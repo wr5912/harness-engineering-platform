@@ -1,0 +1,6 @@
+{
+  "name": "@ai-agent-harness/dsh-runtime-compat",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module"
+}

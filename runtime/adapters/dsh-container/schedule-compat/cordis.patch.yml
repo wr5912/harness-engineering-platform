@@ -1,0 +1,5 @@
+# rc.2 的 web-app 已装载 schedule 与 ui-schedule，不能重复插入。
+# 仅为所选业务 Preset 的根 Agent 补齐拆出的原生插件。
+- insert:
+    - id: schedule-root-scope
+      name: /opt/dsh-adapter/schedule-compat/root-scope.ts

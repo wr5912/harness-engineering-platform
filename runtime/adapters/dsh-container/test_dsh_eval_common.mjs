@@ -43,6 +43,40 @@ assert.throws(
   /evidence-cross-turn/,
 )
 
+const rc2Failure = JSON.parse(await readFile(new URL('./fixtures/rc2-prompt-render-failure.json', import.meta.url), 'utf8'))
+const failedBeforeSurface = turnsFromTrace(archive(rc2Failure.events), [rc2Failure.input])
+assert.equal(failedBeforeSurface[0].turn_reason, 'error', '真实 rc.2 前置错误不应被误判为仍在等待模型')
+assert.equal(failedBeforeSurface[0].assistant_text, '')
+assert.equal(failedBeforeSurface[0].route, null, '未发起模型请求时不虚构实际模型')
+assert.equal(failedBeforeSurface[0].input_message_id, 'fixture-user-message')
+assert.throws(() => turnsFromTrace(archive(rc2Failure.events), ['不是本次输入']), /evidence-cross-turn/)
+assert.equal(turnsFromTrace(archive(rc2Failure.events.slice(0, 1)), [rc2Failure.input]), null, '只排队尚未消费不算完成')
+
+const claimed = rc2Failure.events.slice(0, 3)
+const committedRc2 = archive([
+  ...claimed, user('fixture-user-message', rc2Failure.input), header([]), assistant('已就绪。'), end(1),
+])
+assert.equal(turnsFromTrace(committedRc2, [rc2Failure.input]).length, 1, '已投影输入不能和 inbox claim 重复计数')
+const canceledRc2 = archive([
+  claimed[0],
+  { ...claimed[2], data: { ...claimed[2].data, outcome: 'canceled' } },
+  claimed[1],
+  rc2Failure.events.at(-1),
+])
+assert.equal(turnsFromTrace(canceledRc2, [rc2Failure.input]), null, '取消队列输入不能冒充回合消费')
+const errorThenSuccess = turnsFromTrace(archive([
+  ...rc2Failure.events,
+  user('u2', '再次检查。'), header([]), assistant('已就绪。'), end(2),
+]), [rc2Failure.input, '再次检查。'])
+assert.deepEqual(errorThenSuccess.map(turn => turn.turn_reason), ['error', 'completed'])
+const successThenError = turnsFromTrace(archive([
+  user('u1', '先检查。'), header([{ name: 'first_tool' }]), assistant('首次完成。'), end(1),
+  ...rc2Failure.events.map(event => ({ ...event, data: { ...event.data, ...(event.data.turn === 1 ? { turn: 2 } : {}) } })),
+]), ['先检查。', rc2Failure.input])
+assert.equal(successThenError[1].turn_reason, 'error')
+assert.equal(successThenError[1].route, null, '前置失败不得继承上一轮实际模型')
+assert.equal(successThenError[1].tool_names, null, '前置失败不得继承上一轮可用工具')
+
 const targetArchive = archive([
   user('u1', '执行一次常规巡检。'), header([{ name: 'inspection.run' }]),
   { type: 'tool/call', data: { name: 'inspection.run' } },
@@ -113,4 +147,4 @@ try {
   assert.equal(await readFile(join(evidenceDirectory, 'trace.jsonl'), 'utf8'), '')
 } finally { await rm(evidenceDirectory, { recursive: true, force: true }) }
 
-console.log(JSON.stringify({ status: 'dsh-eval-common-tests-passed', cases: 9 }))
+console.log(JSON.stringify({ status: 'dsh-eval-common-tests-passed', cases: 16 }))

@@ -39,9 +39,10 @@ RUN --mount=type=cache,id=dsh-pnpm-store,target=/root/.local/share/pnpm/store,sh
     && corepack enable \
     && COREPACK_NPM_REGISTRY="$DSH_NPM_REGISTRY" corepack prepare "$DSH_PACKAGE_MANAGER" --activate \
     && printf 'registry=%s\n' "$DSH_NPM_REGISTRY" > .npmrc \
-    && test "$(pnpm config get registry)" = "$DSH_NPM_REGISTRY" \
+    && test "$(pnpm config get registry | sed 's:/$::')" = "${DSH_NPM_REGISTRY%/}" \
     && pnpm install --frozen-lockfile \
-    && DSH_CLIENT_COMMIT_HASH="$DSH_CLIENT_COMMIT_HASH" pnpm run build \
+    # 官方聚合构建默认并发多个高内存 gate；共享开发主机按原生开关串行构建。
+    && DSH_GATE_CONCURRENCY=1 DSH_CLIENT_COMMIT_HASH="$DSH_CLIENT_COMMIT_HASH" pnpm run build \
     && test -s apps/cli/lib/bin.js \
     && rm -rf /opt/dsh/.git /opt/dsh/.npmrc
 

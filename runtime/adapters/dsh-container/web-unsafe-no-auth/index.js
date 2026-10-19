@@ -9,6 +9,8 @@ export function apply(ctx) {
     table.push({ kind: 'global', name: '__DSH_TRANSPORT__', value: { ownsHost: true } })
   })
   const replacements = {
+    // rc.2 的 RPC、Fetch 和 WebSocket 从 admit 取得 Peer；沿用本实例既有免认证访问。
+    admit: () => ({ peer: connection.browserPeer }),
     requestRejection: () => undefined,
     authorizeIndex: () => true,
     authenticatedUrl: (baseUrl) => {

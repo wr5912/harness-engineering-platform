@@ -46,7 +46,7 @@ CONTAINER_EVAL_INPUT = "/work/eval-input"
 IMAGE_FINGERPRINT_VERSION = "1"
 IMAGE_LABEL_KEY = "org.ai-agent-harness.dsh.image-build-fingerprint"
 # source_contract.py 只在宿主读取来源，不进入镜像；路径/目录调整不能改变 Runtime 镜像身份。
-IMAGE_BUILD_FILES = ("Dockerfile", "apt-mirror.sh", "build-image.sh", "dsh-cli.sh", "remote-host-settings.patch")
+IMAGE_BUILD_FILES = ("Dockerfile", "apt-mirror.sh", "build-image.sh", "dsh-cli.sh")
 
 
 def image_build_input_digests(*, lock_path: Path = LOCK, adapter: Path = ADAPTER) -> dict[str, str]:
