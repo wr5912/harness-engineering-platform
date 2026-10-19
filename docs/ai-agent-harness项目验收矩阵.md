@@ -1,6 +1,6 @@
 # Harness 工程平台项目验收矩阵
 
-更新日期：2026-10-17
+更新日期：2026-10-19
 
 本文是 **Harness 工程平台项目与工具链**验证路径、当前证据和缺口的唯一维护位置。它直接回答三个问题：总共有多少条路径、每条做到什么程度、哪些检查应该进入自动化测试。
 
@@ -92,7 +92,15 @@
 
 同日按用户要求将平台现有 `security-operations-expert-eval` 接入 Mock：优先在实例 MCP 插件保存连接与业务分组，仅对不读取插件配置的固定后端补充运行环境；同名、同端口、同 HOME 和标准镜像重建，Harness 资产不改动。真实 Session 完成巡检、故障查询、策略及应急确认；SOC 和报告后端另做原客户端可达检查，未在该实例重新执行完整研判。旧 `security-operations-expert-mock` 的容器和登记已删除，HOME 保留。最终分组、浏览器、后端和删除证据仍集中在上述 Mock 接入说明，平台重建需重新注入环境的边界亦在那里维护。
 
-2026-10-19 的 [DSH rc.2 升级验收](../platform/plugin/test/evidence/dsh-rc2-upgrade-20261019/README.md)补充 `PA-05/06/08/12`：两管理平台与四业务容器实际使用 `0.2.1-rc.2`，保留原端口、HOME、来源及访问方式；用于小模型适配的另一组程序、数据 Git worktree 保持原目录与 HOME，其实验部署不属于当前平台架构图的范围。六实例真实模型轮次、六页管理界面、业务桌面/390px/设置/刷新/双向 WebSocket、旧含内容会话导出通过；两个基础 Mock 巡检完成报告与 CSV 下载，SOC 只读 MCP 查询通过。隔离 HOME 探针验证原生 Schedule 恢复、三角色装载与工具边界、真实前台委派及取消、旧 Session 字节保留；官方 9 个构建 gate、平台 521 项和适配器 186 项等检查通过。首轮失败、私有备份、数据仓库无本轮资产变更及限制见记录。统一业务网关、共享 Runtime 用户隔离与 MCP 风险联动仅纳入未来设计；语音仅检查入口与只读配置路由，不提升全项目路径、Harness 效果或 Release 状态。
+2026-10-19 的 [DSH rc.2 升级验收](../platform/plugin/test/evidence/dsh-rc2-upgrade-20261019/README.md)补充 `PA-05/06/08/12`：验收时两管理平台与四业务容器实际使用 `0.2.1-rc.2`，保留原端口、HOME、来源及访问方式。六实例真实模型轮次、六页管理界面、业务桌面/390px/设置/刷新/双向 WebSocket、旧含内容会话导出通过；两个基础 Mock 巡检完成报告与 CSV 下载，SOC 只读 MCP 查询通过。隔离 HOME 探针验证原生 Schedule 恢复、三角色装载与工具边界、真实前台委派及取消、旧 Session 字节保留；官方 9 个构建 gate、平台 521 项和适配器 186 项等检查通过。首轮失败、私有备份、数据仓库无本轮资产变更及限制见记录。小模型试验部署的后续处置见下方“任务工作副本清理”，原六实例验收事实保留。统一业务网关、共享 Runtime 用户隔离与 MCP 风险联动仅纳入未来设计；语音仅检查入口与只读配置路由，不提升全项目路径、Harness 效果或 Release 状态。
+
+### 任务工作副本清理
+
+2026-10-19 按用户要求退役六个任务工作副本：`hep-task-delivery-data`、`hep-management-assets`、`hep-data-management-assets`、`harness-data-decision-samples-20261016`、`hep-small-model-platform`、`hep-small-model-data`。已停止 3124 管理平台进程，移除 3125 的 `hep-small-model-inspection`、配套 `home-init` 容器及两份专属 fallback 卷；3121 核对时无进程。六目录已移除，五份 Git worktree 登记已清理，分支保留。
+
+清理前的六份目录快照、未提交资产与运行状态，以及程序、数据仓库全部 refs 的 Git bundle 保存在私有备份 `/home/admin/harness-engineering-platform-backups/worktree-cleanup-20261019-154951/`。快照逐文件比较和 Git bundle 校验通过。历史 Run 与原始验收 JSON 保留其身份，旧路径、端口、PID 和六实例验收数量仅表示当时快照；本次清理不重新证明业务效果或 Research Release 可复现。
+
+清理后六目录及关联进程、容器、专属卷和启动引用均未发现残留，3121、3124、3125 无监听。主平台 3090 与业务实例 3081、3089、3114 的 PID、容器名称、HTTP 200 和页面标题与清理前一致，未重启保留实例；主数据仓库原有 232 个变更文件的内容与权限模式保持不变。本轮仅核对运行状态与页面响应，未新增模型业务请求。
 
 ### PA-01 项目定位、AI 协作入口与项目 Memory
 
@@ -112,7 +120,7 @@
 
 ### PA-03 仓库结构、项目技能与研究资产合同
 
-- **管理业务资产分工（2026-10-16）**：[装载与研究工具验收](../platform/plugin/test/evidence/management-assets-20261016/README.md)核对数据根业务规则与 12 项 Skill、程序研发技能和研究工具的分工；真实助手请求装载数据资产，缺失 Skill 时历史仍可读、新任务明确受阻。隔离环境证据不替代正式服务切换验证。
+- **管理业务资产分工（2026-10-16）**：[装载与研究工具验收](../platform/plugin/test/evidence/management-assets-20261016/README.md)核对数据根业务规则与 12 项 Skill、程序研发技能和研究工具的分工；真实助手请求装载数据资产，缺失 Skill 时历史仍可读、新任务明确受阻。隔离环境证据不替代正式服务切换验证；工作副本后续处置见[任务工作副本清理](#任务工作副本清理)。
 - **要回答**：研究资产是否放在正确位置，是否避免重复 Baseline/current 和定义投影，Experiment、Run 和 Research Release 是否具备最小可复现内容。
 - **操作链**：由 `harness-guided-workflow` 判断创建、迁移、修改或优化任务并路由现有技能 → 只读检查外部资产 → 核对每个 Agent 只有一个 `evaluation.md` 当前业务测试源，Case 以场景归组，除名称、用户输入和预期外仅允许可选的 `fast` 标记 → 运行仓库校验 → 运行 Experiment 校验 → 用负向样例验证重复 `definition.md`、技术 Case、额外字段、未知选择、非法身份、空资产和危险链接会被拒绝。
 - **当前证据**：程序研发技能与数据工作区业务技能分别检查；`runtime/research/` 中的 `inspect_source.py`、`validate_repository.py`、`validate_experiment.py` 及其测试覆盖当前确定性合同，评测合同测试覆盖场景与 `fast` 解析。2026-10-13 新增平台开发技能并登记为必需技能，两个工作流入口通过技能格式校验，仓库校验和 `RepositoryValidatorTests` 的 14 项测试通过；临时反例确认缺失新技能、缺失其元数据及调用策略类型错误均被拒绝，33 个入口与技能本地链接及相关锚点通过检查。经验与术语入口已列入仓库必需文件；6 个更新技能通过格式校验，当前仓库校验与 14 项仓库合同测试通过。两处业务 UI 的显示名称已同步源码和生成物，类型检查、构建及现有交互测试通过；未验证新实例装载。本次 390 个本地链接无新增错误，12 张术语修订图片已核对名称、布局和尺寸。这些检查不证明 AI 工具已实际选择新技能。
@@ -127,6 +135,7 @@
 
 ### PA-05 `dsh-dev` 实例完整生命周期
 
+- **任务试验实例退役（2026-10-19）**：关联隔离实例、容器与运行状态的处置见[任务工作副本清理](#任务工作副本清理)。
 - **要回答**：本地实例能否从参数预览到停止完整运行，失败时是否如实报告。
 - **操作链**：`up --dry-run` → `up` → `ps` → `url` → `logs` → `up --replace` → `down` → `delete`（保留 HOME）；同时检查缺参数时的可用值列表、自动实例名与端口、端口竞态、缺少环境变量、单一 stdout JSON 和停止失败。
 - **当前证据**：单元测试覆盖当前 eval-only CLI 合同、新建 Experiment 时只引用全仓 DSH 锁而不生成 Candidate 锁，以及旧实例的只读运维兼容；既有实机证据见 [`dsh-dev-identity-and-lifecycle-20260919.json`](https://github.com/wr5912/harness-engineering-platform-data/blob/9afc8fd0047367deb9df5b51595f101835359044/evolution/experiments/EXP-security-operations-expert-001/evaluation/evidence/dsh-dev-identity-and-lifecycle-20260919.json)、[`dsh-review-followup-20260920.json`](https://github.com/wr5912/harness-engineering-platform-data/blob/9afc8fd0047367deb9df5b51595f101835359044/evolution/experiments/EXP-security-operations-expert-001/evaluation/evidence/dsh-review-followup-20260920.json) 和 [`dsh-plugin-restart-20260922.json`](https://github.com/wr5912/harness-engineering-platform-data/blob/9afc8fd0047367deb9df5b51595f101835359044/evolution/experiments/EXP-test01-002/runs/run-a4abf894-4750-4113-8497-7fc08a3a36b5/evidence/T-AUTHORING-PLUGIN-PERSISTENCE/dsh-plugin-restart-20260922.json)，但这些实机记录早于本次模式收敛。
@@ -205,6 +214,7 @@
 
 ### PA-12 全局 DSH 平台启动、认证与研究工具
 
+- **任务试验平台退役（2026-10-19）**：隔离平台与工作副本的处置见[任务工作副本清理](#任务工作副本清理)，已合入的工具与弱推理适配功能继续由主程序和数据仓库维护。
 - **管理助手工具合同与弱推理验收（2026-10-17）**：[原始错误流验证](../platform/plugin/test/evidence/extraction-json-20261017/README.md)之后，模型侧改为逐操作参数合同和单题抽样传输，固定目标内特性与样本预览自动保存回读；两次原生 JSON 恢复有界且不重放工具。[实机验收与截图](../platform/plugin/test/evidence/assistant-flash-off-20261017/README.md)分别记录隔离 Flash/off、正式页面按钮及候选语义复核。只读巡检完成固定三 Case、独立实例与五设备报告下载，预算和重启恢复另测；生成与编译不代替装载或等效，候选保存不代替人员复核或训练质量。此项关联 `PA-03/04/08`；本地小参数模型不可达，Mock 通过不提升真实上游验收结论。
 
 - **独立变体名称与名称搜索（2026-10-16）**：变体名称使用独立的 `change.yaml.variant_name`，列表、详情及版本选择器读取同一名称，缺失显示“未命名变体”；现有搜索支持名称及子串，策略和研究问题保留原用途。实际通过 UI 将隔离数据中的 024 命名为“资产关联告警查询（LangGraph）”并保留，[首次浏览器记录](../platform/plugin/test/evidence/variant-name-20261016/attempt01-acceptance.json)发现版本选项未读取精简 DTO 之外的名称，修复后[命名验收](../platform/plugin/test/evidence/variant-name-20261016/acceptance.json)9/9 通过，覆盖详情/list 回读、名称搜索、刷新、改名控件、创建名称必填及已有比较恢复，页面错误与失败请求均为零。[元数据保护核对](../platform/plugin/test/evidence/variant-name-20261016/metadata-preservation.json)确认仅名称字段改变，研究问题、策略及 Candidate、Run、Decision、比较回执共 2130 个文件或链接的摘要不变；没有新增 Experiment、Run 或模型调用，也未改正式数据与既有归档。名称实现全量回归 428/428 通过，随后修复版本选择器和列表迟到响应再次构建并通过相关测试 30/30。[桌面](../platform/plugin/test/evidence/variant-name-20261016/name-1440.png)、[390px 列表](../platform/plugin/test/evidence/variant-name-20261016/name-390.png)与[390px 详情](../platform/plugin/test/evidence/variant-name-20261016/name-390-detail.png)保留实际名称布局；原阶段 13 项浏览器证据继续保留。当前 [3115 验收入口](http://10.0.160.32:3115/hep/#/agents?agent_id=security-operations-expert&experiment_id=EXP-security-operations-expert-024-r290c02339cb3&tab=overview&list_view=variants)进程为 `3778448`，日志为 `/tmp/hep-variant-name-20261016/platform-final.log`，停止命令为 `kill -TERM 3778448`；[装载来源与 11 个文件摘要](/tmp/hep-variant-name-20261016/environment.json)一致，正式 3090 仍为原进程。存储与页面合同分别见 [03](platform-design/03_存储架构与数据契约.md#当前代码变体与固定外部输入)和 [06](platform-design/06_界面与前后端渐进建设.md#35-当前第一阶段页面)。
