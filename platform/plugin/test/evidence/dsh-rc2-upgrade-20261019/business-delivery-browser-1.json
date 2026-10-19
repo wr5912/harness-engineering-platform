@@ -1,0 +1,37 @@
+{
+  "at": "2026-10-19T06:28:47.602Z",
+  "key": "delivery",
+  "port": "3114",
+  "errors": [],
+  "failed_requests": [],
+  "websockets": [
+    {
+      "path": "/assistant/api/remote.mux",
+      "received": 8,
+      "sent": 6,
+      "closed": false
+    },
+    {
+      "path": "/assistant/api/remote.mux",
+      "received": 6,
+      "sent": 6,
+      "closed": false
+    }
+  ],
+  "title": "DSH 本地构建",
+  "body_visible": true,
+  "transport": {
+    "ownsHost": true
+  },
+  "voice_control_count": 0,
+  "settings_open": true,
+  "settings_sections": 0,
+  "settings_has_models": true,
+  "mobile": {
+    "width": 390,
+    "scroll": 390
+  },
+  "reloaded": true,
+  "native_websocket": true,
+  "ok": true
+}

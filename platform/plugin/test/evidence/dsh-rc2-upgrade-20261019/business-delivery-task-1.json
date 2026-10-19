@@ -1,0 +1,150 @@
+{
+  "at": "2026-10-19T06:29:16.788Z",
+  "name": "hep-inspection-delivery",
+  "port": 3114,
+  "phase": "task",
+  "preset": "inspection-delivery-demo",
+  "checks": {
+    "settings_read": true,
+    "old_session_export": true,
+    "model_completed": true
+  },
+  "errors": [],
+  "preset_available": true,
+  "settings_namespaces": [
+    "session-log-deepseek",
+    "agent-default-model",
+    "llm-pi-ai",
+    "bash-sandbox",
+    "permission",
+    "subagent",
+    "web",
+    "web-search-deepseek",
+    "web-deepseek-api",
+    "agent-loop",
+    "llm-deepseek",
+    "llm-deepseek-account",
+    "subagent-model-selection-settings",
+    "ui-settings-account",
+    "ui-theme",
+    "locale",
+    "ui-settings",
+    "ui-settings-general",
+    "ui-conversation",
+    "ui-chat",
+    "agent-preset-registry"
+  ],
+  "sessions_before": 3,
+  "old_sessions": [
+    {
+      "session_id": "session-0c5ec21d-1a8e-4528-b51e-b13fc8bb19f3",
+      "export_bytes": 431,
+      "export_sha256": "6d8b1e8573bbefe800fd28609d5effb9ebf850107b377808f570038ce3464468",
+      "event_count": 5
+    }
+  ],
+  "session_id": "session-2677c235-ea76-4645-9c0f-7803c15728a0",
+  "workspace_id": "8bc00658-274d-4c54-811f-9570c4e526ad",
+  "input_sha256": "e8b837fc3a6bba9526d35423dd7c5a4275550a8abdcb2aa6e67847de12d2532b",
+  "turns": [
+    {
+      "reason": "completed",
+      "provider": "deepseek-official",
+      "model": "deepseek-flash",
+      "reasoningEffort": "off",
+      "tool_names": [
+        "task_inspection"
+      ],
+      "answer_sha256": "cb010d9c9bb34099848c4bca3db668e4cd1442665a3645ec9854fcf0bcbf747b",
+      "answer_mentions_mock": true,
+      "answer_mentions_ready": false,
+      "answer_mentions_preset": false
+    }
+  ],
+  "tool_calls": [
+    {
+      "name": "task_inspection",
+      "call_id": "call_00_993zv3SIp4QIGhgOoP8z2114"
+    },
+    {
+      "name": "task_inspection",
+      "call_id": "call_00_9URYThGS6Z2K7faYGvn13714"
+    },
+    {
+      "name": "task_inspection",
+      "call_id": "call_00_7bu5Mkz6AsmPxQSWtlqU5113"
+    },
+    {
+      "name": "task_inspection",
+      "call_id": "call_00_PJW8sYTObS5g0pREhDMD8761"
+    },
+    {
+      "name": "task_inspection",
+      "call_id": "call_00_9zCMwPcIW9TqQJfzuLx66963"
+    }
+  ],
+  "tool_result_shapes": [
+    {
+      "keys": [
+        "turn",
+        "step",
+        "message"
+      ]
+    },
+    {
+      "keys": [
+        "turn",
+        "step",
+        "message"
+      ]
+    },
+    {
+      "keys": [
+        "turn",
+        "step",
+        "message"
+      ]
+    },
+    {
+      "keys": [
+        "turn",
+        "step",
+        "message"
+      ]
+    },
+    {
+      "keys": [
+        "turn",
+        "step",
+        "message"
+      ]
+    }
+  ],
+  "archive": {
+    "bytes": 12376,
+    "sha256": "a60af56c22ee6fd1121150e7bdd5110377539d568882020be184e39213764eaf",
+    "event_count": 52
+  },
+  "actual_session_preset": "inspection-delivery-demo",
+  "actual_session_cwd": "/work/harness/workspace",
+  "artifacts": [
+    {
+      "file": "report.md",
+      "http_status": 200,
+      "bytes": 702,
+      "sha256": "6a97472e4b50ecad34a441a6f23a62cb6fb95aff7f4783903908e4ce40de738b",
+      "fixed_device_count": 5,
+      "mock_scope": true,
+      "hash_matches_receipt": true
+    },
+    {
+      "file": "devices.csv",
+      "http_status": 200,
+      "bytes": 365,
+      "sha256": "f9e32ff5b4bf103b53fc42b5f877d081dbd0e313faccc775bf1e4aaf70b27575",
+      "fixed_device_count": 5,
+      "csv_lines": 6
+    }
+  ],
+  "ok": true
+}

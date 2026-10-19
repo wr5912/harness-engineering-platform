@@ -1,0 +1,17 @@
+{
+  "at": "2026-10-19T06:30:39.212Z",
+  "name": "hep-small-model-inspection",
+  "old_sessions": [
+    {
+      "session_id": "session-1b08d945-1d6f-4f83-9a54-cd3bcc602756",
+      "http_status": 200,
+      "bytes": 11397,
+      "sha256": "4fe8efefd367d073bda496cb8455a2d1707df6cdcd3e7ee2fb0ea7671818b553",
+      "event_count": 52,
+      "user_messages": 3,
+      "assistant_messages": 6,
+      "tool_calls": 5
+    }
+  ],
+  "ok": true
+}

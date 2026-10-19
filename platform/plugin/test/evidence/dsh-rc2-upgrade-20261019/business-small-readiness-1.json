@@ -1,0 +1,81 @@
+{
+  "at": "2026-10-19T06:29:57.370Z",
+  "name": "hep-small-model-inspection",
+  "port": 3125,
+  "phase": "readiness",
+  "preset": "daily-inspection-assistant",
+  "checks": {
+    "settings_read": true,
+    "old_session_export": true,
+    "model_completed": true
+  },
+  "errors": [],
+  "preset_available": true,
+  "settings_namespaces": [
+    "session-log-deepseek",
+    "agent-default-model",
+    "llm-pi-ai",
+    "bash-sandbox",
+    "permission",
+    "subagent",
+    "web",
+    "web-search-deepseek",
+    "web-deepseek-api",
+    "agent-loop",
+    "llm-deepseek",
+    "llm-deepseek-account",
+    "subagent-model-selection-settings",
+    "ui-settings-account",
+    "ui-theme",
+    "locale",
+    "ui-settings",
+    "ui-settings-general",
+    "ui-conversation",
+    "ui-chat",
+    "agent-preset-registry"
+  ],
+  "sessions_before": 1,
+  "old_sessions": [
+    {
+      "session_id": "session-1b08d945-1d6f-4f83-9a54-cd3bcc602756",
+      "export_bytes": 11397,
+      "export_sha256": "f27b18378c476c2c2a9dbf6cf990ab932fecd7f16484a0aa3404ea9695041983",
+      "event_count": 52
+    }
+  ],
+  "session_id": "session-3800e0b8-b9f9-4184-90d3-d7d0a436d757",
+  "workspace_id": "35073033-eadb-49c1-a2ca-199177e5825e",
+  "input_sha256": "21b2e84b7076e77f73eba4e2d0dc5ed78b89c84c78c1afe27c1436bb8ab79bfa",
+  "turns": [
+    {
+      "reason": "completed",
+      "provider": "deepseek-official",
+      "model": "deepseek-flash",
+      "reasoningEffort": "off",
+      "tool_names": [
+        "edit",
+        "glob",
+        "grep",
+        "read",
+        "read_image",
+        "task_inspection",
+        "working_directory",
+        "write"
+      ],
+      "answer_sha256": "135f9fe2a2820c59fb32fefc4723572560d67005b75ed4ec3c2cc8c61fedfa06",
+      "answer_mentions_mock": false,
+      "answer_mentions_ready": true,
+      "answer_mentions_preset": true
+    }
+  ],
+  "tool_calls": [],
+  "tool_result_shapes": [],
+  "archive": {
+    "bytes": 7070,
+    "sha256": "a7d22d5fde95df8a4b64509c64d10e2875ee118c6e64d243627aaa9dee5f1b41",
+    "event_count": 19
+  },
+  "actual_session_preset": "daily-inspection-assistant",
+  "actual_session_cwd": "/work/harness/workspace",
+  "ok": true
+}

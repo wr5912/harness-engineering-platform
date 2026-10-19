@@ -1,0 +1,28 @@
+{
+  "at": "2026-10-19T06:01:33.243Z",
+  "port": 3090,
+  "operation": "published-readonly-composition",
+  "mutated_configuration": false,
+  "composition_id": "security-asset-related-alerts-readonly",
+  "version_id": "fd2c27b47da1e6e5a717fc68dec5fbf0ec39e6aab9bf5861878b38066c480554",
+  "tool_name": "query_asset_related_alerts",
+  "covered": true,
+  "query_ok": true,
+  "operations": [
+    {
+      "operation_id": "get_soc_asset_by_asset_id",
+      "method": "GET"
+    },
+    {
+      "operation_id": "list_detect_alert",
+      "method": "GET"
+    }
+  ],
+  "actual_version": {
+    "program_commit": "157d07f28e85ed118424386b0a18a032c642e15c",
+    "data_commit": "06ebaef9789e36a7a322a81b30eb503f6da63052",
+    "implementation_digest": "fa95ccd385981efdd5432acf81af35502b8f2e116ab5943328e939e549f69977"
+  },
+  "result_sha256": "e372276982a77c1294c01240d4956a21e05ea11c6973ae6e0793ff6a64ce85b4",
+  "ok": true
+}

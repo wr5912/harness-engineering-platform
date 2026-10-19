@@ -1,0 +1,135 @@
+{
+  "at_utc": "2026-10-19T06:34:36.234783+00:00",
+  "scope": "本机六实例的版本、来源和存活快照；业务验收见独立摘要；不证明未来用户隔离或统一网关已实现。",
+  "platforms": [
+    {
+      "pid": 1107957,
+      "port": 3090,
+      "bind": "10.0.160.32",
+      "url": "http://10.0.160.32:3090/hep/",
+      "program_root": "/home/admin/work/ai-agent-harness",
+      "asset_root": "/home/admin/harness-engineering-platform-data",
+      "program_commit": "651824c260ecb13f3848a2c938c5db89395e3b56",
+      "runtime": "0.2.1-rc.2",
+      "runtime_entry": "/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/lib/bin.js",
+      "artifacts": {
+        "platform/plugin/lib/index.js": "7f8677efa1569a379bc9be1dd90e752a901c132f54c3a53c89d2ba0cb0d44ebf",
+        "platform/plugin/lib/client.js": "447bd4e0c3005dada66d3bb9903a7d29feb21ed21b6a070384b523fb9568a24f"
+      }
+    },
+    {
+      "pid": 1111965,
+      "port": 3124,
+      "bind": "127.0.0.1",
+      "url": "http://127.0.0.1:3124/hep/",
+      "program_root": "/home/admin/work/hep-small-model-platform",
+      "asset_root": "/home/admin/work/hep-small-model-data",
+      "program_commit": "960707b3da60e79b286361d249fd5d33f098a598",
+      "runtime": "0.2.1-rc.2",
+      "runtime_entry": "/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/lib/bin.js",
+      "artifacts": {
+        "platform/plugin/lib/index.js": "7f8677efa1569a379bc9be1dd90e752a901c132f54c3a53c89d2ba0cb0d44ebf",
+        "platform/plugin/lib/client.js": "447bd4e0c3005dada66d3bb9903a7d29feb21ed21b6a070384b523fb9568a24f"
+      }
+    }
+  ],
+  "business_containers": [
+    {
+      "name": "security-operations-expert-eval",
+      "port": 3081,
+      "source": "experiment:EXP-security-operations-expert-019-rc442472a242a",
+      "program_root": "/home/admin/work/ai-agent-harness",
+      "asset_root": "/home/admin/harness-engineering-platform-data",
+      "old_image": "sha256:060d338f4d4cfe18097d7c0ae72a4fb22d82c3fe8da11829bba0121686c458f8",
+      "image": "sha256:1c777fe4929a41275ba5bcd899877aaa156f8f166975254840f52b26703eca90",
+      "runtime": "0.2.1-rc.2",
+      "running": true,
+      "network": "host",
+      "restart_count": 0,
+      "home_preserved": "/home/admin/harness-engineering-platform-data/.local/instances/security-operations-expert-eval/dsh-home",
+      "harness_mounts": [
+        {
+          "destination": "/work/harness/workspace/.env",
+          "read_only": true
+        },
+        {
+          "destination": "/work/harness/workspace",
+          "read_only": true
+        }
+      ]
+    },
+    {
+      "name": "test01-002-64212",
+      "port": 3089,
+      "source": "experiment:EXP-test01-002",
+      "program_root": "/home/admin/work/ai-agent-harness-copy1",
+      "asset_root": "/home/admin/harness-engineering-platform-data",
+      "old_image": "sha256:060d338f4d4cfe18097d7c0ae72a4fb22d82c3fe8da11829bba0121686c458f8",
+      "image": "sha256:1c777fe4929a41275ba5bcd899877aaa156f8f166975254840f52b26703eca90",
+      "runtime": "0.2.1-rc.2",
+      "running": true,
+      "network": "host",
+      "restart_count": 0,
+      "home_preserved": "/home/admin/harness-engineering-platform-data/.local/instances/test01-002-64212/dsh-home",
+      "harness_mounts": [
+        {
+          "destination": "/work/harness/workspace",
+          "read_only": true
+        },
+        {
+          "destination": "/work/harness/workspace/.env",
+          "read_only": true
+        }
+      ]
+    },
+    {
+      "name": "hep-inspection-delivery",
+      "port": 3114,
+      "source": "experiment:EXP-inspection-delivery-demo-001-rf841e4415364",
+      "program_root": "/home/admin/work/ai-agent-harness",
+      "asset_root": "/home/admin/harness-engineering-platform-data",
+      "old_image": "sha256:060d338f4d4cfe18097d7c0ae72a4fb22d82c3fe8da11829bba0121686c458f8",
+      "image": "sha256:1c777fe4929a41275ba5bcd899877aaa156f8f166975254840f52b26703eca90",
+      "runtime": "0.2.1-rc.2",
+      "running": true,
+      "network": "host",
+      "restart_count": 0,
+      "home_preserved": "/home/admin/harness-engineering-platform-data/.local/instances/hep-inspection-delivery/dsh-home",
+      "harness_mounts": [
+        {
+          "destination": "/work/harness/workspace/.env",
+          "read_only": true
+        },
+        {
+          "destination": "/work/harness/workspace",
+          "read_only": true
+        }
+      ]
+    },
+    {
+      "name": "hep-small-model-inspection",
+      "port": 3125,
+      "source": "experiment:EXP-daily-inspection-assistant-006-r2843ec359b07",
+      "program_root": "/home/admin/work/hep-small-model-platform",
+      "asset_root": "/home/admin/work/hep-small-model-data",
+      "old_image": "sha256:060d338f4d4cfe18097d7c0ae72a4fb22d82c3fe8da11829bba0121686c458f8",
+      "image": "sha256:1c777fe4929a41275ba5bcd899877aaa156f8f166975254840f52b26703eca90",
+      "runtime": "0.2.1-rc.2",
+      "running": true,
+      "network": "host",
+      "restart_count": 0,
+      "home_preserved": "/home/admin/work/hep-small-model-data/.local/instances/hep-small-model-inspection/dsh-home",
+      "harness_mounts": [
+        {
+          "destination": "/work/harness/workspace",
+          "read_only": true
+        },
+        {
+          "destination": "/work/harness/workspace/.env",
+          "read_only": true
+        }
+      ]
+    }
+  ],
+  "future_features_deployed": false
+}

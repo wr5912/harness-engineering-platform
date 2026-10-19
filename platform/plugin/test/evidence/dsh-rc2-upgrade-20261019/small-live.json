@@ -1,0 +1,19 @@
+{
+  "at": "2026-10-19T05:49:27.890Z",
+  "base": "http://127.0.0.1:3124/hep/",
+  "label": "small-live",
+  "errors": [],
+  "pages": [],
+  "websockets": [
+    {
+      "path": "/hep/api/remote.mux",
+      "received": 4,
+      "sent": 5
+    }
+  ],
+  "anonymous_denied": true,
+  "login_title": "登录 · Harness工程平台",
+  "title": "Harness工程平台",
+  "ok": false,
+  "error": "apiRequestContext.post: read ECONNRESET\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3124/hep/harness-platform/inventory\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/148.0.0.0 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 106\u001b[22m\n\u001b[2m    - cookie: harness_platform_session=[hidden]\n"
+}

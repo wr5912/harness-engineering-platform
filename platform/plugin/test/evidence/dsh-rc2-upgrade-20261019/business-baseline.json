@@ -1,0 +1,155 @@
+[
+  {
+    "name": "security-operations-expert-eval",
+    "port": 3081,
+    "session_count": 17,
+    "old_session_ids": [
+      "session-f44c6fc0-abb0-42ae-aa9f-0d58668e9afa",
+      "session-1d14ccde-be95-4d5b-b7ff-6c67de2967a4",
+      "session-f8c3ad6a-3ef5-4c94-9622-92a5ed4c40dc"
+    ],
+    "presets": [
+      {
+        "id": "standard",
+        "problem_count": 0
+      },
+      {
+        "id": "ptc",
+        "problem_count": 0
+      },
+      {
+        "id": "minimal",
+        "problem_count": 0
+      },
+      {
+        "id": "cordis",
+        "problem_count": 0
+      },
+      {
+        "id": "evaluation-judge",
+        "problem_count": 0
+      },
+      {
+        "id": "scenario-analysis",
+        "problem_count": 0
+      },
+      {
+        "id": "security-operations-expert",
+        "problem_count": 0
+      }
+    ]
+  },
+  {
+    "name": "test01-002-64212",
+    "port": 3089,
+    "session_count": 0,
+    "old_session_ids": [],
+    "presets": [
+      {
+        "id": "standard",
+        "problem_count": 0
+      },
+      {
+        "id": "ptc",
+        "problem_count": 0
+      },
+      {
+        "id": "minimal",
+        "problem_count": 0
+      },
+      {
+        "id": "cordis",
+        "problem_count": 0
+      },
+      {
+        "id": "evaluation-judge",
+        "problem_count": 0
+      },
+      {
+        "id": "scenario-analysis",
+        "problem_count": 0
+      },
+      {
+        "id": "test01",
+        "problem_count": 0
+      }
+    ]
+  },
+  {
+    "name": "hep-inspection-delivery",
+    "port": 3114,
+    "session_count": 2,
+    "old_session_ids": [
+      "session-0c5ec21d-1a8e-4528-b51e-b13fc8bb19f3",
+      "session-f9f3bc6e-54fe-4d0e-8b3a-fe2d0eb97f1e"
+    ],
+    "presets": [
+      {
+        "id": "standard",
+        "problem_count": 0
+      },
+      {
+        "id": "ptc",
+        "problem_count": 0
+      },
+      {
+        "id": "minimal",
+        "problem_count": 0
+      },
+      {
+        "id": "cordis",
+        "problem_count": 0
+      },
+      {
+        "id": "evaluation-judge",
+        "problem_count": 0
+      },
+      {
+        "id": "inspection-delivery-demo",
+        "problem_count": 0
+      },
+      {
+        "id": "scenario-analysis",
+        "problem_count": 0
+      }
+    ]
+  },
+  {
+    "name": "hep-small-model-inspection",
+    "port": 3125,
+    "session_count": 1,
+    "old_session_ids": [
+      "session-1b08d945-1d6f-4f83-9a54-cd3bcc602756"
+    ],
+    "presets": [
+      {
+        "id": "standard",
+        "problem_count": 0
+      },
+      {
+        "id": "ptc",
+        "problem_count": 0
+      },
+      {
+        "id": "minimal",
+        "problem_count": 0
+      },
+      {
+        "id": "cordis",
+        "problem_count": 0
+      },
+      {
+        "id": "daily-inspection-assistant",
+        "problem_count": 0
+      },
+      {
+        "id": "evaluation-judge",
+        "problem_count": 0
+      },
+      {
+        "id": "scenario-analysis",
+        "problem_count": 0
+      }
+    ]
+  }
+]

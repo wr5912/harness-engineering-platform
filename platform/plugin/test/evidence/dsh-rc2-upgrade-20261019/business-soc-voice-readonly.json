@@ -1,0 +1,20 @@
+{
+  "at": "2026-10-19T06:31:40.032Z",
+  "port": 3081,
+  "checks": [
+    {
+      "path": "/assistant/voice-mode/service-config",
+      "method": "GET",
+      "http_status": 200,
+      "content_type": "application/json"
+    },
+    {
+      "path": "/assistant/voice-mode/summary-models",
+      "method": "GET",
+      "http_status": 200,
+      "content_type": "application/json"
+    }
+  ],
+  "actual_audio_test": false,
+  "limitation": "只核对已装载语音UI及只读配置/模型目录路由；未录音、不调用ASR/TTS、不证明真实语音效果。"
+}

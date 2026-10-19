@@ -1,0 +1,175 @@
+{
+  "at": "2026-10-19T06:32:57.331Z",
+  "overall_business_runtime_acceptance": true,
+  "final_results": [
+    {
+      "name": "test01-002-64212",
+      "port": 3089,
+      "readiness": true,
+      "browser": true,
+      "old_session": "none at baseline",
+      "initial_failure": "cwd prompt variable unresolved; fixed with native Runtime bridge and new Session retry"
+    },
+    {
+      "name": "hep-inspection-delivery",
+      "port": 3114,
+      "readiness": true,
+      "browser": true,
+      "old_session": true,
+      "basic_mock_report": true,
+      "report_and_csv_download": true
+    },
+    {
+      "name": "hep-small-model-inspection",
+      "port": 3125,
+      "readiness": true,
+      "browser": true,
+      "old_session": true,
+      "basic_mock_report": true,
+      "report_and_csv_download": true,
+      "workspace": "independent hep-small-model-data"
+    },
+    {
+      "name": "security-operations-expert-eval",
+      "port": 3081,
+      "readiness": true,
+      "browser": true,
+      "old_session": true,
+      "readonly_mcp_query": true,
+      "voice_ui": true,
+      "voice_readonly_routes": true
+    }
+  ],
+  "files": [
+    {
+      "name": "business-baseline.json",
+      "bytes": 2945,
+      "sha256": "95446dfe49d2700d63b3854f7da1b50d92c6358e47b474e6073116e63d48318a"
+    },
+    {
+      "name": "platform-readonly-mcp.json",
+      "bytes": 907,
+      "sha256": "12c2d99c4d3b581c683a3914030c8630600cf9bf2db0e21cff73f1df2d490e9d"
+    },
+    {
+      "name": "mock-service-restored.json",
+      "bytes": 366,
+      "sha256": "c5041c6f2fadf94037bf69e0f503b56690a97fbfb634ea3d7b73a7cdc852c075"
+    },
+    {
+      "name": "business-test-readiness-1.json",
+      "bytes": 681,
+      "sha256": "e19db347f1b44236d18ff035e9149e74a9bf5dd9cfcb86a75561e7db713747d4"
+    },
+    {
+      "name": "business-test-readiness-2.json",
+      "bytes": 1871,
+      "sha256": "9a2ab0be7f212904c7f7c9cc35fa7bab7cbc4ad52e527b2a878ab3cffa2f2b13"
+    },
+    {
+      "name": "business-test-browser-3.json",
+      "bytes": 694,
+      "sha256": "4b174eb235caaf6ae8f25c890ff02a0c7c62a52df9de800f4f2cbf4a45610ff6"
+    },
+    {
+      "name": "business-delivery-readiness-1.json",
+      "bytes": 2145,
+      "sha256": "a013dcb3f7e05cb6cc9fed1d09a2164f50017190e4fd6d14c43bcf5676dbebe7"
+    },
+    {
+      "name": "business-delivery-task-1.json",
+      "bytes": 3446,
+      "sha256": "e23f90db031e57e27ab51a3fd634e7fe7f84842adce669e73bf944b783c7349c"
+    },
+    {
+      "name": "business-delivery-browser-1.json",
+      "bytes": 698,
+      "sha256": "176180d469367a234d6004e969eb3be0e24d864d98d211ba1842f35d0391a4c3"
+    },
+    {
+      "name": "old-hep-inspection-delivery.json",
+      "bytes": 745,
+      "sha256": "f36919df2cd5e76e2c5c44cddd285cb040b332a61699c0e80637292e285c320e"
+    },
+    {
+      "name": "business-small-readiness-1.json",
+      "bytes": 2155,
+      "sha256": "221755926446c77e2d15c79cc7bed08391333f4bf981a0d4b4529735ec98f6a7"
+    },
+    {
+      "name": "business-small-task-1.json",
+      "bytes": 3456,
+      "sha256": "c32b4cc9d404bf4f61b6f308dc6cd526295e680d06f40cf3c87feffb86296b9b"
+    },
+    {
+      "name": "business-small-browser-1.json",
+      "bytes": 696,
+      "sha256": "3d92d68e5c6c3a7efede399e60ce5db6163e784074cb287c56e04ac3b17a41ec"
+    },
+    {
+      "name": "old-hep-small-model-inspection.json",
+      "bytes": 434,
+      "sha256": "38c3cde2f284d7cb84d394abfbfdf07b9448a6651249d89cbeb5ca9a447adbd4"
+    },
+    {
+      "name": "business-soc-readiness-1.json",
+      "bytes": 3269,
+      "sha256": "57ddcecc62f4badbfc1f270933b00d2c5190cdbeaa158f771bc6cdcd791a4807"
+    },
+    {
+      "name": "business-soc-soc-query-1.json",
+      "bytes": 3692,
+      "sha256": "be388cb380b625890d6d3cf25d885829c7bb33c466318f502e2c445c9c64f73b"
+    },
+    {
+      "name": "business-soc-query-result.json",
+      "bytes": 1082,
+      "sha256": "3c436ffc324266ac91844ccd5cca4300b911e8e6f1a8aa66b3f97bd5ca152afb"
+    },
+    {
+      "name": "business-soc-browser-1.json",
+      "bytes": 694,
+      "sha256": "a01a2000efea7ac2e392ec555e04b07630319af46eb8da6878e0cc73dbfaa1ae"
+    },
+    {
+      "name": "business-soc-voice-readonly.json",
+      "bytes": 561,
+      "sha256": "72080a68dd030399a42a3750e94f4ca49be115e1e27c2ad8378a761328d25e6a"
+    },
+    {
+      "name": "old-security-operations-expert-eval.json",
+      "bytes": 1073,
+      "sha256": "4d747aacbd6c56c5a0324640890b880297b8531236ce42541af63676bbbe335e"
+    }
+  ],
+  "private_evidence_root": "/home/admin/.local/state/hep-rc2-upgrade-20261019/private",
+  "limitations": [
+    "验收证明本轮Runtime装载、接口与限定的真实模型任务路径，不构成对智能体质量的完整评测。",
+    "delivery/small任务使用原有基础Mock资产1–5，只读台账生成报告，不检测真实设备。",
+    "SOC只查询已配置可执行巡检列表；未在live新增定时任务或执行处置、策略配置。",
+    "语音仅实际UI激活与只读路由；没有录音、ASR、TTS或真实语音效果验收。",
+    "test01升级前没有历史Session；没有声称已验收其旧Session迁移。",
+    "原始ZIP、截图、报告下载文件仅保留在private；安全摘要不含凭据或业务正文。",
+    "早期浏览器1/2失败为验收器未使用账号菜单aria名称；当前正式browser3通过，原记录未删。"
+  ],
+  "mock_service": {
+    "port": 53001,
+    "pid": 1129116,
+    "log": "/home/admin/.local/state/hep-rc2-upgrade-20261019/private/mock-53001.log",
+    "stop": "kill 1129116",
+    "reused_service_53002_pid": 659459
+  },
+  "parser_change": {
+    "files": [
+      "runtime/adapters/dsh-container/dsh-eval-common.mjs",
+      "runtime/adapters/dsh-container/test_dsh_eval_common.mjs",
+      "runtime/adapters/dsh-container/fixtures/rc2-prompt-render-failure.json"
+    ],
+    "tests": {
+      "common": 16,
+      "review_trace": 11,
+      "delivery": 3
+    },
+    "independent_review": true
+  }
+}

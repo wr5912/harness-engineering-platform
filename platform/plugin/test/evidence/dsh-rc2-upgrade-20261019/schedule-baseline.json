@@ -1,0 +1,257 @@
+{
+  "security-operations-expert-eval": {
+    "decoder": "Node native zstdDecompressSync(info) iterated all concatenated frames; each file consumed exactly",
+    "session_count": 17,
+    "event_count": 712,
+    "schedule_event_count": 0,
+    "active_schedule_count": 0,
+    "sessions": [
+      {
+        "session": "0e205e96-59f3-45a2-aa95-c7fac18a3222",
+        "sha256": "2092593967711b235507a360fce7b3585c4ae5f6f5ccfe58973f2d726ef56a8f",
+        "compressed_bytes": 32679,
+        "decoded_all_bytes": 32679,
+        "frames": 29,
+        "events": 59,
+        "schedule_events": 0,
+        "active_schedule": 0,
+        "error": null
+      },
+      {
+        "session": "session-0b5c4451-406c-4093-9691-e00038138929",
+        "sha256": "7dc9995363a39a5d624108dbce1b4e5cebc6c72752e78bb5806cc7da499397ce",
+        "compressed_bytes": 16985,
+        "decoded_all_bytes": 16985,
+        "frames": 8,
+        "events": 23,
+        "schedule_events": 0,
+        "active_schedule": 0,
+        "error": null
+      },
+      {
+        "session": "session-1d14ccde-be95-4d5b-b7ff-6c67de2967a4",
+        "sha256": "8082428d820818eaf8ff609c59ad3e006bfef6dddba76157290c1dbbedddd80d",
+        "compressed_bytes": 24425,
+        "decoded_all_bytes": 24425,
+        "frames": 17,
+        "events": 35,
+        "schedule_events": 0,
+        "active_schedule": 0,
+        "error": null
+      },
+      {
+        "session": "session-464a7fb5-e457-4f62-919b-c69fd00afa21",
+        "sha256": "53257a681dde9740735278021c17680772f850f76479ca504488a173a8faf979",
+        "compressed_bytes": 29675,
+        "decoded_all_bytes": 29675,
+        "frames": 26,
+        "events": 50,
+        "schedule_events": 0,
+        "active_schedule": 0,
+        "error": null
+      },
+      {
+        "session": "session-61accf04-70e5-42e1-aa4b-d2e907288dd4",
+        "sha256": "d9a10c9ef41afa78e53f71649c1687f35512ccf777e8244f4ae479543e4332f6",
+        "compressed_bytes": 35445,
+        "decoded_all_bytes": 35445,
+        "frames": 34,
+        "events": 66,
+        "schedule_events": 0,
+        "active_schedule": 0,
+        "error": null
+      },
+      {
+        "session": "session-6204c591-605c-42f8-a072-e61233911632",
+        "sha256": "e1856c29434460f738ee9393acd2fffa73aea0ef3f28765e811529b0e7ca8da1",
+        "compressed_bytes": 44503,
+        "decoded_all_bytes": 44503,
+        "frames": 38,
+        "events": 79,
+        "schedule_events": 0,
+        "active_schedule": 0,
+        "error": null
+      },
+      {
+        "session": "session-6db23391-eae9-4153-95b2-535bb44db7dd",
+        "sha256": "34081b2f1dfec6bd556396f39949036fb48cfc581b0083fd541fda81229eab90",
+        "compressed_bytes": 30740,
+        "decoded_all_bytes": 30740,
+        "frames": 26,
+        "events": 50,
+        "schedule_events": 0,
+        "active_schedule": 0,
+        "error": null
+      },
+      {
+        "session": "session-777123f3-eae4-42bb-b564-b28a211ea0c9",
+        "sha256": "5825f94714330371ba3eb57b8fd5937899b158c115cdc54b5324cc8cc71d2dfc",
+        "compressed_bytes": 328,
+        "decoded_all_bytes": 328,
+        "frames": 2,
+        "events": 3,
+        "schedule_events": 0,
+        "active_schedule": 0,
+        "error": null
+      },
+      {
+        "session": "session-b87d2c3e-ada9-4208-aa84-71e2500773c8",
+        "sha256": "5f493788822dbc57436e2402b4979adea69823423f5e6f25c7b2e11aca223fec",
+        "compressed_bytes": 21349,
+        "decoded_all_bytes": 21349,
+        "frames": 12,
+        "events": 33,
+        "schedule_events": 0,
+        "active_schedule": 0,
+        "error": null
+      },
+      {
+        "session": "session-cb6f2007-bd35-43e3-a481-58978b1fd20f",
+        "sha256": "5a143771901e064983e9c5adbc77ee0d1d5e29a58376dd31d4ce62572e377820",
+        "compressed_bytes": 32222,
+        "decoded_all_bytes": 32222,
+        "frames": 17,
+        "events": 37,
+        "schedule_events": 0,
+        "active_schedule": 0,
+        "error": null
+      },
+      {
+        "session": "session-d6a53ee4-d052-48c5-9725-2dfbf577d3b9",
+        "sha256": "a06c0ea4d4c90d8902393e50b2e4463c46f73552344ce6f807d3f02625948451",
+        "compressed_bytes": 30110,
+        "decoded_all_bytes": 30110,
+        "frames": 25,
+        "events": 50,
+        "schedule_events": 0,
+        "active_schedule": 0,
+        "error": null
+      },
+      {
+        "session": "session-d8d24d7d-2a1e-4fc2-a097-c9ac3f69fe13",
+        "sha256": "ac9c868385c5482ff0d6fc2b6246b2f1b18608a7e238b6941920ad095e59ad6a",
+        "compressed_bytes": 21893,
+        "decoded_all_bytes": 21893,
+        "frames": 12,
+        "events": 34,
+        "schedule_events": 0,
+        "active_schedule": 0,
+        "error": null
+      },
+      {
+        "session": "session-e2750051-2ac4-4a1c-a1de-38883c291a36",
+        "sha256": "c5d0398121b23e8f948f554b27465ec8409f29757f0cfc396e62e3c3e46d98d9",
+        "compressed_bytes": 38485,
+        "decoded_all_bytes": 38485,
+        "frames": 35,
+        "events": 73,
+        "schedule_events": 0,
+        "active_schedule": 0,
+        "error": null
+      },
+      {
+        "session": "session-f029b899-98f1-4681-89d1-37794eb3ecd3",
+        "sha256": "8450fc6e22c63621bdc686560446c585eeba09f7ef151b3852c00d770df14aa5",
+        "compressed_bytes": 330,
+        "decoded_all_bytes": 330,
+        "frames": 2,
+        "events": 3,
+        "schedule_events": 0,
+        "active_schedule": 0,
+        "error": null
+      },
+      {
+        "session": "session-f44c6fc0-abb0-42ae-aa9f-0d58668e9afa",
+        "sha256": "7bb0795c72af3af3dc78b40ed9ad6bc54f856be7e7aa9a74ce5f01ba64b5401f",
+        "compressed_bytes": 29275,
+        "decoded_all_bytes": 29275,
+        "frames": 25,
+        "events": 49,
+        "schedule_events": 0,
+        "active_schedule": 0,
+        "error": null
+      },
+      {
+        "session": "session-f8c3ad6a-3ef5-4c94-9622-92a5ed4c40dc",
+        "sha256": "65421eadb0e0cb64bdf229edf7f460a3f8746a5906f23da029db6778f7417800",
+        "compressed_bytes": 25731,
+        "decoded_all_bytes": 25731,
+        "frames": 20,
+        "events": 45,
+        "schedule_events": 0,
+        "active_schedule": 0,
+        "error": null
+      },
+      {
+        "session": "session-fc55ff87-ffbe-4eae-b198-f74918ee8783",
+        "sha256": "14dec00dbd78f7cfdb065c5d9eb95cd0ac1405ff4282336855fa04778d6a8d17",
+        "compressed_bytes": 17059,
+        "decoded_all_bytes": 17059,
+        "frames": 8,
+        "events": 23,
+        "schedule_events": 0,
+        "active_schedule": 0,
+        "error": null
+      }
+    ]
+  },
+  "test01-002-64212": {
+    "decoder": "Node native zstdDecompressSync(info) iterated all concatenated frames; each file consumed exactly",
+    "session_count": 0,
+    "event_count": 0,
+    "schedule_event_count": 0,
+    "active_schedule_count": 0,
+    "sessions": []
+  },
+  "hep-inspection-delivery": {
+    "decoder": "Node native zstdDecompressSync(info) iterated all concatenated frames; each file consumed exactly",
+    "session_count": 2,
+    "event_count": 56,
+    "schedule_event_count": 0,
+    "active_schedule_count": 0,
+    "sessions": [
+      {
+        "session": "session-0c5ec21d-1a8e-4528-b51e-b13fc8bb19f3",
+        "sha256": "6f115cf89b9c1f54b5f62230fe5405c2089829d34a2de3352f40a8fa3a158565",
+        "compressed_bytes": 325,
+        "decoded_all_bytes": 325,
+        "frames": 2,
+        "events": 3,
+        "schedule_events": 0,
+        "active_schedule": 0,
+        "error": null
+      },
+      {
+        "session": "session-f9f3bc6e-54fe-4d0e-8b3a-fe2d0eb97f1e",
+        "sha256": "37147f68094b35eda402094caaceec25845dd967ff9aed3f9595aa7518c76a20",
+        "compressed_bytes": 21084,
+        "decoded_all_bytes": 21084,
+        "frames": 26,
+        "events": 53,
+        "schedule_events": 0,
+        "active_schedule": 0,
+        "error": null
+      }
+    ]
+  },
+  "hep-small-model-inspection": {
+    "decoder": "Node native zstdDecompressSync(info) iterated all concatenated frames; each file consumed exactly",
+    "session_count": 1,
+    "event_count": 51,
+    "schedule_event_count": 0,
+    "active_schedule_count": 0,
+    "sessions": [
+      {
+        "session": "session-1b08d945-1d6f-4f83-9a54-cd3bcc602756",
+        "sha256": "924cdb7a720f66b7da8371121a5133f9f0990bcc8764e0d9b737163dd5e63df9",
+        "compressed_bytes": 20649,
+        "decoded_all_bytes": 20649,
+        "frames": 27,
+        "events": 51,
+        "schedule_events": 0,
+        "active_schedule": 0,
+        "error": null
+      }
+    ]
+  }
+}

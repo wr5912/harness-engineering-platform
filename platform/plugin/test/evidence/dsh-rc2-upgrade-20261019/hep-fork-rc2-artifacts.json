@@ -1,0 +1,8 @@
+{
+  "platform/plugin/package.json": "124083ba3ddce5f250b004d6fb80bab89eed2de1f84105afd2725dc1c8da9b45",
+  "platform/plugin/pnpm-lock.yaml": "2d3c3eeac823f60b4a9df7366f2b088c755617d99babdc2cc4af99f1a6dbc334",
+  "platform/plugin/src/auth.ts": "11726f5d037169fe7cd3108f7dcf81859d57684887db8de77b404f2f7717b801",
+  "platform/plugin/lib/index.js": "7f8677efa1569a379bc9be1dd90e752a901c132f54c3a53c89d2ba0cb0d44ebf",
+  "platform/plugin/lib/client.js": "447bd4e0c3005dada66d3bb9903a7d29feb21ed21b6a070384b523fb9568a24f",
+  "platform/plugin/lib/mcp-manager.js": "07d58e9b8a3a53b8982fb4a60509ab20692dc3fddaa15c73bd9db39b4f7148b9"
+}

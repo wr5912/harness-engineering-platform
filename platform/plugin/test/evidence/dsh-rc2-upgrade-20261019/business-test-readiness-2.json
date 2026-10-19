@@ -1,0 +1,73 @@
+{
+  "at": "2026-10-19T06:13:47.244Z",
+  "name": "test01-002-64212",
+  "port": 3089,
+  "phase": "readiness",
+  "preset": "test01",
+  "checks": {
+    "settings_read": true,
+    "old_session_export": "no-preexisting-session",
+    "model_completed": true
+  },
+  "errors": [],
+  "preset_available": true,
+  "settings_namespaces": [
+    "session-log-deepseek",
+    "agent-default-model",
+    "llm-pi-ai",
+    "bash-sandbox",
+    "permission",
+    "subagent",
+    "web",
+    "web-search-deepseek",
+    "web-deepseek-api",
+    "agent-loop",
+    "llm-deepseek",
+    "llm-deepseek-account",
+    "subagent-model-selection-settings",
+    "ui-settings-account",
+    "ui-theme",
+    "locale",
+    "ui-settings",
+    "ui-settings-general",
+    "ui-conversation",
+    "ui-chat",
+    "agent-preset-registry"
+  ],
+  "sessions_before": 2,
+  "old_sessions": [],
+  "session_id": "session-f0536800-ae99-479a-9a2e-ea5c2e829f2b",
+  "workspace_id": "7076302a-5cd2-41b3-bb99-04f62e7f66be",
+  "input_sha256": "21b2e84b7076e77f73eba4e2d0dc5ed78b89c84c78c1afe27c1436bb8ab79bfa",
+  "turns": [
+    {
+      "reason": "completed",
+      "provider": "deepseek-official",
+      "model": "deepseek-flash",
+      "reasoningEffort": "off",
+      "tool_names": [
+        "edit",
+        "glob",
+        "grep",
+        "read",
+        "read_image",
+        "working_directory",
+        "write"
+      ],
+      "answer_sha256": "090a526705f6aac88d6050a9544ae3ea7e0b941a00f020ef3f0b1a52bd4e8ab9",
+      "answer_mentions_mock": false,
+      "answer_mentions_ready": true,
+      "answer_mentions_preset": true
+    }
+  ],
+  "tool_calls": [],
+  "tool_result_shapes": [],
+  "archive": {
+    "bytes": 5771,
+    "sha256": "e3f720a6618d7dfb5de846b9ca3a81b31e5d4ed8e62a43adb45844a87a6ea4f3",
+    "event_count": 19
+  },
+  "actual_session_preset": "test01",
+  "actual_session_cwd": "/work/harness/workspace",
+  "ok": true
+}

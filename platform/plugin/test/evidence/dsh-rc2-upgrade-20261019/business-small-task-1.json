@@ -1,0 +1,150 @@
+{
+  "at": "2026-10-19T06:30:32.503Z",
+  "name": "hep-small-model-inspection",
+  "port": 3125,
+  "phase": "task",
+  "preset": "daily-inspection-assistant",
+  "checks": {
+    "settings_read": true,
+    "old_session_export": true,
+    "model_completed": true
+  },
+  "errors": [],
+  "preset_available": true,
+  "settings_namespaces": [
+    "session-log-deepseek",
+    "agent-default-model",
+    "llm-pi-ai",
+    "bash-sandbox",
+    "permission",
+    "subagent",
+    "web",
+    "web-search-deepseek",
+    "web-deepseek-api",
+    "agent-loop",
+    "llm-deepseek",
+    "llm-deepseek-account",
+    "subagent-model-selection-settings",
+    "ui-settings-account",
+    "ui-theme",
+    "locale",
+    "ui-settings",
+    "ui-settings-general",
+    "ui-conversation",
+    "ui-chat",
+    "agent-preset-registry"
+  ],
+  "sessions_before": 3,
+  "old_sessions": [
+    {
+      "session_id": "session-1b08d945-1d6f-4f83-9a54-cd3bcc602756",
+      "export_bytes": 11397,
+      "export_sha256": "8adc19fa6d63983a80707500b6fbb7bc7924359ae3242ee9e63e2bebfa410040",
+      "event_count": 52
+    }
+  ],
+  "session_id": "session-66cc5619-9698-4803-a578-7f07b7a7af9c",
+  "workspace_id": "35073033-eadb-49c1-a2ca-199177e5825e",
+  "input_sha256": "e8b837fc3a6bba9526d35423dd7c5a4275550a8abdcb2aa6e67847de12d2532b",
+  "turns": [
+    {
+      "reason": "completed",
+      "provider": "deepseek-official",
+      "model": "deepseek-flash",
+      "reasoningEffort": "off",
+      "tool_names": [
+        "task_inspection"
+      ],
+      "answer_sha256": "2b4678cdd0f49b055785f264b3b0e1bae704fb0c8c21e63e2f7a771467beb006",
+      "answer_mentions_mock": true,
+      "answer_mentions_ready": false,
+      "answer_mentions_preset": false
+    }
+  ],
+  "tool_calls": [
+    {
+      "name": "task_inspection",
+      "call_id": "call_00_mEkPSfeh2es2iLkcJP0Q4641"
+    },
+    {
+      "name": "task_inspection",
+      "call_id": "call_00_BE4ztjBqUWHsmiEqi6e24518"
+    },
+    {
+      "name": "task_inspection",
+      "call_id": "call_00_6nfs3fPto7YmgvukIOSw1761"
+    },
+    {
+      "name": "task_inspection",
+      "call_id": "call_00_t7zlbQhK9FWhj5LH6SSR3288"
+    },
+    {
+      "name": "task_inspection",
+      "call_id": "call_00_s5vUI1ZRxstsUhgsXblW6580"
+    }
+  ],
+  "tool_result_shapes": [
+    {
+      "keys": [
+        "turn",
+        "step",
+        "message"
+      ]
+    },
+    {
+      "keys": [
+        "turn",
+        "step",
+        "message"
+      ]
+    },
+    {
+      "keys": [
+        "turn",
+        "step",
+        "message"
+      ]
+    },
+    {
+      "keys": [
+        "turn",
+        "step",
+        "message"
+      ]
+    },
+    {
+      "keys": [
+        "turn",
+        "step",
+        "message"
+      ]
+    }
+  ],
+  "archive": {
+    "bytes": 12156,
+    "sha256": "a9327488465ac7140bc4cff218220949f8539e4a661742cac051556123e258a5",
+    "event_count": 52
+  },
+  "actual_session_preset": "daily-inspection-assistant",
+  "actual_session_cwd": "/work/harness/workspace",
+  "artifacts": [
+    {
+      "file": "report.md",
+      "http_status": 200,
+      "bytes": 693,
+      "sha256": "b17de117424bf3ea8004bc77d7ae0bc3bf40151205c5d4fa7483e987b5274506",
+      "fixed_device_count": 5,
+      "mock_scope": true,
+      "hash_matches_receipt": true
+    },
+    {
+      "file": "devices.csv",
+      "http_status": 200,
+      "bytes": 356,
+      "sha256": "93c9841b1829257076df535298d8a9b34c5af468ea346f923ff9552773f7c0ed",
+      "fixed_device_count": 5,
+      "csv_lines": 6
+    }
+  ],
+  "ok": true
+}

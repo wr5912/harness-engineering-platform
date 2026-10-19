@@ -1,0 +1,127 @@
+{
+  "at": "2026-10-19T05:51:05.754Z",
+  "base": "http://127.0.0.1:3124/hep/",
+  "label": "small-live",
+  "runtime": "0.2.1-rc.2",
+  "program_root": "/home/admin/work/hep-small-model-platform",
+  "workspace_id": "workspace-f9d8041b-c878-4181-870f-49932f055eaa",
+  "management_assets_ready": true,
+  "loaded_assets": [
+    {
+      "name": "AGENTS.md",
+      "path": "/home/admin/work/hep-small-model-data/AGENTS.md",
+      "sha256": "ba4b1f6c6807af0d690ac206aeaf18b9ef878698b0474f4b136ede7b68fad4a5"
+    },
+    {
+      "name": "workspace-management",
+      "path": "/home/admin/work/hep-small-model-data/.agents/skills/workspace-management/SKILL.md",
+      "sha256": "1191c7d75b0d906f23e6c76bd21a140b02b9e9ec647ee2a74be8222fb5a44a3b"
+    },
+    {
+      "name": "task-builder",
+      "path": "/home/admin/work/hep-small-model-data/.agents/skills/task-builder/SKILL.md",
+      "sha256": "2e91037946b375fa017822de5865ca5304d023c8c6094c04aebd527bb9621407"
+    },
+    {
+      "name": "agent-maintenance",
+      "path": "/home/admin/work/hep-small-model-data/.agents/skills/agent-maintenance/SKILL.md",
+      "sha256": "a8b07d02ee53032f83eb5e8956d1b3047ad6a12b009c253f4fa44e89177222de"
+    },
+    {
+      "name": "mcp-composition",
+      "path": "/home/admin/work/hep-small-model-data/.agents/skills/mcp-composition/SKILL.md",
+      "sha256": "e157e3fa58a1484cbff2e6fc02717dba671d17a86cc7b3f451f91a3ad6ca7da8"
+    },
+    {
+      "name": "compute-variant-research",
+      "path": "/home/admin/work/hep-small-model-data/.agents/skills/compute-variant-research/SKILL.md",
+      "sha256": "f550aa8938dcc6046c892e969f258bc82bc4c0c1b5a6a1bd715ee0b61c0e06c4"
+    },
+    {
+      "name": "decision-sample-extraction",
+      "path": "/home/admin/work/hep-small-model-data/.agents/skills/decision-sample-extraction/SKILL.md",
+      "sha256": "d63a33c6f415dda8073363857856e73b8f38187a9a36e4eca0b99fba3e20cba0"
+    },
+    {
+      "name": "harness-guided-workflow",
+      "path": "/home/admin/work/hep-small-model-data/.agents/skills/harness-guided-workflow/SKILL.md",
+      "sha256": "c1e9614da84ab053183fe6f00f80db94c606d4ce1dc7497d505e5df2094214e1"
+    },
+    {
+      "name": "harness-evolution",
+      "path": "/home/admin/work/hep-small-model-data/.agents/skills/harness-evolution/SKILL.md",
+      "sha256": "3ac134a4231f94d522dbdceaf4a432d0cbac7e08b41419b1132e8a34d92e6e6a"
+    },
+    {
+      "name": "harness-experiment-fusion",
+      "path": "/home/admin/work/hep-small-model-data/.agents/skills/harness-experiment-fusion/SKILL.md",
+      "sha256": "75def1bae61b5926fe4f95a50f5902b2d2649d78f13c6ae1f8e6ccf1b683abc7"
+    },
+    {
+      "name": "research-eval",
+      "path": "/home/admin/work/hep-small-model-data/.agents/skills/research-eval/SKILL.md",
+      "sha256": "aea60caf58cb195b6bfccc034c29f3865b020fd408744a176a9d2acb139b9601"
+    },
+    {
+      "name": "legacy-asset-intake",
+      "path": "/home/admin/work/hep-small-model-data/.agents/skills/legacy-asset-intake/SKILL.md",
+      "sha256": "e325b12f47ed8fc678caf6ad26d8a689b7da76464b50d7297031d751fad4ff2f"
+    },
+    {
+      "name": "user-facing-output",
+      "path": "/home/admin/work/hep-small-model-data/.agents/skills/user-facing-output/SKILL.md",
+      "sha256": "6b10248c59c29ceda28c0471ff9067b032930734f9bec08012e2f34f97d1d4d9"
+    }
+  ],
+  "native_settings_read": true,
+  "native_settings_sha256": "0bdf4335a783dc92359f6051b72f00f9da8478fd634229931c95be89625ae9d6",
+  "old_session_count": 26,
+  "old_session": {
+    "id": "session-2e2b42a6-36de-4111-88d7-6ef1e5e5553b",
+    "read": true,
+    "events": 4,
+    "archive_sha256": "3d460a7aed769fcb1644c298eabf751558a0df23c17b9acc3ce88e7352b646a8"
+  },
+  "session_id": "session-9588638e-a8b8-4bb5-8169-aac9672abeaf",
+  "turn_reasons": [
+    "completed"
+  ],
+  "assistant_reply_matches": true,
+  "tool_calls": 0,
+  "models": [
+    {
+      "provider": "deepseek-official",
+      "model": "deepseek-flash",
+      "reasoningEffort": "off"
+    }
+  ],
+  "trusted_data_root": true,
+  "archive_sha256": "534c6d55a260b63e900a7d971ea60afbcb3070bcf89c86f63eaabf1d027e03b1",
+  "archive_bytes": 14231,
+  "business_writes": "none-observed-no-tools-called",
+  "ok": true,
+  "state_preservation": {
+    "preexisting_files": 84,
+    "unchanged_files": 82,
+    "changed_files": [
+      ".credentials.yaml",
+      "storages/workspace.json"
+    ],
+    "only_expected_login_and_new_session_metadata_changed": true,
+    "user_patch_unchanged": true,
+    "historical_session_files_unchanged": true,
+    "mcp_servers_before": 1,
+    "mcp_servers_after": 1,
+    "mcp_shared_token_preserved_in_unchanged_patch": true
+  },
+  "process": {
+    "pid": 1111965,
+    "host": "127.0.0.1",
+    "port": 3124,
+    "home": "/home/admin/work/hep-small-model-data/.local/platform-home",
+    "data_root": "/home/admin/work/hep-small-model-data",
+    "program_root": "/home/admin/work/hep-small-model-platform",
+    "log": "/home/admin/.local/state/hep-rc2-upgrade-20261019/live/small/runtime.log",
+    "stop_command": "kill -INT 1111965"
+  }
+}

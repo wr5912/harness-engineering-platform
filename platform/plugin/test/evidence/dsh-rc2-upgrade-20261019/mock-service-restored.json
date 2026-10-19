@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-19T13:56:37+0800",
+  "pid": 1129116,
+  "running": true,
+  "log": "/home/admin/.local/state/hep-rc2-upgrade-20261019/private/mock-53001.log",
+  "url": "http://127.0.0.1:53001",
+  "stop": "kill 1129116",
+  "checks": {
+    "health_http": 200,
+    "assets_http": 200,
+    "asset_count": 20,
+    "fixed_asset_count": 5
+  },
+  "source_changes": false
+}

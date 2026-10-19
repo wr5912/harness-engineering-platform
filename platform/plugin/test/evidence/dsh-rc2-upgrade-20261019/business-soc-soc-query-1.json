@@ -1,0 +1,129 @@
+{
+  "at": "2026-10-19T06:31:25.739Z",
+  "name": "security-operations-expert-eval",
+  "port": 3081,
+  "phase": "soc-query",
+  "preset": "security-operations-expert",
+  "checks": {
+    "settings_read": true,
+    "old_session_export": true,
+    "model_completed": true,
+    "actual_mcp_query": true
+  },
+  "errors": [],
+  "preset_available": true,
+  "settings_namespaces": [
+    "session-log-deepseek",
+    "agent-default-model",
+    "llm-pi-ai",
+    "bash-sandbox",
+    "permission",
+    "subagent",
+    "web",
+    "web-search-deepseek",
+    "web-deepseek-api",
+    "agent-loop",
+    "llm-deepseek",
+    "llm-deepseek-account",
+    "subagent-model-selection-settings",
+    "ui-settings-account",
+    "ui-theme",
+    "locale",
+    "ui-settings",
+    "ui-settings-general",
+    "ui-conversation",
+    "ui-chat",
+    "agent-preset-registry",
+    "mcp-session-manager"
+  ],
+  "sessions_before": 18,
+  "old_sessions": [
+    {
+      "session_id": "session-f44c6fc0-abb0-42ae-aa9f-0d58668e9afa",
+      "export_bytes": 22343,
+      "export_sha256": "8090ee957bf30d973199007a68510925656d16eda13bfb20918f0d601a08fb7a",
+      "event_count": 50
+    }
+  ],
+  "session_id": "session-e610d52b-c613-413e-9c85-a64f87b34e3a",
+  "workspace_id": "d2a77159-4899-45d3-81ff-6d2023cead3b",
+  "input_sha256": "e1ef040365510a153818e1d7fc913d11faf752906f00b5ea1df1f0f9e3fc25cf",
+  "turns": [
+    {
+      "reason": "completed",
+      "provider": "deepseek-official",
+      "model": "deepseek-flash",
+      "reasoningEffort": "off",
+      "tool_names": [
+        "analyze_pending_threat_incidents",
+        "delegate_fault_analysis",
+        "delegate_response_planning",
+        "delegate_threat_analysis",
+        "edit",
+        "glob",
+        "grep",
+        "list_mcp_resource_templates",
+        "list_mcp_resources",
+        "mcp__emergency-action__cancel_emergency_action",
+        "mcp__emergency-action__get_emergency_action",
+        "mcp__emergency-action__get_emergency_action_result",
+        "mcp__emergency-action__list_emergency_actions",
+        "mcp__emergency-action__prepare_emergency_action",
+        "mcp__emergency-action__revise_emergency_action",
+        "mcp__inspection__get_inspection_result",
+        "mcp__inspection__list_executable_inspections",
+        "mcp__inspection__start_inspection",
+        "mcp__policy-configuration__get_policy_configuration_result",
+        "mcp__policy-configuration__get_policy_configuration_status",
+        "mcp__policy-configuration__prepare_policy_configuration",
+        "mcp__policy-configuration__select_policy_configuration_candidate",
+        "read",
+        "read_mcp_resource",
+        "schedule_create",
+        "schedule_delete",
+        "schedule_list",
+        "schedule_update",
+        "skill",
+        "write"
+      ],
+      "answer_sha256": "89c8cecda540de30270d3b23bacb181ead998faa2d41d163e3aaedd4ef05a91e",
+      "answer_mentions_mock": true,
+      "answer_mentions_ready": false,
+      "answer_mentions_preset": false
+    }
+  ],
+  "tool_calls": [
+    {
+      "name": "skill",
+      "call_id": "call_00_iHL0P09yUQjz2iaMB8iZ0892"
+    },
+    {
+      "name": "mcp__inspection__list_executable_inspections",
+      "call_id": "call_00_uwaktRE50EcrIA587w0h2725"
+    }
+  ],
+  "tool_result_shapes": [
+    {
+      "keys": [
+        "turn",
+        "step",
+        "message"
+      ]
+    },
+    {
+      "keys": [
+        "turn",
+        "step",
+        "message"
+      ]
+    }
+  ],
+  "archive": {
+    "bytes": 18803,
+    "sha256": "86ce727825707d5147c7febe61098b13590bc403d6a484a7943c1410147f63d1",
+    "event_count": 33
+  },
+  "actual_session_preset": "security-operations-expert",
+  "actual_session_cwd": "/work/harness/workspace",
+  "ok": true
+}

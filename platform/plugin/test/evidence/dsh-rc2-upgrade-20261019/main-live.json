@@ -1,0 +1,37 @@
+{
+  "at": "2026-10-19T05:48:49.624Z",
+  "base": "http://10.0.160.32:3090/hep/",
+  "label": "main-live",
+  "errors": [],
+  "pages": [
+    "home",
+    "conversations",
+    "agents",
+    "evaluation",
+    "instances",
+    "mcp"
+  ],
+  "websockets": [
+    {
+      "path": "/hep/api/remote.mux",
+      "received": 21,
+      "sent": 5
+    },
+    {
+      "path": "/hep/api/remote.mux",
+      "received": 0,
+      "sent": 4
+    }
+  ],
+  "anonymous_denied": true,
+  "login_title": "登录 · Harness工程平台",
+  "title": "Harness工程平台",
+  "workspace_id": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+  "preset_count": 1,
+  "assistant_ready": true,
+  "mobile": {
+    "width": 390,
+    "scroll": 390
+  },
+  "ok": true
+}

@@ -1,0 +1,81 @@
+{
+  "at": "2026-10-19T06:28:42.528Z",
+  "name": "hep-inspection-delivery",
+  "port": 3114,
+  "phase": "readiness",
+  "preset": "inspection-delivery-demo",
+  "checks": {
+    "settings_read": true,
+    "old_session_export": true,
+    "model_completed": true
+  },
+  "errors": [],
+  "preset_available": true,
+  "settings_namespaces": [
+    "session-log-deepseek",
+    "agent-default-model",
+    "llm-pi-ai",
+    "bash-sandbox",
+    "permission",
+    "subagent",
+    "web",
+    "web-search-deepseek",
+    "web-deepseek-api",
+    "agent-loop",
+    "llm-deepseek",
+    "llm-deepseek-account",
+    "subagent-model-selection-settings",
+    "ui-settings-account",
+    "ui-theme",
+    "locale",
+    "ui-settings",
+    "ui-settings-general",
+    "ui-conversation",
+    "ui-chat",
+    "agent-preset-registry"
+  ],
+  "sessions_before": 2,
+  "old_sessions": [
+    {
+      "session_id": "session-0c5ec21d-1a8e-4528-b51e-b13fc8bb19f3",
+      "export_bytes": 405,
+      "export_sha256": "18b152bf97c6ca0496f424bbf7690fc0bb1e2799a795c2cd476d412b4114a7f1",
+      "event_count": 4
+    }
+  ],
+  "session_id": "session-9822e238-d218-494a-b61a-aa7a0896d4da",
+  "workspace_id": "8bc00658-274d-4c54-811f-9570c4e526ad",
+  "input_sha256": "21b2e84b7076e77f73eba4e2d0dc5ed78b89c84c78c1afe27c1436bb8ab79bfa",
+  "turns": [
+    {
+      "reason": "completed",
+      "provider": "deepseek-official",
+      "model": "deepseek-flash",
+      "reasoningEffort": "off",
+      "tool_names": [
+        "edit",
+        "glob",
+        "grep",
+        "read",
+        "read_image",
+        "task_inspection",
+        "working_directory",
+        "write"
+      ],
+      "answer_sha256": "b1fc52944d56f29a569e9bf23e197a2b1299a8252bd7ef3c5eb37e2c82568278",
+      "answer_mentions_mock": false,
+      "answer_mentions_ready": true,
+      "answer_mentions_preset": true
+    }
+  ],
+  "tool_calls": [],
+  "tool_result_shapes": [],
+  "archive": {
+    "bytes": 6570,
+    "sha256": "7e3e956740cde198ee3edb5b142d75500adc1c62cb34fef7abe48bf0ab74bc2c",
+    "event_count": 19
+  },
+  "actual_session_preset": "inspection-delivery-demo",
+  "actual_session_cwd": "/work/harness/workspace",
+  "ok": true
+}

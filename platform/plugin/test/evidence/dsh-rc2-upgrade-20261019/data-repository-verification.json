@@ -1,0 +1,22 @@
+[
+  {
+    "root": "/home/admin/harness-engineering-platform-data",
+    "branch": "main",
+    "head": "06ebaef9789e36a7a322a81b30eb503f6da63052",
+    "origin_main": "06ebaef9789e36a7a322a81b30eb503f6da63052",
+    "tracked_changes_equal_task_start": true,
+    "original_untracked_files_checked": 226,
+    "task_asset_changes": false,
+    "empty_commit_created": false
+  },
+  {
+    "root": "/home/admin/work/hep-small-model-data",
+    "branch": "refactor/PLATFORM-small-model-harness",
+    "head": "9d3e6a834369c292a6318416c1d5ec10c3726a2f",
+    "origin_main": "06ebaef9789e36a7a322a81b30eb503f6da63052",
+    "tracked_changes_equal_task_start": true,
+    "original_untracked_files_checked": 75,
+    "task_asset_changes": false,
+    "empty_commit_created": false
+  }
+]

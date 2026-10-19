@@ -1,0 +1,12 @@
+{
+  "name": "hep-small-model-inspection",
+  "port": 3125,
+  "source": "experiment:EXP-daily-inspection-assistant-006-r2843ec359b07",
+  "program_root": "/home/admin/work/hep-small-model-platform",
+  "asset_root": "/home/admin/work/hep-small-model-data",
+  "old_image": "sha256:060d338f4d4cfe18097d7c0ae72a4fb22d82c3fe8da11829bba0121686c458f8",
+  "image": "sha256:1c777fe4929a41275ba5bcd899877aaa156f8f166975254840f52b26703eca90",
+  "runtime": "0.2.1-rc.2",
+  "running": true,
+  "network": "host"
+}

@@ -1,0 +1,111 @@
+{
+  "scope": "Technical runtime compatibility; not a Harness quality evaluation",
+  "runtime": "0.2.1-rc.2",
+  "checks": {
+    "old_session_listing": {
+      "count": 17,
+      "expected": 17
+    },
+    "first_step_directory": {
+      "tools": [
+        "schedule_create",
+        "schedule_list",
+        "schedule_delete",
+        "schedule_update"
+      ],
+      "time_context_projection": true,
+      "preset": "security-operations-expert"
+    },
+    "crud": {
+      "create": true,
+      "list": true,
+      "update": true,
+      "delete": true,
+      "session_association": "session-5fb96295-647e-4ff1-af91-1b51f83bdacb"
+    },
+    "trigger": {
+      "schedule_message": true,
+      "time_context_message": true,
+      "inactive_after_delivery": true
+    },
+    "restart": {
+      "old_sessions_preserved": 17,
+      "new_session_restored": true,
+      "schedule_session_association": true,
+      "active_reminder_recovered": true,
+      "cleanup": true
+    },
+    "delegation": {
+      "all_three_tools_registered": true,
+      "real_foreground_child_completed": true,
+      "foreground_result_contract": true,
+      "child_preset": "dsh-compat-security-operations-expert-delegate-fault-analysis",
+      "child_tool_count": 18,
+      "child_schedule_hidden": true,
+      "native_schedule_direct_call_refused": true,
+      "child_allow_list": true
+    },
+    "roles": [
+      {
+        "role": "fault-analysis",
+        "preset": "dsh-compat-security-operations-expert-delegate-fault-analysis",
+        "tools": [
+          "list_mcp_resources",
+          "list_mcp_resource_templates",
+          "read_mcp_resource",
+          "mcp__sec-ops__search_graph_assets",
+          "mcp__sec-ops__get_graph_resolve_ip_host",
+          "mcp__sec-ops__get_soc_asset_by_asset_id",
+          "mcp__sec-ops__list_soc_asset",
+          "mcp__sec-ops__get_soc_asset_biz_systems",
+          "mcp__sec-ops__get_soc_asset_vulnerabilities",
+          "mcp__sec-ops__get_ingest_devices_by_asset_by_asset_id",
+          "mcp__sec-ops__get_graph_node_detail",
+          "mcp__sec-ops__get_graph_path_query",
+          "mcp__sec-ops__get_reachability_path_by_ip",
+          "mcp__sec-ops__get_graph_flow_host_pair_ports",
+          "mcp__sec-ops__get_reachability_cross_signal",
+          "mcp__sec-ops__get_graph_compliance_violations",
+          "mcp__sec-ops__get_graph_coverage",
+          "mcp__sec-ops__get_event_by_id"
+        ],
+        "persona_sha256": "25dd0c96f815e5ffc51c10747ffabc97f1056c3960e714c43049264b95a48621"
+      },
+      {
+        "role": "response-planning",
+        "preset": "dsh-compat-security-operations-expert-delegate-response-planning",
+        "tools": [],
+        "persona_sha256": "fe17bef64360ac671205533822b9e0ccbe9534dde05741740c95ef5b45f964fe"
+      },
+      {
+        "role": "threat-analysis",
+        "preset": "dsh-compat-security-operations-expert-delegate-threat-analysis",
+        "tools": [
+          "analyze_threat_incident"
+        ],
+        "persona_sha256": "78c00130ba25a5d27739d442143e076e61a7bbd1e46f4af5b282a80b74b8be75"
+      }
+    ],
+    "cancellation": {
+      "after_publication": true,
+      "tool_is_error": true,
+      "child_disposed": true,
+      "child_stop_reason": "aborted",
+      "elapsed_ms": 484
+    },
+    "old_session_bytes": {
+      "count": 17,
+      "all_original_files_unchanged": true
+    }
+  },
+  "session_id": "session-5fb96295-647e-4ff1-af91-1b51f83bdacb",
+  "retained_schedule_id": "schedule-59927be9-c275-4da1-922f-cb7300e245e4",
+  "image_id": "sha256:1c777fe4929a41275ba5bcd899877aaa156f8f166975254840f52b26703eca90",
+  "image_fingerprint": "sha256:b9bce5f1fe5fdbf33aca2d4133768a9276d31e9aca176eac6cbdee6ba761d87d",
+  "cleanup": {
+    "temporary_containers_removed": true,
+    "temporary_fallback_volume_removed": true,
+    "port_3158_released": true,
+    "private_home_copy_retained_for_review": true
+  }
+}

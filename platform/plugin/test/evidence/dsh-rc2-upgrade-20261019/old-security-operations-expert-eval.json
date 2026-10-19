@@ -1,0 +1,37 @@
+{
+  "at": "2026-10-19T06:31:06.163Z",
+  "name": "security-operations-expert-eval",
+  "old_sessions": [
+    {
+      "session_id": "session-f44c6fc0-abb0-42ae-aa9f-0d58668e9afa",
+      "http_status": 200,
+      "bytes": 22343,
+      "sha256": "515de67c363389f85e8b6e36310332ba80459cbaaefe49a800ebce25fbce169a",
+      "event_count": 50,
+      "user_messages": 5,
+      "assistant_messages": 5,
+      "tool_calls": 5
+    },
+    {
+      "session_id": "session-1d14ccde-be95-4d5b-b7ff-6c67de2967a4",
+      "http_status": 200,
+      "bytes": 19392,
+      "sha256": "8f6d66ecad46570a7eff8d5cb3012109476d3314d8d94c16e31a0954b107477d",
+      "event_count": 36,
+      "user_messages": 5,
+      "assistant_messages": 3,
+      "tool_calls": 2
+    },
+    {
+      "session_id": "session-f8c3ad6a-3ef5-4c94-9622-92a5ed4c40dc",
+      "http_status": 200,
+      "bytes": 20787,
+      "sha256": "0e3693d2e18c3bad89e92d096b8891b04ebdf75b8c8e8be80e259d4e45dc4866",
+      "event_count": 46,
+      "user_messages": 5,
+      "assistant_messages": 3,
+      "tool_calls": 7
+    }
+  ],
+  "ok": true
+}

@@ -1,0 +1,17 @@
+{
+  "at": "2026-10-19T06:11:22.062Z",
+  "name": "test01-002-64212",
+  "port": 3089,
+  "preset": "test01",
+  "session_id": "session-b3752366-8e16-491d-9f3d-36d2caba84f7",
+  "ok": false,
+  "turn_reason": "error",
+  "error_code": "UNKNOWN",
+  "error_message": "unknown prompt variable \"{{cwd}}\" in section \"deployment:persona-suffix\"; registered variables: provider, model",
+  "archive": {
+    "sha256": "f2ece5461df6f8d6c3daae50ef423277e31f977917e8963eb0cfcf382519bd8c",
+    "bytes": 1056
+  },
+  "old_session_export": "no-preexisting-session",
+  "limitations": "模板变量失败发生在 user/message 装载之前；首败原始ZIP保留，未把RPC接受当模型成功。"
+}

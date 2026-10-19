@@ -1,0 +1,27 @@
+{
+  "at": "2026-10-19T06:30:17.576Z",
+  "name": "hep-inspection-delivery",
+  "old_sessions": [
+    {
+      "session_id": "session-0c5ec21d-1a8e-4528-b51e-b13fc8bb19f3",
+      "http_status": 200,
+      "bytes": 431,
+      "sha256": "082ce02e775394eec51f46dd995007637af989a65a4dc27bd25858bbbe193598",
+      "event_count": 5,
+      "user_messages": 0,
+      "assistant_messages": 0,
+      "tool_calls": 0
+    },
+    {
+      "session_id": "session-f9f3bc6e-54fe-4d0e-8b3a-fe2d0eb97f1e",
+      "http_status": 200,
+      "bytes": 11934,
+      "sha256": "1d7e5d8a935883f93d7cfc219dbff861028ca774fef836b128dafc0af4e1deb7",
+      "event_count": 54,
+      "user_messages": 3,
+      "assistant_messages": 6,
+      "tool_calls": 6
+    }
+  ],
+  "ok": true
+}
