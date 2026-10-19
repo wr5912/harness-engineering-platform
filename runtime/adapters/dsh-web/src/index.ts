@@ -5,10 +5,11 @@ export { transformClientUrls } from './client-urls.ts'
 type Handler = (req: IncomingMessage, res: ServerResponse) => any
 
 /** 在原生注册边界挂载站点；协议、路由所有者与流式响应继续由 DSH 执行。 */
-export function createMountedWebServer(NativeWebServer: any, basePath: string, productTitle?: string): any {
+export function createMountedWebServer(NativeWebServer: any, basePath: string, productTitle?: string, configSchema = NativeWebServer.Config): any {
   if (!/^\/[a-z][a-z0-9-]*\/$/.test(basePath)) throw new Error(`无效 Web 基址：${basePath}`)
   const prefix = basePath.slice(0, -1)
   return class MountedWebServer extends NativeWebServer {
+    static Config = configSchema
     readonly basePath = basePath
     private readonly siteContext: any
     private readonly clientSources = new Map<string, string>()
@@ -88,4 +89,12 @@ export function createMountedWebServer(NativeWebServer: any, basePath: string, p
       res.end(body)
     }
   }
+}
+
+/** 保留既有明确配置的 IPv4 LAN 监听；未来网关私网部署使用原生具体地址。 */
+export function legacyLanConfig(NativeWebServer: any, z: any): any {
+  return z.object({
+    ...NativeWebServer.Config.dict,
+    host: z.union([z.const('0.0.0.0'), NativeWebServer.Config.dict.host]).required(),
+  })
 }

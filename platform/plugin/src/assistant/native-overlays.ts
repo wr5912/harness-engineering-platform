@@ -1,4 +1,4 @@
-// DSH 0.2.1-alpha.2 的设置弹窗与菜单通过 portal 挂载到 body。
+// DSH 0.2.1-rc.2 的设置弹窗与菜单通过 portal 挂载到 body。
 // 优先使用 role、data-shortcut-modal 和 data-slot；仅设置壳层及原生字段布局
 // 使用已核对的 CSS Module 语义后缀，不绑定构建 hash，不替换原生交互。
 export const nativeOverlayTheme = `

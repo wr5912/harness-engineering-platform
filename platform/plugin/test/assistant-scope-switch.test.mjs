@@ -51,7 +51,9 @@ test('真实HTTP管理会话统一限制原生读写，专用切换与可信Skil
   })
   await ctx.plugin(WebServer, { host: '127.0.0.1', port: 0 })
   await ctx.plugin({ name: 'scope-switch-services', apply(inner) {
-    new HostConnectionService(inner, [], { isAuthenticated: request => request.headers.authorization === 'Bearer fixture' })
+    new HostConnectionService(inner, [], {
+      isAuthenticated: request => request.headers.authorization === 'Bearer fixture', authenticateApi: () => undefined,
+    })
     new SessionStore(inner)
     new SessionProjectionRegistry(inner)
     new SystemPrompt(inner, {})

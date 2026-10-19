@@ -59,7 +59,7 @@ function fixture() {
     'runtime/research/validate_repository.py',
     'runtime/research/inspect_source.py',
   ]) copyFixtureFile(root, rel)
-  for (const name of ['Dockerfile', 'apt-mirror.sh', 'build-image.sh', 'dsh-cli.sh', 'remote-host-settings.patch']) {
+  for (const name of ['Dockerfile', 'apt-mirror.sh', 'build-image.sh', 'dsh-cli.sh']) {
     write(join(root, 'runtime/adapters/dsh-container', name), `${name}\n`)
   }
   write(join(root, 'runtime/adapters/dsh-container/source.lock.json'), JSON.stringify({
@@ -71,7 +71,7 @@ function fixture() {
     node_base: `node:20@sha256:${'5'.repeat(64)}`,
     platform: 'linux/amd64',
     local_image_tag: 'ai-agent-harness/dsh:21638c563',
-    cli_version: '0.2.1-alpha.2',
+    cli_version: '0.2.1-rc.2',
     cli_package: '@deepseek-ai/dsh',
   }, null, 2) + '\n')
   write(join(root, 'agents/test-agent/manifest.yaml'), 'schema_version: 1.0\nagent_id: test-agent\nactive_experiment: EXP-test-agent-001\n')

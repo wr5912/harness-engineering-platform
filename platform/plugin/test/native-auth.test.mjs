@@ -100,6 +100,10 @@ test('平台登录保护原生 API、三个写入域与 MCP，旧 Token/Cookie �
   assert.equal(anonymous.headers.get('location'), '/hep/login')
   assert.equal(anonymous.headers.get('set-cookie'), null)
   assert.equal((await request('/harness-platform/inventory', envelope('inventory'), oldCookie)).status, 401)
+  const oldConnect = await fetch(base + '/connect' + new URL(oldUrl).search, { redirect: 'manual' })
+  assert.equal(oldConnect.status, 401)
+  assert.equal(oldConnect.headers.get('set-cookie'), null)
+  assert.deepEqual(root.connection.admitConnection({ headers: { host: new URL(base).host, cookie: oldCookie } }), { rejection: 401 })
   assert.equal(root.connection.authenticatedUrl(base + '/?token=discard'), base + '/')
   const login = body => fetch(base + '/login', { method: 'POST', redirect: 'manual',
     headers: { 'content-type': 'application/x-www-form-urlencoded', origin }, body })
@@ -125,6 +129,9 @@ test('平台登录保护原生 API、三个写入域与 MCP，旧 Token/Cookie �
   const setCookie = signedIn.headers.get('set-cookie')
   assert.match(setCookie, /Path=\/; HttpOnly; SameSite=Strict; Max-Age=2592000/)
   const cookie = setCookie.split(';')[0]
+  const admission = root.connection.admitConnection({ headers: { host: new URL(base).host, cookie } })
+  assert.equal(admission.peer, root.connection.browserPeer)
+  await admission.release()
   const storedSession = root.credentials.records.get('harness-platform/browser-sessions')
   assert.ok(storedSession.payload.sessions.every(item => /^[a-f0-9]{64}$/.test(item.digest)))
   assert.ok(!JSON.stringify(storedSession).includes(cookie.split('=')[1]))
@@ -185,6 +192,7 @@ test('平台登录保护原生 API、三个写入域与 MCP，旧 Token/Cookie �
   assert.equal(logout.headers.get('location'), '/hep/login')
   assert.match(logout.headers.get('set-cookie'), /Max-Age=0/)
   assert.equal((await request('/harness-platform/inventory', envelope('inventory'), cookie)).status, 401)
+  assert.deepEqual(root.connection.admitConnection({ headers: { host: new URL(base).host, cookie } }), { rejection: 401 })
   assert.equal((await fetch(base + downloadPath, { headers: { cookie } })).status, 401)
   const second = await login('username=admin&password=admin123')
   const secondCookie = second.headers.get('set-cookie').split(';')[0]

@@ -173,7 +173,7 @@ function createFixture() {
   process.env.HARNESS_PROGRAM_ROOT = root
   process.env.HARNESS_ASSET_ROOT = root
   const files = ['runtime/adapters/dsh-container/dsh-dev', 'runtime/adapters/dsh-container/source_contract.py', 'runtime/adapters/dsh-container/workspace_paths.py', 'runtime/adapters/dsh-container/scenario_analysis.py',
-    'runtime/adapters/dsh-container/source.lock.json', 'runtime/adapters/dsh-container/Dockerfile', 'runtime/adapters/dsh-container/apt-mirror.sh', 'runtime/adapters/dsh-container/build-image.sh', 'runtime/adapters/dsh-container/dsh-cli.sh', 'runtime/adapters/dsh-container/remote-host-settings.patch',
+    'runtime/adapters/dsh-container/source.lock.json', 'runtime/adapters/dsh-container/Dockerfile', 'runtime/adapters/dsh-container/apt-mirror.sh', 'runtime/adapters/dsh-container/build-image.sh', 'runtime/adapters/dsh-container/dsh-cli.sh',
     'runtime/adapters/dsh-container/verification-home-controls/locked-bootstrap.env', 'runtime/adapters/dsh-container/verification-home-controls/web-profile.package.json',
     'runtime/research/validate_experiment.py', 'runtime/research/evaluation_contract.py']
   for (const file of files) { mkdirSync(dirname(join(root, file)), { recursive: true }); copyFileSync(join(repo, file), join(root, file)) }
