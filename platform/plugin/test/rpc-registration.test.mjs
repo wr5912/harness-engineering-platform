@@ -29,6 +29,7 @@ test('真实 Cordis 提供方 Fiber 无 webServer 注入时，插件仍经原生
     apply(ctx) {
       new HostConnectionService(ctx, [], {
         isAuthenticated: request => request.headers.authorization === 'Bearer fixture',
+        authenticateApi: () => undefined,
       })
     },
   })

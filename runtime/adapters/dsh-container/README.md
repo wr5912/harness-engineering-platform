@@ -16,7 +16,7 @@ export HARNESS_ASSET_ROOT="$HOME/harness-engineering-platform-data"
 
 ## 源码与镜像身份
 
-`source.lock.json` 锁定官方仓库提交、Git tree、`pnpm-lock.yaml` 摘要、包管理器版本、Node 基础镜像 OCI index digest 和目标平台；当前提交包含 EXP-007 所需的 Schedule Bundle。所有 Experiment 共用这份锁。宿主来源解析脚本不进入 Runtime 镜像，因此不参与镜像构建指纹。实际本地镜像标签在锁定标签后追加构建指纹前 12 位，允许不同构建输入在同一宿主机并行构建而不覆盖彼此。`build-image.sh` 新建临时源码工作树，在宿主侧核对提交、tree 和锁摘要后用 BuildKit named context 构建。官方构建脚本支持显式 `DSH_CLIENT_COMMIT_HASH`；构建器不依赖 named context 是否携带 `.git`，只安装本地 C 编译及 musl 工具，最终镜像不保留这些构建工具或 `.git`。本仓库没有 DSH 源码副本。
+`source.lock.json` 锁定官方仓库提交、Git tree、`pnpm-lock.yaml` 摘要、包管理器版本、Node 基础镜像 OCI index digest 和目标平台；当前锁定 `v0.2.1-rc.2`，Web 组合原生包含 Schedule 服务和任务界面。所有 Experiment 共用这份锁。宿主来源解析脚本不进入 Runtime 镜像，因此不参与镜像构建指纹。实际本地镜像标签在锁定标签后追加构建指纹前 12 位，允许不同构建输入在同一宿主机并行构建而不覆盖彼此。`build-image.sh` 新建临时源码工作树，在宿主侧核对提交、tree 和锁摘要后用 BuildKit named context 构建。官方构建脚本支持显式 `DSH_CLIENT_COMMIT_HASH`；构建器不依赖 named context 是否携带 `.git`，只安装本地 C 编译及 musl 工具，最终镜像不保留这些构建工具或 `.git`。本仓库没有 DSH 源码副本。
 
 ```bash
 bash runtime/adapters/dsh-container/build-image.sh
@@ -26,6 +26,8 @@ bash runtime/adapters/dsh-container/build-image.sh
 APT 索引使用 `Error-Mode=any`、单次重试、30 秒 HTTP 连接超时和 IPv4；失败必须中止，而非沿用不完整索引。默认主源使用 `http://mirrors.tuna.tsinghua.edu.cn/debian`，security 保持 `http://deb.debian.org/debian-security`；TUNA 不可达时可显式加 `--apt-mirror http://deb.debian.org/debian` 回退到官方主源。构建前先用同一锁定 Node 底座执行 Debian archive keyring 签名的 APT 更新预检，main、updates、security 任一签名或索引失败即停；Dockerfile 中再次校验，构建证据记录两条实际镜像 URI。回退源改变了构建期软件包的分发路径、可用性和更新时间边界，虽未降低 Debian 签名校验，也不能把它说成与默认源的网络来源完全相同。
 
 本机 Docker 构建网络异常时还可显式加 `--build-network host`，但这会让构建步骤直接使用宿主网络命名空间；默认仍为 Docker 隔离网络。镜像源与网络选项都不改变锁定 DSH 源码和 Node 基础镜像身份，实际值写入构建证据。
+
+镜像构建使用官方 `DSH_GATE_CONCURRENCY=1` 串行执行构建 gate，避免 Host 编译、打包和整体验证同时占用共享开发主机的内存；不修改官方源码或 Runtime 运行配置。
 
 成功构建后脚本根据 `source.lock.json` 和镜像构建输入计算 `image_build_fingerprint`，并把它写入 OCI label；同时打印实际本地 Image ID，并向本 Experiment 的 `evaluation/evidence/dsh-image-build-<UTC>-<PID>.json` 写入只追加的本地构建证据。也可以指定 `--evidence-output FILE`。`source.lock.json` 仅锁构建输入，不填写未取得的 Registry digest；本地标签可重指向，运行前会同时核对标签、Image ID、构建指纹和平台，不能把标签当作不可变身份。
 
@@ -49,7 +51,11 @@ Candidate 的 Managed Patch 如加载带独立 Node 依赖的插件，先在该�
 
 `dsh-dev` 在来源 Managed Patch 和访问设置之后装载 [`runtime-model.patch.yml`](runtime-model.patch.yml)，将实例当前运行默认统一为 `deepseek-official/deepseek-flash`、推理强度 `off`、DeepSeek `thinking: disabled`。这会覆盖 Candidate 中的旧默认模型声明，不改写 Candidate、已有 Session 或历史 Run；已有 Session 的显式模型选择仍保留，核对默认时使用新 Session。该 Patch 是当前运行策略的唯一业务实例维护位置，调整后同名重建实例生效；新增覆盖前创建的实例同样需要重建，并保持原端口、HOME 和运行环境，无需重建镜像。原生会话仍可显式选择其他可用模型，但固定启动 Patch 会阻止“设置 → 模型”把被覆盖的默认模型或 Provider 字段保存到实例 Profile；MCP 等未覆盖设置仍可保存。API Key 继续通过调用环境或受控凭据服务提供，不写入此 Patch。
 
-Web Profile manifest 与本地 module 路径由受控文件和空的 deny-layer 锁定，避免从可写 HOME 装载私有 Plugin。EXP-007 选择自己的 `candidate/dsh/managed/web-profile.package.json`，将 `@deepseek-ai/dsh-experimental-schedule-bundle` 加入 Profile；其他来源仍使用默认 Web Profile。旧版 DSH 使用共享 fallback 卷中的安装链接；新版 DSH 使用原生模块解析，两种路径均须解析到镜像内 `/opt/dsh/`。旧 HOME 中被 deny-layer 隐藏的本地模块不会自动删除。
+Web Profile manifest 与本地 module 路径由受控文件和空的 deny-layer 锁定，避免从可写 HOME 装载私有 Plugin。选择旧 `@deepseek-ai/dsh-experimental-schedule-bundle` 的固定 Candidate 在实例目录生成只读兼容 manifest；投影移除已退役的 bundle 引用，由受控适配 Patch 提前补回原生 `tool-schedule`，保持旧 bundle 的根工具集合，并为目标自定义 Preset 补齐 `time-context`。不重复 Schedule 服务和任务界面；原 Guard 继续隐藏子 Agent 的任务工具，原生工具继续拒绝被委派调用。原 manifest 及其摘要记录在实例投影的 `origin.json`，原 Candidate 不变。Web Profile 的初始 MCP seed 始终从原 manifest 同目录读取。已有 HOME 中的 manifest 仅在字节匹配原来源时迁移；不匹配时拒绝覆盖。其他来源仍使用默认 Web Profile。旧版 DSH 使用共享 fallback 卷中的安装链接；新版 DSH 使用原生模块解析，两种路径均须解析到镜像内 `/opt/dsh/`。Runtime 安装 fallback 卷名包含当前镜像构建指纹，升级使用新派生卷并保留旧卷用于回退；它不属于业务 HOME。旧 HOME 中被 deny-layer 隐藏的本地模块不会自动删除。
+
+同一旧 Profile 的 Managed Patch 若仍声明 `persona`、`toolFilter` 前台委派，启动器只替换运行投影中的模块入口，原提示词与工具名单不变。适配器通过原生 include Patch 覆盖子角色 Persona，复用原 Preset 的 Guard 与确认器，在最终 Agent 层应用原白名单；前台桥使用公开 `startActivation(delivery: caller)` 等待结果、取消与清理，保留旧 `foreground` 回执，避免子结果重复通知。原文件与投影摘要记录在 `managed-origin.json`。当前兼容范围仅为已固定的 `spawn`、`enableRunInBackground: false`、`backgroundMode: one-shot` 配置，其他退役配置明确失败。
+
+旧 Persona 的 `{{cwd}}` 由公共适配插件映射到原生 `workingDirectory.get(agent.session)`，反映当前已提交工作目录，不修改 Candidate 模板。
 
 启动 `web` Profile 并叠加来源声明的 Managed Patch。锁定官方 Loader 在本 Node 镜像的无 internal-loader 路径会从 `/opt/dsh/vendor/loader` 相对查找 bare package，因此仅主 `dsh` 服务使用精确向量 `node --expose-internals /opt/dsh/apps/cli/lib/bin.js`；`home-init` 与装载探针保持普通 `node`。隔离、无 Candidate Managed Patch 的官方 base+web 技术预检可运行至少 15 秒；这不表示 Candidate 业务启动、MCP 或模型连接通过。
 
@@ -69,7 +75,7 @@ docker compose -f runtime/adapters/dsh-container/verification.compose.yaml confi
 
 官方 Web 默认只绑定容器内 `127.0.0.1`，基础 Compose 不发布宿主端口。需要浏览器访问时使用 `dsh-dev` 生成的本地 host-network 实例；容器启动或配置展开仍不能替代 `PA-08` 的实际 Web 交互。
 
-业务实例的局域网监听与 Web 设置由适配层 Patch 统一启用，访问规则见下文[实例访问规则](#实例访问规则)。标准镜像对锁定 DSH 来源应用 `remote-host-settings.patch`；适配层的 LAN Patch 注入启用标记。模型设置与使用设置表单的插件入口均依赖这条路径；升级 Runtime 时需重新核对补丁与浏览器行为。
+业务实例的局域网监听与 Web 设置由适配层 Patch 统一启用，访问规则见下文[实例访问规则](#实例访问规则)。锁定 rc.2 已原生支持浏览器 Host 设置持久化；不再修改 Runtime 源码或注入旧版设置标记。升级后仍需验证模型设置与插件表单保存、重启回读及浏览器行为。rc.2 原生要求绑定具体 IP；站点适配器仅为既有明确配置的 `0.0.0.0` 提供兼容，保持 LAN 与 loopback 入口可达，其他地址和配置继续执行原生校验。未来统一业务网关采用具体私网地址后移除此兼容。
 
 仅在受控反向代理保留外部 `Host`、后端仍监听本机回环时，`dsh-dev up` 可显式加 `--trusted-host HOST[:PORT]` 让 DSH 接受该代理地址；这不提供用户认证，也不允许把启动令牌写进菜单 URL。EXP-007 门户接入的实际拓扑、验证和限制见数据工作区 `agents/security-operations-expert/docs/security-operations-expert门户联调记录.md`。
 

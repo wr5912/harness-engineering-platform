@@ -1,13 +1,13 @@
 {
   "schema_version": "1.0",
   "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
-  "commit": "21638c56315ae6a2b552d6091945d3144c9af32e",
-  "tree": "02a1f781d666354e407dd086366f214d876cac59",
+  "commit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+  "tree": "f127f0f96a815eac4dea336a2ae0d9cd0f2aa82d",
   "cli_package": "@deepseek-ai/dsh",
-  "cli_version": "0.1.7-rc.2",
-  "package_manager": "pnpm@11.7.0",
-  "pnpm_lock_sha256": "27ff7d97d57118036454ad719fcc6a3d481a6376e2acae538cf0d35665c65bc0",
+  "cli_version": "0.2.1-rc.2",
+  "package_manager": "pnpm@11.28.5",
+  "pnpm_lock_sha256": "4637cca3b89c4c8d5a147321710e597aa62ec2444a3772ab542be5690893dfe4",
   "node_base": "node:24-bookworm-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553",
   "platform": "linux/amd64",
-  "local_image_tag": "ai-agent-harness/dsh:21638c563"
+  "local_image_tag": "ai-agent-harness/dsh:687f282e8"
 }

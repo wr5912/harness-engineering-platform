@@ -5,16 +5,18 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 const adapterRoot = fileURLToPath(new URL('../', import.meta.url))
+const containerAdapterRoot = fileURLToPath(new URL('../../dsh-container/', import.meta.url))
 const sourceContract = fileURLToPath(new URL('../../dsh-container/source_contract.py', import.meta.url))
 const lock = JSON.parse(readFileSync(new URL('../../dsh-container/source.lock.json', import.meta.url), 'utf8'))
 
-test('锁定 Runtime 的原生 DeepSeek 插件清单接受 Web 适配器，并拒绝缺失版本的包', () => {
+test('锁定 Runtime 的原生 DeepSeek 插件清单保留自研适配器身份，缺版本时不虚构版本', () => {
   const resolved = spawnSync('python3', [sourceContract, '--field', 'image.local_image_tag'], { encoding: 'utf8' })
   assert.equal(resolved.status, 0, resolved.stderr || resolved.error?.message)
   const image = resolved.stdout.trim()
   const result = spawnSync('docker', [
     'run', '--rm', '--pull=never', '--network', 'none', '-i',
     '--mount', `type=bind,source=${adapterRoot},target=/opt/dsh-web,readonly`,
+    '--mount', `type=bind,source=${containerAdapterRoot},target=/opt/dsh-adapter,readonly`,
     '--entrypoint', 'node', image, '--input-type=module', '-',
   ], {
     encoding: 'utf8',
@@ -61,19 +63,26 @@ assert.ok(typeof manifest.version === 'string' && manifest.version.length > 0)
 assert.deepEqual(await prepare(wrappers), { value: {
   version: 1, packages: [{ name: manifest.name, version: manifest.version }],
 } })
+const scheduleManifest = JSON.parse(readFileSync('/opt/dsh-adapter/schedule-compat/package.json', 'utf8'))
+assert.deepEqual(await prepare([...wrappers, '/opt/dsh-adapter/schedule-compat/root-scope.ts']), { value: {
+  version: 1, packages: [
+    { name: scheduleManifest.name, version: scheduleManifest.version },
+    { name: manifest.name, version: manifest.version },
+  ],
+} })
 
 const fixture = mkdtempSync(join(tmpdir(), 'dsh-web-inventory-'))
 try {
   writeFileSync(join(fixture, 'package.json'), JSON.stringify({ name: '@fixture/missing-version', type: 'module' }))
   const module = join(fixture, 'plugin.mjs')
   writeFileSync(module, 'export default {}')
-  await assert.rejects(prepare([module]), {
-    message: 'plugin-package-inventory-deepseek: ' + join(fixture, 'package.json') + ' must declare non-empty name and version',
-  })
+  assert.deepEqual(await prepare([module]), { value: {
+    version: 1, packages: [{ name: '@fixture/missing-version' }],
+  } })
 } finally {
   rmSync(fixture, { recursive: true, force: true })
 }
-console.log('真实锁版 provider：当前适配器身份通过；缺失 version 的原故障对照被拒绝。')
+console.log('真实锁版 provider：适配器包身份完整；原生 rc.2 对无版本包只上报名称。')
 `,
   })
   assert.equal(result.status, 0, result.stderr || result.stdout || result.error?.message)

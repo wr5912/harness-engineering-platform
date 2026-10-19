@@ -3,11 +3,24 @@ import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { request as httpRequest } from 'node:http'
 import test from 'node:test'
-import { createMountedWebServer } from '../lib/index.mjs'
+import { createMountedWebServer, legacyLanConfig } from '../lib/index.mjs'
 
 const require = createRequire(new URL('../../../../platform/plugin/package.json', import.meta.url))
 const { Context } = await import(pathToFileURL(require.resolve('@deepseek-ai/cordis')).href)
 const { default: NativeWebServer } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-host-webserver')).href)
+const nativeRequire = createRequire(require.resolve('@deepseek-ai/dsh-host-webserver'))
+const { default: z } = await import(pathToFileURL(nativeRequire.resolve('@deepseek-ai/schemastery')).href)
+
+test('既有 LAN 仅兼容明确的 IPv4 wildcard，其他原生配置校验保持有效', () => {
+  const schema = legacyLanConfig(NativeWebServer, z)
+  assert.equal(schema({ host: '0.0.0.0', port: 3080 }).host, '0.0.0.0')
+  assert.equal(schema({ host: '127.0.0.1', port: 3080 }).host, '127.0.0.1')
+  for (const host of ['::', '::ffff:0.0.0.0', 'localhost', '*']) {
+    assert.throws(() => schema({ host, port: 3080 }))
+  }
+  for (const port of [-1, 65536]) assert.throws(() => schema({ host: '0.0.0.0', port }))
+  assert.throws(() => schema({ host: '0.0.0.0', port: 3080, compression: 'invalid' }))
+})
 
 for (const basePath of ['/assistant/', '/hep/']) test(`${basePath} 原生 HTTP、插件资源、SSE 和 upgrade 共同挂载且旧入口拒绝`, async t => {
   const root = new Context()

@@ -1,5 +1,7 @@
 # Loader 的同 id 插入以后者为准；普通 patch 的 name 只校验已有实现。
 - insert:
+    - id: legacy-prompt-variables
+      name: /opt/dsh-adapter/runtime-compat/index.ts
     - id: webserver
       name: /opt/dsh-web/lib/container-webserver.mjs
       disabled: false
@@ -18,4 +20,5 @@
         openBrowser: !!js ctx.webStartup.openBrowser
         printUrl: true
         surfaceContext: true
+        publicUrl: !!js ctx.webStartup.publicUrl
         trustedHosts: !!js ctx.webStartup.trustedHosts

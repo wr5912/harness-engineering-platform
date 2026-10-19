@@ -62,17 +62,44 @@ export async function withCaseTimeout(task, timeoutMs, settleOnAbort = false) {
 export function turnsFromTrace(archive, inputs) {
   const users = archive.root.map((event, index) => ({ event, index }))
     .filter(({ event }) => event.type === 'user/message' && event.data?.source?.kind === 'user')
+  // rc.2 在渲染提示词等前置步骤失败时，已从 inbox 取走输入，却还没提交
+  // user/message。只为明确消费过输入的失败回合补齐定位，避免把该失败轮询到超时。
+  const surfacedIds = new Set(users.map(({ event }) => event.data.id))
+  const inboxes = new Map()
+  let openTurn
+  for (const [index, event] of archive.root.entries()) {
+    if (event.type === 'turn/start') openTurn = { index, claimed: [] }
+    else if (event.type === 'agent/inbox/spliced') {
+      const { target, start, removedCount = 0, inserted = [], outcome } = event.data
+      const inbox = inboxes.get(target) ?? []
+      const removed = inbox.splice(start, removedCount, ...inserted)
+      inboxes.set(target, inbox)
+      if (openTurn && outcome !== 'canceled') openTurn.claimed.push(...removed)
+    } else if (event.type === 'turn/end') {
+      if (openTurn && event.data?.reason?.kind !== 'completed') {
+        for (const message of openTurn.claimed) {
+          if (message.source?.kind !== 'user' || surfacedIds.has(message.id)) continue
+          users.push({ event: { type: 'user/message', data: message }, index: openTurn.index, endIndex: index })
+          surfacedIds.add(message.id)
+        }
+      }
+      openTurn = undefined
+    }
+  }
+  users.sort((left, right) => left.index - right.index)
   if (users.length < inputs.length) return null
   if (users.length !== inputs.length
     || users.some(({ event }, index) => contentText(event.data.content) !== inputs[index])) {
     throw safetyError('evidence-cross-turn', archive)
   }
   const turns = []
-  for (const { event: user, index: start } of users) {
-    const offset = archive.root.slice(start + 1).findIndex(event => event.type === 'turn/end')
+  for (const { event: user, index: start, endIndex } of users) {
+    const offset = endIndex === undefined
+      ? archive.root.slice(start + 1).findIndex(event => event.type === 'turn/end')
+      : endIndex - start - 1
     if (offset < 0) return null
     const events = archive.root.slice(start + 1, start + 2 + offset)
-    const header = archive.root.slice(0, start + 2 + offset)
+    const header = (endIndex === undefined ? archive.root.slice(0, start + 2 + offset) : events)
       .filter(event => event.type === 'request/header').at(-1)?.data?.header
     const assistants = events.filter(event => event.type === 'assistant/message')
     turns.push({

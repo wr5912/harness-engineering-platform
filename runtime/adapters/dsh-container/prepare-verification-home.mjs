@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readlinkSync, readdirSync, readSync, realpathSync, statSync, writeFileSync } from 'node:fs'
+import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readlinkSync, readdirSync, readSync, realpathSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createRequire } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -145,7 +145,7 @@ function readBoundedExisting(path, prior, allowEmpty = false) {
   }
 }
 
-function ensureTarget(path, source, allowEmpty = false, mutable = false) {
+export function ensureTarget(path, source, allowEmpty = false, mutable = false, legacySource) {
   const controlledState = lstatSync(source)
   if (!controlledState.isFile() || controlledState.isSymbolicLink() || controlledState.nlink !== 1) {
     throw new Error(`controlled DSH_HOME source is not a single regular file: ${source}`)
@@ -158,6 +158,23 @@ function ensureTarget(path, source, allowEmpty = false, mutable = false) {
   }
   const existing = readBoundedExisting(path, state, allowEmpty)
   if (!mutable && (existing.length !== controlled.length || sha256(existing) !== sha256(controlled))) {
+    // 仅将字节仍匹配固定来源的旧 Schedule manifest 迁移为受控投影。
+    // Web cordis.patch.yml 是运行设置，始终保留，不能借迁移覆盖用户修改。
+    if (legacySource && existsSync(legacySource)) {
+      const legacy = readBoundedExisting(legacySource, lstatSync(legacySource))
+      const manifest = JSON.parse(legacy.toString('utf8'))
+      const bundles = manifest.dsh?.profile?.bundles
+      if (Array.isArray(bundles) && bundles.includes('@deepseek-ai/dsh-experimental-schedule-bundle')) {
+        manifest.dsh.profile.bundles = bundles.filter(value => value !== '@deepseek-ai/dsh-experimental-schedule-bundle')
+        const projected = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`)
+        if (sha256(existing) === sha256(legacy) && sha256(controlled) === sha256(projected)) {
+          const temporary = `${path}.rc2-${process.pid}`
+          writeFileSync(temporary, controlled, { flag: 'wx', mode: 0o600 })
+          renameSync(temporary, path)
+          return
+        }
+      }
+    }
     throw new Error(`verification home target differs from controlled file: ${path}`)
   }
 }
@@ -184,7 +201,8 @@ export async function prepareControlledHome() {
   const appBoot = createRequire(installAnchor).resolve('@deepseek-ai/dsh-app-boot')
   const { healProfilesModuleFallback } = await import(pathToFileURL(appBoot).href)
   const profileManifest = join(home, 'profiles', 'web', 'package.json')
-  ensureTarget(profileManifest, join(controls, 'web-profile.package.json'))
+  ensureTarget(profileManifest, join(controls, 'web-profile.package.json'), false, false,
+    '/opt/dsh-profile-seed/web-profile.package.json')
 
   // 仅 home-init 可写独立 fallback 卷；主 DSH 对这棵树只读挂载。
   // 旧卷已有任何非精确安装 symlink 均拒绝，绝不先调用 healer 修补或执行。

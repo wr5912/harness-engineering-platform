@@ -395,6 +395,13 @@ def image_reference(tag: str | None, image_id: str | None) -> str | None:
     return tag
 
 
+def needs_schedule_compat(profile_manifest: str | None) -> bool:
+    if not profile_manifest or not Path(profile_manifest).is_file():
+        return False
+    profile = json.loads(Path(profile_manifest).read_text(encoding="utf-8"))
+    return "@deepseek-ai/dsh-experimental-schedule-bundle" in profile.get("dsh", {}).get("profile", {}).get("bundles", [])
+
+
 def compose_env(contract: dict, mode: str, port: int, name: str,
                 image_id: str | None = None, analysis_workspace: str | None = None,
                 plugin_node_modules: str | None = None) -> dict:
@@ -410,10 +417,13 @@ def compose_env(contract: dict, mode: str, port: int, name: str,
         "DSH_EVALUATION_PATCH": contract["evaluation_patch"],
         "DSH_WEB_PROFILE_MANIFEST_HOST": (
             str(ADAPTER / "verification-home-controls/web-profile.package.json")
-            if analysis_workspace else contract.get("profile_manifest", str(ADAPTER / "verification-home-controls/web-profile.package.json"))
+            if analysis_workspace else contract.get("runtime_profile_manifest", contract.get("profile_manifest", str(ADAPTER / "verification-home-controls/web-profile.package.json")))
         ),
     })
-    environment["DSH_WEB_PROFILE_SEED_DIR_HOST"] = str(Path(environment["DSH_WEB_PROFILE_MANIFEST_HOST"]).parent)
+    environment["DSH_WEB_PROFILE_SEED_DIR_HOST"] = str(Path(
+        str(ADAPTER / "verification-home-controls/web-profile.package.json") if analysis_workspace
+        else contract.get("profile_manifest", environment["DSH_WEB_PROFILE_MANIFEST_HOST"])
+    ).parent)
     if analysis_workspace:
         environment["DSH_ANALYSIS_WORKSPACE_HOST"] = analysis_workspace
     else:
@@ -425,6 +435,9 @@ def compose_env(contract: dict, mode: str, port: int, name: str,
         })
         if plugin_node_modules:
             environment["DSH_PLUGIN_NODE_MODULES_HOST"] = plugin_node_modules
+        if contract.get("runtime_managed_patch"):
+            environment["DSH_RUNTIME_MANAGED_PATCH_HOST"] = contract["runtime_managed_patch"]
+            environment["DSH_MANAGED_PATCH"] = "/opt/dsh-profile-compat/managed.patch.yml"
     return environment
 
 
@@ -501,7 +514,9 @@ def render_compose(template: str, *, mode: str, name: str, project: str, port: i
                    runtime_env_names: list[str] = (), lan_access: bool = False,
                    analysis_workspace: bool = False, trusted_host: str | None = None,
                    unsafe_no_auth: bool = False, skip_testing_notice: bool = False,
-                   plugin_node_modules: bool = False, bind_home: bool = False) -> str:
+                   plugin_node_modules: bool = False, bind_home: bool = False,
+                   image_fingerprint: str | None = None, schedule_compat: bool = False,
+                   managed_patch_compat: bool = False) -> str:
     """把受控 Compose 模板渲染为隔离的业务或归因实例配置。"""
     if mode not in MODES:
         fail("mode 只能是 verification")
@@ -514,16 +529,25 @@ def render_compose(template: str, *, mode: str, name: str, project: str, port: i
     if plugin_node_modules and analysis_workspace:
         fail("归因实例不能装载业务插件依赖")
     validate_trusted_host(trusted_host)
+    fallback_suffix = ""
+    if image_fingerprint:
+        if not re.fullmatch(r"sha256:[0-9a-f]{64}", image_fingerprint):
+            fail("镜像构建指纹格式无效，不能确定只读安装 fallback 卷")
+        fallback_suffix = "-" + image_fingerprint[7:19]
     text = template
     replacements = [
         (f"name: ai-agent-harness-dsh-{mode}", f"name: {project}"),
         (f"dsh-{mode}-home", f"{project}-home"),
-        (f"dsh-{mode}-trusted-fallback", f"{project}-fallback"),
+        (f"dsh-{mode}-trusted-fallback", f"{project}-fallback{fallback_suffix}"),
     ]
     for old, new in replacements:
         if text.count(old) < 1:
             fail(f"Compose 模板缺少预期锚点：{old}")
         text = text.replace(old, new)
+    if schedule_compat:
+        text = text.replace("      - --no-open\n", "      - --patch\n"
+                            "      - /opt/dsh-adapter/schedule-compat/cordis.patch.yml\n"
+                            "      - --no-open\n")
     if bind_home:
         volume = f"      - type: volume\n        source: {project}-home\n        target: /var/lib/dsh\n"
         if text.count(volume) != 2:
@@ -540,6 +564,10 @@ def render_compose(template: str, *, mode: str, name: str, project: str, port: i
     text = text.replace(web_mount, web_mount + "      - type: bind\n"
                         "        source: ${DSH_SITES_CONFIG_HOST:?站点路径由工作区配置注入}\n"
                         "        target: /opt/harness-config/sites.json\n        read_only: true\n")
+    if managed_patch_compat:
+        text = text.replace(web_mount, web_mount + "      - type: bind\n"
+                            "        source: ${DSH_RUNTIME_MANAGED_PATCH_HOST:?兼容 Patch 由启动器注入}\n"
+                            "        target: /opt/dsh-profile-compat/managed.patch.yml\n        read_only: true\n")
     working_dir = "    working_dir: /work/harness/workspace\n"
     if text.count(working_dir) != 1:
         fail("Compose 模板缺少唯一的 working_dir 锚点")
@@ -699,6 +727,20 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
         validate_existing_identity(name, manifest, contract, mode, analysis_workspace)
     else:
         target.mkdir(parents=True, exist_ok=True)
+    original_profile = (str(ADAPTER / "verification-home-controls/web-profile.package.json")
+                        if analysis_workspace else contract.get("profile_manifest", str(ADAPTER / "verification-home-controls/web-profile.package.json")))
+    runtime_profile = original_profile
+    if needs_schedule_compat(original_profile):
+        projected = run(["node", str(ADAPTER / "profile-compat.ts"), original_profile,
+                         str(target / "profile-compat/web-profile.package.json")])
+        runtime_profile = projected.stdout.strip()
+    contract["runtime_profile_manifest"] = runtime_profile
+    if not analysis_workspace and runtime_profile != original_profile:
+        original_patch = str(Path(contract["managed"]) / Path(contract["patch"]).relative_to("/opt/dsh-managed"))
+        projected_patch = run(["node", str(ADAPTER / "profile-compat.ts"), "--managed", original_patch,
+                               str(target / "profile-compat/managed.patch.yml")]).stdout.strip()
+        if projected_patch != original_patch:
+            contract["runtime_managed_patch"] = projected_patch
     home_directory = selected_home_directory(name, current, migrate_home=migrate_home)
     if home_directory:
         Path(home_directory).mkdir(exist_ok=True)
@@ -727,6 +769,9 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
         skip_testing_notice=skip_testing_notice,
         plugin_node_modules=plugin_node_modules is not None,
         bind_home=home_directory is not None,
+        image_fingerprint=contract["image"].get("build_fingerprint"),
+        schedule_compat=runtime_profile != original_profile,
+        managed_patch_compat=bool(contract.get("runtime_managed_patch")),
     )
     (target / "compose.yaml").write_text(rendered, encoding="utf-8")
     manifest = {
@@ -758,12 +803,13 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
         "web_adapter_root": str(WEB_ADAPTER),
         "web_base_path": current_web_base_path(),
         "sites_config_file": str(sites_config(REPO)),
-        "web_profile_manifest": (
-            str(ADAPTER / "verification-home-controls/web-profile.package.json")
-            if analysis_workspace else contract.get("profile_manifest", str(ADAPTER / "verification-home-controls/web-profile.package.json"))
-        ),
+        "web_profile_manifest": runtime_profile,
+        "web_profile_seed_directory": str(Path(original_profile).parent),
         "evaluation_patch": contract["evaluation_patch"],
-        "managed_patch": None if analysis_workspace else contract["patch"],
+        "managed_patch": None if analysis_workspace else (
+            "/opt/dsh-profile-compat/managed.patch.yml" if contract.get("runtime_managed_patch") else contract["patch"]),
+        **({"runtime_managed_patch_host": contract["runtime_managed_patch"],
+            "original_managed_patch": contract["patch"]} if contract.get("runtime_managed_patch") else {}),
         "mounts": ({"analysis_workspace": analysis_workspace} if analysis_workspace else {
             "workspace": contract["workspace"],
             "presets": contract["presets"],
@@ -805,11 +851,13 @@ def instance_compose_env(manifest: dict) -> dict:
         "DSH_WEB_ADAPTER_HOST": manifest.get("web_adapter_root"),
         "DSH_WEB_PROFILE_MANIFEST_HOST": manifest.get("web_profile_manifest"),
         "DSH_WEB_PROFILE_SEED_DIR_HOST": (
-            str(Path(manifest["web_profile_manifest"]).parent) if manifest.get("web_profile_manifest") else None
+            manifest.get("web_profile_seed_directory") or
+            (str(Path(manifest["web_profile_manifest"]).parent) if manifest.get("web_profile_manifest") else None)
         ),
         "DSH_EVALUATION_PATCH": manifest.get("evaluation_patch"),
         "DSH_DEV_TARGET_HOST": manifest.get("dev_target_file"),
         "DSH_MANAGED_PATCH": manifest.get("managed_patch"),
+        "DSH_RUNTIME_MANAGED_PATCH_HOST": manifest.get("runtime_managed_patch_host"),
         "DSH_MANAGED_PATCH_OVERLAY": manifest.get("patch_overlay"),
         "DSH_WORKSPACE_HOST": mounts.get("workspace"),
         "DSH_PRESETS_HOST": mounts.get("presets"),
@@ -1919,6 +1967,8 @@ def preflight_new_instance(args: argparse.Namespace, contract: dict) -> None:
             skip_testing_notice=bool(getattr(args, "skip_testing_notice", False)),
             plugin_node_modules=bool(getattr(args, "plugin_node_modules", None)),
             bind_home=home_directory is not None,
+            image_fingerprint=contract["image"].get("build_fingerprint"),
+            schedule_compat=not analysis_workspace and needs_schedule_compat(contract.get("profile_manifest")),
         )
         compose = root / "compose.yaml"
         compose.write_text(rendered, encoding="utf-8")

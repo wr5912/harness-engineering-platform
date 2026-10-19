@@ -111,7 +111,7 @@ class SourceContractTest(unittest.TestCase):
         )
         values = json.loads(completed.stdout)
         self.assertIn("Dockerfile", values)
-        self.assertIn("remote-host-settings.patch", values)
+        self.assertNotIn("remote-host-settings.patch", values)
         self.assertTrue(all(value.startswith("sha256:") for value in values.values()))
 
     def test_all_experiments_share_runtime_and_schedule_keeps_web_profile(self):

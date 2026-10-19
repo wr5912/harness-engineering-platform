@@ -228,9 +228,18 @@ class RenderComposeTest(unittest.TestCase):
         listener_patch = (ADAPTER / "verification-home-controls/lan-listen.patch.yml").read_text()
         self.assertIn("- id: webserver\n", listener_patch)
         self.assertIn("host: 0.0.0.0\n", listener_patch)
-        self.assertIn("name: /opt/dsh-adapter/web-remote-settings/index.js\n", listener_patch)
+        self.assertNotIn("web-remote-settings", listener_patch)
         self.assertNotIn("auth-gate", listener_patch)
         self.assertIn('      - --port\n      - "3154"\n', rendered)
+
+    def test_runtime_upgrade_uses_new_derived_fallback_volume_without_changing_home(self):
+        template = (ADAPTER / "verification.compose.yaml").read_text(encoding="utf-8")
+        rendered = dev.render_compose(
+            template, mode="verification", name="probe", project="dsh-dev-probe", port=3081,
+            image_fingerprint="sha256:" + "a" * 64,
+        )
+        self.assertIn("dsh-dev-probe-fallback-aaaaaaaaaaaa", rendered)
+        self.assertIn("dsh-dev-probe-home", rendered)
 
     def test_no_auth_and_notice_patches_are_independent_of_lan_access(self):
         template = (ADAPTER / "verification.compose.yaml").read_text(encoding="utf-8")
@@ -519,6 +528,37 @@ class EvaluationModeContractTest(unittest.TestCase):
                              ["DSH_WEB_PROFILE_MANIFEST_HOST"], contract["profile_manifest"])
             self.assertEqual(dev.instance_compose_env(manifest)["DSH_WEB_PROFILE_MANIFEST_HOST"],
                              contract["profile_manifest"])
+
+    def test_legacy_profile_projection_keeps_original_seed_for_up_and_lifecycle(self):
+        contract = self.contract()
+        with tempfile.TemporaryDirectory() as temp, mock.patch.object(dev, "STATE_ROOT", Path(temp) / "instances"):
+            source = Path(temp) / "candidate" / "web-profile.package.json"
+            source.parent.mkdir()
+            source.write_text(json.dumps({"dsh": {"profile": {"bundles": [
+                "@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app",
+                "@deepseek-ai/dsh-experimental-schedule-bundle",
+            ]}}}), encoding="utf-8")
+            contract["profile_manifest"] = str(source)
+            contract["managed"] = str(source.parent)
+            managed_patch = source.parent / Path(contract["patch"]).name
+            managed_patch.write_text("- insert:\n    - id: legacy-delegate\n"
+                                     "      name: '@deepseek-ai/dsh-tool-subagent'\n"
+                                     "      config:\n        persona: fixed-role\n", encoding="utf-8")
+            original_patch = managed_patch.read_bytes()
+            original = source.read_bytes()
+            target = dev.write_instance("legacy-probe", mode="verification", contract=contract, port=3082)
+            manifest = json.loads((target / "instance.json").read_text(encoding="utf-8"))
+            self.assertEqual(source.read_bytes(), original)
+            self.assertEqual(managed_patch.read_bytes(), original_patch)
+            self.assertNotEqual(manifest["web_profile_manifest"], str(source))
+            for environment in (dev.compose_env(contract, "verification", 3082, "legacy-probe"),
+                                dev.instance_compose_env(manifest)):
+                self.assertEqual(environment["DSH_WEB_PROFILE_MANIFEST_HOST"], manifest["web_profile_manifest"])
+                self.assertEqual(environment["DSH_WEB_PROFILE_SEED_DIR_HOST"], str(source.parent))
+                self.assertEqual(environment["DSH_MANAGED_PATCH"], "/opt/dsh-profile-compat/managed.patch.yml")
+                self.assertEqual(environment["DSH_RUNTIME_MANAGED_PATCH_HOST"],
+                                 manifest["runtime_managed_patch_host"])
+            self.assertIn("target: /opt/dsh-profile-compat/managed.patch.yml", (target / "compose.yaml").read_text())
 
     def test_plugin_dependencies_are_recorded_for_compose_lifecycle(self):
         contract = self.contract()

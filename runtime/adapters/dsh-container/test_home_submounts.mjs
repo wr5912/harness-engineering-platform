@@ -64,10 +64,7 @@ assert.deepEqual(manifest.dsh.profile.bundles.slice(0, 2), [
   '@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app',
 ])
 assert.equal(manifest.dsh.profile.patchReload, 'startup')
-assert.ok(manifest.dsh.profile.bundles.length === 2 || (
-  manifest.dsh.profile.bundles.length === 3
-  && manifest.dsh.profile.bundles[2] === '@deepseek-ai/dsh-experimental-schedule-bundle'
-))
+assert.equal(manifest.dsh.profile.bundles.length, 2)
 assert.deepEqual(manifest.dependencies, {})
 assert.equal(readFileSync('/var/lib/dsh/AGENTS.md').length, 0)
 for (const path of ['/var/lib/dsh/.env', '/work/harness/workspace/.env']) {

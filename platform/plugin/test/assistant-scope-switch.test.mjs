@@ -47,7 +47,9 @@ test('真实HTTP助手接口在compute与普通任务间排他切换，用户续
   })
   await ctx.plugin(WebServer, { host: '127.0.0.1', port: 0 })
   await ctx.plugin({ name: 'scope-switch-services', apply(inner) {
-    new HostConnectionService(inner, [], { isAuthenticated: request => request.headers.authorization === 'Bearer fixture' })
+    new HostConnectionService(inner, [], {
+      isAuthenticated: request => request.headers.authorization === 'Bearer fixture', authenticateApi: () => undefined,
+    })
     new SessionStore(inner)
     new SessionProjectionRegistry(inner)
     new SystemPrompt(inner, {})

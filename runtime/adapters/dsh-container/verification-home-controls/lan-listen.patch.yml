@@ -1,4 +1,4 @@
-# 业务实例统一装载：开放 Web 监听和浏览器的 Host 设置。
+# 业务实例统一装载：开放 Web 监听。
 # DSH patch 会整体替换 config，故保留官方 webserver 行的其他配置。
 - id: webserver
   config:
@@ -7,6 +7,3 @@
     compression: gzip
     compressionLevel: 1
     compressionThresholdBytes: 1024
-- insert:
-    - id: web-remote-settings
-      name: /opt/dsh-adapter/web-remote-settings/index.js

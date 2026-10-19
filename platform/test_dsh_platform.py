@@ -20,7 +20,7 @@ from unittest import mock
 
 
 PLATFORM = Path(__file__).resolve().parent
-VERSION = "0.2.1-alpha.2"
+VERSION = "0.2.1-rc.2"
 
 
 class PlatformLauncherTests(unittest.TestCase):
@@ -49,7 +49,7 @@ class PlatformLauncherTests(unittest.TestCase):
         (self.plugin / "package.json").write_text(json.dumps({
             "name": "@ai-agent-harness/harness-platform", "peerDependencies": {
                 "@deepseek-ai/dsh-client-connection": VERSION,
-                "@deepseek-ai/cordis": "~4.0.5-alpha.1",
+                "@deepseek-ai/cordis": "4.0.5",
             },
         }))
         (self.plugin / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n")
@@ -63,7 +63,7 @@ class PlatformLauncherTests(unittest.TestCase):
         self.write_executable("dsh", r'''
 import json, os, pathlib, signal, sys, time
 if sys.argv[1:] == ["--version"]:
-    print(os.environ.get("FAKE_DSH_VERSION", "0.2.1-alpha.2"))
+    print(os.environ.get("FAKE_DSH_VERSION", "0.2.1-rc.2"))
 else:
     if sys.argv.index("--patch") > sys.argv.index("--host"):
         print("error: unknown option '--patch'", file=sys.stderr)
