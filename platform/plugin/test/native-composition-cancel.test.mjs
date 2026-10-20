@@ -118,6 +118,50 @@ test('真实原生 MCP 分组把 SDK 取消传入平台组合客户端，组合�
   assert.match(artifact, /server\.platformComposition\s*\?\s*\{\s*toolCallTimeoutMs:\s*36\s*\*\s*(?:6e4|60_000|60000)\s*\}\s*:\s*\{\}/)
 })
 
+test('v2 分组资源读取将 SDK 取消传到实际来源', async t => {
+  const manager = await managerModule(t)
+  const started = deferred(), aborted = deferred()
+  const sourceUri = 'soc://assets/9106'
+  const protocol = createMcpHandler(() => {
+    const server = new McpServer({ name: 'resource-source', version: '1' }, { capabilities: { resources: {} } })
+    server.server.setRequestHandler('resources/list', async () => ({ resources: [{ uri: sourceUri, name: '资产 9106' }] }))
+    server.server.setRequestHandler('resources/read', async (_request, context) =>
+      waitForAbort(context.mcpReq.signal, started, aborted))
+    return server
+  })
+  t.after(() => protocol.close())
+  const upstream = await serve(t, toNodeHandler(protocol))
+  const routes = []
+  const gateway = await serve(t, (request, response) => {
+    const path = new URL(request.url, 'http://localhost').pathname
+    const route = routes.find(item => item.kind === 'exact' ? path === item.path : path.startsWith(item.path))
+    if (!route) { response.writeHead(404).end(); return }
+    return route.handler(request, response)
+  })
+  const service = { id: 'soc-source', serverName: 'external-name', url: `${upstream.origin}/mcp`,
+    enabled: true, headers: [], tools: { mode: 'all', names: [] } }
+  const token = '4'.repeat(64)
+  const context = { webServer: { port: gateway.server.address().port, register: route => { routes.push(route); return () => {} } },
+    connection: { requestRejection: () => undefined }, effect: create => create(), on: () => {}, provide(name, value) { this[name] = value } }
+  manager.apply(context, { servers: { get: () => [service] }, groups: { get: () => [{ id: 'asset-group',
+    members: [{ serverId: service.id, names: [], resourceUris: [sourceUri], resourceTemplates: [] }] }] },
+    sharedToken: { get: () => token } })
+  const client = new Client({ name: 'resource-cancel-test', version: '1' }, { versionNegotiation: { mode: 'auto' } })
+  t.after(() => client.close())
+  await client.connect(new StreamableHTTPClientTransport(new URL('/mcp/groups/asset-group/v2', gateway.origin),
+    { requestInit: { headers: { Authorization: `Bearer ${token}` } } }))
+  const listed = await client.listResources()
+  assert.equal(listed.resources.length, 1)
+  assert.match(listed.resources[0].uri, /^mcp-group:\/asset-group\/soc-source\/r\//)
+  const controller = new AbortController()
+  const pending = client.readResource({ uri: listed.resources[0].uri }, { signal: controller.signal, timeout: 5000 })
+  const rejected = assert.rejects(pending)
+  await bounded(started.promise, '来源资源读取进入')
+  controller.abort()
+  await rejected
+  await bounded(aborted.promise, '来源资源读取取消')
+})
+
 test('原生 dispatch 调用真实外部 MCP 时保留认证 Header 并把取消传至服务端', async t => {
   const manager = await managerModule(t)
   const started = deferred(), aborted = deferred()

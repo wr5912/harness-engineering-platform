@@ -65,7 +65,7 @@ function fixture(t, responder, root) {
   t.after(async () => { await assistant.dispose(); await ctx.fiber.dispose() })
   const signal = new AbortController().signal
   const rpc = (action, input, requestSignal = signal) => assistant.handler(action, input, requestSignal)
-  const execute = async (id, domain, action, input = {}, toolSignal = signal) => tools.get(`platform_${domain}`).execute({ action, input }, { agent: { id }, signal: toolSignal })
+  const execute = async (id, domain, action, input = {}, toolSignal = signal) => tools.get(`platform_${domain}`).execute({ action, input }, { agent: { id, session: sessions.get(id)?.session }, signal: toolSignal })
   const status = async id => (await rpc('status', { session_id: id })).value
   async function proposal(id) {
     for (let index = 0; index < 40; index++) {
@@ -485,15 +485,31 @@ test('工具方案关联真实 Session；结果脱敏且模型结束不伪造融
     { password: '[已隐藏]', headers: { Authorization: '[已隐藏]' }, token: '[已隐藏]', credential_configured: true })
 })
 
-test('MCP 配置使用原生 revision，调试管理复用实际 dispatcher action', async () => {
+test('MCP 配置使用数据仓库 revision，调试管理复用实际 dispatcher action', async () => {
   const calls = []
-  const bridge = assistantMcp({ describe: () => ({ namespaces: [{ ns: 'mcp-session-manager', revision: 9 }] }), async mutate(...args) { calls.push(args); return { revision: 10 } } },
-    { dispatch: async request => { calls.push(request); return { status: 200, value: { tools: [] } } } })
+  const bridge = assistantMcp({ configuration: () => ({ revision: 'r9', value: { servers: [{ id: 'soc', enabled: true,
+    url: 'http://fixture.invalid/mcp', apiKey: 'opaque-fixture-key', headers: [{ name: 'X-Custom', value: 'opaque-fixture-header' }],
+    tools: { mode: 'all', names: [] } }], groups: [], sharedToken: 'opaque-fixture-group' } }),
+    saveConfiguration(...args) { calls.push(args); return { revision: 'r10' } },
+    dispatch: async request => { calls.push(request); return { status: 200, value: { tools: [] } } } })
   const signal = new AbortController().signal
-  assert.equal((await bridge('configuration', {}, signal)).value.revision, 9)
-  await bridge('saveConfiguration', { ops: [{ op: 'set', path: ['servers', '0', 'description'], value: '更新' }], revision: 9 }, signal)
-  assert.equal(calls[0][0], 'mcp-session-manager')
-  assert.equal(calls[0][2], 9)
+  const view = (await bridge('configuration', {}, signal)).value
+  assert.equal(view.revision, 'r9')
+  assert.equal(view.server_access[0].headers[0].configured, true)
+  for (const secret of ['opaque-fixture-key', 'opaque-fixture-header', 'opaque-fixture-group']) {
+    assert.ok(!JSON.stringify(view).includes(secret), '助手配置投影不得回显任意格式的凭据')
+  }
+  await bridge('saveConfiguration', { ops: [{ op: 'set', path: ['servers', '0', 'description'], value: '更新' }], revision: 'r9' }, signal)
+  assert.equal(calls[0][1], 'r9')
+  await assert.rejects(bridge('saveConfiguration', { ops: [{ op: 'set', path: ['servers'], value: view.value.servers }], revision: 'r9' }, signal), /整体替换/)
+  await assert.rejects(bridge('saveConfiguration', { ops: [{ op: 'set', path: ['servers', '0', 'headers'], value: [] }], revision: 'r9' }, signal), /凭据/)
+  for (const op of [
+    { op: 'set', path: ['sharedToken'], value: 'opaque-fixture-group' },
+    { op: 'set', path: ['servers', '0', 'loginUsername'], value: 'opaque-fixture-login' },
+    { op: 'set', path: ['servers', '1'], value: { id: 'next', headers: [{ name: 'X-Custom', value: 'opaque-fixture-header' }] } },
+    { op: 'set', path: ['servers', '1'], value: { id: 'next', apiKey: 'opaque-fixture-key' } },
+  ]) await assert.rejects(bridge('saveConfiguration', { ops: [op], revision: 'r9' }, signal), /凭据/)
+  assert.equal(calls.length, 1, '直接桥接拒绝凭据修改，不调用配置保存')
   await bridge('sources/list', { serverId: 'soc' }, signal)
   assert.equal(calls[1].action, 'sources')
 })
@@ -580,7 +596,7 @@ test('URL 用户信息及查询凭据在写提案前拒绝，查询、上下文�
   const id = (await f.rpc('session', {})).value.session_id
   for (const url of credentials) await assert.rejects(f.execute(id, 'mcp', 'saveConfiguration', {
     revision: 1, ops: [{ op: 'set', path: ['servers', '0', 'specUrl'], value: url }],
-  }), /凭据请通过原生配置页面维护/)
+  }), /凭据请通过 MCP 管理页面维护/)
   assert.equal((await f.status(id)).proposals.length, 0)
   assert.equal(f.calls.length, 0)
   await f.rpc('context', { session_id: id, context: { url: credentials[0] } })
@@ -607,6 +623,22 @@ test('URL 用户信息及查询凭据在写提案前拒绝，查询、上下文�
   assert.ok(!JSON.stringify(failure).includes('dummy-'))
   // 恢复内存夹具，便于正常释放原生投影。
   f.services.controller.resolveAgent = async sessionId => ({ agent: { session: f.sessions.get(sessionId).session } })
+})
+
+test('MCP 服务凭据和任意 Header 值在提案持久化前拒绝', async t => {
+  const f = fixture(t)
+  const id = (await f.rpc('session', {})).value.session_id
+  const opaque = 'opaque-fixture-private-value'
+  for (const op of [
+    { op: 'set', path: ['servers', '0', 'headers'], value: [{ name: 'X-Custom', value: opaque }] },
+    { op: 'set', path: ['servers', '0', 'loginUsername'], value: opaque },
+    { op: 'set', path: ['servers', '1'], value: { id: 'next', headers: [{ name: 'X-Custom', value: opaque }] } },
+    { op: 'set', path: ['servers', '1'], value: { id: 'next', loginUsername: opaque } },
+    { op: 'set', path: ['sharedToken'], value: opaque },
+  ]) await assert.rejects(f.execute(id, 'mcp', 'saveConfiguration', { revision: 'r9', ops: [op] }), /凭据请通过 MCP 管理页面维护/)
+  assert.equal((await f.status(id)).proposals.length, 0)
+  assert.equal(f.calls.length, 0)
+  assert.ok(!JSON.stringify(f.sessions.get(id).events).includes(opaque))
 })
 
 test('决策抽取预览使用当前真实请求模型和固定 Run，AI 不能自行把标签标为人员复核', async t => {
@@ -696,7 +728,7 @@ test('已绑定的管理 Session 不随路径复用而跨工作区身份接受�
   writeFileSync(descriptor, JSON.stringify({ schemaVersion: 1, id: 'workspace-second', legacyRoots: [] }))
   assert.equal((await f.rpc('status', { session_id: id })).ok, false)
   assert.equal(await f.assemble(id), '')
-  await assert.rejects(() => f.execute(id, 'agents', 'list'), /另一个工作区身份/)
+  await assert.rejects(() => f.execute(id, 'agents', 'list'), /当前 Session 不是平台管理会话/)
   assert.equal(f.calls.length, 0)
 })
 

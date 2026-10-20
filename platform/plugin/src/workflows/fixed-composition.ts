@@ -5,6 +5,7 @@ import type { ModelAttemptContext } from '../evaluation/model-attempts.ts'
 
 export type FixedCompositionBinding = {
   group_id: string; group_target_digest: string; tool_name: string
+  group_link_version?: 1 | 2
   compositionId: string; versionId: string; expectedImplementationDigest: string; input_schema: Record<string, any>
 }
 type Client = { connect(transport: any, options?: any): Promise<any>; listTools(params?: any, options?: any): Promise<any>; callTool(params: any, options?: any): Promise<any>; close(): Promise<any> }
@@ -49,10 +50,13 @@ export function registerFixedCompositionTools(ctx: any, bindings: Record<string,
   const aliases = new Map<string, string>()
   for (const [name, supplied] of Object.entries(bindings)) {
     const binding: FixedCompositionBinding = structuredClone(supplied)
+    const groupVersion = binding.group_link_version ?? 1
     if (!/^[A-Za-z0-9_-]{1,32}$/.test(binding.group_id) || !/^[0-9a-f]{64}$/.test(binding.group_target_digest)
       || !/^[0-9a-f]{64}$/.test(binding.versionId) || !/^[0-9a-f]{64}$/.test(binding.expectedImplementationDigest)
       || typeof binding.compositionId !== 'string' || !/^[a-z0-9-]{1,80}$/.test(binding.compositionId)
-      || typeof binding.tool_name !== 'string' || !binding.tool_name.startsWith('mcp__compositions__') || !binding.input_schema || typeof binding.input_schema !== 'object') throw new Error('固定组合绑定无效')
+      || ![1, 2].includes(groupVersion) || typeof binding.tool_name !== 'string'
+      || !binding.tool_name.startsWith(groupVersion === 2 ? 'platform-compositions__' : 'mcp__compositions__')
+      || !binding.input_schema || typeof binding.input_schema !== 'object') throw new Error('固定组合绑定无效')
     const alias = fixedCompositionToolName(name, binding)
     ctx.tools.register({ name: alias, description: `执行固定组合 ${name}`, parameters: binding.input_schema,
       isConcurrencySafe: () => false,
@@ -62,17 +66,30 @@ export function registerFixedCompositionTools(ctx: any, bindings: Record<string,
       async execute(args: Record<string, any>, exec: any) {
         exec.signal.throwIfAborted()
         if (!ctx.tools.get(name, exec.agent)) throw new Error('固定组合原工具不在当前实例范围')
-        const current = () => ctx.mcpSessionManager?.currentGroup(binding.group_id)
+        const current = () => ctx.mcpSessionManager?.currentGroup(binding.group_id, groupVersion)
         const assertGroup = () => {
           const group = current()
           if (!group?.token || group.targetDigest !== binding.group_target_digest) throw new Error('固定组合 MCP 分组已变化')
           return group
         }
         const group = assertGroup()
-        if (!Number.isInteger(ctx.webServer?.port) || ctx.webServer.port < 1) throw new Error('原生 MCP 分组服务未就绪')
-        const path = `/mcp/groups/${binding.group_id}`
-        const url = `http://127.0.0.1:${ctx.webServer.port}${ctx.webServer.publicPath?.(path) ?? path}`
-        const client = await (dependencies.clientFactory ?? nativeClient)(url, group.token, exec.signal)
+        let client: Client
+        if (groupVersion === 2) {
+          if (typeof ctx.mcpSessionManager?.listGroupTools !== 'function' || typeof ctx.mcpSessionManager?.callGroupTool !== 'function') {
+            throw new Error('原生 MCP 分组 v2 服务未就绪')
+          }
+          client = {
+            listTools: () => ctx.mcpSessionManager.listGroupTools(binding.group_id, 2),
+            callTool: (params: any) => ctx.mcpSessionManager.callGroupTool(binding.group_id, 2,
+              params.name, params.arguments, params._meta, exec),
+            connect: async () => {}, close: async () => {},
+          }
+        } else {
+          if (!Number.isInteger(ctx.webServer?.port) || ctx.webServer.port < 1) throw new Error('原生 MCP 分组服务未就绪')
+          const path = `/mcp/groups/${binding.group_id}`
+          const url = `http://127.0.0.1:${ctx.webServer.port}${ctx.webServer.publicPath?.(path) ?? path}`
+          client = await (dependencies.clientFactory ?? nativeClient)(url, group.token, exec.signal)
+        }
         try {
           const listed = await client.listTools(undefined, { signal: exec.signal })
           assertGroup()

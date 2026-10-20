@@ -2,6 +2,7 @@
 """准备和前台启动使用全局 DSH 的研究资产平台。"""
 
 import argparse
+import hashlib
 import ipaddress
 import json
 import os
@@ -10,10 +11,11 @@ import re
 import shutil
 import secrets
 import socket
+import stat
 import subprocess
 import sys
 import tempfile
-from urllib.parse import quote, unquote, urlparse
+from urllib.parse import parse_qsl, quote, unquote, urlparse, urlsplit
 
 REPO = Path(__file__).resolve().parent.parent
 PLUGIN = REPO / "platform" / "plugin"
@@ -193,7 +195,7 @@ def link_program_asset(target, source, relative):
 
 
 def check_artifacts():
-    for name in ("index.js", "client.js", "mcp-manager.js"):
+    for name in ("index.js", "client.js", "mcp-manager.js", "platform-mcp-manager.js"):
         path = PLUGIN / "lib" / name
         if not path.is_file():
             raise PlatformError(f"缺少插件构建产物：{path}；请先运行 prepare。")
@@ -218,24 +220,26 @@ def check_profile(profile, rendered):
         if actual != content:
             raise PlatformError(f"平台 Profile 与仓库模板不一致：{path}；请重新运行 prepare。")
     user_patch = profile / "cordis.patch.yml"
-    if user_patch.is_file() and normalized_mcp_patch(profile) != user_patch.read_bytes().decode("utf-8"):
-        raise PlatformError("原生 MCP 配置仍引用旧 Profile 路径；请运行 prepare 完成身份引用迁移。")
+    if user_patch.is_file():
+        source = user_patch.read_bytes().decode("utf-8")
+        if normalized_mcp_patch(profile, source) != source or legacy_mcp_row(source) is not None:
+            raise PlatformError("原生 MCP 配置尚未迁至数据工作区；请运行 prepare。")
+    check_mcp_store()
 
 
-def normalized_mcp_patch(profile):
-    """仅重定位原生保存的本平台 MCP 插件 name，保留其余配置的原始字节。"""
+def normalized_mcp_patch(profile, source=None):
+    """核对旧 MCP 插件身份；规范化结果仅供判断旧 Profile 引用。"""
     try:
         import yaml
     except ImportError:
         raise PlatformError("检查原生 MCP 配置需要 Python 依赖 PyYAML；请为启动器使用的 Python 安装 PyYAML 后重试。") from None
     patch = profile / "cordis.patch.yml"
-    source = patch.read_bytes().decode("utf-8")
-    target = profile / "node_modules/@ai-agent-harness/harness-platform/lib/mcp-manager.js"
+    source = patch.read_bytes().decode("utf-8") if source is None else source
+    target = profile / "node_modules/@ai-agent-harness/harness-platform/lib/platform-mcp-manager.js"
     # DSH 使用 Node 的 pathToFileURL；其包名中的 @ 保持原样，不能按 Path.as_uri 编码。
     expected = "file://" + quote(str(target.absolute()), safe="/:@!$&'()*+,;=")
-    suffix = "/profiles/harness-platform/node_modules/@ai-agent-harness/harness-platform/lib/mcp-manager.js"
-    # 原生序列化器可能将长 URL 折为多行。仅组合 YAML 节点，不构造或执行配置标签；
-    # 用源码位置替换目标标量，避免重新序列化其余连接、组、凭据和注释。
+    suffix = "/profiles/harness-platform/node_modules/@ai-agent-harness/harness-platform/lib/"
+    # 原生序列化器可能将长 URL 折为多行；只解析节点位置，不执行配置标签。
     try:
         document = yaml.compose(source, Loader=yaml.SafeLoader)
     except yaml.YAMLError:
@@ -254,7 +258,7 @@ def normalized_mcp_patch(profile):
             continue
         field = fields.get("name")
         if field is None:
-            continue
+            raise PlatformError("原生 MCP 插件缺少 name 身份；保留原配置并人工核对。")
         if not isinstance(field, yaml.ScalarNode) or field.tag != "tag:yaml.org,2002:str":
             raise PlatformError("原生 MCP 插件 name 必须是字符串；保留原配置。")
         name = field.value
@@ -262,9 +266,11 @@ def normalized_mcp_patch(profile):
             continue
         uri = urlparse(name)
         previous = Path(unquote(uri.path))
-        if uri.scheme != "file" or uri.netloc or not previous.is_absolute() or not str(previous).endswith(suffix):
+        if (uri.scheme != "file" or uri.netloc or not previous.is_absolute()
+                or previous.name not in ("mcp-manager.js", "platform-mcp-manager.js")
+                or not str(previous).endswith(suffix + previous.name)):
             raise PlatformError("原生 MCP 插件身份不属于已知平台 bundle；保留原配置，请核对其来源。")
-        if previous.exists() and previous.resolve() != target.resolve():
+        if previous.exists() and previous.resolve().parent != target.resolve().parent:
             raise PlatformError("原生 MCP 插件引用另一份程序；保留原配置，请核对迁移来源。")
         start, end = field.start_mark.index, field.end_mark.index
         if not row.start_mark.index <= start < end <= row.end_mark.index or source[start:end].lstrip().startswith("&"):
@@ -273,6 +279,340 @@ def normalized_mcp_patch(profile):
     for start, end, replacement in sorted(replacements, reverse=True):
         source = source[:start] + replacement + source[end:]
     return source
+
+
+def mcp_store_paths():
+    root = asset_root()
+    return root / "config/mcp-manager.json", root / ".local/credentials/mcp-manager.json"
+
+
+def legacy_mcp_row(source):
+    """只构造旧 Patch 中的 MCP 节点；其他插件可能含 SafeLoader 不识别的 JS 标签。"""
+    try:
+        import yaml
+    except ImportError:
+        raise PlatformError("迁移原生 MCP 配置需要 Python 依赖 PyYAML。") from None
+    try:
+        document = yaml.compose(source, Loader=yaml.SafeLoader)
+    except yaml.YAMLError:
+        raise PlatformError("原生 MCP Patch YAML 格式无效；保留原配置。") from None
+    if document is None:
+        return None
+    if not isinstance(document, yaml.SequenceNode):
+        raise PlatformError("原生 MCP Patch 必须是 YAML 列表；保留原配置。")
+    def validate_keys(node, visited):
+        identity = id(node)
+        if identity in visited:
+            raise PlatformError("原生 MCP 配置使用共享 YAML 引用；保留原配置并人工核对。")
+        visited.add(identity)
+        if isinstance(node, yaml.MappingNode):
+            keys = set()
+            for key, value in node.value:
+                if not isinstance(key, yaml.ScalarNode) or key.value in keys:
+                    raise PlatformError("原生 MCP 配置含重复或非标量 YAML 键；保留原配置并人工核对。")
+                keys.add(key.value)
+                validate_keys(value, visited)
+        elif isinstance(node, yaml.SequenceNode):
+            for value in node.value:
+                validate_keys(value, visited)
+
+    matches = []
+    for row in document.value:
+        if not isinstance(row, yaml.MappingNode):
+            continue
+        identities = [value.value for key, value in row.value
+                      if isinstance(key, yaml.ScalarNode) and key.value == "id" and isinstance(value, yaml.ScalarNode)]
+        if "mcp-session-manager" in identities:
+            validate_keys(row, set())
+            fields = {key.value: value for key, value in row.value}
+            matches.append((row, fields))
+    if len(matches) > 1:
+        raise PlatformError("原生 MCP Patch 含多个 MCP 配置节点；保留原配置并人工核对。")
+    return matches[0] if matches else None
+
+
+def split_legacy_mcp(source):
+    selected = legacy_mcp_row(source)
+    if selected is None:
+        return None
+    row, fields = selected
+    try:
+        import yaml
+        loader = yaml.SafeLoader(source)
+        config = loader.construct_object(fields["config"], deep=True) if "config" in fields else {}
+        loader.dispose()
+    except (yaml.YAMLError, KeyError, TypeError, ValueError):
+        raise PlatformError("原生 MCP 配置无法安全解析；保留原配置。") from None
+    if not isinstance(config, dict) or not isinstance(config.get("servers", []), list) or not isinstance(config.get("groups", []), list):
+        raise PlatformError("原生 MCP 服务或分组格式无效；保留原配置。")
+    if set(config) - {"servers", "groups", "sharedToken"}:
+        raise PlatformError("原生 MCP 配置包含未知字段；保留原配置并人工核对。")
+    token = config.get("sharedToken", "")
+    if not isinstance(token, str) or token and not re.fullmatch(r"[0-9a-f]{64}", token):
+        raise PlatformError("原生 MCP 分组凭据格式无效；保留原配置。")
+    public = {"schemaVersion": 1, "servers": [], "groups": config.get("groups", [])}
+    private = {"schemaVersion": 1, "sharedToken": token, "servers": {}}
+    for server in config.get("servers", []):
+        if not isinstance(server, dict) or not isinstance(server.get("id"), str) or not server["id"]:
+            raise PlatformError("原生 MCP 服务 ID 无效；保留原配置。")
+        if set(server) - MCP_SERVER_FIELDS:
+            raise PlatformError("原生 MCP 服务包含未知字段；保留原配置并人工核对。")
+        if "tools" in server and (not isinstance(server["tools"], dict)
+                                  or set(server["tools"]) - {"mode", "names"}):
+            raise PlatformError("原生 MCP 工具策略包含未知字段；保留原配置并人工核对。")
+        if not isinstance(server.get("enabled"), bool) or not isinstance(server.get("tools"), dict) \
+                or server["tools"].get("mode") not in ("all", "selected") \
+                or not isinstance(server["tools"].get("names"), list) \
+                or any(not isinstance(name, str) for name in server["tools"]["names"]):
+            raise PlatformError("原生 MCP 服务缺少已生效的 enabled/tools 字段；保留原配置并人工核对。")
+        identity = server["id"]
+        if identity in private["servers"]:
+            raise PlatformError("原生 MCP 服务 ID 重复；保留原配置。")
+        check_mcp_urls(server, "原生 MCP 服务")
+        visible = {key: value for key, value in server.items() if key not in MCP_PRIVATE_FIELDS and key != "headers"}
+        concealed = {key: server[key] for key in MCP_PRIVATE_FIELDS if key in server}
+        if any(not isinstance(value, str) for value in concealed.values()):
+            raise PlatformError("原生 MCP 服务凭据格式无效；保留原配置。")
+        if "headers" in server:
+            if not isinstance(server["headers"], list):
+                raise PlatformError("原生 MCP Header 格式无效；保留原配置。")
+            visible["headers"] = []
+            concealed["headers"] = {}
+            for header in server["headers"]:
+                if not isinstance(header, dict) or set(header) != {"name", "value"} or not isinstance(header["name"], str) or not isinstance(header["value"], str):
+                    raise PlatformError("原生 MCP Header 格式无效；保留原配置。")
+                if any(name.lower() == header["name"].lower() for name in concealed["headers"]):
+                    raise PlatformError("原生 MCP Header 重复；保留原配置。")
+                visible["headers"].append({"name": header["name"]})
+                concealed["headers"][header["name"]] = header["value"]
+        public["servers"].append(visible)
+        private["servers"][identity] = concealed
+    for group in public["groups"]:
+        if not isinstance(group, dict) or set(group) - {"id", "members"} or not isinstance(group.get("members"), list):
+            raise PlatformError("原生 MCP 分组包含未知字段；保留原配置并人工核对。")
+        if any(not isinstance(member, dict) or set(member) - {"serverId", "names", "resourceUris", "resourceTemplates"}
+               or not isinstance(member.get("names"), list)
+               for member in group.get("members", [])):
+            raise PlatformError("原生 MCP 分组成员包含未知字段；保留原配置并人工核对。")
+    return public, private, row
+
+
+MCP_SERVER_FIELDS = {"id", "serverName", "description", "enabled", "specUrl", "apiKey", "authType",
+                     "authHeader", "loginUrl", "loginUsername", "loginPassword", "loginTokenPath",
+                     "url", "headers", "managementUrl", "tools"}
+MCP_PRIVATE_FIELDS = ("apiKey", "loginUsername", "loginPassword")
+
+
+def check_mcp_urls(server, label):
+    for field in ("specUrl", "loginUrl", "url", "managementUrl"):
+        address = server.get(field)
+        if not address:
+            continue
+        if not isinstance(address, str):
+            raise PlatformError(f"{label}地址格式无效；保留原配置。")
+        try:
+            parsed = urlsplit(address)
+        except ValueError:
+            raise PlatformError(f"{label}地址格式无效；保留原配置。") from None
+        sensitive_query = any(re.search(r"(?:token|secret|password|passwd|api.?key|auth|signature|credential)", key, re.I)
+                              for key, _ in parse_qsl(parsed.query, keep_blank_values=True))
+        if parsed.username or parsed.password or sensitive_query:
+            raise PlatformError(f"{label}地址含凭据；保留原配置并移出 URL 凭据后再迁移。")
+
+
+def read_mcp_store(path, label):
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raise PlatformError(f"{label} 无法读取或 JSON 无效；保留原配置。") from None
+    if not isinstance(value, dict) or value.get("schemaVersion") != 1:
+        raise PlatformError(f"{label} schemaVersion 无效；保留原配置。")
+    return value
+
+
+def check_mcp_store():
+    public_path, private_path = mcp_store_paths()
+    if public_path.is_symlink() or private_path.is_symlink():
+        raise PlatformError("MCP 配置或凭据路径不能是符号链接；保留原配置。")
+    if not public_path.is_file():
+        raise PlatformError("数据工作区尚无 config/mcp-manager.json；请运行 prepare。")
+    public = read_mcp_store(public_path, "公开 MCP 配置")
+    if set(public) != {"schemaVersion", "servers", "groups"} \
+            or not isinstance(public.get("servers"), list) or not isinstance(public.get("groups"), list):
+        raise PlatformError("公开 MCP 服务或分组格式无效；保留原配置。")
+    for server in public["servers"]:
+        if not isinstance(server, dict) or any(field in server for field in ("apiKey", "loginUsername", "loginPassword")):
+            raise PlatformError("公开 MCP 配置包含服务凭据；保留原配置。")
+        if set(server) - (MCP_SERVER_FIELDS - set(MCP_PRIVATE_FIELDS)):
+            raise PlatformError("公开 MCP 服务包含未知字段；保留原配置。")
+        check_mcp_urls(server, "公开 MCP 服务")
+        if "tools" in server and (not isinstance(server["tools"], dict)
+                                  or set(server["tools"]) - {"mode", "names"}):
+            raise PlatformError("公开 MCP 工具策略包含未知字段；保留原配置。")
+        if not isinstance(server.get("enabled"), bool) or not isinstance(server.get("tools"), dict) \
+                or server["tools"].get("mode") not in ("all", "selected") \
+                or not isinstance(server["tools"].get("names"), list) \
+                or any(not isinstance(name, str) for name in server["tools"]["names"]):
+            raise PlatformError("公开 MCP 服务缺少已生效的 enabled/tools 字段；保留原配置。")
+        if "headers" in server and (not isinstance(server["headers"], list) or any(
+                not isinstance(header, dict) or set(header) != {"name"} for header in server["headers"])):
+            raise PlatformError("公开 MCP Header 包含凭据或格式无效；保留原配置。")
+    for group in public["groups"]:
+        if not isinstance(group, dict) or set(group) - {"id", "members"} or not isinstance(group.get("members"), list):
+            raise PlatformError("公开 MCP 分组包含未知字段；保留原配置。")
+        if any(not isinstance(member, dict) or set(member) - {"serverId", "names", "resourceUris", "resourceTemplates"}
+               or not isinstance(member.get("names"), list)
+               for member in group.get("members", [])):
+            raise PlatformError("公开 MCP 分组成员包含未知字段；保留原配置。")
+    if not private_path.is_file():
+        raise PlatformError("本地 MCP 凭据缺失；请恢复 .local/credentials/mcp-manager.json 后重试。")
+    private = read_mcp_store(private_path, "本地 MCP 凭据")
+    if set(private) != {"schemaVersion", "sharedToken", "servers"} \
+            or not isinstance(private.get("sharedToken"), str) or not isinstance(private.get("servers"), dict):
+        raise PlatformError("本地 MCP 凭据格式无效；保留原配置。")
+    for identity, value in private["servers"].items():
+        server = next((entry for entry in public["servers"] if entry.get("id") == identity), None)
+        if server is None or not isinstance(value, dict) or set(value) - {*MCP_PRIVATE_FIELDS, "headers"} \
+                or any(not isinstance(value[key], str) for key in MCP_PRIVATE_FIELDS if key in value):
+            raise PlatformError("本地 MCP 凭据与公开服务不一致；保留原配置。")
+        headers = value.get("headers", {})
+        names = {header["name"] for header in server.get("headers", [])}
+        if not isinstance(headers, dict) or any(name not in names or not isinstance(header, str)
+                                                  for name, header in headers.items()):
+            raise PlatformError("本地 MCP Header 与公开服务不一致；保留原配置。")
+    if stat.S_IMODE(private_path.stat().st_mode) & 0o077:
+        raise PlatformError("本地 MCP 凭据权限过宽；请设为 0600 后重试。")
+    return public, private
+
+
+def create_mcp_json(path, value, mode):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            os.fchmod(handle.fileno(), mode)
+            json.dump(value, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        try:
+            os.link(temporary, path)  # 仅首次创建；并行写入者不会被覆盖。
+        except FileExistsError:
+            raise PlatformError("MCP 配置在迁移期间已由其他操作写入；保留原配置并重新核对。") from None
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
+
+def mcp_row_removed(source, row):
+    try:
+        import yaml
+    except ImportError:
+        raise PlatformError("迁移原生 MCP 配置需要 Python 依赖 PyYAML。") from None
+    def deepest_end(node):
+        if isinstance(node, yaml.MappingNode):
+            return max([deepest_end(part) for pair in node.value for part in pair], default=node.end_mark.index)
+        if isinstance(node, yaml.SequenceNode):
+            return max([deepest_end(part) for part in node.value], default=node.end_mark.index)
+        return node.end_mark.index
+    start = source.rfind("\n", 0, row.start_mark.index) + 1
+    if not re.match(r"[ \t]*-[ \t]+", source[start:row.start_mark.index]):
+        raise PlatformError("原生 MCP Patch 不是可独立迁移的 YAML 列表节点；保留原配置。")
+    end = source.find("\n", deepest_end(row))
+    end = len(source) if end < 0 else end + 1
+    return source[:start] + source[end:]
+
+
+def migrate_mcp_patch(profile):
+    lock = asset_root() / ".local/credentials/mcp-manager.lock"
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        handle = os.open(lock, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        raise PlatformError("MCP 配置正在保存或保存锁未释放；保留原配置并稍后重试。") from None
+    try:
+        migrate_mcp_patch_locked(profile)
+    finally:
+        os.close(handle)
+        lock.unlink()
+
+
+def migrate_mcp_patch_locked(profile):
+    patch = profile / "cordis.patch.yml"
+    if patch.is_symlink():
+        raise PlatformError("原生 MCP Patch 是符号链接；保留原配置并人工核对。")
+    original = patch.read_bytes()
+    try:
+        source = original.decode("utf-8")
+    except UnicodeDecodeError:
+        raise PlatformError("原生 MCP Patch 不是 UTF-8；保留原配置。") from None
+    # 在读取旧配置前先验证插件身份；不从来源不明的 Patch 迁移凭据。
+    normalized_mcp_patch(profile, source)
+    split = split_legacy_mcp(source)
+    public_path, private_path = mcp_store_paths()
+    expected_public, expected_private, row = split if split else (
+        {"schemaVersion": 1, "servers": [], "groups": []},
+        {"schemaVersion": 1, "sharedToken": "", "servers": {}}, None)
+    public_exists, private_exists = public_path.exists(), private_path.exists()
+    if public_exists:
+        public = read_mcp_store(public_path, "公开 MCP 配置")
+        if split and public != expected_public:
+            raise PlatformError("旧 Patch 与数据工作区 MCP 配置冲突；保留两份配置并人工核对。")
+    elif private_exists and not split:
+        raise PlatformError("仅有本地 MCP 凭据而无公开配置；请恢复 config/mcp-manager.json。")
+    if private_exists:
+        private = read_mcp_store(private_path, "本地 MCP 凭据")
+        if split and private != expected_private:
+            raise PlatformError("旧 Patch 与本地 MCP 凭据冲突；保留两份配置并人工核对。")
+    elif public_exists:
+        if public.get("servers") or public.get("groups") or split and expected_private["sharedToken"]:
+            raise PlatformError("本地 MCP 凭据缺失；请恢复 .local/credentials/mcp-manager.json，保留旧 Patch。")
+    if split:
+        backups = asset_root() / ".local/credentials/mcp-manager-patch-backups"
+        if backups.is_symlink():
+            raise PlatformError("旧 MCP Patch 备份目录不能是符号链接；保留原配置。")
+        backups.mkdir(parents=True, exist_ok=True, mode=0o700)
+        os.chmod(backups, 0o700)
+        digest = hashlib.sha256(original).hexdigest()
+        backup = backups / f"{digest}.yml"
+        if backup.is_symlink():
+            raise PlatformError("旧 MCP Patch 备份不能是符号链接；保留原配置。")
+        if not backup.exists():
+            try:
+                fd = os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            except FileExistsError:
+                fd = None
+            if fd is not None:
+                with os.fdopen(fd, "wb") as handle:
+                    handle.write(original)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+        if backup.read_bytes() != original or stat.S_IMODE(backup.stat().st_mode) & 0o077:
+            raise PlatformError("旧 MCP Patch 备份摘要或权限核对失败；保留原配置。")
+    if not private_exists:
+        create_mcp_json(private_path, expected_private, 0o600)
+    if not public_exists:
+        create_mcp_json(public_path, expected_public, 0o644)
+    current_public, current_private = check_mcp_store()
+    if split and (current_public != expected_public or current_private != expected_private):
+        raise PlatformError("MCP 数据配置在迁移期间已变化；保留旧 Patch 并人工核对。")
+    if row is None:
+        return
+    store_bytes = (public_path.read_bytes(), private_path.read_bytes())
+    migrated = mcp_row_removed(source, row).encode("utf-8")
+    if patch.read_bytes() != original:
+        raise PlatformError("原生 MCP Patch 在迁移期间已变化；保留当前内容并人工核对。")
+    fd, temporary = tempfile.mkstemp(prefix=".cordis.patch.", dir=profile)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            os.fchmod(handle.fileno(), stat.S_IMODE(patch.stat().st_mode))
+            handle.write(migrated)
+            handle.flush()
+            os.fsync(handle.fileno())
+        if patch.read_bytes() != original or (public_path.read_bytes(), private_path.read_bytes()) != store_bytes:
+            raise PlatformError("原生 MCP Patch 在迁移期间已变化；保留当前内容并人工核对。")
+        os.replace(temporary, patch)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
 
 
 def link_bundle(profile):
@@ -334,18 +674,11 @@ def prepare(home):
     user_patch = profile / "cordis.patch.yml"
     if not user_patch.exists():
         user_patch.write_text("[]\n", encoding="utf-8")
-    # 在重建 bundle 链接前核对旧 MCP 身份，旧 HOME 必须指向恢复出的同一程序。
-    # 换链后再核对会丢失该来源关系，导致合法的程序与数据同时迁移被拒绝。
-    normalized = normalized_mcp_patch(profile)
+    # 在重建 bundle 链接前核对旧 MCP 身份并迁出配置；换链后会丢失旧来源关系。
+    migrate_mcp_patch(profile)
     link_bundle(profile)
     for name, content in rendered.items():
         (profile / name).write_text(content, encoding="utf-8")
-    if normalized != user_patch.read_bytes().decode("utf-8"):
-        temporary = user_patch.with_name(f".cordis.patch.{os.getpid()}.tmp")
-        with temporary.open("x", encoding="utf-8") as handle:
-            os.chmod(temporary, user_patch.stat().st_mode & 0o777)
-            handle.write(normalized)
-        temporary.replace(user_patch)
     print(f"平台准备完成：DSH {version} ({executable})")
     print(f"Profile：{profile}")
     print("启动：./platform/dsh-platform start")

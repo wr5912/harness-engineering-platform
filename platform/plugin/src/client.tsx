@@ -7,7 +7,7 @@ import type { PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-
 import type { HeroBrandMarkOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { SidebarBrandMarkOwnerProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
-import type { ConfigForm, SettingsLauncherOwnerProps, SettingsOnboardingOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { SettingsLauncherOwnerProps, SettingsOnboardingOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { createCatalog, type Catalog } from './catalog.ts'
 import type { PageId, PlatformNavigation, PlatformPageProps } from './protocol.ts'
 import { HomePage, PlatformLogo } from './home.tsx'
@@ -23,7 +23,7 @@ import { AssistantConversation, AssistantOperations, PlatformOperationCard, crea
 import { createPlatformUpdates, type PlatformUpdates } from './realtime/client.ts'
 
 export const name = 'harness-platform-client'
-export const inject = ['connection', 'slots', 'configForms', 'layout', 'workspaces', 'uiWorkspace', 'uiSession', 'sessions', 'conversation']
+export const inject = ['connection', 'slots', 'layout', 'workspaces', 'uiWorkspace', 'uiSession', 'sessions', 'conversation']
 type ClientContext = Omit<Context, 'connection'> & { connection: ConnectionHandle }
 const pages: { id: PageId; label: string }[] = [
   { id: 'home', label: '首页' }, { id: 'conversations', label: '管理对话' }, { id: 'agents', label: '智能体管理' },
@@ -35,12 +35,11 @@ type PlatformProps = PlatformPageProps & PropsRuntime<'shell.overlay'> & PropsRe
   catalog: Catalog
   assistant: Assistant
   updates: PlatformUpdates
-  mcpForm: ConfigForm<any>
   enterConversation: (sidebarCollapsed?: boolean) => void
   showNativeConversation: (visible: boolean, afterHidden?: () => void) => void
 }
 
-function PlatformPage({ catalog, rpc, mcpForm, assistant, updates, enterConversation, showNativeConversation, SessionProvider, renderSlot, useSessionStatus }: PlatformProps) {
+function PlatformPage({ catalog, rpc, assistant, updates, enterConversation, showNativeConversation, SessionProvider, renderSlot, useSessionStatus }: PlatformProps) {
   const [target, setTarget] = useState<PlatformNavigation>(() => readNavigation(window.location.hash))
   const page = target.page
   const [open, setOpen] = useState(false)
@@ -159,7 +158,7 @@ function PlatformPage({ catalog, rpc, mcpForm, assistant, updates, enterConversa
         <div hidden={page !== 'evaluation'}><EvaluationPage rpc={rpc} updates={updates} onAssistant={onAssistant} onContext={onContext} target={target} onNavigate={navigate} active={page === 'evaluation'} /></div>
         <div hidden={page !== 'instances'}><InstancesPage rpc={rpc} updates={updates} onContext={onContext} target={target} onNavigate={navigate} /></div>
         <div hidden={page !== 'gateway'}><BusinessControlPage rpc={rpc} updates={updates} active={page === 'gateway'} /></div>
-        <div hidden={page !== 'mcp'}><McpPage rpc={rpc} form={mcpForm} updates={updates} onContext={onContext} /></div>
+        <div hidden={page !== 'mcp'}><McpPage rpc={rpc} updates={updates} onContext={onContext} /></div>
         <div ref={conversation} className="harness-conversation-viewport" hidden={!full}/>
         <section className="harness-assistant harness-assistant-floating" hidden={!floating} aria-label="平台 AI 助手">
           <header className="harness-assistant-heading"><div><strong>平台 AI 助手</strong><small role="status">{assistantState.busy ? '正在准备会话…' : statusLabel}</small></div><div>
@@ -247,7 +246,7 @@ export function apply(ctx: ClientContext) {
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay', id: 'harness-platform', order: -100,
     children: { 'harness.assistant.conversation': { kind: 'single', scope: 'session-maybe' } },
-    inject: () => ({ catalog, assistant, updates, rpc: ctx.connection.rpc, mcpForm: ctx.configForms.get('mcp-session-manager'), enterConversation: (sidebarCollapsed?: boolean) => prepareConversation(ctx.layout, sidebarCollapsed), showNativeConversation }),
+    inject: () => ({ catalog, assistant, updates, rpc: ctx.connection.rpc, enterConversation: (sidebarCollapsed?: boolean) => prepareConversation(ctx.layout, sidebarCollapsed), showNativeConversation }),
   }, PlatformPage))
   ctx.slots.inject('harness.assistant.conversation', () => ctx.slots.register({ name: 'harness.assistant.conversation' }, AssistantConversation))
   ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({ name: 'conversation.input.dock', id: 'harness-operation-confirmation', inject: () => ({ rpc: ctx.connection.rpc, assistant }) }, AssistantOperations))

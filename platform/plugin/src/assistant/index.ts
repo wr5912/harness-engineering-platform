@@ -8,6 +8,7 @@ import type { ProjectionDefinition, SessionProjectionRegistry } from '@deepseek-
 import type { PromptAssembly, SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { z } from 'zod'
 import { COMPOSITION_SERVICE_ID, compositionConfig } from '../mcp/compositions.ts'
+import { mcpCredentialEdit } from './mcp.ts'
 import { assertTaskBudget, parseTaskPlan, taskAllows, taskCandidatePath, type TaskExecution } from './task.ts'
 import { completedTaskModelView } from './task-model-view.ts'
 import { deliveryProjection, deliveryProjectionSchema, readInstanceDeliveryHistory, type DeliveryHistoryReader, type DeliveryProjection } from './delivery-history.ts'
@@ -96,6 +97,7 @@ export const assistantProjection = {
     if (typeof data.workspace_id === 'string' && !state.workspace_id) state = { ...state, workspace_id: data.workspace_id }
     if (data.kind === 'task') return { ...state, active: true, task: data.task, task_context: data.context ?? {} }
     if (data.kind === 'context') return { ...state, active: true, context: data.context ?? {} }
+    if (data.kind === 'workspace') return { ...state, active: true }
     if (data.kind === 'tool-contract') return { ...state, tool_contracts: { ...state.tool_contracts, [data.domain]: data.action } }
     if (data.kind === 'automatic-save' && data.owner_session_id === state.session_id && pluginRecord.seq >= state.inherited_event_count) return { ...state, automatic_save: data }
     if (data.kind === 'execution') {
@@ -166,8 +168,8 @@ function object(value: unknown): MapValue {
 function result(ok: boolean, value: any) { return ok ? { ok: true, value: redactAssistant(value) } : { ok: false, error: { code: 'assistant_operation_failed', message: redactAssistant(value instanceof Error ? value.message : String(value)), details: {} } } }
 
 function assertNoCredentials(domain: Domain, action: string, input: MapValue) {
-  const secretPath = domain === 'mcp' && action === 'saveConfiguration' && Array.isArray(input.ops) && input.ops.some((op: any) => Array.isArray(op.path) && op.path.some((part: any) => /password|token|api.?key|authorization|secret/i.test(String(part))))
-  if (secretPath || JSON.stringify(input) !== JSON.stringify(redactAssistant(input))) throw new Error('凭据请通过原生配置页面维护，助手操作仅使用已配置引用')
+  const secretPath = domain === 'mcp' && action === 'saveConfiguration' && mcpCredentialEdit(input)
+  if (secretPath || JSON.stringify(input) !== JSON.stringify(redactAssistant(input))) throw new Error('凭据请通过 MCP 管理页面维护，助手操作仅使用已配置引用')
 }
 
 export function createAssistant(root: string, platform: ConnectionRpcHandler, services: AssistantServices) {
@@ -179,7 +181,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
   const pending = new Map<string, { sessionId: string; signal: AbortSignal; executing: boolean; resolve(value: any): void; detach(): void }>()
   const unregisterProjection = services.projections.register(assistantProjection)
   function promptState(agent: any) {
-    if (!agent || !workspaceOwnsCwd(root, agent.session.header.cwd)) return undefined
+    if (!agent?.session?.header || !workspaceOwnsCwd(root, agent.session.header.cwd)) return undefined
     const state = services.projections.stateOf(agent.session, projectionKey)
     if (state?.workspace_id && state.workspace_id !== workspaceIdentity(root).id) return undefined
     return state?.active ? state : undefined
@@ -942,6 +944,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
       } },
       async execute(args: any, exec: any) {
         const id = String(exec.agent.id)
+        if (!promptState(exec.agent) || exec.agent.session.header.id !== id) throw new Error('当前 Session 不是平台管理会话')
         const { state } = await inspect(id, exec.signal)
         await assertAssistantConfigured(root, services.skills, requiredContext(state), exec.agent, exec.signal)
         if (args.action === 'describe') {

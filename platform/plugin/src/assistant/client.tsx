@@ -277,7 +277,7 @@ function BusinessPreview({ value, meta }: { value: unknown; meta: OperationMeta 
     const ops = data?.input?.ops ?? input.ops ?? []
     const disabled = ops.filter((op: any) => op.path?.at(-1) === 'enabled' && op.value === false).length
     const removed = ops.filter((op: any) => op.op === 'unset' && op.path?.[0] === 'servers' && op.path.length === 2).length
-    summary = <><p>将 <strong>{ops.length} 项连接设置修改</strong>保存到原生 MCP 配置。</p>{disabled > 0 && <p><strong>其中 {disabled} 项会停用连接，相关工具将不可调用。</strong></p>}{removed > 0 && <p><strong>将移除 {removed} 个连接及其工具入口。</strong></p>}<p>现有凭据沿用原生配置；此操作不验证上游业务效果。</p></>
+    summary = <><p>将 <strong>{ops.length} 项连接设置修改</strong>保存到数据仓库 MCP 配置。</p>{disabled > 0 && <p><strong>其中 {disabled} 项会停用连接，相关工具将不可调用。</strong></p>}{removed > 0 && <p><strong>将移除 {removed} 个连接及其工具入口。</strong></p>}<p>现有凭据沿用本地受控凭据文件；此操作不验证上游业务效果。</p></>
   } else if (data?.parent_experiment_id && plan) summary = <>
     <p>从{versionLabel(data.parent_experiment_id)}为 <strong>{data.agent_id}</strong>创建独立融合版本。</p>
     <p>采用 {plan.sources?.filter((source: any) => source.decision === 'inherit').length ?? 0} 个来源，纳入 {plan.features?.length ?? 0} 项特性，约定 {plan.checks?.length ?? 0} 项验证。当前版本保留，新版本须完成验证后才可交付。</p>

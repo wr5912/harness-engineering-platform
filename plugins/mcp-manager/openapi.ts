@@ -194,17 +194,24 @@ export async function loadOpenApi(server: any): Promise<any> {
       const description = raw.summary || raw.description || `${method.toUpperCase()} ${path}`
       const item = { name, method, path, parameters, body, raw, uri, description }
       operations.set(name, item)
-      if (method === 'get' && !body && parameters.every(parameter => parameter.in === 'path')) {
+      const queryReadable = method === 'get' && parameters.some(parameter => parameter.in === 'query')
+      if (method === 'get' && !body && parameters.every(parameter => ['path', 'query'].includes(parameter.in)
+        && (parameter.in !== 'query' || parameter.schema?.type !== 'array' && /^[A-Za-z0-9_.-]+$/.test(parameter.name)))) {
         readable.push(item)
         const info = { name, description, mimeType: 'application/json' }
-        if (parameters.length) resourceTemplates.push({ ...info, uriTemplate: uri.replace(/%7B/gi, '{').replace(/%7D/gi, '}') })
+        if (parameters.length) {
+          const queryNames = parameters.filter(parameter => parameter.in === 'query').map(parameter => parameter.name)
+          resourceTemplates.push({ ...info, uriTemplate: uri.replace(/%7B/gi, '{').replace(/%7D/gi, '}')
+            + (queryNames.length ? `{?${queryNames.join(',')}}` : '') })
+        }
         else resources.push({ ...info, uri })
+        if (queryReadable) tools.push({ name, description, inputSchema: operationSchema(spec, parameters, body) })
       } else {
         tools.push({ name, description, inputSchema: operationSchema(spec, parameters, body) })
       }
     }
   }
-  const businessTools = [...tools, ...readable.map(item => ({ name: item.name, description: item.description,
+  const businessTools = [...tools, ...readable.filter(item => !tools.some(tool => tool.name === item.name)).map(item => ({ name: item.name, description: item.description,
     inputSchema: operationSchema(spec, item.parameters, item.body) }))]
   return { spec, base, tools, businessTools, resources, resourceTemplates, operations, readable, server }
 }
@@ -241,26 +248,33 @@ async function execute(source: any, item: any, args: any): Promise<{ response: R
 
 export async function callOpenApiTool(source: any, name: string, args: any): Promise<any> {
   const item = source.operations.get(name)
-  if (!item || source.readable.includes(item) && !source.server.platformToolResources) throw new Error('工具不属于当前 OpenAPI 范围')
+  if (!item || source.readable.includes(item) && !source.server.platformToolResources
+    && !source.tools.some((tool: any) => tool.name === name)) throw new Error('工具不属于当前 OpenAPI 范围')
   const { response, text } = await execute(source, item, args)
   return { content: [{ type: 'text', text: text || `HTTP ${response.status}` }], isError: !response.ok }
 }
 
 export async function readOpenApiResource(source: any, uri: string): Promise<any> {
   const request = new URL(uri)
-  if (request.search || request.hash) throw new Error('Resource URI 不属于当前 OpenAPI 范围')
+  if (request.hash) throw new Error('Resource URI 不属于当前 OpenAPI 范围')
   for (const item of source.readable) {
     const template = new URL(item.uri)
     if (request.origin !== template.origin) continue
     const expected = template.pathname.split('/').map(decodeURIComponent)
     const actual = request.pathname.split('/')
     if (expected.length !== actual.length) continue
-    const args: Record<string, string> = {}
+    const args: Record<string, string> = Object.create(null)
     if (!expected.every((part, index) => {
       const variable = /^\{([^{}]+)\}$/.exec(part)
       if (variable) { args[variable[1]] = decodeURIComponent(actual[index]); return true }
-      return part === actual[index]
+      return part === decodeURIComponent(actual[index])
     })) continue
+    const queryNames = item.parameters.filter((parameter: any) => parameter.in === 'query').map((parameter: any) => parameter.name)
+    if ([...request.searchParams.keys()].some(name => !queryNames.includes(name) || request.searchParams.getAll(name).length !== 1)) continue
+    for (const name of queryNames) {
+      const value = request.searchParams.get(name)
+      if (value !== null) args[name] = value
+    }
     const { response, text } = await execute(source, item, args)
     if (!response.ok) throw new Error(`Resource 读取失败：HTTP ${response.status}`)
     return { contents: [{ uri, mimeType: response.headers.get('content-type')?.split(';')[0] || 'application/json', text }] }

@@ -24,14 +24,19 @@ interface State {
 interface Confirmation { id: string; subjectId: string; binding: string; version: number; expiresAt: number; confirmed: boolean }
 interface Shared {
   contexts: AsyncLocalStorage<BusinessContext>; services: Map<string, BusinessControl>; managers: WeakSet<BusinessContext>
+  signedRuntimeSessions: AsyncLocalStorage<boolean>
   stateRoots: Map<string, string>
 }
 const symbol = Symbol.for('harness.platform.business-control.v1')
 const globals = globalThis as typeof globalThis & { [symbol]?: Shared }
 // 各 esbuild 制品共用同一个 ALS；否则 MCP 独立 bundle 会遗失受信上下文。
-const shared = globals[symbol] ??= { contexts: new AsyncLocalStorage<BusinessContext>(), services: new Map(), managers: new WeakSet(), stateRoots: new Map() }
+const shared = globals[symbol] ??= { contexts: new AsyncLocalStorage<BusinessContext>(), services: new Map(), managers: new WeakSet(),
+  signedRuntimeSessions: new AsyncLocalStorage<boolean>(), stateRoots: new Map() }
+shared.signedRuntimeSessions ??= new AsyncLocalStorage<boolean>()
 export function currentBusinessContext(): BusinessContext | undefined { return shared.contexts.getStore() }
 export function withBusinessContext<T>(context: BusinessContext, fn: () => T): T { return shared.contexts.run(context, fn) }
+/** 仅在平台核验 Runtime 的逐请求签名后使用；Session 事实仍由业务 Runtime 持有。 */
+export function withSignedRuntimeSession<T>(fn: () => T): T { return shared.signedRuntimeSessions.run(true, fn) }
 export function getBusinessControl(assetRoot: string, stateRoot?: string): BusinessControl {
   const root = resolve(assetRoot), selectedStateRoot = stateRoot ?? shared.stateRoots.get(root)
   const key = JSON.stringify([root, resolve(selectedStateRoot ?? join(root, '.local', 'business-control'))])
@@ -303,7 +308,7 @@ export class BusinessControl {
     if (!context.identity || context.identity.evidence.externalSubject !== context.subject.id
       || context.identity.evidence.issuer !== context.subject.identitySource || !future(context.identity.expiresAt)
       || !future(context.identity.evidence.expiresAt)) return error('identity_expired', 401)
-    if (context.scope.sessionId) this.checkSession(context, context.scope.sessionId)
+    if (context.scope.sessionId && !shared.signedRuntimeSessions.getStore()) this.checkSession(context, context.scope.sessionId)
     return context
   }
   private checkSession(context: BusinessContext, sessionId: string): SessionBinding {

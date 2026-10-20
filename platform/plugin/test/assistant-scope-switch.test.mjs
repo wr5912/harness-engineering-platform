@@ -138,6 +138,9 @@ test('真实HTTP管理会话统一限制原生读写，专用切换与可信Skil
   const ordinary = agents.get((await ctx.sessionController.create()).sessionId)
   assert.ok((await ctx.systemPrompt.assemble({ scope: ordinary, agent: ordinary })).tools.some(tool => tool.name === 'read'))
   for (const name of ['bash', 'read', 'write']) assert.equal((await execute(name, {}, ordinary)).isError, false, '未激活管理身份的原生Session保持原能力')
+  assert.equal((await execute('platform_mcp', { action: 'context', input: {} }, ordinary)).isError, true, '普通原生Session即使在数据工作区也不能调用平台MCP工具')
+  assert.equal((await execute('platform_mcp', { action: 'context', input: {} }, { ...ordinary, id })).isError, true, '不能借用管理Session ID绕过执行身份')
+  assert.equal((await execute('platform_mcp', { action: 'context', input: {} })).isError, false, '管理Session保持MCP工具访问')
   await rpc('session', { session_id: id, task: '再次进入算力任务', context: { skill: 'compute-variant-research' } })
   await assertCompute()
 

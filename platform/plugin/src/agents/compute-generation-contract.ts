@@ -33,7 +33,7 @@ export function computeGenerationContract() {
       },
       output: 'run 返回无损 JSON：普通对象、数组、字符串、有限数字、布尔或 null；无值字段省略或设 null，禁止 undefined、NaN、Infinity、类实例和循环引用。registerWorkflowTool 返回 {ok,result?,error?,graph_execution}，必须检查 ok 和图状态；模型退回原子工具后答对不能证明工作流成功。',
       fixed_compositions: {
-        binding_fields: ['group_id', 'group_target_digest', 'tool_name', 'compositionId', 'versionId', 'expectedImplementationDigest', 'input_schema'],
+        binding_fields: ['group_id', 'group_link_version', 'group_target_digest', 'tool_name', 'compositionId', 'versionId', 'expectedImplementationDigest', 'input_schema'],
         dispatch: '从 tasks/capabilities 读取真实目标原生分组、工具 schema 与固定版本。fixedCompositions 以原工具名为键传给 defineWorkflow；context.callTool 仍用原名，运行库注册固定别名。用 fixedCompositionToolName(name,binding) 计算别名，Preset/Guard 同时保留工作流、原工具与别名。版本元数据仅由受信 helper 注入，不放进业务参数；未知回执保持未知。',
       },
     },

@@ -10,6 +10,8 @@ window.__ModuleLoader__.load({
       enabled: true, tools: { mode: 'all', names: [] } })
     const commonHeaders = ['Authorization', 'X-API-Key', 'Api-Key', 'X-Auth-Token']
     const emptyGroup = () => ({ id: '', members: [] })
+    const duplicateMemberIds = members => [...new Set(members.map(member => member.serverId)
+      .filter((serverId, index, ids) => ids.indexOf(serverId) !== index))]
     const input = (value, change, props = {}) => <input value={value ?? ''} onChange={event => change(event.target.value)} {...props} />
     const button = (label, action, disabled = false) => <button type="button" onClick={action} disabled={disabled}>{label}</button>
     const styles = `
@@ -32,9 +34,8 @@ window.__ModuleLoader__.load({
       .mcp-manager .mcp-tabs button[aria-current=page]{border-color:var(--mcp-blue);color:var(--mcp-link);font-weight:600}
       .mcp-manager .mcp-tabs small{margin-left:6px;padding:2px 6px;border-radius:6px;background:var(--mcp-tint);color:inherit;font-size:12px;font-variant-numeric:tabular-nums}
       .mcp-manager .mcp-content{min-width:0}
-      .mcp-manager .mcp-heading{display:flex;justify-content:space-between;align-items:start;gap:16px;margin-bottom:20px}
-      .mcp-manager h2,.mcp-manager h3{margin:0;color:var(--mcp-ink);line-height:1.4;overflow-wrap:anywhere}.mcp-manager h2{font-size:18px}.mcp-manager h3{font-size:16px}
-      .mcp-manager .mcp-muted{color:var(--mcp-muted);line-height:1.6;overflow-wrap:anywhere}.mcp-manager .mcp-heading p{margin:6px 0 0}
+      .mcp-manager h3{margin:0;color:var(--mcp-ink);line-height:1.4;overflow-wrap:anywhere;font-size:16px}
+      .mcp-manager .mcp-muted{color:var(--mcp-muted);line-height:1.6;overflow-wrap:anywhere}
       .mcp-manager .mcp-layout{display:grid;grid-template-columns:240px minmax(0,1fr);gap:24px;align-items:start}
       .mcp-manager .mcp-card{min-width:0;border:1px solid var(--mcp-line);border-radius:var(--hep-radius,12px);background:var(--mcp-surface);padding:24px}
       .mcp-manager .mcp-sidebar{padding:8px;background:var(--mcp-tint);border-color:transparent}
@@ -63,6 +64,7 @@ window.__ModuleLoader__.load({
       .mcp-manager .mcp-server-tools summary::-webkit-details-marker{display:none}.mcp-manager .mcp-server-tools summary::before{content:'▸';flex:none;color:var(--mcp-link);transition:transform var(--hep-motion-fast,140ms)}.mcp-manager .mcp-server-tools[open] summary::before{transform:rotate(90deg)}
       .mcp-manager .mcp-server-tools summary .mcp-muted{margin-left:auto;flex:none;font-size:12px}
       .mcp-manager .mcp-tool-body{padding:4px 0 16px}.mcp-manager .mcp-tool-body p{margin:0 0 12px}
+      .mcp-manager .mcp-tool-body h4{margin:16px 0 6px;font-size:13px;line-height:1.4}
       .mcp-manager .mcp-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-height:320px;overflow:auto;margin-top:12px}
       .mcp-manager .mcp-check{min-width:0;overflow-wrap:anywhere;padding:10px;border-radius:var(--hep-control-radius,8px);background:var(--mcp-tint);font-size:13px}
       .mcp-manager .mcp-result{max-height:420px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;margin:16px 0 0;padding:20px;border:1px solid var(--mcp-line);border-radius:var(--hep-control-radius,8px);background:var(--mcp-tint);color:var(--mcp-ink);font-size:13px;line-height:1.7}
@@ -79,6 +81,7 @@ window.__ModuleLoader__.load({
       const state = form?.state
       const [draft, setDraft] = useState(null)
       const [discovered, setDiscovered] = useState({})
+      const [discoveredResources, setDiscoveredResources] = useState({})
       const [selected, setSelected] = useState('')
       const [sources, setSources] = useState(null)
       const [sourceId, setSourceId] = useState('')
@@ -101,7 +104,7 @@ window.__ModuleLoader__.load({
           groups: structuredClone(state.value.groups ?? []), sharedToken: state.value.sharedToken ?? '', revision: state.revision })
       }, [state?.value, state?.revision, state?.status])
       if (view === 'summary') return <>通过 OpenAPI 规范生成 MCP tools/resources，并管理分组链接。</>
-      if (!draft || !state) return <p>正在读取 Web profile 配置…</p>
+      if (!draft || !state) return <p>正在读取 MCP 配置…</p>
 
       const editServer = (index, field, value) => setDraft(previous => {
         const next = structuredClone(previous)
@@ -147,6 +150,10 @@ window.__ModuleLoader__.load({
             setCatalog({ serverId: diagnosticId, data })
             setDiscovered(previous => ({ ...previous,
               [diagnosticId]: data.tools?.map(tool => tool.name) ?? [] }))
+            setDiscoveredResources(previous => ({ ...previous, [diagnosticId]: {
+              resourceUris: data.resources?.unavailable ? undefined : data.resources?.resources?.map(item => item.uri),
+              resourceTemplates: data.resourceTemplates?.unavailable ? undefined : data.resourceTemplates?.resourceTemplates?.map(item => item.uriTemplate),
+            } }))
           }
           setStatus(action === 'test' ? '配置解析与工具发现成功；新会话仍需单独验证。'
             : '上游操作已返回；请检查下方结果和新会话。')
@@ -198,11 +205,23 @@ window.__ModuleLoader__.load({
         } catch (error) { setStatus(String(error)) }
         finally { setBusy(false) }
       }
-      const toggleTool = (groupIndex, serverId, tool) => editGroup(groupIndex, group => {
+      const toggleSelection = (groupIndex, serverId, field, value) => editGroup(groupIndex, group => {
         let member = group.members.find(item => item.serverId === serverId)
-        if (!member) { member = { serverId, names: [] }; group.members.push(member) }
-        member.names = member.names.includes(tool) ? member.names.filter(name => name !== tool) : [...member.names, tool]
-        group.members = group.members.filter(item => item.names.length)
+        if (!member) { member = { serverId, names: [], resourceUris: [], resourceTemplates: [] }; group.members.push(member) }
+        const current = member[field] ?? []
+        member[field] = current.includes(value) ? current.filter(item => item !== value) : [...current, value]
+        group.members = group.members.filter(item => item.names?.length || item.resourceUris?.length || item.resourceTemplates?.length)
+      })
+      const mergeDuplicateMembers = groupIndex => editGroup(groupIndex, group => {
+        const firstByServer = new Map()
+        group.members = group.members.filter(member => {
+          const first = firstByServer.get(member.serverId)
+          if (!first) { firstByServer.set(member.serverId, member); return true }
+          for (const field of ['names', 'resourceUris', 'resourceTemplates']) {
+            first[field] = [...new Set([...(first[field] ?? []), ...(member[field] ?? [])])]
+          }
+          return false
+        })
       })
       const sourceList = Array.isArray(sources) ? sources : sources?.items ?? sources?.data ?? []
       const isDirty = JSON.stringify(draft.servers) !== JSON.stringify(state.value.servers ?? [])
@@ -210,6 +229,11 @@ window.__ModuleLoader__.load({
         || draft.sharedToken !== (state.value.sharedToken ?? '')
       const editingServer = draft.servers[activeServer]
       const editingGroup = draft.groups[activeGroup]
+      const duplicateIds = editingGroup ? duplicateMemberIds(editingGroup.members) : []
+      const savedGroup = (state.value.groups ?? []).find(group => group.id === editingGroup?.id)
+      const savedDuplicateIds = savedGroup ? duplicateMemberIds(savedGroup.members) : []
+      const linkReady = !!savedGroup && !duplicateIds.length && !savedDuplicateIds.length
+        && !!state.value.sharedToken && draft.sharedToken === state.value.sharedToken
 
       return <section className="mcp-manager">
         <style>{styles}</style>
@@ -226,7 +250,6 @@ window.__ModuleLoader__.load({
           </nav>
           <div className="mcp-content">
             {page === 'servers' && <>
-              <div className="mcp-heading"><div><h2>MCP 服务器</h2><p className="mcp-muted">添加 OpenAPI 规范地址生成工具，或填写现成 MCP 服务地址。</p></div></div>
               <div className="mcp-layout">
                 <aside className="mcp-card mcp-sidebar" aria-label="服务器列表">
                   {draft.servers.map((server, index) => <button key={index} className="mcp-list-item" type="button" aria-current={activeServer === index ? 'true' : undefined} onClick={() => setActiveServer(index)}>
@@ -241,7 +264,7 @@ window.__ModuleLoader__.load({
                   <section className="mcp-section"><h3>基本信息</h3><div className="mcp-fields">
                     <label className="mcp-field">ID{input(editingServer.id, value => editServer(activeServer, 'id', value), { placeholder: '例如 sec-ops-api' })}</label>
                     <label className="mcp-field">描述（可选）{input(editingServer.description, value => editServer(activeServer, 'description', value))}</label>
-                    {editingServer.serverName !== undefined && <label className="mcp-field">模型可见名称{input(editingServer.serverName, value => editServer(activeServer, 'serverName', value))}</label>}
+                    <label className="mcp-field">直连服务名称（可选）{input(editingServer.serverName, value => editServer(activeServer, 'serverName', value))}<small>为空时使用服务 ID；分组链接使用分组 ID 作为连接名。</small></label>
                     <label className="mcp-field">接入方式<select value={'specUrl' in editingServer ? 'openapi' : 'mcp'} onChange={event => switchServerType(activeServer, event.target.value)}>
                       <option value="openapi">OpenAPI 接口规范</option><option value="mcp">现成 MCP 连接</option>
                     </select></label>
@@ -290,7 +313,6 @@ window.__ModuleLoader__.load({
               </div>
             </>}
             {page === 'groups' && <>
-              <div className="mcp-heading"><div><h2>工具分组</h2><p className="mcp-muted">为每组选择可访问的服务器工具，并使用独立的 MCP 链接。</p></div></div>
               <div className="mcp-card" style={{ marginBottom: 16 }}>
                 <h3>统一访问 Token</h3><p className="mcp-muted">分组和智能体 MCP 链接共用。未生成时链接不接受访问；更换并保存后旧 Token 立即失效。</p>
                 <div className="mcp-fields"><label className="mcp-field mcp-wide">Token{input(draft.sharedToken, () => {}, { type: tokenVisible ? 'text' : 'password', readOnly: true, placeholder: '尚未生成', autoComplete: 'off', id: 'mcp-shared-token' })}</label></div>
@@ -309,30 +331,52 @@ window.__ModuleLoader__.load({
               <div className="mcp-layout">
                 <aside className="mcp-card mcp-sidebar" aria-label="分组列表">
                   {draft.groups.map((group, index) => <button key={index} className="mcp-list-item" type="button" aria-current={activeGroup === index ? 'true' : undefined} onClick={() => setActiveGroup(index)}>
-                    <strong>{group.id || '新分组'}</strong><small>{group.members.reduce((count, member) => count + member.names.length, 0)} 个工具</small>
+                    <strong>{group.id || '新分组'}</strong><small>{group.members.reduce((count, member) => count + (member.names?.length ?? 0), 0)} 个工具 · {group.members.reduce((count, member) => count + (member.resourceUris?.length ?? 0), 0)} 个资源 · {group.members.reduce((count, member) => count + (member.resourceTemplates?.length ?? 0), 0)} 个模板</small>
                   </button>)}
                   <button className="mcp-add" type="button" onClick={() => { setActiveGroup(draft.groups.length); setDraft(previous => ({ ...previous, groups: [...previous.groups, emptyGroup()] })) }}>＋ 新增分组</button>
                 </aside>
                 {editingGroup ? <div className="mcp-card">
-                  <div className="mcp-card-head"><div><h3>{editingGroup.id || '新分组'}</h3><p className="mcp-muted">仅开放此组勾选的工具。</p></div></div>
+                  <div className="mcp-card-head"><div><h3>{editingGroup.id || '新分组'}</h3><p className="mcp-muted">仅开放此组勾选的工具与资源。</p></div></div>
                   <section className="mcp-section"><div className="mcp-fields"><label className="mcp-field">分组 ID{input(editingGroup.id, value => editGroup(activeGroup, group => { group.id = value }))}</label></div>
-                    {editingGroup.id && <div className="mcp-actions"><span className="mcp-muted">MCP 链接</span><code className="mcp-link">{new URL(`mcp/groups/${editingGroup.id}`, document.baseURI).href}</code></div>}
-                    <p className="mcp-muted">通过 Authorization: Bearer &lt;统一访问 Token&gt; 调用；此链接的工具范围由本组勾选结果决定。</p>
+                    {/^[A-Za-z0-9_-]{1,32}$/.test(editingGroup.id) && <div className="mcp-actions"><span className="mcp-muted">MCP 链接</span>{linkReady && <code className="mcp-link">{new URL(`mcp/groups/${editingGroup.id}/v2`, document.baseURI).href}</code>}
+                      {button('复制分组链接', async () => { try { await navigator.clipboard.writeText(new URL(`mcp/groups/${editingGroup.id}/v2`, document.baseURI).href); setStatus('分组链接已复制。') } catch { setStatus('当前浏览器无法自动复制，请手动复制上方链接。') } }, !linkReady)}</div>}
+                    {editingGroup.id && !/^[A-Za-z0-9_-]{1,32}$/.test(editingGroup.id) && <p className="mcp-muted">分组 ID 须为 1–32 个字母、数字、下划线或连字符。</p>}
+                    {!!duplicateIds.length && <div className="mcp-note">服务 {duplicateIds.join('、')} 在此分组中有重复成员，v2 链接不可用。合并会对工具、资源 URI 和资源模板取并集，并改变旧版分组的目标摘要；请保存后重新发现工具。
+                      <div className="mcp-actions">{button('合并同源成员', () => mergeDuplicateMembers(activeGroup))}</div></div>}
+                    {!duplicateIds.length && !!savedDuplicateIds.length && <p className="mcp-muted">重复成员已在草稿中合并；保存并等待配置刷新后，v2 链接才可使用。</p>}
+                    {!savedGroup && !duplicateIds.length && <p className="mcp-muted">此分组尚未保存；保存后才会生成可用链接。</p>}
+                    {!!savedGroup && !duplicateIds.length && !savedDuplicateIds.length && !state.value.sharedToken && <p className="mcp-muted">请生成并保存统一访问 Token 后使用分组链接。</p>}
+                    {!!savedGroup && !duplicateIds.length && !savedDuplicateIds.length && !!state.value.sharedToken && draft.sharedToken !== state.value.sharedToken && <p className="mcp-muted">新 Token 尚未保存；保存后再复制分组链接。</p>}
+                    {linkReady && isDirty && <p className="mcp-muted">当前草稿尚未保存；链接仍使用上次保存的配置。</p>}
+                    <p className="mcp-muted">通过 Authorization: Bearer &lt;统一访问 Token&gt; 调用。DSH 中将连接名设为分组 ID，模型可见工具名以该分组为前缀；超长工具名由 DSH 缩短。</p>
                   </section>
-                  <section className="mcp-section"><h3>选择工具</h3><p className="mcp-muted">发现工具后勾选；已保存的工具会直接显示。</p>
+                  <section className="mcp-section"><h3>选择工具与资源</h3><p className="mcp-muted">发现使用上次保存的服务配置；已保存的选择始终显示。</p>
                     {draft.servers.map((server, index) => {
-                      const checked = editingGroup.members.find(member => member.serverId === server.id)?.names ?? []
-                      const names = [...new Set([...checked, ...(discovered[server.id] ?? [])])]
+                      const members = editingGroup.members.filter(item => item.serverId === server.id)
+                      const selected = Object.fromEntries(['names', 'resourceUris', 'resourceTemplates'].map(field =>
+                        [field, [...new Set(members.flatMap(member => member[field] ?? []))]]))
+                      const needsMerge = members.length > 1
+                      const resources = discoveredResources[server.id]
+                      const sections = [
+                        { field: 'names', title: '工具', items: [...new Set([...selected.names, ...(discovered[server.id] ?? [])])], discovered: discovered[server.id] },
+                        { field: 'resourceUris', title: '资源 URI', items: [...new Set([...selected.resourceUris, ...(resources?.resourceUris ?? [])])], discovered: resources?.resourceUris },
+                        { field: 'resourceTemplates', title: '资源模板', items: [...new Set([...selected.resourceTemplates, ...(resources?.resourceTemplates ?? [])])], discovered: resources?.resourceTemplates },
+                      ]
+                      const selectedCount = selected.names.length + selected.resourceUris.length + selected.resourceTemplates.length
                       return <details className="mcp-server-tools" key={index}>
-                        <summary>{server.serverName || server.id || '新服务器'}<span className="mcp-muted">{checked.length} 个已选</span></summary>
+                        <summary>{server.serverName || server.id || '新服务器'}<span className="mcp-muted">{selectedCount} 个已选{server.enabled === false ? ' · 已停用' : ''}</span></summary>
                         <div className="mcp-tool-body">
-                          <p className="mcp-muted">服务器：{server.id || '未设置 ID'}</p>
-                          <button className="mcp-quiet" type="button" onClick={() => { setSelected(server.id); void callTest(server.id) }} disabled={busy || !server.id}>发现工具</button>
-                          {names.length ? <div className="mcp-tools">{names.map(tool => <label className="mcp-check" key={tool}><input type="checkbox" checked={checked.includes(tool)} onChange={() => toggleTool(activeGroup, server.id, tool)} />{tool}</label>)}</div>
-                            : <p className="mcp-muted">尚无工具。点击“发现工具”读取该服务器的工具列表。</p>}
+                          <p className="mcp-muted">服务器 ID：{server.id || '未设置 ID'}{server.enabled === false ? '。此来源已停用，所选能力不会通过分组开放。' : ''}{needsMerge ? '。此来源有重复成员，请先合并再编辑选择。' : ''}</p>
+                          <button className="mcp-quiet" type="button" onClick={() => { setSelected(server.id); void callTest(server.id) }} disabled={busy || !server.id || server.enabled === false}>发现工具与资源</button>
+                          {sections.map(section => <section key={section.field}><h4>{section.title}</h4>
+                            {section.items.length ? <div className="mcp-tools">{section.items.map(item => <label className="mcp-check" key={item}><input type="checkbox" checked={selected[section.field].includes(item)} disabled={needsMerge} onChange={() => toggleSelection(activeGroup, server.id, section.field, item)} />{item}{selected[section.field].includes(item) && Array.isArray(section.discovered) && !section.discovered.includes(item) && <span className="mcp-muted">（当前未发现）</span>}</label>)}</div>
+                              : <p className="mcp-muted">{section.discovered === undefined ? '尚未发现，或此服务未提供该列表。' : '没有可选项目。'}</p>}
+                            {section.discovered === undefined && selected[section.field].length > 0 && <p className="mcp-muted">已保存的选择尚无法通过当前发现结果核对。</p>}
+                          </section>)}
                         </div>
                       </details>
                     })}
+                    {editingGroup.members.filter(member => !draft.servers.some(server => server.id === member.serverId)).map(member => <p className="mcp-note" key={member.serverId}>已选来源 {member.serverId} 不在服务列表中；请恢复该服务或取消此分组引用。</p>)}
                     {!draft.servers.length && <p className="mcp-note">请先添加 MCP 服务器。</p>}
                   </section>
                   <div className="mcp-actions"><button className="mcp-danger" type="button" onClick={() => {
@@ -340,11 +384,10 @@ window.__ModuleLoader__.load({
                     setDraft(previous => ({ ...previous, groups: previous.groups.filter((_, at) => at !== activeGroup) }))
                     setActiveGroup(Math.max(0, activeGroup - 1))
                   }}>删除分组</button></div>
-                </div> : <div className="mcp-card mcp-empty"><strong>暂无分组</strong><p>从左侧新增工具分组。</p></div>}
+                </div> : <div className="mcp-card mcp-empty"><strong>暂无分组</strong><p>从左侧新增工具与资源分组。</p></div>}
               </div>
             </>}
             {page === 'connection' && <>
-              <div className="mcp-heading"><div><h2>工具与资源</h2><p className="mcp-muted">按已保存的配置查看 OpenAPI 生成或现成 MCP 服务提供的能力。</p></div></div>
               <div className="mcp-card">
                 <h3>连接检查</h3><p className="mcp-muted">测试使用上次保存的服务器配置。</p>
                 <div className="mcp-fields"><label className="mcp-field">服务器<select value={diagnosticId} onChange={event => { setSelected(event.target.value); setSources(null); setResult(null); setCatalog(null); setUriText('') }}>
@@ -406,8 +449,12 @@ window.__ModuleLoader__.load({
             headers: { 'content-type': 'application/json' }, body: JSON.stringify({ serverId, action: 'test' }) })
           const data = await response.json()
           if (!response.ok) throw new Error(data.error)
-          setDiscovered(previous => ({ ...previous, [serverId]: data.tools.map(tool => tool.name) }))
-          setStatus(`${serverId} 已发现 ${data.tools.length} 个工具`)
+          setDiscovered(previous => ({ ...previous, [serverId]: data.tools?.map(tool => tool.name) ?? [] }))
+          setDiscoveredResources(previous => ({ ...previous, [serverId]: {
+            resourceUris: data.resources?.unavailable ? undefined : data.resources?.resources?.map(item => item.uri),
+            resourceTemplates: data.resourceTemplates?.unavailable ? undefined : data.resourceTemplates?.resourceTemplates?.map(item => item.uriTemplate),
+          } }))
+          setStatus(`${serverId} 已发现 ${data.tools?.length ?? 0} 个工具、${data.resources?.resources?.length ?? 0} 个资源、${data.resourceTemplates?.resourceTemplates?.length ?? 0} 个模板。`)
         } catch (error) { setStatus(String(error)) }
         finally { setBusy(false) }
       }

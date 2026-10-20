@@ -135,6 +135,26 @@ export function applyTools(ctx: Context) {
   const registrationContext = ctx.extend({ webServer: ctx.webServer })
   const manager = ctx.platformMcp
   const mcp = manager?.compositionHandler ?? (manager ? createManagedMcpHandler(assetRoot, () => manager.servers.get()) : createMcpHandler(assetRoot))
+  const mcpManagement: ConnectionRpcHandler = async (endpoint, payload, signal, peer) => {
+    if (['configuration', 'saveConfiguration'].includes(endpoint) && peer?.principal?.kind !== 'owner') {
+      return failure('forbidden', 'MCP 配置读写要求平台管理身份')
+    }
+    if (endpoint === 'configuration') {
+      if (!manager?.configuration) return failure('unavailable', 'MCP 数据配置尚未装载')
+      try { return { ok: true, value: manager.configuration() } }
+      catch (error) { return failure('configuration_failed', (error as Error).message) }
+    }
+    if (endpoint === 'saveConfiguration') {
+      if (!manager?.saveConfiguration) return failure('unavailable', 'MCP 数据配置尚未装载')
+      const input = payload as { ops?: unknown; revision?: unknown } | undefined
+      if (!Array.isArray(input?.ops) || typeof input.revision !== 'string') {
+        return failure('invalid_request', 'MCP 保存需要原始版本和修改操作')
+      }
+      try { return { ok: true, value: manager.saveConfiguration(input.ops, input.revision) } }
+      catch (error) { return failure('configuration_save_failed', (error as Error).message) }
+    }
+    return mcp(endpoint, payload, signal, peer)
+  }
   const events = createPlatformEvents(assetRoot)
   events.register(registrationContext)
   registrationContext.connection.fetch.register({ path: '/api/harness-platform/runs/download', methods: ['GET'], requestBody: 'buffered', fetch: createRunDownloadHandler(assetRoot) })
@@ -143,7 +163,7 @@ export function applyTools(ctx: Context) {
     if (getBusinessControl(assetRoot).enabled() && !currentBusinessContext() && peer?.principal.kind !== 'owner') return failure('forbidden', '平台管理操作要求管理身份')
     try { return await managementDispatch(assetRoot, () => handler(endpoint, payload, signal, peer)) }
     finally {
-      if (!['control/status', 'research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'list', 'detail', 'url', 'logs', 'edit/read', 'cases/list', 'cases/read', 'eval/status', 'runs/index', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/preview', 'compute-variants/compare', 'compute-variants/build-preview', 'compute-variants/freeze-preview', 'tasks/capabilities', 'datasets/source', 'datasets/list', 'datasets/read', 'datasets/export', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'fusion/status', 'fusion/proposal', 'features/proposal', 'features/read-source'].includes(endpoint)) notify([domain, 'catalog'])
+      if (!['control/status', 'research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'list', 'detail', 'url', 'logs', 'edit/read', 'cases/list', 'cases/read', 'eval/status', 'runs/index', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/preview', 'compute-variants/compare', 'compute-variants/build-preview', 'compute-variants/freeze-preview', 'tasks/capabilities', 'datasets/source', 'datasets/list', 'datasets/read', 'datasets/export', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'fusion/status', 'fusion/proposal', 'features/proposal', 'features/read-source', 'configuration'].includes(endpoint)) notify([domain, 'catalog'])
     }
   }
   const domains = {
@@ -167,9 +187,10 @@ export function applyTools(ctx: Context) {
           const groups = (manager?.groups.get() ?? []).filter(group => callable.has(entry.published.toolName)
             && group.members?.some((member: any) => member.serverId === 'platform-compositions' && member.names?.includes(entry.published.toolName)))
           const bindings = groups.flatMap(group => {
-            const actual = manager?.currentGroup?.(group.id)
+            const actual = manager?.currentGroup?.(group.id, 2)
             return actual && /^[0-9a-f]{64}$/.test(actual.targetDigest) ? [{ ...base, fixed_binding: {
-              group_id: actual.id, group_target_digest: actual.targetDigest, tool_name: `mcp__compositions__${entry.published.toolName}`,
+              group_id: actual.id, group_link_version: 2, group_target_digest: actual.targetDigest,
+              tool_name: `platform-compositions__${entry.published.toolName}`,
               compositionId: entry.binding.compositionId, versionId: entry.binding.versionId,
               expectedImplementationDigest: entry.binding.expectedImplementationDigest, input_schema: compositionInputSchema(entry.published),
             } }] : []
@@ -178,7 +199,7 @@ export function applyTools(ctx: Context) {
         })
       },
     })),
-    instances: wrap('instances', createInstancesHandler(assetRoot)), mcp: wrap('mcp', mcp),
+    instances: wrap('instances', createInstancesHandler(assetRoot)), mcp: wrap('mcp', mcpManagement),
     assistant: undefined as ConnectionRpcHandler | undefined,
   }
   const handler = createPlatformHandler(assetRoot, domains)
@@ -202,7 +223,7 @@ export function applyTools(ctx: Context) {
     liveAgent: id => services.agents.get(id),
     record: async (session, type, value) => { const records = await runtimeModule('@deepseek-ai/dsh-session'); records.appendPluginRecord(session, type, value) },
     projections: services.sessionProjections, systemPrompt: services.systemPrompt, skills: services.skills,
-    notify, mcp: manager ? assistantMcp(services.settingsController, manager) : undefined,
+    notify, mcp: manager ? assistantMcp(manager) : undefined,
     goals: services.goals,
   })
   domains.assistant = assistant.handler

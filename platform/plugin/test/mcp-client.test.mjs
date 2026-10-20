@@ -5,7 +5,7 @@ import vm from 'node:vm'
 import test from 'node:test'
 
 // 运行实际客户端产物，只替换 React 的状态调度和 Portal 容器。
-function editor() {
+function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理请求') } } = {}) {
   const require = createRequire(import.meta.url)
   const states = [], dependencies = []
   let registration, cursor, effects, changed
@@ -34,10 +34,12 @@ function editor() {
   }
   const source = readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8')
     .replace('return module.exports;}});', 'return { ...module.exports, Manager };}});')
+  const copied = []
   vm.runInNewContext(source, {
     window: { __ModuleLoader__: { load: value => { registration = value } } },
     structuredClone, URL, location: { origin: 'http://127.0.0.1:3090' },
     document: { baseURI: 'http://127.0.0.1:3090/hep/' },
+    fetch, navigator: { clipboard: { writeText: async value => { copied.push(value) } } },
   })
   const { Manager } = registration.factory(name => name === '@deepseek-ai/dsh-client-ui-primitives' ? {} : name === 'react' ? react
     : name === 'react-dom' ? { ...require(name), createPortal: element => element } : require(name))
@@ -79,10 +81,15 @@ function editor() {
   const input = label => nodes(nodes().find(node => node.type === 'label' && text(node) === label))
     .find(node => node.type === 'input')
   render()
-  return { render, nodes, text, button, input, writes, server, groups,
+  return { render, nodes, text, button, input, writes, copied, server, groups,
     refreshValue: (value = props.form.state.value, revision = props.form.state.revision) => {
       props.form.state.value = structuredClone(value)
       props.form.state.revision = revision
+      render()
+    },
+    setPublishedTools: names => {
+      props.publishedService = { ...props.publishedService, tools: { mode: 'all', names },
+        publishedTools: names.map(name => ({ toolName: name })) }
       render()
     },
     setView: value => { props.view = value; render() }, getView: () => props.view }
@@ -158,8 +165,117 @@ test('无修改时同步外部配置，未保存草稿保留输入和原版本�
   assert.match(ui.text(ui.render()), /配置版本冲突/)
 })
 
-test('MCP 分组入口使用当前站点基址', () => {
+test('MCP 分组入口使用当前站点基址与 v2 路径', async () => {
+  const ui = editor()
+  ui.refreshValue({ servers: [ui.server], groups: ui.groups, sharedToken: 'fixture-token' })
+  ui.setView('groups')
+  assert.match(ui.text(ui.render()), /http:\/\/127\.0\.0\.1:3090\/hep\/mcp\/groups\/research\/v2/)
+  await ui.button('复制分组链接').props.onClick()
+  assert.deepEqual(ui.copied, ['http://127.0.0.1:3090/hep/mcp/groups/research/v2'])
+})
+
+test('旧分组重复成员需显式合并并保存后才可复制 v2 链接', async () => {
+  const ui = editor()
+  const group = { id: 'legacy', members: [
+    { serverId: ui.server.id, names: ['first', 'shared'], resourceUris: ['fixture:/one'], resourceTemplates: ['fixture:/item/{id}'] },
+    { serverId: ui.server.id, names: ['shared', 'second'], resourceUris: ['fixture:/one', 'fixture:/two'], resourceTemplates: ['fixture:/other/{id}'] },
+  ] }
+  ui.refreshValue({ servers: [ui.server], groups: [group], sharedToken: 'fixture-token' })
+  ui.setView('groups')
+  assert.match(ui.text(ui.render()), /重复成员，v2 链接不可用/)
+  assert.equal(ui.button('复制分组链接').props.disabled, true)
+  assert.doesNotMatch(ui.text(ui.render()), /http:\/\/127\.0\.0\.1:3090\/hep\/mcp\/groups\/legacy\/v2/)
+  const second = ui.nodes().find(node => node.type === 'label' && node.props?.className === 'mcp-check' && ui.text(node).startsWith('second'))
+  assert.equal(ui.nodes(second).find(node => node.type === 'input').props.disabled, true)
+  ui.button('合并同源成员').props.onClick()
+  ui.render()
+  assert.match(ui.text(ui.render()), /重复成员已在草稿中合并/)
+  assert.equal(ui.button('复制分组链接').props.disabled, true)
+  const mergedChoice = ui.nodes().find(node => node.type === 'label' && node.props?.className === 'mcp-check' && ui.text(node).startsWith('second'))
+  assert.equal(ui.nodes(mergedChoice).find(node => node.type === 'input').props.disabled, false)
+  await ui.button('保存更改').props.onClick()
+  const saved = ui.writes.at(-1).ops.find(op => op.path[0] === 'groups').value[0]
+  assert.equal(saved.members.length, 1)
+  assert.deepEqual(JSON.parse(JSON.stringify(saved.members[0])), {
+    serverId: ui.server.id, names: ['first', 'shared', 'second'],
+    resourceUris: ['fixture:/one', 'fixture:/two'],
+    resourceTemplates: ['fixture:/item/{id}', 'fixture:/other/{id}'],
+  })
+  assert.equal(ui.button('复制分组链接').props.disabled, true)
+  ui.refreshValue({ servers: [ui.server], groups: [saved], sharedToken: 'fixture-token' }, 'r2')
+  assert.equal(ui.button('复制分组链接').props.disabled, false)
+  await ui.button('复制分组链接').props.onClick()
+  assert.deepEqual(ui.copied, ['http://127.0.0.1:3090/hep/mcp/groups/legacy/v2'])
+})
+
+test('新分组保存前不提供可复制链接，现有链接仅使用已保存配置', () => {
   const ui = editor()
   ui.setView('groups')
-  assert.match(ui.text(ui.render()), /http:\/\/127\.0\.0\.1:3090\/hep\/mcp\/groups\/research/)
+  assert.equal(ui.button('复制分组链接').props.disabled, true)
+  assert.match(ui.text(ui.render()), /请生成并保存统一访问 Token/)
+  ui.button('＋ 新增分组').props.onClick()
+  ui.render()
+  ui.input('分组 ID').props.onChange({ target: { value: 'new-group' } })
+  ui.render()
+  assert.match(ui.text(ui.render()), /此分组尚未保存/)
+  assert.equal(ui.button('复制分组链接').props.disabled, true)
+  const existing = editor()
+  existing.refreshValue({ servers: [existing.server], groups: existing.groups, sharedToken: 'fixture-token' })
+  existing.setView('groups')
+  const checked = existing.nodes().find(node => node.type === 'label' && node.props?.className === 'mcp-check'
+    && existing.text(node).startsWith('query_asset_related_alerts'))
+  existing.nodes(checked).find(node => node.type === 'input').props.onChange()
+  existing.render()
+  assert.match(existing.text(existing.render()), /当前草稿尚未保存；链接仍使用上次保存的配置/)
+  assert.equal(existing.button('复制分组链接').props.disabled, false)
+})
+
+test('已发布组合更名后保留旧分组选择并标记当前未发现', () => {
+  const ui = editor()
+  ui.setView('groups')
+  assert.doesNotMatch(ui.text(ui.render()), /已选来源 platform-compositions 不在服务列表中/)
+  assert.doesNotMatch(ui.text(ui.render()), /query_asset_related_alerts（当前未发现）/)
+  ui.setPublishedTools(['replacement_query'])
+  assert.match(ui.text(ui.render()), /query_asset_related_alerts（当前未发现）/)
+  assert.match(ui.text(ui.render()), /replacement_query/)
+  assert.doesNotMatch(ui.text(ui.render()), /已选来源 platform-compositions 不在服务列表中/)
+})
+
+test('分组三类选择保留草稿；发现后失效项可见，三个页签不重复显示总述', async () => {
+  let discovered = { tools: [{ name: 'query_asset' }], resources: { resources: [{ uri: 'soc://asset/9106' }] },
+    resourceTemplates: { resourceTemplates: [{ uriTemplate: 'soc://asset/{id}' }] } }
+  const ui = editor({ fetch: async (_url, init) => {
+    assert.equal(JSON.parse(init.body).action, 'test')
+    return { ok: true, json: async () => discovered }
+  } })
+  const heading = () => ui.nodes().filter(node => node.props?.className === 'mcp-heading')
+  assert.equal(heading().length, 0)
+  ui.setView('groups')
+  assert.equal(heading().length, 0)
+  ui.button('发现工具与资源').props.onClick()
+  await new Promise(resolve => setImmediate(resolve)); ui.render()
+  const choice = label => ui.nodes().find(node => node.type === 'label' && node.props?.className === 'mcp-check' && ui.text(node).startsWith(label))
+  for (const label of ['query_asset', 'soc://asset/9106', 'soc://asset/{id}']) {
+    assert.ok(choice(label), label)
+    ui.nodes(choice(label)).find(node => node.type === 'input').props.onChange()
+    ui.render()
+  }
+  const beforeSave = ui.text(ui.render())
+  assert.match(beforeSave, /2 个工具 · 1 个资源 · 1 个模板/)
+  await ui.button('保存更改').props.onClick()
+  const member = ui.writes.at(-1).ops.find(op => op.path[0] === 'groups').value[0].members.find(item => item.serverId === 'biz-soc-framework')
+  assert.deepEqual(JSON.parse(JSON.stringify(member)), { serverId: 'biz-soc-framework', names: ['query_asset'],
+    resourceUris: ['soc://asset/9106'], resourceTemplates: ['soc://asset/{id}'] })
+  ui.nodes(choice('query_asset')).find(node => node.type === 'input').props.onChange()
+  ui.render()
+  await ui.button('保存更改').props.onClick()
+  const resourcesOnly = ui.writes.at(-1).ops.find(op => op.path[0] === 'groups').value[0].members.find(item => item.serverId === 'biz-soc-framework')
+  assert.deepEqual(JSON.parse(JSON.stringify(resourcesOnly)), { serverId: 'biz-soc-framework', names: [],
+    resourceUris: ['soc://asset/9106'], resourceTemplates: ['soc://asset/{id}'] })
+  discovered = { tools: [], resources: { resources: [] }, resourceTemplates: { resourceTemplates: [] } }
+  ui.button('发现工具与资源').props.onClick()
+  await new Promise(resolve => setImmediate(resolve)); ui.render()
+  assert.equal((ui.text(ui.render()).match(/当前未发现/g) ?? []).length, 2)
+  ui.setView('connection')
+  assert.equal(heading().length, 0)
 })

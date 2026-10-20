@@ -10,7 +10,8 @@ import { getBusinessControl, configureBusinessControlStateRoot, currentBusinessC
 import type { BusinessContext, BusinessOperation, InstanceBinding } from './contracts.ts'
 import { readBusinessReport } from './reports.ts'
 import { HttpIdentityTrustProvider } from './providers.ts'
-import { readBusinessSecret, signBusinessAssertion, verifyBusinessAssertion, type RuntimeAssertion } from './gateway.ts'
+import { businessRpcDigest, readBusinessSecret, signBusinessAssertion, verifyBusinessAssertion, type RuntimeAssertion } from './gateway.ts'
+import { platformGroupUrl } from './group-link.ts'
 
 const containerConnectionManifest = '/opt/dsh/packages/client/connection/package.json'
 const NativeConnection: typeof import('@deepseek-ai/dsh-client-connection') = await runtimeModule('@deepseek-ai/dsh-client-connection', existsSync(containerConnectionManifest) ? containerConnectionManifest : undefined)
@@ -56,6 +57,33 @@ export class BusinessConnection extends NativeConnection.HostConnectionService {
     timer.unref(); monitor.unref()
     void this.refresh().catch(() => { /* 尚未握手时拒绝执行，后续定期重试受信通道。 */ })
     ctx.effect(() => async () => { this.disposedBusiness = true; this.businessLifetime.abort(); clearInterval(timer); clearInterval(monitor); await Promise.all([...this.businessPeers.keys()].map(peer => peer.dispose())); this.businessPeers.clear() }, 'business connection: Peer and lease lifecycle')
+  }
+  /** 仅向当前受信平台分组发送请求；每次请求使用最新 Session 事实重新签名。 */
+  groupFetch(groupId: string, sessionId?: string): typeof fetch {
+    return async (input, init) => {
+      const actual = new URL(input instanceof Request ? input.url : String(input))
+      if (actual.href !== platformGroupUrl(this.businessConfig.assetRoot, groupId)) throw new Error('平台 MCP 分组请求目标已变化')
+      const context = sessionId ? this.control.contextForSession(sessionId) : currentBusinessContext()
+      if (sessionId && !context) throw new Error('业务 MCP 请求缺少当前 Session')
+      if (context) this.control.assert(context, 'agent:access', [{ kind: 'agent', id: context.scope.agentId }])
+      const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase()
+      const headers = new Headers(input instanceof Request ? input.headers : undefined)
+      new Headers(init?.headers).forEach((value, key) => headers.set(key, value))
+      for (const key of [...headers.keys()]) if (key.startsWith('x-harness-')) headers.delete(key)
+      const outgoing = new Request(input, { ...init, method, headers, redirect: 'error' })
+      let requestDigest: string | undefined
+      if (method === 'POST') {
+        const body = await outgoing.clone().text()
+        if (Buffer.byteLength(body) > 64 * 1024) throw new Error('业务 MCP 请求体超过 64 KiB')
+        requestDigest = businessRpcDigest(JSON.parse(body))
+      }
+      const assertion: RuntimeAssertion = { binding: this.businessConfig.binding,
+        ...(context ? { context } : {}), ...(requestDigest ? { requestDigest } : {}),
+        issuedAt: Date.now(), nonce: randomBytes(24).toString('base64url') }
+      for (const [key, value] of Object.entries(signBusinessAssertion(this.secret, assertion, method,
+        actual.pathname + actual.search))) headers.set(key, value)
+      return fetch(outgoing, { headers, redirect: 'error' })
+    }
   }
   private assertion(request: ConnectionTrustRequest): RuntimeAssertion {
     const { method, path: logicalPath } = requestAddress(request)
@@ -259,17 +287,24 @@ export async function apply(ctx: Context, config: BusinessRuntimeConfig): Promis
   if (!control.enabled()) throw new Error('业务 Runtime 控制未启用')
   control.setAvailable(true)
   ctx.effect(() => () => control.setAvailable(false), 'business Runtime: authorization lifecycle')
-  const managedTools = new Set<string>()
-  ctx.provide('businessRuntime', Object.freeze({ binding: Object.freeze({ ...config.binding }), managedTools }))
+  const managedTools = new Set<string>(), resourceServers = new Set<string>()
   const connection = new BusinessConnection(ctx, config, control)
+  ctx.provide('businessRuntime', Object.freeze({ binding: Object.freeze({ ...config.binding }), managedTools, resourceServers,
+    groupUrl: (id: string) => platformGroupUrl(config.assetRoot, id),
+    groupFetch: (id: string, sessionId?: string) => connection.groupFetch(id, sessionId) }))
   registerBusinessRemotePolicy(ctx, control, config.workspacePath)
   registerBusinessInboxChecks(ctx, control)
   // 所有模型工具先恢复Session真实归属；只有受管MCP工具可执行。
-  ;(ctx as any).tools.guard((exec: { agent?: { session: { id: string } }; name: string }) => {
+  ;(ctx as any).tools.guard((exec: { agent?: { session: { id: string } }; name: string; arguments?: unknown }) => {
     try {
       const id = exec.agent?.session.id
       if (!id || !control.contextForSession(id)) return '业务 Session 未登记'
-      if (!managedTools.has(exec.name)) return '首期业务入口只开放受管 MCP 工具'
+      const resourceServer = exec.arguments && typeof exec.arguments === 'object'
+        ? (exec.arguments as { server?: unknown }).server : undefined
+      if (!managedTools.has(exec.name) && !(typeof resourceServer === 'string' && resourceServers.has(resourceServer) &&
+        ['list_mcp_resources', 'list_mcp_resource_templates', 'read_mcp_resource'].includes(exec.name))) {
+        return '首期业务入口只开放受管 MCP 工具与资源'
+      }
     } catch { return '业务任务上下文或许可无效' }
   })
   const approvals = createBusinessApprovalAdapter(ctx, control)

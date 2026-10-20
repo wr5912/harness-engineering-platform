@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http'
 import { join } from 'node:path'
@@ -14,13 +14,22 @@ export interface BusinessGatewayConfig {
   host: string; port: number; publicOrigin: string; sharedSecretFile: string
   instances: { agentId: string; instanceId: string }[]; managementUrl?: string
 }
-export interface RuntimeAssertion { context?: BusinessContext; binding: InstanceBinding; snapshot?: ControlSnapshot; observation?: ReplicaObservation; issuedAt: number; nonce: string }
+export interface RuntimeAssertion { context?: BusinessContext; binding: InstanceBinding; snapshot?: ControlSnapshot; observation?: ReplicaObservation; requestDigest?: string; issuedAt: number; nonce: string }
 export interface RegisteredBusinessInstance { binding: InstanceBinding; origin: string; basePath: string }
 
 export function readBusinessSecret(path: string): Buffer {
   const value = readFileSync(path)
   if (value.length < 32) throw new Error('业务接入共享密钥必须至少为 32 字节')
   return value
+}
+
+/** 只固定 RPC 方法与参数，排除每次传输生成的 JSON-RPC ID。 */
+export function businessRpcDigest(value: { method?: unknown; params?: unknown }): string {
+  if (!value || typeof value.method !== 'string' || !value.method) throw new Error('业务 MCP 请求体无效')
+  const payload = { method: value.method, ...(value.params === undefined ? {} : { params: value.params }) }
+  const canonical = JSON.stringify(payload, (_key, item) => item && typeof item === 'object' && !Array.isArray(item)
+    ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item)
+  return createHash('sha256').update(canonical).digest('hex')
 }
 
 /** 绑定实际接收实例、HTTP 方法和路径；不把入站用户 Header 当作身份。 */

@@ -1,5 +1,6 @@
 """启动器隔离测试；替换 DSH/pnpm 外部进程，保留真实 CLI、文件和端口路径。"""
 
+import hashlib
 import json
 import os
 import re
@@ -7,6 +8,7 @@ from pathlib import Path
 import shutil
 import signal
 import socket
+import stat
 import subprocess
 import sys
 import tempfile
@@ -92,6 +94,7 @@ if sys.argv[1:] == ["run", "build"]:
     pathlib.Path("lib").mkdir(exist_ok=True)
     pathlib.Path("lib/index.js").write_text("export function apply() {}\n")
     pathlib.Path("lib/mcp-manager.js").write_text("export function apply() {}\n")
+    pathlib.Path("lib/platform-mcp-manager.js").write_text("export function apply() {}\n")
     pathlib.Path("lib/client.js").write_text("export function apply() {}\n")
     web = pathlib.Path("../../runtime/adapters/dsh-web/lib")
     web.mkdir(parents=True, exist_ok=True)
@@ -122,6 +125,14 @@ if sys.argv[1:] == ["run", "build"]:
     def prepare(self):
         result = self.run_cli("prepare")
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def remove_mcp_store(self):
+        for path in (self.assets / "config/mcp-manager.json", self.assets / ".local/credentials/mcp-manager.json"):
+            path.unlink(missing_ok=True)
+
+    def mcp_store(self):
+        return (json.loads((self.assets / "config/mcp-manager.json").read_text()),
+                json.loads((self.assets / ".local/credentials/mcp-manager.json").read_text()))
 
     def free_port(self):
         with socket.socket() as listener:
@@ -161,6 +172,8 @@ if sys.argv[1:] == ["run", "build"]:
         self.assertIn("inject: [webStartup]", patch)
         self.assertIn("- id: skill-filesystem\n  disabled: false\n  config:\n    includeDefaultRoots: false\n", patch)
         self.assertEqual((self.profile / "cordis.patch.yml").read_text(), "[]\n")
+        self.assertEqual(self.mcp_store(), ({"schemaVersion": 1, "servers": [], "groups": []},
+                                            {"schemaVersion": 1, "sharedToken": "", "servers": {}}))
         self.prepare()
         self.assertEqual(session.read_text(), "retained")
         self.assertFalse(Path(self.env["DSH_HOME"]).exists())
@@ -188,6 +201,7 @@ if sys.argv[1:] == ["run", "build"]:
 
     def test_native_mcp_identity_moves_with_home_without_changing_configuration(self):
         self.prepare()
+        self.remove_mcp_store()  # 模拟已有原生 Patch 首次升级，新 Store 尚不存在。
         old_profile = self.root / "old home/profiles/harness-platform"
         bundle = old_profile / "node_modules/@ai-agent-harness/harness-platform"
         bundle.parent.mkdir(parents=True)
@@ -197,6 +211,7 @@ if sys.argv[1:] == ["run", "build"]:
         source = ("- id: ui-settings-general\n  name: stable-package-name\n  config:\n    welcomeNoticeVersion: 1\n"
                   "- id: mcp-session-manager\n  name: " + json.dumps(previous) + "\n"
                   "  config:\n    servers:\n      - id: fixture-api\n        apiKey: fixture-private-value\n"
+                  "        enabled: true\n        tools: {mode: all, names: []}\n"
                   "        specUrl: http://127.0.0.1:58001/openapi.json\n"
                   "    groups:\n      - id: fixture-group\n        members:\n          - serverId: fixture-api\n            names: [basic_status]\n"
                   "    sharedToken: '" + "0" * 64 + "'\n")
@@ -204,14 +219,24 @@ if sys.argv[1:] == ["run", "build"]:
         patch.write_text(source)
         blocked = self.run_cli("start", "--dry-run", "--port", str(self.free_port()))
         self.assertNotEqual(blocked.returncode, 0)
-        self.assertIn("旧 Profile 路径", blocked.stderr)
+        self.assertIn("尚未迁至数据工作区", blocked.stderr)
         self.assertEqual(patch.read_text(), source)
         self.assertNotIn("fixture-private-value", blocked.stderr)
         self.prepare()
-        migrated = source.replace("  name: " + json.dumps(previous), "  name: " + json.dumps(expected))
-        self.assertEqual(patch.read_text(), migrated)
+        self.assertEqual(patch.read_text(), "- id: ui-settings-general\n  name: stable-package-name\n  config:\n    welcomeNoticeVersion: 1\n")
+        public, private = self.mcp_store()
+        self.assertEqual([server["id"] for server in public["servers"]], ["fixture-api"])
+        self.assertEqual([group["id"] for group in public["groups"]], ["fixture-group"])
+        self.assertNotIn("fixture-private-value", (self.assets / "config/mcp-manager.json").read_text())
+        self.assertEqual(private["servers"]["fixture-api"]["apiKey"], "fixture-private-value")
+        self.assertEqual(private["sharedToken"], "0" * 64)
+        self.assertEqual(stat.S_IMODE((self.assets / ".local/credentials/mcp-manager.json").stat().st_mode), 0o600)
+        digest = hashlib.sha256(source.encode()).hexdigest()
+        backup = self.assets / ".local/credentials/mcp-manager-patch-backups" / f"{digest}.yml"
+        self.assertEqual(backup.read_bytes(), source.encode())
+        self.assertEqual(stat.S_IMODE(backup.stat().st_mode), 0o600)
         self.prepare()
-        self.assertEqual(patch.read_text(), migrated)
+        self.assertEqual(patch.read_text(), "- id: ui-settings-general\n  name: stable-package-name\n  config:\n    welcomeNoticeVersion: 1\n")
         self.assertEqual(self.run_cli("start", "--dry-run", "--port", str(self.free_port())).returncode, 0)
 
     def test_native_mcp_identity_does_not_rewrite_an_unrelated_plugin(self):
@@ -226,11 +251,12 @@ if sys.argv[1:] == ["run", "build"]:
 
     def test_prepare_restores_data_and_program_elsewhere_preserving_native_settings(self):
         self.prepare()
+        self.remove_mcp_store()
         old_bundle = self.profile / "node_modules/@ai-agent-harness/harness-platform"
         previous = (old_bundle / "lib/mcp-manager.js").as_uri().replace("%40", "@")
         original = ("# 保留全部用户配置\n- id: mcp-session-manager\n  name: " + json.dumps(previous)
-                    + "\n  config:\n    servers: [{id: retained, apiKey: fixture-private-value}]\n"
-                    "    groups: [{id: retained-group}]\n- id: agent-default-model\n  config: {reasoningEffort: max}\n")
+                    + "\n  config:\n    servers: [{id: retained, apiKey: fixture-private-value, enabled: true, tools: {mode: all, names: []}, specUrl: 'http://127.0.0.1:58001/openapi.json'}]\n"
+                    "    groups: [{id: retained-group, members: []}]\n- id: agent-default-model\n  config: {reasoningEffort: max}\n")
         (self.profile / "cordis.patch.yml").write_text(original)
         session = self.home / "sessions/retained-session"
         session.parent.mkdir(exist_ok=True)
@@ -242,9 +268,13 @@ if sys.argv[1:] == ["run", "build"]:
         self.launcher = replacement / "platform/dsh-platform"
         self.env["HARNESS_ASSET_ROOT"] = str(recovered)
         recovered_profile = recovered / ".local/platform-home/profiles/harness-platform"
-        expected = (recovered_profile / "node_modules/@ai-agent-harness/harness-platform/lib/mcp-manager.js").as_uri().replace("%40", "@")
         self.prepare()
-        self.assertEqual((recovered_profile / "cordis.patch.yml").read_text(), original.replace(json.dumps(previous), json.dumps(expected)))
+        self.assertEqual((recovered_profile / "cordis.patch.yml").read_text(), "# 保留全部用户配置\n- id: agent-default-model\n  config: {reasoningEffort: max}\n")
+        public = json.loads((recovered / "config/mcp-manager.json").read_text())
+        private = json.loads((recovered / ".local/credentials/mcp-manager.json").read_text())
+        self.assertEqual(public["servers"][0]["id"], "retained")
+        self.assertEqual(public["groups"][0]["id"], "retained-group")
+        self.assertEqual(private["servers"]["retained"]["apiKey"], "fixture-private-value")
         self.assertEqual((recovered_profile / "node_modules/@ai-agent-harness/harness-platform").resolve(), replacement / "platform/plugin")
         patch = (recovered_profile / "harness-platform.patch.yml").read_text()
         self.assertIn(str(recovered / ".agents/skills"), patch)
@@ -300,36 +330,173 @@ if sys.argv[1:] == ["run", "build"]:
         # 原生 settings/update 的 YAML 序列化器将长双引号标量以反斜线折行。
         folded = '"' + expected[:60] + '\\\n    ' + expected[60:120] + '\\\n    ' + expected[120:] + '"'
         source = ("# 保留原生用户配置\n- id: mcp-session-manager\n  name: " + folded + " # 保留同行说明\n"
-                  "  config:\n    sharedToken: fixture-private-value\n    groups: [{id: existing-group}]\n"
+                  "  config:\n    sharedToken: '" + "f" * 64 + "'\n    groups: [{id: existing-group, members: []}]\n"
                   "- id: agent-default-model\n  config: {reasoningEffort: max}\n")
         patch = self.profile / "cordis.patch.yml"
         for newline in ("\n", "\r\n"):
             with self.subTest(newline=repr(newline)):
+                self.remove_mcp_store()
                 original = source.replace("\n", newline).encode()
                 patch.write_bytes(original)
                 self.prepare()
-                self.assertEqual(patch.read_bytes(), original)
+                self.assertEqual(patch.read_bytes(), ("# 保留原生用户配置\n- id: agent-default-model\n  config: {reasoningEffort: max}\n").replace("\n", newline).encode())
+                self.assertEqual(self.mcp_store()[1]["sharedToken"], "f" * 64)
                 result = self.run_cli("start", "--dry-run", "--port", str(self.free_port()))
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertNotIn("fixture-private-value", result.stdout + result.stderr)
 
     def test_native_mcp_multiline_old_name_only_replaces_target_scalar(self):
         self.prepare()
+        self.remove_mcp_store()
         previous = (self.root / "old missing home/profiles/harness-platform/node_modules/@ai-agent-harness/harness-platform/lib/mcp-manager.js").as_uri().replace("%40", "@")
         expected = (self.profile / "node_modules/@ai-agent-harness/harness-platform/lib/mcp-manager.js").as_uri().replace("%40", "@")
         folded = '"' + previous[:70] + '\\\n    ' + previous[70:] + '"'
         source = ("- name: " + folded + " # 原路径\n  id: mcp-session-manager\n"
-                  "  config:\n    servers: [{id: fixture-api, apiKey: fixture-private-value}]\n"
-                  "    groups: [{id: fixture-group, members: [{serverId: fixture-api}]}]\n"
+                  "  config:\n    servers: [{id: fixture-api, apiKey: fixture-private-value, enabled: true, tools: {mode: all, names: []}, specUrl: 'http://127.0.0.1:58001/openapi.json'}]\n"
+                  "    groups: [{id: fixture-group, members: [{serverId: fixture-api, names: [lookup]}]}]\n"
                   "- id: other-plugin\n  config: {name: preserved}\n")
         patch = self.profile / "cordis.patch.yml"
         patch.write_text(source)
         blocked = self.run_cli("start", "--dry-run", "--port", str(self.free_port()))
-        self.assertIn("旧 Profile 路径", blocked.stderr)
+        self.assertIn("尚未迁至数据工作区", blocked.stderr)
         self.assertNotIn("fixture-private-value", blocked.stderr)
         self.prepare()
-        self.assertEqual(patch.read_text(), source.replace(folded, json.dumps(expected), 1))
+        self.assertEqual(patch.read_text(), "- id: other-plugin\n  config: {name: preserved}\n")
+        self.assertEqual(self.mcp_store()[1]["servers"]["fixture-api"]["apiKey"], "fixture-private-value")
         self.assertEqual(self.run_cli("start", "--dry-run", "--port", str(self.free_port())).returncode, 0)
+
+    def test_legacy_mcp_header_is_private_and_new_home_recovers_from_store(self):
+        self.prepare()
+        self.remove_mcp_store()
+        patch = self.profile / "cordis.patch.yml"
+        name = (self.profile / "node_modules/@ai-agent-harness/harness-platform/lib/mcp-manager.js").as_uri().replace("%40", "@")
+        source = ("- id: mcp-session-manager\n  name: " + json.dumps(name) + "\n  config:\n"
+                  "    servers:\n      - id: fixture-http\n        enabled: true\n        tools: {mode: all, names: []}\n"
+                  "        url: http://127.0.0.1:58001/mcp\n"
+                  "        headers: [{name: Authorization, value: 'Bearer fixture-private-header'}]\n"
+                  "    groups: [{id: fixture-group, members: [{serverId: fixture-http, names: [lookup]}]}]\n"
+                  "    sharedToken: '" + "a" * 64 + "'\n"
+                  "- id: ui-settings-general\n  config: {welcomeNoticeVersion: 1}\n")
+        patch.write_text(source)
+        self.prepare()
+        public_path = self.assets / "config/mcp-manager.json"
+        private_path = self.assets / ".local/credentials/mcp-manager.json"
+        public = public_path.read_bytes()
+        private = private_path.read_bytes()
+        self.assertNotIn(b"fixture-private-header", public)
+        self.assertNotIn(b"Bearer", public)
+        self.assertEqual(self.mcp_store()[0]["servers"][0]["headers"], [{"name": "Authorization"}])
+        self.assertEqual(self.mcp_store()[1]["servers"]["fixture-http"]["headers"],
+                         {"Authorization": "Bearer fixture-private-header"})
+        self.assertEqual(patch.read_text(), "- id: ui-settings-general\n  config: {welcomeNoticeVersion: 1}\n")
+        old_home = self.home.with_name("saved-platform-home")
+        self.home.rename(old_home)
+        self.prepare()
+        self.assertEqual((self.profile / "cordis.patch.yml").read_text(), "[]\n")
+        self.assertEqual(public_path.read_bytes(), public)
+        self.assertEqual(private_path.read_bytes(), private)
+        self.assertEqual(self.run_cli("start", "--dry-run", "--port", str(self.free_port())).returncode, 0)
+
+    def test_existing_mcp_store_rejects_divergent_legacy_patch(self):
+        self.prepare()
+        patch = self.profile / "cordis.patch.yml"
+        name = (self.profile / "node_modules/@ai-agent-harness/harness-platform/lib/mcp-manager.js").as_uri().replace("%40", "@")
+        original = ("- id: mcp-session-manager\n  name: " + json.dumps(name)
+                    + "\n  config: {servers: [{id: concurrent, enabled: true, tools: {mode: all, names: []}, specUrl: 'http://127.0.0.1:58001/openapi.json'}], groups: []}\n")
+        patch.write_text(original)
+        public_path = self.assets / "config/mcp-manager.json"
+        private_path = self.assets / ".local/credentials/mcp-manager.json"
+        before = (public_path.read_bytes(), private_path.read_bytes())
+        result = self.run_cli("prepare")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("冲突", result.stderr)
+        self.assertEqual(patch.read_text(), original)
+        self.assertEqual((public_path.read_bytes(), private_path.read_bytes()), before)
+
+    def test_missing_private_mcp_file_blocks_prepare_and_start(self):
+        self.prepare()
+        public_path = self.assets / "config/mcp-manager.json"
+        public = {"schemaVersion": 1, "servers": [{"id": "saved", "enabled": False,
+                 "tools": {"mode": "all", "names": []}}], "groups": []}
+        public_path.write_text(json.dumps(public))
+        (self.assets / ".local/credentials/mcp-manager.json").unlink()
+        for operation in (("prepare",), ("start", "--dry-run", "--port", str(self.free_port()))):
+            result = self.run_cli(*operation)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("本地 MCP 凭据缺失", result.stderr)
+            self.assertFalse((self.assets / ".local/credentials/mcp-manager.json").exists())
+            self.assertEqual(json.loads(public_path.read_text()), public)
+
+    def test_sensitive_query_in_legacy_url_is_not_written_to_public_config(self):
+        self.prepare()
+        self.remove_mcp_store()
+        patch = self.profile / "cordis.patch.yml"
+        name = (self.profile / "node_modules/@ai-agent-harness/harness-platform/lib/mcp-manager.js").as_uri().replace("%40", "@")
+        original = ("- id: mcp-session-manager\n  name: " + json.dumps(name) + "\n  config:\n    servers:\n"
+                    "      - id: fixture-api\n        enabled: true\n        tools: {mode: all, names: []}\n"
+                    "        specUrl: 'http://127.0.0.1:58001/openapi.json?api_key=fixture-private'\n"
+                    "    groups: []\n")
+        patch.write_text(original)
+        result = self.run_cli("prepare")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("地址含凭据", result.stderr)
+        self.assertNotIn("fixture-private", result.stderr)
+        self.assertEqual(patch.read_text(), original)
+        self.assertFalse((self.assets / "config/mcp-manager.json").exists())
+        self.assertFalse((self.assets / ".local/credentials/mcp-manager.json").exists())
+
+    def test_unknown_legacy_mcp_field_is_not_silently_discarded(self):
+        self.prepare()
+        self.remove_mcp_store()
+        patch = self.profile / "cordis.patch.yml"
+        name = (self.profile / "node_modules/@ai-agent-harness/harness-platform/lib/mcp-manager.js").as_uri().replace("%40", "@")
+        original = ("- id: mcp-session-manager\n  name: " + json.dumps(name) + "\n  config:\n    servers:\n"
+                    "      - id: fixture-api\n        specUrl: http://127.0.0.1:58001/openapi.json\n"
+                    "        futureCredential: fixture-private\n    groups: []\n")
+        patch.write_text(original)
+        result = self.run_cli("prepare")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("未知字段", result.stderr)
+        self.assertNotIn("fixture-private", result.stderr)
+        self.assertEqual(patch.read_text(), original)
+        self.assertFalse((self.assets / "config/mcp-manager.json").exists())
+
+    def test_legacy_mcp_missing_identity_or_duplicate_yaml_key_is_rejected(self):
+        self.prepare()
+        self.remove_mcp_store()
+        patch = self.profile / "cordis.patch.yml"
+        name = (self.profile / "node_modules/@ai-agent-harness/harness-platform/lib/mcp-manager.js").as_uri().replace("%40", "@")
+        for source, marker in (
+            ("- id: mcp-session-manager\n  config: {servers: [], groups: []}\n", "缺少 name"),
+            ("- id: mcp-session-manager\n  name: " + json.dumps(name)
+             + "\n  config:\n    servers: []\n    servers: []\n    groups: []\n", "重复"),
+        ):
+            with self.subTest(marker=marker):
+                patch.write_text(source)
+                result = self.run_cli("prepare")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(marker, result.stderr)
+                self.assertEqual(patch.read_text(), source)
+                self.assertFalse((self.assets / "config/mcp-manager.json").exists())
+
+    def test_legacy_mcp_missing_native_default_fields_is_rejected(self):
+        self.prepare()
+        self.remove_mcp_store()
+        patch = self.profile / "cordis.patch.yml"
+        name = (self.profile / "node_modules/@ai-agent-harness/harness-platform/lib/mcp-manager.js").as_uri().replace("%40", "@")
+        for config, marker in (
+            ("servers: [{id: fixture, enabled: true, specUrl: 'http://127.0.0.1:58001/openapi.json'}]\n    groups: []", "enabled/tools"),
+            ("servers: []\n    groups: [{id: fixture}]", "分组"),
+            ("servers: []\n    groups: [{id: fixture, members: [{serverId: fixture}]}]", "分组成员"),
+        ):
+            with self.subTest(marker=marker):
+                source = "- id: mcp-session-manager\n  name: " + json.dumps(name) + "\n  config:\n    " + config + "\n"
+                patch.write_text(source)
+                result = self.run_cli("prepare")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(marker, result.stderr)
+                self.assertEqual(patch.read_text(), source)
+                self.assertFalse((self.assets / "config/mcp-manager.json").exists())
 
     def test_missing_yaml_dependency_does_not_block_bootstrap_check(self):
         with mock.patch.dict(sys.modules, {"yaml": None}):

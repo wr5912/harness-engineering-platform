@@ -59,16 +59,20 @@ export async function discoverTaskCapabilities(assetRoot: string, options: Capab
   }))
   const composition_bindings = bindings.filter(binding => typeof binding.composition_id === 'string' && typeof binding.version_id === 'string' && typeof binding.tool_name === 'string').map(binding => {
     const fixed = binding.fixed_binding
+    const groupVersion = fixed?.group_link_version ?? 1
     const verified = fixed && /^[A-Za-z0-9_-]{1,32}$/.test(fixed.group_id)
+      && [1, 2].includes(groupVersion)
       && /^[a-f0-9]{64}$/.test(fixed.group_target_digest) && /^[a-f0-9]{64}$/.test(fixed.versionId)
       && /^[a-f0-9]{64}$/.test(fixed.expectedImplementationDigest) && /^[a-z0-9-]{1,80}$/.test(fixed.compositionId)
-      && typeof fixed.tool_name === 'string' && fixed.tool_name.startsWith('mcp__compositions__')
+      && typeof fixed.tool_name === 'string'
+      && fixed.tool_name.startsWith(groupVersion === 2 ? 'platform-compositions__' : 'mcp__compositions__')
       && fixed.input_schema && typeof fixed.input_schema === 'object' && !Array.isArray(fixed.input_schema)
       && fixed.compositionId === binding.composition_id && fixed.versionId === binding.version_id
       && fixed.expectedImplementationDigest === binding.source_digest
     return { composition_id: binding.composition_id, version_id: binding.version_id, tool_name: binding.tool_name,
       ...(typeof binding.source_digest === 'string' ? { source_digest: binding.source_digest } : {}),
-      ...(verified ? { fixed_binding: { group_id: fixed.group_id, group_target_digest: fixed.group_target_digest,
+      ...(verified ? { fixed_binding: { group_id: fixed.group_id,
+        ...(fixed.group_link_version === 2 ? { group_link_version: 2 } : {}), group_target_digest: fixed.group_target_digest,
         tool_name: fixed.tool_name, compositionId: fixed.compositionId, versionId: fixed.versionId,
         expectedImplementationDigest: fixed.expectedImplementationDigest, input_schema: fixed.input_schema } } : {}),
       ...(!verified && typeof binding.fixed_binding_unavailable === 'string' ? { fixed_binding_unavailable: binding.fixed_binding_unavailable } : {}),

@@ -78,6 +78,21 @@ test('能力目录只保留来源一致且完整的原生分组固定绑定，�
   assert.doesNotMatch(JSON.stringify(result), /do-not-output|token/)
 })
 
+test('能力目录接受分组 v2 固定绑定并保留旧版默认值', async t => {
+  const root = fixture(t), version = 'a'.repeat(64), implementation = 'b'.repeat(64)
+  const entry = { composition_id: 'asset-alerts', version_id: version, tool_name: 'query_asset_alerts', source_digest: implementation }
+  const fixed = { group_id: 'research-tools', group_link_version: 2, group_target_digest: 'c'.repeat(64),
+    tool_name: 'platform-compositions__query_asset_alerts', compositionId: 'asset-alerts', versionId: version,
+    expectedImplementationDigest: implementation, input_schema: { type: 'object' } }
+  const result = await discoverTaskCapabilities(root, { compositionBindings: async () => [
+    { ...entry, fixed_binding: { ...fixed, token: 'do-not-output' } },
+    { ...entry, fixed_binding: { ...fixed, tool_name: 'mcp__compositions__query_asset_alerts' } },
+  ] })
+  assert.deepEqual(result.composition_bindings[0].fixed_binding, fixed)
+  assert.equal(result.composition_bindings[1].fixed_binding, undefined)
+  assert.doesNotMatch(JSON.stringify(result), /do-not-output/)
+})
+
 test('装配预览无写入，应用复制真实 Skill 并核对配置引用，拒绝重复应用和来源漂移', async t => {
   const root = fixture(t), input = assemblyInput(root), target = join(root, `evolution/experiments/${targetId}/candidate/${input.files[0].path}`)
   assert.equal((await previewTaskAssembly(root, input)).bindings.status, 'declared'); assert.equal(existsSync(target), false)

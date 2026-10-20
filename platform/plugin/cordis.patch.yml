@@ -11,9 +11,5 @@
     reasoningEffort: max
 - insert:
     - id: mcp-session-manager
-      name: ./lib/mcp-manager.js
+      name: ./lib/platform-mcp-manager.js
       disabled: false
-      config:
-        servers: []
-        groups: []
-        sharedToken: ''

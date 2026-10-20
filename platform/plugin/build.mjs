@@ -56,12 +56,14 @@ export const managerSources = {
           .replace('?? draft.servers[0]', '?? services[0]')
           .replace('const editingServer = draft.servers[activeServer]', 'const editingServer = services[activeServer]')
           .replaceAll('draft.servers.map(', 'services.map(')
+          .replace('!draft.servers.some(server => server.id === member.serverId)', '!services.some(server => server.id === member.serverId)')
           .replace('!draft.servers.length &&', '!services.length &&')
           .replaceAll("server.serverName || server.id || '新服务器'", "server.platformComposition ? '工具组合编排' : (server.serverName || server.id || '新服务器')")
           .replace("<small>{server.id || '未设置 ID'} · {server.enabled === false ? '已停用' : '已启用'}</small>", "<small>{server.description || '未填写描述'} · {server.enabled === false ? '已停用' : '已启用'}</small>")
           .replace('{editingServer ? <div className="mcp-card">', '{editingServer ? editingServer.platformComposition ? <PublishedService service={editingServer} /> : <div className="mcp-card">')
-          .replace('...(discovered[server.id] ?? [])', '...(server.platformComposition ? server.tools.names : discovered[server.id] ?? [])')
-          .replace('<h2>MCP 服务器</h2>', '<h2>服务列表</h2>')
+          .replace('const sections = [', 'const listedTools = server.platformComposition ? server.tools.names : discovered[server.id]\n                      const sections = [')
+          .replace('...(discovered[server.id] ?? [])', '...(listedTools ?? [])')
+          .replace('discovered: discovered[server.id]', 'discovered: listedTools')
           .replace('<input value={value ?? \'\'} onChange={event => change(event.target.value)} {...props} />', "props.type === 'password' && !props.readOnly ? <PasswordInput value={value ?? ''} onChange={event => change(event.target.value)} {...props} /> : <input value={value ?? ''} onChange={event => change(event.target.value)} {...props} />")
           .replace('<section className="mcp-section"><h3>读取 Resource</h3>', `${toolEditor}<section className="mcp-section"><h3>读取 Resource</h3>`)
         contents = `import * as React from 'react'; import { createPortal } from 'react-dom'; import { PasswordInput, PublishedService } from ${JSON.stringify(resolve('src/mcp/components.tsx'))}; const { useEffect, useState, useRef } = React;\n${adapted}\nexport { Manager };`
@@ -76,18 +78,17 @@ export const managerSources = {
           .replace("from './openapi.mjs'", "from 'harness-mcp-manager-openapi'")
           .replace('if (server.specUrl) {', 'if (server.platformComposition) {\n      if (!config.platformClient) throw new Error("已发布编排服务未装载")\n      server.platformClient = config.platformClient\n      continue\n    }\n    if (server.specUrl) {')
           .replace('const url = resolvedUrl(server)\n', 'if (server.platformComposition) return run(server.platformClient)\n  const url = resolvedUrl(server)\n')
-          .replace('requestInit: { headers:', 'requestInit: { signal: server.platformSignal, headers:')
-          .replace('await client.connect(transport)', 'await client.connect(transport, { signal: server.platformSignal })')
-          .replace("mcp.server.setRequestHandler('tools/call', async (request: any) => {", "mcp.server.setRequestHandler('tools/call', async (request: any, extra: any) => {")
-          .replace('const owner = toolOwner(target, request.params.name)', 'const selectedOwner = toolOwner(target, request.params.name)\n      const owner = selectedOwner && { ...selectedOwner, server: { ...selectedOwner.server, platformSignal: extra?.mcpReq?.signal ?? extra?.signal } }')
-          .replace('client.callTool({ ...request.params, name: owner.rawName })', 'client.callTool({ ...request.params, name: owner.rawName }, platformCallOptions(owner.server))')
           .replace("transport: 'streamable-http',\n              serverName:", "transport: 'streamable-http',\n              ...(server.platformComposition ? { toolCallTimeoutMs: 36 * 60_000 } : {}),\n              serverName:")
           .replace('Boolean(server.specUrl || resolvedUrl(server))', 'Boolean(server.platformComposition || server.specUrl || resolvedUrl(server))')
           .replace('!(server.specUrl || resolvedUrl(server))', '!(server.platformComposition || server.specUrl || resolvedUrl(server))')
           .replace('source.tools.map(({ name, description }: any) => ({ name, description }))', 'source.tools.map(({ name, description, inputSchema }: any) => ({ name, description, inputSchema }))')
+        if (!["async (request: any, extra: any) => runRequest('tools/call'",
+          "async (request: any, extra: any) => runRequest('resources/read'",
+          'readGroupResource(target, request.params.uri, extra?.mcpReq?.signal ?? extra?.signal)',
+          'readManagedResource({ ...server, platformSignal: signal ?? server.platformSignal }, upstreamUri)'
+        ].every(anchor => contents.includes(anchor))) throw new Error('MCP 分组请求取消信号装载合同已变化')
       }
       if (!path.endsWith('client') && !path.endsWith('openapi')) {
-        contents = `function platformCallOptions(server: any) { return { signal: server.platformSignal, timeout: server.platformComposition ? 36 * 60_000 : (server.platformTimeoutMs ?? 60_000) } }\n${contents}`
         // 从同一个原生 HTTP 处理函数提取业务 dispatch，供 AI 工具复用。
         const adminStart = contents.indexOf("  ctx.effect(() => ctx.webServer.register({ kind: 'exact', path: '/api/mcp-manager'")
         const dispatchStart = contents.indexOf('      const server = current.servers.find', adminStart)
@@ -117,12 +118,13 @@ export const managerSources = {
 
 const { name } = JSON.parse(await readFile(new URL('./package.json', import.meta.url), 'utf8'))
 // 固定已打包执行代码的身份，不能用运行时工作树替代实际装载制品。
-const implementationFiles = ['definition.ts', 'compositions.ts', 'executor.ts', 'index.ts', 'openapi.ts', 'native.ts', 'nested.ts', 'extension.ts', 'control.ts', 'manager.ts']
+const implementationFiles = ['definition.ts', 'compositions.ts', 'executor.ts', 'index.ts', 'openapi.ts', 'native.ts', 'nested.ts', 'extension.ts', 'control.ts', 'manager.ts', 'platform-manager.ts']
   .map(file => `platform/plugin/src/mcp/${file}`)
   .concat(['platform/plugin/build.mjs', 'platform/plugin/package.json', 'platform/plugin/pnpm-lock.yaml', 'platform/plugin/src/index.ts',
     'platform/plugin/src/evaluation/model-attempts.ts', 'platform/plugin/src/workflows/graph.ts',
-    ...['contracts.ts', 'core.ts', 'providers.ts', 'reports.ts'].map(file => `platform/plugin/src/business-control/${file}`),
-    ...['index.ts', 'openapi.ts'].map(file => `plugins/mcp-manager/${file}`)])
+    ...['contracts.ts', 'core.ts', 'gateway.ts', 'group-link.ts', 'providers.ts', 'reports.ts', 'runtime.ts'].map(file => `platform/plugin/src/business-control/${file}`),
+    ...['index.ts', 'openapi.ts'].map(file => `plugins/mcp-manager/${file}`),
+    'platform/plugin/src/mcp/store.ts'])
 const implementationHash = createHash('sha256')
 for (const file of implementationFiles) implementationHash.update(file).update('\0').update(await readFile(new URL('../../' + file, import.meta.url)))
 const implementationDefine = { __PLATFORM_MCP_IMPLEMENTATION_DIGEST__: JSON.stringify(implementationHash.digest('hex')) }
@@ -140,6 +142,8 @@ await build({
   plugins: [managerSources],
 })
 await build({ entryPoints: ['src/mcp/manager.ts'], outfile: 'lib/mcp-manager.js', bundle: true,
+  platform: 'node', target: 'node24', format: 'esm', packages: 'external', plugins: [managerSources], legalComments: 'none', define: implementationDefine })
+await build({ entryPoints: ['src/mcp/platform-manager.ts'], outfile: 'lib/platform-mcp-manager.js', bundle: true,
   platform: 'node', target: 'node24', format: 'esm', packages: 'external', plugins: [managerSources], legalComments: 'none', define: implementationDefine })
 await build({ entryPoints: ['src/business-control/runtime.ts'], outfile: 'lib/business-runtime.js', bundle: true,
   platform: 'node', target: 'node24', format: 'esm', packages: 'external', legalComments: 'none' })

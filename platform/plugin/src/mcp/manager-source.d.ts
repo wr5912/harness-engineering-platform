@@ -3,10 +3,11 @@ declare module 'harness-mcp-manager-server' {
   export const inject: string[]
   export const Config: any
   export function apply(ctx: any, config: any): void
+  export function validateConfiguration(value: { servers: any[]; groups: any[]; sharedToken: string }): void
 }
 declare module 'harness-mcp-manager-client' {
   import type { ComponentType } from 'react'
-  export const Manager: ComponentType<{ view: string; onValidationError(): void; publishedService: any; toolbarTarget: HTMLElement | null; form: { state: any }; write: (ops: any, revision: number) => Promise<any> }>
+  export const Manager: ComponentType<{ view: string; onValidationError(): void; publishedService: any; toolbarTarget: HTMLElement | null; form: { state: any }; write: (ops: any, revision: string) => Promise<any> }>
 }
 declare module 'harness-mcp-manager-openapi' {
   export function loadOpenApi(server: any): Promise<any>

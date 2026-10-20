@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { getBusinessControl } from './core.ts'
 import { startBusinessGateway, type BusinessGatewayConfig } from './gateway.ts'
-export { startBusinessGateway, allowedBusinessPath, resolveBusinessInstance, signBusinessAssertion, verifyBusinessAssertion, readBusinessSecret } from './gateway.ts'
+export { startBusinessGateway, allowedBusinessPath, resolveBusinessInstance, signBusinessAssertion, verifyBusinessAssertion, readBusinessSecret, businessRpcDigest } from './gateway.ts'
 export type { BusinessGatewayConfig, BusinessGatewayHandle } from './gateway.ts'
 
 /** 管理平台启动独立业务监听；管理登录、owner Connection及浏览器来源保持独立。 */

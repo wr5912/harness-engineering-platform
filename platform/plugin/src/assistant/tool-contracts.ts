@@ -55,8 +55,8 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['batch-preview batch', 'items', 'items 为多个与 run 相同的操作对象；逐项核对结果，部分失败不能称为全部完成。'],
   ],
   mcp: [
-    ['list configuration', '', '先读取当前目录、配置及 revision；凭据通过原生配置页面维护，不在工具参数中发送。'],
-    ['saveConfiguration', 'ops revision', 'revision 使用 configuration 返回的整数；修改路径使用字符串数组。'],
+    ['list configuration', '', '先读取当前目录、公开配置及字符串 revision；凭据仅返回已配置状态，通过 MCP 管理页面维护。'],
+    ['saveConfiguration', 'ops revision', 'revision 使用 configuration 返回的字符串；修改路径使用字符串数组，只修改单个服务的公开字段。新增服务可写入 servers 的末尾索引；凭据和 Header 值通过页面维护。'],
     ['test resources resourceTemplates sources/list', 'serverId', 'serverId 来自当前配置。test 和 sources/components 提供真实可用工具及其输入合同。'],
     ['sources/components sources/logs sources/refresh', 'serverId sourceId'],
     ['readResource', 'serverId uri'], ['callTool', 'serverId toolName arguments', '先读取实际工具 inputSchema，再传 arguments；执行仍请求确认。'],
@@ -115,7 +115,6 @@ export function assistantActionContract(domain: AssistantDomain, action: string)
   const properties = Object.fromEntries(hint[1].split(' ').filter(Boolean).map(key => [key, fields[key] ?? (/^(?:.*_id|.*_sha256|.*_ref|agent_id|source|target_source|name|description|role|path|ref|content|title|scene|expected_behavior|mode|executor|review|model|compare_to|left|right|filename|status|outcome|operation|serverId|sourceId|componentId|compositionId|artifactId|toolName|specUrl|uri|version|revision|topic|variant_name|strategy|resource_metric|variant_model|variant_reasoning_effort|entry_path|check_id)$/.test(key) ? string : {})]))
   // 同名 plan 在融合业务是另一份既有合同，不能误用任务执行计划。
   if (domain === 'agents' && action === 'fusion/preview') properties.plan = object
-  if (domain === 'mcp' && action === 'saveConfiguration') properties.revision = { type: 'integer' }
   return { domain, action, input_schema: { type: 'object', properties, additionalProperties: true },
     instructions: hint[2] ?? '使用先前实际返回的对象标识；缺少目标先查询目录。输入由原业务接口校验，错误时核对具体字段，不重放结果未知的写操作。' }
 }

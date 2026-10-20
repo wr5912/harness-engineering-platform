@@ -51,7 +51,8 @@ async function setup(t) {
   const secret = randomBytes(48); const secretPath = join(assetRoot, 'business.secret'); writeFileSync(secretPath, secret)
   const ctx = new Context(); t.after(async () => { await ctx.fiber.dispose(); rmSync(assetRoot, { recursive: true, force: true }) })
   await ctx.plugin(WebServer, { host: '127.0.0.1', port: 0 }); await ctx.plugin(TypertRegistry); ctx.typert.resources.register('session', { field: 'sessionId' }); await ctx.plugin(RemoteAccessService)
-  await ctx.plugin({ name: 'fixture-tools', apply(ctx) { ctx.provide('tools', { guard() {} }) } })
+  const toolGuards = []
+  await ctx.plugin({ name: 'fixture-tools', apply(ctx) { ctx.provide('tools', { guard(check) { toolGuards.push(check) } }) } })
   await ctx.plugin(SessionStore); await ctx.plugin(ApprovalService, { policy: 'ask' })
   const workspacePath = join(assetRoot, 'workspace'); mkdirSync(workspacePath)
   const workspaceRows = [{ id: 'native-fixed-workspace', path: workspacePath, title: '固定业务工作区', sessionIds: [], createdAt: Date.now(), updatedAt: Date.now() }, { id: 'native-hidden-workspace', path: join(assetRoot, 'other'), title: 'OTHER_PRIVATE_WORKSPACE', sessionIds: [], createdAt: Date.now(), updatedAt: Date.now() }]
@@ -65,8 +66,22 @@ async function setup(t) {
   const context = id => { const value = identity(id); value.subject.identitySource = `http://127.0.0.1:${provider.address().port}`; value.evidence.issuer = value.subject.identitySource; return control.createContext(value, binding) }
   const headers = (id, path, method = 'POST') => signBusinessAssertion(secret, { binding, context: context(id), snapshot: coordinator.issueSnapshot(binding.instanceId), nonce: randomBytes(24).toString('base64url'), issuedAt: Date.now() }, method, path)
   const rpc = async (id, endpoint, request) => { const path = `/api/${endpoint}`; return fetch(`http://127.0.0.1:${ctx.webServer.port}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers(id, path) }, body: JSON.stringify({ type: 'client-request', rpcId: randomBytes(8).toString('hex'), method: endpoint, payload: { args: { request } } }) }) }
-  return { ctx, control, fixture, headers, rpc, context, secret, coordinator, workspacePath, workspaceRows, workspaceRegistry, trustCalls, delayTrust: (id, delay) => trustDelays.set(id, delay), revoke: id => revokedSubjects.add(id) }
+  return { ctx, control, fixture, headers, rpc, context, secret, coordinator, workspacePath, workspaceRows, workspaceRegistry, toolGuards, trustCalls, delayTrust: (id, delay) => trustDelays.set(id, delay), revoke: id => revokedSubjects.add(id) }
 }
+test('业务共享资源工具仅开放已登记的分组来源', async t => {
+  const { ctx, control, context, toolGuards } = await setup(t)
+  const runtime = ctx.get('businessRuntime')
+  const sessionId = 'resource-guard-session'
+  control.bindSession(context('A'), sessionId)
+  runtime.resourceServers.add('group-source')
+  const guard = toolGuards.at(-1)
+  assert.equal(guard({ name: 'read_mcp_resource', arguments: { server: 'group-source', uri: 'fixture:/read' },
+    agent: { session: { id: sessionId } } }), undefined)
+  assert.match(guard({ name: 'read_mcp_resource', arguments: { server: 'other-source', uri: 'fixture:/read' },
+    agent: { session: { id: sessionId } } }), /只开放受管 MCP 工具与资源/)
+  assert.match(guard({ name: 'read_mcp_resource', arguments: { server: 'group-source', uri: 'fixture:/read' },
+    agent: { session: { id: 'unknown-session' } } }), /业务 Session 未登记/)
+})
 test('原生 Connection/Remote/Gateway 非 owner 创建持久归属并隔离列表和历史', async t => {
   const { rpc, fixture, ctx, context } = await setup(t); const a = await (await rpc('A', 'session/create', { workspaceId: 'untrusted-workspace', cwd: '/etc', agentPreset: 'untrusted-preset' })).json(); const b = await (await rpc('B', 'session/create', {})).json()
   assert.equal(a.result.ok, true, JSON.stringify(a)); assert.equal(b.result.ok, true, JSON.stringify(b)); assert.deepEqual(fixture.seen, ['harness-business', 'harness-business'])

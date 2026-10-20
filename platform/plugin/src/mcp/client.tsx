@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
+import { useEffect, useRef, useState } from 'react'
 import { Manager } from 'harness-mcp-manager-client'
 import { CHANNEL, type PlatformPageProps } from '../protocol.ts'
 import type { CompositionConfig, CompositionEntry } from './compositions.ts'
@@ -15,10 +14,8 @@ const tabs = [
   { id: 'composition', title: '工具组合编排' },
 ] as const
 
-export function McpPage({ rpc, form, updates, onContext }: PlatformPageProps & LivePageProps & { form: ConfigForm<any> }) {
-  const subscribe = useMemo(() => form.subscribe.bind(form), [form])
-  const snapshot = useMemo(() => form.getSnapshot.bind(form), [form])
-  const state = useSyncExternalStore(subscribe, snapshot)
+export function McpPage({ rpc, updates, onContext }: PlatformPageProps & LivePageProps) {
+  const [state, setState] = useState<any>({ status: 'loading' })
   const [page, setPage] = useState<string>('servers')
   const [toolbarTarget, setToolbarTarget] = useState<HTMLDivElement | null>(null)
   const [publishedService, setPublishedService] = useState<any>(null)
@@ -27,6 +24,18 @@ export function McpPage({ rpc, form, updates, onContext }: PlatformPageProps & L
   useEffect(() => updates?.subscribe(() => {
     if (updates.getSnapshot().domains.includes('mcp')) setRevision(value => value + 1)
   }), [updates])
+  useEffect(() => {
+    let active = true
+    void rpc.call(CHANNEL, 'mcp/configuration', {}).then(response => {
+      if (!active) return
+      setState(response.ok ? { status: 'ready', writable: true, ...(response.value as object) }
+        : (previous: any) => previous.status === 'ready' ? { ...previous, error: response.error.message }
+          : { status: 'unavailable', error: response.error.message })
+    }).catch(() => { if (active) setState((previous: any) => previous.status === 'ready'
+      ? { ...previous, error: '无法读取 MCP 数据配置，请检查连接后重试。' }
+      : { status: 'unavailable', error: '无法读取 MCP 数据配置，请检查连接后重试。' }) })
+    return () => { active = false }
+  }, [rpc, revision])
   useEffect(() => { onContext?.({ page: 'mcp', tab: page }) }, [page, onContext])
   useEffect(() => {
     if (state.status !== 'ready') return
@@ -43,13 +52,19 @@ export function McpPage({ rpc, form, updates, onContext }: PlatformPageProps & L
       <nav className="harness-mcp-tabs" aria-label="MCP 工作区">{tabs.map(tab => <button key={tab.id} type="button" aria-current={page === tab.id ? 'page' : undefined} onClick={() => setPage(tab.id)}>{tab.title}</button>)}</nav>
       <div className="harness-mcp-actions" ref={setToolbarTarget} />
     </div>
-    {state.status === 'unavailable' && <p role="alert">MCP 配置插件未装载，请检查平台启动日志。</p>}
+    {state.error && <p role="alert">{state.error}</p>}
+    {state.status === 'loading' && <p>正在读取数据仓库 MCP 配置…</p>}
     {serviceError && <p role="alert">{serviceError}</p>}
-    <div hidden={page === 'composition'}><Manager view={page} onValidationError={() => setPage('servers')} publishedService={publishedService} toolbarTarget={page === 'composition' ? null : toolbarTarget} form={{ state }} write={async (ops, revision) => {
-      const ok = await form.mutate(ops, revision)
-      if (ok) updates?.invalidate(['mcp'])
-      return ok ? { ok: true } : { ok: false, error: { message: '配置保存失败或已变化，请刷新后重试。' } }
-    }} /></div>
+    <div hidden={page === 'composition'}>{state.status === 'ready' && <Manager view={page} onValidationError={() => setPage('servers')} publishedService={publishedService} toolbarTarget={page === 'composition' ? null : toolbarTarget} form={{ state }} write={async (ops, revision) => {
+      try {
+        const response = await rpc.call(CHANNEL, 'mcp/saveConfiguration', { ops, revision })
+        if (response.ok) {
+          setState({ status: 'ready', writable: true, ...(response.value as object) })
+          updates?.invalidate(['mcp'])
+        }
+        return response.ok ? { ok: true } : { ok: false, error: response.error }
+      } catch { return { ok: false, error: { message: 'MCP 数据配置保存失败，请检查连接后重试。' } } }
+    }} />}</div>
     <div hidden={page !== 'composition'}><CompositionPage rpc={rpc} configuration={state} updates={updates} active={page === 'composition'} onContext={onContext} onCatalogChange={value => { setPublishedService(value.publishedService ?? null); setServiceError('') }} /></div>
   </main>
 }

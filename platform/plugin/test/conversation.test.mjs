@@ -69,10 +69,11 @@ test('助手写操作等待用户确认，原生记录恢复状态且失败回�
   })
   t.after(async () => { await assistant.dispose(); await root.fiber.dispose(); rmSync(assetRoot, { recursive: true, force: true }) })
   assistant.registerTools({ register: tool => tools.set(tool.name, tool) })
+  appendPluginRecord(session, 'plugin:harness-platform/assistant', { kind: 'workspace' })
   const controller = new AbortController()
   let finished = false
   const draft = { toolName: 'basic_read', title: '基础查询', description: '仅基础模拟数据', connectionId: 'mock-basic' }
-  const execution = tools.get('platform_mcp').execute({ action: 'saveCompositionDraft', input: { draft } }, { agent: { id: session.id }, signal: controller.signal })
+  const execution = tools.get('platform_mcp').execute({ action: 'saveCompositionDraft', input: { draft } }, { agent: { id: session.id, session }, signal: controller.signal })
     .then(value => { finished = true; return value })
   const status = async () => (await assistant.handler('status', { session_id: session.id }, controller.signal)).value
   let state
