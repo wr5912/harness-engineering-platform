@@ -4,6 +4,7 @@ import { createRequire } from 'node:module'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createBusinessRuntimePatch } from '../../../platform/plugin/src/business-control/patch.ts'
+import { businessGatewayEntry } from '../../../platform/plugin/src/business-control/entry.ts'
 
 const programRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const require = createRequire(join(programRoot, 'platform/plugin/package.json'))
@@ -34,15 +35,6 @@ export function businessSourceDigest(paths: Record<string, string>): string {
   }
   for (const [kind, root] of Object.entries(paths).sort()) { hash.update(kind).update('\0'); visit(root, '') }
   return `sha256:${hash.digest('hex')}`
-}
-
-export function businessGatewayEntry(assetRoot: string, agentId: string, instanceId: string): string {
-  const access = JSON.parse(readFileSync(join(assetRoot, 'config/business-access.json'), 'utf8'))
-  const gateway = access.gateway
-  if (access.enabled !== true || !gateway?.instances?.some((value: { agentId: string; instanceId: string }) => value.agentId === agentId && value.instanceId === instanceId)) throw new Error('实例未向业务网关开放')
-  const origin = new URL(gateway.publicOrigin)
-  if (!['http:', 'https:'].includes(origin.protocol) || origin.username || origin.password || origin.pathname !== '/' || origin.search || origin.hash) throw new Error('业务网关公开来源无效')
-  return `${origin.origin}/agents/${agentId}/`
 }
 
 /** 启动配置只定位程序、事实源和受信通道，不复制授权规则或连接清单。 */

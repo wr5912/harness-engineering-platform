@@ -1,0 +1,659 @@
+{
+  "at": "2026-10-20T05:56:55.917Z",
+  "url": "http://10.0.160.32:3090/hep/#/gateway",
+  "widths": [
+    1920,
+    1440,
+    1250,
+    1024,
+    768,
+    390
+  ],
+  "views": {
+    "390": {
+      "智能体身份": {
+        "config": {
+          "x": 16,
+          "y": 462,
+          "width": 358,
+          "height": 1805,
+          "bottom": 2267
+        },
+        "runtime": {
+          "x": 16,
+          "y": 2287,
+          "width": 358,
+          "height": 629,
+          "bottom": 2916
+        },
+        "gridColumns": "358px",
+        "accessPanels": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          }
+        ],
+        "pageWidth": 390,
+        "viewportWidth": 390
+      },
+      "风险评估": {
+        "config": {
+          "x": 16,
+          "y": 462,
+          "width": 358,
+          "height": 1645,
+          "bottom": 2106
+        },
+        "runtime": {
+          "x": 16,
+          "y": 2126,
+          "width": 358,
+          "height": 629,
+          "bottom": 2755
+        },
+        "gridColumns": "358px",
+        "accessPanels": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          }
+        ],
+        "pageWidth": 390,
+        "viewportWidth": 390
+      },
+      "访问控制": {
+        "config": {
+          "x": 16,
+          "y": 462,
+          "width": 358,
+          "height": 1744,
+          "bottom": 2206
+        },
+        "runtime": {
+          "x": 16,
+          "y": 2226,
+          "width": 358,
+          "height": 629,
+          "bottom": 2855
+        },
+        "gridColumns": "358px",
+        "accessPanels": [
+          {
+            "x": 33,
+            "y": 865,
+            "width": 324,
+            "height": 531,
+            "bottom": 1396
+          },
+          {
+            "x": 33,
+            "y": 1420,
+            "width": 324,
+            "height": 598,
+            "bottom": 2019
+          }
+        ],
+        "pageWidth": 390,
+        "viewportWidth": 390
+      }
+    },
+    "768": {
+      "智能体身份": {
+        "config": {
+          "x": 24,
+          "y": 363,
+          "width": 720,
+          "height": 1233,
+          "bottom": 1596
+        },
+        "runtime": {
+          "x": 24,
+          "y": 1616,
+          "width": 720,
+          "height": 441,
+          "bottom": 2056
+        },
+        "gridColumns": "720px",
+        "accessPanels": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          }
+        ],
+        "pageWidth": 768,
+        "viewportWidth": 768
+      },
+      "风险评估": {
+        "config": {
+          "x": 24,
+          "y": 363,
+          "width": 720,
+          "height": 1177,
+          "bottom": 1540
+        },
+        "runtime": {
+          "x": 24,
+          "y": 1560,
+          "width": 720,
+          "height": 441,
+          "bottom": 2001
+        },
+        "gridColumns": "720px",
+        "accessPanels": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          }
+        ],
+        "pageWidth": 768,
+        "viewportWidth": 768
+      },
+      "访问控制": {
+        "config": {
+          "x": 24,
+          "y": 363,
+          "width": 720,
+          "height": 1343,
+          "bottom": 1706
+        },
+        "runtime": {
+          "x": 24,
+          "y": 1726,
+          "width": 720,
+          "height": 441,
+          "bottom": 2166
+        },
+        "gridColumns": "720px",
+        "accessPanels": [
+          {
+            "x": 49,
+            "y": 696,
+            "width": 670,
+            "height": 387,
+            "bottom": 1082
+          },
+          {
+            "x": 49,
+            "y": 1106,
+            "width": 670,
+            "height": 425,
+            "bottom": 1531
+          }
+        ],
+        "pageWidth": 768,
+        "viewportWidth": 768
+      }
+    },
+    "1024": {
+      "智能体身份": {
+        "config": {
+          "x": 32,
+          "y": 363,
+          "width": 960,
+          "height": 1211,
+          "bottom": 1574
+        },
+        "runtime": {
+          "x": 32,
+          "y": 1594,
+          "width": 960,
+          "height": 418,
+          "bottom": 2012
+        },
+        "gridColumns": "960px",
+        "accessPanels": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          }
+        ],
+        "pageWidth": 1024,
+        "viewportWidth": 1024
+      },
+      "风险评估": {
+        "config": {
+          "x": 32,
+          "y": 363,
+          "width": 960,
+          "height": 1177,
+          "bottom": 1540
+        },
+        "runtime": {
+          "x": 32,
+          "y": 1560,
+          "width": 960,
+          "height": 418,
+          "bottom": 1979
+        },
+        "gridColumns": "960px",
+        "accessPanels": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          }
+        ],
+        "pageWidth": 1024,
+        "viewportWidth": 1024
+      },
+      "访问控制": {
+        "config": {
+          "x": 32,
+          "y": 363,
+          "width": 960,
+          "height": 1321,
+          "bottom": 1684
+        },
+        "runtime": {
+          "x": 32,
+          "y": 1704,
+          "width": 960,
+          "height": 418,
+          "bottom": 2122
+        },
+        "gridColumns": "960px",
+        "accessPanels": [
+          {
+            "x": 57,
+            "y": 674,
+            "width": 910,
+            "height": 387,
+            "bottom": 1060
+          },
+          {
+            "x": 57,
+            "y": 1084,
+            "width": 910,
+            "height": 425,
+            "bottom": 1509
+          }
+        ],
+        "pageWidth": 1024,
+        "viewportWidth": 1024
+      }
+    },
+    "1250": {
+      "智能体身份": {
+        "config": {
+          "x": 32,
+          "y": 303,
+          "width": 1186,
+          "height": 1144,
+          "bottom": 1448
+        },
+        "runtime": {
+          "x": 32,
+          "y": 1468,
+          "width": 1186,
+          "height": 418,
+          "bottom": 1886
+        },
+        "gridColumns": "1186px",
+        "accessPanels": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          }
+        ],
+        "pageWidth": 1250,
+        "viewportWidth": 1250
+      },
+      "风险评估": {
+        "config": {
+          "x": 32,
+          "y": 303,
+          "width": 1186,
+          "height": 1155,
+          "bottom": 1459
+        },
+        "runtime": {
+          "x": 32,
+          "y": 1479,
+          "width": 1186,
+          "height": 418,
+          "bottom": 1897
+        },
+        "gridColumns": "1186px",
+        "accessPanels": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          }
+        ],
+        "pageWidth": 1250,
+        "viewportWidth": 1250
+      },
+      "访问控制": {
+        "config": {
+          "x": 32,
+          "y": 303,
+          "width": 1186,
+          "height": 1321,
+          "bottom": 1624
+        },
+        "runtime": {
+          "x": 32,
+          "y": 1644,
+          "width": 1186,
+          "height": 418,
+          "bottom": 2062
+        },
+        "gridColumns": "1186px",
+        "accessPanels": [
+          {
+            "x": 57,
+            "y": 614,
+            "width": 1136,
+            "height": 387,
+            "bottom": 1001
+          },
+          {
+            "x": 57,
+            "y": 1025,
+            "width": 1136,
+            "height": 425,
+            "bottom": 1449
+          }
+        ],
+        "pageWidth": 1250,
+        "viewportWidth": 1250
+      }
+    },
+    "1440": {
+      "智能体身份": {
+        "config": {
+          "x": 32,
+          "y": 303,
+          "width": 1376,
+          "height": 1144,
+          "bottom": 1448
+        },
+        "runtime": {
+          "x": 32,
+          "y": 1468,
+          "width": 1376,
+          "height": 373,
+          "bottom": 1841
+        },
+        "gridColumns": "1376px",
+        "accessPanels": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          }
+        ],
+        "pageWidth": 1440,
+        "viewportWidth": 1440
+      },
+      "风险评估": {
+        "config": {
+          "x": 32,
+          "y": 303,
+          "width": 1376,
+          "height": 1155,
+          "bottom": 1459
+        },
+        "runtime": {
+          "x": 32,
+          "y": 1479,
+          "width": 1376,
+          "height": 373,
+          "bottom": 1852
+        },
+        "gridColumns": "1376px",
+        "accessPanels": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          }
+        ],
+        "pageWidth": 1440,
+        "viewportWidth": 1440
+      },
+      "访问控制": {
+        "config": {
+          "x": 32,
+          "y": 303,
+          "width": 1376,
+          "height": 910,
+          "bottom": 1214
+        },
+        "runtime": {
+          "x": 32,
+          "y": 1234,
+          "width": 1376,
+          "height": 373,
+          "bottom": 1607
+        },
+        "gridColumns": "1376px",
+        "accessPanels": [
+          {
+            "x": 57,
+            "y": 614,
+            "width": 651,
+            "height": 387,
+            "bottom": 1001
+          },
+          {
+            "x": 732,
+            "y": 614,
+            "width": 651,
+            "height": 425,
+            "bottom": 1039
+          }
+        ],
+        "pageWidth": 1440,
+        "viewportWidth": 1440
+      }
+    },
+    "1920": {
+      "智能体身份": {
+        "config": {
+          "x": 32,
+          "y": 303,
+          "width": 1856,
+          "height": 1144,
+          "bottom": 1448
+        },
+        "runtime": {
+          "x": 32,
+          "y": 1468,
+          "width": 1856,
+          "height": 373,
+          "bottom": 1841
+        },
+        "gridColumns": "1856px",
+        "accessPanels": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          }
+        ],
+        "pageWidth": 1920,
+        "viewportWidth": 1920
+      },
+      "风险评估": {
+        "config": {
+          "x": 32,
+          "y": 303,
+          "width": 1856,
+          "height": 1155,
+          "bottom": 1459
+        },
+        "runtime": {
+          "x": 32,
+          "y": 1479,
+          "width": 1856,
+          "height": 373,
+          "bottom": 1852
+        },
+        "gridColumns": "1856px",
+        "accessPanels": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "bottom": 0
+          }
+        ],
+        "pageWidth": 1920,
+        "viewportWidth": 1920
+      },
+      "访问控制": {
+        "config": {
+          "x": 32,
+          "y": 303,
+          "width": 1856,
+          "height": 910,
+          "bottom": 1214
+        },
+        "runtime": {
+          "x": 32,
+          "y": 1234,
+          "width": 1856,
+          "height": 373,
+          "bottom": 1607
+        },
+        "gridColumns": "1856px",
+        "accessPanels": [
+          {
+            "x": 57,
+            "y": 614,
+            "width": 891,
+            "height": 387,
+            "bottom": 1001
+          },
+          {
+            "x": 972,
+            "y": 614,
+            "width": 891,
+            "height": 425,
+            "bottom": 1039
+          }
+        ],
+        "pageWidth": 1920,
+        "viewportWidth": 1920
+      }
+    }
+  },
+  "draftPreservedOnTabSwitch": true,
+  "discardRestoredConfig": true,
+  "errors": []
+}

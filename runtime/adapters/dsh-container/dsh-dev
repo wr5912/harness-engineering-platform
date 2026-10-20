@@ -1484,6 +1484,7 @@ def instance_entry(target: Path, manifest: dict, observation: dict | None = None
         "target_preset": manifest.get("target_preset"),
         "session_preset": manifest.get("session_preset"),
         "profile": manifest.get("profile", "web"),
+        "business_gateway": bool(manifest.get("business_control")),
         "lan_access": bool(manifest.get("lan_access", False)),
         "unsafe_no_auth": bool(manifest.get("unsafe_no_auth", False)),
         "skip_testing_notice": bool(manifest.get("skip_testing_notice", False)),

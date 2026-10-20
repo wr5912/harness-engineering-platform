@@ -1,0 +1,13 @@
+{
+  "time": "2026-10-20T03:52:40.794Z",
+  "instance": "security-operations-expert-business-mock",
+  "platform": "http://10.0.160.32:3090/hep/",
+  "popupUrl": "http://10.0.160.32:53105/agents/security-operations-expert/",
+  "popupTitle": "DSH 本地构建",
+  "detailPopupTitle": "DSH 本地构建",
+  "loginRendered": true,
+  "webLoaded": true,
+  "detailWebLoaded": true,
+  "sourcePageStayed": true,
+  "pageErrors": []
+}

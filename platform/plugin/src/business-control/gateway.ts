@@ -228,7 +228,17 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
       const instance = await prepare(req, 'http')
       await proxy.web(req, res, { target: instance.origin })
     } catch (error) {
-      if (!res.headersSent) json(res, (error as { httpStatus?: number }).httpStatus || 403, { error: '业务访问被拒绝' })
+      const status = (error as { httpStatus?: number }).httpStatus || 403
+      const match = /^\/agents\/([a-z0-9-]+)\/$/.exec(req.url || '')
+      if (!res.headersSent && status === 401 && req.method === 'GET' && req.headers.accept?.includes('text/html')
+        && req.headers.host === origin.host && match && config.instances.some(item => item.agentId === match[1])) {
+        res.writeHead(401, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
+        res.end(renderBusinessGatewayHome({ availableAgents: [], rules: [], facts: [], restrictions: [],
+          authenticationMessage: '请先登录，再访问业务智能体。', managementUrl: config.managementUrl,
+          riskProvider: !!control.config().riskAssessment, agentStatuses: [], operations: [] }))
+        return
+      }
+      if (!res.headersSent) json(res, status, { error: '业务访问被拒绝' })
       else res.destroy()
     }
   })

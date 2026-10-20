@@ -182,6 +182,31 @@ test('agents detail reads manifest, selectable versions, real cases, refs and ed
   }
 })
 
+test('智能体描述只投影已启用资产的名称、说明和发现的 Skill，不把发现当作装载', async () => {
+  const { createAgentsHandler } = await loadServer()
+  const fx = fixture()
+  try {
+    const base = 'evolution/experiments/EXP-test-agent-001/candidate'
+    write(join(fx.root, `${base}/harness.yaml`), 'agent:\n  name: 当前启用智能体\n')
+    write(join(fx.root, `${base}/dsh/presets/test-agent/preset.yml`), 'description: 业务资产说明\n')
+    write(join(fx.root, `${base}/dsh/workspace/.agents/skills/check-state/SKILL.md`), '---\nname: 状态核对\ndescription: 查询当前状态\n---\n\n# 状态核对\n')
+    addVersion(fx.root, 'EXP-test-agent-002', 'status: draft\n')
+    write(join(fx.root, 'evolution/experiments/EXP-test-agent-002/candidate/harness.yaml'), 'agent:\n  name: 未启用草稿\n')
+    const handler = createAgentsHandler(fx.root)
+    const catalog = await rpc(handler, 'list')
+    assert.equal(catalog.agents.find(value => value.id === 'test-agent').name, '当前启用智能体')
+    const description = await rpc(handler, 'description', { agent_id: 'test-agent' })
+    assert.equal(description.source.experimentId, 'EXP-test-agent-001')
+    assert.equal(description.name, '当前启用智能体')
+    assert.equal(description.description, '业务资产说明')
+    assert.deepEqual(description.skills.map(value => ({ ...value })), [{ skillId: 'check-state', skillName: '状态核对', skillDescription: '查询当前状态', verification: 'discovered' }])
+    write(join(fx.root, 'agents/test-agent/manifest.yaml'), 'schema_version: 1.0\nagent_id: test-agent\nactive_experiment: null\n')
+    assert.deepEqual({ ...(await rpc(handler, 'description', { agent_id: 'test-agent' })) }, { agentId: 'test-agent', source: null, name: null, description: null, skills: [] })
+  } finally {
+    await rm(fx.root, { recursive: true, force: true })
+  }
+})
+
 const sampleFeatures = [{ id: 'route', title: '意图路由', description: '按需求路由到对应能力。', source_refs: ['EXP-test-agent-001'], evidence_refs: [], change: '保留既有路由' }]
 
 function versionRequest(commit, extra = {}) {

@@ -1,0 +1,30 @@
+{
+  "at": "2026-10-20T07:04:13.986Z",
+  "address": "http://10.0.160.32:3090/hep/#/gateway",
+  "views": [
+    "运行概览",
+    "智能体身份",
+    "风险评估",
+    "访问控制"
+  ],
+  "permittedMockUserCount": 2,
+  "multipleSelectionDisablesSession": true,
+  "probeResult": "收到 HTTP 405 响应 · 52 毫秒。POST 合同及业务结果未验证。",
+  "draftAcrossTabs": true,
+  "discardRestoresSavedConfig": true,
+  "horizontalOverflow": {
+    "access390": false,
+    "overview390": false
+  },
+  "pageErrors": [],
+  "badServerResponses": [],
+  "screenshots": [
+    "overview-1440.png",
+    "overview-multiselect-1440.png",
+    "identity-1440.png",
+    "risk-1440.png",
+    "access-1440.png",
+    "access-390.png",
+    "overview-390.png"
+  ]
+}

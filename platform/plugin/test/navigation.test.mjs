@@ -33,6 +33,10 @@ test('旧链接保留原样，非法列表视图在读取和写入时均忽略',
 test('统一网关有独立稳定路由，旧 MCP 地址保持原样', () => {
   assert.equal(navigationHash({ page: 'gateway' }), '#/gateway')
   assert.deepEqual(readNavigation('#/gateway'), { page: 'gateway' })
+  for (const tab of ['identity', 'risk', 'authorization']) {
+    const target = { page: 'gateway', tab }
+    assert.deepEqual(readNavigation(navigationHash(target)), target)
+  }
   assert.deepEqual(readNavigation('#/mcp'), { page: 'mcp' })
 })
 
@@ -91,6 +95,7 @@ test('一级导航可直接进入统一网关，单一管理页面保持挂载�
   assert.equal(ui.nodes().filter(node => node.type === 'button' && ui.text(node) === '统一网关').length, 1)
   assert.equal(gateway().length, 1)
   assert.equal(gateway()[0].props.active, false)
+  assert.equal(ui.nodes().some(node => node.type?.name === 'AgentsPage'), false, '尚未打开的页面不应在后台发起读取')
   ui.button('统一网关').props.onClick(); ui.render()
   assert.equal(ui.location.hash, '#/gateway')
   assert.equal(ui.button('统一网关').props['aria-current'], 'page')
@@ -99,6 +104,7 @@ test('一级导航可直接进入统一网关，单一管理页面保持挂载�
   ui.button('MCP 管理').props.onClick(); ui.render()
   assert.equal(gateway().length, 1, '切换页面保持管理表单挂载以保留草稿')
   assert.equal(gateway()[0].props.active, false)
+  assert.equal(ui.nodes().some(node => node.type?.name === 'McpPage'), true)
   ui.location.hash = '#/gateway'; ui.listeners.get('hashchange')(); ui.render()
   assert.equal(gateway()[0].props.active, true)
 })

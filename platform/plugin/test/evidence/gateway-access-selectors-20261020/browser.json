@@ -1,0 +1,27 @@
+{
+  "at": "2026-10-20T04:49:12.621Z",
+  "url": "http://10.0.160.32:3090/hep/#/gateway",
+  "initialMethod": "TOOLS/CALL",
+  "services": [
+    "仅允许所选服务",
+    "inspection"
+  ],
+  "actionCount": 9,
+  "methodOptions": [
+    "选择方法",
+    "GET",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
+    "TOOLS/CALL",
+    "RESOURCES/READ"
+  ],
+  "refreshPreservedDraft": true,
+  "discardRestoredConfiguration": true,
+  "viewport": {
+    "bodyWidth": 390,
+    "viewportWidth": 390
+  },
+  "pageErrors": []
+}
