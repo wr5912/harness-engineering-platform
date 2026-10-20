@@ -38,3 +38,4 @@
 | 按需停止 | `kill -TERM 1969383` |
 
 同日后续重新部署了[智能体选择器与紧凑状态栏](../gateway-selector-ui-20261020/README.md)，最新运行进程与停止方式以该记录为准；本表保留分类整改部署时的定位。
+2026-10-20 清理后，构建目录已归档至 `/home/admin/harness-engineering-platform-backups/state-cleanup-20261020-Vl9YYs/gateway-history/gateway-ui-live-20261020/`，3090 当前日志位于数据根 `.local/logs/main-3090-20261020.log`；表内 PID 不代表当前进程。

@@ -27,3 +27,5 @@
 | 平台日志 | 程序根下 `.local/business-control-acceptance/main-3090.log` |
 | 构建日志、备份与装载摘要 | 程序根下 `.local/gateway-selector-ui-20261020/`；`deployment.json` 保存客户端 SHA-256 和配置未变核对结果 |
 | 按需停止 | `kill -TERM 2004307` |
+
+上表是本轮部署时的定位。2026-10-20 清理后，构建目录已归档至 `/home/admin/harness-engineering-platform-backups/state-cleanup-20261020-Vl9YYs/gateway-history/gateway-selector-ui-20261020/`，3090 当前日志位于数据根 `.local/logs/main-3090-20261020.log`；表内 PID 不代表当前进程。
