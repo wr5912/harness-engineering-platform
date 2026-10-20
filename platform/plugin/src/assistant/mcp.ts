@@ -4,6 +4,10 @@ import type { ManagerConfig } from '../mcp/manager.ts'
 export function assistantMcp(settings: any, manager: ManagerConfig) {
   return async (action: string, input: Record<string, any>, signal: AbortSignal) => {
     signal.throwIfAborted()
+    if (action.startsWith('control/')) {
+      if (!manager.control) throw new Error('业务运行权限服务尚未装载')
+      return manager.control(action.slice('control/'.length), input, signal, undefined as never)
+    }
     if (action === 'configuration') {
       const view = settings.describe().namespaces.find((item: any) => item.ns === 'mcp-session-manager')
       if (!view) throw new Error('MCP 配置尚未装载')

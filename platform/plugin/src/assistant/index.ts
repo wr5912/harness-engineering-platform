@@ -46,6 +46,7 @@ export interface AssistantServices {
 
 
 const readActions = new Set(['research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'tasks/capabilities', 'tasks/assembly-preview', 'list', 'detail', 'edit/read', 'edit/preview', 'cases/list', 'cases/read', 'eval/preview', 'eval/status', 'runs/index', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/preview', 'compute-variants/build-preview', 'compute-variants/freeze-preview', 'compute-variants/compare', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'datasets/source', 'datasets/preview', 'datasets/list', 'datasets/read', 'datasets/export', 'features/read-source', 'features/preview', 'features/proposal', 'fusion/preview', 'fusion/proposal', 'fusion/status', 'url', 'logs', 'preview', 'batch-preview', 'configuration', 'test', 'resources', 'resourceTemplates', 'readResource', 'sources/list', 'sources/components', 'sources/logs', 'sources/preview', 'dryRunComposition', 'compositionRun', 'compositionArtifact'])
+readActions.add('control/status')
 const recordType = 'plugin:harness-platform/assistant'
 const projectionKey = 'harnessPlatformAssistant'
 
@@ -541,7 +542,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
   }
   async function dispatch(domain: Domain, action: string, input: MapValue, signal: AbortSignal, peer?: any) {
     try {
-      if (domain === 'mcp' && services.mcp && (['configuration', 'saveConfiguration', 'test', 'resources', 'resourceTemplates', 'readResource', 'callTool'].includes(action) || action.startsWith('sources/'))) {
+      if (domain === 'mcp' && services.mcp && (['configuration', 'saveConfiguration', 'test', 'resources', 'resourceTemplates', 'readResource', 'callTool'].includes(action) || action.startsWith('sources/') || action.startsWith('control/'))) {
         return await services.mcp!(action, input, signal)
       }
       return await platform(`${domain}/${action}`, input, signal, peer)

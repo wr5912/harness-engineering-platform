@@ -16,6 +16,7 @@ import { EvaluationPage } from './evaluation/client.tsx'
 import { navigationHash, readNavigation } from './navigation.ts'
 import { InstancesPage } from './instances/client.tsx'
 import { McpPage } from './mcp/client.tsx'
+import { BusinessControlPage } from './business-control/ui.tsx'
 import { platformTheme } from './theme.ts'
 import { prepareConversation } from './conversation.ts'
 import { AssistantConversation, AssistantOperations, PlatformOperationCard, createAssistant, type Assistant, type AssistantContext } from './assistant/client.tsx'
@@ -27,7 +28,7 @@ type ClientContext = Omit<Context, 'connection'> & { connection: ConnectionHandl
 const pages: { id: PageId; label: string }[] = [
   { id: 'home', label: '首页' }, { id: 'conversations', label: '管理对话' }, { id: 'agents', label: '智能体管理' },
   { id: 'evaluation', label: '评测中心' },
-  { id: 'instances', label: '实例管理' }, { id: 'mcp', label: 'MCP 管理' },
+  { id: 'instances', label: '实例管理' }, { id: 'gateway', label: '统一网关' }, { id: 'mcp', label: 'MCP 管理' },
 ]
 
 type PlatformProps = PlatformPageProps & PropsRuntime<'shell.overlay'> & PropsRenderSlots<'harness.assistant.conversation'> & {
@@ -157,6 +158,7 @@ function PlatformPage({ catalog, rpc, mcpForm, assistant, updates, enterConversa
         <div hidden={page !== 'agents'}><AgentsPage rpc={rpc} updates={updates} onAssistant={onAssistant} onContext={onContext} target={target} onNavigate={navigate} active={page === 'agents'} /></div>
         <div hidden={page !== 'evaluation'}><EvaluationPage rpc={rpc} updates={updates} onAssistant={onAssistant} onContext={onContext} target={target} onNavigate={navigate} active={page === 'evaluation'} /></div>
         <div hidden={page !== 'instances'}><InstancesPage rpc={rpc} updates={updates} onContext={onContext} target={target} onNavigate={navigate} /></div>
+        <div hidden={page !== 'gateway'}><BusinessControlPage rpc={rpc} updates={updates} active={page === 'gateway'} /></div>
         <div hidden={page !== 'mcp'}><McpPage rpc={rpc} form={mcpForm} updates={updates} onContext={onContext} /></div>
         <div ref={conversation} className="harness-conversation-viewport" hidden={!full}/>
         <section className="harness-assistant harness-assistant-floating" hidden={!floating} aria-label="平台 AI 助手">

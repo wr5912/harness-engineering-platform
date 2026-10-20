@@ -25,6 +25,9 @@ import { createAssistant } from './assistant/index.ts'
 import { assistantMcp } from './assistant/mcp.ts'
 import { createPlatformEvents } from './realtime/index.ts'
 import logo from '../assets/harness-logo.svg'
+import { applyBusinessGateway } from './business-control/index.ts'
+import { managementDispatch } from './mcp/control.ts'
+import { currentBusinessContext, getBusinessControl } from './business-control/core.ts'
 
 // 使用启动器核对过的全局 Runtime；开发依赖只提供类型和隔离测试环境。
 const WebApp: typeof NativeWebApp = await runtimeModule('@deepseek-ai/dsh-web-app')
@@ -137,9 +140,10 @@ export function applyTools(ctx: Context) {
   registrationContext.connection.fetch.register({ path: '/api/harness-platform/runs/download', methods: ['GET'], requestBody: 'buffered', fetch: createRunDownloadHandler(assetRoot) })
   const notify = (domains: string[], ids?: string[]) => events.notify(domains as any, ids)
   const wrap = (domain: 'agents' | 'instances' | 'mcp', handler: ConnectionRpcHandler): ConnectionRpcHandler => async (endpoint, payload, signal, peer) => {
-    try { return await handler(endpoint, payload, signal, peer) }
+    if (getBusinessControl(assetRoot).enabled() && !currentBusinessContext() && peer?.principal.kind !== 'owner') return failure('forbidden', '平台管理操作要求管理身份')
+    try { return await managementDispatch(assetRoot, () => handler(endpoint, payload, signal, peer)) }
     finally {
-      if (!['research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'list', 'detail', 'url', 'logs', 'edit/read', 'cases/list', 'cases/read', 'eval/status', 'runs/index', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/preview', 'compute-variants/compare', 'compute-variants/build-preview', 'compute-variants/freeze-preview', 'tasks/capabilities', 'datasets/source', 'datasets/list', 'datasets/read', 'datasets/export', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'fusion/status', 'fusion/proposal', 'features/proposal', 'features/read-source'].includes(endpoint)) notify([domain, 'catalog'])
+      if (!['control/status', 'research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'list', 'detail', 'url', 'logs', 'edit/read', 'cases/list', 'cases/read', 'eval/status', 'runs/index', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/preview', 'compute-variants/compare', 'compute-variants/build-preview', 'compute-variants/freeze-preview', 'tasks/capabilities', 'datasets/source', 'datasets/list', 'datasets/read', 'datasets/export', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'fusion/status', 'fusion/proposal', 'features/proposal', 'features/read-source'].includes(endpoint)) notify([domain, 'catalog'])
     }
   }
   const domains = {
@@ -249,5 +253,6 @@ export async function apply(ctx: Context, config: Config) {
     .replace(/<title>[^<]*<\/title>/i, '<title>Harness工程平台</title>')
     .replace('</head>', `${icon}</head>`)))
   applyTools(ctx)
+  await applyBusinessGateway(ctx, assetRoot)
   WebApp.apply(ctx, { ...config, publicUrl: `${ctx.webServer.protocol}//${ctx.webServer.host}:${ctx.webServer.port}${ctx.webServer.publicPath('/')}` })
 }

@@ -70,7 +70,7 @@ export const managerSources = {
         contents = `import { appendQueryParameter } from ${JSON.stringify(resolve('src/mcp/openapi.ts'))};\nfunction platformTimeout(server: any) { const timeout = AbortSignal.timeout(server.platformTimeoutMs ?? 20_000); return server.platformSignal ? AbortSignal.any([server.platformSignal, timeout]) : timeout }\n${original.replaceAll('AbortSignal.timeout(20_000)', 'platformTimeout(server)').replace('const { response, credential } = await authorizedFetch(source.server', 'const server = source.server\n  const { response, credential } = await authorizedFetch(source.server').replace("if (parameter.in === 'query') for (const entry of Array.isArray(value) ? value : [value]) url.searchParams.append(parameter.name, String(entry))", "if (parameter.in === 'query') appendQueryParameter(url.searchParams, parameter, value)")}\nexport { execute };`
       } else {
         contents = (await readFile(resolve(managerSource, 'index.ts'), 'utf8'))
-          .replace("createRequire('/opt/dsh/packages/mcp/mcp-client/package.json')", "resolveRuntimeRequire('@deepseek-ai/schemastery')")
+          .replace("createRequire('/opt/dsh/packages/mcp/mcp-client/package.json')", "resolveRuntimeRequire('@deepseek-ai/schemastery', existsSync('/opt/dsh/packages/mcp/mcp-client/package.json') ? '/opt/dsh/packages/mcp/mcp-client/package.json' : undefined)")
           .replace("const z = runtimeRequire", "const platformRequire = createRequire(import.meta.url)\nconst z = runtimeRequire")
           .replaceAll("runtimeRequire('@modelcontextprotocol/", "platformRequire('@modelcontextprotocol/")
           .replace("from './openapi.mjs'", "from 'harness-mcp-manager-openapi'")
@@ -85,14 +85,6 @@ export const managerSources = {
           .replace('Boolean(server.specUrl || resolvedUrl(server))', 'Boolean(server.platformComposition || server.specUrl || resolvedUrl(server))')
           .replace('!(server.specUrl || resolvedUrl(server))', '!(server.platformComposition || server.specUrl || resolvedUrl(server))')
           .replace('source.tools.map(({ name, description }: any) => ({ name, description }))', 'source.tools.map(({ name, description, inputSchema }: any) => ({ name, description, inputSchema }))')
-          .replace("if (request.action === 'test') {", `if (request.action === 'callTool') {
-        if (typeof request.toolName !== 'string' || !request.arguments || typeof request.arguments !== 'object' || Array.isArray(request.arguments)) return send(res, 400, { error: '工具名称或参数无效' })
-        const result = server.specUrl
-          ? await callOpenApiTool(await loadOpenApi(server), request.toolName, request.arguments)
-          : await withClient(server, client => client.callTool({ name: request.toolName, arguments: request.arguments }, platformCallOptions(server)))
-        return send(res, 200, result)
-      }
-      if (request.action === 'test') {`)
       }
       if (!path.endsWith('client') && !path.endsWith('openapi')) {
         contents = `function platformCallOptions(server: any) { return { signal: server.platformSignal, timeout: server.platformComposition ? 36 * 60_000 : (server.platformTimeoutMs ?? 60_000) } }\n${contents}`
@@ -102,7 +94,7 @@ export const managerSources = {
         const dispatchEnd = contents.indexOf('    } catch (error)', dispatchStart)
         if (adminStart < 0 || dispatchStart < 0 || dispatchEnd < 0) throw new Error('MCP 管理 dispatch 合同已变化')
         const dispatchBody = contents.slice(dispatchStart, dispatchEnd).replaceAll('send(res, ', 'reply(')
-        const dispatcher = `  const platformDispatch = async (request: any, signal?: AbortSignal) => {
+        const dispatcher = `  const runPlatformDispatch = async (request: any, signal?: AbortSignal) => {
           signal?.throwIfAborted()
           const current = snapshot(config)
           const timeoutMs = Number.isSafeInteger(request.timeoutMs) && request.timeoutMs > 0 && request.timeoutMs <= 36 * 60_000 ? request.timeoutMs : undefined
@@ -110,11 +102,13 @@ export const managerSources = {
           const reply = (status: number, value: any) => ({ status, value })
           try { ${dispatchBody} } catch (error) { return reply(400, { error: error instanceof Error ? error.message : String(error) }) }
         }
+        const platformDispatch = (request: any, signal?: AbortSignal) => config.withManagement
+          ? config.withManagement(() => runPlatformDispatch(request, signal)) : runPlatformDispatch(request, signal)
         config.platformDispatch?.(platformDispatch)
 `
         contents = contents.slice(0, dispatchStart) + `      const outcome = await platformDispatch(request)\n      return send(res, outcome.status, outcome.value)\n` + contents.slice(dispatchEnd)
         contents = contents.slice(0, adminStart) + dispatcher + contents.slice(adminStart)
-        contents = `import { runtimeRequire as resolveRuntimeRequire } from ${JSON.stringify(resolve('../../runtime/adapters/dsh-web/src/resolve-runtime.ts'))};\n${contents}`
+        contents = `import { existsSync } from 'node:fs';\nimport { runtimeRequire as resolveRuntimeRequire } from ${JSON.stringify(resolve('../../runtime/adapters/dsh-web/src/resolve-runtime.ts'))};\n${contents}`
       }
       return { contents, loader: path.endsWith('client') ? 'tsx' : 'ts', resolveDir: managerSource }
     })
@@ -123,10 +117,12 @@ export const managerSources = {
 
 const { name } = JSON.parse(await readFile(new URL('./package.json', import.meta.url), 'utf8'))
 // 固定已打包执行代码的身份，不能用运行时工作树替代实际装载制品。
-const implementationFiles = ['definition.ts', 'compositions.ts', 'executor.ts', 'index.ts', 'openapi.ts', 'native.ts', 'nested.ts', 'extension.ts']
+const implementationFiles = ['definition.ts', 'compositions.ts', 'executor.ts', 'index.ts', 'openapi.ts', 'native.ts', 'nested.ts', 'extension.ts', 'control.ts', 'manager.ts']
   .map(file => `platform/plugin/src/mcp/${file}`)
   .concat(['platform/plugin/build.mjs', 'platform/plugin/package.json', 'platform/plugin/pnpm-lock.yaml', 'platform/plugin/src/index.ts',
-    'platform/plugin/src/evaluation/model-attempts.ts', 'platform/plugin/src/workflows/graph.ts', ...['index.ts', 'openapi.ts'].map(file => `plugins/mcp-manager/${file}`)])
+    'platform/plugin/src/evaluation/model-attempts.ts', 'platform/plugin/src/workflows/graph.ts',
+    ...['contracts.ts', 'core.ts', 'providers.ts', 'reports.ts'].map(file => `platform/plugin/src/business-control/${file}`),
+    ...['index.ts', 'openapi.ts'].map(file => `plugins/mcp-manager/${file}`)])
 const implementationHash = createHash('sha256')
 for (const file of implementationFiles) implementationHash.update(file).update('\0').update(await readFile(new URL('../../' + file, import.meta.url)))
 const implementationDefine = { __PLATFORM_MCP_IMPLEMENTATION_DIGEST__: JSON.stringify(implementationHash.digest('hex')) }
@@ -145,6 +141,15 @@ await build({
 })
 await build({ entryPoints: ['src/mcp/manager.ts'], outfile: 'lib/mcp-manager.js', bundle: true,
   platform: 'node', target: 'node24', format: 'esm', packages: 'external', plugins: [managerSources], legalComments: 'none', define: implementationDefine })
+await build({ entryPoints: ['src/business-control/runtime.ts'], outfile: 'lib/business-runtime.js', bundle: true,
+  platform: 'node', target: 'node24', format: 'esm', packages: 'external', legalComments: 'none' })
+await build({ entryPoints: ['src/business-control/index.ts'], outfile: 'lib/business-gateway.js', bundle: true,
+  platform: 'node', target: 'node24', format: 'esm', packages: 'external', legalComments: 'none' })
+await build({ entryPoints: ['src/business-control/core.ts'], outfile: 'lib/business-control.js', bundle: true,
+  platform: 'node', target: 'node24', format: 'esm', packages: 'external', legalComments: 'none' })
+// 独立业务 Host 包不声明管理客户端；薄入口继续复用同一份已构建实现。
+await build({ entryPoints: ['business/runtime.ts', 'business/mcp-manager.ts'], outdir: 'business', bundle: false,
+  platform: 'node', target: 'node24', format: 'esm', legalComments: 'none' })
 await build({
   entryPoints: ['src/client.tsx'],
   outfile: 'lib/client.js',

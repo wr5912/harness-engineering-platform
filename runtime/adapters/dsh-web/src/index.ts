@@ -1,22 +1,64 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { transformClientUrls } from './client-urls.ts'
+import { Worker } from 'node:worker_threads'
 export { transformClientUrls } from './client-urls.ts'
 
 type Handler = (req: IncomingMessage, res: ServerResponse) => any
 
 /** 在原生注册边界挂载站点；协议、路由所有者与流式响应继续由 DSH 执行。 */
 export function createMountedWebServer(NativeWebServer: any, basePath: string, productTitle?: string, configSchema = NativeWebServer.Config): any {
-  if (!/^\/[a-z][a-z0-9-]*\/$/.test(basePath)) throw new Error(`无效 Web 基址：${basePath}`)
+  if (!/^\/(?:[a-z][a-z0-9-]*\/)+$/.test(basePath)) throw new Error(`无效 Web 基址：${basePath}`)
   const prefix = basePath.slice(0, -1)
   return class MountedWebServer extends NativeWebServer {
     static Config = configSchema
     readonly basePath = basePath
     private readonly siteContext: any
-    private readonly clientSources = new Map<string, string>()
+    private readonly clientSources = new Map<string, Promise<string>>()
+    private clientWorker?: Worker
+    private clientRequestId = 0
+    private clientClosed = false
+    private readonly clientRequests = new Map<number, { resolve(code: string): void; reject(error: Error): void }>()
 
     constructor(ctx: any, config: any) {
       super(ctx, config)
       this.siteContext = ctx
+      ctx.effect(() => () => {
+        this.clientClosed = true
+        const worker = this.clientWorker
+        if (worker) this.failClientWorker(worker)
+        return worker?.terminate()
+      }, 'web adapter: client URL transformer')
+    }
+
+    private failClientWorker(worker: Worker): void {
+      if (this.clientWorker !== worker) return
+      this.clientWorker = undefined
+      for (const request of this.clientRequests.values()) request.reject(new Error('客户端路径转换不可用'))
+      this.clientRequests.clear()
+    }
+
+    /** 大插件包的 AST 解析不占用承载业务租约与控制握手的主线程。 */
+    private transformClient(source: string): Promise<string> {
+      if (this.clientClosed) return Promise.reject(new Error('Web 服务已关闭'))
+      if (!this.clientWorker) {
+        const worker = this.clientWorker = new Worker(new URL('./client-urls-worker.mjs', import.meta.url))
+        worker.on('message', (result: { id: number; code?: string }) => {
+          const request = this.clientRequests.get(result.id)
+          if (!request) return
+          this.clientRequests.delete(result.id)
+          if (typeof result.code === 'string') request.resolve(result.code)
+          else request.reject(new Error('客户端路径转换失败'))
+          if (!this.clientRequests.size) worker.unref()
+        })
+        worker.on('error', () => this.failClientWorker(worker))
+        worker.on('exit', () => this.failClientWorker(worker))
+      }
+      const worker = this.clientWorker, id = ++this.clientRequestId
+      return new Promise<string>((resolve, reject) => {
+        this.clientRequests.set(id, { resolve, reject })
+        worker.ref()
+        try { worker.postMessage({ id, source }) }
+        catch { this.failClientWorker(worker); void worker.terminate() }
+      })
     }
 
     publicPath(path: string): string {
@@ -75,13 +117,15 @@ export function createMountedWebServer(NativeWebServer: any, basePath: string, p
           const key = req.url ?? ''
           let code = this.clientSources.get(key)
           if (code === undefined) {
-            code = transformClientUrls(body.toString('utf8'))
+            code = this.transformClient(body.toString('utf8')).then(code => {
             // 当前原生布局在构建时固定产品名；平台沿原有标题投影更换品牌。
-            if (productTitle !== undefined) code = code.replace('const productTitle = "DeepSeek Harness";', `const productTitle = ${JSON.stringify(productTitle)};`)
+              return productTitle === undefined ? code : code.replace('const productTitle = "DeepSeek Harness";', `const productTitle = ${JSON.stringify(productTitle)};`)
+            })
             this.clientSources.set(key, code)
+            void code.catch(() => { if (this.clientSources.get(key) === code) this.clientSources.delete(key) })
             if (this.clientSources.size > 16) this.clientSources.delete(this.clientSources.keys().next().value!)
           }
-          body = Buffer.from(code)
+          body = Buffer.from(await code)
           headers.delete('content-length')
         }
       }

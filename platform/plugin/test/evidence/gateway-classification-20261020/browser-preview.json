@@ -1,0 +1,21 @@
+{
+  "scope": "隔离源码预览，测试数据；没有连接、重启或更新3090及业务服务",
+  "pageErrors": [],
+  "checks": [
+    "只有三类一级入口；认证与可信来源同属身份页内分区",
+    "三类切换保留同一草稿，放弃后恢复原值",
+    "1440px身份内双分区，390px自适应且无页面横向溢出",
+    "业务入口与管理页使用同一三类分类"
+  ],
+  "desktop": {
+    "width": 1440,
+    "scrollWidth": 1440,
+    "identityColumns": 2
+  },
+  "mobile": {
+    "width": 390,
+    "scrollWidth": 390,
+    "identityColumns": 1
+  },
+  "ok": true
+}

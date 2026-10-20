@@ -1,0 +1,38 @@
+{
+  "at": "2026-10-19T14:27:27.780Z",
+  "ok": true,
+  "checks": [
+    "冷首屏静态资源可用",
+    "已进入固定工作区并生成本人Session",
+    "可打开本人会话历史",
+    "浏览器实际输入只读消息并收到真实模型结果"
+  ],
+  "scope": "subject-a / security-operations-expert",
+  "ownHistoryLoaded": true,
+  "chatInputVisible": true,
+  "modelStreamSettled": true,
+  "uiPrompt": {
+    "sessionId": "session-2bf94589-8eff-4707-aeef-5c5f9ca0c3bc",
+    "status": 200,
+    "ok": true
+  },
+  "uiRead": {
+    "beforeTargetCount": 3,
+    "afterTargetCount": 4,
+    "markerRenderedTwice": true
+  },
+  "pageErrors": [],
+  "unavailableAuxiliaryRoutes": [
+    "/api/settings/describe",
+    "/api/dynamicCordisRunner/syncInspectManifest",
+    "/api/credentials/describe",
+    "/api/dynamicCordisRunner/inventory",
+    "/api/agentPresets/list",
+    "/api/permissionPresets/catalog",
+    "/voice-mode/config",
+    "/api/security-operations/overview",
+    "/api/commands/list",
+    "/api/skills/list"
+  ],
+  "note": "辅助管理/语音/Skill/命令及运行概览未开放，拒绝不表示即时受管MCP聊天不可用；不声明完整Candidate功能验收"
+}

@@ -1,0 +1,229 @@
+{
+  "recordedAt": "2026-10-19T14:31:42.217Z",
+  "evidenceLevel": "真实平台与标准容器、真实DeepSeek模型；外部身份/风险/MCP/报告为隔离HTTP Mock",
+  "source": {
+    "dataCommit": "06ebaef9789e36a7a322a81b30eb503f6da63052",
+    "workspaceId": "workspace-5b0ab796-a479-438a-9d22-e9907f7be35c",
+    "agentId": "security-operations-expert",
+    "sourceDigest": "sha256:9f32b205f30af44bf9b46e6a5c974caec56684fb1f1c66046ce6577c04c07998",
+    "runtimeGeneration": "bb4155b0476055a531fbd0604ab55357",
+    "imageId": "sha256:1c777fe4929a41275ba5bcd899877aaa156f8f166975254840f52b26703eca90",
+    "candidateChanged": false
+  },
+  "identity": {
+    "agentAuthentication": "真实HMAC控制握手",
+    "agentTrust": "实际来源pin、当前代次与有效签名及ACK",
+    "humanSubjects": [
+      "subject-a",
+      "subject-b"
+    ],
+    "note": "A/B为辅助用户范围，不是Agent身份；HMAC限同受信部署域"
+  },
+  "sessions": {
+    "a": "session-2bf94589-8eff-4707-aeef-5c5f9ca0c3bc",
+    "b": "session-9dd07c8a-52fd-418f-8c05-91bbae90c880",
+    "fixedCwd": "/work/harness/workspace",
+    "fixedPreset": "security-operations-expert",
+    "crossSubjectProjectionStatus": 403,
+    "ownProjectionStatus": 200,
+    "ownPageResultOk": true,
+    "after3500msListStatus": 200
+  },
+  "model": {
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "readOperation": "inspection/list_executable_inspections",
+    "bothSubjectsRealToolSucceeded": true,
+    "firstSecOpsProbe": "原Candidate仅允许子Agent调用sec-ops，父Agent请求被原角色Guard拒绝，目标0请求；随后用已有父Agent允许的巡检查询验收"
+  },
+  "risk": {
+    "automaticAgentInputAndOperationFacts": true,
+    "operationFactServerId": "inspection",
+    "restrictionVersionProgress": [
+      2,
+      4,
+      8,
+      10
+    ],
+    "tightenedScope": {
+      "agentId": "security-operations-expert",
+      "subjectId": "subject-a"
+    },
+    "deniedAction": "write",
+    "tightenedTargetCounts": {
+      "aWrite": 0,
+      "bWrite": 1,
+      "aReadAfterWriteDenied": 1
+    },
+    "aSameSessionWriteAfterReassessment": 1,
+    "automaticReplay": false,
+    "finalFixtureDeniedOperations": [],
+    "expiredRisk": "过期事实返回导致输入拒绝；已显式刷新隔离fixture低风险有效期3600秒",
+    "finalRestrictionVersion": 23
+  },
+  "report": {
+    "operation": "inspection/get_inspection_result",
+    "explicitKind": "publish",
+    "downloadRule": "inspection/report-download GET same-origin /reports/{reportFile}",
+    "nativeModelQueries": 2,
+    "controlledUrlReturned": true,
+    "aDownload": {
+      "status": 200,
+      "htmlCharacters": 455
+    },
+    "bDownload": {
+      "status": 403,
+      "htmlReleased": false
+    },
+    "publishRestriction": {
+      "aStatus": 403,
+      "htmlReleased": false,
+      "newTargetDownloads": 0
+    },
+    "afterClear": {
+      "aStatus": 200,
+      "bStatus": 403
+    },
+    "externalBody": "Mock固定运行元数据HTML，不保存上传原文，不构成真实业务报告效果证明"
+  },
+  "confirmation": {
+    "status": "passed",
+    "at": "2026-10-19T14:23:46.814Z",
+    "sessionId": "session-9ea1de72-9015-460f-8059-9b7be38af610",
+    "operationId": "start_inspection",
+    "promptAccepted": true,
+    "initialCount": 1,
+    "beforeAnswerCount": 1,
+    "bVisibleCount": 0,
+    "bAnswerStatus": 403,
+    "afterBCount": 1,
+    "aAnswerStatus": 200,
+    "repeatedAnswerStatus": 403,
+    "finalCount": 2,
+    "waitBeforeAnswerMs": 1200,
+    "targetNewRequests": 1,
+    "initialFailure": "新事实入中心使旧冻结版本失效，曾本人答409且目标0新增；保留初始证据，已修为本次事实获中心接收并应用后再冻结"
+  },
+  "nativeUi": {
+    "status": "passed-for-managed-immediate-chat",
+    "coldStaticFailures": 0,
+    "ownWorkspaceAndSession": true,
+    "ownHistoryLoaded": true,
+    "modelStreamSettled": true,
+    "uiPrompt": {
+      "sessionId": "session-2bf94589-8eff-4707-aeef-5c5f9ca0c3bc",
+      "status": 200,
+      "ok": true
+    },
+    "uiRead": {
+      "beforeTargetCount": 3,
+      "afterTargetCount": 4,
+      "markerRenderedTwice": true
+    },
+    "pageErrors": [],
+    "limitations": [
+      "管理设置、凭据目录、动态插件、语音、Skill/命令及业务运行概览接口未向首期业务用户开放，相应辅助组件显示不可用",
+      "该结果仅证明固定Candidate的受管MCP即时聊天，不是完整Candidate功能/研究效果或生产身份系统验收"
+    ],
+    "initialFailuresPreserved": ".local/business-control-acceptance/browser-native-earlier-failure.json"
+  },
+  "boundaries": {
+    "directRuntimeStatus": 403,
+    "gatewayUnauthenticatedStatus": 401,
+    "scheduledTasksSupported": false,
+    "idlePeriodicRiskScan": false,
+    "scheduleImpact": [
+      "即时巡检与报告需手动发起",
+      "存在延迟或漏执行",
+      "既有研究实例定时任务不属于本闭环"
+    ]
+  },
+  "rawEvidenceReferences": [
+    ".local/business-control-acceptance/final-session-probes.json",
+    ".local/business-control-acceptance/final-risk-denied-summary.json",
+    ".local/business-control-acceptance/final-risk-read-ledger.json",
+    ".local/business-control-acceptance/final-risk-recovery-summary.json",
+    ".local/business-control-acceptance/final-report-download-blocked.json",
+    ".local/business-control-acceptance/final-report-blocked-ledger.json",
+    ".local/business-control-acceptance/final-report-download-probes.json",
+    ".local/business-control-acceptance/final-confirmation-initial-cancel.json",
+    ".local/business-control-acceptance/native-asset-timing.json",
+    ".local/business-control-acceptance/native-asset-timing-after-worker.json",
+    ".local/business-control-acceptance/final-fresh-confirmation-initial-stale.json",
+    ".local/business-control-acceptance/final-fresh-confirmation-probes.json",
+    ".local/business-control-acceptance/final-agent-trust-revoked.json",
+    ".local/business-control-acceptance/final-agent-trust-restored.json",
+    ".local/business-control-acceptance/final-native-ui-read.json",
+    ".local/business-control-acceptance/final-native-interactive.json",
+    ".local/business-control-acceptance/final-credential-rotation.json"
+  ],
+  "webAdapter": {
+    "largeBundleRegressionMs": 2247,
+    "heartbeatServedBeforeTransformCompleted": true,
+    "concurrentVendorBefore": {
+      "requests": 8,
+      "status": 503,
+      "minMs": 1623,
+      "maxMs": 1761
+    },
+    "concurrentVendorAfter": {
+      "requests": 8,
+      "status": 200,
+      "bytesPerResponse": 741114,
+      "minMs": 388,
+      "maxMs": 408
+    },
+    "leaseUnchangedMs": 2000
+  },
+  "agentTrustGui": {
+    "status": "passed",
+    "revoked": {
+      "at": "2026-10-19T14:25:06.119Z",
+      "homepageStatus": 200,
+      "authentication": "已验证",
+      "trust": "信任已撤销",
+      "reason": "agent_trust_revoked",
+      "businessStatus": 503,
+      "businessHtmlReleased": false
+    },
+    "restored": {
+      "at": "2026-10-19T14:25:52.298Z",
+      "homepageStatus": 200,
+      "authentication": "已验证",
+      "trust": "可信",
+      "reason": "authenticated-pinned-channel",
+      "businessStatus": 200,
+      "businessHtmlReleased": true
+    }
+  },
+  "finalTargetCounts": {
+    "subject-a/list_executable_inspections": 4,
+    "subject-b/list_executable_inspections": 3,
+    "subject-b/start_inspection": 1,
+    "subject-a/start_inspection": 2,
+    "subject-a/get_inspection_result": 2,
+    "subject-a/download_report": 2
+  },
+  "tests": {
+    "core": 22,
+    "webAdapter": 13
+  },
+  "userCredentialRotation": {
+    "at": "2026-10-19T14:31:19.716943+00:00",
+    "testRunId": "gateway-mcp-final-c0d3b328-6c04-44c5-b711-99b2dab8d248",
+    "results": {
+      "subject-a": {
+        "newCredentialListStatus": 200,
+        "oldCredentialListStatus": 401,
+        "ownedSessionsRefreshed": 8,
+        "expiresAt": "2026-10-19T15:31:18.791716Z"
+      },
+      "subject-b": {
+        "newCredentialListStatus": 200,
+        "oldCredentialListStatus": 401,
+        "ownedSessionsRefreshed": 1,
+        "expiresAt": "2026-10-19T15:31:18.818553Z"
+      }
+    }
+  }
+}

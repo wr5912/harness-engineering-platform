@@ -1,0 +1,99 @@
+"""业务启动的 Python 接缝测试；实际渲染与权限决策由 TypeScript 测试覆盖。"""
+import contextlib
+import importlib.util
+import io
+import json
+from importlib.machinery import SourceFileLoader
+from pathlib import Path
+import tempfile
+import types
+import unittest
+import urllib.error
+from unittest import mock
+
+ADAPTER = Path(__file__).resolve().parent
+SPEC = importlib.util.spec_from_loader("dsh_dev_business", SourceFileLoader("dsh_dev_business", str(ADAPTER / "dsh-dev")))
+dev = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(dev)
+
+
+class BusinessStartupTest(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.state = self.root / "instances"
+        self.contract = {"source_id": "experiment:EXP-soc-001", "source_kind": "experiment", "agent_id": "soc", "preset_id": "soc",
+                         "workspace": str(self.root / "workspace"), "presets": str(self.root / "presets"), "managed": str(self.root / "managed"),
+                         "image": {"local_image_tag": "standard-image"}, "required_env_names": []}
+        for target, value in [("REPO", self.root), ("STATE_ROOT", self.state), ("resolve", mock.Mock(return_value=self.contract)),
+                              ("current_web_base_path", mock.Mock(return_value="/assistant/"))]:
+            patch = mock.patch.object(dev, target, value); patch.start(); self.addCleanup(patch.stop)
+
+    def args(self, **values):
+        defaults = dict(source="experiment:EXP-soc-001", mode="verification", name="business-test", port=53191, analysis_workspace=None,
+                        plugin_node_modules=None, lan_access=False, unsafe_no_auth=False, skip_testing_notice=False, trusted_host=None,
+                        business_control=str(self.root / "launch.json"), dry_run=True, replace=False, migrate_home=False)
+        defaults.update(values)
+        return types.SimpleNamespace(**defaults)
+
+    def helper(self):
+        return mock.patch.object(dev, "business_helper", return_value={"assetRoot": str(self.root), "sourceDigest": "sha256:fixed"})
+
+    def test_business_dry_run_preserves_tree_and_closes_direct_flags(self):
+        args = self.args()
+        with self.helper(), mock.patch.object(dev, "run") as commands, contextlib.redirect_stdout(io.StringIO()) as output:
+            contract, current = dev.prepare_up(args)
+            dev._command_up(args, contract, current)
+        self.assertFalse(self.state.exists())
+        self.assertFalse(args.lan_access)
+        self.assertFalse(args.unsafe_no_auth)
+        self.assertFalse(args.skip_testing_notice)
+        commands.assert_not_called()
+        plan = json.loads(output.getvalue())
+        self.assertFalse(plan["business_control"]["scheduling_supported"])
+        self.assertEqual(plan["network"], "private bridge (host port 127.0.0.1 only)")
+
+    def test_business_rejects_unsafe_flags_and_existing_unmanaged_home(self):
+        for changes in ({"unsafe_no_auth": True}, {"lan_access": True}, {"migrate_home": True}):
+            with self.subTest(changes=changes), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                dev.prepare_up(self.args(**changes))
+        home = self.state / "business-test/dsh-home"
+        home.mkdir(parents=True); (home / "old-session").write_text("preserve")
+        with self.helper(), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            dev.prepare_up(self.args())
+        self.assertEqual((home / "old-session").read_text(), "preserve")
+
+    def test_existing_registration_cannot_switch_business_boundary(self):
+        for old_business, new_file in [(None, str(self.root / "launch.json")), ({"runtime_generation": "existing"}, None)]:
+            manifest = {"port": 53191, **({"business_control": old_business} if old_business else {})}
+            with mock.patch.object(dev, "existing_instance", return_value=(self.state, manifest)), \
+                 mock.patch.object(dev, "validate_existing_identity"), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                dev.prepare_up(self.args(business_control=new_file))
+
+    def test_business_environment_uses_instance_patch_in_current_and_historical_operations(self):
+        contract = {**self.contract, "patch": "managed.patch.yml", "evaluation_patch": "evaluation.patch.yml", "business_control": {"source_digest": "fixed"}}
+        current = dev.compose_env(contract, "verification", 53191, "business-test")
+        historical = dev.instance_compose_env({"name": "business-test", "business_control": {"runtime_generation": "fixed"}})
+        expected = str(self.state / "business-test/business.patch.yml")
+        self.assertEqual(current["DSH_BUSINESS_PATCH_HOST"], expected)
+        self.assertEqual(historical["DSH_BUSINESS_PATCH_HOST"], expected)
+
+    def test_business_url_returns_only_verified_gateway_entry_without_owner_log_lookup(self):
+        manifest = {"agent_id": "soc", "business_control": {"runtime_generation": "fixed"}}
+        output = io.StringIO()
+        response = types.SimpleNamespace(stdout=json.dumps({"url": "http://business.localhost:53190/agents/soc/"}))
+        denied = urllib.error.HTTPError("http://business.localhost:53190/agents/soc/", 401, "Unauthorized", {}, None)
+        with mock.patch.object(dev, "load_instance", return_value=(self.state, manifest)), \
+             mock.patch.object(dev, "require_docker_registration"), mock.patch.object(dev, "running_container"), \
+             mock.patch.object(dev, "run", return_value=response) as run, \
+             mock.patch.object(dev.urllib.request, "build_opener") as build_opener, contextlib.redirect_stdout(output):
+            build_opener.return_value.open.side_effect = denied
+            dev.command_url(types.SimpleNamespace(name="business-test", non_interactive=False))
+        self.assertEqual(output.getvalue().strip(), "http://business.localhost:53190/agents/soc/")
+        self.assertEqual(run.call_count, 1)
+        self.assertIn("--entry", run.call_args.args[0])
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,66 @@
+{
+  "owner": {
+    "title": "Harness工程平台",
+    "legends": [
+      "1．Agent 身份认证",
+      "2．Agent 身份信任",
+      "3．Agent 自动风险评估",
+      "4．Agent 访问控制策略"
+    ],
+    "desktop": {
+      "width": 1440,
+      "scrollWidth": 1440
+    },
+    "scheduleLimitVisible": true,
+    "mobile": {
+      "width": 390,
+      "scrollWidth": 390
+    }
+  },
+  "business": [
+    {
+      "subjectId": "subject-a",
+      "title": "统一网关",
+      "fourControls": true,
+      "authenticated": true,
+      "agentTrusted": true,
+      "otherSubjectHidden": true,
+      "width": {
+        "width": 1440,
+        "scrollWidth": 1440
+      }
+    },
+    {
+      "subjectId": "subject-b",
+      "title": "统一网关",
+      "fourControls": true,
+      "authenticated": true,
+      "agentTrusted": true,
+      "otherSubjectHidden": true,
+      "width": {
+        "width": 1440,
+        "scrollWidth": 1440
+      }
+    }
+  ],
+  "errors": [],
+  "failedRequests": [
+    {
+      "path": "/session",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "path": "/agents/security-operations-expert/assets/vendor-DcuzkuQH.js",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "path": "/session",
+      "error": "net::ERR_ABORTED"
+    }
+  ],
+  "native": {
+    "url": "http://business.localhost:53102/agents/security-operations-expert/",
+    "title": "",
+    "body": ""
+  }
+}
