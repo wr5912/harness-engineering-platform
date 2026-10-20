@@ -1,0 +1,78 @@
+{
+  "ready": true,
+  "elapsedMs": 3697,
+  "url": "http://business.localhost:53102/agents/security-operations-expert/",
+  "title": "DSH Local Build",
+  "body": "HARNESS\nFailed to load plugins\nweb boot: 61 entries did not activate\n@ai-agent-harness/harness-platform: pending (waiting for services: connection, configForms, layout, workspaces, uiWorkspace, uiSession, sessions, conversation)\n@deepseek-ai/dsh-client-ui-cordis: pending (waiting for services: locale, remote, remote.dynamicCordisRunner, dynamicCordisRunner)\n@deepseek-ai/dsh-api-gateway: pending (waiting for service: connection)\n@deepseek-ai/dsh-api-job-controller: pending (waiting for services: remote, remote.job)\n@deepseek-ai/dsh-api-terminal-controller: pending (waiting for services: remote, remote.terminal, connection)\n@deepseek-ai/dsh-api-workspace-files: pending (waiting for services: remote, remote.workspaceFiles)\n@deepseek-ai/dsh-client-ui-settings-account: pending (waiting for services: locale, remote, remote.account, remote.session, theme, configForms)\n@deepseek-ai/dsh-cordis-client-runner: pending (waiting for services: remote, remote.dynamicCordisRunner)\n@deepseek-ai/dsh-client-ui-theme: pending (waiting for services: locale, remote, configForms)\n@deepseek-ai/dsh-client-locale: pending (waiting for services: remote, configForms)\n@deepseek-ai/dsh-client-shortcuts: pending (waiting for service: locale)\n@deepseek-ai/dsh-client-ui-shortcuts: pending (waiting for services: shortcuts, locale)\n@deepseek-ai/dsh-client-ui-layout: pending (waiting for services: theme, locale, shortcuts)\n@deepseek-ai/dsh-client-ui-session: pending (waiting for services: sessions, remote, remoteAccess)\n@deepseek-ai/dsh-client-ui-sidebar: pending (waiting for services: layout, uiWorkspace, locale, shortcuts)\n@deepseek-ai/dsh-client-ui-sidebar-right: pending (waiting for services: layout, locale, sessions, uiSession, shortcuts)\n@deepseek-ai/dsh-client-ui-sidebar-documentpreview: pending (waiting for services: locale, sidebarRightTabs, remote, remote.workspaceFiles, configForms)\n@deepseek-ai/dsh-client-ui-sidebar-terminal: pending (waiting for services: locale, sidebarRight, sidebarRightTabs, webTerminals, theme, shortcuts)\n@deepseek-ai/dsh-client-ui-sidebar-files: pending (waiting for services: locale, sidebarRightTabs, sidebarRight, remote, remote.workspaceFiles)\n@deepseek-ai/dsh-client-ui-settings: pending (waiting for services: remote, remote.settings)\n@deepseek-ai/dsh-client-ui-settings-general: pending (waiting for services: locale, connection, remote, remote.settings, configForms, shortcuts)\n@deepseek-ai/dsh-client-ui-settings-models: pending (waiting for services: locale, remote, remote.credentials, remote.llm, remote.settings, remote.session, configForms, settingsSchema)\n@deepseek-ai/dsh-client-ui-plugin-manager: pending (waiting for services: locale, remote, remote.pluginManager, remote.pluginInventory, remote.pluginRegistryProbe, configForms, layout)\n@deepseek-ai/dsh-client-ui-settings-plugin-inventory: pending (waiting for services: locale, remote, remote.pluginInventory)\n@deepseek-ai/dsh-client-ui-conversation: pending (waiting for services: sessions, fileUpload, uiSession, uiWorkspace, locale, configForms)\n@deepseek-ai/dsh-client-ui-approval: pending (waiting for services: sessions, remote, uiSession, locale)\n@deepseek-ai/dsh-client-ui-chat: pending (waiting for services: sessions, uiWorkspace, uiSession, uiConversation, locale, configForms, remote, remote.session, sidebarRight)\n@deepseek-ai/dsh-client-ui-tool: pending (waiting for service: remote)\n@deepseek-ai/dsh-client-ui-workspace: pending (waiting for services: sessions, workspaces, locale, remote, remote.directoryPicker, layout, shortcuts, remoteAccess)\n@deepseek-ai/dsh-client-ui-workflow-run: pending (waiting for services: uiConversation, uiWorkspace, sessions, locale)\n@deepseek-ai/dsh-client-ui-input-trigger: pending (waiting for services: sessions, locale)\n@deepseek-ai/dsh-client-ui-commands: pending (waiting for services: inputTriggers, sessions, remote, remote.commands, locale)\n@deepseek-ai/dsh-client-ui-skill: pending (waiting for services: inputTriggers, sessions, locale, remote, remote.skills, sidebarRight, uiConversation)\n@deepseek-ai/dsh-client-ui-subagent: pending (waiting for services: sessions, uiWorkspace, locale, sidebarRight)\n@deepseek-ai/dsh-client-ui-reference: pending (waiting for services: inputTriggers, locale, sessions, remote, remote.fileReferences, remote.sessionReferenceResolver, sidebarRight, uiConversation)\n@deepseek-ai/dsh-client-ui-secret-mask: pending (waiting for services: locale, uiConversation)\n@deepseek-ai/dsh-client-ui-jobs: pending ",
+  "errors": [],
+  "consoleErrors": [
+    "Error: web boot: 61 entries did not activate\n@ai-agent-harness/harness-platform: pending (waiting for services: connection, configForms, layout, workspaces, uiWorkspace, uiSession, sessions, conversation)\n@deepseek-ai/dsh-client-ui-cordis: pending (waiting for services: locale, remote, remote.dynamicCordisRunner, dynamicCordisRunner)\n@deepseek-ai/dsh-api-gateway: pending (waiting for service: connection)\n@deepseek-ai/dsh-api-job-controller: pending (waiting for services: remote, remote.job)\n@deepseek-ai/dsh-api-terminal-controller: pending (waiting for services: remote, remote.terminal, connection)\n@deepseek-ai/dsh-api-workspace-files: pending (waiting for services: remote, remote.workspaceFiles)\n@deepseek-ai/dsh-client-ui-settings-account: pending (waiting for services: locale, remote, remote.account, remote.session, theme, configForms)\n@deepseek-ai/dsh-cordis-client-runner: pending (waiting for services: remote, remote.dynamicCordisRunner)\n@deepseek-ai/dsh-client-ui-theme: pending (waiting for services: locale, remote, configForms)\n@deepseek-ai/dsh-client-locale: pending (waiting for services: remote, configForms)\n@deepseek-ai/dsh-client-shortcuts: pending (waiting for service: locale)\n@deepseek-ai/dsh-client-ui-shortcuts: pending (waiting for services: shortcuts, locale)\n@deepseek-ai/dsh-client-ui-layout: pending (waiting for services: theme, locale, shortcuts)\n@deepseek-ai/dsh-client-ui-session: pending (waiting for services: sessions, remote, remoteAccess)\n@deepseek-ai/dsh-client-ui-sidebar: pending (waiting for services: layout, uiWorkspace, locale, shortcuts)\n@deepseek-ai/dsh-client-ui-sidebar-right: pending (waiting for services: layout, locale, sessions, uiSession, shortcuts)\n@deepseek-ai/dsh-client-ui-sidebar-documentpreview: pending (waiting for services: locale, sidebarRightTabs, remote, remote.workspaceFiles, configForms)\n@deepseek-ai/dsh-client-ui-sidebar-terminal: pending (waiting for services: locale, sidebarRight, sidebarRightTabs, webTerminals, theme, shortcuts)\n@deepseek-ai/dsh-client-ui-sidebar-files: pending (waiting for services: locale, sidebarRightTabs, sidebarRight, remote, remote.workspaceFiles)\n@deepseek-ai/dsh-client-ui-settings: pending (waiting for services: remote, remote.settings)\n@deepseek-ai/dsh-client-ui-settings-general: pending (waiting for services: locale, connection, remote, remote.settings, configForms, shortcuts)\n@deepseek-ai/dsh-client-ui-settings-models: pending (waiting for services: locale, remote, remote.credentials, remote.llm, remote.settings, remote.session, configForms, settingsSchema)\n@deepseek-ai/dsh-client-ui-plugin-manager: pending (waiting for services: locale, remote, remote.pluginManager, remote.pluginInventory, remote.pluginRegistryProbe, configForms, layout)\n@deepseek-ai/dsh-client-ui-settings-plugin-inventory: pending (waiting for services: locale, remote, remote.pluginInventory)\n@deepseek-ai/dsh-client-ui-conversation: pending (waiting for services: sessions, fileUpload, uiSession, uiWorkspace, locale, configForms)\n@deepseek-ai/dsh-client-ui-approval: pending (waiting for services: sessions, remote, uiSession, locale)\n@deepseek-ai/dsh-client-ui-chat: pending (waiting for services: sessions, uiWorkspace, uiSession, uiConversation, locale, configForms, remote, remote.session, sidebarRight)\n@deepseek-ai/dsh-client-ui-tool: pending (waiting for service: remote)\n@deepseek-ai/dsh-client-ui-workspace: pending (waiting for services: sessions, workspaces, locale, remote, remote.directoryPicker, layout, shortcuts, remoteAccess)\n@deepseek-ai/dsh-client-ui-workflow-run: pending (waiting for services: uiConversation, uiWorkspace, sessions, locale)\n@deepseek-ai/dsh-client-ui-input-trigger: pending (waiting for services: sessions, locale)\n@deepseek-ai/dsh-client-ui-commands: pending (waiting for services: inputTriggers, sessions, remote, remote.commands, locale)\n@deepseek-ai/dsh-client-ui-skill: pending (waiting for services: inputTriggers, sessions, locale, remote, remote.skills, sidebarRight, uiConversation)\n@deepseek-ai/dsh-client-ui-subagent: pending (waiting for services: sessions, uiWorkspace, locale, sidebarRight)\n@deepseek-ai/dsh-client-ui-reference: pending (waiting for services: inputTriggers, locale, sessions, remote, remote.fileReferences, remote.sessionReferenceResolver, sidebarRight, uiConversation)\n@deepseek-ai/dsh-client-ui-secret-mask: pending (waiting for services: locale, uiConversation)\n@deepseek-ai/dsh-client-ui-jobs: pending (waiting for services: jobs, locale)\n@deepseek-ai/dsh-client-ui-goal: pending (waiting for services: sessions, remote, remote.goals, locale, uiConversation)\n@deepseek-ai/dsh-client-ui-message-feedback: pending (waiting for services: remote, remote.messageFeedback, remote.sessionFeedback, locale)\n@deepseek-ai/dsh-client-ui-model-selection: pending (waiting for services: commandUi, locale, sessions, remote, remote.session)\n@deepseek-ai/dsh-client-ui-deepseek-model-label-1017: pending (waiting for service: locale)\n@deepseek-ai/dsh-client-ui-permission-presets: pending (waiting for services: commandUi, connection, sessions, locale, remote, remote.permissionPresets, remote.settings, configForms, settingsSchema)\n@deepseek-ai/dsh-client-ui-agent-preset: pending (waiting for services: sessions, locale, remote, remote.agentPresets, remote.settings, configForms)\n@deepseek-ai/dsh-client-ui-settings-session-log: pending (waiting for services: locale, configForms)\n@deepseek-ai/dsh-client-ui-settings-plugins: pending (waiting for service: locale)\n@deepseek-ai/dsh-client-ui-settings-shell: pending (waiting for services: locale, configForms)\n@deepseek-ai/dsh-client-ui-settings-agent-loop: pending (waiting for services: locale, configForms)\n@deepseek-ai/dsh-client-ui-settings-subagent: pending (waiting for services: locale, remote, remote.session, configForms)\n@deepseek-ai/dsh-client-ui-settings-web-search: pending (waiting for services: locale, remote, remote.credentials, configForms)\n@deepseek-ai/dsh-client-ui-plan: pending (waiting for services: remote, remote.commands, remote.session, sessions, locale, uiConversation, sidebarRight, sidebarRightTabs)\n@deepseek-ai/dsh-client-ui-user-questions: pending (waiting for services: sessions, remote, remote.userQuestions, uiSession, locale, uiConversation)\n@deepseek-ai/dsh-client-ui-trajectory: pending (waiting for services: sessions, uiSession, uiConversation, locale)\ndsh-security-operations-ui: pending (waiting for services: sidebarRight, sidebarRightTabs, uiWorkspace, workspaces, sessions, remote.agentPresets, locale, configForms)\n@deepseek-ai/dsh-api-remote-access: pending (waiting for service: remote)\n@deepseek-ai/dsh-client-file-upload: pending (waiting for service: remote)\n@deepseek-ai/dsh-api-remotes: pending (waiting for service: remote)\n@deepseek-ai/dsh-client-ui-deliverables: pending (waiting for services: locale, uiConversation, remote, remote.session, sidebarRightTabs, sidebarRight, configForms)\n@deepseek-ai/dsh-api-workspace-controller: pending (waiting for services: remote, remote.workspace)\n@deepseek-ai/dsh-api-session-controller: pending (waiting for services: connection, fileUpload, remote, remote.commands, remote.session, remote.subagents)\n@aisoc/dsh-voice-hub: pending (waiting for services: sessions, remote)\n@deepseek-ai/dsh-client-ui-directory-picker-browse: pending (waiting for services: uiWorkspace, locale)\n    at bZ (http://business.localhost:53102/agents/security-operations-expert/assets/index-CN7NIWNw.js:188:62352)\n    at kZ (http://business.localhost:53102/agents/security-operations-expert/assets/index-CN7NIWNw.js:188:61816)\n    at async TZ.run (http://business.localhost:53102/agents/security-operations-expert/assets/index-CN7NIWNw.js:190:4457)"
+  ],
+  "requests": [
+    {
+      "path": "/agents/security-operations-expert/",
+      "status": 200,
+      "type": "text/html; charset=utf-8"
+    },
+    {
+      "path": "/agents/security-operations-expert/assets/index-BxpfOGf3.css",
+      "status": 200,
+      "type": "text/css; charset=utf-8"
+    },
+    {
+      "path": "/agents/security-operations-expert/assets/vendor-DV2921Zo.css",
+      "status": 200,
+      "type": "text/css; charset=utf-8"
+    },
+    {
+      "path": "/agents/security-operations-expert/plugins/",
+      "status": 200,
+      "type": "text/javascript; charset=utf-8"
+    },
+    {
+      "path": "/agents/security-operations-expert/assets/index-CN7NIWNw.js",
+      "status": 200,
+      "type": "text/javascript; charset=utf-8"
+    },
+    {
+      "path": "/agents/security-operations-expert/api/business-control/confirmations",
+      "status": 200,
+      "type": "application/json"
+    },
+    {
+      "path": "/agents/security-operations-expert/assets/vendor-DcuzkuQH.js",
+      "status": 200,
+      "type": "text/javascript; charset=utf-8"
+    },
+    {
+      "path": "/agents/security-operations-expert/plugins/",
+      "status": 200,
+      "type": "text/javascript; charset=utf-8"
+    },
+    {
+      "path": "/agents/security-operations-expert/plugins/",
+      "status": 200,
+      "type": "text/javascript; charset=utf-8"
+    },
+    {
+      "path": "/agents/security-operations-expert/plugins/events",
+      "status": 200,
+      "type": "text/event-stream"
+    },
+    {
+      "path": "/agents/security-operations-expert/api/business-control/confirmations",
+      "status": 200,
+      "type": "application/json"
+    },
+    {
+      "path": "/agents/security-operations-expert/favicon.svg",
+      "status": 200,
+      "type": "image/svg+xml"
+    },
+    {
+      "path": "/agents/security-operations-expert/api/business-control/confirmations",
+      "status": 200,
+      "type": "application/json"
+    }
+  ]
+}

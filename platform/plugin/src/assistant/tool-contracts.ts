@@ -7,7 +7,7 @@ export const assistantActions: Record<AssistantDomain, readonly string[]> = {
   task: ['preview', 'start', 'status', 'begin-repair', 'checkpoint', 'rollback', 'deliver'],
   agents: ['research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'list', 'detail', 'edit/read', 'edit/preview', 'edit/apply', 'cases/list', 'cases/read', 'cases/update', 'eval/preview', 'eval/start', 'eval/status', 'eval/cancel', 'runs/index', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/preview', 'compute-variants/create', 'compute-variants/rename', 'compute-variants/build-preview', 'compute-variants/build', 'compute-variants/freeze-preview', 'compute-variants/freeze', 'compute-variants/compare', 'new', 'create', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'cases/create', 'datasets/source', 'datasets/preview', 'datasets/apply', 'datasets/list', 'datasets/read', 'datasets/export', 'decision/update', 'features/read-source', 'features/preview', 'features/proposal', 'features/apply', 'fusion/preview', 'fusion/proposal', 'fusion/confirm', 'fusion/status', 'fusion/verify', 'fusion/finalize', 'tasks/capabilities', 'tasks/assembly-preview', 'tasks/assembly-apply', 'tasks/delivery'],
   instances: ['list', 'detail', 'url', 'logs', 'preview', 'batch-preview', 'run', 'batch'],
-  mcp: ['list', 'configuration', 'saveConfiguration', 'test', 'resources', 'resourceTemplates', 'readResource', 'callTool', 'sources/list', 'sources/create', 'sources/refresh', 'sources/toggle', 'sources/components', 'sources/logs', 'sources/preview', 'sources/invoke', 'saveCompositionDraft', 'publishComposition', 'executeComposition', 'dryRunComposition', 'callPublishedComposition', 'compositionRun', 'compositionArtifact', 'seedThreatCompositions'],
+  mcp: ['list', 'configuration', 'saveConfiguration', 'test', 'resources', 'resourceTemplates', 'readResource', 'callTool', 'sources/list', 'sources/create', 'sources/refresh', 'sources/toggle', 'sources/components', 'sources/logs', 'sources/preview', 'sources/invoke', 'saveCompositionDraft', 'publishComposition', 'executeComposition', 'dryRunComposition', 'callPublishedComposition', 'compositionRun', 'compositionArtifact', 'seedThreatCompositions', 'control/status', 'control/saveConfiguration', 'control/restrict', 'control/reassess', 'control/release'],
 }
 
 export const featureActions = ['research/read-reference', 'detail', 'edit/read', 'assets/diff', 'assets/read-fixed', 'features/read-source', 'features/preview', 'features/proposal', 'runs/index', 'runs/show', 'runs/report', 'runs/files', 'runs/read-file', 'runs/trace']
@@ -38,6 +38,8 @@ const fields: MapValue = {
   draft: { ...object, description: '按 list 返回的现有编排结构及已装载业务扩展编辑；由 compositionConfig 校验。' },
   bindings: object, artifact_export: object, files: { type: 'array', items: object }, configuration_edits: { type: 'array', items: object },
   items: { type: 'array', items: object }, expected_device_ids: strings, required_case_ids: strings, required_tool_names: strings,
+  agents: { type: 'array', items: object }, scope: object, deniedActions: strings,
+  sessionId: string, restrictionId: string, reason: string, action: string,
 }
 type Hint = [actions: string, input: string, note?: string]
 // 这里是模型的逐操作用法索引，不是第二套业务校验器；完整语义仍由原接口处理。
@@ -64,6 +66,11 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['publishComposition executeComposition dryRunComposition', 'compositionId version revision input', '先保存草稿；version=draft/published，发布只接受 draft；使用当前 revision。'],
     ['callPublishedComposition', 'toolName input', '服务器从当前目录固定实际已发布版本，再请求执行确认。'],
     ['compositionRun', 'run_id'], ['compositionArtifact', 'run_id artifactId'], ['seedThreatCompositions', 'revision bindings', '仅在业务扩展实际装载且用户要求时使用。'],
+    ['control/status', '', '读取基础许可、风险事实、限制与真实实例回执；定时任务不在首期覆盖范围。'],
+    ['control/saveConfiguration', 'revision enabled agents', '使用 control/status 的字符串 revision 和当前 agents 规则；只修改开放与基础授权，不发送凭据。'],
+    ['control/restrict', 'scope deniedActions reason', 'scope 至少指定 workspaceId、agentId、subjectId；使用已登记实例及主体，动作 read/write/publish。'],
+    ['control/reassess', 'sessionId action', '重新评估当前 Session 的指定动作；不会执行或重放业务。'],
+    ['control/release', 'restrictionId sessionId action', '重新评估后仅解除所选限制，其他约束保留；未知副作用先查实际结果，不能以恢复操作补发业务。'],
   ],
   agents: [
     ['list', ''], ['detail', 'agent_id experiment_id', '明确指定版本；有固定任务目标时不要改成最新版本。'],

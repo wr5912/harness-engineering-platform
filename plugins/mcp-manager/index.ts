@@ -11,7 +11,7 @@ const { createScope, scopeParentOf } = await import(runtimeRequire.resolve('@dee
 const McpClient = await import(runtimeRequire.resolve('@deepseek-ai/dsh-mcp-client'))
 
 export const name = 'mcp-session-manager'
-export const inject = ['agents', 'webServer', 'connection']
+export const inject = ['agents', 'webServer', 'connection', 'tools']
 
 const key = z.string().required().pattern(/^[A-Za-z0-9_-]{1,32}$/)
 const toolPolicy = z.object({
@@ -50,6 +50,12 @@ const namePattern = /^[A-Za-z0-9_-]{1,32}$/
 const headerNamePattern = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/
 const MAX_BODY = 64 * 1024
 const MAX_RESPONSE = 1024 * 1024
+
+function serverFingerprint(server: any): string {
+  // platformClient 是装载时注入的本地组合执行器，不是可编辑连接身份。
+  const { platformClient, ...connection } = server
+  return createHash('sha256').update(JSON.stringify(connection)).digest('hex')
+}
 
 function validateUrl(value: string): string {
   const url = new URL(value)
@@ -109,7 +115,17 @@ function snapshot(config: any) {
       }
     }
   }
-  return { servers, groups, sharedToken }
+  return { servers: servers.map(server => {
+    const expected = serverFingerprint(server)
+    const assertCurrent = () => {
+      const current = config.servers.get().find((item: any) => item.id === server.id)
+      if (!current || current.enabled === false || serverFingerprint(current) !== expected) throw new Error('MCP 当前连接或工具范围已变化')
+    }
+    return { ...server, platformToolResources: Boolean(config.withToolContext), platformAssertCurrent: assertCurrent,
+      platformRequestHeaders: config.platformExecute?.requestHeaders,
+      platformExecute: config.platformExecute ? (operation: any, dispatch: (signal: AbortSignal) => Promise<any>, signal?: AbortSignal) =>
+        config.platformExecute(operation, (controlledSignal: AbortSignal) => { assertCurrent(); return dispatch(controlledSignal) }, signal) : undefined }
+  }), groups, sharedToken }
 }
 
 function resolvedUrl(server: any): string | undefined {
@@ -119,7 +135,10 @@ function resolvedUrl(server: any): string | undefined {
 function serverName(server: any): string { return server.serverName || server.id }
 
 async function serverTools(server: any): Promise<any[]> {
-  if (server.specUrl) return (await loadOpenApi(server)).tools
+  if (server.specUrl) {
+    const source = await loadOpenApi(server)
+    return server.platformToolResources ? source.businessTools : source.tools
+  }
   return (await withClient(server, client => client.listTools())).tools
 }
 
@@ -128,7 +147,8 @@ async function withClient<T>(server: any, run: (client: any) => Promise<T>): Pro
   if (!url) throw new Error(`${server.id}: MCP URL 未配置`)
   const client = new Client({ name: 'dsh-web-mcp-manager', version: '0.1.0' })
   const transport = new StreamableHTTPClientTransport(new URL(url), {
-    requestInit: { headers: Object.fromEntries((server.headers ?? []).map(({ name, value }: any) => [name, value])) },
+    requestInit: { headers: { ...Object.fromEntries((server.headers ?? []).map(({ name, value }: any) => [name, value])),
+      ...server.platformRequestHeaders?.(url) } },
   })
   try {
     await client.connect(transport)
@@ -136,6 +156,39 @@ async function withClient<T>(server: any, run: (client: any) => Promise<T>): Pro
   } finally {
     await client.close()
   }
+}
+
+async function callManagedTool(server: any, name: string, args: any, meta?: Record<string, unknown>): Promise<any> {
+  if (server.enabled === false) throw new Error('MCP 服务器已停用')
+  if (server.tools?.mode === 'selected' && !server.tools.names.includes(name)) throw new Error('工具不属于当前 MCP 范围')
+  if (server.specUrl) return callOpenApiTool(await loadOpenApi(server), name, args)
+  return withClient(server, async client => {
+    const tool = (await client.listTools()).tools.find((item: any) => item.name === name)
+    if (!tool) throw new Error('工具不属于当前 MCP 范围')
+    const dispatch = (signal?: AbortSignal) => client.callTool({ name, arguments: args, ...(meta ? { _meta: meta } : {}) }, {
+      signal: signal ?? server.platformSignal, timeout: server.platformComposition ? 36 * 60_000 : server.platformTimeoutMs ?? 60_000,
+    })
+    if (server.platformComposition) {
+      // 已发布组合保留固定版本与业务上下文；真实目标授权在每个叶子派发时执行。
+      server.platformAssertCurrent?.()
+      return dispatch()
+    }
+    return server.platformExecute ? server.platformExecute({ serverId: server.id, operationId: name,
+      kind: 'write', target: resolvedUrl(server), method: 'tools/call', args,
+      schemaDigest: createHash('sha256').update(JSON.stringify(tool.inputSchema)).digest('hex'),
+    }, dispatch, server.platformSignal) : dispatch()
+  })
+}
+
+async function readManagedResource(server: any, uri: string): Promise<any> {
+  if (server.enabled === false) throw new Error('MCP 服务器已停用')
+  if (server.specUrl) return readOpenApiResource(await loadOpenApi(server), uri)
+  return withClient(server, client => {
+    const dispatch = (signal?: AbortSignal) => client.readResource({ uri }, { signal: signal ?? server.platformSignal })
+    return server.platformExecute ? server.platformExecute({ serverId: server.id, operationId: 'resources/read',
+      kind: 'resource', target: resolvedUrl(server), method: 'resources/read', args: { uri },
+    }, dispatch, server.platformSignal) : dispatch()
+  })
 }
 
 function send(res: any, status: number, body: unknown): void {
@@ -188,7 +241,7 @@ export function groupTargetDigest(target: Extract<Target, { kind: 'group' }>): s
 async function toolsFor(target: Target): Promise<any[]> {
   if (target.kind === 'agent') {
     const tools = await serverTools(target.server)
-    return tools.filter((tool: any) => target.server.specUrl || target.server.tools.mode === 'all'
+    return tools.filter((tool: any) => !target.server.tools || target.server.tools.mode === 'all'
       || target.server.tools.names.includes(tool.name))
   }
   const result: any[] = []
@@ -205,7 +258,7 @@ async function toolsFor(target: Target): Promise<any[]> {
 
 function toolOwner(target: Target, name: string): { server: any; rawName: string } | undefined {
   if (target.kind === 'agent') {
-    if (!target.server.specUrl && target.server.tools.mode === 'selected' && !target.server.tools.names.includes(name)) return
+    if (target.server.tools.mode === 'selected' && !target.server.tools.names.includes(name)) return
     return { server: target.server, rawName: name }
   }
   for (const member of target.group.members) {
@@ -218,12 +271,15 @@ function toolOwner(target: Target, name: string): { server: any; rawName: string
   }
 }
 
-async function serveMcp(req: any, res: any, target: Target, currentGroup?: () => Extract<Target, { kind: 'group' }> | undefined): Promise<void> {
+async function serveMcp(req: any, res: any, target: Target, currentTarget?: () => Target | undefined): Promise<void> {
   const digest = target.kind === 'group' ? groupTargetDigest(target) : undefined
+  const agentDigest = (value: any) => JSON.stringify([value?.id, value?.enabled, value?.specUrl, value?.url, value?.tools])
   const assertTarget = (request?: any) => {
     const expected = request?.params?._meta?.[GROUP_TARGET_META_KEY]?.digest
-    const current = currentGroup?.()
-    if (digest && (expected !== undefined && expected !== digest || currentGroup && (!current || groupTargetDigest(current) !== digest))) throw new Error('MCP 分组目标已变化')
+    const current = currentTarget?.()
+    if (digest && (expected !== undefined && expected !== digest || currentTarget && (!current || current.kind !== 'group' || groupTargetDigest(current) !== digest))) throw new Error('MCP 分组目标已变化')
+    if (target.kind === 'agent' && currentTarget && (!current || current.kind !== 'agent' || current.server.enabled === false
+      || agentDigest(current.server) !== agentDigest(target.server))) throw new Error('MCP 服务器目标已变化或已停用')
   }
   const handler = createMcpHandler(() => {
     const mcp = new McpServer({ name: target.kind === 'group' ? target.group.id : serverName(target.server),
@@ -236,11 +292,8 @@ async function serveMcp(req: any, res: any, target: Target, currentGroup?: () =>
       assertTarget(request)
       const owner = toolOwner(target, request.params.name)
       if (!owner) throw new Error('工具不属于当前 MCP 范围')
-      if (owner.server.specUrl) {
-        const source = await loadOpenApi(owner.server); assertTarget(request)
-        return callOpenApiTool(source, owner.rawName, request.params.arguments ?? {})
-      }
-      return withClient(owner.server, client => { assertTarget(request); return client.callTool({ ...request.params, name: owner.rawName }) })
+      assertTarget(request)
+      return callManagedTool(owner.server, owner.rawName, request.params.arguments ?? {}, request.params._meta)
     })
     if (target.kind === 'agent') {
       mcp.server.setRequestHandler('resources/list', async () => target.server.specUrl
@@ -249,9 +302,10 @@ async function serveMcp(req: any, res: any, target: Target, currentGroup?: () =>
       mcp.server.setRequestHandler('resources/templates/list', async () => target.server.specUrl
         ? { resourceTemplates: (await loadOpenApi(target.server)).resourceTemplates }
         : withClient(target.server, client => client.listResourceTemplates()))
-      mcp.server.setRequestHandler('resources/read', async (request: any) => target.server.specUrl
-        ? readOpenApiResource(await loadOpenApi(target.server), request.params.uri)
-        : withClient(target.server, client => client.readResource(request.params)))
+      mcp.server.setRequestHandler('resources/read', async (request: any) => {
+        assertTarget(request)
+        return readManagedResource(target.server, request.params.uri)
+      })
     }
     return mcp
   })
@@ -265,12 +319,18 @@ async function serveMcp(req: any, res: any, target: Target, currentGroup?: () =>
 async function upstream(server: any, method: string, path: string, data?: unknown): Promise<any> {
   if (!server.managementUrl) throw new Error(`${server.id}: 未设置 OpenAPI 管理地址`)
   const root = validateUrl(server.managementUrl)
-  const response = await fetch(new URL(path, root.endsWith('/') ? root : `${root}/`), {
+  const target = new URL(path, root.endsWith('/') ? root : `${root}/`)
+  const dispatch = (signal?: AbortSignal) => fetch(target, {
     method,
     headers: data === undefined ? {} : { 'content-type': 'application/json' },
     body: data === undefined ? undefined : JSON.stringify(data),
-    signal: AbortSignal.timeout(20_000),
+    signal: signal ?? server.platformSignal ?? AbortSignal.timeout(20_000),
+    redirect: 'error',
   })
+  const response = server.platformExecute && path.endsWith('/invoke')
+    ? await server.platformExecute({ serverId: server.id, operationId: path.split('/').at(-2),
+      kind: 'write', target: target.href, method, args: data }, dispatch, server.platformSignal)
+    : await dispatch()
   if (Number(response.headers.get('content-length')) > MAX_RESPONSE) throw new Error('上游响应超过 1 MiB')
   const text = await response.text()
   if (Buffer.byteLength(text) > MAX_RESPONSE) throw new Error('上游响应超过 1 MiB')
@@ -333,13 +393,20 @@ export function apply(ctx: any, config: any): void {
     const id = new URL(req.url, 'http://localhost').pathname.split('/')[3]
     const target = agents.get(id)
     if (!target) return send(res, 404, { error: 'agent MCP endpoint not found' })
-    try { await serveMcp(req, res, target) }
+    try { await serveMcp(req, res, target, () => {
+      const server = snapshot(config).servers.find(item => item.id === (target as Extract<Target, { kind: 'agent' }>).server.id)
+      return server ? { kind: 'agent', server } : undefined
+    }) }
     catch (error) { if (!res.headersSent) send(res, 502, { error: String(error) }); else res.destroy() }
   } }), 'mcp-manager.agents')
 
   ctx.effect(() => ctx.webServer.register({ kind: 'exact', path: '/api/mcp-manager', handler: async (req: any, res: any) => {
     const rejected = ctx.connection.requestRejection(req)
     if (rejected) return send(res, rejected, { error: 'unauthorized' })
+    if (config.withManagement) {
+      const admission = ctx.connection.admit(req)
+      if ('rejection' in admission || admission.peer.principal.kind !== 'owner') return send(res, 403, { error: 'management owner required' })
+    }
     try {
       const current = snapshot(config)
       if (req.method === 'GET') return send(res, 200, {
@@ -352,6 +419,10 @@ export function apply(ctx: any, config: any): void {
       const request = await bodyOf(req)
       const server = current.servers.find(item => item.id === request.serverId)
       if (!server) return send(res, 404, { error: 'MCP server not found' })
+      if (request.action === 'callTool') {
+        if (typeof request.toolName !== 'string' || !request.arguments || typeof request.arguments !== 'object' || Array.isArray(request.arguments)) return send(res, 400, { error: '工具名称或参数无效' })
+        return send(res, 200, await callManagedTool(server, request.toolName, request.arguments))
+      }
       if (request.action === 'test') {
         if (server.specUrl) {
           const source = await loadOpenApi(server)
@@ -370,12 +441,12 @@ export function apply(ctx: any, config: any): void {
           const source = await loadOpenApi(server)
           const result = request.action === 'resources' ? { resources: source.resources }
             : request.action === 'resourceTemplates' ? { resourceTemplates: source.resourceTemplates }
-              : await readOpenApiResource(source, request.uri)
+              : await readManagedResource(server, request.uri)
           return send(res, 200, result)
         }
         const result = await withClient(server, client => request.action === 'resources' ? client.listResources()
           : request.action === 'resourceTemplates' ? client.listResourceTemplates()
-            : client.readResource({ uri: request.uri }))
+            : readManagedResource(server, request.uri))
         return send(res, 200, result)
       }
       return send(res, 200, await manage(server, request))
@@ -401,7 +472,26 @@ export function apply(ctx: any, config: any): void {
             scopes.push(scope)
             agents.set(id, { kind: 'agent', server })
             scope.ctx.effect(() => () => { agents.delete(id) }, 'mcp-manager.agent-endpoint')
-            await scope.ctx.plugin(McpClient, McpClient.Config({
+            if (config.withToolContext) {
+              // 直接复用原生工具桥；避免进程内 HTTP loopback 丢失每次调用的业务主体。
+              const tools = await serverTools(server)
+              for (const tool of tools.filter((item: any) => server.tools.mode === 'all' || server.tools.names.includes(item.name))) {
+                const publicName = `mcp__${serverName(server)}__${tool.name}`
+                scope.ctx.effect(() => {
+                  const unregister = scope.ctx.tools.register(McpClient.createMcpToolDefinition(scope.ctx, {
+                  name: publicName, rawName: tool.name,
+                  description: tool.description ?? '', inputSchema: tool.inputSchema, outputSchema: tool.outputSchema,
+                  call: (args: any, execution: any) => config.withToolContext(execution, async () => {
+                    const latest = snapshot(config).servers.find(item => item.id === server.id && item.enabled !== false)
+                    if (!latest || JSON.stringify([latest.specUrl, latest.url]) !== JSON.stringify([server.specUrl, server.url])) throw new Error('MCP 服务器目标已变化或已停用')
+                    return callManagedTool({ ...latest, platformSignal: execution.signal }, tool.name, args)
+                  }),
+                  }))
+                  config.onManagedTool?.(publicName, true)
+                  return () => { config.onManagedTool?.(publicName, false); return unregister() }
+                })
+              }
+            } else await scope.ctx.plugin(McpClient, McpClient.Config({
               transport: 'streamable-http',
               serverName: serverName(server),
               url: `http://127.0.0.1:${ctx.webServer.port}${publicPath(`/mcp/agents/${id}`)}`,

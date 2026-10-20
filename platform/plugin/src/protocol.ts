@@ -4,7 +4,7 @@ export const CHANNEL = '/harness-platform'
 
 // 服务端模块处理去掉前缀后的 endpoint，页面使用同一个原生认证 RPC。
 export const DOMAIN_PREFIXES = ['agents/', 'instances/', 'mcp/', 'assistant/'] as const
-export type PageId = 'home' | 'conversations' | 'agents' | 'evaluation' | 'instances' | 'mcp'
+export type PageId = 'home' | 'conversations' | 'agents' | 'evaluation' | 'instances' | 'gateway' | 'mcp'
 export interface PlatformNavigation {
   page: PageId
   replace?: boolean

@@ -1,0 +1,36 @@
+{
+  "at": "2026-10-19T14:23:33.357Z",
+  "mode": "main3090",
+  "checks": [
+    "原3090平台原账号可登录，一级统一网关菜单和四项配置可见",
+    "刷新深链仍打开统一网关",
+    "四项配置每次仅显示当前页签，表单没有直接堆叠",
+    "跨页面和轮询保留未保存草稿，放弃后恢复真实空配置，未写业务配置"
+  ],
+  "pageErrors": [],
+  "failedRequests": [],
+  "consoleErrors": [
+    "[cordis-client-runner] syncing inspect providers failed: Error: gateway/internal: client api: dynamicCordisRunner/syncInspectManifest failed: Failed to fetch\n    at Object.sync (http://10.0.160.32:3090/hep/plugins/??@deepseek-ai/dsh-api-gateway/client.js,@deepseek-ai/dsh-client-ui-open-in-app/client.js,@deepseek-ai/dsh-api-job-controller/client.js,@deepseek-ai/dsh-api-terminal-controller/client.js,@deepseek-ai/dsh-api-workspace-files/client.js,@deepseek-ai/dsh-client-ui-settings-account/client.j"
+  ],
+  "controlProbe": {
+    "status": 200,
+    "body": "{\"type\":\"server-response\",\"rpcId\":\"gateway-visible-probe\",\"result\":{\"ok\":true,\"value\":{\"enabled\":false,\"restrictionVersion\":0,\"instances\":[],\"restrictions\":[],\"riskFacts\":[],\"events\":[],\"revision\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"sessionTrustFacts\":[],\"agentStatuses\":[],\"configuration\":{\"schemaVersion\":1,\"enabled\":false,\"agents\":[],\"providers\":{\"authentication\":false,\"identityTrust\":false,\"riskAssessment\":false},\"operationCount\":0,\"authentication\":{\"configured\":false,\"endpoint\":\"\",\"endpointHidden\":false,\"mode\":\"unconfigured\"},\"identityTrust\":{\"configured\":false,\"endpoint\":\"\",\"endpointHidden\":false,\"mode\":\"unconfigured\"},\"riskAssessment\":{\"configured\":false,\"endpoint\":\"\",\"endpointHidden\":false,\"mode\":\"unconfigured\",\"requiredKinds\":[\"write\",\"publish\"]},\"detection\":{\"inputMarkers\":[],\"operationMarkers\":[],\"reportMarkers\":[]},\"operations\":[]},\"coverage\":{\"immediate\":true,\"schedules\":false,\"leaseMs\":2000,\"acknowledgementDeadlineMs\":2000}}}}"
+  },
+  "url": "http://10.0.160.32:3090/hep/#/gateway",
+  "title": "Harness工程平台",
+  "sections": [
+    "1．Agent 身份认证",
+    "2．Agent 身份信任",
+    "3．Agent 自动风险评估",
+    "4．Agent 访问控制策略"
+  ],
+  "desktop": {
+    "width": 1440,
+    "scrollWidth": 1440
+  },
+  "mobile": {
+    "width": 390,
+    "scrollWidth": 390
+  },
+  "ok": true
+}

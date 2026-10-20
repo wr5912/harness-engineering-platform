@@ -438,6 +438,8 @@ def compose_env(contract: dict, mode: str, port: int, name: str,
         if contract.get("runtime_managed_patch"):
             environment["DSH_RUNTIME_MANAGED_PATCH_HOST"] = contract["runtime_managed_patch"]
             environment["DSH_MANAGED_PATCH"] = "/opt/dsh-profile-compat/managed.patch.yml"
+    if contract.get("business_control"):
+        environment["DSH_BUSINESS_PATCH_HOST"] = str(instance_dir(name) / "business.patch.yml")
     return environment
 
 
@@ -773,6 +775,12 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
         schedule_compat=runtime_profile != original_profile,
         managed_patch_compat=bool(contract.get("runtime_managed_patch")),
     )
+    business = None
+    if contract.get("business_control"):
+        business = render_business_instance(contract, name, port, rendered)
+        rendered = business["compose"]
+        (target / "business.patch.yml").write_text(business["patch"], encoding="utf-8")
+        os.chmod(target / "business.patch.yml", 0o600)
     (target / "compose.yaml").write_text(rendered, encoding="utf-8")
     manifest = {
         "schema_version": INSTANCE_SCHEMA_VERSION,
@@ -801,7 +809,7 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
         "image_build_fingerprint": contract["image"].get("build_fingerprint"),
         "adapter_root": str(ADAPTER),
         "web_adapter_root": str(WEB_ADAPTER),
-        "web_base_path": current_web_base_path(),
+        "web_base_path": f"/agents/{contract['agent_id']}/" if business else current_web_base_path(),
         "sites_config_file": str(sites_config(REPO)),
         "web_profile_manifest": runtime_profile,
         "web_profile_seed_directory": str(Path(original_profile).parent),
@@ -824,6 +832,7 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
         "required_env_names": required_env_names(contract, analysis_workspace),
         "optional_env_names": [name for name in runtime_env_names(contract, analysis_workspace)
                                if name not in required_env_names(contract, analysis_workspace)],
+        **({"business_control": business["registration"]} if business else {}),
     }
     (target / "instance.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -865,6 +874,7 @@ def instance_compose_env(manifest: dict) -> dict:
         "DSH_PLUGIN_NODE_MODULES_HOST": mounts.get("plugin_node_modules"),
         "DSH_ANALYSIS_WORKSPACE_HOST": mounts.get("analysis_workspace"),
         "DSH_EVAL_TARGET_PRESET": manifest.get("target_preset"),
+        "DSH_BUSINESS_PATCH_HOST": str(instance_dir(str(manifest.get("name"))) / "business.patch.yml") if manifest.get("business_control") else None,
     }
     # 只读兼容旧 authoring 状态，保证历史实例仍可 ps/logs/down；新实例不再写入这些字段。
     for asset in manifest.get("context_mounts") or []:
@@ -1006,8 +1016,12 @@ def prepare_up(args: argparse.Namespace) -> tuple[dict, tuple[Path, dict] | None
         fail("归因实例只允许监听 127.0.0.1，不能启用 --lan-access")
     if args.analysis_workspace and bool(getattr(args, "unsafe_no_auth", False)):
         fail("归因实例不能启用 --unsafe-no-auth")
-    # 业务实例统一采用平台直连设置；专用归因工作进程保持内部访问边界。
-    args.lan_access = args.unsafe_no_auth = args.skip_testing_notice = not args.analysis_workspace
+    business_file = getattr(args, "business_control", None)
+    if business_file and (args.analysis_workspace or getattr(args, "migrate_home", False)
+                          or getattr(args, "lan_access", False) or getattr(args, "unsafe_no_auth", False)):
+        fail("业务控制模式不能与归因、HOME 迁移、LAN 直连或免认证开关并用")
+    # 受管业务单独使用 bridge 与签名上下文；既有研究实例保留原访问方式。
+    args.lan_access = args.unsafe_no_auth = args.skip_testing_notice = not args.analysis_workspace and not business_file
     validate_trusted_host(getattr(args, "trusted_host", None))
     contract = resolve(args.source, repo=REPO)
     args.name = args.name or f"{contract['agent_id']}-{PURPOSES[args.mode]}"
@@ -1015,6 +1029,19 @@ def prepare_up(args: argparse.Namespace) -> tuple[dict, tuple[Path, dict] | None
     if current is not None:
         _, manifest = current
         validate_existing_identity(args.name, manifest, contract, args.mode, args.analysis_workspace)
+    if current is not None and bool(current[1].get("business_control")) != bool(business_file):
+        fail("不能在既有实例上切换业务控制边界；请使用新实例名和独立 HOME")
+    if business_file:
+        home = instance_dir(args.name) / "dsh-home"
+        if current is None and (home.is_symlink() or home.exists() and (not home.is_dir() or any(home.iterdir()))):
+            fail("首期业务控制模式只接受新的独立 HOME，不接管旧运行状态")
+        launch = business_helper(business_file, {"sourcePaths": {key: contract[key] for key in ("workspace", "presets", "managed")}})
+        if launch["assetRoot"] != str(REPO):
+            fail("业务启动配置的数据根必须与当前 --repo 一致")
+        contract["business_control"] = {
+            "config_file": str(Path(business_file).resolve()), "source_digest": launch["sourceDigest"],
+            "runtime_generation": (current[1]["business_control"]["runtime_generation"] if current else secrets.token_hex(16)),
+        }
     if args.port is None:
         if current is not None:
             args.port = instance_recorded_port(current[1])
@@ -1042,6 +1069,7 @@ def build_plan(args: argparse.Namespace, contract: dict) -> dict:
     required_names = required_env_names(contract, analysis_workspace)
     runtime_names = runtime_env_names(contract, analysis_workspace)
     missing = [name for name in required_names if not os.environ.get(name)]
+    base_path = f"/agents/{contract['agent_id']}/" if contract.get("business_control") else current_web_base_path()
     plan = {
         "schema_version": "2.1",
         "name": args.name,
@@ -1060,8 +1088,8 @@ def build_plan(args: argparse.Namespace, contract: dict) -> dict:
         "listen_host": "0.0.0.0" if lan_access else "127.0.0.1",
         "workspace_to_register": workspace_to_register(args.mode, analysis_workspace),
         "grading_material_mounted": analysis_workspace is not None,
-        "web_base_path": current_web_base_path(),
-        "base_url": f"http://127.0.0.1:{args.port}{current_web_base_path()}",
+        "web_base_path": base_path,
+        "base_url": f"http://127.0.0.1:{args.port}{base_path}",
         "port": args.port,
         "source_id": contract["source_id"],
         "source_kind": contract["source_kind"],
@@ -1096,7 +1124,34 @@ def build_plan(args: argparse.Namespace, contract: dict) -> dict:
     }
     if contract["source_kind"] == "experiment" and not analysis_workspace:
         plan["evaluation_source_notice"] = "评测模式绑定当前宿主 Candidate；运行期间不要改写该来源，并在 Run 中记录实际 Git 与 dirty 状态。"
+    if contract.get("business_control"):
+        plan.update({"business_control": {"runtime_generation": contract["business_control"]["runtime_generation"],
+                                         "source_digest": contract["business_control"]["source_digest"],
+                                         "scheduling_supported": False},
+                     "network": "private bridge (host port 127.0.0.1 only)",
+                     "risk": "即时任务经签名业务网关执行；首期不支持定时任务检测、防护闭环，后台巡检与报表需手动发起。"})
     return plan
+
+
+def business_helper(config_file: str, payload: dict) -> dict:
+    """仅桥接 TypeScript 实现；输出不包含密钥原值。"""
+    completed = subprocess.run(["node", str(ADAPTER / "business.ts"), str(Path(config_file).resolve())],
+                               input=json.dumps(payload), text=True, capture_output=True, check=False, timeout=30)
+    if completed.returncode != 0:
+        fail("业务启动配置或固定资产校验失败；请核对可达协调器、共享密钥与已构建插件")
+    return json.loads(completed.stdout)
+
+
+def render_business_instance(contract: dict, name: str, port: int, compose: str) -> dict:
+    config = contract["business_control"]
+    return business_helper(config["config_file"], {
+        "name": name, "agentId": contract["agent_id"], "workspaceId": workspace_id(REPO),
+        "sourceDigest": config["source_digest"], "runtimeGeneration": config["runtime_generation"],
+        "port": port, "compose": compose, "profileManifest": contract.get("profile_manifest", str(ADAPTER / "verification-home-controls/web-profile.package.json")),
+        "presetId": session_preset(contract, "verification"),
+        "runtimeSettings": str(instance_dir(name) / "dsh-home/profiles/web/cordis.patch.yml"),
+        "basePath": f"/agents/{contract['agent_id']}/", "sourcePaths": {key: contract[key] for key in ("workspace", "presets", "managed")},
+    })
 
 
 def running_dsh_image_id(name: str) -> tuple[str | None, bool]:
@@ -1232,10 +1287,11 @@ def _command_up(args: argparse.Namespace, contract: dict,
     run(compose_command(target, args.name, "up", "-d", "--no-build"), env=environment)
     # `docker compose up -d` 返回 0 只说明命令成功，不说明容器在运行：容器可能立刻退出。
     containers = wait_for_service(args.name, "dsh")
+    business_base = f"/agents/{contract['agent_id']}/" if contract.get("business_control") else current_web_base_path()
     report = {"name": args.name, "container_name": args.name,
               "project": project_name(args.name), "port": args.port,
-              "web_base_path": current_web_base_path(),
-              "base_url": f"http://127.0.0.1:{args.port}{current_web_base_path()}",
+              "web_base_path": business_base,
+              "base_url": f"http://127.0.0.1:{args.port}{business_base}",
               "state_dir": str(target), "agent_id": contract["agent_id"],
               "target_preset": target_preset(contract),
               "session_preset": session_preset(contract, args.mode, args.analysis_workspace),
@@ -1480,6 +1536,20 @@ def running_container(name: str) -> tuple[str, str]:
 def command_url(args: argparse.Namespace) -> None:
     _, manifest = load_instance(args.name)
     require_docker_registration(args.name, manifest)
+    if manifest.get("business_control"):
+        running_container(args.name)
+        result = run(["node", str(ADAPTER / "business.ts"), "--entry", str(REPO), manifest["agent_id"], args.name])
+        url = json.loads(result.stdout)["url"]
+        try:
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirectHandler())
+            opener.open(urllib.request.Request(url, method="GET"), timeout=5).close()
+        except urllib.error.HTTPError as error:
+            if error.code == 401:
+                print(url)
+                return
+        except (OSError, urllib.error.URLError):
+            pass
+        fail("业务网关未确认当前入口的未认证拒绝；不返回内部 Runtime 或 owner 链接")
     if manifest.get("profile") == "web-lan":
         running_container(args.name)
         deadline = time.monotonic() + 30.0
@@ -1970,12 +2040,18 @@ def preflight_new_instance(args: argparse.Namespace, contract: dict) -> None:
             image_fingerprint=contract["image"].get("build_fingerprint"),
             schedule_compat=not analysis_workspace and needs_schedule_compat(contract.get("profile_manifest")),
         )
+        if contract.get("business_control"):
+            business = render_business_instance(contract, args.name, args.port, rendered)
+            rendered = business["compose"]
+            (root / "business.patch.yml").write_text(business["patch"], encoding="utf-8")
         compose = root / "compose.yaml"
         compose.write_text(rendered, encoding="utf-8")
         environment = compose_env(
             contract, args.mode, args.port, args.name, analysis_workspace=analysis_workspace,
             plugin_node_modules=getattr(args, "plugin_node_modules", None),
         )
+        if contract.get("business_control"):
+            environment["DSH_BUSINESS_PATCH_HOST"] = str(root / "business.patch.yml")
         run(compose_command(root, args.name, "config", "--quiet"), env=environment)
 
 
@@ -2141,6 +2217,8 @@ def main() -> None:
                     help=argparse.SUPPRESS)
     up.add_argument("--plugin-node-modules", metavar="PATH",
                     help="将已有 Node 插件依赖目录只读挂载到 /opt/node_modules")
+    up.add_argument("--business-control", metavar="CONFIG",
+                    help="以独立 HOME 和私有 bridge 启动受管即时任务；CONFIG 指定数据根、共享密钥文件及可达协调器")
     up.set_defaults(handler=command_up)
 
     ps_parser = commands.add_parser("ps", help="默认列出运行中的实例；加 --all 查看全部状态记录")

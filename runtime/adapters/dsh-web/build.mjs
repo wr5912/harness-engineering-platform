@@ -12,7 +12,7 @@ try { require.resolve('esbuild'); require.resolve('typescript') } catch {
 const { build } = await import('esbuild')
 await build({
   absWorkingDir: root,
-  entryPoints: Object.fromEntries(['index', 'platform-webserver', 'container-webserver', 'container-web-app']
+  entryPoints: Object.fromEntries(['index', 'platform-webserver', 'container-webserver', 'container-web-app', 'client-urls-worker']
     .map(name => [name, `src/${name}.ts`])),
   outdir: resolve(root, 'lib'),
   outExtension: { '.js': '.mjs' },

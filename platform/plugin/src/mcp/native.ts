@@ -2,6 +2,7 @@ import { createMcpHandler } from './index.ts'
 import { digestOf, redacted } from './openapi.ts'
 import { loadOpenApi, execute } from 'harness-mcp-manager-openapi'
 import type { ThreatRuntime, CompositionExtension } from './extension.ts'
+import { managedServer } from './control.ts'
 
 export function createManagedMcpHandler(assetRoot: string, servers: () => any[], options: { threat?: ThreatRuntime; extension?: CompositionExtension } = {}) {
   return createMcpHandler(assetRoot, {
@@ -12,7 +13,7 @@ export function createManagedMcpHandler(assetRoot: string, servers: () => any[],
       async load(connection, signal) {
         const server = servers().find(item => item.id === connection.id && item.enabled !== false)
         if (!server?.specUrl) throw new Error('组合依赖的 OpenAPI 服务器未启用')
-        return { ...await loadOpenApi({ ...server, platformSignal: signal }), connection }
+        return { ...await loadOpenApi({ ...managedServer(assetRoot, server, () => servers().find(item => item.id === connection.id)), platformSignal: signal }), connection }
       },
       async call(source, operationId, args, signal) {
         signal?.throwIfAborted()

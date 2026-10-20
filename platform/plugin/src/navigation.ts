@@ -1,6 +1,6 @@
 import type { PageId, PlatformNavigation } from './protocol.ts'
 
-const pages: PageId[] = ['home', 'conversations', 'agents', 'evaluation', 'instances', 'mcp']
+const pages: PageId[] = ['home', 'conversations', 'agents', 'evaluation', 'instances', 'gateway', 'mcp']
 const fields = ['agent_id', 'experiment_id', 'run_id', 'case_id', 'tab'] as const
 
 export function readNavigation(hash: string): PlatformNavigation {

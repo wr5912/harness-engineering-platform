@@ -1,0 +1,10 @@
+{
+  "name": "@ai-agent-harness/business-host",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./runtime": "./runtime.js",
+    "./mcp-manager": "./mcp-manager.js"
+  }
+}

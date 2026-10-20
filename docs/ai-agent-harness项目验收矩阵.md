@@ -1,6 +1,6 @@
 # Harness 工程平台项目验收矩阵
 
-更新日期：2026-10-19
+更新日期：2026-10-20
 
 本文是 **Harness 工程平台项目与工具链**验证路径、当前证据和缺口的唯一维护位置。它直接回答三个问题：总共有多少条路径、每条做到什么程度、哪些检查应该进入自动化测试。
 
@@ -25,7 +25,7 @@
 | 派生 | `PA-09` | 新 Preset 创建、登记、重载与选择闭环 | 部分验证 |
 | 记录 | `PA-10` | Research Run 的创建、记录、缺口与封存 | 已验证（机器范围） |
 | 复用 | `PA-11` | Research Release 打包、解析与复现装载 | 未实现 |
-| 平台 | `PA-12` | 全局 DSH 平台启动、认证与研究工具 | 部分验证；六页与全局启动已验证 |
+| 平台 | `PA-12` | 全局 DSH 平台启动、认证与研究工具 | 部分验证；原六页、统一网关与全局启动分项已验证 |
 
 状态含义：
 
@@ -92,7 +92,7 @@
 
 同日按用户要求将平台现有 `security-operations-expert-eval` 接入 Mock：优先在实例 MCP 插件保存连接与业务分组，仅对不读取插件配置的固定后端补充运行环境；同名、同端口、同 HOME 和标准镜像重建，Harness 资产不改动。真实 Session 完成巡检、故障查询、策略及应急确认；SOC 和报告后端另做原客户端可达检查，未在该实例重新执行完整研判。旧 `security-operations-expert-mock` 的容器和登记已删除，HOME 保留。最终分组、浏览器、后端和删除证据仍集中在上述 Mock 接入说明，平台重建需重新注入环境的边界亦在那里维护。
 
-2026-10-19 的 [DSH rc.2 升级验收](../platform/plugin/test/evidence/dsh-rc2-upgrade-20261019/README.md)补充 `PA-05/06/08/12`：验收时两管理平台与四业务容器实际使用 `0.2.1-rc.2`，保留原端口、HOME、来源及访问方式。六实例真实模型轮次、六页管理界面、业务桌面/390px/设置/刷新/双向 WebSocket、旧含内容会话导出通过；两个基础 Mock 巡检完成报告与 CSV 下载，SOC 只读 MCP 查询通过。隔离 HOME 探针验证原生 Schedule 恢复、三角色装载与工具边界、真实前台委派及取消、旧 Session 字节保留；官方 9 个构建 gate、平台 521 项和适配器 186 项等检查通过。首轮失败、私有备份、数据仓库无本轮资产变更及限制见记录。小模型试验部署的后续处置见下方“任务工作副本清理”，原六实例验收事实保留。统一业务网关、共享 Runtime 用户隔离与 MCP 风险联动仅纳入未来设计；语音仅检查入口与只读配置路由，不提升全项目路径、Harness 效果或 Release 状态。
+2026-10-19 的 [DSH rc.2 升级验收](../platform/plugin/test/evidence/dsh-rc2-upgrade-20261019/README.md)补充 `PA-05/06/08/12`：验收时两管理平台与四业务容器实际使用 `0.2.1-rc.2`，保留原端口、HOME、来源及访问方式。六实例真实模型轮次、六页管理界面、业务桌面/390px/设置/刷新/双向 WebSocket、旧含内容会话导出通过；两个基础 Mock 巡检完成报告与 CSV 下载，SOC 只读 MCP 查询通过。隔离 HOME 探针验证原生 Schedule 恢复、三角色装载与工具边界、真实前台委派及取消、旧 Session 字节保留；官方 9 个构建 gate、平台 521 项和适配器 186 项等检查通过。首轮失败、私有备份、数据仓库无本轮资产变更及限制见记录。小模型试验部署的后续处置见下方“任务工作副本清理”，原六实例验收事实保留。当次升级尚未覆盖统一业务网关、共享 Runtime 用户隔离与 MCP 风险联动；后续独立实施见下方新增验收。语音仅检查入口与只读配置路由，不提升全项目路径、Harness 效果或 Release 状态。
 
 ### 任务工作副本清理
 
@@ -135,6 +135,8 @@
 
 ### PA-05 `dsh-dev` 实例完整生命周期
 
+- **统一网关业务模式（2026-10-19）**：[实施验收](platform-design/21_统一网关与MCP控制实施验收.md)记录新增 `--business-control`、独立 HOME／bridge、回环端口、标准镜像和固定来源；原研究实例保持原方式。首期关闭定时服务与后台投递，范围不扩展到历史任务。
+
 - **任务试验实例退役（2026-10-19）**：关联隔离实例、容器与运行状态的处置见[任务工作副本清理](#任务工作副本清理)。
 - **要回答**：本地实例能否从参数预览到停止完整运行，失败时是否如实报告。
 - **操作链**：`up --dry-run` → `up` → `ps` → `url` → `logs` → `up --replace` → `down` → `delete`（保留 HOME）；同时检查缺参数时的可用值列表、自动实例名与端口、端口竞态、缺少环境变量、单一 stdout JSON 和停止失败。
@@ -151,6 +153,8 @@
 
 ### PA-06 被测容器的真实装载与只读边界
 
+- **受控业务装载（2026-10-19）**：[统一网关验收](platform-design/21_统一网关与MCP控制实施验收.md)在独立数据快照装载固定 EXP-021，核对标准镜像、只读程序／资产／策略、真实 HMAC 通道及来源回执；未修改 Candidate 或重建派生镜像。不证明任意插件或子 Agent 全链已受控。
+
 - **要回答**：评测容器是否加载正确来源，并形成三棵 Candidate 资产只读、判分材料不可见的视图。
 - **操作链**：确认镜像身份 → 启动评测实例 → 核对目标 Preset、Skill、Plugin/MCP 声明、三棵只读挂载和判分材料不可见性。
 - **当前证据**：Compose、来源计划和装载探针测试覆盖当前机器合同；全仓版本锁对应的新镜像已核对 Image ID 与构建指纹，全部九个已登记来源的隔离 `verify-load` 均通过，见[装载证据](https://github.com/wr5912/harness-engineering-platform-data/blob/9afc8fd0047367deb9df5b51595f101835359044/evolution/experiments/EXP-security-operations-expert-007/evaluation/evidence/dsh-global-lock-load-20260928T112027Z.json)。EXP-007 的真实 Web 会话曾完成自动化任务创建、查看和删除，见其 [Decision](https://github.com/wr5912/harness-engineering-platform-data/blob/9afc8fd0047367deb9df5b51595f101835359044/evolution/experiments/EXP-security-operations-expert-007/decision.md)。语音隔离实例使用同一锁定来源的标准镜像，已核对四个 Candidate/依赖挂载均为只读，见[构建证据](https://github.com/wr5912/harness-engineering-platform-data/blob/9afc8fd0047367deb9df5b51595f101835359044/evolution/experiments/EXP-security-operations-expert-007/evaluation/evidence/dsh-image-build-20260929T102953Z-875853.json)及[语音 Run](https://github.com/wr5912/harness-engineering-platform-data/blob/9afc8fd0047367deb9df5b51595f101835359044/evolution/experiments/EXP-security-operations-expert-007/runs/run-fe58afad-133d-44fb-b92c-19bf74523083/report.md)。
@@ -166,6 +170,8 @@
 - **自动化边界**：摘要、冻结与恢复合同进入测试；模型行为和真实工具效果由 Experiment Run 记录。
 
 ### PA-08 DSH Runtime API 与 Web UI 的 Session、消息与结果闭环
+
+- **即时任务检测、防护（2026-10-19）**：[统一网关证据](../platform/plugin/test/evidence/business-control-20261019/README.md)关联真实双用户 Session、模型巡检调用、自动风险收紧／恢复及报告归属下载。A 写操作受限时目标零新增，B 与 A 只读继续；解除后新操作恢复且不重放。外部身份、风险和设备结果来自 Mock，定时任务与业务子 Agent 全链未由此验证。
 
 - **要回答**：受管评测能否分别通过 DSH Runtime API 完成业务 Turn，并通过 Web UI 完成用户可见链路冒烟，两者不混算结果。
 - **操作链**：启动 Web → 使用本次认证 URL → API 默认路径注册 Workspace、逐 Case 创建正确 Preset 的 Session、发送消息、等待 Turn 并导出轨迹；或显式选择浏览器路径，核对页面进入、新会话身份、发送和回答显示。
@@ -213,6 +219,11 @@
 - **自动化边界**：清单、摘要和解析进入测试；真实 DSH 重新装载用复现探针。该结论不包含生产部署验收。
 
 ### PA-12 全局 DSH 平台启动、认证与研究工具
+
+- **统一网关选择器与紧凑状态栏（2026-10-20）**：[实机记录](../platform/plugin/test/evidence/gateway-selector-ui-20261020/README.md)确认智能体选择器复用资产列表，支持名称／ID 搜索、只读关联 ID、版本与业务实例核对；未知身份和失败读取保留已有配置，更换对象清除旧来源及启用状态。页内大标题移除，桌面状态区从约 122px 缩至约 21px，390px 下约 46px且无横向溢出。50 项针对性测试、类型检查、构建及 3090 真实登录、草稿保留、放弃恢复、刷新和深色主题通过；首次重载窗口连接失败及最终复验均保留。原 Profile、HOME 和业务配置保持一致，没有执行业务任务或提升定时闭环结论；最新进程定位见记录。
+- **统一网关分类整改 3090 生效（2026-10-20）**：按用户后续要求构建并重载原 3090 平台，原 Profile、数据根、HOME 和账号保持一致；[实机证据](../platform/plugin/test/evidence/gateway-classification-20261020/README.md#3090-实际生效验证)确认三类配置入口、MCP 第五个重复按钮消失且顶部网关入口可用。真实登录、刷新深链、草稿保留及放弃恢复、深色主题和 1440px／390px 布局通过，无页面错误或失败请求；没有保存业务配置、调用模型或操作业务实例。运行页面仍显示真实未配置状态，不提升真实业务或定时任务检测、防护闭环结论。
+- **统一网关分类整改源码验证（2026-10-20）**：[计划](platform-design/20_业务访问与运行控制插件开发规范.md#分类整改顺序与完成条件2026-10-20)与[隔离验证记录](../platform/plugin/test/evidence/gateway-classification-20261020/README.md)覆盖“智能体身份、风险评估、访问控制”三类入口，身份内保留凭据与可信来源分区；移除 MCP 页签栏重复的统一网关按钮，顶部一级入口保留。类型检查和 63 项针对性测试通过，1440px／390px 测试数据预览验证布局与草稿保留。该阶段只修改源码并临时构建验证，没有更新共享运行制品、重启平台或验证 3090 实际装载；不提升真实业务、Harness 效果或 Release 状态。下条四项界面记录保留当时事实。
+- **统一网关一级界面（2026-10-19）**：[3090 实机与验收](platform-design/21_统一网关与MCP控制实施验收.md)记录一级 `#/gateway`、平台一致主题、状态概览、四功能切换与桌面双栏工作台；真实空配置、刷新、深链、轮询和跨页草稿保留经过浏览器检查。认证／信任对象为业务 Agent，接入用户另列；实际状态以签名、风险及回执为依据，保存不等于生效。
 
 - **任务试验平台退役（2026-10-19）**：隔离平台与工作副本的处置见[任务工作副本清理](#任务工作副本清理)，已合入的工具与弱推理适配功能继续由主程序和数据仓库维护。
 - **管理助手工具合同与弱推理验收（2026-10-17）**：[原始错误流验证](../platform/plugin/test/evidence/extraction-json-20261017/README.md)之后，模型侧改为逐操作参数合同和单题抽样传输，固定目标内特性与样本预览自动保存回读；两次原生 JSON 恢复有界且不重放工具。[实机验收与截图](../platform/plugin/test/evidence/assistant-flash-off-20261017/README.md)分别记录隔离 Flash/off、正式页面按钮及候选语义复核。只读巡检完成固定三 Case、独立实例与五设备报告下载，预算和重启恢复另测；生成与编译不代替装载或等效，候选保存不代替人员复核或训练质量。此项关联 `PA-03/04/08`；本地小参数模型不可达，Mock 通过不提升真实上游验收结论。

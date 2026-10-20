@@ -9,6 +9,9 @@ import { workspaceConfigPath } from '../workspace.ts'
 import { executableCatalog, type CompositionExecutionContext } from './extension.ts'
 import { createRegistry, executeComposition, dryRunComposition, compositionStructure, compositionVersion, saveRegistry, type McpRegistry } from './executor.ts'
 import { callOpenApiOperation, limitedText, loadOpenApi, normalizeConnection, publicConnection, validateSpecUrl, type CredentialRef } from './openapi.ts'
+import { managedDispatch, managementDispatch, type ManagedDispatch } from './control.ts'
+import { currentBusinessContext, getBusinessControl } from '../business-control/core.ts'
+import { createBusinessControlHandler } from '../business-control/management.ts'
 
 const SERVER_INFO = { name: 'harness-platform-mcp-composition', version: '0.1.0' }
 const PROTOCOL_VERSION = '2025-06-18'
@@ -130,11 +133,16 @@ function parseSseJsonRpc(text: string, id: unknown, secret?: string) {
   throw new Error(sawData ? 'MCP SSE 未返回匹配请求 id 的 JSON-RPC 结果' : 'MCP SSE 响应为空')
 }
 
-async function mcpJsonRpc(connection: any, message: any, session?: { id?: string; protocolVersion?: string }, signal?: AbortSignal) {
+async function mcpJsonRpc(connection: any, message: any, session?: { id?: string; protocolVersion?: string }, signal?: AbortSignal, control?: ManagedDispatch) {
   const headers = await mcpAuthHeaders(connection)
+  for (const [name, value] of Object.entries(control?.requestHeaders?.(connection.endpointUrl) ?? {})) headers.set(name, value)
   if (session?.id) headers.set('Mcp-Session-Id', session.id)
   if (session?.protocolVersion) headers.set('MCP-Protocol-Version', session.protocolVersion)
-  const response = await fetch(connection.endpointUrl, { method: 'POST', headers, body: JSON.stringify(message), signal })
+  const dispatch = (controlledSignal?: AbortSignal) => fetch(connection.endpointUrl, { method: 'POST', headers, body: JSON.stringify(message), signal: controlledSignal ?? signal, redirect: 'error' })
+  const response = control && message.method === 'tools/call'
+    ? await control({ serverId: connection.id, operationId: message.params.name, kind: 'write',
+      target: connection.endpointUrl, method: message.method, args: message.params.arguments }, dispatch, signal)
+    : await dispatch()
   const secret = await mcpSecret(connection)
   if (!response.ok) throw new Error(`MCP 请求失败：HTTP ${response.status}`)
   const text = await limitedText(response, 512 * 1024)
@@ -165,7 +173,7 @@ async function listMcpTools(connection: any, signal?: AbortSignal) {
   return await mcpJsonRpc(connection, { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }, session, runSignal)
 }
 
-async function callMcpTool(connection: any, name: string, args: any, signal?: AbortSignal) {
+async function callMcpTool(connection: any, name: string, args: any, signal?: AbortSignal, control?: ManagedDispatch) {
   const session = {}
   const runSignal = totalSignal(signal)
   await mcpJsonRpc(connection, { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: PROTOCOL_VERSION, capabilities: {}, clientInfo: { name: 'harness-platform', version: '0.1.0' } } }, session, runSignal)
@@ -175,7 +183,7 @@ async function callMcpTool(connection: any, name: string, args: any, signal?: Ab
   const notified = await fetch(connection.endpointUrl, { method: 'POST', headers, body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized', params: {} }), signal: runSignal })
   if (!notified.ok) throw new Error(`MCP initialized 通知失败：HTTP ${notified.status}`)
   await mcpJsonRpc(connection, { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }, session, runSignal)
-  return await mcpJsonRpc(connection, { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name, arguments: args ?? {} } }, session, runSignal)
+  return await mcpJsonRpc(connection, { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name, arguments: args ?? {} } }, session, runSignal, control)
 }
 
 export function createMcpHandler(assetRoot: string, options: { stateFile?: string; compositionsFile?: string; servers?: () => any[]; native?: McpRegistry['native']; threat?: McpRegistry['threat']; extension?: McpRegistry['extension'] } = {}): ConnectionRpcHandler {
@@ -183,9 +191,12 @@ export function createMcpHandler(assetRoot: string, options: { stateFile?: strin
   const compositionsFile = options.compositionsFile ?? workspaceConfigPath(assetRoot, 'mcp-compositions.json')
   registry.native = options.native
   registry.threat = options.threat
+  registry.control = managedDispatch(assetRoot)
   registry.extension = options.extension
-  return async (endpoint, payload, signal) => {
+  const controlHandler = createBusinessControlHandler(assetRoot)
+  return async (endpoint, payload, signal, peer) => {
     try {
+      if (endpoint.startsWith('control/')) return controlHandler(endpoint.slice('control/'.length), payload, signal, peer)
       if (registry.extension) registry.threat = registry.extension.threat
       if (options.servers) {
         registry.openapi.clear()
@@ -203,9 +214,19 @@ export function createMcpHandler(assetRoot: string, options: { stateFile?: strin
         if (!registry.threat) throw new Error('威胁分析运行器尚未装载')
         const request = payload as any
         if (typeof request?.run_id !== 'string') throw new Error('请选择运行 ID')
+        const context = currentBusinessContext(), control = getBusinessControl(assetRoot)
+        if (control.enabled()) {
+          if (!context) throw new Error('缺少受信业务上下文')
+          control.assert(context, 'read', [{ kind: 'run', id: request.run_id }])
+        }
         if (endpoint === 'compositionRun') return success(await registry.threat.inspect(request.run_id))
         if (typeof request.artifactId !== 'string') throw new Error('请选择运行产物')
-        return success(await registry.threat.artifact(request.run_id, request.artifactId))
+        const artifact = await registry.threat.artifact(request.run_id, request.artifactId)
+        if (context) {
+          await control.inspect(context, 'report', artifact.body, signal)
+          control.assert(context, 'read', [{ kind: 'run', id: request.run_id }])
+        }
+        return success(artifact)
       }
       if (endpoint === 'seedThreatCompositions') {
         if (!registry.extension?.seed) throw new Error('业务组合扩展尚未装载')
@@ -303,8 +324,8 @@ export function createMcpHandler(assetRoot: string, options: { stateFile?: strin
         if (!connection && !mcp) return failure('not_found', '连接不存在')
         const runSignal = totalSignal(signal)
         const result = connection
-          ? await callOpenApiOperation(await loadOpenApi(connection, runSignal), name, (payload as any)?.arguments ?? {}, runSignal)
-          : await callMcpTool(mcp, name, (payload as any)?.arguments ?? {}, runSignal)
+          ? await callOpenApiOperation(await loadOpenApi(connection, runSignal), name, (payload as any)?.arguments ?? {}, runSignal, registry.control)
+          : await callMcpTool(mcp, name, (payload as any)?.arguments ?? {}, runSignal, registry.control)
         const status = statusOf(registry, id)
         status.specLoaded = true
         status.toolCallSucceeded = connection ? result.ok : !result?.isError
@@ -423,5 +444,6 @@ export function createMcpGatewayFetchHandler(assetRoot: string, handler = create
 
 export function applyMcpGateway(ctx: Context, assetRoot: string, handler: ConnectionRpcHandler) {
   const fetch = createMcpGatewayFetchHandler(assetRoot, handler)
-  ctx.connection.fetch.register({ path: '/api/harness-platform/mcp', methods: ['POST'], requestBody: 'buffered', fetch })
+  ctx.connection.fetch.register({ path: '/api/harness-platform/mcp', methods: ['POST'], requestBody: 'buffered',
+    fetch: request => managementDispatch(assetRoot, () => fetch(request)) })
 }

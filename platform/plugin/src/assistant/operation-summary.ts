@@ -25,6 +25,8 @@ const titles: Record<string, string> = {
   'datasets/source': '读取决策样本来源', 'datasets/preview': '核对待保存决策样本', 'datasets/apply': '保存待复核决策样本', 'datasets/list': '查询决策样本集',
   new: '创建智能体资产', create: '从固定父版派生', configuration: '读取 MCP 配置', saveConfiguration: '保存 MCP 配置',
   callTool: '调用 MCP 工具', callPublishedComposition: '执行工具组合', test: '测试工具连接',
+  'control/status': '读取业务运行权限', 'control/saveConfiguration': '保存业务开放规则',
+  'control/restrict': '收紧业务操作', 'control/reassess': '重新评估风险', 'control/release': '复评并解除所选限制',
 }
 const taskTitles: Record<string, string> = { preview: '核对交付方案', start: '启动交付任务', status: '查询交付任务进度', 'begin-repair': '预留一轮修复', checkpoint: '核对中断操作', rollback: '恢复任务前版本', deliver: '检查交付实例与业务产物' }
 const taskStates: Record<string, string> = { not_started: '尚未确认交付方案，任务还未开始', running: '任务执行中', paused: '任务已暂停', completed: '实际实例与业务产物已核验', cancelled: '任务已取消', unknown: '仍有操作结果待核对', budget_exhausted: '预算已耗尽，任务已停止' }

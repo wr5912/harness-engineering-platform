@@ -1,0 +1,38 @@
+{
+  "at": "2026-10-19T14:06:08.215Z",
+  "mode": "isolated",
+  "checks": [
+    "原3090平台原账号可登录，一级统一网关菜单和四项配置可见",
+    "刷新深链仍打开统一网关",
+    "四项配置每次仅显示当前页签，表单没有直接堆叠"
+  ],
+  "pageErrors": [],
+  "failedRequests": [],
+  "consoleErrors": [],
+  "controlProbe": {
+    "status": 200,
+    "ok": true,
+    "enabled": true,
+    "instanceCount": 1,
+    "agentCount": 1,
+    "operationCount": 54,
+    "riskFactCount": 4
+  },
+  "url": "http://127.0.0.1:53104/hep/#/gateway",
+  "title": "Harness工程平台",
+  "sections": [
+    "1．Agent 身份认证",
+    "2．Agent 身份信任",
+    "3．Agent 自动风险评估",
+    "4．Agent 访问控制策略"
+  ],
+  "desktop": {
+    "width": 1440,
+    "scrollWidth": 1440
+  },
+  "mobile": {
+    "width": 390,
+    "scrollWidth": 390
+  },
+  "ok": true
+}

@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
+import type { ManagedDispatch } from './control.ts'
+import type { BusinessOperation } from '../business-control/contracts.ts'
 
 const MAX_DOCUMENT = 2 * 1024 * 1024
 const MAX_RESULT = 512 * 1024
@@ -110,11 +112,15 @@ function authHeaders(connection: OpenApiConnection, token?: string): Record<stri
   return { Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}` }
 }
 
-async function fetchWithAuth(connection: OpenApiConnection, url: URL, init: RequestInit = {}) {
+async function fetchWithAuth(connection: OpenApiConnection, url: URL, init: RequestInit = {}, control?: ManagedDispatch, operation?: BusinessOperation) {
   const token = await credentialOf(connection)
   const headers = new Headers(init.headers)
   for (const [name, value] of Object.entries(authHeaders(connection, token))) headers.set(name, value)
-  return { response: await fetch(url, { ...init, headers }), token }
+  const dispatch = (signal?: AbortSignal) => {
+    for (const [name, value] of Object.entries(control?.requestHeaders?.(url.href) ?? {})) headers.set(name, value)
+    return fetch(url, { ...init, signal: signal ?? init.signal, headers, redirect: control ? 'error' : init.redirect })
+  }
+  return { response: await (control && operation ? control(operation, dispatch, init.signal ?? undefined) : dispatch()), token }
 }
 
 function resolveObject(spec: any, value: any): any {
@@ -230,7 +236,7 @@ export function appendQueryParameter(query: URLSearchParams, parameter: any, val
   }
 }
 
-export async function callOpenApiOperation(source: LoadedOpenApi, operationId: string, args: Record<string, any>, signal?: AbortSignal) {
+export async function callOpenApiOperation(source: LoadedOpenApi, operationId: string, args: Record<string, any>, signal?: AbortSignal, control?: ManagedDispatch) {
   const operation = source.operations.get(operationId)
   if (!operation) throw new Error(`OpenAPI 操作不存在：${operationId}`)
   const url = operationUrl(source.base, operation.path)
@@ -252,7 +258,8 @@ export async function callOpenApiOperation(source: LoadedOpenApi, operationId: s
     headers,
     body: operation.body && args.body !== undefined ? JSON.stringify(args.body) : undefined,
     signal,
-  })
+  }, control, { serverId: source.connection.id, operationId, kind: 'write', target: url.href,
+    method: operation.method.toUpperCase(), args, schemaDigest: digestOf(operation.raw) })
   let text = await limitedText(response, MAX_RESULT)
   for (const secret of [token]) if (secret) text = text.replaceAll(secret, '[redacted]')
   let json: any

@@ -1,0 +1,21 @@
+{
+  "at": "2026-10-20T01:26:15.517Z",
+  "mode": "after",
+  "checks": [
+    "移除重复大标题，状态卡片收紧为13px单行状态栏",
+    "真实资产列表可搜索选择，关联ID只读，所选项在无搜索匹配时保留，版本与业务实例可核对",
+    "三类切换和跨页保留所选智能体，MCP重复按钮仍已移除",
+    "390px无横向溢出、状态栏自动换行；放弃草稿、刷新深链及深色主题通过，未保存业务配置"
+  ],
+  "pageErrors": [],
+  "failedResponses": [],
+  "statusHeight": 20.796875,
+  "headingCount": 0,
+  "agentCount": 6,
+  "mobile": {
+    "width": 390,
+    "scrollWidth": 390,
+    "statusHeight": 45.59375
+  },
+  "ok": true
+}

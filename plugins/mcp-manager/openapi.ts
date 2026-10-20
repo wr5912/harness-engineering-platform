@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+
 const MAX_DOCUMENT = 2 * 1024 * 1024
 const MAX_RESULT = 1024 * 1024
 const methods = new Set(['get', 'post', 'put', 'patch', 'delete'])
@@ -127,7 +129,7 @@ async function loginToken(server: any): Promise<string> {
   return state.pending
 }
 
-async function authorizedFetch(server: any, url: URL, init: RequestInit, spec?: any, operation?: any) {
+async function authorizedFetch(server: any, url: URL, init: RequestInit, spec?: any, operation?: any, controlled?: any) {
   const request = async () => {
     const headers = new Headers(init.headers)
     let credential = server.apiKey || ''
@@ -141,10 +143,18 @@ async function authorizedFetch(server: any, url: URL, init: RequestInit, spec?: 
       for (const [name, value] of Object.entries(spec ? authHeaders(spec, operation, credential) :
         credential ? { Authorization: `Bearer ${credential}` } : {})) headers.set(name, value)
     }
-    return { response: await fetch(url, { ...init, headers }), credential }
+    const dispatch = (signal?: AbortSignal) => {
+      for (const [name, value] of Object.entries(server.platformRequestHeaders?.(url.href) ?? {})) headers.set(name, String(value))
+      return fetch(url, { ...init, signal: signal ?? init.signal, headers, redirect: controlled ? 'error' : init.redirect })
+    }
+    const response = controlled && server.platformExecute
+      ? await server.platformExecute(controlled, dispatch, init.signal)
+      : await dispatch()
+    return { response, credential }
   }
   let result = await request()
-  if (result.response.status === 401 && server.authType === 'login') {
+  // 已派发的业务写请求不因 401 自动重放；规格发现仍可刷新凭据重试。
+  if (result.response.status === 401 && server.authType === 'login' && !controlled) {
     const state = loginState(server)
     if (state.token === result.credential) state.token = undefined
     result = await request()
@@ -194,7 +204,9 @@ export async function loadOpenApi(server: any): Promise<any> {
       }
     }
   }
-  return { spec, base, tools, resources, resourceTemplates, operations, readable, server }
+  const businessTools = [...tools, ...readable.map(item => ({ name: item.name, description: item.description,
+    inputSchema: operationSchema(spec, item.parameters, item.body) }))]
+  return { spec, base, tools, businessTools, resources, resourceTemplates, operations, readable, server }
 }
 
 async function execute(source: any, item: any, args: any): Promise<{ response: Response; text: string; uri: string }> {
@@ -213,9 +225,12 @@ async function execute(source: any, item: any, args: any): Promise<{ response: R
     if (args?.[parameter.name] !== undefined) headers[parameter.name] = String(args[parameter.name])
   }
   if (item.body) headers['content-type'] = 'application/json'
+  const controlled = { serverId: source.server.id, operationId: item.name, kind: 'write',
+    target: url.href, method: item.method.toUpperCase(), args,
+    schemaDigest: createHash('sha256').update(JSON.stringify(item.raw)).digest('hex') }
   const { response, credential } = await authorizedFetch(source.server, url, { method: item.method.toUpperCase(), headers,
     body: item.body && args?.body !== undefined ? JSON.stringify(args.body) : undefined,
-    signal: AbortSignal.timeout(20_000) }, source.spec, item.raw)
+    signal: AbortSignal.timeout(20_000) }, source.spec, item.raw, controlled)
   const raw = await limitedText(response, MAX_RESULT)
   let text = raw
   for (const secret of [credential, source.server.apiKey, source.server.loginPassword]) {
@@ -226,7 +241,7 @@ async function execute(source: any, item: any, args: any): Promise<{ response: R
 
 export async function callOpenApiTool(source: any, name: string, args: any): Promise<any> {
   const item = source.operations.get(name)
-  if (!item || source.readable.includes(item)) throw new Error('工具不属于当前 OpenAPI 范围')
+  if (!item || source.readable.includes(item) && !source.server.platformToolResources) throw new Error('工具不属于当前 OpenAPI 范围')
   const { response, text } = await execute(source, item, args)
   return { content: [{ type: 'text', text: text || `HTTP ${response.status}` }], isError: !response.ok }
 }

@@ -1,0 +1,36 @@
+{
+  "platform": {
+    "tests": 586,
+    "pass": 586,
+    "fail": 0
+  },
+  "startupAndLifecycle": {
+    "tests": 132,
+    "passed": 132
+  },
+  "businessRenderer": {
+    "tests": 4,
+    "passed": 4
+  },
+  "webAdapter": {
+    "tests": 13,
+    "passed": 13
+  },
+  "mockService": {
+    "tests": 149,
+    "passed": 149
+  },
+  "latestControlAndUi": {
+    "tests": 63,
+    "passed": 63
+  },
+  "buildAndTypes": "passed",
+  "repositoryContracts": {
+    "schema_version": "1.0",
+    "valid": true,
+    "errors": [],
+    "warnings": [],
+    "scope": "仅校验项目与 Harness 资产合同；不代表 Experiment 结果或生产验收"
+  },
+  "scope": "项目与工具链；外部身份/风险/设备为Mock，不构成Experiment Evaluation或生产验收"
+}
