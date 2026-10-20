@@ -77,6 +77,8 @@ export interface RiskFact {
 export interface RiskAssessmentPlugin { assess(request: AccessRequest, signal: AbortSignal): Promise<RiskFact> }
 export interface AccessAuthorizationPlugin { decide(request: AccessRequest): AccessDecision }
 export type OperationKind = 'read' | 'write' | 'resource' | 'publish'
+export const agentAccessActions: readonly string[] = ['*', 'read', 'write', 'publish', 'resource', 'agent:access', 'session:create', 'session:read', 'session:prompt']
+export const businessOperationMethods: readonly string[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'TOOLS/CALL', 'RESOURCES/READ']
 export interface BusinessOperation {
   serverId: string; operationId: string; kind: OperationKind; target: string; method: string
   args?: unknown; schemaDigest?: string; resources?: readonly ResourceRef[]

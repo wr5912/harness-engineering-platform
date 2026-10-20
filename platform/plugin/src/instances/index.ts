@@ -1,4 +1,5 @@
 import { instanceStateRoot, programRoot, workspaceConfigPath, workspaceOwnsInstance } from '../workspace.ts'
+import { businessGatewayEntry } from '../business-control/entry.ts'
 import { execFile as execFileCallback } from 'node:child_process'
 import { readFile, readdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
@@ -393,6 +394,12 @@ export function createInstancesHandler(assetRoot: string): ConnectionRpcHandler 
         if (!port) throw new Error('实例未记录有效 Web 端口')
         const result = await runDsh(assetRoot, ['url', name, '--non-interactive'], signal)
         const url = new URL(result.stdout.trim())
+        if (manifest.business_control) {
+          if (typeof manifest.agent_id !== 'string') throw new Error('业务实例缺少 Agent 登记')
+          const entry = businessGatewayEntry(assetRoot, manifest.agent_id, name)
+          if (url.href !== entry) throw new Error('实例返回的业务网关地址与登记入口不一致')
+          return ok({ url: entry, lan_access: false })
+        }
         if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || Number(url.port || 80) !== port || url.username || url.password) {
           throw new Error('实例返回的 Web 地址与登记端口不一致')
         }

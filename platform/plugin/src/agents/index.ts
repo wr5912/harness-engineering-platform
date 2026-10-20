@@ -34,6 +34,7 @@ import { createComputeBuildHandler } from './compute-build.ts'
 import { createComputeFreezeHandler } from './compute-freeze.ts'
 import { programRoot, workspaceConfigPath } from '../workspace.ts'
 import { discoverTaskCapabilities, type CapabilityOptions } from '../tasks/capabilities.ts'
+import { candidateFiles, dataPath, sourceInfo } from '../tasks/files.ts'
 import { previewTaskAssembly, applyTaskAssembly, type TaskAssemblyInput } from '../tasks/assembly.ts'
 import { verifyTaskDelivery, type TaskDeliveryInput } from '../tasks/delivery.ts'
 import { containsLiteralLlmKey } from '../tasks/llm-key.ts'
@@ -246,9 +247,45 @@ function listAgents(root: string, experiments = listExperiments(root)) {
   return listDirs(join(root, 'agents')).filter(id => AGENT_ID.test(id)).map(id => {
     const manifest = readYamlMap(root, join(root, 'agents', id, 'manifest.yaml'))
     const versions = experiments.filter(item => item.agent_id === id).sort((a, b) => b.id.localeCompare(a.id, 'en', { numeric: true }))
-    return { id, name: agentDisplayName(root, versions[0]?.id) ?? id, version_count: versions.length, latest_experiment_status: versions[0]?.status ?? null,
+    const active = typeof manifest.active_experiment === 'string' && versions.some(value => value.id === manifest.active_experiment) ? manifest.active_experiment : undefined
+    return { id, name: agentDisplayName(root, active ?? versions[0]?.id) ?? id, version_count: versions.length, latest_experiment_status: versions[0]?.status ?? null,
       path: `agents/${id}`, manifest, active_experiment: manifest.active_experiment ?? null }
   })
+}
+
+/** 只投影已启用版本的资产描述；发现 Skill 不表示运行实例已装载或可执行。 */
+function agentDescription(root: string, payload: JsonMap) {
+  const agentId = agentIdField(payload)
+  const manifest = readYamlMap(root, dataPath(root, `agents/${agentId}/manifest.yaml`))
+  const experimentId = typeof manifest.active_experiment === 'string' ? manifest.active_experiment : ''
+  if (!experimentId) return ok({ agentId, source: null, name: null, description: null, skills: [] })
+  const source = sourceInfo(root, experimentId)
+  if (source.agent_id !== agentId) throw new RpcError('invalid_source', '已启用版本不属于该 Agent')
+  const base = `evolution/experiments/${experimentId}/candidate`
+  const harness = readYamlMap(root, dataPath(root, `${base}/harness.yaml`))
+  const asset = harness.agent && typeof harness.agent === 'object' && !Array.isArray(harness.agent) ? harness.agent as JsonMap : {}
+  const loadable = harness.loadable_assets && typeof harness.loadable_assets === 'object' && !Array.isArray(harness.loadable_assets) ? harness.loadable_assets as JsonMap : {}
+  const presetRoot = typeof loadable.preset_root === 'string' ? loadable.preset_root : 'dsh/presets'
+  const presetId = typeof loadable.preset_id === 'string' ? loadable.preset_id : agentId
+  const presetFile = dataPath(root, `${base}/${presetRoot}/${presetId}/preset.yml`)
+  const preset = existsSync(presetFile) ? readYamlMap(root, presetFile) : {}
+  const workspace = typeof loadable.workspace === 'string' ? loadable.workspace : 'dsh/workspace'
+  const prefix = `${workspace}/.agents/skills/`
+  const skills = candidateFiles(source.candidate).filter(path => path.startsWith(prefix) && path.endsWith('/SKILL.md')).map(path => {
+    const skillId = path.slice(prefix.length, -'/SKILL.md'.length)
+    const content = readFileSync(dataPath(root, `${base}/${path}`), 'utf8')
+    const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content)
+    let fields: JsonMap = {}
+    if (frontmatter) {
+      try { const value = loadYaml(frontmatter[1]); if (value && typeof value === 'object' && !Array.isArray(value)) fields = value as JsonMap }
+      catch { /* 无效元数据不冒充完整技能描述。 */ }
+    }
+    return { skillId, skillName: typeof fields.name === 'string' ? fields.name : null,
+      skillDescription: typeof fields.description === 'string' ? fields.description : null, verification: 'discovered' as const }
+  })
+  return ok({ agentId, source: { experimentId, basis: 'active_experiment' },
+    name: typeof asset.name === 'string' ? asset.name : null,
+    description: typeof preset.description === 'string' ? preset.description : null, skills })
 }
 
 function experimentInfo(root: string, id: string, changeContent?: string) {
@@ -1575,6 +1612,7 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
           return (entry.value as { url: string }).url
         } }))
         case 'list': return list(root)
+        case 'description': return agentDescription(root, body)
         case 'detail': return await detail(root, body, signal)
         case 'create': return await createExperiment(root, body)
         case 'new': return await createAgent(root, body, signal)
