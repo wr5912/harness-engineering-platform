@@ -3,10 +3,9 @@ import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, r
 import { dirname, join } from 'node:path'
 import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
 import { BusinessControlError, getBusinessControl } from './core.ts'
-import type { AgentAccessRule, BusinessAccessConfig, BusinessContext, ControlScope, OperationRule, ProviderConfig, Restriction, RiskFact, SessionTrustFact } from './contracts.ts'
+import { agentAccessActions, businessOperationMethods, type AgentAccessRule, type BusinessAccessConfig, type BusinessContext, type ControlScope, type OperationRule, type ProviderConfig, type Restriction, type RiskFact, type SessionTrustFact } from './contracts.ts'
 
 const actions = ['read', 'write', 'publish'] as const
-const baseActions = ['*', ...actions, 'resource', 'agent:access', 'session:create', 'session:read', 'session:prompt']
 const scopeKeys = ['workspaceId', 'agentId', 'subjectId', 'instanceId', 'runtimeGeneration', 'sessionId', 'serverId']
 const fail = (code: string, message: string): never => { throw new BusinessControlError(code, message) }
 const object = (value: unknown): Record<string, unknown> => {
@@ -39,12 +38,12 @@ export interface BusinessProviderView {
   configured: boolean; endpoint: string; endpointHidden: boolean; timeoutMs?: number; testRunId?: string
   mode: 'test-mock' | 'external-provider' | 'unconfigured'
 }
-function providerView(value?: ProviderConfig): BusinessProviderView {
+function providerView(value?: ProviderConfig, kind?: 'riskAssessment'): BusinessProviderView {
   const endpoint = value ? publicUrl(value.endpoint, true) : ''
-  let mock = !!value?.testRunId
+  let mock = kind === 'riskAssessment' && !!value?.testRunId
   try { mock ||= new URL(value!.endpoint).pathname.startsWith('/api/v1/control/') } catch { /* 未配置不产生已验证事实。 */ }
   return { configured: !!value, endpoint, endpointHidden: !!value && !endpoint,
-    ...(value?.timeoutMs !== undefined ? { timeoutMs: value.timeoutMs } : {}), ...(value?.testRunId ? { testRunId: value.testRunId } : {}),
+    ...(value?.timeoutMs !== undefined ? { timeoutMs: value.timeoutMs } : {}), ...(kind === 'riskAssessment' && value?.testRunId ? { testRunId: value.testRunId } : {}),
     mode: !value ? 'unconfigured' : mock ? 'test-mock' : 'external-provider' }
 }
 function providerPatch(value: unknown, previous?: ProviderConfig): ProviderConfig | undefined {
@@ -81,7 +80,7 @@ function operationRules(value: unknown, previous: OperationRule[] = []): Operati
     seen.add(id)
     const target = input.targetHidden === true && !input.target && old ? old.target : editableUrl(input.target)
     const method = text(input.method, '操作方法').toUpperCase()
-    if (!['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'TOOLS/CALL', 'RESOURCES/READ'].includes(method)) return fail('invalid_request', '操作方法无效')
+    if (!businessOperationMethods.includes(method)) return fail('invalid_request', '操作方法无效')
     if (input.confirmation !== undefined && typeof input.confirmation !== 'boolean') return fail('invalid_request', '必要确认必须为布尔值')
     const privateFields = Object.fromEntries(Object.entries(old ?? {}).filter(([key]) => !['serverId', 'operationId', 'kind', 'target', 'method', 'schemaDigest', 'confirmation', 'queryParameters'].includes(key)))
     return { ...privateFields, serverId, operationId, kind: input.kind as OperationRule['kind'], target, method,
@@ -102,7 +101,7 @@ function agentRules(value: unknown): AgentAccessRule[] {
       || typeof row.enabled !== 'boolean' || !Array.isArray(row.subjects) || !Array.isArray(row.actions)) return fail('invalid_request', 'Agent 开放规则无效')
     const subjects = row.subjects.map(value => text(value, '主体 ID'))
     const allowedActions = row.actions.map(value => text(value, '基础动作'))
-    if (subjects.includes('*') || allowedActions.some(value => !baseActions.includes(value))) return fail('invalid_request', '主体或基础动作无效')
+    if (subjects.includes('*') || allowedActions.some(value => !agentAccessActions.includes(value))) return fail('invalid_request', '主体或基础动作无效')
     if (row.serverIds !== undefined && !Array.isArray(row.serverIds)) return fail('invalid_request', 'MCP 服务范围无效')
     const authentication = row.agentAuthentication === undefined ? undefined : object(row.agentAuthentication)
     const trust = row.agentTrust === undefined ? undefined : object(row.agentTrust)
@@ -160,7 +159,7 @@ export function createBusinessControlHandler(assetRoot: string): ConnectionRpcHa
         providers: { authentication: !!config.authentication, identityTrust: !!config.identityTrust, riskAssessment: !!config.riskAssessment },
         operationCount: config.operations?.length ?? 0,
         authentication: providerView(config.authentication), identityTrust: providerView(config.identityTrust),
-        riskAssessment: { ...providerView(config.riskAssessment), requiredKinds: config.riskAssessment?.requiredKinds ?? ['write', 'publish'] },
+        riskAssessment: { ...providerView(config.riskAssessment, 'riskAssessment'), requiredKinds: config.riskAssessment?.requiredKinds ?? ['write', 'publish'] },
         detection: { inputMarkers: config.detection?.inputMarkers ?? [], operationMarkers: config.detection?.operationMarkers ?? [], reportMarkers: config.detection?.reportMarkers ?? [] },
         operations: (config.operations ?? []).map(rule => ({ serverId: rule.serverId, operationId: rule.operationId, kind: rule.kind,
           target: publicUrl(rule.target), ...(!publicUrl(rule.target) ? { targetHidden: true } : {}), method: rule.method,
@@ -242,12 +241,39 @@ export function createBusinessControlHandler(assetRoot: string): ConnectionRpcHa
     if (!context) return fail('invalid_scope', 'Session 尚未绑定业务主体，不能推断归属')
     return context
   }
+  async function probeProvider(request: Record<string, unknown>, signal: AbortSignal) {
+    const kind = request.kind
+    if (kind !== 'authentication' && kind !== 'identityTrust' && kind !== 'riskAssessment') return fail('invalid_request', '请选择提供方种类')
+    if (Object.keys(request).some(key => !['kind', 'endpoint', 'timeoutMs'].includes(key))) return fail('invalid_request', '探测参数无效')
+    const saved = readConfiguration().config[kind]
+    const endpoint = editableUrl(request.endpoint === undefined ? saved?.endpoint : request.endpoint, true)
+    const requestedTimeout = request.timeoutMs === undefined ? saved?.timeoutMs ?? 1500 : request.timeoutMs
+    if (typeof requestedTimeout !== 'number' || !Number.isSafeInteger(requestedTimeout) || requestedTimeout < 1 || requestedTimeout > 60000) return fail('invalid_request', '提供方超时必须为 1 至 60000 毫秒')
+    const effectiveTimeoutMs = Math.min(requestedTimeout, 3000)
+    const deadline = AbortSignal.timeout(effectiveTimeoutMs)
+    const started = Date.now()
+    let network: 'httpResponded' | 'timeout' | 'noResponse' = 'noResponse'
+    let httpStatus: number | undefined
+    try {
+      const response = await fetch(endpoint, { method: 'OPTIONS', redirect: 'manual', signal: AbortSignal.any([signal, deadline]) })
+      network = 'httpResponded'
+      httpStatus = response.status
+      void response.body?.cancel().catch(() => {})
+    } catch {
+      signal.throwIfAborted()
+      network = deadline.aborted ? 'timeout' : 'noResponse'
+    }
+    return { kind, source: request.endpoint === undefined ? 'saved' : 'draft', checkedAt: new Date().toISOString(),
+      durationMs: Date.now() - started, effectiveTimeoutMs, network, ...(httpStatus !== undefined ? { httpStatus } : {}),
+      contractChecked: false, businessChecked: false }
+  }
   return async (endpoint, payload, signal, peer) => {
     try {
       if (!peer || peer.principal?.kind !== 'owner') return fail('forbidden', '运行权限管理仅供平台 owner 使用')
       signal.throwIfAborted()
       if (endpoint === 'status') return { ok: true, value: view() }
       const request = object(payload)
+      if (endpoint === 'probeProvider') return { ok: true, value: await probeProvider(request, signal) }
       if (endpoint === 'saveConfiguration') { saveConfiguration(request); return { ok: true, value: view() } }
       if (endpoint === 'restrict') {
         const scope = scopeFor(request.scope)

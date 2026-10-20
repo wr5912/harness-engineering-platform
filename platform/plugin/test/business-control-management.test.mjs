@@ -23,8 +23,9 @@ const future = () => new Date(Date.now() + 60000).toISOString()
 async function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'business-control-management-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
-  const remote = { version: 1, denied: [], riskCalls: [], businessCalls: 0, gate: undefined }
+  const remote = { version: 1, denied: [], riskCalls: [], businessCalls: 0, probeCalls: 0, gate: undefined }
   const server = createServer(async (request, response) => {
+    if (request.method === 'OPTIONS') { remote.probeCalls++; response.writeHead(request.url === '/missing' ? 404 : 405); response.end(); return }
     if (request.url === '/business') { remote.businessCalls++; response.end('{}'); return }
     const chunks = []; for await (const chunk of request) chunks.push(chunk)
     const body = JSON.parse(Buffer.concat(chunks).toString())
@@ -58,7 +59,7 @@ async function fixture(t) {
   control.bindSession(context('subject-a'), 'session-a')
   control.bindSession(context('subject-b'), 'session-b')
   const handler = createBusinessControlHandler(root)
-  return { root, path, config, control, remote, handler,
+  return { root, path, origin, config, control, remote, handler,
     call: (endpoint, payload = {}, peer = owner) => handler(endpoint, payload, new AbortController().signal, peer) }
 }
 
@@ -96,6 +97,29 @@ test('状态只返回可编辑公开投影、真实 ACK 和定时任务未覆盖
   assert.equal(value.instances[0].acknowledgement.restrictionVersion, snapshot.restrictionVersion)
   await f.call('reassess', { sessionId: 'session-a', action: 'write' })
   assert.doesNotMatch(JSON.stringify((await f.call('status')).value), /DO_NOT_RETURN|\/risk\?private/)
+})
+
+test('提供方 HTTP 响应探测仅发 OPTIONS，区分路径响应且不改配置或发业务请求', async t => {
+  const f = await fixture(t)
+  const before = readFileSync(f.path, 'utf8')
+  const saved = await f.call('probeProvider', { kind: 'identityTrust' })
+  assert.equal(saved.ok, true)
+  assert.equal(saved.value.source, 'saved')
+  assert.equal(saved.value.network, 'httpResponded')
+  assert.equal(saved.value.httpStatus, 405)
+  assert.equal(saved.value.contractChecked, false)
+  assert.equal(saved.value.businessChecked, false)
+  const missing = await f.call('probeProvider', { kind: 'riskAssessment', endpoint: `${f.origin}/missing`, timeoutMs: 60000 })
+  assert.equal(missing.value.source, 'draft')
+  assert.equal(missing.value.httpStatus, 404)
+  assert.equal(missing.value.effectiveTimeoutMs, 3000)
+  const forbidden = await f.call('probeProvider', { kind: 'identityTrust' }, { principal: { kind: 'harness-business' } })
+  assert.equal(forbidden.error.code, 'forbidden')
+  assert.equal((await f.call('probeProvider', { kind: 'identityTrust', endpoint: `${f.origin}/trust?token=private` })).error.code, 'invalid_request')
+  assert.equal(f.remote.probeCalls, 2)
+  assert.equal(f.remote.riskCalls.length, 0)
+  assert.equal(f.remote.businessCalls, 0)
+  assert.equal(readFileSync(f.path, 'utf8'), before)
 })
 
 test('业务访问配置使用唯一文件与原子 revision 写入，冲突和锁保留当前文件', async t => {
@@ -287,7 +311,7 @@ function uiStatus(revision = 'revision-1') {
     coverage: { immediate: true, schedules: false, leaseMs: 2000, acknowledgementDeadlineMs: 2000 } }
 }
 
-function page({ active = true, statusHandler, saveHandler, catalogHandler } = {}) {
+function page({ active = true, statusHandler, saveHandler, catalogHandler, probeHandler } = {}) {
   const states = [], dependencies = [], cleanups = [], calls = [], intervals = new Map()
   let cursor = 0, effects = [], changed = false, tree, current = uiStatus(), saveConflict = false
   const react = { ...require('react'),
@@ -296,13 +320,16 @@ function page({ active = true, statusHandler, saveHandler, catalogHandler } = {}
     useEffect(effect, deps) { const at = cursor++; if (!dependencies[at] || deps.some((value, index) => !Object.is(value, dependencies[at][index]))) { dependencies[at] = deps; effects.push(() => { cleanups[at]?.(); cleanups[at] = effect() }) } },
   }
   const module = { exports: {} }
-  vm.runInNewContext(clientSource, { module, exports: module.exports, require: name => name === 'react' ? react : require(name),
+  vm.runInNewContext(clientSource, { module, exports: module.exports, require: name => name === 'react' ? react : require(name), URL,
+    window: { confirm: () => true, addEventListener() {}, removeEventListener() {}, requestAnimationFrame: fn => fn() }, document: { querySelector: () => null },
     setInterval: fn => { const id = intervals.size + 1; intervals.set(id, fn); return id }, clearInterval: id => intervals.delete(id) })
   const props = { active, rpc: { async call(channel, endpoint, payload) {
     calls.push({ channel, endpoint, payload })
     if (endpoint === 'agents/list') return catalogHandler ? catalogHandler() : { ok: true, value: {
       agents: [{ id: 'soc', name: '安全运营专家', active_experiment: 'EXP-soc-001', version_count: 1 }, { id: 'helper', name: '业务助手', version_count: 0 }],
       experiments: [{ id: 'EXP-soc-001', agent_id: 'soc' }] } }
+    if (endpoint === 'agents/description') return { ok: true, value: { agentId: payload.agent_id, source: { experimentId: 'EXP-soc-001', basis: 'active_experiment' }, name: '安全运营专家', description: '当前资产说明', skills: [] } }
+    if (endpoint === 'mcp/control/probeProvider' && probeHandler) return probeHandler(payload)
     if (endpoint === 'mcp/control/status' && statusHandler) return statusHandler()
     if (endpoint === 'mcp/control/saveConfiguration' && saveHandler) return saveHandler(payload)
     if (endpoint === 'mcp/control/saveConfiguration' && saveConflict) return { ok: false, error: { code: 'conflict', message: '配置已变化，草稿保留' } }
@@ -311,10 +338,11 @@ function page({ active = true, statusHandler, saveHandler, catalogHandler } = {}
   function render() { let count = 0; do { if (++count > 30) throw new Error('render loop'); cursor = 0; effects = []; changed = false; tree = module.exports.BusinessControlPage(props); effects.forEach(effect => effect()) } while (changed); return tree }
   async function settle() { for (let i = 0; i < 5; i++) { await new Promise(resolve => setImmediate(resolve)); render() } }
   function nodes(value) { if (!arguments.length) value = tree; if (Array.isArray(value)) return value.flatMap(item => nodes(item)); if (!value || typeof value !== 'object') return []; if (typeof value.type === 'function') return nodes(value.type(value.props)); return [value, ...nodes(value.props?.children)] }
-  function text(value) { if (Array.isArray(value)) return value.map(text).join(''); if (value && typeof value === 'object' && typeof value.type === 'function') return text(value.type(value.props)); return value && typeof value === 'object' ? text(value.props?.children) : String(value ?? '') }
+  function text(value) { if (Array.isArray(value)) return value.map(text).join(''); if (value && typeof value === 'object' && typeof value.type === 'function') return text(value.type(value.props)); return value && typeof value === 'object' ? text(value.props?.children) : typeof value === 'boolean' ? '' : String(value ?? '') }
   const button = title => nodes().find(value => value.type === 'button' && text(value) === title)
+  const tab = id => nodes().find(value => value.type === 'button' && value.props?.['data-gateway-tab'] === id)
   render()
-  return { render, settle, nodes, text, button, calls, props, intervals, current: value => { current = value }, conflict: () => { saveConflict = true } }
+  return { render, settle, nodes, text, button, tab, calls, props, intervals, current: value => { current = value }, conflict: () => { saveConflict = true } }
 }
 
 test('运行权限 UI 展示定时缺口、影响及真实回执，不把保存写成已应用', async () => {
@@ -323,7 +351,7 @@ test('运行权限 UI 展示定时缺口、影响及真实回执，不把保存�
   assert.match(rendered, /暂不支持定时任务的检测、防护闭环/)
   assert.match(rendered, /延迟和漏执行风险/)
   assert.match(rendered, /未确认；到期许可不能用于受保护动作/)
-  assert.match(rendered, /许可租期上限：2 秒/)
+  assert.match(rendered, /许可租期上限 2 秒/)
   assert.equal(ui.intervals.size, 1)
   ui.props.active = false; ui.render()
   assert.equal(ui.intervals.size, 0)
@@ -351,6 +379,7 @@ test('保存中离开统一网关，后台回执完成后返回清除忙状态�
   const ui = page({ saveHandler: payload => { savedPayload = payload; return new Promise(resolve => { resolveSave = resolve }) },
     statusHandler: () => holdStatus ? new Promise(resolve => { resolveOldStatus = resolve }) : Promise.resolve({ ok: true, value: savedPayload ? saved : uiStatus() }) })
   await ui.settle()
+  ui.tab('authorization').props.onClick(); ui.render()
   const open = () => ui.nodes(ui.nodes().find(value => value.type === 'label' && ui.text(value) === '开放即时业务访问')).find(value => value.type === 'input')
   open().props.onChange({ target: { checked: false } }); ui.render()
   holdStatus = true; ui.button('刷新状态').props.onClick()
@@ -360,7 +389,7 @@ test('保存中离开统一网关，后台回执完成后返回清除忙状态�
   assert.equal(ui.intervals.size, 0)
   resolveSave({ ok: true, value: saved }); await ui.settle()
   assert.equal(ui.button('刷新状态').props.disabled, false)
-  assert.equal(ui.button('放弃草稿并读取当前配置').props.disabled, false)
+  assert.equal(ui.button('放弃草稿并读取当前配置').props.disabled, true)
   assert.equal(open().props.checked, false)
   assert.match(ui.text(ui.render()), /配置已保存/)
   resolveOldStatus({ ok: true, value: uiStatus() }); await ui.settle()
@@ -368,7 +397,7 @@ test('保存中离开统一网关，后台回执完成后返回清除忙状态�
   holdStatus = false; ui.props.active = true; ui.render(); await ui.settle()
   assert.equal(ui.button('刷新状态').props.disabled, false)
   assert.equal(open().props.checked, false)
-  assert.match(ui.text(ui.render()), /已与当前配置同步/)
+  assert.match(ui.text(ui.render()), /配置草稿与已保存内容一致/)
   assert.doesNotMatch(ui.text(ui.render()), /当前草稿已保留/)
   assert.equal(savedPayload.revision, 'revision-1')
   assert.equal(savedPayload.enabled, false)
@@ -376,6 +405,7 @@ test('保存中离开统一网关，后台回执完成后返回清除忙状态�
 
 test('外部更新和保存冲突均保留运行权限草稿，刷新不会静默覆盖', async () => {
   const ui = page(); await ui.settle()
+  ui.tab('authorization').props.onClick(); ui.render()
   const textarea = () => ui.nodes().find(value => value.type === 'textarea' && value.props['aria-label'] === 'Agent 规则 JSON')
   const draft = '[{"agentId":"soc","enabled":true,"subjects":["subject-a"],"actions":["read"]}]'
   textarea().props.onChange({ target: { value: draft } }); ui.render()
@@ -393,27 +423,34 @@ test('外部更新和保存冲突均保留运行权限草稿，刷新不会静�
   assert.equal(ui.text(ui.render()).includes('当前草稿已保留'), false)
 })
 
-test('统一网关三类边界明确，身份包含凭据和来源核验，风险未知不冒充低风险', async () => {
+test('统一网关四视图边界明确，身份与配置分离，风险未知不冒充低风险', async () => {
   const ui = page(); await ui.settle()
   assert.equal(ui.nodes().some(value => value.type === 'h1'), false, '页面内不重复显示一级菜单标题')
-  assert.deepEqual(ui.nodes().filter(value => value.type === 'legend').map(value => ui.text(value)), ['1．智能体身份', '2．风险评估', '3．访问控制'])
-  const navigation = ui.nodes().find(value => value.props?.['aria-label'] === '统一网关功能')
-  assert.deepEqual(ui.nodes(navigation).filter(value => value.type === 'button').map(value => ui.text(value)), ['智能体身份', '风险评估', '访问控制'])
-  const identity = ui.nodes().find(value => value.type === 'fieldset' && !value.props.hidden)
+  assert.deepEqual(ui.nodes().filter(value => value.props?.role === 'tab').map(value => ui.text(value)), ['运行概览', '智能体身份', '风险评估', '访问控制'])
+  assert.equal(ui.tab('overview').props['aria-selected'], true)
+  assert.equal(ui.nodes().filter(value => value.type === 'fieldset' && value.props.className !== 'harness-gateway-subject-picker').length, 0)
+  assert.match(ui.text(ui.render()), /实例与身份回执/)
+  ui.tab('identity').props.onClick(); ui.render()
+  assert.deepEqual(ui.nodes().filter(value => value.type === 'legend').map(value => ui.text(value)), ['1．智能体身份'])
+  const identity = ui.nodes().find(value => value.type === 'fieldset')
   assert.ok(ui.nodes(identity).some(value => value.props?.['aria-label'] === '认证方式与凭据'))
   assert.ok(ui.nodes(identity).some(value => value.props?.['aria-label'] === '可信来源与身份状态'))
   assert.equal(ui.button('身份信任'), undefined)
+  assert.match(ui.text(ui.render()), /辅助：接入用户认证与状态核验/)
+  assert.doesNotMatch(ui.text(ui.render()), /测试 fixture ID（可选）/)
+  ui.tab('risk').props.onClick(); ui.render()
   const content = ui.text(ui.render())
   assert.match(content, /按业务事件实时自动评估各 Agent/)
-  assert.match(content, /辅助：接入用户验证/)
-  assert.match(content, /尚未评估/)
+  assert.doesNotMatch(content, /当前限制/)
   assert.match(content, /测试模拟提供方/)
   assert.doesNotMatch(content, /低风险（已评估范围）/)
+  ui.tab('authorization').props.onClick(); ui.render()
   assert.ok(ui.nodes().some(value => value.props?.['aria-label'] === '工具与资源操作允许清单'))
   const value = uiStatus('revision-2')
   value.riskFacts = [{ id: 'agent-risk', version: 1, scope: { workspaceId: binding.workspaceId, agentId: 'soc' }, status: 'assessed', level: 'high',
     source: 'test', signals: [], observedAt: new Date().toISOString(), expiresAt: future() }]
   ui.current(value); await ui.button('刷新状态').props.onClick(); await ui.settle()
+  ui.tab('overview').props.onClick(); ui.render()
   assert.match(ui.text(ui.render()), /高风险（已评估范围）/)
   assert.match(ui.text(ui.render()), /人工限制 0/)
   value.riskFacts[0].expiresAt = new Date(Date.now() - 1).toISOString()
@@ -431,8 +468,10 @@ test('统一网关三类边界明确，身份包含凭据和来源核验，风�
 
 test('身份撤销和风险提供方共用草稿，三类配置保存保持原revision及持久字段兼容', async () => {
   const ui = page(); await ui.settle()
+  ui.tab('identity').props.onClick(); ui.render()
   const trust = ui.nodes().find(value => value.type === 'label' && ui.text(value).includes('允许该智能体身份'))
   ui.nodes(trust).find(value => value.type === 'input').props.onChange({ target: { checked: false } }); ui.render()
+  ui.tab('risk').props.onClick(); ui.render()
   const providerLabel = ui.nodes().find(value => value.type === 'label' && ui.text(value) === 'Agent 风险评估提供方超时（毫秒）')
   ui.nodes(providerLabel).find(value => value.type === 'input').props.onChange({ target: { value: '950' } }); ui.render()
   ui.nodes().find(value => value.type === 'form' && value.props['aria-label'] === '统一网关配置').props.onSubmit({ preventDefault() {} })
@@ -447,39 +486,117 @@ test('身份撤销和风险提供方共用草稿，三类配置保存保持原re
   assert.equal(ui.calls.filter(value => value.endpoint === 'mcp/control/reassess').length, 0)
 })
 
-test('Agent 服务与动作范围保留键入中的分隔符，刷新不覆盖未完成结构化草稿', async () => {
+test('访问范围从已登记操作选择服务与动作，刷新保留草稿并按所选值保存', async () => {
   const ui = page(); await ui.settle()
-  const input = () => ui.nodes(ui.nodes().find(value => value.type === 'label' && ui.text(value) === '允许访问的服务（逗号分隔）')).find(value => value.type === 'input')
-  input().props.onChange({ target: { value: 'soc,' } }); ui.render()
-  assert.equal(input().props.value, 'soc,')
+  ui.tab('authorization').props.onClick(); ui.render()
+  const status = uiStatus()
+  status.configuration.agents[0].serverIds = ['inspection']
+  status.configuration.agents[0].actions = ['read']
+  status.configuration.operations = [
+    { serverId: 'inspection', operationId: 'list', kind: 'read', method: 'TOOLS/CALL', target: 'http://127.0.0.1/inspection' },
+    { serverId: 'reports', operationId: 'create', kind: 'write', method: 'POST', target: 'http://127.0.0.1/reports' },
+  ]
+  ui.current(status); await ui.button('刷新状态').props.onClick(); await ui.settle()
+  const group = label => ui.nodes().find(value => value.props?.role === 'group' && value.props['aria-label'] === label)
+  const checkbox = (label, name) => ui.nodes(group(label)).find(value => value.type === 'label' && ui.text(value).includes(name)).props.children[0]
+  assert.equal(checkbox('允许访问的服务 1', 'inspection').props.checked, true)
+  checkbox('允许访问的服务 1', 'reports').props.onChange({ target: { checked: true } }); ui.render()
+  checkbox('允许的动作 1', '写入（write）').props.onChange({ target: { checked: true } }); ui.render()
+  const method = () => ui.nodes().find(value => value.type === 'select' && value.props['aria-label'] === '方法 1')
+  assert.equal(method().props.value, 'TOOLS/CALL')
+  method().props.onChange({ target: { value: 'GET' } }); ui.render()
   await ui.button('刷新状态').props.onClick(); await ui.settle()
-  assert.equal(input().props.value, 'soc,')
-  input().props.onChange({ target: { value: 'soc,reports' } }); ui.render()
+  assert.equal(checkbox('允许访问的服务 1', 'reports').props.checked, true)
+  assert.equal(checkbox('允许的动作 1', '写入（write）').props.checked, true)
+  assert.equal(method().props.value, 'GET')
   ui.nodes().find(value => value.type === 'form' && value.props['aria-label'] === '统一网关配置').props.onSubmit({ preventDefault() {} })
   await ui.settle()
-  assert.deepEqual(Array.from(ui.calls.find(value => value.endpoint === 'mcp/control/saveConfiguration').payload.agents[0].serverIds), ['soc', 'reports'])
+  const saved = ui.calls.find(value => value.endpoint === 'mcp/control/saveConfiguration').payload
+  assert.deepEqual(Array.from(saved.agents[0].serverIds), ['inspection', 'reports'])
+  assert.deepEqual(Array.from(saved.agents[0].actions), ['read', 'write'])
+  assert.equal(saved.operations[0].method, 'GET')
 })
 
-test('统一网关按三类功能切换编辑，同一表单草稿与运行工作区独立保留', async () => {
+test('不限定服务与限定为空保持不同授权语义，当前配置中已移除的服务仍可取消', async () => {
   const ui = page(); await ui.settle()
-  const selectedFieldsets = () => ui.nodes().filter(value => value.type === 'fieldset' && !value.props.hidden)
+  ui.tab('authorization').props.onClick(); ui.render()
+  const status = uiStatus()
+  status.configuration.agents[0].serverIds = ['old-service']
+  ui.current(status); await ui.button('刷新状态').props.onClick(); await ui.settle()
+  const group = () => ui.nodes().find(value => value.props?.role === 'group' && value.props['aria-label'] === '允许访问的服务 1')
+  const checkbox = label => ui.nodes(group()).find(value => value.type === 'label' && ui.text(value).includes(label)).props.children[0]
+  assert.equal(checkbox('old-service').props.checked, true)
+  checkbox('old-service').props.onChange({ target: { checked: false } }); ui.render()
+  const draft = () => JSON.parse(ui.nodes().find(value => value.props?.['aria-label'] === 'Agent 规则 JSON').props.value)[0]
+  assert.deepEqual(Array.from(draft().serverIds), [])
+  checkbox('仅允许所选服务').props.onChange({ target: { checked: false } }); ui.render()
+  assert.equal(Object.hasOwn(draft(), 'serverIds'), false)
+})
+
+test('统一网关四视图切换保留草稿，运行概览仅在首页呈现', async () => {
+  const ui = page(); await ui.settle()
+  const selectedFieldsets = () => ui.nodes().filter(value => value.type === 'fieldset' && value.props.className !== 'harness-gateway-subject-picker')
   assert.ok(ui.nodes().some(value => value.props?.['aria-label'] === '统一网关状态概览'))
+  assert.equal(selectedFieldsets().length, 0)
+  assert.ok(ui.nodes().some(value => value.props?.['aria-label'] === '运行概览'))
+  ui.tab('identity').props.onClick(); ui.render()
   assert.equal(selectedFieldsets().length, 1)
   assert.match(ui.text(selectedFieldsets()[0]), /1．智能体身份/)
-  ui.button('智能体身份').props.onClick(); ui.render()
-  assert.equal(selectedFieldsets().length, 1)
-  assert.match(ui.text(selectedFieldsets()[0]), /1．智能体身份/)
+  assert.equal(ui.nodes().some(value => value.props?.['aria-label'] === '运行概览'), false)
   const pin = () => ui.nodes().find(value => value.type === 'input' && value.props.placeholder?.includes('sourceDigest'))
   pin().props.onChange({ target: { value: 'sha256:draft-source' } }); ui.render()
-  ui.button('风险评估').props.onClick(); ui.render()
+  ui.tab('risk').props.onClick(); ui.render()
   assert.match(ui.text(selectedFieldsets()[0]), /2．风险评估/)
   assert.match(ui.text(ui.render()), /有未保存更改/)
-  ui.button('智能体身份').props.onClick(); ui.render()
+  assert.ok(ui.nodes(ui.tab('identity')).some(value => value.props?.['aria-label'] === '有未保存更改'))
+  ui.tab('identity').props.onClick(); ui.render()
   assert.equal(pin().props.value, 'sha256:draft-source')
   assert.equal(ui.nodes().filter(value => value.type === 'form' && value.props['aria-label'] === '统一网关配置').length, 1)
-  ui.button('风险与限制').props.onClick(); ui.render()
-  assert.equal(ui.button('风险与限制').props['aria-current'], 'page')
-  assert.equal(pin().props.value, 'sha256:draft-source')
+  ui.tab('overview').props.onClick(); ui.render()
+  assert.ok(ui.nodes().some(value => value.props?.['aria-label'] === '运行概览'))
+  assert.equal(selectedFieldsets().length, 0)
+  assert.equal(ui.calls.some(value => value.endpoint === 'mcp/control/saveConfiguration'), false)
+})
+
+test('运行限制可多选已获准用户，按用户分别收紧且多选不携带 Session ID', async () => {
+  const ui = page(); await ui.settle()
+  const status = uiStatus()
+  status.configuration.agents[0].subjects = ['subject-a', 'subject-b']
+  ui.current(status); await ui.button('刷新状态').props.onClick(); await ui.settle()
+  const picker = () => ui.nodes().find(value => value.type === 'fieldset' && value.props.className === 'harness-gateway-subject-picker')
+  const option = id => ui.nodes(picker()).find(value => value.type === 'label' && ui.text(value).includes(id)).props.children[0]
+  const session = () => ui.nodes().find(value => value.type === 'input' && value.props.maxLength === 500 && value.props.disabled !== undefined)
+  option('subject-a').props.onChange({ target: { checked: true } }); ui.render()
+  session().props.onChange({ target: { value: 'session-a' } }); ui.render()
+  option('subject-b').props.onChange({ target: { checked: true } }); ui.render()
+  assert.equal(session().props.value, '')
+  assert.equal(session().props.disabled, true)
+  const reason = ui.nodes().find(value => value.type === 'label' && ui.text(value).includes('收紧依据'))
+  ui.nodes(reason).find(value => value.type === 'input').props.onChange({ target: { value: '人工风险限制' } }); ui.render()
+  const form = ui.nodes().find(value => value.type === 'form' && value.props.className === 'harness-composition-editor')
+  form.props.onSubmit({ preventDefault() {} }); await ui.settle()
+  const calls = ui.calls.filter(value => value.endpoint === 'mcp/control/restrict')
+  assert.deepEqual(calls.map(value => value.payload.scope.subjectId), ['subject-a', 'subject-b'])
+  assert.ok(calls.every(value => !Object.hasOwn(value.payload.scope, 'sessionId')))
+  assert.match(ui.text(ui.render()), /2 \/ 2 位接入用户的限制已保存/)
+})
+
+test('跨页保存先校验隐藏配置并定位错误页，HTTP 探测仅发送只读请求', async () => {
+  const ui = page({ probeHandler: () => ({ ok: true, value: { network: 'httpResponded', httpStatus: 405, checkedAt: new Date().toISOString(), durationMs: 3, contractChecked: false, businessChecked: false } }) }); await ui.settle()
+  ui.tab('identity').props.onClick(); ui.render()
+  const endpoint = ui.nodes().find(value => value.type === 'input' && value.props['data-gateway-field'] === 'authentication-endpoint')
+  endpoint.props.onChange({ target: { value: 'ftp://invalid' } }); ui.render()
+  ui.tab('risk').props.onClick(); ui.render()
+  ui.button('保存业务访问配置').props.onClick(); ui.render()
+  assert.equal(ui.tab('identity').props['aria-selected'], true)
+  assert.match(ui.text(ui.render()), /提供方地址必须是无凭据/)
+  assert.equal(ui.calls.some(value => value.endpoint === 'mcp/control/saveConfiguration'), false)
+  const corrected = ui.nodes().find(value => value.type === 'input' && value.props['data-gateway-field'] === 'authentication-endpoint')
+  corrected.props.onChange({ target: { value: 'http://127.0.0.1:53101/api/v1/control/authenticate' } }); ui.render()
+  ui.button('测试 HTTP 响应').props.onClick(); await ui.settle()
+  const probe = ui.calls.find(value => value.endpoint === 'mcp/control/probeProvider')
+  assert.equal(probe.payload.kind, 'authentication')
+  assert.equal(probe.payload.endpoint, 'http://127.0.0.1:53101/api/v1/control/authenticate')
   assert.equal(ui.calls.some(value => value.endpoint === 'mcp/control/saveConfiguration'), false)
 })
 
@@ -488,11 +605,13 @@ test('空配置仍有三类功能和首个 Agent 配置入口，不假造实例�
   const empty = uiStatus()
   empty.enabled = false; empty.configuration.enabled = false; empty.configuration.agents = []; empty.instances = []; empty.agentStatuses = []
   ui.current(empty); await ui.button('刷新状态').props.onClick(); await ui.settle()
+  ui.tab('identity').props.onClick(); ui.render()
   assert.match(ui.text(ui.render()), /尚未配置业务 Agent/)
   assert.match(ui.text(ui.render()), /尚无评估/)
   assert.ok(ui.button('配置首个 Agent'))
   ui.button('配置首个 Agent').props.onClick(); ui.render()
-  assert.equal(ui.button('智能体身份').props['aria-current'], 'page')
+  assert.equal(ui.tab('identity').props['aria-selected'], true)
+  ui.tab('authorization').props.onClick(); ui.render()
   const agents = JSON.parse(ui.nodes().find(value => value.type === 'textarea' && value.props['aria-label'] === 'Agent 规则 JSON').props.value)
   assert.equal(agents.length, 1)
   assert.equal(agents[0].enabled, false)
@@ -503,10 +622,13 @@ test('空配置仍有三类功能和首个 Agent 配置入口，不假造实例�
 test('选择器复用资产列表，搜索保留已选值，更换身份不继承来源或自动开放', async () => {
   let saved
   const ui = page({ saveHandler: payload => { saved = payload; return { ok: true, value: uiStatus('saved') } } }); await ui.settle()
+  ui.tab('identity').props.onClick(); ui.render()
   const selector = () => ui.nodes().find(value => value.type === 'select' && value.props['aria-label'] === '选择智能体 1')
   const search = () => ui.nodes().find(value => value.type === 'input' && value.props.type === 'search')
   const id = () => ui.nodes(ui.nodes().find(value => value.type === 'label' && ui.text(value) === 'Agent ID')).find(value => value.type === 'input')
-  const draft = () => JSON.parse(ui.nodes().find(value => value.props?.['aria-label'] === 'Agent 规则 JSON').props.value)
+  const draft = () => { ui.tab('authorization').props.onClick(); ui.render()
+    const value = JSON.parse(ui.nodes().find(node => node.props?.['aria-label'] === 'Agent 规则 JSON').props.value)
+    ui.tab('identity').props.onClick(); ui.render(); return value }
   assert.equal(id().props.readOnly, true)
   assert.match(ui.text(selector()), /安全运营专家（soc）/)
   assert.match(ui.text(ui.render()), /EXP-soc-001/)
@@ -517,16 +639,17 @@ test('选择器复用资产列表，搜索保留已选值，更换身份不继�
   search().props.onChange({ target: { value: 'no-match' } }); ui.render()
   assert.equal(selector().props.value, 'soc')
   assert.doesNotMatch(ui.text(selector()), /业务助手/)
-  const agents = draft(); agents[0].sourceDigest = 'sha256:old-source'; agents[0].agentTrust = { enabled: true }
-  ui.nodes().find(value => value.props?.['aria-label'] === 'Agent 规则 JSON').props.onChange({ target: { value: JSON.stringify(agents) } }); ui.render()
+  ui.nodes().find(value => value.type === 'input' && value.props.placeholder?.includes('sourceDigest')).props.onChange({ target: { value: 'sha256:old-source' } }); ui.render()
+  const trust = ui.nodes().find(value => value.type === 'label' && ui.text(value).includes('允许该智能体身份'))
+  ui.nodes(trust).find(value => value.type === 'input').props.onChange({ target: { checked: true } }); ui.render()
   search().props.onChange({ target: { value: 'HELPER' } }); ui.render()
   selector().props.onChange({ target: { value: 'helper' } }); ui.render()
   assert.equal(id().props.value, 'helper')
   assert.equal(draft()[0].enabled, false)
   assert.equal(draft()[0].agentTrust.enabled, false)
   assert.equal(Object.hasOwn(draft()[0], 'sourceDigest'), false)
-  ui.button('风险评估').props.onClick(); ui.render()
-  ui.button('智能体身份').props.onClick(); ui.render()
+  ui.tab('risk').props.onClick(); ui.render()
+  ui.tab('identity').props.onClick(); ui.render()
   await ui.button('刷新状态').props.onClick(); await ui.settle()
   assert.equal(selector().props.value, 'helper')
   ui.nodes().find(value => value.type === 'form' && value.props['aria-label'] === '统一网关配置').props.onSubmit({ preventDefault() {} }); await ui.settle()
@@ -540,6 +663,7 @@ test('已配置身份缺失或资产列表读取失败时保留原值，重试�
   let mode = 'missing'
   const ui = page({ catalogHandler: () => mode === 'failure' ? { ok: false, error: { code: 'unavailable', message: '资产目录暂不可用' } }
     : { ok: true, value: { agents: mode === 'empty' ? [] : [{ id: 'helper', name: '业务助手' }], experiments: [] } } }); await ui.settle()
+  ui.tab('identity').props.onClick(); ui.render()
   const selector = () => ui.nodes().find(value => value.type === 'select' && value.props['aria-label'] === '选择智能体 1')
   assert.equal(selector().props.value, 'soc')
   assert.match(ui.text(selector()), /soc（当前未找到，保留配置）/)
@@ -562,6 +686,7 @@ test('切页后的迟到资产列表不会覆盖新列表，选择器不因后�
   ui.props.active = true; ui.render()
   pending[1]({ ok: true, value: { agents: [{ id: 'soc', name: '当前目录' }], experiments: [] } }); await ui.settle()
   pending[0]({ ok: true, value: { agents: [{ id: 'soc', name: '过时目录' }], experiments: [] } }); await ui.settle()
+  ui.tab('identity').props.onClick(); ui.render()
   const selector = ui.nodes().find(value => value.type === 'select' && value.props['aria-label'] === '选择智能体 1')
   assert.match(ui.text(selector), /当前目录/)
   assert.doesNotMatch(ui.text(selector), /过时目录/)

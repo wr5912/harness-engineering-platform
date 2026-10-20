@@ -14,6 +14,7 @@ interface InstanceRow {
   image_tag?: string
   agent_id?: string
   port?: number
+  business_gateway?: boolean
   lan_access?: boolean
   home_volume?: string
   home_directory?: string
@@ -418,14 +419,14 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
                 <td className="instance-list-td instance-name" data-label="实例">{item.name}</td>
                 <td className="instance-list-td" data-label="状态"><span className="instance-state-badge" data-state={item.state}>{stateLabels[item.state ?? 'unknown'] || item.state}</span></td>
                 <td className="instance-list-td instance-source" data-label="来源版本"><span title={item.source_id}>{item.source_id || '未记录'}</span></td>
-                <td className="instance-list-td" data-label="端口">{item.port || '—'}</td>
+                <td className="instance-list-td" data-label="端口" title={item.business_gateway ? '业务 Runtime 内部端口；公开入口由业务网关提供' : undefined}>{item.port || '—'}</td>
                 <td className="instance-list-td" data-label="访问入口">
                   <button type="button" disabled={item.state !== 'running' || !item.port || opening.has(item.name)}
                     onClick={() => openWeb(item.name)} className="instance-button"
-                    title={item.state !== 'running' ? '实例运行后可访问' : item.lan_access ? '在新标签页打开' : '仅宿主机浏览器可访问'}>
+                    title={item.state !== 'running' ? '实例运行后可访问' : item.business_gateway ? '经业务网关打开；需要业务用户登录' : item.lan_access ? '在新标签页打开' : '仅宿主机浏览器可访问'}>
                     {opening.has(item.name) ? '正在打开…' : '访问 DSH Web'}
                   </button>
-                  <div className="instance-muted instance-access-note">{item.state !== 'running' ? '实例运行后可访问' : !item.port ? '未记录端口' : !item.lan_access ? '仅宿主机' : null}</div>
+                  <div className="instance-muted instance-access-note">{item.state !== 'running' ? '实例运行后可访问' : !item.port ? '未记录端口' : item.business_gateway ? '经业务网关 · 需个人登录' : !item.lan_access ? '仅宿主机' : null}</div>
                 </td>
                 <td className="instance-list-td" data-label="操作"><div className="instance-actions">
                   <button type="button" onClick={() => openDetail(item.name)} disabled={detailLoading} className="instance-button">详情</button>
@@ -470,7 +471,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
               {[
                 ['来源版本', detail.instance.source_id || '未记录'],
                 ['智能体', detail.instance.agent_id || '未记录'],
-                ['访问端口', detail.instance.port || '未记录'],
+                [detail.instance.business_gateway ? '内部 Web 端口' : '访问端口', detail.instance.port || '未记录'],
                 ['运行镜像', detail.instance.image_tag || '未记录'],
                 ['HOME 存储', String(detail.instance.home_directory || detail.session_scope.home_volume || detail.instance.home_volume || '未记录')],
                 ['HOME 保留状态', detail.session_scope.preserved === true ? '已保留' : detail.session_scope.preserved === false ? '未保留' : '尚未确认'],

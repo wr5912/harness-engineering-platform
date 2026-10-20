@@ -1,0 +1,51 @@
+{
+  "at": "2026-10-20T05:03:02.257Z",
+  "url": "http://10.0.160.32:3090/hep/#/gateway",
+  "desktopLayout": {
+    "bodyWidth": 1920,
+    "viewportWidth": 1920,
+    "configWidth": 1856,
+    "runtimeBelow": true,
+    "panelsSideBySide": true,
+    "panelWidths": [
+      891,
+      891
+    ]
+  },
+  "medium": {
+    "bodyWidth": 1440,
+    "viewportWidth": 1440,
+    "sideBySide": true
+  },
+  "intermediate": [
+    {
+      "bodyWidth": 1250,
+      "viewportWidth": 1250
+    },
+    {
+      "bodyWidth": 1024,
+      "viewportWidth": 1024
+    },
+    {
+      "bodyWidth": 768,
+      "viewportWidth": 768
+    },
+    {
+      "bodyWidth": 680,
+      "viewportWidth": 680
+    }
+  ],
+  "mobile": {
+    "bodyWidth": 390,
+    "viewportWidth": 390,
+    "panelsStacked": true
+  },
+  "actionChoices": 9,
+  "dynamicServiceOption": true,
+  "agentAddRemoveDraft": true,
+  "methodDraft": true,
+  "refreshPreservedDraft": true,
+  "categorySwitchPreservedDraft": true,
+  "discardRestoredConfig": true,
+  "errors": []
+}

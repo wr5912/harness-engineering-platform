@@ -6,11 +6,11 @@
 
 2026-10-19 初次部署时，统一网关进入平台一级导航，与 MCP 管理并列；MCP 工作区保留跳转。页面复用平台主题，提供顶部状态概览、四项功能配置切换和运行观察工作区。认证配置的是 Agent 的认证方式，信任判断针对 Agent 本身，风险由业务事件自动评估，访问授权维护服务和操作的访问控制策略；用户登录另列辅助配置。
 
-2026-10-20 的[分类整改与 3090 实机复验](../../platform/plugin/test/evidence/gateway-classification-20261020/README.md#3090-实际生效验证)已将当前界面改为三类，移除 MCP 内重复的统一网关按钮，顶部一级入口继续使用；最新进程与日志定位见该记录。下文四项界面及原服务 PID 保留初次验收的历史事实。
+2026-10-20 的[分类整改与 3090 实机复验](../../platform/plugin/test/evidence/gateway-classification-20261020/README.md#3090-实际生效验证)已将当前界面改为三类，移除 MCP 内重复的统一网关按钮，顶部一级入口继续使用；当时的进程与日志定位见该记录。下文四项界面及原服务 PID 保留初次验收的历史事实。
 
-同日后续的[智能体选择器与紧凑状态栏验收](../../platform/plugin/test/evidence/gateway-selector-ui-20261020/README.md)已在 3090 生效：智能体从现有资产列表搜索选择，页内重复大标题移除，状态区改为紧凑摘要。当前 3090 运行定位以该后续记录为准。
+同日后续的[智能体选择器与紧凑状态栏验收](../../platform/plugin/test/evidence/gateway-selector-ui-20261020/README.md)已在 3090 生效：智能体从现有资产列表搜索选择，页内重复大标题移除，状态区改为紧凑摘要。当时的 3090 运行定位见该记录；当前 Mock 接入见本文末节。
 
-3090 当前数据工作区尚无业务网关配置，页面展示关闭、未接入与尚无评估，不能将联调数据显示成已启用状态。独立验收环境使用固定数据快照、独立 HOME 和标准 DSH 镜像，在真实平台、Runtime、模型及 MCP 调用之间验证控制；外部身份、风险与设备服务由 Mock 提供。业务 Candidate 没有为通过验收而放宽角色或工具限制。
+2026-10-19 初次验收时，3090 所用数据工作区尚无业务网关配置，页面展示关闭、未接入与尚无评估。独立验收环境使用固定数据快照、独立 HOME 和标准 DSH 镜像，在真实平台、Runtime、模型及 MCP 调用之间验证控制；外部身份、风险与设备服务由 Mock 提供。业务 Candidate 没有为通过验收而放宽角色或工具限制。
 
 | 对象 | 实际范围 |
 |---|---|
@@ -47,7 +47,7 @@
 
 ### 初次验收服务定位（2026-10-19）
 
-以下保留初次验收结束时的本机定位；3090 已于 2026-10-20 重载，其最新运行定位和停止命令见上方分类整改记录，其他服务不属于此次更新范围。
+以下保留初次验收结束时的本机定位；当前 3090 的 Mock 接入及运行定位见本文末节。
 
 | 服务 | 地址或实例 | 进程与日志 | 按需停止 |
 |---|---|---|---|
@@ -81,3 +81,23 @@ HARNESS_ASSET_ROOT="$PWD/.local/business-control-acceptance/data" \
 本次结果属于 `PA-05/06/08/12` 的项目与工具链验证：真实平台与 Runtime 使用模拟外部提供方验证所选即时任务链。不证明企业身份互信、真实设备处置、所有工具或任意插件网络请求均受保护，也不替代 Harness Experiment Evaluation、Research Release 或生产验收。未验证其他终端的局域网连通、TLS、长期无人值守、业务子 Agent 全链及另一业务的完整复用。
 
 原生业务页面的 owner 管理、语音、Skill／命令目录和运行概览辅助接口未开放，对应组件可能显示不可用；本次验证范围是受管 MCP 的即时会话与选定产物，不能表述为完整 Candidate 全部功能已通过。独立 fixture 已清除测试风险限制并恢复 Agent 信任，巡检发起保留必要确认，报告查询明确按发布操作授权。
+
+## 当前 3090 Mock 接入（2026-10-20）
+
+当前数据工作区的唯一业务访问配置为 `/home/admin/harness-engineering-platform-data/config/business-access.json`。3090 的“统一网关”页面已读取该配置：接入用户验证、身份信任及风险评估指向独立 Mock service `172.17.0.1:53101`，Agent 来源固定为 `EXP-security-operations-expert-021-rdd331f9f2e30`。业务用户从 `http://10.0.160.32:53105/` 登录，再进入 `security-operations-expert`；3090 仍是平台管理员配置入口，不代替业务用户入口。业务 Runtime 为 `security-operations-expert-business-mock`，宿主只开放回环端口 53107，使用原标准镜像和独立 HOME。
+
+登录测试凭据在数据根的 `.local/business-control-mock/fixture-credentials.json`，文件权限为 `0600`，分别对应 `subject-a`、`subject-b`；凭据原值不进入业务配置、文档或验收记录。Mock 凭据最长有效一小时，到期后在宿主机运行 `node /home/admin/harness-engineering-platform-data/.local/business-control-mock/refresh-fixture.mjs` 轮换，再使用文件中的新凭据登录。Mock 进程重启会清空内存 fixture，该命令也会重新创建 fixture。业务 Session 仍由 Runtime 保存，但续用时需要重新验证当前凭据。Mock 服务与临时凭据只用于本地联调。
+
+本次实际验证：3090 登录后页面显示测试模拟提供方，实例签名与回执稳定后均为 `1/1`；A/B 凭据均可进入业务入口并创建真实 Session，匿名与无效凭据被拒绝，A 读取 B 的 Session 返回 403；固定标记 `MOCK_CONTROL_DENY_INPUT` 在模型执行前返回 403，并形成高风险事实。只开放 `inspection.list_executable_inspections` 这一项只读 Mock 操作；B 经真实模型完成调用，Mock 目标账本记录 `subject-b`、`mcp:inspection`、`finished/succeeded`，控制中心记录对应低风险事实。浏览器打开 B 的历史会话，能看到返回的“基础资产健康巡检”且编辑器可用；轮换凭据后仍可读取同一 Session。原候选资产中的 `sec-ops` 和 `inspection` 初始地址已不可达；仅该实例的运行配置改接 Mock MCP，不修改 Candidate 或其来源摘要。`sec-ops.search_graph_assets` 的主 Agent 直调被角色 Guard 拒绝，因此未作为开放操作。
+
+实例管理入口的后续[实机复验](../../platform/plugin/test/evidence/instance-gateway-web-20261020.json)修正了访问地址合同：业务实例的 53107 是内部 Runtime 端口，`dsh-dev url` 返回的是已登记网关 53105 的 Agent 深链；平台按同一配置核对完整公开地址，不再要求两端口相等。匿名浏览器打开该深链仍返回 401，但显示可操作的个人登录表单；使用本地 Mock 用户登录后直接进入原深链的 DSH Web。3090 的表格和详情按钮均已点击验证，页面注明“经业务网关”，源页面保留，浏览器页面错误为零。普通实例继续校验本机实例端口；业务实例内部地址、错误网关地址和未登记入口均被拒绝。业务登录仍使用前述临时 Mock 凭据。
+
+冷加载 3090 管理页时曾短暂显示签名与回执 `0/1`，业务入口同期返回 503；后续轮询恢复 `1/1`，网关连续访问返回 200。模拟风险事实有短有效期，空闲时页面可能显示“评估已过期”，下次受控输入或操作会重新评估。本次没有证明长期持续可用。
+
+当前进程及本机证据位于数据根 `.local/business-control-mock/`；3090 日志位于程序根 `.local/business-control-acceptance/main-3090.log`。停止 3090 可使用 `kill -TERM "$(cat /home/admin/harness-engineering-platform-data/.local/business-control-mock/platform-3090.pid)"`；停止本次 Mock 可使用 `kill -TERM "$(cat /home/admin/harness-engineering-platform-data/.local/business-control-mock/mock-service.pid)"`；停止业务 Runtime 可在程序根执行 `python3.10 runtime/adapters/dsh-container/dsh-dev --repo /home/admin/harness-engineering-platform-data down security-operations-expert-business-mock`。本次只证明 Mock 身份、风险和指定只读业务调用；真实身份提供方、真实 SOC、其他工具、定时任务及生产网络部署未在此验收。
+
+## 当前 3090 管理界面整改（2026-10-20）
+
+在原 3090 Profile 和数据根重载插件后，[真实浏览器验收](../../platform/plugin/test/evidence/gateway-overhaul-20261020/README.md)确认统一网关以“运行概览、智能体身份、风险评估、访问控制”四视图运行：运行状态集中在概览，三类配置共用一份可跨页保留的草稿和一次保存入口。未访问的其他一级页面延后挂载，身份页的提供方 HTTP 探测在真实页面返回；`HTTP 405` 仅表明地址有响应，界面明确提示 POST 合同及业务结果未验证。当前资产描述只读显示已启用 Experiment 中发现的名称、描述和技能，不表示实例已装载。
+
+访问控制中的“允许使用此 Agent 的接入用户 ID”维护基础许可；运行概览中的“要限制的接入用户”只选取已获准用户，支持多选并逐人建立限制。选中多位后不能附带 Session ID，辅助重评仍要求单个用户及 Session。浏览器只验证了选择、提示和禁用状态，未实际提交人工限制。草稿跨页保留、放弃恢复、390px 布局、页面错误及 5xx 响应均经检查；业务访问配置摘要未变。插件全量测试 **595/595** 通过，构建与 TypeScript 检查通过。3090 的当前 PID 以数据根 `.local/business-control-mock/platform-3090.pid` 为准；本次实测为 `2580356`，停止命令沿用上节。

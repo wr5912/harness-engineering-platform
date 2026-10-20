@@ -181,6 +181,40 @@ test('Web 入口按需读取 CLI 当前链接，保留认证并拒绝非实例�
   assert.ok(calls.every(args => args[0] === 'url' && args[2] === '--non-interactive'))
 })
 
+test('业务实例 Web 入口使用已登记网关地址并拒绝地址漂移', async t => {
+  const { module, cleanup } = await loadModule()
+  const fx = fixture()
+  const previous = process.env.XDG_STATE_HOME
+  process.env.XDG_STATE_HOME = fx.state
+  t.after(() => { fx.cleanup(); cleanup(); if (previous === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = previous })
+  const manifestPath = join(fx.state, 'dsh-dev/running-one/instance.json')
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  const accessPath = join(fx.root, 'config/business-access.json')
+  mkdirSync(join(fx.root, 'config'), { recursive: true })
+  const access = { enabled: true, gateway: { publicOrigin: 'http://business.example:53105', instances: [{ agentId: 'real-agent', instanceId: 'running-one' }] } }
+  const entry = 'http://business.example:53105/agents/real-agent/'
+  writeFileSync(accessPath, JSON.stringify(access))
+  const businessManifest = { ...manifest, agent_id: 'real-agent', business_control: { runtime_generation: 'current' }, url_override: entry }
+  writeFileSync(manifestPath, JSON.stringify(businessManifest))
+  const request = () => module.createInstancesHandler(fx.root)('url', { name: 'running-one' }, new AbortController().signal)
+  assert.deepEqual((await request()).value, { url: entry, lan_access: false })
+  for (const url_override of [
+    'http://127.0.0.1:3181/',
+    'http://other.example:53105/agents/real-agent/',
+    'http://business.example:53106/agents/real-agent/',
+    'http://business.example:53105/agents/other-agent/',
+    `${entry}?token=unexpected`,
+  ]) {
+    writeFileSync(manifestPath, JSON.stringify({ ...businessManifest, url_override }))
+    const result = await request()
+    assert.equal(result.ok, false, url_override)
+    assert.match(result.error.message, /业务网关地址与登记入口不一致/)
+  }
+  writeFileSync(manifestPath, JSON.stringify(businessManifest))
+  writeFileSync(accessPath, JSON.stringify({ ...access, gateway: { ...access.gateway, instances: [] } }))
+  assert.match((await request()).error.message, /实例未向业务网关开放/)
+})
+
 test('preview uses real sources and rejects invented sources', async () => {
   const { module, cleanup: cleanupModule } = await loadModule()
   const fx = fixture()

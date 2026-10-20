@@ -42,6 +42,8 @@ type PlatformProps = PlatformPageProps & PropsRuntime<'shell.overlay'> & PropsRe
 function PlatformPage({ catalog, rpc, assistant, updates, enterConversation, showNativeConversation, SessionProvider, renderSlot, useSessionStatus }: PlatformProps) {
   const [target, setTarget] = useState<PlatformNavigation>(() => readNavigation(window.location.hash))
   const page = target.page
+  const mountedPages = useRef(new Set<PageId>([page]))
+  mountedPages.current.add(page)
   const [open, setOpen] = useState(false)
   const [nativeMode, setNativeMode] = useState(false)
   const [unread, setUnread] = useState(false)
@@ -153,12 +155,12 @@ function PlatformPage({ catalog, rpc, assistant, updates, enterConversation, sho
     <div className="harness-body">
       <div className="harness-content">
         {page !== 'home' && <div className="harness-breadcrumb">工作空间 / {pages.find(item => item.id === page)?.label}</div>}
-        <div hidden={page !== 'home'}><HomePage catalog={catalog} rpc={rpc} updates={updates} navigate={navigate} startConversation={async (_root, prompt, context) => { await assistant.create(prompt, context ?? { page: 'home' }); collapseOnEntry.current = true }} /></div>
-        <div hidden={page !== 'agents'}><AgentsPage rpc={rpc} updates={updates} onAssistant={onAssistant} onContext={onContext} target={target} onNavigate={navigate} active={page === 'agents'} /></div>
-        <div hidden={page !== 'evaluation'}><EvaluationPage rpc={rpc} updates={updates} onAssistant={onAssistant} onContext={onContext} target={target} onNavigate={navigate} active={page === 'evaluation'} /></div>
-        <div hidden={page !== 'instances'}><InstancesPage rpc={rpc} updates={updates} onContext={onContext} target={target} onNavigate={navigate} /></div>
-        <div hidden={page !== 'gateway'}><BusinessControlPage rpc={rpc} updates={updates} active={page === 'gateway'} /></div>
-        <div hidden={page !== 'mcp'}><McpPage rpc={rpc} updates={updates} onContext={onContext} /></div>
+        {mountedPages.current.has('home') && <div hidden={page !== 'home'}><HomePage catalog={catalog} rpc={rpc} updates={updates} navigate={navigate} startConversation={async (_root, prompt, context) => { await assistant.create(prompt, context ?? { page: 'home' }); collapseOnEntry.current = true }} /></div>}
+        {mountedPages.current.has('agents') && <div hidden={page !== 'agents'}><AgentsPage rpc={rpc} updates={updates} onAssistant={onAssistant} onContext={onContext} target={target} onNavigate={navigate} active={page === 'agents'} /></div>}
+        {mountedPages.current.has('evaluation') && <div hidden={page !== 'evaluation'}><EvaluationPage rpc={rpc} updates={updates} onAssistant={onAssistant} onContext={onContext} target={target} onNavigate={navigate} active={page === 'evaluation'} /></div>}
+        {mountedPages.current.has('instances') && <div hidden={page !== 'instances'}><InstancesPage rpc={rpc} updates={updates} onContext={onContext} target={target} onNavigate={navigate} /></div>}
+        <div hidden={page !== 'gateway'}><BusinessControlPage rpc={rpc} updates={updates} active={page === 'gateway'} target={target} onNavigate={navigate} /></div>
+        {mountedPages.current.has('mcp') && <div hidden={page !== 'mcp'}><McpPage rpc={rpc} updates={updates} onContext={onContext} /></div>}
         <div ref={conversation} className="harness-conversation-viewport" hidden={!full}/>
         <section className="harness-assistant harness-assistant-floating" hidden={!floating} aria-label="平台 AI 助手">
           <header className="harness-assistant-heading"><div><strong>平台 AI 助手</strong><small role="status">{assistantState.busy ? '正在准备会话…' : statusLabel}</small></div><div>
