@@ -1,0 +1,74 @@
+{
+  "schema_version": "1.0",
+  "records": [
+    {
+      "agent_id": "autonomous-training-researcher",
+      "source_id": "experiment:EXP-autonomous-training-researcher-001-redf6be6240bf",
+      "name": "arch-training",
+      "port": 31981,
+      "up": true,
+      "image_id": "sha256:ba2ec964ef463b2d0f8f55ecca75e4e97751d06f5267ba0c9c1dc33f5ed20952",
+      "platform": "linux/amd64",
+      "container_name": "arch-training",
+      "http_status": 200,
+      "session_created": true,
+      "session_listed": true,
+      "down": true
+    },
+    {
+      "agent_id": "daily-inspection-assistant",
+      "source_id": "experiment:EXP-daily-inspection-assistant-002-r9eba480e9d2a",
+      "name": "arch-daily",
+      "port": 31982,
+      "up": true,
+      "image_id": "sha256:ba2ec964ef463b2d0f8f55ecca75e4e97751d06f5267ba0c9c1dc33f5ed20952",
+      "platform": "linux/amd64",
+      "container_name": "arch-daily",
+      "http_status": 200,
+      "session_created": true,
+      "session_listed": true,
+      "down": true
+    },
+    {
+      "agent_id": "inspection-delivery-demo",
+      "source_id": "experiment:EXP-inspection-delivery-demo-001-rf841e4415364",
+      "name": "arch-delivery",
+      "port": 31983,
+      "up": true,
+      "image_id": "sha256:ba2ec964ef463b2d0f8f55ecca75e4e97751d06f5267ba0c9c1dc33f5ed20952",
+      "platform": "linux/amd64",
+      "container_name": "arch-delivery",
+      "http_status": 200,
+      "session_created": true,
+      "session_listed": true,
+      "down": true
+    },
+    {
+      "agent_id": "multi-step-research-analyst",
+      "source_id": "experiment:EXP-multi-step-research-analyst-001-r97fa04b7c613",
+      "name": "arch-research",
+      "port": 31984,
+      "up": true,
+      "image_id": "sha256:ba2ec964ef463b2d0f8f55ecca75e4e97751d06f5267ba0c9c1dc33f5ed20952",
+      "platform": "linux/amd64",
+      "container_name": "arch-research",
+      "http_status": 200,
+      "session_created": true,
+      "session_listed": true,
+      "down": true
+    },
+    {
+      "agent_id": "security-operations-expert",
+      "source_id": "experiment:EXP-security-operations-expert-021-rdd331f9f2e30",
+      "name": "arch-security",
+      "port": 31985,
+      "up": true,
+      "image_id": "sha256:ba2ec964ef463b2d0f8f55ecca75e4e97751d06f5267ba0c9c1dc33f5ed20952",
+      "platform": "linux/amd64",
+      "container_name": "arch-security",
+      "http_status": 200,
+      "error": "TimeoutError",
+      "down": true
+    }
+  ]
+}

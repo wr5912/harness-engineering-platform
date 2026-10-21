@@ -1,0 +1,11 @@
+{
+  "agent_id": "security-operations-expert",
+  "statuses": {
+    "/assistant/": 200,
+    "/assistant/voice-mode": 404,
+    "/assistant/voice-mode/config": 404,
+    "/voice-mode/config": 404
+  },
+  "up": true,
+  "down": true
+}
