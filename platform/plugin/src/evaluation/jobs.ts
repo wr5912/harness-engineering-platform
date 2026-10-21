@@ -16,13 +16,26 @@ type Job = {
   error?: string; result?: MapValue | null; deadline_at?: string;
 }
 type Options = {
-  command(payload: MapValue): { executable: string; args: string[] };
+  command(payload: MapValue, jobId: string): Promise<{ executable: string; args: string[]; environment?: NodeJS.ProcessEnv; dispose?: () => void }> | { executable: string; args: string[]; environment?: NodeJS.ProcessEnv; dispose?: () => void };
   environment(): NodeJS.ProcessEnv; redact(text: string): string; onChange?: () => void;
+  cleanup?: (jobId: string) => void;
 }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 const RUN = /^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 const FINAL = new Set(['completed', 'failed', 'cancelled'])
 const LOG_LIMIT = 16 * 1024
+
+/** 子进程可能只输出密钥前缀后换行；这些已知片段也不能进入持久 Job 日志。 */
+export function redactKnownValues(value: string, secrets: readonly string[]): string {
+  let text = value
+  for (const secret of secrets) {
+    text = text.replaceAll(secret, '[REDACTED]')
+    for (let length = secret.length - 1; length >= 4; length -= 1) {
+      text = text.replaceAll(secret.slice(0, length), '[REDACTED]')
+    }
+  }
+  return text
+}
 
 export class EvaluationJobError extends Error {
   constructor(readonly code: string, message: string) { super(message) }
@@ -157,6 +170,7 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
       }
       if (job.deadline_at && Date.parse(job.deadline_at) <= Date.now() && alive && job.status !== 'cancelling') cancel(id)
     }
+    if (FINAL.has(job.status)) options.cleanup?.(id)
     save(job, false)
     return { ...job, result: { ...job.result, ...actual }, stdout: options.redact(job.stdout), stderr: options.redact(job.stderr), ...actual,
       log_note: '日志为截断显示；Case、来源和 Session 从 Run 回读；模型请求按持久尝试结算核对，轨迹不完整时总数保持未知。' }
@@ -187,13 +201,12 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
     }
     return { status: job.status }
   }
-  function start(payload: MapValue) {
+  async function start(payload: MapValue) {
     const budget = payload.task_budget as MapValue | undefined
     const deadline = budget?.deadline_at
     if (deadline !== undefined && (typeof deadline !== 'string' || !/(Z|[+-]\d{2}:\d{2})$/.test(deadline)
       || !Number.isFinite(Date.parse(deadline)) || Date.parse(deadline) <= Date.now()))
       throw new EvaluationJobError('invalid_request', '任务截止时间无效或已到期')
-    const command = options.command(payload)
     const id = budget?.operation_id ?? randomUUID()
     if (typeof id !== 'string' || !UUID.test(id)) throw new EvaluationJobError('invalid_request', '任务操作 ID 格式无效')
     const existing = () => {
@@ -203,31 +216,63 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
       return status(id)
     }
     if (existsSync(pathFor(id))) return existing()
+    const command = await options.command(payload, id)
+    let disposed = false
+    const dispose = () => { if (!disposed) { disposed = true; command.dispose?.() } }
+    if (existsSync(pathFor(id))) { dispose(); return existing() }
     const now = new Date().toISOString()
     const job: Job = { job_id: id, workspace_id: identity.id, asset_root: root,
       source: String(payload.source), cases: payload.cases, status: 'running', started_at: now, updated_at: now,
       stdout: '', stderr: '', ...(deadline ? { deadline_at: deadline } : {}) }
     mkdirSync(directory, { recursive: true })
     try { writeFileSync(pathFor(id), JSON.stringify(job, null, 2) + '\n', { mode: 0o600, flag: 'wx' }) }
-    catch (error) { if ((error as NodeJS.ErrnoException).code === 'EEXIST') return existing(); throw error }
-    const proc = spawn(command.executable, command.args, { cwd: root,
-      env: { ...options.environment(), HARNESS_EVAL_JOB_ID: id, ...(deadline ? { HARNESS_EVAL_DEADLINE_AT: deadline } : {}) },
-      stdio: ['ignore', 'pipe', 'pipe'] })
+    catch (error) { dispose(); if ((error as NodeJS.ErrnoException).code === 'EEXIST') return existing(); throw error }
+    const secrets = Object.values(command.environment ?? {}).filter((value): value is string => typeof value === 'string' && value.length > 0)
+    const redactJob = (value: string) => options.redact(redactKnownValues(value, secrets))
+    let proc: ReturnType<typeof spawn>
+    try {
+      proc = spawn(command.executable, command.args, { cwd: root,
+        env: { ...options.environment(), ...command.environment, HARNESS_EVAL_JOB_ID: id, ...(deadline ? { HARNESS_EVAL_DEADLINE_AT: deadline } : {}) },
+        stdio: ['ignore', 'pipe', 'pipe'] })
+    } catch (error) {
+      dispose()
+      job.status = 'failed'
+      job.error = redactJob((error as Error).message)
+      save(job)
+      throw new Error(job.error)
+    }
+    const pending = { stdout: '', stderr: '' }
     const active = { process: proc, job, timer: undefined as NodeJS.Timeout | undefined }
     live.set(id, active)
     proc.on('spawn', () => { job.pid = proc.pid; job.process_start = proc.pid ? processStart(proc.pid) : undefined; save(job) })
     const append = (field: 'stdout' | 'stderr', chunk: unknown) => {
-      job[field] = options.redact((job[field] + String(chunk)).slice(-LOG_LIMIT))
+      const raw = secrets.reduce((text, secret) => text.replaceAll(secret, '[REDACTED]'), pending[field] + String(chunk))
+      let held = 0
+      for (const secret of secrets) for (let length = 1; length < secret.length; length += 1) {
+        if (raw.endsWith(secret.slice(0, length))) held = Math.max(held, length)
+      }
+      pending[field] = raw.slice(raw.length - held)
+      const visible = raw.slice(0, raw.length - held)
+      if (!visible) return
+      job[field] = options.redact(job[field] + redactKnownValues(visible, secrets)).slice(-LOG_LIMIT)
       const run = job.stderr.match(/(?:^|\n)Research Run: (run-[0-9a-f-]+)(?:\n|$)/)?.[1]
       if (run && RUN.test(run)) job.run_id = run
       job.updated_at = new Date().toISOString()
       save(job)
     }
-    proc.stdout.setEncoding('utf8').on('data', chunk => append('stdout', chunk))
-    proc.stderr.setEncoding('utf8').on('data', chunk => append('stderr', chunk))
-    proc.on('error', error => { job.status = 'failed'; job.error = options.redact(error.message); save(job) })
+    const flushPending = () => {
+      for (const field of ['stdout', 'stderr'] as const) if (pending[field]) {
+        job[field] = redactJob(job[field] + '[REDACTED]').slice(-LOG_LIMIT)
+        pending[field] = ''
+      }
+    }
+    proc.stdout!.setEncoding('utf8').on('data', chunk => append('stdout', chunk))
+    proc.stderr!.setEncoding('utf8').on('data', chunk => append('stderr', chunk))
+    proc.on('error', error => { job.status = 'failed'; job.error = redactJob(error.message); dispose(); save(job) })
     proc.on('close', code => {
       clearTimeout(active.timer)
+      dispose()
+      flushPending()
       job.exit_code = code
       job.updated_at = new Date().toISOString()
       try { job.result = JSON.parse(job.stdout) } catch { job.result = null }

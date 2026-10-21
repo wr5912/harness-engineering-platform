@@ -52,7 +52,8 @@ MODES = ("verification",)
 MODE_ALIASES = {"eval": "verification"}
 MODE_CHOICES = ("eval", "verification")
 PURPOSES = {"verification": "eval"}
-AUTO_PORT_START = 3081
+AUTO_PORT_START = 18500
+AUTO_PORT_END = 28999
 # 实例目录分属不同账户/数据根，宿主监听端口仍共享；只在启动期间共用此锁。
 STARTUP_LOCK = Path("/tmp/harness-engineering-platform-dsh-dev-startup.lock")
 LAN_LISTEN_PATCH = "/opt/dsh-adapter/verification-home-controls/lan-listen.patch.yml"
@@ -76,6 +77,7 @@ MODEL_RUNTIME_HOST = ADAPTER.parents[2] / "platform/plugin/lib/model-runtime.js"
 MODEL_RUNTIME_CONTAINER = "/opt/harness-model-runtime/model-runtime.mjs"
 MODEL_PATCH_CONTAINER = "/opt/harness-model-runtime/model.patch.yml"
 MODEL_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+@-]{0,255}$")
+NODE_EXECUTABLE = shutil.which("node") or "node"
 ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 MODEL_PATCH_IDS = {"agent-default-model", "llm-deepseek", "llm-pi-ai", "llm-deepseek-account"}
 # 现有来源的模型连接变量。平台策略接管模型配置时，来源原有模型路由不再决定必需变量；
@@ -93,11 +95,11 @@ def instance_base_url(manifest: dict) -> str:
     return f"http://127.0.0.1:{manifest['port']}{manifest.get('web_base_path', '/')}"
 
 
-# DSH Web 首次打开是冷启动：会话必须先绑定一个**已注册工作区**，而新实例的 DSH_HOME 里工作区注册表为空
-# （注册表 storages/workspace.json 只从已存会话头 bootstrap，且初始化标记一经写入不再重建）。DSH 在该锁定提交上
-# 没有受支持的工作区预注册入口，因此启动器只如实交付路径与操作步骤，不改写 Runtime 存储内部格式。
-def web_cold_start_hint(mode: str, analysis_workspace: str | None = None) -> str:
+# 业务 Runtime 使用 DSH 原生 workspaceRegistry.create 预登记固定工作区；普通实例仍由用户在 Web 登记。
+def web_cold_start_hint(mode: str, analysis_workspace: str | None = None, business_control: bool = False) -> str:
     path = workspace_to_register(mode, analysis_workspace)
+    if business_control:
+        return f"业务实例启动时自动登记固定工作区“{path}”；打开网关链接后无需选择工作区或预设。"
     return (
         "DSH Web 首次打开需要在界面注册工作区：点击“选择工作区”→ 目录对话框的“编辑路径”→ 粘贴 "
         f"“{path}” → “打开”，随后即可直接对话。该注册写入本实例 DSH_HOME 数据卷并跨重启保留；"
@@ -398,13 +400,27 @@ def assert_model_policy_current(policy: dict, *, repo: Path = REPO) -> None:
         fail("业务默认模型配置已在启动过程中变化，请重新预览实例计划")
 
 
-def model_policy_patch(policy: dict) -> str:
+def model_policy_patch(policy: dict, local_routes: list[dict] | None = None, *, business: bool = False) -> str:
     if policy["source"] == "analysis-runtime":
         return "[]\n"
+    config = {"agentId": policy["agent_id"], "allowed": policy["allowed"]}
+    if business:
+        config["assetRoot"] = "/opt/harness-business-assets"
+    if local_routes:
+        config["localRoutes"] = local_routes
     rows = [*policy["patch"], {"insert": [{"id": "harness-model-runtime",
              "name": f"file://{MODEL_RUNTIME_CONTAINER}",
-             "config": {"agentId": policy["agent_id"], "allowed": policy["allowed"]}}]}]
+             "config": config}]}]
     return json.dumps(rows, ensure_ascii=False, indent=2) + "\n"
+
+
+def source_local_model_routes(contract: dict) -> list[dict]:
+    """从同一 Candidate 声明读取固定本地适配器，不写入平台外部模型目录。"""
+    completed = subprocess.run([NODE_EXECUTABLE, str(ADAPTER / "business.ts"), "--capabilities", contract["managed"]],
+                               capture_output=True, text=True, check=False, timeout=30)
+    if completed.returncode != 0:
+        fail("业务来源的本地模型能力声明无效")
+    return json.loads(completed.stdout)["localModelRoutes"]
 
 
 def model_policy_summary(policy: dict) -> dict:
@@ -1129,7 +1145,8 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
     policy = contract.get("model_policy") or (analysis_model_policy(contract["agent_id"]) if analysis_workspace else
         _model_policy({"agent_id": contract["agent_id"], "allowed": [], "default": None}, contract["agent_id"],
                       source="business-config", manifest_sha256=None))
-    (target / "model.patch.yml").write_text(model_policy_patch(policy), encoding="utf-8")
+    local_routes = business["localModelRoutes"] if business else source_local_model_routes(contract) if analysis_workspace is None else None
+    (target / "model.patch.yml").write_text(model_policy_patch(policy, local_routes, business=business is not None), encoding="utf-8")
     os.chmod(target / "model.patch.yml", 0o644)
     (target / "compose.yaml").write_text(rendered, encoding="utf-8")
     manifest = {
@@ -1159,7 +1176,7 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
         "image_build_fingerprint": contract["image"].get("build_fingerprint"),
         "adapter_root": str(ADAPTER),
         "web_adapter_root": str(WEB_ADAPTER),
-        "web_base_path": f"/agents/{contract['agent_id']}/" if business else current_web_base_path(),
+        "web_base_path": f"/agents/{contract['agent_id']}/instances/{name}/" if business else current_web_base_path(),
         "sites_config_file": str(sites_config(REPO)),
         "web_profile_manifest": runtime_profile,
         "web_profile_seed_directory": str(Path(original_profile).parent),
@@ -1183,7 +1200,8 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
         "model_policy": model_policy_summary(policy),
         "optional_env_names": [name for name in runtime_env_names(contract, analysis_workspace)
                                if name not in required_env_names(contract, analysis_workspace)],
-        **({"business_control": business["registration"]} if business else {}),
+        **({"business_control": {**business["registration"],
+                                  "launch_config_file": contract["business_control"]["config_file"]}} if business else {}),
     }
     (target / "instance.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -1318,10 +1336,10 @@ def reserved_instance_ports(exclude_name: str) -> set[int]:
 
 def first_available_port(name: str) -> int:
     reserved = reserved_instance_ports(name)
-    for port in range(AUTO_PORT_START, 65536):
+    for port in range(AUTO_PORT_START, AUTO_PORT_END + 1):
         if port not in reserved and not port_in_use(port):
             return port
-    fail(f"从 {AUTO_PORT_START} 起没有可用 TCP 端口")
+    fail(f"{AUTO_PORT_START}–{AUTO_PORT_END} 没有可用 TCP 端口；请显式指定端口")
 
 
 @contextmanager
@@ -1444,6 +1462,8 @@ def prepare_up(args: argparse.Namespace) -> tuple[dict, tuple[Path, dict] | None
             "config_file": str(Path(business_file).resolve()), "source_digest": launch["sourceDigest"],
             "runtime_generation": (current[1]["business_control"]["runtime_generation"] if current else secrets.token_hex(16)),
         }
+        if current is not None and current[1]["business_control"].get("source_digest") != launch["sourceDigest"]:
+            fail("业务来源资产与实例固定摘要不一致；保留旧实例及 Session，请以新实例名创建新版本")
     if args.port is None:
         if current is not None:
             args.port = instance_recorded_port(current[1])
@@ -1471,7 +1491,7 @@ def build_plan(args: argparse.Namespace, contract: dict) -> dict:
     required_names = required_env_names(contract, analysis_workspace)
     runtime_names = runtime_env_names(contract, analysis_workspace)
     missing = [name for name in required_names if not os.environ.get(name)]
-    base_path = f"/agents/{contract['agent_id']}/" if contract.get("business_control") else current_web_base_path()
+    base_path = f"/agents/{contract['agent_id']}/instances/{args.name}/" if contract.get("business_control") else current_web_base_path()
     plan = {
         "schema_version": "2.1",
         "name": args.name,
@@ -1491,7 +1511,7 @@ def build_plan(args: argparse.Namespace, contract: dict) -> dict:
         "workspace_to_register": workspace_to_register(args.mode, analysis_workspace),
         "grading_material_mounted": analysis_workspace is not None,
         "web_base_path": base_path,
-        "base_url": f"http://127.0.0.1:{args.port}{base_path}",
+        **({} if contract.get("business_control") else {"base_url": f"http://127.0.0.1:{args.port}{base_path}"}),
         "port": args.port,
         "source_id": contract["source_id"],
         "source_kind": contract["source_kind"],
@@ -1507,7 +1527,7 @@ def build_plan(args: argparse.Namespace, contract: dict) -> dict:
         ]),
         "web_adapter_mount": {"host": str(WEB_ADAPTER), "container": "/opt/dsh-web", "mode": "ro"},
         "context_assets": [],
-        "web_cold_start": web_cold_start_hint(args.mode, analysis_workspace),
+        "web_cold_start": web_cold_start_hint(args.mode, analysis_workspace, bool(contract.get("business_control"))),
         "network": "host (0.0.0.0, LAN exposed)" if lan_access else "host (127.0.0.1 only)",
         "required_env_names": required_names,
         "model_policy": model_policy_summary(contract["model_policy"]),
@@ -1538,10 +1558,12 @@ def build_plan(args: argparse.Namespace, contract: dict) -> dict:
 
 def business_helper(config_file: str, payload: dict) -> dict:
     """仅桥接 TypeScript 实现；输出不包含密钥原值。"""
-    completed = subprocess.run(["node", str(ADAPTER / "business.ts"), str(Path(config_file).resolve())],
+    completed = subprocess.run([NODE_EXECUTABLE, str(ADAPTER / "business.ts"), str(Path(config_file).resolve())],
                                input=json.dumps(payload), text=True, capture_output=True, check=False, timeout=30)
     if completed.returncode != 0:
-        fail("业务启动配置或固定资产校验失败；请核对可达协调器、共享密钥与已构建插件")
+        prefix = "BUSINESS_STARTUP_ERROR:"
+        reasons = [line[len(prefix):] for line in completed.stderr.splitlines() if line.startswith(prefix)]
+        fail(reasons[-1] if reasons else "业务启动接缝校验失败；请核对网关配置、业务插件和来源文件")
     return json.loads(completed.stdout)
 
 
@@ -1553,7 +1575,7 @@ def render_business_instance(contract: dict, name: str, port: int, compose: str)
         "port": port, "compose": compose, "profileManifest": contract.get("profile_manifest", str(ADAPTER / "verification-home-controls/web-profile.package.json")),
         "presetId": session_preset(contract, "verification"),
         "runtimeSettings": str(instance_dir(name) / "dsh-home/profiles/web/cordis.patch.yml"),
-        "basePath": f"/agents/{contract['agent_id']}/", "sourcePaths": {key: contract[key] for key in ("workspace", "presets", "managed")},
+        "basePath": f"/agents/{contract['agent_id']}/instances/{name}/", "sourcePaths": {key: contract[key] for key in ("workspace", "presets", "managed")},
     })
 
 
@@ -1697,11 +1719,11 @@ def _command_up(args: argparse.Namespace, contract: dict,
     run(compose_command(target, args.name, "up", "-d", "--no-build"), env=environment)
     # `docker compose up -d` 返回 0 只说明命令成功，不说明容器在运行：容器可能立刻退出。
     containers = wait_for_service(args.name, "dsh")
-    business_base = f"/agents/{contract['agent_id']}/" if contract.get("business_control") else current_web_base_path()
+    business_base = f"/agents/{contract['agent_id']}/instances/{args.name}/" if contract.get("business_control") else current_web_base_path()
     report = {"name": args.name, "container_name": args.name,
               "project": project_name(args.name), "port": args.port,
               "web_base_path": business_base,
-              "base_url": f"http://127.0.0.1:{args.port}{business_base}",
+              **({} if contract.get("business_control") else {"base_url": f"http://127.0.0.1:{args.port}{business_base}"}),
               "state_dir": str(target), "agent_id": contract["agent_id"],
               "target_preset": target_preset(contract),
               "session_preset": session_preset(contract, args.mode, args.analysis_workspace),
@@ -1735,7 +1757,7 @@ def _command_up(args: argparse.Namespace, contract: dict,
         fail("dsh 容器未确认拥有指定端口的监听；不能交付可能属于其它实例的入口，用 logs 查看失败原因")
     print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
     print(json.dumps({
-        "hint": web_cold_start_hint(args.mode, args.analysis_workspace),
+        "hint": web_cold_start_hint(args.mode, args.analysis_workspace, bool(contract.get("business_control"))),
         "workspace_to_register": workspace_to_register(args.mode, args.analysis_workspace),
     },
                      ensure_ascii=False), file=sys.stderr)
@@ -1918,7 +1940,7 @@ def instance_entry(target: Path, manifest: dict, observation: dict | None = None
         "state_dir": str(target),
         "context_mounts": [item.get("container") for item in manifest.get("context_mounts") or []],
         "web_base_path": manifest.get("web_base_path", "/"),
-        "base_url": instance_base_url(manifest) if isinstance(port, int) else None,
+        **({} if manifest.get("business_control") else {"base_url": instance_base_url(manifest) if isinstance(port, int) else None}),
         "ps_query": ps_state,
         "ps": ps_detail,
     }
@@ -1953,17 +1975,23 @@ def command_url(args: argparse.Namespace) -> None:
     if manifest.get("business_control"):
         running_container(args.name)
         result = run(["node", str(ADAPTER / "business.ts"), "--entry", str(REPO), manifest["agent_id"], args.name])
-        url = json.loads(result.stdout)["url"]
+        entry = json.loads(result.stdout)
+        url = entry["url"]
+        anonymous = entry.get("accessMode") == "anonymous"
         try:
             opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirectHandler())
-            opener.open(urllib.request.Request(url, method="GET"), timeout=5).close()
+            with opener.open(urllib.request.Request(url, headers={"Accept": "text/html"}, method="GET"), timeout=5) as response:
+                if anonymous and response.status == 200:
+                    print(url)
+                    return
         except urllib.error.HTTPError as error:
-            if error.code == 401:
+            if not anonymous and error.code == 401:
                 print(url)
                 return
         except (OSError, urllib.error.URLError):
             pass
-        fail("业务网关未确认当前入口的未认证拒绝；不返回内部 Runtime 或 owner 链接")
+        expected = "匿名网页首帧成功" if anonymous else "未认证拒绝"
+        fail(f"业务网关未确认当前入口的{expected}；不返回内部 Runtime 或 owner 链接")
     if manifest.get("profile") == "web-lan":
         running_container(args.name)
         deadline = time.monotonic() + 30.0
@@ -2458,11 +2486,13 @@ def preflight_new_instance(args: argparse.Namespace, contract: dict) -> None:
             image_fingerprint=contract["image"].get("build_fingerprint"),
             schedule_compat=not analysis_workspace and needs_schedule_compat(contract.get("profile_manifest")),
         )
+        business = None
         if contract.get("business_control"):
             business = render_business_instance(contract, args.name, args.port, rendered)
             rendered = business["compose"]
             (root / "business.patch.yml").write_text(business["patch"], encoding="utf-8")
-        (root / "model.patch.yml").write_text(model_policy_patch(contract["model_policy"]), encoding="utf-8")
+        local_routes = business["localModelRoutes"] if business else source_local_model_routes(contract) if analysis_workspace is None else None
+        (root / "model.patch.yml").write_text(model_policy_patch(contract["model_policy"], local_routes, business=business is not None), encoding="utf-8")
         compose = root / "compose.yaml"
         compose.write_text(rendered, encoding="utf-8")
         environment = compose_env(
@@ -2617,7 +2647,7 @@ def main() -> None:
     up.add_argument("--mode", nargs="?", choices=MODE_CHOICES, metavar="{eval}", type=normalize_mode,
                     help="eval（被测模式）")
     up.add_argument("--name", help="实例名；默认 <agent-id>-eval")
-    up.add_argument("--port", type=int, help=f"宿主 Web 端口；新实例默认从 {AUTO_PORT_START} 起自动选择")
+    up.add_argument("--port", type=int, help=f"宿主 Web 端口；新实例默认在 {AUTO_PORT_START}–{AUTO_PORT_END} 自动选择")
     up.add_argument("--dry-run", action="store_true", help="只输出实例计划，不写状态、不调用 Docker")
     up.add_argument("--replace", action="store_true",
                     help="先停止同名实例自身的容器（保留 HOME 数据卷）再启动；用于重载配置或迁移旧状态")

@@ -20,6 +20,31 @@ export interface BusinessLaunchConfig {
 export interface BusinessRenderInput {
   name: string; agentId: string; workspaceId: string; sourceDigest: string; runtimeGeneration?: string
   port: number; compose: string; profileManifest: string; basePath: string; presetId?: string; runtimeSettings?: string
+  sourcePaths?: { managed: string }
+}
+
+interface LocalModelRoute { provider: string; model: string }
+function readLocalCapabilities(managed: string): { localTools: string[]; localModelRoutes: LocalModelRoute[] } {
+  const path = join(managed, 'role-tool-matrix.yaml')
+  if (!existsSync(path)) return { localTools: [], localModelRoutes: [] }
+  const state = lstatSync(path)
+  if (!state.isFile() || state.size > 64 * 1024) throw new Error('业务本地能力声明必须是受控普通文件')
+  const value = yaml.load(readFileSync(path, 'utf8')) as any
+  const declared = value?.runtime_capabilities
+  if (declared === undefined) return { localTools: [], localModelRoutes: [] }
+  const namePattern = /^[A-Za-z][A-Za-z0-9_-]{0,127}$/
+  const modelPattern = /^[A-Za-z0-9][A-Za-z0-9._:/+@-]{0,255}$/
+  const tools = declared?.local_tools, routes = declared?.local_model_routes
+  if (!declared || Array.isArray(declared) || Object.keys(declared).sort().join(',') !== 'local_model_routes,local_tools'
+    || !Array.isArray(tools) || tools.length > 32 || tools.some(name => typeof name !== 'string' || !namePattern.test(name))
+    || new Set(tools).size !== tools.length || !Array.isArray(routes) || routes.length > 16
+    || routes.some(route => !route || Array.isArray(route) || Object.keys(route).sort().join(',') !== 'model,provider'
+      || typeof route.provider !== 'string' || !modelPattern.test(route.provider)
+      || typeof route.model !== 'string' || !modelPattern.test(route.model))
+    || new Set(routes.map(route => `${route.provider}\0${route.model}`)).size !== routes.length) {
+    throw new Error('业务本地能力声明无效')
+  }
+  return { localTools: tools, localModelRoutes: routes }
 }
 
 /** 固定实际装载资产的内容身份；依赖按其锁文件纳入，安装缓存不回流资产。 */
@@ -39,7 +64,12 @@ export function businessSourceDigest(paths: Record<string, string>): string {
 
 /** 启动配置只定位程序、事实源和受信通道，不复制授权规则或连接清单。 */
 export function readBusinessLaunchConfig(file: string): BusinessLaunchConfig {
-  const config = JSON.parse(readFileSync(file, 'utf8')) as BusinessLaunchConfig
+  const saved = JSON.parse(readFileSync(file, 'utf8')) as BusinessLaunchConfig & { gateway?: { publicOrigin?: string; sharedSecretFile?: string } }
+  // 平台以业务访问配置作为唯一可编辑来源；历史独立 launch 文件仍可用于既有实例。
+  const config: BusinessLaunchConfig = saved.gateway ? {
+    assetRoot: dirname(dirname(file)), sharedSecretFile: saved.gateway.sharedSecretFile!,
+    coordinatorOrigin: saved.gateway.publicOrigin!, pluginRoot: join(programRoot, 'platform/plugin'),
+  } : saved
   for (const key of ['assetRoot', 'sharedSecretFile'] as const) {
     const path = config[key]
     if (typeof path !== 'string' || !isAbsolute(path) || !existsSync(path) || realpathSync(path) !== path) throw new Error(`业务启动配置的 ${key} 必须是已存在的规范化绝对路径`)
@@ -52,39 +82,53 @@ export function readBusinessLaunchConfig(file: string): BusinessLaunchConfig {
   if (!['http:', 'https:'].includes(origin.protocol) || origin.username || origin.password || origin.pathname !== '/' || origin.search || origin.hash) throw new Error('协调器必须使用不含路径和凭据的 HTTP 来源地址')
   if (['127.0.0.1', 'localhost', '[::1]'].includes(origin.hostname)) throw new Error('bridge 容器不能使用宿主回环地址访问协调器；请配置可达宿主地址')
   const pluginRoot = config.pluginRoot ?? join(programRoot, 'platform/plugin')
-  if (!isAbsolute(pluginRoot) || !statSync(pluginRoot).isDirectory() || realpathSync(pluginRoot) !== pluginRoot) throw new Error('业务插件根路径无效')
-  for (const file of ['lib/business-runtime.js', 'lib/mcp-manager.js', 'business/package.json', 'business/runtime.js', 'business/mcp-manager.js']) {
-    if (!statSync(join(pluginRoot, file)).isFile()) throw new Error('业务 Runtime 插件尚未构建')
+  if (!isAbsolute(pluginRoot) || !existsSync(pluginRoot) || !statSync(pluginRoot).isDirectory() || realpathSync(pluginRoot) !== pluginRoot) throw new Error('业务插件根路径无效')
+  for (const file of ['lib/business-runtime.js', 'business/package.json', 'business/runtime.js']) {
+    if (!existsSync(join(pluginRoot, file)) || !statSync(join(pluginRoot, file)).isFile()) throw new Error('业务 Runtime 插件尚未构建')
   }
   return { ...config, pluginRoot }
 }
 
 /** 只返回生成内容；实例目录由原启动器在 preflight 成功后写入。 */
 export function renderBusinessInstance(config: BusinessLaunchConfig, input: BusinessRenderInput) {
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(input.name) || !input.sourceDigest || !input.workspaceId || !input.agentId
+  if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(input.name) || !/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(input.agentId)
+    || !input.sourceDigest || !input.workspaceId
     || !Number.isInteger(input.port) || input.port < 1 || input.port > 65535) throw new Error('业务实例登记参数无效')
   const compose = yaml.load(input.compose)
   const service = compose?.services?.dsh
   if (!service || service.network_mode !== 'host') throw new Error('业务 Compose 缺少受控 dsh 网络入口')
   const seed = input.runtimeSettings && existsSync(input.runtimeSettings) ? input.runtimeSettings : join(dirname(input.profileManifest), 'web-profile.seed.patch.yml')
-  if (!existsSync(seed)) throw new Error('业务来源缺少 MCP 配置种子')
-  // 种子只按数据读取；不执行其中的表达式、Hook 或插件。
-  const entries = (yaml.load(readFileSync(seed, 'utf8')) ?? []) as any[]
-  const managers = entries.flatMap(item => item?.insert ?? []).filter(item => typeof item.name === 'string' && /(?:^|\/)mcp-manager\/(?:index\.(?:mjs|js|ts))$/.test(item.name))
-  if (managers.length !== 1 || !managers[0].id || typeof managers[0].config !== 'object') throw new Error('业务来源必须有一个明确的 MCP manager 配置')
+  // 可选来源种子只按数据读取；无 MCP manager 时保留 DSH 原生装载。
+  const entries = existsSync(seed) ? yaml.load(readFileSync(seed, 'utf8')) ?? [] : []
+  if (!Array.isArray(entries) || entries.some(item => item?.insert !== undefined && !Array.isArray(item.insert))) throw new Error('业务来源 MCP 配置种子无效')
+  const managers = entries.flatMap(item => [item, ...(item?.insert ?? [])])
+    .filter(item => item?.id === 'mcp-session-manager' || typeof item?.name === 'string' && /(?:^|\/)mcp-manager\/(?:index\.(?:mjs|js|ts))$/.test(item.name))
+  if (managers.length > 1 || managers.length === 1 && (typeof managers[0]?.id !== 'string' || !managers[0].id
+    || typeof managers[0]?.name !== 'string' || !/(?:^|\/)mcp-manager\/(?:index\.(?:mjs|js|ts))$/.test(managers[0].name)
+    || !managers[0].config || typeof managers[0].config !== 'object' || Array.isArray(managers[0].config))) {
+    throw new Error('业务来源 MCP manager 声明冲突或配置无效')
+  }
+  const manager = managers[0]
+  const pluginRoot = config.pluginRoot ?? join(programRoot, 'platform/plugin')
+  if (manager) for (const file of ['lib/mcp-manager.js', 'business/mcp-manager.js']) {
+    if (!existsSync(join(pluginRoot, file)) || !statSync(join(pluginRoot, file)).isFile()) throw new Error('业务 MCP manager 插件尚未构建')
+  }
+  const capabilities = readLocalCapabilities(input.sourcePaths?.managed ?? dirname(input.profileManifest))
   const runtimeGeneration = input.runtimeGeneration ?? randomUUID()
-  const businessBasePath = `/agents/${input.agentId}/`
+  const businessBasePath = `/agents/${input.agentId}/instances/${input.name}/`
   const runtimeConfig = {
     assetRoot: containerAssets, stateRoot: '/var/lib/dsh/business-control-state', sharedSecretFile: containerSecret,
     coordinatorOrigin: config.coordinatorOrigin, basePath: businessBasePath,
     workspacePath: '/work/harness/workspace', presetId: input.presetId ?? input.agentId,
+    localTools: capabilities.localTools,
     binding: { workspaceId: input.workspaceId, agentId: input.agentId, instanceId: input.name,
       runtimeGeneration, sourceDigest: input.sourceDigest },
   }
   const patch = [
     { id: 'webserver', config: { host: '0.0.0.0', port: input.port, compression: 'gzip', compressionLevel: 1, compressionThresholdBytes: 1024 } },
-    { id: managers[0].id, disabled: true },
-    ...createBusinessRuntimePatch(runtimeConfig, `${containerPlugin}/business/runtime.js`, `${containerPlugin}/business/mcp-manager.js`, managers[0].config),
+    ...(manager ? [{ id: manager.id, disabled: true }] : []),
+    ...createBusinessRuntimePatch(runtimeConfig, `${containerPlugin}/business/runtime.js`,
+      manager ? `${containerPlugin}/business/mcp-manager.js` : undefined, manager?.config),
   ]
   delete service.network_mode
   service.networks = ['business']
@@ -99,8 +143,9 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
   command.splice(tail, 0, '--patch', containerPatch)
   service.environment.push(`HARNESS_ASSET_ROOT=${containerAssets}`)
   service.environment.push(`HARNESS_BUSINESS_AGENT_ID=${input.agentId}`)
+  service.environment.push(`HARNESS_BUSINESS_INSTANCE_ID=${input.name}`)
   service.volumes.push(
-    { type: 'bind', source: config.pluginRoot, target: containerPlugin, read_only: true },
+    { type: 'bind', source: pluginRoot, target: containerPlugin, read_only: true },
     { type: 'bind', source: config.assetRoot, target: containerAssets, read_only: true },
     { type: 'bind', source: config.sharedSecretFile, target: containerSecret, read_only: true },
     { type: 'bind', source: '${DSH_BUSINESS_PATCH_HOST:?业务控制 Patch 由启动器注入}', target: containerPatch, read_only: true },
@@ -108,13 +153,21 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
   return { compose: yaml.dump(compose, { lineWidth: -1, noRefs: true }), patch: yaml.dump(patch, { lineWidth: -1, noRefs: true }),
     registration: { runtime_generation: runtimeGeneration, source_digest: input.sourceDigest,
       origin: `http://127.0.0.1:${input.port}`, scheduling_supported: false },
-    runtimeConfig }
+    runtimeConfig, localModelRoutes: capabilities.localModelRoutes }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
+    if (process.argv[2] === '--capabilities') {
+      console.log(JSON.stringify(readLocalCapabilities(resolve(process.argv[3]!))))
+      process.exit(0)
+    }
     if (process.argv[2] === '--entry') {
-      console.log(JSON.stringify({ url: businessGatewayEntry(resolve(process.argv[3]!), process.argv[4]!, process.argv[5]!) }))
+      const assetRoot = resolve(process.argv[3]!), agentId = process.argv[4]!, instanceId = process.argv[5]!
+      const url = businessGatewayEntry(assetRoot, agentId, instanceId)
+      const access = JSON.parse(readFileSync(join(assetRoot, 'config/business-access.json'), 'utf8'))
+      const selected = access.gateway.instances.find((item: { agentId: string; instanceId: string }) => item.agentId === agentId && item.instanceId === instanceId)
+      console.log(JSON.stringify({ url, accessMode: selected?.accessMode === 'anonymous' ? 'anonymous' : 'authenticated' }))
       process.exit(0)
     }
     const config = readBusinessLaunchConfig(resolve(process.argv[2]!))
@@ -124,5 +177,19 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       valid: true, assetRoot: config.assetRoot, pluginRoot: config.pluginRoot,
       ...(input?.sourcePaths ? { sourceDigest: businessSourceDigest(input.sourcePaths) } : {}),
     }))
-  } catch { console.error('业务启动配置或受控 Compose 无效，请核对路径、已构建插件和可达协调器'); process.exitCode = 1 }
+  } catch (error) {
+    const known = new Set([
+      '业务数据根或共享密钥文件无效', '业务访问配置尚未启用', '协调器必须使用不含路径和凭据的 HTTP 来源地址',
+      'bridge 容器不能使用宿主回环地址访问协调器；请配置可达宿主地址', '业务插件根路径无效',
+      '业务 Runtime 插件尚未构建', '业务 MCP manager 插件尚未构建', '业务来源 MCP 配置种子无效',
+      '业务来源 MCP manager 声明冲突或配置无效', '业务本地能力声明必须是受控普通文件',
+      '业务本地能力声明无效', '业务资产在计划后已改变', '业务实例登记参数无效',
+      '业务 Compose 缺少受控 dsh 网络入口', '业务 Runtime 必须关闭免认证并保留明确监听配置',
+      '业务启动配置的 assetRoot 必须是已存在的规范化绝对路径',
+      '业务启动配置的 sharedSecretFile 必须是已存在的规范化绝对路径',
+    ])
+    const reason = error instanceof Error && known.has(error.message) ? error.message : '业务启动配置或来源文件解析失败'
+    console.error(`BUSINESS_STARTUP_ERROR:${reason}`)
+    process.exitCode = 1
+  }
 }

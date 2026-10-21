@@ -255,6 +255,7 @@ type GroupTarget = Extract<Target, { kind: 'group' }>
 type GroupVersion = 1 | 2
 
 export const GROUP_TARGET_META_KEY = 'io.deepseek.dsh/mcp-group-target'
+export const GROUP_DISCOVERY_META_KEY = 'io.deepseek.dsh/mcp-group-discovery'
 /** 与既有业务 MCP 桥使用同一身份合同，凭据轮换不改变目标摘要。 */
 export function groupTargetDigest(target: GroupTarget, version: GroupVersion = 1): string {
   if (version === 2 && new Set(target.group.members.map((member: any) => member.serverId)).size !== target.group.members.length) {
@@ -285,7 +286,7 @@ function v2ToolName(serverId: string, rawName: string): string {
   return `${serverId.replaceAll('_', '_0')}__${rawName}`
 }
 
-async function toolsFor(target: Target, version: GroupVersion = 1, signal?: AbortSignal): Promise<any[]> {
+async function toolsFor(target: Target, version: GroupVersion = 1, signal?: AbortSignal, unavailable: string[] = []): Promise<any[]> {
   if (target.kind === 'agent') {
     const tools = await serverTools({ ...target.server, platformSignal: signal ?? target.server.platformSignal })
     return tools.filter((tool: any) => !target.server.tools || target.server.tools.mode === 'all'
@@ -293,11 +294,19 @@ async function toolsFor(target: Target, version: GroupVersion = 1, signal?: Abor
   }
   const result: any[] = []
   const names = new Set<string>()
-  for (const member of target.group.members) {
-    if (!member.names.length) continue
+  const catalogs = await Promise.all(target.group.members.filter(member => member.names.length).map(async member => {
     const server = target.servers.find(item => item.id === member.serverId && item.enabled)
-    if (!server) continue
-    const tools = await serverTools({ ...server, platformSignal: signal ?? server.platformSignal })
+    if (!server) return { member, server, tools: [] as any[] }
+    let tools: any[]
+    try { tools = await serverTools({ ...server, platformSignal: signal ?? server.platformSignal }) }
+    catch (error) {
+      if (version === 1 || signal?.aborted) throw error
+      return { member, server, tools: [] as any[], failed: true }
+    }
+    return { member, server, tools }
+  }))
+  for (const { member, server, tools, failed } of catalogs) {
+    if (failed) unavailable.push(server.id)
     for (const tool of tools) {
       if (member.names.includes(tool.name) && (version === 1 || server.tools?.mode !== 'selected' || server.tools.names.includes(tool.name))) {
         const name = version === 1 ? `mcp__${serverName(server)}__${tool.name}` : v2ToolName(server.id, tool.name)
@@ -353,14 +362,24 @@ async function resourceCatalog(server: any, kind: 'r' | 't'): Promise<any[]> {
     : (await client.listResourceTemplates(undefined, { signal: server.platformSignal })).resourceTemplates)
 }
 
-async function resourcesFor(target: GroupTarget, kind: 'r' | 't', signal?: AbortSignal): Promise<any[]> {
+async function resourcesFor(target: GroupTarget, kind: 'r' | 't', signal?: AbortSignal, unavailable: string[] = []): Promise<any[]> {
   const result: any[] = []
   const uris = new Set<string>()
-  for (const member of target.group.members) {
+  const catalogs = await Promise.all(target.group.members.map(async member => {
     const selected = kind === 'r' ? member.resourceUris ?? [] : member.resourceTemplates ?? []
     const server = target.servers.find(item => item.id === member.serverId && item.enabled)
-    if (!server || !selected.length) continue
-    for (const item of await resourceCatalog({ ...server, platformSignal: signal ?? server.platformSignal }, kind)) {
+    if (!server || !selected.length) return { member, server, selected, catalog: [] as any[] }
+    let catalog: any[]
+    try { catalog = await resourceCatalog({ ...server, platformSignal: signal ?? server.platformSignal }, kind) }
+    catch (error) {
+      if (signal?.aborted) throw error
+      return { member, server, selected, catalog: [] as any[], failed: true }
+    }
+    return { member, server, selected, catalog }
+  }))
+  for (const { server, selected, catalog, failed } of catalogs) {
+    if (failed) unavailable.push(server.id)
+    for (const item of catalog) {
       const sourceUri = kind === 'r' ? item.uri : item.uriTemplate
       if (!selected.includes(sourceUri)) continue
       const uri = groupResourceUri(target.group.id, server.id, kind, sourceUri)
@@ -445,8 +464,10 @@ async function serveMcp(req: any, res: any, target: Target, currentTarget?: () =
       version: '0.1.0' }, { capabilities: target.kind === 'agent' || target.kind === 'group' && version === 2
         ? { tools: {}, resources: {} } : { tools: {} } })
     mcp.server.setRequestHandler('tools/list', async (request: any, extra: any) => runRequest('tools/list', request, async () => {
-      const tools = await toolsFor(target, version, extra?.mcpReq?.signal ?? extra?.signal); assertTarget()
-      return { tools, ...(digest ? { _meta: { [GROUP_TARGET_META_KEY]: version === 1 ? { digest } : { digest, version } } } : {}) }
+      const unavailable: string[] = []
+      const tools = await toolsFor(target, version, extra?.mcpReq?.signal ?? extra?.signal, unavailable); assertTarget()
+      return { tools, ...(digest ? { _meta: { [GROUP_TARGET_META_KEY]: version === 1 ? { digest } : { digest, version },
+        ...(unavailable.length ? { [GROUP_DISCOVERY_META_KEY]: { unavailable } } : {}) } } : {}) }
     }))
     mcp.server.setRequestHandler('tools/call', async (request: any, extra: any) => runRequest('tools/call', request, async () => {
       assertTarget(request)
@@ -459,15 +480,19 @@ async function serveMcp(req: any, res: any, target: Target, currentTarget?: () =
     if (target.kind === 'agent' || target.kind === 'group' && version === 2) {
       mcp.server.setRequestHandler('resources/list', async (request: any, extra: any) => runRequest('resources/list', request, async () => {
         const signal = extra?.mcpReq?.signal ?? extra?.signal
-        const resources = target.kind === 'group' ? await resourcesFor(target, 'r', signal)
+        const unavailable: string[] = []
+        const resources = target.kind === 'group' ? await resourcesFor(target, 'r', signal, unavailable)
           : (await resourceCatalog({ ...target.server, platformSignal: signal }, 'r'))
-        assertTarget(); return { resources, ...(digest ? { _meta: { [GROUP_TARGET_META_KEY]: { digest, version } } } : {}) }
+        assertTarget(); return { resources, ...(digest ? { _meta: { [GROUP_TARGET_META_KEY]: { digest, version },
+          ...(unavailable.length ? { [GROUP_DISCOVERY_META_KEY]: { unavailable } } : {}) } } : {}) }
       }))
       mcp.server.setRequestHandler('resources/templates/list', async (request: any, extra: any) => runRequest('resources/templates/list', request, async () => {
         const signal = extra?.mcpReq?.signal ?? extra?.signal
-        const resourceTemplates = target.kind === 'group' ? await resourcesFor(target, 't', signal)
+        const unavailable: string[] = []
+        const resourceTemplates = target.kind === 'group' ? await resourcesFor(target, 't', signal, unavailable)
           : (await resourceCatalog({ ...target.server, platformSignal: signal }, 't'))
-        assertTarget(); return { resourceTemplates, ...(digest ? { _meta: { [GROUP_TARGET_META_KEY]: { digest, version } } } : {}) }
+        assertTarget(); return { resourceTemplates, ...(digest ? { _meta: { [GROUP_TARGET_META_KEY]: { digest, version },
+          ...(unavailable.length ? { [GROUP_DISCOVERY_META_KEY]: { unavailable } } : {}) } } : {}) }
       }))
       mcp.server.setRequestHandler('resources/read', async (request: any, extra: any) => runRequest('resources/read', request, async () => {
         assertTarget(request)
@@ -535,7 +560,8 @@ export function apply(ctx: any, config: any): void {
   const publicPath = (path: string) => ctx.webServer.publicPath?.(path) ?? path
   const agents = new Map<string, Target>()
   const agentToken = randomBytes(32).toString('hex')
-  const mounted = new Map<object, { version: string; ready: Promise<any[]>; users: number }>()
+  const mounted = new Map<object, { version: string; ready: Promise<any[]>; users: number;
+    unavailable: Set<string>; retry?: Promise<void> }>()
   const registeredTools = new Map<string, number>()
   const registeredResourceServers = new Map<string, number>()
   snapshot(config)
@@ -559,10 +585,12 @@ export function apply(ctx: any, config: any): void {
   }, async listGroupTools(id: string, version: GroupVersion = 2) {
     const target = currentGroup(id)
     if (!target) throw new Error('MCP 分组不存在')
-    const tools = await toolsFor(target, version)
+    const unavailable: string[] = []
+    const tools = await toolsFor(target, version, undefined, unavailable)
     assertGroupTarget(target, () => currentGroup(id), version)
     const digest = groupTargetDigest(target, version)
-    return { tools, _meta: { [GROUP_TARGET_META_KEY]: version === 1 ? { digest } : { digest, version } } }
+    return { tools, _meta: { [GROUP_TARGET_META_KEY]: version === 1 ? { digest } : { digest, version },
+      ...(unavailable.length ? { [GROUP_DISCOVERY_META_KEY]: { unavailable } } : {}) } }
   }, async callGroupTool(id: string, version: GroupVersion, name: string, args: any,
     meta: Record<string, unknown> | undefined, exec: any) {
     const dispatch = async () => {
@@ -670,104 +698,160 @@ export function apply(ctx: any, config: any): void {
     } catch (error) { send(res, 400, { error: error instanceof Error ? error.message : String(error) }) }
   } }), 'mcp-manager.admin')
 
-  ctx.on('agent/created', async ({ agent }: any) => {
+  const loadServers = async (selected: any[], preset: object, scopes: any[], unavailable: Set<string>) => {
+    const enabled = selected.filter(server => server.enabled && (server.platformComposition || server.specUrl || resolvedUrl(server)))
+    // Session 创建只等待有界的并发发现；单个上游卡住时，其余工具仍可装载。
+    const discoveries = config.withToolContext ? await Promise.allSettled(enabled.map(server => {
+      const timeoutMs = Number.isSafeInteger(server.platformTimeoutMs) && server.platformTimeoutMs > 0
+        ? Math.min(server.platformTimeoutMs, 10_000) : 10_000
+      const timeout = AbortSignal.timeout(timeoutMs)
+      return serverTools({ ...server, platformSignal: server.platformSignal
+        ? AbortSignal.any([server.platformSignal, timeout]) : timeout })
+    })) : []
+    for (const [index, server] of enabled.entries()) {
+      let discoveredTools: any[] = []
+      if (config.withToolContext) {
+        const result = discoveries[index]
+        if (result.status === 'rejected') {
+          if (server.platformSignal?.aborted) throw result.reason
+          const status = result.reason instanceof Error ? result.reason.message.match(/\bHTTP\s+([1-5]\d\d)\b/)?.[1] : undefined
+          ctx.logger?.warn(`MCP 服务 ${server.id} 工具发现失败${status ? `（HTTP ${status}）` : ''}；本次 Session 不装载该服务，请在 MCP 管理检查连接`)
+          unavailable.add(server.id)
+          continue
+        }
+        discoveredTools = result.value
+      }
+      const id = randomUUID()
+      const scope = createScope(ctx, preset)
+      scopes.push(scope)
+      try {
+        agents.set(id, { kind: 'agent', server })
+        scope.ctx.effect(() => () => { agents.delete(id) }, 'mcp-manager.agent-endpoint')
+        if (config.withToolContext) {
+          if (server.platformGroup) scope.ctx.inject(['mcpResources'], (inner: any) => {
+            inner.mcpResources.register(server.id, { request: (request: any, execution: any) => config.withToolContext(execution, async () => {
+              server.platformAssertCurrent?.()
+              const active = { ...server, platformSignal: execution.signal }
+              const result = await withClient(active, client => {
+                if (request.method === 'resources/list') return client.listResources(request.cursor ? { cursor: request.cursor } : undefined, { signal: execution.signal })
+                if (request.method === 'resources/templates/list') return client.listResourceTemplates(request.cursor ? { cursor: request.cursor } : undefined, { signal: execution.signal })
+                if (request.method === 'resources/read' && typeof request.uri === 'string') return client.readResource({ uri: request.uri }, { signal: execution.signal })
+                throw new Error('不支持的 MCP Resource 操作')
+              })
+              server.platformAssertCurrent?.()
+              return result
+            }) })
+            inner.effect(() => {
+              const count = (registeredResourceServers.get(server.id) ?? 0) + 1
+              registeredResourceServers.set(server.id, count)
+              if (count === 1) config.onManagedResourceServer?.(server.id, true)
+              return () => {
+                const remaining = (registeredResourceServers.get(server.id) ?? 1) - 1
+                if (remaining) registeredResourceServers.set(server.id, remaining)
+                else { registeredResourceServers.delete(server.id); config.onManagedResourceServer?.(server.id, false) }
+              }
+            }, 'mcp-manager.group-resources')
+          })
+          // 直接复用原生工具桥；避免进程内 HTTP loopback 丢失每次调用的业务主体。
+          for (const tool of discoveredTools.filter((item: any) => server.tools.mode === 'all' || server.tools.names.includes(item.name))) {
+            const publicName = publicToolName(serverName(server), tool.name)
+            scope.ctx.effect(() => {
+              const unregister = scope.ctx.tools.register(McpClient.createMcpToolDefinition(scope.ctx, {
+              name: publicName, rawName: tool.name,
+              description: tool.description ?? '', inputSchema: tool.inputSchema, outputSchema: tool.outputSchema,
+              call: (args: any, execution: any) => config.withToolContext(execution, async () => {
+                const latest = snapshot(config).servers.find(item => item.id === server.id && item.enabled !== false)
+                if (!latest || JSON.stringify([latest.specUrl, latest.url]) !== JSON.stringify([server.specUrl, server.url])) throw new Error('MCP 服务器目标已变化或已停用')
+                return callManagedTool({ ...latest, platformSignal: execution.signal }, tool.name, args)
+              }),
+              }))
+              const registration = `${server.id}\0${publicName}`
+              const count = registeredTools.get(registration) ?? 0
+              registeredTools.set(registration, count + 1)
+              if (count === 0) config.onManagedTool?.(publicName, true)
+              return () => {
+                const remaining = (registeredTools.get(registration) ?? 1) - 1
+                if (remaining) registeredTools.set(registration, remaining)
+                else { registeredTools.delete(registration); config.onManagedTool?.(publicName, false) }
+                return unregister()
+              }
+            })
+          }
+        } else await scope.ctx.plugin(McpClient, McpClient.Config({
+          transport: 'streamable-http',
+          serverName: serverName(server),
+          url: `http://127.0.0.1:${ctx.webServer.port}${publicPath(`/mcp/agents/${id}`)}`,
+          headers: { Authorization: `Bearer ${agentToken}` },
+        }))
+        unavailable.delete(server.id)
+      } catch (error) {
+        scopes.pop()
+        await scope.dispose()
+        unavailable.add(server.id)
+        ctx.logger?.warn(`MCP 服务 ${server.id} 工具注册失败；本次 Session 不装载该服务，请检查工具定义`)
+      }
+    }
+  }
+
+  if (config.autoMountServers !== false) ctx.on('agent/created', async ({ agent }: any) => {
     const preset = scopeParentOf(agent)
     if (!preset) return
     const current = snapshot(config)
     const version = JSON.stringify([current.servers, current.sharedToken])
     let entry = mounted.get(preset)
-    if (!entry || entry.version !== version) {
+    const reused = entry?.version === version
+    if (!reused) {
       const previous = entry
-      entry = { version, users: 0, ready: (async () => {
-        if (previous) await Promise.all((await previous.ready.catch(() => [])).map(scope => scope.dispose()))
+      const unavailable = new Set<string>()
+      const ready = (async () => {
+        if (previous) {
+          await previous.retry?.catch(() => {})
+          await Promise.all((await previous.ready.catch(() => [])).map(scope => scope.dispose()))
+        }
         const scopes: any[] = []
         try {
-          for (const server of current.servers) {
-            if (!server.enabled || !(server.specUrl || resolvedUrl(server))) continue
-            const id = randomUUID()
-            const scope = createScope(ctx, preset)
-            scopes.push(scope)
-            agents.set(id, { kind: 'agent', server })
-            scope.ctx.effect(() => () => { agents.delete(id) }, 'mcp-manager.agent-endpoint')
-            if (config.withToolContext) {
-              if (server.platformGroup) scope.ctx.inject(['mcpResources'], (inner: any) => {
-                inner.mcpResources.register(server.id, { request: (request: any, execution: any) => config.withToolContext(execution, async () => {
-                  server.platformAssertCurrent?.()
-                  const active = { ...server, platformSignal: execution.signal }
-                  const result = await withClient(active, client => {
-                    if (request.method === 'resources/list') return client.listResources(request.cursor ? { cursor: request.cursor } : undefined, { signal: execution.signal })
-                    if (request.method === 'resources/templates/list') return client.listResourceTemplates(request.cursor ? { cursor: request.cursor } : undefined, { signal: execution.signal })
-                    if (request.method === 'resources/read' && typeof request.uri === 'string') return client.readResource({ uri: request.uri }, { signal: execution.signal })
-                    throw new Error('不支持的 MCP Resource 操作')
-                  })
-                  server.platformAssertCurrent?.()
-                  return result
-                }) })
-                inner.effect(() => {
-                  const count = (registeredResourceServers.get(server.id) ?? 0) + 1
-                  registeredResourceServers.set(server.id, count)
-                  if (count === 1) config.onManagedResourceServer?.(server.id, true)
-                  return () => {
-                    const remaining = (registeredResourceServers.get(server.id) ?? 1) - 1
-                    if (remaining) registeredResourceServers.set(server.id, remaining)
-                    else { registeredResourceServers.delete(server.id); config.onManagedResourceServer?.(server.id, false) }
-                  }
-                }, 'mcp-manager.group-resources')
-              })
-              // 直接复用原生工具桥；避免进程内 HTTP loopback 丢失每次调用的业务主体。
-              const tools = await serverTools(server)
-              for (const tool of tools.filter((item: any) => server.tools.mode === 'all' || server.tools.names.includes(item.name))) {
-                const publicName = publicToolName(serverName(server), tool.name)
-                scope.ctx.effect(() => {
-                  const unregister = scope.ctx.tools.register(McpClient.createMcpToolDefinition(scope.ctx, {
-                  name: publicName, rawName: tool.name,
-                  description: tool.description ?? '', inputSchema: tool.inputSchema, outputSchema: tool.outputSchema,
-                  call: (args: any, execution: any) => config.withToolContext(execution, async () => {
-                    const latest = snapshot(config).servers.find(item => item.id === server.id && item.enabled !== false)
-                    if (!latest || JSON.stringify([latest.specUrl, latest.url]) !== JSON.stringify([server.specUrl, server.url])) throw new Error('MCP 服务器目标已变化或已停用')
-                    return callManagedTool({ ...latest, platformSignal: execution.signal }, tool.name, args)
-                  }),
-                  }))
-                  const registration = `${server.id}\0${publicName}`
-                  const count = registeredTools.get(registration) ?? 0
-                  registeredTools.set(registration, count + 1)
-                  if (count === 0) config.onManagedTool?.(publicName, true)
-                  return () => {
-                    const remaining = (registeredTools.get(registration) ?? 1) - 1
-                    if (remaining) registeredTools.set(registration, remaining)
-                    else { registeredTools.delete(registration); config.onManagedTool?.(publicName, false) }
-                    return unregister()
-                  }
-                })
-              }
-            } else await scope.ctx.plugin(McpClient, McpClient.Config({
-              transport: 'streamable-http',
-              serverName: serverName(server),
-              url: `http://127.0.0.1:${ctx.webServer.port}${publicPath(`/mcp/agents/${id}`)}`,
-              headers: { Authorization: `Bearer ${agentToken}` },
-            }))
-          }
+          await loadServers(current.servers, preset, scopes, unavailable)
           return scopes
         } catch (error) {
           await Promise.all(scopes.map(scope => scope.dispose()))
           throw error
         }
-      })() }
+      })()
+      entry = { version, users: 0, ready, unavailable }
       mounted.set(preset, entry)
     }
-    entry.users++
-    try { await entry.ready }
+    const active = entry!
+    const release = async () => {
+      active.users--
+      if (active.users === 0) {
+        if (mounted.get(preset) === active) mounted.delete(preset)
+        await Promise.all((await active.ready.catch(() => [])).map(scope => scope.dispose()))
+      }
+    }
+    active.users++
+    try {
+      await active.ready
+      if (reused && active.unavailable.size) {
+        active.retry ??= (async () => {
+          const scopes = await active.ready
+          const added: any[] = []
+          const pending = new Set(active.unavailable)
+          try {
+            await loadServers(current.servers.filter(server => pending.has(server.id)), preset, added, active.unavailable)
+            scopes.push(...added)
+          } catch (error) {
+            for (const id of pending) active.unavailable.add(id)
+            await Promise.all(added.map(scope => scope.dispose()))
+            throw error
+          }
+        })().finally(() => { active.retry = undefined })
+        await active.retry
+      }
+    }
     catch (error) {
-      entry.users--
-      if (mounted.get(preset) === entry) mounted.delete(preset)
+      await release()
       throw error
     }
-    agent.ctx.effect(() => async () => {
-      entry.users--
-      if (entry.users === 0) {
-        if (mounted.get(preset) === entry) mounted.delete(preset)
-        await Promise.all((await entry.ready).map(scope => scope.dispose()))
-      }
-    }, 'mcp-manager.agent')
+    agent.ctx.effect(() => release, 'mcp-manager.agent')
   }, { prepend: true })
 }

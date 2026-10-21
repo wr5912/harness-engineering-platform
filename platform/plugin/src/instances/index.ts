@@ -2,7 +2,7 @@ import { instanceStateRoot, programRoot, workspaceConfigPath, workspaceOwnsInsta
 import { businessGatewayEntry } from '../business-control/entry.ts'
 import { execFile as execFileCallback } from 'node:child_process'
 import { createHmac, randomBytes } from 'node:crypto'
-import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdtemp, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, relative, resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -28,8 +28,12 @@ export interface InstanceActionRequest {
   name: string
   source?: string
   expected_source_id?: string
+  expected_source_digest?: string
   expected_state?: string
   mode?: 'eval'
+  business_control?: boolean
+  access_mode?: 'authenticated' | 'anonymous'
+  identity_mode?: 'development' | 'published'
   port?: number
   allow_missing_env?: boolean
   model_selection?: ModelSelection
@@ -103,6 +107,52 @@ function optionalBoolean(value: unknown, name: string): boolean | undefined {
   if (value === undefined) return undefined
   if (typeof value !== 'boolean') throw new Error(`${name} 必须是 boolean`)
   return value
+}
+
+function businessAccessPath(assetRoot: string): string { return workspaceConfigPath(assetRoot, 'business-access.json') }
+
+async function businessAccess(assetRoot: string, requireEnabled = true): Promise<Record<string, unknown> & { gateway: Record<string, unknown> }> {
+  const access = JSON.parse(await readFile(businessAccessPath(assetRoot), 'utf8')) as Record<string, unknown>
+  const gateway = access.gateway
+  if (access.schemaVersion !== 1 || (requireEnabled && access.enabled !== true) || !gateway || typeof gateway !== 'object'
+    || Array.isArray(gateway) || !Array.isArray((gateway as Record<string, unknown>).instances)) {
+    throw new Error(requireEnabled ? '业务网关尚未配置，无法创建受控实例' : '业务网关登记配置无效，拒绝删除受控实例')
+  }
+  return access as Record<string, unknown> & { gateway: Record<string, unknown> }
+}
+
+function assertMatchingRegistration(instances: Record<string, unknown>[], input: { agentId: string; instanceId: string; sourceId: string; sourceDigest: string; accessMode?: 'authenticated' | 'anonymous'; identityMode?: 'development' | 'published' }): void {
+  const existing = instances.find(row => row.instanceId === input.instanceId)
+  if (existing && (existing.agentId !== input.agentId || existing.sourceId && existing.sourceId !== input.sourceId
+    || existing.sourceDigest && existing.sourceDigest !== input.sourceDigest
+    || input.accessMode && (existing.accessMode ?? 'authenticated') !== input.accessMode
+    || input.identityMode && (existing.identityMode ?? 'published') !== input.identityMode)) throw new Error('业务网关中同名实例的来源、访问方式或实例阶段不一致，拒绝覆盖')
+}
+
+async function preflightGatewayRegistration(assetRoot: string, input: { agentId: string; instanceId: string; sourceId: string; sourceDigest: string; accessMode?: 'authenticated' | 'anonymous'; identityMode?: 'development' | 'published' }, remove = false): Promise<void> {
+  const access = await businessAccess(assetRoot, !remove)
+  assertMatchingRegistration(access.gateway.instances as Record<string, unknown>[], input)
+}
+
+async function updateGatewayRegistration(assetRoot: string, input: { agentId: string; instanceId: string; sourceId: string; sourceDigest: string; accessMode?: 'authenticated' | 'anonymous'; identityMode?: 'development' | 'published' }, remove = false): Promise<void> {
+  const path = businessAccessPath(assetRoot), lock = `${path}.lock`, temporary = `${path}.${process.pid}.${randomBytes(8).toString('hex')}.tmp`
+  let handle: Awaited<ReturnType<typeof open>>
+  try { handle = await open(lock, 'wx', 0o600) }
+  catch { throw new Error('业务网关配置正在更新，请刷新后重试；实例登记状态待核对') }
+  try {
+    const access = await businessAccess(assetRoot, !remove)
+    const instances = access.gateway.instances as Record<string, unknown>[]
+    assertMatchingRegistration(instances, input)
+    const existing = instances.find(row => row.instanceId === input.instanceId)
+    const next = remove ? instances.filter(row => row.instanceId !== input.instanceId)
+      : [...instances.filter(row => row.instanceId !== input.instanceId), { ...input,
+        ...(input.accessMode ? {} : existing?.accessMode ? { accessMode: existing.accessMode } : {}),
+        ...(input.identityMode ? {} : existing?.identityMode ? { identityMode: existing.identityMode } : {}) }]
+    if (JSON.stringify(instances) === JSON.stringify(next)) return
+    access.gateway.instances = next
+    await writeFile(temporary, JSON.stringify(access, null, 2) + '\n', { mode: 0o600, flag: 'wx' })
+    await rename(temporary, path)
+  } finally { await handle.close(); await rm(lock, { force: true }); await rm(temporary, { force: true }) }
 }
 
 function modelSelection(value: unknown): ModelSelection {
@@ -256,7 +306,7 @@ async function runUpWithModelPolicy(assetRoot: string, args: string[], agentId: 
   } finally { await rm(directory, { recursive: true, force: true }) }
 }
 
-async function listSources(assetRoot: string): Promise<{ sources: RegisteredSource[] }> {
+async function listSources(assetRoot: string): Promise<{ sources: RegisteredSource[]; business_gateway_available: boolean }> {
   const file = workspaceConfigPath(assetRoot, 'sources.json')
   let catalog: Record<string, unknown>
   try {
@@ -283,7 +333,9 @@ async function listSources(assetRoot: string): Promise<{ sources: RegisteredSour
       reason: selectable ? '已登记，Candidate 目录可读取；预览时仍需核对 Runtime 与环境' : !agentId ? '来源登记缺少智能体 ID' : 'Candidate 目录不可读取',
     }
   }))
-  return { sources: sources.sort((a, b) => a.agent_id.localeCompare(b.agent_id) || b.experiment_id.localeCompare(a.experiment_id, 'en', { numeric: true })) }
+  const businessGatewayAvailable = await businessAccess(assetRoot).then(() => true, () => false)
+  return { sources: sources.sort((a, b) => a.agent_id.localeCompare(b.agent_id) || b.experiment_id.localeCompare(a.experiment_id, 'en', { numeric: true })),
+    business_gateway_available: businessGatewayAvailable }
 }
 
 async function manifestFor(assetRoot: string, name: string): Promise<Record<string, unknown> | null> {
@@ -301,11 +353,22 @@ async function listInstances(assetRoot: string, signal?: AbortSignal): Promise<{
   const result = await runDsh(assetRoot, ['ps', '--all'], signal)
   const parsed = JSON.parse(result.stdout || '{}') as { instances?: Record<string, unknown>[] }
   const observedAt = new Date().toISOString()
+  const gatewayRows = await businessAccess(assetRoot, false).then(value => value.gateway.instances as Record<string, unknown>[], () => [])
+  const gatewayUrl = (instance: Record<string, unknown>): string | undefined => {
+    if (!instance.business_gateway || typeof instance.agent_id !== 'string' || typeof instance.name !== 'string') return undefined
+    try { return businessGatewayEntry(assetRoot, instance.agent_id, instance.name) }
+    catch { return undefined }
+  }
   return {
     schema_version: '1.0',
     observed_at: observedAt,
     state_root: instanceStateRoot(assetRoot),
-    instances: (parsed.instances || []).map(instance => ({ observed_at: observedAt, ...instance }) as InstanceRecord),
+    instances: (parsed.instances || []).map(instance => ({ observed_at: observedAt, ...instance,
+      ...(instance.business_gateway ? {
+        access_mode: gatewayRows.find(row => row.instanceId === instance.name && row.agentId === instance.agent_id)?.accessMode ?? 'authenticated',
+        identity_mode: gatewayRows.find(row => row.instanceId === instance.name && row.agentId === instance.agent_id)?.identityMode ?? 'published',
+        access_url: gatewayUrl(instance),
+      } : {}) }) as InstanceRecord),
   }
 }
 
@@ -329,16 +392,36 @@ async function requestForUp(assetRoot: string, request: InstanceActionRequest, r
   if (requireRecordedModel && manifest && !request.model_selection && registeredDefault == null) {
     throw new Error('此实例未记录默认模型，请先明确选择模型并重新预览；本次未执行。')
   }
+  if (manifest && request.business_control !== undefined && request.business_control !== Boolean(manifest.business_control)) {
+    throw new Error('既有实例不能切换业务网关边界；请新建独立实例')
+  }
+  const businessControl = manifest ? Boolean(manifest.business_control) : request.business_control === true
+  const access = businessControl ? await businessAccess(assetRoot) : undefined
+  if (request.access_mode && (!businessControl || request.operation !== 'create')) throw new Error('访问方式只能在创建受控实例时选择')
+  if (request.identity_mode && (!businessControl || request.operation !== 'create')) throw new Error('智能体身份验证阶段只能在创建网关实例时选择')
+  const registered = (access?.gateway.instances as Record<string, unknown>[] | undefined)
+    ?.find(row => row.instanceId === request.name && row.agentId === manifest?.agent_id)
+  const recordedBusiness = manifest?.business_control as { launch_config_file?: unknown; config_file?: unknown } | undefined
+  if (recordedBusiness && typeof recordedBusiness.launch_config_file !== 'string' && typeof recordedBusiness.config_file !== 'string') {
+    throw new Error('此旧受控实例未记录启动配置路径；请先核对原启动配置，不自动替换为当前网关配置')
+  }
   return {
     ...request, manifest,
+    business_control: businessControl,
+    ...(businessControl ? {
+      access_mode: request.access_mode ?? (registered?.accessMode === 'anonymous' ? 'anonymous' : 'authenticated'),
+      identity_mode: request.identity_mode ?? (manifest ? registered?.identityMode === 'development' ? 'development' : 'published' : 'development'),
+    } : {}),
     source: request.source || (manifest ? assertSource(manifest.source_id) : undefined),
     port: request.port ?? optionalPort(manifest?.port),
     model_selection: request.model_selection ?? (registeredDefault == null ? undefined : modelSelection(registeredDefault)),
   }
 }
 
-function upArgs(request: InstanceActionRequest & { manifest?: any }, dryRun = false): string[] {
+function upArgs(assetRoot: string, request: InstanceActionRequest & { manifest?: any }, dryRun = false): string[] {
   const args = ['up', '--name', request.name, '--source', request.source || '', '--mode', 'eval']
+  if (request.business_control) args.push('--business-control', request.manifest?.business_control?.launch_config_file
+    || request.manifest?.business_control?.config_file || businessAccessPath(assetRoot))
   if (request.port) args.push('--port', String(request.port))
   if (dryRun) args.push('--dry-run')
   if (request.operation === 'restart') args.push('--replace')
@@ -368,9 +451,10 @@ async function previewOne(assetRoot: string, request: InstanceActionRequest, sig
     const source = prepared.source
     if (!source) throw new Error('创建、启动或重启需要来源')
     const agentId = await ensureRealSource(assetRoot, source)
-    const projected = await runUpWithModelPolicy(assetRoot, upArgs({ ...prepared, name, source }, true), agentId,
+    const projected = await runUpWithModelPolicy(assetRoot, upArgs(assetRoot, { ...prepared, name, source }, true), agentId,
       modelPolicy, prepared.model_selection, undefined, registeredModelSnapshot(prepared.manifest), signal)
     return { operation: request.operation, name, plan: JSON.parse(projected.result.stdout), retention: retention(request.operation),
+      ...(prepared.business_control ? { access_mode: prepared.access_mode, identity_mode: prepared.identity_mode } : {}),
       model_selection: projected.model_selection, model_policy_hash: projected.model_policy_hash }
   }
   const manifest = await manifestFor(assetRoot, name)
@@ -448,13 +532,56 @@ async function runOne(assetRoot: string, request: InstanceActionRequest, signal?
         const source = prepared.source
         if (!source) throw new Error('创建、启动或重启需要来源')
         const agentId = await ensureRealSource(assetRoot, source)
-        const projected = await runUpWithModelPolicy(assetRoot, upArgs({ ...prepared, name, source }), agentId,
+        if (prepared.business_control) {
+          const preview = await runUpWithModelPolicy(assetRoot, upArgs(assetRoot, { ...prepared, name, source }, true), agentId,
+            modelPolicy, prepared.model_selection, request.expected_model_policy_hash, registeredModelSnapshot(prepared.manifest), signal)
+          const plan = JSON.parse(preview.result.stdout) as { business_control?: { source_digest?: string } }
+          if (!request.expected_source_digest || plan.business_control?.source_digest !== request.expected_source_digest) {
+            throw new Error('业务来源摘要与预览不一致，请重新预览；本次未执行')
+          }
+          await preflightGatewayRegistration(assetRoot, { agentId, instanceId: name, sourceId: source,
+            sourceDigest: request.expected_source_digest,
+            ...(request.operation === 'create' ? { accessMode: prepared.access_mode, identityMode: prepared.identity_mode } : {}) })
+        }
+        const projected = await runUpWithModelPolicy(assetRoot, upArgs(assetRoot, { ...prepared, name, source }), agentId,
           modelPolicy, prepared.model_selection, request.expected_model_policy_hash, registeredModelSnapshot(prepared.manifest), signal)
+        if (prepared.business_control) {
+          try {
+            const manifest = await manifestFor(assetRoot, name)
+            const registration = manifest?.business_control as { source_digest?: string } | undefined
+            const sourceDigest = registration?.source_digest
+            if (manifest?.source_id !== source || manifest?.agent_id !== agentId
+              || !sourceDigest || sourceDigest !== request.expected_source_digest) {
+              throw new Error('受控实例启动后来源登记与预览不一致')
+            }
+            await updateGatewayRegistration(assetRoot, { agentId, instanceId: name, sourceId: source, sourceDigest,
+              ...(request.operation === 'create' ? { accessMode: prepared.access_mode, identityMode: prepared.identity_mode } : {}) })
+            businessGatewayEntry(assetRoot, agentId, name)
+          } catch (error) {
+            try { await runDsh(assetRoot, ['down', name], signal) }
+            catch { throw new Error(`实例已启动但网关登记失败，回退状态未知；请刷新实例与网关配置。${(error as Error).message}`) }
+            throw new Error(`实例已停止并保留 HOME；网关登记失败，请修复配置后重启。${(error as Error).message}`)
+          }
+        }
         return { name, operation: request.operation, ok: true, requested_source_id: source,
           value: parseCommandOutput(projected.result.stdout, projected.result.stderr) }
       }
       const command = request.operation === 'delete' ? 'delete' : 'down'
+      const before = command === 'delete' ? await manifestFor(assetRoot, name) : null
+      const beforeDigest = (before?.business_control as { source_digest?: unknown } | undefined)?.source_digest
+      let registration: { agentId: string; instanceId: string; sourceId: string; sourceDigest: string } | undefined
+      if (command === 'delete' && before?.business_control) {
+        if (typeof before.agent_id !== 'string' || typeof before.source_id !== 'string' || typeof beforeDigest !== 'string') {
+          throw new Error('受控实例来源登记不完整，拒绝删除；请先核对实例与网关配置')
+        }
+        registration = { agentId: before.agent_id, instanceId: name, sourceId: before.source_id, sourceDigest: beforeDigest }
+        await preflightGatewayRegistration(assetRoot, registration, true)
+      }
       const result = await runDsh(assetRoot, [command, name], signal)
+      if (registration) {
+        try { await updateGatewayRegistration(assetRoot, registration, true) }
+        catch (error) { throw new Error(`实例已由 DSH 删除，但业务网关登记清理未完成；请核对网关配置。${(error as Error).message}`) }
+      }
       return { name, operation: request.operation, ok: true, value: parseCommandOutput(result.stdout, result.stderr) }
     })
   } catch (error) {
@@ -510,9 +637,22 @@ function actionRequest(payload: unknown): InstanceActionRequest {
     name: assertName(object.name),
     port: optionalPort(object.port),
     allow_missing_env: optionalBoolean(object.allow_missing_env, 'allow_missing_env'),
+    business_control: optionalBoolean(object.business_control, 'business_control'),
+  }
+  if (object.access_mode !== undefined) {
+    if (!['authenticated', 'anonymous'].includes(String(object.access_mode))) throw new Error('访问方式无效')
+    request.access_mode = object.access_mode as 'authenticated' | 'anonymous'
+  }
+  if (object.identity_mode !== undefined) {
+    if (!['development', 'published'].includes(String(object.identity_mode))) throw new Error('智能体身份验证阶段无效')
+    request.identity_mode = object.identity_mode as 'development' | 'published'
   }
   if (object.source !== undefined) request.source = assertSource(object.source)
   if (object.expected_source_id !== undefined) request.expected_source_id = assertSource(object.expected_source_id)
+  if (object.expected_source_digest !== undefined) {
+    if (typeof object.expected_source_digest !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(object.expected_source_digest)) throw new Error('来源摘要无效，请重新预览')
+    request.expected_source_digest = object.expected_source_digest
+  }
   if (object.expected_state !== undefined) {
     if (request.operation !== 'stop' || !['running', 'stopped', 'absent', 'failed'].includes(String(object.expected_state))) {
       throw new Error('预览的实例状态无效，请重新预览')

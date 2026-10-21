@@ -71,7 +71,7 @@ python3 runtime/adapters/dsh-container/dsh-dev up \
 
 来源只接受 `experiment:<id>`。`source_contract.py` 校验 `sources.json` 中登记的 `candidate_root`、patch、preset、Guard 与开发叠加层确实存在且不是符号链接或硬链接，并从 preset 相对路径推出 `preset_id`——适配层不内联任何业务 Agent 名。
 
-`--source` 和 `--mode` 必须显式给出；缺失或旗标后没有值时，命令会列出当前登记的 `experiment:<id>` 和公开模式 `dev`、`eval`，然后以退出码 `2` 结束。`--name` 默认为 `<agent-id>-<dev|eval>`。新实例的 `--port` 默认从 `3081` 起选第一个未监听且未被有效实例记录占用的端口；已有同名实例则复用记录端口。两者仍可显式覆盖。
+`--source` 和 `--mode` 必须显式给出；缺失或旗标后没有值时，命令会列出当前登记的 `experiment:<id>` 和公开模式 `dev`、`eval`，然后以退出码 `2` 结束。`--name` 默认为 `<agent-id>-<dev|eval>`。新业务智能体实例的 `--port` 默认在 `18500–28999` 内选第一个未监听且未被有效实例记录占用的端口；区间已满时明确失败，已有同名实例则复用记录端口。显式指定端口沿用现有校验，不受默认区间限制。
 
 ### 4.2 编辑资产
 

@@ -51,7 +51,7 @@ export interface AgentAuthenticationEvidence {
 export interface AgentInstanceStatus {
   instanceId: string; agentId?: string
   authentication: {
-    method: 'hmac-sha256'; status: 'verified' | 'unknown' | 'expired' | 'disabled'
+    method: 'hmac-sha256' | 'none'; status: 'verified' | 'unknown' | 'expired' | 'disabled' | 'not_required'
     verifiedAt?: string; expiresAt?: string; evidence?: 'signed-control-assertion'
   }
   /** 智能体身份下的可信来源、实例绑定与撤销状态；保留既有字段，不表示行为风险或综合信任评分。 */
@@ -110,6 +110,8 @@ export interface InstanceBinding {
 }
 export interface SessionBinding extends InstanceBinding {
   sessionId: string; subjectId: string; subject: Subject; identity?: BusinessContext['identity']; createdAt: string; observedAt?: string
+  /** 经 DSH 原生 child header 核验的直接父 Session；仅保存归属关系，不保存对话。 */
+  parentSessionId?: string
 }
 export interface SessionTrustFact {
   sessionId: string; subjectId: string; agentId: string; instanceId: string; identitySource: string

@@ -145,7 +145,7 @@ test('创建弹窗填写后只请求预览，返回修改与关闭均不创建�
   select('选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } }); await ui.settle()
   assert.match(ui.text(), /现有业务实例不会因创建操作而停止或切换版本/)
   await ui.button('查看创建预览').props.onClick(); await ui.settle()
-  assert.deepEqual(JSON.parse(JSON.stringify(ui.calls.find(call => call.endpoint === 'instances/preview').payload)), { operation: 'create', name: 'new-instance', source: 'experiment:EXP-basic-001', port: 3088, model_selection: defaultModel })
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.calls.find(call => call.endpoint === 'instances/preview').payload)), { operation: 'create', name: 'new-instance', source: 'experiment:EXP-basic-001', port: 3088, business_control: false, model_selection: defaultModel })
   assert.match(ui.text(), /确认创建业务实例.*来源版本.*EXP-basic-001.*验证范围.*3 项已选用例.*最近 Run：最近评测未通过.*新增独立业务访问入口 127\.0\.0\.1:3088/)
   assert.match(ui.text(), /现有 1 个运行中业务实例保持当前状态.*创建不代表业务验证通过/)
   assert.ok(ui.button('确认创建'))
@@ -270,7 +270,7 @@ test('创建自动端口从预览冻结到执行请求，失效预览不能执�
   assert.match(ui.text(), /访问端口.*3199/)
   await ui.button('确认创建').props.onClick(); await ui.settle()
   assert.deepEqual(JSON.parse(JSON.stringify(ui.calls.find(call => call.endpoint === 'instances/run').payload)), {
-    operation: 'create', name: 'new-auto', source: 'experiment:EXP-basic-001', model_selection: defaultModel, expected_model_policy_hash: previewHash, expected_source_id: 'experiment:EXP-basic-001', port: 3199,
+    operation: 'create', name: 'new-auto', source: 'experiment:EXP-basic-001', business_control: false, model_selection: defaultModel, expected_model_policy_hash: previewHash, expected_source_id: 'experiment:EXP-basic-001', port: 3199,
   })
 
   const invalid = page({ respond(endpoint, payload) {
@@ -285,6 +285,44 @@ test('创建自动端口从预览冻结到执行请求，失效预览不能执�
   assert.match(invalid.text(), /预览缺少有效端口/)
   assert.equal(invalid.button('确认创建'), undefined)
   assert.equal(invalid.calls.some(call => call.endpoint === 'instances/run'), false)
+})
+
+test('受控实例创建预览、列表、详情和回执显示网关深链与无需登录语义', async () => {
+  const rows = [{ name: 'existing-guest', agent_id: 'basic-agent', state: 'running', source_id: 'experiment:EXP-basic-001', port: 3084,
+    business_gateway: true, access_mode: 'anonymous', identity_mode: 'development', access_url: 'http://business.example:53105/agents/basic-agent/instances/existing-guest/', model_policy: { default: defaultModel } }]
+  const ui = page({ instances: rows, respond(endpoint, payload) {
+    if (endpoint === 'instances/sources') return { ok: true, value: { business_gateway_available: true, sources: [
+      { source_id: 'experiment:EXP-basic-001', experiment_id: 'EXP-basic-001', agent_id: 'basic-agent', selectable: true, reason: '已登记' },
+    ] } }
+    if (endpoint === 'instances/preview' && payload.operation === 'create') return { ok: true, value: {
+      operation: 'create', name: payload.name, access_mode: payload.access_mode, identity_mode: payload.identity_mode, model_selection: payload.model_selection,
+      model_policy_hash: previewHash, plan: { source_id: payload.source, port: payload.port ?? 3199,
+        business_control: { source_digest: 'sha256:' + 'a'.repeat(64) } },
+    } }
+    if (endpoint === 'instances/run' && payload.operation === 'create') {
+      rows.push({ ...rows[0], name: payload.name, port: payload.port,
+        access_url: `http://business.example:53105/agents/basic-agent/instances/${payload.name}/` })
+      return { ok: true, value: { name: payload.name, operation: 'create', ok: true, value: { value: { port: payload.port } } } }
+    }
+  } })
+  await ui.settle()
+  assert.match(ui.text(), /经统一网关 · 无需登录.*http:\/\/business\.example:53105\/agents\/basic-agent\/instances\/existing-guest\//)
+  ui.button('详情').props.onClick(); await ui.settle()
+  assert.match(ui.text(), /内部 Web 端口.*访问方式.*经统一网关，无需登录.*已登记网关入口.*http:\/\/business\.example:53105\/agents\/basic-agent\/instances\/existing-guest\//)
+  ui.button('关闭详情').props.onClick(); ui.render()
+  openCreate(ui); await ui.settle()
+  ui.nodes().find(node => node.type === 'input' && node.props['aria-label'] === '实例名').props.onChange({ target: { value: 'new-guest' } }); ui.render()
+  chooseAgent(ui, '基础助手 · basic-agent')
+  ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } }); await ui.settle()
+  ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '访客访问方式').props.onChange({ target: { value: 'anonymous' } }); ui.render()
+  assert.equal(ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '实例阶段').props.value, 'development')
+  assert.match(ui.text(), /内部 Runtime 端口（可选）/)
+  await ui.button('查看创建预览').props.onClick(); await ui.settle()
+  assert.equal(ui.calls.find(call => call.endpoint === 'instances/preview').payload.identity_mode, 'development')
+  assert.match(ui.text(), /开发调试 · 不要求发布身份签名/)
+  assert.match(ui.text(), /访问方式.*经统一网关，无需登录.*内部 Runtime 端口.*127\.0\.0\.1:3199.*经统一网关路径.*\/agents\/basic-agent\/instances\/new-guest\//)
+  await ui.button('确认创建').props.onClick(); await ui.settle()
+  assert.match(ui.text(), /已登记网关入口：http:\/\/business\.example:53105\/agents\/basic-agent\/instances\/new-guest\/；无需登录/)
 })
 
 test('创建回执到达后等待登记回读，并展示实际登记来源而非提交来源', async () => {

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
-import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, symlinkSync, writeFileSync } from 'node:fs'
+import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -972,6 +972,73 @@ test('eval preview, case list, run index and decision update use existing backen
   } finally {
     await rm(fx.root, { recursive: true, force: true })
   }
+})
+
+test('平台评测预览和 Job 共用当前模型投影，策略文件随任务退出清理，凭据仅进子进程环境', async () => {
+  const { createAgentsHandler } = await loadServer()
+  const fx = fixture()
+  const secret = 'fixture-model-secret-938104'
+  const policyRoot = join(fx.root, '.local/evaluation-jobs/model-policies')
+  try {
+    write(join(fx.root, 'runtime/adapters/dsh-container/dsh-eval'), [
+      'import json,os,sys,time',
+      'path=sys.argv[sys.argv.index("--model-policy")+1]',
+      'policy=json.load(open(path))',
+      'if "--dry-run" in sys.argv:',
+      ' print(json.dumps({"case_ids":["U-CASE-001"],"agent_id":policy["agent_id"],"key_present":bool(os.environ.get("MODEL_API_KEY")),"key_in_policy":os.environ.get("MODEL_API_KEY") in open(path).read(),"policy_mode":oct(os.stat(path).st_mode & 0o777)}))',
+      ' sys.exit(0)',
+      'if "U-CASE-FAIL" in sys.argv: sys.exit(2)',
+      'print("started",file=sys.stderr,flush=True)',
+      'print(os.environ.get("MODEL_API_KEY"),file=sys.stderr,flush=True)',
+      'time.sleep(.35)',
+      'print(json.dumps({"policy_exists_at_exit":os.path.exists(path),"agent_id":policy["agent_id"]}))',
+    ].join('\n'))
+    const projected = []
+    const handler = createAgentsHandler(fx.root, undefined, {}, async agentId => {
+      projected.push(agentId)
+      return { policy: { agent_id: agentId, default: { provider: 'example', model: 'flash' } }, environment: { MODEL_API_KEY: secret } }
+    })
+    const payload = { source: 'experiment:EXP-test-agent-001', cases: ['U-CASE-001'] }
+    const preview = await rpc(handler, 'eval/preview', payload)
+    assert.equal(preview.result.agent_id, 'test-agent')
+    assert.equal(preview.result.key_present, true)
+    assert.equal(preview.result.key_in_policy, false)
+    assert.equal(preview.result.policy_mode, '0o600')
+    assert.equal(preview.command.includes(secret), false)
+    assert.equal(preview.command.some(part => part.includes(policyRoot)), false)
+    assert.deepEqual(readdirSync(policyRoot), [])
+    const started = await rpc(handler, 'eval/start', payload)
+    let running
+    for (let attempt = 0; attempt < 30; attempt++) {
+      running = await rpc(handler, 'eval/status', { job_id: started.job_id })
+      if (running.stderr.includes('started')) break
+      await new Promise(resolve => setTimeout(resolve, 20))
+    }
+    assert.match(running.stderr, /started/)
+    assert.equal(running.stderr.includes(secret), false)
+    assert.match(running.stderr, /\[REDACTED\]/)
+    const directories = readdirSync(policyRoot)
+    assert.equal(directories.length, 1)
+    assert.equal(statSync(join(policyRoot, directories[0], 'policy.json')).mode & 0o777, 0o600)
+    const finished = await waitForJob(handler, started.job_id)
+    assert.equal(finished.status, 'completed')
+    assert.equal(finished.result.policy_exists_at_exit, true)
+    assert.deepEqual(readdirSync(policyRoot), [])
+    const failed = await rpc(handler, 'eval/start', { ...payload, cases: ['U-CASE-FAIL'] })
+    assert.equal((await waitForJob(handler, failed.job_id)).status, 'failed')
+    assert.deepEqual(readdirSync(policyRoot), [])
+    write(join(fx.root, 'runtime/adapters/dsh-container/dsh-eval'), [
+      'import os,sys',
+      'print(os.environ["MODEL_API_KEY"][:12],file=sys.stderr)',
+      'sys.exit(2)',
+    ].join('\n'))
+    const rejected = await handler('eval/preview', payload, new AbortController().signal)
+    assert.equal(rejected.ok, false)
+    assert.equal(JSON.stringify(rejected).includes(secret.slice(0, 12)), false)
+    assert.match(JSON.stringify(rejected), /\[REDACTED\]/)
+    assert.deepEqual(readdirSync(policyRoot), [])
+    assert.deepEqual(projected, ['test-agent', 'test-agent', 'test-agent', 'test-agent'])
+  } finally { await rm(fx.root, { recursive: true, force: true }) }
 })
 
 test('从 Run 转入的用例经过普通编辑仍保留来源引用，注释不进入输入与预期', async () => {

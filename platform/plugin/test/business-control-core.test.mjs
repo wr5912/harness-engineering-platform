@@ -16,7 +16,7 @@ const second = await import(`file://${join(buildRoot, 'second.mjs')}`)
 test.after(() => rmSync(buildRoot, { recursive: true, force: true }))
 
 const deadline = () => new Date(Date.now() + 60000).toISOString()
-const binding = { workspaceId: 'workspace-test', agentId: 'soc', instanceId: 'shared-runtime', runtimeGeneration: 'generation-1', sourceDigest: 'git:fixed' }
+const binding = { workspaceId: 'workspace-test', agentId: 'soc', instanceId: 'shared-runtime', runtimeGeneration: 'generation-1', sourceDigest: 'sha256:' + 'a'.repeat(64) }
 const operations = [
   { serverId: 'soc', operationId: 'query', kind: 'read', target: 'https://upstream.example/assets/{id}', method: 'GET', queryParameters: ['page'], schemaDigest: 'schema-1' },
   { serverId: 'soc', operationId: 'writeback', kind: 'write', target: 'https://upstream.example/events/{id}', method: 'PUT', schemaDigest: 'schema-1' },
@@ -36,7 +36,7 @@ async function fixture(t, { remote = true, confirmation = false } = {}) {
   t.after(() => rmSync(root, { recursive: true, force: true }))
   const upstream = { denied: {}, version: 1, level: 'low', riskCalls: [], revoked: new Set(), trustGate: undefined, unavailable: false, requests: 0 }
   let origin
-  if (remote) {
+  {
     const server = createServer(async (request, response) => {
       const chunks = []; for await (const chunk of request) chunks.push(chunk)
       const body = JSON.parse(Buffer.concat(chunks).toString())
@@ -60,11 +60,12 @@ async function fixture(t, { remote = true, confirmation = false } = {}) {
     t.after(() => { server.closeAllConnections(); server.close() })
   }
   const config = { schemaVersion: 1, enabled: true,
-    agents: [{ agentId: 'soc', enabled: true, subjects: ['subject-a', 'subject-b'], actions: ['*'], serverIds: ['soc', 'reports'], sourceDigest: 'git:fixed' }],
+    agents: [{ agentId: 'soc', enabled: true, subjects: ['subject-a', 'subject-b'], actions: ['*'], serverIds: ['soc', 'reports'], sourceDigest: binding.sourceDigest }],
+    gateway: { instances: [{ agentId: binding.agentId, instanceId: binding.instanceId, sourceId: 'experiment:EXP-soc-001', sourceDigest: binding.sourceDigest }] },
     operations: operations.map(item => ({ ...item, ...(confirmation && item.kind === 'write' ? { confirmation: true } : {}) })),
     detection: { inputMarkers: ['TEST-INJECT'], operationMarkers: ['TEST-PARAM'], reportMarkers: ['TEST-SENSITIVE'] },
-    ...(remote ? { authentication: { endpoint: `${origin}/authenticate` }, identityTrust: { endpoint: `${origin}/trust` },
-      riskAssessment: { endpoint: `${origin}/risk`, requiredKinds: ['write', 'publish'] } } : {}) }
+    authentication: { endpoint: `${origin}/authenticate` }, identityTrust: { endpoint: `${origin}/trust` },
+    ...(remote ? { riskAssessment: { endpoint: `${origin}/risk`, requiredKinds: ['write', 'publish'] } } : {}) }
   mkdirSync(join(root, 'config'))
   writeFileSync(join(root, 'config', 'business-access.json'), JSON.stringify(config))
   const control = getBusinessControl(root)
@@ -85,9 +86,104 @@ test('独立 bundle 共用 singleton 与 ALS；未启用旧研究模式保留，
   assert.equal(currentBusinessContext(), undefined)
   await assert.rejects(f.control.execute(operation(), () => assert.fail('禁止派发')), { code: 'business_context_missing' })
   assert.equal(await withBusinessContext(f.control.managementContext(), () => f.control.execute(operation(), () => 'managed')), 'managed')
-  await assert.rejects(withBusinessContext(structuredClone(f.control.managementContext()), () => f.control.execute(operation(), () => assert.fail())), { code: 'context_invalid' })
+  await assert.rejects(withBusinessContext(structuredClone(f.control.managementContext()), () => f.control.execute(operation(), () => assert.fail())), { code: 'identity_unavailable' })
   const legacyRoot = mkdtempSync(join(tmpdir(), 'business-control-legacy-')); t.after(() => rmSync(legacyRoot, { recursive: true, force: true }))
   assert.equal(await getBusinessControl(legacyRoot).execute(operation(), () => 'legacy'), 'legacy')
+})
+
+test('匿名访客普通聊天保留本地输入限制，不依赖外部用户风险服务且不得执行业务读取', async t => {
+  const f = await fixture(t)
+  f.config.gateway.instances[0].accessMode = 'anonymous'
+  writeFileSync(join(f.root, 'config/business-access.json'), JSON.stringify(f.config))
+  const subjectId = 'visitor-' + 'x'.repeat(32), expiresAt = deadline()
+  const guest = f.control.bindSession(f.control.createContext({
+    subject: { id: subjectId, kind: 'human', identitySource: 'gateway-anonymous' },
+    evidence: { issuer: 'gateway-anonymous', externalSubject: subjectId, method: 'anonymous',
+      verifiedAt: new Date().toISOString(), expiresAt }, expiresAt,
+  }, binding), 'guest-session')
+  const before = f.upstream.riskCalls.length
+  assert.equal(await f.control.inspect(guest, 'input', '普通聊天', undefined, 'session:prompt'), undefined)
+  assert.equal(f.upstream.riskCalls.length, before)
+  assert.equal(f.control.assert(guest, 'session:prompt').kind, 'allow')
+  assert.throws(() => f.control.assert(guest, 'read'), { code: 'agent_forbidden' })
+  await assert.rejects(f.control.inspect(guest, 'input', 'TEST-INJECT', undefined, 'session:prompt'), { code: 'content_restricted' })
+  f.config.gateway.instances[0].accessMode = 'authenticated'
+  writeFileSync(join(f.root, 'config/business-access.json'), JSON.stringify(f.config))
+  assert.throws(() => f.control.assert(guest, 'session:prompt'))
+  await assert.rejects(f.control.inspect(guest, 'input', '切换后消息', undefined, 'session:prompt'), { code: 'identity_source_changed' })
+  assert.equal(f.upstream.riskCalls.length, before)
+})
+
+test('开发调试实例依赖来源 pin 与签名通道回执，无规则时保留聊天', async t => {
+  const f = await fixture(t)
+  const path = join(f.root, 'config/business-access.json')
+  f.config.agents = []
+  f.config.gateway.instances[0].identityMode = 'development'
+  writeFileSync(path, JSON.stringify(f.config))
+  const control = new BusinessControl(f.root)
+  assert.equal(control.agentStatus(binding.instanceId).authentication.status, 'not_required')
+  assert.equal(control.agentStatus(binding.instanceId).trust.status, 'unknown')
+  assert.throws(() => control.assert(f.a, 'session:prompt'), { code: 'development_channel_unknown' })
+  const snapshot = control.issueSnapshot(binding.instanceId)
+  assert.equal(control.acknowledge(binding.instanceId, snapshot.restrictionVersion, snapshot.leaseId), true)
+  assert.equal(control.agentStatus(binding.instanceId).trust.status, 'trusted')
+  assert.equal(control.assert(f.a, 'session:prompt').kind, 'allow')
+  assert.throws(() => control.assert(f.a, 'read'), { code: 'agent_forbidden' })
+  control.recordAgentAuthentication(binding)
+  assert.deepEqual(control.agentStatus(binding.instanceId).authentication, { method: 'none', status: 'not_required' })
+  f.config.gateway.instances[0].sourceDigest = 'sha256:' + 'b'.repeat(64)
+  writeFileSync(path, JSON.stringify(f.config))
+  assert.equal(control.agentStatus(binding.instanceId).trust.status, 'mismatch')
+  assert.throws(() => control.assert(f.a, 'session:prompt'), { code: 'agent_source_mismatch' })
+  f.config.gateway.instances[0].sourceDigest = binding.sourceDigest
+  delete f.config.gateway.instances[0].identityMode
+  writeFileSync(path, JSON.stringify(f.config))
+  assert.equal(control.agentStatus(binding.instanceId).authentication.status, 'unknown', '历史缺字段按发布模式执行')
+  assert.throws(() => control.assert(f.a, 'session:prompt'), { code: 'agent_closed' })
+})
+
+test('开发调试实例跳过发布身份签名，但已配置的访问规则仍约束开关、动作和认证主体', async t => {
+  const f = await fixture(t)
+  const path = join(f.root, 'config/business-access.json')
+  f.config.gateway.instances[0].identityMode = 'development'
+  f.config.agents[0].subjects = ['subject-b']
+  f.config.agents[0].actions = ['agent:access', 'session:create', 'session:prompt']
+  f.config.agents[0].agentAuthentication = { enabled: false, method: 'hmac-sha256' }
+  f.config.agents[0].agentTrust = { enabled: false }
+  const save = () => writeFileSync(path, JSON.stringify(f.config))
+  save()
+  const control = new BusinessControl(f.root)
+  const acknowledge = () => {
+    const snapshot = control.issueSnapshot(binding.instanceId)
+    assert.equal(control.acknowledge(binding.instanceId, snapshot.restrictionVersion, snapshot.leaseId), true)
+  }
+  acknowledge()
+  assert.deepEqual(control.agentStatus(binding.instanceId).authentication, { method: 'none', status: 'not_required' })
+  assert.equal(control.agentStatus(binding.instanceId).trust.status, 'trusted')
+  assert.throws(() => control.assert(f.a, 'session:prompt'), { code: 'agent_forbidden' })
+  assert.equal(control.assert(f.b, 'session:prompt').kind, 'allow')
+
+  f.config.agents[0].enabled = false; save()
+  assert.equal(control.agentStatus(binding.instanceId).trust.status, 'revoked')
+  assert.throws(() => control.assert(f.b, 'session:prompt'), { code: 'agent_closed' })
+  f.config.agents[0].enabled = true
+  f.config.agents[0].actions = ['agent:access', 'session:create']; save(); acknowledge()
+  assert.throws(() => control.assert(f.b, 'session:prompt'), { code: 'action_forbidden' })
+  assert.equal(control.assert(f.b, 'agent:access').kind, 'allow')
+
+  f.config.agents[0].actions = ['*']; save(); acknowledge()
+  assert.equal(control.assert(f.b, 'read').kind, 'allow', '已认证开发者仍按已配置动作使用受管能力')
+  f.config.gateway.instances[0].accessMode = 'anonymous'; save(); acknowledge()
+  const subjectId = 'visitor-' + 'v'.repeat(32), expiresAt = deadline()
+  const guest = control.bindSession(control.createContext({
+    subject: { id: subjectId, kind: 'human', identitySource: 'gateway-anonymous' },
+    evidence: { issuer: 'gateway-anonymous', externalSubject: subjectId, method: 'anonymous',
+      verifiedAt: new Date().toISOString(), expiresAt }, expiresAt,
+  }, binding), 'development-guest-session')
+  assert.equal(control.assert(guest, 'session:prompt').kind, 'allow', '访客不按认证主体白名单判断')
+  assert.throws(() => control.assert(guest, 'read'), { code: 'agent_forbidden' })
+  f.config.agents[0].actions = ['agent:access', 'session:create']; save(); acknowledge()
+  assert.throws(() => control.assert(guest, 'session:prompt'), { code: 'action_forbidden' })
 })
 
 test('持久会话和资源严格归属，不认领历史记录，同人凭据轮换不改变归属', async t => {
@@ -102,10 +198,25 @@ test('持久会话和资源严格归属，不认领历史记录，同人凭据�
   assert.equal(f.control.sessionContext(f.control.createContext(rotated, binding), 'session-a').subject.id, 'subject-a')
   const restored = new BusinessControl(f.root)
   authenticatedSnapshot(restored)
-  assert.equal(restored.contextForSession('session-a').sourceDigest, 'git:fixed')
+  assert.equal(restored.contextForSession('session-a').sourceDigest, binding.sourceDigest)
   assert.equal(restored.contextForSession('session-a').identity.evidence.credentialRef, 'rotated-credential')
   assert.equal(restored.contextForSession('historical'), undefined)
   assert.throws(() => restored.acceptContext({ ...f.a, scope: { ...f.a.scope, runtimeGeneration: 'another-generation' } }), { code: 'instance_binding_mismatch' })
+})
+
+test('原生子 Session 只保留不可改写的父归属，重载后仍能校验双重归属', async t => {
+  const f = await fixture(t)
+  const child = f.control.bindSession(f.a, 'child-session', 'session-a')
+  assert.equal(child.subject.id, 'subject-a')
+  assert.equal(f.control.parentSessionId(f.a, 'child-session'), 'session-a')
+  assert.throws(() => f.control.parentSessionId(f.b, 'child-session'), { code: 'resource_unavailable' })
+  f.control.bindSession(f.a, 'second-parent')
+  assert.throws(() => f.control.bindSession(f.a, 'nested-child', 'child-session'), { code: 'session_invalid' })
+  assert.throws(() => f.control.bindSession(f.a, 'child-session', 'second-parent'), { code: 'session_parent_mismatch' })
+  assert.throws(() => f.control.bindSession(f.b, 'foreign-child', 'session-a'), { code: 'resource_unavailable' })
+  const reloaded = new BusinessControl(f.root)
+  authenticatedSnapshot(reloaded)
+  assert.equal(reloaded.parentSessionId(f.a, 'child-session'), 'session-a')
 })
 
 test('真实提供方认证及撤销，过期凭据拒绝，认证材料不写状态事件', async t => {
@@ -466,7 +577,11 @@ test('Agent认证与信任独立于用户凭据及风险版本，撤销、来源
   change({ ...f.config.agents[0], agentTrust: { enabled: false } })
   assert.equal(f.control.agentStatus(binding.instanceId).trust.status, 'revoked')
   assert.throws(() => f.control.assert(f.a, 'read'), { code: 'agent_trust_revoked' })
-  change({ ...f.config.agents[0], sourceDigest: 'git:other' })
+  change({ ...f.config.agents[0], sourceDigest: 'sha256:' + 'b'.repeat(64) })
+  assert.equal(f.control.agentStatus(binding.instanceId).trust.status, 'trusted', '实例 pin 优先于旧 Agent 默认 pin')
+  assert.equal(f.control.assert(f.a, 'read').kind, 'allow')
+  writeFileSync(configPath, JSON.stringify({ ...f.config, gateway: { instances: [{ ...f.config.gateway.instances[0], sourceDigest: 'sha256:' + 'b'.repeat(64) }] } }))
+  f.control.configurationChanged()
   assert.equal(f.control.agentStatus(binding.instanceId).trust.status, 'mismatch')
   assert.throws(() => f.control.assert(f.a, 'read'), { code: 'agent_source_mismatch' })
   change({ ...f.config.agents[0], agentAuthentication: { enabled: false, method: 'hmac-sha256' } })

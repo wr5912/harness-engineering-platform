@@ -85,6 +85,13 @@ export class BusinessConnection extends NativeConnection.HostConnectionService {
       return fetch(outgoing, { headers, redirect: 'error' })
     }
   }
+  invalidateSubject(ctx: Context, context: BusinessContext): void {
+    for (const [peer, current] of this.businessPeers) {
+      if (current.subject.id === context.subject.id && current.subject.identitySource === context.subject.identitySource
+        && current.scope.workspaceId === context.scope.workspaceId && current.scope.agentId === context.scope.agentId
+        && current.scope.instanceId === context.scope.instanceId) (ctx as any).remoteAccess.invalidate(peer.principal)
+    }
+  }
   private assertion(request: ConnectionTrustRequest): RuntimeAssertion {
     const { method, path: logicalPath } = requestAddress(request)
     const prefix = this.businessConfig.basePath?.replace(/\/$/, '') || ''
@@ -168,6 +175,7 @@ export class BusinessConnection extends NativeConnection.HostConnectionService {
     const trustConfig = this.control.config().identityTrust
     if (!trustConfig || this.disposedBusiness) return
     for (const context of this.businessPeers.values()) {
+      if (context.identity?.evidence.method === 'anonymous') continue
       const key = this.peerTrustKey(context)
       if (this.peerTrustChecks.has(key)) continue
       const task = (async () => {
@@ -185,16 +193,26 @@ function principalContext(peer: PeerScope): BusinessContext {
   if (peer.principal.kind !== PRINCIPAL) throw new Error('业务入口要求非 owner 主体')
   return peer.principal.context
 }
-function addressedSession(args: unknown): string | undefined {
+function addressedSession(args: unknown, verifyChild?: (parentId: string, childId: string) => void): string | undefined {
   if (!args || typeof args !== 'object') return undefined
-  const value = args as { request?: { sessionId?: unknown; address?: { kind?: unknown; sessionId?: unknown } }; sessionId?: unknown; address?: { kind?: unknown; sessionId?: unknown } }
+  const value = args as { request?: { sessionId?: unknown; address?: { kind?: unknown; sessionId?: unknown; parentSessionId?: unknown; childSessionId?: unknown; mode?: unknown } }; sessionId?: unknown; address?: { kind?: unknown; sessionId?: unknown; parentSessionId?: unknown; childSessionId?: unknown; mode?: unknown } }
   const request = value.request ?? value
   if (request.address !== undefined) {
-    if (request.address?.kind !== 'session' || typeof request.address.sessionId !== 'string' || !request.address.sessionId) throw new Error('首期只允许明确的业务Session地址')
-    return request.address.sessionId
+    if (request.address?.kind === 'session' && typeof request.address.sessionId === 'string' && request.address.sessionId) return request.address.sessionId
+    if (request.address?.kind !== 'subagent' || typeof request.address.parentSessionId !== 'string' || !request.address.parentSessionId
+      || typeof request.address.childSessionId !== 'string' || !request.address.childSessionId
+      || !['one-shot', 'continuable', 'unknown'].includes(String(request.address.mode)) || !verifyChild) throw new Error('业务 Session 地址无效')
+    verifyChild(request.address.parentSessionId, request.address.childSessionId)
+    return request.address.childSessionId
   }
   const session = request.sessionId
   return typeof session === 'string' && session ? session : undefined
+}
+function assertChildAddress(control: BusinessControl, context: BusinessContext, binding: InstanceBinding, parentId: string, childId: string): void {
+  const parent = control.sessionContext(context, parentId), child = control.sessionContext(context, childId)
+  if (!matchesInstance(parent, binding) || !matchesInstance(child, binding)
+    || control.parentSessionId(context, childId) !== parentId
+    || parent.subject.id !== child.subject.id || parent.subject.identitySource !== child.subject.identitySource) throw new Error('子 Session 归属与地址不一致')
 }
 function actionFor(endpoint: string): string { return endpoint === 'session/create' || endpoint === 'session/fork' || endpoint === 'workspace/create' ? 'session:create' : endpoint === 'session/prompt' || endpoint === 'session/updateQueue' ? 'session:prompt' : 'session:read' }
 function fixedWorkspaceRequest(args: unknown, path?: string): boolean {
@@ -205,7 +223,7 @@ function nativeFixedWorkspace(ctx: Context, path?: string): { id: string; path: 
   return path ? (ctx.get('workspaceRegistry') as { list(): { id: string; path: string }[] } | undefined)?.list().find(item => item.path === path) : undefined
 }
 
-export function registerBusinessRemotePolicy(ctx: Context, control: BusinessControl, workspacePath?: string): void {
+export function registerBusinessRemotePolicy(ctx: Context, control: BusinessControl, instanceBinding: InstanceBinding, workspacePath?: string): void {
   const remoteAccess = (ctx as any).remoteAccess
   remoteAccess.registerPolicy(PRINCIPAL, {
     bindings(principal: BusinessPrincipal) {
@@ -215,7 +233,7 @@ export function registerBusinessRemotePolicy(ctx: Context, control: BusinessCont
         condition(request: { action: string; args?: unknown }) {
           try {
             if (request.action === 'workspace/create' && !fixedWorkspaceRequest(request.args, workspacePath)) throw new Error('业务工作区使用服务端固定路径')
-            const session = addressedSession(request.args)
+            const session = addressedSession(request.args, (parentId, childId) => assertChildAddress(control, context, instanceBinding, parentId, childId))
             const scoped = session ? control.sessionContext(context, session) : context
             if (sessionActions.includes(request.action) && !session && request.args) throw new Error('Session 缺失')
             control.assert(scoped, actionFor(request.action), kind === 'session' ? [{ kind, id: id! }] : [])
@@ -233,7 +251,11 @@ export function registerBusinessRemotePolicy(ctx: Context, control: BusinessCont
     explain: () => 'business-access-denied',
   })
   // HTML首帧永远不带owner baseline；原生follow会立刻取得该主体的实际快照。
-  ctx.on('webserver/index-inject', table => { table.push({ kind: 'global', name: '__DSH_REMOTE_ACCESS__', value: { type: 'baseline', owner: false, grants: [] } }) })
+  ctx.on('webserver/index-inject', table => {
+    table.push({ kind: 'global', name: '__DSH_REMOTE_ACCESS__', value: { type: 'baseline', owner: false, grants: [] } })
+    // 仅业务 Runtime 装载此样式；只隐藏原生工作区按钮，保留同一行的模型等选项。
+    table.push({ kind: 'style', text: '[data-conversation-content] button[aria-haspopup="menu"][aria-label="选择工作区"], [data-conversation-content] button[aria-haspopup="menu"][aria-label="Choose workspace"] { display: none !important; }' })
+  })
 }
 
 async function readBody(req: IncomingMessage): Promise<Buffer> {
@@ -261,13 +283,48 @@ export function businessInboxContent(endpoint: string, args: unknown): readonly 
 }
 
 /** 原生串行创建接缝在释放恢复队列前等待检测；失败不修改旧队列。 */
-export function registerBusinessInboxChecks(ctx: Context, control: BusinessControl): void {
-  ;(ctx as any).on('agent/created', async ({ agent, signal }: { agent: { session: { id: string }; inbox: { nextTurn: readonly { content: readonly unknown[] }[]; nextStep: readonly { content: readonly unknown[] }[] } }; signal?: AbortSignal }) => {
+interface BusinessAgent {
+  session: { id: string; header?: { id?: string; origin?: string; parentSession?: string; delegationDepth?: number } }
+  inbox: { nextTurn: readonly { content: readonly unknown[] }[]; nextStep: readonly { content: readonly unknown[] }[] }
+}
+function matchesInstance(context: BusinessContext, binding: InstanceBinding): boolean {
+  return context.scope.workspaceId === binding.workspaceId && context.scope.agentId === binding.agentId
+    && context.scope.instanceId === binding.instanceId && context.scope.runtimeGeneration === binding.runtimeGeneration
+    && context.sourceDigest === binding.sourceDigest
+}
+function parentForNativeChild(ctx: Context, control: BusinessControl, binding: InstanceBinding, child: BusinessAgent): BusinessContext | undefined {
+  const header = child.session.header, parentId = header?.parentSession
+  if (header?.origin !== 'subagent' || typeof parentId !== 'string' || !parentId || header.delegationDepth !== 1
+    || header.id !== child.session.id || parentId === child.session.id) return undefined
+  const parent = (ctx as any).get('agents')?.get(parentId) as BusinessAgent | undefined
+  if (!parent || parent.session.id !== parentId || parent.session.header?.id !== parentId) return undefined
+  const context = control.contextForSession(parentId)
+  return context && matchesInstance(context, binding) ? context : undefined
+}
+function trustedNativeChild(ctx: Context, control: BusinessControl, binding: InstanceBinding, parentId: string, childId: string): boolean {
+  const child = (ctx as any).get('agents')?.get(childId) as BusinessAgent | undefined
+  if (!child || child.session.header?.parentSession !== parentId || !parentForNativeChild(ctx, control, binding, child)) return false
+  const parent = control.contextForSession(parentId), own = control.contextForSession(childId)
+  return !!parent && !!own && matchesInstance(own, binding)
+    && control.parentSessionId(parent, childId) === parentId
+    && parent.subject.id === own.subject.id && parent.subject.identitySource === own.subject.identitySource
+}
+
+export function registerBusinessInboxChecks(ctx: Context, control: BusinessControl, binding: InstanceBinding): void {
+  ;(ctx as any).on('agent/created', async ({ agent, signal }: { agent: BusinessAgent; signal?: AbortSignal }) => {
     const messages = [...agent.inbox.nextTurn, ...agent.inbox.nextStep]
     let context = control.contextForSession(agent.session.id)
-    const creator = currentBusinessContext()
-    // 新Agent在原生串行创建边界先绑定归属，初始队列才可进入执行。
-    if (!context && creator && !control.isManagement(creator)) context = control.bindSession(creator, agent.session.id)
+    const header = agent.session.header
+    if (header?.origin === 'subagent') {
+      const parent = parentForNativeChild(ctx, control, binding, agent)
+      if (!parent) throw new Error('子 Session 缺少受信原生父归属')
+      context = control.bindSession(parent, agent.session.id, header!.parentSession)
+    } else {
+      if (header?.origin !== undefined || header?.delegationDepth !== undefined) throw new Error('Session 来源元数据无效')
+      const creator = currentBusinessContext()
+      // 新Agent在原生串行创建边界先绑定归属，初始队列才可进入执行。
+      if (!context && creator && !control.isManagement(creator)) context = control.bindSession(creator, agent.session.id)
+    }
     if (!messages.length) return
     if (!context) throw new Error('历史待执行输入缺少可信业务归属，拒绝自动恢复')
     const lifetime = signal || new AbortController().signal
@@ -278,34 +335,69 @@ export function registerBusinessInboxChecks(ctx: Context, control: BusinessContr
 }
 
 export const name = 'harness-business-runtime'
-export const inject = ['webServer', 'remoteAccess', 'tools', 'approval']
+export const inject = ['webServer', 'remoteAccess', 'tools', 'approval', 'workspaceRegistry']
+const deferredBusinessTools = new Set(['schedule_create', 'schedule_list', 'schedule_update', 'schedule_delete', 'analyze_pending_threat_incidents'])
+
+export function businessToolDeniedReason(exec: { agent?: { session: { id: string } }; name: string; arguments?: unknown },
+  sessionContext: (id: string) => BusinessContext | undefined, managedTools: ReadonlySet<string>,
+  localTools: ReadonlySet<string>, resourceServers: ReadonlySet<string>, useNativeTools = false): string | undefined {
+  try {
+    const id = exec.agent?.session.id
+    if (!id || !sessionContext(id)) return '业务 Session 未登记'
+    if (deferredBusinessTools.has(exec.name)) return '受控业务入口尚未开放定时任务与自动研判'
+    if (useNativeTools) return
+    const resourceServer = exec.arguments && typeof exec.arguments === 'object'
+      ? (exec.arguments as { server?: unknown }).server : undefined
+    if (!managedTools.has(exec.name) && !localTools.has(exec.name) && !(typeof resourceServer === 'string' && resourceServers.has(resourceServer) &&
+      ['list_mcp_resources', 'list_mcp_resource_templates', 'read_mcp_resource'].includes(exec.name))) {
+      return '业务入口只开放受管 MCP 工具与资源或来源声明的本地工具'
+    }
+  } catch { return '业务任务上下文或许可无效' }
+}
+
 export async function apply(ctx: Context, config: BusinessRuntimeConfig): Promise<void> {
-  if (!config?.binding || !config.assetRoot || !config.stateRoot || !config.coordinatorOrigin) throw new Error('业务 Runtime 配置缺失')
+  if (!config?.binding || !config.assetRoot || !config.stateRoot || !config.coordinatorOrigin || !config.workspacePath) throw new Error('业务 Runtime 配置缺失')
+  if (config.localTools !== undefined && (!Array.isArray(config.localTools) || config.localTools.some(name => typeof name !== 'string' || !name)
+    || new Set(config.localTools).size !== config.localTools.length || config.localTools.some(name => deferredBusinessTools.has(name)))) throw new Error('业务本地工具声明无效')
   if (ctx.get('connection')) throw new Error('业务 Profile 必须停用默认 owner Connection')
   if (ctx.get('schedule')) throw new Error('首期业务 Profile 不得装载定时投递服务')
   const control = configureBusinessControlStateRoot(config.assetRoot, config.stateRoot)
   if (!control.enabled()) throw new Error('业务 Runtime 控制未启用')
+  try {
+    await (ctx.get('workspaceRegistry') as { create(path: string): Promise<unknown> }).create(config.workspacePath)
+  } catch (error) {
+    throw new Error(`业务固定工作区登记失败：${config.workspacePath}：${error instanceof Error ? error.message : String(error)}`, { cause: error })
+  }
   control.setAvailable(true)
   ctx.effect(() => () => control.setAvailable(false), 'business Runtime: authorization lifecycle')
-  const managedTools = new Set<string>(), resourceServers = new Set<string>()
+  const managedTools = new Set<string>(), resourceServers = new Set<string>(), localTools = new Set(config.localTools ?? [])
   const connection = new BusinessConnection(ctx, config, control)
-  ctx.provide('businessRuntime', Object.freeze({ binding: Object.freeze({ ...config.binding }), managedTools, resourceServers,
+  ctx.provide('businessRuntime', Object.freeze({ binding: Object.freeze({ ...config.binding }),
+    basePath: config.basePath ?? `/agents/${config.binding.agentId}/instances/${config.binding.instanceId}/`, managedTools, resourceServers,
+    isTrustedChildSession: (parentId: string, childId: string) => trustedNativeChild(ctx, control, config.binding, parentId, childId),
     groupUrl: (id: string) => platformGroupUrl(config.assetRoot, id),
     groupFetch: (id: string, sessionId?: string) => connection.groupFetch(id, sessionId) }))
-  registerBusinessRemotePolicy(ctx, control, config.workspacePath)
-  registerBusinessInboxChecks(ctx, control)
-  // 所有模型工具先恢复Session真实归属；只有受管MCP工具可执行。
+  registerBusinessRemotePolicy(ctx, control, config.binding, config.workspacePath)
+  registerBusinessInboxChecks(ctx, control, config.binding)
+  ;(ctx as any).on('subagent/start', (info: { id: string; provider: string; local: boolean }) => {
+    if (!info.local || info.provider !== 'spawn') return
+    const child = (ctx as any).get('agents')?.get(info.id) as BusinessAgent | undefined
+    const parentId = child?.session.header?.parentSession
+    if (!parentId || !trustedNativeChild(ctx, control, config.binding, parentId, info.id)) return
+    connection.invalidateSubject(ctx, control.contextForSession(info.id)!)
+  })
+  // 所有模型工具先恢复Session真实归属；来源声明仅增加精确本地工具，受管MCP仍走平台授权。
   ;(ctx as any).tools.guard((exec: { agent?: { session: { id: string } }; name: string; arguments?: unknown }) => {
-    try {
-      const id = exec.agent?.session.id
-      if (!id || !control.contextForSession(id)) return '业务 Session 未登记'
-      const resourceServer = exec.arguments && typeof exec.arguments === 'object'
-        ? (exec.arguments as { server?: unknown }).server : undefined
-      if (!managedTools.has(exec.name) && !(typeof resourceServer === 'string' && resourceServers.has(resourceServer) &&
-        ['list_mcp_resources', 'list_mcp_resource_templates', 'read_mcp_resource'].includes(exec.name))) {
-        return '首期业务入口只开放受管 MCP 工具与资源'
-      }
-    } catch { return '业务任务上下文或许可无效' }
+    const context = exec.agent?.session.id ? control.contextForSession(exec.agent.session.id) : undefined
+    if (context) {
+      try { control.assert(context, 'agent:access', [{ kind: 'agent', id: context.scope.agentId }]) }
+      catch { return '业务任务上下文或许可无效' }
+    }
+    if (context?.identity?.evidence.method === 'anonymous' && localTools.has(exec.name) && exec.name !== 'skill') {
+      try { control.assert(context, 'read') } catch { return '访客尚未获准使用业务工具' }
+    }
+    return businessToolDeniedReason(exec, id => control.contextForSession(id), managedTools, localTools, resourceServers,
+      Boolean(context && context.identity?.evidence.method !== 'anonymous' && control.isDevelopmentContext(context)))
   })
   const approvals = createBusinessApprovalAdapter(ctx, control)
   const fetchHandler = connection.createSharedFetchHandler('/api')
@@ -326,7 +418,8 @@ export async function apply(ctx: Context, config: BusinessRuntimeConfig): Promis
       let body = ['POST', 'PUT', 'PATCH'].includes(req.method || '') ? await readBody(req) : undefined
       const envelope = body ? JSON.parse(body.toString()) : undefined
       const endpoint = new URL(req.url || '/', 'http://runtime').pathname.slice('/api/'.length)
-      const session = endpoint === 'session/create' ? undefined : addressedSession(envelope?.payload?.args)
+      const session = endpoint === 'session/create' ? undefined : addressedSession(envelope?.payload?.args,
+        (parentId, childId) => assertChildAddress(control, base, config.binding, parentId, childId))
       const context = session ? control.sessionContext(base, session) : base
       if (endpoint === 'workspace/create') {
         if (!fixedWorkspaceRequest(envelope?.payload?.args, config.workspacePath)) throw new Error('业务工作区使用服务端固定路径')
@@ -405,7 +498,7 @@ export function createBusinessApprovalAdapter(ctx: Context, control: BusinessCon
   }
   const send = (res: ServerResponse, status: number, value: unknown) => { res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(JSON.stringify(value)) }
   // 与原生UI共页；只使用自有受归属检查的接口，不能回答owner瀑布。
-  ctx.on('webserver/index-inject', table => { table.push({ kind: 'script', placement: 'body', text: `(function(){const base=${JSON.stringify('/agents/' + (ctx.get('businessRuntime') as any)?.binding.agentId + '/')};const panel=document.createElement('aside');panel.setAttribute('aria-label','业务操作确认');panel.style.cssText='position:fixed;bottom:16px;right:16px;max-width:420px;background:Canvas;color:CanvasText;padding:16px;border:1px solid #888;z-index:9999;display:none';document.body.append(panel);let busy=false;async function poll(){if(busy)return;busy=true;try{const r=await fetch(base+'api/business-control/confirmations');if(!r.ok)return;const list=await r.json();panel.replaceChildren();panel.style.display=list.items.length?'block':'none';for(const item of list.items){const title=document.createElement('p');title.textContent='确认操作：'+item.operationId;const detail=document.createElement('pre');detail.style.cssText='white-space:pre-wrap;max-height:240px;overflow:auto';detail.textContent=item.target+'\\n'+JSON.stringify(item.args,null,2);panel.append(title,detail);for(const allow of [true,false]){const b=document.createElement('button');b.textContent=allow?'确认执行':'拒绝';b.onclick=async()=>{await fetch(base+'api/business-control/confirmations',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:item.id,allow})});poll()};panel.append(b)}}}finally{busy=false}}setInterval(()=>poll().catch(()=>{}),750);poll().catch(()=>{})})();` }) })
+  ctx.on('webserver/index-inject', table => { table.push({ kind: 'script', placement: 'body', text: `(function(){const base=${JSON.stringify((ctx.get('businessRuntime') as any).basePath)};const panel=document.createElement('aside');panel.setAttribute('aria-label','业务操作确认');panel.style.cssText='position:fixed;bottom:16px;right:16px;max-width:420px;background:Canvas;color:CanvasText;padding:16px;border:1px solid #888;z-index:9999;display:none';document.body.append(panel);let busy=false;async function poll(){if(busy)return;busy=true;try{const r=await fetch(base+'api/business-control/confirmations');if(!r.ok)return;const list=await r.json();panel.replaceChildren();panel.style.display=list.items.length?'block':'none';for(const item of list.items){const title=document.createElement('p');title.textContent='确认操作：'+item.operationId;const detail=document.createElement('pre');detail.style.cssText='white-space:pre-wrap;max-height:240px;overflow:auto';detail.textContent=item.target+'\\n'+JSON.stringify(item.args,null,2);panel.append(title,detail);for(const allow of [true,false]){const b=document.createElement('button');b.textContent=allow?'确认执行':'拒绝';b.onclick=async()=>{await fetch(base+'api/business-control/confirmations',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:item.id,allow})});poll()};panel.append(b)}}}finally{busy=false}}setInterval(()=>poll().catch(()=>{}),750);poll().catch(()=>{})})();` }) })
   return {
     async handle(req: IncomingMessage, res: ServerResponse, context: BusinessContext): Promise<void> {
       control.assert(context, 'session:read')

@@ -4,6 +4,11 @@ const MAX_DOCUMENT = 2 * 1024 * 1024
 const MAX_RESULT = 1024 * 1024
 const methods = new Set(['get', 'post', 'put', 'patch', 'delete'])
 
+function requestSignal(server: any): AbortSignal {
+  const timeout = AbortSignal.timeout(server.platformTimeoutMs ?? 20_000)
+  return server.platformSignal ? AbortSignal.any([server.platformSignal, timeout]) : timeout
+}
+
 export function validateSpecUrl(value: string): string {
   const url = new URL(value)
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.hash) {
@@ -117,7 +122,7 @@ async function loginToken(server: any): Promise<string> {
     const response = await fetch(validateSpecUrl(server.loginUrl), {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ username: server.loginUsername, password: server.loginPassword }),
-      signal: AbortSignal.timeout(20_000),
+      signal: requestSignal(server),
     })
     if (!response.ok) throw new Error(`登录授权失败：HTTP ${response.status}`)
     const result = JSON.parse(await limitedText(response, MAX_RESULT))
@@ -164,11 +169,11 @@ async function authorizedFetch(server: any, url: URL, init: RequestInit, spec?: 
 
 export async function loadOpenApi(server: any): Promise<any> {
   const specUrl = validateSpecUrl(server.specUrl)
-  let response = await fetch(specUrl, { signal: AbortSignal.timeout(20_000) })
+  let response = await fetch(specUrl, { signal: requestSignal(server) })
   let retriedWithAuth = false
   if ([401, 403].includes(response.status) && (server.authType === 'login' || server.apiKey)) {
     await response.body?.cancel()
-    response = (await authorizedFetch(server, new URL(specUrl), { signal: AbortSignal.timeout(20_000) })).response
+    response = (await authorizedFetch(server, new URL(specUrl), { signal: requestSignal(server) })).response
     retriedWithAuth = true
   }
   if (!response.ok) throw new Error(`读取 OpenAPI 规范失败：HTTP ${response.status}（${retriedWithAuth ? '凭据重试' : '匿名访问'}）`)
@@ -237,7 +242,7 @@ async function execute(source: any, item: any, args: any): Promise<{ response: R
     schemaDigest: createHash('sha256').update(JSON.stringify(item.raw)).digest('hex') }
   const { response, credential } = await authorizedFetch(source.server, url, { method: item.method.toUpperCase(), headers,
     body: item.body && args?.body !== undefined ? JSON.stringify(args.body) : undefined,
-    signal: AbortSignal.timeout(20_000) }, source.spec, item.raw, controlled)
+    signal: requestSignal(source.server) }, source.spec, item.raw, controlled)
   const raw = await limitedText(response, MAX_RESULT)
   let text = raw
   for (const secret of [credential, source.server.apiKey, source.server.loginPassword]) {

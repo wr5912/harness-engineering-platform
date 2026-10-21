@@ -115,7 +115,7 @@ test('真实原生 MCP 分组把 SDK 取消传入平台组合客户端，组合�
 
   // 外层 Agent 配置尚未创建 Session；单独核对当前构建产物包含组合专属的配置。
   const artifact = await readFile(new URL('../lib/mcp-manager.js', import.meta.url), 'utf8')
-  assert.match(artifact, /server\.platformComposition\s*\?\s*\{\s*toolCallTimeoutMs:\s*36\s*\*\s*(?:6e4|60_000|60000)\s*\}\s*:\s*\{\}/)
+  assert.match(artifact, /timeout:\s*server\.platformComposition\s*\?\s*36\s*\*\s*(?:6e4|60_000|60000)/)
 })
 
 test('v2 分组资源读取将 SDK 取消传到实际来源', async t => {

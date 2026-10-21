@@ -117,7 +117,8 @@ function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理
 
 test('自动生成的已发布组合服务不参与原生服务保存校验或持久化', async () => {
   const ui = editor()
-  assert.match(ui.text(ui.serviceButton('工具组合编排')), /已发布工具目录.*连接与工具发现待检查.*本页尚未检查/)
+  assert.match(ui.text(ui.serviceButton('工具组合编排')), /由已发布组合生成.*目录已发布/)
+  assert.doesNotMatch(ui.text(ui.serviceButton('工具组合编排')), /连接已验证/)
   ui.input('描述（可选）').props.onChange({ target: { value: '18080' } })
   ui.render()
   ui.serviceButton('工具组合编排').props.onClick()
@@ -155,11 +156,16 @@ test('非空服务详情按原型层级呈现服务选择、状态摘要和真�
 
 test('服务列表区分检查成功、失败和未保存配置', async () => {
   const ui = editor({ fetch: async () => ({ ok: true, json: async () => ({ tools: [{ name: 'lookup' }], resources: { resources: [] } }) }) })
-  assert.match(ui.text(ui.serviceButton('biz-soc-framework')), /连接与工具发现待检查.*本页尚未检查/)
+  const badge = (page, name) => page.nodes(page.serviceButton(name)).find(node => node.props?.className === 'mcp-service-badge')
+  assert.equal(ui.text(badge(ui, 'biz-soc-framework')), '连接待检查')
+  assert.equal(badge(ui, 'biz-soc-framework').props['data-state'], 'neutral')
+  assert.doesNotMatch(ui.text(ui.serviceButton('biz-soc-framework')), /连接已验证/)
   ui.setView('connection')
   await ui.button('发现工具与资源').props.onClick()
   ui.setView('servers')
-  assert.match(ui.text(ui.serviceButton('biz-soc-framework')), /规范已读取 · 已发现 1 个工具.*最近检查/)
+  assert.equal(ui.text(badge(ui, 'biz-soc-framework')), '规范已读取')
+  assert.equal(badge(ui, 'biz-soc-framework').props['data-state'], 'verified')
+  assert.doesNotMatch(ui.text(ui.serviceButton('biz-soc-framework')), /连接已验证/)
   assert.match(ui.text(ui.render()), /实际调用和业务结果待验证/)
   ui.button('连接配置').props.onClick()
   ui.render()
@@ -167,15 +173,38 @@ test('服务列表区分检查成功、失败和未保存配置', async () => {
   assert.ok(typeField)
   typeField.props.onChange({ target: { value: 'mcp' } })
   ui.render()
-  assert.match(ui.text(ui.serviceButton('biz-soc-framework')), /当前修改未保存.*保存当前配置后再检查/)
-  assert.doesNotMatch(ui.text(ui.serviceButton('biz-soc-framework')), /最近检查/)
+  assert.equal(ui.text(badge(ui, 'biz-soc-framework')), '修改未保存')
+  assert.equal(badge(ui, 'biz-soc-framework').props['data-state'], 'changed')
+  assert.doesNotMatch(ui.text(ui.serviceButton('biz-soc-framework')), /规范已读取/)
 
   const failed = editor({ fetch: async () => ({ ok: false, json: async () => ({ error: '连接超时' }) }) })
   failed.setView('connection')
   await failed.button('发现工具与资源').props.onClick()
   failed.setView('servers')
-  assert.match(failed.text(failed.serviceButton('biz-soc-framework')), /检查失败，连接与工具发现待核对.*最近检查/)
+  assert.equal(failed.text(badge(failed, 'biz-soc-framework')), '检查失败')
+  assert.equal(badge(failed, 'biz-soc-framework').props['data-state'], 'failed')
   assert.doesNotMatch(failed.text(failed.serviceButton('biz-soc-framework')), /规范已读取/)
+
+  const disconnected = editor({ fetch: async () => ({ ok: false, json: async () => ({ error: 'Error POSTing to endpoint' }) }) })
+  disconnected.button('连接测试').props.onClick()
+  await new Promise(resolve => setImmediate(resolve))
+  disconnected.render()
+  assert.match(disconnected.text(disconnected.render()), /连接测试失败.*检查服务地址、网络与凭据后重试/)
+  assert.doesNotMatch(disconnected.text(disconnected.render()), /Error POSTing to endpoint/)
+})
+
+test('原生 MCP 成功检查后才标记连接已验证，列表身份和选中态保持真实配置', async () => {
+  const ui = editor({ fetch: async () => ({ ok: true, json: async () => ({ tools: [{ name: 'save_result' }] }) }) })
+  ui.refreshValue({ servers: [{ id: 'mock-threat-report', description: '测试报告保存', url: 'http://127.0.0.1:53001/mcp', enabled: true }], groups: ui.groups, sharedToken: '' })
+  const item = () => ui.serviceButton('mock-threat-report')
+  assert.match(ui.text(item()), /mock-threat-report.*测试报告保存.*连接待检查/)
+  assert.equal(item().props['data-server-id'], 'mock-threat-report')
+  assert.equal(item().props['aria-current'], 'true')
+  ui.setView('connection')
+  await ui.button('发现工具与资源').props.onClick()
+  ui.setView('servers')
+  assert.match(ui.text(item()), /连接已验证/)
+  assert.doesNotMatch(ui.text(item()), /报告文件服务/)
 })
 
 test('列表中的其他服务不完整时定位该服务和具体字段，且不写入配置', async () => {
@@ -238,6 +267,29 @@ test('MCP 分组入口使用当前站点基址与 v2 路径', async () => {
   assert.deepEqual(ui.copied, ['http://127.0.0.1:3090/hep/mcp/groups/research/v2'])
 })
 
+test('MCP 管理的连接、诊断和来源请求使用当前 DSH 子路径', async () => {
+  const actions = []
+  const ui = editor({ fetch: async (url, init) => {
+    assert.equal(String(url), 'http://127.0.0.1:3090/hep/api/mcp-manager')
+    assert.equal(init.credentials, 'same-origin')
+    actions.push(JSON.parse(init.body).action)
+    return { ok: true, json: async () => ({ tools: [], resources: { resources: [] }, items: [] }) }
+  } })
+  ui.button('连接测试').props.onClick()
+  await new Promise(resolve => setImmediate(resolve))
+  ui.setView('connection')
+  await ui.button('发现工具与资源').props.onClick()
+
+  delete ui.server.specUrl
+  ui.server.managementUrl = 'http://127.0.0.1:18080/api'
+  ui.refreshValue()
+  ui.setView('connection')
+  ui.input('来源名称').props.onChange({ target: { value: 'fixture' } })
+  ui.render()
+  await ui.button('创建来源').props.onClick()
+  assert.deepEqual(actions, ['test', 'test', 'create', 'sources'])
+})
+
 test('旧分组重复成员需显式合并并保存后才可复制 v2 链接', async () => {
   const ui = editor()
   const group = { id: 'legacy', members: [
@@ -292,6 +344,20 @@ test('新分组保存前不提供可复制链接，现有链接仅使用已保�
   existing.render()
   assert.match(existing.text(existing.render()), /当前草稿尚未保存；链接仍使用上次保存的配置/)
   assert.equal(existing.button('复制分组链接').props.disabled, false)
+})
+
+test('分组地址与上游发现状态分别显示，来源失败不误报可用', async () => {
+  const ui = editor({ fetch: async () => { throw new Error('fixture 上游不可达') } })
+  const group = { id: 'selected', members: [{ serverId: ui.server.id, names: ['lookup'] }] }
+  ui.refreshValue({ servers: [ui.server], groups: [group], sharedToken: 'fixture-token' }, 'r2')
+  ui.setView('groups')
+  assert.equal(ui.button('复制分组链接').props.disabled, false)
+  assert.match(ui.text(ui.render()), /分组地址已生成.*链接存在只证明访问入口/)
+  assert.match(ui.text(ui.render()), /尚未检查当前配置/)
+  ui.button('发现工具与资源').props.onClick()
+  await new Promise(resolve => setImmediate(resolve)); ui.render()
+  assert.match(ui.text(ui.render()), /来源 biz-soc-framework 最近一次发现失败/)
+  assert.match(ui.text(ui.render()), /fixture 上游不可达/)
 })
 
 test('已发布组合更名后保留旧分组选择并标记当前未发现', () => {

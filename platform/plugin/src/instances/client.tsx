@@ -17,6 +17,9 @@ interface InstanceRow {
   agent_id?: string
   port?: number
   business_gateway?: boolean
+  access_mode?: 'authenticated' | 'anonymous'
+  identity_mode?: 'development' | 'published'
+  access_url?: string
   lan_access?: boolean
   home_volume?: string
   home_directory?: string
@@ -37,8 +40,12 @@ interface ActionRequest {
   name: string
   source?: string
   expected_source_id?: string
+  expected_source_digest?: string
   expected_state?: string
   port?: number
+  business_control?: boolean
+  access_mode?: 'authenticated' | 'anonymous'
+  identity_mode?: 'development' | 'published'
   model_selection?: ModelSelection
   expected_model_policy_hash?: string
 }
@@ -57,7 +64,7 @@ interface Receipt {
   status?: 'success' | 'failed' | 'unknown' | 'not_dispatched'
   requested_source_id?: string
   model_selection?: ModelSelection
-  registration?: { status: 'checking' | 'verified' | 'unknown'; observed?: Pick<InstanceRow, 'source_id' | 'state'> | null; checked_at?: string }
+  registration?: { status: 'checking' | 'verified' | 'unknown'; observed?: Pick<InstanceRow, 'source_id' | 'state' | 'business_gateway' | 'access_mode' | 'identity_mode' | 'access_url'> | null; checked_at?: string }
   value?: unknown
   error?: { message: string }
 }
@@ -87,7 +94,7 @@ interface OperationPreview {
   name: string
   operation: Operation
   ok: boolean
-  value?: { name: string; operation: Operation; plan?: Record<string, unknown>; source_id?: string; port?: number; retention?: Record<string, string>; model_selection?: ModelSelection; model_policy_hash?: string; observed_state?: string; observed_at?: string }
+  value?: { name: string; operation: Operation; plan?: Record<string, unknown>; source_id?: string; port?: number; retention?: Record<string, string>; model_selection?: ModelSelection; model_policy_hash?: string; observed_state?: string; observed_at?: string; access_mode?: 'authenticated' | 'anonymous'; identity_mode?: 'development' | 'published' }
   error?: { message: string }
 }
 
@@ -182,7 +189,8 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
   const createDialog = useRef<HTMLDialogElement>(null)
   const actionOpener = useRef<HTMLElement | null>(null)
   const createOpener = useRef<HTMLElement | null>(null)
-  const [form, setForm] = useState({ name: '', source: '', port: '' })
+  const [form, setForm] = useState<{ name: string; source: string; port: string; access_mode: 'authenticated' | 'anonymous'; identity_mode: 'development' | 'published' }>({ name: '', source: '', port: '', access_mode: 'authenticated', identity_mode: 'development' })
+  const [businessGatewayAvailable, setBusinessGatewayAvailable] = useState(false)
   const [sources, setSources] = useState<SourceOption[]>([])
   const [agents, setAgents] = useState<AgentOption[]>([])
   const [models, setModels] = useState<ModelList | null>(null)
@@ -286,14 +294,14 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
     setSourceLoading(true)
     setSourceError('')
     const [sourceResult, agentResult] = await Promise.allSettled([
-      call<{ sources: SourceOption[] }>('sources', {}),
+      call<{ sources: SourceOption[]; business_gateway_available?: boolean }>('sources', {}),
       rpc.call(CHANNEL, 'agents/list', {}).then(result => {
         if (!result.ok) throw new Error(result.error.message)
         return result.value as { agents: AgentOption[] }
       }),
     ])
     if (request !== sourceRequest.current) return
-    if (sourceResult.status === 'fulfilled') { setSources(sourceResult.value.sources); setSourcesLoaded(true) }
+    if (sourceResult.status === 'fulfilled') { setSources(sourceResult.value.sources); setBusinessGatewayAvailable(sourceResult.value.business_gateway_available === true); setSourcesLoaded(true) }
     else setSourceError(sourceResult.reason instanceof Error ? sourceResult.reason.message : String(sourceResult.reason))
     if (agentResult.status === 'fulfilled') setAgents(agentResult.value.agents)
     setSourceLoading(false)
@@ -468,6 +476,8 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
       name: form.name,
       source: form.source,
       port: form.port ? Number(form.port) : undefined,
+      business_control: businessGatewayAvailable,
+      ...(businessGatewayAvailable ? { access_mode: form.access_mode, identity_mode: form.identity_mode } : {}),
       ...(createModel ? { model_selection: createModel } : {}),
     }
   }
@@ -516,7 +526,15 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
             skipped.push({ ...item, ok: false, status: 'not_dispatched', error: { message } })
             return { ...result, ok: false, error: { message } }
           }
-          frozen.push({ ...item, model_selection: selected, expected_model_policy_hash: hash, expected_source_id: source, port: plannedPort as number })
+          const business = result.value.plan?.business_control as { source_digest?: unknown } | undefined
+          const sourceDigest = business?.source_digest
+          if (business && (typeof sourceDigest !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(sourceDigest))) {
+            const message = '预览缺少受控实例来源摘要，请重新预览；本项不会执行。'
+            skipped.push({ ...item, ok: false, status: 'not_dispatched', error: { message } })
+            return { ...result, ok: false, error: { message } }
+          }
+          frozen.push({ ...item, model_selection: selected, expected_model_policy_hash: hash, expected_source_id: source,
+            ...(typeof sourceDigest === 'string' ? { expected_source_digest: sourceDigest } : {}), port: plannedPort as number })
         } else if (operation === 'stop') {
           const state = result.value.observed_state
           if (!state || state === 'unknown' || !result.value.observed_at) {
@@ -781,12 +799,13 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
         <strong>{item.name}</strong> · {labels[item.operation]} · {status === 'success' ? '成功' : status === 'failed' ? '失败' : status === 'unknown' ? '结果未知，请刷新核对' : '未派发'}
         {item.error?.message && <div>{item.error.message}</div>}
         {status === 'failed' && item.port && <div>请核对当前端口和实例状态，重新预览后再执行。</div>}
-        {item.port && <div className="instance-muted">预览端口：{item.port}；执行回执端口：{typeof command?.port === 'number' ? command.port : '尚未确认'}</div>}
+        {item.port && <div className="instance-muted">{registration?.observed?.business_gateway ? '内部 Runtime ' : ''}预览端口：{item.port}；执行回执端口：{typeof command?.port === 'number' ? command.port : '尚未确认'}</div>}
         {item.model_selection && <div className="instance-muted">提交默认模型：{modelLabel(models?.catalog, item.model_selection)}；当前实例登记与实际模型调用请分别核对。</div>}
         {item.requested_source_id && <div className="instance-muted">提交来源：<code>{item.requested_source_id}</code>；当前登记来源{registration?.checked_at ? `（核对于 ${new Date(registration.checked_at).toLocaleString('zh-CN')}）` : ''}：{registration?.status === 'checking' ? '正在核对…' : registration?.status === 'unknown' ? '未知，登记读取未完成' : registration?.status === 'verified' ? registration.observed?.source_id ? <code>{registration.observed.source_id}</code> : registration.observed ? '登记未记录来源' : '未找到此实例登记' : '等待操作完成后核对'}{registration?.status === 'verified' && registration.observed && `；登记状态：${stateLabels[registration.observed.state || 'unknown'] || '状态待核对'}`}</div>}
         {status === 'success' && !item.requested_source_id && registration && <div className="instance-muted">当前登记状态{registration.checked_at ? `（核对于 ${new Date(registration.checked_at).toLocaleString('zh-CN')}）` : ''}：{registration.status === 'checking' ? '正在核对…' : registration.status === 'unknown' ? '未知，登记读取未完成' : registration.observed ? stateLabels[registration.observed.state || 'unknown'] || '状态待核对' : '未找到此实例登记'}{registration.status === 'verified' && registration.observed?.source_id && <>；登记来源：<code>{registration.observed.source_id}</code></>}</div>}
         {status === 'success' && registration?.status === 'unknown' && <div role="alert">操作回执已成功，但当前实例登记未知。请重新读取登记核对；不会再次执行操作。</div>}
         {status === 'success' && registration?.status === 'verified' && !registrationMatchesReceipt(item) && <div role="alert">操作回执已成功，但当前登记与本次操作预期不一致。请重新读取登记核对。</div>}
+        {status === 'success' && item.operation === 'create' && registration?.status === 'verified' && registration.observed?.business_gateway && <div className="instance-muted">已登记网关入口：{registration.observed.access_url ? <code>{registration.observed.access_url}</code> : '尚未核对，请刷新实例登记'}；{registration.observed.access_mode === 'anonymous' ? '无需登录' : '需要个人登录'}；{registration.observed.identity_mode === 'development' ? '开发调试，不要求发布身份签名' : '对外服务，验证智能体身份签名'}。</div>}
       </div>
     })}</div>
   }
@@ -822,6 +841,13 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
         </div>
         <label className="instance-field">实例名称<input aria-label="实例名" placeholder="例如 my-agent" value={form.name}
           onChange={event => updateForm({ ...form, name: event.target.value })} className="instance-field-input" /></label>
+        {businessGatewayAvailable && <p className="instance-field-hint">此工作区的业务实例经统一网关访问，使用独立 HOME 与实例专属地址；定时任务暂不开放自动投递。</p>}
+        {businessGatewayAvailable && <label className="instance-field">实例阶段<select aria-label="实例阶段" value={form.identity_mode} onChange={event => updateForm({ ...form, identity_mode: event.target.value as 'development' | 'published' })} className="instance-field-input">
+          <option value="development">开发调试 · 不要求发布身份签名</option><option value="published">对外服务 · 验证智能体身份签名</option>
+        </select><span className="instance-field-hint">开发调试仍经统一网关；对外服务时再启用智能体身份验证。</span></label>}
+        {businessGatewayAvailable && <label className="instance-field">访客访问方式<select aria-label="访客访问方式" value={form.access_mode} onChange={event => updateForm({ ...form, access_mode: event.target.value as 'authenticated' | 'anonymous' })} className="instance-field-input">
+          <option value="authenticated">需要个人登录</option><option value="anonymous">无需登录，仍经统一网关</option>
+        </select><span className="instance-field-hint">无需登录时，网关使用各浏览器的 Cookie 区分会话；业务动作仍按现有许可检查。</span></label>}
         <div className="instance-create-model" aria-label="设置新实例默认模型">
           <div className="instance-create-model-heading"><strong>此实例默认模型</strong>{modelError && <button type="button" className="instance-button" disabled={modelLoading} onClick={() => void loadModels()}>{modelLoading ? '读取中…' : '刷新模型'}</button>}</div>
           <p className="instance-field-hint">预选“设置 → 模型”的业务统一默认；此实例也可另选已配置模型。</p>
@@ -829,7 +855,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
           {models && <ModelChoice catalog={models.catalog} allowed={createAllowed} value={createModel || null} label="新实例默认模型" onChange={selection => { setCreateModelDraft(selection); setPreviews([]); setPending(null) }} />}
           {createModelIssue && !modelError && <p role="status" className="instance-model-warning">{createModelIssue}</p>}
         </div>
-        <details className="instance-create-advanced"><summary>高级设置 · 端口与来源表达式</summary><div className="instance-create-advanced-body"><label className="instance-field">访问端口（可选）<input aria-label="端口" placeholder="留空自动分配" value={form.port}
+        <details className="instance-create-advanced"><summary>高级设置 · 端口与来源表达式</summary><div className="instance-create-advanced-body"><label className="instance-field">{businessGatewayAvailable ? '内部 Runtime 端口（可选）' : '访问端口（可选）'}<input aria-label="端口" placeholder="留空从 18500–28999 自动分配" value={form.port}
           onChange={event => updateForm({ ...form, port: event.target.value })} className="instance-field-input" /></label><button type="button" className="instance-source-advanced" aria-expanded={advancedSource} onClick={() => setAdvancedSource(value => !value)}>{advancedSource ? '收起来源表达式' : '手动输入来源表达式'}</button>
           {advancedSource && <label className="instance-field">来源表达式<input aria-label="来源" placeholder="experiment:EXP-..." value={form.source} onChange={event => {
             const source = event.target.value.trim()
@@ -908,10 +934,11 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
                 <td className="instance-list-td" data-label="访问入口">
                   <button type="button" disabled={item.state !== 'running' || !item.port || opening.has(item.name)}
                     onClick={() => openWeb(item.name)} className="instance-button"
-                    title={item.state !== 'running' ? '实例运行后可访问' : item.business_gateway ? '经业务网关打开；需要业务用户登录' : item.lan_access ? '在新标签页打开' : '仅宿主机浏览器可访问'}>
+                    title={item.state !== 'running' ? '实例运行后可访问' : item.business_gateway ? item.access_mode === 'anonymous' ? '经业务网关打开；无需登录' : '经业务网关打开；需要业务用户登录' : item.lan_access ? '在新标签页打开' : '仅宿主机浏览器可访问'}>
                     {opening.has(item.name) ? '正在打开…' : '打开 Web'}
                   </button>
-                  <div className="instance-muted instance-access-note">{item.state !== 'running' ? '实例运行后可访问' : !item.port ? '未记录端口' : item.business_gateway ? '经业务网关 · 需个人登录' : !item.lan_access ? '仅宿主机' : null}</div>
+                  <div className="instance-muted instance-access-note">{item.state !== 'running' ? '实例运行后可访问' : !item.port ? '未记录端口' : item.business_gateway ? `${item.identity_mode === 'development' ? '开发调试' : '对外服务'} · 经统一网关 · ${item.access_mode === 'anonymous' ? '无需登录' : '需个人登录'}` : !item.lan_access ? '仅宿主机' : null}</div>
+                  {item.business_gateway && <div className="instance-muted instance-access-note">{item.access_url || '网关深链尚未核对'}</div>}
                 </td>
                 <td className="instance-list-td" data-label="操作"><div className="instance-actions">
                   <button type="button" onClick={event => openDetail(item.name, false, false, event?.currentTarget)} disabled={detailLoading} className="instance-button">详情</button>
@@ -960,6 +987,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
               {[
                 ['智能体', detail.instance.agent_id || '未记录'],
                 [detail.instance.business_gateway ? '内部 Web 端口' : '访问端口', detail.instance.port || '未记录'],
+                ...(detail.instance.business_gateway ? [['实例阶段', detail.instance.identity_mode === 'development' ? '开发调试，不要求发布身份签名' : '对外服务，验证智能体身份签名'], ['访问方式', detail.instance.access_mode === 'anonymous' ? '经统一网关，无需登录；浏览器 Cookie 区分会话' : '经统一网关，需要个人登录'], ['已登记网关入口', detail.instance.access_url || '尚未核对，请刷新实例登记']] : []),
                 ['登记镜像', detail.instance.image_tag || '未记录'],
                 ['登记镜像 ID', detail.instance.image_id || '未记录'],
                 ['HOME 存储', String(detail.instance.home_directory || detail.session_scope.home_volume || detail.instance.home_volume || '未记录')],
@@ -1004,12 +1032,12 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
             <div className="instance-embed-heading"><div><h3 className="instance-section-title">将智能体嵌入网站</h3><p className="instance-muted">生成 iframe 代码，粘贴到网站的 HTML 中即可展示此实例。</p></div>
               <button type="button" className="instance-button" disabled={detail.instance.state !== 'running' || !detail.instance.port} onClick={() => void generateEmbed(detail.instance.name)}>{embedCode ? '重新生成代码' : '生成 iframe 代码'}</button>
             </div>
-            {(detail.instance.state !== 'running' || !detail.instance.port) && <p role="status">实例运行且记录访问端口后，才可生成嵌入代码。</p>}
+            {(detail.instance.state !== 'running' || !detail.instance.port) && <p role="status">实例运行且记录{detail.instance.business_gateway ? '内部 Runtime 端口' : '访问端口'}后，才可生成嵌入代码。</p>}
             {embedCode ? <div className="instance-code-box"><div className="instance-code-heading"><span>HTML 嵌入代码</span><button type="button" className="instance-button" onClick={() => void copyEmbed()}>复制嵌入代码</button></div><pre className="instance-embed-code">{embedCode}</pre></div> : <div className="instance-embed-empty">点击“生成 iframe 代码”，获取使用此实例实际访问地址的代码。</div>}
             {embedMessage && <p role="status" className="instance-muted">{embedMessage}</p>}
             <details className="instance-detail-fold"><summary className="instance-fold-title">使用须知</summary><ul className="instance-embed-notes">
               <li>网站访问者需要能连接到实例地址。供其他电脑访问时，使用局域网可达的地址；127.0.0.1 只指访问者自己的电脑。</li>
-              <li>嵌入沿用实例自身的登录设置，不会自动传递平台登录状态。跨站登录受浏览器 Cookie 限制时，可使用同站点反向代理或直接打开 DSH Web。</li>
+              <li>{detail.instance.business_gateway ? detail.instance.access_mode === 'anonymous' ? '匿名访客无需登录，浏览器使用 SameSite=Strict Cookie 区分会话；跨站嵌入可能无法携带 Cookie，可同站点嵌入或直接打开网关入口。' : '业务访问仍经统一网关，需要个人登录；跨站嵌入受浏览器 Cookie 限制，可同站点嵌入或直接打开网关入口。' : '嵌入沿用实例自身的登录设置，不会自动传递平台登录状态。跨站登录受浏览器 Cookie 限制时，可使用同站点反向代理或直接打开 DSH Web。'}</li>
               <li>HTTPS 网站需使用 HTTPS 实例入口，网站的 CSP 也需要允许该 iframe 来源。</li>
             </ul></details>
           </section>
@@ -1043,6 +1071,9 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
             const retention = value?.retention
             const observed = instances.find(instance => instance.name === item.name)
             const runForPreview = previewRun?.source === source ? previewRun : null
+            const businessCreate = item.operation === 'create' && (value?.access_mode === 'anonymous' || value?.access_mode === 'authenticated')
+            const agentId = sourceById.get(String(source))?.agent_id
+            const plannedGatewayPath = businessCreate && agentId ? `/agents/${agentId}/instances/${item.name}/` : ''
             const singleReference = previews.length === 1 && (item.operation === 'create' || item.operation === 'stop')
             return <article key={`${item.operation}-${item.name}`} className={`instance-preview-item${singleReference ? ' instance-reference-preview' : ''}`} data-ok={item.ok}>
               {!singleReference && <h3>{item.name} <span className="instance-muted">· {labels[item.operation]}</span></h3>}
@@ -1054,11 +1085,13 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
                   <div><dt>{item.operation === 'create' ? '运行方式' : '本次预览状态'}</dt><dd>{item.operation === 'create' ? '新增一个独立的本地实例' : <>{stateLabels[value?.observed_state || ''] || '状态待核对'}{value?.observed_at && <small className="instance-muted">观察于 {new Date(value.observed_at).toLocaleString('zh-CN')}</small>}</>}</dd></div>
                   {item.operation === 'create' && <div><dt>验证范围</dt><dd>{runForPreview && !runForPreview.error ? runForPreview.scope : '读取失败，请到评测中心核对'}{runForPreview && !runForPreview.error && <small className="instance-muted">{runForPreview.hasRun ? '最近 Run：' : '评测记录：'}{runForPreview.heading}{runForPreview.hasRun && ` · ${runForPreview.cases}`}{runForPreview.runAt && ` · 记录于 ${new Date(runForPreview.runAt).toLocaleString('zh-CN')}`}{runForPreview.checkedAt && ` · 核对于 ${new Date(runForPreview.checkedAt).toLocaleString('zh-CN')}`}</small>}</dd></div>}
                   {item.operation === 'create' && <div><dt>实例默认模型</dt><dd>{modelLabel(models?.catalog, value?.model_selection)}</dd></div>}
-                  <div><dt>{item.operation === 'create' ? '访问端口' : '影响入口'}</dt><dd>{typeof port === 'number' ? `127.0.0.1:${port}` : observed?.port ? `127.0.0.1:${observed.port}` : '未确认'}</dd></div>
+                  {item.operation === 'create' && businessCreate && <div><dt>实例阶段</dt><dd>{value?.identity_mode === 'published' ? '对外服务 · 验证智能体身份签名' : '开发调试 · 不要求发布身份签名'}</dd></div>}
+                  {item.operation === 'create' && <div><dt>访问方式</dt><dd>{value?.access_mode === 'anonymous' ? '经统一网关，无需登录；浏览器 Cookie 区分会话' : value?.access_mode === 'authenticated' ? '经统一网关，需要个人登录' : '按实例配置'}</dd></div>}
+                  <div><dt>{item.operation === 'create' ? businessCreate ? '内部 Runtime 端口' : '访问端口' : '影响入口'}</dt><dd>{item.operation === 'create' ? typeof port === 'number' ? `127.0.0.1:${port}` : '未确认' : observed?.business_gateway ? observed.access_url || '网关深链尚未核对' : observed?.port ? `127.0.0.1:${observed.port}` : '未确认'}</dd></div>
                 </dl></div>
                 {item.operation === 'stop' && <div className="instance-preview-warning" role="note"><strong>业务访问将中断</strong><span>进行中的业务请求可能终止，需要再次启动后恢复访问。</span></div>}
                 <div className="instance-preview-impact"><h4>{item.operation === 'create' ? '执行后的影响' : '数据与任务影响'}</h4><ul>{item.operation === 'create' ? <>
-                  <li>新增独立业务访问入口{typeof port === 'number' ? ` 127.0.0.1:${port}` : '，端口以执行回执为准'}。</li>
+                  <li>{businessCreate ? <>创建成功并完成登记后，经统一网关路径 <code>{plannedGatewayPath || '待登记核对'}</code> 访问；{value?.access_mode === 'anonymous' ? '无需登录' : '需要个人登录'}。</> : <>新增独立业务访问入口{typeof port === 'number' ? ` 127.0.0.1:${port}` : '，端口以执行回执为准'}。</>}</li>
                   <li>现有 {instances.filter(instance => instance.state === 'running').length} 个运行中业务实例保持当前状态。</li>
                   <li>创建不代表业务验证通过；请按来源版本的评测范围核对结果。</li>
                 </> : <>
@@ -1071,7 +1104,8 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
                 <div><dt>登记来源</dt><dd>{typeof source === 'string' ? <>{sourceLabel(source)}<br/><code>{source}</code></> : '未确认'}</dd></div>
                 <div><dt>本次变化</dt><dd>{impacts[item.operation]}</dd></div>
                 {['create', 'start', 'restart'].includes(item.operation) && <div><dt>默认模型</dt><dd>{modelLabel(models?.catalog, value?.model_selection)}{value?.model_selection?.reasoningEffort ? ` · 推理档位 ${value.model_selection.reasoningEffort}` : ''}<small className="instance-muted">应用到本次实例启动配置；已有 Session 需另行核对。</small></dd></div>}
-                <div><dt>访问端口</dt><dd>{typeof port === 'number' ? port : '未确认或不适用'}</dd></div>
+                <div><dt>{observed?.business_gateway ? '内部 Runtime 端口' : '访问端口'}</dt><dd>{typeof port === 'number' ? port : '未确认或不适用'}</dd></div>
+                {observed?.business_gateway && <div><dt>网关入口</dt><dd>{observed.access_url || '网关深链尚未核对'}；{observed.access_mode === 'anonymous' ? '无需登录' : '需要个人登录'}</dd></div>}
                 <div><dt>保留</dt><dd>{retention ? `HOME：${retention.home || '未确认'}；Session：${retention.sessions || '未确认'}；来源：${retention.source || '未确认'}；Run：${retention.runs || '未确认'}` : '未确认'}</dd></div>
                 <div><dt>登记处置</dt><dd>{retention?.registration || '未确认'}</dd></div>
               </dl>}

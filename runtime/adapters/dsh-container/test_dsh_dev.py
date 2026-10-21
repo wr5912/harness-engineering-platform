@@ -507,6 +507,10 @@ class ModelPolicyTest(unittest.TestCase):
             self.assertEqual(patch[-1]["insert"][0]["config"]["allowed"], policy["allowed"])
             self.assertEqual(patch[-1]["insert"][0]["config"],
                              {"agentId": "example-agent", "allowed": policy["allowed"]})
+            local = [{"provider": "threat-analysis-delivery", "model": "fixed-summary"}]
+            with_local = json.loads(dev.model_policy_patch(policy, local))[-1]["insert"][0]["config"]
+            self.assertEqual(with_local["allowed"], policy["allowed"])
+            self.assertEqual(with_local["localRoutes"], local)
             contract = EvaluationModeContractTest().contract(model_policy=policy)
             contract["agent_id"] = "example-agent"
             with mock.patch.object(dev, "assert_model_policy_current"):
@@ -612,6 +616,27 @@ class ModelPolicyTest(unittest.TestCase):
             self.assertEqual(json.loads((target / "model.patch.yml").read_text()), [])
             entry = dev.instance_entry(target, state, {"projects": {}, "homes": {}})
             self.assertEqual(entry["model_policy"]["sha256"], state["model_policy"]["sha256"])
+
+    def test_eval_source_reads_candidate_local_routes_without_expanding_external_catalog(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            managed = Path(temporary) / "managed"
+            managed.mkdir()
+            (managed / "role-tool-matrix.yaml").write_text(
+                "runtime_capabilities:\n"
+                "  local_tools: [skill]\n"
+                "  local_model_routes:\n"
+                "    - provider: threat-analysis-delivery\n"
+                "      model: fixed-summary\n", encoding="utf-8")
+            routes = dev.source_local_model_routes({"managed": str(managed)})
+            policy = dev._model_policy({"agent_id": "example-agent", "allowed": [
+                {"provider": "catalog-model", "model": "catalog-route"}],
+                "default": {"provider": "catalog-model", "model": "catalog-route"}},
+                "example-agent", source="business-config", manifest_sha256=None)
+            config = json.loads(dev.model_policy_patch(policy, routes))[-1]["insert"][0]["config"]
+            self.assertEqual(config["allowed"], [{"provider": "catalog-model", "model": "catalog-route"}])
+            self.assertEqual(config["localRoutes"], routes)
+            business_config = json.loads(dev.model_policy_patch(policy, routes, business=True))[-1]["insert"][0]["config"]
+            self.assertEqual(business_config["assetRoot"], "/opt/harness-business-assets")
 
     def test_policy_file_must_be_regular_absolute_and_match_source(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -1838,7 +1863,7 @@ class UpPortOwnershipTest(unittest.TestCase):
         plan = json.loads(stdout.getvalue())
         self.assertEqual(plan["name"], "security-operations-expert-eval")
         self.assertEqual(plan["container_name"], "security-operations-expert-eval")
-        self.assertEqual(plan["port"], 3081)
+        self.assertEqual(plan["port"], 18500)
         self.assertEqual(plan["listen_host"], "0.0.0.0")
         for flag in ("lan_access", "unsafe_no_auth", "skip_testing_notice"):
             self.assertTrue(plan[flag])
@@ -1847,9 +1872,16 @@ class UpPortOwnershipTest(unittest.TestCase):
         runner.assert_not_called()
 
     def test_auto_port_skips_instance_records_and_listeners(self):
-        self.write_existing(port=3081)
-        with mock.patch.object(dev, "port_in_use", side_effect=lambda port: port == 3082):
-            self.assertEqual(dev.first_available_port("new-probe"), 3083)
+        self.write_existing(port=18500)
+        with mock.patch.object(dev, "port_in_use", side_effect=lambda port: port == 18501):
+            self.assertEqual(dev.first_available_port("new-probe"), 18502)
+
+    def test_auto_port_stays_within_business_instance_range(self):
+        with mock.patch.object(dev, "AUTO_PORT_START", 28998), mock.patch.object(dev, "AUTO_PORT_END", 28999), \
+             mock.patch.object(dev, "reserved_instance_ports", return_value={28998}), \
+             mock.patch.object(dev, "port_in_use", return_value=True):
+            with self.assertRaises(SystemExit):
+                dev.first_available_port("new-probe")
 
     def test_existing_default_name_reuses_recorded_port(self):
         name = "security-operations-expert-eval"
@@ -1942,7 +1974,7 @@ class UpPortOwnershipTest(unittest.TestCase):
                 contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaises(SystemExit):
                 dev.command_up(args)
-        self.assertEqual(args.port, 3081)
+        self.assertEqual(args.port, 18500)
         self.assertEqual(stdout.getvalue(), "")
         writer.assert_not_called()
 
@@ -2226,7 +2258,8 @@ class PortProbeTest(unittest.TestCase):
             port = listener.getsockname()[1]
             self.assertTrue(dev.port_in_use(port))
             with mock.patch.object(dev, "reserved_instance_ports", return_value=set()), \
-                    mock.patch.object(dev, "AUTO_PORT_START", port):
+                    mock.patch.object(dev, "AUTO_PORT_START", port), \
+                    mock.patch.object(dev, "AUTO_PORT_END", 65535):
                 self.assertGreater(dev.first_available_port("lan-probe"), port)
 
     def test_bind_errors_are_not_reported_as_an_available_port(self):
@@ -2247,7 +2280,7 @@ adapter, directory, name, port = sys.argv[1:]
 spec = importlib.util.spec_from_loader('startup_probe', SourceFileLoader('startup_probe', str(Path(adapter) / 'dsh-dev')))
 dev = importlib.util.module_from_spec(spec); spec.loader.exec_module(dev)
 base = Path(directory); dev.STATE_ROOT = base / name / 'instances'
-dev.STARTUP_LOCK = base / 'startup.lock'; dev.AUTO_PORT_START = int(port)
+dev.STARTUP_LOCK = base / 'startup.lock'; dev.AUTO_PORT_START = int(port); dev.AUTO_PORT_END = int(port) + 1
 contract = {'source_id':'experiment:EXP-fixture-001','source_kind':'experiment','agent_id':'fixture',
  'preset_id':'fixture','workspace':'/tmp/ws','presets':'/tmp/presets','managed':'/tmp/managed',
  'patch':'/opt/managed/fixture.patch.yml','required_env_names':[], 'image':{'local_image_tag':'fixture'}}

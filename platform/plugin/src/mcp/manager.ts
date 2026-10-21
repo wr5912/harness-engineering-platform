@@ -29,6 +29,28 @@ export interface ManagerConfig {
   configuration?: () => McpConfigurationView
   saveConfiguration?: (ops: any[], revision: string) => McpConfigurationView
 }
+
+const connectionFields = ['specUrl', 'url', 'managementUrl', 'authType', 'authHeader', 'loginUrl',
+  'loginTokenPath', 'apiKey', 'loginUsername', 'loginPassword', 'headers'] as const
+
+function businessServers(assetRoot: string, candidateServers: any[], platformServers: any[]): any[] {
+  const platformById = new Map(platformServers.map(server => [server.id, server]))
+  return candidateServers.map(candidate => {
+    if (platformGroupServer(assetRoot, candidate)) return candidate
+    const current = platformById.get(candidate.id)
+    const server = { ...candidate }
+    for (const field of connectionFields) delete server[field]
+    if (!current) return { ...server, enabled: false }
+    for (const field of connectionFields) if (Object.hasOwn(current, field)) server[field] = current[field]
+    const candidateTools = candidate.tools
+    const platformTools = current.tools
+    const tools = candidateTools.mode === 'selected'
+      ? { ...candidateTools, names: candidateTools.names.filter((name: string) => platformTools.mode === 'all' || platformTools.names.includes(name)) }
+      : platformTools.mode === 'selected' ? platformTools : candidateTools
+    return { ...server, enabled: candidate.enabled !== false && current.enabled !== false, tools }
+  })
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Context { platformMcp: ManagerConfig }
 }
@@ -41,19 +63,21 @@ export function apply(ctx: Context, suppliedConfig: ManagerConfig) {
     const catalog = readCompositions(workspaceConfigPath(assetRoot, 'mcp-compositions.json')).catalog
     return publishedCompositionService(catalog, executableCatalog(catalog, compositionExtension))
   }
-  const store = businessRuntime ? undefined : new McpConfigStore(assetRoot, value => {
+  const store = new McpConfigStore(assetRoot, value => {
     if (value.servers.some(server => server.id === COMPOSITION_SERVICE_ID || server.platformComposition)) {
       throw new Error('platform-compositions 是已发布编排的保留服务 ID')
     }
     const service = publishedService()
     manager.validateConfiguration({ ...value, servers: service ? [...value.servers, service] : value.servers })
   })
-  if (store) store.view()
-  const config = store ? { ...suppliedConfig,
+  store.view()
+  const config = businessRuntime ? { ...suppliedConfig,
+    servers: { get: () => businessServers(assetRoot, suppliedConfig.servers.get(), store.view().value.servers) },
+  } : { ...suppliedConfig,
     servers: { get: () => store.view().value.servers },
     groups: { get: () => store.view().value.groups },
     sharedToken: { get: () => store.view().value.sharedToken },
-  } : suppliedConfig
+  }
   let dispatch: ManagerConfig['dispatch']
   const compositionHandler = createManagedMcpHandler(assetRoot, () => config.servers.get(), { extension: compositionExtension })
   const platformClient = createPublishedCompositionClient(assetRoot, compositionHandler)
@@ -78,7 +102,7 @@ export function apply(ctx: Context, suppliedConfig: ManagerConfig) {
     } }
   }))
   const controlHandler = createBusinessControlHandler(assetRoot)
-  manager.apply(ctx, { ...config, platformClient,
+  manager.apply(ctx, { ...config, platformClient, autoMountServers: Boolean(businessRuntime),
     platformExecute: execute,
     ...(businessRuntime ? {
       businessGroupUrl: (id: string) => businessRuntime.groupUrl(id),
@@ -94,9 +118,9 @@ export function apply(ctx: Context, suppliedConfig: ManagerConfig) {
         selected = { agentId: candidate.binding.agentId, instanceId: candidate.binding.instanceId }
       } catch { throw new Error('业务分组签名信封无效') }
       const gateway = control.config().gateway as Partial<BusinessGatewayConfig> | undefined
-      if (!control.enabled() || !gateway?.instances?.some(item => item.agentId === selected.agentId && item.instanceId === selected.instanceId)
-        || typeof gateway.sharedSecretFile !== 'string') throw new Error('业务实例未开放')
-      const instance = resolveBusinessInstance(assetRoot, selected)
+      const registered = gateway?.instances?.find(item => item.agentId === selected.agentId && item.instanceId === selected.instanceId)
+      if (!control.enabled() || !registered || typeof gateway?.sharedSecretFile !== 'string') throw new Error('业务实例未开放')
+      const instance = resolveBusinessInstance(assetRoot, registered)
       const logical = new URL(req.url || '/', 'http://localhost')
       const path = ctx.webServer.publicPath(logical.pathname) + logical.search
       const assertion = verifyBusinessAssertion(readBusinessSecret(gateway.sharedSecretFile), req.headers,
@@ -142,7 +166,13 @@ export function apply(ctx: Context, suppliedConfig: ManagerConfig) {
       if (runtime && (!sessionId || !context)) throw new Error('业务工具调用缺少受信 Session 归属')
       if (context) {
         const active = currentBusinessContext()
-        if (runtime && active?.scope.sessionId && active.scope.sessionId !== sessionId) throw new Error('业务工具调用的 Session 与当前上下文不一致')
+        if (runtime && active && (active.subject.id !== context.subject.id
+          || active.subject.identitySource !== context.subject.identitySource
+          || active.scope.workspaceId !== context.scope.workspaceId || active.scope.agentId !== context.scope.agentId
+          || active.scope.instanceId !== context.scope.instanceId || active.scope.runtimeGeneration !== context.scope.runtimeGeneration
+          || active.sourceDigest !== context.sourceDigest)) throw new Error('业务工具调用的主体或实例与当前上下文不一致')
+        if (runtime && active?.scope.sessionId && active.scope.sessionId !== sessionId
+          && !runtime.isTrustedChildSession?.(active.scope.sessionId, sessionId)) throw new Error('业务工具调用的 Session 与当前上下文不一致')
         return withBusinessContext({ ...context, invocationId: execution.callId }, run)
       }
       if (currentBusinessContext()) return run()
@@ -151,11 +181,12 @@ export function apply(ctx: Context, suppliedConfig: ManagerConfig) {
     platformDispatch: (handler: NonNullable<ManagerConfig['dispatch']>) => { dispatch = handler }, servers: { get() {
     const servers = config.servers.get()
     if (servers.some(server => server.id === COMPOSITION_SERVICE_ID || server.platformComposition)) throw new Error('platform-compositions 是已发布编排的保留服务 ID')
+    if (businessRuntime) return servers
     const service = publishedService()
     return service ? [...servers, service] : servers
   } } })
   ctx.provide('platformMcp', { ...config, compositionHandler, compositionExtension,
-    ...(store ? { configuration: () => store.view(),
+    ...(!businessRuntime ? { configuration: () => store.view(),
       saveConfiguration: (ops: any[], revision: string) => store.mutate(ops, revision) } : {}),
     control: (endpoint, payload, signal) => controlHandler(endpoint, payload, signal, ctx.connection.browserPeer),
     currentGroup: (id, version) => (ctx as any).mcpSessionManager.currentGroup(id, version), dispatch: (request, signal) => {

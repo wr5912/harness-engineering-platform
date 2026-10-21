@@ -25,7 +25,7 @@ import type { ConnectionRpcHandler, ConnectionRpcResult } from '@deepseek-ai/dsh
 import { RunFileError, readRunReport, listRunFiles, previewRunFile, redactRunText } from './run-files.ts'
 import { readRunTrace } from '../evaluation/trace.ts'
 import { createDecisionDatasetHandler } from '../evaluation/datasets.ts'
-import { createEvaluationJobs, EvaluationJobError } from '../evaluation/jobs.ts'
+import { createEvaluationJobs, EvaluationJobError, redactKnownValues } from '../evaluation/jobs.ts'
 import { caseSourceReferences, createCaseManagementHandler, type RunCaseSource } from '../evaluation/cases.ts'
 import { readAssetDiff, readFixedAsset } from './asset-diff.ts'
 import { createAgent } from './create-agent.ts'
@@ -33,7 +33,7 @@ import { createComputeVariantsHandler } from './compute-variants.ts'
 import { createTrainingServersHandler } from './training-servers.ts'
 import { createComputeBuildHandler } from './compute-build.ts'
 import { createComputeFreezeHandler } from './compute-freeze.ts'
-import { programRoot, workspaceConfigPath } from '../workspace.ts'
+import { programRoot, workspaceConfigPath, workspaceLocalPath } from '../workspace.ts'
 import { discoverTaskCapabilities, type CapabilityOptions } from '../tasks/capabilities.ts'
 import { candidateFiles, dataPath, sourceInfo } from '../tasks/files.ts'
 import { previewTaskAssembly, applyTaskAssembly, type TaskAssemblyInput } from '../tasks/assembly.ts'
@@ -45,6 +45,7 @@ import { inspectLegacy, readResearchReference, validateResearch } from './resear
 type JsonMap = Record<string, unknown>
 type SourceCatalog = { schema_version?: string; sources?: Record<string, JsonMap> }
 type RpcValue = JsonMap | JsonMap[] | string | number | boolean | null
+type EvalModelPolicyProvider = (agentId: string) => Promise<{ policy: unknown; environment: Record<string, string> }>
 
 const EXP_ID = /^EXP-([a-z0-9]+(?:-[a-z0-9]+)*)-(\d{3})(?:-r[0-9a-f]{12})?$/
 const RUN_ID = /^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
@@ -165,20 +166,23 @@ function parseJsonCommand(root: string, args: string[], message = '命令执行�
   }
 }
 
-async function parseJsonCommandAsync(root: string, args: string[], message = '命令执行失败', signal?: AbortSignal, input?: string) {
+async function parseJsonCommandAsync(root: string, args: string[], message = '命令执行失败', signal?: AbortSignal, input?: string,
+  extraEnvironment: NodeJS.ProcessEnv = {}) {
   let stdout: string
+  const secrets = Object.values(extraEnvironment).filter((value): value is string => typeof value === 'string' && !!value)
+  const redactEnvironment = (value: string) => redact(redactKnownValues(value, secrets))
   try {
     const pending = promisify(execFile)(process.env.HARNESS_PYTHON || 'python3', programArgs(args), {
-      cwd: root, env: programEnvironment(root), encoding: 'utf8', maxBuffer: 20 * 1024 * 1024, timeout: 20_000, signal,
+      cwd: root, env: { ...programEnvironment(root), ...extraEnvironment }, encoding: 'utf8', maxBuffer: 20 * 1024 * 1024, timeout: 20_000, signal,
     })
     if (input !== undefined) pending.child.stdin?.end(input)
     stdout = (await pending).stdout
   } catch (error) {
     const failed = error as Error & { stderr?: string }
-    throw new RpcError('command_failed', message, { reason: redact(failed.stderr || failed.message) })
+    throw new RpcError('command_failed', message, { reason: redactEnvironment(failed.stderr || failed.message) })
   }
   try { return JSON.parse(stdout) as JsonMap }
-  catch { throw new RpcError('command_failed', '命令没有返回合法 JSON', { stdout: redact(stdout) }) }
+  catch { throw new RpcError('command_failed', '命令没有返回合法 JSON', { stdout: redactEnvironment(stdout) }) }
 }
 
 function readYamlMap(root: string, file: string, content?: string): JsonMap {
@@ -1395,7 +1399,7 @@ async function updateCase(root: string, payload: JsonMap, signal?: AbortSignal) 
   return ok({ case: caseFromEvaluation(saved, caseId), sha256: saved.sha256, path: saved.path })
 }
 
-function evalArgs(payload: JsonMap, dryRun: boolean) {
+function evalArgs(payload: JsonMap, dryRun: boolean, modelPolicyPath?: string) {
   const source = stringField(payload, 'source')
   if (source.startsWith('experiment:')) experimentIdValue(source.slice('experiment:'.length), 'source')
   const args = [DSH_EVAL, '--source', source, '--mode', optionalString(payload, 'mode') ?? 'fast', '--executor', optionalString(payload, 'executor') ?? 'api', '--review', optionalString(payload, 'review') ?? 'none']
@@ -1404,6 +1408,7 @@ function evalArgs(payload: JsonMap, dryRun: boolean) {
   const model = optionalString(payload, 'model')
   const compareTo = optionalString(payload, 'compare_to')
   if (model) args.push('--model', model)
+  if (modelPolicyPath) args.push('--model-policy', modelPolicyPath)
   if (compareTo) args.push('--compare-to', compareTo)
   if (payload.artifact_export !== undefined) {
     const artifact = requireObject(payload.artifact_export)
@@ -1421,8 +1426,37 @@ function commandJson(root: string, args: string[]) {
   return parseJsonCommand(root, args)
 }
 
-async function evalPreview(root: string, payload: JsonMap, signal?: AbortSignal) {
-  return ok({ command: [process.env.HARNESS_PYTHON || 'python3', ...programArgs(evalArgs(payload, true))], result: await parseJsonCommandAsync(root, evalArgs(payload, true), '评测预览失败', signal) })
+function cleanupEvalPolicies(root: string, jobId: string) {
+  const directory = workspaceLocalPath(root, 'evaluation-jobs', 'model-policies')
+  if (!existsSync(directory)) return
+  for (const name of readdirSync(directory)) if (name.startsWith(`${jobId}-`)) rmSync(join(directory, name), { recursive: true, force: true })
+}
+
+async function evalCommand(root: string, payload: JsonMap, dryRun: boolean, modelPolicy?: EvalModelPolicyProvider,
+  jobId = 'preview'): Promise<{ executable: string; args: string[]; environment?: NodeJS.ProcessEnv; dispose?: () => void }> {
+  if (!modelPolicy) return { executable: process.env.HARNESS_PYTHON || 'python3', args: programArgs(evalArgs(payload, dryRun)) }
+  let projected: Awaited<ReturnType<EvalModelPolicyProvider>>
+  try { projected = await modelPolicy(sourceInfo(root, stringField(payload, 'source')).agent_id) }
+  catch (error) { throw new RpcError('model_policy_unavailable', redact((error as Error).message)) }
+  const directory = workspaceLocalPath(root, 'evaluation-jobs', 'model-policies')
+  mkdirSync(directory, { recursive: true, mode: 0o700 })
+  const temporary = mkdtempSync(join(directory, `${jobId}-`))
+  try {
+    const file = join(temporary, 'policy.json')
+    writeFileSync(file, JSON.stringify(projected.policy), { mode: 0o600, flag: 'wx' })
+    return { executable: process.env.HARNESS_PYTHON || 'python3', args: programArgs(evalArgs(payload, dryRun, file)),
+      environment: projected.environment, dispose: () => rmSync(temporary, { recursive: true, force: true }) }
+  } catch (error) { rmSync(temporary, { recursive: true, force: true }); throw error }
+}
+
+async function evalPreview(root: string, payload: JsonMap, signal?: AbortSignal, modelPolicy?: EvalModelPolicyProvider) {
+  const prepared = await evalCommand(root, payload, true, modelPolicy)
+  try {
+    const command = modelPolicy
+      ? [prepared.executable, ...programArgs(evalArgs(payload, true, '<平台模型投影>'))]
+      : [prepared.executable, ...prepared.args]
+    return ok({ command, result: await parseJsonCommandAsync(root, prepared.args, '评测预览失败', signal, undefined, prepared.environment) })
+  } finally { prepared.dispose?.() }
 }
 
 async function runRecord(root: string, op: 'index' | 'show' | 'compare', payload: JsonMap, signal?: AbortSignal) {
@@ -1554,11 +1588,13 @@ async function decisionUpdate(root: string, payload: JsonMap, signal?: AbortSign
   }
 }
 
-export function createAgentsHandler(assetRoot: string, onChange?: () => void, capabilityOptions: CapabilityOptions = {}): ConnectionRpcHandler {
+export function createAgentsHandler(assetRoot: string, onChange?: () => void, capabilityOptions: CapabilityOptions = {},
+  modelPolicy?: EvalModelPolicyProvider): ConnectionRpcHandler {
   const root = rootOf(assetRoot)
   const jobs = createEvaluationJobs(root, {
-    command: payload => ({ executable: process.env.HARNESS_PYTHON || 'python3', args: programArgs(evalArgs(payload, false)) }),
+    command: (payload, jobId) => evalCommand(root, payload, false, modelPolicy, jobId),
     environment: () => programEnvironment(root), redact: text => redact(text, 16 * 1024), onChange,
+    cleanup: jobId => cleanupEvalPolicies(root, jobId),
   })
   const previews = new Map<string, VersionPreview>()
   const datasets = createDecisionDatasetHandler(root)
@@ -1642,8 +1678,8 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
         case 'cases/from-run':
         case 'cases/create-preview':
         case 'cases/create': return await caseManagement(endpoint, body, signal, peer)
-        case 'eval/preview': return await evalPreview(root, body, signal)
-        case 'eval/start': return ok(jobs.start(body))
+        case 'eval/preview': return await evalPreview(root, body, signal, modelPolicy)
+        case 'eval/start': return ok(await jobs.start(body))
         case 'eval/list': return ok({ jobs: jobs.list().map(job => {
           const experimentId = job.source.startsWith('experiment:') ? job.source.slice('experiment:'.length) : null
           let agentId: string | null = null

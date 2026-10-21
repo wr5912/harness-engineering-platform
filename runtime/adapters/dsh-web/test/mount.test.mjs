@@ -26,7 +26,7 @@ test('既有 LAN 仅兼容明确的 IPv4 wildcard，其他原生配置校验保�
   assert.throws(() => schema({ host: '0.0.0.0', port: 3080, compression: 'invalid' }))
 })
 
-for (const basePath of ['/assistant/', '/hep/', '/agents/security-operations-expert/']) test(`${basePath} 原生 HTTP、插件资源、SSE 和 upgrade 共同挂载且旧入口拒绝`, async t => {
+for (const basePath of ['/assistant/', '/hep/', '/agents/security-operations-expert/', '/agents/security-operations-expert/instances/business-test/']) test(`${basePath} 原生 HTTP、插件资源、SSE 和 upgrade 共同挂载且旧入口拒绝`, async t => {
   const root = new Context()
   t.after(() => root.fiber.dispose())
   const productTitle = basePath === '/hep/' ? 'Harness工程平台' : undefined
@@ -59,6 +59,10 @@ for (const basePath of ['/assistant/', '/hep/', '/agents/security-operations-exp
   if (basePath.startsWith('/agents/')) {
     assert.equal((await fetch(origin + '/assistant/api/echo')).status, 404)
     assert.equal((await fetch(origin + '/agents/other-agent/api/echo')).status, 404)
+    if (basePath.includes('/instances/')) {
+      assert.equal((await fetch(origin + '/agents/security-operations-expert/api/echo')).status, 404)
+      assert.equal((await fetch(origin + '/agents/security-operations-expert/instances/other/api/echo')).status, 404)
+    }
   }
   for (const path of ['/', basePath.slice(0, -1)]) {
     const response = await fetch(origin + path + '?token=fixture&next=a%2Fb', { redirect: 'manual' })
@@ -95,24 +99,36 @@ for (const basePath of ['/assistant/', '/hep/', '/agents/security-operations-exp
 })
 
 
-test('业务 Agent 身份直接派生多段入口，平台仍读取唯一站点配置', t => {
+test('业务 Agent 与实例身份派生入口，历史 Agent 入口及平台站点配置保留', t => {
   const root = mkdtempSync(join(tmpdir(), 'harness-business-site-'))
-  const siteConfig = join(root, 'sites.json'), oldAgent = process.env.HARNESS_BUSINESS_AGENT_ID, oldSites = process.env.HARNESS_SITES_CONFIG
+  const siteConfig = join(root, 'sites.json'), oldAgent = process.env.HARNESS_BUSINESS_AGENT_ID,
+    oldInstance = process.env.HARNESS_BUSINESS_INSTANCE_ID, oldSites = process.env.HARNESS_SITES_CONFIG
   t.after(() => {
     if (oldAgent === undefined) delete process.env.HARNESS_BUSINESS_AGENT_ID; else process.env.HARNESS_BUSINESS_AGENT_ID = oldAgent
+    if (oldInstance === undefined) delete process.env.HARNESS_BUSINESS_INSTANCE_ID; else process.env.HARNESS_BUSINESS_INSTANCE_ID = oldInstance
     if (oldSites === undefined) delete process.env.HARNESS_SITES_CONFIG; else process.env.HARNESS_SITES_CONFIG = oldSites
     rmSync(root, { recursive: true, force: true })
   })
   writeFileSync(siteConfig, JSON.stringify({ assistant: '/existing-assistant/', platform: '/existing-platform/' }))
   process.env.HARNESS_SITES_CONFIG = siteConfig
   process.env.HARNESS_BUSINESS_AGENT_ID = 'security-operations-expert'
+  delete process.env.HARNESS_BUSINESS_INSTANCE_ID
   assert.equal(sitePath('assistant'), '/agents/security-operations-expert/')
+  process.env.HARNESS_BUSINESS_INSTANCE_ID = 'business-test'
+  assert.equal(sitePath('assistant'), '/agents/security-operations-expert/instances/business-test/')
   assert.equal(sitePath('platform'), '/existing-platform/')
+  for (const invalid of ['', '../other', 'instance/other', 'instance--other', 'Instance', '1instance']) {
+    process.env.HARNESS_BUSINESS_INSTANCE_ID = invalid
+    assert.throws(() => sitePath('assistant'), /无效业务实例 ID/)
+  }
+  process.env.HARNESS_BUSINESS_INSTANCE_ID = 'business-test'
   for (const invalid of ['../other', 'agent/other', 'agent--other', 'Agent']) {
     process.env.HARNESS_BUSINESS_AGENT_ID = invalid
     assert.throws(() => sitePath('assistant'), /无效业务 Agent ID/)
   }
   delete process.env.HARNESS_BUSINESS_AGENT_ID
+  assert.throws(() => sitePath('assistant'), /无效业务 Agent ID/)
+  delete process.env.HARNESS_BUSINESS_INSTANCE_ID
   assert.equal(sitePath('assistant'), '/existing-assistant/')
 })
 

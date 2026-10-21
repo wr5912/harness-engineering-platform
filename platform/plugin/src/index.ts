@@ -176,6 +176,9 @@ export function applyTools(ctx: Context) {
       if (!['control/status', 'control/probeProvider', 'description', 'research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'list', 'detail', 'sources', 'url', 'logs', 'edit/read', 'cases/list', 'cases/read', 'eval/list', 'eval/status', 'runs/index', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/preview', 'compute-variants/compare', 'compute-variants/build-preview', 'compute-variants/freeze-preview', 'training-servers/list', 'training-servers/probe', 'tasks/capabilities', 'datasets/source', 'datasets/list', 'datasets/read', 'datasets/export', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'fusion/status', 'fusion/proposal', 'features/proposal', 'features/read-source', 'configuration'].includes(endpoint)) notify([domain, 'catalog'])
     }
   }
+  const modelProjection = (agentId: string, selected?: { provider: string; model: string; reasoningEffort?: string }) => projectModelPolicy(assetRoot, agentId, {
+    sessionController: ctx.sessionController, settingsController: ctx.settingsController, credentials: ctx.credentials, llm: ctx.llm,
+  }, selected)
   const domains = {
     agents: wrap('agents', createAgentsHandler(assetRoot, () => notify(['agents', 'catalog']), {
       nativeServers: () => manager?.servers.get() ?? [],
@@ -208,10 +211,8 @@ export function applyTools(ctx: Context) {
           return bindings.length ? bindings : [{ ...base, fixed_binding_unavailable: '尚无已登记且可核验目标身份的原生 MCP 分组包含该工具' }]
         })
       },
-    })),
-    instances: wrap('instances', createInstancesHandler(assetRoot, (agentId, selected) => projectModelPolicy(assetRoot, agentId, {
-      sessionController: ctx.sessionController, settingsController: ctx.settingsController, credentials: ctx.credentials, llm: ctx.llm,
-    }, selected))), mcp: wrap('mcp', mcpManagement),
+    }, modelProjection)),
+    instances: wrap('instances', createInstancesHandler(assetRoot, modelProjection)), mcp: wrap('mcp', mcpManagement),
     models: wrap('models', createModelsHandler(assetRoot, {
       modelCatalog: () => ctx.sessionController.modelCatalog(),
       providerReadiness: providers => modelProviderReadiness(providers, {

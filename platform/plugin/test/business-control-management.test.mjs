@@ -18,7 +18,7 @@ const clientSource = (await build({ entryPoints: ['src/business-control/ui.tsx']
 test.after(() => rmSync(buildRoot, { recursive: true, force: true }))
 
 const owner = { principal: { kind: 'owner' } }
-const binding = { workspaceId: 'workspace-test', agentId: 'soc', instanceId: 'shared-runtime', runtimeGeneration: 'generation-1', sourceDigest: 'git:fixed' }
+const binding = { workspaceId: 'workspace-test', agentId: 'soc', instanceId: 'shared-runtime', runtimeGeneration: 'generation-1', sourceDigest: 'sha256:' + 'a'.repeat(64) }
 const future = () => new Date(Date.now() + 60000).toISOString()
 async function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'business-control-management-'))
@@ -43,7 +43,7 @@ async function fixture(t) {
       agentAuthentication: { enabled: true, method: 'hmac-sha256' }, agentTrust: { enabled: true } }],
     authentication: { endpoint: `${origin}/authenticate?private=DO_NOT_RETURN` }, identityTrust: { endpoint: `${origin}/trust` },
     riskAssessment: { endpoint: `${origin}/risk?private=DO_NOT_RETURN` },
-    gateway: { sharedSecretFile: '/private/no-return', signingKey: 'DO_NOT_RETURN' },
+    gateway: { sharedSecretFile: '/private/no-return', signingKey: 'DO_NOT_RETURN', instances: [{ agentId: binding.agentId, instanceId: binding.instanceId, sourceId: 'experiment:EXP-soc-001', sourceDigest: binding.sourceDigest }] },
     operations: [{ serverId: 'soc', operationId: 'writeback', kind: 'write', method: 'POST', target: origin + '/business' }],
     preservedValue: { nested: 'DO_NOT_RETURN' } }
   mkdirSync(join(root, 'config'))
@@ -84,6 +84,7 @@ test('状态只返回可编辑公开投影、真实 ACK 和定时任务未覆盖
   assert.equal(value.coverage.schedules, false)
   assert.equal(value.coverage.leaseMs, 2000)
   assert.equal(value.instances[0].applied, true)
+  assert.equal(value.instances[0].identityMode, 'published')
   assert.doesNotMatch(JSON.stringify(value), /DO_NOT_RETURN|sharedSecretFile|signingKey/)
   assert.equal(value.configuration.authentication.endpointHidden, true)
   assert.equal(value.configuration.authentication.endpoint, '')
@@ -97,6 +98,19 @@ test('状态只返回可编辑公开投影、真实 ACK 和定时任务未覆盖
   assert.equal(value.instances[0].acknowledgement.restrictionVersion, snapshot.restrictionVersion)
   await f.call('reassess', { sessionId: 'session-a', action: 'write' })
   assert.doesNotMatch(JSON.stringify((await f.call('status')).value), /DO_NOT_RETURN|\/risk\?private/)
+})
+
+test('开发调试身份模式在管理状态中明确呈现，来源仍取实例登记且无需 Agent 规则', async t => {
+  const f = await fixture(t)
+  f.config.gateway.instances[0].identityMode = 'development'
+  f.config.agents = []
+  writeFileSync(f.path, JSON.stringify(f.config))
+  const status = (await f.call('status')).value
+  assert.equal(status.instances[0].identityMode, 'development')
+  assert.equal(status.instances[0].pinnedSourceDigest, binding.sourceDigest)
+  assert.deepEqual(status.agentStatuses[0].authentication, { method: 'none', status: 'not_required' })
+  assert.equal(status.agentStatuses[0].trust.status, 'trusted')
+  assert.equal(status.configuration.agents.length, 0)
 })
 
 test('提供方 HTTP 响应探测仅发 OPTIONS，区分路径响应且不改配置或发业务请求', async t => {
@@ -202,16 +216,21 @@ test('三类配置写回唯一来源，Agent 开关真实生效，用户接入�
   assert.equal((await f.call('saveConfiguration', { revision: before.revision, enabled: true, agents: before.configuration.agents })).error.code, 'conflict')
 })
 
-test('Agent 来源 pin 与信任撤销独立于用户提供方配置，状态由真实核心计算', async t => {
+test('实例来源 pin 独立于旧 Agent 默认值及用户提供方配置，信任撤销由真实核心计算', async t => {
   const f = await fixture(t)
   let status = (await f.call('status')).value
   const changed = await f.call('saveConfiguration', { revision: status.revision, enabled: true,
     agents: status.configuration.agents.map(value => ({ ...value, sourceDigest: 'different-source' })), authentication: null, identityTrust: null })
   assert.equal(changed.ok, true)
   assert.equal(changed.value.agentStatuses[0].authentication.status, 'verified')
-  assert.equal(changed.value.agentStatuses[0].trust.status, 'mismatch')
+  assert.equal(changed.value.agentStatuses[0].trust.status, 'trusted')
+  assert.equal(changed.value.instances[0].pinnedSourceDigest, binding.sourceDigest)
   assert.equal(changed.value.configuration.authentication.configured, false)
-  status = changed.value
+  const mismatched = JSON.parse(readFileSync(f.path, 'utf8'))
+  mismatched.gateway.instances[0].sourceDigest = 'sha256:' + 'b'.repeat(64)
+  writeFileSync(f.path, JSON.stringify(mismatched))
+  status = (await f.call('status')).value
+  assert.equal(status.agentStatuses[0].trust.status, 'mismatch')
   const revoked = await f.call('saveConfiguration', { revision: status.revision, enabled: true,
     agents: status.configuration.agents.map(value => ({ ...value, sourceDigest: binding.sourceDigest, agentTrust: { enabled: false } })) })
   assert.equal(revoked.value.agentStatuses[0].trust.status, 'revoked')
@@ -571,7 +590,7 @@ test('统一网关四视图切换保留草稿，运行概览仅在首页呈现',
   assert.equal(selectedFieldsets().length, 1)
   assert.match(ui.text(selectedFieldsets()[0]), /1．智能体身份/)
   assert.equal(ui.nodes().some(value => value.props?.['aria-label'] === '运行概览'), false)
-  const pin = () => ui.nodes().find(value => value.type === 'input' && value.props.placeholder?.includes('sourceDigest'))
+  const pin = () => ui.nodes(ui.nodes().find(value => value.type === 'label' && ui.text(value).includes('旧实例默认固定来源'))).find(value => value.type === 'input')
   pin().props.onChange({ target: { value: 'sha256:draft-source' } }); ui.render()
   ui.tab('risk').props.onClick(); ui.render()
   assert.match(ui.text(selectedFieldsets()[0]), /2．风险评估/)
@@ -690,7 +709,7 @@ test('选择器复用资产列表，搜索保留已选值，更换身份不继�
   search().props.onChange({ target: { value: 'no-match' } }); ui.render()
   assert.equal(selector().props.value, 'soc')
   assert.doesNotMatch(ui.text(selector()), /业务助手/)
-  ui.nodes().find(value => value.type === 'input' && value.props.placeholder?.includes('sourceDigest')).props.onChange({ target: { value: 'sha256:old-source' } }); ui.render()
+  ui.nodes(ui.nodes().find(value => value.type === 'label' && ui.text(value).includes('旧实例默认固定来源'))).find(value => value.type === 'input').props.onChange({ target: { value: 'sha256:old-source' } }); ui.render()
   const trust = ui.nodes().find(value => value.type === 'label' && ui.text(value).includes('允许该智能体身份'))
   ui.nodes(trust).find(value => value.type === 'input').props.onChange({ target: { checked: true } }); ui.render()
   search().props.onChange({ target: { value: 'HELPER' } }); ui.render()

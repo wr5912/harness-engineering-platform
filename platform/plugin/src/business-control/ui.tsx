@@ -73,9 +73,14 @@ function ProviderFields({ title, kind, value, current, revision, rpc, change }: 
 }
 const actionNames: Record<string, string> = { read: '查询', write: '写入', publish: '报告发布' }
 const accessActionNames: Record<string, string> = { '*': '全部动作', 'agent:access': '访问 Agent', 'session:create': '创建会话', 'session:read': '读取会话', 'session:prompt': '发送会话消息', read: '读取', write: '写入', resource: '读取资源', publish: '发布报告' }
-const stateNames: Record<string, string> = { verified: '已验证签名', unknown: '未知', expired: '已过期', disabled: '已停用', trusted: '身份条件已满足', revoked: '身份已撤销', mismatch: '来源或代次不匹配' }
+const stateNames: Record<string, string> = { verified: '已验证签名', unknown: '未知', expired: '已过期', disabled: '已停用', not_required: '开发调试无需发布身份签名', trusted: '来源与通道已确认', revoked: '身份已撤销', mismatch: '来源或代次不匹配' }
 function identityResult(value: BusinessControlManagementStatus['agentStatuses'][number] | undefined) {
   if (!value) return { label: '待核对', state: 'pending' }
+  if (value.authentication.status === 'not_required') return value.trust.status === 'trusted'
+    ? { label: '开发调试 · 不要求发布身份签名', state: 'success' }
+    : value.trust.status === 'revoked' || value.trust.status === 'mismatch'
+      ? { label: '开发调试 · 来源不可用', state: 'blocked' }
+      : { label: '开发调试 · 来源待核对', state: 'pending' }
   if (value.authentication.status === 'verified' && value.trust.status === 'trusted') return { label: '已核验', state: 'success' }
   if (value.authentication.status === 'disabled' || value.trust.status === 'revoked') return { label: '已撤销', state: 'blocked' }
   if (value.authentication.status === 'expired' || value.trust.status === 'expired') return { label: '已过期', state: 'pending' }
@@ -386,13 +391,14 @@ export function BusinessControlPage({ rpc, updates, active = true, target, onNav
     : !freshFacts.length ? '选择匹配的 Session 重新评估，再核对新证据'
       : unknownRiskCount ? '核对提供方响应与未知评估的依据'
         : highRiskCount ? '核对高风险信号与当前限制' : '执行时仍按实际请求重新判断许可'
-  const trustedInstances = data?.agentStatuses.filter(value => value.authentication.status === 'verified' && value.trust.status === 'trusted').length ?? 0
+  const publishedStatuses = data?.agentStatuses.filter(value => value.authentication.status !== 'not_required') ?? []
+  const trustedInstances = publishedStatuses.filter(value => value.authentication.status === 'verified' && value.trust.status === 'trusted').length
   const appliedInstances = data?.instances.filter(value => value.applied).length ?? 0
   const activeAgentIndex = Math.min(accessAgentIndex, Math.max(0, agentDrafts.length - 1))
   const accessAgent = agentDrafts[activeAgentIndex]
   const statusCards = data && <>
     <span><span className="harness-gateway-stat-label">即时访问 <GatewayIcon kind="external" /></span><strong>{data.enabled ? '已开放' : '已关闭'}</strong><small>{data.enabled ? '开放配置 · 单次请求仍需判定' : '当前配置未开放即时访问'}</small></span>
-    <span title="已验证凭据、可信来源与实例绑定"><span className="harness-gateway-stat-label">身份核验 <GatewayIcon kind="shield" /></span><strong>{trustedInstances} <small>/ {data.instances.length}</small></strong><small>{data.instances.length ? trustedInstances === data.instances.length ? '实例身份已核验' : '实例身份仍需核对' : '尚无已登记实例'}</small></span>
+    <span title="仅统计对外服务实例的发布身份验证"><span className="harness-gateway-stat-label">发布身份核验 <GatewayIcon kind="shield" /></span><strong>{trustedInstances} <small>/ {publishedStatuses.length}</small></strong><small>{publishedStatuses.length ? trustedInstances === publishedStatuses.length ? '对外服务实例已核验' : '对外服务实例身份待核对' : data.instances.length ? '开发调试实例不要求发布身份签名' : '尚无已登记实例'}</small></span>
     <span title={`有效事实 ${freshFacts.length} / ${data.riskFacts.length} · 高风险 ${highRiskCount} · 未知 ${unknownRiskCount}`}><span className="harness-gateway-stat-label">风险评估 <GatewayIcon kind="alert" /></span><strong data-summary="risk" className={!freshFacts.length || unknownRiskCount || highRiskCount ? 'harness-gateway-warning-text' : undefined}>{riskOverview}</strong><small><button className="harness-gateway-text-button" type="button" onClick={() => openSection('risk')}>查看评估，复核当前许可 →</button></small></span>
     <span><span className="harness-gateway-stat-label">配置应用 <GatewayIcon kind="check" /></span><strong>{appliedInstances} <small>/ {data.instances.length}</small></strong><small>{data.instances.length ? appliedInstances === data.instances.length ? '目标实例已确认应用' : '目标实例应用待核对' : '尚无目标实例'}</small></span>
   </>
@@ -406,7 +412,7 @@ export function BusinessControlPage({ rpc, updates, active = true, target, onNav
         <div className="harness-gateway-status harness-gateway-status-desktop" aria-label="统一网关状态概览">
           {statusCards}
         </div>
-        <div className="harness-gateway-mobile-status" aria-label="统一网关状态概览"><div><strong>即时访问 {data.enabled ? '已开放' : '已关闭'} · 身份 {trustedInstances}/{data.instances.length}</strong><span className="harness-gateway-risk-badge">● {riskOverview}</span></div><p>{data.instances.length ? `配置 ${appliedInstances}/${data.instances.length} 已应用` : '配置尚无目标实例'} · <button className="harness-gateway-text-button" type="button" onClick={() => openSection('risk')}>复核当前许可</button></p></div>
+        <div className="harness-gateway-mobile-status" aria-label="统一网关状态概览"><div><strong>即时访问 {data.enabled ? '已开放' : '已关闭'} · 发布身份 {trustedInstances}/{publishedStatuses.length}</strong><span className="harness-gateway-risk-badge">● {riskOverview}</span></div><p>{data.instances.length ? `配置 ${appliedInstances}/${data.instances.length} 已应用` : '配置尚无目标实例'} · <button className="harness-gateway-text-button" type="button" onClick={() => openSection('risk')}>复核当前许可</button></p></div>
         {conflict && <p role="alert">配置已在其他位置更新，当前草稿已保留。请复制需要的修改，放弃草稿后按最新版本编辑；旧草稿不能覆盖新配置。</p>}
         <nav className="harness-mcp-toolbar harness-mcp-tabs harness-gateway-main-tabs" role="tablist" aria-label="统一网关视图" onKeyDown={event => {
           const index = configurationTabs.findIndex(tab => tab.id === section)
@@ -465,7 +471,7 @@ export function BusinessControlPage({ rpc, updates, active = true, target, onNav
             <p>核对当前代次的有效签名、已建立的回执及固定来源。这里说明身份条件是否满足；当前访问策略是否应用另看实例回执。</p>
             {agentDrafts.map((row, index) => <div key={index} className="harness-composition-editor harness-gateway-agent"><strong>{row.agentId || '待填写 Agent'}</strong>
               <label style={{ display: 'flex', alignItems: 'center' }}><input type="checkbox" style={{ width: 'auto' }} checked={row.agentTrust?.enabled ?? true} onChange={event => changeAgent(index, { agentTrust: { enabled: event.target.checked } })} />允许该智能体身份（取消即撤销）</label>
-              <label className="harness-mcp-wide">{row.agentId || 'Agent'} 的可信固定来源<input value={row.sourceDigest ?? ''} onChange={event => changeAgent(index, { sourceDigest: event.target.value || undefined })} placeholder="填写已核对的 sourceDigest；缺失时为未知" /></label>
+              <label className="harness-mcp-wide">{row.agentId || 'Agent'} 的旧实例默认固定来源<input value={row.sourceDigest ?? ''} onChange={event => changeAgent(index, { sourceDigest: event.target.value || undefined })} placeholder="旧登记缺少实例专属摘要时使用" /></label>
             </div>)}
             <p>可信来源的实时核验结果请到“运行概览”核对。</p>
             </section></div>
@@ -527,15 +533,15 @@ export function BusinessControlPage({ rpc, updates, active = true, target, onNav
           const access = data.configuration.agents.find(item => item.agentId === value.agentId)
           const outcome = identityResult(identity)
           return <tr key={value.instanceId}><td><strong>{value.instanceId}</strong><small>{agentCatalog?.agents.find(item => item.id === value.agentId)?.name || value.agentId}</small></td>
-            <td><span>来源已登记</span><details><summary>查看来源与代次</summary><code>{value.sourceDigest}</code><small>当前代次 {value.runtimeGeneration}</small></details></td>
+            <td><span>来源已登记</span><details><summary>查看来源与代次</summary><small>实际来源</small><code>{value.sourceDigest}</code><small>该实例固定来源</small><code>{value.pinnedSourceDigest || '尚未固定'}</code><small>当前代次 {value.runtimeGeneration}</small></details></td>
             <td><span className="harness-gateway-badge" data-state={outcome.state}>● {outcome.label}</span></td>
-            <td>{access ? data.enabled && access.enabled ? '已开放' : '已关闭' : '未配置'}</td>
+            <td>{identity?.authentication.status === 'not_required' ? '开发调试，仅开放基础会话' : access ? data.enabled && access.enabled ? '已开放' : '已关闭' : '未配置'}</td>
             <td><span className="harness-gateway-badge" data-state={value.applied ? 'success' : 'pending'}>● {value.applied ? '已应用' : '待核对'}</span></td>
             <td><button className="harness-gateway-text-button" type="button" onClick={() => { setAccessAgentIndex(Math.max(0, agentDrafts.findIndex(row => row.agentId === value.agentId))); openSection('authorization') }}>访问配置</button></td></tr>
         })}</tbody></table></div> : <div className="harness-gateway-access-empty"><strong>暂无已登记业务实例</strong><p>配置保存不表示实例已应用。创建实例并取得回执后，这里才会显示实际状态。</p></div>}
         <div className="harness-gateway-overview-cards"><article><h3>配置应用回执</h3><strong className={data.instances.length && appliedInstances === data.instances.length ? 'harness-gateway-applied' : undefined}>{data.instances.length ? `${appliedInstances}/${data.instances.length} 个目标实例已确认应用` : '尚无目标实例'}</strong><p>{data.instances.length ? '回执确认配置生效；业务验证结果仍以对应评测证据为准。' : '登记目标实例后，再核对实际应用回执。'}</p></article><article><h3>管理范围</h3><p>当前工作区经统一业务网关发起的即时任务。</p><details><summary>展开范围与来源说明</summary><p>定时任务暂不在此范围，需手动发起；存在延迟和漏执行风险。配置保存、实例应用与业务许可分别核对。</p></details></article></div>
         <details className="harness-gateway-auxiliary" aria-label="实例与身份回执"><summary>实例与身份回执 · 查看核验依据</summary><p className="harness-gateway-description">许可租期上限 2 秒，在线回执目标 2 秒；下列事实按当前工作区读取。</p>
-          {data.agentStatuses.length ? <ul className="harness-gateway-list">{data.agentStatuses.map(value => <li key={value.instanceId}>{value.agentId} / {value.instanceId}：签名 {stateNames[value.authentication.status] ?? value.authentication.status}；可信来源 {stateNames[value.trust.status] ?? value.trust.status}<p>签名最近验证 {value.authentication.verifiedAt ?? '尚无证据'} · 签名有效期 {value.authentication.expiresAt ?? '未知'} · 来源依据 {value.trust.reason}</p></li>)}</ul> : <p>尚无 Agent 身份核验事实。</p>}
+          {data.agentStatuses.length ? <ul className="harness-gateway-list">{data.agentStatuses.map(value => <li key={value.instanceId}>{value.agentId} / {value.instanceId}：{value.authentication.status === 'not_required' ? '开发调试，不要求发布身份签名' : `发布身份 ${stateNames[value.authentication.status] ?? value.authentication.status}`}；来源状态 {stateNames[value.trust.status] ?? value.trust.status}<p>{value.authentication.status === 'not_required' ? '实例仍需保持网关传输签名、来源登记与配置回执。' : `签名最近验证 ${value.authentication.verifiedAt ?? '尚无证据'} · 签名有效期 ${value.authentication.expiresAt ?? '未知'}`} · 来源依据 {value.trust.reason}</p></li>)}</ul> : <p>尚无 Agent 身份核验事实。</p>}
           {data.sessionTrustFacts?.length ? <details className="harness-gateway-auxiliary"><summary>查看接入用户会话身份事实（{data.sessionTrustFacts.length}）</summary><ul>{data.sessionTrustFacts.map(value => <li key={value.sessionId}>{value.subjectId} / {value.sessionId}：{value.state === 'evidence-held' ? '持有已验证身份记录（非实时探测）' : '身份记录已过期'} · 验证时间 {value.verifiedAt ?? '未知'} · 有效期 {value.expiresAt ?? '未知'} · 观察时间 {value.observedAt}</li>)}</ul></details> : <p>尚无用户会话信任事实。</p>}
         </details>
         <section className="harness-gateway-runtime-section" aria-label="风险与运行限制">

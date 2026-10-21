@@ -19,7 +19,7 @@ async function fixture(t, body) {
   writeFileSync(script, body)
   const options = { command: () => ({ executable: process.execPath, args: [script] }),
     environment: () => process.env, redact: text => text.replaceAll('secret-value', '[REDACTED]') }
-  return { root, create: () => createEvaluationJobs(root, options), EvaluationJobError }
+  return { root, create: overrides => createEvaluationJobs(root, { ...options, ...overrides }), EvaluationJobError, script }
 }
 
 async function waitFor(fn, accept) {
@@ -38,7 +38,7 @@ test('新建管理器从磁盘查询并取消同一评测进程，回执继续�
     "console.error('ready')", 'setInterval(()=>{},1000)',
   ].join('\n'))
   const before = fx.create()
-  const started = before.start({ source: 'experiment:EXP-test-agent-001', cases: ['U-CASE-001'] })
+  const started = await before.start({ source: 'experiment:EXP-test-agent-001', cases: ['U-CASE-001'] })
   await waitFor(() => before.status(started.job_id), job => job.stderr.includes('ready'))
   const restored = fx.create()
   assert.equal(restored.status(started.job_id).status, 'running')
@@ -48,6 +48,26 @@ test('新建管理器从磁盘查询并取消同一评测进程，回执继续�
   assert.equal(final.result.instance_stopped, true)
   assert.equal(final.actual_model_calls, null)
   assert.equal(final.hard_cap_supported, false)
+})
+
+test('模型凭据拆成多个输出块时，运行中与完成后的 Job 日志均不保留片段', async t => {
+  const secret = 'credential-fragment-938104'
+  const fx = await fixture(t, [
+    "process.stderr.write('started\\n')",
+    'process.stderr.write(process.env.MODEL_API_KEY.slice(0, 12))',
+    'setTimeout(()=>{process.stderr.write(process.env.MODEL_API_KEY.slice(12));process.stderr.write("\\n");process.stderr.write(process.env.MODEL_API_KEY.slice(0,12)+"\\n");process.stdout.write(process.env.MODEL_API_KEY.slice(0,12)+"\\n");setTimeout(()=>process.exit(0),50)},100)',
+  ].join('\n'))
+  const jobs = fx.create({ command: () => ({ executable: process.execPath, args: [fx.script], environment: { MODEL_API_KEY: secret } }) })
+  const started = await jobs.start({ source: 'experiment:EXP-test-agent-001' })
+  const running = await waitFor(() => jobs.status(started.job_id), job => job.stderr.includes('started'))
+  assert.equal(running.stderr.includes(secret.slice(0, 12)), false)
+  const finished = await waitFor(() => jobs.status(started.job_id), job => job.status === 'completed')
+  assert.equal(finished.stderr.includes(secret), false)
+  assert.equal(finished.stderr.includes(secret.slice(0, 12)), false)
+  assert.equal(finished.stdout.includes(secret.slice(0, 12)), false)
+  assert.match(finished.stderr, /\[REDACTED\]/)
+  const persisted = readFileSync(join(fx.root, '.local/evaluation-jobs', `${started.job_id}.json`), 'utf8')
+  assert.equal(persisted.includes(secret.slice(0, 12)), false)
 })
 
 test('业务未通过的已结束 Run 保持 completed 执行状态，列表可从磁盘恢复', async t => {
@@ -64,7 +84,7 @@ test('业务未通过的已结束 Run 保持 completed 执行状态，列表可�
   process.env.TEST_RUN_ID = runId
   t.after(() => { if (previous === undefined) delete process.env.TEST_RUN_ID; else process.env.TEST_RUN_ID = previous })
   const jobs = fx.create()
-  jobs.start({ source: 'experiment:EXP-test-agent-001', task_budget: { operation_id: operation } })
+  await jobs.start({ source: 'experiment:EXP-test-agent-001', task_budget: { operation_id: operation } })
   const finished = await waitFor(() => fx.create().status(operation), job => job.exit_code === 1)
   assert.equal(finished.status, 'completed')
   assert.equal(finished.summary.effective_verdict, 'failed')
@@ -75,7 +95,7 @@ test('业务未通过的已结束 Run 保持 completed 执行状态，列表可�
 test('过时 PID 的取消拒绝向当前进程发信号', async t => {
   const fx = await fixture(t, '')
   const jobs = fx.create()
-  const started = jobs.start({ source: 'experiment:EXP-test-agent-001' })
+  const started = await jobs.start({ source: 'experiment:EXP-test-agent-001' })
   const final = await waitFor(() => jobs.status(started.job_id), job => job.status === 'completed')
   const path = join(fx.root, '.local/evaluation-jobs', `${started.job_id}.json`)
   const stored = JSON.parse(readFileSync(path, 'utf8'))
@@ -92,14 +112,14 @@ test('同一持久操作 ID 重试只查询原 Job，不重复启动；改来源
   const jobs = fx.create()
   const operation = randomUUID()
   const payload = { source: 'experiment:EXP-test-agent-001', cases: ['U-CASE-001'], task_budget: { operation_id: operation } }
-  const first = jobs.start(payload)
-  const repeated = jobs.start(payload)
+  const first = await jobs.start(payload)
+  const repeated = await jobs.start(payload)
   assert.equal(first.job_id, operation)
   assert.equal(repeated.job_id, first.job_id)
   const final = await waitFor(() => jobs.status(first.job_id), job => job.status === 'completed')
   assert.equal((final.stderr.match(/started-once/g) ?? []).length, 1)
-  assert.equal(fx.create().start(payload).job_id, operation)
-  assert.throws(() => fx.create().start({ ...payload, source: 'experiment:EXP-other-agent-001' }), error => error.code === 'conflict')
+  assert.equal((await fx.create().start(payload)).job_id, operation)
+  await assert.rejects(() => fx.create().start({ ...payload, source: 'experiment:EXP-other-agent-001' }), error => error.code === 'conflict')
 })
 
 test('截止时间传入执行环境并触发取消，重建管理器不重置期限', async t => {
@@ -109,7 +129,7 @@ test('截止时间传入执行环境并触发取消，重建管理器不重置�
   ].join('\n'))
   const jobs = fx.create()
   const deadline = new Date(Date.now() + 300).toISOString()
-  const started = jobs.start({ source: 'experiment:EXP-test-agent-001', task_budget: { deadline_at: deadline } })
+  const started = await jobs.start({ source: 'experiment:EXP-test-agent-001', task_budget: { deadline_at: deadline } })
   const final = await waitFor(() => fx.create().status(started.job_id), job => job.status === 'cancelled')
   assert.match(final.stderr, new RegExp(deadline.replaceAll('.', '\\.')))
 })
@@ -117,7 +137,7 @@ test('截止时间传入执行环境并触发取消，重建管理器不重置�
 test('未捕获 stdout 的 Job 从已有 Run 恢复固定来源、Session 和产物结论', async t => {
   const fx = await fixture(t, '')
   const jobs = fx.create()
-  const started = jobs.start({ source: 'experiment:EXP-test-agent-001' })
+  const started = await jobs.start({ source: 'experiment:EXP-test-agent-001' })
   await waitFor(() => jobs.status(started.job_id), job => job.status === 'completed')
   const jobPath = join(fx.root, '.local/evaluation-jobs', `${started.job_id}.json`)
   const stored = JSON.parse(readFileSync(jobPath, 'utf8'))

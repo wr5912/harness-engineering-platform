@@ -36,9 +36,9 @@ test('v2 分组只接受固定实例签名与当前受信 Session，签名不降
   const secret = randomBytes(48), secretFile = join(root, 'business.secret')
   writeFileSync(secretFile, secret)
   writeFileSync(join(root, 'config', 'sites.json'), JSON.stringify({ platform: '/hep/' }))
-  const sourceDigest = 'fixed-source', generation = 'generation-1'
+  const sourceDigest = `sha256:${'a'.repeat(64)}`, generation = 'generation-1'
   writeFileSync(join(root, '.local', 'instances', 'soc-instance', 'instance.json'), JSON.stringify({
-    asset_root: root, agent_id: 'soc', business_control: { runtime_generation: generation,
+    asset_root: root, agent_id: 'soc', web_base_path: '/agents/soc/instances/soc-instance/', business_control: { runtime_generation: generation,
       source_digest: sourceDigest, origin: 'http://127.0.0.1:44001' },
   }))
   const sourceCalls = []
@@ -67,7 +67,7 @@ test('v2 分组只接受固定实例签名与当前受信 Session，签名不降
     agents: [{ agentId: 'soc', enabled: true, subjects: ['A'], actions: ['*'], sourceDigest }],
     authentication: { endpoint: `${sourceOrigin}/authenticate` }, identityTrust: { endpoint: `${sourceOrigin}/trust` },
     operations: [{ serverId: 'source', operationId: 'echo', kind: 'resource', target: `${sourceOrigin}/echo`, method: 'GET' }],
-    gateway: { instances: [{ agentId: 'soc', instanceId: 'soc-instance' }], sharedSecretFile: secretFile,
+    gateway: { instances: [{ agentId: 'soc', instanceId: 'soc-instance', sourceDigest }], sharedSecretFile: secretFile,
       managementUrl: 'http://127.0.0.1:44002/hep/#/gateway' },
   }
   writeFileSync(join(root, 'config', 'business-access.json'), JSON.stringify(access))
@@ -76,9 +76,10 @@ test('v2 分组只接受固定实例签名与当前受信 Session，签名不降
     connection: { requestRejection: () => undefined }, effect: create => create(), on() {}, get: () => undefined,
     provide(name, value) { this[name] = value } }
   const servers = [{ id: 'source', serverName: 'display-source', enabled: true, specUrl: `${sourceOrigin}/openapi.json`,
+    tools: { mode: 'all', names: [] } }, { id: 'unreachable', enabled: true, url: 'http://127.0.0.1:1/mcp',
     tools: { mode: 'all', names: [] } }]
   const groups = [{ id: 'soc-tools', members: [{ serverId: 'source', names: ['echo'],
-    resourceUris: [`${sourceOrigin}/echo`] }] }], token = 'a'.repeat(64)
+    resourceUris: [`${sourceOrigin}/echo`] }, { serverId: 'unreachable', names: ['echo'] }] }], token = 'a'.repeat(64)
   mkdirSync(join(root, '.local', 'credentials'), { recursive: true })
   writeFileSync(join(root, 'config', 'mcp-manager.json'), JSON.stringify({ schemaVersion: 1, servers, groups }))
   writeFileSync(join(root, '.local', 'credentials', 'mcp-manager.json'), JSON.stringify({ schemaVersion: 1,
@@ -150,8 +151,13 @@ test('v2 分组只接受固定实例签名与当前受信 Session，签名不降
   await assert.rejects(withBusinessContext(business, () => execute('missing')), /缺少受信 Session 归属/)
   control.bindSession(base, 'session-B')
   await assert.rejects(withBusinessContext(business, () => execute('session-B')), /Session 与当前上下文不一致/)
+  await assert.rejects(withBusinessContext({ ...business, subject: { ...business.subject, id: 'other-subject' } },
+    () => execute('session-A')), /主体或实例与当前上下文不一致/)
   context.get = () => undefined
   const startupOnly = await connect(new StreamableHTTPClientTransport(url, { fetch: signed(undefined) }))
+  const startupTools = await startupOnly.listTools()
+  assert.deepEqual(startupTools.tools.map(tool => tool.name), ['source__echo'])
+  assert.deepEqual(startupTools._meta['io.deepseek.dsh/mcp-group-discovery'], { unavailable: ['unreachable'] })
   await assert.rejects(startupOnly.listResources())
   const bearerOnly = await connect(new StreamableHTTPClientTransport(url,
     { requestInit: { headers: { Authorization: `Bearer ${token}` } } }))
@@ -180,4 +186,13 @@ test('v2 分组只接受固定实例签名与当前受信 Session，签名不降
     accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: 2,
     method: 'resources/read', params: { uri: 'mcp-group:/soc-tools/other/r/ZmFrZQ' } }) })
   assert.match(await replaced.text(), /业务 MCP 请求内容与签名不一致/, '签名后的 RPC 方法和参数不得替换')
+  access.gateway.instances[0].sourceDigest = `sha256:${'f'.repeat(64)}`
+  writeFileSync(join(root, 'config', 'business-access.json'), JSON.stringify(access))
+  const staleList = await signed(undefined)(url, { method: 'POST', headers: { 'content-type': 'application/json',
+    accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: 3,
+    method: 'tools/list', params: {} }) })
+  assert.equal(staleList.status, 401, '实例来源 pin 变化后旧签名不得列出分组工具')
+  access.gateway.instances[0].sourceDigest = sourceDigest
+  writeFileSync(join(root, 'config', 'business-access.json'), JSON.stringify(access))
+  assert.deepEqual((await startupOnly.listTools()).tools.map(tool => tool.name), ['source__echo'])
 })

@@ -51,17 +51,29 @@ const args = process.argv.slice(2)
 require('node:fs').appendFileSync(require('node:path').join(__dirname, 'dsh-dev.calls'), JSON.stringify(args) + '\\n')
 const out = value => process.stdout.write(JSON.stringify(value, null, 2) + '\\n')
 if (args[0] === 'ps') {
+  const newBusinessFile = require('node:path').join(process.env.XDG_STATE_HOME, 'dsh-dev', 'new-business', 'instance.json')
+  const newBusiness = require('node:fs').existsSync(newBusinessFile)
+    ? [{name:'new-business', state:'running', source_id:'experiment:EXP-real-001', agent_id:'real-agent', port:3199, business_gateway:true}]
+    : []
   out({schema_version:'1.0', instances:[
     {name:'running-one', state:'running', source_id:'experiment:EXP-real-001', source_kind:'experiment', image_tag:'dsh:locked', agent_id:'real-agent', port:3181, home_volume:'home-running', home_preserved:true, container_name:'running-one', observed_at:'2026-10-13T00:00:00.000Z', mounts:{workspace:'/x'}, mount_modes:{workspace:'ro'}},
     {name:'unknown-one', state:'unknown', source_id:'experiment:EXP-real-001', image_tag:'dsh:locked', agent_id:'real-agent', port:3182, home_volume:null, home_preserved:null, container_name:'unknown-one', observed_at:'2026-10-13T00:00:00.000Z'},
-    {name:'absent-one', state:'absent', source_id:'experiment:EXP-real-001', home_volume:'home-absent', home_preserved:true}
+    {name:'absent-one', state:'absent', source_id:'experiment:EXP-real-001', home_volume:'home-absent', home_preserved:true},
+    ...newBusiness
   ]})
 } else if (args[0] === 'up') {
   const dry = args.includes('--dry-run')
+  const business = args.includes('--business-control')
   const name = args[args.indexOf('--name') + 1]
   const source = args[args.indexOf('--source') + 1]
-  if (dry) out({args, name, source_id:source, image_tag:'dsh:locked', port:3199, mounts:[{container:'/work/harness/workspace', mode:'ro'}], state_dir:'state'})
-  else { process.stdout.write(JSON.stringify({warning:'first'}) + '\\n' + JSON.stringify({name, dsh_running:true, token:'receipt-secret'}) + '\\n'); process.stderr.write(JSON.stringify({hint:'not a receipt'}) + '\\n') }
+  if (dry) out({args, name, source_id:source, image_tag:'dsh:locked', port:3199, mounts:[{container:'/work/harness/workspace', mode:'ro'}], state_dir:'state', ...(business ? { business_control: { source_digest: 'sha256:' + 'a'.repeat(64) } } : {})})
+  else {
+    if (business) {
+      const file = require('node:path').join(process.env.XDG_STATE_HOME, 'dsh-dev', name, 'instance.json')
+      require('node:fs').mkdirSync(require('node:path').dirname(file), {recursive:true})
+      require('node:fs').writeFileSync(file, JSON.stringify({name, source_id:source, agent_id:'real-agent', asset_root:process.env.HARNESS_ASSET_ROOT, port:3199, web_base_path:'/agents/real-agent/instances/' + name + '/', business_control:{source_digest:'sha256:' + 'a'.repeat(64), runtime_generation:'generation-new', origin:'http://127.0.0.1:3199', launch_config_file:args[args.indexOf('--business-control')+1]}}))
+    }
+    process.stdout.write(JSON.stringify({warning:'first'}) + '\\n' + JSON.stringify({name, dsh_running:true, token:'receipt-secret'}) + '\\n'); process.stderr.write(JSON.stringify({hint:'not a receipt'}) + '\\n') }
 } else if (args[0] === 'down') {
   const name = args[1]
   if (name === 'fail-one') { process.stderr.write('stop failed token=secret-token\\n'); process.exit(1) }
@@ -72,9 +84,10 @@ if (args[0] === 'ps') {
   }
   out({name:args[1], deleted:true, home_preserved:true})
 } else if (args[0] === 'url') {
-  if (args[1] !== 'running-one') { process.stderr.write('实例没有运行中的容器'); process.exit(1) }
+  if (!['running-one', 'new-business'].includes(args[1])) { process.stderr.write('实例没有运行中的容器'); process.exit(1) }
   const manifest = JSON.parse(require('node:fs').readFileSync(require('node:path').join(process.env.XDG_STATE_HOME, 'dsh-dev', args[1], 'instance.json')))
-  process.stdout.write(manifest.url_override || ('http://127.0.0.1:' + manifest.port + (manifest.unsafe_no_auth ? '/' : '/?token=transient-test-token')))
+  const entry = manifest.business_control ? JSON.parse(require('node:fs').readFileSync(require('node:path').join(process.env.HARNESS_ASSET_ROOT, 'config/business-access.json'))).gateway.publicOrigin + '/agents/' + manifest.agent_id + '/instances/' + args[1] + '/' : ''
+  process.stdout.write(manifest.url_override || entry || ('http://127.0.0.1:' + manifest.port + (manifest.unsafe_no_auth ? '/' : '/?token=transient-test-token')))
 } else if (args[0] === 'logs') {
   process.stdout.write('hello token=secret-token Authorization: Bearer bearer-secret {"password":"json-secret"} API_KEY=abc123\\n')
 } else {
@@ -201,16 +214,17 @@ test('业务实例 Web 入口使用已登记网关地址并拒绝地址漂移', 
   const accessPath = join(fx.root, 'config/business-access.json')
   mkdirSync(join(fx.root, 'config'), { recursive: true })
   const access = { enabled: true, gateway: { publicOrigin: 'http://business.example:53105', instances: [{ agentId: 'real-agent', instanceId: 'running-one' }] } }
-  const entry = 'http://business.example:53105/agents/real-agent/'
+  const entry = 'http://business.example:53105/agents/real-agent/instances/running-one/'
   writeFileSync(accessPath, JSON.stringify(access))
-  const businessManifest = { ...manifest, agent_id: 'real-agent', business_control: { runtime_generation: 'current' }, url_override: entry }
+  const businessManifest = { ...manifest, agent_id: 'real-agent', web_base_path: '/agents/real-agent/instances/running-one/', business_control: { runtime_generation: 'current', source_digest: 'sha256:' + 'a'.repeat(64), origin: 'http://127.0.0.1:3181' }, url_override: entry }
   writeFileSync(manifestPath, JSON.stringify(businessManifest))
   const request = () => module.createInstancesHandler(fx.root)('url', { name: 'running-one' }, new AbortController().signal)
   assert.deepEqual((await request()).value, { url: entry, lan_access: false })
   for (const url_override of [
     'http://127.0.0.1:3181/',
-    'http://other.example:53105/agents/real-agent/',
-    'http://business.example:53106/agents/real-agent/',
+    'http://other.example:53105/agents/real-agent/instances/running-one/',
+    'http://business.example:53106/agents/real-agent/instances/running-one/',
+    'http://business.example:53105/agents/real-agent/',
     'http://business.example:53105/agents/other-agent/',
     `${entry}?token=unexpected`,
   ]) {
@@ -220,8 +234,98 @@ test('业务实例 Web 入口使用已登记网关地址并拒绝地址漂移', 
     assert.match(result.error.message, /业务网关地址与登记入口不一致/)
   }
   writeFileSync(manifestPath, JSON.stringify(businessManifest))
+  writeFileSync(accessPath, JSON.stringify({ ...access, gateway: { ...access.gateway, instances: [{ agentId: 'real-agent', instanceId: 'running-one', sourceId: 'experiment:EXP-real-001', sourceDigest: 'sha256:' + 'b'.repeat(64) }] } }))
+  assert.match((await request()).error.message, /来源与网关登记不一致/)
   writeFileSync(accessPath, JSON.stringify({ ...access, gateway: { ...access.gateway, instances: [] } }))
   assert.match((await request()).error.message, /实例未向业务网关开放/)
+})
+
+test('平台创建受控实例后原子登记来源，沿用当前管理入口并可读回网关地址', async t => {
+  const { module, cleanup } = await loadModule()
+  const fx = fixture()
+  const previous = process.env.XDG_STATE_HOME
+  process.env.XDG_STATE_HOME = fx.state
+  t.after(() => { fx.cleanup(); cleanup(); if (previous === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = previous })
+  mkdirSync(join(fx.root, 'config'), { recursive: true })
+  const accessPath = join(fx.root, 'config/business-access.json')
+  writeFileSync(accessPath, JSON.stringify({ schemaVersion: 1, enabled: true, gateway: { publicOrigin: 'http://business.example:53105', managementUrl: 'http://127.0.0.1:18120', instances: [] } }))
+  const handler = module.createInstancesHandler(fx.root)
+  const source = 'experiment:EXP-real-001', name = 'new-business'
+  const item = { operation: 'create', name, source, business_control: true, access_mode: 'anonymous' }
+  const signal = new AbortController().signal
+  const preview = await handler('preview', item, signal)
+  assert.equal(preview.ok, true)
+  assert.equal(preview.value.plan.business_control.source_digest, 'sha256:' + 'a'.repeat(64))
+  assert.equal(preview.value.access_mode, 'anonymous')
+  assert.equal(preview.value.identity_mode, 'development')
+  const result = await handler('run', { ...item, expected_source_id: source, expected_source_digest: preview.value.plan.business_control.source_digest }, signal)
+  assert.equal(result.value.ok, true, JSON.stringify(result))
+  const access = JSON.parse(readFileSync(accessPath, 'utf8'))
+  assert.equal(access.gateway.managementUrl, 'http://127.0.0.1:18120')
+  assert.deepEqual(access.gateway.instances, [{ agentId: 'real-agent', instanceId: name, sourceId: source, sourceDigest: 'sha256:' + 'a'.repeat(64), accessMode: 'anonymous', identityMode: 'development' }])
+  const entryResult = await handler('url', { name }, signal)
+  assert.equal(entryResult.ok, true, JSON.stringify(entryResult))
+  assert.deepEqual(entryResult.value, { url: 'http://business.example:53105/agents/real-agent/instances/new-business/', lan_access: false })
+  const listed = await handler('list', {}, signal)
+  assert.equal(listed.ok, true)
+  assert.equal(listed.value.instances.find(row => row.name === name)?.access_url, entryResult.value.url)
+  assert.equal(listed.value.instances.find(row => row.name === name)?.access_mode, 'anonymous')
+  assert.equal(listed.value.instances.find(row => row.name === name)?.identity_mode, 'development')
+  const restart = { operation: 'restart', name }
+  const restartPreview = await handler('preview', restart, signal)
+  assert.equal(restartPreview.ok, true)
+  assert.equal(restartPreview.value.access_mode, 'anonymous')
+  assert.equal(restartPreview.value.identity_mode, 'development')
+  assert.equal((await handler('run', { ...restart, expected_source_id: source, expected_source_digest: restartPreview.value.plan.business_control.source_digest }, signal)).value.ok, true)
+  assert.equal(JSON.parse(readFileSync(accessPath, 'utf8')).gateway.instances.length, 1)
+  assert.equal(JSON.parse(readFileSync(accessPath, 'utf8')).gateway.instances[0].accessMode, 'anonymous', '同名实例重启保留访客访问方式')
+  assert.equal(JSON.parse(readFileSync(accessPath, 'utf8')).gateway.instances[0].identityMode, 'development', '同名实例重启保留开发阶段')
+  const conflicting = JSON.parse(readFileSync(accessPath, 'utf8'))
+  conflicting.gateway.instances[0].sourceDigest = 'sha256:' + 'b'.repeat(64)
+  writeFileSync(accessPath, JSON.stringify(conflicting))
+  const callsBeforeConflict = readFileSync(join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls'), 'utf8')
+  const rejected = await handler('run', { ...restart, expected_source_id: source, expected_source_digest: restartPreview.value.plan.business_control.source_digest }, signal)
+  assert.equal(rejected.value.ok, false)
+  assert.match(rejected.value.error.message, /业务网关中同名实例的来源、访问方式或实例阶段不一致/)
+  const mutatingCalls = value => value.trim().split('\n').map(line => JSON.parse(line))
+    .filter(args => args[0] === 'down' || args[0] === 'up' && !args.includes('--dry-run'))
+  assert.deepEqual(mutatingCalls(readFileSync(join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls'), 'utf8')),
+    mutatingCalls(callsBeforeConflict), '已知来源冲突不得执行 --replace 或 down')
+  assert.equal(JSON.parse(readFileSync(accessPath, 'utf8')).gateway.instances[0].sourceDigest, 'sha256:' + 'b'.repeat(64))
+  const calls = readFileSync(join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls'), 'utf8').trim().split('\n').map(line => JSON.parse(line))
+  assert.ok(calls.filter(args => args[0] === 'up').every(args => args[args.indexOf('--business-control') + 1] === accessPath))
+  assert.ok(calls.some(args => args[0] === 'up' && args.includes('--replace') && args.includes('--port') && args[args.indexOf('--port') + 1] === '3199'))
+  assert.ok(!calls.some(args => args[0] === 'down' && args[1] === name))
+})
+
+test('受控实例在网关关闭后仍可删除对应登记，来源冲突则在 CLI 前拒绝', async t => {
+  const { module, cleanup } = await loadModule()
+  const fx = fixture()
+  const previous = process.env.XDG_STATE_HOME
+  process.env.XDG_STATE_HOME = fx.state
+  t.after(() => { fx.cleanup(); cleanup(); if (previous === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = previous })
+  const sourceDigest = 'sha256:' + 'a'.repeat(64)
+  const sourceId = 'experiment:EXP-real-001'
+  const instance = name => ({ name, agent_id: 'real-agent', source_id: sourceId, business_control: { source_digest: sourceDigest } })
+  const row = name => ({ agentId: 'real-agent', instanceId: name, sourceId, sourceDigest })
+  for (const name of ['stopped-business', 'conflict-business']) {
+    mkdirSync(join(fx.state, 'dsh-dev', name), { recursive: true })
+    writeFileSync(join(fx.state, 'dsh-dev', name, 'instance.json'), JSON.stringify(instance(name)))
+  }
+  mkdirSync(join(fx.root, 'config'), { recursive: true })
+  const accessPath = join(fx.root, 'config/business-access.json')
+  writeFileSync(accessPath, JSON.stringify({ schemaVersion: 1, enabled: false, gateway: { instances: [row('stopped-business'),
+    { ...row('conflict-business'), sourceDigest: 'sha256:' + 'b'.repeat(64) }] } }))
+  const handler = module.createInstancesHandler(fx.root), signal = new AbortController().signal
+  const deleted = await handler('run', { operation: 'delete', name: 'stopped-business' }, signal)
+  assert.equal(deleted.value.ok, true, JSON.stringify(deleted))
+  assert.deepEqual(JSON.parse(readFileSync(accessPath, 'utf8')).gateway.instances.map(item => item.instanceId), ['conflict-business'])
+  const callsPath = join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls')
+  const callsBeforeConflict = readFileSync(callsPath, 'utf8')
+  const rejected = await handler('run', { operation: 'delete', name: 'conflict-business' }, signal)
+  assert.equal(rejected.value.ok, false)
+  assert.match(rejected.value.error.message, /业务网关中同名实例的来源、访问方式或实例阶段不一致/)
+  assert.equal(readFileSync(callsPath, 'utf8'), callsBeforeConflict)
 })
 
 test('preview uses real sources and rejects invented sources', async () => {
@@ -331,6 +435,9 @@ test('request boundary rejects invalid port, source and booleans', async () => {
       { operation: 'create', name: 'stage1-new', source: 'experiment:EXP-real-001', port: 65536 },
       { operation: 'create', name: 'stage1-new', source: 7 },
       { operation: 'create', name: 'stage1-new', source: 'experiment:EXP-real-001', allow_missing_env: 'yes' },
+      { operation: 'create', name: 'stage1-new', source: 'experiment:EXP-real-001', access_mode: 'open' },
+      { operation: 'create', name: 'stage1-new', source: 'experiment:EXP-real-001', identity_mode: 'unknown' },
+      { operation: 'create', name: 'stage1-new', source: 'experiment:EXP-real-001', access_mode: 'anonymous', business_control: false },
     ]) {
       const result = await handler('preview', payload, new AbortController().signal)
       assert.equal(result.ok, false)

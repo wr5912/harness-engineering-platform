@@ -781,7 +781,7 @@ def main():
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("prepare", help="安装插件构建依赖、构建并生成独立平台 Profile")
     start_parser = commands.add_parser("start", help="使用全局 DSH 前台启动平台")
-    start_parser.add_argument("--port", type=port_value, default=3090, help="监听端口，默认 3090")
+    start_parser.add_argument("--port", type=port_value, default=18120, help="监听端口，默认 18120")
     start_parser.add_argument("--host", type=host_value, help="监听 IPv4，默认选择本机局域网地址")
     start_parser.add_argument("--dry-run", action="store_true", help="只读检查并预览启动参数")
     args = parser.parse_args()

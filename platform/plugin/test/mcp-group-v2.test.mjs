@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -32,6 +33,15 @@ async function managerModule(t) {
   return import(pathToFileURL(outfile).href)
 }
 
+async function rawOpenApiModule(t) {
+  const directory = await mkdtemp(join(tmpdir(), 'mcp-openapi-signal-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const outfile = join(directory, 'openapi.mjs')
+  await build({ entryPoints: [new URL('../../../plugins/mcp-manager/openapi.ts', import.meta.url).pathname],
+    outfile, bundle: true, platform: 'node', format: 'esm' })
+  return import(pathToFileURL(outfile).href)
+}
+
 async function serve(t, handler) {
   const server = createServer((request, response) => {
     Promise.resolve(handler(request, response)).catch(() => response.destroy())
@@ -41,12 +51,14 @@ async function serve(t, handler) {
   return `http://127.0.0.1:${server.address().port}`
 }
 
-async function fixtureMcp(t, id, reads, resourceOnly = false) {
+async function fixtureMcp(t, id, reads, resourceOnly = false, duplicateTools = false) {
   return serve(t, async (req, res) => {
     const handler = createMcpHandler(() => {
       const mcp = new McpServer({ name: id, version: '1' }, { capabilities: { ...(resourceOnly ? {} : { tools: {} }), resources: {} } })
       if (!resourceOnly) {
-        mcp.server.setRequestHandler('tools/list', async () => ({ tools: [{ name: 'echo', inputSchema: { type: 'object' } }] }))
+        mcp.server.setRequestHandler('tools/list', async () => ({ tools: duplicateTools
+          ? [{ name: 'echo', inputSchema: { type: 'object' } }, { name: 'echo', inputSchema: { type: 'object' } }]
+          : [{ name: 'echo', inputSchema: { type: 'object' } }] }))
         mcp.server.setRequestHandler('tools/call', async request => ({ content: [{ type: 'text', text: `${id}:${request.params.arguments.value}` }] }))
       }
       mcp.server.setRequestHandler('resources/list', async () => ({ resources: [{ name: 'same', uri: 'fixture:/same' }] }))
@@ -143,6 +155,206 @@ test('v2 分组名称与显示名解耦，资源代理隔离同 URI 来源并拒
   servers[0].serverName = 'Renamed'
   assert.equal(context.mcpSessionManager.currentGroup('ops', 2).targetDigest, before)
   assert.notEqual(context.mcpSessionManager.currentGroup('ops').targetDigest, old)
+})
+
+test('v2 分组保留可达来源，标出不可达来源；平台可关闭管理 Agent 自动装载', async t => {
+  const manager = await managerModule(t), reads = []
+  const healthy = await fixtureMcp(t, 'healthy', reads)
+  const servers = [
+    { id: 'healthy', enabled: true, url: healthy, tools: { mode: 'all', names: [] } },
+    { id: 'unreachable', enabled: true, url: 'http://127.0.0.1:1/mcp', tools: { mode: 'all', names: [] } },
+  ]
+  const groups = [{ id: 'mixed', members: servers.map(server => ({ serverId: server.id, names: ['echo'] })) }]
+  const { client } = await groupServer(t, manager, servers, groups)
+  const v2 = await client(2)
+  const listed = await v2.listTools()
+  assert.deepEqual(listed.tools.map(tool => tool.name), ['healthy__echo'])
+  assert.deepEqual(listed._meta[manager.GROUP_DISCOVERY_META_KEY], { unavailable: ['unreachable'] })
+  const events = []
+  const ctx = { effect: callback => callback(), webServer: { register: () => () => {}, publicPath: path => path },
+    connection: { requestRejection: () => undefined }, on: name => events.push(name), provide() {} }
+  manager.apply(ctx, { servers: { get: () => servers }, groups: { get: () => groups },
+    sharedToken: { get: () => '0'.repeat(64) }, autoMountServers: false })
+  assert.equal(events.includes('agent/created'), false)
+  const defaultEvents = []
+  manager.apply({ ...ctx, on: name => defaultEvents.push(name) }, { servers: { get: () => servers },
+    groups: { get: () => groups }, sharedToken: { get: () => '0'.repeat(64) } })
+  assert.equal(defaultEvents.includes('agent/created'), true)
+})
+
+test('业务 Session 跳过连接、鉴权和规范发现失败的 MCP 来源，仍校验本地配置', async t => {
+  const manager = await managerModule(t)
+  const duplicate = await fixtureMcp(t, 'duplicate', [], false, true)
+  const sdkRequire = createRequire('/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/package.json')
+  const [{ Context }, { ToolRuntime }, { createScope }, { SystemPrompt }] = await Promise.all([
+    '@deepseek-ai/cordis', '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-scope', '@deepseek-ai/dsh-system-prompt',
+  ].map(name => import(pathToFileURL(sdkRequire.resolve(name)).href)))
+  const healthy = await serve(t, (req, res) => res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({
+    openapi: '3.0.0', info: { title: 'healthy', version: '1' }, paths: {
+      '/echo': { get: { operationId: 'echo', responses: { 200: { description: 'ok' } } } },
+    },
+  })))
+  const hanging = await serve(t, () => {})
+  const reserved = createServer()
+  await new Promise(resolve => reserved.listen(0, '127.0.0.1', resolve))
+  const port = reserved.address().port
+  await new Promise(resolve => reserved.close(resolve))
+  let mode = 'healthy'
+  const recovering = createServer((_req, res) => mode === 'unauthorized' ? res.writeHead(401).end() :
+    res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(
+    mode === 'invalid' ? { openapi: '3.0.0' } : { openapi: '3.0.0', info: { title: 'recovering', version: '1' },
+      paths: { '/echo': { get: { operationId: 'echo', responses: { 200: { description: 'ok' } } } } } },
+  )))
+  t.after(async () => { if (recovering.listening) { recovering.closeAllConnections(); await new Promise(resolve => recovering.close(resolve)) } })
+  const servers = [
+    { id: 'healthy', serverName: 'Healthy', enabled: true, specUrl: `${healthy}/openapi.json`, tools: { mode: 'all', names: [] } },
+    { id: 'recovering', serverName: 'Recovering', enabled: true, specUrl: `http://127.0.0.1:${port}/openapi.json`,
+      tools: { mode: 'all', names: [] } },
+    { id: 'hanging', serverName: 'Hanging', enabled: true, url: hanging, platformTimeoutMs: 150,
+      tools: { mode: 'all', names: [] } },
+    { id: 'hanging-api', serverName: 'HangingApi', enabled: true, specUrl: `${hanging}/openapi.json`, platformTimeoutMs: 150,
+      tools: { mode: 'all', names: [] } },
+    { id: 'duplicate', serverName: 'Duplicate', enabled: true, url: duplicate, tools: { mode: 'all', names: [] } },
+  ]
+  const ctx = new Context(), scopes = new Set(), transitions = []
+  const services = ctx.plugin({ name: 'mcp-mount-test-services', apply(inner) {
+    inner.provide('webServer', { register: () => () => {}, publicPath: path => path })
+    inner.provide('connection', { requestRejection: () => undefined })
+    new SystemPrompt(inner, {})
+    new ToolRuntime(inner, { mode: 'native' })
+  } })
+  await services
+  const loaded = ctx.plugin({ name: 'mcp-mount-test', inject: ['webServer', 'connection', 'tools'], apply(inner) {
+    manager.apply(inner, { servers: { get: () => servers }, groups: { get: () => [] },
+      sharedToken: { get: () => '' }, withToolContext: (_execution, run) => run(),
+      onManagedTool: (name, registered) => transitions.push([name, registered]) })
+  } })
+  await loaded
+  t.after(async () => {
+    for (const scope of scopes) await scope.dispose()
+    await loaded.dispose()
+    await services.dispose()
+    await ctx.fiber.dispose()
+  })
+  async function session(id, parent = {}) {
+    const agent = { id, session: { id } }
+    const scope = createScope(ctx, agent, { parent })
+    agent.ctx = scope.ctx
+    scopes.add(scope)
+    await ctx.serial('agent/created', { agent })
+    return { agent, scope }
+  }
+  const parent = {}
+  const started = Date.now()
+  const first = await session('offline', parent)
+  assert.ok(Date.now() - started < 3000, '不响应来源不得长期阻塞 Session 创建')
+  assert.ok(ctx.tools.get('mcp__Healthy__echo', first.agent), '可达来源照常注册')
+  assert.equal(ctx.tools.get('mcp__Recovering__echo', first.agent), undefined, '不可达来源不得注册工具')
+  assert.equal(ctx.tools.get('mcp__Hanging__echo', first.agent), undefined)
+  assert.equal(ctx.tools.get('mcp__HangingApi__echo', first.agent), undefined)
+  assert.equal(ctx.tools.get('mcp__Duplicate__echo', first.agent), undefined, '部分注册成功的坏来源必须回滚')
+  assert.equal(ctx.mcpSessionManager.resolveTool('recovering', 'echo'), undefined)
+  assert.equal(ctx.mcpSessionManager.resolveTool('duplicate', 'echo'), undefined)
+  const [stillOffline, concurrentOffline] = await Promise.all([
+    session('still-offline', parent), session('concurrent-offline', parent),
+  ])
+  assert.ok(ctx.tools.get('mcp__Healthy__echo', stillOffline.agent))
+  assert.ok(ctx.tools.get('mcp__Healthy__echo', concurrentOffline.agent))
+  assert.equal(transitions.filter(([name, active]) => name === 'mcp__Healthy__echo' && active).length, 1,
+    '共享 Preset 的新 Session 不得重复注册健康工具')
+  assert.ok(transitions.some(([name, active]) => name === 'mcp__Duplicate__echo' && active),
+    '重复工具名须触发部分注册后的来源级回滚')
+  assert.equal(transitions.filter(([name, active]) => name === 'mcp__Duplicate__echo' && active).length,
+    transitions.filter(([name, active]) => name === 'mcp__Duplicate__echo' && !active).length,
+    '坏来源不得留下工具注册引用')
+  await new Promise(resolve => recovering.listen(port, '127.0.0.1', resolve))
+  const second = await session('online', parent)
+  assert.ok(ctx.tools.get('mcp__Recovering__echo', second.agent), '后续新 Session 可重新发现恢复的来源')
+  assert.equal(ctx.mcpSessionManager.resolveTool('recovering', 'echo'), 'mcp__Recovering__echo')
+  assert.equal(transitions.filter(([name, active]) => name === 'mcp__Healthy__echo' && active).length, 1)
+  assert.equal(transitions.filter(([name, active]) => name === 'mcp__Recovering__echo' && active).length, 1)
+  await first.scope.dispose(); scopes.delete(first.scope)
+  await stillOffline.scope.dispose(); scopes.delete(stillOffline.scope)
+  await concurrentOffline.scope.dispose(); scopes.delete(concurrentOffline.scope)
+  assert.ok(ctx.mcpSessionManager.resolveTool('healthy', 'echo'), '仍有 Session 时健康工具保持可用')
+  await second.scope.dispose(); scopes.delete(second.scope)
+  assert.equal(ctx.mcpSessionManager.resolveTool('healthy', 'echo'), undefined)
+  assert.equal(ctx.mcpSessionManager.resolveTool('recovering', 'echo'), undefined)
+  assert.equal(transitions.filter(([name, active]) => name === 'mcp__Healthy__echo' && !active).length, 1)
+  assert.equal(transitions.filter(([name, active]) => name === 'mcp__Recovering__echo' && !active).length, 1)
+  mode = 'invalid'
+  const invalid = await session('invalid-spec')
+  assert.ok(ctx.tools.get('mcp__Healthy__echo', invalid.agent))
+  assert.equal(ctx.tools.get('mcp__Recovering__echo', invalid.agent), undefined)
+  mode = 'unauthorized'
+  const denied = await session('unauthorized')
+  assert.ok(ctx.tools.get('mcp__Healthy__echo', denied.agent))
+  assert.equal(ctx.tools.get('mcp__Recovering__echo', denied.agent), undefined)
+  servers.push({ ...servers[0] })
+  await assert.rejects(session('duplicate-local-id'), /MCP 服务器 ID 或名称重复\/无效/)
+})
+
+test('原始 OpenAPI 发现尊重调用方取消信号，包括登录授权过程', async t => {
+  const { loadOpenApi } = await rawOpenApiModule(t)
+  const hanging = await serve(t, () => {})
+  const started = Date.now()
+  await assert.rejects(loadOpenApi({ id: 'spec-hangs', specUrl: `${hanging}/openapi.json`,
+    platformSignal: AbortSignal.timeout(120) }), error => error.name === 'TimeoutError')
+  assert.ok(Date.now() - started < 2000, '规范读取不能等待内部 20 秒超时')
+  const unauthorized = await serve(t, (request, response) => {
+    if (request.url === '/login') return
+    response.writeHead(401).end()
+  })
+  const loginStarted = Date.now()
+  await assert.rejects(loadOpenApi({ id: 'login-hangs', specUrl: `${unauthorized}/openapi.json`,
+    authType: 'login', loginUrl: `${unauthorized}/login`, loginUsername: 'fixture', loginPassword: 'fixture',
+    loginTokenPath: 'token', platformSignal: AbortSignal.timeout(120) }), error => error.name === 'TimeoutError')
+  assert.ok(Date.now() - loginStarted < 2000, '登录授权不能等待内部 20 秒超时')
+})
+
+test('原生 MCP 桥沿用 DSH 的非致命启动与无工具注册状态', async t => {
+  const manager = await managerModule(t)
+  const sdkRequire = createRequire('/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/package.json')
+  const [{ Context }, { ToolRuntime }, { createScope }, { SystemPrompt }] = await Promise.all([
+    '@deepseek-ai/cordis', '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-scope', '@deepseek-ai/dsh-system-prompt',
+  ].map(name => import(pathToFileURL(sdkRequire.resolve(name)).href)))
+  const routes = []
+  const denied = await serve(t, (_request, response) => response.writeHead(401).end())
+  const invalid = await serve(t, (_request, response) => response.writeHead(200, {
+    'content-type': 'application/json',
+  }).end('{"not":"mcp"}'))
+  const origin = await serve(t, (request, response) => {
+    const path = new URL(request.url, 'http://localhost').pathname
+    const route = routes.find(item => item.kind === 'exact' ? item.path === path : path.startsWith(item.path))
+    if (!route) return response.writeHead(404).end()
+    return route.handler(request, response)
+  })
+  const ctx = new Context()
+  const services = ctx.plugin({ name: 'native-mcp-mount-services', apply(inner) {
+    inner.provide('webServer', { port: Number(new URL(origin).port), publicPath: path => path,
+      register: route => { routes.push(route); return () => routes.splice(routes.indexOf(route), 1) } })
+    inner.provide('connection', { requestRejection: () => undefined })
+    new SystemPrompt(inner, {})
+    new ToolRuntime(inner, { mode: 'native' })
+  } })
+  await services
+  const loaded = ctx.plugin({ name: 'native-mcp-mount', inject: ['webServer', 'connection', 'tools'], apply(inner) {
+    manager.apply(inner, { servers: { get: () => [{ id: 'offline', serverName: 'Offline', enabled: true,
+      url: 'http://127.0.0.1:65531/mcp', tools: { mode: 'all', names: [] } },
+    { id: 'denied', serverName: 'Denied', enabled: true, url: denied, tools: { mode: 'all', names: [] } },
+    { id: 'invalid', serverName: 'Invalid', enabled: true, url: invalid, tools: { mode: 'all', names: [] } }] },
+    groups: { get: () => [] }, sharedToken: { get: () => '' } })
+  } })
+  await loaded
+  const agent = { id: 'native-offline', session: { id: 'native-offline' } }
+  const scope = createScope(ctx, agent, { parent: {} })
+  agent.ctx = scope.ctx
+  t.after(async () => { await scope.dispose(); await loaded.dispose(); await services.dispose(); await ctx.fiber.dispose() })
+  await ctx.serial('agent/created', { agent })
+  assert.equal(ctx.tools.get('mcp__Offline__echo', agent), undefined)
+  assert.equal(ctx.mcpSessionManager.resolveTool('offline', 'echo'), undefined)
+  assert.equal(ctx.tools.get('mcp__Denied__echo', agent), undefined)
+  assert.equal(ctx.tools.get('mcp__Invalid__echo', agent), undefined)
 })
 
 test('OpenAPI 查询资源模板经分组读取，同时保留原有 GET 工具', async t => {

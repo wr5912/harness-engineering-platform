@@ -1,6 +1,6 @@
 # Harness 工程平台项目验收矩阵
 
-更新日期：2026-10-20
+更新日期：2026-10-21
 
 本文是 **Harness 工程平台项目与工具链**验证路径、当前证据和缺口的唯一维护位置。它直接回答三个问题：总共有多少条路径、每条做到什么程度、哪些检查应该进入自动化测试。
 
@@ -12,9 +12,11 @@
 
 同日的[正式入口复验](platform-design/17_任务型智能体交付与验收.md#正式入口复验)补充正式 3090 平台、新建 3114 实例、报告下载和首页及六页布局证据。首次来源权限不符的拒绝与按冻结清单恢复后的成功分别保留；原 3081/3089 实例未变。本地精确恢复不等于通用权限迁移已经自动实现，原 Run 和上述验收层级保持不变。
 
-2026-10-20 的[3090 Mock 接入实机验证](platform-design/21_统一网关与MCP控制实施验收.md#当前-3090-mock-接入2026-10-20)补充 `PA-05/06/08/12`：当前数据工作区已配置模拟用户认证、身份信任及风险提供方；独立业务实例沿用固定 EXP-021 来源和标准镜像，运行配置将两项 MCP 连接指向 Mock。A/B 真实 Session、跨用户拒绝、高风险输入拒绝、B 经真实模型完成一次只读巡检目录调用、Mock 账本与浏览器历史均已核对。测试凭据最长一小时且 Mock fixture 仅在进程内保存；真实身份源、真实 SOC、其他操作与生产网络仍未验证，一级路径状态不提升。
+2026-10-20 的[3090 Mock 接入实机验证](platform-design/21_统一网关与MCP控制实施验收.md#2026-10-20-的-3090-mock-接入)补充 `PA-05/06/08/12`：当时数据工作区已配置模拟用户认证、身份信任及风险提供方；独立业务实例沿用固定 EXP-021 来源和标准镜像，运行配置将两项 MCP 连接指向 Mock。A/B 真实 Session、跨用户拒绝、高风险输入拒绝、B 经真实模型完成一次只读巡检目录调用、Mock 账本与浏览器历史均已核对。测试凭据最长一小时且 Mock fixture 仅在进程内保存；真实身份源、真实 SOC、其他操作与生产网络仍未验证，一级路径状态不提升。
 
-同日的[业务实例 Web 入口复验](../platform/plugin/test/evidence/instance-gateway-web-20261020.json)补充 `PA-05/12`：实例管理的表格和详情按钮均按登记的业务网关公开地址打开；未登录时显示个人登录表单，登录 Mock 用户后进入实际 DSH Web。页面将 Runtime 端口标为内部端口，并标明访问需经业务网关；普通实例原有端口校验保留。验收范围为当前 3090 与本机浏览器，不提升真实外部身份或生产网络状态。
+同日的[业务实例 Web 入口复验](../platform/plugin/test/evidence/instance-gateway-web-20261020.json)补充 `PA-05/12`：实例管理的表格和详情按钮均按登记的业务网关公开地址打开；未登录时显示个人登录表单，登录 Mock 用户后进入实际 DSH Web。页面将 Runtime 端口标为内部端口，并标明访问需经业务网关；普通实例原有端口校验保留。验收范围为当时的 3090 与本机浏览器，不提升真实外部身份或生产网络状态。
+
+2026-10-21 的[EXP-024 融合与 MCP 迁移实机核对](platform-design/21_统一网关与MCP控制实施验收.md#exp-024-融合与-mcp-迁移实机核对2026-10-21)补充 `PA-03/04/05/06/08/12`：程序与数据分支保留固定 EXP-024 来源，平台在 18120 装载，网关在 53105 为首次诊断实例精确路由；该实例自动取得 18500 并复用标准镜像。平台配置迁入 14 个服务与 4 个分组，真实 MCP 管理页显示 15 项服务（含一项已发布组合投影）并发现选定 Mock 工具；Mock 用户进入真实 DSH Web，创建和回读新 Session。后续 Candidate 能力修订须以新来源和实例重新核对，业务模型轮次与 Case 结论须另查该 Experiment 的观察和 Run；私网 SOC 连接仍不可达，受控定时投递仍按 DSH 接缝缺口延期，当前一级路径状态不因局部闭环提升。
 
 | 阶段 | ID | 一级验证路径 | 当前状态 |
 |---|---|---|---|
@@ -142,6 +144,7 @@
 
 - **统一网关业务模式（2026-10-19）**：[实施验收](platform-design/21_统一网关与MCP控制实施验收.md)记录新增 `--business-control`、独立 HOME／bridge、回环端口、标准镜像和固定来源；原研究实例保持原方式。首期关闭定时服务与后台投递，范围不扩展到历史任务。
 - **业务实例访问入口（2026-10-20）**：`dsh-dev url` 与平台实例管理共用业务网关入口合同。内部 53107 端口仅供 Runtime，浏览器打开登记的 53105 公开地址；错误主机、端口、Agent 路径及未登记实例由测试拒绝，实机点击结果见[浏览器记录](../platform/plugin/test/evidence/instance-gateway-web-20261020.json)。
+- **空 HOME 固定工作区整改（2026-10-21）**：[根因与实机核对](platform-design/21_统一网关与MCP控制实施验收.md#业务实例固定工作区与选择入口整改)记录 `tt` 首次进入触发 DSH 通用默认工作区创建、随后手动目录选择被受管网关拒绝的路径。业务 Runtime 改用 DSH 原生 `workspaceRegistry.create` 在开放连接前预登记固定目录；重启后该实例的原生 Registry 只有 `/work/harness/workspace`，经 53105 网关初开页面自动选中且无原失败请求。定向机器回归覆盖空 HOME、重复登记、固定 Session 与登记失败不开放连接，目录浏览 403 仍符合受管边界；其他业务实例未逐一检查空 HOME。
 
 - **任务试验实例退役（2026-10-19）**：关联隔离实例、容器与运行状态的处置见[任务工作副本清理](#任务工作副本清理)。
 - **要回答**：本地实例能否从参数预览到停止完整运行，失败时是否如实报告。
@@ -178,6 +181,7 @@
 ### PA-08 DSH Runtime API 与 Web UI 的 Session、消息与结果闭环
 
 - **即时任务检测、防护（2026-10-19）**：[统一网关证据](../platform/plugin/test/evidence/business-control-20261019/README.md)关联真实双用户 Session、模型巡检调用、自动风险收紧／恢复及报告归属下载。A 写操作受限时目标零新增，B 与 A 只读继续；解除后新操作恢复且不重放。外部身份、风险和设备结果来自 Mock，定时任务与业务子 Agent 全链未由此验证。
+- **业务页面选择入口与普通对话整改（2026-10-21）**：[共用业务 Profile 修复与实机核对](platform-design/21_统一网关与MCP控制实施验收.md#业务实例固定工作区与选择入口整改)停用原生预设与目录选择插件，仅在业务会话内容区隐藏原生工作区选择按钮，继续保留 DSH 工作区和会话导航。`tt`、需个人登录的 `test-daily-inspection-assistant` 与匿名的 EXP-024 新来源实例 `security-operations-expert-fusion-v3` 均经网关完整加载，无选择按钮或脚本错误，模型按钮可用。`tt` 和 v3 经网关 DSH API 创建固定工作区 Session、完成普通中文问候并回读本人会话；另一访客不能列出或读取，跨访客访问会话页面返回 403。两台实例的真实浏览器编辑器又分别发送问候并显示已完成的助手回复。页面状态实测三台实例、编辑器发送实测两台；其他业务实例由共用代码与测试覆盖但未逐一实机检查，专项业务能力仍待隔离环境验证。
 
 - **要回答**：受管评测能否分别通过 DSH Runtime API 完成业务 Turn，并通过 Web UI 完成用户可见链路冒烟，两者不混算结果。
 - **操作链**：启动 Web → 使用本次认证 URL → API 默认路径注册 Workspace、逐 Case 创建正确 Preset 的 Session、发送消息、等待 Turn 并导出轨迹；或显式选择浏览器路径，核对页面进入、新会话身份、发送和回答显示。
@@ -286,10 +290,10 @@
 - **服务保存与草稿刷新复核（2026-10-14）**：插件 62 项测试、TypeScript 检查和构建通过。[客户端回归](../platform/plugin/test/mcp-client.test.mjs)覆盖派生组合服务不参与保存、错误服务及字段定位、外层页签同步，以及同内容配置重新读取保留草稿、内容变化继续同步。已在真实页面成功保存 `biz-soc-framework` 并刷新回读描述 `18080` 与原凭据；[重启后浏览器记录](../platform/plugin/test/evidence/stage1-mcp-service-save-20261014.json)与[服务页面](../platform/plugin/test/evidence/stage1-mcp-service-save-20261014.png)验证保存请求只包含原生服务、失败自动选中出错项并返回服务列表，客户端错误为零。回归草稿使用截获请求，不写入配置；检查期间新增的其他服务保持原样，账号与编排文件未变，凭据存储仅更新登录会话。原报告的通用错误在新加载页面未复现，未据此确认其触发原因，也未验证真实 SOC 业务调用。
 - **真实 SOC 资产关联告警调试（2026-10-14）**：插件 63 项测试、TypeScript 检查、构建和仓库合同校验通过；受控接口覆盖独立适配器与原生适配器的双服务调用、对象查询参数展开、严格资产 ID、业务失败停止及 dry 零请求。已重启 3090 平台，[浏览器检查记录](../platform/plugin/test/evidence/stage1-compositions-asset-9106-20261014.json)与[实际结果页面](../platform/plugin/test/evidence/stage1-compositions-asset-9106-20261014.png)确认资产 `9106`（联试硬件服务器241，`172.16.138.241`）通过 `biz-soc-master` 的 `get_soc_asset_by_asset_id` 查询，再通过 `biz-soc-detect` 的 `list_detect_alert` 查询近 30 天关联告警：共 22 个分组、777 条告警，当前展示首页 5 个分组。两次真实 GET 均为 HTTP `200` 且业务 `code=200`，回执保留实际规范、参数模型和源码摘要。新编排保存为草稿，刷新回读及版本切换展示各自编译图，原发布版保持不变；原生服务设置、账号及非会话凭据不变，客户端错误为零。未发布新编排，未验证其他资产、全量告警明细或模型选用工具，远端服务未修改。
 - **业务与功能边界**：MCP 保留“资产→关联告警”两节点只读组合，新增能力及边界见[威胁分析阶段组合](platform-design/02_系统架构与部署设计.md#threat-stage-composition)。发布版本保存工具配置，父组合固定子版本；共享 SDK 代码变更仍需构建、重新装载和受影响验证。此前真实 SOC 仅验证资产 `9106` 的近 30 天首页告警分组，不表示其他资产、全量明细或新威胁流程已经验收。平台评测与业务组合运行分别记录，不将组合产物当作 Experiment Evaluation 或 Research Release。
-- **Mock 组合编排接入（2026-10-15）**：通过当前 3090 平台 MCP 管理界面新增 `mock-soc-readonly`，将“资产相关告警只读查询”的两个节点改接该连接，保存、实际执行、发布并刷新回读。页面资产 `9106` 与发布 MCP 调用资产 `9107` 均完成资产 GET → 告警 GET，返回各自基本告警分组；未知资产 404 时第二步跳过。Mock 新增两条实际路由派生的专用只读规范，保留原 19 个 SOC POST；114 项 Mock 测试和现有 native SOC 组合回归通过。平台 SDK、业务 Harness 和平台进程未改动；编排当前配置在 `platform/mcp-compositions.json`，接入说明、浏览器及协议证据集中在 `mock_service/docs/security-operations-expert接入.md`，不复制证据。本次仅证明模拟上游组合接入，没有新增模型 Run 或真实告警结论。
+- **Mock 组合编排接入（2026-10-15）**：通过当时的 3090 平台 MCP 管理界面新增 `mock-soc-readonly`，将“资产相关告警只读查询”的两个节点改接该连接，保存、实际执行、发布并刷新回读。页面资产 `9106` 与发布 MCP 调用资产 `9107` 均完成资产 GET → 告警 GET，返回各自基本告警分组；未知资产 404 时第二步跳过。Mock 新增两条实际路由派生的专用只读规范，保留原 19 个 SOC POST；114 项 Mock 测试和现有 native SOC 组合回归通过。平台 SDK、业务 Harness 和平台进程未改动；编排当前配置在 `platform/mcp-compositions.json`，接入说明、浏览器及协议证据集中在 `mock_service/docs/security-operations-expert接入.md`，不复制证据。本次仅证明模拟上游组合接入，没有新增模型 Run 或真实告警结论。
 - **威胁分析阶段组合（2026-10-15）**：已实现[当前合同](platform-design/02_系统架构与部署设计.md#threat-stage-composition)及[操作入口](https://github.com/wr5912/harness-engineering-platform-data/blob/main/.agents/skills/mcp-composition/SKILL.md)，支持四阶段子组合、固定发布版本的父组合、原生 SOC OpenAPI/报告 MCP 连接、Run 上下文与产物读取。首次联合工作树 143 项测试通过；提交前合入最新 `main` 后，插件 169 项测试、类型检查、构建和仓库合同校验通过；[阶段回归](https://github.com/wr5912/harness-engineering-platform-data/blob/12b6f552d4c15a475d9443c7029276810aafdbf4/extensions/security-operations/tests/threat-runtime.test.mjs)覆盖状态、单次模型、重放、回写、预算与源码完整性；[原 CLI 对照](https://github.com/wr5912/harness-engineering-platform-data/blob/12b6f552d4c15a475d9443c7029276810aafdbf4/extensions/security-operations/tests/threat-equivalence.test.mjs)在隔离 Python 进程和受控连接上比较基本名单快判、完整五源及可解析校验失败分支，核对冻结输入、模型请求、SOC 写回和报告内容。[实机记录](../platform/plugin/test/evidence/threat-composition-live-20261015.md)确认现有 3090 平台通过界面配置、发布五个工具及固定子版本，快速与完整路径均完成 Mock SOC 回写、报告保存及实际下载；完整路径只调用一次 `deepseek-flash/off`，但原机械校验失败，页面明确要求人工复核。原生分组实际发现五个工具并成功重放，旧资产查询回归通过；最终重启后上下文和 HTML 文本产物可读。取消与长超时通过[真实协议回归](../platform/plugin/test/native-composition-cancel.test.mjs)验证，使用当前 DSH 相同的 auto 协商；旧版无状态协议跨请求取消有限制。此范围不证明真实 SOC、完整威胁场景质量或自动调度行为，不构成 Experiment Evaluation 或 Research Release。
 - **运行模型默认值（2026-10-15）**：平台和 `security-operations-expert-eval` 的新 Session 均未手动选模，实际请求记录为 `deepseek-official/deepseek-flash/off`，最小模型问候完成。Agent 统一运行覆盖在 Candidate 之后加载，平台使用原生默认值与受控凭据，模型凭据仅保存在本地忽略文件或受控服务；既有 MCP 及 Mock 后端配置保留。启动器相关检查和当前适配器 99 项测试通过；配置来源、新 Session、并发实例变更及 SDK 核对边界均在 Mock 接入说明的模型默认值章节维护。业务 Harness 文件、镜像及历史研究结果未由本次改动重写。
-- **平台助手、实时更新与版本流程（2026-10-15）**：管理助手复用原生 Session、投影与工具，写操作等待确认并保留失败回执；页面通过认证事件流接收领域与稳定 ID 后重读事实源，配置刷新保留未保存草稿并核对保存版本。版本特性与融合方案保存在 `change.yaml`，融合预览核对 Git HEAD 和 Candidate 摘要，缺少真实装载及能力验证时不能完成版本；Run 新增完整 Candidate 摘要，历史记录继续可读。平台 72 项、研究工具 65 项、适配器 133 项和启动器 14 项测试及类型检查、构建通过，相关检查集中在[平台测试](../platform/plugin/test/)与[研究工具测试](../tests/test_validators.py)。当前 3090 浏览器复查确认已发布 Mock 组合仍可查询资产 `9106`，页面错误为零。本次没有重启平台或新增真实融合 Run，新增助手及融合的模型业务行为仍需单独验证。
+- **平台助手、实时更新与版本流程（2026-10-15）**：管理助手复用原生 Session、投影与工具，写操作等待确认并保留失败回执；页面通过认证事件流接收领域与稳定 ID 后重读事实源，配置刷新保留未保存草稿并核对保存版本。版本特性与融合方案保存在 `change.yaml`，融合预览核对 Git HEAD 和 Candidate 摘要，缺少真实装载及能力验证时不能完成版本；Run 新增完整 Candidate 摘要，历史记录继续可读。平台 72 项、研究工具 65 项、适配器 133 项和启动器 14 项测试及类型检查、构建通过，相关检查集中在[平台测试](../platform/plugin/test/)与[研究工具测试](../tests/test_validators.py)。当时的 3090 浏览器复查确认已发布 Mock 组合仍可查询资产 `9106`，页面错误为零。本次没有重启平台或新增真实融合 Run，新增助手及融合的模型业务行为仍需单独验证。
 - **自动化边界**：参数、路径、摘要、失败恢复、状态分派和平台密码认证进入测试；局域网地址监听已在本机浏览器验证，未从另一台局域网设备访问。真实 Docker 生命周期、浏览器操作、全局 DSH 装载及模型/外部业务调用分别保留证据，不互相替代。
 
 - **双站点基址与实际平台生效（2026-10-15）**：基址唯一配置在 当时的 [`sites.json`](https://github.com/wr5912/harness-engineering-platform/blob/9afc8fd0047367deb9df5b51595f101835359044/runtime/adapters/dsh-web/sites.json)，共用 TypeScript WebServer 适配器通过原生注册接口挂载，未引入反向代理或修改系统全局 DSH。共享适配器 8 项、平台插件 64 项、平台启动器 14 项、容器 CLI/评测访问 101 项及来源合同 20 项测试通过；MCP 受控协议测试覆盖分组和 Agent 内部 loopback 的新基址。项目合同校验无错误或警告。[隔离平台浏览器检查](../platform/plugin/test/evidence/web-base-platform-20261015.json)完成登录、退出、四页、真实 RPC、双向 WebSocket 和窄屏布局；[实际 3090 平台检查](../platform/plugin/test/evidence/web-base-platform-live-20261015.json)确认 `/hap/` 已重启生效，原 HOME、账号、编排及用户配置保持原样，旧协议入口不可用。现有平台没有已保存的 MCP 分组，链接仅用未保存草稿验证；未发送模型消息、调用真实 SOC 服务或验证另一设备连通性。业务容器的观察及限制见 `PA-05`，不提升其他研究结论或 Release 状态。
@@ -326,9 +330,9 @@
 
   前一轮的截图与 3115 来源证据仍指向 `749ef22` 整合阶段；此次没有重新部署第二轮整合程序、更新外部数据仓库或调用业务模型。新程序合同的 2 项回归包含公开导出、类型和入口的真实固定编译，不能替代迁移后新的模型生成任务或业务 Evaluation。
 
-- **MCP 分组 v2 与业务 Harness 迁移机器合同（2026-10-20）**：MCP 管理服务保留旧分组链接的 v1 工具名和摘要，新 `/hep/mcp/groups/<id>/v2` 用来源 ID 生成稳定工具名，分组可选择工具、资源 URI 与模板并代理读取；三个管理页移除重复标题说明。固定编排绑定改用 v2 摘要和同进程受控调用。业务 Runtime 的分组请求按实例、公开路径、RPC 内容和当前 Session 逐次签名，平台拒绝重放、错路径、替换 RPC 与无 Session 执行；带无效业务签名的请求不会降级为 Bearer，外部客户端仍可用分组 Token 直接访问。资源和工具的取消信号传至实际来源。最终程序插件类型检查、构建及 610 项 Node 测试通过，测试进程显式使用 Python 3.10（当前 shell 默认 Python 3.8 会使既有研究脚本失败）。数据侧从固定 EXP-022 独立派生 `EXP-security-operations-expert-024-rad80a907c628` Candidate，保留原版本与实例，按当前来源解析工具名及资源映射；Candidate Node 合同 44/44、Python 合同 11/11、数据仓库合同校验 0 错误及 0 警告。此处证明程序协议和受控夹具；当前 3090 进程尚未重启装载新程序，业务实例未切换，真实第三方 SOC 效果、新业务 Run 和 Research Release 均未验证；`PA-03/04/06/08/12` 的实机状态不因此提升。
+- **MCP 分组 v2 与业务 Harness 迁移机器合同（2026-10-20）**：MCP 管理服务保留旧分组链接的 v1 工具名和摘要，新 `/hep/mcp/groups/<id>/v2` 用来源 ID 生成稳定工具名，分组可选择工具、资源 URI 与模板并代理读取；三个管理页移除重复标题说明。固定编排绑定改用 v2 摘要和同进程受控调用。业务 Runtime 的分组请求按实例、公开路径、RPC 内容和当前 Session 逐次签名，平台拒绝重放、错路径、替换 RPC 与无 Session 执行；带无效业务签名的请求不会降级为 Bearer，外部客户端仍可用分组 Token 直接访问。资源和工具的取消信号传至实际来源。最终程序插件类型检查、构建及 610 项 Node 测试通过，测试进程显式使用 Python 3.10（当前 shell 默认 Python 3.8 会使既有研究脚本失败）。数据侧从固定 EXP-022 独立派生 `EXP-security-operations-expert-024-rad80a907c628` Candidate，保留原版本与实例，按当前来源解析工具名及资源映射；Candidate Node 合同 44/44、Python 合同 11/11、数据仓库合同校验 0 错误及 0 警告。此处证明程序协议和受控夹具；截至 2026-10-20，3090 进程尚未重启装载新程序，业务实例未切换，真实第三方 SOC 效果、新业务 Run 和 Research Release 均未验证；`PA-03/04/06/08/12` 的实机状态不因此提升。
 
-- **平台 MCP 配置迁移与隔离恢复（2026-10-20）**：现场旧用户 `cordis.patch.yml` 的原始 SHA-256 为 `c1f2cdb6019d9f0e3839152363049026ac2eab41c007830201dc8683f72a33e0`，以 `0600` 权限备份于本地忽略目录；其中 3 项服务、2 个分组迁至数据根 `config/mcp-manager.json`，共享 Token 和服务凭据分离至被 Git 忽略的 `.local/credentials/mcp-manager.json`，原 Patch 仅保留其他原生设置。平台专用 manager 入口不向原生 Settings 暴露可写 Config，业务 Runtime 仍使用自身原生配置。启动器 34/34、程序插件 610/610 项测试通过。在无平台 HOME 的隔离数据副本重新 `prepare` 后，保存回读、旧 `revision` 拒绝、真实 Cordis 新 Session 装载 22 个工具及 v2 分组摘要均通过；隔离写入未改现场数据。现场重新 `prepare` 后启动预检通过，用户 Patch、数据配置和本地凭据摘要保持不变。当前 3090 进程尚未重启，新的真实 UI 保存链未在该进程验收；第三方 SOC 效果、新业务 Run 与 Research Release 仍未验证。
+- **平台 MCP 配置迁移与隔离恢复（2026-10-20）**：现场旧用户 `cordis.patch.yml` 的原始 SHA-256 为 `c1f2cdb6019d9f0e3839152363049026ac2eab41c007830201dc8683f72a33e0`，以 `0600` 权限备份于本地忽略目录；其中 3 项服务、2 个分组迁至数据根 `config/mcp-manager.json`，共享 Token 和服务凭据分离至被 Git 忽略的 `.local/credentials/mcp-manager.json`，原 Patch 仅保留其他原生设置。平台专用 manager 入口不向原生 Settings 暴露可写 Config，业务 Runtime 仍使用自身原生配置。启动器 34/34、程序插件 610/610 项测试通过。在无平台 HOME 的隔离数据副本重新 `prepare` 后，保存回读、旧 `revision` 拒绝、真实 Cordis 新 Session 装载 22 个工具及 v2 分组摘要均通过；隔离写入未改现场数据。现场重新 `prepare` 后启动预检通过，用户 Patch、数据配置和本地凭据摘要保持不变。截至 2026-10-20，3090 进程尚未重启，新的真实 UI 保存链未在该进程验收；第三方 SOC 效果、新业务 Run 与 Research Release 仍未验证。
 
 ## 4. 为什么是 12 条
 

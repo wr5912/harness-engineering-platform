@@ -30,14 +30,14 @@ export function registerBusinessReport(assetRoot: string, context: BusinessConte
   if (!upstream?.serverId) throw new Error('业务报告缺少受管服务引用')
   const scoped = { ...context, scope: { ...context.scope, serverId: upstream.serverId } }
   control.assert(scoped, 'publish')
-  if (!context.scope.sessionId) throw new Error('业务报告必须有Session归属')
+  if (!context.scope.sessionId || !context.scope.instanceId) throw new Error('业务报告必须有 Session 和实例归属')
   const url = source(sourceUrl, expectedOrigin), id = randomUUID()
   const value = records(assetRoot)
   value[id] = { sessionId: context.scope.sessionId, sourceUrl: url.href, expectedOrigin: url.origin, ...(upstream ? { serverId: upstream.serverId } : {}) }
   const path = reportPath(assetRoot), temporary = `${path}.${randomUUID()}.tmp`
   mkdirSync(control.stateDirectory(), { recursive: true, mode: 0o700 }); writeFileSync(temporary, JSON.stringify(value, null, 2) + '\n', { mode: 0o600 }); renameSync(temporary, path)
   control.bindResource(scoped, { kind: 'report', id })
-  return `/agents/${context.scope.agentId}/api/business-control/reports/${id}`
+  return `/agents/${context.scope.agentId}/instances/${context.scope.instanceId}/api/business-control/reports/${id}`
 }
 export async function readBusinessReport(assetRoot: string, context: BusinessContext, id: string, signal = new AbortController().signal): Promise<{ body: Uint8Array; contentType: string; filename: string }> {
   if (!/^[a-f0-9-]{36}$/.test(id)) throw new Error('业务报告不可用')

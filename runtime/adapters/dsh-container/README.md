@@ -107,7 +107,7 @@ python3 runtime/adapters/dsh-container/dsh-dev down security-operations-expert-e
 
 `init <agent-id>` 创建最小 Agent、`EXP-<agent-id>-001-r<12位随机十六进制>` Candidate，并把该 Experiment 登记到数据工作区的 `config/sources.json`；已有 Agent、Experiment 或来源登记时拒绝覆盖。旧编号 Experiment 继续可用。它只创建研究资产，不启动实例、不执行 Evaluation，也不创建 Research Release。
 
-`--source` 和 `--mode` 始终由用户显式选择；缺失或无值时命令会列出当前可用值并以用法错误退出。`--name` 默认为 `<agent-id>-eval`。新实例未指定 `--port` 时从 `3081` 起选第一个未监听且未被有效实例记录占用的端口；探测包含仅绑定局域网地址的服务。实际启动时，宿主短期文件锁覆盖选端口到确认本容器持有监听，避免不同账户或数据根并发选中同一端口；已有同名实例复用记录端口。`--dry-run` 只给出建议，不预留端口、不写状态、不调用 Docker，也不要求运行时环境变量。
+`--source` 和 `--mode` 始终由用户显式选择；缺失或无值时命令会列出当前可用值并以用法错误退出。`--name` 默认为 `<agent-id>-eval`。新业务智能体实例未指定 `--port` 时，在 `18500–28999` 内选第一个未监听且未被有效实例记录占用的端口；区间已满时明确失败，显式指定端口不受默认区间限制。探测包含仅绑定局域网地址的服务。实际启动时，宿主短期文件锁覆盖选端口到确认本容器持有监听，避免不同账户或数据根并发选中同一端口；已有同名实例复用记录端口。`--dry-run` 只给出建议，不预留端口、不写状态、不调用 Docker，也不要求运行时环境变量。
 
 `up` 会先核对镜像标签对应的构建指纹、平台和 Image ID，再执行停旧实例、写状态和启动；Compose 使用 `tag@image-id` 不可变引用。新建或替换后的主 `dsh` 容器名与实例名完全一致，Compose 项目名固定为 `dsh-dev-<实例名>`；`up --dry-run`、`up` 和 `ps` 都直接输出实例名、实际主容器名和项目名，旧实例由 `ps` 输出其现有主容器名并标记 `needs_migration`。它仍不只看 `docker compose up -d` 的退出码：命令返回 0 之后还要确认 `dsh` 服务真的在运行（`home-init` 是一次性服务，正常结束不算失败），否则报告失败或 `dsh_running: "unknown"` 并以非零退出码结束。成功时 stdout 只输出一个 JSON 结果，其中包含 `image_id`、`image_ref` 和 `image_build_fingerprint`；进度、提示和错误输出到 stderr，失败时 stdout 保持为空。`up --replace` 的成功 JSON 在 `replaced.stop` 中包含完整停止结果。
 
@@ -165,13 +165,13 @@ python3 runtime/adapters/dsh-container/dsh-eval \
 
 API 通道退出码 `0` 表示锁定 Case 均得到 `passed`；`1` 表示运行已完整封存但至少一个语义结论为 `failed` 或 `inconclusive`。浏览器通道在所选 Case 均完成 UI 冒烟时返回 `0`，业务 `verdict` 仍为 `inconclusive`。退出码 `2` 表示参数、环境或执行基础设施失败。基础设施失败导致未执行的 Case 记为 `execution_status=error`；中断后未开始的 Case 记为 `execution_status=skipped`，两者的 `verdict` 均为 `inconclusive`。每次封存保留 `summary.json`、逐项事实 `results.jsonl`、完整场景目录与选择方式，以及只读的 `analysis.json` 和 `report.md`。报告按场景展示去重 Case 的覆盖、失败、无法判定和未执行数；归因只给出可证伪假设，不改变 Case 原判定。启用 AI 复核时证据复核不完整会使 `review_status` 为 `failed`，Run 失败封存；未启用时只生成确定性场景覆盖，不启动归因 Session。非 `--dry-run` 的 stdout 只输出一个不含凭据的 JSON，字段为 `run_id`、`experiment_id`、`executor`、`verdict`、`cases`、`review_status`、`reviewed_cases`、`summary`、`report` 和 `instance_stopped`。
 
-**手工打开 Web 或使用浏览器执行器时，首次需要在界面注册工作区。** DSH Web 的输入栏在没有已打开会话时是惰性的，必须先选定一个**已注册工作区**才能开会话；工作区注册表（`$DSH_HOME/storages/workspace.json`）只从已存会话头 bootstrap，新实例的 HOME 卷里因此为空——容器的 `working_dir` 只是进程工作目录，不等于 DSH 工作区。API 执行器使用 Runtime 的 `workspace/create` 完成同一注册；启动器不改写 Runtime 存储内部格式。浏览器操作如下：
+**普通研究实例手工打开 Web 时，先选定 Candidate 工作区。** 容器的 `working_dir` 只是进程工作目录，不等于 DSH 已登记的工作区。API 执行器使用 DSH 原生 `workspace/create` 登记；普通实例在浏览器中选择 `/work/harness/workspace` 的步骤如下：
 
 1. 在 Web 界面点击“选择工作区”；
 2. 在“选择工作区目录”对话框点“编辑路径”，粘贴 `/work/harness/workspace`（或从“主目录”逐级进入）；
 3. 点“打开”，会话即在该工作区创建，随后可直接对话。
 
-该注册写入本实例 DSH_HOME 数据卷并跨重启保留；换用新的实例名等于新的 HOME 卷，需要重新选择一次。`up --dry-run` 输出与真正 `up` 的 stderr 提示都会带上该路径与步骤，以 `workspace_to_register` 为准。
+该注册写入本实例 DSH_HOME 数据卷并跨重启保留；换用新的实例名等于新的 HOME 卷，需要重新选择一次。普通实例的 `up --dry-run` 输出与真正 `up` 的 stderr 提示会带上该路径与步骤，以 `workspace_to_register` 为准。受管业务实例由业务 Runtime 在启动时调用 DSH 原生 `workspaceRegistry.create` 登记固定工作区，浏览器自动选中，无需选择工作区或预设；工作区目录选择接口仍不开放。
 
 ### 实例访问规则
 

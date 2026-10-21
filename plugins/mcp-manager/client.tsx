@@ -35,18 +35,20 @@ window.__ModuleLoader__.load({
       .mcp-manager .mcp-content{min-width:0}
       .mcp-manager h3{margin:0;color:var(--mcp-ink);line-height:1.4;overflow-wrap:anywhere;font-size:16px}
       .mcp-manager .mcp-muted{color:var(--mcp-muted);line-height:1.6;overflow-wrap:anywhere}
-      .mcp-manager .mcp-layout{display:grid;grid-template-columns:240px minmax(0,1fr);gap:24px;align-items:start}
+      .mcp-manager .mcp-layout{display:grid;grid-template-columns:258px minmax(0,1fr);gap:24px;align-items:start}
       .mcp-manager .mcp-card{min-width:0;border:1px solid var(--mcp-line);border-radius:var(--hep-radius,12px);background:var(--mcp-surface);padding:24px}
-      .mcp-manager .mcp-sidebar{padding:8px;background:var(--mcp-tint);border-color:transparent}
-      .mcp-manager .mcp-list-item{display:block;width:100%;margin:0 0 4px;padding:12px;border-color:transparent;background:transparent;text-align:left;color:var(--mcp-ink)}
-      .mcp-manager .mcp-list-item:hover:not(:disabled){background:var(--mcp-surface);border-color:transparent}.mcp-manager .mcp-list-item[aria-current=true]{background:var(--mcp-surface);border-color:var(--mcp-line);box-shadow:0 2px 8px #16395908;color:var(--mcp-link)}
-      .mcp-manager .mcp-list-item strong{display:block;overflow-wrap:anywhere;font-weight:600}.mcp-manager .mcp-list-item small{display:block;margin-top:4px;color:var(--mcp-muted);font-size:12px;overflow-wrap:anywhere}
-      .mcp-manager .mcp-service-search{display:grid;gap:6px;padding:8px 4px 12px;color:var(--mcp-muted);font-size:12px}.mcp-manager .mcp-service-search input{width:100%;min-height:40px;padding:8px 10px;border:1px solid var(--mcp-line);border-radius:var(--hep-control-radius,8px);background:var(--mcp-surface);color:var(--mcp-ink)}
-      .mcp-manager .mcp-service-count{display:block;padding:4px 8px 10px;color:var(--mcp-muted);font-size:12px}.mcp-manager .mcp-mobile-service-picker{display:none}
+      .mcp-manager .mcp-sidebar{padding:18px;background:var(--mcp-surface)}
+      .mcp-manager .mcp-list-item{display:block;width:calc(100% + 20px);margin:6px 0 0 -10px;padding:13px 11px;border-color:transparent;border-radius:9px;background:transparent;text-align:left;color:var(--mcp-ink)}
+      .mcp-manager .mcp-list-item:hover:not(:disabled){background:var(--mcp-tint);border-color:transparent}.mcp-manager .mcp-list-item[aria-current=true]{background:var(--mcp-active);border-color:color-mix(in srgb,var(--mcp-blue) 20%,var(--mcp-line));color:var(--mcp-ink)}
+      .mcp-manager .mcp-service-title{display:block;overflow-wrap:anywhere;font-size:13px;font-weight:600;line-height:1.4}.mcp-manager .mcp-service-desc{display:block;margin-top:4px;color:var(--mcp-muted);font-size:11px;line-height:1.5;overflow-wrap:anywhere}
+      .mcp-manager .mcp-service-badge{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:4px 8px;border-radius:5px;background:var(--mcp-tint);color:var(--mcp-muted);font-size:11px;font-weight:600;line-height:1.5;white-space:normal}
+      .mcp-manager .mcp-service-badge::before{content:'';width:5px;height:5px;flex:none;border-radius:50%;background:currentColor}.mcp-manager .mcp-service-badge[data-state=verified]{background:color-mix(in srgb,var(--mcp-surface) 90%,var(--hep-success,#176c3c));color:var(--hep-success,#176c3c)}.mcp-manager .mcp-service-badge[data-state=failed]{background:color-mix(in srgb,var(--mcp-surface) 90%,var(--hep-danger,#b42318));color:var(--hep-danger,#b42318)}.mcp-manager .mcp-service-badge[data-state=changed]{background:color-mix(in srgb,var(--mcp-surface) 90%,var(--hep-warning,#805200));color:var(--hep-warning,#805200)}
+      .mcp-manager .mcp-service-search{display:grid;gap:6px;color:var(--mcp-muted);font-size:12px}.mcp-manager .mcp-service-search input{width:100%;min-height:40px;padding:8px 10px;border:1px solid var(--mcp-line);border-radius:var(--hep-control-radius,8px);background:var(--mcp-surface);color:var(--mcp-ink)}
+      .mcp-manager .mcp-service-count{display:block;padding:15px 0 4px;color:var(--mcp-muted);font-size:11px}.mcp-manager .mcp-mobile-service-picker{display:none}
       .mcp-manager .mcp-service-facts{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px;color:var(--mcp-muted);font-size:12px}
-      .mcp-manager .mcp-list-item .mcp-service-facts{display:grid;gap:2px}
       .mcp-manager .mcp-service-facts>span{overflow-wrap:anywhere}
       .mcp-manager .mcp-add{width:100%;margin-top:8px;border:1px dashed var(--mcp-line);background:transparent;color:var(--mcp-link);padding:10px;font-weight:500}
+      .mcp-manager .mcp-sidebar-note{margin:16px 0 0;padding:14px 0 0;border-top:1px solid var(--mcp-line);color:var(--mcp-muted);font-size:11px;line-height:1.8}
       .mcp-manager .mcp-card-head{display:flex;align-items:start;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-bottom:20px;border-bottom:1px solid var(--mcp-line)}
       .mcp-manager .mcp-card-head>div{min-width:0}.mcp-manager .mcp-card-head p{margin:6px 0 0}.mcp-manager .mcp-card-head .mcp-switch{flex:none;margin:0}
       .mcp-manager .mcp-card-head .mcp-actions{margin:0}.mcp-manager .mcp-card-head .mcp-switch{align-self:center}
@@ -85,8 +87,8 @@ window.__ModuleLoader__.load({
       .mcp-manager .mcp-catalog{list-style:none;margin:0;padding:0}.mcp-manager .mcp-catalog li{padding:16px 0;border-top:1px solid var(--mcp-line);overflow-wrap:anywhere}.mcp-manager .mcp-catalog li:first-child{border-top:0}.mcp-manager .mcp-catalog strong{display:block}.mcp-manager .mcp-catalog small{display:block;margin-top:4px;color:var(--mcp-muted);font-size:12px}
       .mcp-manager .mcp-source{padding:16px 0;border-top:1px solid var(--mcp-line)}.mcp-manager .mcp-source:first-child{border-top:0}
       .mcp-manager .mcp-empty{text-align:center;padding:64px 24px;color:var(--mcp-muted)}.mcp-manager .mcp-empty strong{display:block;color:var(--mcp-ink);font-size:16px}
-      @media(max-width:1000px){.mcp-manager .mcp-layout{grid-template-columns:200px minmax(0,1fr);gap:20px}}
-      @media(max-width:760px){.mcp-manager .mcp-toolbar{align-items:start;flex-direction:column;padding:16px}.mcp-manager .mcp-tabs{gap:20px}.mcp-manager .mcp-layout{grid-template-columns:minmax(0,1fr)}.mcp-manager .mcp-service-layout>.mcp-sidebar{display:none}.mcp-manager .mcp-mobile-service-picker{display:flex;align-items:end;gap:8px;min-width:0}.mcp-manager .mcp-mobile-service-picker label{display:grid;gap:5px;min-width:0;flex:1;color:var(--mcp-muted);font-size:12px}.mcp-manager .mcp-mobile-service-picker select{width:100%;min-width:0;min-height:44px;padding:8px;border:1px solid var(--mcp-line);border-radius:var(--hep-control-radius,8px);background:var(--mcp-surface);color:var(--mcp-ink)}.mcp-manager .mcp-service-summary{grid-template-columns:minmax(0,1fr)}.mcp-manager .mcp-card-head .mcp-actions{width:100%}.mcp-manager .mcp-card-head .mcp-actions>button{flex:1}.mcp-manager .mcp-fields,.mcp-manager .mcp-tools{grid-template-columns:minmax(0,1fr)}.mcp-manager .mcp-card{padding:16px}.mcp-manager .mcp-sidebar{padding:8px}}
+      @media(max-width:1000px){.mcp-manager .mcp-layout{grid-template-columns:220px minmax(0,1fr);gap:20px}}
+      @media(max-width:760px){.mcp-manager .mcp-toolbar{align-items:start;flex-direction:column;padding:16px}.mcp-manager .mcp-tabs{gap:20px}.mcp-manager .mcp-layout{grid-template-columns:minmax(0,1fr)}.mcp-manager .mcp-service-layout>.mcp-sidebar{display:none}.mcp-manager .mcp-mobile-service-picker{display:flex;align-items:end;gap:8px;min-width:0}.mcp-manager .mcp-mobile-service-picker label{display:grid;gap:5px;min-width:0;flex:1;color:var(--mcp-muted);font-size:12px}.mcp-manager .mcp-mobile-service-picker select{width:100%;min-width:0;min-height:44px;padding:8px;border:1px solid var(--mcp-line);border-radius:var(--hep-control-radius,8px);background:var(--mcp-surface);color:var(--mcp-ink)}.mcp-manager .mcp-service-summary{grid-template-columns:minmax(0,1fr)}.mcp-manager .mcp-card-head .mcp-actions{width:100%}.mcp-manager .mcp-card-head .mcp-actions>button{flex:1}.mcp-manager .mcp-fields,.mcp-manager .mcp-tools{grid-template-columns:minmax(0,1fr)}.mcp-manager .mcp-card{padding:16px}}
       @media(pointer:coarse){.mcp-manager button,.mcp-manager .mcp-field input,.mcp-manager .mcp-field select{min-height:44px}.mcp-manager .mcp-switch input,.mcp-manager .mcp-check input{width:20px;height:20px}}
       @media(prefers-reduced-motion:reduce){.mcp-manager button,.mcp-manager input,.mcp-manager select,.mcp-manager summary::before{transition:none}.mcp-manager button:active:not(:disabled){transform:none}}
     `
@@ -201,7 +203,7 @@ window.__ModuleLoader__.load({
         setStatus('')
         if (action === 'test') setCatalog(null)
         try {
-          const response = await fetch('/api/mcp-manager', {
+          const response = await fetch(new URL('api/mcp-manager', document.baseURI), {
             method: 'POST', credentials: 'same-origin',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ serverId: diagnosticId, action, ...extra }),
@@ -230,7 +232,7 @@ window.__ModuleLoader__.load({
         finally { setBusy(false) }
       }
       const callSources = async serverId => {
-        const response = await fetch('/api/mcp-manager', { method: 'POST', credentials: 'same-origin',
+        const response = await fetch(new URL('api/mcp-manager', document.baseURI), { method: 'POST', credentials: 'same-origin',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ serverId, action: 'sources' }) })
         const data = await response.json()
@@ -312,6 +314,13 @@ window.__ModuleLoader__.load({
       const savedDuplicateIds = savedGroup ? duplicateMemberIds(savedGroup.members) : []
       const linkReady = !!savedGroup && !duplicateIds.length && !savedDuplicateIds.length
         && !!state.value.sharedToken && draft.sharedToken === state.value.sharedToken
+      const linkedMembers = linkReady ? savedGroup.members : editingGroup?.members ?? []
+      const failedMembers = linkedMembers.filter(member =>
+        checkOf(visibleServers.find(server => server.id === member.serverId))?.failed).map(member => member.serverId)
+      const uncheckedMembers = linkedMembers.filter(member => {
+        const server = visibleServers.find(item => item.id === member.serverId)
+        return server && server.enabled !== false && !server.platformComposition && !checkOf(server)
+      }).map(member => member.serverId)
 
       return <section className="mcp-manager">
         <style>{styles}</style>
@@ -339,12 +348,23 @@ window.__ModuleLoader__.load({
                 <aside className="mcp-card mcp-sidebar" aria-label="服务器列表">
                   <label className="mcp-service-search">查找服务<input type="search" value={serverQuery} onChange={event => setServerQuery(event.target.value)} placeholder="查找服务或用途" /></label>
                   <span className="mcp-service-count">服务 · {visibleServers.length}</span>
-                  {filteredServers.map(({ server, index }) => <button key={index} className="mcp-list-item" data-server-id={server.id} type="button" aria-current={currentServerIndex === index ? 'true' : undefined} onClick={() => { setActiveServer(index); setServicePane('tools'); onSelectServerId?.(server.id) }}>
-                    <strong>{server.platformComposition ? server.description || '工具组合编排（已发布）' : server.serverName || server.id || '新服务器'}</strong><small>{server.platformComposition ? '由已发布组合生成' : server.description || '用途未填写'}</small>
-                    <span className="mcp-service-facts"><span>{server.platformComposition ? '已发布工具目录' : server.enabled === false ? '配置已停用' : serverDraftChanged(server) ? '当前修改未保存' : '配置已启用'}</span><span>{serverDraftChanged(server) ? '保存当前配置后再检查' : checkOf(server)?.failed ? '检查失败，连接与工具发现待核对' : checkOf(server) ? `${checkOf(server).kind === 'openapi' ? '规范已读取' : '连接成功'} · 已发现 ${checkOf(server).tools} 个工具` : '连接与工具发现待检查'}</span><span>{checkOf(server) ? `最近检查 ${checkOf(server).at}` : '本页尚未检查当前配置'}</span></span>
-                  </button>)}
+                  {filteredServers.map(({ server, index }) => {
+                    const check = checkOf(server)
+                    const badge = server.platformComposition ? ['目录已发布', 'neutral']
+                      : serverDraftChanged(server) ? ['修改未保存', 'changed']
+                      : server.enabled === false ? ['已停用', 'neutral']
+                      : check?.failed ? ['检查失败', 'failed']
+                      : check ? [check.kind === 'openapi' ? '规范已读取' : '连接已验证', 'verified']
+                      : ['连接待检查', 'neutral']
+                    return <button key={index} className="mcp-list-item" data-server-id={server.id} type="button" aria-current={currentServerIndex === index ? 'true' : undefined} onClick={() => { setActiveServer(index); setServicePane('tools'); onSelectServerId?.(server.id) }}>
+                      <span className="mcp-service-title">{server.platformComposition ? server.description || '工具组合编排（已发布）' : server.serverName || server.id || '新服务器'}</span>
+                      <span className="mcp-service-desc">{server.platformComposition ? '由已发布组合生成' : server.description || '用途未填写'}</span>
+                      <span className="mcp-service-badge" data-state={badge[1]}>{badge[0]}</span>
+                    </button>
+                  })}
                   {visibleServers.length > 0 && filteredServers.length === 0 && <p className="mcp-muted">没有匹配的服务，请调整搜索内容。</p>}
                   <button className="mcp-add" type="button" onClick={addServer}>＋ 新增服务器</button>
+                  <p className="mcp-sidebar-note">列表显示本页最近一次检查状态。工具发现和业务可用性请查看右侧详情并在目标环境验证。</p>
                 </aside>
                 <div className="mcp-mobile-service-picker"><label>当前服务<select value={editingServer ? currentServerIndex : -1} onChange={event => { const index = Number(event.target.value); setActiveServer(index); setServicePane('tools'); onSelectServerId?.(visibleServers[index]?.id) }}>
                   <option value={-1}>请选择服务</option>{visibleServers.map((server, index) => <option key={index} value={index}>{server.platformComposition ? server.description || server.id : server.serverName || server.id || '新服务器'}</option>)}
@@ -449,7 +469,10 @@ window.__ModuleLoader__.load({
                   <div className="mcp-card-head"><div><h3>{editingGroup.id || '新分组'}</h3><p className="mcp-muted">仅开放此组勾选的工具与资源。</p></div></div>
                   <section className="mcp-section"><div className="mcp-fields"><label className="mcp-field">分组 ID{input(editingGroup.id, value => editGroup(activeGroup, group => { group.id = value }))}</label></div>
                     {/^[A-Za-z0-9_-]{1,32}$/.test(editingGroup.id) && <div className="mcp-actions"><span className="mcp-muted">MCP 链接</span>{linkReady && <code className="mcp-link">{new URL(`mcp/groups/${editingGroup.id}/v2`, document.baseURI).href}</code>}
-                      {button('复制分组链接', async () => { try { await navigator.clipboard.writeText(new URL(`mcp/groups/${editingGroup.id}/v2`, document.baseURI).href); setStatus('分组链接已复制。') } catch { setStatus('当前浏览器无法自动复制，请手动复制上方链接。') } }, !linkReady)}</div>}
+                      {button('复制分组链接', async () => { try { await navigator.clipboard.writeText(new URL(`mcp/groups/${editingGroup.id}/v2`, document.baseURI).href); setStatus('分组地址已复制；仍需核对所选来源的连接与发现。') } catch { setStatus('当前浏览器无法自动复制，请手动复制上方链接。') } }, !linkReady)}</div>}
+                    {linkReady && <p className="mcp-muted">分组地址已生成。链接存在只证明访问入口；所选来源的工具和资源仍需逐项发现。</p>}
+                    {!!failedMembers.length && <p className="mcp-note" role="alert">来源 {failedMembers.join('、')} 最近一次发现失败；这些来源的工具和资源当前不可用，其他已发现来源可继续使用。</p>}
+                    {!!uncheckedMembers.length && <p className="mcp-muted">来源 {uncheckedMembers.join('、')} 尚未检查当前配置；已保存的选择不代表工具已发现。</p>}
                     {editingGroup.id && !/^[A-Za-z0-9_-]{1,32}$/.test(editingGroup.id) && <p className="mcp-muted">分组 ID 须为 1–32 个字母、数字、下划线或连字符。</p>}
                     {!!duplicateIds.length && <div className="mcp-note">服务 {duplicateIds.join('、')} 在此分组中有重复成员，v2 链接不可用。合并会对工具、资源 URI 和资源模板取并集，并改变旧版分组的目标摘要；请保存后重新发现工具。
                       <div className="mcp-actions">{button('合并同源成员', () => mergeDuplicateMembers(activeGroup))}</div></div>}
@@ -562,7 +585,7 @@ window.__ModuleLoader__.load({
         setStatus('')
         setCatalog(null)
         try {
-          const response = await fetch('/api/mcp-manager', { method: 'POST', credentials: 'same-origin',
+          const response = await fetch(new URL('api/mcp-manager', document.baseURI), { method: 'POST', credentials: 'same-origin',
             headers: { 'content-type': 'application/json' }, body: JSON.stringify({ serverId, action: 'test' }) })
           const data = await response.json()
           if (!response.ok) throw new Error(data.error)
@@ -575,7 +598,11 @@ window.__ModuleLoader__.load({
           setChecks(previous => ({ ...previous, [serverId]: { at: new Date().toLocaleString(), revision: state.revision, tools: data.tools?.length ?? 0,
             kind: (state.value.servers ?? []).find(server => server.id === serverId)?.specUrl ? 'openapi' : 'mcp' } }))
           setStatus(`${serverId} 已发现 ${data.tools?.length ?? 0} 个工具、${data.resources?.resources?.length ?? 0} 个资源、${data.resourceTemplates?.resourceTemplates?.length ?? 0} 个模板。`)
-        } catch (error) { setChecks(previous => ({ ...previous, [serverId]: { at: new Date().toLocaleString(), revision: state.revision, failed: true } })); setStatus(String(error)) }
+        } catch (error) {
+          setChecks(previous => ({ ...previous, [serverId]: { at: new Date().toLocaleString(), revision: state.revision, failed: true } }))
+          const reason = error instanceof Error ? error.message : String(error)
+          setStatus(`${serverId} 连接测试失败：${/[\u4e00-\u9fff]/.test(reason) ? reason : '连接或工具发现未完成'}。请检查服务地址、网络与凭据后重试。`)
+        }
         finally { setBusy(false) }
       }
     }

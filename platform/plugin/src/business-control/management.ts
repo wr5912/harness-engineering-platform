@@ -128,7 +128,7 @@ export interface BusinessControlManagementStatus {
   enabled: boolean; restrictionVersion: number; restrictions: Restriction[]; riskFacts: RiskFact[]
   events: ReturnType<ReturnType<typeof getBusinessControl>['status']>['events']
   instances: Array<{ workspaceId: string; agentId: string; instanceId: string; runtimeGeneration: string; sourceDigest: string
-    applied: boolean; acknowledgement?: { restrictionVersion: number; leaseId: string; at: string } }>
+    pinnedSourceDigest?: string; identityMode: 'development' | 'published'; applied: boolean; acknowledgement?: { restrictionVersion: number; leaseId: string; at: string } }>
   revision: string; configuration: BusinessControlConfiguration
   sessionTrustFacts: SessionTrustFact[]
   agentStatuses: ReturnType<ReturnType<typeof getBusinessControl>['agentStatuses']>
@@ -148,7 +148,14 @@ export function createBusinessControlHandler(assetRoot: string): ConnectionRpcHa
   }
   function view(): BusinessControlManagementStatus {
     const status = control.status(), { config, revision } = readConfiguration()
-    return { ...status, instances: status.instances as BusinessControlManagementStatus['instances'], revision,
+    const registered = (config.gateway as { instances?: Array<{ agentId?: string; instanceId?: string; sourceDigest?: string; identityMode?: 'development' | 'published' }> } | undefined)?.instances ?? []
+    const instances = status.instances.map(value => {
+      const row = registered.find(item => item.agentId === value.agentId && item.instanceId === value.instanceId)
+      const identityMode = row?.identityMode === 'development' ? 'development' as const : 'published' as const
+      return { ...value, identityMode,
+        pinnedSourceDigest: row?.sourceDigest ?? (identityMode === 'published' ? config.agents.find(item => item.agentId === value.agentId)?.sourceDigest : undefined) }
+    })
+    return { ...status, instances, revision,
       sessionTrustFacts: control.sessionTrustFacts(),
       agentStatuses: control.agentStatuses(),
       riskFacts: status.riskFacts.map(fact => ({ ...fact, source: /^https?:\/\//i.test(fact.source) ? 'external-provider' : fact.source })),

@@ -64,6 +64,11 @@ const matches = (scope: ControlScope, context: BusinessContext, serverId?: strin
 const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const future = (value: string) => Number.isFinite(Date.parse(value)) && Date.parse(value) > Date.now()
 const kinds: OperationKind[] = ['read', 'write', 'resource', 'publish']
+const chatActions = ['agent:access', 'session:create', 'session:read', 'session:prompt']
+interface GatewayRegistration { agentId: string; instanceId: string; sourceDigest?: string; accessMode?: string; identityMode?: string }
+function gatewayRegistration(config: BusinessAccessConfig, agentId?: string, instanceId?: string): GatewayRegistration | undefined {
+  return (config.gateway as { instances?: GatewayRegistration[] } | undefined)?.instances?.find(value => value.agentId === agentId && value.instanceId === instanceId)
+}
 const maximumReportBytes = 1024 * 1024
 /** 只解析报告工具明确声明的正文，不将普通字符串猜测为 Base64。 */
 function reportInspectionInput(input: unknown): unknown {
@@ -117,6 +122,7 @@ export class BusinessControl {
   private confirmationHandler?: (context: BusinessContext, operation: BusinessOperation, signal: AbortSignal) => Promise<void>
   private confirmationSynchronizer?: (signal: AbortSignal) => Promise<void>
   private available = true
+  private observedManagedGateway = false
 
   constructor(readonly assetRoot: string, stateRoot?: string) {
     this.path = join(stateRoot ?? join(assetRoot, '.local', 'business-control'), 'state.json')
@@ -129,6 +135,7 @@ export class BusinessControl {
       throw new BusinessControlError('control_state_invalid', '业务控制状态无效', 503)
     }
     this.state.localRiskFacts ??= {}
+    this.observedManagedGateway = this.config().gateway !== undefined
   }
   config(): BusinessAccessConfig {
     const path = join(this.assetRoot, 'config', 'business-access.json')
@@ -151,28 +158,48 @@ export class BusinessControl {
   recordAgentAuthentication(binding: InstanceBinding): void {
     const registered = this.state.instances[binding.instanceId]
     if (!registered || Object.entries(binding).some(([key, value]) => registered[key as keyof InstanceBinding] !== value)) return error('agent_authentication_binding_invalid')
+    if (gatewayRegistration(this.config(), binding.agentId, binding.instanceId)?.identityMode === 'development') {
+      this.agentAuthentications.delete(binding.instanceId)
+      return
+    }
     this.agentAuthentications.set(binding.instanceId, { receivedAt: performance.now(), evidence: {
       method: 'hmac-sha256', binding: { ...binding }, verifiedAt: iso(), expiresAt: new Date(Date.now() + 2000).toISOString(), source: 'signed-control-assertion',
     } })
   }
   agentStatus(instanceId: string): AgentInstanceStatus {
     const binding = this.state.instances[instanceId], config = this.config()
+    if (config.gateway) this.observedManagedGateway = true
     const rule = config.agents.find(rule => rule.agentId === binding?.agentId)
+    const registered = gatewayRegistration(config, binding?.agentId, instanceId)
+    const development = registered?.identityMode === 'development'
+    const pinnedDigest = development ? registered.sourceDigest : registered?.sourceDigest ?? rule?.sourceDigest
     const result: AgentInstanceStatus = { instanceId, agentId: binding?.agentId,
-      authentication: { method: 'hmac-sha256', status: 'unknown' },
-      trust: { status: 'unknown', reason: 'agent_authentication_unknown', sourceDigest: binding?.sourceDigest,
+      authentication: development ? { method: 'none', status: 'not_required' } : { method: 'hmac-sha256', status: 'unknown' },
+      trust: { status: 'unknown', reason: development ? 'development_channel_unknown' : 'agent_authentication_unknown', sourceDigest: binding?.sourceDigest,
         runtimeGeneration: binding?.runtimeGeneration, restrictionVersion: this.state.restrictionVersion } }
     if (!binding) { result.trust.reason = 'instance_unregistered'; return result }
     const replica = this.requiredSnapshots.has(instanceId), lease = this.leases.get(instanceId)
     if (replica && lease?.snapshot.agentStatus) {
       result.authentication = { ...lease.snapshot.agentStatus.authentication }
       result.trust = { ...lease.snapshot.agentStatus.trust, restrictionVersion: this.state.restrictionVersion }
+      if (development !== (result.authentication.status === 'not_required')) {
+        result.authentication = development ? { method: 'none', status: 'not_required' } : { method: 'hmac-sha256', status: 'unknown' }
+        result.trust.status = 'unknown'; result.trust.reason = 'identity_mode_changed'
+      }
       if (performance.now() - lease.receivedAt >= Math.min(2000, lease.snapshot.leaseMs)) {
-        result.authentication.status = 'expired'; result.trust.status = 'expired'; result.trust.reason = 'agent_channel_expired'
+        if (!development) result.authentication.status = 'expired'
+        result.trust.status = 'expired'; result.trust.reason = 'agent_channel_expired'
       }
     } else if (!replica) {
-      const authenticated = this.agentAuthentications.get(instanceId)
-      if (authenticated) {
+      const authenticated = development ? undefined : this.agentAuthentications.get(instanceId)
+      if (development) {
+        const ack = this.acknowledgements.get(instanceId)
+        if (ack) {
+          const fresh = Date.now() - Date.parse(ack.at) < 2000
+          result.trust.status = fresh ? 'trusted' : 'expired'
+          result.trust.reason = fresh ? 'development-pinned-channel' : 'development_channel_expired'
+        }
+      } else if (authenticated) {
         const fresh = performance.now() - authenticated.receivedAt < 2000
         result.authentication = { method: 'hmac-sha256', status: fresh ? 'verified' : 'expired',
           verifiedAt: authenticated.evidence.verifiedAt, expiresAt: authenticated.evidence.expiresAt, evidence: authenticated.evidence.source }
@@ -182,12 +209,16 @@ export class BusinessControl {
         else { result.trust.status = fresh ? 'unknown' : 'expired'; result.trust.reason = fresh ? 'agent_channel_unconfirmed' : 'agent_authentication_expired' }
       }
     }
-    if (rule?.agentAuthentication?.enabled === false) {
+    if (!development && rule?.agentAuthentication?.enabled === false) {
       result.authentication.status = 'disabled'; result.trust.status = 'revoked'; result.trust.reason = 'agent_authentication_disabled'
-    } else if (!config.enabled || !rule?.enabled || rule.agentTrust?.enabled === false) {
+    } else if (!config.enabled || rule?.enabled === false || !development && (!rule || rule.agentTrust?.enabled === false)) {
       result.trust.status = 'revoked'; result.trust.reason = !config.enabled ? 'business_disabled' : !rule?.enabled ? 'agent_closed' : 'agent_trust_revoked'
-    } else if (!rule.sourceDigest) { result.trust.status = 'unknown'; result.trust.reason = 'agent_source_unpinned' }
-    else if (binding.sourceDigest !== rule.sourceDigest) { result.trust.status = 'mismatch'; result.trust.reason = 'agent_source_mismatch' }
+    } else if (this.observedManagedGateway && !config.gateway) {
+      result.trust.status = 'revoked'; result.trust.reason = 'gateway_registration_unavailable'
+    } else if (config.gateway && !registered) {
+      result.trust.status = 'revoked'; result.trust.reason = 'instance_not_registered'
+    } else if (!pinnedDigest) { result.trust.status = 'unknown'; result.trust.reason = 'agent_source_unpinned' }
+    else if (binding.sourceDigest !== pinnedDigest) { result.trust.status = 'mismatch'; result.trust.reason = 'agent_source_mismatch' }
     return result
   }
   agentStatuses(): AgentInstanceStatus[] { return Object.keys(this.state.instances).map(id => this.agentStatus(id)) }
@@ -216,13 +247,22 @@ export class BusinessControl {
     for (const session of observation.sessions) {
       if (!session.sessionId || ['__proto__', 'constructor', 'prototype'].includes(session.sessionId)
         || Object.entries(binding).some(([key, value]) => session[key as keyof InstanceBinding] !== value)
+        || (session.parentSessionId !== undefined && (typeof session.parentSessionId !== 'string' || !session.parentSessionId
+          || session.parentSessionId === session.sessionId))
         || session.subject?.kind !== 'human' || session.subjectId !== session.subject.id || !session.subject.identitySource
         || !session.identity || session.identity.evidence.externalSubject !== session.subjectId
         || session.identity.evidence.issuer !== session.subject.identitySource) return error('replica_session_invalid')
       const previous = this.state.sessions[session.sessionId]
       if (previous && (Object.entries(binding).some(([key, value]) => previous[key as keyof InstanceBinding] !== value)
-        || previous.subjectId !== session.subjectId || previous.subject.identitySource !== session.subject.identitySource)) return error('replica_session_conflict')
+        || previous.subjectId !== session.subjectId || previous.subject.identitySource !== session.subject.identitySource
+        || previous.parentSessionId !== session.parentSessionId)) return error('replica_session_conflict')
       subjects.add(session.subjectId); sessions.set(session.sessionId, session)
+    }
+    for (const session of sessions.values()) if (session.parentSessionId) {
+      const parent = sessions.get(session.parentSessionId)
+      if (!parent || parent.parentSessionId || parent.subjectId !== session.subjectId
+        || parent.subject.identitySource !== session.subject.identitySource)
+        return error('replica_session_invalid')
     }
     for (const fact of observation.riskFacts) {
       if (!this.validRiskFact(fact) || fact.scope.workspaceId !== binding.workspaceId || fact.scope.agentId !== binding.agentId
@@ -299,6 +339,18 @@ export class BusinessControl {
       sourceDigest: binding.sourceDigest, identity: { evidence: { ...identity.evidence }, expiresAt: identity.expiresAt } }
     return this.acceptContext(context)
   }
+  private anonymousContext(context: BusinessContext): boolean {
+    const evidence = context.identity?.evidence
+    if (context.subject.kind !== 'human' || context.subject.identitySource !== 'gateway-anonymous'
+      || !/^visitor-[A-Za-z0-9_-]{32,}$/.test(context.subject.id)
+      || evidence?.issuer !== 'gateway-anonymous' || evidence.method !== 'anonymous'
+      || evidence.externalSubject !== context.subject.id) return false
+    const registered = gatewayRegistration(this.config(), context.scope.agentId, context.scope.instanceId)
+    return registered?.accessMode === 'anonymous'
+  }
+  isDevelopmentContext(context: BusinessContext): boolean {
+    return gatewayRegistration(this.config(), context.scope.agentId, context.scope.instanceId)?.identityMode === 'development'
+  }
   acceptContext(context: BusinessContext): BusinessContext {
     if (!context?.subject?.id || !context.scope || !context.requestId || !context.sourceDigest) return error('context_invalid')
     if (context.subject.kind !== 'human' || context.scope.subjectId !== context.subject.id) return error('context_invalid')
@@ -319,18 +371,27 @@ export class BusinessControl {
       || binding.sourceDigest !== context.sourceDigest) return error('resource_unavailable')
     return binding
   }
-  bindSession(context: BusinessContext, sessionId: string): BusinessContext {
+  bindSession(context: BusinessContext, sessionId: string, parentSessionId?: string): BusinessContext {
     this.assert(context, 'session:create')
     if (!sessionId || typeof sessionId !== 'string') return error('session_invalid')
+    if (parentSessionId !== undefined && (typeof parentSessionId !== 'string' || !parentSessionId || parentSessionId === sessionId)) return error('session_invalid')
+    if (parentSessionId && this.checkSession(context, parentSessionId).parentSessionId) return error('session_invalid')
     const previous = this.state.sessions[sessionId]
-    if (previous) this.checkSession(context, sessionId)
+    if (previous) {
+      this.checkSession(context, sessionId)
+      if (previous.parentSessionId !== parentSessionId) return error('session_parent_mismatch')
+    }
     else {
       const binding = this.state.instances[context.scope.instanceId!]!
       this.state.sessions[sessionId] = { ...binding, sessionId, subjectId: context.subject.id,
-        subject: { ...context.subject }, identity: structuredClone(context.identity), createdAt: iso(), observedAt: iso() }
+        subject: { ...context.subject }, identity: structuredClone(context.identity), createdAt: iso(), observedAt: iso(),
+        ...(parentSessionId ? { parentSessionId } : {}) }
       this.persist()
     }
     return this.sessionContext(context, sessionId)
+  }
+  parentSessionId(context: BusinessContext, sessionId: string): string | undefined {
+    return this.checkSession(context, sessionId).parentSessionId
   }
   sessionContext(context: BusinessContext, sessionId: string): BusinessContext {
     const binding = this.checkSession(context, sessionId)
@@ -392,13 +453,32 @@ export class BusinessControl {
     if (this.isManagement(context)) return { kind: 'allow', policyVersion, restrictionVersion: this.state.restrictionVersion }
     if (!config.enabled) return error('business_disabled', 503)
     if (!this.available) return error('authorization_unavailable', 503)
+    const anonymous = this.anonymousContext(context)
+    if (!anonymous && (!config.authentication || !config.identityTrust || !context.identity)) return error('identity_unavailable', 503)
+    if (!anonymous && context.identity!.evidence.issuer !== new URL(config.authentication!.endpoint).origin) return error('identity_source_changed', 401)
     this.acceptContext(context); this.checkLease(context)
+    if (config.gateway) this.observedManagedGateway = true
+    if (this.observedManagedGateway && !config.gateway) return error('gateway_registration_unavailable', 503)
+    const registered = gatewayRegistration(config, context.scope.agentId, context.scope.instanceId)
+    if (config.gateway && !registered) return error('instance_not_registered', 403)
+    const development = registered?.identityMode === 'development'
     const agent = config.agents.find(value => value.agentId === context.scope.agentId)
-    if (!agent?.enabled) return error('agent_closed')
+    if (agent?.enabled === false || !development && !agent) return error('agent_closed')
     const agentStatus = this.agentStatus(context.scope.instanceId!)
     if (agentStatus.trust.status !== 'trusted') return error(agentStatus.trust.reason, 503)
-    if (!agent.subjects.includes(context.subject.id) || (agent.sourceDigest && agent.sourceDigest !== context.sourceDigest)) return error('agent_forbidden')
-    if (!agent.actions.includes('*') && !actionNames.some(value => agent.actions.includes(value))) return error('action_forbidden')
+    if (development) {
+      if (!registered.sourceDigest || registered.sourceDigest !== context.sourceDigest) return error('agent_source_mismatch')
+      if ((!agent || anonymous) && !chatActions.includes(action)) return error('agent_forbidden')
+      if (agent && !anonymous && !agent.subjects.includes(context.subject.id)) return error('agent_forbidden')
+      if (agent && !agent.actions.includes('*') && !actionNames.some(value => agent.actions.includes(value))) return error('action_forbidden')
+      resources.forEach(value => this.checkResource(context, value))
+      return { kind: 'allow', policyVersion, restrictionVersion: this.state.restrictionVersion }
+    }
+    if (agentStatus.authentication.status !== 'verified') return error('agent_authentication_unknown', 503)
+    const pinnedDigest = registered?.sourceDigest ?? agent!.sourceDigest
+    if ((anonymous ? !chatActions.includes(action) : !agent!.subjects.includes(context.subject.id))
+      || (pinnedDigest && pinnedDigest !== context.sourceDigest)) return error('agent_forbidden')
+    if (!agent!.actions.includes('*') && !actionNames.some(value => agent!.actions.includes(value))) return error('action_forbidden')
     resources.forEach(value => this.checkResource(context, value))
     return { kind: 'allow', policyVersion, restrictionVersion: this.state.restrictionVersion }
   }
@@ -492,6 +572,7 @@ export class BusinessControl {
   }
   async inspect(context: BusinessContext, stage: 'input' | 'operation' | 'report', input: unknown, signal = noSignal(), action: string = 'write', operationBinding?: AccessRequest['operationBinding']): Promise<RiskFact | undefined> {
     this.acceptContext(context)
+    if (context.identity?.evidence.method === 'anonymous' && !this.anonymousContext(context)) return error('identity_source_changed', 401)
     const config = this.config(), inspected = stage === 'report' ? reportInspectionInput(input) : input
     const text = typeof inspected === 'string' ? inspected : JSON.stringify(inspected)
     const markers = stage === 'input' ? config.detection?.inputMarkers : stage === 'report' ? config.detection?.reportMarkers : config.detection?.operationMarkers
@@ -504,6 +585,8 @@ export class BusinessControl {
       this.updateRisk(fact)
       return error('content_restricted')
     }
+    // 匿名基础聊天没有外部用户凭据；保留本地检测和既有访问限制，不调用要求认证主体的风险提供方。
+    if (stage === 'input' && this.anonymousContext(context)) return
     if (config.riskAssessment) {
       try { return await this.reassess(context, signal, stage === 'report' ? 'publish' : stage === 'input' ? 'input' : action, inspected, operationBinding) }
       catch (cause) {
@@ -518,6 +601,7 @@ export class BusinessControl {
     if (!this.available) return error('authorization_unavailable', 503)
     this.acceptContext(context)
     const config = this.config()
+    if (this.anonymousContext(context)) { this.assert(context, 'agent:access', [{ kind: 'agent', id: context.scope.agentId }]); return }
     if (!config.authentication || !config.identityTrust || !context.identity) return error('identity_unavailable', 503)
     if (context.identity.evidence.issuer !== new URL(config.authentication.endpoint).origin) return error('identity_source_changed', 401)
     const trust = await new HttpIdentityTrustProvider(config.identityTrust).resolve(context.identity.evidence, signal)
@@ -653,7 +737,7 @@ export class BusinessControl {
     this.config()
     this.state.restrictionVersion++; this.persist(); this.cancelRestricted()
   }
-  status(): { enabled: boolean; restrictionVersion: number; instances: unknown[]; restrictions: Restriction[]; riskFacts: RiskFact[]; events: ControlEvent[] } {
+  status(): { enabled: boolean; restrictionVersion: number; instances: Array<InstanceBinding & { applied: boolean; acknowledgement?: { restrictionVersion: number; leaseId: string; at: string } }>; restrictions: Restriction[]; riskFacts: RiskFact[]; events: ControlEvent[] } {
     return { enabled: this.enabled(), restrictionVersion: this.state.restrictionVersion,
       instances: Object.values(this.state.instances).map(value => {
         const ack = this.acknowledgements.get(value.instanceId)
