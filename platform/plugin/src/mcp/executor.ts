@@ -1,7 +1,8 @@
-import { execFileSync } from 'node:child_process'
+import { execFile } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { promisify } from 'node:util'
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph'
 import { compositionDefinition, compositionInputSchema, compositionOutputSchema, INCIDENT_ID_PATTERN, RUN_ID_PATTERN } from './definition.ts'
 import { compositionConfig, compositionVersionId, readCompositions, versionConfig, type Catalog, type CompositionConfig } from './compositions.ts'
@@ -63,17 +64,21 @@ export function saveRegistry(registry: McpRegistry) {
   renameSync(temp, registry.stateFile)
 }
 
-function gitCommitOf(assetRoot: string): string {
+const execFileAsync = promisify(execFile)
+
+async function gitCommitOf(assetRoot: string): Promise<string> {
   try {
-    return execFileSync('git', ['-C', assetRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+    const { stdout } = await execFileAsync('git', ['-C', assetRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8' })
+    return stdout.trim()
   } catch {
     return 'unknown'
   }
 }
 
-function gitDirtyOf(assetRoot: string): boolean | 'unknown' {
+async function gitDirtyOf(assetRoot: string): Promise<boolean | 'unknown'> {
   try {
-    return execFileSync('git', ['-C', assetRoot, 'status', '--porcelain'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().length > 0
+    const { stdout } = await execFileAsync('git', ['-C', assetRoot, 'status', '--porcelain'], { encoding: 'utf8' })
+    return stdout.trim().length > 0
   } catch {
     return 'unknown'
   }
@@ -135,11 +140,7 @@ function connectionIdentities(definition: any, registry?: McpRegistry): any[] {
     return { id, kind: connection.specUrl ? 'openapi' : 'mcp', targetDigest: createHash('sha256').update(url.href).digest('hex') }
   })
 }
-export function compositionVersion(assetRoot: string, config?: CompositionConfig, extension?: CompositionExtension, catalog?: Catalog, registry?: McpRegistry) {
-  const gitCommit = gitCommitOf(assetRoot)
-  const programCommit = gitCommitOf(programRoot())
-  const programDirty = gitDirtyOf(programRoot())
-  const gitDirty = gitDirtyOf(assetRoot)
+function compositionImplementation(config?: CompositionConfig, extension?: CompositionExtension, catalog?: Catalog, registry?: McpRegistry) {
   const sourceDigest = sourceDigestOf()
   const normalized = config ? compositionConfig(config) : undefined
   const definition = { ...compositionDefinition, ...normalized, readonly: !config?.kind, inputSchema: compositionInputSchema(config), outputSchema: compositionOutputSchema(config),
@@ -147,8 +148,20 @@ export function compositionVersion(assetRoot: string, config?: CompositionConfig
   const businessExtension = extension?.id ? { id: extension.id, sourceDigest: extension.sourceDigest ?? 'unknown' } : undefined
   const dependencies = dependencyDefinitions(config, catalog)
   const implementationDigest = createHash('sha256').update(canonical({ sourceDigest, businessExtension, definition, dependencies, connections: connectionIdentities(dependencies, registry) })).digest('hex')
-  return { gitCommit, gitDirty, programCommit, programDirty, sourceDigest, businessExtension, digest: implementationDigest, implementationDigest, definition,
+  return { sourceDigest, businessExtension, digest: implementationDigest, implementationDigest, definition,
     ...(config ? { versionId: compositionVersionId(config) } : {}) }
+}
+
+export function compositionImplementationDigest(config?: CompositionConfig, extension?: CompositionExtension, catalog?: Catalog, registry?: McpRegistry): string {
+  return compositionImplementation(config, extension, catalog, registry).implementationDigest
+}
+
+export async function compositionVersion(assetRoot: string, config?: CompositionConfig, extension?: CompositionExtension, catalog?: Catalog, registry?: McpRegistry) {
+  const gitCommit = await gitCommitOf(assetRoot)
+  const programCommit = await gitCommitOf(programRoot())
+  const programDirty = await gitDirtyOf(programRoot())
+  const gitDirty = await gitDirtyOf(assetRoot)
+  return { gitCommit, gitDirty, programCommit, programDirty, ...compositionImplementation(config, extension, catalog, registry) }
 }
 
 function statusFor(registry: McpRegistry, id: string): ConnectionStatus {
@@ -301,13 +314,13 @@ function assertReadonlyOperation(source: Awaited<ReturnType<typeof loadOpenApi>>
   if (operation.method !== 'get') throw new Error(`只读组合拒绝非 GET 操作：${operationId}`)
 }
 
-export async function executeComposition(registry: McpRegistry, assetRoot: string, config: CompositionConfig, input: Record<string, any>, signal?: AbortSignal, catalog?: Catalog, nested = false, execution?: CompositionExecutionContext): Promise<any> {
+export async function executeComposition(registry: McpRegistry, assetRoot: string, config: CompositionConfig, input: Record<string, any>, signal?: AbortSignal, catalog?: Catalog, nested = false, execution?: CompositionExecutionContext, checkedVersion?: Awaited<ReturnType<typeof compositionVersion>>): Promise<any> {
   const context = currentBusinessContext()
   if (context && getBusinessControl(assetRoot).enabled() && typeof input.run_id === 'string') {
     getBusinessControl(assetRoot).assert(context, 'read', [{ kind: 'run', id: input.run_id }])
   }
   const resolvedCatalog = catalog ?? readCompositions(workspaceConfigPath(assetRoot, 'mcp-compositions.json')).catalog
-  const version = compositionVersion(assetRoot, config, registry.extension, resolvedCatalog, registry)
+  const version = checkedVersion ?? await compositionVersion(assetRoot, config, registry.extension, resolvedCatalog, registry)
   const attempts: ModelAttempt[] = []
   const inheritedRecorder = execution?.recordAttempt
   const runContext: CompositionExecutionContext = { execution_id: execution?.execution_id ?? `graph-${randomUUID()}`, role: execution?.role ?? 'target',
