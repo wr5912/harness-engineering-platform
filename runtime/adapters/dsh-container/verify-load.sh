@@ -148,7 +148,7 @@ node "$DSH_WEB_ADAPTER_HOST/build.mjs"
 
 # 先在无卷、无网络的容器中核挂载进来的三脚本身份：脚本来自本目录的只读 bind，
 # 因此这里核对的是"容器实际读到的字节"与"宿主审查过的字节"一致，而不是镜像是否过期。
-task_mounted_script_hashes="$(docker run --rm --network none --read-only --user 1000:1000 \
+task_mounted_script_hashes="$(docker run --rm --platform "$task_image_platform_expected" --network none --read-only --user 1000:1000 \
   --mount "type=bind,src=$task_adapter_dir,dst=/opt/dsh-adapter,readonly" \
   --entrypoint sha256sum "$task_image_ref" \
   /opt/dsh-adapter/prepare-verification-home.mjs \

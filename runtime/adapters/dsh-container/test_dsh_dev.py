@@ -1190,6 +1190,57 @@ class ImageIdentityAndPsStateTest(unittest.TestCase):
         self.assertEqual(identity["image_id"], image_id)
         self.assertEqual(identity["image_ref"], f"{contract['image']['local_image_tag']}@{image_id}")
 
+    def test_validate_image_identity_accepts_arm64(self):
+        fingerprint = "sha256:" + "2" * 64
+        image_id = "sha256:" + "1" * 64
+        contract = {
+            "source_id": "experiment:EXP-security-operations-expert-001",
+            "image": {
+                "local_image_tag": IMAGE_TAG,
+                "build_fingerprint": fingerprint,
+                "platform": "linux/arm64",
+            },
+        }
+        metadata = {
+            "Id": image_id,
+            "Os": "linux",
+            "Architecture": "arm64",
+            "Config": {"Labels": {dev.IMAGE_LABEL_KEY: fingerprint}},
+        }
+        with mock.patch.object(
+            dev, "run", return_value=subprocess.CompletedProcess(
+                [], 0, stdout=json.dumps(metadata), stderr=""
+            )
+        ):
+            identity = dev.validate_image_identity(contract)
+        self.assertEqual(identity["platform"], "linux/arm64")
+        self.assertEqual(identity["image_ref"], f"{IMAGE_TAG}@{image_id}")
+
+    def test_validate_image_identity_rejects_other_architecture(self):
+        fingerprint = "sha256:" + "2" * 64
+        contract = {
+            "source_id": "experiment:EXP-security-operations-expert-001",
+            "image": {
+                "local_image_tag": IMAGE_TAG,
+                "build_fingerprint": fingerprint,
+                "platform": "linux/arm64",
+            },
+        }
+        metadata = {
+            "Id": "sha256:" + "1" * 64,
+            "Os": "linux",
+            "Architecture": "amd64",
+            "Config": {"Labels": {dev.IMAGE_LABEL_KEY: fingerprint}},
+        }
+        errors = io.StringIO()
+        with mock.patch.object(
+            dev, "run", return_value=subprocess.CompletedProcess(
+                [], 0, stdout=json.dumps(metadata), stderr=""
+            )
+        ), contextlib.redirect_stderr(errors), self.assertRaises(SystemExit):
+            dev.validate_image_identity(contract)
+        self.assertIn("期望 linux/arm64，实际 linux/amd64", errors.getvalue())
+
     def test_validate_image_identity_rejects_unlabelled_image(self):
         fingerprint = "sha256:" + "2" * 64
         metadata = {

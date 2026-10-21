@@ -63,13 +63,13 @@ function fixture() {
     write(join(root, 'runtime/adapters/dsh-container', name), `${name}\n`)
   }
   write(join(root, 'runtime/adapters/dsh-container/source.lock.json'), JSON.stringify({
+    schema_version: '1.1',
     repository: 'https://github.com/deepseek-ai/deepseek-harness.git',
     commit: '21638c5630000000000000000000000000000000',
     tree: '31638c5630000000000000000000000000000000',
     pnpm_lock_sha256: '4'.repeat(64),
     package_manager: 'pnpm@10.0.0',
     node_base: `node:20@sha256:${'5'.repeat(64)}`,
-    platform: 'linux/amd64',
     local_image_tag: 'ai-agent-harness/dsh:21638c563',
     cli_version: '0.2.1-rc.2',
     cli_package: '@deepseek-ai/dsh',

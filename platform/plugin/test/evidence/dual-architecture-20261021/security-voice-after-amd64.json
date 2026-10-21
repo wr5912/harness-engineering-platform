@@ -1,0 +1,15 @@
+{
+  "agent_id": "security-operations-expert",
+  "source_id": "experiment:EXP-security-operations-expert-021-rdd331f9f2e30",
+  "route": "/assistant/voice-mode/config",
+  "full_dependency_install": true,
+  "plugin_import": true,
+  "native_import": true,
+  "up": true,
+  "platform": "linux/amd64",
+  "image_id": "sha256:ba2ec964ef463b2d0f8f55ecca75e4e97751d06f5267ba0c9c1dc33f5ed20952",
+  "status": 200,
+  "content_type": "application/json",
+  "nonempty_body": true,
+  "down": true
+}

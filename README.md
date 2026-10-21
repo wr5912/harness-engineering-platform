@@ -75,6 +75,32 @@ python3 runtime/adapters/dsh-container/dsh-eval \
 
 当前启动器的来源选择器支持 `experiment:<id>`；`--mode eval` 表示实例只读装载被测 Harness，`dsh-eval --mode fast/full` 表示评测范围，两者不同。业务实例从 `/assistant/` 访问。实例生命周期、镜像构建、工作区注册、环境变量和访问规则的唯一使用说明见[容器适配器 README](./runtime/adapters/dsh-container/README.md)。业务实例的访问设置与平台密码登录分别维护。
 
+## AMD64 与 ARM64 主机部署
+
+目标主机为 Linux `x86_64`/`amd64` 或 `aarch64`/`arm64`，包括 Ubuntu 24.04 ARM64；来源解析分别选择 `linux/amd64` 和 `linux/arm64`，明确拒绝其他架构。`x86_64` 是 AMD64 的主机名称，不会被拒绝。平台和业务实例在各自目标主机原生安装、构建和运行；跨架构仿真或仅检查镜像清单不能代替目标主机验收。实际通过状态以[项目验收矩阵](./docs/ai-agent-harness项目验收矩阵.md)为准。
+
+每台主机分别安装 Node.js 24、与 [`peerDependencies`](./platform/plugin/package.json) 精确匹配的系统全局 DSH、pnpm、Python 3.10 及以上版本与 PyYAML，以及 Docker Engine、Buildx 和 Compose 插件。DSH、Node 原生模块和 Docker daemon 都须属于当前主机架构；核对 `dsh` 的可执行来源，并运行：
+
+```bash
+uname -m
+node --version && dsh --version && pnpm --version
+python3 --version && python3 -c 'import yaml'
+docker version --format '{{.Server.Os}}/{{.Server.Arch}}'
+docker buildx version && docker compose version
+```
+
+在目标主机完整克隆本程序仓库和私有[数据仓库](https://github.com/wr5912/harness-engineering-platform-data)。本程序仓库的命令见上文；数据仓库可克隆到默认数据根：
+
+```bash
+git clone git@github.com:wr5912/harness-engineering-platform-data.git \
+  "$HOME/harness-engineering-platform-data"
+git -C "$HOME/harness-engineering-platform-data" rev-parse --is-shallow-repository
+```
+
+最后一条应输出 `false`。不要用浅克隆代替数据仓库历史：现有业务扩展可能从固定历史提交读取源码。首次使用可按上文 `/hep/` 初始化引导连接数据仓库并建立平台账号。Git 不包含数据根 `.local/` 的持久状态和本地凭据；按[独立数据工作区合同](./docs/platform-design/02_系统架构与部署设计.md#独立数据工作区)恢复所需账号、模型凭据和 HOME，或在新主机重新配置。逐项核对数据根的 `config/sites.json`、`config/mcp-manager.json`、`config/business-access.json` 及实例启动配置中目标主机可达的地址和 `sharedSecretFile`，不要沿用旧主机的回环地址、Mock 地址或本地密钥文件路径。模型与上游服务不可用时，记录对应的装载或业务验证缺口。
+
+在每台主机使用同一份锁定来源、本机 Docker daemon 和[容器适配器构建命令](./runtime/adapters/dsh-container/README.md#源码与镜像身份)构建一次标准 DSH Runtime 镜像，再让各业务智能体实例共用它。不要迁移另一架构的本地镜像、构建缓存或 `node_modules/`；带原生依赖的 Candidate 插件须在目标主机按锁文件重新安装，尤其是当前 `security-operations-expert` 的 `dsh-voice-hub`。先核对来源解析的 `image.platform`、镜像的 OS/Architecture、Image ID 和构建指纹，再分别执行平台 `prepare`、浏览器登录及新 Session，以及各 Agent 当前 active Experiment 的实例启动、新 Session 和所需插件、Chromium 功能检查。具体命令、装载层级和本地证据见[容器适配器 README](./runtime/adapters/dsh-container/README.md)；只在 Ubuntu ARM64 主机完成实测后记录 ARM64 通过。
+
 ## 开发与研究方式
 
 项目的工作方式和修改边界由[根级规则](./AGENTS.md#项目定位与工作方式)维护。平台开发围绕实际需求交付可用能力；遇到技术或效果不确定的问题时，做必要研究或 POC，再将验证有效的结果纳入实现。技术研究的依据按需保存在既有任务或设计记录中，不另建阶段台账。

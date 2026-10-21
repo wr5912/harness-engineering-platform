@@ -103,7 +103,7 @@ rm -rf -- "$task_source_dir/.git"
 
 # 使用同一固定 Node 底座与 mirror 规则先签名核验 main/updates/security 索引。
 # 如果镜像缺 security、签名或 Valid-Until 不通过，不进入耗时的 DSH 构建。
-docker run --rm --network "$task_build_network" \
+docker run --rm --platform "$task_platform" --network "$task_build_network" \
   --env http_proxy --env https_proxy --env no_proxy \
   --env HTTP_PROXY --env HTTPS_PROXY --env NO_PROXY \
   --mount "type=bind,src=$task_adapter_dir/apt-mirror.sh,dst=/opt/dsh-adapter/apt-mirror.sh,readonly" \
@@ -135,18 +135,28 @@ task_image_platform="$(docker image inspect "$task_image_tag" --format '{{.Os}}/
 task_image_labels="$(docker image inspect "$task_image_tag" --format '{{json .Config.Labels}}')"
 task_image_label="$(python3 -c 'import json,sys; print((json.loads(sys.argv[1]) or {}).get(sys.argv[2], ""))' \
   "$task_image_labels" "$task_image_label_key")"
+if [[ ! "$task_image_id" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+  printf 'Built image returned an invalid immutable ID: %s.\n' "$task_image_id" >&2
+  exit 1
+fi
+if [[ "$task_image_platform" != "$task_platform" ]]; then
+  printf 'Built image platform mismatch: expected %s, got %s.\n' "$task_platform" "$task_image_platform" >&2
+  exit 1
+fi
+if [[ "$task_image_label" != "$task_image_build_fingerprint" ]]; then
+  printf 'Built image fingerprint mismatch: expected %s, got %s.\n' "$task_image_build_fingerprint" "${task_image_label:-missing}" >&2
+  exit 1
+fi
 task_image_ref="$task_image_tag@$task_image_id"
-task_runtime_version="$(docker run --rm --network none --entrypoint node "$task_image_ref" /opt/dsh/apps/cli/lib/bin.js --version)"
-task_dsh_command_version="$(docker run --rm --network none --entrypoint dsh "$task_image_ref" --version)"
-task_dsh_web_help="$(docker run --rm --network none --entrypoint dsh "$task_image_ref" web --help)"
-task_pnpm_runtime_version="$(docker run --rm --network none --entrypoint pnpm "$task_image_ref" --version)"
-[[ "$task_image_platform" == "$task_platform" ]]
-[[ "$task_image_label" == "$task_image_build_fingerprint" ]]
+task_runtime_version="$(docker run --rm --platform "$task_platform" --network none --entrypoint node "$task_image_ref" /opt/dsh/apps/cli/lib/bin.js --version)"
+task_dsh_command_version="$(docker run --rm --platform "$task_platform" --network none --entrypoint dsh "$task_image_ref" --version)"
+task_dsh_web_help="$(docker run --rm --platform "$task_platform" --network none --entrypoint dsh "$task_image_ref" web --help)"
+task_pnpm_runtime_version="$(docker run --rm --platform "$task_platform" --network none --entrypoint pnpm "$task_image_ref" --version)"
 [[ "$task_runtime_version" == "$task_cli_version" ]]
 [[ "$task_dsh_command_version" == "$task_cli_version" ]]
 [[ "$task_dsh_web_help" == *"Usage: dsh --profile web"* ]]
 [[ "$task_pnpm_version" != "$task_package_manager" && "$task_pnpm_runtime_version" == "$task_pnpm_version" ]]
-docker run --rm --network none --entrypoint sh "$task_image_ref" -c 'test -x /usr/bin/chromium'
+docker run --rm --platform "$task_platform" --network none --entrypoint sh "$task_image_ref" -c 'test -x /usr/bin/chromium'
 
 python3 - "$task_evidence_file" "$task_source_id" "$task_source_repository" "$task_source_commit" "$task_source_tree" "$task_lock_sha" "$task_package_manager" "$task_node_base" "$task_image_tag" "$task_image_id" "$task_image_platform" "$task_runtime_version" "$task_dsh_command_version" "$task_pnpm_runtime_version" "$task_build_network" "$task_apt_mirror" "$task_npm_registry" "$task_image_build_fingerprint" "$task_image_label_key" "$task_image_input_digests" <<'PY'
 from datetime import datetime, timezone

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readFile, readdir, symlink, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createServer } from 'node:http'
@@ -502,6 +502,61 @@ test('平台接入传入仓库根目录时组合回执仍含实际实现摘要',
   assert.equal(result.ok, true)
   assert.match(result.value.implementation.sourceDigest, /^[0-9a-f]{64}$/)
   assert.match(result.value.implementation.gitCommit, /^[0-9a-f]{40}$/)
+})
+
+test('多版本列表每次只读取四项 Git 来源，慢 Git 不阻塞事件循环且 dirty 实时更新', async () => {
+  const module = await loadMcpModule()
+  const root = await mkdtemp(join(tmpdir(), 'mcp-list-git-'))
+  const compositions = []
+  for (let index = 0; index < 2; index++) {
+    const entry = { id: `composition-${index}` }
+    publishCompositionVersion(entry, { toolName: `query_${index}`, title: `组合 ${index}`, description: '', connectionId: 'source' })
+    compositions.push(entry)
+  }
+  const compositionsFile = join(root, 'compositions.json')
+  await writeFile(compositionsFile, JSON.stringify({ schema_version: '1.0', compositions }))
+  execFileSync('git', ['init', '-q'], { cwd: root })
+  execFileSync('git', ['add', 'compositions.json'], { cwd: root })
+  execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'fixture'], { cwd: root })
+
+  const bin = await mkdtemp(join(tmpdir(), 'mcp-git-wrapper-')), callsFile = join(bin, 'git-calls.log')
+  const realGit = execFileSync('which', ['git'], { encoding: 'utf8' }).trim()
+  await writeFile(join(bin, 'git'), `#!/bin/sh\nprintf '%s\\n' "$*" >> "$MCP_GIT_CALLS_FILE"\nsleep 0.05\nexec "${realGit}" "$@"\n`, { mode: 0o755 })
+  const previousPath = process.env.PATH, previousCallsFile = process.env.MCP_GIT_CALLS_FILE
+  process.env.PATH = `${bin}:${previousPath}`
+  process.env.MCP_GIT_CALLS_FILE = callsFile
+  try {
+    const rpc = module.createMcpHandler(root, { compositionsFile })
+    const firstRequest = rpc('list', {})
+    assert.equal(await Promise.race([firstRequest.then(() => 'list'), new Promise(resolve => setTimeout(() => resolve('timer'), 20))]), 'timer')
+    const first = await firstRequest
+    assert.equal(first.ok, true)
+    assert.equal(first.value.implementation.gitDirty, false)
+    assert.equal(first.value.compositions.length, 2)
+    assert.equal((await readFile(callsFile, 'utf8')).trim().split('\n').length, 4)
+
+    await writeFile(join(root, 'untracked.txt'), '工作区变化')
+    const second = await rpc('list', {})
+    assert.equal(second.ok, true)
+    assert.equal(second.value.implementation.gitDirty, true)
+    assert.deepEqual(second.value.compositions.map(entry => entry.binding), first.value.compositions.map(entry => entry.binding))
+    assert.equal((await readFile(callsFile, 'utf8')).trim().split('\n').length, 8)
+
+    const fixed = await rpc('callPublishedComposition', { ...second.value.compositions[0].binding, toolName: 'query_0', input: { asset: 'host-a' } })
+    assert.equal(fixed.ok, false)
+    assert.equal((await readFile(callsFile, 'utf8')).trim().split('\n').length, 12)
+
+    const missingRoot = await module.createMcpHandler(join(root, 'missing'), { compositionsFile })('list', {})
+    assert.equal(missingRoot.ok, true)
+    assert.equal(missingRoot.value.implementation.gitCommit, 'unknown')
+    assert.equal(missingRoot.value.implementation.gitDirty, 'unknown')
+    assert.deepEqual(missingRoot.value.compositions.map(entry => entry.binding), second.value.compositions.map(entry => entry.binding))
+  } finally {
+    if (previousPath === undefined) delete process.env.PATH
+    else process.env.PATH = previousPath
+    if (previousCallsFile === undefined) delete process.env.MCP_GIT_CALLS_FILE
+    else process.env.MCP_GIT_CALLS_FILE = previousCallsFile
+  }
 })
 
 test('平台 MCP 读取原插件的已保存配置，不建立第二份连接登记', async () => {
