@@ -1011,7 +1011,7 @@ test('平台评测预览和 Job 共用当前模型投影，策略文件随任务
     let running
     for (let attempt = 0; attempt < 30; attempt++) {
       running = await rpc(handler, 'eval/status', { job_id: started.job_id })
-      if (running.stderr.includes('started')) break
+      if (running.stderr.includes('started') && running.stderr.includes('[REDACTED]')) break
       await new Promise(resolve => setTimeout(resolve, 20))
     }
     assert.match(running.stderr, /started/)

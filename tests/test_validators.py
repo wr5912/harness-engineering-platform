@@ -91,11 +91,12 @@ def case_contract_digest(path: Path, case_ids: list[str]) -> str:
     return module.evaluation_digest(path, case_ids)
 
 
-def evaluation_case_ids(repository: Path) -> list[str]:
+def evaluation_case_ids(repository: Path, *, fast_only: bool = False) -> list[str]:
     spec = importlib.util.spec_from_file_location("evaluation_case_ids", EVALUATION_CONTRACT)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.load_evaluation(repository / "agents" / AGENT_ID / "evaluation.md")["case_ids"]
+    evaluation = module.load_evaluation(repository / "agents" / AGENT_ID / "evaluation.md")
+    return [item["case_id"] for item in evaluation["catalog"] if item["fast"]] if fast_only else evaluation["case_ids"]
 
 
 def write_minimal_experiment(root: Path, *, status: str = "active", outcome: str | None = None,
@@ -1890,6 +1891,7 @@ print(json.dumps({"schema_version": "1.0", "rows": rows}))
         with tempfile.TemporaryDirectory() as temp:
             repository = copy_repository(Path(temp))
             expected_case_ids = evaluation_case_ids(repository)
+            expected_fast_case_ids = evaluation_case_ids(repository, fast_only=True)
             command = [
                 "python3", str(repository / "runtime/adapters/dsh-container/dsh-eval"), "--repo", str(repository),
                 "--source", "experiment:EXP-security-operations-expert-006",
@@ -1915,9 +1917,7 @@ print(json.dumps({"schema_version": "1.0", "rows": rows}))
                 command, cwd=repository, text=True, capture_output=True, check=False, timeout=180,
             )
         self.assertEqual(fast.returncode, 0, fast.stderr)
-        self.assertEqual(json.loads(fast.stdout)["case_ids"], [
-            "U-INS-001", "U-EMG-001", "U-POL-001", "U-FLT-001", "U-QA-002", "U-QA-003", "U-THREAT-FAST",
-        ])
+        self.assertEqual(json.loads(fast.stdout)["case_ids"], expected_fast_case_ids)
         self.assertEqual(json.loads(fast.stdout)["selection_mode"], "fast")
         self.assertEqual(full.returncode, 0, full.stderr)
         self.assertEqual(json.loads(full.stdout)["case_ids"], expected_case_ids)
@@ -1931,6 +1931,7 @@ print(json.dumps({"schema_version": "1.0", "rows": rows}))
     def test_default_fast_run_locks_selected_scenes(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             repository, env, _ = self.runtime_fixture(Path(temp))
+            expected_fast_case_ids = evaluation_case_ids(repository, fast_only=True)
             completed, payload = self.run_eval(repository, env)
             run_dir = (repository / payload["summary"]).parent
             inputs = json.loads((run_dir / "inputs.lock.json").read_text(encoding="utf-8"))
@@ -1939,11 +1940,9 @@ print(json.dumps({"schema_version": "1.0", "rows": rows}))
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertEqual(inputs["selection_mode"], "fast")
         self.assertIn("- Case 选择：`fast`", report)
-        self.assertEqual([item["case_id"] for item in inputs["evaluation_cases"]], [
-            "U-INS-001", "U-EMG-001", "U-POL-001", "U-FLT-001", "U-QA-002", "U-QA-003", "U-THREAT-FAST",
-        ])
+        self.assertEqual([item["case_id"] for item in inputs["evaluation_cases"]], expected_fast_case_ids)
         self.assertEqual(analysis["review_status"], "not_requested")
-        self.assertEqual(sum(scene["machine_counts"]["passed"] for scene in analysis["scenes"]), 7)
+        self.assertEqual(sum(scene["machine_counts"]["passed"] for scene in analysis["scenes"]), len(expected_fast_case_ids))
         self.assertEqual(sum(scene["machine_counts"]["not_executed"] for scene in analysis["scenes"]), 0)
 
     def test_case_patterns_select_in_document_order(self) -> None:
