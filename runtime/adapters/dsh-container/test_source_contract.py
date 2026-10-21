@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import source_contract
 
@@ -88,7 +89,7 @@ class SourceContractTest(unittest.TestCase):
         self.assertRegex(fingerprint, r"^sha256:[0-9a-f]{64}$")
         self.assertEqual(result["image"]["local_image_tag"],
                          source_contract._read_source_lock(source_contract.LOCK)["local_image_tag"]
-                         + "-" + fingerprint[7:19])
+                         + "-" + result["image"]["platform"].split("/")[1] + "-" + fingerprint[7:19])
         with tempfile.TemporaryDirectory(prefix="dsh-image-inputs-") as location:
             adapter = Path(location)
             for name in source_contract.IMAGE_BUILD_FILES:
@@ -103,6 +104,47 @@ class SourceContractTest(unittest.TestCase):
                 source_contract._read_source_lock(lock_path), lock_path=lock_path, adapter=adapter
             )
         self.assertNotEqual(first, second)
+
+    def test_supported_linux_architectures_select_distinct_images(self):
+        images = {}
+        for machine, expected in (
+            ("x86_64", "linux/amd64"), ("amd64", "linux/amd64"),
+            ("X86_64", "linux/amd64"),
+            ("aarch64", "linux/arm64"), ("arm64", "linux/arm64"),
+        ):
+            with self.subTest(machine=machine), \
+                    patch.object(source_contract.platform, "system", return_value="Linux"), \
+                    patch.object(source_contract.platform, "machine", return_value=machine):
+                image = source_contract.resolve()["image"]
+                self.assertEqual(image["platform"], expected)
+                self.assertIn("-" + expected.split("/")[1] + "-", image["local_image_tag"])
+                images[machine] = image
+        self.assertEqual(images["x86_64"]["build_fingerprint"], images["amd64"]["build_fingerprint"])
+        self.assertEqual(images["aarch64"]["build_fingerprint"], images["arm64"]["build_fingerprint"])
+        self.assertNotEqual(images["x86_64"]["build_fingerprint"], images["aarch64"]["build_fingerprint"])
+        self.assertNotEqual(images["x86_64"]["local_image_tag"], images["aarch64"]["local_image_tag"])
+
+    def test_other_host_architectures_and_systems_are_rejected(self):
+        for system, machine in (("Linux", "riscv64"), ("Linux", "i686"),
+                                ("Darwin", "arm64"), ("Windows", "AMD64")):
+            with self.subTest(system=system, machine=machine), \
+                    patch.object(source_contract.platform, "system", return_value=system), \
+                    patch.object(source_contract.platform, "machine", return_value=machine):
+                with self.assertRaisesRegex(ValueError, "unsupported DSH image host"):
+                    source_contract.resolve()
+        with self.assertRaisesRegex(ValueError, "unsupported DSH image platform"):
+            source_contract.image_build_fingerprint(
+                source_contract._read_source_lock(source_contract.LOCK), image_platform_name="linux/riscv64"
+            )
+
+    def test_source_lock_does_not_pin_an_architecture(self):
+        lock = source_contract._read_source_lock(source_contract.LOCK)
+        self.assertNotIn("platform", lock)
+        with tempfile.TemporaryDirectory(prefix="dsh-source-lock-") as location:
+            path = Path(location) / "source.lock.json"
+            path.write_text(json.dumps({**lock, "platform": "linux/amd64"}), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "fixed platform"):
+                source_contract._read_source_lock(path)
 
     def test_image_input_digest_cli_is_json_without_private_values(self):
         completed = subprocess.run(

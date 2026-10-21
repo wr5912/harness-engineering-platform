@@ -16,7 +16,7 @@ export HARNESS_ASSET_ROOT="$HOME/harness-engineering-platform-data"
 
 ## 源码与镜像身份
 
-`source.lock.json` 锁定官方仓库提交、Git tree、`pnpm-lock.yaml` 摘要、包管理器版本、Node 基础镜像 OCI index digest 和目标平台；当前锁定 `v0.2.1-rc.2`，Web 组合原生包含 Schedule 服务和任务界面。所有 Experiment 共用这份锁。宿主来源解析脚本不进入 Runtime 镜像，因此不参与镜像构建指纹。实际本地镜像标签在锁定标签后追加构建指纹前 12 位，允许不同构建输入在同一宿主机并行构建而不覆盖彼此。`build-image.sh` 新建临时源码工作树，在宿主侧核对提交、tree 和锁摘要后用 BuildKit named context 构建。官方构建脚本支持显式 `DSH_CLIENT_COMMIT_HASH`；构建器不依赖 named context 是否携带 `.git`，只安装本地 C 编译及 musl 工具，最终镜像不保留这些构建工具或 `.git`。本仓库没有 DSH 源码副本。
+`source.lock.json` 锁定官方仓库提交、Git tree、`pnpm-lock.yaml` 摘要、包管理器版本和 Node 基础镜像 OCI index digest；当前锁定 `v0.2.1-rc.2`，Web 组合原生包含 Schedule 服务和任务界面。所有 Experiment 共用这份锁。宿主来源解析将 Linux `x86_64`/`amd64` 映射为 `linux/amd64`，将 Linux `aarch64`/`arm64` 映射为 `linux/arm64`，其他系统或架构明确拒绝。构建指纹和本地镜像标签包含解析出的平台，因此同一锁定源码在两种架构上的镜像身份不同，不能混用。宿主来源解析脚本不进入 Runtime 镜像，因此不参与镜像构建指纹。`build-image.sh` 新建临时源码工作树，在宿主侧核对提交、tree 和锁摘要后用 BuildKit named context 构建。官方构建脚本支持显式 `DSH_CLIENT_COMMIT_HASH`；构建器不依赖 named context 是否携带 `.git`，只安装本地 C 编译及 musl 工具，最终镜像不保留这些构建工具或 `.git`。本仓库没有 DSH 源码副本。
 
 ```bash
 bash runtime/adapters/dsh-container/build-image.sh
@@ -45,7 +45,7 @@ APT 索引使用 `Error-Mode=any`、单次重试、30 秒 HTTP 连接超时和 I
 
 评测实例不挂载 `evaluation.md` 或其他判分材料；`verify-load.mjs` 与 `test_home_submounts.mjs` 对此做负向断言。Harness 修改由宿主开发会话完成，容器只负责装载和评测。
 
-Candidate 的 Managed Patch 如加载带独立 Node 依赖的插件，先在该插件目录按 `package-lock.json` 执行 `npm ci --omit=dev --ignore-scripts --legacy-peer-deps --registry=https://registry.npmmirror.com`。`node_modules/` 已被 Git 忽略，会随 `candidate/dsh/managed` 一起只读挂载，Node 从插件文件所在目录向上解析依赖；启动后仍须核对插件实际激活及浏览器功能。只有依赖必须存放在 Candidate 外时，才用 `dsh-dev up --plugin-node-modules PATH` 额外挂载到 `/opt/node_modules`。
+Candidate 的 Managed Patch 如加载带独立 Node 依赖的插件，先在目标主机的该插件目录按 `package-lock.json` 执行 `npm ci --ignore-scripts --legacy-peer-deps --registry=https://registry.npmmirror.com`。当前 `dsh-voice-hub` 的运行时导入链需要锁定的 peer/dev 依赖 `@deepseek-ai/cordis`，不能加 `--omit=dev`。`node_modules/` 已被 Git 忽略，会随 `candidate/dsh/managed` 一起只读挂载，Node 从插件文件所在目录向上解析依赖；不得把 AMD64 主机安装的 `node_modules/` 复制到 ARM64 主机。当前 `security-operations-expert` 的 `dsh-voice-hub` 使用 `sherpa-onnx-node` 原生包，须在每台目标主机的当前 active Experiment Candidate 中安装，并在对应容器内核对完整插件导入、原生模块加载、插件激活和浏览器语音功能；目录存在只表示依赖已放置。只有依赖必须存放在 Candidate 外时，才用 `dsh-dev up --plugin-node-modules PATH` 额外挂载到 `/opt/node_modules`。
 
 `locked-user.patch.yml` 只读覆盖 HOME 级用户 Patch；Web Profile 的 `cordis.patch.yml` 留在实例 HOME 卷中，由 DSH Web 保存当前实例的设置（新版 DSH 的设置写入要求对该文件原子替换）。真正 **0 字节**的 `locked-global.AGENTS.md` 和只含注释的 `locked-bootstrap.env` 分别只读覆盖全局 Agent instructions 与 Boot 环境文件。模型/MCP Endpoint 和凭据只能由调用环境或 Runtime 受控凭据提供，不能由 Candidate 工作区改变。复用实例时须把 Web Profile 设置视为运行状态，而非 Candidate 资产；评估前核对其摘要或使用新实例。
 
@@ -88,6 +88,39 @@ bash runtime/adapters/dsh-container/build-image.sh --build-network host
 构建期 APT 默认走 `http://mirrors.tuna.tsinghua.edu.cn/debian`，security 保持 `http://deb.debian.org/debian-security`；npm/pnpm 与 corepack 走 `https://registry.npmmirror.com`。两者都不需要调用方额外加参数；只有 TUNA 不可达时，才用 `--apt-mirror http://deb.debian.org/debian` 显式回退到官方主源。
 
 换源不放松校验：APT 仍由 `debian-archive-keyring` 校验 Release/InRelease 签名与 `Valid-Until`，依赖仍按 `pnpm-lock.yaml` 的完整性摘要校验。实际使用的源写入该次构建证据。
+
+在目标主机用当前 Agent 的 active Experiment ID 查询平台并构建一次标准镜像；同一主机的其他 Agent 共用它。原生部署时，`uname -m` 与 Docker server 的 Architecture 应对应同一种架构。构建后核对 Image ID、平台和构建指纹，再启动实例：
+
+```bash
+python3 runtime/adapters/dsh-container/source_contract.py \
+  --source experiment:<experiment-id> --field image.platform
+bash runtime/adapters/dsh-container/build-image.sh --source <experiment-id>
+hep_image_tag="$(python3 runtime/adapters/dsh-container/source_contract.py \
+  --source experiment:<experiment-id> --field image.local_image_tag)"
+docker image inspect "$hep_image_tag" --format \
+  '{{.Os}}/{{.Architecture}} {{.Id}} {{index .Config.Labels "org.ai-agent-harness.dsh.image-build-fingerprint"}}'
+```
+
+启动器还会核对镜像身份。现有 AMD64 本地镜像的旧构建指纹不会自动升级；更换源码锁或适配器构建输入后先重新构建，已有实例按实际需要使用 `up --replace` 重新装载并核对 HOME。目标主机应分别检查标准镜像中的 DSH CLI 和 Chromium 可执行、当前 active Experiment 的 Candidate 装载、插件激活及新 Session；只有文件存在、`docker image inspect` 成功或容器处于 running 状态不能证明业务可用。跨架构搬运的原生依赖即使目录存在也不等于可装载。
+
+当前 `security-operations-expert` 的 `dsh-voice-hub` 安装示例（`<experiment-id>` 必须取该 Agent 的当前 active Experiment）：
+
+```bash
+cd "$HARNESS_ASSET_ROOT/evolution/experiments/<experiment-id>/candidate/dsh/managed/dsh-voice-hub"
+npm ci --ignore-scripts --legacy-peer-deps --registry=https://registry.npmmirror.com
+node -e "require('sherpa-onnx-node')"
+```
+
+宿主机导入成功后，还要在该 Agent 的运行实例中验证完整插件及原生模块都可加载：
+
+```bash
+docker exec <instance-name> node -e \
+  "import('file:///opt/dsh-managed/dsh-voice-hub/lib/index.js').then(() => console.log('voice plugin import ok'))"
+docker exec -w /opt/dsh-managed/dsh-voice-hub <instance-name> \
+  node -e "require('sherpa-onnx-node')"
+```
+
+随后核对 `/assistant/voice-mode/config` 返回 JSON 200、DSH 插件界面及目标浏览器的实际语音行为。局域网麦克风访问还受下文[实例访问规则](#实例访问规则)的 HTTPS 条件约束。若模型、MCP 或语音服务端点尚不可用，分别记录对应限制，不把技术装载写成任务效果通过。
 
 ## 评测实例与本地装载核验
 

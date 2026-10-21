@@ -1,0 +1,14 @@
+{
+  "agent_id": "test01",
+  "source_id": "experiment:EXP-test01-002",
+  "name": "arch-test01",
+  "port": 31980,
+  "image_id": "sha256:ba2ec964ef463b2d0f8f55ecca75e4e97751d06f5267ba0c9c1dc33f5ed20952",
+  "platform": "linux/amd64",
+  "http_status": 200,
+  "session_created": true,
+  "session_listed": true,
+  "persisted_session_files": 1,
+  "down": true,
+  "scope": "isolated data clone; no model prompt"
+}

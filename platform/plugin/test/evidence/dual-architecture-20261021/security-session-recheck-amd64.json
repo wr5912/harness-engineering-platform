@@ -1,0 +1,19 @@
+{
+  "agent_id": "security-operations-expert",
+  "source_id": "experiment:EXP-security-operations-expert-021-rdd331f9f2e30",
+  "name": "arch-security",
+  "port": 31985,
+  "up": true,
+  "platform": "linux/amd64",
+  "image_id": "sha256:ba2ec964ef463b2d0f8f55ecca75e4e97751d06f5267ba0c9c1dc33f5ed20952",
+  "session_preset": "security-operations-expert",
+  "http_status": 200,
+  "list_before_seconds": 0.047,
+  "list_before_count": 1,
+  "existing_session_listed": true,
+  "session_created": true,
+  "list_after_seconds": 0.008,
+  "session_listed": true,
+  "voice_native_import": true,
+  "down": true
+}

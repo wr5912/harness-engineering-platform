@@ -75,6 +75,12 @@ def copy_repository(destination: Path) -> Path:
     sites.parent.mkdir(parents=True, exist_ok=True)
     if not sites.exists():
         shutil.copyfile(ASSETS / "config/sites.json", sites)
+    default_model = target / "config/business-model-default.json"
+    if not default_model.exists():
+        default_model.write_text(json.dumps({
+            "schema_version": "1.2",
+            "default": {"provider": "deepseek-official", "model": "deepseek-flash", "reasoningEffort": "off"},
+        }) + "\n", encoding="utf-8")
     return target
 
 
@@ -1250,19 +1256,19 @@ class DshEvalTests(unittest.TestCase):
 
     def runtime_fixture(self, root: Path, *, mode: str = "pass") -> tuple[Path, dict[str, str], Path]:
         repository = copy_repository(root)
-        image_fingerprint = subprocess.check_output(
+        image_contract = json.loads(subprocess.check_output(
             [
                 "python3",
                 str(repository / "runtime/adapters/dsh-container/source_contract.py"),
                 "--repo", str(repository),
                 "--source",
                 "experiment:EXP-security-operations-expert-006",
-                "--field",
-                "image.build_fingerprint",
             ],
             cwd=repository,
             text=True,
-        ).strip()
+        ))["image"]
+        image_fingerprint = image_contract["build_fingerprint"]
+        image_platform = image_contract["platform"]
         command_log = root / "dsh-dev.jsonl"
         fake_dsh = root / "fake-dsh-dev"
         fake_dsh.write_text(
@@ -1281,7 +1287,7 @@ elif sys.argv[1] == "up":
         "image_id": "sha256:{'a' * 64}",
         "image_ref": "ai-agent-harness/dsh:test@sha256:{'a' * 64}",
         "image_build_fingerprint": "{image_fingerprint}",
-        "platform": "linux/amd64",
+        "platform": "{image_platform}",
     }}))
 else:
     print("{{}}")

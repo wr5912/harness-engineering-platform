@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import platform
 import re
 import stat
 import sys
@@ -43,10 +44,21 @@ GRADING_ROLES = ("scoring",)
 CONTAINER_WORKSPACE = "/work/harness/workspace"
 CONTAINER_REFERENCE = "/work/reference"
 CONTAINER_EVAL_INPUT = "/work/eval-input"
-IMAGE_FINGERPRINT_VERSION = "1"
+IMAGE_FINGERPRINT_VERSION = "2"
 IMAGE_LABEL_KEY = "org.ai-agent-harness.dsh.image-build-fingerprint"
 # source_contract.py 只在宿主读取来源，不进入镜像；路径/目录调整不能改变 Runtime 镜像身份。
 IMAGE_BUILD_FILES = ("Dockerfile", "apt-mirror.sh", "build-image.sh", "dsh-cli.sh")
+IMAGE_ARCHITECTURES = {"x86_64": "amd64", "amd64": "amd64", "aarch64": "arm64", "arm64": "arm64"}
+
+
+def image_platform() -> str:
+    """将受支持的 Linux 宿主架构映射为 Docker 平台名。"""
+    system = platform.system()
+    machine = platform.machine()
+    architecture = IMAGE_ARCHITECTURES.get(machine.lower())
+    if system != "Linux" or architecture is None:
+        raise ValueError(f"unsupported DSH image host: {system}/{machine}; expected Linux amd64 or arm64")
+    return f"linux/{architecture}"
 
 
 def image_build_input_digests(*, lock_path: Path = LOCK, adapter: Path = ADAPTER) -> dict[str, str]:
@@ -61,10 +73,15 @@ def image_build_input_digests(*, lock_path: Path = LOCK, adapter: Path = ADAPTER
     return dict(sorted(digests.items()))
 
 
-def image_build_fingerprint(lock: dict, *, lock_path: Path = LOCK, adapter: Path = ADAPTER) -> str:
+def image_build_fingerprint(lock: dict, *, image_platform_name: str | None = None,
+                            lock_path: Path = LOCK, adapter: Path = ADAPTER) -> str:
     """由锁定来源和镜像构建输入生成稳定的本地镜像身份。"""
+    selected_platform = image_platform() if image_platform_name is None else image_platform_name
+    if selected_platform not in ("linux/amd64", "linux/arm64"):
+        raise ValueError(f"unsupported DSH image platform: {selected_platform}")
     payload = {
         "version": IMAGE_FINGERPRINT_VERSION,
+        "platform": selected_platform,
         "source_lock": lock,
         "input_digests": image_build_input_digests(lock_path=lock_path, adapter=adapter),
     }
@@ -173,8 +190,13 @@ def _experiment_contract(
     # 实际装载一致性由候选 harness.yaml、sources.json 与基础 patch 默认值的交叉门禁保证。
     declared_preset = preset_id(item["preset"])
     image = dict(lock)
-    image["build_fingerprint"] = image_build_fingerprint(lock, lock_path=lock_path)
-    image["local_image_tag"] = f"{lock['local_image_tag']}-{image['build_fingerprint'][7:19]}"
+    image["platform"] = image_platform()
+    image["build_fingerprint"] = image_build_fingerprint(
+        lock, image_platform_name=image["platform"], lock_path=lock_path
+    )
+    image["local_image_tag"] = (
+        f"{lock['local_image_tag']}-{image['platform'].split('/')[1]}-{image['build_fingerprint'][7:19]}"
+    )
     contract = {
         "schema_version": "2.1",
         "source_kind": "experiment",
@@ -241,8 +263,10 @@ def _resolve_experiment(source_id: str, *, repo: Path, sources: Path, lock_path:
 
 def _read_source_lock(lock_path: Path) -> dict:
     lock = strict_json(lock_path)
+    if lock.get("schema_version") != "1.1" or "platform" in lock:
+        raise ValueError("unsupported DSH source lock schema or fixed platform")
     for key in ("repository", "commit", "tree", "pnpm_lock_sha256", "package_manager",
-                "node_base", "platform", "local_image_tag", "cli_version"):
+                "node_base", "local_image_tag", "cli_version"):
         if not isinstance(lock.get(key), str) or not lock[key]:
             raise ValueError(f"missing DSH lock field: {key}")
     if not re.fullmatch(r"[0-9a-f]{40}", lock["commit"]) or not re.fullmatch(r"[0-9a-f]{40}", lock["tree"]):
@@ -253,7 +277,6 @@ def _read_source_lock(lock_path: Path) -> dict:
             or lock.get("cli_package") != "@deepseek-ai/dsh" \
             or not re.fullmatch(r"pnpm@[0-9]+(?:\.[0-9]+){2}", lock["package_manager"]) \
             or not re.fullmatch(r"node:[^@]+@sha256:[0-9a-f]{64}", lock["node_base"]) \
-            or lock["platform"] != "linux/amd64" \
             or lock["local_image_tag"] != "ai-agent-harness/dsh:" + lock["commit"][:9] \
             or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?", lock["cli_version"]):
         raise ValueError("invalid DSH build source or image identity")
