@@ -41,7 +41,7 @@
 | 管理页面 | 3090 使用原账号打开一级统一网关与深链；页面未配置时返回真实空状态。配置与轮询共用后端事实，慢响应期间不重复发起读取导致结果持续被丢弃。 |
 | 原生业务页面 | 实际进入固定工作区、打开本人历史并从编辑器发送只读消息；真实模型完成巡检目录查询，目标 A 读计数由 3 增至 4，页面显示完成且消息流结束。不是仅检查非空页面或 HTTP 状态。 |
 
-精简实机结果与截图见[证据目录](../../platform/plugin/test/evidence/business-control-20261019/README.md)。原始模型轮次、账本、启动日志和部署定位保存在本机 `.local/business-control-acceptance/`；其中凭据文件不入仓、不进入截图或普通证据。
+精简实机结果与截图见[证据目录](../../platform/plugin/test/evidence/business-control-20261019/README.md)。原始模型轮次、账本、启动日志和部署定位原保存在本机 `.local/business-control-acceptance/`，2026-10-20 已移至 `/home/admin/harness-engineering-platform-backups/state-cleanup-20261020-Vl9YYs/business-control-acceptance/`；其中凭据文件不入仓、不进入截图或普通证据。
 
 最终平台全量测试 **586/586** 通过；启动器与业务启动测试 **132/132**、业务渲染 **4/4**、Web 适配器 **13/13**、Mock **149/149** 通过。最终构建、TypeScript 检查和仓库合同校验通过，文档链接与凭据值扫描未发现本轮问题。上述检查验证实现合同，不替代外部真实业务或研究效果。
 
@@ -61,6 +61,8 @@ HARNESS_ASSET_ROOT="$PWD/.local/business-control-acceptance/data" \
   /usr/bin/python3 runtime/adapters/dsh-container/dsh-dev \
   --repo "$PWD/.local/business-control-acceptance/data" down soc-business-control
 ```
+
+上表及命令保留初次验收时的定位。2026-10-20 已停止独立联调平台和 `soc-business-control`，删除该实例登记并保存 HOME；旧 PID 与原路径不再用于当前操作。
 
 ## 原生接入与边界修正
 
@@ -94,7 +96,7 @@ HARNESS_ASSET_ROOT="$PWD/.local/business-control-acceptance/data" \
 
 冷加载 3090 管理页时曾短暂显示签名与回执 `0/1`，业务入口同期返回 503；后续轮询恢复 `1/1`，网关连续访问返回 200。模拟风险事实有短有效期，空闲时页面可能显示“评估已过期”，下次受控输入或操作会重新评估。本次没有证明长期持续可用。
 
-当前进程及本机证据位于数据根 `.local/business-control-mock/`；3090 日志位于程序根 `.local/business-control-acceptance/main-3090.log`。停止 3090 可使用 `kill -TERM "$(cat /home/admin/harness-engineering-platform-data/.local/business-control-mock/platform-3090.pid)"`；停止本次 Mock 可使用 `kill -TERM "$(cat /home/admin/harness-engineering-platform-data/.local/business-control-mock/mock-service.pid)"`；停止业务 Runtime 可在程序根执行 `python3.10 runtime/adapters/dsh-container/dsh-dev --repo /home/admin/harness-engineering-platform-data down security-operations-expert-business-mock`。本次只证明 Mock 身份、风险和指定只读业务调用；真实身份提供方、真实 SOC、其他工具、定时任务及生产网络部署未在此验收。
+当前进程及本机证据位于数据根 `.local/business-control-mock/`；3090 日志已移至数据根 `.local/logs/main-3090-20261020.log`，当前进程的标准输出与错误输出仍指向该文件。停止 3090 可使用 `kill -TERM "$(cat /home/admin/harness-engineering-platform-data/.local/business-control-mock/platform-3090.pid)"`；停止本次 Mock 可使用 `kill -TERM "$(cat /home/admin/harness-engineering-platform-data/.local/business-control-mock/mock-service.pid)"`；停止业务 Runtime 可在程序根执行 `python3.10 runtime/adapters/dsh-container/dsh-dev --repo /home/admin/harness-engineering-platform-data down security-operations-expert-business-mock`。本次只证明 Mock 身份、风险和指定只读业务调用；真实身份提供方、真实 SOC、其他工具、定时任务及生产网络部署未在此验收。
 
 ## 当前 3090 管理界面整改（2026-10-20）
 

@@ -15,7 +15,7 @@
 | [原生业务最终检查](browser-native-final.json)与[桌面](business-native-desktop.png) | 固定工作区、本人历史、编辑器发送只读消息、真实模型与上游计数，以及首次确认等待和跨用户拒绝；辅助接口的范围限制仍保留 |
 | [验证结果](verification.json) | 最终平台 586 项、启动器 132 项、渲染 4 项、Web 13 项和 Mock 149 项的检查边界 |
 
-`browser-main-3090.json` 与 `browser-management-final.json` 对管理 HTTP 响应只保留数量及开关摘要；原始响应保存在本机 `.local/business-control-acceptance/`。刷新、切页时观察到的原生 Cordis 检查请求取消保留在 console 记录，不作为业务成功或失败的替代证据。
+`browser-main-3090.json` 与 `browser-management-final.json` 对管理 HTTP 响应只保留数量及开关摘要；原始响应原保存在本机 `.local/business-control-acceptance/`，现已归档至 `/home/admin/harness-engineering-platform-backups/state-cleanup-20261020-Vl9YYs/business-control-acceptance/`。刷新、切页时观察到的原生 Cordis 检查请求取消保留在 console 记录，不作为业务成功或失败的替代证据。
 
 ## 早期观察与失败
 
@@ -29,4 +29,4 @@
 
 ## 验证日志
 
-本机 `.local/business-control-acceptance/` 保存平台全量测试、启动器、业务渲染、Web 适配器、模型 Session、风险收紧／恢复、报告下载及目标账本。外部提供方与业务目标使用 Mock；真实企业身份服务、实际设备处置、定时任务、全部业务子 Agent 及生产部署不在本次证明范围。凭据与模型 Key 位于本地忽略文件，不入此证据目录。
+上述本机归档保存平台全量测试、启动器、业务渲染、Web 适配器、模型 Session、风险收紧／恢复、报告下载及目标账本。外部提供方与业务目标使用 Mock；真实企业身份服务、实际设备处置、定时任务、全部业务子 Agent 及生产部署不在本次证明范围。凭据与模型 Key 位于本地忽略文件，不入此证据目录。
