@@ -51,7 +51,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
   ],
   instances: [
     ['list', ''], ['detail url', 'name'], ['logs', 'name tail'],
-    ['preview run', 'name operation source port allow_missing_env', 'operation=create/start/stop/restart/delete；创建或重启需要真实 experiment:<ID> 来源。调用 run 发起平台原生确认提案，确认后由平台执行；已有整体任务授权沿用。范围已明确时直接提交所需提案，不再另问口头许可。'],
+    ['preview run', 'name operation source port allow_missing_env', 'operation=create/start/stop/restart/delete；创建必须传明确的 experiment:<ID> 来源。用户要求最新版本时，先用 agents/detail 的 versions[0].id 确定版本，再作为 source 传入；默认 detail.experiment 可能是已启用版本，不等于最新版本。直接调用 run 即可由平台内部核对模型与来源、展示一次确认卡，确认后执行；无需另调 preview 或口头确认。'],
     ['batch-preview batch', 'items', 'items 为多个与 run 相同的操作对象；逐项核对结果，部分失败不能称为全部完成。'],
   ],
   mcp: [
@@ -73,7 +73,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['control/release', 'restrictionId sessionId action', '重新评估后仅解除所选限制，其他约束保留；未知副作用先查实际结果，不能以恢复操作补发业务。'],
   ],
   agents: [
-    ['list', ''], ['detail', 'agent_id experiment_id', '明确指定版本；有固定任务目标时不要改成最新版本。'],
+    ['list', ''], ['detail', 'agent_id experiment_id', '明确指定版本；未传 experiment_id 时 detail.experiment 优先是已启用版本，用户要求最新版本时应读取 versions[0].id。有固定任务目标时不要改成最新版本。'],
     ['research/read-reference', 'topic', 'topic=controlled-improvement/evaluation-and-evidence/inheritance-and-fusion/compute-variants/decision-samples。'],
     ['research/validate', 'experiment_id'], ['legacy/inspect', 'path', '仅检查 data evolution/history/imports 内的既有材料，不执行旧代码。'],
     ['new', 'agent_id name description role evaluation_cases', '先查 tasks/capabilities 复用已有能力；evaluation_cases 使用实际业务测试，身份测试由平台创建。'],

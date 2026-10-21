@@ -1,0 +1,378 @@
+{
+  "source": {
+    "service": "http://10.0.160.32:3091/hep/",
+    "data_root": "/tmp/hep-ui-acceptance-20261020-YzAfQF/data",
+    "target_agent": "test01",
+    "actual_browser": true,
+    "native_settings": true
+  },
+  "checks": [
+    {
+      "name": "原生模型设置与共享区同时显示",
+      "pass": true,
+      "observed": {
+        "nativeProviders": [
+          "DeepSeek",
+          "xiaomi-token-plan-cn"
+        ],
+        "shared": true
+      },
+      "expected": "原生提供方和共享区同屏"
+    },
+    {
+      "name": "平台助手下拉覆盖原生可用目录",
+      "pass": true,
+      "observed": [
+        "MiMo-V2.5 (mimo-v2.5)",
+        "MiMo-V2.5-Pro (mimo-v2.5-pro)",
+        "MiMo-V2.6-Flash (mimo-v2.6-flash)",
+        "MiMo-V2.6-Pro (mimo-v2.6-pro)"
+      ],
+      "expected": "4 个 MiMo 模型"
+    },
+    {
+      "name": "失效平台默认有明确提示",
+      "pass": true,
+      "observed": "平台 AI 助手\n\n可使用上方目录中的全部模型。\n\n全部可用\n默认模型\n请选择模型\n原默认模型当前不可选：deepseek-official / deepseek-flash\nMiMo-V2.5 (mimo-v2.5)\nMiMo-V2.5-Pro (mimo-v2.5-pro)\nMiMo-V2.6-Flash (mimo-v2.6-flash)\nMiMo-V2.6-Pro (mimo-v2.6-pro)\n\n当前默认模型不在可用目录中，请选择已配置的模型。\n\n保存平台助手默认模型",
+      "expected": "原默认 deepseek-official / deepseek-flash 不在目录时提示"
+    },
+    {
+      "name": "隔离目录未列入 deepseek-account",
+      "pass": true,
+      "observed": [
+        "",
+        "[\"deepseek-official\",\"deepseek-flash\"]",
+        "[\"xiaomi-token-plan-cn\",\"mimo-v2.5\"]",
+        "[\"xiaomi-token-plan-cn\",\"mimo-v2.5-pro\"]",
+        "[\"xiaomi-token-plan-cn\",\"mimo-v2.6-flash\"]",
+        "[\"xiaomi-token-plan-cn\",\"mimo-v2.6-pro\"]"
+      ],
+      "expected": "当前隔离目录无账号路由"
+    },
+    {
+      "name": "业务智能体列表包含 6 个对象",
+      "pass": true,
+      "observed": 6,
+      "expected": 6
+    },
+    {
+      "name": "未授权智能体无可选默认模型",
+      "pass": true,
+      "observed": {
+        "checked": 0,
+        "options": [
+          {
+            "text": "请选择模型",
+            "value": "",
+            "disabled": false
+          }
+        ]
+      },
+      "expected": "0 个授权模型，仅占位选项"
+    },
+    {
+      "name": "勾选 1 个模型后默认候选仅 1 个",
+      "pass": true,
+      "observed": [
+        {
+          "text": "请选择模型",
+          "value": "",
+          "disabled": false
+        },
+        {
+          "text": "MiMo-V2.5 (mimo-v2.5)",
+          "value": "[\"xiaomi-token-plan-cn\",\"mimo-v2.5\"]",
+          "disabled": false
+        }
+      ],
+      "expected": "仅已勾选模型"
+    },
+    {
+      "name": "缺少默认时阻止保存并说明原因",
+      "pass": true,
+      "observed": "test01\n1 个可用 · 未设置默认 · 未保存\n无已识别实例\n\n仅勾选的模型可供此业务智能体使用；默认模型必须从已勾选项中选择。全部取消表示不启用模型。\n\n无已识别实例\n\n当前没有已识别的业务实例。创建实例后需核对实际模型装载。\n\nxiaomi-token-plan-cn\nMiMo-V2.5\nmimo-v2.5\nMiMo-V2.5-Pro\nmimo-v2.5-pro\nMiMo-V2.6-Flash\nmimo-v2.6-flash\nMiMo-V2.6-Pro\nmimo-v2.6-pro\n此智能体的默认模型\n请选择模型\nMiMo-V2.5 (mimo-v2.5)\n\n请选择业务智能体的默认模型。\n\n有未保存修改，关闭设置后仍会保留本次选择。\n\n保存此智能体模型设置\n放弃修改",
+      "expected": "保存按钮不可用，说明需选择默认模型"
+    },
+    {
+      "name": "关闭设置后未保存勾选仍保留",
+      "pass": true,
+      "observed": 1,
+      "expected": 1
+    },
+    {
+      "name": "刷新后未保存勾选仍保留",
+      "pass": true,
+      "observed": 1,
+      "expected": 1
+    },
+    {
+      "name": "已选默认属于授权集合且保存可用",
+      "pass": true,
+      "observed": {
+        "selected": "[\"xiaomi-token-plan-cn\",\"mimo-v2.5\"]",
+        "checked": 1
+      },
+      "expected": "可保存"
+    },
+    {
+      "name": "Agent 设置保存后回读且清单落盘",
+      "pass": true,
+      "observed": {
+        "changed": true,
+        "modelAccess": true
+      },
+      "expected": "manifest.yaml 含 model_access"
+    },
+    {
+      "name": "重开后 Agent 可用与默认值一致",
+      "pass": true,
+      "observed": {
+        "checked": 1,
+        "selected": "[\"xiaomi-token-plan-cn\",\"mimo-v2.5\"]"
+      },
+      "expected": "[\"xiaomi-token-plan-cn\",\"mimo-v2.5\"]"
+    },
+    {
+      "name": "平台默认可从全目录选择",
+      "pass": true,
+      "observed": {
+        "selected": "[\"xiaomi-token-plan-cn\",\"mimo-v2.5\"]"
+      },
+      "expected": "可保存"
+    },
+    {
+      "name": "平台默认保存回读",
+      "pass": true,
+      "observed": "[\"xiaomi-token-plan-cn\",\"mimo-v2.5\"]",
+      "expected": "[\"xiaomi-token-plan-cn\",\"mimo-v2.5\"]"
+    },
+    {
+      "name": "刷新后平台默认仍为保存值",
+      "pass": true,
+      "observed": "[\"xiaomi-token-plan-cn\",\"mimo-v2.5\"]",
+      "expected": "[\"xiaomi-token-plan-cn\",\"mimo-v2.5\"]"
+    },
+    {
+      "name": "新构建 设置保存值在重载后回读",
+      "pass": true,
+      "observed": {
+        "platformDefault": "[\"xiaomi-token-plan-cn\",\"mimo-v2.5\"]",
+        "agentChecked": 1,
+        "agentDefault": "[\"xiaomi-token-plan-cn\",\"mimo-v2.5\"]"
+      },
+      "expected": "平台与 test01 均使用 xiaomi-token-plan-cn / mimo-v2.5"
+    },
+    {
+      "name": "新构建 实例状态提示与当前数据一致",
+      "pass": true,
+      "observed": "无已识别实例\n\n当前没有已识别的业务实例。创建实例后需核对实际模型装载。",
+      "expected": "无已识别实例，创建实例后核对装载"
+    },
+    {
+      "name": "新构建 授权与业务连接状态分开说明",
+      "pass": true,
+      "observed": {
+        "connection": "已授权，业务连接未就绪\n\n提供方 xiaomi-token-plan-cn 尚无业务实例可解析的 API Key；请在设置 → 模型中配置后刷新。 授权可以保存，业务实例须待连接配置就绪后启动。",
+        "provider": "· 缺少业务 API Key"
+      },
+      "expected": "已标记授权，但该提供方缺少业务 API Key"
+    },
+    {
+      "name": "新构建 刷新后连接状态与授权结果仍一致",
+      "pass": true,
+      "observed": {
+        "status": "已授权，业务连接未就绪\n\n提供方 xiaomi-token-plan-cn 尚无业务实例可解析的 API Key；请在设置 → 模型中配置后刷新。 授权可以保存，业务实例须待连接配置就绪后启动。",
+        "checked": 1
+      },
+      "expected": "授权保持，业务连接未就绪状态保持"
+    },
+    {
+      "name": "新构建 实例预览投影生成且来源准确",
+      "pass": false,
+      "observed": {
+        "summary": "",
+        "error": "提供方 xiaomi-token-plan-cn 尚无业务实例可解析的 API Key；请在设置 → 模型中配置后刷新。",
+        "sourceVisible": true
+      },
+      "expected": "可确认 1 项、预览失败 0 项，来源 EXP-test01-001"
+    },
+    {
+      "name": "新构建 预览失败说明业务凭据条件",
+      "pass": true,
+      "observed": "提供方 xiaomi-token-plan-cn 尚无业务实例可解析的 API Key；请在设置 → 模型中配置后刷新。",
+      "expected": "不能装载时明确说明缺少业务实例 API Key 与配置入口"
+    },
+    {
+      "name": "新构建 预览后未创建容器",
+      "pass": true,
+      "observed": {
+        "noContainers": true,
+        "noRegistrations": true
+      },
+      "expected": "仅预览，无容器和登记"
+    },
+    {
+      "name": "390px 原生模型页与共享区可达",
+      "pass": true,
+      "observed": {
+        "options": 4
+      },
+      "expected": "原生模型页和共享设置同屏"
+    },
+    {
+      "name": "390px 平台默认保存值可见",
+      "pass": true,
+      "observed": "[\"xiaomi-token-plan-cn\",\"mimo-v2.5\"]",
+      "expected": "xiaomi-token-plan-cn / mimo-v2.5"
+    },
+    {
+      "name": "390px 业务 Agent 保存值可见",
+      "pass": true,
+      "observed": {
+        "checked": 1,
+        "default": "[\"xiaomi-token-plan-cn\",\"mimo-v2.5\"]"
+      },
+      "expected": "1 个授权模型且默认相同"
+    },
+    {
+      "name": "390px 授权与缺失业务 Key 提示可见",
+      "pass": true,
+      "observed": {
+        "connection": "已授权，业务连接未就绪\n\n提供方 xiaomi-token-plan-cn 尚无业务实例可解析的 API Key；请在设置 → 模型中配置后刷新。 授权可以保存，业务实例须待连接配置就绪后启动。",
+        "provider": "· 缺少业务 API Key"
+      },
+      "expected": "授权、业务连接未就绪和缺少业务 API Key 同时可见"
+    },
+    {
+      "name": "390px 页面和共享区无横向溢出",
+      "pass": true,
+      "observed": {
+        "viewport": 390,
+        "documentOverflow": 0,
+        "sharingOverflow": 0,
+        "sharing": {
+          "x": 29,
+          "right": 361,
+          "width": 332
+        },
+        "dialog": {
+          "x": 12,
+          "right": 378,
+          "width": 366
+        }
+      },
+      "expected": "<=1px"
+    }
+  ],
+  "screenshots": [
+    "platform/plugin/test/evidence/ui-productization-20261020/final/model-settings-desktop-initial.png",
+    "platform/plugin/test/evidence/ui-productization-20261020/final/model-settings-desktop-agent-empty.png",
+    "platform/plugin/test/evidence/ui-productization-20261020/final/model-settings-desktop-agent-needs-default.png",
+    "platform/plugin/test/evidence/ui-productization-20261020/final/model-settings-desktop-agent-ready.png",
+    "platform/plugin/test/evidence/ui-productization-20261020/final/model-settings-desktop-agent-saved.png",
+    "platform/plugin/test/evidence/ui-productization-20261020/final/model-settings-desktop-platform-saved.png",
+    "platform/plugin/test/evidence/ui-productization-20261020/final/model-settings-new-build-settings-readback.png",
+    "platform/plugin/test/evidence/ui-productization-20261020/final/model-settings-new-build-instance-preview.png",
+    "platform/plugin/test/evidence/ui-productization-20261020/final/model-settings-mobile-platform.png",
+    "platform/plugin/test/evidence/ui-productization-20261020/final/model-settings-mobile-agent-saved.png"
+  ],
+  "errors": [],
+  "observations": [
+    {
+      "name": "platform_initial",
+      "selection": {
+        "value": "[\"deepseek-official\",\"deepseek-flash\"]",
+        "options": [
+          {
+            "text": "请选择模型",
+            "value": "",
+            "disabled": false
+          },
+          {
+            "text": "原默认模型当前不可选：deepseek-official / deepseek-flash",
+            "value": "[\"deepseek-official\",\"deepseek-flash\"]",
+            "disabled": true
+          },
+          {
+            "text": "MiMo-V2.5 (mimo-v2.5)",
+            "value": "[\"xiaomi-token-plan-cn\",\"mimo-v2.5\"]",
+            "disabled": false
+          },
+          {
+            "text": "MiMo-V2.5-Pro (mimo-v2.5-pro)",
+            "value": "[\"xiaomi-token-plan-cn\",\"mimo-v2.5-pro\"]",
+            "disabled": false
+          },
+          {
+            "text": "MiMo-V2.6-Flash (mimo-v2.6-flash)",
+            "value": "[\"xiaomi-token-plan-cn\",\"mimo-v2.6-flash\"]",
+            "disabled": false
+          },
+          {
+            "text": "MiMo-V2.6-Pro (mimo-v2.6-pro)",
+            "value": "[\"xiaomi-token-plan-cn\",\"mimo-v2.6-pro\"]",
+            "disabled": false
+          }
+        ]
+      },
+      "warning": [
+        "当前默认模型不在可用目录中，请选择已配置的模型。"
+      ]
+    },
+    {
+      "name": "new_build_restart_scope",
+      "detail": "隔离数据根当前没有已识别实例，无法在真实浏览器中证明待重启状态；仅核对无实例分支。"
+    },
+    {
+      "name": "new_build_preview",
+      "summary": "",
+      "error": "提供方 xiaomi-token-plan-cn 尚无业务实例可解析的 API Key；请在设置 → 模型中配置后刷新。",
+      "note": "只读创建预览；未点击确认创建。模型真实调用未执行。"
+    },
+    {
+      "name": "automation_navigation",
+      "detail": "桌面用例后改为从手机平台菜单进入设置；前次仅测试脚本因隐藏桌面按钮超时，导航导致的 EventSource ERR_ABORTED 已排除。"
+    },
+    {
+      "name": "mobile_geometry",
+      "viewport": 390,
+      "documentOverflow": 0,
+      "sharingOverflow": 0,
+      "sharing": {
+        "x": 29,
+        "right": 361,
+        "width": 332
+      },
+      "dialog": {
+        "x": 12,
+        "right": 378,
+        "width": 366
+      }
+    }
+  ],
+  "changes": [
+    {
+      "file": "/tmp/hep-ui-acceptance-20261020-YzAfQF/data/agents/test01/manifest.yaml",
+      "before_sha256": "769d00f9116e3637e10fb780cee8f6709bc2f9dc125842e78f87910146d87c49",
+      "after_sha256": "609bd960449d66aeb9698a9c0fd70484dd093c46964821b8f87a240628c3557c",
+      "persisted": true,
+      "chosen_route": [
+        "xiaomi-token-plan-cn",
+        "mimo-v2.5"
+      ],
+      "restore": "仅在隔离数据根，将 test01/manifest.yaml 恢复到执行前 SHA-256 769d00f9116e3637e10fb780cee8f6709bc2f9dc125842e78f87910146d87c49 的内容"
+    },
+    {
+      "name": "platform_default",
+      "before": "[\"deepseek-official\",\"deepseek-flash\"]",
+      "after": "[\"xiaomi-token-plan-cn\",\"mimo-v2.5\"]",
+      "note": "修改仅作用于 3091 隔离 DSH Profile 的原生默认选择"
+    }
+  ],
+  "summary": {
+    "passed": 27,
+    "failed": 1,
+    "total": 28,
+    "pageErrors": 0
+  }
+}

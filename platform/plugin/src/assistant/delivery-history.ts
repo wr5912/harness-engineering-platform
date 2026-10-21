@@ -4,6 +4,8 @@ import type { TaskExecution } from './task.ts'
 
 export const deliveryProjectionSchema = z.object({
   session_id: z.string(), workspace_id: z.string().optional(),
+  pending_proposals: z.number().int().nonnegative().optional(),
+  unknown_proposals: z.number().int().nonnegative().optional(),
   task: z.object({
     id: z.string(), owner_session_id: z.string(), state: z.string(), reason: z.string().optional(),
     agent_id: z.string(), instance_name: z.string().optional(), target_source: z.string().optional(),
@@ -23,10 +25,14 @@ function definedFields<T extends object, K extends keyof T>(value: T, keys: read
 }
 
 /** 原生对外投影只提供此只读视图；任务原记录仍是唯一事实来源。 */
-export function deliveryProjection(state: { session_id: string; workspace_id?: string; execution?: TaskExecution }): DeliveryProjection {
+export function deliveryProjection(state: { session_id: string; workspace_id?: string; execution?: TaskExecution; proposals?: { state?: string }[] }): DeliveryProjection {
   const task = state.execution, delivery = task?.delivery
+  const pending = state.proposals?.filter(item => item.state === 'awaiting_confirmation').length ?? 0
+  const unknown = state.proposals?.filter(item => item.state === 'unknown').length ?? 0
   return {
     session_id: state.session_id, ...definedFields(state, ['workspace_id']),
+    ...(pending ? { pending_proposals: pending } : {}),
+    ...(unknown ? { unknown_proposals: unknown } : {}),
     ...(task ? { task: {
       id: task.id, owner_session_id: task.owner_session_id, state: task.state, ...definedFields(task, ['reason', 'target_source']),
       agent_id: task.plan.agent_id, ...definedFields(task.plan, ['instance_name']),

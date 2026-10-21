@@ -1,0 +1,146 @@
+{
+  "checkedAt": "2026-10-21T03:48:32.845Z",
+  "agentId": "test01",
+  "expectedVersions": [
+    "EXP-test01-001",
+    "EXP-test01-002"
+  ],
+  "views": [
+    {
+      "label": "1440-list",
+      "hash": "#/agents?agent_id=test01&experiment_id=EXP-test01-002&tab=overview",
+      "heading": "test01",
+      "navVisible": true,
+      "sidebarVisible": true,
+      "navIds": [
+        "EXP-test01-002",
+        "EXP-test01-001"
+      ],
+      "selectedId": "EXP-test01-002",
+      "statuses": [
+        {
+          "id": "EXP-test01-002",
+          "label": "登记版本"
+        },
+        {
+          "id": "EXP-test01-001",
+          "label": "尚无 Run"
+        }
+      ],
+      "detailVersion": "EXP-test01-002",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "panelWidth": 278,
+      "panelScrollWidth": 278,
+      "navWidth": 246,
+      "navScrollWidth": 246,
+      "firstVersionTop": 727.84375,
+      "firstVersionBottom": 845.46875,
+      "viewportHeight": 1000
+    },
+    {
+      "label": "1440-switched",
+      "hash": "#/agents?agent_id=test01&experiment_id=EXP-test01-001&tab=overview",
+      "heading": "test01",
+      "navVisible": true,
+      "sidebarVisible": true,
+      "navIds": [
+        "EXP-test01-002",
+        "EXP-test01-001"
+      ],
+      "selectedId": "EXP-test01-001",
+      "statuses": [
+        {
+          "id": "EXP-test01-002",
+          "label": "登记版本"
+        },
+        {
+          "id": "EXP-test01-001",
+          "label": "尚无 Run"
+        }
+      ],
+      "detailVersion": "EXP-test01-001",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "panelWidth": 278,
+      "panelScrollWidth": 278,
+      "navWidth": 246,
+      "navScrollWidth": 246,
+      "firstVersionTop": 727.84375,
+      "firstVersionBottom": 845.46875,
+      "viewportHeight": 1000
+    },
+    {
+      "label": "390-list",
+      "hash": "#/agents?agent_id=test01&experiment_id=EXP-test01-001&tab=overview",
+      "heading": "test01",
+      "navVisible": true,
+      "sidebarVisible": true,
+      "navIds": [
+        "EXP-test01-002",
+        "EXP-test01-001"
+      ],
+      "selectedId": "EXP-test01-001",
+      "statuses": [
+        {
+          "id": "EXP-test01-002",
+          "label": "登记版本"
+        },
+        {
+          "id": "EXP-test01-001",
+          "label": "尚无 Run"
+        }
+      ],
+      "detailVersion": "EXP-test01-001",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "panelWidth": 356,
+      "panelScrollWidth": 356,
+      "navWidth": 324,
+      "navScrollWidth": 324,
+      "firstVersionTop": 554.6875,
+      "firstVersionBottom": 672.3125,
+      "viewportHeight": 844
+    },
+    {
+      "label": "390-switched",
+      "hash": "#/agents?agent_id=test01&experiment_id=EXP-test01-002&tab=overview",
+      "heading": "test01",
+      "navVisible": true,
+      "sidebarVisible": true,
+      "navIds": [
+        "EXP-test01-002",
+        "EXP-test01-001"
+      ],
+      "selectedId": "EXP-test01-002",
+      "statuses": [
+        {
+          "id": "EXP-test01-002",
+          "label": "登记版本"
+        },
+        {
+          "id": "EXP-test01-001",
+          "label": "尚无 Run"
+        }
+      ],
+      "detailVersion": "EXP-test01-002",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "panelWidth": 356,
+      "panelScrollWidth": 356,
+      "navWidth": 324,
+      "navScrollWidth": 324,
+      "firstVersionTop": 554.6875,
+      "firstVersionBottom": 672.3125,
+      "viewportHeight": 844
+    }
+  ],
+  "errors": [],
+  "failedResponses": [],
+  "screenshots": [
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/agents-version-nav-1440.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/agents-version-switched-1440.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/agents-version-nav-390.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/agents-version-detail-390.png"
+  ]
+}

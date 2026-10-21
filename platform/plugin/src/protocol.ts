@@ -3,7 +3,7 @@ import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/cli
 export const CHANNEL = '/harness-platform'
 
 // 服务端模块处理去掉前缀后的 endpoint，页面使用同一个原生认证 RPC。
-export const DOMAIN_PREFIXES = ['agents/', 'instances/', 'mcp/', 'assistant/'] as const
+export const DOMAIN_PREFIXES = ['agents/', 'instances/', 'mcp/', 'models/', 'assistant/'] as const
 export type PageId = 'home' | 'conversations' | 'agents' | 'evaluation' | 'instances' | 'gateway' | 'mcp'
 export interface PlatformNavigation {
   page: PageId
@@ -11,7 +11,16 @@ export interface PlatformNavigation {
   agent_id?: string
   experiment_id?: string
   run_id?: string
+  run_tab?: 'report' | 'results' | 'trace' | 'files' | 'datasets'
   case_id?: string
+  job_id?: string
+  instance_name?: string
+  source_id?: string
+  server_id?: string
+  composition_id?: string
+  version?: 'draft' | 'published'
+  version_id?: string
+  intent?: 'start_eval'
   list_view?: 'agents' | 'variants'
   tab?: string
 }

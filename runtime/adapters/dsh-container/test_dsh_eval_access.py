@@ -2,6 +2,7 @@
 
 import importlib.util
 import io
+import hashlib
 import os
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
@@ -70,6 +71,158 @@ class EvaluationAccessTest(unittest.TestCase):
             with self.subTest(url=url), mock.patch.object(evaluation, "checked_process", return_value=subprocess.CompletedProcess([], 0, url, "")):
                 with self.assertRaises(evaluation.EvaluationError):
                     evaluation.authentication_url("probe")
+
+
+class EvaluationModelPolicyTest(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.patch(mock.patch.object(evaluation, "REPO", self.root))
+        agent = self.root / "agents/example-agent"
+        agent.mkdir(parents=True)
+        manifest = agent / "manifest.yaml"
+        manifest.write_text("agent_id: example-agent\n", encoding="utf-8")
+        selected = {"provider": "xiaomi-token-plan-cn", "model": "MiMo-V2.6-Flash", "reasoningEffort": "off"}
+        config = self.root / "config"
+        config.mkdir()
+        default = config / "business-model-default.json"
+        default.write_text(json.dumps({"schema_version": "1.2", "default": selected}), encoding="utf-8")
+        self.policy = self.root / "policy.json"
+        self.policy.write_text(json.dumps({
+            "agent_id": "example-agent",
+            "manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
+            "business_model_revision": hashlib.sha256(default.read_bytes()).hexdigest(),
+            "allowed": [{"provider": selected["provider"], "model": selected["model"]}],
+            "default": selected,
+            "credential_refs": ["XIAOMI_TOKEN_PLAN_CN_API_KEY"],
+            "patch": [
+                {"id": "agent-default-model", "config": selected},
+                {"id": "llm-deepseek", "disabled": True},
+                {"id": "llm-deepseek-account", "disabled": True},
+                {"id": "llm-pi-ai", "config": {"providers": {"xiaomi-token-plan-cn": {
+                    "apiKeyEnv": "XIAOMI_TOKEN_PLAN_CN_API_KEY", "models": [{"id": "MiMo-V2.6-Flash"}],
+                }}}},
+            ],
+        }), encoding="utf-8")
+        self.contract = {
+            "source_id": "experiment:EXP-example-agent-001", "experiment_id": "EXP-example-agent-001",
+            "agent_id": "example-agent", "required_env_names": ["DEEPSEEK_API_KEY", "LOCAL_LLM_BASE_URL", "OPS_MCP_URL"],
+            "image": {"local_image_tag": "fixture", "build_fingerprint": "sha256:" + "1" * 64},
+        }
+        self.cases = [{"case_id": "U-INS-001"}]
+
+    def patch(self, patcher):
+        self.addCleanup(patcher.stop)
+        return patcher.start()
+
+    def test_dry_run_uses_same_policy_as_real_instance_and_keeps_business_environment(self):
+        path = str(self.policy)
+        with mock.patch.dict(os.environ, {"XIAOMI_TOKEN_PLAN_CN_API_KEY": "fixture-key"}, clear=True):
+            plan = evaluation.dry_run_payload(self.contract, self.cases, "api", "fast", "explicit", "none",
+                                              path, "MiMo-V2.6-Flash")
+        self.assertEqual(plan["required_env_names"], ["OPS_MCP_URL", "XIAOMI_TOKEN_PLAN_CN_API_KEY"])
+        self.assertEqual(plan["missing_env_names"], ["OPS_MCP_URL"])
+        self.assertNotIn("DEEPSEEK_API_KEY", plan["required_env_names"])
+        with redirect_stderr(io.StringIO()), self.assertRaisesRegex(evaluation.EvaluationError, "--model-policy"):
+            evaluation.dry_run_payload(self.contract, self.cases, "api", "fast", "explicit", "none")
+        image = "sha256:" + "1" * 64
+        reply = subprocess.CompletedProcess([], 0, json.dumps({
+            "image_tag": "fixture", "image_id": image, "image_ref": "fixture@" + image,
+            "image_build_fingerprint": image, "platform": "fixture",
+        }), "")
+        with mock.patch.object(evaluation, "checked_process", return_value=reply) as process:
+            evaluation.start_instance(self.contract["source_id"], "eval-fixture", path)
+        command = process.call_args.args[0]
+        self.assertEqual(command[-2:], ["--model-policy", path])
+        self.assertNotIn("fixture-key", str(process.call_args))
+
+    def test_direct_dry_run_keeps_source_default_and_legacy_environment(self):
+        selected = {"provider": "local-qwen", "model": "Qwen3.8-27B"}
+        (self.root / "config/business-model-default.json").write_text(json.dumps({
+            "schema_version": "1.2", "default": selected,
+        }), encoding="utf-8")
+        managed = self.root / "candidate/managed"
+        managed.mkdir(parents=True)
+        (managed / "example-agent.patch.yml").write_text(
+            "- id: agent-default-model\n  config:\n    provider: local-qwen\n    model: Qwen3.8-27B\n"
+            "- id: llm-pi-ai\n  config:\n    providers:\n      local-qwen:\n"
+            "        models:\n          - id: Qwen3.8-27B\n",
+            encoding="utf-8",
+        )
+        contract = {**self.contract, "managed": str(managed),
+                    "patch": "/opt/dsh-managed/example-agent.patch.yml"}
+        direct = evaluation.dry_run_payload(contract, self.cases, "api", "fast", "explicit", "none")
+        self.assertEqual(direct["required_env_names"], self.contract["required_env_names"])
+        self.assertIn("DEEPSEEK_API_KEY", direct["missing_env_names"])
+
+    def test_source_only_draft_preview_does_not_load_runtime_model_policy(self):
+        args = types.SimpleNamespace(source=self.contract["source_id"], case=["U-INS-001"], mode="fast",
+                                     executor="api", review="none", model=None, model_policy=None,
+                                     compare_to=None, dry_run=True, source_check=True)
+        self.patch(mock.patch.object(evaluation, "resolve", return_value=self.contract))
+        self.patch(mock.patch.object(evaluation, "load_evaluation", return_value={}))
+        self.patch(mock.patch.object(evaluation, "select_case_ids", return_value=["U-INS-001"]))
+        self.patch(mock.patch.object(evaluation, "execution_for", return_value=self.cases))
+        with mock.patch.object(evaluation, "DSH_DEV", self.root / "missing-dsh-dev"), \
+                mock.patch("sys.stdout", new_callable=io.StringIO) as output:
+            self.assertEqual(evaluation.execute(args), 0)
+        plan = json.loads(output.getvalue())
+        self.assertEqual(plan["required_env_names"], self.contract["required_env_names"])
+        self.assertEqual(plan["case_ids"], ["U-INS-001"])
+        self.assertEqual(plan["preflight_scope"], "source-and-cases")
+
+    def test_source_check_cannot_replace_runtime_model_preflight(self):
+        args = types.SimpleNamespace(source=self.contract["source_id"], case=["U-INS-001"], mode="fast",
+                                     executor="api", review="none", model=None, model_policy=None,
+                                     compare_to=None, dry_run=False, source_check=True)
+        with self.assertRaisesRegex(evaluation.EvaluationError, "--source-check"):
+            evaluation.execute(args)
+        args.dry_run = True
+        args.model = "MiMo-V2.6-Flash"
+        with self.assertRaisesRegex(evaluation.EvaluationError, "--source-check"):
+            evaluation.execute(args)
+        args.model = None
+        args.source_check = False
+        self.patch(mock.patch.object(evaluation, "resolve", return_value=self.contract))
+        self.patch(mock.patch.object(evaluation, "load_evaluation", return_value={}))
+        self.patch(mock.patch.object(evaluation, "select_case_ids", return_value=["U-INS-001"]))
+        self.patch(mock.patch.object(evaluation, "execution_for", return_value=self.cases))
+        with redirect_stderr(io.StringIO()), self.assertRaisesRegex(evaluation.EvaluationError, "--model-policy"):
+            evaluation.execute(args)
+
+    def test_missing_business_environment_blocks_before_validation_or_run_creation(self):
+        args = types.SimpleNamespace(source=self.contract["source_id"], case=["U-INS-001"], mode="fast",
+                                     executor="api", review="none", model="MiMo-V2.6-Flash",
+                                     model_policy=str(self.policy), compare_to=None, dry_run=False)
+        self.patch(mock.patch.object(evaluation, "resolve", return_value=self.contract))
+        self.patch(mock.patch.object(evaluation, "load_evaluation", return_value={}))
+        self.patch(mock.patch.object(evaluation, "select_case_ids", return_value=["U-INS-001"]))
+        self.patch(mock.patch.object(evaluation, "execution_for", return_value=self.cases))
+        validation = self.patch(mock.patch.object(evaluation, "validate_before_run", return_value={"repository": {"valid": True}}))
+        run = self.patch(mock.patch.object(evaluation, "execute_owned_run", return_value=0))
+        self.patch(mock.patch.object(evaluation, "emit_result"))
+        with mock.patch.dict(os.environ, {"XIAOMI_TOKEN_PLAN_CN_API_KEY": "fixture-key"}, clear=True), \
+                redirect_stderr(io.StringIO()):
+            self.assertEqual(evaluation.execute(args), 2)
+        validation.assert_not_called()
+        run.assert_not_called()
+        with mock.patch.dict(os.environ, {"XIAOMI_TOKEN_PLAN_CN_API_KEY": "fixture-key", "OPS_MCP_URL": "http://tools"}, clear=True):
+            self.assertEqual(evaluation.execute(args), 0)
+        validation.assert_called_once()
+        run.assert_called_once()
+
+    def test_expected_model_and_policy_identity_must_match_before_run(self):
+        with self.assertRaisesRegex(evaluation.EvaluationError, "--model 与实例默认模型不一致"):
+            evaluation.dry_run_payload(self.contract, self.cases, "api", "fast", "explicit", "none",
+                                       str(self.policy), "other-model")
+        with self.assertRaisesRegex(evaluation.EvaluationError, "--model 与实例默认模型不一致"):
+            evaluation.dry_run_payload(self.contract, self.cases, "api", "fast", "explicit", "none",
+                                       expected_model="other-model")
+        wrong_agent = dict(self.contract, agent_id="another-agent")
+        with redirect_stderr(io.StringIO()), self.assertRaisesRegex(evaluation.EvaluationError, "模型策略不可用"):
+            evaluation.dry_run_payload(wrong_agent, self.cases, "api", "fast", "explicit", "none",
+                                       str(self.policy))
 
 
 class EvaluationInterpreterTest(unittest.TestCase):

@@ -1,0 +1,44 @@
+{
+  "checkedAt": "2026-10-21T04:02:32.971988+00:00",
+  "environment": "isolated 3091 data root",
+  "sessionId": "session-b90b1264-4164-46f6-a495-9f79e395cc41",
+  "proposalId": "6320fb66-0f87-404b-85b6-058d21127a76",
+  "platformModel": {
+    "provider": "xiaomi-token-plan-cn",
+    "model": "mimo-v2.6-flash",
+    "reasoningEffort": "high"
+  },
+  "platformModelRequestCount": 7,
+  "proposalStates": [
+    "awaiting_confirmation",
+    "running",
+    "completed"
+  ],
+  "proposalStateFinal": "completed",
+  "receipt": {
+    "outerOk": true,
+    "name": "mimo-lui-e2e-20261021",
+    "operation": "create",
+    "operationOk": true,
+    "requestedSource": "experiment:EXP-security-operations-expert-023-r2233d74f6fb3"
+  },
+  "ui": {
+    "beforeConfirmationScreenshot": "/tmp/hep-ui-acceptance-20261020-YzAfQF/mimo-lui-before-confirm.png",
+    "afterConfirmationScreenshot": "/tmp/hep-ui-acceptance-20261020-YzAfQF/mimo-lui-after-confirm.png",
+    "visibleFinalMessage": "实例已创建并启动；显示实例名、31894、来源 023、running",
+    "dockAfterSettlement": "完成后消失"
+  },
+  "afterCleanup": {
+    "cliState": "absent",
+    "port": 31894,
+    "source": "experiment:EXP-security-operations-expert-023-r2233d74f6fb3",
+    "homePreserved": true
+  },
+  "checks": {
+    "realPlatformModelHigh": true,
+    "proposalFrozenSource023": true,
+    "singleProposalCompleted": true,
+    "successfulCreateReceipt": true,
+    "testInstanceStoppedAndHomePreserved": true
+  }
+}

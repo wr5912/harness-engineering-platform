@@ -40,6 +40,8 @@ test('真实 Cordis 提供方 Fiber 无 webServer 注入时，插件仍经原生
     new SystemPrompt(ctx, {})
     ctx.provide('sessionController', {})
     ctx.provide('settingsController', {})
+    ctx.provide('agentDefaultModel', {})
+    ctx.provide('llm', { listConfigurableProviders: () => [] })
     ctx.provide('agents', { get: () => undefined })
     ctx.provide('tools', { register() {} })
     ctx.provide('goals', { get: () => undefined })

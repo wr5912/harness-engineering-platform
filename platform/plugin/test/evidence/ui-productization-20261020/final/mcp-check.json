@@ -1,0 +1,6 @@
+{
+  "url": "#/mcp?tab=servers&server_id=ui-acceptance-local",
+  "before": "Harness工程平台\nHarness Engineering Platform\n首页\n管理对话\n智能体管理\n评测中心\n实例管理\n统一网关\nMCP 管理\n…\n读取账号中…\n设置\n退出登录\n工作空间 / MCP 管理\nMCP 管理\n\n从服务连接到工具调试，让每一步的证据和适用范围清晰可见。\n\n＋ 接入服务\n服务列表\n工具与资源分组\n工具与资源调试\n工具组合编排\n\n正在读取数据仓库 MCP 配置…\n\n返回服务列表",
+  "after": "Harness工程平台\nHarness Engineering Platform\n首页\n管理对话\n智能体管理\n评测中心\n实例管理\n统一网关\nMCP 管理\nA\nadmin\n设置\n退出登录\n工作空间 / MCP 管理\nMCP 管理\n\n从服务连接到工具调试，让每一步的证据和适用范围清晰可见。\n\n＋ 接入服务\n服务列表\n工具与资源分组\n工具与资源调试\n工具组合编排\n返回服务列表\n\nui-acceptance-local 已发现 1 个工具、0 个资源、1 个模板。\n\n查找服务\n服务 · 2\nui-acceptance-local\n仅用于 3091 隔离环境的本地 UI 验收；不代表真实业务服务。\n配置已启用\n规范已读取 · 已发现 1 个工具\n最近检查 2026/10/20 22:54:24\n工具组合编排（已发布）\n由已发布组合生成\n已发布工具目录\n连接与工具发现待检查\n本页尚未检查当前配置\n＋ 新增服务器\nui-acceptance-local\n\n仅用于 3091 隔离环境的本地 UI 验收；不代表真实业务服务。\n\n连接测试\n调试工具\n启用\n连接状态\n规范已读取\n最近检查 2026/10/20 22:54:24\n工具发现\n1 个工具\n已枚举工具定义\n服务配置\n已启用\nOpenAPI 接口规范\n\n仅确认接口读取或工具枚举；实际调用和业务结果待验证。\n\n工具与调试\n连接配置\n最近检查\n已发现的工具\nlist_fixture_assets\n\n读取本地验收夹具资产\n\n调试\n删除服务器",
+  "errors": []
+}

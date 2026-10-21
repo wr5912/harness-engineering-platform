@@ -1,0 +1,936 @@
+{
+  "url": "http://10.0.160.32:3091/hep/",
+  "checkedAt": "2026-10-20T14:47:39.804Z",
+  "views": [
+    {
+      "label": "evaluation-assistant-open",
+      "width": 1440,
+      "height": 1000,
+      "page": "evaluation",
+      "assistantOpen": true,
+      "pane": {
+        "left": 984,
+        "top": 272,
+        "right": 1416,
+        "bottom": 912,
+        "width": 432
+      },
+      "content": {
+        "left": 0,
+        "right": 1440,
+        "width": 1440
+      },
+      "contentPaddingRight": "456px",
+      "horizontalOverflowPx": 0,
+      "theme": "dark",
+      "targets": {
+        "agentFilter": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 61,
+            "top": 275.46875,
+            "right": 320.328125,
+            "bottom": 310.46875
+          },
+          "hitTag": "SELECT",
+          "hitClass": ""
+        },
+        "versionFilter": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 330.328125,
+            "top": 275.46875,
+            "right": 589.65625,
+            "bottom": 310.46875
+          },
+          "hitTag": "SELECT",
+          "hitClass": ""
+        },
+        "newEvaluation": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 847.546875,
+            "top": 150.4375,
+            "right": 948,
+            "bottom": 188.828125
+          },
+          "hitTag": "BUTTON",
+          "hitClass": "harness-primary"
+        },
+        "firstRunLink": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 77,
+            "top": 389.046875,
+            "right": 181.015625,
+            "bottom": 431.734375
+          },
+          "hitTag": "BUTTON",
+          "hitClass": "harness-eval-row-link"
+        },
+        "firstRunVerdict": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 435.859375,
+            "top": 380.546875,
+            "right": 546.609375,
+            "bottom": 440.234375
+          },
+          "hitTag": "SPAN",
+          "hitClass": "harness-eval-badge"
+        },
+        "firstRunDate": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 546.609375,
+            "top": 380.546875,
+            "right": 717,
+            "bottom": 440.234375
+          },
+          "hitTag": "TD",
+          "hitClass": ""
+        },
+        "logout": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 1326,
+            "top": 18.296875,
+            "right": 1408,
+            "bottom": 56.6875
+          },
+          "hitTag": "BUTTON",
+          "hitClass": ""
+        },
+        "closeAssistant": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 1596.59375,
+          "box": {
+            "left": 1358.984375,
+            "top": 288.984375,
+            "right": 1401,
+            "bottom": 326.984375
+          },
+          "hitTag": "BUTTON",
+          "hitClass": ""
+        },
+        "composerCard": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 44574,
+          "box": {
+            "left": 1001,
+            "top": 632.171875,
+            "right": 1392,
+            "bottom": 746.171875
+          },
+          "hitTag": "DIV",
+          "hitClass": "uV2eYG_input"
+        }
+      },
+      "screenshot": "/tmp/hep-ui-acceptance-20261020-YzAfQF/screenshots/desktop-avoidance/evaluation-assistant-open-1440x1000.png"
+    },
+    {
+      "label": "evaluation-assistant-open",
+      "width": 1366,
+      "height": 768,
+      "page": "evaluation",
+      "assistantOpen": true,
+      "pane": {
+        "left": 932.203125,
+        "top": 92,
+        "right": 1342,
+        "bottom": 680,
+        "width": 409.796875
+      },
+      "content": {
+        "left": 0,
+        "right": 1366,
+        "width": 1366
+      },
+      "contentPaddingRight": "433.8px",
+      "horizontalOverflowPx": 0,
+      "theme": "dark",
+      "targets": {
+        "agentFilter": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 61,
+            "top": 275.46875,
+            "right": 303.0625,
+            "bottom": 310.46875
+          },
+          "hitTag": "SELECT",
+          "hitClass": ""
+        },
+        "versionFilter": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 313.0625,
+            "top": 275.46875,
+            "right": 555.125,
+            "bottom": 310.46875
+          },
+          "hitTag": "SELECT",
+          "hitClass": ""
+        },
+        "newEvaluation": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 795.75,
+            "top": 150.4375,
+            "right": 896.203125,
+            "bottom": 188.828125
+          },
+          "hitTag": "BUTTON",
+          "hitClass": "harness-primary"
+        },
+        "firstRunLink": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 77,
+            "top": 389.046875,
+            "right": 181.015625,
+            "bottom": 431.734375
+          },
+          "hitTag": "BUTTON",
+          "hitClass": "harness-eval-row-link"
+        },
+        "firstRunVerdict": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 413.0625,
+            "top": 380.546875,
+            "right": 517.078125,
+            "bottom": 440.234375
+          },
+          "hitTag": "SPAN",
+          "hitClass": "harness-eval-badge"
+        },
+        "firstRunDate": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 517.078125,
+            "top": 380.546875,
+            "right": 677.109375,
+            "bottom": 440.234375
+          },
+          "hitTag": "TD",
+          "hitClass": ""
+        },
+        "logout": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 1252,
+            "top": 18.296875,
+            "right": 1334,
+            "bottom": 56.6875
+          },
+          "hitTag": "BUTTON",
+          "hitClass": ""
+        },
+        "closeAssistant": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 1596.59375,
+          "box": {
+            "left": 1284.984375,
+            "top": 108.984375,
+            "right": 1327,
+            "bottom": 146.984375
+          },
+          "hitTag": "BUTTON",
+          "hitClass": ""
+        },
+        "composerCard": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 42042.84375,
+          "box": {
+            "left": 949.203125,
+            "top": 426.171875,
+            "right": 1318,
+            "bottom": 540.171875
+          },
+          "hitTag": "DIV",
+          "hitClass": "uV2eYG_input"
+        }
+      },
+      "screenshot": "/tmp/hep-ui-acceptance-20261020-YzAfQF/screenshots/desktop-avoidance/evaluation-assistant-open-1366x768.png"
+    },
+    {
+      "label": "evaluation-assistant-open",
+      "width": 900,
+      "height": 1000,
+      "page": "evaluation",
+      "assistantOpen": true,
+      "pane": {
+        "left": 0,
+        "top": 0,
+        "right": 900,
+        "bottom": 1000,
+        "width": 900
+      },
+      "content": {
+        "left": 0,
+        "right": 900,
+        "width": 900
+      },
+      "contentPaddingRight": "0px",
+      "horizontalOverflowPx": 0,
+      "theme": "dark",
+      "targets": {
+        "agentFilter": {
+          "exists": true,
+          "visible": true,
+          "hit": false,
+          "obscuredAreaPx2": 8376.484375,
+          "box": {
+            "left": 49,
+            "top": 265.46875,
+            "right": 288.328125,
+            "bottom": 300.46875
+          },
+          "hitTag": "DIV",
+          "hitClass": "wSkVaW_scrollBody"
+        },
+        "versionFilter": {
+          "exists": true,
+          "visible": true,
+          "hit": false,
+          "obscuredAreaPx2": 8376.484375,
+          "box": {
+            "left": 298.328125,
+            "top": 265.46875,
+            "right": 537.65625,
+            "bottom": 300.46875
+          },
+          "hitTag": "DIV",
+          "hitClass": "wSkVaW_scrollBody"
+        },
+        "newEvaluation": {
+          "exists": true,
+          "visible": true,
+          "hit": false,
+          "obscuredAreaPx2": 3856.458251953125,
+          "box": {
+            "left": 775.546875,
+            "top": 140.4375,
+            "right": 876,
+            "bottom": 178.828125
+          },
+          "hitTag": "DIV",
+          "hitClass": "wSkVaW_scrollBody"
+        },
+        "firstRunLink": {
+          "exists": true,
+          "visible": true,
+          "hit": false,
+          "obscuredAreaPx2": 4440.1669921875,
+          "box": {
+            "left": 65,
+            "top": 401.4375,
+            "right": 169.015625,
+            "bottom": 444.125
+          },
+          "hitTag": "DIV",
+          "hitClass": "wSkVaW_scrollBody"
+        },
+        "firstRunVerdict": {
+          "exists": true,
+          "visible": true,
+          "hit": false,
+          "obscuredAreaPx2": 6145.0146484375,
+          "box": {
+            "left": 397.453125,
+            "top": 392.9375,
+            "right": 500.40625,
+            "bottom": 452.625
+          },
+          "hitTag": "DIV",
+          "hitClass": "wSkVaW_scrollBody"
+        },
+        "firstRunDate": {
+          "exists": true,
+          "visible": true,
+          "hit": false,
+          "obscuredAreaPx2": 9453.9404296875,
+          "box": {
+            "left": 500.40625,
+            "top": 392.9375,
+            "right": 658.796875,
+            "bottom": 452.625
+          },
+          "hitTag": "DIV",
+          "hitClass": "wSkVaW_scrollBody"
+        },
+        "logout": {
+          "exists": true,
+          "visible": false,
+          "hit": false,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 0,
+            "top": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "hitTag": "HEADER",
+          "hitClass": "harness-assistant-heading"
+        },
+        "closeAssistant": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 1596.59375,
+          "box": {
+            "left": 843.984375,
+            "top": 15.984375,
+            "right": 886,
+            "bottom": 53.984375
+          },
+          "hitTag": "BUTTON",
+          "hitClass": ""
+        },
+        "composerCard": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 98154,
+          "box": {
+            "left": 16,
+            "top": 540.171875,
+            "right": 877,
+            "bottom": 654.171875
+          },
+          "hitTag": "DIV",
+          "hitClass": "uV2eYG_input"
+        }
+      },
+      "screenshot": "/tmp/hep-ui-acceptance-20261020-YzAfQF/screenshots/desktop-avoidance/evaluation-assistant-open-900x1000.png"
+    },
+    {
+      "label": "evaluation-assistant-open",
+      "width": 390,
+      "height": 844,
+      "page": "evaluation",
+      "assistantOpen": true,
+      "pane": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 844,
+        "width": 390
+      },
+      "content": {
+        "left": 0,
+        "right": 390,
+        "width": 390
+      },
+      "contentPaddingRight": "0px",
+      "horizontalOverflowPx": 0,
+      "theme": "dark",
+      "targets": {
+        "agentFilter": {
+          "exists": true,
+          "visible": false,
+          "hit": false,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 0,
+            "top": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "hitTag": "HEADER",
+          "hitClass": "harness-assistant-heading"
+        },
+        "versionFilter": {
+          "exists": true,
+          "visible": false,
+          "hit": false,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 0,
+            "top": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "hitTag": "HEADER",
+          "hitClass": "harness-assistant-heading"
+        },
+        "newEvaluation": {
+          "exists": true,
+          "visible": true,
+          "hit": false,
+          "obscuredAreaPx2": 3856.458251953125,
+          "box": {
+            "left": 16,
+            "top": 178.640625,
+            "right": 116.453125,
+            "bottom": 217.03125
+          },
+          "hitTag": "DIV",
+          "hitClass": "pXSMma_root"
+        },
+        "firstRunLink": {
+          "exists": true,
+          "visible": true,
+          "hit": false,
+          "obscuredAreaPx2": 3900.5859375,
+          "box": {
+            "left": 40,
+            "top": 404.65625,
+            "right": 144.015625,
+            "bottom": 442.15625
+          },
+          "hitTag": "DIV",
+          "hitClass": "pXSMma_headline"
+        },
+        "firstRunVerdict": {
+          "exists": true,
+          "visible": true,
+          "hit": false,
+          "obscuredAreaPx2": 4785,
+          "box": {
+            "left": 303,
+            "top": 395.90625,
+            "right": 398,
+            "bottom": 450.90625
+          },
+          "hitTag": "DIV",
+          "hitClass": "pXSMma_headline"
+        },
+        "firstRunDate": {
+          "exists": true,
+          "visible": true,
+          "hit": false,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 398,
+            "top": 395.90625,
+            "right": 573,
+            "bottom": 450.90625
+          },
+          "hitTag": null,
+          "hitClass": ""
+        },
+        "logout": {
+          "exists": true,
+          "visible": false,
+          "hit": false,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 0,
+            "top": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "hitTag": "HEADER",
+          "hitClass": "harness-assistant-heading"
+        },
+        "closeAssistant": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 1596.59375,
+          "box": {
+            "left": 337.984375,
+            "top": 13.1875,
+            "right": 380,
+            "bottom": 51.1875
+          },
+          "hitTag": "BUTTON",
+          "hitClass": ""
+        },
+        "composerCard": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 40014,
+          "box": {
+            "left": 16,
+            "top": 698,
+            "right": 367,
+            "bottom": 812
+          },
+          "hitTag": "DIV",
+          "hitClass": "uV2eYG_input"
+        }
+      },
+      "screenshot": "/tmp/hep-ui-acceptance-20261020-YzAfQF/screenshots/desktop-avoidance/evaluation-assistant-open-390x844.png"
+    },
+    {
+      "label": "gateway-assistant-open",
+      "width": 1440,
+      "height": 1000,
+      "page": "gateway",
+      "assistantOpen": true,
+      "pane": {
+        "left": 984,
+        "top": 272,
+        "right": 1416,
+        "bottom": 912,
+        "width": 432
+      },
+      "content": {
+        "left": 0,
+        "right": 1440,
+        "width": 1440
+      },
+      "contentPaddingRight": "456px",
+      "horizontalOverflowPx": 0,
+      "theme": "dark",
+      "targets": {
+        "save": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 618,
+            "top": 441.734375,
+            "right": 756,
+            "bottom": 480.125
+          },
+          "hitTag": "BUTTON",
+          "hitClass": "harness-primary"
+        },
+        "discard": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 768,
+            "top": 441.734375,
+            "right": 948,
+            "bottom": 480.125
+          },
+          "hitTag": "BUTTON",
+          "hitClass": ""
+        },
+        "logout": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 1326,
+            "top": 18.296875,
+            "right": 1408,
+            "bottom": 56.6875
+          },
+          "hitTag": "BUTTON",
+          "hitClass": ""
+        },
+        "closeAssistant": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 1596.59375,
+          "box": {
+            "left": 1358.984375,
+            "top": 288.984375,
+            "right": 1401,
+            "bottom": 326.984375
+          },
+          "hitTag": "BUTTON",
+          "hitClass": ""
+        }
+      },
+      "screenshot": "/tmp/hep-ui-acceptance-20261020-YzAfQF/screenshots/desktop-avoidance/gateway-assistant-open-1440x1000.png"
+    },
+    {
+      "label": "gateway-assistant-open",
+      "width": 1366,
+      "height": 768,
+      "page": "gateway",
+      "assistantOpen": true,
+      "pane": {
+        "left": 932.203125,
+        "top": 92,
+        "right": 1342,
+        "bottom": 680,
+        "width": 409.796875
+      },
+      "content": {
+        "left": 0,
+        "right": 1366,
+        "width": 1366
+      },
+      "contentPaddingRight": "433.8px",
+      "horizontalOverflowPx": 0,
+      "theme": "dark",
+      "targets": {
+        "save": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 566.203125,
+            "top": 441.734375,
+            "right": 704.203125,
+            "bottom": 480.125
+          },
+          "hitTag": "BUTTON",
+          "hitClass": "harness-primary"
+        },
+        "discard": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 716.203125,
+            "top": 441.734375,
+            "right": 896.203125,
+            "bottom": 480.125
+          },
+          "hitTag": "BUTTON",
+          "hitClass": ""
+        },
+        "logout": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 0,
+          "box": {
+            "left": 1252,
+            "top": 18.296875,
+            "right": 1334,
+            "bottom": 56.6875
+          },
+          "hitTag": "BUTTON",
+          "hitClass": ""
+        },
+        "closeAssistant": {
+          "exists": true,
+          "visible": true,
+          "hit": true,
+          "obscuredAreaPx2": 1596.59375,
+          "box": {
+            "left": 1284.984375,
+            "top": 108.984375,
+            "right": 1327,
+            "bottom": 146.984375
+          },
+          "hitTag": "BUTTON",
+          "hitClass": ""
+        }
+      },
+      "screenshot": "/tmp/hep-ui-acceptance-20261020-YzAfQF/screenshots/desktop-avoidance/gateway-assistant-open-1366x768.png"
+    },
+    {
+      "label": "native-management-regression",
+      "width": 1440,
+      "height": 1000,
+      "page": "conversations",
+      "assistantOpen": false,
+      "pane": {
+        "left": 0,
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "width": 0
+      },
+      "content": {
+        "left": 0,
+        "right": 1440,
+        "width": 1440
+      },
+      "contentPaddingRight": "0px",
+      "horizontalOverflowPx": 0,
+      "theme": "dark",
+      "targets": {},
+      "screenshot": "/tmp/hep-ui-acceptance-20261020-YzAfQF/screenshots/desktop-avoidance/native-management-regression-1440x1000.png"
+    },
+    {
+      "label": "native-management-regression",
+      "width": 390,
+      "height": 844,
+      "page": "conversations",
+      "assistantOpen": false,
+      "pane": {
+        "left": 0,
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "width": 0
+      },
+      "content": {
+        "left": 0,
+        "right": 390,
+        "width": 390
+      },
+      "contentPaddingRight": "0px",
+      "horizontalOverflowPx": 0,
+      "theme": "dark",
+      "targets": {},
+      "screenshot": "/tmp/hep-ui-acceptance-20261020-YzAfQF/screenshots/desktop-avoidance/native-management-regression-390x844.png"
+    }
+  ],
+  "assertions": [
+    {
+      "name": "1440 evaluation open and no horizontal overflow",
+      "passed": true
+    },
+    {
+      "name": "1440 assistant close reachable",
+      "passed": true
+    },
+    {
+      "name": "1440 evaluation filters and right columns reachable",
+      "passed": true
+    },
+    {
+      "name": "1440 global logout entirely reachable",
+      "passed": true
+    },
+    {
+      "name": "1440 content avoids assistant",
+      "passed": true
+    },
+    {
+      "name": "1440 close restores toggle focus",
+      "passed": true
+    },
+    {
+      "name": "1366 evaluation open and no horizontal overflow",
+      "passed": true
+    },
+    {
+      "name": "1366 assistant close reachable",
+      "passed": true
+    },
+    {
+      "name": "1366 evaluation filters and right columns reachable",
+      "passed": true
+    },
+    {
+      "name": "1366 global logout entirely reachable",
+      "passed": true
+    },
+    {
+      "name": "1366 content avoids assistant",
+      "passed": true
+    },
+    {
+      "name": "1366 close restores toggle focus",
+      "passed": true
+    },
+    {
+      "name": "900 evaluation open and no horizontal overflow",
+      "passed": true
+    },
+    {
+      "name": "900 assistant close reachable",
+      "passed": true
+    },
+    {
+      "name": "900 assistant full screen and input reachable",
+      "passed": true
+    },
+    {
+      "name": "900 close restores toggle focus",
+      "passed": true
+    },
+    {
+      "name": "390 evaluation open and no horizontal overflow",
+      "passed": true
+    },
+    {
+      "name": "390 assistant close reachable",
+      "passed": true
+    },
+    {
+      "name": "390 assistant full screen and input reachable",
+      "passed": true
+    },
+    {
+      "name": "390 close restores toggle focus",
+      "passed": true
+    },
+    {
+      "name": "1440 gateway save and discard reachable",
+      "passed": true
+    },
+    {
+      "name": "1440 gateway open no horizontal overflow",
+      "passed": true
+    },
+    {
+      "name": "1366 gateway save and discard reachable",
+      "passed": true
+    },
+    {
+      "name": "1366 gateway open no horizontal overflow",
+      "passed": true
+    },
+    {
+      "name": "1440 native management conversation visible",
+      "passed": true
+    },
+    {
+      "name": "1440 management conversation returns to agents",
+      "passed": true
+    },
+    {
+      "name": "390 native management conversation visible",
+      "passed": true
+    },
+    {
+      "name": "390 management conversation returns to agents",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "failedResponses": []
+}

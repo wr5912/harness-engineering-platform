@@ -163,10 +163,19 @@ test('原生 ApprovalService 暂停同一次调用，B不能回答A的确认且�
   const owner = control.sessionContext(context('A'), sessionId); const operation = { serverId: 'writes', operationId: 'update', kind: 'write', method: 'POST', target: 'https://business.test/item', args: { value: 'fixed' } }; let dispatched = 0
   const execution = withBusinessContext(owner, () => control.execute(operation, () => { dispatched++; return 'done' }))
   const path = '/api/business-control/confirmations'; const endpoint = `http://127.0.0.1:${ctx.webServer.port}${path}`
-  const list = async id => (await fetch(endpoint, { headers: headers(id, path, 'GET') })).json()
+  const synchronized = Date.now() + 1000
+  while (Date.now() < synchronized && (!coordinator.status().riskFacts.some(fact => fact.scope.sessionId === sessionId && fact.source.endsWith('/risk'))
+    || control.status().restrictionVersion !== coordinator.status().restrictionVersion)) await new Promise(resolve => setTimeout(resolve, 10))
+  assert.ok(coordinator.status().riskFacts.some(fact => fact.scope.sessionId === sessionId && fact.source.endsWith('/risk')), '确认前本次风险事实已同步到中心')
+  assert.equal(control.status().restrictionVersion, coordinator.status().restrictionVersion, '确认前实例已装载最新许可快照')
+  const list = async id => {
+    const response = await fetch(endpoint, { headers: headers(id, path, 'GET') })
+    const body = await response.text()
+    assert.equal(response.status, 200, `业务确认列表 HTTP ${response.status}: ${body}`)
+    return JSON.parse(body)
+  }
   let pending; const until = Date.now() + 1000; while (!pending && Date.now() < until) { pending = (await list('A')).items[0]; if (!pending) await new Promise(resolve => setTimeout(resolve, 10)) }
   assert.ok(pending); assert.equal(dispatched, 0); assert.deepEqual((await list('B')).items, [])
-  assert.ok(coordinator.status().riskFacts.some(fact => fact.scope.sessionId === sessionId && fact.source.endsWith('/risk')), '展示确认之前本次风险事实必须已同步到中心')
   // 模拟本人阅读目标后作答，覆盖本地新事实观察及ACK的两个实际心跳周期。
   await new Promise(resolve => setTimeout(resolve, 1200)); assert.ok((await list('A')).items.some(item => item.id === pending.id)); assert.equal(dispatched, 0)
   const answer = (id, allow) => fetch(endpoint, { method: 'POST', headers: { ...headers(id, path), 'content-type': 'application/json' }, body: JSON.stringify({ id: pending.id, allow }) })

@@ -1,0 +1,70 @@
+{
+  "checkedAt": "2026-10-21T03:56:29.624992+00:00",
+  "source": "experiment:EXP-security-operations-expert-023-r2233d74f6fb3",
+  "agentId": "security-operations-expert",
+  "instance": {
+    "name": "mimo-gui-e2e-20261021",
+    "state": "running",
+    "port": 31893,
+    "source": "experiment:EXP-security-operations-expert-023-r2233d74f6fb3",
+    "model": {
+      "model": "mimo-v2.6-flash",
+      "provider": "xiaomi-token-plan-cn",
+      "reasoningEffort": "off"
+    },
+    "http": 200
+  },
+  "url": {
+    "origin": "http://127.0.0.1:31893",
+    "path": "/assistant/"
+  },
+  "dryRun": {
+    "model": {
+      "model": "mimo-v2.6-flash",
+      "provider": "xiaomi-token-plan-cn",
+      "reasoningEffort": "off"
+    },
+    "missingSourceEnvNames": [
+      "DEEPSEEK_API_KEY",
+      "LOCAL_LLM_BASE_URL",
+      "LOCAL_LLM_API_KEY"
+    ]
+  },
+  "evaluationDryRun": {
+    "caseIds": [
+      "U-INS-001"
+    ],
+    "missingEnvNames": [
+      "DEEPSEEK_API_KEY",
+      "LOCAL_LLM_BASE_URL",
+      "LOCAL_LLM_API_KEY"
+    ],
+    "note": "--model记录预期标识，不切换Runtime；本次未启动正式Research Run。"
+  },
+  "checks": [
+    {
+      "name": "来源合同解析到隔离根023",
+      "passed": true
+    },
+    {
+      "name": "CLI新实例dry-run读取统一默认MiMo/off",
+      "passed": true
+    },
+    {
+      "name": "CLI ps回读023业务实例运行中",
+      "passed": true
+    },
+    {
+      "name": "CLI url可取得正确实例入口",
+      "passed": true
+    },
+    {
+      "name": "业务实例原生Web可访问",
+      "passed": true
+    },
+    {
+      "name": "评测CLI dry-run明确环境边界",
+      "passed": true
+    }
+  ]
+}

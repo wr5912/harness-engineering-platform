@@ -1,0 +1,382 @@
+{
+  "service": "http://10.0.160.32:3091/hep/",
+  "pid": 98382,
+  "prototype": "/home/admin/Downloads/Harness_算力变体策划_交互原型.html",
+  "checks": [
+    {
+      "name": "light 选择态首卡完整在固定页脚上方",
+      "pass": true,
+      "observed": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "overflowX": 0,
+        "header": {
+          "top": 30,
+          "bottom": 202,
+          "height": 172
+        },
+        "subtitle": {
+          "top": 78,
+          "bottom": 119,
+          "height": 41
+        },
+        "footer": {
+          "top": 730,
+          "bottom": 845,
+          "height": 116
+        },
+        "firstCard": {
+          "top": 282,
+          "bottom": 717,
+          "height": 435
+        },
+        "traceRows": [],
+        "dialog": {
+          "top": 29,
+          "bottom": 845,
+          "height": 816
+        },
+        "bodyScroll": 0
+      },
+      "expected": "中算力卡片及适合说明在首屏完整可见"
+    },
+    {
+      "name": "light 选择态无横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1"
+    },
+    {
+      "name": "light 中算力配置首屏至少显示两条完整轨迹",
+      "pass": true,
+      "observed": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "overflowX": 0,
+        "header": {
+          "top": 29,
+          "bottom": 166,
+          "height": 137
+        },
+        "subtitle": {
+          "top": 0,
+          "bottom": 0,
+          "height": 0
+        },
+        "footer": {
+          "top": 728,
+          "bottom": 844,
+          "height": 116
+        },
+        "firstCard": null,
+        "traceRows": [
+          {
+            "top": 562,
+            "bottom": 636
+          },
+          {
+            "top": 636,
+            "bottom": 709
+          },
+          {
+            "top": 709,
+            "bottom": 782
+          }
+        ],
+        "dialog": {
+          "top": 28,
+          "bottom": 844,
+          "height": 816
+        },
+        "bodyScroll": 0
+      },
+      "expected": "与原型相同可见两条完整轨迹"
+    },
+    {
+      "name": "light 中算力配置无横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1"
+    },
+    {
+      "name": "light 低算力配置首屏至少显示两条完整轨迹",
+      "pass": true,
+      "observed": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "overflowX": 0,
+        "header": {
+          "top": 29,
+          "bottom": 166,
+          "height": 137
+        },
+        "subtitle": {
+          "top": 0,
+          "bottom": 0,
+          "height": 0
+        },
+        "footer": {
+          "top": 728,
+          "bottom": 844,
+          "height": 116
+        },
+        "firstCard": null,
+        "traceRows": [
+          {
+            "top": 562,
+            "bottom": 636
+          },
+          {
+            "top": 636,
+            "bottom": 709
+          },
+          {
+            "top": 709,
+            "bottom": 782
+          }
+        ],
+        "dialog": {
+          "top": 28,
+          "bottom": 844,
+          "height": 816
+        },
+        "bodyScroll": 0
+      },
+      "expected": "与原型相同可见两条完整轨迹"
+    },
+    {
+      "name": "light 低算力配置无横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1"
+    },
+    {
+      "name": "dark 选择态首卡完整在固定页脚上方",
+      "pass": true,
+      "observed": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "overflowX": 0,
+        "header": {
+          "top": 31,
+          "bottom": 203,
+          "height": 172
+        },
+        "subtitle": {
+          "top": 79,
+          "bottom": 120,
+          "height": 41
+        },
+        "footer": {
+          "top": 731,
+          "bottom": 846,
+          "height": 116
+        },
+        "firstCard": {
+          "top": 283,
+          "bottom": 718,
+          "height": 435
+        },
+        "traceRows": [],
+        "dialog": {
+          "top": 30,
+          "bottom": 846,
+          "height": 816
+        },
+        "bodyScroll": 0
+      },
+      "expected": "中算力卡片及适合说明在首屏完整可见"
+    },
+    {
+      "name": "dark 选择态无横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1"
+    },
+    {
+      "name": "dark 中算力配置首屏至少显示两条完整轨迹",
+      "pass": true,
+      "observed": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "overflowX": 0,
+        "header": {
+          "top": 29,
+          "bottom": 166,
+          "height": 137
+        },
+        "subtitle": {
+          "top": 0,
+          "bottom": 0,
+          "height": 0
+        },
+        "footer": {
+          "top": 728,
+          "bottom": 844,
+          "height": 116
+        },
+        "firstCard": null,
+        "traceRows": [
+          {
+            "top": 562,
+            "bottom": 636
+          },
+          {
+            "top": 636,
+            "bottom": 709
+          },
+          {
+            "top": 709,
+            "bottom": 782
+          }
+        ],
+        "dialog": {
+          "top": 28,
+          "bottom": 844,
+          "height": 816
+        },
+        "bodyScroll": 0
+      },
+      "expected": "与原型相同可见两条完整轨迹"
+    },
+    {
+      "name": "dark 中算力配置无横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1"
+    },
+    {
+      "name": "dark 低算力配置首屏至少显示两条完整轨迹",
+      "pass": true,
+      "observed": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "overflowX": 0,
+        "header": {
+          "top": 29,
+          "bottom": 166,
+          "height": 137
+        },
+        "subtitle": {
+          "top": 0,
+          "bottom": 0,
+          "height": 0
+        },
+        "footer": {
+          "top": 728,
+          "bottom": 844,
+          "height": 116
+        },
+        "firstCard": null,
+        "traceRows": [
+          {
+            "top": 562,
+            "bottom": 636
+          },
+          {
+            "top": 636,
+            "bottom": 709
+          },
+          {
+            "top": 709,
+            "bottom": 782
+          }
+        ],
+        "dialog": {
+          "top": 28,
+          "bottom": 844,
+          "height": 816
+        },
+        "bodyScroll": 0
+      },
+      "expected": "与原型相同可见两条完整轨迹"
+    },
+    {
+      "name": "dark 低算力配置无横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1"
+    },
+    {
+      "name": "手机版 首页 最新服务可加载",
+      "pass": true,
+      "observed": {
+        "marker": true,
+        "overflow": 0,
+        "title": "Harness工程平台"
+      },
+      "expected": "页面标识与无水平溢出"
+    },
+    {
+      "name": "手机版 智能体管理 最新服务可加载",
+      "pass": true,
+      "observed": {
+        "marker": true,
+        "overflow": 0,
+        "title": "Harness工程平台"
+      },
+      "expected": "页面标识与无水平溢出"
+    },
+    {
+      "name": "手机版 评测中心 最新服务可加载",
+      "pass": true,
+      "observed": {
+        "marker": true,
+        "overflow": 0,
+        "title": "Harness工程平台"
+      },
+      "expected": "页面标识与无水平溢出"
+    },
+    {
+      "name": "手机版 实例管理 最新服务可加载",
+      "pass": true,
+      "observed": {
+        "marker": true,
+        "overflow": 0,
+        "title": "Harness工程平台"
+      },
+      "expected": "页面标识与无水平溢出"
+    },
+    {
+      "name": "手机版 统一网关 最新服务可加载",
+      "pass": true,
+      "observed": {
+        "marker": true,
+        "overflow": 0,
+        "title": "Harness工程平台"
+      },
+      "expected": "页面标识与无水平溢出"
+    },
+    {
+      "name": "手机版 MCP 管理 最新服务可加载",
+      "pass": true,
+      "observed": {
+        "marker": true,
+        "overflow": 0,
+        "title": "Harness工程平台"
+      },
+      "expected": "页面标识与无水平溢出"
+    }
+  ],
+  "screenshots": [
+    "platform/plugin/test/evidence/ui-productization-20261020/final/compute-mobile-final-light-choose.png",
+    "platform/plugin/test/evidence/ui-productization-20261020/final/compute-mobile-final-light-medium.png",
+    "platform/plugin/test/evidence/ui-productization-20261020/final/compute-mobile-final-light-low.png",
+    "platform/plugin/test/evidence/ui-productization-20261020/final/compute-mobile-final-dark-choose.png",
+    "platform/plugin/test/evidence/ui-productization-20261020/final/compute-mobile-final-dark-medium.png",
+    "platform/plugin/test/evidence/ui-productization-20261020/final/compute-mobile-final-dark-low.png"
+  ],
+  "errors": []
+}

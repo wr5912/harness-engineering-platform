@@ -1,0 +1,205 @@
+{
+  "checkedAt": "2026-10-21T03:43:51.250Z",
+  "assertions": [
+    {
+      "name": "1440 概览标题和四张状态卡",
+      "passed": true
+    },
+    {
+      "name": "1440 页面无横向溢出",
+      "passed": true
+    },
+    {
+      "name": "1440 智能体身份标题与操作",
+      "passed": true
+    },
+    {
+      "name": "1440 身份为真实实例表或空态",
+      "passed": true
+    },
+    {
+      "name": "1440 身份配置可展开",
+      "passed": true
+    },
+    {
+      "name": "1440 智能体身份无横向溢出",
+      "passed": true
+    },
+    {
+      "name": "1440 风险评估标题与操作",
+      "passed": true
+    },
+    {
+      "name": "1440 风险事实与下一步可见",
+      "passed": true
+    },
+    {
+      "name": "1440 风险配置默认收起",
+      "passed": true
+    },
+    {
+      "name": "1440 风险评估无横向溢出",
+      "passed": true
+    },
+    {
+      "name": "1440 访问控制对象和操作",
+      "passed": true
+    },
+    {
+      "name": "1440 访问开关位于整行右侧",
+      "passed": true
+    },
+    {
+      "name": "1440 访问控制无横向溢出",
+      "passed": true
+    },
+    {
+      "name": "900 概览标题和四张状态卡",
+      "passed": true
+    },
+    {
+      "name": "900 页面无横向溢出",
+      "passed": true
+    },
+    {
+      "name": "900 宽度四卡同排",
+      "passed": true
+    },
+    {
+      "name": "900 智能体身份标题与操作",
+      "passed": true
+    },
+    {
+      "name": "900 身份为真实实例表或空态",
+      "passed": true
+    },
+    {
+      "name": "900 身份配置可展开",
+      "passed": true
+    },
+    {
+      "name": "900 智能体身份无横向溢出",
+      "passed": true
+    },
+    {
+      "name": "900 风险评估标题与操作",
+      "passed": true
+    },
+    {
+      "name": "900 风险事实与下一步可见",
+      "passed": true
+    },
+    {
+      "name": "900 风险配置默认收起",
+      "passed": true
+    },
+    {
+      "name": "900 风险评估无横向溢出",
+      "passed": true
+    },
+    {
+      "name": "900 访问控制对象和操作",
+      "passed": true
+    },
+    {
+      "name": "900 访问开关位于整行右侧",
+      "passed": true
+    },
+    {
+      "name": "900 访问控制无横向溢出",
+      "passed": true
+    },
+    {
+      "name": "390 概览标题和四张状态卡",
+      "passed": true
+    },
+    {
+      "name": "390 页面无横向溢出",
+      "passed": true
+    },
+    {
+      "name": "390 宽度显示简要状态",
+      "passed": true
+    },
+    {
+      "name": "390 标题说明占整行",
+      "passed": true
+    },
+    {
+      "name": "390 智能体身份标题与操作",
+      "passed": true
+    },
+    {
+      "name": "390 身份为真实实例表或空态",
+      "passed": true
+    },
+    {
+      "name": "390 身份配置可展开",
+      "passed": true
+    },
+    {
+      "name": "390 智能体身份无横向溢出",
+      "passed": true
+    },
+    {
+      "name": "390 风险评估标题与操作",
+      "passed": true
+    },
+    {
+      "name": "390 风险事实与下一步可见",
+      "passed": true
+    },
+    {
+      "name": "390 风险配置默认收起",
+      "passed": true
+    },
+    {
+      "name": "390 风险评估无横向溢出",
+      "passed": true
+    },
+    {
+      "name": "390 访问控制对象和操作",
+      "passed": true
+    },
+    {
+      "name": "390 访问开关位于整行右侧",
+      "passed": true
+    },
+    {
+      "name": "390 访问控制无横向溢出",
+      "passed": true
+    },
+    {
+      "name": "预览展示配置且未写入",
+      "passed": true
+    },
+    {
+      "name": "Escape 关闭预览并保留草稿",
+      "passed": true
+    },
+    {
+      "name": "放弃未保存草稿后后端配置不变",
+      "passed": true
+    },
+    {
+      "name": "浏览器无脚本错误",
+      "passed": true
+    }
+  ],
+  "pageErrors": [],
+  "failedResponses": [],
+  "screenshots": [
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/gateway-overview-1440.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/gateway-identity-1440.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/gateway-risk-1440.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/gateway-access-1440.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/gateway-overview-900.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/gateway-identity-900.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/gateway-risk-900.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/gateway-access-900.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/gateway-overview-390.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/gateway-identity-390.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/gateway-risk-390.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/gateway-access-390.png"
+  ]
+}

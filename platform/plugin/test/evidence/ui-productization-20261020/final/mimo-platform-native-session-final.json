@@ -1,0 +1,59 @@
+{
+  "checkedAt": "2026-10-21T03:32:48.835Z",
+  "profile": "platform",
+  "base": "http://10.0.160.32:3091/hep/",
+  "workspace": "/tmp/hep-ui-acceptance-20261020-YzAfQF/data",
+  "preset": "standard",
+  "expected": {
+    "provider": "xiaomi-token-plan-cn",
+    "model": "mimo-v2.6-flash",
+    "reasoningEffort": "high"
+  },
+  "checks": [
+    {
+      "name": "原生 Session RPC 可用",
+      "passed": true
+    },
+    {
+      "name": "工作区身份准确",
+      "passed": true
+    },
+    {
+      "name": "新 Session 使用目标 Preset",
+      "passed": true
+    },
+    {
+      "name": "Session 已固定标题",
+      "passed": true
+    },
+    {
+      "name": "消息已被原生 Session 接收",
+      "passed": true
+    },
+    {
+      "name": "原生轨迹记录完整回合",
+      "passed": true
+    },
+    {
+      "name": "实际模型路由与指定配置一致",
+      "passed": true
+    },
+    {
+      "name": "模型回复完成且非空",
+      "passed": true
+    }
+  ],
+  "sessionId": "session-2428e900-a8e4-4aa9-8aaf-740e83a7dbad",
+  "assistantText": "我没有可用的只读检测结果，因此无法确认平台管理助手的模型连接当前是否正常。",
+  "actual": {
+    "provider": "xiaomi-token-plan-cn",
+    "model": "mimo-v2.6-flash",
+    "reasoningEffort": "high",
+    "turnReason": "completed",
+    "availableToolCount": 38,
+    "toolCallNames": [],
+    "inputMessageId": "ef7ff533-a090-4e84-93a9-8d8b4ad82750",
+    "textSha256": "6ed4fdf376e73d13acb38572572232f9eb95bc77e76d014db925f319e5152d17"
+  },
+  "error": null
+}

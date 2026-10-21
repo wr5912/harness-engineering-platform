@@ -1,0 +1,231 @@
+{
+  "service": "http://10.0.160.32:3091/hep/",
+  "route": "http://10.0.160.32:3091/hep/#/agents?agent_id=autonomous-training-researcher&experiment_id=EXP-autonomous-training-researcher-001-redf6be6240bf&tab=compute-variants",
+  "isolatedDataRoot": true,
+  "sent": true,
+  "chosenType": "low",
+  "selectedRun": "run-59e5fb6b-b867-42cb-a675-d7d952387cfa",
+  "dialogClosed": true,
+  "assistantVisible": true,
+  "assistantContainsTask": true,
+  "assistantStatus": "AI 助手",
+  "errors": [],
+  "http": [
+    {
+      "path": "/hep/plugins/",
+      "status": 200
+    },
+    {
+      "path": "/hep/api/harness-platform/events",
+      "status": 200
+    },
+    {
+      "path": "/hep/api/session/modelCatalog",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/inventory",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/agents/eval/list",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/auth/current",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/inventory",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/home",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/agents/eval/list",
+      "status": 200
+    },
+    {
+      "path": "/hep/api/session/list",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/home",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/inventory",
+      "status": 200
+    },
+    {
+      "path": "/hep/api/session/list",
+      "status": 200
+    },
+    {
+      "path": "/hep/api/session/modelCatalog",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/inventory",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/agents/eval/list",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/home",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/agents/list",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/agents/fusion/proposal",
+      "status": 200
+    },
+    {
+      "path": "/hep/api/session/create",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/auth/current",
+      "status": 200
+    },
+    {
+      "path": "/hep/api/session/projections",
+      "status": 200
+    },
+    {
+      "path": "/hep/api/session/projections",
+      "status": 200
+    },
+    {
+      "path": "/hep/api/session/projections",
+      "status": 200
+    },
+    {
+      "path": "/hep/api/session/projections",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/assistant/context",
+      "status": 200
+    },
+    {
+      "path": "/hep/api/session/projections",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/assistant/status",
+      "status": 200
+    },
+    {
+      "path": "/hep/api/session/projections",
+      "status": 200
+    },
+    {
+      "path": "/hep/api/session/projections",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/assistant/status",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/agents/detail",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/assistant/context",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/agents/fusion/proposal",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/agents/features/proposal",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/agents/edit/read",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/agents/compute-variants/context",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/assistant/status",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/agents/runs/index",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/agents/runs/show",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/agents/list",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/assistant/configuration",
+      "status": 200
+    },
+    {
+      "path": "/hep/api/session/projections",
+      "status": 200
+    },
+    {
+      "path": "/hep/api/session/create",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/assistant/status",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/assistant/session",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/assistant/context",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/assistant/status",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/assistant/status",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/assistant/status",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/assistant/status",
+      "status": 200
+    },
+    {
+      "path": "/hep/harness-platform/assistant/status",
+      "status": 200
+    }
+  ],
+  "screenshots": [
+    "platform/plugin/test/evidence/ui-productization-20261020/final/compute-assistant-before-send.png",
+    "platform/plugin/test/evidence/ui-productization-20261020/final/compute-assistant-after-send.png",
+    "platform/plugin/test/evidence/ui-productization-20261020/final/compute-assistant-after-30s.png"
+  ],
+  "assistantTextExcerpt": "平台 AI 助手\nAI 助手\n新任务\n展开\n收起\n当前查看：智能体管理 · 自主训练研究助手 · 版本 001\n定位当前对象\n查看完整对象 ID\n请使用 compute-variant-research，为 自主训练研究助手 的 v001（EXP-autonomous-training-researcher-001-redf6be6240bf）策划低算力变体“自主训练研究助手 · 低算力变体”。本次只策划，不连接服务器、启动训练、生成或创建变体。\n策划请求编号：1792515273627-sx950tierjg。如果发送结果未知，先按此编号核对已有会话，不自动重发。\n技术路线：从轨迹提取稳定规则和分支，用 LangGraph 代码与现有真实工具模拟原执行路径，不训练决策模型。\n目标：隔离环境浏览器验收：仅核对当前固定版本和所选真实 Run，策划低算力 LangGraph 代码模拟方案；不得创建变体、运行实验或连接外部资源。\n轨迹：只核对以下当前版本 Run，并区分诊断证据与后续独立比较 Run：run-59e5fb6b-b867-42cb-a675-d7d952387cfa。\n未覆盖场景：中止并报告；不自动回退大模型。其他要求：无。\n请先核对真实固定父版、轨迹、工具合同与可比性；列出待补充信息、实施步骤、独立 Case 和质量/资源验收方法。近似等效和资源收益是待验证目标，不能当作当前结论。\n00:54\n处理失败\n处理失败\n本轮运行失败Provider is not configured: xiaomi-token-plan-cn\nPI_AI_ERROR\n发消息或创建任务, / 调用指令, @ 文件或对话\nMiMo-V2.5\nDefault\n1 轮 1 步\n0%",
+  "assistantStatusAfter30s": "AI 助手",
+  "assistantTextExcerptAfter30s": "平台 AI 助手\nAI 助手\n新任务\n展开\n收起\n当前查看：智能体管理 · 自主训练研究助手 · 版本 001\n定位当前对象\n查看完整对象 ID\n请使用 compute-variant-research，为 自主训练研究助手 的 v001（EXP-autonomous-training-researcher-001-redf6be6240bf）策划低算力变体“自主训练研究助手 · 低算力变体”。本次只策划，不连接服务器、启动训练、生成或创建变体。\n策划请求编号：1792515273627-sx950tierjg。如果发送结果未知，先按此编号核对已有会话，不自动重发。\n技术路线：从轨迹提取稳定规则和分支，用 LangGraph 代码与现有真实工具模拟原执行路径，不训练决策模型。\n目标：隔离环境浏览器验收：仅核对当前固定版本和所选真实 Run，策划低算力 LangGraph 代码模拟方案；不得创建变体、运行实验或连接外部资源。\n轨迹：只核对以下当前版本 Run，并区分诊断证据与后续独立比较 Run：run-59e5fb6b-b867-42cb-a675-d7d952387cfa。\n未覆盖场景：中止并报告；不自动回退大模型。其他要求：无。\n请先核对真实固定父版、轨迹、工具合同与可比性；列出待补充信息、实施步骤、独立 Case 和质量/资源验收方法。近似等效和资源收益是待验证目标，不能当作当前结论。\n00:54\n处理失败\n处理失败\n本轮运行失败Provider is not configured: xiaomi-token-plan-cn\nPI_AI_ERROR\n发消息或创建任务, / 调用指令, @ 文件或对话\nMiMo-V2.5\nDefault\n1 轮 1 步\n0%"
+}

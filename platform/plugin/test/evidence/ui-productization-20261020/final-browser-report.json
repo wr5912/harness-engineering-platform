@@ -1,0 +1,1024 @@
+{
+  "assertions": [
+    {
+      "name": "non-default account displayed",
+      "passed": true
+    },
+    {
+      "name": "home mode 构建智能体",
+      "passed": true,
+      "action": "开始构建"
+    },
+    {
+      "name": "home mode 评测效果",
+      "passed": true,
+      "action": "开始评测"
+    },
+    {
+      "name": "home mode 改进能力",
+      "passed": true,
+      "action": "开始改进"
+    },
+    {
+      "name": "home mode 管理实例与工具",
+      "passed": true,
+      "action": "开始管理"
+    },
+    {
+      "name": "home run deep link survives refresh",
+      "passed": true
+    },
+    {
+      "name": "navigation to evaluation",
+      "passed": true
+    },
+    {
+      "name": "native management conversation visible",
+      "passed": true
+    },
+    {
+      "name": "management conversation returns to agents",
+      "passed": true
+    },
+    {
+      "name": "instance source selector populated",
+      "passed": true
+    },
+    {
+      "name": "mcp composition tab deep link",
+      "passed": true
+    },
+    {
+      "name": "mobile navigation to agents",
+      "passed": true
+    },
+    {
+      "name": "mobile assistant open",
+      "passed": true
+    },
+    {
+      "name": "mobile assistant close focus return",
+      "passed": true
+    },
+    {
+      "name": "dark mobile native management conversation visible",
+      "passed": true
+    },
+    {
+      "name": "invalid instance deep link returns to list",
+      "passed": true
+    }
+  ],
+  "assertionSummary": {
+    "passed": 16,
+    "total": 16
+  },
+  "viewports": [
+    {
+      "view": "home-light",
+      "width": 1440,
+      "height": 1000,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "home-four-task-modes",
+      "width": 1440,
+      "height": 1000,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "home-run-deeplink",
+      "width": 1440,
+      "height": 1000,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "home-nav-base",
+      "width": 1440,
+      "height": 1000,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "evaluation-navigation",
+      "width": 1440,
+      "height": 1000,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "agents-light",
+      "width": 1440,
+      "height": 1000,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "evaluation-light",
+      "width": 1440,
+      "height": 1000,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "instances-light",
+      "width": 1440,
+      "height": 1000,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "mcp-light",
+      "width": 1440,
+      "height": 1000,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "gateway-light",
+      "width": 1440,
+      "height": 1000,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "conversations-regression",
+      "width": 1440,
+      "height": 1000,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "instances-create-base",
+      "width": 1440,
+      "height": 1000,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "instances-create-source-selection",
+      "width": 1440,
+      "height": 1000,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "mcp-composition-base",
+      "width": 1440,
+      "height": 1000,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "mcp-composition",
+      "width": 1440,
+      "height": 1000,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "evaluation-assistant-desktop-base",
+      "width": 1440,
+      "height": 1000,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "assistant-desktop-open",
+      "width": 1440,
+      "height": 1000,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "evaluation-compact",
+      "width": 1366,
+      "height": 768,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "evaluation-zoom-equivalent-css-viewport",
+      "width": 720,
+      "height": 500,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "instances-zoom-equivalent-css-viewport",
+      "width": 720,
+      "height": 500,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "evaluation-medium-901",
+      "width": 901,
+      "height": 1000,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "evaluation-medium-900",
+      "width": 900,
+      "height": 1000,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "evaluation-medium-899",
+      "width": 899,
+      "height": 1000,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "home-mobile",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "evaluation-mobile",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "instances-mobile",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "gateway-mobile",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "mcp-mobile",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "conversations-mobile-regression",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "evaluation-mobile-assistant-base",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "assistant-mobile-open",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "evaluation-mobile-dark",
+      "width": 390,
+      "height": 844,
+      "theme": "dark",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "assistant-mobile-dark-open",
+      "width": 390,
+      "height": 844,
+      "theme": "dark",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "conversations-mobile-dark-regression",
+      "width": 390,
+      "height": 844,
+      "theme": "dark",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "evaluation-desktop-dark",
+      "width": 1440,
+      "height": 1000,
+      "theme": "dark",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "assistant-desktop-dark-open",
+      "width": 1440,
+      "height": 1000,
+      "theme": "dark",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "view": "instances-invalid-deeplink",
+      "width": 1440,
+      "height": 1000,
+      "theme": "dark",
+      "horizontalOverflowPx": 0
+    }
+  ],
+  "themeMeasurements": {
+    "mobileAssistantLight": {
+      "welcomeForegroundRgb": "rgb(15, 17, 21)",
+      "paneBackgroundRgb": "rgb(255, 255, 255)",
+      "composerCardPx": {
+        "top": 698,
+        "bottom": 812
+      }
+    },
+    "mobileAssistantDark": {
+      "welcomeForegroundRgb": "rgb(249, 250, 251)",
+      "paneBackgroundRgb": "rgb(35, 35, 36)",
+      "welcomeContrastRatio": 15.03,
+      "composerCardPx": {
+        "top": 698,
+        "bottom": 812
+      }
+    },
+    "nativeManagementConversation": {
+      "mobileLightVisible": true,
+      "mobileDarkVisible": true
+    }
+  },
+  "browserErrors": [],
+  "http5xxResponses": [],
+  "viewportEquivalent200Percent": {
+    "width": 720,
+    "height": 500,
+    "horizontalOverflowPx": 0
+  },
+  "actualBrowserZoom200Percent": {
+    "confirmed": false,
+    "method": "headless Chrome Control+Equal x6",
+    "before": {
+      "innerWidth": 1440,
+      "devicePixelRatio": 1,
+      "visualViewportScale": 1
+    },
+    "after": {
+      "innerWidth": 1440,
+      "devicePixelRatio": 1,
+      "visualViewportScale": 1
+    }
+  },
+  "isolatedServiceStop": {
+    "url": "http://127.0.0.1:3091/hep/",
+    "pid": 2967048,
+    "stopped": true,
+    "port3091Listening": false,
+    "originalPort3090Pid": 2580356,
+    "originalPort3090Listening": true
+  },
+  "desktopAvoidanceRecheck": {
+    "checkedAt": "2026-10-20T10:32:01.672Z",
+    "assertions": [
+      {
+        "name": "1440 evaluation open and no horizontal overflow",
+        "passed": true
+      },
+      {
+        "name": "1440 assistant close reachable",
+        "passed": true
+      },
+      {
+        "name": "1440 evaluation filters and right columns reachable",
+        "passed": true
+      },
+      {
+        "name": "1440 global logout entirely reachable",
+        "passed": true
+      },
+      {
+        "name": "1440 content avoids assistant",
+        "passed": true
+      },
+      {
+        "name": "1440 close restores toggle focus",
+        "passed": true
+      },
+      {
+        "name": "1366 evaluation open and no horizontal overflow",
+        "passed": true
+      },
+      {
+        "name": "1366 assistant close reachable",
+        "passed": true
+      },
+      {
+        "name": "1366 evaluation filters and right columns reachable",
+        "passed": true
+      },
+      {
+        "name": "1366 global logout entirely reachable",
+        "passed": true
+      },
+      {
+        "name": "1366 content avoids assistant",
+        "passed": true
+      },
+      {
+        "name": "1366 close restores toggle focus",
+        "passed": true
+      },
+      {
+        "name": "900 evaluation open and no horizontal overflow",
+        "passed": true
+      },
+      {
+        "name": "900 assistant close reachable",
+        "passed": true
+      },
+      {
+        "name": "900 assistant full screen and input reachable",
+        "passed": true
+      },
+      {
+        "name": "900 close restores toggle focus",
+        "passed": true
+      },
+      {
+        "name": "390 evaluation open and no horizontal overflow",
+        "passed": true
+      },
+      {
+        "name": "390 assistant close reachable",
+        "passed": true
+      },
+      {
+        "name": "390 assistant full screen and input reachable",
+        "passed": true
+      },
+      {
+        "name": "390 close restores toggle focus",
+        "passed": true
+      },
+      {
+        "name": "1440 gateway save and discard reachable",
+        "passed": true
+      },
+      {
+        "name": "1440 gateway open no horizontal overflow",
+        "passed": true
+      },
+      {
+        "name": "1366 gateway save and discard reachable",
+        "passed": true
+      },
+      {
+        "name": "1366 gateway open no horizontal overflow",
+        "passed": true
+      },
+      {
+        "name": "1440 native management conversation visible",
+        "passed": true
+      },
+      {
+        "name": "1440 management conversation returns to agents",
+        "passed": true
+      },
+      {
+        "name": "390 native management conversation visible",
+        "passed": true
+      },
+      {
+        "name": "390 management conversation returns to agents",
+        "passed": true
+      }
+    ],
+    "assertionSummary": {
+      "passed": 28,
+      "total": 28
+    },
+    "viewports": [
+      {
+        "label": "evaluation-assistant-open",
+        "width": 1440,
+        "height": 1000,
+        "theme": "dark",
+        "assistantOpen": true,
+        "pane": {
+          "left": 984,
+          "top": 272,
+          "right": 1416,
+          "bottom": 912,
+          "width": 432
+        },
+        "contentPaddingRight": "456px",
+        "horizontalOverflowPx": 0,
+        "targets": {
+          "versionFilter": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 0,
+            "box": {
+              "left": 500,
+              "top": 319.34375,
+              "right": 927,
+              "bottom": 354.34375
+            }
+          },
+          "firstRunVerdict": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 0,
+            "box": {
+              "left": 658.96875,
+              "top": 578.625,
+              "right": 779.359375,
+              "bottom": 649.609375
+            }
+          },
+          "firstRunDate": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 0,
+            "box": {
+              "left": 779.359375,
+              "top": 578.625,
+              "right": 917,
+              "bottom": 649.609375
+            }
+          },
+          "logout": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 0,
+            "box": {
+              "left": 1326,
+              "top": 17.59375,
+              "right": 1408,
+              "bottom": 55.984375
+            }
+          },
+          "closeAssistant": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 1596.59375,
+            "box": {
+              "left": 1358.984375,
+              "top": 288.984375,
+              "right": 1401,
+              "bottom": 326.984375
+            }
+          },
+          "composerCard": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 44574,
+            "box": {
+              "left": 1001,
+              "top": 621.578125,
+              "right": 1392,
+              "bottom": 735.578125
+            }
+          }
+        },
+        "screenshot": "assistant-desktop-dark-open-1440x1000.png"
+      },
+      {
+        "label": "evaluation-assistant-open",
+        "width": 1366,
+        "height": 768,
+        "theme": "dark",
+        "assistantOpen": true,
+        "pane": {
+          "left": 932.203125,
+          "top": 92,
+          "right": 1342,
+          "bottom": 680,
+          "width": 409.796875
+        },
+        "contentPaddingRight": "433.8px",
+        "horizontalOverflowPx": 0,
+        "targets": {
+          "versionFilter": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 0,
+            "box": {
+              "left": 474.109375,
+              "top": 319.34375,
+              "right": 875.21875,
+              "bottom": 354.34375
+            }
+          },
+          "firstRunVerdict": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 0,
+            "box": {
+              "left": 622.71875,
+              "top": 578.625,
+              "right": 735.859375,
+              "bottom": 649.609375
+            }
+          },
+          "firstRunDate": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 0,
+            "box": {
+              "left": 735.859375,
+              "top": 578.625,
+              "right": 865.203125,
+              "bottom": 649.609375
+            }
+          },
+          "logout": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 0,
+            "box": {
+              "left": 1252,
+              "top": 17.59375,
+              "right": 1334,
+              "bottom": 55.984375
+            }
+          },
+          "closeAssistant": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 1596.59375,
+            "box": {
+              "left": 1284.984375,
+              "top": 108.984375,
+              "right": 1327,
+              "bottom": 146.984375
+            }
+          },
+          "composerCard": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 42042.84375,
+            "box": {
+              "left": 949.203125,
+              "top": 415.578125,
+              "right": 1318,
+              "bottom": 529.578125
+            }
+          }
+        },
+        "screenshot": "assistant-compact-dark-open-1366x768.png"
+      },
+      {
+        "label": "evaluation-assistant-open",
+        "width": 900,
+        "height": 1000,
+        "theme": "dark",
+        "assistantOpen": true,
+        "pane": {
+          "left": 0,
+          "top": 0,
+          "right": 900,
+          "bottom": 1000,
+          "width": 900
+        },
+        "contentPaddingRight": "0px",
+        "horizontalOverflowPx": 0,
+        "targets": {
+          "versionFilter": {
+            "exists": true,
+            "hit": false,
+            "obscuredAreaPx2": 13755,
+            "box": {
+              "left": 458,
+              "top": 352.15625,
+              "right": 851,
+              "bottom": 387.15625
+            }
+          },
+          "firstRunVerdict": {
+            "exists": true,
+            "hit": false,
+            "obscuredAreaPx2": 7870.392578125,
+            "box": {
+              "left": 603.375,
+              "top": 611.4375,
+              "right": 714.25,
+              "bottom": 682.421875
+            }
+          },
+          "firstRunDate": {
+            "exists": true,
+            "hit": false,
+            "obscuredAreaPx2": 8997.26953125,
+            "box": {
+              "left": 714.25,
+              "top": 611.4375,
+              "right": 841,
+              "bottom": 682.421875
+            }
+          },
+          "logout": {
+            "exists": true,
+            "hit": false,
+            "obscuredAreaPx2": 3148.03125,
+            "box": {
+              "left": 794,
+              "top": 12,
+              "right": 876,
+              "bottom": 50.390625
+            }
+          },
+          "closeAssistant": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 1596.59375,
+            "box": {
+              "left": 843.984375,
+              "top": 15.984375,
+              "right": 886,
+              "bottom": 53.984375
+            }
+          },
+          "composerCard": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 98154,
+            "box": {
+              "left": 16,
+              "top": 529.578125,
+              "right": 877,
+              "bottom": 643.578125
+            }
+          }
+        },
+        "screenshot": "assistant-medium-fullscreen-900x1000.png"
+      },
+      {
+        "label": "evaluation-assistant-open",
+        "width": 390,
+        "height": 844,
+        "theme": "dark",
+        "assistantOpen": true,
+        "pane": {
+          "left": 0,
+          "top": 0,
+          "right": 390,
+          "bottom": 844,
+          "width": 390
+        },
+        "contentPaddingRight": "0px",
+        "horizontalOverflowPx": 0,
+        "targets": {
+          "versionFilter": {
+            "exists": true,
+            "hit": false,
+            "obscuredAreaPx2": 11340,
+            "box": {
+              "left": 33,
+              "top": 497.75,
+              "right": 357,
+              "bottom": 532.75
+            }
+          },
+          "firstRunVerdict": {
+            "exists": true,
+            "hit": false,
+            "obscuredAreaPx2": 0,
+            "box": {
+              "left": 298.984375,
+              "top": 916.90625,
+              "right": 347,
+              "bottom": 964.90625
+            }
+          },
+          "firstRunDate": {
+            "exists": true,
+            "hit": false,
+            "obscuredAreaPx2": 0,
+            "box": {
+              "left": 33,
+              "top": 976.90625,
+              "right": 286.984375,
+              "bottom": 1021.296875
+            }
+          },
+          "logout": {
+            "exists": true,
+            "hit": false,
+            "obscuredAreaPx2": 2508.59375,
+            "box": {
+              "left": 307.984375,
+              "top": 10,
+              "right": 374,
+              "bottom": 48
+            }
+          },
+          "closeAssistant": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 1596.59375,
+            "box": {
+              "left": 337.984375,
+              "top": 13.1875,
+              "right": 380,
+              "bottom": 51.1875
+            }
+          },
+          "composerCard": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 40014,
+            "box": {
+              "left": 16,
+              "top": 698,
+              "right": 367,
+              "bottom": 812
+            }
+          }
+        },
+        "screenshot": "assistant-mobile-fullscreen-final-390x844.png"
+      },
+      {
+        "label": "gateway-assistant-open",
+        "width": 1440,
+        "height": 1000,
+        "theme": "dark",
+        "assistantOpen": true,
+        "pane": {
+          "left": 984,
+          "top": 272,
+          "right": 1416,
+          "bottom": 912,
+          "width": 432
+        },
+        "contentPaddingRight": "456px",
+        "horizontalOverflowPx": 0,
+        "targets": {
+          "save": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 0,
+            "box": {
+              "left": 622,
+              "top": 482.296875,
+              "right": 760,
+              "bottom": 520.6875
+            }
+          },
+          "discard": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 0,
+            "box": {
+              "left": 772,
+              "top": 482.296875,
+              "right": 952,
+              "bottom": 520.6875
+            }
+          },
+          "logout": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 0,
+            "box": {
+              "left": 1326,
+              "top": 17.59375,
+              "right": 1408,
+              "bottom": 55.984375
+            }
+          },
+          "closeAssistant": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 1596.59375,
+            "box": {
+              "left": 1358.984375,
+              "top": 288.984375,
+              "right": 1401,
+              "bottom": 326.984375
+            }
+          }
+        },
+        "screenshot": "gateway-assistant-avoided-1440x1000.png"
+      },
+      {
+        "label": "gateway-assistant-open",
+        "width": 1366,
+        "height": 768,
+        "theme": "dark",
+        "assistantOpen": true,
+        "pane": {
+          "left": 932.203125,
+          "top": 92,
+          "right": 1342,
+          "bottom": 680,
+          "width": 409.796875
+        },
+        "contentPaddingRight": "433.8px",
+        "horizontalOverflowPx": 0,
+        "targets": {
+          "save": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 0,
+            "box": {
+              "left": 570.203125,
+              "top": 482.296875,
+              "right": 708.203125,
+              "bottom": 520.6875
+            }
+          },
+          "discard": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 0,
+            "box": {
+              "left": 720.203125,
+              "top": 482.296875,
+              "right": 900.203125,
+              "bottom": 520.6875
+            }
+          },
+          "logout": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 0,
+            "box": {
+              "left": 1252,
+              "top": 17.59375,
+              "right": 1334,
+              "bottom": 55.984375
+            }
+          },
+          "closeAssistant": {
+            "exists": true,
+            "hit": true,
+            "obscuredAreaPx2": 1596.59375,
+            "box": {
+              "left": 1284.984375,
+              "top": 108.984375,
+              "right": 1327,
+              "bottom": 146.984375
+            }
+          }
+        },
+        "screenshot": "gateway-assistant-avoided-1366x768.png"
+      },
+      {
+        "label": "native-management-regression",
+        "width": 1440,
+        "height": 1000,
+        "theme": "dark",
+        "assistantOpen": false,
+        "pane": {
+          "left": 0,
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "width": 0
+        },
+        "contentPaddingRight": "0px",
+        "horizontalOverflowPx": 0,
+        "targets": {},
+        "screenshot": "conversations-desktop-dark-regression-1440x1000.png"
+      },
+      {
+        "label": "native-management-regression",
+        "width": 390,
+        "height": 844,
+        "theme": "dark",
+        "assistantOpen": false,
+        "pane": {
+          "left": 0,
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "width": 0
+        },
+        "contentPaddingRight": "0px",
+        "horizontalOverflowPx": 0,
+        "targets": {},
+        "screenshot": "conversations-mobile-dark-regression-390x844.png"
+      }
+    ],
+    "browserErrors": [],
+    "http5xxResponses": [],
+    "isolatedServiceStop": {
+      "url": "http://127.0.0.1:3091/hep/",
+      "pid": 2994062,
+      "stopped": true,
+      "port3091Listening": false,
+      "originalPort3090Pid": 2580356,
+      "originalPort3090Listening": true
+    }
+  }
+}

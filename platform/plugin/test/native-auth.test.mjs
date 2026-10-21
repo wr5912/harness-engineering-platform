@@ -54,6 +54,8 @@ test('平台登录保护原生 API、三个写入域与 MCP，旧 Token/Cookie �
     new SystemPrompt(ctx, {})
     ctx.provide('sessionController', {})
     ctx.provide('settingsController', {})
+    ctx.provide('agentDefaultModel', {})
+    ctx.provide('llm', { listConfigurableProviders: () => [] })
     ctx.provide('agents', { get: () => undefined })
     ctx.provide('tools', { register() {} })
     ctx.provide('goals', { get: () => undefined })

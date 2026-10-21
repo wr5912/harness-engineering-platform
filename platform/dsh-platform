@@ -70,7 +70,7 @@ def runtime_environment(home):
             raise PlatformError("无法读取本地模型凭据 JSON 文件。") from None
         if not isinstance(values, dict):
             raise PlatformError("本地模型凭据必须是 JSON 字段映射。")
-        for name in ("DEEPSEEK_API_KEY", "LOCAL_LLM_BASE_URL", "LOCAL_LLM_API_KEY"):
+        for name in ("DEEPSEEK_API_KEY", "LOCAL_LLM_BASE_URL", "LOCAL_LLM_API_KEY", "XIAOMI_TOKEN_PLAN_CN_API_KEY"):
             if name not in values or name in environment:
                 continue
             if not isinstance(values[name], str) or not values[name].strip():

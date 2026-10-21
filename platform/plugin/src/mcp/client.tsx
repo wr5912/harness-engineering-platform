@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
+import { useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { Manager } from 'harness-mcp-manager-client'
-import { CHANNEL, type PlatformPageProps } from '../protocol.ts'
+import { PasswordInput } from './components.tsx'
+import { CHANNEL, type PlatformNavigation, type PlatformPageProps } from '../protocol.ts'
 import type { CompositionConfig, CompositionEntry } from './compositions.ts'
 import type { PlatformUpdates } from '../realtime/client.ts'
 import { compositionTestInput, isThreatComposition, ThreatConfigurationFields, ThreatRunResult, threatEditorStyle } from './threat-editor.tsx'
 
 type LivePageProps = { updates?: PlatformUpdates; onContext?(context: Record<string, unknown>): void }
+type NavigationProps = { target?: PlatformNavigation; onNavigate?(target: PlatformNavigation): void; active?: boolean }
 
 const tabs = [
   { id: 'servers', title: '服务列表' },
@@ -14,48 +18,115 @@ const tabs = [
   { id: 'composition', title: '工具组合编排' },
 ] as const
 
-export function McpPage({ rpc, updates, onContext }: PlatformPageProps & LivePageProps) {
+export function McpPage({ rpc, updates, onContext, target, onNavigate, active = true }: PlatformPageProps & LivePageProps & NavigationProps) {
   const [state, setState] = useState<any>({ status: 'loading' })
-  const [page, setPage] = useState<string>('servers')
+  const [page, setPage] = useState<string>(tabs.some(tab => tab.id === target?.tab) ? target!.tab! : 'servers')
   const [toolbarTarget, setToolbarTarget] = useState<HTMLDivElement | null>(null)
   const [publishedService, setPublishedService] = useState<any>(null)
   const [serviceError, setServiceError] = useState('')
+  const managerRoot = useRef<HTMLDivElement>(null)
+  const lastServer = useRef<string | undefined>(target?.server_id)
+  const locatedServer = useRef('')
+  const lastComposition = useRef<{ composition_id: string; version?: 'draft' | 'published'; version_id?: string } | null>(null)
+  const compositionContext = useCallback((context: Record<string, unknown>) => {
+    if (typeof context.composition_id === 'string') lastComposition.current = {
+      composition_id: context.composition_id,
+      ...(context.version === 'draft' || context.version === 'published' ? { version: context.version } : {}),
+      ...(typeof context.version_id === 'string' ? { version_id: context.version_id } : {}),
+    }
+    onContext?.(context)
+  }, [onContext])
   const [revision, setRevision] = useState(0)
+  const [serviceLoaded, setServiceLoaded] = useState(false)
+  useEffect(() => {
+    if (active && target?.page === 'mcp' && tabs.some(tab => tab.id === target.tab)) setPage(target.tab!)
+  }, [active, target?.page, target?.tab])
   useEffect(() => updates?.subscribe(() => {
     if (updates.getSnapshot().domains.includes('mcp')) setRevision(value => value + 1)
   }), [updates])
   useEffect(() => {
-    let active = true
+    let mounted = true
     void rpc.call(CHANNEL, 'mcp/configuration', {}).then(response => {
-      if (!active) return
+      if (!mounted) return
       setState(response.ok ? { status: 'ready', writable: true, ...(response.value as object) }
         : (previous: any) => previous.status === 'ready' ? { ...previous, error: response.error.message }
           : { status: 'unavailable', error: response.error.message })
-    }).catch(() => { if (active) setState((previous: any) => previous.status === 'ready'
+    }).catch(() => { if (mounted) setState((previous: any) => previous.status === 'ready'
       ? { ...previous, error: '无法读取 MCP 数据配置，请检查连接后重试。' }
       : { status: 'unavailable', error: '无法读取 MCP 数据配置，请检查连接后重试。' }) })
-    return () => { active = false }
+    return () => { mounted = false }
   }, [rpc, revision])
-  useEffect(() => { onContext?.({ page: 'mcp', tab: page }) }, [page, onContext])
+  useEffect(() => {
+    if (active && page !== 'composition') onContext?.({ page: 'mcp', tab: page, server_id: target?.server_id })
+  }, [active, page, target?.server_id, onContext])
   useEffect(() => {
     if (state.status !== 'ready') return
     let active = true
     void rpc.call(CHANNEL, 'mcp/list', {}).then(response => {
       if (!active) return
-      if (response.ok) { setPublishedService((response.value as any).publishedService ?? null); setServiceError('') }
+      if (response.ok) { setPublishedService((response.value as any).publishedService ?? null); setServiceError(''); setServiceLoaded(true) }
       else setServiceError(response.error.message)
     }).catch(() => { if (active) setServiceError('无法读取已发布组合服务，请刷新重试。') })
     return () => { active = false }
   }, [state.revision, state.status, revision])
+  const servers = state.status === 'ready' ? [...(state.value?.servers ?? []), ...(publishedService ? [publishedService] : [])] : []
+  const missingServer = active && page !== 'composition' && target?.server_id && serviceLoaded && state.status === 'ready' && !servers.some((server: any) => server.id === target.server_id)
+  useEffect(() => {
+    if (!active || page !== 'servers' || !target?.server_id) { locatedServer.current = ''; return }
+    if (state.status !== 'ready' || !servers.some((server: any) => server.id === target.server_id) || locatedServer.current === target.server_id) return
+    const root = managerRoot.current
+    if (!root) return
+    const locate = () => {
+      const item = [...root.querySelectorAll<HTMLButtonElement>('.mcp-list-item')].find(button => button.dataset.serverId === target.server_id)
+      const detail = root.querySelector<HTMLElement>('.mcp-layout > .mcp-card:not(.mcp-sidebar)')
+      if (item?.getAttribute('aria-current') !== 'true' || !detail) return false
+      locatedServer.current = target.server_id!
+      detail.tabIndex = -1
+      detail.scrollIntoView({ block: 'start' })
+      detail.focus({ preventScroll: true })
+      return true
+    }
+    const observer = new MutationObserver(() => { if (locate()) observer.disconnect() })
+    observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-current'] })
+    const frame = requestAnimationFrame(() => { if (locate()) observer.disconnect() })
+    return () => { if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame); observer.disconnect() }
+  }, [active, page, target?.server_id, state.status, state.revision, publishedService])
+  function selectTab(next: string) {
+    setPage(next)
+    if (active) onNavigate?.({ page: 'mcp', tab: next,
+      ...(next === 'composition' ? target?.composition_id ? { composition_id: target.composition_id, version: target.version, version_id: target.version_id } : lastComposition.current ?? {} : {}),
+      ...(next !== 'composition' && (target?.server_id || lastServer.current) ? { server_id: target?.server_id ?? lastServer.current } : {}) })
+  }
   return <main className="harness-mcp-page" aria-label="MCP 管理">
+    <header className="harness-page-heading"><div><h1>MCP 管理</h1><p>从服务连接到工具调试，让每一步的证据和适用范围清晰可见。</p></div><button type="button" className="harness-primary" disabled={state.status !== 'ready'} onClick={() => {
+      selectTab('servers')
+      requestAnimationFrame(() => managerRoot.current?.querySelector<HTMLButtonElement>('.mcp-service-layout .mcp-add')?.click())
+    }}>＋ 接入服务</button></header>
     <div className="harness-mcp-toolbar">
-      <nav className="harness-mcp-tabs" aria-label="MCP 工作区">{tabs.map(tab => <button key={tab.id} type="button" aria-current={page === tab.id ? 'page' : undefined} onClick={() => setPage(tab.id)}>{tab.title}</button>)}</nav>
+      <nav className="harness-mcp-tabs" aria-label="MCP 工作区">{tabs.map(tab => <button key={tab.id} type="button" aria-current={page === tab.id ? 'page' : undefined} onClick={() => selectTab(tab.id)}>{tab.title}</button>)}</nav>
       <div className="harness-mcp-actions" ref={setToolbarTarget} />
     </div>
     {state.error && <p role="alert">{state.error}</p>}
     {state.status === 'loading' && <p>正在读取数据仓库 MCP 配置…</p>}
     {serviceError && <p role="alert">{serviceError}</p>}
-    <div hidden={page === 'composition'}>{state.status === 'ready' && <Manager view={page} onValidationError={() => setPage('servers')} publishedService={publishedService} toolbarTarget={page === 'composition' ? null : toolbarTarget} form={{ state }} write={async (ops, revision) => {
+    {missingServer && <p role="alert">服务 ID <code>{target.server_id}</code> 不存在。请选择其他服务，或检查此链接。</p>}
+    <div ref={managerRoot} hidden={page === 'composition'}>
+      {target?.server_id && page === 'servers' && <button type="button" className="harness-mcp-return" onClick={() => {
+        const item = managerRoot.current?.querySelector<HTMLElement>('.mcp-sidebar [aria-current="true"]')
+        item?.scrollIntoView({ block: 'nearest' }); item?.focus()
+      }}>返回服务列表</button>}
+      {state.status === 'ready' && <Manager view={page} onValidationError={() => selectTab('servers')} publishedService={publishedService} selectedServerId={target?.server_id} PasswordInput={PasswordInput} renderToolbar={(control, container) => createPortal(control, container)} onOpenView={(view, serverId) => {
+      lastServer.current = serverId
+      setPage(view)
+      if (active) onNavigate?.({ page: 'mcp', tab: view, server_id: serverId })
+    }} onSelectServerId={server_id => {
+      lastServer.current = server_id
+      if (active) onNavigate?.({ page: 'mcp', tab: page, ...(server_id ? { server_id } : {}) })
+      if (server_id && page === 'servers') requestAnimationFrame(() => {
+        const detail = managerRoot.current?.querySelector<HTMLElement>('.mcp-layout > .mcp-card:not(.mcp-sidebar)')
+        if (detail) { detail.tabIndex = -1; detail.scrollIntoView({ block: 'start' }); detail.focus() }
+      })
+    }} toolbarTarget={page === 'composition' ? null : toolbarTarget} form={{ state }} write={async (ops, revision) => {
       try {
         const response = await rpc.call(CHANNEL, 'mcp/saveConfiguration', { ops, revision })
         if (response.ok) {
@@ -65,31 +136,80 @@ export function McpPage({ rpc, updates, onContext }: PlatformPageProps & LivePag
         return response.ok ? { ok: true } : { ok: false, error: response.error }
       } catch { return { ok: false, error: { message: 'MCP 数据配置保存失败，请检查连接后重试。' } } }
     }} />}</div>
-    <div hidden={page !== 'composition'}><CompositionPage rpc={rpc} configuration={state} updates={updates} active={page === 'composition'} onContext={onContext} onCatalogChange={value => { setPublishedService(value.publishedService ?? null); setServiceError('') }} /></div>
+    <div hidden={page !== 'composition'}><CompositionPage rpc={rpc} configuration={state} updates={updates} active={active && page === 'composition'} target={target} onNavigate={onNavigate} onContext={compositionContext} onCatalogChange={value => { setPublishedService(value.publishedService ?? null); setServiceError(''); setServiceLoaded(true) }} /></div>
   </main>
 }
 
-function CompositionPage({ rpc, configuration, onCatalogChange, updates, onContext, active }: PlatformPageProps & LivePageProps & { configuration: unknown; active: boolean; onCatalogChange(value: any): void }) {
+function CompositionPage({ rpc, configuration, onCatalogChange, updates, onContext, active, target, onNavigate }: PlatformPageProps & LivePageProps & NavigationProps & { configuration: unknown; active: boolean; onCatalogChange(value: any): void }) {
   const [data, setData] = useState<any>(null)
-  const [selection, setSelection] = useState<{ id: string; version: 'draft' | 'published' } | null>(null)
+  const [selection, setSelection] = useState<{ id: string; version: 'draft' | 'published'; versionId?: string } | null>(null)
   const [editor, setEditor] = useState<{ id?: string; revision: string; value: CompositionConfig } | null>(null)
+  const [recoveryDraft, setRecoveryDraft] = useState<{ id?: string; revision: string; value: CompositionConfig } | null>(null)
+  const [conflictDetected, setConflictDetected] = useState(false)
   const [asset, setAsset] = useState('')
-  const [result, setResult] = useState<any>(null)
+  const [rawResult, setResult] = useState<any>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [selectedNode, setSelectedNode] = useState('getAsset')
   const requestId = useRef(0)
   const actionId = useRef(0)
+  const detailRef = useRef<HTMLElement>(null)
+  const locatedComposition = useRef('')
+  const listRef = useRef<HTMLElement>(null)
+  const listButtons = useRef(new Map<string, HTMLButtonElement>())
   const [revision, setRevision] = useState(0)
+  const routeMatchesSelection = !target?.composition_id || target.composition_id === selection?.id
+    && (!target.version || target.version === selection?.version) && target.version_id === selection?.versionId
+  const result = routeMatchesSelection ? rawResult : null
+  useEffect(() => {
+    if (routeMatchesSelection) return
+    actionId.current++
+    setResult(null); setError(''); setBusy(false)
+  }, [target?.composition_id, target?.version, target?.version_id])
   useEffect(() => updates?.subscribe(() => {
     if (updates.getSnapshot().domains.includes('mcp')) setRevision(value => value + 1)
   }), [updates])
   useEffect(() => {
-    if (active) onContext?.({ page: 'mcp', tab: 'composition', composition_id: selection?.id, version: selection?.version })
+    if (!editor && !recoveryDraft) return
+    const protect = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', protect)
+    return () => window.removeEventListener('beforeunload', protect)
+  }, [editor, recoveryDraft])
+  useEffect(() => {
+    if (active) onContext?.({ page: 'mcp', tab: 'composition', composition_id: selection?.id, version: selection?.version, version_id: selection?.versionId })
   }, [active, selection, onContext])
+  useEffect(() => {
+    if (!active || target?.page !== 'mcp' || target.tab !== 'composition' || !target.composition_id) return
+    const requested = data?.compositions?.find((item: CompositionEntry) => item.id === target.composition_id)
+    if (!target.version && !data) return
+    const next = { id: target.composition_id, version: target.version === 'draft' || (!target.version && requested?.draft) ? 'draft' as const : 'published' as const,
+      ...(target.version_id ? { versionId: target.version_id } : {}) }
+    setSelection(current => current?.id === next.id && current.version === next.version && current.versionId === next.versionId ? current : next)
+  }, [active, data, target?.page, target?.tab, target?.composition_id, target?.version, target?.version_id])
+  useEffect(() => {
+    if (active && selection && !target?.composition_id) onNavigate?.({ page: 'mcp', tab: 'composition', composition_id: selection.id,
+      version: selection.version, ...(selection.versionId ? { version_id: selection.versionId } : {}), replace: true })
+  }, [active, selection, target?.composition_id, onNavigate])
   const entries: CompositionEntry[] = data?.compositions ?? []
   const entry = entries.find(item => item.id === selection?.id)
-  const config = selection && entry?.[selection.version]
+  const frozenVersion = selection?.versionId && selection.version === 'published' ? entry?.versions?.find(item => item.versionId === selection.versionId) : undefined
+  const config = selection && (selection.version === 'draft' ? entry?.draft : selection.versionId ? frozenVersion?.config : entry?.published)
+  useEffect(() => {
+    if (!active || target?.page !== 'mcp' || target.tab !== 'composition') { locatedComposition.current = ''; return }
+    if (!target.composition_id || !data || selection?.id !== target.composition_id) return
+    const expectedVersion = target.version === 'draft' || (!target.version && entry?.draft) ? 'draft' : 'published'
+    if (selection.version !== expectedVersion || (target.version_id && selection.versionId !== target.version_id)) return
+    const routeKey = `${target.composition_id}:${selection.version}:${selection.versionId ?? ''}`
+    if (locatedComposition.current === routeKey) return
+    const frame = requestAnimationFrame(() => {
+      if (!detailRef.current) return
+      locatedComposition.current = routeKey
+      detailRef.current.scrollIntoView({ block: 'start' })
+      detailRef.current.focus({ preventScroll: true })
+    })
+    return () => { if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame) }
+  }, [active, target?.page, target?.tab, target?.composition_id, target?.version, target?.version_id, data, selection, entry])
+  const historical = selection?.version === 'published' && Boolean(selection.versionId) && selection.versionId !== entry?.publishedVersionId
   const threat = isThreatComposition(config)
   const registeredConnections = data?.connections ?? []
   const connections = data?.connections?.filter((item: any) => item.kind === 'openapi') ?? []
@@ -98,7 +218,7 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
     ? [config.bindings?.socConnectionId, config.bindings?.reportConnectionId].every(id => registeredConnections.some((item: any) => item.id === id))
     : config.kind === 'composite' ? config.steps?.every(step => entries.find(item => item.id === step.compositionId)?.versions?.some(version => version.versionId === step.versionId))
       : [config.connectionId, ...(config.flow ? [config.alertsConnectionId] : [])].every(id => connections.some((item: any) => item.id === id)))
-  const graph = result?.graph ?? (selection && data?.compositions.find((item: any) => item.id === selection.id)?.graphs?.[selection.version])
+  const graph = result?.graph ?? (historical ? undefined : selection && data?.compositions.find((item: any) => item.id === selection.id)?.graphs?.[selection.version])
   const nodes = graph?.nodes.filter((node: any) => node.operationId) ?? []
   const node = nodes.find((item: any) => item.id === selectedNode) ?? nodes[0]
   const trace = result?.result?.trace?.find((item: any) => node && ((node.step && item.step === node.step) || item.step === node.id || item.stage === node.operationId))
@@ -107,9 +227,9 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
     setData(value)
     onCatalogChange(value)
     setSelection(current => {
-      if (current) return current
+      if (current || target?.composition_id) return current
       const first = value.compositions[0]
-      return first ? { id: first.id, version: first.draft ? 'draft' : 'published' } : null
+      return first ? { id: first.id, version: first.draft ? 'draft' : 'published', ...(first.draft ? {} : { versionId: first.publishedVersionId }) } : null
     })
   }
   useEffect(() => {
@@ -122,8 +242,23 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
     return () => { requestId.current++ }
   }, [configuration, revision])
 
-  function select(item: CompositionEntry, version: 'draft' | 'published') {
-    setSelection({ id: item.id, version }); setResult(null); setError(''); setAsset('')
+  function select(item: CompositionEntry, version: 'draft' | 'published', versionId?: string, focus = true) {
+    const next = { id: item.id, version, ...(versionId ? { versionId } : {}) }
+    actionId.current++
+    setSelection(next); setResult(null); setError(''); setAsset(''); setBusy(false)
+    if (active) onNavigate?.({ page: 'mcp', tab: 'composition', composition_id: item.id, version, ...(versionId ? { version_id: versionId } : {}) })
+    if (focus) requestAnimationFrame(() => { detailRef.current?.scrollIntoView({ block: 'start' }); detailRef.current?.focus() })
+  }
+  function exportDraft(value: CompositionConfig, download: boolean) {
+    const content = JSON.stringify(value, null, 2)
+    if (!download) {
+      void navigator.clipboard.writeText(content).then(() => setError('草稿已复制，可在读取最新版本后手工重应用。')).catch(() => setError('无法自动复制，请下载草稿。'))
+      return
+    }
+    const url = URL.createObjectURL(new Blob([content], { type: 'application/json' }))
+    const link = document.createElement('a')
+    link.href = url; link.download = 'mcp-composition-draft.json'; link.click()
+    setTimeout(() => URL.revokeObjectURL(url), 0)
   }
   async function action(endpoint: string, payload: any) {
     const id = ++actionId.current
@@ -131,44 +266,65 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
     try {
       const response = await rpc.call(CHANNEL, `mcp/${endpoint}`, payload)
       if (id !== actionId.current) return
-      if (!response.ok) { setError(response.error.message); return }
+      if (!response.ok) {
+        setError(response.error.message)
+        if (endpoint === 'saveCompositionDraft' && /变化|冲突|版本/.test(response.error.message)) {
+          setConflictDetected(true)
+          try {
+            const latest = await rpc.call(CHANNEL, 'mcp/list', {})
+            if (id === actionId.current && latest.ok) accept(latest.value)
+          } catch { /* 保留原冲突信息与本地草稿，由用户手动重试读取。 */ }
+        }
+        return
+      }
       const value = response.value as any
-      if (endpoint === 'list') accept(value)
+      if (endpoint === 'list') { accept(value); setConflictDetected(false) }
       else if (endpoint === 'saveCompositionDraft') {
         requestId.current++
         const saved = editor?.id ? value.compositions.find((item: CompositionEntry) => item.id === editor.id) : value.compositions.at(-1)
-        accept(value); setSelection({ id: saved.id, version: 'draft' }); setEditor(null)
+        accept(value); setEditor(null); setRecoveryDraft(null); setConflictDetected(false); select(saved, 'draft', undefined, false)
       } else if (endpoint === 'publishComposition') {
         requestId.current++
-        accept(value); setSelection({ id: payload.compositionId, version: 'published' }); setResult(value.dry)
+        accept(value)
+        const saved = value.compositions.find((item: CompositionEntry) => item.id === payload.compositionId)
+        select(saved, 'published', saved.publishedVersionId, false); setResult(value.dry)
       } else setResult(value)
       if (['saveCompositionDraft', 'publishComposition'].includes(endpoint)) updates?.invalidate(['mcp'])
     } catch { if (id === actionId.current) setError('操作失败，请检查连接并重试。') }
-    finally { setBusy(false) }
+    finally { if (id === actionId.current) setBusy(false) }
   }
   const selectedPayload = { compositionId: entry?.id, version: selection?.version, revision: data?.revision, input: compositionTestInput(config || undefined, asset) }
+  const conflict = Boolean(editor && data && (conflictDetected || editor.revision !== data.revision))
   return <div className="harness-composition-workspace">
     <style>{threatEditorStyle}</style>
-    <nav className="harness-card harness-composition-sidebar" aria-label="工具编排列表">
+    <nav ref={listRef} className="harness-card harness-composition-sidebar" aria-label="工具编排列表">
       <h2>工具组合编排</h2><div className="harness-mcp-actions"><button type="button" disabled={busy || !!editor || !data} onClick={() => setEditor({ revision: data.revision, value: { toolName: '', title: '资产相关告警查询', description: '查询资产后查询相关告警的两步只读组合', connectionId: connections[0]?.id ?? '' } })}>新建编排</button>
         <button type="button" disabled={busy || !!editor} onClick={() => void action('list', {})}>刷新</button></div>
       <section aria-label="全部编排"><h3>全部编排（{entries.length}）</h3>
         {entries.length ? <ul>{entries.map(item => {
           const version = item.draft ? 'draft' : 'published'
           const value = item[version]!
-          return <li key={item.id}><button type="button" disabled={busy || !!editor} aria-current={selection?.id === item.id ? 'true' : undefined} onClick={() => select(item, version)}>
+          return <li key={item.id}><button ref={element => { if (element) listButtons.current.set(item.id, element); else listButtons.current.delete(item.id) }} type="button" disabled={busy || !!editor} aria-current={selection?.id === item.id ? 'true' : undefined} onClick={() => select(item, version, version === 'published' ? item.publishedVersionId : undefined)}>
             <span>{value.title}</span><small>{value.toolName}</small>
             <span className="harness-composition-status">{item.published && <span data-state="published">已发布</span>}{item.draft && <span data-state="draft">正在编辑</span>}</span>
           </button></li>
         })}</ul> : <p>暂无编排</p>}
       </section>
     </nav>
-    <section className="harness-card harness-composition-detail" aria-label="组合编排详情">
+    <section ref={detailRef} tabIndex={-1} className="harness-card harness-composition-detail" aria-label="组合编排详情">
+      <button type="button" className="harness-composition-return" onClick={() => { listRef.current?.scrollIntoView({ block: 'start' }); if (selection) listButtons.current.get(selection.id)?.focus() }}>返回编排列表</button>
       {error && <p role="alert">{error}</p>}
       {busy && <p role="status">正在处理…</p>}
       {config && !extensionReady && <p role="alert">此编排依赖的业务扩展尚未装载。已有目录保持可读，请先启用工作区的 DSH 扩展。</p>}
-      {editor && data && editor.revision !== data.revision && <p role="alert">编排目录已在其他位置更新，当前草稿已保留。请先复制需要保留的内容，取消编辑后重新读取；旧版本草稿不会覆盖新数据。</p>}
-      {!config && !editor ? <p>{data ? selection ? `所选编排 ${selection.id} 的${selection.version === 'draft' ? '草稿' : '已发布版本'}已不存在，请重新选择。` : '选择一个编排查看，或新建编排。' : '正在读取编排目录…'}</p> : <>
+      {conflict && <section className="harness-composition-conflict" role="alert"><h3>编排目录版本冲突</h3><p>当前编辑基于版本 <code>{editor?.revision.slice(0, 12)}</code>，页面已读取的目录版本为 <code>{data?.revision?.slice(0, 12)}</code>。本地草稿仍在编辑器中；请先取回草稿，再读取最新内容并手工重应用修改。</p>
+        <div className="harness-mcp-actions"><button type="button" onClick={() => exportDraft(editor!.value, false)}>复制本地草稿</button><button type="button" onClick={() => exportDraft(editor!.value, true)}>下载本地草稿</button><button type="button" disabled={busy} onClick={() => void action('list', {})}>读取最新目录</button>{data && editor?.revision !== data.revision && <button type="button" onClick={() => {
+          const latest = entries.find(item => item.id === editor!.id)
+          setRecoveryDraft(editor); setEditor(latest ? { id: latest.id, revision: data.revision, value: structuredClone(latest.draft ?? latest.published!) } : null)
+          setConflictDetected(false); setError(latest ? '已装载最新内容。保留的本地草稿可复制或下载，请手工重应用修改后保存。' : '原编排已不存在；本地草稿仍可复制或下载。')
+        }}>以最新版本继续编辑</button>}</div>
+      </section>}
+      {recoveryDraft && <section className="harness-composition-conflict" role="status"><h3>保留的本地草稿</h3><p>原草稿基于版本 <code>{recoveryDraft.revision.slice(0, 12)}</code>；重新读取目录后请逐项核对并手工重应用。刷新页面前请复制或下载。</p><div className="harness-mcp-actions"><button type="button" onClick={() => exportDraft(recoveryDraft.value, false)}>复制保留草稿</button><button type="button" onClick={() => exportDraft(recoveryDraft.value, true)}>下载保留草稿</button><button type="button" onClick={() => setRecoveryDraft(null)}>放弃保留草稿</button></div></section>}
+      {!config && !editor ? <p>{data ? selection ? `所选编排 ${selection.id} 的${selection.version === 'draft' ? '草稿' : selection.versionId ? `发布版本 ${selection.versionId}` : '当前发布版本'}已不存在，请重新选择。` : '选择一个编排查看，或新建编排。' : '正在读取编排目录…'}</p> : <>
         <h2>{editor ? (editor.id ? '编辑草稿' : '新建编排') : config?.title}</h2>
         {editor ? <form onSubmit={event => { event.preventDefault(); void action('saveCompositionDraft', { compositionId: editor.id, revision: editor.revision, draft: editor.value }) }} className="harness-composition-editor">
           <p>{isThreatComposition(editor.value) ? '编辑阶段连接或固定子版本，保存草稿后进行 dry 校验和发布。' : '复用当前 LangGraph 两步只读流程：查询资产 → 查询相关告警。保存草稿后进行 dry 测试和发布。'}</p>
@@ -186,16 +342,20 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
             <option value="">请选择服务器</option>{editor.value.alertsConnectionId && !connections.some((item: any) => item.id === editor.value.alertsConnectionId) && <option value={editor.value.alertsConnectionId}>{editor.value.alertsConnectionId}（尚未接入）</option>}
             {connections.map((item: any) => <option key={item.id} value={item.id}>{item.name || item.id}（{item.id}）</option>)}
           </select></label>}</>}
-          <div className="harness-mcp-actions"><button disabled={busy} type="submit">保存草稿</button><button disabled={busy} type="button" onClick={() => { setEditor(null); setError('') }}>取消编辑</button></div>
+          <div className="harness-mcp-actions"><button disabled={busy || conflict} type="submit">保存草稿</button><button disabled={busy} type="button" onClick={() => { setRecoveryDraft(editor); setEditor(null); setError('草稿已暂存于当前页面。刷新或关闭前请复制或下载，继续编辑时请手工核对最新目录。') }}>暂存并返回详情</button></div>
           <p>草稿保存到仓库编排目录；已发布版本继续供 MCP 调用。</p>
         </form> : <>
-          <div className="harness-mcp-actions" aria-label="编排版本">{(['draft', 'published'] as const).filter(version => entry?.[version]).map(version => <button key={version} disabled={busy} aria-pressed={selection?.version === version} onClick={() => select(entry!, version)}>{version === 'draft' ? '编辑草稿' : '已发布版本'}</button>)}</div>
-          <p>{selection?.version === 'draft' ? '草稿尚未发布' : '当前版本已发布'} · {upstream ? '依赖已登记，等待实际调用验证' : threat ? '请编辑连接或选择已发布的固定子版本' : '请先接入所需的 OpenAPI 服务器'}</p>
+          <div className="harness-mcp-actions" aria-label="编排版本">{(['draft', 'published'] as const).filter(version => entry?.[version]).map(version => <button key={version} disabled={busy} aria-pressed={selection?.version === version && (version === 'draft' || !selection.versionId || selection.versionId === entry?.publishedVersionId)} onClick={() => select(entry!, version, version === 'published' ? entry?.publishedVersionId : undefined, false)}>{version === 'draft' ? '编辑草稿' : '当前发布版本'}</button>)}
+            {entry?.versions?.filter(version => version.versionId !== entry.publishedVersionId).map(version => <button key={version.versionId} type="button" disabled={busy} aria-pressed={selection?.versionId === version.versionId} onClick={() => select(entry, 'published', version.versionId, false)}>历史版本 {version.versionId.slice(0, 12)}</button>)}</div>
+          <p>{selection?.version === 'draft' ? '草稿尚未发布' : historical ? '历史发布版本，只读查看' : '当前版本已发布'} · {upstream ? '依赖已登记，等待实际调用验证' : threat ? '请编辑连接或选择已发布的固定子版本' : '请先接入所需的 OpenAPI 服务器'}</p>
+          {selection?.version === 'published' && <p>版本 ID：<code>{selection.versionId ?? entry?.publishedVersionId ?? '未提供'}</code>{historical && <> · 发布时间：{frozenVersion?.publishedAt ?? '未记录'}</>}</p>}
+          {historical && <details><summary>冻结版本配置</summary><pre>{JSON.stringify(config, null, 2)}</pre></details>}
           <p>{config?.description}</p><p>工具：<code>{config?.toolName}</code> · {config?.kind === 'threat-stage' ? <>SOC：<code>{config.bindings?.socConnectionId}</code> · 报告：<code>{config.bindings?.reportConnectionId}</code></> : config?.kind === 'composite' ? '调用下列固定子组合版本' : <>上游：<code>{config?.connectionId}</code>{config?.flow && <> → <code>{config.alertsConnectionId}</code></>}</>}</p>
-          {selection?.version === 'published' && entry?.published?.publishedAt && <p>发布时间：{entry.published.publishedAt}</p>}
+          {selection?.version === 'published' && !historical && entry?.published?.publishedAt && <p>发布时间：{entry.published.publishedAt}</p>}
           <button type="button" disabled={busy} onClick={() => { setEditor({ id: entry!.id, revision: data.revision, value: { ...(entry!.draft ?? config!) } }); setResult(null); setError('') }}>{entry?.draft ? '继续编辑草稿' : '编辑为草稿'}</button>
         </>}
         {!editor && <div className="harness-composition-layout"><div>
+          {historical && <p>此历史版本仅提供冻结配置查看；执行请通过固定版本的调用入口验证。</p>}
           <div className="harness-mcp-flow">{nodes.map((step: any, index: number) => <article key={step.id}><small>步骤 {index + 1}</small><h3><button type="button" aria-pressed={step.id === node?.id} onClick={() => setSelectedNode(step.id)}>{step.title}</button></h3><code>{step.operationId}</code>{step.versionId && <p>固定版本：<code>{step.versionId.slice(0, 12)}</code></p>}{step.when && <small>条件：{step.when}</small>}</article>)}</div>
           <ul aria-label="编排路径">{(graph?.edges ?? []).map((edge: any) => <li key={`${edge.source}-${edge.target}`}>{edge.source === '__start__' ? '开始' : nodes.find((item: any) => item.id === edge.source)?.title} → {edge.target === '__end__' ? '结束' : nodes.find((item: any) => item.id === edge.target)?.title}{edge.conditional ? '（按前置结果）' : ''}</li>)}</ul>
         </div><aside className="harness-card" aria-label="编排节点详情">{node && <><h3>{node.title}</h3><p>工具：<code>{node.operationId}</code></p><p>状态：{result?.mode === 'dry' ? 'dry 未执行节点' : trace?.status ?? '尚未执行'}</p>
@@ -203,7 +363,7 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
           {trace?.mappedArguments && <pre className="harness-asset-content">{JSON.stringify(trace.mappedArguments, null, 2)}</pre>}
           <h4>输出：{node.output}</h4><pre className="harness-asset-content">{result?.result ? JSON.stringify(config?.kind === 'threat-stage' ? result.result : result.result.stepValues?.[node.output] ?? result.result[node.output], null, 2) : '尚无执行结果'}</pre>{trace?.reason && <p>{trace.reason}</p>}
         </>}</aside></div>}
-        {!editor && <><section className="harness-composition-test"><p>{threat ? '实际执行将按已编译流程调用取证、模型或模拟存储；请使用基本运维测试事件。' : '第一步失败或缺少资产 ID 时，第二步停止执行。'}</p>
+        {!editor && !historical && <><section className="harness-composition-test"><p>{threat ? '实际执行将按已编译流程调用取证、模型或模拟存储；请使用基本运维测试事件。' : '第一步失败或缺少资产 ID 时，第二步停止执行。'}</p>
           <label>{threat ? config?.kind === 'threat-stage' && config.stage !== 'collect' ? '运行 ID' : '事件 ID' : '查询资产'}<input aria-label={threat ? config?.kind === 'threat-stage' && config.stage !== 'collect' ? '组合运行 ID' : '组合事件 ID' : '组合查询资产'} value={asset} onChange={event => { setAsset(event.target.value); setResult(null) }} placeholder={threat ? config?.kind === 'threat-stage' && config.stage !== 'collect' ? '先执行取证阶段，复制返回的 run_id' : 'INC-20261015-000001' : config?.flow ? '资产 ID，如 9106' : '资产 ID、主机名或 IP'} /></label>
           <div className="harness-mcp-actions"><button type="button" disabled={busy || !asset.trim()} onClick={() => void action('dryRunComposition', selectedPayload)}>测试（dry）</button>
             {selection?.version === 'draft' && <button type="button" disabled={busy || !asset.trim()} onClick={() => void action('publishComposition', selectedPayload)}>发布工具</button>}

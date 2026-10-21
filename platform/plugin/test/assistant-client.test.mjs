@@ -252,7 +252,7 @@ test('组合确认卡片显示实际冻结版本与工具身份', async () => {
   const jsx = (type, props) => ({ type, props })
   const module = { exports: {} }
   runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, require(name) {
-    if (name === 'react') return { useState: initial => [initial, () => {}], useSyncExternalStore: (_subscribe, snapshot) => snapshot() }
+    if (name === 'react') return { createContext: value => ({ value }), useContext: context => context.value, useState: initial => [initial, () => {}], useSyncExternalStore: (_subscribe, snapshot) => snapshot() }
     if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx }
     throw new Error(`unexpected import: ${name}`)
   } })
@@ -277,7 +277,7 @@ test('原生回执消费真实参数与结果，完成提案不重复进dock，�
   const assistant = { subscribe: () => () => {}, getSnapshot: () => ({ sessionId: 's', status: { proposals } }) }
   const jsx = (type, props) => ({ type, props }), module = { exports: {} }
   runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, require(name) {
-    if (name === 'react') return { useState: initial => [initial, () => {}], useSyncExternalStore: (_subscribe, snapshot) => snapshot() }
+    if (name === 'react') return { createContext: value => ({ value }), useContext: context => context.value, useState: initial => [initial, () => {}], useSyncExternalStore: (_subscribe, snapshot) => snapshot() }
     if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx }
     throw new Error(`unexpected import: ${name}`)
   } })
@@ -316,7 +316,7 @@ test('确认首屏仅展示决策摘要、具体交付与重要预算，完整�
   const requests = [], rpc = { async call(_channel, method, body) { requests.push({ method, body }); return { ok: true, value: { state: 'cancelled' } } } }
   const jsx = (type, props) => ({ type, props }), module = { exports: {} }
   runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, require(name) {
-    if (name === 'react') return { useState: initial => [initial, () => {}], useSyncExternalStore: (_subscribe, snapshot) => snapshot() }
+    if (name === 'react') return { createContext: value => ({ value }), useContext: context => context.value, useState: initial => [initial, () => {}], useSyncExternalStore: (_subscribe, snapshot) => snapshot() }
     if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx }
     throw new Error(`unexpected import: ${name}`)
   } })

@@ -45,6 +45,11 @@ function accountAt(assetRoot: string): { username: string; password: string } {
   }
 }
 
+/** 已通过平台认证的 RPC 仅返回账号显示所需字段。 */
+export function currentAccount(assetRoot: string) {
+  return { username: accountAt(assetRoot).username }
+}
+
 function formBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     let size = 0

@@ -1,8 +1,10 @@
 import { programRoot } from './workspace.ts'
 import { execFile } from 'node:child_process'
 import { join } from 'node:path'
-import { readFile } from 'node:fs/promises'
 import { promisify } from 'node:util'
+import { readFile } from 'node:fs/promises'
+import { load as loadYaml } from 'js-yaml'
+import { readRunVerdict } from './evaluation/run-verdict.ts'
 
 const execute = promisify(execFile)
 
@@ -14,6 +16,7 @@ export interface RecentRun {
   created_at: string | null
   finished_at: string | null
   effective_verdict?: string | null
+  agent_name?: string | null
 }
 
 export async function recentRuns(root: string, agentIds: string[], signal: AbortSignal): Promise<RecentRun[]> {
@@ -29,12 +32,21 @@ export async function recentRuns(root: string, agentIds: string[], signal: Abort
     })))
   }))
   const recent = rows.flat().sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? '')).slice(0, 8)
-  return Promise.all(recent.map(async run => {
-    try {
-      if (!/^run-[0-9a-f-]{36}$/.test(run.id)) return { ...run, effective_verdict: null }
-      const summary = JSON.parse(await readFile(join(root, 'evolution/experiments', run.experiment_id, 'runs', run.id, 'summary.json'), 'utf8'))
-      const verdict = summary.effective_verdict ?? summary.machine_overall_verdict
-      return { ...run, effective_verdict: ['passed', 'failed', 'inconclusive'].includes(verdict) ? verdict : null }
-    } catch { return { ...run, effective_verdict: null } }
-  }))
+  const names = new Map<string, Promise<string | null>>()
+  const nameFor = (experimentId: string) => {
+    let pending = names.get(experimentId)
+    if (!pending) {
+      pending = readFile(join(root, 'evolution/experiments', experimentId, 'candidate/harness.yaml'), 'utf8')
+        .then(content => {
+          const name = (loadYaml(content) as { agent?: { name?: unknown } })?.agent?.name
+          return typeof name === 'string' && name.trim() ? name.trim() : null
+        }).catch(() => null)
+      names.set(experimentId, pending)
+    }
+    return pending
+  }
+  return Promise.all(recent.map(async run => ({ ...run,
+    effective_verdict: await readRunVerdict(root, run.experiment_id, run.id, run.status),
+    agent_name: await nameFor(run.experiment_id),
+  })))
 }

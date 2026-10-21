@@ -27,7 +27,7 @@ async function loadServer() {
 }
 
 function run(cwd, command, args) {
-  const result = spawnSync(command, args, { cwd, encoding: 'utf8' })
+  const result = spawnSync(command === 'python3' ? process.env.HARNESS_PYTHON || command : command, args, { cwd, encoding: 'utf8' })
   assert.equal(result.status, 0, `${command} ${args.join(' ')}\n${result.stderr}\n${result.stdout}`)
   return result.stdout.trim()
 }
@@ -635,6 +635,7 @@ test('create copies fixed git parent candidate, validates source and dry-runs ds
     assert.match(created.experiment_id, /^EXP-test-agent-002-r[0-9a-f]{12}$/)
     assert.equal(created.validation.valid, true)
     assert.deepEqual(created.dry_run.case_ids, ['U-CASE-001'])
+    assert.equal(created.dry_run.preflight_scope, 'source-and-cases')
     assert.equal(readFileSync(join(fx.root, `evolution/experiments/${created.experiment_id}/candidate/harness.yaml`), 'utf8'), 'name: test\n')
     assert.equal(existsSync(join(fx.root, `evolution/experiments/${created.experiment_id}/candidate/RuntimeHOME/session.txt`)), false)
     const sources = JSON.parse(readFileSync(join(fx.root, 'runtime/adapters/dsh-container/sources.json'), 'utf8'))
@@ -758,6 +759,7 @@ test('edit reads existing content, uses preview hash, rejects unsafe writes and 
     ].join('\n') }] })
     assert.equal(evalPreview.edits[0].changed, true)
     assert.equal(evalPreview.dry_run.mode, 'dry')
+    assert.equal(evalPreview.dry_run.preflight_scope, 'source-and-cases')
     assert.deepEqual(evalPreview.dry_run.case_ids, ['U-CASE-002'])
     assert.match(readFileSync(join(fx.root, 'agents/test-agent/evaluation.md'), 'utf8'), /U-CASE-001/)
     assert.equal(readFileSync(join(fx.root, 'evolution/experiments/EXP-test-agent-001/runs/run-11111111-1111-4111-8111-111111111111/run.json'), 'utf8'), beforeRun)
@@ -916,13 +918,54 @@ test('eval preview, case list, run index and decision update use existing backen
   const { createAgentsHandler } = await loadServer()
   const fx = fixture()
   try {
+    copyFixtureFile(fx.root, 'runtime/adapters/dsh-container/dsh-dev')
+    copyFixtureFile(fx.root, 'runtime/adapters/dsh-container/runtime-model.patch.yml')
+    write(join(fx.root, 'config/business-model-default.json'), JSON.stringify({
+      schema_version: '1.2', default: { provider: 'deepseek-official', model: 'deepseek-flash' },
+    }))
+    const catalogPath = join(fx.root, 'runtime/adapters/dsh-container/sources.json')
+    const catalog = JSON.parse(readFileSync(catalogPath, 'utf8'))
+    catalog.sources['EXP-test-agent-001'].required_env_names = ['DEEPSEEK_API_KEY']
+    write(catalogPath, JSON.stringify(catalog))
     const handler = createAgentsHandler(fx.root)
     const cases = await rpc(handler, 'cases/list', { agent_id: 'test-agent' })
     assert.deepEqual(cases.cases.map(item => item.id), ['U-CASE-001'])
     const preview = await rpc(handler, 'eval/preview', { source: 'experiment:EXP-test-agent-001', mode: 'fast', executor: 'api', review: 'none', cases: ['U-CASE-001'] })
     assert.deepEqual(preview.result.case_ids, ['U-CASE-001'])
+    const runId = 'run-11111111-1111-4111-8111-111111111111'
+    const run = join(fx.root, 'evolution/experiments/EXP-test-agent-001/runs', runId)
+    write(join(run, 'run.yaml'), `run_id: ${runId}\nstatus: completed\n`)
+    write(join(run, 'summary.json'), '{"effective_verdict":"inconclusive","machine_overall_verdict":"passed"}')
+    write(join(run, 'inputs.lock.json'), JSON.stringify({ evaluation_cases: [
+      { case_id: 'U-CASE-001', title: '读取分页' }, { case_id: 'U-CASE-002', title: '核对总数' },
+      { case_id: 'U-CASE-003', title: '生成报告' }, { case_id: 'U-CASE-004', title: '异常处理' },
+    ], case_catalog: ['U-CASE-001', 'U-CASE-002', 'U-CASE-003', 'U-CASE-004'].map(case_id => ({ case_id, scene: '分页与报告完整性' })) }))
+    write(join(run, 'results.jsonl'), [
+      { input_id: 'U-CASE-001', verdict: 'passed' }, { input_id: 'U-CASE-001', verdict: 'passed' },
+      { input_id: 'U-CASE-002', verdict: 'failed' }, { input_id: 'U-CASE-003', verdict: 'failed' },
+    ].map(row => JSON.stringify(row)).join('\n') + '\n')
+    write(join(run, 'analysis.json'), JSON.stringify({ scenes: [{ case_reviews: [{ case_id: 'U-CASE-002', reviewed_verdict: 'inconclusive' }] }] }))
+    for (const [suffix, status] of [['2', 'running'], ['3', 'failed'], ['4', 'cancelled']]) {
+      const partialId = `run-${suffix.repeat(8)}-${suffix.repeat(4)}-4${suffix.repeat(3)}-8${suffix.repeat(3)}-${suffix.repeat(12)}`
+      const partial = join(fx.root, 'evolution/experiments/EXP-test-agent-001/runs', partialId)
+      write(join(partial, 'run.yaml'), `run_id: ${partialId}\nstatus: ${status}\n`)
+      write(join(partial, 'summary.json'), '{"effective_verdict":"passed"}')
+    }
     const runs = await rpc(handler, 'runs/index', { agent_id: 'test-agent' })
     assert.equal(runs.agent_id, 'test-agent')
+    const verdicts = Object.fromEntries(runs.experiments[0].runs.map(item => [item.run_id, item.effective_verdict]))
+    assert.equal(verdicts[runId], 'inconclusive', '有效结论优先于机器结论')
+    assert.equal(Object.values(verdicts).filter(Boolean).length, 1, '运行中、失败和取消 Run 的部分 summary 不应成为整体结论')
+    const indexed = runs.experiments[0].runs.find(item => item.run_id === runId)
+    assert.equal(indexed.title, '分页与报告完整性评测')
+    assert.equal(indexed.case_scope, '4 项已选用例')
+    assert.deepEqual(indexed.case_counts, { total: 4, passed: 1, failed: 1, inconclusive: 1, mixed: 0, pending: 1 }, '两次 Trial 只计一项用例，证据复核优先')
+    assert.equal(runs.experiments[0].runs.find(item => item.status === 'running').case_counts, null, '冻结用例缺失时不编造零项结果')
+    const frozen = JSON.parse(readFileSync(join(run, 'inputs.lock.json'), 'utf8'))
+    frozen.case_catalog.forEach(item => { item.scene = '未分组' })
+    write(join(run, 'inputs.lock.json'), JSON.stringify(frozen))
+    const ungrouped = await rpc(handler, 'runs/index', { agent_id: 'test-agent' })
+    assert.equal(ungrouped.experiments[0].runs.find(item => item.run_id === runId).title, '读取分页等 4 项用例', '占位场景不得遮蔽冻结用例标题')
     const detail = await rpc(handler, 'detail', { agent_id: 'test-agent' })
     const saved = await rpc(handler, 'decision/update', { experiment_id: 'EXP-test-agent-001', content: '# Decision\n\n状态：inconclusive\n', expected_sha256: detail.decision.sha256 })
     assert.equal(saved.path, 'evolution/experiments/EXP-test-agent-001/decision.md')
@@ -960,6 +1003,11 @@ test('eval job status parses redacted stdout result', async () => {
     assert.equal(status.result.api_key, '[REDACTED]')
     assert.equal(status.stdout.includes('key-value'), false)
     assert.match(status.log_note, /截断显示/)
+    const listed = await rpc(createAgentsHandler(fx.root), 'eval/list')
+    assert.equal(listed.jobs[0].job_id, started.job_id)
+    assert.equal(listed.jobs[0].agent_id, 'test-agent')
+    assert.equal(listed.jobs[0].experiment_id, 'EXP-test-agent-001')
+    assert.equal(listed.jobs[0].status, 'completed')
   } finally {
     await rm(fx.root, { recursive: true, force: true })
   }

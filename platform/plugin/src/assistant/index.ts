@@ -167,6 +167,47 @@ function object(value: unknown): MapValue {
 }
 function result(ok: boolean, value: any) { return ok ? { ok: true, value: redactAssistant(value) } : { ok: false, error: { code: 'assistant_operation_failed', message: redactAssistant(value instanceof Error ? value.message : String(value)), details: {} } } }
 
+function freezeInstanceOperation(input: MapValue, preview: any): MapValue {
+  const value = preview?.value
+  if (!value || value.name !== input.name || value.operation !== input.operation) throw new Error('实例预览与请求对象不一致，请重新提交操作')
+  const source = value.plan?.source_id ?? value.source_id
+  if (typeof source !== 'string' || !source || input.operation === 'create' && !input.source
+    || input.source && input.source !== source) throw new Error('实例预览来源与请求不一致，请先指定并核对固定版本')
+  if (['create', 'start', 'restart'].includes(input.operation)) {
+    const port = value.plan?.port
+    const selected = value.model_selection
+    const hash = value.model_policy_hash
+    if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('实例预览缺少有效端口，请重新提交操作')
+    if (!selected || typeof selected.provider !== 'string' || !selected.provider || typeof selected.model !== 'string' || !selected.model
+      || selected.reasoningEffort !== undefined && (typeof selected.reasoningEffort !== 'string' || !selected.reasoningEffort)
+      || typeof hash !== 'string' || !/^[0-9a-f]{64}$/.test(hash)) throw new Error('实例预览缺少已核对的模型设置，请重新提交操作')
+    if (input.model_selection && (input.model_selection.provider !== selected.provider || input.model_selection.model !== selected.model
+      || input.model_selection.reasoningEffort !== selected.reasoningEffort)) throw new Error('实例预览模型与请求不一致，请重新提交操作')
+    return { ...input, expected_source_id: source, port, model_selection: selected, expected_model_policy_hash: hash }
+  }
+  if (input.operation === 'stop') {
+    if (!['running', 'stopped', 'absent', 'failed'].includes(value.observed_state) || !value.observed_at) throw new Error('实例预览缺少当前状态，请重新提交操作')
+    return { ...input, expected_source_id: source, expected_state: value.observed_state }
+  }
+  if (input.operation === 'delete') return { ...input, expected_source_id: source }
+  throw new Error('未知实例操作')
+}
+
+function freezeInstancePreview(action: string, input: MapValue, preview: any): MapValue {
+  if (action === 'run') return freezeInstanceOperation(input, preview)
+  const requested = input.items
+  const results = preview?.value?.previews
+  if (!Array.isArray(requested) || !requested.length || !Array.isArray(results) || results.length !== requested.length) {
+    throw new Error('批量实例预览与请求不一致，请重新提交操作')
+  }
+  const items = requested.map((item: MapValue, index: number) => {
+    const result = results[index]
+    if (!result?.ok) throw new Error(`实例 ${item?.name ?? index + 1} 预览失败，请核对后重新提交批量操作`)
+    return freezeInstanceOperation(item, result)
+  })
+  return { ...input, items }
+}
+
 function assertNoCredentials(domain: Domain, action: string, input: MapValue) {
   const secretPath = domain === 'mcp' && action === 'saveConfiguration' && mcpCredentialEdit(input)
   if (secretPath || JSON.stringify(input) !== JSON.stringify(redactAssistant(input))) throw new Error('凭据请通过 MCP 管理页面维护，助手操作仅使用已配置引用')
@@ -589,6 +630,11 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
       }
       if (domain === 'agents' && action === 'new') actualInput = { ...task.plan.new_agent, agent_id: task.plan.agent_id, confirmed: true }
       if (domain === 'agents' && action === 'create') actualInput = { agent_id: task.plan.agent_id, parent_experiment_id: task.plan.source?.slice(11), parent_ref: task.source_ref, research_question: task.plan.goal, confirmed: true }
+      if (domain === 'instances' && ['run', 'batch'].includes(action)) {
+        const preview = await dispatch(domain, action === 'run' ? 'preview' : 'batch-preview', input, signal)
+        if (!preview.ok) return wireValue({ kind: 'platform-operation', domain, action, state: 'failed', result: preview })
+        actualInput = { ...freezeInstancePreview(action, input, preview), confirmed: true }
+      }
       if (action === 'eval/start') actualInput = { ...actualInput, task_budget: { deadline_at: task.deadline_at, remaining_model_calls: task.plan.budget.max_model_calls - task.model_calls, assistant_session_id: id } }
       const loggedInput = action === 'edit/apply' ? { experiment_id: input.experiment_id, edits: (input.edits ?? []).map((edit: any) => ({ path: edit.path, expected_sha256: edit.expected_sha256, target_sha256: createHash('sha256').update(edit.content).digest('hex') })) }
         : action === 'new' ? { agent_id: task.plan.agent_id }
@@ -669,6 +715,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
     if (domain === 'instances' && ['run', 'batch'].includes(action)) {
       preview = await dispatch(domain, action === 'run' ? 'preview' : 'batch-preview', input, signal)
       if (!preview.ok) return wireValue(preview)
+      input = freezeInstancePreview(action, input, preview)
     }
     signal.throwIfAborted()
     const proposal = { kind: 'proposal', id: randomUUID(), owner_session_id: id, domain, action, input, preview, state: 'awaiting_confirmation' }
@@ -839,6 +886,12 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
     assertNoCredentials(proposal.domain, proposal.action, proposal.input)
     if (proposal.domain === 'mcp' && (proposal.action === 'callPublishedComposition' || proposal.action === 'callTool' && proposal.input.serverId === COMPOSITION_SERVICE_ID)
       && (!proposal.input.compositionId || !proposal.input.versionId)) throw new Error('旧提案缺少固定组合版本，请重新生成预览')
+    if (proposal.domain === 'instances' && ['run', 'batch'].includes(proposal.action)) {
+      const items = proposal.action === 'batch' ? proposal.input.items : [proposal.input]
+      if (!Array.isArray(items) || items.some((item: any) => ['create', 'start', 'restart'].includes(item?.operation) && !item.expected_model_policy_hash)) {
+        throw new Error('旧实例提案缺少模型设置核对结果，请重新生成提案')
+      }
+    }
     if (busy.has(proposalId)) throw new Error('该操作正在执行，请等待回执')
     const waiting = pending.get(proposalId)
     const operationSignal = waiting?.signal ?? signal

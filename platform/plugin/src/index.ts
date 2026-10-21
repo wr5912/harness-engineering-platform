@@ -1,10 +1,12 @@
 import { readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-agent-default-model'
+import type {} from '@deepseek-ai/dsh-api-settings-controller'
 import type { ConnectionRpcHandler, ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type * as NativeWebApp from '@deepseek-ai/dsh-web-app'
-import { applyAuthentication } from './auth.ts'
+import { applyAuthentication, currentAccount } from './auth.ts'
 import { inventory as agentExperimentInventory } from '../../../plugins/asset-query-cli/query.mjs'
 import { CHANNEL } from './protocol.ts'
 import type { Inventory, RunAsset } from './protocol.ts'
@@ -16,6 +18,8 @@ import { createExtractionScope, createComputeVariantScope, isDecisionExtraction,
 import { createToolInputRecovery } from './assistant/tool-input-recovery.ts'
 import { createRunDownloadHandler } from './agents/run-files.ts'
 import { createInstancesHandler } from './instances/index.ts'
+import { createModelsHandler } from './models/index.ts'
+import { modelProviderReadiness, projectModelPolicy } from './models/projection.ts'
 import { applyMcpGateway, createMcpHandler } from './mcp/index.ts'
 import { compositionInputSchema } from './mcp/definition.ts'
 import type {} from './mcp/manager.ts'
@@ -33,7 +37,7 @@ import { currentBusinessContext, getBusinessControl } from './business-control/c
 const WebApp: typeof NativeWebApp = await runtimeModule('@deepseek-ai/dsh-web-app')
 
 export const name = 'harness-platform'
-export const inject = ['connection', 'webServer', 'credentials', 'platformMcp', 'sessionController', 'settingsController', 'tools', 'agents', 'sessionProjections', 'systemPrompt', 'goals', 'skills']
+export const inject = ['connection', 'webServer', 'credentials', 'platformMcp', 'sessionController', 'settingsController', 'agentDefaultModel', 'llm', 'tools', 'agents', 'sessionProjections', 'systemPrompt', 'goals', 'skills']
 export const Config = WebApp.Config
 export type Config = NativeWebApp.Config
 
@@ -88,10 +92,15 @@ export function createInventoryHandler(assetRoot: string): ConnectionRpcHandler 
   }
 }
 
-export function createPlatformHandler(assetRoot: string, domains: Record<'agents' | 'instances' | 'mcp', ConnectionRpcHandler> & { assistant?: ConnectionRpcHandler }): ConnectionRpcHandler {
+export function createPlatformHandler(assetRoot: string, domains: Record<'agents' | 'instances' | 'mcp' | 'models', ConnectionRpcHandler> & { assistant?: ConnectionRpcHandler }): ConnectionRpcHandler {
   const readInventory = createInventoryHandler(assetRoot)
   return async (endpoint, payload, signal, peer) => {
     if (signal.aborted) return failure('aborted', '请求已取消')
+    if (endpoint === 'auth/current') {
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload) || Object.keys(payload).length) return failure('invalid_request', '当前账号查询不接受参数')
+      try { return { ok: true, value: currentAccount(assetRoot) } }
+      catch { return failure('account_read_failed', '无法读取当前账号') }
+    }
     if (endpoint === 'inventory') return readInventory(endpoint, payload, signal, peer)
     if (endpoint === 'home') {
       if (!payload || typeof payload !== 'object' || Array.isArray(payload) || Object.keys(payload).length) {
@@ -116,10 +125,11 @@ export function createPlatformHandler(assetRoot: string, domains: Record<'agents
     const result = await domain(endpoint.slice(prefix.length), payload, signal, peer)
     if (endpoint === 'agents/detail' && result.ok) {
       const instances = await domains.instances('list', {}, signal, peer)
-      const value = result.value as { experiment: { id: string }; loaded_instance: unknown }
+      const value = result.value as { agent: { id: string }; experiment: { id: string }; loaded_instance: unknown }
+      const observed = instances.ok ? (instances.value as { instances: { agent_id?: string; source_id: string }[] }).instances : []
       value.loaded_instance = instances.ok
-        ? { status: 'observed', instances: (instances.value as { instances: { source_id: string }[] }).instances
-          .filter(instance => instance.source_id === `experiment:${value.experiment.id}`),
+        ? { status: 'observed', instances: observed.filter(instance => instance.source_id === `experiment:${value.experiment.id}`),
+          agent_instances: observed.filter(instance => instance.agent_id === value.agent.id),
         note: '实例与只读挂载来自 Docker 观察；具体能力是否生效仍需相应 Session/Run 证据。' }
         : { status: 'unknown', reason: instances.error.message }
     }
@@ -159,11 +169,11 @@ export function applyTools(ctx: Context) {
   events.register(registrationContext)
   registrationContext.connection.fetch.register({ path: '/api/harness-platform/runs/download', methods: ['GET'], requestBody: 'buffered', fetch: createRunDownloadHandler(assetRoot) })
   const notify = (domains: string[], ids?: string[]) => events.notify(domains as any, ids)
-  const wrap = (domain: 'agents' | 'instances' | 'mcp', handler: ConnectionRpcHandler): ConnectionRpcHandler => async (endpoint, payload, signal, peer) => {
+  const wrap = (domain: 'agents' | 'instances' | 'mcp' | 'models', handler: ConnectionRpcHandler): ConnectionRpcHandler => async (endpoint, payload, signal, peer) => {
     if (getBusinessControl(assetRoot).enabled() && !currentBusinessContext() && peer?.principal.kind !== 'owner') return failure('forbidden', '平台管理操作要求管理身份')
     try { return await managementDispatch(assetRoot, () => handler(endpoint, payload, signal, peer)) }
     finally {
-      if (!['control/status', 'control/probeProvider', 'description', 'research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'list', 'detail', 'url', 'logs', 'edit/read', 'cases/list', 'cases/read', 'eval/status', 'runs/index', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/preview', 'compute-variants/compare', 'compute-variants/build-preview', 'compute-variants/freeze-preview', 'tasks/capabilities', 'datasets/source', 'datasets/list', 'datasets/read', 'datasets/export', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'fusion/status', 'fusion/proposal', 'features/proposal', 'features/read-source', 'configuration'].includes(endpoint)) notify([domain, 'catalog'])
+      if (!['control/status', 'control/probeProvider', 'description', 'research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'list', 'detail', 'sources', 'url', 'logs', 'edit/read', 'cases/list', 'cases/read', 'eval/list', 'eval/status', 'runs/index', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/preview', 'compute-variants/compare', 'compute-variants/build-preview', 'compute-variants/freeze-preview', 'training-servers/list', 'training-servers/probe', 'tasks/capabilities', 'datasets/source', 'datasets/list', 'datasets/read', 'datasets/export', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'fusion/status', 'fusion/proposal', 'features/proposal', 'features/read-source', 'configuration'].includes(endpoint)) notify([domain, 'catalog'])
     }
   }
   const domains = {
@@ -199,7 +209,17 @@ export function applyTools(ctx: Context) {
         })
       },
     })),
-    instances: wrap('instances', createInstancesHandler(assetRoot)), mcp: wrap('mcp', mcpManagement),
+    instances: wrap('instances', createInstancesHandler(assetRoot, (agentId, selected) => projectModelPolicy(assetRoot, agentId, {
+      sessionController: ctx.sessionController, settingsController: ctx.settingsController, credentials: ctx.credentials, llm: ctx.llm,
+    }, selected))), mcp: wrap('mcp', mcpManagement),
+    models: wrap('models', createModelsHandler(assetRoot, {
+      modelCatalog: () => ctx.sessionController.modelCatalog(),
+      providerReadiness: providers => modelProviderReadiness(providers, {
+        settingsController: ctx.settingsController, credentials: ctx.credentials, llm: ctx.llm,
+      }),
+      currentSelection: () => ctx.agentDefaultModel.currentSelection(),
+      saveSelection: value => ctx.agentDefaultModel.saveSelection(value as Parameters<typeof ctx.agentDefaultModel.saveSelection>[0]),
+    })),
     assistant: undefined as ConnectionRpcHandler | undefined,
   }
   const handler = createPlatformHandler(assetRoot, domains)

@@ -1,0 +1,29 @@
+{
+  "checkedAt": "2026-10-21T04:07:45.007Z",
+  "sessionId": "session-34baf816-0b54-464e-8bbb-476b49039b8f",
+  "checks": [
+    {
+      "label": "原策划会话可从管理对话定位",
+      "passed": true
+    },
+    {
+      "label": "原 Session 策划回复在管理对话可见",
+      "passed": true
+    },
+    {
+      "label": "同一策划回复在浮窗可见",
+      "passed": true
+    },
+    {
+      "label": "浮窗标明待验证目标",
+      "passed": true
+    },
+    {
+      "label": "页面无脚本错误或 5xx",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "failure": null,
+  "screenshot": "/tmp/hep-ui-acceptance-20261020-YzAfQF/mimo-low-compute-gui-answer.png"
+}

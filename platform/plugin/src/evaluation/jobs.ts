@@ -100,8 +100,11 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
       token_usage_note: '尚未取得可核验轨迹，总 Token 和费用未知。', hard_cap_supported: false,
       model_calls_complete: false, model_calls_basis: '轨迹请求头仅在配置变化时产生，不能据此推算实际模型调用或内部重试次数。' }
     if (!run) return result
-    const inputs = JSON.parse(readFileSync(join(run, 'inputs.lock.json'), 'utf8'))
-    const manifest = loadYaml(readFileSync(join(run, 'run.yaml'), 'utf8')) as MapValue
+    let inputs: MapValue, manifest: MapValue
+    try {
+      inputs = JSON.parse(readFileSync(join(run, 'inputs.lock.json'), 'utf8'))
+      manifest = loadYaml(readFileSync(join(run, 'run.yaml'), 'utf8')) as MapValue
+    } catch { return result }
     Object.assign(result, { run_id: job.run_id, run_status: manifest.status,
       source: inputs.source_id, cases: inputs.evaluation_cases?.map((item: MapValue) => item.case_id),
       candidate_sha256: inputs.candidate_sha256, evaluation_sha256: inputs.evaluation_sha256,
@@ -141,11 +144,13 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
     const job = read(id)
     const actual = receipt(job)
     const alive = live.has(id) || ownsProcess(job)
+    if (job.status === 'failed' && job.exit_code === 1 && actual.run_status === 'completed') {
+      // dsh-eval 用退出码 1 表示业务结论未通过；Run 已完成仍是一次已结束的执行。
+      job.status = 'completed'
+    }
     if (!FINAL.has(job.status)) {
-      if (FINAL.has(actual.run_status)) {
-        job.status = actual.run_status === 'completed' && actual.summary
-          && actual.summary.executor !== 'browser'
-          && (actual.summary.effective_verdict ?? actual.summary.overall_verdict) !== 'passed' ? 'failed' : actual.run_status
+      if (!alive && FINAL.has(actual.run_status)) {
+        job.status = actual.run_status
       } else if (!alive) {
         job.status = 'failed'
         job.error = '评测进程已停止；已有 Run 和部分证据已保留。请核对报告后新建复测，不重复执行未知状态动作。'
@@ -155,6 +160,18 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
     save(job, false)
     return { ...job, result: { ...job.result, ...actual }, stdout: options.redact(job.stdout), stderr: options.redact(job.stderr), ...actual,
       log_note: '日志为截断显示；Case、来源和 Session 从 Run 回读；模型请求按持久尝试结算核对，轨迹不完整时总数保持未知。' }
+  }
+  function list() {
+    if (!existsSync(directory)) return []
+    return readdirSync(directory)
+      .filter(name => UUID.test(name.slice(0, -5)) && name.endsWith('.json'))
+      .map(name => {
+        const persisted = read(name.slice(0, -5))
+        const job = FINAL.has(persisted.status) ? persisted : status(persisted.job_id)
+        return { job_id: job.job_id, source: job.source, status: job.status, run_id: job.run_id ?? job.result?.run_id,
+          started_at: job.started_at, updated_at: job.updated_at, error: job.error }
+      })
+      .sort((a, b) => b.started_at.localeCompare(a.started_at))
   }
   function cancel(id: string) {
     const job = read(id)
@@ -225,5 +242,5 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
     }
     return { job_id: id, status: job.status, started_at: now, hard_cap_supported: false }
   }
-  return { start, status, cancel }
+  return { start, status, cancel, list }
 }

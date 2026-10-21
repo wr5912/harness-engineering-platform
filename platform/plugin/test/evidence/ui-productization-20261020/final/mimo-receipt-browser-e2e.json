@@ -1,0 +1,293 @@
+{
+  "checkedAt": "2026-10-21T04:45:30.830Z",
+  "name": "mimo-lui-e2e-20261021",
+  "source": "experiment:EXP-security-operations-expert-023-r2233d74f6fb3",
+  "checks": [
+    {
+      "label": "仅定位隔离测试实例",
+      "passed": true
+    },
+    {
+      "label": "原登记为无容器或已停止",
+      "passed": true
+    },
+    {
+      "label": "原登记来源是固定 023 版本",
+      "passed": true
+    },
+    {
+      "label": "启动预览固定原实例与来源",
+      "passed": true
+    },
+    {
+      "label": "启动回执成功",
+      "passed": true
+    },
+    {
+      "label": "启动回执显示实登来源、运行状态与核对时间",
+      "passed": true
+    },
+    {
+      "label": "启动回执不显示错误阶段",
+      "passed": true
+    },
+    {
+      "label": "收到启动成功回执后未回退预览阶段",
+      "passed": true
+    },
+    {
+      "label": "启动回执可关闭",
+      "passed": true
+    },
+    {
+      "label": "停止预览显示同一实例和保留影响",
+      "passed": true
+    },
+    {
+      "label": "停止回执成功",
+      "passed": true
+    },
+    {
+      "label": "停止回执显示无容器登记、来源与核对时间",
+      "passed": true
+    },
+    {
+      "label": "停止回执不显示错误阶段",
+      "passed": true
+    },
+    {
+      "label": "收到停止成功回执后未回退预览阶段",
+      "passed": true
+    },
+    {
+      "label": "停止回执可关闭",
+      "passed": true
+    },
+    {
+      "label": "最终实例回到无容器登记",
+      "passed": true
+    },
+    {
+      "label": "对同一测试实例仅点击启动和停止各一次",
+      "passed": true
+    },
+    {
+      "label": "浏览器没有脚本或 HTTP 5xx 错误",
+      "passed": true
+    }
+  ],
+  "before": "\tmimo-lui-e2e-20261021\t网络安全运营专家\t\nEXP-security-operations-expert-023-r2233d74f6fb3\n实际装载须在目标 Session 核对\n\t无容器\t打开 Web\n实例运行后可访问\n\t\n详情\n启动\n删除",
+  "start": {
+    "preview": "启动业务实例\n\n核对目标和实际影响，再确认执行。\n\n×\n\n共选择 1 项 · 可确认 1 项 · 预览失败 0 项\n\n确认只会派发下方可确认的目标。来源、模型与启动端口沿用本次预览；配置变化或端口占用时，本项会失败并提示重新预览。\n\nmimo-lui-e2e-20261021 · 启动\n目标\nmimo-lui-e2e-20261021\n登记来源\n网络安全运营专家 · EXP-security-operations-expert-023-r2233d74f6fb3\nexperiment:EXP-security-operations-expert-023-r2233d74f6fb3\n本次变化\n启动此实例容器\n默认模型\nxiaomi-token-plan-cn · MiMo-V2.6-Flash · 推理档位 off应用到本次实例启动配置；已有 Session 需另行核对。\n访问端口\n31894\n保留\nHOME：保留；Session：保留在 HOME 卷；来源：保留；Run：保留\n登记处置\n保留\n技术详情 · 预览参数\n取消\n确认启动 1 项",
+    "receipt": "启动业务实例\n\n核对目标和实际影响，再确认执行。\n\n×\n操作回执：成功 1 项，失败 0 项，结果未知 0 项，未派发 0 项\nmimo-lui-e2e-20261021 · 启动 · 成功\n预览端口：31894；执行回执端口：31894\n提交默认模型：xiaomi-token-plan-cn · MiMo-V2.6-Flash；当前实例登记与实际模型调用请分别核对。\n提交来源：experiment:EXP-security-operations-expert-023-r2233d74f6fb3；当前登记来源（核对于 2026/10/21 12:46:31）：experiment:EXP-security-operations-expert-023-r2233d74f6fb3；登记状态：运行中\n关闭",
+    "trace": [
+      {
+        "at": "2026-10-21T04:46:01.765Z",
+        "snapshot": {
+          "status": "",
+          "receipt": "",
+          "closeDisabled": false
+        }
+      },
+      {
+        "at": "2026-10-21T04:46:01.867Z",
+        "snapshot": {
+          "status": "正在执行：已收到 0 / 1 项回执",
+          "receipt": "",
+          "closeDisabled": true
+        }
+      },
+      {
+        "at": "2026-10-21T04:46:20.143Z",
+        "snapshot": {
+          "status": "操作回执已收到，正在读取实例登记；请勿重复提交操作。",
+          "receipt": "mimo-lui-e2e-20261021 · 启动 · 成功预览端口：31894；执行回执端口：31894提交默认模型：xiaomi-token-plan-cn · MiMo-V2.6-Flash；当前实例登记与实际模型调用请分别核对。提交来源：experiment:EXP-security-operations-expert-023-r2233d74f6fb3；当前登记来源：正在核对…",
+          "closeDisabled": false
+        }
+      },
+      {
+        "at": "2026-10-21T04:46:35.886Z",
+        "snapshot": {
+          "status": "",
+          "receipt": "mimo-lui-e2e-20261021 · 启动 · 成功预览端口：31894；执行回执端口：31894提交默认模型：xiaomi-token-plan-cn · MiMo-V2.6-Flash；当前实例登记与实际模型调用请分别核对。提交来源：experiment:EXP-security-operations-expert-023-r2233d74f6fb3；当前登记来源（核对于 2026/10/21 12:46:31）：experiment:EXP-security-operations-expert-023-r2233d74f6fb3；登记状态：运行中",
+          "closeDisabled": false
+        }
+      }
+    ],
+    "screenshot": "/tmp/hep-ui-acceptance-20261020-YzAfQF/mimo-receipt-start.png"
+  },
+  "stop": {
+    "preview": "停止业务实例？\n\n这是对业务实例的操作，不会取消独立的评测任务。\n\n×\nmimo-lui-e2e-20261021\n智能体\n网络安全运营专家\n登记来源版本\n网络安全运营专家 · EXP-security-operations-expert-023-r2233d74f6fb3\n本次预览状态\n运行中\n观察于 2026/10/21 12:46:36\n影响入口\n127.0.0.1:31894\n业务访问将中断\n进行中的业务请求可能终止，需要再次启动后恢复访问。\n数据与任务影响\n保留实例配置和 HOME 数据。\n已有运行记录：保留；来源版本不会因停止实例而删除。\n独立评测任务不在本次停止范围内。\n技术详情 · 操作参数\n保持运行\n确认停止",
+    "receipt": "停止业务实例？\n\n这是对业务实例的操作，不会取消独立的评测任务。\n\n×\n操作回执：成功 1 项，失败 0 项，结果未知 0 项，未派发 0 项\nmimo-lui-e2e-20261021 · 停止 · 成功\n当前登记状态（核对于 2026/10/21 12:46:49）：无容器；登记来源：experiment:EXP-security-operations-expert-023-r2233d74f6fb3\n关闭",
+    "trace": [
+      {
+        "at": "2026-10-21T04:46:37.120Z",
+        "snapshot": {
+          "status": "",
+          "receipt": "",
+          "closeDisabled": false
+        }
+      },
+      {
+        "at": "2026-10-21T04:46:37.158Z",
+        "snapshot": {
+          "status": "正在执行：已收到 0 / 1 项回执",
+          "receipt": "",
+          "closeDisabled": true
+        }
+      },
+      {
+        "at": "2026-10-21T04:46:49.160Z",
+        "snapshot": {
+          "status": "操作回执已收到，正在读取实例登记；请勿重复提交操作。",
+          "receipt": "mimo-lui-e2e-20261021 · 停止 · 成功当前登记状态：正在核对…",
+          "closeDisabled": false
+        }
+      },
+      {
+        "at": "2026-10-21T04:46:54.847Z",
+        "snapshot": {
+          "status": "",
+          "receipt": "mimo-lui-e2e-20261021 · 停止 · 成功当前登记状态（核对于 2026/10/21 12:46:49）：无容器；登记来源：experiment:EXP-security-operations-expert-023-r2233d74f6fb3",
+          "closeDisabled": false
+        }
+      }
+    ],
+    "screenshot": "/tmp/hep-ui-acceptance-20261020-YzAfQF/mimo-receipt-stop.png"
+  },
+  "errors": [],
+  "events": [
+    {
+      "at": "2026-10-21T04:45:30.898Z",
+      "kind": "navigation",
+      "path": "/hep/login",
+      "hash": ""
+    },
+    {
+      "at": "2026-10-21T04:45:31.435Z",
+      "kind": "navigation",
+      "path": "/hep/",
+      "hash": ""
+    },
+    {
+      "at": "2026-10-21T04:45:48.423Z",
+      "kind": "navigation",
+      "path": "/hep/",
+      "hash": "#/instances"
+    },
+    {
+      "at": "2026-10-21T04:45:48.561Z",
+      "kind": "dialog",
+      "open": false
+    },
+    {
+      "at": "2026-10-21T04:46:00.717Z",
+      "kind": "dialog",
+      "open": true,
+      "title": "启动业务实例",
+      "phase": "正在读取操作预览…",
+      "hasReceipt": false
+    },
+    {
+      "at": "2026-10-21T04:46:01.376Z",
+      "kind": "dialog",
+      "open": true,
+      "title": "启动业务实例",
+      "phase": "",
+      "hasReceipt": false
+    },
+    {
+      "at": "2026-10-21T04:46:01.769Z",
+      "kind": "submit-click",
+      "operation": "start",
+      "name": "mimo-lui-e2e-20261021"
+    },
+    {
+      "at": "2026-10-21T04:46:01.866Z",
+      "kind": "dialog",
+      "open": true,
+      "title": "启动业务实例",
+      "phase": "正在执行：已收到 0 / 1 项回执",
+      "hasReceipt": false
+    },
+    {
+      "at": "2026-10-21T04:46:20.142Z",
+      "kind": "dialog",
+      "open": true,
+      "title": "启动业务实例",
+      "phase": "操作回执已收到，正在读取实例登记；请勿重复提交操作。",
+      "hasReceipt": true
+    },
+    {
+      "at": "2026-10-21T04:46:35.885Z",
+      "kind": "dialog",
+      "open": true,
+      "title": "启动业务实例",
+      "phase": "",
+      "hasReceipt": true
+    },
+    {
+      "at": "2026-10-21T04:46:36.132Z",
+      "kind": "dialog",
+      "open": false
+    },
+    {
+      "at": "2026-10-21T04:46:36.234Z",
+      "kind": "dialog",
+      "open": true,
+      "title": "停止业务实例？",
+      "phase": "正在读取操作预览…",
+      "hasReceipt": false
+    },
+    {
+      "at": "2026-10-21T04:46:36.905Z",
+      "kind": "dialog",
+      "open": true,
+      "title": "停止业务实例？",
+      "phase": "",
+      "hasReceipt": false
+    },
+    {
+      "at": "2026-10-21T04:46:37.121Z",
+      "kind": "submit-click",
+      "operation": "stop",
+      "name": "mimo-lui-e2e-20261021"
+    },
+    {
+      "at": "2026-10-21T04:46:37.159Z",
+      "kind": "dialog",
+      "open": true,
+      "title": "停止业务实例？",
+      "phase": "正在执行：已收到 0 / 1 项回执",
+      "hasReceipt": false
+    },
+    {
+      "at": "2026-10-21T04:46:49.161Z",
+      "kind": "dialog",
+      "open": true,
+      "title": "停止业务实例？",
+      "phase": "操作回执已收到，正在读取实例登记；请勿重复提交操作。",
+      "hasReceipt": true
+    },
+    {
+      "at": "2026-10-21T04:46:54.847Z",
+      "kind": "dialog",
+      "open": true,
+      "title": "停止业务实例？",
+      "phase": "",
+      "hasReceipt": true
+    },
+    {
+      "at": "2026-10-21T04:46:55.029Z",
+      "kind": "dialog",
+      "open": false
+    }
+  ],
+  "rpc": [],
+  "actionClicks": {
+    "start": 1,
+    "stop": 1
+  },
+  "startSubmitted": true,
+  "stopSubmitted": true
+}

@@ -1,0 +1,1627 @@
+{
+  "at": "2026-10-20T13:12:01.678Z",
+  "views": [
+    {
+      "name": "instances-1440",
+      "width": 1440,
+      "height": 1000,
+      "hash": "#/instances",
+      "h1": [
+        "实例管理"
+      ],
+      "h2": [],
+      "alerts": [],
+      "viewportWidth": 1440,
+      "scrollWidth": 1440,
+      "instanceAction": {
+        "x": 1326,
+        "y": 167,
+        "width": 82,
+        "height": 38
+      },
+      "instanceSearch": {
+        "x": 53,
+        "y": 281,
+        "width": 300,
+        "height": 40
+      },
+      "instanceStatus": {
+        "x": 365,
+        "y": 281,
+        "width": 160,
+        "height": 40
+      },
+      "instanceTable": {
+        "x": 33,
+        "y": 342,
+        "width": 1374,
+        "height": 169
+      },
+      "mcpAction": null,
+      "mcpTabs": null,
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 0,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": null,
+      "gatewayWorkspace": null,
+      "gatewaySavebar": null,
+      "gatewayField": null,
+      "gatewayScope": null,
+      "focus": "BODY"
+    },
+    {
+      "name": "instances-1366",
+      "width": 1366,
+      "height": 900,
+      "hash": "#/instances",
+      "h1": [
+        "实例管理"
+      ],
+      "h2": [],
+      "alerts": [],
+      "viewportWidth": 1366,
+      "scrollWidth": 1366,
+      "instanceAction": {
+        "x": 1252,
+        "y": 167,
+        "width": 82,
+        "height": 38
+      },
+      "instanceSearch": {
+        "x": 53,
+        "y": 281,
+        "width": 300,
+        "height": 40
+      },
+      "instanceStatus": {
+        "x": 365,
+        "y": 281,
+        "width": 160,
+        "height": 40
+      },
+      "instanceTable": {
+        "x": 33,
+        "y": 342,
+        "width": 1300,
+        "height": 169
+      },
+      "mcpAction": null,
+      "mcpTabs": null,
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 0,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": null,
+      "gatewayWorkspace": null,
+      "gatewaySavebar": null,
+      "gatewayField": null,
+      "gatewayScope": null,
+      "focus": "BODY"
+    },
+    {
+      "name": "instances-900",
+      "width": 900,
+      "height": 850,
+      "hash": "#/instances",
+      "h1": [
+        "实例管理"
+      ],
+      "h2": [],
+      "alerts": [],
+      "viewportWidth": 900,
+      "scrollWidth": 900,
+      "instanceAction": {
+        "x": 794,
+        "y": 157,
+        "width": 82,
+        "height": 38
+      },
+      "instanceSearch": {
+        "x": 45,
+        "y": 271,
+        "width": 300,
+        "height": 40
+      },
+      "instanceStatus": {
+        "x": 357,
+        "y": 271,
+        "width": 160,
+        "height": 40
+      },
+      "instanceTable": {
+        "x": 25,
+        "y": 332,
+        "width": 850,
+        "height": 169
+      },
+      "mcpAction": null,
+      "mcpTabs": null,
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 0,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": null,
+      "gatewayWorkspace": null,
+      "gatewaySavebar": null,
+      "gatewayField": null,
+      "gatewayScope": null,
+      "focus": "BODY"
+    },
+    {
+      "name": "instances-390",
+      "width": 390,
+      "height": 844,
+      "hash": "#/instances",
+      "h1": [
+        "实例管理"
+      ],
+      "h2": [],
+      "alerts": [],
+      "viewportWidth": 390,
+      "scrollWidth": 390,
+      "instanceAction": {
+        "x": 292,
+        "y": 78,
+        "width": 82,
+        "height": 38
+      },
+      "instanceSearch": {
+        "x": 33,
+        "y": 218,
+        "width": 324,
+        "height": 40
+      },
+      "instanceStatus": {
+        "x": 33,
+        "y": 270,
+        "width": 160,
+        "height": 40
+      },
+      "instanceTable": {
+        "x": 17,
+        "y": 327,
+        "width": 356,
+        "height": 169
+      },
+      "mcpAction": null,
+      "mcpTabs": null,
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 0,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": null,
+      "gatewayWorkspace": null,
+      "gatewaySavebar": null,
+      "gatewayField": null,
+      "gatewayScope": null,
+      "focus": "BODY"
+    },
+    {
+      "name": "instances-create-390",
+      "width": 390,
+      "height": 844,
+      "hash": "#/instances",
+      "h1": [
+        "实例管理"
+      ],
+      "h2": [],
+      "alerts": [],
+      "viewportWidth": 390,
+      "scrollWidth": 390,
+      "instanceAction": {
+        "x": 292,
+        "y": 78,
+        "width": 82,
+        "height": 38
+      },
+      "instanceSearch": {
+        "x": 33,
+        "y": 1075,
+        "width": 324,
+        "height": 40
+      },
+      "instanceStatus": {
+        "x": 33,
+        "y": 1127,
+        "width": 160,
+        "height": 40
+      },
+      "instanceTable": {
+        "x": 17,
+        "y": 1184,
+        "width": 356,
+        "height": 169
+      },
+      "mcpAction": null,
+      "mcpTabs": null,
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 0,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": null,
+      "gatewayWorkspace": null,
+      "gatewaySavebar": null,
+      "gatewayField": null,
+      "gatewayScope": null,
+      "focus": "BUTTON"
+    },
+    {
+      "name": "instances-invalid-390",
+      "width": 390,
+      "height": 844,
+      "hash": "#/instances?instance_name=ui-acceptance-missing",
+      "h1": [
+        "实例管理"
+      ],
+      "h2": [],
+      "alerts": [
+        "未找到实例 ui-acceptance-missing 返回实例列表"
+      ],
+      "viewportWidth": 390,
+      "scrollWidth": 390,
+      "instanceAction": {
+        "x": 292,
+        "y": 78,
+        "width": 82,
+        "height": 38
+      },
+      "instanceSearch": {
+        "x": 33,
+        "y": 218,
+        "width": 324,
+        "height": 40
+      },
+      "instanceStatus": {
+        "x": 33,
+        "y": 270,
+        "width": 160,
+        "height": 40
+      },
+      "instanceTable": {
+        "x": 17,
+        "y": 327,
+        "width": 356,
+        "height": 169
+      },
+      "mcpAction": null,
+      "mcpTabs": null,
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 0,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": null,
+      "gatewayWorkspace": null,
+      "gatewaySavebar": null,
+      "gatewayField": null,
+      "gatewayScope": null,
+      "focus": "DIV"
+    },
+    {
+      "name": "mcp-service-1440-before",
+      "width": 1440,
+      "height": 1000,
+      "hash": "#/mcp?tab=servers&server_id=ui-acceptance-local",
+      "h1": [
+        "MCP 管理"
+      ],
+      "h2": [],
+      "alerts": [],
+      "viewportWidth": 1440,
+      "scrollWidth": 1440,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": null,
+      "mcpTabs": {
+        "x": 32,
+        "y": 227,
+        "width": 1376,
+        "height": 50
+      },
+      "mcpSidebar": {
+        "x": 32,
+        "y": 344,
+        "width": 240,
+        "height": 468
+      },
+      "mcpPicker": null,
+      "mcpDetail": {
+        "x": 296,
+        "y": 344,
+        "width": 1112,
+        "height": 514
+      },
+      "mcpSummaryCards": 3,
+      "mcpTools": 0,
+      "gatewayStatusCards": 0,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": null,
+      "gatewayWorkspace": null,
+      "gatewaySavebar": null,
+      "gatewayField": null,
+      "gatewayScope": null,
+      "focus": "DIV"
+    },
+    {
+      "name": "mcp-service-1440-discovered",
+      "width": 1440,
+      "height": 1000,
+      "hash": "#/mcp?tab=servers&server_id=ui-acceptance-local",
+      "h1": [
+        "MCP 管理"
+      ],
+      "h2": [],
+      "alerts": [],
+      "viewportWidth": 1440,
+      "scrollWidth": 1440,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": null,
+      "mcpTabs": {
+        "x": 32,
+        "y": 227,
+        "width": 1376,
+        "height": 50
+      },
+      "mcpSidebar": {
+        "x": 32,
+        "y": 412,
+        "width": 240,
+        "height": 468
+      },
+      "mcpPicker": null,
+      "mcpDetail": {
+        "x": 296,
+        "y": 412,
+        "width": 1112,
+        "height": 574
+      },
+      "mcpSummaryCards": 3,
+      "mcpTools": 1,
+      "gatewayStatusCards": 0,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": null,
+      "gatewayWorkspace": null,
+      "gatewaySavebar": null,
+      "gatewayField": null,
+      "gatewayScope": null,
+      "focus": "BODY"
+    },
+    {
+      "name": "mcp-service-1366",
+      "width": 1366,
+      "height": 900,
+      "hash": "#/mcp?tab=servers&server_id=ui-acceptance-local",
+      "h1": [
+        "MCP 管理"
+      ],
+      "h2": [],
+      "alerts": [],
+      "viewportWidth": 1366,
+      "scrollWidth": 1366,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": null,
+      "mcpTabs": {
+        "x": 32,
+        "y": 227,
+        "width": 1302,
+        "height": 50
+      },
+      "mcpSidebar": {
+        "x": 32,
+        "y": 412,
+        "width": 240,
+        "height": 468
+      },
+      "mcpPicker": null,
+      "mcpDetail": {
+        "x": 296,
+        "y": 412,
+        "width": 1038,
+        "height": 574
+      },
+      "mcpSummaryCards": 3,
+      "mcpTools": 1,
+      "gatewayStatusCards": 0,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": null,
+      "gatewayWorkspace": null,
+      "gatewaySavebar": null,
+      "gatewayField": null,
+      "gatewayScope": null,
+      "focus": "BODY"
+    },
+    {
+      "name": "mcp-service-900",
+      "width": 900,
+      "height": 850,
+      "hash": "#/mcp?tab=servers&server_id=ui-acceptance-local",
+      "h1": [
+        "MCP 管理"
+      ],
+      "h2": [],
+      "alerts": [],
+      "viewportWidth": 900,
+      "scrollWidth": 900,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": null,
+      "mcpTabs": {
+        "x": 24,
+        "y": 217,
+        "width": 852,
+        "height": 50
+      },
+      "mcpSidebar": {
+        "x": 24,
+        "y": 402,
+        "width": 200,
+        "height": 519
+      },
+      "mcpPicker": null,
+      "mcpDetail": {
+        "x": 244,
+        "y": 402,
+        "width": 632,
+        "height": 649
+      },
+      "mcpSummaryCards": 3,
+      "mcpTools": 1,
+      "gatewayStatusCards": 0,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": null,
+      "gatewayWorkspace": null,
+      "gatewaySavebar": null,
+      "gatewayField": null,
+      "gatewayScope": null,
+      "focus": "BODY"
+    },
+    {
+      "name": "mcp-service-390",
+      "width": 390,
+      "height": 844,
+      "hash": "#/mcp?tab=servers&server_id=ui-acceptance-local",
+      "h1": [
+        "MCP 管理"
+      ],
+      "h2": [],
+      "alerts": [],
+      "viewportWidth": 390,
+      "scrollWidth": 390,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": null,
+      "mcpTabs": {
+        "x": 16,
+        "y": 192,
+        "width": 358,
+        "height": 50
+      },
+      "mcpSidebar": null,
+      "mcpPicker": {
+        "x": 16,
+        "y": 350,
+        "width": 358,
+        "height": 44
+      },
+      "mcpDetail": {
+        "x": 16,
+        "y": 402,
+        "width": 358,
+        "height": 886
+      },
+      "mcpSummaryCards": 3,
+      "mcpTools": 1,
+      "gatewayStatusCards": 0,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": null,
+      "gatewayWorkspace": null,
+      "gatewaySavebar": null,
+      "gatewayField": null,
+      "gatewayScope": null,
+      "focus": "BODY"
+    },
+    {
+      "name": "mcp-service-reloaded-390",
+      "width": 390,
+      "height": 844,
+      "hash": "#/mcp?tab=servers&server_id=ui-acceptance-local",
+      "h1": [
+        "MCP 管理"
+      ],
+      "h2": [],
+      "alerts": [],
+      "viewportWidth": 390,
+      "scrollWidth": 390,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": null,
+      "mcpTabs": {
+        "x": 16,
+        "y": 64,
+        "width": 358,
+        "height": 50
+      },
+      "mcpSidebar": null,
+      "mcpPicker": {
+        "x": 16,
+        "y": 130,
+        "width": 358,
+        "height": 44
+      },
+      "mcpDetail": {
+        "x": 16,
+        "y": 182,
+        "width": 358,
+        "height": 849
+      },
+      "mcpSummaryCards": 3,
+      "mcpTools": 0,
+      "gatewayStatusCards": 0,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": null,
+      "gatewayWorkspace": null,
+      "gatewaySavebar": null,
+      "gatewayField": null,
+      "gatewayScope": null,
+      "focus": "DIV"
+    },
+    {
+      "name": "mcp-groups-1440",
+      "width": 1440,
+      "height": 1000,
+      "hash": "#/mcp?server_id=ui-acceptance-local&tab=groups",
+      "h1": [
+        "MCP 管理"
+      ],
+      "h2": [],
+      "alerts": [],
+      "viewportWidth": 1440,
+      "scrollWidth": 1440,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": null,
+      "mcpTabs": {
+        "x": 32,
+        "y": 227,
+        "width": 1376,
+        "height": 50
+      },
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 0,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": null,
+      "gatewayWorkspace": null,
+      "gatewaySavebar": null,
+      "gatewayField": null,
+      "gatewayScope": null,
+      "focus": "BUTTON"
+    },
+    {
+      "name": "mcp-groups-390",
+      "width": 390,
+      "height": 844,
+      "hash": "#/mcp?server_id=ui-acceptance-local&tab=groups",
+      "h1": [
+        "MCP 管理"
+      ],
+      "h2": [],
+      "alerts": [],
+      "viewportWidth": 390,
+      "scrollWidth": 390,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": null,
+      "mcpTabs": {
+        "x": 16,
+        "y": 192,
+        "width": 358,
+        "height": 50
+      },
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 0,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": null,
+      "gatewayWorkspace": null,
+      "gatewaySavebar": null,
+      "gatewayField": null,
+      "gatewayScope": null,
+      "focus": "BUTTON"
+    },
+    {
+      "name": "mcp-debug-1440",
+      "width": 1440,
+      "height": 1000,
+      "hash": "#/mcp?server_id=ui-acceptance-local&tab=connection",
+      "h1": [
+        "MCP 管理"
+      ],
+      "h2": [],
+      "alerts": [],
+      "viewportWidth": 1440,
+      "scrollWidth": 1440,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": null,
+      "mcpTabs": {
+        "x": 32,
+        "y": 227,
+        "width": 1376,
+        "height": 50
+      },
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 0,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": null,
+      "gatewayWorkspace": null,
+      "gatewaySavebar": null,
+      "gatewayField": null,
+      "gatewayScope": null,
+      "focus": "BUTTON"
+    },
+    {
+      "name": "mcp-debug-390",
+      "width": 390,
+      "height": 844,
+      "hash": "#/mcp?server_id=ui-acceptance-local&tab=connection",
+      "h1": [
+        "MCP 管理"
+      ],
+      "h2": [],
+      "alerts": [],
+      "viewportWidth": 390,
+      "scrollWidth": 390,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": null,
+      "mcpTabs": {
+        "x": 16,
+        "y": 192,
+        "width": 358,
+        "height": 50
+      },
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 0,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": null,
+      "gatewayWorkspace": null,
+      "gatewaySavebar": null,
+      "gatewayField": null,
+      "gatewayScope": null,
+      "focus": "BUTTON"
+    },
+    {
+      "name": "mcp-composition-1440",
+      "width": 1440,
+      "height": 1000,
+      "hash": "#/mcp?composition_id=security-asset-related-alerts-readonly&version_id=fd2c27b47da1e6e5a717fc68dec5fbf0ec39e6aab9bf5861878b38066c480554&tab=composition&version=published",
+      "h1": [
+        "MCP 管理"
+      ],
+      "h2": [
+        "工具组合编排",
+        "资产相关告警只读查询"
+      ],
+      "alerts": [],
+      "viewportWidth": 1440,
+      "scrollWidth": 1440,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": null,
+      "mcpTabs": {
+        "x": 32,
+        "y": -430,
+        "width": 1376,
+        "height": 50
+      },
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 0,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": null,
+      "gatewayWorkspace": null,
+      "gatewaySavebar": null,
+      "gatewayField": null,
+      "gatewayScope": null,
+      "focus": "SECTION"
+    },
+    {
+      "name": "mcp-composition-390",
+      "width": 390,
+      "height": 844,
+      "hash": "#/mcp?composition_id=security-asset-related-alerts-readonly&version_id=fd2c27b47da1e6e5a717fc68dec5fbf0ec39e6aab9bf5861878b38066c480554&tab=composition&version=published",
+      "h1": [
+        "MCP 管理"
+      ],
+      "h2": [
+        "工具组合编排",
+        "资产相关告警只读查询"
+      ],
+      "alerts": [],
+      "viewportWidth": 390,
+      "scrollWidth": 390,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": null,
+      "mcpTabs": {
+        "x": 16,
+        "y": -465,
+        "width": 358,
+        "height": 50
+      },
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 0,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": null,
+      "gatewayWorkspace": null,
+      "gatewaySavebar": null,
+      "gatewayField": null,
+      "gatewayScope": null,
+      "focus": "SECTION"
+    },
+    {
+      "name": "gateway-overview-1440",
+      "width": 1440,
+      "height": 1000,
+      "hash": "#/gateway",
+      "h1": [
+        "统一网关"
+      ],
+      "h2": [
+        "运行概览"
+      ],
+      "alerts": [],
+      "viewportWidth": 1440,
+      "scrollWidth": 1440,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": {
+        "x": 1326,
+        "y": 153,
+        "width": 82,
+        "height": 38
+      },
+      "mcpTabs": {
+        "x": 32,
+        "y": 375,
+        "width": 1376,
+        "height": 50
+      },
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 4,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": {
+        "x": 32,
+        "y": 375,
+        "width": 1376,
+        "height": 50
+      },
+      "gatewayWorkspace": {
+        "x": 32,
+        "y": 441,
+        "width": 1376,
+        "height": 1534
+      },
+      "gatewaySavebar": null,
+      "gatewayField": {
+        "x": 57,
+        "y": 1396,
+        "width": 651,
+        "height": 50
+      },
+      "gatewayScope": null,
+      "focus": "BODY"
+    },
+    {
+      "name": "gateway-overview-1366",
+      "width": 1366,
+      "height": 900,
+      "hash": "#/gateway",
+      "h1": [
+        "统一网关"
+      ],
+      "h2": [
+        "运行概览"
+      ],
+      "alerts": [],
+      "viewportWidth": 1366,
+      "scrollWidth": 1366,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": {
+        "x": 1252,
+        "y": 153,
+        "width": 82,
+        "height": 38
+      },
+      "mcpTabs": {
+        "x": 32,
+        "y": 375,
+        "width": 1302,
+        "height": 50
+      },
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 4,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": {
+        "x": 32,
+        "y": 375,
+        "width": 1302,
+        "height": 50
+      },
+      "gatewayWorkspace": {
+        "x": 32,
+        "y": 441,
+        "width": 1302,
+        "height": 1534
+      },
+      "gatewaySavebar": null,
+      "gatewayField": {
+        "x": 57,
+        "y": 1396,
+        "width": 614,
+        "height": 50
+      },
+      "gatewayScope": null,
+      "focus": "BODY"
+    },
+    {
+      "name": "gateway-overview-900",
+      "width": 900,
+      "height": 850,
+      "hash": "#/gateway",
+      "h1": [
+        "统一网关"
+      ],
+      "h2": [
+        "运行概览"
+      ],
+      "alerts": [],
+      "viewportWidth": 900,
+      "scrollWidth": 900,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": {
+        "x": 794,
+        "y": 143,
+        "width": 82,
+        "height": 38
+      },
+      "mcpTabs": {
+        "x": 24,
+        "y": 457,
+        "width": 852,
+        "height": 50
+      },
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 4,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": {
+        "x": 24,
+        "y": 457,
+        "width": 852,
+        "height": 50
+      },
+      "gatewayWorkspace": {
+        "x": 24,
+        "y": 524,
+        "width": 852,
+        "height": 1595
+      },
+      "gatewaySavebar": null,
+      "gatewayField": {
+        "x": 49,
+        "y": 1487,
+        "width": 389,
+        "height": 59
+      },
+      "gatewayScope": null,
+      "focus": "BODY"
+    },
+    {
+      "name": "gateway-overview-390",
+      "width": 390,
+      "height": 844,
+      "hash": "#/gateway",
+      "h1": [
+        "统一网关"
+      ],
+      "h2": [
+        "运行概览"
+      ],
+      "alerts": [],
+      "viewportWidth": 390,
+      "scrollWidth": 390,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": {
+        "x": 292,
+        "y": 78,
+        "width": 82,
+        "height": 38
+      },
+      "mcpTabs": {
+        "x": 16,
+        "y": 263,
+        "width": 358,
+        "height": 50
+      },
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 0,
+      "gatewayMobileStatus": {
+        "x": 16,
+        "y": 192,
+        "width": 358,
+        "height": 61
+      },
+      "gatewayTabs": {
+        "x": 16,
+        "y": 263,
+        "width": 358,
+        "height": 50
+      },
+      "gatewayWorkspace": {
+        "x": 16,
+        "y": 324,
+        "width": 358,
+        "height": 2165
+      },
+      "gatewaySavebar": null,
+      "gatewayField": {
+        "x": 33,
+        "y": 1607,
+        "width": 324,
+        "height": 36
+      },
+      "gatewayScope": null,
+      "focus": "BODY"
+    },
+    {
+      "name": "gateway-identity-1440",
+      "width": 1440,
+      "height": 1000,
+      "hash": "#/gateway?tab=identity",
+      "h1": [
+        "统一网关"
+      ],
+      "h2": [
+        "智能体身份配置"
+      ],
+      "alerts": [],
+      "viewportWidth": 1440,
+      "scrollWidth": 1440,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": {
+        "x": 1326,
+        "y": 153,
+        "width": 82,
+        "height": 38
+      },
+      "mcpTabs": {
+        "x": 32,
+        "y": 375,
+        "width": 1376,
+        "height": 50
+      },
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 4,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": {
+        "x": 32,
+        "y": 375,
+        "width": 1376,
+        "height": 50
+      },
+      "gatewayWorkspace": {
+        "x": 32,
+        "y": 441,
+        "width": 1376,
+        "height": 1042
+      },
+      "gatewaySavebar": null,
+      "gatewayField": {
+        "x": 57,
+        "y": 915,
+        "width": 653,
+        "height": 40
+      },
+      "gatewayScope": {
+        "x": 32,
+        "y": 1484,
+        "width": 1376,
+        "height": 22
+      },
+      "focus": "BUTTON"
+    },
+    {
+      "name": "gateway-identity-390",
+      "width": 390,
+      "height": 844,
+      "hash": "#/gateway?tab=identity",
+      "h1": [
+        "统一网关"
+      ],
+      "h2": [
+        "智能体身份配置"
+      ],
+      "alerts": [],
+      "viewportWidth": 390,
+      "scrollWidth": 390,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": {
+        "x": 292,
+        "y": 78,
+        "width": 82,
+        "height": 38
+      },
+      "mcpTabs": {
+        "x": 16,
+        "y": 263,
+        "width": 358,
+        "height": 50
+      },
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 0,
+      "gatewayMobileStatus": {
+        "x": 16,
+        "y": 192,
+        "width": 358,
+        "height": 61
+      },
+      "gatewayTabs": {
+        "x": 16,
+        "y": 263,
+        "width": 358,
+        "height": 50
+      },
+      "gatewayWorkspace": {
+        "x": 16,
+        "y": 324,
+        "width": 358,
+        "height": 1594
+      },
+      "gatewaySavebar": null,
+      "gatewayField": {
+        "x": 33,
+        "y": 971,
+        "width": 324,
+        "height": 40
+      },
+      "gatewayScope": {
+        "x": 16,
+        "y": 1921,
+        "width": 358,
+        "height": 44
+      },
+      "focus": "BUTTON"
+    },
+    {
+      "name": "gateway-risk-1440",
+      "width": 1440,
+      "height": 1000,
+      "hash": "#/gateway?tab=risk",
+      "h1": [
+        "统一网关"
+      ],
+      "h2": [
+        "风险评估配置"
+      ],
+      "alerts": [],
+      "viewportWidth": 1440,
+      "scrollWidth": 1440,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": {
+        "x": 1326,
+        "y": 153,
+        "width": 82,
+        "height": 38
+      },
+      "mcpTabs": {
+        "x": 32,
+        "y": 375,
+        "width": 1376,
+        "height": 50
+      },
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 4,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": {
+        "x": 32,
+        "y": 375,
+        "width": 1376,
+        "height": 50
+      },
+      "gatewayWorkspace": {
+        "x": 32,
+        "y": 441,
+        "width": 1376,
+        "height": 858
+      },
+      "gatewaySavebar": null,
+      "gatewayField": {
+        "x": 61,
+        "y": 692,
+        "width": 13,
+        "height": 13
+      },
+      "gatewayScope": {
+        "x": 32,
+        "y": 1299,
+        "width": 1376,
+        "height": 22
+      },
+      "focus": "BUTTON"
+    },
+    {
+      "name": "gateway-risk-390",
+      "width": 390,
+      "height": 844,
+      "hash": "#/gateway?tab=risk",
+      "h1": [
+        "统一网关"
+      ],
+      "h2": [
+        "风险评估配置"
+      ],
+      "alerts": [],
+      "viewportWidth": 390,
+      "scrollWidth": 390,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": {
+        "x": 292,
+        "y": 78,
+        "width": 82,
+        "height": 38
+      },
+      "mcpTabs": {
+        "x": 16,
+        "y": 263,
+        "width": 358,
+        "height": 50
+      },
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 0,
+      "gatewayMobileStatus": {
+        "x": 16,
+        "y": 192,
+        "width": 358,
+        "height": 61
+      },
+      "gatewayTabs": {
+        "x": 16,
+        "y": 263,
+        "width": 358,
+        "height": 50
+      },
+      "gatewayWorkspace": {
+        "x": 16,
+        "y": 324,
+        "width": 358,
+        "height": 1227
+      },
+      "gatewaySavebar": null,
+      "gatewayField": {
+        "x": 37,
+        "y": 632,
+        "width": 13,
+        "height": 13
+      },
+      "gatewayScope": {
+        "x": 16,
+        "y": 1555,
+        "width": 358,
+        "height": 44
+      },
+      "focus": "BUTTON"
+    },
+    {
+      "name": "gateway-access-1440",
+      "width": 1440,
+      "height": 1000,
+      "hash": "#/gateway?tab=authorization",
+      "h1": [
+        "统一网关"
+      ],
+      "h2": [
+        "访问控制配置"
+      ],
+      "alerts": [],
+      "viewportWidth": 1440,
+      "scrollWidth": 1440,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": {
+        "x": 1326,
+        "y": 153,
+        "width": 82,
+        "height": 38
+      },
+      "mcpTabs": {
+        "x": 32,
+        "y": 375,
+        "width": 1376,
+        "height": 50
+      },
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 4,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": {
+        "x": 32,
+        "y": 375,
+        "width": 1376,
+        "height": 50
+      },
+      "gatewayWorkspace": {
+        "x": 32,
+        "y": 441,
+        "width": 1376,
+        "height": 714
+      },
+      "gatewaySavebar": null,
+      "gatewayField": {
+        "x": 61,
+        "y": 600,
+        "width": 13,
+        "height": 13
+      },
+      "gatewayScope": {
+        "x": 32,
+        "y": 1155,
+        "width": 1376,
+        "height": 22
+      },
+      "focus": "BUTTON"
+    },
+    {
+      "name": "gateway-access-390",
+      "width": 390,
+      "height": 844,
+      "hash": "#/gateway?tab=authorization",
+      "h1": [
+        "统一网关"
+      ],
+      "h2": [
+        "访问控制配置"
+      ],
+      "alerts": [],
+      "viewportWidth": 390,
+      "scrollWidth": 390,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": {
+        "x": 292,
+        "y": 78,
+        "width": 82,
+        "height": 38
+      },
+      "mcpTabs": {
+        "x": 16,
+        "y": 263,
+        "width": 358,
+        "height": 50
+      },
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 0,
+      "gatewayMobileStatus": {
+        "x": 16,
+        "y": 192,
+        "width": 358,
+        "height": 61
+      },
+      "gatewayTabs": {
+        "x": 16,
+        "y": 263,
+        "width": 358,
+        "height": 50
+      },
+      "gatewayWorkspace": {
+        "x": 16,
+        "y": 324,
+        "width": 358,
+        "height": 1530
+      },
+      "gatewaySavebar": null,
+      "gatewayField": {
+        "x": 37,
+        "y": 519,
+        "width": 13,
+        "height": 13
+      },
+      "gatewayScope": {
+        "x": 16,
+        "y": 1857,
+        "width": 358,
+        "height": 44
+      },
+      "focus": "BUTTON"
+    },
+    {
+      "name": "gateway-access-1366",
+      "width": 1366,
+      "height": 900,
+      "hash": "#/gateway?tab=authorization",
+      "h1": [
+        "统一网关"
+      ],
+      "h2": [
+        "访问控制配置"
+      ],
+      "alerts": [],
+      "viewportWidth": 1366,
+      "scrollWidth": 1366,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": {
+        "x": 1252,
+        "y": 153,
+        "width": 82,
+        "height": 38
+      },
+      "mcpTabs": {
+        "x": 32,
+        "y": 375,
+        "width": 1302,
+        "height": 50
+      },
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 4,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": {
+        "x": 32,
+        "y": 375,
+        "width": 1302,
+        "height": 50
+      },
+      "gatewayWorkspace": {
+        "x": 32,
+        "y": 441,
+        "width": 1302,
+        "height": 714
+      },
+      "gatewaySavebar": null,
+      "gatewayField": {
+        "x": 61,
+        "y": 600,
+        "width": 13,
+        "height": 13
+      },
+      "gatewayScope": {
+        "x": 32,
+        "y": 1155,
+        "width": 1302,
+        "height": 22
+      },
+      "focus": "BUTTON"
+    },
+    {
+      "name": "gateway-access-900",
+      "width": 900,
+      "height": 850,
+      "hash": "#/gateway?tab=authorization",
+      "h1": [
+        "统一网关"
+      ],
+      "h2": [
+        "访问控制配置"
+      ],
+      "alerts": [],
+      "viewportWidth": 900,
+      "scrollWidth": 900,
+      "instanceAction": null,
+      "instanceSearch": null,
+      "instanceStatus": null,
+      "instanceTable": null,
+      "mcpAction": {
+        "x": 794,
+        "y": 143,
+        "width": 82,
+        "height": 38
+      },
+      "mcpTabs": {
+        "x": 24,
+        "y": 457,
+        "width": 852,
+        "height": 50
+      },
+      "mcpSidebar": null,
+      "mcpPicker": null,
+      "mcpDetail": null,
+      "mcpSummaryCards": 0,
+      "mcpTools": 0,
+      "gatewayStatusCards": 4,
+      "gatewayMobileStatus": null,
+      "gatewayTabs": {
+        "x": 24,
+        "y": 457,
+        "width": 852,
+        "height": 50
+      },
+      "gatewayWorkspace": {
+        "x": 24,
+        "y": 524,
+        "width": 852,
+        "height": 1147
+      },
+      "gatewaySavebar": null,
+      "gatewayField": {
+        "x": 53,
+        "y": 704,
+        "width": 13,
+        "height": 13
+      },
+      "gatewayScope": {
+        "x": 24,
+        "y": 1670,
+        "width": 852,
+        "height": 22
+      },
+      "focus": "BUTTON"
+    }
+  ],
+  "actions": [
+    {
+      "name": "instanceCreateClosedWithoutWrite",
+      "result": true
+    },
+    {
+      "name": "instanceInvalidRoute",
+      "visible": true
+    },
+    {
+      "name": "mcpFixtureSelected",
+      "selected": "true"
+    },
+    {
+      "name": "mcpRouteAfterReload",
+      "hash": "#/mcp?tab=servers&server_id=ui-acceptance-local",
+      "detailText": "ui-acceptance-local仅用于 3091 隔离环境的本地 UI 验收；不代表真实业务服务。连接测试调试工具启用连接状态待检查本页尚未检查当前配置工具发现待核对尚无可用的发现结果服务配置已启用OpenAPI 接口规范尚未检查当前配置；连接、工具发现和实际调用均待验证。工具与调试连接配置最近检查已发现的工具当前配置尚无已验证的工具目录。保存配置后运"
+    },
+    {
+      "name": "gatewayAccessReload",
+      "sameHash": true,
+      "selected": "true"
+    },
+    {
+      "name": "gatewayKeyboardTab",
+      "focusedRisk": true
+    }
+  ],
+  "errors": [],
+  "responses": []
+}

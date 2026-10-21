@@ -1,0 +1,75 @@
+{
+  "results": [
+    {
+      "id": "build",
+      "label": "构建智能体",
+      "action": "开始构建",
+      "draft": "UI 验收 build：保持当前模式和输入。",
+      "before": {
+        "selected": "true",
+        "focusedInput": true,
+        "placeholder": "描述要构建的智能体用途和目标，例如整理模拟资产台账并生成报告。",
+        "actionVisible": true
+      },
+      "afterReload": {
+        "selected": "true",
+        "draft": "UI 验收 build：保持当前模式和输入。"
+      }
+    },
+    {
+      "id": "evaluate",
+      "label": "评测效果",
+      "action": "开始评测",
+      "draft": "UI 验收 evaluate：保持当前模式和输入。",
+      "before": {
+        "selected": "true",
+        "focusedInput": true,
+        "placeholder": "描述要评测的智能体和业务能力，例如评测巡检助手能否完整统计全部设备。",
+        "actionVisible": true
+      },
+      "afterReload": {
+        "selected": "true",
+        "draft": "UI 验收 evaluate：保持当前模式和输入。"
+      }
+    },
+    {
+      "id": "improve",
+      "label": "改进能力",
+      "action": "开始改进",
+      "draft": "UI 验收 improve：保持当前模式和输入。",
+      "before": {
+        "selected": "true",
+        "focusedInput": true,
+        "placeholder": "描述希望改进的能力，例如让巡检报告覆盖全部设备。",
+        "actionVisible": true
+      },
+      "afterReload": {
+        "selected": "true",
+        "draft": "UI 验收 improve：保持当前模式和输入。"
+      }
+    },
+    {
+      "id": "manage",
+      "label": "管理实例与工具",
+      "action": "开始管理",
+      "draft": "UI 验收 manage：保持当前模式和输入。",
+      "before": {
+        "selected": "true",
+        "focusedInput": true,
+        "placeholder": "描述要管理的实例或工具，例如核对实例来源或接入 MCP 工具。",
+        "actionVisible": true
+      },
+      "afterReload": {
+        "selected": "true",
+        "draft": "UI 验收 manage：保持当前模式和输入。"
+      }
+    }
+  ],
+  "selectedAfterReload": "true",
+  "general": {
+    "selectedModeCount": 0,
+    "action": 1
+  },
+  "keyboardSelected": "true",
+  "errors": []
+}

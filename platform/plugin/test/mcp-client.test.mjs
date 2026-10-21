@@ -8,6 +8,7 @@ import test from 'node:test'
 function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理请求') } } = {}) {
   const require = createRequire(import.meta.url)
   const states = [], dependencies = []
+  const clipboard = []
   let registration, cursor, effects, changed
   const react = {
     ...require('react'),
@@ -34,12 +35,12 @@ function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理
   }
   const source = readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8')
     .replace('return module.exports;}});', 'return { ...module.exports, Manager };}});')
-  const copied = []
   vm.runInNewContext(source, {
-    window: { __ModuleLoader__: { load: value => { registration = value } } },
+    window: { __ModuleLoader__: { load: value => { registration = value } }, addEventListener() {}, removeEventListener() {}, confirm: () => true },
     structuredClone, URL, location: { origin: 'http://127.0.0.1:3090' },
     document: { baseURI: 'http://127.0.0.1:3090/hep/' },
-    fetch, navigator: { clipboard: { writeText: async value => { copied.push(value) } } },
+    navigator: { clipboard: { writeText: async value => { clipboard.push(value) } } },
+    fetch,
   })
   const { Manager } = registration.factory(name => name === '@deepseek-ai/dsh-client-ui-primitives' ? {} : name === 'react' ? react
     : name === 'react-dom' ? { ...require(name), createPortal: element => element } : require(name))
@@ -47,8 +48,9 @@ function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理
     specUrl: 'http://127.0.0.1:18080/v3/api-docs/mcp', authType: 'credential',
     authHeader: 'X-API-Key', apiKey: 'fixture-credential', tools: { mode: 'all', names: [] } }
   const groups = [{ id: 'research', members: [{ serverId: 'platform-compositions', names: ['query_asset_related_alerts'] }] }]
-  const writes = []
+  const writes = [], selections = []
   const props = { view: 'servers', toolbarTarget: {}, onValidationError: () => { props.view = 'servers' },
+    onSelectServerId: id => { selections.push(id); props.selectedServerId = id },
     form: { state: { status: 'ready', writable: true, revision: 'r1', value: { servers: [server], groups, sharedToken: '' } } },
     publishedService: { id: 'platform-compositions', platformComposition: true, enabled: true,
       description: '工具组合编排（已发布）', publishedTools: [{ name: 'query_asset_related_alerts' }],
@@ -68,20 +70,36 @@ function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理
     } while (changed)
     return tree
   }
-  function nodes(value = tree) {
+  function renderBeforeEffects() {
+    const previousDependencies = dependencies.slice()
+    cursor = 0; effects = []; changed = false
+    tree = Manager(props)
+    dependencies.splice(0, dependencies.length, ...previousDependencies)
+    return tree
+  }
+  function nodes(value) {
+    if (arguments.length === 0) value = tree
     if (Array.isArray(value)) return value.flatMap(item => nodes(item))
     if (!value || typeof value !== 'object') return []
     return [value, ...(value.props?.children === undefined ? [] : nodes(value.props.children))]
   }
   function text(value) {
     if (Array.isArray(value)) return value.map(text).join('')
+    if (value?.type === 'style') return ''
     return value && typeof value === 'object' ? text(value.props?.children) : String(value ?? '')
   }
   const button = label => nodes().find(node => node.type === 'button' && text(node) === label)
-  const input = label => nodes(nodes().find(node => node.type === 'label' && text(node) === label))
-    .find(node => node.type === 'input')
+  const serviceButton = name => nodes().find(node => node.props?.className === 'mcp-list-item' && text(node).startsWith(name))
+  const input = label => {
+    if (!nodes().some(node => node.type === 'label' && text(node) === label)) {
+      button('连接配置')?.props.onClick()
+      render()
+    }
+    return nodes(nodes().find(node => node.type === 'label' && text(node) === label))
+      .find(node => node.type === 'input')
+  }
   render()
-  return { render, nodes, text, button, input, writes, copied, server, groups,
+  return { render, nodes, text, button, serviceButton, input, writes, selections, copied: clipboard, clipboard, server, groups,
     refreshValue: (value = props.form.state.value, revision = props.form.state.revision) => {
       props.form.state.value = structuredClone(value)
       props.form.state.revision = revision
@@ -92,17 +110,20 @@ function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理
         publishedTools: names.map(name => ({ toolName: name })) }
       render()
     },
-    setView: value => { props.view = value; render() }, getView: () => props.view }
+    setView: value => { props.view = value; render() }, getView: () => props.view,
+    setServerId: value => { props.selectedServerId = value; render() },
+    replaceDraftServersBeforeEffects: servers => { states[0] = { ...states[0], servers: structuredClone(servers) }; return renderBeforeEffects() } }
 }
 
 test('自动生成的已发布组合服务不参与原生服务保存校验或持久化', async () => {
   const ui = editor()
-  assert.ok(ui.button('工具组合编排工具组合编排（已发布） · 已启用'))
+  assert.match(ui.text(ui.serviceButton('工具组合编排')), /已发布工具目录.*连接与工具发现待检查.*本页尚未检查/)
   ui.input('描述（可选）').props.onChange({ target: { value: '18080' } })
   ui.render()
-  ui.button('工具组合编排工具组合编排（已发布） · 已启用').props.onClick()
+  ui.serviceButton('工具组合编排').props.onClick()
   ui.render()
-  assert.ok(ui.nodes().some(node => node.props?.service?.id === 'platform-compositions'))
+  assert.match(ui.text(ui.render()), /已发布组合生成的服务.*已发布工具.*query_asset_related_alerts/)
+  assert.equal(ui.input('ID'), undefined)
   assert.equal(ui.button('保存更改').props.disabled, false)
   await ui.button('保存更改').props.onClick()
   ui.render()
@@ -112,6 +133,49 @@ test('自动生成的已发布组合服务不参与原生服务保存校验或�
   assert.deepEqual(ops.find(op => op.path[0] === 'servers').value, [{ ...ui.server, description: '18080' }])
   assert.deepEqual(ops.find(op => op.path[0] === 'groups').value, ui.groups)
   assert.match(ui.text(ui.render()), /配置已保存/)
+})
+
+test('非空服务详情按原型层级呈现服务选择、状态摘要和真实发现结果', async () => {
+  const ui = editor({ fetch: async () => ({ ok: true, json: async () => ({ tools: [{ name: 'lookup', description: '读取测试资产' }], resources: { resources: [] } }) }) })
+  assert.ok(ui.nodes().some(node => node.props?.className === 'mcp-mobile-service-picker'))
+  const statusCards = () => ui.nodes().filter(node => node.type === 'article' && node.props?.children).map(ui.text)
+  assert.equal(statusCards().length, 3)
+  assert.match(statusCards()[2], /业务验证范围.*未验证.*请核对实际调用与目标业务结果/)
+  assert.match(ui.text(ui.render()), /待检查.*待核对.*尚未检查当前配置/)
+  ui.button('连接测试').props.onClick()
+  await new Promise(resolve => setImmediate(resolve))
+  ui.render()
+  assert.match(ui.text(ui.render()), /连接状态.*规范已读取.*工具发现.*1 个工具.*已发现的工具.*lookup.*读取测试资产/)
+  assert.match(statusCards()[2], /业务验证范围.*未验证.*请核对实际调用与目标业务结果/)
+  assert.match(ui.text(ui.render()), /实际调用和业务结果待验证/)
+  ui.button('连接配置').props.onClick()
+  ui.render()
+  assert.ok(ui.input('ID'))
+})
+
+test('服务列表区分检查成功、失败和未保存配置', async () => {
+  const ui = editor({ fetch: async () => ({ ok: true, json: async () => ({ tools: [{ name: 'lookup' }], resources: { resources: [] } }) }) })
+  assert.match(ui.text(ui.serviceButton('biz-soc-framework')), /连接与工具发现待检查.*本页尚未检查/)
+  ui.setView('connection')
+  await ui.button('发现工具与资源').props.onClick()
+  ui.setView('servers')
+  assert.match(ui.text(ui.serviceButton('biz-soc-framework')), /规范已读取 · 已发现 1 个工具.*最近检查/)
+  assert.match(ui.text(ui.render()), /实际调用和业务结果待验证/)
+  ui.button('连接配置').props.onClick()
+  ui.render()
+  const typeField = ui.nodes().find(node => node.type === 'select' && node.props.value === 'openapi')
+  assert.ok(typeField)
+  typeField.props.onChange({ target: { value: 'mcp' } })
+  ui.render()
+  assert.match(ui.text(ui.serviceButton('biz-soc-framework')), /当前修改未保存.*保存当前配置后再检查/)
+  assert.doesNotMatch(ui.text(ui.serviceButton('biz-soc-framework')), /最近检查/)
+
+  const failed = editor({ fetch: async () => ({ ok: false, json: async () => ({ error: '连接超时' }) }) })
+  failed.setView('connection')
+  await failed.button('发现工具与资源').props.onClick()
+  failed.setView('servers')
+  assert.match(failed.text(failed.serviceButton('biz-soc-framework')), /检查失败，连接与工具发现待核对.*最近检查/)
+  assert.doesNotMatch(failed.text(failed.serviceButton('biz-soc-framework')), /规范已读取/)
 })
 
 test('列表中的其他服务不完整时定位该服务和具体字段，且不写入配置', async () => {
@@ -278,4 +342,87 @@ test('分组三类选择保留草稿；发现后失效项可见，三个页签�
   assert.equal((ui.text(ui.render()).match(/当前未发现/g) ?? []).length, 2)
   ui.setView('connection')
   assert.equal(heading().length, 0)
+})
+
+test('深链按服务 ID 恢复，失效 ID 不静默选中其他服务', () => {
+  const ui = editor()
+  ui.setServerId('platform-compositions')
+  assert.match(ui.text(ui.render()), /已发布组合生成的服务.*已发布工具.*query_asset_related_alerts/)
+  assert.equal(ui.input('ID'), undefined)
+  ui.setServerId('missing-server')
+  assert.equal(ui.input('ID'), undefined)
+  ui.setServerId('biz-soc-framework')
+  assert.equal(ui.input('ID').props.value, 'biz-soc-framework')
+  ui.serviceButton('工具组合编排').props.onClick()
+  assert.equal(ui.selections.at(-1), 'platform-compositions')
+})
+
+test('深链服务在配置重排或删除后仍绑定原 ID，不显示其他服务详情', () => {
+  const ui = editor()
+  const other = { ...ui.server, id: 'other-server', serverName: '其他服务' }
+  ui.refreshValue({ servers: [ui.server, other], groups: ui.groups, sharedToken: '' }, 'r2')
+  ui.setServerId('biz-soc-framework')
+  assert.equal(ui.input('ID').props.value, 'biz-soc-framework')
+  ui.refreshValue({ servers: [other, ui.server], groups: ui.groups, sharedToken: '' }, 'r3')
+  assert.equal(ui.input('ID').props.value, 'biz-soc-framework')
+  ui.refreshValue({ servers: [other], groups: ui.groups, sharedToken: '' }, 'r4')
+  assert.equal(ui.input('ID'), undefined)
+  assert.match(ui.text(ui.render()), /指定服务不存在/)
+})
+
+test('深链服务重排后的首帧从 ID 派生详情和编辑对象', () => {
+  const ui = editor()
+  const other = { ...ui.server, id: 'other-server', serverName: '其他服务' }
+  ui.setServerId('biz-soc-framework')
+  ui.button('连接配置').props.onClick(); ui.render()
+  ui.replaceDraftServersBeforeEffects([other, ui.server])
+  assert.equal(ui.input('ID').props.value, 'biz-soc-framework')
+  assert.equal(ui.serviceButton('biz-soc-framework').props['aria-current'], 'true')
+  ui.input('描述（可选）').props.onChange({ target: { value: '绑定原服务' } })
+  ui.render()
+  assert.equal(ui.input('描述（可选）').props.value, '绑定原服务')
+  ui.replaceDraftServersBeforeEffects([other])
+  assert.equal(ui.nodes().find(node => node.type === 'input' && node.props.placeholder === '例如 sec-ops-api'), undefined)
+  assert.match(ui.text(ui.nodes()), /指定服务不存在/)
+})
+
+test('深链服务改名后可继续编辑，路由随 ID 更新', () => {
+  const ui = editor()
+  ui.setServerId('biz-soc-framework')
+  ui.input('ID').props.onChange({ target: { value: 'renamed-server' } })
+  ui.render()
+  assert.equal(ui.selections.at(-1), 'renamed-server')
+  assert.equal(ui.input('ID').props.value, 'renamed-server')
+})
+
+test('主动删除深链服务后改选下一可用服务', () => {
+  const ui = editor()
+  ui.setServerId('biz-soc-framework')
+  ui.button('连接配置').props.onClick(); ui.render()
+  ui.button('删除服务器').props.onClick(); ui.render()
+  assert.equal(ui.selections.at(-1), 'platform-compositions')
+  assert.match(ui.text(ui.render()), /已发布组合生成的服务/)
+  assert.equal(ui.serviceButton('工具组合编排').props['aria-current'], 'true')
+})
+
+test('配置冲突后复制完整草稿，读取最新内容并保留原草稿供手工重应用', async () => {
+  const ui = editor()
+  ui.input('描述（可选）').props.onChange({ target: { value: '本地修改' } })
+  ui.render()
+  ui.refreshValue({ servers: [{ ...ui.server, description: '另一会话的修改' }], groups: ui.groups, sharedToken: '' }, 'r2')
+  assert.match(ui.text(ui.render()), /配置版本冲突/)
+  assert.equal(ui.button('读取最新配置').props.disabled, true)
+  ui.button('复制本地草稿').props.onClick()
+  await new Promise(setImmediate)
+  ui.render()
+  assert.equal(JSON.parse(ui.clipboard.at(-1)).servers[0].description, '本地修改')
+  assert.equal(ui.button('读取最新配置').props.disabled, false)
+  ui.button('读取最新配置').props.onClick()
+  ui.render()
+  assert.equal(ui.input('描述（可选）').props.value, '另一会话的修改')
+  assert.ok(ui.button('复制保留草稿'))
+  ui.button('复制保留草稿').props.onClick()
+  await new Promise(setImmediate)
+  assert.equal(JSON.parse(ui.clipboard.at(-1)).servers[0].description, '本地修改')
+  assert.equal(ui.writes.length, 0)
 })

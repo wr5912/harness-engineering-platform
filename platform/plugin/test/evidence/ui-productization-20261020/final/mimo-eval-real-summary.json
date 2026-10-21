@@ -1,0 +1,59 @@
+{
+  "checkedAt": "2026-10-21T04:24:24.197910+00:00",
+  "runId": "run-8256cf6f-5e0f-4ec3-8420-0bff47423bf0",
+  "sourceId": "experiment:EXP-security-operations-expert-023-r2233d74f6fb3",
+  "caseId": "U-INS-003",
+  "scope": "3091 独立数据根的真实 dsh-eval API 单 Case；非正式数据仓库 Release",
+  "route": {
+    "provider": "xiaomi-token-plan-cn",
+    "model": "mimo-v2.6-flash",
+    "reasoningEffort": "off"
+  },
+  "targetTurnReason": "completed",
+  "caseExecutionStatus": "completed",
+  "caseVerdict": "passed",
+  "effectiveVerdict": "passed",
+  "reviewStatus": "not_requested",
+  "instanceStopped": true,
+  "responseLength": 485,
+  "responseObjectKeys": [
+    "巡检事实",
+    "辅助研判",
+    "待核验项",
+    "说明"
+  ],
+  "checks": [
+    {
+      "name": "隔离来源与 Case 固定",
+      "passed": true
+    },
+    {
+      "name": "预检只需当前 Xiaomi 连接变量",
+      "passed": true
+    },
+    {
+      "name": "Research Run 已完成且评测实例已停止",
+      "passed": true
+    },
+    {
+      "name": "目标 Session 实际为 MiMo/off 并完成",
+      "passed": true
+    },
+    {
+      "name": "回答是单个 JSON 且包含四项给定数量",
+      "passed": true
+    },
+    {
+      "name": "Case 完成并通过",
+      "passed": true
+    },
+    {
+      "name": "Judge 走同一 MiMo/off 路由",
+      "passed": true
+    },
+    {
+      "name": "来源校验相符且报告已封存",
+      "passed": true
+    }
+  ]
+}

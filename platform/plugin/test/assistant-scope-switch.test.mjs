@@ -69,6 +69,8 @@ test('真实HTTP管理会话统一限制原生读写，专用切换与可信Skil
     })
     inner.provide('platformMcp', { servers: { get: () => [] }, groups: { get: () => [] } })
     inner.provide('settingsController', {})
+    inner.provide('agentDefaultModel', {})
+    inner.provide('llm', { listConfigurableProviders: () => [] })
     inner.provide('agents', { get: id => agents.get(id) })
     inner.provide('goals', { get: () => undefined })
     // 仅隔离会话调度与模型输入；HTTP、Session投影、插件入口和工具执行均使用真实实现。

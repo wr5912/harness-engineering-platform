@@ -1,0 +1,138 @@
+{
+  "results": [
+    {
+      "route": "home",
+      "width": 1440,
+      "height": 1000,
+      "dark": true,
+      "innerWidth": 1440,
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "foreground": "rgb(249, 250, 251)",
+      "background": "color(srgb 0.0798824 0.0936471 0.111255)"
+    },
+    {
+      "route": "agents",
+      "width": 1440,
+      "height": 1000,
+      "dark": true,
+      "innerWidth": 1440,
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "foreground": "rgb(249, 250, 251)",
+      "background": "color(srgb 0.0798824 0.0936471 0.111255)"
+    },
+    {
+      "route": "evaluation",
+      "width": 1440,
+      "height": 1000,
+      "dark": true,
+      "innerWidth": 1440,
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "foreground": "rgb(249, 250, 251)",
+      "background": "color(srgb 0.0798824 0.0936471 0.111255)"
+    },
+    {
+      "route": "instances",
+      "width": 1440,
+      "height": 1000,
+      "dark": true,
+      "innerWidth": 1440,
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "foreground": "rgb(249, 250, 251)",
+      "background": "color(srgb 0.0798824 0.0936471 0.111255)"
+    },
+    {
+      "route": "gateway",
+      "width": 1440,
+      "height": 1000,
+      "dark": true,
+      "innerWidth": 1440,
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "foreground": "rgb(249, 250, 251)",
+      "background": "color(srgb 0.0798824 0.0936471 0.111255)"
+    },
+    {
+      "route": "mcp",
+      "width": 1440,
+      "height": 1000,
+      "dark": true,
+      "innerWidth": 1440,
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "foreground": "rgb(249, 250, 251)",
+      "background": "color(srgb 0.0798824 0.0936471 0.111255)"
+    },
+    {
+      "route": "home",
+      "width": 390,
+      "height": 844,
+      "dark": true,
+      "innerWidth": 390,
+      "documentWidth": 390,
+      "viewportWidth": 390,
+      "foreground": "rgb(249, 250, 251)",
+      "background": "color(srgb 0.0798824 0.0936471 0.111255)"
+    },
+    {
+      "route": "agents",
+      "width": 390,
+      "height": 844,
+      "dark": true,
+      "innerWidth": 390,
+      "documentWidth": 390,
+      "viewportWidth": 390,
+      "foreground": "rgb(249, 250, 251)",
+      "background": "color(srgb 0.0798824 0.0936471 0.111255)"
+    },
+    {
+      "route": "evaluation",
+      "width": 390,
+      "height": 844,
+      "dark": true,
+      "innerWidth": 390,
+      "documentWidth": 390,
+      "viewportWidth": 390,
+      "foreground": "rgb(249, 250, 251)",
+      "background": "color(srgb 0.0798824 0.0936471 0.111255)"
+    },
+    {
+      "route": "instances",
+      "width": 390,
+      "height": 844,
+      "dark": true,
+      "innerWidth": 390,
+      "documentWidth": 390,
+      "viewportWidth": 390,
+      "foreground": "rgb(249, 250, 251)",
+      "background": "color(srgb 0.0798824 0.0936471 0.111255)"
+    },
+    {
+      "route": "gateway",
+      "width": 390,
+      "height": 844,
+      "dark": true,
+      "innerWidth": 390,
+      "documentWidth": 390,
+      "viewportWidth": 390,
+      "foreground": "rgb(249, 250, 251)",
+      "background": "color(srgb 0.0798824 0.0936471 0.111255)"
+    },
+    {
+      "route": "mcp",
+      "width": 390,
+      "height": 844,
+      "dark": true,
+      "innerWidth": 390,
+      "documentWidth": 390,
+      "viewportWidth": 390,
+      "foreground": "rgb(249, 250, 251)",
+      "background": "color(srgb 0.0798824 0.0936471 0.111255)"
+    }
+  ],
+  "persisted": true,
+  "errors": []
+}

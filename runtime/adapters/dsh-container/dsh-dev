@@ -19,6 +19,7 @@ import os
 import re
 import secrets
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -71,6 +72,15 @@ CONTAINER_REFERENCE = "/work/reference"
 # 2.7：整站 Web 基址与只读适配器挂载写入实例状态。
 INSTANCE_SCHEMA_VERSION = "2.8"
 ANALYSIS_PRESET = "scenario-analysis"
+MODEL_RUNTIME_HOST = ADAPTER.parents[2] / "platform/plugin/lib/model-runtime.js"
+MODEL_RUNTIME_CONTAINER = "/opt/harness-model-runtime/model-runtime.mjs"
+MODEL_PATCH_CONTAINER = "/opt/harness-model-runtime/model.patch.yml"
+MODEL_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+@-]{0,255}$")
+ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+MODEL_PATCH_IDS = {"agent-default-model", "llm-deepseek", "llm-pi-ai", "llm-deepseek-account"}
+# 现有来源的模型连接变量。平台策略接管模型配置时，来源原有模型路由不再决定必需变量；
+# MCP 等来源环境要求仍按原声明检查。
+SOURCE_MODEL_ENV_NAMES = frozenset({"DEEPSEEK_API_KEY", "LOCAL_LLM_API_KEY", "LOCAL_LLM_BASE_URL"})
 
 
 def current_web_base_path() -> str:
@@ -98,6 +108,318 @@ def web_cold_start_hint(mode: str, analysis_workspace: str | None = None) -> str
 def fail(message: str) -> None:
     print(f"dsh-dev failed: {message}", file=sys.stderr)
     raise SystemExit(1)
+
+
+def _unique_json(pairs: list[tuple[str, object]]) -> dict:
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("重复的 JSON 字段")
+        result[key] = value
+    return result
+
+
+def _model_identity(value: object, label: str, *, default: bool = False) -> dict:
+    fields = {"provider", "model", "reasoningEffort"} if default else {"provider", "model"}
+    if not isinstance(value, dict) or not {"provider", "model"} <= value.keys() or not value.keys() <= fields:
+        fail(f"{label} 必须明确提供 provider 与 model")
+    if any(not isinstance(value[key], str) or not MODEL_ID_RE.fullmatch(value[key])
+           for key in ("provider", "model")):
+        fail(f"{label} 的模型身份无效")
+    if "reasoningEffort" in value and (not isinstance(value["reasoningEffort"], str)
+                                       or not MODEL_ID_RE.fullmatch(value["reasoningEffort"])):
+        fail(f"{label} 的 reasoningEffort 无效")
+    return dict(value)
+
+
+def _public_model_config(value: object, *, depth: int = 0) -> None:
+    """策略文件只容纳模型设置与环境变量引用，不能借 Patch 执行插件或携带凭据。"""
+    if depth > 12:
+        fail("模型配置嵌套层级过深")
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if not isinstance(key, str) or len(key) > 128:
+                fail("模型配置字段无效")
+            normalized = key.lower().replace("_", "").replace("-", "")
+            if normalized in {"headers", "header", "apikey", "token", "password", "secret", "credential", "authorization"}:
+                fail("模型策略不得包含凭据或请求头原值")
+            if key in {"apiKeyEnv", "baseURLEnv"} and (not isinstance(item, str) or not ENV_NAME_RE.fullmatch(item)):
+                fail(f"模型配置的 {key} 必须是环境变量名称")
+            if key == "baseURL" and isinstance(item, str):
+                address = urllib.parse.urlsplit(item)
+                if address.scheme not in {"http", "https"} or not address.netloc or address.username or address.password or address.query or address.fragment:
+                    fail("模型端点只能是不含凭据和查询参数的 HTTP 地址")
+            _public_model_config(item, depth=depth + 1)
+    elif isinstance(value, list):
+        if len(value) > 512:
+            fail("模型配置列表过长")
+        for item in value:
+            _public_model_config(item, depth=depth + 1)
+    elif value is not None and not isinstance(value, (str, bool, int, float)):
+        fail("模型配置包含不支持的值")
+    elif isinstance(value, str) and len(value) > 4096:
+        fail("模型配置文本过长")
+
+
+def _model_policy(raw: object, agent_id: str, *, source: str, manifest_sha256: str | None) -> dict:
+    if not isinstance(raw, dict) or raw.get("agent_id") != agent_id or not raw.keys() <= {
+        "agent_id", "allowed", "default", "patch", "credential_refs", "manifest_sha256", "business_model_revision"
+    }:
+        fail("模型策略的 Agent 身份或字段与所选来源不一致")
+    if source == "platform" and (not isinstance(raw.get("manifest_sha256"), str)
+                                 or not re.fullmatch(r"[0-9a-f]{64}", raw["manifest_sha256"])
+                                 or raw["manifest_sha256"] != manifest_sha256):
+        fail("模型策略对应的 Agent manifest 已变化，请刷新设置后重新启动")
+    revision = raw.get("business_model_revision")
+    if source == "platform" and (not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{64}", revision)):
+        fail("平台模型策略缺少业务默认模型配置修订摘要")
+    if revision is not None and (not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{64}", revision)):
+        fail("业务默认模型配置修订摘要无效")
+    allowed_raw = raw.get("allowed", [])
+    if not isinstance(allowed_raw, list) or len(allowed_raw) > 200:
+        fail("模型策略的 allowed 必须是模型列表")
+    allowed = [_model_identity(item, "allowed") for item in allowed_raw]
+    identities = {(item["provider"], item["model"]) for item in allowed}
+    if len(identities) != len(allowed):
+        fail("模型策略的 allowed 存在重复模型")
+    default = raw.get("default")
+    if default is not None:
+        default = _model_identity(default, "default", default=True)
+        if (default["provider"], default["model"]) not in identities:
+            fail("实例默认模型不在当前可用模型目录中")
+    elif allowed and source != "business-config":
+        fail("模型策略包含可用模型时必须指定实例默认模型")
+    refs = raw.get("credential_refs", [])
+    if not isinstance(refs, list) or len(refs) > 32 or any(
+        not isinstance(name, str) or not ENV_NAME_RE.fullmatch(name) for name in refs
+    ) or len(set(refs)) != len(refs):
+        fail("模型凭据引用必须是不重复的环境变量名称")
+    patch = raw.get("patch", [])
+    if not isinstance(patch, list) or len(patch) > 4:
+        fail("模型 Patch 必须是受限配置列表")
+    seen = set()
+    for entry in patch:
+        if not isinstance(entry, dict) or entry.get("id") not in MODEL_PATCH_IDS or entry["id"] in seen:
+            fail("模型 Patch 包含重复或未授权的插件")
+        seen.add(entry["id"])
+        if "disabled" in entry:
+            if entry not in ({"id": "llm-deepseek-account", "disabled": True},
+                             {"id": "llm-deepseek", "disabled": True}):
+                fail("模型 Patch 只能禁用受控的内置模型入口")
+        elif set(entry) != {"id", "config"} or not isinstance(entry["config"], dict):
+            fail("模型 Patch 只允许指定模型插件的配置")
+        else:
+            _public_model_config(entry["config"])
+            if entry["id"] == "agent-default-model" and entry["config"] != default:
+                fail("模型 Patch 默认模型与授权默认值不一致")
+            def check_refs(value: object) -> None:
+                if isinstance(value, dict):
+                    for key, item in value.items():
+                        if key in {"apiKeyEnv", "baseURLEnv"} and item not in refs:
+                            fail(f"模型配置的 {key} 未列入 credential_refs")
+                        check_refs(item)
+                elif isinstance(value, list):
+                    for item in value:
+                        check_refs(item)
+            check_refs(entry["config"])
+    if default and source == "platform" and "agent-default-model" not in seen:
+        fail("平台模型 Patch 缺少默认模型配置")
+    if source == "business-config" and patch:
+        fail("业务统一模型配置不能注入运行时 Patch")
+    if source == "business-config" and default:
+        patch = [{"id": "agent-default-model", "config": default}]
+    policy = {"agent_id": agent_id, "allowed": allowed, "default": default,
+              "credential_refs": refs, "patch": patch, "source": source,
+              "manifest_sha256": manifest_sha256, "business_model_revision": revision}
+    digest_input = {key: policy[key] for key in ("agent_id", "allowed", "default", "credential_refs", "patch", "source", "manifest_sha256", "business_model_revision")}
+    policy["sha256"] = hashlib.sha256(json.dumps(digest_input, ensure_ascii=False, sort_keys=True,
+                                                 separators=(",", ":")).encode()).hexdigest()
+    return policy
+
+
+def read_business_model_policy(repo: Path) -> dict:
+    """统一默认模型来自本文件；业务可选目录由平台当前 DSH 模型目录派生。"""
+    config = repo / "config"
+    file = config / "business-model-default.json"
+    if config.is_symlink() or file.is_symlink():
+        fail("业务模型配置必须位于实体目录和普通文件")
+    if not file.exists():
+        return {"default": None, "revision": hashlib.sha256(b"").hexdigest(), "migration_required": False}
+    if not file.is_file() or file.stat().st_size > 16 * 1024:
+        fail("业务模型配置必须是有效的普通文件")
+    try:
+        raw = file.read_bytes()
+        value = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_json)
+    except (OSError, UnicodeError, ValueError):
+        fail("业务模型配置不是有效的 JSON")
+    if not isinstance(value, dict):
+        fail("业务模型配置格式无效")
+    revision = hashlib.sha256(raw).hexdigest()
+    if value.get("schema_version") == "1.0" and set(value) == {"schema_version", "default"}:
+        if value["default"] is not None:
+            _model_identity(value["default"], "旧业务默认模型", default=True)
+        return {"default": None, "revision": revision, "migration_required": True}
+    if value.get("schema_version") == "1.1" and set(value) == {"schema_version", "allowed", "default"}:
+        allowed_raw = value["allowed"]
+        if not isinstance(allowed_raw, list) or len(allowed_raw) > 200:
+            fail("旧业务模型范围格式无效")
+        allowed = [_model_identity(item, "旧业务可用模型") for item in allowed_raw]
+        if len({(item["provider"], item["model"]) for item in allowed}) != len(allowed) \
+                or any(item["provider"] == "deepseek-account" for item in allowed):
+            fail("旧业务模型范围格式无效")
+        selected = value["default"]
+        if selected is not None:
+            selected = _model_identity(selected, "旧业务默认模型", default=True)
+        if (bool(allowed) != bool(selected)) or (selected is not None and
+                (selected["provider"], selected["model"]) not in {
+                    (item["provider"], item["model"]) for item in allowed}):
+            fail("旧业务模型范围格式无效")
+        return {"default": None, "revision": revision, "migration_required": True}
+    if value.get("schema_version") != "1.2" or set(value) != {"schema_version", "default"}:
+        fail("业务模型配置格式无效")
+    default = value["default"]
+    if default is not None:
+        default = _model_identity(default, "业务统一默认模型", default=True)
+        if default["provider"] == "deepseek-account":
+            fail("账号登录模型不能作为业务默认模型")
+    return {"default": default, "revision": revision, "migration_required": False}
+
+
+def read_model_policy(path: str | None, agent_id: str, *, repo: Path = REPO,
+                      selected: dict | None = None) -> dict:
+    """Host JSON 是同步投影；直连启动只读取统一业务默认模型。"""
+    manifest = repo / "agents" / agent_id / "manifest.yaml"
+    manifest_bytes = None
+    if manifest.is_file():
+        if manifest.is_symlink() or manifest.parent.is_symlink() or manifest.stat().st_size > 128 * 1024:
+            fail("Agent manifest 不是可读取的普通文件")
+        manifest_bytes = manifest.read_bytes()
+    manifest_sha256 = hashlib.sha256(manifest_bytes).hexdigest() if manifest_bytes is not None else None
+    business = read_business_model_policy(repo)
+    if business["migration_required"] or business["default"] is None:
+        fail("尚未确认业务智能体统一默认模型，请先在设置 → 模型中配置")
+    if path:
+        if manifest_bytes is None:
+            fail("平台模型策略需要当前 Agent manifest")
+        policy_path = Path(path)
+        if not policy_path.is_absolute() or policy_path != policy_path.resolve() or not policy_path.is_file() \
+                or policy_path.is_symlink() or not stat.S_ISREG(policy_path.stat().st_mode) \
+                or policy_path.stat().st_size > 256 * 1024 or policy_path.stat().st_mode & stat.S_IWOTH:
+            fail("--model-policy 必须是已存在的规范化绝对普通文件，且不能对所有用户可写")
+        try:
+            raw = json.loads(policy_path.read_text(encoding="utf-8"), object_pairs_hook=_unique_json)
+        except (OSError, UnicodeError, ValueError):
+            fail("--model-policy 不是有效的非秘密 JSON")
+        policy = _model_policy(raw, agent_id, source="platform", manifest_sha256=manifest_sha256)
+        if policy["business_model_revision"] != business["revision"]:
+            fail("平台模型策略与当前业务默认模型配置修订不一致，请重新预览实例计划")
+        return policy
+    if selected is None:
+        selected = business["default"]
+    if selected != business["default"]:
+        fail("直连启动只能使用业务统一默认模型；实例另选模型请从平台预览并启动")
+    return _model_policy({"agent_id": agent_id, "allowed": [{"provider": selected["provider"], "model": selected["model"]}],
+                          "default": selected, "business_model_revision": business["revision"]}, agent_id, source="business-config",
+                         manifest_sha256=manifest_sha256)
+
+
+def _declared_patch_default(path: Path, *, require_route: bool = False) -> tuple[str, str] | None:
+    """只识别来源 Patch 明确声明的简单默认模型；不推测任意 YAML 的运行结果。"""
+    try:
+        if path.is_symlink() or not path.is_file() or path.stat().st_size > 2 * 1024 * 1024:
+            return None
+        content = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return None
+    entries = re.findall(r"(?m)^-[ \t]+id:[ \t]+agent-default-model[ \t]*$", content)
+    if len(entries) != 1:
+        return None
+    match = re.search(
+        r"(?m)^-[ \t]+id:[ \t]+agent-default-model[ \t]*\n"
+        r"[ \t]+config:[ \t]*\n"
+        r"[ \t]+provider:[ \t]+([A-Za-z0-9._:/+@-]+)[ \t]*\n"
+        r"[ \t]+model:[ \t]+([A-Za-z0-9._:/+@-]+)[ \t]*(?:\n|$)",
+        content,
+    )
+    if not match:
+        return None
+    identity = (match.group(1), match.group(2))
+    if not require_route:
+        return identity
+    # 来源默认模型只证明选择意图；直连还需要来源明确注册同一 Provider/Model。
+    plugins = list(re.finditer(r"(?m)^-[ \t]+id:[ \t]+llm-pi-ai[ \t]*$", content))
+    if len(plugins) != 1:
+        return None
+    remainder = content[plugins[0].end():]
+    next_entry = re.search(r"(?m)^-[ \t]+", remainder)
+    plugin_content = remainder[:next_entry.start()] if next_entry else remainder
+    if re.search(r"(?m)^  disabled:[ \t]+true[ \t]*$", plugin_content):
+        return None
+    provider = re.search(rf"(?m)^      {re.escape(identity[0])}:[ \t]*$", plugin_content)
+    if provider is None:
+        return None
+    remainder = plugin_content[provider.end():]
+    next_provider = re.search(r"(?m)^      [A-Za-z0-9._:/+@-]+:[ \t]*$", remainder)
+    provider_content = remainder[:next_provider.start()] if next_provider else remainder
+    route = re.search(rf"(?m)^        models:[ \t]*\n          - id:[ \t]+{re.escape(identity[1])}[ \t]*(?:\n|$)", provider_content)
+    return identity if route else None
+
+
+def assert_direct_model_available(contract: dict, policy: dict) -> None:
+    """直连只能使用来源已能连接的默认模型；其他连接由平台策略投影。"""
+    if policy["source"] != "business-config":
+        return
+    selected = policy["default"]
+    if selected is None:
+        fail("业务统一默认模型未设置；请先在设置 → 模型中配置")
+    prefix = "/opt/dsh-managed/"
+    patch = contract.get("patch", "")
+    managed = contract.get("managed")
+    source_file = Path(managed) / patch[len(prefix):] if managed and patch.startswith(prefix) else None
+    defaults = {_declared_patch_default(ADAPTER / "runtime-model.patch.yml")}
+    if source_file is not None:
+        defaults.add(_declared_patch_default(source_file, require_route=True))
+    if (selected["provider"], selected["model"]) not in defaults:
+        fail("业务统一默认模型在当前来源中没有可用的直连模型连接；请从平台实例管理启动，或提供当前 --model-policy")
+
+
+def assert_model_policy_current(policy: dict, *, repo: Path = REPO) -> None:
+    if policy["source"] == "analysis-runtime":
+        return
+    manifest = repo / "agents" / policy["agent_id"] / "manifest.yaml"
+    if policy["manifest_sha256"] is None:
+        if manifest.exists():
+            fail("Agent manifest 已在启动过程中创建，请重新预览实例计划")
+    elif not manifest.is_file() or manifest.is_symlink() or manifest.parent.is_symlink() \
+            or hashlib.sha256(manifest.read_bytes()).hexdigest() != policy["manifest_sha256"]:
+        fail("Agent manifest 已在启动过程中变化，请重新预览实例计划")
+    business = read_business_model_policy(repo)
+    if business["migration_required"] or policy.get("business_model_revision") != business["revision"]:
+        fail("业务默认模型配置已在启动过程中变化，请重新预览实例计划")
+
+
+def model_policy_patch(policy: dict) -> str:
+    if policy["source"] == "analysis-runtime":
+        return "[]\n"
+    rows = [*policy["patch"], {"insert": [{"id": "harness-model-runtime",
+             "name": f"file://{MODEL_RUNTIME_CONTAINER}",
+             "config": {"agentId": policy["agent_id"], "allowed": policy["allowed"]}}]}]
+    return json.dumps(rows, ensure_ascii=False, indent=2) + "\n"
+
+
+def model_policy_summary(policy: dict) -> dict:
+    return {"source": policy["source"], "sha256": policy["sha256"],
+            "agent_manifest_sha256": policy["manifest_sha256"],
+            "allowed_model_count": len(policy["allowed"]), "default": policy["default"],
+            "credential_env_names": policy["credential_refs"],
+            "enforced": policy["source"] != "analysis-runtime",
+            "platform_sync": policy["source"] == "platform"}
+
+
+def analysis_model_policy(agent_id: str) -> dict:
+    """归因评审使用独立 Preset；其模型选择不属于被测业务 Agent 的授权范围。"""
+    return _model_policy({"agent_id": agent_id, "allowed": [], "default": None}, agent_id,
+                         source="analysis-runtime", manifest_sha256=None)
 
 
 def _atomic_replace(path: Path, data: bytes) -> None:
@@ -413,6 +735,8 @@ def compose_env(contract: dict, mode: str, port: int, name: str,
         "DSH_HOME_HOST": str(instance_dir(name) / "dsh-home"),
         "DSH_SITES_CONFIG_HOST": str(sites_config(REPO)),
         "DSH_WEB_ADAPTER_HOST": str(WEB_ADAPTER),
+        "DSH_MODEL_RUNTIME_HOST": str(MODEL_RUNTIME_HOST),
+        "DSH_MODEL_PATCH_HOST": str(instance_dir(name) / "model.patch.yml"),
         "DSH_EVAL_TARGET_PRESET": ANALYSIS_PRESET if analysis_workspace else target_preset(contract),
         "DSH_EVALUATION_PATCH": contract["evaluation_patch"],
         "DSH_WEB_PROFILE_MANIFEST_HOST": (
@@ -444,14 +768,26 @@ def compose_env(contract: dict, mode: str, port: int, name: str,
 
 
 def required_env_names(contract: dict, analysis_workspace: str | None = None) -> list[str]:
-    return ["DEEPSEEK_API_KEY"] if analysis_workspace else list(contract.get("required_env_names") or [])
+    source_required = ["DEEPSEEK_API_KEY"] if analysis_workspace else list(contract.get("required_env_names") or [])
+    policy = contract.get("model_policy") or {}
+    if not analysis_workspace and policy.get("source") == "platform":
+        source_required = [name for name in source_required if name not in SOURCE_MODEL_ENV_NAMES]
+    return list(dict.fromkeys(source_required + list(policy.get("credential_refs") or [])))
+
+
+def source_optional_env_names(contract: dict) -> list[str]:
+    optional = list(contract.get("optional_env_names") or [])
+    if (contract.get("model_policy") or {}).get("source") == "platform":
+        optional = [name for name in optional if name not in SOURCE_MODEL_ENV_NAMES]
+    return optional
 
 
 def runtime_env_names(contract: dict, analysis_workspace: str | None = None) -> list[str]:
     required = required_env_names(contract, analysis_workspace)
     if analysis_workspace:
         return required
-    return required + [name for name in contract.get("optional_env_names", []) if os.environ.get(name)]
+    optional = [name for name in source_optional_env_names(contract) if os.environ.get(name)]
+    return list(dict.fromkeys(required + optional))
 
 
 def existing_runtime_environment(args: argparse.Namespace, contract: dict,
@@ -462,7 +798,7 @@ def existing_runtime_environment(args: argparse.Namespace, contract: dict,
     validate_existing_identity(args.name, current[1], contract, args.mode, args.analysis_workspace)
     names = required_env_names(contract, args.analysis_workspace)
     if args.analysis_workspace is None:
-        names += list(contract.get("optional_env_names") or [])
+        names += source_optional_env_names(contract)
     missing = set(names) - os.environ.keys()
     if not missing:
         return {}
@@ -566,6 +902,12 @@ def render_compose(template: str, *, mode: str, name: str, project: str, port: i
     text = text.replace(web_mount, web_mount + "      - type: bind\n"
                         "        source: ${DSH_SITES_CONFIG_HOST:?站点路径由工作区配置注入}\n"
                         "        target: /opt/harness-config/sites.json\n        read_only: true\n")
+    text = text.replace(web_mount, web_mount + "      - type: bind\n"
+                        "        source: ${DSH_MODEL_RUNTIME_HOST:?模型授权插件由启动器注入}\n"
+                        f"        target: {MODEL_RUNTIME_CONTAINER}\n        read_only: true\n"
+                        "      - type: bind\n"
+                        "        source: ${DSH_MODEL_PATCH_HOST:?模型授权 Patch 由启动器注入}\n"
+                        f"        target: {MODEL_PATCH_CONTAINER}\n        read_only: true\n")
     if managed_patch_compat:
         text = text.replace(web_mount, web_mount + "      - type: bind\n"
                             "        source: ${DSH_RUNTIME_MANAGED_PATCH_HOST:?兼容 Patch 由启动器注入}\n"
@@ -664,7 +1006,8 @@ def render_compose(template: str, *, mode: str, name: str, project: str, port: i
         )
     text = text.replace(
         command_tail,
-        "      - --patch\n      - /opt/dsh-adapter/runtime-model.patch.yml\n" + command_tail,
+        "      - --patch\n      - /opt/dsh-adapter/runtime-model.patch.yml\n"
+        f"      - --patch\n      - {MODEL_PATCH_CONTAINER}\n" + command_tail,
     )
     if trusted_host:
         port_line = f'      - "{port}"\n'
@@ -722,6 +1065,8 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
                    plugin_node_modules: str | None = None, migrate_home: bool = False) -> Path:
     if lan_access and analysis_workspace:
         fail("归因实例只允许监听 127.0.0.1，不能启用 --lan-access")
+    if contract.get("model_policy"):
+        assert_model_policy_current(contract["model_policy"], repo=REPO)
     target = instance_dir(name)
     current = existing_instance(name)
     if current is not None:
@@ -781,6 +1126,11 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
         rendered = business["compose"]
         (target / "business.patch.yml").write_text(business["patch"], encoding="utf-8")
         os.chmod(target / "business.patch.yml", 0o600)
+    policy = contract.get("model_policy") or (analysis_model_policy(contract["agent_id"]) if analysis_workspace else
+        _model_policy({"agent_id": contract["agent_id"], "allowed": [], "default": None}, contract["agent_id"],
+                      source="business-config", manifest_sha256=None))
+    (target / "model.patch.yml").write_text(model_policy_patch(policy), encoding="utf-8")
+    os.chmod(target / "model.patch.yml", 0o644)
     (target / "compose.yaml").write_text(rendered, encoding="utf-8")
     manifest = {
         "schema_version": INSTANCE_SCHEMA_VERSION,
@@ -830,6 +1180,7 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
             **({"plugin_node_modules": "ro"} if plugin_node_modules else {}),
         }),
         "required_env_names": required_env_names(contract, analysis_workspace),
+        "model_policy": model_policy_summary(policy),
         "optional_env_names": [name for name in runtime_env_names(contract, analysis_workspace)
                                if name not in required_env_names(contract, analysis_workspace)],
         **({"business_control": business["registration"]} if business else {}),
@@ -858,6 +1209,8 @@ def instance_compose_env(manifest: dict) -> dict:
         "DSH_HOME_HOST": manifest.get("home_directory"),
         "DSH_SITES_CONFIG_HOST": manifest.get("sites_config_file"),
         "DSH_WEB_ADAPTER_HOST": manifest.get("web_adapter_root"),
+        "DSH_MODEL_RUNTIME_HOST": str(MODEL_RUNTIME_HOST) if manifest.get("model_policy") else None,
+        "DSH_MODEL_PATCH_HOST": str(instance_dir(str(manifest.get("name"))) / "model.patch.yml") if manifest.get("model_policy") else None,
         "DSH_WEB_PROFILE_MANIFEST_HOST": manifest.get("web_profile_manifest"),
         "DSH_WEB_PROFILE_SEED_DIR_HOST": (
             manifest.get("web_profile_seed_directory") or
@@ -1001,6 +1354,36 @@ def instance_startup_lock(timeout: float = 120.0):
         os.close(descriptor)
 
 
+@contextmanager
+def model_policy_start_lock(repo: Path, timeout: float = 120.0):
+    """与平台统一业务授权保存互斥，直至实例启动完成。"""
+    directory = repo / "config"
+    if directory.is_symlink():
+        fail("业务模型配置目录不能是符号链接")
+    directory.mkdir(exist_ok=True)
+    if not directory.is_dir() or directory.is_symlink():
+        fail("业务模型配置目录无效")
+    lock_file = directory / ".business-model-policy.lock"
+    descriptor = None
+    deadline = time.monotonic() + timeout
+    while descriptor is None:
+        try:
+            descriptor = os.open(lock_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+        except FileExistsError:
+            if time.monotonic() >= deadline:
+                fail("业务模型设置正在保存或实例正在启动；确认没有写入进程后处理 .business-model-policy.lock，再重试")
+            time.sleep(0.05)
+    try:
+        yield
+    finally:
+        try:
+            if lock_file.stat().st_ino == os.fstat(descriptor).st_ino:
+                lock_file.unlink()
+        except FileNotFoundError:
+            pass
+        os.close(descriptor)
+
+
 def prepare_up(args: argparse.Namespace) -> tuple[dict, tuple[Path, dict] | None]:
     """解析来源并补齐确定性的实例名与端口，不修改状态。"""
     require_up_arguments(args)
@@ -1029,6 +1412,25 @@ def prepare_up(args: argparse.Namespace) -> tuple[dict, tuple[Path, dict] | None
     if current is not None:
         _, manifest = current
         validate_existing_identity(args.name, manifest, contract, args.mode, args.analysis_workspace)
+    if args.analysis_workspace:
+        if getattr(args, "model_policy", None):
+            fail("归因实例使用独立评审 Preset，不能传入业务 Agent 的 --model-policy")
+        contract["model_policy"] = analysis_model_policy(contract["agent_id"])
+    else:
+        recorded_policy = current[1].get("model_policy") if current is not None else None
+        recorded_default = recorded_policy.get("default") if isinstance(recorded_policy, dict) else None
+        policy_file = getattr(args, "model_policy", None)
+        if current is not None and isinstance(recorded_policy, dict) and recorded_policy.get("source") == "platform" and not policy_file:
+            fail("此实例使用平台模型连接设置；请从平台实例管理启动，或提供当前 --model-policy")
+        if current is not None and not isinstance(recorded_default, dict) and not policy_file:
+            fail("此旧实例未登记默认模型；请在平台实例管理中显式选择后再启动")
+        contract["model_policy"] = read_model_policy(
+            policy_file, contract["agent_id"], repo=REPO,
+            selected=recorded_default if isinstance(recorded_default, dict) else None,
+        )
+        if current is not None and not isinstance(recorded_default, dict) and contract["model_policy"]["default"] is None:
+            fail("此旧实例未登记默认模型；平台模型策略必须包含显式选择")
+        assert_direct_model_available(contract, contract["model_policy"])
     if current is not None and bool(current[1].get("business_control")) != bool(business_file):
         fail("不能在既有实例上切换业务控制边界；请使用新实例名和独立 HOME")
     if business_file:
@@ -1108,6 +1510,7 @@ def build_plan(args: argparse.Namespace, contract: dict) -> dict:
         "web_cold_start": web_cold_start_hint(args.mode, analysis_workspace),
         "network": "host (0.0.0.0, LAN exposed)" if lan_access else "host (127.0.0.1 only)",
         "required_env_names": required_names,
+        "model_policy": model_policy_summary(contract["model_policy"]),
         "optional_env_names": [name for name in runtime_names if name not in required_names],
         "missing_env_names": missing,
         "state_dir": str(instance_dir(args.name)),
@@ -1228,15 +1631,18 @@ def validate_image_identity(contract: dict, current: tuple[Path, dict] | None = 
 
 def command_up(args: argparse.Namespace) -> None:
     # 必须在选端口前加锁；仅锁写 instance.json 无法避免两个启动同时看到空闲端口。
-    with nullcontext() if getattr(args, "dry_run", False) else instance_startup_lock():
-        contract, current = prepare_up(args)
-        inherited = existing_runtime_environment(args, contract, current)
-        os.environ.update(inherited)
-        try:
-            _command_up(args, contract, current)
-        finally:
-            for name in inherited:
-                os.environ.pop(name, None)
+    dry_run = bool(getattr(args, "dry_run", False))
+    lock_business = not dry_run and not getattr(args, "analysis_workspace", None)
+    with model_policy_start_lock(REPO) if lock_business else nullcontext():
+        with nullcontext() if dry_run else instance_startup_lock():
+            contract, current = prepare_up(args)
+            inherited = existing_runtime_environment(args, contract, current)
+            os.environ.update(inherited)
+            try:
+                _command_up(args, contract, current)
+            finally:
+                for name in inherited:
+                    os.environ.pop(name, None)
 
 
 def _command_up(args: argparse.Namespace, contract: dict,
@@ -1259,6 +1665,8 @@ def _command_up(args: argparse.Namespace, contract: dict,
     identity = validate_image_identity(contract, current=current, replace=getattr(args, "replace", False))
     # Compose 插值与模板结构都可以在停旧实例前检查；明显无效的新配置不得先触发停机。
     preflight_new_instance(args, contract)
+    if contract.get("model_policy"):
+        assert_model_policy_current(contract["model_policy"], repo=REPO)
     replaced = migrate_existing_instance(args, contract, current)
     if port_in_use(args.port):
         holder = running_instance_service(args.name)
@@ -1278,6 +1686,8 @@ def _command_up(args: argparse.Namespace, contract: dict,
         skip_testing_notice=bool(getattr(args, "skip_testing_notice", False)),
         migrate_home=bool(getattr(args, "migrate_home", False)),
     )
+    if contract.get("model_policy"):
+        assert_model_policy_current(contract["model_policy"], repo=REPO)
     environment = compose_env(
         contract, args.mode, args.port, args.name,
         image_id=identity["image_id"], analysis_workspace=args.analysis_workspace,
@@ -1295,6 +1705,8 @@ def _command_up(args: argparse.Namespace, contract: dict,
               "state_dir": str(target), "agent_id": contract["agent_id"],
               "target_preset": target_preset(contract),
               "session_preset": session_preset(contract, args.mode, args.analysis_workspace),
+              **({"model_policy": model_policy_summary(contract["model_policy"])}
+                 if contract.get("model_policy") else {}),
               "profile": "web",
               "lan_access": bool(getattr(args, "lan_access", False)),
               "unsafe_no_auth": bool(getattr(args, "unsafe_no_auth", False)),
@@ -1481,6 +1893,7 @@ def instance_entry(target: Path, manifest: dict, observation: dict | None = None
         "mode": manifest.get("mode"),
         "purpose": manifest.get("purpose", PURPOSES.get(manifest.get("mode"), manifest.get("mode"))),
         "agent_id": manifest.get("agent_id"),
+        "model_policy": manifest.get("model_policy"),
         "target_preset": manifest.get("target_preset"),
         "session_preset": manifest.get("session_preset"),
         "profile": manifest.get("profile", "web"),
@@ -1954,6 +2367,8 @@ def delete_instance(name: str, manifest: dict) -> dict:
         # HOME 位于登记目录之下；删除实例不能同时删除 Session 和原生 MCP 设置。
         (target / "instance.json").unlink()
         (target / "compose.yaml").unlink(missing_ok=True)
+        (target / "model.patch.yml").unlink(missing_ok=True)
+        (target / "business.patch.yml").unlink(missing_ok=True)
     else:
         shutil.rmtree(target)
     report["deleted"] = True
@@ -1988,7 +2403,7 @@ def existing_instance(name: str) -> tuple[Path, dict] | None:
         return None
     manifest_path = target / "instance.json"
     if not manifest_path.is_file():
-        if set(path.name for path in target.iterdir()) <= {"dsh-home"}:
+        if set(path.name for path in target.iterdir()) <= {"dsh-home", "model.patch.yml"}:
             return None
         fail(f"实例目录已存在但缺少 instance.json：{target}")
     return load_instance(name)
@@ -2020,6 +2435,8 @@ def preflight_new_instance(args: argparse.Namespace, contract: dict) -> None:
     for filename in ("container-webserver.mjs", "container-web-app.mjs"):
         if not (WEB_ADAPTER / "lib" / filename).is_file():
             fail(f"Web 基址适配器缺少构建产物：{filename}")
+    if not MODEL_RUNTIME_HOST.is_file() or MODEL_RUNTIME_HOST.is_symlink():
+        fail("模型授权插件尚未构建；请先运行 platform/plugin 的 pnpm run build")
     if analysis_workspace is None:
         check_managed_plugin_dependencies(contract, getattr(args, "plugin_node_modules", None))
     with tempfile.TemporaryDirectory(prefix="dsh-dev-preflight-") as location:
@@ -2045,12 +2462,14 @@ def preflight_new_instance(args: argparse.Namespace, contract: dict) -> None:
             business = render_business_instance(contract, args.name, args.port, rendered)
             rendered = business["compose"]
             (root / "business.patch.yml").write_text(business["patch"], encoding="utf-8")
+        (root / "model.patch.yml").write_text(model_policy_patch(contract["model_policy"]), encoding="utf-8")
         compose = root / "compose.yaml"
         compose.write_text(rendered, encoding="utf-8")
         environment = compose_env(
             contract, args.mode, args.port, args.name, analysis_workspace=analysis_workspace,
             plugin_node_modules=getattr(args, "plugin_node_modules", None),
         )
+        environment["DSH_MODEL_PATCH_HOST"] = str(root / "model.patch.yml")
         if contract.get("business_control"):
             environment["DSH_BUSINESS_PATCH_HOST"] = str(root / "business.patch.yml")
         run(compose_command(root, args.name, "config", "--quiet"), env=environment)
@@ -2218,6 +2637,8 @@ def main() -> None:
                     help=argparse.SUPPRESS)
     up.add_argument("--plugin-node-modules", metavar="PATH",
                     help="将已有 Node 插件依赖目录只读挂载到 /opt/node_modules")
+    up.add_argument("--model-policy", metavar="PATH",
+                    help="平台生成的非秘密模型策略 JSON；未提供时只使用统一业务默认模型")
     up.add_argument("--business-control", metavar="CONFIG",
                     help="以独立 HOME 和私有 bridge 启动受管即时任务；CONFIG 指定数据根、共享密钥文件及可达协调器")
     up.set_defaults(handler=command_up)

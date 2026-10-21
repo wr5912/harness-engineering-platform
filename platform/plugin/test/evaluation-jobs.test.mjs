@@ -42,11 +42,34 @@ test('新建管理器从磁盘查询并取消同一评测进程，回执继续�
   await waitFor(() => before.status(started.job_id), job => job.stderr.includes('ready'))
   const restored = fx.create()
   assert.equal(restored.status(started.job_id).status, 'running')
+  assert.deepEqual(restored.list().map(job => job.job_id), [started.job_id])
   assert.equal(restored.cancel(started.job_id).status, 'cancelling')
   const final = await waitFor(() => restored.status(started.job_id), job => job.status === 'cancelled')
   assert.equal(final.result.instance_stopped, true)
   assert.equal(final.actual_model_calls, null)
   assert.equal(final.hard_cap_supported, false)
+})
+
+test('业务未通过的已结束 Run 保持 completed 执行状态，列表可从磁盘恢复', async t => {
+  const fx = await fixture(t, 'console.log(JSON.stringify({run_id:process.env.TEST_RUN_ID}));process.exit(1)')
+  const operation = randomUUID()
+  const runId = `run-${randomUUID()}`
+  const run = join(fx.root, 'evolution/experiments/EXP-test-agent-001/runs', runId)
+  mkdirSync(run, { recursive: true })
+  writeFileSync(join(run, 'execution.json'), JSON.stringify({ job_id: operation, instance_stopped: true }))
+  writeFileSync(join(run, 'run.yaml'), 'status: completed\n')
+  writeFileSync(join(run, 'inputs.lock.json'), JSON.stringify({ source_id: 'experiment:EXP-test-agent-001', evaluation_cases: [] }))
+  writeFileSync(join(run, 'summary.json'), JSON.stringify({ effective_verdict: 'failed' }))
+  const previous = process.env.TEST_RUN_ID
+  process.env.TEST_RUN_ID = runId
+  t.after(() => { if (previous === undefined) delete process.env.TEST_RUN_ID; else process.env.TEST_RUN_ID = previous })
+  const jobs = fx.create()
+  jobs.start({ source: 'experiment:EXP-test-agent-001', task_budget: { operation_id: operation } })
+  const finished = await waitFor(() => fx.create().status(operation), job => job.exit_code === 1)
+  assert.equal(finished.status, 'completed')
+  assert.equal(finished.summary.effective_verdict, 'failed')
+  assert.equal(fx.create().list()[0].status, 'completed')
+  assert.equal(fx.create().list()[0].run_id, runId)
 })
 
 test('过时 PID 的取消拒绝向当前进程发信号', async t => {

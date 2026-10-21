@@ -195,6 +195,7 @@ test('普通旧计划的图关联未知时token与实际调用保持未知，历
   assert.equal(result.resources.actual_model_calls.variant, null)
   for (const key of ['input_tokens', 'output_tokens', 'total_tokens']) assert.equal(result.resources[key].variant, null)
   assert.ok(result.comparability.limits.some(message => message.includes('关联图或实际模型请求的完整性未知')))
+  assert.ok(result.resource_evidence.limits.some(message => message.includes('关联图或实际模型请求的完整性未知')))
   assert.ok(result.resource_evidence.limits.some(message => message.includes('graph-execution-association-invalid')))
   assert.equal(result.comparability.passed, false)
   assert.equal(result.resource_evidence.passed, false)

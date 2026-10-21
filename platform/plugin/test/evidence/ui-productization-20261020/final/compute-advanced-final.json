@@ -1,0 +1,41 @@
+{
+  "source": {
+    "service": "http://10.0.160.32:3091/hep/",
+    "pid": 98382,
+    "browser": "Chromium",
+    "prototype": "/home/admin/Downloads/Harness_算力变体策划_交互原型.html",
+    "assistantRequestSent": false
+  },
+  "checks": [
+    {
+      "name": "中算力存在原型选填区",
+      "pass": true,
+      "observed": "更多策划补充（选填）"
+    },
+    {
+      "name": "中算力摘要反映附加要求",
+      "pass": true,
+      "observed": "本次策划摘要中算力变体决策模型 + 工具编排父版本自主训练研究助手 · v001轨迹依据0 条当前版本轨迹决策基模型请助手建议训练服务器新连接待填写其他限制必须覆盖断线恢复；验收时核对资源预算。发送后在平台 AI 助手中继续策划，不会启动训练或创建变体。方案中待补充 / 验证决策基模型选型模型版本固定模型训练适配性评估SSH 服务标识验证SSH 认证、GPU、依赖与训练环境检查认证凭据引用独立比较集与验收阈值"
+    },
+    {
+      "name": "关闭后中算力草稿保留",
+      "pass": true,
+      "observed": "必须覆盖断线恢复；验收时核对资源预算。"
+    },
+    {
+      "name": "低算力沿用同一附加要求",
+      "pass": true,
+      "observed": "必须覆盖断线恢复；验收时核对资源预算。"
+    },
+    {
+      "name": "页面无横向溢出",
+      "pass": true,
+      "observed": 0
+    }
+  ],
+  "errors": [],
+  "screenshots": [
+    "final/compute-advanced-final-medium-mobile.png",
+    "final/compute-advanced-final-low-mobile.png"
+  ]
+}

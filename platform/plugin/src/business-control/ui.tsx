@@ -74,7 +74,18 @@ function ProviderFields({ title, kind, value, current, revision, rpc, change }: 
 const actionNames: Record<string, string> = { read: '查询', write: '写入', publish: '报告发布' }
 const accessActionNames: Record<string, string> = { '*': '全部动作', 'agent:access': '访问 Agent', 'session:create': '创建会话', 'session:read': '读取会话', 'session:prompt': '发送会话消息', read: '读取', write: '写入', resource: '读取资源', publish: '发布报告' }
 const stateNames: Record<string, string> = { verified: '已验证签名', unknown: '未知', expired: '已过期', disabled: '已停用', trusted: '身份条件已满足', revoked: '身份已撤销', mismatch: '来源或代次不匹配' }
+function identityResult(value: BusinessControlManagementStatus['agentStatuses'][number] | undefined) {
+  if (!value) return { label: '待核对', state: 'pending' }
+  if (value.authentication.status === 'verified' && value.trust.status === 'trusted') return { label: '已核验', state: 'success' }
+  if (value.authentication.status === 'disabled' || value.trust.status === 'revoked') return { label: '已撤销', state: 'blocked' }
+  if (value.authentication.status === 'expired' || value.trust.status === 'expired') return { label: '已过期', state: 'pending' }
+  if (value.trust.status === 'mismatch') return { label: '来源不匹配', state: 'blocked' }
+  return { label: '待核对', state: 'pending' }
+}
 const configurationTabs = [{ id: 'overview', label: '运行概览' }, { id: 'identity', label: '智能体身份' }, { id: 'risk', label: '风险评估' }, { id: 'authorization', label: '访问控制' }] as const
+function GatewayIcon({ kind }: { kind: 'refresh' | 'external' | 'shield' | 'alert' | 'check' }) {
+  return <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{kind === 'refresh' ? <><path d="M20 11a8 8 0 1 0-2.3 6.2" /><path d="M20 4v7h-7" /></> : kind === 'external' ? <><path d="M13 5h6v6" /><path d="m19 5-9 9" /><path d="M19 14v5H5V5h5" /></> : kind === 'shield' ? <><path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3Z" /><path d="m9 12 2 2 4-4" /></> : kind === 'alert' ? <><path d="m12 3 10 18H2L12 3Z" /><path d="M12 9v5m0 3h.01" /></> : <path d="m4 12 5 5L20 6" />}</svg>
+}
 function changedSections(draft: Draft): Set<Section> {
   const base = JSON.parse(draft.base) as Omit<Draft, 'base' | 'revision'>
   const changed = new Set<Section>()
@@ -149,9 +160,13 @@ export function BusinessControlPage({ rpc, updates, active = true, target, onNav
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const previewDialog = useRef<HTMLDivElement | null>(null)
   const [localSection, setLocalSection] = useState<Section>('overview')
+  const [accessAgentIndex, setAccessAgentIndex] = useState(0)
+  const [identityEditorOpen, setIdentityEditorOpen] = useState(false)
   const section = target?.page === 'gateway' ? configurationTabs.find(value => value.id === target.tab)?.id ?? 'overview' : localSection
-  const openSection = (next: Section) => { setLocalSection(next); onNavigate?.({ page: 'gateway', ...(next === 'overview' ? {} : { tab: next }) }) }
+  const openSection = (next: Section) => { setPreviewOpen(false); setLocalSection(next); onNavigate?.({ page: 'gateway', ...(next === 'overview' ? {} : { tab: next }) }) }
   const [instanceId, setInstanceId] = useState('')
   const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([])
   const [sessionId, setSessionId] = useState('')
@@ -174,7 +189,7 @@ export function BusinessControlPage({ rpc, updates, active = true, target, onNav
   const mutating = useRef(false)
   function accept(value: BusinessControlManagementStatus) {
     setData(value)
-    setLastStatusAt(new Date().toISOString())
+    setLastStatusAt(new Date().toLocaleString())
     setDraft(previous => {
       if (previous && dirty(previous)) return previous
       return draftOf(value)
@@ -198,6 +213,7 @@ export function BusinessControlPage({ rpc, updates, active = true, target, onNav
     // 常驻页面隐藏时仍接收写入回执；只有实际卸载才结束组件寿命。
     return () => { mounted.current = false; requestId.current++; reading.current = null }
   }, [])
+  useEffect(() => { if (!active) setPreviewOpen(false) }, [active])
   useEffect(() => {
     if (!active) return
     void refresh()
@@ -284,19 +300,29 @@ export function BusinessControlPage({ rpc, updates, active = true, target, onNav
   }
   function resetDraft() {
     if (!data) return
+    setPreviewOpen(false)
     setDraft(draftOf(data))
     setError('')
   }
-  function saveDraft() {
-    if (!draft || busy || conflict) return
+  function validateDraft() {
+    if (!draft || busy || conflict) return false
     const invalid = draftError(draft)
     if (invalid) {
       setError(`${configurationTabs.find(value => value.id === invalid.section)?.label}：${invalid.message}`)
+      setPreviewOpen(false)
+      if (invalid.section === 'identity') setIdentityEditorOpen(true)
       openSection(invalid.section)
       window.requestAnimationFrame?.(() => { const field = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[data-gateway-field="${invalid.field}"]`)
-        field?.closest('details')?.setAttribute('open', ''); field?.focus() })
-      return
+        for (let parent = field?.parentElement; parent; parent = parent.parentElement) if (parent.tagName === 'DETAILS') (parent as HTMLDetailsElement).open = true
+        field?.focus() })
+      return false
     }
+    return true
+  }
+  function openPreview() { if (validateDraft()) setPreviewOpen(true) }
+  function saveDraft() {
+    if (!validateDraft() || !draft) return
+    setPreviewOpen(false)
     void perform('saveConfiguration', { revision: draft.revision, enabled: draft.enabled, agents: JSON.parse(draft.agents), operations: JSON.parse(draft.operations),
       authentication: providerPayload(draft.authentication), identityTrust: providerPayload(draft.identityTrust),
       riskAssessment: draft.riskAssessment.enabled ? { ...providerPayload(draft.riskAssessment, true), requiredKinds: lines(draft.requiredKinds) } : null,
@@ -333,6 +359,12 @@ export function BusinessControlPage({ rpc, updates, active = true, target, onNav
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
   }, [draft])
+  useEffect(() => {
+    if (!previewOpen || typeof document === 'undefined') return
+    const previousFocus = document.activeElement as HTMLElement | null
+    previewDialog.current?.focus()
+    return () => previousFocus?.focus?.()
+  }, [previewOpen])
   const registeredServerIds = [...new Set(operationDrafts.map(row => String(row.serverId ?? '').trim()).filter(Boolean))]
   const changeAgent = (index: number, value: Partial<AgentAccessRule>) => { if (draft) setDraft({ ...draft, agents: JSON.stringify(agentDrafts.map((row, at) => at === index ? { ...row, ...value } : row), null, 2) }) }
   const selectAgent = (index: number, agentId: string) => {
@@ -341,25 +373,40 @@ export function BusinessControlPage({ rpc, updates, active = true, target, onNav
     changeAgent(index, { agentId, enabled: false, sourceDigest: undefined, agentTrust: { enabled: false } })
   }
   const changeOperation = (index: number, value: Record<string, unknown>) => { if (draft) setDraft({ ...draft, operations: JSON.stringify(operationDrafts.map((row, at) => at === index ? { ...row, ...value } : row), null, 2) }) }
-  const addAgent = () => { if (draft) { setDraft({ ...draft, agents: JSON.stringify([...agentDrafts, { agentId: '', enabled: false, subjects: [], actions: ['read'], serverIds: [], agentAuthentication: { enabled: true, method: 'hmac-sha256' }, agentTrust: { enabled: false } }], null, 2) }); openSection('identity') } }
+  const addAgent = () => { if (draft) { setAccessAgentIndex(agentDrafts.length); setDraft({ ...draft, agents: JSON.stringify([...agentDrafts, { agentId: '', enabled: false, subjects: [], actions: ['read'], serverIds: [], agentAuthentication: { enabled: true, method: 'hmac-sha256' }, agentTrust: { enabled: false } }], null, 2) }); openSection('identity') } }
   const freshFacts = data?.riskFacts.filter(value => Date.parse(value.expiresAt) > Date.now()) ?? []
   const highRiskCount = freshFacts.filter(value => value.level === 'high').length
   const unknownRiskCount = freshFacts.filter(value => value.status === 'unknown' || value.level === 'unknown' || value.level === undefined).length
   const riskOverview = !data?.riskFacts.length ? '尚无评估' : !freshFacts.length ? '评估已过期'
     : unknownRiskCount ? '存在未知评估' : `已评估范围内 ${highRiskCount} 项高风险`
+  const riskLabel = !data?.riskFacts.length ? '尚无评估' : !freshFacts.length ? '已过期'
+    : unknownRiskCount ? '结果未知' : highRiskCount ? '高风险' : '当前范围已评估'
+  const latestRiskFact = data?.riskFacts.reduce<BusinessControlManagementStatus['riskFacts'][number] | undefined>((latest, fact) => !latest || Date.parse(fact.observedAt) > Date.parse(latest.observedAt) ? fact : latest, undefined)
+  const riskNext = !data?.riskFacts.length ? '等待下一次受管业务事件，或为已知 Session 发起辅助重评'
+    : !freshFacts.length ? '选择匹配的 Session 重新评估，再核对新证据'
+      : unknownRiskCount ? '核对提供方响应与未知评估的依据'
+        : highRiskCount ? '核对高风险信号与当前限制' : '执行时仍按实际请求重新判断许可'
+  const trustedInstances = data?.agentStatuses.filter(value => value.authentication.status === 'verified' && value.trust.status === 'trusted').length ?? 0
+  const appliedInstances = data?.instances.filter(value => value.applied).length ?? 0
+  const activeAgentIndex = Math.min(accessAgentIndex, Math.max(0, agentDrafts.length - 1))
+  const accessAgent = agentDrafts[activeAgentIndex]
+  const statusCards = data && <>
+    <span><span className="harness-gateway-stat-label">即时访问 <GatewayIcon kind="external" /></span><strong>{data.enabled ? '已开放' : '已关闭'}</strong><small>{data.enabled ? '开放配置 · 单次请求仍需判定' : '当前配置未开放即时访问'}</small></span>
+    <span title="已验证凭据、可信来源与实例绑定"><span className="harness-gateway-stat-label">身份核验 <GatewayIcon kind="shield" /></span><strong>{trustedInstances} <small>/ {data.instances.length}</small></strong><small>{data.instances.length ? trustedInstances === data.instances.length ? '实例身份已核验' : '实例身份仍需核对' : '尚无已登记实例'}</small></span>
+    <span title={`有效事实 ${freshFacts.length} / ${data.riskFacts.length} · 高风险 ${highRiskCount} · 未知 ${unknownRiskCount}`}><span className="harness-gateway-stat-label">风险评估 <GatewayIcon kind="alert" /></span><strong data-summary="risk" className={!freshFacts.length || unknownRiskCount || highRiskCount ? 'harness-gateway-warning-text' : undefined}>{riskOverview}</strong><small><button className="harness-gateway-text-button" type="button" onClick={() => openSection('risk')}>查看评估，复核当前许可 →</button></small></span>
+    <span><span className="harness-gateway-stat-label">配置应用 <GatewayIcon kind="check" /></span><strong>{appliedInstances} <small>/ {data.instances.length}</small></strong><small>{data.instances.length ? appliedInstances === data.instances.length ? '目标实例已确认应用' : '目标实例应用待核对' : '尚无目标实例'}</small></span>
+  </>
   return <main className="harness-mcp-page harness-gateway-page" aria-label="统一网关管理">
       <style>{businessControlStyle}</style>
-      <header className="harness-page-heading"><div><p>智能体身份、实时风险评估与访问控制</p></div><button type="button" disabled={busy} onClick={() => { void refresh(); setAgentCatalogRevision(value => value + 1) }}>刷新状态</button></header>
-      {(loadError || error) && <p role="alert">{error || loadError}</p>}
+      <header className="harness-page-heading"><div><h1>统一网关</h1><p>管理业务访问、智能体身份与配置应用状态。</p></div><button className="harness-gateway-refresh" type="button" disabled={busy} onClick={() => { void refresh(); setAgentCatalogRevision(value => value + 1) }}><GatewayIcon kind="refresh" />刷新状态</button></header>
+      {error && <p role="alert">{error}</p>}
+      {loadError && <p role="alert">{loadError}{data && `；以下为上次成功读取的状态（${lastStatusAt || '时间未知'}），当前许可需重新核对。`}</p>}
       {notice && <p role="status">{notice}</p>}
-      {!data ? <section className="harness-card"><p role="status">正在读取统一网关状态…</p></section> : <>
-        <div className="harness-gateway-status" aria-label="统一网关状态概览">
-          <span>即时访问 <strong>{data.enabled ? '已开放' : '已关闭'}</strong><small>限制版本 {data.restrictionVersion}</small></span>
-          <span title="已验证凭据、可信来源与实例绑定">身份核验 <strong>{data.agentStatuses.filter(value => value.trust.status === 'trusted').length} / {data.instances.length}</strong></span>
-          <span title={`有效事实 ${freshFacts.length} / ${data.riskFacts.length} · 高风险 ${highRiskCount} · 未知 ${unknownRiskCount}`}>风险 <strong data-summary="risk">{riskOverview}</strong></span>
-          <span>策略回执 <strong>{data.instances.filter(value => value.applied).length} / {data.instances.length}</strong></span>
+      {!data ? <section className="harness-card">{loadError ? <><h2>无法读取统一网关状态</h2><p>当前访问范围和实例回执尚未确认。</p><button type="button" onClick={() => void refresh()}>重新读取</button></> : <p role="status">正在读取统一网关状态…</p>}</section> : <>
+        <div className="harness-gateway-status harness-gateway-status-desktop" aria-label="统一网关状态概览">
+          {statusCards}
         </div>
-        <p className="harness-guide" role="note">首期仅覆盖经统一业务网关发起的即时任务。暂不支持定时任务的检测、防护闭环；定时巡检、自动研判和报表需手动发起，存在延迟和漏执行风险。现有研究实例的定时任务不纳入本闭环的完整保护声明。</p>
+        <div className="harness-gateway-mobile-status" aria-label="统一网关状态概览"><div><strong>即时访问 {data.enabled ? '已开放' : '已关闭'} · 身份 {trustedInstances}/{data.instances.length}</strong><span className="harness-gateway-risk-badge">● {riskOverview}</span></div><p>{data.instances.length ? `配置 ${appliedInstances}/${data.instances.length} 已应用` : '配置尚无目标实例'} · <button className="harness-gateway-text-button" type="button" onClick={() => openSection('risk')}>复核当前许可</button></p></div>
         {conflict && <p role="alert">配置已在其他位置更新，当前草稿已保留。请复制需要的修改，放弃草稿后按最新版本编辑；旧草稿不能覆盖新配置。</p>}
         <nav className="harness-mcp-toolbar harness-mcp-tabs harness-gateway-main-tabs" role="tablist" aria-label="统一网关视图" onKeyDown={event => {
           const index = configurationTabs.findIndex(tab => tab.id === section)
@@ -369,13 +416,21 @@ export function BusinessControlPage({ rpc, updates, active = true, target, onNav
           event.preventDefault(); openSection(configurationTabs[next].id)
           window.requestAnimationFrame?.(() => document.querySelector<HTMLButtonElement>(`[data-gateway-tab="${configurationTabs[next].id}"]`)?.focus())
         }}>{configurationTabs.map(tab => <button key={tab.id} data-gateway-tab={tab.id} role="tab" aria-selected={section === tab.id} aria-controls="gateway-panel" tabIndex={section === tab.id ? 0 : -1} type="button" onClick={() => openSection(tab.id)}>{tab.label}{dirtyPages.has(tab.id) && <span className="harness-gateway-dirty-dot" aria-label="有未保存更改"> ●</span>}</button>)}</nav>
-        {draft && <div className="harness-gateway-savebar"><div><strong>{dirty(draft) ? '有未保存更改' : '配置草稿与已保存内容一致'}</strong><small>一次保存全部配置；实例应用状态见运行概览。</small></div><div className="harness-mcp-actions"><button className="harness-primary" type="button" onClick={saveDraft} disabled={busy || !dirty(draft) || conflict}>保存业务访问配置</button><button type="button" disabled={busy || !dirty(draft)} onClick={() => { if (window.confirm?.('放弃全部未保存更改并读取当前配置？') ?? true) resetDraft() }}>放弃草稿并读取当前配置</button></div></div>}
+        {draft && dirty(draft) && <div className="harness-gateway-savebar"><div><strong>有未保存更改</strong><small>一次保存全部配置；实例应用状态见运行概览。</small></div><div className="harness-mcp-actions">{section !== 'authorization' && <button className="harness-primary" type="button" disabled={busy || conflict} onClick={openPreview}>预览配置</button>}<button type="button" disabled={busy} onClick={() => { if (window.confirm?.('放弃全部未保存更改并读取当前配置？') ?? true) resetDraft() }}>放弃草稿并读取当前配置</button></div></div>}
         <div className="harness-gateway-workspace" id="gateway-panel" role="tabpanel" aria-label={configurationTabs.find(tab => tab.id === section)?.label}>
         {section !== 'overview' && <section className="harness-card harness-composition-detail" aria-label="功能配置">
-        <div className="harness-section-heading"><h2>{configurationTabs.find(tab => tab.id === section)?.label}配置</h2><span className="harness-gateway-description">三类配置共用一份草稿</span></div>
-        {draft && <form noValidate className="harness-composition-editor harness-gateway-config" aria-label="统一网关配置" onSubmit={event => { event.preventDefault(); saveDraft() }}>
-          {section === 'identity' && !agentDrafts.length && <div className="harness-gateway-empty"><strong>尚未配置业务 Agent</strong><p>先登记智能体身份并核对可信来源，再配置风险评估和访问范围。</p><button type="button" className="harness-primary" onClick={addAgent}>配置首个 Agent</button></div>}
-          {section === 'identity' && <fieldset><legend>1．智能体身份</legend>
+        <div className="harness-section-heading"><div><h2>{configurationTabs.find(tab => tab.id === section)?.label}</h2><p className="harness-gateway-description">{section === 'authorization' ? '配置智能体可访问的服务、动作与实际目标。' : section === 'identity' ? '可读名称用于识别，稳定 ID 用于核对与复制。' : latestRiskFact ? `最近评估：${latestRiskFact.scope.agentId}${latestRiskFact.scope.instanceId ? ` · ${latestRiskFact.scope.instanceId}` : ''}` : '当前工作区暂无评估事实。'}</p></div>{section === 'risk' ? <span className="harness-gateway-badge" data-state={riskLabel === '当前范围已评估' ? 'success' : 'pending'}>{riskLabel}</span> : section === 'authorization' && <span className="harness-gateway-draft-state">{draft && dirty(draft) ? '有未保存更改' : '配置草稿'}</span>}</div>
+        {section === 'identity' && (data.instances.length ? <div className="harness-table-scroll harness-gateway-overview-table harness-gateway-identity-table"><table><thead><tr><th>智能体</th><th>Agent ID</th><th>业务实例</th><th>实际装载</th><th>核验结果</th></tr></thead><tbody>{data.instances.map(instance => {
+          const status = data.agentStatuses.find(value => value.instanceId === instance.instanceId)
+          const outcome = identityResult(status)
+          return <tr key={instance.instanceId}><td><strong>{agentCatalog?.agents.find(value => value.id === instance.agentId)?.name || instance.agentId}</strong><details className="harness-gateway-mobile-identity-details"><summary>查看实例核验</summary><p>{instance.instanceId} · 代次 {instance.runtimeGeneration} · {outcome.label}</p><code>{instance.sourceDigest}</code></details></td><td><code>{instance.agentId}</code></td><td>{instance.instanceId}</td><td>代次 {instance.runtimeGeneration}<details><summary>查看来源</summary><code>{instance.sourceDigest}</code></details></td><td><span className="harness-gateway-badge" data-state={outcome.state}>● {outcome.label}</span></td></tr>
+        })}</tbody></table></div> : <div className="harness-gateway-access-empty"><strong>暂无已登记业务实例</strong><p>实例运行并登记后，可在这里核对实际装载来源和身份结果。配置中的 Agent 身份不等于实例已核验。</p><button type="button" onClick={() => onNavigate?.({ page: 'instances' })}>前往实例管理</button></div>)}
+        {section === 'risk' && <div className="harness-gateway-risk-summary"><div className="harness-gateway-risk-notice" role="status"><div><strong>{riskLabel === '已过期' ? '当前评估已超过有效期' : riskLabel === '尚无评估' ? '当前没有可用于判断许可的评估事实' : riskLabel === '结果未知' ? '当前评估包含未知结果' : riskLabel === '高风险' ? '当前评估范围内存在高风险' : '当前范围已有有效评估'}</strong><p>{riskLabel === '已过期' ? '请重新评估或核对有效证据；不能据此推断访问已允许或已阻止。' : '评估只覆盖记录的对象与动作；单次请求仍需核对当时的身份和访问配置。'}</p></div></div>
+          <dl className="harness-gateway-risk-facts"><dt>评估范围</dt><dd>{latestRiskFact ? `${latestRiskFact.scope.agentId}${latestRiskFact.scope.instanceId ? ` · ${latestRiskFact.scope.instanceId}` : ''}${latestRiskFact.scope.subjectId ? ` · ${latestRiskFact.scope.subjectId}` : ''}` : '当前工作区尚无评估对象'}</dd><dt>最近评估</dt><dd>{latestRiskFact ? `${latestRiskFact.observedAt} · ${Date.parse(latestRiskFact.expiresAt) <= Date.now() ? '已过期' : latestRiskFact.status === 'unknown' ? '结果未知' : '当前有效'}` : '尚无记录'}</dd><dt>即时访问配置</dt><dd>{data.enabled ? '已开放' : '已关闭'}；单次请求的许可仍需核对</dd><dt>下一步</dt><dd>{riskNext}</dd></dl>
+          <div className="harness-gateway-risk-actions"><button className="harness-primary" type="button" onClick={() => { openSection('overview'); window.requestAnimationFrame?.(() => { const target = document.getElementById('gateway-reassess'); target?.scrollIntoView({ block: 'start' }); target?.focus() }) }}>选择会话并辅助重评</button><details><summary>查看评估依据（{data.riskFacts.length}）</summary>{data.riskFacts.length ? <ul className="harness-gateway-list">{[...data.riskFacts].sort((a, b) => Date.parse(b.observedAt) - Date.parse(a.observedAt)).map(fact => <li key={fact.id}><strong>{fact.scope.agentId} · {fact.scope.instanceId || '未限定实例'} · {Date.parse(fact.expiresAt) <= Date.now() ? '已过期' : fact.status === 'unknown' ? '结果未知' : fact.level === 'high' ? '高风险' : fact.level === 'low' ? '低风险' : '等级未知'}</strong><p>{fact.observedAt} · 有效期至 {fact.expiresAt} · {fact.signals.length ? fact.signals.map(signal => signal.reason).join('；') : '未附加风险信号'}</p></li>)}</ul> : <p>暂无已保存的评估事实。</p>}</details></div>
+        </div>}
+        {draft && <form noValidate className="harness-composition-editor harness-gateway-config" aria-label="统一网关配置" onSubmit={event => { event.preventDefault(); openPreview() }}>
+          {section === 'identity' && <details className="harness-gateway-config-details" open={identityEditorOpen || !agentDrafts.length} onToggle={event => { if (event.target === event.currentTarget) setIdentityEditorOpen(event.currentTarget.open) }}><summary>配置智能体身份与可信来源</summary>{!agentDrafts.length && <div className="harness-gateway-empty"><strong>尚未配置业务 Agent</strong><p>先登记智能体身份并核对可信来源，再配置访问范围。</p><button type="button" className="harness-primary" onClick={addAgent}>配置首个 Agent</button></div>}<fieldset><legend>1．智能体身份</legend>
             <p>验证智能体的身份凭据、可信来源与实例绑定。身份过期、撤销或来源不匹配直接阻断访问，不折算成业务风险分数；低风险不能覆盖身份条件失败。</p>
             {!!descriptionAgentId && <section className="harness-gateway-description-card" aria-label="当前资产描述"><div className="harness-gateway-panel-heading"><div><h3>当前资产描述</h3><small>读取已启用 Experiment 的业务 Agent 资产；不等于实例已装载。</small></div>{agentDrafts.filter(row => row.agentId).length > 1 && <label>查看 Agent<select value={descriptionAgentId} onChange={event => setDescriptionSelection(event.target.value)}>{agentDrafts.filter(row => row.agentId).map(row => <option key={row.agentId} value={row.agentId}>{row.agentId}</option>)}</select></label>}</div>
               {descriptionLoading ? <p role="status">正在读取资产描述…</p> : descriptionError ? <p role="alert">{descriptionError}</p> : description ? <>
@@ -419,69 +474,70 @@ export function BusinessControlPage({ rpc, updates, active = true, target, onNav
               <ProviderFields title="接入用户认证提供方" kind="authentication" value={draft.authentication} current={data.configuration.authentication} revision={draft.revision} rpc={rpc} change={value => setDraft({ ...draft, authentication: value })} />
               <ProviderFields title="接入用户状态核验提供方" kind="identityTrust" value={draft.identityTrust} current={data.configuration.identityTrust} revision={draft.revision} rpc={rpc} change={value => setDraft({ ...draft, identityTrust: value })} />
             </details>
-          </fieldset>}
-          {section === 'risk' && <fieldset><legend>2．风险评估</legend>
+          </fieldset></details>}
+          {section === 'risk' && <details className="harness-gateway-config-details"><summary>配置风险评估提供方与检测范围</summary><fieldset><legend>2．风险评估</legend>
             <p>按业务事件实时自动评估各 Agent：输入、每个工具或资源执行步骤、报告发布与下载。风险变化自动参与执行许可；手动重评仅为辅助。空闲周期巡检不在首期范围。</p>
             <ProviderFields title="Agent 风险评估提供方" kind="riskAssessment" value={draft.riskAssessment} current={data.configuration.riskAssessment} revision={draft.revision} rpc={rpc} change={value => setDraft({ ...draft, riskAssessment: value })} />
             <label>必须自动评估的动作（逗号分隔）<input value={draft.requiredKinds} onChange={event => setDraft({ ...draft, requiredKinds: event.target.value })} placeholder="write, publish" /></label>
             <p>检测标记每行一个，仅验证已配置的检测接入，不代表通用攻击识别。</p>
             <div className="harness-composition-editor">{(['inputMarkers', 'operationMarkers', 'reportMarkers'] as const).map((key, index) => <label key={key}>{['输入检测标记', '执行参数检测标记', '报告检测标记'][index]}<textarea value={draft[key]} onChange={event => setDraft({ ...draft, [key]: event.target.value })} /></label>)}</div>
-          </fieldset>}
-          {section === 'authorization' && <fieldset className="harness-gateway-access"><legend>3．访问控制</legend>
-            <p>配置智能体可访问的服务、工具、资源和动作。执行时综合身份核验、当前风险与资源归属作出允许或拒绝；身份有效或低风险不会自动增加权限。</p>
-            <label className="harness-gateway-inline"><input type="checkbox" checked={draft.enabled} onChange={event => setDraft({ ...draft, enabled: event.target.checked })} />开放即时业务访问</label>
-            <div className="harness-gateway-access-layout">
-              <section className="harness-gateway-access-panel" aria-label="Agent 访问范围">
-                <div className="harness-gateway-panel-heading"><div><h3>Agent 访问范围</h3><small>新增 Agent 先完成身份配置</small></div><button type="button" onClick={addAgent}>添加 Agent 身份</button></div>
-                {agentDrafts.map((row, index) => <article key={index} className="harness-gateway-access-card">
-                  <div className="harness-gateway-access-card-heading"><strong>{row.agentId || '待填写智能体身份'}</strong><label className="harness-gateway-inline"><input type="checkbox" checked={row.enabled ?? false} onChange={event => changeAgent(index, { enabled: event.target.checked })} />开放该 Agent</label></div>
-                  <div className="harness-gateway-access-fields">
-                    <div className="harness-gateway-choices" role="group" aria-label={`允许访问的服务 ${index + 1}`}>
-                      <span>服务范围</span>
-                      <label className="harness-gateway-inline"><input type="checkbox" checked={row.serverIds !== undefined} onChange={event => changeAgent(index, { serverIds: event.target.checked ? [] : undefined })} />仅允许所选服务</label>
-                      {row.serverIds !== undefined && <div className="harness-gateway-choice-list">{[...new Set([...registeredServerIds, ...row.serverIds])].map(serverId => <label key={serverId} className="harness-gateway-option" data-selected={(row.serverIds ?? []).includes(serverId)}><input type="checkbox" checked={(row.serverIds ?? []).includes(serverId)} onChange={event => changeAgent(index, { serverIds: event.target.checked ? [...(row.serverIds ?? []), serverId] : (row.serverIds ?? []).filter(value => value !== serverId) })} />{serverId}{!registeredServerIds.includes(serverId) && <small>（操作清单中已无此服务）</small>}</label>)}</div>}
-                      <small>{row.serverIds === undefined ? '按已登记操作开放服务。' : registeredServerIds.length ? '未选任何服务时不允许访问。' : row.serverIds.length ? '旧服务可取消；新增服务先登记操作。' : '先在右侧登记操作，再选择服务。'}</small>
-                    </div>
-                    <label className="harness-gateway-subjects">允许使用此 Agent 的接入用户 ID<input value={(row.subjects ?? []).join(',')} onChange={event => changeAgent(index, { subjects: draftList(event.target.value) })} placeholder="例如 subject-a,subject-b" /><small>填写接入用户登录验证后返回的稳定 ID，多个用逗号分隔。留空表示无人可使用；当前没有可选择的用户目录。</small></label>
-                  </div>
-                  <div className="harness-gateway-choices" role="group" aria-label={`允许的动作 ${index + 1}`}><details className="harness-gateway-action-details"><summary><span>允许的动作</span><small>{row.actions?.includes('*') ? '全部动作' : row.actions?.length ? row.actions.map(value => accessActionNames[value] ?? value).join(' · ') : '尚未选择'}</small><span className="harness-gateway-selection-count">{row.actions?.includes('*') ? '全部' : `${row.actions?.length ?? 0} 项`}</span><span className="harness-gateway-edit-label">编辑</span></summary><div className="harness-gateway-choice-list">{[...new Set([...agentAccessActions, ...(row.actions ?? [])])].map(value => <label key={value} className="harness-gateway-option" data-selected={(row.actions ?? []).includes(value)}><input type="checkbox" checked={(row.actions ?? []).includes(value)} onChange={event => changeAgent(index, { actions: event.target.checked ? [...(row.actions ?? []), value] : (row.actions ?? []).filter(action => action !== value) })} />{accessActionNames[value] ?? '未知动作'}（{value}）</label>)}</div></details></div>
-                  <div className="harness-gateway-access-card-footer"><button type="button" onClick={() => setDraft({ ...draft, agents: JSON.stringify(agentDrafts.filter((_, at) => at !== index), null, 2) })}>移除 Agent 配置</button></div>
-                </article>)}
-                {!agentDrafts.length && <p className="harness-gateway-access-empty">尚无 Agent 配置，请先添加并完成身份设置。</p>}
-              </section>
-              <section className="harness-gateway-access-panel" aria-label="工具与资源操作允许清单">
-                <div className="harness-gateway-panel-heading"><div><h3>工具与资源操作</h3><small>每项绑定实际方法和目标</small></div><button type="button" onClick={() => setDraft({ ...draft, operations: JSON.stringify([...operationDrafts, { serverId: '', operationId: '', kind: 'read', method: 'GET', target: '' }], null, 2) })}>添加操作</button></div>
-                {operationDrafts.map((row, index) => <article key={index} className="harness-gateway-operation-card">
-                  <div className="harness-gateway-operation-heading"><div><strong>{row.operationId || `操作 ${index + 1}`}</strong><small>{row.serverId || '尚未填写服务 ID'}</small></div><button type="button" onClick={() => setDraft({ ...draft, operations: JSON.stringify(operationDrafts.filter((_, at) => at !== index), null, 2) })}>移除操作</button></div>
-                  <div className="harness-gateway-operation-fields">
-                    <label>服务 ID<input aria-label={`服务 ID ${index + 1}`} list="gateway-service-suggestions" value={row.serverId ?? ''} onChange={event => changeOperation(index, { serverId: event.target.value })} /></label>
-                    <label>操作 ID<input aria-label={`操作 ID ${index + 1}`} value={row.operationId ?? ''} onChange={event => changeOperation(index, { operationId: event.target.value })} /></label>
-                    <label>动作<select aria-label={`动作 ${index + 1}`} value={row.kind ?? 'read'} onChange={event => changeOperation(index, { kind: event.target.value })}>{['read', 'write', 'resource', 'publish'].map(value => <option key={value} value={value}>{accessActionNames[value]}（{value}）</option>)}</select></label>
-                    <label>方法<select aria-label={`方法 ${index + 1}`} value={row.method ?? ''} onChange={event => changeOperation(index, { method: event.target.value })}><option value="" disabled>选择方法</option>{!!row.method && !businessOperationMethods.includes(row.method) && <option value={row.method}>{row.method}（无效）</option>}{businessOperationMethods.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
-                    <label className="harness-gateway-field-wide">实际目标<input aria-label={`实际目标 ${index + 1}`} value={row.target ?? ''} placeholder={row.targetHidden ? '原目标私有部分不回传，留空保留' : 'http://…/path/{id}'} onChange={event => changeOperation(index, { target: event.target.value, targetHidden: !event.target.value && !!row.targetHidden })} /></label>
-                    <label className="harness-gateway-inline harness-gateway-field-wide"><input aria-label={`必要确认 ${index + 1}`} type="checkbox" checked={row.confirmation ?? false} onChange={event => changeOperation(index, { confirmation: event.target.checked })} />执行前需要确认</label>
-                  </div>
-                </article>)}
-                {!operationDrafts.length && <p className="harness-gateway-access-empty">尚无操作。添加工具或资源操作后，才能授权实际目标。</p>}
-              </section>
+          </fieldset></details>}
+          {section === 'authorization' && <fieldset className="harness-gateway-access"><legend className="harness-gateway-visually-hidden">3．访问控制</legend>
+            <div className="harness-gateway-access-fields">
+              <label>业务智能体<select aria-label="业务智能体" value={String(activeAgentIndex)} disabled={!agentDrafts.length} onChange={event => setAccessAgentIndex(Number(event.target.value))}>{agentDrafts.map((row, index) => <option key={index} value={index}>{agentCatalog?.agents.find(value => value.id === row.agentId)?.name || row.agentId || `待配置智能体 ${index + 1}`} · {row.agentId || '未选择'}</option>)}</select></label>
+              <label>关联实例实际装载<input readOnly value={accessAgent ? (() => { const instances = data.instances.filter(value => value.agentId === accessAgent.agentId); return instances.length ? `${instances.map(value => value.instanceId).join('、')} · ${instances.length} 个已登记` : '尚无关联实例' })() : '请先配置业务智能体'} /><small>装载来源与配置回执请在运行概览核对。</small></label>
             </div>
-            <p className="harness-gateway-access-note">资源读取还受 resource 动作及 RESOURCES/READ 实际目标约束。</p>
+            {!agentDrafts.length && <div className="harness-gateway-access-empty"><p>尚无业务智能体配置。先登记身份，再设置访问范围。</p><button type="button" onClick={addAgent}>配置智能体身份</button></div>}
+            {accessAgent && <>
+              <div className="harness-gateway-switch-row"><label className="harness-gateway-switch-label">开放即时业务访问<span className="harness-gateway-switch"><input type="checkbox" role="switch" checked={draft.enabled} onChange={event => setDraft({ ...draft, enabled: event.target.checked })} /><span aria-hidden="true" /></span></label><small>仅覆盖经统一业务网关发起的即时任务。</small></div>
+              <div className="harness-gateway-access-fields">
+                <div className="harness-gateway-choices" role="group" aria-label={`允许访问的服务 ${activeAgentIndex + 1}`}><span>允许访问的服务</span>
+                  <details className="harness-gateway-service-picker"><summary>{accessAgent.serverIds === undefined ? '按已登记操作开放服务' : accessAgent.serverIds.length ? accessAgent.serverIds.join('、') : '尚未选择服务'}</summary><div className="harness-gateway-service-options"><label className="harness-gateway-inline"><input type="checkbox" checked={accessAgent.serverIds !== undefined} onChange={event => changeAgent(activeAgentIndex, { serverIds: event.target.checked ? [] : undefined })} />仅允许所选服务</label>
+                    {accessAgent.serverIds !== undefined && <div className="harness-gateway-choice-list">{[...new Set([...registeredServerIds, ...accessAgent.serverIds])].map(serverId => <label key={serverId} className="harness-gateway-option" data-selected={accessAgent.serverIds?.includes(serverId)}><input type="checkbox" checked={accessAgent.serverIds?.includes(serverId) ?? false} onChange={event => changeAgent(activeAgentIndex, { serverIds: event.target.checked ? [...(accessAgent.serverIds ?? []), serverId] : (accessAgent.serverIds ?? []).filter(value => value !== serverId) })} />{serverId}{!registeredServerIds.includes(serverId) && <small>（操作清单中已无此服务）</small>}</label>)}</div>}
+                  </div></details><small>{accessAgent.serverIds === undefined ? '按已登记操作开放服务；可选择进一步限制。' : accessAgent.serverIds.length ? '仅允许所选服务；保留现有 Agent 服务范围。' : '未选任何服务时不允许访问；可先在下方登记操作。'}</small>
+                </div>
+                <label className="harness-gateway-subjects">允许使用此智能体的接入用户 ID<input value={(accessAgent.subjects ?? []).join(',')} onChange={event => changeAgent(activeAgentIndex, { subjects: draftList(event.target.value) })} placeholder="例如 subject-a,subject-b" /><small>填写接入用户的稳定 ID，多个用逗号分隔；留空表示无人可用。</small></label>
+              </div>
+              <div className="harness-gateway-action-row harness-gateway-choices" role="group" aria-label={`允许的动作 ${activeAgentIndex + 1}`}><div><strong>允许的动作</strong><small>身份有效或低风险不会自动增加权限。</small></div><label className="harness-gateway-inline"><input type="checkbox" checked={accessAgent.actions?.includes('read') ?? false} onChange={event => changeAgent(activeAgentIndex, { actions: event.target.checked ? [...(accessAgent.actions ?? []), 'read'] : (accessAgent.actions ?? []).filter(value => value !== 'read') })} />读取（read）</label><details className="harness-gateway-action-details"><summary>其他动作 · {accessAgent.actions?.filter(value => value !== 'read').length ?? 0} 项</summary><div className="harness-gateway-choice-list">{[...new Set([...agentAccessActions, ...(accessAgent.actions ?? [])])].filter(value => value !== 'read').map(value => <label key={value} className="harness-gateway-option" data-selected={(accessAgent.actions ?? []).includes(value)}><input type="checkbox" checked={(accessAgent.actions ?? []).includes(value)} onChange={event => changeAgent(activeAgentIndex, { actions: event.target.checked ? [...(accessAgent.actions ?? []), value] : (accessAgent.actions ?? []).filter(action => action !== value) })} />{accessActionNames[value] ?? '未知动作'}（{value}）</label>)}</div></details></div>
+              <div className="harness-gateway-agent-tools"><label className="harness-gateway-inline"><input type="checkbox" checked={accessAgent.enabled ?? false} onChange={event => changeAgent(activeAgentIndex, { enabled: event.target.checked })} />开放该智能体的访问权限</label><button type="button" onClick={addAgent}>添加智能体身份</button><button type="button" onClick={() => setDraft({ ...draft, agents: JSON.stringify(agentDrafts.filter((_, at) => at !== activeAgentIndex), null, 2) })}>移除当前智能体配置</button></div>
+            </>}
+            <section className="harness-gateway-operation-list" aria-label="工具与资源操作允许清单"><div className="harness-gateway-operation-list-heading"><h3>工具与资源操作</h3><button type="button" onClick={() => setDraft({ ...draft, operations: JSON.stringify([...operationDrafts, { serverId: '', operationId: '', kind: 'read', method: 'GET', target: '' }], null, 2) })}>添加操作</button></div>
+              {operationDrafts.map((row, index) => <details key={index} className="harness-gateway-operation-card"><summary>{row.operationId || `操作 ${index + 1}`} · {row.serverId || '未填写服务'} · {row.method || '未选方法'} · {accessActionNames[row.kind] ?? row.kind}</summary><div className="harness-gateway-operation-fields">
+                <label>服务 ID<input aria-label={`服务 ID ${index + 1}`} list="gateway-service-suggestions" value={row.serverId ?? ''} onChange={event => changeOperation(index, { serverId: event.target.value })} /></label>
+                <label>操作 ID<input aria-label={`操作 ID ${index + 1}`} value={row.operationId ?? ''} onChange={event => changeOperation(index, { operationId: event.target.value })} /></label>
+                <label>动作<select aria-label={`动作 ${index + 1}`} value={row.kind ?? 'read'} onChange={event => changeOperation(index, { kind: event.target.value })}>{['read', 'write', 'resource', 'publish'].map(value => <option key={value} value={value}>{accessActionNames[value]}（{value}）</option>)}</select></label>
+                <label>方法<select aria-label={`方法 ${index + 1}`} value={row.method ?? ''} onChange={event => changeOperation(index, { method: event.target.value })}><option value="" disabled>选择方法</option>{!!row.method && !businessOperationMethods.includes(row.method) && <option value={row.method}>{row.method}（无效）</option>}{businessOperationMethods.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
+                <label className="harness-gateway-field-wide">实际目标<input aria-label={`实际目标 ${index + 1}`} value={row.target ?? ''} placeholder={row.targetHidden ? '原目标私有部分不回传，留空保留' : 'http://…/path/{id}'} onChange={event => changeOperation(index, { target: event.target.value, targetHidden: !event.target.value && !!row.targetHidden })} /></label>
+                <label className="harness-gateway-inline harness-gateway-field-wide"><input aria-label={`必要确认 ${index + 1}`} type="checkbox" checked={row.confirmation ?? false} onChange={event => changeOperation(index, { confirmation: event.target.checked })} />执行前需要确认</label>
+                <button type="button" onClick={() => setDraft({ ...draft, operations: JSON.stringify(operationDrafts.filter((_, at) => at !== index), null, 2) })}>移除操作</button>
+              </div></details>)}
+              {!operationDrafts.length && <p className="harness-gateway-access-empty">尚无操作。添加工具或资源操作后，才能授权实际目标。</p>}
+            </section>
+            <div className="harness-gateway-access-footer"><details><summary>范围与应用说明</summary><p>先保存访问配置，再核对实例回执。资源读取还受 resource 动作及 RESOURCES/READ 实际目标约束；定时任务暂不在此范围。</p></details><button type="submit" className="harness-primary" disabled={busy || conflict}>预览配置</button></div>
             <datalist id="gateway-service-suggestions">{[...new Set([...serviceSuggestions, ...registeredServerIds])].map(value => <option key={value} value={value} />)}</datalist>
             <details className="harness-gateway-access-advanced"><summary>高级 JSON 编辑</summary><label>Agent 规则 JSON<textarea data-gateway-field="agents-json" aria-label="Agent 规则 JSON" rows={10} spellCheck={false} value={draft.agents} onChange={event => setDraft({ ...draft, agents: event.target.value })} /></label><label>操作授权 JSON<textarea data-gateway-field="operations-json" aria-label="操作授权 JSON" rows={10} spellCheck={false} value={draft.operations} onChange={event => setDraft({ ...draft, operations: event.target.value })} /></label></details>
           </fieldset>}
         </form>}
         </section>}
         {section === 'overview' && <section className="harness-card harness-composition-detail" aria-label="运行概览">
-        <div className="harness-section-heading"><h2>运行概览</h2><span className="harness-gateway-description">最近读取 {lastStatusAt || '尚未读取'} · 许可租期上限 2 秒 · 在线回执目标 2 秒</span></div>
-        <p className="harness-gateway-description">配置保存、实例应用与业务允许是不同状态。下方显示当前管理接口观察到的事实；执行记录仅展示最近 30 条。</p>
-        <section className="harness-gateway-runtime-section" aria-label="实例与身份回执"><h3>实例与身份回执</h3>
-        {data.instances.length ? <div className="harness-table-scroll"><table><thead><tr><th>实例</th><th>Agent</th><th>当前代次</th><th>回执版本</th><th>实际应用</th></tr></thead><tbody>{data.instances.map(value => <tr key={value.instanceId}>
-          <td>{value.instanceId}</td><td>{value.agentId}</td><td>{value.runtimeGeneration}</td><td>{value.acknowledgement?.restrictionVersion ?? '尚无回执'}</td>
-          <td>{value.applied ? '已应用（2 秒内有效回执）' : '未确认；到期许可不能用于受保护动作'}</td>
-        </tr>)}</tbody></table></div> : <p>暂无已登记业务实例。配置保存不表示实例已经应用。</p>}
-        {data.agentStatuses.length ? <details className="harness-gateway-auxiliary"><summary>查看 Agent 签名与可信来源核验（{data.agentStatuses.length}）</summary><ul className="harness-gateway-list">{data.agentStatuses.map(value => <li key={value.instanceId}>{value.agentId} / {value.instanceId}：签名 {stateNames[value.authentication.status] ?? value.authentication.status}；可信来源 {stateNames[value.trust.status] ?? value.trust.status}<p>签名最近验证 {value.authentication.verifiedAt ?? '尚无证据'} · 签名有效期 {value.authentication.expiresAt ?? '未知'} · 来源依据 {value.trust.reason}</p></li>)}</ul></details> : <p>尚无 Agent 身份核验事实。</p>}
-        {data.sessionTrustFacts?.length ? <details className="harness-gateway-auxiliary"><summary>查看接入用户会话身份事实（{data.sessionTrustFacts.length}）</summary><ul>{data.sessionTrustFacts.map(value => <li key={value.sessionId}>{value.subjectId} / {value.sessionId}：{value.state === 'evidence-held' ? '持有已验证身份记录（非实时探测）' : '身份记录已过期'} · 验证时间 {value.verifiedAt ?? '未知'} · 有效期 {value.expiresAt ?? '未知'} · 观察时间 {value.observedAt}</li>)}</ul></details> : <p>尚无用户会话信任事实。</p>}
-        </section>
+        <div className="harness-section-heading"><div><h2>业务访问与配置应用</h2><p className="harness-gateway-description">区分当前访问状态、评估有效性与实例回执。</p></div><span className="harness-gateway-description">{loadError ? '最近读取失败 · 状态待核对' : `${lastStatusAt || '尚未读取'} 更新`}</span></div>
+        {(!freshFacts.length || highRiskCount > 0 || unknownRiskCount > 0) && <div className="harness-gateway-risk-notice" role="status"><div><strong>{!data.riskFacts.length ? '尚无风险评估，当前许可待核对' : !freshFacts.length ? '风险评估已过期，需要复核当前许可' : riskOverview}</strong><p>{!freshFacts.length ? '没有有效评估事实，不等于已确认高风险；请核对评估范围与证据。' : '请核对评估范围与证据，再判断当前许可。'}</p></div><button className="harness-gateway-text-button" type="button" onClick={() => openSection('risk')}>查看评估 →</button></div>}
+        {data.instances.length ? <div className="harness-table-scroll harness-gateway-overview-table"><table><thead><tr><th>业务实例</th><th>实际装载</th><th>身份核验</th><th>访问配置</th><th>配置应用</th><th><span className="harness-gateway-visually-hidden">操作</span></th></tr></thead><tbody>{data.instances.map(value => {
+          const identity = data.agentStatuses.find(item => item.instanceId === value.instanceId)
+          const access = data.configuration.agents.find(item => item.agentId === value.agentId)
+          const outcome = identityResult(identity)
+          return <tr key={value.instanceId}><td><strong>{value.instanceId}</strong><small>{agentCatalog?.agents.find(item => item.id === value.agentId)?.name || value.agentId}</small></td>
+            <td><span>来源已登记</span><details><summary>查看来源与代次</summary><code>{value.sourceDigest}</code><small>当前代次 {value.runtimeGeneration}</small></details></td>
+            <td><span className="harness-gateway-badge" data-state={outcome.state}>● {outcome.label}</span></td>
+            <td>{access ? data.enabled && access.enabled ? '已开放' : '已关闭' : '未配置'}</td>
+            <td><span className="harness-gateway-badge" data-state={value.applied ? 'success' : 'pending'}>● {value.applied ? '已应用' : '待核对'}</span></td>
+            <td><button className="harness-gateway-text-button" type="button" onClick={() => { setAccessAgentIndex(Math.max(0, agentDrafts.findIndex(row => row.agentId === value.agentId))); openSection('authorization') }}>访问配置</button></td></tr>
+        })}</tbody></table></div> : <div className="harness-gateway-access-empty"><strong>暂无已登记业务实例</strong><p>配置保存不表示实例已应用。创建实例并取得回执后，这里才会显示实际状态。</p></div>}
+        <div className="harness-gateway-overview-cards"><article><h3>配置应用回执</h3><strong className={data.instances.length && appliedInstances === data.instances.length ? 'harness-gateway-applied' : undefined}>{data.instances.length ? `${appliedInstances}/${data.instances.length} 个目标实例已确认应用` : '尚无目标实例'}</strong><p>{data.instances.length ? '回执确认配置生效；业务验证结果仍以对应评测证据为准。' : '登记目标实例后，再核对实际应用回执。'}</p></article><article><h3>管理范围</h3><p>当前工作区经统一业务网关发起的即时任务。</p><details><summary>展开范围与来源说明</summary><p>定时任务暂不在此范围，需手动发起；存在延迟和漏执行风险。配置保存、实例应用与业务许可分别核对。</p></details></article></div>
+        <details className="harness-gateway-auxiliary" aria-label="实例与身份回执"><summary>实例与身份回执 · 查看核验依据</summary><p className="harness-gateway-description">许可租期上限 2 秒，在线回执目标 2 秒；下列事实按当前工作区读取。</p>
+          {data.agentStatuses.length ? <ul className="harness-gateway-list">{data.agentStatuses.map(value => <li key={value.instanceId}>{value.agentId} / {value.instanceId}：签名 {stateNames[value.authentication.status] ?? value.authentication.status}；可信来源 {stateNames[value.trust.status] ?? value.trust.status}<p>签名最近验证 {value.authentication.verifiedAt ?? '尚无证据'} · 签名有效期 {value.authentication.expiresAt ?? '未知'} · 来源依据 {value.trust.reason}</p></li>)}</ul> : <p>尚无 Agent 身份核验事实。</p>}
+          {data.sessionTrustFacts?.length ? <details className="harness-gateway-auxiliary"><summary>查看接入用户会话身份事实（{data.sessionTrustFacts.length}）</summary><ul>{data.sessionTrustFacts.map(value => <li key={value.sessionId}>{value.subjectId} / {value.sessionId}：{value.state === 'evidence-held' ? '持有已验证身份记录（非实时探测）' : '身份记录已过期'} · 验证时间 {value.verifiedAt ?? '未知'} · 有效期 {value.expiresAt ?? '未知'} · 观察时间 {value.observedAt}</li>)}</ul></details> : <p>尚无用户会话信任事实。</p>}
+        </details>
         <section className="harness-gateway-runtime-section" aria-label="风险与运行限制">
         <h3>风险状态</h3>
         {data.configuration.agents.length ? <div className="harness-gateway-facts">{data.configuration.agents.map(row => {
@@ -495,7 +551,7 @@ export function BusinessControlPage({ rpc, updates, active = true, target, onNav
         })}</div> : <p>尚无已配置业务 Agent。</p>}
         <div className="harness-gateway-runtime-layout"><div><h3>当前限制</h3>
         {data.restrictions.length ? <ul className="harness-gateway-list">{data.restrictions.map(value => <RestrictionRow key={value.id} value={value} sessions={data.sessionTrustFacts ?? []} busy={busy} perform={perform} />)}</ul> : <p>暂无人工运行限制。风险事实和基础授权仍会参与每次请求判断。</p>}
-        </div><aside><h3>辅助：收紧指定实例与接入用户范围</h3>
+        </div><aside id="gateway-reassess" tabIndex={-1}><h3>辅助：收紧指定实例与接入用户范围</h3>
         <form className="harness-composition-editor" onSubmit={event => { event.preventDefault(); void restrictSelected() }}>
           <label>业务实例<select required value={instanceId} onChange={event => { setInstanceId(event.target.value); setSelectedSubjectIds([]); setSessionId('') }}><option value="">请选择实例</option>{data.instances.map(value => <option key={value.instanceId} value={value.instanceId}>{value.instanceId}（{value.agentId}）</option>)}</select></label>
           <fieldset className="harness-gateway-subject-picker"><legend>要限制的接入用户（可多选）</legend>
@@ -525,6 +581,25 @@ export function BusinessControlPage({ rpc, updates, active = true, target, onNav
           <td>{value.at}</td><td>{value.subjectId} / {value.sessionId}</td><td>{value.action} / {value.operationId}</td><td>{value.outcome}</td><td>{value.reason ?? '—'}</td>
         </tr>)}</tbody></table></div> : <p>暂无受管执行记录。</p>}</section>
         </section>}</div>
+        {section !== 'overview' && <><p className="harness-gateway-scope" role="note">仅覆盖经统一业务网关发起的即时任务；定时任务暂不在此范围。</p><details className="harness-guide"><summary>查看覆盖范围与限制</summary><p>定时巡检、自动研判和报表需手动发起，存在延迟和漏执行风险。现有研究实例的定时任务不纳入本闭环的完整保护声明。</p></details></>}
+        {previewOpen && draft && <div className="harness-gateway-preview-backdrop" onClick={event => { if (event.target === event.currentTarget) setPreviewOpen(false) }}><div ref={previewDialog} tabIndex={-1} className="harness-gateway-preview-dialog" role="dialog" aria-modal="true" aria-label="确认保存业务访问配置" onKeyDown={event => {
+          if (event.key === 'Escape') { event.preventDefault(); setPreviewOpen(false) }
+          if (event.key !== 'Tab') return
+          const buttons = previewDialog.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')
+          if (!buttons?.length) return
+          const first = buttons[0], last = buttons[buttons.length - 1]
+          if (event.shiftKey && (document.activeElement === first || document.activeElement === previewDialog.current)) { event.preventDefault(); last.focus() }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+        }}>
+          <h2>确认保存业务访问配置</h2><p>先保存配置，再根据对应版本的实例回执判断应用结果。</p>
+          <dl><dt>配置对象</dt><dd>{agentDrafts.map(row => row.agentId || '未选择智能体').join('、') || '尚无业务智能体'}</dd>
+            <dt>即时业务访问</dt><dd>{draft.enabled ? '开放' : '关闭'} · 单次请求仍需核对</dd>
+            <dt>智能体访问范围</dt><dd>{agentDrafts.length ? agentDrafts.map((row, index) => <p key={index}>{row.agentId || '待配置智能体'}：{row.enabled ? '已开放' : '未开放'} · {row.serverIds === undefined ? '按已登记操作开放服务' : row.serverIds.length ? `服务 ${row.serverIds.join('、')}` : '无已选服务'} · 接入用户 {row.subjects.length ? row.subjects.join('、') : '未配置'} · 动作 {row.actions.length ? row.actions.map(value => accessActionNames[value] ?? value).join('、') : '未选择'}</p>) : '尚未配置'}</dd>
+            <dt>实际操作目标</dt><dd>{operationDrafts.length ? operationDrafts.map((row, index) => <p key={index}>{row.serverId || '未填写服务'} · {row.operationId || '未填写操作'} · {row.method || '未选方法'} · {row.target || (row.targetHidden ? '原目标已保留' : '未填写目标')}</p>) : '尚未登记操作'}</dd>
+          </dl>
+          <p className="harness-gateway-preview-warning">{riskOverview}。保存配置不表示身份核验、风险许可或目标实例已经应用。</p>
+          <div className="harness-gateway-preview-actions"><button type="button" onClick={() => setPreviewOpen(false)}>返回修改</button><button className="harness-primary" type="button" disabled={busy || conflict || !dirty(draft)} onClick={saveDraft}>{dirty(draft) ? '确认保存业务访问配置' : '当前没有待保存更改'}</button></div>
+        </div></div>}
       </>}
   </main>
 }

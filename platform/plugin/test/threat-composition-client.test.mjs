@@ -28,7 +28,9 @@ function client() {
     useEffect(effect, next = []) { const index = cursor++; if (!deps[index] || next.some((value, at) => value !== deps[index][at])) { deps[index] = next; effects.push(() => { cleanups[index]?.(); cleanups[index] = effect() }) } },
   }
   const module = { exports: {} }
-  vm.runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, require: name => name === 'react' ? react : require(name), URL, Blob, document: { baseURI: 'http://127.0.0.1:3090/hep/' } })
+  vm.runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, require: name => name === 'react' ? react : require(name), URL, Blob,
+    window: { addEventListener() {}, removeEventListener() {} }, requestAnimationFrame: callback => callback(),
+    document: { baseURI: 'http://127.0.0.1:3090/hep/' } })
   // 子组件通过实际页面元素传出，保持与生产引用相同的函数。
   function mount(component, value) { cleanups.forEach(cleanup => cleanup?.()); states.length = deps.length = cleanups.length = 0; Component = component; props = value; return render() }
   function render() { for (let i = 0; i < 20; i++) { cursor = 0; effects = []; changed = false; tree = Component(props); effects.forEach(effect => effect()); if (!changed) return tree } throw new Error('render did not settle') }
@@ -83,9 +85,9 @@ test('编排只列一次，草稿与发布状态并存且发布版本仍可选�
   assert.equal(rows().length, 3)
   assert.match(ui.text(rows()[0]), /已发布.*正在编辑/)
   assert.equal(ui.nodes(list()).filter(node => node.type === 'section').length, 1)
-  assert.ok(ui.button('已发布版本'))
-  ui.button('已发布版本').props.onClick(); ui.render()
-  assert.equal(ui.button('已发布版本').props['aria-pressed'], true)
+  assert.ok(ui.button('当前发布版本'))
+  ui.button('当前发布版本').props.onClick(); ui.render()
+  assert.equal(ui.button('当前发布版本').props['aria-pressed'], true)
   assert.equal(ui.nodes(rows()[0]).find(node => node.type === 'button').props['aria-current'], 'true')
   assert.ok(ui.nodes().some(node => node.type === 'h2' && ui.text(node) === '资产查询发布版'))
   ui.nodes(rows()[1]).find(node => node.type === 'button').props.onClick(); ui.render()

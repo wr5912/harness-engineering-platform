@@ -61,7 +61,7 @@ if (args[0] === 'ps') {
   const name = args[args.indexOf('--name') + 1]
   const source = args[args.indexOf('--source') + 1]
   if (dry) out({args, name, source_id:source, image_tag:'dsh:locked', port:3199, mounts:[{container:'/work/harness/workspace', mode:'ro'}], state_dir:'state'})
-  else process.stdout.write(JSON.stringify({warning:'first'}) + '\\n' + JSON.stringify({name, dsh_running:true, token:'receipt-secret'}) + '\\n')
+  else { process.stdout.write(JSON.stringify({warning:'first'}) + '\\n' + JSON.stringify({name, dsh_running:true, token:'receipt-secret'}) + '\\n'); process.stderr.write(JSON.stringify({hint:'not a receipt'}) + '\\n') }
 } else if (args[0] === 'down') {
   const name = args[1]
   if (name === 'fail-one') { process.stderr.write('stop failed token=secret-token\\n'); process.exit(1) }
@@ -143,10 +143,19 @@ test('确认实例操作沿用预览来源，来源被替换时在任何CLI调�
   t.after(() => { fx.cleanup(); cleanup(); if (previous === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = previous })
   const handler = module.createInstancesHandler(fx.root)
   const signal = new AbortController().signal
+  const preview = await handler('preview', { operation: 'stop', name: 'running-one' }, signal)
+  assert.equal(preview.ok, true)
+  assert.equal(preview.value.observed_state, 'running')
+  assert.match(preview.value.observed_at, /^\d{4}-\d\d-\d\dT/)
+  const callsFile = join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls')
+  const beforeStateChange = readFileSync(callsFile, 'utf8')
+  const stateChanged = await handler('run', { operation: 'stop', name: 'running-one', expected_source_id: 'experiment:EXP-real-001', expected_state: 'stopped' }, signal)
+  assert.equal(stateChanged.value.ok, false)
+  assert.match(stateChanged.value.error.message, /实例状态已变化/)
+  assert.equal(readFileSync(callsFile, 'utf8').split('\n').filter(line => line.includes('"down"')).length, beforeStateChange.split('\n').filter(line => line.includes('"down"')).length)
   const same = await handler('run', { operation: 'stop', name: 'running-one', expected_source_id: 'experiment:EXP-real-001' }, signal)
   assert.equal(same.ok, true)
   assert.equal(same.value.ok, true)
-  const callsFile = join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls')
   const before = readFileSync(callsFile, 'utf8')
   const manifest = join(fx.state, 'dsh-dev/running-one/instance.json')
   writeFileSync(manifest, JSON.stringify({ name: 'running-one', source_id: 'experiment:EXP-another-001', port: 3181 }))
@@ -240,6 +249,51 @@ test('preview uses real sources and rejects invented sources', async () => {
   }
 })
 
+test('来源候选只读来自当前登记，并标明 Candidate 缺失或可读取', async t => {
+  const { module, cleanup } = await loadModule()
+  const fx = fixture()
+  t.after(() => { fx.cleanup(); cleanup() })
+  const handler = module.createInstancesHandler(fx.root)
+  const missing = await handler('sources', {}, new AbortController().signal)
+  assert.equal(missing.ok, true)
+  assert.equal(missing.value.sources[0].source_id, 'experiment:EXP-real-001')
+  assert.equal(missing.value.sources[0].selectable, false)
+  writeFileSync(join(fx.root, 'runtime/adapters/dsh-container/sources.json'), JSON.stringify({
+    schema_version: '1.1', sources: { 'EXP-real-001': { agent_id: 'real-agent', candidate_root: 'evolution/experiments/EXP-real-001/candidate/dsh' } },
+  }))
+  mkdirSync(join(fx.root, 'evolution/experiments/EXP-real-001/candidate/dsh'), { recursive: true })
+  const ready = await handler('sources', {}, new AbortController().signal)
+  assert.equal(ready.value.sources[0].selectable, true)
+  assert.equal(ready.value.sources[0].agent_id, 'real-agent')
+})
+
+test('创建请求必须沿用预览来源，否则在调用 CLI 前拒绝', async t => {
+  const { module, cleanup } = await loadModule()
+  const fx = fixture()
+  t.after(() => { fx.cleanup(); cleanup() })
+  const handler = module.createInstancesHandler(fx.root)
+  const result = await handler('run', {
+    operation: 'create', name: 'new-one', source: 'experiment:EXP-real-001', expected_source_id: 'experiment:EXP-other-002',
+  }, new AbortController().signal)
+  assert.equal(result.ok, true)
+  assert.equal(result.value.ok, false)
+  assert.match(result.value.error.message, /预览来源不一致/)
+  assert.throws(() => readFileSync(join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls')), /ENOENT/)
+})
+
+test('确认创建时把预览端口作为显式端口交给 CLI', async t => {
+  const { module, cleanup } = await loadModule()
+  const fx = fixture()
+  t.after(() => { fx.cleanup(); cleanup() })
+  const handler = module.createInstancesHandler(fx.root)
+  const result = await handler('run', {
+    operation: 'create', name: 'port-frozen', source: 'experiment:EXP-real-001', expected_source_id: 'experiment:EXP-real-001', port: 3265,
+  }, new AbortController().signal)
+  assert.equal(result.value.ok, true)
+  const calls = readFileSync(join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls'), 'utf8').trim().split('\n').map(line => JSON.parse(line))
+  assert.deepEqual(calls[0].slice(calls[0].indexOf('--port'), calls[0].indexOf('--port') + 2), ['--port', '3265'])
+})
+
 test('run parses two stdout JSON objects and redacts bounded logs', async () => {
   const { module, cleanup: cleanupModule } = await loadModule()
   const fx = fixture()
@@ -253,7 +307,7 @@ test('run parses two stdout JSON objects and redacts bounded logs', async () => 
     }, new AbortController().signal)
     assert.equal(receipt.ok, true)
     assert.equal(receipt.value.ok, true)
-    assert.equal(receipt.value.value.json_objects.length, 2)
+    assert.equal(receipt.value.value.json_objects.length, 3)
     assert.deepEqual(receipt.value.value.value, { name: 'stage1-new', dsh_running: true, token: '<redacted>' })
     assert.equal(JSON.stringify(receipt).includes('receipt-secret'), false)
     const logs = await handler('logs', { name: 'running-one', tail: 5 }, new AbortController().signal)
@@ -382,4 +436,128 @@ test('创建、启动与重启由 CLI 统一访问设置，旧实例保留端口
   const created = await handler('preview', { name: 'new-one', operation: 'create', source: 'experiment:EXP-real-001' }, new AbortController().signal)
   assert.equal(created.ok, true)
   for (const flag of ['--lan-access', '--unsafe-no-auth', '--skip-testing-notice']) assert.equal(created.value.plan.args.includes(flag), false)
+})
+
+test('实例创建预览固定模型投影，执行前拒绝缺失或过期的摘要', async t => {
+  const { module, cleanup } = await loadModule()
+  const fx = fixture()
+  t.after(() => { fx.cleanup(); cleanup() })
+  let revision = 'current'
+  let credential = 'credential-first'
+  const defaultModel = { provider: 'deepseek-official', model: 'deepseek-chat' }
+  const provider = async (agentId, selected) => {
+    if (selected && (selected.provider !== defaultModel.provider || selected.model !== defaultModel.model)) {
+      throw new Error('该业务智能体未标记此模型为可使用')
+    }
+    return { policy: { agent_id: agentId, allowed: [defaultModel], default: selected ?? defaultModel, revision },
+      environment: { DEEPSEEK_API_KEY: credential } }
+  }
+  const handler = module.createInstancesHandler(fx.root, provider)
+  const signal = new AbortController().signal
+  const item = { operation: 'create', name: 'model-new', source: 'experiment:EXP-real-001', model_selection: defaultModel }
+  const preview = await handler('preview', item, signal)
+  assert.equal(preview.ok, true)
+  assert.deepEqual(preview.value.model_selection, defaultModel)
+  assert.match(preview.value.model_policy_hash, /^[0-9a-f]{64}$/)
+  const callsPath = join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls')
+  const callsBefore = readFileSync(callsPath, 'utf8')
+  const denied = await handler('preview', { ...item, model_selection: { provider: 'openai', model: 'gpt-5' } }, signal)
+  assert.equal(denied.ok, false)
+  assert.match(denied.error.message, /未标记此模型/)
+  assert.equal(readFileSync(callsPath, 'utf8'), callsBefore)
+  const withoutHash = await handler('run', item, signal)
+  assert.equal(withoutHash.value.ok, false)
+  assert.match(withoutHash.value.error.message, /先预览当前模型设置/)
+  assert.equal(readFileSync(callsPath, 'utf8'), callsBefore)
+  revision = 'changed'
+  const stale = await handler('run', { ...item, expected_model_policy_hash: preview.value.model_policy_hash }, signal)
+  assert.equal(stale.value.ok, false)
+  assert.match(stale.value.error.message, /模型设置或实例默认模型已变化/)
+  assert.equal(readFileSync(callsPath, 'utf8'), callsBefore, '模型投影变化后不得派发创建')
+  revision = 'current'
+  credential = 'credential-changed'
+  const changedCredential = await handler('run', { ...item, expected_model_policy_hash: preview.value.model_policy_hash }, signal)
+  assert.equal(changedCredential.value.ok, false)
+  assert.match(changedCredential.value.error.message, /模型设置或实例默认模型已变化/)
+  assert.equal(readFileSync(callsPath, 'utf8'), callsBefore, '同名凭据的值变化后不得派发创建')
+  assert.equal(JSON.stringify(changedCredential).includes(credential), false)
+  credential = 'credential-first'
+  const current = await handler('run', { ...item, expected_model_policy_hash: preview.value.model_policy_hash }, signal)
+  assert.equal(current.value.ok, true)
+  const calls = readFileSync(callsPath, 'utf8').trim().split('\n').map(line => JSON.parse(line))
+  assert.equal(calls.filter(args => args[0] === 'up' && !args.includes('--dry-run')).length, 1)
+})
+
+test('已有实例继续使用登记的默认模型，显式选择只影响该实例操作', async t => {
+  const { module, cleanup } = await loadModule()
+  const fx = fixture()
+  const previous = process.env.XDG_STATE_HOME
+  process.env.XDG_STATE_HOME = fx.state
+  t.after(() => { fx.cleanup(); cleanup(); if (previous === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = previous })
+  const oldModel = { provider: 'deepseek-official', model: 'deepseek-chat' }
+  const globalModel = { provider: 'openai', model: 'gpt-5' }
+  const manifestPath = join(fx.state, 'dsh-dev/running-one/instance.json')
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  writeFileSync(manifestPath, JSON.stringify({ ...manifest, model_policy: { default: oldModel } }))
+  const selections = []
+  const provider = async (_agentId, selected) => {
+    selections.push(selected)
+    const effective = selected ?? globalModel
+    return { policy: { agent_id: 'real-agent', allowed: [oldModel, globalModel], default: effective }, environment: {} }
+  }
+  const handler = module.createInstancesHandler(fx.root, provider)
+  const signal = new AbortController().signal
+  const start = await handler('preview', { operation: 'start', name: 'running-one' }, signal)
+  assert.equal(start.ok, true)
+  assert.deepEqual(start.value.model_selection, oldModel)
+  assert.deepEqual(selections[0], oldModel)
+  const started = await handler('run', {
+    operation: 'start', name: 'running-one', expected_source_id: 'experiment:EXP-real-001',
+    expected_model_policy_hash: start.value.model_policy_hash,
+  }, signal)
+  assert.equal(started.value.ok, true)
+  assert.deepEqual(selections[1], oldModel)
+  const restart = await handler('preview', { operation: 'restart', name: 'running-one', model_selection: globalModel }, signal)
+  assert.equal(restart.ok, true)
+  assert.deepEqual(restart.value.model_selection, globalModel)
+  assert.deepEqual(selections[2], globalModel)
+  const callsPath = join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls')
+  const upCount = () => readFileSync(callsPath, 'utf8').trim().split('\n').map(line => JSON.parse(line))
+    .filter(args => args[0] === 'up' && !args.includes('--dry-run')).length
+  const before = upCount()
+  writeFileSync(manifestPath, JSON.stringify({ ...manifest, model_policy: { default: globalModel } }))
+  const stale = await handler('run', {
+    operation: 'restart', name: 'running-one', model_selection: globalModel,
+    expected_model_policy_hash: restart.value.model_policy_hash,
+  }, signal)
+  assert.equal(stale.value.ok, false)
+  assert.match(stale.value.error.message, /模型设置或实例默认模型已变化/)
+  assert.equal(upCount(), before, '登记的实例默认模型变化后不得按过期预览重启')
+})
+
+test('历史实例未记录默认模型时必须显式选择，不能套用新的统一默认', async t => {
+  const { module, cleanup } = await loadModule()
+  const fx = fixture()
+  const previous = process.env.XDG_STATE_HOME
+  process.env.XDG_STATE_HOME = fx.state
+  t.after(() => { fx.cleanup(); cleanup(); if (previous === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = previous })
+  const unified = { provider: 'deepseek-official', model: 'deepseek-chat' }
+  const selected = { provider: 'openai', model: 'gpt-5' }
+  const provider = async (agentId, requested) => ({
+    policy: { agent_id: agentId, allowed: [unified, selected], default: requested ?? unified }, environment: {},
+  })
+  const handler = module.createInstancesHandler(fx.root, provider)
+  const signal = new AbortController().signal
+  const request = { operation: 'start', name: 'running-one' }
+  const preview = await handler('preview', request, signal)
+  assert.equal(preview.ok, false)
+  assert.match(preview.error.message, /未记录默认模型/)
+  const callsPath = join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls')
+  assert.throws(() => readFileSync(callsPath), /ENOENT/)
+  const explicit = await handler('preview', { ...request, model_selection: selected }, signal)
+  assert.equal(explicit.ok, true)
+  assert.deepEqual(explicit.value.model_selection, selected)
+  const run = await handler('run', { ...request, model_selection: selected,
+    expected_model_policy_hash: explicit.value.model_policy_hash }, signal)
+  assert.equal(run.value.ok, true)
 })

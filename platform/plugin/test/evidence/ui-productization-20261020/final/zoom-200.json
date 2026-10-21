@@ -1,0 +1,68 @@
+{
+  "chromeZoomSetting": "2",
+  "results": [
+    {
+      "route": "home",
+      "outerWidth": 1440,
+      "innerWidth": 720,
+      "clientWidth": 720,
+      "documentWidth": 720,
+      "devicePixelRatio": 2,
+      "heading": "用 AI 构建和管理智能体",
+      "visibleHeading": true
+    },
+    {
+      "route": "agents",
+      "outerWidth": 1440,
+      "innerWidth": 720,
+      "clientWidth": 720,
+      "documentWidth": 720,
+      "devicePixelRatio": 2,
+      "heading": "智能体管理",
+      "visibleHeading": true
+    },
+    {
+      "route": "evaluation",
+      "outerWidth": 1440,
+      "innerWidth": 720,
+      "clientWidth": 720,
+      "documentWidth": 720,
+      "devicePixelRatio": 2,
+      "heading": "评测中心",
+      "visibleHeading": true
+    },
+    {
+      "route": "instances",
+      "outerWidth": 1440,
+      "innerWidth": 720,
+      "clientWidth": 720,
+      "documentWidth": 720,
+      "devicePixelRatio": 2,
+      "heading": "实例管理",
+      "visibleHeading": true
+    },
+    {
+      "route": "gateway",
+      "outerWidth": 1440,
+      "innerWidth": 698,
+      "clientWidth": 698,
+      "documentWidth": 698,
+      "devicePixelRatio": 2,
+      "heading": "统一网关",
+      "visibleHeading": true
+    },
+    {
+      "route": "mcp",
+      "outerWidth": 1440,
+      "innerWidth": 720,
+      "clientWidth": 720,
+      "documentWidth": 720,
+      "devicePixelRatio": 2,
+      "heading": "MCP 管理",
+      "visibleHeading": true
+    }
+  ],
+  "createPanel": true,
+  "closed": true,
+  "errors": []
+}

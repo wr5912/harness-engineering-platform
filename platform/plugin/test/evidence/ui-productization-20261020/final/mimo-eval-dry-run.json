@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "source_id": "experiment:EXP-security-operations-expert-023-r2233d74f6fb3",
+  "experiment_id": "EXP-security-operations-expert-023-r2233d74f6fb3",
+  "executor": "api",
+  "requested_mode": "fast",
+  "selection_mode": "explicit",
+  "review_mode": "none",
+  "case_ids": [
+    "U-INS-003"
+  ],
+  "runtime_required": true,
+  "image": "ai-agent-harness/dsh:687f282e8-b9bce5f1fe5f",
+  "image_build_fingerprint": "sha256:b9bce5f1fe5fdbf33aca2d4133768a9276d31e9aca176eac6cbdee6ba761d87d",
+  "required_env_names": [
+    "XIAOMI_TOKEN_PLAN_CN_API_KEY"
+  ],
+  "missing_env_names": []
+}

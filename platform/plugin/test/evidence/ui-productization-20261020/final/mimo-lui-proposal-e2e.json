@@ -1,0 +1,17 @@
+{
+  "checkedAt": "2026-10-21T03:48:20.892Z",
+  "sessionRoute": "#/instances",
+  "modelHigh": true,
+  "prompt": "以网络安全专家智能体最新版本，创建启动智能体实例；实例名使用 mimo-lui-e2e-20261021，端口 31894。",
+  "sent": true,
+  "proposal": {
+    "text": "创建实例：mimo-lui-e2e-20261021\n实例\n\n创建并启动实例 mimo-lui-e2e-20261021，来源为智能体“security-operations-expert”的版本 023。\n\n固定来源：experiment:EXP-security-operations-expert-023-r2233d74f6fb3\n\n访问端口：31894；本次默认模型：xiaomi-token-plan-cn · mimo-v2.6-flash（推理档位 off）。\n\n确认后直接创建并启动；运行状态与业务效果以实际回执核对。\n查看完整方案与实际修改\n创建实例\n暂不执行",
+    "confirmButton": 1,
+    "source023": true,
+    "instanceName": true,
+    "port31894": true,
+    "modelOff": true
+  },
+  "assistantStatus": "",
+  "errors": []
+}

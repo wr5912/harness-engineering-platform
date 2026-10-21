@@ -344,13 +344,20 @@ function page({ active = true, statusHandler, saveHandler, catalogHandler, probe
   render()
   return { render, settle, nodes, text, button, tab, calls, props, intervals, current: value => { current = value }, conflict: () => { saveConflict = true } }
 }
+function confirmPreview(ui) {
+  ui.render()
+  assert.ok(ui.button('确认保存业务访问配置'), '预览应列出配置并要求确认保存')
+  ui.button('确认保存业务访问配置').props.onClick()
+  ui.render()
+}
 
 test('运行权限 UI 展示定时缺口、影响及真实回执，不把保存写成已应用', async () => {
   const ui = page(); await ui.settle()
   const rendered = ui.text(ui.render())
-  assert.match(rendered, /暂不支持定时任务的检测、防护闭环/)
+  assert.match(rendered, /定时任务暂不在此范围/)
+  assert.match(rendered, /展开范围与来源说明/)
   assert.match(rendered, /延迟和漏执行风险/)
-  assert.match(rendered, /未确认；到期许可不能用于受保护动作/)
+  assert.match(rendered, /待核对/)
   assert.match(rendered, /许可租期上限 2 秒/)
   assert.equal(ui.intervals.size, 1)
   ui.props.active = false; ui.render()
@@ -373,6 +380,17 @@ test('一级常驻页面从未激活进入时发起读取，慢响应不会被�
   assert.equal(statusCalls().length, 2)
 })
 
+test('状态刷新失败时旧事实在四视图中明确标记为历史读取', async () => {
+  let fail = false
+  const ui = page({ statusHandler: () => fail ? { ok: false, error: { message: '状态读取失败' } } : { ok: true, value: uiStatus() } })
+  await ui.settle()
+  fail = true; ui.button('刷新状态').props.onClick(); await ui.settle()
+  for (const tab of ['overview', 'identity', 'risk', 'authorization']) {
+    ui.tab(tab).props.onClick(); ui.render()
+    assert.match(ui.text(ui.render()), /上次成功读取的状态.*当前许可需重新核对/)
+  }
+})
+
 test('保存中离开统一网关，后台回执完成后返回清除忙状态并保留保存事实', async () => {
   let resolveSave, savedPayload, resolveOldStatus, holdStatus = false
   const saved = uiStatus('revision-saved'); saved.enabled = false; saved.configuration.enabled = false
@@ -383,13 +401,13 @@ test('保存中离开统一网关，后台回执完成后返回清除忙状态�
   const open = () => ui.nodes(ui.nodes().find(value => value.type === 'label' && ui.text(value) === '开放即时业务访问')).find(value => value.type === 'input')
   open().props.onChange({ target: { checked: false } }); ui.render()
   holdStatus = true; ui.button('刷新状态').props.onClick()
-  ui.nodes().find(value => value.type === 'form' && value.props['aria-label'] === '统一网关配置').props.onSubmit({ preventDefault() {} }); ui.render()
+  ui.nodes().find(value => value.type === 'form' && value.props['aria-label'] === '统一网关配置').props.onSubmit({ preventDefault() {} }); confirmPreview(ui)
   assert.equal(ui.button('刷新状态').props.disabled, true)
   ui.props.active = false; ui.render()
   assert.equal(ui.intervals.size, 0)
   resolveSave({ ok: true, value: saved }); await ui.settle()
   assert.equal(ui.button('刷新状态').props.disabled, false)
-  assert.equal(ui.button('放弃草稿并读取当前配置').props.disabled, true)
+  assert.equal(ui.button('放弃草稿并读取当前配置'), undefined)
   assert.equal(open().props.checked, false)
   assert.match(ui.text(ui.render()), /配置已保存/)
   resolveOldStatus({ ok: true, value: uiStatus() }); await ui.settle()
@@ -397,7 +415,7 @@ test('保存中离开统一网关，后台回执完成后返回清除忙状态�
   holdStatus = false; ui.props.active = true; ui.render(); await ui.settle()
   assert.equal(ui.button('刷新状态').props.disabled, false)
   assert.equal(open().props.checked, false)
-  assert.match(ui.text(ui.render()), /配置草稿与已保存内容一致/)
+  assert.equal(ui.button('保存业务访问配置'), undefined)
   assert.doesNotMatch(ui.text(ui.render()), /当前草稿已保留/)
   assert.equal(savedPayload.revision, 'revision-1')
   assert.equal(savedPayload.enabled, false)
@@ -411,10 +429,10 @@ test('外部更新和保存冲突均保留运行权限草稿，刷新不会静�
   textarea().props.onChange({ target: { value: draft } }); ui.render()
   ui.current(uiStatus('revision-2')); ui.conflict()
   const form = ui.nodes().find(value => value.type === 'form' && ui.nodes(value).some(node => node.type === 'textarea'))
-  form.props.onSubmit({ preventDefault() {} }); await ui.settle()
+  form.props.onSubmit({ preventDefault() {} }); confirmPreview(ui); await ui.settle()
   assert.equal(textarea().props.value, draft)
   assert.match(ui.text(ui.render()), /当前草稿已保留/)
-  assert.equal(ui.button('保存业务访问配置').props.disabled, true)
+  assert.equal(ui.button('预览配置').props.disabled, true)
   assert.equal(ui.calls.find(call => call.endpoint === 'mcp/control/saveConfiguration').payload.revision, 'revision-1')
   await ui.button('刷新状态').props.onClick(); await ui.settle()
   assert.equal(textarea().props.value, draft)
@@ -425,13 +443,17 @@ test('外部更新和保存冲突均保留运行权限草稿，刷新不会静�
 
 test('统一网关四视图边界明确，身份与配置分离，风险未知不冒充低风险', async () => {
   const ui = page(); await ui.settle()
-  assert.equal(ui.nodes().some(value => value.type === 'h1'), false, '页面内不重复显示一级菜单标题')
+  assert.equal(ui.nodes().find(value => value.type === 'h1' && ui.text(value) === '统一网关')?.type, 'h1')
   assert.deepEqual(ui.nodes().filter(value => value.props?.role === 'tab').map(value => ui.text(value)), ['运行概览', '智能体身份', '风险评估', '访问控制'])
   assert.equal(ui.tab('overview').props['aria-selected'], true)
   assert.equal(ui.nodes().filter(value => value.type === 'fieldset' && value.props.className !== 'harness-gateway-subject-picker').length, 0)
   assert.match(ui.text(ui.render()), /实例与身份回执/)
   ui.tab('identity').props.onClick(); ui.render()
   assert.deepEqual(ui.nodes().filter(value => value.type === 'legend').map(value => ui.text(value)), ['1．智能体身份'])
+  assert.match(ui.text(ui.render()), /安全运营专家/)
+  assert.match(ui.text(ui.render()), /代次/)
+  assert.match(ui.text(ui.render()), /待核对/)
+  assert.match(ui.text(ui.render()), /配置智能体身份与可信来源/)
   const identity = ui.nodes().find(value => value.type === 'fieldset')
   assert.ok(ui.nodes(identity).some(value => value.props?.['aria-label'] === '认证方式与凭据'))
   assert.ok(ui.nodes(identity).some(value => value.props?.['aria-label'] === '可信来源与身份状态'))
@@ -440,6 +462,9 @@ test('统一网关四视图边界明确，身份与配置分离，风险未知�
   assert.doesNotMatch(ui.text(ui.render()), /测试 fixture ID（可选）/)
   ui.tab('risk').props.onClick(); ui.render()
   const content = ui.text(ui.render())
+  assert.match(content, /当前没有可用于判断许可的评估事实/)
+  assert.match(content, /选择会话并辅助重评/)
+  assert.match(content, /查看评估依据（0）/)
   assert.match(content, /按业务事件实时自动评估各 Agent/)
   assert.doesNotMatch(content, /当前限制/)
   assert.match(content, /测试模拟提供方/)
@@ -458,6 +483,9 @@ test('统一网关四视图边界明确，身份与配置分离，风险未知�
   assert.match(ui.text(ui.render()), /评估已过期/)
   const overview = () => ui.nodes().find(node => node.props?.['data-summary'] === 'risk')
   assert.equal(ui.text(overview()), '评估已过期')
+  ui.tab('risk').props.onClick(); ui.render()
+  assert.match(ui.text(ui.render()), /当前评估已超过有效期/)
+  assert.match(ui.text(ui.render()), /不能据此推断访问已允许或已阻止/)
   value.riskFacts[0].expiresAt = future(); value.riskFacts[0].level = 'unknown'; value.riskFacts[0].status = 'unknown'
   ui.current(value); await ui.button('刷新状态').props.onClick(); await ui.settle()
   assert.equal(ui.text(overview()), '存在未知评估')
@@ -474,7 +502,7 @@ test('身份撤销和风险提供方共用草稿，三类配置保存保持原re
   ui.tab('risk').props.onClick(); ui.render()
   const providerLabel = ui.nodes().find(value => value.type === 'label' && ui.text(value) === 'Agent 风险评估提供方超时（毫秒）')
   ui.nodes(providerLabel).find(value => value.type === 'input').props.onChange({ target: { value: '950' } }); ui.render()
-  ui.nodes().find(value => value.type === 'form' && value.props['aria-label'] === '统一网关配置').props.onSubmit({ preventDefault() {} })
+  ui.nodes().find(value => value.type === 'form' && value.props['aria-label'] === '统一网关配置').props.onSubmit({ preventDefault() {} }); confirmPreview(ui)
   await ui.settle()
   const call = ui.calls.find(value => value.endpoint === 'mcp/control/saveConfiguration')
   assert.equal(call.payload.revision, 'revision-1')
@@ -509,7 +537,7 @@ test('访问范围从已登记操作选择服务与动作，刷新保留草稿�
   assert.equal(checkbox('允许访问的服务 1', 'reports').props.checked, true)
   assert.equal(checkbox('允许的动作 1', '写入（write）').props.checked, true)
   assert.equal(method().props.value, 'GET')
-  ui.nodes().find(value => value.type === 'form' && value.props['aria-label'] === '统一网关配置').props.onSubmit({ preventDefault() {} })
+  ui.nodes().find(value => value.type === 'form' && value.props['aria-label'] === '统一网关配置').props.onSubmit({ preventDefault() {} }); confirmPreview(ui)
   await ui.settle()
   const saved = ui.calls.find(value => value.endpoint === 'mcp/control/saveConfiguration').payload
   assert.deepEqual(Array.from(saved.agents[0].serverIds), ['inspection', 'reports'])
@@ -558,6 +586,27 @@ test('统一网关四视图切换保留草稿，运行概览仅在首页呈现',
   assert.equal(ui.calls.some(value => value.endpoint === 'mcp/control/saveConfiguration'), false)
 })
 
+test('访问控制按单个智能体编辑，预览与确认保存分开', async () => {
+  const ui = page(); await ui.settle()
+  assert.ok(ui.nodes().some(value => value.props?.className === 'harness-gateway-mobile-status'))
+  assert.ok(ui.nodes().some(value => value.props?.className === 'harness-table-scroll harness-gateway-overview-table'))
+  ui.tab('authorization').props.onClick(); ui.render()
+  assert.equal(ui.nodes().find(value => value.type === 'select' && value.props['aria-label'] === '业务智能体')?.props.value, '0')
+  assert.ok(ui.nodes().some(value => value.props?.className === 'harness-gateway-switch-row'))
+  const open = ui.nodes().find(value => value.type === 'label' && ui.text(value) === '开放即时业务访问')
+  ui.nodes(open).find(value => value.type === 'input').props.onChange({ target: { checked: false } }); ui.render()
+  const form = () => ui.nodes().find(value => value.type === 'form' && value.props['aria-label'] === '统一网关配置')
+  form().props.onSubmit({ preventDefault() {} }); ui.render()
+  assert.ok(ui.nodes().some(value => value.props?.role === 'dialog'))
+  assert.equal(ui.calls.some(value => value.endpoint === 'mcp/control/saveConfiguration'), false)
+  ui.button('返回修改').props.onClick(); ui.render()
+  assert.equal(ui.nodes().some(value => value.props?.role === 'dialog'), false)
+  assert.equal(ui.calls.some(value => value.endpoint === 'mcp/control/saveConfiguration'), false)
+  form().props.onSubmit({ preventDefault() {} }); confirmPreview(ui); await ui.settle()
+  assert.equal(ui.calls.filter(value => value.endpoint === 'mcp/control/saveConfiguration').length, 1)
+  assert.equal(ui.calls.find(value => value.endpoint === 'mcp/control/saveConfiguration').payload.enabled, false)
+})
+
 test('运行限制可多选已获准用户，按用户分别收紧且多选不携带 Session ID', async () => {
   const ui = page(); await ui.settle()
   const status = uiStatus()
@@ -587,7 +636,7 @@ test('跨页保存先校验隐藏配置并定位错误页，HTTP 探测仅发送
   const endpoint = ui.nodes().find(value => value.type === 'input' && value.props['data-gateway-field'] === 'authentication-endpoint')
   endpoint.props.onChange({ target: { value: 'ftp://invalid' } }); ui.render()
   ui.tab('risk').props.onClick(); ui.render()
-  ui.button('保存业务访问配置').props.onClick(); ui.render()
+  ui.button('预览配置').props.onClick(); ui.render()
   assert.equal(ui.tab('identity').props['aria-selected'], true)
   assert.match(ui.text(ui.render()), /提供方地址必须是无凭据/)
   assert.equal(ui.calls.some(value => value.endpoint === 'mcp/control/saveConfiguration'), false)
@@ -605,6 +654,8 @@ test('空配置仍有三类功能和首个 Agent 配置入口，不假造实例�
   const empty = uiStatus()
   empty.enabled = false; empty.configuration.enabled = false; empty.configuration.agents = []; empty.instances = []; empty.agentStatuses = []
   ui.current(empty); await ui.button('刷新状态').props.onClick(); await ui.settle()
+  assert.match(ui.text(ui.render()), /配置尚无目标实例/)
+  assert.doesNotMatch(ui.text(ui.render()), /配置 0\/0 已应用/)
   ui.tab('identity').props.onClick(); ui.render()
   assert.match(ui.text(ui.render()), /尚未配置业务 Agent/)
   assert.match(ui.text(ui.render()), /尚无评估/)
@@ -652,7 +703,7 @@ test('选择器复用资产列表，搜索保留已选值，更换身份不继�
   ui.tab('identity').props.onClick(); ui.render()
   await ui.button('刷新状态').props.onClick(); await ui.settle()
   assert.equal(selector().props.value, 'helper')
-  ui.nodes().find(value => value.type === 'form' && value.props['aria-label'] === '统一网关配置').props.onSubmit({ preventDefault() {} }); await ui.settle()
+  ui.nodes().find(value => value.type === 'form' && value.props['aria-label'] === '统一网关配置').props.onSubmit({ preventDefault() {} }); confirmPreview(ui); await ui.settle()
   assert.equal(saved.agents[0].agentId, 'helper')
   assert.equal(saved.agents[0].enabled, false)
   assert.equal(Object.hasOwn(saved.agents[0], 'name'), false)

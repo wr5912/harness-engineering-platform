@@ -1,0 +1,85 @@
+{
+  "checked_at": "2026-10-21T03:42:06.040Z",
+  "checks": [
+    {
+      "name": "创建默认模型为业务统一默认",
+      "passed": true
+    },
+    {
+      "name": "来源说明含真实 Run 标题与验证范围",
+      "passed": true
+    },
+    {
+      "name": "执行失败与业务结论分开",
+      "passed": true
+    },
+    {
+      "name": "来源记录与核对时间可见",
+      "passed": true
+    },
+    {
+      "name": "创建预览使用目标实例和来源",
+      "passed": true
+    },
+    {
+      "name": "创建预览展示验证范围",
+      "passed": true
+    },
+    {
+      "name": "创建预览冻结执行状态与核对时间",
+      "passed": true
+    },
+    {
+      "name": "创建预览手机无横向溢出",
+      "passed": true
+    },
+    {
+      "name": "返回修改保留实例名",
+      "passed": true
+    },
+    {
+      "name": "返回修改保留来源",
+      "passed": true
+    },
+    {
+      "name": "停止预览有现场状态与时间",
+      "passed": true
+    },
+    {
+      "name": "停止预览有保留影响",
+      "passed": true
+    },
+    {
+      "name": "停止预览手机无横向溢出",
+      "passed": true
+    },
+    {
+      "name": "取消停止后保持运行",
+      "passed": true
+    },
+    {
+      "name": "浏览器无脚本错误",
+      "passed": true
+    },
+    {
+      "name": "没有 5xx 响应",
+      "passed": true
+    }
+  ],
+  "page_errors": [],
+  "failed_responses": [],
+  "screenshots": [
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/final-instances-list-1440-20261021.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/final-instance-create-1440-20261021.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/final-instance-preview-1440-20261021.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/final-instance-preview-390-20261021.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/final-instance-stop-390-20261021.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/final-instance-stop-1440-20261021.png"
+  ],
+  "facts": {
+    "source": "最近评测执行失败\nEXP-test01-002 · 身份装载\n验证范围：1 项已选用例 · 1 通过 / 0 未通过 / 0 无法判定\nRun 记录于 2026/10/15 17:59:33 · 核对于 2026/10/21 11:42:20\n重新核对评测\n创建实例不代表业务验证通过。",
+    "default_model": "[\"xiaomi-token-plan-cn\",\"mimo-v2.6-flash\"]",
+    "create_preview": "确认创建业务实例\n\n核对来源、影响对象和验证范围后再执行。\n\n×\nui-preview-only-20261021\n来源智能体\ntest01\n来源版本\ntest01 · EXP-test01-002\n运行方式\n新增一个独立的本地实例\n验证范围\n1 项已选用例\n最近 Run：最近评测执行失败 · 1 通过 / 0 未通过 / 0 无法判定 · 记录于 2026/10/15 17:59:33 · 核对于 2026/10/21 11:42:20\n实例默认模型\nxiaomi-token-plan-cn · MiMo-V2.6-Flash\n访问端口\n127.0.0.1:31892\n执行后的影响\n新增独立业务访问入口 127.0.0.1:31892。\n现有 1 个运行中业务实例保持当前状态。\n创建不代表业务验证通过；请按来源版本的评测范围核对结果。\n技术详情 · 操作参数\n返回修改\n确认创建",
+    "stop_preview": "停止业务实例？\n\n这是对业务实例的操作，不会取消独立的评测任务。\n\n×\nui-model-acceptance-20261021\n智能体\ntest01\n登记来源版本\ntest01 · EXP-test01-001\n本次预览状态\n运行中\n观察于 2026/10/21 11:42:25\n影响入口\n127.0.0.1:31891\n业务访问将中断\n进行中的业务请求可能终止，需要再次启动后恢复访问。\n数据与任务影响\n保留实例配置和 HOME 数据。\n已有运行记录：保留；来源版本不会因停止实例而删除。\n独立评测任务不在本次停止范围内。\n技术详情 · 操作参数\n保持运行\n确认停止"
+  }
+}

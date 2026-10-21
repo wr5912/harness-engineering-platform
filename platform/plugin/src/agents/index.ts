@@ -30,6 +30,7 @@ import { caseSourceReferences, createCaseManagementHandler, type RunCaseSource }
 import { readAssetDiff, readFixedAsset } from './asset-diff.ts'
 import { createAgent } from './create-agent.ts'
 import { createComputeVariantsHandler } from './compute-variants.ts'
+import { createTrainingServersHandler } from './training-servers.ts'
 import { createComputeBuildHandler } from './compute-build.ts'
 import { createComputeFreezeHandler } from './compute-freeze.ts'
 import { programRoot, workspaceConfigPath } from '../workspace.ts'
@@ -1056,7 +1057,7 @@ async function createExperiment(root: string, payload: JsonMap) {
     wroteCatalogHash = writeCatalog(root, nextCatalog, optionalString(payload, 'catalog_sha256') ?? currentCatalog.hash)
     const validation = commandJson(root, [VALIDATE_EXPERIMENT, `evolution/experiments/${experimentId}`])
     commandJson(root, [SOURCE_CONTRACT, '--source', `experiment:${experimentId}`])
-    const dryRun = commandJson(root, [DSH_EVAL, '--source', `experiment:${experimentId}`, '--mode', 'fast', '--executor', 'api', '--review', 'none', '--dry-run'])
+    const dryRun = commandJson(root, [DSH_EVAL, '--source', `experiment:${experimentId}`, '--mode', 'fast', '--executor', 'api', '--review', 'none', '--dry-run', '--source-check'])
     return ok({ experiment_id: experimentId, path: `evolution/experiments/${experimentId}`, source_catalog_sha256: catalog(root).hash, validation, dry_run: dryRun, dependency_reuse: dependencyReuse })
   } catch (error) {
     if (wroteCatalogHash) {
@@ -1249,9 +1250,10 @@ async function validateDraft(root: string, payload: JsonMap, drafts: { rel: stri
         throw new RpcError('invalid_request', 'JavaScript 草稿语法校验失败', { path: draft.rel, checker: 'node --check', reason: redact(reason || 'Node 语法检查未通过') })
       }
     }
-    const result = await parseJsonCommandAsync(temp, [DSH_EVAL, '--source', `experiment:${experimentId}`, '--dry-run', '--mode', 'full', '--executor', 'api', '--review', 'none'], '草稿 dry 校验失败', signal)
-    return { mode: 'dry', checks: ['草稿格式', ...(javascriptDrafts.length ? ['JavaScript 语法（仅本次草稿）'] : []), '来源合同', '评测计划'], case_ids: result.case_ids,
-      missing_env_names: result.missing_env_names, note: '未执行 Candidate 代码、模型或业务工具，未启动实例或创建 Run。' }
+    const result = await parseJsonCommandAsync(temp, [DSH_EVAL, '--source', `experiment:${experimentId}`, '--dry-run', '--source-check', '--mode', 'full', '--executor', 'api', '--review', 'none'], '草稿 dry 校验失败', signal)
+    return { mode: 'dry', preflight_scope: result.preflight_scope,
+      checks: ['草稿格式', ...(javascriptDrafts.length ? ['JavaScript 语法（仅本次草稿）'] : []), '来源合同', '评测计划'], case_ids: result.case_ids,
+      missing_env_names: result.missing_env_names, note: '已核对来源与用例；未核对运行模型连接，未执行 Candidate 代码或业务工具，未启动实例或创建 Run。' }
   } finally { rmSync(temp, { recursive: true, force: true }) }
 }
 
@@ -1572,6 +1574,7 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
       return result.value
     },
   })
+  const trainingServers = createTrainingServersHandler(root)
   const caseManagement = createCaseManagementHandler(root, {
     applyEvaluation: async (id, content, hash, signal) => {
       const result = await applyEdit(root, { experiment_id: id, edits: [{ path: 'evaluation.md', content, expected_sha256: hash }] }, signal)
@@ -1589,6 +1592,7 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
     try {
       const body = payload === undefined ? {} : requireObject(payload)
       if (endpoint.startsWith('datasets/')) return ok(await datasets(endpoint, body, signal))
+      if (endpoint.startsWith('training-servers/')) return trainingServers(endpoint.slice('training-servers/'.length), body, signal, peer)
       if (endpoint.startsWith('compute-variants/')) {
         const method = endpoint.slice('compute-variants/'.length)
         const result = ['build-preview', 'build'].includes(method) ? await computeBuild(method === 'build-preview' ? 'preview' : 'build', body, signal)
@@ -1640,6 +1644,14 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
         case 'cases/create': return await caseManagement(endpoint, body, signal, peer)
         case 'eval/preview': return await evalPreview(root, body, signal)
         case 'eval/start': return ok(jobs.start(body))
+        case 'eval/list': return ok({ jobs: jobs.list().map(job => {
+          const experimentId = job.source.startsWith('experiment:') ? job.source.slice('experiment:'.length) : null
+          let agentId: string | null = null
+          if (experimentId && EXP_ID.test(experimentId)) {
+            try { agentId = experimentInfo(root, experimentId).agent_id } catch { /* 来源可能已移除，原 Job 仍可查询。 */ }
+          }
+          return { ...job, experiment_id: experimentId, agent_id: agentId }
+        }) })
         case 'eval/status': return ok(jobs.status(stringField(body, 'job_id')))
         case 'eval/cancel': return ok(jobs.cancel(stringField(body, 'job_id')))
         case 'runs/index': return await runRecord(root, 'index', body, signal)

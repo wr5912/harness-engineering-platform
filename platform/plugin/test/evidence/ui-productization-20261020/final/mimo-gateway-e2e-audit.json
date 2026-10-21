@@ -1,0 +1,27 @@
+{
+  "checkedAt": "2026-10-21T04:11:07.024388+00:00",
+  "scope": "3091 隔离平台 + 现有 31893 MiMo/off 业务实例的统一网关真实请求可行性",
+  "result": "blocked_by_current_configuration",
+  "e2eRequestSent": false,
+  "preflight": {
+    "platformPort": 3091,
+    "platformHttpStatus": 303,
+    "businessInstance": "mimo-gui-e2e-20261021",
+    "businessInstancePort": 31893,
+    "businessInstanceHttpStatus": 200,
+    "businessInstanceSource": "experiment:EXP-security-operations-expert-023-r2233d74f6fb3",
+    "businessInstanceBusinessControlRegistered": false,
+    "businessInstanceWebBasePath": "/assistant/",
+    "gatewayEnabled": false,
+    "gatewayRegisteredInstanceIds": [
+      "security-operations-expert-business-mock"
+    ],
+    "targetRegisteredInGateway": false
+  },
+  "contract": "applyBusinessGateway 在配置 disabled 时不启动监听；resolveBusinessInstance 要求实例 manifest 的 business_control 中有 runtime_generation 和 source_digest；业务请求必须经网关完成身份、实例、策略与 Runtime 签名核对。",
+  "decision": "现有实例缺少受信业务接入登记，且 3091 网关未启用、登记对象也不是该实例。直接访问 31893 的原生 Session 只能证明 DSH 和 MiMo，不能证明统一网关。此轮禁止新建重型实例，故不修改配置、不绕过控制、不发送业务请求。",
+  "verificationBoundary": "只完成配置/进程/HTTP 预检；未验证 GUI/RPC→网关→实例→模型→回执。",
+  "repoChanged": false,
+  "formal3090Touched": false,
+  "credentialsCaptured": false
+}

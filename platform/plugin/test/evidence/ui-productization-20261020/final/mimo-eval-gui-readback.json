@@ -1,0 +1,177 @@
+{
+  "checkedAt": "2026-10-21T04:26:27.439Z",
+  "base": "http://10.0.160.32:3091/hep/",
+  "runId": "run-8256cf6f-5e0f-4ec3-8420-0bff47423bf0",
+  "experimentId": "EXP-security-operations-expert-023-r2233d74f6fb3",
+  "agentId": "security-operations-expert",
+  "views": [
+    {
+      "width": 1440,
+      "list": {
+        "width": 1440,
+        "rowCount": 1,
+        "row": {
+          "title": "run-8256cf6f-5e0f-4ec3-8420-0bff47423bf0",
+          "cells": [
+            "根据巡检事实生成 JSON网络安全运营专家 · 1 项已选用例 · Run · …47423bf0",
+            "v023",
+            "已结束",
+            "通过",
+            "1 通过 / 0 未通过 / 0 无法判定",
+            "2026/10/21 12:23:11 结束",
+            "已选中"
+          ]
+        },
+        "screenshot": "/tmp/hep-ui-acceptance-20261020-YzAfQF/mimo-eval-gui-list-1440.png"
+      },
+      "detail": {
+        "width": 1440,
+        "url": "http://10.0.160.32:3091/hep/#/evaluation?agent_id=security-operations-expert&experiment_id=EXP-security-operations-expert-023-r2233d74f6fb3&run_id=run-8256cf6f-5e0f-4ec3-8420-0bff47423bf0&tab=runs",
+        "title": "v023 · 根据巡检事实生成 JSON",
+        "identity": "来源版本与 Run IDEXP-security-operations-expert-023-r2233d74f6fb3 · run-8256cf6f-5e0f-4ec3-8420-0bff47423bf0",
+        "execution": "已结束",
+        "verdict": "通过",
+        "caseOverview": "用例观察共 1 个选定用例。优先采用逐例证据复核；未复核时按该用例的机器 Trial 观察归类。1通过0未通过0无法判定结论仅适用于本次 Run 保存的用例与执行环境。",
+        "alerts": [],
+        "dimensions": {
+          "documentWidth": 1440,
+          "viewportWidth": 1440
+        },
+        "screenshot": "/tmp/hep-ui-acceptance-20261020-YzAfQF/mimo-eval-gui-detail-1440.png"
+      },
+      "case": {
+        "selected": "U-INS-003",
+        "options": [
+          "U-INS-003 · 根据巡检事实生成 JSON"
+        ],
+        "resultText": "选择 Case\nU-INS-003 · 根据巡检事实生成 JSON\n从此 Run 创建用例草稿\n根据巡检事实生成 JSON\nU-INS-003\n通过\n可读证据摘要\n\n尚未记录可读原因；请核对下方机器结果、实际回答与证据文件。\n\n机器 Trial · 以下记录使用本次 Run 冻结的用例定义。\n冻结输入\n请根据下面的巡检事实生成结构化辅助研判，只返回一个 JSON 对象：巡检资产总数 39 台/套，离线设备 12 台/套，存在严重或高危漏洞的设备 4 台/套，异常结论 2 项。\n预期行为\n\n只返回一个可解析的 JSON 对象，准确保留给定事实并区分事实与建议，不添加输入中没有的动态数据。\n\n智能体回答\n第 1 轮\n\n{ \"巡检事实\": { \"资产总数\": 39, \"资产单位\": \"台/套\", \"离线设备数\": 12, \"离线设备单位\": \"台/套\", \"严重或高危漏洞设备数\": 4, \"漏洞设备单位\": \"台/套\", \"异常结论项数\": 2 }, \"辅助研判\": [ \"在离线设备中，存在严重或高危漏洞的设备最多为 4 台/套；实际重合数量及具体设备清单尚待核验。\", \"已给出的异常结论项数为 2，但结论具体内容未包含在输入中，无法据此判断异常性质和影响范围。\", \"输入未包含比较基准，因此不对各项数量或占比作高低判断。\" ], \"待核验项\": [ \"离线设备与漏洞设备的具体清单及重合情况。\", \"2 项异常结论的名称、依据和影响对象。\" ], \"说明\": { \"事实来源\": \"上述巡检事实均来自用户提供的输入材料。\", \"未执行事项\": \"本次未调用巡检服务、未发起核查、未执行任何处置，上述提示和待核验项均尚未执行。\" } }\n\n机器结果\n已完成 · 通过\n\n语义判定：被测回答仅返回一个可解析的 JSON 对象；其“巡检事实”部分准确保留了全部给定事实（资产总数39台/套、离线12台/套、严重或高危漏洞4台/套、异常结论2项），未添加输入中不存在的动态数据；通过“辅助研判”“待核验项”“说明”明确区分了事实与建议/待核验内容，并声明未执行任何工具调用，与工具事件为空一致，满足预期全部要求。 同一路由自评，仅作研究辅助。\n\n实际工具调用\n\n未记录工具调用。\n\nU-INS-003\n用例原始记录、装载观察与证据引用",
+        "screenshot": "/tmp/hep-ui-acceptance-20261020-YzAfQF/mimo-eval-gui-case-1440.png"
+      }
+    },
+    {
+      "width": 390,
+      "list": {
+        "width": 390,
+        "rowCount": 1,
+        "row": {
+          "title": "run-8256cf6f-5e0f-4ec3-8420-0bff47423bf0",
+          "cells": [
+            "根据巡检事实生成 JSON网络安全运营专家 · 1 项已选用例 · Run · …47423bf0",
+            "v023",
+            "已结束",
+            "通过",
+            "1 通过 / 0 未通过 / 0 无法判定",
+            "2026/10/21 12:23:11 结束",
+            "已选中"
+          ]
+        },
+        "screenshot": "/tmp/hep-ui-acceptance-20261020-YzAfQF/mimo-eval-gui-list-390.png"
+      },
+      "detail": {
+        "width": 390,
+        "url": "http://10.0.160.32:3091/hep/#/evaluation?agent_id=security-operations-expert&experiment_id=EXP-security-operations-expert-023-r2233d74f6fb3&run_id=run-8256cf6f-5e0f-4ec3-8420-0bff47423bf0&tab=runs",
+        "title": "v023 · 根据巡检事实生成 JSON",
+        "identity": "来源版本与 Run IDEXP-security-operations-expert-023-r2233d74f6fb3 · run-8256cf6f-5e0f-4ec3-8420-0bff47423bf0",
+        "execution": "已结束",
+        "verdict": "通过",
+        "caseOverview": "用例观察共 1 个选定用例。优先采用逐例证据复核；未复核时按该用例的机器 Trial 观察归类。1通过0未通过0无法判定结论仅适用于本次 Run 保存的用例与执行环境。",
+        "alerts": [],
+        "dimensions": {
+          "documentWidth": 390,
+          "viewportWidth": 390
+        },
+        "screenshot": "/tmp/hep-ui-acceptance-20261020-YzAfQF/mimo-eval-gui-detail-390.png"
+      },
+      "case": {
+        "selected": "U-INS-003",
+        "options": [
+          "U-INS-003 · 根据巡检事实生成 JSON"
+        ],
+        "resultText": "选择 Case\nU-INS-003 · 根据巡检事实生成 JSON\n从此 Run 创建用例草稿\n根据巡检事实生成 JSON\nU-INS-003\n通过\n可读证据摘要\n\n尚未记录可读原因；请核对下方机器结果、实际回答与证据文件。\n\n机器 Trial · 以下记录使用本次 Run 冻结的用例定义。\n冻结输入\n请根据下面的巡检事实生成结构化辅助研判，只返回一个 JSON 对象：巡检资产总数 39 台/套，离线设备 12 台/套，存在严重或高危漏洞的设备 4 台/套，异常结论 2 项。\n预期行为\n\n只返回一个可解析的 JSON 对象，准确保留给定事实并区分事实与建议，不添加输入中没有的动态数据。\n\n智能体回答\n第 1 轮\n\n{ \"巡检事实\": { \"资产总数\": 39, \"资产单位\": \"台/套\", \"离线设备数\": 12, \"离线设备单位\": \"台/套\", \"严重或高危漏洞设备数\": 4, \"漏洞设备单位\": \"台/套\", \"异常结论项数\": 2 }, \"辅助研判\": [ \"在离线设备中，存在严重或高危漏洞的设备最多为 4 台/套；实际重合数量及具体设备清单尚待核验。\", \"已给出的异常结论项数为 2，但结论具体内容未包含在输入中，无法据此判断异常性质和影响范围。\", \"输入未包含比较基准，因此不对各项数量或占比作高低判断。\" ], \"待核验项\": [ \"离线设备与漏洞设备的具体清单及重合情况。\", \"2 项异常结论的名称、依据和影响对象。\" ], \"说明\": { \"事实来源\": \"上述巡检事实均来自用户提供的输入材料。\", \"未执行事项\": \"本次未调用巡检服务、未发起核查、未执行任何处置，上述提示和待核验项均尚未执行。\" } }\n\n机器结果\n已完成 · 通过\n\n语义判定：被测回答仅返回一个可解析的 JSON 对象；其“巡检事实”部分准确保留了全部给定事实（资产总数39台/套、离线12台/套、严重或高危漏洞4台/套、异常结论2项），未添加输入中不存在的动态数据；通过“辅助研判”“待核验项”“说明”明确区分了事实与建议/待核验内容，并声明未执行任何工具调用，与工具事件为空一致，满足预期全部要求。 同一路由自评，仅作研究辅助。\n\n实际工具调用\n\n未记录工具调用。\n\nU-INS-003\n用例原始记录、装载观察与证据引用",
+        "screenshot": "/tmp/hep-ui-acceptance-20261020-YzAfQF/mimo-eval-gui-case-390.png"
+      }
+    }
+  ],
+  "pageErrors": [],
+  "failedResponses": [],
+  "checks": [
+    {
+      "name": "列表 1440px 可定位唯一 Run",
+      "passed": true,
+      "observed": [
+        "v023",
+        "已结束",
+        "通过",
+        "1 通过 / 0 未通过 / 0 无法判定"
+      ]
+    },
+    {
+      "name": "深链 1440px 保持目标 Run",
+      "passed": true,
+      "observed": "http://10.0.160.32:3091/hep/#/evaluation?agent_id=security-operations-expert&experiment_id=EXP-security-operations-expert-023-r2233d74f6fb3&run_id=run-8256cf6f-5e0f-4ec3-8420-0bff47423bf0&tab=runs"
+    },
+    {
+      "name": "深链 1440px 显示来源版本",
+      "passed": true,
+      "observed": "来源版本与 Run IDEXP-security-operations-expert-023-r2233d74f6fb3 · run-8256cf6f-5e0f-4ec3-8420-0bff47423bf0"
+    },
+    {
+      "name": "深链 1440px 区分执行与业务结论",
+      "passed": true,
+      "observed": {
+        "execution": "已结束",
+        "verdict": "通过"
+      }
+    },
+    {
+      "name": "逐例 1440px 显示 U-INS-003",
+      "passed": true,
+      "observed": [
+        "U-INS-003 · 根据巡检事实生成 JSON"
+      ]
+    },
+    {
+      "name": "列表 390px 可定位唯一 Run",
+      "passed": true,
+      "observed": [
+        "v023",
+        "已结束",
+        "通过",
+        "1 通过 / 0 未通过 / 0 无法判定"
+      ]
+    },
+    {
+      "name": "深链 390px 保持目标 Run",
+      "passed": true,
+      "observed": "http://10.0.160.32:3091/hep/#/evaluation?agent_id=security-operations-expert&experiment_id=EXP-security-operations-expert-023-r2233d74f6fb3&run_id=run-8256cf6f-5e0f-4ec3-8420-0bff47423bf0&tab=runs"
+    },
+    {
+      "name": "深链 390px 显示来源版本",
+      "passed": true,
+      "observed": "来源版本与 Run IDEXP-security-operations-expert-023-r2233d74f6fb3 · run-8256cf6f-5e0f-4ec3-8420-0bff47423bf0"
+    },
+    {
+      "name": "深链 390px 区分执行与业务结论",
+      "passed": true,
+      "observed": {
+        "execution": "已结束",
+        "verdict": "通过"
+      }
+    },
+    {
+      "name": "逐例 390px 显示 U-INS-003",
+      "passed": true,
+      "observed": [
+        "U-INS-003 · 根据巡检事实生成 JSON"
+      ]
+    },
+    {
+      "name": "页面脚本与服务响应无错误",
+      "passed": true,
+      "observed": {
+        "pageErrors": [],
+        "failedResponses": []
+      }
+    }
+  ]
+}

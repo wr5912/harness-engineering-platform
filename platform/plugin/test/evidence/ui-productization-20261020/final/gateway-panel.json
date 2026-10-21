@@ -1,0 +1,219 @@
+{
+  "results": [
+    {
+      "name": "gateway-desktop.png",
+      "width": 1440,
+      "height": 1000,
+      "h1": "统一网关",
+      "h1Y": 137,
+      "h2": [
+        "运行概览"
+      ],
+      "actions": [
+        "刷新状态",
+        "运行概览",
+        "智能体身份",
+        "风险评估",
+        "访问控制",
+        "查看风险评估",
+        "收紧所选用户的动作",
+        "辅助重评当前 Session"
+      ],
+      "nav": [
+        "首页",
+        "管理对话",
+        "智能体管理",
+        "评测中心",
+        "实例管理",
+        "统一网关",
+        "MCP 管理"
+      ],
+      "contentTop": 76,
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "documentHeight": 1000,
+      "viewportHeight": 1000,
+      "dark": false,
+      "activeLink": "统一网关",
+      "panelGap": 0
+    },
+    {
+      "name": "gateway-mobile.png",
+      "width": 390,
+      "height": 844,
+      "h1": "统一网关",
+      "h1Y": 78,
+      "h2": [
+        "运行概览"
+      ],
+      "actions": [
+        "刷新状态",
+        "运行概览",
+        "智能体身份",
+        "风险评估",
+        "访问控制",
+        "查看风险评估",
+        "收紧所选用户的动作",
+        "辅助重评当前 Session"
+      ],
+      "nav": [],
+      "contentTop": 62,
+      "documentWidth": 390,
+      "viewportWidth": 390,
+      "documentHeight": 844,
+      "viewportHeight": 844,
+      "dark": false,
+      "activeLink": "统一网关",
+      "panelGap": 0
+    },
+    {
+      "name": "gateway-1366x768.png",
+      "width": 1366,
+      "height": 768,
+      "h1": "统一网关",
+      "h1Y": 137,
+      "h2": [
+        "运行概览"
+      ],
+      "actions": [
+        "刷新状态",
+        "运行概览",
+        "智能体身份",
+        "风险评估",
+        "访问控制",
+        "查看风险评估",
+        "收紧所选用户的动作",
+        "辅助重评当前 Session"
+      ],
+      "nav": [
+        "首页",
+        "管理对话",
+        "智能体管理",
+        "评测中心",
+        "实例管理",
+        "统一网关",
+        "MCP 管理"
+      ],
+      "contentTop": 76,
+      "documentWidth": 1366,
+      "viewportWidth": 1366,
+      "documentHeight": 768,
+      "viewportHeight": 768,
+      "dark": false,
+      "activeLink": "统一网关",
+      "panelGap": 0
+    },
+    {
+      "name": "gateway-901x1000.png",
+      "width": 901,
+      "height": 1000,
+      "h1": "统一网关",
+      "h1Y": 127,
+      "h2": [
+        "运行概览"
+      ],
+      "actions": [
+        "刷新状态",
+        "运行概览",
+        "智能体身份",
+        "风险评估",
+        "访问控制",
+        "查看风险评估",
+        "收紧所选用户的动作",
+        "辅助重评当前 Session"
+      ],
+      "nav": [],
+      "contentTop": 66,
+      "documentWidth": 901,
+      "viewportWidth": 901,
+      "documentHeight": 1000,
+      "viewportHeight": 1000,
+      "dark": false,
+      "activeLink": "统一网关",
+      "panelGap": 0
+    },
+    {
+      "name": "gateway-900x1000.png",
+      "width": 900,
+      "height": 1000,
+      "h1": "统一网关",
+      "h1Y": 127,
+      "h2": [
+        "运行概览"
+      ],
+      "actions": [
+        "刷新状态",
+        "运行概览",
+        "智能体身份",
+        "风险评估",
+        "访问控制",
+        "查看风险评估",
+        "收紧所选用户的动作",
+        "辅助重评当前 Session"
+      ],
+      "nav": [],
+      "contentTop": 66,
+      "documentWidth": 900,
+      "viewportWidth": 900,
+      "documentHeight": 1000,
+      "viewportHeight": 1000,
+      "dark": false,
+      "activeLink": "统一网关",
+      "panelGap": 0
+    },
+    {
+      "name": "gateway-899x1000.png",
+      "width": 899,
+      "height": 1000,
+      "h1": "统一网关",
+      "h1Y": 127,
+      "h2": [
+        "运行概览"
+      ],
+      "actions": [
+        "刷新状态",
+        "运行概览",
+        "智能体身份",
+        "风险评估",
+        "访问控制",
+        "查看风险评估",
+        "收紧所选用户的动作",
+        "辅助重评当前 Session"
+      ],
+      "nav": [],
+      "contentTop": 66,
+      "documentWidth": 899,
+      "viewportWidth": 899,
+      "documentHeight": 1000,
+      "viewportHeight": 1000,
+      "dark": false,
+      "activeLink": "统一网关",
+      "panelGap": 0
+    },
+    {
+      "name": "gateway-desktop-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "dark": true,
+      "innerWidth": 1440,
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "foreground": "rgb(249, 250, 251)",
+      "background": "color(srgb 0.0798824 0.0936471 0.111255)",
+      "h1": "统一网关"
+    },
+    {
+      "name": "gateway-mobile-dark.png",
+      "width": 390,
+      "height": 844,
+      "dark": true,
+      "innerWidth": 390,
+      "documentWidth": 390,
+      "viewportWidth": 390,
+      "foreground": "rgb(249, 250, 251)",
+      "background": "color(srgb 0.0798824 0.0936471 0.111255)",
+      "h1": "统一网关"
+    }
+  ],
+  "errors": []
+}

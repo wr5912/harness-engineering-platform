@@ -255,7 +255,26 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
         const path = safe(root, `${relative(root, dir)}/${run}/run.yaml`)
         if (!existsSync(path)) continue
         const manifest = loadYaml(readFileSync(path, 'utf8')) as Map
-        if (['completed', 'failed', 'cancelled'].includes(manifest?.status)) runs.push({ run_id: run, experiment_id: item.name, status: manifest.status, created_at: manifest.created_at })
+        if (!['completed', 'failed', 'cancelled'].includes(manifest?.status)) continue
+        const row: Map = { run_id: run, experiment_id: item.name, status: manifest.status, created_at: manifest.created_at }
+        const runDir = relative(root, dir) + `/${run}`
+        try {
+          const lock = JSON.parse(readFileSync(safe(root, `${runDir}/inputs.lock.json`), 'utf8'))
+          if (lock.run_id === run && Array.isArray(lock.evaluation_cases)) {
+            const titles = lock.evaluation_cases.map((entry: Map) => entry?.title).filter((title: unknown) => typeof title === 'string' && title.trim()) as string[]
+            if (titles.length === 1 && lock.evaluation_cases.length === 1) row.title = titles[0].trim()
+            else if (titles.length) row.title = `${titles[0].trim()}等 ${lock.evaluation_cases.length} 项任务`
+            else if (lock.evaluation_cases.length) row.title = `覆盖 ${lock.evaluation_cases.length} 项评测任务`
+          }
+        } catch { /* 冻结用例不可读时保留 Run 身份，不猜测任务标题。 */ }
+        if (manifest.status === 'completed') try {
+          const summaryContent = readFileSync(safe(root, `${runDir}/summary.json`))
+          if (manifest.summary_sha256 && hash(summaryContent) !== manifest.summary_sha256) throw new Error('summary digest mismatch')
+          const summary = JSON.parse(summaryContent.toString())
+          const verdict = summary.effective_verdict ?? summary.machine_overall_verdict ?? summary.overall_verdict
+          if (summary.run_id === run && ['passed', 'failed', 'inconclusive'].includes(verdict)) row.effective_verdict = verdict
+        } catch { /* 执行已结束但业务结论不可读时保持未知。 */ }
+        runs.push(row)
       }
     }
     const commit = head(root), digest = services.candidateDigest(id)
@@ -420,6 +439,7 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
           if ((graphs.executions.length || graphs.unknown_reasons.length) && !usage.model_calls_complete) {
             graphUsageComplete = false
             issues(`${caseId} 关联图或实际模型请求的完整性未知`)
+            resourceLimits.push(`${runId}/${caseId}: 关联图或实际模型请求的完整性未知`)
           }
           if (plan.measurement_schema_version === 2) {
             metrics.values.actual_model_calls = usage.actual_model_calls

@@ -11,6 +11,7 @@ import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { build } from 'esbuild'
 import { createAssistant, redactAssistant } from '../src/assistant/index.ts'
+import { createInstancesHandler } from '../src/instances/index.ts'
 import { managementSkills } from '../src/assistant/business-assets.ts'
 import { assistantMcp } from '../src/assistant/mcp.ts'
 import { applyTaskAssembly } from '../src/tasks/assembly.ts'
@@ -58,7 +59,18 @@ function fixture(t, responder, root) {
   }
   const services = { controller, skills, projections: ctx.sessionProjections, systemPrompt: ctx.systemPrompt,
     record(session, type, data) { appendPluginRecord(session, type, data) }, notify() {} }
-  const platform = async (endpoint, input, signal) => { calls.push({ endpoint, input }); return await responder?.(endpoint, input, signal) ?? { ok: true, value: { ok: true, source: endpoint } } }
+  const platform = async (endpoint, input, signal) => {
+    calls.push({ endpoint, input })
+    const custom = await responder?.(endpoint, input, signal)
+    if (custom !== undefined) return custom
+    if (endpoint === 'instances/preview') return { ok: true, value: {
+      name: input.name, operation: input.operation, source_id: 'experiment:EXP-test-agent-001',
+      observed_state: 'running', observed_at: '2026-10-21T00:00:00.000Z',
+      plan: { source_id: input.source ?? 'experiment:EXP-test-agent-001', port: 3199 },
+      model_selection: { provider: 'fixture', model: 'default' }, model_policy_hash: 'a'.repeat(64),
+    } }
+    return { ok: true, value: { ok: true, source: endpoint } }
+  }
   const create = () => { const assistant = createAssistant(root, platform, services); assistant.registerTools({ register: tool => tools.set(tool.name, tool) }); return assistant }
   let assistant = create()
   ctx.on('system-prompt/assemble', async (_assembly, context, next) => assistant.assemblePrompt(await next(), context))
@@ -68,7 +80,8 @@ function fixture(t, responder, root) {
   const execute = async (id, domain, action, input = {}, toolSignal = signal) => tools.get(`platform_${domain}`).execute({ action, input }, { agent: { id, session: sessions.get(id)?.session }, signal: toolSignal })
   const status = async id => (await rpc('status', { session_id: id })).value
   async function proposal(id) {
-    for (let index = 0; index < 40; index++) {
+    const deadline = Date.now() + 3000
+    while (Date.now() < deadline) {
       const value = (await status(id)).proposals.find(item => item.state === 'awaiting_confirmation')
       if (value) return value
       await setImmediate()
@@ -399,6 +412,146 @@ test('工具在确认前保持 pending，真实回执返回原调用，重复确
   assert.equal(f.calls.filter(call => call.endpoint === 'instances/run').length, 1)
   assert.equal(f.calls.find(call => call.endpoint === 'instances/run').input.confirmed, true)
   assert.equal(f.prompts.length, 1)
+})
+
+test('实例创建、启动和重启由助手内部预览冻结来源、端口及模型设置，一次确认直接执行', async t => {
+  assert.match(assistantActionContract('instances', 'run').instructions, /versions\[0\]\.id/)
+  assert.match(assistantActionContract('agents', 'detail').instructions, /已启用版本/)
+  const f = fixture(t)
+  const id = (await f.rpc('session', { task: '按固定版本办理实例操作' })).value.session_id
+  for (const operation of ['create', 'start', 'restart']) {
+    const request = { operation, name: `assistant-${operation}`, ...(operation === 'create' ? { source: 'experiment:EXP-test-agent-001' } : {}),
+      expected_model_policy_hash: 'b'.repeat(64) }
+    const pending = f.execute(id, 'instances', 'run', request)
+    const card = await f.proposal(id)
+    assert.equal(f.calls.at(-1).endpoint, 'instances/preview')
+    assert.equal(f.calls.some(call => call.endpoint === 'instances/run' && call.input.name === request.name), false)
+    assert.equal(card.input.expected_source_id, 'experiment:EXP-test-agent-001')
+    assert.equal(card.input.port, 3199)
+    assert.deepEqual(card.input.model_selection, { provider: 'fixture', model: 'default' })
+    assert.equal(card.input.expected_model_policy_hash, 'a'.repeat(64), '模型填入的旧摘要不得覆盖实际预览')
+    const confirmed = await f.rpc('confirm', { session_id: id, proposal_id: card.id })
+    assert.equal(confirmed.value.state, 'completed')
+    assert.equal((await pending).state, 'completed')
+    const run = f.calls.find(call => call.endpoint === 'instances/run' && call.input.name === request.name)
+    assert.equal(run.input.confirmed, true)
+    assert.equal(run.input.expected_model_policy_hash, 'a'.repeat(64))
+    await f.rpc('confirm', { session_id: id, proposal_id: card.id })
+    assert.equal(f.calls.filter(call => call.endpoint === 'instances/run' && call.input.name === request.name).length, 1)
+  }
+})
+
+test('实例预览失败、对象变化和批量部分失败均不生成可执行提案', async t => {
+  const f = fixture(t, (endpoint, input) => {
+    if (endpoint === 'instances/batch-preview') return { ok: true, value: { previews: [
+      { name: 'first', operation: 'stop', ok: true, value: { name: 'first', operation: 'stop', source_id: 'experiment:EXP-test-agent-001', observed_state: 'running', observed_at: '2026-10-21T00:00:00.000Z' } },
+      { name: 'second', operation: 'stop', ok: false, error: { message: '状态未知' } },
+    ] } }
+    if (endpoint === 'instances/preview' && input.name === 'mismatch') return { ok: true, value: { name: 'other', operation: 'create', plan: { source_id: input.source, port: 3199 }, model_selection: { provider: 'fixture', model: 'default' }, model_policy_hash: 'a'.repeat(64) } }
+    if (endpoint === 'instances/preview' && input.name === 'failed') return { ok: false, error: { message: '模型不可用' } }
+  })
+  const id = (await f.rpc('session', { task: '检查实例操作' })).value.session_id
+  assert.equal((await f.execute(id, 'instances', 'run', { name: 'failed', operation: 'create', source: 'experiment:EXP-test-agent-001' })).ok, false)
+  await assert.rejects(() => f.execute(id, 'instances', 'run', { name: 'missing-source', operation: 'create' }), /固定版本/)
+  await assert.rejects(() => f.execute(id, 'instances', 'run', { name: 'mismatch', operation: 'create', source: 'experiment:EXP-test-agent-001' }), /预览与请求对象不一致/)
+  await assert.rejects(() => f.execute(id, 'instances', 'batch', { items: [{ name: 'first', operation: 'stop' }, { name: 'second', operation: 'stop' }] }), /预览失败/)
+  assert.equal((await f.status(id)).proposals.length, 0)
+  assert.equal(f.calls.some(call => ['instances/run', 'instances/batch'].includes(call.endpoint)), false)
+})
+
+test('已确认整体任务中的实例操作也先核对模型设置，不重复请求确认', async t => {
+  const f = fixture(t, taskResponder)
+  installTaskGoals(f)
+  const id = (await f.rpc('session', { task: '按固定目标交付实例' })).value.session_id
+  await beginTask(f, id)
+  const count = (await f.status(id)).proposals.length
+  const receipt = await f.execute(id, 'instances', 'run', {
+    operation: 'create', name: 'test-delivery', source: 'experiment:EXP-test-agent-001',
+  })
+  assert.equal(receipt.state, 'completed')
+  assert.equal((await f.status(id)).proposals.length, count)
+  const preview = f.calls.find(call => call.endpoint === 'instances/preview')
+  const run = f.calls.find(call => call.endpoint === 'instances/run')
+  assert.ok(preview)
+  assert.equal(run.input.expected_source_id, 'experiment:EXP-test-agent-001')
+  assert.equal(run.input.expected_model_policy_hash, 'a'.repeat(64))
+})
+
+test('真实实例 handler 接收助手一次确认的冻结参数，策略过期与批量坏项不启动实例', async t => {
+  let handler
+  const f = fixture(t, (endpoint, input, signal) => endpoint.startsWith('instances/')
+    ? handler(endpoint.slice('instances/'.length), input, signal) : undefined)
+  const previousProgram = process.env.HARNESS_PROGRAM_ROOT
+  const previousPython = process.env.HARNESS_PYTHON
+  const previousState = process.env.HARNESS_INSTANCE_STATE_ROOT
+  process.env.HARNESS_PROGRAM_ROOT = f.root
+  process.env.HARNESS_PYTHON = process.execPath
+  process.env.HARNESS_INSTANCE_STATE_ROOT = join(f.root, '.local/instances')
+  t.after(() => {
+    if (previousProgram === undefined) delete process.env.HARNESS_PROGRAM_ROOT; else process.env.HARNESS_PROGRAM_ROOT = previousProgram
+    if (previousPython === undefined) delete process.env.HARNESS_PYTHON; else process.env.HARNESS_PYTHON = previousPython
+    if (previousState === undefined) delete process.env.HARNESS_INSTANCE_STATE_ROOT; else process.env.HARNESS_INSTANCE_STATE_ROOT = previousState
+  })
+  const adapter = join(f.root, 'runtime/adapters/dsh-container')
+  const callsPath = join(f.root, 'dsh-dev.calls')
+  mkdirSync(adapter, { recursive: true })
+  writeFileSync(join(adapter, 'sources.json'), JSON.stringify({ sources: { 'EXP-real-agent-002': { agent_id: 'real-agent' } } }))
+  writeFileSync(join(adapter, 'dsh-dev'), `const fs = require('node:fs')
+const args = process.argv.slice(2)
+fs.appendFileSync(${JSON.stringify(callsPath)}, JSON.stringify(args) + '\\n')
+const option = key => args[args.indexOf(key) + 1]
+if (args[0] === 'up') console.log(JSON.stringify(args.includes('--dry-run')
+  ? { name: option('--name'), source_id: option('--source'), port: Number(option('--port')) || 3199, image_tag: 'dsh:fixture', mounts: [] }
+  : { name: option('--name'), dsh_running: true }))
+else if (args[0] === 'ps') console.log(JSON.stringify({ instances: [{ name: 'existing', state: 'running', source_id: 'experiment:EXP-real-agent-002' }] }))
+else throw new Error('unexpected command')
+`)
+  mkdirSync(join(f.root, '.local/instances/existing'), { recursive: true })
+  writeFileSync(join(f.root, '.local/instances/existing/instance.json'), JSON.stringify({
+    name: 'existing', source_id: 'experiment:EXP-real-agent-002', port: 3198,
+    model_policy: { default: { provider: 'fixture', model: 'business' } },
+  }))
+  let revision = 'current'
+  const selected = { provider: 'fixture', model: 'business' }
+  handler = createInstancesHandler(f.root, async (agentId, model) => {
+    assert.equal(agentId, 'real-agent')
+    assert.deepEqual(model ?? selected, selected)
+    return { policy: { allowed: [selected], default: selected, revision }, environment: {} }
+  })
+  const id = (await f.rpc('session', { task: '以最新固定版本创建并启动实例' })).value.session_id
+  const source = 'experiment:EXP-real-agent-002'
+  const created = f.execute(id, 'instances', 'run', { operation: 'create', name: 'new-one', source })
+  const card = await f.proposal(id)
+  assert.equal(card.preview.value.plan.source_id, source)
+  assert.equal(card.input.expected_source_id, source)
+  assert.deepEqual(card.input.model_selection, selected)
+  assert.match(card.input.expected_model_policy_hash, /^[0-9a-f]{64}$/)
+  assert.equal(f.calls.some(call => call.endpoint === 'instances/run'), false)
+  const confirmed = await f.rpc('confirm', { session_id: id, proposal_id: card.id })
+  assert.equal(confirmed.value.state, 'completed')
+  assert.equal((await created).state, 'completed')
+  assert.equal(f.calls.find(call => call.endpoint === 'instances/run').input.expected_model_policy_hash, card.input.expected_model_policy_hash)
+  for (const operation of ['start', 'restart']) {
+    const pending = f.execute(id, 'instances', 'run', { operation, name: 'existing' })
+    const proposed = await f.proposal(id)
+    assert.equal(proposed.input.expected_source_id, source)
+    assert.equal(proposed.input.port, 3198)
+    assert.match(proposed.input.expected_model_policy_hash, /^[0-9a-f]{64}$/)
+    await f.rpc('confirm', { session_id: id, proposal_id: proposed.id })
+    assert.equal((await pending).state, 'completed')
+  }
+  const stale = f.execute(id, 'instances', 'run', { operation: 'create', name: 'stale-one', source })
+  const staleCard = await f.proposal(id)
+  const before = readFileSync(callsPath, 'utf8').split('\n').filter(Boolean).map(JSON.parse).filter(args => args[0] === 'up' && !args.includes('--dry-run')).length
+  revision = 'changed'
+  assert.equal((await f.rpc('confirm', { session_id: id, proposal_id: staleCard.id })).value.state, 'failed')
+  assert.equal((await stale).state, 'failed')
+  assert.equal(readFileSync(callsPath, 'utf8').split('\n').filter(Boolean).map(JSON.parse).filter(args => args[0] === 'up' && !args.includes('--dry-run')).length, before)
+  const batch = await f.execute(id, 'instances', 'batch', { items: [
+    { operation: 'create', name: 'good-one', source }, { operation: 'create', name: 'bad-one', source: 'experiment:EXP-missing-003' },
+  ] }).catch(error => error)
+  assert.match(String(batch), /预览失败/)
+  assert.equal(f.calls.some(call => call.endpoint === 'instances/batch'), false)
 })
 
 test('原生记录冷恢复后可确认一次，但不会通过伪用户消息自动启动旧工具', async t => {

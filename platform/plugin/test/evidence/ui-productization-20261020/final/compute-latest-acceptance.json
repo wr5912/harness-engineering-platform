@@ -1,0 +1,1286 @@
+{
+  "source": {
+    "prototype": "file:///home/admin/Downloads/Harness_算力变体策划_交互原型.html",
+    "service": "http://10.0.160.32:3091/hep/",
+    "dataRoot": "/tmp/hep-ui-acceptance-20261020-YzAfQF/data",
+    "target": {
+      "agent": "autonomous-training-researcher",
+      "experiment": "EXP-autonomous-training-researcher-001-redf6be6240bf"
+    },
+    "browser": true,
+    "assistantRequestSent": false,
+    "trainingStarted": false,
+    "servicePid": 98382,
+    "localSshStubPort": 37911
+  },
+  "checks": [
+    {
+      "name": "desktop-light-page 页面无横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1"
+    },
+    {
+      "name": "desktop-light 入口与流程 让运行经验成为更轻量的实现",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-light 入口与流程 先定义路线，再验证效果",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-light 入口与流程 选择技术路线",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-light 入口与流程 补充策划信息",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-light 入口与流程 与 AI 助手策划",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-light 入口与流程 独立比较与验收",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-light 手动计划二级折叠",
+      "pass": true,
+      "observed": {
+        "details": 1,
+        "manual": 0
+      },
+      "expected": "默认仅显示其他策划方式"
+    },
+    {
+      "name": "desktop-light 当前版本最近 Run 为真实对象",
+      "pass": true,
+      "observed": "算力变体\n基于 v001 策划\n刷新\n让运行经验成为更轻量的实现\n先定义路线，再验证效果\n\n选择中算力或低算力路线，由平台 AI 助手根据已有轨迹策划实现与比较方案。近似等效是待验证目标。\n\n请 AI 策划算力变体\n选择技术路线\n理解两类变体的实现方式\n补充策划信息\n引用轨迹、模型与训练资源\n与 AI 助手策划\n确认数据与实现方案\n独立比较与验收\n评估效果、覆盖与资源开销\nv001 · 真实训练资源预检\n\n运行记录 run-59e5fb6b-b867-42cb-a675-d7d952387cfa · 2026-10-16T09:09:50Z；可作为本次策划的诊断轨迹，比较仍需新 Run。\n\n成功\n\n当前版本尚未保存算力变体计划。\n\n其他策划方式",
+      "expected": "真实标题、Run 身份，无 Mock 台账"
+    },
+    {
+      "name": "desktop-light-choose 页面无横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1"
+    },
+    {
+      "name": "desktop-light-choose 弹窗视口可达",
+      "pass": true,
+      "observed": {
+        "x": 180,
+        "y": 47,
+        "width": 1080,
+        "height": 905
+      },
+      "expected": "视口内"
+    },
+    {
+      "name": "desktop-light 中低路线技术说明",
+      "pass": true,
+      "observed": [
+        "中算力\n\n决策模型 + 工具编排\n\n把轨迹中的决策经验转为训练样本，训练一个决策模型，再由 LangGraph 连接模型、流程和工具。\n\n1\n提炼决策样本\n从真实运行轨迹提取决策输入、动作与结果\n2\n训练决策模型\n选择基模型，在已配置服务器上训练\n3\n组装 LangGraph\n决策模型 + 状态流程",
+        "低算力\n\n规则代码 + 工具编排\n\n把轨迹中可归纳的决策行为转为规则、分支和数据处理代码，直接用 LangGraph 实现，不训练决策模型。\n\n1\n提炼规则与分支\n从轨迹归纳决策规则和数据处理逻辑\n2\n编写 LangGraph 代码\n用明确的规则与流程实现决策\n3\n复用真实工具\n调用原有工具，不以假"
+      ],
+      "expected": "两路线各四步及技术说明"
+    },
+    {
+      "name": "desktop-light 未选路线先提示",
+      "pass": true,
+      "observed": [
+        "请选择一种算力变体。"
+      ],
+      "expected": "请选择一种算力变体。"
+    },
+    {
+      "name": "desktop-light-medium 页面无横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1"
+    },
+    {
+      "name": "desktop-light-medium 弹窗视口可达",
+      "pass": true,
+      "observed": {
+        "x": 140,
+        "y": 23,
+        "width": 1160,
+        "height": 954
+      },
+      "expected": "视口内"
+    },
+    {
+      "name": "desktop-light 冻结 Run 标题与业务结果对应",
+      "pass": true,
+      "observed": {
+        "actual": [
+          {
+            "title": "真实训练资源预检",
+            "status": "成功"
+          },
+          {
+            "title": "真实训练资源预检",
+            "status": "成功"
+          },
+          {
+            "title": "身份与职责等 2 项任务",
+            "status": "成功"
+          }
+        ],
+        "ids": [
+          "run-59e5fb6b-b867-42cb-a675-d7d952387cfa",
+          "run-0e64207b-4fa6-443b-824b-4277842deb5f",
+          "run-288f1d03-4997-4bc0-9fe8-1ffc78ade264"
+        ],
+        "expected": [
+          {
+            "title": "真实训练资源预检",
+            "status": "成功"
+          },
+          {
+            "title": "真实训练资源预检",
+            "status": "成功"
+          },
+          {
+            "title": "身份与职责等 2 项任务",
+            "status": "成功"
+          }
+        ]
+      },
+      "expected": "标题取冻结 inputs.lock；状态取封存 Run 和有效 summary"
+    },
+    {
+      "name": "desktop-light 普通行隐藏内部 ID",
+      "pass": true,
+      "observed": "真实训练资源预检\n成功\n2026/10/16 17:09:50",
+      "expected": "ID 按需在来源详情查看"
+    },
+    {
+      "name": "desktop-light 无授权模型时目录为空且有下一步",
+      "pass": true,
+      "observed": "决策基模型\n模型库\n自定义\n请助手建议\n当前智能体没有已标记的可用模型。请先到“设置 → 模型”标记，或选择“自定义”提交策划意向、“请助手建议”继续策划。\n刷新模型目录\n版本 / Revision 选填\n训练适配性待评估\n\n模型库引用共享的 DSH 推理目录；训练适配性、版本、许可与资源要求仍需核实。",
+      "expected": "不列出未授权模型；说明去设置标记或改用策划建议"
+    },
+    {
+      "name": "desktop-light 新连接未自动保存",
+      "pass": true,
+      "observed": false,
+      "expected": "只点击显式保存才写登记文件"
+    },
+    {
+      "name": "无效主机不发起连接",
+      "pass": true,
+      "observed": "主机或端口无效，未发起 SSH 服务探测。",
+      "expected": "校验拒绝"
+    },
+    {
+      "name": "本机临时 SSH 标识真实探测",
+      "pass": true,
+      "observed": "SSH 服务标识已确认可达。 已收到 SSH 服务标识；身份认证、训练依赖与 GPU 尚未验证。 认证、GPU 与训练依赖仍未验证。 · 2026/10/21 02:53:36",
+      "expected": "确认 SSH banner，明确其余未验证"
+    },
+    {
+      "name": "显式登记后列表回读且不存原文凭据",
+      "pass": true,
+      "observed": {
+        "id": "train-c6284c42-67e1-4506-a6f2-ee22ba5df75b",
+        "name": "浏览器验收临时连接",
+        "host": "127.0.0.1",
+        "port": 37911,
+        "credentialRef": "ref:browser-acceptance-only"
+      },
+      "expected": "连接资料与 ref 引用；无原文密钥"
+    },
+    {
+      "name": "登记后自动选中且状态不冒充认证成功",
+      "pass": true,
+      "observed": {
+        "selected": "train-c6284c42-67e1-4506-a6f2-ee22ba5df75b",
+        "text": "配置\n连接记录\n请选择已登记连接\n浏览器验收临时连接\nHost\n127.0.0.1\nPort\n37911\nUsername\ntester\n认证\nSSH 密钥引用\n工作目录\n/tmp/hep-browser-acceptance\n凭据引用\nref:browser-acceptance-only\n\n登记只表示资料已保存；SSH 连通性、GPU 与训练环境仍未验证。\n\n刷新登记记录\n列表来自当前数据工作区\n测试连接\n真实端口与 SSH 标识探测\n\nSSH 服务尚未探测；可先发送策划，后续核对训练环境。\n\n连接资料已登记并选中；SSH 连通性与训练环境仍未验证。"
+      },
+      "expected": "已选中，训练与认证未验证"
+    },
+    {
+      "name": "desktop-light-low 页面无横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1"
+    },
+    {
+      "name": "desktop-light-low 弹窗视口可达",
+      "pass": true,
+      "observed": {
+        "x": 140,
+        "y": 23,
+        "width": 1160,
+        "height": 954
+      },
+      "expected": "视口内"
+    },
+    {
+      "name": "desktop-light 低算力不含训练配置",
+      "pass": true,
+      "observed": {
+        "route": "提炼规则与分支\n\n分析轨迹中的条件、动作与数据处理。\n\nLangGraph 代码实现\n\n将决策流程转为可检查的代码。\n\n复用真实工具\n\n沿用工具接口与权限，保留真实调用。",
+        "medium": 0
+      },
+      "expected": "代码模拟及真实工具，无训练配置"
+    },
+    {
+      "name": "desktop-light 关闭后焦点返回入口",
+      "pass": true,
+      "observed": {
+        "className": "compute-primary",
+        "text": "请 AI 策划算力变体"
+      },
+      "expected": "焦点回入口"
+    },
+    {
+      "name": "mobile-light-page 页面无横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1"
+    },
+    {
+      "name": "mobile-light 入口与流程 让运行经验成为更轻量的实现",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-light 入口与流程 先定义路线，再验证效果",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-light 入口与流程 选择技术路线",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-light 入口与流程 补充策划信息",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-light 入口与流程 与 AI 助手策划",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-light 入口与流程 独立比较与验收",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-light 手动计划二级折叠",
+      "pass": true,
+      "observed": {
+        "details": 1,
+        "manual": 0
+      },
+      "expected": "默认仅显示其他策划方式"
+    },
+    {
+      "name": "mobile-light 当前版本最近 Run 为真实对象",
+      "pass": true,
+      "observed": "算力变体\n基于 v001 策划\n刷新\n让运行经验成为更轻量的实现\n先定义路线，再验证效果\n\n选择中算力或低算力路线，由平台 AI 助手根据已有轨迹策划实现与比较方案。近似等效是待验证目标。\n\n请 AI 策划算力变体\n选择技术路线\n理解两类变体的实现方式\n补充策划信息\n引用轨迹、模型与训练资源\n与 AI 助手策划\n确认数据与实现方案\n独立比较与验收\n评估效果、覆盖与资源开销\nv001 · 真实训练资源预检\n\n运行记录 run-59e5fb6b-b867-42cb-a675-d7d952387cfa · 2026-10-16T09:09:50Z；可作为本次策划的诊断轨迹，比较仍需新 Run。\n\n成功\n\n当前版本尚未保存算力变体计划。\n\n其他策划方式",
+      "expected": "真实标题、Run 身份，无 Mock 台账"
+    },
+    {
+      "name": "mobile-light-choose 页面无横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1"
+    },
+    {
+      "name": "mobile-light-choose 弹窗视口可达",
+      "pass": true,
+      "observed": {
+        "x": 0,
+        "y": 28,
+        "width": 390,
+        "height": 816
+      },
+      "expected": "视口内"
+    },
+    {
+      "name": "mobile-light 中低路线技术说明",
+      "pass": true,
+      "observed": [
+        "中算力\n\n决策模型 + 工具编排\n\n把轨迹中的决策经验转为训练样本，训练一个决策模型，再由 LangGraph 连接模型、流程和工具。\n\n1\n提炼决策样本\n从真实运行轨迹提取决策输入、动作与结果\n2\n训练决策模型\n选择基模型，在已配置服务器上训练\n3\n组装 LangGraph\n决策模型 + 状态流程",
+        "低算力\n\n规则代码 + 工具编排\n\n把轨迹中可归纳的决策行为转为规则、分支和数据处理代码，直接用 LangGraph 实现，不训练决策模型。\n\n1\n提炼规则与分支\n从轨迹归纳决策规则和数据处理逻辑\n2\n编写 LangGraph 代码\n用明确的规则与流程实现决策\n3\n复用真实工具\n调用原有工具，不以假"
+      ],
+      "expected": "两路线各四步及技术说明"
+    },
+    {
+      "name": "mobile-light 未选路线先提示",
+      "pass": true,
+      "observed": [
+        "请选择一种算力变体。"
+      ],
+      "expected": "请选择一种算力变体。"
+    },
+    {
+      "name": "mobile-light-medium 页面无横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1"
+    },
+    {
+      "name": "mobile-light-medium 弹窗视口可达",
+      "pass": true,
+      "observed": {
+        "x": 0,
+        "y": 28,
+        "width": 390,
+        "height": 816
+      },
+      "expected": "视口内"
+    },
+    {
+      "name": "mobile-light 冻结 Run 标题与业务结果对应",
+      "pass": true,
+      "observed": {
+        "actual": [
+          {
+            "title": "真实训练资源预检",
+            "status": "成功"
+          },
+          {
+            "title": "真实训练资源预检",
+            "status": "成功"
+          },
+          {
+            "title": "身份与职责等 2 项任务",
+            "status": "成功"
+          }
+        ],
+        "ids": [
+          "run-59e5fb6b-b867-42cb-a675-d7d952387cfa",
+          "run-0e64207b-4fa6-443b-824b-4277842deb5f",
+          "run-288f1d03-4997-4bc0-9fe8-1ffc78ade264"
+        ],
+        "expected": [
+          {
+            "title": "真实训练资源预检",
+            "status": "成功"
+          },
+          {
+            "title": "真实训练资源预检",
+            "status": "成功"
+          },
+          {
+            "title": "身份与职责等 2 项任务",
+            "status": "成功"
+          }
+        ]
+      },
+      "expected": "标题取冻结 inputs.lock；状态取封存 Run 和有效 summary"
+    },
+    {
+      "name": "mobile-light 普通行隐藏内部 ID",
+      "pass": true,
+      "observed": "真实训练资源预检\n成功\n2026/10/16 17:09:50",
+      "expected": "ID 按需在来源详情查看"
+    },
+    {
+      "name": "mobile-light 无授权模型时目录为空且有下一步",
+      "pass": true,
+      "observed": "决策基模型\n模型库\n自定义\n请助手建议\n当前智能体没有已标记的可用模型。请先到“设置 → 模型”标记，或选择“自定义”提交策划意向、“请助手建议”继续策划。\n刷新模型目录\n版本 / Revision 选填\n训练适配性待评估\n\n模型库引用共享的 DSH 推理目录；训练适配性、版本、许可与资源要求仍需核实。",
+      "expected": "不列出未授权模型；说明去设置标记或改用策划建议"
+    },
+    {
+      "name": "mobile-light 新连接未自动保存",
+      "pass": true,
+      "observed": true,
+      "expected": "只点击显式保存才写登记文件"
+    },
+    {
+      "name": "mobile-light 新登记连接共享到已登记列表",
+      "pass": true,
+      "observed": [
+        "请选择已登记连接",
+        "浏览器验收临时连接"
+      ],
+      "expected": "含验收临时连接"
+    },
+    {
+      "name": "mobile-light-low 页面无横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1"
+    },
+    {
+      "name": "mobile-light-low 弹窗视口可达",
+      "pass": true,
+      "observed": {
+        "x": 0,
+        "y": 28,
+        "width": 390,
+        "height": 816
+      },
+      "expected": "视口内"
+    },
+    {
+      "name": "mobile-light 低算力不含训练配置",
+      "pass": true,
+      "observed": {
+        "route": "提炼规则与分支\n\n分析轨迹中的条件、动作与数据处理。\n\nLangGraph 代码实现\n\n将决策流程转为可检查的代码。\n\n复用真实工具\n\n沿用工具接口与权限，保留真实调用。",
+        "medium": 0
+      },
+      "expected": "代码模拟及真实工具，无训练配置"
+    },
+    {
+      "name": "mobile-light 关闭后焦点返回入口",
+      "pass": true,
+      "observed": {
+        "className": "compute-primary",
+        "text": "请 AI 策划算力变体"
+      },
+      "expected": "焦点回入口"
+    },
+    {
+      "name": "desktop-dark-page 页面无横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1"
+    },
+    {
+      "name": "desktop-dark 入口与流程 让运行经验成为更轻量的实现",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-dark 入口与流程 先定义路线，再验证效果",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-dark 入口与流程 选择技术路线",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-dark 入口与流程 补充策划信息",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-dark 入口与流程 与 AI 助手策划",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-dark 入口与流程 独立比较与验收",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-dark 手动计划二级折叠",
+      "pass": true,
+      "observed": {
+        "details": 1,
+        "manual": 0
+      },
+      "expected": "默认仅显示其他策划方式"
+    },
+    {
+      "name": "desktop-dark 当前版本最近 Run 为真实对象",
+      "pass": true,
+      "observed": "算力变体\n基于 v001 策划\n刷新\n让运行经验成为更轻量的实现\n先定义路线，再验证效果\n\n选择中算力或低算力路线，由平台 AI 助手根据已有轨迹策划实现与比较方案。近似等效是待验证目标。\n\n请 AI 策划算力变体\n选择技术路线\n理解两类变体的实现方式\n补充策划信息\n引用轨迹、模型与训练资源\n与 AI 助手策划\n确认数据与实现方案\n独立比较与验收\n评估效果、覆盖与资源开销\nv001 · 真实训练资源预检\n\n运行记录 run-59e5fb6b-b867-42cb-a675-d7d952387cfa · 2026-10-16T09:09:50Z；可作为本次策划的诊断轨迹，比较仍需新 Run。\n\n成功\n\n当前版本尚未保存算力变体计划。\n\n其他策划方式",
+      "expected": "真实标题、Run 身份，无 Mock 台账"
+    },
+    {
+      "name": "desktop-dark-choose 页面无横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1"
+    },
+    {
+      "name": "desktop-dark-choose 弹窗视口可达",
+      "pass": true,
+      "observed": {
+        "x": 180,
+        "y": 47,
+        "width": 1080,
+        "height": 905
+      },
+      "expected": "视口内"
+    },
+    {
+      "name": "desktop-dark 中低路线技术说明",
+      "pass": true,
+      "observed": [
+        "中算力\n\n决策模型 + 工具编排\n\n把轨迹中的决策经验转为训练样本，训练一个决策模型，再由 LangGraph 连接模型、流程和工具。\n\n1\n提炼决策样本\n从真实运行轨迹提取决策输入、动作与结果\n2\n训练决策模型\n选择基模型，在已配置服务器上训练\n3\n组装 LangGraph\n决策模型 + 状态流程",
+        "低算力\n\n规则代码 + 工具编排\n\n把轨迹中可归纳的决策行为转为规则、分支和数据处理代码，直接用 LangGraph 实现，不训练决策模型。\n\n1\n提炼规则与分支\n从轨迹归纳决策规则和数据处理逻辑\n2\n编写 LangGraph 代码\n用明确的规则与流程实现决策\n3\n复用真实工具\n调用原有工具，不以假"
+      ],
+      "expected": "两路线各四步及技术说明"
+    },
+    {
+      "name": "desktop-dark 未选路线先提示",
+      "pass": true,
+      "observed": [
+        "请选择一种算力变体。"
+      ],
+      "expected": "请选择一种算力变体。"
+    },
+    {
+      "name": "desktop-dark-medium 页面无横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1"
+    },
+    {
+      "name": "desktop-dark-medium 弹窗视口可达",
+      "pass": true,
+      "observed": {
+        "x": 140,
+        "y": 23,
+        "width": 1160,
+        "height": 954
+      },
+      "expected": "视口内"
+    },
+    {
+      "name": "desktop-dark 冻结 Run 标题与业务结果对应",
+      "pass": true,
+      "observed": {
+        "actual": [
+          {
+            "title": "真实训练资源预检",
+            "status": "成功"
+          },
+          {
+            "title": "真实训练资源预检",
+            "status": "成功"
+          },
+          {
+            "title": "身份与职责等 2 项任务",
+            "status": "成功"
+          }
+        ],
+        "ids": [
+          "run-59e5fb6b-b867-42cb-a675-d7d952387cfa",
+          "run-0e64207b-4fa6-443b-824b-4277842deb5f",
+          "run-288f1d03-4997-4bc0-9fe8-1ffc78ade264"
+        ],
+        "expected": [
+          {
+            "title": "真实训练资源预检",
+            "status": "成功"
+          },
+          {
+            "title": "真实训练资源预检",
+            "status": "成功"
+          },
+          {
+            "title": "身份与职责等 2 项任务",
+            "status": "成功"
+          }
+        ]
+      },
+      "expected": "标题取冻结 inputs.lock；状态取封存 Run 和有效 summary"
+    },
+    {
+      "name": "desktop-dark 普通行隐藏内部 ID",
+      "pass": true,
+      "observed": "真实训练资源预检\n成功\n2026/10/16 17:09:50",
+      "expected": "ID 按需在来源详情查看"
+    },
+    {
+      "name": "desktop-dark 无授权模型时目录为空且有下一步",
+      "pass": true,
+      "observed": "决策基模型\n模型库\n自定义\n请助手建议\n当前智能体没有已标记的可用模型。请先到“设置 → 模型”标记，或选择“自定义”提交策划意向、“请助手建议”继续策划。\n刷新模型目录\n版本 / Revision 选填\n训练适配性待评估\n\n模型库引用共享的 DSH 推理目录；训练适配性、版本、许可与资源要求仍需核实。",
+      "expected": "不列出未授权模型；说明去设置标记或改用策划建议"
+    },
+    {
+      "name": "desktop-dark 新连接未自动保存",
+      "pass": true,
+      "observed": true,
+      "expected": "只点击显式保存才写登记文件"
+    },
+    {
+      "name": "desktop-dark 新登记连接共享到已登记列表",
+      "pass": true,
+      "observed": [
+        "请选择已登记连接",
+        "浏览器验收临时连接"
+      ],
+      "expected": "含验收临时连接"
+    },
+    {
+      "name": "desktop-dark-low 页面无横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1"
+    },
+    {
+      "name": "desktop-dark-low 弹窗视口可达",
+      "pass": true,
+      "observed": {
+        "x": 140,
+        "y": 23,
+        "width": 1160,
+        "height": 954
+      },
+      "expected": "视口内"
+    },
+    {
+      "name": "desktop-dark 低算力不含训练配置",
+      "pass": true,
+      "observed": {
+        "route": "提炼规则与分支\n\n分析轨迹中的条件、动作与数据处理。\n\nLangGraph 代码实现\n\n将决策流程转为可检查的代码。\n\n复用真实工具\n\n沿用工具接口与权限，保留真实调用。",
+        "medium": 0
+      },
+      "expected": "代码模拟及真实工具，无训练配置"
+    },
+    {
+      "name": "desktop-dark 关闭后焦点返回入口",
+      "pass": true,
+      "observed": {
+        "className": "compute-primary",
+        "text": "请 AI 策划算力变体"
+      },
+      "expected": "焦点回入口"
+    },
+    {
+      "name": "mobile-dark-page 页面无横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1"
+    },
+    {
+      "name": "mobile-dark 入口与流程 让运行经验成为更轻量的实现",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-dark 入口与流程 先定义路线，再验证效果",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-dark 入口与流程 选择技术路线",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-dark 入口与流程 补充策划信息",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-dark 入口与流程 与 AI 助手策划",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-dark 入口与流程 独立比较与验收",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-dark 手动计划二级折叠",
+      "pass": true,
+      "observed": {
+        "details": 1,
+        "manual": 0
+      },
+      "expected": "默认仅显示其他策划方式"
+    },
+    {
+      "name": "mobile-dark 当前版本最近 Run 为真实对象",
+      "pass": true,
+      "observed": "算力变体\n基于 v001 策划\n刷新\n让运行经验成为更轻量的实现\n先定义路线，再验证效果\n\n选择中算力或低算力路线，由平台 AI 助手根据已有轨迹策划实现与比较方案。近似等效是待验证目标。\n\n请 AI 策划算力变体\n选择技术路线\n理解两类变体的实现方式\n补充策划信息\n引用轨迹、模型与训练资源\n与 AI 助手策划\n确认数据与实现方案\n独立比较与验收\n评估效果、覆盖与资源开销\nv001 · 真实训练资源预检\n\n运行记录 run-59e5fb6b-b867-42cb-a675-d7d952387cfa · 2026-10-16T09:09:50Z；可作为本次策划的诊断轨迹，比较仍需新 Run。\n\n成功\n\n当前版本尚未保存算力变体计划。\n\n其他策划方式",
+      "expected": "真实标题、Run 身份，无 Mock 台账"
+    },
+    {
+      "name": "mobile-dark-choose 页面无横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1"
+    },
+    {
+      "name": "mobile-dark-choose 弹窗视口可达",
+      "pass": true,
+      "observed": {
+        "x": 0,
+        "y": 28,
+        "width": 390,
+        "height": 816
+      },
+      "expected": "视口内"
+    },
+    {
+      "name": "mobile-dark 中低路线技术说明",
+      "pass": true,
+      "observed": [
+        "中算力\n\n决策模型 + 工具编排\n\n把轨迹中的决策经验转为训练样本，训练一个决策模型，再由 LangGraph 连接模型、流程和工具。\n\n1\n提炼决策样本\n从真实运行轨迹提取决策输入、动作与结果\n2\n训练决策模型\n选择基模型，在已配置服务器上训练\n3\n组装 LangGraph\n决策模型 + 状态流程",
+        "低算力\n\n规则代码 + 工具编排\n\n把轨迹中可归纳的决策行为转为规则、分支和数据处理代码，直接用 LangGraph 实现，不训练决策模型。\n\n1\n提炼规则与分支\n从轨迹归纳决策规则和数据处理逻辑\n2\n编写 LangGraph 代码\n用明确的规则与流程实现决策\n3\n复用真实工具\n调用原有工具，不以假"
+      ],
+      "expected": "两路线各四步及技术说明"
+    },
+    {
+      "name": "mobile-dark 未选路线先提示",
+      "pass": true,
+      "observed": [
+        "请选择一种算力变体。"
+      ],
+      "expected": "请选择一种算力变体。"
+    },
+    {
+      "name": "mobile-dark-medium 页面无横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1"
+    },
+    {
+      "name": "mobile-dark-medium 弹窗视口可达",
+      "pass": true,
+      "observed": {
+        "x": 0,
+        "y": 28,
+        "width": 390,
+        "height": 816
+      },
+      "expected": "视口内"
+    },
+    {
+      "name": "mobile-dark 冻结 Run 标题与业务结果对应",
+      "pass": true,
+      "observed": {
+        "actual": [
+          {
+            "title": "真实训练资源预检",
+            "status": "成功"
+          },
+          {
+            "title": "真实训练资源预检",
+            "status": "成功"
+          },
+          {
+            "title": "身份与职责等 2 项任务",
+            "status": "成功"
+          }
+        ],
+        "ids": [
+          "run-59e5fb6b-b867-42cb-a675-d7d952387cfa",
+          "run-0e64207b-4fa6-443b-824b-4277842deb5f",
+          "run-288f1d03-4997-4bc0-9fe8-1ffc78ade264"
+        ],
+        "expected": [
+          {
+            "title": "真实训练资源预检",
+            "status": "成功"
+          },
+          {
+            "title": "真实训练资源预检",
+            "status": "成功"
+          },
+          {
+            "title": "身份与职责等 2 项任务",
+            "status": "成功"
+          }
+        ]
+      },
+      "expected": "标题取冻结 inputs.lock；状态取封存 Run 和有效 summary"
+    },
+    {
+      "name": "mobile-dark 普通行隐藏内部 ID",
+      "pass": true,
+      "observed": "真实训练资源预检\n成功\n2026/10/16 17:09:50",
+      "expected": "ID 按需在来源详情查看"
+    },
+    {
+      "name": "mobile-dark 无授权模型时目录为空且有下一步",
+      "pass": true,
+      "observed": "决策基模型\n模型库\n自定义\n请助手建议\n当前智能体没有已标记的可用模型。请先到“设置 → 模型”标记，或选择“自定义”提交策划意向、“请助手建议”继续策划。\n刷新模型目录\n版本 / Revision 选填\n训练适配性待评估\n\n模型库引用共享的 DSH 推理目录；训练适配性、版本、许可与资源要求仍需核实。",
+      "expected": "不列出未授权模型；说明去设置标记或改用策划建议"
+    },
+    {
+      "name": "mobile-dark 新连接未自动保存",
+      "pass": true,
+      "observed": true,
+      "expected": "只点击显式保存才写登记文件"
+    },
+    {
+      "name": "mobile-dark 新登记连接共享到已登记列表",
+      "pass": true,
+      "observed": [
+        "请选择已登记连接",
+        "浏览器验收临时连接"
+      ],
+      "expected": "含验收临时连接"
+    },
+    {
+      "name": "mobile-dark-low 页面无横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1"
+    },
+    {
+      "name": "mobile-dark-low 弹窗视口可达",
+      "pass": true,
+      "observed": {
+        "x": 0,
+        "y": 28,
+        "width": 390,
+        "height": 816
+      },
+      "expected": "视口内"
+    },
+    {
+      "name": "mobile-dark 低算力不含训练配置",
+      "pass": true,
+      "observed": {
+        "route": "提炼规则与分支\n\n分析轨迹中的条件、动作与数据处理。\n\nLangGraph 代码实现\n\n将决策流程转为可检查的代码。\n\n复用真实工具\n\n沿用工具接口与权限，保留真实调用。",
+        "medium": 0
+      },
+      "expected": "代码模拟及真实工具，无训练配置"
+    },
+    {
+      "name": "mobile-dark 关闭后焦点返回入口",
+      "pass": true,
+      "observed": {
+        "className": "compute-primary",
+        "text": "请 AI 策划算力变体"
+      },
+      "expected": "焦点回入口"
+    },
+    {
+      "name": "已授权 Agent 的模型库仅列已标记模型",
+      "pass": true,
+      "observed": [
+        {
+          "value": "",
+          "text": "请选择已标记模型"
+        },
+        {
+          "value": "[\"xiaomi-token-plan-cn\",\"mimo-v2.5\"]",
+          "text": "xiaomi-token-plan-cn · MiMo-V2.5"
+        }
+      ],
+      "expected": "占位 + test01 已标记 MiMo-V2.5"
+    },
+    {
+      "name": "模型摘要反映所选共享目录模型",
+      "pass": true,
+      "observed": "本次策划摘要\n中算力变体\n\n决策模型 + 工具编排\n\n父版本\ntest01 · v002\n轨迹依据\n0 条当前版本轨迹\n决策基模型\nxiaomi-token-plan-cn · MiMo-V2.5\n训练服务器\n新连接待填写\n发送后在平台 AI 助手中继续策划，不会启动训练或创建变体。\n方案中待补充 / 验证\n模型版本固定\n模型训练适配性评估\nSSH 服务标识验证\nSSH 认证、GPU、依赖与训练环境检查\n认证凭据引用\n独立比较集与验收阈值",
+      "expected": "MiMo-V2.5"
+    },
+    {
+      "name": "手动入口展开后可输入",
+      "pass": true,
+      "observed": "EXP-security-operations-expert-022-r41bf6c2f0d3d",
+      "expected": "展开、可输入"
+    },
+    {
+      "name": "切版本收起旧手动计划且避免旧草稿",
+      "pass": true,
+      "observed": "算力变体\n基于 v022 策划\n刷新\n让运行经验成为更轻量的实现\n先定义路线，再验证效果\n\n选择中算力或低算力路线，由平台 AI 助手根据已有轨迹策划实现与比较方案。近似等效是待验证目标。\n\n请 AI 策划算力变体\n选择技术路线\n理解两类变体的实现方式\n补充策划信息\n引用轨迹、模型与训练资源\n与 AI 助手策划\n确认数据与实现方案\n独立比较与验收\n评估效果、覆盖与资源开销\nv022 · 基本模拟事件的研判输出合同\n\n运行记录 run-bba792ca-42b7-4ee8-9935-b7b5deb09d06 · 2026-10-16T04:20:21Z；可作为本次策划的诊断轨迹，比较仍需新 Run。\n\n成功\n\n当前版本尚未保存算力变体计划。\n\n其他策划方式",
+      "expected": "新版本不继承旧表单"
+    }
+  ],
+  "screenshots": [
+    {
+      "name": "desktop-light-page-full",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-desktop-light-page-full.png"
+    },
+    {
+      "name": "desktop-light-choose",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-desktop-light-choose.png"
+    },
+    {
+      "name": "desktop-light-medium",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-desktop-light-medium.png"
+    },
+    {
+      "name": "desktop-light-medium-catalog-empty",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-desktop-light-medium-catalog-empty.png"
+    },
+    {
+      "name": "desktop-light-medium-probe",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-desktop-light-medium-probe.png"
+    },
+    {
+      "name": "desktop-light-medium-registered",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-desktop-light-medium-registered.png"
+    },
+    {
+      "name": "desktop-light-low",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-desktop-light-low.png"
+    },
+    {
+      "name": "mobile-light-page-full",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-mobile-light-page-full.png"
+    },
+    {
+      "name": "mobile-light-choose",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-mobile-light-choose.png"
+    },
+    {
+      "name": "mobile-light-medium",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-mobile-light-medium.png"
+    },
+    {
+      "name": "mobile-light-medium-catalog-empty",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-mobile-light-medium-catalog-empty.png"
+    },
+    {
+      "name": "mobile-light-medium-registered",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-mobile-light-medium-registered.png"
+    },
+    {
+      "name": "mobile-light-low",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-mobile-light-low.png"
+    },
+    {
+      "name": "desktop-dark-page-full",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-desktop-dark-page-full.png"
+    },
+    {
+      "name": "desktop-dark-choose",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-desktop-dark-choose.png"
+    },
+    {
+      "name": "desktop-dark-medium",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-desktop-dark-medium.png"
+    },
+    {
+      "name": "desktop-dark-medium-catalog-empty",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-desktop-dark-medium-catalog-empty.png"
+    },
+    {
+      "name": "desktop-dark-medium-registered",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-desktop-dark-medium-registered.png"
+    },
+    {
+      "name": "desktop-dark-low",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-desktop-dark-low.png"
+    },
+    {
+      "name": "mobile-dark-page-full",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-mobile-dark-page-full.png"
+    },
+    {
+      "name": "mobile-dark-choose",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-mobile-dark-choose.png"
+    },
+    {
+      "name": "mobile-dark-medium",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-mobile-dark-medium.png"
+    },
+    {
+      "name": "mobile-dark-medium-catalog-empty",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-mobile-dark-medium-catalog-empty.png"
+    },
+    {
+      "name": "mobile-dark-medium-registered",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-mobile-dark-medium-registered.png"
+    },
+    {
+      "name": "mobile-dark-low",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-mobile-dark-low.png"
+    },
+    {
+      "name": "authorized-catalog",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-authorized-catalog.png"
+    },
+    {
+      "name": "manual-open",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-manual-open.png"
+    },
+    {
+      "name": "after-version-switch",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-latest-after-version-switch.png"
+    }
+  ],
+  "geometry": [
+    {
+      "scene": "desktop-light-page",
+      "width": 1440,
+      "height": 1000,
+      "documentOverflowX": 0,
+      "dialog": null,
+      "dialogBody": null,
+      "focus": "SECTION"
+    },
+    {
+      "scene": "desktop-light-choose",
+      "width": 1440,
+      "height": 1000,
+      "documentOverflowX": 0,
+      "dialog": {
+        "x": 180,
+        "y": 47,
+        "width": 1080,
+        "height": 905
+      },
+      "dialogBody": {
+        "height": 653,
+        "scrollHeight": 653
+      },
+      "focus": "H2"
+    },
+    {
+      "scene": "desktop-light-medium",
+      "width": 1440,
+      "height": 1000,
+      "documentOverflowX": 0,
+      "dialog": {
+        "x": 140,
+        "y": 23,
+        "width": 1160,
+        "height": 954
+      },
+      "dialogBody": {
+        "height": 700,
+        "scrollHeight": 1251
+      },
+      "focus": "H2"
+    },
+    {
+      "scene": "desktop-light-low",
+      "width": 1440,
+      "height": 1000,
+      "documentOverflowX": 0,
+      "dialog": {
+        "x": 140,
+        "y": 23,
+        "width": 1160,
+        "height": 954
+      },
+      "dialogBody": {
+        "height": 700,
+        "scrollHeight": 1031
+      },
+      "focus": "H2"
+    },
+    {
+      "scene": "mobile-light-page",
+      "width": 390,
+      "height": 844,
+      "documentOverflowX": 0,
+      "dialog": null,
+      "dialogBody": null,
+      "focus": "SECTION"
+    },
+    {
+      "scene": "mobile-light-choose",
+      "width": 390,
+      "height": 844,
+      "documentOverflowX": 0,
+      "dialog": {
+        "x": 0,
+        "y": 28,
+        "width": 390,
+        "height": 816
+      },
+      "dialogBody": {
+        "height": 528,
+        "scrollHeight": 1077
+      },
+      "focus": "H2"
+    },
+    {
+      "scene": "mobile-light-medium",
+      "width": 390,
+      "height": 844,
+      "documentOverflowX": 0,
+      "dialog": {
+        "x": 0,
+        "y": 28,
+        "width": 390,
+        "height": 816
+      },
+      "dialogBody": {
+        "height": 562,
+        "scrollHeight": 1937
+      },
+      "focus": "H2"
+    },
+    {
+      "scene": "mobile-light-low",
+      "width": 390,
+      "height": 844,
+      "documentOverflowX": 0,
+      "dialog": {
+        "x": 0,
+        "y": 28,
+        "width": 390,
+        "height": 816
+      },
+      "dialogBody": {
+        "height": 562,
+        "scrollHeight": 1386
+      },
+      "focus": "H2"
+    },
+    {
+      "scene": "desktop-dark-page",
+      "width": 1440,
+      "height": 1000,
+      "documentOverflowX": 0,
+      "dialog": null,
+      "dialogBody": null,
+      "focus": "SECTION"
+    },
+    {
+      "scene": "desktop-dark-choose",
+      "width": 1440,
+      "height": 1000,
+      "documentOverflowX": 0,
+      "dialog": {
+        "x": 180,
+        "y": 47,
+        "width": 1080,
+        "height": 905
+      },
+      "dialogBody": {
+        "height": 653,
+        "scrollHeight": 653
+      },
+      "focus": "H2"
+    },
+    {
+      "scene": "desktop-dark-medium",
+      "width": 1440,
+      "height": 1000,
+      "documentOverflowX": 0,
+      "dialog": {
+        "x": 140,
+        "y": 23,
+        "width": 1160,
+        "height": 954
+      },
+      "dialogBody": {
+        "height": 700,
+        "scrollHeight": 1251
+      },
+      "focus": "H2"
+    },
+    {
+      "scene": "desktop-dark-low",
+      "width": 1440,
+      "height": 1000,
+      "documentOverflowX": 0,
+      "dialog": {
+        "x": 140,
+        "y": 23,
+        "width": 1160,
+        "height": 954
+      },
+      "dialogBody": {
+        "height": 700,
+        "scrollHeight": 1031
+      },
+      "focus": "H2"
+    },
+    {
+      "scene": "mobile-dark-page",
+      "width": 390,
+      "height": 844,
+      "documentOverflowX": 0,
+      "dialog": null,
+      "dialogBody": null,
+      "focus": "SECTION"
+    },
+    {
+      "scene": "mobile-dark-choose",
+      "width": 390,
+      "height": 844,
+      "documentOverflowX": 0,
+      "dialog": {
+        "x": 0,
+        "y": 28,
+        "width": 390,
+        "height": 816
+      },
+      "dialogBody": {
+        "height": 528,
+        "scrollHeight": 1077
+      },
+      "focus": "H2"
+    },
+    {
+      "scene": "mobile-dark-medium",
+      "width": 390,
+      "height": 844,
+      "documentOverflowX": 0,
+      "dialog": {
+        "x": 0,
+        "y": 28,
+        "width": 390,
+        "height": 816
+      },
+      "dialogBody": {
+        "height": 562,
+        "scrollHeight": 1937
+      },
+      "focus": "H2"
+    },
+    {
+      "scene": "mobile-dark-low",
+      "width": 390,
+      "height": 844,
+      "documentOverflowX": 0,
+      "dialog": {
+        "x": 0,
+        "y": 28,
+        "width": 390,
+        "height": 816
+      },
+      "dialogBody": {
+        "height": 562,
+        "scrollHeight": 1386
+      },
+      "focus": "H2"
+    }
+  ],
+  "skipped": [
+    {
+      "name": "已保存计划和独立比较的真实浏览器态",
+      "reason": "3091 隔离数据中没有已保存 compute_variant 计划；未创建研究变体，也未伪造比较 Run。源码/自动化合同不能替代真实页面验收。"
+    },
+    {
+      "name": "真实 AI 助手回复",
+      "reason": "本次按要求不发送模型请求；隔离服务缺少可用 Xiaomi API Key，不能证明真实模型回复。"
+    }
+  ],
+  "errors": [],
+  "cleanup": {
+    "temporaryTrainingServerRemoved": true,
+    "registryRestored": true
+  }
+}

@@ -6,8 +6,8 @@ declare module 'harness-mcp-manager-server' {
   export function validateConfiguration(value: { servers: any[]; groups: any[]; sharedToken: string }): void
 }
 declare module 'harness-mcp-manager-client' {
-  import type { ComponentType } from 'react'
-  export const Manager: ComponentType<{ view: string; onValidationError(): void; publishedService: any; toolbarTarget: HTMLElement | null; form: { state: any }; write: (ops: any, revision: string) => Promise<any> }>
+  import type { ComponentType, ReactNode } from 'react'
+  export const Manager: ComponentType<{ view: string; onValidationError(): void; publishedService: any; selectedServerId?: string; onSelectServerId?(id?: string): void; onOpenView?(view: string, serverId: string): void; toolbarTarget: HTMLElement | null; renderToolbar?(control: ReactNode, container: HTMLElement): ReactNode; PasswordInput?: ComponentType<any>; form: { state: any }; write: (ops: any, revision: string) => Promise<any> }>
 }
 declare module 'harness-mcp-manager-openapi' {
   export function loadOpenApi(server: any): Promise<any>

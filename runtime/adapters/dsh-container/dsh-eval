@@ -7,6 +7,8 @@ import argparse
 import hashlib
 from contextlib import contextmanager
 from fnmatch import fnmatchcase
+import importlib.util
+from importlib.machinery import SourceFileLoader
 import json
 import os
 import re
@@ -346,9 +348,12 @@ def dsh_dev_command() -> list[str]:
     return [override] if override is not None else [sys.executable, str(DSH_DEV)]
 
 
-def start_instance(source: str, name: str) -> dict:
+def start_instance(source: str, name: str, model_policy_path: str | None = None) -> dict:
+    command = [*dsh_dev_command(), "up", "--source", source, "--mode", "eval", "--name", name]
+    if model_policy_path:
+        command.extend(("--model-policy", model_policy_path))
     completed = checked_process(
-        [*dsh_dev_command(), "up", "--source", source, "--mode", "eval", "--name", name],
+        command,
         label="启动 DSH 评测实例", timeout=240, env=os.environ.copy(),
     )
     try:
@@ -535,11 +540,40 @@ def select_case_ids(catalog: dict, patterns: list[str], mode: str) -> list[str]:
     ]
 
 
+def effective_required_env_names(contract: dict, model_policy_path: str | None,
+                                 expected_model: str | None, *, source_only: bool = False) -> list[str]:
+    """评测预检与实际 dsh-dev 启动共用模型策略及环境变量判定。"""
+    if source_only:
+        # 新建/编辑的纯来源 dry 校验不启动实例，也无需复制业务模型设置。
+        return list(contract["required_env_names"])
+    loader = SourceFileLoader("dsh_eval_dsh_dev", str(DSH_DEV))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    assert spec is not None
+    dsh_dev = importlib.util.module_from_spec(spec)
+    loader.exec_module(dsh_dev)
+    try:
+        policy = dsh_dev.read_model_policy(model_policy_path, contract["agent_id"], repo=REPO)
+    except SystemExit as error:
+        if model_policy_path:
+            raise EvaluationError("当前来源的模型策略不可用，请核对设置 → 模型及实例策略") from error
+        raise EvaluationError("业务统一默认模型在当前来源中无法直连；请核对设置 → 模型，或提供平台生成的 --model-policy") from error
+    default = policy["default"]
+    if expected_model and expected_model != default["model"]:
+        raise EvaluationError("--model 与实例默认模型不一致；此参数只记录预期，不切换 Runtime")
+    try:
+        dsh_dev.assert_direct_model_available(contract, policy)
+    except SystemExit as error:
+        raise EvaluationError("业务统一默认模型在当前来源中无法直连；请提供平台生成的 --model-policy") from error
+    return dsh_dev.required_env_names({**contract, "model_policy": policy})
+
+
 def dry_run_payload(contract: dict, cases: list[dict], executor: str, requested_mode: str,
-                    selection_mode: str, review_mode: str) -> dict:
-    required = contract["required_env_names"]
+                    selection_mode: str, review_mode: str, model_policy_path: str | None = None,
+                    expected_model: str | None = None, *, source_only: bool = False) -> dict:
+    required = effective_required_env_names(contract, model_policy_path, expected_model, source_only=source_only)
     return {
         "schema_version": "1.0",
+        "preflight_scope": "source-and-cases" if source_only else "source-cases-and-model-policy",
         "source_id": contract["source_id"],
         "experiment_id": contract["experiment_id"],
         "executor": executor,
@@ -609,6 +643,9 @@ def emit_result(*args, **kwargs) -> None:
 
 
 def execute(args: argparse.Namespace) -> int:
+    source_only = bool(getattr(args, "source_check", False))
+    if source_only and (not args.dry_run or getattr(args, "model_policy", None) or getattr(args, "model", None)):
+        raise EvaluationError("--source-check 只用于不指定模型的 --dry-run 来源与 Case 校验")
     contract = resolve(args.source, repo=REPO)
     evaluation_path = REPO / "agents" / contract["agent_id"] / "evaluation.md"
     catalog = load_evaluation(evaluation_path)
@@ -618,7 +655,11 @@ def execute(args: argparse.Namespace) -> int:
     review_mode = "none" if args.executor == "browser" else args.review or ("ai" if selection_mode == "full" else "none")
     case_ids = select_case_ids(catalog, args.case, args.mode)
     cases = execution_for(evaluation_path, case_ids)
-    plan = dry_run_payload(contract, cases, args.executor, args.mode, selection_mode, review_mode)
+    model_policy_path = getattr(args, "model_policy", None)
+    expected_model = getattr(args, "model", None)
+    plan = dry_run_payload(contract, cases, args.executor, args.mode, selection_mode, review_mode,
+                           model_policy_path, expected_model,
+                           source_only=source_only)
     if args.compare_to:
         plan["compare_to_run_id"] = args.compare_to
     if args.dry_run:
@@ -677,7 +718,7 @@ def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict
         with allow_cancellation():
             progress("启动独立 DSH 评测实例")
             up_attempted = True
-            image_identity = start_instance(args.source, instance_name)
+            image_identity = start_instance(args.source, instance_name, getattr(args, "model_policy", None))
             if image_identity["image_build_fingerprint"] != contract["image"]["build_fingerprint"]:
                 raise EvaluationError("DSH 实际镜像身份与本次来源合同不一致")
             write_json(run_dir / "evidence" / "dsh-image.json", {
@@ -813,10 +854,14 @@ def main() -> None:
     )
     parser.add_argument("--executor", choices=("api", "browser"), default="api", help="执行通道")
     parser.add_argument("--review", choices=("ai", "none"), help="API 证据复核；默认 full 为 ai，其余为 none；浏览器仅支持 none")
-    parser.add_argument("--model", help="记录本次 Session 预期使用的模型标识，不改变 Runtime 设置")
+    parser.add_argument("--model", help="记录本次 Session 预期使用的模型 ID，不改变 Runtime 设置")
+    parser.add_argument("--model-policy", metavar="PATH",
+                        help="平台投影的非秘密模型策略 JSON；用于评测实例装载并按策略核对环境变量")
     parser.add_argument("--compare-to", help="已封存的同 Agent Run ID，自动生成观察性对照")
     parser.add_argument("--export-response-markdown", help="显式导出各已完成 Case 的最后真实回答；指定不含目录的 .md 文件名")
     parser.add_argument("--dry-run", action="store_true", help="只解析计划，不写 Run、不启动进程")
+    parser.add_argument("--source-check", action="store_true",
+                        help="仅配 --dry-run：校验来源与 Case，不核对业务默认模型连接")
     parser.add_argument("--timeout-seconds", type=int, default=300, help="每轮等待上限（秒）")
     args = parser.parse_args()
     REPO = args.repo.expanduser().resolve()

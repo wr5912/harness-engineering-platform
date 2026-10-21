@@ -1,0 +1,3224 @@
+{
+  "source": {
+    "prototype": "file:///home/admin/Downloads/Harness_算力变体策划_交互原型.html",
+    "service": "http://10.0.160.32:3091/hep/",
+    "target": {
+      "agentId": "autonomous-training-researcher",
+      "experimentId": "EXP-autonomous-training-researcher-001-redf6be6240bf"
+    },
+    "actualData": true,
+    "assistantRequestSent": false
+  },
+  "checks": [
+    {
+      "name": "desktop-light 页面 无页面横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1px"
+    },
+    {
+      "name": "desktop-light 整页内容 算力变体",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-light 整页内容 让运行经验成为更轻量的实现",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-light 整页内容 先定义路线，再验证效果",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-light 整页内容 请 AI 策划算力变体",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-light 整页内容 选择技术路线",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-light 整页内容 补充策划信息",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-light 整页内容 与 AI 助手策划",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-light 整页内容 独立比较与验收",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-light 引导卡与四步顺序",
+      "pass": true,
+      "observed": {
+        "guidance": 1,
+        "steps": 4,
+        "run": 1
+      },
+      "expected": "引导卡 1、四步 4、真实 Run 卡 1"
+    },
+    {
+      "name": "desktop-light 真实版本标识",
+      "pass": true,
+      "observed": "基于 v001 策划",
+      "expected": "引用当前真实版本"
+    },
+    {
+      "name": "入口仍是策划",
+      "pass": true,
+      "observed": "请 AI 策划算力变体",
+      "expected": "请 AI 策划算力变体"
+    },
+    {
+      "name": "desktop-light 选择态 无页面横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1px"
+    },
+    {
+      "name": "desktop-light 选择态 弹窗左右可达",
+      "pass": true,
+      "observed": {
+        "x": 180,
+        "y": 47,
+        "width": 1080,
+        "height": 905,
+        "bottom": 953
+      },
+      "expected": "位于视口宽度内"
+    },
+    {
+      "name": "desktop-light 选择态 弹窗固定头尾",
+      "pass": true,
+      "observed": {
+        "header": {
+          "x": 181,
+          "y": 48,
+          "width": 1078,
+          "height": 175,
+          "bottom": 223
+        },
+        "footer": {
+          "x": 181,
+          "y": 876,
+          "width": 1078,
+          "height": 75,
+          "bottom": 952
+        },
+        "body": {
+          "clientHeight": 653,
+          "scrollHeight": 653,
+          "scrollTop": 0
+        }
+      },
+      "expected": "固定头尾，内部可滚动"
+    },
+    {
+      "name": "desktop-light 两类路线默认未选",
+      "pass": true,
+      "observed": {
+        "checked": 0,
+        "cards": 2
+      },
+      "expected": "中、低两卡且默认未选"
+    },
+    {
+      "name": "desktop-light 技术说明分别包含模型训练与代码模拟",
+      "pass": true,
+      "observed": 8,
+      "expected": "两条技术路线各四步"
+    },
+    {
+      "name": "desktop-light 未选类型校验",
+      "pass": true,
+      "observed": 1,
+      "expected": "错误提示与停留第一步"
+    },
+    {
+      "name": "desktop-light 进入 medium 配置从顶部显示",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=2px"
+    },
+    {
+      "name": "desktop-light 中算力配置 无页面横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1px"
+    },
+    {
+      "name": "desktop-light 中算力配置 弹窗左右可达",
+      "pass": true,
+      "observed": {
+        "x": 140,
+        "y": 23,
+        "width": 1160,
+        "height": 954,
+        "bottom": 977
+      },
+      "expected": "位于视口宽度内"
+    },
+    {
+      "name": "desktop-light 中算力配置 弹窗固定头尾",
+      "pass": true,
+      "observed": {
+        "header": {
+          "x": 141,
+          "y": 24,
+          "width": 1158,
+          "height": 177,
+          "bottom": 201
+        },
+        "footer": {
+          "x": 141,
+          "y": 901,
+          "width": 1158,
+          "height": 75,
+          "bottom": 976
+        },
+        "body": {
+          "clientHeight": 700,
+          "scrollHeight": 1086,
+          "scrollTop": 0
+        }
+      },
+      "expected": "固定头尾，内部可滚动"
+    },
+    {
+      "name": "desktop-light 中算力字段",
+      "pass": true,
+      "observed": {
+        "baseModel": 1,
+        "server": 1,
+        "summary": 1
+      },
+      "expected": "基模型、训练服务器、策划摘要"
+    },
+    {
+      "name": "desktop-light 来源轨迹以当前版本数据呈现",
+      "pass": true,
+      "observed": {
+        "availableRunRows": 3,
+        "text": "运行记录 run-59e5fb6b-b867-42cb-a675-d7d952387cfa\n执行已结束\n2026/10/16 17:09:50\n运行记录 run-0e64207b-4fa6-443b-824b-4277842deb5f\n执行已结束\n2026/10/16 17:04:11\n运行记录 run-288f1d03-4997-4bc0-9fe8-1ffc78ade264\n执行已结束\n2026/10/16 16:49:50"
+      },
+      "expected": "真实 Run 列表或真实空态"
+    },
+    {
+      "name": "desktop-light 真实外部资源未假设已登记",
+      "pass": true,
+      "observed": {
+        "model": "决策基模型\n模型库\n自定义\n请助手建议\n助手将结合轨迹、目标和训练资源建议候选基模型。\n\n模型版本、许可、样本适配性与资源要求仍需核实。",
+        "connectionDisabled": true
+      },
+      "expected": "未接入的连接与模型明确显示待配置"
+    },
+    {
+      "name": "desktop-light 必填与 SSH 校验阻止发送",
+      "pass": true,
+      "observed": [
+        "请说明本次策划希望达成的目标。",
+        "请至少选择一条当前版本轨迹，或选择由助手补充轨迹采集方案。",
+        "请填写有效主机名或 IP，不含协议与空格。",
+        "请填写有效 SSH 用户名。",
+        "请填写以 / 开头的绝对工作目录。"
+      ],
+      "expected": "目标、轨迹、Host、SSH 用户与工作目录提示"
+    },
+    {
+      "name": "desktop-light 校验未打开助手",
+      "pass": true,
+      "observed": {
+        "dialogOpen": true
+      },
+      "expected": "弹窗仍在且未发送"
+    },
+    {
+      "name": "desktop-light 配置摘要随输入更新",
+      "pass": true,
+      "observed": "本次策划摘要\n中算力变体\n\n决策模型 + 工具编排\n\n父版本\n自主训练研究助手 · v001\n轨迹依据\n由助手策划采集\n决策基模型\norg/research-base\n训练服务器\ntraining.example.test:22\n发送后在平台 AI 助手中继续策划，不会启动训练或创建变体。\n方案中待补充 / 验证\n轨迹采集方案与样本覆盖\n模型版本固定\n模型训练适配性评估\nSSH 连接、GPU、依赖与训练环境验证\n独立比较集与验收阈值",
+      "expected": "自定义基模型、新连接和轨迹采集状态"
+    },
+    {
+      "name": "desktop-light 页面标识未发送草稿",
+      "pass": true,
+      "observed": "算力变体\n基于 v001 策划\n刷新\n让运行经验成为更轻量的实现\n先定义路线，再验证效果\n\n选择中算力或低算力路线，由平台 AI 助手根据已有轨迹策划实现与比较方案。近似等效是待验证目标。\n\n请 AI 策划算力变体\n\n本次页面内有策划草稿，再次点击可继续填写。\n\n选择技术路线\n理解两类变体的实现方式\n补充策划信息\n引用轨迹、模型与训练资源\n与 AI 助手策划\n确认数据与实现方案\n独立比较与验收\n评估效果、覆盖与资源开销\nv001 · 最近封存 Run\n\n运行记录 run-59e5fb6b-b867-42cb-a675-d7d952387cfa · 2026-10-16T09:09:50Z；可作为本次策划的诊断轨迹，比较仍需新 Run。\n\n执行完成\n\n当前版本尚未保存算力变体计划。\n\n手动制定计划",
+      "expected": "再次点击可继续填写"
+    },
+    {
+      "name": "入口仍是策划",
+      "pass": true,
+      "observed": "请 AI 策划算力变体",
+      "expected": "请 AI 策划算力变体"
+    },
+    {
+      "name": "desktop-light 关闭后保留原草稿",
+      "pass": true,
+      "observed": "浏览器验收中算力草稿",
+      "expected": "浏览器验收中算力草稿"
+    },
+    {
+      "name": "入口仍是策划",
+      "pass": true,
+      "observed": "请 AI 策划算力变体",
+      "expected": "请 AI 策划算力变体"
+    },
+    {
+      "name": "desktop-light 切换标签仍保留当前版本草稿",
+      "pass": true,
+      "observed": "浏览器验收中算力草稿",
+      "expected": "浏览器验收中算力草稿"
+    },
+    {
+      "name": "入口仍是策划",
+      "pass": true,
+      "observed": "请 AI 策划算力变体",
+      "expected": "请 AI 策划算力变体"
+    },
+    {
+      "name": "desktop-light 刷新仍保留当前版本草稿",
+      "pass": true,
+      "observed": "浏览器验收中算力草稿",
+      "expected": "浏览器验收中算力草稿"
+    },
+    {
+      "name": "desktop-light Escape 关闭并回焦入口",
+      "pass": true,
+      "observed": {
+        "className": "compute-primary",
+        "text": "请 AI 策划算力变体"
+      },
+      "expected": "焦点返回策划按钮"
+    },
+    {
+      "name": "入口仍是策划",
+      "pass": true,
+      "observed": "请 AI 策划算力变体",
+      "expected": "请 AI 策划算力变体"
+    },
+    {
+      "name": "desktop-light 进入 low 配置从顶部显示",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=2px"
+    },
+    {
+      "name": "desktop-light 低算力配置 无页面横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1px"
+    },
+    {
+      "name": "desktop-light 低算力配置 弹窗左右可达",
+      "pass": true,
+      "observed": {
+        "x": 140,
+        "y": 23,
+        "width": 1160,
+        "height": 954,
+        "bottom": 977
+      },
+      "expected": "位于视口宽度内"
+    },
+    {
+      "name": "desktop-light 低算力配置 弹窗固定头尾",
+      "pass": true,
+      "observed": {
+        "header": {
+          "x": 141,
+          "y": 24,
+          "width": 1158,
+          "height": 177,
+          "bottom": 201
+        },
+        "footer": {
+          "x": 141,
+          "y": 901,
+          "width": 1158,
+          "height": 75,
+          "bottom": 976
+        },
+        "body": {
+          "clientHeight": 700,
+          "scrollHeight": 1013,
+          "scrollTop": 0
+        }
+      },
+      "expected": "固定头尾，内部可滚动"
+    },
+    {
+      "name": "desktop-light 低算力用规则代码和真实工具",
+      "pass": true,
+      "observed": "提炼规则与分支\n\n分析轨迹中的条件、动作与数据处理。\n\nLangGraph 代码实现\n\n将决策流程转为可检查的代码。\n\n复用真实工具\n\n沿用工具接口与权限，保留真实调用。",
+      "expected": "规则、LangGraph、真实工具；无中算力训练配置"
+    },
+    {
+      "name": "desktop-light 低算力策略摘要更新",
+      "pass": true,
+      "observed": "本次策划摘要\n低算力变体\n\n规则代码 + 工具编排\n\n父版本\n自主训练研究助手 · v001\n轨迹依据\n0 条当前版本轨迹\n工具调用\n复用原有真实工具\n未覆盖情况\n暂停并请求人工处理\n发送后在平台 AI 助手中继续策划，不会启动训练或创建变体。\n方案中待补充 / 验证\n独立比较集与验收阈值",
+      "expected": "暂停并请求人工处理"
+    },
+    {
+      "name": "mobile-light 页面 无页面横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1px"
+    },
+    {
+      "name": "mobile-light 整页内容 算力变体",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-light 整页内容 让运行经验成为更轻量的实现",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-light 整页内容 先定义路线，再验证效果",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-light 整页内容 请 AI 策划算力变体",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-light 整页内容 选择技术路线",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-light 整页内容 补充策划信息",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-light 整页内容 与 AI 助手策划",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-light 整页内容 独立比较与验收",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-light 引导卡与四步顺序",
+      "pass": true,
+      "observed": {
+        "guidance": 1,
+        "steps": 4,
+        "run": 1
+      },
+      "expected": "引导卡 1、四步 4、真实 Run 卡 1"
+    },
+    {
+      "name": "mobile-light 真实版本标识",
+      "pass": true,
+      "observed": "基于 v001 策划",
+      "expected": "引用当前真实版本"
+    },
+    {
+      "name": "mobile-light 手机四步双列",
+      "pass": true,
+      "observed": "157px 157px",
+      "expected": "两列"
+    },
+    {
+      "name": "入口仍是策划",
+      "pass": true,
+      "observed": "请 AI 策划算力变体",
+      "expected": "请 AI 策划算力变体"
+    },
+    {
+      "name": "mobile-light 选择态 无页面横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1px"
+    },
+    {
+      "name": "mobile-light 选择态 弹窗左右可达",
+      "pass": true,
+      "observed": {
+        "x": 0,
+        "y": 16,
+        "width": 390,
+        "height": 828,
+        "bottom": 844
+      },
+      "expected": "位于视口宽度内"
+    },
+    {
+      "name": "mobile-light 选择态 弹窗固定头尾",
+      "pass": true,
+      "observed": {
+        "header": {
+          "x": 1,
+          "y": 17,
+          "width": 388,
+          "height": 172,
+          "bottom": 189
+        },
+        "footer": {
+          "x": 1,
+          "y": 728,
+          "width": 388,
+          "height": 116,
+          "bottom": 844
+        },
+        "body": {
+          "clientHeight": 540,
+          "scrollHeight": 1110,
+          "scrollTop": 0
+        }
+      },
+      "expected": "固定头尾，内部可滚动"
+    },
+    {
+      "name": "mobile-light 选择态 手机配置摘要收起",
+      "pass": true,
+      "observed": null,
+      "expected": false
+    },
+    {
+      "name": "mobile-light 两类路线默认未选",
+      "pass": true,
+      "observed": {
+        "checked": 0,
+        "cards": 2
+      },
+      "expected": "中、低两卡且默认未选"
+    },
+    {
+      "name": "mobile-light 技术说明分别包含模型训练与代码模拟",
+      "pass": true,
+      "observed": 8,
+      "expected": "两条技术路线各四步"
+    },
+    {
+      "name": "mobile-light 未选类型校验",
+      "pass": true,
+      "observed": 1,
+      "expected": "错误提示与停留第一步"
+    },
+    {
+      "name": "mobile-light 进入 medium 配置从顶部显示",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=2px"
+    },
+    {
+      "name": "mobile-light 中算力配置 无页面横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1px"
+    },
+    {
+      "name": "mobile-light 中算力配置 弹窗左右可达",
+      "pass": true,
+      "observed": {
+        "x": 0,
+        "y": 16,
+        "width": 390,
+        "height": 828,
+        "bottom": 844
+      },
+      "expected": "位于视口宽度内"
+    },
+    {
+      "name": "mobile-light 中算力配置 弹窗固定头尾",
+      "pass": true,
+      "observed": {
+        "header": {
+          "x": 1,
+          "y": 17,
+          "width": 388,
+          "height": 174,
+          "bottom": 191
+        },
+        "footer": {
+          "x": 1,
+          "y": 728,
+          "width": 388,
+          "height": 116,
+          "bottom": 844
+        },
+        "body": {
+          "clientHeight": 538,
+          "scrollHeight": 1812,
+          "scrollTop": 0
+        }
+      },
+      "expected": "固定头尾，内部可滚动"
+    },
+    {
+      "name": "mobile-light 中算力配置 手机配置摘要收起",
+      "pass": true,
+      "observed": false,
+      "expected": false
+    },
+    {
+      "name": "mobile-light 中算力字段",
+      "pass": true,
+      "observed": {
+        "baseModel": 1,
+        "server": 1,
+        "summary": 1
+      },
+      "expected": "基模型、训练服务器、策划摘要"
+    },
+    {
+      "name": "mobile-light 来源轨迹以当前版本数据呈现",
+      "pass": true,
+      "observed": {
+        "availableRunRows": 3,
+        "text": "运行记录 run-59e5fb6b-b867-42cb-a675-d7d952387cfa\n执行已结束\n2026/10/16 17:09:50\n运行记录 run-0e64207b-4fa6-443b-824b-4277842deb5f\n执行已结束\n2026/10/16 17:04:11\n运行记录 run-288f1d03-4997-4bc0-9fe8-1ffc78ade264\n执行已结束\n2026/10/16 16:49:50"
+      },
+      "expected": "真实 Run 列表或真实空态"
+    },
+    {
+      "name": "mobile-light 真实外部资源未假设已登记",
+      "pass": true,
+      "observed": {
+        "model": "决策基模型\n模型库\n自定义\n请助手建议\n助手将结合轨迹、目标和训练资源建议候选基模型。\n\n模型版本、许可、样本适配性与资源要求仍需核实。",
+        "connectionDisabled": true
+      },
+      "expected": "未接入的连接与模型明确显示待配置"
+    },
+    {
+      "name": "mobile-light 必填与 SSH 校验阻止发送",
+      "pass": true,
+      "observed": [
+        "请说明本次策划希望达成的目标。",
+        "请至少选择一条当前版本轨迹，或选择由助手补充轨迹采集方案。",
+        "请填写有效主机名或 IP，不含协议与空格。",
+        "请填写有效 SSH 用户名。",
+        "请填写以 / 开头的绝对工作目录。"
+      ],
+      "expected": "目标、轨迹、Host、SSH 用户与工作目录提示"
+    },
+    {
+      "name": "mobile-light 校验未打开助手",
+      "pass": true,
+      "observed": {
+        "dialogOpen": true
+      },
+      "expected": "弹窗仍在且未发送"
+    },
+    {
+      "name": "mobile-light 配置摘要随输入更新",
+      "pass": true,
+      "observed": "本次策划摘要中算力变体决策模型 + 工具编排父版本自主训练研究助手 · v001轨迹依据由助手策划采集决策基模型org/research-base训练服务器training.example.test:22发送后在平台 AI 助手中继续策划，不会启动训练或创建变体。方案中待补充 / 验证轨迹采集方案与样本覆盖模型版本固定模型训练适配性评估SSH 连接、GPU、依赖与训练环境验证独立比较集与验收阈值",
+      "expected": "自定义基模型、新连接和轨迹采集状态"
+    },
+    {
+      "name": "mobile-light 页面标识未发送草稿",
+      "pass": true,
+      "observed": "算力变体\n基于 v001 策划\n刷新\n让运行经验成为更轻量的实现\n先定义路线，再验证效果\n\n选择中算力或低算力路线，由平台 AI 助手根据已有轨迹策划实现与比较方案。近似等效是待验证目标。\n\n请 AI 策划算力变体\n\n本次页面内有策划草稿，再次点击可继续填写。\n\n选择技术路线\n理解两类变体的实现方式\n补充策划信息\n引用轨迹、模型与训练资源\n与 AI 助手策划\n确认数据与实现方案\n独立比较与验收\n评估效果、覆盖与资源开销\nv001 · 最近封存 Run\n\n运行记录 run-59e5fb6b-b867-42cb-a675-d7d952387cfa · 2026-10-16T09:09:50Z；可作为本次策划的诊断轨迹，比较仍需新 Run。\n\n执行完成\n\n当前版本尚未保存算力变体计划。\n\n手动制定计划",
+      "expected": "再次点击可继续填写"
+    },
+    {
+      "name": "入口仍是策划",
+      "pass": true,
+      "observed": "请 AI 策划算力变体",
+      "expected": "请 AI 策划算力变体"
+    },
+    {
+      "name": "mobile-light 关闭后保留原草稿",
+      "pass": true,
+      "observed": "浏览器验收中算力草稿",
+      "expected": "浏览器验收中算力草稿"
+    },
+    {
+      "name": "入口仍是策划",
+      "pass": true,
+      "observed": "请 AI 策划算力变体",
+      "expected": "请 AI 策划算力变体"
+    },
+    {
+      "name": "mobile-light 切换标签仍保留当前版本草稿",
+      "pass": true,
+      "observed": "浏览器验收中算力草稿",
+      "expected": "浏览器验收中算力草稿"
+    },
+    {
+      "name": "入口仍是策划",
+      "pass": true,
+      "observed": "请 AI 策划算力变体",
+      "expected": "请 AI 策划算力变体"
+    },
+    {
+      "name": "mobile-light 刷新仍保留当前版本草稿",
+      "pass": true,
+      "observed": "浏览器验收中算力草稿",
+      "expected": "浏览器验收中算力草稿"
+    },
+    {
+      "name": "mobile-light Escape 关闭并回焦入口",
+      "pass": true,
+      "observed": {
+        "className": "compute-primary",
+        "text": "请 AI 策划算力变体"
+      },
+      "expected": "焦点返回策划按钮"
+    },
+    {
+      "name": "入口仍是策划",
+      "pass": true,
+      "observed": "请 AI 策划算力变体",
+      "expected": "请 AI 策划算力变体"
+    },
+    {
+      "name": "mobile-light 进入 low 配置从顶部显示",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=2px"
+    },
+    {
+      "name": "mobile-light 低算力配置 无页面横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1px"
+    },
+    {
+      "name": "mobile-light 低算力配置 弹窗左右可达",
+      "pass": true,
+      "observed": {
+        "x": 0,
+        "y": 16,
+        "width": 390,
+        "height": 828,
+        "bottom": 844
+      },
+      "expected": "位于视口宽度内"
+    },
+    {
+      "name": "mobile-light 低算力配置 弹窗固定头尾",
+      "pass": true,
+      "observed": {
+        "header": {
+          "x": 1,
+          "y": 17,
+          "width": 388,
+          "height": 174,
+          "bottom": 191
+        },
+        "footer": {
+          "x": 1,
+          "y": 728,
+          "width": 388,
+          "height": 116,
+          "bottom": 844
+        },
+        "body": {
+          "clientHeight": 538,
+          "scrollHeight": 1452,
+          "scrollTop": 0
+        }
+      },
+      "expected": "固定头尾，内部可滚动"
+    },
+    {
+      "name": "mobile-light 低算力配置 手机配置摘要收起",
+      "pass": true,
+      "observed": false,
+      "expected": false
+    },
+    {
+      "name": "mobile-light 低算力用规则代码和真实工具",
+      "pass": true,
+      "observed": "提炼规则与分支\n\n分析轨迹中的条件、动作与数据处理。\n\nLangGraph 代码实现\n\n将决策流程转为可检查的代码。\n\n复用真实工具\n\n沿用工具接口与权限，保留真实调用。",
+      "expected": "规则、LangGraph、真实工具；无中算力训练配置"
+    },
+    {
+      "name": "mobile-light 低算力策略摘要更新",
+      "pass": true,
+      "observed": "本次策划摘要低算力变体规则代码 + 工具编排父版本自主训练研究助手 · v001轨迹依据0 条当前版本轨迹工具调用复用原有真实工具未覆盖情况暂停并请求人工处理发送后在平台 AI 助手中继续策划，不会启动训练或创建变体。方案中待补充 / 验证独立比较集与验收阈值",
+      "expected": "暂停并请求人工处理"
+    },
+    {
+      "name": "desktop-dark 页面 无页面横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1px"
+    },
+    {
+      "name": "desktop-dark 整页内容 算力变体",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-dark 整页内容 让运行经验成为更轻量的实现",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-dark 整页内容 先定义路线，再验证效果",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-dark 整页内容 请 AI 策划算力变体",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-dark 整页内容 选择技术路线",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-dark 整页内容 补充策划信息",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-dark 整页内容 与 AI 助手策划",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-dark 整页内容 独立比较与验收",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "desktop-dark 引导卡与四步顺序",
+      "pass": true,
+      "observed": {
+        "guidance": 1,
+        "steps": 4,
+        "run": 1
+      },
+      "expected": "引导卡 1、四步 4、真实 Run 卡 1"
+    },
+    {
+      "name": "desktop-dark 真实版本标识",
+      "pass": true,
+      "observed": "基于 v001 策划",
+      "expected": "引用当前真实版本"
+    },
+    {
+      "name": "入口仍是策划",
+      "pass": true,
+      "observed": "请 AI 策划算力变体",
+      "expected": "请 AI 策划算力变体"
+    },
+    {
+      "name": "desktop-dark 选择态 无页面横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1px"
+    },
+    {
+      "name": "desktop-dark 选择态 弹窗左右可达",
+      "pass": true,
+      "observed": {
+        "x": 180,
+        "y": 47,
+        "width": 1080,
+        "height": 905,
+        "bottom": 953
+      },
+      "expected": "位于视口宽度内"
+    },
+    {
+      "name": "desktop-dark 选择态 弹窗固定头尾",
+      "pass": true,
+      "observed": {
+        "header": {
+          "x": 181,
+          "y": 48,
+          "width": 1078,
+          "height": 175,
+          "bottom": 223
+        },
+        "footer": {
+          "x": 181,
+          "y": 876,
+          "width": 1078,
+          "height": 75,
+          "bottom": 952
+        },
+        "body": {
+          "clientHeight": 653,
+          "scrollHeight": 653,
+          "scrollTop": 0
+        }
+      },
+      "expected": "固定头尾，内部可滚动"
+    },
+    {
+      "name": "desktop-dark 两类路线默认未选",
+      "pass": true,
+      "observed": {
+        "checked": 0,
+        "cards": 2
+      },
+      "expected": "中、低两卡且默认未选"
+    },
+    {
+      "name": "desktop-dark 技术说明分别包含模型训练与代码模拟",
+      "pass": true,
+      "observed": 8,
+      "expected": "两条技术路线各四步"
+    },
+    {
+      "name": "desktop-dark 未选类型校验",
+      "pass": true,
+      "observed": 1,
+      "expected": "错误提示与停留第一步"
+    },
+    {
+      "name": "desktop-dark 进入 medium 配置从顶部显示",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=2px"
+    },
+    {
+      "name": "desktop-dark 中算力配置 无页面横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1px"
+    },
+    {
+      "name": "desktop-dark 中算力配置 弹窗左右可达",
+      "pass": true,
+      "observed": {
+        "x": 140,
+        "y": 23,
+        "width": 1160,
+        "height": 954,
+        "bottom": 977
+      },
+      "expected": "位于视口宽度内"
+    },
+    {
+      "name": "desktop-dark 中算力配置 弹窗固定头尾",
+      "pass": true,
+      "observed": {
+        "header": {
+          "x": 141,
+          "y": 24,
+          "width": 1158,
+          "height": 177,
+          "bottom": 201
+        },
+        "footer": {
+          "x": 141,
+          "y": 901,
+          "width": 1158,
+          "height": 75,
+          "bottom": 976
+        },
+        "body": {
+          "clientHeight": 700,
+          "scrollHeight": 1086,
+          "scrollTop": 0
+        }
+      },
+      "expected": "固定头尾，内部可滚动"
+    },
+    {
+      "name": "desktop-dark 中算力字段",
+      "pass": true,
+      "observed": {
+        "baseModel": 1,
+        "server": 1,
+        "summary": 1
+      },
+      "expected": "基模型、训练服务器、策划摘要"
+    },
+    {
+      "name": "desktop-dark 来源轨迹以当前版本数据呈现",
+      "pass": true,
+      "observed": {
+        "availableRunRows": 3,
+        "text": "运行记录 run-59e5fb6b-b867-42cb-a675-d7d952387cfa\n执行已结束\n2026/10/16 17:09:50\n运行记录 run-0e64207b-4fa6-443b-824b-4277842deb5f\n执行已结束\n2026/10/16 17:04:11\n运行记录 run-288f1d03-4997-4bc0-9fe8-1ffc78ade264\n执行已结束\n2026/10/16 16:49:50"
+      },
+      "expected": "真实 Run 列表或真实空态"
+    },
+    {
+      "name": "desktop-dark 真实外部资源未假设已登记",
+      "pass": true,
+      "observed": {
+        "model": "决策基模型\n模型库\n自定义\n请助手建议\n助手将结合轨迹、目标和训练资源建议候选基模型。\n\n模型版本、许可、样本适配性与资源要求仍需核实。",
+        "connectionDisabled": true
+      },
+      "expected": "未接入的连接与模型明确显示待配置"
+    },
+    {
+      "name": "desktop-dark 低算力配置 无页面横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1px"
+    },
+    {
+      "name": "desktop-dark 低算力配置 弹窗左右可达",
+      "pass": true,
+      "observed": {
+        "x": 140,
+        "y": 23,
+        "width": 1160,
+        "height": 954,
+        "bottom": 977
+      },
+      "expected": "位于视口宽度内"
+    },
+    {
+      "name": "desktop-dark 低算力配置 弹窗固定头尾",
+      "pass": true,
+      "observed": {
+        "header": {
+          "x": 141,
+          "y": 24,
+          "width": 1158,
+          "height": 177,
+          "bottom": 201
+        },
+        "footer": {
+          "x": 141,
+          "y": 901,
+          "width": 1158,
+          "height": 75,
+          "bottom": 976
+        },
+        "body": {
+          "clientHeight": 700,
+          "scrollHeight": 1013,
+          "scrollTop": 0
+        }
+      },
+      "expected": "固定头尾，内部可滚动"
+    },
+    {
+      "name": "mobile-dark 页面 无页面横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1px"
+    },
+    {
+      "name": "mobile-dark 整页内容 算力变体",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-dark 整页内容 让运行经验成为更轻量的实现",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-dark 整页内容 先定义路线，再验证效果",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-dark 整页内容 请 AI 策划算力变体",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-dark 整页内容 选择技术路线",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-dark 整页内容 补充策划信息",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-dark 整页内容 与 AI 助手策划",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-dark 整页内容 独立比较与验收",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "name": "mobile-dark 引导卡与四步顺序",
+      "pass": true,
+      "observed": {
+        "guidance": 1,
+        "steps": 4,
+        "run": 1
+      },
+      "expected": "引导卡 1、四步 4、真实 Run 卡 1"
+    },
+    {
+      "name": "mobile-dark 真实版本标识",
+      "pass": true,
+      "observed": "基于 v001 策划",
+      "expected": "引用当前真实版本"
+    },
+    {
+      "name": "mobile-dark 手机四步双列",
+      "pass": true,
+      "observed": "157px 157px",
+      "expected": "两列"
+    },
+    {
+      "name": "入口仍是策划",
+      "pass": true,
+      "observed": "请 AI 策划算力变体",
+      "expected": "请 AI 策划算力变体"
+    },
+    {
+      "name": "mobile-dark 选择态 无页面横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1px"
+    },
+    {
+      "name": "mobile-dark 选择态 弹窗左右可达",
+      "pass": true,
+      "observed": {
+        "x": 0,
+        "y": 16,
+        "width": 390,
+        "height": 828,
+        "bottom": 844
+      },
+      "expected": "位于视口宽度内"
+    },
+    {
+      "name": "mobile-dark 选择态 弹窗固定头尾",
+      "pass": true,
+      "observed": {
+        "header": {
+          "x": 1,
+          "y": 17,
+          "width": 388,
+          "height": 172,
+          "bottom": 189
+        },
+        "footer": {
+          "x": 1,
+          "y": 728,
+          "width": 388,
+          "height": 116,
+          "bottom": 844
+        },
+        "body": {
+          "clientHeight": 540,
+          "scrollHeight": 1110,
+          "scrollTop": 0
+        }
+      },
+      "expected": "固定头尾，内部可滚动"
+    },
+    {
+      "name": "mobile-dark 选择态 手机配置摘要收起",
+      "pass": true,
+      "observed": null,
+      "expected": false
+    },
+    {
+      "name": "mobile-dark 两类路线默认未选",
+      "pass": true,
+      "observed": {
+        "checked": 0,
+        "cards": 2
+      },
+      "expected": "中、低两卡且默认未选"
+    },
+    {
+      "name": "mobile-dark 技术说明分别包含模型训练与代码模拟",
+      "pass": true,
+      "observed": 8,
+      "expected": "两条技术路线各四步"
+    },
+    {
+      "name": "mobile-dark 未选类型校验",
+      "pass": true,
+      "observed": 1,
+      "expected": "错误提示与停留第一步"
+    },
+    {
+      "name": "mobile-dark 进入 medium 配置从顶部显示",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=2px"
+    },
+    {
+      "name": "mobile-dark 中算力配置 无页面横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1px"
+    },
+    {
+      "name": "mobile-dark 中算力配置 弹窗左右可达",
+      "pass": true,
+      "observed": {
+        "x": 0,
+        "y": 16,
+        "width": 390,
+        "height": 828,
+        "bottom": 844
+      },
+      "expected": "位于视口宽度内"
+    },
+    {
+      "name": "mobile-dark 中算力配置 弹窗固定头尾",
+      "pass": true,
+      "observed": {
+        "header": {
+          "x": 1,
+          "y": 17,
+          "width": 388,
+          "height": 174,
+          "bottom": 191
+        },
+        "footer": {
+          "x": 1,
+          "y": 728,
+          "width": 388,
+          "height": 116,
+          "bottom": 844
+        },
+        "body": {
+          "clientHeight": 538,
+          "scrollHeight": 1812,
+          "scrollTop": 0
+        }
+      },
+      "expected": "固定头尾，内部可滚动"
+    },
+    {
+      "name": "mobile-dark 中算力配置 手机配置摘要收起",
+      "pass": true,
+      "observed": false,
+      "expected": false
+    },
+    {
+      "name": "mobile-dark 中算力字段",
+      "pass": true,
+      "observed": {
+        "baseModel": 1,
+        "server": 1,
+        "summary": 1
+      },
+      "expected": "基模型、训练服务器、策划摘要"
+    },
+    {
+      "name": "mobile-dark 来源轨迹以当前版本数据呈现",
+      "pass": true,
+      "observed": {
+        "availableRunRows": 3,
+        "text": "运行记录 run-59e5fb6b-b867-42cb-a675-d7d952387cfa\n执行已结束\n2026/10/16 17:09:50\n运行记录 run-0e64207b-4fa6-443b-824b-4277842deb5f\n执行已结束\n2026/10/16 17:04:11\n运行记录 run-288f1d03-4997-4bc0-9fe8-1ffc78ade264\n执行已结束\n2026/10/16 16:49:50"
+      },
+      "expected": "真实 Run 列表或真实空态"
+    },
+    {
+      "name": "mobile-dark 真实外部资源未假设已登记",
+      "pass": true,
+      "observed": {
+        "model": "决策基模型\n模型库\n自定义\n请助手建议\n助手将结合轨迹、目标和训练资源建议候选基模型。\n\n模型版本、许可、样本适配性与资源要求仍需核实。",
+        "connectionDisabled": true
+      },
+      "expected": "未接入的连接与模型明确显示待配置"
+    },
+    {
+      "name": "mobile-dark 低算力配置 无页面横向溢出",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=1px"
+    },
+    {
+      "name": "mobile-dark 低算力配置 弹窗左右可达",
+      "pass": true,
+      "observed": {
+        "x": 0,
+        "y": 16,
+        "width": 390,
+        "height": 828,
+        "bottom": 844
+      },
+      "expected": "位于视口宽度内"
+    },
+    {
+      "name": "mobile-dark 低算力配置 弹窗固定头尾",
+      "pass": true,
+      "observed": {
+        "header": {
+          "x": 1,
+          "y": 17,
+          "width": 388,
+          "height": 174,
+          "bottom": 191
+        },
+        "footer": {
+          "x": 1,
+          "y": 728,
+          "width": 388,
+          "height": 116,
+          "bottom": 844
+        },
+        "body": {
+          "clientHeight": 538,
+          "scrollHeight": 1452,
+          "scrollTop": 0
+        }
+      },
+      "expected": "固定头尾，内部可滚动"
+    },
+    {
+      "name": "mobile-dark 低算力配置 手机配置摘要收起",
+      "pass": true,
+      "observed": false,
+      "expected": false
+    },
+    {
+      "name": "入口仍是策划",
+      "pass": true,
+      "observed": "请 AI 策划算力变体",
+      "expected": "请 AI 策划算力变体"
+    },
+    {
+      "name": "real-runs 进入 low 配置从顶部显示",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=2px"
+    },
+    {
+      "name": "真实 Run 来自所选版本并可多选",
+      "pass": true,
+      "observed": {
+        "version": "EXP-autonomous-training-researcher-001-redf6be6240bf",
+        "count": 3,
+        "selected": 2,
+        "display": "已选择 2 条轨迹 · 场景覆盖待分析\n先由助手补充轨迹采集方案",
+        "source": "autonomous-training-researcher · EXP-autonomous-training-researcher-001-redf6be6240bf · git:278593d071c3a9543b794ac59e66f99ac88786d4"
+      },
+      "expected": "选择后摘要与来源版本一致"
+    }
+  ],
+  "screenshots": [
+    {
+      "name": "desktop-light-page",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-desktop-light-page.png"
+    },
+    {
+      "name": "desktop-light-choose",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-desktop-light-choose.png"
+    },
+    {
+      "name": "desktop-light-choose-error",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-desktop-light-choose-error.png"
+    },
+    {
+      "name": "desktop-light-medium",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-desktop-light-medium.png"
+    },
+    {
+      "name": "desktop-light-medium-detail",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-desktop-light-medium-detail.png"
+    },
+    {
+      "name": "desktop-light-medium-errors",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-desktop-light-medium-errors.png"
+    },
+    {
+      "name": "desktop-light-medium-filled",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-desktop-light-medium-filled.png"
+    },
+    {
+      "name": "desktop-light-page-draft",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-desktop-light-page-draft.png"
+    },
+    {
+      "name": "desktop-light-low",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-desktop-light-low.png"
+    },
+    {
+      "name": "desktop-light-low-detail",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-desktop-light-low-detail.png"
+    },
+    {
+      "name": "mobile-light-page",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-mobile-light-page.png"
+    },
+    {
+      "name": "mobile-light-choose",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-mobile-light-choose.png"
+    },
+    {
+      "name": "mobile-light-choose-error",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-mobile-light-choose-error.png"
+    },
+    {
+      "name": "mobile-light-medium",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-mobile-light-medium.png"
+    },
+    {
+      "name": "mobile-light-medium-detail",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-mobile-light-medium-detail.png"
+    },
+    {
+      "name": "mobile-light-medium-errors",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-mobile-light-medium-errors.png"
+    },
+    {
+      "name": "mobile-light-medium-filled",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-mobile-light-medium-filled.png"
+    },
+    {
+      "name": "mobile-light-page-draft",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-mobile-light-page-draft.png"
+    },
+    {
+      "name": "mobile-light-low",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-mobile-light-low.png"
+    },
+    {
+      "name": "mobile-light-low-detail",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-mobile-light-low-detail.png"
+    },
+    {
+      "name": "desktop-dark-page",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-desktop-dark-page.png"
+    },
+    {
+      "name": "desktop-dark-choose",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-desktop-dark-choose.png"
+    },
+    {
+      "name": "desktop-dark-choose-error",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-desktop-dark-choose-error.png"
+    },
+    {
+      "name": "desktop-dark-medium",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-desktop-dark-medium.png"
+    },
+    {
+      "name": "desktop-dark-medium-detail",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-desktop-dark-medium-detail.png"
+    },
+    {
+      "name": "desktop-dark-low",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-desktop-dark-low.png"
+    },
+    {
+      "name": "mobile-dark-page",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-mobile-dark-page.png"
+    },
+    {
+      "name": "mobile-dark-choose",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-mobile-dark-choose.png"
+    },
+    {
+      "name": "mobile-dark-choose-error",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-mobile-dark-choose-error.png"
+    },
+    {
+      "name": "mobile-dark-medium",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-mobile-dark-medium.png"
+    },
+    {
+      "name": "mobile-dark-medium-detail",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-mobile-dark-medium-detail.png"
+    },
+    {
+      "name": "mobile-dark-low",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-mobile-dark-low.png"
+    },
+    {
+      "name": "real-run-selection",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-real-run-selection.png"
+    }
+  ],
+  "prototypeGeometry": [
+    {
+      "scene": "choose",
+      "mode": "desktop-light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "documentOverflowX": 0,
+      "bodyScrollY": 0,
+      "dialog": {
+        "x": 180,
+        "y": 65,
+        "width": 1080,
+        "height": 898,
+        "bottom": 964
+      },
+      "dialogBody": {
+        "clientHeight": 649,
+        "scrollHeight": 649,
+        "scrollTop": 0
+      },
+      "dialogHeader": {
+        "x": 181,
+        "y": 66,
+        "width": 1078,
+        "height": 173,
+        "bottom": 239
+      },
+      "dialogFooter": {
+        "x": 181,
+        "y": 889,
+        "width": 1078,
+        "height": 74,
+        "bottom": 963
+      },
+      "typeCards": [
+        {
+          "x": 208,
+          "y": 326,
+          "width": 503,
+          "height": 476
+        },
+        {
+          "x": 729,
+          "y": 326,
+          "width": 503,
+          "height": 476
+        }
+      ],
+      "summaryVisible": null,
+      "page": {
+        "x": 50,
+        "y": 104,
+        "width": 1340,
+        "height": 971,
+        "bottom": 1075
+      },
+      "computePanel": {
+        "x": 347,
+        "y": 437,
+        "width": 1008,
+        "height": 587,
+        "bottom": 1024
+      },
+      "intro": {
+        "x": 371,
+        "y": 507,
+        "width": 960,
+        "height": 211,
+        "bottom": 718
+      },
+      "workflow": {
+        "x": 371,
+        "y": 741,
+        "width": 960,
+        "height": 108,
+        "bottom": 849
+      },
+      "relatedRun": {
+        "x": 371,
+        "y": 872,
+        "width": 960,
+        "height": 78,
+        "bottom": 951
+      },
+      "activeElement": "modal "
+    },
+    {
+      "scene": "medium",
+      "mode": "desktop-light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "documentOverflowX": 0,
+      "bodyScrollY": 0,
+      "dialog": {
+        "x": 140,
+        "y": 52,
+        "width": 1160,
+        "height": 925,
+        "bottom": 977
+      },
+      "dialogBody": {
+        "clientHeight": 676,
+        "scrollHeight": 1156,
+        "scrollTop": 0
+      },
+      "dialogHeader": {
+        "x": 141,
+        "y": 53,
+        "width": 1158,
+        "height": 173,
+        "bottom": 226
+      },
+      "dialogFooter": {
+        "x": 141,
+        "y": 902,
+        "width": 1158,
+        "height": 74,
+        "bottom": 976
+      },
+      "typeCards": [],
+      "summaryVisible": true,
+      "page": {
+        "x": 50,
+        "y": 104,
+        "width": 1340,
+        "height": 971,
+        "bottom": 1075
+      },
+      "computePanel": {
+        "x": 347,
+        "y": 437,
+        "width": 1008,
+        "height": 587,
+        "bottom": 1024
+      },
+      "intro": {
+        "x": 371,
+        "y": 507,
+        "width": 960,
+        "height": 211,
+        "bottom": 718
+      },
+      "workflow": {
+        "x": 371,
+        "y": 741,
+        "width": 960,
+        "height": 108,
+        "bottom": 849
+      },
+      "relatedRun": {
+        "x": 371,
+        "y": 872,
+        "width": 960,
+        "height": 78,
+        "bottom": 951
+      },
+      "activeElement": "modal config"
+    },
+    {
+      "scene": "low",
+      "mode": "desktop-light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "documentOverflowX": 0,
+      "bodyScrollY": 0,
+      "dialog": {
+        "x": 140,
+        "y": 52,
+        "width": 1160,
+        "height": 925,
+        "bottom": 977
+      },
+      "dialogBody": {
+        "clientHeight": 676,
+        "scrollHeight": 1059,
+        "scrollTop": 0
+      },
+      "dialogHeader": {
+        "x": 141,
+        "y": 53,
+        "width": 1158,
+        "height": 173,
+        "bottom": 226
+      },
+      "dialogFooter": {
+        "x": 141,
+        "y": 902,
+        "width": 1158,
+        "height": 74,
+        "bottom": 976
+      },
+      "typeCards": [],
+      "summaryVisible": true,
+      "page": {
+        "x": 50,
+        "y": 104,
+        "width": 1340,
+        "height": 971,
+        "bottom": 1075
+      },
+      "computePanel": {
+        "x": 347,
+        "y": 437,
+        "width": 1008,
+        "height": 587,
+        "bottom": 1024
+      },
+      "intro": {
+        "x": 371,
+        "y": 507,
+        "width": 960,
+        "height": 211,
+        "bottom": 718
+      },
+      "workflow": {
+        "x": 371,
+        "y": 741,
+        "width": 960,
+        "height": 108,
+        "bottom": 849
+      },
+      "relatedRun": {
+        "x": 371,
+        "y": 872,
+        "width": 960,
+        "height": 78,
+        "bottom": 951
+      },
+      "activeElement": "modal config"
+    },
+    {
+      "scene": "choose",
+      "mode": "mobile-light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "documentOverflowX": 0,
+      "bodyScrollY": 0,
+      "dialog": {
+        "x": 0,
+        "y": 28,
+        "width": 390,
+        "height": 816,
+        "bottom": 844
+      },
+      "dialogBody": {
+        "clientHeight": 527,
+        "scrollHeight": 1072,
+        "scrollTop": 0
+      },
+      "dialogHeader": {
+        "x": 0,
+        "y": 28,
+        "width": 390,
+        "height": 173,
+        "bottom": 201
+      },
+      "dialogFooter": {
+        "x": 0,
+        "y": 728,
+        "width": 390,
+        "height": 116,
+        "bottom": 844
+      },
+      "typeCards": [
+        {
+          "x": 17,
+          "y": 280,
+          "width": 356,
+          "height": 435
+        },
+        {
+          "x": 17,
+          "y": 728,
+          "width": 356,
+          "height": 415
+        }
+      ],
+      "summaryVisible": null,
+      "page": {
+        "x": 0,
+        "y": 90,
+        "width": 390,
+        "height": 1006,
+        "bottom": 1096
+      },
+      "computePanel": {
+        "x": 17,
+        "y": 422,
+        "width": 356,
+        "height": 652,
+        "bottom": 1074
+      },
+      "intro": {
+        "x": 33,
+        "y": 481,
+        "width": 324,
+        "height": 200,
+        "bottom": 680
+      },
+      "workflow": {
+        "x": 33,
+        "y": 697,
+        "width": 324,
+        "height": 205,
+        "bottom": 903
+      },
+      "relatedRun": {
+        "x": 33,
+        "y": 920,
+        "width": 324,
+        "height": 87,
+        "bottom": 1007
+      },
+      "activeElement": "modal "
+    },
+    {
+      "scene": "medium",
+      "mode": "mobile-light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "documentOverflowX": 0,
+      "bodyScrollY": 0,
+      "dialog": {
+        "x": 0,
+        "y": 28,
+        "width": 390,
+        "height": 816,
+        "bottom": 844
+      },
+      "dialogBody": {
+        "clientHeight": 560,
+        "scrollHeight": 1876,
+        "scrollTop": 0
+      },
+      "dialogHeader": {
+        "x": 0,
+        "y": 28,
+        "width": 390,
+        "height": 141,
+        "bottom": 169
+      },
+      "dialogFooter": {
+        "x": 0,
+        "y": 728,
+        "width": 390,
+        "height": 116,
+        "bottom": 844
+      },
+      "typeCards": [],
+      "summaryVisible": false,
+      "page": {
+        "x": 0,
+        "y": 90,
+        "width": 390,
+        "height": 1006,
+        "bottom": 1096
+      },
+      "computePanel": {
+        "x": 17,
+        "y": 422,
+        "width": 356,
+        "height": 652,
+        "bottom": 1074
+      },
+      "intro": {
+        "x": 33,
+        "y": 481,
+        "width": 324,
+        "height": 200,
+        "bottom": 680
+      },
+      "workflow": {
+        "x": 33,
+        "y": 697,
+        "width": 324,
+        "height": 205,
+        "bottom": 903
+      },
+      "relatedRun": {
+        "x": 33,
+        "y": 920,
+        "width": 324,
+        "height": 87,
+        "bottom": 1007
+      },
+      "activeElement": "modal config"
+    },
+    {
+      "scene": "low",
+      "mode": "mobile-light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "documentOverflowX": 0,
+      "bodyScrollY": 0,
+      "dialog": {
+        "x": 0,
+        "y": 28,
+        "width": 390,
+        "height": 816,
+        "bottom": 844
+      },
+      "dialogBody": {
+        "clientHeight": 560,
+        "scrollHeight": 1380,
+        "scrollTop": 0
+      },
+      "dialogHeader": {
+        "x": 0,
+        "y": 28,
+        "width": 390,
+        "height": 141,
+        "bottom": 169
+      },
+      "dialogFooter": {
+        "x": 0,
+        "y": 728,
+        "width": 390,
+        "height": 116,
+        "bottom": 844
+      },
+      "typeCards": [],
+      "summaryVisible": false,
+      "page": {
+        "x": 0,
+        "y": 90,
+        "width": 390,
+        "height": 1006,
+        "bottom": 1096
+      },
+      "computePanel": {
+        "x": 17,
+        "y": 422,
+        "width": 356,
+        "height": 652,
+        "bottom": 1074
+      },
+      "intro": {
+        "x": 33,
+        "y": 481,
+        "width": 324,
+        "height": 200,
+        "bottom": 680
+      },
+      "workflow": {
+        "x": 33,
+        "y": 697,
+        "width": 324,
+        "height": 205,
+        "bottom": 903
+      },
+      "relatedRun": {
+        "x": 33,
+        "y": 920,
+        "width": 324,
+        "height": 87,
+        "bottom": 1007
+      },
+      "activeElement": "modal config"
+    }
+  ],
+  "actualGeometry": [
+    {
+      "scene": "page",
+      "mode": "desktop-light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "documentOverflowX": 0,
+      "bodyScrollY": 0,
+      "dialog": null,
+      "dialogBody": {
+        "clientHeight": 0,
+        "scrollHeight": 0,
+        "scrollTop": 0
+      },
+      "dialogHeader": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "bottom": 0
+      },
+      "dialogFooter": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "bottom": 0
+      },
+      "typeCards": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        }
+      ],
+      "summaryVisible": null,
+      "page": {
+        "x": 40,
+        "y": 113,
+        "width": 1360,
+        "height": 1086,
+        "bottom": 1199
+      },
+      "computePanel": {
+        "x": 371,
+        "y": 467,
+        "width": 960,
+        "height": 557,
+        "bottom": 1024
+      },
+      "intro": {
+        "x": 371,
+        "y": 517,
+        "width": 960,
+        "height": 197,
+        "bottom": 714
+      },
+      "workflow": {
+        "x": 371,
+        "y": 734,
+        "width": 960,
+        "height": 108,
+        "bottom": 842
+      },
+      "relatedRun": {
+        "x": 371,
+        "y": 862,
+        "width": 960,
+        "height": 77,
+        "bottom": 939
+      },
+      "activeElement": "harness-theme-toggle"
+    },
+    {
+      "scene": "choose",
+      "mode": "desktop-light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "documentOverflowX": 0,
+      "bodyScrollY": 0,
+      "dialog": {
+        "x": 180,
+        "y": 47,
+        "width": 1080,
+        "height": 905,
+        "bottom": 953
+      },
+      "dialogBody": {
+        "clientHeight": 653,
+        "scrollHeight": 653,
+        "scrollTop": 0
+      },
+      "dialogHeader": {
+        "x": 181,
+        "y": 48,
+        "width": 1078,
+        "height": 175,
+        "bottom": 223
+      },
+      "dialogFooter": {
+        "x": 181,
+        "y": 876,
+        "width": 1078,
+        "height": 75,
+        "bottom": 952
+      },
+      "typeCards": [
+        {
+          "x": 208,
+          "y": 313,
+          "width": 503,
+          "height": 476
+        },
+        {
+          "x": 729,
+          "y": 313,
+          "width": 503,
+          "height": 476
+        }
+      ],
+      "summaryVisible": null,
+      "page": {
+        "x": 40,
+        "y": 113,
+        "width": 1360,
+        "height": 1086,
+        "bottom": 1199
+      },
+      "computePanel": {
+        "x": 371,
+        "y": 467,
+        "width": 960,
+        "height": 557,
+        "bottom": 1024
+      },
+      "intro": {
+        "x": 371,
+        "y": 517,
+        "width": 960,
+        "height": 197,
+        "bottom": 714
+      },
+      "workflow": {
+        "x": 371,
+        "y": 734,
+        "width": 960,
+        "height": 108,
+        "bottom": 842
+      },
+      "relatedRun": {
+        "x": 371,
+        "y": 862,
+        "width": 960,
+        "height": 77,
+        "bottom": 939
+      },
+      "activeElement": "hep-plan-title"
+    },
+    {
+      "scene": "medium",
+      "mode": "desktop-light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "documentOverflowX": 0,
+      "bodyScrollY": 0,
+      "dialog": {
+        "x": 140,
+        "y": 23,
+        "width": 1160,
+        "height": 954,
+        "bottom": 977
+      },
+      "dialogBody": {
+        "clientHeight": 700,
+        "scrollHeight": 1086,
+        "scrollTop": 0
+      },
+      "dialogHeader": {
+        "x": 141,
+        "y": 24,
+        "width": 1158,
+        "height": 177,
+        "bottom": 201
+      },
+      "dialogFooter": {
+        "x": 141,
+        "y": 901,
+        "width": 1158,
+        "height": 75,
+        "bottom": 976
+      },
+      "typeCards": [],
+      "summaryVisible": true,
+      "page": {
+        "x": 40,
+        "y": 113,
+        "width": 1360,
+        "height": 1086,
+        "bottom": 1199
+      },
+      "computePanel": {
+        "x": 371,
+        "y": 467,
+        "width": 960,
+        "height": 557,
+        "bottom": 1024
+      },
+      "intro": {
+        "x": 371,
+        "y": 517,
+        "width": 960,
+        "height": 197,
+        "bottom": 714
+      },
+      "workflow": {
+        "x": 371,
+        "y": 734,
+        "width": 960,
+        "height": 108,
+        "bottom": 842
+      },
+      "relatedRun": {
+        "x": 371,
+        "y": 862,
+        "width": 960,
+        "height": 77,
+        "bottom": 939
+      },
+      "activeElement": "hep-plan-title"
+    },
+    {
+      "scene": "low",
+      "mode": "desktop-light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "documentOverflowX": 0,
+      "bodyScrollY": 0,
+      "dialog": {
+        "x": 140,
+        "y": 23,
+        "width": 1160,
+        "height": 954,
+        "bottom": 977
+      },
+      "dialogBody": {
+        "clientHeight": 700,
+        "scrollHeight": 1013,
+        "scrollTop": 0
+      },
+      "dialogHeader": {
+        "x": 141,
+        "y": 24,
+        "width": 1158,
+        "height": 177,
+        "bottom": 201
+      },
+      "dialogFooter": {
+        "x": 141,
+        "y": 901,
+        "width": 1158,
+        "height": 75,
+        "bottom": 976
+      },
+      "typeCards": [],
+      "summaryVisible": true,
+      "page": {
+        "x": 40,
+        "y": 113,
+        "width": 1360,
+        "height": 1086,
+        "bottom": 1199
+      },
+      "computePanel": {
+        "x": 371,
+        "y": 467,
+        "width": 960,
+        "height": 557,
+        "bottom": 1024
+      },
+      "intro": {
+        "x": 371,
+        "y": 517,
+        "width": 960,
+        "height": 197,
+        "bottom": 714
+      },
+      "workflow": {
+        "x": 371,
+        "y": 734,
+        "width": 960,
+        "height": 108,
+        "bottom": 842
+      },
+      "relatedRun": {
+        "x": 371,
+        "y": 862,
+        "width": 960,
+        "height": 77,
+        "bottom": 939
+      },
+      "activeElement": "hep-plan-title"
+    },
+    {
+      "scene": "page",
+      "mode": "mobile-light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "documentOverflowX": 0,
+      "bodyScrollY": 0,
+      "dialog": null,
+      "dialogBody": {
+        "clientHeight": 0,
+        "scrollHeight": 0,
+        "scrollTop": 0
+      },
+      "dialogHeader": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "bottom": 0
+      },
+      "dialogFooter": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "bottom": 0
+      },
+      "typeCards": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        }
+      ],
+      "summaryVisible": null,
+      "page": {
+        "x": 0,
+        "y": 62,
+        "width": 390,
+        "height": 1323,
+        "bottom": 1385
+      },
+      "computePanel": {
+        "x": 33,
+        "y": 425,
+        "width": 324,
+        "height": 809,
+        "bottom": 1234
+      },
+      "intro": {
+        "x": 33,
+        "y": 475,
+        "width": 324,
+        "height": 229,
+        "bottom": 704
+      },
+      "workflow": {
+        "x": 33,
+        "y": 724,
+        "width": 324,
+        "height": 254,
+        "bottom": 978
+      },
+      "relatedRun": {
+        "x": 33,
+        "y": 998,
+        "width": 324,
+        "height": 146,
+        "bottom": 1144
+      },
+      "activeElement": "BODY"
+    },
+    {
+      "scene": "choose",
+      "mode": "mobile-light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "documentOverflowX": 0,
+      "bodyScrollY": 0,
+      "dialog": {
+        "x": 0,
+        "y": 16,
+        "width": 390,
+        "height": 828,
+        "bottom": 844
+      },
+      "dialogBody": {
+        "clientHeight": 540,
+        "scrollHeight": 1110,
+        "scrollTop": 0
+      },
+      "dialogHeader": {
+        "x": 1,
+        "y": 17,
+        "width": 388,
+        "height": 172,
+        "bottom": 189
+      },
+      "dialogFooter": {
+        "x": 1,
+        "y": 728,
+        "width": 388,
+        "height": 116,
+        "bottom": 844
+      },
+      "typeCards": [
+        {
+          "x": 17,
+          "y": 293,
+          "width": 356,
+          "height": 440
+        },
+        {
+          "x": 17,
+          "y": 746,
+          "width": 356,
+          "height": 420
+        }
+      ],
+      "summaryVisible": null,
+      "page": {
+        "x": 0,
+        "y": 62,
+        "width": 390,
+        "height": 1323,
+        "bottom": 1385
+      },
+      "computePanel": {
+        "x": 33,
+        "y": 425,
+        "width": 324,
+        "height": 809,
+        "bottom": 1234
+      },
+      "intro": {
+        "x": 33,
+        "y": 475,
+        "width": 324,
+        "height": 229,
+        "bottom": 704
+      },
+      "workflow": {
+        "x": 33,
+        "y": 724,
+        "width": 324,
+        "height": 254,
+        "bottom": 978
+      },
+      "relatedRun": {
+        "x": 33,
+        "y": 998,
+        "width": 324,
+        "height": 146,
+        "bottom": 1144
+      },
+      "activeElement": "hep-plan-title"
+    },
+    {
+      "scene": "medium",
+      "mode": "mobile-light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "documentOverflowX": 0,
+      "bodyScrollY": 0,
+      "dialog": {
+        "x": 0,
+        "y": 16,
+        "width": 390,
+        "height": 828,
+        "bottom": 844
+      },
+      "dialogBody": {
+        "clientHeight": 538,
+        "scrollHeight": 1812,
+        "scrollTop": 0
+      },
+      "dialogHeader": {
+        "x": 1,
+        "y": 17,
+        "width": 388,
+        "height": 174,
+        "bottom": 191
+      },
+      "dialogFooter": {
+        "x": 1,
+        "y": 728,
+        "width": 388,
+        "height": 116,
+        "bottom": 844
+      },
+      "typeCards": [],
+      "summaryVisible": false,
+      "page": {
+        "x": 0,
+        "y": 62,
+        "width": 390,
+        "height": 1323,
+        "bottom": 1385
+      },
+      "computePanel": {
+        "x": 33,
+        "y": 425,
+        "width": 324,
+        "height": 809,
+        "bottom": 1234
+      },
+      "intro": {
+        "x": 33,
+        "y": 475,
+        "width": 324,
+        "height": 229,
+        "bottom": 704
+      },
+      "workflow": {
+        "x": 33,
+        "y": 724,
+        "width": 324,
+        "height": 254,
+        "bottom": 978
+      },
+      "relatedRun": {
+        "x": 33,
+        "y": 998,
+        "width": 324,
+        "height": 146,
+        "bottom": 1144
+      },
+      "activeElement": "hep-plan-title"
+    },
+    {
+      "scene": "low",
+      "mode": "mobile-light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "documentOverflowX": 0,
+      "bodyScrollY": 0,
+      "dialog": {
+        "x": 0,
+        "y": 16,
+        "width": 390,
+        "height": 828,
+        "bottom": 844
+      },
+      "dialogBody": {
+        "clientHeight": 538,
+        "scrollHeight": 1452,
+        "scrollTop": 0
+      },
+      "dialogHeader": {
+        "x": 1,
+        "y": 17,
+        "width": 388,
+        "height": 174,
+        "bottom": 191
+      },
+      "dialogFooter": {
+        "x": 1,
+        "y": 728,
+        "width": 388,
+        "height": 116,
+        "bottom": 844
+      },
+      "typeCards": [],
+      "summaryVisible": false,
+      "page": {
+        "x": 0,
+        "y": 62,
+        "width": 390,
+        "height": 1323,
+        "bottom": 1385
+      },
+      "computePanel": {
+        "x": 33,
+        "y": 425,
+        "width": 324,
+        "height": 809,
+        "bottom": 1234
+      },
+      "intro": {
+        "x": 33,
+        "y": 475,
+        "width": 324,
+        "height": 229,
+        "bottom": 704
+      },
+      "workflow": {
+        "x": 33,
+        "y": 724,
+        "width": 324,
+        "height": 254,
+        "bottom": 978
+      },
+      "relatedRun": {
+        "x": 33,
+        "y": 998,
+        "width": 324,
+        "height": 146,
+        "bottom": 1144
+      },
+      "activeElement": "hep-plan-title"
+    },
+    {
+      "scene": "page",
+      "mode": "desktop-dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "documentOverflowX": 0,
+      "bodyScrollY": 0,
+      "dialog": null,
+      "dialogBody": {
+        "clientHeight": 0,
+        "scrollHeight": 0,
+        "scrollTop": 0
+      },
+      "dialogHeader": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "bottom": 0
+      },
+      "dialogFooter": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "bottom": 0
+      },
+      "typeCards": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        }
+      ],
+      "summaryVisible": null,
+      "page": {
+        "x": 40,
+        "y": 113,
+        "width": 1360,
+        "height": 1086,
+        "bottom": 1199
+      },
+      "computePanel": {
+        "x": 371,
+        "y": 467,
+        "width": 960,
+        "height": 557,
+        "bottom": 1024
+      },
+      "intro": {
+        "x": 371,
+        "y": 517,
+        "width": 960,
+        "height": 197,
+        "bottom": 714
+      },
+      "workflow": {
+        "x": 371,
+        "y": 734,
+        "width": 960,
+        "height": 108,
+        "bottom": 842
+      },
+      "relatedRun": {
+        "x": 371,
+        "y": 862,
+        "width": 960,
+        "height": 77,
+        "bottom": 939
+      },
+      "activeElement": "harness-theme-toggle"
+    },
+    {
+      "scene": "choose",
+      "mode": "desktop-dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "documentOverflowX": 0,
+      "bodyScrollY": 0,
+      "dialog": {
+        "x": 180,
+        "y": 47,
+        "width": 1080,
+        "height": 905,
+        "bottom": 953
+      },
+      "dialogBody": {
+        "clientHeight": 653,
+        "scrollHeight": 653,
+        "scrollTop": 0
+      },
+      "dialogHeader": {
+        "x": 181,
+        "y": 48,
+        "width": 1078,
+        "height": 175,
+        "bottom": 223
+      },
+      "dialogFooter": {
+        "x": 181,
+        "y": 876,
+        "width": 1078,
+        "height": 75,
+        "bottom": 952
+      },
+      "typeCards": [
+        {
+          "x": 208,
+          "y": 313,
+          "width": 503,
+          "height": 476
+        },
+        {
+          "x": 729,
+          "y": 313,
+          "width": 503,
+          "height": 476
+        }
+      ],
+      "summaryVisible": null,
+      "page": {
+        "x": 40,
+        "y": 113,
+        "width": 1360,
+        "height": 1086,
+        "bottom": 1199
+      },
+      "computePanel": {
+        "x": 371,
+        "y": 467,
+        "width": 960,
+        "height": 557,
+        "bottom": 1024
+      },
+      "intro": {
+        "x": 371,
+        "y": 517,
+        "width": 960,
+        "height": 197,
+        "bottom": 714
+      },
+      "workflow": {
+        "x": 371,
+        "y": 734,
+        "width": 960,
+        "height": 108,
+        "bottom": 842
+      },
+      "relatedRun": {
+        "x": 371,
+        "y": 862,
+        "width": 960,
+        "height": 77,
+        "bottom": 939
+      },
+      "activeElement": "hep-plan-title"
+    },
+    {
+      "scene": "medium",
+      "mode": "desktop-dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "documentOverflowX": 0,
+      "bodyScrollY": 0,
+      "dialog": {
+        "x": 140,
+        "y": 23,
+        "width": 1160,
+        "height": 954,
+        "bottom": 977
+      },
+      "dialogBody": {
+        "clientHeight": 700,
+        "scrollHeight": 1086,
+        "scrollTop": 0
+      },
+      "dialogHeader": {
+        "x": 141,
+        "y": 24,
+        "width": 1158,
+        "height": 177,
+        "bottom": 201
+      },
+      "dialogFooter": {
+        "x": 141,
+        "y": 901,
+        "width": 1158,
+        "height": 75,
+        "bottom": 976
+      },
+      "typeCards": [],
+      "summaryVisible": true,
+      "page": {
+        "x": 40,
+        "y": 113,
+        "width": 1360,
+        "height": 1086,
+        "bottom": 1199
+      },
+      "computePanel": {
+        "x": 371,
+        "y": 467,
+        "width": 960,
+        "height": 557,
+        "bottom": 1024
+      },
+      "intro": {
+        "x": 371,
+        "y": 517,
+        "width": 960,
+        "height": 197,
+        "bottom": 714
+      },
+      "workflow": {
+        "x": 371,
+        "y": 734,
+        "width": 960,
+        "height": 108,
+        "bottom": 842
+      },
+      "relatedRun": {
+        "x": 371,
+        "y": 862,
+        "width": 960,
+        "height": 77,
+        "bottom": 939
+      },
+      "activeElement": "hep-plan-title"
+    },
+    {
+      "scene": "low",
+      "mode": "desktop-dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "documentOverflowX": 0,
+      "bodyScrollY": 0,
+      "dialog": {
+        "x": 140,
+        "y": 23,
+        "width": 1160,
+        "height": 954,
+        "bottom": 977
+      },
+      "dialogBody": {
+        "clientHeight": 700,
+        "scrollHeight": 1013,
+        "scrollTop": 0
+      },
+      "dialogHeader": {
+        "x": 141,
+        "y": 24,
+        "width": 1158,
+        "height": 177,
+        "bottom": 201
+      },
+      "dialogFooter": {
+        "x": 141,
+        "y": 901,
+        "width": 1158,
+        "height": 75,
+        "bottom": 976
+      },
+      "typeCards": [],
+      "summaryVisible": true,
+      "page": {
+        "x": 40,
+        "y": 113,
+        "width": 1360,
+        "height": 1086,
+        "bottom": 1199
+      },
+      "computePanel": {
+        "x": 371,
+        "y": 467,
+        "width": 960,
+        "height": 557,
+        "bottom": 1024
+      },
+      "intro": {
+        "x": 371,
+        "y": 517,
+        "width": 960,
+        "height": 197,
+        "bottom": 714
+      },
+      "workflow": {
+        "x": 371,
+        "y": 734,
+        "width": 960,
+        "height": 108,
+        "bottom": 842
+      },
+      "relatedRun": {
+        "x": 371,
+        "y": 862,
+        "width": 960,
+        "height": 77,
+        "bottom": 939
+      },
+      "activeElement": "hep-plan-title"
+    },
+    {
+      "scene": "page",
+      "mode": "mobile-dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "documentOverflowX": 0,
+      "bodyScrollY": 0,
+      "dialog": null,
+      "dialogBody": {
+        "clientHeight": 0,
+        "scrollHeight": 0,
+        "scrollTop": 0
+      },
+      "dialogHeader": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "bottom": 0
+      },
+      "dialogFooter": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "bottom": 0
+      },
+      "typeCards": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        }
+      ],
+      "summaryVisible": null,
+      "page": {
+        "x": 0,
+        "y": 62,
+        "width": 390,
+        "height": 1323,
+        "bottom": 1385
+      },
+      "computePanel": {
+        "x": 33,
+        "y": 425,
+        "width": 324,
+        "height": 809,
+        "bottom": 1234
+      },
+      "intro": {
+        "x": 33,
+        "y": 475,
+        "width": 324,
+        "height": 229,
+        "bottom": 704
+      },
+      "workflow": {
+        "x": 33,
+        "y": 724,
+        "width": 324,
+        "height": 254,
+        "bottom": 978
+      },
+      "relatedRun": {
+        "x": 33,
+        "y": 998,
+        "width": 324,
+        "height": 146,
+        "bottom": 1144
+      },
+      "activeElement": "BODY"
+    },
+    {
+      "scene": "choose",
+      "mode": "mobile-dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "documentOverflowX": 0,
+      "bodyScrollY": 0,
+      "dialog": {
+        "x": 0,
+        "y": 16,
+        "width": 390,
+        "height": 828,
+        "bottom": 844
+      },
+      "dialogBody": {
+        "clientHeight": 540,
+        "scrollHeight": 1110,
+        "scrollTop": 0
+      },
+      "dialogHeader": {
+        "x": 1,
+        "y": 17,
+        "width": 388,
+        "height": 172,
+        "bottom": 189
+      },
+      "dialogFooter": {
+        "x": 1,
+        "y": 728,
+        "width": 388,
+        "height": 116,
+        "bottom": 844
+      },
+      "typeCards": [
+        {
+          "x": 17,
+          "y": 293,
+          "width": 356,
+          "height": 440
+        },
+        {
+          "x": 17,
+          "y": 746,
+          "width": 356,
+          "height": 420
+        }
+      ],
+      "summaryVisible": null,
+      "page": {
+        "x": 0,
+        "y": 62,
+        "width": 390,
+        "height": 1323,
+        "bottom": 1385
+      },
+      "computePanel": {
+        "x": 33,
+        "y": 425,
+        "width": 324,
+        "height": 809,
+        "bottom": 1234
+      },
+      "intro": {
+        "x": 33,
+        "y": 475,
+        "width": 324,
+        "height": 229,
+        "bottom": 704
+      },
+      "workflow": {
+        "x": 33,
+        "y": 724,
+        "width": 324,
+        "height": 254,
+        "bottom": 978
+      },
+      "relatedRun": {
+        "x": 33,
+        "y": 998,
+        "width": 324,
+        "height": 146,
+        "bottom": 1144
+      },
+      "activeElement": "hep-plan-title"
+    },
+    {
+      "scene": "medium",
+      "mode": "mobile-dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "documentOverflowX": 0,
+      "bodyScrollY": 0,
+      "dialog": {
+        "x": 0,
+        "y": 16,
+        "width": 390,
+        "height": 828,
+        "bottom": 844
+      },
+      "dialogBody": {
+        "clientHeight": 538,
+        "scrollHeight": 1812,
+        "scrollTop": 0
+      },
+      "dialogHeader": {
+        "x": 1,
+        "y": 17,
+        "width": 388,
+        "height": 174,
+        "bottom": 191
+      },
+      "dialogFooter": {
+        "x": 1,
+        "y": 728,
+        "width": 388,
+        "height": 116,
+        "bottom": 844
+      },
+      "typeCards": [],
+      "summaryVisible": false,
+      "page": {
+        "x": 0,
+        "y": 62,
+        "width": 390,
+        "height": 1323,
+        "bottom": 1385
+      },
+      "computePanel": {
+        "x": 33,
+        "y": 425,
+        "width": 324,
+        "height": 809,
+        "bottom": 1234
+      },
+      "intro": {
+        "x": 33,
+        "y": 475,
+        "width": 324,
+        "height": 229,
+        "bottom": 704
+      },
+      "workflow": {
+        "x": 33,
+        "y": 724,
+        "width": 324,
+        "height": 254,
+        "bottom": 978
+      },
+      "relatedRun": {
+        "x": 33,
+        "y": 998,
+        "width": 324,
+        "height": 146,
+        "bottom": 1144
+      },
+      "activeElement": "hep-plan-title"
+    },
+    {
+      "scene": "low",
+      "mode": "mobile-dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "documentOverflowX": 0,
+      "bodyScrollY": 0,
+      "dialog": {
+        "x": 0,
+        "y": 16,
+        "width": 390,
+        "height": 828,
+        "bottom": 844
+      },
+      "dialogBody": {
+        "clientHeight": 538,
+        "scrollHeight": 1452,
+        "scrollTop": 0
+      },
+      "dialogHeader": {
+        "x": 1,
+        "y": 17,
+        "width": 388,
+        "height": 174,
+        "bottom": 191
+      },
+      "dialogFooter": {
+        "x": 1,
+        "y": 728,
+        "width": 388,
+        "height": 116,
+        "bottom": 844
+      },
+      "typeCards": [],
+      "summaryVisible": false,
+      "page": {
+        "x": 0,
+        "y": 62,
+        "width": 390,
+        "height": 1323,
+        "bottom": 1385
+      },
+      "computePanel": {
+        "x": 33,
+        "y": 425,
+        "width": 324,
+        "height": 809,
+        "bottom": 1234
+      },
+      "intro": {
+        "x": 33,
+        "y": 475,
+        "width": 324,
+        "height": 229,
+        "bottom": 704
+      },
+      "workflow": {
+        "x": 33,
+        "y": 724,
+        "width": 324,
+        "height": 254,
+        "bottom": 978
+      },
+      "relatedRun": {
+        "x": 33,
+        "y": 998,
+        "width": 324,
+        "height": 146,
+        "bottom": 1144
+      },
+      "activeElement": "hep-plan-title"
+    }
+  ],
+  "differences": [],
+  "errors": [],
+  "skipped": [
+    {
+      "name": "desktop-light 切版本草稿隔离",
+      "reason": "当前智能体只有一个版本"
+    },
+    {
+      "name": "mobile-light 切版本草稿隔离",
+      "reason": "当前智能体只有一个版本"
+    }
+  ]
+}

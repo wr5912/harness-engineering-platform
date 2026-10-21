@@ -1,0 +1,271 @@
+{
+  "checkedAt": "2026-10-21T04:47:20.722Z",
+  "checks": [
+    {
+      "name": "1440 首页路由与内容",
+      "passed": true
+    },
+    {
+      "name": "1440 首页内容读取已结束",
+      "passed": true
+    },
+    {
+      "name": "1440 首页无页面横向溢出",
+      "passed": true
+    },
+    {
+      "name": "1440 智能体管理路由与内容",
+      "passed": true
+    },
+    {
+      "name": "1440 智能体管理内容读取已结束",
+      "passed": true
+    },
+    {
+      "name": "1440 智能体管理无页面横向溢出",
+      "passed": true
+    },
+    {
+      "name": "1440 评测中心路由与内容",
+      "passed": true
+    },
+    {
+      "name": "1440 评测中心内容读取已结束",
+      "passed": true
+    },
+    {
+      "name": "1440 评测中心无页面横向溢出",
+      "passed": true
+    },
+    {
+      "name": "1440 实例管理路由与内容",
+      "passed": true
+    },
+    {
+      "name": "1440 实例管理内容读取已结束",
+      "passed": true
+    },
+    {
+      "name": "1440 实例管理无页面横向溢出",
+      "passed": true
+    },
+    {
+      "name": "1440 统一网关路由与内容",
+      "passed": true
+    },
+    {
+      "name": "1440 统一网关内容读取已结束",
+      "passed": true
+    },
+    {
+      "name": "1440 统一网关无页面横向溢出",
+      "passed": true
+    },
+    {
+      "name": "1440 MCP 管理路由与内容",
+      "passed": true
+    },
+    {
+      "name": "1440 MCP 管理内容读取已结束",
+      "passed": true
+    },
+    {
+      "name": "1440 MCP 管理无页面横向溢出",
+      "passed": true
+    },
+    {
+      "name": "390 首页路由与内容",
+      "passed": true
+    },
+    {
+      "name": "390 首页内容读取已结束",
+      "passed": true
+    },
+    {
+      "name": "390 首页无页面横向溢出",
+      "passed": true
+    },
+    {
+      "name": "390 智能体管理路由与内容",
+      "passed": true
+    },
+    {
+      "name": "390 智能体管理内容读取已结束",
+      "passed": true
+    },
+    {
+      "name": "390 智能体管理无页面横向溢出",
+      "passed": true
+    },
+    {
+      "name": "390 评测中心路由与内容",
+      "passed": true
+    },
+    {
+      "name": "390 评测中心内容读取已结束",
+      "passed": true
+    },
+    {
+      "name": "390 评测中心无页面横向溢出",
+      "passed": true
+    },
+    {
+      "name": "390 实例管理路由与内容",
+      "passed": true
+    },
+    {
+      "name": "390 实例管理内容读取已结束",
+      "passed": true
+    },
+    {
+      "name": "390 实例管理无页面横向溢出",
+      "passed": true
+    },
+    {
+      "name": "390 统一网关路由与内容",
+      "passed": true
+    },
+    {
+      "name": "390 统一网关内容读取已结束",
+      "passed": true
+    },
+    {
+      "name": "390 统一网关无页面横向溢出",
+      "passed": true
+    },
+    {
+      "name": "390 MCP 管理路由与内容",
+      "passed": true
+    },
+    {
+      "name": "390 MCP 管理内容读取已结束",
+      "passed": true
+    },
+    {
+      "name": "390 MCP 管理无页面横向溢出",
+      "passed": true
+    },
+    {
+      "name": "管理对话原生容器仍可进入",
+      "passed": true
+    },
+    {
+      "name": "逐页无脚本错误与 5xx",
+      "passed": true
+    }
+  ],
+  "screenshots": [
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/final-page-home-1440.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/final-page-agents-1440.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/final-page-evaluation-1440.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/final-page-instances-1440.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/final-page-gateway-1440.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/final-page-mcp-1440.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/final-page-home-390.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/final-page-agents-390.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/final-page-evaluation-390.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/final-page-instances-390.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/final-page-gateway-390.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/final-page-mcp-390.png"
+  ],
+  "pageErrors": [],
+  "failedResponses": [],
+  "facts": [
+    {
+      "name": "首页",
+      "width": 1440,
+      "hash": "#/home",
+      "viewport": 1440,
+      "heading": "用 AI 构建和管理智能体",
+      "hasLoading": false
+    },
+    {
+      "name": "智能体管理",
+      "width": 1440,
+      "hash": "#/agents?agent_id=autonomous-training-researcher&experiment_id=EXP-autonomous-training-researcher-001-redf6be6240bf&tab=overview",
+      "viewport": 1440,
+      "heading": "用 AI 构建和管理智能体",
+      "hasLoading": false
+    },
+    {
+      "name": "评测中心",
+      "width": 1440,
+      "hash": "#/evaluation?run_id=run-8256cf6f-5e0f-4ec3-8420-0bff47423bf0&tab=runs",
+      "viewport": 1440,
+      "heading": "用 AI 构建和管理智能体",
+      "hasLoading": false
+    },
+    {
+      "name": "实例管理",
+      "width": 1440,
+      "hash": "#/instances",
+      "viewport": 1440,
+      "heading": "用 AI 构建和管理智能体",
+      "hasLoading": false
+    },
+    {
+      "name": "统一网关",
+      "width": 1440,
+      "hash": "#/gateway",
+      "viewport": 1440,
+      "heading": "用 AI 构建和管理智能体",
+      "hasLoading": false
+    },
+    {
+      "name": "MCP 管理",
+      "width": 1440,
+      "hash": "#/mcp",
+      "viewport": 1440,
+      "heading": "用 AI 构建和管理智能体",
+      "hasLoading": false
+    },
+    {
+      "name": "首页",
+      "width": 390,
+      "hash": "#/home",
+      "viewport": 390,
+      "heading": "用 AI 构建和管理智能体",
+      "hasLoading": false
+    },
+    {
+      "name": "智能体管理",
+      "width": 390,
+      "hash": "#/agents?agent_id=autonomous-training-researcher&experiment_id=EXP-autonomous-training-researcher-001-redf6be6240bf&tab=overview",
+      "viewport": 390,
+      "heading": "用 AI 构建和管理智能体",
+      "hasLoading": false
+    },
+    {
+      "name": "评测中心",
+      "width": 390,
+      "hash": "#/evaluation?run_id=run-8256cf6f-5e0f-4ec3-8420-0bff47423bf0&tab=runs",
+      "viewport": 390,
+      "heading": "用 AI 构建和管理智能体",
+      "hasLoading": false
+    },
+    {
+      "name": "实例管理",
+      "width": 390,
+      "hash": "#/instances",
+      "viewport": 390,
+      "heading": "用 AI 构建和管理智能体",
+      "hasLoading": false
+    },
+    {
+      "name": "统一网关",
+      "width": 390,
+      "hash": "#/gateway",
+      "viewport": 390,
+      "heading": "用 AI 构建和管理智能体",
+      "hasLoading": false
+    },
+    {
+      "name": "MCP 管理",
+      "width": 390,
+      "hash": "#/mcp",
+      "viewport": 390,
+      "heading": "用 AI 构建和管理智能体",
+      "hasLoading": false
+    }
+  ]
+}

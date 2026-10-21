@@ -642,6 +642,89 @@ def compare_views(left: dict, right: dict) -> dict:
     return json.loads(completed.stdout)
 
 
+def run_index_facts(run_dir: Path, manifest: dict) -> dict:
+    """从本 Run 的冻结用例与结果生成列表摘要，不读取当前用例或轨迹。"""
+    facts = {"title": None, "case_scope": None, "case_counts": None, "effective_verdict": None}
+    summary_path = run_dir / "summary.json"
+    try:
+        summary = json.loads(summary_path.read_text(encoding="utf-8")) if summary_path.is_file() and not summary_path.is_symlink() else None
+    except (OSError, ValueError):
+        summary = None
+    if manifest.get("status") == "completed" and isinstance(summary, dict) and summary.get("run_id", manifest.get("run_id")) == manifest.get("run_id"):
+        verdict = summary.get("effective_verdict")
+        if verdict is None:
+            verdict = summary.get("machine_overall_verdict")
+        if verdict is None:
+            verdict = summary.get("overall_verdict")
+        if verdict in VERDICTS:
+            facts["effective_verdict"] = verdict
+
+    inputs_path = run_dir / "inputs.lock.json"
+    try:
+        inputs = json.loads(inputs_path.read_text(encoding="utf-8")) if inputs_path.is_file() and not inputs_path.is_symlink() else None
+    except (OSError, ValueError):
+        inputs = None
+    if not isinstance(inputs, dict):
+        return facts
+    frozen = inputs.get("evaluation_cases")
+    if isinstance(frozen, list):
+        selected = [item for item in frozen if isinstance(item, dict) and isinstance(item.get("case_id"), str)]
+        case_ids = list(dict.fromkeys(item["case_id"] for item in selected))
+    else:
+        selected = []
+        selection = inputs.get("evaluation_selection")
+        raw_ids = selection.get("case_ids") if isinstance(selection, dict) else None
+        if not isinstance(raw_ids, list):
+            return facts
+        case_ids = list(dict.fromkeys(item for item in raw_ids if isinstance(item, str)))
+    if not case_ids:
+        return facts
+    facts["case_scope"] = f"{len(case_ids)} 项已选用例"
+    catalog = inputs.get("case_catalog")
+    scene_by_id = {item["case_id"]: item.get("scene") for item in catalog
+                   if isinstance(item, dict) and isinstance(item.get("case_id"), str) and isinstance(item.get("scene"), str)} if isinstance(catalog, list) else {}
+    scenes = {scene_by_id.get(case_id) for case_id in case_ids}
+    scene = next(iter(scenes)) if len(scenes) == 1 else None
+    scene_name = scene.strip() if isinstance(scene, str) else ""
+    first_title = selected[0].get("title") if selected else None
+    if len(case_ids) == 1 and isinstance(first_title, str) and first_title.strip():
+        facts["title"] = first_title.strip()
+    elif scene_name and scene_name not in ("未分组", "未分类", "无分组"):
+        facts["title"] = scene_name if scene_name.endswith(("评测", "验证")) else f"{scene_name}评测"
+    elif isinstance(first_title, str) and first_title.strip():
+        facts["title"] = f"{first_title.strip()}等 {len(case_ids)} 项用例"
+    else:
+        facts["title"] = f"{len(case_ids)} 项用例评测"
+
+    results_path = run_dir / "results.jsonl"
+    analysis_path = run_dir / "analysis.json"
+    try:
+        if results_path.is_symlink() or analysis_path.is_symlink():
+            return facts
+        rows = [json.loads(line) for line in results_path.read_text(encoding="utf-8").splitlines() if line.strip()] if results_path.is_file() else []
+        analysis = json.loads(analysis_path.read_text(encoding="utf-8")) if analysis_path.is_file() else {}
+        if not isinstance(analysis, dict) or not isinstance(analysis.get("scenes", []), list) or not all(isinstance(row, dict) for row in rows):
+            return facts
+    except (OSError, ValueError):
+        return facts
+    trials = {case_id: [] for case_id in case_ids}
+    for row in rows:
+        if isinstance(row.get("input_id"), str) and row["input_id"] in trials:
+            trials[row["input_id"]].append(row.get("verdict"))
+    reviews = {item["case_id"]: item.get("reviewed_verdict") for scene in analysis.get("scenes", []) if isinstance(scene, dict)
+               for item in (scene.get("case_reviews") if isinstance(scene.get("case_reviews"), list) else [])
+               if isinstance(item, dict) and isinstance(item.get("case_id"), str)}
+    counts = {key: 0 for key in (*VERDICTS, "mixed", "pending")}
+    for case_id in case_ids:
+        reviewed = reviews.get(case_id)
+        verdicts = trials[case_id]
+        observed = reviewed if reviewed in VERDICTS else ("pending" if not verdicts or any(verdict not in VERDICTS for verdict in verdicts)
+                   else verdicts[0] if all(verdict == verdicts[0] for verdict in verdicts) else "mixed")
+        counts[observed] += 1
+    facts["case_counts"] = {"total": len(case_ids), **counts}
+    return facts
+
+
 def command_index(repo: Path, args: argparse.Namespace) -> None:
     if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", args.agent):
         raise ValueError("agent 必须是小写 kebab-case")
@@ -656,7 +739,8 @@ def command_index(repo: Path, args: argparse.Namespace) -> None:
             if path.is_symlink() or path.parent.is_symlink():
                 continue
             manifest = read_flat_yaml(path)
-            runs.append({key: manifest.get(key) for key in ("run_id", "status", "created_at", "finished_at")})
+            runs.append({**{key: manifest.get(key) for key in ("run_id", "status", "created_at", "finished_at")},
+                         **run_index_facts(path.parent, manifest)})
         experiments.append({"experiment_id": root.name, "status": change.get("status"), "runs": runs})
     print(json.dumps({"agent_id": args.agent, "evaluation_path": f"agents/{args.agent}/evaluation.md",
                       "experiments": experiments}, ensure_ascii=False, indent=2))

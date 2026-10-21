@@ -1,0 +1,42 @@
+{
+  "checkedAt": "2026-10-21T04:48:34.452Z",
+  "checks": [
+    {
+      "name": "平台 AI 助手默认 MiMo-V2.6-Flash/high",
+      "passed": true
+    },
+    {
+      "name": "业务智能体统一默认 MiMo-V2.6-Flash/off",
+      "passed": true
+    },
+    {
+      "name": "设置仅有两张模型卡",
+      "passed": true
+    },
+    {
+      "name": "无虚假草稿或修订冲突提示",
+      "passed": true
+    },
+    {
+      "name": "模型设置无页面错误或 5xx",
+      "passed": true
+    }
+  ],
+  "values": {
+    "platform": {
+      "model": "[\"xiaomi-token-plan-cn\",\"mimo-v2.6-flash\"]",
+      "effort": "high"
+    },
+    "business": {
+      "model": "[\"xiaomi-token-plan-cn\",\"mimo-v2.6-flash\"]",
+      "effort": "off",
+      "connection": "ready"
+    }
+  },
+  "screenshots": [
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/mimo-model-settings-final-1440.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/mimo-model-settings-final-390.png"
+  ],
+  "pageErrors": [],
+  "httpErrors": []
+}

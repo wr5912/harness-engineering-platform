@@ -1,11 +1,12 @@
-export type HomeMode = 'general' | 'evaluate' | 'improve'
+export type HomeMode = 'general' | 'build' | 'evaluate' | 'improve' | 'manage'
 export const PLATFORM_SLOGAN = '让智能体真正可用，持续变好。'
-export const HOME_SUBTITLE = '描述你希望它完成的任务，平台协助接入工具、构建能力、验证效果，并根据评测结果持续改进。'
-export const GENERAL_PLACEHOLDER = '描述你的问题或任务，例如查询运行中的实例、接入工具，或构建一个业务智能体。'
+export const HOME_SUBTITLE = '描述目标，协同构建、评测与改进，也能处理实例和工具管理。'
+export const GENERAL_PLACEHOLDER = '例如：检查巡检助手的评测结果，定位遗漏并提出改进方案。'
 export const HOME_MODES = [
-  { id: 'general', label: '与助手对话', action: '开始任务' },
-  { id: 'evaluate', label: '评测已有智能体', action: '开始评测' },
-  { id: 'improve', label: '改进优化任务', action: '开始改进' },
+  { id: 'build', label: '构建智能体', action: '开始构建' },
+  { id: 'evaluate', label: '评测效果', action: '开始评测' },
+  { id: 'improve', label: '改进能力', action: '开始改进' },
+  { id: 'manage', label: '管理实例与工具', action: '开始管理' },
 ] as const
 export const DEMO_AGENT = 'daily-inspection-assistant'
 export const DEMO_CASE = 'U-ASSET-PAGES-001'
@@ -18,13 +19,23 @@ export function homeTaskRequest(mode: HomeMode, prompt: string): { prompt: strin
     if (!task) throw new Error('请先描述你的问题或任务。')
     return { prompt: task, context: { page: 'home', entry_intent: 'general' } }
   }
+  if (mode === 'build') {
+    return { prompt: task || '请先了解我要构建的业务智能体的用途、输入、可复用资产和业务测试。信息不足时集中询问，明确目标与来源后展示完整任务范围；经确认再创建、评测和交付，不把预览当成完成。', context: {
+      page: 'home', skill: 'task-builder', workflow: 'creation', entry_intent: 'build',
+    } }
+  }
   if (mode === 'evaluate') {
     return { prompt: task || '请先查询当前工作区的智能体、版本、已有测试用例和运行记录，帮助我确定评测目标。先利用已有信息，仍有歧义时集中询问必要信息；明确并固定来源版本、测试用例和评判口径，说明环境与执行范围，经整体确认后开展真实评测，保存并解释实际结果。缺少用例或运行条件时先说明，不将预览当作评测通过。', context: {
       page: 'home', skill: 'agent-maintenance', workflow: 'evaluation', entry_intent: 'evaluate',
     } }
   }
-  return { prompt: task || '请先查询当前工作区的智能体、已有能力和运行记录，帮助我确定值得改进或优化的任务。先利用已有信息，仍有歧义时集中询问必要信息；固定来源版本、原始证据与评判口径，提出明确的目标、评测、执行范围和预算后，再请求整体确认。在最多 3 轮“分析问题→修改→复测”内改进，条件不足或达到预算时如实停止。', context: {
-    page: 'home', skill: 'task-builder', workflow: 'improvement', entry_intent: 'improve',
-    max_repair_rounds: 3,
+  if (mode === 'improve') {
+    return { prompt: task || '请先查询当前工作区的智能体、已有能力和运行记录，帮助我确定值得改进或优化的任务。先利用已有信息，仍有歧义时集中询问必要信息；固定来源版本、原始证据与评判口径，提出明确的目标、评测、执行范围和预算后，再请求整体确认。在最多 3 轮“分析问题→修改→复测”内改进，条件不足或达到预算时如实停止。', context: {
+      page: 'home', skill: 'task-builder', workflow: 'improvement', entry_intent: 'improve',
+      max_repair_rounds: 3,
+    } }
+  }
+  return { prompt: task || '请先查询当前工作区的实例与 MCP 工具状态，帮助我确定需要管理的对象和操作。核对实际配置、影响范围与预览；任何写操作须经确认，完成后以真实回执和重新读取的状态说明结果。', context: {
+    page: 'home', entry_intent: 'manage',
   } }
 }

@@ -1,6 +1,7 @@
 """dsh-dev 启动器的纯函数与状态文件契约测试；不启动容器。"""
 
 import contextlib
+import hashlib
 import http.server
 import importlib.util
 import io
@@ -186,7 +187,10 @@ class RenderComposeTest(unittest.TestCase):
                 )
                 policy = "      - /opt/dsh-adapter/runtime-model.patch.yml\n"
                 self.assertEqual(rendered.count(policy), 1)
-                self.assertIn(policy + "      - --no-open\n", rendered)
+                self.assertIn(policy + "      - --patch\n      - /opt/harness-model-runtime/model.patch.yml\n"
+                              "      - --no-open\n", rendered)
+                self.assertIn("target: /opt/harness-model-runtime/model-runtime.mjs\n        read_only: true", rendered)
+                self.assertIn("target: /opt/harness-model-runtime/model.patch.yml\n        read_only: true", rendered)
                 self.assertLess(rendered.index(dev.SKIP_TESTING_NOTICE_PATCH), rendered.index(policy))
                 if not analysis_workspace:
                     self.assertLess(rendered.index("${DSH_MANAGED_PATCH"), rendered.index(policy))
@@ -317,6 +321,339 @@ class RenderComposeTest(unittest.TestCase):
             dev.render_compose("services:\n  dsh:\n    working_dir: /tmp\n", mode="verification",
                                name="probe", project="dsh-dev-probe", port=3081)
 
+
+class ModelPolicyTest(unittest.TestCase):
+    def test_model_policy_start_lock_serializes_instance_startup_with_authorization_save(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            lock = repo / "config/.business-model-policy.lock"
+            with dev.model_policy_start_lock(repo):
+                self.assertTrue(lock.is_file())
+                with contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
+                    with dev.model_policy_start_lock(repo, timeout=0.01):
+                        self.fail("第二次启动不应越过模型策略锁")
+                self.assertIn("业务模型设置", error.getvalue())
+            self.assertFalse(lock.exists())
+
+            args = types.SimpleNamespace(source="experiment:EXP-example-agent-001", dry_run=False,
+                                         analysis_workspace=None)
+            observed = []
+            with mock.patch.object(dev, "REPO", repo), \
+                    mock.patch.object(dev, "resolve", return_value={"agent_id": "example-agent"}), \
+                    mock.patch.object(dev, "instance_startup_lock", return_value=contextlib.nullcontext()), \
+                    mock.patch.object(dev, "prepare_up", return_value=({"agent_id": "example-agent"}, None)), \
+                    mock.patch.object(dev, "existing_runtime_environment", return_value={}), \
+                    mock.patch.object(dev, "_command_up", side_effect=lambda *_: observed.append(lock.is_file())):
+                dev.command_up(args)
+            self.assertEqual(observed, [True])
+            self.assertFalse(lock.exists())
+
+    def policy(self, **changes):
+        value = {
+            "agent_id": "example-agent",
+            "allowed": [{"provider": "deepseek-official", "model": "deepseek-flash"}],
+            "default": {"provider": "deepseek-official", "model": "deepseek-flash", "reasoningEffort": "off"},
+            "patch": [
+                {"id": "agent-default-model", "config": {"provider": "deepseek-official", "model": "deepseek-flash", "reasoningEffort": "off"}},
+                {"id": "llm-deepseek", "config": {"apiKeyEnv": "DEEPSEEK_API_KEY", "models": [{"id": "deepseek-flash"}]}},
+                {"id": "llm-pi-ai", "config": {"providers": {}}},
+                {"id": "llm-deepseek-account", "disabled": True},
+            ],
+            "credential_refs": ["DEEPSEEK_API_KEY"],
+            "business_model_revision": "a" * 64,
+        }
+        value.update(changes)
+        return value
+
+    def test_platform_projection_replaces_source_model_env_but_keeps_tool_env(self):
+        selected = {"provider": "xiaomi-token-plan-cn", "model": "mimo-v2.5"}
+        policy = dev._model_policy({
+            "agent_id": "example-agent", "allowed": [selected], "default": selected,
+            "patch": [
+                {"id": "agent-default-model", "config": selected},
+                {"id": "llm-deepseek", "disabled": True},
+                {"id": "llm-deepseek-account", "disabled": True},
+                {"id": "llm-pi-ai", "config": {"providers": {"xiaomi-token-plan-cn": {
+                    "apiKeyEnv": "XIAOMI_TOKEN_PLAN_CN_API_KEY", "models": [{"id": "mimo-v2.5"}]
+                }}}},
+            ],
+            "credential_refs": ["XIAOMI_TOKEN_PLAN_CN_API_KEY"],
+            "manifest_sha256": "0" * 64,
+            "business_model_revision": "a" * 64,
+        }, "example-agent", source="platform", manifest_sha256="0" * 64)
+        contract = EvaluationModeContractTest().contract(
+            model_policy=policy,
+            required_env_names=["DEEPSEEK_API_KEY", "SEC_OPS_MCP_URL", "LOCAL_LLM_BASE_URL",
+                                "SEC_OPS_MCP_TOKEN"],
+            optional_env_names=["LOCAL_LLM_API_KEY", "INSPECTION_MCP_TOKEN"],
+        )
+        expected = ["SEC_OPS_MCP_URL", "SEC_OPS_MCP_TOKEN", "XIAOMI_TOKEN_PLAN_CN_API_KEY"]
+        self.assertEqual(dev.required_env_names(contract), expected)
+        environment = {"SEC_OPS_MCP_URL": "http://tools", "SEC_OPS_MCP_TOKEN": "tool-fixture",
+                       "XIAOMI_TOKEN_PLAN_CN_API_KEY": "model-fixture", "INSPECTION_MCP_TOKEN": "other-tool-fixture",
+                       "LOCAL_LLM_API_KEY": "old-model-fixture"}
+        with mock.patch.dict(os.environ, environment, clear=True):
+            dev.check_environment(contract)
+            self.assertEqual(dev.runtime_env_names(contract), expected + ["INSPECTION_MCP_TOKEN"])
+            with tempfile.TemporaryDirectory() as temporary, mock.patch.object(dev, "STATE_ROOT", Path(temporary)), \
+                    mock.patch.object(dev, "assert_model_policy_current"):
+                target = dev.write_instance("mimo-probe", mode="verification", contract=contract, port=3082)
+                state = json.loads((target / "instance.json").read_text(encoding="utf-8"))
+                compose = (target / "compose.yaml").read_text(encoding="utf-8")
+            self.assertEqual(state["required_env_names"], expected)
+            self.assertIn("      - XIAOMI_TOKEN_PLAN_CN_API_KEY\n", compose)
+            self.assertIn("      - SEC_OPS_MCP_TOKEN\n", compose)
+            for name in dev.SOURCE_MODEL_ENV_NAMES:
+                self.assertNotIn(f"      - {name}\n", compose)
+        with mock.patch.dict(os.environ, {"XIAOMI_TOKEN_PLAN_CN_API_KEY": "model-fixture"}, clear=True), \
+                contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
+            dev.check_environment(contract)
+        self.assertIn("SEC_OPS_MCP_URL", error.getvalue())
+        self.assertNotIn("DEEPSEEK_API_KEY", error.getvalue())
+
+    def test_source_model_env_remains_for_direct_and_analysis(self):
+        direct_policy = dev._model_policy({"agent_id": "example-agent", "allowed": [
+            {"provider": "local-qwen", "model": "Qwen3.8-27B"}],
+            "default": {"provider": "local-qwen", "model": "Qwen3.8-27B"}},
+            "example-agent", source="business-config", manifest_sha256="0" * 64)
+        contract = EvaluationModeContractTest().contract(
+            model_policy=direct_policy,
+            required_env_names=["DEEPSEEK_API_KEY", "LOCAL_LLM_BASE_URL", "LOCAL_LLM_API_KEY", "SEC_OPS_MCP_URL"],
+        )
+        self.assertEqual(dev.required_env_names(contract), contract["required_env_names"])
+        contract["model_policy"] = dev.analysis_model_policy("example-agent")
+        self.assertEqual(dev.required_env_names(contract, "/tmp/analysis-run"), ["DEEPSEEK_API_KEY"])
+        self.assertEqual(dev.runtime_env_names(contract, "/tmp/analysis-run"), ["DEEPSEEK_API_KEY"])
+
+    def test_direct_default_requires_source_or_adapter_model_connection(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            managed = Path(temporary)
+            source_patch = managed / "example-agent.patch.yml"
+            source_patch.write_text("- id: agent-default-model\n  config:\n    provider: local-qwen\n"
+                                    "    model: Qwen3.8-27B\n- id: llm-pi-ai\n  config:\n"
+                                    "    providers:\n      local-qwen:\n        models:\n"
+                                    "          - id: Qwen3.8-27B\n", encoding="utf-8")
+            contract = {"managed": str(managed), "patch": "/opt/dsh-managed/example-agent.patch.yml"}
+            local = dev._model_policy({"agent_id": "example-agent", "allowed": [
+                {"provider": "local-qwen", "model": "Qwen3.8-27B"}],
+                "default": {"provider": "local-qwen", "model": "Qwen3.8-27B"}},
+                "example-agent", source="business-config", manifest_sha256=None)
+            dev.assert_direct_model_available(contract, local)
+            deepseek = dev._model_policy({"agent_id": "example-agent", "allowed": [
+                {"provider": "deepseek-official", "model": "deepseek-flash"}],
+                "default": {"provider": "deepseek-official", "model": "deepseek-flash"}},
+                "example-agent", source="business-config", manifest_sha256=None)
+            dev.assert_direct_model_available(contract, deepseek)
+            mimo = dev._model_policy({"agent_id": "example-agent", "allowed": [
+                {"provider": "xiaomi-token-plan-cn", "model": "MiMo-V2.6-Flash"}],
+                "default": {"provider": "xiaomi-token-plan-cn", "model": "MiMo-V2.6-Flash"}},
+                "example-agent", source="business-config", manifest_sha256=None)
+            with contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
+                dev.assert_direct_model_available(contract, mimo)
+            self.assertIn("--model-policy", error.getvalue())
+            source_patch.write_text("- id: agent-default-model\n  config:\n"
+                                    "    provider: xiaomi-token-plan-cn\n    model: MiMo-V2.6-Flash\n", encoding="utf-8")
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                dev.assert_direct_model_available(contract, mimo)
+            source_patch.write_text("- id: agent-default-model\n  config:\n"
+                                    "    provider: xiaomi-token-plan-cn\n    model: MiMo-V2.6-Flash\n"
+                                    "- id: llm-pi-ai\n  config:\n    providers:\n"
+                                    "      xiaomi-token-plan-cn:\n        models:\n"
+                                    "          - id: MiMo-V2.6-Flash\n", encoding="utf-8")
+            dev.assert_direct_model_available(contract, mimo)
+            source_patch.write_text("- id: agent-default-model\n  config:\n"
+                                    "    provider: xiaomi-token-plan-cn\n    model: MiMo-V2.6-Flash\n"
+                                    "- id: agent-default-model\n  config:\n"
+                                    "    provider: xiaomi-token-plan-cn\n    model: MiMo-V2.6-Flash\n"
+                                    "- id: llm-pi-ai\n  config:\n    providers:\n"
+                                    "      xiaomi-token-plan-cn:\n        models:\n"
+                                    "          - id: MiMo-V2.6-Flash\n", encoding="utf-8")
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                dev.assert_direct_model_available(contract, mimo)
+
+    def test_platform_projection_retains_selected_legacy_model_ref(self):
+        policy = dev._model_policy(self.policy(manifest_sha256="0" * 64), "example-agent",
+                                   source="platform", manifest_sha256="0" * 64)
+        contract = EvaluationModeContractTest().contract(
+            model_policy=policy,
+            required_env_names=["DEEPSEEK_API_KEY", "LOCAL_LLM_BASE_URL", "SEC_OPS_MCP_URL"],
+        )
+        self.assertEqual(dev.required_env_names(contract), ["SEC_OPS_MCP_URL", "DEEPSEEK_API_KEY"])
+
+    def test_platform_projection_is_read_only_and_only_refs_enter_compose(self):
+        with tempfile.TemporaryDirectory() as temporary, mock.patch.object(dev, "STATE_ROOT", Path(temporary) / "instances"):
+            repo = Path(temporary) / "data"
+            manifest = repo / "agents/example-agent/manifest.yaml"
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text("agent_id: example-agent\nmodel_access:\n  allowed:\n"
+                                "    - provider: deepseek-official\n      model: deepseek-flash\n", encoding="utf-8")
+            manifest_digest = hashlib.sha256(manifest.read_bytes()).hexdigest()
+            config = repo / "config"
+            config.mkdir()
+            default_file = config / "business-model-default.json"
+            default_file.write_text(json.dumps({
+                "schema_version": "1.2", "default": {"provider": "deepseek-official", "model": "deepseek-flash"}
+            }), encoding="utf-8")
+            source = Path(temporary) / "model-policy.json"
+            source.write_text(json.dumps(self.policy(manifest_sha256=manifest_digest,
+                business_model_revision=hashlib.sha256(default_file.read_bytes()).hexdigest())), encoding="utf-8")
+            policy = dev.read_model_policy(str(source), "example-agent", repo=repo)
+            self.assertEqual(policy["source"], "platform")
+            self.assertEqual(policy["credential_refs"], ["DEEPSEEK_API_KEY"])
+            self.assertEqual(policy["manifest_sha256"], manifest_digest)
+            dev.assert_model_policy_current(policy, repo=repo)
+            patch = json.loads(dev.model_policy_patch(policy))
+            self.assertEqual(patch[-1]["insert"][0]["name"], "file:///opt/harness-model-runtime/model-runtime.mjs")
+            self.assertEqual(patch[-1]["insert"][0]["config"]["allowed"], policy["allowed"])
+            self.assertEqual(patch[-1]["insert"][0]["config"],
+                             {"agentId": "example-agent", "allowed": policy["allowed"]})
+            contract = EvaluationModeContractTest().contract(model_policy=policy)
+            contract["agent_id"] = "example-agent"
+            with mock.patch.object(dev, "assert_model_policy_current"):
+                target = dev.write_instance("model-probe", mode="verification", contract=contract, port=3082)
+            state = json.loads((target / "instance.json").read_text())
+            self.assertEqual(state["model_policy"]["sha256"], policy["sha256"])
+            self.assertNotIn("patch", state["model_policy"])
+            self.assertEqual(dev.instance_compose_env(state)["DSH_MODEL_PATCH_HOST"], str(target / "model.patch.yml"))
+            self.assertEqual(dev.required_env_names(contract), ["DEEPSEEK_API_KEY"])
+            self.assertIn("      - DEEPSEEK_API_KEY\n", (target / "compose.yaml").read_text())
+            default_file.write_text(json.dumps({"schema_version": "1.2", "default": None}), encoding="utf-8")
+            with contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
+                dev.assert_model_policy_current(policy, repo=repo)
+            self.assertIn("业务默认模型配置已在启动过程中变化", error.getvalue())
+            default_file.write_text(json.dumps({"schema_version": "1.2",
+                "default": {"provider": "deepseek-official", "model": "deepseek-flash"}}), encoding="utf-8")
+            manifest.write_text(manifest.read_text() + "# newer\n", encoding="utf-8")
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                dev.assert_model_policy_current(policy, repo=repo)
+
+    def test_unmarked_default_and_arbitrary_plugin_are_rejected(self):
+        outside = self.policy(manifest_sha256="0" * 64,
+                              default={"provider": "deepseek-official", "model": "deepseek-pro"})
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            dev._model_policy(outside, "example-agent", source="platform", manifest_sha256="0" * 64)
+        injected = self.policy(manifest_sha256="0" * 64,
+                               patch=[{"insert": [{"id": "other", "name": "file:///tmp/other.mjs"}]}])
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            dev._model_policy(injected, "example-agent", source="platform", manifest_sha256="0" * 64)
+        secret = self.policy(manifest_sha256="0" * 64,
+                             patch=[{"id": "llm-pi-ai", "config": {"providers": {"other": {"headers": {"Authorization": "Bearer secret"}}}}}])
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            dev._model_policy(secret, "example-agent", source="platform", manifest_sha256="0" * 64)
+
+    def test_direct_launcher_uses_only_confirmed_unified_default(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            manifest = repo / "agents/example-agent/manifest.yaml"
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text("agent_id: example-agent\n", encoding="utf-8")
+            with contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
+                dev.read_model_policy(None, "example-agent", repo=repo)
+            self.assertIn("尚未确认业务智能体统一默认模型", error.getvalue())
+            # 旧 Agent manifest 授权不再影响直连实例。
+            manifest.write_text("agent_id: example-agent\nmodel_access:\n  allowed:\n"
+                                "    - provider: local-qwen\n      model: Qwen3.8-27B\n"
+                                "    - provider: deepseek-official\n      model: deepseek-flash\n"
+                                "  default:\n    provider: local-qwen\n    model: Qwen3.8-27B\n", encoding="utf-8")
+            with contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
+                dev.read_model_policy(None, "example-agent", repo=repo)
+            self.assertIn("尚未确认业务智能体统一默认模型", error.getvalue())
+            config = repo / "config"
+            config.mkdir()
+            (config / "business-model-default.json").write_text(json.dumps({
+                "schema_version": "1.0", "default": {"provider": "local-qwen", "model": "Qwen3.8-27B"}
+            }), encoding="utf-8")
+            with contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
+                dev.read_model_policy(None, "example-agent", repo=repo)
+            self.assertIn("尚未确认业务智能体统一默认模型", error.getvalue())
+            allowed = [{"provider": "local-qwen", "model": "Qwen3.8-27B"},
+                       {"provider": "deepseek-official", "model": "deepseek-flash"}]
+            (config / "business-model-default.json").write_text(json.dumps({
+                "schema_version": "1.1", "allowed": allowed, "default": allowed[0]
+            }), encoding="utf-8")
+            with contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
+                dev.read_model_policy(None, "example-agent", repo=repo)
+            self.assertIn("尚未确认业务智能体统一默认模型", error.getvalue())
+            (config / "business-model-default.json").write_text(json.dumps({
+                "schema_version": "1.2", "default": allowed[0]
+            }), encoding="utf-8")
+            selected = dev.read_model_policy(None, "example-agent", repo=repo)
+            self.assertEqual(selected["default"]["model"], "Qwen3.8-27B")
+            self.assertEqual(selected["allowed"], [allowed[0]])
+            self.assertEqual(selected["source"], "business-config")
+            self.assertFalse(dev.model_policy_summary(selected)["platform_sync"])
+            self.assertEqual(selected["patch"][0]["id"], "agent-default-model")
+            (config / "business-model-default.json").write_text(json.dumps({
+                "schema_version": "1.2", "default": {**allowed[0], "reasoningEffort": "off"}
+            }), encoding="utf-8")
+            selected_with_effort = dev.read_model_policy(None, "example-agent", repo=repo)
+            self.assertEqual(selected_with_effort["default"]["reasoningEffort"], "off")
+            self.assertEqual(selected_with_effort["allowed"], [allowed[0]])
+            self.assertEqual(selected_with_effort["patch"][0]["config"]["reasoningEffort"], "off")
+            with contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
+                dev.read_model_policy(None, "example-agent", repo=repo, selected=allowed[1])
+            self.assertIn("直连启动只能使用业务统一默认模型", error.getvalue())
+            (config / "business-model-default.json").write_text(json.dumps({
+                "schema_version": "1.0", "default": None
+            }), encoding="utf-8")
+            self.assertEqual(dev.read_business_model_policy(repo)["migration_required"], True)
+
+    def test_analysis_instance_keeps_its_own_model_route(self):
+        policy = dev.analysis_model_policy("example-agent")
+        self.assertEqual(dev.model_policy_patch(policy), "[]\n")
+        self.assertFalse(dev.model_policy_summary(policy)["enforced"])
+        dev.assert_model_policy_current(policy)
+        with tempfile.TemporaryDirectory() as temporary, mock.patch.object(dev, "STATE_ROOT", Path(temporary)):
+            contract = EvaluationModeContractTest().contract(model_policy=policy)
+            target = dev.write_instance("analysis-probe", mode="verification", contract=contract, port=3082,
+                                        analysis_workspace="/tmp/analysis-run")
+            state = json.loads((target / "instance.json").read_text())
+            self.assertEqual(state["model_policy"]["source"], "analysis-runtime")
+            self.assertEqual(json.loads((target / "model.patch.yml").read_text()), [])
+            entry = dev.instance_entry(target, state, {"projects": {}, "homes": {}})
+            self.assertEqual(entry["model_policy"]["sha256"], state["model_policy"]["sha256"])
+
+    def test_policy_file_must_be_regular_absolute_and_match_source(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary) / "data"
+            manifest = repo / "agents/example-agent/manifest.yaml"
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text("agent_id: example-agent\nmodel_access:\n  allowed:\n"
+                                "    - provider: deepseek-official\n      model: deepseek-flash\n"
+                                "  default:\n    provider: deepseek-official\n    model: deepseek-flash\n"
+                                "    reasoningEffort: off\n", encoding="utf-8")
+            config = repo / "config"
+            config.mkdir()
+            default_file = config / "business-model-default.json"
+            default_file.write_text(json.dumps({
+                "schema_version": "1.2", "default": {"provider": "deepseek-official", "model": "deepseek-flash"}
+            }), encoding="utf-8")
+            source = Path(temporary) / "model-policy.json"
+            source.write_text(json.dumps(self.policy(manifest_sha256=hashlib.sha256(manifest.read_bytes()).hexdigest(),
+                business_model_revision=hashlib.sha256(default_file.read_bytes()).hexdigest())), encoding="utf-8")
+            default_file.write_text(json.dumps({"schema_version": "1.2", "default": None}), encoding="utf-8")
+            with contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
+                dev.read_model_policy(str(source), "example-agent", repo=repo)
+            self.assertIn("尚未确认业务智能体统一默认模型", error.getvalue())
+            default_file.write_text(json.dumps({"schema_version": "1.2", "default": {
+                "provider": "other", "model": "different"}}), encoding="utf-8")
+            with contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
+                dev.read_model_policy(str(source), "example-agent", repo=repo)
+            self.assertIn("配置修订不一致", error.getvalue())
+            default_file.write_text(json.dumps({"schema_version": "1.2", "default": {
+                "provider": "deepseek-official", "model": "deepseek-flash"}}), encoding="utf-8")
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                dev.read_model_policy(str(source), "other-agent", repo=repo)
+            alias = Path(temporary) / "alias.json"
+            alias.symlink_to(source)
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                dev.read_model_policy(str(alias), "example-agent", repo=repo)
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                dev.read_model_policy("relative.json", "example-agent", repo=repo)
+            stale = self.policy(manifest_sha256="0" * 64)
+            source.write_text(json.dumps(stale), encoding="utf-8")
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                dev.read_model_policy(str(source), "example-agent", repo=repo)
 
 class EvaluationModeContractTest(unittest.TestCase):
     """新实例只有 eval 模式，且 Candidate 始终只读。"""
@@ -582,7 +919,11 @@ class EvaluationModeContractTest(unittest.TestCase):
         args = types.SimpleNamespace(source="experiment:EXP-security-operations-expert-001",
                                      mode="verification", name="secops-eval", port=3085, dry_run=True)
         stdout = io.StringIO()
-        with contextlib.redirect_stdout(stdout):
+        selected = {"provider": "deepseek-official", "model": "deepseek-flash"}
+        policy = dev._model_policy({"agent_id": "security-operations-expert", "allowed": [selected],
+                                    "default": selected}, "security-operations-expert",
+                                   source="business-config", manifest_sha256=None)
+        with mock.patch.object(dev, "read_model_policy", return_value=policy), contextlib.redirect_stdout(stdout):
             dev.command_up(args)
         plan = json.loads(stdout.getvalue())
         self.assertEqual(plan["workspace_to_register"], "/work/harness/workspace")
@@ -601,7 +942,11 @@ class EvaluationModeContractTest(unittest.TestCase):
             lan_access=True,
         )
         stdout = io.StringIO()
-        with contextlib.redirect_stdout(stdout):
+        selected = {"provider": "deepseek-official", "model": "deepseek-flash"}
+        policy = dev._model_policy({"agent_id": "security-operations-expert", "allowed": [selected],
+                                    "default": selected}, "security-operations-expert",
+                                   source="business-config", manifest_sha256=None)
+        with mock.patch.object(dev, "read_model_policy", return_value=policy), contextlib.redirect_stdout(stdout):
             dev.command_up(args)
         plan = json.loads(stdout.getvalue())
         self.assertEqual(plan["profile"], "web")
@@ -1218,6 +1563,14 @@ class UpCommandStateTest(unittest.TestCase):
         isolate_registration_guard(self)
         self._temp = tempfile.TemporaryDirectory()
         dev.STATE_ROOT = Path(self._temp.name)
+        selected = {"provider": "deepseek-official", "model": "deepseek-flash"}
+        policy = dev._model_policy({"agent_id": "security-operations-expert", "allowed": [selected],
+                                    "default": selected}, "security-operations-expert",
+                                   source="business-config", manifest_sha256=None)
+        self._policy_reader = mock.patch.object(dev, "read_model_policy", return_value=policy)
+        self._policy_reader.start()
+        self._policy_check = mock.patch.object(dev, "assert_model_policy_current")
+        self._policy_check.start()
         self._image_identity = mock.patch.object(dev, "validate_image_identity", return_value={
             "image_tag": IMAGE_TAG,
             "image_id": "sha256:" + "1" * 64,
@@ -1229,6 +1582,8 @@ class UpCommandStateTest(unittest.TestCase):
 
     def tearDown(self):
         self._image_identity.stop()
+        self._policy_check.stop()
+        self._policy_reader.stop()
         self._temp.cleanup()
 
     def args(self, **overrides):
@@ -1402,6 +1757,24 @@ class UpPortOwnershipTest(unittest.TestCase):
         isolate_registration_guard(self)
         self._temp = tempfile.TemporaryDirectory()
         dev.STATE_ROOT = Path(self._temp.name)
+        self._managed = Path(self._temp.name) / "managed"
+        self._managed.mkdir()
+        (self._managed / "security-operations-expert.patch.yml").write_text(
+            "- id: agent-default-model\n  config:\n    provider: local-qwen\n    model: Qwen3.8-27B\n"
+            "- id: llm-pi-ai\n  config:\n    providers:\n      local-qwen:\n"
+            "        models:\n          - id: Qwen3.8-27B\n",
+            encoding="utf-8",
+        )
+        # 本组只验证端口与重载顺序，使用已登记的实例模型，避免依赖数据根的模型设置。
+        self._model_policy = dev._model_policy({
+            "agent_id": "security-operations-expert",
+            "allowed": [{"provider": "local-qwen", "model": "Qwen3.8-27B"}],
+            "default": {"provider": "local-qwen", "model": "Qwen3.8-27B"},
+        }, "security-operations-expert", source="business-config", manifest_sha256=None)
+        self._policy_reader = mock.patch.object(dev, "read_model_policy", return_value=self._model_policy)
+        self._policy_reader.start()
+        self._policy_check = mock.patch.object(dev, "assert_model_policy_current")
+        self._policy_check.start()
         self._image_identity = mock.patch.object(dev, "validate_image_identity", return_value={
             "image_tag": IMAGE_TAG,
             "image_id": "sha256:" + "1" * 64,
@@ -1413,16 +1786,17 @@ class UpPortOwnershipTest(unittest.TestCase):
 
     def tearDown(self):
         self._image_identity.stop()
+        self._policy_check.stop()
+        self._policy_reader.stop()
         self._temp.cleanup()
 
-    @staticmethod
-    def contract():
+    def contract(self):
         return {
             "source_id": "experiment:EXP-security-operations-expert-001",
             "source_kind": "experiment",
             "agent_id": "security-operations-expert",
             "preset_id": "security-operations-expert",
-            "workspace": "/tmp/ws", "presets": "/tmp/presets", "managed": "/tmp/managed",
+            "workspace": "/tmp/ws", "presets": "/tmp/presets", "managed": str(self._managed),
             "patch": "/opt/dsh-managed/security-operations-expert.patch.yml",
             "required_env_names": [],
             "image": {"local_image_tag": IMAGE_TAG},
@@ -1445,6 +1819,7 @@ class UpPortOwnershipTest(unittest.TestCase):
                         image_tag=IMAGE_TAG,
                         adapter_root=str(ADAPTER),
                         managed_patch="/opt/dsh-managed/security-operations-expert.patch.yml",
+                        model_policy={"default": {"provider": "local-qwen", "model": "Qwen3.8-27B"}},
                         mounts={"workspace": "/tmp/ws", "presets": "/tmp/presets", "managed": "/tmp/managed"},
                         context_mounts=[], patch_overlay=None)
         manifest.update(overrides)
@@ -1487,6 +1862,47 @@ class UpPortOwnershipTest(unittest.TestCase):
         self.assertEqual(args.name, name)
         self.assertEqual(args.port, 3090)
         probe.assert_not_called()
+
+    def test_direct_start_rejects_unprojected_business_default_before_port_selection(self):
+        selected = {"provider": "xiaomi-token-plan-cn", "model": "MiMo-V2.6-Flash"}
+        policy = dev._model_policy({"agent_id": "security-operations-expert", "allowed": [selected],
+                                    "default": selected}, "security-operations-expert",
+                                   source="business-config", manifest_sha256=None)
+        with mock.patch.object(dev, "resolve", return_value=self.contract()), \
+                mock.patch.object(dev, "read_model_policy", return_value=policy), \
+                mock.patch.object(dev, "port_in_use") as probe, \
+                contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
+            dev.prepare_up(self.args(port=None))
+        self.assertIn("--model-policy", error.getvalue())
+        probe.assert_not_called()
+
+    def test_existing_instance_without_registered_default_requires_explicit_selection(self):
+        self.write_existing(model_policy=None)
+        with mock.patch.object(dev, "resolve", return_value=self.contract()), \
+                contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
+            dev.prepare_up(self.args())
+        self.assertIn("未登记默认模型", error.getvalue())
+        with mock.patch.object(dev, "resolve", return_value=self.contract()):
+            contract, _ = dev.prepare_up(self.args(model_policy="/tmp/explicit-policy.json"))
+        self.assertEqual(contract["model_policy"]["default"]["model"], "Qwen3.8-27B")
+        without_default = dict(self._model_policy, default=None)
+        with mock.patch.object(dev, "resolve", return_value=self.contract()), \
+                mock.patch.object(dev, "read_model_policy", return_value=without_default), \
+                contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
+            dev.prepare_up(self.args(model_policy="/tmp/empty-policy.json"))
+        self.assertIn("必须包含显式选择", error.getvalue())
+
+    def test_platform_managed_instance_requires_current_policy_for_direct_restart(self):
+        self.write_existing(model_policy={
+            "source": "platform", "default": {"provider": "local-qwen", "model": "Qwen3.8-27B"}
+        })
+        with mock.patch.object(dev, "resolve", return_value=self.contract()), \
+                contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
+            dev.prepare_up(self.args(replace=True))
+        self.assertIn("请从平台实例管理启动", error.getvalue())
+        with mock.patch.object(dev, "resolve", return_value=self.contract()):
+            contract, _ = dev.prepare_up(self.args(replace=True, model_policy="/tmp/current-policy.json"))
+        self.assertEqual(contract["model_policy"]["default"]["model"], "Qwen3.8-27B")
 
     def test_old_business_instances_apply_uniform_access_without_replace(self):
         for replace in (False, True):
@@ -1835,6 +2251,9 @@ dev.STARTUP_LOCK = base / 'startup.lock'; dev.AUTO_PORT_START = int(port)
 contract = {'source_id':'experiment:EXP-fixture-001','source_kind':'experiment','agent_id':'fixture',
  'preset_id':'fixture','workspace':'/tmp/ws','presets':'/tmp/presets','managed':'/tmp/managed',
  'patch':'/opt/managed/fixture.patch.yml','required_env_names':[], 'image':{'local_image_tag':'fixture'}}
+selected = {'provider':'deepseek-official','model':'deepseek-flash'}
+policy = dev._model_policy({'agent_id':'fixture','allowed':[selected],'default':selected},
+ 'fixture',source='business-config',manifest_sha256=None)
 listener = None
 def write_instance(name, **kwargs):
  target = dev.STATE_ROOT / name; target.mkdir(parents=True)
@@ -1851,6 +2270,7 @@ while not (base / 'go').exists(): time.sleep(.01)
 args = types.SimpleNamespace(source='experiment:EXP-fixture-001', mode='verification', name=name,
  port=None, allow_missing_env=False, replace=False)
 with mock.patch.object(dev, 'resolve', return_value=contract), \
+ mock.patch.object(dev, 'read_model_policy', return_value=policy), mock.patch.object(dev, 'assert_model_policy_current'), \
  mock.patch.object(dev, 'require_unused_docker_name'), mock.patch.object(dev, 'require_docker_registration'), \
  mock.patch.object(dev, 'existing_runtime_environment', return_value={}), \
  mock.patch.object(dev, 'check_environment'), mock.patch.object(dev, 'preflight_new_instance'), \

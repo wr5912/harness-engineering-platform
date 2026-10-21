@@ -19,54 +19,10 @@ export const managerSources = {
         const start = original.indexOf('    const formName =')
         const end = original.indexOf('    function apply(ctx)')
         if (start < 0 || end <= start) throw new Error('MCP 管理客户端装载合同已变化')
-        const toolbarStart = original.indexOf('        <div className="mcp-toolbar">', start)
-        const toolbarEnd = original.indexOf('        {status &&', toolbarStart)
-        if (toolbarStart < start || toolbarEnd <= toolbarStart) throw new Error('MCP 管理工具栏装载合同已变化')
-        const client = original.slice(start, toolbarStart) + `{toolbarTarget && createPortal(<button className="harness-primary" type="button" onClick={save} disabled={busy || !state.writable || !isDirty}>保存更改</button>, toolbarTarget)}\n` + original.slice(toolbarEnd, end)
-        const toolEditor = `<section className="mcp-section"><h3>调用工具</h3><div className="mcp-fields"><label className="mcp-field">工具<select value={toolName} onChange={event => setToolName(event.target.value)}><option value="">请选择工具</option>{(catalog.data.tools ?? []).map(tool => <option key={tool.name} value={tool.name}>{tool.name}</option>)}</select></label><label className="mcp-field mcp-wide">调用参数 JSON{input(argumentsText, setArgumentsText)}</label></div><div className="mcp-actions">{button('测试工具', () => callTool('callTool'), busy || !toolName)}</div></section>`
-        const draftEffect = `setDraft({ servers: structuredClone(state.value.servers ?? []),
-          groups: structuredClone(state.value.groups ?? []), sharedToken: state.value.sharedToken ?? '', revision: state.revision })`
-        const preservedDraft = `setDraft(previous => {
-          const incoming = { servers: structuredClone(state.value.servers ?? []), groups: structuredClone(state.value.groups ?? []), sharedToken: state.value.sharedToken ?? '' }
-          const serialized = JSON.stringify(incoming)
-          const previousData = previous && JSON.stringify({ servers: previous.servers, groups: previous.groups, sharedToken: previous.sharedToken })
-          if (previous && draftBase.current !== previousData && serialized !== previousData) {
-            setStatus('配置已在其他位置更新，当前草稿已保留；保存将核对原版本。')
-            return previous
-          }
-          draftBase.current = serialized
-          return { ...incoming, revision: state.revision }
-        })`
-        if (!client.includes(draftEffect)) throw new Error('MCP 草稿同步合同已变化')
-        const adapted = client
-          .replace('const [draft, setDraft] = useState(null)', 'const [draft, setDraft] = useState(null); const draftBase = useRef(null)')
-          .replace(draftEffect, preservedDraft)
-          .replace('function Manager({ view, form, write })', 'function Manager({ view, form, write, toolbarTarget, publishedService, onValidationError })')
-          .replace("const [page, setPage] = useState('servers')", "const [page, setPage] = useState('servers'); useEffect(() => { if (['servers', 'groups', 'connection'].includes(view)) setPage(view) }, [view])")
-          .replace('[state?.value, state?.revision, state?.status]', '[JSON.stringify(state?.value), state?.revision, state?.status]')
-          .replace('for (const server of draft.servers) {', 'for (const [index, server] of draft.servers.entries()) {\n            try {')
-          .replace("if (!/^[A-Za-z0-9_-]{1,32}$/.test(server.id) || (server.enabled !== false && !server.specUrl)) throw new Error('请填写有效的服务器 ID 和 OpenAPI 接口规范地址')", "if (!/^[A-Za-z0-9_-]{1,32}$/.test(server.id)) throw new Error('ID 须为 1–32 个字母、数字、下划线或连字符');\n            if (server.enabled !== false && !server.specUrl) throw new Error('请填写 OpenAPI 接口规范地址')")
-          .replace('          }\n          const response = await write([', `            } catch (error) {
-              onValidationError?.(); setPage('servers'); setActiveServer(index)
-              throw new Error(\`第 \${index + 1} 项服务：\${error instanceof Error ? error.message : String(error)}\`)
-            }
-          }
-          const response = await write([`)
-          .replace('const diagnosticServer = draft.servers.find', 'const services = [...draft.servers, ...(publishedService ? [publishedService] : [])];\n      const diagnosticServer = services.find')
-          .replace('?? draft.servers[0]', '?? services[0]')
-          .replace('const editingServer = draft.servers[activeServer]', 'const editingServer = services[activeServer]')
-          .replaceAll('draft.servers.map(', 'services.map(')
-          .replace('!draft.servers.some(server => server.id === member.serverId)', '!services.some(server => server.id === member.serverId)')
-          .replace('!draft.servers.length &&', '!services.length &&')
-          .replaceAll("server.serverName || server.id || '新服务器'", "server.platformComposition ? '工具组合编排' : (server.serverName || server.id || '新服务器')")
-          .replace("<small>{server.id || '未设置 ID'} · {server.enabled === false ? '已停用' : '已启用'}</small>", "<small>{server.description || '未填写描述'} · {server.enabled === false ? '已停用' : '已启用'}</small>")
-          .replace('{editingServer ? <div className="mcp-card">', '{editingServer ? editingServer.platformComposition ? <PublishedService service={editingServer} /> : <div className="mcp-card">')
-          .replace('const sections = [', 'const listedTools = server.platformComposition ? server.tools.names : discovered[server.id]\n                      const sections = [')
-          .replace('...(discovered[server.id] ?? [])', '...(listedTools ?? [])')
-          .replace('discovered: discovered[server.id]', 'discovered: listedTools')
-          .replace('<input value={value ?? \'\'} onChange={event => change(event.target.value)} {...props} />', "props.type === 'password' && !props.readOnly ? <PasswordInput value={value ?? ''} onChange={event => change(event.target.value)} {...props} /> : <input value={value ?? ''} onChange={event => change(event.target.value)} {...props} />")
-          .replace('<section className="mcp-section"><h3>读取 Resource</h3>', `${toolEditor}<section className="mcp-section"><h3>读取 Resource</h3>`)
-        contents = `import * as React from 'react'; import { createPortal } from 'react-dom'; import { PasswordInput, PublishedService } from ${JSON.stringify(resolve('src/mcp/components.tsx'))}; const { useEffect, useState, useRef } = React;\n${adapted}\nexport { Manager };`
+        const client = original.slice(start, end)
+        contents = `import * as React from 'react'; const { useEffect, useState, useRef } = React;
+${client}
+export { Manager };`
       } else if (path.endsWith('openapi')) {
         const original = await readFile(resolve(managerSource, 'openapi.ts'), 'utf8')
         contents = `import { appendQueryParameter } from ${JSON.stringify(resolve('src/mcp/openapi.ts'))};\nfunction platformTimeout(server: any) { const timeout = AbortSignal.timeout(server.platformTimeoutMs ?? 20_000); return server.platformSignal ? AbortSignal.any([server.platformSignal, timeout]) : timeout }\n${original.replaceAll('AbortSignal.timeout(20_000)', 'platformTimeout(server)').replace('const { response, credential } = await authorizedFetch(source.server', 'const server = source.server\n  const { response, credential } = await authorizedFetch(source.server').replace("if (parameter.in === 'query') for (const entry of Array.isArray(value) ? value : [value]) url.searchParams.append(parameter.name, String(entry))", "if (parameter.in === 'query') appendQueryParameter(url.searchParams, parameter, value)")}\nexport { execute };`
@@ -150,6 +106,8 @@ await build({ entryPoints: ['src/business-control/runtime.ts'], outfile: 'lib/bu
 await build({ entryPoints: ['src/business-control/index.ts'], outfile: 'lib/business-gateway.js', bundle: true,
   platform: 'node', target: 'node24', format: 'esm', packages: 'external', legalComments: 'none' })
 await build({ entryPoints: ['src/business-control/core.ts'], outfile: 'lib/business-control.js', bundle: true,
+  platform: 'node', target: 'node24', format: 'esm', packages: 'external', legalComments: 'none' })
+await build({ entryPoints: ['src/models/runtime.ts'], outfile: 'lib/model-runtime.js', bundle: true,
   platform: 'node', target: 'node24', format: 'esm', packages: 'external', legalComments: 'none' })
 // 独立业务 Host 包不声明管理客户端；薄入口继续复用同一份已构建实现。
 await build({ entryPoints: ['business/runtime.ts', 'business/mcp-manager.ts'], outdir: 'business', bundle: false,

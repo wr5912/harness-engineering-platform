@@ -1,14 +1,21 @@
 export const mcpPageTheme = `
 .harness-mcp-page{width:100%;min-width:0;padding:24px var(--hep-page-padding);font-size:14px;line-height:1.6}
-.harness-mcp-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:16px;margin:0 0 24px;border-bottom:1px solid var(--hep-border);padding-bottom:12px}
+.harness-mcp-page .harness-page-heading>button{flex-shrink:0;white-space:nowrap}
+.harness-mcp-toolbar{display:flex;align-items:center;gap:16px;margin:0 0 16px;padding:0 16px;border:1px solid var(--hep-border);border-radius:var(--hep-radius);background:var(--hep-surface)}
 .harness-mcp-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
 .harness-mcp-toolbar>.harness-mcp-actions{margin-left:auto;flex-shrink:0}
-.harness-mcp-tabs{display:flex;gap:24px;flex-wrap:wrap;min-width:0}
+.harness-mcp-tabs{display:flex;gap:24px;min-width:0;overflow-x:auto;scrollbar-width:thin}
 .harness-platform .harness-mcp-tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;padding:12px 0;background:transparent;color:var(--hep-muted)}
 .harness-platform .harness-mcp-tabs [aria-current=page]{color:var(--hep-link);border-bottom-color:var(--hep-primary);font-weight:600}
 .harness-mcp-page .mcp-manager{max-width:none;width:100%;margin:0;overflow-wrap:anywhere}
 .harness-mcp-page .mcp-manager .mcp-tabs{display:none}
 .harness-mcp-page .mcp-manager .mcp-content{padding:0;min-height:0}
+.harness-mcp-page :is(.harness-mcp-return,.harness-composition-return){margin:0 0 12px}
+.harness-mcp-page :is(.harness-composition-detail,.mcp-layout>.mcp-card):focus{outline:2px solid var(--hep-primary);outline-offset:3px}
+.harness-mcp-page :is(.harness-composition-detail,.mcp-layout>.mcp-card){scroll-margin-top:120px}
+.harness-mcp-conflict,.harness-composition-conflict{margin:16px 0;padding:16px;border:1px solid var(--hep-border);border-left:4px solid var(--hep-link);border-radius:var(--hep-control-radius);background:var(--hep-surface-muted);overflow-wrap:anywhere}
+.harness-composition-conflict h3{margin:0 0 8px}
+.harness-composition-conflict p{margin:8px 0}
 .harness-composition-workspace{display:grid;grid-template-columns:250px minmax(0,1fr);gap:24px;align-items:start}
 .harness-composition-sidebar{min-width:0}
 .harness-composition-sidebar h3{font-size:13px;color:var(--hep-muted);margin:20px 8px 12px;font-weight:500}
@@ -61,5 +68,6 @@ export const mcpPageTheme = `
 .harness-composition-trace th{font-weight:500;color:var(--hep-muted);font-size:12px;background:var(--hep-surface-muted)}
 @media(max-width:1200px){.harness-composition-workspace{grid-template-columns:220px minmax(0,1fr)}.harness-composition-layout{grid-template-columns:minmax(0,1fr)}.harness-composition-layout>aside{border-left:0;border-top:1px solid var(--hep-border);padding:20px 0 0}}
 @media(max-width:900px){.harness-composition-workspace{grid-template-columns:minmax(0,1fr)}.harness-composition-sidebar ul{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:8px}.harness-composition-sidebar .harness-mcp-actions{margin-bottom:16px}}
-@media(max-width:680px){.harness-mcp-page{padding-top:16px;padding-bottom:16px}.harness-mcp-toolbar{gap:12px}.harness-mcp-tabs{gap:8px 20px}.harness-composition-detail{padding:16px}.harness-composition-editor{grid-template-columns:minmax(0,1fr)}.harness-composition-trace thead{display:none}.harness-composition-trace tbody{display:block}.harness-composition-trace tr{display:block;padding:12px 0;border-bottom:1px solid var(--hep-border)}.harness-composition-trace td{display:grid;grid-template-columns:52px minmax(0,1fr);gap:12px;padding:4px 0;border:0}.harness-composition-trace td::before{content:attr(data-label);color:var(--hep-muted);font-size:12px}}
+@media(max-width:760px){.harness-mcp-return{display:none}}
+@media(max-width:680px){.harness-mcp-page{padding-top:16px;padding-bottom:16px}.harness-mcp-page:not(.harness-gateway-page)>.harness-page-heading{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:'title action' 'description description';align-items:start;column-gap:12px;row-gap:4px;margin-bottom:16px}.harness-mcp-page:not(.harness-gateway-page)>.harness-page-heading>div{display:contents}.harness-mcp-page:not(.harness-gateway-page)>.harness-page-heading h1{grid-area:title;min-width:0}.harness-mcp-page:not(.harness-gateway-page)>.harness-page-heading p{grid-area:description}.harness-mcp-page:not(.harness-gateway-page)>.harness-page-heading>button{grid-area:action;align-self:start}.harness-mcp-toolbar{gap:0;flex-wrap:wrap}.harness-mcp-tabs{gap:20px;flex-wrap:nowrap;white-space:nowrap;width:100%}.harness-mcp-toolbar>.harness-mcp-actions:not(:empty){width:100%;justify-content:flex-end;padding:0 0 12px}.harness-mcp-page .mcp-manager .mcp-service-layout{gap:8px}.harness-mcp-page .mcp-manager .mcp-mobile-service-picker{align-items:center}.harness-mcp-page .mcp-manager .mcp-mobile-service-picker label{gap:0;font-size:0;line-height:0}.harness-mcp-page .mcp-manager .mcp-mobile-service-picker select{font-size:14px;line-height:1.4}.harness-mcp-page .mcp-manager .mcp-mobile-service-picker>button{display:none}.harness-composition-detail{padding:16px}.harness-composition-editor{grid-template-columns:minmax(0,1fr)}.harness-composition-trace thead{display:none}.harness-composition-trace tbody{display:block}.harness-composition-trace tr{display:block;padding:12px 0;border-bottom:1px solid var(--hep-border)}.harness-composition-trace td{display:grid;grid-template-columns:52px minmax(0,1fr);gap:12px;padding:4px 0;border:0}.harness-composition-trace td::before{content:attr(data-label);color:var(--hep-muted);font-size:12px}}
 `

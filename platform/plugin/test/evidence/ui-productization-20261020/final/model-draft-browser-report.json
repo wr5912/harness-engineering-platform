@@ -1,0 +1,81 @@
+{
+  "checkedAt": "2026-10-21T03:40:43.605Z",
+  "checks": [
+    {
+      "name": "模型设置只含平台与业务统一默认两张卡",
+      "passed": true
+    },
+    {
+      "name": "当前统一默认回读正确",
+      "passed": true
+    },
+    {
+      "name": "初次打开无假冲突或假草稿",
+      "passed": true
+    },
+    {
+      "name": "第 1 次重新打开无假警告",
+      "passed": true
+    },
+    {
+      "name": "第 2 次重新打开无假警告",
+      "passed": true
+    },
+    {
+      "name": "存在可测试的另一业务模型",
+      "passed": true
+    },
+    {
+      "name": "真实修改仅显示未保存而非别处变化",
+      "passed": true
+    },
+    {
+      "name": "重新打开保留真实草稿",
+      "passed": true
+    },
+    {
+      "name": "放弃草稿后恢复已保存默认",
+      "passed": true
+    },
+    {
+      "name": "旧会话草稿与服务端相同时自动归一",
+      "passed": true
+    },
+    {
+      "name": "假草稿从会话存储清除",
+      "passed": true
+    },
+    {
+      "name": "390px 页面无横向溢出",
+      "passed": true
+    },
+    {
+      "name": "浏览器无脚本错误或服务端 5xx",
+      "passed": true
+    }
+  ],
+  "pageErrors": [],
+  "failedResponses": [],
+  "llmResponses": [
+    {
+      "status": 200,
+      "path": "/hep/api/llm/listProviders"
+    },
+    {
+      "status": 200,
+      "path": "/hep/api/llm/listConfigurableProviders"
+    },
+    {
+      "status": 200,
+      "path": "/hep/api/llm/listProviders"
+    },
+    {
+      "status": 200,
+      "path": "/hep/api/llm/listConfigurableProviders"
+    }
+  ],
+  "screenshots": [
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/model-draft-clean-1440.png",
+    "/tmp/hep-ui-acceptance-20261020-YzAfQF/model-draft-clean-390.png"
+  ]
+}

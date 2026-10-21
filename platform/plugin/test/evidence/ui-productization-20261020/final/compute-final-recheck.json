@@ -1,0 +1,219 @@
+{
+  "service": "http://10.0.160.32:3091/hep/",
+  "source": "http://10.0.160.32:3091/hep/#/agents?agent_id=autonomous-training-researcher&experiment_id=EXP-autonomous-training-researcher-001-redf6be6240bf&tab=compute-variants",
+  "checks": [
+    {
+      "name": "desktop 弹窗内主题入口可见",
+      "pass": true,
+      "observed": 1,
+      "expected": "1 个可见按钮"
+    },
+    {
+      "name": "desktop 弹窗主题入口切换前标签",
+      "pass": true,
+      "observed": "切换到深色主题",
+      "expected": "切换到深色主题"
+    },
+    {
+      "name": "desktop 弹窗内切换深色后保持打开",
+      "pass": true,
+      "observed": {
+        "dialog": 1,
+        "label": "切换到浅色主题"
+      },
+      "expected": "弹窗仍开，入口可切回浅色"
+    },
+    {
+      "name": "desktop medium 配置起点",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=2px"
+    },
+    {
+      "name": "desktop medium 下一步不自动提交",
+      "pass": true,
+      "observed": {
+        "submitCount": 0,
+        "alerts": [],
+        "dialog": 1
+      },
+      "expected": "0 次 submit、无校验错误且弹窗保留"
+    },
+    {
+      "name": "desktop medium 暗色保持",
+      "pass": true,
+      "observed": 1,
+      "expected": 1
+    },
+    {
+      "name": "desktop low 配置起点",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=2px"
+    },
+    {
+      "name": "desktop low 下一步不自动提交",
+      "pass": true,
+      "observed": {
+        "submitCount": 0,
+        "alerts": [],
+        "dialog": 1
+      },
+      "expected": "0 次 submit、无校验错误且弹窗保留"
+    },
+    {
+      "name": "desktop low 暗色保持",
+      "pass": true,
+      "observed": 1,
+      "expected": 1
+    },
+    {
+      "name": "desktop 重开低算力草稿从顶部显示",
+      "pass": true,
+      "observed": {
+        "top": 0,
+        "low": 1
+      },
+      "expected": "scrollTop<=2，低算力配置保留"
+    },
+    {
+      "name": "desktop 弹窗重开暗色保持",
+      "pass": true,
+      "observed": 1,
+      "expected": 1
+    },
+    {
+      "name": "desktop 弹窗内切回浅色且保持打开",
+      "pass": true,
+      "observed": {
+        "dialog": 1,
+        "label": "切换到深色主题"
+      },
+      "expected": "弹窗仍开，入口可切回深色"
+    },
+    {
+      "name": "mobile 弹窗内主题入口可见",
+      "pass": true,
+      "observed": 1,
+      "expected": "1 个可见按钮"
+    },
+    {
+      "name": "mobile 弹窗主题入口切换前标签",
+      "pass": true,
+      "observed": "切换到深色主题",
+      "expected": "切换到深色主题"
+    },
+    {
+      "name": "mobile 弹窗内切换深色后保持打开",
+      "pass": true,
+      "observed": {
+        "dialog": 1,
+        "label": "切换到浅色主题"
+      },
+      "expected": "弹窗仍开，入口可切回浅色"
+    },
+    {
+      "name": "mobile medium 配置起点",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=2px"
+    },
+    {
+      "name": "mobile medium 下一步不自动提交",
+      "pass": true,
+      "observed": {
+        "submitCount": 0,
+        "alerts": [],
+        "dialog": 1
+      },
+      "expected": "0 次 submit、无校验错误且弹窗保留"
+    },
+    {
+      "name": "mobile medium 暗色保持",
+      "pass": true,
+      "observed": 1,
+      "expected": 1
+    },
+    {
+      "name": "mobile low 配置起点",
+      "pass": true,
+      "observed": 0,
+      "expected": "<=2px"
+    },
+    {
+      "name": "mobile low 下一步不自动提交",
+      "pass": true,
+      "observed": {
+        "submitCount": 0,
+        "alerts": [],
+        "dialog": 1
+      },
+      "expected": "0 次 submit、无校验错误且弹窗保留"
+    },
+    {
+      "name": "mobile low 暗色保持",
+      "pass": true,
+      "observed": 1,
+      "expected": 1
+    },
+    {
+      "name": "mobile 重开低算力草稿从顶部显示",
+      "pass": true,
+      "observed": {
+        "top": 0,
+        "low": 1
+      },
+      "expected": "scrollTop<=2，低算力配置保留"
+    },
+    {
+      "name": "mobile 弹窗重开暗色保持",
+      "pass": true,
+      "observed": 1,
+      "expected": 1
+    },
+    {
+      "name": "mobile 弹窗内切回浅色且保持打开",
+      "pass": true,
+      "observed": {
+        "dialog": 1,
+        "label": "切换到深色主题"
+      },
+      "expected": "弹窗仍开，入口可切回深色"
+    }
+  ],
+  "screenshots": [
+    {
+      "name": "desktop-dark-choose",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-final-desktop-dark-choose.png"
+    },
+    {
+      "name": "desktop-dark-medium",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-final-desktop-dark-medium.png"
+    },
+    {
+      "name": "desktop-dark-low",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-final-desktop-dark-low.png"
+    },
+    {
+      "name": "desktop-light-reopen",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-final-desktop-light-reopen.png"
+    },
+    {
+      "name": "mobile-dark-choose",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-final-mobile-dark-choose.png"
+    },
+    {
+      "name": "mobile-dark-medium",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-final-mobile-dark-medium.png"
+    },
+    {
+      "name": "mobile-dark-low",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-final-mobile-dark-low.png"
+    },
+    {
+      "name": "mobile-light-reopen",
+      "file": "platform/plugin/test/evidence/ui-productization-20261020/final/compute-final-mobile-light-reopen.png"
+    }
+  ],
+  "errors": []
+}

@@ -1,0 +1,103 @@
+{
+  "results": [
+    {
+      "mode": "desktop",
+      "tab": "overview",
+      "navBottom": 424.328125,
+      "cardTop": 424.328125,
+      "overflow": 0,
+      "label": "运行概览",
+      "heading": "运行概览",
+      "dark": false
+    },
+    {
+      "mode": "desktop",
+      "tab": "identity",
+      "navBottom": 424.328125,
+      "cardTop": 424.328125,
+      "overflow": 0,
+      "label": "智能体身份",
+      "heading": "智能体身份配置",
+      "dark": false
+    },
+    {
+      "mode": "desktop",
+      "tab": "risk",
+      "navBottom": 424.328125,
+      "cardTop": 424.328125,
+      "overflow": 0,
+      "label": "风险评估",
+      "heading": "风险评估配置",
+      "dark": false
+    },
+    {
+      "mode": "desktop",
+      "tab": "authorization",
+      "navBottom": 424.328125,
+      "cardTop": 424.328125,
+      "overflow": 0,
+      "label": "访问控制",
+      "heading": "访问控制配置",
+      "dark": false
+    },
+    {
+      "mode": "desktop",
+      "tab": "dirty",
+      "navBottom": -179.265625,
+      "cardTop": -115.875,
+      "savebarTop": -179.265625,
+      "savebarBottom": -115.875,
+      "overflow": 0
+    },
+    {
+      "mode": "mobile",
+      "tab": "overview",
+      "navBottom": 312.765625,
+      "cardTop": 312.765625,
+      "overflow": 0,
+      "label": "运行概览",
+      "heading": "运行概览",
+      "dark": false
+    },
+    {
+      "mode": "mobile",
+      "tab": "identity",
+      "navBottom": 312.765625,
+      "cardTop": 312.765625,
+      "overflow": 0,
+      "label": "智能体身份",
+      "heading": "智能体身份配置",
+      "dark": false
+    },
+    {
+      "mode": "mobile",
+      "tab": "risk",
+      "navBottom": 312.765625,
+      "cardTop": 312.765625,
+      "overflow": 0,
+      "label": "风险评估",
+      "heading": "风险评估配置",
+      "dark": false
+    },
+    {
+      "mode": "mobile",
+      "tab": "authorization",
+      "navBottom": 312.765625,
+      "cardTop": 312.765625,
+      "overflow": 0,
+      "label": "访问控制",
+      "heading": "访问控制配置",
+      "dark": false
+    },
+    {
+      "mode": "mobile",
+      "tab": "dirty",
+      "navBottom": -447.828125,
+      "cardTop": -447.828125,
+      "savebarTop": 1006.40625,
+      "savebarBottom": 1123.578125,
+      "overflow": 0
+    }
+  ],
+  "errors": []
+}

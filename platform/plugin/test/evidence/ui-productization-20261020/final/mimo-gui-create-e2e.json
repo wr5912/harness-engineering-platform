@@ -1,0 +1,38 @@
+{
+  "checkedAt": "2026-10-21T03:48:29.555Z",
+  "name": "mimo-gui-e2e-20261021",
+  "source": "experiment:EXP-security-operations-expert-023-r2233d74f6fb3",
+  "checks": [
+    {
+      "label": "同名实例当前不存在",
+      "passed": true
+    },
+    {
+      "label": "新实例选择 MiMo-V2.6-Flash",
+      "passed": true
+    },
+    {
+      "label": "新实例默认推理档位 off",
+      "passed": true
+    },
+    {
+      "label": "预览固定目标来源",
+      "passed": true
+    },
+    {
+      "label": "预览未显示错误",
+      "passed": true
+    },
+    {
+      "label": "实例创建成功",
+      "passed": true
+    },
+    {
+      "label": "页面没有脚本错误或 5xx",
+      "passed": true
+    }
+  ],
+  "preview": "确认创建业务实例\n\n核对来源、影响对象和验证范围后再执行。\n\n×\nmimo-gui-e2e-20261021\n来源智能体\n网络安全运营专家\n来源版本\n网络安全运营专家 · EXP-security-operations-expert-023-r2233d74f6fb3\n运行方式\n新增一个独立的本地实例\n验证范围\n未记录验证范围\n评测记录：此版本尚无评测记录 · 核对于 2026/10/21 11:48:58\n实例默认模型\nxiaomi-token-plan-cn · MiMo-V2.6-Flash\n访问端口\n127.0.0.1:31893\n执行后的影响\n新增独立业务访问入口 127.0.0.1:31893。\n现有 1 个运行中业务实例保持当前状态。\n创建不代表业务验证通过；请按来源版本的评测范围核对结果。\n技术详情 · 操作参数\n返回修改\n确认创建",
+  "receipt": "确认创建业务实例\n\n核对来源、影响对象和验证范围后再执行。\n\n×\n\n正在读取操作预览…\n\n操作回执：成功 1 项，失败 0 项，结果未知 0 项，未派发 0 项\nmimo-gui-e2e-20261021 · 创建 · 成功\n预览端口：31893；执行回执端口：31893\n提交默认模型：xiaomi-token-plan-cn · MiMo-V2.6-Flash；当前实例登记与实际模型调用请分别核对。\n提交来源：experiment:EXP-security-operations-expert-023-r2233d74f6fb3；当前登记来源：尚未观察到\n关闭",
+  "errors": []
+}

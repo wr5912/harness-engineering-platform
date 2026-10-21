@@ -69,12 +69,20 @@ async function fixture(t) {
   const binding = { workspaceId: 'workspace', agentId: 'soc', instanceId: 'shared', runtimeGeneration: 'one', sourceDigest: 'fixed' }
   control.registerInstance(binding)
   // 本文件验证MCP执行合同；真实签名握手另由网关HTTP和容器验收覆盖。
-  control.recordAgentAuthentication(binding)
-  const snapshot = control.issueSnapshot(binding.instanceId)
-  control.acknowledge(binding.instanceId, snapshot.restrictionVersion, snapshot.leaseId)
+  const refreshChannel = () => {
+    control.recordAgentAuthentication(binding)
+    const snapshot = control.issueSnapshot(binding.instanceId)
+    assert.equal(control.acknowledge(binding.instanceId, snapshot.restrictionVersion, snapshot.leaseId), true)
+  }
+  const withActiveChannel = async action => {
+    refreshChannel()
+    const timer = setInterval(refreshChannel, 250)
+    try { return await action() } finally { clearInterval(timer) }
+  }
   const identities = {}
   for (const id of ['a', 'b']) {
     const identity = await control.authenticate({ transport: 'http', method: 'POST', path: '/', headers: { authorization: `Bearer ${id}` } })
+    refreshChannel()
     identities[id] = control.bindSession(control.createContext(identity, binding), `session-${id}`)
   }
   const service = { id: 'soc', specUrl: origin + '/openapi.json', enabled: true, tools: { mode: 'all', names: [] } }
@@ -82,14 +90,15 @@ async function fixture(t) {
   module.apply({ webServer: { register: () => () => {} }, connection: { requestRejection: () => undefined }, effect: create => create(), on() {}, provide() {} }, {
     servers: { get: () => [service] }, groups: { get: () => [] }, sharedToken: { get: () => '' }, platformExecute: module.managedDispatch(root), platformDispatch: value => { dispatch = value },
   })
-  const run = (id, request) => module.withBusinessContext(identities[id], () => dispatch({ serverId: 'soc', ...request }))
-  return { module, root, origin, calls, observedHeaders, options, control, identities, service, dispatch, run }
+  const run = (id, request) => withActiveChannel(() => module.withBusinessContext(identities[id], () => dispatch({ serverId: 'soc', ...request })))
+  return { module, root, origin, calls, observedHeaders, options, control, identities, service, dispatch, run, withActiveChannel }
 }
 
 test('真实原生OpenAPI执行只收紧A写入，A资源查询与B写入继续，目标账本可核对', async t => {
   const f = await fixture(t)
   f.control.updateRestriction({ scope: { workspaceId: 'workspace', agentId: 'soc', subjectId: 'a' }, deniedActions: ['write'], reason: 'synthetic', active: true })
   assert.equal((await f.run('a', { action: 'callTool', toolName: 'writeback', arguments: { body: { value: 'normal' } } })).status, 400)
+  assert.equal(f.control.status().events.at(-1)?.reason, 'risk_restricted')
   assert.deepEqual(f.calls, [])
   assert.equal((await f.run('a', { action: 'readResource', uri: f.origin + '/query' })).status, 200)
   assert.equal((await f.run('b', { action: 'callTool', toolName: 'writeback', arguments: { body: { value: 'normal' } } })).status, 200)
@@ -118,7 +127,7 @@ test('独立handler调用也走相同控制，外部关联session_id不能赋予
   const call = () => handler('callTool', { connectionId: 'soc', toolName: 'writeback', arguments: { body: {} }, execution: { session_id: 'session-a' } })
   assert.equal((await call()).ok, false)
   assert.deepEqual(f.calls, [])
-  assert.equal((await f.module.withBusinessContext(f.identities.a, call)).ok, true)
+  assert.equal((await f.withActiveChannel(() => f.module.withBusinessContext(f.identities.a, call))).ok, true)
   assert.equal(f.calls.length, 1)
   assert.equal(f.observedHeaders[0].subjectId, 'a')
 })
@@ -152,8 +161,8 @@ test('已发布组合保留真实业务上下文，在真实叶子授权；撤�
     servers: { get: () => [f.service, published] }, groups: { get: () => [] }, sharedToken: { get: () => '' }, platformClient,
     platformExecute: f.module.managedDispatch(f.root), platformDispatch: value => { dispatch = value },
   })
-  const run = id => f.module.withBusinessContext(f.identities[id], () => dispatch({ action: 'callTool', serverId: published.id,
-    toolName: 'asset_alerts', arguments: { asset: 'basic' } }))
+  const run = id => f.withActiveChannel(() => f.module.withBusinessContext(f.identities[id], () => dispatch({ action: 'callTool', serverId: published.id,
+    toolName: 'asset_alerts', arguments: { asset: 'basic' } })))
   const first = await run('a')
   assert.equal(first.status, 200)
   assert.equal(first.value.isError, false, JSON.stringify(first.value))
@@ -161,6 +170,7 @@ test('已发布组合保留真实业务上下文，在真实叶子授权；撤�
   f.control.updateRestriction({ scope: { workspaceId: 'workspace', agentId: 'soc', subjectId: 'a' }, deniedActions: ['read'], reason: 'synthetic', active: true })
   const denied = await run('a')
   assert.equal(denied.value.isError, true)
+  assert.equal(f.control.status().events.at(-1)?.reason, 'risk_restricted')
   assert.equal(f.calls.length, 2, 'A的受限组合没有派发任何叶子请求')
   const other = await run('b')
   assert.equal(other.value.isError, false)

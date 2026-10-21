@@ -1,0 +1,158 @@
+{
+  "checkedAt": "2026-10-21T03:57:39.014Z",
+  "sessionId": "session-96206f20-1f2c-40ee-9e8b-08d87401f24e",
+  "checks": [
+    {
+      "label": "业务 GUI 入口加载",
+      "passed": true
+    },
+    {
+      "label": "已有业务答复在 GUI 可见",
+      "passed": true
+    },
+    {
+      "label": "业务 GUI 模型显示 MiMo Off",
+      "passed": true
+    }
+  ],
+  "url": "http://10.0.160.32:31893/assistant/",
+  "buttons": [
+    {
+      "text": "AI 安全运营",
+      "title": null,
+      "aria": "新建会话"
+    },
+    {
+      "text": "",
+      "title": null,
+      "aria": "收起侧边栏"
+    },
+    {
+      "text": "新会话",
+      "title": null,
+      "aria": "新建会话"
+    },
+    {
+      "text": "插件",
+      "title": null,
+      "aria": "插件"
+    },
+    {
+      "text": "自动化任务",
+      "title": null,
+      "aria": "自动化任务"
+    },
+    {
+      "text": "",
+      "title": null,
+      "aria": "搜索会话"
+    },
+    {
+      "text": "",
+      "title": null,
+      "aria": "视图选项"
+    },
+    {
+      "text": "更多",
+      "title": null,
+      "aria": "账号菜单"
+    },
+    {
+      "text": "展开详情 ⌄",
+      "title": null,
+      "aria": null
+    },
+    {
+      "text": "系统消息",
+      "title": null,
+      "aria": null
+    },
+    {
+      "text": "新增访问策略草稿\n↗\n填写源与目的 IPv4、协议和端口，先生成待确认草稿。",
+      "title": null,
+      "aria": null
+    },
+    {
+      "text": "准备应急指令\n↗\n填写单个目标与动作，先查看冻结草案。",
+      "title": null,
+      "aria": null
+    },
+    {
+      "text": "最近24小时网络总结报告\n↗\n汇总最近 24 小时网络运行、安全事件、风险变化及待处理事项。",
+      "title": null,
+      "aria": null
+    },
+    {
+      "text": "自动巡检\n↗\n巡检已接入设备、关键资产、服务和数据链路，定位异常与待办。",
+      "title": null,
+      "aria": null
+    },
+    {
+      "text": "风险处置\n↗\n梳理未闭环风险并形成分级、可验证、可回退的处置建议。",
+      "title": null,
+      "aria": null
+    },
+    {
+      "text": "资产盘点\n↗\n按资产类型、归属、状态、暴露面和风险等级形成资产视图。",
+      "title": null,
+      "aria": null
+    },
+    {
+      "text": "周报生成\n↗\n生成本周截至当前的安全运营周报，呈现趋势、成果和待办。",
+      "title": null,
+      "aria": null
+    },
+    {
+      "text": "月报生成\n↗\n生成本月截至当前的安全运营月报，分析风险变化和治理成效。",
+      "title": null,
+      "aria": null
+    },
+    {
+      "text": "",
+      "title": null,
+      "aria": "添加文件或调用指令"
+    },
+    {
+      "text": "仅可查看",
+      "title": null,
+      "aria": "访问模式，当前：仅可查看"
+    },
+    {
+      "text": "MiMo-V2.6-Flash\nOff",
+      "title": "MiMo-V2.6-Flash · Off",
+      "aria": "选择模型，当前 MiMo-V2.6-Flash，推理等级 Off"
+    },
+    {
+      "text": "",
+      "title": null,
+      "aria": "发送消息"
+    },
+    {
+      "text": "",
+      "title": null,
+      "aria": "关闭"
+    },
+    {
+      "text": "",
+      "title": null,
+      "aria": "新标签页"
+    },
+    {
+      "text": "",
+      "title": null,
+      "aria": "分栏"
+    },
+    {
+      "text": "",
+      "title": null,
+      "aria": "全屏"
+    },
+    {
+      "text": "",
+      "title": null,
+      "aria": "收起右侧边栏"
+    }
+  ],
+  "failure": null,
+  "sessionLinks": []
+}

@@ -1,0 +1,131 @@
+{
+  "source": {
+    "url": "http://10.0.160.32:3091/hep/",
+    "data_root": "/tmp/hep-ui-acceptance-20261020-YzAfQF/data",
+    "target": "test01",
+    "browser": "Chromium",
+    "actual_browser": true,
+    "read_only": true,
+    "service_pid": 98382
+  },
+  "checks": [
+    {
+      "name": "桌面原生模型目录和共享设置加载",
+      "pass": true,
+      "observed": {
+        "providersVisible": true,
+        "default": "[\"xiaomi-token-plan-cn\",\"mimo-v2.5\"]"
+      },
+      "expected": "原生目录与共享设置同屏"
+    },
+    {
+      "name": "桌面平台默认模型与推理档位可见",
+      "pass": true,
+      "observed": {
+        "model": "[\"xiaomi-token-plan-cn\",\"mimo-v2.5\"]",
+        "effort": {
+          "visible": true,
+          "selected": "",
+          "options": [
+            "使用模型默认档位",
+            "Off",
+            "High"
+          ]
+        }
+      },
+      "expected": "MiMo-V2.5 默认，推理档位可读"
+    },
+    {
+      "name": "桌面 Agent 授权与默认模型回读",
+      "pass": true,
+      "observed": {
+        "checked": 1,
+        "model": "[\"xiaomi-token-plan-cn\",\"mimo-v2.5\"]"
+      },
+      "expected": "test01 授权 1 个 MiMo-V2.5 且设为默认"
+    },
+    {
+      "name": "桌面 Agent 推理档位和业务连接状态可见",
+      "pass": true,
+      "observed": {
+        "effort": {
+          "visible": true,
+          "selected": "",
+          "options": [
+            "使用模型默认档位",
+            "Off",
+            "High"
+          ]
+        },
+        "connection": "已授权，业务连接未就绪\n\n提供方 xiaomi-token-plan-cn 尚无业务实例可解析的 API Key；请在设置 → 模型中配置后刷新。 授权可以保存，业务实例须待连接配置就绪后启动。"
+      },
+      "expected": "可读推理档位及业务连接状态"
+    },
+    {
+      "name": "刷新后模型、授权与推理档位未漂移",
+      "pass": true,
+      "observed": {
+        "platform": "[\"xiaomi-token-plan-cn\",\"mimo-v2.5\"]",
+        "agent": "[\"xiaomi-token-plan-cn\",\"mimo-v2.5\"]",
+        "platformEffort": "",
+        "agentEffort": ""
+      },
+      "expected": "模型、授权、推理档位与读取前一致"
+    },
+    {
+      "name": "390px 共享区无横向溢出",
+      "pass": true,
+      "observed": {
+        "viewport": 390,
+        "documentOverflow": 0,
+        "sharingOverflow": 0
+      },
+      "expected": "<=1px"
+    },
+    {
+      "name": "390px 平台和 Agent 默认模型与推理档位可见",
+      "pass": true,
+      "observed": {
+        "platform": {
+          "visible": true,
+          "selected": "",
+          "options": [
+            "使用模型默认档位",
+            "Off",
+            "High"
+          ]
+        },
+        "agent": {
+          "visible": true,
+          "selected": "",
+          "options": [
+            "使用模型默认档位",
+            "Off",
+            "High"
+          ]
+        }
+      },
+      "expected": "两个对象的默认模型与推理档位可操作"
+    }
+  ],
+  "observations": [
+    {
+      "name": "read_only_scope",
+      "detail": "未修改模型、授权、凭据或实例；只读取模型设置并刷新页面。"
+    }
+  ],
+  "screenshots": [
+    "platform/plugin/test/evidence/ui-productization-20261020/final/model-settings-final-recheck-desktop-platform.png",
+    "platform/plugin/test/evidence/ui-productization-20261020/final/model-settings-final-recheck-desktop-agent.png",
+    "platform/plugin/test/evidence/ui-productization-20261020/final/model-settings-final-recheck-mobile-platform.png",
+    "platform/plugin/test/evidence/ui-productization-20261020/final/model-settings-final-recheck-mobile-agent.png",
+    "platform/plugin/test/evidence/ui-productization-20261020/final/model-settings-final-recheck-mobile-agent-effort.png"
+  ],
+  "errors": [],
+  "summary": {
+    "passed": 7,
+    "failed": 0,
+    "total": 7,
+    "errors": 0
+  }
+}

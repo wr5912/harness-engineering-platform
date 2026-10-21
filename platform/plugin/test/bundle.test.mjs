@@ -18,5 +18,5 @@ test('客户端产物使用 DSH ModuleLoader 和共享 React，导出可装载�
   })
   assert.deepEqual(new Set(dependencies), new Set(['react', 'react/jsx-runtime', 'react-dom', '@deepseek-ai/dsh-client-ui-primitives']))
   assert.equal(typeof plugin.apply, 'function')
-  assert.deepEqual(Array.from(plugin.inject), ['connection', 'slots', 'layout', 'workspaces', 'uiWorkspace', 'uiSession', 'sessions', 'conversation'])
+  assert.deepEqual(Array.from(plugin.inject), ['connection', 'remote', 'slots', 'layout', 'workspaces', 'uiWorkspace', 'uiSession', 'sessions', 'conversation', 'theme'])
 })

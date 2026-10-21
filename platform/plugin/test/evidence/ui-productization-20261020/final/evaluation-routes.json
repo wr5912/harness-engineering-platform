@@ -1,0 +1,84 @@
+{
+  "steps": [
+    {
+      "name": "run-tab-results",
+      "ok": true,
+      "runId": "run-05973a80-6b91-40e7-a0da-acca3a4ea696",
+      "selectedTab": "evaluation-run-tab-results",
+      "routeTab": "results",
+      "panelVisible": true
+    },
+    {
+      "name": "run-tab-trace",
+      "ok": true,
+      "runId": "run-05973a80-6b91-40e7-a0da-acca3a4ea696",
+      "selectedTab": "evaluation-run-tab-trace",
+      "routeTab": "trace",
+      "panelVisible": true
+    },
+    {
+      "name": "run-tab-files",
+      "ok": true,
+      "runId": "run-05973a80-6b91-40e7-a0da-acca3a4ea696",
+      "selectedTab": "evaluation-run-tab-files",
+      "routeTab": "files",
+      "panelVisible": true
+    },
+    {
+      "name": "run-tab-datasets",
+      "ok": true,
+      "runId": "run-05973a80-6b91-40e7-a0da-acca3a4ea696",
+      "selectedTab": "evaluation-run-tab-datasets",
+      "routeTab": "datasets",
+      "panelVisible": true
+    },
+    {
+      "name": "run-tab-report",
+      "ok": true,
+      "runId": "run-05973a80-6b91-40e7-a0da-acca3a4ea696",
+      "selectedTab": "evaluation-run-tab-report",
+      "routeTab": "report",
+      "panelVisible": true
+    },
+    {
+      "name": "run-tab-refresh-back-forward",
+      "ok": true,
+      "before": "#/evaluation?run_id=run-05973a80-6b91-40e7-a0da-acca3a4ea696&tab=runs&run_tab=files",
+      "back": {
+        "url": "#/evaluation?run_id=run-05973a80-6b91-40e7-a0da-acca3a4ea696&tab=runs&run_tab=trace",
+        "tab": "evaluation-run-tab-trace",
+        "run": "run-05973a80-6b91-40e7-a0da-acca3a4ea696"
+      },
+      "forward": {
+        "url": "#/evaluation?run_id=run-05973a80-6b91-40e7-a0da-acca3a4ea696&tab=runs&run_tab=files",
+        "tab": "evaluation-run-tab-files",
+        "run": "run-05973a80-6b91-40e7-a0da-acca3a4ea696"
+      },
+      "reload": {
+        "tab": "evaluation-run-tab-files",
+        "run": "run-05973a80-6b91-40e7-a0da-acca3a4ea696"
+      },
+      "sameRun": true
+    },
+    {
+      "name": "case-route-priority",
+      "ok": true,
+      "hash": "#/evaluation?tab=runs&run_id=run-05973a80-6b91-40e7-a0da-acca3a4ea696&case_id=U-IDENTITY-001&run_tab=trace",
+      "tab": "evaluation-run-tab-results",
+      "caseSelection": "U-IDENTITY-001",
+      "run": "run-05973a80-6b91-40e7-a0da-acca3a4ea696"
+    },
+    {
+      "name": "job-error-deep-link",
+      "ok": true,
+      "hash": "#/evaluation?tab=jobs&job_id=job-unknown",
+      "title": "智能体未知 版本待读取",
+      "alert": [
+        "未能连接任务 job-unknown：invalid_request: 评测任务 ID 格式无效。可重新查询。"
+      ],
+      "focus": "STRONG"
+    }
+  ],
+  "pageErrors": [],
+  "consoleErrors": []
+}

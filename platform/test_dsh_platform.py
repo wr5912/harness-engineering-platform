@@ -185,6 +185,7 @@ if sys.argv[1:] == ["run", "build"]:
             "DEEPSEEK_API_KEY": "fixture-file-key",
             "LOCAL_LLM_BASE_URL": "http://127.0.0.1:8000",
             "LOCAL_LLM_API_KEY": "fixture-local-key",
+            "XIAOMI_TOKEN_PLAN_CN_API_KEY": "fixture-mimo-key",
             "UNRELATED_VALUE": "must-not-enter-environment",
         })
         credentials.write_text(content)
@@ -195,6 +196,7 @@ if sys.argv[1:] == ["run", "build"]:
         self.assertEqual(environment["DEEPSEEK_API_KEY"], "fixture-explicit-key")
         self.assertEqual(environment["LOCAL_LLM_BASE_URL"], "http://127.0.0.1:8000")
         self.assertEqual(environment["LOCAL_LLM_API_KEY"], "fixture-local-key")
+        self.assertEqual(environment["XIAOMI_TOKEN_PLAN_CN_API_KEY"], "fixture-mimo-key")
         self.assertNotIn("UNRELATED_VALUE", environment)
         self.assertEqual(environment["HARNESS_ASSET_ROOT"], str(self.assets))
         self.assertEqual(credentials.read_text(), content)

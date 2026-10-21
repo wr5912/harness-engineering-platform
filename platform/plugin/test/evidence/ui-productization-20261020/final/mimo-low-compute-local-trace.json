@@ -1,0 +1,112 @@
+{
+  "checkedAt": "2026-10-21T04:01:12.062Z",
+  "sessionId": "session-34baf816-0b54-464e-8bbb-476b49039b8f",
+  "source": "isolated local DSH native session log",
+  "checks": [
+    {
+      "label": "真实消息包含父版本与 Run",
+      "passed": true
+    },
+    {
+      "label": "消息声明只策划",
+      "passed": true
+    },
+    {
+      "label": "原生请求头路由 MiMo high",
+      "passed": true
+    },
+    {
+      "label": "回合完成且回复非空",
+      "passed": true
+    },
+    {
+      "label": "回复区分待验证目标",
+      "passed": true
+    },
+    {
+      "label": "工具调用没有变体/训练写入",
+      "passed": true
+    }
+  ],
+  "route": {
+    "provider": "xiaomi-token-plan-cn",
+    "model": "mimo-v2.6-flash",
+    "reasoningEffort": "high"
+  },
+  "turnReason": "completed",
+  "toolActions": [
+    {
+      "name": "skill",
+      "action": null
+    },
+    {
+      "name": "platform_agents",
+      "action": "compute-variants/context"
+    },
+    {
+      "name": "platform_agents",
+      "action": "detail"
+    },
+    {
+      "name": "platform_agents",
+      "action": "detail"
+    },
+    {
+      "name": "platform_agents",
+      "action": "runs/show"
+    },
+    {
+      "name": "platform_agents",
+      "action": "runs/report"
+    },
+    {
+      "name": "platform_agents",
+      "action": "runs/trace"
+    },
+    {
+      "name": "platform_agents",
+      "action": "tasks/capabilities"
+    },
+    {
+      "name": "platform_agents",
+      "action": "describe"
+    },
+    {
+      "name": "platform_agents",
+      "action": "describe"
+    },
+    {
+      "name": "platform_agents",
+      "action": "assets/read-fixed"
+    },
+    {
+      "name": "platform_agents",
+      "action": "research/read-reference"
+    },
+    {
+      "name": "platform_agents",
+      "action": "assets/read-fixed"
+    },
+    {
+      "name": "platform_agents",
+      "action": "describe"
+    },
+    {
+      "name": "platform_agents",
+      "action": "runs/evidence"
+    },
+    {
+      "name": "platform_agents",
+      "action": "describe"
+    },
+    {
+      "name": "platform_agents",
+      "action": "runs/read-file"
+    }
+  ],
+  "responseLength": 5404,
+  "responseSha256": "b2dae03676729f20eef76c9b7620dee8a4d4d8bb7d8a79770d54bada4e7c2a64",
+  "responseExcerpt": "已完成只读核对，未创建变体、未执行任何业务工具、未产生写入。策划请求 1792554964788-r4sgvkq7jeg 无需重发。\n\n## 一、核对结果（固定父版、轨迹、工具合同、可比性）\n\n**父版**：低算力变体从 `EXP-autonomous-training-researcher-001-redf6be6240bf` 派生，`parent_ref` 为 `git:278593d071c3a9543b794ac59e66f99ac88786d4`，已用 `assets/read-fixed` 核对到完整 Candidate（含 `dsh/managed/task-example-tools.mjs`、preset、workspace、`harness.yaml` 共 6 个文件）。当前 Candidate `candidate_sha256` 为 `0202f59ff0b527eb6002c7ca143d0e9252c027caef5bc9b5458b87b780b59ed3`，与 detail 的 derivation 一致；本 Experiment 是首个版本（`baseline_ref: none:first-experiment`），context 里的 `fixed_parent_ref` 指它自身无基线，不作为变体父版。`workflow_status` 全为 false、`plan` 为 null，即尚无已创建变体，本次计划不与既有研究冲突。\n\n**轨迹**：只核对 `run-59e5fb6b-b867-42cb-a675-d7d952387cfa`（completed / passed，来源核对 matched）。该 Run 只执行了 `U-TRAIN-PREFLIGHT-001`；`U-IDENTITY-001`、`U-ROLE-001` 在 `uncovered_case_ids` 中未执行。Run 记录的 `asset_origin` 是 `c3d8245fdc01a375480bcd65b9772482519a7306`（dirty，2 文件），但四项组件 SHA 全部 matched，说明轨迹对应的 Candidate 内容与当前版本一致，可比。执行通道 `api`，模型 `deepseek-official/deepseek-flash`、`reasoningEffort: off`。\n\n**工具合同**：`task_training` 是父版本地插件工具（`dsh/managed/task-example-tools.mjs`），schema `required:[\"action\"]`，本次实际调用 `{action:\"preflight\"}` 成功。`tasks/capabilities` 中没有 `task_training` 的 MCP 固定组合绑定（MCP 工具列表为空，`composition_bindings` 只有安全类工具），因此工作流走 `context.callTool(\"task_training\", …)` 原生分发即可，不需要、也不应编造 fixed composition 或绕过 Guard。\n\n**生成合同**：`mode: langgraph-aot`，`entry_path` 用 `dsh/managed/compute-workflow/index.ts`，`source_run_ids` 必填（已具备），`fixture_sha256` 可选；SDK 导出、`defineWorkflow`/`runWorkflow`/`registerWorkflowTool`/`context.callTool` 等合同字段均以平台返回为准。\n\n## 二、成本诊断（观察与假设分开）\n\n`run-59e5fb6b…` 的 `U-TRAIN-PREFLIGHT-001`：\n\n| 项 | 观察值 |\n|---|---|\n| 主循环模型请求 | 2 次（step1 与 step2） |\n| Token | step1 共 3223（in 2790 / out 49 / cacheRead 384）；step2 共 3709（in 2095 / out 334 / cacheRea",
+  "eventCount": 114,
+  "failure": null
+}
