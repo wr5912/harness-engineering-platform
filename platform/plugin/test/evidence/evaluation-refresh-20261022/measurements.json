@@ -1,0 +1,48 @@
+{
+  "date": "2026-10-22",
+  "environment": {
+    "platform": "http://172.16.138.228:18120/hep/",
+    "asset_root": "/home/cmp/harness-engineering-platform-data",
+    "running_containers": ["dsh-eval-driver-7f5453ba29c14639baba893f48f0bfca", "security-operations-expert-eval-038b85eb"],
+    "restarted_platform": false
+  },
+  "before": {
+    "evidence_write_events_15s": 176,
+    "evidence_write_events_per_second": 11.7,
+    "rewritten_files_content_unchanged": true,
+    "notify_merge_window_ms": 100,
+    "estimated_sse_frames_per_second": 10,
+    "runs_index_requests_per_frame": 6,
+    "runs_index_duration_seconds": 0.257,
+    "runs_index_response_bytes": 59040,
+    "browser_error": "POST /hep/harness-platform/agents/runs/index net::ERR_INSUFFICIENT_RESOURCES"
+  },
+  "after": {
+    "real_asset_root_notifications_10s": 0,
+    "overview_duration_seconds": 0.28,
+    "overview_response_bytes": 83046,
+    "overview_agents": 6,
+    "overview_experiments": 39,
+    "index_agent_experiments": 29,
+    "notify_min_interval_ms": 1000,
+    "evaluation_debounce_ms": 250,
+    "runs_requests_per_refresh": 1
+  },
+  "tests": {
+    "plugin_pnpm_test": { "total": 817, "passed": 817, "failed": 0 },
+    "realtime": { "total": 6, "passed": 6, "failed": 0 },
+    "evaluation_client": { "total": 56, "passed": 56, "failed": 0 },
+    "agents_overview_integration": { "total": 1, "passed": 1, "failed": 0 },
+    "dsh_eval_common": { "total": 18, "passed": 18, "failed": 0 },
+    "dsh_eval_review_trace": { "total": 11, "passed": 11, "failed": 0 },
+    "dsh_eval_access": { "total": 2, "passed": 2, "failed": 0 },
+    "run_comparison": { "total": 7, "passed": 7, "failed": 0 },
+    "platform_launcher": { "total": 35, "passed": 8, "failed": 26, "errors": 1, "note": "测试运行器环境缺少 PyYAML 且引导服务返回 400；与本次改动无关，未计为通过" }
+  },
+  "limits": [
+    "浏览器端到端验收未执行，需要重启平台装载服务端插件与客户端 bundle",
+    "评测驱动的 300ms Session 导出仍存在，本次只消除未变化证据的磁盘重写",
+    "其他页面未逐一增加通知去抖，依赖服务端 1 帧/秒上限",
+    "启动器测试失败为环境问题，未修改启动器"
+  ]
+}

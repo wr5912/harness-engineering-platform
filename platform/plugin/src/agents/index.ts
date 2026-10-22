@@ -1459,7 +1459,7 @@ async function evalPreview(root: string, payload: JsonMap, signal?: AbortSignal,
   } finally { prepared.dispose?.() }
 }
 
-async function runRecord(root: string, op: 'index' | 'show' | 'compare', payload: JsonMap, signal?: AbortSignal) {
+async function runRecord(root: string, op: 'index' | 'overview' | 'show' | 'compare', payload: JsonMap, signal?: AbortSignal) {
   const args = [RUN_RECORD, '--repo', root, op]
   if (op === 'index') args.push('--agent', agentIdField(payload))
   if (op === 'show') {
@@ -1691,6 +1691,7 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
         case 'eval/status': return ok(jobs.status(stringField(body, 'job_id')))
         case 'eval/cancel': return ok(jobs.cancel(stringField(body, 'job_id')))
         case 'runs/index': return await runRecord(root, 'index', body, signal)
+        case 'runs/overview': return await runRecord(root, 'overview', body, signal)
         case 'runs/show': return await runRecord(root, 'show', body, signal)
         case 'runs/evidence': return await readRunEvidence(root, body, signal)
         case 'runs/report': return ok(await readRunReport(root, stringField(body, 'run_id'), signal))

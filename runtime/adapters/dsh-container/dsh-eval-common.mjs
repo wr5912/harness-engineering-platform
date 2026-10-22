@@ -1,4 +1,4 @@
-import { mkdir, rename, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 export const SAFETY_STOP_REASONS = new Set([
@@ -121,9 +121,14 @@ function jsonl(rows) {
   return rows.length ? `${rows.map(row => JSON.stringify(row)).join('\n')}\n` : ''
 }
 
+/** 轮询会反复导出同一份轨迹；内容未变时不改写文件，避免制造无意义的失效事件。 */
 async function atomicWrite(path, content) {
+  try {
+    if (await readFile(path, 'utf8') === content) return false
+  } catch { /* 首次写入或旧文件不可读时继续写。 */ }
   await writeFile(`${path}.tmp`, content)
   await rename(`${path}.tmp`, path)
+  return true
 }
 
 export function toolEvents(archive) {
@@ -169,8 +174,7 @@ export async function saveCaseResult(root, row) {
   const directory = join(root, row.case_id)
   await mkdir(directory, { recursive: true })
   const path = join(directory, 'case-result.json')
-  await writeFile(`${path}.tmp`, `${JSON.stringify(row, null, 2)}\n`)
-  await rename(`${path}.tmp`, path)
+  await atomicWrite(path, `${JSON.stringify(row, null, 2)}\n`)
 }
 
 export function assertSessionIdentity(session, presetId, workspace) {

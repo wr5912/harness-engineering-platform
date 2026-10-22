@@ -725,13 +725,11 @@ def run_index_facts(run_dir: Path, manifest: dict) -> dict:
     return facts
 
 
-def command_index(repo: Path, args: argparse.Namespace) -> None:
-    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", args.agent):
-        raise ValueError("agent 必须是小写 kebab-case")
+def agent_experiments(repo: Path, agent: str) -> list[dict]:
     experiments = []
-    for root in sorted((repo / "evolution/experiments").glob(f"EXP-{args.agent}-*")):
+    for root in sorted((repo / "evolution/experiments").glob(f"EXP-{agent}-*")):
         match = EXPERIMENT_RE.fullmatch(root.name)
-        if not root.is_dir() or root.is_symlink() or not match or match.group(1) != args.agent:
+        if not root.is_dir() or root.is_symlink() or not match or match.group(1) != agent:
             continue
         change = read_change_yaml(root / "change.yaml")
         runs = []
@@ -742,8 +740,26 @@ def command_index(repo: Path, args: argparse.Namespace) -> None:
             runs.append({**{key: manifest.get(key) for key in ("run_id", "status", "created_at", "finished_at")},
                          **run_index_facts(path.parent, manifest)})
         experiments.append({"experiment_id": root.name, "status": change.get("status"), "runs": runs})
+    return experiments
+
+
+def command_index(repo: Path, args: argparse.Namespace) -> None:
+    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", args.agent):
+        raise ValueError("agent 必须是小写 kebab-case")
     print(json.dumps({"agent_id": args.agent, "evaluation_path": f"agents/{args.agent}/evaluation.md",
-                      "experiments": experiments}, ensure_ascii=False, indent=2))
+                      "experiments": agent_experiments(repo, args.agent)}, ensure_ascii=False, indent=2))
+
+
+def command_overview(repo: Path) -> None:
+    """一次列出全部 Agent 的 Run 索引；页面汇总读取不按 Agent 重复启动解析进程。"""
+    agents = []
+    for path in sorted((repo / "agents").glob("*")):
+        agent = path.name
+        if not path.is_dir() or path.is_symlink() or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", agent):
+            continue
+        agents.append({"agent_id": agent, "evaluation_path": f"agents/{agent}/evaluation.md",
+                       "experiments": agent_experiments(repo, agent)})
+    print(json.dumps({"agents": agents}, ensure_ascii=False, indent=2))
 
 
 def command_show(repo: Path, args: argparse.Namespace) -> None:
@@ -1066,6 +1082,7 @@ def main() -> None:
     finalize_parser.add_argument("--status", required=True, choices=FINAL_STATUSES)
     index_parser = commands.add_parser("index", help="按 Agent 列出 Experiment 和 Run")
     index_parser.add_argument("--agent", required=True)
+    commands.add_parser("overview", help="列出全部 Agent 的 Experiment 和 Run")
     show_parser = commands.add_parser("show", help="查看 Run 的冻结口径、结果和证据")
     show_parser.add_argument("--run", required=True)
     show_parser.add_argument("--case", help="只查看一个已选 Case")
@@ -1088,6 +1105,8 @@ def main() -> None:
             command_finalize(repo, args)
         elif args.command == "index":
             command_index(repo, args)
+        elif args.command == "overview":
+            command_overview(repo)
         elif args.command == "show":
             command_show(repo, args)
         else:

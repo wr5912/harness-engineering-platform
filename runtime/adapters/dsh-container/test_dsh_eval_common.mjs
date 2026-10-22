@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { judgeCase, turnsFromTrace, saveSessionTrace } from './dsh-eval-common.mjs'
+import { judgeCase, turnsFromTrace, saveSessionTrace, saveCaseResult } from './dsh-eval-common.mjs'
 
 const user = (id, text) => ({
   type: 'user/message',
@@ -147,4 +147,32 @@ try {
   assert.equal(await readFile(join(evidenceDirectory, 'trace.jsonl'), 'utf8'), '')
 } finally { await rm(evidenceDirectory, { recursive: true, force: true }) }
 
-console.log(JSON.stringify({ status: 'dsh-eval-common-tests-passed', cases: 16 }))
+// 评测轮询会反复导出同一份轨迹；相同内容不得重复改写，避免平台收到无意义的文件变更。
+const dedupeDirectory = await mkdtemp(join(tmpdir(), 'dsh-eval-common-dedupe-'))
+try {
+  const tracePath = join(dedupeDirectory, 'trace.jsonl')
+  await saveSessionTrace(dedupeDirectory, targetArchive, { completed: false })
+  const firstTrace = await stat(tracePath, { bigint: true })
+  const firstContent = await readFile(tracePath, 'utf8')
+  await new Promise(resolve => setTimeout(resolve, 10))
+  await saveSessionTrace(dedupeDirectory, targetArchive, { completed: false })
+  assert.equal((await stat(tracePath, { bigint: true })).mtimeNs, firstTrace.mtimeNs,
+    '相同轨迹重复保存不得改写文件')
+  assert.equal(await readFile(tracePath, 'utf8'), firstContent)
+  await saveSessionTrace(dedupeDirectory, archive([user('changed', '轨迹已变化')]), { completed: true })
+  assert.ok((await stat(tracePath, { bigint: true })).mtimeNs > firstTrace.mtimeNs,
+    '轨迹内容变化仍必须写入')
+
+  const resultPath = join(dedupeDirectory, 'C-1', 'case-result.json')
+  await saveCaseResult(dedupeDirectory, { case_id: 'C-1', verdict: 'passed' })
+  const firstResult = await stat(resultPath, { bigint: true })
+  await new Promise(resolve => setTimeout(resolve, 10))
+  await saveCaseResult(dedupeDirectory, { case_id: 'C-1', verdict: 'passed' })
+  assert.equal((await stat(resultPath, { bigint: true })).mtimeNs, firstResult.mtimeNs,
+    '相同 Case 回执重复保存不得改写文件')
+  await saveCaseResult(dedupeDirectory, { case_id: 'C-1', verdict: 'failed' })
+  assert.ok((await stat(resultPath, { bigint: true })).mtimeNs > firstResult.mtimeNs,
+    'Case 回执内容变化仍必须写入')
+} finally { await rm(dedupeDirectory, { recursive: true, force: true }) }
+
+console.log(JSON.stringify({ status: 'dsh-eval-common-tests-passed', cases: 18 }))

@@ -190,6 +190,15 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
   const decisionDirty = decision.body !== decision.saved
   const current = useRef({ caseDirty, decisionDirty, datasetDirty, datasetBusy, newCaseDirty, newCaseBusy, caseBusy, decisionBusy, agentId, experimentId, tab, runId, caseId, active, targetJobId: target?.job_id, targetRunId: target?.run_id ?? '' })
   current.current = { caseDirty, decisionDirty, datasetDirty, datasetBusy, newCaseDirty, newCaseBusy, caseBusy, decisionBusy, agentId, experimentId, tab, runId, caseId, active, targetJobId: target?.job_id, targetRunId: target?.run_id ?? '' }
+  const refreshTimer = useRef<number | undefined>(undefined)
+  const refreshRunning = useRef(false)
+  const refreshPending = useRef(false)
+  const refreshOnActive = useRef(false)
+  const refreshTask = useRef<() => Promise<void>>(async () => {})
+  const refreshSnapshot = useRef({ caseBusy, caseId, experimentId, runId, job })
+  refreshSnapshot.current = { caseBusy, caseId, experimentId, runId, job }
+  const decisionSnapshot = useRef({ open: decisionOpen, target: decisionTarget, hash: decision.hash })
+  decisionSnapshot.current = { open: decisionOpen, target: decisionTarget, hash: decision.hash }
   const cases: any[] = detail?.evaluation?.cases ?? []
 
   async function call(operation: string, payload: Record<string, unknown> = {}) {
@@ -280,14 +289,52 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
   async function loadRuns() {
     const request = ++runsRequest.current
     setRunListReady(false); setRunsLoading(true); setRunsError('')
-    const results = await Promise.allSettled(agents.map(async agent => {
-      const value = await call('runs/index', { agent_id: agent.id })
-      return (value.experiments ?? []).flatMap((experiment: any) => (experiment.runs ?? []).map((run: any) => ({ ...run, run_id: run.run_id ?? run.id, experiment_id: experiment.experiment_id ?? experiment.id, agent_id: agent.id }))) as Run[]
-    }))
-    if (request !== runsRequest.current) return
-    setRuns(results.flatMap(result => result.status === 'fulfilled' ? result.value : []).sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? '')))
-    const failures = results.flatMap((result, index) => result.status === 'rejected' ? [`${agents[index].id}：${result.reason.message}`] : [])
-    setRunsError(failures.length ? `${failures.length === agents.length ? 'Run 列表读取失败' : '部分 Run 列表读取失败'}：${failures.join('；')}` : ''); setRunsLoading(false); setRunListReady(true)
+    try {
+      const value = await call('runs/overview') as { agents?: any[] }
+      if (request !== runsRequest.current) return
+      // 汇总读取一次返回全部 Agent，避免按 Agent 重复启动 Run 索引解析。
+      const rows = (value.agents ?? []).flatMap(agent => (agent.experiments ?? []).flatMap((experiment: any) =>
+        (experiment.runs ?? []).map((run: any) => ({
+          ...run, run_id: run.run_id ?? run.id, experiment_id: experiment.experiment_id ?? experiment.id, agent_id: agent.agent_id,
+        })))) as Run[]
+      setRuns(rows.sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? '')))
+      setRunsError('')
+    } catch (error) {
+      // 读取失败保留上次结果，避免把已经看到的记录清空。
+      if (request === runsRequest.current) setRunsError((error as Error).message)
+    } finally {
+      if (request === runsRequest.current) { setRunsLoading(false); setRunListReady(true) }
+    }
+  }
+  async function runRefresh() {
+    if (refreshRunning.current) { refreshPending.current = true; return }
+    refreshRunning.current = true
+    const snapshot = refreshSnapshot.current
+    try {
+      const tasks: Promise<unknown>[] = [loadAgents(), loadJobs(), loadRuns(), loadDetail()]
+      if (snapshot.caseId && snapshot.experimentId && !snapshot.caseBusy) tasks.push(loadCase())
+      if (snapshot.runId) tasks.push(loadRun())
+      if (snapshot.job?.job_id && !isFinal(snapshot.job.status)) tasks.push(statusEvaluation())
+      await Promise.allSettled(tasks)
+    } finally {
+      refreshRunning.current = false
+      if (refreshPending.current) { refreshPending.current = false; scheduleRefresh(0) }
+    }
+  }
+  refreshTask.current = runRefresh
+  /** 通知先合并 250ms；同一页面只允许一批刷新在途，结束后再补一次。 */
+  function scheduleRefresh(delay = 250) {
+    if (!current.current.active) { refreshOnActive.current = true; return }
+    if (refreshTimer.current !== undefined) return
+    refreshTimer.current = window.setTimeout(() => {
+      refreshTimer.current = undefined
+      void refreshTask.current()
+    }, delay)
+  }
+  function refreshNow() {
+    if (refreshTimer.current !== undefined) { window.clearTimeout(refreshTimer.current); refreshTimer.current = undefined }
+    refreshOnActive.current = false
+    void refreshTask.current()
   }
   async function loadDetail() {
     const request = ++detailRequest.current
@@ -435,7 +482,7 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
           && state.agentId === navigation.agent_id && state.experimentId === navigation.experiment_id
           && state.tab === 'runs' && state.runId === navigation.initial_run_id && runSelectionVersion.current === navigation.run_selection_version) chooseRun(id, 'runs', true)
       }
-      if (isFinal(value.status)) { void loadJobs(); void loadRuns(); if (id && current.current.runId === id) void loadRun(id) }
+      if (isFinal(value.status)) scheduleRefresh(0)
     } catch (error) {
       if (jobNavigation.current?.job_id !== jobId) return
       setJob((previous: any) => previous?.job_id === jobId ? { ...previous, status: 'unknown' } : previous)
@@ -506,8 +553,7 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
     if (!decisionDirty) { setDecision({ body: '', hash: '', saved: '' }); setDecisionLatest(null); decisionRequest.current++ }
   }
 
-  useEffect(() => { void loadAgents(); void loadJobs(); return () => { listRequest.current++; runsRequest.current++; jobsRequest.current++; detailRequest.current++; caseRequest.current++; runRequest.current++; fileRequest.current++; compareRequest.current++; evalRequest.current++; decisionRequest.current++ } }, [])
-  useEffect(() => { if (agents.length) void loadRuns(); else setRuns([]) }, [agents.map(agent => agent.id).join(',')])
+  useEffect(() => { void runRefresh(); return () => { listRequest.current++; runsRequest.current++; jobsRequest.current++; detailRequest.current++; caseRequest.current++; runRequest.current++; fileRequest.current++; compareRequest.current++; evalRequest.current++; decisionRequest.current++; if (refreshTimer.current !== undefined) { window.clearTimeout(refreshTimer.current); refreshTimer.current = undefined } } }, [])
   useEffect(() => { void loadDetail() }, [agentId, experimentId, tab, configOpen])
   useEffect(() => { void loadCase() }, [experimentId, caseId])
   useEffect(() => { setDatasetSource(null); void loadRun() }, [runId])
@@ -591,16 +637,19 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
       if (cancelJobId) setCancelJobId('')
     }
   }, [active, cancelJobId, job?.job_id, job?.status, jobError])
+  useEffect(() => {
+    if (!active) return
+    if (refreshOnActive.current) { refreshOnActive.current = false; refreshNow() }
+  }, [active])
   useEffect(() => updates?.subscribe(() => {
     if (!updates.getSnapshot().domains.some(domain => ['agents', 'catalog'].includes(domain))) return
-    void loadAgents(); void loadJobs(); void loadRuns(); void loadDetail()
-    if (caseId && experimentId && !caseBusy) void loadCase()
-    if (runId) void loadRun()
-    if (job?.job_id && !isFinal(job.status)) void statusEvaluation()
-    if (decisionOpen && decisionTarget.experiment && decision.hash) void call('detail', { agent_id: decisionTarget.agent, experiment_id: decisionTarget.experiment }).then(value => {
-      if (value.decision.sha256 !== decision.hash) { if (current.current.decisionDirty) { setDecisionConflict(true); setDecisionLatest({ body: value.decision.content ?? '', hash: value.decision.sha256 }) } else setDecision({ body: value.decision.content ?? '', hash: value.decision.sha256, saved: value.decision.content ?? '' }) }
+    scheduleRefresh()
+    const decisionState = decisionSnapshot.current
+    if (!decisionState.open || !decisionState.target.experiment || !decisionState.hash) return
+    void call('detail', { agent_id: decisionState.target.agent, experiment_id: decisionState.target.experiment }).then(value => {
+      if (value.decision.sha256 !== decisionState.hash) { if (current.current.decisionDirty) { setDecisionConflict(true); setDecisionLatest({ body: value.decision.content ?? '', hash: value.decision.sha256 }) } else setDecision({ body: value.decision.content ?? '', hash: value.decision.sha256, saved: value.decision.content ?? '' }) }
     }).catch(() => undefined)
-  }), [updates, agents, agentId, experimentId, caseId, caseBusy, runId, job?.job_id, job?.status, decisionOpen, decisionTarget.experiment, decision.hash])
+  }), [updates])
   useEffect(() => {
     if (!job?.job_id || isFinal(job.status)) return
     const timer = window.setInterval(() => void statusEvaluation(), 2500)
@@ -649,7 +698,7 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
   const showRecords = tab === 'runs' || tab === 'jobs'
   const scopeControls = <>
     <button type="button" className="harness-eval-mobile-filter-toggle" aria-expanded={scopeFiltersOpen} aria-controls="evaluation-scope-filters" onClick={() => setScopeFiltersOpen(open => !open)}>筛选：{agents.find(agent => agent.id === agentId)?.name || agentId || '全部智能体'} · {experimentId || '全部版本'}</button>
-    <div id="evaluation-scope-filters" className="harness-eval-filters harness-eval-scope-filters" data-mobile-open={scopeFiltersOpen}><label>智能体<select aria-label="评测智能体" value={agentId} onChange={event => changeScope(event.target.value)}><option value="">全部智能体</option>{agents.map(agent => <option key={agent.id} value={agent.id}>{agent.name || agent.id}</option>)}</select></label><label>研究版本<select aria-label="评测研究版本" value={experimentId} disabled={!agentId} onChange={event => changeScope(agentId, event.target.value)}><option value="">全部版本</option>{versions.map(id => <option key={id} value={id} title={id}>{versionName(id)} · {id}</option>)}</select></label><label>评测结论<select aria-label="筛选评测结论" value={runVerdictFilter} onChange={event => setRunVerdictFilter(event.target.value)}><option value="">全部结论</option>{['passed', 'failed', 'inconclusive'].map(verdict => <option key={verdict} value={verdict}>{verdictLabel(verdict)}</option>)}</select></label><button type="button" onClick={() => { void loadAgents(); void loadJobs(); void loadRuns(); if (agentId) void loadDetail(); if (runId) void loadRun(); if (job?.job_id) void statusEvaluation() }}>刷新</button>{detailLoading && <span role="status" className="harness-eval-muted">读取版本中…</span>}{detailError && <p role="alert">{detailError}</p>}</div>
+    <div id="evaluation-scope-filters" className="harness-eval-filters harness-eval-scope-filters" data-mobile-open={scopeFiltersOpen}><label>智能体<select aria-label="评测智能体" value={agentId} onChange={event => changeScope(event.target.value)}><option value="">全部智能体</option>{agents.map(agent => <option key={agent.id} value={agent.id}>{agent.name || agent.id}</option>)}</select></label><label>研究版本<select aria-label="评测研究版本" value={experimentId} disabled={!agentId} onChange={event => changeScope(agentId, event.target.value)}><option value="">全部版本</option>{versions.map(id => <option key={id} value={id} title={id}>{versionName(id)} · {id}</option>)}</select></label><label>评测结论<select aria-label="筛选评测结论" value={runVerdictFilter} onChange={event => setRunVerdictFilter(event.target.value)}><option value="">全部结论</option>{['passed', 'failed', 'inconclusive'].map(verdict => <option key={verdict} value={verdict}>{verdictLabel(verdict)}</option>)}</select></label><button type="button" onClick={refreshNow}>刷新</button>{detailLoading && <span role="status" className="harness-eval-muted">读取版本中…</span>}{detailError && <p role="alert">{detailError}</p>}</div>
   </>
 
   return <main className="harness-evaluation" aria-label="评测中心">

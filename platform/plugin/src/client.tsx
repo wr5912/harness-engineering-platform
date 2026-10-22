@@ -358,7 +358,8 @@ export function apply(ctx: ClientContext) {
   const updates = createPlatformUpdates(ctx.connection)
   ctx.effect(() => updates.start())
   const catalog = createCatalog(ctx.connection.rpc, updates)
-  ctx.effect(() => () => catalog.dispose())
+  // 首次读取不依赖事件流首帧；连接池或通知通道异常时页面仍会发起资产查询。
+  ctx.effect(() => { void catalog.refresh(); return () => catalog.dispose() })
   const assistant = createAssistant(ctx, ctx.connection.rpc, () => catalog.getSnapshot().inventory?.root, () => catalog.getSnapshot().inventory?.workspace?.legacyRoots ?? [])
   ctx.effect(() => () => assistant.dispose())
   ctx.effect(() => updates.subscribe(() => { void assistant.refresh() }))

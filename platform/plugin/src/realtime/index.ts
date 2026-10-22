@@ -7,15 +7,18 @@ import type {} from '@deepseek-ai/dsh-client-connection'
 import { PLATFORM_DOMAINS, type PlatformDomain } from './client.ts'
 
 export type PlatformInvalidation = { revision: number; domains: PlatformDomain[]; ids: string[] }
-type Options = { docker?: boolean; stateRoot?: string }
+type Options = { docker?: boolean; stateRoot?: string; minIntervalMs?: number }
 const IGNORED = new Set(['node_modules', '.git', '.venv', '__pycache__', 'lib', 'dist', '.cache', 'cache', 'history', 'RuntimeHOME', 'dsh-home', 'sessions', 'attachments'])
+const RUN_DIRECTORY = /^run-/
 
 /** 观察已有事实源；通知只含稳定标识，不携带文件内容、配置或运行日志。 */
 export function createPlatformEvents(assetRoot: string, options: Options = {}) {
   const root = resolve(assetRoot)
+  const minIntervalMs = options.minIntervalMs ?? 1000
   let revision = 0
   let started = false
   let disposed = false
+  let lastSent = 0
   const listeners = new Set<(event: PlatformInvalidation) => void>()
   const watchers = new Map<string, { close(): void }>()
   const pollingDirectories = new Set<string>()
@@ -30,12 +33,16 @@ export function createPlatformEvents(assetRoot: string, options: Options = {}) {
     if (disposed) return
     for (const domain of domains) pendingDomains.add(domain)
     for (const id of ids) if (/^[A-Za-z0-9_.:-]{1,200}$/.test(id)) pendingIds.add(id)
-    if (!pending) pending = setTimeout(() => {
+    if (pending) return
+    // 首次通知保留 100ms 合并窗口；持续写入时按最小间隔发送，避免把文件变化放大成每秒多帧。
+    const wait = Math.max(100, lastSent + minIntervalMs - Date.now())
+    pending = setTimeout(() => {
       pending = undefined
+      lastSent = Date.now()
       const event = { revision: ++revision, domains: [...pendingDomains], ids: [...pendingIds] }
       pendingDomains.clear(); pendingIds.clear()
       for (const listener of listeners) listener(event)
-    }, 100)
+    }, wait)
   }
   const stateRoot = instanceStateRoot(root, options.stateRoot)
   function relevant(path: string) {
@@ -102,9 +109,36 @@ export function createPlatformEvents(assetRoot: string, options: Options = {}) {
     if (!recursive) return
     try {
       for (const entry of readdirSync(directory, { withFileTypes: true })) {
-        if (entry.isDirectory() && relevant(entry.name)) observe(join(directory, entry.name), domains, true)
+        if (!entry.isDirectory() || !relevant(entry.name)) continue
+        // Run 证据在评测期间被高频重写；Run 列表只需感知 run 目录的增删，不进入 run 内部。
+        if (entry.name === 'runs') { observeRunRoots(join(directory, entry.name), domains); continue }
+        observe(join(directory, entry.name), domains, true)
       }
     } catch { /* 删除或重命名期间，父目录通知会重新核对。 */ }
+  }
+  /** 只观察 runs 目录的直接子项；run 内部内容变化由 Run 详情按需读取，不触发列表失效。 */
+  function observeRunRoots(directory: string, domains: PlatformDomain[]) {
+    if (!existsSync(directory)) return
+    if (pollingDirectories.has(directory)) { observePolling(directory, domains); return }
+    if (watchers.has(directory)) return
+    try {
+      const watcher = watch(directory, (kind, name) => {
+        if (kind !== 'rename') return
+        const changed = name?.toString()
+        if (changed && !RUN_DIRECTORY.test(changed)) return
+        notify(domains)
+        if (!rescan) rescan = setTimeout(() => { rescan = undefined; scan() }, 80)
+      })
+      watcher.on('error', () => {
+        watcher.close(); watchers.delete(directory); pollingDirectories.add(directory)
+        observePolling(directory, domains); notify(domains)
+      })
+      watchers.set(directory, watcher)
+    } catch {
+      // 文件监听额度不足时只比较 runs 目录的直接项，不进入 run 内部。
+      pollingDirectories.add(directory)
+      observePolling(directory, domains)
+    }
   }
   function scan() {
     if (disposed) return

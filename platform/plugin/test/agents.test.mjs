@@ -953,6 +953,12 @@ test('eval preview, case list, run index and decision update use existing backen
     }
     const runs = await rpc(handler, 'runs/index', { agent_id: 'test-agent' })
     assert.equal(runs.agent_id, 'test-agent')
+    write(join(fx.root, 'agents/UPPER-case/manifest.yaml'), 'agent_id: UPPER-case\n')
+    const overview = await rpc(handler, 'runs/overview', {})
+    assert.deepEqual(overview.agents.map(item => item.agent_id), ['test-agent'], 'overview 过滤非 kebab-case 目录')
+    assert.equal(overview.agents[0].experiments[0].experiment_id, 'EXP-test-agent-001')
+    assert.equal(overview.agents[0].experiments[0].runs.find(item => item.run_id === runId).case_scope, '4 项已选用例',
+      'overview 与 index 使用同一 Run 摘要合同')
     const verdicts = Object.fromEntries(runs.experiments[0].runs.map(item => [item.run_id, item.effective_verdict]))
     assert.equal(verdicts[runId], 'inconclusive', '有效结论优先于机器结论')
     assert.equal(Object.values(verdicts).filter(Boolean).length, 1, '运行中、失败和取消 Run 的部分 summary 不应成为整体结论')

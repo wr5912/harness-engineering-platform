@@ -11,6 +11,9 @@ const runB = 'run-22222222-2222-4222-8222-222222222222'
 const expA = 'EXP-alpha-001'
 const doc = { case: { id: 'C-1', title: '测试一', inputs: ['第一轮'], expected_behavior: '正确回答', scene: '场景一', tier: 'fast' }, sha256: 'case-v1', path: 'agents/alpha/evaluation.md' }
 const detail = { experiment: { id: expA }, versions: [{ id: expA }], evaluation: { path: doc.path, sha256: doc.sha256, cases: [{ id: 'C-1', title: '测试一', scene: '场景一', tier: 'fast', input_preview: '第一轮' }, { id: 'C-2', title: '测试二', scene: '场景二', tier: 'full', input_preview: '第二轮' }] }, decision: { content: '# Decision\ncontinue', sha256: 'decision-v1' } }
+const overview = entries => ({ agents: entries.map(([agentId, experiments]) => ({ agent_id: agentId, experiments })) })
+const betaRun = { experiment_id: 'EXP-beta-001', runs: [{ run_id: runB, status: 'completed', created_at: '2026-10-15T09:00:00Z' }] }
+const alphaOverview = experiments => overview([['alpha', experiments], ['beta', [betaRun]]])
 function workbench({ target, handler, onAssistant } = {}) {
   const states = [], dependencies = [], cleanups = []
   let cursor, effects, changed, tree, failSave = false, loadedDoc = structuredClone(doc), decisionContent = detail.decision.content
@@ -36,13 +39,16 @@ function workbench({ target, handler, onAssistant } = {}) {
   const MarkdownText = () => null, MarkdownDelegateProvider = () => null
   const module = { exports: {} }
   const beforeUnload = new Set()
-  const window = { confirm: message => { confirmations.push(message); return confirmationAnswers.shift() ?? true }, addEventListener: (name, listener) => { if (name === 'beforeunload') beforeUnload.add(listener) }, removeEventListener: (name, listener) => beforeUnload.delete(listener), setInterval: () => 1, clearInterval: () => undefined }
+  const timers = new Map()
+  let timerId = 0
+  const flushTimers = () => { while (timers.size) { const [id, callback] = timers.entries().next().value; timers.delete(id); callback() } }
+  const window = { confirm: message => { confirmations.push(message); return confirmationAnswers.shift() ?? true }, addEventListener: (name, listener) => { if (name === 'beforeunload') beforeUnload.add(listener) }, removeEventListener: (name, listener) => beforeUnload.delete(listener), setInterval: () => 1, clearInterval: () => undefined, setTimeout: callback => { const id = ++timerId; timers.set(id, callback); return id }, clearTimeout: id => { timers.delete(id) } }
   vm.runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, require: name => name === 'react' ? react : name === '@deepseek-ai/dsh-client-ui-primitives' ? { MarkdownText, MarkdownDelegateProvider } : require(name), window, document: { baseURI: 'http://localhost:3090/hep/', getElementById: () => ({ focus() {} }) }, URL })
   const { EvaluationPage } = module.exports
   const defaultHandler = async (action, payload) => {
     if (action === 'list') return { agents: [{ id: 'alpha' }, { id: 'beta' }] }
     if (action === 'detail') return { ...detail, decision: { ...detail.decision, content: decisionContent } }
-    if (action === 'runs/index') return { experiments: [{ experiment_id: payload.agent_id === 'alpha' ? expA : 'EXP-beta-001', runs: [{ run_id: payload.agent_id === 'alpha' ? runA : runB, status: 'completed', created_at: '2026-10-15T08:00:00Z' }] }] }
+    if (action === 'runs/overview') return overview([['alpha', [{ experiment_id: expA, runs: [{ run_id: runA, status: 'completed', created_at: '2026-10-15T08:00:00Z' }] }]], ['beta', [betaRun]]])
     if (action === 'runs/show') return { run_id: payload.run_id, run_path: `evolution/experiments/${expA}/runs/${payload.run_id}`, manifest: { agent_id: 'alpha', experiment_id: expA, status: 'completed' }, summary: { effective_verdict: 'passed' }, source: { executor: 'api' }, cases: [{ case_id: 'C-1', frozen: { inputs: ['原始输入'], expected_behavior: '原始标准' }, trials: [], evidence: [] }], missing: [] }
     if (action === 'runs/report') return { present: true, path: 'report.md', content: '# 测试评估报告\n\n完整报告正文' }
     if (action === 'runs/files') return { sealed: true, files: [{ path: `evolution/experiments/${expA}/runs/${payload.run_id}/evidence/C-1/trace.jsonl`, size: 90000, kind: 'text' }] }
@@ -71,7 +77,7 @@ function workbench({ target, handler, onAssistant } = {}) {
     do { if (++count > 60) throw new Error('渲染未收敛'); cursor = 0; effects = []; changed = false; tree = EvaluationPage(props); effects.forEach(effect => effect()) } while (changed)
     return tree
   }
-  async function settle() { for (let index = 0; index < 8; index++) { render(); await new Promise(resolve => setImmediate(resolve)) }; return render() }
+  async function settle() { for (let index = 0; index < 8; index++) { render(); flushTimers(); await new Promise(resolve => setImmediate(resolve)) }; return render() }
   function nodes(value) { if (!arguments.length) value = tree; if (Array.isArray(value)) return value.flatMap(item => nodes(item)); if (!value || typeof value !== 'object') return []; return [value, ...(value.props?.children === undefined ? [] : nodes(value.props.children))] }
   function text(value) { if (!arguments.length) value = tree; if (Array.isArray(value)) return value.map(text).join(''); return value && typeof value === 'object' ? text(value.props?.children) : String(value ?? '') }
   const button = title => nodes().find(node => node.type === 'button' && text(node) === title)
@@ -79,13 +85,13 @@ function workbench({ target, handler, onAssistant } = {}) {
   const byLabel = title => nodes().find(node => node.props?.['aria-label'] === title)
   function change(title, value) { const element = byLabel(title); assert.ok(element, `缺少控件 ${title}`); element.props.onChange({ target: { value, checked: value } }); render() }
   render()
-  return { render, settle, nodes, text, button, idButton, byLabel, change, calls, navigations, contexts, assistants, MarkdownText, beforeUnload, confirmations, confirmationAnswers, setFailSave: value => { failSave = value }, setTarget(value) { props.target = value; render() }, setActive(value) { props.active = value; render() }, getTarget() { return props.target }, cleanup() { cleanups.forEach(cleanup => cleanup?.()) } }
+  return { render, settle, nodes, text, button, idButton, byLabel, change, invalidate: updates.invalidate, calls, navigations, contexts, assistants, MarkdownText, beforeUnload, confirmations, confirmationAnswers, setFailSave: value => { failSave = value }, setTarget(value) { props.target = value; render() }, setActive(value) { props.active = value; render() }, getTarget() { return props.target }, cleanup() { cleanups.forEach(cleanup => cleanup?.()); timers.clear() } }
 }
 
 test('评测中心默认汇总全部智能体 Run，点击即读取报告并保留挂载前缀下载', async () => {
   const ui = workbench()
   await ui.settle()
-  assert.deepEqual(ui.calls.filter(call => call.action === 'runs/index').map(call => call.payload.agent_id).sort(), ['alpha', 'beta'])
+  assert.equal(ui.calls.filter(call => call.action === 'runs/overview').length, 1, '汇总读取一次覆盖全部 Agent')
   assert.equal(ui.calls.some(call => call.action === 'detail'), false)
   assert.equal(ui.byLabel('评测工作区').props.children.find(node => node.props.id === 'evaluation-tab-runs').props['aria-selected'], true)
   const records = () => ui.nodes().find(node => node.type === 'section' && node.props.className?.includes('harness-eval-record-list'))
@@ -106,7 +112,7 @@ test('评测中心默认汇总全部智能体 Run，点击即读取报告并保�
 
 test('无深链时默认选中最新已保存 Run，选中身份进入 URL 与结果视图', async () => {
   const ui = workbench({ target: { page: 'evaluation' }, handler: async (action, payload, original) => {
-    if (action === 'runs/index') return { experiments: [{ experiment_id: payload.agent_id === 'alpha' ? expA : 'EXP-beta-001', runs: [{ run_id: payload.agent_id === 'alpha' ? runA : runB, status: 'completed', created_at: payload.agent_id === 'alpha' ? '2026-10-15T08:00:00Z' : '2026-10-15T09:00:00Z' }] }] }
+    if (action === 'runs/overview') return overview([['alpha', [{ experiment_id: expA, runs: [{ run_id: runA, status: 'completed', created_at: '2026-10-15T08:00:00Z' }] }]], ['beta', [betaRun]]])
     return original(action, payload)
   } })
   try {
@@ -124,7 +130,7 @@ test('只有 Job 或 Run 索引读取失败时不伪造默认 Run', async () => 
   for (const failed of [false, true]) {
     const ui = workbench({ target: { page: 'evaluation' }, handler: async (action, payload, original) => {
       if (action === 'eval/list') return { jobs: [{ job_id: 'job-1', source: `experiment:${expA}`, agent_id: 'alpha', experiment_id: expA, status: 'running', started_at: '2026-10-15T08:00:00Z' }] }
-      if (action === 'runs/index') { if (failed) throw new Error('network: 暂时不可达'); return { experiments: [] } }
+      if (action === 'runs/overview') { if (failed) throw new Error('network: 暂时不可达'); return { agents: [] } }
       return original(action, payload)
     } })
     try {
@@ -142,7 +148,7 @@ test('迟到的 Run 索引不覆盖显式深链或用户切换的工作区', asy
     let release
     const pending = new Promise(resolve => { release = resolve })
     const ui = workbench({ target: { page: 'evaluation' }, handler: async (action, payload, original) => {
-      if (action === 'runs/index') { await pending; return { experiments: [{ experiment_id: expA, runs: [{ run_id: runB, status: 'completed', created_at: '2026-10-15T09:00:00Z' }] }] } }
+      if (action === 'runs/overview') { await pending; return alphaOverview([{ experiment_id: expA, runs: [{ run_id: runB, status: 'completed', created_at: '2026-10-15T09:00:00Z' }] }]) }
       return original(action, payload)
     } })
     try {
@@ -318,7 +324,7 @@ test('Run 深链接等待列表布局稳定后才定位详情', async () => {
   let releaseIndex
   const pendingIndex = new Promise(resolve => { releaseIndex = resolve })
   const ui = workbench({ target: { page: 'evaluation', tab: 'runs', run_id: runA }, handler: async (action, payload, original) => {
-    if (action === 'runs/index' && payload.agent_id === 'alpha') await pendingIndex
+    if (action === 'runs/overview') await pendingIndex
     return original(action, payload)
   } })
   try {
@@ -426,10 +432,10 @@ test('未主动选择任务时仍显示真实运行中 Job，并从同一任务�
 
 test('Run 列表将执行完成和有效失败、无法判定分别显示', async () => {
   const ui = workbench({ handler: async (action, payload, original) => {
-    if (action === 'runs/index' && payload.agent_id === 'alpha') return { experiments: [{ experiment_id: expA, runs: [
+    if (action === 'runs/overview') return alphaOverview([{ experiment_id: expA, runs: [
       { run_id: runA, status: 'completed', effective_verdict: 'failed' },
       { run_id: 'run-33333333-3333-4333-8333-333333333333', status: 'completed', effective_verdict: 'inconclusive' },
-    ] }] }
+    ] }])
     return original(action, payload)
   } })
   try {
@@ -470,10 +476,10 @@ test('Run 详情优先展示保存的结论、用例观察和异常证据入口'
 
 test('评测列表按业务结论筛选，默认选中后只展示该 Run 的逐例分布', async () => {
   const ui = workbench({ handler: async (action, payload, original) => {
-    if (action === 'runs/index' && payload.agent_id === 'alpha') return { experiments: [{ experiment_id: expA, runs: [
+    if (action === 'runs/overview') return alphaOverview([{ experiment_id: expA, runs: [
       { run_id: runA, status: 'completed', effective_verdict: 'failed', created_at: '2026-10-20T08:00:00Z', title: '分页与报告完整性验证', case_scope: '3 项已选用例', case_counts: { total: 3, passed: 1, failed: 1, inconclusive: 1, mixed: 0, pending: 0 } },
       { run_id: 'run-33333333-3333-4333-8333-333333333333', status: 'completed', effective_verdict: 'passed', title: '巡检能力基线验证', case_scope: '2 项已选用例', case_counts: { total: 2, passed: 2, failed: 0, inconclusive: 0, mixed: 0, pending: 0 } },
-    ] }] }
+    ] }])
     if (action === 'runs/show') return { ...(await original(action, payload)), summary: { effective_verdict: 'failed' }, cases: [
       { case_id: 'C-1', trials: [{ verdict: 'passed' }] },
       { case_id: 'C-2', trials: [{ verdict: 'failed' }] },
@@ -503,7 +509,7 @@ test('评测列表按业务结论筛选，默认选中后只展示该 Run 的逐
 
 test('Run 列表读取失败与真实空列表分开显示', async () => {
   const ui = workbench({ handler: async (action, payload, original) => {
-    if (action === 'runs/index') throw new Error('网络中断')
+    if (action === 'runs/overview') throw new Error('网络中断')
     return original(action, payload)
   } })
   try {
@@ -520,8 +526,7 @@ test('未完成 Run 的部分通过摘要不成为列表、详情或对照的整
     { run_id: 'run-44444444-4444-4444-8444-444444444444', status: 'running', effective_verdict: 'passed' },
   ]
   const ui = workbench({ handler: async (action, payload, original) => {
-    if (action === 'runs/index' && payload.agent_id === 'beta') return { experiments: [] }
-    if (action === 'runs/index' && payload.agent_id === 'alpha') return { experiments: [{ experiment_id: expA, runs: [{ run_id: runA, status: 'completed', effective_verdict: 'passed' }, ...partial] }] }
+    if (action === 'runs/overview') return overview([['alpha', [{ experiment_id: expA, runs: [{ run_id: runA, status: 'completed', effective_verdict: 'passed' }, ...partial] }]], ['beta', []]])
     if (action === 'runs/show') {
       const status = partial.find(run => run.run_id === payload.run_id)?.status ?? 'completed'
       return { ...(await original(action, payload)), manifest: { agent_id: 'alpha', experiment_id: expA, status },
@@ -823,7 +828,7 @@ test('深链切换 Run 后迟到的报告响应不会覆盖当前目标', async 
 test('比较限制候选为同一智能体，并按冻结输入并排展示共同 Case', async () => {
   const runC = 'run-33333333-3333-4333-8333-333333333333'
   const ui = workbench({ target: { page: 'evaluation', tab: 'compare' }, handler: async (action, payload, original) => {
-    if (action === 'runs/index' && payload.agent_id === 'alpha') return { experiments: [{ experiment_id: expA, runs: [{ run_id: runA, status: 'completed' }, { run_id: runC, status: 'completed' }] }] }
+    if (action === 'runs/overview') return alphaOverview([{ experiment_id: expA, runs: [{ run_id: runA, status: 'completed' }, { run_id: runC, status: 'completed' }] }])
     if (action === 'runs/compare') return { left_run: runA, right_run: runC, left_only: [], right_only: [], limits: ['executor: 不同'], cases: [{ case_id: 'C-1', frozen_contract_same: false, observed_change: '记录有差异' }] }
     const value = await original(action, payload)
     if (action === 'runs/show') value.cases[0].frozen.inputs = [payload.run_id === runA ? '左侧冻结输入' : '右侧冻结输入']
@@ -884,7 +889,7 @@ test('已有旧报告时启动新评测会定位新 Run，任务报告按钮合�
 test('比较证据入口一次导航到运行标签和对应 Run，并打开实际轨迹文件', async () => {
   const runC = 'run-33333333-3333-4333-8333-333333333333'
   const ui = workbench({ target: { page: 'evaluation', tab: 'compare' }, handler: async (action, payload, original) => {
-    if (action === 'runs/index' && payload.agent_id === 'alpha') return { experiments: [{ experiment_id: expA, runs: [{ run_id: runA, status: 'completed' }, { run_id: runC, status: 'completed' }] }] }
+    if (action === 'runs/overview') return alphaOverview([{ experiment_id: expA, runs: [{ run_id: runA, status: 'completed' }, { run_id: runC, status: 'completed' }] }])
     if (action === 'runs/compare') return { left_run: runA, right_run: runC, left_only: [], right_only: [], limits: [], cases: [{ case_id: 'C-1', frozen_contract_same: true, observed_change: '记录相同' }] }
     return original(action, payload)
   } })
@@ -911,7 +916,7 @@ test('深链切换智能体会取消旧比较选择并隔离迟到的比较响�
   let release
   const pending = new Promise(resolve => { release = resolve })
   const ui = workbench({ target: { page: 'evaluation', tab: 'compare', agent_id: 'alpha' }, handler: async (action, payload, original) => {
-    if (action === 'runs/index' && payload.agent_id === 'alpha') return { experiments: [{ experiment_id: expA, runs: [{ run_id: runA, status: 'completed' }, { run_id: runC, status: 'completed' }] }] }
+    if (action === 'runs/overview') return alphaOverview([{ experiment_id: expA, runs: [{ run_id: runA, status: 'completed' }, { run_id: runC, status: 'completed' }] }])
     if (action === 'runs/compare') { await pending; return { left_run: runA, right_run: runC, limits: ['Alpha迟到结果'], cases: [{ case_id: 'C-1', frozen_contract_same: true, observed_change: 'Alpha结果' }] } }
     return original(action, payload)
   } })
@@ -1012,7 +1017,7 @@ test('从任务手动查看历史 Run 后清除任务绑定，子页签与刷新
   const handler = async (action, payload, original) => {
     if (action === 'eval/list') return { jobs: [{ job_id: 'job-1', agent_id: 'alpha', experiment_id: expA, status: 'running', started_at: '2026-10-15T08:00:00Z' }] }
     if (action === 'eval/status') return { job_id: 'job-1', status: 'completed', result: { run_id: runA } }
-    if (action === 'runs/index') return { experiments: [{ experiment_id: expA, runs: [{ run_id: runB, status: 'completed', created_at: '2026-10-15T09:00:00Z' }, { run_id: runA, status: 'completed', created_at: '2026-10-15T08:00:00Z' }] }] }
+    if (action === 'runs/overview') return alphaOverview([{ experiment_id: expA, runs: [{ run_id: runB, status: 'completed', created_at: '2026-10-15T09:00:00Z' }, { run_id: runA, status: 'completed', created_at: '2026-10-15T08:00:00Z' }] }])
     return original(action, payload)
   }
   const ui = workbench({ target, handler })
@@ -1232,5 +1237,64 @@ test('从样本跳到固定轨迹并返回保留组件身份和草稿保护，�
     assert.equal(ui.confirmations.length, 0)
     let prevented = false; for (const protect of ui.beforeUnload) protect({ preventDefault() { prevented = true }, returnValue: undefined }); assert.equal(prevented, true)
     returned.props.onReextract(); await ui.settle(); assert.equal(ui.assistants.at(-1).context.run_id, runA); assert.match(ui.assistants.at(-1).task, /extraction_contract/)
+  } finally { ui.cleanup() }
+})
+
+test('评测中心把连续失效通知合并成一批刷新，隐藏时暂停并在恢复后补一次', async () => {
+  const ui = workbench({ target: { page: 'evaluation' } })
+  try {
+    await ui.settle()
+    const overviewCalls = () => ui.calls.filter(call => call.action === 'runs/overview').length
+    const before = overviewCalls()
+    for (let index = 0; index < 10; index++) ui.invalidate(['agents'])
+    await ui.settle()
+    assert.equal(overviewCalls() - before, 1, '连续通知只产生一次汇总读取')
+
+    ui.setActive(false)
+    const hidden = ui.calls.length
+    for (let index = 0; index < 5; index++) ui.invalidate(['agents'])
+    await ui.settle()
+    assert.equal(ui.calls.length, hidden, '页面隐藏时不自动重读')
+    assert.equal(ui.navigations.length > 0, true)
+
+    ui.setActive(true)
+    await ui.settle()
+    assert.equal(overviewCalls() - before, 2, '恢复可见时补一次刷新')
+  } finally { ui.cleanup() }
+})
+
+test('评测页刷新单飞，在途时再次通知只在完成后补一次', async () => {
+  let release
+  const pending = new Promise(resolve => { release = resolve })
+  const ui = workbench({ target: { page: 'evaluation' }, handler: async (action, payload, original) => {
+    if (action === 'runs/overview') await pending
+    return original(action, payload)
+  } })
+  try {
+    await ui.settle()
+    const before = ui.calls.filter(call => call.action === 'runs/overview').length
+    ui.invalidate(['agents']); ui.render()
+    ui.invalidate(['agents']); ui.render()
+    await ui.settle()
+    assert.equal(ui.calls.filter(call => call.action === 'runs/overview').length, before, '在途时不得叠加新的汇总读取')
+    release()
+    await ui.settle()
+    assert.equal(ui.calls.filter(call => call.action === 'runs/overview').length - before, 1, '在途批次完成后补一次')
+  } finally { ui.cleanup() }
+})
+
+test('Run 汇总读取失败保留上次列表并显示错误', async () => {
+  let fail = false
+  const ui = workbench({ handler: async (action, payload, original) => {
+    if (action === 'runs/overview' && fail) throw new Error('network: 暂时不可达')
+    return original(action, payload)
+  } })
+  try {
+    await ui.settle()
+    assert.match(ui.text(), /评测记录\s*2/)
+    fail = true
+    ui.invalidate(['agents']); await ui.settle()
+    assert.match(ui.text(), /Run 列表读取失败：network: 暂时不可达/)
+    assert.match(ui.text(), /评测记录\s*2/, '读取失败不得清空上次看到的记录')
   } finally { ui.cleanup() }
 })
