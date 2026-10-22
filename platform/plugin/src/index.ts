@@ -14,7 +14,7 @@ import { DOMAIN_PREFIXES } from './protocol.ts'
 import { recentRuns } from './dashboard.ts'
 import { workspaceIdentity } from './workspace.ts'
 import { createAgentsHandler } from './agents/index.ts'
-import { createExtractionScope, createComputeVariantScope, isDecisionExtraction, isComputeVariantResearch, createFeatureScope, isFeatureOrganization, createTaskBuilderScope, createExclusiveTaskScopes, projectDecisionExtractionTools } from './assistant/extraction-scope.ts'
+import { createExtractionScope, createComputeVariantScope, isDecisionExtraction, isComputeVariantResearch, createFeatureScope, isFeatureOrganization, createExclusiveTaskScopes, projectDecisionExtractionTools } from './assistant/extraction-scope.ts'
 import { createToolInputRecovery } from './assistant/tool-input-recovery.ts'
 import { createRunDownloadHandler } from './agents/run-files.ts'
 import { createInstancesHandler } from './instances/index.ts'
@@ -228,8 +228,7 @@ export function applyTools(ctx: Context) {
   const extractionScope = createExtractionScope()
   const computeVariantScope = createComputeVariantScope()
   const featureScope = createFeatureScope()
-  const managementScope = createTaskBuilderScope(assetRoot, services.skills)
-  const taskScopes = createExclusiveTaskScopes([extractionScope, computeVariantScope, featureScope, managementScope])
+  const taskScopes = createExclusiveTaskScopes([extractionScope, computeVariantScope, featureScope])
   const taskScope = (agent: any, state: any) => isDecisionExtraction(assetRoot, agent, state) ? extractionScope
     : isComputeVariantResearch(assetRoot, agent, state) ? computeVariantScope
       : isFeatureOrganization(assetRoot, agent, state) ? featureScope : undefined
@@ -238,7 +237,6 @@ export function applyTools(ctx: Context) {
     scopeExtraction: agent => taskScopes.apply(agent, extractionScope),
     scopeComputeVariants: agent => taskScopes.apply(agent, computeVariantScope),
     scopeFeatures: agent => taskScopes.apply(agent, featureScope),
-    scopeTaskBuilder: agent => taskScopes.apply(agent, managementScope),
     releaseTaskScope: agent => taskScopes.release(agent),
     running: id => services.agents.get(id)?.status === 'running',
     liveAgent: id => services.agents.get(id),
@@ -257,17 +255,17 @@ export function applyTools(ctx: Context) {
   }) as any)
   ctx.on('agent/created' as any, (({ agent }: any) => {
     const state = services.sessionProjections.stateOf(agent.session, 'harnessPlatformAssistant')
-    taskScopes.apply(agent, taskScope(agent, state) ?? (assistant.isManagementSession(agent) ? managementScope : undefined))
+    const scope = taskScope(agent, state)
+    if (scope) taskScopes.apply(agent, scope)
   }) as any)
   ctx.on('agent/disposed' as any, (({ agent }: any) => taskScopes.release(agent)) as any)
   ctx.on('system-prompt/assemble' as any, (async (_assembly: any, context: any, next: any) => {
     const agent = context.agent
     const state = agent && services.sessionProjections.stateOf(agent.session, 'harnessPlatformAssistant')
     const scope = taskScope(agent, state)
-    const management = !scope && assistant.isManagementSession(agent)
-    if (agent) taskScopes.apply(agent, scope ?? (management ? managementScope : undefined))
+    if (agent && scope) taskScopes.apply(agent, scope)
+    else if (agent && assistant.isManagementSession(agent)) taskScopes.release(agent)
     const assembly = await assistant.assemblePrompt(await next(), context)
-    if (management) return { ...assembly, tools: assembly.tools.filter((tool: any) => ['skill', 'platform_task', 'platform_agents', 'platform_instances', 'platform_mcp'].includes(tool.name)) }
     if (!scope) return assembly
     const names = isComputeVariantResearch(assetRoot, agent, state) ? ['skill', 'platform_agents', 'platform_task'] : ['skill', 'platform_agents']
     const tools = assembly.tools.filter((tool: any) => names.includes(tool.name))
@@ -287,6 +285,11 @@ export function applyTools(ctx: Context) {
 export async function apply(ctx: Context, config: Config) {
   const assetRoot = process.env.HARNESS_ASSET_ROOT
   if (!assetRoot) throw new Error('未设置 HARNESS_ASSET_ROOT')
+  // 管理对话使用数据根作为工作区：平台先初始化原生默认工作区，避免首次使用落回 DSH 文档目录默认值。
+  const workspaceRegistry = ctx.get('workspaceRegistry') as {
+    initializeDefault(resolve: () => Promise<string>): Promise<unknown>
+  } | undefined
+  if (workspaceRegistry) await workspaceRegistry.initializeDefault(async () => assetRoot)
   await applyAuthentication(ctx, assetRoot)
   // 替换原生明暗主题图标，避免浏览器从多条候选中继续选择 DSH 图标。
   const icon = `<link rel="icon" type="image/svg+xml" href="${logo.replaceAll('&', '&amp;').replaceAll('"', '&quot;')}" />`

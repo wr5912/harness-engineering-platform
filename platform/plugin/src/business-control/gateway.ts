@@ -57,14 +57,10 @@ export function businessRequestHeaders(req: IncomingMessage): Record<string, str
   return { authorization: typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined }
 }
 function rejectSocket(socket: Duplex, status = 401): void { socket.end(`HTTP/1.1 ${status} Rejected\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`) }
-/** 只开放首期真实纳管入口；原生插件自注册HTTP不能因签名自动获得授权。 */
+/** 业务智能体请求默认全部转发；实例内的业务 Runtime 继续做身份、来源与动作校验。 */
 export function allowedBusinessPath(path: string, method: string, transport: 'http' | 'websocket'): boolean {
-  if (transport === 'websocket') return method === 'GET' && path === '/api/remote.mux'
-  if (path.startsWith('/api/')) return (method === 'POST' && /^\/api\/(?:session|remoteAccess)\/[A-Za-z]+$/.test(path))
-    || (method === 'POST' && path === '/api/workspace/create')
-    || (['GET', 'POST'].includes(method) && path === '/api/business-control/confirmations')
-    || (method === 'GET' && /^\/api\/business-control\/reports\/[a-f0-9-]{36}$/.test(path))
-  return ['GET', 'HEAD'].includes(method) && (path === '/' || /^\/(?:plugins|assets|sessions?|conversation)(?:\/|$)/.test(path) || /^\/(?:favicon\.(?:ico|svg|png)|manifest\.webmanifest)$/.test(path))
+  void path; void method; void transport
+  return true
 }
 async function readSignedControlRequest(req: IncomingMessage): Promise<IncomingMessage['headers']> {
   if (!req.headers['content-type']?.startsWith('application/json')) throw new Error('控制续租必须使用签名JSON信封')
@@ -106,7 +102,7 @@ function renderBusinessGatewayHome(input: { identity?: AuthenticatedIdentity; av
   const authorization = identity ? (rules.length ? rules.map(rule => {
     const operations = input.operations.filter(operation => (!rule.serverIds || rule.serverIds.includes(operation.serverId)) && (rule.actions.includes('*') || rule.actions.includes(operation.kind)))
     return `<section><h3>${escapeHtml(rule.agentId)}</h3><dl>${pair('Agent基础动作', rule.actions.join('、'))}${pair('服务范围', rule.serverIds?.join('、') || '按已登记操作的实际目标执行')}</dl>${operations.length ? `<ul>${operations.map(operation => `<li>${escapeHtml(operation.serverId)} / ${escapeHtml(operation.operationId)}：${escapeHtml(operation.kind)} · ${escapeHtml(operation.method)} ${escapeHtml(targetLabel(operation.target))}</li>`).join('')}</ul>` : '<p>当前没有已登记且匹配基础授权的工具或资源操作。</p>'}<p>以上是配置的能力范围；实际执行会综合智能体身份、当前风险、运行许可和业务归属作出访问决定。</p></section>`
-  }).join('') : input.agentStatuses.some(item => item.status.authentication.status === 'not_required') ? '<p>开发调试时，获准的已认证用户可按来源和 DSH 原生权限使用工具；匿名访客仅开放普通聊天。发布访问规则尚未验证。</p>' : '<p>当前没有获准的业务 Agent。</p>') : '<p>登录后展示本人可见业务 Agent 的动作、工具和资源范围。</p>'
+  }).join('') : input.agentStatuses.some(item => item.status.authentication.status === 'not_required') ? '<p>开发调试时，已认证用户与匿名访客按同一 Agent 规则使用允许的动作；写与发布仍受操作和风险规则约束。发布访问规则尚未验证。</p>' : '<p>当前没有获准的业务 Agent。</p>') : '<p>登录后展示本人可见业务 Agent 的动作、工具和资源范围。</p>'
   const visitor = identity ? `<p class="visitor">当前访问者：${escapeHtml(identity.subject.id)}；会话有效至 ${escapeHtml(identity.expiresAt)}。个人登录用于区分业务上下文，不代替智能体的凭据、可信来源与实例绑定核验。</p>` : input.anonymousInstances?.length ? '<p>无需登录的实例可直接打开；其他业务实例使用个人凭据登录。访客会话由各自浏览器的 Cookie 区分。</p>' : '<p>先使用个人凭据登录；登录身份用于会话隔离，智能体身份、风险评估与访问控制的对象是业务 Agent。</p>'
   const publicLinks = (input.anonymousInstances ?? []).map(item => `<p><a href="/agents/${escapeHtml(item.agentId)}/instances/${escapeHtml(item.instanceId)}/">${escapeHtml(item.agentId)} · ${escapeHtml(item.instanceId)}</a>（无需登录；浏览器 Cookie 仅用于区分各自会话）</p>`).join('')
   const directory = identity ? `<h2>我的业务智能体</h2>${availableAgents.length ? availableAgents.map(item => `<p><a href="/agents/${escapeHtml(item.agentId)}/">${escapeHtml(item.agentId)}</a></p>`).join('') : '<p>当前没有可以进入的已认证业务智能体。</p>'}${publicLinks}${input.unavailableCount ? `<p role="status">${input.unavailableCount} 个已登记实例无法核对，请在平台实例管理检查来源与状态。</p>` : ''}` : publicLinks ? `<h2>无需登录的业务智能体</h2>${publicLinks}` : ''
@@ -234,6 +230,9 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
     const path = instance.basePath + route + url.search
     // 代理丢弃调用方凭据与伪造控制 Header，只有此边界签名进入 Runtime。
     for (const name of Object.keys(req.headers)) if (name.startsWith('x-harness-') || ['authorization', 'cookie', 'forwarded', 'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto'].includes(name)) delete req.headers[name]
+    // 受信网关重建公开来源；Runtime 内插件按 X-Forwarded-Host 识别反代，不能继承调用方值。
+    req.headers['x-forwarded-host'] = origin.host
+    req.headers['x-forwarded-proto'] = origin.protocol.replace(':', '')
     req.url = path
     Object.assign(req.headers, signBusinessAssertion(secret, assertionFor(instance, context), req.method || 'GET', path))
     req.headers.host = new URL(instance.origin).host

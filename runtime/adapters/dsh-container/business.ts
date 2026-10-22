@@ -66,8 +66,10 @@ export function businessSourceDigest(paths: Record<string, string>): string {
 export function readBusinessLaunchConfig(file: string): BusinessLaunchConfig {
   const saved = JSON.parse(readFileSync(file, 'utf8')) as BusinessLaunchConfig & { gateway?: { publicOrigin?: string; sharedSecretFile?: string } }
   // 平台以业务访问配置作为唯一可编辑来源；历史独立 launch 文件仍可用于既有实例。
+  const assetRoot = dirname(dirname(file)), secretFile = saved.gateway?.sharedSecretFile
   const config: BusinessLaunchConfig = saved.gateway ? {
-    assetRoot: dirname(dirname(file)), sharedSecretFile: saved.gateway.sharedSecretFile!,
+    assetRoot,
+    sharedSecretFile: typeof secretFile === 'string' && !isAbsolute(secretFile) ? resolve(assetRoot, secretFile) : secretFile!,
     coordinatorOrigin: saved.gateway.publicOrigin!, pluginRoot: join(programRoot, 'platform/plugin'),
   } : saved
   for (const key of ['assetRoot', 'sharedSecretFile'] as const) {

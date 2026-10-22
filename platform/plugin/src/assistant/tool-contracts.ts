@@ -24,6 +24,9 @@ const string = { type: 'string' }, strings = { type: 'array', items: string }, o
 const fields: MapValue = {
   case_ids: strings, critical_case_ids: strings, cases: strings, inputs: strings, artifacts: strings, parent_run_ids: strings, variant_run_ids: strings,
   fast: { type: 'boolean' }, enabled: { type: 'boolean' }, allow_missing_env: { type: 'boolean' },
+  business_control: { type: 'boolean', description: '业务受控实例（统一网关）为 true；纯评测验证为 false。' },
+  access_mode: { type: 'string', enum: ['authenticated', 'anonymous'], description: '业务实例访问方式；anonymous 为无需登录的局域网匿名访问。' },
+  identity_mode: { type: 'string', enum: ['development', 'published'], description: '业务实例身份验证阶段。' },
   min_runs_per_case: { type: 'integer' }, max_pass_rate_drop_pp: { type: 'number' }, min_resource_reduction_pct: { type: 'number' }, allow_model_change: { type: 'boolean' }, generation: object,
   port: { type: 'integer' }, tail: { type: 'integer' }, cursor: { type: 'integer' }, limit: { type: 'integer' },
   arguments: { ...object, description: '使用 test 或 sources/components 返回的真实工具 inputSchema，不猜测参数。' },
@@ -51,7 +54,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
   ],
   instances: [
     ['list', ''], ['detail url', 'name'], ['logs', 'name tail'],
-    ['preview run', 'name operation source port allow_missing_env', 'operation=create/start/stop/restart/delete；创建必须传明确的 experiment:<ID> 来源。用户要求最新版本时，先用 agents/detail 的 versions[0].id 确定版本，再作为 source 传入；默认 detail.experiment 可能是已启用版本，不等于最新版本。直接调用 run 即可由平台内部核对模型与来源、展示一次确认卡，确认后执行；无需另调 preview 或口头确认。'],
+    ['preview run', 'name operation source port allow_missing_env business_control access_mode identity_mode', 'operation=create/start/stop/restart/delete；创建必须传明确的 experiment:<ID> 来源。业务智能体、MCP 业务分组或用户需要通过统一网关访问时传 business_control:true，并传 access_mode(authenticated/anonymous) 与 identity_mode(development/published)；只有明确做评测验证时才传 business_control:false。用户要求最新版本时，先用 agents/detail 的 versions[0].id 确定版本，再作为 source 传入；默认 detail.experiment 可能是已启用版本，不等于最新版本。直接调用 run 即可由平台内部核对模型、业务来源摘要与访问设置、展示一次确认卡，确认后执行；无需另调 preview 或口头确认。业务实例创建后用 instances/url 取统一网关入口，不要把容器直连端口当作业务链接。'],
     ['batch-preview batch', 'items', 'items 为多个与 run 相同的操作对象；逐项核对结果，部分失败不能称为全部完成。'],
   ],
   mcp: [

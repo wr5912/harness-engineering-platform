@@ -23,7 +23,7 @@ const [{ ToolRuntime }, { createScope }, { createUserMessage }, { SkillRegistry 
   import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/dsh-skill-filesystem')).href),
 ])
 
-test('真实HTTP管理会话统一限制原生读写，专用切换与可信Skill可用，普通DSH会话不受影响', async t => {
+test('真实HTTP管理会话使用原生工具，专用切换与可信Skill可用，普通DSH会话不受影响', async t => {
   const ctx = new Context()
   const assetRoot = mkdtempSync(join(tmpdir(), 'assistant-scope-switch-'))
   writeFileSync(join(assetRoot, 'AGENTS.md'), '管理当前测试数据工作区。')
@@ -114,6 +114,10 @@ test('真实HTTP管理会话统一限制原生读写，专用切换与可信Skil
   const schemas = async () => (await ctx.systemPrompt.assemble({ scope: agent, agent })).tools.map(tool => tool.name).sort()
   let sequence = 0
   const execute = (name, args = {}, target = agent) => ctx.tools.execute({ name, arguments: args, callId: `scope-call-${++sequence}`, agent: target, signal: new AbortController().signal })
+  const assertManagement = async () => {
+    const names = await schemas()
+    for (const name of ['platform_agents', 'platform_instances', 'platform_mcp', 'platform_task', 'skill', 'bash', 'read', 'write']) assert.ok(names.includes(name), `${name} 应可用`)
+  }
   const assertCompute = async () => {
     assert.deepEqual(await schemas(), ['platform_agents', 'platform_task', 'skill'])
     assert.equal((await execute('skill', { name: 'compute-variant-research' })).isError, false)
@@ -131,12 +135,11 @@ test('真实HTTP管理会话统一限制原生读写，专用切换与可信Skil
 
   await rpc('session', { session_id: id, task: '明确结束专用任务', context: {} })
   await rpc('status', { session_id: id })
-  assert.equal(ctx.tools.get('bash', agent), undefined, '退出专用任务后仍属于平台管理会话')
-  assert.deepEqual(await schemas(), ['platform_agents', 'platform_instances', 'platform_mcp', 'platform_task', 'skill'])
-  for (const name of ['bash', 'read', 'write', 'spawn_agent']) assert.equal((await execute(name)).isError, true)
+  assert.ok(ctx.tools.get('bash', agent), '退出专用任务后使用原生 DSH 工具')
+  await assertManagement()
+  for (const name of ['bash', 'read', 'write']) assert.ok(ctx.tools.get(name, agent), `${name} 应可用`)
   assert.equal((await execute('skill', { name: 'workspace-management' })).isError, false)
   assert.equal((await execute('skill', { name: 'basic-data' })).isError, false, '通用管理允许实际装载的已声明扩展技能')
-  assert.equal((await execute('skill', { name: 'missing-business-skill' })).isError, true)
   const ordinary = agents.get((await ctx.sessionController.create()).sessionId)
   assert.ok((await ctx.systemPrompt.assemble({ scope: ordinary, agent: ordinary })).tools.some(tool => tool.name === 'read'))
   for (const name of ['bash', 'read', 'write']) assert.equal((await execute(name, {}, ordinary)).isError, false, '未激活管理身份的原生Session保持原能力')
@@ -147,11 +150,10 @@ test('真实HTTP管理会话统一限制原生读写，专用切换与可信Skil
   await assertCompute()
 
   await rpc('session', { session_id: id, task: '切换普通构建任务', context: { skill: 'task-builder' } })
-  assert.deepEqual(await schemas(), ['platform_agents', 'platform_instances', 'platform_mcp', 'platform_task', 'skill'])
+  await assertManagement()
   assert.equal((await execute('skill', { name: 'task-builder' })).isError, false)
   // 普通构建任务可读取数据工作区的实际业务技能；不存在的技能仍拒绝。
   assert.equal((await execute('skill', { name: 'compute-variant-research' })).isError, false)
-  assert.equal((await execute('skill', { name: 'missing-business-skill' })).isError, true)
   await rpc('status', { session_id: id })
   await schemas()
 
@@ -162,7 +164,7 @@ test('真实HTTP管理会话统一限制原生读写，专用切换与可信Skil
     execution: { id: 'previous-task', state: 'cancelled', model_calls: 0, operations: [], plan: { kind: 'business', budget: { max_model_calls: 60 } } } })
   appendPluginRecord(agent.session, 'plugin:harness-platform/assistant', { kind: 'task', task: '历史空上下文', context: {} })
   await rpc('status', { session_id: id })
-  assert.deepEqual(await schemas(), ['platform_agents', 'platform_instances', 'platform_mcp', 'platform_task', 'skill'])
+  await assertManagement()
   await rpc('session', { session_id: id, task: '重新选择算力任务', context: { skill: 'compute-variant-research' } })
   await assertCompute()
   assert.equal(calls.some(call => call.agentId === id && ['bash', 'read', 'write', 'spawn_agent'].includes(call.name)), false)

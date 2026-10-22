@@ -124,6 +124,7 @@ Baseline 用固定 Git 提交、Research Release 或 `none:first-experiment` 引
 |---|---|
 | 平台功能、通用工具与 Runtime 适配 | [`dsh-platform-development`](./.agents/skills/dsh-platform-development/SKILL.md) |
 | 平台页面任务梳理 | [`dsh-platform-task-list`](./.agents/skills/dsh-platform-task-list/SKILL.md) |
+| 审查、质疑或精简已有 Skill | [`reviewing-agent-skills`](./.agents/skills/reviewing-agent-skills/SKILL.md) |
 | Harness 创建、迁移、修改与优化 | [`harness-guided-workflow`](https://github.com/wr5912/harness-engineering-platform-data/blob/main/.agents/skills/harness-guided-workflow/SKILL.md) |
 | 并行能力融合 | [`harness-experiment-fusion`](https://github.com/wr5912/harness-engineering-platform-data/blob/main/.agents/skills/harness-experiment-fusion/SKILL.md) |
 | 旧资产只读清点 | [`legacy-asset-intake`](https://github.com/wr5912/harness-engineering-platform-data/blob/main/.agents/skills/legacy-asset-intake/SKILL.md) |
@@ -146,7 +147,7 @@ tests/                                   # 可重复的合同测试
 AI纠错记录/                               # 按天追加的开发纠错记录
 ```
 
-数据工作区保存管理助手的 `AGENTS.md`、`.agents/skills/`、研究方法文档，以及 `agents/`、`evolution/`、`config/`、业务 `extensions/` 和被 Git 忽略的 `.local/`。12 项管理、研究和表达 Skill 均由数据仓库维护；程序只提供加载和工具实现。目录归属和备份边界见[独立工作区合同](docs/platform-design/02_系统架构与部署设计.md#独立数据工作区)。平台从自身位置解析脚本，从 `HARNESS_ASSET_ROOT` 解析业务规则和资产，不能通过启动目录切换数据源。
+数据工作区保存管理助手的 `AGENTS.md`、`.agents/skills/`、研究方法文档，以及 `agents/`、`evolution/`、`config/`、业务 `extensions/` 和被 Git 忽略的 `.local/`。13 项管理、研究、审查和表达 Skill 均由数据仓库维护；程序只提供加载和工具实现。目录归属和备份边界见[独立工作区合同](docs/platform-design/02_系统架构与部署设计.md#独立数据工作区)。平台从自身位置解析脚本，从 `HARNESS_ASSET_ROOT` 解析业务规则和资产，不能通过启动目录切换数据源。
 
 每个 Agent 的业务 Case 只在数据根的 `agents/<agent-id>/evaluation.md` 维护；Run 中的冻结输入是历史事实，不是第二份可编辑 Case。Git 和 Research Release 保存可恢复版本，不维护 `evolution/baselines/` 或 `agents/<agent-id>/current/`。Session、缓存、附件和整个 Runtime HOME 不作为 Harness 资产回流。
 

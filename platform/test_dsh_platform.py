@@ -88,7 +88,10 @@ else:
 import json, os, pathlib, sys
 with open(os.environ["FAKE_PNPM_TRACE"], "a") as handle:
     handle.write(json.dumps({"args": sys.argv[1:], "cwd": os.getcwd()}) + "\n")
-if os.environ.get("FAKE_PNPM_FAIL"):
+if os.environ.get("FAKE_PNPM_FAIL") == "build" and sys.argv[1:] == ["run", "build"]:
+    print("[ERR_PNPM_TEST_BUILD] fixture build failed", file=sys.stderr)
+    sys.exit(1)
+if os.environ.get("FAKE_PNPM_FAIL") not in (None, "", "build"):
     sys.exit(1)
 if sys.argv[1:] == ["run", "build"]:
     pathlib.Path("lib").mkdir(exist_ok=True)
@@ -415,19 +418,23 @@ if sys.argv[1:] == ["run", "build"]:
         self.assertEqual(patch.read_text(), original)
         self.assertEqual((public_path.read_bytes(), private_path.read_bytes()), before)
 
-    def test_missing_private_mcp_file_blocks_prepare_and_start(self):
+    def test_missing_private_mcp_credentials_are_initialized_for_ui_setup(self):
         self.prepare()
         public_path = self.assets / "config/mcp-manager.json"
+        private_path = self.assets / ".local/credentials/mcp-manager.json"
         public = {"schemaVersion": 1, "servers": [{"id": "saved", "enabled": False,
                  "tools": {"mode": "all", "names": []}}], "groups": []}
         public_path.write_text(json.dumps(public))
-        (self.assets / ".local/credentials/mcp-manager.json").unlink()
-        for operation in (("prepare",), ("start", "--dry-run", "--port", str(self.free_port()))):
-            result = self.run_cli(*operation)
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("本地 MCP 凭据缺失", result.stderr)
-            self.assertFalse((self.assets / ".local/credentials/mcp-manager.json").exists())
-            self.assertEqual(json.loads(public_path.read_text()), public)
+        private_path.unlink()
+        result = self.run_cli("prepare")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("已初始化为空", result.stdout)
+        self.assertEqual(json.loads(private_path.read_text()),
+                         {"schemaVersion": 1, "sharedToken": "", "servers": {}})
+        self.assertEqual(stat.S_IMODE(private_path.stat().st_mode), 0o600)
+        self.assertEqual(json.loads(public_path.read_text()), public)
+        started = self.run_cli("start", "--dry-run", "--port", str(self.free_port()))
+        self.assertEqual(started.returncode, 0, started.stderr)
 
     def test_sensitive_query_in_legacy_url_is_not_written_to_public_config(self):
         self.prepare()
@@ -663,7 +670,15 @@ if sys.argv[1:] == ["run", "build"]:
         (self.repo / "platform" / "profile" / "cordis.patch.yml").write_text("[]\n")
         result = self.run_cli("prepare", env={**self.env, "FAKE_PNPM_FAIL": "1"})
         self.assertNotEqual(result.returncode, 0)
+        self.assertIn("插件依赖安装失败（退出码 1）", result.stderr)
         self.assertEqual((self.profile / "harness-platform.patch.yml").read_bytes(), before)
+
+    def test_build_failure_reports_step_and_reason(self):
+        self.prepare()
+        result = self.run_cli("prepare", env={**self.env, "FAKE_PNPM_FAIL": "build"})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("插件构建失败（退出码 1）：[ERR_PNPM_TEST_BUILD] fixture build failed", result.stderr)
+        self.assertIn("平台 Profile 未更新", result.stderr)
 
     def test_missing_web_adapter_blocks_start(self):
         self.prepare()

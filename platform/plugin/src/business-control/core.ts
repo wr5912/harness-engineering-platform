@@ -9,6 +9,7 @@ import type {
   ReplicaObservation, ResourceRef, Restriction, RiskFact, SessionBinding, SessionTrustFact,
 } from './contracts.js'
 import { HttpAuthenticationProvider, HttpIdentityTrustProvider, HttpRiskAssessmentProvider } from './providers.js'
+import { resolveBusinessSecretFile } from './secret-file.ts'
 
 export * from './contracts.js'
 
@@ -149,6 +150,11 @@ export class BusinessControl {
       || (value.operations && (!Array.isArray(value.operations) || value.operations.some(rule =>
         !rule.serverId || !rule.operationId || !kinds.includes(rule.kind) || !rule.target || !rule.method)))) {
       return error('control_config_invalid', 503)
+    }
+    // 共享密钥属于本地状态：配置保存相对路径，读取时按当前数据根解析，避免数据仓库迁移后失效。
+    const gateway = value.gateway as { sharedSecretFile?: string } | undefined
+    if (typeof gateway?.sharedSecretFile === 'string') {
+      gateway.sharedSecretFile = resolveBusinessSecretFile(this.assetRoot, gateway.sharedSecretFile)
     }
     return value
   }
@@ -468,7 +474,9 @@ export class BusinessControl {
     if (agentStatus.trust.status !== 'trusted') return error(agentStatus.trust.reason, 503)
     if (development) {
       if (!registered.sourceDigest || registered.sourceDigest !== context.sourceDigest) return error('agent_source_mismatch')
-      if ((!agent || anonymous) && !chatActions.includes(action)) return error('agent_forbidden')
+      // 开发调试实例：匿名访客与认证用户一样按 Agent 规则使用已声明的动作；
+      // 未配置 Agent 规则时仍只开放聊天动作。写与发布继续受动作、操作和风险规则约束。
+      if (!agent && !chatActions.includes(action)) return error('agent_forbidden')
       if (agent && !anonymous && !agent.subjects.includes(context.subject.id)) return error('agent_forbidden')
       if (agent && !agent.actions.includes('*') && !actionNames.some(value => agent.actions.includes(value))) return error('action_forbidden')
       resources.forEach(value => this.checkResource(context, value))

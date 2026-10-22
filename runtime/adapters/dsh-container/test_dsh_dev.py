@@ -2626,6 +2626,8 @@ class BindHomeMigrationTests(unittest.TestCase):
             self.assertTrue(report["home_preserved"])
             self.assertFalse((target / "instance.json").exists())
             self.assertEqual(session.read_text(), '{"fixture":true}')
+            (target / "profile-compat").mkdir()
+            (target / "profile-compat" / "web-profile.package.json").write_text("{}")
             self.assertIsNone(dev.existing_instance("probe"))
             dev.write_instance("probe", mode="verification", contract=contract, port=3081)
             self.assertEqual(session.read_text(), '{"fixture":true}')

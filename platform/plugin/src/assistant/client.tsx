@@ -302,6 +302,7 @@ function BusinessPreview({ value, meta }: { value: unknown; meta: OperationMeta 
       <p>{operation === 'create' ? '创建并启动' : '启动'}实例 <strong>{data?.name ?? input.name ?? '未确认名称'}</strong>，来源为{source ? targetVersionLabel(source, data, input) : '未确认版本'}。</p>
       {source && <small className="harness-instance-source">固定来源：<code>{source}</code></small>}
       <p>访问端口：<strong>{typeof port === 'number' ? port : '未确认'}</strong>；本次默认模型：<strong>{model?.provider && model?.model ? `${model.provider} · ${model.model}` : '未确认'}</strong>{model?.reasoningEffort ? `（推理档位 ${model.reasoningEffort}）` : ''}。</p>
+      {input.business_control === true && <p>业务受控实例：通过统一网关访问，固定工作区与业务预设由业务 Runtime 装载。</p>}
       <small>确认后直接{operation === 'create' ? '创建并启动' : '启动'}；运行状态与业务效果以实际回执核对。</small>
     </>
   }

@@ -21,7 +21,12 @@ export { createBusinessRuntimePatch } from './patch.ts'
 export type { BusinessRuntimeConfig } from './patch.ts'
 interface BusinessPrincipal { kind: 'harness-business'; context: BusinessContext }
 declare module '@deepseek-ai/dsh-typert-protocol' { interface PrincipalMap { 'harness-business': BusinessPrincipal } }
-const generalReads = ['session/list', 'session/search', 'session/modelCatalog', 'session/control', 'remoteAccess/follow']
+const generalReads = ['session/list', 'session/search', 'session/modelCatalog', 'session/control', 'remoteAccess/follow',
+  'settings/describe', 'credentials/describe', 'permissionPresets/catalog', 'llm/listProviders',
+  'dynamicCordisRunner/inventory', 'dynamicCordisRunner/syncInspectManifest', 'commands/list', 'skills/list', 'voiceMode/follow',
+  'pluginInventory/list', 'pluginManager/listBundles', 'pluginManager/listPlugins']
+/** 自动化任务当前按实例开放；任务目录尚未按访问者过滤，跨用户可见性作为已知缺陷记录。 */
+const scheduleActions = ['schedule/list', 'schedule/catalog', 'schedule/history', 'schedule/delete', 'schedule/update', 'event:schedule/changed']
 const sessionActions = ['session/page', 'session/follow', 'session/projections', 'session/attachment', 'session/prompt', 'session/cancel', 'session/updateQueue', 'session/rename', 'session/fork', 'session/selectModel']
 const sessionEvents = ['event:api-session/activity', 'event:api-session/added', 'event:api-session/error', 'event:api-session/removed', 'event:api-session/status']
 const requestContext = new WeakMap<object, { peer: PeerScope; context: BusinessContext }>()
@@ -244,8 +249,8 @@ export function registerBusinessRemotePolicy(ctx: Context, control: BusinessCont
       const owned = control.listSessions(context)
       const workspace = nativeFixedWorkspace(ctx, workspacePath)
       const workspaceActions = workspacePath ? ['workspace/create', 'workspace/follow'] : []
-      return [binding('global', undefined, [...generalReads, 'session/create', ...sessionActions, ...workspaceActions]),
-        ...owned.map(id => binding('session', id, [...generalReads, ...sessionActions, ...sessionEvents, ...(workspacePath ? ['workspace/follow'] : [])])),
+      return [binding('global', undefined, [...generalReads, ...scheduleActions, 'session/create', ...sessionActions, ...workspaceActions]),
+        ...owned.map(id => binding('session', id, [...generalReads, ...scheduleActions, ...sessionActions, ...sessionEvents, ...(workspacePath ? ['workspace/follow'] : [])])),
         ...(workspace ? [binding('workspace', workspace.id, ['workspace/follow', 'session/create'])] : [])]
     },
     explain: () => 'business-access-denied',
@@ -336,7 +341,8 @@ export function registerBusinessInboxChecks(ctx: Context, control: BusinessContr
 
 export const name = 'harness-business-runtime'
 export const inject = ['webServer', 'remoteAccess', 'tools', 'approval', 'workspaceRegistry']
-const deferredBusinessTools = new Set(['schedule_create', 'schedule_list', 'schedule_update', 'schedule_delete', 'analyze_pending_threat_incidents'])
+const deferredBusinessTools = new Set(['analyze_pending_threat_incidents'])
+const scheduleTools = new Set(['schedule_create', 'schedule_list', 'schedule_update', 'schedule_delete'])
 
 export function businessToolDeniedReason(exec: { agent?: { session: { id: string } }; name: string; arguments?: unknown },
   sessionContext: (id: string) => BusinessContext | undefined, managedTools: ReadonlySet<string>,
@@ -344,7 +350,8 @@ export function businessToolDeniedReason(exec: { agent?: { session: { id: string
   try {
     const id = exec.agent?.session.id
     if (!id || !sessionContext(id)) return '业务 Session 未登记'
-    if (deferredBusinessTools.has(exec.name)) return '受控业务入口尚未开放定时任务与自动研判'
+    if (deferredBusinessTools.has(exec.name)) return '受控业务入口尚未开放自动研判'
+    if (scheduleTools.has(exec.name)) return
     if (useNativeTools) return
     const resourceServer = exec.arguments && typeof exec.arguments === 'object'
       ? (exec.arguments as { server?: unknown }).server : undefined
@@ -360,7 +367,6 @@ export async function apply(ctx: Context, config: BusinessRuntimeConfig): Promis
   if (config.localTools !== undefined && (!Array.isArray(config.localTools) || config.localTools.some(name => typeof name !== 'string' || !name)
     || new Set(config.localTools).size !== config.localTools.length || config.localTools.some(name => deferredBusinessTools.has(name)))) throw new Error('业务本地工具声明无效')
   if (ctx.get('connection')) throw new Error('业务 Profile 必须停用默认 owner Connection')
-  if (ctx.get('schedule')) throw new Error('首期业务 Profile 不得装载定时投递服务')
   const control = configureBusinessControlStateRoot(config.assetRoot, config.stateRoot)
   if (!control.enabled()) throw new Error('业务 Runtime 控制未启用')
   try {

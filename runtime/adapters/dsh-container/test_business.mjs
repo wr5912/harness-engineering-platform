@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { businessSourceDigest, readBusinessLaunchConfig, renderBusinessInstance } from './business.ts'
 const require = createRequire(new URL('../../../platform/plugin/package.json', import.meta.url))
@@ -39,6 +39,21 @@ test('启动配置只读核验，拒绝容器不可达协调器、未构建插�
   assert.throws(() => readBusinessLaunchConfig(f.file))
 })
 
+test('业务访问配置中的相对密钥路径按当前数据根解析并用于容器挂载', t => {
+  const f = fixture(t)
+  const file = join(f.config.assetRoot, 'config/business-access.json')
+  const secret = join(f.config.assetRoot, '.local/business-control-mock/gateway-secret.bin')
+  mkdirSync(dirname(secret), { recursive: true })
+  writeFileSync(secret, 'b'.repeat(48))
+  writeFileSync(file, JSON.stringify({ schemaVersion: 1, enabled: true, agents: [],
+    gateway: { host: '127.0.0.1', port: 53105, publicOrigin: 'http://host.docker.internal:53105',
+      sharedSecretFile: '.local/business-control-mock/gateway-secret.bin', instances: [] } }))
+  const config = readBusinessLaunchConfig(file)
+  assert.equal(config.assetRoot, f.config.assetRoot)
+  assert.equal(config.sharedSecretFile, secret)
+  assert.equal(config.coordinatorOrigin, 'http://host.docker.internal:53105')
+})
+
 test('业务渲染改独立bridge和回环映射，标准镜像及MCP配置保持，所有代码与策略只读装载', t => {
   const f = fixture(t), result = renderBusinessInstance(readBusinessLaunchConfig(f.file), f.input), compose = yaml.load(result.compose), patch = yaml.load(result.patch)
   assert.equal(compose.services.dsh.image, 'standard-image')
@@ -52,7 +67,7 @@ test('业务渲染改独立bridge和回环映射，标准镜像及MCP配置保�
   assert.equal(patch.find(item => item.id === 'webserver').config.host, '0.0.0.0')
   assert.ok(compose.services.dsh.volumes.every(item => item.read_only))
   assert.ok(patch.some(item => item.id === 'mcp-session-manager' && item.disabled))
-  assert.ok(patch.some(item => item.id === 'schedule' && item.disabled))
+  assert.ok(!patch.some(item => item.id === 'schedule' && item.disabled), '自动化任务按当前需求开放')
   const manager = patch.flatMap(item => item.insert ?? []).find(item => item.id === 'business-mcp-manager')
   assert.equal(manager.config.servers[0].url, 'http://host.docker.internal:53101/mcp')
   assert.deepEqual(manager.inject, ['businessRuntime'])

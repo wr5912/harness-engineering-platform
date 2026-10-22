@@ -103,14 +103,14 @@ test('业务共享资源工具仅开放已登记的分组来源', async t => {
   assert.match(guard({ name: 'read_mcp_resource', arguments: { server: 'group-source', uri: 'fixture:/read' },
     agent: { session: { id: 'unknown-session' } } }), /业务 Session 未登记/)
 })
-test('受控本地工具只按来源声明和 Session 归属开放，定时自动研判保持关闭', async t => {
+test('受控本地工具只按来源声明和 Session 归属开放，定时任务按原生工具开放、自动研判保持关闭', async t => {
   const { control, context, toolGuards } = await setup(t, { localTools: ['skill', 'analyze_threat_incident', 'delegate_threat_analysis', 'delegate_fault_analysis'] })
   control.bindSession(context('A'), 'local-session')
   const guard = toolGuards.at(-1), exec = name => ({ name, agent: { session: { id: 'local-session' } } })
   for (const name of ['skill', 'analyze_threat_incident', 'delegate_threat_analysis', 'delegate_fault_analysis']) assert.equal(guard(exec(name)), undefined)
   for (const name of ['delegate_response_planning', 'bash', 'unknown_tool']) assert.match(guard(exec(name)), /只开放受管 MCP 工具与资源/)
-  for (const name of ['schedule_create', 'schedule_list', 'schedule_update', 'schedule_delete', 'analyze_pending_threat_incidents'])
-    assert.match(guard(exec(name)), /尚未开放定时任务与自动研判/)
+  for (const name of ['schedule_create', 'schedule_list', 'schedule_update', 'schedule_delete']) assert.equal(guard(exec(name)), undefined)
+  assert.match(guard(exec('analyze_pending_threat_incidents')), /尚未开放自动研判/)
   assert.match(guard({ name: 'skill', agent: { session: { id: 'other-session' } } }), /业务 Session 未登记/)
 })
 
@@ -130,7 +130,8 @@ test('已认证开发会话保留 DSH 原生工具接缝，匿名与失效归属
   const guard = toolGuards.at(-1), request = (name, id = 'development-native-session') => ({ name, agent: { session: { id } } })
   assert.equal(guard(request('native_read')), undefined, '具体原生工具许可交由 DSH 判定')
   assert.equal(guard(request('skill')), undefined)
-  assert.match(guard(request('schedule_create')), /尚未开放定时任务与自动研判/)
+  assert.equal(guard(request('schedule_create')), undefined)
+  assert.match(guard(request('analyze_pending_threat_incidents')), /尚未开放自动研判/)
   assert.match(guard(request('native_read', 'unknown-session')), /业务 Session 未登记/)
   const visitorId = 'visitor-' + 'v'.repeat(32), expiresAt = new Date(Date.now() + 60000).toISOString()
   control.bindSession(control.createContext({ subject: { id: visitorId, kind: 'human', identitySource: 'gateway-anonymous' },
@@ -292,8 +293,9 @@ test('签名绑定方法、路径、实例代次与有效期，拒绝重放', ()
   for (const [method, path, receiver, now] of [['GET', '/api/session/create', binding, issuedAt], ['POST', '/api/session/page', binding, issuedAt], ['POST', '/api/session/create', { ...binding, runtimeGeneration: 'other' }, issuedAt], ['POST', '/api/session/create', binding, issuedAt + 2001]]) assert.throws(() => verifyBusinessAssertion(secret, headers, method, path, receiver, new Map(), now))
   const seen = new Map(); verifyBusinessAssertion(secret, headers, 'POST', '/api/session/create', binding, seen); assert.throws(() => verifyBusinessAssertion(secret, headers, 'POST', '/api/session/create', binding, seen))
 })
-test('首期业务 Profile停用定时投递和任意Shell并保留HOME数据', () => {
-  const patch = Runtime.createBusinessRuntimePatch({ binding }, '/runtime.js'); for (const id of ['schedule', 'ui-schedule', 'tool-schedule', 'tool-bash', 'tool-pwsh', 'tool-fs', 'tool-web', 'connection']) assert.ok(patch.some(item => item.id === id && item.disabled))
+test('业务 Profile停用任意Shell并保留HOME数据，自动化任务按当前需求开放', () => {
+  const patch = Runtime.createBusinessRuntimePatch({ binding }, '/runtime.js'); for (const id of ['tool-bash', 'tool-pwsh', 'tool-fs', 'tool-web', 'connection']) assert.ok(patch.some(item => item.id === id && item.disabled))
+  for (const id of ['schedule', 'ui-schedule', 'tool-schedule']) assert.ok(!patch.some(item => item.id === id && item.disabled))
   const client = patch.flatMap(item => item.insert ?? []).find(item => item.id === 'business-client-connection'); assert.equal(client.name, '/opt/dsh/packages/client/connection/lib/client.node.js'); assert.deepEqual(client.isolate, { connection: true })
 })
 
@@ -362,8 +364,8 @@ test('受控报告首次读取、重读和下载均检查归属与最新限制�
   assert.throws(() => registerBusinessReport(control.assetRoot, owner, 'https://elsewhere.test/reports/f.html', origin))
 })
 
-test('网关未开放原生插件任意HTTP、Shell、定时任务及owner握手入口', () => {
-  for (const path of ['/api/files/download', '/api/schedule/list', '/api/remoteEvents/result', '/api/$events/result', '/connect', '/download', '/api/mcp-manager']) assert.equal(allowedBusinessPath(path, 'POST', 'http'), false)
+test('网关默认转发业务智能体请求，实例内业务 Runtime 继续做身份与动作校验', () => {
+  for (const path of ['/api/files/download', '/api/schedule/list', '/api/remoteEvents/result', '/api/$events/result', '/connect', '/download', '/api/mcp-manager']) assert.equal(allowedBusinessPath(path, 'POST', 'http'), true)
   assert.equal(allowedBusinessPath('/api/remote.mux', 'GET', 'websocket'), true); assert.equal(allowedBusinessPath('/api/session/page', 'POST', 'http'), true)
 })
 
@@ -634,7 +636,8 @@ test('开发调试实例无发布 Agent 规则仍经签名网关聊天，切回�
   assert.equal(local('analyze_threat_incident', true), undefined, '已认证开发会话保留来源声明的本地 DSH 工具')
   assert.equal(local('native_read', true), undefined, '开发会话由 DSH 原生工具权限继续判断')
   assert.match(local('native_read', false), /只开放受管 MCP 工具与资源或来源声明的本地工具/)
-  assert.match(local('schedule_create', true), /尚未开放定时任务与自动研判/)
+  assert.equal(local('schedule_create', true), undefined)
+  assert.match(local('analyze_pending_threat_incidents', true), /尚未开放自动研判/)
   config.gateway.instances[0].identityMode = 'unexpected'; save()
   assert.equal((await frontFetch(base + 'api/session/list', { method: 'POST', headers: { cookie } })).status, 403, '未知身份模式不得降级为开发访问')
   config.gateway.instances[0].identityMode = 'published'; save()

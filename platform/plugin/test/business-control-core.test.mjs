@@ -91,7 +91,7 @@ test('独立 bundle 共用 singleton 与 ALS；未启用旧研究模式保留，
   assert.equal(await getBusinessControl(legacyRoot).execute(operation(), () => 'legacy'), 'legacy')
 })
 
-test('匿名访客普通聊天保留本地输入限制，不依赖外部用户风险服务且不得执行业务读取', async t => {
+test('匿名访客普通聊天保留本地输入限制，发布访问不授予业务读取', async t => {
   const f = await fixture(t)
   f.config.gateway.instances[0].accessMode = 'anonymous'
   writeFileSync(join(f.root, 'config/business-access.json'), JSON.stringify(f.config))
@@ -181,7 +181,7 @@ test('开发调试实例跳过发布身份签名，但已配置的访问规则�
       verifiedAt: new Date().toISOString(), expiresAt }, expiresAt,
   }, binding), 'development-guest-session')
   assert.equal(control.assert(guest, 'session:prompt').kind, 'allow', '访客不按认证主体白名单判断')
-  assert.throws(() => control.assert(guest, 'read'), { code: 'agent_forbidden' })
+  assert.equal(control.assert(guest, 'read').kind, 'allow', '访客按已配置动作使用受管只读能力')
   f.config.agents[0].actions = ['agent:access', 'session:create']; save(); acknowledge()
   assert.throws(() => control.assert(guest, 'session:prompt'), { code: 'action_forbidden' })
 })

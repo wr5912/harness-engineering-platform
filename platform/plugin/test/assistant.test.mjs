@@ -42,7 +42,7 @@ function fixture(t, responder, root) {
   new SessionStore(ctx)
   new SessionProjectionRegistry(ctx)
   new SystemPrompt(ctx, {})
-  const sessions = new Map(), tools = new Map(), calls = [], prompts = []
+  const sessions = new Map(), tools = new Map(), calls = [], peers = [], prompts = []
   let count = 0
   ctx.on('session/event', (session, event) => sessions.get(session.id)?.events.push(event))
   function addSession(id, cwd = root, seed = [], parentSession) {
@@ -59,8 +59,9 @@ function fixture(t, responder, root) {
   }
   const services = { controller, skills, projections: ctx.sessionProjections, systemPrompt: ctx.systemPrompt,
     record(session, type, data) { appendPluginRecord(session, type, data) }, notify() {} }
-  const platform = async (endpoint, input, signal) => {
+  const platform = async (endpoint, input, signal, peer) => {
     calls.push({ endpoint, input })
+    peers.push({ endpoint, peer })
     const custom = await responder?.(endpoint, input, signal)
     if (custom !== undefined) return custom
     if (endpoint === 'instances/preview') return { ok: true, value: {
@@ -90,7 +91,7 @@ function fixture(t, responder, root) {
   }
   const assembly = id => ctx.systemPrompt.assemble({ agent: { session: sessions.get(id).session } })
   const assemble = async id => (await assembly(id)).sections.filter(item => ['harness-platform/assistant', 'harness-platform/assistant-output'].includes(item.name)).map(item => item.text).filter(Boolean).join('\n')
-  return { root, ctx, sessions, services, tools, calls, prompts, rpc, status, execute, proposal, assemble, assembly, addSession,
+  return { root, ctx, sessions, services, tools, calls, peers, prompts, rpc, status, execute, proposal, assemble, assembly, addSession,
     beforeModelCall: id => assistant.beforeModelCall(id),
     async reload() { await assistant.dispose(); assistant = create() } }
 }
@@ -136,6 +137,16 @@ test('尚未确认任务的原生status返回对象，不触发工具输出schem
   assert.equal((await f.status(id)).proposals.length, 0)
   assert.equal(f.calls.length, 0)
 })
+
+test('管理助手工具以 owner 身份访问平台管理接口', async t => {
+  const f = fixture(t)
+  const id = (await f.rpc('session', { task: '查看已有实例', context: { skill: 'task-builder' } })).value.session_id
+  await f.execute(id, 'instances', 'list')
+  const call = f.peers[f.peers.length - 1]
+  assert.equal(call.endpoint, 'instances/list')
+  assert.equal(call.peer?.principal?.kind, 'owner')
+})
+
 
 test('任务一次确认后仅向固定目标连续执行，初测不计轮次且第四轮修复被拒绝', async t => {
   const f = fixture(t, taskResponder)
@@ -280,7 +291,6 @@ test('向已有专用会话追加无context指导保留固定skill与目标，�
   const f = fixture(t), fixed = { skill: 'compute-variant-research', workflow: 'compute-variants', agent_id: 'alpha', experiment_id: 'EXP-alpha-002' }
   let scoped = 0, managed = 0, released = 0
   f.services.scopeComputeVariants = () => { scoped++ }
-  f.services.scopeTaskBuilder = () => { managed++ }
   f.services.releaseTaskScope = () => { released++ }
   const id = (await f.rpc('session', { task: '生成代码变体', context: fixed })).value.session_id
   await f.rpc('context', { session_id: id, context: { page: 'instances', instance_name: 'latest-page-only' } })
@@ -296,8 +306,8 @@ test('向已有专用会话追加无context指导保留固定skill与目标，�
   const beforeManagement = managed, beforeRelease = released
   assert.equal((await f.rpc('session', { session_id: id, task: '显式切换普通讨论', context: {} })).ok, true)
   assert.deepEqual((await f.status(id)).task_context, {})
-  assert.ok(managed > beforeManagement, '显式退出专用任务后，状态入口应应用通用管理作用域')
-  assert.equal(released, beforeRelease, '通用管理不能释放为全部原生工具')
+  assert.equal(managed, beforeManagement, '通用管理不额外应用平台任务作用域')
+  assert.ok(released > beforeRelease, '退出专用任务后释放专用 Scope，使用原生 DSH 工具')
 })
 
 test('各类平台任务只装载一份共用表达正文，不写入用户消息或会话事实', async t => {
@@ -439,6 +449,39 @@ test('实例创建、启动和重启由助手内部预览冻结来源、端口�
     await f.rpc('confirm', { session_id: id, proposal_id: card.id })
     assert.equal(f.calls.filter(call => call.endpoint === 'instances/run' && call.input.name === request.name).length, 1)
   }
+})
+
+test('业务实例创建冻结来源摘要、访问方式并使用统一网关入口', async t => {
+  const contract = assistantActionContract('instances', 'run')
+  for (const key of ['business_control', 'access_mode', 'identity_mode']) assert.ok(contract.input_schema.properties[key], `${key} 应出现在实例合同`)
+  assert.deepEqual(contract.input_schema.properties.access_mode.enum, ['authenticated', 'anonymous'])
+  assert.deepEqual(contract.input_schema.properties.identity_mode.enum, ['development', 'published'])
+  const digest = 'sha256:' + 'b'.repeat(64)
+  const f = fixture(t, async endpoint => {
+    if (endpoint === 'instances/preview') return { ok: true, value: {
+      name: 'biz-one', operation: 'create', source_id: 'experiment:EXP-test-agent-001',
+      plan: { source_id: 'experiment:EXP-test-agent-001', port: 18600, business_control: { source_digest: digest } },
+      access_mode: 'anonymous', identity_mode: 'development',
+      model_selection: { provider: 'fixture', model: 'default' }, model_policy_hash: 'a'.repeat(64),
+    } }
+    if (endpoint === 'instances/url') return { ok: true, value: { url: 'http://172.16.138.228:53105/agents/security-operations-expert/instances/biz-one/', lan_access: true } }
+  })
+  const id = (await f.rpc('session', { task: '创建业务受控实例' })).value.session_id
+  const pending = f.execute(id, 'instances', 'run', { name: 'biz-one', operation: 'create', source: 'experiment:EXP-test-agent-001', port: 18600,
+    business_control: true, access_mode: 'anonymous', identity_mode: 'development' })
+  const card = await f.proposal(id)
+  assert.equal(card.input.business_control, true)
+  assert.equal(card.input.expected_source_digest, digest)
+  assert.equal(card.input.access_mode, 'anonymous')
+  assert.equal(card.input.identity_mode, 'development')
+  await f.rpc('confirm', { session_id: id, proposal_id: card.id })
+  const receipt = await pending
+  assert.equal(receipt.state, 'completed')
+  const run = f.calls.find(call => call.endpoint === 'instances/run')
+  assert.equal(run.input.business_control, true)
+  assert.equal(run.input.expected_source_digest, digest)
+  assert.equal(run.input.access_mode, 'anonymous')
+  assert.equal(receipt.result.value.entry_url, 'http://172.16.138.228:53105/agents/security-operations-expert/instances/biz-one/')
 })
 
 test('实例预览失败、对象变化和批量部分失败均不生成可执行提案', async t => {

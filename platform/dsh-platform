@@ -465,7 +465,7 @@ def check_mcp_store():
                for member in group.get("members", [])):
             raise PlatformError("公开 MCP 分组成员包含未知字段；保留原配置。")
     if not private_path.is_file():
-        raise PlatformError("本地 MCP 凭据缺失；请恢复 .local/credentials/mcp-manager.json 后重试。")
+        raise PlatformError("本地 MCP 凭据缺失；请运行平台 prepare 初始化，或从备份恢复 .local/credentials/mcp-manager.json。")
     private = read_mcp_store(private_path, "本地 MCP 凭据")
     if set(private) != {"schemaVersion", "sharedToken", "servers"} \
             or not isinstance(private.get("sharedToken"), str) or not isinstance(private.get("servers"), dict):
@@ -563,9 +563,7 @@ def migrate_mcp_patch_locked(profile):
         private = read_mcp_store(private_path, "本地 MCP 凭据")
         if split and private != expected_private:
             raise PlatformError("旧 Patch 与本地 MCP 凭据冲突；保留两份配置并人工核对。")
-    elif public_exists:
-        if public.get("servers") or public.get("groups") or split and expected_private["sharedToken"]:
-            raise PlatformError("本地 MCP 凭据缺失；请恢复 .local/credentials/mcp-manager.json，保留旧 Patch。")
+    # 本地凭据由 MCP 管理页维护：缺失时初始化为空并允许先进入平台，不阻断初始化。
     if split:
         backups = asset_root() / ".local/credentials/mcp-manager-patch-backups"
         if backups.is_symlink():
@@ -590,6 +588,8 @@ def migrate_mcp_patch_locked(profile):
             raise PlatformError("旧 MCP Patch 备份摘要或权限核对失败；保留原配置。")
     if not private_exists:
         create_mcp_json(private_path, expected_private, 0o600)
+        if not split and public_exists and (public.get("servers") or public.get("groups")):
+            print("未找到本地 MCP 凭据，已初始化为空；进入平台后可在 MCP 管理页补充服务凭据与分组 Token。", flush=True)
     if not public_exists:
         create_mcp_json(public_path, expected_public, 0o644)
     current_public, current_private = check_mcp_store()
@@ -651,6 +651,29 @@ def check_port(host, port):
             raise PlatformError(f"平台端口不可用：{host}:{port}；请停止占用进程或指定 --port。") from exc
 
 
+SENSITIVE_OUTPUT = re.compile(r"password|token|secret|api.?key|sk-", re.I)
+
+
+def build_command(label, command, **options):
+    """执行构建命令；完整输出留给启动终端，只向启动器回传一行可展示原因。"""
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, **options)
+    except OSError as exc:
+        raise PlatformError(f"{label}无法执行：{exc.strerror or exc}；平台 Profile 未更新。") from None
+    if not result.returncode:
+        return result
+    sys.stderr.write(result.stdout + result.stderr)
+    reason = ""
+    for stream in (result.stderr, result.stdout):
+        for line in reversed([line.strip() for line in (stream or "").splitlines() if line.strip()]):
+            if re.search(r"\[ERR_|error|failed|失败|无法", line, re.I) and not SENSITIVE_OUTPUT.search(line):
+                reason = "：" + re.sub(r"\s+", " ", line)[:300]
+                break
+        if reason:
+            break
+    raise PlatformError(f"{label}失败（退出码 {result.returncode}）{reason}；平台 Profile 未更新。")
+
+
 def prepare(home):
     check_workspace()
     executable, version = global_dsh(home)
@@ -660,11 +683,11 @@ def prepare(home):
         raise PlatformError("PATH 中没有 pnpm；请先安装插件构建工具。")
     if not (PLUGIN / "pnpm-lock.yaml").is_file():
         raise PlatformError(f"缺少插件依赖锁：{PLUGIN / 'pnpm-lock.yaml'}")
-    try:
-        subprocess.run([pnpm, "install", "--frozen-lockfile"], cwd=PLUGIN, check=True)
-        subprocess.run([pnpm, "run", "build"], cwd=PLUGIN, env=runtime_environment(home), check=True)
-    except (OSError, subprocess.CalledProcessError) as exc:
-        raise PlatformError("插件依赖安装或构建失败；平台 Profile 未更新。") from exc
+    # Web 基址适配的依赖在构建时按需安装；失败原因必须回传到启动器，不能只留一行笼统提示。
+    print("安装插件依赖…", flush=True)
+    build_command("插件依赖安装", [pnpm, "install", "--frozen-lockfile"], cwd=PLUGIN)
+    print("构建平台插件与 Web 基址适配…", flush=True)
+    build_command("插件构建", [pnpm, "run", "build"], cwd=PLUGIN, env=runtime_environment(home))
     for extension in workspace_extensions():
         extension_output(extension)
     check_artifacts()

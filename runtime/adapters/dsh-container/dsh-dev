@@ -1422,7 +1422,9 @@ def prepare_up(args: argparse.Namespace) -> tuple[dict, tuple[Path, dict] | None
                           or getattr(args, "lan_access", False) or getattr(args, "unsafe_no_auth", False)):
         fail("业务控制模式不能与归因、HOME 迁移、LAN 直连或免认证开关并用")
     # 受管业务单独使用 bridge 与签名上下文；既有研究实例保留原访问方式。
-    args.lan_access = args.unsafe_no_auth = args.skip_testing_notice = not args.analysis_workspace and not business_file
+    args.lan_access = args.unsafe_no_auth = not args.analysis_workspace and not business_file
+    # 业务实例同样跳过 Web 预览版说明；网关默认放行后该弹窗会直接可见。
+    args.skip_testing_notice = not args.analysis_workspace
     validate_trusted_host(getattr(args, "trusted_host", None))
     contract = resolve(args.source, repo=REPO)
     args.name = args.name or f"{contract['agent_id']}-{PURPOSES[args.mode]}"
@@ -2431,7 +2433,7 @@ def existing_instance(name: str) -> tuple[Path, dict] | None:
         return None
     manifest_path = target / "instance.json"
     if not manifest_path.is_file():
-        if set(path.name for path in target.iterdir()) <= {"dsh-home", "model.patch.yml"}:
+        if set(path.name for path in target.iterdir()) <= {"dsh-home", "model.patch.yml", "profile-compat"}:
             return None
         fail(f"实例目录已存在但缺少 instance.json：{target}")
     return load_instance(name)

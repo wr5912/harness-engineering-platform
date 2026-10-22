@@ -1,0 +1,18 @@
+[
+  {"id":"P01","input":"帮我审查这个 SKILL.md 是否存在触发误判并给出修改建议","expected_activation":true},
+  {"id":"P02","input":"对抗式 review 这个 Agent Skill，优先找设计上的反模式","expected_activation":true},
+  {"id":"P03","input":"MCP 工具改名后这个 skill 经常失效，帮我排查耦合","expected_activation":true},
+  {"id":"P04","input":"这个 skill 需要十几个 MCP 工具串行执行，是否应该改成组合 MCP？","expected_activation":true},
+  {"id":"P05","input":"把这份技能精简一下，保留必要的行为约束","expected_activation":true},
+  {"id":"P06","input":"给我一组能验证 Skill 触发与产物质量的回归测试","expected_activation":true},
+  {"id":"N01","input":"请创建一个全新的日报摘要 Skill","expected_activation":false},
+  {"id":"N02","input":"什么是 MCP 协议？","expected_activation":false},
+  {"id":"N03","input":"把这个 Python 函数进行常规代码审查","expected_activation":false},
+  {"id":"N04","input":"帮我直接发布 MCP 服务到生产环境","expected_activation":false},
+  {"id":"N05","input":"设计一个 DSH 智能体运行平台 Logo","expected_activation":false},
+  {"id":"N06","input":"解释什么叫做渐进披露","expected_activation":false},
+  {"id":"E01","input":"只根据这两段 SKILL.md 内容提出可能的问题，不要宣称已运行测试","expected_activation":true},
+  {"id":"E02","input":"审查一个引用了稳定 MCP 工具名的 Skill，判断是否真的需要动态发现","expected_activation":true},
+  {"id":"E03","input":"仅给出最小修改 Diff，不要改我的原始文件","expected_activation":true},
+  {"id":"E04","input":"这个 Skill 中没有可执行脚本，是否还必须创建 scripts/？","expected_activation":true}
+]

@@ -12,6 +12,9 @@ import { mcpCredentialEdit } from './mcp.ts'
 import { assertTaskBudget, parseTaskPlan, taskAllows, taskCandidatePath, type TaskExecution } from './task.ts'
 import { completedTaskModelView } from './task-model-view.ts'
 import { deliveryProjection, deliveryProjectionSchema, readInstanceDeliveryHistory, type DeliveryHistoryReader, type DeliveryProjection } from './delivery-history.ts'
+
+// 助手工具在平台自己的管理会话内执行，不是外部客户端连接；以平台管理身份调用管理接口。
+const managementPeer = { principal: { kind: 'owner' } } as unknown as Parameters<ConnectionRpcHandler>[3]
 import { rollbackTaskAssets } from '../tasks/assembly.ts'
 import { assistantConfiguration, assertAssistantConfigured, managementPrinciples, managementSkill, managementSkillRoot, type NativeSkills } from './business-assets.ts'
 import { DECISION_EXTRACTION_ACTIONS } from './extraction-scope.ts'
@@ -38,7 +41,6 @@ export interface AssistantServices {
   scopeExtraction?(agent: any): void
   scopeComputeVariants?(agent: any): void
   scopeFeatures?(agent: any): void
-  scopeTaskBuilder?(agent: any): void
   releaseTaskScope?(agent: any): void
   notify(domains: string[], ids?: string[]): void
   mcp?: (action: string, input: MapValue, signal: AbortSignal) => Promise<any>
@@ -183,7 +185,21 @@ function freezeInstanceOperation(input: MapValue, preview: any): MapValue {
       || typeof hash !== 'string' || !/^[0-9a-f]{64}$/.test(hash)) throw new Error('实例预览缺少已核对的模型设置，请重新提交操作')
     if (input.model_selection && (input.model_selection.provider !== selected.provider || input.model_selection.model !== selected.model
       || input.model_selection.reasoningEffort !== selected.reasoningEffort)) throw new Error('实例预览模型与请求不一致，请重新提交操作')
-    return { ...input, expected_source_id: source, port, model_selection: selected, expected_model_policy_hash: hash }
+    const business = input.business_control === true || Boolean(value.plan?.business_control)
+    if (business) {
+      const digest = value.plan?.business_control?.source_digest
+      if (typeof digest !== 'string' || !digest) throw new Error('业务实例预览缺少来源摘要，请重新核对')
+      const frozen: MapValue = { ...input, business_control: true, expected_source_id: source, port, model_selection: selected,
+        expected_model_policy_hash: hash, expected_source_digest: digest }
+      if (input.operation === 'create') {
+        if (!['authenticated', 'anonymous'].includes(value.access_mode)) throw new Error('业务实例预览缺少访问方式，请重新核对')
+        if (!['development', 'published'].includes(value.identity_mode)) throw new Error('业务实例预览缺少身份验证阶段，请重新核对')
+        frozen.access_mode = value.access_mode
+        frozen.identity_mode = value.identity_mode
+      }
+      return frozen
+    }
+    return { ...input, business_control: false, expected_source_id: source, port, model_selection: selected, expected_model_policy_hash: hash }
   }
   if (input.operation === 'stop') {
     if (!['running', 'stopped', 'absent', 'failed'].includes(value.observed_state) || !value.observed_at) throw new Error('实例预览缺少当前状态，请重新提交操作')
@@ -247,7 +263,6 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
     if (state.task_context.skill === 'decision-sample-extraction') services.scopeExtraction?.(found.agent)
     else if (state.task_context.skill === 'compute-variant-research') services.scopeComputeVariants?.(found.agent)
     else if (state.task_context.skill === 'agent-maintenance' && state.task_context.workflow === 'features') services.scopeFeatures?.(found.agent)
-    else if (state.active) services.scopeTaskBuilder?.(found.agent)
     else services.releaseTaskScope?.(found.agent)
     return { session, state }
   }
@@ -588,7 +603,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
       if (domain === 'mcp' && services.mcp && (['configuration', 'saveConfiguration', 'test', 'resources', 'resourceTemplates', 'readResource', 'callTool'].includes(action) || action.startsWith('sources/') || action.startsWith('control/'))) {
         return await services.mcp!(action, input, signal)
       }
-      return await platform(`${domain}/${action}`, input, signal, peer)
+      return await platform(`${domain}/${action}`, input, signal, peer ?? managementPeer)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       const safe = redactAssistant(message)
@@ -908,9 +923,16 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
       started = true
       if (waiting) waiting.executing = true
       // 浏览器请求断连不取消仍在运行的原工具；用户停止会话时由工具信号取消。
-      const receipt = proposal.domain === 'task' && proposal.action === 'start'
+      let receipt = proposal.domain === 'task' && proposal.action === 'start'
         ? await startTask(id, proposal.input, operationSignal)
         : await dispatch(proposal.domain, proposal.action, { ...proposal.input, confirmed: true }, operationSignal)
+      if (proposal.domain === 'instances' && ['create', 'start', 'restart'].includes(proposal.input.operation)
+        && receipt.ok && proposal.input.business_control === true) {
+        const entry = await dispatch('instances', 'url', { name: proposal.input.name }, operationSignal)
+        receipt = entry.ok && typeof entry.value?.url === 'string'
+          ? { ...receipt, value: { ...(receipt.value ?? {}), entry_url: entry.value.url } }
+          : { ...receipt, value: { ...(receipt.value ?? {}), entry_url_error: entry.ok === false ? entry.error.message : '统一网关入口未返回' } }
+      }
       const successful = !receiptFailed(receipt)
       const settlement = { ...proposal, kind: 'settlement', state: successful ? 'completed' : 'failed', result: redactAssistant(receipt) }
       await record(id, settlement)

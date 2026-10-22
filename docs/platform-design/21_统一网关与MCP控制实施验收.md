@@ -31,9 +31,38 @@
 
 v3 页面另显示“语音连接不可用，请重新启用插件”。受管网关当前未开放 `voiceMode/follow`，该提示所涉语音路径不在本次普通聊天验收内；语音订阅在锁定版插件中按广播发送，不能仅为消除提示而开放访问。此现象不影响上述文本对话结果，后续若要求语音可用，需单独核对会话归属和网关接入。
 
+### 业务实例插件清单读取整改（2026-10-22）
+
+业务实例 `security-operations-expert-024-v2` 的侧边栏“插件”页面只显示部分内置配置，底部报“可能由于网络问题，无法读取全部插件”，语音相关条目未完整呈现。浏览器经 53105 网关复现并抓取请求后确认：`pluginInventory/list`、`pluginManager/listBundles`、`pluginManager/listPlugins` 均返回 `remote-access/denied`（原因 `business-access-denied`），页面把读取被拒显示为网络错误；共用业务 Runtime 的只读动作白名单此前不包含这三个动作。
+
+整改在只读动作白名单中加入上述三个动作，安装、启停、卸载等写操作仍不在白名单内。重新构建平台插件并重启该实例后，浏览器经网关打开插件页显示 5 项内置插件配置与 4 项实验性插件（含“语音输入”，语音摘要性播报同时可见），不再出现读取错误；点击实验性插件开关返回 `启用失败：remote access: pluginManager/setBundleEnabled: access denied`，确认业务实例仍不能修改插件。插件全量测试 812/812 通过，[插件页截图](../../platform/plugin/test/evidence/business-plugin-inventory-20261022.png)。
+
+边界：本次只在该实例实机核对，其他业务实例需重启后生效；插件页仍呈现原生管理操作入口，点击后显示 DSH 原生拒绝信息，尚未按只读语义隐藏；插件启停与安装仍不在业务实例开放范围，业务能力由固定来源与平台资产决定。
+
+### 业务实例语音端点与自动化任务开放（2026-10-22）
+
+“进入语音模式失败：HTTP（请求状态）403”“自动播报切换失败”“朗读这条回复失败：cross-origin request denied”来自语音插件的三个自定义端点 `/voice-mode/toggle`、`/voice-mode/read-toggle`、`/voice-mode/read-once`。这些端点做 Origin 同源校验；网关转发时把 Host 重建为容器回环地址并删除调用方的 `X-Forwarded-*`，浏览器 Origin 因此与请求 Host 不一致，三个端点均以 `cross-origin request denied` 拒绝。整改在网关 `prepare` 删除调用方转发头后，以受信公开来源重建 `x-forwarded-host` 与 `x-forwarded-proto`。验证：三个端点经 53105 网关返回 200；真实页面“开启后续回复自动播报”与“朗读这条回复”均成功（`read-toggle`、`read-once` 返回 200）；进入语音模式仍因当前环境没有可用麦克风与语音识别服务显示“语音模式启动失败”，未验证识别链路，[自动播报与朗读截图](../../platform/plugin/test/evidence/business-voice-read-20261022.png)。
+
+自动化任务按用户要求先行开放，暂不补齐投递前授权重验与任务目录按用户过滤：业务 Patch 不再停用 `schedule`、`ui-schedule`、`tool-schedule`，业务 Runtime 移除“不得装载定时投递服务”检查，只读动作白名单加入 `schedule/list`、`schedule/catalog`、`schedule/history`、`schedule/delete`、`schedule/update` 与 `event:schedule/changed`，工具 Guard 放行四个 `schedule_*` 工具，`analyze_pending_threat_incidents` 继续拒绝。经平台“重启”重新生成实例 Patch 后，侧边栏出现“自动化任务”，任务页空状态正常；会话中模型调用 `schedule_create` 创建“测试提醒”（2 分钟后到期），任务页显示该任务，`schedule/list` 与 `schedule/catalog` 返回 200。到期后任务存储写入 `deliveredAt` 与投递消息标识，原 Session 收到提醒；另建 60 秒任务并停留在任务页，状态从“23 秒后”自动更新为“已结束”，无需手动刷新，[任务页截图](../../platform/plugin/test/evidence/business-schedule-live-20261022.png)。两次任务均按计划到期，投递到原访客 Session，未向其他会话串发。
+
+未补齐条件带来的缺口与后续完成条件见 [05 的定时任务边界](05_实施路线与迭代计划.md#首期定时任务边界与影响)。
+
+### 业务实例巡检授权与 MCP 迁移整改（2026-10-22）
+
+实例 `security-operations-expert` 的匿名会话执行“执行一次常规巡检”时，目录查询返回“当前请求未获业务许可”，未发起巡检。排查确认两个叠加原因：
+
+- 业务访问控制的 `operations` 仍绑定 Mock 联调地址 `http://172.17.0.1:53101/mcp/inspection/`，而平台 MCP 配置的 `inspection` 服务地址是 `http://172.16.138.232:18150/mcp/inspection`，工具调用因目标不一致被 `operation_binding_changed` 拒绝；`start_inspection` 与 `get_inspection_result` 也未登记。
+- 开发调试实例的匿名访客原先只允许聊天动作，巡检工具属于 `read`，即使操作登记正确也会被 `agent_forbidden` 拒绝。
+
+整改按平台 MCP 实际地址重新登记 `list_executable_inspections`、`get_inspection_result`、`start_inspection` 三项操作及当前工具 schema 摘要；`core.ts` 的开发调试分支改为匿名访客与认证用户一样按 Agent 规则动作授权，未配置 Agent 规则时仍只开放聊天动作，写与发布继续受动作、操作和风险规则约束，网关首页文案同步。相关测试断言更新后全量 **812/812** 通过。
+
+验证：新会话的目录查询返回 5 个巡检模板；“执行一次常规巡检”完成，返回 `runId run-8b90791dcf0e4e1884ef51a5f66e6a5c` 与 HTML 报告地址，巡检结果为 ABNORMAL / PARTIAL（5 台离线、1 台在线状态证据缺口、基线均无报告），[巡检结果截图](../../platform/plugin/test/evidence/business-inspection-20261022.png)。这只证明匿名开发实例的巡检工具授权与调用链，不证明巡检业务结论正确。
+
+未补齐：`start_inspection` 当前按只读登记，未按写操作执行风险评估；风险提供方仍指向已停止的 Mock 地址；操作登记的地址与 schema 摘要需随平台 MCP 服务变化手工同步，尚无自动同步机制，本次根因即迁移后未同步；报告下载地址由上游直接返回，未改写到业务网关的归属下载入口。
+
 旧 Candidate 的 `sec-ops` 与 `inspection` 私网目标在本机连接超时。联调曾只在平台 MCP 配置的这两项连接上暂时改接已有 Mock 接口，保持服务 ID、工具范围和凭据字段，通过新业务 Session 验证装载；测试后已将当前配置和凭据恢复到联调前摘要。本次 Mock 只证明隔离外部依赖后的技术链路，真实 SOC 查询、回写及报告效果尚未验证。
 
-DSH 原生 Schedule 已提供任务存储、定时器、Session 绑定和恢复机制；本轮核对锁定版公开接缝后，仍缺少受控业务模式所需的投递前授权重验和按用户过滤任务目录的完整接入点。因此当前受控 Profile 不启动 Schedule 服务、工具与页面，不另建调度器；旧研究实例保留其原生任务。无人值守巡检与定时报表的缺口、影响和后续完成条件仍由 [05 的首期定时任务边界](05_实施路线与迭代计划.md#首期定时任务边界与影响)维护。
+DSH 原生 Schedule 已提供任务存储、定时器、Session 绑定和恢复机制；当时核对锁定版公开接缝后，受控业务模式仍缺少投递前授权重验和按用户过滤任务目录的完整接入点。2026-10-22 已按用户要求先行开放自动化任务并保留这些缺口，当前限制与后续完成条件由 [05 的定时任务边界](05_实施路线与迭代计划.md#首期定时任务边界与影响)维护；旧研究实例继续保留其原生任务。
 
 ## 2026-10-19 初次交付与部署
 
