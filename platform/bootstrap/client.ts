@@ -20,7 +20,7 @@ function bootstrapClient() {
     for (const field of Array.from(form.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input,button'))) field.disabled = applying || entering
     previewButton.disabled = checking || applying || entering
     applyButton.disabled = checking || applying || entering || !plan?.canApply
-    get<HTMLButtonElement>('refresh').disabled = applying || entering
+    get<HTMLButtonElement>('refresh').disabled = checking || applying || entering
     get<HTMLElement>('repository-field').hidden = action() !== 'clone'
     repository.required = action() === 'clone'
     get<HTMLElement>('account').hidden = !needsAccount
@@ -107,6 +107,7 @@ function bootstrapClient() {
       statusText.textContent = applying ? '正在初始化工作区并准备平台，请保留此页面…' : '先检查工作区，再确认初始化。'
       if (state.error) message(state.error)
       controls()
+      if (initial && action() === 'existing' && !applying && !state.error && state.checks?.some((item: any) => item.id === 'workspace.json' && item.status === 'ok')) form.requestSubmit()
     } catch (error) {
       try { if (await loginReady()) { window.location.assign(normalUrl); return } } catch { /* 平台接续前登录入口可能尚未监听。 */ }
       if (applying) {

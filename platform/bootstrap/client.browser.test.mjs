@@ -12,10 +12,18 @@ const program = fileURLToPath(new URL('../../', import.meta.url))
 const evidence = process.env.HARNESS_BOOTSTRAP_EVIDENCE
 const browserTest = (name, run) => test(name, { skip: !modulePath && '设置 HARNESS_BROWSER_MODULE 后执行隔离浏览器验收', timeout: 45_000 }, run)
 
-async function fixture(t, { delay = 150, failPrepareOnce = false } = {}) {
+async function fixture(t, { delay = 150, failPrepareOnce = false, existingWorkspace = false } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'harness-bootstrap-ui-'))
   const home = join(directory, 'home'), root = join(directory, 'data'), result = join(directory, 'result.json')
   await mkdir(home)
+  if (existingWorkspace) {
+    await mkdir(join(root, 'config'), { recursive: true })
+    await writeFile(join(root, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: 'workspace-fixture', legacyRoots: [], extensions: [] }))
+    await writeFile(join(root, 'config/sites.json'), JSON.stringify({ assistant: '/assistant/', platform: '/hep/' }))
+    await writeFile(join(root, 'config/sources.json'), JSON.stringify({ schema_version: '1.1', sources: {} }))
+    await writeFile(join(root, 'config/mcp-compositions.json'), JSON.stringify({ schema_version: '1.0', compositions: [] }))
+    execFileSync('git', ['-c', 'core.hooksPath=/dev/null', 'init', '-q', root])
+  }
   const launcher = join(directory, 'serve.mjs')
   await writeFile(launcher, `
 import { createBootstrapServer } from ${JSON.stringify(pathToFileURL(join(program, 'platform/bootstrap/server.ts')).href)}
@@ -65,6 +73,24 @@ async function entered(page) {
   try { await page.getByRole('heading', { name: '平台已就绪' }).waitFor({ timeout: 10_000 }) }
   catch { throw new Error(`平台尚未接续：${await page.locator('body').innerText()}`) }
 }
+
+browserTest('已有工作区完成状态检查后自动预览，填写账号即可确认初始化', async t => {
+  const fx = await fixture(t, { existingWorkspace: true }), { page } = fx
+  await page.waitForFunction(() => !document.querySelector('#plan').hidden && !document.querySelector('#apply').disabled)
+  assert.match(await page.locator('#changes').innerText(), /本地账号文件/)
+  await assert.rejects(stat(join(fx.root, '.local/credentials/admin.json')), { code: 'ENOENT' })
+  await account(page)
+  assert.equal(await page.locator('#apply').isEnabled(), true)
+  await screenshot(page, 'bootstrap-existing-preview.png')
+  assert.equal('account' in fx.requests.find(request => request.url.endsWith('/preview')).data, false)
+  await page.click('#refresh')
+  await page.waitForFunction(() => !document.querySelector('#plan').hidden && !document.querySelector('#apply').disabled)
+  await page.click('#apply')
+  await entered(page)
+  assert.equal(fx.requests.filter(request => request.url.endsWith('/preview')).length, 2)
+  assert.equal(fx.requests.filter(request => request.url.endsWith('/apply')).length, 1)
+  assert.deepEqual(fx.errors, [])
+})
 
 browserTest('引导页预览、刷新失效、密码边界与空白工作区进入平台', async t => {
   const fx = await fixture(t), { page } = fx
