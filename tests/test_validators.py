@@ -18,10 +18,11 @@ from unittest import mock
 import uuid
 import zipfile
 from pathlib import Path
+from asset_fixture import historical_assets
 
 
 ROOT = Path(__file__).resolve().parents[1]
-ASSETS = Path(os.environ.get("HARNESS_ASSET_ROOT", Path.home() / "harness-engineering-platform-data")).expanduser().resolve()
+ASSETS = historical_assets()
 INSPECT_SOURCE = ROOT / "runtime/research/inspect_source.py"
 VALIDATE_REPOSITORY = ROOT / "runtime/research/validate_repository.py"
 VALIDATE_EXPERIMENT = ROOT / "runtime/research/validate_experiment.py"
@@ -264,7 +265,7 @@ class RepositoryValidatorTests(unittest.TestCase):
 
     def test_current_repository_passes_project_contract(self) -> None:
         # 程序合同由 HARNESS_PROGRAM_ROOT 定位，业务资产从独立数据根读取。
-        completed, payload = run_json(VALIDATE_REPOSITORY, ASSETS)
+        completed, payload = run_json(VALIDATE_REPOSITORY, ROOT)
         self.assertEqual(completed.returncode, 0, json.dumps(payload, ensure_ascii=False, indent=2))
         self.assertTrue(payload["valid"])
         self.assertIn("不代表 Experiment 结果", payload["scope"])

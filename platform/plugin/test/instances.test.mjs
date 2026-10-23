@@ -63,15 +63,16 @@ if (args[0] === 'ps') {
   ]})
 } else if (args[0] === 'up') {
   const dry = args.includes('--dry-run')
+  const sourceDigest = require('node:fs').existsSync(require('node:path').join(__dirname, 'next-source-digest')) ? 'sha256:' + 'c'.repeat(64) : 'sha256:' + 'a'.repeat(64)
   const business = args.includes('--business-control')
   const name = args[args.indexOf('--name') + 1]
   const source = args[args.indexOf('--source') + 1]
-  if (dry) out({args, name, source_id:source, image_tag:'dsh:locked', port:3199, mounts:[{container:'/work/harness/workspace', mode:'ro'}], state_dir:'state', ...(business ? { business_control: { source_digest: 'sha256:' + 'a'.repeat(64) } } : {})})
+  if (dry) out({args, name, source_id:source, image_tag:'dsh:locked', port:3199, mounts:[{container:'/work/harness/workspace', mode:'ro'}], state_dir:'state', ...(business ? { business_control: { source_digest: sourceDigest } } : {})})
   else {
     if (business) {
       const file = require('node:path').join(process.env.XDG_STATE_HOME, 'dsh-dev', name, 'instance.json')
       require('node:fs').mkdirSync(require('node:path').dirname(file), {recursive:true})
-      require('node:fs').writeFileSync(file, JSON.stringify({name, source_id:source, agent_id:'real-agent', asset_root:process.env.HARNESS_ASSET_ROOT, port:3199, web_base_path:'/agents/real-agent/instances/' + name + '/', business_control:{source_digest:'sha256:' + 'a'.repeat(64), runtime_generation:'generation-new', origin:'http://127.0.0.1:3199', launch_config_file:args[args.indexOf('--business-control')+1]}}))
+      require('node:fs').writeFileSync(file, JSON.stringify({name, source_id:source, agent_id:'real-agent', asset_root:process.env.HARNESS_ASSET_ROOT, port:3199, web_base_path:'/agents/real-agent/instances/' + name + '/', business_control:{source_digest:sourceDigest, runtime_generation:'generation-new', origin:'http://127.0.0.1:3199', launch_config_file:args[args.indexOf('--business-control')+1]}}))
     }
     process.stdout.write(JSON.stringify({warning:'first'}) + '\\n' + JSON.stringify({name, dsh_running:true, token:'receipt-secret'}) + '\\n'); process.stderr.write(JSON.stringify({hint:'not a receipt'}) + '\\n') }
 } else if (args[0] === 'down') {
@@ -278,13 +279,18 @@ test('平台创建受控实例后原子登记来源，沿用当前管理入口�
   assert.equal(restartPreview.value.identity_mode, 'development')
   assert.equal((await handler('run', { ...restart, expected_source_id: source, expected_source_digest: restartPreview.value.plan.business_control.source_digest }, signal)).value.ok, true)
   assert.equal(JSON.parse(readFileSync(accessPath, 'utf8')).gateway.instances.length, 1)
-  assert.equal(JSON.parse(readFileSync(accessPath, 'utf8')).gateway.instances[0].accessMode, 'anonymous', '同名实例重启保留访客访问方式')
+  assert.equal(JSON.parse(readFileSync(accessPath, 'utf8')).gateway.instances[0].accessMode, 'anonymous', '同名实例重启保留无需认证方式')
   assert.equal(JSON.parse(readFileSync(accessPath, 'utf8')).gateway.instances[0].identityMode, 'development', '同名实例重启保留开发阶段')
+  writeFileSync(join(fx.root, 'runtime/adapters/dsh-container/next-source-digest'), 'changed')
+  const refreshed = await handler('preview', restart, signal)
+  assert.equal(refreshed.value.plan.business_control.source_digest, 'sha256:' + 'c'.repeat(64))
+  assert.equal((await handler('run', { ...restart, expected_source_digest: refreshed.value.plan.business_control.source_digest }, signal)).value.ok, true)
+  assert.equal(JSON.parse(readFileSync(accessPath, 'utf8')).gateway.instances[0].sourceDigest, 'sha256:' + 'c'.repeat(64))
   const conflicting = JSON.parse(readFileSync(accessPath, 'utf8'))
   conflicting.gateway.instances[0].sourceDigest = 'sha256:' + 'b'.repeat(64)
   writeFileSync(accessPath, JSON.stringify(conflicting))
   const callsBeforeConflict = readFileSync(join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls'), 'utf8')
-  const rejected = await handler('run', { ...restart, expected_source_id: source, expected_source_digest: restartPreview.value.plan.business_control.source_digest }, signal)
+  const rejected = await handler('run', { ...restart, expected_source_id: source, expected_source_digest: refreshed.value.plan.business_control.source_digest }, signal)
   assert.equal(rejected.value.ok, false)
   assert.match(rejected.value.error.message, /业务网关中同名实例的来源、访问方式或实例阶段不一致/)
   const mutatingCalls = value => value.trim().split('\n').map(line => JSON.parse(line))

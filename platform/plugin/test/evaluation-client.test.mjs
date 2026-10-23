@@ -543,7 +543,7 @@ test('未完成 Run 的部分通过摘要不成为列表、详情或对照的整
     for (const run of partial) {
       const row = rows.find(node => ui.nodes(node).some(child => child.type === 'button' && child.props.title === run.run_id))
       assert.match(ui.text(row), /尚无结论/)
-      assert.equal(row.props.children[3].props.children.props['data-state'], 'unknown')
+      assert.equal(ui.nodes(row).find(node => node.type === 'td' && node.props['data-label'] === '评测结论').props.children.at(-1).props['data-state'], 'unknown')
     }
     assert.match(ui.text(rows.find(node => ui.nodes(node).some(child => child.type === 'button' && child.props.title === runB))), /1 通过 \/ 0 未通过 \/ 0 无法判定 \/ 1 待核对.*部分记录，非最终结论/)
     assert.match(ui.text(rows.find(node => ui.nodes(node).some(child => child.type === 'button' && child.props.title === runA))), /通过/)
@@ -1296,5 +1296,37 @@ test('Run 汇总读取失败保留上次列表并显示错误', async () => {
     ui.invalidate(['agents']); await ui.settle()
     assert.match(ui.text(), /Run 列表读取失败：network: 暂时不可达/)
     assert.match(ui.text(), /评测记录\s*2/, '读取失败不得清空上次看到的记录')
+  } finally { ui.cleanup() }
+})
+
+test('刷新排队后隐藏时暂停，重新进入只补一次', async () => {
+  const ui = workbench()
+  try {
+    await ui.settle()
+    const count = () => ui.calls.filter(call => call.action === 'runs/overview').length
+    const before = count()
+    ui.invalidate(['agents']); ui.render()
+    ui.setActive(false); await ui.settle()
+    assert.equal(count(), before)
+    ui.setActive(true); await ui.settle()
+    assert.equal(count(), before + 1)
+  } finally { ui.cleanup() }
+})
+
+test('坏记录保留带提示的旧行，其余记录更新，恢复后清除提示', async () => {
+  let broken = false
+  const ui = workbench({ handler: async (action, payload, original) => {
+    const value = await original(action, payload)
+    if (action !== 'runs/overview' || !broken) return value
+    return { agents: value.agents.filter(agent => agent.agent_id !== 'alpha'), errors: [{ agent_id: 'alpha', experiment_id: expA, run_id: runA, path: 'run.yaml', error: '清单暂不可读' }] }
+  } })
+  try {
+    await ui.settle(); broken = true
+    ui.invalidate(['agents']); await ui.settle()
+    assert.match(ui.text(), /评测记录\s*2/)
+    assert.match(ui.text(), /部分记录读取失败/)
+    assert.match(ui.text(), /上次读取结果，当前记录暂不可读/)
+    broken = false; ui.invalidate(['agents']); await ui.settle()
+    assert.doesNotMatch(ui.text(), /当前记录暂不可读|部分记录读取失败/)
   } finally { ui.cleanup() }
 })

@@ -1457,14 +1457,15 @@ def prepare_up(args: argparse.Namespace) -> tuple[dict, tuple[Path, dict] | None
         home = instance_dir(args.name) / "dsh-home"
         if current is None and (home.is_symlink() or home.exists() and (not home.is_dir() or any(home.iterdir()))):
             fail("首期业务控制模式只接受新的独立 HOME，不接管旧运行状态")
-        launch = business_helper(business_file, {"sourcePaths": {key: contract[key] for key in ("workspace", "presets", "managed")}})
+        launch = business_helper(business_file, {"name": args.name, "agentId": contract["agent_id"],
+                                               "sourcePaths": {key: contract[key] for key in ("workspace", "presets", "managed")}})
         if launch["assetRoot"] != str(REPO):
             fail("业务启动配置的数据根必须与当前 --repo 一致")
         contract["business_control"] = {
             "config_file": str(Path(business_file).resolve()), "source_digest": launch["sourceDigest"],
             "runtime_generation": (current[1]["business_control"]["runtime_generation"] if current else secrets.token_hex(16)),
         }
-        if current is not None and current[1]["business_control"].get("source_digest") != launch["sourceDigest"]:
+        if current is not None and current[1]["business_control"].get("source_digest") != launch["sourceDigest"] and not launch.get("development"):
             fail("业务来源资产与实例固定摘要不一致；保留旧实例及 Session，请以新实例名创建新版本")
     if args.port is None:
         if current is not None:
@@ -1552,9 +1553,9 @@ def build_plan(args: argparse.Namespace, contract: dict) -> dict:
     if contract.get("business_control"):
         plan.update({"business_control": {"runtime_generation": contract["business_control"]["runtime_generation"],
                                          "source_digest": contract["business_control"]["source_digest"],
-                                         "scheduling_supported": False},
+                                         "scheduling_supported": True},
                      "network": "private bridge (host port 127.0.0.1 only)",
-                     "risk": "即时任务经签名业务网关执行；首期不支持定时任务检测、防护闭环，后台巡检与报表需手动发起。"})
+                     "risk": "即时任务与原生 Schedule 经签名业务通道执行；尚未验证定时检测、防护闭环。当前能力边界见 docs/platform-design/05_实施路线与迭代计划.md。"})
     return plan
 
 
@@ -1574,6 +1575,7 @@ def render_business_instance(contract: dict, name: str, port: int, compose: str)
     return business_helper(config["config_file"], {
         "name": name, "agentId": contract["agent_id"], "workspaceId": workspace_id(REPO),
         "sourceDigest": config["source_digest"], "runtimeGeneration": config["runtime_generation"],
+        "managedPatch": str(Path(contract["managed"]) / Path(contract["patch"]).relative_to("/opt/dsh-managed")),
         "port": port, "compose": compose, "profileManifest": contract.get("profile_manifest", str(ADAPTER / "verification-home-controls/web-profile.package.json")),
         "presetId": session_preset(contract, "verification"),
         "runtimeSettings": str(instance_dir(name) / "dsh-home/profiles/web/cordis.patch.yml"),
@@ -2641,7 +2643,7 @@ def main() -> None:
     build = commands.add_parser("image", help="构建锁定 DSH 镜像")
     build_sub = build.add_subparsers(dest="image_command", required=True)
     build_parser = build_sub.add_parser("build")
-    build_parser.add_argument("--source", default="EXP-security-operations-expert-001")
+    build_parser.add_argument("--source", default="")
     build_parser.set_defaults(handler=command_image_build)
 
     up = commands.add_parser("up", help="启动实例（可用 --dry-run 预览）")

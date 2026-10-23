@@ -725,20 +725,32 @@ def run_index_facts(run_dir: Path, manifest: dict) -> dict:
     return facts
 
 
-def agent_experiments(repo: Path, agent: str) -> list[dict]:
+def agent_experiments(repo: Path, agent: str, errors: list[dict] | None = None) -> list[dict]:
+    errors = errors if errors is not None else []
     experiments = []
     for root in sorted((repo / "evolution/experiments").glob(f"EXP-{agent}-*")):
         match = EXPERIMENT_RE.fullmatch(root.name)
         if not root.is_dir() or root.is_symlink() or not match or match.group(1) != agent:
             continue
-        change = read_change_yaml(root / "change.yaml")
+        try:
+            change = read_change_yaml(root / "change.yaml")
+        except (OSError, ValueError, yaml.YAMLError) as exc:
+            errors.append({"agent_id": agent, "experiment_id": root.name,
+                           "path": (root / "change.yaml").relative_to(repo).as_posix(),
+                           "error": f"版本清单暂不可读（{type(exc).__name__}）"})
+            continue
         runs = []
         for path in sorted((root / "runs").glob("run-*/run.yaml")):
             if path.is_symlink() or path.parent.is_symlink():
                 continue
-            manifest = read_flat_yaml(path)
-            runs.append({**{key: manifest.get(key) for key in ("run_id", "status", "created_at", "finished_at")},
-                         **run_index_facts(path.parent, manifest)})
+            try:
+                manifest = read_flat_yaml(path)
+                runs.append({**{key: manifest.get(key) for key in ("run_id", "status", "created_at", "finished_at")},
+                             **run_index_facts(path.parent, manifest)})
+            except (OSError, ValueError, TypeError, KeyError) as exc:
+                errors.append({"agent_id": agent, "experiment_id": root.name, "run_id": path.parent.name,
+                               "path": path.relative_to(repo).as_posix(),
+                               "error": f"运行记录暂不可读（{type(exc).__name__}）"})
         experiments.append({"experiment_id": root.name, "status": change.get("status"), "runs": runs})
     return experiments
 
@@ -746,20 +758,27 @@ def agent_experiments(repo: Path, agent: str) -> list[dict]:
 def command_index(repo: Path, args: argparse.Namespace) -> None:
     if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", args.agent):
         raise ValueError("agent 必须是小写 kebab-case")
+    errors = []
+    experiments = agent_experiments(repo, args.agent, errors)
     print(json.dumps({"agent_id": args.agent, "evaluation_path": f"agents/{args.agent}/evaluation.md",
-                      "experiments": agent_experiments(repo, args.agent)}, ensure_ascii=False, indent=2))
+                      "experiments": experiments, "errors": errors}, ensure_ascii=False, indent=2))
 
 
 def command_overview(repo: Path) -> None:
     """一次列出全部 Agent 的 Run 索引；页面汇总读取不按 Agent 重复启动解析进程。"""
     agents = []
+    errors = []
     for path in sorted((repo / "agents").glob("*")):
         agent = path.name
         if not path.is_dir() or path.is_symlink() or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", agent):
             continue
-        agents.append({"agent_id": agent, "evaluation_path": f"agents/{agent}/evaluation.md",
-                       "experiments": agent_experiments(repo, agent)})
-    print(json.dumps({"agents": agents}, ensure_ascii=False, indent=2))
+        try:
+            experiments = agent_experiments(repo, agent, errors)
+            agents.append({"agent_id": agent, "evaluation_path": f"agents/{agent}/evaluation.md", "experiments": experiments})
+        except (OSError, ValueError) as exc:
+            errors.append({"agent_id": agent, "path": f"agents/{agent}",
+                           "error": f"智能体记录暂不可读（{type(exc).__name__}）"})
+    print(json.dumps({"agents": agents, "errors": errors}, ensure_ascii=False, indent=2))
 
 
 def command_show(repo: Path, args: argparse.Namespace) -> None:

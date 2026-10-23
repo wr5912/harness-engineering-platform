@@ -1,12 +1,12 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join, resolve, sep } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { copyTree } from './fsutil.mts'
 import { readManifest, verifyEntries } from './manifest.mts'
 import { rewriteKnownPaths, scanKnownOldPaths } from './paths.mts'
 import { installRuntime } from './runtime.mts'
-import { dockerAvailable, loadImage, inspectImage, verifyImageInfo } from './image.mts'
+import { dockerAvailable, loadVerifiedImage } from './image.mts'
 import { assertRealWorkspace } from './data.mts'
 
 export interface InstallOptions {
@@ -53,8 +53,12 @@ export function install(options: InstallOptions): InstallReport {
   }
   const problems = verifyEntries(bundleRoot, manifest.files, ['manifest.json'])
   if (problems.length) throw new Error(`安装包校验失败：\n${problems.slice(0, 20).join('\n')}`)
+  if (manifest.image && (!manifest.image.tag || !manifest.image.id || !manifest.image.fingerprint || manifest.image.arch !== manifest.package.arch)) {
+    throw new Error('安装包镜像身份不完整或架构不符；请使用标准 Runtime 镜像重新打包')
+  }
   if (existsSync(prefix) && readdirSync(prefix).length > 0) throw new Error(`目标程序目录已存在且非空：${prefix}`)
   if (existsSync(dataRoot) && readdirSync(dataRoot).length > 0) throw new Error(`目标数据根已存在且非空：${dataRoot}`)
+  if (prefix === dataRoot || prefix.startsWith(dataRoot + sep) || dataRoot.startsWith(prefix + sep)) throw new Error('程序目录和数据根必须相互独立')
 
   const warnings: string[] = []
   const report: InstallReport = {
@@ -78,80 +82,75 @@ export function install(options: InstallOptions): InstallReport {
   }
   if (options.dryRun) return report
 
-  copyTree(join(bundleRoot, 'program'), prefix)
-  let dataCheck: ReturnType<typeof assertRealWorkspace> | undefined
-  if (manifest.data) {
-    if (!existsSync(join(bundleRoot, 'data'))) throw new Error('安装包声明包含数据根，但缺少 data/ 目录')
-    copyTree(join(bundleRoot, 'data'), dataRoot)
-    dataCheck = assertRealWorkspace(dataRoot, options.allowFixtureData)
-    if (dataCheck.kind === 'fixture') warnings.push('安装的是夹具数据根；管理助手工作区和管理 Skill 不完整')
-  }
-  if (manifest.source.programRoot !== prefix || manifest.source.dataRoot !== dataRoot || manifest.source.home !== homedir()) {
-    const mappings = [{ from: manifest.source.home, to: homedir() }]
-    if (manifest.source.programRoot) mappings.push({ from: manifest.source.programRoot, to: prefix })
-    if (manifest.source.dataRoot) mappings.push({ from: manifest.source.dataRoot, to: dataRoot })
-    const changedMappings = mappings.filter(mapping => mapping.from !== mapping.to)
-    const rewritten = rewriteKnownPaths(dataRoot, mappings)
-    report.rewritten = rewritten.changed
-    report.oldReferences = rewritten.oldReferences
-    const remaining = scanKnownOldPaths(dataRoot, changedMappings.map(mapping => mapping.from))
-    if (remaining.length && options.strictPaths) throw new Error(`数据根仍包含旧路径：\n${remaining.map(item => item.file + ':' + item.pattern).join('\n')}`)
-    report.oldReferences.push(...remaining)
-  }
-  report.pendingInstances = instanceNames(dataRoot)
-
-  const runtime = installRuntime(bundleRoot, prefix, dataRoot)
-  report.runtime = runtime.versions
-  warnings.push(...runtime.warnings)
-
   if (manifest.image && !options.skipImage) {
     if (!dockerAvailable()) {
-      warnings.push('Docker 不可用；镜像未导入，业务实例不可用')
+      throw new Error('Docker 不可用；无法导入标准 Runtime 镜像。请启动 Docker 后重试，或显式使用 --skip-image')
     } else {
-      const output = loadImage(join(bundleRoot, manifest.image.archive))
-      const loaded = output.match(/Loaded image ID: (sha256:[0-9a-f]{64})/)?.[1]
-      const target = manifest.image.tag || manifest.image.id || loaded
-      if (!target) throw new Error('镜像已导入但无法确定镜像身份')
-      const info = inspectImage(target)
-      const imageProblems = verifyImageInfo(info, { id: manifest.image.id, arch: manifest.image.arch, fingerprint: manifest.image.fingerprint })
-      if (imageProblems.length) throw new Error(`导入镜像校验失败：\n${imageProblems.join('\n')}`)
-      report.image = { tag: manifest.image.tag, id: manifest.image.id, loaded: true }
+      const info = loadVerifiedImage(join(bundleRoot, manifest.image.archive), manifest.image)
+      report.image = { tag: manifest.image.tag, id: info.id, loaded: true }
     }
   } else if (manifest.image && options.skipImage) {
     warnings.push('按要求跳过镜像导入')
   }
 
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    PATH: [join(prefix, 'runtime', 'node', 'bin'), join(prefix, 'runtime', 'pnpm', 'bin'), join(prefix, 'runtime', 'git'), join(prefix, 'bin'), process.env.PATH || ''].join(':'),
-    HARNESS_PROGRAM_ROOT: prefix,
-    HARNESS_ASSET_ROOT: dataRoot,
-    HARNESS_PYTHON: runtime.python,
-  }
-  if (existsSync(join(bundleRoot, 'offline', 'python', 'site'))) {
-    env.PYTHONPATH = [join(bundleRoot, 'offline', 'python', 'site'), env.PYTHONPATH].filter(Boolean).join(':')
-  }
-  if (options.skipPrepare) {
-    warnings.push('按要求跳过 prepare；平台尚未构建，不能直接启动')
-  } else {
-    const prepared = spawnSync(runtime.python, [join(prefix, 'platform', 'dsh-platform'), 'prepare', '--offline'], {
-      cwd: prefix,
-      env,
-      stdio: 'inherit',
-    })
-    if (prepared.status !== 0) throw new Error(`离线 prepare 失败（退出码 ${prepared.status}）`)
-    report.prepare = 'ok'
-    if (dataCheck?.kind === 'workspace') {
-      const patch = join(dataRoot, '.local', 'platform-home', 'profiles', 'harness-platform', 'harness-platform.patch.yml')
-      if (!existsSync(patch) || !readFileSync(patch, 'utf8').includes(join(dataRoot, '.agents', 'skills'))) {
-        throw new Error('平台 Profile 未装载数据工作区的 .agents/skills；管理助手工作区不完整')
-      }
-      const locator = join(homedir(), '.config', 'harness-engineering-platform', 'workspace.json')
-      if (!existsSync(locator)) {
-        mkdirSync(join(homedir(), '.config', 'harness-engineering-platform'), { recursive: true })
-        writeFileSync(locator, JSON.stringify({ assetRoot: dataRoot }, null, 2) + '\n', { mode: 0o600 })
+  const targets = [prefix, ...(manifest.data ? [dataRoot] : [])].map(path => ({ path, existed: existsSync(path) }))
+  let env: NodeJS.ProcessEnv
+  try {
+    copyTree(join(bundleRoot, 'program'), prefix)
+    let dataCheck: ReturnType<typeof assertRealWorkspace> | undefined
+    if (manifest.data) {
+      if (!existsSync(join(bundleRoot, 'data'))) throw new Error('安装包声明包含数据根，但缺少 data/ 目录')
+      copyTree(join(bundleRoot, 'data'), dataRoot)
+      dataCheck = assertRealWorkspace(dataRoot, options.allowFixtureData)
+      if (dataCheck.kind === 'fixture') warnings.push('安装的是夹具数据根；管理助手工作区和管理 Skill 不完整')
+    }
+    if (manifest.source.programRoot !== prefix || manifest.source.dataRoot !== dataRoot || manifest.source.home !== homedir()) {
+      const mappings = [{ from: manifest.source.home, to: homedir() }]
+      if (manifest.source.programRoot) mappings.push({ from: manifest.source.programRoot, to: prefix })
+      if (manifest.source.dataRoot) mappings.push({ from: manifest.source.dataRoot, to: dataRoot })
+      const changedMappings = mappings.filter(mapping => mapping.from !== mapping.to)
+      const rewritten = rewriteKnownPaths(dataRoot, mappings)
+      report.rewritten = rewritten.changed
+      report.oldReferences = rewritten.oldReferences
+      const remaining = scanKnownOldPaths(dataRoot, changedMappings.map(mapping => mapping.from))
+      if (remaining.length && options.strictPaths) throw new Error(`数据根仍包含旧路径：\n${remaining.map(item => item.file + ':' + item.pattern).join('\n')}`)
+      report.oldReferences.push(...remaining)
+    }
+    report.pendingInstances = instanceNames(dataRoot)
+
+    const runtime = installRuntime(bundleRoot, prefix, dataRoot)
+    report.runtime = runtime.versions
+    warnings.push(...runtime.warnings)
+
+    env = runtime.env
+    if (options.skipPrepare) {
+      warnings.push('按要求跳过 prepare；平台尚未构建，不能直接启动')
+    } else {
+      const prepared = spawnSync(runtime.python, [join(prefix, 'platform', 'dsh-platform'), 'prepare', '--offline'], {
+        cwd: prefix,
+        env,
+        stdio: 'inherit',
+      })
+      if (prepared.status !== 0) throw new Error(`离线 prepare 失败（退出码 ${prepared.status}）`)
+      report.prepare = 'ok'
+      if (dataCheck?.kind === 'workspace') {
+        const patch = join(dataRoot, '.local', 'platform-home', 'profiles', 'harness-platform', 'harness-platform.patch.yml')
+        if (!existsSync(patch) || !readFileSync(patch, 'utf8').includes(join(dataRoot, '.agents', 'skills'))) {
+          throw new Error('平台 Profile 未装载数据工作区的 .agents/skills；管理助手工作区不完整')
+        }
+        const locator = join(homedir(), '.config', 'harness-engineering-platform', 'workspace.json')
+        if (!existsSync(locator)) {
+          mkdirSync(join(homedir(), '.config', 'harness-engineering-platform'), { recursive: true })
+          writeFileSync(locator, JSON.stringify({ assetRoot: dataRoot }, null, 2) + '\n', { mode: 0o600 })
+        }
       }
     }
+  } catch (error) {
+    for (const target of targets) {
+      rmSync(target.path, { recursive: true, force: true })
+      if (target.existed) mkdirSync(target.path, { recursive: true })
+    }
+    throw error
   }
 
   if (options.start) {

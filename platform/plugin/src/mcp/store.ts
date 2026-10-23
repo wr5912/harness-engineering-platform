@@ -7,7 +7,7 @@ type Secrets = { schemaVersion: 1; sharedToken: string; servers: Record<string, 
   apiKey?: string; loginUsername?: string; loginPassword?: string; headers?: Record<string, string>
 }> }
 export type McpConfiguration = { servers: any[]; groups: any[]; sharedToken: string }
-export type McpConfigurationView = { revision: string; value: McpConfiguration }
+export type McpConfigurationView = { revision: string; value: McpConfiguration; publicUrl?: string }
 
 function readJson(path: string): { raw: string; value: any } {
   let raw: string

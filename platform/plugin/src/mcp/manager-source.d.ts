@@ -1,4 +1,5 @@
 declare module 'harness-mcp-manager-server' {
+  export function assertConnectionReady(server: any): void
   export const name: string
   export const inject: string[]
   export const Config: any

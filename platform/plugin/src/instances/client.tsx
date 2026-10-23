@@ -189,7 +189,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
   const createDialog = useRef<HTMLDialogElement>(null)
   const actionOpener = useRef<HTMLElement | null>(null)
   const createOpener = useRef<HTMLElement | null>(null)
-  const [form, setForm] = useState<{ name: string; source: string; port: string; access_mode: 'authenticated' | 'anonymous'; identity_mode: 'development' | 'published' }>({ name: '', source: '', port: '', access_mode: 'authenticated', identity_mode: 'development' })
+  const [form, setForm] = useState<{ name: string; source: string; port: string; access_mode: 'authenticated' | 'anonymous'; identity_mode: 'development' | 'published' }>({ name: '', source: '', port: '', access_mode: 'anonymous', identity_mode: 'development' })
   const [businessGatewayAvailable, setBusinessGatewayAvailable] = useState(false)
   const [sources, setSources] = useState<SourceOption[]>([])
   const [agents, setAgents] = useState<AgentOption[]>([])
@@ -841,13 +841,13 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
         </div>
         <label className="instance-field">实例名称<input aria-label="实例名" placeholder="例如 my-agent" value={form.name}
           onChange={event => updateForm({ ...form, name: event.target.value })} className="instance-field-input" /></label>
-        {businessGatewayAvailable && <p className="instance-field-hint">此工作区的业务实例经统一网关访问，使用独立 HOME 与实例专属地址；定时任务暂不开放自动投递。</p>}
+        {businessGatewayAvailable && <p className="instance-field-hint">此工作区的业务实例经统一网关访问，使用独立 HOME 与实例专属地址；已开放原生定时任务，任务到期按实例和会话的当前许可执行。</p>}
         {businessGatewayAvailable && <label className="instance-field">实例阶段<select aria-label="实例阶段" value={form.identity_mode} onChange={event => updateForm({ ...form, identity_mode: event.target.value as 'development' | 'published' })} className="instance-field-input">
           <option value="development">开发调试 · 不要求发布身份签名</option><option value="published">对外服务 · 验证智能体身份签名</option>
         </select><span className="instance-field-hint">开发调试仍经统一网关；对外服务时再启用智能体身份验证。</span></label>}
-        {businessGatewayAvailable && <label className="instance-field">访客访问方式<select aria-label="访客访问方式" value={form.access_mode} onChange={event => updateForm({ ...form, access_mode: event.target.value as 'authenticated' | 'anonymous' })} className="instance-field-input">
-          <option value="authenticated">需要个人登录</option><option value="anonymous">无需登录，仍经统一网关</option>
-        </select><span className="instance-field-hint">无需登录时，网关使用各浏览器的 Cookie 区分会话；业务动作仍按现有许可检查。</span></label>}
+        {businessGatewayAvailable && <label className="instance-field">访问方式<select aria-label="访问方式" value={form.access_mode} onChange={event => updateForm({ ...form, access_mode: event.target.value as 'authenticated' | 'anonymous' })} className="instance-field-input">
+          <option value="authenticated">经过网关，需要登录</option><option value="anonymous">经过网关，无需认证（共享数据和会话）</option>
+        </select><span className="instance-field-hint">无需登录时，所有访问者共享此实例的历史会话、任务与工作区数据。未发布实例不做风险评估，网关全部放行。</span></label>}
         <div className="instance-create-model" aria-label="设置新实例默认模型">
           <div className="instance-create-model-heading"><strong>此实例默认模型</strong>{modelError && <button type="button" className="instance-button" disabled={modelLoading} onClick={() => void loadModels()}>{modelLoading ? '读取中…' : '刷新模型'}</button>}</div>
           <p className="instance-field-hint">预选“设置 → 模型”的业务统一默认；此实例也可另选已配置模型。</p>
@@ -987,7 +987,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
               {[
                 ['智能体', detail.instance.agent_id || '未记录'],
                 [detail.instance.business_gateway ? '内部 Web 端口' : '访问端口', detail.instance.port || '未记录'],
-                ...(detail.instance.business_gateway ? [['实例阶段', detail.instance.identity_mode === 'development' ? '开发调试，不要求发布身份签名' : '对外服务，验证智能体身份签名'], ['访问方式', detail.instance.access_mode === 'anonymous' ? '经统一网关，无需登录；浏览器 Cookie 区分会话' : '经统一网关，需要个人登录'], ['已登记网关入口', detail.instance.access_url || '尚未核对，请刷新实例登记']] : []),
+                ...(detail.instance.business_gateway ? [['实例阶段', detail.instance.identity_mode === 'development' ? '开发调试，不要求发布身份签名' : '对外服务，验证智能体身份签名'], ['访问方式', detail.instance.access_mode === 'anonymous' ? '经过网关，无需认证（共享数据和会话）' : '经统一网关，需要个人登录'], ['已登记网关入口', detail.instance.access_url || '尚未核对，请刷新实例登记']] : []),
                 ['登记镜像', detail.instance.image_tag || '未记录'],
                 ['登记镜像 ID', detail.instance.image_id || '未记录'],
                 ['HOME 存储', String(detail.instance.home_directory || detail.session_scope.home_volume || detail.instance.home_volume || '未记录')],
@@ -1037,7 +1037,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
             {embedMessage && <p role="status" className="instance-muted">{embedMessage}</p>}
             <details className="instance-detail-fold"><summary className="instance-fold-title">使用须知</summary><ul className="instance-embed-notes">
               <li>网站访问者需要能连接到实例地址。供其他电脑访问时，使用局域网可达的地址；127.0.0.1 只指访问者自己的电脑。</li>
-              <li>{detail.instance.business_gateway ? detail.instance.access_mode === 'anonymous' ? '匿名访客无需登录，浏览器使用 SameSite=Strict Cookie 区分会话；跨站嵌入可能无法携带 Cookie，可同站点嵌入或直接打开网关入口。' : '业务访问仍经统一网关，需要个人登录；跨站嵌入受浏览器 Cookie 限制，可同站点嵌入或直接打开网关入口。' : '嵌入沿用实例自身的登录设置，不会自动传递平台登录状态。跨站登录受浏览器 Cookie 限制时，可使用同站点反向代理或直接打开 DSH Web。'}</li>
+              <li>{detail.instance.business_gateway ? detail.instance.access_mode === 'anonymous' ? '无需认证时所有访问者共享此实例的数据和会话，无需登录或访客 Cookie；统一网关提供访问入口。' : '业务访问仍经统一网关，需要个人登录；跨站嵌入受浏览器 Cookie 限制，可同站点嵌入或直接打开网关入口。' : '嵌入沿用实例自身的登录设置，不会自动传递平台登录状态。跨站登录受浏览器 Cookie 限制时，可使用同站点反向代理或直接打开 DSH Web。'}</li>
               <li>HTTPS 网站需使用 HTTPS 实例入口，网站的 CSP 也需要允许该 iframe 来源。</li>
             </ul></details>
           </section>
@@ -1086,7 +1086,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
                   {item.operation === 'create' && <div><dt>验证范围</dt><dd>{runForPreview && !runForPreview.error ? runForPreview.scope : '读取失败，请到评测中心核对'}{runForPreview && !runForPreview.error && <small className="instance-muted">{runForPreview.hasRun ? '最近 Run：' : '评测记录：'}{runForPreview.heading}{runForPreview.hasRun && ` · ${runForPreview.cases}`}{runForPreview.runAt && ` · 记录于 ${new Date(runForPreview.runAt).toLocaleString('zh-CN')}`}{runForPreview.checkedAt && ` · 核对于 ${new Date(runForPreview.checkedAt).toLocaleString('zh-CN')}`}</small>}</dd></div>}
                   {item.operation === 'create' && <div><dt>实例默认模型</dt><dd>{modelLabel(models?.catalog, value?.model_selection)}</dd></div>}
                   {item.operation === 'create' && businessCreate && <div><dt>实例阶段</dt><dd>{value?.identity_mode === 'published' ? '对外服务 · 验证智能体身份签名' : '开发调试 · 不要求发布身份签名'}</dd></div>}
-                  {item.operation === 'create' && <div><dt>访问方式</dt><dd>{value?.access_mode === 'anonymous' ? '经统一网关，无需登录；浏览器 Cookie 区分会话' : value?.access_mode === 'authenticated' ? '经统一网关，需要个人登录' : '按实例配置'}</dd></div>}
+                  {item.operation === 'create' && <div><dt>访问方式</dt><dd>{value?.access_mode === 'anonymous' ? '经过网关，无需认证（共享数据和会话）' : value?.access_mode === 'authenticated' ? '经统一网关，需要个人登录' : '按实例配置'}</dd></div>}
                   <div><dt>{item.operation === 'create' ? businessCreate ? '内部 Runtime 端口' : '访问端口' : '影响入口'}</dt><dd>{item.operation === 'create' ? typeof port === 'number' ? `127.0.0.1:${port}` : '未确认' : observed?.business_gateway ? observed.access_url || '网关深链尚未核对' : observed?.port ? `127.0.0.1:${observed.port}` : '未确认'}</dd></div>
                 </dl></div>
                 {item.operation === 'stop' && <div className="instance-preview-warning" role="note"><strong>业务访问将中断</strong><span>进行中的业务请求可能终止，需要再次启动后恢复访问。</span></div>}

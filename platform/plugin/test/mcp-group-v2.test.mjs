@@ -11,9 +11,14 @@ import { Client, StreamableHTTPClientTransport, UriTemplate } from '@modelcontex
 import { McpServer, createMcpHandler } from '@modelcontextprotocol/server'
 import { toNodeHandler } from '@modelcontextprotocol/node'
 
+async function waitFor(check) {
+  for (let i = 0; i < 300 && !check(); i++) await new Promise(resolve => setTimeout(resolve, 10))
+  assert.ok(check(), '后台 MCP 工具状态应收敛')
+}
+
 async function managerModule(t) {
   const previousEntry = process.env.HARNESS_DSH_ENTRY
-  process.env.HARNESS_DSH_ENTRY ??= '/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/package.json'
+  process.env.HARNESS_DSH_ENTRY ??= new URL('../package.json', import.meta.url).pathname
   t.after(() => { if (previousEntry === undefined) delete process.env.HARNESS_DSH_ENTRY; else process.env.HARNESS_DSH_ENTRY = previousEntry })
   const directory = await mkdtemp(join(tmpdir(), 'mcp-group-v2-'))
   t.after(() => rm(directory, { recursive: true, force: true }))
@@ -185,7 +190,7 @@ test('v2 分组保留可达来源，标出不可达来源；平台可关闭管�
 test('业务 Session 跳过连接、鉴权和规范发现失败的 MCP 来源，仍校验本地配置', async t => {
   const manager = await managerModule(t)
   const duplicate = await fixtureMcp(t, 'duplicate', [], false, true)
-  const sdkRequire = createRequire('/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/package.json')
+  const sdkRequire = createRequire(process.env.HARNESS_DSH_ENTRY || new URL('../package.json', import.meta.url))
   const [{ Context }, { ToolRuntime }, { createScope }, { SystemPrompt }] = await Promise.all([
     '@deepseek-ai/cordis', '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-scope', '@deepseek-ai/dsh-system-prompt',
   ].map(name => import(pathToFileURL(sdkRequire.resolve(name)).href)))
@@ -247,7 +252,8 @@ test('业务 Session 跳过连接、鉴权和规范发现失败的 MCP 来源，
   const parent = {}
   const started = Date.now()
   const first = await session('offline', parent)
-  assert.ok(Date.now() - started < 3000, '不响应来源不得长期阻塞 Session 创建')
+  assert.ok(Date.now() - started < 100, 'Session 创建不能等待外部 MCP 发现')
+  await waitFor(() => transitions.some(([name, active]) => name === 'mcp__Duplicate__echo' && !active))
   assert.ok(ctx.tools.get('mcp__Healthy__echo', first.agent), '可达来源照常注册')
   assert.equal(ctx.tools.get('mcp__Recovering__echo', first.agent), undefined, '不可达来源不得注册工具')
   assert.equal(ctx.tools.get('mcp__Hanging__echo', first.agent), undefined)
@@ -260,6 +266,7 @@ test('业务 Session 跳过连接、鉴权和规范发现失败的 MCP 来源，
   ])
   assert.ok(ctx.tools.get('mcp__Healthy__echo', stillOffline.agent))
   assert.ok(ctx.tools.get('mcp__Healthy__echo', concurrentOffline.agent))
+  await waitFor(() => transitions.filter(([name, active]) => name === 'mcp__Duplicate__echo' && !active).length >= 2)
   assert.equal(transitions.filter(([name, active]) => name === 'mcp__Healthy__echo' && active).length, 1,
     '共享 Preset 的新 Session 不得重复注册健康工具')
   assert.ok(transitions.some(([name, active]) => name === 'mcp__Duplicate__echo' && active),
@@ -269,6 +276,7 @@ test('业务 Session 跳过连接、鉴权和规范发现失败的 MCP 来源，
     '坏来源不得留下工具注册引用')
   await new Promise(resolve => recovering.listen(port, '127.0.0.1', resolve))
   const second = await session('online', parent)
+  await waitFor(() => ctx.tools.get('mcp__Recovering__echo', second.agent))
   assert.ok(ctx.tools.get('mcp__Recovering__echo', second.agent), '后续新 Session 可重新发现恢复的来源')
   assert.equal(ctx.mcpSessionManager.resolveTool('recovering', 'echo'), 'mcp__Recovering__echo')
   assert.equal(transitions.filter(([name, active]) => name === 'mcp__Healthy__echo' && active).length, 1)
@@ -284,10 +292,12 @@ test('业务 Session 跳过连接、鉴权和规范发现失败的 MCP 来源，
   assert.equal(transitions.filter(([name, active]) => name === 'mcp__Recovering__echo' && !active).length, 1)
   mode = 'invalid'
   const invalid = await session('invalid-spec')
+  await waitFor(() => ctx.tools.get('mcp__Healthy__echo', invalid.agent))
   assert.ok(ctx.tools.get('mcp__Healthy__echo', invalid.agent))
   assert.equal(ctx.tools.get('mcp__Recovering__echo', invalid.agent), undefined)
   mode = 'unauthorized'
   const denied = await session('unauthorized')
+  await waitFor(() => ctx.tools.get('mcp__Healthy__echo', denied.agent))
   assert.ok(ctx.tools.get('mcp__Healthy__echo', denied.agent))
   assert.equal(ctx.tools.get('mcp__Recovering__echo', denied.agent), undefined)
   servers.push({ ...servers[0] })
@@ -314,7 +324,7 @@ test('原始 OpenAPI 发现尊重调用方取消信号，包括登录授权过�
 
 test('原生 MCP 桥沿用 DSH 的非致命启动与无工具注册状态', async t => {
   const manager = await managerModule(t)
-  const sdkRequire = createRequire('/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/package.json')
+  const sdkRequire = createRequire(process.env.HARNESS_DSH_ENTRY || new URL('../package.json', import.meta.url))
   const [{ Context }, { ToolRuntime }, { createScope }, { SystemPrompt }] = await Promise.all([
     '@deepseek-ai/cordis', '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-scope', '@deepseek-ai/dsh-system-prompt',
   ].map(name => import(pathToFileURL(sdkRequire.resolve(name)).href)))

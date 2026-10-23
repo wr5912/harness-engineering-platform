@@ -37,7 +37,9 @@ test('真实HTTP管理会话使用原生工具，专用切换与可信Skill可�
   writeFileSync(join(extensionSkills, 'basic-data/SKILL.md'), '---\nname: basic-data\ndescription: 声明扩展业务技能\n---\n读取基础模拟数据。')
   writeFileSync(join(assetRoot, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: 'workspace-scope-switch', extensions: [{ id: 'basic', path: 'extensions/basic' }] }))
   const previous = process.env.HARNESS_ASSET_ROOT
+  const previousEntry = process.env.HARNESS_DSH_ENTRY
   process.env.HARNESS_ASSET_ROOT = assetRoot
+  process.env.HARNESS_DSH_ENTRY = new URL('../package.json', import.meta.url).pathname
   const agents = new Map(), scopes = [], calls = [], prompts = []
   let loaded, skillProvider
   t.after(async () => {
@@ -48,6 +50,8 @@ test('真实HTTP管理会话使用原生工具，专用切换与可信Skill可�
     rmSync(assetRoot, { recursive: true, force: true })
     if (previous === undefined) delete process.env.HARNESS_ASSET_ROOT
     else process.env.HARNESS_ASSET_ROOT = previous
+    if (previousEntry === undefined) delete process.env.HARNESS_DSH_ENTRY
+    else process.env.HARNESS_DSH_ENTRY = previousEntry
   })
   await ctx.plugin(WebServer, { host: '127.0.0.1', port: 0 })
   await ctx.plugin({ name: 'scope-switch-services', apply(inner) {

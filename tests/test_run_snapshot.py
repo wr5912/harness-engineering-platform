@@ -79,6 +79,26 @@ def recorded_run(module, repo: Path, external_fixture: bytes | None = None) -> t
 
 
 class FrozenRunSnapshotTests(unittest.TestCase):
+    def test_overview_isolates_invalid_run_and_experiment(self) -> None:
+        module = load_module(fixtures.ROOT / "runtime/adapters/dsh-container/run_record.py", "record")
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            run_dir, _ = recorded_run(module, repo)
+            bad_run = run_dir.parent / ("run-" + str(uuid.uuid4()))
+            bad_run.mkdir()
+            (bad_run / "run.yaml").write_text("run_id: first\nrun_id: second\n", encoding="utf-8")
+            bad_exp = repo / "evolution/experiments/EXP-example-agent-999"
+            bad_exp.mkdir()
+            (bad_exp / "change.yaml").write_text("invalid: [\n", encoding="utf-8")
+            (repo / "agents/another-agent").mkdir()
+            with contextlib.redirect_stdout(io.StringIO()) as output:
+                module.command_overview(repo)
+            result = json.loads(output.getvalue())
+            self.assertEqual(len(result["agents"]), 2)
+            self.assertEqual(len(result["errors"]), 2)
+            example = next(agent for agent in result["agents"] if agent["agent_id"] == "example-agent")
+            self.assertEqual(example["experiments"][0]["runs"][0]["run_id"], run_dir.name)
+
     def test_external_inputs_freeze_original_bytes_and_explicit_mode(self) -> None:
         for mode in ("mock-replay", "replay"):
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as temporary:

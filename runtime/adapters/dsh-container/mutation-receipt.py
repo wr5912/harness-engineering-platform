@@ -20,13 +20,10 @@ from source_contract import DEFAULT_SOURCE, resolve, strict_json
 
 from workspace_paths import asset_root
 REPO = asset_root()
-EXPERIMENT = REPO / "evolution/experiments/EXP-security-operations-expert-001"
-DSH_ROOT = EXPERIMENT / "candidate/dsh"
-WORKSPACE = DSH_ROOT / "workspace"
-ALLOWED_ROOTS = {WORKSPACE, DSH_ROOT / "presets", DSH_ROOT / "managed"}
-FROZEN = EXPERIMENT / "snapshots/frozen-sources"
+EXPERIMENT = DSH_ROOT = WORKSPACE = FROZEN = None
+ALLOWED_ROOTS = set()
 SOURCE_ID = DEFAULT_SOURCE
-AGENT_ID = "security-operations-expert"
+AGENT_ID = None
 DEFAULT_LIMITS = {
     "max_file_bytes": 64 * 1024 * 1024,
     "max_total_bytes": 1024 * 1024 * 1024,

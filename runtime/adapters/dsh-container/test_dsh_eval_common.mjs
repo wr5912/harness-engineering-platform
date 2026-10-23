@@ -100,7 +100,7 @@ const judged = await judgeCase(item, {
       session: { session_id: 'judge-session' },
       archive: archive([
         user('judge-user', input), header([]),
-        assistant('{"verdict":"passed","reason":"回答与同一 Session 工具结果一致"}'), end(1),
+        assistant(JSON.stringify({ verdict: 'passed', reason: '回答与同一 Session 工具结果一致', requirements: request.requirements.map(requirement => ({ requirement, status: 'satisfied', evidence: [{ index: 2, quote: 'total' }] })) })), end(1),
       ]),
     }
   })
@@ -118,7 +118,7 @@ const extraJudgeField = await judgeCase(item, {
     assistant('{"verdict":"passed","reason":"回执与回答一致","reason_note":"附加说明"}'), end(1),
   ]),
 }))
-assert.deepEqual(extraJudgeField.response, { verdict: 'passed', reason: '回执与回答一致' })
+assert.equal(extraJudgeField.response.verdict, 'inconclusive', '没有逐项证据的通过不能采信')
 
 const englishReply = await judgeCase({ ...item, expected_behavior: '用中文指出证据缺口。' }, {
   assistant_texts: ['Please provide the evidence.'],
@@ -127,7 +127,7 @@ const englishReply = await judgeCase({ ...item, expected_behavior: '用中文指
   session: { session_id: 'judge-session' },
   archive: archive([
     user('judge-user', input), header([]),
-    assistant('{"verdict":"passed","reason":"内容符合要求"}'), end(1),
+    assistant(JSON.stringify({ verdict: 'passed', reason: '内容符合要求', requirements: JSON.parse(input).requirements.map(requirement => ({ requirement, status: 'satisfied', evidence: [{ index: 0, quote: 'Please' }] })) })), end(1),
   ]),
 }))
 assert.equal(englishReply.response.verdict, 'failed')

@@ -1,3 +1,5 @@
+import { connectionIssue } from './connection.ts'
+
 window.__ModuleLoader__.load({
   id: 'dsh-web-mcp-manager',
   factory(require) {
@@ -243,11 +245,11 @@ window.__ModuleLoader__.load({
         try { void call(action, { sourceId, toolName, arguments: JSON.parse(argumentsText) }) }
         catch (error) { setStatus(`工具参数 JSON 无效：${String(error)}`) }
       }
-      const save = async () => {
+      const save = async (value = draft) => {
         setBusy(true)
         setStatus('')
         try {
-          for (const [index, server] of draft.servers.entries()) {
+          for (const [index, server] of value.servers.entries()) {
             const invalid = message => { setActiveServer(index); onSelectServerId?.(server.id); setServicePane('connection'); setPage('servers'); throw new Error(`第 ${index + 1} 项服务：${message}`) }
             if (!/^[A-Za-z0-9_-]{1,32}$/.test(server.id)) invalid('ID 须为 1–32 个字母、数字、下划线或连字符')
             if (!('specUrl' in server)) {
@@ -260,18 +262,17 @@ window.__ModuleLoader__.load({
             if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.hash) throw new Error('OpenAPI 接口规范地址须为 HTTP(S) URL')
             if (server.authType === 'credential' && !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(server.authHeader ?? 'Authorization')) throw new Error('凭据 Header 字段名无效')
             if (server.authType === 'login') {
-              if (server.enabled !== false && (!server.loginUrl || !server.loginUsername || !server.loginPassword || !server.loginTokenPath)) throw new Error('请填写完整的登录授权信息')
               if (!server.loginUrl) continue
               const loginUrl = new URL(server.loginUrl)
               if (!['http:', 'https:'].includes(loginUrl.protocol) || loginUrl.username || loginUrl.password || loginUrl.hash) throw new Error('登录接口地址须为 HTTP(S) URL')
-              if (!server.loginTokenPath.split('.').every(part => /^[A-Za-z_][\w-]*$/.test(part))) throw new Error('凭据字段路径无效')
+              if (server.loginTokenPath && !server.loginTokenPath.split('.').every(part => /^[A-Za-z_][\w-]*$/.test(part))) throw new Error('凭据字段路径无效')
             }
           }
           const response = await write([
-            { op: 'set', path: ['servers'], value: draft.servers },
-            { op: 'set', path: ['groups'], value: draft.groups },
-            { op: 'set', path: ['sharedToken'], value: draft.sharedToken },
-          ], draft.revision)
+            { op: 'set', path: ['servers'], value: value.servers },
+            { op: 'set', path: ['groups'], value: value.groups },
+            { op: 'set', path: ['sharedToken'], value: value.sharedToken },
+          ], value.revision)
           setStatus(response.ok ? '配置已保存。请新建会话验证连接与工具发现。'
             : `保存失败：${response.error.message}`)
           if (response.ok) setCatalog(null)
@@ -324,9 +325,9 @@ window.__ModuleLoader__.load({
 
       return <section className="mcp-manager">
         <style>{styles}</style>
-        {toolbarTarget && renderToolbar ? renderToolbar(isDirty ? <button className="harness-primary" type="button" onClick={save} disabled={busy || !state.writable}>保存更改</button> : null, toolbarTarget) : <div className="mcp-toolbar">
+        {toolbarTarget && renderToolbar ? renderToolbar(isDirty ? <button className="harness-primary" type="button" onClick={() => save()} disabled={busy || !state.writable}>保存更改</button> : null, toolbarTarget) : <div className="mcp-toolbar">
           <div><strong>MCP 服务与分组配置</strong><p>保存后新建会话验证连接和工具发现。</p></div>
-          <button className="mcp-primary" type="button" onClick={save} disabled={busy || !state.writable || !isDirty}>保存更改</button>
+          <button className="mcp-primary" type="button" onClick={() => save()} disabled={busy || !state.writable || !isDirty}>保存更改</button>
         </div>}
         {conflict && <div className="mcp-note" role="alert">配置已在其他位置更新，当前草稿已保留。原版本保存会发生配置版本冲突。
           <div className="mcp-actions">{button('复制本地草稿', async () => { try { await navigator.clipboard.writeText(draftContent); setCopiedDraft(draftContent); setStatus('本地草稿已复制。') } catch { setStatus('无法复制草稿，请检查浏览器剪贴板权限。') } })}
@@ -353,6 +354,7 @@ window.__ModuleLoader__.load({
                     const badge = server.platformComposition ? ['目录已发布', 'neutral']
                       : serverDraftChanged(server) ? ['修改未保存', 'changed']
                       : server.enabled === false ? ['已停用', 'neutral']
+                      : connectionIssue(server) ? [connectionIssue(server), 'changed']
                       : check?.failed ? ['检查失败', 'failed']
                       : check ? [check.kind === 'openapi' ? '规范已读取' : '连接已验证', 'verified']
                       : ['连接待检查', 'neutral']
@@ -468,18 +470,24 @@ window.__ModuleLoader__.load({
                 {editingGroup ? <div className="mcp-card">
                   <div className="mcp-card-head"><div><h3>{editingGroup.id || '新分组'}</h3><p className="mcp-muted">仅开放此组勾选的工具与资源。</p></div></div>
                   <section className="mcp-section"><div className="mcp-fields"><label className="mcp-field">分组 ID{input(editingGroup.id, value => editGroup(activeGroup, group => { group.id = value }))}</label></div>
-                    {/^[A-Za-z0-9_-]{1,32}$/.test(editingGroup.id) && <div className="mcp-actions"><span className="mcp-muted">MCP 链接</span>{linkReady && <code className="mcp-link">{new URL(`mcp/groups/${editingGroup.id}/v2`, document.baseURI).href}</code>}
-                      {button('复制分组链接', async () => { try { await navigator.clipboard.writeText(new URL(`mcp/groups/${editingGroup.id}/v2`, document.baseURI).href); setStatus('分组地址已复制；仍需核对所选来源的连接与发现。') } catch { setStatus('当前浏览器无法自动复制，请手动复制上方链接。') } }, !linkReady)}</div>}
+                    {/^[A-Za-z0-9_-]{1,32}$/.test(editingGroup.id) && <div className="mcp-actions"><span className="mcp-muted">MCP 链接</span>{linkReady && <code className="mcp-link">{new URL(`mcp/groups/${editingGroup.id}/v2`, state.publicUrl ?? document.baseURI).href}</code>}
+                      {button('复制分组链接', async () => { try { await navigator.clipboard.writeText(new URL(`mcp/groups/${editingGroup.id}/v2`, state.publicUrl ?? document.baseURI).href); setStatus('分组地址已复制；仍需核对所选来源的连接与发现。') } catch { setStatus('当前浏览器无法自动复制，请手动复制上方链接。') } }, !linkReady)}</div>}
                     {linkReady && <p className="mcp-muted">分组地址已生成。链接存在只证明访问入口；所选来源的工具和资源仍需逐项发现。</p>}
                     {!!failedMembers.length && <p className="mcp-note" role="alert">来源 {failedMembers.join('、')} 最近一次发现失败；这些来源的工具和资源当前不可用，其他已发现来源可继续使用。</p>}
                     {!!uncheckedMembers.length && <p className="mcp-muted">来源 {uncheckedMembers.join('、')} 尚未检查当前配置；已保存的选择不代表工具已发现。</p>}
                     {editingGroup.id && !/^[A-Za-z0-9_-]{1,32}$/.test(editingGroup.id) && <p className="mcp-muted">分组 ID 须为 1–32 个字母、数字、下划线或连字符。</p>}
                     {!!duplicateIds.length && <div className="mcp-note">服务 {duplicateIds.join('、')} 在此分组中有重复成员，v2 链接不可用。合并会对工具、资源 URI 和资源模板取并集，并改变旧版分组的目标摘要；请保存后重新发现工具。
                       <div className="mcp-actions">{button('合并同源成员', () => mergeDuplicateMembers(activeGroup))}</div></div>}
-                    {!duplicateIds.length && !!savedDuplicateIds.length && <p className="mcp-muted">重复成员已在草稿中合并；保存并等待配置刷新后，v2 链接才可使用。</p>}
-                    {!savedGroup && !duplicateIds.length && <p className="mcp-muted">此分组尚未保存；保存后才会生成可用链接。</p>}
-                    {!!savedGroup && !duplicateIds.length && !savedDuplicateIds.length && !state.value.sharedToken && <p className="mcp-muted">请生成并保存统一访问 Token 后使用分组链接。</p>}
-                    {!!savedGroup && !duplicateIds.length && !savedDuplicateIds.length && !!state.value.sharedToken && draft.sharedToken !== state.value.sharedToken && <p className="mcp-muted">新 Token 尚未保存；保存后再复制分组链接。</p>}
+                    {!duplicateIds.length && !!savedDuplicateIds.length && <div className="mcp-muted">重复成员已在草稿中合并；保存并等待配置刷新后，v2 链接才可使用。{button("保存更改", () => save(), busy || !state.writable)}</div>}
+                    {!savedGroup && !duplicateIds.length && <div className="mcp-muted">此分组尚未保存；保存后才会生成可用链接。{button("保存更改", () => save(), busy || !state.writable)}</div>}
+                    {!!savedGroup && !duplicateIds.length && !savedDuplicateIds.length && !state.value.sharedToken && <div className="mcp-muted">请生成并保存统一访问 Token 后使用分组链接。{button('生成并保存 Token', () => {
+                      const bytes = new Uint8Array(32)
+                      window.crypto.getRandomValues(bytes)
+                      const next = { ...draft, sharedToken: draft.sharedToken || Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('') }
+                      setDraft(next)
+                      void save(next)
+                    }, busy || !state.writable)}</div>}
+                    {!!savedGroup && !duplicateIds.length && !savedDuplicateIds.length && !!state.value.sharedToken && draft.sharedToken !== state.value.sharedToken && <div className="mcp-muted">新 Token 尚未保存；保存后再复制分组链接。{button("保存更改", () => save(), busy || !state.writable)}</div>}
                     {linkReady && isDirty && <p className="mcp-muted">当前草稿尚未保存；链接仍使用上次保存的配置。</p>}
                     <p className="mcp-muted">通过 Authorization: Bearer &lt;统一访问 Token&gt; 调用。DSH 中将连接名设为分组 ID，模型可见工具名以该分组为前缀；超长工具名由 DSH 缩短。</p>
                   </section>

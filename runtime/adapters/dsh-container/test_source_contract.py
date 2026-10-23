@@ -1,6 +1,7 @@
 """来源合同只依赖 sources.json 描述：新增第二个 Harness 不改适配工具中的业务名。"""
 
 import hashlib
+from functools import partial
 import json
 import os
 import re
@@ -11,7 +12,12 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tests"))
+from asset_fixture import historical_assets
 import source_contract
+
+ASSETS = historical_assets()
+resolve = partial(source_contract.resolve, repo=ASSETS)
 
 
 class SourceContractTest(unittest.TestCase):
@@ -44,7 +50,7 @@ class SourceContractTest(unittest.TestCase):
         ):
             self.assertIsNone(source_contract.EXPERIMENT.fullmatch(invalid))
         self.assertEqual(
-            source_contract.resolve("EXP-security-operations-expert-013-r26ecd1295ab4")["agent_id"],
+            resolve("EXP-security-operations-expert-013-r26ecd1295ab4")["agent_id"],
             "security-operations-expert",
         )
 
@@ -67,15 +73,16 @@ class SourceContractTest(unittest.TestCase):
         completed = subprocess.run(
             [sys.executable, str(source_contract.ADAPTER / "source_contract.py"), "--env-names"],
             capture_output=True, text=True, check=True,
+            env={**os.environ, "HARNESS_ASSET_ROOT": str(ASSETS)},
         )
         self.assertEqual(
-            completed.stdout.splitlines(), source_contract.resolve()["required_env_names"]
+            completed.stdout.splitlines(), resolve()["required_env_names"]
         )
         self.assertNotIn("=", completed.stdout)
 
     def test_current_source_resolves_without_private_values(self):
-        result = source_contract.resolve()
-        self.assertEqual(result["source_id"], "experiment:EXP-security-operations-expert-001")
+        result = resolve()
+        self.assertEqual(result["source_id"], "experiment:EXP-security-operations-expert-024-rad80a907c628")
         self.assertEqual(result["source_kind"], "experiment")
         self.assertEqual(result["patch"], "/opt/dsh-managed/security-operations-expert.patch.yml")
         self.assertNotIn("patch_overlay", result)
@@ -83,8 +90,38 @@ class SourceContractTest(unittest.TestCase):
         self.assertEqual(result["schema_version"], "2.1")
         self.assertNotIn("TOKEN=", json.dumps(result))
 
+    def test_default_source_follows_active_manifest_and_rejects_invalid_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = root / "agents/security-operations-expert/manifest.yaml"
+            manifest.parent.mkdir(parents=True)
+            identity = "EXP-security-operations-expert-025-r0123456789ab"
+            manifest.write_text(f"active_experiment: {identity}\n", encoding="utf-8")
+            with patch.object(source_contract, "_resolve_experiment", return_value={}) as resolver:
+                resolve(repo=root)
+                self.assertEqual(resolver.call_args.args, (identity,))
+            manifest.write_text("active_experiment: ../outside\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "active_experiment"):
+                resolve(repo=root)
+
+    def test_image_identity_cli_supports_target_architecture(self):
+        lock = source_contract._read_source_lock(source_contract.LOCK)
+        for platform in ("linux/amd64", "linux/arm64"):
+            with self.subTest(platform=platform):
+                completed = subprocess.run(
+                    [sys.executable, str(source_contract.ADAPTER / "source_contract.py"),
+                     "--image-identity-for", platform],
+                    capture_output=True, text=True, check=True,
+                )
+                identity = json.loads(completed.stdout)
+                fingerprint = source_contract.image_build_fingerprint(lock, image_platform_name=platform)
+                self.assertEqual(identity, {
+                    "tag": f"{lock['local_image_tag']}-{platform.split('/')[1]}-{fingerprint[7:19]}",
+                    "fingerprint": fingerprint,
+                })
+
     def test_image_fingerprint_is_derived_and_changes_with_build_input(self):
-        result = source_contract.resolve()
+        result = resolve()
         fingerprint = result["image"]["build_fingerprint"]
         self.assertRegex(fingerprint, r"^sha256:[0-9a-f]{64}$")
         self.assertEqual(result["image"]["local_image_tag"],
@@ -115,7 +152,7 @@ class SourceContractTest(unittest.TestCase):
             with self.subTest(machine=machine), \
                     patch.object(source_contract.platform, "system", return_value="Linux"), \
                     patch.object(source_contract.platform, "machine", return_value=machine):
-                image = source_contract.resolve()["image"]
+                image = resolve()["image"]
                 self.assertEqual(image["platform"], expected)
                 self.assertIn("-" + expected.split("/")[1] + "-", image["local_image_tag"])
                 images[machine] = image
@@ -131,7 +168,7 @@ class SourceContractTest(unittest.TestCase):
                     patch.object(source_contract.platform, "system", return_value=system), \
                     patch.object(source_contract.platform, "machine", return_value=machine):
                 with self.assertRaisesRegex(ValueError, "unsupported DSH image host"):
-                    source_contract.resolve()
+                    resolve()
         with self.assertRaisesRegex(ValueError, "unsupported DSH image platform"):
             source_contract.image_build_fingerprint(
                 source_contract._read_source_lock(source_contract.LOCK), image_platform_name="linux/riscv64"
@@ -150,6 +187,7 @@ class SourceContractTest(unittest.TestCase):
         completed = subprocess.run(
             [sys.executable, str(source_contract.ADAPTER / "source_contract.py"), "--image-input-digests"],
             capture_output=True, text=True, check=True,
+            env={**os.environ, "HARNESS_ASSET_ROOT": str(ASSETS)},
         )
         values = json.loads(completed.stdout)
         self.assertIn("Dockerfile", values)
@@ -157,11 +195,11 @@ class SourceContractTest(unittest.TestCase):
         self.assertTrue(all(value.startswith("sha256:") for value in values.values()))
 
     def test_all_experiments_share_runtime_and_schedule_keeps_web_profile(self):
-        catalog = json.loads(source_contract.SOURCES.read_text(encoding="utf-8"))
+        catalog = json.loads((ASSETS / "config/sources.json").read_text(encoding="utf-8"))
         expected = source_contract._read_source_lock(source_contract.LOCK)
         fingerprints = set()
         for source in catalog["sources"]:
-            contract = source_contract.resolve(source)
+            contract = resolve(source)
             self.assertEqual(contract["image"]["commit"], expected["commit"])
             self.assertEqual(contract["runtime_lock"], str(source_contract.LOCK))
             candidate = Path(contract["candidate_root"]).parent
@@ -170,7 +208,7 @@ class SourceContractTest(unittest.TestCase):
             fingerprints.add(contract["image"]["build_fingerprint"])
         self.assertEqual(len(fingerprints), 1)
         source = "EXP-security-operations-expert-007"
-        contract = source_contract.resolve(source)
+        contract = resolve(source)
         self.assertEqual(contract["evaluation_patch"], "/opt/dsh-adapter/evaluation-registry.patch.yml")
         self.assertEqual(
             json.loads(Path(contract["profile_manifest"]).read_text(encoding="utf-8"))["dsh"]["profile"]["bundles"][-1],
@@ -180,19 +218,20 @@ class SourceContractTest(unittest.TestCase):
             [sys.executable, str(source_contract.ADAPTER / "source_contract.py"),
              "--source", source, "--image-input-digests"],
             capture_output=True, text=True, check=True,
+            env={**os.environ, "HARNESS_ASSET_ROOT": str(ASSETS)},
         ).stdout)
         self.assertEqual(digests["source.lock.json"], "sha256:" + hashlib.sha256(
             source_contract.LOCK.read_bytes()).hexdigest())
 
     def test_combined_source_declares_optional_service_connections(self):
-        contract = source_contract.resolve("EXP-security-operations-expert-007")
+        contract = resolve("EXP-security-operations-expert-007")
         self.assertIn("POLICY_CONFIGURATION_MCP_URL", contract["optional_env_names"])
         self.assertIn("EMERGENCY_ACTION_MCP_URL", contract["optional_env_names"])
         self.assertIn("EMERGENCY_CONFIRMATION_PRIVATE_KEY_B64", contract["optional_env_names"])
         self.assertNotIn("POLICY_CONFIGURATION_MCP_URL", contract["required_env_names"])
 
     def test_exp008_source_declares_optional_emergency_connection(self):
-        contract = source_contract.resolve("EXP-security-operations-expert-008")
+        contract = resolve("EXP-security-operations-expert-008")
         emergency = {
             "EMERGENCY_ACTION_MCP_URL", "EMERGENCY_ACTION_MCP_TOKEN",
             "EMERGENCY_WORKBENCH_URL", "EMERGENCY_WORKBENCH_TOKEN",
@@ -204,7 +243,7 @@ class SourceContractTest(unittest.TestCase):
 
     def test_optional_environment_names_reject_invalid_or_required_duplicates(self):
         source = "EXP-security-operations-expert-007"
-        original = json.loads(source_contract.SOURCES.read_text(encoding="utf-8"))
+        original = json.loads((ASSETS / "config/sources.json").read_text(encoding="utf-8"))
         with tempfile.TemporaryDirectory(prefix="dsh-source-contract-") as location:
             catalog_path = Path(location) / "sources.json"
             for names, message in (
@@ -216,11 +255,11 @@ class SourceContractTest(unittest.TestCase):
                 catalog["sources"][source]["optional_env_names"] = names
                 catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
                 with self.assertRaisesRegex(ValueError, message):
-                    source_contract.resolve(source, sources=catalog_path)
+                    resolve(source, sources=catalog_path)
 
     def test_experiment_rejects_runtime_override_and_invalid_profile(self):
         source = "EXP-security-operations-expert-007"
-        original = json.loads(source_contract.SOURCES.read_text(encoding="utf-8"))
+        original = json.loads((ASSETS / "config/sources.json").read_text(encoding="utf-8"))
         with tempfile.TemporaryDirectory(prefix="dsh-source-contract-") as location:
             catalog_path = Path(location) / "sources.json"
             for field, value, message in (
@@ -233,12 +272,12 @@ class SourceContractTest(unittest.TestCase):
                 catalog["sources"][source][field] = value
                 catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
                 with self.assertRaisesRegex(ValueError, message):
-                    source_contract.resolve(source, sources=catalog_path)
+                    resolve(source, sources=catalog_path)
             catalog = json.loads(json.dumps(original))
             catalog["sources"][source]["evaluation_patch"] = "../other.patch.yml"
             catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "source fields differ from schema"):
-                source_contract.resolve(source, sources=catalog_path)
+                resolve(source, sources=catalog_path)
 
     def test_reference_root_requires_evaluation_source(self):
         with tempfile.TemporaryDirectory(prefix="dsh-source-contract-") as location:
@@ -255,13 +294,13 @@ class SourceContractTest(unittest.TestCase):
             )
 
     def test_preset_identity_is_derived_from_the_source_declaration(self):
-        result = source_contract.resolve()
+        result = resolve()
         self.assertEqual(result["preset_id"], "security-operations-expert")
         self.assertEqual(result["preset"], "/opt/dsh-presets/security-operations-expert/agent.cordis.yml")
 
     def test_retired_snapshot_selector_fails_closed(self):
         with self.assertRaisesRegex(ValueError, "unknown source selector"):
-            source_contract.resolve("snapshot:snap-00000000-0000-4000-8000-000000000000")
+            resolve("snapshot:snap-00000000-0000-4000-8000-000000000000")
 
     def test_preset_must_declare_an_agent_subdirectory(self):
         with self.assertRaisesRegex(ValueError, "preset-id"):
@@ -285,7 +324,7 @@ class SourceContractTest(unittest.TestCase):
             }}}
             catalog_path = repo / "sources.json"
             catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
-            result = source_contract.resolve(source_id, repo=repo, sources=catalog_path)
+            result = resolve(source_id, repo=repo, sources=catalog_path)
             self.assertEqual(result["agent_id"], "second-harness")
             self.assertEqual(result["required_env_names"], [])
             self.assertIsNone(result["guard"])
@@ -309,18 +348,18 @@ class SourceContractTest(unittest.TestCase):
             }}}
             catalog_path = repo / "sources.json"
             catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
-            result = source_contract.resolve(source_id, repo=repo, sources=catalog_path)
+            result = resolve(source_id, repo=repo, sources=catalog_path)
             self.assertEqual(result["agent_id"], "second-harness")
             self.assertEqual(result["preset_id"], "second-harness-variant")
 
     def test_wrong_experiment_directory_is_rejected(self):
         with tempfile.TemporaryDirectory(prefix="dsh-source-contract-") as location:
             catalog_path = Path(location) / "sources.json"
-            catalog = json.loads(source_contract.SOURCES.read_text(encoding="utf-8"))
-            catalog["sources"][source_contract.DEFAULT_SOURCE]["candidate_root"] = "evolution/experiments/other/candidate/dsh"
+            catalog = json.loads((ASSETS / "config/sources.json").read_text(encoding="utf-8"))
+            catalog["sources"][resolve()["experiment_id"]]["candidate_root"] = "evolution/experiments/other/candidate/dsh"
             catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "does not belong"):
-                source_contract.resolve(sources=catalog_path)
+                resolve(sources=catalog_path)
 
     def test_nested_source_file_symlink_is_rejected(self):
         with tempfile.TemporaryDirectory(prefix="dsh-source-contract-") as location:
@@ -344,7 +383,7 @@ class SourceContractTest(unittest.TestCase):
             catalog_path = repo / "sources.json"
             catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "unsafe source file"):
-                source_contract.resolve(source_id, repo=repo, sources=catalog_path)
+                resolve(source_id, repo=repo, sources=catalog_path)
 
     def test_hardlinked_selected_asset_is_rejected(self):
         with tempfile.TemporaryDirectory(prefix="dsh-source-contract-") as location:
@@ -367,7 +406,7 @@ class SourceContractTest(unittest.TestCase):
             catalog_path = repo / "sources.json"
             catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "source file"):
-                source_contract.resolve(source_id, repo=repo, sources=catalog_path)
+                resolve(source_id, repo=repo, sources=catalog_path)
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ import { getBusinessControl } from '../lib/business-control.js'
 import { resolveBusinessInstance } from '../lib/business-gateway.js'
 import { McpConfigStore } from '../src/mcp/store.ts'
 
-const sdkRequire = createRequire('/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/package.json')
+const sdkRequire = createRequire(process.env.HARNESS_DSH_ENTRY || new URL('../package.json', import.meta.url))
 const [{ Context }, { SystemPrompt }, { ToolRuntime }, { createScope, scopeParentOf }] = await Promise.all([
   import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/cordis')).href),
   import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/dsh-system-prompt')).href),
@@ -24,7 +24,7 @@ test('受控业务仅投影 Candidate 重叠连接，平台保存收缩新目录
   const previousRoot = process.env.HARNESS_ASSET_ROOT
   const previousEntry = process.env.HARNESS_DSH_ENTRY
   process.env.HARNESS_ASSET_ROOT = root
-  process.env.HARNESS_DSH_ENTRY ??= '/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/package.json'
+  process.env.HARNESS_DSH_ENTRY ??= new URL('../package.json', import.meta.url).pathname
   t.after(() => {
     if (previousRoot === undefined) delete process.env.HARNESS_ASSET_ROOT
     else process.env.HARNESS_ASSET_ROOT = previousRoot
@@ -56,7 +56,7 @@ test('受控业务仅投影 Candidate 重叠连接，平台保存收缩新目录
     { id: 'source', serverName: 'candidate-label', enabled: true, specUrl: 'http://127.0.0.1:1/old.json',
       tools: { mode: 'selected', names: ['echo', 'candidate-only'] } },
     { id: 'candidate-only', serverName: 'candidate-only', enabled: false,
-      url: 'http://127.0.0.1:18120/hep/mcp/groups/candidate-only/v2', tools: { mode: 'all', names: [] } },
+      url: 'http://old-host:18120/hep/mcp/groups/candidate-only/v2', tools: { mode: 'all', names: [] } },
   ]
   const candidateGroups = [{ id: 'candidate-group', members: [{ serverId: 'source', names: ['echo'] }] }]
   const events = []
@@ -79,7 +79,7 @@ test('受控业务仅投影 Candidate 重叠连接，平台保存收缩新目录
   assert.equal(projected[0].serverName, 'candidate-label')
   assert.equal(projected[0].specUrl, sourceA)
   assert.deepEqual(projected[0].tools, { mode: 'selected', names: ['echo'] })
-  assert.equal(projected[1].url, candidate[1].url, 'Candidate 专有平台分组链接不能被平台目录替换')
+  assert.equal(projected[1].url, businessRuntime.groupUrl('candidate-only'), '分组身份不变，旧宿主地址由当前平台入口派生')
   assert.equal(createHash('sha256').update(projected[0].apiKey).digest('hex'), createHash('sha256').update(secret).digest('hex'))
   assert.equal(context.mcpSessionManager.currentGroup('platform-only-group', 2), undefined)
   const oldDigest = context.mcpSessionManager.currentGroup('candidate-group', 2).targetDigest
@@ -107,7 +107,7 @@ test('受控业务仅投影 Candidate 重叠连接，平台保存收缩新目录
     sharedToken: { get: () => 'b'.repeat(64) } })
   assert.equal(restarted.platformMcp.servers.get()[0].enabled, false, '业务实例重启时缺少同 ID 平台服务仍须停用')
   assert.equal(restarted.platformMcp.servers.get()[0].specUrl, undefined)
-  assert.equal(restarted.platformMcp.servers.get()[1].url, candidate[1].url, '平台 v2 分组链接保持 Candidate 种子')
+  assert.equal(restarted.platformMcp.servers.get()[1].url, businessRuntime.groupUrl('candidate-only'), '重启仍使用当前平台入口')
 })
 
 test('平台保存后的新业务 Session 装载当前连接，旧 Session 在目标变化和停用时拒绝调用', async t => {
@@ -115,7 +115,7 @@ test('平台保存后的新业务 Session 装载当前连接，旧 Session 在�
   const previousRoot = process.env.HARNESS_ASSET_ROOT
   const previousEntry = process.env.HARNESS_DSH_ENTRY
   process.env.HARNESS_ASSET_ROOT = root
-  process.env.HARNESS_DSH_ENTRY ??= '/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/package.json'
+  process.env.HARNESS_DSH_ENTRY ??= new URL('../package.json', import.meta.url).pathname
   let loaded, services
   const ctx = new Context()
   const scopes = []
@@ -218,13 +218,20 @@ test('平台保存后的新业务 Session 装载当前连接，旧 Session 在�
     return agent
   }
   const name = 'mcp__candidate-name__echo'
+  async function waitForTool(agent, previous) {
+    for (let i = 0; i < 300 && (!ctx.tools.get(name, agent) || ctx.tools.get(name, agent) === previous); i++) await new Promise(resolve => setTimeout(resolve, 10))
+    assert.ok(ctx.tools.get(name, agent), '后台发现完成后应注册工具')
+    assert.notEqual(ctx.tools.get(name, agent), previous)
+  }
   const first = await newSession('session-A')
+  await waitForTool(first)
   assert.ok(ctx.mcpSessionManager, '业务 manager 应完成装载')
   assert.deepEqual(ctx.platformMcp.servers.get().map(server => server.id), ['source'])
   assert.ok(ctx.tools.get(name, first), `首个 Session 装载 Candidate 固定工具名，当前工具=${JSON.stringify(ctx.tools.schemas(first).map(tool => tool.name))}`)
   assert.equal(ctx.tools.get('mcp__platform-name__echo', first), undefined)
   assert.equal(ctx.tools.get('mcp__extra__echo', first), undefined)
   const store = new McpConfigStore(root, () => {})
+  const previousTool = ctx.tools.get(name, first)
   let view = store.view()
   view = store.mutate([{ op: 'set', path: ['servers', '0', 'specUrl'], value: `${origin}/b/openapi.json` },
     { op: 'set', path: ['servers', '0', 'apiKey'], value: 'fixture-current-private' }], view.revision)
@@ -234,6 +241,7 @@ test('平台保存后的新业务 Session 装载当前连接，旧 Session 在�
   assert.match(JSON.stringify(oldCall), /目标已变化|已停用/)
   assert.deepEqual(calls, [], '旧 Session 不得触达新目标')
   const second = await newSession('session-B')
+  await waitForTool(second, previousTool)
   assert.ok(ctx.tools.get(name, second), '保存后新 Session 保留 Candidate 工具名并装载新目标')
   const currentCall = await ctx.tools.execute({ name, arguments: {}, callId: 'current-call', agent: second,
     signal: new AbortController().signal })
@@ -248,5 +256,6 @@ test('平台保存后的新业务 Session 装载当前连接，旧 Session 在�
   assert.match(JSON.stringify(disabledCall), /目标已变化|已停用/)
   assert.equal(calls.length, 1, '平台停用后旧 Session 不得继续触达目标')
   const third = await newSession('session-C')
+  for (let i = 0; i < 300 && ctx.tools.get(name, third); i++) await new Promise(resolve => setTimeout(resolve, 10))
   assert.equal(ctx.tools.get(name, third), undefined, '停用后的新 Session 不得装载工具')
 })

@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { createRequire } from 'node:module'
 import test from 'node:test'
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
 import { getBusinessControl, withBusinessContext } from '../lib/business-control.js'
@@ -135,11 +136,33 @@ test('v2 分组只接受固定实例签名与当前受信 Session，签名不降
   const throughRuntime = await connect(new StreamableHTTPClientTransport(url, { fetch: runtimeFetch }))
   const resources = (await throughRuntime.listResources()).resources
   assert.equal(resources.length, 1)
+  assert.equal((await throughRuntime.listResources(undefined,
+    { signal: new AbortController().signal, timeout: 20_000 })).resources.length, 1)
+  assert.equal((await throughRuntime.listResourceTemplates(undefined,
+    { signal: new AbortController().signal, timeout: 20_000 })).resourceTemplates.length, 0)
+  const nativeMcp = createRequire(process.env.HARNESS_DSH_ENTRY)('@modelcontextprotocol/client')
+  const nativeClient = new nativeMcp.Client({ name: 'native-business-test', version: '1' },
+    { versionNegotiation: { mode: 'auto' } })
+  await nativeClient.connect(new nativeMcp.StreamableHTTPClientTransport(url, { fetch: (input, init) => {
+    control.recordAgentAuthentication(binding)
+    const current = control.issueSnapshot(binding.instanceId)
+    control.acknowledge(binding.instanceId, current.restrictionVersion, current.leaseId)
+    return runtimeFetch(input, init)
+  } }))
+  t.after(() => nativeClient.close())
+  assert.equal((await nativeClient.listResources(undefined,
+    { signal: new AbortController().signal, timeout: 20_000 })).resources.length, 1)
+  assert.equal((await nativeClient.listResourceTemplates(undefined,
+    { signal: new AbortController().signal, timeout: 20_000 })).resourceTemplates.length, 0)
   const targetDigest = context.mcpSessionManager.currentGroup('soc-tools', 2).targetDigest
+  const nativeResult = await nativeClient.callTool({ name: 'source__echo', arguments: { nested: { z: 1, a: 2 } },
+    _meta: { 'io.deepseek.dsh/mcp-group-target': { digest: targetDigest }, nested: { z: 1, a: 2 } } })
+  assert.deepEqual(nativeResult.content, [{ type: 'text', text: '{"reached":true}' }])
+  assert.equal((await nativeClient.readResource({ uri: resources[0].uri })).contents[0].text, '{"reached":true}')
   const toolResult = await throughRuntime.callTool({ name: 'source__echo', arguments: { nested: { z: 1, a: 2 } },
     _meta: { 'io.deepseek.dsh/mcp-group-target': { digest: targetDigest }, nested: { z: 1, a: 2 } } })
   assert.deepEqual(toolResult.content, [{ type: 'text', text: '{"reached":true}' }], '真实 SDK callTool 应通过签名并派发到来源工具')
-  assert.deepEqual(sourceCalls, [{ method: 'GET', path: '/echo' }])
+  assert.deepEqual(sourceCalls, Array.from({ length: 3 }, () => ({ method: 'GET', path: '/echo' })))
   assert.equal((await throughRuntime.readResource({ uri: resources[0].uri })).contents[0].text, '{"reached":true}')
   await assert.rejects(runtimeFetch(`${url.origin}/hep/mcp/groups/other/v2`, { method: 'POST' }), /目标已变化/)
   const absentSession = BusinessConnection.prototype.groupFetch.call({ businessConfig: { assetRoot: root, binding },

@@ -2,7 +2,7 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypt
 import { readFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http'
 import type { Duplex } from 'node:stream'
-import { getBusinessControl } from './core.ts'
+import { sharedInstanceIdentity, getBusinessControl } from './core.ts'
 import { resolveBusinessInstance, type BusinessGatewayInstance, type RegisteredBusinessInstance } from './instance.ts'
 export { resolveBusinessInstance } from './instance.ts'
 export type { BusinessGatewayInstance, RegisteredBusinessInstance } from './instance.ts'
@@ -102,11 +102,11 @@ function renderBusinessGatewayHome(input: { identity?: AuthenticatedIdentity; av
   const authorization = identity ? (rules.length ? rules.map(rule => {
     const operations = input.operations.filter(operation => (!rule.serverIds || rule.serverIds.includes(operation.serverId)) && (rule.actions.includes('*') || rule.actions.includes(operation.kind)))
     return `<section><h3>${escapeHtml(rule.agentId)}</h3><dl>${pair('Agent基础动作', rule.actions.join('、'))}${pair('服务范围', rule.serverIds?.join('、') || '按已登记操作的实际目标执行')}</dl>${operations.length ? `<ul>${operations.map(operation => `<li>${escapeHtml(operation.serverId)} / ${escapeHtml(operation.operationId)}：${escapeHtml(operation.kind)} · ${escapeHtml(operation.method)} ${escapeHtml(targetLabel(operation.target))}</li>`).join('')}</ul>` : '<p>当前没有已登记且匹配基础授权的工具或资源操作。</p>'}<p>以上是配置的能力范围；实际执行会综合智能体身份、当前风险、运行许可和业务归属作出访问决定。</p></section>`
-  }).join('') : input.agentStatuses.some(item => item.status.authentication.status === 'not_required') ? '<p>开发调试时，已认证用户与匿名访客按同一 Agent 规则使用允许的动作；写与发布仍受操作和风险规则约束。发布访问规则尚未验证。</p>' : '<p>当前没有获准的业务 Agent。</p>') : '<p>登录后展示本人可见业务 Agent 的动作、工具和资源范围。</p>'
-  const visitor = identity ? `<p class="visitor">当前访问者：${escapeHtml(identity.subject.id)}；会话有效至 ${escapeHtml(identity.expiresAt)}。个人登录用于区分业务上下文，不代替智能体的凭据、可信来源与实例绑定核验。</p>` : input.anonymousInstances?.length ? '<p>无需登录的实例可直接打开；其他业务实例使用个人凭据登录。访客会话由各自浏览器的 Cookie 区分。</p>' : '<p>先使用个人凭据登录；登录身份用于会话隔离，智能体身份、风险评估与访问控制的对象是业务 Agent。</p>'
-  const publicLinks = (input.anonymousInstances ?? []).map(item => `<p><a href="/agents/${escapeHtml(item.agentId)}/instances/${escapeHtml(item.instanceId)}/">${escapeHtml(item.agentId)} · ${escapeHtml(item.instanceId)}</a>（无需登录；浏览器 Cookie 仅用于区分各自会话）</p>`).join('')
+  }).join('') : input.agentStatuses.some(item => item.status.authentication.status === 'not_required') ? '<p>未发布实例经统一网关全部放行，不做风险评估；无需认证时所有访问者共享实例的数据和会话。</p>' : '<p>当前没有获准的业务 Agent。</p>') : '<p>登录后展示本人可见业务 Agent 的动作、工具和资源范围。</p>'
+  const visitor = identity ? `<p class="visitor">当前访问者：${escapeHtml(identity.subject.id)}；会话有效至 ${escapeHtml(identity.expiresAt)}。个人登录用于区分业务上下文，不代替智能体的凭据、可信来源与实例绑定核验。</p>` : input.anonymousInstances?.length ? '<p>无需登录的实例可直接打开；其他业务实例使用个人凭据登录。无需登录的访问者共享同一实例的历史和工作区数据。</p>' : '<p>先使用个人凭据登录；登录身份用于会话隔离，智能体身份、风险评估与访问控制的对象是业务 Agent。</p>'
+  const publicLinks = (input.anonymousInstances ?? []).map(item => `<p><a href="/agents/${escapeHtml(item.agentId)}/instances/${escapeHtml(item.instanceId)}/">${escapeHtml(item.agentId)} · ${escapeHtml(item.instanceId)}</a>（无需登录；共享此实例的历史和数据）</p>`).join('')
   const directory = identity ? `<h2>我的业务智能体</h2>${availableAgents.length ? availableAgents.map(item => `<p><a href="/agents/${escapeHtml(item.agentId)}/">${escapeHtml(item.agentId)}</a></p>`).join('') : '<p>当前没有可以进入的已认证业务智能体。</p>'}${publicLinks}${input.unavailableCount ? `<p role="status">${input.unavailableCount} 个已登记实例无法核对，请在平台实例管理检查来源与状态。</p>` : ''}` : publicLinks ? `<h2>无需登录的业务智能体</h2>${publicLinks}` : ''
-  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>统一网关</title><style>body{max-width:1000px;margin:5vh auto;padding:24px;font:16px/1.6 system-ui;background:Canvas;color:CanvasText}h1,h2,h3{line-height:1.3}.notice{padding:14px 18px;border:1px solid #b58b31;border-radius:8px}.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:24px}.card{padding:20px;border:1px solid #8886;border-radius:10px;min-width:0}.card h2{margin-top:0;font-size:20px}dt{font-weight:600}dd{margin:0 0 10px;overflow-wrap:anywhere}li{overflow-wrap:anywhere}.agent-risk{border-top:1px solid #8884;margin-top:16px}input,button{font:inherit;padding:7px 10px;margin:4px}input{max-width:65%}a{color:LinkText}@media(max-width:900px){.cards{grid-template-columns:1fr}body{padding:16px;margin:1vh auto}}</style></head><body><h1>统一网关</h1><p>所有实例经网关核对来源与接入通道；发布实例另需通过智能体身份签名和访问规则。</p>${visitor}<p class="notice"><strong>首期仅支持即时任务。</strong>定时任务尚未纳入检测、防护闭环；巡检与报表需要手动启动，可能延迟或漏执行。空闲期间不执行周期巡检。</p><form id="login"><label>${identity ? '更换个人凭据' : '个人访问凭据'} <input id="credential" type="password" autocomplete="off" required></label><button>登录</button></form><p id="message" role="status">${escapeHtml(input.authenticationMessage)}</p>${identity ? '<button id="logout">退出</button>' : ''}${directory}<div class="cards"><section class="card"><h2>智能体身份</h2><h3>认证方式与凭据</h3>${auth}<h3>可信来源与身份状态</h3>${trust}</section><section class="card"><h2>风险评估</h2><p>业务输入、工具执行、报告发布和下载会自动触发评估，并联动访问限制；手动重评仅用于辅助复核。</p><p>${input.riskProvider ? '已配置风险提供方；以下展示当前业务上下文内 Agent 的真实评估记录。' : '尚未接入外部风险提供方；已配置的本地检测规则仍在执行边界运行。'}</p>${identity ? riskRows || '<p>当前没有可核验的实例风险状态。</p>' : '<p>登录后展示本人可见业务 Agent 的自动评估状态、时间、依据和限制。</p>'}</section><section class="card"><h2>访问控制</h2>${authorization}</section></div><p>${management || '功能配置请在平台“统一网关”管理页完成。'}业务入口不提供管理配置写入。</p><script>const output=document.getElementById('message');document.getElementById('login').onsubmit=async e=>{e.preventDefault();const field=document.getElementById('credential');const value=field.value;field.value='';const response=await fetch('/session',{method:'POST',headers:{authorization:'Bearer '+value}});if(response.ok)location.reload();else output.textContent='凭据无效或身份服务不可用。'};const logout=document.getElementById('logout');if(logout)logout.onclick=async()=>{await fetch('/session',{method:'DELETE'});location.reload()};</script></body></html>`
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>统一网关</title><style>body{max-width:1000px;margin:5vh auto;padding:24px;font:16px/1.6 system-ui;background:Canvas;color:CanvasText}h1,h2,h3{line-height:1.3}.notice{padding:14px 18px;border:1px solid #b58b31;border-radius:8px}.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:24px}.card{padding:20px;border:1px solid #8886;border-radius:10px;min-width:0}.card h2{margin-top:0;font-size:20px}dt{font-weight:600}dd{margin:0 0 10px;overflow-wrap:anywhere}li{overflow-wrap:anywhere}.agent-risk{border-top:1px solid #8884;margin-top:16px}input,button{font:inherit;padding:7px 10px;margin:4px}input{max-width:65%}a{color:LinkText}@media(max-width:900px){.cards{grid-template-columns:1fr}body{padding:16px;margin:1vh auto}}</style></head><body><h1>统一网关</h1><p>所有实例经网关核对来源与接入通道；发布实例另需通过智能体身份签名和访问规则。</p>${visitor}<p class="notice"><strong>原生定时任务已开放。</strong>定时任务尚未纳入检测、防护闭环；到期投递不代表巡检或报表已经执行，需核对实际任务回执。</p><form id="login"><label>${identity ? '更换个人凭据' : '个人访问凭据'} <input id="credential" type="password" autocomplete="off" required></label><button>登录</button></form><p id="message" role="status">${escapeHtml(input.authenticationMessage)}</p>${identity ? '<button id="logout">退出</button>' : ''}${directory}<div class="cards"><section class="card"><h2>智能体身份</h2><h3>认证方式与凭据</h3>${auth}<h3>可信来源与身份状态</h3>${trust}</section><section class="card"><h2>风险评估</h2><p>业务输入、工具执行、报告发布和下载会自动触发评估，并联动访问限制；手动重评仅用于辅助复核。</p><p>${input.riskProvider ? '已配置风险提供方；以下展示当前业务上下文内 Agent 的真实评估记录。' : '尚未接入外部风险提供方；已配置的本地检测规则仍在执行边界运行。'}</p>${identity ? riskRows || '<p>当前没有可核验的实例风险状态。</p>' : '<p>登录后展示本人可见业务 Agent 的自动评估状态、时间、依据和限制。</p>'}</section><section class="card"><h2>访问控制</h2>${authorization}</section></div><p>${management || '功能配置请在平台“统一网关”管理页完成。'}业务入口不提供管理配置写入。</p><script>const output=document.getElementById('message');document.getElementById('login').onsubmit=async e=>{e.preventDefault();const field=document.getElementById('credential');const value=field.value;field.value='';const response=await fetch('/session',{method:'POST',headers:{authorization:'Bearer '+value}});if(response.ok)location.reload();else output.textContent='凭据无效或身份服务不可用。'};const logout=document.getElementById('logout');if(logout)logout.onclick=async()=>{await fetch('/session',{method:'DELETE'});location.reload()};</script></body></html>`
 }
 function renderInstanceChoice(agentId: string, instances: BusinessGatewayInstance[], unavailableCount = 0): string {
   const links = instances.map(value => `<li><a href="/agents/${escapeHtml(agentId)}/instances/${escapeHtml(value.instanceId)}/">${escapeHtml(value.instanceId)}</a>${value.sourceId ? ` · ${escapeHtml(value.sourceId)}` : ''}</li>`).join('')
@@ -154,7 +154,6 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
   const browserConnections = new Map<string, Set<Duplex>>()
   const cookieValue = (req: IncomingMessage, name: string) => req.headers.cookie?.split(';').map(part => part.trim()).find(part => part.startsWith(`${name}=`))?.slice(name.length + 1)
   const browserSessionId = (req: IncomingMessage) => cookieValue(req, 'harness-business')
-  const guestCookie = (req: IncomingMessage) => cookieValue(req, 'harness-guest')
   const lifetime = new AbortController()
   const headerForIdentity = (req: IncomingMessage): Record<string, string | undefined> => {
     if (req.headers.authorization) return businessRequestHeaders(req)
@@ -171,35 +170,6 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
     const identity = await control.authenticate({ transport, method: req.method || 'GET', path: req.url || '/', headers: headerForIdentity(req) }, lifetime.signal)
     return identity
   }
-  const guestIdentity = (instance: RegisteredBusinessInstance, selected: BusinessGatewayInstance, token: string | undefined): AuthenticatedIdentity | undefined => {
-    if (!token || token.length > 1024) return undefined
-    const [encoded, signature] = token.split('.')
-    if (!encoded || !signature || token.split('.').length !== 2) return undefined
-    const expected = createHmac('sha256', secret).update(`harness-guest\n${encoded}`).digest()
-    const supplied = Buffer.from(signature, 'base64url')
-    if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) return undefined
-    let value: { version?: unknown; agentId?: unknown; instanceId?: unknown; sourceDigest?: unknown; visitorId?: unknown; issuedAt?: unknown; expiresAt?: unknown }
-    try { value = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8')) } catch { return undefined }
-    if (value.version !== 1 || value.agentId !== selected.agentId || value.instanceId !== selected.instanceId
-      || value.sourceDigest !== instance.binding.sourceDigest || typeof value.visitorId !== 'string'
-      || !/^visitor-[A-Za-z0-9_-]{32,}$/.test(value.visitorId) || !Number.isSafeInteger(value.issuedAt)
-      || !Number.isSafeInteger(value.expiresAt) || (value.issuedAt as number) > Date.now()
-      || (value.expiresAt as number) <= Date.now() || (value.expiresAt as number) - (value.issuedAt as number) > 7 * 86400_000) return undefined
-    const issuedAt = new Date(value.issuedAt as number).toISOString(), expiresAt = new Date(value.expiresAt as number).toISOString()
-    return { subject: { id: value.visitorId, kind: 'human', identitySource: 'gateway-anonymous' },
-      evidence: { issuer: 'gateway-anonymous', externalSubject: value.visitorId, method: 'anonymous', verifiedAt: issuedAt, expiresAt }, expiresAt }
-  }
-  const newGuestCookie = (instance: RegisteredBusinessInstance, selected: BusinessGatewayInstance): { identity: AuthenticatedIdentity; header: string } => {
-    const issuedAt = Date.now()
-    const value = { version: 1, agentId: selected.agentId, instanceId: selected.instanceId,
-      sourceDigest: instance.binding.sourceDigest, visitorId: `visitor-${randomBytes(24).toString('base64url')}`,
-      issuedAt, expiresAt: issuedAt + 7 * 86400_000 }
-    const encoded = Buffer.from(JSON.stringify(value)).toString('base64url')
-    const signature = createHmac('sha256', secret).update(`harness-guest\n${encoded}`).digest('base64url')
-    const path = `/agents/${selected.agentId}/instances/${selected.instanceId}/`
-    return { identity: guestIdentity(instance, selected, `${encoded}.${signature}`)!,
-      header: `harness-guest=${encoded}.${signature}; HttpOnly; SameSite=Strict; Path=${path}${origin.protocol === 'https:' ? '; Secure' : ''}; Max-Age=604800` }
-  }
   const assertionFor = (instance: RegisteredBusinessInstance, context?: BusinessContext): RuntimeAssertion => ({ binding: instance.binding, context, snapshot: control.issueSnapshot(instance.binding.instanceId), issuedAt: Date.now(), nonce: randomBytes(24).toString('base64url') })
   const prepare = async (req: IncomingMessage, transport: 'http' | 'websocket', res?: ServerResponse) => {
     assertOrigin(req)
@@ -211,22 +181,10 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
     const instance = resolveBusinessInstance(assetRoot, selected)
     const route = match[3] || '/'
     if (!allowedBusinessPath(route, req.method || 'GET', transport)) throw new Error('业务路径未开放')
-    let identity: AuthenticatedIdentity, newCookie: string | undefined
-    if (selected.accessMode === 'anonymous') {
-      const cookie = guestCookie(req)
-      const existing = guestIdentity(instance, selected, cookie)
-      if (existing) identity = existing
-      else if (transport === 'http' && req.method === 'GET' && route === '/'
-        && req.headers.accept?.includes('text/html') && res) {
-        const guest = newGuestCookie(instance, selected)
-        identity = guest.identity; newCookie = guest.header
-      }
-      else throw Object.assign(new Error('访客会话缺失'), { httpStatus: 401 })
-    } else identity = await admit(req, transport)
+    const identity = selected.accessMode === 'anonymous' ? sharedInstanceIdentity(instance.binding) : await admit(req, transport)
     control.registerInstance(instance.binding)
     const context = control.createContext(identity, instance.binding)
     control.assert(context, 'agent:access', [{ kind: 'agent', id: selected.agentId }])
-    if (newCookie) res!.setHeader('set-cookie', newCookie)
     const path = instance.basePath + route + url.search
     // 代理丢弃调用方凭据与伪造控制 Header，只有此边界签名进入 Runtime。
     for (const name of Object.keys(req.headers)) if (name.startsWith('x-harness-') || ['authorization', 'cookie', 'forwarded', 'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto'].includes(name)) delete req.headers[name]
@@ -257,16 +215,15 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
               const instance = resolveBusinessInstance(assetRoot, selected)
               control.registerInstance(instance.binding)
               const rule = control.config().agents.find(item => item.agentId === selected.agentId)
-              if ((rule ? rule.enabled && (rule.actions.includes('*') || rule.actions.includes('agent:access'))
-                : selected.identityMode === 'development')
+              if ((selected.identityMode === 'development' || rule?.enabled && (rule.actions.includes('*') || rule.actions.includes('agent:access')))
                 && control.agentStatus(instance.binding.instanceId).trust.status === 'trusted') anonymousInstances.push(selected)
             } catch { unavailableCount++ }
             continue
           }
           if (identity) {
             const rule = control.config().agents.find(item => item.agentId === selected.agentId)
-            if (rule ? !rule.enabled || !rule.subjects.includes(identity.subject.id)
-              || !rule.actions.includes('*') && !rule.actions.includes('agent:access') : selected.identityMode !== 'development') continue
+            if (selected.identityMode !== 'development' && (!rule?.enabled || !rule.subjects.includes(identity.subject.id)
+              || !rule.actions.includes('*') && !rule.actions.includes('agent:access'))) continue
             let instance: RegisteredBusinessInstance
             try { instance = resolveBusinessInstance(assetRoot, selected) }
             catch { unavailableCount++; continue }
@@ -326,15 +283,14 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
               const instance = resolveBusinessInstance(assetRoot, selected)
               control.registerInstance(instance.binding)
               const rule = control.config().agents.find(item => item.agentId === selected.agentId)
-              if ((rule ? rule.enabled && (rule.actions.includes('*') || rule.actions.includes('agent:access'))
-                : selected.identityMode === 'development')
+              if ((selected.identityMode === 'development' || rule?.enabled && (rule.actions.includes('*') || rule.actions.includes('agent:access')))
                 && control.agentStatus(instance.binding.instanceId).trust.status === 'trusted') available.push(selected)
             } catch { unavailableCount++ }
             continue
           }
           const rule = control.config().agents.find(item => item.agentId === selected.agentId)
-          if (!identity || (rule ? !rule.enabled || !rule.subjects.includes(identity.subject.id)
-            || !rule.actions.includes('*') && !rule.actions.includes('agent:access') : selected.identityMode !== 'development')) continue
+          if (!identity || selected.identityMode !== 'development' && (!rule?.enabled || !rule.subjects.includes(identity.subject.id)
+            || !rule.actions.includes('*') && !rule.actions.includes('agent:access'))) continue
           let instance: RegisteredBusinessInstance
           try { instance = resolveBusinessInstance(assetRoot, selected) }
           catch { unavailableCount++; continue }
@@ -383,7 +339,7 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
   })
   const controlNonces = new Map<string, number>()
   server.on('connection', socket => { connections.add(socket); socket.once('close', () => connections.delete(socket)) })
-  server.on('upgrade', (req, socket, head) => { const sessionId = browserSessionId(req) ?? guestCookie(req); void prepare(req, 'websocket').then(instance => { if (sessionId) { const owned = browserConnections.get(sessionId) ?? new Set<Duplex>(); owned.add(socket); browserConnections.set(sessionId, owned); socket.once('close', () => { owned.delete(socket); if (!owned.size) browserConnections.delete(sessionId) }) }; return proxy.ws(req, socket as import('node:net').Socket, { target: instance.origin }, head) }).catch(() => rejectSocket(socket)) })
+  server.on('upgrade', (req, socket, head) => { const sessionId = browserSessionId(req); void prepare(req, 'websocket').then(instance => { if (sessionId) { const owned = browserConnections.get(sessionId) ?? new Set<Duplex>(); owned.add(socket); browserConnections.set(sessionId, owned); socket.once('close', () => { owned.delete(socket); if (!owned.size) browserConnections.delete(sessionId) }) }; return proxy.ws(req, socket as import('node:net').Socket, { target: instance.origin }, head) }).catch(() => rejectSocket(socket)) })
   await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(config.port, config.host, () => { server.removeListener('error', reject); resolve() }) })
   return { server, origin: origin.origin, async close() { lifetime.abort(); sessions.clear(); for (const socket of connections) socket.destroy(); await proxy.close(); await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())) } }
 }

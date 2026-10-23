@@ -370,12 +370,12 @@ function confirmPreview(ui) {
   ui.render()
 }
 
-test('运行权限 UI 展示定时缺口、影响及真实回执，不把保存写成已应用', async () => {
+test('运行权限 UI 区分原生定时任务、待验证闭环及真实应用回执', async () => {
   const ui = page(); await ui.settle()
   const rendered = ui.text(ui.render())
-  assert.match(rendered, /定时任务暂不在此范围/)
+  assert.match(rendered, /原生定时任务已开放/)
   assert.match(rendered, /展开范围与来源说明/)
-  assert.match(rendered, /延迟和漏执行风险/)
+  assert.match(rendered, /自动检测与防护闭环尚待验证/)
   assert.match(rendered, /待核对/)
   assert.match(rendered, /许可租期上限 2 秒/)
   assert.equal(ui.intervals.size, 1)

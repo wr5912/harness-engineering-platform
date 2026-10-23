@@ -3,9 +3,9 @@ export interface BusinessRuntimeConfig {
   assetRoot: string; stateRoot: string; sharedSecretFile: string; coordinatorOrigin: string
   basePath?: string; workspacePath?: string; presetId?: string; localTools?: string[]; binding: InstanceBinding
 }
-/** 独立业务Profile保留历史HOME，停用owner认证及未纳管执行入口；自动化任务按当前需求开放。 */
+/** 独立业务 Profile 保留 HOME；原生工具启停由业务来源决定。 */
 export function createBusinessRuntimePatch(config: BusinessRuntimeConfig, runtimePlugin: string, mcpManagerPlugin?: string, mcpManagerConfig: Record<string, unknown> = {}): unknown[] {
-  const disabled = ['connection', 'tool-bash', 'tool-pwsh', 'tool-fs', 'tool-fs-search', 'tool-jobs', 'tool-web', 'tool-cordis', 'tool-plugin-manager', 'tool-plugin-market', 'session-log-download', 'open-in-app', 'ui-open-in-app', 'ui-agent-preset', 'directory-picker']
+  const disabled = ['connection', 'session-log-download', 'open-in-app', 'ui-open-in-app', 'ui-agent-preset', 'directory-picker']
   if (mcpManagerPlugin) disabled.push('mcp-manager')
   return [...disabled.map(id => ({ id, disabled: true })),
     // 装载原生Node客户端面以保留真实浏览器模块；独立realm只容纳惰性ClientHandle，不创建默认owner Host。

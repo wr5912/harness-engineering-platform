@@ -4,11 +4,17 @@ import { createRequire } from 'node:module'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createBusinessRuntimePatch } from '../../../platform/plugin/src/business-control/patch.ts'
+import { platformGroupUrl } from '../../../platform/plugin/src/business-control/group-link.ts'
 import { businessGatewayEntry } from '../../../platform/plugin/src/business-control/entry.ts'
 
 const programRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const require = createRequire(join(programRoot, 'platform/plugin/package.json'))
-const yaml = require('js-yaml') as { load(text: string): any; dump(value: unknown, options?: unknown): string }
+const yaml = require('js-yaml') as { load(text: string, options?: unknown): any; dump(value: unknown, options?: unknown): string; Type: any; DEFAULT_SCHEMA: any }
+// DSH 表达式只作为带标签的标量保留，装配连接时不求值。
+const patchSchema = yaml.DEFAULT_SCHEMA.extend(new yaml.Type('tag:yaml.org,2002:js', {
+  kind: 'scalar', construct: (value: string) => new String(value),
+  predicate: (value: unknown) => value instanceof String, represent: (value: String) => String(value),
+}))
 const containerAssets = '/opt/harness-business-assets'
 const containerPlugin = '/opt/harness-platform'
 const containerSecret = '/opt/harness-business/shared-secret'
@@ -19,7 +25,7 @@ export interface BusinessLaunchConfig {
 }
 export interface BusinessRenderInput {
   name: string; agentId: string; workspaceId: string; sourceDigest: string; runtimeGeneration?: string
-  port: number; compose: string; profileManifest: string; basePath: string; presetId?: string; runtimeSettings?: string
+  port: number; compose: string; profileManifest: string; basePath: string; presetId?: string; runtimeSettings?: string; managedPatch?: string
   sourcePaths?: { managed: string }
 }
 
@@ -126,8 +132,27 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
     binding: { workspaceId: input.workspaceId, agentId: input.agentId, instanceId: input.name,
       runtimeGeneration, sourceDigest: input.sourceDigest },
   }
+  // 平台分组连接随部署入口装配；固定 Candidate 及其摘要保持原样。
+  const projectLinks = (value: any): any => {
+    if (typeof value === 'string') {
+      const match = /^https?:\/\/[^/]+\/.*mcp\/groups\/([A-Za-z0-9_-]{1,32})\/v2$/.exec(value)
+      return match ? platformGroupUrl(config.assetRoot, match[1]!) : value
+    }
+    if (Array.isArray(value)) return value.map(projectLinks)
+    if (value instanceof String) return value
+    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, projectLinks(item)]))
+    return value
+  }
+  const managedEntries = input.managedPatch ? yaml.load(readFileSync(input.managedPatch, 'utf8'), { schema: patchSchema }) : []
+  if (!Array.isArray(managedEntries)) throw new Error('业务来源配置 Patch 无效')
+  const connectionPatches = managedEntries.flatMap(item => [item, ...(item?.insert ?? [])]).flatMap(item => {
+    if (!item?.id || !item.config) return []
+    const config = projectLinks(item.config)
+    return JSON.stringify(config) === JSON.stringify(item.config) ? [] : [{ id: item.id, config }]
+  })
   const patch = [
     { id: 'webserver', config: { host: '0.0.0.0', port: input.port, compression: 'gzip', compressionLevel: 1, compressionThresholdBytes: 1024 } },
+    ...connectionPatches,
     ...(manager ? [{ id: manager.id, disabled: true }] : []),
     ...createBusinessRuntimePatch(runtimeConfig, `${containerPlugin}/business/runtime.js`,
       manager ? `${containerPlugin}/business/mcp-manager.js` : undefined, manager?.config),
@@ -152,9 +177,9 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
     { type: 'bind', source: config.sharedSecretFile, target: containerSecret, read_only: true },
     { type: 'bind', source: '${DSH_BUSINESS_PATCH_HOST:?业务控制 Patch 由启动器注入}', target: containerPatch, read_only: true },
   )
-  return { compose: yaml.dump(compose, { lineWidth: -1, noRefs: true }), patch: yaml.dump(patch, { lineWidth: -1, noRefs: true }),
+  return { compose: yaml.dump(compose, { lineWidth: -1, noRefs: true }), patch: yaml.dump(patch, { lineWidth: -1, noRefs: true, schema: patchSchema }),
     registration: { runtime_generation: runtimeGeneration, source_digest: input.sourceDigest,
-      origin: `http://127.0.0.1:${input.port}`, scheduling_supported: false },
+      origin: `http://127.0.0.1:${input.port}`, scheduling_supported: true },
     runtimeConfig, localModelRoutes: capabilities.localModelRoutes }
 }
 
@@ -174,9 +199,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     }
     const config = readBusinessLaunchConfig(resolve(process.argv[2]!))
     const text = readFileSync(0, 'utf8').trim(), input = text ? JSON.parse(text) : undefined
+    const access = JSON.parse(readFileSync(join(config.assetRoot, 'config/business-access.json'), 'utf8'))
+    const development = access.gateway?.instances?.some((row: any) => row.agentId === input?.agentId
+      && row.instanceId === input?.name && row.identityMode === 'development') === true
     if (input?.compose && input?.sourcePaths && businessSourceDigest(input.sourcePaths) !== input.sourceDigest) throw new Error('业务资产在计划后已改变')
     console.log(JSON.stringify(input?.compose ? renderBusinessInstance(config, input) : {
-      valid: true, assetRoot: config.assetRoot, pluginRoot: config.pluginRoot,
+      valid: true, assetRoot: config.assetRoot, pluginRoot: config.pluginRoot, development,
       ...(input?.sourcePaths ? { sourceDigest: businessSourceDigest(input.sourcePaths) } : {}),
     }))
   } catch (error) {
@@ -184,7 +212,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       '业务数据根或共享密钥文件无效', '业务访问配置尚未启用', '协调器必须使用不含路径和凭据的 HTTP 来源地址',
       'bridge 容器不能使用宿主回环地址访问协调器；请配置可达宿主地址', '业务插件根路径无效',
       '业务 Runtime 插件尚未构建', '业务 MCP manager 插件尚未构建', '业务来源 MCP 配置种子无效',
-      '业务来源 MCP manager 声明冲突或配置无效', '业务本地能力声明必须是受控普通文件',
+      '业务来源 MCP manager 声明冲突或配置无效', '业务来源配置 Patch 无效', '业务本地能力声明必须是受控普通文件',
       '业务本地能力声明无效', '业务资产在计划后已改变', '业务实例登记参数无效',
       '业务 Compose 缺少受控 dsh 网络入口', '业务 Runtime 必须关闭免认证并保留明确监听配置',
       '业务启动配置的 assetRoot 必须是已存在的规范化绝对路径',

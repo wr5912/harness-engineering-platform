@@ -17,6 +17,8 @@ import stat
 import sys
 from pathlib import Path
 
+import yaml
+
 from workspace_paths import PROGRAM_ROOT, asset_root, source_catalog, workspace_id
 
 
@@ -24,7 +26,7 @@ ADAPTER = Path(__file__).resolve().parent
 REPO = asset_root()
 SOURCES = source_catalog(REPO)
 LOCK = ADAPTER / "source.lock.json"
-DEFAULT_SOURCE = "EXP-security-operations-expert-001"
+DEFAULT_SOURCE = ""
 NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _EXPERIMENT_BASE = r"^EXP-([a-z0-9]+(?:-[a-z0-9]+)*)-[0-9]{3}"
 # 解析器保留历史格式；新建与仓库校验另按 NEW_EXPERIMENT 和固定兼容集合判断。
@@ -298,6 +300,11 @@ def resolve(source_id: str = DEFAULT_SOURCE, *, repo: Path = REPO, sources: Path
             lock_path: Path = LOCK, require_assets: bool = True) -> dict:
     repo = repo.expanduser().resolve()
     sources = sources if sources is not None else source_catalog(repo)
+    if not source_id:
+        manifest = yaml.safe_load((repo / "agents/security-operations-expert/manifest.yaml").read_text(encoding="utf-8"))
+        source_id = manifest.get("active_experiment") if isinstance(manifest, dict) else None
+        if not isinstance(source_id, str) or not EXPERIMENT.fullmatch(source_id):
+            raise ValueError("默认智能体没有有效的 active_experiment；请通过 --source 指定来源")
     if source_id.startswith("experiment:"):
         return _resolve_experiment(source_id[len("experiment:"):], repo=repo, sources=sources, lock_path=lock_path, require_assets=require_assets)
     if source_id.startswith("release:"):
@@ -348,6 +355,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", default=DEFAULT_SOURCE)
     parser.add_argument("--repo", type=Path, default=REPO, help="用户数据工作区根目录")
+    parser.add_argument("--image-identity-for", choices=("linux/amd64", "linux/arm64"),
+                        help="print the locked standard image identity for a target platform")
     parser.add_argument("--field", help="print one top-level scalar field")
     parser.add_argument("--image-input-digests", action="store_true",
                         help="print image build input SHA-256 digests")
@@ -359,6 +368,14 @@ def main() -> None:
     parser.add_argument("--eval-input", help="已确认不含预期答案的被测输入根；只对 subject 角色有效")
     args = parser.parse_args()
     try:
+        if args.image_identity_for:
+            lock = _read_source_lock(LOCK)
+            fingerprint = image_build_fingerprint(lock, image_platform_name=args.image_identity_for)
+            print(json.dumps({
+                "tag": f"{lock['local_image_tag']}-{args.image_identity_for.split('/')[1]}-{fingerprint[7:19]}",
+                "fingerprint": fingerprint,
+            }, separators=(",", ":")))
+            return
         contract = resolve(args.source, repo=args.repo, require_assets=not args.allow_missing_assets)
         selected = sum(flag is not None and flag is not False
                        for flag in (args.field, args.image_input_digests, args.env_names, args.mount_plan))

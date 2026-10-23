@@ -2,6 +2,7 @@
 
 import contextlib
 import hashlib
+from functools import partial
 import http.server
 import importlib.util
 import io
@@ -21,12 +22,17 @@ from unittest import mock
 
 
 ADAPTER = Path(__file__).resolve().parent
+sys.path.insert(0, str(ADAPTER.parents[2] / "tests"))
+from asset_fixture import historical_assets
 SPEC = importlib.util.spec_from_loader(
     "dsh_dev", SourceFileLoader("dsh_dev", str(ADAPTER / "dsh-dev"))
 )
 assert SPEC is not None and SPEC.loader is not None
 dev = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(dev)
+dev.REPO = historical_assets()
+dev.SOURCES = dev.REPO / "config/sources.json"
+dev.resolve = partial(dev.resolve, repo=dev.REPO)
 
 TOKEN = "dsh web: http://127.0.0.1:3081/?token=secret-token-value\n"
 IMAGE_TAG = dev.resolve()["image"]["local_image_tag"]
@@ -1583,6 +1589,8 @@ class RuntimeEnvironmentRetentionTest(unittest.TestCase):
                 return subprocess.CompletedProcess(command, 0, "fixture-container\n", "")
             if command[:2] == ["docker", "inspect"]:
                 return subprocess.CompletedProcess(command, 0, json.dumps(self.inspected_environment()), "")
+            if command[0] == "node":
+                return subprocess.CompletedProcess(command, 0, command[-1] + "\n", "")
             passed_environments.append(options["env"])
             return subprocess.CompletedProcess(command, 0, "", "")
 
@@ -2174,7 +2182,7 @@ class CliSurfaceTest(unittest.TestCase):
             capture_output=True, text=True, check=False, timeout=60)
         self.assertEqual(completed.returncode, 2)
         self.assertEqual(completed.stdout, "")
-        self.assertIn("experiment:EXP-security-operations-expert-001", completed.stderr)
+        self.assertIn("experiment:EXP-security-operations-expert-024-rad80a907c628", completed.stderr)
         self.assertIn("可用 --mode：eval", completed.stderr)
 
     def test_up_help_documents_replace(self):

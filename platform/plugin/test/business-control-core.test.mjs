@@ -11,7 +11,7 @@ import { build } from 'esbuild'
 const buildRoot = mkdtempSync(join(tmpdir(), 'business-control-test-build-'))
 const entry = new URL('../src/business-control/core.ts', import.meta.url).pathname
 await Promise.all(['core.mjs', 'second.mjs'].map(name => build({ entryPoints: [entry], outfile: join(buildRoot, name), bundle: true, platform: 'node', format: 'esm' })))
-const { BusinessControl, getBusinessControl, withBusinessContext, currentBusinessContext, matchesOperationTarget, configureBusinessControlStateRoot } = await import(`file://${join(buildRoot, 'core.mjs')}`)
+const { BusinessControl, getBusinessControl, withBusinessContext, currentBusinessContext, matchesOperationTarget, configureBusinessControlStateRoot, sharedInstanceIdentity } = await import(`file://${join(buildRoot, 'core.mjs')}`)
 const second = await import(`file://${join(buildRoot, 'second.mjs')}`)
 test.after(() => rmSync(buildRoot, { recursive: true, force: true }))
 
@@ -91,7 +91,7 @@ test('独立 bundle 共用 singleton 与 ALS；未启用旧研究模式保留，
   assert.equal(await getBusinessControl(legacyRoot).execute(operation(), () => 'legacy'), 'legacy')
 })
 
-test('匿名访客普通聊天保留本地输入限制，发布访问不授予业务读取', async t => {
+test('无需认证共享实例允许读取，发布模式仍执行适用的内容策略', async t => {
   const f = await fixture(t)
   f.config.gateway.instances[0].accessMode = 'anonymous'
   writeFileSync(join(f.root, 'config/business-access.json'), JSON.stringify(f.config))
@@ -105,7 +105,7 @@ test('匿名访客普通聊天保留本地输入限制，发布访问不授予�
   assert.equal(await f.control.inspect(guest, 'input', '普通聊天', undefined, 'session:prompt'), undefined)
   assert.equal(f.upstream.riskCalls.length, before)
   assert.equal(f.control.assert(guest, 'session:prompt').kind, 'allow')
-  assert.throws(() => f.control.assert(guest, 'read'), { code: 'agent_forbidden' })
+  assert.equal(f.control.assert(guest, 'read').kind, 'allow')
   await assert.rejects(f.control.inspect(guest, 'input', 'TEST-INJECT', undefined, 'session:prompt'), { code: 'content_restricted' })
   f.config.gateway.instances[0].accessMode = 'authenticated'
   writeFileSync(join(f.root, 'config/business-access.json'), JSON.stringify(f.config))
@@ -114,7 +114,7 @@ test('匿名访客普通聊天保留本地输入限制，发布访问不授予�
   assert.equal(f.upstream.riskCalls.length, before)
 })
 
-test('开发调试实例依赖来源 pin 与签名通道回执，无规则时保留聊天', async t => {
+test('开发调试实例核对固定来源，无控制租约或发布规则仍可聊天', async t => {
   const f = await fixture(t)
   const path = join(f.root, 'config/business-access.json')
   f.config.agents = []
@@ -122,13 +122,13 @@ test('开发调试实例依赖来源 pin 与签名通道回执，无规则时保
   writeFileSync(path, JSON.stringify(f.config))
   const control = new BusinessControl(f.root)
   assert.equal(control.agentStatus(binding.instanceId).authentication.status, 'not_required')
-  assert.equal(control.agentStatus(binding.instanceId).trust.status, 'unknown')
-  assert.throws(() => control.assert(f.a, 'session:prompt'), { code: 'development_channel_unknown' })
+  assert.equal(control.agentStatus(binding.instanceId).trust.status, 'trusted')
+  assert.equal(control.assert(f.a, 'session:prompt').kind, 'allow')
   const snapshot = control.issueSnapshot(binding.instanceId)
   assert.equal(control.acknowledge(binding.instanceId, snapshot.restrictionVersion, snapshot.leaseId), true)
   assert.equal(control.agentStatus(binding.instanceId).trust.status, 'trusted')
   assert.equal(control.assert(f.a, 'session:prompt').kind, 'allow')
-  assert.throws(() => control.assert(f.a, 'read'), { code: 'agent_forbidden' })
+  assert.equal(control.assert(f.a, 'read').kind, 'allow')
   control.recordAgentAuthentication(binding)
   assert.deepEqual(control.agentStatus(binding.instanceId).authentication, { method: 'none', status: 'not_required' })
   f.config.gateway.instances[0].sourceDigest = 'sha256:' + 'b'.repeat(64)
@@ -142,48 +142,45 @@ test('开发调试实例依赖来源 pin 与签名通道回执，无规则时保
   assert.throws(() => control.assert(f.a, 'session:prompt'), { code: 'agent_closed' })
 })
 
-test('开发调试实例跳过发布身份签名，但已配置的访问规则仍约束开关、动作和认证主体', async t => {
+test('未发布实例全部放行，不访问认证与风险服务，也不受发布动作和确认策略限制', async t => {
+  const f = await fixture(t, { confirmation: true })
+  f.config.gateway.instances[0].identityMode = 'development'
+  f.config.gateway.instances[0].accessMode = 'anonymous'
+  Object.assign(f.config.agents[0], { enabled: false, subjects: [], actions: [], serverIds: [], agentTrust: { enabled: false } })
+  writeFileSync(join(f.root, 'config/business-access.json'), JSON.stringify(f.config))
+  const control = f.control
+  const snapshot = control.issueSnapshot(binding.instanceId)
+  control.acknowledge(binding.instanceId, snapshot.restrictionVersion, snapshot.leaseId)
+  const context = control.bindSession(control.createContext(sharedInstanceIdentity(binding), binding), 'shared-development')
+  f.upstream.unavailable = true
+  for (const action of ['agent:access', 'session:prompt', 'read', 'write', 'publish']) assert.equal(control.assert(context, action).kind, 'allow')
+  await control.inspect(context, 'input', 'TEST-INJECT')
+  assert.equal(await f.run(context, { ...operation('writeback'), operationId: 'unregistered', args: { value: 'TEST-PARAM' } }), 'ok')
+  assert.equal(await f.run(context, { ...operation('publish'), args: { fileContentBase64: 'invalid' } }), 'ok')
+  assert.deepEqual(f.upstream.riskCalls, [])
+  assert.equal(control.agentStatus(binding.instanceId).trust.status, 'trusted')
+  assert.throws(() => control.acceptContext({ ...context, sourceDigest: 'different' }), { code: 'instance_binding_mismatch' })
+})
+
+test('开发实例更新来源保留同代次会话，发布实例和其他代次不迁移', async t => {
   const f = await fixture(t)
   const path = join(f.root, 'config/business-access.json')
+  const next = { ...binding, sourceDigest: 'sha256:' + 'c'.repeat(64) }
   f.config.gateway.instances[0].identityMode = 'development'
-  f.config.agents[0].subjects = ['subject-b']
-  f.config.agents[0].actions = ['agent:access', 'session:create', 'session:prompt']
-  f.config.agents[0].agentAuthentication = { enabled: false, method: 'hmac-sha256' }
-  f.config.agents[0].agentTrust = { enabled: false }
-  const save = () => writeFileSync(path, JSON.stringify(f.config))
-  save()
-  const control = new BusinessControl(f.root)
-  const acknowledge = () => {
-    const snapshot = control.issueSnapshot(binding.instanceId)
-    assert.equal(control.acknowledge(binding.instanceId, snapshot.restrictionVersion, snapshot.leaseId), true)
-  }
-  acknowledge()
-  assert.deepEqual(control.agentStatus(binding.instanceId).authentication, { method: 'none', status: 'not_required' })
-  assert.equal(control.agentStatus(binding.instanceId).trust.status, 'trusted')
-  assert.throws(() => control.assert(f.a, 'session:prompt'), { code: 'agent_forbidden' })
-  assert.equal(control.assert(f.b, 'session:prompt').kind, 'allow')
-
-  f.config.agents[0].enabled = false; save()
-  assert.equal(control.agentStatus(binding.instanceId).trust.status, 'revoked')
-  assert.throws(() => control.assert(f.b, 'session:prompt'), { code: 'agent_closed' })
-  f.config.agents[0].enabled = true
-  f.config.agents[0].actions = ['agent:access', 'session:create']; save(); acknowledge()
-  assert.throws(() => control.assert(f.b, 'session:prompt'), { code: 'action_forbidden' })
-  assert.equal(control.assert(f.b, 'agent:access').kind, 'allow')
-
-  f.config.agents[0].actions = ['*']; save(); acknowledge()
-  assert.equal(control.assert(f.b, 'read').kind, 'allow', '已认证开发者仍按已配置动作使用受管能力')
-  f.config.gateway.instances[0].accessMode = 'anonymous'; save(); acknowledge()
-  const subjectId = 'visitor-' + 'v'.repeat(32), expiresAt = deadline()
-  const guest = control.bindSession(control.createContext({
-    subject: { id: subjectId, kind: 'human', identitySource: 'gateway-anonymous' },
-    evidence: { issuer: 'gateway-anonymous', externalSubject: subjectId, method: 'anonymous',
-      verifiedAt: new Date().toISOString(), expiresAt }, expiresAt,
-  }, binding), 'development-guest-session')
-  assert.equal(control.assert(guest, 'session:prompt').kind, 'allow', '访客不按认证主体白名单判断')
-  assert.equal(control.assert(guest, 'read').kind, 'allow', '访客按已配置动作使用受管只读能力')
-  f.config.agents[0].actions = ['agent:access', 'session:create']; save(); acknowledge()
-  assert.throws(() => control.assert(guest, 'session:prompt'), { code: 'action_forbidden' })
+  writeFileSync(path, JSON.stringify(f.config))
+  f.control.registerInstance(next)
+  f.config.gateway.instances[0].sourceDigest = next.sourceDigest
+  writeFileSync(path, JSON.stringify(f.config))
+  const context = f.control.createContext(f.identity('subject-a'), next)
+  assert.equal(f.control.sessionContext(context, 'session-a').sourceDigest, next.sourceDigest)
+  assert.throws(() => f.control.acceptContext(f.a), { code: 'instance_binding_mismatch' })
+  const newer = { ...next, runtimeGeneration: 'new-generation' }
+  f.control.registerInstance(newer)
+  assert.throws(() => f.control.sessionContext(f.control.createContext(f.identity('subject-a'), newer), 'session-a'), { code: 'resource_unavailable' })
+  f.config.gateway.instances[0].identityMode = 'published'
+  writeFileSync(path, JSON.stringify(f.config))
+  f.control.registerInstance(binding)
+  assert.throws(() => f.control.sessionContext(f.control.createContext(f.identity('subject-a'), binding), 'session-a'), { code: 'resource_unavailable' })
 })
 
 test('持久会话和资源严格归属，不认领历史记录，同人凭据轮换不改变归属', async t => {
@@ -651,4 +648,30 @@ test('报告Base64实际正文在首次发布前检查，敏感或无效内容�
     await assert.rejects(f.run(f.a, { ...operation('publish'), args: { fileContentBase64: value } }), { code: 'report_content_invalid' })
   }
   assert.equal(f.upstream.requests, 1)
+})
+
+test('既有匿名历史映射到同实例共享访问，保留原归属与资源并隔离其他实例和登录用户', async t => {
+  const f = await fixture(t)
+  f.config.gateway.instances[0].accessMode = 'anonymous'
+  writeFileSync(join(f.root, 'config/business-access.json'), JSON.stringify(f.config))
+  const guest = id => f.control.createContext({ subject: { id, kind: 'human', identitySource: 'gateway-anonymous' },
+    evidence: { issuer: 'gateway-anonymous', externalSubject: id, method: 'anonymous', verifiedAt: new Date().toISOString(), expiresAt: deadline() }, expiresAt: deadline() }, binding)
+  const oldId = 'visitor-' + 'o'.repeat(32), old = f.control.bindSession(guest(oldId), 'legacy-guest')
+  f.control.bindResource(old, { kind: 'attachment', id: 'legacy-data' })
+  const visitor = guest('visitor-' + 'n'.repeat(32))
+  assert.ok(f.control.listSessions(visitor).includes('legacy-guest'))
+  assert.equal(f.control.sessionContext(visitor, 'legacy-guest').subject.id, visitor.subject.id)
+  assert.equal(f.control.assert(f.control.sessionContext(visitor, 'legacy-guest'), 'session:read', [{ kind: 'attachment', id: 'legacy-data' }]).kind, 'allow')
+  assert.equal(f.control.bindSession(visitor, 'legacy-child', 'legacy-guest').subject.id, visitor.subject.id)
+  assert.ok(f.control.listSessions(visitor).includes('legacy-child'))
+  assert.equal(f.control.listSessions(f.a).includes('legacy-guest'), false)
+  const other = { ...binding, instanceId: 'other-runtime' }; f.control.registerInstance(other)
+  assert.throws(() => f.control.sessionContext({ ...visitor, scope: { ...visitor.scope, instanceId: other.instanceId } }, 'legacy-guest'), { code: 'resource_unavailable' })
+  assert.equal(f.control.contextForSession('legacy-guest').subject.id, sharedInstanceIdentity(binding).subject.id)
+  assert.ok(f.control.listSessions(visitor).includes('session-a'), '同实例的既有登录会话也共享')
+  const persisted = JSON.parse(readFileSync(join(f.root, '.local/business-control/state.json'), 'utf8'))
+  assert.equal(persisted.sessions['legacy-guest'].subjectId, oldId)
+  f.config.gateway.instances[0].accessMode = 'authenticated'
+  writeFileSync(join(f.root, 'config/business-access.json'), JSON.stringify(f.config))
+  assert.throws(() => f.control.sessionContext(visitor, 'legacy-guest'), { code: 'resource_unavailable' })
 })

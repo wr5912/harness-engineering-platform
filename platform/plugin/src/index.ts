@@ -30,6 +30,7 @@ import { assistantMcp } from './assistant/mcp.ts'
 import { createPlatformEvents } from './realtime/index.ts'
 import logo from '../assets/harness-logo.svg'
 import { applyBusinessGateway } from './business-control/index.ts'
+import { platformEntryUrl } from './business-control/group-link.ts'
 import { managementDispatch } from './mcp/control.ts'
 import { currentBusinessContext, getBusinessControl } from './business-control/core.ts'
 
@@ -299,5 +300,7 @@ export async function apply(ctx: Context, config: Config) {
     .replace('</head>', `${icon}</head>`)))
   applyTools(ctx)
   await applyBusinessGateway(ctx, assetRoot)
-  WebApp.apply(ctx, { ...config, publicUrl: `${ctx.webServer.protocol}//${ctx.webServer.host}:${ctx.webServer.port}${ctx.webServer.publicPath('/')}` })
+  const publicUrl = platformEntryUrl(assetRoot, { publicUrl: config.publicUrl,
+    fallback: `${ctx.webServer.protocol}//${ctx.webServer.host}:${ctx.webServer.port}${ctx.webServer.publicPath('/')}` })
+  WebApp.apply(ctx, { ...config, publicUrl })
 }

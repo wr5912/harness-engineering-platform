@@ -1,6 +1,8 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { createRequire } from 'node:module'
 import { callOpenApiTool, loadOpenApi, readOpenApiResource, validateAuthHeader, validateSpecUrl } from './openapi.mjs'
+import { assertConnectionReady, connectionIssue } from './connection.ts'
+export { assertConnectionReady } from './connection.ts'
 
 const runtimeRequire = createRequire('/opt/dsh/packages/mcp/mcp-client/package.json')
 const z = runtimeRequire('@deepseek-ai/schemastery')
@@ -83,7 +85,6 @@ function snapshot(config: any) {
       validateSpecUrl(server.specUrl)
       if (server.url || server.managementUrl || server.headers?.length) throw new Error(`${server.id}: OpenAPI 与现成 MCP 连接不能混用`)
       if (server.authType === 'login') {
-        if (server.enabled && (!server.loginUrl || !server.loginUsername || !server.loginPassword || !server.loginTokenPath)) throw new Error(`${server.id}: 登录授权信息不完整`)
         if (server.loginUrl) validateSpecUrl(server.loginUrl)
         if (server.loginTokenPath && !server.loginTokenPath.split('.').every((part: string) => /^[A-Za-z_][\w-]*$/.test(part))) throw new Error(`${server.id}: 凭据字段路径无效`)
       } else if (server.authType === 'credential') {
@@ -97,7 +98,7 @@ function snapshot(config: any) {
     const headerNames = new Set<string>()
     for (const header of server.headers ?? []) {
       const name = header.name?.toLowerCase()
-      if (!headerNamePattern.test(header.name) || (server.enabled && !header.value) || /[\r\n]/.test(header.value) || headerNames.has(name)) {
+      if (!headerNamePattern.test(header.name) || /[\r\n]/.test(header.value) || headerNames.has(name)) {
         throw new Error(`${server.id}: 请求 Header 无效或重复`)
       }
       headerNames.add(name)
@@ -165,6 +166,7 @@ async function serverTools(server: any): Promise<any[]> {
 }
 
 async function withClient<T>(server: any, run: (client: any) => Promise<T>): Promise<T> {
+  assertConnectionReady(server)
   const url = resolvedUrl(server)
   if (!url) throw new Error(`${server.id}: MCP URL 未配置`)
   const client = new Client({ name: 'dsh-web-mcp-manager', version: '0.1.0' })
@@ -450,8 +452,9 @@ function assertGroupTarget(target: GroupTarget, currentTarget: (() => Target | u
 async function serveMcp(req: any, res: any, target: Target, currentTarget?: () => Target | undefined,
   version: GroupVersion = 1, withGroupRequest?: (req: any, rpcMethod: string, run: () => Promise<any>, rpcRequest: any) => Promise<any>): Promise<void> {
   const digest = target.kind === 'group' ? groupTargetDigest(target, version) : undefined
+  let wireRequest: any
   const runRequest = (method: string, rpcRequest: any, run: () => Promise<any>) => withGroupRequest
-    ? withGroupRequest(req, method, run, rpcRequest) : run()
+    ? withGroupRequest(req, method, run, wireRequest ?? rpcRequest) : run()
   const agentDigest = (value: any) => JSON.stringify([value?.id, value?.enabled, value?.specUrl, value?.url, value?.tools])
   const assertTarget = (request?: any) => {
     const current = currentTarget?.()
@@ -504,7 +507,13 @@ async function serveMcp(req: any, res: any, target: Target, currentTarget?: () =
     return mcp
   })
   try {
-    await toNodeHandler(handler)(req, res)
+    await toNodeHandler({ fetch: async (request, options) => {
+      // SDK 会提取现代协议的信封字段；签名必须核对传输原文。
+      if (withGroupRequest && request.method === 'POST') {
+        try { wireRequest = await request.clone().json() } catch { /* 由 SDK 返回协议解析错误。 */ }
+      }
+      return handler.fetch(request, wireRequest === undefined ? options : { ...options, parsedBody: wireRequest })
+    } })(req, res)
   } finally {
     await handler.close()
   }
@@ -535,6 +544,7 @@ async function upstream(server: any, method: string, path: string, data?: unknow
 }
 
 async function manage(server: any, request: any): Promise<any> {
+  assertConnectionReady(server)
   const { action, sourceId, toolName } = request
   const source = typeof sourceId === 'string' && /^[0-9a-fA-F-]{36}$/.test(sourceId) ? sourceId : undefined
   const tool = typeof toolName === 'string' && /^[A-Za-z0-9_.-]{1,160}$/.test(toolName) ? toolName : undefined
@@ -655,7 +665,7 @@ export function apply(ctx: any, config: any): void {
       const current = snapshot(config)
       if (req.method === 'GET') return send(res, 200, {
         servers: current.servers.map(server => ({ id: server.id, enabled: server.enabled,
-          addressConfigured: Boolean(server.specUrl || resolvedUrl(server)), managementConfigured: Boolean(server.managementUrl) })),
+          addressConfigured: Boolean(server.specUrl || resolvedUrl(server)), managementConfigured: Boolean(server.managementUrl), configurationIssue: connectionIssue(server) })),
         groupPaths: current.groups.map(group => ({ id: group.id, path: publicPath(`/mcp/groups/${group.id}`),
           v2Path: publicPath(`/mcp/groups/${group.id}/v2`) })),
         tokenConfigured: Boolean(current.sharedToken),
@@ -699,8 +709,8 @@ export function apply(ctx: any, config: any): void {
   } }), 'mcp-manager.admin')
 
   const loadServers = async (selected: any[], preset: object, scopes: any[], unavailable: Set<string>) => {
-    const enabled = selected.filter(server => server.enabled && (server.platformComposition || server.specUrl || resolvedUrl(server)))
-    // Session 创建只等待有界的并发发现；单个上游卡住时，其余工具仍可装载。
+    const enabled = selected.filter(server => server.enabled && !connectionIssue(server) && (server.platformComposition || server.specUrl || resolvedUrl(server)))
+    // 并发发现有界执行；单个上游失败时，其余工具仍可装载。
     const discoveries = config.withToolContext ? await Promise.allSettled(enabled.map(server => {
       const timeoutMs = Number.isSafeInteger(server.platformTimeoutMs) && server.platformTimeoutMs > 0
         ? Math.min(server.platformTimeoutMs, 10_000) : 10_000
@@ -793,7 +803,7 @@ export function apply(ctx: any, config: any): void {
     }
   }
 
-  if (config.autoMountServers !== false) ctx.on('agent/created', async ({ agent }: any) => {
+  if (config.autoMountServers !== false) ctx.on('agent/created', ({ agent }: any) => {
     const preset = scopeParentOf(agent)
     if (!preset) return
     const current = snapshot(config)
@@ -825,33 +835,37 @@ export function apply(ctx: any, config: any): void {
       active.users--
       if (active.users === 0) {
         if (mounted.get(preset) === active) mounted.delete(preset)
+        await active.retry?.catch(() => {})
         await Promise.all((await active.ready.catch(() => [])).map(scope => scope.dispose()))
       }
     }
     active.users++
-    try {
-      await active.ready
-      if (reused && active.unavailable.size) {
-        active.retry ??= (async () => {
-          const scopes = await active.ready
-          const added: any[] = []
-          const pending = new Set(active.unavailable)
-          try {
-            await loadServers(current.servers.filter(server => pending.has(server.id)), preset, added, active.unavailable)
-            scopes.push(...added)
-          } catch (error) {
-            for (const id of pending) active.unavailable.add(id)
-            await Promise.all(added.map(scope => scope.dispose()))
-            throw error
-          }
-        })().finally(() => { active.retry = undefined })
-        await active.retry
-      }
-    }
-    catch (error) {
-      await release()
-      throw error
-    }
     agent.ctx.effect(() => release, 'mcp-manager.agent')
+    // 外部发现只负责补充工具，不能阻塞原生 Session 创建和普通对话。
+    void (async () => {
+      try {
+        await active.ready
+        if (active.users === 0) return
+        if (reused && active.unavailable.size) {
+          active.retry ??= (async () => {
+            const scopes = await active.ready
+            const added: any[] = []
+            const pending = new Set(active.unavailable)
+            try {
+              await loadServers(current.servers.filter(server => pending.has(server.id)), preset, added, active.unavailable)
+              scopes.push(...added)
+            } catch (error) {
+              for (const id of pending) active.unavailable.add(id)
+              await Promise.all(added.map(scope => scope.dispose()))
+              throw error
+            }
+          })().finally(() => { active.retry = undefined })
+          await active.retry
+        }
+      }
+      catch (error) {
+        ctx.logger?.warn('MCP 工具装载未完成；智能体继续运行，请在 MCP 管理检查连接')
+      }
+    })()
   }, { prepend: true })
 }

@@ -21,6 +21,7 @@ export const managerSources = {
         if (start < 0 || end <= start) throw new Error('MCP 管理客户端装载合同已变化')
         const client = original.slice(start, end)
         contents = `import * as React from 'react'; const { useEffect, useState, useRef } = React;
+import { connectionIssue } from './connection.ts';
 ${client}
 export { Manager };`
       } else if (path.endsWith('openapi')) {
@@ -79,7 +80,7 @@ const implementationFiles = ['definition.ts', 'compositions.ts', 'executor.ts', 
   .concat(['platform/plugin/build.mjs', 'platform/plugin/package.json', 'platform/plugin/pnpm-lock.yaml', 'platform/plugin/src/index.ts',
     'platform/plugin/src/evaluation/model-attempts.ts', 'platform/plugin/src/workflows/graph.ts',
     ...['contracts.ts', 'core.ts', 'gateway.ts', 'group-link.ts', 'providers.ts', 'reports.ts', 'runtime.ts'].map(file => `platform/plugin/src/business-control/${file}`),
-    ...['index.ts', 'openapi.ts'].map(file => `plugins/mcp-manager/${file}`),
+    ...['index.ts', 'openapi.ts', 'connection.ts'].map(file => `plugins/mcp-manager/${file}`),
     'platform/plugin/src/mcp/store.ts'])
 const implementationHash = createHash('sha256')
 for (const file of implementationFiles) implementationHash.update(file).update('\0').update(await readFile(new URL('../../' + file, import.meta.url)))

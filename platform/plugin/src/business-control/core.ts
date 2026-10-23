@@ -13,6 +13,14 @@ import { resolveBusinessSecretFile } from './secret-file.ts'
 
 export * from './contracts.js'
 
+/** 无需认证时仅构造实例级路由上下文，不识别访问者。 */
+export function sharedInstanceIdentity(binding: Pick<InstanceBinding, 'workspaceId' | 'agentId' | 'instanceId'>): AuthenticatedIdentity {
+  const id = `shared-${createHash('sha256').update(JSON.stringify([binding.workspaceId, binding.agentId, binding.instanceId])).digest('base64url')}`
+  const expiresAt = new Date(Date.now() + 7 * 86400_000).toISOString()
+  return { subject: { id, kind: 'human', identitySource: 'gateway-shared' },
+    evidence: { issuer: 'gateway-shared', externalSubject: id, method: 'none', verifiedAt: new Date().toISOString(), expiresAt }, expiresAt }
+}
+
 export class BusinessControlError extends Error {
   constructor(public code: string, message: string, public httpStatus = 403) { super(message); this.name = 'BusinessControlError' }
 }
@@ -65,7 +73,6 @@ const matches = (scope: ControlScope, context: BusinessContext, serverId?: strin
 const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const future = (value: string) => Number.isFinite(Date.parse(value)) && Date.parse(value) > Date.now()
 const kinds: OperationKind[] = ['read', 'write', 'resource', 'publish']
-const chatActions = ['agent:access', 'session:create', 'session:read', 'session:prompt']
 interface GatewayRegistration { agentId: string; instanceId: string; sourceDigest?: string; accessMode?: string; identityMode?: string }
 function gatewayRegistration(config: BusinessAccessConfig, agentId?: string, instanceId?: string): GatewayRegistration | undefined {
   return (config.gateway as { instances?: GatewayRegistration[] } | undefined)?.instances?.find(value => value.agentId === agentId && value.instanceId === instanceId)
@@ -185,7 +192,9 @@ export class BusinessControl {
         runtimeGeneration: binding?.runtimeGeneration, restrictionVersion: this.state.restrictionVersion } }
     if (!binding) { result.trust.reason = 'instance_unregistered'; return result }
     const replica = this.requiredSnapshots.has(instanceId), lease = this.leases.get(instanceId)
-    if (replica && lease?.snapshot.agentStatus) {
+    if (development) {
+      result.trust.status = 'trusted'; result.trust.reason = 'development-pinned-source'
+    } else if (replica && lease?.snapshot.agentStatus) {
       result.authentication = { ...lease.snapshot.agentStatus.authentication }
       result.trust = { ...lease.snapshot.agentStatus.trust, restrictionVersion: this.state.restrictionVersion }
       if (development !== (result.authentication.status === 'not_required')) {
@@ -197,15 +206,8 @@ export class BusinessControl {
         result.trust.status = 'expired'; result.trust.reason = 'agent_channel_expired'
       }
     } else if (!replica) {
-      const authenticated = development ? undefined : this.agentAuthentications.get(instanceId)
-      if (development) {
-        const ack = this.acknowledgements.get(instanceId)
-        if (ack) {
-          const fresh = Date.now() - Date.parse(ack.at) < 2000
-          result.trust.status = fresh ? 'trusted' : 'expired'
-          result.trust.reason = fresh ? 'development-pinned-channel' : 'development_channel_expired'
-        }
-      } else if (authenticated) {
+      const authenticated = this.agentAuthentications.get(instanceId)
+      if (authenticated) {
         const fresh = performance.now() - authenticated.receivedAt < 2000
         result.authentication = { method: 'hmac-sha256', status: fresh ? 'verified' : 'expired',
           verifiedAt: authenticated.evidence.verifiedAt, expiresAt: authenticated.evidence.expiresAt, evidence: authenticated.evidence.source }
@@ -217,7 +219,7 @@ export class BusinessControl {
     }
     if (!development && rule?.agentAuthentication?.enabled === false) {
       result.authentication.status = 'disabled'; result.trust.status = 'revoked'; result.trust.reason = 'agent_authentication_disabled'
-    } else if (!config.enabled || rule?.enabled === false || !development && (!rule || rule.agentTrust?.enabled === false)) {
+    } else if (!config.enabled || !development && (!rule || rule.enabled === false || rule.agentTrust?.enabled === false)) {
       result.trust.status = 'revoked'; result.trust.reason = !config.enabled ? 'business_disabled' : !rule?.enabled ? 'agent_closed' : 'agent_trust_revoked'
     } else if (this.observedManagedGateway && !config.gateway) {
       result.trust.status = 'revoked'; result.trust.reason = 'gateway_registration_unavailable'
@@ -330,6 +332,14 @@ export class BusinessControl {
     if (Object.values(binding).some(value => typeof value !== 'string' || !value)) return error('instance_binding_invalid')
     const old = this.state.instances[binding.instanceId]
     if (JSON.stringify(old) === JSON.stringify(binding)) return
+    const registered = gatewayRegistration(this.config(), binding.agentId, binding.instanceId)
+    if (old && old.workspaceId === binding.workspaceId && old.agentId === binding.agentId
+      && old.runtimeGeneration === binding.runtimeGeneration && registered?.identityMode === 'development') {
+      for (const session of Object.values(this.state.sessions)) {
+        if (session.instanceId === old.instanceId && session.workspaceId === old.workspaceId && session.agentId === old.agentId
+          && session.runtimeGeneration === old.runtimeGeneration && session.sourceDigest === old.sourceDigest) session.sourceDigest = binding.sourceDigest
+      }
+    }
     this.state.instances[binding.instanceId] = { ...binding }
     this.agentAuthentications.delete(binding.instanceId); this.acknowledgements.delete(binding.instanceId)
     this.persist()
@@ -345,12 +355,13 @@ export class BusinessControl {
       sourceDigest: binding.sourceDigest, identity: { evidence: { ...identity.evidence }, expiresAt: identity.expiresAt } }
     return this.acceptContext(context)
   }
-  private anonymousContext(context: BusinessContext): boolean {
+  isSharedContext(context: BusinessContext): boolean {
     const evidence = context.identity?.evidence
-    if (context.subject.kind !== 'human' || context.subject.identitySource !== 'gateway-anonymous'
-      || !/^visitor-[A-Za-z0-9_-]{32,}$/.test(context.subject.id)
-      || evidence?.issuer !== 'gateway-anonymous' || evidence.method !== 'anonymous'
-      || evidence.externalSubject !== context.subject.id) return false
+    const shared = context.subject.identitySource === 'gateway-shared' && evidence?.issuer === 'gateway-shared'
+      && evidence.method === 'none' && context.subject.id === sharedInstanceIdentity(context.scope as InstanceBinding).subject.id
+    const legacy = context.subject.identitySource === 'gateway-anonymous' && evidence?.issuer === 'gateway-anonymous'
+      && evidence.method === 'anonymous' && /^visitor-[A-Za-z0-9_-]{32,}$/.test(context.subject.id)
+    if (context.subject.kind !== 'human' || (!shared && !legacy) || evidence?.externalSubject !== context.subject.id) return false
     const registered = gatewayRegistration(this.config(), context.scope.agentId, context.scope.instanceId)
     return registered?.accessMode === 'anonymous'
   }
@@ -371,7 +382,8 @@ export class BusinessControl {
   }
   private checkSession(context: BusinessContext, sessionId: string): SessionBinding {
     const binding = this.state.sessions[sessionId]
-    if (!binding || binding.subjectId !== context.subject.id || binding.subject.identitySource !== context.subject.identitySource
+    const shared = this.isSharedContext(context)
+    if (!binding || (!shared && (binding.subjectId !== context.subject.id || binding.subject.identitySource !== context.subject.identitySource))
       || binding.workspaceId !== context.scope.workspaceId || binding.agentId !== context.scope.agentId
       || binding.instanceId !== context.scope.instanceId || binding.runtimeGeneration !== context.scope.runtimeGeneration
       || binding.sourceDigest !== context.sourceDigest) return error('resource_unavailable')
@@ -381,7 +393,10 @@ export class BusinessControl {
     this.assert(context, 'session:create')
     if (!sessionId || typeof sessionId !== 'string') return error('session_invalid')
     if (parentSessionId !== undefined && (typeof parentSessionId !== 'string' || !parentSessionId || parentSessionId === sessionId)) return error('session_invalid')
-    if (parentSessionId && this.checkSession(context, parentSessionId).parentSessionId) return error('session_invalid')
+    if (parentSessionId) {
+      if (this.checkSession(context, parentSessionId).parentSessionId) return error('session_invalid')
+      context = this.sessionContext(context, parentSessionId)
+    }
     const previous = this.state.sessions[sessionId]
     if (previous) {
       this.checkSession(context, sessionId)
@@ -402,7 +417,7 @@ export class BusinessControl {
   sessionContext(context: BusinessContext, sessionId: string): BusinessContext {
     const binding = this.checkSession(context, sessionId)
     // 新凭据仍属于同一主体；刷新任务恢复证据，不改变持久归属。
-    if (context.identity && Date.parse(context.identity.evidence.verifiedAt) >= Date.parse(binding.identity?.evidence.verifiedAt ?? '1970-01-01')
+    if (!this.isSharedContext(context) && context.identity && Date.parse(context.identity.evidence.verifiedAt) >= Date.parse(binding.identity?.evidence.verifiedAt ?? '1970-01-01')
       && digest(context.identity) !== digest(binding.identity)) {
       binding.identity = structuredClone(context.identity); binding.observedAt = iso(); this.persist()
     }
@@ -411,10 +426,14 @@ export class BusinessControl {
   contextForSession(sessionId: string): BusinessContext | undefined {
     const binding = this.state.sessions[sessionId]
     if (!binding) return undefined
-    return this.acceptContext({ requestId: randomUUID(), subject: { ...binding.subject }, sourceDigest: binding.sourceDigest,
-      identity: structuredClone(binding.identity), scope: { workspaceId: binding.workspaceId, agentId: binding.agentId,
-        subjectId: binding.subjectId, instanceId: binding.instanceId, runtimeGeneration: binding.runtimeGeneration, sessionId } })
+    const identity = gatewayRegistration(this.config(), binding.agentId, binding.instanceId)?.accessMode === 'anonymous'
+      ? sharedInstanceIdentity(binding) : binding.identity && { subject: binding.subject, ...structuredClone(binding.identity) }
+    if (!identity) return undefined
+    return this.acceptContext({ requestId: randomUUID(), subject: { ...identity.subject }, sourceDigest: binding.sourceDigest,
+      identity: { evidence: identity.evidence, expiresAt: identity.expiresAt }, scope: { workspaceId: binding.workspaceId, agentId: binding.agentId,
+        subjectId: identity.subject.id, instanceId: binding.instanceId, runtimeGeneration: binding.runtimeGeneration, sessionId } })
   }
+
   listSessions(context: BusinessContext): string[] {
     this.assert(context, 'session:read')
     return Object.keys(this.state.sessions).filter(id => { try { this.checkSession(context, id); return true } catch { return false } })
@@ -423,7 +442,7 @@ export class BusinessControl {
     this.acceptContext(context)
     if (!context.scope.sessionId || !resource.kind || !resource.id) return error('resource_invalid')
     const key = JSON.stringify([resource.kind, resource.id]), old = this.state.resources[key]
-    if (old && (old.subjectId !== context.subject.id || old.sessionId !== context.scope.sessionId)) return error('resource_unavailable')
+    if (old) { this.checkResource(context, resource); return }
     this.state.resources[key] = { subjectId: context.subject.id, sessionId: context.scope.sessionId }
     this.persist()
   }
@@ -434,7 +453,9 @@ export class BusinessControl {
     if (resource.kind === 'instance' && resource.id === context.scope.instanceId) return
     if (resource.kind === 'operation') return
     const saved = this.state.resources[JSON.stringify([resource.kind, resource.id])]
-    if (!saved || saved.subjectId !== context.subject.id || saved.sessionId !== context.scope.sessionId) return error('resource_unavailable')
+    if (!saved || saved.sessionId !== context.scope.sessionId) return error('resource_unavailable')
+    const session = this.checkSession(context, saved.sessionId)
+    if (saved.subjectId !== context.subject.id && !(this.isSharedContext(context) && saved.subjectId === session.subjectId)) return error('resource_unavailable')
   }
   private checkLease(context: BusinessContext): void {
     const id = context.scope.instanceId!
@@ -459,32 +480,28 @@ export class BusinessControl {
     if (this.isManagement(context)) return { kind: 'allow', policyVersion, restrictionVersion: this.state.restrictionVersion }
     if (!config.enabled) return error('business_disabled', 503)
     if (!this.available) return error('authorization_unavailable', 503)
-    const anonymous = this.anonymousContext(context)
+    const anonymous = this.isSharedContext(context)
     if (!anonymous && (!config.authentication || !config.identityTrust || !context.identity)) return error('identity_unavailable', 503)
     if (!anonymous && context.identity!.evidence.issuer !== new URL(config.authentication!.endpoint).origin) return error('identity_source_changed', 401)
-    this.acceptContext(context); this.checkLease(context)
+    this.acceptContext(context)
+    if (!this.isDevelopmentContext(context)) this.checkLease(context)
     if (config.gateway) this.observedManagedGateway = true
     if (this.observedManagedGateway && !config.gateway) return error('gateway_registration_unavailable', 503)
     const registered = gatewayRegistration(config, context.scope.agentId, context.scope.instanceId)
     if (config.gateway && !registered) return error('instance_not_registered', 403)
     const development = registered?.identityMode === 'development'
     const agent = config.agents.find(value => value.agentId === context.scope.agentId)
-    if (agent?.enabled === false || !development && !agent) return error('agent_closed')
+    if (!development && (!agent || agent.enabled === false)) return error('agent_closed')
     const agentStatus = this.agentStatus(context.scope.instanceId!)
     if (agentStatus.trust.status !== 'trusted') return error(agentStatus.trust.reason, 503)
     if (development) {
       if (!registered.sourceDigest || registered.sourceDigest !== context.sourceDigest) return error('agent_source_mismatch')
-      // 开发调试实例：匿名访客与认证用户一样按 Agent 规则使用已声明的动作；
-      // 未配置 Agent 规则时仍只开放聊天动作。写与发布继续受动作、操作和风险规则约束。
-      if (!agent && !chatActions.includes(action)) return error('agent_forbidden')
-      if (agent && !anonymous && !agent.subjects.includes(context.subject.id)) return error('agent_forbidden')
-      if (agent && !agent.actions.includes('*') && !actionNames.some(value => agent.actions.includes(value))) return error('action_forbidden')
       resources.forEach(value => this.checkResource(context, value))
       return { kind: 'allow', policyVersion, restrictionVersion: this.state.restrictionVersion }
     }
     if (agentStatus.authentication.status !== 'verified') return error('agent_authentication_unknown', 503)
     const pinnedDigest = registered?.sourceDigest ?? agent!.sourceDigest
-    if ((anonymous ? !chatActions.includes(action) : !agent!.subjects.includes(context.subject.id))
+    if ((!anonymous && !agent!.subjects.includes(context.subject.id))
       || (pinnedDigest && pinnedDigest !== context.sourceDigest)) return error('agent_forbidden')
     if (!agent!.actions.includes('*') && !actionNames.some(value => agent!.actions.includes(value))) return error('action_forbidden')
     resources.forEach(value => this.checkResource(context, value))
@@ -492,7 +509,7 @@ export class BusinessControl {
   }
   assert(context: BusinessContext, action: string, resources: readonly ResourceRef[] = [], args?: unknown): AccessDecision & { kind: 'allow' } {
     const decision = this.assertBase(context, action, resources)
-    if (this.isManagement(context)) return decision
+    if (this.isManagement(context) || this.isDevelopmentContext(context)) return decision
     const config = this.config(), actionNames = action === 'resource' ? ['resource', 'read'] : [action]
     const required = actionNames.some(value => (config.riskAssessment?.requiredKinds ?? ['write', 'publish']).includes(value as OperationKind))
     if (required && !config.riskAssessment) return error('risk_provider_unavailable', 503)
@@ -521,6 +538,7 @@ export class BusinessControl {
     this.operationRule(context, operation)
   }
   private operationRule(context: BusinessContext, operation: BusinessOperation, checkRisk = true): void {
+    if (this.isDevelopmentContext(context)) return
     const config = this.config(), rule = config.operations?.find(value => value.serverId === operation.serverId && value.operationId === operation.operationId)
     if (!rule) return error('operation_unregistered')
     if (rule.kind !== operation.kind || !matchesOperationTarget(rule.target, operation.target, rule.queryParameters) || rule.method.toUpperCase() !== operation.method.toUpperCase()
@@ -580,7 +598,8 @@ export class BusinessControl {
   }
   async inspect(context: BusinessContext, stage: 'input' | 'operation' | 'report', input: unknown, signal = noSignal(), action: string = 'write', operationBinding?: AccessRequest['operationBinding']): Promise<RiskFact | undefined> {
     this.acceptContext(context)
-    if (context.identity?.evidence.method === 'anonymous' && !this.anonymousContext(context)) return error('identity_source_changed', 401)
+    if (this.isDevelopmentContext(context)) return
+    if (['anonymous', 'none'].includes(context.identity?.evidence.method ?? '') && !this.isSharedContext(context)) return error('identity_source_changed', 401)
     const config = this.config(), inspected = stage === 'report' ? reportInspectionInput(input) : input
     const text = typeof inspected === 'string' ? inspected : JSON.stringify(inspected)
     const markers = stage === 'input' ? config.detection?.inputMarkers : stage === 'report' ? config.detection?.reportMarkers : config.detection?.operationMarkers
@@ -594,7 +613,7 @@ export class BusinessControl {
       return error('content_restricted')
     }
     // 匿名基础聊天没有外部用户凭据；保留本地检测和既有访问限制，不调用要求认证主体的风险提供方。
-    if (stage === 'input' && this.anonymousContext(context)) return
+    if (stage === 'input' && this.isSharedContext(context)) return
     if (config.riskAssessment) {
       try { return await this.reassess(context, signal, stage === 'report' ? 'publish' : stage === 'input' ? 'input' : action, inspected, operationBinding) }
       catch (cause) {
@@ -609,7 +628,7 @@ export class BusinessControl {
     if (!this.available) return error('authorization_unavailable', 503)
     this.acceptContext(context)
     const config = this.config()
-    if (this.anonymousContext(context)) { this.assert(context, 'agent:access', [{ kind: 'agent', id: context.scope.agentId }]); return }
+    if (this.isSharedContext(context)) { this.assert(context, 'agent:access', [{ kind: 'agent', id: context.scope.agentId }]); return }
     if (!config.authentication || !config.identityTrust || !context.identity) return error('identity_unavailable', 503)
     if (context.identity.evidence.issuer !== new URL(config.authentication.endpoint).origin) return error('identity_source_changed', 401)
     const trust = await new HttpIdentityTrustProvider(config.identityTrust).resolve(context.identity.evidence, signal)
@@ -649,6 +668,11 @@ export class BusinessControl {
     if (!this.enabled()) return error('business_disabled', 503)
     if (!context) return error('business_context_missing')
     const scoped = { ...context, scope: { ...context.scope, serverId: operation.serverId } }
+    if (this.isDevelopmentContext(scoped)) {
+      signal.throwIfAborted()
+      this.assert(scoped, operation.kind, operation.resources, operation.args)
+      return dispatch(signal)
+    }
     const operationBinding: AccessRequest['operationBinding'] = { serverId: operation.serverId, operationId: operation.operationId,
       target: operation.target, method: operation.method, kind: operation.kind }
     const controller = new AbortController(), executionSignal = AbortSignal.any([signal, controller.signal]), id = randomUUID()

@@ -4,7 +4,7 @@ set -euo pipefail
 task_adapter_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 task_repo_dir="$(cd "$task_adapter_dir/../../.." && pwd -P)"
 task_source_dir=""
-task_source_id="EXP-security-operations-expert-001"
+task_source_id=""
 task_evidence_file=""
 task_build_network="default"
 # 构建期 APT 默认使用 TUNA 主源和 Debian 官方 security；npm/pnpm 走 registry.npmmirror.com。
@@ -60,6 +60,7 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+task_source_id="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --field experiment_id)"
 task_source_commit="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --field image.commit)"
 task_source_tree="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --field image.tree)"
 task_lock_sha="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --field image.pnpm_lock_sha256)"

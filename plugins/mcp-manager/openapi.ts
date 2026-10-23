@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { assertConnectionReady } from './connection.ts'
 
 const MAX_DOCUMENT = 2 * 1024 * 1024
 const MAX_RESULT = 1024 * 1024
@@ -168,6 +169,7 @@ async function authorizedFetch(server: any, url: URL, init: RequestInit, spec?: 
 }
 
 export async function loadOpenApi(server: any): Promise<any> {
+  assertConnectionReady(server)
   const specUrl = validateSpecUrl(server.specUrl)
   let response = await fetch(specUrl, { signal: requestSignal(server) })
   let retriedWithAuth = false

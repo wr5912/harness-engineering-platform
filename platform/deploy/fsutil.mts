@@ -28,6 +28,10 @@ export function ensureEmptyDir(path: string): void {
 
 export function copyTree(source: string, target: string, filter?: (source: string, target: string) => boolean): void {
   mkdirSync(dirname(target), { recursive: true })
+  if (!filter && !existsSync(target)) {
+    run('/bin/cp', ['-a', '--', source, target])
+    return
+  }
   cpSync(source, target, {
     recursive: true,
     force: true,

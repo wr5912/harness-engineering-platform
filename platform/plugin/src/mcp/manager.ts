@@ -9,14 +9,14 @@ import { executableCatalog, type CompositionExtension } from './extension.ts'
 import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
 import { getBusinessControl, currentBusinessContext, withBusinessContext, withSignedRuntimeSession } from '../business-control/core.ts'
 import { businessRpcDigest, readBusinessSecret, resolveBusinessInstance, verifyBusinessAssertion, type BusinessGatewayConfig, type RuntimeAssertion } from '../business-control/gateway.ts'
-import { platformGroupServer } from '../business-control/group-link.ts'
+import { platformEntryUrl, platformGroupServer, platformGroupUrl } from '../business-control/group-link.ts'
 import { managedDispatch, managementDispatch } from './control.ts'
 import { setBusinessReportHeaderResolver } from '../business-control/reports.ts'
 import { createBusinessControlHandler } from '../business-control/management.ts'
 import { loadOpenApi } from 'harness-mcp-manager-openapi'
 import { McpConfigStore, type McpConfigurationView } from './store.ts'
 
-export const { name, Config } = manager
+export const { name, Config, validateConfiguration } = manager
 export const inject = manager.inject
 export interface ManagerConfig {
   servers: { get(): any[] }
@@ -36,7 +36,10 @@ const connectionFields = ['specUrl', 'url', 'managementUrl', 'authType', 'authHe
 function businessServers(assetRoot: string, candidateServers: any[], platformServers: any[]): any[] {
   const platformById = new Map(platformServers.map(server => [server.id, server]))
   return candidateServers.map(candidate => {
-    if (platformGroupServer(assetRoot, candidate)) return candidate
+    // Candidate 保留分组身份；部署入口由当前工作区解析，不沿用种子中的宿主地址。
+    if (candidate.url && new URL(candidate.url).pathname.endsWith(`/mcp/groups/${candidate.id}/v2`)) {
+      return { ...candidate, url: platformGroupUrl(assetRoot, candidate.id) }
+    }
     const current = platformById.get(candidate.id)
     const server = { ...candidate }
     for (const field of connectionFields) delete server[field]
@@ -88,6 +91,7 @@ export function apply(ctx: Context, suppliedConfig: ManagerConfig) {
   ctx.effect(() => setBusinessReportHeaderResolver(assetRoot, async (serverId, expectedOrigin) => {
     const server = config.servers.get().find(value => value.id === serverId && value.enabled !== false)
     if (!server) throw new Error('报告依赖连接已停用')
+    manager.assertConnectionReady(server)
     const fingerprint = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
     const expected = fingerprint(server)
     const currentOrigin = server.specUrl ? (await loadOpenApi(server)).base.origin : new URL(server.url).origin
@@ -186,8 +190,11 @@ export function apply(ctx: Context, suppliedConfig: ManagerConfig) {
     return service ? [...servers, service] : servers
   } } })
   ctx.provide('platformMcp', { ...config, compositionHandler, compositionExtension,
-    ...(!businessRuntime ? { configuration: () => store.view(),
-      saveConfiguration: (ops: any[], revision: string) => store.mutate(ops, revision) } : {}),
+    ...(!businessRuntime ? { configuration: () => ({ ...store.view(), publicUrl: platformEntryUrl(assetRoot) }),
+      saveConfiguration: (ops: any[], revision: string) => {
+        const publicUrl = platformEntryUrl(assetRoot)
+        return { ...store.mutate(ops, revision), publicUrl }
+      } } : {}),
     control: (endpoint, payload, signal) => controlHandler(endpoint, payload, signal, ctx.connection.browserPeer),
     currentGroup: (id, version) => (ctx as any).mcpSessionManager.currentGroup(id, version), dispatch: (request, signal) => {
     if (!dispatch) throw new Error('MCP 管理服务尚未就绪')

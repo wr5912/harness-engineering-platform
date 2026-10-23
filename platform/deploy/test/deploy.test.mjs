@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { collectEntries, verifyEntries } from '../manifest.mts'
+import { copyTree } from '../fsutil.mts'
 import { rewriteKnownPaths, scanKnownOldPaths } from '../paths.mts'
 import { ensureDshScopeLink } from '../runtime.mts'
 import { assertRealWorkspace, inspectDataRoot } from '../data.mts'
@@ -23,6 +24,23 @@ test('manifest 校验文件、符号链接与额外文件', () => {
     assert.equal(verifyEntries(root, entries).length, 0)
     writeFileSync(join(root, 'extra'), 'x')
     assert.match(verifyEntries(root, entries).join('\n'), /清单外文件：extra/)
+  } finally { close() }
+})
+
+test('无过滤目录复制保留符号链接，已有目标仍复制目录内容', () => {
+  const { root, close } = workspace()
+  try {
+    const source = join(root, 'source')
+    mkdirSync(source)
+    writeFileSync(join(source, 'file'), 'value')
+    symlinkSync('file', join(source, 'link'))
+    const fresh = join(root, 'fresh')
+    copyTree(source, fresh)
+    assert.equal(readFileSync(join(fresh, 'link'), 'utf8'), 'value')
+    const existing = join(root, 'existing')
+    mkdirSync(existing)
+    copyTree(source, existing)
+    assert.equal(readFileSync(join(existing, 'file'), 'utf8'), 'value')
   } finally { close() }
 })
 

@@ -64,7 +64,7 @@ python3 runtime/adapters/dsh-container/dsh-dev init test01
 
 ```bash
 python3 runtime/adapters/dsh-container/dsh-dev up \
-  --source experiment:EXP-security-operations-expert-001 --mode dev --dry-run
+  --source experiment:EXP-security-operations-expert-024-rad80a907c628 --mode dev --dry-run
 ```
 
 `up --dry-run` 会打印本次的 `mode`、`agent_id`、`session_preset`、`target_preset`、`workspace_to_register`、`dev_instructions`、`grading_material_mounted`、挂载清单和缺失的环境变量名。先核对这些值与本次任务一致，再启动；报告目标用 `target_preset`，描述本次会话用 `session_preset`。该命令不要求运行时环境变量或 `--accept-cordis-trust`；自动端口是当下建议，不是保留。
@@ -87,15 +87,15 @@ python3 runtime/adapters/dsh-container/dsh-dev image build
 
 # 开发会话：出厂 cordis 创造模式，等同 shell 权限，需要显式确认
 python3 runtime/adapters/dsh-container/dsh-dev up \
-  --source experiment:EXP-security-operations-expert-001 --mode dev --accept-cordis-trust
+  --source experiment:EXP-security-operations-expert-024-rad80a907c628 --mode dev --accept-cordis-trust
 
 # 被测目标会话：运行所选来源声明的目标 preset
 python3 runtime/adapters/dsh-container/dsh-dev up \
-  --source experiment:EXP-security-operations-expert-001 --mode eval
+  --source experiment:EXP-security-operations-expert-024-rad80a907c628 --mode eval
 
 # 受信局域网直连：Token 认证、监听 0.0.0.0；仅用于 eval
 python3 runtime/adapters/dsh-container/dsh-dev up \
-  --source experiment:EXP-security-operations-expert-001 --mode eval \
+  --source experiment:EXP-security-operations-expert-024-rad80a907c628 --mode eval \
   --name security-operations-expert-ui --port 3154 --lan-access
 
 # 取认证 URL 并打开界面
@@ -128,11 +128,11 @@ DSH Web 首次打开需要在界面注册工作区：点击"选择工作区" →
 
 ```bash
 python3 runtime/adapters/dsh-container/dsh-eval \
-  --source experiment:EXP-security-operations-expert-006 --case U-INS-001 --dry-run
+  --source experiment:EXP-security-operations-expert-024-rad80a907c628 --case U-INS-001 --dry-run
 python3 runtime/adapters/dsh-container/dsh-eval \
-  --source experiment:EXP-security-operations-expert-006 --case 'U-INS-*'
+  --source experiment:EXP-security-operations-expert-024-rad80a907c628 --case 'U-INS-*'
 python3 runtime/adapters/dsh-container/dsh-eval \
-  --source experiment:EXP-security-operations-expert-006 --executor browser --case U-INS-001
+  --source experiment:EXP-security-operations-expert-024-rad80a907c628 --executor browser --case U-INS-001
 ```
 
 `dsh-eval` 只执行通过 `--case` 显式选择的业务 Case；缺失选择时列出可选项并退出。该参数可重复，也可使用大小写敏感的 shell 风格通配符，最终按 `evaluation.md` 声明顺序展开并去重。默认 API 执行器只通过 DSH Runtime 完成 Workspace 注册、每 Case 新建 Session、目标 Preset 与 Workspace 核对、消息发送、Turn 等待和 Session 导出，不直连底层模型 API；一个 Case 的多轮输入在同一 Session 中依次发送。API 执行器另用独立无工具 Session 对照输入和预期给出语义结论。浏览器执行器只验证真实页面进入、目标新 Session、发送及回答显示；保存同一 Session 的回答与工具轨迹供核对，不创建判分 Session，业务 `verdict` 保持 `inconclusive`。浏览器冒烟完成时命令返回 `0`，`--mode full` 也不启动 AI 复核。技术装载、合同和工具链检查由运行前校验承担，不写成业务 Case。
@@ -145,7 +145,7 @@ python3 runtime/adapters/dsh-container/dsh-eval \
 
 ```bash
 python3 runtime/adapters/dsh-container/run_record.py --repo . init \
-  --source experiment:EXP-security-operations-expert-001 \
+  --source experiment:EXP-security-operations-expert-024-rad80a907c628 \
   --case <case-id> --kind research
 ```
 

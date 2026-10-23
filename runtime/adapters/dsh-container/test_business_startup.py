@@ -52,10 +52,10 @@ class BusinessStartupTest(unittest.TestCase):
         self.assertFalse(self.state.exists())
         self.assertFalse(args.lan_access)
         self.assertFalse(args.unsafe_no_auth)
-        self.assertFalse(args.skip_testing_notice)
+        self.assertTrue(args.skip_testing_notice)
         commands.assert_not_called()
         plan = json.loads(output.getvalue())
-        self.assertFalse(plan["business_control"]["scheduling_supported"])
+        self.assertTrue(plan["business_control"]["scheduling_supported"])
         self.assertEqual(plan["network"], "private bridge (host port 127.0.0.1 only)")
 
     def test_business_rejects_unsafe_flags_and_existing_unmanaged_home(self):
@@ -74,6 +74,24 @@ class BusinessStartupTest(unittest.TestCase):
             with mock.patch.object(dev, "existing_instance", return_value=(self.state, manifest)), \
                  mock.patch.object(dev, "validate_existing_identity"), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 dev.prepare_up(self.args(business_control=new_file))
+
+    def test_development_refreshes_source_and_preserves_runtime_generation(self):
+        manifest = {"port": 53191, "business_control": {"runtime_generation": "existing", "source_digest": "sha256:old"}}
+        policy = {"agent_id": "soc", "source": "platform", "default": {"provider": "fixture", "model": "fixture"}, "allowed": []}
+        for development in (True, False):
+            with self.subTest(development=development), \
+                 mock.patch.object(dev, "existing_instance", return_value=(self.state, manifest)), \
+                 mock.patch.object(dev, "validate_existing_identity"), \
+                 mock.patch.object(dev, "read_model_policy", return_value=policy), \
+                 mock.patch.object(dev, "business_helper", return_value={"assetRoot": str(self.root), "sourceDigest": "sha256:new", "development": development}):
+                args = self.args(model_policy="policy.json", replace=True)
+                if development:
+                    contract, _ = dev.prepare_up(args)
+                    self.assertEqual(contract["business_control"]["source_digest"], "sha256:new")
+                    self.assertEqual(contract["business_control"]["runtime_generation"], "existing")
+                else:
+                    with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                        dev.prepare_up(args)
 
     def test_business_environment_uses_instance_patch_in_current_and_historical_operations(self):
         contract = {**self.contract, "patch": "managed.patch.yml", "evaluation_patch": "evaluation.patch.yml", "business_control": {"source_digest": "fixed"}}

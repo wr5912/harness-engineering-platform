@@ -34,12 +34,13 @@ function fixture(t, { empty = false } = {}) {
   return { root, ctx, writeSkill, provider }
 }
 
-test('真实原生注册表与文件提供方装载12项数据技能，正文变更下一次读取生效', async t => {
+test('真实原生注册表装载全部管理技能，正文变更下一次读取生效', async t => {
   const f = fixture(t)
   const config = await assistantConfiguration(f.root, f.ctx.skills)
   assert.equal(config.ready, true)
   assert.equal(config.missing.length, 0)
-  assert.equal(config.assets.length, 13)
+  assert.equal(config.assets.length, managementSkills.length + 1)
+  assert.equal(config.tasks['reviewing-agent-skills'], true)
   assert.ok(config.assets.filter(asset => asset.name !== 'AGENTS.md').every(asset => asset.path.startsWith(join(f.root, '.agents/skills'))))
   const previous = await managementSkill(f.root, f.ctx.skills, 'user-facing-output')
   const path = f.writeSkill('user-facing-output', '改用用户任务结果开头。')

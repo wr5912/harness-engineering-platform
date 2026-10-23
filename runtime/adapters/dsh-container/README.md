@@ -8,7 +8,7 @@
 
 ```bash
 export HARNESS_ASSET_ROOT="$HOME/harness-engineering-platform-data"
-/usr/bin/python3 runtime/adapters/dsh-container/source_contract.py --source experiment:EXP-security-operations-expert-001
+/usr/bin/python3 runtime/adapters/dsh-container/source_contract.py --source experiment:EXP-security-operations-expert-024-rad80a907c628
 /usr/bin/python3 runtime/adapters/dsh-container/dsh-dev --repo "$HARNESS_ASSET_ROOT" ps --all
 ```
 
@@ -130,8 +130,8 @@ docker exec -w /opt/dsh-managed/dsh-voice-hub <instance-name> \
 
 ```bash
 python3 runtime/adapters/dsh-container/dsh-dev init test01
-python3 runtime/adapters/dsh-container/dsh-dev up --source experiment:EXP-security-operations-expert-001 --mode eval --dry-run
-python3 runtime/adapters/dsh-container/dsh-dev up --source experiment:EXP-security-operations-expert-001 --mode eval
+python3 runtime/adapters/dsh-container/dsh-dev up --source experiment:EXP-security-operations-expert-024-rad80a907c628 --mode eval --dry-run
+python3 runtime/adapters/dsh-container/dsh-dev up --source experiment:EXP-security-operations-expert-024-rad80a907c628 --mode eval
 python3 runtime/adapters/dsh-container/dsh-dev ps
 python3 runtime/adapters/dsh-container/dsh-dev url security-operations-expert-eval --non-interactive   # 交互终端可省略该旗标
 python3 runtime/adapters/dsh-container/dsh-dev logs security-operations-expert-eval --tail 200
@@ -166,12 +166,12 @@ python3 runtime/adapters/dsh-container/dsh-dev down security-operations-expert-e
 本地 TypeScript 研究入口直接读取现有来源与 Run，不另存可编辑副本。`edit` 调用编辑器修改所选 Experiment 的 `candidate/`；`run` 默认对显式 Case 启用 AI 证据复核，完成后输出封存状态、工具调用与证据路径。真实业务判断仍需核对原始回答及工具记录。
 
 ```bash
-node runtime/adapters/dsh-container/research-tool.mts context --source experiment:EXP-security-operations-expert-012
-node runtime/adapters/dsh-container/research-tool.mts edit --source experiment:EXP-security-operations-expert-012 --file dsh/workspace/.agents/skills/security-inspection/SKILL.md
-node runtime/adapters/dsh-container/research-tool.mts run --source experiment:EXP-security-operations-expert-012 --case U-INS-001 --case U-INS-002 --case U-INS-007 --dry-run
-node runtime/adapters/dsh-container/research-tool.mts run --source experiment:EXP-security-operations-expert-012 --case U-INS-001 --case U-INS-002 --case U-INS-007 --compare-to <baseline-run-id>
+node runtime/adapters/dsh-container/research-tool.mts context --source experiment:EXP-security-operations-expert-024-rad80a907c628
+node runtime/adapters/dsh-container/research-tool.mts edit --source experiment:EXP-security-operations-expert-024-rad80a907c628 --file dsh/workspace/.agents/skills/security-inspection/SKILL.md
+node runtime/adapters/dsh-container/research-tool.mts run --source experiment:EXP-security-operations-expert-024-rad80a907c628 --case U-INS-001 --case U-INS-002 --case U-INS-007 --dry-run
+node runtime/adapters/dsh-container/research-tool.mts run --source experiment:EXP-security-operations-expert-024-rad80a907c628 --case U-INS-001 --case U-INS-002 --case U-INS-007 --compare-to <baseline-run-id>
 node runtime/adapters/dsh-container/research-tool.mts review --left <baseline-run-id> --right <candidate-run-id>
-node runtime/adapters/dsh-container/research-tool.mts instance --source experiment:EXP-security-operations-expert-012
+node runtime/adapters/dsh-container/research-tool.mts instance --source experiment:EXP-security-operations-expert-024-rad80a907c628
 ```
 
 `context --run <run-id> [--case <case-id>]` 显示冻结口径、当前口径、已注册工具和实际调用；`instance --restart --name <已存在且属于该来源的实例名>` 重启后重新读取容器镜像与只读挂载。`--review ai|none` 也可直接传给 `dsh-eval`；API 通道的 `full` 默认 `ai`，其他选择默认 `none`。浏览器通道仅支持 `none`。
@@ -180,16 +180,16 @@ node runtime/adapters/dsh-container/research-tool.mts instance --source experime
 
 ```bash
 python3 runtime/adapters/dsh-container/dsh-eval \
-  --source experiment:EXP-security-operations-expert-006 --mode fast --dry-run
+  --source experiment:EXP-security-operations-expert-024-rad80a907c628 --mode fast --dry-run
 python3 runtime/adapters/dsh-container/dsh-eval \
-  --source experiment:EXP-security-operations-expert-006 --mode fast
+  --source experiment:EXP-security-operations-expert-024-rad80a907c628 --mode fast
 python3 runtime/adapters/dsh-container/dsh-eval \
-  --source experiment:EXP-security-operations-expert-006 --mode full --dry-run
+  --source experiment:EXP-security-operations-expert-024-rad80a907c628 --mode full --dry-run
 python3 runtime/adapters/dsh-container/dsh-eval \
-  --source experiment:EXP-security-operations-expert-006 --executor browser --case U-INS-001
+  --source experiment:EXP-security-operations-expert-024-rad80a907c628 --executor browser --case U-INS-001
 python3 runtime/adapters/dsh-container/dsh-eval \
-  --source experiment:EXP-security-operations-expert-008 --case U-QA-012 --case U-QA-013 \
-  --compare-to run-f630f91f-09f1-4c12-bdb3-42f5b815cfdd
+  --source experiment:EXP-security-operations-expert-024-rad80a907c628 --case U-QA-012 --case U-QA-013 \
+  --compare-to <baseline-run-id>
 ```
 
 默认 `--mode fast` 执行标记了 `**评估档位：** \`fast\`` 的业务 Case；`--mode full` 执行全部 Case。没有 fast 标记时默认档位明确报错。`--case` 可重复并支持大小写敏感的 shell 风格通配符，一旦出现就覆盖 `--mode`；结果按 `evaluation.md` 顺序去重，为避免 shell 提前展开应给通配符加引号。`--dry-run` 输出请求档位、实际选择方式和 Case 列表。这里的 `--mode` 是评测范围，和 `dsh-dev --mode eval` 的容器运行模式不同。非 `--dry-run` 执行会先校验仓库和 Experiment，再创建独立评测实例。每个 Case 使用新的目标 Session，多轮输入在该 Session 内依次发送；API 和浏览器执行器都导出回答及同一 Session 的工具事件。API 通道用独立的无工具评审 Session 对照输入、预期、回答和工具证据给出语义结论；浏览器通道只检查页面、会话身份、消息发送及回答显示，业务结论保持 `inconclusive`。
@@ -216,7 +216,7 @@ API 通道退出码 `0` 表示锁定 Case 均得到 `passed`；`1` 表示运行�
 
 这一模式复用标准 Runtime 镜像，将业务插件和资产只读装载到新实例，使用独立 bridge 网络；宿主映射端口只监听 `127.0.0.1`，原生 HTTP/WS 接入还需网关签名。`dsh-dev url` 返回统一网关的 `/agents/<agent-id>/` 地址；用户登录、智能体 HMAC 认证、来源信任和访问策略分别核验。普通同 HOME 重启保留持久实例代次和会话归属，重新建立签名握手；删除登记后同名新建不能继承旧认证证据。
 
-不能同时使用 `--migrate-home`、归因模式、`--lan-access` 或 `--unsafe-no-auth`，也不能把既有研究实例原地切换为业务控制模式。首期停用定时服务、工具与页面，只支持即时任务的检测、防护；每日巡检、研判和报表需要手动启动，存在延迟与漏执行风险。具体未覆盖项见[实施路线](../../../docs/platform-design/05_实施路线与迭代计划.md#首期定时任务边界与影响)。
+不能同时使用 `--migrate-home`、归因模式、`--lan-access` 或 `--unsafe-no-auth`，也不能把既有研究实例原地切换为业务控制模式。原生定时服务、工具与页面已开放，当前检测、防护闭环仍只覆盖即时任务；到期消息与业务执行须分别核对回执。定时任务的当前边界见[实施路线](../../../docs/platform-design/05_实施路线与迭代计划.md#首期定时任务边界与影响)。
 
 #### 既有研究模式
 
@@ -234,19 +234,9 @@ API 通道退出码 `0` 表示锁定 Case 均得到 `passed`；`1` 表示运行�
 
 需要浏览器麦克风的插件在局域网使用时，页面还须由浏览器认可的 HTTPS 入口提供；局域网 IP 上的纯 HTTP 页面没有麦克风所需的安全上下文。本机 `localhost` 页面可以直接使用麦克风。
 
-EXP-007 早期局域网直连验证与门户试点边界见数据工作区 `agents/security-operations-expert/docs/security-operations-expert门户联调记录.md`，其中历史访问设置不替代上述当前启动规则。
+MCP 是可选的外部服务。连接失败只影响相应工具发现与调用，不阻塞实例启动、普通聊天或其他可用工具。当前来源默认取智能体 manifest 的 `active_experiment`；需要复现历史来源时，先从固定数据提交恢复到独立数据目录，再显式指定来源，不向当前来源目录重新登记旧版本。
 
-候选 Profile 以 fail-closed 方式声明三个 `streamable-http` MCP 客户端；缺少真实端点与凭据时容器会在启动阶段退出，使"装载是否成立"无法核验。为此适配层提供两个只用于受控技术装载核验的本地工具：
-
-```bash
-python3 "$HARNESS_ASSET_ROOT/evolution/experiments/EXP-security-operations-expert-001/evaluation/tools/derive_mcp_stub_tools.py" --check
-python3 "$HARNESS_ASSET_ROOT/evolution/experiments/EXP-security-operations-expert-001/evaluation/tools/derive_mcp_stub_tools.py" --out "$STATE/tools.json"
-node runtime/adapters/dsh-container/stub-mcp-streamable-http.mjs --port 3099 --tools "$STATE/tools.json" --log "$STATE/stub.log"
-```
-
-派生脚本只从候选 `mcp-servers.yaml`、`mcp-tool-name-map.json`、`role-tool-matrix.yaml` 取工具原始名，无法解析到"服务名 + 原始名"的引用即非零退出；桩服务只实现 `initialize`、`notifications/initialized`、`tools/list` 的最小协议面，只监听回环、不校验凭据、无业务语义，并只记录"是否带鉴权头"而不记录凭据值；`tools/call` **默认返回 `isError: true` 并拒绝编造业务数据**（只有显式 `--stub-success` 才回显桩标记，供协议自测），因此用它补齐不可用的 MCP 分组时，相关工具调用会明确失败而不会产生假通过结果。它证明的是**受控 Profile 的 MCP 客户端配置、鉴权头注入与工具注册链路可装载**，不证明真实 MCP 服务集成、租户/对象授权、状态机、业务能力、评估结论或 Release 验收。真实业务核验必须在受信 Runtime 提供模型与 MCP 端点后进行。
-
-本轮候选的实例级装载证据见 数据工作区 `evolution/experiments/EXP-security-operations-expert-001/evaluation/evidence/dsh-dev-live-load-20260918.json`：容器保持运行、三个 MCP 客户端完成握手、三棵只读资产树与受控 HOME 摘要通过容器内探针、Web Token 入口探针通过；同时记录未验证项（无模型凭据，未建立 Agent Session）。
+历史装载证据见 [2026-09-18 实机记录](https://github.com/wr5912/harness-engineering-platform-data/blob/9afc8fd0047367deb9df5b51595f101835359044/evolution/experiments/EXP-security-operations-expert-001/evaluation/evidence/dsh-dev-live-load-20260918.json)。该记录只证明当时的技术装载，不代表当前业务验收。
 
 在上述装载核验开始前，脚本会核对镜像构建指纹、平台和 Image ID，并把 Compose 固定到 `tag@image-id`；无 OCI 指纹 label 或指纹过期的本地镜像会直接拒绝。
 

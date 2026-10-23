@@ -4,7 +4,11 @@ import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
+import { createRequire } from 'node:module'
 import { transformClientUrls } from '../lib/index.mjs'
+
+const require = createRequire(new URL('../../../../platform/plugin/package.json', import.meta.url))
+const yaml = require('js-yaml')
 
 function execute(source, basePath = '/assistant/') {
   const calls = []
@@ -86,7 +90,8 @@ test('保留原脚本严格模式，URL helper 不受原脚本局部变量遮蔽
 
 test('当前三个业务客户端制品可转换并作为浏览器脚本解析', () => {
   const assetRoot = resolve(process.env.HARNESS_ASSET_ROOT || join(homedir(), 'harness-engineering-platform-data'))
-  const root = join(assetRoot, 'evolution/experiments/EXP-security-operations-expert-019-rc442472a242a/candidate/dsh/managed')
+  const { active_experiment } = yaml.load(readFileSync(join(assetRoot, 'agents/security-operations-expert/manifest.yaml'), 'utf8'))
+  const root = join(assetRoot, 'evolution/experiments', active_experiment, 'candidate/dsh/managed')
   for (const file of ['security-operations-ui/client.js', 'mcp-manager/client.js', 'dsh-voice-hub/lib/client.js']) {
     const source = readFileSync(join(root, file), 'utf8')
     const transformed = transformClientUrls(source)

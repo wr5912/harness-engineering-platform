@@ -170,7 +170,7 @@ test('持续通知按最小间隔合并，不把每次写入放大成一帧', as
   assert.deepEqual(new Set(merged.domains), new Set(['mcp', 'instances']))
 })
 
-test('Run 内部证据写入不触发列表失效，新 Run 目录出现才通知', async t => {
+test('Run 延迟清单和完成摘要通知列表，高频轨迹不触发刷新', async t => {
   const root = mkdtempSync(join(tmpdir(), 'platform run events '))
   const runs = join(root, 'evolution/experiments/EXP-demo-001/runs')
   mkdirSync(runs, { recursive: true })
@@ -188,6 +188,12 @@ test('Run 内部证据写入不触发列表失效，新 Run 目录出现才通�
   writeFileSync(join(run, 'evidence/U-1/trace.jsonl'), '{}')
   await delay(600)
   assert.equal(count, 0, 'Run 内部证据写入不得触发 agents/catalog 失效')
+  for (const file of ['run.yaml', 'summary.json', 'inputs.lock.json', 'analysis.json']) {
+    writeFileSync(join(run, file), '{}')
+    await until(() => count > 0)
+    await delay(150)
+    count = 0
+  }
   mkdirSync(join(runs, 'run-22222222-2222-4222-8222-222222222222'))
   await until(() => count === 1)
 })

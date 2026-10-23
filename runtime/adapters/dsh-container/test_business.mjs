@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
@@ -39,6 +40,19 @@ test('启动配置只读核验，拒绝容器不可达协调器、未构建插�
   assert.throws(() => readBusinessLaunchConfig(f.file))
 })
 
+test('开发模式从数据根登记读取，不依赖启动配置副本', t => {
+  const f = fixture(t)
+  const accessFile = join(f.config.assetRoot, 'config/business-access.json')
+  for (const identityMode of ['development', 'published']) {
+    writeFileSync(accessFile, JSON.stringify({ schemaVersion: 1, enabled: true, gateway: { instances: [
+      { agentId: f.input.agentId, instanceId: f.input.name, identityMode },
+    ] } }))
+    const result = JSON.parse(execFileSync(process.execPath, [new URL('./business.ts', import.meta.url).pathname, f.file],
+      { input: JSON.stringify({ agentId: f.input.agentId, name: f.input.name }), encoding: 'utf8' }))
+    assert.equal(result.development, identityMode === 'development')
+  }
+})
+
 test('业务访问配置中的相对密钥路径按当前数据根解析并用于容器挂载', t => {
   const f = fixture(t)
   const file = join(f.config.assetRoot, 'config/business-access.json')
@@ -68,6 +82,7 @@ test('业务渲染改独立bridge和回环映射，标准镜像及MCP配置保�
   assert.ok(compose.services.dsh.volumes.every(item => item.read_only))
   assert.ok(patch.some(item => item.id === 'mcp-session-manager' && item.disabled))
   assert.ok(!patch.some(item => item.id === 'schedule' && item.disabled), '自动化任务按当前需求开放')
+  assert.ok(!patch.some(item => item.id?.startsWith('tool-')), '启动器不得额外停用来源中的原生工具')
   const manager = patch.flatMap(item => item.insert ?? []).find(item => item.id === 'business-mcp-manager')
   assert.equal(manager.config.servers[0].url, 'http://host.docker.internal:53101/mcp')
   assert.deepEqual(manager.inject, ['businessRuntime'])
@@ -78,7 +93,7 @@ test('业务渲染改独立bridge和回环映射，标准镜像及MCP配置保�
   assert.equal(runtime.config.assetRoot, '/opt/harness-business-assets')
   assert.equal(runtime.config.basePath, '/agents/soc/instances/business-test/')
   assert.equal(result.registration.runtime_generation, 'generation-test')
-  assert.equal(result.registration.scheduling_supported, false)
+  assert.equal(result.registration.scheduling_supported, true)
   assert.equal(result.registration.origin, 'http://127.0.0.1:53191')
   assert.ok(!result.patch.includes('a'.repeat(32)))
 })
@@ -140,16 +155,19 @@ test('资产身份按内容固定，安装缓存不成为另一份可编辑资�
   assert.deepEqual(readFileSync(seed), original)
 })
 
-test('业务实例只从固定 Candidate 声明装载本地能力，定时自动研判不在受控清单', t => {
+test('业务实例从固定 Candidate 声明装载本地工具与定时研判路由', t => {
   const f = fixture(t), matrix = join(f.managed, 'role-tool-matrix.yaml')
   writeFileSync(matrix, `schema_version: "2.0"
 runtime_capabilities:
   local_tools:
     - skill
     - analyze_threat_incident
+    - analyze_pending_threat_incidents
     - delegate_threat_analysis
     - delegate_fault_analysis
   local_model_routes:
+    - provider: threat-analysis-automation
+      model: scheduled-batch
     - provider: threat-analysis-delivery
       model: fixed-summary
     - provider: security-operation-delivery
@@ -158,12 +176,29 @@ runtime_capabilities:
   const before = businessSourceDigest({ managed: f.managed })
   const rendered = renderBusinessInstance(f.config, { ...f.input, sourcePaths: { managed: f.managed } })
   const runtime = yaml.load(rendered.patch).flatMap(item => item.insert ?? []).find(item => item.id === 'business-runtime')
-  assert.deepEqual(runtime.config.localTools, ['skill', 'analyze_threat_incident', 'delegate_threat_analysis', 'delegate_fault_analysis'])
-  assert.deepEqual(rendered.localModelRoutes, [{ provider: 'threat-analysis-delivery', model: 'fixed-summary' },
+  assert.deepEqual(runtime.config.localTools, ['skill', 'analyze_threat_incident', 'analyze_pending_threat_incidents', 'delegate_threat_analysis', 'delegate_fault_analysis'])
+  assert.deepEqual(rendered.localModelRoutes, [{ provider: 'threat-analysis-automation', model: 'scheduled-batch' }, { provider: 'threat-analysis-delivery', model: 'fixed-summary' },
     { provider: 'security-operation-delivery', model: 'fixed-operation-result' }])
-  assert.ok(!runtime.config.localTools.includes('analyze_pending_threat_incidents'))
   writeFileSync(matrix, readFileSync(matrix, 'utf8') + '# revised\n')
   assert.notEqual(businessSourceDigest({ managed: f.managed }), before)
   writeFileSync(matrix, `runtime_capabilities:\n  local_tools: [skill, skill]\n  local_model_routes: []\n`)
   assert.throws(() => renderBusinessInstance(f.config, f.input), /业务本地能力声明无效/)
+})
+
+
+test('固定来源中的平台分组连接随部署入口装配，不改写资产或外部地址', t => {
+  const f = fixture(t), file = join(f.managed, 'agent.patch.yml')
+  writeFileSync(join(f.config.assetRoot, 'config/business-access.json'), JSON.stringify({ schemaVersion: 1, enabled: true,
+    gateway: { managementUrl: 'http://current.example/hep/' } }))
+  const entries = [{ insert: [{ id: 'analysis', config: { connections: { runtimeGroup: {
+    id: 'threat-analysis-runtime', url: 'http://old.example/hep/mcp/groups/threat-analysis-runtime/v2' } }, external: 'http://external.example/mcp' } }] }]
+  writeFileSync(file, yaml.dump(entries).replace(/^(\s*)external: /m, (_, indent) => `${indent}watch: !!js process.env.DSH_HARNESS_MODE === 'authoring'\n${indent}external: `))
+  const original = readFileSync(file, 'utf8')
+  const result = renderBusinessInstance(f.config, { ...f.input, managedPatch: file })
+  const patch = yaml.load(result.patch, { schema: yaml.DEFAULT_SCHEMA.extend(new yaml.Type('tag:yaml.org,2002:js', { kind: 'scalar', construct: value => value })) }).find(item => item.id === 'analysis')
+  assert.equal(patch.config.connections.runtimeGroup.url, 'http://current.example/hep/mcp/groups/threat-analysis-runtime/v2')
+  assert.equal(patch.config.external, 'http://external.example/mcp')
+  assert.equal(patch.config.watch, "process.env.DSH_HARNESS_MODE === 'authoring'")
+  assert.match(result.patch, /!!js/)
+  assert.equal(readFileSync(file, 'utf8'), original)
 })

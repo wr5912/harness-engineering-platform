@@ -24,4 +24,4 @@ if [ "$MAJOR" -lt 24 ]; then
   echo "install: 需要 Node 24 或更新版本，当前为 $VERSION" >&2
   exit 4
 fi
-exec "$NODE" "$ROOT/program/platform/deploy/cli.mts" install --bundle-root "$ROOT" "$@"
+"$NODE" "$ROOT/program/platform/deploy/cli.mts" install --bundle-root "$ROOT" "$@"

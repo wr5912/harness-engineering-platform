@@ -46,7 +46,7 @@ def stop(*args):
 def record(run_id,case_id,result): (run/"recorded.json").write_text(json.dumps(result))
 def finalize(run_id,status): (run/"run.yaml").write_text("status: "+status+"\n")
 g=m.execute.__globals__
-g.update(REPO=base,resolve=lambda *a,**kw:contract,load_evaluation=lambda p:{},select_case_ids=lambda *a:["U-BASIC-001"],execution_for=lambda *a:cases,dry_run_payload=lambda *a:{"missing_env_names":[]},validate_before_run=lambda *a:{"repository":{"valid":True}},initialize_run=initialize,authentication_url=lambda *a:"http://127.0.0.1:1/",start_instance=start,run_driver=driver,stop_instance=stop,record_trial=record,finalize_run=finalize,validate_after_run=lambda *a:None)
+g.update(REPO=base,resolve=lambda *a,**kw:contract,load_evaluation=lambda p:{},select_case_ids=lambda *a:["U-BASIC-001"],execution_for=lambda *a:cases,dry_run_payload=lambda *a,**kw:{"missing_env_names":[]},validate_before_run=lambda *a:{"repository":{"valid":True}},initialize_run=initialize,authentication_url=lambda *a:"http://127.0.0.1:1/",start_instance=start,run_driver=driver,stop_instance=stop,record_trial=record,finalize_run=finalize,validate_after_run=lambda *a:None)
 raise SystemExit(m.execute(types.SimpleNamespace(source="experiment:EXP-basic-001",case=[],mode="fast",executor="api",review="none",compare_to=None,dry_run=False,model=None,timeout_seconds=30)))
 '''
 

@@ -1,10 +1,10 @@
 import { existsSync, lstatSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { basename, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { copyTree, ensureEmptyDir, removeTree, run, tarCreate } from './fsutil.mts'
 import { collectEntries, sha256File, writeManifest, type Arch, type Manifest, type RuntimeEntry } from './manifest.mts'
 import { collectSystemGit } from './git.mts'
-import { inspectImage, saveImage } from './image.mts'
+import { expectedImage, inspectImage, inspectImageArchive, saveImage, verifyImageInfo } from './image.mts'
 import { assertRealWorkspace } from './data.mts'
 
 export interface PackOptions {
@@ -41,6 +41,16 @@ function commitOf(programRoot: string): { commit: string; dirty: boolean } {
   }
 }
 
+function copyAsset(source: string, target: string): void {
+  mkdirSync(dirname(target), { recursive: true })
+  // 打包暂存只读；同一文件系统复用离线资源的 inode，避免重复复制大安装树。
+  if (statSync(source).dev === statSync(dirname(target)).dev) {
+    try { run('/bin/cp', ['-al', '--', source, target]); return }
+    catch { removeTree(target) }
+  }
+  copyTree(source, target)
+}
+
 function copyProgram(programRoot: string, staging: string, assetsDir?: string): void {
   const target = join(staging, 'program')
   mkdirSync(target, { recursive: true })
@@ -66,8 +76,8 @@ function copyProgram(programRoot: string, staging: string, assetsDir?: string): 
     const preparedWeb = join(assetsDir, 'program', 'runtime', 'adapters', 'dsh-web', 'node_modules')
     if (!existsSync(preparedPlugin)) throw new Error(`离线资源缺少平台插件依赖：${preparedPlugin}`)
     if (!existsSync(preparedWeb)) throw new Error(`离线资源缺少 Web 适配器依赖：${preparedWeb}`)
-    copyTree(preparedPlugin, join(target, 'platform', 'plugin', 'node_modules'))
-    copyTree(preparedWeb, join(target, 'runtime', 'adapters', 'dsh-web', 'node_modules'))
+    copyAsset(preparedPlugin, join(target, 'platform', 'plugin', 'node_modules'))
+    copyAsset(preparedWeb, join(target, 'runtime', 'adapters', 'dsh-web', 'node_modules'))
   }
 }
 
@@ -85,29 +95,39 @@ function copyData(dataRoot: string, staging: string): void {
 
 function copyImage(options: PackOptions, staging: string): Manifest['image'] {
   if (!options.includeImage) return undefined
+  const expected = expectedImage(resolve(options.programRoot), options.arch)
+  if (options.imageTag && options.imageTag !== expected.tag) throw new Error(`镜像标签不符合锁定 Runtime：期望 ${expected.tag}，实际 ${options.imageTag}`)
+  if (options.imageFingerprint && options.imageFingerprint !== expected.fingerprint) throw new Error('镜像构建指纹不符合锁定 Runtime')
   const target = join(staging, 'images')
   mkdirSync(target, { recursive: true })
   if (options.imageArchive) {
     const archive = resolve(options.imageArchive)
     if (!existsSync(archive)) throw new Error(`镜像归档不存在：${archive}`)
+    const info = inspectImageArchive(archive, expected.tag)
+    const problems = verifyImageInfo(info, { id: options.imageId, arch: options.arch, fingerprint: expected.fingerprint })
+    if (info.os !== 'linux') problems.push(`镜像系统不符：${info.os ?? '未知'}`)
+    if (problems.length) throw new Error(`镜像归档与锁定 Runtime 不符：\n${problems.join('\n')}`)
     const fileName = basename(archive)
-    copyTree(archive, join(target, fileName))
+    copyAsset(archive, join(target, fileName))
     return {
-      tag: options.imageTag,
-      id: options.imageId,
-      fingerprint: options.imageFingerprint,
+      tag: expected.tag,
+      id: info.id,
+      fingerprint: expected.fingerprint,
       arch: options.arch,
       archive: `images/${fileName}`,
     }
   }
   if (!options.imageTag) throw new Error('打包镜像需要 --image-archive 或 --image-tag')
   const info = inspectImage(options.imageTag)
+  const problems = verifyImageInfo(info, { id: options.imageId, arch: options.arch, fingerprint: expected.fingerprint })
+  if (info.os !== 'linux') problems.push(`镜像系统不符：${info.os ?? '未知'}`)
+  if (problems.length) throw new Error(`镜像与锁定 Runtime 不符：\n${problems.join('\n')}`)
   const archiveName = `${options.imageTag.replace(/[^A-Za-z0-9_.-]+/g, '_')}.tar`
   saveImage(options.imageTag, join(target, archiveName))
   return {
-    tag: options.imageTag,
+    tag: expected.tag,
     id: info.id,
-    fingerprint: info.labels?.['org.ai-agent-harness.dsh.image-build-fingerprint'],
+    fingerprint: expected.fingerprint,
     arch: options.arch,
     archive: `images/${archiveName}`,
   }
@@ -134,7 +154,7 @@ export function pack(options: PackOptions): { archive: string; size: number } {
   for (const name of ['node', 'pnpm', 'python', 'dsh', 'docker']) {
     const source = options.assetsDir ? join(options.assetsDir, name) : undefined
     if (source && existsSync(source)) {
-      copyTree(source, join(offline, name))
+      copyAsset(source, join(offline, name))
       runtime[name] = { path: `offline/${name}` }
     }
   }
@@ -143,7 +163,7 @@ export function pack(options: PackOptions): { archive: string; size: number } {
 
   const gitSource = options.assetsDir ? join(options.assetsDir, 'git') : undefined
   if (gitSource && existsSync(gitSource)) {
-    copyTree(gitSource, join(offline, 'git'))
+    copyAsset(gitSource, join(offline, 'git'))
     let version = 'unknown'
     try { version = run(join(offline, 'git', 'git'), ['--version']).trim() } catch { /* 跨架构打包不能在当前主机执行目标架构 Git */ }
     runtime.git = { path: 'offline/git', version, source: 'bundle' }

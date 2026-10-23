@@ -121,20 +121,21 @@ async function businessAccess(assetRoot: string, requireEnabled = true): Promise
   return access as Record<string, unknown> & { gateway: Record<string, unknown> }
 }
 
-function assertMatchingRegistration(instances: Record<string, unknown>[], input: { agentId: string; instanceId: string; sourceId: string; sourceDigest: string; accessMode?: 'authenticated' | 'anonymous'; identityMode?: 'development' | 'published' }): void {
+function assertMatchingRegistration(instances: Record<string, unknown>[], input: { agentId: string; instanceId: string; sourceId: string; sourceDigest: string; accessMode?: 'authenticated' | 'anonymous'; identityMode?: 'development' | 'published' }, previousSourceDigest?: string): void {
   const existing = instances.find(row => row.instanceId === input.instanceId)
+  const expectedDigest = existing?.identityMode === 'development' && previousSourceDigest ? previousSourceDigest : input.sourceDigest
   if (existing && (existing.agentId !== input.agentId || existing.sourceId && existing.sourceId !== input.sourceId
-    || existing.sourceDigest && existing.sourceDigest !== input.sourceDigest
+    || existing.sourceDigest && existing.sourceDigest !== expectedDigest
     || input.accessMode && (existing.accessMode ?? 'authenticated') !== input.accessMode
     || input.identityMode && (existing.identityMode ?? 'published') !== input.identityMode)) throw new Error('业务网关中同名实例的来源、访问方式或实例阶段不一致，拒绝覆盖')
 }
 
-async function preflightGatewayRegistration(assetRoot: string, input: { agentId: string; instanceId: string; sourceId: string; sourceDigest: string; accessMode?: 'authenticated' | 'anonymous'; identityMode?: 'development' | 'published' }, remove = false): Promise<void> {
+async function preflightGatewayRegistration(assetRoot: string, input: { agentId: string; instanceId: string; sourceId: string; sourceDigest: string; accessMode?: 'authenticated' | 'anonymous'; identityMode?: 'development' | 'published' }, remove = false, previousSourceDigest?: string): Promise<void> {
   const access = await businessAccess(assetRoot, !remove)
-  assertMatchingRegistration(access.gateway.instances as Record<string, unknown>[], input)
+  assertMatchingRegistration(access.gateway.instances as Record<string, unknown>[], input, previousSourceDigest)
 }
 
-async function updateGatewayRegistration(assetRoot: string, input: { agentId: string; instanceId: string; sourceId: string; sourceDigest: string; accessMode?: 'authenticated' | 'anonymous'; identityMode?: 'development' | 'published' }, remove = false): Promise<void> {
+async function updateGatewayRegistration(assetRoot: string, input: { agentId: string; instanceId: string; sourceId: string; sourceDigest: string; accessMode?: 'authenticated' | 'anonymous'; identityMode?: 'development' | 'published' }, remove = false, previousSourceDigest?: string): Promise<void> {
   const path = businessAccessPath(assetRoot), lock = `${path}.lock`, temporary = `${path}.${process.pid}.${randomBytes(8).toString('hex')}.tmp`
   let handle: Awaited<ReturnType<typeof open>>
   try { handle = await open(lock, 'wx', 0o600) }
@@ -142,7 +143,7 @@ async function updateGatewayRegistration(assetRoot: string, input: { agentId: st
   try {
     const access = await businessAccess(assetRoot, !remove)
     const instances = access.gateway.instances as Record<string, unknown>[]
-    assertMatchingRegistration(instances, input)
+    assertMatchingRegistration(instances, input, previousSourceDigest)
     const existing = instances.find(row => row.instanceId === input.instanceId)
     const next = remove ? instances.filter(row => row.instanceId !== input.instanceId)
       : [...instances.filter(row => row.instanceId !== input.instanceId), { ...input,
@@ -532,6 +533,7 @@ async function runOne(assetRoot: string, request: InstanceActionRequest, signal?
         const source = prepared.source
         if (!source) throw new Error('创建、启动或重启需要来源')
         const agentId = await ensureRealSource(assetRoot, source)
+        const previousSourceDigest = (prepared.manifest?.business_control as { source_digest?: string } | undefined)?.source_digest
         if (prepared.business_control) {
           const preview = await runUpWithModelPolicy(assetRoot, upArgs(assetRoot, { ...prepared, name, source }, true), agentId,
             modelPolicy, prepared.model_selection, request.expected_model_policy_hash, registeredModelSnapshot(prepared.manifest), signal)
@@ -541,7 +543,7 @@ async function runOne(assetRoot: string, request: InstanceActionRequest, signal?
           }
           await preflightGatewayRegistration(assetRoot, { agentId, instanceId: name, sourceId: source,
             sourceDigest: request.expected_source_digest,
-            ...(request.operation === 'create' ? { accessMode: prepared.access_mode, identityMode: prepared.identity_mode } : {}) })
+            ...(request.operation === 'create' ? { accessMode: prepared.access_mode, identityMode: prepared.identity_mode } : {}) }, false, previousSourceDigest)
         }
         const projected = await runUpWithModelPolicy(assetRoot, upArgs(assetRoot, { ...prepared, name, source }), agentId,
           modelPolicy, prepared.model_selection, request.expected_model_policy_hash, registeredModelSnapshot(prepared.manifest), signal)
@@ -555,7 +557,7 @@ async function runOne(assetRoot: string, request: InstanceActionRequest, signal?
               throw new Error('受控实例启动后来源登记与预览不一致')
             }
             await updateGatewayRegistration(assetRoot, { agentId, instanceId: name, sourceId: source, sourceDigest,
-              ...(request.operation === 'create' ? { accessMode: prepared.access_mode, identityMode: prepared.identity_mode } : {}) })
+              ...(request.operation === 'create' ? { accessMode: prepared.access_mode, identityMode: prepared.identity_mode } : {}) }, false, previousSourceDigest)
             businessGatewayEntry(assetRoot, agentId, name)
           } catch (error) {
             try { await runDsh(assetRoot, ['down', name], signal) }

@@ -1,5 +1,5 @@
 import { chmodSync, existsSync, mkdirSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { copyTree, run } from './fsutil.mts'
 
 export interface InstalledRuntime {
@@ -10,6 +10,7 @@ export interface InstalledRuntime {
   python: string
   versions: Record<string, string>
   warnings: string[]
+  env: NodeJS.ProcessEnv
 }
 
 export function ensureDshScopeLink(dshRoot: string): void {
@@ -29,13 +30,17 @@ function toolVersion(command: string, args: string[] = ['--version']): string {
   try { return run(command, args).trim() } catch { return 'unknown' }
 }
 
-function systemCommand(name: string): string | undefined {
+function systemCommand(name: string, usable = false): string | undefined {
   for (const directory of (process.env.PATH || '').split(':')) {
     if (!directory) continue
     const candidate = join(directory, name)
-    if (existsSync(candidate)) return candidate
+    if (existsSync(candidate) && (!usable || toolVersion(candidate) !== 'unknown')) return candidate
   }
   return undefined
+}
+
+function shellQuote(value: string): string {
+  return "'" + value.replaceAll("'", "'\"'\"'") + "'"
 }
 
 export function installRuntime(bundle: string, prefix: string, dataRoot: string): InstalledRuntime {
@@ -76,10 +81,11 @@ export function installRuntime(bundle: string, prefix: string, dataRoot: string)
     git = join(runtime, 'git', 'git')
     if (existsSync(git)) chmodSync(git, 0o755)
   }
-  if (!git || !existsSync(git)) {
+  if (!git || toolVersion(git) === 'unknown') {
     warnings.push('安装包未包含可用的 Git 客户端；将回退系统 Git')
-    git = systemCommand('git')
+    git = systemCommand('git', true)
   }
+  if (!git) throw new Error('安装包和系统都没有可执行的 Git 客户端（git --version 失败）')
 
   let dsh: string | undefined
   if (existsSync(join(offline, 'dsh'))) {
@@ -106,22 +112,36 @@ export function installRuntime(bundle: string, prefix: string, dataRoot: string)
   if (!existsSync(python)) throw new Error('安装包缺少 Python 3.10+，系统 PATH 中也没有 python3')
 
   const pathParts: string[] = [join(nodeDirectory, 'bin')]
-  if (pnpm) pathParts.push(join(runtime, 'pnpm', 'bin'))
-  if (git) pathParts.push(join(runtime, 'git'))
+  if (pnpm) pathParts.push(dirname(pnpm))
+  pathParts.push(dirname(git))
   pathParts.push(bin)
-  const pythonPath = existsSync(join(offline, 'python', 'site')) ? join(offline, 'python', 'site') : ''
+  const pythonPath = existsSync(join(portable, 'site')) ? join(runtime, 'python-site') : ''
+  if (pythonPath) copyTree(join(portable, 'site'), pythonPath)
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    HARNESS_PROGRAM_ROOT: prefix,
+    HARNESS_ASSET_ROOT: dataRoot,
+    HARNESS_PYTHON: python,
+    HEP_NODE: node,
+    HEP_PYTHON: python,
+    PATH: [...pathParts, process.env.PATH || ''].join(':'),
+  }
+  if (dsh) env.HEP_DSH = dsh
+  if (systemDsh) env.HEP_SYSTEM_DSH = systemDsh
+  if (pythonPath) env.PYTHONPATH = [pythonPath, process.env.PYTHONPATH].filter(Boolean).join(':')
   const envFile = join(bin, 'hep-env.sh')
   const lines = [
     '# 由离线安装器生成，仅用于当前安装目录。',
-    `export HARNESS_PROGRAM_ROOT=${JSON.stringify(prefix)}`,
-    `export HARNESS_ASSET_ROOT=${JSON.stringify(dataRoot)}`,
-    `export HEP_NODE=${JSON.stringify(node)}`,
-    `export HEP_PYTHON=${JSON.stringify(python)}`,
+    `export HARNESS_PROGRAM_ROOT=${shellQuote(prefix)}`,
+    `export HARNESS_ASSET_ROOT=${shellQuote(dataRoot)}`,
+    `export HARNESS_PYTHON=${shellQuote(python)}`,
+    `export HEP_NODE=${shellQuote(node)}`,
+    `export HEP_PYTHON=${shellQuote(python)}`,
   ]
-  if (dsh) lines.push(`export HEP_DSH=${JSON.stringify(dsh)}`)
-  if (systemDsh) lines.push(`export HEP_SYSTEM_DSH=${JSON.stringify(systemDsh)}`)
-  if (pythonPath) lines.push(`export PYTHONPATH=${JSON.stringify(pythonPath)}\${PYTHONPATH:+:$PYTHONPATH}`)
-  lines.push(`export PATH=${pathParts.join(':')}:"$PATH"`)
+  if (dsh) lines.push(`export HEP_DSH=${shellQuote(dsh)}`)
+  if (systemDsh) lines.push(`export HEP_SYSTEM_DSH=${shellQuote(systemDsh)}`)
+  if (pythonPath) lines.push(`export PYTHONPATH=${shellQuote(pythonPath)}\${PYTHONPATH:+:"$PYTHONPATH"}`)
+  lines.push(`export PATH=${shellQuote(pathParts.join(':') + ':')}"$PATH"`)
   writeFileSync(envFile, lines.join('\n') + '\n', { mode: 0o644 })
 
   const dshPath = join(bin, 'dsh')
@@ -146,8 +166,8 @@ exec "$HEP_PYTHON" "$HARNESS_PROGRAM_ROOT/platform/dsh-platform" start "$@"
     node: toolVersion(node),
     python: toolVersion(python),
   }
-  if (pnpm) versions.pnpm = toolVersion(node, [join(runtime, 'pnpm', 'lib', 'node_modules', 'pnpm', 'bin', 'pnpm.cjs'), '--version'])
+  if (pnpm) versions.pnpm = toolVersion(pnpm)
   if (git) versions.git = toolVersion(git)
   if (dsh) versions.dsh = toolVersion(node, [dsh, '--version'])
-  return { node, pnpm, git, dsh, python, versions, warnings }
+  return { node, pnpm, git, dsh, python, versions, warnings, env }
 }

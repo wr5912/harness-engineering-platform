@@ -36,6 +36,27 @@ function flag(options: Options, name: string): boolean {
   return options[name] === true || options[name] === 'true'
 }
 
+function validateOptions(command: string, options: Options): void {
+  const values: Record<string, string[]> = {
+    pack: ['out', 'program-root', 'data-root', 'assets-dir', 'image-archive', 'image-tag', 'image-id', 'image-fingerprint', 'arch'],
+    install: ['bundle-root', 'prefix', 'data-root'],
+    verify: ['prefix', 'data-root', 'url'],
+  }
+  const flags: Record<string, string[]> = {
+    pack: ['no-image', 'no-data', 'allow-dirty', 'allow-fixture-data', 'keep-staging'],
+    install: ['dry-run', 'skip-image', 'skip-prepare', 'strict-paths', 'allow-fixture-data', 'start'],
+    verify: [],
+  }
+  if (!values[command]) throw new Error(`未知命令：${command}`)
+  for (const [key, value] of Object.entries(options)) {
+    if (['help', 'json', ...flags[command]].includes(key)) {
+      if (value !== true && value !== 'true' && value !== 'false') throw new Error(`选项 --${key} 只能使用 true 或 false`)
+    } else if (values[command].includes(key)) {
+      if (typeof value !== 'string' || !value) throw new Error(`选项 --${key} 需要值`)
+    } else throw new Error(`不支持的选项：--${key}`)
+  }
+}
+
 function archOf(value: string | undefined): Arch {
   const arch = value || (process.arch === 'arm64' ? 'arm64' : 'amd64')
   if (arch !== 'amd64' && arch !== 'arm64') throw new Error('--arch 只能是 amd64 或 arm64')
@@ -82,6 +103,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   try {
     const { command, options } = parse(argv)
     if (!command || command === '--help' || flag(options, 'help')) { console.log(usage()); return 0 }
+    validateOptions(command, options)
     if (command === 'pack') {
       const result = pack({
         programRoot: resolve(text(options, 'program-root', REPO) as string),

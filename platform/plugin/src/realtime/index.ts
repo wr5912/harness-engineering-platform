@@ -53,13 +53,14 @@ export function createPlatformEvents(assetRoot: string, options: Options = {}) {
   function sourceFile(name: string) {
     return relevant(name) && /\.(?:md|ya?ml|jsonl?|[cm]?js|[jt]sx?|toml|txt|csv|py|sh|svg)$/.test(name)
   }
-  function entries(directory: string, filename?: string) {
+  const matches = (name: string, filename?: string | string[]) => !filename || (Array.isArray(filename) ? filename.includes(name) : name === filename)
+  function entries(directory: string, filename?: string | string[]) {
     try {
       return readdirSync(directory, { withFileTypes: true }).filter(entry => relevant(entry.name)
-        && (!filename || entry.name === filename) && (entry.isDirectory() || (entry.isFile() && sourceFile(entry.name))))
+        && matches(entry.name, filename) && (entry.isDirectory() || (entry.isFile() && sourceFile(entry.name))))
     } catch { return [] }
   }
-  function observePolling(directory: string, domains: PlatformDomain[], filename?: string) {
+  function observePolling(directory: string, domains: PlatformDomain[], filename?: string | string[]) {
     const listing = () => entries(directory, filename).map(entry => entry.name).sort().join('\n')
     if (!watchers.has(directory)) {
       let previous = listing()
@@ -82,14 +83,14 @@ export function createPlatformEvents(assetRoot: string, options: Options = {}) {
       watchers.set(file, { close: () => unwatchFile(file, changed) })
     }
   }
-  function observe(directory: string, domains: PlatformDomain[], recursive: boolean, filename?: string) {
+  function observe(directory: string, domains: PlatformDomain[], recursive: boolean, filename?: string | string[]) {
     if (!existsSync(directory)) return
     if (pollingDirectories.has(directory)) observePolling(directory, domains, filename)
     else if (!watchers.has(directory)) {
       try {
         const watcher = watch(directory, (kind, name) => {
           const changed = name?.toString()
-          if (changed && (!relevant(changed) || (filename && changed !== filename))) return
+          if (changed && (!relevant(changed) || !matches(changed, filename))) return
           // 目录增删仍需刷新；二进制文件内容变化无需重读业务数据。
           if (changed && !sourceFile(changed) && kind !== 'rename') return
           notify(domains)
@@ -110,18 +111,17 @@ export function createPlatformEvents(assetRoot: string, options: Options = {}) {
     try {
       for (const entry of readdirSync(directory, { withFileTypes: true })) {
         if (!entry.isDirectory() || !relevant(entry.name)) continue
-        // Run 证据在评测期间被高频重写；Run 列表只需感知 run 目录的增删，不进入 run 内部。
+        // Run 列表只观察生命周期事实，跳过高频 trace 和工具证据。
         if (entry.name === 'runs') { observeRunRoots(join(directory, entry.name), domains); continue }
         observe(join(directory, entry.name), domains, true)
       }
     } catch { /* 删除或重命名期间，父目录通知会重新核对。 */ }
   }
-  /** 只观察 runs 目录的直接子项；run 内部内容变化由 Run 详情按需读取，不触发列表失效。 */
+  /** 观察目录增删及列表依赖的低频事实，支持先建目录后写清单的 CLI Run。 */
   function observeRunRoots(directory: string, domains: PlatformDomain[]) {
     if (!existsSync(directory)) return
-    if (pollingDirectories.has(directory)) { observePolling(directory, domains); return }
-    if (watchers.has(directory)) return
-    try {
+    if (pollingDirectories.has(directory)) observePolling(directory, domains)
+    else if (!watchers.has(directory)) try {
       const watcher = watch(directory, (kind, name) => {
         if (kind !== 'rename') return
         const changed = name?.toString()
@@ -138,6 +138,11 @@ export function createPlatformEvents(assetRoot: string, options: Options = {}) {
       // 文件监听额度不足时只比较 runs 目录的直接项，不进入 run 内部。
       pollingDirectories.add(directory)
       observePolling(directory, domains)
+    }
+    for (const entry of entries(directory)) {
+      if (entry.isDirectory() && RUN_DIRECTORY.test(entry.name)) {
+        observe(join(directory, entry.name), domains, false, ['run.yaml', 'summary.json', 'inputs.lock.json', 'analysis.json'])
+      }
     }
   }
   function scan() {

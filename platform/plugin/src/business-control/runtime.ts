@@ -49,7 +49,7 @@ export class BusinessConnection extends NativeConnection.HostConnectionService {
   private readonly secret: Buffer
   private latestSnapshot?: RuntimeAssertion['snapshot']
   constructor(ctx: Context, readonly businessConfig: BusinessRuntimeConfig, readonly control: BusinessControl) {
-    // owner Peer 由原生基类管理，但所有业务admission均覆盖，永不返回browserPeer。
+    // 所有业务 admission 均经网关签名验证，不使用原生免校验 browserPeer。
     super(ctx, [], { isAuthenticated: () => false, authenticateApi: () => undefined } as never)
     this.secret = readBusinessSecret(businessConfig.sharedSecretFile)
     control.registerInstance(businessConfig.binding)
@@ -115,8 +115,9 @@ export class BusinessConnection extends NativeConnection.HostConnectionService {
       if (!assertion.context) return { rejection: 401 }
       const context = this.control.acceptContext(assertion.context)
       this.control.assert(context, 'agent:access', [{ kind: 'agent', id: context.scope.agentId }])
-      // 原生浏览器需事件ready建立generation；非owner依旧不能回答瀑布，广播仍经RemoteAccess过滤。
-      const peer = this.createPeer({ principal: { kind: PRINCIPAL, context }, interactions: 'answer' })
+      // 无需认证的开发实例共享整个原生界面；已认证及已发布实例保留各自资源合同。
+      const sharedDevelopment = this.control.isDevelopmentContext(context) && this.control.isSharedContext(context)
+      const peer = this.createPeer({ principal: sharedDevelopment ? { kind: 'owner' } : { kind: PRINCIPAL, context }, interactions: 'answer' })
       this.businessPeers.set(peer, context); requestContext.set(request, { peer, context })
       peer.signal.addEventListener('abort', () => this.businessPeers.delete(peer), { once: true })
       return { peer }
@@ -136,6 +137,11 @@ export class BusinessConnection extends NativeConnection.HostConnectionService {
   }
   override authorizeConnect(_request: ConnectionIndexRequest, response: ConnectionIndexResponse): void { response.writeHead(403); response.end('业务入口不提供 owner 接入') }
   override authenticatedUrl(base: string): string { return base }
+  contextForPeer(peer: PeerScope): BusinessContext {
+    const context = this.businessPeers.get(peer)
+    if (!context) throw new Error('业务连接上下文缺失')
+    return context
+  }
   refresh(): Promise<void> {
     if (this.refreshing) return this.refreshing
     const task = this.refreshOnce().finally(() => { if (this.refreshing === task) this.refreshing = undefined })
@@ -180,7 +186,7 @@ export class BusinessConnection extends NativeConnection.HostConnectionService {
     const trustConfig = this.control.config().identityTrust
     if (!trustConfig || this.disposedBusiness) return
     for (const context of this.businessPeers.values()) {
-      if (context.identity?.evidence.method === 'anonymous') continue
+      if (this.control.isSharedContext(context)) continue
       const key = this.peerTrustKey(context)
       if (this.peerTrustChecks.has(key)) continue
       const task = (async () => {
@@ -194,10 +200,6 @@ export class BusinessConnection extends NativeConnection.HostConnectionService {
   }
 }
 
-function principalContext(peer: PeerScope): BusinessContext {
-  if (peer.principal.kind !== PRINCIPAL) throw new Error('业务入口要求非 owner 主体')
-  return peer.principal.context
-}
 function addressedSession(args: unknown, verifyChild?: (parentId: string, childId: string) => void): string | undefined {
   if (!args || typeof args !== 'object') return undefined
   const value = args as { request?: { sessionId?: unknown; address?: { kind?: unknown; sessionId?: unknown; parentSessionId?: unknown; childSessionId?: unknown; mode?: unknown } }; sessionId?: unknown; address?: { kind?: unknown; sessionId?: unknown; parentSessionId?: unknown; childSessionId?: unknown; mode?: unknown } }
@@ -325,7 +327,7 @@ export function registerBusinessInboxChecks(ctx: Context, control: BusinessContr
       if (!parent) throw new Error('子 Session 缺少受信原生父归属')
       context = control.bindSession(parent, agent.session.id, header!.parentSession)
     } else {
-      if (header?.origin !== undefined || header?.delegationDepth !== undefined) throw new Error('Session 来源元数据无效')
+      if (header?.origin !== undefined || (header?.delegationDepth !== undefined && header.delegationDepth !== 0)) throw new Error('Session 来源元数据无效')
       const creator = currentBusinessContext()
       // 新Agent在原生串行创建边界先绑定归属，初始队列才可进入执行。
       if (!context && creator && !control.isManagement(creator)) context = control.bindSession(creator, agent.session.id)
@@ -341,7 +343,6 @@ export function registerBusinessInboxChecks(ctx: Context, control: BusinessContr
 
 export const name = 'harness-business-runtime'
 export const inject = ['webServer', 'remoteAccess', 'tools', 'approval', 'workspaceRegistry']
-const deferredBusinessTools = new Set(['analyze_pending_threat_incidents'])
 const scheduleTools = new Set(['schedule_create', 'schedule_list', 'schedule_update', 'schedule_delete'])
 
 export function businessToolDeniedReason(exec: { agent?: { session: { id: string } }; name: string; arguments?: unknown },
@@ -350,9 +351,8 @@ export function businessToolDeniedReason(exec: { agent?: { session: { id: string
   try {
     const id = exec.agent?.session.id
     if (!id || !sessionContext(id)) return '业务 Session 未登记'
-    if (deferredBusinessTools.has(exec.name)) return '受控业务入口尚未开放自动研判'
-    if (scheduleTools.has(exec.name)) return
     if (useNativeTools) return
+    if (scheduleTools.has(exec.name)) return
     const resourceServer = exec.arguments && typeof exec.arguments === 'object'
       ? (exec.arguments as { server?: unknown }).server : undefined
     if (!managedTools.has(exec.name) && !localTools.has(exec.name) && !(typeof resourceServer === 'string' && resourceServers.has(resourceServer) &&
@@ -365,7 +365,7 @@ export function businessToolDeniedReason(exec: { agent?: { session: { id: string
 export async function apply(ctx: Context, config: BusinessRuntimeConfig): Promise<void> {
   if (!config?.binding || !config.assetRoot || !config.stateRoot || !config.coordinatorOrigin || !config.workspacePath) throw new Error('业务 Runtime 配置缺失')
   if (config.localTools !== undefined && (!Array.isArray(config.localTools) || config.localTools.some(name => typeof name !== 'string' || !name)
-    || new Set(config.localTools).size !== config.localTools.length || config.localTools.some(name => deferredBusinessTools.has(name)))) throw new Error('业务本地工具声明无效')
+    || new Set(config.localTools).size !== config.localTools.length)) throw new Error('业务本地工具声明无效')
   if (ctx.get('connection')) throw new Error('业务 Profile 必须停用默认 owner Connection')
   const control = configureBusinessControlStateRoot(config.assetRoot, config.stateRoot)
   if (!control.enabled()) throw new Error('业务 Runtime 控制未启用')
@@ -399,11 +399,8 @@ export async function apply(ctx: Context, config: BusinessRuntimeConfig): Promis
       try { control.assert(context, 'agent:access', [{ kind: 'agent', id: context.scope.agentId }]) }
       catch { return '业务任务上下文或许可无效' }
     }
-    if (context?.identity?.evidence.method === 'anonymous' && localTools.has(exec.name) && exec.name !== 'skill') {
-      try { control.assert(context, 'read') } catch { return '访客尚未获准使用业务工具' }
-    }
     return businessToolDeniedReason(exec, id => control.contextForSession(id), managedTools, localTools, resourceServers,
-      Boolean(context && context.identity?.evidence.method !== 'anonymous' && control.isDevelopmentContext(context)))
+      Boolean(context && control.isDevelopmentContext(context)))
   })
   const approvals = createBusinessApprovalAdapter(ctx, control)
   const fetchHandler = connection.createSharedFetchHandler('/api')
@@ -413,7 +410,7 @@ export async function apply(ctx: Context, config: BusinessRuntimeConfig): Promis
     const lifetime = new AbortController()
     res.once('close', () => lifetime.abort())
     try {
-      const base = principalContext(admission.peer)
+      const base = connection.contextForPeer(admission.peer)
       const report = /^\/api\/business-control\/reports\/([a-f0-9-]{36})$/.exec(new URL(req.url || '/', 'http://runtime').pathname)
       if (report) {
         if (req.method !== 'GET') throw new Error('报告只允许读取')
@@ -499,8 +496,11 @@ export function createBusinessApprovalAdapter(ctx: Context, control: BusinessCon
   }, signal => (ctx.get('connection') as BusinessConnection).refreshLatest(signal))
   ctx.effect(() => () => { control.setConfirmationHandler(undefined); for (const request of pending.values()) request.finish('cancelled'); liveAgents.clear() }, 'business confirmations')
   const authorized = (context: BusinessContext, request: PendingBusinessApproval) => {
-    if (context.subject.id !== request.context.subject.id || context.subject.identitySource !== request.context.subject.identitySource) return false
-    try { const owned = control.sessionContext(context, request.context.scope.sessionId!); control.assert(owned, request.operation.kind, request.operation.resources); return true } catch { return false }
+    try {
+      const owned = control.sessionContext(context, request.context.scope.sessionId!)
+      if (owned.subject.id !== request.context.subject.id || owned.subject.identitySource !== request.context.subject.identitySource) return false
+      control.assert(owned, request.operation.kind, request.operation.resources); return true
+    } catch { return false }
   }
   const send = (res: ServerResponse, status: number, value: unknown) => { res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(JSON.stringify(value)) }
   // 与原生UI共页；只使用自有受归属检查的接口，不能回答owner瀑布。

@@ -4,6 +4,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { McpConfigStore } from '../src/mcp/store.ts'
+import { connectionIssue, assertConnectionReady } from '../../../plugins/mcp-manager/connection.ts'
+
+process.env.HARNESS_DSH_ENTRY ??= new URL('../package.json', import.meta.url).pathname
+const { validateConfiguration } = await import('../lib/mcp-manager.js')
 
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'mcp-store-'))
@@ -67,16 +71,19 @@ test('本地凭据为空时可装载，并在界面保存时补充到本地文�
   const secretFile = join(root, '.local', 'credentials', 'mcp-manager.json')
   writeFileSync(publicFile, JSON.stringify({ schemaVersion: 1, servers: [server], groups: [] }))
   writeFileSync(secretFile, JSON.stringify({ schemaVersion: 1, sharedToken: '', servers: {} }), { mode: 0o600 })
-  const store = new McpConfigStore(root, () => {})
+  const store = new McpConfigStore(root, validateConfiguration)
   const empty = store.view()
   assert.equal(empty.value.servers[0].headers[0].value, '')
   assert.equal(empty.value.sharedToken, '')
+  assert.match(connectionIssue(empty.value.servers[0]), /Header/)
+  assert.throws(() => assertConnectionReady(empty.value.servers[0]), /补全并保存/)
   const saved = store.mutate([
     { op: 'set', path: ['sharedToken'], value: 'b'.repeat(64) },
     { op: 'set', path: ['servers', '0', 'headers', '0', 'value'], value: 'Bearer fixture-private' },
   ], empty.revision)
   assert.equal(saved.value.sharedToken, 'b'.repeat(64))
   assert.equal(saved.value.servers[0].headers[0].value, 'Bearer fixture-private')
+  assert.equal(connectionIssue(saved.value.servers[0]), undefined)
   assert.deepEqual(JSON.parse(readFileSync(secretFile, 'utf8')),
     { schemaVersion: 1, sharedToken: 'b'.repeat(64),
       servers: { first: { headers: { Authorization: 'Bearer fixture-private' } } } })
@@ -84,9 +91,19 @@ test('本地凭据为空时可装载，并在界面保存时补充到本地文�
   assert.ok(!readFileSync(publicFile, 'utf8').includes('fixture-private'))
 })
 
+test('真实配置校验允许待补充登录和无授权来源，仍拒绝非法结构', () => {
+  const login = { id: 'login', enabled: true, specUrl: 'http://localhost/spec', authType: 'login', tools: { mode: 'all', names: [] } }
+  const publicServer = { id: 'public', enabled: true, url: 'http://localhost/mcp', headers: [], tools: { mode: 'all', names: [] } }
+  const value = { servers: [login, publicServer], groups: [{ id: 'group', members: [{ serverId: 'login', names: ['echo'] }] }], sharedToken: '' }
+  validateConfiguration(value)
+  assert.match(connectionIssue(login), /登录/)
+  assert.equal(connectionIssue(publicServer), undefined)
+  assert.throws(() => validateConfiguration({ ...value, servers: [{ ...publicServer, headers: [{ name: 'bad header', value: '' }] }] }), /Header/)
+})
+
 test('平台 MCP 入口不暴露原生 Settings 配置，业务入口保留自身配置合同', async () => {
   const previous = process.env.HARNESS_DSH_ENTRY
-  process.env.HARNESS_DSH_ENTRY = '/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/package.json'
+  process.env.HARNESS_DSH_ENTRY ??= new URL('../package.json', import.meta.url).pathname
   try {
     const platform = await import('../lib/platform-mcp-manager.js')
     const business = await import('../lib/mcp-manager.js')
