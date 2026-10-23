@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+if ! command -v node >/dev/null 2>&1; then
+  echo "dsh-deploy: PATH 中没有 Node.js 24" >&2
+  exit 2
+fi
+if ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 24 ? 0 : 1)'; then
+  echo "dsh-deploy: 需要 Node.js 24，当前为 $(node --version)" >&2
+  exit 2
+fi
+exec node "$ROOT/deploy/cli.mts" "$@"

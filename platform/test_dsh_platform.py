@@ -181,6 +181,16 @@ if sys.argv[1:] == ["run", "build"]:
         self.assertEqual(session.read_text(), "retained")
         self.assertFalse(Path(self.env["DSH_HOME"]).exists())
 
+    def test_prepare_offline_skips_pnpm_install(self):
+        (self.plugin / "node_modules").mkdir()
+        (self.web / "node_modules").mkdir()
+        result = self.run_cli("prepare", "--offline")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = [json.loads(line) for line in self.pnpm_trace.read_text().splitlines()]
+        self.assertEqual([call["args"] for call in calls], [["run", "build"]])
+        self.assertTrue((self.plugin / "lib/index.js").is_file())
+        self.assertTrue((self.web / "lib/platform-webserver.mjs").is_file())
+
     def test_model_credentials_only_enter_runtime_environment_with_explicit_values_first(self):
         credentials = self.assets / ".local/credentials/models.llm-api-key"
         credentials.parent.mkdir(parents=True, exist_ok=True)

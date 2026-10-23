@@ -2,6 +2,20 @@
 
 本文件记录仓库治理、目录契约和公共演进工具的变化。单个 Agent/Harness Release 的变更应记录在对应不可变 Release 中。
 
+## [0.7.0]
+
+### 新增
+
+- 新增 `platform/dsh-deploy pack`/`install` 离线打包与安装入口：生成含平台程序、目标架构依赖、Node/pnpm/DSH/Git 离线资源、标准镜像和可选完整数据根快照的安装包；安装器校验 manifest/SHA-256/架构，导入镜像并运行 `prepare --offline`。
+- 新增 `platform/dsh-platform prepare --offline`：跳过 `pnpm install`，使用安装包内 `node_modules` 完成本地构建。
+- Git 客户端随包：优先静态 Git，否则收集目标发行版 Git 与依赖库；安装器优先包内 Git，回退系统 Git时必须报告。
+- 新增 `PA-13` 离线一键打包与安装部署验证路径；先验证 ARM64，AMD64 打包/安装验证暂缓。
+
+### 边界
+
+- 离线包包含完整数据根，默认包含平台凭据和 LLM API Key，按敏感制品管理；路径映射只覆盖平台已知文件，旧 Session 不保证。
+- Docker Engine 不随包通用安装；Docker 离线安装、真实凭据跨用户恢复和业务实例启动仍未验证。
+
 ## [0.6.0]
 
 ### 变更

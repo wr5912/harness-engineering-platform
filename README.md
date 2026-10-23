@@ -101,6 +101,30 @@ git -C "$HOME/harness-engineering-platform-data" rev-parse --is-shallow-reposito
 
 在每台主机使用同一份锁定来源、本机 Docker daemon 和[容器适配器构建命令](./runtime/adapters/dsh-container/README.md#源码与镜像身份)构建一次标准 DSH Runtime 镜像，再让各业务智能体实例共用它。不要迁移另一架构的本地镜像、构建缓存或 `node_modules/`；带原生依赖的 Candidate 插件须在目标主机按锁文件重新安装，尤其是当前 `security-operations-expert` 的 `dsh-voice-hub`。先核对来源解析的 `image.platform`、镜像的 OS/Architecture、Image ID 和构建指纹，再分别执行平台 `prepare`、浏览器登录及新 Session，以及各 Agent 当前 active Experiment 的实例启动、新 Session 和所需插件、Chromium 功能检查。具体命令、装载层级和本地证据见[容器适配器 README](./runtime/adapters/dsh-container/README.md)；只在 Ubuntu ARM64 主机完成实测后记录 ARM64 通过。
 
+单机承载多个业务智能体实例时的制品分层、实例编排、升级回滚、容量与清理边界见[单机多实例打包部署](./docs/platform-design/02_系统架构与部署设计.md#packaging-deployment)。镜像构建、实例生命周期和访问规则仍以[容器适配器说明](./runtime/adapters/dsh-container/README.md)为准。
+
+## 离线打包与安装
+
+在线准备机生成安装包：
+
+```bash
+./platform/dsh-deploy pack --out dist \
+  --assets-dir <离线资源目录> \
+  --data-root <完整数据根> \
+  --image-archive <镜像 tar>
+```
+
+离线目标机解包后运行：
+
+```bash
+tar xf harness-engineering-platform-*.tar.gz
+cd harness-engineering-platform-*
+./install.sh --prefix ~/work/harness-engineering-platform \
+  --data-root ~/harness-engineering-platform-data --start
+```
+
+安装包必须与目标机架构一致；当前先验证 ARM64，AMD64 打包/安装验证暂缓。`--data-root` 必须是包含 `AGENTS.md`、`.agents/skills`、`agents/`、`evolution/`、`config/` 和 `workspace.json` 的真实数据仓库；夹具数据根默认拒绝，仅测试可显式 `--allow-fixture-data`。安装后使用 `./platform/dsh-deploy verify --prefix <安装目录> --data-root <数据根> --url http://<host>:18120/hep/login` 核对工作区、管理 Skill、默认工作区和登录页。包格式、Git 客户端、路径映射和未验证项见[离线一键打包与安装](./docs/platform-design/23_离线一键打包与安装.md)。
+
 ## 开发与研究方式
 
 项目的工作方式和修改边界由[根级规则](./AGENTS.md#项目定位与工作方式)维护。平台开发围绕实际需求交付可用能力；遇到技术或效果不确定的问题时，做必要研究或 POC，再将验证有效的结果纳入实现。技术研究的依据按需保存在既有任务或设计记录中，不另建阶段台账。

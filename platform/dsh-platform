@@ -674,7 +674,7 @@ def build_command(label, command, **options):
     raise PlatformError(f"{label}失败（退出码 {result.returncode}）{reason}；平台 Profile 未更新。")
 
 
-def prepare(home):
+def prepare(home, offline=False):
     check_workspace()
     executable, version = global_dsh(home)
     rendered = rendered_profile()
@@ -683,9 +683,15 @@ def prepare(home):
         raise PlatformError("PATH 中没有 pnpm；请先安装插件构建工具。")
     if not (PLUGIN / "pnpm-lock.yaml").is_file():
         raise PlatformError(f"缺少插件依赖锁：{PLUGIN / 'pnpm-lock.yaml'}")
-    # Web 基址适配的依赖在构建时按需安装；失败原因必须回传到启动器，不能只留一行笼统提示。
-    print("安装插件依赖…", flush=True)
-    build_command("插件依赖安装", [pnpm, "install", "--frozen-lockfile"], cwd=PLUGIN)
+    if offline:
+        for directory in (PLUGIN, WEB):
+            if not (directory / "node_modules").is_dir():
+                raise PlatformError(f"离线模式缺少依赖目录：{directory / 'node_modules'}；请确认安装包包含依赖")
+        print("离线模式：跳过 pnpm install，使用安装包内的 node_modules。", flush=True)
+    else:
+        # Web 基址适配的依赖在构建时按需安装；失败原因必须回传到启动器，不能只留一行笼统提示。
+        print("安装插件依赖…", flush=True)
+        build_command("插件依赖安装", [pnpm, "install", "--frozen-lockfile"], cwd=PLUGIN)
     print("构建平台插件与 Web 基址适配…", flush=True)
     build_command("插件构建", [pnpm, "run", "build"], cwd=PLUGIN, env=runtime_environment(home))
     for extension in workspace_extensions():
@@ -802,7 +808,8 @@ def main():
         return 1
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("prepare", help="安装插件构建依赖、构建并生成独立平台 Profile")
+    prepare_parser = commands.add_parser("prepare", help="安装插件构建依赖、构建并生成独立平台 Profile")
+    prepare_parser.add_argument("--offline", action="store_true", help="跳过 pnpm install，使用安装包内的 node_modules")
     start_parser = commands.add_parser("start", help="使用全局 DSH 前台启动平台")
     start_parser.add_argument("--port", type=port_value, default=18120, help="监听端口，默认 18120")
     start_parser.add_argument("--host", type=host_value, help="监听 IPv4，默认选择本机局域网地址")
@@ -811,7 +818,7 @@ def main():
     try:
         home = platform_home()
         if args.command == "prepare":
-            prepare(home)
+            prepare(home, offline=args.offline)
         else:
             start(home, args.host, args.port, args.dry_run)
     except (PlatformError, OSError) as exc:

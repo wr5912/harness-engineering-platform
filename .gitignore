@@ -26,3 +26,6 @@ node_modules/
 
 # 本地开发入口；HOME/缓存/临时工作区
 .local/
+
+# 离线安装包输出
+dist/
