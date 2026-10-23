@@ -293,13 +293,17 @@ function agentDescription(root: string, payload: JsonMap) {
     description: typeof preset.description === 'string' ? preset.description : null, skills })
 }
 
-function experimentInfo(root: string, id: string, changeContent?: string) {
+function experimentInfo(root: string, id: string) {
   experimentIdValue(id)
   const base = join(root, 'evolution/experiments', id)
   const file = join(base, 'change.yaml')
   let content: string
-  try { content = changeContent ?? readFileSync(file, 'utf8') }
-  catch { throw new RpcError('asset_read_failed', 'YAML 解析失败', { path: repoRelative(root, file) }) }
+  try { content = readFileSync(file, 'utf8') }
+  catch (error) {
+    const filesystemCode = (error as NodeJS.ErrnoException).code ?? 'unknown'
+    throw new RpcError('asset_read_failed', filesystemCode === 'ENOENT' ? '版本清单不存在' : '版本清单读取失败',
+      { path: repoRelative(root, file), filesystem_code: filesystemCode })
+  }
   const change = readYamlMap(root, file, content)
   const agentId = typeof change.agent_id === 'string' ? change.agent_id : id.replace(EXP_ID, '$1')
   if (!AGENT_ID.test(agentId)) throw new RpcError('invalid_request', 'change.yaml agent_id 格式无效', { experiment_id: id, agent_id: agentId })
@@ -317,6 +321,12 @@ function experimentInfo(root: string, id: string, changeContent?: string) {
 function listExperiments(root: string, agentId?: string) {
   return listDirs(join(root, 'evolution/experiments'))
     .filter(id => EXP_ID.test(id))
+    .filter(id => {
+      const base = `evolution/experiments/${id}`
+      if (existsSync(join(root, base, 'change.yaml'))) return true
+      const visible = spawnSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '--', base], { cwd: root, encoding: 'utf8' })
+      return visible.status !== 0 || Boolean(visible.stdout)
+    })
     .map(id => experimentInfo(root, id))
     .filter(item => !agentId || item.agent_id === agentId)
 }
@@ -870,8 +880,7 @@ async function detail(root: string, payload: JsonMap, signal?: AbortSignal) {
   const rawExperimentId = explicitExperiment ?? activeExperiment ?? versions[0]?.id
   const experimentId = rawExperimentId ? experimentIdValue(rawExperimentId) : undefined
   if (!experimentId) throw new RpcError('invalid_request', '未指定 experiment_id，manifest 也没有 active_experiment')
-  const changeContent = readFileSync(changePath(root, experimentId), 'utf8')
-  const exp = experimentInfo(root, experimentId, changeContent)
+  const exp = experimentInfo(root, experimentId)
   if (exp.agent_id !== agentId) throw new RpcError('invalid_request', 'Experiment 不属于该 Agent', { agent_id: agentId, experiment_id: experimentId })
   const source = catalog(root)
   const [evaluation, contract] = await Promise.all([loadEvaluation(root, agentId, signal), sourceContract(root, experimentId, signal)])
@@ -891,7 +900,7 @@ async function detail(root: string, payload: JsonMap, signal?: AbortSignal) {
   return ok({
     agent: { id: agentId, name: agentDisplayName(root, experimentId) ?? agentId, manifest, path: `agents/${agentId}` },
     experiment: exp,
-    change_sha256: sha256(changeContent),
+    change_sha256: exp.change_sha256,
     candidate_sha256: readableCandidateDigest,
     selection: { basis: explicitExperiment ? 'explicit' : activeExperiment ? 'active_experiment' : 'latest_experiment', experiment_id: experimentId },
     versions: versions.map(item => ({ id: item.id, status: item.status, baseline_ref: item.baseline_ref })),

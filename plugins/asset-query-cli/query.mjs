@@ -1,4 +1,5 @@
-import { readdirSync, statSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { existsSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 export const name = 'harness-asset-query'
@@ -19,12 +20,26 @@ function directoryNames(path, pattern) {
     .map(entry => entry.name).sort()
 }
 
+function experimentNames(assetRoot) {
+  const base = join(assetRoot, 'evolution', 'experiments')
+  return directoryNames(base, EXPERIMENT_ID).filter(id => {
+    if (existsSync(join(base, id, 'change.yaml'))) return true
+    const path = `evolution/experiments/${id}`
+    const result = spawnSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', path],
+      { cwd: assetRoot, encoding: 'utf8' })
+    if (result.error) throw result.error
+    if (result.status !== 0) throw new Error(`无法核对 Experiment 目录：${path}`)
+    if (!result.stdout) return false
+    throw Object.assign(new Error(`Experiment 缺少 change.yaml：${path}`), { code: 'EXPERIMENT_MANIFEST_MISSING' })
+  })
+}
+
 export function inventory(assetRoot) {
   if (!statSync(assetRoot).isDirectory()) throw new Error('资产根路径不是目录')
   return {
     schema_version: '1.0',
     agents: directoryNames(join(assetRoot, 'agents'), AGENT_ID),
-    experiments: directoryNames(join(assetRoot, 'evolution', 'experiments'), EXPERIMENT_ID),
+    experiments: experimentNames(assetRoot),
   }
 }
 

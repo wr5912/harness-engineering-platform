@@ -732,11 +732,23 @@ def agent_experiments(repo: Path, agent: str, errors: list[dict] | None = None) 
         match = EXPERIMENT_RE.fullmatch(root.name)
         if not root.is_dir() or root.is_symlink() or not match or match.group(1) != agent:
             continue
+        change_path = root / "change.yaml"
+        if not change_path.exists():
+            try:
+                visible = subprocess.run(
+                    ["git", "ls-files", "--cached", "--others", "--exclude-standard", "--",
+                     root.relative_to(repo).as_posix()],
+                    cwd=repo, text=True, capture_output=True, check=False, timeout=5,
+                )
+            except (OSError, subprocess.TimeoutExpired):
+                visible = None
+            if visible is not None and visible.returncode == 0 and not visible.stdout.strip():
+                continue
         try:
-            change = read_change_yaml(root / "change.yaml")
+            change = read_change_yaml(change_path)
         except (OSError, ValueError, yaml.YAMLError) as exc:
             errors.append({"agent_id": agent, "experiment_id": root.name,
-                           "path": (root / "change.yaml").relative_to(repo).as_posix(),
+                           "path": change_path.relative_to(repo).as_posix(),
                            "error": f"版本清单暂不可读（{type(exc).__name__}）"})
             continue
         runs = []

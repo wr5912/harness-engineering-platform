@@ -8,6 +8,7 @@ import io
 import hashlib
 import json
 import os
+import subprocess
 import tempfile
 import unittest
 import uuid
@@ -79,6 +80,37 @@ def recorded_run(module, repo: Path, external_fixture: bytes | None = None) -> t
 
 
 class FrozenRunSnapshotTests(unittest.TestCase):
+    def test_experiment_index_skips_ignored_residue_but_reports_missing_visible_manifest(self) -> None:
+        module = load_module(fixtures.RUN_RECORD, "ignored_experiment_residue")
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            subprocess.run(["git", "init", "-q", str(repo)], check=True, capture_output=True)
+            (repo / ".gitignore").write_text("node_modules/\n", encoding="utf-8")
+            experiment = repo / "evolution/experiments/EXP-example-agent-998"
+            ignored = experiment / "candidate/node_modules/cache.js"
+            ignored.parent.mkdir(parents=True)
+            ignored.write_text("cached", encoding="utf-8")
+
+            errors = []
+            self.assertEqual(module.agent_experiments(repo, "example-agent", errors), [])
+            self.assertEqual(errors, [], "仅剩 Git 忽略产物的目录不应污染 Run 列表")
+
+            visible = experiment / "notes.md"
+            visible.write_text("尚未完成的版本资料", encoding="utf-8")
+            for stage in ("untracked", "tracked", "tracked-deleted"):
+                with self.subTest(stage=stage):
+                    if stage == "tracked":
+                        subprocess.run(["git", "-C", str(repo), "add", "--", str(visible.relative_to(repo))],
+                                       check=True, capture_output=True)
+                    elif stage == "tracked-deleted":
+                        visible.unlink()
+                    errors = []
+                    self.assertEqual(module.agent_experiments(repo, "example-agent", errors), [])
+                    self.assertEqual(len(errors), 1)
+                    self.assertEqual(errors[0]["experiment_id"], experiment.name)
+                    self.assertEqual(errors[0]["path"], str((experiment / "change.yaml").relative_to(repo)))
+                    self.assertIn("FileNotFoundError", errors[0]["error"])
+
     def test_overview_isolates_invalid_run_and_experiment(self) -> None:
         module = load_module(fixtures.ROOT / "runtime/adapters/dsh-container/run_record.py", "record")
         with tempfile.TemporaryDirectory() as temporary:

@@ -162,6 +162,46 @@ test('experiment readers accept historical IDs and twelve hex suffixes, rejectin
   }
 })
 
+test('版本枚举跳过仅有忽略产物的遗留目录，缺失真实清单仍明确报错', async t => {
+  const { createAgentsHandler } = await loadServer()
+  const { root } = fixture()
+  t.after(() => rm(root, { recursive: true, force: true }))
+  write(join(root, '.gitignore'), 'node_modules/\n__pycache__/\n')
+  const ignoredId = 'EXP-test-agent-007'
+  const ignoredBase = `evolution/experiments/${ignoredId}`
+  write(join(root, ignoredBase, 'candidate/node_modules/pkg/index.js'), 'cached\n')
+  write(join(root, ignoredBase, 'candidate/__pycache__/module.pyc'), 'cached\n')
+  assert.equal(run(root, 'git', ['ls-files', '--cached', '--others', '--exclude-standard', '--', ignoredBase]), '')
+
+  const handler = createAgentsHandler(root)
+  const listed = await rpc(handler, 'list')
+  assert.deepEqual(listed.experiments.map(item => item.id), ['EXP-test-agent-001'])
+  assert.equal(listed.agents[0].version_count, 1)
+  assert.equal((await rpc(handler, 'detail', { agent_id: 'test-agent' })).experiment.id, 'EXP-test-agent-001')
+  const explicit = await handler('detail', { agent_id: 'test-agent', experiment_id: ignoredId }, new AbortController().signal)
+  assert.equal(explicit.ok, false)
+  assert.equal(explicit.error.code, 'asset_read_failed')
+  assert.equal(explicit.error.message, '版本清单不存在')
+  assert.equal(explicit.error.details.path, `${ignoredBase}/change.yaml`)
+
+  const untrackedId = 'EXP-test-agent-008'
+  const untrackedBase = `evolution/experiments/${untrackedId}`
+  write(join(root, untrackedBase, 'hypothesis.md'), '# 尚未写入版本清单\n')
+  const untracked = await handler('list', {}, new AbortController().signal)
+  assert.equal(untracked.ok, false)
+  assert.equal(untracked.error.code, 'asset_read_failed')
+  assert.equal(untracked.error.message, '版本清单不存在')
+  assert.equal(untracked.error.details.path, `${untrackedBase}/change.yaml`)
+  await rm(join(root, untrackedBase), { recursive: true })
+
+  await rm(join(root, 'evolution/experiments/EXP-test-agent-001/change.yaml'))
+  const tracked = await handler('list', {}, new AbortController().signal)
+  assert.equal(tracked.ok, false)
+  assert.equal(tracked.error.code, 'asset_read_failed')
+  assert.equal(tracked.error.message, '版本清单不存在')
+  assert.equal(tracked.error.details.path, 'evolution/experiments/EXP-test-agent-001/change.yaml')
+})
+
 test('agents detail reads manifest, selectable versions, real cases, refs and editable files', async () => {
   const { createAgentsHandler } = await loadServer()
   const fx = fixture()

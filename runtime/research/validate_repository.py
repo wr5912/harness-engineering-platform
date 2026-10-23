@@ -10,6 +10,7 @@ import json
 import os
 import re
 import stat
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -394,6 +395,17 @@ def validate_experiments(root: Path, errors: list[dict[str, str]], warnings: lis
         if not experiment.is_dir() or experiment.is_symlink():
             errors.append(issue("EXPERIMENT_DIR", "experiments/ 只能包含实体目录", relative(experiment, root)))
             continue
+        if not (experiment / "change.yaml").exists() and EXPERIMENT_RE.fullmatch(experiment.name):
+            try:
+                visible = subprocess.run(
+                    ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--",
+                     experiment.relative_to(root).as_posix()],
+                    cwd=root, capture_output=True, check=False, timeout=5,
+                )
+            except (OSError, subprocess.TimeoutExpired):
+                visible = None
+            if visible is not None and visible.returncode == 0 and not visible.stdout:
+                continue
         payload, _ = validator.validate(experiment.resolve())
         for item in payload.get("errors", []):
             copied = dict(item)

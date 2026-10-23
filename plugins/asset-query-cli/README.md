@@ -1,6 +1,6 @@
 # DSH 只读资产查询原型
 
-此原型验证 DSH 应用级命令行扩展：不装载业务 Bundle、模型或 MCP，只读取显式挂载的仓库资产目录，输出 Agent 与 Experiment 目录清单。它不判断资产有效性、评估结论或插件是否激活，也不是完整研发管理 CLI。
+此原型验证 DSH 应用级命令行扩展：不装载业务 Bundle、模型或 MCP，只读取显式挂载的仓库资产目录，输出 Agent 与 Experiment 目录清单。Experiment 缺少 `change.yaml` 时，仅跳过没有 Git 可见文件的残留目录；仍有资料的目录会报错。它不判断清单内容、评估结论或插件是否激活，也不是完整研发管理 CLI。
 
 Profile 模板位于 `profile/`，插件入口为 `query.mjs`。容器内将本目录只读挂载到 `/opt/harness-plugins/asset-query-cli`；把模板复制到独立、可写的 `$DSH_HOME/profiles/asset-query-cli`，因为 DSH 启动时会生成该 Profile 的有效 `cordis.yml`。只读挂载仓库资产并设置 `HARNESS_ASSET_ROOT` 后，可运行 `dsh --profile asset-query-cli --help` 或 `dsh --profile asset-query-cli inventory`。标准输出的查询结果是单行 JSON；参数错误写标准错误并返回非零码。Profile 的运行态副本不归档为 Harness 资产。
 

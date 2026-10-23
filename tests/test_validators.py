@@ -233,6 +233,41 @@ class SourceInspectorTests(unittest.TestCase):
 
 
 class RepositoryValidatorTests(unittest.TestCase):
+    def test_experiment_validator_ignores_only_retired_cache_directories(self) -> None:
+        spec = importlib.util.spec_from_file_location("experiment_cache_validator", VALIDATE_REPOSITORY)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "workspace.json").write_text("{}", encoding="utf-8")
+            (root / ".gitignore").write_text("node_modules/\n__pycache__/\n", encoding="utf-8")
+            subprocess.run(["git", "init", "-q", str(root)], check=True, capture_output=True)
+            experiment = root / "evolution/experiments/EXP-example-agent-999-r0123456789ab"
+            cache = experiment / "candidate/node_modules/cache.js"
+            cache.parent.mkdir(parents=True)
+            cache.write_text("cached", encoding="utf-8")
+
+            errors, warnings = [], []
+            module.validate_experiments(root, errors, warnings)
+            self.assertEqual(errors, [])
+            self.assertEqual(warnings, [])
+
+            notes = experiment / "notes.md"
+            notes.write_text("尚未完成的版本资料", encoding="utf-8")
+            for stage in ("untracked", "tracked-deleted", "git-failed"):
+                with self.subTest(stage=stage):
+                    if stage == "tracked-deleted":
+                        subprocess.run(["git", "-C", str(root), "add", "--", str(notes.relative_to(root))],
+                                       check=True, capture_output=True)
+                        notes.unlink()
+                    errors, warnings = [], []
+                    if stage == "git-failed":
+                        with mock.patch.object(module.subprocess, "run", side_effect=OSError("git unavailable")):
+                            module.validate_experiments(root, errors, warnings)
+                    else:
+                        module.validate_experiments(root, errors, warnings)
+                    self.assertIn("EXPERIMENT_CHANGE", error_codes({"errors": errors}))
+
     def test_program_skill_check_does_not_require_data_business_skills(self) -> None:
         spec = importlib.util.spec_from_file_location("program_repository_validator", VALIDATE_REPOSITORY)
         module = importlib.util.module_from_spec(spec)
