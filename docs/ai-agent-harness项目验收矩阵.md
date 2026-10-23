@@ -373,8 +373,9 @@
 - **AMD64**：本机打包/安装验证按用户要求暂缓，等通知后执行。
 - **真实数据工作区部署（2026-10-23）**：此前 207 使用 `hep-arm64-poc/fixture-data`，安装包 `source.dataRoot` 为夹具，包内没有 `AGENTS.md`、`.agents/skills`、`agents/`、`evolution/`，因此不能作为部署验收。已把 228 的 `~/harness-engineering-platform-data` 传输到 207，改为 `HARNESS_ASSET_ROOT=/home/aisoc/harness-engineering-platform-data`，重建 Profile 并创建新的平台 HOME；`storages/workspace.json` 的 `defaultWorkspaceId` 已指向该数据根，标题为 `harness-engineering-platform-data`，Profile 装载 13 项管理 Skill。207 的 `config/business-access.json` 置为 `enabled=false`，外部身份/风险/MCP 服务未部署；旧夹具安装包不作为部署证据。安装器已新增真实工作区校验，默认拒绝夹具（测试需 `--allow-fixture-data`）。
 - **207 实际访问（2026-10-23）**：安装目录后台启动，`http://172.16.138.207:18120/hep/` 登录页 200，`admin` 账号登录后首页 200；首次启动发现 DSH 构建树缺少 `@deepseek-ai/dsh-scope` 链接，安装器已补齐并在当前目录修复后重启成功；207 的 10 个 AI SOC 容器保持不变。后台进程不是 systemd 服务，重启后需重新启动。
-- **未验证**：Docker Engine 离线安装、真实凭据/旧平台 Session 的跨用户恢复、动态 Git/便携 Python 跨发行版兼容性、业务实例启动；离线包不构成生产部署验收。
-- **状态**：部分验证（真实数据工作区及管理助手默认工作区已验收；真实数据包已生成并通过 dry-run；AMD64、Docker 离线安装和外部业务服务未验证）。
+- **52 实际部署（2026-10-23）**：ARM64 完整包 `0.7.0-a1385532650c`（SHA-256 `084583938db946b29719bef86d5ebb1b40fdebb15370950430fe746bc74f71bd`）在 52 校验、安装并导入标准 DSH 镜像 `sha256:e25891e6aa4bb19e8cdd3ea30840e4458bd17ca16b7be6febe4dd02564d680ce`；镜像标签和构建指纹与新旧两个工作区的来源解析一致，容器内 DSH 版本检查通过。程序和数据分别安装到 `/root/work/harness-engineering-platform-imagefix`、`/root/harness-engineering-platform-data-imagefix`；数据 Git 为 `23e83aaa`，仅目标主机业务网关配置发生预期修改。离线 `prepare` 成功，`dsh-deploy verify` 的工作区资产、13 项 Skill、默认工作区、启动器、登录页 5 项均通过；新平台 `18121` 与业务网关 `53106` 监听，原 `18120/53105` 保持运行。
+- **未验证**：Docker Engine 离线安装、旧平台 Session 的跨用户恢复、动态 Git/便携 Python 跨发行版兼容性、52 新实例的模型调用及业务交互；离线包不构成生产部署验收。
+- **状态**：部分验证（ARM64 真实数据包已在 52 完整安装并启动，标准镜像已导入；AMD64、Docker 离线安装和业务实例交互未验证）。
 
 ## 4. 为什么是 13 条
 
