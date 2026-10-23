@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { collectEntries, verifyEntries } from '../manifest.mts'
-import { copyTree } from '../fsutil.mts'
-import { rewriteKnownPaths, scanKnownOldPaths } from '../paths.mts'
+import { copyTree, tarCreate } from '../fsutil.mts'
+import { rewriteDeploymentAddress, rewriteKnownPaths, scanKnownOldPaths } from '../paths.mts'
 import { ensureDshScopeLink } from '../runtime.mts'
 import { assertRealWorkspace, inspectDataRoot } from '../data.mts'
 import { pack } from '../pack.mts'
@@ -42,6 +42,38 @@ test('无过滤目录复制保留符号链接，已有目标仍复制目录内�
     mkdirSync(existing)
     copyTree(source, existing)
     assert.equal(readFileSync(join(existing, 'file'), 'utf8'), 'value')
+  } finally { close() }
+})
+
+test('安装时将业务网关和管理入口绑定到目标主机与空闲端口', () => {
+  const { root, close } = workspace()
+  try {
+    const file = join(root, 'config', 'business-access.json')
+    mkdirSync(join(root, 'config'))
+    writeFileSync(file, JSON.stringify({ enabled: true, gateway: {
+      host: '172.16.138.228', port: 53105, publicOrigin: 'http://172.16.138.228:53105',
+      managementUrl: 'http://172.16.138.228:18120/hep/', sharedSecretFile: '/root/data/secret',
+    } }))
+    assert.equal(rewriteDeploymentAddress(root, '172.16.138.52', 18121, 53106), true)
+    const result = JSON.parse(readFileSync(file, 'utf8'))
+    assert.equal(result.gateway.host, '172.16.138.52')
+    assert.equal(result.gateway.port, 53106)
+    assert.equal(result.gateway.publicOrigin, 'http://172.16.138.52:53106')
+    assert.equal(result.gateway.managementUrl, 'http://172.16.138.52:18121/hep/')
+    assert.equal(result.gateway.sharedSecretFile, '/root/data/secret')
+  } finally { close() }
+})
+
+test('敏感安装包归档仅允许打包用户读取，覆盖旧归档也保持权限', () => {
+  const { root, close } = workspace()
+  try {
+    const source = join(root, 'source')
+    mkdirSync(source)
+    writeFileSync(join(source, 'credential'), 'secret')
+    const archive = join(root, 'bundle.tar.gz')
+    writeFileSync(archive, '', { mode: 0o644 })
+    tarCreate(source, archive)
+    assert.equal(statSync(archive).mode & 0o777, 0o600)
   } finally { close() }
 })
 

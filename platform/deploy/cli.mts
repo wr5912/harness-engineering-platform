@@ -1,4 +1,5 @@
 import { homedir } from 'node:os'
+import { isIP } from 'node:net'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { pack } from './pack.mts'
@@ -39,7 +40,7 @@ function flag(options: Options, name: string): boolean {
 function validateOptions(command: string, options: Options): void {
   const values: Record<string, string[]> = {
     pack: ['out', 'program-root', 'data-root', 'assets-dir', 'image-archive', 'image-tag', 'image-id', 'image-fingerprint', 'arch'],
-    install: ['bundle-root', 'prefix', 'data-root'],
+    install: ['bundle-root', 'prefix', 'data-root', 'host', 'port', 'gateway-port'],
     verify: ['prefix', 'data-root', 'url'],
   }
   const flags: Record<string, string[]> = {
@@ -61,6 +62,13 @@ function archOf(value: string | undefined): Arch {
   const arch = value || (process.arch === 'arm64' ? 'arm64' : 'amd64')
   if (arch !== 'amd64' && arch !== 'arm64') throw new Error('--arch 只能是 amd64 或 arm64')
   return arch
+}
+
+function installPort(value: string | undefined, name: string, fallback: number): number {
+  if (value === undefined) return fallback
+  const port = Number(value)
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`--${name} 必须是 1 至 65535 的整数`)
+  return port
 }
 
 function usage(): string {
@@ -89,6 +97,9 @@ function usage(): string {
     --bundle-root <目录>         解包后的安装包根目录（install.sh 会传入）
     --prefix <目录>              程序安装目录，默认 ~/work/harness-engineering-platform
     --data-root <目录>           数据根，默认 ~/harness-engineering-platform-data
+    --host <IPv4>                平台与业务网关监听地址；跨主机恢复数据根时指定
+    --port <端口>                平台端口，默认 18120
+    --gateway-port <端口>        业务网关端口；并行部署时指定空闲端口
     --dry-run                    只校验和展示计划，不写入
     --skip-image                 不导入镜像
     --skip-prepare               不执行 prepare（仅用于诊断/分步安装）
@@ -135,10 +146,19 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     if (command === 'install') {
       const bundleRoot = text(options, 'bundle-root')
       if (!bundleRoot) throw new Error('install 需要 --bundle-root（install.sh 会自动传入）')
+      const host = text(options, 'host')
+      if (host && (isIP(host) !== 4 || host === '0.0.0.0' || host === '255.255.255.255' || Number(host.split('.')[0]) >= 224)) {
+        throw new Error('--host 必须是具体 IPv4 地址')
+      }
+      if (text(options, 'port') && !host) throw new Error('--port 需要同时指定 --host')
+      if (text(options, 'gateway-port') && !host) throw new Error('--gateway-port 需要同时指定 --host')
       const report = install({
         bundleRoot: resolve(bundleRoot),
         prefix: resolve(text(options, 'prefix', join(homedir(), 'work', 'harness-engineering-platform')) as string),
         dataRoot: resolve(text(options, 'data-root', join(homedir(), 'harness-engineering-platform-data')) as string),
+        host,
+        port: installPort(text(options, 'port'), 'port', 18120),
+        gatewayPort: text(options, 'gateway-port') ? installPort(text(options, 'gateway-port'), 'gateway-port', 0) : undefined,
         skipImage: flag(options, 'skip-image'),
         skipPrepare: flag(options, 'skip-prepare'),
         allowFixtureData: flag(options, 'allow-fixture-data'),

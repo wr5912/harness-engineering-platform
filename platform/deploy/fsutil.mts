@@ -1,4 +1,4 @@
-import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
@@ -80,6 +80,8 @@ export function assertSafeArchive(archive: string): void {
 
 export function tarCreate(directory: string, archive: string): void {
   mkdirSync(dirname(archive), { recursive: true })
+  writeFileSync(archive, '', { mode: 0o600 })
+  chmodSync(archive, 0o600)
   run('tar', ['-C', directory, '-czf', archive, '.'])
 }
 

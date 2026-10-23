@@ -4,7 +4,7 @@ import { join, resolve, sep } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { copyTree } from './fsutil.mts'
 import { readManifest, verifyEntries } from './manifest.mts'
-import { rewriteKnownPaths, scanKnownOldPaths } from './paths.mts'
+import { rewriteDeploymentAddress, rewriteKnownPaths, scanKnownOldPaths } from './paths.mts'
 import { installRuntime } from './runtime.mts'
 import { dockerAvailable, loadVerifiedImage } from './image.mts'
 import { assertRealWorkspace } from './data.mts'
@@ -13,6 +13,9 @@ export interface InstallOptions {
   bundleRoot: string
   prefix: string
   dataRoot: string
+  host?: string
+  port: number
+  gatewayPort?: number
   skipImage: boolean
   skipPrepare: boolean
   allowFixtureData: boolean
@@ -116,6 +119,9 @@ export function install(options: InstallOptions): InstallReport {
       if (remaining.length && options.strictPaths) throw new Error(`数据根仍包含旧路径：\n${remaining.map(item => item.file + ':' + item.pattern).join('\n')}`)
       report.oldReferences.push(...remaining)
     }
+    if (options.host && rewriteDeploymentAddress(dataRoot, options.host, options.port, options.gatewayPort)) {
+      report.rewritten.push(join(dataRoot, 'config', 'business-access.json'))
+    }
     report.pendingInstances = instanceNames(dataRoot)
 
     const runtime = installRuntime(bundleRoot, prefix, dataRoot)
@@ -154,7 +160,8 @@ export function install(options: InstallOptions): InstallReport {
   }
 
   if (options.start) {
-    const started = spawnSync(join(prefix, 'bin', 'hep-start'), [], { cwd: prefix, env, stdio: 'inherit' })
+    const args = options.host ? ['--host', options.host, '--port', String(options.port)] : ['--port', String(options.port)]
+    const started = spawnSync(join(prefix, 'bin', 'hep-start'), args, { cwd: prefix, env, stdio: 'inherit' })
     if (started.status !== 0) throw new Error(`平台启动失败（退出码 ${started.status}）`)
   }
   return report

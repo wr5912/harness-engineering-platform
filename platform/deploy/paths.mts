@@ -73,3 +73,27 @@ export function scanKnownOldPaths(dataRoot: string, patterns: string[]): Array<{
   }
   return found
 }
+
+export function rewriteDeploymentAddress(dataRoot: string, host: string, port: number, gatewayPort?: number): boolean {
+  const file = join(dataRoot, 'config', 'business-access.json')
+  if (!existsSync(file)) return false
+  const access = JSON.parse(readFileSync(file, 'utf8'))
+  if (!access.gateway) return false
+  const gateway = access.gateway
+  gateway.host = host
+  if (gatewayPort !== undefined) gateway.port = gatewayPort
+  if (gateway.publicOrigin) {
+    const origin = new URL(gateway.publicOrigin)
+    origin.hostname = host
+    if (gatewayPort !== undefined) origin.port = String(gatewayPort)
+    gateway.publicOrigin = origin.origin
+  }
+  if (gateway.managementUrl) {
+    const management = new URL(gateway.managementUrl)
+    management.hostname = host
+    management.port = String(port)
+    gateway.managementUrl = management.href
+  }
+  writeFileSync(file, `${JSON.stringify(access, null, 2)}\n`, { mode: 0o600 })
+  return true
+}

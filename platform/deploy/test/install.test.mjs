@@ -33,7 +33,7 @@ function manifest(path, image) {
   }))
 }
 const options = (path, prefix) => ({ bundleRoot: path, prefix, dataRoot: prefix + '-data', skipImage: false,
-  skipPrepare: false, allowFixtureData: false, strictPaths: false, start: false, dryRun: false, json: false })
+  skipPrepare: false, allowFixtureData: false, strictPaths: false, start: false, dryRun: false, json: false, port: 18120 })
 
 test('安装环境不依赖解包目录，特殊路径按原值进入 shell，Git 失败时使用已探测系统客户端', () => {
   const path = bundle('runtime-bundle')
@@ -61,6 +61,16 @@ test('安装 prepare 使用同一环境；失败清理后可以原命令重试',
   finally { delete process.env.HEP_TEST_PREPARE_FAILURE }
   assert.equal(existsSync(prefix), false)
   assert.equal(install(options(path, prefix)).prepare, 'ok')
+})
+
+test('安装后启动沿用目标主机与平台端口', () => {
+  const path = bundle('start-bundle'), prefix = join(root, 'start-program'), output = join(root, 'start-arguments.json')
+  write(join(path, 'program/platform/dsh-platform'), 'import json, os, sys\nif sys.argv[1] == "start":\n    open(os.environ["HEP_TEST_START_FILE"], "w").write(json.dumps(sys.argv[2:]))\n')
+  manifest(path)
+  process.env.HEP_TEST_START_FILE = output
+  try { install({ ...options(path, prefix), host: '127.0.0.1', port: 18121, start: true }) }
+  finally { delete process.env.HEP_TEST_START_FILE }
+  assert.deepEqual(JSON.parse(readFileSync(output, 'utf8')), ['--host', '127.0.0.1', '--port', '18121'])
 })
 
 test('包内 Git 可用时优先使用，包内和系统均不可用时明确失败', () => {
@@ -143,9 +153,9 @@ test('安装 shell 在成功、失败、dry-run 后清理临时目录并保留�
     assert.equal(result.status, args.includes('--fail-fixture') ? 7 : 0, result.stderr)
     assert.deepEqual(readdirSync(temporary), [])
   }
-  for (const args of [['install', '--install-docker'], ['pack', '--arch'], ['install', '--skip-image=typo']]) {
+  for (const args of [['install', '--install-docker'], ['pack', '--arch'], ['install', '--skip-image=typo'], ['install', '--bundle-root', path, '--host', 'bad'], ['install', '--bundle-root', path, '--gateway-port', '53106'], ['install', '--bundle-root', path, '--port', '18121']]) {
     const result = spawnSync(process.execPath, [new URL('../cli.mts', import.meta.url).pathname, ...args], { encoding: 'utf8' })
     assert.equal(result.status, 1)
-    assert.match(result.stderr, /不支持的选项|需要值|只能使用/)
+    assert.match(result.stderr, /不支持的选项|需要值|只能使用|IPv4|需要同时指定/)
   }
 })
