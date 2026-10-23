@@ -8,6 +8,7 @@ import { copyTree } from '../fsutil.mts'
 import { rewriteKnownPaths, scanKnownOldPaths } from '../paths.mts'
 import { ensureDshScopeLink } from '../runtime.mts'
 import { assertRealWorkspace, inspectDataRoot } from '../data.mts'
+import { pack } from '../pack.mts'
 
 function workspace() {
   const root = mkdtempSync(join(tmpdir(), 'hep-deploy-test-'))
@@ -78,6 +79,26 @@ test('安装器为 DSH 构建树补齐 dsh-scope 链接', () => {
     mkdirSync(join(root, 'packages', 'core', 'scope'), { recursive: true })
     ensureDshScopeLink(root)
     assert.equal(realpathSync(join(root, 'node_modules', '@deepseek-ai', 'dsh-scope')), join(root, 'packages', 'core', 'scope'))
+  } finally { close() }
+})
+
+test('打包时拒绝未构建的 DSH 和缺少二进制的 Git 资源', () => {
+  const { root, close } = workspace()
+  try {
+    const program = join(root, 'program'), assets = join(root, 'assets')
+    for (const name of ['platform', 'runtime', 'plugins']) mkdirSync(join(program, name), { recursive: true })
+    mkdirSync(join(program, 'platform', 'deploy'), { recursive: true })
+    writeFileSync(join(program, 'platform', 'deploy', 'install.sh'), '#!/bin/sh\n')
+    for (const path of ['program/platform/plugin/node_modules', 'program/runtime/adapters/dsh-web/node_modules', 'node', 'pnpm', 'git/root']) {
+      mkdirSync(join(assets, path), { recursive: true })
+    }
+    const options = { programRoot: program, assetsDir: assets, out: join(root, 'out'), arch: 'arm64',
+      includeImage: false, includeData: false, allowDirty: true, keepStaging: false, allowFixtureData: false }
+    assert.throws(() => pack(options), /缺少已构建的 DSH CLI/)
+    mkdirSync(join(assets, 'dsh', 'apps', 'cli', 'lib'), { recursive: true })
+    writeFileSync(join(assets, 'dsh', 'apps', 'cli', 'lib', 'bin.js'), '')
+    writeFileSync(join(assets, 'git', 'git'), '#!/bin/sh\n')
+    assert.throws(() => pack(options), /Git 离线资源缺少可执行入口或包内二进制/)
   } finally { close() }
 })
 

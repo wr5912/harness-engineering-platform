@@ -26,8 +26,8 @@ function firstFile(directory: string, suffix: string): string | undefined {
   return readdirSync(directory).sort().map(name => join(directory, name)).find(path => path.endsWith(suffix))
 }
 
-function toolVersion(command: string, args: string[] = ['--version']): string {
-  try { return run(command, args).trim() } catch { return 'unknown' }
+function toolVersion(command: string, args: string[] = ['--version'], env?: NodeJS.ProcessEnv): string {
+  try { return run(command, args, { env }).trim() } catch { return 'unknown' }
 }
 
 function systemCommand(name: string, usable = false): string | undefined {
@@ -166,7 +166,7 @@ exec "$HEP_PYTHON" "$HARNESS_PROGRAM_ROOT/platform/dsh-platform" start "$@"
     node: toolVersion(node),
     python: toolVersion(python),
   }
-  if (pnpm) versions.pnpm = toolVersion(pnpm)
+  if (pnpm) versions.pnpm = toolVersion(pnpm, ['--version'], env)
   if (git) versions.git = toolVersion(git)
   if (dsh) versions.dsh = toolVersion(node, [dsh, '--version'])
   return { node, pnpm, git, dsh, python, versions, warnings, env }

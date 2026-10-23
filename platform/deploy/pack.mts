@@ -141,6 +141,9 @@ export function pack(options: PackOptions): { archive: string; size: number } {
   if (dirty && !options.allowDirty) {
     throw new Error('工作树存在未提交改动；请先提交或显式使用 --allow-dirty')
   }
+  if (!options.assetsDir || !existsSync(join(options.assetsDir, 'dsh', 'apps', 'cli', 'lib', 'bin.js'))) {
+    throw new Error('离线资源缺少已构建的 DSH CLI：--assets-dir dsh/apps/cli/lib/bin.js')
+  }
   const packageName = `harness-engineering-platform-${versionOf(programRoot)}-${commit.slice(0, 12)}-${options.arch}`
   const staging = join(out, '.staging', packageName)
   if (existsSync(staging)) removeTree(staging)
@@ -163,6 +166,9 @@ export function pack(options: PackOptions): { archive: string; size: number } {
 
   const gitSource = options.assetsDir ? join(options.assetsDir, 'git') : undefined
   if (gitSource && existsSync(gitSource)) {
+    if (!existsSync(join(gitSource, 'git')) || (existsSync(join(gitSource, 'root')) && !existsSync(join(gitSource, 'root', 'usr', 'bin', 'git')))) {
+      throw new Error('Git 离线资源缺少可执行入口或包内二进制')
+    }
     copyAsset(gitSource, join(offline, 'git'))
     let version = 'unknown'
     try { version = run(join(offline, 'git', 'git'), ['--version']).trim() } catch { /* 跨架构打包不能在当前主机执行目标架构 Git */ }
