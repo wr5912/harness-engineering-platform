@@ -68,12 +68,15 @@ export function inspectImageArchive(archive: string, tag: string): ImageInfo {
     const index = JSON.parse(run('tar', ['-xOf', archive, 'index.json'])) as {
       manifests?: Array<{ digest: string }>
     }
+    const readBlob = (digest: string): { config?: { digest?: string }; manifests?: Array<{ digest: string }> } => {
+      if (!/^sha256:[0-9a-f]{64}$/.test(digest)) throw new Error('镜像 OCI 清单摘要格式无效')
+      const body = run('tar', ['-xOf', archive, `blobs/sha256/${digest.slice(7)}`])
+      if (`sha256:${sha256Text(body)}` !== digest) throw new Error('镜像 OCI 清单摘要不符')
+      return JSON.parse(body)
+    }
     const matches = (index.manifests ?? []).filter(entry => {
-      if (!/^sha256:[0-9a-f]{64}$/.test(entry.digest)) return false
-      const body = run('tar', ['-xOf', archive, `blobs/sha256/${entry.digest.slice(7)}`])
-      if (`sha256:${sha256Text(body)}` !== entry.digest) throw new Error('镜像 OCI 清单摘要不符')
-      const image = JSON.parse(body) as { config?: { digest?: string } }
-      return image.config?.digest === id
+      const image = readBlob(entry.digest)
+      return image.config?.digest === id || image.manifests?.some(child => readBlob(child.digest).config?.digest === id)
     })
     if (matches.length !== 1) throw new Error('镜像 OCI 索引无法唯一定位标准镜像')
     id = matches[0].digest

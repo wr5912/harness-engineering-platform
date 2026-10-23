@@ -25,6 +25,7 @@ RUN sh /opt/dsh-adapter/apt-mirror.sh "$DSH_APT_MIRROR" \
 
 WORKDIR /opt/dsh
 COPY --from=dsh_source / /opt/dsh
+ENV NODE_USE_ENV_PROXY=1
 
 # corepack 下载包管理器、pnpm 解析依赖都走同一个国内 registry；
 # 依赖仍按 pnpm-lock.yaml 的完整性摘要校验，换源不改变锁定内容。

@@ -118,6 +118,18 @@ test('打包前从 Docker 归档核对标签、配置摘要、架构和构建指
   assert.deepEqual(verifyImageInfo(info, { arch: 'arm64', fingerprint: 'expected' }), [])
   assert.match(verifyImageInfo(info, { fingerprint: 'wrong' }).join(''), /指纹不符/)
   assert.throws(() => inspectImageArchive(archive, 'hep:poc'), /标准标签/)
+  const oci = JSON.stringify({ schemaVersion: 2, config: { digest: `sha256:${digest}` }, layers: [] })
+  const ociDigest = createHash('sha256').update(oci).digest('hex')
+  write(join(dir, 'blobs/sha256', ociDigest), oci)
+  write(join(dir, 'index.json'), JSON.stringify({ manifests: [{ digest: `sha256:${ociDigest}` }] }))
+  assert.equal(spawnSync('tar', ['-C', dir, '-cf', archive, 'manifest.json', `${digest}.json`, 'index.json', 'blobs']).status, 0)
+  assert.equal(inspectImageArchive(archive, 'hep:standard').id, `sha256:${ociDigest}`)
+  const nested = JSON.stringify({ schemaVersion: 2, manifests: [{ digest: `sha256:${ociDigest}` }] })
+  const nestedDigest = createHash('sha256').update(nested).digest('hex')
+  write(join(dir, 'blobs/sha256', nestedDigest), nested)
+  write(join(dir, 'index.json'), JSON.stringify({ manifests: [{ digest: `sha256:${nestedDigest}` }] }))
+  assert.equal(spawnSync('tar', ['-C', dir, '-cf', archive, 'manifest.json', `${digest}.json`, 'index.json', 'blobs']).status, 0)
+  assert.equal(inspectImageArchive(archive, 'hep:standard').id, `sha256:${nestedDigest}`)
 })
 
 test('安装 shell 在成功、失败、dry-run 后清理临时目录并保留退出码；CLI 拒绝未知选项', () => {
