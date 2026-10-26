@@ -2572,6 +2572,23 @@ class BindHomeMigrationTests(unittest.TestCase):
     def setUp(self):
         isolate_registration_guard(self)
 
+    def test_root_business_patch_is_private_and_owned_by_container_user(self):
+        with tempfile.TemporaryDirectory() as temporary, mock.patch.object(dev, "STATE_ROOT", Path(temporary)):
+            contract = {
+                "source_id": "experiment:EXP-example-agent-001-r0123456789ab", "source_kind": "experiment",
+                "agent_id": "example-agent", "workspace": "/tmp/workspace", "presets": "/tmp/presets",
+                "managed": "/tmp/managed", "preset_id": "example-agent", "patch": "/opt/dsh-managed/example.patch.yml",
+                "evaluation_patch": "/opt/dsh-adapter/evaluation-registry.patch.yml", "required_env_names": [],
+                "image": {"local_image_tag": IMAGE_TAG}, "business_control": {"config_file": "/tmp/business.json"},
+            }
+            business = {"compose": "", "patch": "{}", "localModelRoutes": {}, "registration": {}}
+            with mock.patch.object(os, "geteuid", return_value=0), mock.patch.object(os, "chown") as chown, \
+                 mock.patch.object(dev, "render_business_instance", return_value=business):
+                target = dev.write_instance("probe", mode="verification", contract=contract, port=3081)
+            patch = target / "business.patch.yml"
+            self.assertEqual(patch.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(chown.call_args_list[-1], mock.call(patch, 1000, 1000))
+
     def test_old_home_is_not_implicitly_replaced_by_empty_directory(self):
         with tempfile.TemporaryDirectory() as temporary, mock.patch.object(dev, "STATE_ROOT", Path(temporary)):
             current = (Path(temporary) / "probe", {"name": "probe"})

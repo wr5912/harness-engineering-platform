@@ -1143,6 +1143,8 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
         rendered = business["compose"]
         (target / "business.patch.yml").write_text(business["patch"], encoding="utf-8")
         os.chmod(target / "business.patch.yml", 0o600)
+        if os.geteuid() == 0:
+            os.chown(target / "business.patch.yml", 1000, 1000)
     policy = contract.get("model_policy") or (analysis_model_policy(contract["agent_id"]) if analysis_workspace else
         _model_policy({"agent_id": contract["agent_id"], "allowed": [], "default": None}, contract["agent_id"],
                       source="business-config", manifest_sha256=None))
