@@ -16,7 +16,7 @@ test('业务 Patch 关闭原生预设选择和目录选择流，保留 DSH 工�
     assert.ok(profileIds.has(id), `锁定版 DSH Profile 缺少 ${id}`)
     assert.ok(disabled.has(id), `${id} 必须被业务 Patch 关闭`)
   }
-  for (const id of ['workspace', 'workspace-controller', 'ui-workspace', 'ui-conversation']) {
+  for (const id of ['workspace', 'workspace-controller', 'ui-workspace', 'ui-conversation', 'session-log-download']) {
     assert.ok(profileIds.has(id), `锁定版 DSH Profile 缺少 ${id}`)
     assert.ok(!disabled.has(id), `${id} 须保留原生 Workspace/Session 路径`)
   }
