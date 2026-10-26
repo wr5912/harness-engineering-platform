@@ -103,6 +103,9 @@ const judged = await judgeCase(item, {
     assert.equal(request.indexed_evidence[2].event_seq, 3)
     assert.equal(request.indexed_evidence[2].call_id, 'inspection-call-1')
     assert.equal(request.indexed_evidence[2].content_index, 0)
+    assert.equal(request.indexed_evidence[2].citation_allowed, true)
+    assert.equal(request.indexed_evidence[1].citation_allowed, false)
+    assert.deepEqual(Object.keys(request.output_contract.requirements[0].evidence[0]), ['index'])
     return {
       session: { session_id: 'judge-session' },
       archive: archive([
@@ -115,6 +118,7 @@ assert.equal(judged.available, true)
 assert.equal(judged.response.verdict, 'passed')
 assert.deepEqual(judged.checks.tools, [])
 assert.equal(judged.checks.same_route_as_target, true)
+assert.equal(judged.response.requirements[0].evidence[0].quote_source, 'judge_output')
 
 const nativeReceipt = JSON.stringify({ ok: true, result: { reply: '报告包含“台账”说明。' }, graph_execution: { execution_mode: 'code-only' } })
 const nativeToolArchive = archive([
@@ -146,6 +150,49 @@ for (const [name, reference, expected] of [
 }
 assert.equal(JSON.stringify(nativeToolArchive), nativeArchiveBefore, '创建索引不改写原生轨迹或工具内容')
 
+for (const [name, references, expected] of [
+  ['按选择索引物化完整原文', [{ index: 2 }], 'passed'],
+  ['不代选其他证据块', [{ index: 3 }], 'passed'],
+  ['多个索引分别保留单块原文', [{ index: 2 }, { index: 3 }], 'passed'],
+  ['遗漏索引', [{}], 'inconclusive'],
+  ['null 索引', [{ index: null }], 'inconclusive'],
+  ['空字符串索引', [{ index: '' }], 'inconclusive'],
+  ['负数索引', [{ index: -1 }], 'inconclusive'],
+  ['越界索引', [{ index: 4 }], 'inconclusive'],
+  ['工具调用索引', [{ index: 1 }], 'inconclusive'],
+  ['显式空引文不能物化回退', [{ index: 2, quote: '' }], 'inconclusive'],
+  ['显式 null 引文不能物化回退', [{ index: 2, quote: null }], 'inconclusive'],
+  ['显式错误引文不能物化回退', [{ index: 2, quote: '不存在的结果原文' }], 'inconclusive'],
+  ['引用列表为空', [], 'inconclusive'],
+  ['有效引用不能掩盖另一条非法索引', [{ index: 2 }, { index: 99 }], 'inconclusive'],
+]) {
+  let rawJudgeOutput
+  const evaluated = await judgeCase(item, { assistant_texts: ['报告包含“台账”说明。'], turns: turnsFromTrace(nativeToolArchive, item.inputs) }, nativeToolArchive, async input => {
+    const request = JSON.parse(input)
+    assert.equal(request.indexed_evidence[1].citation_allowed, false)
+    assert.equal(request.indexed_evidence[2].citation_allowed, true)
+    rawJudgeOutput = JSON.stringify({ verdict: 'passed', reason: name,
+      requirements: request.requirements.map(requirement => ({ requirement, status: 'satisfied', evidence: references })) })
+    return { session: { session_id: 'indexed-judge' }, archive: archive([
+      user('indexed-judge-user', input), header([]), assistant(rawJudgeOutput), end(1),
+    ]) }
+  })
+  assert.equal(evaluated.response.verdict, expected, name)
+  assert.equal(evaluated.archive.root.find(event => event.type === 'assistant/message').data.message.content[0].text, rawJudgeOutput,
+    '索引物化结果不能覆盖或冒充模型原始输出')
+  if (expected === 'passed') {
+    assert.equal(evaluated.response.evidence_normalized, true)
+    const materialized = evaluated.response.requirements[0].evidence
+    assert.deepEqual(materialized.map(ref => ref.index), references.map(ref => ref.index))
+    for (const ref of materialized) {
+      assert.equal(ref.quote, ref.index === 2 ? nativeReceipt : '第二个独立文本块。')
+      assert.equal(ref.quote_source, 'indexed_evidence')
+    }
+    assert.deepEqual(JSON.parse(rawJudgeOutput).requirements[0].evidence, references,
+      '原始模型只选择索引，完整 quote 属于明确标记的程序物化结果')
+  }
+}
+
 for (const withText of [true, false]) {
   const failureText = '模拟服务不可达，未读取任何资产。'
   const nativeError = { code: 'MOCK_UNAVAILABLE', message: '模拟服务不可达' }
@@ -166,9 +213,10 @@ for (const withText of [true, false]) {
       assert.equal(receipt.is_error, true)
       assert.deepEqual(receipt.error, nativeError)
       assert.equal(receipt.text, withText ? failureText : '')
+      assert.equal(receipt.citation_allowed, withText)
       return { session: { session_id: 'failure-judge' }, archive: archive([
         user('failure-judge-user', input), header([]), assistant(JSON.stringify({ verdict: 'passed', reason: '核对异常处理与失败回执',
-          requirements: request.requirements.map(requirement => ({ requirement, status: 'satisfied', evidence: [{ index: 2, quote: withText ? failureText : nativeError.message }] })) })), end(1),
+          requirements: request.requirements.map(requirement => ({ requirement, status: 'satisfied', evidence: [withText ? { index: 2, quote: failureText } : { index: 2 }] })) })), end(1),
       ]) }
     })
   assert.equal(evaluated.response.verdict, withText ? 'passed' : 'inconclusive',
@@ -241,4 +289,4 @@ try {
     'Case 回执内容变化仍必须写入')
 } finally { await rm(dedupeDirectory, { recursive: true, force: true }) }
 
-console.log(JSON.stringify({ status: 'dsh-eval-common-tests-passed', cases: 24 }))
+console.log(JSON.stringify({ status: 'dsh-eval-common-tests-passed', cases: 38 }))

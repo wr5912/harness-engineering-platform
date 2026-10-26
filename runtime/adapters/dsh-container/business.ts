@@ -153,6 +153,7 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
   const patch = [
     { id: 'webserver', config: { host: '0.0.0.0', port: input.port, compression: 'gzip', compressionLevel: 1, compressionThresholdBytes: 1024 } },
     ...connectionPatches,
+    { id: 'web-runtime', config: { publicUrl: new URL(businessBasePath, config.coordinatorOrigin).href } },
     ...(manager ? [{ id: manager.id, disabled: true }] : []),
     ...createBusinessRuntimePatch(runtimeConfig, `${containerPlugin}/business/runtime.js`,
       manager ? `${containerPlugin}/business/mcp-manager.js` : undefined, manager?.config),

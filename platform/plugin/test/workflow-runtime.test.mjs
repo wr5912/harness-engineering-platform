@@ -235,7 +235,7 @@ function codeOnlyFixture(t, run, renderResult) {
       source: { kind: 'tool', callId: call.id, name: call.name }, content: result.content, ...(result.isError ? { isError: true } : {}) }, ...(result.isError ? { error: { code: 'TOOL_FAILED' } } : {}) } })
     return result
   }
-  return { ...f, agent, hooks, hook, events, titles, enter, stream, execute }
+  return { ...f, agent, hooks, hook, events, titles, adapters, enter, stream, execute }
 }
 
 test('纯代码原生回合将当前输入交给LangGraph和真实工具，再按同轮回执本地回复', async t => {
@@ -249,6 +249,7 @@ test('纯代码原生回合将当前输入交给LangGraph和真实工具，再�
   const initial = await f.stream(1)
   entered.commit()
   assert.deepEqual(initial.route, { provider: 'harness-code-only', model: 'workflow-v1', reasoningEffort: 'off' })
+  assert.deepEqual((await f.adapters.get('harness-code-only').listModels()).map(model => model.name), ['纯代码工作流'])
   const call = initial.chunks.find(chunk => chunk.type === 'block-end').block
   assert.deepEqual(JSON.parse(call.arguments), { request: '请读取台账' })
   const executed = await f.execute(1, initial)

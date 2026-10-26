@@ -216,7 +216,7 @@ export function registerCodeOnlyWorkflowAgent(ctx: any, options: CodeOnlyWorkflo
     providerInfo: (provider: string) => ({ id: provider, name: '纯代码工作流（本地执行）' }),
     providerRetryPolicy: () => undefined,
     imageRequestPricing: () => undefined,
-    listModels: async () => [],
+    async listModels() { return [await this.resolveModel(CODE_ONLY_PROVIDER, CODE_ONLY_MODEL)] },
     resolveModel: async (provider: string, model: string) => {
       if (provider !== CODE_ONLY_PROVIDER || model !== CODE_ONLY_MODEL) throw new Error('纯代码工作流路由无效')
       return { provider, id: model, name: '纯代码工作流', reasoning: { efforts: [{ id: 'off', name: '关闭' }] } }

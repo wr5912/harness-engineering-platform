@@ -79,6 +79,7 @@ test('业务渲染改独立bridge和回环映射，标准镜像及MCP配置保�
   assert.ok(compose.services.dsh.environment.includes('HARNESS_BUSINESS_INSTANCE_ID=business-test'))
   assert.equal(compose.services.dsh.command[compose.services.dsh.command.indexOf('--host') + 1], '127.0.0.1')
   assert.equal(patch.find(item => item.id === 'webserver').config.host, '0.0.0.0')
+  assert.equal(patch.find(item => item.id === 'web-runtime').config.publicUrl, 'http://host.docker.internal:53190/agents/soc/instances/business-test/')
   assert.ok(compose.services.dsh.volumes.every(item => item.read_only))
   assert.ok(patch.some(item => item.id === 'mcp-session-manager' && item.disabled))
   assert.ok(!patch.some(item => item.id === 'schedule' && item.disabled), '自动化任务按当前需求开放')
@@ -96,6 +97,17 @@ test('业务渲染改独立bridge和回环映射，标准镜像及MCP配置保�
   assert.equal(result.registration.scheduling_supported, true)
   assert.equal(result.registration.origin, 'http://127.0.0.1:53191')
   assert.ok(!result.patch.includes('a'.repeat(32)))
+})
+
+test('业务公开根使用网关来源和实例子路径，不暴露容器监听地址', t => {
+  const f = fixture(t)
+  const config = { ...f.config, coordinatorOrigin: 'http://192.0.2.20:53105' }
+  const input = { ...f.input, name: 'inspection-code-only', agentId: 'inspection-delivery-demo' }
+  const patch = yaml.load(renderBusinessInstance(config, input).patch)
+  const publicUrl = patch.find(item => item.id === 'web-runtime').config.publicUrl
+  assert.equal(publicUrl, 'http://192.0.2.20:53105/agents/inspection-delivery-demo/instances/inspection-code-only/')
+  assert.equal(new URL('api/task-examples/artifact', publicUrl).href,
+    'http://192.0.2.20:53105/agents/inspection-delivery-demo/instances/inspection-code-only/api/task-examples/artifact')
 })
 
 test('免认证来源不会被转为业务实例', t => {
