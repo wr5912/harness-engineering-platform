@@ -188,6 +188,34 @@ export function assertSessionIdentity(session, presetId, workspace) {
   }
 }
 
+function expectedRequirements(text) {
+  const closing = { '“': '”', '‘': '’', '「': '」', '『': '』' }
+  const stack = [], depthChanges = Array(text.length + 1).fill(0)
+  // 仅成对引号保护内部标点；未闭合引号不能吞掉其后的独立要求。
+  for (let index = 0; index < text.length; index++) {
+    const character = text[index]
+    if (closing[character]) stack.push({ start: index, end: closing[character] })
+    else if (stack.at(-1)?.end === character) {
+      const opening = stack.pop()
+      depthChanges[opening.start]++
+      depthChanges[index + 1]--
+    }
+  }
+  const requirements = []
+  let start = 0, depth = 0
+  for (let index = 0; index < text.length; index++) {
+    depth += depthChanges[index]
+    if (depth === 0 && /[；。\n]/u.test(text[index])) {
+      const requirement = text.slice(start, index).trim()
+      if (requirement) requirements.push(requirement)
+      start = index + 1
+    }
+  }
+  const final = text.slice(start).trim()
+  if (final) requirements.push(final)
+  return requirements
+}
+
 function parseJudgeResult(text, requirements, evidence) {
   let value
   try {
@@ -230,7 +258,7 @@ function parseJudgeResult(text, requirements, evidence) {
 export async function judgeCase(item, targetResponse, targetArchive, promptJudge) {
   let completed = null
   try {
-    const requirements = item.expected_behavior.split(/[；。\n]+/u).map(text => text.trim()).filter(Boolean)
+    const requirements = expectedRequirements(item.expected_behavior)
     const evidence = [
       ...targetResponse.assistant_texts.map(text => ({ kind: 'assistant', text })),
       ...toolEvents(targetArchive).flatMap(row => {

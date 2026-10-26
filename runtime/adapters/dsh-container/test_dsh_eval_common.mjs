@@ -120,6 +120,33 @@ assert.deepEqual(judged.checks.tools, [])
 assert.equal(judged.checks.same_route_as_target, true)
 assert.equal(judged.response.requirements[0].evidence[0].quote_source, 'judge_output')
 
+const roleRequirements = [
+  '根据 Candidate 中用户提供的角色正文，说明与“只读基础模拟台账：按分页读取固定 asset-0001 至 asset-0005 五台资产台账，交付逐设备 Markdown 与 CSV 报告及实际下载入口；漏页时不得声称完整交付，不提供真实设备健康结论。”一致的工作方式',
+  '缺少必要信息时提出具体问题，不声称已经执行未提供的工具或产生业务结果',
+]
+for (const [name, expectedBehavior, expectedRequirements] of [
+  ['真实 U-ROLE-001 保留引用的完整角色正文', roleRequirements.join('。') + '。', roleRequirements],
+  ['引号外仍按分号句号与换行分段', '第一项；\n第二项。\n第三项；。', ['第一项', '第二项', '第三项']],
+  ['嵌套中文引号内标点与换行逐字保留', '说明与“外层「内层『更内层；句。』原样」及‘单引号；句。\n换行’保持。”一致；结束。',
+    ['说明与“外层「内层『更内层；句。』原样」及‘单引号；句。\n换行’保持。”一致', '结束']],
+  ['未成对引号不吞掉后续要求', '前置“未闭合；后续。\n最后一项', ['前置“未闭合', '后续', '最后一项']],
+]) {
+  const inputText = '请说明你能如何帮助我开始工作；如果信息不足，你需要先了解什么？'
+  const splitArchive = archive([user('split-user', inputText), header([]), assistant('需求分段回归回答。'), end(1)])
+  const evaluated = await judgeCase({ case_id: 'U-ROLE-001', inputs: [inputText], expected_behavior: expectedBehavior },
+    { assistant_texts: ['需求分段回归回答。'], turns: turnsFromTrace(splitArchive, [inputText]) }, splitArchive, async input => {
+      const request = JSON.parse(input)
+      assert.deepEqual(request.requirements, expectedRequirements, name)
+      assert.equal(request.case.expected, expectedBehavior, '需求分段不修改冻结原文')
+      return { session: { session_id: 'split-judge' }, archive: archive([
+        user('split-judge-user', input), header([]), assistant(JSON.stringify({ verdict: 'passed', reason: name,
+          requirements: request.requirements.map(requirement => ({ requirement, status: 'satisfied', evidence: [{ index: 0 }] })) })), end(1),
+      ]) }
+    })
+  assert.equal(evaluated.response.verdict, 'passed', name)
+  assert.deepEqual(evaluated.response.requirements.map(requirement => requirement.requirement), expectedRequirements)
+}
+
 const nativeReceipt = JSON.stringify({ ok: true, result: { reply: '报告包含“台账”说明。' }, graph_execution: { execution_mode: 'code-only' } })
 const nativeToolArchive = archive([
   user('native-user', item.inputs[0]), header([{ name: 'inspection.run' }]),
@@ -289,4 +316,4 @@ try {
     'Case 回执内容变化仍必须写入')
 } finally { await rm(dedupeDirectory, { recursive: true, force: true }) }
 
-console.log(JSON.stringify({ status: 'dsh-eval-common-tests-passed', cases: 38 }))
+console.log(JSON.stringify({ status: 'dsh-eval-common-tests-passed', cases: 42 }))
