@@ -5,7 +5,7 @@ import { copyTree, ensureEmptyDir, removeTree, run, tarCreate } from './fsutil.m
 import { collectEntries, sha256File, writeManifest, type Arch, type Manifest, type RuntimeEntry } from './manifest.mts'
 import { collectSystemGit } from './git.mts'
 import { expectedImage, inspectImage, inspectImageArchive, saveImage, verifyImageInfo } from './image.mts'
-import { assertRealWorkspace } from './data.mts'
+import { assertRealWorkspace, copyDataDependencies } from './data.mts'
 import { snapshotRepository } from './repository.mts'
 
 export interface PackOptions {
@@ -169,6 +169,7 @@ export function pack(options: PackOptions): { archive: string; size: number } {
   if (dataRoot) {
     dataCheck = assertRealWorkspace(dataRoot, options.allowFixtureData)
     dataRepository = copyData(dataRoot, staging)
+    copyDataDependencies(join(staging, 'data'), options.assetsDir!)
   }
   const image = copyImage(options, staging)
   const files = collectEntries(staging)

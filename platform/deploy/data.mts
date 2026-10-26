@@ -1,5 +1,29 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { copyTree, safeRelative } from './fsutil.mts'
+
+/** 依赖来自目标架构资源；不把开发机的原生模块混进跨架构包。 */
+export function copyDataDependencies(root: string, assets: string): void {
+  const catalog = join(root, 'config/sources.json')
+  if (!existsSync(catalog)) return
+  const sources = JSON.parse(readFileSync(catalog, 'utf8')).sources
+  for (const candidate of new Set<string>(Object.values(sources).map((source: any) => safeRelative(source.candidate_root)))) {
+    const managed = join(root, candidate, 'managed')
+    if (!existsSync(managed)) continue
+    for (const name of readdirSync(managed)) {
+      const manifest = join(managed, name, 'package.json')
+      if (!existsSync(manifest)) continue
+      const dependencies = Object.keys(JSON.parse(readFileSync(manifest, 'utf8')).dependencies || {})
+      if (!dependencies.length) continue
+      const relative = join(candidate, 'managed', name, 'node_modules')
+      const prepared = join(assets, 'data', relative)
+      for (const dependency of dependencies) {
+        if (!existsSync(join(prepared, safeRelative(dependency)))) throw new Error(`离线资源缺少业务插件依赖：${join(prepared, dependency)}`)
+      }
+      copyTree(prepared, join(root, relative))
+    }
+  }
+}
 
 export interface DataRootCheck {
   kind: 'workspace' | 'fixture'
