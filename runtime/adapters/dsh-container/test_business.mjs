@@ -105,6 +105,16 @@ test('免认证来源不会被转为业务实例', t => {
   assert.throws(() => renderBusinessInstance(f.config, { ...f.input, compose: yaml.dump(compose) }))
 })
 
+test('业务bridge保留宿主别名及既有映射，不重复通用启动器的host-gateway条目', t => {
+  const f = fixture(t), compose = yaml.load(f.input.compose)
+  compose.services.dsh.extra_hosts = ['host.docker.internal:host-gateway', 'mock.internal:192.0.2.10']
+  const result = renderBusinessInstance(f.config, { ...f.input, compose: yaml.dump(compose) })
+  const service = yaml.load(result.compose).services.dsh
+  assert.deepEqual(service.extra_hosts, ['host.docker.internal:host-gateway', 'mock.internal:192.0.2.10'])
+  assert.equal(service.network_mode, undefined)
+  assert.deepEqual(service.networks, ['business'])
+})
+
 test('开发来源无 MCP seed 或 manager 时沿用 DSH 原生来源装载', t => {
   const f = fixture(t), seed = join(f.managed, 'web-profile.seed.patch.yml')
   rmSync(seed)

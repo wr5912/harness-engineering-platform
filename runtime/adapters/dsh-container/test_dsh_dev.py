@@ -220,6 +220,18 @@ class RenderComposeTest(unittest.TestCase):
         self.assertIn("source: ${DSH_WEB_ADAPTER_HOST:?", rendered)
         self.assertIn("target: /opt/dsh-web\n        read_only: true", rendered)
 
+    def test_host_network_instances_map_the_standard_host_alias(self):
+        template = (ADAPTER / "verification.compose.yaml").read_text(encoding="utf-8")
+        for analysis_workspace in (False, True):
+            with self.subTest(analysis_workspace=analysis_workspace):
+                rendered = dev.render_compose(
+                    template, mode="verification", name="probe", project="dsh-dev-probe", port=3081,
+                    analysis_workspace=analysis_workspace,
+                )
+                self.assertIn("    network_mode: host\n    extra_hosts:\n"
+                              "      - host.docker.internal:host-gateway\n", rendered)
+                self.assertEqual(rendered.count("host.docker.internal:host-gateway"), 1)
+
     def test_lan_template_enables_authenticated_remote_settings(self):
         template = (ADAPTER / "verification.compose.yaml").read_text(encoding="utf-8")
         rendered = dev.render_compose(

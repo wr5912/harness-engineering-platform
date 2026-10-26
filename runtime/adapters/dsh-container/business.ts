@@ -160,7 +160,7 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
   delete service.network_mode
   service.networks = ['business']
   service.ports = [`127.0.0.1:${input.port}:${input.port}`]
-  service.extra_hosts = [...(service.extra_hosts ?? []), 'host.docker.internal:host-gateway']
+  service.extra_hosts = [...new Set([...(service.extra_hosts ?? []), 'host.docker.internal:host-gateway'])]
   compose.networks = { ...(compose.networks ?? {}), business: { driver: 'bridge' } }
   const command = service.command as string[]
   const host = command.indexOf('--host'), tail = command.indexOf('--no-open')
