@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -22,7 +22,14 @@ test('仓库快照保留历史和 origin，排除工作树改动；安装不覆�
     writeFileSync(join(source, 'asset'), 'uncommitted')
     writeFileSync(join(source, 'local-cache'), 'excluded')
     const bundle = join(root, 'repository.bundle')
-    const result = snapshotRepository(source, snapshot, bundle)
+    const previousMask = process.umask(0o077)
+    let result
+    try {
+      result = snapshotRepository(source, snapshot, bundle)
+      assert.equal(process.umask(), 0o077)
+    } finally { process.umask(previousMask) }
+    assert.equal(statSync(snapshot).mode & 0o777, 0o755)
+    assert.equal(statSync(join(snapshot, 'asset')).mode & 0o777, 0o644)
     assert.equal(result.dirty, true)
     assert.equal(readFileSync(join(snapshot, 'asset'), 'utf8'), 'second')
     assert.equal(run('git', ['-C', snapshot, 'rev-list', '--count', 'HEAD']).trim(), '2')

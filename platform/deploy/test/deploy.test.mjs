@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { collectEntries, verifyEntries } from '../manifest.mts'
-import { copyTree, tarCreate } from '../fsutil.mts'
+import { copyTree, run, tarCreate, tarExtract } from '../fsutil.mts'
 import { rewriteDeploymentAddress, rewriteKnownPaths, scanKnownOldPaths } from '../paths.mts'
 import { ensureDshScopeLink } from '../runtime.mts'
 import { assertRealWorkspace, inspectDataRoot } from '../data.mts'
@@ -147,6 +147,9 @@ test('路径映射重写实例登记、Compose 与配置', () => {
       mounts: { managed: '/home/old/data/evolution/x/candidate/dsh/managed' },
     }))
     writeFileSync(join(root, '.local', 'instances', 'agent-1', 'compose.yaml'), 'source: /home/old/data\n')
+    const userPatch = join(root, '.local/platform-home/profiles/harness-platform/cordis.patch.yml')
+    mkdirSync(join(userPatch, '..'), { recursive: true })
+    writeFileSync(userPatch, 'baseURL: /home/old/data/provider\n')
     const report = rewriteKnownPaths(root, [
       { from: '/home/old', to: '/home/new' },
       { from: '/home/old/data', to: '/home/new/data' },
@@ -156,5 +159,35 @@ test('路径映射重写实例登记、Compose 与配置', () => {
     const instance = JSON.parse(readFileSync(join(root, '.local', 'instances', 'agent-1', 'instance.json'), 'utf8'))
     assert.equal(instance.asset_root, '/home/new/data')
     assert.match(instance.home_directory, /^\/home\/new\/data\//)
+    assert.match(readFileSync(userPatch, 'utf8'), /\/home\/new\/data\/provider/)
+  } finally { close() }
+})
+
+test('完整包携带原生用户设置和专用凭据，排除 HOME 运行态', () => {
+  const { root, close } = workspace()
+  try {
+    const program = join(root, 'program'), data = join(root, 'data'), assets = join(root, 'assets')
+    const write = (path, content) => { mkdirSync(join(path, '..'), { recursive: true }); writeFileSync(path, content) }
+    for (const [repo, file] of [[program, 'platform/deploy/install.sh'], [data, 'workspace.json']]) {
+      write(join(repo, file), '{}')
+      const git = (...args) => run('git', ['-C', repo, ...args])
+      git('init', '-b', 'main'); git('config', 'user.name', 'fixture'); git('config', 'user.email', 'fixture@example.invalid')
+      git('remote', 'add', 'origin', 'https://example.invalid/repo.git')
+      git('add', '.'); git('commit', '-m', 'fixture')
+    }
+    const patch = '.local/platform-home/profiles/harness-platform/cordis.patch.yml'
+    write(join(data, patch), '- id: llm-pi-ai\n  config: {}\n')
+    write(join(data, '.local/platform-home/sessions/private'), 'excluded')
+    write(join(data, '.local/credentials/models.llm-api-key'), '{}')
+    for (const path of ['node/stub', 'pnpm/stub', 'python/stub', 'dsh/apps/cli/lib/bin.js',
+      'program/platform/plugin/node_modules/stub', 'program/runtime/adapters/dsh-web/node_modules/stub']) write(join(assets, path), '')
+    write(join(assets, 'git/git'), '#!/bin/sh\necho git-fixture\n'); chmodSync(join(assets, 'git/git'), 0o755)
+    const result = pack({ programRoot: program, dataRoot: data, assetsDir: assets, out: join(root, 'out'), arch: 'amd64',
+      includeImage: false, includeData: true, allowDirty: true, keepStaging: false, allowFixtureData: true })
+    const unpacked = join(root, 'unpacked')
+    tarExtract(result.archive, unpacked)
+    assert.equal(readFileSync(join(unpacked, 'data', patch), 'utf8'), readFileSync(join(data, patch), 'utf8'))
+    assert.equal(existsSync(join(unpacked, 'data/.local/platform-home/sessions')), false)
+    assert.equal(existsSync(join(unpacked, 'data/.local/credentials/models.llm-api-key')), true)
   } finally { close() }
 })

@@ -72,6 +72,8 @@ function copyData(dataRoot: string, staging: string): ReturnType<typeof snapshot
   removeTree(join(target, '.git'))
   const credentials = join(dataRoot, '.local/credentials')
   if (existsSync(credentials)) copyTree(credentials, join(target, '.local/credentials'))
+  const userPatch = '.local/platform-home/profiles/harness-platform/cordis.patch.yml'
+  if (existsSync(join(dataRoot, userPatch))) copyTree(join(dataRoot, userPatch), join(target, userPatch))
   return repository
 }
 

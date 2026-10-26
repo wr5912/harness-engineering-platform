@@ -33,6 +33,7 @@ export function knownPathFiles(dataRoot: string): string[] {
   const files = [
     join(dataRoot, 'workspace.json'),
     join(dataRoot, 'config', 'business-access.json'),
+    join(dataRoot, '.local/platform-home/profiles/harness-platform/cordis.patch.yml'),
   ].filter(existsSync)
   return files.concat(instanceFiles(dataRoot))
 }

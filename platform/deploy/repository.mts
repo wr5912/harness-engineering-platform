@@ -10,11 +10,15 @@ export function snapshotRepository(source: string, target: string, bundle: strin
     const url = new URL(origin)
     if (url.username || url.password || url.search) throw new Error('Git origin 不能含凭据')
   }
-  mkdirSync(target, { recursive: true })
-  mkdirSync(join(bundle, '..'), { recursive: true })
-  // 通过 bundle 的锁定提交检出，既保留完整历史，也不复制工作树临时文件。
-  run('git', ['-C', source, 'bundle', 'create', bundle, 'HEAD'])
-  restoreRepository(target, bundle, commit, origin, true)
+  // Git 文件须能被容器的非 root 用户读取；归档和凭据另行保留私有权限。
+  const previousMask = process.umask(0o022)
+  try {
+    mkdirSync(target, { recursive: true })
+    mkdirSync(join(bundle, '..'), { recursive: true })
+    // 通过 bundle 的锁定提交检出，既保留完整历史，也不复制工作树临时文件。
+    run('git', ['-C', source, 'bundle', 'create', bundle, 'HEAD'])
+    restoreRepository(target, bundle, commit, origin, true)
+  } finally { process.umask(previousMask) }
   return { commit, dirty, origin }
 }
 

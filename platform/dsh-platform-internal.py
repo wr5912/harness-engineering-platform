@@ -657,7 +657,7 @@ SENSITIVE_OUTPUT = re.compile(r"password|token|secret|api.?key|sk-", re.I)
 def build_command(label, command, **options):
     """执行构建命令；完整输出留给启动终端，只向启动器回传一行可展示原因。"""
     try:
-        result = subprocess.run(command, capture_output=True, text=True, **options)
+        result = subprocess.run(command, capture_output=True, text=True, umask=0o022, **options)
     except OSError as exc:
         raise PlatformError(f"{label}无法执行：{exc.strerror or exc}；平台 Profile 未更新。") from None
     if not result.returncode:
