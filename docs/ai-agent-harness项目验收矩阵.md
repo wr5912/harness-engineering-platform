@@ -1,6 +1,6 @@
 # Harness 工程平台项目验收矩阵
 
-更新日期：2026-10-23
+更新日期：2026-10-26
 
 本文是 **Harness 工程平台项目与工具链**验证路径、当前证据和缺口的唯一维护位置。它直接回答三个问题：总共有多少条路径、每条做到什么程度、哪些检查应该进入自动化测试。
 
@@ -36,7 +36,7 @@
 | 记录 | `PA-10` | Research Run 的创建、记录、缺口与封存 | 已验证（机器范围） |
 | 复用 | `PA-11` | Research Release 打包、解析与复现装载 | 未实现 |
 | 平台 | `PA-12` | 全局 DSH 平台启动、认证与研究工具 | 部分验证；原六页、统一网关与全局启动分项已验证 |
-| 部署 | `PA-13` | 离线一键打包与安装部署 | 部分验证（真实数据工作区与默认工作区、ARM64 安装、真实数据包 dry-run、`/hep/` 登录通过；AMD64 与外部业务服务未验证） |
+| 部署 | `PA-13` | 离线一键打包与安装部署 | 部分验证（ARM64 完整离线安装、镜像导入及模型回复通过；AMD64 使用已有镜像的内存盘安装通过，持久磁盘安装与镜像导入失败；指定业务请求均已执行，完整业务未通过） |
 
 状态含义：
 
@@ -240,6 +240,8 @@
 
 ### PA-12 全局 DSH 平台启动、认证与研究工具
 
+- **统一启停与原路径切换（2026-10-26，关联 `PA-13`）**：开发目录与离线安装目录统一使用 `platform/dsh-platform prepare/start/stop/restart/status`；`start` 默认后台运行，`--foreground` 用于前台调试，`bin/hep-start` 只转发 `start`。进程状态按数据根记录，核对 PID 出生时间、端口归属和 HTTP 就绪；重复启动复用已有进程。52 原 `/root/work/harness-engineering-platform` 已切换到该入口，原数据根、工作区 `workspace-95db14d2-d53d-4015-8256-ade8612b1b77` 及原有两个管理 Session 保留；`18120` 的启动、重启、重复启动和密码登录后 inventory RPC 均通过，`18121` 未监听。切换前的 45 个容器均保留。未增加 systemd 或开机自启；进程、日志及安装来源核对材料保存在目标机 `/root/hep-unified-20261025/`。
+
 - **退役 Experiment 残留导致页面读取失败（2026-10-23，关联 `PA-10`）**：程序与数据工作区分别基于远端 `f21cea0`、`23e83aa`。数据提交已删除安全运营专家的旧 Experiment，但 `007`、`019`、`021` 目录内仍有 Git 忽略的 `__pycache__` 或 `node_modules`；智能体列表把缺失的 `change.yaml` 误报成 YAML 解析失败，Run 概览显示三个 `FileNotFoundError`。确认目录无 Git 可见文件、Run 和运行占用后，将残留缓存移入数据根 `.local/backups/retired-experiment-residue-20261023-23e83aa/`，未改写历史 Run。平台智能体、Run 概览、资产查询与仓库校验四处枚举均改为仅跳过无 Git 可见文件的缺清单目录；真实资料缺清单仍报错。定向回归 51、10、6、19 项通过，平台 `prepare --offline` 构建完成，仓库校验零错误与警告。18120 重启装载后，真实浏览器登录核对智能体管理显示 6 个智能体、评测中心显示 24 条记录，相关失败提示、页面脚本错误及平台 Agent 请求失败均为零；Run 概览返回 6 个智能体、11 个 Experiment、24 条 Run、零读取错误。此次恢复属于工具与页面验证，未运行新评测、复现历史版本或验证业务效果。
 
 - **已有工作区首次初始化入口（2026-10-22）**：用户截图显示默认目录的工作区身份、Git 和配置均已就绪，仅本地平台账号待创建；页面虽已读取这些状态，仍要求另行点击“检查并预览”才会启用确认按钮，且“重新读取状态”会清除预览。引导页现对已识别的已有工作区自动执行只读预览并显示将发生的写入，刷新状态后重新预览；目录或准备方式变化仍使旧预览失效。隔离浏览器复现修复前按钮持续禁用，修复后完成账号填写、状态刷新、单次确认与真实引导服务接续登录入口；引导页与工作区合同 12 项测试通过。测试使用本机临时工作区和注入的 prepare，未连接截图所在的 `/home/cmp` 部署，也未验证该机的 DSH prepare 与正式登录。
@@ -370,15 +372,22 @@
 
 ### PA-13 离线一键打包与安装部署
 
-- **操作链**：在线准备机执行 `platform/dsh-deploy pack`，目标机解包后运行 `./install.sh`，安装器校验清单和架构、恢复程序/完整数据根、安装 Node/pnpm/DSH/Git、`docker load` 标准镜像，再执行 `platform/dsh-platform prepare --offline`；可用 `start --dry-run` 或前台启动。
+- **操作链**：在线准备机执行 `platform/dsh-deploy pack`，目标机解包后运行 `./install.sh`，安装器校验清单和架构、恢复程序及完整数据仓库与 Git 历史、安装 Node/pnpm/DSH/Git/Python+PyYAML、恢复目标架构业务插件依赖、`docker load` 标准镜像，再执行 `platform/dsh-platform prepare --offline`；`--start` 使用统一后台启动入口，安装后可执行 `dsh-deploy verify --url` 核对密码登录、实际工作区与进程来源。
 - **当前实现（2026-10-22）**：新增 `platform/deploy/` 打包器和安装器、`platform/dsh-deploy` 入口、`platform/deploy/install.sh` 自举、`prepare --offline`；包内必带 Git 客户端。自动测试覆盖 manifest 摘要/符号链接、清单外文件、路径映射和 `prepare --offline` 跳过 `pnpm install`；启动器 36 项测试通过（需为隔离 HOME 提供 PyYAML）。
 - **ARM64 先行**：228 在线准备 ARM64 资源；207 上确认 ARM64 Node 24、pnpm 11、包内 Git、DSH 构建（9 个 gate 通过）、离线 `prepare`、最小安装和 `start --dry-run`；真实数据完整包约 2.3GB（SHA-256 `5e4c2f7559936b1a6e6432a0e5296182b61623708c0304c5da8432361ee5d609`）的 manifest 为 `data.kind=workspace`、13 项 Skill，`install --dry-run` 通过；207 现有 10 个 AI SOC 容器保持不变。
-- **AMD64**：本机打包/安装验证按用户要求暂缓，等通知后执行。
+- **AMD64 历史安排（2026-10-22）**：当时按用户要求暂缓；本轮已按后续授权在 232 执行，结果见下文。
 - **真实数据工作区部署（2026-10-23）**：此前 207 使用 `hep-arm64-poc/fixture-data`，安装包 `source.dataRoot` 为夹具，包内没有 `AGENTS.md`、`.agents/skills`、`agents/`、`evolution/`，因此不能作为部署验收。已把 228 的 `~/harness-engineering-platform-data` 传输到 207，改为 `HARNESS_ASSET_ROOT=/home/aisoc/harness-engineering-platform-data`，重建 Profile 并创建新的平台 HOME；`storages/workspace.json` 的 `defaultWorkspaceId` 已指向该数据根，标题为 `harness-engineering-platform-data`，Profile 装载 13 项管理 Skill。207 的 `config/business-access.json` 置为 `enabled=false`，外部身份/风险/MCP 服务未部署；旧夹具安装包不作为部署证据。安装器已新增真实工作区校验，默认拒绝夹具（测试需 `--allow-fixture-data`）。
 - **207 实际访问（2026-10-23）**：安装目录后台启动，`http://172.16.138.207:18120/hep/` 登录页 200，`admin` 账号登录后首页 200；首次启动发现 DSH 构建树缺少 `@deepseek-ai/dsh-scope` 链接，安装器已补齐并在当前目录修复后重启成功；207 的 10 个 AI SOC 容器保持不变。后台进程不是 systemd 服务，重启后需重新启动。
-- **52 实际部署（2026-10-23）**：ARM64 完整包 `0.7.0-a1385532650c`（SHA-256 `084583938db946b29719bef86d5ebb1b40fdebb15370950430fe746bc74f71bd`）在 52 校验、安装并导入标准 DSH 镜像 `sha256:e25891e6aa4bb19e8cdd3ea30840e4458bd17ca16b7be6febe4dd02564d680ce`；镜像标签和构建指纹与新旧两个工作区的来源解析一致，容器内 DSH 版本检查通过。程序和数据分别安装到 `/root/work/harness-engineering-platform-imagefix`、`/root/harness-engineering-platform-data-imagefix`；数据 Git 为 `23e83aaa`，仅目标主机业务网关配置发生预期修改。离线 `prepare` 成功，`dsh-deploy verify` 的工作区资产、13 项 Skill、默认工作区、启动器、登录页 5 项均通过；新平台 `18121` 与业务网关 `53106` 监听，原 `18120/53105` 保持运行。
-- **未验证**：Docker Engine 离线安装、旧平台 Session 的跨用户恢复、动态 Git/便携 Python 跨发行版兼容性、52 新实例的模型调用及业务交互；离线包不构成生产部署验收。
-- **状态**：部分验证（ARM64 真实数据包已在 52 完整安装并启动，标准镜像已导入；AMD64、Docker 离线安装和业务实例交互未验证）。
+- **52 历史部署（2026-10-23）**：ARM64 完整包 `0.7.0-a1385532650c`（SHA-256 `084583938db946b29719bef86d5ebb1b40fdebb15370950430fe746bc74f71bd`）在 52 校验、安装并导入标准 DSH 镜像 `sha256:e25891e6aa4bb19e8cdd3ea30840e4458bd17ca16b7be6febe4dd02564d680ce`；镜像标签和构建指纹与新旧两个工作区的来源解析一致，容器内 DSH 版本检查通过。程序和数据分别安装到 `/root/work/harness-engineering-platform-imagefix`、`/root/harness-engineering-platform-data-imagefix`；数据 Git 为 `23e83aaa`，仅目标主机业务网关配置发生预期修改。离线 `prepare` 成功，`dsh-deploy verify` 的工作区资产、13 项 Skill、默认工作区、启动器、登录页 5 项均通过；当时新平台 `18121` 与业务网关 `53106` 监听，原 `18120/53105` 保持运行。`18121` 后续已按用户要求停止，当前原路径状态见 `PA-12`。
+- **ARM64 完整离线安装（2026-10-26）**：程序来源 `6aafd0077d10a873d9a7415d3250806cb1a9a786`、数据来源 `a34d1a65ae3e5c4b123b03df0bbafbe74487ee36` 的真实工作区包，在 Ubuntu 24.04 ARM64 的 52 上以 root、`unshare -n` 隔离网络安装成功。安装恢复两仓 Git 历史和目标架构业务插件依赖，导入同一标准镜像；六个当前 Agent 共用该架构的标准 Runtime。隔离平台 `18220` 的六项认证核对、重复启动、重启后核对通过；Qwen3.8-27B 经局域网模型端点完成真实业务实例回复，Session 为 `session-290bfdd7-b683-4b5a-8eef-00b61aaa176b`。首次外网模型不可达及本地无认证模型的 SDK 凭据缺失失败分别保留，成功复验仅在隔离验收工作区配置原生模型提供方与忽略的专用凭据文件，未修改业务 Harness 或 DSH 源码。
+- **ARM64 指定业务请求（2026-10-26，关联 `PA-08`）**：固定 `EXP-security-operations-expert-024-rad80a907c628` 实例执行“执行一次常规巡检”，Session `session-8a0f6ce2-900c-498a-80ba-c04b17b2869f` 读取巡检 Skill 后报告未发现可调用巡检工具，未产生巡检 Run 或报告。执行“对INC-20261026-000026/INC-20261026-000027/INC-20261026-000026等事件进行威胁研判”，Session `session-cb768d2c-3025-4561-b40e-d8568f800bc4` 按两个不同事件创建子会话 `5ddbe6a2-b33b-419c-8106-acb8346426d5`、`d688e178-92f1-4dd3-ae94-183847da814a`，均调用 `analyze_threat_incident` 并因 SOC 工具映射缺失返回错误；最终根会话明确报告两项失败，无研判结论、报告或 SOC 回写。已在子会话结束后重新导出完整轨迹，原始与最终证据分别保存在目标机 `business-evidence-arm64/`、`business-final-evidence-arm64/`。实测 232 的 `18150` 无监听，223 的 SOC OpenAPI 端点不可达；未替换为 Mock，也未修改外部服务。会话完成不计为业务通过。
+- **AMD64 磁盘安装失败（2026-10-26）**：同程序、数据提交的 AMD64 包已在 Ubuntu 22.04 的 232 校验归档摘要并解包；以 root、`unshare -n` 安装时，复制离线 DSH 到程序目录超过十分钟，报 `spawnSync /bin/cp ETIMEDOUT`，安装器清理了本次新建的目标目录。现场持续存在严重磁盘 I/O 等待，其他工作负载保持不变；失败记录保存在目标机 `/root/hep-unified-20261025/install-unified-amd64.log`。该次磁盘安装不通过。
+- **AMD64 临时离线安装（2026-10-26）**：为继续验证，在 232 的 `/run/hep-acceptance-20261026` 内存盘中安装同一包。首次 `docker load` 十分钟超时，失败记录为 `install-ram-amd64.log`；随后独立核对本机已有标准镜像的 ID、架构和构建指纹均与包内清单一致，ID 为 `sha256:d90185713372e65b6c49555cf2ca633a3351e7f379c9b792804d8d79c7d4211b`。显式使用 `--skip-image` 后，root、`unshare -n` 安装、两仓 Git 历史恢复和离线 `prepare` 成功，Node 24、pnpm 11、Git、Python+PyYAML 与 DSH 使用包内工具链；记录为 `install-ram-existing-image-amd64.log` 和 `existing-image-amd64.json`。`18220` 的启动、重复启动及重启完成，重启前后六项部署核对均通过，包含密码登录后的 inventory RPC 与实际工作区身份；记录为 `verify-unified-amd64-before-restart.json`、`verify-unified-amd64-after-restart.json`。这是使用已有镜像的临时安装，不计为镜像导入或持久磁盘安装通过；内存盘内容在主机重启后丢失。
+- **AMD64 业务实例接续（2026-10-26）**：创建 RPC 超时后，核对初始化容器已正常退出、业务容器处于 `Created` 且原创建命令已结束，再启动同一容器接续验证；未重复创建实例。创建超时及接续操作分别保存在 `create-unified-amd64.log`、`resume-created-container-amd64.log`。同一次超时还留下网关登记缺失及模型配置锁：核对实例、来源、镜像和摘要后，在隔离工作区备份配置并补回创建时的匿名开发登记；确认没有实例命令运行后清理空锁，再通过平台重启同一实例。重启 RPC 再次超时后，确认命令已结束且重新生成的容器为 `Created`，再启动该容器接续验证；记录为 `restart-recovered-instance-amd64-retry.log`、`resume-restarted-container-amd64.log`。恢复记录为 `recover-gateway-amd64.log`、`recover-model-lock-amd64.json`。后续真实请求是在人工接续后的实例中执行，不计为平台正常创建或重启业务实例通过。
+- **AMD64 指定业务请求（2026-10-26，关联 `PA-08`）**：同一 `EXP-security-operations-expert-024-rad80a907c628` 来源实例使用 Qwen3.8-27B 完成真实连通性回复，Session `session-b2e8aaa2-8156-4a43-9355-c1c026a916a9` 正文为“部署连通性正常。”且没有工具调用。巡检 Session `session-1522c636-9cb5-4431-8763-a23116ba613b` 实际执行“执行一次常规巡检”，加载 Skill 并核对工具后报告缺少巡检工具，未产生巡检 Run 或报告。包含重复事件号的同一研判输入由根会话 `session-fce84510-38a5-4484-98d0-176ee916c18a` 去重为两个事件，子会话分别为 `19a6d20c-1db5-4b2b-a44c-80eabf28fe9d`、`b698b5ad-5b40-4e9d-a9c7-ea9dbddfb605`。两次 `analyze_threat_incident` 均返回非错误结果，内层模型已调用；工具元数据分别记录 222 次和 42 次取证 MCP 调用、0 次取证失败。026 的业务运行 ID 为 `run-b50add16-e249-400e-87fd-d304889a3ad3`，027 为 `run-b00f2d95-4065-4c8c-9095-44303ac5aea5`；两项 SOC 摘要保存回执均为 `saved`，完整报告均因 `persistence MCP tool error` 保存失败，无下载链接。输出校验均为 `passed_with_warnings`，分别有 8 条和 4 条证据值不匹配警告，未据此确认研判正确性。两个子会话及根会话两次回调均已结束，根会话最终汇总了两项结论及报告失败；原始、最终轨迹与精简回执分别保存在目标机 `/root/hep-unified-20261025/business-evidence-x64/`、`business-final-evidence-x64/`、`business-final-receipts-amd64.json`。此处业务运行 ID 来自研判工具，不是 Experiment Evaluation Run；完整业务仍未通过。
+- **本轮确定性回归**：启动器与实例适配器 145 项、统一生命周期及部署定向 15 项、业务配置与实例合同 51 项通过；原生会话导出合同 1 项通过。另在 52 以 root 运行 MCP 文件与共享密钥的定向测试，确认容器 UID 1000 可读且保持私有权限；未用放宽为全局可读替代属主修复。上述为工具合同，不替代前述真实业务结果。
+- **未验证**：Docker Engine 离线安装、旧平台 Session 的跨用户恢复、未列出的发行版与架构组合；完整巡检、报告下载及研判正确性未通过。ARM64 的 SOC 映射缺失与 AMD64 的 SOC 摘要保存回执分别按所在环境记录，不推定两边外部连接状态相同。用户确认稍后自行配置这些 MCP，当前保留原连接配置及失败证据。离线包不构成 Research Release 复现。
+- **状态**：部分验证（ARM64 完整离线安装、镜像导入、平台启停及真实模型回复通过；AMD64 使用已有镜像的内存盘安装、平台启停及真实模型回复通过，持久磁盘安装、镜像导入和正常业务实例创建未通过。双架构均执行指定巡检及研判，业务结果与限制如上，未认定完整业务通过）。
 
 ## 4. 为什么是 13 条
 
