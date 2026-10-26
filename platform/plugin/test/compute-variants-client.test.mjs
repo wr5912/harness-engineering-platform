@@ -120,6 +120,25 @@ test('AI为主入口，手动计划先预览后确认，表单修改使预览失
   } finally { ui.cleanup() }
 })
 
+test('手动纯代码计划将零调用约束和百分之百改善传入派生预览', async () => {
+  const ui = panel(false, false)
+  try {
+    await ui.settle()
+    ui.button('手动制定计划').props.onClick(); await ui.settle()
+    ui.change('变体名称', '台账纯代码版')
+    ui.change('策略与研究问题', '所有业务分支通过图和原工具执行')
+    ui.change('生成 LangGraph 代码变体', true)
+    ui.change('生成来源 variant-run', true)
+    ui.button('预览派生计划').props.onClick(); await ui.settle()
+    const input = ui.calls.find(call => call.method.endsWith('/preview')).body
+    assert.equal(input.execution_mode, 'code-only')
+    assert.equal(input.resource_metric, 'actual_model_calls')
+    assert.equal(input.min_resource_reduction_pct, 100)
+    assert.equal(input.allow_model_change, false)
+    assert.deepEqual(Array.from(input.generation.source_run_ids), ['variant-run'])
+  } finally { ui.cleanup() }
+})
+
 test('初次读取期间禁止刷新竞态，失败后刷新恢复完整表单默认值', async () => {
   let rejectInitial, reads = 0
   const ui = panel(false, false, context => ++reads === 1
@@ -186,7 +205,8 @@ test('策划入口打开弹窗，选择低算力后才把真实来源与规则�
     assert.equal(ui.tasks[0].context.experiment_id, 'EXP-alpha-002')
     assert.deepEqual(Array.from(ui.tasks[0].context.source_run_ids), ['variant-run'])
     assert.match(ui.tasks[0].task, /LangGraph 代码/)
-    assert.match(ui.tasks[0].task, /不训练决策模型/)
+    assert.match(ui.tasks[0].task, /业务全链零 LLM/)
+    assert.equal(ui.tasks[0].context.execution_mode, 'code-only')
     assert.match(ui.tasks[0].task, /其他限制与验收关注点：延迟变化须单独说明/)
     assert.equal(ui.tasks[0].context.advanced, '延迟变化须单独说明')
     assert.match(ui.tasks[0].task, /近似等效和资源收益是待验证目标/)
@@ -204,6 +224,7 @@ test('中算力请求包含模型与 SSH 非敏感配置，拒绝失效 Run 和�
     assert.equal(ui.tasks.length, 0)
     await ui.planningDialog().props.onSend(base)
     assert.equal(ui.tasks[0].context.variant_type, 'medium')
+    assert.equal(ui.tasks[0].context.execution_mode, undefined)
     assert.equal(ui.tasks[0].context.variant_name, '资产告警助手 · 中算力变体')
     assert.equal(ui.tasks[0].context.medium.base_model_id, 'org/base-model')
     assert.equal(ui.tasks[0].context.medium.server_host, 'training.example')

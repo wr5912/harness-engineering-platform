@@ -9,6 +9,7 @@ import { extractGraphExecutions, measureModelUsage, normalizeTokenUsage } from '
 import type { ModelAttempt } from '../evaluation/model-attempts.ts'
 import { inspectComputeBuild } from './compute-build.ts'
 import { computeGenerationContract } from './compute-generation-contract.ts'
+import { isCodeOnlyModelRoute } from '../workflows/code-only-route.ts'
 
 type Map = Record<string, any>
 type Result = { ok: true; value: any } | { ok: false; error: { code: string; message: string } }
@@ -31,6 +32,7 @@ export interface ComputePlan {
   resource_metric: ComputeMetric
   min_resource_reduction_pct: number
   model_change: { model: string; reasoning_effort: string } | null
+  execution_mode?: 'code-only'
   measurement_schema_version?: 2
   generation?: GenerationPlan
 }
@@ -76,6 +78,7 @@ function workflowLoadEvidence(graphs: ReturnType<typeof extractGraphExecutions>,
   const wrappers = workflows.filter(graph => !nested.has(graph.execution_id))
   return {
     artifacts: wrappers.length > 0 && wrappers.every(graph => graph.esm_sha256 === receipt.esm_sha256 && graph.build_digest === receipt.build_digest),
+    codeOnly: wrappers.length > 0 && wrappers.every(graph => graph.execution_mode === 'code-only'),
     completed: workflows.every(graph => graph.status === 'completed' && graph.complete === true),
     fixedReceipts: fixedReceipts && graphs.executions.filter(graph => !graph.workflow_id).every(graph => fixed.has(graph.execution_id)),
   }
@@ -139,11 +142,15 @@ function makePlan(body: Map, cases: Record<string, any>): ComputePlan {
     generation = { mode: 'langgraph-aot', entry_path: entry, source_run_ids: ids(value.source_run_ids, RUN, 'source_run_ids').sort(),
       ...(value.fixture_sha256 ? { fixture_sha256: value.fixture_sha256 } : {}) }
   }
+  if (body.execution_mode !== undefined && body.execution_mode !== 'code-only') fail('execution_mode 无效')
+  if (body.execution_mode === 'code-only' && !generation) fail('纯代码执行必须提供代码生成计划')
+  if (body.execution_mode === 'code-only' && (modelChange || body.model_change)) fail('纯代码执行不能指定模型变更')
   return { schema_version: 1, created_at: new Date().toISOString(), strategy: text(body, 'strategy'),
     case_hashes: Object.fromEntries(selected.sort().map(id => [id, hash(canonical(cases[id]))])), critical_case_ids: critical.sort(),
     min_runs_per_case: minimum, max_pass_rate_drop_pp: number(body.max_pass_rate_drop_pp ?? 0, 0, 100, 'max_pass_rate_drop_pp'),
     resource_metric: metric, min_resource_reduction_pct: number(body.min_resource_reduction_pct ?? 10, 0.01, 100, 'min_resource_reduction_pct'), model_change: modelChange,
-    ...(generation ? { generation } : {}), ...(generation || metric === 'actual_model_calls' ? { measurement_schema_version: 2 as const } : {}) }
+    ...(generation ? { generation } : {}), ...(body.execution_mode === 'code-only' ? { execution_mode: 'code-only' as const } : {}),
+    ...(generation || metric === 'actual_model_calls' ? { measurement_schema_version: 2 as const } : {}) }
 }
 
 /** 仅核算原始目标轨迹，包括已采集的子 Session；不将配置快照当作模型调用。 */
@@ -297,7 +304,8 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
             const trace = await readRunEvidenceFile(root, run.run_id, `evidence/${item.case_id}/trace.jsonl`, signal)
             const graphs = extractGraphExecutions(trace.data.toString().split('\n').filter(Boolean).map(line => JSON.parse(line)))
             const load = workflowLoadEvidence(graphs, buildState.receipt)
-            if (!graphs.unknown_reasons.length && load.artifacts && load.completed && load.fixedReceipts) {
+            if (!graphs.unknown_reasons.length && load.artifacts && load.completed && load.fixedReceipts
+              && (change.compute_variant.execution_mode !== 'code-only' || load.codeOnly)) {
               loadedRuns.push(run.run_id); break
             }
           }
@@ -346,7 +354,8 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
       plan.generation.source_evidence = evidence
     }
     const value = { parent_experiment_id: parentId, parent_ref: parentRef, agent_id: parent.change.agent_id, variant_name: name, plan,
-      model_configuration: 'inherited_from_fixed_parent', notes: ['完整继承固定父版；策略与模型差异仅记录为研究计划，不自动修改模型路由或业务资产。', '运行前需将该计划固定到数据仓库 Git；历史 Run 只能事后观察。'] }
+      model_configuration: plan.execution_mode === 'code-only' ? 'code_only_local_execution' : 'inherited_from_fixed_parent',
+      notes: [plan.execution_mode === 'code-only' ? '完整继承固定父版；派生后需实现纯代码会话适配与工作流，业务全链模型请求次数必须为零。' : '完整继承固定父版；策略与模型差异仅记录为研究计划，不自动修改模型路由或业务资产。', '运行前需将该计划固定到数据仓库 Git；历史 Run 只能事后观察。'] }
     const { created_at: _createdAt, ...frozenPlan } = plan
     return { ...value, preview_sha256: hash(canonical({ ...value, plan: frozenPlan })) }
   }
@@ -354,13 +363,15 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
     const id = text(body, 'experiment_id'), { change, content } = experiment(root, id)
     const plan = change.compute_variant as ComputePlan
     if (!plan || plan.schema_version !== 1 || !plan.case_hashes || !Number.isFinite(Date.parse(plan.created_at))) fail('当前版本尚未建立冻结的算力变体计划')
+    if (plan.execution_mode !== undefined && plan.execution_mode !== 'code-only') fail('execution_mode 无效')
+    if (plan.execution_mode === 'code-only' && (!plan.generation || plan.model_change)) fail('纯代码执行计划必须包含代码生成且不能指定模型变更')
     const parentIds = ids(body.parent_run_ids, RUN, 'parent_run_ids'), variantIds = ids(body.variant_run_ids, RUN, 'variant_run_ids')
     if (parentIds.some(id => variantIds.includes(id))) fail('父版和变体不能使用同一个 Run')
     const limits: string[] = [], resourceLimits: string[] = [], proof: Map[] = []
     const caseIds = Object.keys(plan.case_hashes).sort()
     const parentDigest = services.gitCandidateDigest(change.parent_experiment_id, change.baseline_ref)
     const currentDigest = services.candidateDigest(id)
-    let graphUsageComplete = true
+    let graphUsageComplete = true, codeOnlyEvidencePassed = true
     if (!parentDigest) limits.push('固定父版不能完整恢复')
     const workflowBuild = plan.generation ? inspectComputeBuild(root, id) : null
     if (workflowBuild && !workflowBuild.verified) limits.push('工作流源码、共享执行器或构建产物已变化 / 尚未构建')
@@ -425,6 +436,7 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
           catch { issues(`${caseId}/${file} 原始证据缺失`) }
         }
         let actualRoutes = item.actual_routes
+        let codeOnlyVerified = false
         let metrics = { values: Object.fromEntries(METRICS.map(key => [key, null])) as Record<ComputeMetric, number | null>, missing: ['未取得目标执行轨迹'] }
         try {
           const trace = await readRunEvidenceFile(root, runId, `evidence/${caseId}/trace.jsonl`, signal)
@@ -453,6 +465,7 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
             if (graphs.unknown_reasons.length || !load.artifacts) issues(`${caseId} 缺少本次构建工作流的真实装载与调用证据`)
             if (!load.completed) issues(`${caseId} 图执行失败或取消，不能仅凭外层工具回执判为完成`)
             if (!load.fixedReceipts) issues(`${caseId} 子组合缺少一致的固定版本、实现或完整执行回执`)
+            if (plan.execution_mode === 'code-only' && !load.codeOnly) issues(`${caseId} 缺少纯代码执行模式的工作流回执`)
           }
           const rootSession = traceRows.map(row => row.event ?? row).find(event => event.type === 'session' && event.delegationDepth === 0)
           if (!Number.isFinite(rootSession?.createdAt) || rootSession.createdAt < Date.parse(plan.created_at) || rootSession.createdAt < Date.parse(lock.created_at)) issues(`${caseId} 原始 Session 早于冻结计划或当前 Run，不能复用为新重复`)
@@ -483,7 +496,16 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
           if (graphRoutes.some(route => !route.provider || !route.model || !route.reasoning_effort)) issues(`${caseId} 图内实际模型请求缺少明确路由`)
           actualRoutes = [...(actualRoutes ?? []), ...graphRoutes.map(route => ({ provider: route.provider, model: route.model, reasoningEffort: route.reasoning_effort }))]
           if (side === 'variant' && plan.model_change && actualRoutes.some((route: Map) => route?.model !== plan.model_change!.model || route?.reasoningEffort !== plan.model_change!.reasoning_effort)) issues(`${caseId} 中间步骤、子 Session 或图内模型不符合显式计划`)
+          if (side === 'variant' && plan.execution_mode === 'code-only') {
+            const localRoutes = actualRoutes?.length > 0 && actualRoutes.every((route: Map) => isCodeOnlyModelRoute(route) && route.reasoningEffort === 'off')
+            if (!localRoutes) issues(`${caseId} 纯代码变体包含非受控本地执行路由`)
+            codeOnlyVerified = localRoutes && usage.model_calls_complete && usage.actual_model_calls === 0
+          }
         } catch { issues(`${caseId} 原始轨迹或工具证据缺失 / 无法解析`); metrics = { values: Object.fromEntries(METRICS.map(key => [key, null])) as Record<ComputeMetric, number | null>, missing: ['原始轨迹或工具证据无法核算'] } }
+        if (side === 'variant' && plan.execution_mode === 'code-only' && !codeOnlyVerified) {
+          codeOnlyEvidencePassed = false
+          resourceLimits.push(`${runId}/${caseId}: 纯代码变体必须完整证明业务模型请求次数为零`)
+        }
         resourceLimits.push(...metrics.missing.map(message => `${runId}/${caseId}: ${message}`))
         selected.push({ case_id: caseId, verdict: trial?.execution_status === 'completed' ? verdict : 'inconclusive', metrics: metrics.values, actual_routes: actualRoutes, evidence: item.evidence })
       }
@@ -502,7 +524,9 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
       const parent = groups('parent'), variant = groups('variant')
       if (parent.length !== variant.length || parent.length < plan.min_runs_per_case) limits.push(`${caseId}: 独立 Run 数量不足或两侧不平衡（${parent.length}/${variant.length}，至少 ${plan.min_runs_per_case}）`)
       const routes = (entries: any[]) => [...new Set(entries.flatMap(item => item.actual_routes ?? []).map(route => canonical([route.provider, route.model, route.reasoningEffort])))].sort()
-      if (!plan.model_change && !same(routes(parent), routes(variant))) limits.push(`${caseId}: 未预先允许的模型路由差异`)
+      if (plan.execution_mode === 'code-only') {
+        if (parent.some(item => !same(routes([item]), routes(parent.slice(0, 1))))) limits.push(`${caseId}: 父版独立 Run 的实际模型路由不同`)
+      } else if (!plan.model_change && !same(routes(parent), routes(variant))) limits.push(`${caseId}: 未预先允许的模型路由差异`)
       const rate = (entries: any[]) => entries.length && entries.every(item => ['passed', 'failed'].includes(item.verdict)) ? entries.filter(item => item.verdict === 'passed').length / entries.length * 100 : null
       const a = rate(parent), b = rate(variant), drop = a === null || b === null ? null : a - b
       const critical = plan.critical_case_ids.includes(caseId)
@@ -515,14 +539,16 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
     const resources = Object.fromEntries(METRICS.map(key => { const values = caseRows.map(row => row.metrics[key]); const avg = (side: 'parent' | 'variant') => values.every(value => value[side] !== null) ? values.reduce((sum, value) => sum + value[side]!, 0) / values.length : null; const parent = avg('parent'), variant = avg('variant'); return [key, { parent, variant, reduction_pct: parent !== null && variant !== null && parent > 0 ? (parent - variant) / parent * 100 : null }] }))
     const qualityPassed = caseRows.every(row => row.quality_passed)
     const reduction = resources[plan.resource_metric].reduction_pct
-    const resourcePassed = graphUsageComplete && reduction !== null && reduction >= plan.min_resource_reduction_pct
+    const resourcePassed = graphUsageComplete && codeOnlyEvidencePassed && reduction !== null && reduction >= plan.min_resource_reduction_pct
     if (reduction === null) resourceLimits.push('目标资源指标缺少完整数据或父版基数为零')
     const result = { experiment_id: id, candidate_sha256: currentDigest, parent_candidate_sha256: parentDigest, plan, parent_run_ids: parentIds, variant_run_ids: variantIds, change_sha256: hash(content),
       inputs: { parent_experiment_id: change.parent_experiment_id, parent_ref: change.baseline_ref, build: workflowBuild ? { verified: workflowBuild.verified, receipt: workflowBuild.receipt } : null },
       quality: { passed: qualityPassed, cases: caseRows }, resources, comparability: { passed: limits.length === 0, limits: [...new Set(limits)] },
       resource_evidence: { passed: resourcePassed, limits: [...new Set(resourceLimits)] },
       eligible_for_end: !limits.length && qualityPassed && resourcePassed,
-      notes: ['结果仅适用于预先冻结的任务范围和所选独立 Run；不是对所有任务的统计等效证明。', 'token、模型响应次数与耗时属于已记录资源指标；未测量硬件算力、供应商费用或不可见的外部模型调用。', '人工确认需完整审阅原始输出和工具结果；表格只汇总证据，不替代业务判断。', '依赖环境记录仅含变量配置状态；外部数据状态、网络负载与供应商变化未被完整控制，资源改善不能单独归因于 Harness。'], proof }
+      notes: ['结果仅适用于预先冻结的任务范围和所选独立 Run；不是对所有任务的统计等效证明。',
+        ...(plan.execution_mode === 'code-only' ? ['历史 model_calls 统计会话回复次数，包含本地代码适配器回复；业务零推理以完整 actual_model_calls 为零核验。'] : []),
+        'token、模型响应次数与耗时属于已记录资源指标；未测量硬件算力、供应商费用或不可见的外部模型调用。', '人工确认需完整审阅原始输出和工具结果；表格只汇总证据，不替代业务判断。', '依赖环境记录仅含变量配置状态；外部数据状态、网络负载与供应商变化未被完整控制，资源改善不能单独归因于 Harness。'], proof }
     return { ...result, comparison_sha256: hash(canonical(result)) }
   }
   return async (method: string, body: Map, signal?: AbortSignal): Promise<Result> => {

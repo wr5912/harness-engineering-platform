@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { isCodeOnlyModelRoute } from '../workflows/code-only-route.ts'
 
 export type ModelRole = 'target' | 'judge' | 'analysis' | 'generation'
 export type ModelAttemptContext = {
@@ -77,4 +78,5 @@ export function observeLlm(llm: any, context: ModelAttemptContext, record: Attem
 export function isLocalModelRoute(route: any): boolean {
   return route?.provider === 'threat-analysis-delivery' && route?.model === 'fixed-summary'
     || route?.provider === 'threat-analysis-automation' && route?.model === 'scheduled-batch'
+    || isCodeOnlyModelRoute(route)
 }

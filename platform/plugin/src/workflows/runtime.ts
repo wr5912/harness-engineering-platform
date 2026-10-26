@@ -6,6 +6,7 @@ import { observeLlm, type ModelAttempt } from '../evaluation/model-attempts.ts'
 import { compileSequence } from './graph.ts'
 import { registerFixedCompositionTools, withFixedCompositionExecution, type FixedCompositionBinding } from './fixed-composition.ts'
 import { runtimeModule, runtimeRequire } from '../../../../runtime/adapters/dsh-web/src/resolve-runtime.ts'
+import { CODE_ONLY_MODEL, CODE_ONLY_PROVIDER } from './code-only-route.ts'
 
 export { Annotation, END, START, StateGraph }
 export { fixedCompositionToolName, type FixedCompositionBinding } from './fixed-composition.ts'
@@ -36,6 +37,10 @@ export interface WorkflowDefinition {
 }
 export function defineWorkflow<T extends WorkflowDefinition>(definition: T): T { return definition }
 
+export interface WorkflowToolOptions {
+  executionMode?: 'code-only'
+}
+
 /** 顺序节点共用 LangGraph；业务条件和参数来源留在业务源码。 */
 export async function runWorkflow(context: WorkflowContext, steps: { id: string; run(values: Record<string, any>, context: WorkflowContext): Promise<any> }[]) {
   if (!steps.length || new Set(steps.map(step => step.id)).size !== steps.length) throw new Error('工作流节点不能为空或重名')
@@ -57,7 +62,7 @@ export async function runWorkflow(context: WorkflowContext, steps: { id: string;
 }
 
 /** 通过原生工具管线执行子调用，保留调用身份、取消和真实回执。 */
-export function registerWorkflowTool(ctx: any, definition: WorkflowDefinition) {
+export function registerWorkflowTool(ctx: any, definition: WorkflowDefinition, options: WorkflowToolOptions = {}) {
   const aliases = registerFixedCompositionTools(ctx, definition.fixedCompositions ?? {})
   return ctx.tools.register({
     name: definition.toolName, description: definition.description, parameters: definition.inputSchema,
@@ -72,7 +77,7 @@ export function registerWorkflowTool(ctx: any, definition: WorkflowDefinition) {
       const identity = { execution_id: executionId, role: 'target' as const,
         ...(exec.agent?.session?.id ? { session_id: exec.agent.session.id } : {}), ...(exec.callId ? { tool_call_id: exec.callId } : {}),
         ...(exec.parent_run_id ? { parent_run_id: exec.parent_run_id } : {}), ...(exec.case_id ? { case_id: exec.case_id } : {}) }
-      const observed = ctx.llm ? observeLlm(ctx.llm, identity, (event: ModelAttempt) => {
+      const observed = options.executionMode !== 'code-only' && ctx.llm ? observeLlm(ctx.llm, identity, (event: ModelAttempt) => {
         attempts.push(Object.fromEntries(Object.entries(event).filter(([, value]) => value !== undefined)) as ModelAttempt)
       }) : null
       const context: WorkflowContext = {
@@ -94,6 +99,7 @@ export function registerWorkflowTool(ctx: any, definition: WorkflowDefinition) {
           return result.value
         },
         async infer(config, payload) {
+          if (options.executionMode === 'code-only') throw new Error('纯代码工作流禁止模型调用')
           if (!observed) throw new Error('工作流模型服务未装载')
           const prepared = await observed.prepareCall(config, exec.signal)
           let content = '', completed = false
@@ -114,6 +120,7 @@ export function registerWorkflowTool(ctx: any, definition: WorkflowDefinition) {
         }
       } catch { failure = exec.signal.aborted ? '工作流已取消' : '工作流执行失败，请查看节点回执' }
       const graph_execution = { ...identity, workflow_id: definition.id, complete: true,
+        ...(options.executionMode ? { execution_mode: options.executionMode } : {}),
         ...(typeof __WORKFLOW_BUILD_DIGEST__ === 'string' ? { build_digest: __WORKFLOW_BUILD_DIGEST__, source_digest: __WORKFLOW_SOURCE_DIGEST__ } : {}),
         esm_sha256: loadedEsmSha256,
         status: failure ? exec.signal.aborted ? 'cancelled' : 'failed' : 'completed', trace, model_attempts: attempts }
@@ -121,4 +128,137 @@ export function registerWorkflowTool(ctx: any, definition: WorkflowDefinition) {
       return { ok: !failure, ...(failure ? { error: failure, ...(errorCode ? { error_code: errorCode } : {}) } : { result }), graph_execution }
     },
   })
+}
+
+export interface CodeOnlyWorkflowAgent {
+  presetId: string
+  workflow: WorkflowDefinition
+  renderResult?(result: any): string
+}
+
+interface CodeOnlyTurn {
+  turn: number
+  request: string
+  callId: string
+  issued: boolean
+  replied: boolean
+  pending?: { kind: 'tool' } | { kind: 'text'; text: string }
+}
+
+const textContent = (message: any): string => (message?.content ?? [])
+  .filter((block: any) => block.type === 'text').map((block: any) => block.text).join('\n')
+
+/** 用本地原生适配器完成一个回合；业务规则、分支和回复内容仍由 LangGraph 提供。 */
+export function registerCodeOnlyWorkflowAgent(ctx: any, options: CodeOnlyWorkflowAgent) {
+  if (!options.presetId.trim()) throw new Error('纯代码工作流必须绑定 Preset')
+  const { workflow } = options
+  registerWorkflowTool(ctx, workflow, { executionMode: 'code-only' })
+  const turns = new Map<string, CodeOnlyTurn>()
+  const sessionId = (agent: any): string => agent.session.id
+  const isSubject = (agent: any): boolean => agent?.session?.header?.agentPreset === options.presetId
+  const route = { provider: CODE_ONLY_PROVIDER, model: CODE_ONLY_MODEL, reasoningEffort: 'off' }
+  const unknown = '工作流执行结果未知，已停止；请核对本轮工具回执后继续。'
+
+  ctx.on('agent/pre-step', async ({ agent, turn }: any, next: () => Promise<any>) => {
+    const decision = await next()
+    if (!isSubject(agent) || decision.kind !== 'enter') return decision
+    const messages = decision.messages.filter((message: any) => message.source?.kind === 'user')
+    if (messages.length) turns.set(sessionId(agent), {
+      turn, request: messages.map(textContent).join('\n'), callId: `code-only-${randomUUID()}`, issued: false, replied: false,
+    })
+    return decision
+  })
+
+  function restoredTurn(agent: any, turn: number): CodeOnlyTurn | undefined {
+    const events = agent.session.snapshotEvents()
+    const start = events.findLastIndex((event: any) => event.type === 'turn/start' && event.data.turn === turn)
+    if (start < 0) return undefined
+    const current = events.slice(start)
+    const call = current.findLast((event: any) => event.type === 'tool/call' && event.data.turn === turn && event.data.name === workflow.toolName)
+    const request = current.filter((event: any) => event.type === 'user/message' && event.data.source?.kind === 'user').map((event: any) => textContent(event.data)).join('\n')
+    if (!request && !call) return undefined
+    return { turn, request, callId: call?.data.callId ?? `code-only-${randomUUID()}`, issued: Boolean(call), replied: false }
+  }
+
+  function resultText(agent: any, state: CodeOnlyTurn): string {
+    const receipt = agent.session.snapshotEvents().findLast((event: any) => event.type === 'tool/result'
+      && event.data.turn === state.turn && event.data.message?.toolCallId === state.callId
+      && event.data.message?.source?.callId === state.callId)
+    if (!receipt) return unknown
+    if (receipt.data.message.isError || receipt.data.error) return '工作流工具执行失败，已停止；请查看本轮工具回执。'
+    try {
+      const value = JSON.parse(textContent(receipt.data.message)), graph = value.graph_execution
+      if (graph?.session_id !== sessionId(agent) || graph?.tool_call_id !== state.callId || graph.execution_mode !== 'code-only'
+        || graph.complete !== true || graph.status !== 'completed' || !Array.isArray(graph.model_attempts) || graph.model_attempts.length) return '工作流未完成或执行证据不符合纯代码要求，已停止；请查看本轮图回执。'
+      if (value.ok !== true) return '工作流执行失败，已停止；请查看本轮图回执。'
+      const text = options.renderResult ? options.renderResult(value.result) : value.result?.reply
+      return typeof text === 'string' && text.trim() ? text : '工作流未提供有效回复，已停止；请查看本轮图回执。'
+    } catch { return '工作流回执无法解析，已停止；请查看本轮工具回执。' }
+  }
+
+  ctx.on('agent/request', async ({ agent, turn, signal }: any, next: () => Promise<any>) => {
+    if (!isSubject(agent)) return next()
+    signal.throwIfAborted()
+    const id = sessionId(agent)
+    let state = turns.get(id)
+    if (!state || state.turn !== turn) {
+      state = restoredTurn(agent, turn)
+      if (state) turns.set(id, state)
+    }
+    if (!state) {
+      state = { turn, request: '', callId: '', issued: true, replied: false, pending: { kind: 'text', text: unknown } }
+      turns.set(id, state)
+    } else state.pending = state.issued ? { kind: 'text', text: state.replied ? '本轮工作流已结束，请提交新的任务。' : resultText(agent, state) } : { kind: 'tool' }
+    return route
+  })
+
+  ctx.llm.registerAdapter([CODE_ONLY_PROVIDER], {
+    providerInfo: (provider: string) => ({ id: provider, name: '纯代码工作流（本地执行）' }),
+    providerRetryPolicy: () => undefined,
+    imageRequestPricing: () => undefined,
+    listModels: async () => [],
+    resolveModel: async (provider: string, model: string) => {
+      if (provider !== CODE_ONLY_PROVIDER || model !== CODE_ONLY_MODEL) throw new Error('纯代码工作流路由无效')
+      return { provider, id: model, name: '纯代码工作流', reasoning: { efforts: [{ id: 'off', name: '关闭' }] } }
+    },
+    async prepareCall(provider: string, model: string) {
+      return { model: await this.resolveModel(provider, model), stream: (request: any) => this.stream(request) }
+    },
+    async *stream(request: any) {
+      request.signal?.throwIfAborted()
+      const state = turns.get(request.sessionId), pending = state?.pending
+      if (!state || !pending) throw new Error('纯代码工作流缺少本轮请求')
+      delete state.pending
+      if (pending.kind === 'tool') {
+        // 调用一旦发出就不重放；取消或未知回执都由后续本地回复说明。
+        if (state.issued) throw new Error('纯代码工作流调用已发出')
+        state.issued = true
+        const args = JSON.stringify({ request: state.request })
+        yield { type: 'block-start', index: 0, blockType: 'tool-call' }
+        yield { type: 'tool-call-delta', index: 0, id: state.callId, name: workflow.toolName, argumentsDelta: args }
+        yield { type: 'block-end', index: 0, block: { type: 'tool-call', id: state.callId, name: workflow.toolName, arguments: args } }
+        request.signal?.throwIfAborted()
+        yield { type: 'finish', reason: { kind: 'tool-calls' } }
+      } else {
+        state.replied = true
+        yield { type: 'block-start', index: 0, blockType: 'text' }
+        yield { type: 'text-delta', index: 0, text: pending.text }
+        yield { type: 'block-end', index: 0, block: { type: 'text', text: pending.text } }
+        yield { type: 'finish', reason: { kind: 'stop' } }
+      }
+    },
+  })
+  ctx.sessionTitle.register({
+    id: 'harness-code-only-title', automatic: 'first-prompt',
+    async generate(request: any) {
+      request.signal.throwIfAborted()
+      const first = request.messages[0]
+      if (!first) throw new Error('纯代码标题缺少用户输入')
+      return { title: [...first.text.replace(/\s+/g, ' ').trim()].slice(0, 32).join(''), messageSeqs: [first.seq] }
+    },
+  })
+  ctx.on('session/event', (session: any, event: any) => {
+    if (event.type === 'turn/end' && turns.get(session.id)?.turn === event.data.turn) turns.delete(session.id)
+  })
+  ctx.on('agent/disposed', ({ agent }: any) => { if (isSubject(agent)) turns.delete(sessionId(agent)) })
 }
