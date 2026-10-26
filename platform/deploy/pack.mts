@@ -1,11 +1,12 @@
-import { existsSync, lstatSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { basename, dirname, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { copyTree, ensureEmptyDir, removeTree, run, tarCreate } from './fsutil.mts'
 import { collectEntries, sha256File, writeManifest, type Arch, type Manifest, type RuntimeEntry } from './manifest.mts'
 import { collectSystemGit } from './git.mts'
 import { expectedImage, inspectImage, inspectImageArchive, saveImage, verifyImageInfo } from './image.mts'
 import { assertRealWorkspace } from './data.mts'
+import { snapshotRepository } from './repository.mts'
 
 export interface PackOptions {
   programRoot: string
@@ -53,24 +54,8 @@ function copyAsset(source: string, target: string): void {
 
 function copyProgram(programRoot: string, staging: string, assetsDir?: string): void {
   const target = join(staging, 'program')
-  mkdirSync(target, { recursive: true })
-  const skipNames = new Set(['node_modules', 'lib', '__pycache__', '.pytest_cache', '.git', 'dist', 'coverage', '.local', 'test'])
-  const copy = (relative: string): void => {
-    const source = join(programRoot, relative)
-    const destination = join(target, relative)
-    copyTree(source, destination, sourcePath => {
-      const name = basename(sourcePath)
-      if (skipNames.has(name)) return false
-      if (name.startsWith('test_') && relative.includes('dsh-container')) return false
-      if (name.endsWith('.test.mjs')) return false
-      return true
-    })
-  }
-  for (const name of ['platform', 'runtime', 'plugins']) copy(name)
-  for (const name of ['README.md', 'VERSION.md', 'CHANGELOG.md']) {
-    const source = join(programRoot, name)
-    if (existsSync(source)) copyTree(source, join(target, name))
-  }
+  snapshotRepository(programRoot, target, join(staging, 'repositories/program.bundle'))
+  removeTree(join(target, '.git'))
   if (assetsDir) {
     const preparedPlugin = join(assetsDir, 'program', 'platform', 'plugin', 'node_modules')
     const preparedWeb = join(assetsDir, 'program', 'runtime', 'adapters', 'dsh-web', 'node_modules')
@@ -81,16 +66,13 @@ function copyProgram(programRoot: string, staging: string, assetsDir?: string): 
   }
 }
 
-function copyData(dataRoot: string, staging: string): void {
+function copyData(dataRoot: string, staging: string): ReturnType<typeof snapshotRepository> {
   const target = join(staging, 'data')
-  mkdirSync(target, { recursive: true })
-  const runtime = ['.local/platform-home', '.local/instances', '.local/npm-cache', '.local/evaluation-jobs', '.local/platform-start.log', '.local/platform-start.pid']
-  copyTree(dataRoot, target, sourcePath => {
-    const stat = lstatSync(sourcePath)
-    if (stat.isSocket() || stat.isFIFO() || stat.isBlockDevice() || stat.isCharacterDevice()) return false
-    const path = relative(dataRoot, sourcePath).split(sep).join('/')
-    return !runtime.some(prefix => path === prefix || path.startsWith(prefix + '/'))
-  })
+  const repository = snapshotRepository(dataRoot, target, join(staging, 'repositories/data.bundle'))
+  removeTree(join(target, '.git'))
+  const credentials = join(dataRoot, '.local/credentials')
+  if (existsSync(credentials)) copyTree(credentials, join(target, '.local/credentials'))
+  return repository
 }
 
 function copyImage(options: PackOptions, staging: string): Manifest['image'] {
@@ -117,13 +99,13 @@ function copyImage(options: PackOptions, staging: string): Manifest['image'] {
       archive: `images/${fileName}`,
     }
   }
-  if (!options.imageTag) throw new Error('打包镜像需要 --image-archive 或 --image-tag')
-  const info = inspectImage(options.imageTag)
+  const tag = options.imageTag ?? expected.tag
+  const info = inspectImage(tag)
   const problems = verifyImageInfo(info, { id: options.imageId, arch: options.arch, fingerprint: expected.fingerprint })
   if (info.os !== 'linux') problems.push(`镜像系统不符：${info.os ?? '未知'}`)
   if (problems.length) throw new Error(`镜像与锁定 Runtime 不符：\n${problems.join('\n')}`)
-  const archiveName = `${options.imageTag.replace(/[^A-Za-z0-9_.-]+/g, '_')}.tar`
-  saveImage(options.imageTag, join(target, archiveName))
+  const archiveName = `${tag.replace(/[^A-Za-z0-9_.-]+/g, '_')}.tar`
+  saveImage(tag, join(target, archiveName))
   return {
     tag: expected.tag,
     id: info.id,
@@ -148,8 +130,7 @@ export function pack(options: PackOptions): { archive: string; size: number } {
   const staging = join(out, '.staging', packageName)
   if (existsSync(staging)) removeTree(staging)
   ensureEmptyDir(staging)
-  copyProgram(programRoot, staging, options.assetsDir)
-  copyTree(join(programRoot, 'platform', 'deploy', 'install.sh'), join(staging, 'install.sh'))
+  // 所需资源先检查，再建立仓库快照，避免留下半包。
 
   const offline = join(staging, 'offline')
   mkdirSync(offline, { recursive: true })
@@ -174,15 +155,20 @@ export function pack(options: PackOptions): { archive: string; size: number } {
     try { version = run(join(offline, 'git', 'git'), ['--version']).trim() } catch { /* 跨架构打包不能在当前主机执行目标架构 Git */ }
     runtime.git = { path: 'offline/git', version, source: 'bundle' }
   } else {
+    if (options.arch !== (process.arch === 'arm64' ? 'arm64' : 'amd64')) throw new Error('跨架构打包必须提供目标架构的 git 离线资源')
     const collected = collectSystemGit(join(offline, 'git'))
     runtime.git = { path: 'offline/git', version: collected.version, source: collected.source }
   }
 
   const dataRoot = options.includeData && options.dataRoot ? resolve(options.dataRoot) : undefined
   let dataCheck: ReturnType<typeof assertRealWorkspace> | undefined
+  let dataRepository: ReturnType<typeof snapshotRepository> | undefined
+  for (const name of ['python', 'dsh']) if (!existsSync(join(offline, name))) throw new Error(`安装包缺少离线 ${name} 资源`)
+  copyProgram(programRoot, staging, options.assetsDir)
+  copyTree(join(staging, 'program/platform/deploy/install.sh'), join(staging, 'install.sh'))
   if (dataRoot) {
     dataCheck = assertRealWorkspace(dataRoot, options.allowFixtureData)
-    copyData(dataRoot, staging)
+    dataRepository = copyData(dataRoot, staging)
   }
   const image = copyImage(options, staging)
   const files = collectEntries(staging)
@@ -200,11 +186,13 @@ export function pack(options: PackOptions): { archive: string; size: number } {
       home: homedir(),
       programRoot,
       dataRoot,
+      programOrigin: run('git', ['-C', programRoot, 'remote', 'get-url', 'origin']).trim(),
+      dataOrigin: dataRepository?.origin,
     },
     files,
     runtime,
     image,
-    data: dataRoot && dataCheck ? { sensitive: true, kind: dataCheck.kind, workspaceId: dataCheck.workspaceId, skills: dataCheck.skills } : undefined,
+    data: dataRoot && dataCheck ? { commit: dataRepository?.commit, dirty: dataRepository?.dirty, sensitive: true, kind: dataCheck.kind, workspaceId: dataCheck.workspaceId, skills: dataCheck.skills } : undefined,
     sensitivePaths: options.includeData ? ['data/.local'] : undefined,
   }
   writeManifest(join(staging, 'manifest.json'), manifest)

@@ -43,7 +43,7 @@ export function inspectImage(target: string): ImageInfo {
 
 export function expectedImage(programRoot: string, arch: Arch): { tag: string; fingerprint: string } {
   const script = join(programRoot, 'runtime', 'adapters', 'dsh-container', 'source_contract.py')
-  return JSON.parse(run('python3', [script, '--image-identity-for', `linux/${arch}`]))
+  return JSON.parse(run(process.env.HARNESS_PYTHON || 'python3', [script, '--image-identity-for', `linux/${arch}`]))
 }
 
 export function inspectImageArchive(archive: string, tag: string): ImageInfo {

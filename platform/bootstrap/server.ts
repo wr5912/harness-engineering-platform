@@ -1,15 +1,35 @@
 import { execFile } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type IncomingMessage } from 'node:http'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { defaultRepository, extensionDigest, initializeWorkspace, inspectWorkspace, previewWorkspace, rememberWorkspace, type SetupRequest } from './workspace.ts'
+import { managedState } from '../lifecycle.mts'
 
 const execute = promisify(execFile)
 const base = '/hep/'
 export type BootstrapOptions = { root: string; host: string; port: number; token: string; resultFile: string; programRoot: string; python?: string; prepare?: (root: string) => Promise<void> }
+
+export function handoffService(from: string, to: string, programRoot: string) {
+  if (resolve(from) === resolve(to)) return
+  const state = managedState(from, programRoot)
+  if (!state || state.pid !== process.ppid) return
+  if (managedState(to, programRoot)) throw new Error('选定数据工作区已有运行中的平台，请先停止后重试')
+  const directory = join(to, '.local/platform-service')
+  mkdirSync(directory, { recursive: true })
+  const destination = join(directory, 'state.json')
+  writeFileSync(destination + '.tmp', JSON.stringify({ ...state, dataRoot: resolve(to) }) + '\n', { mode: 0o600 })
+  renameSync(destination + '.tmp', destination)
+  rmSync(join(from, '.local/platform-service/state.json'))
+  const env = join(programRoot, 'bin/hep-env.sh')
+  if (existsSync(env)) {
+    const quote = (value: string) => "'" + value.replaceAll("'", "'\"'\"'") + "'"
+    const previous = `export HARNESS_ASSET_ROOT=\${HARNESS_ASSET_ROOT:-${quote(from)}}`
+    writeFileSync(env, readFileSync(env, 'utf8').replace(previous, `export HARNESS_ASSET_ROOT=\${HARNESS_ASSET_ROOT:-${quote(to)}}`))
+  }
+}
 
 async function requestBody(req: IncomingMessage): Promise<SetupRequest> {
   let body = ''
@@ -25,7 +45,7 @@ export async function createBootstrapServer(options: BootstrapOptions) {
   const session = randomBytes(32).toString('base64url')
   const prepare = options.prepare ?? (async (assetRoot: string) => {
     try {
-      await execute(options.python || process.env.HARNESS_PYTHON || 'python3', [join(options.programRoot, 'platform/dsh-platform'), 'prepare'], {
+      await execute(join(options.programRoot, 'platform/dsh-platform'), ['prepare', ...(process.env.HEP_OFFLINE === '1' ? ['--offline'] : [])], {
         cwd: options.programRoot, env: { ...process.env, HARNESS_ASSET_ROOT: assetRoot }, timeout: 300_000, maxBuffer: 2 * 1024 * 1024,
       })
     } catch (failure) {
@@ -75,6 +95,7 @@ export async function createBootstrapServer(options: BootstrapOptions) {
         }
         if (extensionDigest(root, current.extensions) !== plan.extensionsDigest) throw new Error('扩展源码在预览后变化，请重新预览后装载')
         await prepare(root)
+        handoffService(options.root, root, options.programRoot)
         rememberWorkspace(root)
         writeFileSync(options.resultFile, JSON.stringify({ root }) + '\n', { mode: 0o600, flag: 'wx' })
         phase = 'ready'

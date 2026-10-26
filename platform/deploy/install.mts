@@ -8,6 +8,7 @@ import { rewriteDeploymentAddress, rewriteKnownPaths, scanKnownOldPaths } from '
 import { installRuntime } from './runtime.mts'
 import { dockerAvailable, loadVerifiedImage } from './image.mts'
 import { assertRealWorkspace } from './data.mts'
+import { restoreRepository } from './repository.mts'
 
 export interface InstallOptions {
   bundleRoot: string
@@ -85,16 +86,6 @@ export function install(options: InstallOptions): InstallReport {
   }
   if (options.dryRun) return report
 
-  if (manifest.image && !options.skipImage) {
-    if (!dockerAvailable()) {
-      throw new Error('Docker 不可用；无法导入标准 Runtime 镜像。请启动 Docker 后重试，或显式使用 --skip-image')
-    } else {
-      const info = loadVerifiedImage(join(bundleRoot, manifest.image.archive), manifest.image)
-      report.image = { tag: manifest.image.tag, id: info.id, loaded: true }
-    }
-  } else if (manifest.image && options.skipImage) {
-    warnings.push('按要求跳过镜像导入')
-  }
 
   const targets = [prefix, ...(manifest.data ? [dataRoot] : [])].map(path => ({ path, existed: existsSync(path) }))
   let env: NodeJS.ProcessEnv
@@ -125,14 +116,34 @@ export function install(options: InstallOptions): InstallReport {
     report.pendingInstances = instanceNames(dataRoot)
 
     const runtime = installRuntime(bundleRoot, prefix, dataRoot)
+    mkdirSync(join(prefix, '.local'), { recursive: true })
+    writeFileSync(join(prefix, '.local/installation.json'), JSON.stringify(manifest), { mode: 0o600 })
     report.runtime = runtime.versions
     warnings.push(...runtime.warnings)
 
     env = runtime.env
+
+    if (manifest.image && !options.skipImage) {
+      if (!dockerAvailable()) {
+        throw new Error('Docker 不可用；无法导入标准 Runtime 镜像。请启动 Docker 后重试，或显式使用 --skip-image')
+      } else {
+        const info = loadVerifiedImage(join(bundleRoot, manifest.image.archive), manifest.image)
+        report.image = { tag: manifest.image.tag, id: info.id, loaded: true }
+      }
+    } else if (manifest.image && options.skipImage) {
+      warnings.push('按要求跳过镜像导入')
+    }
+
+    const previousPath = process.env.PATH
+    process.env.PATH = env.PATH
+    try {
+      if (manifest.source.programOrigin) restoreRepository(prefix, join(bundleRoot, 'repositories/program.bundle'), manifest.package.commit, manifest.source.programOrigin)
+      if (manifest.data?.commit && manifest.source.dataOrigin) restoreRepository(dataRoot, join(bundleRoot, 'repositories/data.bundle'), manifest.data.commit, manifest.source.dataOrigin)
+    } finally { process.env.PATH = previousPath }
     if (options.skipPrepare) {
       warnings.push('按要求跳过 prepare；平台尚未构建，不能直接启动')
     } else {
-      const prepared = spawnSync(runtime.python, [join(prefix, 'platform', 'dsh-platform'), 'prepare', '--offline'], {
+      const prepared = spawnSync(join(prefix, 'platform', 'dsh-platform'), ['prepare', '--offline'], {
         cwd: prefix,
         env,
         stdio: 'inherit',
@@ -160,9 +171,9 @@ export function install(options: InstallOptions): InstallReport {
   }
 
   if (options.start) {
-    const args = options.host ? ['--host', options.host, '--port', String(options.port)] : ['--port', String(options.port)]
-    const started = spawnSync(join(prefix, 'bin', 'hep-start'), args, { cwd: prefix, env, stdio: 'inherit' })
-    if (started.status !== 0) throw new Error(`平台启动失败（退出码 ${started.status}）`)
+    const args = options.host ? ['--host', options.host, '--port', String(options.port)] : []
+    const started = spawnSync(join(prefix, 'platform', 'dsh-platform'), ['start', ...args], { cwd: prefix, env, stdio: 'inherit' })
+    if (started.status !== 0) throw new Error(`平台启动失败（退出码 ${started.status}）；安装目录已保留，可重试 ${prefix}/platform/dsh-platform start`)
   }
   return report
 }

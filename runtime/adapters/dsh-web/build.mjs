@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 const root = dirname(fileURLToPath(import.meta.url))
 const require = createRequire(import.meta.url)
 try { require.resolve('esbuild'); require.resolve('typescript') } catch {
+  if (process.env.HEP_OFFLINE === '1') throw new Error('离线模式缺少 Web 构建依赖；请重新打包完整 node_modules')
   const install = spawnSync('pnpm', ['install', '--frozen-lockfile'], { cwd: root, stdio: 'inherit' })
   if (install.status !== 0) throw new Error('Web 路径适配器依赖安装失败')
 }

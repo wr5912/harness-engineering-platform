@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process'
 import test from 'node:test'
 import { installRuntime } from '../runtime.mts'
 import { install } from '../install.mts'
+import { copyTree } from '../fsutil.mts'
 import { collectEntries } from '../manifest.mts'
 import { inspectImageArchive, loadVerifiedImage, verifyImageInfo } from '../image.mts'
 
@@ -22,8 +23,17 @@ function bundle(name) {
   write(join(path, 'offline/node/bin/node'), `#!/bin/sh\nexec '${process.execPath}' "$@"\n`, true)
   write(join(path, 'offline/git/git'), '#!/bin/sh\necho git-version-bundled\n', true)
   write(join(path, 'offline/python/site/hep_install_probe.py'), 'VALUE = 42\n')
-  write(join(path, 'program/platform/dsh-platform'), 'import os, sys\nsys.exit(int(os.environ.get("HEP_TEST_PREPARE_FAILURE", "0")))\n')
+  write(join(path, 'offline/python/site/yaml.py'), '# 外部解释器依赖夹具\n')
+  write(join(path, 'offline/python/bin/python3'), '#!/bin/sh\nunset PYTHONHOME\nexec /usr/bin/python3 "$@"\n', true)
+  write(join(path, 'offline/pnpm/bin/pnpm'), '#!/bin/sh\necho 11.28.5\n', true)
+  write(join(path, 'offline/dsh/apps/cli/lib/bin.js'), 'console.log("0.2.1-rc.2")\n')
+  write(join(path, 'program/platform/plugin/package.json'), JSON.stringify({peerDependencies:{'@deepseek-ai/dsh-client-connection':'0.2.1-rc.2'}}))
+  writeLauncher(path, 'import os, sys\nsys.exit(int(os.environ.get("HEP_TEST_PREPARE_FAILURE", "0")))\n')
   return path
+}
+function writeLauncher(path, code) {
+  write(join(path, 'program/platform/fixture.py'), code)
+  write(join(path, 'program/platform/dsh-platform'), '#!/bin/sh\nunset PYTHONHOME\nexec /usr/bin/python3 "$(dirname "$0")/fixture.py" "$@"\n', true)
 }
 function manifest(path, image) {
   write(join(path, 'manifest.json'), JSON.stringify({
@@ -35,26 +45,29 @@ function manifest(path, image) {
 const options = (path, prefix) => ({ bundleRoot: path, prefix, dataRoot: prefix + '-data', skipImage: false,
   skipPrepare: false, allowFixtureData: false, strictPaths: false, start: false, dryRun: false, json: false, port: 18120 })
 
-test('安装环境不依赖解包目录，特殊路径按原值进入 shell，Git 失败时使用已探测系统客户端', () => {
+test('安装环境不依赖解包目录，特殊路径按原值进入 shell，Git 失败时明确拒绝', () => {
   const path = bundle('runtime-bundle')
   const prefix = join(root, "program space ' $(touch SHOULD_NOT_EXIST)")
   const data = join(root, "data ' $HOME `touch ALSO_NOT_EXIST`")
   write(join(path, 'offline/git/git'), '#!/bin/sh\nexit 9\n', true)
+  assert.throws(() => installRuntime(path, prefix + '-failed', data), /缺少可执行的 Git/)
+  write(join(path, 'offline/git/git'), '#!/bin/sh\necho git-version-bundled\n', true)
+  copyTree(join(path, 'program'), prefix)
   const installed = installRuntime(path, prefix, data)
   assert.notEqual(installed.versions.git, 'unknown')
-  assert.ok(!installed.git.startsWith(prefix))
+  assert.ok(installed.git.startsWith(prefix))
   renameSync(path, path + '-moved')
   const result = spawnSync('/bin/sh', ['-c', '. "$1/bin/hep-env.sh"; "$HEP_NODE" -p "JSON.stringify([process.env.HARNESS_PROGRAM_ROOT, process.env.HARNESS_ASSET_ROOT])"; git --version; "$HEP_PYTHON" -c "import hep_install_probe; print(hep_install_probe.VALUE)"', 'sh', prefix], { cwd: root, encoding: 'utf8' })
   assert.equal(result.status, 0, result.stderr)
   assert.deepEqual(JSON.parse(result.stdout.split('\n')[0]), [prefix, data])
-  assert.match(result.stdout, /git version/)
+  assert.match(result.stdout, /git-version-bundled/)
   assert.match(result.stdout, /42/)
   assert.ok(!existsSync(join(root, 'SHOULD_NOT_EXIST')) && !existsSync(join(root, 'ALSO_NOT_EXIST')))
 })
 
 test('安装 prepare 使用同一环境；失败清理后可以原命令重试', () => {
   const path = bundle('retry-bundle'), prefix = join(root, 'retry-program')
-  write(join(path, 'program/platform/dsh-platform'), 'import hep_install_probe, os, sys\nassert hep_install_probe.VALUE == 42\nsys.exit(int(os.environ.get("HEP_TEST_PREPARE_FAILURE", "0")))\n')
+  writeLauncher(path, 'import hep_install_probe, os, sys\nassert hep_install_probe.VALUE == 42\nsys.exit(int(os.environ.get("HEP_TEST_PREPARE_FAILURE", "0")))\n')
   manifest(path)
   process.env.HEP_TEST_PREPARE_FAILURE = '3'
   try { assert.throws(() => install(options(path, prefix)), /prepare 失败/) }
@@ -65,7 +78,7 @@ test('安装 prepare 使用同一环境；失败清理后可以原命令重试',
 
 test('安装后启动沿用目标主机与平台端口', () => {
   const path = bundle('start-bundle'), prefix = join(root, 'start-program'), output = join(root, 'start-arguments.json')
-  write(join(path, 'program/platform/dsh-platform'), 'import json, os, sys\nif sys.argv[1] == "start":\n    open(os.environ["HEP_TEST_START_FILE"], "w").write(json.dumps(sys.argv[2:]))\n')
+  writeLauncher(path, 'import json, os, sys\nif sys.argv[1] == "start":\n    open(os.environ["HEP_TEST_START_FILE"], "w").write(json.dumps(sys.argv[2:]))\n')
   manifest(path)
   process.env.HEP_TEST_START_FILE = output
   try { install({ ...options(path, prefix), host: '127.0.0.1', port: 18121, start: true }) }
@@ -75,6 +88,7 @@ test('安装后启动沿用目标主机与平台端口', () => {
 
 test('包内 Git 可用时优先使用，包内和系统均不可用时明确失败', () => {
   const path = bundle('git-bundle')
+  copyTree(join(path, 'program'), join(root, 'git-program'))
   assert.equal(installRuntime(path, join(root, 'git-program'), join(root, 'git-data')).versions.git, 'git-version-bundled')
   write(join(path, 'offline/git/git'), '#!/bin/sh\nexit 9\n', true)
   const previous = process.env.PATH
@@ -82,7 +96,7 @@ test('包内 Git 可用时优先使用，包内和系统均不可用时明确失
   write(join(system, 'python3'), '#!/bin/sh\necho Python\n', true)
   write(join(system, 'git'), '#!/bin/sh\nexit 8\n', true)
   process.env.PATH = system
-  try { assert.throws(() => installRuntime(path, join(root, 'no-git-program'), join(root, 'no-git-data')), /没有可执行的 Git/) }
+  try { assert.throws(() => installRuntime(path, join(root, 'no-git-program'), join(root, 'no-git-data')), /缺少可执行的 Git/) }
   finally { process.env.PATH = previous }
 })
 

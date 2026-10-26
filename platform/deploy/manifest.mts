@@ -52,6 +52,8 @@ export interface Manifest {
     home: string
     programRoot: string
     dataRoot?: string
+    programOrigin?: string
+    dataOrigin?: string
   }
   files: FileEntry[]
   runtime: Record<string, RuntimeEntry>
@@ -125,6 +127,7 @@ export function verifyEntries(root: string, expected: FileEntry[], ignoreExtra: 
     if (!found) { problems.push(`缺少文件：${path}`); continue }
     if (found.type !== entry.type) problems.push(`类型不符：${path}`)
     else if (entry.type === 'file' && found.sha256 !== entry.sha256) problems.push(`摘要不符：${path}`)
+    else if (entry.type === 'file' && entry.mode !== undefined && found.mode !== entry.mode) problems.push(`权限不符：${path}`)
     else if (entry.type === 'symlink' && found.target !== entry.target) problems.push(`链接目标不符：${path}`)
   }
   const ignored = new Set(ignoreExtra)

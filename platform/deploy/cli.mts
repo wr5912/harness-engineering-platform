@@ -6,6 +6,7 @@ import { pack } from './pack.mts'
 import { install } from './install.mts'
 import { verifyDeployment } from './verify.mts'
 import type { Arch } from './manifest.mts'
+import { defaultAssetRoot } from '../plugin/src/workspace.ts'
 
 const REPO = resolve(fileURLToPath(new URL('../..', import.meta.url)))
 
@@ -76,7 +77,7 @@ function usage(): string {
   dsh-deploy pack [选项]
     --out <目录>                 输出目录，默认 ./dist
     --program-root <目录>        程序仓库根，默认当前仓库
-    --data-root <目录>           完整数据根快照；默认不包含
+    --data-root <目录>           完整数据根，默认当前关联工作区
     --assets-dir <目录>          离线资源目录（node/pnpm/git/dsh/program 依赖）
     --image-archive <tar>        预构建镜像归档；与 --image-tag 二选一
     --image-tag <tag>            从本机 Docker 导出镜像
@@ -84,14 +85,14 @@ function usage(): string {
     --image-fingerprint <值>     期望构建指纹
     --arch amd64|arm64           包架构，默认当前主机
     --no-image / --no-data       不包含镜像或数据根
-    --allow-dirty                允许未提交工作树
+    --allow-dirty                工作树有改动时仍打包 HEAD 快照（不包含未提交改动）
     --allow-fixture-data         允许夹具数据根（仅测试；真实部署默认拒绝）
     --keep-staging               保留暂存目录
 
   dsh-deploy verify [选项]
     --prefix <目录>              程序安装目录
     --data-root <目录>           数据根
-    --url <地址>                 可选：检查登录页 HTTP
+    --url <地址>                 可选：核对受管进程与登录后的工作区清单
 
   dsh-deploy install [选项]
     --bundle-root <目录>         解包后的安装包根目录（install.sh 会传入）
@@ -105,7 +106,7 @@ function usage(): string {
     --skip-prepare               不执行 prepare（仅用于诊断/分步安装）
     --strict-paths               路径映射后仍有旧路径时失败
     --allow-fixture-data         允许夹具数据根（仅测试；真实部署默认拒绝）
-    --start                      安装完成后前台启动平台
+    --start                      安装完成后后台启动平台，等待就绪后返回
 
 安装包必须在相同架构主机上生成和使用；AMD64 与 ARM64 不混用。`
 }
@@ -119,14 +120,14 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       const result = pack({
         programRoot: resolve(text(options, 'program-root', REPO) as string),
         out: resolve(text(options, 'out', join(REPO, 'dist')) as string),
-        dataRoot: text(options, 'data-root'),
+        dataRoot: text(options, 'data-root', defaultAssetRoot()),
         assetsDir: text(options, 'assets-dir'),
         imageArchive: text(options, 'image-archive'),
         imageTag: text(options, 'image-tag'),
         imageId: text(options, 'image-id'),
         imageFingerprint: text(options, 'image-fingerprint'),
         includeImage: !flag(options, 'no-image'),
-        includeData: Boolean(text(options, 'data-root')) && !flag(options, 'no-data'),
+        includeData: !flag(options, 'no-data'),
         allowDirty: flag(options, 'allow-dirty'),
         allowFixtureData: flag(options, 'allow-fixture-data'),
         keepStaging: flag(options, 'keep-staging'),
@@ -141,6 +142,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       const report = await verifyDeployment({ prefix, dataRoot, url: text(options, 'url') })
       if (flag(options, 'json')) console.log(JSON.stringify(report, null, 2))
       else for (const check of report.checks) console.log(`${check.status === 'ok' ? 'OK' : 'FAIL'} ${check.id}: ${check.detail}`)
+      if (!flag(options, 'json') && !report.onlineVerified) console.log('未完成在线工作区核验；请指定实际平台 --url')
       return report.ok ? 0 : 1
     }
     if (command === 'install') {

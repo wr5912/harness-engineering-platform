@@ -46,8 +46,14 @@ cd harness-engineering-platform
 # 只预览来源、HOME、插件路径和监听参数
 ./platform/dsh-platform start --dry-run
 
-# 前台启动，默认监听本机局域网 IPv4 的 18120 端口
+# 后台启动；优先使用数据工作区已保存的管理地址，缺省端口 18120
 ./platform/dsh-platform start
+./platform/dsh-platform status
+./platform/dsh-platform restart
+./platform/dsh-platform stop
+
+# 开发调试时前台运行
+./platform/dsh-platform start --foreground
 
 # 指定地址或端口；仅本机使用可设置 --host 127.0.0.1
 ./platform/dsh-platform start --host 192.168.1.10 --port 3091
@@ -61,7 +67,7 @@ cd harness-engineering-platform
 
 首页的构建、评测和改进优化都直接描述任务，无需预先选择智能体、版本或运行记录。助手先查询已有资产和证据，必要时集中澄清，再确认执行范围。“体验示例”会核对当前工作区已有的巡检工具与业务测试，使用基础 Mock 台账；缺少样例或服务时说明具体条件。任务执行、验证范围和外部预算限制见[任务交付与验收](./docs/platform-design/17_任务型智能体交付与验收.md)。
 
-平台使用数据根 `.local/platform-home/` 保存 Session、设置及凭据（`.local/` 不提交 Git，克隆后需从本地备份恢复或按部署说明准备），再次 `prepare` 和重启会保留用户设置。使用 `Ctrl+C` 停止，再次 `start` 复用同一 HOME；“退出登录”撤销当前会话。版本兼容、认证和装载的完整合同见[当前平台接入合同](./docs/platform-design/02_系统架构与部署设计.md#当前最小平台接入合同)。
+平台使用数据根 `.local/platform-home/` 保存 Session、设置及凭据（`.local/` 不提交 Git，克隆后需从本地备份恢复或按部署说明准备），再次 `prepare` 和重启会保留用户设置。使用 `stop` 停止，`restart` 重启；前台模式也可用 `Ctrl+C` 停止，再次 `start` 复用同一 HOME；“退出登录”撤销当前会话。版本兼容、认证和装载的完整合同见[当前平台接入合同](./docs/platform-design/02_系统架构与部署设计.md#当前最小平台接入合同)。
 
 业务实例还需要 Docker、标准 DSH Runtime 镜像及所选来源声明的运行环境。将示例中的 `<experiment-id>` 替换为已有 Experiment ID，先预览来源，再按需启动或评测：
 

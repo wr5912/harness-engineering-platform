@@ -11,11 +11,9 @@ if [ -n "$TARBALL" ]; then
   NODE=$(find "$TMP" -maxdepth 3 -type f -path '*/bin/node' | sort | head -n 1)
 elif [ -x "$ROOT/offline/node/bin/node" ]; then
   NODE="$ROOT/offline/node/bin/node"
-else
-  NODE=$(command -v node 2>/dev/null || true)
 fi
 if [ -z "$NODE" ]; then
-  echo "install: 安装包没有 Node 运行时，系统 PATH 中也没有 node" >&2
+  echo "install: 安装包没有可用的 Node 运行时，请重新打包" >&2
   exit 4
 fi
 VERSION=$("$NODE" -p "process.versions.node")

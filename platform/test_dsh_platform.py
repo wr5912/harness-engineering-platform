@@ -34,6 +34,7 @@ class PlatformLauncherTests(unittest.TestCase):
         self.plugin = self.repo / "platform" / "plugin"
         self.plugin.mkdir(parents=True)
         shutil.copytree(PLATFORM / "plugin/assets", self.plugin / "assets")
+        shutil.copytree(PLATFORM / "plugin/src", self.plugin / "src")
         self.web = self.repo / "runtime" / "adapters" / "dsh-web"
         self.web.mkdir(parents=True)
         adapter = self.repo / "runtime/adapters/dsh-container"
@@ -57,7 +58,7 @@ class PlatformLauncherTests(unittest.TestCase):
         (self.plugin / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n")
         self.bin = self.root / "bin"
         self.bin.mkdir()
-        for command in ("node", "git"):
+        for command in ("node", "git", "dirname"):
             (self.bin / command).symlink_to(shutil.which(command))
         self.write_executable("ip", 'import os\nprint(os.environ.get("FAKE_ROUTE", \'[{"prefsrc":"127.0.0.1"}]\'))\n')
         self.trace = self.root / "dsh-trace.jsonl"
@@ -104,6 +105,7 @@ if sys.argv[1:] == ["run", "build"]:
     (web / "platform-webserver.mjs").write_text("export default class WebServer {}\n")
 ''')
         self.env = {**os.environ, "PATH": str(self.bin), "HOME": str(self.root / "user"),
+                    "HARNESS_PYTHON": sys.executable,
                     "XDG_STATE_HOME": str(self.root / "state"), "HARNESS_ASSET_ROOT": str(self.assets),
                     "DSH_HOME": str(self.root / "unrelated-dsh-home"),
                     "FAKE_DSH_TRACE": str(self.trace), "FAKE_PNPM_TRACE": str(self.pnpm_trace)}
@@ -111,7 +113,7 @@ if sys.argv[1:] == ["run", "build"]:
         self.profile = self.home / "profiles" / "harness-platform"
         self.cwd = self.root / "unrelated-cwd"
         self.cwd.mkdir()
-        self.launcher = self.repo / "platform" / "dsh-platform"
+        self.launcher = self.repo / "platform" / "dsh-platform-internal.py"
 
     def tearDown(self):
         self.temp.cleanup()
@@ -280,7 +282,7 @@ if sys.argv[1:] == ["run", "build"]:
         recovered = self.root / "recovered data"
         shutil.copytree(self.repo, replacement, symlinks=True)
         shutil.copytree(self.assets, recovered, symlinks=True)
-        self.launcher = replacement / "platform/dsh-platform"
+        self.launcher = replacement / "platform/dsh-platform-internal.py"
         self.env["HARNESS_ASSET_ROOT"] = str(recovered)
         recovered_profile = recovered / ".local/platform-home/profiles/harness-platform"
         self.prepare()
