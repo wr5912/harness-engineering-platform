@@ -2594,7 +2594,11 @@ class BindHomeMigrationTests(unittest.TestCase):
                 "evaluation_patch": "/opt/dsh-adapter/evaluation-registry.patch.yml", "required_env_names": [],
                 "image": {"local_image_tag": IMAGE_TAG},
             }
-            target = dev.write_instance("probe", mode="verification", contract=contract, port=3081)
+            with mock.patch.object(os, "geteuid", return_value=0), mock.patch.object(os, "chown") as chown:
+                target = dev.write_instance("probe", mode="verification", contract=contract, port=3081)
+            home = target / "dsh-home"
+            self.assertEqual(chown.call_args_list, [mock.call(home / relative, 1000, 1000)
+                                                   for relative in ("", "profiles", "profiles/web")])
             manifest = json.loads((target / "instance.json").read_text())
             directory = Path(manifest["home_directory"])
             # 子卷挂载之前父目录必须已由调用用户创建，避免 Docker 以 root 创建它。
