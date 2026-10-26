@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { prepareBusinessRuntimeFile } from './secret-file.ts'
 import { dirname, join } from 'node:path'
 import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
 import { BusinessControlError, getBusinessControl } from './core.ts'
@@ -210,6 +211,7 @@ export function createBusinessControlHandler(assetRoot: string): ConnectionRpcHa
         for (const key of ['inputMarkers', 'operationMarkers', 'reportMarkers'] as const) if (detection[key] !== undefined) config.detection[key] = stringList(detection[key], '检测标记')
       }
       writeFileSync(temporary, JSON.stringify(config, null, 2) + '\n', { mode: 0o600, flag: 'wx' })
+      prepareBusinessRuntimeFile(temporary)
       renameSync(temporary, path)
       control.configurationChanged()
     } finally { closeSync(descriptor); rmSync(lock); rmSync(temporary, { force: true }) }

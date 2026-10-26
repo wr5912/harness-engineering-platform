@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { prepareBusinessRuntimeFile } from '../plugin/src/business-control/secret-file.ts'
 
 export interface PathMapping {
   from: string
@@ -96,5 +97,6 @@ export function rewriteDeploymentAddress(dataRoot: string, host: string, port: n
     gateway.managementUrl = management.href
   }
   writeFileSync(file, `${JSON.stringify(access, null, 2)}\n`, { mode: 0o600 })
+  prepareBusinessRuntimeFile(file)
   return true
 }

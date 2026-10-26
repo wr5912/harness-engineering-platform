@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, openSync, closeSync, unlinkSync, rmSync, statSync } from 'node:fs'
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, openSync, closeSync, unlinkSync, rmSync, statSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -39,8 +40,30 @@ test('MCP 保存共用数据仓库版本，凭据只进本地文件，旧版本�
   assert.ok(!readFileSync(publicFile, 'utf8').includes('fixture-private'))
   assert.ok(readFileSync(secretFile, 'utf8').includes('fixture-private'))
   assert.equal(statSync(secretFile).mode & 0o777, 0o600)
+  assert.equal(statSync(secretFile).uid, process.geteuid?.() === 0 ? 1000 : process.getuid())
   assert.throws(() => store.mutate([{ op: 'set', path: ['groups'], value: [] }], original.revision), /已变化/)
   assert.equal(store.view().value.groups.length, 1)
+})
+
+test('root 初始化保留其他凭据私有，业务 UID 可在保存前后读取 MCP 凭据', { skip: process.geteuid?.() !== 0 }, t => {
+  const { root, secretFile } = fixture(t)
+  chmodSync(root, 0o755)
+  for (const directory of [join(root, '.local'), join(root, '.local/credentials')]) chmodSync(directory, 0o700)
+  const admin = join(root, '.local/credentials/admin.json')
+  writeFileSync(admin, '{}', { mode: 0o600 })
+  const store = new McpConfigStore(root, () => {})
+  function check() {
+    const result = spawnSync('/bin/cat', [secretFile], { uid: 1000, gid: 1000 })
+    assert.equal(result.status, 0, result.error?.message || result.stderr?.toString())
+    assert.equal(statSync(secretFile).mode & 0o777, 0o600)
+    assert.equal(statSync(secretFile).uid, 1000)
+    assert.equal(statSync(admin).mode & 0o777, 0o600)
+    assert.equal(statSync(admin).uid, 0)
+    assert.equal(statSync(join(root, '.local')).mode & 0o777, 0o711)
+  }
+  check()
+  store.mutate([{ op: 'set', path: ['sharedToken'], value: 'b'.repeat(64) }], store.view().revision)
+  check()
 })
 
 test('MCP 保存锁阻止并行写；未知字段与地址凭据不能进入公开配置', t => {

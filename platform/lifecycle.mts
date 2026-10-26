@@ -7,13 +7,15 @@ import { isIP } from 'node:net'
 import { setTimeout as delay } from 'node:timers/promises'
 import { defaultAssetRoot } from './plugin/src/workspace.ts'
 import { platformEntryUrl } from './plugin/src/business-control/group-link.ts'
+import { prepareBusinessRuntimeFile } from './plugin/src/business-control/secret-file.ts'
 
 const programRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 type State = { pid: number; birth: string; programRoot: string; dataRoot: string; url: string; host: string; port: number; log: string; phase: string; detached: boolean }
 const json = (path: string) => JSON.parse(readFileSync(path, 'utf8'))
-function atomic(path: string, value: unknown) {
+function atomic(path: string, value: unknown, business = false) {
   const temporary = `${path}.${process.pid}.tmp`
   writeFileSync(temporary, JSON.stringify(value, null, 2) + '\n', { mode: 0o600 })
+  if (business) prepareBusinessRuntimeFile(temporary)
   renameSync(temporary, path)
 }
 
@@ -172,7 +174,7 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
       const access = before ? JSON.parse(before) : { schemaVersion: 1, enabled: false, agents: [] }
       access.gateway ??= {}
       access.gateway.managementUrl = address!.url
-      atomic(accessPath, access)
+      atomic(accessPath, access, true)
       saved = readFileSync(accessPath, 'utf8')
     }
     const log = join(service, 'platform.log')

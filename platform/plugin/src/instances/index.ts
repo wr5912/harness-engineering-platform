@@ -1,5 +1,6 @@
 import { instanceStateRoot, programRoot, workspaceConfigPath, workspaceOwnsInstance } from '../workspace.ts'
 import { businessGatewayEntry } from '../business-control/entry.ts'
+import { prepareBusinessRuntimeFile } from '../business-control/secret-file.ts'
 import { execFile as execFileCallback } from 'node:child_process'
 import { createHmac, randomBytes } from 'node:crypto'
 import { mkdtemp, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
@@ -152,6 +153,7 @@ async function updateGatewayRegistration(assetRoot: string, input: { agentId: st
     if (JSON.stringify(instances) === JSON.stringify(next)) return
     access.gateway.instances = next
     await writeFile(temporary, JSON.stringify(access, null, 2) + '\n', { mode: 0o600, flag: 'wx' })
+    prepareBusinessRuntimeFile(temporary)
     await rename(temporary, path)
   } finally { await handle.close(); await rm(lock, { force: true }); await rm(temporary, { force: true }) }
 }

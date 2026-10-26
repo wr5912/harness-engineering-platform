@@ -13,8 +13,10 @@ export function copyDataDependencies(root: string, assets: string): void {
     for (const name of readdirSync(managed)) {
       const manifest = join(managed, name, 'package.json')
       if (!existsSync(manifest)) continue
-      const dependencies = Object.keys(JSON.parse(readFileSync(manifest, 'utf8')).dependencies || {})
-      if (!dependencies.length) continue
+      const pkg = JSON.parse(readFileSync(manifest, 'utf8'))
+      const dependencies = new Set([...Object.keys(pkg.dependencies || {}),
+        ...Object.keys(pkg.peerDependencies || {}).filter(name => !pkg.peerDependenciesMeta?.[name]?.optional)])
+      if (!dependencies.size) continue
       const relative = join(candidate, 'managed', name, 'node_modules')
       const prepared = join(assets, 'data', relative)
       for (const dependency of dependencies) {

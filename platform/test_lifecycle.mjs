@@ -56,7 +56,7 @@ test('浏览器选择其他数据根后迁移受管进程记录和安装默认�
 test('统一入口后台启停、重复启动、重启、只读预检与端口冲突', async () => {
   const root = mkdtempSync(join(tmpdir(), 'hep-lifecycle-'))
   const repo = join(root, 'program with spaces'), data = join(root, 'data')
-  for (const file of ['platform/dsh-platform', 'platform/tool-env.sh', 'platform/lifecycle.mts', 'platform/plugin/src/workspace.ts', 'platform/plugin/src/business-control/group-link.ts']) {
+  for (const file of ['platform/dsh-platform', 'platform/tool-env.sh', 'platform/lifecycle.mts', 'platform/plugin/src/workspace.ts', 'platform/plugin/src/business-control/group-link.ts', 'platform/plugin/src/business-control/secret-file.ts']) {
     const target = join(repo, file)
     mkdirSync(dirname(target), { recursive: true })
     copyFileSync(new URL('../' + file, import.meta.url), target)

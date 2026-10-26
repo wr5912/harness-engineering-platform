@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { closeSync, existsSync, fchmodSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, closeSync, existsSync, fchmodSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { prepareBusinessRuntimeFile } from '../business-control/secret-file.ts'
 
 type Document = { schemaVersion: 1; servers: any[]; groups: any[] }
 type Secrets = { schemaVersion: 1; sharedToken: string; servers: Record<string, {
@@ -114,13 +115,14 @@ function split(value: McpConfiguration): { document: Document; secrets: Secrets 
     secrets: { schemaVersion: 1, sharedToken: value.sharedToken, servers: privateServers } }
 }
 
-function atomicReplace(path: string, content: string, mode: number): void {
+function atomicReplace(path: string, content: string, mode: number, business = false): void {
   mkdirSync(dirname(path), { recursive: true })
   const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`
   const file = openSync(temporary, 'wx', mode)
   try {
     try { writeFileSync(file, content); fchmodSync(file, mode); fsyncSync(file) }
     finally { closeSync(file) }
+    if (business) prepareBusinessRuntimeFile(temporary)
     renameSync(temporary, path)
   }
   finally { if (existsSync(temporary)) unlinkSync(temporary) }
@@ -137,6 +139,13 @@ export class McpConfigStore {
     this.secretFile = join(assetRoot, '.local', 'credentials', 'mcp-manager.json')
     this.lockFile = join(assetRoot, '.local', 'credentials', 'mcp-manager.lock')
     this.validate = validate
+    if (process.geteuid?.() === 0 && existsSync(this.secretFile)) {
+      // 容器只需穿过目录读取指定凭据；不开放目录列表或其他私有文件。
+      for (const directory of [join(assetRoot, '.local'), dirname(this.secretFile)]) {
+        chmodSync(directory, (statSync(directory).mode & 0o777) | 0o111)
+      }
+      prepareBusinessRuntimeFile(this.secretFile)
+    }
   }
   private readView(publicData = readJson(this.publicFile), privateData = readJson(this.secretFile)): McpConfigurationView {
     checkDocument(publicData.value, privateData.value)
@@ -199,9 +208,9 @@ export class McpConfigStore {
     const privateRaw = JSON.stringify(secrets, null, 2) + '\n'
     const previousSecret = readFileSync(this.secretFile, 'utf8')
     const publicMode = statSync(this.publicFile).mode & 0o777
-    atomicReplace(this.secretFile, privateRaw, 0o600)
+    atomicReplace(this.secretFile, privateRaw, 0o600, true)
     try { atomicReplace(this.publicFile, publicRaw, publicMode) }
-    catch (error) { atomicReplace(this.secretFile, previousSecret, 0o600); throw error }
+    catch (error) { atomicReplace(this.secretFile, previousSecret, 0o600, true); throw error }
     return this.readView()
   }
 }
