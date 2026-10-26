@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { copyTree, safeRelative } from './fsutil.mts'
+import { copyTree, run, safeRelative } from './fsutil.mts'
 
 /** 依赖来自目标架构资源；不把开发机的原生模块混进跨架构包。 */
 export function copyDataDependencies(root: string, assets: string): void {
@@ -21,6 +21,7 @@ export function copyDataDependencies(root: string, assets: string): void {
         if (!existsSync(join(prepared, safeRelative(dependency)))) throw new Error(`离线资源缺少业务插件依赖：${join(prepared, dependency)}`)
       }
       copyTree(prepared, join(root, relative))
+      run('chmod', ['-R', 'a+rX', join(root, relative)])
     }
   }
 }
