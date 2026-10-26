@@ -1,0 +1,63 @@
+{
+  "checkedAt": "2026-10-26T02:17:16.651Z",
+  "instance": "security-operations-expert-acceptance",
+  "entryPath": "/agents/security-operations-expert/instances/security-operations-expert-acceptance/",
+  "sessionId": "session-f3b033cd-a9cc-4ef3-af9e-8aeaf3a16e74",
+  "summary": "已启动威胁研判子智能体 · 研判威胁事件 INC-20261026-000022",
+  "checks": {
+    "defaultCollapsed": true,
+    "taskVisible": true,
+    "internalIdHiddenInSummary": true,
+    "technicalReceiptPreserved": true,
+    "inspectOpenAndClose": true,
+    "mobile": {
+      "width": 390,
+      "scrollWidth": 390
+    }
+  },
+  "pageErrors": [],
+  "limits": [
+    "使用已有真实委派记录验证工具步骤；历史聊天正文保留原文。",
+    "本次没有重新发起威胁研判或调用外部 MCP；新聊天回执转换由当前 Runtime 内的回归测试验证。",
+    "故障分析与响应规划的展示通过组件测试，未重新发起业务任务。"
+  ],
+  "source": {
+    "programBaseCommit": "d66c81a4f5ac5f5d4aecbd283617e5f1e2fbebcb",
+    "candidateCommit": "a34d1a65ae3e5c4b123b03df0bbafbe74487ee36",
+    "candidate": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/candidate"
+  },
+  "runtime": {
+    "image": "sha256:a67f382fbf6c81bf472dc71cfbf9b39f16444069ad7d506171dff7e51ab05d00",
+    "startedAt": "2026-10-26T02:05:27.082407294Z",
+    "running": true,
+    "loading": "当前 Candidate 只读卷映射；保留已有会话重启进程，Runtime 镜像不变。"
+  },
+  "verification": [
+    {
+      "command": "npm run build",
+      "result": "passed",
+      "coverage": "TypeScript 检查、共享回执模块及浏览器构建产物"
+    },
+    {
+      "command": "npm test",
+      "result": "passed",
+      "coverage": "三类委派的准备、启动、失败、未知回执与详情；既有概览、快捷入口、员工编辑和三种应用前缀"
+    },
+    {
+      "command": "node --test tests/delegation-presentation.test.mjs tests/threat-analysis-automation.test.mjs",
+      "environment": "当前标准 Runtime 容器",
+      "passed": 13,
+      "failed": 0
+    }
+  ],
+  "artifacts": [
+    "desktop.png",
+    "mobile.png"
+  ],
+  "assetSha256": {
+    "dsh/managed/security-operations-ui/client.js": "d3751dc8d6c24c343f06b64786a9c1cda32e14fc8f59db1527af3547cb99ae73",
+    "dsh/managed/security-operations-ui/delegation.js": "c94030cb5dce33e410fcab8ab8c6406f2dfac758f1f2b19d2e2c9331d56759fe",
+    "dsh/managed/security-operations-ui/index.js": "9ea4a8edb66b93502486f51c9cd600536abd0f8f24c3d343f2de7843654aa63d",
+    "dsh/managed/threat-analysis.mjs": "9ad04eadbadaf1dfbc67e220686ec9f0562e2475f779a404e275efd471cedb26"
+  }
+}
