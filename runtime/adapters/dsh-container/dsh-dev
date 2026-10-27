@@ -416,11 +416,7 @@ def model_policy_patch(policy: dict, local_routes: list[dict] | None = None, *, 
 
 def source_local_model_routes(contract: dict) -> list[dict]:
     """从同一 Candidate 声明读取固定本地适配器，不写入平台外部模型目录。"""
-    completed = subprocess.run([NODE_EXECUTABLE, str(ADAPTER / "business.ts"), "--capabilities", contract["managed"]],
-                               capture_output=True, text=True, check=False, timeout=30)
-    if completed.returncode != 0:
-        fail("业务来源的本地模型能力声明无效")
-    return json.loads(completed.stdout)["localModelRoutes"]
+    return business_command(["--capabilities", contract["managed"]])["localModelRoutes"]
 
 
 def model_policy_summary(policy: dict) -> dict:
@@ -1563,15 +1559,20 @@ def build_plan(args: argparse.Namespace, contract: dict) -> dict:
     return plan
 
 
-def business_helper(config_file: str, payload: dict) -> dict:
+def business_command(arguments: list[str], payload: dict | None = None) -> dict:
     """仅桥接 TypeScript 实现；输出不包含密钥原值。"""
-    completed = subprocess.run([NODE_EXECUTABLE, str(ADAPTER / "business.ts"), str(Path(config_file).resolve())],
-                               input=json.dumps(payload), text=True, capture_output=True, check=False, timeout=30)
+    completed = subprocess.run([NODE_EXECUTABLE, str(ADAPTER / "business.ts"), *arguments],
+                               input=json.dumps(payload) if payload is not None else None,
+                               text=True, capture_output=True, check=False, timeout=30)
     if completed.returncode != 0:
         prefix = "BUSINESS_STARTUP_ERROR:"
         reasons = [line[len(prefix):] for line in completed.stderr.splitlines() if line.startswith(prefix)]
         fail(reasons[-1] if reasons else "业务启动接缝校验失败；请核对网关配置、业务插件和来源文件")
     return json.loads(completed.stdout)
+
+
+def business_helper(config_file: str, payload: dict) -> dict:
+    return business_command([str(Path(config_file).resolve())], payload)
 
 
 def render_business_instance(contract: dict, name: str, port: int, compose: str) -> dict:
@@ -1982,8 +1983,7 @@ def command_url(args: argparse.Namespace) -> None:
     require_docker_registration(args.name, manifest)
     if manifest.get("business_control"):
         running_container(args.name)
-        result = run(["node", str(ADAPTER / "business.ts"), "--entry", str(REPO), manifest["agent_id"], args.name])
-        entry = json.loads(result.stdout)
+        entry = business_command(["--entry", str(REPO), manifest["agent_id"], args.name])
         url = entry["url"]
         anonymous = entry.get("accessMode") == "anonymous"
         try:

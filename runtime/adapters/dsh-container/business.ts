@@ -218,8 +218,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       '业务 Compose 缺少受控 dsh 网络入口', '业务 Runtime 必须关闭免认证并保留明确监听配置',
       '业务启动配置的 assetRoot 必须是已存在的规范化绝对路径',
       '业务启动配置的 sharedSecretFile 必须是已存在的规范化绝对路径',
+      '实例未向业务网关开放', '业务网关公开来源无效', '业务实例名称无效', '业务实例归属不匹配',
+      '实例没有已核对的业务接入登记', '业务实例来源与网关登记不一致', '业务实例接入地址无效',
+      '业务 Runtime 必须使用本机或私网地址', '业务实例 Web 基址与实例入口不一致',
     ])
-    const reason = error instanceof Error && known.has(error.message) ? error.message : '业务启动配置或来源文件解析失败'
+    const reason = error instanceof Error && known.has(error.message) ? error.message
+      : process.argv[2] === '--entry' ? '业务网页入口配置或实例登记读取失败，请核对当前数据工作区与网关登记'
+        : '业务启动配置或来源文件解析失败'
     console.error(`BUSINESS_STARTUP_ERROR:${reason}`)
     process.exitCode = 1
   }

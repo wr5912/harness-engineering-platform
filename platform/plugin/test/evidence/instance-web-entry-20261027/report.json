@@ -1,0 +1,67 @@
+{
+  "checkedAt": "2026-10-27T07:02:26.269Z",
+  "assetRoot": "/home/cmp/harness-engineering-platform-data",
+  "instance": "test-zhouyang",
+  "platformEntry": "http://172.16.138.228:18120/hep/#/instances",
+  "gatewayEntry": "http://172.16.138.228:53105/agents/security-operations-expert/instances/test-zhouyang/",
+  "clickedOpenWeb": true,
+  "noLoginRequired": true,
+  "composerReady": true,
+  "model": "DeepSeek-V4.1-Flash",
+  "historySessionOpened": "session-43287d0f-2516-4e05-9107-f04b9f147aee",
+  "sessionsBeforeRecovery": 4,
+  "allOriginalSessionsPreserved": true,
+  "scheduleVisible": "schedule-486c3864-d22a-4333-af57-a6bff45959f1",
+  "chat": {
+    "sessionId": "session-31fe4167-fb41-4990-a04d-c3db9945097a",
+    "turn": {
+      "turn": 1,
+      "seq": 4,
+      "prompt": "请仅回复：连接正常。不要调用工具。",
+      "response": "连接正常。"
+    }
+  },
+  "pageErrors": [],
+  "platformRestarted": false,
+  "instanceRecreated": true,
+  "standardImageRebuilt": false,
+  "tests": {
+    "test_dsh_dev": 146,
+    "test_source_contract": 26,
+    "test_workspace_paths": 7,
+    "test_business_startup": 10,
+    "test_business": 14,
+    "total": 203
+  },
+  "limits": [
+    "未在本次恢复中重新执行巡检和威胁研判业务验收",
+    "浏览器验收新建了独立聊天会话，原有会话保持保留"
+  ],
+  "programRevision": "08ebbf6edc9b6b1812a45b195babfe6f95a26736",
+  "programWorktreeDirty": true,
+  "dataRevision": "fb74a99e225358675841273087841946874b294f",
+  "dataWorktreeDirty": true,
+  "platformPid": 4074385,
+  "platformStartedAt": "Mon Oct 26 20:01:56 2026",
+  "instanceStartedAt": "2026-10-27T06:55:11.181482069Z",
+  "sourceId": "experiment:EXP-security-operations-expert-025-r3f8a8b3da3f1",
+  "sourceDigest": "sha256:589a08ba99023147a30dc1d32205157754a4d6492f15e843e8db5e5400cb3d51",
+  "gatewayDigestMatchesInstance": true,
+  "runtimeGeneration": "e32355e64f9ea3488c92b272c0a1d83f",
+  "imageId": "sha256:d90185713372e65b6c49555cf2ca633a3351e7f379c9b792804d8d79c7d4211b",
+  "oldDataRootMountCount": 0,
+  "preservedSessionIds": [
+    "1267c9b1-592a-496f-b65d-7f25c42c9773",
+    "session-43287d0f-2516-4e05-9107-f04b9f147aee",
+    "session-6963ab1f-3287-4bd6-bed6-25eab995adcd",
+    "session-80945714-83e8-4016-9c4d-6e5457d42dcd"
+  ],
+  "scheduleConfigurationUnchanged": true,
+  "scheduleDeliveryCountBefore": 1,
+  "scheduleDeliveryCountAfter": 2,
+  "screenshots": [
+    "web-ready.png",
+    "chat.png",
+    "schedule.png"
+  ]
+}

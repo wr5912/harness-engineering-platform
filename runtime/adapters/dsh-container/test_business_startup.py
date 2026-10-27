@@ -104,11 +104,11 @@ class BusinessStartupTest(unittest.TestCase):
     def test_business_url_returns_only_verified_gateway_entry_without_owner_log_lookup(self):
         manifest = {"agent_id": "soc", "business_control": {"runtime_generation": "fixed"}}
         output = io.StringIO()
-        response = types.SimpleNamespace(stdout=json.dumps({"url": "http://business.localhost:53190/agents/soc/instances/business-test/", "accessMode": "authenticated"}))
+        response = {"url": "http://business.localhost:53190/agents/soc/instances/business-test/", "accessMode": "authenticated"}
         denied = urllib.error.HTTPError("http://business.localhost:53190/agents/soc/instances/business-test/", 401, "Unauthorized", {}, None)
         with mock.patch.object(dev, "load_instance", return_value=(self.state, manifest)), \
              mock.patch.object(dev, "require_docker_registration"), mock.patch.object(dev, "running_container"), \
-             mock.patch.object(dev, "run", return_value=response) as run, \
+             mock.patch.object(dev, "business_command", return_value=response) as run, \
              mock.patch.object(dev.urllib.request, "build_opener") as build_opener, contextlib.redirect_stdout(output):
             build_opener.return_value.open.side_effect = denied
             dev.command_url(types.SimpleNamespace(name="business-test", non_interactive=False))
@@ -120,13 +120,13 @@ class BusinessStartupTest(unittest.TestCase):
     def test_anonymous_business_url_requires_successful_gateway_html_entry(self):
         url = "http://business.localhost:53190/agents/soc/instances/business-test/"
         manifest = {"agent_id": "soc", "business_control": {"runtime_generation": "fixed"}}
-        command = types.SimpleNamespace(stdout=json.dumps({"url": url, "accessMode": "anonymous"}))
+        command = {"url": url, "accessMode": "anonymous"}
         html = mock.MagicMock()
         html.__enter__.return_value.status = 200
         output = io.StringIO()
         with mock.patch.object(dev, "load_instance", return_value=(self.state, manifest)), \
              mock.patch.object(dev, "require_docker_registration"), mock.patch.object(dev, "running_container"), \
-             mock.patch.object(dev, "run", return_value=command), \
+             mock.patch.object(dev, "business_command", return_value=command), \
              mock.patch.object(dev.urllib.request, "build_opener") as build_opener, contextlib.redirect_stdout(output):
             build_opener.return_value.open.return_value = html
             dev.command_url(types.SimpleNamespace(name="business-test", non_interactive=False))
@@ -138,10 +138,10 @@ class BusinessStartupTest(unittest.TestCase):
         manifest = {"agent_id": "soc", "business_control": {"runtime_generation": "fixed"}}
         output = io.StringIO()
         for mode, status in [("anonymous", 401), ("authenticated", 200)]:
-            response = types.SimpleNamespace(stdout=json.dumps({"url": url, "accessMode": mode}))
+            response = {"url": url, "accessMode": mode}
             with self.subTest(mode=mode), mock.patch.object(dev, "load_instance", return_value=(self.state, manifest)), \
                  mock.patch.object(dev, "require_docker_registration"), mock.patch.object(dev, "running_container"), \
-                 mock.patch.object(dev, "run", return_value=response), \
+                 mock.patch.object(dev, "business_command", return_value=response), \
                  mock.patch.object(dev.urllib.request, "build_opener") as build_opener, \
                  contextlib.redirect_stdout(output), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 if status == 401:
@@ -152,6 +152,22 @@ class BusinessStartupTest(unittest.TestCase):
                     build_opener.return_value.open.return_value = html
                 dev.command_url(types.SimpleNamespace(name="business-test", non_interactive=False))
         self.assertEqual(output.getvalue(), "")
+
+    def test_business_url_reports_real_entry_error_without_node_warning(self):
+        config = self.root / "config/business-access.json"
+        config.parent.mkdir()
+        config.write_text(json.dumps({"enabled": True, "gateway": {"instances": []}}))
+        manifest = {"agent_id": "soc", "business_control": {"runtime_generation": "fixed"}}
+        stderr = io.StringIO()
+        with mock.patch.object(dev, "load_instance", return_value=(self.state, manifest)), \
+             mock.patch.object(dev, "require_docker_registration"), mock.patch.object(dev, "running_container"), \
+             mock.patch.object(dev.urllib.request, "build_opener") as opener, \
+             contextlib.redirect_stderr(stderr), self.assertRaises(SystemExit):
+            dev.command_url(types.SimpleNamespace(name="business-test", non_interactive=False))
+        self.assertIn("实例未向业务网关开放", stderr.getvalue())
+        self.assertNotIn("Warning", stderr.getvalue())
+        self.assertNotIn("配置或来源文件解析失败", stderr.getvalue())
+        opener.assert_not_called()
 
     def test_business_helper_reports_safe_specific_failure_category(self):
         error = "BUSINESS_STARTUP_ERROR:业务来源 MCP manager 声明冲突或配置无效\n"

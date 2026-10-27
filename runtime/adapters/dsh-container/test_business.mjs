@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
@@ -66,6 +66,39 @@ test('业务访问配置中的相对密钥路径按当前数据根解析并用�
   assert.equal(config.assetRoot, f.config.assetRoot)
   assert.equal(config.sharedSecretFile, secret)
   assert.equal(config.coordinatorOrigin, 'http://host.docker.internal:53105')
+})
+
+test('网页入口保留登记错误并隐藏配置解析细节', t => {
+  const f = fixture(t), file = join(f.config.assetRoot, 'config/business-access.json')
+  const state = join(f.root, 'instances'), directory = join(state, f.input.name)
+  mkdirSync(directory, { recursive: true })
+  const selected = { agentId: f.input.agentId, instanceId: f.input.name, sourceDigest: f.input.sourceDigest, accessMode: 'anonymous' }
+  const basePath = `/agents/${selected.agentId}/instances/${selected.instanceId}/`
+  writeFileSync(join(directory, 'instance.json'), JSON.stringify({ asset_root: f.config.assetRoot, agent_id: selected.agentId,
+    web_base_path: basePath, business_control: { runtime_generation: 'generation-test', source_digest: f.input.sourceDigest, origin: 'http://127.0.0.1:53191' } }))
+  const run = () => spawnSync(process.execPath, [new URL('./business.ts', import.meta.url).pathname,
+    '--entry', f.config.assetRoot, selected.agentId, selected.instanceId], {
+    encoding: 'utf8', env: { ...process.env, HARNESS_INSTANCE_STATE_ROOT: state },
+  })
+  const access = { enabled: true, gateway: { publicOrigin: 'http://business.localhost:53190', instances: [selected] } }
+  writeFileSync(file, JSON.stringify(access))
+  const success = run()
+  assert.equal(success.status, 0, success.stderr)
+  assert.deepEqual(JSON.parse(success.stdout), { url: `http://business.localhost:53190${basePath}`, accessMode: 'anonymous' })
+  for (const [instances, reason] of [
+    [[], '实例未向业务网关开放'],
+    [[{ ...selected, sourceDigest: 'sha256:other' }], '业务实例来源与网关登记不一致'],
+  ]) {
+    writeFileSync(file, JSON.stringify({ ...access, gateway: { ...access.gateway, instances } }))
+    const failed = run()
+    assert.equal(failed.status, 1)
+    assert.ok(failed.stderr.includes(`BUSINESS_STARTUP_ERROR:${reason}`))
+  }
+  writeFileSync(file, '{"private-secret-value":')
+  const malformed = run()
+  assert.equal(malformed.status, 1)
+  assert.ok(malformed.stderr.includes('BUSINESS_STARTUP_ERROR:业务网页入口配置或实例登记读取失败'))
+  assert.ok(!malformed.stderr.includes('private-secret-value'))
 })
 
 test('业务渲染改独立bridge和回环映射，标准镜像及MCP配置保持，所有代码与策略只读装载', t => {
