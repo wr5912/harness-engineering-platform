@@ -1,0 +1,155 @@
+{
+  "observed_at": "2026-10-26T07:08:23.442Z",
+  "program_commit": "83bccab57098f1e7958edc3f5dd11b060e28e0f3",
+  "data_commit": "60a35ec0bdd9a279d2a60f89a9548df3a8bfde60",
+  "previous_deployment": "deployment-228-20261026.json",
+  "platform": {
+    "url": "http://172.16.138.228:18120/hep/",
+    "pid": 3361687,
+    "program_root": "/home/cmp/work/harness-engineering-platform",
+    "data_root": "/home/cmp/harness-engineering-platform-data",
+    "prepare_completed": true,
+    "restarted": true,
+    "login_verified": true
+  },
+  "management": {
+    "configuration": {
+      "ready": true,
+      "core_ready": true
+    },
+    "loaded_assets": [
+      {
+        "name": "AGENTS.md",
+        "path": "/home/cmp/harness-engineering-platform-data/AGENTS.md",
+        "sha256": "ebe59efe54db632c23f16d8de264d07f1a31a831cfc84aafcdb807d7c90434d8",
+        "matches_current_file": true
+      },
+      {
+        "name": "user-facing-output",
+        "path": "/home/cmp/harness-engineering-platform-data/.agents/skills/user-facing-output/SKILL.md",
+        "sha256": "da1f8846cbe1e3b76a7d3c9739bd82317639959315082d31cd9b5e98057f54ff",
+        "matches_current_file": true
+      },
+      {
+        "name": "workspace-management",
+        "path": "/home/cmp/harness-engineering-platform-data/.agents/skills/workspace-management/SKILL.md",
+        "sha256": "78b456984b634baf020fa596b0cb32af0e82fb4442d1e847fa08a1ca394a27bd",
+        "matches_current_file": true
+      }
+    ],
+    "changed_skill_metadata": {
+      "kev_trace_pipeline": true,
+      "user_facing_output": true
+    },
+    "data_skills_expected": 23,
+    "visible_skills": 31,
+    "missing_data_skills": [],
+    "pages": [
+      "首页",
+      "管理对话",
+      "智能体管理",
+      "评测中心",
+      "实例管理",
+      "MCP 管理",
+      "统一网关"
+    ],
+    "page_errors": []
+  },
+  "instances": [
+    {
+      "name": "security-operations-expert-acceptance",
+      "port": 18502,
+      "image_tag": "ai-agent-harness/dsh:687f282e8-amd64-cbfc10fa115b",
+      "image_id": "sha256:d90185713372e65b6c49555cf2ca633a3351e7f379c9b792804d8d79c7d4211b",
+      "source_id": "experiment:EXP-security-operations-expert-024-rad80a907c628",
+      "access_url": "http://172.16.138.228:53105/agents/security-operations-expert/instances/security-operations-expert-acceptance/",
+      "no_login": true,
+      "chat_input_visible": true,
+      "sessions": 74,
+      "session_export": {
+        "status": 200,
+        "bytes": 57949,
+        "zip": true
+      },
+      "original_sessions_preserved": 69
+    },
+    {
+      "name": "security-operations-expert-acceptance-v2",
+      "port": 18501,
+      "image_tag": "ai-agent-harness/dsh:687f282e8-amd64-cbfc10fa115b",
+      "image_id": "sha256:d90185713372e65b6c49555cf2ca633a3351e7f379c9b792804d8d79c7d4211b",
+      "source_id": "experiment:EXP-security-operations-expert-024-rad80a907c628",
+      "access_url": "http://172.16.138.228:53105/agents/security-operations-expert/instances/security-operations-expert-acceptance-v2/",
+      "no_login": true,
+      "chat_input_visible": true,
+      "sessions": 12,
+      "session_export": {
+        "status": 200,
+        "bytes": 21492,
+        "zip": true
+      },
+      "original_sessions_preserved": 10
+    },
+    {
+      "name": "security-operations-expert-biz-exp024",
+      "port": 18500,
+      "image_tag": "ai-agent-harness/dsh:687f282e8-amd64-cbfc10fa115b",
+      "image_id": "sha256:d90185713372e65b6c49555cf2ca633a3351e7f379c9b792804d8d79c7d4211b",
+      "source_id": "experiment:EXP-security-operations-expert-024-rad80a907c628",
+      "access_url": "http://172.16.138.228:53105/agents/security-operations-expert/instances/security-operations-expert-biz-exp024/",
+      "no_login": true,
+      "chat_input_visible": true,
+      "sessions": 32,
+      "session_export": {
+        "status": 200,
+        "bytes": 21979,
+        "zip": true
+      },
+      "original_sessions_preserved": 30
+    }
+  ],
+  "business_instance_restart_required": false,
+  "business_instance_restart_reason": "本次上游更新仅涉及管理助手技能及文档，业务 Candidate 和 Runtime 来源未变。",
+  "chat": {
+    "checkedAt": "2026-10-26T07:08:23.442Z",
+    "url": "http://172.16.138.228:53105/agents/security-operations-expert/instances/security-operations-expert-acceptance/",
+    "instance": "security-operations-expert-acceptance",
+    "prompt": "你好，请只回复两个字：收到。不要调用任何工具。",
+    "answer": "收到",
+    "no_login": true,
+    "pageErrors": []
+  },
+  "first_chat_probe": {
+    "session_id": "session-6b72dc95-a898-46a8-95db-55ea469018af",
+    "expected": "部署验证通过",
+    "assertion": "fixed_reply_timeout_90000ms",
+    "observed": "模型完成回复，因未亲自执行部署而拒绝声明部署验证通过。",
+    "turn": {
+      "turn": 1,
+      "seq": 4,
+      "prompt": "你好，请只回复“部署验证通过”，不要调用任何工具。",
+      "response": "你好。我不能只回复“部署验证通过”——本轮没有执行任何部署或验证动作，直接输出该结论会构成未经执行的验证声明，这与本工作区“没有执行就不得声称已经验证”的约束冲突。 如果你需要，我可以协助： - 制定部署验证的检查项与执行计划； - 基于…"
+    },
+    "statistics": {
+      "turns": 1,
+      "steps": 1,
+      "llmMs": 12513,
+      "toolMs": 0,
+      "ttftMs": 3606,
+      "ttftSteps": 1,
+      "decodeMs": 8907,
+      "decodeTokens": 368,
+      "lastTurn": 1,
+      "openStep": null,
+      "pendingCalls": {}
+    }
+  },
+  "deployment_configuration": "保留原有实例登记、端口、访问方式及会话；本机已装载的三个实例来源摘要保留在 config/business-access.json。",
+  "limits": [
+    "技能发现、元数据与管理核心正文摘要核对仅证明装载，未执行新增 KEV 数据处理或训练。",
+    "未重新发起巡检、威胁研判或定时任务。",
+    "浏览器运行在部署主机，未使用其他物理设备访问。",
+    "本次普通聊天仅在 acceptance 实例验证。",
+    "使用统一后台启停入口，未配置开机自启。"
+  ]
+}

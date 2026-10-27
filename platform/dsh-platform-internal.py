@@ -207,6 +207,32 @@ def check_artifacts():
             raise PlatformError(f"扩展 {extension['id']} 尚未按当前来源构建；请运行 prepare。")
 
 
+def merged_profile_manifest(source, template):
+    try:
+        manifest = json.loads(source)
+    except ValueError:
+        raise PlatformError("平台 Profile package.json 格式无效；保留原配置，请先修复。") from None
+    if not isinstance(manifest, dict):
+        raise PlatformError("平台 Profile package.json 必须是对象；保留原配置，请先修复。")
+    dsh = manifest.setdefault("dsh", {})
+    if not isinstance(dsh, dict):
+        raise PlatformError("平台 Profile dsh 必须是对象；保留原配置，请先修复。")
+    native = dsh.setdefault("profile", {})
+    if not isinstance(native, dict):
+        raise PlatformError("平台 Profile dsh.profile 必须是对象；保留原配置，请先修复。")
+    bundles = native.get("bundles", [])
+    if not isinstance(bundles, list) or any(not isinstance(bundle, str) for bundle in bundles):
+        raise PlatformError("平台 Profile bundles 必须是字符串列表；保留原配置，请先修复。")
+    required = json.loads(template)
+    manifest["name"] = required["name"]
+    manifest["private"] = required["private"]
+    manifest.setdefault("dependencies", {})
+    native["patchReload"] = required["dsh"]["profile"]["patchReload"]
+    # 原生安装器维护额外插件的登记与启停；平台只固定自身必需的 bundle。
+    native["bundles"] = list(dict.fromkeys(required["dsh"]["profile"]["bundles"] + bundles))
+    return json.dumps(manifest, ensure_ascii=False, indent=2) + "\n"
+
+
 def check_profile(profile, rendered):
     bundle = profile / "node_modules" / "@ai-agent-harness" / "harness-platform"
     if not bundle.is_symlink() or bundle.resolve() != PLUGIN:
@@ -217,7 +243,9 @@ def check_profile(profile, rendered):
             actual = path.read_text(encoding="utf-8")
         except OSError as exc:
             raise PlatformError(f"平台 Profile 尚未准备：{path}；请先运行 prepare。") from exc
-        if actual != content:
+        matches = (json.loads(merged_profile_manifest(actual, content)) == json.loads(actual)
+                   if name == "package.json" else actual == content)
+        if not matches:
             raise PlatformError(f"平台 Profile 与仓库模板不一致：{path}；请重新运行 prepare。")
     user_patch = profile / "cordis.patch.yml"
     if user_patch.is_file():
@@ -680,6 +708,12 @@ def prepare(home, offline=False):
     check_workspace()
     executable, version = global_dsh(home)
     rendered = rendered_profile()
+    profile = home / "profiles" / PROFILE_NAME
+    manifest = profile / "package.json"
+    rendered["package.json"] = merged_profile_manifest(
+        manifest.read_text(encoding="utf-8") if manifest.exists() else rendered["package.json"],
+        rendered["package.json"],
+    )
     pnpm = shutil.which("pnpm")
     if not pnpm:
         raise PlatformError("PATH 中没有 pnpm；请先安装插件构建工具。")
@@ -699,7 +733,6 @@ def prepare(home, offline=False):
     for extension in workspace_extensions():
         extension_output(extension)
     check_artifacts()
-    profile = home / "profiles" / PROFILE_NAME
     profile.mkdir(parents=True, exist_ok=True)
     # 原生用户 Patch 保存 DSH 设置；仓库组合通过独立 overlay 装载。
     user_patch = profile / "cordis.patch.yml"

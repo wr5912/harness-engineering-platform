@@ -1,0 +1,162 @@
+{
+  "observed_at": "2026-10-26T08:37:17.674Z",
+  "acceptance_paths": [
+    "PA-12",
+    "PA-10"
+  ],
+  "program": {
+    "commit": "2fb0b0e9988e96a2f3aa5e007221b73281df487c",
+    "dirty": true,
+    "changed_source_sha256": {
+      "platform/plugin/src/evaluation/jobs.ts": "722b75e1ae51cc1d677b47ab1f5e71fec750a38a935ccab74ba9039bd9486657",
+      "platform/plugin/test/evaluation-jobs.test.mjs": "16d1eb1bc533d390a8cc9e11d6a13bc4d8480f9e837661d9424aa6b08c6c226b"
+    }
+  },
+  "workspace": {
+    "commit": "d2a93bf93f9713cc4b781e134e5a49b45cc1ec38",
+    "dirty": true,
+    "id": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+    "root": "/home/cmp/work/harness-engineering-platform-data",
+    "legacy_roots": [
+      "/home/admin/work/ai-agent-harness",
+      "/home/cmp/harness-engineering-platform-data",
+      "/home/cmp/work/luopeng/harness-engineering-platform-data"
+    ]
+  },
+  "before": {
+    "observed_at": "2026-10-26T08:32:44.141Z",
+    "operation": "agents/eval/list",
+    "result": {
+      "ok": false,
+      "error": {
+        "code": "not_found",
+        "message": "评测任务不属于当前工作区",
+        "details": {}
+      }
+    }
+  },
+  "validation": {
+    "plugin_build": "pnpm run build：类型检查与打包通过",
+    "targeted_tests": {
+      "command": "node --test test/evaluation-jobs.test.mjs test/workspace-paths.test.mjs test/evaluation-client.test.mjs test/independent-workspace.test.mjs",
+      "passed": 72,
+      "failed": 0
+    },
+    "migration_regressions": [
+      "目录迁移后保留工作区身份；登记原目录后可读取历史任务和 Run",
+      "同一操作重试不启动新进程，不改写 asset_root",
+      "工作区 ID 不符、未登记的克隆目录及任务 ID 不符时仍拒绝访问",
+      "按当前目录恢复与取消进程；不向旧路径克隆中的进程发送信号"
+    ]
+  },
+  "platform": {
+    "url": "http://172.16.138.228:18120/hep/",
+    "pid": 3441802,
+    "prepare_offline_completed": true,
+    "restarted": true,
+    "data_root": "/home/cmp/work/harness-engineering-platform-data"
+  },
+  "browser": {
+    "list_result": {
+      "ok": true,
+      "value": {
+        "jobs": [
+          {
+            "job_id": "6eacb1e7-5a6d-4f0b-868e-b3c7463795dd",
+            "source": "experiment:EXP-security-operations-expert-024-rad80a907c628",
+            "status": "completed",
+            "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+            "started_at": "2026-10-22T10:01:17.022Z",
+            "updated_at": "2026-10-22T10:51:35.643Z",
+            "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+            "agent_id": "security-operations-expert"
+          },
+          {
+            "job_id": "83b3b153-10dc-4a04-aca6-ead7064f14bc",
+            "source": "experiment:EXP-security-operations-expert-024-rad80a907c628",
+            "status": "failed",
+            "run_id": "run-6544173e-0670-4cfd-af86-f0d27cad77d2",
+            "started_at": "2026-10-22T08:53:57.426Z",
+            "updated_at": "2026-10-22T09:47:48.466Z",
+            "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+            "agent_id": "security-operations-expert"
+          },
+          {
+            "job_id": "f79f1adf-e8c3-4ab0-b874-eea8eca92b8f",
+            "source": "experiment:EXP-security-operations-expert-024-rad80a907c628",
+            "status": "failed",
+            "run_id": null,
+            "started_at": "2026-10-22T08:45:55.999Z",
+            "updated_at": "2026-10-22T08:45:57.736Z",
+            "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+            "agent_id": "security-operations-expert"
+          }
+        ]
+      }
+    },
+    "checks": [
+      {
+        "job_id": "6eacb1e7-5a6d-4f0b-868e-b3c7463795dd",
+        "status": "completed",
+        "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408"
+      },
+      {
+        "job_id": "83b3b153-10dc-4a04-aca6-ead7064f14bc",
+        "status": "failed",
+        "run_id": "run-6544173e-0670-4cfd-af86-f0d27cad77d2"
+      },
+      {
+        "job_id": "f79f1adf-e8c3-4ab0-b874-eea8eca92b8f",
+        "status": "failed",
+        "run_id": null
+      },
+      {
+        "job_id": "6eacb1e7-5a6d-4f0b-868e-b3c7463795dd",
+        "report_opened": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+        "download_status": 200
+      },
+      {
+        "job_id": "83b3b153-10dc-4a04-aca6-ead7064f14bc",
+        "report_opened": "run-6544173e-0670-4cfd-af86-f0d27cad77d2",
+        "download_status": 200
+      },
+      {
+        "refresh_restored_job": "f79f1adf-e8c3-4ab0-b874-eea8eca92b8f"
+      }
+    ],
+    "page_errors": [],
+    "ownership_error_visible": false,
+    "start_requests": 0,
+    "cancel_requests": 0,
+    "instance_registration_count": 0
+  },
+  "previous_instance_cleanup": {
+    "instances": {
+      "security-operations-expert-acceptance": {
+        "container_absent": true,
+        "registration_absent": true,
+        "home_unchanged": true,
+        "files": 1229
+      },
+      "security-operations-expert-acceptance-v2": {
+        "container_absent": true,
+        "registration_absent": true,
+        "home_unchanged": true,
+        "files": 98
+      },
+      "security-operations-expert-biz-exp024": {
+        "container_absent": true,
+        "registration_absent": true,
+        "home_unchanged": true,
+        "files": 105
+      }
+    },
+    "home_check_basis": "核对相对文件路径与文件大小一致，未逐字节计算内容摘要",
+    "other_containers_preserved": 19,
+    "gateway_registrations_removed": true
+  },
+  "limits": [
+    "未发起新的业务评测；历史失败任务与业务结论保留。",
+    "浏览器检查在 228 本机运行，未验证其他物理客户端。"
+  ]
+}

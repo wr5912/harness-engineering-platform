@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { load as loadYaml } from 'js-yaml'
-import { workspaceIdentity, workspaceLocalPath } from '../workspace.ts'
+import { workspaceIdentity, workspaceLocalPath, workspaceOwnsCwd } from '../workspace.ts'
 import { measureModelUsage, type UsageTrace } from './model-usage.ts'
 
 type MapValue = Record<string, any>
@@ -51,11 +51,11 @@ function processStart(pid: number): string | undefined {
   } catch { return undefined }
 }
 
-function ownsProcess(job: Job): boolean {
+function ownsProcess(job: Job, root: string): boolean {
   if (!job.pid || !job.process_start || processStart(job.pid) !== job.process_start) return false
   try {
     return statSync(`/proc/${job.pid}`).uid === process.getuid?.()
-      && realpathSync(`/proc/${job.pid}/cwd`) === realpathSync(job.asset_root)
+      && realpathSync(`/proc/${job.pid}/cwd`) === realpathSync(root)
       && readFileSync(`/proc/${job.pid}/cmdline`, 'utf8').split('\0').some(arg => arg.endsWith('/dsh-eval'))
   } catch { return false }
 }
@@ -83,7 +83,7 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
     const path = pathFor(id)
     if (!existsSync(path)) throw new EvaluationJobError('not_found', '评测任务不存在')
     const job = JSON.parse(readFileSync(path, 'utf8')) as Job
-    if (job.asset_root !== root || job.workspace_id !== identity.id || job.job_id !== id)
+    if (!workspaceOwnsCwd(root, job.asset_root) || job.workspace_id !== identity.id || job.job_id !== id)
       throw new EvaluationJobError('not_found', '评测任务不属于当前工作区')
     return job
   }
@@ -156,7 +156,7 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
   function status(id: string) {
     const job = read(id)
     const actual = receipt(job)
-    const alive = live.has(id) || ownsProcess(job)
+    const alive = live.has(id) || ownsProcess(job, root)
     if (job.status === 'failed' && job.exit_code === 1 && actual.run_status === 'completed') {
       // dsh-eval 用退出码 1 表示业务结论未通过；Run 已完成仍是一次已结束的执行。
       job.status = 'completed'
@@ -193,7 +193,7 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
     const active = live.get(id)
     if (job.status !== 'cancelling') {
       if (active) active.process.kill('SIGTERM')
-      else if (ownsProcess(job)) process.kill(job.pid!, 'SIGTERM')
+      else if (ownsProcess(job, root)) process.kill(job.pid!, 'SIGTERM')
       else throw new EvaluationJobError('process_identity_unknown', '无法确认评测进程归属，已保留证据；未向其他进程发送信号。')
       job.status = 'cancelling'
       job.updated_at = new Date().toISOString()

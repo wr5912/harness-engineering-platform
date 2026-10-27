@@ -1,0 +1,98 @@
+{
+  "observed_at": "2026-10-26T06:28:25.624Z",
+  "program_commit": "83bccab57098f1e7958edc3f5dd11b060e28e0f3",
+  "data_commit": "6b12e298d74e7163750335f94a48c687d225105a",
+  "platform": {
+    "url": "http://172.16.138.228:18120/hep/",
+    "pid": 3291237,
+    "program_root": "/home/cmp/work/harness-engineering-platform",
+    "data_root": "/home/cmp/harness-engineering-platform-data",
+    "lifecycle": "platform/dsh-platform",
+    "login_verified": true
+  },
+  "management": {
+    "configuration": {
+      "ready": true,
+      "core_ready": true
+    },
+    "data_skills_expected": 23,
+    "visible_skills": 31,
+    "missing_data_skills": [],
+    "pages": [
+      "首页",
+      "管理对话",
+      "智能体管理",
+      "评测中心",
+      "实例管理",
+      "MCP 管理",
+      "统一网关"
+    ],
+    "page_errors": []
+  },
+  "instances": [
+    {
+      "name": "security-operations-expert-acceptance",
+      "port": 18502,
+      "image_tag": "ai-agent-harness/dsh:687f282e8-amd64-cbfc10fa115b",
+      "image_id": "sha256:d90185713372e65b6c49555cf2ca633a3351e7f379c9b792804d8d79c7d4211b",
+      "source_id": "experiment:EXP-security-operations-expert-024-rad80a907c628",
+      "access_url": "http://172.16.138.228:53105/agents/security-operations-expert/instances/security-operations-expert-acceptance/",
+      "no_login": true,
+      "chat_input_visible": true,
+      "sessions": 71,
+      "session_export": {
+        "status": 200,
+        "bytes": 57949,
+        "zip": true
+      },
+      "original_sessions_preserved": 69
+    },
+    {
+      "name": "security-operations-expert-acceptance-v2",
+      "port": 18501,
+      "image_tag": "ai-agent-harness/dsh:687f282e8-amd64-cbfc10fa115b",
+      "image_id": "sha256:d90185713372e65b6c49555cf2ca633a3351e7f379c9b792804d8d79c7d4211b",
+      "source_id": "experiment:EXP-security-operations-expert-024-rad80a907c628",
+      "access_url": "http://172.16.138.228:53105/agents/security-operations-expert/instances/security-operations-expert-acceptance-v2/",
+      "no_login": true,
+      "chat_input_visible": true,
+      "sessions": 11,
+      "session_export": {
+        "status": 200,
+        "bytes": 21492,
+        "zip": true
+      },
+      "original_sessions_preserved": 10
+    },
+    {
+      "name": "security-operations-expert-biz-exp024",
+      "port": 18500,
+      "image_tag": "ai-agent-harness/dsh:687f282e8-amd64-cbfc10fa115b",
+      "image_id": "sha256:d90185713372e65b6c49555cf2ca633a3351e7f379c9b792804d8d79c7d4211b",
+      "source_id": "experiment:EXP-security-operations-expert-024-rad80a907c628",
+      "access_url": "http://172.16.138.228:53105/agents/security-operations-expert/instances/security-operations-expert-biz-exp024/",
+      "no_login": true,
+      "chat_input_visible": true,
+      "sessions": 31,
+      "session_export": {
+        "status": 200,
+        "bytes": 21979,
+        "zip": true
+      },
+      "original_sessions_preserved": 30
+    }
+  ],
+  "chat": {
+    "instance": "security-operations-expert-acceptance",
+    "prompt": "你好，请只回复“部署验证通过”，不要调用任何工具。",
+    "response": "部署验证通过",
+    "page_errors": []
+  },
+  "deployment_configuration": "平台重启实例时更新 config/business-access.json 内三个实例的 sourceDigest；网关登记集合保持一致。",
+  "limits": [
+    "未重新发起巡检、威胁研判或定时任务。",
+    "浏览器运行在部署主机；未使用另一台物理设备访问。",
+    "本次普通聊天仅在 acceptance 实例验证。",
+    "使用统一后台启停入口，未配置开机自启。"
+  ]
+}

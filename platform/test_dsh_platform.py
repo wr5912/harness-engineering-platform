@@ -183,6 +183,60 @@ if sys.argv[1:] == ["run", "build"]:
         self.assertEqual(session.read_text(), "retained")
         self.assertFalse(Path(self.env["DSH_HOME"]).exists())
 
+    def test_native_plugin_registration_survives_start_and_prepare(self):
+        self.prepare()
+        path = self.profile / "package.json"
+        manifest = json.loads(path.read_text())
+        manifest["dependencies"] = {"enabled-plugin": "github:owner/plugin#fixed-commit",
+                                    "disabled-plugin": "1.0.0"}
+        manifest["devDependencies"] = {"test-dependency": "1.0.0"}
+        manifest["dsh"]["profile"]["bundles"].append("enabled-plugin")
+        manifest["dsh"]["profile"]["compatibility"] = {"fixture": True}
+        path.write_text(json.dumps(manifest))
+        patch = "- id: enabled-plugin\n  config:\n    language: zh\n"
+        (self.profile / "cordis.patch.yml").write_text(patch)
+        for phase in ("installed", "prepared"):
+            with self.subTest(phase=phase):
+                if phase == "prepared":
+                    self.prepare()
+                result = self.run_cli("start", "--dry-run", "--port", str(self.free_port()))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads(path.read_text()), manifest)
+                self.assertEqual((self.profile / "cordis.patch.yml").read_text(), patch)
+
+    def test_prepare_restores_required_bundles_without_enabling_disabled_plugins(self):
+        self.prepare()
+        path = self.profile / "package.json"
+        manifest = json.loads(path.read_text())
+        required = manifest["dsh"]["profile"]["bundles"][:]
+        manifest["private"] = False
+        manifest["dependencies"] = {"disabled-plugin": "1.0.0"}
+        manifest["dsh"]["profile"]["bundles"] = [required[-1], "enabled-plugin"]
+        path.write_text(json.dumps(manifest))
+        result = self.run_cli("start", "--dry-run", "--port", str(self.free_port()))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Profile 与仓库模板不一致", result.stderr)
+        self.prepare()
+        restored = json.loads(path.read_text())
+        self.assertTrue(restored["private"])
+        self.assertEqual(restored["dsh"]["profile"]["bundles"], required + ["enabled-plugin"])
+        self.assertEqual(restored["dependencies"], manifest["dependencies"])
+
+    def test_invalid_native_manifest_is_preserved(self):
+        self.prepare()
+        path = self.profile / "package.json"
+        for source in ("{", "[]", '{"dsh": null}', '{"dsh": {"profile": []}}',
+                       '{"dsh": {"profile": {"bundles": "plugin"}}}',
+                       '{"dsh": {"profile": {"bundles": [null]}}}'):
+            with self.subTest(source=source):
+                path.write_text(source)
+                for command in (("prepare",), ("start", "--dry-run", "--port", str(self.free_port()))):
+                    result = self.run_cli(*command)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("保留原配置", result.stderr)
+                    self.assertNotIn("Traceback", result.stderr)
+                    self.assertEqual(path.read_text(), source)
+
     def test_prepare_offline_skips_pnpm_install(self):
         (self.plugin / "node_modules").mkdir()
         (self.web / "node_modules").mkdir()

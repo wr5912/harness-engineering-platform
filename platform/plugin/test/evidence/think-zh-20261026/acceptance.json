@@ -1,0 +1,108 @@
+{
+  "observed_at": "2026-10-27T02:21:29.433631+00:00",
+  "acceptance_paths": [
+    "PA-12"
+  ],
+  "program": {
+    "commit": "04c7d2f7cb2f361dbc1c986397378c321c2b8c9b",
+    "dirty": true,
+    "source_sha256": {
+      "platform/dsh-platform-internal.py": "59415c6aea2d0dae18636213e46978e239fb22e052fcba151e82d63dec3f3130",
+      "platform/test_dsh_platform.py": "750d45eb9194a5880c95b969b88e41d217bccab02f19d349eed5fe0d97408c11",
+      "platform/plugin/src/evaluation/jobs.ts": "722b75e1ae51cc1d677b47ab1f5e71fec750a38a935ccab74ba9039bd9486657"
+    }
+  },
+  "workspace": {
+    "root": "/home/cmp/work/harness-engineering-platform-data",
+    "id": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+    "commit": "d2a93bf93f9713cc4b781e134e5a49b45cc1ec38",
+    "dirty": true
+  },
+  "plugin": {
+    "name": "dsh-think-zh",
+    "version": "1.1.1",
+    "repository": "https://github.com/Len7183/DSH-Think-zh",
+    "commit": "2ba0a1e338410b44c07f221087907e210ad65b59",
+    "install_command": "DSH_HOME=<数据根>/.local/platform-home dsh plugin --profile harness-platform add github:Len7183/DSH-Think-zh#2ba0a1e338410b44c07f221087907e210ad65b59",
+    "profile": "harness-platform",
+    "thinkingLanguage": "zh",
+    "injectPrompt": true,
+    "injectPerTurn": false,
+    "custom_injection_text": false
+  },
+  "validation": {
+    "launcher_tests": {
+      "command": "/usr/bin/python3 platform/test_dsh_platform.py",
+      "passed": 39,
+      "failed": 0
+    },
+    "evaluation_tests": {
+      "command": "node --test test/evaluation-jobs.test.mjs test/evaluation*.test.mjs",
+      "cwd": "platform/plugin",
+      "passed": 78,
+      "failed": 0
+    },
+    "prepare_offline_completed": true,
+    "reprepare_offline_completed": true,
+    "restarted_after_each_prepare": true,
+    "profile_files_unchanged_after_reprepare": {
+      "package.json": true,
+      "pnpm-lock.yaml": true,
+      "cordis.patch.yml": true,
+      "harness-platform.patch.yml": true
+    },
+    "native_session_logs_preserved": 74,
+    "native_session_logs_with_runtime_writes": 6,
+    "native_session_logs_missing": 0,
+    "browser": {
+      "settings_row": "思考语言 / 简体中文",
+      "switched_en_then_zh": true,
+      "refresh_persisted": true,
+      "after_restart_persisted": true,
+      "new_session_chat_before_and_after_restart": [
+        {
+          "session_id": "session-9d61db0c-eaa9-47b4-922f-69e0114476a8",
+          "cwd": "/home/cmp/work/harness-engineering-platform-data",
+          "provider": "deepseek-official",
+          "model": "deepseek-flash",
+          "system_instruction_at_start": true,
+          "chinese_reasoning_instruction_present": true,
+          "system_prompt_sha256": "f3d6a7e8ad2bbac2952580a80eed1ed51bf466949c6e24dc68c512f074279e01",
+          "reasoning_contains_chinese": true,
+          "answer": "17×23 = 391\n\n算法：17×20 = 340，17×3 = 51，合计 391。",
+          "turn_end": "completed",
+          "tool_call_count": 0
+        },
+        {
+          "session_id": "session-5dc511b3-6c3e-4f0e-a83e-be06bc8ae732",
+          "cwd": "/home/cmp/work/harness-engineering-platform-data",
+          "provider": "deepseek-official",
+          "model": "deepseek-flash",
+          "system_instruction_at_start": true,
+          "chinese_reasoning_instruction_present": true,
+          "system_prompt_sha256": "f3d6a7e8ad2bbac2952580a80eed1ed51bf466949c6e24dc68c512f074279e01",
+          "reasoning_contains_chinese": true,
+          "answer": "17×23 = 17×20 + 17×3 = 340 + 51 = **391**。",
+          "turn_end": "completed",
+          "tool_call_count": 0
+        }
+      ],
+      "page_errors": [],
+      "screenshots": [
+        "settings.png",
+        "chat.png"
+      ]
+    }
+  },
+  "platform": {
+    "url": "http://172.16.138.228:18120/hep/",
+    "pid_after_reprepare_restart": 4028911,
+    "dsh_version": "0.2.1-rc.2"
+  },
+  "limits": [
+    "仅安装到平台管理助手的独立 Profile；未向业务实例安装或重建镜像。",
+    "语言通过模型提示指令引导；两次聊天不保证所有模型或任务均遵循。",
+    "未重新执行巡检、威胁研判、定时任务或完整业务评测。",
+    "会话保留核对标识与文件存在；6 个日志有 Runtime 写入，不声称全部字节不变。"
+  ]
+}
