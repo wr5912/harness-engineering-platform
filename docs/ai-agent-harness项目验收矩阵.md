@@ -240,6 +240,8 @@
 
 ### PA-12 全局 DSH 平台启动、认证与研究工具
 
+- **零模型代码变体（2026-10-26 执行、2026-10-27 整理，关联 `PA-08/10`）**：[平台与实际装载证据](../platform/plugin/test/evidence/code-only-20261026/README.md)覆盖零模型方案、公开 SDK、本地 Session 路由及标题、模型请求计量、源码展示、构建冻结、两侧独立评测与比较界面。基础台账巡检助手的 LangGraph 入口以明确 `if/else` 和条件边实现五条分支；真实八轮会话核对当前构建、完整/第一页工具链和 Markdown/CSV 下载，业务及辅助模型请求均为零。1440/390px 方案页无溢出或脚本错误，受影响回归及构建通过。数据侧四个最终 Run 使用同一 clean 程序提交 `4f86644`：变体两次共 8 项通过，父版仍有 5 项评审无法判定；比较如实保留未知、未允许 `end`，原活动版本未切换。研究结论以数据侧 EXP-003 观察和不可变比较回执为准；固定 Mock 与局部工具验证不提升完整 `PA-12`、等效或 Research Release 状态。
+
 - **统一启停与原路径切换（2026-10-26，关联 `PA-13`）**：开发目录与离线安装目录统一使用 `platform/dsh-platform prepare/start/stop/restart/status`；`start` 默认后台运行，`--foreground` 用于前台调试，`bin/hep-start` 只转发 `start`。进程状态按数据根记录，核对 PID 出生时间、端口归属和 HTTP 就绪；重复启动复用已有进程。52 原 `/root/work/harness-engineering-platform` 已切换到该入口，原数据根、工作区 `workspace-95db14d2-d53d-4015-8256-ade8612b1b77` 及原有两个管理 Session 保留；`18120` 的启动、重启、重复启动和密码登录后 inventory RPC 均通过，`18121` 未监听。切换前的 45 个容器均保留。未增加 systemd 或开机自启；进程、日志及安装来源核对材料保存在目标机 `/root/hep-unified-20261025/`。
 
 - **退役 Experiment 残留导致页面读取失败（2026-10-23，关联 `PA-10`）**：程序与数据工作区分别基于远端 `f21cea0`、`23e83aa`。数据提交已删除安全运营专家的旧 Experiment，但 `007`、`019`、`021` 目录内仍有 Git 忽略的 `__pycache__` 或 `node_modules`；智能体列表把缺失的 `change.yaml` 误报成 YAML 解析失败，Run 概览显示三个 `FileNotFoundError`。确认目录无 Git 可见文件、Run 和运行占用后，将残留缓存移入数据根 `.local/backups/retired-experiment-residue-20261023-23e83aa/`，未改写历史 Run。平台智能体、Run 概览、资产查询与仓库校验四处枚举均改为仅跳过无 Git 可见文件的缺清单目录；真实资料缺清单仍报错。定向回归 51、10、6、19 项通过，平台 `prepare --offline` 构建完成，仓库校验零错误与警告。18120 重启装载后，真实浏览器登录核对智能体管理显示 6 个智能体、评测中心显示 24 条记录，相关失败提示、页面脚本错误及平台 Agent 请求失败均为零；Run 概览返回 6 个智能体、11 个 Experiment、24 条 Run、零读取错误。此次恢复属于工具与页面验证，未运行新评测、复现历史版本或验证业务效果。
