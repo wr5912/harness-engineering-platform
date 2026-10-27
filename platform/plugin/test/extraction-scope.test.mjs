@@ -48,7 +48,7 @@ function fixture(t, { parentPtc = false, computeResearch = false, featureOrganiz
   agent.ctx = agentScope.ctx
   const root = mkdtempSync(join(tmpdir(), 'builder-skills-'))
   t.after(() => rm(root, { recursive: true, force: true }))
-  for (const name of ['task-builder', 'research-eval', 'harness-evolution', 'harness-guided-workflow', 'legacy-asset-intake']) {
+  for (const name of ['task-builder', 'research-eval', 'harness-evolution', 'workspace-management', 'legacy-asset-intake']) {
     mkdirSync(join(root, '.agents/skills', name), { recursive: true })
     writeFileSync(join(root, '.agents/skills', name, 'SKILL.md'), '业务技能')
   }
@@ -269,7 +269,7 @@ test('构建任务使用真实工具作用域阻止shell或子智能体绕过限
   const f = fixture(t, { taskBuilding: true, parentPtc: true })
   f.scope.apply(f.agent)
   assert.deepEqual(await f.schemas(f.agent), ['platform_agents', 'platform_instances', 'platform_mcp', 'platform_task', 'skill'])
-  for (const name of ['task-builder', 'research-eval', 'harness-evolution', 'harness-guided-workflow', 'legacy-asset-intake']) assert.equal((await f.execute('skill', { name })).isError, false)
+  for (const name of ['task-builder', 'research-eval', 'harness-evolution', 'workspace-management', 'legacy-asset-intake']) assert.equal((await f.execute('skill', { name })).isError, false)
   assert.equal((await f.execute('skill', { name: 'business-tool' })).isError, false)
   assert.equal((await f.execute('skill', { name: 'undeclared-tool' })).isError, true)
   assert.equal((await f.execute('skill', { name: 'untrusted-skill' })).isError, true)

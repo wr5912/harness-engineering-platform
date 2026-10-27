@@ -13,7 +13,7 @@
 
 受控来源中的稳定 Baseline、生产 R1/R2/R3、审批、安全控制映射和部署流程不自动成为当前要求。只有实际使用需求涉及这些能力时才明确范围与合同，并复用已有资产、来源和证据，不因项目定位变化重做已验证能力。
 
-数据工作区 `.agents/skills/harness-guided-workflow/` 是新建、迁移、修改和优化 Harness 的对话入口。它按需求清晰程度组织澄清、计划、执行与验证，并复用资产清点、Experiment 演进和研究评估技能；已授权且必要信息齐全时连续执行，研究事实写回现有 Agent、Experiment 与 Run。
+数据工作区 `.agents/skills/workspace-management/` 是新建、迁移、修改和优化 Harness 的对话入口。它按需求清晰程度组织澄清、计划、执行与验证，并复用资产清点、Experiment 演进和研究评估技能；已授权且必要信息齐全时连续执行，研究事实写回现有 Agent、Experiment 与 Run。
 
 ### 平台设计输入的适用关系
 

@@ -51,6 +51,21 @@ test('真实原生注册表装载全部管理技能，正文变更下一次读�
   assert.match(readFileSync(path, 'utf8'), /name: user-facing-output/)
 })
 
+test('旧引导入口使用工作区管理配置，不再要求或发布已退役技能', async t => {
+  const f = fixture(t)
+  const context = { skill: 'harness-guided-workflow', agent_id: 'fixed-agent' }
+  const config = await assistantConfiguration(f.root, f.ctx.skills, context)
+  assert.equal(config.ready, true)
+  assert.equal(config.requested_skill, 'workspace-management')
+  assert.equal(config.tasks['workspace-management'], true)
+  assert.equal(config.tasks['harness-guided-workflow'], undefined)
+  assert.ok(!config.assets.some(asset => asset.name === 'harness-guided-workflow'))
+  assert.deepEqual(config.missing, [])
+  assert.deepEqual(context, { skill: 'harness-guided-workflow', agent_id: 'fixed-agent' }, '配置查询不得改写调用方上下文')
+  rmSync(join(f.root, '.agents/skills/workspace-management/SKILL.md'))
+  assert.equal((await assistantConfiguration(f.root, f.ctx.skills, context)).ready, false, '兼容旧名不能绕过真实工作区技能校验')
+})
+
 test('空白数据工作区可查询配置，缺失或不可装载技能不以文件存在冒充就绪', async t => {
   const f = fixture(t, { empty: true })
   assert.equal((await assistantConfiguration(f.root, f.ctx.skills)).ready, false)

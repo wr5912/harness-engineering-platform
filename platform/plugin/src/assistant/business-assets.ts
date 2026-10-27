@@ -11,10 +11,15 @@ export interface NativeSkill {
 export interface NativeSkills {
   get(name: string, options: { cwd: string; scope?: any; signal?: AbortSignal }): Promise<NativeSkill | undefined>
 }
-export const managementSkills = ['workspace-management', 'task-builder', 'agent-maintenance', 'mcp-composition', 'compute-variant-research', 'decision-sample-extraction', 'harness-guided-workflow', 'harness-evolution', 'harness-experiment-fusion', 'research-eval', 'legacy-asset-intake', 'reviewing-agent-skills', 'user-facing-output'] as const
+export const managementSkills = ['workspace-management', 'task-builder', 'agent-maintenance', 'mcp-composition', 'compute-variant-research', 'decision-sample-extraction', 'harness-evolution', 'harness-experiment-fusion', 'research-eval', 'legacy-asset-intake', 'reviewing-agent-skills', 'user-facing-output'] as const
 const coreSkills = ['workspace-management', 'user-facing-output']
 export const managementSkillRoot = (root: string) => join(root, '.agents/skills')
 const digest = (content: string) => createHash('sha256').update(content).digest('hex')
+
+/** 引导入口已并入工作区管理；只规范当前上下文，不改写历史 Session 事件。 */
+export function normalizeManagementContext(context: Record<string, any>) {
+  return context.skill === 'harness-guided-workflow' ? { ...context, skill: 'workspace-management' } : context
+}
 
 /** 只接受当前数据工作区中的真实资产；重名程序技能或外部软链接不能替代它。 */
 function realWorkspaceFile(root: string, path: string) {
@@ -69,7 +74,8 @@ export async function assistantConfiguration(root: string, skills: NativeSkills,
   })))
   const missing = assets.filter(item => !item.ready).map(item => item.name)
   const coreMissing = missing.filter(name => name === 'AGENTS.md' || coreSkills.includes(name))
-  const requested = typeof context.skill === 'string' ? context.skill : 'workspace-management'
+  const normalized = normalizeManagementContext(context)
+  const requested = typeof normalized.skill === 'string' ? normalized.skill : 'workspace-management'
   const requestedReady = assets.some(item => item.name === requested && item.ready)
   const ready = coreMissing.length === 0 && requestedReady
   const message = coreMissing.length ? `当前工作区未配置平台管理助手，缺少或无法装载：${coreMissing.join('、')}。请连接或克隆包含管理助手业务资产的数据仓库。`

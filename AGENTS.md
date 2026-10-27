@@ -144,7 +144,7 @@ Memory 位于仓库外的 `$CODEX_HOME/memories`，不得复制进仓库、Resea
 2. 按本次任务检索[AI 纠错经验总结](docs/AI纠错经验总结.md)的相关条目，涉及歧义时查[项目术语表](docs/项目术语表.md)；不要求每次通读全部历史记录。
 3. 阅读 `docs/standards/SOURCES.md` 与 `docs/standards/PROJECT-INTERPRETATION.md`，确认来源对平台开发及 Harness 研究的适用范围。
 4. 阅读项目验收矩阵，确定涉及的 `PA-xx`、已有证据和缺口。
-5. 按[分支与开发工作流](#分支与开发工作流)判断任务对象并选择技能；平台及通用工具开发使用本仓库 `dsh-platform-development`。新建、迁移、修改或优化业务 Harness 时，读取已选数据工作区的 `AGENTS.md` 和 `.agents/skills/harness-guided-workflow/SKILL.md`，按数据侧原则开展任务。
+5. 按[分支与开发工作流](#分支与开发工作流)判断任务对象并选择技能；平台及通用工具开发使用本仓库 `dsh-platform-development`。新建、迁移、修改或优化业务 Harness 时，读取已选数据工作区的 `AGENTS.md` 和 `.agents/skills/workspace-management/SKILL.md`，按数据侧原则开展任务。
 6. 检查 Git 工作树和现有资产；不得覆盖、回退或混入他人的改动。涉及运行或环境操作时，先核对工作树、目标主机、实例、进程／端口及实际来源，按本次目标区分本地、部署测试与其他环境。
 
 ## 分支与开发工作流
@@ -156,7 +156,7 @@ Memory 位于仓库外的 `$CODEX_HOME/memories`，不得复制进仓库、Resea
 | 对象标识 | 按任务目标判断的范围 | 工作流入口 |
 |---|---|---|
 | `PLATFORM` | 平台页面、研究管理工具、通用 CLI、Runtime 适配器及仓库研发协作配置 | 实现使用 [`dsh-platform-development`](.agents/skills/dsh-platform-development/SKILL.md)；仅编写页面开发任务清单使用 `dsh-platform-task-list` |
-| `AGENT` | 某个业务智能体的 Harness 资产、需求、评估标准及研究结果 | 语义性 Harness 变化使用 数据工作区的 [`harness-guided-workflow`](https://github.com/wr5912/harness-engineering-platform-data/blob/main/.agents/skills/harness-guided-workflow/SKILL.md)；仅维护文档或整理既有证据不因此新建 Experiment |
+| `AGENT` | 某个业务智能体的 Harness 资产、需求、评估标准及研究结果 | 语义性 Harness 变化使用 数据工作区的 [`workspace-management`](https://github.com/wr5912/harness-engineering-platform-data/blob/main/.agents/skills/workspace-management/SKILL.md)；仅维护文档或整理既有证据不因此新建 Experiment |
 
 AI 开发工具在创建分支前必须读取本节，根据**任务名称、任务描述与仓库上下文**选择操作类型、对象标识和主题，而不是只按文件目录、出现的关键词或工具默认分支名推断。业务智能体已知时，`AGENT` 主题包含其 Agent ID。上下文不足先检查目标资产、调用关系和已有实现，仍无法判断主要目标时再澄清。
 
@@ -170,7 +170,7 @@ AI 开发工具在创建分支前必须读取本节，根据**任务名称、任
 
 - 本项目的当前行为以根级 `AGENTS.md` 和 `PROJECT-INTERPRETATION.md` 对平台开发与 Harness 研究的适用解释为准。
 - 两份受控 Harness 规范保留版本身份、原始摘要及本地修订摘要，作为目录与资产模型的设计输入；不因引用规范自动引入其生产化结构。
-- `agent-engineering-spec` 锁定提交中的任务分流、多轮澄清和外部资产复用原则可经 `harness-guided-workflow` 采用；固定 Case、R1/R2/R3、安全控制映射和生产发布门禁仍只作为未来生产化参考。
+- `agent-engineering-spec` 锁定提交中的任务分流、多轮澄清和外部资产复用原则可经 `workspace-management` 采用；固定 Case、R1/R2/R3、安全控制映射和生产发布门禁仍只作为未来生产化参考。
 - 受控来源的修订与恢复定位在 `SOURCES.md` 中记录，适用关系在 `PROJECT-INTERPRETATION.md` 中说明；本地术语修订不自动采用原规范中的生产流程。
 
 ## 文件与命名

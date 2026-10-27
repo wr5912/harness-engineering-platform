@@ -8,7 +8,7 @@
 
 | 共同原因 | 执行时的检查动作 | 唯一规则或方法入口 | 沉淀方式 |
 |---|---|---|---|
-| 把反问、质疑或方向讨论当作实施确认，或扩大当前目标 | 根据上下文判断用户要求；明确的实施授权直接执行，仍有实质分歧的部分先澄清 | [AGENTS.md](../AGENTS.md#开始工作前)、[引导工作流](https://github.com/wr5912/harness-engineering-platform-data/blob/main/.agents/skills/harness-guided-workflow/SKILL.md) | 补齐意图判断；研究优先、精要主义和精准修改沿用现有规则 |
+| 把反问、质疑或方向讨论当作实施确认，或扩大当前目标 | 根据上下文判断用户要求；明确的实施授权直接执行，仍有实质分歧的部分先澄清 | [AGENTS.md](../AGENTS.md#开始工作前)、[工作区管理](https://github.com/wr5912/harness-engineering-platform-data/blob/main/.agents/skills/workspace-management/SKILL.md) | 补齐意图判断；研究优先、精要主义和精准修改沿用现有规则 |
 | 混淆开发身份、业务 Harness、评审 Harness 或运行环境 | 沿目标入口核对对象、来源、主机、实例、端口和实际装载；只检查本任务涉及的层面 | [开发对象](../AGENTS.md#开发对象与修改边界)、[平台开发](../.agents/skills/dsh-platform-development/SKILL.md) | 将目标确认放到操作前，保留各角色现有职责 |
 | 只改已暴露文件，遗漏生成器、解析器、报告或其他入口 | 找出同一事实的全部声明、生成和消费位置；修共同来源，再验证受影响路径 | [代码与适配层审查](项目审查原则.md#代码与适配层)、[文档与数据审查](项目审查原则.md#文档与数据) | 沿用根因整改与单一事实源；补齐全量用词检查方法 |
 | 把版本编号、源码存在或依赖安装当作继承和生效 | 核对固定父版、仍有效的并行能力、目标制品、运行依赖和新 Session | [研究演进](../AGENTS.md#研究演进)、[harness-evolution](https://github.com/wr5912/harness-engineering-platform-data/blob/main/.agents/skills/harness-evolution/SKILL.md) | 使用已有继承检查与装载验证，不逐故障追加原则 |

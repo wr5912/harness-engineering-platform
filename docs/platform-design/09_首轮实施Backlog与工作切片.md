@@ -49,7 +49,7 @@
 ## 4. 工作切片的选择依据
 
 1. 这次修改解决哪一个当前真的出现的问题？
-2. 能否复用现有 `harness-guided-workflow`、`source_contract.py`、`dsh-dev`、`dsh-eval`、`evaluation.md` 和 Run？
+2. 能否复用现有 `workspace-management`、`source_contract.py`、`dsh-dev`、`dsh-eval`、`evaluation.md` 和 Run？
 3. 哪个文件/服务拥有当前唯一可编辑事实？是否出现了第二个编辑入口？
 4. 能用一个真实 Case/Session/Run 验证，而不是只验证 HTTP 200 或静态类型吗？
 5. 若本轮工具化无收益，新增代码能否轻易撤回？

@@ -155,7 +155,7 @@ Baseline 用固定 Git 提交、Research Release 或 `none:first-experiment` 引
 | 平台功能、通用工具与 Runtime 适配 | [`dsh-platform-development`](./.agents/skills/dsh-platform-development/SKILL.md) |
 | 平台页面任务梳理 | [`dsh-platform-task-list`](./.agents/skills/dsh-platform-task-list/SKILL.md) |
 | 审查、质疑或精简已有 Skill | [`reviewing-agent-skills`](./.agents/skills/reviewing-agent-skills/SKILL.md) |
-| Harness 创建、迁移、修改与优化 | [`harness-guided-workflow`](https://github.com/wr5912/harness-engineering-platform-data/blob/main/.agents/skills/harness-guided-workflow/SKILL.md) |
+| Harness 创建、迁移、修改与优化 | [`workspace-management`](https://github.com/wr5912/harness-engineering-platform-data/blob/main/.agents/skills/workspace-management/SKILL.md) |
 | 并行能力融合 | [`harness-experiment-fusion`](https://github.com/wr5912/harness-engineering-platform-data/blob/main/.agents/skills/harness-experiment-fusion/SKILL.md) |
 | 旧资产只读清点 | [`legacy-asset-intake`](https://github.com/wr5912/harness-engineering-platform-data/blob/main/.agents/skills/legacy-asset-intake/SKILL.md) |
 | Harness 实验与评估 | [`harness-evolution`](https://github.com/wr5912/harness-engineering-platform-data/blob/main/.agents/skills/harness-evolution/SKILL.md)、[`research-eval`](https://github.com/wr5912/harness-engineering-platform-data/blob/main/.agents/skills/research-eval/SKILL.md) |

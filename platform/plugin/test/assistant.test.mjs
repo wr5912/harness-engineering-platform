@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { setImmediate } from 'node:timers/promises'
 import { Context } from '@deepseek-ai/cordis'
-import { SessionStore, appendPluginRecord } from '@deepseek-ai/dsh-session'
+import { SessionStore, appendPluginRecord, pluginRecordOf } from '@deepseek-ai/dsh-session'
 import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { build } from 'esbuild'
@@ -286,6 +286,70 @@ test('真实 Session 投影隔离上下文、冷恢复固定任务，用户 prom
   assert.equal(await f.assemble('ordinary'), '', '普通原生会话不自动注入平台策略')
   f.addSession('foreign', '/another-project')
   assert.equal((await f.rpc('status', { session_id: 'foreign' })).ok, false)
+})
+
+test('旧引导名创建会话后写入规范上下文，配置、describe和模型装配使用工作区入口', async t => {
+  const f = fixture(t), context = { skill: 'harness-guided-workflow', agent_id: 'fixed-agent', page: 'agents' }
+  const canonical = { ...context, skill: 'workspace-management' }
+  assert.equal(existsSync(join(f.root, '.agents/skills/harness-guided-workflow/SKILL.md')), false)
+  const config = (await f.rpc('configuration', { context })).value
+  assert.equal(config.ready, true)
+  assert.equal(config.requested_skill, 'workspace-management')
+  const created = await f.rpc('session', { task: '澄清已有智能体的修改目标', context })
+  assert.equal(created.ok, true, JSON.stringify(created))
+  const id = created.value.session_id
+  assert.deepEqual((await f.status(id)).task_context, canonical)
+  assert.deepEqual((await f.status(id)).context, canonical)
+  assert.equal(context.skill, 'harness-guided-workflow', '新建不改写调用方输入')
+  assert.deepEqual(f.prompts[0].content, [{ type: 'text', text: '澄清已有智能体的修改目标' }])
+  await f.rpc('context', { session_id: id, context: { skill: 'harness-guided-workflow', page: 'instances' } })
+  const toolContext = (await f.execute(id, 'agents', 'context')).value
+  assert.deepEqual(toolContext.task_context, canonical)
+  assert.deepEqual(toolContext.context, { skill: 'workspace-management', page: 'instances' })
+  assert.equal((await f.execute(id, 'agents', 'describe', { action: 'list' })).value.action, 'list')
+  assert.doesNotMatch(await f.assemble(id), /harness-guided-workflow/)
+  assert.match(await f.assemble(id), /"skill":"workspace-management"/)
+  await f.beforeModelCall(id)
+  assert.doesNotMatch(JSON.stringify(f.sessions.get(id).events), /harness-guided-workflow/, '新事件只保存当前入口')
+  await f.reload()
+  assert.deepEqual((await f.status(id)).task_context, canonical)
+})
+
+test('旧引导会话从原生事件冷恢复并续接，当前投影规范化且历史事件原样保留', async t => {
+  const original = fixture(t), id = 'legacy-guided-session'
+  const context = { skill: 'harness-guided-workflow', agent_id: 'fixed-agent', experiment_id: 'EXP-fixed-agent-001' }
+  const session = original.addSession(id)
+  original.services.record(session, 'plugin:harness-platform/assistant', { kind: 'task', task: '原始需求', context })
+  original.services.record(session, 'plugin:harness-platform/assistant', { kind: 'context', context: { skill: 'harness-guided-workflow', page: 'instances' } })
+  const history = JSON.parse(JSON.stringify(original.sessions.get(id).events)), historical = JSON.stringify(history)
+  const checkpoint = original.services.projections.checkpoint(session)
+  checkpoint.harnessPlatformAssistant.ver = 5
+  checkpoint.harnessPlatformAssistant.val.task_context = context
+  checkpoint.harnessPlatformAssistant.val.context = { skill: 'harness-guided-workflow', page: 'instances' }
+  const restored = fixture(t, undefined, original.root)
+  restored.addSession(id, original.root, history)
+  const canonical = { ...context, skill: 'workspace-management' }
+  assert.equal(restored.services.projections.restoreFloor(checkpoint), 0, '旧版本缓存必须从原始事件重建')
+  const rebuilt = restored.services.projections.restore(checkpoint, history, 0, session.header, session.inheritedEventCount)
+  assert.deepEqual(rebuilt.checkpoint.harnessPlatformAssistant.val.task_context, canonical)
+  assert.equal(rebuilt.checkpoint.harnessPlatformAssistant.val.context.skill, 'workspace-management')
+  assert.deepEqual((await restored.status(id)).task_context, canonical)
+  assert.equal((await restored.status(id)).context.skill, 'workspace-management')
+  assert.deepEqual((await restored.execute(id, 'agents', 'context')).value.task_context, canonical)
+  assert.equal((await restored.execute(id, 'agents', 'describe', { action: 'list' })).value.action, 'list')
+  assert.doesNotMatch(await restored.assemble(id), /harness-guided-workflow/)
+  await restored.beforeModelCall(id)
+  assert.equal(restored.prompts.length, 0, '恢复和模型装配不得伪造用户消息')
+  assert.equal((await restored.rpc('session', { session_id: id, task: '保留固定目标并继续澄清' })).ok, true)
+  assert.deepEqual((await restored.status(id)).task_context, canonical)
+  const lastTask = restored.sessions.get(id).events.map(pluginRecordOf).filter(record => record?.data.kind === 'task').at(-1)
+  assert.deepEqual(lastTask.data.context, canonical, '续接的新事件继承规范上下文与原固定目标')
+  await restored.reload()
+  assert.deepEqual((await restored.status(id)).task_context, canonical)
+  assert.equal(JSON.stringify(restored.sessions.get(id).events.slice(0, history.length)), historical)
+  assert.equal(JSON.stringify(history), historical)
+  assert.equal(context.skill, 'harness-guided-workflow')
+  assert.match(historical, /harness-guided-workflow/, '历史记录保留真实旧名')
 })
 
 test('向已有专用会话追加无context指导保留固定skill与目标，不跟随最新页面', async t => {

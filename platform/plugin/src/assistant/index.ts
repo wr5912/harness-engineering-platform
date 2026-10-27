@@ -16,7 +16,7 @@ import { deliveryProjection, deliveryProjectionSchema, readInstanceDeliveryHisto
 // 助手工具在平台自己的管理会话内执行，不是外部客户端连接；以平台管理身份调用管理接口。
 const managementPeer = { principal: { kind: 'owner' } } as unknown as Parameters<ConnectionRpcHandler>[3]
 import { rollbackTaskAssets } from '../tasks/assembly.ts'
-import { assistantConfiguration, assertAssistantConfigured, managementPrinciples, managementSkill, managementSkillRoot, type NativeSkills } from './business-assets.ts'
+import { assistantConfiguration, assertAssistantConfigured, managementPrinciples, managementSkill, managementSkillRoot, normalizeManagementContext, type NativeSkills } from './business-assets.ts'
 import { DECISION_EXTRACTION_ACTIONS } from './extraction-scope.ts'
 import { assistantActions, assistantActionContract, allowedAssistantActions, projectAssistantTools, featureActions, type AssistantDomain } from './tool-contracts.ts'
 import { TOOL_INPUT_JSON_RETRY_POLICY, toolInputJsonRetrySchema } from './tool-input-recovery.ts'
@@ -66,7 +66,7 @@ const assistantStateSchema = z.object({
   tool_contracts: z.record(z.string(), z.string()).default({}),
 })
 type AssistantState = z.infer<typeof assistantStateSchema>
-const requiredContext = (state: AssistantState) => state.execution ? { ...state.task_context, skill: state.execution.plan.kind === 'compute-variant' ? 'compute-variant-research' : 'task-builder' } : state.task_context
+const requiredContext = (state: AssistantState) => state.execution ? { ...state.task_context, skill: state.execution.plan.kind === 'compute-variant' ? 'compute-variant-research' : 'task-builder' } : normalizeManagementContext(state.task_context)
 declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionStateMap { harnessPlatformAssistant: AssistantState }
   interface SessionProjectionMap { harnessPlatformAssistant: DeliveryProjection }
@@ -77,7 +77,7 @@ declare module '@deepseek-ai/dsh-session' {
 
 // 框架负责按 Session 增量折叠、冷恢复和 fork；本插件不再读取完整事件日志。
 export const assistantProjection = {
-  key: projectionKey, stateVersion: 5, stateSchema: assistantStateSchema,
+  key: projectionKey, stateVersion: 6, stateSchema: assistantStateSchema,
   wire: { viewSchema: deliveryProjectionSchema, view: state => redactAssistant(deliveryProjection(state)) },
   init: (header, inheritedEventCount) => ({ session_id: header.id, inherited_event_count: inheritedEventCount, active: false, context: {}, task_context: {}, proposals: [], running: false, model_calls_observed: 0, tool_contracts: {} }),
   apply(state, event) {
@@ -97,8 +97,8 @@ export const assistantProjection = {
     const data = pluginRecord.data as MapValue
     if (!data || typeof data !== 'object') return state
     if (typeof data.workspace_id === 'string' && !state.workspace_id) state = { ...state, workspace_id: data.workspace_id }
-    if (data.kind === 'task') return { ...state, active: true, task: data.task, task_context: data.context ?? {} }
-    if (data.kind === 'context') return { ...state, active: true, context: data.context ?? {} }
+    if (data.kind === 'task') return { ...state, active: true, task: data.task, task_context: normalizeManagementContext(data.context ?? {}) }
+    if (data.kind === 'context') return { ...state, active: true, context: normalizeManagementContext(data.context ?? {}) }
     if (data.kind === 'workspace') return { ...state, active: true }
     if (data.kind === 'tool-contract') return { ...state, tool_contracts: { ...state.tool_contracts, [data.domain]: data.action } }
     if (data.kind === 'automatic-save' && data.owner_session_id === state.session_id && pluginRecord.seq >= state.inherited_event_count) return { ...state, automatic_save: data }
@@ -267,7 +267,9 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
   }
   async function record(id: string, value: MapValue) {
     const { session } = await inspect(id)
-    await services.record(session, recordType, wireValue({ ...value, workspace_id: workspaceIdentity(root).id }))
+    const normalized = value.kind === 'task' || value.kind === 'context'
+      ? { ...value, context: normalizeManagementContext(object(value.context ?? {})) } : value
+    await services.record(session, recordType, wireValue({ ...normalized, workspace_id: workspaceIdentity(root).id }))
     services.notify(['assistant'], [id])
   }
   async function locked<T>(id: string, action: () => Promise<T>): Promise<T> {
