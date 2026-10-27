@@ -1,0 +1,132 @@
+{
+  "checked_at": "2026-10-27T01:38:56.353Z",
+  "scope": "PA-08/PA-12 门户配置、真实 iframe 普通对话及刷新验证",
+  "local_program_commit": "2fb0b0e9988e96a2f3aa5e007221b73281df487c",
+  "deployed_program_commit": "6aafd0077d10a873d9a7415d3250806cb1a9a786",
+  "deployed_data_commit": "a34d1a65ae3e5c4b123b03df0bbafbe74487ee36",
+  "gateway_source_sha256": "10a63aa9ecc5885e7ef74be716dfd3c512fe87117753fdbeff7c8465ed457f7f",
+  "deployment": {
+    "program_root": "/srv/storage/hep-acceptance-20261026/program",
+    "data_root": "/srv/storage/hep-acceptance-20261026/data",
+    "changed_program_source": [
+      "platform/plugin/src/business-control/gateway.ts"
+    ],
+    "configuration_change": {
+      "gateway.proxyOrigin": "https://172.16.138.232:18060"
+    },
+    "other_business_configuration_unchanged": true,
+    "platform_pid": 3408110,
+    "target_container_restarted": false,
+    "target_container_started_at": "2026-10-26T08:06:53.256471806Z",
+    "source_id": "experiment:EXP-security-operations-expert-024-rad80a907c628",
+    "image_id": "sha256:d90185713372e65b6c49555cf2ca633a3351e7f379c9b792804d8d79c7d4211b",
+    "rollback_backup": "/srv/storage/hep-acceptance-20261026/portal-integration-backup-20261026",
+    "hosts_restored": true,
+    "runtime_and_portal_source_changed": false
+  },
+  "portal": {
+    "checkedAt": "2026-10-27T01:38:58.138Z",
+    "client": {
+      "id": 5,
+      "clientId": "agent",
+      "routePrefix": "/agents/",
+      "upstream": "http://172.16.138.232:53108",
+      "stripPrefix": "0",
+      "longConn": "1",
+      "status": "0"
+    },
+    "menu": {
+      "menuId": 95224,
+      "parentId": 95223,
+      "menuName": "AI助手",
+      "path": "${origin}/agents/security-operations-expert/instances/hep-deploy-accept-amd64-final/",
+      "component": "InnerLink"
+    },
+    "otherClientsUnchanged": true,
+    "otherMenusUnchanged": true,
+    "gateway": {
+      "code": 200,
+      "msg": "操作成功",
+      "data": {
+        "known": true,
+        "unknownReason": null,
+        "result": "ok",
+        "routes": 6,
+        "rollback": null,
+        "timestamp": "2026-10-27T01:28:23Z",
+        "detail": "nginx: the configuration file /etc/nginx/nginx.conf syntax is ok\nnginx: configuration file /etc/nginx/nginx.conf test is successful\n",
+        "rejected": null
+      },
+      "timestamp": 1793065015011,
+      "traceId": null,
+      "success": true
+    }
+  },
+  "browser": {
+    "portal_url": "https://172.16.138.232:18060/iframe/1",
+    "iframe_url": "https://172.16.138.232:18060/agents/security-operations-expert/instances/hep-deploy-accept-amd64-final/",
+    "entry": "智能应用/AI助手",
+    "session_id": "session-100e6a7d-d684-4091-9f75-8822d283f344",
+    "session_running": false,
+    "prompt": "你好，请只回复四个字：收到消息。不要调用任何工具。",
+    "reply": "收到消息。",
+    "session_stats": {
+      "turns": 1,
+      "steps": 1,
+      "llmMs": 2047,
+      "toolMs": 0,
+      "ttftMs": 1983,
+      "ttftSteps": 1,
+      "decodeMs": 64,
+      "decodeTokens": 4
+    },
+    "model": {
+      "provider": "local",
+      "model": "Qwen3.8-27B"
+    },
+    "websockets": [
+      {
+        "path": "/agents/security-operations-expert/instances/hep-deploy-accept-amd64-final/api/remote.mux",
+        "receivedFrames": 79
+      },
+      {
+        "path": "/agents/security-operations-expert/instances/hep-deploy-accept-amd64-final/api/remote.mux",
+        "receivedFrames": 9
+      },
+      {
+        "path": "/agents/security-operations-expert/instances/hep-deploy-accept-amd64-final/api/remote.mux",
+        "receivedFrames": 9
+      }
+    ],
+    "iframe_refresh_preserved": true,
+    "portal_refresh_preserved": true,
+    "page_errors": [],
+    "http_errors": [],
+    "screenshot": "browser.png"
+  },
+  "direct_entry": {
+    "url": "http://172.16.138.232:53108/agents/security-operations-expert/instances/hep-deploy-accept-amd64-final/",
+    "http_status": 200,
+    "seconds": 0.022938
+  },
+  "checks": {
+    "pnpm_run_build": "passed",
+    "pnpm_run_check": "passed",
+    "business_gateway_tests": {
+      "passed": 29,
+      "failed": 0
+    },
+    "portal_targeted_test": "passed"
+  },
+  "observations": [
+    "原上游 host.docker.internal 无法连接只监听部署地址的 53108，已改为实际监听地址。",
+    "门户传入 Host 不含端口，原业务来源校验拒绝；新增明确 proxyOrigin 并为 Runtime 重建来源头，保留原 publicOrigin。",
+    "平台重启后一度超时，strace 观察到服务器和客户端地址的 PTR 查询。临时 hosts 条目未完整解决等待，随后恢复响应，原 hosts 已还原；未认定 DNS 根因或长期重启稳定性已解决。",
+    "本次浏览器验证启用 ignoreHTTPSErrors，未验证证书信任链。"
+  ],
+  "limits": [
+    "实例保持 anonymous/development，访问者共享实例数据和会话；未接入门户 SSO 票据核销。",
+    "未重新验证巡检、威胁研判、外部 MCP、语音、全量业务 Case 或 Research Release。",
+    "本地及远程修改未提交或推送，远程插件已构建并重启装载。"
+  ]
+}

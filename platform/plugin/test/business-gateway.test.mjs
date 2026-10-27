@@ -10,6 +10,7 @@ import ApprovalService from '@deepseek-ai/dsh-user-approval'
 import test from 'node:test'
 import { Context, Service } from '@deepseek-ai/cordis'
 import WebServer from '@deepseek-ai/dsh-host-webserver'
+import { createMountedWebServer } from '../../../runtime/adapters/dsh-web/lib/index.mjs'
 import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
 import RemoteAccessService from '@deepseek-ai/dsh-api-remote-access'
 import TypertGateway from '@deepseek-ai/dsh-api-gateway'
@@ -37,7 +38,7 @@ class Fixture extends Service {
   async *follow(request, signal) { yield { sessionId: request.address?.sessionId ?? request.sessionId, kind: this.ctx.invocation.peer.principal.kind }; await new Promise(resolve => signal.addEventListener('abort', resolve, { once: true })) }
 }
 mark('create'); mark('list'); mark('updateQueue'); mark('page', { resources: { session: request => request.address?.sessionId ?? request.address?.childSessionId ?? request.sessionId } }); mark('follow', { mode: 'stream', resources: { session: request => request.address?.sessionId ?? request.address?.childSessionId ?? request.sessionId } })
-async function setup(t, { localTools = [], emptyWorkspace = false, registrationFailure = false, sharedDevelopment = false } = {}) {
+async function setup(t, { localTools = [], emptyWorkspace = false, registrationFailure = false, sharedDevelopment = false, proxyOrigin } = {}) {
   const assetRoot = mkdtempSync(join(tmpdir(), 'business-native-')); mkdirSync(join(assetRoot, 'config'))
   const revokedSubjects = new Set(), trustDelays = new Map(), trustCalls = new Map()
   const provider = createServer(async (req, res) => {
@@ -51,10 +52,12 @@ async function setup(t, { localTools = [], emptyWorkspace = false, registrationF
   const secret = randomBytes(48); const secretPath = join(assetRoot, 'business.secret'); writeFileSync(secretPath, secret)
   const setupConfigPath = join(assetRoot, 'config/business-access.json'), setupConfig = JSON.parse(readFileSync(setupConfigPath, 'utf8'))
   setupConfig.gateway = { host: '127.0.0.1', port: 0, publicOrigin: 'http://business.localhost:0', sharedSecretFile: secretPath, instances: [{ agentId: binding.agentId, instanceId: binding.instanceId }] }
+  if (proxyOrigin) setupConfig.gateway.proxyOrigin = proxyOrigin
   if (sharedDevelopment) Object.assign(setupConfig.gateway.instances[0], { accessMode: 'anonymous', identityMode: 'development', sourceDigest: binding.sourceDigest })
   writeFileSync(setupConfigPath, JSON.stringify(setupConfig))
   const ctx = new Context(); t.after(async () => { await ctx.fiber.dispose(); rmSync(assetRoot, { recursive: true, force: true }) })
-  await ctx.plugin(WebServer, { host: '127.0.0.1', port: 0 }); await ctx.plugin(TypertRegistry); ctx.typert.resources.register('session', { field: 'sessionId' }); await ctx.plugin(RemoteAccessService)
+  const basePath = proxyOrigin ? '/agents/soc/instances/soc-business/' : undefined
+  await ctx.plugin(basePath ? createMountedWebServer(WebServer, basePath) : WebServer, { host: '127.0.0.1', port: 0 }); await ctx.plugin(TypertRegistry); ctx.typert.resources.register('session', { field: 'sessionId' }); await ctx.plugin(RemoteAccessService)
   const toolGuards = []
   await ctx.plugin({ name: 'fixture-tools', apply(ctx) { ctx.provide('tools', { guard(check) { toolGuards.push(check) } }) } })
   const agents = new Map()
@@ -75,8 +78,8 @@ async function setup(t, { localTools = [], emptyWorkspace = false, registrationF
     return row
   }, archivedSessionIds: [], pinnedSessionIds: [] }
   await ctx.plugin({ name: 'fixture-workspace-storage', apply(ctx) { ctx.provide('workspaceRegistry', workspaceRegistry) } })
-  const centerRoot = join(assetRoot, 'center-assets'); mkdirSync(join(centerRoot, 'config'), { recursive: true }); mkdirSync(join(centerRoot, '.local/instances/soc-business'), { recursive: true }); symlinkSync(join(assetRoot, 'config/business-access.json'), join(centerRoot, 'config/business-access.json')); writeFileSync(join(centerRoot, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: binding.workspaceId })); writeFileSync(join(centerRoot, '.local/instances/soc-business/instance.json'), JSON.stringify({ workspace_id: binding.workspaceId, asset_root: centerRoot, agent_id: binding.agentId, web_base_path: '/agents/soc/instances/soc-business/', business_control: { runtime_generation: binding.runtimeGeneration, source_digest: binding.sourceDigest, origin: `http://127.0.0.1:${ctx.webServer.port}` } })); const coordinator = getBusinessControl(centerRoot); coordinator.registerInstance(binding); const gateway = await startBusinessGateway(centerRoot, { host: '127.0.0.1', port: 0, publicOrigin: 'http://business.localhost:0', sharedSecretFile: secretPath, instances: [{ agentId: binding.agentId, instanceId: binding.instanceId }] }); t.after(() => gateway.close())
-  const loaded = ctx.plugin(Runtime, { assetRoot, stateRoot: join(assetRoot, 'runtime-state'), sharedSecretFile: secretPath, coordinatorOrigin: `http://127.0.0.1:${gateway.server.address().port}`, workspacePath, binding, localTools })
+  const centerRoot = join(assetRoot, 'center-assets'); mkdirSync(join(centerRoot, 'config'), { recursive: true }); mkdirSync(join(centerRoot, '.local/instances/soc-business'), { recursive: true }); symlinkSync(join(assetRoot, 'config/business-access.json'), join(centerRoot, 'config/business-access.json')); writeFileSync(join(centerRoot, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: binding.workspaceId })); writeFileSync(join(centerRoot, '.local/instances/soc-business/instance.json'), JSON.stringify({ workspace_id: binding.workspaceId, asset_root: centerRoot, agent_id: binding.agentId, web_base_path: '/agents/soc/instances/soc-business/', business_control: { runtime_generation: binding.runtimeGeneration, source_digest: binding.sourceDigest, origin: `http://127.0.0.1:${ctx.webServer.port}` } })); const coordinator = getBusinessControl(centerRoot); coordinator.registerInstance(binding); const gateway = await startBusinessGateway(centerRoot, { ...setupConfig.gateway, sharedSecretFile: secretPath }); t.after(() => gateway.close())
+  const loaded = ctx.plugin(Runtime, { assetRoot, stateRoot: join(assetRoot, 'runtime-state'), sharedSecretFile: secretPath, coordinatorOrigin: `http://127.0.0.1:${gateway.server.address().port}`, basePath, workspacePath, binding, localTools })
   if (registrationFailure) {
     await assert.rejects(async () => { await loaded }, /业务固定工作区登记失败.*EACCES/)
     return { ctx, workspaceRows, registrationConnections }
@@ -88,8 +91,40 @@ async function setup(t, { localTools = [], emptyWorkspace = false, registrationF
   const context = id => { const value = sharedDevelopment ? sharedInstanceIdentity(binding) : identity(id); if (!sharedDevelopment) { value.subject.identitySource = `http://127.0.0.1:${provider.address().port}`; value.evidence.issuer = value.subject.identitySource }; return control.createContext(value, binding) }
   const headers = (id, path, method = 'POST') => signBusinessAssertion(secret, { binding, context: context(id), snapshot: coordinator.issueSnapshot(binding.instanceId), nonce: randomBytes(24).toString('base64url'), issuedAt: Date.now() }, method, path)
   const rpc = async (id, endpoint, request) => { const path = `/api/${endpoint}`; return fetch(`http://127.0.0.1:${ctx.webServer.port}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers(id, path) }, body: JSON.stringify({ type: 'client-request', rpcId: randomBytes(8).toString('hex'), method: endpoint, payload: { args: { request } } }) }) }
-  return { ctx, control, fixture, headers, rpc, context, secret, coordinator, workspacePath, workspaceRows, workspaceRegistry, registrationConnections, toolGuards, agents, trustCalls, delayTrust: (id, delay) => trustDelays.set(id, delay), revoke: id => revokedSubjects.add(id) }
+  return { ctx, control, fixture, headers, rpc, context, secret, coordinator, gateway, workspacePath, workspaceRows, workspaceRegistry, registrationConnections, toolGuards, agents, trustCalls, delayTrust: (id, delay) => trustDelays.set(id, delay), revoke: id => revokedSubjects.add(id) }
 }
+test('门户代理保留路径并使用 HTTPS 来源连接原生 API 与 WebSocket，直连入口仍可用', { timeout: 5000 }, async t => {
+  const { gateway } = await setup(t, { sharedDevelopment: true, proxyOrigin: 'https://portal.localhost:18060' })
+  const target = `http://127.0.0.1:${gateway.server.address().port}`, base = '/agents/soc/instances/soc-business/'
+  const portalHeaders = { host: 'portal.localhost', 'x-forwarded-proto': 'https', origin: 'https://portal.localhost:18060' }
+  const frontFetch = (path, options = {}) => new Promise((resolve, reject) => {
+    const request = httpRequest(target + path, options, response => {
+      const chunks = []; response.on('data', data => chunks.push(data))
+      response.on('end', () => resolve(new Response(Buffer.concat(chunks), { status: response.statusCode })))
+    })
+    request.on('error', reject); request.end(options.body)
+  })
+  for (const headers of [portalHeaders, { ...portalHeaders, host: 'portal.localhost:18060' }, { host: 'business.localhost:0' }]) {
+    const response = await frontFetch(base + 'api/session/list', { method: 'POST', headers: { ...headers, 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'client-request', rpcId: 'portal-list', method: 'session/list', payload: { args: { request: {} } } }) })
+    const text = await response.text()
+    assert.equal(response.status, 200, text)
+    assert.doesNotMatch(text, /error/)
+  }
+  for (const headers of [{ ...portalHeaders, origin: 'https://other.localhost:18060' },
+    { ...portalHeaders, 'x-forwarded-proto': 'http' }, { ...portalHeaders, host: 'other.localhost' }]) {
+    assert.equal((await frontFetch(base, { headers })).status, 403)
+  }
+  const ws = new WebSocket(target.replace('http:', 'ws:') + base + 'api/remote.mux', { headers: portalHeaders })
+  t.after(() => ws.terminate())
+  await once(ws, 'open')
+  const message = once(ws, 'message')
+  ws.send(JSON.stringify({ type: 'open', streamId: 'portal-workspace', endpoint: 'workspace/follow', payload: { args: {} } }))
+  const frame = JSON.parse((await message)[0].toString())
+  assert.equal(frame.streamId, 'portal-workspace')
+  assert.equal(frame.type, 'item')
+  assert.equal(frame.value.type, 'baseline')
+})
 test('业务共享资源工具仅开放已登记的分组来源', async t => {
   const { ctx, control, context, toolGuards } = await setup(t)
   const runtime = ctx.get('businessRuntime')

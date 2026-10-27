@@ -13,6 +13,7 @@ const SIGNATURE_HEADER = 'x-harness-business-signature'
 const SIGNATURE_TTL_MS = 2_000
 export interface BusinessGatewayConfig {
   host: string; port: number; publicOrigin: string; sharedSecretFile: string
+  proxyOrigin?: string
   instances: BusinessGatewayInstance[]; managementUrl?: string
 }
 export interface RuntimeAssertion { context?: BusinessContext; binding: InstanceBinding; snapshot?: ControlSnapshot; observation?: ReplicaObservation; requestDigest?: string; issuedAt: number; nonce: string }
@@ -122,12 +123,13 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
   if (!control.enabled()) throw new Error('业务控制尚未启用')
   const secret = readBusinessSecret(config.sharedSecretFile)
   const origin = new URL(config.publicOrigin)
-  if (origin.pathname !== '/' || origin.search || origin.hash || origin.username || origin.password) throw new Error('业务公开来源必须是独立 origin')
+  const proxyOrigin = config.proxyOrigin ? new URL(config.proxyOrigin) : undefined
+  for (const value of [origin, proxyOrigin]) if (value && (!['http:', 'https:'].includes(value.protocol) || value.pathname !== '/' || value.search || value.hash || value.username || value.password)) throw new Error('业务公开来源必须是独立 origin')
   const currentInstances = (): BusinessGatewayInstance[] => {
     const access = control.config(), current = access.gateway as Partial<BusinessGatewayConfig> | undefined
     if (!access.enabled) throw new Error('业务网关已关闭')
     if (!current) throw new Error('业务网关登记已移除')
-    if (current.publicOrigin !== config.publicOrigin || current.sharedSecretFile !== config.sharedSecretFile
+    if (current.publicOrigin !== config.publicOrigin || current.proxyOrigin !== config.proxyOrigin || current.sharedSecretFile !== config.sharedSecretFile
       || current.host !== config.host || current.port !== config.port || !Array.isArray(current.instances)) {
       throw new Error('业务网关监听配置已变化，请重新启动平台后访问')
     }
@@ -162,8 +164,18 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
     if (!session || session.expiresAt <= Date.now()) return {}
     return session.headers
   }
-  const assertOrigin = (req: IncomingMessage) => {
-    if (req.headers.host !== origin.host || (req.headers.origin && req.headers.origin !== origin.origin)) throw new Error('业务请求来源无效')
+  const requestOrigin = (req: IncomingMessage): URL | undefined => {
+    // 门户转发 Host 时可能去掉端口；只接受已配置的代理来源及其协议。
+    const expected = proxyOrigin && [proxyOrigin.host, proxyOrigin.hostname].includes(req.headers.host || '')
+      && req.headers['x-forwarded-proto'] === proxyOrigin.protocol.slice(0, -1) ? proxyOrigin : origin
+    if (req.headers.host !== expected.host && !(expected === proxyOrigin && req.headers.host === expected.hostname)) return undefined
+    if (req.headers.origin && req.headers.origin !== expected.origin) return undefined
+    return expected
+  }
+  const assertOrigin = (req: IncomingMessage): URL => {
+    const expected = requestOrigin(req)
+    if (!expected) throw new Error('业务请求来源无效')
+    return expected
   }
   const admit = async (req: IncomingMessage, transport: 'http' | 'websocket') => {
     assertOrigin(req)
@@ -172,7 +184,7 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
   }
   const assertionFor = (instance: RegisteredBusinessInstance, context?: BusinessContext): RuntimeAssertion => ({ binding: instance.binding, context, snapshot: control.issueSnapshot(instance.binding.instanceId), issuedAt: Date.now(), nonce: randomBytes(24).toString('base64url') })
   const prepare = async (req: IncomingMessage, transport: 'http' | 'websocket', res?: ServerResponse) => {
-    assertOrigin(req)
+    const externalOrigin = assertOrigin(req)
     const url = new URL(req.url || '/', origin)
     const match = /^\/agents\/([a-z0-9-]+)\/instances\/([a-z0-9-]+)(\/.*)?$/.exec(url.pathname)
     if (!match) throw new Error('请选择已开放业务实例')
@@ -189,8 +201,8 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
     // 代理丢弃调用方凭据与伪造控制 Header，只有此边界签名进入 Runtime。
     for (const name of Object.keys(req.headers)) if (name.startsWith('x-harness-') || ['authorization', 'cookie', 'forwarded', 'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto'].includes(name)) delete req.headers[name]
     // 受信网关重建公开来源；Runtime 内插件按 X-Forwarded-Host 识别反代，不能继承调用方值。
-    req.headers['x-forwarded-host'] = origin.host
-    req.headers['x-forwarded-proto'] = origin.protocol.replace(':', '')
+    req.headers['x-forwarded-host'] = externalOrigin.host
+    req.headers['x-forwarded-proto'] = externalOrigin.protocol.replace(':', '')
     req.url = path
     Object.assign(req.headers, signBusinessAssertion(secret, assertionFor(instance, context), req.method || 'GET', path))
     req.headers.host = new URL(instance.origin).host
@@ -199,7 +211,7 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
   const server = createServer(async (req, res) => {
     try {
       if (req.url === '/' && req.method === 'GET') {
-        if (req.headers.host !== origin.host) throw new Error('业务请求来源无效')
+        assertOrigin(req)
         const instances = currentInstances()
         let availableAgents: { agentId: string; instanceId: string }[] = []
         const anonymousInstances: BusinessGatewayInstance[] = []
@@ -255,11 +267,11 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
         if (previousId) { sessions.delete(previousId); for (const socket of browserConnections.get(previousId) || []) socket.destroy(); browserConnections.delete(previousId) }
         const id = randomBytes(32).toString('base64url')
         sessions.set(id, { headers: bearer, expiresAt: Date.parse(identity.expiresAt) })
-        res.setHeader('set-cookie', `harness-business=${id}; HttpOnly; SameSite=Strict; Path=/${origin.protocol === 'https:' ? '; Secure' : ''}`)
+        res.setHeader('set-cookie', `harness-business=${id}; HttpOnly; SameSite=Strict; Path=/${assertOrigin(req).protocol === 'https:' ? '; Secure' : ''}`)
         return json(res, 200, { subject: identity.subject, expiresAt: identity.expiresAt })
       }
       if (req.url === '/session' && req.method === 'DELETE') {
-        if (req.headers.host !== origin.host || (req.headers.origin && req.headers.origin !== origin.origin)) throw new Error('业务请求来源无效')
+        assertOrigin(req)
         const key = browserSessionId(req)
         if (key) { sessions.delete(key); for (const socket of browserConnections.get(key) || []) socket.destroy(); browserConnections.delete(key) }
         res.setHeader('set-cookie', 'harness-business=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0')
@@ -326,7 +338,7 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
       let knownAgent = false
       try { knownAgent = !!match && currentInstances().some(item => item.agentId === match[1]) } catch { /* 配置失效时保持拒绝。 */ }
       if (!res.headersSent && status === 401 && req.method === 'GET' && req.headers.accept?.includes('text/html')
-        && req.headers.host === origin.host && match && knownAgent) {
+        && requestOrigin(req) && match && knownAgent) {
         res.writeHead(401, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
         res.end(renderBusinessGatewayHome({ availableAgents: [], rules: [], facts: [], restrictions: [],
           authenticationMessage: '请先登录，再访问业务智能体。', managementUrl: currentManagementUrl(),
