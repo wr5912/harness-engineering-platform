@@ -179,7 +179,12 @@ test('v2 分组只接受固定实例签名与当前受信 Session，签名不降
   context.get = () => undefined
   const startupOnly = await connect(new StreamableHTTPClientTransport(url, { fetch: signed(undefined) }))
   const startupTools = await startupOnly.listTools()
-  assert.deepEqual(startupTools.tools.map(tool => tool.name), ['source__echo'])
+  const expectedNames = startupTools.tools.map(tool => tool.name)
+  assert.equal(expectedNames.length, 2)
+  assert.equal(expectedNames[0], 'source__echo')
+  assert.match(expectedNames[1], /^source__resource_echo_[a-f0-9]{12}$/)
+  assert.equal((await throughRuntime.callTool({ name: expectedNames[1], arguments: {},
+    _meta: { 'io.deepseek.dsh/mcp-group-target': { digest: targetDigest } } })).content[0].text, '{"reached":true}')
   assert.deepEqual(startupTools._meta['io.deepseek.dsh/mcp-group-discovery'], { unavailable: ['unreachable'] })
   await assert.rejects(startupOnly.listResources())
   const bearerOnly = await connect(new StreamableHTTPClientTransport(url,
@@ -217,5 +222,5 @@ test('v2 分组只接受固定实例签名与当前受信 Session，签名不降
   assert.equal(staleList.status, 401, '实例来源 pin 变化后旧签名不得列出分组工具')
   access.gateway.instances[0].sourceDigest = sourceDigest
   writeFileSync(join(root, 'config', 'business-access.json'), JSON.stringify(access))
-  assert.deepEqual((await startupOnly.listTools()).tools.map(tool => tool.name), ['source__echo'])
+  assert.deepEqual((await startupOnly.listTools()).tools.map(tool => tool.name), expectedNames)
 })

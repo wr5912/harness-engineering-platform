@@ -70,6 +70,7 @@ window.__ModuleLoader__.load({
       .mcp-manager .mcp-field input,.mcp-manager .mcp-field select{width:100%;min-width:0;min-height:40px;padding:8px 12px;border:1px solid var(--mcp-line);border-radius:var(--hep-control-radius,8px);background:var(--mcp-surface);color:var(--mcp-ink);font-weight:400;transition:border-color var(--hep-motion-fast,140ms),box-shadow var(--hep-motion-fast,140ms)}
       .mcp-manager .mcp-field input:focus,.mcp-manager .mcp-field select:focus{border-color:var(--mcp-blue);box-shadow:0 0 0 3px var(--mcp-active)}
       .mcp-manager .mcp-field small{font-size:12px;color:var(--mcp-muted);font-weight:400}
+      .mcp-manager .mcp-check-info{display:grid;gap:3px;min-width:0}.mcp-manager .mcp-check-info small{overflow-wrap:anywhere}
       .mcp-manager .mcp-wide{grid-column:1/-1}.mcp-manager .mcp-switch,.mcp-manager .mcp-check{display:flex;align-items:center;gap:10px;cursor:pointer}
       .mcp-manager .mcp-switch input,.mcp-manager .mcp-check input{width:16px;height:16px;flex:none;accent-color:var(--mcp-blue)}
       .mcp-manager .mcp-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:20px}
@@ -225,15 +226,15 @@ window.__ModuleLoader__.load({
           if (action === 'test') {
             setCatalog({ serverId: diagnosticId, data })
             setDiscovered(previous => ({ ...previous,
-              [diagnosticId]: data.tools?.map(tool => tool.name) ?? [] }))
+              [diagnosticId]: data.toolsUnavailable ? undefined : data.tools ?? [] }))
             setDiscoveredResources(previous => ({ ...previous, [diagnosticId]: {
-              resourceUris: data.resources?.unavailable ? undefined : data.resources?.resources?.map(item => item.uri),
-              resourceTemplates: data.resourceTemplates?.unavailable ? undefined : data.resourceTemplates?.resourceTemplates?.map(item => item.uriTemplate),
+              resourceUris: data.resources?.unavailable ? undefined : data.resources?.resources,
+              resourceTemplates: data.resourceTemplates?.unavailable ? undefined : data.resourceTemplates?.resourceTemplates,
             } }))
             setChecks(previous => ({ ...previous, [diagnosticId]: { at: new Date().toLocaleString(), revision: state.revision, tools: data.tools?.length ?? 0,
               kind: (state.value.servers ?? []).find(server => server.id === diagnosticId)?.specUrl ? 'openapi' : 'mcp' } }))
           }
-          setStatus(action === 'test' ? '配置解析与工具发现成功；新会话仍需单独验证。'
+          setStatus(action === 'test' ? (data.toolsUnavailable || data.resources?.unavailable || data.resourceTemplates?.unavailable ? '部分列表读取失败，已保留可用的发现结果；可重试发现。' : '配置解析与工具发现成功；新会话仍需单独验证。')
             : '上游操作已返回；请检查下方结果和新会话。')
         } catch (error) { if (action === 'test') setChecks(previous => ({ ...previous, [diagnosticId]: { at: new Date().toLocaleString(), revision: state.revision, failed: true } })); setStatus(String(error)) }
         finally { setBusy(false) }
@@ -313,7 +314,7 @@ window.__ModuleLoader__.load({
       const currentServerIndex = selectedServerId ? visibleServers.findIndex(server => server.id === selectedServerId) : activeServer
       const editingServer = visibleServers[currentServerIndex]
       const currentCheck = checkOf(editingServer)
-      const currentTools = currentCheck && !currentCheck.failed ? (catalog?.serverId === editingServer?.id ? catalog.data.tools ?? [] : (discovered[editingServer?.id] ?? []).map(name => ({ name }))) : []
+      const currentTools = currentCheck && !currentCheck.failed ? (catalog?.serverId === editingServer?.id ? catalog.data.tools ?? [] : discovered[editingServer?.id] ?? []) : []
       const editingGroup = draft.groups[activeGroup]
       const duplicateIds = editingGroup ? duplicateMemberIds(editingGroup.members) : []
       const savedGroup = (state.value.groups ?? []).find(group => group.id === editingGroup?.id)
@@ -496,21 +497,29 @@ window.__ModuleLoader__.load({
                     {linkReady && isDirty && <p className="mcp-muted">当前草稿尚未保存；链接仍使用上次保存的配置。</p>}
                     <p className="mcp-muted">通过 Authorization: Bearer &lt;统一访问 Token&gt; 调用。DSH 中将连接名设为分组 ID，模型可见工具名以该分组为前缀；超长工具名由 DSH 缩短。</p>
                   </section>
-                  <section className="mcp-section"><h3>选择工具与资源</h3><p className="mcp-muted">发现使用上次保存的服务配置；未发现的已保存项目仍可筛选，筛选不更改勾选结果。</p>
+                  <section className="mcp-section"><h3>选择工具与资源</h3><p className="mcp-muted">发现使用上次保存的服务配置；名称下方显示原始标识、URI 与分组工具名。勾选的资源在 v2 链接中各自发布为可调用工具，筛选不更改勾选结果。</p>
                     {visibleServers.map((server, index) => {
                       const members = editingGroup.members.filter(item => item.serverId === server.id)
                       const selected = Object.fromEntries(['names', 'resourceUris', 'resourceTemplates'].map(field =>
                         [field, [...new Set(members.flatMap(member => member[field] ?? []))]]))
                       const needsMerge = members.length > 1
                       const resources = discoveredResources[server.id]
-                      const discoveredNames = server.platformComposition ? (server.publishedTools ?? []).map(tool => tool.toolName || tool.name).filter(Boolean) : discovered[server.id]
+                      const discoveredTools = server.platformComposition ? (server.publishedTools ?? []).map(tool => ({ ...tool, name: tool.toolName || tool.name })).filter(tool => tool.name) : discovered[server.id]
                       const query = selectionQueries.get(server.id) ?? ''
                       const keyword = query.trim().toLowerCase()
                       const sections = [
-                        { field: 'names', title: '工具', items: [...new Set([...selected.names, ...(discoveredNames ?? [])])], discovered: discoveredNames },
-                        { field: 'resourceUris', title: '资源 URI', items: [...new Set([...selected.resourceUris, ...(resources?.resourceUris ?? [])])], discovered: resources?.resourceUris },
-                        { field: 'resourceTemplates', title: '资源模板', items: [...new Set([...selected.resourceTemplates, ...(resources?.resourceTemplates ?? [])])], discovered: resources?.resourceTemplates },
-                      ].map(section => ({ ...section, visibleItems: section.items.filter(item => item.toLowerCase().includes(keyword)) }))
+                        { field: 'names', title: '工具', key: 'name', discovered: discoveredTools },
+                        { field: 'resourceUris', title: '资源 URI', key: 'uri', discovered: resources?.resourceUris },
+                        { field: 'resourceTemplates', title: '资源模板', key: 'uriTemplate', discovered: resources?.resourceTemplates },
+                      ].map(section => {
+                        const catalog = new Map((section.discovered ?? []).map(item => [item[section.key], item]))
+                        const items = [...new Set([...selected[section.field], ...catalog.keys()])].map(value => {
+                          const item = catalog.get(value)
+                          return { value, item, label: item?.title || item?.name || value,
+                            details: [...new Set([item?.name, value, item?.groupToolName].filter(Boolean))] }
+                        })
+                        return { ...section, items, visibleItems: items.filter(item => [item.label, ...item.details].join(' ').toLowerCase().includes(keyword)) }
+                      })
                       const selectedCount = selected.names.length + selected.resourceUris.length + selected.resourceTemplates.length
                       return <details className="mcp-server-tools" key={server.id || index} data-server-id={server.id}>
                         <summary>{server.serverName || server.id || '新服务器'}<span className="mcp-muted">{selectedCount} 个已选{server.enabled === false ? ' · 已停用' : ''}</span></summary>
@@ -518,7 +527,7 @@ window.__ModuleLoader__.load({
                           <div className="mcp-selection-row">
                             <p className="mcp-muted">服务器 ID：{server.id || '未设置 ID'}</p>
                             <div className="mcp-selection-search">
-                              <input type="search" aria-label={`筛选服务 ${server.id || '未设置 ID'} 的工具与资源`} placeholder="筛选工具、资源 URI、资源模板" value={query} onChange={event => setSelectionQueries(previous => new Map(previous).set(server.id, event.target.value))} />
+                              <input type="search" aria-label={`筛选服务 ${server.id || '未设置 ID'} 的工具与资源`} placeholder="按名称、标识或 URI 筛选" value={query} onChange={event => setSelectionQueries(previous => new Map(previous).set(server.id, event.target.value))} />
                               {query && <button type="button" aria-label="清空筛选" title="清空筛选" onClick={event => {
                                 setSelectionQueries(previous => new Map(previous).set(server.id, ''))
                                 event.currentTarget.previousElementSibling?.focus()
@@ -529,7 +538,7 @@ window.__ModuleLoader__.load({
                           {needsMerge && <p className="mcp-muted">此来源有重复成员，请先合并再编辑选择。</p>}
                           {!server.platformComposition && <button className="mcp-quiet" type="button" onClick={() => { setSelected(server.id); void callTest(server.id) }} disabled={busy || !server.id || server.enabled === false}>发现工具与资源</button>}
                           {sections.map(section => <section key={section.field}><h4>{section.title}</h4>
-                            {section.visibleItems.length ? <div className="mcp-tools">{section.visibleItems.map(item => <label className="mcp-check" key={item}><input type="checkbox" checked={selected[section.field].includes(item)} disabled={needsMerge} onChange={() => toggleSelection(activeGroup, server.id, section.field, item)} />{item}{selected[section.field].includes(item) && Array.isArray(section.discovered) && !section.discovered.includes(item) && <span className="mcp-muted">（当前未发现）</span>}</label>)}</div>
+                            {section.visibleItems.length ? <div className="mcp-tools">{section.visibleItems.map(({ value, item, label, details }) => <label className="mcp-check" key={value}><input type="checkbox" checked={selected[section.field].includes(value)} disabled={needsMerge} onChange={() => toggleSelection(activeGroup, server.id, section.field, value)} /><span className="mcp-check-info"><span>{label}{selected[section.field].includes(value) && Array.isArray(section.discovered) && !item && <span className="mcp-muted">（当前未发现）</span>}</span>{details.filter(detail => detail !== label).map(detail => <small className="mcp-muted" key={detail}>{detail}</small>)}</span></label>)}</div>
                               : section.items.length ? <p className="mcp-muted">没有匹配项。</p>
                               : <p className="mcp-muted">{section.discovered === undefined ? '尚未发现，或此服务未提供该列表。' : '没有可选项目。'}</p>}
                             {section.discovered === undefined && selected[section.field].length > 0 && <p className="mcp-muted">已保存的选择尚无法通过当前发现结果核对。</p>}
@@ -617,14 +626,14 @@ window.__ModuleLoader__.load({
           const data = await response.json()
           if (!response.ok) throw new Error(data.error)
           setCatalog({ serverId, data })
-          setDiscovered(previous => ({ ...previous, [serverId]: data.tools?.map(tool => tool.name) ?? [] }))
+          setDiscovered(previous => ({ ...previous, [serverId]: data.toolsUnavailable ? undefined : data.tools ?? [] }))
           setDiscoveredResources(previous => ({ ...previous, [serverId]: {
-            resourceUris: data.resources?.unavailable ? undefined : data.resources?.resources?.map(item => item.uri),
-            resourceTemplates: data.resourceTemplates?.unavailable ? undefined : data.resourceTemplates?.resourceTemplates?.map(item => item.uriTemplate),
+            resourceUris: data.resources?.unavailable ? undefined : data.resources?.resources,
+            resourceTemplates: data.resourceTemplates?.unavailable ? undefined : data.resourceTemplates?.resourceTemplates,
           } }))
           setChecks(previous => ({ ...previous, [serverId]: { at: new Date().toLocaleString(), revision: state.revision, tools: data.tools?.length ?? 0,
             kind: (state.value.servers ?? []).find(server => server.id === serverId)?.specUrl ? 'openapi' : 'mcp' } }))
-          setStatus(`${serverId} 已发现 ${data.tools?.length ?? 0} 个工具、${data.resources?.resources?.length ?? 0} 个资源、${data.resourceTemplates?.resourceTemplates?.length ?? 0} 个模板。`)
+          setStatus(`${serverId} 已发现 ${data.tools?.length ?? 0} 个工具、${data.resources?.resources?.length ?? 0} 个资源、${data.resourceTemplates?.resourceTemplates?.length ?? 0} 个模板。${data.toolsUnavailable || data.resources?.unavailable || data.resourceTemplates?.unavailable ? "部分列表读取失败，可重试发现。" : ""}`)
         } catch (error) {
           setChecks(previous => ({ ...previous, [serverId]: { at: new Date().toLocaleString(), revision: state.revision, failed: true } }))
           const reason = error instanceof Error ? error.message : String(error)

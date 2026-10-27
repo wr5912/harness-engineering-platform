@@ -205,7 +205,8 @@ export async function loadOpenApi(server: any): Promise<any> {
       if (method === 'get' && !body && parameters.every(parameter => ['path', 'query'].includes(parameter.in)
         && (parameter.in !== 'query' || parameter.schema?.type !== 'array' && /^[A-Za-z0-9_.-]+$/.test(parameter.name)))) {
         readable.push(item)
-        const info = { name, description, mimeType: 'application/json' }
+        const info = { name, title: raw.summary, description, mimeType: 'application/json',
+          inputSchema: { ...operationSchema(spec, parameters, body), additionalProperties: false } }
         if (parameters.length) {
           const queryNames = parameters.filter(parameter => parameter.in === 'query').map(parameter => parameter.name)
           resourceTemplates.push({ ...info, uriTemplate: uri.replace(/%7B/gi, '{').replace(/%7D/gi, '}')
@@ -261,7 +262,18 @@ export async function callOpenApiTool(source: any, name: string, args: any): Pro
   return { content: [{ type: 'text', text: text || `HTTP ${response.status}` }], isError: !response.ok }
 }
 
-export async function readOpenApiResource(source: any, uri: string): Promise<any> {
+async function readResourceOperation(source: any, item: any, args: any, uri: string): Promise<any> {
+  const { response, text } = await execute(source, item, args)
+  if (!response.ok) throw new Error(`Resource 读取失败：HTTP ${response.status}`)
+  return { contents: [{ uri, mimeType: response.headers.get('content-type')?.split(';')[0] || 'application/json', text }] }
+}
+
+export async function readOpenApiResource(source: any, uri: string, args?: Record<string, unknown>): Promise<any> {
+  if (args !== undefined) {
+    const resource = [...source.resources, ...source.resourceTemplates].find(item => (item.uri ?? item.uriTemplate) === uri)
+    if (!resource) throw new Error('Resource URI 不属于当前 OpenAPI 范围')
+    return readResourceOperation(source, source.operations.get(resource.name), args, uri)
+  }
   const request = new URL(uri)
   if (request.hash) throw new Error('Resource URI 不属于当前 OpenAPI 范围')
   for (const item of source.readable) {
@@ -282,9 +294,7 @@ export async function readOpenApiResource(source: any, uri: string): Promise<any
       const value = request.searchParams.get(name)
       if (value !== null) args[name] = value
     }
-    const { response, text } = await execute(source, item, args)
-    if (!response.ok) throw new Error(`Resource 读取失败：HTTP ${response.status}`)
-    return { contents: [{ uri, mimeType: response.headers.get('content-type')?.split(';')[0] || 'application/json', text }] }
+    return readResourceOperation(source, item, args, uri)
   }
   throw new Error('Resource URI 不属于当前 OpenAPI 范围')
 }

@@ -11,6 +11,7 @@ const { McpServer, createMcpHandler } = runtimeRequire('@modelcontextprotocol/se
 const { toNodeHandler } = runtimeRequire('@modelcontextprotocol/node')
 const { createScope, scopeParentOf } = await import(runtimeRequire.resolve('@deepseek-ai/dsh-scope'))
 const McpClient = await import(runtimeRequire.resolve('@deepseek-ai/dsh-mcp-client'))
+const { validateJsonSchemaValue } = await import(runtimeRequire.resolve('@deepseek-ai/dsh-tools'))
 
 export const name = 'mcp-session-manager'
 export const inject = ['agents', 'webServer', 'connection', 'tools']
@@ -161,8 +162,23 @@ async function serverTools(server: any): Promise<any[]> {
     const source = await loadOpenApi(server)
     return server.platformToolResources ? source.businessTools : source.tools
   }
-  return withClient(server, async client => typeof client.getServerCapabilities !== 'function'
-    || client.getServerCapabilities()?.tools ? (await client.listTools(undefined, { signal: server.platformSignal })).tools : [])
+  return withClient(server, client => listCatalog(client, 'tools', server.platformSignal))
+}
+
+async function listCatalog(client: any, kind: 'tools' | 'resources' | 'resourceTemplates', signal?: AbortSignal): Promise<any[]> {
+  const capability = kind === 'tools' ? 'tools' : 'resources'
+  if (typeof client.getServerCapabilities === 'function' && !client.getServerCapabilities()?.[capability]) return []
+  const method = kind === 'tools' ? 'listTools' : kind === 'resources' ? 'listResources' : 'listResourceTemplates'
+  const items: any[] = [], cursors = new Set<string>()
+  let cursor: string | undefined
+  do {
+    const page = await client[method](cursor ? { cursor } : undefined, { signal })
+    items.push(...page[kind])
+    cursor = page.nextCursor
+    if (cursor && cursors.has(cursor)) throw new Error('MCP 发现分页游标重复')
+    if (cursor) cursors.add(cursor)
+  } while (cursor)
+  return items
 }
 
 async function withClient<T>(server: any, run: (client: any) => Promise<T>): Promise<T> {
@@ -188,7 +204,7 @@ async function callManagedTool(server: any, name: string, args: any, meta?: Reco
   if (server.tools?.mode === 'selected' && !server.tools.names.includes(name)) throw new Error('工具不属于当前 MCP 范围')
   if (server.specUrl) return callOpenApiTool(await loadOpenApi(server), name, args)
   return withClient(server, async client => {
-    const tool = (await client.listTools(undefined, { signal: server.platformSignal })).tools.find((item: any) => item.name === name)
+    const tool = (await listCatalog(client, 'tools', server.platformSignal)).find((item: any) => item.name === name)
     if (!tool) throw new Error('工具不属于当前 MCP 范围')
     const dispatch = (signal?: AbortSignal) => client.callTool({ name, arguments: args, ...(meta ? { _meta: meta } : {}) }, {
       signal: signal ?? server.platformSignal, timeout: server.platformComposition ? 36 * 60_000 : server.platformTimeoutMs ?? 60_000,
@@ -210,9 +226,9 @@ async function callManagedTool(server: any, name: string, args: any, meta?: Reco
   })
 }
 
-async function readManagedResource(server: any, uri: string): Promise<any> {
+async function readManagedResource(server: any, uri: string, args?: Record<string, unknown>): Promise<any> {
   if (server.enabled === false) throw new Error('MCP 服务器已停用')
-  if (server.specUrl) return readOpenApiResource(await loadOpenApi(server), uri)
+  if (server.specUrl) return readOpenApiResource(await loadOpenApi(server), uri, args)
   return withClient(server, client => {
     const dispatch = (signal?: AbortSignal) => client.readResource({ uri }, { signal: signal ?? server.platformSignal })
     if (server.platformGroup) {
@@ -288,6 +304,19 @@ function v2ToolName(serverId: string, rawName: string): string {
   return `${serverId.replaceAll('_', '_0')}__${rawName}`
 }
 
+function resourceToolName(serverId: string, kind: 'r' | 't', item: any): string {
+  const type = kind === 'r' ? 'resource' : 'template'
+  const uri = kind === 'r' ? item.uri : item.uriTemplate
+  const label = String(item.name || type).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 32)
+  const hash = createHash('sha256').update(`${kind}\0${uri}`).digest('hex').slice(0, 12)
+  return v2ToolName(serverId, `${type}_${label}_${hash}`)
+}
+
+function discoveryMetadata(server: any, kind: 'tools' | 'r' | 't', items: any[]): any[] {
+  return items.map(item => ({ ...item, groupToolName: kind === 'tools'
+    ? v2ToolName(server.id, item.name) : resourceToolName(server.id, kind, item) }))
+}
+
 async function toolsFor(target: Target, version: GroupVersion = 1, signal?: AbortSignal, unavailable: string[] = []): Promise<any[]> {
   if (target.kind === 'agent') {
     const tools = await serverTools({ ...target.server, platformSignal: signal ?? target.server.platformSignal })
@@ -317,6 +346,11 @@ async function toolsFor(target: Target, version: GroupVersion = 1, signal?: Abor
         result.push({ ...tool, name })
       }
     }
+  }
+  if (version === 2) for (const { tool } of await resourceToolsFor(target, signal, unavailable)) {
+    if (names.has(tool.name)) throw new Error('MCP 分组工具名重复')
+    names.add(tool.name)
+    result.push(tool)
   }
   return result
 }
@@ -359,12 +393,30 @@ async function resourceCatalog(server: any, kind: 'r' | 't'): Promise<any[]> {
     const source = await loadOpenApi(server)
     return kind === 'r' ? source.resources : source.resourceTemplates
   }
-  return withClient(server, async client => kind === 'r'
-    ? (await client.listResources(undefined, { signal: server.platformSignal })).resources
-    : (await client.listResourceTemplates(undefined, { signal: server.platformSignal })).resourceTemplates)
+  return withClient(server, client => listCatalog(client, kind === 'r' ? 'resources' : 'resourceTemplates', server.platformSignal))
 }
 
-async function resourcesFor(target: GroupTarget, kind: 'r' | 't', signal?: AbortSignal, unavailable: string[] = []): Promise<any[]> {
+async function discoverServer(server: any): Promise<any> {
+  if (server.specUrl) {
+    const source = await loadOpenApi(server)
+    return { tools: discoveryMetadata(server, 'tools', source.tools),
+      resources: { resources: discoveryMetadata(server, 'r', source.resources) },
+      resourceTemplates: { resourceTemplates: discoveryMetadata(server, 't', source.resourceTemplates) } }
+  }
+  return withClient(server, async client => {
+    const [tools, resources, templates] = await Promise.allSettled(
+      (['tools', 'resources', 'resourceTemplates'] as const).map(kind => listCatalog(client, kind, server.platformSignal)))
+    if ([tools, resources, templates].every(result => result.status === 'rejected')) throw new Error('MCP 工具与资源发现均未完成')
+    return { tools: tools.status === 'fulfilled' ? discoveryMetadata(server, 'tools', tools.value) : [],
+      ...(tools.status === 'rejected' ? { toolsUnavailable: true } : {}),
+      resources: { resources: resources.status === 'fulfilled' ? discoveryMetadata(server, 'r', resources.value) : [],
+        ...(resources.status === 'rejected' ? { unavailable: true } : {}) },
+      resourceTemplates: { resourceTemplates: templates.status === 'fulfilled' ? discoveryMetadata(server, 't', templates.value) : [],
+        ...(templates.status === 'rejected' ? { unavailable: true } : {}) } }
+  })
+}
+
+async function selectedResources(target: GroupTarget, kind: 'r' | 't', signal?: AbortSignal, unavailable: string[] = []): Promise<any[]> {
   const result: any[] = []
   const uris = new Set<string>()
   const catalogs = await Promise.all(target.group.members.map(async member => {
@@ -380,18 +432,72 @@ async function resourcesFor(target: GroupTarget, kind: 'r' | 't', signal?: Abort
     return { member, server, selected, catalog }
   }))
   for (const { server, selected, catalog, failed } of catalogs) {
+    if (!server) continue
     if (failed) unavailable.push(server.id)
+    for (const uri of selected) if (!catalog.some(item => (kind === 'r' ? item.uri : item.uriTemplate) === uri)) {
+      unavailable.push(`${server.id}: ${uri}（已选资源当前不可用）`)
+    }
     for (const item of catalog) {
       const sourceUri = kind === 'r' ? item.uri : item.uriTemplate
       if (!selected.includes(sourceUri)) continue
       const uri = groupResourceUri(target.group.id, server.id, kind, sourceUri)
       if (uris.has(uri)) throw new Error('MCP 分组 Resource URI 重复')
       uris.add(uri)
-      if (kind === 'r') result.push({ ...item, uri })
-      else result.push({ ...item, uriTemplate: `${uri}{?${sourceTemplate(sourceUri).variableNames.join(',')}}` })
+      let parsed: ReturnType<typeof sourceTemplate> | undefined
+      if (kind === 't') {
+        try { parsed = sourceTemplate(sourceUri) }
+        catch { unavailable.push(`${server.id}: ${sourceUri}（不支持的资源模板）`); continue }
+      }
+      result.push({ server, kind, item, uri, parsed })
     }
   }
   return result
+}
+
+async function resourcesFor(target: GroupTarget, kind: 'r' | 't', signal?: AbortSignal, unavailable: string[] = []): Promise<any[]> {
+  return (await selectedResources(target, kind, signal, unavailable)).map(({ item, uri, parsed }) => kind === 'r'
+    ? { ...item, uri } : { ...item, uriTemplate: `${uri}{?${parsed.variableNames.join(',')}}` })
+}
+
+async function resourceToolsFor(target: GroupTarget, signal?: AbortSignal, unavailable: string[] = []): Promise<any[]> {
+  const selected = (await Promise.all((['r', 't'] as const).map(kind => selectedResources(target, kind, signal, unavailable)))).flat()
+  return selected.map(binding => {
+    const { server, kind, item, parsed } = binding
+    const inputSchema = kind === 'r' ? { type: 'object', properties: {}, additionalProperties: false }
+      : server.specUrl ? item.inputSchema : { type: 'object', properties: Object.fromEntries(parsed.variableNames.map((name: string) =>
+        [name, { oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] }])),
+        required: parsed.requiredNames, additionalProperties: false }
+    return { ...binding, tool: { name: resourceToolName(server.id, kind, item),
+      ...(item.title ? { title: item.title } : {}), description: [item.description || item.title || item.name,
+        `读取资源：${kind === 'r' ? item.uri : item.uriTemplate}`].filter(Boolean).join('\n'), inputSchema,
+      annotations: { readOnlyHint: true } } }
+  })
+}
+
+async function callSelectedTool(target: Target, version: GroupVersion, name: string, args: any, meta?: Record<string, unknown>, signal?: AbortSignal,
+  assertCurrent?: () => void): Promise<any> {
+  const owner = toolOwner(target, name, version)
+  if (target.kind === 'group' && version === 2 && /__(?:resource|template)_/.test(name)) {
+    const candidates = { ...target, group: { ...target.group, members: target.group.members.filter((member: any) =>
+      name.startsWith(`${member.serverId.replaceAll('_', '_0')}__`)) } }
+    const bindings = (await resourceToolsFor(candidates, signal)).filter(binding => binding.tool.name === name)
+    if (bindings.length > 1 || bindings.length && owner) throw new Error('MCP 分组工具名重复')
+    if (bindings.length) {
+      const { tool, uri, parsed, server } = bindings[0]
+      const violations = validateJsonSchemaValue(tool.inputSchema, args, '')
+      if (violations.length) throw new Error(`资源工具参数无效：${violations.join('; ')}`)
+      const query = Object.entries(args).map(([key, value]) => `${key}=${(Array.isArray(value) ? value : [value]).map(item => encodeURIComponent(String(item))).join(',')}`).join('&')
+      const response = await readGroupResource(target, parsed && query && !server.specUrl ? `${uri}?${query}` : uri, signal, assertCurrent,
+        server.specUrl ? args : undefined)
+      // DSH 将嵌入资源显示为占位符；正文通过 text 交给模型，原始内容保留在 structuredContent。
+      return { content: response.contents.map((item: any) => ({ type: 'text', text: typeof item.text === 'string' ? item.text
+        : `资源 ${item.uri} 返回二进制内容（${item.mimeType || '未知类型'}），请通过资源读取接口获取。` })),
+        structuredContent: response }
+    }
+  }
+  if (!owner) throw new Error('工具不属于当前 MCP 范围')
+  assertCurrent?.()
+  return callManagedTool({ ...owner.server, platformSignal: signal ?? owner.server.platformSignal }, owner.rawName, args, meta)
 }
 
 function parseProxyResourceUri(uri: string): { groupId: string; serverId: string; kind: 'r' | 't'; sourceUri: string; query?: string } {
@@ -420,7 +526,8 @@ function templateValues(query: string | undefined, variableNames: string[]): Rec
   return result
 }
 
-async function readGroupResource(target: GroupTarget, uri: string, signal?: AbortSignal): Promise<any> {
+async function readGroupResource(target: GroupTarget, uri: string, signal?: AbortSignal, assertCurrent?: () => void,
+  args?: Record<string, unknown>): Promise<any> {
   const proxy = parseProxyResourceUri(uri)
   const member = target.group.members.find((item: any) => item.serverId === proxy.serverId)
   const selected = proxy.kind === 'r' ? member?.resourceUris ?? [] : member?.resourceTemplates ?? []
@@ -430,13 +537,15 @@ async function readGroupResource(target: GroupTarget, uri: string, signal?: Abor
     (proxy.kind === 'r' ? item.uri : item.uriTemplate) === proxy.sourceUri)
   if (sources.length !== 1) throw new Error(sources.length ? '来源 Resource URI 重复' : '已选 Resource 在来源中不可用')
   let upstreamUri = proxy.sourceUri
-  if (proxy.kind === 't') {
+  if (proxy.kind === 't' && args === undefined) {
     const { template, variableNames, requiredNames } = sourceTemplate(proxy.sourceUri)
     const values = templateValues(proxy.query, variableNames)
     if (requiredNames.some(name => !Object.hasOwn(values, name))) throw new Error('Resource URI 模板缺少路径参数')
     upstreamUri = template.expand(values)
   }
-  const response = await readManagedResource({ ...server, platformSignal: signal ?? server.platformSignal }, upstreamUri)
+  assertCurrent?.()
+  server.platformAssertCurrent?.()
+  const response = await readManagedResource({ ...server, platformSignal: signal ?? server.platformSignal }, upstreamUri, args)
   return { ...response, contents: response.contents?.map((item: any) => ({ ...item, uri })) ?? [] }
 }
 
@@ -474,11 +583,10 @@ async function serveMcp(req: any, res: any, target: Target, currentTarget?: () =
     }))
     mcp.server.setRequestHandler('tools/call', async (request: any, extra: any) => runRequest('tools/call', request, async () => {
       assertTarget(request)
-      const selectedOwner = toolOwner(target, request.params.name, version)
-      const owner = selectedOwner && { ...selectedOwner, server: { ...selectedOwner.server, platformSignal: extra?.mcpReq?.signal ?? extra?.signal } }
-      if (!owner) throw new Error('工具不属于当前 MCP 范围')
+      const response = await callSelectedTool(target, version, request.params.name, request.params.arguments ?? {}, request.params._meta,
+        extra?.mcpReq?.signal ?? extra?.signal, () => assertTarget(request))
       assertTarget(request)
-      return callManagedTool(owner.server, owner.rawName, request.params.arguments ?? {}, request.params._meta)
+      return response
     }))
     if (target.kind === 'agent' || target.kind === 'group' && version === 2) {
       mcp.server.setRequestHandler('resources/list', async (request: any, extra: any) => runRequest('resources/list', request, async () => {
@@ -499,7 +607,7 @@ async function serveMcp(req: any, res: any, target: Target, currentTarget?: () =
       }))
       mcp.server.setRequestHandler('resources/read', async (request: any, extra: any) => runRequest('resources/read', request, async () => {
         assertTarget(request)
-        const response = target.kind === 'group' ? await readGroupResource(target, request.params.uri, extra?.mcpReq?.signal ?? extra?.signal)
+        const response = target.kind === 'group' ? await readGroupResource(target, request.params.uri, extra?.mcpReq?.signal ?? extra?.signal, () => assertTarget(request))
           : await readManagedResource({ ...target.server, platformSignal: extra?.mcpReq?.signal ?? extra?.signal }, request.params.uri)
         assertTarget(request); return response
       }))
@@ -608,9 +716,8 @@ export function apply(ctx: any, config: any): void {
       if (!target) throw new Error('MCP 分组不存在')
       const request = { params: { _meta: meta } }
       assertGroupTarget(target, () => currentGroup(id), version, request)
-      const owner = toolOwner(target, name, version)
-      if (!owner) throw new Error('工具不属于当前 MCP 范围')
-      const response = await callManagedTool({ ...owner.server, platformSignal: exec?.signal }, owner.rawName, args, meta)
+      const response = await callSelectedTool(target, version, name, args, meta, exec?.signal,
+        () => assertGroupTarget(target, () => currentGroup(id), version, request))
       assertGroupTarget(target, () => currentGroup(id), version, request)
       return response
     }
@@ -679,30 +786,12 @@ export function apply(ctx: any, config: any): void {
         return send(res, 200, await callManagedTool(server, request.toolName, request.arguments))
       }
       if (request.action === 'test') {
-        if (server.specUrl) {
-          const source = await loadOpenApi(server)
-          return send(res, 200, { tools: source.tools.map(({ name, description, inputSchema, outputSchema }: any) => ({ name, description, inputSchema, ...(outputSchema ? { outputSchema } : {}) })),
-            resources: { resources: source.resources }, resourceTemplates: { resourceTemplates: source.resourceTemplates } })
-        }
-        const result = await withClient(server, async client => ({
-          tools: (await client.listTools()).tools,
-          resources: await client.listResources().catch(() => ({ resources: [], unavailable: true })),
-          resourceTemplates: await client.listResourceTemplates().catch(() => ({ resourceTemplates: [], unavailable: true })),
-        }))
-        return send(res, 200, result)
+        return send(res, 200, await discoverServer(server))
       }
       if (request.action === 'resources' || request.action === 'resourceTemplates' || request.action === 'readResource') {
-        if (server.specUrl) {
-          const source = await loadOpenApi(server)
-          const result = request.action === 'resources' ? { resources: source.resources }
-            : request.action === 'resourceTemplates' ? { resourceTemplates: source.resourceTemplates }
-              : await readManagedResource(server, request.uri)
-          return send(res, 200, result)
-        }
-        const result = await withClient(server, client => request.action === 'resources' ? client.listResources()
-          : request.action === 'resourceTemplates' ? client.listResourceTemplates()
-            : readManagedResource(server, request.uri))
-        return send(res, 200, result)
+        if (request.action === 'readResource') return send(res, 200, await readManagedResource(server, request.uri))
+        const kind = request.action === 'resources' ? 'r' : 't'
+        return send(res, 200, { [request.action]: discoveryMetadata(server, kind, await resourceCatalog(server, kind)) })
       }
       return send(res, 200, await manage(server, request))
     } catch (error) { send(res, 400, { error: error instanceof Error ? error.message : String(error) }) }

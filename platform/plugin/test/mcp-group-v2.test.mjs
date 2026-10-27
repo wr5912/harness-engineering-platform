@@ -127,7 +127,8 @@ test('v2 分组名称与显示名解耦，资源代理隔离同 URI 来源并拒
   const v1 = await client(1), v2 = await client(2)
   assert.deepEqual((await v1.listTools()).tools.map(tool => tool.name), ['mcp__DisplayOne__echo', 'mcp__DisplayTwo__echo'])
   const listed = await v2.listTools()
-  assert.deepEqual(listed.tools.map(tool => tool.name), ['alpha_0id__echo', 'beta__echo'])
+  assert.deepEqual(listed.tools.filter(tool => tool.name.endsWith('__echo')).map(tool => tool.name), ['alpha_0id__echo', 'beta__echo'])
+  assert.equal(listed.tools.length, 6)
   const digest = context.mcpSessionManager.currentGroup('ops', 2).targetDigest
   assert.equal(listed._meta['io.deepseek.dsh/mcp-group-target'].digest, digest)
   assert.equal((await v2.callTool({ name: 'alpha_0id__echo', arguments: { value: 'ok' },
@@ -434,7 +435,9 @@ test('分组允许只有 Resource 能力的服务，工具发现不要求上游 
   const groups = [{ id: 'assets', members: [{ serverId: 'resource', names: [], resourceUris: ['fixture:/same'], resourceTemplates: [] }] }]
   const { client } = await groupServer(t, manager, servers, groups)
   const v2 = await client(2)
-  assert.deepEqual((await v2.listTools()).tools, [])
+  const alias = (await v2.listTools()).tools[0]
+  assert.match(alias.name, /^resource__resource_same_[a-f0-9]{12}$/)
+  assert.equal((await v2.callTool({ name: alias.name, arguments: {} })).content[0].text, 'resource-only')
   const uri = (await v2.listResources()).resources[0].uri
   assert.equal((await v2.readResource({ uri })).contents[0].text, 'resource-only')
 })
@@ -478,4 +481,132 @@ test('v2 工具代理将 SDK 取消传到实际来源', async t => {
   controller.abort()
   await rejected
   await within(cancelled, '来源工具未取消')
+})
+
+
+test('资源工具复用真实读取、参数约束和同进程分派，正文可供 DSH 模型读取', async t => {
+  const manager = await managerModule(t), reads = []
+  const endpoint = await fixtureMcp(t, 'source text', reads)
+  const servers = [{ id: 'source', enabled: true, url: endpoint, tools: { mode: 'selected', names: [] } }]
+  const groups = [{ id: 'bridge', members: [{ serverId: 'source', names: [], resourceUris: ['fixture:/same'],
+    resourceTemplates: ['fixture:/item/{id}{?q}'] }] }]
+  const { client, context, origin } = await groupServer(t, manager, servers, groups)
+  const v2 = await client(2)
+  const admin = await (await fetch(`${origin}/api/mcp-manager`, { method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ action: 'test', serverId: 'source' }) })).json()
+  assert.equal(admin.resources.resources[0].name, 'same')
+  const tools = (await v2.listTools()).tools
+  assert.equal(tools.length, 2)
+  const fixed = tools.find(tool => tool.name === admin.resources.resources[0].groupToolName)
+  const template = tools.find(tool => tool.name === admin.resourceTemplates.resourceTemplates[0].groupToolName)
+  assert.ok(fixed); assert.ok(template)
+  assert.deepEqual(template.inputSchema.required, ['id'])
+  assert.deepEqual((await context.mcpSessionManager.listGroupTools('bridge', 2)).tools, tools)
+  const result = await context.mcpSessionManager.callGroupTool('bridge', 2, fixed.name, {}, undefined, {})
+  assert.deepEqual(result.content, [{ type: 'text', text: 'source text' }])
+  assert.equal(result.structuredContent.contents[0].uri.startsWith('mcp-group:/bridge/source/r/'), true)
+  assert.equal(result.structuredContent.contents[0].text, 'source text')
+  const runtime = createRequire(process.env.HARNESS_DSH_ENTRY)
+  const { createMcpToolDefinition } = await import(pathToFileURL(runtime.resolve('@deepseek-ai/dsh-mcp-client')).href)
+  const definition = createMcpToolDefinition({}, { name: fixed.name, rawName: fixed.name, inputSchema: fixed.inputSchema,
+    call: args => context.mcpSessionManager.callGroupTool('bridge', 2, fixed.name, args, undefined, {}) })
+  const value = await definition.execute({}, {})
+  assert.deepEqual(definition.output.render({}, value), [{ type: 'text', text: 'source text' }])
+  const called = await v2.callTool({ name: template.name, arguments: { id: 'A/B', q: ['x,y', 'z'] } })
+  assert.equal(called.content[0].text, 'source text')
+  assert.deepEqual(reads.at(-1), { id: 'source text', uri: 'fixture:/item/A%2FB?q=x%2Cy,z' })
+  const before = reads.length
+  await assert.rejects(v2.callTool({ name: template.name, arguments: { q: 'missing path' } }), /参数/)
+  await assert.rejects(v2.callTool({ name: template.name, arguments: { id: 'A', unknown: 1 } }), /参数/)
+  await assert.rejects(v2.callTool({ name: fixed.name, arguments: { uri: 'fixture:/other' } }), /参数/)
+  assert.equal(reads.length, before)
+  groups[0].members[0].resourceUris = []
+  await assert.rejects(context.mcpSessionManager.callGroupTool('bridge', 2, fixed.name, {}, undefined, {}), /范围/)
+  assert.equal(reads.length, before)
+})
+
+test('OpenAPI 资源工具保留参数类型、必填查询参数与说明，并隔离未选操作', async t => {
+  const manager = await managerModule(t), calls = []
+  let endpoint
+  endpoint = await serve(t, (req, res) => {
+    const url = new URL(req.url, endpoint)
+    if (url.pathname === '/openapi.json') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({
+      openapi: '3.0.0', servers: [{ url: endpoint }], paths: {
+        '/items/{id}': { get: { operationId: 'lookup', summary: '查询条目', parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'integer' }, description: '条目编号' },
+          { name: 'active', in: 'query', required: true, schema: { type: 'boolean' }, description: '是否启用' },
+          { name: 'filter', in: 'query', schema: { type: 'object', properties: { q: { type: 'string' }, page: { type: 'integer' } } } },
+        ] } }, '/unused': { get: { operationId: 'unselected' } }, '/status': { get: { operationId: 'status' } },
+      },
+    }))
+    calls.push(url.href)
+    res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ id: url.pathname.split('/').at(-1), active: url.searchParams.get('active') }))
+  })
+  const servers = [{ id: 'api', enabled: true, specUrl: `${endpoint}/openapi.json`, tools: { mode: 'selected', names: [] } }]
+  const groups = [{ id: 'typed', members: [{ serverId: 'api', names: [], resourceUris: [`${endpoint}/status`],
+    resourceTemplates: [`${endpoint}/items/{id}{?active,filter}`] }] }]
+  const { client, context } = await groupServer(t, manager, servers, groups)
+  const v2 = await client(2), listed = (await v2.listTools()).tools
+  assert.equal(listed.length, 2)
+  const template = listed.find(tool => tool.name.includes('__template_'))
+  assert.equal(template.title, '查询条目')
+  assert.deepEqual(template.inputSchema.required, ['id', 'active'])
+  assert.equal(template.inputSchema.properties.id.type, 'integer')
+  assert.equal(template.inputSchema.properties.active.type, 'boolean')
+  assert.equal(template.inputSchema.properties.id.description, '条目编号')
+  assert.equal(JSON.parse((await v2.callTool({ name: template.name, arguments: { id: 7, active: false } })).content[0].text).active, 'false')
+  assert.equal(calls.at(-1), `${endpoint}/items/7?active=false`)
+  const args = { id: 8, active: true, filter: { q: 'a & 中', page: 2 } }
+  await v2.callTool({ name: template.name, arguments: args })
+  assert.equal(calls.at(-1), `${endpoint}/items/8?active=true&q=a+%26+%E4%B8%AD&page=2`)
+  await context.mcpSessionManager.callGroupTool('typed', 2, template.name, args, undefined, {})
+  assert.equal(calls.at(-1), `${endpoint}/items/8?active=true&q=a+%26+%E4%B8%AD&page=2`)
+  const before = calls.length
+  await assert.rejects(context.mcpSessionManager.callGroupTool('typed', 2, template.name, { id: 7 }, undefined, {}), /active/)
+  await assert.rejects(v2.callTool({ name: template.name, arguments: { id: '7', active: true } }), /id/)
+  await assert.rejects(v2.callTool({ name: 'api__unselected', arguments: {} }), /范围/)
+  assert.equal(calls.length, before)
+})
+
+test('三类发现遍历全部分页，模板不支持与坏来源不阻塞其他资源工具，二进制保留原文', async t => {
+  const manager = await managerModule(t)
+  let templatesSupported = true
+  const endpoint = await serve(t, async (req, res) => {
+    const handler = createMcpHandler(() => {
+      const mcp = new McpServer({ name: 'paged', version: '1' }, { capabilities: { tools: {}, resources: {} } })
+      mcp.server.setRequestHandler('tools/list', async request => ({ tools: [{ name: request.params?.cursor ? 'second' : 'first', inputSchema: { type: 'object' } }],
+        ...(!request.params?.cursor ? { nextCursor: 'next' } : {}) }))
+      mcp.server.setRequestHandler('tools/call', async () => ({ content: [{ type: 'text', text: 'second tool' }] }))
+      mcp.server.setRequestHandler('resources/list', async request => ({ resources: [{ name: request.params?.cursor ? 'binary' : 'first', uri: request.params?.cursor ? 'fixture:/binary' : 'fixture:/first' }],
+        ...(!request.params?.cursor ? { nextCursor: 'next' } : {}) }))
+      mcp.server.setRequestHandler('resources/templates/list', async request => {
+        if (!templatesSupported) throw new Error('unavailable')
+        return { resourceTemplates: [{ name: request.params?.cursor ? 'second_template' : 'unsupported', uriTemplate: request.params?.cursor ? 'fixture:/{id}' : 'fixture:/{id*}' }],
+          ...(!request.params?.cursor ? { nextCursor: 'next' } : {}) }
+      })
+      mcp.server.setRequestHandler('resources/read', async request => ({ contents: [{ uri: request.params.uri, mimeType: 'application/octet-stream', blob: 'AAEC' }] }))
+      return mcp
+    })
+    try { await toNodeHandler(handler)(req, res) } finally { await handler.close() }
+  })
+  const servers = [{ id: 'paged', enabled: true, url: endpoint, tools: { mode: 'all', names: [] } },
+    { id: 'offline', enabled: true, url: 'http://127.0.0.1:1/mcp', tools: { mode: 'all', names: [] } }]
+  const groups = [{ id: 'pages', members: [{ serverId: 'paged', names: ['second'], resourceUris: ['fixture:/binary'],
+    resourceTemplates: ['fixture:/{id*}', 'fixture:/{id}'] }, { serverId: 'offline', names: [], resourceUris: ['fixture:/missing'] }] }]
+  const { client, origin } = await groupServer(t, manager, servers, groups), v2 = await client(2)
+  const admin = await (await fetch(`${origin}/api/mcp-manager`, { method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ action: 'test', serverId: 'paged' }) })).json()
+  assert.equal(admin.tools.length, 2); assert.equal(admin.resources.resources.length, 2); assert.equal(admin.resourceTemplates.resourceTemplates.length, 2)
+  const list = await v2.listTools()
+  assert.equal(list.tools.length, 3)
+  assert.ok(list._meta[manager.GROUP_DISCOVERY_META_KEY].unavailable.some(value => value.includes('不支持')))
+  assert.equal((await v2.callTool({ name: 'paged__second', arguments: {} })).content[0].text, 'second tool')
+  const resource = list.tools.find(tool => tool.name.includes('__resource_'))
+  const result = await v2.callTool({ name: resource.name, arguments: {} })
+  assert.match(result.content[0].text, /二进制/)
+  assert.equal(result.structuredContent.contents[0].blob, 'AAEC')
+  assert.equal(result.structuredContent.contents[0].mimeType, 'application/octet-stream')
+  templatesSupported = false
+  assert.equal((await v2.listTools()).tools.length, 2)
+  assert.equal((await v2.callTool({ name: resource.name, arguments: {} })).structuredContent.contents[0].blob, 'AAEC')
 })

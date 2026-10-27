@@ -1,0 +1,258 @@
+{
+  "at": "2026-10-27T05:02:35.936Z",
+  "platform": "http://172.16.138.228:18120/hep/",
+  "sources": [
+    {
+      "id": "policy-configuration",
+      "resources": 0,
+      "templates": 2,
+      "partial": false
+    },
+    {
+      "id": "emergency-action",
+      "resources": 0,
+      "templates": 3,
+      "partial": false
+    },
+    {
+      "id": "sec-ops",
+      "resources": 0,
+      "templates": 0,
+      "partial": false
+    },
+    {
+      "id": "inspection",
+      "resources": 0,
+      "templates": 0,
+      "discoveryUnavailable": true,
+      "http": 400
+    },
+    {
+      "id": "ai-soc-correlate",
+      "resources": 11,
+      "templates": 40,
+      "partial": false
+    },
+    {
+      "id": "ai-soc-detect",
+      "resources": 4,
+      "templates": 17,
+      "partial": false
+    },
+    {
+      "id": "ai-soc-event",
+      "resources": 1,
+      "templates": 1,
+      "partial": false
+    },
+    {
+      "id": "ai-soc-graph",
+      "resources": 21,
+      "templates": 56,
+      "partial": false
+    },
+    {
+      "id": "ai-soc-ingest",
+      "resources": 18,
+      "templates": 78,
+      "partial": false
+    },
+    {
+      "id": "ai-soc-master",
+      "resources": 11,
+      "templates": 45,
+      "partial": false
+    },
+    {
+      "id": "report-write",
+      "resources": 0,
+      "templates": 0,
+      "discoveryUnavailable": true,
+      "http": 400
+    }
+  ],
+  "calls": [
+    {
+      "source": "ai-soc-correlate",
+      "original": "get_correlate_kev_status",
+      "kind": "resources",
+      "tool": "ai-soc-correlate__resource_get_correlate_kev_status_46a763a60c27",
+      "bytes": 52,
+      "sha256": "0cc4856881111c76739c4f212dfad495699e49f0e23135bef3b57de4a720e6d3",
+      "code": 200,
+      "nativeRead": true
+    },
+    {
+      "source": "ai-soc-correlate",
+      "original": "get_correlate_rule_fields",
+      "kind": "templates",
+      "tool": "ai-soc-correlate__template_get_correlate_rule_fields_3b8bef53e294",
+      "bytes": 36766,
+      "sha256": "9ac29e4cc812d9a2c1ab41cce889ac03fecf83d099c1b766edc6b35f42d6bd1d",
+      "code": 200
+    },
+    {
+      "source": "ai-soc-master",
+      "original": "list_soc_biz_system",
+      "kind": "templates",
+      "tool": "ai-soc-master__template_list_soc_biz_system_8f5e0f613423",
+      "bytes": 459,
+      "sha256": "c5fa61990c36aa1b372e8216ab257cc0c9321e374118879b44f6bb46cb011b36",
+      "code": 200
+    }
+  ],
+  "ui": [
+    {
+      "kind": "resource",
+      "search": "source-id",
+      "passed": true
+    },
+    {
+      "kind": "resource",
+      "search": "title",
+      "passed": true
+    },
+    {
+      "kind": "resource",
+      "search": "published-id",
+      "passed": true
+    },
+    {
+      "kind": "resource",
+      "search": "uri",
+      "passed": true
+    },
+    {
+      "kind": "template",
+      "search": "source-id",
+      "passed": true
+    },
+    {
+      "kind": "template",
+      "search": "title",
+      "passed": true
+    },
+    {
+      "kind": "template",
+      "search": "published-id",
+      "passed": true
+    },
+    {
+      "kind": "template",
+      "search": "uri",
+      "passed": true
+    }
+  ],
+  "publication": {
+    "tools": 308,
+    "resources": 66,
+    "templates": 242,
+    "unavailable": []
+  },
+  "refreshPreservesSelection": true,
+  "cleanup": {
+    "temporaryGroupRemoved": true,
+    "configBytesUnchanged": true
+  },
+  "scope": {
+    "acceptancePath": "PA-12",
+    "sourceBaseline": "9299fd2",
+    "workingTree": "task changes pending commit",
+    "businessHarnessChanged": false
+  },
+  "validation": {
+    "typecheck": {
+      "command": "pnpm run check",
+      "passed": true
+    },
+    "build": {
+      "command": "node build.mjs",
+      "passed": true
+    },
+    "focused": {
+      "command": "node --test test/mcp-group-v2.test.mjs test/mcp-client.test.mjs test/business-group-v2.test.mjs test/native-composition-cancel.test.mjs",
+      "tests": 43,
+      "passed": 43,
+      "failed": 0
+    },
+    "fullPlugin": {
+      "command": "node --test test/*.test.mjs",
+      "tests": 851,
+      "passed": 847,
+      "failed": 3,
+      "skipped": 1
+    },
+    "baselineReproduction": {
+      "commit": "9299fd2",
+      "method": "clean git archive; same dependency directory; build; run inventory.test.mjs and native-auth.test.mjs",
+      "tests": 4,
+      "passed": 1,
+      "failed": 3,
+      "failures": [
+        {
+          "file": "test/inventory.test.mjs",
+          "test": "查询真实目录、Run 归属与来源，过滤不符合资产合同的名称和普通文件",
+          "result": "directory query did not return expected result"
+        },
+        {
+          "file": "test/inventory.test.mjs",
+          "test": "空仓库是成功查询；缺失根与不可读取 Run 路径是失败",
+          "result": "unknown instead of ENOTDIR"
+        },
+        {
+          "file": "test/native-auth.test.mjs",
+          "test": "平台登录保护原生 API、三个写入域与 MCP，旧 Token/Cookie 被拒绝且退出可撤销会话",
+          "result": "Cannot read properties of undefined (reading root)"
+        }
+      ]
+    },
+    "environment": {
+      "HARNESS_DSH_ENTRY": "/opt/nvm/versions/node/v24.21.0/lib/node_modules/@deepseek-ai/dsh/package.json",
+      "python": "/opt/miniconda3/bin/python",
+      "pythonVersion": "3.10"
+    }
+  },
+  "activation": {
+    "at": "2026-10-27T05:00:01.535Z",
+    "method": "DSH pluginManager/setBundleEnabled",
+    "application": "applied",
+    "warnings": [],
+    "pidBefore": 4074385,
+    "pidAfter": 4074385,
+    "platformRestarted": false,
+    "sourceRoot": "/home/cmp/work/harness-engineering-platform",
+    "dataRoot": "/home/cmp/harness-engineering-platform-data"
+  },
+  "uiLayout": {
+    "desktopWidth": 1440,
+    "mobileWidth": 390,
+    "mobileHorizontalOverflow": false,
+    "screenshots": [
+      "desktop.png",
+      "mobile.png"
+    ]
+  },
+  "artifacts": {
+    "plugins/mcp-manager/index.ts": {
+      "sha256": "1ceee8627e382ab8a382c3aa92622e80403483e9a522195246dd24fc00fc5f1d"
+    },
+    "plugins/mcp-manager/openapi.ts": {
+      "sha256": "92de2e605c71967187e63d390697b73477f4f33e767c3ebc1030eded5e937c7a"
+    },
+    "plugins/mcp-manager/client.tsx": {
+      "sha256": "ce8ffc58c788f4867654b746154dc90be6c1938f8aa75f9b3cd8c28165ebd025"
+    },
+    "platform/plugin/lib/index.js": {
+      "sha256": "890b0051a89b8a393d2f17ffed42fbe0237c0a076d2fa38eddde13cfb40c10d8"
+    },
+    "platform/plugin/lib/client.js": {
+      "sha256": "5e3648a08b10c91460258593195336e4281549c0b12cd52fda195c5a3b380069"
+    }
+  },
+  "limitations": [
+    "inspection and report-write discovery returned HTTP 400; source capabilities could not be verified",
+    "851 plugin tests include 3 failures reproduced at baseline and 1 skipped test",
+    "no autonomous model tool selection or business Evaluation was run",
+    "unsupported URI template syntax is reported unavailable"
+  ]
+}

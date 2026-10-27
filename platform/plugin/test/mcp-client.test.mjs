@@ -444,7 +444,7 @@ test('服务内关键词同时筛选三类项目，勾选状态不影响大小�
   ui.setView('groups')
   const service = serviceSelection(ui, ui.server.id)
   assert.ok(service.input().props['aria-label'].includes(ui.server.id))
-  assert.equal(service.input().props.placeholder, '筛选工具、资源 URI、资源模板')
+  assert.equal(service.input().props.placeholder, '按名称、标识或 URI 筛选')
   assert.equal(service.clear(), undefined)
   ui.button('发现工具与资源').props.onClick()
   await new Promise(resolve => setImmediate(resolve)); ui.render()
@@ -640,4 +640,30 @@ test('配置冲突后复制完整草稿，读取最新内容并保留原草稿�
   await new Promise(setImmediate)
   assert.equal(JSON.parse(ui.clipboard.at(-1)).servers[0].description, '本地修改')
   assert.equal(ui.writes.length, 0)
+})
+
+
+test('分组保留发现元数据，按资源名称、标题与发布工具标识搜索且仍保存 URI', async () => {
+  const ui = editor({ fetch: async () => ({ ok: true, json: async () => ({ tools: [],
+    resources: { resources: [{ name: 'getAssetList', title: '查询设备目录', uri: 'soc://inventory', groupToolName: 'server__resource_getAssetList_0123456789ab' }] },
+    resourceTemplates: { resourceTemplates: [{ name: 'getAsset', title: '查询设备详情', uriTemplate: 'soc://inventory/{id}', groupToolName: 'server__template_getAsset_0123456789ab' }] },
+  }) }) })
+  ui.refreshValue({ servers: [ui.server], groups: [{ id: 'named', members: [] }], sharedToken: 'fixture-token' })
+  ui.setView('groups')
+  ui.button('发现工具与资源').props.onClick()
+  await new Promise(resolve => setImmediate(resolve)); ui.render()
+  const service = serviceSelection(ui, ui.server.id)
+  for (const keyword of ['GETASSETLIST', '查询设备目录', 'soc://inventory', 'resource_getAssetList_0123456789ab']) {
+    service.query(keyword)
+    assert.equal(service.choices('资源 URI').length, 1)
+    assert.match(ui.text(service.choices('资源 URI')[0]), /查询设备目录.*getAssetList.*soc:\/\/inventory.*server__resource_/)
+  }
+  ui.nodes(service.choices('资源 URI')[0]).find(node => node.type === 'input').props.onChange()
+  service.query('template_getAsset_0123456789ab')
+  assert.equal(service.choices('资源模板').length, 1)
+  ui.nodes(service.choices('资源模板')[0]).find(node => node.type === 'input').props.onChange()
+  ui.render()
+  await ui.button('保存更改').props.onClick()
+  const saved = ui.writes.at(-1).ops.find(op => op.path[0] === 'groups').value[0].members[0]
+  assert.deepEqual(JSON.parse(JSON.stringify(saved)), { serverId: ui.server.id, names: [], resourceUris: ['soc://inventory'], resourceTemplates: ['soc://inventory/{id}'] })
 })

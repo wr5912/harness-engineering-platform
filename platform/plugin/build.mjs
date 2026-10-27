@@ -41,8 +41,8 @@ export { Manager };`
           .replace('source.tools.map(({ name, description }: any) => ({ name, description }))', 'source.tools.map(({ name, description, inputSchema }: any) => ({ name, description, inputSchema }))')
         if (!["async (request: any, extra: any) => runRequest('tools/call'",
           "async (request: any, extra: any) => runRequest('resources/read'",
-          'readGroupResource(target, request.params.uri, extra?.mcpReq?.signal ?? extra?.signal)',
-          'readManagedResource({ ...server, platformSignal: signal ?? server.platformSignal }, upstreamUri)'
+          'readGroupResource(target, request.params.uri, extra?.mcpReq?.signal ?? extra?.signal, () => assertTarget(request))',
+          'readManagedResource({ ...server, platformSignal: signal ?? server.platformSignal }, upstreamUri, args)'
         ].every(anchor => contents.includes(anchor))) throw new Error('MCP 分组请求取消信号装载合同已变化')
       }
       if (!path.endsWith('client') && !path.endsWith('openapi')) {
