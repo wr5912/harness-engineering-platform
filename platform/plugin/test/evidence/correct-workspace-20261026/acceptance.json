@@ -1,0 +1,205 @@
+{
+  "checked_at": "2026-10-27T03:23:33.404Z",
+  "acceptance_paths": [
+    "PA-12",
+    "PA-10"
+  ],
+  "platform": {
+    "url": "http://172.16.138.228:18120/hep/",
+    "program_root": "/home/cmp/work/harness-engineering-platform",
+    "asset_root": "/home/cmp/harness-engineering-platform-data",
+    "workspace_id": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+    "program_base_commit": "f3ab12dd4b29dc548ed3ea17acbae75712d30dce",
+    "data_base_commit": "8574e97cd13af6f23d7a21a71242f6cd5da96b49",
+    "task_changes_uncommitted_at_verification": true,
+    "dsh_version": "0.2.1-rc.2"
+  },
+  "workspace": {
+    "default_native_workspace_id": "027d43d2-ae90-4d51-a2be-5464ae34e478",
+    "default_native_workspace_root": "/home/cmp/harness-engineering-platform-data",
+    "legacy_roots_added": [
+      "/home/cmp/work/harness-engineering-platform-data",
+      "/home/cmp/work/luopeng/harness-engineering-platform-data"
+    ],
+    "historical_job_asset_roots_preserved": true,
+    "runtime_migration": {
+      "missing_entries_copied": 6340,
+      "session_files_preserved_with_matching_hashes": 156,
+      "existing_destination_files_kept": 6,
+      "backup": ".local/backups/think-zh-20261026-195849",
+      "scope": "仅补齐缺失的原生 HOME、凭据与本地平台状态；迁移时切换平台进程到正确数据根，未重启业务容器。"
+    },
+    "restored_run": {
+      "path": "evolution/experiments/EXP-security-operations-expert-025-r3f8a8b3da3f1/runs/run-0b57799c-329b-410b-b4da-e112f379d681",
+      "files": 85,
+      "bytes": 2474460,
+      "all_file_hashes_match_source": true,
+      "run_yaml_sha256": "cdf192f1fc235274d5706572b748e954f329e52e3c29cd846169b9cda6baf23b",
+      "status": "cancelled",
+      "historical_results_rewritten": false
+    }
+  },
+  "think_zh": {
+    "name": "dsh-think-zh",
+    "version": "1.1.1",
+    "source": "https://github.com/Len7183/DSH-Think-zh",
+    "commit": "2ba0a1e338410b44c07f221087907e210ad65b59",
+    "native_profile": ".local/platform-home/profiles/harness-platform",
+    "language": "zh",
+    "inject_prompt": true,
+    "inject_per_turn": false,
+    "setting_survives_refresh": true,
+    "native_chat": {
+      "session_id": "session-3cea0d58-604e-4617-b60c-84de3a02e263",
+      "created_at": 1793071247938,
+      "cwd": "/home/cmp/harness-engineering-platform-data",
+      "system_mentions_chinese": true,
+      "correct_root_in_system": true,
+      "contains_391": true,
+      "turn_ends": [
+        {
+          "kind": "completed"
+        }
+      ],
+      "tool_event_count": 0
+    },
+    "browser_page_errors": [],
+    "git_restore_instructions": "README.md in the data repository"
+  },
+  "evaluation_page": {
+    "checked_at": "2026-10-27T03:19:44.981Z",
+    "checks": [
+      {
+        "job_id": "32182d51-2c94-43ec-b7c6-84bf09ef3d91",
+        "status": "cancelled",
+        "run_id": "run-0b57799c-329b-410b-b4da-e112f379d681"
+      },
+      {
+        "job_id": "acd420d8-bc0c-4a8a-b2cf-d8667610bd65",
+        "status": "failed",
+        "run_id": null
+      },
+      {
+        "job_id": "5fdec787-fae4-48d7-826b-fd40beb182e7",
+        "status": "failed",
+        "run_id": null
+      },
+      {
+        "job_id": "6eacb1e7-5a6d-4f0b-868e-b3c7463795dd",
+        "status": "completed",
+        "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408"
+      },
+      {
+        "job_id": "83b3b153-10dc-4a04-aca6-ead7064f14bc",
+        "status": "failed",
+        "run_id": "run-6544173e-0670-4cfd-af86-f0d27cad77d2"
+      },
+      {
+        "job_id": "f79f1adf-e8c3-4ab0-b874-eea8eca92b8f",
+        "status": "failed",
+        "run_id": null
+      },
+      {
+        "job_id": "32182d51-2c94-43ec-b7c6-84bf09ef3d91",
+        "report_opened": "run-0b57799c-329b-410b-b4da-e112f379d681",
+        "download_status": 200
+      },
+      {
+        "job_id": "6eacb1e7-5a6d-4f0b-868e-b3c7463795dd",
+        "report_opened": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+        "download_status": 200
+      },
+      {
+        "job_id": "83b3b153-10dc-4a04-aca6-ead7064f14bc",
+        "report_opened": "run-6544173e-0670-4cfd-af86-f0d27cad77d2",
+        "download_status": 200
+      },
+      {
+        "refresh_restored_job": "f79f1adf-e8c3-4ab0-b874-eea8eca92b8f"
+      }
+    ],
+    "browser_page_errors": [],
+    "started_jobs": 0,
+    "cancelled_jobs": 0
+  },
+  "latest_code_activation": {
+    "method": "DSH 原生 pluginManager/setBundleEnabled 对已启用的平台 bundle 执行 Profile reconcile",
+    "native_receipt": {
+      "at": "2026-10-27T03:19:21.679Z",
+      "phase": "apply",
+      "preflight": {
+        "active_sessions": 0,
+        "active_jobs": 0
+      },
+      "reload": {
+        "http": 200,
+        "type": "server-response",
+        "rpcId": "reload-check-1793071163853",
+        "result": {
+          "ok": true,
+          "value": {
+            "stage": "enable",
+            "target": "@ai-agent-harness/harness-platform",
+            "enabled": true,
+            "changed": false,
+            "application": "applied",
+            "warnings": []
+          }
+        }
+      }
+    },
+    "pid_before": 4074385,
+    "pid_after": 4074385,
+    "platform_restart_for_latest_pull": false,
+    "latest_backend_validation": {
+      "ok": false,
+      "error": {
+        "code": "invalid_request",
+        "message": "纯代码执行必须提供代码生成计划",
+        "details": {}
+      }
+    },
+    "latest_frontend": {
+      "server": "inspection",
+      "filter_matches": 1,
+      "checked_restored": 3,
+      "clear_restores_focus": true,
+      "page_errors": []
+    }
+  },
+  "validation": {
+    "prepare_offline": "passed at program base commit",
+    "targeted_node_tests": {
+      "passed": 189,
+      "failed": 0,
+      "files": [
+        "evaluation-jobs",
+        "workspace-paths",
+        "independent-workspace",
+        "evaluation-client",
+        "mcp-client",
+        "compute-variants",
+        "compute-variants-client",
+        "workflow-runtime",
+        "model-usage"
+      ]
+    },
+    "platform_launcher_tests": {
+      "passed": 39,
+      "failed": 0,
+      "interpreter": "/usr/bin/python3"
+    }
+  },
+  "screenshots": [
+    "settings.png",
+    "chat.png",
+    "evaluation.png",
+    "mcp-filter.png"
+  ],
+  "limits": [
+    "未重新执行业务巡检、威胁研判、定时任务或完整评测；保留原任务失败、取消及业务结论。",
+    "未验证中文思考对所有模型的遵循效果；系统提示与一次真实模型回复仅证明实际装载和本次请求。",
+    "原生插件依赖、锁文件和语言设置保存在被 Git 忽略的 Profile，本地备份保存运行状态；仅恢复 Git 时按数据 README 重装插件并选择语言。",
+    "早前迁移到正确数据根时重启过平台；本次拉取最新代码后通过原生热重载生效，PID 保持不变。"
+  ]
+}
