@@ -1,7 +1,7 @@
 import type { PageId, PlatformNavigation } from './protocol.ts'
 
 const pages: PageId[] = ['home', 'conversations', 'agents', 'evaluation', 'instances', 'gateway', 'mcp']
-const fields = ['agent_id', 'experiment_id', 'run_id', 'case_id', 'job_id', 'instance_name', 'source_id', 'server_id', 'composition_id', 'version_id', 'tab'] as const
+const fields = ['agent_id', 'experiment_id', 'run_id', 'case_id', 'job_id', 'instance_name', 'source_id', 'server_id', 'group_id', 'composition_id', 'version_id', 'tab'] as const
 const runTabs = ['report', 'results', 'trace', 'files', 'datasets'] as const
 
 export function readNavigation(hash: string): PlatformNavigation {

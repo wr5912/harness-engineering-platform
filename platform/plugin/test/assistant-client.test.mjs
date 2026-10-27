@@ -312,7 +312,7 @@ test('确认首屏仅展示决策摘要、具体交付与重要预算，完整�
   const plan = { goal: '构建只读巡检助手：完整需求包括五台模拟设备的分页查询与正式报告下载。', agent_id: 'daily-inspection-assistant', source: 'experiment:EXP-daily-inspection-assistant-002-r123456789abc', evaluation_case_ids: ['U-PRIVATE-BUSINESS-CASE'], allowed_actions: [{ domain: 'agents', action: 'create' }], budget: { timeout_minutes: 30, max_repair_rounds: 3, max_model_calls: 60 }, deliverables: ['Markdown 报告和设备 CSV'], artifact_paths: ['artifacts/U-PRIVATE-BUSINESS-CASE/report.md'], instance_name: 'delivery-test' }
   let proposal = { id: 'p', domain: 'task', action: 'start', state: 'awaiting_confirmation', preview: { plan, agent_name: '日常巡检整理助手', candidate_sha256: 'a'.repeat(64) } }
   let execution, refreshes = 0
-  const assistant = { subscribe: () => () => {}, getSnapshot: () => ({ sessionId: 's', status: { proposals: proposal ? [proposal] : [], execution } }), refresh: async () => { refreshes++ } }
+  const assistant = { subscribe: () => () => {}, getSnapshot: () => ({ sessionId: 's', status: { proposals: proposal ? [proposal] : [], execution } }), refresh: async () => { refreshes++ }, applySettlement: (_id, receipt) => { proposal = { ...proposal, ...receipt } } }
   const requests = [], rpc = { async call(_channel, method, body) { requests.push({ method, body }); return { ok: true, value: { state: 'cancelled' } } } }
   const jsx = (type, props) => ({ type, props }), module = { exports: {} }
   runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, require(name) {
@@ -342,6 +342,17 @@ test('确认首屏仅展示决策摘要、具体交付与重要预算，完整�
   assert.ok(all.includes(plan.goal)); assert.match(all, /U-PRIVATE-BUSINESS-CASE|a{64}/)
   await nodes.find(node => node.type === 'button' && node.props.children === '暂不执行').props.onClick()
   assert.equal(requests[0].method, 'assistant/reject'); assert.equal(requests[0].body.proposal_id, 'p')
+  assert.equal(view(), null, '取消回执立即移出输入区')
+  proposal = { ...proposal, state: 'awaiting_confirmation' }
+  let finishRefresh
+  assistant.refresh = () => new Promise(resolve => { finishRefresh = resolve })
+  rpc.call = async () => ({ ok: true, value: { id: 'p', state: 'completed', continuation: 'requires_user_message' } })
+  nodes = []; render(view())
+  const confirming = nodes.find(node => node.type === 'button' && node.props.children === '开始构建并验证').props.onClick()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(view(), null, '确认成功后无需等待状态刷新即可收起')
+  finishRefresh(); await confirming
+  assistant.refresh = async () => { refreshes++ }
   proposal = { id: 'dataset', domain: 'agents', action: 'datasets/apply', state: 'awaiting_confirmation', preview: { status: 'suggested', count: 1, records: [{ workflow: '安全事件处置', questions: { action: {}, needs_review: {} }, targets: { action: { basis: '只在完整详情展示的标签依据' } } }] } }
   nodes = []
   const sample = render(view())
@@ -404,5 +415,29 @@ test('配置缺失在创建原生工作区和会话之前提示，既有会话�
   assert.equal(f.nativeCreates.length, 0)
   assert.equal(f.assistant.getSnapshot().sessionId, 'existing')
   assert.match(f.assistant.getSnapshot().error, /连接或克隆/)
+  f.assistant.dispose()
+})
+
+test('确认回执优先于在途旧状态，刷新失败保持结算且显式提示，跨会话回执被忽略', async () => {
+  let fail = false, pending, hold = false
+  const f = fixture(async (_channel, endpoint) => {
+    if (endpoint !== 'assistant/status') return { ok: true, value: { session_id: 's' } }
+    if (fail) throw new Error('offline')
+    if (hold) return new Promise(resolve => { pending = resolve })
+    return { ok: true, value: { proposals: [{ id: 'p', state: 'awaiting_confirmation' }] } }
+  }, undefined, {}, { sessionIds: ['s'] })
+  await f.assistant.create('继续')
+  hold = true
+  const refresh = f.assistant.refresh()
+  f.assistant.applySettlement('s', { id: 'p', state: 'completed' })
+  pending({ ok: true, value: { proposals: [{ id: 'p', state: 'awaiting_confirmation' }] } }); await refresh
+  assert.equal(f.assistant.getSnapshot().status.proposals[0].state, 'completed')
+  fail = true; await f.assistant.refresh()
+  assert.match(f.assistant.getSnapshot().statusError, /读取失败/)
+  assert.equal(f.assistant.getSnapshot().status.proposals[0].state, 'completed')
+  f.assistant.applySettlement('other-session', { id: 'p', state: 'running' })
+  assert.equal(f.assistant.getSnapshot().status.proposals[0].state, 'completed')
+  hold = false; fail = false; await f.assistant.refresh()
+  assert.equal(f.assistant.getSnapshot().statusError, '')
   f.assistant.dispose()
 })

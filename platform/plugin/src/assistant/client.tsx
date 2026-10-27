@@ -30,7 +30,8 @@ interface AssistantSnapshot {
   platformContext?: boolean
   busy: boolean
   error: string
-  status?: { running?: boolean; execution?: TaskExecution; proposals?: { id: string; state: OperationMeta['state']; domain: string; action: string; input?: Record<string, any>; preview?: unknown; result?: unknown; error?: string }[] }
+  statusError?: string
+  status?: { running?: boolean; execution?: TaskExecution; proposals?: { id: string; state: OperationMeta['state']; domain: string; action: string; input?: Record<string, any>; preview?: unknown; result?: unknown; error?: string; continuation?: string }[] }
 }
 
 /** 浏览器只保留当前会话引用，任务与业务结果由原生 Session 和后端维护。 */
@@ -60,8 +61,12 @@ export function createAssistant(ctx: Pick<Context, 'sessions' | 'uiSession' | 'u
     const request = ++refreshGeneration
     try {
       const response = await rpc.call(CHANNEL, 'assistant/status', { session_id: sessionId })
-      if (!disposed && generation === current && request === refreshGeneration && response.ok) publish({ status: response.value as AssistantSnapshot['status'] })
-    } catch { /* 原生连接重连和下一次失效通知会重新读取。 */ }
+      if (disposed || generation !== current || request !== refreshGeneration) return
+      if (!response.ok) throw new Error(response.error.message)
+      publish({ status: response.value as AssistantSnapshot['status'], statusError: '' })
+    } catch {
+      if (!disposed && generation === current && request === refreshGeneration) publish({ statusError: '操作状态读取失败，当前显示上次结果；请重试核对。' })
+    }
   }
   async function syncContext() {
     contextPending = true
@@ -91,7 +96,7 @@ export function createAssistant(ctx: Pick<Context, 'sessions' | 'uiSession' | 'u
     try {
       const reference = ctx.sessions.retain(sessionId, { source: 'harnessAssistant' })
       snapshot.reference?.release()
-      publish({ sessionId, reference, platformContext: navigate || isProjectSession(sessionId), status: undefined, error: '' })
+      publish({ sessionId, reference, platformContext: navigate || isProjectSession(sessionId), status: undefined, statusError: '', error: '' })
       void syncContext()
       await reference.ready
       if (current === generation && !disposed) { if (navigate) ctx.uiWorkspace.openSession(sessionId); await refresh() }
@@ -107,11 +112,11 @@ export function createAssistant(ctx: Pick<Context, 'sessions' | 'uiSession' | 'u
     if (!sessionId && snapshot.sessionId) {
       generation++
       snapshot.reference?.release()
-      publish({ sessionId: undefined, reference: undefined, platformContext: false, status: undefined, error: '' })
+      publish({ sessionId: undefined, reference: undefined, platformContext: false, status: undefined, statusError: '', error: '' })
     }
     if (sessionId && snapshot.sessionId !== sessionId) void select(sessionId, false)
     else if (sessionId && snapshot.platformContext !== isProjectSession(sessionId)) {
-      publish({ platformContext: isProjectSession(sessionId), status: undefined, error: '' })
+      publish({ platformContext: isProjectSession(sessionId), status: undefined, statusError: '', error: '' })
       void syncContext()
       void refresh()
     }
@@ -122,6 +127,12 @@ export function createAssistant(ctx: Pick<Context, 'sessions' | 'uiSession' | 'u
     getSnapshot: () => snapshot,
     select,
     refresh,
+    applySettlement(sessionId: SessionId, receipt: any) {
+      if (disposed || snapshot.sessionId !== sessionId || !receipt || !['running', 'completed', 'failed', 'cancelled', 'unknown'].includes(receipt.state)) return
+      refreshGeneration++
+      const id = receipt.id ?? receipt.proposal_id
+      publish({ status: { ...snapshot.status, proposals: snapshot.status?.proposals?.map(proposal => proposal.id === id ? { ...proposal, ...receipt } : proposal) } })
+    },
     restore,
     reveal() { if (snapshot.sessionId) ctx.uiWorkspace.openSession(snapshot.sessionId) },
     async create(task?: string, taskContext: AssistantContext = context) {
@@ -324,7 +335,6 @@ interface OperationProps {
 function OperationCard(props: OperationProps) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
   const assistantState = useSyncExternalStore(props.assistant.subscribe, props.assistant.getSnapshot)
   const meta = props.meta
   const proposal = assistantState.sessionId === props.sessionId ? assistantState.status?.proposals?.find(item => item.id === meta?.proposal_id) : undefined
@@ -337,6 +347,7 @@ function OperationCard(props: OperationProps) {
       <summary><strong>{summary.title}</strong><span role={summary.failed ? 'alert' : undefined}> · {summary.outcome}</span></summary>
       {result !== undefined && <Details value={unwrap(result)}/>}
       {proposal?.error && <p role="alert">{proposal.error}</p>}
+      {proposal?.continuation === 'requires_user_message' && <p>原会话运行已结束，请发送后续消息继续。</p>}
     </details>}
   </div>
   return <section className="harness-operation-card" aria-label="平台操作回执">
@@ -347,11 +358,11 @@ function OperationCard(props: OperationProps) {
       {result !== undefined && <details className="harness-operation-result"><summary>查看实际操作回执</summary><Details value={unwrap(result)}/></details>}
       {proposal?.error && <p role="alert">{proposal.error}</p>}
       {state === 'awaiting_confirmation' && meta.proposal_id && <div className="harness-confirmation-actions"><button className="harness-primary" disabled={busy} onClick={async () => {
-        setBusy(true); setError(''); setNotice('')
+        setBusy(true); setError('')
         try {
           const response = await props.rpc.call(CHANNEL, 'assistant/confirm', { session_id: props.sessionId, proposal_id: meta.proposal_id })
           if (!response.ok) throw new Error(response.error.message)
-          if ((response.value as { continuation?: string }).continuation === 'requires_user_message') setNotice('操作已确认执行。原会话运行已结束，请发送后续消息继续。')
+          props.assistant.applySettlement(props.sessionId, response.value)
           await props.assistant.refresh()
         } catch (failure) { setError(failure instanceof Error ? failure.message : '确认失败，请重试。') }
         finally { setBusy(false) }
@@ -361,13 +372,13 @@ function OperationCard(props: OperationProps) {
         try {
           const response = await props.rpc.call(CHANNEL, 'assistant/reject', { session_id: props.sessionId, proposal_id: meta.proposal_id })
           if (!response.ok) throw new Error(response.error.message)
+          props.assistant.applySettlement(props.sessionId, response.value)
           await props.assistant.refresh()
         } catch (failure) { setError(failure instanceof Error ? failure.message : '暂缓失败，请重试。') }
         finally { setBusy(false) }
       }}>暂不执行</button></div>}
     </>}
     {error && <p role="alert">{error}</p>}
-    {notice && <p role="status">{notice}</p>}
   </section>
 }
 
@@ -395,11 +406,11 @@ export function AssistantOperations({ assistant, rpc, sessionId }: PropsRuntime<
   const state = useSyncExternalStore(assistant.subscribe, assistant.getSnapshot)
   if (state.sessionId !== sessionId) return null
   const proposals = state.status?.proposals ?? []
-  const pending = proposals.filter(item => ['awaiting_confirmation', 'running', 'unknown'].includes(item.state))
-  const execution = state.status?.execution
-  if (!pending.length && !execution) return null
-  return <div className="harness-assistant-proposals-dock">{execution && <TaskCard task={execution} assistant={assistant} rpc={rpc} sessionId={sessionId} compact={floating}/>}{pending.length > 0 && <details className="harness-assistant-proposals" open>
-    <summary>平台操作确认与进度</summary>
+  const pending = proposals.filter(item => ['awaiting_confirmation', 'running'].includes(item.state))
+  const execution = state.status?.execution?.state === 'completed' || state.status?.execution?.state === 'cancelled' ? undefined : state.status?.execution
+  if (!pending.length && !execution && !state.statusError) return null
+  return <div className="harness-assistant-proposals-dock">{state.statusError && <p role="alert">{state.statusError} <button type="button" onClick={() => void assistant.refresh()}>重试读取</button></p>}{execution && <TaskCard task={execution} assistant={assistant} rpc={rpc} sessionId={sessionId} compact={floating}/>}{pending.length > 0 && <details className="harness-assistant-proposals" open>
+    <summary>{pending.some(item => item.state === 'awaiting_confirmation') ? '待处理的历史操作' : '平台操作进度'}</summary>
     <div>{pending.map(proposal => <OperationCard key={proposal.id} assistant={assistant} rpc={rpc} sessionId={sessionId}
       origin="dock" phase="result" toolName={`platform_${proposal.domain}`} meta={{ ...proposal, kind: 'platform-operation', proposal_id: proposal.id }}/>)}</div>
   </details>}</div>

@@ -1,0 +1,165 @@
+{
+  "at": "2026-10-27T11:10:08.660093+00:00",
+  "scope": "PA-12；MCP 分组调试、管理助手 DSH 原生权限与历史卡片状态",
+  "source": {
+    "program_commit": "533385ad2fd628b8a60552d9579bb80146e54bed",
+    "program_dirty": true,
+    "data_root": "/home/cmp/harness-engineering-platform-data",
+    "data_commit": "9044d71734d33a6291a78f6141a9615da07221d4",
+    "data_dirty": true
+  },
+  "deployment": {
+    "url": "http://172.16.138.228:18120/hep/",
+    "pid_before": 4074385,
+    "pid_after": 4074385,
+    "restarted": false,
+    "native_reload": {
+      "at": "2026-10-27T10:45:56.546Z",
+      "phase": "apply",
+      "preflight": {
+        "active_sessions": 0,
+        "active_jobs": 0
+      },
+      "reload": {
+        "http": 200,
+        "type": "server-response",
+        "rpcId": "reload-check-1793097962551",
+        "result": {
+          "ok": true,
+          "value": {
+            "stage": "enable",
+            "target": "@ai-agent-harness/harness-platform",
+            "enabled": true,
+            "changed": false,
+            "application": "applied",
+            "warnings": []
+          }
+        }
+      }
+    }
+  },
+  "live_group_debug": {
+    "at": "2026-10-27T10:51:35.659Z",
+    "requests": [
+      {
+        "groupId": "inspection-readonly",
+        "action": "test"
+      },
+      {
+        "groupId": "inspection-readonly",
+        "action": "callTool",
+        "toolName": "list_executable_inspections"
+      },
+      {
+        "groupId": "threat-analysis-runtime",
+        "action": "test"
+      },
+      {
+        "groupId": "threat-analysis-runtime",
+        "action": "readResource"
+      },
+      {
+        "groupId": "threat-analysis-runtime",
+        "action": "readResource"
+      }
+    ],
+    "errors": [],
+    "overflow": false,
+    "inspection_list_called": true,
+    "resource_read": true,
+    "template_read": true,
+    "group_refresh": true,
+    "target_switch_clears": true,
+    "endpoint": "实际已保存分组的 /hep/mcp/groups/{groupId}/v2，由服务器使用当前分组令牌连接；未复制来源工具列表充当发现结果",
+    "inspection_tool_count": 3,
+    "threat_analysis_tool_count": 27,
+    "resource": "list_detect_whitelist",
+    "template": "get_correlate_incident_by_incident_id",
+    "incident_id": "INC-20261026-000022",
+    "resource_business_code": 200,
+    "template_business_code": 200,
+    "business_write_calls": 0,
+    "mobile_viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "physical_mobile_device": false
+  },
+  "legacy_cards": {
+    "at": "2026-10-27T11:00:45.002Z",
+    "scope": "实际加载界面，历史状态与确认回执使用浏览器受控接口；未执行真实历史写操作",
+    "checks": [
+      {
+        "action": "confirm",
+        "settled": "completed",
+        "card_removed_despite_status_failure": true,
+        "input_available": true
+      },
+      {
+        "action": "reject",
+        "settled": "cancelled",
+        "card_removed_despite_status_failure": true,
+        "input_available": true
+      }
+    ],
+    "pageErrors": []
+  },
+  "native_permission_integration": {
+    "test": "platform/plugin/test/assistant-scope-switch.test.mjs",
+    "passed": 1,
+    "failed": 0,
+    "scope": "临时数据根、真实 DSH ToolRuntime/ApprovalService、真实管理 HTTP 与 MCP 组合写入处理器；会话和模型编排使用测试夹具",
+    "denied": {
+      "isError": true,
+      "composition_file_created": false
+    },
+    "allowed": {
+      "saved_drafts": 1,
+      "operation_state": "completed",
+      "platform_confirmation_wait": false
+    },
+    "live_data_written": false
+  },
+  "model_driven_live_write": {
+    "state": "blocked",
+    "session_id": "session-c6a63aea-f1b4-4430-83fa-21b1e8275e2a",
+    "native_access_mode": "完全权限",
+    "model": "Qwen3.5-4B",
+    "observed": "界面出现请求重试（3/5），等待 180 秒未生成平台操作记录；未取得草稿写入完成回执",
+    "cause": "本轮未定位模型请求重试根因",
+    "composition_file_unchanged": true,
+    "passed": false
+  },
+  "checks": {
+    "plugin_check_and_build": "passed",
+    "targeted_tests": {
+      "tests": 173,
+      "passed": 173,
+      "failed": 0,
+      "note": "6 文件 165 项、补充 2 文件 7 项、扩展原生权限写入集成 1 项分别执行"
+    },
+    "full_plugin_suite": {
+      "tests": 869,
+      "passed": 865,
+      "failed": 3,
+      "skipped": 1,
+      "note": "扩展集成断言前执行全量；扩展后该集成独立通过"
+    },
+    "baseline_failures": {
+      "commit": "533385a",
+      "reproduced": 3,
+      "tests": [
+        "inventory.test.mjs 中两个缺 change.yaml 夹具的断言",
+        "native-auth.test.mjs 中读取未定义 value.root 的断言"
+      ]
+    },
+    "program_repository_validation": "passed",
+    "data_repository_validation": "passed"
+  },
+  "limits": [
+    "未重新执行巡检业务、威胁研判或 Research Release 复现；巡检只调用目录查询。",
+    "历史卡片确认/取消的页面验证使用受控接口回执，没有执行真实历史写操作。",
+    "模型驱动管理写入未通过，不以原生工具集成测试替代模型端到端验收。",
+    "保留数据仓库已有配置、EXP025 与 Run 修改，不纳入本次改动。"
+  ]
+}

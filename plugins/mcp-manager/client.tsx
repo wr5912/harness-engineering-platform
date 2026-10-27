@@ -104,7 +104,7 @@ window.__ModuleLoader__.load({
       @media(prefers-reduced-motion:reduce){.mcp-manager button,.mcp-manager input,.mcp-manager select,.mcp-manager summary::before{transition:none}.mcp-manager button:active:not(:disabled){transform:none}}
     `
 
-    function Manager({ view, form, write, publishedService, selectedServerId, onSelectServerId, onOpenView, onValidationError, toolbarTarget, renderToolbar, PasswordInput }) {
+    function Manager({ view, form, write, publishedService, selectedServerId, selectedGroupId, onSelectServerId, onSelectGroupId, onOpenView, onValidationError, toolbarTarget, renderToolbar, PasswordInput }) {
       const state = form?.state
       const input = (value, change, props = {}) => props.type === 'password' && !props.readOnly && PasswordInput
         ? <PasswordInput value={value ?? ''} onChange={event => change(event.target.value)} {...props} />
@@ -136,9 +136,15 @@ window.__ModuleLoader__.load({
       const [servicePane, setServicePane] = useState('tools')
       const [activeGroup, setActiveGroup] = useState(0)
       const [tokenVisible, setTokenVisible] = useState(false)
+      const [templateUri, setTemplateUri] = useState('')
+      const [templateArguments, setTemplateArguments] = useState('{}')
+      const diagnosticRequest = React.useRef(0)
+      const diagnosticTarget = React.useRef('')
+      const initialTool = React.useRef('')
       const page = ['servers', 'groups', 'connection'].includes(view) ? view : localPage
       const setPage = next => { setLocalPage(next); if (next === 'servers') onValidationError?.() }
-      const openDiagnostic = (serverId, name) => { setSelected(serverId); if (name) setToolName(name); if (onOpenView) onOpenView('connection', serverId); else setPage('connection') }
+      const openGroupDiagnostic = groupId => { setSelected(`group:${groupId}`); if (onOpenView) onOpenView('connection', undefined, groupId); else setPage('connection') }
+      const openDiagnostic = (serverId, name) => { setSelected(serverId); initialTool.current = name ?? ''; if (name) setToolName(name); if (onOpenView) onOpenView('connection', serverId); else setPage('connection') }
       const copy = async (key, value, onCopied = () => {}) => {
         try {
           await copyText(value)
@@ -176,10 +182,21 @@ window.__ModuleLoader__.load({
       }, [draft, state?.value, state?.status, recoveryDraft])
       useEffect(() => {
         if (!selectedServerId || !draft) return
+        setSelected(selectedServerId)
         const servers = [...draft.servers, ...(publishedService ? [publishedService] : [])]
         const index = servers.findIndex(server => server.id === selectedServerId)
         if (index >= 0) setActiveServer(current => current === index ? current : index)
       }, [selectedServerId, draft?.servers, publishedService?.id])
+      useEffect(() => {
+        if (!selectedGroupId) return
+        setSelected(`group:${selectedGroupId}`)
+        const index = draft?.groups.findIndex(group => group.id === selectedGroupId)
+        if (index >= 0) setActiveGroup(index)
+      }, [selectedGroupId, draft?.groups])
+      useEffect(() => {
+        diagnosticRequest.current++
+        setBusy(false); setSources(null); setResult(null); setCatalog(null); if (page === 'connection') setStatus(''); setToolName(initialTool.current); initialTool.current = ''; setArgumentsText('{}'); setUriText(''); setTemplateUri(''); setTemplateArguments('{}')
+      }, [selected, state?.revision])
       if (view === 'summary') return <>通过 OpenAPI 规范生成 MCP tools/resources，并管理分组链接。</>
       if (!draft || !state) return <p>正在读取 MCP 配置…</p>
 
@@ -221,9 +238,16 @@ window.__ModuleLoader__.load({
         update(next.groups[index])
         return next
       })
-      const diagnosticServer = draft.servers.find(server => server.id === selected) ?? draft.servers[0]
-      const diagnosticId = diagnosticServer?.id ?? ''
+      const savedServers = [...(state.value.servers ?? []), ...(publishedService ? [publishedService] : [])]
+      const isGroup = selected.startsWith('group:')
+      const diagnosticGroup = isGroup ? (state.value.groups ?? []).find(group => group.id === selected.slice(6)) : null
+      const diagnosticServer = isGroup ? null : selected ? savedServers.find(server => server.id === selected) : savedServers[0]
+      const diagnosticId = (isGroup ? diagnosticGroup : diagnosticServer)?.id ?? ''
+      const targetKey = `${isGroup ? 'group' : 'server'}:${diagnosticId}:${state.revision}`
+      diagnosticTarget.current = targetKey
       const call = async (action, extra = {}) => {
+        const requestId = ++diagnosticRequest.current
+        const current = () => diagnosticTarget.current === targetKey && diagnosticRequest.current === requestId
         setBusy(true)
         setStatus('')
         if (action === 'test') setCatalog(null)
@@ -231,17 +255,20 @@ window.__ModuleLoader__.load({
           const response = await fetch(new URL('api/mcp-manager', document.baseURI), {
             method: 'POST', credentials: 'same-origin',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ serverId: diagnosticId, action, ...extra }),
+            body: JSON.stringify({ ...(isGroup ? { groupId: diagnosticId } : { serverId: diagnosticId }), action, ...extra }),
           })
           const data = await response.json()
+          if (!current()) return
           if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`)
           setResult(action === 'test' ? null : data)
           if (action === 'sources' || action === 'create' || action === 'refresh' || action === 'toggle') {
             const list = action === 'sources' ? data : await callSources(diagnosticId)
+            if (!current()) return
             setSources(list)
           }
           if (action === 'test') {
-            setCatalog({ serverId: diagnosticId, data })
+            setCatalog({ targetKey, ...(isGroup ? { groupId: diagnosticId } : { serverId: diagnosticId }), data })
+            if (!isGroup) {
             setDiscovered(previous => ({ ...previous,
               [diagnosticId]: data.toolsUnavailable ? undefined : data.tools ?? [] }))
             setDiscoveredResources(previous => ({ ...previous, [diagnosticId]: {
@@ -250,11 +277,12 @@ window.__ModuleLoader__.load({
             } }))
             setChecks(previous => ({ ...previous, [diagnosticId]: { at: new Date().toLocaleString(), revision: state.revision, tools: data.tools?.length ?? 0,
               kind: (state.value.servers ?? []).find(server => server.id === diagnosticId)?.specUrl ? 'openapi' : 'mcp' } }))
+            }
           }
-          setStatus(action === 'test' ? (data.toolsUnavailable || data.resources?.unavailable || data.resourceTemplates?.unavailable ? '部分列表读取失败，已保留可用的发现结果；可重试发现。' : '配置解析与工具发现成功；新会话仍需单独验证。')
+          setStatus(action === 'test' ? (data.toolsUnavailable || data.resources?.unavailable || data.resourceTemplates?.unavailable ? '部分列表读取失败，已保留可用的发现结果；可重试发现。' : isGroup ? '已连接已发布分组端点并读取能力列表；业务效果请以实际调用结果为准。' : '配置解析与工具发现成功；新会话仍需单独验证。')
             : '上游操作已返回；请检查下方结果和新会话。')
-        } catch (error) { if (action === 'test') setChecks(previous => ({ ...previous, [diagnosticId]: { at: new Date().toLocaleString(), revision: state.revision, failed: true } })); setStatus(String(error)) }
-        finally { setBusy(false) }
+        } catch (error) { if (!current()) return; if (action === 'test' && !isGroup) setChecks(previous => ({ ...previous, [diagnosticId]: { at: new Date().toLocaleString(), revision: state.revision, failed: true } })); setStatus(String(error)) }
+        finally { if (current()) setBusy(false) }
       }
       const callSources = async serverId => {
         const response = await fetch(new URL('api/mcp-manager', document.baseURI), { method: 'POST', credentials: 'same-origin',
@@ -515,6 +543,7 @@ window.__ModuleLoader__.load({
                   <div className="mcp-card-head"><div><h3>{editingGroup.id || '新分组'}</h3><p className="mcp-muted">仅开放此组勾选的工具与资源。</p></div></div>
                   <section className="mcp-section"><div className="mcp-fields"><label className="mcp-field">分组 ID{input(editingGroup.id, value => editGroup(activeGroup, group => { group.id = value }))}</label></div>
                     {/^[A-Za-z0-9_-]{1,32}$/.test(editingGroup.id) && <div className="mcp-actions"><span className="mcp-muted">MCP 链接</span>{linkReady && <code className="mcp-link">{new URL(`mcp/groups/${editingGroup.id}/v2`, state.publicUrl ?? document.baseURI).href}</code>}
+                      {button('调试分组', () => openGroupDiagnostic(savedGroup.id), !linkReady)}
                       {button('复制分组链接', () => copy(`group:${editingGroup.id}`, new URL(`mcp/groups/${editingGroup.id}/v2`, state.publicUrl ?? document.baseURI).href), !linkReady)}
                       {copyFeedback(`group:${editingGroup.id}`, new URL(`mcp/groups/${editingGroup.id}/v2`, state.publicUrl ?? document.baseURI).href)}</div>}
                     {linkReady && <p className="mcp-muted">分组地址已生成。链接存在只证明访问入口；所选来源的工具和资源仍需逐项发现。</p>}
@@ -604,7 +633,7 @@ window.__ModuleLoader__.load({
                           </div>
                           {server.enabled === false && <p className="mcp-muted">此来源已停用，所选能力不会通过分组开放。</p>}
                           {needsMerge && <p className="mcp-muted">此来源有重复成员，请先合并再编辑选择。</p>}
-                          {!server.platformComposition && <button className="mcp-quiet" type="button" onClick={() => { setSelected(server.id); void callTest(server.id) }} disabled={busy || !server.id || server.enabled === false}>发现工具与资源</button>}
+                          {!server.platformComposition && <button className="mcp-quiet" type="button" onClick={() => void callTest(server.id)} disabled={busy || !server.id || server.enabled === false}>发现工具与资源</button>}
                           {sections.filter(section => section.items.length || !section.merged.length).map(section => <section key={section.field}><h4>{section.title}</h4>
                             {section.visibleItems.length ? <div className="mcp-tools">{section.visibleItems.map(({ value, item, label, details, operation, choices }) => {
                               const info = <span className="mcp-check-info"><span>{label}{selected[section.field].includes(value) && Array.isArray(section.discovered) && !item && <span className="mcp-muted">（当前未发现）</span>}</span>
@@ -636,13 +665,20 @@ window.__ModuleLoader__.load({
             </>}
             {page === 'connection' && <>
               <div className="mcp-card">
-                <h3>连接检查</h3><p className="mcp-muted">测试使用上次保存的服务器配置。</p>
-                <div className="mcp-fields"><label className="mcp-field">服务器<select value={diagnosticId} onChange={event => { setSelected(event.target.value); setSources(null); setResult(null); setCatalog(null); setUriText('') }}>
-                  {draft.servers.map((server, index) => <option key={index} value={server.id}>{server.serverName || server.id || '新服务器'}</option>)}
+                <h3>工具与资源调试</h3><p className="mcp-muted">使用上次保存的配置。分组通过已发布的 MCP v2 端点连接，未保存的编辑不会参与调试。</p>
+                <div className="mcp-fields"><label className="mcp-field">调试目标<select value={isGroup ? `group:${selected.slice(6)}` : `server:${diagnosticId}`} onChange={event => {
+                  const value = event.target.value
+                  if (value.startsWith('group:')) { setSelected(value); onSelectGroupId?.(value.slice(6)) }
+                  else { setSelected(value.slice(7)); onSelectServerId?.(value.slice(7)) }
+                }}>
+                  <optgroup label="服务器">{savedServers.map(server => <option key={server.id} value={`server:${server.id}`}>{server.serverName || server.id}</option>)}</optgroup>
+                  <optgroup label="已保存分组">{(state.value.groups ?? []).map(group => <option key={group.id} value={`group:${group.id}`}>{group.id}</option>)}</optgroup>
                 </select></label></div>
+                {!diagnosticId && <p role="alert">调试目标不存在或尚未保存，请重新选择。</p>}
+                {diagnosticGroup && <p className="mcp-muted">分组：{diagnosticGroup.id}<br/>MCP 端点：<code>{new URL(`mcp/groups/${diagnosticGroup.id}/v2`, state.publicUrl ?? document.baseURI).href}</code></p>}
                 <div className="mcp-actions">{button('发现工具与资源', () => call('test'), busy || !diagnosticId)}</div>
               </div>
-              {diagnosticServer?.specUrl ? <div className="mcp-card" style={{ marginTop: 16 }}>
+              {!isGroup && (diagnosticServer?.specUrl ? <div className="mcp-card" style={{ marginTop: 16 }}>
                 <h3>OpenAPI 来源</h3><p className="mcp-muted">{diagnosticServer.specUrl}</p>
               </div> : diagnosticServer?.managementUrl ? <div className="mcp-card" style={{ marginTop: 16 }}>
                 <div className="mcp-card-head"><div><h3>OpenAPI 来源</h3><p className="mcp-muted">管理 API：{diagnosticServer.managementUrl}</p></div>{button('读取来源', () => call('sources'), busy || !diagnosticId)}</div>
@@ -663,18 +699,21 @@ window.__ModuleLoader__.load({
                   <label className="mcp-field mcp-wide">工具参数 JSON{input(argumentsText, setArgumentsText)}</label>
                 </div><div className="mcp-actions">{button('预览请求', () => callTool('preview'), busy || !sourceId || !toolName)}
                   {button('执行工具', () => callTool('invoke'), busy || !sourceId || !toolName)}</div></section>
-              </div> : <div className="mcp-card" style={{ marginTop: 16 }}><h3>现成 MCP 连接</h3><p className="mcp-muted">该服务器按已保存的 MCP URL 和请求 Header 连接。</p></div>}
-              {catalog?.serverId === diagnosticId && <div className="mcp-card" style={{ marginTop: 16 }}>
-                <h3>{diagnosticServer?.specUrl ? 'OpenAPI 生成的 MCP 能力' : '现成 MCP 服务的能力'}</h3>
+              </div> : <div className="mcp-card" style={{ marginTop: 16 }}><h3>现成 MCP 连接</h3><p className="mcp-muted">该服务器按已保存的 MCP URL 和请求 Header 连接。</p></div>)}
+              {catalog?.targetKey === targetKey && <div className="mcp-card" style={{ marginTop: 16 }}>
+                <h3>{isGroup ? '分组实际发布的 MCP 能力' : diagnosticServer?.specUrl ? 'OpenAPI 生成的 MCP 能力' : '现成 MCP 服务的能力'}</h3>
                 {[
-                  { title: '工具', items: catalog.data.tools ?? [] },
-                  { title: 'Resources', items: catalog.data.resources?.resources ?? [], unavailable: catalog.data.resources?.unavailable },
-                  { title: 'Resource Templates', items: catalog.data.resourceTemplates?.resourceTemplates ?? [], unavailable: catalog.data.resourceTemplates?.unavailable },
+                  { title: '工具', items: catalog.data.tools ?? [], unavailable: catalog.data.toolsUnavailable },
+                  { title: '资源 URI', items: catalog.data.resources?.resources ?? [], unavailable: catalog.data.resources?.unavailable },
+                  { title: '资源模板', items: catalog.data.resourceTemplates?.resourceTemplates ?? [], unavailable: catalog.data.resourceTemplates?.unavailable },
                 ].map(section => <section className="mcp-section" key={section.title}>
                   <h3>{section.title}（{section.items.length}）</h3>
                   {section.unavailable ? <p className="mcp-muted">服务未提供该列表，或读取失败。</p>
                     : section.items.length ? <ul className="mcp-catalog">{section.items.map((item, index) => <li key={index}>
                       <strong>{item.name || item.uri || item.uriTemplate}</strong>
+                      {item.inputSchema && <details><summary>参数定义</summary><pre className="mcp-result">{JSON.stringify(item.inputSchema, null, 2)}</pre></details>}
+                      {item.uri && button('选择资源', () => setUriText(item.uri), busy)}
+                      {item.uriTemplate && button('选择模板', () => { setTemplateUri(item.uriTemplate); setTemplateArguments('{}') }, busy)}
                       {(item.uri || item.uriTemplate || item.description) && <small>{[item.uri || item.uriTemplate, item.description].filter(Boolean).join(' · ')}</small>}
                     </li>)}</ul> : <p className="mcp-muted">没有可列出的项目。</p>}
                 </section>)}
@@ -682,9 +721,15 @@ window.__ModuleLoader__.load({
                   <label className="mcp-field">工具<select value={toolName} onChange={event => setToolName(event.target.value)}><option value="">请选择工具</option>{(catalog.data.tools ?? []).map(tool => <option key={tool.name} value={tool.name}>{tool.name}</option>)}</select></label>
                   <label className="mcp-field mcp-wide">调用参数 JSON{input(argumentsText, setArgumentsText)}</label>
                 </div><div className="mcp-actions">{button('测试工具', () => callTool('callTool'), busy || !toolName)}</div></section>
-                <section className="mcp-section"><h3>读取 Resource</h3>
+                <section className="mcp-section"><h3>读取资源 URI</h3>
                   <div className="mcp-fields"><label className="mcp-field mcp-wide">Resource URI{input(uriText, setUriText)}</label></div>
-                  <div className="mcp-actions">{button('读取 Resource', () => call('readResource', { uri: uriText }), busy || !uriText)}</div>
+                  <div className="mcp-actions">{button('读取资源', () => call('readResource', { uri: uriText }), busy || !uriText)}</div>
+                </section>
+                <section className="mcp-section"><h3>读取资源模板</h3>
+                  <div className="mcp-fields"><label className="mcp-field mcp-wide">资源模板<select value={templateUri} onChange={event => setTemplateUri(event.target.value)}><option value="">请选择模板</option>{(catalog.data.resourceTemplates?.resourceTemplates ?? []).map(item => <option key={item.uriTemplate} value={item.uriTemplate}>{item.name || item.uriTemplate}</option>)}</select></label>
+                  <label className="mcp-field mcp-wide">模板参数 JSON{input(templateArguments, setTemplateArguments)}</label></div>
+                  {templateUri && <p className="mcp-muted"><code>{templateUri}</code> · 按模板中的变量名称填写参数。</p>}
+                  <div className="mcp-actions">{button('读取模板资源', () => { try { void call('readResource', { uriTemplate: templateUri, arguments: JSON.parse(templateArguments) }) } catch { setStatus('模板参数 JSON 无效') } }, busy || !templateUri)}</div>
                 </section>
               </div>}
               {result && <div className="mcp-card" style={{ marginTop: 16 }}><h3>操作结果</h3><pre className="mcp-result">{JSON.stringify(result, null, 2)}</pre></div>}
@@ -694,6 +739,8 @@ window.__ModuleLoader__.load({
       </section>
 
       async function callTest(serverId) {
+        const requestId = ++diagnosticRequest.current
+        const current = () => diagnosticRequest.current === requestId && diagnosticTarget.current === targetKey
         setBusy(true)
         setStatus('')
         setCatalog(null)
@@ -701,6 +748,7 @@ window.__ModuleLoader__.load({
           const response = await fetch(new URL('api/mcp-manager', document.baseURI), { method: 'POST', credentials: 'same-origin',
             headers: { 'content-type': 'application/json' }, body: JSON.stringify({ serverId, action: 'test' }) })
           const data = await response.json()
+          if (!current()) return
           if (!response.ok) throw new Error(data.error)
           setCatalog({ serverId, data })
           setDiscovered(previous => ({ ...previous, [serverId]: data.toolsUnavailable ? undefined : data.tools ?? [] }))
@@ -712,11 +760,12 @@ window.__ModuleLoader__.load({
             kind: (state.value.servers ?? []).find(server => server.id === serverId)?.specUrl ? 'openapi' : 'mcp' } }))
           setStatus(`${serverId} 已发现 ${data.tools?.length ?? 0} 个工具、${data.resources?.resources?.length ?? 0} 个资源、${data.resourceTemplates?.resourceTemplates?.length ?? 0} 个模板。${data.toolsUnavailable || data.resources?.unavailable || data.resourceTemplates?.unavailable ? "部分列表读取失败，可重试发现。" : ""}`)
         } catch (error) {
+          if (!current()) return
           setChecks(previous => ({ ...previous, [serverId]: { at: new Date().toLocaleString(), revision: state.revision, failed: true } }))
           const reason = error instanceof Error ? error.message : String(error)
           setStatus(`${serverId} 连接测试失败：${/[\u4e00-\u9fff]/.test(reason) ? reason : '连接或工具发现未完成'}。请检查服务地址、网络与凭据后重试。`)
         }
-        finally { setBusy(false) }
+        finally { if (current()) setBusy(false) }
       }
     }
 

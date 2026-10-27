@@ -27,6 +27,7 @@ export function McpPage({ rpc, updates, onContext, target, onNavigate, active = 
   const [serviceError, setServiceError] = useState('')
   const managerRoot = useRef<HTMLDivElement>(null)
   const lastServer = useRef<string | undefined>(target?.server_id)
+  const lastGroup = useRef<string | undefined>(target?.group_id)
   const locatedServer = useRef('')
   const lastComposition = useRef<{ composition_id: string; version?: 'draft' | 'published'; version_id?: string } | null>(null)
   const compositionContext = useCallback((context: Record<string, unknown>) => {
@@ -58,8 +59,8 @@ export function McpPage({ rpc, updates, onContext, target, onNavigate, active = 
     return () => { mounted = false }
   }, [rpc, revision])
   useEffect(() => {
-    if (active && page !== 'composition') onContext?.({ page: 'mcp', tab: page, server_id: target?.server_id })
-  }, [active, page, target?.server_id, onContext])
+    if (active && page !== 'composition') onContext?.({ page: 'mcp', tab: page, server_id: target?.server_id, group_id: target?.group_id })
+  }, [active, page, target?.server_id, target?.group_id, onContext])
   useEffect(() => {
     if (state.status !== 'ready') return
     let active = true
@@ -96,7 +97,7 @@ export function McpPage({ rpc, updates, onContext, target, onNavigate, active = 
     setPage(next)
     if (active) onNavigate?.({ page: 'mcp', tab: next,
       ...(next === 'composition' ? target?.composition_id ? { composition_id: target.composition_id, version: target.version, version_id: target.version_id } : lastComposition.current ?? {} : {}),
-      ...(next !== 'composition' && (target?.server_id || lastServer.current) ? { server_id: target?.server_id ?? lastServer.current } : {}) })
+      ...(next !== 'composition' ? target?.group_id || lastGroup.current ? { group_id: target?.group_id ?? lastGroup.current } : { server_id: target?.server_id ?? lastServer.current } : {}) })
   }
   return <main className="harness-mcp-page" aria-label="MCP 管理">
     <header className="harness-page-heading"><div><h1>MCP 管理</h1><p>从服务连接到工具调试，让每一步的证据和适用范围清晰可见。</p></div><button type="button" className="harness-primary" disabled={state.status !== 'ready'} onClick={() => {
@@ -116,11 +117,17 @@ export function McpPage({ rpc, updates, onContext, target, onNavigate, active = 
         const item = managerRoot.current?.querySelector<HTMLElement>('.mcp-sidebar [aria-current="true"]')
         item?.scrollIntoView({ block: 'nearest' }); item?.focus()
       }}>返回服务列表</button>}
-      {state.status === 'ready' && <Manager view={page} onValidationError={() => selectTab('servers')} publishedService={publishedService} selectedServerId={target?.server_id} PasswordInput={PasswordInput} renderToolbar={(control, container) => createPortal(control, container)} onOpenView={(view, serverId) => {
+      {state.status === 'ready' && <Manager view={page} onValidationError={() => selectTab('servers')} publishedService={publishedService} selectedServerId={target?.server_id} selectedGroupId={target?.group_id} PasswordInput={PasswordInput} renderToolbar={(control, container) => createPortal(control, container)} onOpenView={(view, serverId, groupId) => {
       lastServer.current = serverId
+      lastGroup.current = groupId
       setPage(view)
-      if (active) onNavigate?.({ page: 'mcp', tab: view, server_id: serverId })
+      if (active) onNavigate?.({ page: 'mcp', tab: view, server_id: serverId, group_id: groupId })
+    }} onSelectGroupId={group_id => {
+      lastGroup.current = group_id
+      lastServer.current = undefined
+      if (active) onNavigate?.({ page: 'mcp', tab: page, group_id })
     }} onSelectServerId={server_id => {
+      lastGroup.current = undefined
       lastServer.current = server_id
       if (active) onNavigate?.({ page: 'mcp', tab: page, ...(server_id ? { server_id } : {}) })
       if (server_id && page === 'servers') requestAnimationFrame(() => {

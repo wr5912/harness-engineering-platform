@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -11,6 +11,8 @@ import WebServer from '@deepseek-ai/dsh-host-webserver'
 import { SessionStore, appendPluginRecord } from '@deepseek-ai/dsh-session'
 import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
+import { ApprovalService } from '@deepseek-ai/dsh-user-approval'
+import { build } from 'esbuild'
 import * as plugin from '../lib/index.js'
 
 const require = createRequire(import.meta.url)
@@ -26,6 +28,11 @@ const [{ ToolRuntime }, { createScope }, { createUserMessage }, { SkillRegistry 
 test('真实HTTP管理会话使用原生工具，专用切换与可信Skill可用，普通DSH会话不受影响', async t => {
   const ctx = new Context()
   const assetRoot = mkdtempSync(join(tmpdir(), 'assistant-scope-switch-'))
+  symlinkSync(new URL('../node_modules', import.meta.url).pathname, join(assetRoot, 'node_modules'), 'dir')
+  const handlerFile = join(assetRoot, 'mcp-handler.mjs')
+  await build({ entryPoints: [new URL('../src/mcp/index.ts', import.meta.url).pathname], outfile: handlerFile,
+    bundle: true, platform: 'node', format: 'esm', packages: 'external' })
+  const { createMcpHandler } = await import(pathToFileURL(handlerFile).href)
   writeFileSync(join(assetRoot, 'AGENTS.md'), '管理当前测试数据工作区。')
   for (const name of ['workspace-management', 'user-facing-output', 'compute-variant-research', 'task-builder']) {
     const directory = join(assetRoot, '.agents/skills', name)
@@ -66,12 +73,20 @@ test('真实HTTP管理会话使用原生工具，专用切换与可信Skill可�
       includeDefaultRoots: false, customSkillDirs: [join(assetRoot, '.agents/skills'), extensionSkills], watch: false,
     }))
     new ToolRuntime(inner, { mode: 'native' })
+    new ApprovalService(inner, { policy: 'never' })
     for (const name of ['skill', 'bash', 'read', 'write', 'spawn_agent']) inner.tools.register({
       name, description: '作用域回归工具', parameters: { type: 'object', additionalProperties: true },
       output: { schema: { type: 'object' }, render: () => [{ type: 'text', text: '{}' }] },
       execute(args, execution) { calls.push({ name, args, agentId: execution.agent.id }); return {} },
     })
-    inner.provide('platformMcp', { servers: { get: () => [] }, groups: { get: () => [] } })
+    const compositions = createMcpHandler(assetRoot, { servers: () => [] })
+    inner.provide('platformMcp', { servers: { get: () => [] }, groups: { get: () => [] },
+      compositionHandler: compositions,
+      async dispatch({ action, ...input }, signal) {
+        const response = await compositions(action, input, signal)
+        return response.ok ? { status: 200, value: response.value } : { status: 400, value: response.error }
+      },
+    })
     inner.provide('workspaceRegistry', {})
     inner.provide('workspaceController', {})
     inner.provide('settingsController', {})
@@ -152,6 +167,24 @@ test('真实HTTP管理会话使用原生工具，专用切换与可信Skill可�
   assert.equal((await execute('platform_mcp', { action: 'context', input: {} }, ordinary)).isError, true, '普通原生Session即使在数据工作区也不能调用平台MCP工具')
   assert.equal((await execute('platform_mcp', { action: 'context', input: {} }, { ...ordinary, id })).isError, true, '不能借用管理Session ID绕过执行身份')
   assert.equal((await execute('platform_mcp', { action: 'context', input: {} })).isError, false, '管理Session保持MCP工具访问')
+  const listed = JSON.parse((await execute('platform_mcp', { action: 'list', input: {} })).content[0].text).result
+  assert.equal(listed.ok, true, JSON.stringify(listed))
+  const writeInput = { revision: listed.value.revision, draft: { toolName: 'native_permission_check', title: '原生权限验收', description: '', connectionId: 'fixture' } }
+  const compositionsFile = join(assetRoot, 'config/mcp-compositions.json')
+  let gate = 'deny'
+  const disposeGate = ctx.on('tools/pre-execute', (execution, next) => execution.name === 'platform_mcp'
+    ? { kind: gate, reason: 'native-policy-fixture' } : next())
+  for (gate of ['deny', 'ask']) {
+    assert.equal((await execute('platform_mcp', { action: 'context', input: {} })).isError, true, `${gate} 仍由真实原生权限链阻止；never 不代表全部放行`)
+    assert.equal((await execute('platform_mcp', { action: 'saveCompositionDraft', input: writeInput })).isError, true)
+    assert.equal(existsSync(compositionsFile), false, '原生拒绝或不允许询问时不能落盘')
+  }
+  gate = 'allow'
+  assert.equal((await execute('platform_mcp', { action: 'context', input: {} })).isError, false, '原生许可后无需平台二次确认')
+  assert.equal((await execute('platform_mcp', { action: 'saveCompositionDraft', input: writeInput })).isError, false)
+  assert.equal(JSON.parse(readFileSync(compositionsFile, 'utf8')).compositions.length, 1, '原生许可后真实草稿只保存一次')
+  assert.deepEqual((await rpc('status', { session_id: id })).proposals.map(item => item.state), ['completed'])
+  disposeGate()
   await rpc('session', { session_id: id, task: '再次进入算力任务', context: { skill: 'compute-variant-research' } })
   await assertCompute()
 

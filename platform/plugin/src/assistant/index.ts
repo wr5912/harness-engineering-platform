@@ -145,7 +145,7 @@ export function redactAssistant(value: any): any {
   return value
 }
 function wireValue(value: any) { return JSON.parse(JSON.stringify(redactAssistant(value))) }
-/** 完整冻结差异留在持久提案和确认界面；模型按清单与摘要核对，不重复接收编译产物正文。 */
+/** 完整冻结差异留在持久操作记录；模型按清单与摘要核对，不重复接收编译产物正文。 */
 function modelToolValue(domain: Domain, action: string, value: any) {
   if (domain === 'task' && value?.state === 'completed' && value.plan && Array.isArray(value.operations)) return completedTaskModelView(value)
   if (domain !== 'agents' || !['compute-variants/freeze-preview', 'compute-variants/freeze'].includes(action)) return value
@@ -156,7 +156,7 @@ function modelToolValue(domain: Domain, action: string, value: any) {
     return typeof item.diff === 'string' ? { ...projected, diff_omitted: true,
       diff_sha256: createHash('sha256').update(item.diff).digest('hex'), diff_bytes: Buffer.byteLength(item.diff) } : projected
   }
-  return { ...compact(value), model_note: '模型回执省略完整 diff，仅保留真实文件清单与摘要；冻结时由原生确认卡展示完整实际差异，须由用户单独核对确认。' }
+  return { ...compact(value), model_note: '模型回执省略完整 diff，仅保留真实文件清单与摘要；完整实际差异保留在操作记录中，可在界面展开核对。' }
 }
 function receiptFailed(receipt: any) {
   return receipt.ok === false || receipt.value?.ok === false || receipt.value?.isError === true
@@ -235,7 +235,6 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
   const taskTimers = new Map<string, ReturnType<typeof setTimeout>>()
   const taskLocks = new Map<string, Promise<unknown>>()
   const taskOperations = new Map<string, AbortController>()
-  const pending = new Map<string, { sessionId: string; signal: AbortSignal; executing: boolean; resolve(value: any): void; detach(): void }>()
   const unregisterProjection = services.projections.register(assistantProjection)
   function promptState(agent: any) {
     if (!agent?.session?.header || !workspaceOwnsCwd(root, agent.session.header.cwd)) return undefined
@@ -405,7 +404,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
     if (action === 'preview') return taskPreview(id, input, signal)
     if (action === 'start') {
       const preview = await taskPreview(id, input, signal)
-      return propose(id, 'task', 'start', preview, signal, preview)
+      return executeOperation(id, 'task', 'start', preview, signal, preview)
     }
     if (action === 'pause' || action === 'cancel') {
       if (!fromUi) throw new Error('暂停和取消请使用任务卡')
@@ -578,26 +577,6 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
       ...(proposal.domain === 'agents' && proposal.action === 'compute-variants/freeze' ? { preview_sha256: proposal.preview?.value?.preview_sha256 } : {}),
       state: settlement.state, ...(settlement.result !== undefined ? { result: settlement.result } : {}), ...(settlement.error ? { error: settlement.error } : {}) })
   }
-  function finish(id: string, proposal: MapValue, settlement: MapValue) {
-    const waiting = pending.get(proposal.id)
-    if (!waiting || waiting.sessionId !== id) return false
-    pending.delete(proposal.id)
-    waiting.detach()
-    waiting.resolve(settledToolResult(proposal, settlement))
-    return true
-  }
-  async function cancelWaiting(id: string, proposal: MapValue) {
-    const waiting = pending.get(proposal.id)
-    if (!waiting || waiting.sessionId !== id) return
-    const settlement = waiting.executing
-      ? { ...proposal, kind: 'settlement', state: 'unknown', error: '会话已取消，操作可能已经执行，请核对实际状态。' }
-      : { ...proposal, kind: 'settlement', state: 'cancelled', error: '操作确认已取消，未执行写入。' }
-    // 先解除等待，避免重复取消；持久化完成后原工具才返回。
-    pending.delete(proposal.id)
-    waiting.detach()
-    try { await record(id, settlement) }
-    finally { waiting.resolve(settledToolResult(proposal, settlement)) }
-  }
   async function dispatch(domain: Domain, action: string, input: MapValue, signal: AbortSignal, peer?: any) {
     try {
       if (domain === 'mcp' && services.mcp && (['configuration', 'saveConfiguration', 'test', 'resources', 'resourceTemplates', 'readResource', 'callTool'].includes(action) || action.startsWith('sources/') || action.startsWith('control/'))) {
@@ -688,7 +667,8 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
       return wireValue({ kind: 'platform-operation', domain, action, state: receiptFailed(receipt) ? 'failed' : 'completed', result: receipt, task_id: task.id })
     })
   }
-  async function propose(id: string, domain: Domain, action: string, input: MapValue, signal: AbortSignal, prepared?: any) {
+  async function executeOperation(id: string, domain: Domain, action: string, input: MapValue, signal: AbortSignal, prepared?: any) {
+    input = structuredClone(input)
     assertNoCredentials(domain, action, input)
     if (domain === 'mcp' && action === 'saveCompositionDraft') input = { ...input, draft: compositionConfig(input.draft) }
     let preview: any = prepared ?? { action, input: redactAssistant(input) }
@@ -733,25 +713,12 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
       input = freezeInstancePreview(action, input, preview)
     }
     signal.throwIfAborted()
-    const proposal = { kind: 'proposal', id: randomUUID(), owner_session_id: id, domain, action, input, preview, state: 'awaiting_confirmation' }
-    let complete!: (value: any) => void
-    const completion = new Promise<any>(resolve => { complete = resolve })
-    const abort = () => { void cancelWaiting(id, proposal).catch(() => {}) }
-    pending.set(proposal.id, { sessionId: id, signal, executing: false, resolve: complete, detach: () => signal.removeEventListener('abort', abort) })
-    try {
-      await record(id, proposal)
-      if (pending.has(proposal.id)) {
-        signal.addEventListener('abort', abort, { once: true })
-        if (signal.aborted) await cancelWaiting(id, proposal)
-      }
-    } catch (error) {
-      pending.delete(proposal.id)
-      signal.removeEventListener('abort', abort)
-      throw error
-    }
-    // 保持原生工具调用等待；确认回执成为 tool/result，原 Agent loop 自然继续。
-    return completion
+    // 工具执行已通过 DSH 原生权限链，平台只核对业务预览与执行结果。
+    const proposal = { kind: 'proposal', id: randomUUID(), owner_session_id: id, domain, action, input, preview, state: 'running' }
+    const settlement = await runOperation(id, proposal, signal, (await inspect(id, signal)).state)
+    return settledToolResult(proposal, settlement)
   }
+
   function automaticWorkflow(state: AssistantState, action: string) {
     return action === 'datasets/preview' && state.task_context.skill === 'decision-sample-extraction' && state.task_context.run_id
       || action === 'features/preview' && state.task_context.skill === 'agent-maintenance' && state.task_context.workflow === 'features' && state.task_context.experiment_id
@@ -907,9 +874,13 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
         throw new Error('旧实例提案缺少模型设置核对结果，请重新生成提案')
       }
     }
+    const settlement = { ...await runOperation(id, proposal, signal, state), continuation: 'requires_user_message' }
+    await record(id, settlement)
+    return settlement
+  }
+  async function runOperation(id: string, proposal: MapValue, operationSignal: AbortSignal, state: AssistantState) {
+    const proposalId = proposal.id
     if (busy.has(proposalId)) throw new Error('该操作正在执行，请等待回执')
-    const waiting = pending.get(proposalId)
-    const operationSignal = waiting?.signal ?? signal
     busy.add(proposalId)
     let started = false
     try {
@@ -918,10 +889,9 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
         assertTaskBudget(state.execution)
         if (`experiment:${proposal.input.experiment_id}` !== state.execution.target_source) throw new Error('冻结目标与当前任务不一致')
       }
-      await record(id, { ...proposal, kind: 'settlement', state: 'running' })
+      await record(id, { ...proposal, kind: proposal.state === 'running' ? 'proposal' : 'settlement', state: 'running' })
       operationSignal.throwIfAborted()
       started = true
-      if (waiting) waiting.executing = true
       // 浏览器请求断连不取消仍在运行的原工具；用户停止会话时由工具信号取消。
       let receipt = proposal.domain === 'task' && proposal.action === 'start'
         ? await startTask(id, proposal.input, operationSignal)
@@ -936,14 +906,12 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
       const successful = !receiptFailed(receipt)
       const settlement = { ...proposal, kind: 'settlement', state: successful ? 'completed' : 'failed', result: redactAssistant(receipt) }
       await record(id, settlement)
-      const resumed = finish(id, proposal, settlement)
-      return { ...settlement, continuation: resumed ? 'resumed' : 'requires_user_message' }
+      return settlement
     } catch (error) {
       // 执行开始后断连或异常可能已产生副作用，保留未知状态，不自动重试。
-      const settlement = { ...proposal, kind: 'settlement', state: started ? 'unknown' : operationSignal.aborted ? 'cancelled' : 'failed', error: started ? '未收到完整操作回执，请核对实际状态后继续。' : '操作尚未执行，请重新生成预览。' }
-      try { await record(id, settlement) }
-      finally { finish(id, proposal, settlement) }
-      throw error
+      const settlement = { ...proposal, kind: 'settlement', state: started ? 'unknown' : operationSignal.aborted ? 'cancelled' : 'failed', error: started ? '未收到完整操作回执，请核对实际状态后继续。' : operationSignal.aborted ? '操作已取消，尚未执行。' : String(redactAssistant(error instanceof Error ? error.message : error)) }
+      await record(id, settlement)
+      return settlement
     } finally { busy.delete(proposalId); services.notify([proposal.domain, 'catalog', 'assistant'], [id]) }
   }
   const handler: ConnectionRpcHandler = async (endpoint, payload, signal) => {
@@ -984,7 +952,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
         running: services.running ? services.running(id) : state.running }) as any
       if (endpoint === 'cancel') {
         const receipt = await services.controller.cancel({ sessionId: id })
-        await Promise.all(state.proposals.map(proposal => cancelWaiting(id, proposal)))
+        await Promise.all(state.proposals.filter(proposal => proposal.state === 'awaiting_confirmation' && !busy.has(proposal.id)).map(proposal => record(id, { ...proposal, kind: 'settlement', state: 'cancelled', error: '会话已取消，未执行此操作。' })))
         return result(true, receipt) as any
       }
       if (endpoint === 'confirm') return result(true, await confirm(id, String(body.proposal_id ?? ''), signal)) as any
@@ -994,8 +962,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
         if (proposal.state !== 'awaiting_confirmation' || busy.has(proposal.id)) throw new Error('操作已开始或已结算，不能作为未执行提案取消')
         busy.add(proposal.id)
         try {
-          if (pending.has(proposal.id)) await cancelWaiting(id, proposal)
-          else await record(id, { ...proposal, kind: 'settlement', state: 'cancelled', error: '用户选择暂不执行，未实施此操作。' })
+          await record(id, { ...proposal, kind: 'settlement', state: 'cancelled', error: '用户选择暂不执行，未实施此操作。' })
         } finally { busy.delete(proposal.id) }
         return result(true, { state: 'cancelled', proposal_id: proposal.id }) as any
       }
@@ -1005,7 +972,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
   function registerTools(registry: { register(tool: any): any }) {
     for (const domain of Object.keys(actions) as Domain[]) registry.register({
       name: `platform_${domain}`,
-      description: `平台${domain}工具。context 读取固定任务与页面上下文；describe(input.action=操作名)读取单个操作的参数合同。优先查已有对象和能力，再执行；写入按已有确认或专项授权办理。`,
+      description: `平台${domain}工具。context 读取固定任务与页面上下文；describe(input.action=操作名)读取单个操作的参数合同。优先查已有对象和能力，再执行；工具权限遵循 DSH 原生设置，写入前核对预览与目标。`,
       parameters: { type: 'object', properties: { action: { type: 'string', enum: ['context', 'describe', ...actions[domain]] }, input: { type: 'object', additionalProperties: true } }, required: ['action', 'input'], additionalProperties: false },
       output: { schema: { type: 'object', additionalProperties: true }, render: (args: any, value: any) => [{ type: 'text', text: JSON.stringify(modelToolValue(domain, args.action, value)) }], presentationMeta: (args: any, value: any) => {
         const projected = domain === 'instances' && args.action === 'detail' ? { ...value } : domain === 'task' ? value : modelToolValue(domain, args.action, value)
@@ -1082,7 +1049,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
           if (receipt !== undefined) return receipt
         }
         if (!readActions.has(args.action) && !(domain === 'agents' && await confirmedFusion(id, args.action, input, exec.signal))) {
-          return propose(id, domain, args.action, input, exec.signal)
+          return executeOperation(id, domain, args.action, input, exec.signal)
         }
         let receipt = await dispatch(domain, args.action, input, exec.signal)
         if (domain === 'agents' && args.action === 'datasets/source' && state.task_context.skill === 'decision-sample-extraction' && receipt.ok) {
@@ -1092,7 +1059,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
         if (domain === 'agents' && args.action === 'eval/status') receipt = await waitEvaluation(id, input, receipt, exec.signal)
         if (domain === 'agents' && receipt.ok && receipt.value?.preview_id && automaticWorkflow(state, args.action)) return saveAutomaticPreview(id, args.action, receipt.value, exec.signal)
         if (domain === 'agents' && receipt.ok && receipt.value?.preview_id && (args.action === 'datasets/preview' || args.action === 'features/preview' || args.action === 'fusion/preview' && receipt.value.plan_ready)) {
-          return propose(id, domain, args.action === 'datasets/preview' ? 'datasets/apply' : args.action === 'features/preview' ? 'features/apply' : 'fusion/confirm', { preview_id: receipt.value.preview_id, ...(args.action === 'datasets/preview' ? { assistant_session_id: id } : {}) }, exec.signal, receipt.value)
+          return executeOperation(id, domain, args.action === 'datasets/preview' ? 'datasets/apply' : args.action === 'features/preview' ? 'features/apply' : 'fusion/confirm', { preview_id: receipt.value.preview_id, ...(args.action === 'datasets/preview' ? { assistant_session_id: id } : {}) }, exec.signal, receipt.value)
         }
         const history = domain === 'instances' && args.action === 'detail' && receipt.ok && receipt.value?.instance
           ? await readInstanceDeliveryHistory(root, receipt.value.instance, services.controller, exec.signal) : undefined
@@ -1143,12 +1110,6 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
     armedTasks.clear()
     unregisterOutput()
     unregisterPrompt()
-    try {
-      await Promise.all([...pending.entries()].map(async ([id, waiting]) => {
-        const { state } = await inspect(waiting.sessionId)
-        const proposal = state.proposals.find(item => item.id === id)
-        if (proposal) await cancelWaiting(waiting.sessionId, proposal)
-      }))
-    } finally { unregisterProjection() }
+    unregisterProjection()
   } }
 }

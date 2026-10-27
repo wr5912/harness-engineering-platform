@@ -182,6 +182,7 @@ export function apply(ctx: Context, suppliedConfig: ManagerConfig) {
       if (currentBusinessContext()) return run()
       return managementDispatch(assetRoot, run)
     } } : {}),
+    groupUrl: (id: string) => platformGroupUrl(assetRoot, id),
     platformDispatch: (handler: NonNullable<ManagerConfig['dispatch']>) => { dispatch = handler }, servers: { get() {
     const servers = config.servers.get()
     if (servers.some(server => server.id === COMPOSITION_SERVICE_ID || server.platformComposition)) throw new Error('platform-compositions 是已发布编排的保留服务 ID')

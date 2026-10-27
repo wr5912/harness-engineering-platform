@@ -88,7 +88,7 @@ test('首页新任务按原生实际状态收起，不反向展开已折叠的�
   }
 })
 
-test('助手写操作等待用户确认，原生记录恢复状态且失败回执不标记成功', async t => {
+test('助手写操作直接执行并写入原生记录，失败回执不标记成功', async t => {
   const root = new Context()
   const assetRoot = mkdtempSync(join(tmpdir(), 'conversation-data-'))
   writeFileSync(join(assetRoot, 'AGENTS.md'), '管理当前数据工作区的业务资产。')
@@ -123,25 +123,11 @@ test('助手写操作等待用户确认，原生记录恢复状态且失败回�
   assistant.registerTools({ register: tool => tools.set(tool.name, tool) })
   appendPluginRecord(session, 'plugin:harness-platform/assistant', { kind: 'workspace' })
   const controller = new AbortController()
-  let finished = false
   const draft = { toolName: 'basic_read', title: '基础查询', description: '仅基础模拟数据', connectionId: 'mock-basic' }
   const execution = tools.get('platform_mcp').execute({ action: 'saveCompositionDraft', input: { draft } }, { agent: { id: session.id, session }, signal: controller.signal })
-    .then(value => { finished = true; return value })
   const status = async () => (await assistant.handler('status', { session_id: session.id }, controller.signal)).value
-  let state
-  for (let i = 0; i < 10; i++) {
-    state = await status()
-    if (state.proposals.length) break
-    await new Promise(resolve => setImmediate(resolve))
-  }
-  assert.equal(state.proposals[0].state, 'awaiting_confirmation')
-  assert.equal(finished, false)
-  assert.equal(calls.length, 0)
-  const response = await assistant.handler('confirm', { session_id: session.id, proposal_id: state.proposals[0].id }, controller.signal)
-  assert.equal(response.ok, true)
-  assert.equal(response.value.state, 'failed')
-  assert.equal(response.value.continuation, 'resumed')
   assert.equal((await execution).state, 'failed')
   assert.equal((await status()).proposals[0].state, 'failed')
+  assert.equal((await status()).proposals.some(item => item.state === 'awaiting_confirmation'), false)
   assert.deepEqual(calls, [{ endpoint: 'mcp/saveCompositionDraft', input: { draft, confirmed: true } }])
 })

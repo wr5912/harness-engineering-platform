@@ -17,6 +17,7 @@ export interface PlatformNavigation {
   instance_name?: string
   source_id?: string
   server_id?: string
+  group_id?: string
   composition_id?: string
   version?: 'draft' | 'published'
   version_id?: string
