@@ -1,0 +1,39 @@
+{
+  "status": "passed",
+  "environment": "isolated-real-react-manager-with-fixture-api",
+  "client_sha256": "bdd1c4151e3e4668387ad017547ce88a9eda88cb444063c0a491c432ea46242b",
+  "checks": [
+    "desktop-inline-layout",
+    "three-category-case-insensitive-filter",
+    "checked-and-unchecked-same-rule",
+    "service-query-isolation",
+    "chinese-and-literal-symbol-filter",
+    "no-match-state",
+    "keyboard-clear-restores-focus",
+    "fold-tab-group-query-retention",
+    "filter-without-network-or-configuration-write",
+    "mobile-390px-wrap-without-overflow",
+    "inline-clear-pointer-focus",
+    "reload-clears-query"
+  ],
+  "discovery_requests": 1,
+  "page_errors": [],
+  "desktop_layout": {
+    "id": {
+      "x": 427,
+      "y": 417.25,
+      "height": 22.390625
+    },
+    "search": {
+      "x": 610.84375,
+      "y": 408.25,
+      "width": 684.15625,
+      "height": 40.390625
+    }
+  },
+  "mobile_layout": {
+    "wraps": true,
+    "clearInside": true,
+    "overflows": false
+  }
+}

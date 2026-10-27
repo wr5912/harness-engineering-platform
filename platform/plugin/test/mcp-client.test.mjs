@@ -85,6 +85,7 @@ function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理
   }
   function text(value) {
     if (Array.isArray(value)) return value.map(text).join('')
+    if (typeof value === 'boolean') return ''
     if (value?.type === 'style') return ''
     return value && typeof value === 'object' ? text(value.props?.children) : String(value ?? '')
   }
@@ -113,6 +114,23 @@ function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理
     setView: value => { props.view = value; render() }, getView: () => props.view,
     setServerId: value => { props.selectedServerId = value; render() },
     replaceDraftServersBeforeEffects: servers => { states[0] = { ...states[0], servers: structuredClone(servers) }; return renderBeforeEffects() } }
+}
+
+function serviceSelection(ui, serverId) {
+  const root = () => ui.nodes().find(node => node.type === 'details' && node.props['data-server-id'] === serverId)
+  const nodes = () => ui.nodes(root())
+  const input = () => nodes().find(node => node.type === 'input' && node.props.type === 'search')
+  const choices = section => {
+    const parent = section ? nodes().find(node => node.type === 'section'
+      && ui.nodes(node).some(child => child.type === 'h4' && ui.text(child) === section)) : root()
+    return ui.nodes(parent).filter(node => node.type === 'label' && node.props.className === 'mcp-check')
+  }
+  return { root, input, choices,
+    clear: () => nodes().find(node => node.type === 'button' && node.props['aria-label'] === '清空筛选'),
+    query: value => { input().props.onChange({ target: { value } }); ui.render() },
+    sectionText: title => ui.text(nodes().find(node => node.type === 'section'
+      && ui.nodes(node).some(child => child.type === 'h4' && ui.text(child) === title))),
+  }
 }
 
 test('自动生成的已发布组合服务不参与原生服务保存校验或持久化', async () => {
@@ -408,6 +426,137 @@ test('分组三类选择保留草稿；发现后失效项可见，三个页签�
   assert.equal((ui.text(ui.render()).match(/当前未发现/g) ?? []).length, 2)
   ui.setView('connection')
   assert.equal(heading().length, 0)
+})
+
+test('服务内关键词同时筛选三类项目，勾选状态不影响大小写、中文及字面匹配', async () => {
+  let requests = 0
+  const ui = editor({ fetch: async () => {
+    requests++
+    return { ok: true, json: async () => ({
+      tools: ['query_Asset', 'inspect_asset', '列出资产', 'other_tool'].map(name => ({ name })),
+      resources: { resources: ['soc://asset/selected', 'soc://asset/open', 'soc://资产/1', 'soc://other'].map(uri => ({ uri })) },
+      resourceTemplates: { resourceTemplates: ['soc://asset/{id}', 'soc://资产/{id}', 'soc://other/{id}'].map(uriTemplate => ({ uriTemplate })) },
+    }) }
+  } })
+  const group = { id: 'selected', members: [{ serverId: ui.server.id, names: ['query_Asset', 'archived_tool'],
+    resourceUris: ['soc://asset/selected'], resourceTemplates: ['soc://asset/{id}'] }] }
+  ui.refreshValue({ servers: [ui.server], groups: [group], sharedToken: 'fixture-token' })
+  ui.setView('groups')
+  const service = serviceSelection(ui, ui.server.id)
+  assert.ok(service.input().props['aria-label'].includes(ui.server.id))
+  assert.equal(service.input().props.placeholder, '筛选工具、资源 URI、资源模板')
+  assert.equal(service.clear(), undefined)
+  ui.button('发现工具与资源').props.onClick()
+  await new Promise(resolve => setImmediate(resolve)); ui.render()
+  service.query('  AsSeT  ')
+  assert.deepEqual(service.choices('工具').map(ui.text), ['query_Asset', 'inspect_asset'])
+  assert.deepEqual(service.choices('资源 URI').map(ui.text), ['soc://asset/selected', 'soc://asset/open'])
+  assert.deepEqual(service.choices('资源模板').map(ui.text), ['soc://asset/{id}'])
+  assert.deepEqual(service.choices('工具').map(node => ui.nodes(node).find(child => child.type === 'input').props.checked), [true, false])
+  service.query('资产')
+  assert.deepEqual(service.choices().map(ui.text), ['列出资产', 'soc://资产/1', 'soc://资产/{id}'])
+  service.query('.*')
+  assert.equal(service.choices().length, 0, '关键词中的正则符号只按字面匹配')
+  assert.equal((ui.text(service.root()).match(/没有匹配项。/g) ?? []).length, 3)
+  service.query('   ')
+  assert.equal(service.choices().length, 12)
+  assert.equal(requests, 1, '关键词输入不能重新发现上游')
+  assert.equal(ui.writes.length, 0, '关键词输入不能自动保存配置')
+  assert.doesNotMatch(ui.text(ui.render()), /当前草稿尚未保存；链接仍使用上次保存的配置/)
+})
+
+test('筛选不丢失不可见选择，保存只反映勾选操作，内置清空恢复列表与焦点', async () => {
+  const ui = editor()
+  const member = { serverId: ui.server.id, names: ['match_tool', 'hidden_tool'],
+    resourceUris: ['soc://match/1', 'soc://hidden/1'], resourceTemplates: ['soc://match/{id}', 'soc://hidden/{id}'] }
+  const group = { id: 'selected', members: [member] }
+  ui.refreshValue({ servers: [ui.server], groups: [group], sharedToken: 'fixture-token' })
+  ui.setView('groups')
+  const service = serviceSelection(ui, ui.server.id)
+  service.query('match')
+  assert.equal(service.choices().length, 3)
+  assert.equal(ui.writes.length, 0)
+  assert.doesNotMatch(ui.text(ui.render()), /当前草稿尚未保存；链接仍使用上次保存的配置/)
+  const matchedTool = service.choices('工具')[0]
+  ui.nodes(matchedTool).find(node => node.type === 'input').props.onChange()
+  ui.render()
+  await ui.button('保存更改').props.onClick()
+  ui.render()
+  const saved = ui.writes[0].ops.find(op => op.path[0] === 'groups').value[0].members[0]
+  assert.deepEqual(JSON.parse(JSON.stringify(saved)), { ...member, names: ['hidden_tool'] })
+  assert.equal(service.input().props.value, 'match', '保存不能清除当前筛选条件')
+  assert.equal(ui.text(service.clear()), '×')
+  assert.equal(service.clear().props.type, 'button')
+  let focused = 0
+  service.clear().props.onClick({ currentTarget: { previousElementSibling: { focus: () => focused++ } } })
+  ui.render()
+  assert.equal(focused, 1)
+  assert.equal(service.input().props.value, '')
+  assert.equal(service.clear(), undefined)
+  assert.equal(service.choices().length, 5)
+  const restored = service.choices('工具').find(node => ui.text(node).startsWith('hidden_tool'))
+  assert.equal(ui.nodes(restored).find(node => node.type === 'input').props.checked, true)
+  assert.equal(ui.writes.length, 1, '清空只更新筛选，不额外写入配置')
+})
+
+test('服务筛选按 ID 隔离，切换分组和页签及服务重排后保留，重新加载时清空', () => {
+  const ui = editor()
+  const other = { ...ui.server, id: 'other-server' }
+  const groups = ['first-group', 'second-group'].map(id => ({ id, members: [
+    { serverId: ui.server.id, names: ['first_tool', 'shared_tool'] },
+    { serverId: other.id, names: ['second_tool', 'shared_tool'] },
+  ] }))
+  const value = { servers: [ui.server, other], groups, sharedToken: 'fixture-token' }
+  ui.refreshValue(value, 'r2')
+  ui.setView('groups')
+  const first = serviceSelection(ui, ui.server.id), second = serviceSelection(ui, other.id)
+  first.query('first')
+  assert.equal(second.input().props.value, '')
+  assert.equal(second.choices().length, 2)
+  second.query('second')
+  assert.deepEqual(first.choices().map(ui.text), ['first_tool'])
+  assert.deepEqual(second.choices().map(ui.text), ['second_tool'])
+  ui.setView('connection'); ui.setView('groups')
+  ui.serviceButton('second-group').props.onClick(); ui.render()
+  assert.equal(first.input().props.value, 'first')
+  assert.equal(second.input().props.value, 'second')
+  ui.refreshValue({ ...value, servers: [other, ui.server] }, 'r3')
+  assert.equal(first.input().props.value, 'first')
+  assert.equal(second.input().props.value, 'second')
+  assert.deepEqual(first.choices().map(ui.text), ['first_tool'])
+  assert.deepEqual(second.choices().map(ui.text), ['second_tool'])
+  assert.equal(ui.writes.length, 0)
+  const reloaded = editor()
+  reloaded.refreshValue(value)
+  reloaded.setView('groups')
+  assert.equal(serviceSelection(reloaded, ui.server.id).input().props.value, '')
+  assert.equal(serviceSelection(reloaded, other.id).input().props.value, '')
+})
+
+test('筛选无匹配不混淆未发现或已知空列表，已保存的失效项目仍保持原状态', async () => {
+  const ui = editor({ fetch: async () => ({ ok: true, json: async () => ({
+    tools: [], resources: { resources: [] }, resourceTemplates: { resourceTemplates: [] },
+  }) }) })
+  const group = { id: 'selected', members: [{ serverId: ui.server.id, names: ['saved_tool'] }] }
+  ui.refreshValue({ servers: [ui.server], groups: [group], sharedToken: 'fixture-token' })
+  ui.setView('groups')
+  const service = serviceSelection(ui, ui.server.id)
+  service.query('unmatched')
+  assert.match(service.sectionText('工具'), /没有匹配项。/)
+  for (const title of ['资源 URI', '资源模板']) {
+    assert.match(service.sectionText(title), /尚未发现，或此服务未提供该列表。/)
+    assert.doesNotMatch(service.sectionText(title), /没有匹配项。/)
+  }
+  ui.button('发现工具与资源').props.onClick()
+  await new Promise(resolve => setImmediate(resolve)); ui.render()
+  assert.match(service.sectionText('工具'), /没有匹配项。/)
+  for (const title of ['资源 URI', '资源模板']) {
+    assert.match(service.sectionText(title), /没有可选项目。/)
+    assert.doesNotMatch(service.sectionText(title), /没有匹配项。|尚未发现/)
+  }
+  service.query('saved')
+  assert.match(ui.text(service.choices()[0]), /saved_tool（当前未发现）/)
+  assert.equal(ui.nodes(service.choices()[0]).find(node => node.type === 'input').props.checked, true)
 })
 
 test('深链按服务 ID 恢复，失效 ID 不静默选中其他服务', () => {

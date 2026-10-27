@@ -82,6 +82,9 @@ window.__ModuleLoader__.load({
       .mcp-manager .mcp-server-tools summary::-webkit-details-marker{display:none}.mcp-manager .mcp-server-tools summary::before{content:'▸';flex:none;color:var(--mcp-link);transition:transform var(--hep-motion-fast,140ms)}.mcp-manager .mcp-server-tools[open] summary::before{transform:rotate(90deg)}
       .mcp-manager .mcp-server-tools summary .mcp-muted{margin-left:auto;flex:none;font-size:12px}
       .mcp-manager .mcp-tool-body{padding:4px 0 16px}.mcp-manager .mcp-tool-body p{margin:0 0 12px}
+      .mcp-manager .mcp-selection-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;margin-bottom:12px}.mcp-manager .mcp-selection-row>p{margin:0;min-width:0}
+      .mcp-manager .mcp-selection-search{position:relative;flex:1 1 280px;min-width:0}.mcp-manager .mcp-selection-search input{width:100%;min-width:0;min-height:40px;padding:8px 44px 8px 12px;border:1px solid var(--mcp-line);border-radius:var(--hep-control-radius,8px);background:var(--mcp-surface);color:var(--mcp-ink)}
+      .mcp-manager .mcp-selection-search input::-webkit-search-cancel-button{-webkit-appearance:none}.mcp-manager .mcp-selection-search button{position:absolute;right:0;top:0;width:40px;height:100%;min-height:40px;padding:0;border:0;background:transparent;font-size:22px}.mcp-manager .mcp-selection-search button:focus-visible{outline-offset:-4px}
       .mcp-manager .mcp-tool-body h4{margin:16px 0 6px;font-size:13px;line-height:1.4}
       .mcp-manager .mcp-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-height:320px;overflow:auto;margin-top:12px}
       .mcp-manager .mcp-check{min-width:0;overflow-wrap:anywhere;padding:10px;border-radius:var(--hep-control-radius,8px);background:var(--mcp-tint);font-size:13px}
@@ -90,6 +93,7 @@ window.__ModuleLoader__.load({
       .mcp-manager .mcp-source{padding:16px 0;border-top:1px solid var(--mcp-line)}.mcp-manager .mcp-source:first-child{border-top:0}
       .mcp-manager .mcp-empty{text-align:center;padding:64px 24px;color:var(--mcp-muted)}.mcp-manager .mcp-empty strong{display:block;color:var(--mcp-ink);font-size:16px}
       @media(max-width:1000px){.mcp-manager .mcp-layout{grid-template-columns:220px minmax(0,1fr);gap:20px}}
+      @media(max-width:760px){.mcp-manager .mcp-selection-search{flex-basis:100%}}
       @media(max-width:760px){.mcp-manager .mcp-toolbar{align-items:start;flex-direction:column;padding:16px}.mcp-manager .mcp-tabs{gap:20px}.mcp-manager .mcp-layout{grid-template-columns:minmax(0,1fr)}.mcp-manager .mcp-service-layout>.mcp-sidebar{display:none}.mcp-manager .mcp-mobile-service-picker{display:flex;align-items:end;gap:8px;min-width:0}.mcp-manager .mcp-mobile-service-picker label{display:grid;gap:5px;min-width:0;flex:1;color:var(--mcp-muted);font-size:12px}.mcp-manager .mcp-mobile-service-picker select{width:100%;min-width:0;min-height:44px;padding:8px;border:1px solid var(--mcp-line);border-radius:var(--hep-control-radius,8px);background:var(--mcp-surface);color:var(--mcp-ink)}.mcp-manager .mcp-service-summary{grid-template-columns:minmax(0,1fr)}.mcp-manager .mcp-card-head .mcp-actions{width:100%}.mcp-manager .mcp-card-head .mcp-actions>button{flex:1}.mcp-manager .mcp-fields,.mcp-manager .mcp-tools{grid-template-columns:minmax(0,1fr)}.mcp-manager .mcp-card{padding:16px}}
       @media(pointer:coarse){.mcp-manager button,.mcp-manager .mcp-field input,.mcp-manager .mcp-field select{min-height:44px}.mcp-manager .mcp-switch input,.mcp-manager .mcp-check input{width:20px;height:20px}}
       @media(prefers-reduced-motion:reduce){.mcp-manager button,.mcp-manager input,.mcp-manager select,.mcp-manager summary::before{transition:none}.mcp-manager button:active:not(:disabled){transform:none}}
@@ -122,6 +126,7 @@ window.__ModuleLoader__.load({
       const [localPage, setLocalPage] = useState('servers')
       const [activeServer, setActiveServer] = useState(0)
       const [serverQuery, setServerQuery] = useState('')
+      const [selectionQueries, setSelectionQueries] = useState(new Map())
       const [servicePane, setServicePane] = useState('tools')
       const [activeGroup, setActiveGroup] = useState(0)
       const [tokenVisible, setTokenVisible] = useState(false)
@@ -491,7 +496,7 @@ window.__ModuleLoader__.load({
                     {linkReady && isDirty && <p className="mcp-muted">当前草稿尚未保存；链接仍使用上次保存的配置。</p>}
                     <p className="mcp-muted">通过 Authorization: Bearer &lt;统一访问 Token&gt; 调用。DSH 中将连接名设为分组 ID，模型可见工具名以该分组为前缀；超长工具名由 DSH 缩短。</p>
                   </section>
-                  <section className="mcp-section"><h3>选择工具与资源</h3><p className="mcp-muted">发现使用上次保存的服务配置；已保存的选择始终显示。</p>
+                  <section className="mcp-section"><h3>选择工具与资源</h3><p className="mcp-muted">发现使用上次保存的服务配置；未发现的已保存项目仍可筛选，筛选不更改勾选结果。</p>
                     {visibleServers.map((server, index) => {
                       const members = editingGroup.members.filter(item => item.serverId === server.id)
                       const selected = Object.fromEntries(['names', 'resourceUris', 'resourceTemplates'].map(field =>
@@ -499,19 +504,33 @@ window.__ModuleLoader__.load({
                       const needsMerge = members.length > 1
                       const resources = discoveredResources[server.id]
                       const discoveredNames = server.platformComposition ? (server.publishedTools ?? []).map(tool => tool.toolName || tool.name).filter(Boolean) : discovered[server.id]
+                      const query = selectionQueries.get(server.id) ?? ''
+                      const keyword = query.trim().toLowerCase()
                       const sections = [
                         { field: 'names', title: '工具', items: [...new Set([...selected.names, ...(discoveredNames ?? [])])], discovered: discoveredNames },
                         { field: 'resourceUris', title: '资源 URI', items: [...new Set([...selected.resourceUris, ...(resources?.resourceUris ?? [])])], discovered: resources?.resourceUris },
                         { field: 'resourceTemplates', title: '资源模板', items: [...new Set([...selected.resourceTemplates, ...(resources?.resourceTemplates ?? [])])], discovered: resources?.resourceTemplates },
-                      ]
+                      ].map(section => ({ ...section, visibleItems: section.items.filter(item => item.toLowerCase().includes(keyword)) }))
                       const selectedCount = selected.names.length + selected.resourceUris.length + selected.resourceTemplates.length
-                      return <details className="mcp-server-tools" key={index}>
+                      return <details className="mcp-server-tools" key={server.id || index} data-server-id={server.id}>
                         <summary>{server.serverName || server.id || '新服务器'}<span className="mcp-muted">{selectedCount} 个已选{server.enabled === false ? ' · 已停用' : ''}</span></summary>
                         <div className="mcp-tool-body">
-                          <p className="mcp-muted">服务器 ID：{server.id || '未设置 ID'}{server.enabled === false ? '。此来源已停用，所选能力不会通过分组开放。' : ''}{needsMerge ? '。此来源有重复成员，请先合并再编辑选择。' : ''}</p>
+                          <div className="mcp-selection-row">
+                            <p className="mcp-muted">服务器 ID：{server.id || '未设置 ID'}</p>
+                            <div className="mcp-selection-search">
+                              <input type="search" aria-label={`筛选服务 ${server.id || '未设置 ID'} 的工具与资源`} placeholder="筛选工具、资源 URI、资源模板" value={query} onChange={event => setSelectionQueries(previous => new Map(previous).set(server.id, event.target.value))} />
+                              {query && <button type="button" aria-label="清空筛选" title="清空筛选" onClick={event => {
+                                setSelectionQueries(previous => new Map(previous).set(server.id, ''))
+                                event.currentTarget.previousElementSibling?.focus()
+                              }}>×</button>}
+                            </div>
+                          </div>
+                          {server.enabled === false && <p className="mcp-muted">此来源已停用，所选能力不会通过分组开放。</p>}
+                          {needsMerge && <p className="mcp-muted">此来源有重复成员，请先合并再编辑选择。</p>}
                           {!server.platformComposition && <button className="mcp-quiet" type="button" onClick={() => { setSelected(server.id); void callTest(server.id) }} disabled={busy || !server.id || server.enabled === false}>发现工具与资源</button>}
                           {sections.map(section => <section key={section.field}><h4>{section.title}</h4>
-                            {section.items.length ? <div className="mcp-tools">{section.items.map(item => <label className="mcp-check" key={item}><input type="checkbox" checked={selected[section.field].includes(item)} disabled={needsMerge} onChange={() => toggleSelection(activeGroup, server.id, section.field, item)} />{item}{selected[section.field].includes(item) && Array.isArray(section.discovered) && !section.discovered.includes(item) && <span className="mcp-muted">（当前未发现）</span>}</label>)}</div>
+                            {section.visibleItems.length ? <div className="mcp-tools">{section.visibleItems.map(item => <label className="mcp-check" key={item}><input type="checkbox" checked={selected[section.field].includes(item)} disabled={needsMerge} onChange={() => toggleSelection(activeGroup, server.id, section.field, item)} />{item}{selected[section.field].includes(item) && Array.isArray(section.discovered) && !section.discovered.includes(item) && <span className="mcp-muted">（当前未发现）</span>}</label>)}</div>
+                              : section.items.length ? <p className="mcp-muted">没有匹配项。</p>
                               : <p className="mcp-muted">{section.discovered === undefined ? '尚未发现，或此服务未提供该列表。' : '没有可选项目。'}</p>}
                             {section.discovered === undefined && selected[section.field].length > 0 && <p className="mcp-muted">已保存的选择尚无法通过当前发现结果核对。</p>}
                           </section>)}
