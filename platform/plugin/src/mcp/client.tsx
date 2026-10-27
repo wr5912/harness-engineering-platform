@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { Manager } from 'harness-mcp-manager-client'
+import { copyText } from '../../../../plugins/mcp-manager/clipboard.ts'
 import { PasswordInput } from './components.tsx'
 import { CHANNEL, type PlatformNavigation, type PlatformPageProps } from '../protocol.ts'
 import type { CompositionConfig, CompositionEntry } from './compositions.ts'
@@ -252,7 +253,7 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
   function exportDraft(value: CompositionConfig, download: boolean) {
     const content = JSON.stringify(value, null, 2)
     if (!download) {
-      void navigator.clipboard.writeText(content).then(() => setError('草稿已复制，可在读取最新版本后手工重应用。')).catch(() => setError('无法自动复制，请下载草稿。'))
+      void copyText(content).then(() => setError('草稿已复制，可在读取最新版本后手工重应用。')).catch(() => setError('无法自动复制，请下载草稿。'))
       return
     }
     const url = URL.createObjectURL(new Blob([content], { type: 'application/json' }))

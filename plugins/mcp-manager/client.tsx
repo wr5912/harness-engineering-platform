@@ -1,4 +1,5 @@
 import { connectionIssue } from './connection.ts'
+import { copyText } from './clipboard.ts'
 
 window.__ModuleLoader__.load({
   id: 'dsh-web-mcp-manager',
@@ -78,6 +79,8 @@ window.__ModuleLoader__.load({
       .mcp-manager .mcp-note{padding:16px;border-radius:var(--hep-control-radius,8px);background:var(--mcp-tint);color:var(--mcp-muted)}
       .mcp-manager .mcp-status{margin:0 0 20px;padding:12px 16px;border-left:3px solid var(--mcp-blue);border-radius:0 8px 8px 0;background:var(--mcp-active);color:var(--mcp-ink);overflow-wrap:anywhere}
       .mcp-manager .mcp-link{display:block;min-width:0;max-width:100%;overflow-wrap:anywhere;padding:10px 12px;border:1px solid var(--mcp-line);border-radius:var(--hep-control-radius,8px);background:var(--mcp-tint);color:var(--mcp-link)}
+      .mcp-manager .mcp-copy-feedback{flex-basis:100%;min-width:0;margin:4px 0;color:var(--mcp-muted)}.mcp-manager .mcp-copy-feedback textarea{display:block;width:100%;margin-top:8px;padding:8px;color:var(--mcp-ink);background:var(--mcp-surface);border:1px solid var(--mcp-line);border-radius:var(--hep-control-radius,8px)}
+      .mcp-manager .mcp-http-operation{font-size:12px;overflow-wrap:anywhere}.mcp-manager .mcp-http-operation strong{color:var(--mcp-link);margin-right:8px}
       .mcp-manager .mcp-server-tools{border-bottom:1px solid var(--mcp-line);margin-top:12px;background:var(--mcp-surface)}
       .mcp-manager .mcp-server-tools summary{display:flex;align-items:center;gap:8px;cursor:pointer;padding:12px 0;font-weight:500;list-style:none;overflow-wrap:anywhere}
       .mcp-manager .mcp-server-tools summary::-webkit-details-marker{display:none}.mcp-manager .mcp-server-tools summary::before{content:'▸';flex:none;color:var(--mcp-link);transition:transform var(--hep-motion-fast,140ms)}.mcp-manager .mcp-server-tools[open] summary::before{transform:rotate(90deg)}
@@ -89,6 +92,7 @@ window.__ModuleLoader__.load({
       .mcp-manager .mcp-tool-body h4{margin:16px 0 6px;font-size:13px;line-height:1.4}
       .mcp-manager .mcp-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-height:320px;overflow:auto;margin-top:12px}
       .mcp-manager .mcp-check{min-width:0;overflow-wrap:anywhere;padding:10px;border-radius:var(--hep-control-radius,8px);background:var(--mcp-tint);font-size:13px}
+      .mcp-manager .mcp-operation{align-items:stretch;flex-direction:column;cursor:default}.mcp-manager .mcp-operation-options{display:flex;flex-wrap:wrap;gap:8px 16px}.mcp-manager .mcp-operation-options label{display:flex;align-items:center;gap:6px;cursor:pointer}
       .mcp-manager .mcp-result{max-height:420px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;margin:16px 0 0;padding:20px;border:1px solid var(--mcp-line);border-radius:var(--hep-control-radius,8px);background:var(--mcp-tint);color:var(--mcp-ink);font-size:13px;line-height:1.7}
       .mcp-manager .mcp-catalog{list-style:none;margin:0;padding:0}.mcp-manager .mcp-catalog li{padding:16px 0;border-top:1px solid var(--mcp-line);overflow-wrap:anywhere}.mcp-manager .mcp-catalog li:first-child{border-top:0}.mcp-manager .mcp-catalog strong{display:block}.mcp-manager .mcp-catalog small{display:block;margin-top:4px;color:var(--mcp-muted);font-size:12px}
       .mcp-manager .mcp-source{padding:16px 0;border-top:1px solid var(--mcp-line)}.mcp-manager .mcp-source:first-child{border-top:0}
@@ -120,6 +124,7 @@ window.__ModuleLoader__.load({
       const [result, setResult] = useState(null)
       const [catalog, setCatalog] = useState(null)
       const [status, setStatus] = useState('')
+      const [copyNotice, setCopyNotice] = useState(null)
       const [checks, setChecks] = useState({})
       const [recoveryDraft, setRecoveryDraft] = useState(null)
       const [copiedDraft, setCopiedDraft] = useState('')
@@ -134,6 +139,18 @@ window.__ModuleLoader__.load({
       const page = ['servers', 'groups', 'connection'].includes(view) ? view : localPage
       const setPage = next => { setLocalPage(next); if (next === 'servers') onValidationError?.() }
       const openDiagnostic = (serverId, name) => { setSelected(serverId); if (name) setToolName(name); if (onOpenView) onOpenView('connection', serverId); else setPage('connection') }
+      const copy = async (key, value, onCopied = () => {}) => {
+        try {
+          await copyText(value)
+          onCopied()
+          setCopyNotice({ key, value, message: '已复制。' })
+        } catch {
+          setCopyNotice({ key, value, message: '无法自动复制，请选中下方内容手动复制。', manual: true })
+        }
+      }
+      const copyFeedback = (key, value) => copyNotice?.key === key && copyNotice.value === value && <div className="mcp-copy-feedback" role="status">
+        {copyNotice.message}{copyNotice.manual && <textarea aria-label="手动复制内容" readOnly rows={3} value={value} onFocus={event => event.currentTarget.select()} />}
+      </div>
       useEffect(() => {
         if (state?.status !== 'ready') return
         const latest = { servers: structuredClone(state.value.servers ?? []),
@@ -336,11 +353,11 @@ window.__ModuleLoader__.load({
           <button className="mcp-primary" type="button" onClick={() => save()} disabled={busy || !state.writable || !isDirty}>保存更改</button>
         </div>}
         {conflict && <div className="mcp-note" role="alert">配置已在其他位置更新，当前草稿已保留。原版本保存会发生配置版本冲突。
-          <div className="mcp-actions">{button('复制本地草稿', async () => { try { await navigator.clipboard.writeText(draftContent); setCopiedDraft(draftContent); setStatus('本地草稿已复制。') } catch { setStatus('无法复制草稿，请检查浏览器剪贴板权限。') } })}
-            {button('读取最新配置', () => { setRecoveryDraft(structuredClone(draft)); draftBase.current = incomingContent; setDraft({ servers: structuredClone(state.value.servers ?? []), groups: structuredClone(state.value.groups ?? []), sharedToken: state.value.sharedToken ?? '', revision: state.revision }); setCopiedDraft('') }, copiedDraft !== draftContent)}</div>
+          <div className="mcp-actions">{button('复制本地草稿', () => copy('draft', draftContent, () => setCopiedDraft(draftContent)))}
+            {button('读取最新配置', () => { setRecoveryDraft(structuredClone(draft)); draftBase.current = incomingContent; setDraft({ servers: structuredClone(state.value.servers ?? []), groups: structuredClone(state.value.groups ?? []), sharedToken: state.value.sharedToken ?? '', revision: state.revision }); setCopiedDraft('') }, copiedDraft !== draftContent)}{copyFeedback('draft', draftContent)}</div>
         </div>}
         {recoveryDraft && <div className="mcp-note">之前的草稿已保留，可复制后手工对照最新配置。
-          <div className="mcp-actions">{button('复制保留草稿', async () => { await navigator.clipboard.writeText(JSON.stringify(recoveryDraft)) })}</div>
+          <div className="mcp-actions">{button('复制保留草稿', () => copy('recovery', JSON.stringify(recoveryDraft)))}{copyFeedback('recovery', JSON.stringify(recoveryDraft))}</div>
         </div>}
         {status && <p className="mcp-status" role="status">{status}</p>}
         <div className="mcp-shell">
@@ -463,7 +480,7 @@ window.__ModuleLoader__.load({
                     setStatus('新 Token 已生成；请点击「保存更改」使其生效。')
                   })}
                   {button(tokenVisible ? '隐藏' : '显示', () => setTokenVisible(value => !value), !draft.sharedToken)}
-                  {button('复制 Token', async () => { try { await navigator.clipboard.writeText(draft.sharedToken); setStatus('Token 已复制。') } catch { setTokenVisible(true); setStatus('当前浏览器无法自动复制，请显示后手动复制。') } }, !draft.sharedToken)}
+                  {button('复制 Token', () => copy('token', draft.sharedToken), !draft.sharedToken)}{copyFeedback('token', draft.sharedToken)}
                 </div>
               </div>
               <div className="mcp-layout">
@@ -477,7 +494,8 @@ window.__ModuleLoader__.load({
                   <div className="mcp-card-head"><div><h3>{editingGroup.id || '新分组'}</h3><p className="mcp-muted">仅开放此组勾选的工具与资源。</p></div></div>
                   <section className="mcp-section"><div className="mcp-fields"><label className="mcp-field">分组 ID{input(editingGroup.id, value => editGroup(activeGroup, group => { group.id = value }))}</label></div>
                     {/^[A-Za-z0-9_-]{1,32}$/.test(editingGroup.id) && <div className="mcp-actions"><span className="mcp-muted">MCP 链接</span>{linkReady && <code className="mcp-link">{new URL(`mcp/groups/${editingGroup.id}/v2`, state.publicUrl ?? document.baseURI).href}</code>}
-                      {button('复制分组链接', async () => { try { await navigator.clipboard.writeText(new URL(`mcp/groups/${editingGroup.id}/v2`, state.publicUrl ?? document.baseURI).href); setStatus('分组地址已复制；仍需核对所选来源的连接与发现。') } catch { setStatus('当前浏览器无法自动复制，请手动复制上方链接。') } }, !linkReady)}</div>}
+                      {button('复制分组链接', () => copy(`group:${editingGroup.id}`, new URL(`mcp/groups/${editingGroup.id}/v2`, state.publicUrl ?? document.baseURI).href), !linkReady)}
+                      {copyFeedback(`group:${editingGroup.id}`, new URL(`mcp/groups/${editingGroup.id}/v2`, state.publicUrl ?? document.baseURI).href)}</div>}
                     {linkReady && <p className="mcp-muted">分组地址已生成。链接存在只证明访问入口；所选来源的工具和资源仍需逐项发现。</p>}
                     {!!failedMembers.length && <p className="mcp-note" role="alert">来源 {failedMembers.join('、')} 最近一次发现失败；这些来源的工具和资源当前不可用，其他已发现来源可继续使用。</p>}
                     {!!uncheckedMembers.length && <p className="mcp-muted">来源 {uncheckedMembers.join('、')} 尚未检查当前配置；已保存的选择不代表工具已发现。</p>}
@@ -497,7 +515,7 @@ window.__ModuleLoader__.load({
                     {linkReady && isDirty && <p className="mcp-muted">当前草稿尚未保存；链接仍使用上次保存的配置。</p>}
                     <p className="mcp-muted">通过 Authorization: Bearer &lt;统一访问 Token&gt; 调用。DSH 中将连接名设为分组 ID，模型可见工具名以该分组为前缀；超长工具名由 DSH 缩短。</p>
                   </section>
-                  <section className="mcp-section"><h3>选择工具与资源</h3><p className="mcp-muted">发现使用上次保存的服务配置；名称下方显示原始标识、URI 与分组工具名。勾选的资源在 v2 链接中各自发布为可调用工具，筛选不更改勾选结果。</p>
+                  <section className="mcp-section"><h3>选择工具与资源</h3><p className="mcp-muted">发现使用上次保存的服务配置；名称下方显示原始标识、URI 与分组工具名。OpenAPI 同一接口合并显示 HTTP 方法和路径，可分别开放工具调用与资源读取；同时勾选只发布一个工具，资源仍可读取。筛选不更改勾选结果。</p>
                     {visibleServers.map((server, index) => {
                       const members = editingGroup.members.filter(item => item.serverId === server.id)
                       const selected = Object.fromEntries(['names', 'resourceUris', 'resourceTemplates'].map(field =>
@@ -507,19 +525,41 @@ window.__ModuleLoader__.load({
                       const discoveredTools = server.platformComposition ? (server.publishedTools ?? []).map(tool => ({ ...tool, name: tool.toolName || tool.name })).filter(tool => tool.name) : discovered[server.id]
                       const query = selectionQueries.get(server.id) ?? ''
                       const keyword = query.trim().toLowerCase()
-                      const sections = [
+                      const catalogs = [
                         { field: 'names', title: '工具', key: 'name', discovered: discoveredTools },
                         { field: 'resourceUris', title: '资源 URI', key: 'uri', discovered: resources?.resourceUris },
                         { field: 'resourceTemplates', title: '资源模板', key: 'uriTemplate', discovered: resources?.resourceTemplates },
-                      ].map(section => {
+                      ]
+                      const sections = catalogs.map(section => {
                         const catalog = new Map((section.discovered ?? []).map(item => [item[section.key], item]))
                         const items = [...new Set([...selected[section.field], ...catalog.keys()])].map(value => {
                           const item = catalog.get(value)
+                          const operation = server.specUrl ? item?.httpOperation : undefined
+                          const nativeSelected = section.field !== 'names' && operation && discoveredTools?.some(candidate => candidate.name === item.name
+                            && candidate.httpOperation?.method === operation.method && candidate.httpOperation?.path === operation.path) && selected.names.includes(item.name)
+                            && (server.tools?.mode !== 'selected' || server.tools.names.includes(item.name))
+                          const publishedName = nativeSelected ? discoveredTools.find(tool => tool.name === item.name)?.groupToolName : item?.groupToolName
                           return { value, item, label: item?.title || item?.name || value,
-                            details: [...new Set([item?.name, value, item?.groupToolName].filter(Boolean))] }
+                            operation, choices: [{ field: section.field, value, title: section.field === 'names' ? '工具调用' : section.field === 'resourceUris' ? '资源读取' : '资源模板读取' }],
+                            searchNames: [item?.groupToolName],
+                            details: [...new Set([item?.name, value, publishedName].filter(Boolean))] }
                         })
-                        return { ...section, items, visibleItems: items.filter(item => [item.label, ...item.details].join(' ').toLowerCase().includes(keyword)) }
+                        return { ...section, items, merged: [] }
                       })
+                      const operations = new Map()
+                      for (const section of sections) section.items = section.items.filter(row => {
+                        if (!row.operation) return true
+                        const key = JSON.stringify([row.item.name, row.operation.method, row.operation.path])
+                        const existing = operations.get(key)
+                        if (!existing) { operations.set(key, row); return true }
+                        existing.choices.push(...row.choices)
+                        existing.details = [...new Set([...existing.details, ...row.details])]
+                        existing.searchNames.push(...row.searchNames)
+                        section.merged.push(existing)
+                        return false
+                      })
+                      const matches = row => [row.label, ...row.details, ...row.searchNames, row.operation?.method, row.operation?.path].join(' ').toLowerCase().includes(keyword)
+                      for (const section of sections) section.visibleItems = section.items.filter(matches)
                       const selectedCount = selected.names.length + selected.resourceUris.length + selected.resourceTemplates.length
                       return <details className="mcp-server-tools" key={server.id || index} data-server-id={server.id}>
                         <summary>{server.serverName || server.id || '新服务器'}<span className="mcp-muted">{selectedCount} 个已选{server.enabled === false ? ' · 已停用' : ''}</span></summary>
@@ -527,7 +567,7 @@ window.__ModuleLoader__.load({
                           <div className="mcp-selection-row">
                             <p className="mcp-muted">服务器 ID：{server.id || '未设置 ID'}</p>
                             <div className="mcp-selection-search">
-                              <input type="search" aria-label={`筛选服务 ${server.id || '未设置 ID'} 的工具与资源`} placeholder="按名称、标识或 URI 筛选" value={query} onChange={event => setSelectionQueries(previous => new Map(previous).set(server.id, event.target.value))} />
+                              <input type="search" aria-label={`筛选服务 ${server.id || '未设置 ID'} 的工具与资源`} placeholder="按名称、标识、URI、HTTP 方法或路径筛选" value={query} onChange={event => setSelectionQueries(previous => new Map(previous).set(server.id, event.target.value))} />
                               {query && <button type="button" aria-label="清空筛选" title="清空筛选" onClick={event => {
                                 setSelectionQueries(previous => new Map(previous).set(server.id, ''))
                                 event.currentTarget.previousElementSibling?.focus()
@@ -537,8 +577,17 @@ window.__ModuleLoader__.load({
                           {server.enabled === false && <p className="mcp-muted">此来源已停用，所选能力不会通过分组开放。</p>}
                           {needsMerge && <p className="mcp-muted">此来源有重复成员，请先合并再编辑选择。</p>}
                           {!server.platformComposition && <button className="mcp-quiet" type="button" onClick={() => { setSelected(server.id); void callTest(server.id) }} disabled={busy || !server.id || server.enabled === false}>发现工具与资源</button>}
-                          {sections.map(section => <section key={section.field}><h4>{section.title}</h4>
-                            {section.visibleItems.length ? <div className="mcp-tools">{section.visibleItems.map(({ value, item, label, details }) => <label className="mcp-check" key={value}><input type="checkbox" checked={selected[section.field].includes(value)} disabled={needsMerge} onChange={() => toggleSelection(activeGroup, server.id, section.field, value)} /><span className="mcp-check-info"><span>{label}{selected[section.field].includes(value) && Array.isArray(section.discovered) && !item && <span className="mcp-muted">（当前未发现）</span>}</span>{details.filter(detail => detail !== label).map(detail => <small className="mcp-muted" key={detail}>{detail}</small>)}</span></label>)}</div>
+                          {sections.filter(section => section.items.length || !section.merged.length).map(section => <section key={section.field}><h4>{section.title}</h4>
+                            {section.visibleItems.length ? <div className="mcp-tools">{section.visibleItems.map(({ value, item, label, details, operation, choices }) => {
+                              const info = <span className="mcp-check-info"><span>{label}{selected[section.field].includes(value) && Array.isArray(section.discovered) && !item && <span className="mcp-muted">（当前未发现）</span>}</span>
+                                {operation && <span className="mcp-http-operation"><strong>{operation.method}</strong><code>{operation.path}</code></span>}
+                                {details.filter(detail => detail !== label).map(detail => <small className="mcp-muted" key={detail}>{detail}</small>)}
+                              </span>
+                              const checkbox = choice => <input type="checkbox" checked={selected[choice.field].includes(choice.value)} disabled={needsMerge} onChange={() => toggleSelection(activeGroup, server.id, choice.field, choice.value)} />
+                              return choices.length === 1 ? <label className="mcp-check" key={value}>{checkbox(choices[0])}{info}</label>
+                                : <div className="mcp-check mcp-operation" key={value} role="group" aria-label={label}>{info}<div className="mcp-operation-options">{choices.map(choice => <label key={choice.field}>{checkbox(choice)}{choice.title}</label>)}</div></div>
+                            })}</div>
+                              : section.merged.some(matches) ? <p className="mcp-muted">匹配接口的资源选项已合并显示在工具条目中。</p>
                               : section.items.length ? <p className="mcp-muted">没有匹配项。</p>
                               : <p className="mcp-muted">{section.discovered === undefined ? '尚未发现，或此服务未提供该列表。' : '没有可选项目。'}</p>}
                             {section.discovered === undefined && selected[section.field].length > 0 && <p className="mcp-muted">已保存的选择尚无法通过当前发现结果核对。</p>}
