@@ -66,6 +66,22 @@ const save = async fx => apply(fx, await preview(fx, await source(fx)))
 const reviewed = async (fx, value, changes = {}) => fx.handle('datasets/update', updatePayload(value, undefined, changes))
 const exported = (fx, dataset, mode = 'training') => fx.handle('datasets/export', { dataset_id: dataset.id, mode })
 
+test('Skill 注入来源进入样本输入，同源任务分组不随 Skill 目录变化', () => withFixture(async fx => {
+  async function extract(task, catalog) {
+    const rows = traceEvents(task)
+    rows[3].event.data.header.messages.unshift({ role: 'user', source: { kind: 'skill-catalog', form: 'catalog' }, content: catalog })
+    fx.createRun(runId, rows.map(row => JSON.stringify(row)).join('\n') + '\n')
+    return (await preview(fx, await source(fx))).records[0]
+  }
+  const first = await extract('巡检任务甲', '目录版本一')
+  const changedSkill = await extract('巡检任务甲', '目录版本二')
+  const changedTask = await extract('巡检任务乙', '目录版本一')
+  assert.equal(first.state.messages[0].source.kind, 'skill-catalog')
+  assert.equal(first._meta.source_group_id, changedSkill._meta.source_group_id)
+  assert.notEqual(first._meta.source_group_id, changedTask._meta.source_group_id)
+  assert.notEqual(first._meta.content_sha256, changedSkill._meta.content_sha256)
+}))
+
 // 从真实 JSONL 与文件夹来源进入，避免仅断言字符串或模拟保存后的资格结果。
 test('v2完整闭环：输入与targets分离，多命名题逐题复核后只导出合格题子集', () => withFixture(async fx => {
   const listing = await fx.handle('datasets/source', { run_id: runId })

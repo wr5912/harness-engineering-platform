@@ -1,0 +1,43 @@
+{
+  "checked_at": "2026-10-27T06:23:33.552Z",
+  "scope": "PA-12 平台读取与原生 Skill 装载；只读既有 Run，不执行新模型、业务或训练任务",
+  "workspace_root": "/home/cmp/harness-engineering-platform-data",
+  "platform_pid": 4074385,
+  "reload": {
+    "stage": "enable",
+    "target": "@ai-agent-harness/harness-platform",
+    "enabled": true,
+    "changed": false,
+    "application": "applied",
+    "warnings": []
+  },
+  "native_skill_catalog": {
+    "count": 31,
+    "discovery": {
+      "name": "kev-decision-discovery",
+      "path": "/home/cmp/harness-engineering-platform-data/.agents/skills/kev-decision-discovery/SKILL.md",
+      "description": "对照固定版本的 Skill 与已审计轨迹识别可交给 Kev 的决策职责，区分语义分类、确定性规则、参数绑定及开放生成。当用户要发现决策点、规划中低算力 Variant 或判断模型替换收益时使用；不把每次工具调用都当成独立可训练任务。",
+      "modelInvocable": true
+    }
+  },
+  "extraction_skill": {
+    "path": "/home/cmp/harness-engineering-platform-data/.agents/skills/decision-sample-extraction/SKILL.md",
+    "sha256": "5306193b8d66ca292d34dcf63b228baf09fba8853eb53232978f68fd77548c72",
+    "matches_current_file": true
+  },
+  "trace": {
+    "run_id": "run-6544173e-0670-4cfd-af86-f0d27cad77d2",
+    "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-6544173e-0670-4cfd-af86-f0d27cad77d2/evidence/U-EMG-001/trace.jsonl",
+    "decisions": 12,
+    "with_visible_state": 12,
+    "with_skill_catalog": 12,
+    "with_loaded_skill_body": 12,
+    "eligible": 12,
+    "private_replay_excluded": true
+  },
+  "browser_errors": [],
+  "limitations": [
+    "未运行完整 KEV 抽取、人工标注、训练与接管评估；本记录不证明任务效果提升。",
+    "既有 Run 的状态与业务结论保持原样。"
+  ]
+}

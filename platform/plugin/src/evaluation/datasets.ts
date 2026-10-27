@@ -78,7 +78,7 @@ function stateOf(slice: DecisionSlice) {
   return clean({ messages: slice.state.messages.map(({ ref: _ref, ...message }) => message), available_tools: slice.state.available_tools ?? null })
 }
 function sourceGroup(state: any, sessionLog: unknown) {
-  const first = state?.messages?.find((message: any) => message.role === 'user')
+  const first = state?.messages?.find((message: any) => message.role === 'user' && (!message.source || message.source.kind === 'user'))
   return `task-${digest(JSON.stringify(first?.content ?? sessionLog ?? '<未记录任务>').normalize('NFKC').replace(/\s+/g, ' ').trim()).slice(0, 24)}`
 }
 const groupOf = (slice: DecisionSlice) => sourceGroup(stateOf(slice), slice.anchor.session_log)

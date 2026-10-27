@@ -75,7 +75,7 @@ test('来源角色依赖冻结 Case 和真实采集副文件，未知和子 Sess
   assert.equal(api.buildDecisionSlices((await api.loadRunTrace(f.root, { run_id: runId, path: f.path })).events)[0].eligible, false)
 })
 
-test('同批并行工具共用请求前缀，排除当前模型动作与未来结果，过滤伪 user 系统上下文', () => {
+test('同批并行工具共用请求前缀，保留注入来源，排除当前模型动作与未来结果', () => {
   const rows = parse([
     row('user/message', user('用户当前任务'), 1),
     row('user/message', { source: { kind: 'context' }, content: [{ type: 'text', text: '不应混入用户输入的系统上下文' }] }, 2),
@@ -97,7 +97,8 @@ test('同批并行工具共用请求前缀，排除当前模型动作与未来�
   assert.equal(a.eligible, true)
   assert.equal(JSON.stringify(a.state).includes('当前模型输出'), false)
   assert.equal(JSON.stringify(a.state).includes('未来结果'), false)
-  assert.equal(JSON.stringify(a.state).includes('系统上下文'), false)
+  assert.equal(JSON.stringify(a.state).includes('系统上下文'), true)
+  assert.equal(a.state.messages[1].source.kind, 'context')
   assert.ok(a.context_refs.every(ref => ref.line < a.anchor.line))
   assert.equal(a.outcome.result.message.content[0].text, '未来结果A')
   assert.ok(JSON.stringify(final.state).includes('未来结果A'))
@@ -118,6 +119,79 @@ test('优先实际请求 messages，事件流不按时间排序混入其他 Sess
   assert.equal(decision.outcome.result.message.content, '本Session结果')
   const bad = api.parseTraceText(encode([row('user/message', user('hi')), row('request/header')]) + '{bad}\n' + encode([row('tool/call', { name: 'read', callId: 'a' })]), { path: 'trace.jsonl', role: 'target' })
   assert.equal(api.buildDecisionSlices(bad)[0].eligible, false)
+})
+
+test('实际请求保留渐进加载的 Skill 来源与正文，排除提供方私有回放状态', () => {
+  const messages = [
+    { role: 'user', source: { kind: 'skill-catalog', form: 'catalog' }, content: 'inspection: 巡检技能目录' },
+    { role: 'user', source: { kind: 'user' }, content: '执行巡检' },
+    { role: 'user', source: { kind: 'instructions', form: 'instructions', path: 'SKILL.md' }, content: '必须先查目录' },
+    { role: 'assistant', source: { kind: 'model', provider: 'fixture', model: 'fixture', replayState: { hidden: 'PRIVATE_REPLAY' } }, content: '已加载' },
+  ]
+  const [slice] = api.buildDecisionSlices(parse([row('request/header', { header: { messages } }, 0), row('tool/call', { name: 'list', callId: 'a' }, 1)]))
+  assert.equal(slice.context_mode, 'actual_request')
+  assert.equal(slice.state.messages[0].source.form, 'catalog')
+  assert.equal(slice.state.messages[2].source.path, 'SKILL.md')
+  assert.equal(slice.state.messages[2].content, '必须先查目录')
+  assert.equal(JSON.stringify(slice.state).includes('PRIVATE_REPLAY'), false)
+})
+
+test('DSH surface 按决策时刻保留 Skill 目录、已加载正文及工具变更，替换后不复活旧正文', () => {
+  const events = [
+    { type: 'user/message', data: { role: 'user', source: { kind: 'skill-catalog', form: 'catalog' }, content: [{ type: 'text', text: 'inspection: 巡检技能目录' }] }, surfaceOp: 'append' },
+    { type: 'user/message', data: { role: 'user', ...user('执行巡检') }, surfaceOp: 'append' },
+    { type: 'request/header', data: { header: { tools: [{ name: 'skill' }] } } },
+    { type: 'assistant/message', data: { message: { role: 'assistant', content: [{ type: 'tool-call', id: 's', name: 'skill', arguments: '{}' }] } }, surfaceOp: 'append' },
+    { type: 'tool/call', data: { callId: 's', name: 'skill', arguments: '{}' } },
+    { type: 'tool/result', data: { message: { role: 'tool', source: { kind: 'tool', callId: 's' }, content: [{ type: 'text', text: '<skill_content name="inspection">SKILL_BODY_V1</skill_content>' }] } }, surfaceOp: 'append', sourceEventSeqs: [4] },
+    { type: 'developer/message', data: { message: { role: 'developer', content: [{ type: 'tool-removal', toolName: 'skill' }] } }, surfaceOp: 'append' },
+    { type: 'request/header', data: { header: { tools: [{ name: 'list' }] } } },
+    { type: 'tool/call', data: { callId: 'l', name: 'list', arguments: '{}' } },
+    { type: 'user/message', data: { role: 'user', source: { kind: 'context', form: 'notice', summary: '正文已压缩' }, content: [{ type: 'text', text: 'SKILL_SUMMARY' }] }, surfaceOp: { op: 'replace', startSeq: 5, endSeq: 5 }, sourceEventSeqs: [5] },
+    { type: 'request/header', data: { header: {} } },
+    { type: 'assistant/message', data: answer('结束'), surfaceOp: 'append' },
+  ]
+  const slices = source => api.buildDecisionSlices(parse(source.map((event, seq) => ({ session_log: 'root.jsonl', event: { ...event, seq } }))))
+  const input = slice => ({ ...slice.state, messages: slice.state.messages.map(({ ref, ...message }) => message) })
+  const [first, loaded, replaced] = slices(events)
+  assert.ok([first, loaded, replaced].every(slice => slice.eligible))
+  assert.equal(first.state.messages[0].source.kind, 'skill-catalog')
+  assert.equal(JSON.stringify(first.state).includes('SKILL_BODY'), false)
+  assert.equal(JSON.stringify(loaded.state).includes('SKILL_BODY_V1'), true)
+  assert.equal(loaded.state.messages.at(-1).content[0].type, 'tool-removal')
+  assert.deepEqual(loaded.state.available_tools, [{ name: 'list' }])
+  assert.equal(JSON.stringify(replaced.state).includes('SKILL_BODY'), false)
+  assert.equal(JSON.stringify(replaced.state).includes('SKILL_SUMMARY'), true)
+  const changed = structuredClone(events)
+  changed[5].data.message.content[0].text = 'SKILL_BODY_V2'
+  assert.deepEqual(input(slices(changed)[0]), input(first))
+  assert.notDeepEqual(input(slices(changed)[1]), input(loaded))
+  assert.deepEqual(input(slices(changed)[2]), input(replaced))
+  const invalid = structuredClone(events)
+  invalid[9].sourceEventSeqs = [4]
+  assert.equal(slices(invalid)[0].eligible, true)
+  assert.equal(slices(invalid)[2].eligible, false)
+  assert.match(slices(invalid)[2].limitations.join(' '), /surface 合同/)
+  const empty = structuredClone(events)
+  empty[9] = { type: 'developer/message', data: { message: { role: 'developer', content: [] } }, surfaceOp: { op: 'replace', startSeq: 5, endSeq: 5 }, sourceEventSeqs: [5] }
+  assert.equal(JSON.stringify(slices(empty)[2].state).includes('SKILL_BODY'), false)
+})
+
+test('请求头之后的原生工具加载和 Skill 上下文进入当前输入，当前输出不进入', () => {
+  const events = [
+    { type: 'user/message', data: { role: 'user', ...user('执行巡检') }, surfaceOp: 'append' },
+    { type: 'request/header', data: { header: { tools: [{ name: 'skill', description: '读取 Skill', parameters: { type: 'object' } }] } } },
+    { type: 'developer/message', data: { headerSeq: 1, message: { role: 'developer', content: [{ type: 'tool-addition', toolName: 'skill' }] } }, surfaceOp: 'append' },
+    { type: 'user/message', data: { role: 'user', source: { kind: 'skill-catalog', form: 'catalog' }, content: [{ type: 'text', text: 'VISIBLE_SKILL_CATALOG' }] }, surfaceOp: 'append' },
+    { type: 'assistant/message', data: { message: { role: 'assistant', content: [{ type: 'tool-call', id: 's', name: 'skill', arguments: '{"name":"inspection"}' }] } }, surfaceOp: 'append' },
+    { type: 'tool/call', data: { callId: 's', name: 'skill', arguments: '{"name":"inspection"}' } },
+  ]
+  const [slice] = api.buildDecisionSlices(parse(events.map((event, seq) => ({ session_log: 'root.jsonl', event: { ...event, seq } }))))
+  assert.equal(slice.eligible, true)
+  assert.equal(slice.state.messages[1].content[0].type, 'tool-addition')
+  assert.equal(slice.state.messages[2].source.kind, 'skill-catalog')
+  assert.equal(JSON.stringify(slice.state).includes('VISIBLE_SKILL_CATALOG'), true)
+  assert.equal(slice.state.messages.some(message => message.role === 'assistant'), false)
 })
 
 test('历史工具选择只保留一次，保留并行工具结果的 callId 关联，思维块不进入输入', () => {

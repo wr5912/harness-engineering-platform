@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto'
 import { posix } from 'node:path'
 import { load as loadYaml } from 'js-yaml'
+import { foldSurface, deriveEventMessage } from '@deepseek-ai/dsh-session/surface'
+import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { listRunFiles, readRunEvidenceFile, redactRunText, RunFileError } from '../agents/run-files.ts'
 
 type JsonMap = Record<string, any>
@@ -41,6 +43,7 @@ export interface TraceMessage {
   role: string
   content: unknown
   ref: TraceRef
+  source?: JsonMap
   tool_call_id?: string
   tool_calls?: unknown
   name?: string
@@ -71,7 +74,7 @@ export interface RunTraceInput {
 
 const MAX_LINE_BYTES = 128 * 1024
 const PAGE_BYTES = 256 * 1024
-const KNOWN_TYPES = new Set(['session', 'session/created', 'user/message', 'assistant/message', 'system/message', 'tool/call', 'tool/result', 'turn/start', 'turn/end', 'step/start', 'step/end', 'request/header', 'request/context', 'request/body', 'request/messages', 'request/start', 'request/response', 'agent/inbox/spliced', 'session/title', 'session/title-llm-request', 'permission/preset', 'sandbox/mode', 'approval/policy'])
+const KNOWN_TYPES = new Set(['session', 'session/created', 'user/message', 'assistant/message', 'system/message', 'developer/message', 'tool/call', 'tool/result', 'turn/start', 'turn/end', 'step/start', 'step/end', 'request/header', 'request/context', 'request/body', 'request/messages', 'request/start', 'request/response', 'agent/inbox/spliced', 'session/title', 'session/title-llm-request', 'permission/preset', 'sandbox/mode', 'approval/policy'])
 const hash = (value: string | Buffer) => createHash('sha256').update(value).digest('hex')
 const map = (value: unknown): JsonMap | null => value && typeof value === 'object' && !Array.isArray(value) ? value as JsonMap : null
 const asString = (value: unknown): string | null => typeof value === 'string' ? value : null
@@ -185,29 +188,44 @@ export async function loadRunTrace(root: string, input: Pick<RunTraceInput, 'run
 function visibleContent(value: any) {
   if (!Array.isArray(value)) return typeof value === 'string' ? value : []
   // 隐式思维、压缩状态与 stream 不作为训练用的可观察决策输入。
-  return value.filter(block => block && ['text', 'tool-call', 'tool-result', 'image', 'image_url', 'input_text', 'input_image'].includes(block.type))
+  return value.filter(block => block && ['text', 'tool-call', 'tool-result', 'tool-addition', 'tool-removal', 'image', 'image_url', 'input_text', 'input_image'].includes(block.type))
 }
 function messageMeta(message: JsonMap) {
   const callId = asString(message.tool_call_id) ?? (message.source?.kind === 'tool' ? asString(message.source.callId) : null)
-  return { ...(callId ? { tool_call_id: callId } : {}), ...(Array.isArray(message.tool_calls) ? { tool_calls: message.tool_calls } : {}), ...(typeof message.name === 'string' ? { name: message.name } : {}) }
+  const { replayState: _replayState, ...source } = map(message.source) ?? {}
+  return { ...(typeof source.kind === 'string' ? { source } : {}), ...(callId ? { tool_call_id: callId } : {}), ...(Array.isArray(message.tool_calls) ? { tool_calls: message.tool_calls } : {}), ...(typeof message.name === 'string' ? { name: message.name } : {}) }
 }
 function eventMessage(row: TraceEvent): TraceMessage | null {
   const data = row.event?.data ?? {}
   if (row.type === 'user/message') {
     const message = map(data.message) ?? data
-    if (message.source?.kind !== 'user') return null
-    return { role: 'user', content: visibleContent(message.content), ref: row.ref }
+    return { role: 'user', content: visibleContent(message.content), ref: row.ref, ...messageMeta(message) }
   }
-  if (row.type === 'assistant/message' || row.type === 'system/message') {
+  if (['assistant/message', 'system/message', 'developer/message'].includes(row.type)) {
     const message = map(data.message)
-    return message ? { role: row.type === 'assistant/message' ? 'assistant' : 'system', content: visibleContent(message.content), ref: row.ref, ...messageMeta(message) } : null
+    return message ? { role: row.type.split('/')[0]!, content: visibleContent(message.content), ref: row.ref, ...messageMeta(message) } : null
   }
   if (row.type === 'tool/result') return { role: 'tool', content: data.message?.content ?? data.error ?? null, ref: row.ref, ...messageMeta(data.message ?? {}) }
   if (row.type === 'tool/call') return { role: 'assistant', content: [{ type: 'tool-call', toolCallId: data.callId, toolName: data.name, args: data.arguments }], ref: row.ref }
   return null
 }
 
-function reconstructedMessages(before: TraceEvent[]): TraceMessage[] {
+function reconstructedMessages(before: TraceEvent[]): { messages: TraceMessage[]; issues: string[] } {
+  if (before.some(row => row.event?.surfaceOp !== undefined || row.type === 'session' && row.event?.version === 4)) {
+    // 使用锁定 DSH 的 surface 合同，替换或插件投影不可解释时不回退到追加历史。
+    try {
+      const rows = before.filter(row => row.type !== 'session' || row.ref.seq !== null)
+      const events = rows.map(row => row.event as SessionEvent)
+      const surface = foldSurface(events)
+      const messages = surface.nodes.flatMap(seq => {
+        const message = deriveEventMessage(events[seq]!, surface.projectedMessages)
+        return message ? [{ role: message.role, content: visibleContent(message.content), ref: rows[seq]!.ref, ...messageMeta(message) }] : []
+      })
+      return { messages, issues: [] }
+    } catch {
+      return { messages: [], issues: ['无法按锁定 DSH 的 surface 合同重建当前上下文；检查事件序列、替换来源及所需插件投影，不作为训练样本。'] }
+    }
+  }
   const messages: TraceMessage[] = []
   const serializedCalls = new Set<string>()
   for (const row of before) {
@@ -220,7 +238,7 @@ function reconstructedMessages(before: TraceEvent[]): TraceMessage[] {
     } else if (row.type === 'tool/call' && typeof row.event?.data?.callId === 'string') serializedCalls.add(row.event.data.callId)
     messages.push(message)
   }
-  return messages
+  return { messages, issues: [] }
 }
 
 function actualMessages(row: TraceEvent): any[] | null {
@@ -256,6 +274,13 @@ export function buildDecisionSlices(events: TraceEvent[]): DecisionSlice[] {
       if (row.type === 'assistant/message' && (!actionContent?.length || (actionContent as any[])?.some?.(block => block.type === 'tool-call'))) continue
       const sameStepRequest = request >= 0 && (step < 0 || request > step)
       let cutoff = sameStepRequest ? request : step >= 0 ? step : index
+      if (sameStepRequest) {
+        // 请求头之后仍可能装入工具声明或上下文；本批首个输出及后续执行结果不进入输入。
+        for (let at = request + 1; at < index; at++) {
+          if (['assistant/message', 'tool/call'].includes(rows[at]!.type)) break
+          cutoff = at + 1
+        }
+      }
       if (!sameStepRequest && step < 0) {
         // 无请求边界时保守回退到本批第一个输出之前；连续工具共享同一前缀。
         while (cutoff > 0 && ['assistant/message', 'tool/call'].includes(rows[cutoff - 1]!.type)) cutoff--
@@ -266,10 +291,10 @@ export function buildDecisionSlices(events: TraceEvent[]): DecisionSlice[] {
       if (sameStepRequest && !actual) {
         for (let at = request + 1; at < index; at++) if (actualMessages(rows[at]!)) { actual = actualMessages(rows[at]!); break }
       }
-      const messages: TraceMessage[] = actual ? actual.filter(message => message.role !== 'user' || !message.source || message.source.kind === 'user')
-        .map(message => ({ role: message.role, content: visibleContent(message.content), ref: req!.ref, ...messageMeta(message) }))
+      const context = actual ? { messages: actual.map(message => ({ role: message.role, content: visibleContent(message.content), ref: req!.ref, ...messageMeta(message) })), issues: [] }
         : reconstructedMessages(before)
-      const limitations = ['仅保留可观察事件；没有显式证据时不推断私有思维、备选动作或因果归因。']
+      const messages: TraceMessage[] = context.messages
+      const limitations = ['仅保留可观察事件；没有显式证据时不推断私有思维、备选动作或因果归因。', ...context.issues]
       if (!actual) limitations.push('未取得完整模型请求 messages；前缀由同 Session 的可观察历史重建，不能声称与实际模型上下文完全一致。')
       if (!sameStepRequest && step < 0) limitations.push('缺少请求或 step 边界，决策前缀采用保守截点。')
       if (!row.ref.session_log) limitations.push('未记录 session_log，仅按当前文件隔离，Session 身份未知。')
