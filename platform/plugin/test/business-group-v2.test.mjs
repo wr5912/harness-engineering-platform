@@ -74,7 +74,7 @@ test('v2 分组只接受固定实例签名与当前受信 Session，签名不降
   writeFileSync(join(root, 'config', 'business-access.json'), JSON.stringify(access))
   const routes = []
   const context = { webServer: { publicPath: path => `/hep${path}`, register: route => { routes.push({ ...route, path: `/hep${route.path}` }); return () => {} } },
-    connection: { requestRejection: () => undefined }, effect: create => create(), on() {}, get: () => undefined,
+    connection: { requestRejection: () => undefined, admit: () => ({ peer: { principal: { kind: 'owner' } } }) }, effect: create => create(), on() {}, get: () => undefined,
     provide(name, value) { this[name] = value } }
   const servers = [{ id: 'source', serverName: 'display-source', enabled: true, specUrl: `${sourceOrigin}/openapi.json`,
     tools: { mode: 'all', names: [] } }, { id: 'unreachable', enabled: true, url: 'http://127.0.0.1:1/mcp',
@@ -180,10 +180,12 @@ test('v2 分组只接受固定实例签名与当前受信 Session，签名不降
   const startupOnly = await connect(new StreamableHTTPClientTransport(url, { fetch: signed(undefined) }))
   const startupTools = await startupOnly.listTools()
   const expectedNames = startupTools.tools.map(tool => tool.name)
-  assert.equal(expectedNames.length, 2)
-  assert.equal(expectedNames[0], 'source__echo')
-  assert.match(expectedNames[1], /^source__resource_echo_[a-f0-9]{12}$/)
-  assert.equal((await throughRuntime.callTool({ name: expectedNames[1], arguments: {},
+  assert.deepEqual(expectedNames, ['source__echo'])
+  const discovery = await (await fetch(new URL('/hep/api/mcp-manager', url), { method: 'POST',
+    headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'test', serverId: 'source' }) })).json()
+  const resourceAlias = discovery.resources.resources[0].groupToolName
+  assert.match(resourceAlias, /^source__resource_echo_[a-f0-9]{12}$/)
+  assert.equal((await throughRuntime.callTool({ name: resourceAlias, arguments: {},
     _meta: { 'io.deepseek.dsh/mcp-group-target': { digest: targetDigest } } })).content[0].text, '{"reached":true}')
   assert.deepEqual(startupTools._meta['io.deepseek.dsh/mcp-group-discovery'], { unavailable: ['unreachable'] })
   await assert.rejects(startupOnly.listResources())

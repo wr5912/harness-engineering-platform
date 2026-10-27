@@ -22,6 +22,7 @@ export const managerSources = {
         const client = original.slice(start, end)
         contents = `import * as React from 'react'; const { useEffect, useState, useRef } = React;
 import { connectionIssue } from './connection.ts';
+import { copyText } from './clipboard.ts';
 ${client}
 export { Manager };`
       } else if (path.endsWith('openapi')) {

@@ -199,13 +199,14 @@ export async function loadOpenApi(server: any): Promise<any> {
       const body = raw.requestBody ? resolveObject(spec, raw.requestBody) : undefined
       const uri = operationUrl(base, path).href
       const description = raw.summary || raw.description || `${method.toUpperCase()} ${path}`
+      const httpOperation = { method: method.toUpperCase(), path }
       const item = { name, method, path, parameters, body, raw, uri, description }
       operations.set(name, item)
       const queryReadable = method === 'get' && parameters.some(parameter => parameter.in === 'query')
       if (method === 'get' && !body && parameters.every(parameter => ['path', 'query'].includes(parameter.in)
         && (parameter.in !== 'query' || parameter.schema?.type !== 'array' && /^[A-Za-z0-9_.-]+$/.test(parameter.name)))) {
         readable.push(item)
-        const info = { name, title: raw.summary, description, mimeType: 'application/json',
+        const info = { name, title: raw.summary, description, httpOperation, mimeType: 'application/json',
           inputSchema: { ...operationSchema(spec, parameters, body), additionalProperties: false } }
         if (parameters.length) {
           const queryNames = parameters.filter(parameter => parameter.in === 'query').map(parameter => parameter.name)
@@ -213,9 +214,9 @@ export async function loadOpenApi(server: any): Promise<any> {
             + (queryNames.length ? `{?${queryNames.join(',')}}` : '') })
         }
         else resources.push({ ...info, uri })
-        if (queryReadable) tools.push({ name, description, inputSchema: operationSchema(spec, parameters, body) })
+        if (queryReadable) tools.push({ name, title: raw.summary, description, httpOperation, inputSchema: operationSchema(spec, parameters, body) })
       } else {
-        tools.push({ name, description, inputSchema: operationSchema(spec, parameters, body) })
+        tools.push({ name, title: raw.summary, description, httpOperation, inputSchema: operationSchema(spec, parameters, body) })
       }
     }
   }

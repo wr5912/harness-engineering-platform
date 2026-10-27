@@ -368,7 +368,29 @@ test('原生 MCP 桥沿用 DSH 的非致命启动与无工具注册状态', asyn
   assert.equal(ctx.tools.get('mcp__Invalid__echo', agent), undefined)
 })
 
-test('OpenAPI 查询资源模板经分组读取，同时保留原有 GET 工具', async t => {
+test('原生 MCP 的同名工具与资源保留独立调用入口', async t => {
+  const manager = await managerModule(t)
+  const upstream = await serve(t, async (req, res) => {
+    const handler = createMcpHandler(() => {
+      const mcp = new McpServer({ name: 'native', version: '1' }, { capabilities: { tools: {}, resources: {} } })
+      mcp.server.setRequestHandler('tools/list', async () => ({ tools: [{ name: 'echo', inputSchema: { type: 'object' } }] }))
+      mcp.server.setRequestHandler('resources/list', async () => ({ resources: [{ name: 'echo', uri: 'fixture:/echo' }] }))
+      mcp.server.setRequestHandler('resources/read', async () => ({ contents: [{ uri: 'fixture:/echo', text: 'resource' }] }))
+      return mcp
+    })
+    try { await toNodeHandler(handler)(req, res) } finally { await handler.close() }
+  })
+  const servers = [{ id: 'native', enabled: true, url: upstream, tools: { mode: 'all', names: [] } }]
+  const groups = [{ id: 'native', members: [{ serverId: 'native', names: ['echo'], resourceUris: ['fixture:/echo'], resourceTemplates: [] }] }]
+  const { client } = await groupServer(t, manager, servers, groups)
+  const v2 = await client(2), tools = (await v2.listTools()).tools
+  assert.equal(tools.length, 2)
+  assert.equal(tools[0].name, 'native__echo')
+  assert.match(tools[1].name, /^native__resource_echo_/)
+  assert.match((await v2.callTool({ name: tools[1].name, arguments: {} })).content[0].text, /resource/)
+})
+
+test('OpenAPI 同一操作只发布一个工具，保留资源读取与已选包装工具调用', async t => {
   const manager = await managerModule(t), calls = []
   let endpoint = ''
   endpoint = await serve(t, (req, res) => {
@@ -386,9 +408,20 @@ test('OpenAPI 查询资源模板经分组读取，同时保留原有 GET 工具'
   const servers = [{ id: 'api', serverName: 'Display', enabled: true, specUrl: `${endpoint}/openapi.json`, tools: { mode: 'all', names: [] } }]
   const template = `${endpoint}/item/{id}{?q}`
   const groups = [{ id: 'api-group', members: [{ serverId: 'api', names: ['get_item'], resourceUris: [], resourceTemplates: [template] }] }]
-  const { client } = await groupServer(t, manager, servers, groups)
+  const { client, context, origin } = await groupServer(t, manager, servers, groups)
   const v1 = await client(1), v2 = await client(2)
   assert.deepEqual((await v1.listTools()).tools.map(item => item.name), ['mcp__Display__get_item'])
+  const discover = await (await fetch(`${origin}/api/mcp-manager`, { method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ action: 'test', serverId: 'api' }) })).json()
+  assert.deepEqual(discover.tools[0].httpOperation, { method: 'GET', path: '/item/{id}' })
+  assert.deepEqual(discover.resourceTemplates.resourceTemplates[0].httpOperation, discover.tools[0].httpOperation)
+  const alias = discover.resourceTemplates.resourceTemplates[0].groupToolName
+  const originalDigest = context.mcpSessionManager.currentGroup('api-group', 2).targetDigest
+  assert.deepEqual((await v2.listTools()).tools.map(item => item.name), ['api__get_item'])
+  assert.deepEqual((await context.mcpSessionManager.listGroupTools('api-group', 2)).tools.map(item => item.name), ['api__get_item'])
+  assert.equal(context.mcpSessionManager.currentGroup('api-group', 2).targetDigest, originalDigest)
+  assert.equal(JSON.parse((await v2.callTool({ name: alias, arguments: { id: 'A', q: 'legacy' } })).content[0].text).q, 'legacy')
+  await assert.rejects(v2.callTool({ name: alias, arguments: { id: 'A' } }), /参数/)
   const templates = (await v2.listResourceTemplates()).resourceTemplates
   assert.equal(templates.length, 1)
   const uri = new UriTemplate(templates[0].uriTemplate).expand({ id: 'A', q: 'x y' })
@@ -396,6 +429,18 @@ test('OpenAPI 查询资源模板经分组读取，同时保留原有 GET 工具'
   assert.equal(JSON.parse(result.contents[0].text).q, 'x y')
   assert.equal(calls.at(-1), `${endpoint}/item/A?q=x+y`)
   await assert.rejects(v2.readResource({ uri: uri + '&unknown=1' }))
+  groups[0].members[0].names = []
+  assert.deepEqual((await v2.listTools()).tools.map(item => item.name), [alias])
+  assert.equal(JSON.parse((await v2.callTool({ name: alias, arguments: { id: 'A', q: 'resource-only' } })).content[0].text).q, 'resource-only')
+  groups[0].members[0].names = ['get_item']
+  servers[0].tools = { mode: 'selected', names: [] }
+  assert.deepEqual((await v2.listTools()).tools.map(item => item.name), [alias], '来源未开放原工具时仍发布所选资源工具')
+  servers[0].tools = { mode: 'all', names: [] }
+  groups[0].members[0].resourceTemplates = []
+  assert.deepEqual((await v2.listTools()).tools.map(item => item.name), ['api__get_item'])
+  await assert.rejects(v2.callTool({ name: alias, arguments: { id: 'A', q: 'removed' } }))
+  groups[0].members = []
+  assert.deepEqual((await v2.listTools()).tools, [])
 })
 
 test('v2 分组可列出并读取包含多个普通变量的来源资源模板', async t => {

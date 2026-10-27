@@ -1,0 +1,112 @@
+{
+  "at": "2026-10-27T07:58:23.922Z",
+  "source": {
+    "commit": "9b2a1c8b57168d66a5a78d2326d8c23dbda495ea",
+    "dirty": true
+  },
+  "scope": "PA-12 MCP 分组 HTTP 操作信息、工具发布去重和复制交互",
+  "checks": [
+    {
+      "name": "真实 HTTP 桌面复制粘贴及按钮旁反馈",
+      "passed": true
+    },
+    {
+      "name": "同一 OpenAPI 操作仅一张卡片与一份方法路径，工具调用和资源读取可独立选择",
+      "passed": true
+    },
+    {
+      "name": "所有已发现 OpenAPI 工具、资源 URI 和模板均按接口合并，无重复方法路径，原包装 ID 仍可搜索",
+      "passed": true
+    },
+    {
+      "name": "390px 方法路径可读、无横向溢出、真实复制粘贴与局部反馈",
+      "passed": true,
+      "overflow": {
+        "viewport": 390,
+        "document": 390,
+        "manager": 358,
+        "managerWidth": 358
+      }
+    },
+    {
+      "name": "模拟剪贴板权限拒绝后回退页面复制，真实粘贴一致",
+      "passed": true
+    },
+    {
+      "name": "两种复制均失败时准确提示并提供可全选原文",
+      "passed": true,
+      "simulatedFailure": true
+    },
+    {
+      "name": "刷新后链接正常、反馈清空、原配置字节未变、无写操作及脚本异常",
+      "passed": true
+    }
+  ],
+  "application": {
+    "method": "DSH 原生插件热重载",
+    "at": "2026-10-27T07:58:15.095Z",
+    "preflight": {
+      "sessions": 141,
+      "running": 0,
+      "running_jobs": 0
+    },
+    "reload": {
+      "http": 200,
+      "type": "server-response",
+      "rpcId": "workspace-reload-1793087894596",
+      "result": {
+        "ok": true,
+        "value": {
+          "stage": "enable",
+          "target": "@ai-agent-harness/harness-platform",
+          "enabled": true,
+          "changed": false,
+          "application": "applied",
+          "warnings": []
+        }
+      }
+    },
+    "pidBefore": 4074385,
+    "pidAfter": 4074385
+  },
+  "environment": {
+    "secureContext": false,
+    "clipboard": "undefined",
+    "execCommand": "function"
+  },
+  "discovery": {
+    "tools": {
+      "count": 66,
+      "allCarryHttpOperation": true
+    },
+    "resources": {
+      "count": 11,
+      "allCarryHttpOperation": true
+    },
+    "resourceTemplates": {
+      "count": 40,
+      "allCarryHttpOperation": true
+    }
+  },
+  "operation": {
+    "id": "get_correlate_incident_rule_hits",
+    "http": {
+      "method": "GET",
+      "path": "/correlate/incident/{incidentId}/rule-hits"
+    },
+    "cards": 1,
+    "originalChoices": [
+      false,
+      false
+    ],
+    "allOperationCards": 93
+  },
+  "pageErrors": [],
+  "configWrites": 0,
+  "configurationUnchanged": true,
+  "limits": [
+    "窄屏为浏览器视口模拟，未使用其他物理设备。",
+    "页面验证未保存分组变更，未调用第三方业务工具；发布去重、旧名称调用和签名路径由受控协议测试验证。",
+    "未重新执行巡检、威胁研判或模型自主选工具评测。"
+  ]
+}

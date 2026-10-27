@@ -347,7 +347,9 @@ async function toolsFor(target: Target, version: GroupVersion = 1, signal?: Abor
       }
     }
   }
-  if (version === 2) for (const { tool } of await resourceToolsFor(target, signal, unavailable)) {
+  if (version === 2) for (const { tool, server, item } of await resourceToolsFor(target, signal, unavailable)) {
+    // OpenAPI 同一操作的工具与资源共用一个模型入口；资源读取和既有调用名仍有效。
+    if (server.specUrl && names.has(v2ToolName(server.id, item.name))) continue
     if (names.has(tool.name)) throw new Error('MCP 分组工具名重复')
     names.add(tool.name)
     result.push(tool)

@@ -5,7 +5,7 @@ import vm from 'node:vm'
 import test from 'node:test'
 
 // 运行实际客户端产物，只替换 React 的状态调度和 Portal 容器。
-function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理请求') } } = {}) {
+function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理请求') }, clipboardFailure = false } = {}) {
   const require = createRequire(import.meta.url)
   const states = [], dependencies = []
   const clipboard = []
@@ -39,7 +39,7 @@ function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理
     window: { __ModuleLoader__: { load: value => { registration = value } }, addEventListener() {}, removeEventListener() {}, confirm: () => true },
     structuredClone, URL, location: { origin: 'http://127.0.0.1:3090' },
     document: { baseURI: 'http://127.0.0.1:3090/hep/' },
-    navigator: { clipboard: { writeText: async value => { clipboard.push(value) } } },
+    navigator: { clipboard: { writeText: async value => { if (clipboardFailure) throw new Error('denied'); clipboard.push(value) } } },
     fetch,
   })
   const { Manager } = registration.factory(name => name === '@deepseek-ai/dsh-client-ui-primitives' ? {} : name === 'react' ? react
@@ -123,7 +123,8 @@ function serviceSelection(ui, serverId) {
   const choices = section => {
     const parent = section ? nodes().find(node => node.type === 'section'
       && ui.nodes(node).some(child => child.type === 'h4' && ui.text(child) === section)) : root()
-    return ui.nodes(parent).filter(node => node.type === 'label' && node.props.className === 'mcp-check')
+    if (!parent) return []
+    return ui.nodes(parent).filter(node => node.props?.className?.split(' ').includes('mcp-check'))
   }
   return { root, input, choices,
     clear: () => nodes().find(node => node.type === 'button' && node.props['aria-label'] === '清空筛选'),
@@ -283,6 +284,19 @@ test('MCP 分组入口使用当前站点基址与 v2 路径', async () => {
   assert.match(ui.text(ui.render()), /http:\/\/127\.0\.0\.1:3090\/hep\/mcp\/groups\/research\/v2/)
   await ui.button('复制分组链接').props.onClick()
   assert.deepEqual(ui.copied, ['http://127.0.0.1:3090/hep/mcp/groups/research/v2'])
+  assert.ok(ui.nodes(ui.render()).some(node => node.props?.className === 'mcp-copy-feedback' && ui.text(node) === '已复制。'))
+})
+
+test('分组复制失败在按钮旁提供可选取的原链接，切换对象不显示旧反馈', async () => {
+  const ui = editor({ clipboardFailure: true })
+  ui.refreshValue({ servers: [ui.server], groups: ui.groups, sharedToken: 'fixture-token' })
+  ui.setView('groups')
+  await ui.button('复制分组链接').props.onClick(); ui.render()
+  assert.match(ui.text(ui.render()), /无法自动复制/)
+  assert.equal(ui.nodes().find(node => node.type === 'textarea' && node.props.readOnly)?.props.value,
+    'http://127.0.0.1:3090/hep/mcp/groups/research/v2')
+  ui.button('＋ 新增分组').props.onClick(); ui.render()
+  assert.ok(!ui.nodes().some(node => node.props?.className === 'mcp-copy-feedback'))
 })
 
 test('MCP 管理的连接、诊断和来源请求使用当前 DSH 子路径', async () => {
@@ -444,7 +458,7 @@ test('服务内关键词同时筛选三类项目，勾选状态不影响大小�
   ui.setView('groups')
   const service = serviceSelection(ui, ui.server.id)
   assert.ok(service.input().props['aria-label'].includes(ui.server.id))
-  assert.equal(service.input().props.placeholder, '按名称、标识或 URI 筛选')
+  assert.equal(service.input().props.placeholder, '按名称、标识、URI、HTTP 方法或路径筛选')
   assert.equal(service.clear(), undefined)
   ui.button('发现工具与资源').props.onClick()
   await new Promise(resolve => setImmediate(resolve)); ui.render()
@@ -666,4 +680,60 @@ test('分组保留发现元数据，按资源名称、标题与发布工具标�
   await ui.button('保存更改').props.onClick()
   const saved = ui.writes.at(-1).ops.find(op => op.path[0] === 'groups').value[0].members[0]
   assert.deepEqual(JSON.parse(JSON.stringify(saved)), { serverId: ui.server.id, names: [], resourceUris: ['soc://inventory'], resourceTemplates: ['soc://inventory/{id}'] })
+})
+
+test('OpenAPI 同一操作只显示一张卡片，分别保存工具与资源选择，原生 MCP 保持独立', async () => {
+  const operation = { method: 'GET', path: '/items/{id}' }
+  const fetch = async () => ({ ok: true, json: async () => ({
+    tools: [{ name: 'get_item', title: '查询条目', groupToolName: 'api__get_item', httpOperation: operation },
+      { name: 'save_item', httpOperation: { method: 'POST', path: '/items' } }],
+    resources: { resources: [{ name: 'list_items', uri: 'fixture:/items', httpOperation: { method: 'GET', path: '/items' } }] },
+    resourceTemplates: { resourceTemplates: [{ name: 'get_item', title: '查询条目', uriTemplate: 'fixture:/items/{id}',
+      groupToolName: 'api__template_get_item_hash', httpOperation: operation }] },
+  }) })
+  const ui = editor({ fetch })
+  ui.refreshValue({ servers: [ui.server], groups: [{ id: 'http', members: [{ serverId: ui.server.id,
+    names: ['get_item'], resourceUris: [], resourceTemplates: ['fixture:/items/{id}'] }] }], sharedToken: 'fixture-token' })
+  ui.setView('groups'); ui.button('发现工具与资源').props.onClick()
+  await new Promise(setImmediate); ui.render()
+  const service = serviceSelection(ui, ui.server.id)
+  service.query('GET /items/{id}')
+  assert.equal(service.choices('工具').length, 1)
+  assert.equal(service.choices('资源模板').length, 0)
+  assert.equal(service.choices().length, 1)
+  const card = () => service.choices()[0]
+  assert.match(ui.text(card()), /GET.*\/items\/\{id\}/)
+  assert.match(ui.text(card()), /工具调用.*资源模板读取/)
+  assert.match(ui.text(card()), /api__get_item/)
+  assert.doesNotMatch(ui.text(card()), /api__template_get_item_hash/)
+  const toggles = () => ui.nodes(card()).filter(node => node.type === 'input')
+  assert.deepEqual(toggles().map(node => node.props.checked), [true, true])
+  toggles()[0].props.onChange(); ui.render()
+  assert.deepEqual(toggles().map(node => node.props.checked), [false, true])
+  assert.match(ui.text(card()), /api__template_get_item_hash/)
+  await ui.button('保存更改').props.onClick()
+  const member = () => JSON.parse(JSON.stringify(ui.writes.at(-1).ops.find(op => op.path[0] === 'groups').value[0].members[0]))
+  assert.deepEqual(member(), { serverId: ui.server.id, names: [], resourceUris: [], resourceTemplates: ['fixture:/items/{id}'] })
+  toggles()[0].props.onChange(); ui.render()
+  toggles()[1].props.onChange(); ui.render()
+  assert.deepEqual(toggles().map(node => node.props.checked), [true, false])
+  await ui.button('保存更改').props.onClick()
+  assert.deepEqual(member(), { serverId: ui.server.id, names: ['get_item'], resourceUris: [], resourceTemplates: [] })
+  service.query('api__template_get_item_hash')
+  assert.equal(service.choices().length, 1, '原包装工具 ID 仍可搜索到同一接口卡片')
+  service.query('GET /items')
+  assert.equal(service.choices('资源 URI').length, 1)
+  service.query('POST /items')
+  assert.equal(service.choices('工具').length, 1)
+  assert.equal(service.choices('资源 URI').length, 0)
+  const nativeServer = { ...ui.server }; delete nativeServer.specUrl
+  const native = editor({ fetch })
+  native.refreshValue({ servers: [nativeServer], groups: [{ id: 'http', members: [] }], sharedToken: 'fixture-token' })
+  native.setView('groups'); native.button('发现工具与资源').props.onClick()
+  await new Promise(setImmediate); native.render()
+  const nativeService = serviceSelection(native, nativeServer.id)
+  assert.equal(native.nodes().filter(node => node.props?.className === 'mcp-http-operation').length, 0)
+  assert.equal(nativeService.choices('工具').length, 2)
+  assert.equal(nativeService.choices('资源模板').length, 1)
+  assert.equal(native.nodes().filter(node => node.props?.className === 'mcp-check mcp-operation').length, 0)
 })
