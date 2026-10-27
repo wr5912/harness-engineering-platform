@@ -274,6 +274,7 @@ type GroupVersion = 1 | 2
 
 export const GROUP_TARGET_META_KEY = 'io.deepseek.dsh/mcp-group-target'
 export const GROUP_DISCOVERY_META_KEY = 'io.deepseek.dsh/mcp-group-discovery'
+export const GROUP_TOOL_META_KEY = 'io.deepseek.dsh/mcp-group-tool'
 /** 与既有业务 MCP 桥使用同一身份合同，凭据轮换不改变目标摘要。 */
 export function groupTargetDigest(target: GroupTarget, version: GroupVersion = 1): string {
   if (version === 2 && new Set(target.group.members.map((member: any) => member.serverId)).size !== target.group.members.length) {
@@ -297,7 +298,7 @@ export function groupTargetDigest(target: GroupTarget, version: GroupVersion = 1
       resourceUris: [...(member.resourceUris ?? [])].sort(), resourceTemplates: [...(member.resourceTemplates ?? [])].sort() }
   }).sort((a: any, b: any) => a.serverId.localeCompare(b.serverId))
   return createHash('sha256').update(JSON.stringify(version === 1 ? { id: target.group.id, members }
-    : { id: target.group.id, version, members })).digest('hex')
+    : { id: target.group.id, version, naming: 'group-boundary-v1', members })).digest('hex')
 }
 
 function v2ToolName(serverId: string, rawName: string): string {
@@ -312,9 +313,66 @@ function resourceToolName(serverId: string, kind: 'r' | 't', item: any): string 
   return v2ToolName(serverId, `${type}_${label}_${hash}`)
 }
 
-function discoveryMetadata(server: any, kind: 'tools' | 'r' | 't', items: any[]): any[] {
-  return items.map(item => ({ ...item, groupToolName: kind === 'tools'
-    ? v2ToolName(server.id, item.name) : resourceToolName(server.id, kind, item) }))
+function discoveryMetadata(server: any, kind: 'tools' | 'r' | 't', items: any[], groups: string[] = []): any[] {
+  return items.map(item => ({ ...item, groupToolName: item.name,
+    groupPublicNames: Object.fromEntries(groups.map(id => [id, publicToolName(id, item.name)])) }))
+}
+
+const groupResourceBindings = new Map<string, { digest: string; resources: any[] }>()
+
+/** 发布名只属于分组；来源身份保存在映射和元数据中，不从公开名称反向拆解。 */
+async function groupToolBindings(target: GroupTarget, signal?: AbortSignal, unavailable: string[] = []): Promise<any[]> {
+  const catalogs = await Promise.all(target.group.members.map(async (member: any) => {
+    const server = target.servers.find(item => item.id === member.serverId && item.enabled)
+    if (!server) return []
+    const selected = member.names.filter((name: string) => server.tools?.mode !== 'selected' || server.tools.names.includes(name))
+    let tools: any[] = []
+    if (selected.length) try { tools = await serverTools({ ...server, platformSignal: signal ?? server.platformSignal }) }
+    catch (error) { if (signal?.aborted) throw error; unavailable.push(server.id) }
+    // 暂时离线或失效的已选名称仍占用身份，防止同名工具悄然换成其他来源。
+    return selected.flatMap((name: string) => {
+      const matches = tools.filter(tool => tool.name === name)
+      return (matches.length ? matches : [undefined]).map(tool => ({ server, sourceName: name, tool,
+        name, kind: 'tool', aliases: [v2ToolName(server.id, name)] }))
+    })
+  }))
+  const bindings = catalogs.flat()
+  const resources = await resourceToolsFor(target, signal, unavailable)
+  const digest = groupTargetDigest(target, 2), previous = groupResourceBindings.get(target.group.id)
+  // 保留已发现的资源身份，短暂离线不能把它的名称交给另一个来源。
+  if (previous?.digest === digest) for (const resource of previous.resources) {
+    if (!resources.some(item => item.uri === resource.uri)) resources.push({ ...resource, tool: undefined })
+  }
+  groupResourceBindings.set(target.group.id, { digest, resources })
+  for (const resource of resources) {
+    const { server, kind, item, tool } = resource
+    const equivalent = server.specUrl && bindings.find(binding => binding.server.id === server.id && binding.sourceName === item.name
+      && (binding.tool?.httpOperation?.method === item.httpOperation?.method && binding.tool?.httpOperation?.path === item.httpOperation?.path))
+    const alias = resourceToolName(server.id, kind, item)
+    if (equivalent) {
+      equivalent.aliases.push(alias)
+      equivalent.aliasResources = { ...equivalent.aliasResources, [alias]: { ...resource, kind: kind === 'r' ? 'resource' : 'template' } }
+      continue
+    }
+    bindings.push({ ...resource, name: item.name, sourceName: item.name, kind: kind === 'r' ? 'resource' : 'template', aliases: [alias] })
+  }
+  const counts = new Map<string, any[]>()
+  for (const binding of bindings) {
+    const matches = counts.get(binding.name) ?? []
+    matches.push(binding); counts.set(binding.name, matches)
+  }
+  for (const [name, matches] of counts) {
+    const aliases = bindings.filter(binding => binding.name !== name && binding.aliases.includes(name))
+    if (matches.length + aliases.length < 2) continue
+    unavailable.push(`工具名冲突：${name}（${[...matches, ...aliases].map(item => `${item.server.id}/${item.kind}/${item.sourceName}`).join('、')}）；请调整分组选择`)
+    for (const binding of matches) binding.conflict = true
+  }
+  for (const binding of bindings) if (binding.tool) {
+    const sourceUri = binding.item && (binding.item.uri ?? binding.item.uriTemplate)
+    binding.tool = { ...binding.tool, name: binding.name, _meta: { ...binding.tool._meta, [GROUP_TOOL_META_KEY]: {
+      serverId: binding.server.id, kind: binding.kind, sourceName: binding.sourceName, ...(sourceUri ? { sourceUri } : {}) } } }
+  }
+  return bindings
 }
 
 async function toolsFor(target: Target, version: GroupVersion = 1, signal?: AbortSignal, unavailable: string[] = []): Promise<any[]> {
@@ -323,36 +381,22 @@ async function toolsFor(target: Target, version: GroupVersion = 1, signal?: Abor
     return tools.filter((tool: any) => !target.server.tools || target.server.tools.mode === 'all'
       || target.server.tools.names.includes(tool.name))
   }
+  if (version === 2) return (await groupToolBindings(target, signal, unavailable))
+    .filter(binding => !binding.conflict && binding.tool).map(binding => binding.tool)
   const result: any[] = []
-  const names = new Set<string>()
   const catalogs = await Promise.all(target.group.members.filter(member => member.names.length).map(async member => {
     const server = target.servers.find(item => item.id === member.serverId && item.enabled)
     if (!server) return { member, server, tools: [] as any[] }
-    let tools: any[]
-    try { tools = await serverTools({ ...server, platformSignal: signal ?? server.platformSignal }) }
-    catch (error) {
-      if (version === 1 || signal?.aborted) throw error
-      return { member, server, tools: [] as any[], failed: true }
-    }
+    const tools = await serverTools({ ...server, platformSignal: signal ?? server.platformSignal })
     return { member, server, tools }
   }))
-  for (const { member, server, tools, failed } of catalogs) {
-    if (failed) unavailable.push(server.id)
+  for (const { member, server, tools } of catalogs) {
     for (const tool of tools) {
-      if (member.names.includes(tool.name) && (version === 1 || server.tools?.mode !== 'selected' || server.tools.names.includes(tool.name))) {
-        const name = version === 1 ? `mcp__${serverName(server)}__${tool.name}` : v2ToolName(server.id, tool.name)
-        if (version === 2 && names.has(name)) throw new Error('MCP 分组工具名重复')
-        names.add(name)
+      if (member.names.includes(tool.name)) {
+        const name = `mcp__${serverName(server)}__${tool.name}`
         result.push({ ...tool, name })
       }
     }
-  }
-  if (version === 2) for (const { tool, server, item } of await resourceToolsFor(target, signal, unavailable)) {
-    // OpenAPI 同一操作的工具与资源共用一个模型入口；资源读取和既有调用名仍有效。
-    if (server.specUrl && names.has(v2ToolName(server.id, item.name))) continue
-    if (names.has(tool.name)) throw new Error('MCP 分组工具名重复')
-    names.add(tool.name)
-    result.push(tool)
   }
   return result
 }
@@ -398,22 +442,22 @@ async function resourceCatalog(server: any, kind: 'r' | 't'): Promise<any[]> {
   return withClient(server, client => listCatalog(client, kind === 'r' ? 'resources' : 'resourceTemplates', server.platformSignal))
 }
 
-async function discoverServer(server: any): Promise<any> {
+async function discoverServer(server: any, groups: string[] = []): Promise<any> {
   if (server.specUrl) {
     const source = await loadOpenApi(server)
-    return { tools: discoveryMetadata(server, 'tools', source.tools),
-      resources: { resources: discoveryMetadata(server, 'r', source.resources) },
-      resourceTemplates: { resourceTemplates: discoveryMetadata(server, 't', source.resourceTemplates) } }
+    return { tools: discoveryMetadata(server, 'tools', source.tools, groups),
+      resources: { resources: discoveryMetadata(server, 'r', source.resources, groups) },
+      resourceTemplates: { resourceTemplates: discoveryMetadata(server, 't', source.resourceTemplates, groups) } }
   }
   return withClient(server, async client => {
     const [tools, resources, templates] = await Promise.allSettled(
       (['tools', 'resources', 'resourceTemplates'] as const).map(kind => listCatalog(client, kind, server.platformSignal)))
     if ([tools, resources, templates].every(result => result.status === 'rejected')) throw new Error('MCP 工具与资源发现均未完成')
-    return { tools: tools.status === 'fulfilled' ? discoveryMetadata(server, 'tools', tools.value) : [],
+    return { tools: tools.status === 'fulfilled' ? discoveryMetadata(server, 'tools', tools.value, groups) : [],
       ...(tools.status === 'rejected' ? { toolsUnavailable: true } : {}),
-      resources: { resources: resources.status === 'fulfilled' ? discoveryMetadata(server, 'r', resources.value) : [],
+      resources: { resources: resources.status === 'fulfilled' ? discoveryMetadata(server, 'r', resources.value, groups) : [],
         ...(resources.status === 'rejected' ? { unavailable: true } : {}) },
-      resourceTemplates: { resourceTemplates: templates.status === 'fulfilled' ? discoveryMetadata(server, 't', templates.value) : [],
+      resourceTemplates: { resourceTemplates: templates.status === 'fulfilled' ? discoveryMetadata(server, 't', templates.value, groups) : [],
         ...(templates.status === 'rejected' ? { unavailable: true } : {}) } }
   })
 }
@@ -469,7 +513,7 @@ async function resourceToolsFor(target: GroupTarget, signal?: AbortSignal, unava
       : server.specUrl ? item.inputSchema : { type: 'object', properties: Object.fromEntries(parsed.variableNames.map((name: string) =>
         [name, { oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] }])),
         required: parsed.requiredNames, additionalProperties: false }
-    return { ...binding, tool: { name: resourceToolName(server.id, kind, item),
+    return { ...binding, tool: { name: item.name,
       ...(item.title ? { title: item.title } : {}), description: [item.description || item.title || item.name,
         `读取资源：${kind === 'r' ? item.uri : item.uriTemplate}`].filter(Boolean).join('\n'), inputSchema,
       annotations: { readOnlyHint: true } } }
@@ -478,14 +522,16 @@ async function resourceToolsFor(target: GroupTarget, signal?: AbortSignal, unava
 
 async function callSelectedTool(target: Target, version: GroupVersion, name: string, args: any, meta?: Record<string, unknown>, signal?: AbortSignal,
   assertCurrent?: () => void): Promise<any> {
-  const owner = toolOwner(target, name, version)
-  if (target.kind === 'group' && version === 2 && /__(?:resource|template)_/.test(name)) {
-    const candidates = { ...target, group: { ...target.group, members: target.group.members.filter((member: any) =>
-      name.startsWith(`${member.serverId.replaceAll('_', '_0')}__`)) } }
-    const bindings = (await resourceToolsFor(candidates, signal)).filter(binding => binding.tool.name === name)
-    if (bindings.length > 1 || bindings.length && owner) throw new Error('MCP 分组工具名重复')
-    if (bindings.length) {
-      const { tool, uri, parsed, server } = bindings[0]
+  let owner = target.kind === 'group' && version === 2 ? undefined : toolOwner(target, name, version)
+  if (target.kind === 'group' && version === 2) {
+    const bindings = await groupToolBindings(target, signal)
+    const matches = bindings.filter(binding => binding.name === name || binding.aliases.includes(name))
+    if (matches.length > 1 || matches.some(binding => binding.conflict)) throw new Error('MCP 分组工具名冲突，请调整分组选择并重新发现')
+    const binding = matches[0]?.aliasResources?.[name] ?? matches[0]
+    if (!binding?.tool) throw new Error('工具不属于当前 MCP 范围或来源当前不可用')
+    owner = { server: binding.server, rawName: binding.sourceName }
+    if (binding.kind !== 'tool') {
+      const { tool, uri, parsed, server } = binding
       const violations = validateJsonSchemaValue(tool.inputSchema, args, '')
       if (violations.length) throw new Error(`资源工具参数无效：${violations.join('; ')}`)
       const query = Object.entries(args).map(([key, value]) => `${key}=${(Array.isArray(value) ? value : [value]).map(item => encodeURIComponent(String(item))).join(',')}`).join('&')
@@ -788,7 +834,8 @@ export function apply(ctx: any, config: any): void {
         return send(res, 200, await callManagedTool(server, request.toolName, request.arguments))
       }
       if (request.action === 'test') {
-        return send(res, 200, await discoverServer(server))
+        return send(res, 200, await discoverServer(server, current.groups.filter(group =>
+          group.members.some((member: any) => member.serverId === server.id)).map(group => group.id)))
       }
       if (request.action === 'resources' || request.action === 'resourceTemplates' || request.action === 'readResource') {
         if (request.action === 'readResource') return send(res, 200, await readManagedResource(server, request.uri))

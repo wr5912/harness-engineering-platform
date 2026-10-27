@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
@@ -80,7 +80,7 @@ test('v2 分组只接受固定实例签名与当前受信 Session，签名不降
     tools: { mode: 'all', names: [] } }, { id: 'unreachable', enabled: true, url: 'http://127.0.0.1:1/mcp',
     tools: { mode: 'all', names: [] } }]
   const groups = [{ id: 'soc-tools', members: [{ serverId: 'source', names: ['echo'],
-    resourceUris: [`${sourceOrigin}/echo`] }, { serverId: 'unreachable', names: ['echo'] }] }], token = 'a'.repeat(64)
+    resourceUris: [`${sourceOrigin}/echo`] }, { serverId: 'unreachable', names: ['offline_tool'] }] }], token = 'a'.repeat(64)
   mkdirSync(join(root, '.local', 'credentials'), { recursive: true })
   writeFileSync(join(root, 'config', 'mcp-manager.json'), JSON.stringify({ schemaVersion: 1, servers, groups }))
   writeFileSync(join(root, '.local', 'credentials', 'mcp-manager.json'), JSON.stringify({ schemaVersion: 1,
@@ -180,11 +180,14 @@ test('v2 分组只接受固定实例签名与当前受信 Session，签名不降
   const startupOnly = await connect(new StreamableHTTPClientTransport(url, { fetch: signed(undefined) }))
   const startupTools = await startupOnly.listTools()
   const expectedNames = startupTools.tools.map(tool => tool.name)
-  assert.deepEqual(expectedNames, ['source__echo'])
+  assert.deepEqual(expectedNames, ['echo'])
+  assert.deepEqual(startupTools.tools[0]._meta['io.deepseek.dsh/mcp-group-tool'], {
+    serverId: 'source', kind: 'tool', sourceName: 'echo',
+  })
   const discovery = await (await fetch(new URL('/hep/api/mcp-manager', url), { method: 'POST',
     headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'test', serverId: 'source' }) })).json()
-  const resourceAlias = discovery.resources.resources[0].groupToolName
-  assert.match(resourceAlias, /^source__resource_echo_[a-f0-9]{12}$/)
+  assert.equal(discovery.resources.resources[0].groupToolName, 'echo')
+  const resourceAlias = `source__resource_echo_${createHash('sha256').update('r\0' + sourceOrigin + '/echo').digest('hex').slice(0, 12)}`
   assert.equal((await throughRuntime.callTool({ name: resourceAlias, arguments: {},
     _meta: { 'io.deepseek.dsh/mcp-group-target': { digest: targetDigest } } })).content[0].text, '{"reached":true}')
   assert.deepEqual(startupTools._meta['io.deepseek.dsh/mcp-group-discovery'], { unavailable: ['unreachable'] })

@@ -82,7 +82,7 @@ test('能力目录接受分组 v2 固定绑定并保留旧版默认值', async t
   const root = fixture(t), version = 'a'.repeat(64), implementation = 'b'.repeat(64)
   const entry = { composition_id: 'asset-alerts', version_id: version, tool_name: 'query_asset_alerts', source_digest: implementation }
   const fixed = { group_id: 'research-tools', group_link_version: 2, group_target_digest: 'c'.repeat(64),
-    tool_name: 'platform-compositions__query_asset_alerts', compositionId: 'asset-alerts', versionId: version,
+    tool_name: 'query_asset_alerts', compositionId: 'asset-alerts', versionId: version,
     expectedImplementationDigest: implementation, input_schema: { type: 'object' } }
   const result = await discoverTaskCapabilities(root, { compositionBindings: async () => [
     { ...entry, fixed_binding: { ...fixed, token: 'do-not-output' } },

@@ -333,6 +333,27 @@ window.__ModuleLoader__.load({
       const currentCheck = checkOf(editingServer)
       const currentTools = currentCheck && !currentCheck.failed ? (catalog?.serverId === editingServer?.id ? catalog.data.tools ?? [] : discovered[editingServer?.id] ?? []) : []
       const editingGroup = draft.groups[activeGroup]
+      const selectedNames = new Map()
+      for (const member of editingGroup?.members ?? []) {
+        const server = visibleServers.find(item => item.id === member.serverId && item.enabled !== false)
+        if (!server) continue
+        const catalogs = [
+          ['names', 'name', server.platformComposition ? (server.publishedTools ?? []).map(tool => ({ ...tool, name: tool.toolName || tool.name })) : discovered[server.id]],
+          ['resourceUris', 'uri', discoveredResources[server.id]?.resourceUris],
+          ['resourceTemplates', 'uriTemplate', discoveredResources[server.id]?.resourceTemplates],
+        ]
+        for (const [field, key, items] of catalogs) for (const value of member[field] ?? []) {
+          if (field === 'names' && server.tools?.mode === 'selected' && !server.tools.names.includes(value)) continue
+          const item = items?.find(item => item[key] === value)
+          const name = item?.name || (field === 'names' ? value : undefined)
+          if (!name) continue
+          const identity = JSON.stringify(server.specUrl && item?.httpOperation
+            ? [server.id, name, item.httpOperation.method, item.httpOperation.path] : [server.id, field, value])
+          const entries = selectedNames.get(name) ?? new Map()
+          entries.set(identity, `${server.id}/${field}/${value}`); selectedNames.set(name, entries)
+        }
+      }
+      const nameConflicts = [...selectedNames].filter(([, entries]) => entries.size > 1)
       const duplicateIds = editingGroup ? duplicateMemberIds(editingGroup.members) : []
       const savedGroup = (state.value.groups ?? []).find(group => group.id === editingGroup?.id)
       const savedDuplicateIds = savedGroup ? duplicateMemberIds(savedGroup.members) : []
@@ -499,6 +520,7 @@ window.__ModuleLoader__.load({
                     {linkReady && <p className="mcp-muted">分组地址已生成。链接存在只证明访问入口；所选来源的工具和资源仍需逐项发现。</p>}
                     {!!failedMembers.length && <p className="mcp-note" role="alert">来源 {failedMembers.join('、')} 最近一次发现失败；这些来源的工具和资源当前不可用，其他已发现来源可继续使用。</p>}
                     {!!uncheckedMembers.length && <p className="mcp-muted">来源 {uncheckedMembers.join('、')} 尚未检查当前配置；已保存的选择不代表工具已发现。</p>}
+                    {!!nameConflicts.length && <div className="mcp-note" role="alert">以下同名接口不会发布，请调整选择；其他工具可继续使用。{nameConflicts.map(([name, entries]) => <p key={name}><strong>{name}</strong>：{[...entries.values()].join('；')}</p>)}</div>}
                     {editingGroup.id && !/^[A-Za-z0-9_-]{1,32}$/.test(editingGroup.id) && <p className="mcp-muted">分组 ID 须为 1–32 个字母、数字、下划线或连字符。</p>}
                     {!!duplicateIds.length && <div className="mcp-note">服务 {duplicateIds.join('、')} 在此分组中有重复成员，v2 链接不可用。合并会对工具、资源 URI 和资源模板取并集，并改变旧版分组的目标摘要；请保存后重新发现工具。
                       <div className="mcp-actions">{button('合并同源成员', () => mergeDuplicateMembers(activeGroup))}</div></div>}
@@ -513,7 +535,7 @@ window.__ModuleLoader__.load({
                     }, busy || !state.writable)}</div>}
                     {!!savedGroup && !duplicateIds.length && !savedDuplicateIds.length && !!state.value.sharedToken && draft.sharedToken !== state.value.sharedToken && <div className="mcp-muted">新 Token 尚未保存；保存后再复制分组链接。{button("保存更改", () => save(), busy || !state.writable)}</div>}
                     {linkReady && isDirty && <p className="mcp-muted">当前草稿尚未保存；链接仍使用上次保存的配置。</p>}
-                    <p className="mcp-muted">通过 Authorization: Bearer &lt;统一访问 Token&gt; 调用。DSH 中将连接名设为分组 ID，模型可见工具名以该分组为前缀；超长工具名由 DSH 缩短。</p>
+                    <p className="mcp-muted">通过 Authorization: Bearer &lt;统一访问 Token&gt; 调用。分组作为对外命名边界：工具使用原始名称，DSH 连接名使用完整分组 ID，仅添加一次分组命名空间。DSH 名称超过 64 个字符或含不支持的字符时会缩短。</p>
                   </section>
                   <section className="mcp-section"><h3>选择工具与资源</h3><p className="mcp-muted">发现使用上次保存的服务配置；名称下方显示原始标识、URI 与分组工具名。OpenAPI 同一接口合并显示 HTTP 方法和路径，可分别开放工具调用与资源读取；同时勾选只发布一个工具，资源仍可读取。筛选不更改勾选结果。</p>
                     {visibleServers.map((server, index) => {
@@ -539,10 +561,16 @@ window.__ModuleLoader__.load({
                             && candidate.httpOperation?.method === operation.method && candidate.httpOperation?.path === operation.path) && selected.names.includes(item.name)
                             && (server.tools?.mode !== 'selected' || server.tools.names.includes(item.name))
                           const publishedName = nativeSelected ? discoveredTools.find(tool => tool.name === item.name)?.groupToolName : item?.groupToolName
+                          const fullName = publishedName && `mcp__${editingGroup.id}__${publishedName}`
+                          const publicName = item?.groupPublicNames?.[editingGroup.id]
+                          const shortened = fullName && (fullName.length > 64 || /[^A-Za-z0-9_-]/.test(fullName))
                           return { value, item, label: item?.title || item?.name || value,
                             operation, choices: [{ field: section.field, value, title: section.field === 'names' ? '工具调用' : section.field === 'resourceUris' ? '资源读取' : '资源模板读取' }],
                             searchNames: [item?.groupToolName],
-                            details: [...new Set([item?.name, value, publishedName].filter(Boolean))] }
+                            details: [...new Set([item?.name, value, publishedName,
+                              fullName && (shortened && !publicName
+                                ? `DSH 展开名：${fullName}（${fullName.length} 字符，保存并重新发现后显示最终名称）`
+                                : `DSH：${publicName || fullName}（展开前 ${fullName.length} 字符${shortened ? '，由 DSH 缩短' : ''}）`)].filter(Boolean))] }
                         })
                         return { ...section, items, merged: [] }
                       })

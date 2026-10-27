@@ -659,21 +659,21 @@ test('配置冲突后复制完整草稿，读取最新内容并保留原草稿�
 
 test('分组保留发现元数据，按资源名称、标题与发布工具标识搜索且仍保存 URI', async () => {
   const ui = editor({ fetch: async () => ({ ok: true, json: async () => ({ tools: [],
-    resources: { resources: [{ name: 'getAssetList', title: '查询设备目录', uri: 'soc://inventory', groupToolName: 'server__resource_getAssetList_0123456789ab' }] },
-    resourceTemplates: { resourceTemplates: [{ name: 'getAsset', title: '查询设备详情', uriTemplate: 'soc://inventory/{id}', groupToolName: 'server__template_getAsset_0123456789ab' }] },
+    resources: { resources: [{ name: 'getAssetList', title: '查询设备目录', uri: 'soc://inventory', groupToolName: 'getAssetList' }] },
+    resourceTemplates: { resourceTemplates: [{ name: 'getAsset', title: '查询设备详情', uriTemplate: 'soc://inventory/{id}', groupToolName: 'getAsset' }] },
   }) }) })
   ui.refreshValue({ servers: [ui.server], groups: [{ id: 'named', members: [] }], sharedToken: 'fixture-token' })
   ui.setView('groups')
   ui.button('发现工具与资源').props.onClick()
   await new Promise(resolve => setImmediate(resolve)); ui.render()
   const service = serviceSelection(ui, ui.server.id)
-  for (const keyword of ['GETASSETLIST', '查询设备目录', 'soc://inventory', 'resource_getAssetList_0123456789ab']) {
+  for (const keyword of ['GETASSETLIST', '查询设备目录', 'soc://inventory', 'mcp__named__getAssetList']) {
     service.query(keyword)
     assert.equal(service.choices('资源 URI').length, 1)
-    assert.match(ui.text(service.choices('资源 URI')[0]), /查询设备目录.*getAssetList.*soc:\/\/inventory.*server__resource_/)
+    assert.match(ui.text(service.choices('资源 URI')[0]), /查询设备目录.*getAssetList.*soc:\/\/inventory.*mcp__named__getAssetList/)
   }
   ui.nodes(service.choices('资源 URI')[0]).find(node => node.type === 'input').props.onChange()
-  service.query('template_getAsset_0123456789ab')
+  service.query('getAsset')
   assert.equal(service.choices('资源模板').length, 1)
   ui.nodes(service.choices('资源模板')[0]).find(node => node.type === 'input').props.onChange()
   ui.render()
@@ -682,14 +682,38 @@ test('分组保留发现元数据，按资源名称、标题与发布工具标�
   assert.deepEqual(JSON.parse(JSON.stringify(saved)), { serverId: ui.server.id, names: [], resourceUris: ['soc://inventory'], resourceTemplates: ['soc://inventory/{id}'] })
 })
 
+test('分组提示同名来源并展示 DSH 最终名称和原始长度，筛选不改变选择', async () => {
+  const groupId = 'long-group-identifier', raw = 'get_a_very_long_emergency_action_result_with_details'
+  const finalName = 'mcp__long-group-identifier__get_a_very_long_emergency_a_0123456789ab'
+  const ui = editor({ fetch: async () => ({ ok: true, json: async () => ({ tools: [
+    { name: 'echo', groupToolName: 'echo' },
+    { name: raw, groupToolName: raw, groupPublicNames: { [groupId]: finalName } },
+  ], resources: { resources: [{ name: 'echo', uri: 'fixture:/echo' }] }, resourceTemplates: { resourceTemplates: [] } }) }) })
+  const server = { ...ui.server }; delete server.specUrl
+  ui.refreshValue({ servers: [server], groups: [{ id: groupId,
+    members: [{ serverId: server.id, names: ['echo', raw], resourceUris: ['fixture:/echo'], resourceTemplates: [] }] }], sharedToken: 'fixture-token' })
+  ui.setView('groups'); ui.button('发现工具与资源').props.onClick()
+  await new Promise(setImmediate); ui.render()
+  assert.match(ui.text(ui.render()), /以下同名接口不会发布.*echo.*biz-soc-framework\/names\/echo.*biz-soc-framework\/resourceUris/)
+  const service = serviceSelection(ui, server.id)
+  service.query(finalName)
+  assert.equal(service.choices('工具').length, 1)
+  assert.ok(ui.text(service.choices('工具')[0]).includes(`DSH：${finalName}`))
+  assert.ok(ui.text(service.choices('工具')[0]).includes(`展开前 ${`mcp__${groupId}__${raw}`.length} 字符，由 DSH 缩短`))
+  assert.equal(ui.writes.length, 0)
+  service.query('echo')
+  assert.equal(service.choices().length, 2)
+  assert.ok(service.choices().every(choice => ui.nodes(choice).find(node => node.type === 'input').props.checked))
+})
+
 test('OpenAPI 同一操作只显示一张卡片，分别保存工具与资源选择，原生 MCP 保持独立', async () => {
   const operation = { method: 'GET', path: '/items/{id}' }
   const fetch = async () => ({ ok: true, json: async () => ({
-    tools: [{ name: 'get_item', title: '查询条目', groupToolName: 'api__get_item', httpOperation: operation },
+    tools: [{ name: 'get_item', title: '查询条目', groupToolName: 'get_item', httpOperation: operation },
       { name: 'save_item', httpOperation: { method: 'POST', path: '/items' } }],
     resources: { resources: [{ name: 'list_items', uri: 'fixture:/items', httpOperation: { method: 'GET', path: '/items' } }] },
     resourceTemplates: { resourceTemplates: [{ name: 'get_item', title: '查询条目', uriTemplate: 'fixture:/items/{id}',
-      groupToolName: 'api__template_get_item_hash', httpOperation: operation }] },
+      groupToolName: 'get_item', httpOperation: operation }] },
   }) })
   const ui = editor({ fetch })
   ui.refreshValue({ servers: [ui.server], groups: [{ id: 'http', members: [{ serverId: ui.server.id,
@@ -704,13 +728,13 @@ test('OpenAPI 同一操作只显示一张卡片，分别保存工具与资源选
   const card = () => service.choices()[0]
   assert.match(ui.text(card()), /GET.*\/items\/\{id\}/)
   assert.match(ui.text(card()), /工具调用.*资源模板读取/)
-  assert.match(ui.text(card()), /api__get_item/)
-  assert.doesNotMatch(ui.text(card()), /api__template_get_item_hash/)
+  assert.match(ui.text(card()), /get_item/)
+  assert.match(ui.text(card()), /mcp__http__get_item/)
   const toggles = () => ui.nodes(card()).filter(node => node.type === 'input')
   assert.deepEqual(toggles().map(node => node.props.checked), [true, true])
   toggles()[0].props.onChange(); ui.render()
   assert.deepEqual(toggles().map(node => node.props.checked), [false, true])
-  assert.match(ui.text(card()), /api__template_get_item_hash/)
+  assert.match(ui.text(card()), /get_item/)
   await ui.button('保存更改').props.onClick()
   const member = () => JSON.parse(JSON.stringify(ui.writes.at(-1).ops.find(op => op.path[0] === 'groups').value[0].members[0]))
   assert.deepEqual(member(), { serverId: ui.server.id, names: [], resourceUris: [], resourceTemplates: ['fixture:/items/{id}'] })
@@ -719,8 +743,8 @@ test('OpenAPI 同一操作只显示一张卡片，分别保存工具与资源选
   assert.deepEqual(toggles().map(node => node.props.checked), [true, false])
   await ui.button('保存更改').props.onClick()
   assert.deepEqual(member(), { serverId: ui.server.id, names: ['get_item'], resourceUris: [], resourceTemplates: [] })
-  service.query('api__template_get_item_hash')
-  assert.equal(service.choices().length, 1, '原包装工具 ID 仍可搜索到同一接口卡片')
+  service.query('get_item')
+  assert.equal(service.choices().length, 1, '操作 ID 可搜索到同一接口卡片')
   service.query('GET /items')
   assert.equal(service.choices('资源 URI').length, 1)
   service.query('POST /items')

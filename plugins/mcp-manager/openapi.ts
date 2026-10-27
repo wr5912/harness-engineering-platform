@@ -220,7 +220,8 @@ export async function loadOpenApi(server: any): Promise<any> {
       }
     }
   }
-  const businessTools = [...tools, ...readable.filter(item => !tools.some(tool => tool.name === item.name)).map(item => ({ name: item.name, description: item.description,
+  const businessTools = [...tools, ...readable.filter(item => !tools.some(tool => tool.name === item.name)).map(item => ({ name: item.name, title: item.raw.summary,
+    description: item.description, httpOperation: { method: item.method.toUpperCase(), path: item.path },
     inputSchema: operationSchema(spec, item.parameters, item.body) }))]
   return { spec, base, tools, businessTools, resources, resourceTemplates, operations, readable, server }
 }

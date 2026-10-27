@@ -55,7 +55,7 @@ export function registerFixedCompositionTools(ctx: any, bindings: Record<string,
       || !/^[0-9a-f]{64}$/.test(binding.versionId) || !/^[0-9a-f]{64}$/.test(binding.expectedImplementationDigest)
       || typeof binding.compositionId !== 'string' || !/^[a-z0-9-]{1,80}$/.test(binding.compositionId)
       || ![1, 2].includes(groupVersion) || typeof binding.tool_name !== 'string'
-      || !binding.tool_name.startsWith(groupVersion === 2 ? 'platform-compositions__' : 'mcp__compositions__')
+      || !(groupVersion === 2 ? /^[A-Za-z0-9_.-]+$/.test(binding.tool_name) : binding.tool_name.startsWith('mcp__compositions__'))
       || !binding.input_schema || typeof binding.input_schema !== 'object') throw new Error('固定组合绑定无效')
     const alias = fixedCompositionToolName(name, binding)
     ctx.tools.register({ name: alias, description: `执行固定组合 ${name}`, parameters: binding.input_schema,
@@ -94,7 +94,10 @@ export function registerFixedCompositionTools(ctx: any, bindings: Record<string,
           const listed = await client.listTools(undefined, { signal: exec.signal })
           assertGroup()
           if (listed._meta?.[GROUP_TARGET_META_KEY]?.digest !== binding.group_target_digest
-            || !listed.tools?.some((tool: any) => tool.name === binding.tool_name)) throw new Error('固定组合工具不属于当前 MCP 分组')
+            || !listed.tools?.some((tool: any) => tool.name === binding.tool_name && (groupVersion === 1
+              || tool._meta?.['io.deepseek.dsh/mcp-group-tool']?.serverId === 'platform-compositions'
+                && tool._meta['io.deepseek.dsh/mcp-group-tool'].kind === 'tool'
+                && tool._meta['io.deepseek.dsh/mcp-group-tool'].sourceName === binding.tool_name))) throw new Error('固定组合工具不属于当前 MCP 分组')
           const outer = executions.getStore()
           const execution = { execution_id: `fixed-${randomUUID()}`, ...(outer?.parent_run_id ? { parent_run_id: outer.parent_run_id } : {}),
             ...(outer?.case_id ? { case_id: outer.case_id } : {}), session_id: exec.agent?.session?.id, tool_call_id: exec.callId }

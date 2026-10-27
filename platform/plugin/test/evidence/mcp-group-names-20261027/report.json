@@ -1,0 +1,458 @@
+{
+  "observedAt": "2026-10-27T09:27:28.545935+00:00",
+  "programSource": {
+    "baseCommit": "ed07d59793a1b507e61f0c85e6c8a84ce6549915",
+    "dirty": true,
+    "scope": "本次任务工作树；代码差异见同一提交"
+  },
+  "protocol": {
+    "at": "2026-10-27T09:14:16.808Z",
+    "groups": [
+      {
+        "id": "emergency-action",
+        "tools": [
+          {
+            "name": "prepare_emergency_action",
+            "serverId": "emergency-action",
+            "kind": "tool",
+            "sourceName": "prepare_emergency_action"
+          },
+          {
+            "name": "revise_emergency_action",
+            "serverId": "emergency-action",
+            "kind": "tool",
+            "sourceName": "revise_emergency_action"
+          },
+          {
+            "name": "list_emergency_actions",
+            "serverId": "emergency-action",
+            "kind": "tool",
+            "sourceName": "list_emergency_actions"
+          },
+          {
+            "name": "cancel_emergency_action",
+            "serverId": "emergency-action",
+            "kind": "tool",
+            "sourceName": "cancel_emergency_action"
+          },
+          {
+            "name": "preview_disposition",
+            "serverId": "emergency-action",
+            "kind": "tool",
+            "sourceName": "preview_disposition"
+          },
+          {
+            "name": "get_emergency_action",
+            "serverId": "emergency-action",
+            "kind": "template",
+            "sourceName": "get_emergency_action",
+            "sourceUri": "http://127.0.0.1:59420/api/v1/emergency-actions/{operationId}"
+          },
+          {
+            "name": "get_emergency_action_result",
+            "serverId": "emergency-action",
+            "kind": "template",
+            "sourceName": "get_emergency_action_result",
+            "sourceUri": "http://127.0.0.1:59420/api/v1/emergency-actions/{operationId}/result"
+          },
+          {
+            "name": "get_correlate_reasoning_rules_by_rule_id",
+            "serverId": "ai-soc-correlate",
+            "kind": "template",
+            "sourceName": "get_correlate_reasoning_rules_by_rule_id",
+            "sourceUri": "http://172.16.138.223:18085/correlate/reasoning/rules/{ruleId}"
+          },
+          {
+            "name": "get_correlate_incident_by_incident_id",
+            "serverId": "ai-soc-correlate",
+            "kind": "template",
+            "sourceName": "get_correlate_incident_by_incident_id",
+            "sourceUri": "http://172.16.138.223:18085/correlate/incident/{incidentId}"
+          },
+          {
+            "name": "get_correlate_incident_judgements",
+            "serverId": "ai-soc-correlate",
+            "kind": "template",
+            "sourceName": "get_correlate_incident_judgements",
+            "sourceUri": "http://172.16.138.223:18085/correlate/incident/{incidentId}/judgements"
+          },
+          {
+            "name": "get_correlate_incident_judgement_report",
+            "serverId": "ai-soc-correlate",
+            "kind": "template",
+            "sourceName": "get_correlate_incident_judgement_report",
+            "sourceUri": "http://172.16.138.223:18085/correlate/incident/judgement/{judgementId}/report"
+          }
+        ]
+      },
+      {
+        "id": "inspection-readonly",
+        "tools": [
+          {
+            "name": "list_executable_inspections",
+            "serverId": "inspection",
+            "kind": "tool",
+            "sourceName": "list_executable_inspections"
+          },
+          {
+            "name": "get_inspection_result",
+            "serverId": "inspection",
+            "kind": "tool",
+            "sourceName": "get_inspection_result"
+          },
+          {
+            "name": "start_inspection",
+            "serverId": "inspection",
+            "kind": "tool",
+            "sourceName": "start_inspection"
+          }
+        ],
+        "readonlyCall": {
+          "isError": false,
+          "contentTypes": [
+            "text"
+          ]
+        },
+        "legacyReadonlyCall": true
+      },
+      {
+        "id": "threat-analysis-runtime",
+        "tools": [
+          {
+            "name": "get_correlate_incident_judge_pending",
+            "serverId": "ai-soc-correlate",
+            "kind": "tool",
+            "sourceName": "get_correlate_incident_judge_pending"
+          },
+          {
+            "name": "create_incident_judgement_claim",
+            "serverId": "ai-soc-correlate",
+            "kind": "tool",
+            "sourceName": "create_incident_judgement_claim"
+          },
+          {
+            "name": "update_incident_judgement_result",
+            "serverId": "ai-soc-correlate",
+            "kind": "tool",
+            "sourceName": "update_incident_judgement_result"
+          },
+          {
+            "name": "create_correlate_incident_judgement_fail",
+            "serverId": "ai-soc-correlate",
+            "kind": "tool",
+            "sourceName": "create_correlate_incident_judgement_fail"
+          },
+          {
+            "name": "get_correlate_threat_intel",
+            "serverId": "ai-soc-correlate",
+            "kind": "tool",
+            "sourceName": "get_correlate_threat_intel"
+          },
+          {
+            "name": "get_correlate_intel_check",
+            "serverId": "ai-soc-correlate",
+            "kind": "tool",
+            "sourceName": "get_correlate_intel_check"
+          },
+          {
+            "name": "get_correlate_incident_rule_hits",
+            "serverId": "ai-soc-correlate",
+            "kind": "tool",
+            "sourceName": "get_correlate_incident_rule_hits"
+          },
+          {
+            "name": "search_event",
+            "serverId": "ai-soc-event",
+            "kind": "tool",
+            "sourceName": "search_event"
+          },
+          {
+            "name": "get_graph_lm_login_sequence",
+            "serverId": "ai-soc-graph",
+            "kind": "tool",
+            "sourceName": "get_graph_lm_login_sequence"
+          },
+          {
+            "name": "get_graph_flow_host_pair_ports",
+            "serverId": "ai-soc-graph",
+            "kind": "tool",
+            "sourceName": "get_graph_flow_host_pair_ports"
+          },
+          {
+            "name": "save_persistence_result",
+            "serverId": "report-write",
+            "kind": "tool",
+            "sourceName": "save_persistence_result"
+          },
+          {
+            "name": "list_detect_whitelist",
+            "serverId": "ai-soc-detect",
+            "kind": "resource",
+            "sourceName": "list_detect_whitelist",
+            "sourceUri": "http://172.16.138.223:18084/detect/whitelist/list"
+          },
+          {
+            "name": "get_detect_operators",
+            "serverId": "ai-soc-detect",
+            "kind": "resource",
+            "sourceName": "get_detect_operators",
+            "sourceUri": "http://172.16.138.223:18084/detect/operators"
+          },
+          {
+            "name": "get_correlate_rule_by_rule_id",
+            "serverId": "ai-soc-correlate",
+            "kind": "template",
+            "sourceName": "get_correlate_rule_by_rule_id",
+            "sourceUri": "http://172.16.138.223:18085/correlate/rule/{ruleId}"
+          },
+          {
+            "name": "get_correlate_reasoning_rules_by_rule_id",
+            "serverId": "ai-soc-correlate",
+            "kind": "template",
+            "sourceName": "get_correlate_reasoning_rules_by_rule_id",
+            "sourceUri": "http://172.16.138.223:18085/correlate/reasoning/rules/{ruleId}"
+          },
+          {
+            "name": "get_correlate_reasoning_rules_definition",
+            "serverId": "ai-soc-correlate",
+            "kind": "template",
+            "sourceName": "get_correlate_reasoning_rules_definition",
+            "sourceUri": "http://172.16.138.223:18085/correlate/reasoning/rules/{ruleId}/definition"
+          },
+          {
+            "name": "get_correlate_incident_by_incident_id",
+            "serverId": "ai-soc-correlate",
+            "kind": "template",
+            "sourceName": "get_correlate_incident_by_incident_id",
+            "sourceUri": "http://172.16.138.223:18085/correlate/incident/{incidentId}"
+          },
+          {
+            "name": "get_incident_rule_hits_by_hit_id",
+            "serverId": "ai-soc-correlate",
+            "kind": "template",
+            "sourceName": "get_incident_rule_hits_by_hit_id",
+            "sourceUri": "http://172.16.138.223:18085/correlate/incident/{incidentId}/rule-hits/{hitId}"
+          },
+          {
+            "name": "get_correlate_incident_evidence_by_ref",
+            "serverId": "ai-soc-correlate",
+            "kind": "template",
+            "sourceName": "get_correlate_incident_evidence_by_ref",
+            "sourceUri": "http://172.16.138.223:18085/correlate/incident/{incidentId}/evidence/{ref}"
+          },
+          {
+            "name": "get_graph_identity_asset_accounts",
+            "serverId": "ai-soc-graph",
+            "kind": "template",
+            "sourceName": "get_graph_identity_asset_accounts",
+            "sourceUri": "http://172.16.138.223:18088/graph/identity/asset/{assetId}/accounts"
+          },
+          {
+            "name": "get_graph_enrich_topology_by_asset_id",
+            "serverId": "ai-soc-graph",
+            "kind": "template",
+            "sourceName": "get_graph_enrich_topology_by_asset_id",
+            "sourceUri": "http://172.16.138.223:18088/graph/enrich/topology/{assetId}"
+          },
+          {
+            "name": "get_detect_rule_by_rule_id",
+            "serverId": "ai-soc-detect",
+            "kind": "template",
+            "sourceName": "get_detect_rule_by_rule_id",
+            "sourceUri": "http://172.16.138.223:18084/detect/rule/{ruleId}"
+          },
+          {
+            "name": "get_detect_alert_by_alert_id",
+            "serverId": "ai-soc-detect",
+            "kind": "template",
+            "sourceName": "get_detect_alert_by_alert_id",
+            "sourceUri": "http://172.16.138.223:18084/detect/alert/{alertId}"
+          },
+          {
+            "name": "get_ingest_devices_by_asset_by_asset_id",
+            "serverId": "ai-soc-ingest",
+            "kind": "template",
+            "sourceName": "get_ingest_devices_by_asset_by_asset_id",
+            "sourceUri": "http://172.16.138.223:18081/admin/ingest/devices/by-asset/{assetId}"
+          },
+          {
+            "name": "get_soc_asset_by_asset_id",
+            "serverId": "ai-soc-master",
+            "kind": "template",
+            "sourceName": "get_soc_asset_by_asset_id",
+            "sourceUri": "http://172.16.138.223:18087/soc/asset/{assetId}"
+          },
+          {
+            "name": "get_soc_asset_importance",
+            "serverId": "ai-soc-master",
+            "kind": "template",
+            "sourceName": "get_soc_asset_importance",
+            "sourceUri": "http://172.16.138.223:18087/soc/asset/{assetId}/importance"
+          },
+          {
+            "name": "get_soc_asset_biz_systems",
+            "serverId": "ai-soc-master",
+            "kind": "template",
+            "sourceName": "get_soc_asset_biz_systems",
+            "sourceUri": "http://172.16.138.223:18087/soc/asset/{assetId}/biz-systems"
+          }
+        ]
+      },
+      {
+        "id": "policy-runtime",
+        "tools": [
+          {
+            "name": "prepare_policy_configuration",
+            "serverId": "policy-configuration",
+            "kind": "tool",
+            "sourceName": "prepare_policy_configuration"
+          },
+          {
+            "name": "resolve_policy_endpoints",
+            "serverId": "policy-configuration",
+            "kind": "tool",
+            "sourceName": "resolve_policy_endpoints"
+          },
+          {
+            "name": "choose_ambiguous_policy_endpoints",
+            "serverId": "policy-configuration",
+            "kind": "tool",
+            "sourceName": "choose_ambiguous_policy_endpoints"
+          },
+          {
+            "name": "select_policy_configuration_candidate",
+            "serverId": "policy-configuration",
+            "kind": "tool",
+            "sourceName": "select_policy_configuration_candidate"
+          },
+          {
+            "name": "decide_policy_configuration",
+            "serverId": "policy-configuration",
+            "kind": "tool",
+            "sourceName": "decide_policy_configuration"
+          },
+          {
+            "name": "confirm_policy_configuration",
+            "serverId": "policy-configuration",
+            "kind": "tool",
+            "sourceName": "confirm_policy_configuration"
+          },
+          {
+            "name": "get_policy_configuration_status",
+            "serverId": "policy-configuration",
+            "kind": "tool",
+            "sourceName": "get_policy_configuration_status"
+          },
+          {
+            "name": "get_policy_configuration_result",
+            "serverId": "policy-configuration",
+            "kind": "tool",
+            "sourceName": "get_policy_configuration_result"
+          }
+        ]
+      }
+    ]
+  },
+  "ui": {
+    "url": "http://172.16.138.228:18120/hep/#/mcp?tab=groups",
+    "viewport": {
+      "width": 1600,
+      "height": 1100
+    },
+    "emergencyActionTool": "get_emergency_action_result",
+    "dshName": "mcp__emergency-action__get_emergency_action_result",
+    "dshNameLength": 50,
+    "oldTemplatePrefixVisible": false,
+    "copyFeedback": "已复制。",
+    "ruleHitsCards": 1,
+    "ruleHitsMethodPath": "GET/correlate/incident/{incidentId}/rule-hits",
+    "pageErrors": [],
+    "configurationWrites": false
+  },
+  "deployment": {
+    "mechanism": "DSH 原生 pluginManager 热重载",
+    "platformPidBefore": 4074385,
+    "platformPidAfter": 4074385,
+    "platformApplication": "applied",
+    "businessReloads": [
+      {
+        "name": "threat-analysis-rule-opt",
+        "reload": {
+          "stage": "enable",
+          "target": "include:threat-analysis",
+          "enabled": true,
+          "changed": true,
+          "application": "applied",
+          "warnings": []
+        }
+      },
+      {
+        "name": "test-zhouyang-disp2",
+        "reload": {
+          "stage": "enable",
+          "target": "include:threat-analysis",
+          "enabled": true,
+          "changed": true,
+          "application": "applied",
+          "warnings": []
+        }
+      },
+      {
+        "name": "sec-ops-v024",
+        "reload": {
+          "stage": "enable",
+          "target": "include:threat-analysis",
+          "enabled": true,
+          "changed": true,
+          "application": "applied",
+          "warnings": []
+        }
+      }
+    ],
+    "businessContainersRestarted": false,
+    "containerStartedAt": {
+      "threat-analysis-rule-opt": "2026-10-27T08:18:45.253077587Z",
+      "test-zhouyang-disp2": "2026-10-27T09:15:37.937228266Z",
+      "sec-ops-v024": "2026-10-27T06:53:02.522548892Z"
+    }
+  },
+  "validation": {
+    "typecheck": "passed",
+    "build": "passed",
+    "programSuite": {
+      "tests": 866,
+      "pass": 862,
+      "fail": 3,
+      "skipped": 1
+    },
+    "baselineSuite": {
+      "tests": 4,
+      "pass": 1,
+      "fail": 3,
+      "skipped": 0
+    },
+    "baselineFailures": [
+      "inventory.test.mjs:16",
+      "inventory.test.mjs:38",
+      "native-auth.test.mjs:15"
+    ],
+    "baselineCommit": "ed07d59793a1b507e61f0c85e6c8a84ce6549915",
+    "EXP024": {
+      "tests": 9,
+      "pass": 9,
+      "fail": 0,
+      "skipped": 0
+    },
+    "EXP025": {
+      "tests": 9,
+      "pass": 9,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "limits": [
+    "未调用真实应急处置写接口或模型业务任务；此记录证明发现、只读调用、命名和实际装载。",
+    "插件全量仍有 3 项既有失败，已在原始基线复现；不将全量结果记为通过。",
+    "未重新执行 Experiment Evaluation 或 Research Release 复现。"
+  ]
+}

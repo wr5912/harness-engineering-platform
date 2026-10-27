@@ -205,7 +205,7 @@ export function applyTools(ctx: Context) {
             const actual = manager?.currentGroup?.(group.id, 2)
             return actual && /^[0-9a-f]{64}$/.test(actual.targetDigest) ? [{ ...base, fixed_binding: {
               group_id: actual.id, group_link_version: 2, group_target_digest: actual.targetDigest,
-              tool_name: `platform-compositions__${entry.published.toolName}`,
+              tool_name: entry.published.toolName,
               compositionId: entry.binding.compositionId, versionId: entry.binding.versionId,
               expectedImplementationDigest: entry.binding.expectedImplementationDigest, input_schema: compositionInputSchema(entry.published),
             } }] : []

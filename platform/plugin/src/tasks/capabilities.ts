@@ -65,7 +65,8 @@ export async function discoverTaskCapabilities(assetRoot: string, options: Capab
       && /^[a-f0-9]{64}$/.test(fixed.group_target_digest) && /^[a-f0-9]{64}$/.test(fixed.versionId)
       && /^[a-f0-9]{64}$/.test(fixed.expectedImplementationDigest) && /^[a-z0-9-]{1,80}$/.test(fixed.compositionId)
       && typeof fixed.tool_name === 'string'
-      && fixed.tool_name.startsWith(groupVersion === 2 ? 'platform-compositions__' : 'mcp__compositions__')
+      && (groupVersion === 2 ? fixed.tool_name === binding.tool_name && /^[A-Za-z0-9_.-]+$/.test(fixed.tool_name)
+        : fixed.tool_name.startsWith('mcp__compositions__'))
       && fixed.input_schema && typeof fixed.input_schema === 'object' && !Array.isArray(fixed.input_schema)
       && fixed.compositionId === binding.composition_id && fixed.versionId === binding.version_id
       && fixed.expectedImplementationDigest === binding.source_digest

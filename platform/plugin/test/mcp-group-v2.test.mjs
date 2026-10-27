@@ -56,14 +56,15 @@ async function serve(t, handler) {
   return `http://127.0.0.1:${server.address().port}`
 }
 
-async function fixtureMcp(t, id, reads, resourceOnly = false, duplicateTools = false) {
+async function fixtureMcp(t, id, reads, resourceOnly = false, duplicateTools = false, state = {}) {
   return serve(t, async (req, res) => {
+    if (state.offline) return res.writeHead(503).end()
     const handler = createMcpHandler(() => {
       const mcp = new McpServer({ name: id, version: '1' }, { capabilities: { ...(resourceOnly ? {} : { tools: {} }), resources: {} } })
       if (!resourceOnly) {
-        mcp.server.setRequestHandler('tools/list', async () => ({ tools: duplicateTools
+        mcp.server.setRequestHandler('tools/list', async () => ({ tools: state.tools ?? (duplicateTools
           ? [{ name: 'echo', inputSchema: { type: 'object' } }, { name: 'echo', inputSchema: { type: 'object' } }]
-          : [{ name: 'echo', inputSchema: { type: 'object' } }] }))
+          : [{ name: 'echo', inputSchema: { type: 'object' } }]) }))
         mcp.server.setRequestHandler('tools/call', async request => ({ content: [{ type: 'text', text: `${id}:${request.params.arguments.value}` }] }))
       }
       mcp.server.setRequestHandler('resources/list', async () => ({ resources: [{ name: 'same', uri: 'fixture:/same' }] }))
@@ -115,7 +116,7 @@ test('v2 分组名称与显示名解耦，资源代理隔离同 URI 来源并拒
     { id: 'alpha_id', serverName: 'DisplayOne', enabled: true, url: first, tools: { mode: 'all', names: [] } },
     { id: 'beta', serverName: 'DisplayTwo', enabled: true, url: second, tools: { mode: 'all', names: [] } },
   ]
-  const groups = [{ id: 'ops', members: servers.map(server => ({ serverId: server.id, names: ['echo'],
+  const groups = [{ id: 'ops', members: servers.map((server, index) => ({ serverId: server.id, names: index ? [] : ['echo'],
     resourceUris: ['fixture:/same', 'fixture:/missing'], resourceTemplates: ['fixture:/item/{id}{?q}'] })) }]
   const { origin, context, token, client, rpcRequests } = await groupServer(t, manager, servers, groups, methods)
   const paths = await (await fetch(`${origin}/api/mcp-manager`)).json()
@@ -125,10 +126,12 @@ test('v2 分组名称与显示名解耦，资源代理隔离同 URI 来源并拒
   }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }) })
   assert.equal(forged.status, 401, '签名无效不能回退到 Bearer')
   const v1 = await client(1), v2 = await client(2)
-  assert.deepEqual((await v1.listTools()).tools.map(tool => tool.name), ['mcp__DisplayOne__echo', 'mcp__DisplayTwo__echo'])
+  assert.deepEqual((await v1.listTools()).tools.map(tool => tool.name), ['mcp__DisplayOne__echo'])
   const listed = await v2.listTools()
-  assert.deepEqual(listed.tools.filter(tool => tool.name.endsWith('__echo')).map(tool => tool.name), ['alpha_0id__echo', 'beta__echo'])
-  assert.equal(listed.tools.length, 6)
+  assert.deepEqual(listed.tools.map(tool => tool.name), ['echo'])
+  assert.deepEqual(listed.tools[0]._meta[manager.GROUP_TOOL_META_KEY], { serverId: 'alpha_id', kind: 'tool', sourceName: 'echo' })
+  assert.ok(listed._meta[manager.GROUP_DISCOVERY_META_KEY].unavailable.some(value => value.includes('工具名冲突：same')))
+  assert.equal(listed.tools.length, 1)
   const digest = context.mcpSessionManager.currentGroup('ops', 2).targetDigest
   assert.equal(listed._meta['io.deepseek.dsh/mcp-group-target'].digest, digest)
   assert.equal((await v2.callTool({ name: 'alpha_0id__echo', arguments: { value: 'ok' },
@@ -170,11 +173,11 @@ test('v2 分组保留可达来源，标出不可达来源；平台可关闭管�
     { id: 'healthy', enabled: true, url: healthy, tools: { mode: 'all', names: [] } },
     { id: 'unreachable', enabled: true, url: 'http://127.0.0.1:1/mcp', tools: { mode: 'all', names: [] } },
   ]
-  const groups = [{ id: 'mixed', members: servers.map(server => ({ serverId: server.id, names: ['echo'] })) }]
+  const groups = [{ id: 'mixed', members: servers.map((server, index) => ({ serverId: server.id, names: index ? ['offline_tool'] : ['echo'] })) }]
   const { client } = await groupServer(t, manager, servers, groups)
   const v2 = await client(2)
   const listed = await v2.listTools()
-  assert.deepEqual(listed.tools.map(tool => tool.name), ['healthy__echo'])
+  assert.deepEqual(listed.tools.map(tool => tool.name), ['echo'])
   assert.deepEqual(listed._meta[manager.GROUP_DISCOVERY_META_KEY], { unavailable: ['unreachable'] })
   const events = []
   const ctx = { effect: callback => callback(), webServer: { register: () => () => {}, publicPath: path => path },
@@ -186,6 +189,37 @@ test('v2 分组保留可达来源，标出不可达来源；平台可关闭管�
   manager.apply({ ...ctx, on: name => defaultEvents.push(name) }, { servers: { get: () => servers },
     groups: { get: () => groups }, sharedToken: { get: () => '0'.repeat(64) } })
   assert.equal(defaultEvents.includes('agent/created'), true)
+})
+
+test('v2 拒绝跨来源、上游重复和旧名冲突，离线来源不让出名称且不影响其他工具', async t => {
+  const manager = await managerModule(t), reads = [], state = {}
+  const first = await fixtureMcp(t, 'first', reads, false, true)
+  const second = await fixtureMcp(t, 'second', reads, false, false, state)
+  const third = await fixtureMcp(t, 'third', reads, false, false, { tools: [
+    { name: 'same', inputSchema: { type: 'object' } },
+    { name: 'first__echo', inputSchema: { type: 'object' } },
+    { name: 'healthy', inputSchema: { type: 'object' } },
+  ] })
+  const servers = [first, second, third].map((url, index) => ({ id: ['first', 'second', 'third'][index],
+    enabled: true, url, tools: { mode: 'all', names: [] } }))
+  const groups = [{ id: 'conflicts', members: [
+    { serverId: 'first', names: ['echo'] },
+    { serverId: 'second', names: ['echo'], resourceUris: ['fixture:/same'] },
+    { serverId: 'third', names: ['same', 'first__echo', 'healthy'] },
+  ] }]
+  const { client } = await groupServer(t, manager, servers, groups)
+  const v2 = await client(2)
+  assert.deepEqual((await v2.listTools()).tools.map(tool => tool.name), ['healthy'])
+  for (const name of ['echo', 'same', 'first__echo', 'second__echo']) {
+    await assert.rejects(v2.callTool({ name, arguments: {} }), /冲突/)
+  }
+  state.offline = true
+  assert.deepEqual((await v2.listTools()).tools.map(tool => tool.name), ['healthy'])
+  await assert.rejects(v2.callTool({ name: 'same', arguments: {} }), /冲突/)
+  assert.equal((await v2.callTool({ name: 'healthy', arguments: { value: 'ok' } })).content[0].text, 'third:ok')
+  groups[0].members = [{ serverId: 'third', names: ['same', 'healthy'] }]
+  assert.deepEqual((await v2.listTools()).tools.map(tool => tool.name), ['same', 'healthy'])
+  assert.equal(reads.length, 0)
 })
 
 test('业务 Session 跳过连接、鉴权和规范发现失败的 MCP 来源，仍校验本地配置', async t => {
@@ -368,7 +402,7 @@ test('原生 MCP 桥沿用 DSH 的非致命启动与无工具注册状态', asyn
   assert.equal(ctx.tools.get('mcp__Invalid__echo', agent), undefined)
 })
 
-test('原生 MCP 的同名工具与资源保留独立调用入口', async t => {
+test('原生 MCP 的同名工具与资源不合并，冲突项不发布也不能通过旧名调用', async t => {
   const manager = await managerModule(t)
   const upstream = await serve(t, async (req, res) => {
     const handler = createMcpHandler(() => {
@@ -383,11 +417,11 @@ test('原生 MCP 的同名工具与资源保留独立调用入口', async t => {
   const servers = [{ id: 'native', enabled: true, url: upstream, tools: { mode: 'all', names: [] } }]
   const groups = [{ id: 'native', members: [{ serverId: 'native', names: ['echo'], resourceUris: ['fixture:/echo'], resourceTemplates: [] }] }]
   const { client } = await groupServer(t, manager, servers, groups)
-  const v2 = await client(2), tools = (await v2.listTools()).tools
-  assert.equal(tools.length, 2)
-  assert.equal(tools[0].name, 'native__echo')
-  assert.match(tools[1].name, /^native__resource_echo_/)
-  assert.match((await v2.callTool({ name: tools[1].name, arguments: {} })).content[0].text, /resource/)
+  const v2 = await client(2), listed = await v2.listTools()
+  assert.equal(listed.tools.length, 0)
+  assert.match(listed._meta[manager.GROUP_DISCOVERY_META_KEY].unavailable.join(), /native\/tool\/echo.*native\/resource\/echo/)
+  await assert.rejects(v2.callTool({ name: 'echo', arguments: {} }), /冲突/)
+  await assert.rejects(v2.callTool({ name: 'native__echo', arguments: {} }), /冲突/)
 })
 
 test('OpenAPI 同一操作只发布一个工具，保留资源读取与已选包装工具调用', async t => {
@@ -415,10 +449,12 @@ test('OpenAPI 同一操作只发布一个工具，保留资源读取与已选包
     body: JSON.stringify({ action: 'test', serverId: 'api' }) })).json()
   assert.deepEqual(discover.tools[0].httpOperation, { method: 'GET', path: '/item/{id}' })
   assert.deepEqual(discover.resourceTemplates.resourceTemplates[0].httpOperation, discover.tools[0].httpOperation)
-  const alias = discover.resourceTemplates.resourceTemplates[0].groupToolName
+  assert.equal(discover.resourceTemplates.resourceTemplates[0].groupToolName, 'get_item')
+  assert.equal(discover.tools[0].groupPublicNames['api-group'], 'mcp__api-group__get_item')
+  const alias = 'api__template_get_item_' + (await import('node:crypto')).createHash('sha256').update(`t\0${template}`).digest('hex').slice(0, 12)
   const originalDigest = context.mcpSessionManager.currentGroup('api-group', 2).targetDigest
-  assert.deepEqual((await v2.listTools()).tools.map(item => item.name), ['api__get_item'])
-  assert.deepEqual((await context.mcpSessionManager.listGroupTools('api-group', 2)).tools.map(item => item.name), ['api__get_item'])
+  assert.deepEqual((await v2.listTools()).tools.map(item => item.name), ['get_item'])
+  assert.deepEqual((await context.mcpSessionManager.listGroupTools('api-group', 2)).tools.map(item => item.name), ['get_item'])
   assert.equal(context.mcpSessionManager.currentGroup('api-group', 2).targetDigest, originalDigest)
   assert.equal(JSON.parse((await v2.callTool({ name: alias, arguments: { id: 'A', q: 'legacy' } })).content[0].text).q, 'legacy')
   await assert.rejects(v2.callTool({ name: alias, arguments: { id: 'A' } }), /参数/)
@@ -430,14 +466,14 @@ test('OpenAPI 同一操作只发布一个工具，保留资源读取与已选包
   assert.equal(calls.at(-1), `${endpoint}/item/A?q=x+y`)
   await assert.rejects(v2.readResource({ uri: uri + '&unknown=1' }))
   groups[0].members[0].names = []
-  assert.deepEqual((await v2.listTools()).tools.map(item => item.name), [alias])
+  assert.deepEqual((await v2.listTools()).tools.map(item => item.name), ['get_item'])
   assert.equal(JSON.parse((await v2.callTool({ name: alias, arguments: { id: 'A', q: 'resource-only' } })).content[0].text).q, 'resource-only')
   groups[0].members[0].names = ['get_item']
   servers[0].tools = { mode: 'selected', names: [] }
-  assert.deepEqual((await v2.listTools()).tools.map(item => item.name), [alias], '来源未开放原工具时仍发布所选资源工具')
+  assert.deepEqual((await v2.listTools()).tools.map(item => item.name), ['get_item'], '来源未开放原工具时仍发布所选资源工具')
   servers[0].tools = { mode: 'all', names: [] }
   groups[0].members[0].resourceTemplates = []
-  assert.deepEqual((await v2.listTools()).tools.map(item => item.name), ['api__get_item'])
+  assert.deepEqual((await v2.listTools()).tools.map(item => item.name), ['get_item'])
   await assert.rejects(v2.callTool({ name: alias, arguments: { id: 'A', q: 'removed' } }))
   groups[0].members = []
   assert.deepEqual((await v2.listTools()).tools, [])
@@ -481,7 +517,7 @@ test('分组允许只有 Resource 能力的服务，工具发现不要求上游 
   const { client } = await groupServer(t, manager, servers, groups)
   const v2 = await client(2)
   const alias = (await v2.listTools()).tools[0]
-  assert.match(alias.name, /^resource__resource_same_[a-f0-9]{12}$/)
+  assert.equal(alias.name, 'same')
   assert.equal((await v2.callTool({ name: alias.name, arguments: {} })).content[0].text, 'resource-only')
   const uri = (await v2.listResources()).resources[0].uri
   assert.equal((await v2.readResource({ uri })).contents[0].text, 'resource-only')
@@ -593,7 +629,7 @@ test('OpenAPI 资源工具保留参数类型、必填查询参数与说明，并
   const { client, context } = await groupServer(t, manager, servers, groups)
   const v2 = await client(2), listed = (await v2.listTools()).tools
   assert.equal(listed.length, 2)
-  const template = listed.find(tool => tool.name.includes('__template_'))
+  const template = listed.find(tool => tool._meta[manager.GROUP_TOOL_META_KEY].kind === 'template')
   assert.equal(template.title, '查询条目')
   assert.deepEqual(template.inputSchema.required, ['id', 'active'])
   assert.equal(template.inputSchema.properties.id.type, 'integer')
@@ -646,7 +682,7 @@ test('三类发现遍历全部分页，模板不支持与坏来源不阻塞其�
   assert.equal(list.tools.length, 3)
   assert.ok(list._meta[manager.GROUP_DISCOVERY_META_KEY].unavailable.some(value => value.includes('不支持')))
   assert.equal((await v2.callTool({ name: 'paged__second', arguments: {} })).content[0].text, 'second tool')
-  const resource = list.tools.find(tool => tool.name.includes('__resource_'))
+  const resource = list.tools.find(tool => tool._meta[manager.GROUP_TOOL_META_KEY].kind === 'resource')
   const result = await v2.callTool({ name: resource.name, arguments: {} })
   assert.match(result.content[0].text, /二进制/)
   assert.equal(result.structuredContent.contents[0].blob, 'AAEC')
