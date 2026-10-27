@@ -64,6 +64,9 @@ body .harness-platform[data-page=conversations],body .harness-platform :is(.harn
 .harness-assistant-chat [data-slot="conversation.hero.agentPreset"],.harness-assistant-chat [class$="_heroWorkspaceRow"]{display:none}
 .harness-assistant-chat [class$="_titleGroup"]{display:none}
 .harness-assistant-chat [class$="_headline"]{font-size:20px}
+.harness-assistant-floating [data-content-phase=hero] [class$="_composerSeat"]{flex:1 0 auto}
+.harness-assistant-floating [class*="_composerHero"]{flex:1 0 auto;padding-bottom:8px}
+.harness-assistant-floating [class*="_composerHero"]>[class$="_root"]{flex:1;height:auto}
 .harness-conversation-frame{box-sizing:border-box;padding-top:var(--harness-conversation-top);padding-left:var(--harness-conversation-left)}
 .harness-platform[data-page=conversations] .harness-assistant-toggle{pointer-events:auto}
 .harness-conversation-viewport{flex:1;min-height:0}
@@ -108,6 +111,5 @@ body .harness-platform[data-page=conversations],body .harness-platform :is(.harn
 .harness-task-card-compact details small{display:block;color:var(--hep-muted)}
 @media(max-width:1100px){.harness-assistant-floating{inset:0;right:0;bottom:0;max-width:none;width:100vw;height:100dvh;border:0;border-radius:0}.harness-platform button.harness-assistant-launch{display:none}.harness-platform button.harness-assistant-toggle{grid-column:3;grid-row:1;width:44px;height:44px;min-height:44px}.harness-assistant-toggle .harness-assistant-icon{width:34px;height:34px}.harness-platform button.harness-assistant-toggle[aria-expanded=true]{display:none}}
 @media(max-width:580px){.harness-assistant-heading{padding:10px}.harness-assistant-heading strong{font-size:13px}.harness-assistant-context{padding:6px 10px}.harness-assistant-floating .harness-assistant-proposals-dock{max-height:35dvh}}
-@media(max-width:580px){.harness-assistant-floating [class$="_composerSeat"]{flex:1 1 auto;min-height:0}.harness-assistant-floating [class*="_composerStack"]{flex:1 1 auto;min-height:0;justify-content:flex-end}.harness-assistant-floating [class*="_composerStack"]>[class$="_root"]{flex:1 1 auto}}
 .harness-conversation-welcome{display:inline-flex;align-items:center;gap:12px;color:#223550;font-size:24px}
 `

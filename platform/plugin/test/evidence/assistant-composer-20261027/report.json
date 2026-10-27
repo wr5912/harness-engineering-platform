@@ -1,0 +1,228 @@
+{
+  "at": "2026-10-27T05:50:32.615Z",
+  "base": "http://172.16.138.228:18120/hep/",
+  "measurements": [
+    {
+      "label": "new-task",
+      "viewport": [
+        1440,
+        1000
+      ],
+      "panelBottom": 912,
+      "cardBottom": 903,
+      "gap": 9,
+      "cardLeft": 1001,
+      "cardRight": 1392,
+      "cardTop": 789,
+      "phase": "hero",
+      "scrollHeight": 531,
+      "clientHeight": 531,
+      "scrollTop": 0
+    },
+    {
+      "label": "new-task",
+      "viewport": [
+        1280,
+        800
+      ],
+      "panelBottom": 712,
+      "cardBottom": 703,
+      "gap": 9,
+      "cardLeft": 889,
+      "cardRight": 1232,
+      "cardTop": 589,
+      "phase": "hero",
+      "scrollHeight": 511,
+      "clientHeight": 511,
+      "scrollTop": 0
+    },
+    {
+      "label": "new-task",
+      "viewport": [
+        900,
+        800
+      ],
+      "panelBottom": 800,
+      "cardBottom": 792,
+      "gap": 8,
+      "cardLeft": 16,
+      "cardRight": 877,
+      "cardTop": 678,
+      "phase": "hero",
+      "scrollHeight": 693,
+      "clientHeight": 693,
+      "scrollTop": 0
+    },
+    {
+      "label": "new-task",
+      "viewport": [
+        390,
+        844
+      ],
+      "panelBottom": 844,
+      "cardBottom": 836,
+      "gap": 8,
+      "cardLeft": 16,
+      "cardRight": 367,
+      "cardTop": 722,
+      "phase": "hero",
+      "scrollHeight": 746,
+      "clientHeight": 746,
+      "scrollTop": 0
+    },
+    {
+      "label": "new-task",
+      "viewport": [
+        390,
+        480
+      ],
+      "panelBottom": 480,
+      "cardBottom": 472,
+      "gap": 8,
+      "cardLeft": 16,
+      "cardRight": 367,
+      "cardTop": 358,
+      "phase": "hero",
+      "scrollHeight": 382,
+      "clientHeight": 382,
+      "scrollTop": 0
+    },
+    {
+      "label": "draft-after-expand-collapse",
+      "viewport": [
+        1440,
+        1000
+      ],
+      "panelBottom": 912,
+      "cardBottom": 903,
+      "gap": 9,
+      "cardLeft": 1001,
+      "cardRight": 1392,
+      "cardTop": 789,
+      "phase": "hero",
+      "scrollHeight": 531,
+      "clientHeight": 531,
+      "scrollTop": 0
+    },
+    {
+      "label": "long-draft-scroll-bottom",
+      "viewport": [
+        1440,
+        800
+      ],
+      "panelBottom": 712,
+      "cardBottom": 703,
+      "gap": 9,
+      "cardLeft": 1001,
+      "cardRight": 1392,
+      "cardTop": 305,
+      "phase": "hero",
+      "scrollHeight": 511,
+      "clientHeight": 511,
+      "scrollTop": 0
+    },
+    {
+      "label": "long-draft-scroll-bottom",
+      "viewport": [
+        390,
+        844
+      ],
+      "panelBottom": 844,
+      "cardBottom": 836,
+      "gap": 8,
+      "cardLeft": 16,
+      "cardRight": 367,
+      "cardTop": 438,
+      "phase": "hero",
+      "scrollHeight": 687,
+      "clientHeight": 687,
+      "scrollTop": 0
+    },
+    {
+      "label": "long-draft-scroll-bottom",
+      "viewport": [
+        390,
+        480
+      ],
+      "panelBottom": 480,
+      "cardBottom": 471.984375,
+      "gap": 8.015625,
+      "cardLeft": 16,
+      "cardRight": 367,
+      "cardTop": 73.984375,
+      "phase": "hero",
+      "scrollHeight": 423,
+      "clientHeight": 342,
+      "scrollTop": 81
+    },
+    {
+      "label": "existing-conversation",
+      "viewport": [
+        1440,
+        1000
+      ],
+      "gap": 33.390625,
+      "cardTop": 780.609375,
+      "cardBottom": 878.609375,
+      "phase": "active",
+      "flex": "0 0 auto",
+      "baselineGap": 33.5625
+    },
+    {
+      "label": "existing-conversation",
+      "viewport": [
+        390,
+        844
+      ],
+      "gap": 32.75,
+      "cardTop": 713.25,
+      "cardBottom": 811.25,
+      "phase": "active",
+      "flex": "0 0 auto",
+      "baselineGap": 32.390625
+    }
+  ],
+  "checks": [
+    "五种窗口尺寸的新任务输入卡片距面板底部 8–9px，无横向溢出",
+    "收起重开及展开管理对话后返回浮窗，原草稿保留且输入可编辑",
+    "50 行草稿可编辑；长内容滚动到底后输入卡片与操作栏可达",
+    "通过原生侧栏打开已有消息的会话，桌面和窄屏均保持原生 active 输入区布局及底部操作栏"
+  ],
+  "pageErrors": [],
+  "source": {
+    "baseCommit": "769c189b542dd6104696e3587270e19f869c717a",
+    "dirty": true,
+    "file": "platform/plugin/src/assistant/style.ts",
+    "sha256": "fe16eb2f1bd0b268059b097ecd1d343e03e28e0745e9ce55608f2681b995c008"
+  },
+  "baseline": {
+    "viewport": [
+      1440,
+      1000
+    ],
+    "panelBottom": 912,
+    "cardBottom": 735.578125,
+    "gap": 176.421875
+  },
+  "validation": {
+    "typecheck": "pnpm run check: passed",
+    "build": "node build.mjs: passed",
+    "tests": {
+      "command": "node --experimental-strip-types --test test/assistant-client.test.mjs test/conversation.test.mjs test/navigation.test.mjs",
+      "passed": 27,
+      "failed": 0
+    }
+  },
+  "application": {
+    "method": "DSH 原生插件热重载",
+    "at": "2026-10-27T05:49:55.012Z",
+    "result": "applied",
+    "warnings": [],
+    "pidBefore": 4074385,
+    "pidAfter": 4074385
+  },
+  "limits": [
+    "使用真实平台与浏览器验证布局和草稿；未发送模型请求或重新执行业务评测",
+    "窄屏为桌面浏览器视口模拟，未验证物理移动设备与软键盘"
+  ]
+}
