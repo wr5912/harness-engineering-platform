@@ -153,6 +153,7 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
   const patch = [
     { id: 'webserver', config: { host: '0.0.0.0', port: input.port, compression: 'gzip', compressionLevel: 1, compressionThresholdBytes: 1024 } },
     ...connectionPatches,
+    { id: 'web-runtime', config: { publicUrl: new URL(businessBasePath, config.coordinatorOrigin).href } },
     ...(manager ? [{ id: manager.id, disabled: true }] : []),
     ...createBusinessRuntimePatch(runtimeConfig, `${containerPlugin}/business/runtime.js`,
       manager ? `${containerPlugin}/business/mcp-manager.js` : undefined, manager?.config),
@@ -160,7 +161,7 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
   delete service.network_mode
   service.networks = ['business']
   service.ports = [`127.0.0.1:${input.port}:${input.port}`]
-  service.extra_hosts = [...(service.extra_hosts ?? []), 'host.docker.internal:host-gateway']
+  service.extra_hosts = [...new Set([...(service.extra_hosts ?? []), 'host.docker.internal:host-gateway'])]
   compose.networks = { ...(compose.networks ?? {}), business: { driver: 'bridge' } }
   const command = service.command as string[]
   const host = command.indexOf('--host'), tail = command.indexOf('--no-open')

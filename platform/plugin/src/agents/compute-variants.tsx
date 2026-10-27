@@ -18,7 +18,7 @@ type Context = {
   comparison?: any
   workflow_status?: { generated: boolean; built: boolean; frozen: boolean; loaded: boolean; compared: boolean }
 }
-const labels: Record<ComputeMetric | 'actual_model_calls', string> = { actual_model_calls: '实际模型请求次数（含重试）', model_calls: '已记录模型响应次数', input_tokens: '输入 token（含缓存）', output_tokens: '输出 token', total_tokens: '总 token', elapsed_ms: '主 Session 耗时（毫秒）' }
+const labels: Record<ComputeMetric | 'actual_model_calls', string> = { actual_model_calls: '实际模型请求次数（含重试）', model_calls: '会话回复次数（历史口径）', input_tokens: '输入 token（含缓存）', output_tokens: '输出 token', total_tokens: '总 token', elapsed_ms: '主 Session 耗时（毫秒）' }
 const display = (value: number | null | undefined) => value === null || value === undefined ? '未知' : Number.isInteger(value) ? String(value) : value.toFixed(2)
 const percentage = (value: number | null | undefined) => value === null || value === undefined ? '未知' : `${display(value)}%`
 const toggle = (values: string[], id: string) => values.includes(id) ? values.filter(value => value !== id) : [...values, id]
@@ -54,7 +54,7 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
   const [variantName, setVariantName] = useState(''), [strategy, setStrategy] = useState(''), [selectedCases, setSelectedCases] = useState<string[]>([]), [critical, setCritical] = useState<string[]>([])
   const [minimum, setMinimum] = useState(2), [drop, setDrop] = useState(0), [metric, setMetric] = useState<ComputeMetric>('total_tokens'), [reduction, setReduction] = useState(10)
   const [modelChange, setModelChange] = useState(false), [model, setModel] = useState('deepseek-flash'), [reasoning, setReasoning] = useState('off')
-  const [codeMode, setCodeMode] = useState(false), [sourceRuns, setSourceRuns] = useState<string[]>([])
+  const [codeMode, setCodeMode] = useState(false), [codeOnly, setCodeOnly] = useState(false), [sourceRuns, setSourceRuns] = useState<string[]>([])
   const [generatedCode, setGeneratedCode] = useState<any>(null), [freezePreview, setFreezePreview] = useState<any>(null)
   const [parentRuns, setParentRuns] = useState<string[]>([]), [variantRuns, setVariantRuns] = useState<string[]>([])
   const [comparison, setComparison] = useState<any>(null), [humanConfirmed, setHumanConfirmed] = useState(false), [reason, setReason] = useState('')
@@ -78,7 +78,7 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
   }
   useEffect(() => {
     const request = ++generation.current
-    setBusy(true); setContext(null); setComparison(null); setParentRuns([]); setVariantRuns([]); setParent(experimentId); setVariantName(''); setStrategy(''); setSelectedCases([]); setCritical([]); setMinimum(2); setDrop(0); setMetric('total_tokens'); setReduction(10); setModelChange(false); setModel('deepseek-flash'); setReasoning('off'); setReason(''); setError(''); setMessage(''); setCreateOpen(false); setPlanningOpen(false); setPlanningDirty(false); setManualPreview(null); setHumanConfirmed(false); setGeneratedCode(null); setFreezePreview(null); setSourceRuns([]); setCodeMode(false)
+    setBusy(true); setContext(null); setComparison(null); setParentRuns([]); setVariantRuns([]); setParent(experimentId); setVariantName(''); setStrategy(''); setSelectedCases([]); setCritical([]); setMinimum(2); setDrop(0); setMetric('total_tokens'); setReduction(10); setModelChange(false); setModel('deepseek-flash'); setReasoning('off'); setReason(''); setError(''); setMessage(''); setCreateOpen(false); setPlanningOpen(false); setPlanningDirty(false); setManualPreview(null); setHumanConfirmed(false); setGeneratedCode(null); setFreezePreview(null); setSourceRuns([]); setCodeMode(false); setCodeOnly(false)
     invoke('context', { experiment_id: experimentId }).then(value => {
       if (request !== generation.current) return
       restoreContext(value); setParentRef(value.parent_ref); setSelectedCases(value.cases.map((item: any) => item.case_id)); setCritical([])
@@ -129,7 +129,7 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
     const variantName = request.variantName.trim() || `${displayAgent} · ${typeLabel}变体`
     const route = request.type === 'medium'
       ? '从轨迹抽取决策样本，评估基模型并训练决策模型，再用 LangGraph 将决策模型与现有真实工具编排成近似等效变体。'
-      : '从轨迹提取稳定规则和分支，用 LangGraph 代码与现有真实工具模拟原执行路径，不训练决策模型。'
+      : '从轨迹提取稳定规则和分支，用 LangGraph 代码与现有真实工具实现原执行路径，业务全链零 LLM，包括会话调度、回复和辅助处理；使用 execution_mode=code-only。'
     const training = request.medium?.serverMode === 'registered' ? registeredServer : request.medium
     const medium = request.type === 'medium' && request.medium ? {
       base_model_mode: request.medium.baseModelMode,
@@ -177,7 +177,7 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
       agent_id: agentId, agent_name: displayAgent, experiment_id: experimentId, version_label: displayVersion,
       source_ref_hint: context.parent_ref, variant_type: request.type, variant_name: variantName, goal: request.goal.trim(),
       source_run_ids: sourceRunIds, trace_collection_plan_requested: request.tracePlanRequested, advanced: request.advanced,
-      ...(medium ? { medium } : {}), ...(low ? { low } : {}),
+      ...(medium ? { medium } : {}), ...(low ? { low, execution_mode: 'code-only' } : {}),
       acceptance: { equivalence: 'target_to_verify', independent_comparison_required: true, resource_savings: 'to_measure' },
     })
   }
@@ -195,7 +195,7 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
         { page: 'agents', tab: 'compute-variants', agent_id: agentId, experiment_id: experimentId, skill: 'compute-variant-research', workflow: 'compute-variants', variant_name: selectedVariantName ?? null, parent_run_ids: parentRuns, variant_run_ids: variantRuns })
     }) : setPlanningOpen(true)}>{context?.plan ? '请 AI 分析算力变体' : <><ComputeIcon kind="sparkle" />请 AI 策划算力变体</>}</button>
       {context?.plan && context.generation && <button type="button" disabled={busy || !onAssistant} onClick={() => void action(async () => {
-        await onAssistant?.('请使用 compute-variant-research，在当前已派生目标生成并验证 LangGraph TypeScript 代码变体。保留已确定的 variant_name，不用策略正文替换名称；从当前上下文回读名称，名称缺失时先说明。核对已保存计划、固定父版、实际工具schema和来源轨迹，再用 platform_task preview/start 提出 kind=compute-variant 连续任务。确认后保存实际代码、构建、展示真实数据Git差异并单独确认冻结，执行两侧固定Case并核对装载与完整资源记录。完成用实际Run比较，不替我确认end。', { page: 'agents', tab: 'compute-variants', skill: 'compute-variant-research', workflow: 'compute-variants', agent_id: agentId, experiment_id: experimentId, variant_name: selectedVariantName ?? null, generation_intent: 'implement' })
+        await onAssistant?.('请使用 compute-variant-research，在当前已派生目标生成并验证 LangGraph TypeScript 代码变体。保留已确定的 variant_name，不用策略正文替换名称；从当前上下文回读名称，名称缺失时先说明。核对已保存计划、固定父版、实际工具schema和来源轨迹；execution_mode=code-only 时使用公开纯代码会话适配器，业务全链不得调用模型，再用 platform_task preview/start 提出 kind=compute-variant 连续任务。确认后保存实际代码、构建、展示真实数据Git差异并单独确认冻结，执行两侧固定Case并核对装载与完整资源记录。完成用实际Run比较，不替我确认end。', { page: 'agents', tab: 'compute-variants', skill: 'compute-variant-research', workflow: 'compute-variants', agent_id: agentId, experiment_id: experimentId, variant_name: selectedVariantName ?? null, execution_mode: context.plan?.execution_mode ?? null, generation_intent: 'implement' })
       })}>请 AI 生成代码变体</button>}
     </div>{planningDirty && !planningOpen && !context?.plan && <p className="compute-draft-note">本次页面内有策划草稿，再次点击可继续填写。</p>}</div>
     <ol className="compute-workflow" aria-label="算力变体研究流程"><li><strong>选择技术路线</strong><span>理解两类变体的实现方式</span></li><li><strong>补充策划信息</strong><span>引用轨迹、模型与训练资源</span></li><li><strong>与 AI 助手策划</strong><span>确认数据与实现方案</span></li><li><strong>独立比较与验收</strong><span>评估效果、覆盖与资源开销</span></li></ol>
@@ -213,7 +213,8 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
         <label className="agent-field">可恢复的 Git 父版引用<input value={parentRef} onChange={event => setParentRef(event.target.value)} placeholder="git:<40 位提交>" /></label>
         <label className="agent-field agent-field-wide">策略与研究问题<textarea aria-label="策略与研究问题" value={strategy} onChange={event => setStrategy(event.target.value)} placeholder="例如减少重复查询和上下文，完整保留查询结果；说明哪些行为允许变化。" rows={3} /></label>
       </div>
-      <label><input aria-label="生成 LangGraph 代码变体" type="checkbox" checked={codeMode} onChange={event => { setCodeMode(event.target.checked); if (event.target.checked) setMetric('actual_model_calls' as ComputeMetric) }} />生成 LangGraph 代码变体</label>
+      <label><input aria-label="生成 LangGraph 代码变体" type="checkbox" checked={codeMode} onChange={event => { setCodeMode(event.target.checked); setCodeOnly(event.target.checked); if (event.target.checked) { setMetric('actual_model_calls'); setReduction(100); setModelChange(false) } }} />生成 LangGraph 代码变体</label>
+      {codeMode && <label><input aria-label="业务全链零 LLM" type="checkbox" checked={codeOnly} onChange={event => { setCodeOnly(event.target.checked); if (event.target.checked) { setMetric('actual_model_calls'); setReduction(100); setModelChange(false) } }} />业务全链零 LLM；未覆盖输入中止并报告</label>}
       {codeMode && <fieldset><legend>固定父版的诊断轨迹</legend><p className="agent-muted">选择用于提取稳定流程的真实 Run，比较仍需另起两侧独立运行。</p>{context.runs.filter(run => run.experiment_id === parent).map(run => <label key={run.run_id}><input aria-label={`生成来源 ${run.run_id}`} type="checkbox" checked={sourceRuns.includes(run.run_id)} onChange={() => setSourceRuns(values => toggle(values, run.run_id))} />{run.run_id}</label>)}{!context.runs.some(run => run.experiment_id === parent) && <p>该父版尚无诊断 Run，请先运行业务 Case。</p>}</fieldset>}
       <div className="compute-case-table"><table><thead><tr><th>任务范围</th><th>关键任务</th><th>Case</th></tr></thead><tbody>{context.cases.map(item => <tr key={item.case_id}>
         <td><input aria-label={`纳入 ${item.case_id}`} type="checkbox" checked={selectedCases.includes(item.case_id)} onChange={() => { setSelectedCases(values => toggle(values, item.case_id)); setCritical(values => values.filter(value => value !== item.case_id)) }} /></td>
@@ -226,17 +227,18 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
         <label className="agent-field">目标资源指标<select value={metric} onChange={event => setMetric(event.target.value as ComputeMetric)}>{Object.entries(labels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
         <label className="agent-field">最低资源改善（%）<input type="number" min={0.01} max={100} step={0.01} value={reduction} onChange={event => setReduction(Number(event.target.value))} /></label>
       </div>
-      <label><input type="checkbox" checked={modelChange} onChange={event => setModelChange(event.target.checked)} /> 显式允许模型或推理强度变化</label>
+      <label><input type="checkbox" disabled={codeOnly} checked={modelChange} onChange={event => setModelChange(event.target.checked)} /> 显式允许模型或推理强度变化</label>
       {modelChange && <div className="harness-fields"><label className="agent-field">目标模型<input value={model} onChange={event => setModel(event.target.value)} /></label><label className="agent-field">目标推理强度<input value={reasoning} onChange={event => setReasoning(event.target.value)} /></label></div>}
       <p className="agent-muted">派生会完整继承固定父版。默认继承固定父版的实际模型与推理配置；此计划不会自动修改模型或业务资产。创建后在 Harness 资产中实现策略，将数据仓库中的计划与 Candidate 提交到 Git，再分别评测父版和变体。已有旧 Run 可查看，但不能追认为预先冻结的比较。</p>
       <div className="compute-actions"><button className="compute-primary" disabled={!variantName.trim() || !strategy.trim() || !selectedCases.length || !parentRef.trim() || codeMode && !sourceRuns.length} onClick={() => void action(async () => {
         const request = generation.current
-        const input = { agent_id: agentId, variant_name: variantName.trim(), parent_experiment_id: parent, parent_ref: parentRef, strategy, case_ids: selectedCases, critical_case_ids: critical, min_runs_per_case: minimum, max_pass_rate_drop_pp: drop, resource_metric: metric, min_resource_reduction_pct: reduction, allow_model_change: modelChange, variant_model: model, variant_reasoning_effort: reasoning, ...(codeMode ? { generation: { mode: 'langgraph-aot', entry_path: 'dsh/managed/compute-workflow/index.ts', source_run_ids: sourceRuns } } : {}) }
+        const input = { agent_id: agentId, variant_name: variantName.trim(), parent_experiment_id: parent, parent_ref: parentRef, strategy, case_ids: selectedCases, critical_case_ids: critical, min_runs_per_case: minimum, max_pass_rate_drop_pp: drop, resource_metric: metric, min_resource_reduction_pct: reduction, allow_model_change: modelChange, variant_model: model, variant_reasoning_effort: reasoning, ...(codeMode ? { ...(codeOnly ? { execution_mode: 'code-only' } : {}), generation: { mode: 'langgraph-aot', entry_path: 'dsh/managed/compute-workflow/index.ts', source_run_ids: sourceRuns } } : {}) }
         const value = await invoke('preview', input)
         if (request === generation.current) setManualPreview({ input, value })
       })}>预览派生计划</button></div>
       {manualPreview && <div className="compute-plan-preview" role="region" aria-label="派生计划预览">
         <h4>确认这次派生</h4>
+        {manualPreview.value.plan.execution_mode === 'code-only' && <p>执行约束：业务全链零 LLM，包含辅助标题与上下文处理；缺失计量不能按零通过。</p>}
         <p>变体名称：{manualPreview.value.variant_name}</p>
         <p>父版：{manualPreview.value.parent_experiment_id}</p>
         <p>研究策略：{manualPreview.value.plan.strategy}</p>
@@ -254,6 +256,7 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
       <div className="compute-plan-summary"><div className="compute-plan-summary-top"><span>已保存的研究计划</span><span className="compute-run-status" data-status={context.decision === 'end' ? 'completed' : 'empty'}>{context.decision === 'end' ? '已确认结论' : context.decision === 'continue' ? '继续研究' : '证据待补充'}</span></div>
         <h4>变体名称：{selectedVariantName || '未命名变体'}</h4>
         <p>研究策略：{context.plan.strategy}</p>
+        {context.plan.execution_mode === 'code-only' && <p>执行约束：业务全链零 LLM；会话调度、图内执行和辅助处理均须具备完整的零调用证据。</p>}
         <p>父版：{context.parent_experiment_id || '未记录'}；当前阶段：{context.variant_kind === 'end' ? '已标记 end' : '探索性变体'}。</p>
         <details><summary>查看固定来源引用</summary><code>{context.fixed_parent_ref || '未记录'}</code></details>
       </div>

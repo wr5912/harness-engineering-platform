@@ -540,7 +540,7 @@ export function ComputePlanningDialog({ rpc, open, agentName, agentId, experimen
           {(['medium', 'low'] as const).map(type => <label key={type} className="hep-plan-type-card" data-selected={draft.type === type}>
             <input type="radio" name="compute-type" value={type} checked={draft.type === type} onChange={() => change(value => ({ ...value, type }))} />
             <div className="hep-plan-type-heading"><span className="hep-plan-type-icon"><Icon name={type === 'medium' ? 'chip' : 'code'} /></span><div><h3>{typeLabel(type)}</h3><p>{type === 'medium' ? '决策模型 + 工具编排' : '规则代码 + 工具编排'}</p></div><span className="hep-plan-radio-mark" aria-hidden="true" /></div>
-            <p className="hep-plan-type-desc">{type === 'medium' ? '把轨迹中的决策经验转为训练样本，训练一个决策模型，再由 LangGraph 连接模型、流程和工具。' : '把轨迹中可归纳的决策行为转为规则、分支和数据处理代码，直接用 LangGraph 实现，不训练决策模型。'}</p>
+            <p className="hep-plan-type-desc">{type === 'medium' ? '把轨迹中的决策经验转为训练样本，训练一个决策模型，再由 LangGraph 连接模型、流程和工具。' : '把轨迹中可归纳的决策行为转为规则、分支和数据处理代码，用 LangGraph 实现业务全链零 LLM。'}</p>
             <ol className="hep-plan-route-list">{(type === 'medium' ? mediumRoute : lowRoute).map(([title, explanation], index) => <li key={title}><i>{index + 1}</i><div><strong>{title}</strong><small>{explanation}</small></div></li>)}</ol>
             <div className="hep-plan-type-foot"><b>适合：</b>{type === 'medium' ? '需要模型参与决策，且有可用样本与训练资源的场景。' : '流程较稳定、决策可归纳为明确规则的场景。'}</div>
           </label>)}
@@ -626,7 +626,7 @@ export function ComputePlanningDialog({ rpc, open, agentName, agentId, experimen
                 </div>
               </div>
             </section> : <section className="hep-plan-form-section">
-              <h3><span>03</span>低算力实现约束 <em>不训练决策模型</em></h3>
+              <h3><span>03</span>低算力实现约束 <em>业务全链零 LLM</em></h3>
               <div className="hep-plan-low-route"><div><Icon name="layers" /><strong>提炼规则与分支</strong><p>分析轨迹中的条件、动作与数据处理。</p></div><div><Icon name="code" /><strong>LangGraph 代码实现</strong><p>将决策流程转为可检查的代码。</p></div><div><Icon name="tool" /><strong>复用真实工具</strong><p>沿用工具接口与权限，保留真实调用。</p></div></div>
               <div className="hep-plan-low-policy"><h4>未覆盖情况如何处理</h4><label className="hep-plan-field">处理策略<select value={draft.low.uncovered} onChange={event => change(value => ({ ...value, low: { ...value.low, uncovered: event.target.value as Draft['low']['uncovered'] } }))}><option value="stop_and_report">中止并报告（默认）</option><option value="request_human">暂停并请求人工处理</option></select></label><p>无法匹配规则、工具异常或输入越界时，明确报告原因；不会自动改用大模型。</p></div>
               <label className="hep-plan-field"><span>实现要求与限制 <small>选填</small></span><textarea maxLength={1500} rows={3} value={draft.low.requirements} onChange={event => change(value => ({ ...value, low: { ...value.low, requirements: event.target.value } }))} placeholder="可补充必须保留的工具、输出格式与边界条件" /></label>

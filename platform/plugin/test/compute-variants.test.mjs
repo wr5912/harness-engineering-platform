@@ -290,6 +290,22 @@ test('代码生成预览读取固定父版真实轨迹，拒绝把其他版本Ru
   assert.match(rejected.error.message, /固定父版/)
 }))
 
+test('纯代码执行计划保存独立约束，拒绝缺少生成计划或同时变更模型', () => withFixture(async fx => {
+  const input = { parent_experiment_id: parent, parent_ref: `git:${fx.parentCommit}`, strategy: '用确定性代码执行完整查询，不调用模型。',
+    case_ids: ['U-ONE-001'], execution_mode: 'code-only', resource_metric: 'actual_model_calls', min_resource_reduction_pct: 100,
+    generation: { mode: 'langgraph-aot', source_run_ids: [parentRun] } }
+  const preview = success(await fx.handler('preview', input))
+  assert.equal(preview.plan.execution_mode, 'code-only')
+  assert.equal(preview.model_configuration, 'code_only_local_execution')
+  assert.equal(preview.plan.min_resource_reduction_pct, 100)
+  const created = success(await fx.handler('create', { ...input, expected_preview_sha256: preview.preview_sha256 }))
+  assert.equal(created.plan.execution_mode, 'code-only')
+  assert.equal(load(readFileSync(join(fx.path(variant), 'change.yaml'), 'utf8')).compute_variant.execution_mode, 'code-only')
+  for (const body of [{ ...input, generation: undefined }, { ...input, allow_model_change: true, variant_model: 'other', variant_reasoning_effort: 'off' }, { ...input, execution_mode: 'unknown' }]) {
+    assert.equal((await fx.handler('preview', body)).ok, false)
+  }
+}))
+
 test('新口径不能把缺少原生事件序号的旧响应统计当实际请求证据', () => withFixture(async fx => {
   const result = success(await fx.handler('compare', fx.body))
   assert.equal(result.resources.model_calls.parent, 2)
@@ -349,6 +365,96 @@ export function apply(ctx:any){registerWorkflowTool(ctx,workflow)}\n`)
   saveVariant()
   return { built, child, raw, wrapper, saveVariant }
 }
+
+async function codeOnlyFixture(fx) {
+  const generated = await generatedNestedFixture(fx)
+  const changePath = join(fx.path(variant), 'change.yaml'), change = load(readFileSync(changePath, 'utf8'))
+  change.compute_variant.execution_mode = 'code-only'
+  change.compute_variant.min_resource_reduction_pct = 100
+  write(changePath, dump(change))
+  git(fx.root, ['add', `evolution/experiments/${variant}/change.yaml`]); git(fx.root, ['commit', '-m', 'freeze code-only execution'])
+  const commit = git(fx.root, ['rev-parse', 'HEAD'])
+  for (const run of [fx.left, fx.right]) { run.lock.git_version.commit = commit; write(join(run.base, 'inputs.lock.json'), JSON.stringify(run.lock)) }
+  generated.child.model_attempts = []
+  generated.wrapper.execution_mode = 'code-only'
+  function saveCodeOnly() {
+    generated.saveVariant()
+    const file = join(fx.right.base, 'evidence/U-ONE-001/trace.jsonl')
+    const rows = readFileSync(file, 'utf8').split('\n').map(JSON.parse)
+    const route = { provider: 'harness-code-only', model: 'workflow-v1', reasoningEffort: 'off' }
+    for (const row of rows) {
+      if (row.event.type === 'request/header') row.event.data.header.config = route
+      if (row.event.type === 'assistant/message') delete row.event.data.usage
+    }
+    fx.right.view.cases[0].actual_routes = [route]
+    write(join(fx.right.base, 'evidence/U-ONE-001/response.json'), JSON.stringify({ assistant_texts: ['模拟资产状态正常。'], turns: [{ route }] }))
+    write(file, rows.map(JSON.stringify).join('\n'))
+    write(join(fx.right.base, 'evidence/U-ONE-001/tools.jsonl'), rows.filter(row => row.event.type.startsWith('tool/')).map(JSON.stringify).join('\n'))
+  }
+  saveCodeOnly()
+  return { ...generated, saveCodeOnly }
+}
+
+test('纯代码变体以完整零模型请求通过比较，外层本地回复无供应商Token也确认为零', () => withFixture(async fx => {
+  await codeOnlyFixture(fx)
+  const compared = success(await fx.handler('compare', fx.body))
+  assert.deepEqual(compared.comparability.limits, [])
+  assert.equal(compared.resources.actual_model_calls.parent, 3)
+  assert.equal(compared.resources.actual_model_calls.variant, 0)
+  assert.equal(compared.resources.actual_model_calls.reduction_pct, 100)
+  assert.equal(compared.resources.total_tokens.variant, 0)
+  assert.ok(compared.notes.some(message => message.includes('本地代码适配器回复') && message.includes('actual_model_calls')))
+  assert.equal(compared.resource_evidence.passed, true)
+  assert.equal(compared.eligible_for_end, true)
+}))
+
+test('纯代码变体不能以图内调用、未知计量或非受控路由通过零调用验收', () => withFixture(async fx => {
+  const generated = await codeOnlyFixture(fx)
+  const identity = { execution_id: generated.child.execution_id, session_id: generated.child.session_id, tool_call_id: generated.child.tool_call_id,
+    role: 'target', attempt_id: 'unexpected-inference', provider: 'deepseek', model: 'deepseek-flash', reasoning_effort: 'off' }
+  generated.child.model_attempts = [{ ...identity, status: 'started', time: 1 }, { ...identity, status: 'completed', time: 2, usage: { inputTokens: 5, outputTokens: 2, totalTokens: 7 } }]
+  generated.saveCodeOnly()
+  const inferred = success(await fx.handler('compare', fx.body))
+  assert.equal(inferred.resources.actual_model_calls.variant, 1)
+  assert.equal(inferred.resource_evidence.passed, false)
+  assert.equal(inferred.eligible_for_end, false)
+  generated.child.model_attempts = []
+  generated.saveCodeOnly()
+  const file = join(fx.right.base, 'evidence/U-ONE-001/trace.jsonl')
+  const rows = readFileSync(file, 'utf8').split('\n').map(JSON.parse)
+  delete rows.find(row => row.event.type === 'step/end').event.seq
+  write(file, rows.map(JSON.stringify).join('\n'))
+  const unknown = success(await fx.handler('compare', fx.body))
+  assert.equal(unknown.resources.actual_model_calls.variant, null)
+  assert.equal(unknown.resource_evidence.passed, false)
+  assert.equal(unknown.eligible_for_end, false)
+  generated.saveCodeOnly()
+  const wrong = readFileSync(file, 'utf8').split('\n').map(JSON.parse)
+  wrong.find(row => row.event.type === 'request/header').event.data.header.config.reasoningEffort = 'high'
+  write(file, wrong.map(JSON.stringify).join('\n'))
+  const routed = success(await fx.handler('compare', fx.body))
+  assert.ok(routed.comparability.limits.some(message => message.includes('非受控本地执行路由')))
+  assert.equal(routed.resource_evidence.passed, false)
+  assert.equal(routed.eligible_for_end, false)
+}))
+
+test('纯代码装载须有执行模式回执，历史计划仍拒绝未经允许的路由变化', () => withFixture(async fx => {
+  const generated = await codeOnlyFixture(fx)
+  delete generated.wrapper.execution_mode
+  generated.saveCodeOnly()
+  const missingMode = success(await fx.handler('compare', fx.body))
+  assert.ok(missingMode.comparability.limits.some(message => message.includes('纯代码执行模式')))
+  assert.equal(success(await fx.handler('context', { experiment_id: variant })).loaded.verified, false)
+  const changePath = join(fx.path(variant), 'change.yaml'), change = load(readFileSync(changePath, 'utf8'))
+  delete change.compute_variant.execution_mode
+  write(changePath, dump(change))
+  git(fx.root, ['add', `evolution/experiments/${variant}/change.yaml`]); git(fx.root, ['commit', '-m', 'ordinary legacy code plan'])
+  const commit = git(fx.root, ['rev-parse', 'HEAD'])
+  for (const run of [fx.left, fx.right]) { run.lock.git_version.commit = commit; write(join(run.base, 'inputs.lock.json'), JSON.stringify(run.lock)) }
+  const historical = success(await fx.handler('compare', fx.body))
+  assert.ok(historical.comparability.limits.some(message => message.includes('未预先允许的模型路由差异')))
+  assert.equal(historical.eligible_for_end, false)
+}))
 
 test('已构建wrapper嵌套固定MCP子图无需共享ESM，图内实际调用计入且可比/装载通过', () => withFixture(async fx => {
   const nested = await generatedNestedFixture(fx)

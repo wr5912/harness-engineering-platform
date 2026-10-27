@@ -13,7 +13,7 @@ const directory = mkdtempSync(join(tmpdir(), 'workflow-runtime-test-'))
 const file = join(directory, 'runtime.mjs')
 await build({ entryPoints: [new URL('../src/workflows/runtime.ts', import.meta.url).pathname], outfile: file, bundle: true,
   platform: 'node', format: 'esm', banner: { js: `import { createRequire as __createRequire } from 'node:module'; const require=__createRequire(import.meta.url);` } })
-const { defineWorkflow, registerWorkflowTool, runWorkflow } = await import(`file://${file}`)
+const { defineWorkflow, registerWorkflowTool, registerCodeOnlyWorkflowAgent, runWorkflow } = await import(`file://${file}`)
 const require = createRequire(import.meta.url)
 const sdkRequire = createRequire(require.resolve('@deepseek-ai/dsh-api-session-controller'))
 const sdk = name => import(pathToFileURL(sdkRequire.resolve(name)).href)
@@ -184,4 +184,148 @@ test('真实ToolRuntime中图模型派发前中间件失败保留原始attempt�
   assert.equal(measured.actual_model_calls, null)
   assert.equal(measured.observed_model_calls, 0)
   assert.ok(measured.model_calls_unknown_reasons.includes('graph-attempt-invocation-unproven'))
+})
+
+test('纯代码工作流拒绝infer，保留失败图且不准备任何模型请求', async t => {
+  let preparations = 0
+  const f = nativeFixture(t, { async prepareCall() { preparations++; throw new Error('不应访问模型') } })
+  registerWorkflowTool(f.registration, defineWorkflow({ id: 'code-only-infer', toolName: 'code_only_infer', description: '纯代码限制', inputSchema: { type: 'object' },
+    run: context => context.infer({ provider: 'remote', model: 'remote' }, { messages: [] }) }), { executionMode: 'code-only' })
+  const result = await f.execute('code_only_infer')
+  assert.equal(result.value.ok, false)
+  assert.equal(result.value.graph_execution.execution_mode, 'code-only')
+  assert.equal(result.value.graph_execution.status, 'failed')
+  assert.deepEqual(result.value.graph_execution.model_attempts, [])
+  assert.equal(preparations, 0)
+})
+
+function codeOnlyFixture(t, run, renderResult) {
+  const f = nativeFixture(t), hooks = new Map(), adapters = new Map(), titles = []
+  const events = [], agent = { ...f.agent, session: { id: 'workflow-session', header: { agentPreset: 'code-preset' }, snapshotEvents: () => events } }
+  const registration = { ...f.registration,
+    on(name, handler) { hooks.set(name, [...(hooks.get(name) ?? []), handler]) },
+    llm: { registerAdapter(providers, adapter) { for (const provider of providers) adapters.set(provider, adapter) },
+      prepareCall() { assert.fail('纯代码回合不能使用远程模型服务') } },
+    sessionTitle: { register(provider) { titles.push(provider) } },
+  }
+  registerCodeOnlyWorkflowAgent(registration, { presetId: 'code-preset', renderResult, workflow: defineWorkflow({ id: 'code-test', toolName: 'code_test', description: '业务图',
+    inputSchema: { type: 'object', properties: { request: { type: 'string' } }, required: ['request'], additionalProperties: false }, run }) })
+  const signal = new AbortController().signal
+  const hook = (name, ...args) => hooks.get(name)?.at(-1)(...args)
+  async function enter(turn, text, target = agent) {
+    const messages = text === undefined ? [] : [{ role: 'user', id: `message-${turn}`, source: { kind: 'user' }, content: [{ type: 'text', text }] }]
+    if (text !== undefined) events.push({ type: 'turn/start', data: { turn } })
+    const decision = await hook('agent/pre-step', { agent: target, turn }, async () => ({ kind: 'enter', messages }))
+    return { decision, commit() { for (const message of messages) events.push({ type: 'user/message', data: message }) } }
+  }
+  async function stream(turn, target = agent, currentSignal = signal) {
+    const route = await hook('agent/request', { agent: target, turn, step: events.length, signal: currentSignal }, async () => ({ provider: 'remote', model: 'remote' }))
+    const adapter = adapters.get(route.provider)
+    if (!adapter) return { route, chunks: [] }
+    const prepared = await adapter.prepareCall(route.provider, route.model)
+    const chunks = []
+    for await (const chunk of prepared.stream({ sessionId: target.session.id, signal: currentSignal })) chunks.push(chunk)
+    return { route, chunks, text: chunks.filter(chunk => chunk.type === 'text-delta').map(chunk => chunk.text).join('') }
+  }
+  async function execute(turn, response, target = agent) {
+    const call = response.chunks.find(chunk => chunk.type === 'block-end' && chunk.block.type === 'tool-call').block
+    events.push({ type: 'tool/call', data: { turn, step: 1, callId: call.id, name: call.name, arguments: call.arguments } })
+    const result = await f.ctx.tools.execute({ name: call.name, arguments: JSON.parse(call.arguments), callId: call.id, agent: target, signal })
+    events.push({ type: 'tool/result', data: { turn, step: 1, message: { role: 'tool', toolCallId: call.id,
+      source: { kind: 'tool', callId: call.id, name: call.name }, content: result.content, ...(result.isError ? { isError: true } : {}) }, ...(result.isError ? { error: { code: 'TOOL_FAILED' } } : {}) } })
+    return result
+  }
+  return { ...f, agent, hooks, hook, events, titles, adapters, enter, stream, execute }
+}
+
+test('纯代码原生回合将当前输入交给LangGraph和真实工具，再按同轮回执本地回复', async t => {
+  const f = codeOnlyFixture(t, context => runWorkflow(context, [
+    { id: 'read', run: (_v, current) => current.callTool('read_ledger', { request: current.input.request }) },
+    { id: 'answer', async run(values) { return { reply: `台账：${values.read.asset_id}` } } },
+  ]), value => value.answer.reply)
+  const childCalls = []
+  f.register('read_ledger', (input, exec) => { childCalls.push({ input, exec }); return { asset_id: 'asset-0001' } })
+  const entered = await f.enter(1, '请读取台账')
+  const initial = await f.stream(1)
+  entered.commit()
+  assert.deepEqual(initial.route, { provider: 'harness-code-only', model: 'workflow-v1', reasoningEffort: 'off' })
+  assert.deepEqual((await f.adapters.get('harness-code-only').listModels()).map(model => model.name), ['纯代码工作流'])
+  const call = initial.chunks.find(chunk => chunk.type === 'block-end').block
+  assert.deepEqual(JSON.parse(call.arguments), { request: '请读取台账' })
+  const executed = await f.execute(1, initial)
+  assert.equal(executed.isError, false)
+  assert.equal(executed.value.graph_execution.execution_mode, 'code-only')
+  assert.equal(executed.value.graph_execution.status, 'completed')
+  assert.equal(childCalls.length, 1)
+  assert.equal(childCalls[0].exec.agent, f.agent)
+  await f.enter(1)
+  const final = await f.stream(1)
+  assert.equal(final.text, '台账：asset-0001')
+  assert.equal(final.chunks.at(-1).reason.kind, 'stop')
+  assert.equal((await f.stream(1)).chunks.some(chunk => chunk.blockType === 'tool-call'), false)
+  const title = await f.titles[0].generate({ messages: [{ seq: 7, text: '请读取台账' }], signal: new AbortController().signal })
+  assert.deepEqual(title, { title: '请读取台账', messageSeqs: [7] })
+  assert.equal(Object.hasOwn(title, 'model'), false)
+})
+
+test('身份和未知输入也通过图，原生Guard失败时本地停止且不重放工具', async t => {
+  let graphs = 0
+  const f = codeOnlyFixture(t, async context => {
+    graphs++
+    if (context.input.request === '身份') return { reply: '我是台账助手' }
+    return context.callTool('blocked_ledger', {})
+  })
+  f.register('blocked_ledger', () => assert.fail('原生Guard应拦截工具'))
+  f.ctx.tools.guard(exec => exec.name === 'blocked_ledger' ? '工具当前不可用' : undefined)
+  let entered = await f.enter(1, '身份'), first = await f.stream(1); entered.commit()
+  const identity = await f.execute(1, first)
+  assert.equal(identity.value.graph_execution.complete, true)
+  assert.equal((await f.stream(1)).text, '我是台账助手')
+  f.hook('session/event', f.agent.session, { type: 'turn/end', data: { turn: 1 } })
+  entered = await f.enter(2, '未知操作'); first = await f.stream(2); entered.commit()
+  const failed = await f.execute(2, first)
+  assert.equal(failed.value.ok, false)
+  assert.equal(failed.value.graph_execution.trace[0].status, 'failed')
+  assert.match((await f.stream(2)).text, /未完成|失败/)
+  assert.equal((await f.stream(2)).chunks.some(chunk => chunk.blockType === 'tool-call'), false)
+  assert.equal(graphs, 2)
+})
+
+test('会话恢复仅消费精确回执，其他Session或旧callId不能替代本轮结果', async t => {
+  const f = codeOnlyFixture(t, async context => ({ reply: context.input.request }))
+  const entered = await f.enter(4, '本轮请求'), first = await f.stream(4); entered.commit()
+  await f.execute(4, first)
+  f.hook('agent/disposed', { agent: f.agent })
+  assert.equal((await f.stream(4)).text, '本轮请求', '恢复后应消费已有回执而非再次执行')
+  f.hook('agent/disposed', { agent: f.agent })
+  f.events.at(-1).data.message.source.callId = 'old-call'
+  assert.match((await f.stream(4)).text, /结果未知/)
+  const other = { ...f.agent, session: { ...f.agent.session, id: 'other-session', snapshotEvents: () => [] } }
+  const unbound = await f.stream(4, other)
+  assert.match(unbound.text, /结果未知/)
+  assert.equal(unbound.chunks.some(chunk => chunk.blockType === 'tool-call'), false)
+})
+
+test('同一turn接受新的用户消息时执行新请求，不丢输入也不重放旧调用', async t => {
+  const requests = [], f = codeOnlyFixture(t, async context => { requests.push(context.input.request); return { reply: context.input.request } })
+  let entered = await f.enter(1, '第一个请求'), first = await f.stream(1); entered.commit()
+  await f.execute(1, first)
+  entered = await f.enter(1, '第二个请求'); const second = await f.stream(1); entered.commit()
+  const firstId = first.chunks.find(chunk => chunk.type === 'block-end').block.id
+  const secondId = second.chunks.find(chunk => chunk.type === 'block-end').block.id
+  assert.notEqual(firstId, secondId)
+  await f.execute(1, second)
+  assert.equal((await f.stream(1)).text, '第二个请求')
+  assert.deepEqual(requests, ['第一个请求', '第二个请求'])
+})
+
+test('取消和其他Preset不会重放纯代码请求或改写其模型路由', async t => {
+  const f = codeOnlyFixture(t, async () => ({ reply: '完成' }))
+  await f.enter(1, '已取消的请求')
+  const controller = new AbortController(); controller.abort()
+  await assert.rejects(() => f.stream(1, f.agent, controller.signal), { name: 'AbortError' })
+  f.hook('session/event', f.agent.session, { type: 'turn/end', data: { turn: 1 } })
+  assert.match((await f.stream(2)).text, /结果未知/)
+  const other = { ...f.agent, session: { ...f.agent.session, header: { agentPreset: 'ordinary-preset' } } }
+  assert.deepEqual((await f.stream(3, other)).route, { provider: 'remote', model: 'remote' })
 })

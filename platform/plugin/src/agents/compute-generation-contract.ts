@@ -18,12 +18,14 @@ export function computeGenerationContract() {
       },
     },
     variant_name: 'preview/create 独立传 variant_name：1–80 字符的单行名称，只保存在 change.yaml.variant_name，不从 strategy/research_question 截取；生成时保留已有名称。rename 仅改名，携带最近 context/detail 的 change_sha256 作为 expected_change_sha256。',
+    execution_mode: '低算力纯代码计划使用 execution_mode: code-only，要求 LangGraph 生成计划，业务主回合、工具背后和辅助处理均为零模型调用；不能同时声明模型变更。缺省保持已有编排方式。',
     available_tools: ['skill', 'platform_agents', 'platform_task'],
     sdk: {
       module: '@harness-platform/workflow-runtime',
-      exports: ['defineWorkflow', 'runWorkflow', 'registerWorkflowTool', 'fixedCompositionToolName', 'Annotation', 'StateGraph', 'START', 'END'],
+      exports: ['defineWorkflow', 'runWorkflow', 'registerWorkflowTool', 'registerCodeOnlyWorkflowAgent', 'fixedCompositionToolName', 'Annotation', 'StateGraph', 'START', 'END'],
       types: ['WorkflowDefinition', 'WorkflowContext', 'FixedCompositionBinding'],
-      plugin: '入口导出 name、inject、apply(ctx)，在 apply 内调用 registerWorkflowTool(ctx, workflow)。inject 包含 tools；使用 infer 时加 llm，使用固定组合时加 webServer、mcpSessionManager。',
+      plugin: '入口导出 name、inject、apply(ctx)，普通模式在 apply 内调用 registerWorkflowTool(ctx, workflow)；code-only 模式只调用 registerCodeOnlyWorkflowAgent，它会注册工作流工具，不能重复注册。普通模式 inject 包含 tools；使用 infer 时加 llm，使用固定组合时加 webServer、mcpSessionManager。',
+      registerCodeOnlyWorkflowAgent: 'registerCodeOnlyWorkflowAgent(ctx,{presetId,workflow,renderResult?})：入口 inject 包含 tools、llm、sessionTitle，llm 仅注册原生本地适配器；本轮用户文本进入图 context.input.request，默认从真实结果读取非空 reply。所有输入均通过图处理；context.infer 在此模式拒绝。使用确定性标题，并在目标 Profile/Preset 禁用 session-title-llm、compaction-basic 和 command-compact。Candidate dsh/managed/role-tool-matrix.yaml 的 runtime_capabilities.local_tools 声明工作流及原工具，local_model_routes 声明 {provider: harness-code-only, model: workflow-v1}；原工具 Guard 须允许工作流及其真实子工具，禁止绕过。',
       defineWorkflow: 'defineWorkflow({id,toolName,description,inputSchema,run,fixedCompositions?})：前五项必填，run(context: WorkflowContext): Promise<any>；业务输入读 context.input，插件 name 不替代 id/toolName。',
       runWorkflow: 'runWorkflow(context, steps) 直接接收原 context。steps 为非空数组，每项 {id,run(values,context): Promise<any>}，id 不重复；values 初始为 {}，节点结果存 values[id]，返回完整结果映射。也可用公开 StateGraph 自行建图。',
       context: {
@@ -38,7 +40,7 @@ export function computeGenerationContract() {
       },
     },
     operations: {
-      preview_create: 'compute-variants/preview/create 使用同一 parent_experiment_id、git:<40位提交>、variant_name、strategy、case_ids 和 generation；create 携带实际 preview_sha256 为 expected_preview_sha256，不能猜摘要。',
+      preview_create: 'compute-variants/preview/create 使用同一 parent_experiment_id、git:<40位提交>、variant_name、strategy、case_ids 和 generation，低算力全链零调用另传 execution_mode: code-only；create 携带实际 preview_sha256 为 expected_preview_sha256，不能猜摘要。',
       edit: 'edit/read 后用 edit/preview、edit/apply 保存完整文件正文 edits[].content 及 expected_sha256；新文件须先取得 exists:false、sha256:null，保存传 expected_sha256:null。Preset 引用 Managed 源码对应的 /opt/dsh-managed/compute-workflow/*.mjs。',
       task: '当前程序的算力变体专用作用域实际提供 skill、platform_agents、platform_task，支持通过 platform_task 管理生成任务。连续任务用 preview/start，kind=compute-variant、source=experiment:<已派生目标>、compute_variant={parent_experiment_id,parent_ref}，evaluation_case_ids 与冻结计划一致。读取 compute-variant-research；任务授权不代替本地冻结确认。',
       build: '保存后读取当前 candidate_sha256，以 expected_candidate_sha256 调 build-preview；build 保留该摘要和实际预览的 expected_preview_sha256。只做类型检查和固定 ESM 编译，不执行 Candidate，不证明装载。源码、runner、依赖或 ESM 变化后旧构建失效。',

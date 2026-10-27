@@ -195,9 +195,12 @@ test('手动固定标题不增加模型调用，fork继承标题不重算', () =
 test('受控本地交付不算模型调用；未知provider没有用量仍计调用并保留Token未知', () => {
   const withRoute = route => trace('local', turn().map(item => item.type === 'request/header'
     ? event(item.type, { header: { config: route } }) : item.type === 'assistant/message' ? event(item.type, { turn: 1, step: 1 }) : item))
-  const local = measureModelUsage([withRoute({ provider: 'threat-analysis-delivery', model: 'fixed-summary' })])
-  assert.equal(local.actual_model_calls, 0)
-  assert.deepEqual(local.token_usage, { input_tokens: 0, output_tokens: 0, total_tokens: 0 })
+  for (const route of [{ provider: 'threat-analysis-delivery', model: 'fixed-summary' }, { provider: 'harness-code-only', model: 'workflow-v1', reasoningEffort: 'off' }]) {
+    const local = measureModelUsage([withRoute(route)])
+    assert.equal(local.actual_model_calls, 0)
+    assert.equal(local.model_calls_complete, true)
+    assert.deepEqual(local.token_usage, { input_tokens: 0, output_tokens: 0, total_tokens: 0 })
+  }
   const unknown = measureModelUsage([withRoute({ provider: 'unknown-local-looking-provider', model: 'fixed-summary' })])
   assert.equal(unknown.actual_model_calls, 1)
   assert.equal(unknown.token_usage, null)

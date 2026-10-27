@@ -1,0 +1,33 @@
+{
+  "quality": false,
+  "comparability": {
+    "passed": false,
+    "limits": [
+      "run-3cb5d380-b314-4cb8-8887-287bb095fadf: U-ASSET-PAGES-001 功能结论未确定",
+      "run-3cb5d380-b314-4cb8-8887-287bb095fadf: U-ROLE-001 功能结论未确定",
+      "run-bb12b61b-dc48-4f4c-9619-01998df63cda: U-ASSET-PAGES-001 功能结论未确定",
+      "run-bb12b61b-dc48-4f4c-9619-01998df63cda: U-ASSET-PARTIAL-001 功能结论未确定",
+      "run-bb12b61b-dc48-4f4c-9619-01998df63cda: U-ROLE-001 功能结论未确定"
+    ]
+  },
+  "resource": {
+    "passed": true,
+    "limits": []
+  },
+  "actual_model_calls": {
+    "parent": 3.5,
+    "variant": 0,
+    "reduction_pct": 100
+  },
+  "total_tokens": {
+    "parent": 8375.75,
+    "variant": 0,
+    "reduction_pct": 100
+  },
+  "eligible_for_end": false,
+  "receipt": {
+    "path": "evolution/experiments/EXP-inspection-delivery-demo-003-r1c42f11c4f9a/evaluation/compute-comparison-f3c376615550c755293321c22dbcf3687a057152858d48b995c3949e89749e21.json",
+    "sha256": "f3c376615550c755293321c22dbcf3687a057152858d48b995c3949e89749e21"
+  },
+  "page_errors": []
+}

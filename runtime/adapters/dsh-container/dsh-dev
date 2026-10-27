@@ -934,7 +934,8 @@ def render_compose(template: str, *, mode: str, name: str, project: str, port: i
     selected_working_dir = (
         f"    working_dir: {CONTAINER_ANALYSIS_WORKSPACE}\n" if analysis_workspace else working_dir
     )
-    text = text.replace(working_dir, selected_working_dir + "    network_mode: host\n")
+    text = text.replace(working_dir, selected_working_dir + "    network_mode: host\n"
+                        "    extra_hosts:\n      - host.docker.internal:host-gateway\n")
     relative_source = "        source: ./"
     if text.count(relative_source) < 1:
         fail("Compose 模板缺少相对挂载源锚点")
