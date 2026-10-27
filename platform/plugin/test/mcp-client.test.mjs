@@ -50,7 +50,9 @@ function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理
   const groups = [{ id: 'research', members: [{ serverId: 'platform-compositions', names: ['query_asset_related_alerts'] }] }]
   const writes = [], selections = []
   const props = { view: 'servers', toolbarTarget: {}, onValidationError: () => { props.view = 'servers' },
+    onOpenView: (view, serverId, groupId) => { props.view = view; props.selectedServerId = serverId; props.selectedGroupId = groupId },
     onSelectServerId: id => { selections.push(id); props.selectedServerId = id },
+    onSelectGroupId: id => { props.selectedServerId = undefined; props.selectedGroupId = id },
     form: { state: { status: 'ready', writable: true, revision: 'r1', value: { servers: [server], groups, sharedToken: '' } } },
     publishedService: { id: 'platform-compositions', platformComposition: true, enabled: true,
       description: '工具组合编排（已发布）', publishedTools: [{ name: 'query_asset_related_alerts' }],
@@ -112,7 +114,8 @@ function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理
       render()
     },
     setView: value => { props.view = value; render() }, getView: () => props.view,
-    setServerId: value => { props.selectedServerId = value; render() },
+    setServerId: value => { props.selectedGroupId = undefined; props.selectedServerId = value; render() },
+    setGroupId: value => { props.selectedServerId = undefined; props.selectedGroupId = value; render() },
     replaceDraftServersBeforeEffects: servers => { states[0] = { ...states[0], servers: structuredClone(servers) }; return renderBeforeEffects() } }
 }
 
@@ -760,4 +763,39 @@ test('OpenAPI 同一操作只显示一张卡片，分别保存工具与资源选
   assert.equal(nativeService.choices('工具').length, 2)
   assert.equal(nativeService.choices('资源模板').length, 1)
   assert.equal(native.nodes().filter(node => node.props?.className === 'mcp-check mcp-operation').length, 0)
+})
+
+test('分组调试使用已保存目标，切换目标或配置版本后丢弃旧发现和执行回执', async () => {
+  const requests = [], pending = []
+  const ui = editor({ fetch: async (_url, request) => {
+    requests.push(JSON.parse(request.body))
+    return new Promise(resolve => pending.push(data => resolve({ ok: true, json: async () => data })))
+  } })
+  ui.refreshValue({ servers: [ui.server], groups: ui.groups, sharedToken: 'fixture' })
+  ui.setView('groups')
+  const debug = ui.button('调试分组')
+  assert.equal(debug.props.disabled, false)
+  debug.props.onClick(); ui.render()
+  assert.equal(ui.getView(), 'connection')
+  assert.match(ui.text(ui.render()), /mcp\/groups\/research\/v2/)
+  const discover = () => ui.button('发现工具与资源')
+  const first = discover().props.onClick()
+  assert.deepEqual(requests[0], { groupId: 'research', action: 'test' })
+  ui.setServerId('biz-soc-framework')
+  pending.shift()({ tools: [{ name: 'stale-group' }] }); await first; ui.render()
+  assert.doesNotMatch(ui.text(ui.render()), /stale-group/)
+  ui.setGroupId('research')
+  const second = discover().props.onClick()
+  pending.shift()({ tools: [{ name: 'group_tool', inputSchema: { type: 'object', properties: { incidentId: { type: 'string' } } } }], resources: { resources: [{ name: 'resource', uri: 'group:/one' }] }, resourceTemplates: { resourceTemplates: [{ name: 'template', uriTemplate: 'group:/{id}' }] } })
+  await second; ui.render()
+  assert.match(ui.text(ui.render()), /group_tool.*incidentId/s)
+  ui.nodes().find(node => node.type === 'select' && ui.nodes(node).some(child => child.props?.value === 'group_tool')).props.onChange({ target: { value: 'group_tool' } }); ui.render()
+  const calling = ui.button('测试工具').props.onClick()
+  assert.deepEqual(requests.at(-1), { groupId: 'research', action: 'callTool', toolName: 'group_tool', sourceId: '', arguments: {} })
+  ui.refreshValue({ servers: [ui.server], groups: ui.groups, sharedToken: 'fixture' }, 'r2')
+  pending.shift()({ content: [{ type: 'text', text: 'stale-receipt' }] }); await calling; ui.render()
+  assert.doesNotMatch(ui.text(ui.render()), /stale-receipt|group_tool/)
+  ui.setGroupId('removed')
+  assert.match(ui.text(ui.render()), /调试目标不存在或尚未保存/)
+  assert.equal(discover().props.disabled, true)
 })

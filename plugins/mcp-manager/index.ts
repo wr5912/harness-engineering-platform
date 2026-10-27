@@ -827,8 +827,16 @@ export function apply(ctx: any, config: any): void {
       })
       if (req.method !== 'POST') return send(res, 405, { error: 'method not allowed' })
       const request = await bodyOf(req)
-      const server = current.servers.find(item => item.id === request.serverId)
-      if (!server) return send(res, 404, { error: 'MCP server not found' })
+      const server = current.servers.find(item => item.id === request.serverId) ?? (request.groupId ? (() => {
+        if (!current.groups.some(group => group.id === request.groupId)) return undefined
+        if (!config.groupUrl) throw new Error('当前环境未配置分组调试入口')
+        if (!current.sharedToken) throw new Error('请先保存分组访问令牌')
+        return { id: request.groupId, enabled: true, url: config.groupUrl(request.groupId),
+          headers: [{ name: 'Authorization', value: `Bearer ${current.sharedToken}` }], tools: { mode: 'all', names: [] } }
+      })() : undefined)
+      if (Boolean(request.serverId) === Boolean(request.groupId)) return send(res, 400, { error: '请选择一个服务器或已保存分组' })
+      if (!server) return send(res, 404, { error: request.groupId ? '已保存分组不存在，请重新选择' : 'MCP server not found' })
+      if (request.groupId && !['test', 'callTool', 'resources', 'resourceTemplates', 'readResource'].includes(request.action)) return send(res, 400, { error: '分组调试不提供来源管理操作' })
       if (request.action === 'callTool') {
         if (typeof request.toolName !== 'string' || !request.arguments || typeof request.arguments !== 'object' || Array.isArray(request.arguments)) return send(res, 400, { error: '工具名称或参数无效' })
         return send(res, 200, await callManagedTool(server, request.toolName, request.arguments))
@@ -838,7 +846,19 @@ export function apply(ctx: any, config: any): void {
           group.members.some((member: any) => member.serverId === server.id)).map(group => group.id)))
       }
       if (request.action === 'resources' || request.action === 'resourceTemplates' || request.action === 'readResource') {
-        if (request.action === 'readResource') return send(res, 200, await readManagedResource(server, request.uri))
+        if (request.action === 'readResource') {
+          let uri = request.uri
+          if (request.uriTemplate) {
+            const templates = await resourceCatalog(server, 't')
+            if (!templates.some(item => item.uriTemplate === request.uriTemplate)) throw new Error('资源模板不属于当前调试目标，请重新发现')
+            if (!request.arguments || typeof request.arguments !== 'object' || Array.isArray(request.arguments)) throw new Error('模板参数须为 JSON 对象')
+            const parsed = sourceTemplate(request.uriTemplate)
+            if (parsed.requiredNames.some(name => request.arguments[name] === undefined || request.arguments[name] === '')) throw new Error('缺少模板必填参数')
+            uri = parsed.template.expand(request.arguments)
+          }
+          if (typeof uri !== 'string' || !uri) throw new Error('请填写资源 URI')
+          return send(res, 200, await readManagedResource(server, uri))
+        }
         const kind = request.action === 'resources' ? 'r' : 't'
         return send(res, 200, { [request.action]: discoveryMetadata(server, kind, await resourceCatalog(server, kind)) })
       }

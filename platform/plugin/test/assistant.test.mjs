@@ -80,18 +80,19 @@ function fixture(t, responder, root) {
   const rpc = (action, input, requestSignal = signal) => assistant.handler(action, input, requestSignal)
   const execute = async (id, domain, action, input = {}, toolSignal = signal) => tools.get(`platform_${domain}`).execute({ action, input }, { agent: { id, session: sessions.get(id)?.session }, signal: toolSignal })
   const status = async id => (await rpc('status', { session_id: id })).value
-  async function proposal(id) {
+  const observed = new Set()
+  async function operation(id) {
     const deadline = Date.now() + 3000
     while (Date.now() < deadline) {
-      const value = (await status(id)).proposals.find(item => item.state === 'awaiting_confirmation')
-      if (value) return value
+      const value = (await status(id)).proposals.findLast(item => !observed.has(item.id) && ['completed', 'failed', 'cancelled', 'unknown'].includes(item.state))
+      if (value) { observed.add(value.id); return value }
       await setImmediate()
     }
-    assert.fail('未出现待确认提案')
+    assert.fail('未出现已结算操作')
   }
   const assembly = id => ctx.systemPrompt.assemble({ agent: { session: sessions.get(id).session } })
   const assemble = async id => (await assembly(id)).sections.filter(item => ['harness-platform/assistant', 'harness-platform/assistant-output'].includes(item.name)).map(item => item.text).filter(Boolean).join('\n')
-  return { root, ctx, sessions, services, tools, calls, peers, prompts, rpc, status, execute, proposal, assemble, assembly, addSession,
+  return { root, ctx, sessions, services, tools, calls, peers, prompts, rpc, status, execute, operation, assemble, assembly, addSession,
     beforeModelCall: id => assistant.beforeModelCall(id),
     async reload() { await assistant.dispose(); assistant = create() } }
 }
@@ -114,7 +115,7 @@ function installTaskGoals(f) {
 }
 async function beginTask(f, id, plan = taskPlan()) {
   const operation = f.execute(id, 'task', 'start', { plan })
-  const proposal = await f.proposal(id)
+  const proposal = await f.operation(id)
   const confirmed = await f.rpc('confirm', { session_id: id, proposal_id: proposal.id })
   assert.equal(confirmed.ok, true, JSON.stringify(confirmed))
   await operation
@@ -399,18 +400,18 @@ test('配置检查区分核心和专项缺失，并拒绝原生注册表同名�
   assert.equal(f.sessions.size, 0)
 })
 
-test('工具在确认前保持 pending，真实回执返回原调用，重复确认不重复写入或伪造消息', async t => {
+test('原生权限后的工具直接返回真实回执，不生成额外待确认且旧确认不重复写入', async t => {
   const f = fixture(t)
   const id = (await f.rpc('session', { task: '停止实例' })).value.session_id
   await f.execute(id, 'agents', 'eval/status', { job_id: 'same-job' })
   assert.equal(f.calls[0].endpoint, 'agents/eval/status')
   let returned = false
   const operation = f.execute(id, 'instances', 'run', { name: 'isolated', operation: 'stop' }).then(value => { returned = true; return value })
-  const proposed = await f.proposal(id)
-  assert.equal(returned, false)
-  assert.equal(f.calls.filter(call => call.endpoint === 'instances/run').length, 0)
+  const proposed = await f.operation(id)
+  assert.equal(returned, true)
+  assert.equal(f.calls.filter(call => call.endpoint === 'instances/run').length, 1)
   const confirmed = await f.rpc('confirm', { session_id: id, proposal_id: proposed.id })
-  assert.equal(confirmed.value.continuation, 'resumed')
+  assert.equal(confirmed.value.state, 'completed')
   const receipt = await operation
   assert.equal(receipt.kind, 'platform-operation')
   assert.equal(receipt.state, 'completed')
@@ -424,7 +425,7 @@ test('工具在确认前保持 pending，真实回执返回原调用，重复确
   assert.equal(f.prompts.length, 1)
 })
 
-test('实例创建、启动和重启由助手内部预览冻结来源、端口及模型设置，一次确认直接执行', async t => {
+test('实例创建、启动和重启由助手内部预览冻结来源、端口及模型设置，原生许可后直接执行', async t => {
   assert.match(assistantActionContract('instances', 'run').instructions, /versions\[0\]\.id/)
   assert.match(assistantActionContract('agents', 'detail').instructions, /已启用版本/)
   const f = fixture(t)
@@ -433,9 +434,9 @@ test('实例创建、启动和重启由助手内部预览冻结来源、端口�
     const request = { operation, name: `assistant-${operation}`, ...(operation === 'create' ? { source: 'experiment:EXP-test-agent-001' } : {}),
       expected_model_policy_hash: 'b'.repeat(64) }
     const pending = f.execute(id, 'instances', 'run', request)
-    const card = await f.proposal(id)
-    assert.equal(f.calls.at(-1).endpoint, 'instances/preview')
-    assert.equal(f.calls.some(call => call.endpoint === 'instances/run' && call.input.name === request.name), false)
+    const card = await f.operation(id)
+    assert.equal(f.calls.at(-2).endpoint, 'instances/preview')
+    assert.equal(f.calls.some(call => call.endpoint === 'instances/run' && call.input.name === request.name), true)
     assert.equal(card.input.expected_source_id, 'experiment:EXP-test-agent-001')
     assert.equal(card.input.port, 3199)
     assert.deepEqual(card.input.model_selection, { provider: 'fixture', model: 'default' })
@@ -469,7 +470,7 @@ test('业务实例创建冻结来源摘要、访问方式并使用统一网关�
   const id = (await f.rpc('session', { task: '创建业务受控实例' })).value.session_id
   const pending = f.execute(id, 'instances', 'run', { name: 'biz-one', operation: 'create', source: 'experiment:EXP-test-agent-001', port: 18600,
     business_control: true, access_mode: 'anonymous', identity_mode: 'development' })
-  const card = await f.proposal(id)
+  const card = await f.operation(id)
   assert.equal(card.input.business_control, true)
   assert.equal(card.input.expected_source_digest, digest)
   assert.equal(card.input.access_mode, 'anonymous')
@@ -564,31 +565,32 @@ else throw new Error('unexpected command')
   const id = (await f.rpc('session', { task: '以最新固定版本创建并启动实例' })).value.session_id
   const source = 'experiment:EXP-real-agent-002'
   const created = f.execute(id, 'instances', 'run', { operation: 'create', name: 'new-one', source })
-  const card = await f.proposal(id)
+  const card = await f.operation(id)
   assert.equal(card.preview.value.plan.source_id, source)
   assert.equal(card.input.expected_source_id, source)
   assert.deepEqual(card.input.model_selection, selected)
   assert.match(card.input.expected_model_policy_hash, /^[0-9a-f]{64}$/)
-  assert.equal(f.calls.some(call => call.endpoint === 'instances/run'), false)
+  assert.equal(f.calls.some(call => call.endpoint === 'instances/run'), true)
   const confirmed = await f.rpc('confirm', { session_id: id, proposal_id: card.id })
   assert.equal(confirmed.value.state, 'completed')
   assert.equal((await created).state, 'completed')
   assert.equal(f.calls.find(call => call.endpoint === 'instances/run').input.expected_model_policy_hash, card.input.expected_model_policy_hash)
   for (const operation of ['start', 'restart']) {
     const pending = f.execute(id, 'instances', 'run', { operation, name: 'existing' })
-    const proposed = await f.proposal(id)
+    const proposed = await f.operation(id)
     assert.equal(proposed.input.expected_source_id, source)
     assert.equal(proposed.input.port, 3198)
     assert.match(proposed.input.expected_model_policy_hash, /^[0-9a-f]{64}$/)
     await f.rpc('confirm', { session_id: id, proposal_id: proposed.id })
     assert.equal((await pending).state, 'completed')
   }
-  const stale = f.execute(id, 'instances', 'run', { operation: 'create', name: 'stale-one', source })
-  const staleCard = await f.proposal(id)
+  const stalePreview = await handler('preview', { operation: 'create', name: 'stale-one', source }, new AbortController().signal)
+  const staleInput = { ...stalePreview.value.plan, expected_model_policy_hash: stalePreview.value.model_policy_hash }
+  const staleCard = { kind: 'proposal', id: 'legacy-stale', owner_session_id: id, domain: 'instances', action: 'run', input: staleInput, preview: stalePreview, state: 'awaiting_confirmation' }
+  appendPluginRecord(f.sessions.get(id).session, 'plugin:harness-platform/assistant', staleCard)
   const before = readFileSync(callsPath, 'utf8').split('\n').filter(Boolean).map(JSON.parse).filter(args => args[0] === 'up' && !args.includes('--dry-run')).length
   revision = 'changed'
   assert.equal((await f.rpc('confirm', { session_id: id, proposal_id: staleCard.id })).value.state, 'failed')
-  assert.equal((await stale).state, 'failed')
   assert.equal(readFileSync(callsPath, 'utf8').split('\n').filter(Boolean).map(JSON.parse).filter(args => args[0] === 'up' && !args.includes('--dry-run')).length, before)
   const batch = await f.execute(id, 'instances', 'batch', { items: [
     { operation: 'create', name: 'good-one', source }, { operation: 'create', name: 'bad-one', source: 'experiment:EXP-missing-003' },
@@ -642,31 +644,28 @@ test('冷恢复中断的 running 仅在读取时显示 unknown，不改写记录
   assert.equal(f.ctx.sessionProjections.stateOf(f.sessions.get(id).session, 'harnessPlatformAssistant').proposals[0].state, 'running')
 })
 
-test('取消待确认工具会结算取消，不能随后确认执行', async t => {
-  const f = fixture(t)
-  const id = (await f.rpc('session', {})).value.session_id
-  const operation = f.execute(id, 'instances', 'run', { name: 'isolated', operation: 'stop' })
-  const proposed = await f.proposal(id)
+test('取消旧待确认操作后不能随后确认执行', async t => {
+  const f = fixture(t), id = (await f.rpc('session', {})).value.session_id
+  appendPluginRecord(f.sessions.get(id).session, 'plugin:harness-platform/assistant', {
+    kind: 'proposal', id: 'legacy-stop', owner_session_id: id, domain: 'instances', action: 'run',
+    input: { name: 'isolated', operation: 'stop' }, preview: {}, state: 'awaiting_confirmation',
+  })
   await f.rpc('cancel', { session_id: id })
-  const receipt = await operation
-  assert.equal(receipt.kind, 'platform-operation')
-  assert.equal(receipt.state, 'cancelled')
-  await f.rpc('confirm', { session_id: id, proposal_id: proposed.id })
-  assert.equal(f.calls.filter(call => call.endpoint === 'instances/run').length, 0)
+  assert.equal((await f.status(id)).proposals[0].state, 'cancelled')
+  await f.rpc('confirm', { session_id: id, proposal_id: 'legacy-stop' })
+  assert.equal(f.calls.length, 0)
 })
 
-test('写入 running 回执期间取消，不会退回浏览器信号执行写入', async t => {
+test('写入 running 回执期间取消，不执行写入且结算为取消', async t => {
   const f = fixture(t), tool = new AbortController()
   const id = (await f.rpc('session', {})).value.session_id
-  const operation = f.execute(id, 'instances', 'run', { name: 'isolated', operation: 'stop' }, tool.signal)
-  const proposed = await f.proposal(id)
   const original = f.services.record
   f.services.record = async (session, type, value) => {
     original(session, type, value)
-    if (value.kind === 'settlement' && value.state === 'running') tool.abort()
+    if (value.state === 'running') tool.abort()
   }
-  assert.equal((await f.rpc('confirm', { session_id: id, proposal_id: proposed.id })).ok, false)
-  assert.equal((await operation).state, 'cancelled')
+  const operation = await f.execute(id, 'instances', 'run', { name: 'isolated', operation: 'stop' }, tool.signal)
+  assert.equal(operation.state, 'cancelled')
   assert.equal((await f.status(id)).proposals[0].state, 'cancelled')
   assert.equal(f.calls.filter(call => call.endpoint === 'instances/run').length, 0)
 })
@@ -710,28 +709,28 @@ test('MCP 配置使用数据仓库 revision，调试管理复用实际 dispatche
   assert.equal(calls[1].action, 'sources')
 })
 
-test('完整融合方案成为待确认卡片，确认后返回原工具，冻结的工具参数保持不变', async t => {
+test('完整融合方案经校验后执行并返回原工具，冻结的工具参数保持不变', async t => {
   const f = fixture(t, endpoint => endpoint === 'agents/fusion/preview' ? { ok: true, value: { preview_id: 'fixed-preview', plan_ready: true, plan: { features: [] } } } : undefined)
   const id = (await f.rpc('session', {})).value.session_id
   const frozen = Object.freeze({ agent_id: 'a' })
   const operation = f.execute(id, 'agents', 'fusion/preview', frozen)
-  const card = await f.proposal(id)
+  const card = await f.operation(id)
   assert.equal(card.action, 'fusion/confirm')
   assert.equal(frozen.assistant_session_id, undefined)
-  assert.equal(f.calls.filter(call => call.endpoint === 'agents/fusion/confirm').length, 0)
+  assert.equal(f.calls.filter(call => call.endpoint === 'agents/fusion/confirm').length, 1)
   await f.rpc('confirm', { session_id: id, proposal_id: card.id })
   assert.equal((await operation).state, 'completed')
   assert.equal(f.calls.find(call => call.endpoint === 'agents/fusion/confirm').input.preview_id, 'fixed-preview')
 })
 
-test('已确认融合只自主编辑同 Session 目标 Candidate，评测口径仍等待确认', async t => {
+test('融合续办与其他编辑分别校验真实预览', async t => {
   const f = fixture(t, endpoint => endpoint === 'agents/fusion/status' ? { ok: true, value: { creation: { status: 'integrating', assistant_session_id: 'session-1' } } } : undefined)
   const id = (await f.rpc('session', {})).value.session_id
   const allowed = await f.execute(id, 'agents', 'edit/apply', { experiment_id: 'EXP-a-002', edits: [{ path: 'candidate/dsh/workspace/AGENTS.md', content: '融合' }] })
   assert.equal(allowed.state, 'completed')
   const protectedEdit = f.execute(id, 'agents', 'edit/apply', { experiment_id: 'EXP-a-002', edits: [{ path: 'agents/a/evaluation.md', content: '不同口径' }] })
-  assert.equal((await f.proposal(id)).state, 'awaiting_confirmation')
-  assert.equal(f.calls.filter(call => call.endpoint === 'agents/edit/apply').length, 1)
+  assert.equal((await f.operation(id)).state, 'completed')
+  assert.equal(f.calls.filter(call => call.endpoint === 'agents/edit/apply').length, 2)
   await f.rpc('cancel', { session_id: id })
   await protectedEdit
   await assert.rejects(f.execute(id, 'mcp', 'saveConfiguration', { revision: 1, ops: [{ op: 'set', path: ['servers', '0', 'apiKey'], value: 'fixture-secret' }] }), /凭据/)
@@ -749,7 +748,7 @@ for (const action of ['callPublishedComposition', 'callTool']) test(`${action} �
     : { toolName: 'basic_status', input: { asset: 'test' }, compositionId: 'model-supplied', versionId: nextVersion }
   const before = structuredClone(input)
   const operation = f.execute(id, 'mcp', action, Object.freeze(input))
-  const card = await f.proposal(id)
+  const card = await f.operation(id)
   assert.equal(card.action, 'callPublishedComposition')
   assert.equal(card.preview.title, '原版基础状态')
   assert.equal(card.preview.versionId, originalVersion)
@@ -858,17 +857,17 @@ test('决策抽取预览使用当前真实请求模型和固定 Run，AI 不能�
   assert.equal(f.calls.filter(item => item.endpoint === 'agents/datasets/preview').length, 1)
 })
 
-test('AI 决策样本预览经原生确认后仅携原 owner 保存一次，取消提案不写数据集', async t => {
+test('AI 决策样本预览后仅携原 owner 保存一次，旧提案取消不写数据集', async t => {
   const f = fixture(t, (endpoint, input) => endpoint === 'agents/datasets/preview' ? { ok: true, value: { preview_id: `preview-${input.assistant_session_id}`, count: 1, status: 'suggested', records: [{ _meta: { label_status: 'suggested' } }] } } : undefined)
   const runId = 'run-11111111-1111-4111-8111-111111111111'
   const id = (await f.rpc('session', { task: '抽取样本', context: { run_id: runId } })).value.session_id
   const operation = f.execute(id, 'agents', 'datasets/preview', { run_id: runId, samples: [] })
-  const proposed = await f.proposal(id)
+  const proposed = await f.operation(id)
   assert.equal(proposed.action, 'datasets/apply')
   assert.equal(proposed.owner_session_id, id)
   assert.equal(proposed.input.assistant_session_id, id)
   assert.equal(proposed.preview.records[0]._meta.label_status, 'suggested')
-  assert.equal(f.calls.filter(item => item.endpoint === 'agents/datasets/apply').length, 0)
+  assert.equal(f.calls.filter(item => item.endpoint === 'agents/datasets/apply').length, 1)
   const other = (await f.rpc('session', {})).value.session_id
   assert.equal((await f.rpc('confirm', { session_id: other, proposal_id: proposed.id })).ok, false)
   await f.rpc('confirm', { session_id: id, proposal_id: proposed.id })
@@ -879,11 +878,12 @@ test('AI 决策样本预览经原生确认后仅携原 owner 保存一次，取�
   assert.equal(saved[0].input.assistant_session_id, id)
   assert.equal(saved[0].input.preview_id, proposed.input.preview_id)
   const cancelId = (await f.rpc('session', { task: '抽取但取消', context: { run_id: runId } })).value.session_id
-  const cancelled = f.execute(cancelId, 'agents', 'datasets/preview', { run_id: runId, samples: [] })
-  const cancelProposal = await f.proposal(cancelId)
+  appendPluginRecord(f.sessions.get(cancelId).session, 'plugin:harness-platform/assistant', {
+    kind: 'proposal', id: 'cancel-dataset', owner_session_id: cancelId, domain: 'agents', action: 'datasets/apply',
+    input: { preview_id: 'legacy-preview', assistant_session_id: cancelId }, state: 'awaiting_confirmation',
+  })
   await f.rpc('cancel', { session_id: cancelId })
-  assert.equal((await cancelled).state, 'cancelled')
-  await f.rpc('confirm', { session_id: cancelId, proposal_id: cancelProposal.id })
+  await f.rpc('confirm', { session_id: cancelId, proposal_id: 'cancel-dataset' })
   assert.equal(f.calls.filter(item => item.endpoint === 'agents/datasets/apply').length, 1)
 })
 
@@ -928,7 +928,7 @@ test('已绑定的管理 Session 不随路径复用而跨工作区身份接受�
   assert.equal(f.calls.length, 0)
 })
 
-test('普通派生、用例更新与业务样例创建可达，写操作仍须确认且只执行一次', async t => {
+test('普通派生、用例更新与业务样例创建可达，写操作经原生许可后只执行一次', async t => {
   const f = fixture(t)
   const id = (await f.rpc('session', { context: { skill: 'agent-maintenance', workflow: 'research' } })).value.session_id
   for (const [domain, action, input] of [
@@ -937,9 +937,9 @@ test('普通派生、用例更新与业务样例创建可达，写操作仍须�
     ['mcp', 'seedThreatCompositions', { revision: 'fixture-revision', bindings: { socConnectionId: 'basic-soc', reportConnectionId: 'basic-report' } }],
   ]) {
     const operation = f.execute(id, domain, action, input)
-    const proposed = await f.proposal(id)
+    const proposed = await f.operation(id)
     assert.equal(proposed.action, action)
-    assert.equal(f.calls.filter(call => call.endpoint === `${domain}/${action}`).length, 0)
+    assert.equal(f.calls.filter(call => call.endpoint === `${domain}/${action}`).length, 1)
     await f.rpc('confirm', { session_id: id, proposal_id: proposed.id })
     assert.equal((await operation).state, 'completed')
     await f.rpc('confirm', { session_id: id, proposal_id: proposed.id })
@@ -972,7 +972,7 @@ test('整理特性锁定任务版本，页面导航不改变预览目标', async
   assert.ok(settled.result.ok)
 })
 
-test('融合继续评测只使用实际目标source和确认Case，混淆字段与扩大范围重新确认', async t => {
+test('融合继续评测只使用实际目标source和确认Case，其他范围走独立预览', async t => {
   const f = fixture(t, (endpoint, input) => endpoint === 'agents/fusion/status'
     ? { ok: true, value: { creation: { status: 'integrating', assistant_session_id: input.experiment_id === 'EXP-basic-002' ? 'session-1' : 'another-session', plan: { evaluation_case_ids: ['U-BASIC-001'] } } } }
     : undefined)
@@ -985,9 +985,10 @@ test('融合继续评测只使用实际目标source和确认Case，混淆字段�
     { source: 'experiment:EXP-basic-002', cases: ['U-UNCONFIRMED-001'] },
   ]) {
     const operation = f.execute(id, 'agents', 'eval/start', input)
-    const proposed = await f.proposal(id)
+    const proposed = await f.operation(id)
     assert.equal(proposed.action, 'eval/start')
-    assert.equal(f.calls.filter(call => call.endpoint === 'agents/eval/start').length, 1)
+    assert.equal(f.calls.filter(call => call.endpoint === 'agents/eval/start').length, input.source.includes('other') ? 2 : 3)
+    assert.ok(f.calls.some(call => call.endpoint === 'agents/eval/preview'))
     await f.rpc('cancel', { session_id: id })
     await operation
   }
@@ -1004,7 +1005,7 @@ test('普通资产写入与评测先使用真实preview失败时不生成确认�
   assert.deepEqual((await f.status(id)).proposals, [])
 })
 
-test('算力变体先预览真实计划再确认创建，摘要和方案在等待期间固定', async t => {
+test('算力变体先预览真实计划再创建，摘要与方案固定', async t => {
   const digest = 'c'.repeat(64)
   const f = fixture(t, (endpoint, input) => endpoint === 'agents/compute-variants/preview'
     ? { ok: true, value: { variant_name: input.variant_name, parent_experiment_id: input.parent_experiment_id, parent_ref: input.parent_ref, plan: { case_hashes: { 'U-BASIC-001': 'frozen-case' }, model_change: null }, model_configuration: 'inherited_from_fixed_parent', preview_sha256: digest } } : undefined)
@@ -1015,12 +1016,12 @@ test('算力变体先预览真实计划再确认创建，摘要和方案在等�
   for (const action of ['context', 'compare']) assert.equal((await f.execute(id, 'agents', `compute-variants/${action}`, { experiment_id: 'EXP-basic-001' })).state, 'completed')
   const input = { variant_name: '基本状态轻量版', parent_experiment_id: 'EXP-basic-001', parent_ref: `git:${'a'.repeat(40)}`, strategy: '减少重复基本状态查询', case_ids: ['U-BASIC-001'], resource_metric: 'total_tokens', min_resource_reduction_pct: 10 }
   const operation = f.execute(id, 'agents', 'compute-variants/create', input)
-  const proposed = await f.proposal(id)
+  const proposed = await f.operation(id)
   assert.equal(proposed.preview.value.parent_experiment_id, input.parent_experiment_id)
   assert.equal(proposed.preview.value.model_configuration, 'inherited_from_fixed_parent')
   assert.equal(proposed.preview.value.variant_name, '基本状态轻量版')
   assert.equal(proposed.input.expected_preview_sha256, digest)
-  assert.equal(f.calls.filter(call => call.endpoint === 'agents/compute-variants/create').length, 0)
+  assert.equal(f.calls.filter(call => call.endpoint === 'agents/compute-variants/create').length, 1)
   input.case_ids.push('U-OTHER-001')
   await f.rpc('confirm', { session_id: id, proposal_id: proposed.id })
   assert.equal((await operation).state, 'completed')
@@ -1032,7 +1033,7 @@ test('算力变体先预览真实计划再确认创建，摘要和方案在等�
   assert.equal(actual.strategy, '减少重复基本状态查询')
 })
 
-test('变体改名经普通写入提案确认后调用唯一名称接口，不自动修改计划或结论', async t => {
+test('变体改名经原生权限后调用唯一名称接口，不自动修改计划或结论', async t => {
   const f = fixture(t, (endpoint, input) => endpoint === 'agents/compute-variants/rename'
     ? { ok: true, value: { experiment_id: input.experiment_id, variant_name: input.variant_name, change_sha256: 'b'.repeat(64) } } : undefined)
   const id = (await f.rpc('session', { task: '将当前变体命名为资产告警轻量版', context: { skill: 'compute-variant-research', experiment_id: 'EXP-basic-002' } })).value.session_id
@@ -1041,10 +1042,10 @@ test('变体改名经普通写入提案确认后调用唯一名称接口，不�
   assert.match(assistantActionContract('agents', 'compute-variants/create').instructions, /名称与策略分别提供/)
   const input = { experiment_id: 'EXP-basic-002', variant_name: '资产告警轻量版', expected_change_sha256: 'a'.repeat(64) }
   const operation = f.execute(id, 'agents', 'compute-variants/rename', input)
-  const proposed = await f.proposal(id)
+  const proposed = await f.operation(id)
   assert.equal(proposed.action, 'compute-variants/rename')
   assert.equal(proposed.input.variant_name, '资产告警轻量版')
-  assert.equal(f.calls.some(call => call.endpoint === 'agents/compute-variants/rename'), false)
+  assert.equal(f.calls.some(call => call.endpoint === 'agents/compute-variants/rename'), true)
   await f.rpc('confirm', { session_id: id, proposal_id: proposed.id })
   const receipt = await operation
   assert.equal(receipt.state, 'completed')
@@ -1073,7 +1074,7 @@ test('算力变体预览失败或确认时配置已变，助手不宣称创建�
   assert.equal(f.calls.some(call => call.endpoint === 'agents/compute-variants/create'), false)
   invalidPreview = false
   const operation = f.execute(id, 'agents', 'compute-variants/create', { parent_experiment_id: 'EXP-basic-001' })
-  const proposed = await f.proposal(id)
+  const proposed = await f.operation(id)
   await f.rpc('confirm', { session_id: id, proposal_id: proposed.id })
   const receipt = await operation
   assert.equal(receipt.state, 'failed'); assert.equal(receipt.result.error.code, 'conflict')
@@ -1089,7 +1090,7 @@ test('助手不伪造变体人员复核，决策抽取会话也不能借新动�
   assert.equal(f.calls.length, 0)
 })
 
-test('代码变体连续任务固定两侧Case，实际构建后Git冻结仍单独确认，比较完成不标end', async t => {
+test('代码变体连续任务固定两侧Case，实际构建后Git冻结校验真实预览，比较完成不标end', async t => {
   const parent = 'EXP-alpha-001', target = 'EXP-alpha-002', parentRef = 'git:' + 'a'.repeat(40), jobs = new Map()
   const freezeInput = { experiment_id: target, case_ids: ['U-ASSET-001'], evaluation_base_sha256: 'e'.repeat(64) }
   let loaded = false
@@ -1133,10 +1134,10 @@ test('代码变体连续任务固定两侧Case，实际构建后Git冻结仍单�
   assert.equal((await f.execute(id, 'agents', 'compute-variants/build', { experiment_id: target, expected_candidate_sha256: 'c'.repeat(64) })).state, 'completed')
   assert.equal(f.calls.find(call => call.endpoint === 'agents/compute-variants/build').input.expected_preview_sha256, 'b'.repeat(64))
   const freezing = f.execute(id, 'agents', 'compute-variants/freeze', { experiment_id: target })
-  const proposed = await f.proposal(id)
+  const proposed = await f.operation(id)
   assert.equal(proposed.action, 'compute-variants/freeze'); assert.equal(proposed.preview.value.diff, '+ 实际工作流源码')
   assert.deepEqual(proposed.input.case_ids, ['U-ASSET-001']); assert.equal(proposed.input.evaluation_base_sha256, freezeInput.evaluation_base_sha256)
-  assert.equal(f.calls.some(call => call.endpoint === 'agents/compute-variants/freeze'), false)
+  assert.equal(f.calls.some(call => call.endpoint === 'agents/compute-variants/freeze'), true)
   await f.rpc('confirm', { session_id: id, proposal_id: proposed.id }); await freezing
   for (const source of [parent, target]) await f.execute(id, 'agents', 'eval/start', { source: `experiment:${source}`, cases: ['U-ASSET-001'] })
   const delivery = { parent_run_ids: ['parent-run'], variant_run_ids: ['variant-run'] }
@@ -1147,9 +1148,9 @@ test('代码变体连续任务固定两侧Case，实际构建后Git冻结仍单�
   assert.equal(f.calls.some(call => call.endpoint === 'agents/compute-variants/confirm'), false)
   const completed = (await f.status(id)).execution
   const renaming = f.execute(id, 'agents', 'compute-variants/rename', { experiment_id: target, variant_name: '资产告警轻量版', expected_change_sha256: 'a'.repeat(64) })
-  const renameProposal = await f.proposal(id)
+  const renameProposal = await f.operation(id)
   assert.equal(renameProposal.action, 'compute-variants/rename', '任务完成后同一管理会话可发起普通改名提案')
-  assert.equal(f.calls.some(call => call.endpoint === 'agents/compute-variants/rename'), false, '完成任务不等于自动授权后续改名')
+  assert.equal(f.calls.filter(call => call.endpoint === 'agents/compute-variants/rename').length, 1, '后续改名通过原生权限并独立执行一次')
   await f.rpc('confirm', { session_id: id, proposal_id: renameProposal.id })
   assert.equal((await renaming).state, 'completed')
   assert.deepEqual((await f.status(id)).execution, completed, '后续普通写入不重启或改写已完成任务')
@@ -1163,9 +1164,9 @@ test('MCP 草稿复用真实结构校验，无效包装在提案前拒绝', asyn
   await assert.rejects(() => f.execute(id, 'mcp', 'saveCompositionDraft', { revision: 'before', draft: { config: draft, graph: {} } }), /工具名称/)
   assert.equal((await f.status(id)).proposals.length, 0)
   const operation = f.execute(id, 'mcp', 'saveCompositionDraft', { revision: 'before', draft })
-  const proposed = await f.proposal(id)
+  const proposed = await f.operation(id)
   assert.deepEqual(proposed.input.draft, draft)
-  assert.equal(f.calls.length, 0, '确认前不得保存')
+  assert.equal(f.calls.length, 1, '原生权限通过后直接保存')
   await f.rpc('confirm', { session_id: id, proposal_id: proposed.id })
   const result = await operation
   assert.equal(result.state, 'completed')
@@ -1271,7 +1272,7 @@ test('首次新建无固定父版时拒绝回退，不把未验证资产覆盖�
   assert.equal(f.calls.some(call => call.endpoint === 'agents/assets/read-fixed'), false)
 })
 
-test('确认前固定父版变化时拒绝开始，不能静默换成新HEAD', async t => {
+test('旧待确认任务的固定父版变化时拒绝开始，不能静默换成新HEAD', async t => {
   let parent = 'a'.repeat(40)
   const f = fixture(t, (endpoint, input) => {
     const value = taskResponder(endpoint, input)
@@ -1280,13 +1281,13 @@ test('确认前固定父版变化时拒绝开始，不能静默换成新HEAD', a
   })
   const goals = installTaskGoals(f)
   const id = (await f.rpc('session', { task: '从固定版本改进' })).value.session_id
-  const waiting = f.execute(id, 'task', 'start', { plan: taskPlan() })
-  const proposal = await f.proposal(id)
+  const preview = await f.execute(id, 'task', 'preview', { plan: taskPlan() })
+  const proposal = { kind: 'proposal', id: 'legacy-task', owner_session_id: id, domain: 'task', action: 'start', input: preview, preview, state: 'awaiting_confirmation' }
+  appendPluginRecord(f.sessions.get(id).session, 'plugin:harness-platform/assistant', proposal)
   parent = 'b'.repeat(40)
   const confirmed = await f.rpc('confirm', { session_id: id, proposal_id: proposal.id })
-  assert.equal(confirmed.ok, false)
-  assert.match(confirmed.error.message, /固定父版/)
-  await waiting
+  assert.equal(confirmed.value.state, 'unknown')
+  assert.match(confirmed.value.error, /核对实际状态/)
   assert.equal((await f.status(id)).execution, undefined)
   assert.equal(goals.size, 0)
 })
@@ -1422,7 +1423,7 @@ test('冻结模型回执省略完整编译diff并保留真实摘要，持久提�
   for (const projected of [rendered, meta]) {
     assert.doesNotMatch(JSON.stringify(projected), /compiled-esm-boundary|完整差异开始|完整差异结束/)
     assert.ok(JSON.stringify(projected).length < 5000, '模型输出应只包含清单与摘要，不截断保留编译正文')
-    assert.match(JSON.stringify(projected), /原生确认卡.*完整实际差异/)
+    assert.match(JSON.stringify(projected), /完整实际差异保留在操作记录/)
   }
   assert.equal(rendered.result.value.diff, undefined)
   assert.equal(rendered.result.value.diff_sha256, sha256(diff))
@@ -1430,9 +1431,9 @@ test('冻结模型回执省略完整编译diff并保留真实摘要，持久提�
   assert.deepEqual(rendered.result.value.files, files)
   assert.equal(raw.result.value.diff, diff, '模型投影不得修改原始RPC值')
   const pending = f.execute(id, 'agents', 'compute-variants/freeze', args.input)
-  const proposal = await f.proposal(id)
+  const proposal = await f.operation(id)
   assert.equal(proposal.preview.value.diff, diff, '原生确认卡读取的持久预览必须完整')
-  assert.equal(f.calls.some(row => row.endpoint === 'agents/compute-variants/freeze'), false)
+  assert.equal(f.calls.some(row => row.endpoint === 'agents/compute-variants/freeze'), true)
   const confirmation = await f.rpc('confirm', { session_id: id, proposal_id: proposal.id })
   assert.equal(confirmation.value.preview.value.diff, diff, '确认RPC及历史原始回执保留完整预览')
   const settled = await pending, settledArgs = { ...args, action: 'compute-variants/freeze' }
@@ -1445,22 +1446,20 @@ test('冻结模型回执省略完整编译diff并保留真实摘要，持久提�
   assert.equal((await f.status(id)).proposals[0].preview.value.diff, diff)
 })
 
-test('用户可仅拒绝当前未执行提案，结算原工具但不取消其他提案或执行写入', async t => {
-  const f = fixture(t)
-  const id = (await f.rpc('session', { task: '核对两项实例操作' })).value.session_id
-  const first = f.execute(id, 'instances', 'run', { name: 'first', operation: 'stop' })
-  const proposal = await f.proposal(id)
-  const second = f.execute(id, 'instances', 'run', { name: 'second', operation: 'stop' })
-  while ((await f.status(id)).proposals.length < 2) await setImmediate()
-  assert.equal((await f.rpc('reject', { session_id: id, proposal_id: proposal.id })).ok, true)
-  assert.equal((await first).state, 'cancelled')
-  assert.equal(f.calls.some(call => call.endpoint === 'instances/run'), false)
-  const remaining = (await f.status(id)).proposals.find(item => item.id !== proposal.id)
-  assert.equal(remaining.state, 'awaiting_confirmation')
-  await f.rpc('confirm', { session_id: id, proposal_id: remaining.id })
-  await second
+test('用户可仅拒绝当前旧待确认操作，另一个操作可确认一次且不重放', async t => {
+  const f = fixture(t), id = (await f.rpc('session', {})).value.session_id
+  for (const name of ['first', 'second']) appendPluginRecord(f.sessions.get(id).session, 'plugin:harness-platform/assistant', {
+    kind: 'proposal', id: name, owner_session_id: id, domain: 'instances', action: 'run',
+    input: { name, operation: 'stop' }, preview: {}, state: 'awaiting_confirmation',
+  })
+  assert.equal((await f.rpc('reject', { session_id: id, proposal_id: 'first' })).ok, true)
+  assert.equal((await f.status(id)).proposals.find(item => item.id === 'first').state, 'cancelled')
+  assert.equal(f.calls.length, 0)
+  assert.equal((await f.status(id)).proposals.find(item => item.id === 'second').state, 'awaiting_confirmation')
+  assert.equal((await f.rpc('confirm', { session_id: id, proposal_id: 'second' })).value.continuation, 'requires_user_message')
+  await f.rpc('confirm', { session_id: id, proposal_id: 'second' })
   assert.equal(f.calls.filter(call => call.endpoint === 'instances/run').length, 1)
-  assert.equal((await f.rpc('reject', { session_id: id, proposal_id: remaining.id })).ok, false)
+  assert.equal((await f.rpc('reject', { session_id: id, proposal_id: 'second' })).ok, false)
 })
 
 test('暂停跨过截止后恢复持久记录预算耗尽，不更换原任务、额度、截止或操作', async t => {
@@ -1504,7 +1503,7 @@ test('研究结论确认展示结构化变更，并保留双摘要直到实际�
   const f = fixture(t, endpoint => endpoint === 'agents/decision/preview' ? { ok: true, value: { edits: [], change } } : undefined)
   const id = (await f.rpc('session', { task: '保存结论' })).value.session_id
   const operation = f.execute(id, 'agents', 'decision/update', input)
-  const proposal = await f.proposal(id)
+  const proposal = await f.operation(id)
   assert.deepEqual(proposal.preview.value.change, change)
   assert.deepEqual(f.calls[0], { endpoint: 'agents/decision/preview', input })
   await f.rpc('confirm', { session_id: id, proposal_id: proposal.id })

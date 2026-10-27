@@ -58,6 +58,7 @@ test('评测 Job、实例来源与 MCP 组合版本可精确往返，非法动�
     { page: 'evaluation', agent_id: 'demo', experiment_id: 'EXP-demo-001', intent: 'start_eval' },
     { page: 'instances', instance_name: 'demo-001', source_id: 'experiment:EXP-demo-001', tab: 'logs' },
     { page: 'mcp', server_id: 'my-server', tab: 'servers' },
+    { page: 'mcp', group_id: 'inspection-readonly', tab: 'connection' },
     { page: 'mcp', composition_id: 'risk-query', version: 'published', version_id: 'a'.repeat(64), tab: 'compositions' },
   ]) assert.deepEqual(readNavigation(navigationHash(target)), target)
   assert.deepEqual(readNavigation('#/evaluation?intent=delete&job_id=../../outside'), { page: 'evaluation' })

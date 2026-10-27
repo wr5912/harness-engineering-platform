@@ -74,7 +74,7 @@ test('实例创建和启动提案在一次确认前显示冻结的对象、来�
   proposal = { ...proposal, id: 'instance-create-direct', input: { ...proposal.input, operation: 'create' }, preview: { ...proposal.preview, value: { ...proposal.preview.value, operation: 'create' } } }
   const requests = []
   let refreshes = 0
-  const liveAssistant = { ...assistant, refresh: async () => { refreshes++ } }
+  const liveAssistant = { ...assistant, applySettlement: (_id, settlement) => { assert.equal(settlement.state, 'completed') }, refresh: async () => { refreshes++ } }
   const rpc = { async call(_channel, method, body) { requests.push({ method, body }); return { ok: true, value: { state: 'completed' } } } }
   const confirm = findButton(module.exports.AssistantOperations({ assistant: liveAssistant, sessionId: 's', rpc }), '创建实例')
   assert.ok(confirm)

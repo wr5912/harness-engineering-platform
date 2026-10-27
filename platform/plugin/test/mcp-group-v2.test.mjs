@@ -95,6 +95,7 @@ async function groupServer(t, manager, servers, groups, methods = [], rpcRequest
     connection: { requestRejection: () => undefined }, effect: create => create(), on: () => {},
     provide(name, value) { this[name] = value } }
   manager.apply(context, { servers: { get: () => servers }, groups: { get: () => groups }, sharedToken: { get: () => token },
+    groupUrl: id => new URL(`/mcp/groups/${id}/v2`, origin).href,
     withGroupRequest: (req, method, run, rpcRequest) => {
       if (req.url.endsWith('/v2')) { methods.push(method); rpcRequests.push(rpcRequest) }
       return run()
@@ -690,4 +691,34 @@ test('三类发现遍历全部分页，模板不支持与坏来源不阻塞其�
   templatesSupported = false
   assert.equal((await v2.listTools()).tools.length, 2)
   assert.equal((await v2.callTool({ name: resource.name, arguments: {} })).structuredContent.contents[0].blob, 'AAEC')
+})
+
+
+test('分组调试通过实际已发布 v2 端点发现、调用、读 URI 与模板，拒绝混淆目标', async t => {
+  const manager = await managerModule(t), reads = [], methods = []
+  const upstream = await fixtureMcp(t, 'debug', reads)
+  const servers = [{ id: 'source', enabled: true, url: upstream, tools: { mode: 'all', names: [] } }]
+  const groups = [{ id: 'debug-group', members: [{ serverId: 'source', names: ['echo'], resourceUris: ['fixture:/same'], resourceTemplates: ['fixture:/item/{id}{?q}'] }] }]
+  const { origin, client } = await groupServer(t, manager, servers, groups, methods)
+  const post = async input => {
+    const response = await fetch(`${origin}/api/mcp-manager`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ groupId: 'debug-group', ...input }) })
+    return { status: response.status, value: await response.json() }
+  }
+  const discovered = await post({ action: 'test' })
+  assert.equal(discovered.status, 200)
+  const actual = await client(2)
+  assert.deepEqual(discovered.value.tools.map(tool => tool.name), (await actual.listTools()).tools.map(tool => tool.name))
+  assert.ok(methods.includes('tools/list') && methods.includes('resources/list'), '已初始化的 SDK 客户端访问实际分组端点')
+  assert.match(JSON.stringify((await post({ action: 'callTool', toolName: 'echo', arguments: { value: 'ok' } })).value), /debug:ok/)
+  const resource = discovered.value.resources.resources[0]
+  assert.equal((await post({ action: 'readResource', uri: resource.uri })).status, 200)
+  const template = discovered.value.resourceTemplates.resourceTemplates[0]
+  assert.equal((await post({ action: 'readResource', uriTemplate: template.uriTemplate, arguments: { id: 'one', q: 'a b' } })).status, 200)
+  assert.deepEqual(reads.map(read => read.uri), ['fixture:/same', 'fixture:/item/one?q=a%20b'])
+  assert.equal((await post({ action: 'readResource', uriTemplate: 'fixture:/unselected/{id}', arguments: { id: 'one' } })).status, 400)
+  assert.equal((await post({ action: 'readResource', uriTemplate: template.uriTemplate, arguments: [] })).status, 400)
+  assert.equal((await post({ action: 'readResource', uriTemplate: template.uriTemplate, arguments: {} })).status, 400)
+  assert.equal((await post({ action: 'test', serverId: 'source' })).status, 400)
+  assert.equal((await post({ action: 'test', groupId: 'unsaved-draft' })).status, 404)
+  assert.equal((await post({ action: 'refresh' })).status, 400)
 })
