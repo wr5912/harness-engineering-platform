@@ -1,0 +1,87 @@
+{
+  "at": "2026-10-27T06:25:54.413Z",
+  "target": "172.16.138.228:18120/hep/#/conversations",
+  "acceptance": "PA-12",
+  "root": "/home/cmp/harness-engineering-platform-data",
+  "removed_registration": "/home/cmp/work/harness-engineering-platform-data",
+  "workspace_id": "027d43d2-ae90-4d51-a2be-5464ae34e478",
+  "legacy_session_opened": "session-7c402250-1bd7-4f51-a4ab-3ddb85ea3dbf",
+  "new_session_from_history": "session-7664c4f2-fc32-4ccf-9856-b686b735c874",
+  "new_sessions_from_legacy_api_requests": [
+    "session-364b412e-234e-48dc-91af-e488553dcb8f",
+    "session-ba88fb28-3f67-4ba7-a72c-f1220451f296",
+    "session-5bbb16ee-6b50-4d0c-abec-507706ba6862"
+  ],
+  "preserved_sessions": 111,
+  "preserved_original_cwd": true,
+  "preserved_blank_state": true,
+  "legacy_directory_preserved": true,
+  "add_workspace_affordance_count": 0,
+  "add_other_workspace_error": {
+    "code": "gateway/bad-request",
+    "message": "管理对话仅使用平台绑定的数据仓库，不能添加其他工作区。"
+  },
+  "remove_bound_workspace_error": {
+    "code": "gateway/bad-request",
+    "message": "平台绑定的数据工作区不能移除。"
+  },
+  "invalid_create_request_rejected": true,
+  "refresh_keeps_current_root": true,
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "directory_plugins": [
+    {
+      "id": "include:directory-picker",
+      "module": "@deepseek-ai/dsh-host-directory-picker-auto",
+      "enabled": false,
+      "phase": null
+    },
+    {
+      "id": "include:platform-directory-picker",
+      "module": "@deepseek-ai/dsh-host-directory-picker-browse",
+      "enabled": true,
+      "phase": "active"
+    }
+  ],
+  "hot_reload": {
+    "at": "2026-10-27T06:21:47.292Z",
+    "preflight": {
+      "sessions": 116,
+      "running": 0,
+      "running_jobs": 0
+    },
+    "reload": {
+      "http": 200,
+      "type": "server-response",
+      "rpcId": "workspace-reload-1793082106864",
+      "result": {
+        "ok": true,
+        "value": {
+          "stage": "enable",
+          "target": "@ai-agent-harness/harness-platform",
+          "enabled": true,
+          "changed": false,
+          "application": "applied",
+          "warnings": []
+        }
+      }
+    }
+  },
+  "platform_pid": 4074385,
+  "page_errors": [],
+  "verification": "TypeScript/build + 28 targeted tests + real browser/native APIs",
+  "limits": [
+    "未发送模型消息，未重新执行业务评测",
+    "窄屏为浏览器视口模拟",
+    "只撤销工作区登记，保留旧目录与历史会话"
+  ],
+  "mobile_new_session_button_operable": true
+}

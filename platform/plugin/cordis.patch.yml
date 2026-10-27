@@ -9,7 +9,12 @@
   config:
     thinking: enabled
     reasoningEffort: max
+- id: directory-picker
+  disabled: true
 - insert:
     - id: mcp-session-manager
       name: ./lib/platform-mcp-manager.js
+      disabled: false
+    - id: platform-directory-picker
+      name: '@deepseek-ai/dsh-host-directory-picker-browse'
       disabled: false

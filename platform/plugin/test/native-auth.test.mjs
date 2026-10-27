@@ -52,7 +52,10 @@ test('平台登录保护原生 API、三个写入域与 MCP，旧 Token/Cookie �
   await root.plugin({ name: 'test-assistant-services', apply(ctx) {
     new SessionProjectionRegistry(ctx)
     new SystemPrompt(ctx, {})
-    ctx.provide('sessionController', {})
+    const workspace = { id: 'auth-workspace', sessionIds: [] }
+    ctx.provide('workspaceRegistry', { async create(path) { assert.equal(path, assetRoot); return workspace }, list: () => [workspace] })
+    ctx.provide('workspaceController', {})
+    ctx.provide('sessionController', { async create() { assert.fail('认证测试不创建会话') } })
     ctx.provide('settingsController', {})
     ctx.provide('agentDefaultModel', {})
     ctx.provide('llm', { listConfigurableProviders: () => [] })

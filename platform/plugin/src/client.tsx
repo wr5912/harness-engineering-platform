@@ -20,7 +20,7 @@ import { InstancesPage } from './instances/client.tsx'
 import { McpPage } from './mcp/client.tsx'
 import { BusinessControlPage } from './business-control/ui.tsx'
 import { platformTheme } from './theme.ts'
-import { prepareConversation } from './conversation.ts'
+import { bindNewConversation, prepareConversation } from './conversation.ts'
 import { AssistantConversation, AssistantOperations, PlatformOperationCard, createAssistant, type Assistant, type AssistantContext } from './assistant/client.tsx'
 import { FloatingAssistantPresentation } from './assistant/presentation.ts'
 import { createPlatformUpdates, type PlatformUpdates } from './realtime/client.ts'
@@ -333,6 +333,7 @@ function PlatformSettings({ openSettings, settingsOpen, settingsShortcut }: Sett
 }
 
 export function apply(ctx: ClientContext) {
+  ctx.effect(() => bindNewConversation(ctx))
   let modelRevision = 0
   const modelListeners = new Set<() => void>()
   const modelChanges = { getSnapshot: () => modelRevision,

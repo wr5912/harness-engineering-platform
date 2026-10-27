@@ -72,6 +72,8 @@ test('真实HTTP管理会话使用原生工具，专用切换与可信Skill可�
       execute(args, execution) { calls.push({ name, args, agentId: execution.agent.id }); return {} },
     })
     inner.provide('platformMcp', { servers: { get: () => [] }, groups: { get: () => [] } })
+    inner.provide('workspaceRegistry', {})
+    inner.provide('workspaceController', {})
     inner.provide('settingsController', {})
     inner.provide('agentDefaultModel', {})
     inner.provide('llm', { listConfigurableProviders: () => [] })

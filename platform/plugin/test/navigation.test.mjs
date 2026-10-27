@@ -74,7 +74,7 @@ const shellViews = {
   './mcp/client.tsx': 'export const McpPage = () => null',
   './business-control/ui.tsx': 'export const BusinessControlPage = () => null',
   './theme.ts': 'export const platformTheme = ""',
-  './conversation.ts': 'export const prepareConversation = () => {}',
+  './conversation.ts': 'export const prepareConversation = () => {}; export const bindNewConversation = () => {}',
   './assistant/client.tsx': 'export const AssistantConversation = () => null; export const AssistantOperations = () => null; export const PlatformOperationCard = () => null; export const createAssistant = () => {}',
   './realtime/client.ts': 'export const createPlatformUpdates = () => {}',
 }

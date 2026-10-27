@@ -136,6 +136,7 @@ export function createAssistant(ctx: Pick<Context, 'sessions' | 'uiSession' | 'u
         if (!root) throw new Error('项目工作区尚未就绪，请稍后重试。')
         let resumeCwd: string | undefined
         if (sessionIdToResume) {
+          if (!ctx.sessions.list.getSnapshot().byId[sessionIdToResume as SessionId]) await ctx.sessions.refresh()
           resumeCwd = ctx.sessions.list.getSnapshot().byId[sessionIdToResume as SessionId]?.cwd
           if (!resumeCwd) {
             const status = await rpc.call(CHANNEL, 'assistant/status', { session_id: sessionIdToResume })
@@ -145,10 +146,9 @@ export function createAssistant(ctx: Pick<Context, 'sessions' | 'uiSession' | 'u
           if (!resumeCwd || ![root, ...getLegacyRoots()].includes(resumeCwd)) throw new Error('助手会话不属于当前工作区')
         }
         const workspace = sessionIdToResume ? undefined : await ctx.workspaces.create({ path: root })
-        // 原生 create/adopt 会在返回前登记客户端身份，不依赖异步列表通知到达顺序。
-        const preparedSessionId = await ctx.sessions.create(sessionIdToResume
-          ? { sessionId: sessionIdToResume as SessionId, cwd: resumeCwd }
-          : { workspaceId: workspace!.workspaceId })
+        // 续接保留原会话身份；原生 create 只用于新任务，避免历史任务被另建会话。
+        const preparedSessionId = sessionIdToResume as SessionId | undefined
+          ?? await ctx.sessions.create({ workspaceId: workspace!.workspaceId })
         await ctx.sessions.using(preparedSessionId, { source: 'harnessAssistant' }, async () => {
           if (disposed) return
           const response = await rpc.call(CHANNEL, 'assistant/session', {

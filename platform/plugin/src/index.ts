@@ -33,12 +33,13 @@ import { applyBusinessGateway } from './business-control/index.ts'
 import { platformEntryUrl } from './business-control/group-link.ts'
 import { managementDispatch } from './mcp/control.ts'
 import { currentBusinessContext, getBusinessControl } from './business-control/core.ts'
+import { bindConversationWorkspace } from './conversation-workspace.ts'
 
 // 使用启动器核对过的全局 Runtime；开发依赖只提供类型和隔离测试环境。
 const WebApp: typeof NativeWebApp = await runtimeModule('@deepseek-ai/dsh-web-app')
 
 export const name = 'harness-platform'
-export const inject = ['connection', 'webServer', 'credentials', 'platformMcp', 'sessionController', 'settingsController', 'agentDefaultModel', 'llm', 'tools', 'agents', 'sessionProjections', 'systemPrompt', 'goals', 'skills']
+export const inject = ['connection', 'webServer', 'credentials', 'platformMcp', 'workspaceRegistry', 'workspaceController', 'sessionController', 'settingsController', 'agentDefaultModel', 'llm', 'tools', 'agents', 'sessionProjections', 'systemPrompt', 'goals', 'skills']
 export const Config = WebApp.Config
 export type Config = NativeWebApp.Config
 
@@ -286,11 +287,7 @@ export function applyTools(ctx: Context) {
 export async function apply(ctx: Context, config: Config) {
   const assetRoot = process.env.HARNESS_ASSET_ROOT
   if (!assetRoot) throw new Error('未设置 HARNESS_ASSET_ROOT')
-  // 管理对话使用数据根作为工作区：平台先初始化原生默认工作区，避免首次使用落回 DSH 文档目录默认值。
-  const workspaceRegistry = ctx.get('workspaceRegistry') as {
-    initializeDefault(resolve: () => Promise<string>): Promise<unknown>
-  } | undefined
-  if (workspaceRegistry) await workspaceRegistry.initializeDefault(async () => assetRoot)
+  await bindConversationWorkspace(ctx, assetRoot)
   await applyAuthentication(ctx, assetRoot)
   // 替换原生明暗主题图标，避免浏览器从多条候选中继续选择 DSH 图标。
   const icon = `<link rel="icon" type="image/svg+xml" href="${logo.replaceAll('&', '&amp;').replaceAll('"', '&quot;')}" />`

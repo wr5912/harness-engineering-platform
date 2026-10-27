@@ -7,8 +7,60 @@ import { Context } from '@deepseek-ai/cordis'
 import { Session, SESSION_FORMAT_VERSION, appendPluginRecord } from '@deepseek-ai/dsh-session'
 import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
-import { prepareConversation } from '../src/conversation.ts'
+import { bindNewConversation, prepareConversation } from '../src/conversation.ts'
+import { bindConversationWorkspace } from '../src/conversation-workspace.ts'
 import { createAssistant } from '../src/assistant/index.ts'
+
+test('新建会话忽略当前历史工作区，保留原生选项并可卸载恢复', () => {
+  const calls = [], options = { agentPreset: 'standard' }
+  const uiWorkspace = { startSession(...args) { assert.equal(this, uiWorkspace); calls.push(args) } }
+  const original = uiWorkspace.startSession
+  const dispose = bindNewConversation({ uiWorkspace, workspaces: { list: { getSnapshot: () => ({ items: [{ workspaceId: 'current-data' }] }) } } })
+  uiWorkspace.startSession('legacy-data', options)
+  uiWorkspace.startSession()
+  assert.deepEqual(calls, [['current-data', options], ['current-data', undefined]])
+  dispose()
+  assert.equal(uiWorkspace.startSession, original)
+})
+
+test('管理对话只登记数据根，阻止新增与移除，旧会话不被改写且新建固定绑定', async t => {
+  const directory = mkdtempSync(join(tmpdir(), 'conversation-workspaces-'))
+  t.after(() => rmSync(directory, { recursive: true, force: true }))
+  const currentPath = join(directory, 'current'), legacyPath = join(directory, 'legacy')
+  mkdirSync(currentPath); mkdirSync(legacyPath)
+  writeFileSync(join(legacyPath, 'history.txt'), '保留历史目录')
+  const current = { id: 'current-data', path: currentPath, sessionIds: ['current-blank'] }
+  const legacy = { id: 'legacy-data', path: legacyPath, sessionIds: ['legacy-session'] }
+  let rows = [legacy], dispose
+  const creations = []
+  const services = {
+    workspaceRegistry: {
+      async create(path) { assert.equal(path, currentPath); if (!rows.includes(current)) rows.push(current); return current },
+      list: () => rows,
+      async delete(id) { rows = rows.filter(row => row.id !== id); return true },
+    },
+    workspaceController: { async delete() { assert.fail('绑定工作区不能移除') } },
+    sessionController: { async create(request) { creations.push(request); return { sessionId: request.sessionId ?? 'new-session' } } },
+  }
+  const originalCreate = services.sessionController.create, originalRegister = services.workspaceRegistry.create
+  await bindConversationWorkspace({ get: name => services[name], effect: callback => { dispose = callback() } }, currentPath)
+  assert.deepEqual(rows, [current])
+  assert.deepEqual(legacy.sessionIds, ['legacy-session'])
+  assert.equal(readFileSync(join(legacyPath, 'history.txt'), 'utf8'), '保留历史目录')
+  await assert.rejects(services.workspaceRegistry.create(legacyPath), /不能添加其他工作区/)
+  await assert.rejects(services.workspaceRegistry.create('relative-path'), /不能添加其他工作区/)
+  await assert.rejects(services.workspaceController.delete({ workspaceId: current.id }), /不能移除/)
+  assert.equal(await services.workspaceRegistry.create(currentPath), current)
+  for (const request of [{}, { cwd: legacyPath }, { workspaceId: legacy.id }, { sessionId: 'legacy-session', cwd: legacyPath }, { sessionId: 'unknown-session' }]) {
+    await services.sessionController.create({ ...request, agentPreset: 'standard' })
+    assert.deepEqual(creations.at(-1), { ...request, agentPreset: 'standard', cwd: undefined, sessionId: undefined, workspaceId: current.id })
+  }
+  assert.equal((await services.sessionController.create({ sessionId: 'current-blank', workspaceId: current.id })).sessionId, 'current-blank')
+  assert.throws(() => services.sessionController.create({ cwd: currentPath, workspaceId: current.id }), /not both/)
+  dispose()
+  assert.equal(services.sessionController.create, originalCreate)
+  assert.equal(services.workspaceRegistry.create, originalRegister)
+})
 
 test('进入管理对话只切回原生会话面板，保留侧栏与工作区分组偏好', () => {
   for (const activePanelId of [null, 'settings']) {

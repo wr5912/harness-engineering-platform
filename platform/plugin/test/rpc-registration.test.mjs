@@ -38,6 +38,8 @@ test('真实 Cordis 提供方 Fiber 无 webServer 注入时，插件仍经原生
   await root.plugin({ name: 'test-assistant-services', apply(ctx) {
     new SessionProjectionRegistry(ctx)
     new SystemPrompt(ctx, {})
+    ctx.provide('workspaceRegistry', {})
+    ctx.provide('workspaceController', {})
     ctx.provide('sessionController', {})
     ctx.provide('settingsController', {})
     ctx.provide('agentDefaultModel', {})

@@ -21,7 +21,7 @@ function fixture(call, selection, rows = {}, config = {}) {
   const assistant = createAssistant({
     uiSession: { adapter: { current: { getSnapshot: () => ({ key: selection }), subscribe: listener => { selectionListeners.add(listener); return () => selectionListeners.delete(listener) } } } },
     workspaces: { create: async request => { assert.deepEqual(request, { path: '/repo' }); return { workspaceId: 'project' } } },
-    sessions: { list: { getSnapshot: () => ({ byId: rows }), subscribe: () => () => {} }, async create(request) {
+    sessions: { list: { getSnapshot: () => ({ byId: rows }), subscribe: () => () => {} }, async refresh() { Object.assign(rows, config.refreshedRows) }, async create(request) {
       nativeCreates.push(request)
       await config.beforeCreate?.(request)
       const id = request.sessionId ?? config.sessionIds?.[nativeCreates.length - 1] ?? `session-${nativeCreates.length}`
@@ -59,7 +59,7 @@ test('每个新任务使用独立 Session；融合确认可以续接原任务，
   assert.equal(f.assistant.getSnapshot().sessionId, 'session-1')
   assert.deepEqual(f.opened, ['session-1', 'session-2', 'session-1'])
   assert.equal(calls.filter(([, endpoint]) => endpoint === 'assistant/session')[2][2].session_id, 'session-1')
-  assert.deepEqual(f.nativeCreates[2], { sessionId: 'session-1', cwd: '/repo' })
+  assert.equal(f.nativeCreates.length, 2, '续接不另建会话')
   assert.equal(calls.some(([channel]) => channel !== '/harness-platform'), false)
   f.assistant.dispose()
   assert.ok(f.references.every(item => item.released === 1))
@@ -381,9 +381,18 @@ test('迁移前原生会话按服务端提供的旧根恢复平台上下文', as
 test('续接迁移旧会话时保留原 cwd，拒绝把外部会话收编为管理任务', async () => {
   const f = fixture(async (_channel, endpoint, body) => ({ ok: true, value: endpoint === 'assistant/session' ? { session_id: body.session_id } : { proposals: [] } }), undefined, { legacy: { cwd: '/old-repo' }, foreign: { cwd: '/another-project' } }, { legacyRoots: ['/old-repo'] })
   await f.assistant.create('继续任务', { session_id: 'legacy' })
-  assert.deepEqual(f.nativeCreates[0], { sessionId: 'legacy', cwd: '/old-repo' })
+  assert.equal(f.assistant.getSnapshot().sessionId, 'legacy')
+  assert.equal(f.nativeCreates.length, 0)
   await assert.rejects(() => f.assistant.create('继续任务', { session_id: 'foreign' }), /不属于当前工作区/)
-  assert.equal(f.nativeCreates.length, 1)
+  assert.equal(f.nativeCreates.length, 0)
+  f.assistant.dispose()
+})
+
+test('续接前刷新未到达的历史会话目录，不通过新建接口收编', async () => {
+  const f = fixture(async (_channel, endpoint, body) => ({ ok: true, value: endpoint === 'assistant/session' ? { session_id: body.session_id } : { proposals: [] } }), undefined, {}, { legacyRoots: ['/old-repo'], refreshedRows: { legacy: { cwd: '/old-repo' } } })
+  await f.assistant.create('继续任务', { session_id: 'legacy' })
+  assert.equal(f.assistant.getSnapshot().sessionId, 'legacy')
+  assert.equal(f.nativeCreates.length, 0)
   f.assistant.dispose()
 })
 
