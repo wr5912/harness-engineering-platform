@@ -69,7 +69,7 @@ export function transformClientUrls(source: string): string {
     const text=input instanceof Request?input.url:input instanceof URL?input.href:input;
     if(typeof text!=='string')return input;
     const url=new URL(text,base);
-    if(url.origin!==base.origin||!/^\\/(?:api|mcp|voice-mode)(?:\\/|$)/.test(url.pathname))return input;
+    if(url.origin!==base.origin||!/^\\/(?:api|mcp|plugins|voice-mode)(?:\\/|$)/.test(url.pathname))return input;
     url.pathname=base.pathname.replace(/\\/$/,'')+url.pathname;
     return input instanceof Request?new Request(url,input):url.href;
   }\n(()=>{\n${source}\n})();\n})(globalThis);\n`

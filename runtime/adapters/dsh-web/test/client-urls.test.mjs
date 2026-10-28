@@ -66,6 +66,23 @@ test('不把局部同名 fetch 当作浏览器 fetch，也不保留修改前的 
   assert.equal(transformClientUrls(shadowed), shadowed)
 })
 
+test('插件账号与代理请求跟随站点基址，保留外部和已挂载路径', () => {
+  const calls = execute(`
+    const path='/plugins/dsh-openai-codex/auth/status';
+    fetch(path);
+    fetch('/plugins/dsh-openai-codex/proxy/test?proxyUrl=http%3A%2F%2F127.0.0.1%3A7897', {method:'POST'});
+    fetch('/hep/plugins/dsh-openai-codex/auth/accounts');
+    fetch('https://external.invalid/plugins/auth');
+    fetch('/plugins-other/status');
+  `, '/hep/')
+  assert.equal(calls[0].input, 'http://fixture.local/hep/plugins/dsh-openai-codex/auth/status')
+  assert.equal(calls[1].input, 'http://fixture.local/hep/plugins/dsh-openai-codex/proxy/test?proxyUrl=http%3A%2F%2F127.0.0.1%3A7897')
+  assert.equal(calls[1].init.method, 'POST')
+  assert.equal(calls[2].input, '/hep/plugins/dsh-openai-codex/auth/accounts')
+  assert.equal(calls[3].input, 'https://external.invalid/plugins/auth')
+  assert.equal(calls[4].input, '/plugins-other/status')
+})
+
 test('循环与 switch 的局部绑定不阻止后续全局请求转换', () => {
   const calls = execute(`
     for (let fetch of [value=>value]) { fetch('/api/local'); }
