@@ -77,7 +77,7 @@ declare module '@deepseek-ai/dsh-session' {
 
 // 框架负责按 Session 增量折叠、冷恢复和 fork；本插件不再读取完整事件日志。
 export const assistantProjection = {
-  key: projectionKey, stateVersion: 6, stateSchema: assistantStateSchema,
+  key: projectionKey, stateVersion: 7, stateSchema: assistantStateSchema,
   wire: { viewSchema: deliveryProjectionSchema, view: state => redactAssistant(deliveryProjection(state)) },
   init: (header, inheritedEventCount) => ({ session_id: header.id, inherited_event_count: inheritedEventCount, active: false, context: {}, task_context: {}, proposals: [], running: false, model_calls_observed: 0, tool_contracts: {} }),
   apply(state, event) {
@@ -86,18 +86,32 @@ export const assistantProjection = {
       if (config) return { ...state, model: { provider: config.provider ?? null, model: config.model ?? null, reasoningEffort: config.reasoningEffort ?? null } }
     }
     if (event.type === 'turn/start') return { ...state, running: true }
-    if (event.type === 'turn/end') return { ...state, running: false, turn_reason: event.data.reason, extraction_json_retry: undefined }
-    if (event.type === 'step/start') return { ...state, extraction_json_retry: undefined }
+    if (event.type === 'turn/end' || event.type === 'step/start') {
+      const next = { ...state }
+      // 原生投影检查点只接受无损 JSON；清空可选字段时删除属性。
+      delete next.extraction_json_retry
+      if (event.type === 'turn/end') { next.running = false; next.turn_reason = event.data.reason }
+      return next
+    }
     if (event.type === 'llm/retry' && event.data.policyKey === TOOL_INPUT_JSON_RETRY_POLICY) return { ...state,
       extraction_json_retry: { turn: event.data.turn, step: event.data.step, provider: event.data.provider, retry: event.data.retry, retryId: event.data.retryId } }
     // 原生 user/message 也承载 Goal 和注入上下文；只有实际新用户输入结束旧任务的收尾归属。
-    if (event.type === 'user/message' && event.data.source?.kind === 'user') return { ...state, closing_task_id: undefined }
+    if (event.type === 'user/message' && event.data.source?.kind === 'user') {
+      const next = { ...state }
+      delete next.closing_task_id
+      return next
+    }
     const pluginRecord = pluginRecordOf(event)
     if (pluginRecord?.type !== recordType) return state
     const data = pluginRecord.data as MapValue
     if (!data || typeof data !== 'object') return state
     if (typeof data.workspace_id === 'string' && !state.workspace_id) state = { ...state, workspace_id: data.workspace_id }
-    if (data.kind === 'task') return { ...state, active: true, task: data.task, task_context: normalizeManagementContext(data.context ?? {}) }
+    if (data.kind === 'task') {
+      const next = { ...state, active: true, task_context: normalizeManagementContext(data.context ?? {}) }
+      if (data.task === undefined) delete next.task
+      else next.task = data.task
+      return next
+    }
     if (data.kind === 'context') return { ...state, active: true, context: normalizeManagementContext(data.context ?? {}) }
     if (data.kind === 'workspace') return { ...state, active: true }
     if (data.kind === 'tool-contract') return { ...state, tool_contracts: { ...state.tool_contracts, [data.domain]: data.action } }
@@ -108,7 +122,10 @@ export const assistantProjection = {
       const closing = execution.state === 'completed'
         ? state.execution?.state !== 'completed' || state.execution.id !== execution.id ? execution.id : state.closing_task_id
         : undefined
-      return { ...state, execution, closing_task_id: closing }
+      const next = { ...state, execution }
+      if (closing === undefined) delete next.closing_task_id
+      else next.closing_task_id = closing
+      return next
     }
     if (data.kind === 'model-call' && data.owner_session_id === state.session_id && pluginRecord.seq >= state.inherited_event_count) return { ...state,
       model_calls_observed: (state.model_calls_observed ?? 0) + 1,
