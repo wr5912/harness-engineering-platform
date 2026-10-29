@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { webcrypto } from 'node:crypto'
 import { build } from 'esbuild'
 import { createRequire } from 'node:module'
 import vm from 'node:vm'
@@ -14,7 +15,7 @@ const detail = { experiment: { id: expA }, versions: [{ id: expA }], evaluation:
 const overview = entries => ({ agents: entries.map(([agentId, experiments]) => ({ agent_id: agentId, experiments })) })
 const betaRun = { experiment_id: 'EXP-beta-001', runs: [{ run_id: runB, status: 'completed', created_at: '2026-10-15T09:00:00Z' }] }
 const alphaOverview = experiments => overview([['alpha', experiments], ['beta', [betaRun]]])
-function workbench({ target, handler, onAssistant } = {}) {
+function workbench({ target, handler, onAssistant, storage = new Map() } = {}) {
   const states = [], dependencies = [], cleanups = []
   let cursor, effects, changed, tree, modalOpen = false, failSave = false, loadedDoc = structuredClone(doc), decisionContent = detail.decision.content
   const calls = [], navigations = [], contexts = [], confirmations = [], assistants = []
@@ -42,8 +43,8 @@ function workbench({ target, handler, onAssistant } = {}) {
   const timers = new Map()
   let timerId = 0
   const flushTimers = () => { while (timers.size) { const [id, callback] = timers.entries().next().value; timers.delete(id); callback() } }
-  const window = { confirm: message => { confirmations.push(message); return confirmationAnswers.shift() ?? true }, addEventListener: (name, listener) => { if (name === 'beforeunload') beforeUnload.add(listener) }, removeEventListener: (name, listener) => beforeUnload.delete(listener), setInterval: () => 1, clearInterval: () => undefined, setTimeout: callback => { const id = ++timerId; timers.set(id, callback); return id }, clearTimeout: id => { timers.delete(id) } }
-  vm.runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, require: name => name === 'react' ? react : name === '@deepseek-ai/dsh-client-ui-primitives' ? { MarkdownText, MarkdownDelegateProvider } : require(name), window, document: { baseURI: 'http://localhost:3090/hep/', getElementById: () => ({ focus() {} }), querySelector: () => modalOpen ? { role: 'dialog' } : null }, URL })
+  const window = { sessionStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) }, confirm: message => { confirmations.push(message); return confirmationAnswers.shift() ?? true }, addEventListener: (name, listener) => { if (name === 'beforeunload') beforeUnload.add(listener) }, removeEventListener: (name, listener) => beforeUnload.delete(listener), setInterval: () => 1, clearInterval: () => undefined, setTimeout: callback => { const id = ++timerId; timers.set(id, callback); return id }, clearTimeout: id => { timers.delete(id) } }
+  vm.runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, require: name => name === 'react' ? react : name === '@deepseek-ai/dsh-client-ui-primitives' ? { MarkdownText, MarkdownDelegateProvider } : require(name), window, crypto: webcrypto, document: { baseURI: 'http://localhost:3090/hep/', getElementById: () => ({ focus() {} }), querySelector: () => modalOpen ? { role: 'dialog' } : null }, URL })
   const { EvaluationPage } = module.exports
   const defaultHandler = async (action, payload) => {
     if (action === 'list') return { agents: [{ id: 'alpha' }, { id: 'beta' }] }
@@ -85,7 +86,7 @@ function workbench({ target, handler, onAssistant } = {}) {
   const byLabel = title => nodes().find(node => node.props?.['aria-label'] === title || node.props?.label === title)
   function change(title, value) { const element = byLabel(title); assert.ok(element, `缺少控件 ${title}`); element.props.onChange(element.props.label ? value : { target: { value, checked: value } }); render() }
   render()
-  return { render, settle, nodes, text, button, idButton, byLabel, jobStatus: () => text(nodes().find(node => node.props?.className === 'harness-eval-job-title')?.props.children?.[1]), change, invalidate: updates.invalidate, calls, navigations, contexts, assistants, MarkdownText, beforeUnload, confirmations, confirmationAnswers, setFailSave: value => { failSave = value }, setTarget(value) { props.target = value; render() }, setModalOpen(value) { modalOpen = value }, setActive(value) { props.active = value; render() }, getTarget() { return props.target }, cleanup() { cleanups.forEach(cleanup => cleanup?.()); timers.clear() } }
+  return { rpc: props.rpc, render, settle, nodes, text, button, idButton, byLabel, jobStatus: () => text(nodes().find(node => node.props?.className === 'harness-eval-job-title')?.props.children?.[1]), change, invalidate: updates.invalidate, calls, navigations, contexts, assistants, MarkdownText, beforeUnload, confirmations, confirmationAnswers, setFailSave: value => { failSave = value }, setTarget(value) { props.target = value; render() }, setModalOpen(value) { modalOpen = value }, setActive(value) { props.active = value; render() }, getTarget() { return props.target }, cleanup() { cleanups.forEach(cleanup => cleanup?.()); timers.clear() } }
 }
 
 test('评测中心默认汇总全部智能体 Run，点击即读取报告并保留挂载前缀下载', async () => {
@@ -1522,4 +1523,155 @@ test('评测记录后台刷新保留已有列表，读取反馈位于刷新入�
     assert.equal(ui.nodes().find(node => node.props?.id === 'evaluation-record-list').props['aria-busy'], false)
     assert.equal(ui.nodes(ui.button('刷新')).some(node => node.props?.label === '读取评测记录与版本'), false)
   } finally { release(); ui.cleanup() }
+})
+
+test('丢失受理回执进入未知，沿用同一请求继续，明确新建才使用新身份', async () => {
+  const accepted = new Map()
+  let starts = 0, offline = true
+  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA }, handler: async (action, payload, original) => {
+    if (action === 'eval/start') {
+      if (!accepted.has(payload.request_id)) { starts++; accepted.set(payload.request_id, { job_id: payload.request_id, status: 'running' }) }
+      return accepted.get(payload.request_id)
+    }
+    if (action === 'eval/status' && accepted.has(payload.job_id)) return accepted.get(payload.job_id)
+    return original(action, payload)
+  } })
+  const delegate = ui.rpc.call
+  ui.rpc.call = async (...args) => {
+    const endpoint = args[1]
+    if (offline && endpoint === 'agents/eval/status') throw new Error('连接中断')
+    const response = await delegate(...args)
+    if (offline && endpoint === 'agents/eval/start') throw new Error('回执丢失')
+    return response
+  }
+  try {
+    await ui.settle(); ui.button('新建评测').props.onClick(); ui.render()
+    ui.button('启动评测').props.onClick(); await ui.settle()
+    assert.match(ui.text(), /受理结果未知.*可能已经执行/)
+    assert.equal(ui.button('启动评测'), undefined)
+    assert.equal(ui.byLabel('验证目标').props.disabled, true)
+    assert.ok(ui.calls.some(call => call.action === 'eval/start' && /^[0-9a-f-]{36}$/.test(call.payload.request_id)))
+    const request = ui.calls.find(call => call.action === 'eval/start').payload.request_id
+    offline = false
+    ui.button('核对并继续此次请求').props.onClick(); await ui.settle()
+    assert.equal(starts, 1)
+    assert.equal(ui.calls.filter(call => call.action === 'eval/start').at(-1).payload.request_id, request)
+    ui.button('新建评测').props.onClick(); ui.render(); ui.button('启动评测').props.onClick(); await ui.settle()
+    assert.equal(starts, 2)
+    assert.notEqual(ui.calls.filter(call => call.action === 'eval/start').at(-1).payload.request_id, request)
+  } finally { ui.cleanup() }
+})
+
+test('重连只回读并恢复未知请求的原任务，不重发启动', async () => {
+  let job, offline = true
+  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA } })
+  const delegate = ui.rpc.call
+  ui.rpc.call = async (...args) => {
+    if (args[1] === 'agents/eval/start') { job = { job_id: args[2].request_id, status: 'running' }; throw new Error('回执丢失') }
+    if (args[1] === 'agents/eval/status' && job) { if (offline) throw new Error('连接中断'); return { ok: true, value: job } }
+    return delegate(...args)
+  }
+  try {
+    await ui.settle(); ui.button('新建评测').props.onClick(); ui.render(); ui.button('启动评测').props.onClick(); await ui.settle()
+    assert.ok(ui.button('核对并继续此次请求'))
+    offline = false; ui.invalidate(['agents']); await ui.settle()
+    assert.equal(ui.button('核对并继续此次请求'), undefined)
+    assert.equal(ui.getTarget().job_id, undefined, '重连不切换用户当前工作对象')
+    assert.equal(ui.calls.filter(call => call.action === 'eval/start').length, 0, '传输夹具已拦截唯一启动，恢复只查询原任务')
+  } finally { ui.cleanup() }
+})
+
+test('受理前断连后切到全部智能体，仍能核对并续发固定原目标且不改变当前配置', async () => {
+  let offline = true, received = 0
+  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA } })
+  const delegate = ui.rpc.call
+  ui.rpc.call = async (...args) => {
+    if (offline && ['agents/eval/start', 'agents/eval/status'].includes(args[1])) throw new Error('尚未送达')
+    if (args[1] === 'agents/eval/start') received++
+    return delegate(...args)
+  }
+  try {
+    await ui.settle(); ui.button('新建评测').props.onClick(); ui.render(); ui.button('启动评测').props.onClick(); await ui.settle()
+    const dialog = ui.nodes().find(node => node.type === 'dialog' && node.props['aria-labelledby'] === 'evaluation-config-title')
+    dialog.props.onCancel({ preventDefault() {} }); ui.render()
+    ui.change('评测智能体', ''); await ui.settle()
+    assert.match(ui.text(ui.byLabel('待核对的评测请求')), /EXP-alpha-001/)
+    assert.equal(ui.getTarget().agent_id, undefined)
+    offline = false; ui.button('核对原评测请求').props.onClick(); await ui.settle()
+    assert.equal(received, 1)
+    assert.equal(ui.calls.find(call => call.action === 'eval/start').payload.source, `experiment:${expA}`)
+    assert.equal(ui.getTarget().agent_id, undefined, '核对旧请求不把当前全部智能体切回旧对象')
+  } finally { ui.cleanup() }
+})
+
+test('未知评测在发出前保存身份，整页刷新重挂后仍沿用原请求', async () => {
+  const storage = new Map(), savedKey = 'harness-evaluation-pending:http://localhost:3090/hep/'
+  const first = workbench({ storage, target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA } })
+  const delegate = first.rpc.call
+  let requestId
+  first.rpc.call = async (...args) => {
+    if (args[1] === 'agents/eval/start') {
+      requestId = args[2].request_id
+      assert.equal(JSON.parse(storage.get(savedKey)).request_id, requestId, '发送前已保存稳定身份')
+      throw new Error('回执未到达')
+    }
+    if (args[1] === 'agents/eval/status') throw new Error('断连')
+    return delegate(...args)
+  }
+  await first.settle(); first.button('新建评测').props.onClick(); first.render(); first.button('启动评测').props.onClick(); await first.settle(); first.cleanup()
+  const second = workbench({ storage, target: { page: 'evaluation' }, handler: async (action, payload, original) => {
+    if (action === 'eval/status' && payload.job_id === requestId) throw new Error('not_found: 尚未受理')
+    if (action === 'eval/start') return { job_id: payload.request_id, status: 'running' }
+    return original(action, payload)
+  } })
+  try {
+    await second.settle()
+    assert.match(second.text(second.byLabel('待核对的评测请求')), /EXP-alpha-001/)
+    assert.ok(second.button('核对原评测请求'))
+    second.button('核对原评测请求').props.onClick(); await second.settle()
+    const submitted = second.calls.find(call => call.action === 'eval/start')
+    assert.equal(submitted.payload.request_id, requestId)
+    assert.equal(submitted.payload.source, `experiment:${expA}`)
+    assert.equal(storage.has(savedKey), false, '确认受理才清除对应暂存')
+  } finally { second.cleanup() }
+})
+
+test('浏览器暂存不可用时未知请求仍保留内存身份并阻止无提示刷新', async () => {
+  const storage = { get() { return undefined }, set() { throw new Error('storage disabled') }, delete() {} }
+  const ui = workbench({ storage, target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA } })
+  const delegate = ui.rpc.call
+  ui.rpc.call = async (...args) => {
+    if (['agents/eval/start', 'agents/eval/status'].includes(args[1])) throw new Error('断连')
+    return delegate(...args)
+  }
+  try {
+    await ui.settle(); ui.button('新建评测').props.onClick(); ui.render(); ui.button('启动评测').props.onClick(); await ui.settle()
+    const event = { prevented: false, preventDefault() { this.prevented = true } }
+    for (const protect of ui.beforeUnload) protect(event)
+    assert.equal(event.prevented, true)
+    assert.ok(ui.button('核对原评测请求'))
+  } finally { ui.cleanup() }
+})
+
+test('自动回读先确认受理后，旧恢复按钮的迟到点击不得创建新的请求', async () => {
+  let offline = true, accepted = 0, job
+  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA } })
+  const delegate = ui.rpc.call
+  ui.rpc.call = async (...args) => {
+    if (args[1] === 'agents/eval/start') { accepted++; job = { job_id: args[2].request_id, status: 'running' }; throw new Error('回执丢失') }
+    if (args[1] === 'agents/eval/status' && job) { if (offline) throw new Error('尚未重连'); return { ok: true, value: job } }
+    return delegate(...args)
+  }
+  try {
+    await ui.settle(); ui.button('新建评测').props.onClick(); ui.render(); ui.button('启动评测').props.onClick(); await ui.settle()
+    const oldContinue = ui.button('核对并继续此次请求'), oldRecover = ui.button('核对原评测请求')
+    assert.ok(oldContinue); assert.ok(oldRecover)
+    offline = false; ui.invalidate(['agents']); await ui.settle()
+    assert.equal(ui.button('核对原评测请求'), undefined)
+    oldContinue.props.onClick(); oldRecover.props.onClick(); await ui.settle()
+    assert.equal(accepted, 1)
+    ui.button('关闭').props.onClick(); ui.render()
+    ui.button('新建评测').props.onClick(); ui.render(); ui.button('启动评测').props.onClick(); await ui.settle()
+    assert.equal(accepted, 2, '只有明确新建评测才产生第二个请求')
+  } finally { ui.cleanup() }
 })

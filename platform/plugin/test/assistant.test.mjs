@@ -1481,3 +1481,58 @@ test('助手省略网关参数也拒绝缺少网关来源摘要的直连创建�
   await assert.rejects(() => f.execute(id, 'instances', 'run', { operation: 'create', name: 'no-direct', source: 'experiment:EXP-test-agent-001' }), /业务实例预览缺少来源摘要/)
   assert.equal(f.calls.some(call => call.endpoint === 'instances/run'), false)
 })
+
+test('普通管理会话文档读取绑定当前 Agent，保持只读并公开准确分页合同', async t => {
+  const f = fixture(t)
+  const id = (await f.rpc('session', { task: '整理为 LLM Wiki' })).value.session_id
+  const signal = new AbortController().signal
+  const calls = []
+  f.services.readDocument = async (input, agent, requestSignal) => {
+    calls.push({ input, agent, requestSignal })
+    return { filename: 'guide.pdf', blocks: [{ kind: 'page', ordinal: 1, text: '规范正文' }], has_more: true, next_cursor: 'opaque', source_sha256: 'a'.repeat(64) }
+  }
+  const contract = await f.execute(id, 'agents', 'describe', { action: 'documents/read' })
+  assert.equal(contract.value.input_schema.properties.cursor.type, 'string')
+  const result = await f.execute(id, 'agents', 'documents/read', { path: 'guide.pdf' }, signal)
+  assert.equal(result.value.filename, 'guide.pdf')
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].agent.session, f.sessions.get(id).session)
+  assert.equal(calls[0].requestSignal, signal)
+  assert.deepEqual(calls[0].input, { path: 'guide.pdf' })
+  assert.equal(f.calls.filter(call => call.endpoint === 'agents/documents/read').length, 0)
+  assert.deepEqual((await f.status(id)).proposals, [])
+  await assert.rejects(f.tools.get('platform_agents').execute({ action: 'documents/read', input: {} }, { signal }), /当前管理会话/)
+})
+
+test('专项任务不获得通用文档读取能力', async t => {
+  const f = fixture(t)
+  f.services.readDocument = async () => { throw new Error('不应进入通用文档读取') }
+  for (const context of [
+    { skill: 'decision-sample-extraction', run_id: 'run-fixed' },
+    { skill: 'compute-variant-research', experiment_id: 'EXP-basic-001' },
+    { skill: 'agent-maintenance', workflow: 'features', agent_id: 'basic', experiment_id: 'EXP-basic-001' },
+  ]) {
+    const id = (await f.rpc('session', { task: '专项测试', context })).value.session_id
+    await assert.rejects(f.execute(id, 'agents', 'documents/read', { path: 'guide.pdf' }), /不允许|仅允许/)
+    await assert.rejects(f.execute(id, 'agents', 'describe', { action: 'documents/read' }), /不允许/)
+  }
+})
+
+test('文档变量引用在工具与呈现中保留原文，凭据启发式脱敏明确标记', async t => {
+  const f = fixture(t)
+  const id = (await f.rpc('session', { task: '阅读技术文档' })).value.session_id
+  const technical = '接口使用 Bearer ${TOKEN} 验证请求；示例地址 https://example.test/?token=${TOKEN}'
+  f.services.readDocument = async () => ({ filename: 'guide.txt', blocks: [
+    { kind: 'paragraph', ordinal: 1, text: technical, start_offset: 0, end_offset: technical.length },
+    { kind: 'paragraph', ordinal: 2, text: 'Bearer abcdefghijklmnop', start_offset: 0, end_offset: 23 },
+  ], warnings: [], has_more: false })
+  const receipt = await f.execute(id, 'agents', 'documents/read', { path: 'guide.txt' })
+  assert.equal(receipt.value.blocks[0].text, technical)
+  assert.equal(receipt.value.blocks[0].redacted, false)
+  assert.equal(receipt.value.blocks[1].redacted, true)
+  assert.equal(receipt.value.blocks[1].text, 'Bearer [已隐藏]')
+  assert.match(receipt.value.blocks[1].note, /偏移对应原始正文/)
+  const presentation = f.tools.get('platform_agents').output.presentationMeta({ action: 'documents/read', input: { path: 'guide.txt' } }, receipt)
+  assert.equal(presentation.result.value.blocks[0].text, technical)
+  assert.equal(presentation.result.value.blocks[1].redacted, true)
+})

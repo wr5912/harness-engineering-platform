@@ -11,6 +11,7 @@ export interface OperationMeta {
 }
 
 const titles: Record<string, string> = {
+  'documents/read': '读取知识文档',
   'research/read-reference': '读取研究方法', 'research/validate': '检查研究资产', 'legacy/inspect': '清点导入来源', 'decision/preview': '核对研究结论', 'decision/update': '保存研究结论',
   context: '读取工作区与任务目标', describe: '读取操作用法', list: '查询智能体', detail: '读取智能体详情',
   'tasks/capabilities': '查找可复用能力', 'assets/read-fixed': '读取固定版本文件', 'assets/diff': '比较版本资产',
@@ -84,6 +85,7 @@ export function operationSummary(meta: OperationMeta, phase = 'result') {
   else if (action === 'compute-variants/rename' && value?.variant_name) outcome = `已保存变体名称：${value.variant_name}`
   else if (action === 'decision/update' && value) outcome = '已保存研究结论与依据'
   else if (action === 'decision/preview' && value) outcome = '已核对研究结论及状态变更；尚未写入'
+  else if (action === 'documents/read' && Array.isArray(value?.blocks)) outcome = `已读取 ${value.filename ?? '文档'} 的 ${value.blocks.length} 个正文片段${value.has_more ? '，尚有后续内容' : '，正文读取完毕'}${value.warnings?.length ? '；请核对提取说明' : ''}`
   else if (action === 'research/read-reference' && value?.content) outcome = '已读取当前数据工作区中的研究方法'
   else if (action === 'research/validate' && typeof value?.valid === 'boolean') outcome = value.valid ? '研究资产格式检查通过；业务效果需依据实际评测' : '研究资产检查发现问题，请查看实际回执'
   else if (action === 'legacy/inspect' && value) outcome = '来源清点已返回；未执行导入内容'

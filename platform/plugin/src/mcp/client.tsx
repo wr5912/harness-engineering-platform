@@ -12,6 +12,7 @@ import { PasswordInput } from './components.tsx'
 import { CHANNEL, type PlatformNavigation, type PlatformPageProps } from '../protocol.ts'
 import type { CompositionConfig, CompositionEntry } from './compositions.ts'
 import type { PlatformUpdates } from '../realtime/client.ts'
+import { useQueuedRefresh } from '../realtime/refresh.ts'
 import { compositionTestInput, isThreatComposition, ThreatConfigurationFields, ThreatRunResult, threatEditorStyle } from './threat-editor.tsx'
 
 type LivePageProps = { updates?: PlatformUpdates; onContext?(context: Record<string, unknown>): void }
@@ -43,39 +44,32 @@ export function McpPage({ rpc, updates, onContext, target, onNavigate, active = 
     }
     onContext?.(context)
   }, [onContext])
-  const [revision, setRevision] = useState(0)
   const [serviceLoaded, setServiceLoaded] = useState(false)
   useEffect(() => {
     if (active && target?.page === 'mcp' && tabs.some(tab => tab.id === target.tab)) setPage(target.tab!)
   }, [active, target?.page, target?.tab])
+  const refreshConfiguration = useQueuedRefresh(active, async () => {
+    await Promise.allSettled([
+      rpc.call(CHANNEL, 'mcp/configuration', {}).then(response => {
+        setState(response.ok ? { status: 'ready', writable: true, ...(response.value as object) }
+          : (previous: any) => previous.status === 'ready' ? { ...previous, error: response.error.message }
+            : { status: 'unavailable', error: response.error.message })
+      }).catch(() => setState((previous: any) => previous.status === 'ready'
+        ? { ...previous, error: '无法读取 MCP 数据配置，请检查连接后重试。' }
+        : { status: 'unavailable', error: '无法读取 MCP 数据配置，请检查连接后重试。' })),
+      page === 'composition' ? Promise.resolve() : rpc.call(CHANNEL, 'mcp/list', {}).then(response => {
+        if (response.ok) { setPublishedService((response.value as any).publishedService ?? null); setServiceError(''); setServiceLoaded(true) }
+        else setServiceError(response.error.message)
+      }).catch(() => setServiceError('无法读取已发布组合服务，请刷新重试。')),
+    ])
+  })
+  useEffect(() => { void refreshConfiguration() }, [rpc])
   useEffect(() => updates?.subscribe(() => {
-    if (updates.getSnapshot().domains.includes('mcp')) setRevision(value => value + 1)
+    if (updates.getSnapshot().domains.includes('mcp')) void refreshConfiguration()
   }), [updates])
-  useEffect(() => {
-    let mounted = true
-    void rpc.call(CHANNEL, 'mcp/configuration', {}).then(response => {
-      if (!mounted) return
-      setState(response.ok ? { status: 'ready', writable: true, ...(response.value as object) }
-        : (previous: any) => previous.status === 'ready' ? { ...previous, error: response.error.message }
-          : { status: 'unavailable', error: response.error.message })
-    }).catch(() => { if (mounted) setState((previous: any) => previous.status === 'ready'
-      ? { ...previous, error: '无法读取 MCP 数据配置，请检查连接后重试。' }
-      : { status: 'unavailable', error: '无法读取 MCP 数据配置，请检查连接后重试。' }) })
-    return () => { mounted = false }
-  }, [rpc, revision])
   useEffect(() => {
     if (active && page !== 'composition') onContext?.({ page: 'mcp', tab: page, server_id: target?.server_id, group_id: target?.group_id })
   }, [active, page, target?.server_id, target?.group_id, onContext])
-  useEffect(() => {
-    if (state.status !== 'ready') return
-    let active = true
-    void rpc.call(CHANNEL, 'mcp/list', {}).then(response => {
-      if (!active) return
-      if (response.ok) { setPublishedService((response.value as any).publishedService ?? null); setServiceError(''); setServiceLoaded(true) }
-      else setServiceError(response.error.message)
-    }).catch(() => { if (active) setServiceError('无法读取已发布组合服务，请刷新重试。') })
-    return () => { active = false }
-  }, [state.revision, state.status, revision])
   const servers = state.status === 'ready' ? [...(state.value?.servers ?? []), ...(publishedService ? [publishedService] : [])] : []
   const missingServer = active && page !== 'composition' && target?.server_id && serviceLoaded && state.status === 'ready' && !servers.some((server: any) => server.id === target.server_id)
   useEffect(() => {
@@ -176,7 +170,6 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
   const locatedComposition = useRef('')
   const listRef = useRef<HTMLElement>(null)
   const listButtons = useRef(new Map<string, HTMLButtonElement>())
-  const [revision, setRevision] = useState(0)
   const routeMatchesSelection = !target?.composition_id || target.composition_id === selection?.id
     && (!target.version || target.version === selection?.version) && target.version_id === selection?.versionId
   const result = routeMatchesSelection ? rawResult : null
@@ -186,7 +179,7 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
     setResult(null); setError(''); setBusy(false)
   }, [target?.composition_id, target?.version, target?.version_id])
   useEffect(() => updates?.subscribe(() => {
-    if (updates.getSnapshot().domains.includes('mcp')) setRevision(value => value + 1)
+    if (updates.getSnapshot().domains.includes('mcp')) void refreshCatalog()
   }), [updates])
   useEffect(() => {
     if (!editor && !recoveryDraft) return
@@ -265,16 +258,18 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
       return first ? { id: first.id, version: first.draft ? 'draft' : 'published', ...(first.draft ? {} : { versionId: first.publishedVersionId }) } : null
     })
   }
-  useEffect(() => {
+  const refreshCatalog = useQueuedRefresh(active, async () => {
     const id = ++requestId.current
     setCatalogLoading(true)
-    void rpc.call(CHANNEL, 'mcp/list', {}).then(response => {
+    try {
+      const response = await rpc.call(CHANNEL, 'mcp/list', {})
       if (id !== requestId.current) return
-      if (response.ok) accept(response.value)
+      if (response.ok) { accept(response.value); setError(''); setConflictDetected(false) }
       else setError(response.error.message)
-    }).catch(() => { if (id === requestId.current) setError('无法读取编排目录。') }).finally(() => { if (id === requestId.current) setCatalogLoading(false) })
-    return () => { requestId.current++ }
-  }, [configuration, revision])
+    } catch { if (id === requestId.current) setError('无法读取编排目录。') }
+    finally { if (id === requestId.current) setCatalogLoading(false) }
+  })
+  useEffect(() => { void refreshCatalog(); return () => { requestId.current++ } }, [configuration])
 
   function select(item: CompositionEntry, version: 'draft' | 'published', versionId?: string, focus = true) {
     const next = { id: item.id, version, ...(versionId ? { versionId } : {}) }
@@ -295,6 +290,7 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
     setTimeout(() => URL.revokeObjectURL(url), 0)
   }
   async function action(endpoint: string, payload: any) {
+    if (busy) return
     const id = ++actionId.current
     setBusy(true); setPendingAction(endpoint); setResult(null); setError('')
     try {
@@ -333,7 +329,7 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
     <style>{threatEditorStyle}</style>
     <nav ref={listRef} className="harness-card harness-composition-sidebar" aria-label="工具编排列表">
       <h2>工具组合编排{data && (catalogLoading || busy && pendingAction === 'list') && <LoadingIndicator label="刷新编排目录" />}</h2><div className="harness-mcp-actions"><button type="button" disabled={busy || !!editor || !data} onClick={() => setEditor({ revision: data.revision, value: { toolName: '', title: '资产相关告警查询', description: '查询资产后查询相关告警的两步只读组合', connectionId: connections[0]?.id ?? '' } })}>新建编排</button>
-        <button type="button" disabled={busy || !!editor} onClick={() => void action('list', {})}>刷新</button></div>
+        <button type="button" disabled={busy || !!editor} onClick={() => void refreshCatalog()}>刷新</button></div>
       <section aria-label="全部编排"><h3>全部编排（{entries.length}）</h3>
         {!data ? null : entries.length ? <ul>{entries.map(item => {
           const version = item.draft ? 'draft' : 'published'
@@ -351,7 +347,7 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
       {busy && pendingAction !== 'list' && <p role="status">正在处理…</p>}
       {config && !extensionReady && <p role="alert">此编排依赖的业务扩展尚未装载。已有目录保持可读，请先启用工作区的 DSH 扩展。</p>}
       {conflict && <section className="harness-composition-conflict" role="alert"><h3>编排目录版本冲突</h3><p>当前编辑基于版本 <code>{editor?.revision.slice(0, 12)}</code>，页面已读取的目录版本为 <code>{data?.revision?.slice(0, 12)}</code>。本地草稿仍在编辑器中；请先取回草稿，再读取最新内容并手工重应用修改。</p>
-        <div className="harness-mcp-actions"><button type="button" onClick={() => exportDraft(editor!.value, false)}>复制本地草稿</button><button type="button" onClick={() => exportDraft(editor!.value, true)}>下载本地草稿</button><button type="button" disabled={busy} onClick={() => void action('list', {})}>读取最新目录</button>{data && editor?.revision !== data.revision && <button type="button" onClick={() => {
+        <div className="harness-mcp-actions"><button type="button" onClick={() => exportDraft(editor!.value, false)}>复制本地草稿</button><button type="button" onClick={() => exportDraft(editor!.value, true)}>下载本地草稿</button><button type="button" disabled={busy} onClick={() => void refreshCatalog()}>读取最新目录</button>{data && editor?.revision !== data.revision && <button type="button" onClick={() => {
           const latest = entries.find(item => item.id === editor!.id)
           setRecoveryDraft(editor); setEditor(latest ? { id: latest.id, revision: data.revision, value: structuredClone(latest.draft ?? latest.published!) } : null)
           setConflictDetected(false); setError(latest ? '已装载最新内容。保留的本地草稿可复制或下载，请手工重应用修改后保存。' : '原编排已不存在；本地草稿仍可复制或下载。')
@@ -399,9 +395,9 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
         {!editor && !historical && <><section className="harness-composition-test"><p>{threat ? '实际执行将按已编译流程调用取证、模型或模拟存储；请使用基本运维测试事件。' : '第一步失败或缺少资产 ID 时，第二步停止执行。'}</p>
           {config?.kind === 'threat-stage' && config.stage !== 'collect' ? <>
             {carriedRun && <p role="status">已带入上一阶段返回的运行：<code>{carriedRun}</code>。核对本阶段后再执行。</p>}
-            <DetailDrawer title="按已知运行恢复" trigger={carriedRun ? '更换运行（高级恢复）' : '按已知运行恢复（高级）'} active={active} identity={`${selection?.id}:${selection?.version}:${selection?.versionId ?? ''}`}><div className="harness-threat-editor"><p>填写已有阶段返回的运行 ID。关闭窗口后输入仍保留，实际执行仍需在本阶段点击“实际执行组合工具”。</p><label>运行 ID<input aria-label="组合运行 ID" value={asset} onChange={event => { setAsset(event.target.value); setContinuedRun(null); setResult(null) }} placeholder="填写已有阶段返回的 run_id" /></label></div></DetailDrawer>
+            <DetailDrawer title="按已知运行恢复" trigger={carriedRun ? '更换运行（高级恢复）' : '按已知运行恢复（高级）'} active={active} identity={`${selection?.id}:${selection?.version}:${selection?.versionId ?? ''}`}><div className="harness-threat-editor"><p>填写已有阶段返回的运行 ID。关闭窗口后输入仍保留，实际执行仍需在本阶段点击“实际执行组合工具”。</p><label>运行 ID<input aria-label="组合运行 ID" disabled={busy} value={asset} onChange={event => { if (busy) return; actionId.current++; setAsset(event.target.value); setContinuedRun(null); setResult(null) }} placeholder="填写已有阶段返回的 run_id" /></label></div></DetailDrawer>
             {!asset && <p>从上一阶段的实际结果选择“继续”，即可自动带入同一运行；也可按已知运行恢复。</p>}
-          </> : <label>{threat ? '事件 ID' : '查询资产'}<input aria-label={threat ? '组合事件 ID' : '组合查询资产'} value={asset} onChange={event => { setAsset(event.target.value); setResult(null) }} placeholder={threat ? 'INC-20261015-000001' : config?.flow ? '资产 ID，如 9106' : '资产 ID、主机名或 IP'} /></label>}
+          </> : <label>{threat ? '事件 ID' : '查询资产'}<input aria-label={threat ? '组合事件 ID' : '组合查询资产'} disabled={busy} value={asset} onChange={event => { if (busy) return; actionId.current++; setAsset(event.target.value); setResult(null) }} placeholder={threat ? 'INC-20261015-000001' : config?.flow ? '资产 ID，如 9106' : '资产 ID、主机名或 IP'} /></label>}
           <div className="harness-mcp-actions"><button type="button" disabled={busy || !asset.trim()} onClick={() => void action('dryRunComposition', selectedPayload)}>测试（dry）</button>
             {selection?.version === 'draft' && <button type="button" disabled={busy || !asset.trim()} onClick={() => void action('publishComposition', selectedPayload)}>发布工具</button>}
             <button type="button" disabled={busy || !asset.trim() || !upstream} onClick={() => void action('executeComposition', selectedPayload)}>实际执行组合工具</button></div>

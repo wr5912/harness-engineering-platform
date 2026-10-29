@@ -10,6 +10,7 @@ import WebServer from '../../../runtime/adapters/dsh-web/lib/platform-webserver.
 import * as WebApp from '@deepseek-ai/dsh-web-app'
 import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
+import { LocalFileSystem } from '@deepseek-ai/dsh-fs-local'
 import * as plugin from '../lib/index.js'
 
 test('平台登录保护原生 API、三个写入域与 MCP，旧 Token/Cookie 被拒绝且退出可撤销会话', async t => {
@@ -64,6 +65,8 @@ test('平台登录保护原生 API、三个写入域与 MCP，旧 Token/Cookie �
     ctx.provide('goals', { get: () => undefined })
     // 空数据工作区仍可验证认证与原生注册；本项不发起管理会话。
     ctx.provide('skills', { async get() { return undefined } })
+    ctx.provide('attachments', { fileHostPath: () => undefined, async *readFileStream() { assert.fail('认证测试不读取附件') } })
+    new LocalFileSystem(ctx, { cwd: assetRoot, diffBasisMaxBytes: 1024 * 1024 })
   } })
   const origin = `http://127.0.0.1:${root.webServer.port}`
   const base = origin + '/hep'

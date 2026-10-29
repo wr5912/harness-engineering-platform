@@ -36,7 +36,10 @@ export function assertGitBundle(source: string): void {
 export function collectSystemGit(destination: string): GitBundleResult {
   const git = which('git')
   const version = run(git, ['--version']).trim()
-  copyPreservingPath(git, join(destination, 'root'))
+  const binary = join(destination, 'root', 'usr', 'bin', 'git')
+  mkdirSync(dirname(binary), { recursive: true })
+  copyFileSync(git, binary)
+  chmodSync(binary, statSync(git).mode & 0o777)
   for (const path of ['/usr/lib/git-core', '/usr/share/git-core', '/usr/share/git']) {
     if (existsSync(path)) copyPreservingPath(path, join(destination, 'root'))
   }
@@ -53,11 +56,12 @@ BASE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 export LD_LIBRARY_PATH="$BASE/root/lib/${libDir}-linux-gnu:$BASE/root/lib:$BASE/root/usr/lib/${libDir}-linux-gnu\${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export GIT_EXEC_PATH="$BASE/root/usr/lib/git-core"
 export GIT_TEMPLATE_DIR="$BASE/root/usr/share/git-core/templates"
-exec "$BASE/root${git}" "$@"
+exec "$BASE/root/usr/bin/git" "$@"
 `
   const wrapperPath = join(destination, 'git')
   writeFileSync(wrapperPath, wrapper, { mode: 0o755 })
   chmodSync(wrapperPath, 0o755)
+  assertGitBundle(destination)
   return { version, source: 'system', path: wrapperPath }
 }
 

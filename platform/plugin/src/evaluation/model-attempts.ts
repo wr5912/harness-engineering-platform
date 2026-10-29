@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto'
-import { isCodeOnlyModelRoute } from '../workflows/code-only-route.ts'
+import { isCodeOnlyModelRoute, isHybridWorkflowRoute } from '../workflows/code-only-route.ts'
 
 export type ModelRole = 'target' | 'judge' | 'analysis' | 'generation'
 export type ModelAttemptContext = {
   execution_id: string; role?: ModelRole; parent_run_id?: string; case_id?: string; session_id?: string; tool_call_id?: string
   model_invocation?: boolean
+  model_role?: 'language' | 'decision'; kind?: 'typed_decision'
+  checkpoint_sha256?: string; state_constructor_sha256?: string; calibration_sha256?: string
 }
 export type ModelAttempt = ModelAttemptContext & {
   attempt_id: string; status: 'preparing' | 'started' | 'completed' | 'failed' | 'cancelled' | 'local'
@@ -22,7 +24,7 @@ export function observeLlm(llm: any, context: ModelAttemptContext, record: Attem
   return {
     async prepareCall(config: Record<string, any>, signal?: AbortSignal, ...rest: any[]) {
       const identity = { execution_id: context.execution_id, role: context.role ?? 'target', attempt_id: randomUUID(),
-        ...Object.fromEntries(['parent_run_id', 'case_id', 'session_id', 'tool_call_id'].flatMap(key => {
+        ...Object.fromEntries(['parent_run_id', 'case_id', 'session_id', 'tool_call_id', 'model_role', 'kind', 'checkpoint_sha256', 'state_constructor_sha256', 'calibration_sha256'].flatMap(key => {
           const value = context[key as keyof ModelAttemptContext]
           return value === undefined ? [] : [[key, value]]
         })), ...(typeof context.model_invocation === 'boolean' ? { model_invocation: context.model_invocation } : {}) }
@@ -79,4 +81,5 @@ export function isLocalModelRoute(route: any): boolean {
   return route?.provider === 'threat-analysis-delivery' && route?.model === 'fixed-summary'
     || route?.provider === 'threat-analysis-automation' && route?.model === 'scheduled-batch'
     || isCodeOnlyModelRoute(route)
+    || isHybridWorkflowRoute(route)
 }

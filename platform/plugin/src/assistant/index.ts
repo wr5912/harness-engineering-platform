@@ -17,6 +17,7 @@ import { DECISION_EXTRACTION_ACTIONS } from './extraction-scope.ts'
 import { assistantActions, assistantActionContract, allowedAssistantActions, projectAssistantTools, featureActions, type AssistantDomain } from './tool-contracts.ts'
 import { TOOL_INPUT_JSON_RETRY_POLICY, toolInputJsonRetrySchema } from './tool-input-recovery.ts'
 import { decisionExtractionModelContract, normalizeDecisionModelSubmission } from '../evaluation/decision-dataset-contract.ts'
+import type { DocumentReader } from './documents.ts'
 
 type MapValue = Record<string, any>
 type Domain = AssistantDomain
@@ -40,11 +41,13 @@ export interface AssistantServices {
   releaseTaskScope?(agent: any): void
   notify(domains: string[], ids?: string[]): void
   mcp?: (action: string, input: MapValue, signal: AbortSignal) => Promise<any>
+  readDocument?: DocumentReader
 }
 
 
 const readActions = new Set(['research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'tasks/capabilities', 'tasks/assembly-preview', 'list', 'detail', 'edit/read', 'edit/preview', 'cases/list', 'cases/read', 'eval/preview', 'eval/status', 'runs/index', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/preview', 'compute-variants/build-preview', 'compute-variants/freeze-preview', 'compute-variants/compare', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'datasets/source', 'datasets/preview', 'datasets/list', 'datasets/read', 'datasets/export', 'features/read-source', 'features/preview', 'features/proposal', 'fusion/preview', 'fusion/proposal', 'fusion/status', 'url', 'logs', 'preview', 'batch-preview', 'configuration', 'test', 'resources', 'resourceTemplates', 'readResource', 'sources/list', 'sources/components', 'sources/logs', 'sources/preview', 'dryRunComposition', 'compositionRun', 'compositionArtifact'])
 readActions.add('control/status')
+readActions.add('documents/read')
 const recordType = 'plugin:harness-platform/assistant'
 const projectionKey = 'harnessPlatformAssistant'
 
@@ -144,8 +147,14 @@ export function redactAssistant(value: any): any {
 }
 function wireValue(value: any) {
   // 资产端点已标明脱敏/截断状态；二次日志脱敏不能改写可编辑源码。
-  const source = value?.domain === 'agents' && ['edit/read', 'edit/preview', 'assets/read-fixed', 'assets/diff', 'features/read-source'].includes(value.action)
+  const document = value?.domain === 'agents' && value.action === 'documents/read'
+  const source = document || value?.domain === 'agents' && ['edit/read', 'edit/preview', 'assets/read-fixed', 'assets/diff', 'features/read-source'].includes(value.action)
   const view = (item: any, key = ''): any => {
+    if (document && item && typeof item === 'object' && ['page', 'paragraph'].includes(item.kind) && typeof item.text === 'string') {
+      const text = assetText('document', item.text)
+      return { ...item, text: text.content, redacted: item.redacted === true || text.redacted,
+        ...(item.redacted === true || text.redacted ? { note: '此片段含凭据常量，已脱敏；偏移对应原始正文，请勿将此片段作为原文副本。' } : {}) }
+    }
     if (typeof item === 'string') return source && ['content', 'diff', 'before', 'after'].includes(key) ? assetText('source', item).content : redactAssistant(item)
     if (Array.isArray(item)) return item.map(entry => view(entry))
     if (item && typeof item === 'object') return Object.fromEntries(Object.entries(item).map(([name, entry]) => [name, view(entry, name)]))
@@ -610,6 +619,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
           ...projected?.kind === 'platform-operation' ? projected : {}, input: identity })
       } },
       async execute(args: any, exec: any) {
+        if (!exec.agent) throw new Error('平台操作必须在当前管理会话中执行')
         const id = String(exec.agent.id)
         if (!promptState(exec.agent) || exec.agent.session.header.id !== id) throw new Error('当前 Session 不是平台管理会话')
         const { state } = await inspect(id, exec.signal)
@@ -641,6 +651,10 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
         if (!actions[domain].includes(args.action)) throw new Error('未知的领域操作')
         const input = domain === 'agents' && args.action === 'datasets/preview' && state.task_context.skill === 'decision-sample-extraction'
           ? normalizeDecisionModelSubmission({ ...object(args.input) }) : { ...object(args.input) }
+        if (domain === 'agents' && args.action === 'documents/read') {
+          if (!services.readDocument) throw new Error('当前平台未装载文档读取服务')
+          return wireValue({ domain, action: args.action, ok: true, value: await services.readDocument(input, exec.agent, exec.signal) })
+        }
         if (domain === 'agents' && state.task_context.skill === 'decision-sample-extraction' && args.action.startsWith('datasets/')) input.run_id = state.task_context.run_id
         if (domain === 'agents' && automaticWorkflow(state, args.action)) {
           const recovered = await locked(id, () => recoverBeforeAutomaticPreview(id, args.action, exec.signal))

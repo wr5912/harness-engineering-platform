@@ -321,13 +321,25 @@ function discoveryMetadata(server: any, kind: 'tools' | 'r' | 't', items: any[],
 const groupResourceBindings = new Map<string, { digest: string; resources: any[] }>()
 
 /** 发布名只属于分组；来源身份保存在映射和元数据中，不从公开名称反向拆解。 */
-async function groupToolBindings(target: GroupTarget, signal?: AbortSignal, unavailable: string[] = []): Promise<any[]> {
+async function groupToolBindings(target: GroupTarget, signal?: AbortSignal, unavailable: string[] = [], requestedName?: string): Promise<any[]> {
+  const digest = groupTargetDigest(target, 2), cached = groupResourceBindings.get(target.group.id)
+  const previous = cached?.digest === digest ? cached : undefined
+  // 调用只刷新其来源；其他已选名称仍占位，冲突判断不依赖对方在线。
+  const requestedServers = requestedName === undefined ? undefined : new Set<string>([
+    ...target.group.members.filter(member => member.names.some(name => name === requestedName || v2ToolName(member.serverId, name) === requestedName)).map(member => member.serverId),
+    ...(previous?.resources.filter(resource => resource.item.name === requestedName
+      || resourceToolName(resource.server.id, resource.kind, resource.item) === requestedName).map(resource => resource.server.id) ?? []),
+  ])
+  if (requestedServers?.size && !previous && target.group.members.some(member => !requestedServers.has(member.serverId)
+    && ((member.resourceUris?.length ?? 0) + (member.resourceTemplates?.length ?? 0) > 0))) {
+    throw new Error('MCP 分组资源名称尚未发现，请先重新发现工具后调用')
+  }
   const catalogs = await Promise.all(target.group.members.map(async (member: any) => {
     const server = target.servers.find(item => item.id === member.serverId && item.enabled)
     if (!server) return []
     const selected = member.names.filter((name: string) => server.tools?.mode !== 'selected' || server.tools.names.includes(name))
     let tools: any[] = []
-    if (selected.length) try { tools = await serverTools({ ...server, platformSignal: signal ?? server.platformSignal }) }
+    if (selected.length && (!requestedServers || requestedServers.has(server.id))) try { tools = await serverTools({ ...server, platformSignal: signal ?? server.platformSignal }) }
     catch (error) { if (signal?.aborted) throw error; unavailable.push(server.id) }
     // 暂时离线或失效的已选名称仍占用身份，防止同名工具悄然换成其他来源。
     return selected.flatMap((name: string) => {
@@ -337,13 +349,13 @@ async function groupToolBindings(target: GroupTarget, signal?: AbortSignal, unav
     })
   }))
   const bindings = catalogs.flat()
-  const resources = await resourceToolsFor(target, signal, unavailable)
-  const digest = groupTargetDigest(target, 2), previous = groupResourceBindings.get(target.group.id)
+  const resources = await resourceToolsFor(requestedServers ? { ...target,
+    group: { ...target.group, members: target.group.members.filter(member => requestedServers.has(member.serverId)) } } : target, signal, unavailable)
   // 保留已发现的资源身份，短暂离线不能把它的名称交给另一个来源。
-  if (previous?.digest === digest) for (const resource of previous.resources) {
+  if (previous) for (const resource of previous.resources) {
     if (!resources.some(item => item.uri === resource.uri)) resources.push({ ...resource, tool: undefined })
   }
-  groupResourceBindings.set(target.group.id, { digest, resources })
+  if (!requestedServers) groupResourceBindings.set(target.group.id, { digest, resources })
   for (const resource of resources) {
     const { server, kind, item, tool } = resource
     const equivalent = server.specUrl && bindings.find(binding => binding.server.id === server.id && binding.sourceName === item.name
@@ -524,7 +536,7 @@ async function callSelectedTool(target: Target, version: GroupVersion, name: str
   assertCurrent?: () => void): Promise<any> {
   let owner = target.kind === 'group' && version === 2 ? undefined : toolOwner(target, name, version)
   if (target.kind === 'group' && version === 2) {
-    const bindings = await groupToolBindings(target, signal)
+    const bindings = await groupToolBindings(target, signal, [], name)
     const matches = bindings.filter(binding => binding.name === name || binding.aliases.includes(name))
     if (matches.length > 1 || matches.some(binding => binding.conflict)) throw new Error('MCP 分组工具名冲突，请调整分组选择并重新发现')
     const binding = matches[0]?.aliasResources?.[name] ?? matches[0]
@@ -870,6 +882,17 @@ export function apply(ctx: any, config: any): void {
   } }), 'mcp-manager.admin')
 
   const loadServers = async (selected: any[], preset: object, scopes: any[], unavailable: Set<string>) => {
+    if (config.isolateDiscovery && selected.length > 1) {
+      // 每个连接独立完成发现与注册；慢或失效来源不延迟健康工具的可见性。
+      const results = await Promise.allSettled(selected.map(async server => {
+        const owned: any[] = []
+        try { await loadServers([server], preset, owned, unavailable) }
+        finally { scopes.push(...owned) }
+      }))
+      const failed = results.find(result => result.status === 'rejected') as PromiseRejectedResult | undefined
+      if (failed) throw failed.reason
+      return
+    }
     const enabled = selected.filter(server => server.enabled && !connectionIssue(server) && (server.platformComposition || server.specUrl || resolvedUrl(server)))
     // 并发发现有界执行；单个上游失败时，其余工具仍可装载。
     const discoveries = config.withToolContext ? await Promise.allSettled(enabled.map(server => {
@@ -968,6 +991,7 @@ export function apply(ctx: any, config: any): void {
     const preset = scopeParentOf(agent)
     if (!preset) return
     const current = snapshot(config)
+    if (config.mountServers) current.servers = config.mountServers(current.servers)
     const version = JSON.stringify([current.servers, current.sharedToken])
     let entry = mounted.get(preset)
     const reused = entry?.version === version

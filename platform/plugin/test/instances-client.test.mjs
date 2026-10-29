@@ -938,3 +938,37 @@ test('实例后台刷新保留原列表，入口显示轻量读取指示且不�
   assert.equal(ui.buttons('刷新列表')[0].props.disabled, false)
   assert.equal(ui.nodes(ui.buttons('刷新列表')[0]).some(node => node.props?.['aria-label'] === '读取实例列表'), false)
 })
+
+test('Instances 隐藏通知暂停，恢复后的慢刷新合并在途通知', async () => {
+  let block = false, release, concurrent = 0, maximum = 0
+  const ui = page({ respond(endpoint) {
+    if (endpoint !== 'instances/list' || !block) return
+    concurrent++; maximum = Math.max(maximum, concurrent)
+    return new Promise(resolve => { release = () => { concurrent--; resolve({ ok: true, value: { instances: [] } }) } })
+  } })
+  await ui.settle(); const before = ui.calls.length
+  ui.setActive(false); ui.invalidate(); ui.invalidate(); ui.invalidate(); await ui.settle()
+  assert.equal(ui.calls.length, before)
+  block = true; ui.setActive(true); await ui.settle(); assert.equal(concurrent, 1)
+  const started = ui.calls.filter(call => call.endpoint === 'instances/list').length
+  ui.invalidate(); ui.invalidate(); ui.invalidate(); await ui.settle()
+  assert.equal(ui.calls.filter(call => call.endpoint === 'instances/list').length, started)
+  block = false; release(); await ui.settle()
+  assert.equal(ui.calls.filter(call => call.endpoint === 'instances/list').length, started + 1)
+  assert.equal(maximum, 1)
+})
+
+test('Instances 首次列表慢读取与领域通知共用队列', async () => {
+  let release, block = true, reads = 0
+  const ui = page({ respond(endpoint) {
+    if (endpoint !== 'instances/list') return
+    reads++
+    if (block) return new Promise(resolve => { release = () => resolve({ ok: true, value: { instances: [] } }) })
+    return { ok: true, value: { instances: [] } }
+  } })
+  assert.equal(reads, 1)
+  ui.invalidate(); ui.invalidate(); ui.invalidate(); await ui.settle()
+  assert.equal(reads, 1)
+  block = false; release(); await ui.settle()
+  assert.equal(reads, 2)
+})

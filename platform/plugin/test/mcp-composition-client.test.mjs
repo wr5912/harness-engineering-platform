@@ -11,7 +11,7 @@ const oldId = 'a'.repeat(64), currentId = 'b'.repeat(64)
 const oldConfig = { toolName: 'find_asset', title: '旧发布标题', description: '旧版说明', connectionId: 'source-one' }
 const currentConfig = { ...oldConfig, title: '当前发布标题', description: '当前说明' }
 
-function workbench(initialTarget = { page: 'mcp', tab: 'composition', composition_id: 'composition-one', version: 'published', version_id: oldId }, { execute, extraCompositions = [] } = {}) {
+function workbench(initialTarget = { page: 'mcp', tab: 'composition', composition_id: 'composition-one', version: 'published', version_id: oldId }, { execute, action, readCatalog, extraCompositions = [] } = {}) {
   const states = [], dependencies = [], cleanups = [], calls = [], navigations = [], copied = []
   let cursor, effects, changed, tree, listener
   let catalog = { revision: 'r1', connections: [{ kind: 'openapi', id: 'source-one' }], extension: null,
@@ -39,7 +39,8 @@ function workbench(initialTarget = { page: 'mcp', tab: 'composition', compositio
     updates: { subscribe(value) { listener = value; return () => { listener = undefined } }, getSnapshot: () => ({ domains: ['mcp'] }), invalidate() {} },
     rpc: { async call(_channel, endpoint, payload) {
       calls.push({ endpoint, payload })
-      if (endpoint === 'mcp/list') return { ok: true, value: structuredClone(catalog) }
+      if (endpoint === 'mcp/list') return readCatalog ? readCatalog(catalog) : { ok: true, value: structuredClone(catalog) }
+      if (action && ['mcp/dryRunComposition', 'mcp/publishComposition', 'mcp/executeComposition'].includes(endpoint)) return action(endpoint, payload)
       if (endpoint === 'mcp/saveCompositionDraft') {
         if (payload.revision !== catalog.revision) return { ok: false, error: { message: '编排目录已变化，请刷新后重试' } }
         catalog = { ...catalog, revision: 'r3', compositions: catalog.compositions.map(entry => entry.id === payload.compositionId ? { ...entry, draft: payload.draft } : entry) }
@@ -57,7 +58,7 @@ function workbench(initialTarget = { page: 'mcp', tab: 'composition', compositio
   const button = label => nodes().find(node => node.type === 'button' && text(node) === label)
   render()
   return { render, settle, nodes, text, button, calls, navigations, copied,
-    setTarget(value) { props.target = value; render() }, externalUpdate(value) { catalog = value; listener?.(); render() } }
+    setActive(value) { props.active = value; render() }, setTarget(value) { props.target = value; render() }, externalUpdate(value) { catalog = value; listener?.(); render() } }
 }
 
 test('组合深链恢复冻结发布版本，失效版本不回退到当前发布', async () => {
@@ -158,4 +159,66 @@ test('编排首次读取不冒充空目录，刷新已有内容只在标题显�
   await ui.settle()
   assert.equal(loading().length, 0)
   assert.match(ui.text(), /旧发布标题/)
+})
+
+for (const [endpoint, button] of [['dryRunComposition', '测试（dry）'], ['publishComposition', '发布工具'], ['executeComposition', '实际执行组合工具']]) {
+  test(`组合 ${endpoint} 在途固定提交输入，完成后改输入清除回执`, async () => {
+    let release, sent
+    const draft = { id: 'composition-draft', draft: currentConfig, graphs: { draft: { nodes: [], edges: [] } } }
+    const ui = workbench({ page: 'mcp', tab: 'composition', composition_id: draft.id, version: 'draft' }, { extraCompositions: [draft], action: (_endpoint, payload) => {
+      sent = payload
+      return new Promise(resolve => { release = resolve })
+    } })
+    await ui.settle()
+    const input = () => ui.nodes().find(node => node.props?.['aria-label'] === '组合查询资产')
+    input().props.onChange({ target: { value: 'asset-A' } }); ui.render()
+    ui.button(button).props.onClick(); ui.render()
+    assert.equal(sent.input.asset, 'asset-A')
+    assert.equal(input().props.disabled, true)
+    input().props.onChange({ target: { value: 'asset-B' } }); ui.render()
+    assert.equal(input().props.value, 'asset-A')
+    // 发布回执需包含真实目录 DTO；此处只核对冻结输入，不模拟成功发布。
+    release({ ok: false, error: { message: 'fixture：执行已结束' } }); await ui.settle()
+    assert.equal(input().props.disabled, false)
+    input().props.onChange({ target: { value: 'asset-B' } }); ui.render()
+    assert.equal(input().props.value, 'asset-B')
+    assert.doesNotMatch(ui.text(), /组合执行成功/)
+  })
+}
+
+test('组合隐藏通知不读取，恢复补一批，在途多次更新只顺序补一批', async () => {
+  let block = false, release, concurrent = 0, maxConcurrent = 0, reads = 0
+  const ui = workbench(undefined, { readCatalog: async catalog => {
+    reads++; concurrent++; maxConcurrent = Math.max(maxConcurrent, concurrent)
+    if (block) await new Promise(resolve => { release = resolve })
+    concurrent--; return { ok: true, value: structuredClone(catalog) }
+  } })
+  await ui.settle(); const initial = reads
+  ui.setActive(false)
+  for (let count = 0; count < 3; count++) ui.externalUpdate({ revision: 'r2', compositions: [], connections: [] })
+  await ui.settle(); assert.equal(reads, initial)
+  block = true; ui.setActive(true); await ui.settle(); assert.equal(reads, initial + 1)
+  for (let count = 0; count < 3; count++) ui.externalUpdate({ revision: 'r3', compositions: [], connections: [] })
+  await ui.settle(); assert.equal(reads, initial + 1)
+  block = false; release(); await ui.settle()
+  assert.equal(reads, initial + 2)
+  assert.equal(maxConcurrent, 1)
+})
+
+test('阶段组合按已有运行恢复时，在途运行ID同样不可更换', async () => {
+  let release, sent
+  const stage = { id: 'stage-infer', draft: { ...currentConfig, kind: 'threat-stage', stage: 'infer', bindings: { socConnectionId: 'source-one', reportConnectionId: 'source-one' } }, graphs: { draft: { nodes: [], edges: [] } } }
+  const ui = workbench({ page: 'mcp', tab: 'composition', composition_id: stage.id, version: 'draft' }, { extraCompositions: [stage], action: (_endpoint, payload) => {
+    sent = payload; return new Promise(resolve => { release = resolve })
+  } })
+  await ui.settle()
+  const input = () => ui.nodes().find(node => node.props?.['aria-label'] === '组合运行 ID')
+  input().props.onChange({ target: { value: 'run-A' } }); ui.render()
+  ui.button('测试（dry）').props.onClick(); ui.render()
+  assert.equal(sent.input.run_id, 'run-A')
+  assert.equal(input().props.disabled, true)
+  input().props.onChange({ target: { value: 'run-B' } }); ui.render()
+  assert.equal(input().props.value, 'run-A')
+  release({ ok: false, error: { message: 'fixture：阶段校验结束' } }); await ui.settle()
+  assert.equal(input().props.disabled, false)
 })

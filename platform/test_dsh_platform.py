@@ -183,6 +183,22 @@ if sys.argv[1:] == ["run", "build"]:
         self.assertEqual(session.read_text(), "retained")
         self.assertFalse(Path(self.env["DSH_HOME"]).exists())
 
+    def test_offline_knowledge_archive_selects_local_fetch_without_overwriting_native_settings(self):
+        self.prepare()
+        rendered = self.profile / "harness-platform.patch.yml"
+        self.assertNotIn("harness-offline-knowledge", rendered.read_text())
+        native = self.profile / "cordis.patch.yml"
+        native.write_text("- id: retained-user-plugin\n  disabled: true\n")
+        archive = self.assets / "knowledge/offline/index.json"
+        archive.parent.mkdir(parents=True)
+        archive.write_text('{"schemaVersion":1,"kind":"harness-offline-knowledge","sources":[]}')
+        self.prepare()
+        patch = rendered.read_text()
+        self.assertIn("fetchProvider: harness-offline-knowledge", patch)
+        self.assertIn(json.dumps(str(archive)), patch)
+        self.assertIn(json.dumps(str(self.plugin / "lib/standalone-knowledge.js")), patch)
+        self.assertEqual(native.read_text(), "- id: retained-user-plugin\n  disabled: true\n")
+
     def test_native_plugin_registration_survives_start_and_prepare(self):
         self.prepare()
         path = self.profile / "package.json"

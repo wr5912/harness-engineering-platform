@@ -49,7 +49,8 @@ function decodedResult(value: any): any {
 export function registerFixedCompositionTools(ctx: any, bindings: Record<string, FixedCompositionBinding>, dependencies: { clientFactory?: ClientFactory } = {}): Map<string, string> {
   const aliases = new Map<string, string>()
   for (const [name, supplied] of Object.entries(bindings)) {
-    const binding: FixedCompositionBinding = structuredClone(supplied)
+    const original: FixedCompositionBinding = structuredClone(supplied)
+    let binding: FixedCompositionBinding = original
     const groupVersion = binding.group_link_version ?? 1
     if (!/^[A-Za-z0-9_-]{1,32}$/.test(binding.group_id) || !/^[0-9a-f]{64}$/.test(binding.group_target_digest)
       || !/^[0-9a-f]{64}$/.test(binding.versionId) || !/^[0-9a-f]{64}$/.test(binding.expectedImplementationDigest)
@@ -57,7 +58,7 @@ export function registerFixedCompositionTools(ctx: any, bindings: Record<string,
       || ![1, 2].includes(groupVersion) || typeof binding.tool_name !== 'string'
       || !(groupVersion === 2 ? /^[A-Za-z0-9_.-]+$/.test(binding.tool_name) : binding.tool_name.startsWith('mcp__compositions__'))
       || !binding.input_schema || typeof binding.input_schema !== 'object') throw new Error('固定组合绑定无效')
-    const alias = fixedCompositionToolName(name, binding)
+    const alias = fixedCompositionToolName(name, original)
     ctx.tools.register({ name: alias, description: `执行固定组合 ${name}`, parameters: binding.input_schema,
       isConcurrencySafe: () => false,
       output: { schema: { type: 'object', additionalProperties: true }, render: (_args: any, value: any) => value.content ?? [],
@@ -65,6 +66,11 @@ export function registerFixedCompositionTools(ctx: any, bindings: Record<string,
           composition_id: binding.compositionId, version_id: binding.versionId, implementation_digest: binding.expectedImplementationDigest } }) },
       async execute(args: Record<string, any>, exec: any) {
         exec.signal.throwIfAborted()
+        const projected = ctx.standaloneBindings?.resolve(name, original)
+        if (projected && (projected.compositionId !== original.compositionId || projected.versionId !== original.versionId
+          || projected.group_id !== original.group_id || projected.group_link_version !== original.group_link_version
+          || projected.tool_name !== original.tool_name || canonical(projected.input_schema) !== canonical(original.input_schema))) throw new Error('部署绑定不得改变固定组合的版本或工具合同')
+        binding = projected ?? original
         if (!ctx.tools.get(name, exec.agent)) throw new Error('固定组合原工具不在当前实例范围')
         const current = () => ctx.mcpSessionManager?.currentGroup(binding.group_id, groupVersion)
         const assertGroup = () => {

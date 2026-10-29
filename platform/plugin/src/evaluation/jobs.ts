@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { load as loadYaml } from 'js-yaml'
@@ -13,6 +13,7 @@ type Job = {
   started_at: string; updated_at: string; stdout: string; stderr: string;
   pid?: number; process_start?: string; run_id?: string; exit_code?: number | null;
   error?: string; result?: MapValue | null;
+  request_sha256?: string;
 }
 type Options = {
   command(payload: MapValue, jobId: string): Promise<{ executable: string; args: string[]; environment?: NodeJS.ProcessEnv; dispose?: () => void }> | { executable: string; args: string[]; environment?: NodeJS.ProcessEnv; dispose?: () => void };
@@ -23,6 +24,12 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{1
 const RUN = /^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 const FINAL = new Set(['completed', 'failed', 'cancelled'])
 const LOG_LIMIT = 16 * 1024
+function requestDigest(payload: MapValue): string {
+  const normalize = (value: any): any => Array.isArray(value) ? value.map(normalize)
+    : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, normalize(value[key])])) : value
+  const { request_id: _requestId, ...input } = payload
+  return createHash('sha256').update(JSON.stringify(normalize(input))).digest('hex')
+}
 
 /** 子进程可能只输出密钥前缀后换行；这些已知片段也不能进入持久 Job 日志。 */
 export function redactKnownValues(value: string, secrets: readonly string[]): string {
@@ -65,6 +72,7 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
   const identity = workspaceIdentity(root)
   const directory = workspaceLocalPath(root, 'evaluation-jobs')
   const live = new Map<string, { process: ReturnType<typeof spawn>; job: Job }>()
+  const starting = new Map<string, { digest: string; promise: Promise<any> }>()
   const pathFor = (id: string) => {
     if (!UUID.test(id)) throw new EvaluationJobError('invalid_request', '评测任务 ID 格式无效')
     return join(directory, `${id}.json`)
@@ -200,17 +208,43 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
     return { status: job.status }
   }
   async function start(payload: MapValue) {
-    const id = randomUUID()
+    const id = payload.request_id ?? randomUUID()
+    pathFor(id)
+    const digest = requestDigest(payload)
+    const pending = starting.get(id)
+    if (pending) {
+      if (pending.digest !== digest) throw new EvaluationJobError('conflict', '同一评测请求不能更换参数，请新建评测。')
+      return pending.promise
+    }
+    if (existsSync(pathFor(id))) {
+      const job = read(id)
+      if (job.request_sha256 !== digest) throw new EvaluationJobError('conflict', '同一评测请求不能更换参数，请新建评测。')
+      return { job_id: id, status: job.status, started_at: job.started_at }
+    }
+    const promise = launch(payload, id, digest)
+    starting.set(id, { digest, promise })
+    try { return await promise } finally { starting.delete(id) }
+  }
+  async function launch(payload: MapValue, id: string, digest: string) {
     const command = await options.command(payload, id)
     let disposed = false
     const dispose = () => { if (!disposed) { disposed = true; command.dispose?.() } }
     const now = new Date().toISOString()
     const job: Job = { job_id: id, workspace_id: identity.id, asset_root: root,
+      request_sha256: digest,
       source: String(payload.source), cases: payload.cases, status: 'running', started_at: now, updated_at: now,
       stdout: '', stderr: '' }
     mkdirSync(directory, { recursive: true })
     try { writeFileSync(pathFor(id), JSON.stringify(job, null, 2) + '\n', { mode: 0o600, flag: 'wx' }) }
-    catch (error) { dispose(); throw error }
+    catch (error) {
+      dispose()
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+        const existing = read(id)
+        if (existing.request_sha256 === digest) return { job_id: id, status: existing.status, started_at: existing.started_at }
+        throw new EvaluationJobError('conflict', '同一评测请求不能更换参数，请新建评测。')
+      }
+      throw error
+    }
     const secrets = Object.values(command.environment ?? {}).filter((value): value is string => typeof value === 'string' && value.length > 0)
     const redactJob = (value: string) => options.redact(redactKnownValues(value, secrets))
     let proc: ReturnType<typeof spawn>

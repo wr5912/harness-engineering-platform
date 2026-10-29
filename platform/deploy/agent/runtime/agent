@@ -1,0 +1,46 @@
+#!/bin/bash
+set -euo pipefail
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+. "$ROOT/runtime/bundle.env"
+if [ -f "$ROOT/state/deployment.env" ]; then . "$ROOT/state/deployment.env"; fi
+export AGENT_PORT=${AGENT_PORT:-18500}
+if [ -z "${AGENT_HOST:-}" ]; then
+  AGENT_HOST=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++)if($i=="src"){print $(i+1);exit}}' || true)
+  AGENT_HOST=${AGENT_HOST:-$(hostname -I 2>/dev/null | awk '{print $1}' || true)}
+fi
+export AGENT_HOST=${AGENT_HOST:-127.0.0.1}
+export AGENT_UID=${AGENT_UID:-1000}
+export AGENT_GID=${AGENT_GID:-1000}
+export COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-hep-agent-${AGENT_ID}}
+compose() { docker compose --project-directory "$ROOT" -f "$ROOT/runtime/compose.yaml" "$@"; }
+case "${1:-status}" in
+  start) compose up -d --wait dsh; echo "智能体已启动：http://${AGENT_HOST}:${AGENT_PORT}/assistant/"; echo "首次访问请使用受保护入口文件：$ROOT/state/home/standalone/open.html" ;;
+  stop) compose stop ;;
+  restart) compose restart dsh; compose up -d --wait dsh ;;
+  status) compose ps ;;
+  logs) shift; compose logs --tail 150 "$@" dsh ;;
+  open)
+    entry="$ROOT/state/home/standalone/open.html"
+    [ -f "$entry" ] || { echo '访问入口尚未生成，请先启动智能体' >&2; exit 2; }
+    if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && command -v xdg-open >/dev/null; then xdg-open "$entry" >/dev/null 2>&1 || echo "请使用浏览器打开受保护入口文件：$entry"; else echo "请使用浏览器打开受保护入口文件：$entry"; fi
+    ;;
+  configure)
+    if [ -z "${2:-}" ]; then
+      compose run --rm --no-deps dsh configure
+    else
+      [ "${2:-}" = --config-file ] && [ -n "${3:-}" ] || { echo '用法：./agent configure [--config-file <JSON>]' >&2; exit 2; }
+      config_file=$(realpath -- "$3")
+      test -f "$config_file"
+      staged_config="$ROOT/state/.configure.llm-api-key"
+      cp -- "$config_file" "$staged_config"
+      chmod 600 "$staged_config"
+      if [ "$(id -u)" = 0 ]; then chown "$AGENT_UID:$AGENT_GID" "$staged_config"; fi
+      trap 'rm -f "$staged_config"' EXIT
+      compose run --rm --no-deps -T -v "$staged_config:/run/standalone-config.llm-api-key:ro" dsh configure /run/standalone-config.llm-api-key
+      rm -f "$staged_config"
+      trap - EXIT
+    fi
+    echo '模型与 MCP 配置已保存；请在当前任务结束后运行 ./agent restart 使配置生效。'
+    ;;
+  *) echo '用法：./agent start|stop|restart|status|logs|configure|open' >&2; exit 2 ;;
+esac

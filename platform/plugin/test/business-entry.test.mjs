@@ -90,7 +90,9 @@ test('HTTP 拒绝、重定向及非网页响应各自报告，不把当前版本
   loaded.status = 200
   assert.match((await check()).detail, /未返回 HTML/)
   loaded.type = 'text/html'; loaded.version = '1'
-  assert.match((await check()).detail, /版本为 1.*需要 2/)
+  const outdated = await check()
+  assert.equal(outdated.ready, false)
+  assert.match(outdated.detail, new RegExp(`版本为 1.*需要 ${BUSINESS_TRANSPORT_VERSION}`))
 })
 
 test('开启认证时既检查网关登录拒绝，也确认真实 Runtime 装载版本', async t => {

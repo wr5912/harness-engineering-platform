@@ -1,5 +1,6 @@
 import { LoadingIndicator } from '../components/loading-indicator.tsx'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useQueuedRefresh } from '../realtime/refresh.ts'
 import { CHANNEL } from '../protocol.ts'
 import type { PlatformNavigation, PlatformPageProps } from '../protocol.ts'
 import type { PlatformUpdates } from '../realtime/client.ts'
@@ -12,6 +13,7 @@ import { AgentDescriptionPanel } from './description-client.tsx'
 import { SearchSelect } from '../components/search-select.tsx'
 import { DetailDrawer } from '../components/detail-drawer.tsx'
 import { AgentEvaluationOverview, type AgentRunOverview } from './overview.tsx'
+import { DeploymentDialog } from '../deployment/client.tsx'
 
 type RpcResult = { ok: true; value: any } | { ok: false; error: { code: string; message: string; details?: any } }
 type AgentRow = { id: string; name?: string; manifest?: Record<string, any>; active_experiment?: string | null; version_count?: number; latest_experiment_status?: string | null; instance_state?: string }
@@ -104,6 +106,8 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
   const [launchMessage, setLaunchMessage] = useState('')
   const [launchBusy, setLaunchBusy] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
+  const [deploymentOpen, setDeploymentOpen] = useState(false)
+  const [deploymentTarget, setDeploymentTarget] = useState<{ agent_id: string; experiment_id: string; label: string } | null>(null)
   const [moreActionsOpen, setMoreActionsOpen] = useState(false)
   const [diffOpen, setDiffOpen] = useState(false)
   const [publishOpen, setPublishOpen] = useState(false)
@@ -115,6 +119,7 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
   const descriptionDirty = useRef(false)
   const detailRequest = useRef(0)
   const listRequest = useRef(0)
+  const changedList = useRef(true)
   const selectionRequest = useRef(0)
   const versionPreviewRequest = useRef(0)
   const launchRequest = useRef(0)
@@ -198,6 +203,7 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
     if (reveal) pendingReveal.current = reveal
     detailRequest.current++
     selectionRequest.current++
+    runOverviewRequest.current++
     versionPreviewRequest.current++
     launchRequest.current++
     pendingSelectionNavigation.current = notify && !experimentId
@@ -338,16 +344,15 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
     } finally { if (selection === selectionRequest.current) setNameBusy(false) }
   }
 
-  useEffect(() => { void refreshList() }, [])
-  useEffect(() => { void refreshDetail(selected, selectedExperiment) }, [selected, selectedExperiment])
-  useEffect(() => {
-    const experimentId = detail?.experiment?.id
+  useEffect(() => { void refreshChanged() }, [selected, selectedExperiment])
+  async function refreshRunOverview() {
+    const experimentId = selectedExperiment || detail?.experiment?.id
     if (!selected || !experimentId) return
     const agentId = selected, request = ++runOverviewRequest.current
     setRunOverview(current => current?.agentId === agentId && current.experimentId === experimentId && current.phase === 'ready'
       ? { ...current, refreshing: true, refreshError: undefined }
       : { agentId, experimentId, phase: 'loading', runs: [] })
-    void (async () => {
+    await (async () => {
       try {
         const index = await call('runs/index', { agent_id: agentId })
         if (request !== runOverviewRequest.current) return
@@ -383,8 +388,7 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
         }
       }
     })()
-    return () => { runOverviewRequest.current++ }
-  }, [selected, detail])
+  }
   useEffect(() => {
     if (active) onContext?.({ page: 'agents', agent_id: selected || undefined, experiment_id: detail?.experiment?.id, tab })
   }, [active, selected, detail?.experiment?.id, tab, onContext])
@@ -427,29 +431,24 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
     window.addEventListener('beforeunload', guard)
     return () => window.removeEventListener('beforeunload', guard)
   }, [editOpen, editBody, assetInfo?.content, nameOpen, nameDraft, nameInitial])
-  useEffect(() => {
+  const refreshChanged = useQueuedRefresh(active, async () => {
     const selection = selectionRequest.current
-    if (selected) void call('fusion/proposal', { agent_id: selected }).then(value => {
-      if (selection === selectionRequest.current) setVersionProposal(value.proposal)
-    }).catch(() => undefined)
-    if (detail?.experiment?.id) void call('features/proposal', { experiment_id: detail.experiment.id }).then(value => {
-      if (selection === selectionRequest.current) setFeatureProposal(value.proposal)
-    }).catch(() => undefined)
-  }, [selected, detail?.experiment?.id])
-  useEffect(() => updates?.subscribe(() => {
-    const snapshot = updates.getSnapshot()
-    if (!snapshot.domains.some(domain => ['agents', 'instances', 'catalog'].includes(domain))) return
-    const selection = selectionRequest.current
-    void refreshList()
-    void refreshDetail(selected, selectedExperiment)
-    if (selected) void call('fusion/proposal', { agent_id: selected }).then(value => { if (selection === selectionRequest.current) setVersionProposal(value.proposal) }).catch(() => undefined)
-    if (detail?.experiment?.id) void call('features/proposal', { experiment_id: detail.experiment.id }).then(value => { if (selection === selectionRequest.current) setFeatureProposal(value.proposal) }).catch(() => undefined)
+    const readList = changedList.current
+    changedList.current = false
+    const reads: Promise<unknown>[] = [refreshDetail(selected, selectedExperiment), refreshRunOverview()]
+    if (readList) reads.push(refreshList())
+    if (selected) reads.push(call('fusion/proposal', { agent_id: selected }).then(value => { if (selection === selectionRequest.current) setVersionProposal(value.proposal) }).catch(() => undefined))
+    if (selectedExperiment) reads.push(call('features/proposal', { experiment_id: selectedExperiment }).then(value => { if (selection === selectionRequest.current) setFeatureProposal(value.proposal) }).catch(() => undefined))
     if (editOpen && detail?.experiment?.id && editPath && editHash) {
       const request = editRequest.current
-      void call('edit/read', { experiment_id: detail.experiment.id, path: editPath }).then(value => { if (request === editRequest.current && value.sha256 !== editHash) setEditMessage('文件已被其他任务修改，编辑草稿已保留；保存前请核对最新内容。') }).catch(() => undefined)
+      reads.push(call('edit/read', { experiment_id: detail.experiment.id, path: editPath }).then(value => { if (request === editRequest.current && value.sha256 !== editHash) setEditMessage('文件已被其他任务修改，编辑草稿已保留；保存前请核对最新内容。') }).catch(() => undefined))
     }
-  }), [updates, selected, selectedExperiment, detail?.experiment?.id, editOpen, editPath, editHash])
-  useEffect(() => { void loadEditFile(editPath) }, [detail?.experiment?.id, editPath])
+    await Promise.allSettled(reads)
+  }, `${selected}:${selectedExperiment}`)
+  useEffect(() => updates?.subscribe(() => {
+    if (updates.getSnapshot().domains.some(domain => ['agents', 'instances', 'catalog'].includes(domain))) { changedList.current = true; void refreshChanged() }
+  }), [updates])
+  useEffect(() => { if (active) void loadEditFile(editPath) }, [active, detail?.experiment?.id, editPath])
   useEffect(() => {
     if (editOpen && active) editDialog.current?.showModal()
     else editDialog.current?.close()
@@ -678,7 +677,7 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
   return <main className="harness-agents" data-active-tab={tab} aria-label="智能体管理">
     <div className="agent-page-content">
       <header className="agent-page-heading">
-        <div className="agent-actions"><button type="button" className="agent-primary" onClick={() => setCreateOpen(true)}>新建智能体</button><button type="button" onClick={() => { void refreshList(); void refreshDetail() }}>刷新</button></div>
+        <div className="agent-actions"><button type="button" className="agent-primary" onClick={() => setCreateOpen(true)}>新建智能体</button><button type="button" onClick={() => { changedList.current = true; void refreshChanged() }}>刷新</button></div>
         {tab === 'compute-variants' && <button type="button" className="compute-page-back" onClick={returnToList}>返回智能体列表</button>}
       </header>
       {error && <p role="alert" className="agent-error">{error}</p>}
@@ -737,7 +736,7 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
             <button type="button" className="agent-back-to-list" onClick={returnToList}>← 返回{listView === 'variants' ? '变体列表' : '智能体列表'}</button>
             <div className="agent-identity-top">
               <div className="agent-identity-title"><h2>{detail.agent.name || detail.agent.manifest.name || selectedAgent?.name || selected}</h2><SearchSelect className="agent-version-choice" label="版本" value={selectedExperiment || detail.experiment.id} options={agentVersions.map((version: any) => { const metadata = version.id === detail.experiment.id ? detail.experiment : experiments.find(item => item.id === version.id) ?? version; const name = versionLabel(version.id).replace(/^版本 /, 'v'); const disambiguation = agentVersions.filter((item: any) => versionLabel(item.id) === versionLabel(version.id)).length > 1 ? ` · ${version.id.slice(-6)}` : ''; return { value: version.id, label: isComputeVariant(metadata) ? `${variantName(metadata)} · ${name}${disambiguation}` : `${name}${disambiguation}`, description: version.id } })} onChange={value => selectVersion(selected, value)}/><span className="agent-badge">研究版本</span></div>
-              <div className="agent-actions agent-main-actions"><button type="button" className="agent-primary" disabled={!onNavigate} onClick={startEvaluation}>发起评测</button><button type="button" disabled={launchBusy} onClick={() => void launchVersion()}>进入对话</button><button type="button" onClick={() => setPublishOpen(true)}>发布版本</button><details className="agent-more-actions" open={moreActionsOpen}><summary onClick={event => { event.preventDefault(); setMoreActionsOpen(!moreActionsOpen) }}>更多操作</summary><div><button type="button" disabled={!onNavigate} onClick={() => { setMoreActionsOpen(false); openEvaluation() }}>查看评测</button><button type="button" disabled={!onNavigate} onClick={() => { setMoreActionsOpen(false); onNavigate?.({ page: 'instances', agent_id: selected, experiment_id: detail.experiment.id }) }}>查看实例</button><button type="button" onClick={() => { setMoreActionsOpen(false); setVersionOpen(true); resetVersionPreview() }}>新建研究版本</button><button type="button" disabled={!onNavigate} onClick={() => { setMoreActionsOpen(false); onNavigate?.({ page: 'instances', agent_id: selected, experiment_id: detail.experiment.id, source_id: `experiment:${detail.experiment.id}` }) }}>创建实例</button></div></details></div>
+              <div className="agent-actions agent-main-actions"><button type="button" className="agent-primary" disabled={!onNavigate} onClick={startEvaluation}>发起评测</button><button type="button" disabled={launchBusy} onClick={() => void launchVersion()}>进入对话</button><button type="button" onClick={() => setPublishOpen(true)}>发布版本</button><details className="agent-more-actions" open={moreActionsOpen}><summary onClick={event => { event.preventDefault(); setMoreActionsOpen(!moreActionsOpen) }}>更多操作</summary><div><button type="button" onClick={() => { setMoreActionsOpen(false); setDeploymentTarget({ agent_id: selected, experiment_id: detail.experiment.id, label: `${detail.agent.name || selected} · ${versionLabel(detail.experiment.id)}` }); setDeploymentOpen(true) }}>导出独立运行包</button><button type="button" disabled={!onNavigate} onClick={() => { setMoreActionsOpen(false); openEvaluation() }}>查看评测</button><button type="button" disabled={!onNavigate} onClick={() => { setMoreActionsOpen(false); onNavigate?.({ page: 'instances', agent_id: selected, experiment_id: detail.experiment.id }) }}>查看实例</button><button type="button" onClick={() => { setMoreActionsOpen(false); setVersionOpen(true); resetVersionPreview() }}>新建研究版本</button><button type="button" disabled={!onNavigate} onClick={() => { setMoreActionsOpen(false); onNavigate?.({ page: 'instances', agent_id: selected, experiment_id: detail.experiment.id, source_id: `experiment:${detail.experiment.id}` }) }}>创建实例</button></div></details></div>
             </div>
             {isComputeVariant(detail.experiment) && <div className="agent-variant-name"><h3>{variantName(detail.experiment)}</h3><button type="button" disabled={nameBusy || nameOpen} onClick={editVariantName}>修改变体名称</button></div>}
             {nameOpen && <form className="agent-name-form" aria-label="修改变体名称" onSubmit={event => { event.preventDefault(); void saveVariantName() }}>
@@ -849,6 +848,7 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
         </section>
       </section>
       {createOpen && <CreateAgentDialog rpc={rpc} active={active} onClose={() => setCreateOpen(false)} onCreated={() => { void refreshList() }} onSelect={receipt => { if (selectVersion(receipt.agent_id, receipt.experiment_id)) setCreateOpen(false) }} />}
+      {deploymentTarget && <DeploymentDialog rpc={rpc} active={active && deploymentOpen} target={deploymentTarget} onClose={() => setDeploymentOpen(false)} />}
     </div>
   </main>
 }

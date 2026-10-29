@@ -192,6 +192,11 @@ export function createMcpHandler(assetRoot: string, options: { stateFile?: strin
   registry.native = options.native
   registry.threat = options.threat
   registry.control = managedDispatch(assetRoot)
+  registry.access = {
+    context: currentBusinessContext,
+    assertRunRead(context, runId) { const control = getBusinessControl(assetRoot); if (control.enabled()) control.assert(context as any, 'read', [{ kind: 'run', id: runId }]) },
+    bindRun(context, runId) { getBusinessControl(assetRoot).bindResource(context as any, { kind: 'run', id: runId }) },
+  }
   registry.extension = options.extension
   const controlHandler = createBusinessControlHandler(assetRoot)
   return async (endpoint, payload, signal, peer) => {

@@ -8,6 +8,7 @@ import { HostConnectionService } from '@deepseek-ai/dsh-client-connection'
 import WebServer from '@deepseek-ai/dsh-host-webserver'
 import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
+import { LocalFileSystem } from '@deepseek-ai/dsh-fs-local'
 import * as plugin from '../lib/index.js'
 
 test('真实 Cordis 提供方 Fiber 无 webServer 注入时，插件仍经原生 RPC 载体注册且可卸载', async t => {
@@ -49,6 +50,8 @@ test('真实 Cordis 提供方 Fiber 无 webServer 注入时，插件仍经原生
     ctx.provide('goals', { get: () => undefined })
     // 空数据工作区仍可验证认证与原生注册；本项不发起管理会话。
     ctx.provide('skills', { async get() { return undefined } })
+    ctx.provide('attachments', { fileHostPath: () => undefined, async *readFileStream() { assert.fail('注册测试不读取附件') } })
+    new LocalFileSystem(ctx, { cwd: assetRoot, diffBasisMaxBytes: 1024 * 1024 })
   } })
   // 此项只验证注册方 Fiber；完整登录入口由 native-auth 与真实全局 DSH 验证。
   const loaded = root.plugin({ ...plugin, inject: plugin.inject.filter(name => name !== 'credentials'), apply: plugin.applyTools })

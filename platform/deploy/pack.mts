@@ -7,6 +7,7 @@ import { assertGitBundle, collectSystemGit } from './git.mts'
 import { expectedImage, inspectImage, inspectImageArchive, saveImage, verifyImageInfo } from './image.mts'
 import { assertRealWorkspace, copyDataDependencies } from './data.mts'
 import { snapshotRepository } from './repository.mts'
+import { collectPlatformKnowledge } from './knowledge/platform.mts'
 
 export interface PackOptions {
   programRoot: string
@@ -181,6 +182,8 @@ export function pack(options: PackOptions): { archive: string; size: number } {
     dataCheck = assertRealWorkspace(dataRoot, options.allowFixtureData)
     dataRepository = copyData(dataRoot, staging)
     copyDataDependencies(join(staging, 'data'), options.assetsDir!)
+    const knowledge = collectPlatformKnowledge(staging)
+    if (knowledge) runtime.knowledge = knowledge
   }
   console.error('pack: 正在核对并收集标准 Runtime 镜像')
   const image = copyImage(options, staging)

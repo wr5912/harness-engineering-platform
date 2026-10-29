@@ -83,6 +83,7 @@ export function measureModelUsage(files: UsageTrace[], options: { attempts?: Mod
   const sessions = new Map<string, Session>()
   const unknown = new Set<string>()
   const byRole: Partial<Record<Role, number>> & Record<'target' | 'judge' | 'analysis', number> = { target: 0, judge: 0, analysis: 0 }
+  const byModelRole = { language: 0, decision: 0 }
   let failed = 0, tokensKnown = true, tokenSamples = 0, auxiliary = 0, auxiliaryRequests = 0
   const tokens = { input_tokens: 0, output_tokens: 0, total_tokens: 0 }
   const graphs = files.map(file => extractGraphExecutions(file.rows))
@@ -243,7 +244,8 @@ export function measureModelUsage(files: UsageTrace[], options: { attempts?: Mod
     attempts.set(attempt.attempt_id, rows)
   }
   for (const rows of attempts.values()) {
-    const identity = (row: ModelAttempt) => JSON.stringify([row.execution_id, row.role ?? 'target', row.parent_run_id, row.case_id, row.session_id, row.tool_call_id])
+    const identity = (row: ModelAttempt) => JSON.stringify([row.execution_id, row.role ?? 'target', row.parent_run_id, row.case_id, row.session_id, row.tool_call_id,
+      row.model_role, row.kind, row.checkpoint_sha256, row.state_constructor_sha256, row.calibration_sha256])
     if (rows.some(row => identity(row) !== identity(rows[0]))) { unknown.add('graph-attempt-identity-conflict'); continue }
     const ordered = [...rows].sort((a, b) => a.time - b.time)
     const terminal = ordered.filter(row => ['completed', 'failed', 'cancelled', 'local'].includes(row.status))
@@ -253,6 +255,14 @@ export function measureModelUsage(files: UsageTrace[], options: { attempts?: Mod
     if (!started) { unknown.add('graph-attempt-start-missing'); continue }
     const role = rows[0].role ?? 'target'
     if (!['target', 'judge', 'analysis', 'generation'].includes(role)) { unknown.add('graph-attempt-role-invalid'); continue }
+    const modelRole = rows[0].model_role
+    if (modelRole !== undefined && !['language', 'decision'].includes(modelRole)
+      || rows[0].kind !== undefined && rows[0].kind !== 'typed_decision'
+      || modelRole === 'decision' && rows[0].kind !== 'typed_decision'
+      || rows[0].kind === 'typed_decision' && (modelRole !== 'decision'
+        || ['checkpoint_sha256', 'state_constructor_sha256', 'calibration_sha256'].some(key => !/^[0-9a-f]{64}$/.test((rows[0] as any)[key] ?? '')))) {
+      unknown.add('graph-attempt-model-role-invalid'); continue
+    }
     const invocationProven = ordered.some(row => row.model_invocation === true || row.status === 'completed' || normalizeTokenUsage(row.usage) !== null)
     if (!invocationProven) {
       unknown.add('graph-attempt-invocation-unproven'); tokensKnown = false
@@ -260,6 +270,7 @@ export function measureModelUsage(files: UsageTrace[], options: { attempts?: Mod
       continue
     }
     byRole[role] = (byRole[role] ?? 0) + 1
+    if (modelRole) byModelRole[modelRole]++
     if (!last) { unknown.add('graph-attempt-unsettled'); tokensKnown = false; continue }
     if (last.status !== 'completed') failed++
     if (terminal.some(row => row.status !== last.status || JSON.stringify(row.usage) !== JSON.stringify(last.usage))) unknown.add('graph-attempt-settlement-conflict')
@@ -270,7 +281,7 @@ export function measureModelUsage(files: UsageTrace[], options: { attempts?: Mod
   return { actual_model_calls: unknown.size ? null : observed, observed_model_calls: observed,
     failed_model_calls: unknown.size ? null : failed, observed_failed_model_calls: failed,
     auxiliary_model_calls: auxiliary, auxiliary_requests_observed: auxiliaryRequests,
-    model_calls_by_role: byRole, model_calls_complete: unknown.size === 0,
+    model_calls_by_role: byRole, model_calls_by_model_role: byModelRole, model_calls_complete: unknown.size === 0,
     model_calls_basis: '锁定 DSH 的主请求尝试/retry、压缩、辅助标题与关联图模型尝试；Session ID/seq 和图 attempt ID 去重，受控本地路由不计远程模型请求。',
     model_calls_unknown_reasons: [...unknown], token_usage: tokensKnown && !unknown.size ? tokens : null,
     observed_token_usage: tokenSamples ? tokens : null,

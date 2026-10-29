@@ -1,4 +1,5 @@
 import { programRoot } from '../workspace.ts'
+import { assertVersionIdentity } from '../agents/version-source.ts'
 import { createHash } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { lstat, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
@@ -85,7 +86,9 @@ async function documentFor(root: string, body: JsonMap, signal?: AbortSignal) {
   await noLinks(root, changePath)
   const change = loadYaml(await readFile(changePath, 'utf8')) as JsonMap
   const agentId = change?.agent_id
-  if (typeof agentId !== 'string' || !AGENT_ID.test(agentId) || change.experiment_id !== experimentId) throw new CaseError('invalid_request', 'Experiment 身份不一致')
+  if (typeof agentId !== 'string' || !AGENT_ID.test(agentId)) throw new CaseError('invalid_request', 'Experiment 身份不一致')
+  try { assertVersionIdentity(experimentId, change) }
+  catch { throw new CaseError('invalid_request', 'Experiment 身份不一致') }
   const path = `agents/${agentId}/evaluation.md`
   await noLinks(root, join(root, path))
   const content = await readFile(join(root, path), 'utf8')

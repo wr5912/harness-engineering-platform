@@ -26,6 +26,9 @@ import type {} from './mcp/manager.ts'
 import { createManagedMcpHandler } from './mcp/native.ts'
 import { runtimeModule } from '../../../runtime/adapters/dsh-web/src/resolve-runtime.ts'
 import { createAssistant } from './assistant/index.ts'
+import { createDocumentReader } from './assistant/documents.ts'
+import { createDeployments } from './deployment/index.ts'
+import { createDeploymentSeed } from './deployment/seed.ts'
 import { assistantMcp } from './assistant/mcp.ts'
 import { createPlatformEvents } from './realtime/index.ts'
 import logo from '../assets/harness-logo.svg'
@@ -39,7 +42,7 @@ import { bindConversationWorkspace } from './conversation-workspace.ts'
 const WebApp: typeof NativeWebApp = await runtimeModule('@deepseek-ai/dsh-web-app')
 
 export const name = 'harness-platform'
-export const inject = ['connection', 'webServer', 'credentials', 'platformMcp', 'workspaceRegistry', 'workspaceController', 'sessionController', 'settingsController', 'agentDefaultModel', 'llm', 'tools', 'agents', 'sessionProjections', 'systemPrompt', 'skills']
+export const inject = ['connection', 'webServer', 'credentials', 'platformMcp', 'workspaceRegistry', 'workspaceController', 'sessionController', 'settingsController', 'agentDefaultModel', 'llm', 'tools', 'agents', 'sessionProjections', 'systemPrompt', 'skills', 'attachments', 'fs']
 export const Config = WebApp.Config
 export type Config = NativeWebApp.Config
 
@@ -175,12 +178,15 @@ export function applyTools(ctx: Context) {
     if (getBusinessControl(assetRoot).enabled() && !currentBusinessContext() && peer?.principal.kind !== 'owner') return failure('forbidden', '平台管理操作要求管理身份')
     try { return await managementDispatch(assetRoot, () => handler(endpoint, payload, signal, peer)) }
     finally {
-      if (!['control/status', 'control/probeProvider', 'control/providerProtocol', 'description', 'research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'list', 'detail', 'sources', 'url', 'logs', 'edit/read', 'cases/list', 'cases/read', 'eval/list', 'eval/status', 'runs/index', 'runs/overview', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/preview', 'compute-variants/compare', 'compute-variants/build-preview', 'compute-variants/freeze-preview', 'training-servers/list', 'training-servers/probe', 'tasks/capabilities', 'datasets/source', 'datasets/list', 'datasets/read', 'datasets/export', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'fusion/status', 'fusion/proposal', 'features/proposal', 'features/read-source', 'configuration'].includes(endpoint)) notify([domain, 'catalog'])
+      if (!['deployment/preview', 'deployment/status', 'control/status', 'control/probeProvider', 'control/providerProtocol', 'description', 'research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'list', 'detail', 'sources', 'url', 'logs', 'edit/read', 'cases/list', 'cases/read', 'eval/list', 'eval/status', 'runs/index', 'runs/overview', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/preview', 'compute-variants/compare', 'compute-variants/build-preview', 'compute-variants/freeze-preview', 'training-servers/list', 'training-servers/probe', 'tasks/capabilities', 'datasets/source', 'datasets/list', 'datasets/read', 'datasets/export', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'fusion/status', 'fusion/proposal', 'features/proposal', 'features/read-source', 'configuration'].includes(endpoint)) notify([domain, 'catalog'])
     }
   }
   const modelProjection = (agentId: string, selected?: { provider: string; model: string; reasoningEffort?: string }) => projectModelPolicy(assetRoot, agentId, {
     sessionController: ctx.sessionController, settingsController: ctx.settingsController, credentials: ctx.credentials, llm: ctx.llm,
   }, selected)
+  const deployments = createDeployments(assetRoot, { seed: createDeploymentSeed(assetRoot, modelProjection), notify: () => notify(['agents']) })
+  ctx.effect(() => () => deployments.dispose())
+  registrationContext.connection.fetch.register({ path: '/api/harness-platform/agent-deployments/download', methods: ['GET'], requestBody: 'buffered', fetch: deployments.download })
   const domains = {
     agents: wrap('agents', createAgentsHandler(assetRoot, () => notify(['agents', 'catalog']), {
       nativeServers: () => manager?.servers.get() ?? [],
@@ -213,7 +219,7 @@ export function applyTools(ctx: Context) {
           return bindings.length ? bindings : [{ ...base, fixed_binding_unavailable: '尚无已登记且可核验目标身份的原生 MCP 分组包含该工具' }]
         })
       },
-    }, modelProjection)),
+    }, modelProjection, deployments.handler)),
     instances: wrap('instances', createInstancesHandler(assetRoot, modelProjection)), mcp: wrap('mcp', mcpManagement),
     models: wrap('models', createModelsHandler(assetRoot, {
       modelCatalog: () => ctx.sessionController.modelCatalog(),
@@ -236,6 +242,7 @@ export function applyTools(ctx: Context) {
       : isFeatureOrganization(assetRoot, agent, state) ? featureScope : undefined
   const assistant = createAssistant(assetRoot, handler, {
     controller: services.sessionController,
+    readDocument: createDocumentReader(assetRoot, services),
     scopeExtraction: agent => taskScopes.apply(agent, extractionScope),
     scopeComputeVariants: agent => taskScopes.apply(agent, computeVariantScope),
     scopeFeatures: agent => taskScopes.apply(agent, featureScope),

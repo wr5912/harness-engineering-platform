@@ -80,7 +80,7 @@ const implementationFiles = ['definition.ts', 'compositions.ts', 'executor.ts', 
   .map(file => `platform/plugin/src/mcp/${file}`)
   .concat(['platform/plugin/build.mjs', 'platform/plugin/package.json', 'platform/plugin/pnpm-lock.yaml', 'platform/plugin/src/index.ts',
     'platform/plugin/src/evaluation/model-attempts.ts', 'platform/plugin/src/workflows/graph.ts',
-    ...['contracts.ts', 'core.ts', 'gateway.ts', 'group-link.ts', 'providers.ts', 'reports.ts', 'runtime.ts'].map(file => `platform/plugin/src/business-control/${file}`),
+    ...['contracts.ts', 'core.ts', 'gateway.ts', 'group-link.ts', 'providers.ts', 'replica.ts', 'reports.ts', 'runtime.ts'].map(file => `platform/plugin/src/business-control/${file}`),
     ...['index.ts', 'openapi.ts', 'connection.ts'].map(file => `plugins/mcp-manager/${file}`),
     'platform/plugin/src/mcp/store.ts'])
 const implementationHash = createHash('sha256')
@@ -111,6 +111,27 @@ await build({ entryPoints: ['src/business-control/core.ts'], outfile: 'lib/busin
   platform: 'node', target: 'node24', format: 'esm', packages: 'external', legalComments: 'none' })
 await build({ entryPoints: ['src/models/runtime.ts'], outfile: 'lib/model-runtime.js', bundle: true,
   platform: 'node', target: 'node24', format: 'esm', packages: 'external', legalComments: 'none' })
+// Worker 与主插件同目录，源码运行则直接使用相邻的 worker.ts。
+await build({ entryPoints: { 'document-parser': 'src/documents/index.ts', 'document-parser-worker': 'src/documents/worker.ts' }, outdir: 'lib', bundle: true,
+  platform: 'node', target: 'node24', format: 'esm', packages: 'external', legalComments: 'none' })
+await build({ entryPoints: ['src/deployment/worker.ts'], outfile: 'lib/agent-deployment-worker.js', bundle: true,
+  platform: 'node', target: 'node24', format: 'esm', packages: 'external', legalComments: 'none' })
+// 独立包复用镜像锁定的 DSH SDK；其余运行依赖随薄入口打入制品。
+const standaloneManagerSources = { name: 'standalone-mcp-sources', setup(build) {
+  managerSources.setup({ ...build, onLoad(options, callback) {
+    build.onLoad(options, async args => {
+      const result = await callback(args)
+      if (typeof result?.contents === 'string') result.contents = result.contents.replaceAll("platformRequire('@modelcontextprotocol/", "runtimeRequire('@modelcontextprotocol/")
+      return result
+    })
+  } })
+} }
+await build({ entryPoints: {
+  'standalone-bootstrap': 'src/standalone/bootstrap.ts', 'standalone-plugin': 'src/standalone/plugin.ts',
+  'standalone-bridge': 'src/standalone/bridge.ts', 'standalone-knowledge': 'src/standalone-knowledge/index.ts',
+}, outdir: 'lib', bundle: true, platform: 'node', target: 'node24', format: 'esm', packages: 'bundle',
+  external: ['@deepseek-ai/*'], legalComments: 'none', define: implementationDefine, plugins: [standaloneManagerSources],
+  banner: { js: "import { createRequire as __standaloneCreateRequire } from 'node:module'; const require = __standaloneCreateRequire(import.meta.url);" } })
 // 独立业务 Host 包不声明管理客户端；薄入口继续复用同一份已构建实现。
 await build({ entryPoints: ['business/runtime.ts', 'business/mcp-manager.ts'], outdir: 'business', bundle: false,
   platform: 'node', target: 'node24', format: 'esm', legalComments: 'none' })

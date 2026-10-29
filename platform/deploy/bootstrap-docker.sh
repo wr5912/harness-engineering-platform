@@ -8,8 +8,8 @@ if ! command -v systemctl >/dev/null; then
   echo 'Docker 离线引导需要 systemd，请先为当前系统安装并启动 Docker。' >&2
   exit 2
 fi
+resource_root=${1:-$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/bootstrap}
 if ! command -v docker >/dev/null; then
-  resource_root=${1:-$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/bootstrap}
   shopt -s nullglob
   archives=("$resource_root"/docker-*.tgz)
   if [ "${#archives[@]}" != 1 ] || [ ! -x "$resource_root/docker-compose" ]; then
@@ -48,6 +48,16 @@ TasksMax=infinity
 WantedBy=multi-user.target
 UNIT
   systemctl daemon-reload
+fi
+# Engine 与 Compose 独立检查，已有 Engine 不因缺少插件被覆盖。
+if ! docker compose version >/dev/null 2>&1; then
+  if [ ! -x "$resource_root/docker-compose" ]; then
+    echo 'Docker Engine 已有，但缺少 Compose；离线资源需要可执行的 docker-compose。' >&2
+    exit 2
+  fi
+  "$resource_root/docker-compose" version
+  install -D -m 0755 "$resource_root/docker-compose" /usr/local/lib/docker/cli-plugins/docker-compose
+  if command -v restorecon >/dev/null; then restorecon -RF /usr/local/lib/docker; fi
 fi
 systemctl enable --now docker
 docker version --format '{{.Server.Version}} {{.Server.Arch}}'

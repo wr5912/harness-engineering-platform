@@ -10,6 +10,7 @@ import runpy
 import signal
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 import time
@@ -36,7 +37,7 @@ AGENT_ID = "security-operations-expert"
 
 def run_json(script: Path, *args: object, cwd: Path = ROOT) -> tuple[subprocess.CompletedProcess[str], dict]:
     completed = subprocess.run(
-        ["python3", str(script), *(str(value) for value in args)],
+        [sys.executable, str(script), *(str(value) for value in args)],
         cwd=cwd,
         text=True,
         capture_output=True,
@@ -64,6 +65,11 @@ def copy_repository(destination: Path) -> Path:
         target,
         ignore=lambda folder, names: set(ignored(folder, names)) | ({"agents", "evolution"} if Path(folder) == ROOT else set()),
     )
+    # 副本仍运行真实 TypeScript 来源解析器，共用已安装的锁定依赖。
+    dependencies = ROOT / "platform/plugin/node_modules"
+    if not (dependencies / "js-yaml").is_dir():
+        raise RuntimeError("研究回归需要先在 platform/plugin 安装锁定依赖")
+    (target / "platform/plugin/node_modules").symlink_to(dependencies, target_is_directory=True)
     # 兼容历史同根 fixture；真实业务资料来自显式数据工作区，程序不再持有副本。
     for name in ("agents", "evolution"):
         if not (target / name).exists():
@@ -132,7 +138,18 @@ def write_minimal_experiment(root: Path, *, status: str = "active", outcome: str
         lines.append(f"outcome: {outcome}")
     (experiment / "change.yaml").write_text("\n".join(lines) + "\n", encoding="utf-8")
     (experiment / "hypothesis.md").write_text("# 假设\n\n比较一个具体变化。\n", encoding="utf-8")
-    (experiment / "candidate/harness.yaml").write_text('schema_version: "1.0"\nvalue: candidate\n', encoding="utf-8")
+    (experiment / "candidate/harness.yaml").write_text(
+        'schema_version: "1.0"\n'
+        'loadable_assets:\n'
+        '  workspace: dsh/workspace\n'
+        '  preset_root: dsh/presets\n'
+        '  managed_root: dsh/managed\n'
+        '  preset_id: example-agent\n'
+        '  profile_patch: dsh/managed/base.patch.yml\n', encoding="utf-8")
+    for relative in ("workspace/AGENTS.md", "presets/example-agent/agent.cordis.yml", "managed/base.patch.yml"):
+        asset = experiment / "candidate/dsh" / relative
+        asset.parent.mkdir(parents=True, exist_ok=True)
+        asset.write_text("# 最小合同夹具\n", encoding="utf-8")
     if status == "completed":
         (experiment / "decision.md").write_text("# 决定\n\n根据观察停止本实验。\n", encoding="utf-8")
     return experiment
@@ -399,8 +416,7 @@ class RepositoryValidatorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             repository = copy_repository(Path(temp))
             cache = repository / "platform/plugin/node_modules"
-            cache.mkdir(parents=True)
-            (cache / "local-dependency").symlink_to(repository / "README.md")
+            self.assertTrue(cache.is_symlink())
             output = repository / "platform/plugin/lib"
             output.mkdir(exist_ok=True)
             (output / "linked-build.js").symlink_to(repository / "README.md")
@@ -889,7 +905,7 @@ class RunRecordTests(unittest.TestCase):
             repository = copy_repository(Path(temp))
             init = subprocess.run(
                 [
-                    "python3", str(repository / "runtime/adapters/dsh-container/run_record.py"),
+                    sys.executable, str(repository / "runtime/adapters/dsh-container/run_record.py"),
                     "--repo", str(repository), "init", "--source", f"experiment:{EXPERIMENT_ID}",
                     "--case", "U-INS-001", "--kind", "research", "--model", "deepseek-official",
                 ],
@@ -923,7 +939,7 @@ class RunRecordTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            base = ["python3", str(repository / "runtime/adapters/dsh-container/run_record.py"), "--repo", str(repository)]
+            base = [sys.executable, str(repository / "runtime/adapters/dsh-container/run_record.py"), "--repo", str(repository)]
             record = subprocess.run(base + ["record", "--run", run_id, str(trial)], cwd=repository, text=True, capture_output=True, check=False, timeout=180)
             self.assertEqual(record.returncode, 0, record.stderr)
             finalize = subprocess.run(base + ["finalize", "--run", run_id, "--status", "completed"], cwd=repository, text=True, capture_output=True, check=False, timeout=180)
@@ -1058,13 +1074,13 @@ class RunRecordTests(unittest.TestCase):
             repository = copy_repository(Path(temp))
             script = repository / "runtime/adapters/dsh-container/run_record.py"
             initialized = subprocess.run(
-                ["python3", str(script), "--repo", str(repository), "init",
+                [sys.executable, str(script), "--repo", str(repository), "init",
                  "--source", f"experiment:{EXPERIMENT_ID}", "--case", "U-INS-001"],
                 cwd=repository, text=True, capture_output=True, check=False, timeout=180,
             )
             self.assertEqual(initialized.returncode, 0, initialized.stderr)
             finalized = subprocess.run(
-                ["python3", str(script), "--repo", str(repository), "finalize",
+                [sys.executable, str(script), "--repo", str(repository), "finalize",
                  "--run", initialized.stdout.strip(), "--status", "completed"],
                 cwd=repository, text=True, capture_output=True, check=False, timeout=180,
             )
@@ -1293,9 +1309,12 @@ class DshEvalTests(unittest.TestCase):
 
     def runtime_fixture(self, root: Path, *, mode: str = "pass") -> tuple[Path, dict[str, str], Path]:
         repository = copy_repository(root)
+        python_bin = root / "python-bin"
+        python_bin.mkdir()
+        (python_bin / "python3").symlink_to(sys.executable)
         image_contract = json.loads(subprocess.check_output(
             [
-                "python3",
+                sys.executable,
                 str(repository / "runtime/adapters/dsh-container/source_contract.py"),
                 "--repo", str(repository),
                 "--source",
@@ -1528,6 +1547,7 @@ print(json.dumps({"schema_version": "1.0", "rows": rows}))
             "TEST_BROWSER_MODE": mode,
             "TEST_ANALYSIS_MODE": "valid",
             "TEST_BROWSER_READY": str(root / "browser-ready"),
+            "PATH": str(python_bin) + os.pathsep + os.environ.get("PATH", ""),
         }
         for name in self.REQUIRED_RUNTIME_ENV:
             env[name] = "http://example.invalid" if name.endswith(("_URL", "BASE_URL")) else "test-value"
@@ -1546,7 +1566,7 @@ print(json.dumps({"schema_version": "1.0", "rows": rows}))
         export_response_markdown: str | None = None,
     ) -> tuple[subprocess.CompletedProcess[str], dict]:
         command = [
-            "python3", str(repository / "runtime/adapters/dsh-container/dsh-eval"), "--repo", str(repository),
+            sys.executable, str(repository / "runtime/adapters/dsh-container/dsh-eval"), "--repo", str(repository),
             "--source", "experiment:EXP-security-operations-expert-006",
             "--executor", executor,
             "--timeout-seconds", "10",
@@ -1582,7 +1602,7 @@ print(json.dumps({"schema_version": "1.0", "rows": rows}))
                 env.pop(name, None)
             completed = subprocess.run(
                 [
-                    "python3", str(repository / "runtime/adapters/dsh-container/dsh-eval"), "--repo", str(repository),
+                    sys.executable, str(repository / "runtime/adapters/dsh-container/dsh-eval"), "--repo", str(repository),
                     "--source", "experiment:EXP-security-operations-expert-006",
                     "--case", "U-INS-001", "--dry-run",
                 ],
@@ -1593,7 +1613,10 @@ print(json.dumps({"schema_version": "1.0", "rows": rows}))
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertEqual(payload["executor"], "api")
         self.assertTrue(payload["runtime_required"])
-        self.assertEqual(payload["missing_env_names"], list(self.REQUIRED_RUNTIME_ENV))
+        # 默认模型无需显式凭据；来源声明的可选凭据不构成运行必填项。
+        self.assertEqual(payload["preflight_scope"], "source-cases-and-model-policy")
+        self.assertEqual(payload["required_env_names"], [])
+        self.assertEqual(payload["missing_env_names"], [])
         self.assertEqual(before, after)
 
     def test_explicit_export_copies_only_actual_final_response_before_sealing(self) -> None:
@@ -1857,7 +1880,7 @@ print(json.dumps({"schema_version": "1.0", "rows": rows}))
         with tempfile.TemporaryDirectory() as temp:
             repository, env, command_log = self.runtime_fixture(Path(temp))
             script = repository / "runtime/adapters/dsh-container/run_record.py"
-            base = ["python3", str(script), "--repo", str(repository)]
+            base = [sys.executable, str(script), "--repo", str(repository)]
             init = subprocess.run(
                 base + ["init", "--source", "experiment:EXP-security-operations-expert-006",
                         "--case", "U-INS-001"], cwd=repository, env=env,
@@ -1929,7 +1952,7 @@ print(json.dumps({"schema_version": "1.0", "rows": rows}))
             expected_case_ids = evaluation_case_ids(repository)
             expected_fast_case_ids = evaluation_case_ids(repository, fast_only=True)
             command = [
-                "python3", str(repository / "runtime/adapters/dsh-container/dsh-eval"), "--repo", str(repository),
+                sys.executable, str(repository / "runtime/adapters/dsh-container/dsh-eval"), "--repo", str(repository),
                 "--source", "experiment:EXP-security-operations-expert-006",
                 "--dry-run",
             ]
@@ -1985,7 +2008,7 @@ print(json.dumps({"schema_version": "1.0", "rows": rows}))
         with tempfile.TemporaryDirectory() as temp:
             repository = copy_repository(Path(temp))
             command = [
-                "python3", str(repository / "runtime/adapters/dsh-container/dsh-eval"), "--repo", str(repository),
+                sys.executable, str(repository / "runtime/adapters/dsh-container/dsh-eval"), "--repo", str(repository),
                 "--source", "experiment:EXP-security-operations-expert-006", "--dry-run",
                 "--case", "U-INS-*", "--case", "U-INS-001",
             ]
@@ -1994,7 +2017,7 @@ print(json.dumps({"schema_version": "1.0", "rows": rows}))
             )
             unmatched = subprocess.run(
                 [
-                    "python3", str(repository / "runtime/adapters/dsh-container/dsh-eval"), "--repo", str(repository),
+                    sys.executable, str(repository / "runtime/adapters/dsh-container/dsh-eval"), "--repo", str(repository),
                     "--source", "experiment:EXP-security-operations-expert-006",
                     "--dry-run", "--case", "U-NOT-*",
                 ], cwd=repository, text=True,
@@ -2068,7 +2091,7 @@ print(json.dumps({"schema_version": "1.0", "rows": rows}))
             repository, env, command_log = self.runtime_fixture(root, mode="hang")
             process = subprocess.Popen(
                 [
-                    "python3", str(repository / "runtime/adapters/dsh-container/dsh-eval"), "--repo", str(repository),
+                    sys.executable, str(repository / "runtime/adapters/dsh-container/dsh-eval"), "--repo", str(repository),
                     "--source", "experiment:EXP-security-operations-expert-006",
                     "--case", "U-INS-001", "--timeout-seconds", "10",
                 ],
@@ -2108,7 +2131,7 @@ print(json.dumps({"schema_version": "1.0", "rows": rows}))
             root = Path(temp)
             repository, env, _ = self.runtime_fixture(root, mode="partial-hang")
             process = subprocess.Popen([
-                "python3", str(repository / "runtime/adapters/dsh-container/dsh-eval"), "--repo", str(repository),
+                sys.executable, str(repository / "runtime/adapters/dsh-container/dsh-eval"), "--repo", str(repository),
                 "--source", "experiment:EXP-security-operations-expert-006",
                 "--case", "U-INS-001", "--case", "U-INS-002", "--timeout-seconds", "10",
             ], cwd=repository, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
@@ -2149,7 +2172,8 @@ print(json.dumps({"schema_version": "1.0", "rows": rows}))
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             repository, env, _ = self.runtime_fixture(root, mode="hang")
-            env["HARNESS_EVAL_DEADLINE_AT"] = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(time.time() + 8))
+            # 本例检查已创建 Run 的到期封存，为真实来源预检和初始化留出准备时间。
+            env["HARNESS_EVAL_DEADLINE_AT"] = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(time.time() + 60))
             env["HARNESS_EVAL_JOB_ID"] = str(uuid.uuid4())
             completed, payload = self.run_eval(repository, env, "U-INS-001")
             self.assertEqual(completed.returncode, 2, completed.stderr)

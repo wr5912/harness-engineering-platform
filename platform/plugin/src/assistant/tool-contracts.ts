@@ -4,7 +4,7 @@ import { businessCasesSchema } from '../agents/business-cases.ts'
 export type AssistantDomain = 'agents' | 'instances' | 'mcp'
 type MapValue = Record<string, any>
 export const assistantActions: Record<AssistantDomain, readonly string[]> = {
-  agents: ['research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'list', 'detail', 'edit/read', 'edit/preview', 'edit/apply', 'cases/list', 'cases/read', 'cases/update', 'eval/preview', 'eval/start', 'eval/status', 'eval/cancel', 'runs/index', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/preview', 'compute-variants/create', 'compute-variants/rename', 'compute-variants/build-preview', 'compute-variants/build', 'compute-variants/freeze-preview', 'compute-variants/freeze', 'compute-variants/compare', 'new', 'create', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'cases/create', 'datasets/source', 'datasets/preview', 'datasets/apply', 'datasets/list', 'datasets/read', 'datasets/export', 'decision/update', 'features/read-source', 'features/preview', 'features/proposal', 'features/apply', 'fusion/preview', 'fusion/proposal', 'fusion/confirm', 'fusion/status', 'fusion/verify', 'fusion/finalize', 'tasks/capabilities', 'tasks/assembly-preview', 'tasks/assembly-apply'],
+  agents: ['documents/read', 'research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'list', 'detail', 'edit/read', 'edit/preview', 'edit/apply', 'cases/list', 'cases/read', 'cases/update', 'eval/preview', 'eval/start', 'eval/status', 'eval/cancel', 'runs/index', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/preview', 'compute-variants/create', 'compute-variants/rename', 'compute-variants/build-preview', 'compute-variants/build', 'compute-variants/freeze-preview', 'compute-variants/freeze', 'compute-variants/compare', 'new', 'create', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'cases/create', 'datasets/source', 'datasets/preview', 'datasets/apply', 'datasets/list', 'datasets/read', 'datasets/export', 'decision/update', 'features/read-source', 'features/preview', 'features/proposal', 'features/apply', 'fusion/preview', 'fusion/proposal', 'fusion/confirm', 'fusion/status', 'fusion/verify', 'fusion/finalize', 'tasks/capabilities', 'tasks/assembly-preview', 'tasks/assembly-apply'],
   instances: ['list', 'detail', 'url', 'logs', 'preview', 'batch-preview', 'run', 'batch'],
   mcp: ['list', 'configuration', 'saveConfiguration', 'test', 'resources', 'resourceTemplates', 'readResource', 'callTool', 'sources/list', 'sources/create', 'sources/refresh', 'sources/toggle', 'sources/components', 'sources/logs', 'sources/preview', 'sources/invoke', 'saveCompositionDraft', 'publishComposition', 'executeComposition', 'dryRunComposition', 'callPublishedComposition', 'compositionRun', 'compositionArtifact', 'seedThreatCompositions', 'control/status', 'control/saveConfiguration', 'control/restrict', 'control/reassess', 'control/release'],
 }
@@ -27,6 +27,8 @@ const fields: MapValue = {
   access_mode: { type: 'string', enum: ['authenticated', 'anonymous'], description: '业务实例访问方式；anonymous 为无需登录的局域网匿名访问。' },
   identity_mode: { type: 'string', enum: ['development', 'published'], description: '业务实例身份验证阶段。' },
   min_runs_per_case: { type: 'integer' }, max_pass_rate_drop_pp: { type: 'number' }, min_resource_reduction_pct: { type: 'number' }, allow_model_change: { type: 'boolean' }, generation: object,
+  execution_mode: { type: 'string', enum: ['code-only', 'hybrid'] },
+  model_roles: { ...object, description: 'hybrid 必填 {language,decision}；每项 provider/model/reasoning_effort，decision 另需 checkpoint_sha256/state_constructor_sha256/calibration_sha256。使用 generation_contract。' },
   port: { type: 'integer' }, tail: { type: 'integer' }, cursor: { type: 'integer' }, limit: { type: 'integer' },
   arguments: { ...object, description: '使用 test 或 sources/components 返回的真实工具 inputSchema，不猜测参数。' },
   input: { ...object, description: '业务工具输入，使用当前工具目录返回的 inputSchema。' },
@@ -71,6 +73,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
   ],
   agents: [
     ['list', ''], ['detail', 'agent_id experiment_id', '明确指定版本；未传 experiment_id 时 detail.experiment 优先是已启用版本，用户要求最新版本时应读取 versions[0].id。有固定任务目标时不要改成最新版本。'],
+    ['documents/read', 'path cursor limit source_sha256', '只读当前数据工作区文档或当前会话附件。path 使用工作区相对路径或模型输入中原生附件 read_path；不传 Session ID。支持 Markdown/TXT、文本 PDF、DOCX。按 blocks 的页/段号及片段偏移引用来源；has_more=true 时用 next_cursor 与 source_sha256 连续读取，不能将首段当作全文。扫描件、图片及复杂排版以 warnings 为准；不执行文件，也不创建知识资产。'],
     ['research/read-reference', 'topic', 'topic=controlled-improvement/evaluation-and-evidence/inheritance-and-fusion/compute-variants/decision-samples。'],
     ['research/validate', 'experiment_id'], ['legacy/inspect', 'path', '仅检查 data evolution/history/imports 内的既有材料，不执行旧代码。'],
     ['new', 'agent_id name description role evaluation_cases', '先查 tasks/capabilities 复用已有能力；evaluation_cases 使用实际业务测试，ID 以 U- 开头（如 U-CHAT-GREET），身份测试由平台创建。'],
@@ -95,7 +98,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['datasets/preview', 'run_id path source_sha256 samples skipped', '遵循 datasets/source 的 extraction_contract；固定 Run 专项自动保存并回读，样本仍为 suggested。'],
     ['datasets/list', 'run_id'], ['datasets/read', 'dataset_id'], ['datasets/export', 'dataset_id mode', 'mode=candidates/training/development/calibration/test。candidates 可导出候选，其余仅导出符合对应用途且已由人员逐题复核的题目。'],
     ['compute-variants/context', 'experiment_id', '先读取 generation_contract 和固定父版；不凭空编造 SDK 能力。'],
-    ['compute-variants/preview compute-variants/create', 'agent_id parent_experiment_id parent_ref variant_name strategy case_ids critical_case_ids min_runs_per_case max_pass_rate_drop_pp resource_metric min_resource_reduction_pct allow_model_change variant_model variant_reasoning_effort generation', '使用 context 返回的生成合同；名称与策略分别提供。'],
+    ['compute-variants/preview compute-variants/create', 'agent_id parent_experiment_id parent_ref variant_name strategy case_ids critical_case_ids min_runs_per_case max_pass_rate_drop_pp resource_metric min_resource_reduction_pct allow_model_change variant_model variant_reasoning_effort execution_mode model_roles generation', '使用 context 返回的生成合同；名称与策略分别提供。hybrid 双模型身份与单模型变更互斥。'],
     ['compute-variants/rename', 'experiment_id variant_name expected_change_sha256'],
     ['compute-variants/build-preview compute-variants/build', 'experiment_id entry_path expected_candidate_sha256 expected_preview_sha256', '先读取源码后构建；执行时服务器生成并校验真实构建预览。'],
     ['compute-variants/freeze-preview compute-variants/freeze', 'experiment_id case_ids evaluation_base_sha256 expected_preview_sha256', '使用 freeze-preview 返回的 freeze_input，核对真实差异与摘要；冻结遵循 DSH 原生权限；不得用 human_confirmed 代替人员复核。'],
@@ -109,6 +112,10 @@ export function assistantActionContract(domain: AssistantDomain, action: string)
   const hint = hints[domain].find(([names]) => names.split(' ').includes(action))
   if (!hint) throw new Error('未知的领域操作合同')
   const properties = Object.fromEntries(hint[1].split(' ').filter(Boolean).map(key => [key, fields[key] ?? (/^(?:.*_id|.*_sha256|.*_ref|agent_id|source|target_source|name|description|role|path|ref|content|title|scene|expected_behavior|mode|executor|review|model|compare_to|left|right|filename|status|outcome|operation|serverId|sourceId|componentId|compositionId|artifactId|toolName|specUrl|uri|version|revision|topic|variant_name|strategy|resource_metric|variant_model|variant_reasoning_effort|entry_path|check_id)$/.test(key) ? string : {})]))
+  if (action === 'documents/read') {
+    properties.cursor = { type: 'string', description: '上一次回执的 next_cursor，绑定原文件摘要与位置。' }
+    properties.limit = { type: 'integer', description: '本次最多返回的正文字符数，512–32768，默认16000。' }
+  }
   return { domain, action, input_schema: { type: 'object', properties, additionalProperties: true },
     instructions: hint[2] ?? '使用先前实际返回的对象标识；缺少目标先查询目录。输入由原业务接口校验，错误时核对具体字段，不重放结果未知的写操作。' }
 }

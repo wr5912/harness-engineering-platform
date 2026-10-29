@@ -13,6 +13,7 @@ import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { ApprovalService } from '@deepseek-ai/dsh-user-approval'
 import { build } from 'esbuild'
+import { LocalFileSystem } from '@deepseek-ai/dsh-fs-local'
 import * as plugin from '../lib/index.js'
 
 const require = createRequire(import.meta.url)
@@ -91,6 +92,8 @@ test('真实HTTP管理会话使用原生工具，专用切换与可信Skill可�
     inner.provide('workspaceController', {})
     inner.provide('settingsController', {})
     inner.provide('agentDefaultModel', {})
+    inner.provide('attachments', { fileHostPath: () => undefined, async *readFileStream() { throw new Error('此作用域测试未上传附件') } })
+    new LocalFileSystem(inner, { cwd: assetRoot, diffBasisMaxBytes: 1024 * 1024 })
     inner.provide('llm', { listConfigurableProviders: () => [] })
     inner.provide('agents', { get: id => agents.get(id) })
     inner.provide('goals', { get: () => undefined })

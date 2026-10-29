@@ -12,7 +12,6 @@ import { executeNested, nestedStructure, validateNested } from './nested.ts'
 import { programRoot, workspaceConfigPath, workspaceLocalPath } from '../workspace.ts'
 import { callOpenApiOperation, loadOpenApi, type OpenApiConnection } from './openapi.ts'
 import type { ManagedDispatch } from './control.ts'
-import { currentBusinessContext, getBusinessControl } from '../business-control/core.ts'
 
 export type ConnectionStatus = {
   registered: boolean
@@ -29,6 +28,7 @@ export type McpRegistry = {
   threat?: ThreatRuntime
   extension?: CompositionExtension
   control?: ManagedDispatch
+  access?: { context(): unknown; assertRunRead(context: unknown, runId: string): void; bindRun(context: unknown, runId: string): void }
   native?: {
     load(connection: OpenApiConnection, signal?: AbortSignal): Promise<any>
     call(source: any, operationId: string, args: Record<string, any>, signal?: AbortSignal): Promise<any>
@@ -315,10 +315,8 @@ function assertReadonlyOperation(source: Awaited<ReturnType<typeof loadOpenApi>>
 }
 
 export async function executeComposition(registry: McpRegistry, assetRoot: string, config: CompositionConfig, input: Record<string, any>, signal?: AbortSignal, catalog?: Catalog, nested = false, execution?: CompositionExecutionContext, checkedVersion?: Awaited<ReturnType<typeof compositionVersion>>): Promise<any> {
-  const context = currentBusinessContext()
-  if (context && getBusinessControl(assetRoot).enabled() && typeof input.run_id === 'string') {
-    getBusinessControl(assetRoot).assert(context, 'read', [{ kind: 'run', id: input.run_id }])
-  }
+  const context = registry.access?.context()
+  if (context && typeof input.run_id === 'string') registry.access!.assertRunRead(context, input.run_id)
   const resolvedCatalog = catalog ?? readCompositions(workspaceConfigPath(assetRoot, 'mcp-compositions.json')).catalog
   const version = checkedVersion ?? await compositionVersion(assetRoot, config, registry.extension, resolvedCatalog, registry)
   const attempts: ModelAttempt[] = []
@@ -346,7 +344,7 @@ export async function executeComposition(registry: McpRegistry, assetRoot: strin
           error: { code: runSignal.aborted ? 'aborted' : 'threat_stage_failed', message: '业务阶段执行失败，请核对原始模型与阶段记录' } }
       }
       const ok = ['completed', 'skipped'].includes(state.result.phase_status) && state.result.status !== 'claim_failed'
-      if (context && typeof state.result.run_id === 'string') getBusinessControl(assetRoot).bindResource(context, { kind: 'run', id: state.result.run_id })
+      if (context && typeof state.result.run_id === 'string') registry.access!.bindRun(context, state.result.run_id)
       const complete = state.result.replayed === true || config.stage !== 'infer' || state.result.llm_invoked === false || attempts.length > 0
       return { ok, version, receipts: [], result: state.result, graph_execution: graphExecution(complete),
         ...(!ok ? { error: { code: state.result.status === 'claim_failed' ? 'claim_failed' : 'threat_stage_failed',

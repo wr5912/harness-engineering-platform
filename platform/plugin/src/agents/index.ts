@@ -6,6 +6,7 @@ import { DEFAULT_SCHEMA, Type, load as loadYaml, dump as dumpYaml } from 'js-yam
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import {
   existsSync,
+  chmodSync,
   closeSync,
   cpSync,
   lstatSync,
@@ -41,7 +42,7 @@ import { candidateFiles, dataPath, sourceInfo } from '../tasks/files.ts'
 import { previewTaskAssembly, applyTaskAssembly, type TaskAssemblyInput } from '../tasks/assembly.ts'
 import { containsLiteralLlmKey } from '../tasks/llm-key.ts'
 import { createInstancesHandler } from '../instances/index.ts'
-import { versionSource, versionSources } from './version-source.ts'
+import { assertVersionIdentity, versionSource, versionSources } from './version-source.ts'
 import { inspectLegacy, readResearchReference, validateResearch } from './research.ts'
 
 type JsonMap = Record<string, unknown>
@@ -215,8 +216,12 @@ function catalog(root: string) {
 function atomicWrite(file: string, body: string) {
   mkdirSync(dirname(file), { recursive: true })
   const tmp = `${file}.${process.pid}.${Date.now()}.${randomBytes(3).toString('hex')}.tmp`
-  writeFileSync(tmp, body)
-  renameSync(tmp, file)
+  const mode = existsSync(file) ? lstatSync(file).mode & 0o777 : undefined
+  try {
+    writeFileSync(tmp, body, { flag: 'wx', mode })
+    if (mode !== undefined) chmodSync(tmp, mode)
+    renameSync(tmp, file)
+  } finally { rmSync(tmp, { force: true }) }
 }
 
 
@@ -295,8 +300,9 @@ function experimentInfo(root: string, id: string) {
       { path: repoRelative(root, file), filesystem_code: filesystemCode })
   }
   const change = readYamlMap(root, file, content)
-  const agentId = typeof change.agent_id === 'string' ? change.agent_id : id.replace(EXP_ID, '$1')
-  if (!AGENT_ID.test(agentId)) throw new RpcError('invalid_request', 'change.yaml agent_id 格式无效', { experiment_id: id, agent_id: agentId })
+  try { assertVersionIdentity(id, change) }
+  catch { throw new RpcError('invalid_request', 'change.yaml 与版本身份不一致', { experiment_id: id }) }
+  const agentId = change.agent_id as string
   return {
     id,
     path: `evolution/experiments/${id}`,
@@ -692,7 +698,7 @@ function fusionInventory(root: string, agentId: string, parentId: string, parent
     const confirmedVariant = change.compute_variant && typeof computeDecision?.variant_ref === 'string'
       ? snapshot(version.id, computeDecision.variant_ref) : null
     // 算力变体的结论只适用于确认时的计划与 Candidate；后续编辑需要重新比较。
-    const computeEndCurrent = !change.compute_variant || Boolean(confirmedVariant
+    const computeEndCurrent = !change.compute_variant || Boolean(computeDecision?.measurement_schema_version === 2 && confirmedVariant
       && confirmedVariant.digest === currentDigests.get(version.id)
       && isDeepStrictEqual(confirmedVariant.change.compute_variant, change.compute_variant))
     const endVerified = end && fixedEndParent && currentFixed.get(version.id) && computeEndCurrent && change.end_confirmed === true && hasEvidence(refs) && hasEvidence(resourceRefs)
@@ -1570,7 +1576,7 @@ async function decisionUpdate(root: string, payload: JsonMap, signal?: AbortSign
 }
 
 export function createAgentsHandler(assetRoot: string, onChange?: () => void, capabilityOptions: CapabilityOptions = {},
-  modelPolicy?: EvalModelPolicyProvider): ConnectionRpcHandler {
+  modelPolicy?: EvalModelPolicyProvider, deployment?: ConnectionRpcHandler): ConnectionRpcHandler {
   const root = rootOf(assetRoot)
   const jobs = createEvaluationJobs(root, {
     command: (payload, jobId) => evalCommand(root, payload, false, modelPolicy, jobId),
@@ -1606,6 +1612,7 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
   })
   return async (endpoint, payload, signal, peer) => {
     if (signal.aborted) return failure(new RpcError('aborted', '智能体操作已取消'))
+    if (endpoint.startsWith('deployment/') && deployment) return deployment(endpoint.slice('deployment/'.length), payload, signal, peer)
     try {
       const body = payload === undefined ? {} : requireObject(payload)
       if (endpoint.startsWith('datasets/')) return ok(await datasets(endpoint, body, signal))

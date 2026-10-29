@@ -41,11 +41,12 @@ export function candidateDigest(candidate: string): string {
   return hash.digest('hex')
 }
 
-export function candidateFiles(candidate: string): string[] {
+export function candidateFiles(candidate: string, extraExcluded: readonly string[] = []): string[] {
   const files: string[] = []
+  const excluded = extraExcluded.length ? new Set([...EXCLUDED, ...extraExcluded]) : EXCLUDED
   function walk(path: string) {
     for (const name of readdirSync(join(candidate, path)).sort()) {
-      if (EXCLUDED.has(name) || name.endsWith('.llm-api-key')) continue
+      if (excluded.has(name) || name.endsWith('.llm-api-key')) continue
       const rel = path ? `${path}/${name}` : name
       const stat = lstatSync(join(candidate, rel))
       if (stat.isSymbolicLink()) throw new Error('Candidate 不能包含符号链接')

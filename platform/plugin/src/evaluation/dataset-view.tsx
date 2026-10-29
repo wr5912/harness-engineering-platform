@@ -32,6 +32,7 @@ const reviewSummary = (record: any) => record.targets ? `${Object.values(record.
 export function DecisionDatasetView({ rpc, runId, active, updates, onDirty, onBusy, onSource, onReextract }: PlatformPageProps & { runId: string; active: boolean; updates?: PlatformUpdates; onDirty?(dirty: boolean): void; onBusy?(busy: boolean): void; onSource?(source: { path: string; line: number; source_sha256?: string }): void; onReextract?(): void }) {
   const [list, setList] = useState<any[]>([]), [id, setId] = useState(''), [document, setDocument] = useState<any>(null), [recordId, setRecordId] = useState('')
   const [draft, setDraft] = useState<Draft | null>(null), [error, setError] = useState(''), [message, setMessage] = useState(''), [busy, setBusy] = useState(false)
+  const [listPhase, setListPhase] = useState<'loading' | 'ready' | 'error'>('loading'), [listError, setListError] = useState('')
   const generation = useRef(0), refreshSequence = useRef(0), current = useRef({ runId, id, recordId, dirty: false, busy: false, sha256: '' })
   const record = document?.dataset?.records?.find((entry: any) => entry._meta.id === recordId)
   const legacy = document?.dataset?.schema_version !== 2
@@ -51,10 +52,12 @@ export function DecisionDatasetView({ rpc, runId, active, updates, onDirty, onBu
     const target = current.current.runId
     const refreshId = ++refreshSequence.current
     const request = generation.current, selectedId = current.current.id
+    setListPhase('loading'); setListError('')
+    let listRead = false
     try {
       const value = await call('list', { run_id: target })
       if (current.current.runId !== target || request !== generation.current || refreshId !== refreshSequence.current) return
-      setList(value.datasets)
+      setList(value.datasets); setListPhase('ready'); listRead = true
       if (selectedId && !current.current.busy) {
         const latest = await call('read', { dataset_id: selectedId })
         if (current.current.runId !== target || request !== generation.current || refreshId !== refreshSequence.current || current.current.id !== selectedId || current.current.busy) return
@@ -63,9 +66,12 @@ export function DecisionDatasetView({ rpc, runId, active, updates, onDirty, onBu
         setDocument(latest); setRecordId(selected?._meta.id ?? ''); setDraft(selected ? draftOf(selected) : null)
       }
     }
-    catch (e) { if (current.current.runId === target && request === generation.current && refreshId === refreshSequence.current) setError((e as Error).message) }
+    catch (e) { if (current.current.runId === target && request === generation.current && refreshId === refreshSequence.current) {
+      if (listRead) setError((e as Error).message)
+      else { setListPhase('error'); setListError((e as Error).message) }
+    } }
   }
-  useEffect(() => { generation.current++; setId(''); setDocument(null); setRecordId(''); setDraft(null); setList([]); setError(''); setMessage(''); return () => { generation.current++ } }, [runId])
+  useEffect(() => { generation.current++; setId(''); setDocument(null); setRecordId(''); setDraft(null); setList([]); setListPhase('loading'); setListError(''); setError(''); setMessage(''); return () => { generation.current++ } }, [runId])
   useEffect(() => { if (active && runId) void refresh() }, [active, runId])
   useEffect(() => updates?.subscribe(() => { if (active && updates.getSnapshot().domains.includes('agents')) void refresh() }), [updates, active, runId])
   async function open(next: string) {
@@ -120,9 +126,10 @@ export function DecisionDatasetView({ rpc, runId, active, updates, onDirty, onBu
   }
   return <section className="harness-eval-dataset" aria-label="决策样本工作区">
     <div className="harness-eval-section-heading"><div><h3>决策样本</h3><p className="harness-eval-muted">每条样本共享决策前输入，可包含多个命名决策题。AI 标签先作为建议，逐题人员复核后按明确用途导出。</p></div><button onClick={() => void refresh()}>刷新样本</button></div>
+    {listPhase === 'loading' && <p role="status">正在读取样本批次…</p>}{listError && <p role="alert">样本批次读取失败：{listError}。请重新读取。{list.length > 0 && '当前显示上次读取的批次。'}</p>}
     {error && <p role="alert">{error}</p>}{message && <p role="status">{message}</p>}
     <label className="harness-eval-field">样本批次<select aria-label="样本批次" value={id} disabled={busy} onChange={event => void open(event.target.value)}><option value="">选择已保存的批次</option>{list.map(item => <option key={item.id} value={item.id}>{time(item.created_at)} · {item.count} 条 · 有已复核题 {item.reviewed}</option>)}</select></label>
-    {!list.length && <p className="harness-eval-empty">此 Run 尚无样本。点击上方“请 AI 抽取决策样本”，在对话中的预览卡确认保存后刷新。</p>}
+    {listPhase === 'ready' && !list.length && <p className="harness-eval-empty">此 Run 尚无样本。点击上方“请 AI 抽取决策样本”，在对话中的预览卡确认保存后刷新。</p>}
     {document && <>
       {legacy && <div className="harness-eval-limits" role="status"><strong>旧格式样本，仅供阅读和候选下载。</strong><p>原有标签和复核记录保持原样；需要按当前决策合同重新抽取，不能直接作为新版合格训练或评测样本。</p>{onReextract && <button disabled={busy} onClick={onReextract}>按当前合同重新抽取</button>}</div>}
       {document.warnings?.length > 0 && <div className="harness-eval-limits"><strong>批次检查提示</strong><ul>{document.warnings.map((warning: string) => <li key={warning}>{warning}</li>)}</ul></div>}

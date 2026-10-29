@@ -2,6 +2,7 @@ import { homedir } from 'node:os'
 import { isIP } from 'node:net'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { readFileSync } from 'node:fs'
 import { pack } from './pack.mts'
 import { install } from './install.mts'
 import { verifyDeployment } from './verify.mts'
@@ -40,11 +41,15 @@ function flag(options: Options, name: string): boolean {
 
 function validateOptions(command: string, options: Options): void {
   const values: Record<string, string[]> = {
+    'agent-preview': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir'],
+    'agent-pack': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir', 'out', 'seed-file', 'expected-candidate-sha256'],
+    'agent-prepare': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir', 'image-archive', 'docker-assets'],
     pack: ['out', 'program-root', 'data-root', 'assets-dir', 'image-archive', 'image-tag', 'image-id', 'image-fingerprint', 'arch'],
     install: ['bundle-root', 'prefix', 'data-root', 'host', 'port', 'gateway-port'],
     verify: ['prefix', 'data-root', 'url'],
   }
   const flags: Record<string, string[]> = {
+    'agent-preview': [], 'agent-pack': [], 'agent-prepare': [],
     pack: ['no-image', 'no-data', 'allow-dirty', 'allow-fixture-data', 'keep-staging'],
     install: ['dry-run', 'skip-image', 'skip-prepare', 'strict-paths', 'allow-fixture-data', 'start'],
     verify: [],
@@ -74,6 +79,20 @@ function installPort(value: string | undefined, name: string, fallback: number):
 
 function usage(): string {
   return `用法：
+  dsh-deploy agent-preview|agent-pack|agent-prepare [选项]
+    --agent-id <智能体>          明确的业务智能体
+    --source experiment:<ID>    已保存的固定版本，包含实际未提交资产
+    --arch amd64|arm64          目标架构，默认本机架构
+    --mode online|offline      部署方式，默认 online
+    --resources-dir <目录>      目标运行资源，默认 .local/deploy-assets/<arch>
+    --program-root <目录>       程序根，默认当前仓库
+    --data-root <目录>          数据工作区，默认当前关联工作区
+    --out <目录>                agent-pack 输出目录
+    --seed-file <*.llm-api-key> agent-pack 连接与凭据种子；不传时保留原生资产配置和工作区环境
+    --expected-candidate-sha256 <摘要>  agent-pack 核对先前预览的实际资产
+    --image-archive <tar>       agent-prepare 导入该架构标准镜像
+    --docker-assets <目录>      agent-prepare 导入官方 docker-*.tgz 与 docker-compose
+
   dsh-deploy pack [选项]
     --out <目录>                 输出目录，默认 ./dist
     --program-root <目录>        程序仓库根，默认当前仓库
@@ -108,7 +127,7 @@ function usage(): string {
     --allow-fixture-data         允许夹具数据根（仅测试；真实部署默认拒绝）
     --start                      安装完成后后台启动平台，等待就绪后返回
 
-安装包必须在相同架构主机上生成和使用；AMD64 与 ARM64 不混用。`
+可导入已准备的目标架构资源生成安装包；安装和运行须使用匹配架构的主机，AMD64 与 ARM64 不混用。`
 }
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
@@ -116,6 +135,57 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     const { command, options } = parse(argv)
     if (!command || command === '--help' || flag(options, 'help')) { console.log(usage()); return 0 }
     validateOptions(command, options)
+    if (['agent-preview', 'agent-pack', 'agent-prepare'].includes(command)) {
+      const agentId = text(options, 'agent-id'), source = text(options, 'source')
+      if (!agentId || !source?.startsWith('experiment:')) throw new Error('独立包需要 --agent-id 和 --source experiment:<ID>')
+      const mode = text(options, 'mode', 'online')
+      if (mode !== 'online' && mode !== 'offline') throw new Error('--mode 只能是 online 或 offline')
+      const input = {
+        programRoot: resolve(text(options, 'program-root', REPO)!), assetRoot: resolve(text(options, 'data-root', defaultAssetRoot())!),
+        agentId, experimentId: source.slice('experiment:'.length), arch: archOf(text(options, 'arch')), mode,
+        resourcesDir: text(options, 'resources-dir'), out: text(options, 'out'), expectedCandidateSha256: text(options, 'expected-candidate-sha256'),
+      }
+      if (command === 'agent-preview') {
+        const { previewAgentPackage } = await import('./agent/pack.mts')
+        console.log(JSON.stringify(previewAgentPackage(input), null, 2))
+        return 0
+      }
+      const controller = new AbortController()
+      const cancel = () => controller.abort(new Error('独立运行包操作已取消'))
+      process.once('SIGINT', cancel); process.once('SIGTERM', cancel)
+      const hooks = { signal: controller.signal, onProgress: (value: any) => console.error(JSON.stringify({ type: 'agent-deployment-progress', ...value })) }
+      try {
+        if (command === 'agent-prepare') {
+          const { prepareAgentResources } = await import('./agent/prepare.mts')
+          const result = await prepareAgentResources({ ...input, imageArchive: text(options, 'image-archive'), dockerAssetsDir: text(options, 'docker-assets') }, hooks)
+          console.log(JSON.stringify({ resourcesDir: result.resourcesDir, arch: result.manifest.arch, image: result.manifest.image }, null, 2))
+          return 0
+        }
+        const seedFile = text(options, 'seed-file')
+        let seed
+        if (seedFile) {
+          if (!seedFile.endsWith('.llm-api-key')) throw new Error('连接种子可能包含模型凭据，请保存为本地忽略的 *.llm-api-key 文件')
+          try { seed = JSON.parse(readFileSync(resolve(seedFile), 'utf8')) }
+          catch { throw new Error('连接配置种子无法读取或不是有效 JSON') }
+        } else {
+          const { createDeploymentSeed } = await import('../plugin/src/deployment/seed.ts')
+          const { readBusinessDefault } = await import('../plugin/src/models/business-default.ts')
+          const project = createDeploymentSeed(input.assetRoot, async () => {
+            const defaults = readBusinessDefault(input.assetRoot)
+            return { policy: { patch: [], default: defaults.default }, environment: {} }
+          })
+          const projected = await project({ agent_id: input.agentId, experiment_id: input.experimentId }, controller.signal)
+          seed = projected.seed
+          for (const notice of projected.notices) console.error(`agent-pack: ${notice}`)
+          console.error('agent-pack: 已收集当前业务 MCP 配置；自定义模型连接可通过 --seed-file 携带，或安装后使用 agent configure 重新配置。')
+        }
+        const { packAgent } = await import('./agent/pack.mts')
+        const result = await packAgent({ ...input, seed }, hooks)
+        console.log(JSON.stringify({ archive: result.archive, size: result.size, sha256: result.sha256,
+          agentId, experimentId: input.experimentId, arch: input.arch, mode: input.mode }, null, 2))
+        return 0
+      } finally { process.off('SIGINT', cancel); process.off('SIGTERM', cancel) }
+    }
     if (command === 'pack') {
       const result = pack({
         programRoot: resolve(text(options, 'program-root', REPO) as string),

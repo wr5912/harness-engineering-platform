@@ -141,6 +141,14 @@ def rendered_profile():
         result[PLATFORM_PATCH] += ("\n- insert:\n    - id: " + json.dumps(extension["id"])
                                   + "\n      name: " + json.dumps(str(target / "plugin.js"))
                                   + "\n      disabled: false\n")
+    knowledge_index = asset_root() / "knowledge/offline/index.json"
+    if knowledge_index.is_file():
+        result[PLATFORM_PATCH] += (
+            "\n- insert:\n    - id: harness-offline-knowledge\n      name: "
+            + json.dumps(str(PLUGIN / "lib/standalone-knowledge.js"))
+            + "\n      config:\n        indexPath: " + json.dumps(str(knowledge_index))
+            + "\n- id: web\n  config:\n    fetchProvider: harness-offline-knowledge\n"
+        )
     return result
 
 

@@ -6,7 +6,7 @@ import { build } from 'esbuild'
 
 const require = createRequire(import.meta.url)
 const compiled = await build({ entryPoints: [new URL('../src/agents/compute-variants.tsx', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime', '@deepseek-ai/dsh-client-ui-primitives'] })
-function panel(eligible = false, hasPlan = true, readContext) {
+function panel(eligible = false, hasPlan = true, readContext, storage = new Map()) {
   const states = [], deps = [], cleanups = [], calls = [], tasks = []
   let cursor = 0, effects = [], changed = false, tree
   const react = { ...require('react'),
@@ -15,7 +15,7 @@ function panel(eligible = false, hasPlan = true, readContext) {
     useEffect(effect, values) { const index = cursor++; if (!deps[index] || values.some((value, at) => value !== deps[index][at])) { deps[index] = values; effects.push(() => { cleanups[index]?.(); cleanups[index] = effect() }) } },
   }
   const module = { exports: {} }
-  vm.runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, URLSearchParams, require: name => name === 'react' ? react : name === '@deepseek-ai/dsh-client-ui-primitives' ? { Modal: () => null } : require(name) })
+  vm.runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, URLSearchParams, window: { sessionStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) }, addEventListener() {}, removeEventListener() {} }, require: name => name === 'react' ? react : name === '@deepseek-ai/dsh-client-ui-primitives' ? { Modal: () => null } : require(name) })
   const context = { experiment_id: 'EXP-alpha-002', agent_id: 'alpha', freeze: { candidate_matches: true }, parent_ref: `git:${'a'.repeat(40)}`, parent_experiment_id: 'EXP-alpha-001', fixed_parent_ref: `git:${'a'.repeat(40)}`, variant_name: '资产告警轻量版', variant_kind: 'exploratory', decision: 'inconclusive', plan: { strategy: '减少重复调用', case_hashes: { 'U-ONE-001': 'digest' }, critical_case_ids: ['U-ONE-001'], min_runs_per_case: 2, max_pass_rate_drop_pp: 0, resource_metric: 'total_tokens', min_resource_reduction_pct: 10 }, cases: [{ case_id: 'U-ONE-001', title: '查询状态' }], runs: [{ run_id: 'parent-run', experiment_id: 'EXP-alpha-001', status: 'completed' }, { run_id: 'variant-run', experiment_id: 'EXP-alpha-002', status: 'completed' }] }
   if (!hasPlan) context.plan = null
   const props = { onAssistant: async (task, context) => { tasks.push({task, context}) }, agentId: 'alpha', agentName: '资产告警助手', experimentId: 'EXP-alpha-002', versionLabel: 'v002', versions: [{ id: 'EXP-alpha-001' }, { id: 'EXP-alpha-002' }], rpc: { call: async (_channel, method, body) => {
@@ -576,4 +576,41 @@ test('固定来源与比较证据仅保留一个按版本及Run绑定的抽屉�
     ui.props.active = false; ui.render()
     assert.equal(drawers()[0].props.active, false)
   } finally { ui.cleanup() }
+})
+
+test('手动计划卸载与整页重新装载按版本恢复名称、策略、范围和人工结论', async () => {
+  const storage = new Map()
+  const first = panel(true, true, undefined, storage)
+  await compare(first)
+  first.change('变体研究结论', '待补充的研究结论')
+  first.button('手动派生新变体').props.onClick(); await first.settle()
+  first.change('变体名称', '人工草稿名称'); first.change('策略与研究问题', '待验证的策略正文')
+  first.change('关键 U-ONE-001', false)
+  first.cleanup()
+  const second = panel(true, true, undefined, storage)
+  try {
+    await second.settle()
+    assert.equal(second.nodes().find(node => node.props?.['aria-label'] === '变体名称').props.value, '人工草稿名称')
+    assert.equal(second.nodes().find(node => node.props?.['aria-label'] === '策略与研究问题').props.value, '待验证的策略正文')
+    assert.equal(second.nodes().find(node => node.props?.['aria-label'] === '纳入 U-ONE-001').props.checked, true)
+    assert.equal(second.nodes().find(node => node.props?.['aria-label'] === '关键 U-ONE-001').props.checked, false)
+    await compare(second)
+    assert.equal(second.nodes().find(node => node.props?.['aria-label'] === '变体研究结论').props.value, '待补充的研究结论')
+  } finally { second.cleanup() }
+})
+
+test('父版慢读取期间再次卸载不以加载空态覆盖已暂存研究范围和诊断Run', async () => {
+  const storage = new Map(), key = 'harness-compute-manual:alpha:EXP-alpha-002'
+  storage.set(key, JSON.stringify({ schema_version: 1, createOpen: true, parent: 'EXP-alpha-002', variantName: '固定范围草稿', strategy: '保留所选范围', selectedCases: ['U-ONE-001'], critical: [], sourceRuns: ['variant-run'], codeMode: true, caseScopeReady: true }))
+  const slow = panel(false, true, () => new Promise(() => {}), storage)
+  await slow.settle(); slow.cleanup()
+  assert.deepEqual(JSON.parse(storage.get(key)).selectedCases, ['U-ONE-001'])
+  assert.deepEqual(JSON.parse(storage.get(key)).sourceRuns, ['variant-run'])
+  assert.equal(JSON.parse(storage.get(key)).caseScopeReady, true)
+  const restored = panel(false, true, undefined, storage)
+  try {
+    await restored.settle()
+    assert.equal(restored.nodes().find(node => node.props?.['aria-label'] === '关键 U-ONE-001').props.checked, false)
+    assert.equal(restored.nodes().find(node => node.props?.['aria-label'] === '生成来源 variant-run').props.checked, true)
+  } finally { restored.cleanup() }
 })

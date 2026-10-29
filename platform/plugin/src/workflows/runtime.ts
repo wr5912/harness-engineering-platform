@@ -6,10 +6,12 @@ import { observeLlm, type ModelAttempt } from '../evaluation/model-attempts.ts'
 import { compileSequence } from './graph.ts'
 import { registerFixedCompositionTools, withFixedCompositionExecution, type FixedCompositionBinding } from './fixed-composition.ts'
 import { runtimeModule, runtimeRequire } from '../../../../runtime/adapters/dsh-web/src/resolve-runtime.ts'
-import { CODE_ONLY_MODEL, CODE_ONLY_PROVIDER } from './code-only-route.ts'
+import { CODE_ONLY_MODEL, CODE_ONLY_PROVIDER, HYBRID_WORKFLOW_MODEL, HYBRID_WORKFLOW_PROVIDER } from './code-only-route.ts'
+import { matchesWorkflowModelBinding, validateWorkflowModelRoles, type WorkflowModelRoles } from './model-roles.ts'
 
 export { Annotation, END, START, StateGraph }
 export { fixedCompositionToolName, type FixedCompositionBinding } from './fixed-composition.ts'
+export { type WorkflowModelBinding, type WorkflowModelRoles } from './model-roles.ts'
 declare const __WORKFLOW_BUILD_DIGEST__: string
 declare const __WORKFLOW_SOURCE_DIGEST__: string
 // 在模块装载时固定，后续宿主重建同路径不改写本进程实际装载的身份。
@@ -26,6 +28,7 @@ export interface WorkflowContext {
   trace: Record<string, any>[]
   callTool(name: string, args: Record<string, any>): Promise<any>
   infer(config: Record<string, any>, input: { system?: string; messages: any[] }): Promise<{ content: string }>
+  decide(name: string, args: Record<string, any>): Promise<Record<string, any>>
 }
 export interface WorkflowDefinition {
   id: string
@@ -38,7 +41,8 @@ export interface WorkflowDefinition {
 export function defineWorkflow<T extends WorkflowDefinition>(definition: T): T { return definition }
 
 export interface WorkflowToolOptions {
-  executionMode?: 'code-only'
+  executionMode?: 'code-only' | 'hybrid'
+  modelRoles?: WorkflowModelRoles
 }
 
 /** 顺序节点共用 LangGraph；业务条件和参数来源留在业务源码。 */
@@ -63,6 +67,8 @@ export async function runWorkflow(context: WorkflowContext, steps: { id: string;
 
 /** 通过原生工具管线执行子调用，保留调用身份、取消和真实回执。 */
 export function registerWorkflowTool(ctx: any, definition: WorkflowDefinition, options: WorkflowToolOptions = {}) {
+  if (options.executionMode === 'hybrid' && !validateWorkflowModelRoles(options.modelRoles)) throw new Error('混合工作流必须固定语言与决策模型身份')
+  const modelRoles = options.modelRoles ? structuredClone(options.modelRoles) : undefined
   const aliases = registerFixedCompositionTools(ctx, definition.fixedCompositions ?? {})
   return ctx.tools.register({
     name: definition.toolName, description: definition.description, parameters: definition.inputSchema,
@@ -77,38 +83,92 @@ export function registerWorkflowTool(ctx: any, definition: WorkflowDefinition, o
       const identity = { execution_id: executionId, role: 'target' as const,
         ...(exec.agent?.session?.id ? { session_id: exec.agent.session.id } : {}), ...(exec.callId ? { tool_call_id: exec.callId } : {}),
         ...(exec.parent_run_id ? { parent_run_id: exec.parent_run_id } : {}), ...(exec.case_id ? { case_id: exec.case_id } : {}) }
-      const observed = options.executionMode !== 'code-only' && ctx.llm ? observeLlm(ctx.llm, identity, (event: ModelAttempt) => {
+      const llm = options.executionMode === 'hybrid' && ctx.llm ? { async prepareCall(...args: any[]) {
+        const prepared = await ctx.llm.prepareCall(...args)
+        if (!matchesWorkflowModelBinding({ ...prepared.config, reasoning_effort: prepared.config?.reasoningEffort }, modelRoles!.language)) throw new Error('装配后的语言模型不符合混合工作流角色绑定')
+        return prepared
+      } } : ctx.llm
+      const observed = options.executionMode !== 'code-only' && llm ? observeLlm(llm, { ...identity,
+        ...(options.executionMode === 'hybrid' ? { model_role: 'language' as const, ...Object.fromEntries(Object.entries(modelRoles!.language).filter(([key]) => key.endsWith('_sha256'))) } : {}) }, (event: ModelAttempt) => {
         attempts.push(Object.fromEntries(Object.entries(event).filter(([, value]) => value !== undefined)) as ModelAttempt)
       }) : null
+      async function invokeTool(name: string, args: Record<string, any>) {
+        exec.signal.throwIfAborted()
+        const callId = `${exec.callId}:workflow:${trace.length}:${randomUUID()}`
+        const started = Date.now()
+        const result = await withFixedCompositionExecution(identity, () => ctx.tools.execute({ name: aliases.get(name) ?? name,
+          arguments: args, callId, rootCallId: exec.rootCallId ?? exec.callId, parent: exec.token, agent: exec.agent, signal: exec.signal }))
+        const failed = result.isError || result.value?.isError === true
+        trace.push({ node: name, call_id: callId, arguments: args, status: failed ? 'failed' : 'completed',
+          elapsed_ms: Date.now() - started, result: result.isError ? {
+            ...(result.error !== undefined ? { error: result.error } : {}), ...(result.content !== undefined ? { content: result.content } : {}),
+          } : result.value,
+          ...(result.meta ? { meta: result.meta } : {}) })
+        if (result.additionalContexts?.length && exec.deferContext) for (const value of result.additionalContexts) exec.deferContext(value)
+        return { failed, value: result.value }
+      }
       const context: WorkflowContext = {
         input, signal: exec.signal, executionId, trace,
         async callTool(name, args) {
-          exec.signal.throwIfAborted()
-          const callId = `${exec.callId}:workflow:${trace.length}:${randomUUID()}`
-          const started = Date.now()
-          const result = await withFixedCompositionExecution(identity, () => ctx.tools.execute({ name: aliases.get(name) ?? name,
-            arguments: args, callId, rootCallId: exec.rootCallId ?? exec.callId, parent: exec.token, agent: exec.agent, signal: exec.signal }))
-          const failed = result.isError || result.value?.isError === true
-          trace.push({ node: name, call_id: callId, arguments: args, status: failed ? 'failed' : 'completed',
-            elapsed_ms: Date.now() - started, result: result.isError ? {
-              ...(result.error !== undefined ? { error: result.error } : {}), ...(result.content !== undefined ? { content: result.content } : {}),
-            } : result.value,
-            ...(result.meta ? { meta: result.meta } : {}) })
-          if (result.additionalContexts?.length && exec.deferContext) for (const value of result.additionalContexts) exec.deferContext(value)
-          if (failed) throw new Error(`工作流工具失败：${name}`)
+          const result = await invokeTool(name, args)
+          if (result.failed) throw new Error(`工作流工具失败：${name}`)
           return result.value
         },
         async infer(config, payload) {
           if (options.executionMode === 'code-only') throw new Error('纯代码工作流禁止模型调用')
+          if (options.executionMode === 'hybrid' && !matchesWorkflowModelBinding({ ...config, reasoning_effort: config.reasoningEffort }, modelRoles!.language)) throw new Error('语言推理路由不符合混合工作流角色绑定')
           if (!observed) throw new Error('工作流模型服务未装载')
           const prepared = await observed.prepareCall(config, exec.signal)
           let content = '', completed = false
-          for await (const chunk of prepared.stream({ ...prepared.config, ...payload, signal: exec.signal })) {
+          for await (const chunk of prepared.stream({ ...prepared.config, ...(payload.system === undefined ? {} : { system: payload.system }), messages: payload.messages, signal: exec.signal })) {
             if (chunk.type === 'text-delta') content += chunk.text
             if (chunk.type === 'finish') { if (chunk.reason?.kind !== 'stop') throw new Error('工作流模型响应未完成'); completed = true }
           }
           if (!completed) throw new Error('工作流模型响应未完成')
           return { content }
+        },
+        async decide(name, args) {
+          if (options.executionMode !== 'hybrid') throw new Error('类型化决策仅适用于混合工作流')
+          if (Object.hasOwn(args, 'model_execution')) throw new Error('model_execution 由运行库提供')
+          const binding = modelRoles!.decision
+          const decisionCallId = `decision-${randomUUID()}`
+          const invocation = { ...identity, decision_call_id: decisionCallId }
+          // 在无法获得服务回执时保留未知请求，不能把传输失败误记为零调用。
+          const fallback = { ...identity, attempt_id: decisionCallId, model_role: 'decision' as const, kind: 'typed_decision' as const, ...binding }
+          attempts.push({ ...fallback, status: 'preparing', time: Date.now() }, { ...fallback, status: 'started', time: Date.now() })
+          try {
+            const result = await invokeTool(name, { ...args, model_execution: invocation })
+            const value = result.value
+            const received = value?.model_execution
+            if (!received || Object.keys(received).length !== Object.keys(invocation).length
+              || Object.entries(invocation).some(([key, item]) => received[key] !== item)
+              || !Array.isArray(value.model_requests) || !value.model_requests.length) throw new Error('类型化决策缺少模型执行回执')
+            const requests = new Map<string, any>()
+            for (const request of value.model_requests) {
+              if (!request || typeof request.request_id !== 'string' || !request.request_id.trim() || !['completed', 'failed', 'cancelled'].includes(request.status)
+                || typeof request.model_invocation !== 'boolean' || !matchesWorkflowModelBinding(request, binding)
+                || request.status === 'completed' && request.model_invocation !== true
+                || request.model_invocation === false && request.usage !== undefined) throw new Error('类型化决策模型回执与绑定不一致')
+              if (requests.has(request.request_id) && JSON.stringify(requests.get(request.request_id)) !== JSON.stringify(request)) throw new Error('模型请求身份存在冲突')
+              if (requests.has(request.request_id)) continue
+              requests.set(request.request_id, request)
+              const attempt = { ...identity, model_role: 'decision' as const, kind: 'typed_decision' as const, ...binding,
+                attempt_id: `${executionId}:${request.request_id}`, model_invocation: request.model_invocation, time: Date.now() }
+              if (request.model_invocation) attempts.push({ ...attempt, status: 'started' })
+              const usage = request.usage && Object.fromEntries(['inputTokens', 'outputTokens', 'totalTokens', 'cacheReadTokens', 'cacheWriteTokens', 'reasoningTokens']
+                .filter(key => typeof request.usage[key] === 'number').map(key => [key, request.usage[key]]))
+              attempts.push({ ...attempt, status: request.status, ...(usage ? { usage } : {}) })
+            }
+            attempts.splice(0, attempts.length, ...attempts.filter(attempt => attempt.attempt_id !== decisionCallId))
+            if (result.failed || value.ok === false || [...requests.values()].at(-1)?.status !== 'completed'
+              || !value.typed_decision || typeof value.typed_decision !== 'object' || Array.isArray(value.typed_decision)
+              || !Object.keys(value.typed_decision).length || snapshotJsonValue(value.typed_decision) === undefined) throw new Error('类型化决策未完成')
+            return value.typed_decision
+          } catch (error) {
+            trace.push({ node: `${name}:typed_decision`, status: exec.signal.aborted ? 'cancelled' : 'failed', error_code: 'DECISION_NOT_COMPLETED' })
+            if (attempts.some(attempt => attempt.attempt_id === decisionCallId)) attempts.push({ ...fallback, status: exec.signal.aborted ? 'cancelled' : 'failed', time: Date.now(), error_type: 'DecisionReceiptUnavailable' })
+            throw error
+          }
         },
       }
       let result: any, failure: string | undefined, errorCode: string | undefined
@@ -136,6 +196,8 @@ export interface CodeOnlyWorkflowAgent {
   renderResult?(result: any): string
 }
 
+export interface HybridWorkflowAgent extends CodeOnlyWorkflowAgent { modelRoles: WorkflowModelRoles }
+
 interface CodeOnlyTurn {
   turn: number
   request: string
@@ -150,13 +212,25 @@ const textContent = (message: any): string => (message?.content ?? [])
 
 /** 用本地原生适配器完成一个回合；业务规则、分支和回复内容仍由 LangGraph 提供。 */
 export function registerCodeOnlyWorkflowAgent(ctx: any, options: CodeOnlyWorkflowAgent) {
-  if (!options.presetId.trim()) throw new Error('纯代码工作流必须绑定 Preset')
+  return registerWorkflowAgent(ctx, options, 'code-only')
+}
+
+/** 每轮由图控制，只有图中显式 infer 才调用模型，不请求外层模型选择工具。 */
+export function registerHybridWorkflowAgent(ctx: any, options: HybridWorkflowAgent) {
+  return registerWorkflowAgent(ctx, options, 'hybrid')
+}
+
+function registerWorkflowAgent(ctx: any, options: CodeOnlyWorkflowAgent | HybridWorkflowAgent, mode: 'code-only' | 'hybrid') {
+  const codeOnly = mode === 'code-only', label = codeOnly ? '纯代码工作流' : '混合工作流'
+  const providerId = codeOnly ? CODE_ONLY_PROVIDER : HYBRID_WORKFLOW_PROVIDER
+  const modelId = codeOnly ? CODE_ONLY_MODEL : HYBRID_WORKFLOW_MODEL
+  if (!options.presetId.trim()) throw new Error(`${label}必须绑定 Preset`)
   const { workflow } = options
-  registerWorkflowTool(ctx, workflow, { executionMode: 'code-only' })
+  registerWorkflowTool(ctx, workflow, { executionMode: mode, ...('modelRoles' in options ? { modelRoles: options.modelRoles } : {}) })
   const turns = new Map<string, CodeOnlyTurn>()
   const sessionId = (agent: any): string => agent.session.id
   const isSubject = (agent: any): boolean => agent?.session?.header?.agentPreset === options.presetId
-  const route = { provider: CODE_ONLY_PROVIDER, model: CODE_ONLY_MODEL, reasoningEffort: 'off' }
+  const route = { provider: providerId, model: modelId, reasoningEffort: 'off' }
   const unknown = '工作流执行结果未知，已停止；请核对本轮工具回执后继续。'
 
   ctx.on('agent/pre-step', async ({ agent, turn }: any, next: () => Promise<any>) => {
@@ -164,7 +238,7 @@ export function registerCodeOnlyWorkflowAgent(ctx: any, options: CodeOnlyWorkflo
     if (!isSubject(agent) || decision.kind !== 'enter') return decision
     const messages = decision.messages.filter((message: any) => message.source?.kind === 'user')
     if (messages.length) turns.set(sessionId(agent), {
-      turn, request: messages.map(textContent).join('\n'), callId: `code-only-${randomUUID()}`, issued: false, replied: false,
+      turn, request: messages.map(textContent).join('\n'), callId: `${mode}-${randomUUID()}`, issued: false, replied: false,
     })
     return decision
   })
@@ -177,7 +251,7 @@ export function registerCodeOnlyWorkflowAgent(ctx: any, options: CodeOnlyWorkflo
     const call = current.findLast((event: any) => event.type === 'tool/call' && event.data.turn === turn && event.data.name === workflow.toolName)
     const request = current.filter((event: any) => event.type === 'user/message' && event.data.source?.kind === 'user').map((event: any) => textContent(event.data)).join('\n')
     if (!request && !call) return undefined
-    return { turn, request, callId: call?.data.callId ?? `code-only-${randomUUID()}`, issued: Boolean(call), replied: false }
+    return { turn, request, callId: call?.data.callId ?? `${mode}-${randomUUID()}`, issued: Boolean(call), replied: false }
   }
 
   function resultText(agent: any, state: CodeOnlyTurn): string {
@@ -188,8 +262,9 @@ export function registerCodeOnlyWorkflowAgent(ctx: any, options: CodeOnlyWorkflo
     if (receipt.data.message.isError || receipt.data.error) return '工作流工具执行失败，已停止；请查看本轮工具回执。'
     try {
       const value = JSON.parse(textContent(receipt.data.message)), graph = value.graph_execution
-      if (graph?.session_id !== sessionId(agent) || graph?.tool_call_id !== state.callId || graph.execution_mode !== 'code-only'
-        || graph.complete !== true || graph.status !== 'completed' || !Array.isArray(graph.model_attempts) || graph.model_attempts.length) return '工作流未完成或执行证据不符合纯代码要求，已停止；请查看本轮图回执。'
+      if (graph?.session_id !== sessionId(agent) || graph?.tool_call_id !== state.callId || graph.execution_mode !== mode
+        || graph.complete !== true || graph.status !== 'completed' || !Array.isArray(graph.model_attempts)
+        || codeOnly && graph.model_attempts.length) return `工作流未完成或执行证据不符合${label}要求，已停止；请查看本轮图回执。`
       if (value.ok !== true) return '工作流执行失败，已停止；请查看本轮图回执。'
       const text = options.renderResult ? options.renderResult(value.result) : value.result?.reply
       return typeof text === 'string' && text.trim() ? text : '工作流未提供有效回复，已停止；请查看本轮图回执。'
@@ -212,14 +287,14 @@ export function registerCodeOnlyWorkflowAgent(ctx: any, options: CodeOnlyWorkflo
     return route
   })
 
-  ctx.llm.registerAdapter([CODE_ONLY_PROVIDER], {
-    providerInfo: (provider: string) => ({ id: provider, name: '纯代码工作流（本地执行）' }),
+  ctx.llm.registerAdapter([providerId], {
+    providerInfo: (provider: string) => ({ id: provider, name: `${label}（${codeOnly ? '本地执行' : '本地派发'}）` }),
     providerRetryPolicy: () => undefined,
     imageRequestPricing: () => undefined,
-    async listModels() { return [await this.resolveModel(CODE_ONLY_PROVIDER, CODE_ONLY_MODEL)] },
+    async listModels() { return [await this.resolveModel(providerId, modelId)] },
     resolveModel: async (provider: string, model: string) => {
-      if (provider !== CODE_ONLY_PROVIDER || model !== CODE_ONLY_MODEL) throw new Error('纯代码工作流路由无效')
-      return { provider, id: model, name: '纯代码工作流', reasoning: { efforts: [{ id: 'off', name: '关闭' }] } }
+      if (provider !== providerId || model !== modelId) throw new Error(`${label}路由无效`)
+      return { provider, id: model, name: label, reasoning: { efforts: [{ id: 'off', name: '关闭' }] } }
     },
     async prepareCall(provider: string, model: string) {
       return { model: await this.resolveModel(provider, model), stream: (request: any) => this.stream(request) }
@@ -227,11 +302,11 @@ export function registerCodeOnlyWorkflowAgent(ctx: any, options: CodeOnlyWorkflo
     async *stream(request: any) {
       request.signal?.throwIfAborted()
       const state = turns.get(request.sessionId), pending = state?.pending
-      if (!state || !pending) throw new Error('纯代码工作流缺少本轮请求')
+      if (!state || !pending) throw new Error(`${label}缺少本轮请求`)
       delete state.pending
       if (pending.kind === 'tool') {
         // 调用一旦发出就不重放；取消或未知回执都由后续本地回复说明。
-        if (state.issued) throw new Error('纯代码工作流调用已发出')
+        if (state.issued) throw new Error(`${label}调用已发出`)
         state.issued = true
         const args = JSON.stringify({ request: state.request })
         yield { type: 'block-start', index: 0, blockType: 'tool-call' }
@@ -249,11 +324,11 @@ export function registerCodeOnlyWorkflowAgent(ctx: any, options: CodeOnlyWorkflo
     },
   })
   ctx.sessionTitle.register({
-    id: 'harness-code-only-title', automatic: 'first-prompt',
+    id: codeOnly ? 'harness-code-only-title' : 'harness-hybrid-title', automatic: 'first-prompt',
     async generate(request: any) {
       request.signal.throwIfAborted()
       const first = request.messages[0]
-      if (!first) throw new Error('纯代码标题缺少用户输入')
+      if (!first) throw new Error(`${label}标题缺少用户输入`)
       return { title: [...first.text.replace(/\s+/g, ' ').trim()].slice(0, 32).join(''), messageSeqs: [first.seq] }
     },
   })
