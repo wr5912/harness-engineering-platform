@@ -94,13 +94,13 @@ export function inspectImageArchive(archive: string, tag: string): ImageInfo {
 
 export function saveImage(target: string, archive: string): ImageInfo {
   const info = inspectImage(target)
-  run('docker', ['save', '-o', archive, target])
+  run('docker', ['save', '-o', archive, target], { timeout: 0 })
   if (!existsSync(archive)) throw new Error(`docker save 未生成镜像归档：${archive}`)
   return info
 }
 
 export function loadImage(archive: string): string {
-  return run('docker', ['load', '-i', archive])
+  return run('docker', ['load', '-i', archive], { timeout: 0 })
 }
 
 export function loadVerifiedImage(archive: string, expected: { tag?: string; id?: string; arch?: Arch; fingerprint?: string }): ImageInfo {

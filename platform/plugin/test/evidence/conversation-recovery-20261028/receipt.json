@@ -1,0 +1,20 @@
+{
+  "session_id": "session-d6d6be90-14c4-43d7-8cf6-831a1d044c10",
+  "actual_model_reply": "会话已恢复",
+  "execution_removed": true,
+  "task_card_removed": true,
+  "refresh_preserved": true,
+  "desktop": {
+    "viewport": 1440,
+    "document": 1440,
+    "content": 770.390625,
+    "taskCards": 0
+  },
+  "mobile": {
+    "viewport": 390,
+    "document": 390,
+    "content": 291,
+    "taskCards": 0
+  },
+  "observed_at": "2026-10-29T02:12:42.171Z"
+}

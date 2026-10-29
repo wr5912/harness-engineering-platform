@@ -1,0 +1,219 @@
+{
+  "observedAt": "2026-10-29T03:44:57.860876+00:00",
+  "scope": "170 环境统一网关、打开 Web、会话及部署适配修复；现场更新未重新完整安装",
+  "rootCauses": [
+    {
+      "issue": "GUI 与管理助手省略业务网关参数时可回退为直连；初始化仅写管理地址，未建立完整业务网关配置",
+      "fix": "新业务实例统一经网关；缺少网关时明确阻止创建并保留 GUI 表单；初始化补齐网关、密钥及登记合同"
+    },
+    {
+      "issue": "root 写入的配置为 root:root 0600，容器 UID 1000 无法读取；初始化在内容未变时跳过权限修复",
+      "fix": "沿用受控文件权限准备函数，配置未变化时也修复属主与 0600 权限"
+    },
+    {
+      "issue": "主机 firewalld 仅放行 18120，53105 无法从局域网访问",
+      "fix": "按实际监听网卡所属区域放行平台和业务网关端口的运行及持久规则；未分配区域时使用默认区域，不 reload"
+    }
+  ],
+  "instance": {
+    "observedAt": "2026-10-29T03:44:16.704615+00:00",
+    "programRoot": "/root/work/harness-engineering-platform-data",
+    "dataRoot": "/root/harness-engineering-platform-data",
+    "serviceActive": true,
+    "instanceId": "daily-chat",
+    "agentId": "daily-chat",
+    "sourceId": "experiment:EXP-daily-chat-001-r089137d5976f",
+    "sourceDigest": "sha256:d8ed584269601fd036c27723989b0b7087619674e145cf0c73ce3bac53e9f97e",
+    "businessControl": true,
+    "accessMode": "anonymous",
+    "identityMode": "development",
+    "gatewayOrigin": "http://172.16.138.170:53105",
+    "image": "ai-agent-harness/dsh:687f282e8-arm64-56d4fdd3d654@sha256:e25891e6aa4bb19e8cdd3ea30840e4458bd17ca16b7be6febe4dd02564d680ce",
+    "imageId": "sha256:e25891e6aa4bb19e8cdd3ea30840e4458bd17ca16b7be6febe4dd02564d680ce",
+    "runtimePortBindings": {
+      "18500/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "18500"
+        }
+      ]
+    },
+    "runtimeRunning": true,
+    "homeMounts": [
+      {
+        "source": "/root/harness-engineering-platform-data/.local/instances/daily-chat/dsh-home",
+        "destination": "/var/lib/dsh",
+        "readOnly": false
+      }
+    ],
+    "runtimeImageRebuilt": false
+  },
+  "browser": {
+    "openedFromInstanceButton": true,
+    "url": "http://172.16.138.170:53105/agents/daily-chat/instances/daily-chat/",
+    "desktopUrl": "http://172.16.138.170:53105/agents/daily-chat/instances/daily-chat/",
+    "anonymousCookieCount": 0,
+    "remoteAccessOwner": true,
+    "sessionId": "session-ab228240-e112-46b9-87d4-eb4b03947b37",
+    "turn": {
+      "turn": 1,
+      "seq": 4,
+      "prompt": "这是部署连通性测试。请仅回复：统一网关聊天正常。",
+      "response": "统一网关聊天正常。"
+    },
+    "running": false,
+    "model": {
+      "provider": "local",
+      "model": "Qwen3.8-27B"
+    },
+    "refreshRetainsConversation": true,
+    "mobileHorizontalOverflow": false,
+    "desktopScreenshot": "gateway-desktop.png",
+    "mobileScreenshot": "gateway-mobile.png",
+    "gateway-desktopSha256": "98c37ef6cdbcd24abb1222fb0230c286373d4335a9a90f238ab219364c643a3c",
+    "gateway-mobileSha256": "e8d96dc6e10f736e0a5fd3fe50476523fcd555bc5aa231b839e071b1cff93ae0",
+    "nativeCompletionEvidence": {
+      "assistantEventSeq": 16,
+      "messageId": "29986bd6-66d6-4040-a2bf-f88cbabda542",
+      "sourceKind": "model",
+      "provider": "local",
+      "model": "Qwen3.8-27B",
+      "turnEndSeq": 18,
+      "turnEndReason": "completed"
+    }
+  },
+  "managementConversation": {
+    "observedAt": "2026-10-29T03:43:50.427Z",
+    "sessionId": "session-d6d6be90-14c4-43d7-8cf6-831a1d044c10",
+    "extraExecutionStateRemoved": true,
+    "extraCallQuotaStateRemoved": true,
+    "extraTaskCardCount": 0,
+    "previousRecoveryReplyVisible": true,
+    "refreshPreservesHistory": true,
+    "newModelCallIssued": false,
+    "historyIntegrity": [
+      {
+        "backup": "delivery-cleanup-20261029T020858Z",
+        "beforeRows": 600,
+        "afterRows": 622,
+        "originalPrefixPreserved": true
+      },
+      {
+        "backup": "gateway-fix-20261029T025638Z",
+        "beforeRows": 620,
+        "afterRows": 622,
+        "originalPrefixPreserved": true
+      }
+    ]
+  },
+  "permissionsAndFirewall": {
+    "configuration": {
+      "uid": 1000,
+      "gid": 1000,
+      "mode": "600",
+      "unchanged": true
+    },
+    "firewall": "firewalld public 已放行 18120、53105/tcp（即时及持久配置）"
+  },
+  "deployment": {
+    "backup": "/root/harness-engineering-platform-data/.local/backups/gateway-fix-20261029T025638Z/firewall-permission-fix",
+    "files": [
+      {
+        "path": "platform/plugin/src/business-control/configuration.ts",
+        "previous_sha256": "afea4c62f361d04ff9f69a48c9d2fea0b72076b4c8caf08d43b10852520b6336",
+        "sha256": "1b8dfaa9789ec2fa836be34f2803ed17fcb458b4e392bedef3fdbaa482cea275"
+      },
+      {
+        "path": "platform/plugin/lib/index.js",
+        "previous_sha256": "5f2ad4881410d2413e5b56cd2349991f0310ba3c482208fb507ad3c515e0bdf2",
+        "sha256": "9ac20bde5351a3c643175e47e1adce5460a88c576dbf92e1dca3921366a0d299"
+      },
+      {
+        "path": "platform/plugin/lib/business-gateway.js",
+        "previous_sha256": "094a5fc1ff1844c9782cd0a72911894329a90a8c3bbff42d438077f2ea777bf7",
+        "sha256": "094a5fc1ff1844c9782cd0a72911894329a90a8c3bbff42d438077f2ea777bf7"
+      },
+      {
+        "path": "platform/deploy/install.mts",
+        "previous_sha256": "a400f8988589ee71171d16a16dacd10a45c8d9e616df8620ae82b291499ae0f2",
+        "sha256": "8cf5892e3f2f3792caac44069e68d54689e0578706ac9640acfdafb3d69338b4"
+      },
+      {
+        "path": "platform/deploy/firewall.mts",
+        "previous_sha256": null,
+        "sha256": "5f73675301ed503eb7583c697b4a6c428641095abd1d2a5f6821de25e578afca",
+        "intermediate_sha256": "06c109744b243d925bc984927aa9238e5530612b17e83eee3e8ad04de9fa70af"
+      }
+    ],
+    "hashes_verified": true
+  },
+  "verification": {
+    "checks": [
+      {
+        "id": "program-integrity",
+        "status": "mismatch",
+        "detail": "程序文件摘要或权限不符：program/docs/platform-design/03_存储架构与数据契约.md"
+      },
+      {
+        "id": "business-gateway",
+        "status": "ok",
+        "detail": "网关配置和本地共享密钥完整，入口 http://172.16.138.170:53105；监听状态需启动后核对"
+      },
+      {
+        "id": "workspace-assets",
+        "status": "ok",
+        "detail": "18 skills, workspace-ef47d6e4-7e4c-4cac-bc04-1f46f8e02229"
+      },
+      {
+        "id": "profile-skills",
+        "status": "ok",
+        "detail": "/root/harness-engineering-platform-data/.agents/skills"
+      },
+      {
+        "id": "default-workspace",
+        "status": "ok",
+        "detail": "/root/harness-engineering-platform-data"
+      },
+      {
+        "id": "runtime",
+        "status": "ok",
+        "detail": "DSH 0.2.1-rc.2，只读启动预检通过"
+      },
+      {
+        "id": "online-workspace",
+        "status": "ok",
+        "detail": "workspace-ef47d6e4-7e4c-4cac-bc04-1f46f8e02229，PID 6894，密码登录及 inventory RPC 通过"
+      },
+      {
+        "id": "online-business-gateway",
+        "status": "ok",
+        "detail": "PID 6894 已监听业务网关 172.16.138.170:53105"
+      }
+    ],
+    "onlineVerified": true,
+    "ok": false
+  },
+  "tests": [
+    {
+      "scope": "业务网关初始化，包括内容未变时权限修复与真实监听释放",
+      "passed": 5,
+      "log": "gateway-permission-test.log"
+    },
+    {
+      "scope": "防火墙与安装器，包括默认区域、UFW、权限失败、入口端口及失败恢复",
+      "passed": 12,
+      "log": "gateway-firewall-test.log"
+    },
+    {
+      "scope": "此前同一整改的实例、客户端、助手与平台入口定向回归（隔离暂存）",
+      "passed": 129
+    }
+  ],
+  "limits": [
+    "真实防火墙验证为 openEuler firewalld；UFW 只验证命令边界夹具，窄屏为浏览器视口模拟。",
+    "原安装清单 program-integrity 已有文件差异，整体 verify ok=false；本次修复文件通过独立 SHA-256 回执核验，未改写原安装清单。",
+    "本次未重新打包和执行全新离线安装，未重跑完整业务评测。",
+    "未提交或推送 Git；本地并行变更未整体部署。",
+    "模型真实回复和页面检查证明入口与普通聊天可用，不证明其他业务效果或全量测试通过。"
+  ]
+}

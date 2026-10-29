@@ -3,17 +3,72 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSy
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
+import { spawnSync } from 'node:child_process'
 import { collectEntries, verifyEntries } from '../manifest.mts'
 import { copyTree, run, tarCreate, tarExtract } from '../fsutil.mts'
 import { rewriteDeploymentAddress, rewriteKnownPaths, scanKnownOldPaths } from '../paths.mts'
 import { ensureDshScopeLink } from '../runtime.mts'
 import { assertRealWorkspace, inspectDataRoot } from '../data.mts'
 import { pack } from '../pack.mts'
+import { verifyDeployment } from '../verify.mts'
 
 function workspace() {
   const root = mkdtempSync(join(tmpdir(), 'hep-deploy-test-'))
   return { root, close: () => rmSync(root, { recursive: true, force: true }) }
 }
+
+test('部署核对检查唯一绑定的原生工作区，不要求首次使用标记', async () => {
+  const { root, close } = workspace()
+  try {
+    const dataRoot = join(root, 'data')
+    const storage = join(dataRoot, '.local/platform-home/storages/workspace.json')
+    mkdirSync(join(storage, '..'), { recursive: true })
+    const check = async (ids, workspaces, defaultWorkspaceId) => {
+      writeFileSync(storage, JSON.stringify({ global: { workspaceIds: ids, defaultWorkspaceId }, tables: { workspaces } }))
+      const result = await verifyDeployment({ prefix: join(root, 'program'), dataRoot })
+      return result.checks.find(check => check.id === 'default-workspace')
+    }
+    assert.equal((await check(['bound'], { bound: { path: dataRoot } })).status, 'ok')
+    assert.equal((await check(['bound'], { bound: { path: dataRoot } }, 'bound')).status, 'ok')
+    assert.equal((await check(['bound'], { bound: { path: root } })).status, 'mismatch')
+    assert.equal((await check(['bound'], {})).status, 'mismatch')
+    assert.equal((await check(['bound', 'other'], { bound: { path: dataRoot }, other: { path: root } })).status, 'mismatch')
+  } finally { close() }
+})
+
+test('安装和验证默认使用当前用户的独立程序及数据目录，允许显式覆盖', () => {
+  const { root, close } = workspace()
+  try {
+    const home = join(root, 'home')
+    const bundle = join(root, 'bundle')
+    mkdirSync(home)
+    mkdirSync(bundle)
+    writeFileSync(join(bundle, 'manifest.json'), JSON.stringify({
+      schemaVersion: 1, package: { arch: process.arch === 'arm64' ? 'arm64' : 'amd64' }, files: [],
+    }))
+    const cli = new URL('../cli.mts', import.meta.url).pathname
+    const invoke = args => spawnSync(process.execPath, [cli, ...args], {
+      env: { ...process.env, HOME: home }, encoding: 'utf8',
+    })
+    const planned = invoke(['install', '--bundle-root', bundle, '--dry-run', '--json'])
+    assert.equal(planned.status, 0, planned.stderr)
+    const expectedProgram = join(home, 'work', 'harness-engineering-platform-data')
+    const expectedData = join(home, 'harness-engineering-platform-data')
+    assert.equal(JSON.parse(planned.stdout).prefix, expectedProgram)
+    assert.equal(JSON.parse(planned.stdout).dataRoot, expectedData)
+    assert.equal(existsSync(join(home, 'work')), false)
+    const verified = invoke(['verify', '--json'])
+    assert.equal(verified.status, 1)
+    const checks = JSON.parse(verified.stdout).checks
+    assert(checks.find(check => check.id === 'program-integrity').detail.includes(expectedProgram))
+    assert(checks.find(check => check.id === 'profile').detail.startsWith(expectedData + '/'))
+    const custom = invoke(['install', '--bundle-root', bundle, '--dry-run', '--json',
+      '--prefix', join(root, 'custom-program'), '--data-root', join(root, 'custom-data')])
+    assert.equal(custom.status, 0, custom.stderr)
+    assert.equal(JSON.parse(custom.stdout).prefix, join(root, 'custom-program'))
+    assert.equal(JSON.parse(custom.stdout).dataRoot, join(root, 'custom-data'))
+  } finally { close() }
+})
 
 test('manifest 校验文件、符号链接与额外文件', () => {
   const { root, close } = workspace()
@@ -50,9 +105,9 @@ test('安装时将业务网关和管理入口绑定到目标主机与空闲端�
   try {
     const file = join(root, 'config', 'business-access.json')
     mkdirSync(join(root, 'config'))
-    writeFileSync(file, JSON.stringify({ enabled: true, gateway: {
+    writeFileSync(file, JSON.stringify({ schemaVersion: 1, enabled: true, agents: [], gateway: {
       host: '172.16.138.228', port: 53105, publicOrigin: 'http://172.16.138.228:53105',
-      managementUrl: 'http://172.16.138.228:18120/hep/', sharedSecretFile: '/root/data/secret',
+      managementUrl: 'http://172.16.138.228:18120/hep/', sharedSecretFile: join(root, 'secret'),
     } }))
     assert.equal(rewriteDeploymentAddress(root, '172.16.138.52', 18121, 53106), true)
     const result = JSON.parse(readFileSync(file, 'utf8'))
@@ -60,7 +115,7 @@ test('安装时将业务网关和管理入口绑定到目标主机与空闲端�
     assert.equal(result.gateway.port, 53106)
     assert.equal(result.gateway.publicOrigin, 'http://172.16.138.52:53106')
     assert.equal(result.gateway.managementUrl, 'http://172.16.138.52:18121/hep/')
-    assert.equal(result.gateway.sharedSecretFile, '/root/data/secret')
+    assert.equal(result.gateway.sharedSecretFile, join(root, 'secret'))
   } finally { close() }
 })
 
@@ -131,6 +186,27 @@ test('打包时拒绝未构建的 DSH 和缺少二进制的 Git 资源', () => {
     writeFileSync(join(assets, 'dsh', 'apps', 'cli', 'lib', 'bin.js'), '')
     writeFileSync(join(assets, 'git', 'git'), '#!/bin/sh\n')
     assert.throws(() => pack(options), /Git 离线资源缺少可执行入口或包内二进制/)
+    mkdirSync(join(assets, 'git', 'root', 'usr', 'bin'), { recursive: true })
+    writeFileSync(join(assets, 'git', 'root', 'usr', 'bin', 'git'), '')
+    const libc = join(assets, 'git', 'root', 'libc.so.6')
+    writeFileSync(libc, '')
+    assert.throws(() => pack(options), /使用目标系统 glibc/)
+    rmSync(libc)
+    mkdirSync(join(assets, 'python', 'lib'), { recursive: true })
+    const pythonLibc = join(assets, 'python', 'lib', 'libc.so.6')
+    writeFileSync(pythonLibc, '')
+    assert.throws(() => pack(options), /使用目标系统 glibc/)
+    rmSync(pythonLibc)
+    const archiveRoot = join(root, 'python-archive')
+    mkdirSync(archiveRoot)
+    writeFileSync(join(archiveRoot, 'libm.so.6'), '')
+    const pythonArchive = join(assets, 'python', 'python.tar.gz')
+    tarCreate(archiveRoot, pythonArchive)
+    assert.throws(() => pack(options), /Python 离线归档包含 glibc/)
+    rmSync(pythonArchive)
+    writeFileSync(join(assets, 'git', 'git'), '#!/bin/sh\nexit 9\n')
+    chmodSync(join(assets, 'git', 'git'), 0o755)
+    assert.throws(() => pack({ ...options, arch: process.arch === 'arm64' ? 'arm64' : 'amd64' }), /退出码 9/)
   } finally { close() }
 })
 
@@ -189,5 +265,29 @@ test('完整包携带原生用户设置和专用凭据，排除 HOME 运行态',
     assert.equal(readFileSync(join(unpacked, 'data', patch), 'utf8'), readFileSync(join(data, patch), 'utf8'))
     assert.equal(existsSync(join(unpacked, 'data/.local/platform-home/sessions')), false)
     assert.equal(existsSync(join(unpacked, 'data/.local/credentials/models.llm-api-key')), true)
+  } finally { close() }
+})
+
+test('安装到新数据根自动初始化启用的网关，重装保留主动关闭和登记', () => {
+  const { root, close } = workspace()
+  try {
+    rewriteDeploymentAddress(root, '172.16.138.170', 18120, 53107)
+    const file = join(root, 'config/business-access.json')
+    const access = JSON.parse(readFileSync(file))
+    assert.equal(access.enabled, true)
+    assert.equal(access.gateway.host, '172.16.138.170')
+    assert.equal(access.gateway.port, 53107)
+    assert.equal(access.gateway.publicOrigin, 'http://172.16.138.170:53107')
+    assert.equal(access.gateway.managementUrl, 'http://172.16.138.170:18120/hep/')
+    const secret = readFileSync(join(root, access.gateway.sharedSecretFile))
+    assert.ok(secret.length >= 32)
+    access.enabled = false
+    access.gateway.instances.push({ agentId: 'test', instanceId: 'existing', accessMode: 'anonymous' })
+    writeFileSync(file, JSON.stringify(access))
+    rewriteDeploymentAddress(root, '172.16.138.171', 18120)
+    const next = JSON.parse(readFileSync(file))
+    assert.equal(next.enabled, false)
+    assert.deepEqual(next.gateway.instances, access.gateway.instances)
+    assert.deepEqual(readFileSync(join(root, next.gateway.sharedSecretFile)), secret)
   } finally { close() }
 })

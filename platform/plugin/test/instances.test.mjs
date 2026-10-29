@@ -27,6 +27,11 @@ function fixture() {
   process.env.HARNESS_PROGRAM_ROOT = root
   const state = join(root, 'state')
   const adapter = join(root, 'runtime/adapters/dsh-container')
+  mkdirSync(join(root, 'config'), { recursive: true })
+  writeFileSync(join(root, 'config/business-access.json'), JSON.stringify({ schemaVersion: 1, enabled: true, agents: [], gateway: {
+    host: '127.0.0.1', port: 53105, publicOrigin: 'http://business.example:53105',
+    sharedSecretFile: '.local/credentials/business-shared.key', instances: [],
+  } }))
   mkdirSync(adapter, { recursive: true })
   mkdirSync(join(state, 'dsh-dev/running-one'), { recursive: true })
   mkdirSync(join(state, 'dsh-dev/unknown-one'), { recursive: true })
@@ -56,7 +61,8 @@ const args = process.argv.slice(2)
 require('node:fs').appendFileSync(require('node:path').join(__dirname, 'dsh-dev.calls'), JSON.stringify(args) + '\\n')
 const out = value => process.stdout.write(JSON.stringify(value, null, 2) + '\\n')
 if (args[0] === 'ps') {
-  const newBusinessFile = require('node:path').join(process.env.XDG_STATE_HOME, 'dsh-dev', 'new-business', 'instance.json')
+  const stateRoot = process.env.HARNESS_INSTANCE_STATE_ROOT || (process.env.XDG_STATE_HOME ? require('node:path').join(process.env.XDG_STATE_HOME, 'dsh-dev') : require('node:path').join(process.env.HARNESS_ASSET_ROOT, '.local/instances'))
+  const newBusinessFile = require('node:path').join(stateRoot, 'new-business', 'instance.json')
   const newBusiness = require('node:fs').existsSync(newBusinessFile)
     ? [{name:'new-business', state:'running', source_id:'experiment:EXP-real-agent-001', agent_id:'real-agent', port:3199, business_gateway:true}]
     : []
@@ -75,7 +81,8 @@ if (args[0] === 'ps') {
   if (dry) out({args, name, source_id:source, image_tag:'dsh:locked', port:3199, mounts:[{container:'/work/harness/workspace', mode:'ro'}], state_dir:'state', ...(business ? { business_control: { source_digest: sourceDigest } } : {})})
   else {
     if (business) {
-      const file = require('node:path').join(process.env.XDG_STATE_HOME, 'dsh-dev', name, 'instance.json')
+      const stateRoot = process.env.HARNESS_INSTANCE_STATE_ROOT || (process.env.XDG_STATE_HOME ? require('node:path').join(process.env.XDG_STATE_HOME, 'dsh-dev') : require('node:path').join(process.env.HARNESS_ASSET_ROOT, '.local/instances'))
+      const file = require('node:path').join(stateRoot, name, 'instance.json')
       require('node:fs').mkdirSync(require('node:path').dirname(file), {recursive:true})
       require('node:fs').writeFileSync(file, JSON.stringify({name, source_id:source, agent_id:'real-agent', asset_root:process.env.HARNESS_ASSET_ROOT, port:3199, web_base_path:'/agents/real-agent/instances/' + name + '/', business_control:{source_digest:sourceDigest, runtime_generation:'generation-new', origin:'http://127.0.0.1:3199', launch_config_file:args[args.indexOf('--business-control')+1]}}))
     }
@@ -246,7 +253,7 @@ test('业务实例 Web 入口使用已登记网关地址并拒绝地址漂移', 
   assert.match((await request()).error.message, /实例未向业务网关开放/)
 })
 
-test('平台创建受控实例后原子登记来源，沿用当前管理入口并可读回网关地址', async t => {
+test('平台省略网关参数仍创建匿名开发网关实例，原子登记来源并沿用入口', async t => {
   const { module, cleanup } = await loadModule()
   const fx = fixture()
   const previous = process.env.XDG_STATE_HOME
@@ -254,10 +261,11 @@ test('平台创建受控实例后原子登记来源，沿用当前管理入口�
   t.after(() => { fx.cleanup(); cleanup(); if (previous === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = previous })
   mkdirSync(join(fx.root, 'config'), { recursive: true })
   const accessPath = join(fx.root, 'config/business-access.json')
-  writeFileSync(accessPath, JSON.stringify({ schemaVersion: 1, enabled: true, gateway: { publicOrigin: 'http://business.example:53105', managementUrl: 'http://127.0.0.1:18120', instances: [] } }))
+  const originalAccess = JSON.parse(readFileSync(accessPath, 'utf8'))
+  writeFileSync(accessPath, JSON.stringify({ ...originalAccess, gateway: { ...originalAccess.gateway, managementUrl: 'http://127.0.0.1:18120' } }))
   const handler = module.createInstancesHandler(fx.root)
   const source = 'experiment:EXP-real-agent-001', name = 'new-business'
-  const item = { operation: 'create', name, source, business_control: true, access_mode: 'anonymous' }
+  const item = { operation: 'create', name, source }
   const signal = new AbortController().signal
   const preview = await handler('preview', item, signal)
   assert.equal(preview.ok, true)
@@ -305,6 +313,9 @@ test('平台创建受控实例后原子登记来源，沿用当前管理入口�
   assert.equal(JSON.parse(readFileSync(accessPath, 'utf8')).gateway.instances[0].sourceDigest, 'sha256:' + 'b'.repeat(64))
   const calls = readFileSync(join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls'), 'utf8').trim().split('\n').map(line => JSON.parse(line))
   assert.ok(calls.filter(args => args[0] === 'up').every(args => args[args.indexOf('--business-control') + 1] === accessPath))
+  assert.ok(calls.filter(args => args[0] === 'up' && !args.includes('--replace')).every(args =>
+    args[args.indexOf('--business-access-mode') + 1] === 'anonymous' && args[args.indexOf('--business-identity-mode') + 1] === 'development'))
+  assert.ok(calls.filter(args => args.includes('--replace')).every(args => !args.includes('--business-access-mode') && !args.includes('--business-identity-mode')))
   assert.ok(calls.some(args => args[0] === 'up' && args.includes('--replace') && args.includes('--port') && args[args.indexOf('--port') + 1] === '3199'))
   assert.ok(!calls.some(args => args[0] === 'down' && args[1] === name))
 })
@@ -354,6 +365,7 @@ test('preview uses real sources and rejects invented sources', async () => {
       operation: 'create',
       name: 'stage1-new',
       source: 'experiment:EXP-real-agent-001',
+      expected_source_digest: 'sha256:' + 'a'.repeat(64),
     }, new AbortController().signal)
     assert.equal(good.ok, true)
     assert.equal(good.value.plan.source_id, 'experiment:EXP-real-agent-001')
@@ -401,7 +413,7 @@ test('确认创建时把预览端口作为显式端口交给 CLI', async t => {
   t.after(() => { fx.cleanup(); cleanup() })
   const handler = module.createInstancesHandler(fx.root)
   const result = await handler('run', {
-    operation: 'create', name: 'port-frozen', source: 'experiment:EXP-real-agent-001', expected_source_id: 'experiment:EXP-real-agent-001', port: 3265,
+    operation: 'create', name: 'port-frozen', source: 'experiment:EXP-real-agent-001', expected_source_id: 'experiment:EXP-real-agent-001', port: 3265, expected_source_digest: 'sha256:' + 'a'.repeat(64),
   }, new AbortController().signal)
   assert.equal(result.value.ok, true)
   const calls = readFileSync(join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls'), 'utf8').trim().split('\n').map(line => JSON.parse(line))
@@ -572,7 +584,7 @@ test('实例创建预览固定模型投影，执行前拒绝缺失或过期的�
   }
   const handler = module.createInstancesHandler(fx.root, provider)
   const signal = new AbortController().signal
-  const item = { operation: 'create', name: 'model-new', source: 'experiment:EXP-real-agent-001', model_selection: defaultModel }
+  const item = { operation: 'create', name: 'model-new', source: 'experiment:EXP-real-agent-001', model_selection: defaultModel, expected_source_digest: 'sha256:' + 'a'.repeat(64) }
   const preview = await handler('preview', item, signal)
   assert.equal(preview.ok, true)
   assert.deepEqual(preview.value.model_selection, defaultModel)
@@ -678,4 +690,33 @@ test('历史实例未记录默认模型时必须显式选择，不能套用新�
   const run = await handler('run', { ...request, model_selection: selected,
     expected_model_policy_hash: explicit.value.model_policy_hash }, signal)
   assert.equal(run.value.ok, true)
+})
+
+test('新建实例拒绝关闭、缺失或不完整的网关，省略参数与批量操作都不能降级直连', async t => {
+  const { module, cleanup } = await loadModule()
+  const fx = fixture()
+  t.after(() => { fx.cleanup(); cleanup() })
+  const handler = module.createInstancesHandler(fx.root)
+  const signal = new AbortController().signal
+  const file = join(fx.root, 'config/business-access.json')
+  const original = JSON.parse(readFileSync(file, 'utf8'))
+  const item = { operation: 'create', name: 'no-fallback', source: 'experiment:EXP-real-agent-001' }
+  const falsePreview = await handler('preview', { ...item, business_control: false }, signal)
+  assert.equal(falsePreview.ok, false)
+  assert.match(falsePreview.error.message, /必须经过统一网关/)
+  for (const access of [{ ...original, enabled: false }, { schemaVersion: 1, enabled: true, agents: [] },
+    { ...original, gateway: { instances: [] } }]) {
+    writeFileSync(file, JSON.stringify(access))
+    for (const business of [{}, { business_control: true }]) {
+      const preview = await handler('preview', { ...item, ...business }, signal)
+      assert.equal(preview.ok, false)
+      const run = await handler('run', { ...item, ...business }, signal)
+      assert.equal(run.value.ok, false)
+    }
+    const batch = await handler('batch', { items: [item, { ...item, name: 'no-fallback-false', business_control: false }] }, signal)
+    assert.equal(batch.ok, true)
+    assert.equal(batch.value.receipts.every(result => result.ok === false), true)
+    assert.equal(readFileSync(file, 'utf8'), JSON.stringify(access))
+  }
+  assert.throws(() => readFileSync(join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls')), /ENOENT/)
 })

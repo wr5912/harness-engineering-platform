@@ -61,7 +61,7 @@ cd harness-engineering-platform
 
 新业务智能体实例未指定端口时，在 `18500–28999` 中自动选择空闲端口；同名实例重启沿用已记录的端口。平台默认端口为 `18120`。
 
-初始化页可以连接已有目录、克隆 Git 仓库或创建空白数据仓库，并配置首次登录账号；不会覆盖已有内容。私有仓库使用主机已有 Git 认证。终端提供一次性初始化入口；重定向日志时只输出该入口文件的位置，不将访问凭据写入普通日志。选定目录后会实际准备并接续启动平台。
+初始化页可以连接已有目录、克隆 Git 仓库或创建空白数据仓库，并预填默认登录账号，也可自行修改；已有账号保持原配置。私有仓库使用主机已有 Git 认证。终端提供一次性初始化入口；重定向日志时只输出该入口文件的位置，不将访问凭据写入普通日志。选定目录后会实际准备并接续启动平台。
 
 打开终端显示的 `/hep/` URL，使用数据根 `.local/credentials/admin.json` 中配置的账号登录。账号在该文件维护，修改后重启生效，旧登录会话失效。查询与编辑不需要 LLM API Key；使用管理对话前，在“设置 → 模型”配置所选模型。
 
@@ -125,9 +125,10 @@ git -C "$HOME/harness-engineering-platform-data" rev-parse --is-shallow-reposito
 ```bash
 tar xf harness-engineering-platform-*.tar.gz
 cd harness-engineering-platform-*
-./install.sh --prefix ~/work/harness-engineering-platform \
-  --data-root ~/harness-engineering-platform-data --start
+./install.sh --start
 ```
+
+安装和 `verify` 默认使用当前用户的 `~/work/harness-engineering-platform-data` 作为程序目录、`~/harness-engineering-platform-data` 作为独立数据根；可通过 `--prefix`、`--data-root` 显式指定其他目录。
 
 安装包必须与目标机架构一致；当前先验证 ARM64，AMD64 打包/安装验证暂缓。`--data-root` 必须是包含 `AGENTS.md`、`.agents/skills`、`agents/`、`evolution/`、`config/` 和 `workspace.json` 的真实数据仓库；夹具数据根默认拒绝，仅测试可显式 `--allow-fixture-data`。安装后使用 `./platform/dsh-deploy verify --prefix <安装目录> --data-root <数据根> --url http://<host>:18120/hep/login` 核对工作区、管理 Skill、默认工作区和登录页。包格式、Git 客户端、路径映射和未验证项见[离线一键打包与安装](./docs/platform-design/23_离线一键打包与安装.md)。
 

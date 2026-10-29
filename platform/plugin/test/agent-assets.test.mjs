@@ -187,7 +187,7 @@ const input = { agent_id: 'daily-assistant', name: '日常工作助手', descrip
 test('新建向导复用真实 CLI 并保存角色、标准来源与用例，不启动实例', async () => {
   const root = createFixture()
   try {
-    const business = { id: 'U-BUSINESS-001', title: '整理事项', inputs: '整理用户给定的两件事项', expected_behavior: '只依据给定信息列出两件事项', fast: true }
+    const business = { id: 'U-CHAT-GREET', title: '整理事项', inputs: '整理用户给定的两件事项', expected_behavior: '只依据给定信息列出两件事项', fast: true }
     const value = success(await createAgent(root, { ...input, evaluation_cases: [business] }))
     assert.match(value.experiment_id, /^EXP-daily-assistant-001-r[0-9a-f]{12}$/)
     assert.equal(value.started, false)
@@ -210,7 +210,7 @@ test('新建向导复用真实 CLI 并保存角色、标准来源与用例，不
   } finally { rmSync(root, { recursive: true, force: true }) }
 })
 
-test('实际创建入口与任务预检共用Case合同，非法业务Case不落盘', async () => {
+test('实际创建入口与工具参数共用 Case 合同，非法业务 Case 不落盘', async () => {
   const root = createFixture()
   try {
     const original = readFileSync(join(root, 'runtime/adapters/dsh-container/sources.json'), 'utf8')
@@ -220,8 +220,14 @@ test('实际创建入口与任务预检共用Case合同，非法业务Case不落
       [{ ...business, title: '完整分页\n额外标题' }], [{ ...business, expected_behavior: '完整结果\n# 额外标题' }],
       Array.from({ length: 31 }, (_, i) => ({ ...business, id: `U-BUSINESS-${i}` })),
       [{ ...business, inputs: '设备'.repeat(5000) }],
+      [{ ...business, id: 'CHAT-GREET', fast: true }],
+      [{ ...business, id: 'CHAT-GREET', fast: false }],
     ]
-    for (const evaluation_cases of invalidCases) assert.equal((await createAgent(root, { ...input, evaluation_cases })).error.code, 'invalid_request')
+    for (const evaluation_cases of invalidCases) {
+      const result = await createAgent(root, { ...input, evaluation_cases })
+      assert.equal(result.error.code, 'invalid_request')
+      if (evaluation_cases[0].id === 'CHAT-GREET') assert.match(result.error.message, /必须以 U- 开头/)
+    }
     assert.equal(existsSync(join(root, 'agents', input.agent_id)), false)
     assert.deepEqual(readdirSync(join(root, 'evolution/experiments')), [])
     assert.equal(readFileSync(join(root, 'runtime/adapters/dsh-container/sources.json'), 'utf8'), original)
@@ -239,7 +245,10 @@ test('新建失败完整回滚，输入凭据、取消和并发重名不会覆�
     const validator = join(root, 'runtime/research/validate_experiment.py')
     const validScript = readFileSync(validator, 'utf8')
     writeFileSync(validator, 'raise RuntimeError("controlled validation failure")\n')
-    assert.equal((await createAgent(root, input)).ok, false)
+    const failed = await createAgent(root, input)
+    assert.equal(failed.ok, false)
+    assert.match(failed.error.message, /资产合同校验失败/)
+    assert.equal(failed.error.details.phase, 'validation')
     assert.equal(existsSync(join(root, 'agents', input.agent_id)), false)
     assert.deepEqual(readdirSync(join(root, 'evolution/experiments')), [])
     assert.equal(readFileSync(join(root, 'runtime/adapters/dsh-container/sources.json'), 'utf8'), original)

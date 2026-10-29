@@ -95,7 +95,10 @@ browserTest('已有工作区完成状态检查后自动预览，填写账号即�
 browserTest('引导页预览、刷新失效、密码边界与空白工作区进入平台', async t => {
   const fx = await fixture(t), { page } = fx
   assert.equal(await page.locator('input[name=action]').count(), 3)
-  assert.match(await page.locator('#initial-checks').innerText(), /首次初始化需要填写账号与密码/)
+  assert.match(await page.locator('#initial-checks').innerText(), /首次初始化使用默认账号，也可修改/)
+  assert.equal(await page.locator('#username').inputValue(), 'admin')
+  assert.equal(await page.locator('#password').inputValue(), 'admin123')
+  assert.equal(await page.locator('#password-confirm').inputValue(), 'admin123')
   assert.equal(await page.locator('#apply').isDisabled(), true)
   await screenshot(page, 'bootstrap-desktop.png')
   await page.setViewportSize({ width: 390, height: 844 })

@@ -28,8 +28,6 @@ const titles: Record<string, string> = {
   'control/status': '读取业务运行权限', 'control/saveConfiguration': '保存业务开放规则',
   'control/restrict': '收紧业务操作', 'control/reassess': '重新评估风险', 'control/release': '复评并解除所选限制',
 }
-const taskTitles: Record<string, string> = { preview: '核对交付方案', start: '启动交付任务', status: '查询交付任务进度', 'begin-repair': '预留一轮修复', checkpoint: '核对中断操作', rollback: '恢复任务前版本', deliver: '检查交付实例与业务产物' }
-const taskStates: Record<string, string> = { not_started: '尚未确认交付方案，任务还未开始', running: '任务执行中', paused: '任务已暂停', completed: '实际实例与业务产物已核验', cancelled: '任务已取消', unknown: '仍有操作结果待核对', budget_exhausted: '预算已耗尽，任务已停止' }
 
 /** 只翻译实际字段；接口返回、资产创建和任务通过是不同结果。 */
 export function operationSummary(meta: OperationMeta, phase = 'result') {
@@ -47,15 +45,14 @@ export function operationSummary(meta: OperationMeta, phase = 'result') {
   const action = meta.action
   const instanceReceipt = meta.domain === 'instances' ? receipts.find(item => typeof item.operation === 'string' && typeof item.name === 'string') : undefined
   const instanceOperation = instanceReceipt?.operation ?? input.operation
-  let title = meta.domain === 'task' ? taskTitles[action] ?? titles[action] : action === 'list' ? ({ agents: '查询智能体', instances: '查询实例', mcp: '查询 MCP 工具与组合' } as Record<string, string>)[meta.domain] : meta.domain === 'instances' && action === 'run' ? ({ create: '创建实例', start: '启动实例', stop: '停止实例', restart: '重启实例', delete: '删除实例' } as Record<string, string>)[instanceOperation] : meta.domain === 'instances' && action === 'preview' ? '核对实例操作范围' : titles[action]
+  let title = action === 'list' ? ({ agents: '查询智能体', instances: '查询实例', mcp: '查询 MCP 工具与组合' } as Record<string, string>)[meta.domain] : meta.domain === 'instances' && action === 'run' ? ({ create: '创建实例', start: '启动实例', stop: '停止实例', restart: '重启实例', delete: '删除实例' } as Record<string, string>)[instanceOperation] : meta.domain === 'instances' && action === 'preview' ? '核对实例操作范围' : titles[action]
   title ??= action || `平台${meta.domain}操作`
-  if (action === 'describe' && typeof value?.action === 'string') title += `：${(meta.domain === 'task' ? taskTitles[value.action] : titles[value.action]) ?? value.action}`
+  if (action === 'describe' && typeof value?.action === 'string') title += `：${titles[value.action] ?? value.action}`
   const file = input.path ?? value?.selected?.path
   const agent = value?.agent?.name ?? value?.agent?.manifest?.name ?? input.agent_id
   const version = /-(\d{3})(?:-r[0-9a-f]{12})?$/.exec(input.experiment_id ?? value?.experiment?.id ?? '')?.[1]
   const target = file ? String(file).split('/').at(-1) : input.variant_name ?? value?.variant_name ?? input.name ?? input.toolName ?? (agent ? `${agent}${version ? ` · 版本 ${version}` : ''}` : version ? `版本 ${version}` : undefined)
   if (target) title += `：${target}`
-  if (meta.domain === 'task' && value?.plan?.kind === 'compute-variant' && action === 'deliver') title = '核对代码变体与比较证据'
   if (meta.state === 'failed' || value?.ok === false || value?.isError === true) return { title, outcome: error || value?.checks?.find((check: any) => check.ok === false)?.message || '操作失败，请展开查看实际回执', failed: true }
   if (meta.state === 'unknown') return { title, outcome: error || '结果未知，请先核对实际状态', failed: true }
   if (meta.state === 'cancelled') return { title, outcome: '已取消', failed: false }
@@ -67,7 +64,6 @@ export function operationSummary(meta: OperationMeta, phase = 'result') {
   else if (action === 'describe' && value?.input_schema) outcome = '已取得该操作的参数要求'
   else if (action === 'features/apply' && Array.isArray(value?.features)) outcome = `已保存 ${value.features.length} 项特性`
   else if (action === 'datasets/apply' && Array.isArray(value?.dataset?.records)) outcome = `已保存 ${value.dataset.records.length} 条候选样本，标签待复核`
-  else if (meta.domain === 'task') outcome = value?.plan?.kind === 'compute-variant' && value?.state === 'completed' ? '生成与比较已核对，end 仍需用户复核' : action === 'begin-repair' && Number.isFinite(value?.repair_rounds) ? `已预留第 ${value.repair_rounds} 轮修复` : action === 'rollback' && Array.isArray(value?.restored) && Array.isArray(value?.deleted) ? `已恢复 ${value.restored.length} 份原文件、移除 ${value.deleted.length} 份本任务新增文件；预算与记录保留` : taskStates[value?.state] ?? (action === 'preview' && value?.plan ? '方案已校验，执行前将请求整体确认' : outcome)
   else if (meta.domain === 'instances' && action === 'preview' && instanceReceipt) {
     const plan = instanceReceipt.plan ?? instanceReceipt
     const source = /-(\d{3})(?:-r[0-9a-f]{12})?$/.exec(plan.source_id ?? '')?.[1]

@@ -43,13 +43,14 @@ test('启动配置只读核验，拒绝容器不可达协调器、未构建插�
 test('开发模式从数据根登记读取，不依赖启动配置副本', t => {
   const f = fixture(t)
   const accessFile = join(f.config.assetRoot, 'config/business-access.json')
-  for (const identityMode of ['development', 'published']) {
+  for (const [identityMode, accessMode] of [['development', 'anonymous'], ['development', 'authenticated'], ['published', 'anonymous'], ['published', 'authenticated'], ['development', undefined]]) {
     writeFileSync(accessFile, JSON.stringify({ schemaVersion: 1, enabled: true, gateway: { instances: [
-      { agentId: f.input.agentId, instanceId: f.input.name, identityMode },
+      { agentId: f.input.agentId, instanceId: f.input.name, identityMode, accessMode },
     ] } }))
     const result = JSON.parse(execFileSync(process.execPath, [new URL('./business.ts', import.meta.url).pathname, f.file],
       { input: JSON.stringify({ agentId: f.input.agentId, name: f.input.name }), encoding: 'utf8' }))
     assert.equal(result.development, identityMode === 'development')
+    assert.equal(result.accessMode, accessMode === 'anonymous' ? 'anonymous' : 'authenticated')
   }
 })
 

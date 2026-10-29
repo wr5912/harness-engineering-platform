@@ -39,7 +39,7 @@ import { bindConversationWorkspace } from './conversation-workspace.ts'
 const WebApp: typeof NativeWebApp = await runtimeModule('@deepseek-ai/dsh-web-app')
 
 export const name = 'harness-platform'
-export const inject = ['connection', 'webServer', 'credentials', 'platformMcp', 'workspaceRegistry', 'workspaceController', 'sessionController', 'settingsController', 'agentDefaultModel', 'llm', 'tools', 'agents', 'sessionProjections', 'systemPrompt', 'goals', 'skills']
+export const inject = ['connection', 'webServer', 'credentials', 'platformMcp', 'workspaceRegistry', 'workspaceController', 'sessionController', 'settingsController', 'agentDefaultModel', 'llm', 'tools', 'agents', 'sessionProjections', 'systemPrompt', 'skills']
 export const Config = WebApp.Config
 export type Config = NativeWebApp.Config
 
@@ -245,7 +245,6 @@ export function applyTools(ctx: Context) {
     record: async (session, type, value) => { const records = await runtimeModule('@deepseek-ai/dsh-session'); records.appendPluginRecord(session, type, value) },
     projections: services.sessionProjections, systemPrompt: services.systemPrompt, skills: services.skills,
     notify, mcp: manager ? assistantMcp(manager) : undefined,
-    goals: services.goals,
   })
   domains.assistant = assistant.handler
   assistant.registerTools(services.tools)
@@ -269,7 +268,7 @@ export function applyTools(ctx: Context) {
     else if (agent && assistant.isManagementSession(agent)) taskScopes.release(agent)
     const assembly = await assistant.assemblePrompt(await next(), context)
     if (!scope) return assembly
-    const names = isComputeVariantResearch(assetRoot, agent, state) ? ['skill', 'platform_agents', 'platform_task'] : ['skill', 'platform_agents']
+    const names = ['skill', 'platform_agents']
     const tools = assembly.tools.filter((tool: any) => names.includes(tool.name))
     return { ...assembly, tools: isDecisionExtraction(assetRoot, agent, state) ? projectDecisionExtractionTools(tools) : tools }
   }) as any)
@@ -296,8 +295,8 @@ export async function apply(ctx: Context, config: Config) {
     .replace(/<title>[^<]*<\/title>/i, '<title>Harness工程平台</title>')
     .replace('</head>', `${icon}</head>`)))
   applyTools(ctx)
-  await applyBusinessGateway(ctx, assetRoot)
-  const publicUrl = platformEntryUrl(assetRoot, { publicUrl: config.publicUrl,
+  const publicUrl = platformEntryUrl(assetRoot, { publicUrl: config.publicUrl, host: ctx.webServer.host,
     fallback: `${ctx.webServer.protocol}//${ctx.webServer.host}:${ctx.webServer.port}${ctx.webServer.publicPath('/')}` })
+  await applyBusinessGateway(ctx, assetRoot)
   WebApp.apply(ctx, { ...config, publicUrl })
 }

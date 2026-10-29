@@ -22,7 +22,6 @@ import { BusinessControlPage } from './business-control/ui.tsx'
 import { platformTheme } from './theme.ts'
 import { bindNewConversation, prepareConversation } from './conversation.ts'
 import { AssistantConversation, AssistantOperations, PlatformOperationCard, createAssistant, type Assistant, type AssistantContext } from './assistant/client.tsx'
-import { FloatingAssistantPresentation } from './assistant/presentation.ts'
 import { createPlatformUpdates, type PlatformUpdates } from './realtime/client.ts'
 import { ModelsSettingsFooter } from './models/client.tsx'
 
@@ -197,7 +196,8 @@ function PlatformPage({ catalog, rpc, assistant, updates, theme, enterConversati
   const visible = page !== 'home' && (open || full)
   const floating = visible && !full && !nativeMode
   const toggleAssistantOpen = () => { if (full) { setOpen(true); navigate(previousPage.current) } else setOpen(value => !value) }
-  const fixed = assistantState.status?.execution?.plan
+  const taskContext = assistantState.status?.task_context
+  const fixed = taskContext?.agent_id ? { agent_id: String(taskContext.agent_id), instance_name: taskContext.instance_name as string | undefined, source: taskContext.source_id ?? (taskContext.experiment_id ? `experiment:${taskContext.experiment_id}` : undefined) } : undefined
   const needsIdentity = Boolean(target.agent_id || target.experiment_id || target.source_id || fixed?.agent_id)
   useEffect(() => {
     if (!floating || !needsIdentity) { setIdentityRows(null); return }
@@ -236,7 +236,7 @@ function PlatformPage({ catalog, rpc, assistant, updates, theme, enterConversati
     target.server_id && `服务 ${target.server_id}`, target.composition_id && `组合 ${target.composition_id}`,
     target.version_id && `组合版本 ${target.version_id}`, target.job_id && `评测任务 ${target.job_id}`,
     target.run_id && `Run ${target.run_id}`, target.case_id && `用例 ${target.case_id}`].filter(Boolean).join(' · ')
-  const fixedObject = fixed ? [fixed.new_agent?.name ?? agentLabel(fixed.agent_id, identityRows),
+  const fixedObject = fixed ? [agentLabel(fixed.agent_id, identityRows),
     fixed.source && sourceLabel(fixed.source, fixed.agent_id, identityRows),
     fixed.instance_name && `实例 ${fixed.instance_name}`].filter(Boolean).join(' · ') : ''
   const sameObject = Boolean(fixed && target.agent_id === fixed.agent_id
@@ -295,7 +295,7 @@ function PlatformPage({ catalog, rpc, assistant, updates, theme, enterConversati
           {assistantState.error && <p className="harness-assistant-error" role="alert">{assistantState.error}</p>}
           <div className="harness-assistant-workspace">
             <div className="harness-assistant-chat">
-              {floating && assistantState.reference ? <FloatingAssistantPresentation.Provider value><SessionProvider session={assistantState.reference} empty={() => <p role="status">正在连接会话…</p>}>{renderSlot('harness.assistant.conversation', {})}</SessionProvider></FloatingAssistantPresentation.Provider> : <div className="harness-assistant-empty"><PlatformLogo size={48}/><h2>开始新的平台任务</h2><p>管理智能体版本、评测、实例和 MCP。</p><button className="harness-primary" disabled={assistantState.busy} onClick={() => { void assistant.create().catch(() => {}) }}>新建任务会话</button></div>}
+              {floating && assistantState.reference ? <SessionProvider session={assistantState.reference} empty={() => <p role="status">正在连接会话…</p>}>{renderSlot('harness.assistant.conversation', {})}</SessionProvider> : <div className="harness-assistant-empty"><PlatformLogo size={48}/><h2>开始新的平台任务</h2><p>管理智能体版本、评测、实例和 MCP。</p><button className="harness-primary" disabled={assistantState.busy} onClick={() => { void assistant.create().catch(() => {}) }}>新建任务会话</button></div>}
             </div>
           </div>
         </section>
@@ -392,7 +392,7 @@ export function apply(ctx: ClientContext) {
   }, PlatformPage))
   ctx.slots.inject('harness.assistant.conversation', () => ctx.slots.register({ name: 'harness.assistant.conversation' }, AssistantConversation))
   ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({ name: 'conversation.input.dock', id: 'harness-operation-confirmation', inject: () => ({ rpc: ctx.connection.rpc, assistant }) }, AssistantOperations))
-  for (const key of ['platform_agents', 'platform_instances', 'platform_mcp', 'platform_task']) ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({ name: 'tool.call.toolview', key, inject: () => ({ rpc: ctx.connection.rpc, assistant }) }, PlatformOperationCard))
+  for (const key of ['platform_agents', 'platform_instances', 'platform_mcp']) ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({ name: 'tool.call.toolview', key, inject: () => ({ rpc: ctx.connection.rpc, assistant }) }, PlatformOperationCard))
   ctx.slots.inject('settings.launcher', () => ctx.slots.register({ name: 'settings.launcher', priority: -1 }, PlatformSettings))
   ctx.slots.inject('settings.models.footer', () => ctx.slots.register({ name: 'settings.models.footer', id: 'harness-model-sharing', order: 20,
     inject: () => ({ rpc: ctx.connection.rpc, changes: modelChanges }) }, ModelsSettingsFooter))

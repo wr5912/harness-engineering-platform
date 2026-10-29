@@ -201,11 +201,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const config = readBusinessLaunchConfig(resolve(process.argv[2]!))
     const text = readFileSync(0, 'utf8').trim(), input = text ? JSON.parse(text) : undefined
     const access = JSON.parse(readFileSync(join(config.assetRoot, 'config/business-access.json'), 'utf8'))
-    const development = access.gateway?.instances?.some((row: any) => row.agentId === input?.agentId
-      && row.instanceId === input?.name && row.identityMode === 'development') === true
+    const selected = access.gateway?.instances?.find((row: any) => row.agentId === input?.agentId && row.instanceId === input?.name)
+    const development = selected?.identityMode === 'development'
     if (input?.compose && input?.sourcePaths && businessSourceDigest(input.sourcePaths) !== input.sourceDigest) throw new Error('业务资产在计划后已改变')
     console.log(JSON.stringify(input?.compose ? renderBusinessInstance(config, input) : {
-      valid: true, assetRoot: config.assetRoot, pluginRoot: config.pluginRoot, development,
+      valid: true, assetRoot: config.assetRoot, pluginRoot: config.pluginRoot, development, accessMode: selected?.accessMode === 'anonymous' ? 'anonymous' : 'authenticated',
       ...(input?.sourcePaths ? { sourceDigest: businessSourceDigest(input.sourcePaths) } : {}),
     }))
   } catch (error) {

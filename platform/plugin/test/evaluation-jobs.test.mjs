@@ -48,15 +48,14 @@ test('新建管理器从磁盘查询并取消同一评测进程，回执继续�
   const final = await waitFor(() => restored.status(started.job_id), job => job.status === 'cancelled')
   assert.equal(final.result.instance_stopped, true)
   assert.equal(final.actual_model_calls, null)
-  assert.equal(final.hard_cap_supported, false)
 })
 
-test('工作区迁移后读取历史任务及 Run，同一操作重试不重复执行或改写来源', async t => {
+test('工作区迁移后读取历史评测及 Run，不改写来源', async t => {
   const fx = await fixture(t, '')
   const identity = { schemaVersion: 1, id: `workspace-${randomUUID()}`, legacyRoots: [] }
   writeFileSync(join(fx.root, 'workspace.json'), JSON.stringify(identity))
   const jobs = fx.create()
-  const payload = { source: 'experiment:EXP-test-agent-001', cases: ['U-CASE-001'], task_budget: { operation_id: randomUUID() } }
+  const payload = { source: 'experiment:EXP-test-agent-001', cases: ['U-CASE-001'] }
   const started = await jobs.start(payload)
   await waitFor(() => jobs.status(started.job_id), job => job.status === 'completed')
   const runId = `run-${randomUUID()}`
@@ -74,7 +73,7 @@ test('工作区迁移后读取历史任务及 Run，同一操作重试不重复�
   writeFileSync(descriptor, JSON.stringify({ ...identity, legacyRoots: [fx.root] }))
   const restored = fx.create(noSpawn, moved)
   assert.deepEqual(restored.list().map(job => job.job_id), [started.job_id])
-  const retried = await restored.start(payload)
+  const retried = restored.status(started.job_id)
   assert.equal(retried.run_id, runId)
   assert.equal(retried.asset_root, fx.root)
   assert.equal(retried.status, 'completed')
@@ -90,7 +89,6 @@ test('工作区迁移后读取历史任务及 Run，同一操作重试不重复�
     writeFileSync(path, JSON.stringify(foreign))
     assert.throws(() => restored.status(started.job_id), error => error.code === 'not_found')
     assert.throws(() => restored.cancel(started.job_id), error => error.code === 'not_found')
-    await assert.rejects(() => restored.start(payload), error => error.code === 'not_found')
   }
 })
 
@@ -159,11 +157,10 @@ test('模型凭据拆成多个输出块时，运行中与完成后的 Job 日志
 
 test('业务未通过的已结束 Run 保持 completed 执行状态，列表可从磁盘恢复', async t => {
   const fx = await fixture(t, 'console.log(JSON.stringify({run_id:process.env.TEST_RUN_ID}));process.exit(1)')
-  const operation = randomUUID()
   const runId = `run-${randomUUID()}`
   const run = join(fx.root, 'evolution/experiments/EXP-test-agent-001/runs', runId)
   mkdirSync(run, { recursive: true })
-  writeFileSync(join(run, 'execution.json'), JSON.stringify({ job_id: operation, instance_stopped: true }))
+  writeFileSync(join(run, 'execution.json'), JSON.stringify({ instance_stopped: true }))
   writeFileSync(join(run, 'run.yaml'), 'status: completed\n')
   writeFileSync(join(run, 'inputs.lock.json'), JSON.stringify({ source_id: 'experiment:EXP-test-agent-001', evaluation_cases: [] }))
   writeFileSync(join(run, 'summary.json'), JSON.stringify({ effective_verdict: 'failed' }))
@@ -171,8 +168,9 @@ test('业务未通过的已结束 Run 保持 completed 执行状态，列表可�
   process.env.TEST_RUN_ID = runId
   t.after(() => { if (previous === undefined) delete process.env.TEST_RUN_ID; else process.env.TEST_RUN_ID = previous })
   const jobs = fx.create()
-  await jobs.start({ source: 'experiment:EXP-test-agent-001', task_budget: { operation_id: operation } })
-  const finished = await waitFor(() => fx.create().status(operation), job => job.exit_code === 1)
+  const started = await jobs.start({ source: 'experiment:EXP-test-agent-001' })
+  writeFileSync(join(run, 'execution.json'), JSON.stringify({ job_id: started.job_id, instance_stopped: true }))
+  const finished = await waitFor(() => fx.create().status(started.job_id), job => job.exit_code === 1)
   assert.equal(finished.status, 'completed')
   assert.equal(finished.summary.effective_verdict, 'failed')
   assert.equal(fx.create().list()[0].status, 'completed')
@@ -191,34 +189,6 @@ test('过时 PID 的取消拒绝向当前进程发信号', async t => {
   const restored = fx.create()
   assert.throws(() => restored.cancel(started.job_id), error => error.code === 'process_identity_unknown')
   assert.equal(restored.status(started.job_id).status, 'failed')
-  assert.equal(final.hard_cap_supported, false)
-})
-
-test('同一持久操作 ID 重试只查询原 Job，不重复启动；改来源拒绝复用', async t => {
-  const fx = await fixture(t, "console.error('started-once');setTimeout(()=>process.exit(0),100)")
-  const jobs = fx.create()
-  const operation = randomUUID()
-  const payload = { source: 'experiment:EXP-test-agent-001', cases: ['U-CASE-001'], task_budget: { operation_id: operation } }
-  const first = await jobs.start(payload)
-  const repeated = await jobs.start(payload)
-  assert.equal(first.job_id, operation)
-  assert.equal(repeated.job_id, first.job_id)
-  const final = await waitFor(() => jobs.status(first.job_id), job => job.status === 'completed')
-  assert.equal((final.stderr.match(/started-once/g) ?? []).length, 1)
-  assert.equal((await fx.create().start(payload)).job_id, operation)
-  await assert.rejects(() => fx.create().start({ ...payload, source: 'experiment:EXP-other-agent-001' }), error => error.code === 'conflict')
-})
-
-test('截止时间传入执行环境并触发取消，重建管理器不重置期限', async t => {
-  const fx = await fixture(t, [
-    "process.on('SIGTERM',()=>{console.log(JSON.stringify({cancelled:true,instance_stopped:true}));process.exit(2)})",
-    "console.error(process.env.HARNESS_EVAL_DEADLINE_AT)", 'setInterval(()=>{},1000)',
-  ].join('\n'))
-  const jobs = fx.create()
-  const deadline = new Date(Date.now() + 300).toISOString()
-  const started = await jobs.start({ source: 'experiment:EXP-test-agent-001', task_budget: { deadline_at: deadline } })
-  const final = await waitFor(() => fx.create().status(started.job_id), job => job.status === 'cancelled')
-  assert.match(final.stderr, new RegExp(deadline.replaceAll('.', '\\.')))
 })
 
 test('未捕获 stdout 的 Job 从已有 Run 恢复固定来源、Session 和产物结论', async t => {
@@ -247,4 +217,18 @@ test('未捕获 stdout 的 Job 从已有 Run 恢复固定来源、Session 和产
   assert.equal(restored.candidate_sha256, 'fixed-candidate')
   assert.deepEqual(restored.sessions, ['existing-session'])
   assert.equal(restored.actual_model_calls, null)
+})
+
+test('历史交付截止时间不再取消评测，手动取消仍有效', async t => {
+  const fx = await fixture(t, ["process.on('SIGTERM',()=>{console.log(JSON.stringify({cancelled:true,instance_stopped:true}));process.exit(2)})", "console.error('ready')", 'setInterval(()=>{},1000)'].join('\n'))
+  const jobs = fx.create()
+  const started = await jobs.start({ source: 'experiment:EXP-test-agent-001', cases: ['U-CASE-001'] })
+  await waitFor(() => jobs.status(started.job_id), job => job.stderr.includes('ready'))
+  const file = join(fx.root, '.local/evaluation-jobs', `${started.job_id}.json`)
+  const saved = JSON.parse(readFileSync(file, 'utf8'))
+  writeFileSync(file, JSON.stringify({ ...saved, deadline_at: '2020-01-01T00:00:00Z' }))
+  const restored = fx.create()
+  assert.equal(restored.status(started.job_id).status, 'running')
+  assert.equal(restored.cancel(started.job_id).status, 'cancelling')
+  await waitFor(() => restored.status(started.job_id), job => job.status === 'cancelled')
 })

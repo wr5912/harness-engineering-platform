@@ -2,6 +2,7 @@ import { versionSource, versionSources, VERSION_ID } from '../agents/version-sou
 import { instanceStateRoot, programRoot, workspaceConfigPath, workspaceOwnsInstance } from '../workspace.ts'
 import { businessGatewayEntry } from '../business-control/entry.ts'
 import { prepareBusinessRuntimeFile } from '../business-control/secret-file.ts'
+import { validateBusinessGateway } from '../business-control/configuration.ts'
 import { execFile as execFileCallback } from 'node:child_process'
 import { createHmac, randomBytes } from 'node:crypto'
 import { mkdtemp, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
@@ -120,6 +121,7 @@ async function businessAccess(assetRoot: string, requireEnabled = true): Promise
     || Array.isArray(gateway) || !Array.isArray((gateway as Record<string, unknown>).instances)) {
     throw new Error(requireEnabled ? '业务网关尚未配置，无法创建受控实例' : '业务网关登记配置无效，拒绝删除受控实例')
   }
+  if (requireEnabled) validateBusinessGateway(gateway)
   return access as Record<string, unknown> & { gateway: Record<string, unknown> }
 }
 
@@ -374,7 +376,10 @@ async function requestForUp(assetRoot: string, request: InstanceActionRequest, r
   if (manifest && request.business_control !== undefined && request.business_control !== Boolean(manifest.business_control)) {
     throw new Error('既有实例不能切换业务网关边界；请新建独立实例')
   }
-  const businessControl = manifest ? Boolean(manifest.business_control) : request.business_control === true
+  if (request.operation === 'create' && request.business_control === false) {
+    throw new Error('平台创建的业务实例必须经过统一网关；独立研究评测请使用评测入口或 dsh-dev --mode eval')
+  }
+  const businessControl = manifest ? Boolean(manifest.business_control) : true
   const access = businessControl ? await businessAccess(assetRoot) : undefined
   if (request.access_mode && (!businessControl || request.operation !== 'create')) throw new Error('访问方式只能在创建受控实例时选择')
   if (request.identity_mode && (!businessControl || request.operation !== 'create')) throw new Error('智能体身份验证阶段只能在创建网关实例时选择')
@@ -388,7 +393,7 @@ async function requestForUp(assetRoot: string, request: InstanceActionRequest, r
     ...request, manifest,
     business_control: businessControl,
     ...(businessControl ? {
-      access_mode: request.access_mode ?? (registered?.accessMode === 'anonymous' ? 'anonymous' : 'authenticated'),
+      access_mode: request.access_mode ?? (manifest ? registered?.accessMode === 'anonymous' ? 'anonymous' : 'authenticated' : 'anonymous'),
       identity_mode: request.identity_mode ?? (manifest ? registered?.identityMode === 'development' ? 'development' : 'published' : 'development'),
     } : {}),
     source: request.source || (manifest ? assertSource(manifest.source_id) : undefined),
@@ -401,6 +406,9 @@ function upArgs(assetRoot: string, request: InstanceActionRequest & { manifest?:
   const args = ['up', '--name', request.name, '--source', request.source || '', '--mode', 'eval']
   if (request.business_control) args.push('--business-control', request.manifest?.business_control?.launch_config_file
     || request.manifest?.business_control?.config_file || businessAccessPath(assetRoot))
+  if (request.business_control && request.operation === 'create') {
+    args.push('--business-access-mode', request.access_mode!, '--business-identity-mode', request.identity_mode!)
+  }
   if (request.port) args.push('--port', String(request.port))
   if (dryRun) args.push('--dry-run')
   if (request.operation === 'restart') args.push('--replace')

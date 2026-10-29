@@ -1,5 +1,4 @@
 import { spawn } from 'node:child_process'
-import { isDeepStrictEqual } from 'node:util'
 import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -13,7 +12,7 @@ type Job = {
   status: 'running' | 'cancelling' | 'completed' | 'failed' | 'cancelled';
   started_at: string; updated_at: string; stdout: string; stderr: string;
   pid?: number; process_start?: string; run_id?: string; exit_code?: number | null;
-  error?: string; result?: MapValue | null; deadline_at?: string;
+  error?: string; result?: MapValue | null;
 }
 type Options = {
   command(payload: MapValue, jobId: string): Promise<{ executable: string; args: string[]; environment?: NodeJS.ProcessEnv; dispose?: () => void }> | { executable: string; args: string[]; environment?: NodeJS.ProcessEnv; dispose?: () => void };
@@ -65,7 +64,7 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
   const root = resolve(assetRoot)
   const identity = workspaceIdentity(root)
   const directory = workspaceLocalPath(root, 'evaluation-jobs')
-  const live = new Map<string, { process: ReturnType<typeof spawn>; job: Job; timer?: NodeJS.Timeout }>()
+  const live = new Map<string, { process: ReturnType<typeof spawn>; job: Job }>()
   const pathFor = (id: string) => {
     if (!UUID.test(id)) throw new EvaluationJobError('invalid_request', '评测任务 ID 格式无效')
     return join(directory, `${id}.json`)
@@ -110,7 +109,7 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
     const run = runDirectory(job)
     const result: MapValue = { job_id: job.job_id, source: job.source, cases: job.cases ?? [],
       actual_model_calls: null, token_usage: null, observed_token_usage: null, token_usage_complete: false,
-      token_usage_note: '尚未取得可核验轨迹，总 Token 和费用未知。', hard_cap_supported: false,
+      token_usage_note: '尚未取得可核验轨迹，总 Token 和费用未知。',
       model_calls_complete: false, model_calls_basis: '轨迹请求头仅在配置变化时产生，不能据此推算实际模型调用或内部重试次数。' }
     if (!run) return result
     let inputs: MapValue, manifest: MapValue
@@ -168,7 +167,6 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
         job.status = 'failed'
         job.error = '评测进程已停止；已有 Run 和部分证据已保留。请核对报告后新建复测，不重复执行未知状态动作。'
       }
-      if (job.deadline_at && Date.parse(job.deadline_at) <= Date.now() && alive && job.status !== 'cancelling') cancel(id)
     }
     if (FINAL.has(job.status)) options.cleanup?.(id)
     save(job, false)
@@ -202,37 +200,23 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
     return { status: job.status }
   }
   async function start(payload: MapValue) {
-    const budget = payload.task_budget as MapValue | undefined
-    const deadline = budget?.deadline_at
-    if (deadline !== undefined && (typeof deadline !== 'string' || !/(Z|[+-]\d{2}:\d{2})$/.test(deadline)
-      || !Number.isFinite(Date.parse(deadline)) || Date.parse(deadline) <= Date.now()))
-      throw new EvaluationJobError('invalid_request', '任务截止时间无效或已到期')
-    const id = budget?.operation_id ?? randomUUID()
-    if (typeof id !== 'string' || !UUID.test(id)) throw new EvaluationJobError('invalid_request', '任务操作 ID 格式无效')
-    const existing = () => {
-      const job = read(id)
-      if (job.source !== String(payload.source) || !isDeepStrictEqual(job.cases, payload.cases))
-        throw new EvaluationJobError('conflict', '同一任务操作 ID 已绑定其他来源或用例；未重新投递')
-      return status(id)
-    }
-    if (existsSync(pathFor(id))) return existing()
+    const id = randomUUID()
     const command = await options.command(payload, id)
     let disposed = false
     const dispose = () => { if (!disposed) { disposed = true; command.dispose?.() } }
-    if (existsSync(pathFor(id))) { dispose(); return existing() }
     const now = new Date().toISOString()
     const job: Job = { job_id: id, workspace_id: identity.id, asset_root: root,
       source: String(payload.source), cases: payload.cases, status: 'running', started_at: now, updated_at: now,
-      stdout: '', stderr: '', ...(deadline ? { deadline_at: deadline } : {}) }
+      stdout: '', stderr: '' }
     mkdirSync(directory, { recursive: true })
     try { writeFileSync(pathFor(id), JSON.stringify(job, null, 2) + '\n', { mode: 0o600, flag: 'wx' }) }
-    catch (error) { dispose(); if ((error as NodeJS.ErrnoException).code === 'EEXIST') return existing(); throw error }
+    catch (error) { dispose(); throw error }
     const secrets = Object.values(command.environment ?? {}).filter((value): value is string => typeof value === 'string' && value.length > 0)
     const redactJob = (value: string) => options.redact(redactKnownValues(value, secrets))
     let proc: ReturnType<typeof spawn>
     try {
       proc = spawn(command.executable, command.args, { cwd: root,
-        env: { ...options.environment(), ...command.environment, HARNESS_EVAL_JOB_ID: id, ...(deadline ? { HARNESS_EVAL_DEADLINE_AT: deadline } : {}) },
+        env: { ...options.environment(), ...command.environment, HARNESS_EVAL_JOB_ID: id },
         stdio: ['ignore', 'pipe', 'pipe'] })
     } catch (error) {
       dispose()
@@ -242,7 +226,7 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
       throw new Error(job.error)
     }
     const pending = { stdout: '', stderr: '' }
-    const active = { process: proc, job, timer: undefined as NodeJS.Timeout | undefined }
+    const active = { process: proc, job }
     live.set(id, active)
     proc.on('spawn', () => { job.pid = proc.pid; job.process_start = proc.pid ? processStart(proc.pid) : undefined; save(job) })
     const append = (field: 'stdout' | 'stderr', chunk: unknown) => {
@@ -270,7 +254,6 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
     proc.stderr!.setEncoding('utf8').on('data', chunk => append('stderr', chunk))
     proc.on('error', error => { job.status = 'failed'; job.error = redactJob(error.message); dispose(); save(job) })
     proc.on('close', code => {
-      clearTimeout(active.timer)
       dispose()
       flushPending()
       job.exit_code = code
@@ -281,11 +264,7 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
       live.delete(id)
       save(job)
     })
-    if (deadline) {
-      active.timer = setTimeout(() => { if (!FINAL.has(job.status)) cancel(id) }, Math.min(2 ** 31 - 1, Date.parse(deadline) - Date.now()))
-      active.timer.unref()
-    }
-    return { job_id: id, status: job.status, started_at: now, hard_cap_supported: false }
+    return { job_id: id, status: job.status, started_at: now }
   }
   return { start, status, cancel, list }
 }

@@ -1,5 +1,4 @@
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
 import { dirname } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { load as yaml } from 'js-yaml'
@@ -111,70 +110,4 @@ export async function applyTaskAssembly(root: string, input: TaskAssemblyInput) 
     bindings: { status: 'declared', referenced_assets: references, runtime_verified: false, preset: target.entry.preset, patch: target.entry.patch,
       required_env_names: target.entry.required_env_names ?? [] },
     next_step: '在目标 Preset/Plugin 配置中绑定所选资产；工具通过 MCP 配置管理接入，再用新 Session 和业务评测核验。' }
-}
-
-/** 仅供已授权任务回退调用；固定清单来自 assets/read-fixed，不新增可调用的工具。 */
-export function rollbackTaskAssets(root: string, source: string, files: { path: string; expected_sha256: string; original?: { object: string; mode: string } }[], signal?: AbortSignal) {
-  const target = sourceInfo(root, source)
-  const seen = new Set<string>()
-  const prepared = files.map(file => {
-    signal?.throwIfAborted()
-    assertAssetPath(file.path)
-    const to = dataPath(target.candidate, file.path)
-    if (seen.has(to) || !/^[a-f0-9]{64}$/.test(file.expected_sha256)) throw new Error('回退文件路径或摘要无效')
-    seen.add(to)
-    if (!existsSync(to)) throw new Error('文件已被其他操作移除，回退已拒绝；请保留并核对并行改动')
-    const stat = lstatSync(to)
-    if (!stat.isFile() || stat.nlink !== 1) throw new Error('回退只处理本任务修改的普通文件')
-    const before = readFileSync(to), previousMode = stat.mode & 0o777
-    if (sha256(before) !== file.expected_sha256) throw new Error('文件已被其他操作修改，回退已拒绝；请保留并核对并行改动')
-    let content: Buffer | null = null, mode = 0o644
-    if (file.original) {
-      if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(file.original.object) || !/^100(?:644|755)$/.test(file.original.mode)) throw new Error('固定来源缺少有效文件对象与模式')
-      content = execFileSync('git', ['cat-file', 'blob', file.original.object], { cwd: root, maxBuffer: 16 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
-      mode = Number.parseInt(file.original.mode, 8) & 0o777
-    }
-    return { ...file, to, before, previousMode, content, mode }
-  })
-  if (!prepared.length) throw new Error('本任务没有可回退的文件修改')
-  const written: typeof prepared = []
-  const replace = (path: string, content: Buffer, mode: number) => {
-    const temporary = `${path}.${randomUUID()}.tmp`
-    try {
-      mkdirSync(dirname(path), { recursive: true })
-      writeFileSync(temporary, content, { flag: 'wx', mode }); chmodSync(temporary, mode)
-      renameSync(temporary, path)
-    } finally { rmSync(temporary, { force: true }) }
-  }
-  try {
-    // 全部文件和固定对象先读取校验完，再开始写入；任何并行冲突都不先覆盖其它文件。
-    for (const file of prepared) {
-      signal?.throwIfAborted()
-      if (sha256(readFileSync(file.to)) !== file.expected_sha256 || (lstatSync(file.to).mode & 0o777) !== file.previousMode) throw new Error('回退期间检测到并行改动')
-    }
-    for (const file of prepared) {
-      signal?.throwIfAborted()
-      if (sha256(readFileSync(file.to)) !== file.expected_sha256 || (lstatSync(file.to).mode & 0o777) !== file.previousMode) throw new Error('回退期间检测到并行改动')
-      if (file.content === null) rmSync(file.to)
-      else replace(file.to, file.content, file.mode)
-      written.push(file)
-    }
-  } catch (error) {
-    let conflict = false
-    for (const file of written.reverse()) {
-      const matches = file.content === null ? !existsSync(file.to) : existsSync(file.to) && sha256(readFileSync(file.to)) === sha256(file.content) && (lstatSync(file.to).mode & 0o777) === file.mode
-      if (!matches) { conflict = true; continue }
-      replace(file.to, file.before, file.previousMode)
-    }
-    if (conflict) throw new Error('回退期间出现并行改动，已保留他人文件；请核对实际状态后继续', { cause: error })
-    throw error
-  }
-  // Git 不保存空目录；只清理因删除本任务新文件而形成的空祖先，非空目录原样保留。
-  for (const file of prepared.filter(file => file.content === null)) {
-    for (let directory = dirname(file.to); directory !== target.candidate; directory = dirname(directory)) {
-      try { rmdirSync(directory) } catch { break }
-    }
-  }
-  return { source: target.source, restored: prepared.filter(file => file.content !== null).map(file => ({ path: `candidate/${file.path}`, sha256: sha256(file.content!), mode: file.mode })),
-    deleted: prepared.filter(file => file.content === null).map(file => ({ path: `candidate/${file.path}` })) }
 }

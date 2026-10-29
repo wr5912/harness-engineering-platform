@@ -303,14 +303,13 @@ test('原生回执消费真实参数与结果，完成提案不重复进dock，�
   assert.equal((dockText.match(/创建研究版本/g) ?? []).length, 1)
   const toolText = render(module.exports.PlatformOperationCard({ ...props, block: { ...block, meta: { ...proposals[0], kind: 'platform-operation', proposal_id: 'p' } } }))
   assert.doesNotMatch(toolText, /暂不执行/, '同一提案原生轨迹不重复绘制确认按钮')
-  const errorText = render(module.exports.PlatformOperationCard({ ...props, toolName: 'platform_task', block: { ...block, args: { text: () => 'start', value: () => ({}) }, isError: true, content: [{ type: 'text', text: '已有未结束任务' }] } }))
-  assert.match(errorText, /启动交付任务.*已有未结束任务/)
+  const errorText = render(module.exports.PlatformOperationCard({ ...props, toolName: 'platform_agents', block: { ...block, args: { text: () => 'new', value: () => ({}) }, isError: true, content: [{ type: 'text', text: '创建失败' }] } }))
+  assert.match(errorText, /创建智能体资产.*创建失败/)
 })
 
-test('确认首屏仅展示决策摘要、具体交付与重要预算，完整事实可展开并提供暂不执行', async () => {
+test('普通操作确认显示业务摘要和完整事实，旧任务状态不再绘制任务卡', async () => {
   const compiled = await build({ entryPoints: ['src/assistant/client.tsx'], write: false, bundle: true, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime'] })
-  const plan = { goal: '构建只读巡检助手：完整需求包括五台模拟设备的分页查询与正式报告下载。', agent_id: 'daily-inspection-assistant', source: 'experiment:EXP-daily-inspection-assistant-002-r123456789abc', evaluation_case_ids: ['U-PRIVATE-BUSINESS-CASE'], allowed_actions: [{ domain: 'agents', action: 'create' }], budget: { timeout_minutes: 30, max_repair_rounds: 3, max_model_calls: 60 }, deliverables: ['Markdown 报告和设备 CSV'], artifact_paths: ['artifacts/U-PRIVATE-BUSINESS-CASE/report.md'], instance_name: 'delivery-test' }
-  let proposal = { id: 'p', domain: 'task', action: 'start', state: 'awaiting_confirmation', preview: { plan, agent_name: '日常巡检整理助手', candidate_sha256: 'a'.repeat(64) } }
+  let proposal = { id: 'p', domain: 'agents', action: 'datasets/apply', state: 'awaiting_confirmation', preview: { count: 1, records: [] } }
   let execution, refreshes = 0
   const assistant = { subscribe: () => () => {}, getSnapshot: () => ({ sessionId: 's', status: { proposals: proposal ? [proposal] : [], execution } }), refresh: async () => { refreshes++ }, applySettlement: (_id, receipt) => { proposal = { ...proposal, ...receipt } } }
   const requests = [], rpc = { async call(_channel, method, body) { requests.push({ method, body }); return { ok: true, value: { state: 'cancelled' } } } }
@@ -332,14 +331,7 @@ test('确认首屏仅展示决策摘要、具体交付与重要预算，完整�
   }
   const view = () => module.exports.AssistantOperations({ assistant, rpc, sessionId: 's' })
   const visible = render(view())
-  assert.match(visible, /日常巡检整理助手.*版本 002/)
-  assert.match(visible, /Markdown 报告.*设备 CSV.*可访问的智能体实例/)
-  assert.match(visible, /30.*分钟.*3.*轮.*60.*次/)
-  assert.match(visible, /不能实时硬封顶/)
-  assert.match(visible, /开始构建并验证/)
-  assert.doesNotMatch(visible, /U-PRIVATE-BUSINESS-CASE|daily-inspection-assistant|a{64}/)
-  const all = render(view(), true)
-  assert.ok(all.includes(plan.goal)); assert.match(all, /U-PRIVATE-BUSINESS-CASE|a{64}/)
+  assert.match(visible, /保存 1 条样本/)
   await nodes.find(node => node.type === 'button' && node.props.children === '暂不执行').props.onClick()
   assert.equal(requests[0].method, 'assistant/reject'); assert.equal(requests[0].body.proposal_id, 'p')
   assert.equal(view(), null, '取消回执立即移出输入区')
@@ -348,7 +340,7 @@ test('确认首屏仅展示决策摘要、具体交付与重要预算，完整�
   assistant.refresh = () => new Promise(resolve => { finishRefresh = resolve })
   rpc.call = async () => ({ ok: true, value: { id: 'p', state: 'completed', continuation: 'requires_user_message' } })
   nodes = []; render(view())
-  const confirming = nodes.find(node => node.type === 'button' && node.props.children === '开始构建并验证').props.onClick()
+  const confirming = nodes.find(node => node.type === 'button' && node.props.children === '保存 1 条样本').props.onClick()
   await new Promise(resolve => setImmediate(resolve))
   assert.equal(view(), null, '确认成功后无需等待状态刷新即可收起')
   finishRefresh(); await confirming
@@ -366,15 +358,8 @@ test('确认首屏仅展示决策摘要、具体交付与重要预算，完整�
   assert.ok(freezeDetails.includes(fullFreezeDiff), '原生确认界面使用持久完整差异，不使用模型投影或截断版本')
   assert.match(freezeDetails, /确认冻结本次数据差异/)
   proposal = undefined
-  execution = { plan, state: 'paused', repair_rounds: 1, model_calls: 46, deadline_at: '2020-01-01T00:00:00Z', operations: [] }
-  rpc.call = async () => { execution = { ...execution, state: 'budget_exhausted', reason: '任务总时限已耗尽' }; return { ok: false, error: { message: execution.reason } } }
-  nodes = []; render(view())
-  const beforeRefresh = refreshes
-  await nodes.find(node => node.type === 'button' && node.props.children === '恢复任务').props.onClick()
-  await new Promise(resolve => setImmediate(resolve))
-  assert.equal(refreshes, beforeRefresh + 1, '恢复被后端拒绝后也必须刷新持久状态')
-  nodes = []; const exhausted = render(view())
-  assert.match(exhausted, /额度已用尽/); assert.doesNotMatch(exhausted, /恢复任务/)
+  execution = { state: 'budget_exhausted', reason: '任务总时限已耗尽', plan: { budget: { max_model_calls: 60 } } }
+  assert.equal(view(), null, '历史任务额度不再绘制卡片或恢复按钮')
 })
 
 

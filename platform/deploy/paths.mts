@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { prepareBusinessRuntimeFile } from '../plugin/src/business-control/secret-file.ts'
+import { initializeBusinessGateway } from '../plugin/src/business-control/configuration.ts'
 
 export interface PathMapping {
   from: string
@@ -78,9 +79,14 @@ export function scanKnownOldPaths(dataRoot: string, patterns: string[]): Array<{
 
 export function rewriteDeploymentAddress(dataRoot: string, host: string, port: number, gatewayPort?: number): boolean {
   const file = join(dataRoot, 'config', 'business-access.json')
-  if (!existsSync(file)) return false
+  const sites = join(dataRoot, 'config/sites.json')
+  const base = existsSync(sites) ? JSON.parse(readFileSync(sites, 'utf8')).platform : '/hep/'
+  const previous = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : undefined
+  const management = new URL(previous?.gateway?.managementUrl ?? `http://${host}:${port}${base}`)
+  management.hostname = host
+  management.port = String(port)
+  initializeBusinessGateway(dataRoot, management.href, host, gatewayPort)
   const access = JSON.parse(readFileSync(file, 'utf8'))
-  if (!access.gateway) return false
   const gateway = access.gateway
   gateway.host = host
   if (gatewayPort !== undefined) gateway.port = gatewayPort

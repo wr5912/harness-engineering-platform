@@ -302,7 +302,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
     ])
     if (request !== sourceRequest.current) return
     if (sourceResult.status === 'fulfilled') { setSources(sourceResult.value.sources); setBusinessGatewayAvailable(sourceResult.value.business_gateway_available === true); setSourcesLoaded(true) }
-    else setSourceError(sourceResult.reason instanceof Error ? sourceResult.reason.message : String(sourceResult.reason))
+    else { setBusinessGatewayAvailable(false); setSourceError(sourceResult.reason instanceof Error ? sourceResult.reason.message : String(sourceResult.reason)) }
     if (agentResult.status === 'fulfilled') setAgents(agentResult.value.agents)
     setSourceLoading(false)
   }
@@ -476,8 +476,9 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
       name: form.name,
       source: form.source,
       port: form.port ? Number(form.port) : undefined,
-      business_control: businessGatewayAvailable,
-      ...(businessGatewayAvailable ? { access_mode: form.access_mode, identity_mode: form.identity_mode } : {}),
+      business_control: true,
+      access_mode: form.access_mode,
+      identity_mode: form.identity_mode,
       ...(createModel ? { model_selection: createModel } : {}),
     }
   }
@@ -528,7 +529,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
           }
           const business = result.value.plan?.business_control as { source_digest?: unknown } | undefined
           const sourceDigest = business?.source_digest
-          if (business && (typeof sourceDigest !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(sourceDigest))) {
+          if ((operation === 'create' || business) && (typeof sourceDigest !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(sourceDigest))) {
             const message = '预览缺少受控实例来源摘要，请重新预览；本项不会执行。'
             skipped.push({ ...item, ok: false, status: 'not_dispatched', error: { message } })
             return { ...result, ok: false, error: { message } }
@@ -841,13 +842,14 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
         </div>
         <label className="instance-field">实例名称<input aria-label="实例名" placeholder="例如 my-agent" value={form.name}
           onChange={event => updateForm({ ...form, name: event.target.value })} className="instance-field-input" /></label>
-        {businessGatewayAvailable && <p className="instance-field-hint">此工作区的业务实例经统一网关访问，使用独立 HOME 与实例专属地址；已开放原生定时任务，任务到期按实例和会话的当前许可执行。</p>}
-        {businessGatewayAvailable && <label className="instance-field">实例阶段<select aria-label="实例阶段" value={form.identity_mode} onChange={event => updateForm({ ...form, identity_mode: event.target.value as 'development' | 'published' })} className="instance-field-input">
+        <p className="instance-field-hint">此工作区的业务实例经统一网关访问，使用独立 HOME 与实例专属地址；已开放原生定时任务，任务到期按实例和会话的当前许可执行。</p>
+        {sourcesLoaded && !businessGatewayAvailable && <div role="alert" className="instance-error">业务网关未启用或配置不完整，暂时无法创建业务实例。请核对数据目录 config/business-access.json 并启动网关，再重新检查；已填写内容会保留。<button type="button" className="instance-button" disabled={sourceLoading} onClick={() => void loadSources()}>{sourceLoading ? '检查中…' : '重新检查网关'}</button></div>}
+        <label className="instance-field">实例阶段<select aria-label="实例阶段" value={form.identity_mode} onChange={event => updateForm({ ...form, identity_mode: event.target.value as 'development' | 'published' })} className="instance-field-input">
           <option value="development">开发调试 · 不要求发布身份签名</option><option value="published">对外服务 · 验证智能体身份签名</option>
-        </select><span className="instance-field-hint">开发调试仍经统一网关；对外服务时再启用智能体身份验证。</span></label>}
-        {businessGatewayAvailable && <label className="instance-field">访问方式<select aria-label="访问方式" value={form.access_mode} onChange={event => updateForm({ ...form, access_mode: event.target.value as 'authenticated' | 'anonymous' })} className="instance-field-input">
+        </select><span className="instance-field-hint">开发调试仍经统一网关；对外服务时再启用智能体身份验证。</span></label>
+        <label className="instance-field">访问方式<select aria-label="访问方式" value={form.access_mode} onChange={event => updateForm({ ...form, access_mode: event.target.value as 'authenticated' | 'anonymous' })} className="instance-field-input">
           <option value="authenticated">经过网关，需要登录</option><option value="anonymous">经过网关，无需认证（共享数据和会话）</option>
-        </select><span className="instance-field-hint">无需登录时，所有访问者共享此实例的历史会话、任务与工作区数据。未发布实例不做风险评估，网关全部放行。</span></label>}
+        </select><span className="instance-field-hint">无需登录时，所有访问者共享此实例的历史会话、任务与工作区数据。未发布实例不做风险评估，网关全部放行。</span></label>
         <div className="instance-create-model" aria-label="设置新实例默认模型">
           <div className="instance-create-model-heading"><strong>此实例默认模型</strong>{modelError && <button type="button" className="instance-button" disabled={modelLoading} onClick={() => void loadModels()}>{modelLoading ? '读取中…' : '刷新模型'}</button>}</div>
           <p className="instance-field-hint">预选“设置 → 模型”的业务统一默认；此实例也可另选已配置模型。</p>
@@ -855,7 +857,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
           {models && <ModelChoice catalog={models.catalog} allowed={createAllowed} value={createModel || null} label="新实例默认模型" onChange={selection => { setCreateModelDraft(selection); setPreviews([]); setPending(null) }} />}
           {createModelIssue && !modelError && <p role="status" className="instance-model-warning">{createModelIssue}</p>}
         </div>
-        <details className="instance-create-advanced"><summary>高级设置 · 端口与来源表达式</summary><div className="instance-create-advanced-body"><label className="instance-field">{businessGatewayAvailable ? '内部 Runtime 端口（可选）' : '访问端口（可选）'}<input aria-label="端口" placeholder="留空从 18500–28999 自动分配" value={form.port}
+        <details className="instance-create-advanced"><summary>高级设置 · 端口与来源表达式</summary><div className="instance-create-advanced-body"><label className="instance-field">内部 Runtime 端口（可选）<input aria-label="端口" placeholder="留空从 18500–28999 自动分配" value={form.port}
           onChange={event => updateForm({ ...form, port: event.target.value })} className="instance-field-input" /></label><button type="button" className="instance-source-advanced" aria-expanded={advancedSource} onClick={() => setAdvancedSource(value => !value)}>{advancedSource ? '收起来源表达式' : '手动输入来源表达式'}</button>
           {advancedSource && <label className="instance-field">来源表达式<input aria-label="来源" placeholder="experiment:EXP-..." value={form.source} onChange={event => {
             const source = event.target.value.trim()
@@ -865,7 +867,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
           }} className="instance-field-input" /></label>}</div></details>
         <p className="instance-create-impact">将创建独立实例；现有业务实例不会因创建操作而停止或切换版本。</p>
         </div>
-        <footer className="instance-dialog-actions"><button type="button" onClick={() => setCreating(false)} className="instance-button">取消</button><button type="button" className="harness-primary" disabled={busy || !form.name || !form.source || Boolean(sourceFieldError) || sourceLoading || modelLoading || Boolean(createModelIssue) || !currentSourceRun || currentSourceRun.loading} onClick={() => prepare('create', [])}>查看创建预览</button></footer>
+        <footer className="instance-dialog-actions"><button type="button" onClick={() => setCreating(false)} className="instance-button">取消</button><button type="button" className="harness-primary" disabled={busy || !businessGatewayAvailable || !form.name || !form.source || Boolean(sourceFieldError) || sourceLoading || modelLoading || Boolean(createModelIssue) || !currentSourceRun || currentSourceRun.loading} onClick={() => prepare('create', [])}>查看创建预览</button></footer>
         </>}
       </dialog>
       <section aria-label="实例筛选" className="instance-filter-panel">

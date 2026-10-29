@@ -1,0 +1,85 @@
+{
+  "session_id": "session-3531a9d5-c2cb-4014-b3e4-3a03614e974d",
+  "observation": "read_only_inspection_before_target_connectivity_loss",
+  "config": {
+    "path": "config/business-access.json",
+    "enabled": false,
+    "gateway_keys": [
+      "managementUrl"
+    ],
+    "instance_registry_present": false
+  },
+  "instance": {
+    "name": "daily-chat",
+    "source_id": "experiment:EXP-daily-chat-001-r089137d5976f",
+    "business_control": false,
+    "port": 18500,
+    "docker_network_mode": "host",
+    "docker_port_bindings": {}
+  },
+  "calls": [
+    {
+      "seq": 399,
+      "time": "2026-10-29T02:06:29.225Z",
+      "tool": "platform_instances",
+      "action": "run",
+      "operation": "create",
+      "business_control": true,
+      "access_mode": "anonymous",
+      "identity_mode": "development"
+    },
+    {
+      "seq": 405,
+      "time": "2026-10-29T02:06:35.011Z",
+      "tool": "platform_instances",
+      "action": "run",
+      "operation": "create",
+      "business_control": "omitted"
+    }
+  ],
+  "history_final_message_reported_gateway_unconfigured_and_direct_instance_created": true,
+  "preflight_error_from_source": "业务网关尚未配置，无法创建受控实例",
+  "causes": [
+    {
+      "path": "platform/plugin/src/instances/index.ts",
+      "function": "requestForUp",
+      "behavior": "A new instance defaults to direct access unless business_control is explicitly true."
+    },
+    {
+      "path": "platform/plugin/src/instances/client.tsx",
+      "function": "createRequest",
+      "behavior": "business_control follows business_gateway_available; unavailable gateway produces direct access."
+    },
+    {
+      "path": "platform/plugin/src/assistant/index.ts",
+      "function": "freezeInstanceOperation",
+      "behavior": "A direct preview is accepted and frozen with business_control false."
+    },
+    {
+      "path": "platform/plugin/src/business-control/group-link.ts",
+      "function": "platformEntryUrl",
+      "behavior": "A missing access config defaults disabled; startup fills only the management URL."
+    },
+    {
+      "path": "platform/deploy/verify.mts",
+      "function": "verifyDeployment",
+      "behavior": "Workspace and platform login/inventory checks do not establish a usable business gateway."
+    }
+  ],
+  "scope": {
+    "gateway_behavior_changed": false,
+    "instance_migrated": false,
+    "platform_restarted": false
+  },
+  "limits": [
+    "The exact writer of the deployed disabled configuration has not been verified.",
+    "Tool result payloads were not separately retained; call arguments, final assistant message, live config and live manifest/container were inspected.",
+    "SSH and port 18120 later became unreachable; no latest online recheck or migration was performed."
+  ],
+  "existing_gui_fallback_tests": {
+    "passed": 2,
+    "failed": 0,
+    "command": "node --test --test-name-pattern='创建弹窗填写后只请求预览|创建自动端口从预览冻结' test/instances-client.test.mjs",
+    "meaning": "Confirms the existing tests accept direct instance creation through the business-instance GUI when the gateway is unavailable."
+  }
+}

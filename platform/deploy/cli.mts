@@ -90,13 +90,13 @@ function usage(): string {
     --keep-staging               保留暂存目录
 
   dsh-deploy verify [选项]
-    --prefix <目录>              程序安装目录
-    --data-root <目录>           数据根
+    --prefix <目录>              程序安装目录，默认 ~/work/harness-engineering-platform-data
+    --data-root <目录>           数据根，默认 ~/harness-engineering-platform-data
     --url <地址>                 可选：核对受管进程与登录后的工作区清单
 
   dsh-deploy install [选项]
     --bundle-root <目录>         解包后的安装包根目录（install.sh 会传入）
-    --prefix <目录>              程序安装目录，默认 ~/work/harness-engineering-platform
+    --prefix <目录>              程序安装目录，默认 ~/work/harness-engineering-platform-data
     --data-root <目录>           数据根，默认 ~/harness-engineering-platform-data
     --host <IPv4>                平台与业务网关监听地址；跨主机恢复数据根时指定
     --port <端口>                平台端口，默认 18120
@@ -137,7 +137,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       return 0
     }
     if (command === 'verify') {
-      const prefix = text(options, 'prefix', join(homedir(), 'work', 'harness-engineering-platform')) as string
+      const prefix = text(options, 'prefix', join(homedir(), 'work', 'harness-engineering-platform-data')) as string
       const dataRoot = text(options, 'data-root', join(homedir(), 'harness-engineering-platform-data')) as string
       const report = await verifyDeployment({ prefix, dataRoot, url: text(options, 'url') })
       if (flag(options, 'json')) console.log(JSON.stringify(report, null, 2))
@@ -156,7 +156,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       if (text(options, 'gateway-port') && !host) throw new Error('--gateway-port 需要同时指定 --host')
       const report = install({
         bundleRoot: resolve(bundleRoot),
-        prefix: resolve(text(options, 'prefix', join(homedir(), 'work', 'harness-engineering-platform')) as string),
+        prefix: resolve(text(options, 'prefix', join(homedir(), 'work', 'harness-engineering-platform-data')) as string),
         dataRoot: resolve(text(options, 'data-root', join(homedir(), 'harness-engineering-platform-data')) as string),
         host,
         port: installPort(text(options, 'port'), 'port', 18120),

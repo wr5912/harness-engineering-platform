@@ -1,5 +1,4 @@
-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, statSync, symlinkSync, writeFileSync, rmSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import assert from 'node:assert/strict'
@@ -14,13 +13,12 @@ import { createAssistant, redactAssistant } from '../src/assistant/index.ts'
 import { createInstancesHandler } from '../src/instances/index.ts'
 import { managementSkills } from '../src/assistant/business-assets.ts'
 import { assistantMcp } from '../src/assistant/mcp.ts'
-import { applyTaskAssembly } from '../src/tasks/assembly.ts'
-import { candidateDigest, sha256 } from '../src/tasks/files.ts'
+import { sha256 } from '../src/tasks/files.ts'
 import { assistantActions, assistantActionContract, projectAssistantTools } from '../src/assistant/tool-contracts.ts'
 import { DECISION_EXTRACTION_CONTRACT } from '../src/evaluation/decision-dataset-contract.ts'
-import { completedTaskModelView } from '../src/assistant/task-model-view.ts'
-import { deliveryProjection, readInstanceDeliveryHistory } from '../src/assistant/delivery-history.ts'
+import { businessCasesSchema } from '../src/agents/business-cases.ts'
 import { workspaceIdentity } from '../src/workspace.ts'
+import { initializeBusinessGateway } from '../src/business-control/configuration.ts'
 
 const expressionFixture = '先说明结果、影响和用户需要采取的行动。保留失败与未知事实。'
 function fixture(t, responder, root) {
@@ -67,7 +65,9 @@ function fixture(t, responder, root) {
     if (endpoint === 'instances/preview') return { ok: true, value: {
       name: input.name, operation: input.operation, source_id: 'experiment:EXP-test-agent-001',
       observed_state: 'running', observed_at: '2026-10-21T00:00:00.000Z',
-      plan: { source_id: input.source ?? 'experiment:EXP-test-agent-001', port: 3199 },
+      plan: { source_id: input.source ?? 'experiment:EXP-test-agent-001', port: 3199,
+        ...(input.operation === 'create' ? { business_control: { source_digest: 'sha256:' + 'a'.repeat(64) } } : {}) },
+      ...(input.operation === 'create' ? { access_mode: 'anonymous', identity_mode: 'development' } : {}),
       model_selection: { provider: 'fixture', model: 'default' }, model_policy_hash: 'a'.repeat(64),
     } }
     return { ok: true, value: { ok: true, source: endpoint } }
@@ -97,48 +97,6 @@ function fixture(t, responder, root) {
     async reload() { await assistant.dispose(); assistant = create() } }
 }
 
-function taskPlan(overrides = {}) {
-  return { goal: '检查三台设备并交付完整报告', agent_id: 'test-agent', source: 'experiment:EXP-test-agent-001',
-    evaluation_case_ids: ['U-BUSINESS-001'], deliverables: ['设备巡检报告'], instance_name: 'test-delivery',
-    allowed_actions: [{ domain: 'agents', action: 'edit/apply' }, { domain: 'agents', action: 'eval/start' }, { domain: 'instances', action: 'run' }], ...overrides }
-}
-function installTaskGoals(f) {
-  const goals = new Map()
-  f.services.goals = {
-    get(agent) { return goals.get(agent.id) },
-    create(agent, request) { const row = { id: 'native-goal', revision: 1, phase: 'active', activation: 'armed', ...request }; goals.set(agent.id, row); return row },
-    pause(agent) { const row = { ...goals.get(agent.id), revision: goals.get(agent.id).revision + 1, phase: 'paused', activation: 'disarmed' }; goals.set(agent.id, row); return row },
-    resume(agent) { const row = { ...goals.get(agent.id), revision: goals.get(agent.id).revision + 1, phase: 'active', activation: 'armed' }; goals.set(agent.id, row); return row },
-    complete(agent) { const row = { ...goals.get(agent.id), revision: goals.get(agent.id).revision + 1, phase: 'complete', activation: 'disarmed' }; goals.set(agent.id, row); return row },
-  }
-  return goals
-}
-async function beginTask(f, id, plan = taskPlan()) {
-  const operation = f.execute(id, 'task', 'start', { plan })
-  const proposal = await f.operation(id)
-  const confirmed = await f.rpc('confirm', { session_id: id, proposal_id: proposal.id })
-  assert.equal(confirmed.ok, true, JSON.stringify(confirmed))
-  await operation
-  assert.equal((await f.status(id)).execution.state, 'running')
-}
-function taskResponder(endpoint, input) {
-  if (endpoint === 'agents/detail') return { ok: true, value: { experiment: { id: 'EXP-test-agent-001' }, evaluation: { sha256: 'fixed-evaluation', cases: [{ id: 'U-BUSINESS-001' }] }, derivation: { parent_ref: 'git:' + 'a'.repeat(40) } } }
-  if (endpoint === 'agents/eval/start') return { ok: true, value: { job_id: 'job-' + Math.random(), status: 'running' } }
-  if (endpoint === 'agents/eval/status') return { ok: true, value: { status: 'completed', run_id: 'run-own' } }
-  if (endpoint === 'agents/tasks/delivery') return { ok: true, value: { ready: false, checks: [{ name: '业务统计', ok: false }] } }
-}
-
-test('尚未确认任务的原生status返回对象，不触发工具输出schema错误或创建任务', async t => {
-  const f = fixture(t)
-  const id = (await f.rpc('session', { task: '先了解当前任务' })).value.session_id
-  const result = await f.execute(id, 'task', 'status')
-  assert.equal(f.tools.get('platform_task').output.schema.type, 'object')
-  assert.equal(typeof result, 'object'); assert.equal(result.state, 'not_started')
-  assert.equal((await f.status(id)).execution, undefined)
-  assert.equal((await f.status(id)).proposals.length, 0)
-  assert.equal(f.calls.length, 0)
-})
-
 test('管理助手工具以 owner 身份访问平台管理接口', async t => {
   const f = fixture(t)
   const id = (await f.rpc('session', { task: '查看已有实例', context: { skill: 'task-builder' } })).value.session_id
@@ -148,119 +106,6 @@ test('管理助手工具以 owner 身份访问平台管理接口', async t => {
   assert.equal(call.peer?.principal?.kind, 'owner')
 })
 
-
-test('任务一次确认后仅向固定目标连续执行，初测不计轮次且第四轮修复被拒绝', async t => {
-  const f = fixture(t, taskResponder)
-  const goals = installTaskGoals(f)
-  const id = (await f.rpc('session', { task: '构建巡检助手', context: { skill: 'task-builder' } })).value.session_id
-  await beginTask(f, id)
-  for (const action of ['preview', 'start']) await assert.rejects(() => f.execute(id, 'task', action, { plan: taskPlan() }), /已有未结束任务/)
-  assert.equal((await f.status(id)).proposals.length, 1, '活动任务重复 start 不再产生第二张无效确认卡')
-  assert.equal(goals.get(id).maxGoalRounds, 60)
-  await assert.rejects(() => f.execute(id, 'task', 'begin-repair'), /初次评测/)
-  await f.execute(id, 'agents', 'eval/start', { source: 'experiment:EXP-test-agent-001', cases: ['U-BUSINESS-001'] })
-  assert.equal((await f.status(id)).execution.repair_rounds, 0)
-  await assert.rejects(() => f.execute(id, 'agents', 'edit/apply', { experiment_id: 'EXP-test-agent-001', edits: [{ path: 'candidate/dsh/workspace/AGENTS.md', content: 'fix' }] }), /预留/)
-  for (let round = 1; round <= 3; round++) {
-    await f.execute(id, 'task', 'begin-repair')
-    assert.equal((await f.execute(id, 'agents', 'edit/apply', { experiment_id: 'EXP-test-agent-001', edits: [{ path: 'candidate/dsh/workspace/AGENTS.md', content: `fix ${round}` }] })).state, 'completed')
-    await f.execute(id, 'agents', 'eval/start', { source: 'experiment:EXP-test-agent-001', cases: ['U-BUSINESS-001'] })
-    assert.equal((await f.status(id)).execution.repair_rounds, round)
-  }
-  await assert.rejects(() => f.execute(id, 'task', 'begin-repair'), /最多三轮/)
-  await assert.rejects(() => f.execute(id, 'agents', 'cases/update', { experiment_id: 'EXP-test-agent-001' }), /冻结/)
-  assert.equal(f.calls.filter(row => row.endpoint === 'agents/eval/start').length, 4)
-  assert.equal((await f.status(id)).proposals.length, 1)
-})
-
-test('真实Session持久记模型调用，暂停及冷恢复不重置额度，fork不继承执行权', async t => {
-  const f = fixture(t, taskResponder)
-  installTaskGoals(f)
-  const id = (await f.rpc('session', { task: '构建巡检助手' })).value.session_id
-  await f.beforeModelCall(id)
-  await beginTask(f, id, taskPlan({ budget: { max_model_calls: 3, max_repair_rounds: 3, timeout_minutes: 30 } }))
-  assert.equal((await f.status(id)).execution.model_calls, 1)
-  await f.beforeModelCall(id)
-  await f.rpc('task/pause', { session_id: id })
-  const deadline = (await f.status(id)).execution.deadline_at
-  await assert.rejects(() => f.beforeModelCall(id), /尚未恢复/)
-  assert.equal((await f.rpc('task/resume', { session_id: id })).ok, true)
-  await f.reload()
-  assert.equal((await f.status(id)).execution.state, 'paused')
-  assert.equal((await f.status(id)).execution.model_calls, 2)
-  assert.equal((await f.rpc('task/resume', { session_id: id })).ok, true)
-  await f.beforeModelCall(id)
-  await assert.rejects(() => f.beforeModelCall(id), /额度已耗尽/)
-  assert.equal((await f.status(id)).execution.state, 'budget_exhausted')
-  assert.equal((await f.status(id)).execution.model_calls, 3)
-  assert.equal((await f.status(id)).execution.deadline_at, deadline)
-  f.addSession('task-fork', f.root, f.sessions.get(id).events, id)
-  assert.equal((await f.status('task-fork')).execution, undefined)
-  await assert.rejects(() => f.execute('task-fork', 'task', 'begin-repair'), /没有已确认任务/)
-})
-
-test('交付必须引用本任务Run并通过服务侧核验，模型ready不能覆盖失败', async t => {
-  const f = fixture(t, taskResponder)
-  installTaskGoals(f)
-  const id = (await f.rpc('session', { task: '交付报告' })).value.session_id
-  await beginTask(f, id)
-  await assert.rejects(() => f.execute(id, 'task', 'deliver', { run_id: 'run-other', ready: true, artifacts: ['report.md'] }), /本任务实际启动/)
-  await f.execute(id, 'agents', 'eval/start', { source: 'experiment:EXP-test-agent-001', cases: ['U-BUSINESS-001'] })
-  assert.equal((await f.execute(id, 'task', 'deliver', { run_id: 'run-own', ready: true, artifacts: ['report.md'] })).state, 'verification_failed')
-  assert.equal((await f.status(id)).execution.state, 'running')
-})
-
-test('首次创建把已确认业务Case传给真实new入口，回执一次绑定目标和评判摘要', async t => {
-  const f = fixture(t, (endpoint, input) => endpoint === 'agents/new' ? { ok: true, value: { source_id: 'experiment:EXP-test-agent-001', experiment_id: 'EXP-test-agent-001' } } : taskResponder(endpoint, input))
-  installTaskGoals(f)
-  const id = (await f.rpc('session', { task: '创建巡检助手' })).value.session_id
-  await beginTask(f, id, taskPlan({ source: undefined, new_agent: { name: '设备巡检', description: '只读设备检查', role: '完整统计工具数据', evaluation_cases: [{ id: 'U-BUSINESS-001', title: '设备完整', inputs: '检查三台设备', expected_behavior: '包含全部设备且总数3' }] }, allowed_actions: [{ domain: 'agents', action: 'new' }] }))
-  await f.execute(id, 'agents', 'new', { agent_id: 'test-agent', role: '丢弃业务要求' })
-  assert.equal(f.calls.find(row => row.endpoint === 'agents/new').input.role, '完整统计工具数据')
-  assert.equal((await f.status(id)).execution.target_source, 'experiment:EXP-test-agent-001')
-  assert.equal((await f.status(id)).execution.evaluation_sha256, 'fixed-evaluation')
-})
-
-test('不可保存的新建Case在preview和start前被拒绝，不产生确认卡或执行任务', async t => {
-  const f = fixture(t)
-  const goals = installTaskGoals(f)
-  const id = (await f.rpc('session', { task: '新建巡检助手并测试完整分页与漏页' })).value.session_id
-  const business = { id: 'U-ASSET-PAGES-001', title: '完整分页', inputs: '读取全部分页', expected_behavior: '覆盖五台模拟设备' }
-  const invalidCases = [
-    [{ ...business, id: 'U-IDENTITY-001' }],
-    [{ ...business, id: 'U-ROLE-001' }],
-    [business, business],
-    [{ ...business, title: '完整分页\n额外标题' }],
-    [{ ...business, expected_behavior: '覆盖全部设备\n# 额外用例' }],
-    Array.from({ length: 31 }, (_, i) => ({ ...business, id: `U-BUSINESS-${i}` })),
-    [{ ...business, inputs: '设备'.repeat(5000) }],
-  ]
-  for (const evaluation_cases of invalidCases) {
-    const plan = taskPlan({ source: undefined, evaluation_case_ids: [evaluation_cases[0].id], new_agent: { name: '巡检助手', description: '统计模拟台账', role: '读取实际工具数据', evaluation_cases } })
-    for (const action of ['preview', 'start']) await assert.rejects(() => f.execute(id, 'task', action, { plan }))
-    assert.equal((await f.rpc('task/start', { session_id: id, input: { plan } })).ok, false)
-  }
-  const state = await f.status(id)
-  assert.equal(state.proposals.length, 0)
-  assert.equal(state.execution, undefined)
-  assert.equal(goals.size, 0)
-  assert.equal(f.calls.length, 0)
-})
-
-test('新建业务Case可选择平台自动身份回归，不重复定义基础Case', async t => {
-  const business = { id: 'U-BUSINESS-001', title: '完整设备', inputs: '读取全部分页', expected_behavior: '覆盖五台模拟设备' }
-  const f = fixture(t, (endpoint, input) => {
-    if (endpoint === 'agents/new') return { ok: true, value: { source_id: 'experiment:EXP-test-agent-001', experiment_id: 'EXP-test-agent-001' } }
-    if (endpoint === 'agents/detail') return { ok: true, value: { experiment: { id: 'EXP-test-agent-001' }, evaluation: { sha256: 'fixed-evaluation', cases: [business, { id: 'U-IDENTITY-001' }, { id: 'U-ROLE-001' }] } } }
-    return taskResponder(endpoint, input)
-  })
-  installTaskGoals(f)
-  const id = (await f.rpc('session', { task: '创建巡检助手，保留身份回归' })).value.session_id
-  await beginTask(f, id, taskPlan({ source: undefined, evaluation_case_ids: [business.id, 'U-IDENTITY-001', 'U-ROLE-001'], new_agent: { name: '巡检助手', description: '统计模拟台账', role: '读取实际工具数据', evaluation_cases: [business] }, allowed_actions: [{ domain: 'agents', action: 'new' }] }))
-  await f.execute(id, 'agents', 'new', { agent_id: 'test-agent' })
-  assert.equal((await f.status(id)).execution.target_source, 'experiment:EXP-test-agent-001')
-  assert.deepEqual(f.calls.find(row => row.endpoint === 'agents/new').input.evaluation_cases, [{ ...business, fast: false }])
-})
 
 test('真实 Session 投影隔离上下文、冷恢复固定任务，用户 prompt 保持原文', async t => {
   const f = fixture(t)
@@ -499,7 +344,7 @@ test('实例创建、启动和重启由助手内部预览冻结来源、端口�
       expected_model_policy_hash: 'b'.repeat(64) }
     const pending = f.execute(id, 'instances', 'run', request)
     const card = await f.operation(id)
-    assert.equal(f.calls.at(-2).endpoint, 'instances/preview')
+    assert.equal(f.calls.findLast(call => call.endpoint === 'instances/preview').input.name, request.name)
     assert.equal(f.calls.some(call => call.endpoint === 'instances/run' && call.input.name === request.name), true)
     assert.equal(card.input.expected_source_id, 'experiment:EXP-test-agent-001')
     assert.equal(card.input.port, 3199)
@@ -532,8 +377,7 @@ test('业务实例创建冻结来源摘要、访问方式并使用统一网关�
     if (endpoint === 'instances/url') return { ok: true, value: { url: 'http://172.16.138.228:53105/agents/security-operations-expert/instances/biz-one/', lan_access: true } }
   })
   const id = (await f.rpc('session', { task: '创建业务受控实例' })).value.session_id
-  const pending = f.execute(id, 'instances', 'run', { name: 'biz-one', operation: 'create', source: 'experiment:EXP-test-agent-001', port: 18600,
-    business_control: true, access_mode: 'anonymous', identity_mode: 'development' })
+  const pending = f.execute(id, 'instances', 'run', { name: 'biz-one', operation: 'create', source: 'experiment:EXP-test-agent-001', port: 18600 })
   const card = await f.operation(id)
   assert.equal(card.input.business_control, true)
   assert.equal(card.input.expected_source_digest, digest)
@@ -567,24 +411,6 @@ test('实例预览失败、对象变化和批量部分失败均不生成可执�
   assert.equal(f.calls.some(call => ['instances/run', 'instances/batch'].includes(call.endpoint)), false)
 })
 
-test('已确认整体任务中的实例操作也先核对模型设置，不重复请求确认', async t => {
-  const f = fixture(t, taskResponder)
-  installTaskGoals(f)
-  const id = (await f.rpc('session', { task: '按固定目标交付实例' })).value.session_id
-  await beginTask(f, id)
-  const count = (await f.status(id)).proposals.length
-  const receipt = await f.execute(id, 'instances', 'run', {
-    operation: 'create', name: 'test-delivery', source: 'experiment:EXP-test-agent-001',
-  })
-  assert.equal(receipt.state, 'completed')
-  assert.equal((await f.status(id)).proposals.length, count)
-  const preview = f.calls.find(call => call.endpoint === 'instances/preview')
-  const run = f.calls.find(call => call.endpoint === 'instances/run')
-  assert.ok(preview)
-  assert.equal(run.input.expected_source_id, 'experiment:EXP-test-agent-001')
-  assert.equal(run.input.expected_model_policy_hash, 'a'.repeat(64))
-})
-
 test('真实实例 handler 接收助手一次确认的冻结参数，策略过期与批量坏项不启动实例', async t => {
   let handler
   const f = fixture(t, (endpoint, input, signal) => endpoint.startsWith('instances/')
@@ -601,6 +427,7 @@ test('真实实例 handler 接收助手一次确认的冻结参数，策略过�
     if (previousState === undefined) delete process.env.HARNESS_INSTANCE_STATE_ROOT; else process.env.HARNESS_INSTANCE_STATE_ROOT = previousState
   })
   const adapter = join(f.root, 'runtime/adapters/dsh-container')
+  initializeBusinessGateway(f.root, 'http://127.0.0.1:18120/hep/')
   const callsPath = join(f.root, 'dsh-dev.calls')
   mkdirSync(adapter, { recursive: true })
   const versionRoot = join(f.root, 'evolution/experiments/EXP-real-agent-002')
@@ -611,10 +438,18 @@ test('真实实例 handler 接收助手一次确认的冻结参数，策略过�
 const args = process.argv.slice(2)
 fs.appendFileSync(${JSON.stringify(callsPath)}, JSON.stringify(args) + '\\n')
 const option = key => args[args.indexOf(key) + 1]
-if (args[0] === 'up') console.log(JSON.stringify(args.includes('--dry-run')
-  ? { name: option('--name'), source_id: option('--source'), port: Number(option('--port')) || 3199, image_tag: 'dsh:fixture', mounts: [] }
-  : { name: option('--name'), dsh_running: true }))
+if (args[0] === 'up') {
+  const plan = { name: option('--name'), source_id: option('--source'), agent_id: 'real-agent', asset_root: ${JSON.stringify(f.root)}, port: Number(option('--port')) || 3199, image_tag: 'dsh:fixture', mounts: [], model_policy: { default: { provider: 'fixture', model: 'business' } },
+    ...(args.includes('--business-control') ? { web_base_path: '/agents/real-agent/instances/' + option('--name') + '/', business_control: { source_digest: 'sha256:' + 'b'.repeat(64), launch_config_file: option('--business-control'), runtime_generation: 'fixture', origin: 'http://127.0.0.1:3199' } } : {}) }
+  if (!args.includes('--dry-run')) {
+    const directory = require('node:path').join(process.env.HARNESS_INSTANCE_STATE_ROOT, plan.name)
+    fs.mkdirSync(directory, { recursive: true })
+    fs.writeFileSync(require('node:path').join(directory, 'instance.json'), JSON.stringify(plan))
+  }
+  console.log(JSON.stringify(args.includes('--dry-run') ? plan : { name: plan.name, dsh_running: true }))
+}
 else if (args[0] === 'ps') console.log(JSON.stringify({ instances: [{ name: 'existing', state: 'running', source_id: 'experiment:EXP-real-agent-002' }] }))
+else if (args[0] === 'url') console.log('http://127.0.0.1:53105/agents/real-agent/instances/' + args[1] + '/')
 else throw new Error('unexpected command')
 `)
   mkdirSync(join(f.root, '.local/instances/existing'), { recursive: true })
@@ -639,7 +474,7 @@ else throw new Error('unexpected command')
   assert.match(card.input.expected_model_policy_hash, /^[0-9a-f]{64}$/)
   assert.equal(f.calls.some(call => call.endpoint === 'instances/run'), true)
   const confirmed = await f.rpc('confirm', { session_id: id, proposal_id: card.id })
-  assert.equal(confirmed.value.state, 'completed')
+  assert.equal(confirmed.value.state, 'completed', JSON.stringify(confirmed))
   assert.equal((await created).state, 'completed')
   assert.equal(f.calls.find(call => call.endpoint === 'instances/run').input.expected_model_policy_hash, card.input.expected_model_policy_hash)
   for (const operation of ['start', 'restart']) {
@@ -652,7 +487,7 @@ else throw new Error('unexpected command')
     assert.equal((await pending).state, 'completed')
   }
   const stalePreview = await handler('preview', { operation: 'create', name: 'stale-one', source }, new AbortController().signal)
-  const staleInput = { ...stalePreview.value.plan, expected_model_policy_hash: stalePreview.value.model_policy_hash }
+  const staleInput = { operation: 'create', name: 'stale-one', source, business_control: true, access_mode: 'anonymous', identity_mode: 'development', expected_source_id: source, expected_source_digest: stalePreview.value.plan.business_control.source_digest, port: stalePreview.value.plan.port, model_selection: stalePreview.value.model_selection, expected_model_policy_hash: stalePreview.value.model_policy_hash }
   const staleCard = { kind: 'proposal', id: 'legacy-stale', owner_session_id: id, domain: 'instances', action: 'run', input: staleInput, preview: stalePreview, state: 'awaiting_confirmation' }
   appendPluginRecord(f.sessions.get(id).session, 'plugin:harness-platform/assistant', staleCard)
   const before = readFileSync(callsPath, 'utf8').split('\n').filter(Boolean).map(JSON.parse).filter(args => args[0] === 'up' && !args.includes('--dry-run')).length
@@ -1169,73 +1004,6 @@ test('助手不伪造变体人员复核，决策抽取会话也不能借新动�
   assert.equal(f.calls.length, 0)
 })
 
-test('代码变体连续任务固定两侧Case，实际构建后Git冻结校验真实预览，比较完成不标end', async t => {
-  const parent = 'EXP-alpha-001', target = 'EXP-alpha-002', parentRef = 'git:' + 'a'.repeat(40), jobs = new Map()
-  const freezeInput = { experiment_id: target, case_ids: ['U-ASSET-001'], evaluation_base_sha256: 'e'.repeat(64) }
-  let loaded = false
-  const f = fixture(t, (endpoint, input) => {
-    if (endpoint === 'agents/detail') return { ok: true, value: { experiment: { id: input.experiment_id }, candidate_sha256: 'c'.repeat(64), evaluation: { sha256: 'fixed-cases', cases: [{ id: 'U-ASSET-001' }] }, derivation: { parent_ref: parentRef } } }
-    if (endpoint === 'agents/compute-variants/context') return { ok: true, value: { agent_id: 'alpha', parent_experiment_id: parent, fixed_parent_ref: parentRef, plan: { case_hashes: { 'U-ASSET-001': 'fixed-case' }, generation: { mode: 'langgraph-aot' } }, workflow_status: { built: true, frozen: true, loaded } } }
-    if (endpoint === 'agents/compute-variants/freeze-preview') return { ok: true, value: { preview_sha256: 'f'.repeat(64), freeze_input: freezeInput, diff: '+ 实际工作流源码' } }
-    if (endpoint === 'agents/compute-variants/freeze') return { ok: true, value: { commit: 'b'.repeat(40) } }
-    if (endpoint === 'agents/compute-variants/build-preview') return { ok: true, value: { candidate_sha256: 'c'.repeat(64), preview_sha256: 'b'.repeat(64) } }
-    if (endpoint === 'agents/compute-variants/build') return { ok: true, value: { verified: true } }
-    if (endpoint === 'agents/eval/start') { const id = 'job-' + jobs.size; jobs.set(id, { source: input.source, cases: input.cases, status: 'completed', run_id: input.source.endsWith(target) ? 'variant-run' : 'parent-run' }); return { ok: true, value: { job_id: id } } }
-    if (endpoint === 'agents/eval/status') return { ok: true, value: jobs.get(input.job_id) }
-    if (endpoint === 'agents/compute-variants/compare') return { ok: true, value: { comparability: { passed: true }, quality: { passed: false }, eligible_for_end: false } }
-  })
-  installTaskGoals(f)
-  const id = (await f.rpc('session', { task: '生成资产告警代码变体', context: { skill: 'compute-variant-research', experiment_id: target, agent_id: 'alpha' } })).value.session_id
-  for (const action of ['cases/update', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'cases/create']) {
-    assert.equal((await f.execute(id, 'agents', 'describe', { action })).value.action, action, '策划阶段保留受控用例维护')
-  }
-  assert.equal((await f.execute(id, 'agents', 'cases/create-preview', { experiment_id: target })).state, 'completed')
-  const plan = taskPlan({ goal: '生成资产告警代码变体', agent_id: 'alpha', source: `experiment:${target}`, kind: 'compute-variant', compute_variant: { parent_experiment_id: parent, parent_ref: parentRef }, evaluation_case_ids: ['U-ASSET-001'],
-    allowed_actions: [{ domain: 'agents', action: 'edit/apply' }, { domain: 'agents', action: 'compute-variants/build' }, { domain: 'agents', action: 'eval/start' }] })
-  const drift = await f.execute(id, 'task', 'preview', { plan: { ...plan, compute_variant: { parent_experiment_id: parent, parent_ref: 'git:' + 'b'.repeat(40) } } }).then(() => undefined, error => error)
-  assert.match(drift.message, /实际冻结父版/)
-  await beginTask(f, id, plan)
-  for (const action of ['cases/update', 'cases/create']) {
-    await assert.rejects(() => f.execute(id, 'agents', action, { experiment_id: target }), /评判口径已冻结/)
-  }
-  assert.equal(f.calls.some(call => ['agents/cases/update', 'agents/cases/create'].includes(call.endpoint)), false)
-  await f.beforeModelCall(id)
-  const beforeGuidance = (await f.status(id)).execution
-  const fixedContext = (await f.status(id)).task_context
-  assert.equal((await f.rpc('session', { session_id: id, task: '追加Guard验证事实，不改变已确认任务' })).ok, true)
-  const afterGuidance = await f.status(id)
-  assert.deepEqual(afterGuidance.task_context, fixedContext)
-  assert.deepEqual(afterGuidance.execution, beforeGuidance, '追加指导不能重置任务身份、预算、截止时间或执行记录')
-  assert.match(await f.assemble(id), /读取 compute-variant-research/)
-  await assert.rejects(f.execute(id, 'agents', 'compute-variants/build', { experiment_id: parent }), /当前任务范围/)
-  await assert.rejects(f.execute(id, 'agents', 'compute-variants/rename', { experiment_id: target, variant_name: '另一个名称', expected_change_sha256: 'a'.repeat(64) }), /当前任务范围/)
-  await assert.rejects(f.execute(id, 'agents', 'eval/start', { source: `experiment:${target}`, cases: ['U-OTHER-001'] }), /当前任务范围/)
-  assert.equal((await f.execute(id, 'agents', 'compute-variants/build', { experiment_id: target, expected_candidate_sha256: 'c'.repeat(64) })).state, 'completed')
-  assert.equal(f.calls.find(call => call.endpoint === 'agents/compute-variants/build').input.expected_preview_sha256, 'b'.repeat(64))
-  const freezing = f.execute(id, 'agents', 'compute-variants/freeze', { experiment_id: target })
-  const proposed = await f.operation(id)
-  assert.equal(proposed.action, 'compute-variants/freeze'); assert.equal(proposed.preview.value.diff, '+ 实际工作流源码')
-  assert.deepEqual(proposed.input.case_ids, ['U-ASSET-001']); assert.equal(proposed.input.evaluation_base_sha256, freezeInput.evaluation_base_sha256)
-  assert.equal(f.calls.some(call => call.endpoint === 'agents/compute-variants/freeze'), true)
-  await f.rpc('confirm', { session_id: id, proposal_id: proposed.id }); await freezing
-  for (const source of [parent, target]) await f.execute(id, 'agents', 'eval/start', { source: `experiment:${source}`, cases: ['U-ASSET-001'] })
-  const delivery = { parent_run_ids: ['parent-run'], variant_run_ids: ['variant-run'] }
-  assert.equal((await f.execute(id, 'task', 'deliver', delivery)).state, 'verification_failed', '没有真实装载证据不能交付')
-  loaded = true
-  const result = await f.execute(id, 'task', 'deliver', delivery)
-  assert.equal(result.state, 'completed'); assert.equal(result.delivery.end_confirmed, false)
-  assert.equal(f.calls.some(call => call.endpoint === 'agents/compute-variants/confirm'), false)
-  const completed = (await f.status(id)).execution
-  const renaming = f.execute(id, 'agents', 'compute-variants/rename', { experiment_id: target, variant_name: '资产告警轻量版', expected_change_sha256: 'a'.repeat(64) })
-  const renameProposal = await f.operation(id)
-  assert.equal(renameProposal.action, 'compute-variants/rename', '任务完成后同一管理会话可发起普通改名提案')
-  assert.equal(f.calls.filter(call => call.endpoint === 'agents/compute-variants/rename').length, 1, '后续改名通过原生权限并独立执行一次')
-  await f.rpc('confirm', { session_id: id, proposal_id: renameProposal.id })
-  assert.equal((await renaming).state, 'completed')
-  assert.deepEqual((await f.status(id)).execution, completed, '后续普通写入不重启或改写已完成任务')
-})
-
-
 test('MCP 草稿复用真实结构校验，无效包装在提案前拒绝', async t => {
   const f = fixture(t)
   const id = (await f.rpc('session', { task: '新增只读组合', context: { skill: 'mcp-composition' } })).value.session_id
@@ -1253,226 +1021,16 @@ test('MCP 草稿复用真实结构校验，无效包装在提案前拒绝', asyn
   assert.equal(f.calls.filter(call => call.endpoint === 'mcp/saveCompositionDraft').length, 1)
 })
 
-test('真实Git回退覆盖本任务编辑与装配，恢复配置和模式、删除新文件，拒绝并行覆盖且不重置耗尽预算', async t => {
-  const original = '# 已固定的设备巡检\n', edited = '# 本轮修改\n'
-  const root = mkdtempSync(join(tmpdir(), 'harness-task-rollback-'))
-  t.after(() => rmSync(root, { recursive: true, force: true }))
-  const experiment = 'EXP-test-agent-001', donor = 'EXP-test-agent-002'
-  const base = `evolution/experiments/${experiment}/candidate/`, donorBase = `evolution/experiments/${donor}/candidate/`
-  const agentFile = 'dsh/workspace/AGENTS.md', preset = 'dsh/presets/test-agent/agent.cordis.yml', script = 'dsh/workspace/bin/check.txt'
-  const added = ['dsh/managed/added.mjs', 'dsh/workspace/.agents/skills/inspection/SKILL.md']
-  const write = (path, content) => { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), content) }
-  write(base + agentFile, original); write(base + preset, '[]\n'); write(base + 'dsh/managed/test.patch.yml', '[]\n')
-  write(base + script, 'original executable asset\n'); chmodSync(join(root, base, script), 0o755)
-  write(`evolution/experiments/${experiment}/change.yaml`, `experiment_id: ${experiment}\nagent_id: test-agent\nbaseline_ref: none:first-experiment\n`)
-  write(base + 'harness.yaml', 'loadable_assets:\n  workspace: dsh/workspace\n  preset_root: dsh/presets\n  managed_root: dsh/managed\n  preset_id: test-agent\n  profile_patch: dsh/managed/test.patch.yml\n')
-  write(`evolution/experiments/${donor}/change.yaml`, `experiment_id: ${donor}\nagent_id: test-agent\nbaseline_ref: none:first-experiment\n`)
-  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
-  git('init'); git('add', '.'); git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-m', '固定回退父版')
-  const sourceRef = `git:${git('rev-parse', 'HEAD')}`
-  const fixedReader = join(root, '.local/read-fixed.mjs')
-  await build({ entryPoints: [new URL('../src/agents/asset-diff.ts', import.meta.url).pathname], outfile: fixedReader, bundle: true, platform: 'node', format: 'esm' })
-  const { readFixedAsset } = await import(`file://${fixedReader}`)
-  for (const path of [...added, script]) write(donorBase + path, path.endsWith('SKILL.md') ? '# 只读巡检\n' : 'assembled asset\n')
-  const f = fixture(t, async (endpoint, input) => {
-    if (endpoint === 'agents/detail') return { ok: true, value: { ...taskResponder(endpoint, input).value, derivation: { parent_ref: sourceRef } } }
-    if (endpoint === 'agents/assets/read-fixed') return readFixedAsset(root, input)
-    if (endpoint === 'agents/tasks/assembly-apply') return { ok: true, value: await applyTaskAssembly(root, input) }
-    if (endpoint === 'agents/edit/apply') {
-      const written = input.edits.map(edit => {
-        const path = `evolution/experiments/${input.experiment_id}/${edit.path}`
-        assert.equal(sha256(readFileSync(join(root, path))), edit.expected_sha256)
-        write(path, edit.content)
-        return { path: edit.path.slice('candidate/'.length), sha256: sha256(edit.content) }
-      })
-      return { ok: true, value: { written } }
-    }
-    return taskResponder(endpoint, input)
-  }, root)
-  installTaskGoals(f)
-  const id = (await f.rpc('session', { task: '改进巡检' })).value.session_id
-  await beginTask(f, id, taskPlan({ budget: { max_model_calls: 3, timeout_minutes: 30, max_repair_rounds: 3 }, allowed_actions: [{ domain: 'agents', action: 'edit/apply' }, { domain: 'agents', action: 'tasks/assembly-apply' }] }))
-  await f.execute(id, 'agents', 'edit/apply', { experiment_id: experiment, edits: [{ path: agentFile, content: edited, expected_sha256: sha256(original) }] })
-  assert.equal((await f.status(id)).execution.operations[0].input.edits[0].path, 'candidate/dsh/workspace/AGENTS.md')
-  assert.equal((await f.status(id)).execution.operations[0].receipt.value.written[0].path, agentFile, '回退同时支持Candidate内相对路径回执')
-  const configured = '- name: cordis:include\n  config:\n    path: /opt/dsh-managed/added.mjs\n'
-  await f.execute(id, 'agents', 'tasks/assembly-apply', { target_source: `experiment:${experiment}`, expected_candidate_sha256: candidateDigest(join(root, base)), files: [...added, script].map(path => ({ source: `experiment:${donor}`, path, expected_source_sha256: sha256(readFileSync(join(root, donorBase, path))), expected_target_sha256: existsSync(join(root, base, path)) ? sha256(readFileSync(join(root, base, path))) : null })), configuration_edits: [{ path: preset, content: configured, expected_target_sha256: sha256('[]\n') }] })
-  await f.execute(id, 'agents', 'edit/apply', { experiment_id: experiment, edits: [{ path: `candidate/${preset}`, content: configured + '# 后续编辑\n', expected_sha256: sha256(configured) }] })
-  assert.equal(statSync(join(root, base, script)).mode & 0o777, 0o644)
-  write(base + 'notes/user.md', '并行新增但不属于本任务的文件\n')
-  write(base + agentFile, '# 用户并行修改\n')
-  const concurrentDigest = candidateDigest(join(root, base))
-  await assert.rejects(() => f.execute(id, 'task', 'rollback'), /并行改动/)
-  assert.equal(candidateDigest(join(root, base)), concurrentDigest, '预检发现一个冲突时整批文件都不能改写')
-  write(base + agentFile, edited)
-  write('.local/unrelated.txt', '不属于本任务的文件\n')
-  symlinkSync(join(root, '.local/unrelated.txt'), join(root, base, 'notes/user-link'))
-  for (let count = 0; count < 3; count++) await f.beforeModelCall(id)
-  await assert.rejects(() => f.beforeModelCall(id), /额度已耗尽/)
-  const before = (await f.status(id)).execution
-  const restored = await f.execute(id, 'task', 'rollback')
-  assert.equal(restored.state, 'rolled_back')
-  assert.equal(readFileSync(join(root, base, agentFile), 'utf8'), original)
-  assert.equal(readFileSync(join(root, base, preset), 'utf8'), '[]\n')
-  assert.equal(readFileSync(join(root, base, script), 'utf8'), 'original executable asset\n')
-  assert.equal(statSync(join(root, base, script)).mode & 0o777, 0o755)
-  for (const path of added) assert.equal(existsSync(join(root, base, path)), false)
-  assert.equal(existsSync(join(root, base, 'dsh/workspace/.agents')), false, '只清理由删除形成的空祖先目录')
-  assert.match(readFileSync(join(root, base, 'notes/user.md'), 'utf8'), /不属于本任务/)
-  assert.equal(lstatSync(join(root, base, 'notes/user-link')).isSymbolicLink(), true, '不扫描或改写无关用户文件，不能先写完再因全树摘要失败而抛错')
-  assert.equal(readFileSync(join(root, '.local/unrelated.txt'), 'utf8'), '不属于本任务的文件\n')
-  assert.equal((await f.status(id)).execution.state, 'budget_exhausted')
-  assert.equal((await f.status(id)).execution.model_calls, before.model_calls)
-  assert.equal((await f.status(id)).execution.deadline_at, before.deadline_at)
-  assert.equal((await f.status(id)).execution.repair_rounds, before.repair_rounds)
-  assert.equal((await f.status(id)).execution.operations.filter(operation => operation.state === 'rolled_back').length, 3)
-  assert.equal((await f.status(id)).execution.operations[0].state, 'rolled_back')
-})
-
-test('装配与编辑共用修复轮次守卫，不能通过assembly跳过初测后的预留', async t => {
-  const f = fixture(t, taskResponder)
-  installTaskGoals(f)
-  const id = (await f.rpc('session', { task: '装配巡检' })).value.session_id
-  await beginTask(f, id, taskPlan({ allowed_actions: [{ domain: 'agents', action: 'tasks/assembly-apply' }, { domain: 'agents', action: 'eval/start' }] }))
-  await f.execute(id, 'agents', 'eval/start', { source: 'experiment:EXP-test-agent-001', cases: ['U-BUSINESS-001'] })
-  await assert.rejects(() => f.execute(id, 'agents', 'tasks/assembly-apply', { target_source: 'experiment:EXP-test-agent-001', files: [] }), /预留/)
-  assert.equal(f.calls.filter(row => row.endpoint === 'agents/tasks/assembly-apply').length, 0)
-})
-
-test('首次新建无固定父版时拒绝回退，不把未验证资产覆盖成其他来源', async t => {
-  const f = fixture(t, (endpoint, input) => endpoint === 'agents/new' ? { ok: true, value: { source_id: 'experiment:EXP-test-agent-001' } } : taskResponder(endpoint, input))
-  installTaskGoals(f)
-  const id = (await f.rpc('session', { task: '新建只读巡检助手' })).value.session_id
-  await beginTask(f, id, taskPlan({ source: undefined, new_agent: { name: '巡检助手', description: '只读设备数据', role: '核对实际台账', evaluation_cases: [{ id: 'U-BUSINESS-001', title: '设备完整', inputs: '检查三台设备', expected_behavior: '输出完整设备集合' }] }, allowed_actions: [{ domain: 'agents', action: 'new' }, { domain: 'agents', action: 'tasks/assembly-apply' }] }))
-  await f.execute(id, 'agents', 'new', { agent_id: 'test-agent' })
-  const before = (await f.status(id)).execution
-  await assert.rejects(() => f.execute(id, 'task', 'rollback'), /首次创建.*固定可恢复父版/)
-  assert.deepEqual((await f.status(id)).execution, before)
-  assert.equal(f.calls.some(call => call.endpoint === 'agents/assets/read-fixed'), false)
-})
-
-test('旧待确认任务的固定父版变化时拒绝开始，不能静默换成新HEAD', async t => {
-  let parent = 'a'.repeat(40)
-  const f = fixture(t, (endpoint, input) => {
-    const value = taskResponder(endpoint, input)
-    if (endpoint === 'agents/detail') value.value.derivation.parent_ref = `git:${parent}`
-    return value
-  })
-  const goals = installTaskGoals(f)
-  const id = (await f.rpc('session', { task: '从固定版本改进' })).value.session_id
-  const preview = await f.execute(id, 'task', 'preview', { plan: taskPlan() })
-  const proposal = { kind: 'proposal', id: 'legacy-task', owner_session_id: id, domain: 'task', action: 'start', input: preview, preview, state: 'awaiting_confirmation' }
-  appendPluginRecord(f.sessions.get(id).session, 'plugin:harness-platform/assistant', proposal)
-  parent = 'b'.repeat(40)
-  const confirmed = await f.rpc('confirm', { session_id: id, proposal_id: proposal.id })
-  assert.equal(confirmed.value.state, 'unknown')
-  assert.match(confirmed.value.error, /核对实际状态/)
-  assert.equal((await f.status(id)).execution, undefined)
-  assert.equal(goals.size, 0)
-})
-
-test('未知评测回执从预留operation_id读取真实Job后可显式恢复，不重复启动', async t => {
-  let jobId
-  const f = fixture(t, (endpoint, input) => {
-    if (endpoint === 'agents/eval/start') { jobId = input.task_budget.operation_id; throw new Error('外部连接在Job启动后断开') }
-    if (endpoint === 'agents/eval/status') return { ok: true, value: { job_id: jobId, source: 'experiment:EXP-test-agent-001', cases: ['U-BUSINESS-001'], status: 'completed', run_id: 'run-own' } }
-    return taskResponder(endpoint, input)
-  })
-  installTaskGoals(f)
-  const id = (await f.rpc('session', { task: '可恢复巡检' })).value.session_id
-  await beginTask(f, id)
-  await assert.rejects(() => f.execute(id, 'agents', 'eval/start', { source: 'experiment:EXP-test-agent-001', cases: ['U-BUSINESS-001'] }), /断开/)
-  assert.equal((await f.status(id)).execution.state, 'unknown')
-  assert.equal((await f.rpc('task/resume', { session_id: id })).ok, false)
-  assert.equal((await f.rpc('task/checkpoint', { session_id: id })).ok, true)
-  assert.equal((await f.status(id)).execution.state, 'paused')
-  assert.equal((await f.rpc('task/resume', { session_id: id })).ok, true)
-  assert.equal(f.calls.filter(row => row.endpoint === 'agents/eval/start').length, 1)
-})
-
-test('长操作仍在等待时暂停立即取消其信号，晚到成功回执保持已暂停且不重发', async t => {
-  let release, operationSignal
-  const f = fixture(t, (endpoint, input, signal) => {
-    if (endpoint === 'agents/tasks/assembly-apply') { operationSignal = signal; return new Promise(resolve => { release = resolve }) }
-    return taskResponder(endpoint, input)
-  })
-  installTaskGoals(f)
-  const id = (await f.rpc('session', { task: '装配后评测' })).value.session_id
-  await beginTask(f, id, taskPlan({ allowed_actions: [{ domain: 'agents', action: 'tasks/assembly-apply' }] }))
-  const operation = f.execute(id, 'agents', 'tasks/assembly-apply', { target_source: 'experiment:EXP-test-agent-001', files: [] })
-  while (!release) await setImmediate()
-  const paused = await Promise.race([f.rpc('task/pause', { session_id: id }), new Promise(resolve => setTimeout(() => resolve({ timeout: true }), 150))])
-  assert.equal(paused.ok, true)
-  assert.equal(operationSignal.aborted, true)
-  assert.equal((await f.status(id)).execution.state, 'paused')
-  release({ ok: true, value: { source: 'experiment:EXP-test-agent-001' } })
-  await operation
-  assert.equal((await f.status(id)).execution.state, 'paused')
-  assert.equal((await f.status(id)).execution.operations[0].state, 'completed')
-  assert.equal(f.calls.filter(row => row.endpoint === 'agents/tasks/assembly-apply').length, 1)
-})
-
-test('业务与评审请求按job去重累计预算，同一status重复查询不重复计费', async t => {
-  const f = fixture(t, (endpoint, input) => endpoint === 'agents/eval/status' ? { ok: true, value: { status: 'completed', run_id: 'run-own', actual_model_calls: 7, observed_model_calls: 7, model_calls_complete: true } } : taskResponder(endpoint, input))
-  installTaskGoals(f)
-  const id = (await f.rpc('session', { task: '预算内巡检' })).value.session_id
-  await f.beforeModelCall(id)
-  await beginTask(f, id)
-  const started = await f.execute(id, 'agents', 'eval/start', { source: 'experiment:EXP-test-agent-001', cases: ['U-BUSINESS-001'] })
-  const job = started.result.value.job_id
-  await f.execute(id, 'agents', 'eval/status', { job_id: job })
-  await f.execute(id, 'agents', 'eval/status', { job_id: job })
-  assert.equal((await f.status(id)).execution.model_calls, 8)
-  assert.equal((await f.status(id)).execution.assistant_model_calls, 1)
-  assert.equal((await f.status(id)).execution.evaluation_usage[job].complete, true)
-})
-
-test('任务详情缺省使用固定上下文，绑定目标后优先实际新版本，显式复用来源保持不变', async t => {
-  const f = fixture(t, taskResponder)
-  installTaskGoals(f)
+test('智能体详情缺省使用固定会话上下文，显式来源保持不变', async t => {
+  const f = fixture(t)
   const id = (await f.rpc('session', { task: '改进所选版本', context: { skill: 'task-builder', agent_id: 'test-agent', experiment_id: 'EXP-test-agent-000' } })).value.session_id
   await f.execute(id, 'agents', 'detail', { agent_id: 'test-agent' })
   assert.equal(f.calls.at(-1).input.experiment_id, 'EXP-test-agent-000')
   await f.execute(id, 'agents', 'detail', { agent_id: 'test-agent', experiment_id: 'EXP-test-agent-002' })
   assert.equal(f.calls.at(-1).input.experiment_id, 'EXP-test-agent-002')
-  await beginTask(f, id)
-  await f.execute(id, 'agents', 'detail', { agent_id: 'test-agent' })
-  assert.equal(f.calls.at(-1).input.experiment_id, 'EXP-test-agent-001')
   const other = (await f.rpc('session', { task: '查看智能体' })).value.session_id
   await f.execute(other, 'agents', 'detail', { agent_id: 'test-agent' })
   assert.equal(f.calls.at(-1).input.experiment_id, undefined)
-})
-
-test('助手查询本任务评测在工具内等待实际终态，暂停可中断等待且不重复启动', async t => {
-  let polls = 0
-  const f = fixture(t, (endpoint, input) => endpoint === 'agents/eval/status'
-    ? { ok: true, value: { job_id: input.job_id, status: ++polls === 1 ? 'running' : 'completed', observed_model_calls: 2, model_calls_complete: true } }
-    : taskResponder(endpoint, input))
-  installTaskGoals(f)
-  const id = (await f.rpc('session', { task: '等待真实评测' })).value.session_id
-  await beginTask(f, id)
-  const started = await f.execute(id, 'agents', 'eval/start', { source: 'experiment:EXP-test-agent-001', cases: ['U-BUSINESS-001'] })
-  const input = { job_id: started.result.value.job_id }
-  assert.equal((await f.execute(id, 'agents', 'eval/status', input)).result.value.status, 'completed')
-  assert.equal(polls, 2)
-  assert.equal((await f.status(id)).execution.model_calls, 2)
-  polls = 0
-  const pending = f.execute(id, 'agents', 'eval/status', input)
-  while (polls === 0) await setImmediate()
-  await f.rpc('task/pause', { session_id: id })
-  await pending
-  assert.equal(polls, 1, '暂停后不得继续查询或重发评测')
-  assert.equal(f.calls.filter(item => item.endpoint === 'agents/eval/start').length, 1)
-  assert.equal(f.calls.some(item => item.endpoint === 'agents/eval/cancel'), true)
-})
-
-test('任务不能通过领域delivery入口绕过预算或替换已确认业务判据', async t => {
-  const f = fixture(t, taskResponder)
-  installTaskGoals(f)
-  const id = (await f.rpc('session', { task: '交付巡检' })).value.session_id
-  await beginTask(f, id)
-  await assert.rejects(() => f.execute(id, 'agents', 'tasks/delivery', { required_tool_names: [], expected_device_ids: [] }), /platform_task deliver/)
-  assert.equal(f.calls.filter(row => row.endpoint === 'agents/tasks/delivery').length, 0)
 })
 
 test('所有平台工具回执元信息保留真实动作与定位字段，不重复附带文件正文', t => {
@@ -1482,8 +1040,6 @@ test('所有平台工具回执元信息保留真实动作与定位字段，不�
   assert.equal(value.input.experiment_id, 'EXP-test-agent-001')
   assert.equal(value.input.edits[0].path, 'candidate/dsh/workspace/AGENTS.md')
   assert.equal(value.input.edits[0].content, undefined)
-  const preview = f.tools.get('platform_task').output.presentationMeta({ action: 'preview', input: {} }, { plan: { goal: '基本任务' } })
-  assert.equal(preview.domain, 'task'); assert.equal(preview.action, 'preview')
   assert.match(assistantActionContract('agents', 'edit/apply').input_schema.properties.edits.items.properties.content.description, /修改后完整文件正文/)
 })
 
@@ -1540,27 +1096,6 @@ test('用户可仅拒绝当前旧待确认操作，另一个操作可确认一�
   assert.equal(f.calls.filter(call => call.endpoint === 'instances/run').length, 1)
   assert.equal((await f.rpc('reject', { session_id: id, proposal_id: 'second' })).ok, false)
 })
-
-test('暂停跨过截止后恢复持久记录预算耗尽，不更换原任务、额度、截止或操作', async t => {
-  const f = fixture(t, taskResponder)
-  installTaskGoals(f)
-  const id = (await f.rpc('session', { task: '有总时限的交付任务' })).value.session_id
-  await f.beforeModelCall(id)
-  await beginTask(f, id)
-  await f.execute(id, 'agents', 'eval/start', { source: 'experiment:EXP-test-agent-001', cases: ['U-BUSINESS-001'] })
-  await f.rpc('task/pause', { session_id: id })
-  const before = (await f.status(id)).execution
-  t.mock.method(Date, 'now', () => Date.parse(before.deadline_at) + 1)
-  const response = await f.rpc('task/resume', { session_id: id })
-  assert.equal(response.ok, false); assert.match(response.error.message, /总时限已耗尽/)
-  const after = (await f.status(id)).execution
-  assert.equal(after.state, 'budget_exhausted'); assert.match(after.reason, /总时限已耗尽/)
-  for (const key of ['id', 'started_at', 'deadline_at', 'model_calls', 'assistant_model_calls', 'repair_rounds']) assert.equal(after[key], before[key])
-  assert.deepEqual(after.operations, before.operations)
-  assert.equal((await f.rpc('task/resume', { session_id: id })).ok, false)
-  assert.equal(f.calls.filter(item => item.endpoint === 'agents/eval/start').length, 1)
-})
-
 
 test('专项研究文档按任务主题放行，拒绝借资料读取扩展动作范围', async t => {
   const f = fixture(t)
@@ -1633,12 +1168,7 @@ test('所有管理业务可以逐动作发现参数；原生下一轮装配使�
       assert.doesNotThrow(() => assertSupportedJsonSchema(projectAssistantTools([{ name: `platform_${domain}` }], { tool_contracts: { [domain]: action } })[0].parameters))
     }
   }
-  const described = await f.execute(id, 'task', 'describe', { action: 'preview' })
-  assert.equal(described.value.input_schema.properties.plan.properties.budget.properties.max_repair_rounds.maximum, 3)
-  const task = (await f.assembly(id)).tools.find(tool => tool.name === 'platform_task')
-  assert.deepEqual(task.parameters.properties.action.enum, ['context', 'describe', 'preview'])
-  assert.equal(task.parameters.properties.input.properties.plan.additionalProperties, false)
-  assert.equal(validateJsonSchemaValue(task.parameters, { action: 'preview', input: { plan: { ...taskPlan(), budget: { max_repair_rounds: '3' } } } }).length > 0, true)
+  assert.equal(f.tools.has('platform_task'), false)
   assert.equal(f.calls.length, 0, 'describe 不伪装公共业务 RPC，也不执行业务')
   await f.execute(id, 'agents', 'describe', { action: 'edit/apply' })
   await f.reload()
@@ -1766,7 +1296,7 @@ test('旧特性未知保存冷恢复后自然读取详情可核实，同目标�
     assert.equal(records.length, matches ? 2 : 1, '保留原失败；状态未变不追加重复记录')
     assert.equal(records[0].data.state, 'unknown')
     assert.equal(f.calls.length, 1)
-    assert.equal((await f.status(id)).model_calls_observed, 0, '只读核实不产生模型调用或修改预算')
+    assert.equal((await f.status(id)).model_calls_observed, undefined)
   })
 })
 
@@ -1814,95 +1344,6 @@ test('普通管理读取其他版本不会结算原未知保存，并发同目�
   assert.equal(f.calls.length, 3)
 })
 
-test('模型预算耗尽后暂停和取消保持原终态及证据，冷恢复不重新开放额度', async t => {
-  const f = fixture(t, taskResponder)
-  installTaskGoals(f)
-  const id = (await f.rpc('session', { task: '保留耗尽原因的交付任务' })).value.session_id
-  await beginTask(f, id, taskPlan({ budget: { max_model_calls: 3, max_repair_rounds: 3, timeout_minutes: 30 } }))
-  await f.execute(id, 'agents', 'eval/start', { source: 'experiment:EXP-test-agent-001', cases: ['U-BUSINESS-001'] })
-  for (let count = 0; count < 3; count++) await f.beforeModelCall(id)
-  await assert.rejects(() => f.beforeModelCall(id), /额度已耗尽/)
-  const before = (await f.status(id)).execution
-  assert.equal(before.state, 'budget_exhausted')
-  assert.match(before.reason, /额度已耗尽/)
-  assert.equal(before.model_calls, 3)
-  assert.equal(before.operations[0].state, 'completed')
-  const originalEvents = [...f.sessions.get(id).events]
-  const dispatched = f.calls.length
-  for (const action of ['pause', 'cancel', 'pause']) {
-    assert.equal((await f.rpc('task/' + action, { session_id: id })).ok, true)
-    assert.deepEqual((await f.status(id)).execution, before)
-  }
-  assert.equal(f.calls.length, dispatched, '重复停止不重新取消已结算的评测')
-  assert.deepEqual(f.sessions.get(id).events.slice(0, originalEvents.length), originalEvents)
-  await f.reload()
-  assert.deepEqual((await f.status(id)).execution, before)
-  assert.equal((await f.rpc('task/resume', { session_id: id })).ok, false)
-  await assert.rejects(() => f.beforeModelCall(id), /尚未恢复/)
-  await assert.rejects(() => f.execute(id, 'task', 'start', { plan: taskPlan() }), /已有未结束任务/)
-  assert.deepEqual((await f.status(id)).execution, before)
-})
-
-test('预算耗尽时停止仍取消活动操作，晚到结算保留预算原因与真实回执', async t => {
-  for (const outcome of ['success', 'unknown', 'created-with-missing-cases']) await t.test(outcome, async t => {
-    t.mock.timers.enable({ apis: ['setTimeout'] })
-    let release, fail, operationSignal
-    const creating = outcome === 'created-with-missing-cases'
-    const action = creating ? 'create' : 'tasks/assembly-apply'
-    const f = fixture(t, (endpoint, input, signal) => {
-      if (endpoint === 'agents/' + action) {
-        operationSignal = signal
-        return new Promise((resolve, reject) => { release = resolve; fail = reject })
-      }
-      if (creating && endpoint === 'agents/detail' && input.experiment_id === 'EXP-test-agent-002') {
-        return { ok: true, value: { evaluation: { sha256: 'incomplete-evaluation', cases: [] } } }
-      }
-      return taskResponder(endpoint, input)
-    })
-    installTaskGoals(f)
-    const id = (await f.rpc('session', { task: '截止时保持活动操作证据' })).value.session_id
-    await f.beforeModelCall(id)
-    await beginTask(f, id, taskPlan({ budget: { max_model_calls: 3, max_repair_rounds: 3, timeout_minutes: 1 }, allowed_actions: [{ domain: 'agents', action }] }))
-    const operation = f.execute(id, 'agents', action, creating ? { agent_id: 'test-agent' } : { target_source: 'experiment:EXP-test-agent-001', files: [] })
-      .then(value => ({ value }), error => ({ error }))
-    for (let count = 0; count < 40 && !release; count++) await setImmediate()
-    assert.ok(release, '没有进入真实连续操作派发')
-    t.mock.timers.tick(60_001)
-    for (let count = 0; count < 40 && (await f.status(id)).execution.state !== 'budget_exhausted'; count++) await setImmediate()
-    const before = (await f.status(id)).execution
-    assert.equal(before.state, 'budget_exhausted')
-    assert.match(before.reason, /总时限已耗尽/)
-    assert.equal(operationSignal.aborted, true)
-    assert.equal(before.operations[0].state, 'running')
-    for (const action of ['pause', 'cancel']) {
-      assert.equal((await f.rpc('task/' + action, { session_id: id })).ok, true)
-      assert.deepEqual((await f.status(id)).execution, before)
-    }
-    const receipt = { ok: true, value: { source: creating ? 'experiment:EXP-test-agent-002' : 'experiment:EXP-test-agent-001' } }
-    if (outcome === 'unknown') fail(new Error('取消后连接断开，未取得回执'))
-    else release(receipt)
-    const settled = await operation
-    const after = (await f.status(id)).execution
-    for (const key of ['id', 'state', 'reason', 'started_at', 'deadline_at', 'model_calls', 'assistant_model_calls', 'repair_rounds', 'plan']) assert.deepEqual(after[key], before[key])
-    assert.equal(after.operations.length, 1)
-    assert.equal(after.operations[0].id, before.operations[0].id)
-    if (outcome === 'unknown') {
-      assert.match(settled.error.message, /未取得回执/)
-      assert.equal(after.operations[0].state, 'unknown')
-      assert.equal(after.operations[0].receipt, undefined)
-    } else {
-      assert.equal(settled.value.state, creating ? 'failed' : 'completed')
-      assert.equal(after.operations[0].state, 'completed')
-      assert.deepEqual(after.operations[0].receipt, receipt)
-      if (creating) assert.equal(after.target_source, 'experiment:EXP-test-agent-002')
-    }
-    assert.equal(f.calls.filter(call => call.endpoint === 'agents/' + action).length, 1, '不重放活动操作')
-    assert.equal((await f.rpc('task/cancel', { session_id: id })).ok, true)
-    assert.deepEqual((await f.status(id)).execution, after)
-    assert.equal((await f.rpc('task/resume', { session_id: id })).ok, false)
-  })
-})
-
 test('逐题抽样仅适配模型工具入口，固定Run与原公开source和批量samples保持一致', async t => {
   const run_id = 'run-11111111-1111-4111-8111-111111111111'
   const source = { run_id, extraction_contract: DECISION_EXTRACTION_CONTRACT, files: [{ path: 'trace.jsonl' }] }
@@ -1932,186 +1373,6 @@ test('逐题抽样仅适配模型工具入口，固定Run与原公开source和�
   assert.equal(f.calls.length, dispatched); assert.deepEqual((await f.status(id)).proposals, [])
   const general = (await f.rpc('session', { task: '只读查看来源' })).value.session_id
   assert.deepEqual((await f.execute(general, 'agents', 'datasets/source', { run_id })).result.value.extraction_contract, DECISION_EXTRACTION_CONTRACT)
-})
-
-test('已完成任务的工具与真实系统装配共用精简视图，公共查询和GUI保留全文', async t => {
-  const f = fixture(t)
-  const id = (await f.rpc('session', { task: '核对已交付结果', context: { skill: 'task-builder' } })).value.session_id
-  const original = {
-    id: 'finished-task', owner_session_id: id, state: 'completed', plan: taskPlan(),
-    started_at: '2026-10-17T01:00:00.000Z', deadline_at: '2026-10-17T01:30:00.000Z',
-    model_calls: 48, assistant_model_calls: 29, repair_rounds: 0,
-    evaluation_usage: { evaluation: { observed_model_calls: 13, complete: true }, probe: { observed_model_calls: 6, complete: true } },
-    operations: Array.from({ length: 7 }, (_, index) => ({ id: `op-${index}`, domain: 'instances', action: 'run', state: 'completed',
-      input: { name: `instance-${index}` }, receipt: { ok: true, value: { detail: '完整实际操作回执'.repeat(100) } } })),
-    delivery: { ready: true, run_id: 'run-fixed', instance: { name: 'delivery-instance', state: 'running' }, entry: { url: 'http://localhost:3000/' },
-      artifacts: [{ path: 'artifacts/report.md', sha256: 'a'.repeat(64) }], note: '保留实际边界。',
-      checks: [{ name: 'instance_running', ok: true, message: '实际容器正在运行' }, { name: 'optional_check', ok: false, message: '完整失败原因', details: { observed: 'unknown' } }],
-      probe: { id: 'probe-1', path: 'delivery-probes/probe-1', status: 'completed', case_id: 'U-BUSINESS-001', session_id: 'probe-session',
-        model_usage: { actual_model_calls: 6 }, downloads: [{ format: 'markdown', url: 'http://localhost:3000/report.md' }], report_sha256: 'b'.repeat(64),
-        trace: [{ text: '原始探针轨迹正文' }], receipt: { text: '原始探针回执正文' } } },
-  }
-  const before = structuredClone(original)
-  appendPluginRecord(f.sessions.get(id).session, 'plugin:harness-platform/assistant', { kind: 'execution', owner_session_id: id, execution: original })
-  const tool = f.tools.get('platform_task'), args = { action: 'status', input: {} }
-  const raw = await f.execute(id, 'task', 'status')
-  assert.deepEqual(raw, before, 'execute继续返回完整实际记录')
-  const view = JSON.parse(tool.output.render(args, raw)[0].text)
-  assert.equal(view.operations.length, 5); assert.equal(view.operations[0].id, 'op-2')
-  assert.equal(view.operations[0].domain, 'instances'); assert.equal(view.operations[0].receipt, undefined); assert.equal(view.operations[0].input, undefined)
-  assert.deepEqual(view.delivery.checks[0], { name: 'instance_running', ok: true })
-  assert.deepEqual(view.delivery.checks[1], before.delivery.checks[1], '失败检查及其详情不可省略')
-  assert.equal(view.delivery.probe.trace, undefined); assert.equal(view.delivery.probe.receipt, undefined)
-  for (const key of ['status', 'model_usage', 'downloads', 'report_sha256']) assert.deepEqual(view.delivery.probe[key], before.delivery.probe[key])
-  assert.equal(view.model_calls, 48); assert.equal(view.assistant_model_calls, 29)
-  assert.match(view.model_usage_observation, /截至本次状态读取.*最终累计以任务卡当前计数为准/)
-  const system = await f.assemble(id)
-  const systemView = JSON.parse(system.split('当前任务方案与实际进度：')[1].split('\n本任务读取')[0])
-  assert.deepEqual(systemView, view)
-  assert.deepEqual(tool.output.presentationMeta(args, raw).result, before, 'GUI元数据保留原始全文')
-  assert.deepEqual((await f.rpc('task/status', { session_id: id })).value, before)
-  assert.deepEqual((await f.status(id)).execution, before)
-  assert.deepEqual(original, before, '模型投影不能修改持久对象')
-  await f.reload()
-  assert.deepEqual((await f.status(id)).execution, before, '冷恢复仍读取完整原始记录')
-})
-
-test('未完成任务的模型status全文及原系统摘要不变，算力交付比较信息完整保留', async t => {
-  const f = fixture(t)
-  for (const state of ['running', 'paused', 'unknown', 'budget_exhausted', 'cancelled']) {
-    const id = (await f.rpc('session', { task: '核对任务状态', context: { skill: 'task-builder' } })).value.session_id
-    const task = { id: `task-${state}`, owner_session_id: id, state, plan: taskPlan(), model_calls: 4, repair_rounds: 1,
-      operations: [{ id: 'eval-operation', domain: 'agents', action: 'eval/start', state: 'unknown', input: { source: 'experiment:EXP-test-agent-001' }, receipt: { value: { job_id: 'evaluation-job' } } }] }
-    appendPluginRecord(f.sessions.get(id).session, 'plugin:harness-platform/assistant', { kind: 'execution', owner_session_id: id, execution: task })
-    const raw = await f.execute(id, 'task', 'status')
-    assert.deepEqual(JSON.parse(f.tools.get('platform_task').output.render({ action: 'status' }, raw)[0].text), task)
-    assert.equal(completedTaskModelView(task), task)
-    const system = await f.assemble(id)
-    const systemView = JSON.parse(system.split('当前任务方案与实际进度：')[1].split('\n本任务读取')[0])
-    assert.deepEqual(systemView, { ...task, operations: [{ id: 'eval-operation', action: 'eval/start', state: 'unknown' }] })
-  }
-  const compute = { state: 'completed', operations: [], plan: { kind: 'compute-variant' },
-    delivery: { comparison: { comparability: { passed: true }, quality: { passed: false }, resource: { reduction_pct: 12.5 } }, end_confirmed: false, note: '仍需用户复核' } }
-  assert.deepEqual(completedTaskModelView(compute).delivery, compute.delivery)
-})
-
-test('实例工具从精确原生投影读取交付摘要，不激活历史Agent且公共及GUI回执保持原文', async t => {
-  const publicReceipt = { ok: true, value: { instance: { name: 'delivered-instance', source_id: 'experiment:EXP-test-agent-002', agent_id: 'test-agent', state: 'stopped' }, runs: [{ id: 'run-passed' }] } }
-  const before = structuredClone(publicReceipt)
-  const f = fixture(t, endpoint => endpoint === 'instances/detail' ? publicReceipt : undefined)
-  const previousId = (await f.rpc('session', { task: '构建业务智能体' })).value.session_id
-  const currentId = (await f.rpc('session', { task: '核对实例是否已交付' })).value.session_id
-  const identity = workspaceIdentity(f.root)
-  const task = { id: 'delivered-task', owner_session_id: previousId, state: 'completed', target_source: before.value.instance.source_id,
-    plan: taskPlan({ instance_name: 'delivered-instance', goal: '不得进入wire的完整业务目标' }), operations: [], model_calls: 49, repair_rounds: 0,
-    delivery: { ready: true, run_id: 'run-passed', instance: { name: 'delivered-instance', source: before.value.instance.source_id, state: 'running' },
-      checks: [{ name: 'instance_running', ok: true, message: '当时实例正在运行' }], probe: { id: 'probe-original', status: 'completed', session_id: 'probe-session', trace: ['不得进入wire的业务内容'] },
-      entry: { url: 'http://user:private-password@localhost/?token=private-token' }, artifacts: [{ content: '原始报告正文' }] } }
-  const appendTask = execution => appendPluginRecord(f.sessions.get(previousId).session, 'plugin:harness-platform/assistant', { kind: 'execution', workspace_id: identity.id, owner_session_id: previousId, execution: JSON.parse(JSON.stringify(execution)) })
-  appendTask(task)
-  const observed = () => ({ kind: 'sequenced', ...f.ctx.sessionProjections.snapshot(f.sessions.get(previousId).session) })
-  const wire = observed().values.harnessPlatformAssistant
-  assert.equal(wire.task.delivery.ready, true)
-  assert.equal(wire.task.owner_session_id, previousId)
-  assert.doesNotMatch(JSON.stringify(wire), /完整业务目标|业务内容|报告正文|private-password|private-token|http:/)
-  const reads = [], resolved = [], originalResolve = f.services.controller.resolveAgent
-  f.services.controller.resolveAgent = async id => { resolved.push(id); return originalResolve(id) }
-  f.services.controller.list = async () => ({ items: [{ sessionId: previousId, cwd: f.root, projections: { kind: 'cached', values: {} } }] })
-  f.services.controller.projections = async ({ sessionId }) => { reads.push(sessionId); return observed() }
-  const value = await f.execute(currentId, 'instances', 'detail', { name: 'delivered-instance' })
-  assert.deepEqual(reads, [previousId]); assert.ok(resolved.every(id => id === currentId), '不能通过resolveAgent激活历史会话')
-  assert.equal(value.delivery_history.records.length, 1)
-  assert.equal(value.delivery_history.records[0].asOfSeq, observed().asOfSeq)
-  assert.equal(value.delivery_history.records[0].task.delivery.probe.id, 'probe-original')
-  assert.equal(value.delivery_history.records[0].task.delivery.instance.state, 'running')
-  assert.equal(value.result.value.instance.state, 'stopped', '历史交付状态不能改写实时实例状态')
-  assert.match(value.delivery_history.note, /未找到记录不表示从未交付/)
-  const args = { action: 'detail', input: { name: 'delivered-instance' } }, tool = f.tools.get('platform_instances')
-  assert.equal(JSON.parse(tool.output.render(args, value)[0].text).delivery_history.records.length, 1)
-  const meta = tool.output.presentationMeta(args, value)
-  assert.equal(meta.delivery_history, undefined); assert.deepEqual(meta.result, before)
-  assert.deepEqual(publicReceipt, before)
-  assert.deepEqual(f.calls.map(call => call.endpoint), ['instances/detail'], '只读取既有投影，不重跑交付或创建探针')
-  await f.reload()
-  assert.deepEqual(observed().values.harnessPlatformAssistant, wire, '投影重装后仍从原任务事件恢复摘要')
-  appendTask({ ...task, id: 'new-task', state: 'unknown', delivery: undefined, reason: '新任务执行回执未知' })
-  const latest = await f.execute(currentId, 'instances', 'detail', { name: 'delivered-instance' })
-  assert.equal(latest.delivery_history.records[0].task.id, 'new-task')
-  assert.equal(latest.delivery_history.records[0].task.state, 'unknown')
-  assert.equal(latest.delivery_history.records[0].task.reason, '新任务执行回执未知')
-  assert.equal(latest.delivery_history.records[0].task.delivery, undefined, '仅最新任务，不能沿用被替换的成功状态')
-})
-
-test('交付历史按工作区、owner、实例与来源隔离，缓存及待迁移信息不构成交付证明', async t => {
-  const f = fixture(t), identity = workspaceIdentity(f.root)
-  const instance = { name: 'target-instance', source_id: 'experiment:EXP-test-agent-002', agent_id: 'test-agent' }
-  const summary = id => deliveryProjection({ session_id: id, workspace_id: identity.id, execution: {
-    id: `task-${id}`, owner_session_id: id, state: 'completed', target_source: instance.source_id, plan: taskPlan({ instance_name: instance.name }), operations: [],
-    delivery: { ready: true, instance: { name: instance.name, source: instance.source_id }, checks: [{ name: 'delivery_report', ok: true }] },
-  } })
-  const values = Object.fromEntries(['matching', 'other-workspace', 'other-owner', 'other-source', 'other-name', 'other-delivery-source', 'other-cwd', 'unbound-workspace', 'cached', 'migration', 'failed'].map(id => [id, { kind: 'sequenced', asOfSeq: 10, values: { harnessPlatformAssistant: summary(id) } }]))
-  values['other-workspace'].values.harnessPlatformAssistant.workspace_id = 'workspace-other'
-  values['other-owner'].values.harnessPlatformAssistant.task.owner_session_id = 'original-session'
-  values['other-source'].values.harnessPlatformAssistant.task.target_source = 'experiment:EXP-test-agent-001'
-  values['other-name'].values.harnessPlatformAssistant.task.instance_name = 'different-instance'
-  values['other-delivery-source'].values.harnessPlatformAssistant.task.delivery.instance.source = 'experiment:EXP-test-agent-001'
-  delete values['unbound-workspace'].values.harnessPlatformAssistant.workspace_id
-  values.cached.kind = 'cached'; values.migration.kind = 'migration-required'
-  values.failed.values.harnessPlatformAssistant.task.state = 'unknown'
-  values.failed.values.harnessPlatformAssistant.task.reason = '业务回执未知'
-  values.failed.values.harnessPlatformAssistant.task.delivery = { ready: false, checks: [{ name: 'delivery_report', ok: false, message: '实际下载失败' }] }
-  const reads = [], reader = {
-    async list() { return { items: Object.keys(values).map(sessionId => ({ sessionId, cwd: sessionId === 'other-cwd' ? f.root + '/other' : f.root, projections: { kind: 'cached', values: { harnessPlatformAssistant: summary(sessionId) } } })) } },
-    async projections({ sessionId }) { reads.push(sessionId); return values[sessionId] },
-  }
-  const result = await readInstanceDeliveryHistory(f.root, instance, reader, new AbortController().signal)
-  assert.deepEqual(result.records.map(row => row.session_id), ['matching', 'failed'])
-  assert.equal(result.records[1].task.delivery.ready, false)
-  assert.equal(result.records[1].task.delivery.checks[0].message, '实际下载失败')
-  assert.equal(reads.includes('other-cwd'), false)
-  assert.deepEqual(result.unavailable.map(row => row.session_id), ['cached', 'migration'])
-  const noMatch = await readInstanceDeliveryHistory(f.root, { ...instance, source_id: 'experiment:EXP-test-agent-999' }, reader, new AbortController().signal)
-  assert.deepEqual(noMatch.records, []); assert.match(noMatch.note, /不表示从未交付/)
-  const abort = new AbortController()
-  await assert.rejects(() => readInstanceDeliveryHistory(f.root, instance, { ...reader, async projections() { abort.abort(new Error('用户取消')); throw abort.signal.reason } }, abort.signal), /用户取消/)
-})
-
-test('交付wire在初始化及所有稀疏可选字段下符合原生无损JSON，投影重装保持可传输', async t => {
-  const { createRequire } = await import('node:module')
-  const require = createRequire(import.meta.url)
-  const sdk = createRequire(require.resolve('@deepseek-ai/dsh-api-session-controller'))
-  const { snapshotJsonValue } = await import(sdk.resolve('@deepseek-ai/dsh-util-values'))
-  const sparseTask = { id: 'sparse-task', owner_session_id: 'sparse-session', state: 'unknown', operations: [],
-    plan: { agent_id: 'test-agent', instance_name: undefined }, reason: undefined, target_source: undefined }
-  const cases = [
-    { session_id: 'initial-session', workspace_id: undefined, execution: undefined },
-    { session_id: 'sparse-session', execution: sparseTask },
-    { session_id: 'sparse-session', execution: { ...sparseTask, delivery: { ready: undefined, run_id: undefined,
-      instance: { name: 'test-instance', source: 'experiment:EXP-test-agent-001', state: undefined },
-      checks: [{ name: 'unknown_check', ok: undefined, message: undefined }, { name: 'failed_check', ok: false, message: '保留实际失败' }],
-      probe: { id: 'probe-1', status: 'unknown', case_id: undefined, session_id: undefined } } } },
-    { session_id: 'complete-session', workspace_id: 'workspace-test', execution: { ...sparseTask, state: 'completed', owner_session_id: 'complete-session',
-      delivery: { ready: true, run_id: 'run-1', checks: [{ name: 'passed', ok: true, message: '不会重复传输成功说明' }],
-        probe: { id: 'probe-2', status: 'completed', case_id: 'U-BUSINESS-001', session_id: 'probe-session' } } } },
-  ]
-  for (const source of cases) {
-    const view = deliveryProjection(source)
-    assert.deepEqual(snapshotJsonValue(view), view, '必须通过实际原生无损JSON校验，不能靠stringify静默丢字段')
-  }
-  assert.equal(snapshotJsonValue({ workspace_id: undefined }), undefined, '测试须能复现原生传输拒绝条件')
-  const f = fixture(t)
-  const session = f.addSession('initial-session')
-  const snapshot = () => f.ctx.sessionProjections.snapshot(session)
-  assert.deepEqual(snapshot().values.harnessPlatformAssistant, { session_id: 'initial-session' })
-  assert.notEqual(snapshotJsonValue({ sessionId: session.id, cwd: f.root, projections: { kind: 'sequenced', ...snapshot() } }), undefined)
-  appendPluginRecord(session, 'plugin:harness-platform/assistant', { kind: 'execution', owner_session_id: session.id,
-    execution: { id: 'sparse-task', owner_session_id: session.id, state: 'unknown', plan: { agent_id: 'test-agent' }, operations: [],
-      delivery: { checks: [{ name: 'pending_check' }], probe: { id: 'probe-1', status: 'unknown' } } } })
-  const observed = snapshot()
-  assert.deepEqual(snapshotJsonValue(observed), observed)
-  await f.reload()
-  assert.deepEqual(snapshot(), observed)
-  assert.deepEqual(snapshotJsonValue(snapshot()), observed)
 })
 
 test('显式切换固定目标后，旧自动保存只读核实不能代替新目标预览', async t => {
@@ -2167,4 +1428,56 @@ test('显式切换固定目标后，旧自动保存只读核实不能代替新�
     }
     assert.deepEqual((await f.status(id)).proposals, [])
   })
+})
+
+test('旧额度耗尽会话冷恢复后可继续普通对话和工具操作，保留原始历史', async t => {
+  const f = fixture(t), id = 'legacy-budget-session'
+  const session = f.addSession(id)
+  const context = { skill: 'task-builder', agent_id: 'fixed-agent', experiment_id: 'EXP-fixed-agent-001' }
+  const record = data => f.services.record(session, 'plugin:harness-platform/assistant', data)
+  record({ kind: 'task', task: '创建日常聊天助手', context })
+  record({ kind: 'execution', execution: { state: 'budget_exhausted', deadline_at: '2020-01-01T00:00:00Z', model_calls: 60, repair_round: 3 } })
+  record({ kind: 'model-call', count: 60 })
+  record({ kind: 'proposal', id: 'retired-task', domain: 'task', action: 'start', state: 'awaiting_confirmation', owner_session_id: id })
+  record({ kind: 'proposal', id: 'retired-delivery', domain: 'agents', action: 'tasks/delivery', state: 'awaiting_confirmation', owner_session_id: id })
+  const history = JSON.parse(JSON.stringify(f.sessions.get(id).events))
+  const checkpoint = f.services.projections.checkpoint(session)
+  checkpoint.harnessPlatformAssistant.ver = 7
+  checkpoint.harnessPlatformAssistant.val.execution = { state: 'budget_exhausted' }
+  const restored = fixture(t, undefined, f.root)
+  restored.addSession(id, f.root, history)
+  assert.equal(restored.services.projections.restoreFloor(checkpoint), 0)
+  const rebuilt = restored.services.projections.restore(checkpoint, history, 0, session.header, session.inheritedEventCount)
+  assert.equal(rebuilt.checkpoint.harnessPlatformAssistant.val.execution, undefined)
+  await restored.beforeModelCall(id)
+  const state = await restored.status(id)
+  assert.equal(state.execution, undefined)
+  assert.equal(state.model_calls_observed, undefined)
+  assert.deepEqual(state.proposals, [])
+  assert.deepEqual(state.task_context, context)
+  assert.equal(restored.tools.has('platform_task'), false)
+  assert.equal((await restored.rpc('task/resume', { session_id: id })).ok, false)
+  assert.equal((await restored.execute(id, 'agents', 'list')).state, 'completed')
+  assert.equal((await restored.execute(id, 'agents', 'edit/apply', { experiment_id: context.experiment_id, edits: [] })).state, 'completed')
+  assert.doesNotMatch(await restored.assemble(id), /platform_task|额度|预算耗尽|begin-repair/)
+  assert.deepEqual(f.sessions.get(id).events, history)
+  assert.equal(restored.prompts.length, 0, '冷恢复不自动重放旧任务')
+})
+
+test('移除任务机制后新建智能体仍验证业务用例边界', () => {
+  const valid = { id: 'U-CHAT-001', title: '日常问候', inputs: '你好', expected_behavior: '自然回应问候' }
+  assert.equal(businessCasesSchema.safeParse([valid]).success, true)
+  for (const cases of [[], [valid, valid], [{ ...valid, id: 'CHAT-GREET', fast: true }], [{ ...valid, id: 'U-IDENTITY-001' }], [{ ...valid, title: '多行\n标题' }], [{ ...valid, expected_behavior: '# 额外标题' }], [{ ...valid, inputs: '中'.repeat(9000) }]]) {
+    assert.equal(businessCasesSchema.safeParse(cases).success, false)
+  }
+})
+
+test('助手省略网关参数也拒绝缺少网关来源摘要的直连创建预览', async t => {
+  const f = fixture(t, endpoint => endpoint === 'instances/preview' ? { ok: true, value: {
+    name: 'no-direct', operation: 'create', plan: { source_id: 'experiment:EXP-test-agent-001', port: 18500 },
+    model_selection: { provider: 'fixture', model: 'default' }, model_policy_hash: 'a'.repeat(64),
+  } } : undefined)
+  const id = (await f.rpc('session', { task: '创建业务实例' })).value.session_id
+  await assert.rejects(() => f.execute(id, 'instances', 'run', { operation: 'create', name: 'no-direct', source: 'experiment:EXP-test-agent-001' }), /业务实例预览缺少来源摘要/)
+  assert.equal(f.calls.some(call => call.endpoint === 'instances/run'), false)
 })

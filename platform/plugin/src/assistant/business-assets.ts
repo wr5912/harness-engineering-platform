@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, realpathSync } from 'node:fs'
+import { readFileSync, realpathSync } from 'node:fs'
 import { join, relative, resolve, sep } from 'node:path'
 
 export interface NativeSkill {
@@ -43,26 +43,6 @@ export async function managementSkill(root: string, skills: NativeSkills, name: 
   const skill = await skills.get(name, { cwd: root, scope, signal })
   if (!skill?.path || realWorkspaceFile(root, skill.path) !== expected || !skill.content?.trim() || skill.name !== name || skill.invocation?.modelInvocable === false) throw new Error(`技能 ${name} 未从当前数据工作区装载`)
   return { ...skill, path: expected, sha256: digest(skill.content) }
-}
-/** 平台管理还可使用 workspace.json 已声明扩展提供的业务技能；核心资产来源保持固定。 */
-export async function taskBusinessSkill(root: string, skills: NativeSkills, name: string, scope?: any, signal?: AbortSignal) {
-  try { return await managementSkill(root, skills, name, scope, signal) }
-  catch (error) { if (managementSkills.includes(name as typeof managementSkills[number])) throw error }
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) throw new Error('技能名称无效')
-  const descriptor = join(root, 'workspace.json')
-  const extensions = existsSync(descriptor) ? JSON.parse(readFileSync(descriptor, 'utf8')).extensions ?? [] : []
-  const skill = await skills.get(name, { cwd: root, scope, signal })
-  if (!Array.isArray(extensions) || !skill?.path || skill.name !== name || !skill.content?.trim() || skill.invocation?.modelInvocable === false) throw new Error('扩展技能未装载')
-  const actual = realWorkspaceFile(root, skill.path)
-  const declared = extensions.some((extension: any) => {
-    const path = extension?.path
-    if (typeof path !== 'string' || !path.startsWith('extensions/') || path.split('/').includes('..')) return false
-    const base = join(realpathSync(root), path, 'skills')
-    const child = relative(base, actual)
-    return Boolean(child) && child !== '..' && !child.startsWith(`..${sep}`) && resolve(base, child) === actual
-  })
-  if (!declared) throw new Error('技能不属于当前工作区已声明的业务扩展')
-  return { ...skill, path: actual, sha256: digest(skill.content) }
 }
 export async function assistantConfiguration(root: string, skills: NativeSkills, context: Record<string, any> = {}, scope?: any, signal?: AbortSignal) {
   const assets: { name: string; ready: boolean; path: string; sha256?: string }[] = []

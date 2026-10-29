@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
@@ -19,10 +19,10 @@ const [{ Context }, { SystemPrompt }, { ToolRuntime, assertSupportedJsonSchema, 
 ])
 const built = mkdtempSync(join(tmpdir(), 'extraction-scope-build-'))
 await build({ entryPoints: [new URL('../src/assistant/extraction-scope.ts', import.meta.url).pathname], outfile: join(built, 'scope.mjs'), bundle: true, platform: 'node', format: 'esm' })
-const { createExtractionScope, createComputeVariantScope, isDecisionExtraction, isComputeVariantResearch, createFeatureScope, isFeatureOrganization, createTaskBuilderScope, DECISION_EXTRACTION_ACTIONS, projectDecisionExtractionTools } = await import(pathToFileURL(join(built, 'scope.mjs')).href)
+const { createExtractionScope, createComputeVariantScope, isDecisionExtraction, isComputeVariantResearch, createFeatureScope, isFeatureOrganization, DECISION_EXTRACTION_ACTIONS, projectDecisionExtractionTools } = await import(pathToFileURL(join(built, 'scope.mjs')).href)
 test.after(() => rm(built, { recursive: true, force: true }))
 
-function fixture(t, { parentPtc = false, computeResearch = false, featureOrganization = false, taskBuilding = false, actualPlatformTools = false } = {}) {
+function fixture(t, { parentPtc = false, computeResearch = false, featureOrganization = false, actualPlatformTools = false } = {}) {
   const ctx = new Context()
   new SystemPrompt(ctx, {})
   new ToolRuntime(ctx, { mode: 'native' })
@@ -32,7 +32,7 @@ function fixture(t, { parentPtc = false, computeResearch = false, featureOrganiz
     output: { schema: { type: 'object', additionalProperties: true }, render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }] },
     async execute(arguments_) { calls.push({ name, arguments: arguments_ }); return { basic: true } },
   })
-  for (const name of ['skill', 'platform_agents', ...(taskBuilding ? ['platform_task', 'platform_instances', 'platform_mcp'] : computeResearch ? ['platform_task'] : []), 'bash', 'read', 'write', 'spawn_agent', 'run_in_background']) {
+  for (const name of ['skill', 'platform_agents', 'bash', 'read', 'write', 'spawn_agent', 'run_in_background']) {
     if (!actualPlatformTools || !name.startsWith('platform_')) ctx.tools.register(definition(name))
   }
   // 仅装载真实平台工具声明；此夹具不执行平台业务，也不访问模型或实际数据。
@@ -46,19 +46,7 @@ function fixture(t, { parentPtc = false, computeResearch = false, featureOrganiz
   const agent = { id: 'extraction-agent', session: {} }
   const agentScope = createScope(ctx, agent, parent ? { parent: parentKey } : undefined)
   agent.ctx = agentScope.ctx
-  const root = mkdtempSync(join(tmpdir(), 'builder-skills-'))
-  t.after(() => rm(root, { recursive: true, force: true }))
-  for (const name of ['task-builder', 'research-eval', 'harness-evolution', 'workspace-management', 'legacy-asset-intake']) {
-    mkdirSync(join(root, '.agents/skills', name), { recursive: true })
-    writeFileSync(join(root, '.agents/skills', name, 'SKILL.md'), '业务技能')
-  }
-  writeFileSync(join(root, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: 'workspace-test', extensions: [{ id: 'business', path: 'extensions/business' }] }))
-  for (const extension of ['business', 'undeclared']) {
-    mkdirSync(join(root, `extensions/${extension}/skills/${extension}-tool`), { recursive: true })
-    writeFileSync(join(root, `extensions/${extension}/skills/${extension}-tool/SKILL.md`), '声明扩展技能')
-  }
-  const skills = { async get(name) { return { name, path: ['business-tool', 'undeclared-tool'].includes(name) ? join(root, `extensions/${name.replace('-tool', '')}/skills/${name}/SKILL.md`) : join(root, '.agents/skills', name, 'SKILL.md'), content: '业务技能' } } }
-  const scope = taskBuilding ? createTaskBuilderScope(root, skills) : featureOrganization ? createFeatureScope() : computeResearch ? createComputeVariantScope() : createExtractionScope()
+  const scope = featureOrganization ? createFeatureScope() : computeResearch ? createComputeVariantScope() : createExtractionScope()
   const other = { id: 'other-agent', session: {} }
   const otherScope = createScope(ctx, other)
   other.ctx = otherScope.ctx
@@ -133,18 +121,6 @@ test('抽取Schema投影不改变原生注册、其他会话或解除后的管�
   assert.ok(registered.parameters.properties.action.enum.includes('compute-variants/create'))
   f.scope.release(f.agent)
   assert.deepEqual(await f.toolSchemas(f.agent), before)
-})
-
-test('算力、特性与构建作用域保留原平台参数，抽取投影不污染共享定义', async t => {
-  for (const options of [{ computeResearch: true }, { featureOrganization: true }, { taskBuilding: true }]) {
-    const f = fixture(t, { ...options, actualPlatformTools: true })
-    const before = (await f.toolSchemas(f.agent)).find(tool => tool.name === 'platform_agents')
-    projectDecisionExtractionTools([before])
-    f.scope.apply(f.agent)
-    const after = (await f.toolSchemas(f.agent)).find(tool => tool.name === 'platform_agents')
-    assert.deepEqual(after, before)
-    assert.ok(after.parameters.properties.action.enum.includes('compute-variants/create'))
-  }
 })
 
 test('真实 SDK 的 schema 与执行共同过滤，重复应用不叠加，其他 Session 不受影响', async t => {
@@ -237,13 +213,12 @@ test('算力研究真实原生作用域阻止 shell、读写及其他技能，�
   assert.equal(isComputeVariantResearch('/project', f.agent, { task_context: {} }), false)
   assert.equal(isComputeVariantResearch('/project', f.agent, state), true)
   f.scope.apply(f.agent)
-  assert.deepEqual(await f.schemas(f.agent), ['platform_agents', 'platform_task', 'skill'])
+  assert.deepEqual(await f.schemas(f.agent), ['platform_agents', 'skill'])
   for (const name of ['bash', 'read', 'write', 'spawn_agent']) assert.equal((await f.execute(name, { command: '此测试命令不得执行' })).isError, true)
   assert.equal((await f.execute('skill', { name: 'workspace-management' })).isError, true)
   assert.equal((await f.execute('skill', { name: 'compute-variant-research' })).isError, false)
   assert.equal((await f.execute('platform_agents', { action: 'compute-variants/preview' })).isError, false)
-  assert.equal((await f.execute('platform_task', { action: 'status' })).isError, false)
-  assert.deepEqual(f.calls.map(call => call.name), ['skill', 'platform_agents', 'platform_task'])
+  assert.deepEqual(f.calls.map(call => call.name), ['skill', 'platform_agents'])
   assert.ok((await f.schemas(f.other)).includes('bash'))
   assert.equal((await f.execute('bash', {}, f.other)).isError, false)
 })
@@ -262,18 +237,5 @@ test('特性整理工具范围精确绑定 workflow，普通维护会话保持�
   assert.equal((await f.execute('skill', { name: 'agent-maintenance' })).isError, false)
   assert.equal((await f.execute('platform_agents', { action: 'features/read-source' })).isError, false)
   assert.equal((await f.execute('skill', { name: 'compute-variant-research' })).isError, true)
-  assert.ok((await f.schemas(f.other)).includes('bash'))
-})
-
-test('构建任务使用真实工具作用域阻止shell或子智能体绕过限额，保留平台工具及受信任技能', async t => {
-  const f = fixture(t, { taskBuilding: true, parentPtc: true })
-  f.scope.apply(f.agent)
-  assert.deepEqual(await f.schemas(f.agent), ['platform_agents', 'platform_instances', 'platform_mcp', 'platform_task', 'skill'])
-  for (const name of ['task-builder', 'research-eval', 'harness-evolution', 'workspace-management', 'legacy-asset-intake']) assert.equal((await f.execute('skill', { name })).isError, false)
-  assert.equal((await f.execute('skill', { name: 'business-tool' })).isError, false)
-  assert.equal((await f.execute('skill', { name: 'undeclared-tool' })).isError, true)
-  assert.equal((await f.execute('skill', { name: 'untrusted-skill' })).isError, true)
-  assert.equal((await f.execute('platform_task', { action: 'status' })).isError, false)
-  for (const name of ['bash', 'spawn_agent', 'run_in_background', 'run_code']) assert.equal((await f.execute(name)).isError, true)
   assert.ok((await f.schemas(f.other)).includes('bash'))
 })

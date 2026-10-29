@@ -32,7 +32,7 @@ function page({ instances = [{ name: 'basic-instance', agent_id: 'basic-agent', 
       const result = await respond?.(endpoint, payload)
       if (result !== undefined) return result
       if (endpoint === 'instances/list') return { ok: true, value: { instances } }
-      if (endpoint === 'instances/sources') return { ok: true, value: { sources: [
+      if (endpoint === 'instances/sources') return { ok: true, value: { business_gateway_available: true, sources: [
         { source_id: 'experiment:EXP-basic-001', experiment_id: 'EXP-basic-001', agent_id: 'basic-agent', selectable: true, reason: '已登记' },
         { source_id: 'experiment:EXP-other-002', experiment_id: 'EXP-other-002', agent_id: 'other-agent', selectable: true, reason: '已登记' },
       ] } }
@@ -42,7 +42,7 @@ function page({ instances = [{ name: 'basic-instance', agent_id: 'basic-agent', 
       if (endpoint === 'instances/detail') return { ok: true, value: { instance: instances.find(item => item.name === payload.name), runs: [{ id: `run-${payload.name}`, path: `runs/run-${payload.name}` }], session_scope: { home_volume: `${payload.name}-home`, preserved: true, note: '会话保存在独立 HOME 中。' } } }
       if (endpoint === 'instances/logs') return { ok: true, value: { logs: `${payload.name}: runtime ready` } }
       if (endpoint === 'instances/url') return { ok: true, value: { url: `http://127.0.0.1:${instances.find(item => item.name === payload.name).port}/assistant/`, lan_access: false } }
-      if (endpoint === 'instances/preview') return { ok: true, value: { operation: payload.operation, name: payload.name, plan: { source_id: 'experiment:EXP-basic-001', port: payload.port ?? instances.find(item => item.name === payload.name)?.port ?? 3199 }, ...(['create', 'start', 'restart'].includes(payload.operation) ? { model_selection: payload.model_selection ?? instances.find(item => item.name === payload.name)?.model_policy?.default ?? defaultModel, model_policy_hash: previewHash } : {}), ...(payload.operation === 'stop' ? { observed_state: instances.find(item => item.name === payload.name)?.state ?? 'running', observed_at: '2026-10-21T01:00:00.000Z' } : {}) } }
+      if (endpoint === 'instances/preview') return { ok: true, value: { operation: payload.operation, name: payload.name, plan: { source_id: 'experiment:EXP-basic-001', port: payload.port ?? instances.find(item => item.name === payload.name)?.port ?? 3199, ...(payload.operation === 'create' ? { business_control: { source_digest: 'sha256:' + 'a'.repeat(64) } } : {}) }, ...(payload.operation === 'create' ? { access_mode: payload.access_mode, identity_mode: payload.identity_mode } : {}), ...(['create', 'start', 'restart'].includes(payload.operation) ? { model_selection: payload.model_selection ?? instances.find(item => item.name === payload.name)?.model_policy?.default ?? defaultModel, model_policy_hash: previewHash } : {}), ...(payload.operation === 'stop' ? { observed_state: instances.find(item => item.name === payload.name)?.state ?? 'running', observed_at: '2026-10-21T01:00:00.000Z' } : {}) } }
       if (endpoint === 'instances/run') return { ok: true, value: { ...payload, ok: true } }
       throw new Error('unexpected operation')
     } },
@@ -145,8 +145,8 @@ test('创建弹窗填写后只请求预览，返回修改与关闭均不创建�
   select('选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } }); await ui.settle()
   assert.match(ui.text(), /现有业务实例不会因创建操作而停止或切换版本/)
   await ui.button('查看创建预览').props.onClick(); await ui.settle()
-  assert.deepEqual(JSON.parse(JSON.stringify(ui.calls.find(call => call.endpoint === 'instances/preview').payload)), { operation: 'create', name: 'new-instance', source: 'experiment:EXP-basic-001', port: 3088, business_control: false, model_selection: defaultModel })
-  assert.match(ui.text(), /确认创建业务实例.*来源版本.*EXP-basic-001.*验证范围.*3 项已选用例.*最近 Run：最近评测未通过.*新增独立业务访问入口 127\.0\.0\.1:3088/)
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.calls.find(call => call.endpoint === 'instances/preview').payload)), { operation: 'create', name: 'new-instance', source: 'experiment:EXP-basic-001', port: 3088, business_control: true, access_mode: 'anonymous', identity_mode: 'development', model_selection: defaultModel })
+  assert.match(ui.text(), /确认创建业务实例.*来源版本.*EXP-basic-001.*验证范围.*3 项已选用例.*最近 Run：最近评测未通过.*内部 Runtime 端口.*127\.0\.0\.1:3088.*经统一网关路径/)
   assert.match(ui.text(), /现有 1 个运行中业务实例保持当前状态.*创建不代表业务验证通过/)
   assert.ok(ui.button('确认创建'))
   assert.equal(ui.calls.some(call => call.endpoint === 'instances/run'), false)
@@ -267,10 +267,10 @@ test('创建自动端口从预览冻结到执行请求，失效预览不能执�
   chooseAgent(ui, '基础助手 · basic-agent')
   select('选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } }); await ui.settle()
   await ui.button('查看创建预览').props.onClick(); await ui.settle()
-  assert.match(ui.text(), /访问端口.*3199/)
+  assert.match(ui.text(), /内部 Runtime 端口.*3199/)
   await ui.button('确认创建').props.onClick(); await ui.settle()
   assert.deepEqual(JSON.parse(JSON.stringify(ui.calls.find(call => call.endpoint === 'instances/run').payload)), {
-    operation: 'create', name: 'new-auto', source: 'experiment:EXP-basic-001', business_control: false, model_selection: defaultModel, expected_model_policy_hash: previewHash, expected_source_id: 'experiment:EXP-basic-001', port: 3199,
+    operation: 'create', name: 'new-auto', source: 'experiment:EXP-basic-001', business_control: true, access_mode: 'anonymous', identity_mode: 'development', model_selection: defaultModel, expected_model_policy_hash: previewHash, expected_source_id: 'experiment:EXP-basic-001', port: 3199, expected_source_digest: 'sha256:' + 'a'.repeat(64),
   })
 
   const invalid = page({ respond(endpoint, payload) {
@@ -740,4 +740,41 @@ test('日志失败保留详情概览，错误仅在运行日志中显示；未�
     assert.equal(ui.buttons('生成 iframe 代码')[0].props.disabled, true)
   }
   assert.equal(ui.calls.some(call => call.endpoint === 'instances/url'), false)
+})
+
+test('网关不可用时保留新建输入并禁止预览，刷新恢复后仍请求网关实例', async () => {
+  let available = false
+  const ui = page({ respond(endpoint) {
+    if (endpoint === 'instances/sources') return { ok: true, value: { business_gateway_available: available,
+      sources: [{ source_id: 'experiment:EXP-basic-001', experiment_id: 'EXP-basic-001', agent_id: 'basic-agent', selectable: true }] } }
+  } })
+  await ui.settle(); openCreate(ui); await ui.settle()
+  const input = () => ui.nodes().find(node => node.type === 'input' && node.props['aria-label'] === '实例名')
+  input().props.onChange({ target: { value: 'preserved-name' } }); ui.render()
+  chooseAgent(ui, '基础助手 · basic-agent')
+  ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } })
+  await ui.settle()
+  assert.match(ui.text(), /业务网关未启用或配置不完整/)
+  assert.equal(ui.buttons('查看创建预览')[0].props.disabled, true)
+  assert.equal(ui.calls.some(call => ['instances/preview', 'instances/run'].includes(call.endpoint)), false)
+  available = true
+  await ui.button('重新检查网关').props.onClick(); await ui.settle()
+  assert.equal(input().props.value, 'preserved-name')
+  await ui.button('查看创建预览').props.onClick(); await ui.settle()
+  assert.equal(ui.calls.find(call => call.endpoint === 'instances/preview').payload.business_control, true)
+})
+
+test('创建预览缺少网关来源摘要时不能确认执行', async () => {
+  const ui = page({ respond(endpoint, input) {
+    if (endpoint === 'instances/preview') return { ok: true, value: { name: input.name, operation: 'create',
+      plan: { source_id: input.source, port: 18500 }, model_selection: defaultModel, model_policy_hash: previewHash } }
+  } })
+  await ui.settle(); openCreate(ui); await ui.settle()
+  ui.nodes().find(node => node.type === 'input' && node.props['aria-label'] === '实例名').props.onChange({ target: { value: 'no-direct' } }); ui.render()
+  chooseAgent(ui, '基础助手 · basic-agent')
+  ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } })
+  await ui.settle(); await ui.button('查看创建预览').props.onClick(); await ui.settle()
+  assert.match(ui.text(), /预览缺少受控实例来源摘要/)
+  assert.equal(ui.button('确认创建'), undefined)
+  assert.equal(ui.calls.some(call => call.endpoint === 'instances/run'), false)
 })
