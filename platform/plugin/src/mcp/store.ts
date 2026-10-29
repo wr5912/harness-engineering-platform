@@ -10,6 +10,13 @@ type Secrets = { schemaVersion: 1; sharedToken: string; servers: Record<string, 
 export type McpConfiguration = { servers: any[]; groups: any[]; sharedToken: string }
 export type McpConfigurationView = { revision: string; value: McpConfiguration; publicUrl?: string }
 
+/** Runtime 只读取平台已有分组凭据，不把它投影进 Candidate。 */
+export function readMcpSharedToken(assetRoot: string): string {
+  const { value } = readJson(join(assetRoot, '.local', 'credentials', 'mcp-manager.json'))
+  if (typeof value?.sharedToken !== 'string' || !value.sharedToken) throw new Error('MCP 分组凭据不可用')
+  return value.sharedToken
+}
+
 function readJson(path: string): { raw: string; value: any } {
   let raw: string
   try { raw = readFileSync(path, 'utf8') }

@@ -383,6 +383,26 @@ test('运行权限 UI 区分原生定时任务、待验证闭环及真实应用�
   assert.equal(ui.intervals.size, 0)
 })
 
+test('混合实例 UI 仅统计发布许可，开发同步失联不显示为许可失败', async () => {
+  const status = uiStatus()
+  status.instances[0].identityMode = 'published'
+  status.instances[0].applied = true
+  status.instances.push({ ...binding, instanceId: 'dev-runtime', identityMode: 'development', applied: false,
+    synchronization: { lastAttemptAt: new Date().toISOString(), lastError: '控制记录同步失败，请稍后核对' } })
+  const ui = page({ statusHandler: () => ({ ok: true, value: status }) }); await ui.settle()
+  let rendered = ui.text(ui.render())
+  assert.match(rendered, /1\/1 个发布实例已确认应用/)
+  assert.match(rendered, /开发调试，无需许可租约/)
+  assert.match(rendered, /最近记录同步 尚无回执/)
+  assert.match(rendered, /控制记录同步失败，请稍后核对/)
+  assert.match(rendered, /同步失联不阻断交互/)
+  status.instances[1].synchronization = { lastSuccessAt: new Date().toISOString() }
+  ui.button('刷新状态').props.onClick(); await ui.settle()
+  rendered = ui.text(ui.render())
+  assert.match(rendered, /记录同步正常/)
+  assert.doesNotMatch(rendered, /控制记录同步失败/)
+})
+
 test('一级常驻页面从未激活进入时发起读取，慢响应不会被每秒轮询永远丢弃', async () => {
   const replies = []
   const ui = page({ active: false, statusHandler: () => new Promise(resolve => replies.push(resolve)) })

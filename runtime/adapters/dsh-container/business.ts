@@ -21,10 +21,11 @@ const containerSecret = '/opt/harness-business/shared-secret'
 const containerPatch = '/opt/harness-business/business.patch.yml'
 
 export interface BusinessLaunchConfig {
-  assetRoot: string; sharedSecretFile: string; coordinatorOrigin: string; pluginRoot?: string
+  assetRoot: string; sharedSecretFile?: string; coordinatorOrigin: string; pluginRoot?: string
 }
 export interface BusinessRenderInput {
   name: string; agentId: string; workspaceId: string; sourceDigest: string; runtimeGeneration?: string
+  identityMode?: 'development' | 'published'
   port: number; compose: string; profileManifest: string; basePath: string; presetId?: string; runtimeSettings?: string; managedPatch?: string
   sourcePaths?: { managed: string }
 }
@@ -69,7 +70,7 @@ export function businessSourceDigest(paths: Record<string, string>): string {
 }
 
 /** 启动配置只定位程序、事实源和受信通道，不复制授权规则或连接清单。 */
-export function readBusinessLaunchConfig(file: string): BusinessLaunchConfig {
+export function readBusinessLaunchConfig(file: string, target?: { agentId: string; name: string; identityMode?: 'development' | 'published' }): BusinessLaunchConfig {
   const saved = JSON.parse(readFileSync(file, 'utf8')) as BusinessLaunchConfig & { gateway?: { publicOrigin?: string; sharedSecretFile?: string } }
   // 平台以业务访问配置作为唯一可编辑来源；历史独立 launch 文件仍可用于既有实例。
   const assetRoot = dirname(dirname(file)), secretFile = saved.gateway?.sharedSecretFile
@@ -78,14 +79,14 @@ export function readBusinessLaunchConfig(file: string): BusinessLaunchConfig {
     sharedSecretFile: typeof secretFile === 'string' && !isAbsolute(secretFile) ? resolve(assetRoot, secretFile) : secretFile!,
     coordinatorOrigin: saved.gateway.publicOrigin!, pluginRoot: join(programRoot, 'platform/plugin'),
   } : saved
-  for (const key of ['assetRoot', 'sharedSecretFile'] as const) {
+  for (const key of ['assetRoot'] as const) {
     const path = config[key]
     if (typeof path !== 'string' || !isAbsolute(path) || !existsSync(path) || realpathSync(path) !== path) throw new Error(`业务启动配置的 ${key} 必须是已存在的规范化绝对路径`)
   }
-  if (!statSync(config.assetRoot).isDirectory() || !statSync(config.sharedSecretFile).isFile()
-    || statSync(config.sharedSecretFile).size < 32) throw new Error('业务数据根或共享密钥文件无效')
+  if (!statSync(config.assetRoot).isDirectory()) throw new Error('业务数据根或共享密钥文件无效')
   const access = JSON.parse(readFileSync(join(config.assetRoot, 'config/business-access.json'), 'utf8'))
   if (access.schemaVersion !== 1 || access.enabled !== true) throw new Error('业务访问配置尚未启用')
+  if (!isDevelopmentLaunch(access, target)) validateSigningKey(config)
   const origin = new URL(config.coordinatorOrigin)
   if (!['http:', 'https:'].includes(origin.protocol) || origin.username || origin.password || origin.pathname !== '/' || origin.search || origin.hash) throw new Error('协调器必须使用不含路径和凭据的 HTTP 来源地址')
   if (['127.0.0.1', 'localhost', '[::1]'].includes(origin.hostname)) throw new Error('bridge 容器不能使用宿主回环地址访问协调器；请配置可达宿主地址')
@@ -97,11 +98,28 @@ export function readBusinessLaunchConfig(file: string): BusinessLaunchConfig {
   return { ...config, pluginRoot }
 }
 
+function isDevelopmentLaunch(access: any, target?: { agentId: string; name: string; identityMode?: string }): boolean {
+  const selected = access.gateway?.instances?.find((item: any) => item.agentId === target?.agentId && item.instanceId === target?.name)
+  if ([selected?.identityMode, target?.identityMode].some(mode => mode !== undefined && !['development', 'published'].includes(mode))
+    || selected && target?.identityMode && (selected.identityMode ?? 'published') !== target.identityMode) throw new Error('业务实例身份模式无效')
+  // 新建实例在启动成功后登记；已有登记始终优先，不能用启动参数切换阶段。
+  return (selected ? selected.identityMode : target?.identityMode) === 'development'
+}
+
+function validateSigningKey(config: BusinessLaunchConfig): void {
+  const path = config.sharedSecretFile
+  if (typeof path !== 'string' || !isAbsolute(path) || !existsSync(path) || realpathSync(path) !== path) throw new Error('业务启动配置的 sharedSecretFile 必须是已存在的规范化绝对路径')
+  if (!statSync(path).isFile() || statSync(path).size < 32) throw new Error('业务数据根或共享密钥文件无效')
+}
+
 /** 只返回生成内容；实例目录由原启动器在 preflight 成功后写入。 */
 export function renderBusinessInstance(config: BusinessLaunchConfig, input: BusinessRenderInput) {
   if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(input.name) || !/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(input.agentId)
     || !input.sourceDigest || !input.workspaceId
     || !Number.isInteger(input.port) || input.port < 1 || input.port > 65535) throw new Error('业务实例登记参数无效')
+  const access = JSON.parse(readFileSync(join(config.assetRoot, 'config/business-access.json'), 'utf8'))
+  const development = isDevelopmentLaunch(access, input)
+  if (!development) validateSigningKey(config)
   const compose = yaml.load(input.compose)
   const service = compose?.services?.dsh
   if (!service || service.network_mode !== 'host') throw new Error('业务 Compose 缺少受控 dsh 网络入口')
@@ -125,7 +143,7 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
   const runtimeGeneration = input.runtimeGeneration ?? randomUUID()
   const businessBasePath = `/agents/${input.agentId}/instances/${input.name}/`
   const runtimeConfig = {
-    assetRoot: containerAssets, stateRoot: '/var/lib/dsh/business-control-state', sharedSecretFile: containerSecret,
+    assetRoot: containerAssets, stateRoot: '/var/lib/dsh/business-control-state', ...(!development ? { sharedSecretFile: containerSecret } : {}),
     coordinatorOrigin: config.coordinatorOrigin, basePath: businessBasePath,
     workspacePath: '/work/harness/workspace', presetId: input.presetId ?? input.agentId,
     localTools: capabilities.localTools,
@@ -175,7 +193,7 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
   service.volumes.push(
     { type: 'bind', source: pluginRoot, target: containerPlugin, read_only: true },
     { type: 'bind', source: config.assetRoot, target: containerAssets, read_only: true },
-    { type: 'bind', source: config.sharedSecretFile, target: containerSecret, read_only: true },
+    ...(!development ? [{ type: 'bind', source: config.sharedSecretFile!, target: containerSecret, read_only: true }] : []),
     { type: 'bind', source: '${DSH_BUSINESS_PATCH_HOST:?业务控制 Patch 由启动器注入}', target: containerPatch, read_only: true },
   )
   return { compose: yaml.dump(compose, { lineWidth: -1, noRefs: true }), patch: yaml.dump(patch, { lineWidth: -1, noRefs: true, schema: patchSchema }),
@@ -198,11 +216,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       console.log(JSON.stringify({ url, accessMode: selected?.accessMode === 'anonymous' ? 'anonymous' : 'authenticated' }))
       process.exit(0)
     }
-    const config = readBusinessLaunchConfig(resolve(process.argv[2]!))
     const text = readFileSync(0, 'utf8').trim(), input = text ? JSON.parse(text) : undefined
+    const config = readBusinessLaunchConfig(resolve(process.argv[2]!), input)
     const access = JSON.parse(readFileSync(join(config.assetRoot, 'config/business-access.json'), 'utf8'))
     const selected = access.gateway?.instances?.find((row: any) => row.agentId === input?.agentId && row.instanceId === input?.name)
-    const development = selected?.identityMode === 'development'
+    const development = isDevelopmentLaunch(access, input)
     if (input?.compose && input?.sourcePaths && businessSourceDigest(input.sourcePaths) !== input.sourceDigest) throw new Error('业务资产在计划后已改变')
     console.log(JSON.stringify(input?.compose ? renderBusinessInstance(config, input) : {
       valid: true, assetRoot: config.assetRoot, pluginRoot: config.pluginRoot, development, accessMode: selected?.accessMode === 'anonymous' ? 'anonymous' : 'authenticated',
@@ -211,6 +229,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   } catch (error) {
     const known = new Set([
       '业务数据根或共享密钥文件无效', '业务访问配置尚未启用', '协调器必须使用不含路径和凭据的 HTTP 来源地址',
+      '业务实例身份模式无效',
       'bridge 容器不能使用宿主回环地址访问协调器；请配置可达宿主地址', '业务插件根路径无效',
       '业务 Runtime 插件尚未构建', '业务 MCP manager 插件尚未构建', '业务来源 MCP 配置种子无效',
       '业务来源 MCP manager 声明冲突或配置无效', '业务来源配置 Patch 无效', '业务本地能力声明必须是受控普通文件',

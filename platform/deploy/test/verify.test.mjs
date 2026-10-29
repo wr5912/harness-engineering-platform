@@ -37,5 +37,9 @@ test('离线核验检查网关配置与本地密钥，关闭或配置不全不�
   assert.match((await check()).detail, /配置不完整/)
   writeFileSync(file, JSON.stringify(access))
   writeFileSync(join(root, access.gateway.sharedSecretFile), 'short')
+  assert.equal((await check()).status, 'ok', '没有发布实例时核验不依赖签名密钥')
+  access.gateway.instances = [{ agentId: 'soc', instanceId: 'dev', identityMode: 'development' },
+    { agentId: 'soc', instanceId: 'published', identityMode: 'published' }]
+  writeFileSync(file, JSON.stringify(access))
   assert.match((await check()).detail, /密钥无效/)
 })

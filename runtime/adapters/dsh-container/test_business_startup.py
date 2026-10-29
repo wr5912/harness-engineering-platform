@@ -145,6 +145,15 @@ class BusinessStartupTest(unittest.TestCase):
                     with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                         dev.prepare_up(args)
 
+    def test_creation_identity_reaches_preflight_and_renderer_before_registration(self):
+        with self.helper() as helper, mock.patch.object(dev, "read_model_policy", return_value={"source": "platform", "default": None}):
+            contract, _ = dev.prepare_up(self.args(business_access_mode="anonymous", business_identity_mode="development"))
+            self.assertEqual(helper.call_args.args[1]["identityMode"], "development")
+            contract["patch"] = "/opt/dsh-managed/managed.patch.yml"
+            with mock.patch.object(dev, "workspace_id", return_value="workspace-fixture"):
+                dev.render_business_instance(contract, "business-test", 53191, "compose-fixture")
+            self.assertEqual(helper.call_args.args[1]["identityMode"], "development")
+
     def test_business_environment_uses_instance_patch_in_current_and_historical_operations(self):
         contract = {**self.contract, "patch": "managed.patch.yml", "evaluation_patch": "evaluation.patch.yml", "business_control": {"source_digest": "fixed"}}
         current = dev.compose_env(contract, "verification", 53191, "business-test")

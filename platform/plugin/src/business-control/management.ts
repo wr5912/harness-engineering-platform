@@ -129,7 +129,7 @@ export interface BusinessControlManagementStatus {
   enabled: boolean; restrictionVersion: number; restrictions: Restriction[]; riskFacts: RiskFact[]
   events: ReturnType<ReturnType<typeof getBusinessControl>['status']>['events']
   instances: Array<{ workspaceId: string; agentId: string; instanceId: string; runtimeGeneration: string; sourceDigest: string
-    pinnedSourceDigest?: string; identityMode: 'development' | 'published'; applied: boolean; acknowledgement?: { restrictionVersion: number; leaseId: string; at: string } }>
+    pinnedSourceDigest?: string; identityMode: 'development' | 'published'; synchronization?: { lastSuccessAt?: string; lastAttemptAt: string; lastError?: string }; applied: boolean; acknowledgement?: { restrictionVersion: number; leaseId: string; at: string } }>
   revision: string; configuration: BusinessControlConfiguration
   sessionTrustFacts: SessionTrustFact[]
   agentStatuses: ReturnType<ReturnType<typeof getBusinessControl>['agentStatuses']>

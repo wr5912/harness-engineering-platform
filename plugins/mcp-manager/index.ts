@@ -780,13 +780,16 @@ export function apply(ctx: any, config: any): void {
     const route = /^\/mcp\/groups\/([A-Za-z0-9_-]{1,32})(?:\/(v2))?$/.exec(new URL(req.url, 'http://localhost').pathname)
     if (!route) return send(res, 404, { error: 'group endpoint not found' })
     const id = route[1], version: GroupVersion = route[2] === 'v2' ? 2 : 1
-    const signed = version === 2 && (req.headers['x-harness-business-context'] !== undefined
+    const business = version === 2 && (req.headers['x-harness-business-context'] !== undefined
       || req.headers['x-harness-business-signature'] !== undefined)
-    if (signed) {
-      // 签名存在时必须验证；无效签名不能降级为 Bearer 身份。
+    if (business) {
+      // 业务上下文存在时必须核验业务接入，不能降级成管理身份。
       try {
-        if (!config.acceptGroupTransport || !await config.acceptGroupTransport(req)) return send(res, 401, { error: 'invalid business assertion' })
-      } catch { return send(res, 401, { error: 'invalid business assertion' }) }
+        if (!config.acceptGroupTransport || !await config.acceptGroupTransport(req)) return send(res, 401, { error: 'business_registration_invalid', stage: 'registration' })
+      } catch (error) {
+        const stage = ['token', 'registration', 'binding', 'signature', 'context'].includes((error as any)?.stage) ? (error as any).stage : 'registration'
+        return send(res, 401, { error: `business_${stage}_invalid`, stage })
+      }
     } else if (!bearerAccepted(req, config.sharedToken.get())) return send(res, 401, { error: 'Bearer token required' })
     try {
       const current = snapshot(config)

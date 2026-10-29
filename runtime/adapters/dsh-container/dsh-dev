@@ -1387,7 +1387,7 @@ def prepare_up(args: argparse.Namespace) -> tuple[dict, tuple[Path, dict] | None
     if business_file and (args.analysis_workspace or getattr(args, "migrate_home", False)
                           or getattr(args, "lan_access", False) or getattr(args, "unsafe_no_auth", False)):
         fail("业务控制模式不能与归因、HOME 迁移、LAN 直连或免认证开关并用")
-    # 受管业务单独使用 bridge 与签名上下文；既有研究实例保留原访问方式。
+    # 受管业务单独使用 bridge 与实例上下文；既有研究实例保留原访问方式。
     args.lan_access = args.unsafe_no_auth = not args.analysis_workspace and not business_file
     # 业务实例同样跳过 Web 预览版说明；网关默认放行后该弹窗会直接可见。
     args.skip_testing_notice = not args.analysis_workspace
@@ -1424,6 +1424,7 @@ def prepare_up(args: argparse.Namespace) -> tuple[dict, tuple[Path, dict] | None
     if business_file:
         home = instance_dir(args.name) / "dsh-home"
         launch = business_helper(business_file, {"name": args.name, "agentId": contract["agent_id"],
+                                               **({"identityMode": identity_mode} if identity_mode else {}),
                                                "sourcePaths": {key: contract[key] for key in ("workspace", "presets", "managed")}})
         if launch["assetRoot"] != str(REPO):
             fail("业务启动配置的数据根必须与当前 --repo 一致")
@@ -1435,6 +1436,7 @@ def prepare_up(args: argparse.Namespace) -> tuple[dict, tuple[Path, dict] | None
         contract["business_control"] = {
             "config_file": str(Path(business_file).resolve()), "source_digest": launch["sourceDigest"],
             "runtime_generation": (current[1]["business_control"]["runtime_generation"] if current else secrets.token_hex(16)),
+            **({"identity_mode": identity_mode} if identity_mode else {}),
         }
         if current is not None and current[1]["business_control"].get("source_digest") != launch["sourceDigest"] and not launch.get("development"):
             fail("业务来源资产与实例固定摘要不一致；保留旧实例及 Session，请以新实例名创建新版本")
@@ -1526,7 +1528,7 @@ def build_plan(args: argparse.Namespace, contract: dict) -> dict:
                                          "source_digest": contract["business_control"]["source_digest"],
                                          "scheduling_supported": True},
                      "network": "private bridge (host port 127.0.0.1 only)",
-                     "risk": "即时任务与原生 Schedule 经签名业务通道执行；尚未验证定时检测、防护闭环。当前能力边界见 docs/platform-design/05_实施路线与迭代计划.md。"})
+                     "risk": "即时任务与原生 Schedule 经实例业务通道执行；尚未验证定时检测、防护闭环。当前能力边界见 docs/platform-design/05_实施路线与迭代计划.md。"})
     return plan
 
 
@@ -1550,6 +1552,7 @@ def render_business_instance(contract: dict, name: str, port: int, compose: str)
     config = contract["business_control"]
     return business_helper(config["config_file"], {
         "name": name, "agentId": contract["agent_id"], "workspaceId": workspace_id(REPO),
+        **({"identityMode": config["identity_mode"]} if config.get("identity_mode") else {}),
         "sourceDigest": config["source_digest"], "runtimeGeneration": config["runtime_generation"],
         "managedPatch": str(Path(contract["managed"]) / Path(contract["patch"]).relative_to("/opt/dsh-managed")),
         "port": port, "compose": compose, "profileManifest": contract.get("profile_manifest", str(ADAPTER / "verification-home-controls/web-profile.package.json")),

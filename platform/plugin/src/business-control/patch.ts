@@ -1,6 +1,6 @@
 import type { InstanceBinding } from './contracts.ts'
 export interface BusinessRuntimeConfig {
-  assetRoot: string; stateRoot: string; sharedSecretFile: string; coordinatorOrigin: string
+  assetRoot: string; stateRoot: string; sharedSecretFile?: string; coordinatorOrigin: string
   basePath?: string; workspacePath?: string; presetId?: string; localTools?: string[]; binding: InstanceBinding
 }
 /** 独立业务 Profile 保留 HOME；原生工具启停由业务来源决定。 */

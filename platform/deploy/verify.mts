@@ -39,8 +39,9 @@ export async function verifyDeployment(options: VerifyOptions): Promise<{ checks
     const access = JSON.parse(readFileSync(join(dataRoot, 'config/business-access.json'), 'utf8'))
     if (access.schemaVersion !== 1 || access.enabled !== true) throw new Error('业务网关未启用；业务实例不能创建为直连实例')
     validateBusinessGateway(access.gateway)
-    if (readFileSync(resolveBusinessSecretFile(dataRoot, access.gateway.sharedSecretFile)).length < 32) throw new Error('业务网关本地共享密钥无效')
-    checks.push({ id: 'business-gateway', status: 'ok', detail: `网关配置和本地共享密钥完整，入口 ${access.gateway.publicOrigin}；监听状态需启动后核对` })
+    const published = access.gateway.instances.some((item: { identityMode?: string }) => item.identityMode !== 'development')
+    if (published && (!access.gateway.sharedSecretFile || readFileSync(resolveBusinessSecretFile(dataRoot, access.gateway.sharedSecretFile)).length < 32)) throw new Error('已发布实例的业务网关本地共享密钥无效')
+    checks.push({ id: 'business-gateway', status: 'ok', detail: `网关配置完整${published ? '，已核对发布签名密钥' : '，开发模式无需签名密钥'}，入口 ${access.gateway.publicOrigin}；监听状态需启动后核对` })
   } catch (error) {
     checks.push({ id: 'business-gateway', status: 'mismatch', detail: error instanceof Error ? error.message : '业务网关配置无效' })
   }

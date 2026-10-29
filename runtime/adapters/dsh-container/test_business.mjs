@@ -54,6 +54,46 @@ test('开发模式从数据根登记读取，不依赖启动配置副本', t => 
   }
 })
 
+test('开发实例两种访问方式均无需签名文件和挂载，混合登记仍只核对当前实例', t => {
+  const f = fixture(t), file = join(f.config.assetRoot, 'config/business-access.json')
+  rmSync(f.config.sharedSecretFile)
+  delete f.config.sharedSecretFile
+  writeFileSync(f.file, JSON.stringify(f.config))
+  for (const accessMode of ['anonymous', 'authenticated']) {
+    const instances = [{ agentId: f.input.agentId, instanceId: f.input.name, identityMode: 'development', accessMode },
+      { agentId: 'soc', instanceId: 'published', identityMode: 'published' }]
+    writeFileSync(file, JSON.stringify({ schemaVersion: 1, enabled: true, gateway: { instances } }))
+    const config = readBusinessLaunchConfig(f.file, f.input)
+    const rendered = renderBusinessInstance(config, f.input), compose = yaml.load(rendered.compose), patch = yaml.load(rendered.patch)
+    assert.ok(!compose.services.dsh.volumes.some(item => item.target === '/opt/harness-business/shared-secret'))
+    const runtime = patch.flatMap(item => item.insert ?? []).find(item => item.id === 'business-runtime')
+    assert.equal(runtime.config.sharedSecretFile, undefined)
+    assert.throws(() => readBusinessLaunchConfig(f.file, { agentId: 'soc', name: 'published' }), /sharedSecretFile/)
+    instances[0].identityMode = 'unexpected'
+    writeFileSync(file, JSON.stringify({ schemaVersion: 1, enabled: true, gateway: { instances } }))
+    assert.throws(() => readBusinessLaunchConfig(f.file, f.input), /身份模式无效/)
+  }
+})
+
+test('尚未登记的新开发实例在预检和渲染时无需密钥，启动参数不能覆盖已有发布登记', t => {
+  const f = fixture(t), access = join(f.config.assetRoot, 'config/business-access.json')
+  rmSync(f.config.sharedSecretFile)
+  const input = { ...f.input, identityMode: 'development' }
+  const config = readBusinessLaunchConfig(f.file, input)
+  const result = JSON.parse(execFileSync(process.execPath, [new URL('./business.ts', import.meta.url).pathname, f.file],
+    { input: JSON.stringify({ agentId: input.agentId, name: input.name, identityMode: input.identityMode }), encoding: 'utf8' }))
+  assert.equal(result.development, true)
+  const rendered = renderBusinessInstance(config, input)
+  assert.equal(rendered.runtimeConfig.sharedSecretFile, undefined)
+  assert.ok(!yaml.load(rendered.compose).services.dsh.volumes.some(item => item.target === '/opt/harness-business/shared-secret'))
+  assert.throws(() => readBusinessLaunchConfig(f.file, { ...input, identityMode: 'published' }), /sharedSecretFile/)
+  writeFileSync(access, JSON.stringify({ schemaVersion: 1, enabled: true, gateway: { instances: [
+    { agentId: input.agentId, instanceId: input.name, identityMode: 'published' },
+  ] } }))
+  assert.throws(() => readBusinessLaunchConfig(f.file, input), /身份模式无效/)
+  assert.throws(() => renderBusinessInstance(config, input), /身份模式无效/)
+})
+
 test('业务访问配置中的相对密钥路径按当前数据根解析并用于容器挂载', t => {
   const f = fixture(t)
   const file = join(f.config.assetRoot, 'config/business-access.json')

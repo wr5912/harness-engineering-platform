@@ -44,7 +44,7 @@ const shared = globals[symbol] ??= { contexts: new AsyncLocalStorage<BusinessCon
 shared.signedRuntimeSessions ??= new AsyncLocalStorage<boolean>()
 export function currentBusinessContext(): BusinessContext | undefined { return shared.contexts.getStore() }
 export function withBusinessContext<T>(context: BusinessContext, fn: () => T): T { return shared.contexts.run(context, fn) }
-/** 仅在平台核验 Runtime 的逐请求签名后使用；Session 事实仍由业务 Runtime 持有。 */
+/** 仅在平台核验 Runtime 的接入凭据与绑定后使用；Session 事实仍由业务 Runtime 持有。 */
 export function withSignedRuntimeSession<T>(fn: () => T): T { return shared.signedRuntimeSessions.run(true, fn) }
 export function getBusinessControl(assetRoot: string, stateRoot?: string): BusinessControl {
   const root = resolve(assetRoot), selectedStateRoot = stateRoot ?? shared.stateRoots.get(root)
@@ -124,6 +124,7 @@ export class BusinessControl {
   private requiredSnapshots = new Set<string>()
   private issued = new Map<string, ControlSnapshot>()
   private acknowledgements = new Map<string, { restrictionVersion: number; leaseId: string; at: string }>()
+  private synchronizations = new Map<string, { lastSuccessAt?: string; lastAttemptAt: string; lastError?: string }>()
   private active = new Map<string, { context: BusinessContext; operation: BusinessOperation; controller: AbortController }>()
   private confirmations = new Map<string, Confirmation>()
   private agentAuthentications = new Map<string, { evidence: AgentAuthenticationEvidence; receivedAt: number }>()
@@ -342,6 +343,7 @@ export class BusinessControl {
     }
     this.state.instances[binding.instanceId] = { ...binding }
     this.agentAuthentications.delete(binding.instanceId); this.acknowledgements.delete(binding.instanceId)
+    this.synchronizations.delete(binding.instanceId)
     this.persist()
   }
   registeredInstance(instanceId: string): InstanceBinding | undefined {
@@ -366,7 +368,12 @@ export class BusinessControl {
     return registered?.accessMode === 'anonymous'
   }
   isDevelopmentContext(context: BusinessContext): boolean {
-    return gatewayRegistration(this.config(), context.scope.agentId, context.scope.instanceId)?.identityMode === 'development'
+    return this.isDevelopmentInstance(context.scope)
+  }
+  isDevelopmentInstance(binding: { agentId?: string; instanceId?: string }): boolean {
+    const registered = gatewayRegistration(this.config(), binding.agentId, binding.instanceId)
+    if (registered?.identityMode !== undefined && !['development', 'published'].includes(registered.identityMode)) return error('identity_mode_invalid')
+    return registered?.identityMode === 'development'
   }
   acceptContext(context: BusinessContext): BusinessContext {
     if (!context?.subject?.id || !context.scope || !context.requestId || !context.sourceDigest) return error('context_invalid')
@@ -721,7 +728,12 @@ export class BusinessControl {
       throw cause
     } finally { this.active.delete(id) }
   }
+  // 同时标记 Runtime 副本职责；开发模式保留会话单写入方，但不检查租约。
   requireSnapshot(instanceId: string): void { this.requiredSnapshots.add(instanceId) }
+  recordSynchronization(binding: InstanceBinding, lastError?: string): void {
+    const previous = this.synchronizations.get(binding.instanceId)
+    this.synchronizations.set(binding.instanceId, { lastSuccessAt: lastError ? previous?.lastSuccessAt : iso(), lastAttemptAt: iso(), ...(lastError ? { lastError } : {}) })
+  }
   issueSnapshot(instanceId: string): ControlSnapshot {
     const binding = this.state.instances[instanceId]
     if (!binding) return error('instance_unregistered')
@@ -769,11 +781,11 @@ export class BusinessControl {
     this.config()
     this.state.restrictionVersion++; this.persist(); this.cancelRestricted()
   }
-  status(): { enabled: boolean; restrictionVersion: number; instances: Array<InstanceBinding & { applied: boolean; acknowledgement?: { restrictionVersion: number; leaseId: string; at: string } }>; restrictions: Restriction[]; riskFacts: RiskFact[]; events: ControlEvent[] } {
+  status(): { enabled: boolean; restrictionVersion: number; instances: Array<InstanceBinding & { synchronization?: { lastSuccessAt?: string; lastAttemptAt: string; lastError?: string }; applied: boolean; acknowledgement?: { restrictionVersion: number; leaseId: string; at: string } }>; restrictions: Restriction[]; riskFacts: RiskFact[]; events: ControlEvent[] } {
     return { enabled: this.enabled(), restrictionVersion: this.state.restrictionVersion,
       instances: Object.values(this.state.instances).map(value => {
         const ack = this.acknowledgements.get(value.instanceId)
-        return { ...value, acknowledgement: ack, applied: !!ack && ack.restrictionVersion === this.state.restrictionVersion && Date.now() - Date.parse(ack.at) < 2000 }
+        return { ...value, synchronization: this.synchronizations.get(value.instanceId), acknowledgement: ack, applied: !!ack && ack.restrictionVersion === this.state.restrictionVersion && Date.now() - Date.parse(ack.at) < 2000 }
       }), restrictions: structuredClone(Object.values(this.state.restrictions)),
       riskFacts: structuredClone(this.effectiveRiskFacts()), events: structuredClone(this.state.events) }
   }

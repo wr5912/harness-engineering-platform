@@ -212,9 +212,9 @@ API 通道退出码 `0` 表示锁定 Case 均得到 `passed`；`1` 表示运行�
 
 #### 受管即时业务模式
 
-`dsh-dev up` 显式增加 `--business-control <启动配置的绝对路径>`，并选择固定来源、新实例名和独立 HOME。启动配置包含 `assetRoot`、`sharedSecretFile`、`coordinatorOrigin`，可选 `pluginRoot`；它只引用实际数据根、专用签名密钥文件、容器可达的协调器来源和已构建插件，不复制访问策略或 MCP 配置。`coordinatorOrigin` 不能使用宿主回环地址。启动前先构建 `platform/plugin`，由管理平台装载统一网关；业务访问规则及 Agent 的可信来源摘要唯一维护在数据根 `config/business-access.json`，合同见[业务访问规范](../../../docs/platform-design/20_业务访问与运行控制插件开发规范.md)。
+`dsh-dev up` 显式增加 `--business-control <启动配置的绝对路径>`，并选择固定来源、新实例名和独立 HOME。启动配置包含 `assetRoot`、`coordinatorOrigin`，可选 `pluginRoot`；发布模式还要求 `sharedSecretFile`，开发模式不校验或挂载签名密钥；它只引用实际数据根、专用签名密钥文件、容器可达的协调器来源和已构建插件，不复制访问策略或 MCP 配置。`coordinatorOrigin` 不能使用宿主回环地址。启动前先构建 `platform/plugin`，由管理平台装载统一网关；业务访问规则及 Agent 的可信来源摘要唯一维护在数据根 `config/business-access.json`，合同见[业务访问规范](../../../docs/platform-design/20_业务访问与运行控制插件开发规范.md)。
 
-这一模式复用标准 Runtime 镜像，将业务插件和资产只读装载到新实例，使用独立 bridge 网络；宿主映射端口只监听 `127.0.0.1`，原生 HTTP/WS 接入还需网关签名。`dsh-dev url` 返回统一网关的 `/agents/<agent-id>/` 地址；用户登录、智能体 HMAC 认证、来源信任和访问策略分别核验。普通同 HOME 重启保留持久实例代次和会话归属，重新建立签名握手；删除登记后同名新建不能继承旧认证证据。
+这一模式复用标准 Runtime 镜像，将业务插件和资产只读装载到新实例，使用独立 bridge 网络；宿主映射端口只监听 `127.0.0.1`，原生 HTTP/WS 接入核对网关实例上下文，发布模式另须签名。`dsh-dev url` 返回统一网关的 `/agents/<agent-id>/` 地址；用户登录、智能体 HMAC 认证、来源信任和访问策略分别核验。普通同 HOME 重启保留持久实例代次和会话归属，发布模式重新建立签名握手；删除登记后同名新建不能继承旧认证证据。
 
 不能同时使用 `--migrate-home`、归因模式、`--lan-access` 或 `--unsafe-no-auth`，也不能把既有研究实例原地切换为业务控制模式。原生定时服务、工具与页面已开放，当前检测、防护闭环仍只覆盖即时任务；到期消息与业务执行须分别核对回执。定时任务的当前边界见[实施路线](../../../docs/platform-design/05_实施路线与迭代计划.md#首期定时任务边界与影响)。
 

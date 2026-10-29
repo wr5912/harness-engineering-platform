@@ -7,9 +7,10 @@ export function validateBusinessGateway(value: unknown): asserts value is Busine
   const gateway = value as BusinessGatewayConfig | undefined
   if (!gateway || typeof gateway !== 'object' || Array.isArray(gateway) || typeof gateway.host !== 'string' || !gateway.host || !Number.isSafeInteger(gateway.port)
     || gateway.port < 1 || gateway.port > 65535 || typeof gateway.publicOrigin !== 'string'
-    || typeof gateway.sharedSecretFile !== 'string' || !gateway.sharedSecretFile || !Array.isArray(gateway.instances)) {
+    || gateway.sharedSecretFile !== undefined && (typeof gateway.sharedSecretFile !== 'string' || !gateway.sharedSecretFile) || !Array.isArray(gateway.instances)) {
     throw new Error('业务网关配置不完整，请核对 config/business-access.json 后重新启动平台')
   }
+  if (gateway.instances.some(item => item.identityMode !== undefined && !['development', 'published'].includes(item.identityMode))) throw new Error('业务实例身份模式无效')
   const origin = new URL(gateway.publicOrigin)
   if (!['http:', 'https:'].includes(origin.protocol) || origin.username || origin.password || origin.href !== `${origin.origin}/`) {
     throw new Error('业务网关 publicOrigin 必须是无路径和凭据的 HTTP(S) 地址')
@@ -35,7 +36,10 @@ export function initializeBusinessGateway(assetRoot: string, managementUrl: stri
   gateway.instances ??= []
   gateway.managementUrl = managementUrl
   validateBusinessGateway(gateway)
-  if (access.enabled === true) ensureBusinessSecret(assetRoot, gateway.sharedSecretFile)
+  if (access.enabled === true) {
+    try { ensureBusinessSecret(assetRoot, gateway.sharedSecretFile) }
+    catch { /* 预备发布密钥失败只影响发布接入，不能阻塞开发实例和平台启动。 */ }
+  }
   const saved = `${JSON.stringify(access, null, 2)}\n`
   if (saved === before) {
     prepareBusinessRuntimeFile(path)

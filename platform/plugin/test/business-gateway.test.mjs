@@ -19,7 +19,7 @@ import { bindTypertRemote, Remote } from '@deepseek-ai/dsh-typert-protocol'
 import { createRequire } from 'node:module'
 import * as Runtime from '../lib/business-runtime.js'
 import { getBusinessControl, withBusinessContext, configureBusinessControlStateRoot, sharedInstanceIdentity } from '../lib/business-control.js'
-import { signBusinessAssertion, verifyBusinessAssertion, registerBusinessReport, setBusinessReportHeaderResolver, allowedBusinessPath, startBusinessGateway } from '../lib/business-gateway.js'
+import { businessAssertionHeaders, readBusinessAssertion, signBusinessAssertion, verifyBusinessAssertion, registerBusinessReport, setBusinessReportHeaderResolver, allowedBusinessPath, startBusinessGateway } from '../lib/business-gateway.js'
 const wsRequire = createRequire(createRequire(import.meta.url).resolve('@deepseek-ai/dsh-api-gateway/package.json'))
 const WebSocket = wsRequire('ws')
 const NativeRemotes = await import(wsRequire.resolve('@deepseek-ai/dsh-api-remotes'))
@@ -38,7 +38,7 @@ class Fixture extends Service {
   async *follow(request, signal) { yield { sessionId: request.address?.sessionId ?? request.sessionId, kind: this.ctx.invocation.peer.principal.kind }; await new Promise(resolve => signal.addEventListener('abort', resolve, { once: true })) }
 }
 mark('create'); mark('list'); mark('updateQueue'); mark('page', { resources: { session: request => request.address?.sessionId ?? request.address?.childSessionId ?? request.sessionId } }); mark('follow', { mode: 'stream', resources: { session: request => request.address?.sessionId ?? request.address?.childSessionId ?? request.sessionId } })
-async function setup(t, { localTools = [], emptyWorkspace = false, registrationFailure = false, sharedDevelopment = false, proxyOrigin } = {}) {
+async function setup(t, { localTools = [], emptyWorkspace = false, registrationFailure = false, sharedDevelopment = false, development = sharedDevelopment, noSecret = false, proxyOrigin } = {}) {
   const assetRoot = mkdtempSync(join(tmpdir(), 'business-native-')); mkdirSync(join(assetRoot, 'config'))
   const revokedSubjects = new Set(), trustDelays = new Map(), trustCalls = new Map()
   const provider = createServer(async (req, res) => {
@@ -50,10 +50,14 @@ async function setup(t, { localTools = [], emptyWorkspace = false, registrationF
   }); provider.listen(0, '127.0.0.1'); await once(provider, 'listening'); t.after(() => new Promise(resolve => provider.close(resolve)))
   writeFileSync(join(assetRoot, 'config/business-access.json'), JSON.stringify({ schemaVersion: 1, enabled: true, authentication: { endpoint: `http://127.0.0.1:${provider.address().port}/auth` }, identityTrust: { endpoint: `http://127.0.0.1:${provider.address().port}/trust` }, riskAssessment: { endpoint: `http://127.0.0.1:${provider.address().port}/risk` }, operations: [{ serverId: 'writes', operationId: 'update', kind: 'write', method: 'POST', target: 'https://business.test/item', confirmation: true }], agents: [{ agentId: 'soc', enabled: true, sourceDigest: binding.sourceDigest, subjects: ['A', 'B'], actions: ['*'] }] }))
   const secret = randomBytes(48); const secretPath = join(assetRoot, 'business.secret'); writeFileSync(secretPath, secret)
+  if (noSecret) rmSync(secretPath)
+  mkdirSync(join(assetRoot, '.local/credentials'), { recursive: true })
+  writeFileSync(join(assetRoot, '.local/credentials/mcp-manager.json'), JSON.stringify({ sharedToken: 'fixture-token' }))
   const setupConfigPath = join(assetRoot, 'config/business-access.json'), setupConfig = JSON.parse(readFileSync(setupConfigPath, 'utf8'))
   setupConfig.gateway = { host: '127.0.0.1', port: 0, publicOrigin: 'http://business.localhost:0', sharedSecretFile: secretPath, instances: [{ agentId: binding.agentId, instanceId: binding.instanceId }] }
   if (proxyOrigin) setupConfig.gateway.proxyOrigin = proxyOrigin
   if (sharedDevelopment) Object.assign(setupConfig.gateway.instances[0], { accessMode: 'anonymous', identityMode: 'development', sourceDigest: binding.sourceDigest })
+  if (development) Object.assign(setupConfig.gateway.instances[0], { identityMode: 'development', sourceDigest: binding.sourceDigest })
   writeFileSync(setupConfigPath, JSON.stringify(setupConfig))
   const ctx = new Context(); t.after(async () => { await ctx.fiber.dispose(); rmSync(assetRoot, { recursive: true, force: true }) })
   const basePath = proxyOrigin ? '/agents/soc/instances/soc-business/' : undefined
@@ -79,7 +83,8 @@ async function setup(t, { localTools = [], emptyWorkspace = false, registrationF
   }, archivedSessionIds: [], pinnedSessionIds: [] }
   await ctx.plugin({ name: 'fixture-workspace-storage', apply(ctx) { ctx.provide('workspaceRegistry', workspaceRegistry) } })
   const centerRoot = join(assetRoot, 'center-assets'); mkdirSync(join(centerRoot, 'config'), { recursive: true }); mkdirSync(join(centerRoot, '.local/instances/soc-business'), { recursive: true }); symlinkSync(join(assetRoot, 'config/business-access.json'), join(centerRoot, 'config/business-access.json')); writeFileSync(join(centerRoot, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: binding.workspaceId })); writeFileSync(join(centerRoot, '.local/instances/soc-business/instance.json'), JSON.stringify({ workspace_id: binding.workspaceId, asset_root: centerRoot, agent_id: binding.agentId, web_base_path: '/agents/soc/instances/soc-business/', business_control: { runtime_generation: binding.runtimeGeneration, source_digest: binding.sourceDigest, origin: `http://127.0.0.1:${ctx.webServer.port}` } })); const coordinator = getBusinessControl(centerRoot); coordinator.registerInstance(binding); const gateway = await startBusinessGateway(centerRoot, { ...setupConfig.gateway, sharedSecretFile: secretPath }); t.after(() => gateway.close())
-  const loaded = ctx.plugin(Runtime, { assetRoot, stateRoot: join(assetRoot, 'runtime-state'), sharedSecretFile: secretPath, coordinatorOrigin: `http://127.0.0.1:${gateway.server.address().port}`, basePath, workspacePath, binding, localTools })
+  mkdirSync(join(centerRoot, '.local/credentials'), { recursive: true }); symlinkSync(join(assetRoot, '.local/credentials/mcp-manager.json'), join(centerRoot, '.local/credentials/mcp-manager.json'))
+  const loaded = ctx.plugin(Runtime, { assetRoot, stateRoot: join(assetRoot, 'runtime-state'), ...(!noSecret ? { sharedSecretFile: secretPath } : {}), coordinatorOrigin: `http://127.0.0.1:${gateway.server.address().port}`, basePath, workspacePath, binding, localTools })
   if (registrationFailure) {
     await assert.rejects(async () => { await loaded }, /业务固定工作区登记失败.*EACCES/)
     return { ctx, workspaceRows, registrationConnections }
@@ -89,7 +94,8 @@ async function setup(t, { localTools = [], emptyWorkspace = false, registrationF
   assert.equal(loaded.state, 2)
   await ctx.plugin(TypertGateway, {}); await ctx.plugin(WorkspaceController); await ctx.plugin(Fixture); const fixture = ctx.get('sessionFixture'); const control = getBusinessControl(assetRoot)
   const context = id => { const value = sharedDevelopment ? sharedInstanceIdentity(binding) : identity(id); if (!sharedDevelopment) { value.subject.identitySource = `http://127.0.0.1:${provider.address().port}`; value.evidence.issuer = value.subject.identitySource }; return control.createContext(value, binding) }
-  const headers = (id, path, method = 'POST') => signBusinessAssertion(secret, { binding, context: context(id), snapshot: coordinator.issueSnapshot(binding.instanceId), nonce: randomBytes(24).toString('base64url'), issuedAt: Date.now() }, method, path)
+  const headers = (id, path, method = 'POST') => control.isDevelopmentInstance(binding) ? businessAssertionHeaders({ binding, context: context(id) })
+    : signBusinessAssertion(secret, { binding, context: context(id), snapshot: coordinator.issueSnapshot(binding.instanceId), nonce: randomBytes(24).toString('base64url'), issuedAt: Date.now() }, method, path)
   const rpc = async (id, endpoint, request) => { const path = `/api/${endpoint}`; return fetch(`http://127.0.0.1:${ctx.webServer.port}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers(id, path) }, body: JSON.stringify({ type: 'client-request', rpcId: randomBytes(8).toString('hex'), method: endpoint, payload: { args: { request } } }) }) }
   return { ctx, control, fixture, headers, rpc, context, secret, coordinator, gateway, workspacePath, workspaceRows, workspaceRegistry, registrationConnections, toolGuards, agents, trustCalls, delayTrust: (id, delay) => trustDelays.set(id, delay), revoke: id => revokedSubjects.add(id) }
 }
@@ -247,7 +253,7 @@ test('无需认证的开发实例保留完整原生访问能力及共享 Session
   assert.equal(created.result.ok, true, JSON.stringify(created))
   assert.deepEqual(fixture.seen, ['owner'])
   const connection = ctx.get('connection')
-  assert.deepEqual(connection.admit({ method: 'GET', url: '/api', headers: {} }), { rejection: 403 }, '共享 owner 仍须逐请求验签')
+  assert.deepEqual(connection.admit({ method: 'GET', url: '/api', headers: {} }), { rejection: 403 }, '共享 owner 仍须实例上下文')
   const list = await (await rpc('B', 'session/list', {})).json()
   assert.deepEqual(list.result.value.items.map(item => item.sessionId), [created.result.value.sessionId])
   assert.equal((await rpc('B', 'session/page', { sessionId: created.result.value.sessionId })).status, 200)
@@ -258,6 +264,37 @@ async function until(read, message) {
   assert.ok(read(), message)
   return read()
 }
+test('开发实例无需密钥或许可租约，记录同步失败不打断共享 Peer 与原生 Session', async t => {
+  const { ctx, rpc, headers, control, coordinator } = await setup(t, { sharedDevelopment: true, noSecret: true })
+  const connection = ctx.get('connection')
+  const created = await (await rpc('A', 'session/create', {})).json(), sessionId = created.result.value.sessionId
+  await connection.refresh()
+  assert.equal(coordinator.contextForSession(sessionId).scope.sessionId, sessionId, '开发会话记录仍回传中心')
+  const request = { method: 'GET', url: '/api/remote.mux', headers: headers('A', '/api/remote.mux', 'GET') }
+  const admitted = connection.admit(request)
+  assert.ok('peer' in admitted)
+  connection.businessConfig.coordinatorOrigin = 'http://127.0.0.1:1'
+  await assert.rejects(connection.refresh())
+  const syncStatus = () => control.status().instances.find(value => value.instanceId === binding.instanceId).synchronization
+  const failed = syncStatus()
+  assert.match(failed.lastError, /控制同步失败/)
+  await new Promise(resolve => setTimeout(resolve, 2200))
+  assert.equal(syncStatus().lastAttemptAt, failed.lastAttemptAt, '开发同步不沿用 500ms 心跳')
+  assert.equal(connection.admit({ ...request }).peer, admitted.peer, '旧两秒窗口过后仍可沿用上下文')
+  assert.equal(admitted.peer.signal.aborted, false)
+  const page = await (await rpc('B', 'session/page', { sessionId })).json()
+  assert.equal(page.result.value.sessionId, sessionId)
+})
+test('已认证开发实例无签名仍隔离用户 Session，异实例上下文不得借用本实例绑定', async t => {
+  const { rpc, ctx, headers } = await setup(t, { development: true, noSecret: true })
+  const a = await (await rpc('A', 'session/create', {})).json(), b = await (await rpc('B', 'session/create', {})).json()
+  const list = await (await rpc('A', 'session/list', {})).json()
+  assert.deepEqual(list.result.value.items.map(item => item.sessionId), [a.result.value.sessionId])
+  assert.equal((await rpc('A', 'session/page', { sessionId: b.result.value.sessionId })).status, 403)
+  const valid = readBusinessAssertion(headers('A', '/api'), binding)
+  valid.context.scope.instanceId = 'another-instance'
+  assert.deepEqual(ctx.get('connection').admit({ method: 'GET', url: '/api', headers: businessAssertionHeaders(valid) }), { rejection: 403 })
+})
 async function nativeQuestions(t, fixture) {
   const { ctx, headers } = fixture, events = []
   let wake
@@ -347,7 +384,7 @@ test('共享 Peer 不共享请求上下文，连接释放保留 Peer，配置撤
   const unsigned = request(); unsigned.headers = {}
   assert.deepEqual(connection.admit(unsigned), { rejection: 403 })
   const replay = request(); connection.admit(replay)
-  assert.deepEqual(connection.admit({ ...replay }), { rejection: 403 })
+  assert.equal(connection.admit({ ...replay }).peer, one.peer, '开发通道不按签名 nonce 拒绝正常重试')
   const file = join(control.assetRoot, 'config/business-access.json'), original = readFileSync(file, 'utf8')
   for (const edit of [
     config => { config.gateway.instances[0].identityMode = 'published' },
@@ -727,26 +764,26 @@ test('无需登录的业务实例经统一网关使用稳定共享主体，保�
   assert.equal((await frontFetch(base + 'api/session/list', { method: 'POST', headers: { cookie: cookieA } })).status, 503, '切回个人认证后访客 Cookie 不再可用')
 })
 
-test('开发调试实例无发布 Agent 规则仍经签名网关聊天，切回发布模式立即恢复发布校验', async t => {
+test('开发调试实例无签名密钥仍经网关聊天，切回发布模式立即恢复发布校验', async t => {
   const assetRoot = mkdtempSync(join(tmpdir(), 'business-development-'))
   t.after(() => rmSync(assetRoot, { recursive: true, force: true }))
   mkdirSync(join(assetRoot, 'config'))
   mkdirSync(join(assetRoot, '.local/instances/soc-business'), { recursive: true })
   writeFileSync(join(assetRoot, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: binding.workspaceId }))
   const devBinding = { ...binding, sourceDigest: 'sha256:' + 'd'.repeat(64) }
-  const secret = randomBytes(48), secretPath = join(assetRoot, 'business.secret')
-  writeFileSync(secretPath, secret)
+  mkdirSync(join(assetRoot, '.local/credentials'), { recursive: true })
+  writeFileSync(join(assetRoot, '.local/credentials/mcp-manager.json'), JSON.stringify({ sharedToken: 'fixture-token' }))
   const config = { schemaVersion: 1, enabled: true, agents: [], gateway: { host: '127.0.0.1', port: 0,
-    publicOrigin: 'http://business.localhost:0', sharedSecretFile: secretPath,
+    publicOrigin: 'http://business.localhost:0',
     instances: [{ agentId: 'soc', instanceId: 'soc-business', sourceDigest: devBinding.sourceDigest,
       accessMode: 'anonymous', identityMode: 'development' }] } }
   const save = () => writeFileSync(join(assetRoot, 'config/business-access.json'), JSON.stringify(config))
   save()
   const observed = []
-  const nonces = new Map()
   const upstream = createServer((req, res) => {
     try {
-      const assertion = verifyBusinessAssertion(secret, req.headers, req.method, req.url, devBinding, nonces)
+      assert.equal(req.headers['x-harness-business-signature'], undefined)
+      const assertion = readBusinessAssertion(req.headers, devBinding)
       observed.push(assertion.context)
       res.setHeader('content-type', req.method === 'GET' ? 'text/html' : 'application/json')
       res.end(req.method === 'GET' ? '<html>开发对话</html>' : JSON.stringify({ subjectId: assertion.context.subject.id }))
@@ -768,14 +805,12 @@ test('开发调试实例无发布 Agent 规则仍经签名网关聊天，切回�
     })
     request.on('error', reject); request.end()
   })
-  let snapshot
   for (let round = 0; round < 2; round++) {
     const path = '/control/soc-business'
-    const response = await fetch(origin + path, { method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(signBusinessAssertion(secret, { binding: devBinding, ...(snapshot ? { snapshot } : {}),
-        issuedAt: Date.now(), nonce: randomBytes(24).toString('base64url') }, 'POST', path)) })
+    const response = await fetch(origin + path, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer fixture-token' },
+      body: JSON.stringify({ binding: devBinding }) })
     assert.equal(response.status, 200)
-    snapshot = verifyBusinessAssertion(secret, await response.json(), 'RESPONSE', path, devBinding, new Map()).snapshot
+    assert.equal((await response.json()).synchronized, true)
   }
   const status = getBusinessControl(assetRoot).agentStatus(devBinding.instanceId)
   assert.deepEqual(status.authentication, { method: 'none', status: 'not_required' })

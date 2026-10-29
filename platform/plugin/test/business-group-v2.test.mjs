@@ -8,7 +8,7 @@ import { createRequire } from 'node:module'
 import test from 'node:test'
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
 import { getBusinessControl, withBusinessContext } from '../lib/business-control.js'
-import { businessRpcDigest, resolveBusinessInstance, signBusinessAssertion } from '../lib/business-gateway.js'
+import { businessAssertionHeaders, businessRpcDigest, resolveBusinessInstance, signBusinessAssertion } from '../lib/business-gateway.js'
 
 test('业务 RPC 摘要递归忽略对象键顺序，保留数组顺序与 JSON 序列化语义', () => {
   const first = { method: 'tools/call', params: { name: 'source__echo', arguments: { nested: { z: 1, a: 2 }, values: [1, 2] },
@@ -110,6 +110,14 @@ test('v2 分组只接受固定实例签名与当前受信 Session，签名不降
     evidence: { issuer: sourceOrigin, externalSubject: 'A', method: 'fixture', verifiedAt: new Date().toISOString(), expiresAt }, expiresAt }
   const base = control.createContext(identity, binding)
   const business = { ...base, scope: { ...base.scope, sessionId: 'session-A' } }
+  // 此处仅借用 groupFetch，模拟真实 Runtime 独立运行的发布心跳。
+  const heartbeat = setInterval(() => {
+    if (control.isDevelopmentInstance(binding)) return
+    control.recordAgentAuthentication(binding)
+    const current = control.issueSnapshot(binding.instanceId)
+    control.acknowledge(binding.instanceId, current.restrictionVersion, current.leaseId)
+  }, 250)
+  t.after(() => clearInterval(heartbeat))
   const signed = session => async (input, init) => {
     const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase()
     const body = method === 'POST' ? await new Request(input, init).clone().json() : undefined
@@ -131,7 +139,7 @@ test('v2 分组只接受固定实例签名与当前受信 Session，签名不降
   assert.equal((await allowed.listResources()).resources.length, 1)
   const { BusinessConnection } = await import('../lib/business-runtime.js')
   control.bindSession(base, 'session-A')
-  const runtimeFetch = BusinessConnection.prototype.groupFetch.call({ businessConfig: { assetRoot: root, binding },
+  const runtimeFetch = BusinessConnection.prototype.groupFetch.call({ businessConfig: { assetRoot: root, binding, sharedSecretFile: secretFile },
     control, secret }, 'soc-tools', 'session-A')
   const throughRuntime = await connect(new StreamableHTTPClientTransport(url, { fetch: runtimeFetch }))
   const resources = (await throughRuntime.listResources()).resources
@@ -228,4 +236,32 @@ test('v2 分组只接受固定实例签名与当前受信 Session，签名不降
   access.gateway.instances[0].sourceDigest = sourceDigest
   writeFileSync(join(root, 'config', 'business-access.json'), JSON.stringify(access))
   assert.deepEqual((await startupOnly.listTools()).tools.map(tool => tool.name), expectedNames)
+  // 同一连接、同一工具与参数切换为开发模式；删除密钥并等待超过旧签名窗口。
+  access.gateway.instances[0].identityMode = 'development'
+  writeFileSync(join(root, 'config', 'business-access.json'), JSON.stringify(access))
+  rmSync(secretFile)
+  await new Promise(resolve => setTimeout(resolve, 2100))
+  const args = { nested: { z: 1, a: 2 } }
+  for (const client of [throughRuntime, nativeClient]) {
+    const result = await client.callTool({ name: 'echo', arguments: args,
+      _meta: { 'io.deepseek.dsh/mcp-group-target': { digest: targetDigest } } })
+    assert.notEqual(result.isError, true)
+    assert.equal(result.content[0].text, '{"reached":true}')
+  }
+  const unsignedHeaders = { ...businessAssertionHeaders({ binding, context: business }), Authorization: `Bearer ${token}`,
+    'content-type': 'application/json', accept: 'application/json, text/event-stream' }
+  const devRequest = headers => fetch(url, { method: 'POST', headers, body })
+  assert.notEqual((await devRequest(unsignedHeaders)).status, 401)
+  assert.equal((await (await devRequest({ ...unsignedHeaders, Authorization: 'Bearer wrong' })).json()).stage, 'token')
+  for (const key of ['workspaceId', 'runtimeGeneration', 'sourceDigest']) {
+    const response = await devRequest({ ...unsignedHeaders, ...businessAssertionHeaders({ binding: { ...binding, [key]: 'wrong' }, context: business }) })
+    assert.equal((await response.json()).stage, 'binding')
+  }
+  const withoutSession = await connect(new StreamableHTTPClientTransport(url, { fetch: BusinessConnection.prototype.groupFetch.call(
+    { businessConfig: { assetRoot: root, binding }, control }, 'soc-tools') }))
+  assert.deepEqual((await withoutSession.listTools()).tools.map(tool => tool.name), expectedNames)
+  await assert.rejects(withoutSession.callTool({ name: 'echo', arguments: args }), /缺少受信 Session/)
+  access.gateway.instances[0].identityMode = 'published'
+  writeFileSync(join(root, 'config', 'business-access.json'), JSON.stringify(access))
+  assert.equal((await (await devRequest(unsignedHeaders)).json()).stage, 'signature', '发布模式不能沿用开发 Bearer 接入')
 })

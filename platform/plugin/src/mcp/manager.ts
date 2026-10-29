@@ -8,13 +8,14 @@ import { createManagedMcpHandler } from './native.ts'
 import { executableCatalog, type CompositionExtension } from './extension.ts'
 import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
 import { getBusinessControl, currentBusinessContext, withBusinessContext, withSignedRuntimeSession } from '../business-control/core.ts'
-import { businessRpcDigest, readBusinessSecret, resolveBusinessInstance, verifyBusinessAssertion, type BusinessGatewayConfig, type RuntimeAssertion } from '../business-control/gateway.ts'
+import { BusinessTransportError, businessRpcDigest, readBusinessAssertion, readBusinessSecret, requireBusinessToken, resolveBusinessInstance, verifyBusinessAssertion, type BusinessGatewayConfig, type RuntimeAssertion } from '../business-control/gateway.ts'
 import { platformEntryUrl, platformGroupServer, platformGroupUrl } from '../business-control/group-link.ts'
 import { managedDispatch, managementDispatch } from './control.ts'
 import { setBusinessReportHeaderResolver } from '../business-control/reports.ts'
 import { createBusinessControlHandler } from '../business-control/management.ts'
 import { loadOpenApi } from 'harness-mcp-manager-openapi'
 import { McpConfigStore, type McpConfigurationView } from './store.ts'
+import type { BusinessContext } from '../business-control/contracts.ts'
 
 export const { name, Config, validateConfiguration } = manager
 export const inject = manager.inject
@@ -86,7 +87,7 @@ export function apply(ctx: Context, suppliedConfig: ManagerConfig) {
   const platformClient = createPublishedCompositionClient(assetRoot, compositionHandler)
   const control = getBusinessControl(assetRoot)
   const execute = managedDispatch(assetRoot)
-  const signedGroupRequests = new WeakMap<object, RuntimeAssertion>()
+  const businessGroupRequests = new WeakMap<object, RuntimeAssertion>()
   const groupNonces = new Map<string, number>()
   ctx.effect(() => setBusinessReportHeaderResolver(assetRoot, async (serverId, expectedOrigin) => {
     const server = config.servers.get().find(value => value.id === serverId && value.enabled !== false)
@@ -114,36 +115,48 @@ export function apply(ctx: Context, suppliedConfig: ManagerConfig) {
     } : {}),
     acceptGroupTransport: (req: any) => {
       const encoded = req.headers['x-harness-business-context']
-      if (typeof encoded !== 'string' || encoded.length > 256_000) throw new Error('业务分组签名缺失')
-      // 这两个字段仅用于定位本地登记；直到 HMAC 核验成功都不作为身份。
+      if (typeof encoded !== 'string' || encoded.length > 256_000) throw new BusinessTransportError('binding', '业务分组上下文缺失')
+      // 这两个字段只用于定位本地登记；模式以本地配置为准。
       let selected: { agentId: string; instanceId: string }
       try {
         const candidate = JSON.parse(Buffer.from(encoded, 'base64url').toString()) as RuntimeAssertion
         selected = { agentId: candidate.binding.agentId, instanceId: candidate.binding.instanceId }
-      } catch { throw new Error('业务分组签名信封无效') }
+      } catch { throw new BusinessTransportError('binding', '业务分组上下文无效') }
       const gateway = control.config().gateway as Partial<BusinessGatewayConfig> | undefined
       const registered = gateway?.instances?.find(item => item.agentId === selected.agentId && item.instanceId === selected.instanceId)
-      if (!control.enabled() || !registered || typeof gateway?.sharedSecretFile !== 'string') throw new Error('业务实例未开放')
-      const instance = resolveBusinessInstance(assetRoot, registered)
+      if (!control.enabled() || !registered) throw new BusinessTransportError('registration', '业务实例未开放')
+      let instance: ReturnType<typeof resolveBusinessInstance>
+      try { instance = resolveBusinessInstance(assetRoot, registered) }
+      catch { throw new BusinessTransportError('binding', '业务实例来源或代次不匹配') }
       const logical = new URL(req.url || '/', 'http://localhost')
       const path = ctx.webServer.publicPath(logical.pathname) + logical.search
-      const assertion = verifyBusinessAssertion(readBusinessSecret(gateway.sharedSecretFile), req.headers,
-        req.method || 'POST', path, instance.binding, groupNonces)
+      let assertion: RuntimeAssertion
+      if (control.isDevelopmentInstance(instance.binding)) {
+        requireBusinessToken(req.headers.authorization, assetRoot)
+        assertion = readBusinessAssertion(req.headers, instance.binding)
+      } else {
+        try { assertion = verifyBusinessAssertion(readBusinessSecret(gateway?.sharedSecretFile), req.headers,
+          req.method || 'POST', path, instance.binding, groupNonces) }
+        catch { throw new BusinessTransportError('signature', '已发布实例的签名无效、过期或已使用') }
+      }
       control.registerInstance(instance.binding)
       control.recordAgentAuthentication(instance.binding)
-      signedGroupRequests.set(req, assertion)
+      businessGroupRequests.set(req, assertion)
       return true
     },
     withGroupRequest: <T>(req: any, method: string, run: () => Promise<T>, rpcRequest: any) => {
-      if (!control.enabled()) return run()
-      const assertion = signedGroupRequests.get(req)
+      const assertion = businessGroupRequests.get(req)
       if (!assertion) return managementDispatch(assetRoot, run)
+      if (!control.enabled()) throw new BusinessTransportError('registration', '业务接入已关闭')
       if (method === 'tools/list') return run()
-      if (!assertion?.context?.scope.sessionId) throw new Error('业务 MCP 请求缺少受信 Session')
-      if (assertion.requestDigest !== businessRpcDigest(rpcRequest)) throw new Error('业务 MCP 请求内容与签名不一致')
+      if (!assertion?.context?.scope.sessionId) throw new BusinessTransportError('context', '业务 MCP 请求缺少受信 Session')
+      if (!control.isDevelopmentInstance(assertion.binding) && assertion.requestDigest !== businessRpcDigest(rpcRequest)) throw new BusinessTransportError('signature', '业务 MCP 请求内容与签名不一致')
       return withSignedRuntimeSession(() => {
-        const context = control.acceptContext(assertion.context!)
-        control.assert(context, 'agent:access', [{ kind: 'agent', id: context.scope.agentId }])
+        let context: BusinessContext
+        try {
+          context = control.acceptContext(assertion.context!)
+          control.assert(context, 'agent:access', [{ kind: 'agent', id: context.scope.agentId }])
+        } catch { throw new BusinessTransportError('context', '业务 Session、身份或实例许可已失效') }
         return withBusinessContext(context, run)
       })
     },
