@@ -21,7 +21,6 @@ test('数据根含空格且工作目录任意时，新建、读改回读与草�
   t.after(() => rmSync(root, { recursive: true, force: true }))
   for (const path of ['agents', 'evolution/experiments', 'config']) mkdirSync(join(root, path), { recursive: true })
   writeFileSync(join(root, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: 'workspace-isolated', legacyRoots: [] }))
-  writeFileSync(join(root, 'config/sources.json'), JSON.stringify({ schema_version: '1.1', sources: {} }))
   const handler = createAgentsHandler(root), signal = new AbortController().signal
   const invoke = async (endpoint, input) => value(await handler(endpoint, input, signal))
   const previousCwd = process.cwd()
@@ -36,7 +35,7 @@ test('数据根含空格且工作目录任意时，新建、读改回读与草�
     const business = await invoke('cases/read', { experiment_id: id, case_id: 'U-BUSINESS-001' })
     assert.deepEqual(business.case.inputs, ['读取 TEST-01、TEST-02 两台设备。'])
     assert.equal(business.case.expected_behavior, '报告逐台列出两台设备，汇总数为2；声明模拟来源。')
-    assert.equal(detail.declared.catalog_source.agent_id, 'basic-reader')
+    assert.equal(detail.declared.loadable_source.agent_id, 'basic-reader')
     const path = 'candidate/dsh/workspace/AGENTS.md'
     const before = await invoke('edit/read', { experiment_id: id, path })
     const content = before.content + '\n使用明确的对象 ID 查询。\n'
@@ -51,6 +50,6 @@ test('数据根含空格且工作目录任意时，新建、读改回读与草�
     assert.equal(existsSync(join(root, 'runtime')), false)
     assert.equal(existsSync(join(root, 'platform')), false)
     assert.equal(existsSync(join(root, '.agents')), false)
-    assert.equal(Object.keys(JSON.parse(readFileSync(join(root, 'config/sources.json'), 'utf8')).sources).length, 1)
+    assert.equal(existsSync(join(root, 'config/sources.json')), false)
   } finally { process.chdir(previousCwd) }
 })

@@ -1,3 +1,4 @@
+import { assetText } from '../agents/asset-text.ts'
 import { createHash, randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import { programRoot, workspaceIdentity, workspaceLocalPath, workspaceOwnsCwd } from '../workspace.ts'
@@ -161,7 +162,17 @@ export function redactAssistant(value: any): any {
   }).replace(/\b(Bearer\s+)[^\s"']+/gi, '$1[已隐藏]').replace(/\bsk-[A-Za-z0-9_-]{12,}\b/g, '[已隐藏]')
   return value
 }
-function wireValue(value: any) { return JSON.parse(JSON.stringify(redactAssistant(value))) }
+function wireValue(value: any) {
+  // 资产端点已标明脱敏/截断状态；二次日志脱敏不能改写可编辑源码。
+  const source = value?.domain === 'agents' && ['edit/read', 'edit/preview', 'assets/read-fixed', 'assets/diff', 'features/read-source'].includes(value.action)
+  const view = (item: any, key = ''): any => {
+    if (typeof item === 'string') return source && ['content', 'diff', 'before', 'after'].includes(key) ? assetText('source', item).content : redactAssistant(item)
+    if (Array.isArray(item)) return item.map(entry => view(entry))
+    if (item && typeof item === 'object') return Object.fromEntries(Object.entries(item).map(([name, entry]) => [name, view(entry, name)]))
+    return item
+  }
+  return JSON.parse(JSON.stringify(source ? view(value) : redactAssistant(value)))
+}
 /** 完整冻结差异留在持久操作记录；模型按清单与摘要核对，不重复接收编译产物正文。 */
 function modelToolValue(domain: Domain, action: string, value: any) {
   if (domain === 'task' && value?.state === 'completed' && value.plan && Array.isArray(value.operations)) return completedTaskModelView(value)
@@ -242,8 +253,8 @@ function freezeInstancePreview(action: string, input: MapValue, preview: any): M
 }
 
 function assertNoCredentials(domain: Domain, action: string, input: MapValue) {
-  const secretPath = domain === 'mcp' && action === 'saveConfiguration' && mcpCredentialEdit(input)
-  if (secretPath || JSON.stringify(input) !== JSON.stringify(redactAssistant(input))) throw new Error('凭据请通过 MCP 管理页面维护，助手操作仅使用已配置引用')
+  const secretPath = domain === 'mcp' && action === 'saveConfiguration' && (mcpCredentialEdit(input) || JSON.stringify(input) !== JSON.stringify(redactAssistant(input)))
+  if (secretPath) throw new Error('凭据请通过 MCP 管理页面维护，助手操作仅使用已配置引用')
 }
 
 export function createAssistant(root: string, platform: ConnectionRpcHandler, services: AssistantServices) {

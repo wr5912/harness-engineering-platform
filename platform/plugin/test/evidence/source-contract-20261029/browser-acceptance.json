@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-29T03:43:38.979Z",
+  "url": "http://172.16.138.228:18120/hep/#/agents?agent_id=security-operations-expert&experiment_id=EXP-security-operations-expert-025-r3f8a8b3da3f1&tab=assets",
+  "experiment_id": "EXP-security-operations-expert-025-r3f8a8b3da3f1",
+  "path": "evolution/experiments/EXP-security-operations-expert-025-r3f8a8b3da3f1/candidate/dsh/managed/threat-analysis/mcp-group-bridge.ts",
+  "raw_editor_matches_file": true,
+  "token_reference_preserved": true,
+  "syntax_preview_passed": true,
+  "no_op_save_passed": true,
+  "source_bytes_unchanged": true,
+  "page_errors": [],
+  "sha256": "2cec7a66ece71df835f3c2429ee4ccf75b2dc9c109a6f84b739ab1482a992267"
+}

@@ -70,6 +70,7 @@ test('平台登录保护原生 API、三个写入域与 MCP，旧 Token/Cookie �
   const runId = 'run-11111111-1111-4111-8111-111111111111'
   const run = join(assetRoot, 'evolution/experiments/EXP-auth-agent-001/runs', runId)
   mkdirSync(run, { recursive: true })
+  writeFileSync(join(assetRoot, 'evolution/experiments/EXP-auth-agent-001/change.yaml'), 'agent_id: auth-agent\nexperiment_id: EXP-auth-agent-001\n')
   writeFileSync(join(run, 'run.yaml'), `run_id: ${runId}\nstatus: completed\n`)
   writeFileSync(join(run, 'report.md'), '# 认证报告\n\n前缀路径下载验证。\n')
   const downloadPath = `/api/harness-platform/runs/download?run_id=${runId}&kind=report`

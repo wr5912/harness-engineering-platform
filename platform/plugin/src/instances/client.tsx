@@ -263,7 +263,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
                 : latestSourceRun.effective_verdict === 'inconclusive' ? '最近评测无法判定' : '最近评测结论待核对'
   const sourceRunScope = latestSourceRun?.case_scope || '未记录验证范围'
   const sourceRunCases = sourceRunCounts ? `${sourceRunCounts.passed} 通过 / ${sourceRunCounts.failed} 未通过 / ${sourceRunCounts.inconclusive} 无法判定${sourceRunCounts.mixed ? ` / ${sourceRunCounts.mixed} 结果不一致` : ''}${sourceRunCounts.pending ? ` / ${sourceRunCounts.pending} 未记录结果` : ''}` : '逐例结果未记录'
-  const sourceFieldError = form.source && sourcesLoaded && !chosenSource ? '该来源不在当前登记中，请重新选择。'
+  const sourceFieldError = form.source && sourcesLoaded && !chosenSource ? '该版本的装载声明不可用，请重新选择。'
     : chosenSource && selectedAgent && chosenSource.agent_id !== selectedAgent ? '所选来源不属于当前智能体，请重新选择。'
       : chosenSource && !chosenSource.selectable ? chosenSource.reason : ''
   const createAllowed = models?.business_allowed ?? []
@@ -835,7 +835,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
           <label className="instance-field">来源版本<select aria-label="选择来源版本" value={form.source && filteredSources.some(item => item.source_id === form.source) ? form.source : ''} onChange={event => updateForm({ ...form, source: event.target.value })} className="instance-field-input">
             <option value="">请选择已登记版本</option>{filteredSources.map(source => <option key={source.source_id} value={source.source_id} disabled={!source.selectable}>{source.experiment_id}{source.selectable ? '' : ` · 不可用：${source.reason}`}</option>)}
           </select></label>
-          {selectedAgent && sourcesLoaded && !sourceLoading && !sources.some(item => item.agent_id === selectedAgent && item.selectable) && <p role="status" className="instance-muted">此智能体没有可用的已登记来源。请检查来源登记与 Candidate 目录。</p>}
+          {selectedAgent && sourcesLoaded && !sourceLoading && !sources.some(item => item.agent_id === selectedAgent && item.selectable) && <p role="status" className="instance-muted">此智能体没有可用的装载版本。请检查该版本的装载声明与 Candidate 目录。</p>}
           {chosenSource && <div className="instance-source-verdict" data-state={sourceRunResult} role="status"><strong>{sourceRunHeading}</strong><span>{chosenSource.experiment_id} · {latestSourceRun?.title || chosenSource.reason}</span><span>验证范围：{currentSourceRun?.error ? '读取失败，请到评测中心核对' : sourceRunScope}{latestSourceRun && ` · ${sourceRunCases}`}</span>{currentSourceRun?.error && <span>读取原因：{currentSourceRun.error}。</span>}{currentSourceRun?.checkedAt && <span>{latestSourceRun?.created_at && `Run 记录于 ${new Date(latestSourceRun.created_at).toLocaleString('zh-CN')} · `}{currentSourceRun.error ? '读取尝试于' : '核对于'} {new Date(currentSourceRun.checkedAt).toLocaleString('zh-CN')}</span>}<button type="button" className="instance-button" disabled={currentSourceRun?.loading} onClick={() => setSourceRunRefresh(value => value + 1)}>重新核对评测</button><span>创建实例不代表业务验证通过。</span></div>}
           {sourceFieldError && <p role="alert" className="instance-error">{sourceFieldError}</p>}
         </div>

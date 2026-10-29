@@ -14,6 +14,7 @@ import json
 import platform
 import re
 import stat
+import subprocess
 import sys
 from pathlib import Path
 
@@ -189,7 +190,7 @@ def _experiment_contract(
         if not re.fullmatch(r"[A-Z][A-Z0-9_]*", name):
             raise ValueError("invalid environment name")
     # preset_id 是运行时组合身份，agent_id 是业务 Agent 身份；两者允许不同。
-    # 实际装载一致性由候选 harness.yaml、sources.json 与基础 patch 默认值的交叉门禁保证。
+    # 实际装载一致性由候选 harness.yaml 与基础 patch 默认值的一致性检查保证。
     declared_preset = preset_id(item["preset"])
     image = dict(lock)
     image["platform"] = image_platform()
@@ -239,17 +240,11 @@ def preset_id(preset_relative: str) -> str:
 
 
 def _resolve_experiment(source_id: str, *, repo: Path, sources: Path, lock_path: Path, require_assets: bool) -> dict:
-    catalog = strict_json(sources)
-    if catalog.get("schema_version") != "1.1" or not isinstance(catalog.get("sources"), dict):
-        raise ValueError("unsupported source catalog")
-    item = catalog["sources"].get(source_id)
-    match = EXPERIMENT.fullmatch(source_id)
-    if not match or not isinstance(item, dict) or item.get("agent_id") != match.group(1):
-        raise ValueError(f"unknown or inconsistent DSH source: {source_id}")
-    required = {"agent_id", "candidate_root", "profile", "patch", "preset", "guard",
-                "config_markers", "required_env_names"}
-    if not required <= set(item) or set(item) - required - {"profile_manifest", "optional_env_names"}:
-        raise ValueError("source fields differ from schema 1.1")
+    command = ["node", str(ADAPTER / "version-source.mts"), str(repo), source_id]
+    result = subprocess.run(command, capture_output=True, text=True, timeout=20)
+    if result.returncode:
+        raise ValueError(result.stderr.strip() or "版本装载声明读取失败")
+    item = json.loads(result.stdout)
     experiment_root = Path("evolution/experiments") / source_id / "candidate"
     profile_manifest = ADAPTER / "verification-home-controls/web-profile.package.json"
     if "profile_manifest" in item:

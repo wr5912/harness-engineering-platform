@@ -121,11 +121,11 @@ test('服务端通知仅含领域与稳定 ID，请求取消后释放 SSE 监听
 })
 
 
-test('独立工作区同一config目录的来源和组合变更均通知，忽略原生HOME内容', async t => {
+test('独立工作区版本声明和组合变更均通知，忽略原生HOME内容', async t => {
   const root = mkdtempSync(join(tmpdir(), 'workspace events '))
-  for (const folder of ['config', '.local/instances/basic/dsh-home']) mkdirSync(join(root, folder), { recursive: true })
+  for (const folder of ['config', 'evolution/experiments/EXP-demo-001/candidate', '.local/instances/basic/dsh-home']) mkdirSync(join(root, folder), { recursive: true })
   writeFileSync(join(root, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: 'workspace-events', legacyRoots: [] }))
-  writeFileSync(join(root, 'config/sources.json'), '{}')
+  writeFileSync(join(root, 'evolution/experiments/EXP-demo-001/candidate/harness.yaml'), '{}')
   writeFileSync(join(root, 'config/mcp-compositions.json'), '{}')
   const events = createPlatformEvents(root, { docker: false, stateRoot: join(root, '.local/instances') })
   events.start()
@@ -141,7 +141,7 @@ test('独立工作区同一config目录的来源和组合变更均通知，忽�
     return JSON.parse(new TextDecoder().decode(data.value).match(/^data: (.*)$/m)[1])
   }
   assert.ok((await readChange('config/mcp-compositions.json')).domains.includes('mcp'))
-  assert.ok((await readChange('config/sources.json')).domains.includes('catalog'))
+  assert.ok((await readChange('evolution/experiments/EXP-demo-001/candidate/harness.yaml')).domains.includes('catalog'))
   writeFileSync(join(root, '.local/instances/basic/dsh-home/session.json'), '{}')
   let notified = false
   const pending = reader.read().then(() => { notified = true })

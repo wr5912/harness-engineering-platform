@@ -20,16 +20,14 @@ function write(root, path, body) { const file = join(root, path); mkdirSync(dirn
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'task delivery ')); t.after(() => rmSync(root, { recursive: true, force: true }))
   write(root, 'workspace.json', JSON.stringify({ schemaVersion: 1, id: 'workspace-task-test' }))
-  const sources = {}
   for (const id of [sourceId, targetId]) {
     const candidate = `evolution/experiments/${id}/candidate`
     write(root, `${candidate}/dsh/workspace/AGENTS.md`, '只读巡检测试资产。')
     write(root, `${candidate}/dsh/managed/task.patch.yml`, '- name: cordis:include\n  config:\n    path: /opt/dsh-presets/inspection-task/agent.cordis.yml\n')
     write(root, `${candidate}/dsh/presets/inspection-task/agent.cordis.yml`, '- name: "@deepseek-ai/dsh-agent"\n')
-    write(root, `evolution/experiments/${id}/change.yaml`, 'baseline_ref: "none:first-experiment"\n')
-    sources[id] = { agent_id: 'inspection-task', candidate_root: `${candidate}/dsh`, profile: 'web', patch: 'task.patch.yml', preset: 'inspection-task/agent.cordis.yml', guard: null, config_markers: ['inspection-task'], required_env_names: [] }
+    write(root, `evolution/experiments/${id}/change.yaml`, `experiment_id: ${id}\nagent_id: inspection-task\nbaseline_ref: "none:first-experiment"\n`)
+    write(root, `${candidate}/harness.yaml`, 'loadable_assets:\n  workspace: dsh/workspace\n  preset_root: dsh/presets\n  managed_root: dsh/managed\n  preset_id: inspection-task\n  profile_patch: dsh/managed/task.patch.yml\n')
   }
-  write(root, 'config/sources.json', JSON.stringify({ schema_version: '1.1', sources }))
   write(root, `evolution/experiments/${sourceId}/candidate/dsh/workspace/.agents/skills/inspection/SKILL.md`, '# 巡检\n查询指定设备并核对完整性。\n')
   return root
 }

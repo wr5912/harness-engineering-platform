@@ -1,7 +1,7 @@
-import { programRoot, workspaceConfigPath } from '../workspace.ts'
+import { versionSource, versionSources } from './version-source.ts'
+import { programRoot } from '../workspace.ts'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { randomUUID } from 'node:crypto'
 import { lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { dump as dumpYaml, load as loadYaml } from 'js-yaml'
@@ -10,7 +10,6 @@ import { redactRunText } from './run-files.ts'
 import { taskBusinessCasesSchema } from '../assistant/task.ts'
 
 const execute = promisify(execFile)
-const CATALOG = 'config/sources.json'
 const CLI = 'runtime/adapters/dsh-container/dsh-dev'
 type JsonMap = Record<string, unknown>
 export type NewAgentReceipt = { agent_id: string; experiment_id: string; source_id: string; name: string; status: 'created'; started: false; note: string }
@@ -24,13 +23,7 @@ function checkedText(payload: JsonMap, key: string, limit: number) {
 function cancelled(signal?: AbortSignal) { if (signal?.aborted) throw new CreationError('aborted', '新建智能体已取消') }
 function writeYaml(file: string, value: unknown) { writeFileSync(file, dumpYaml(value, { noRefs: true, lineWidth: -1 })) }
 function yamlMap(file: string) { return loadYaml(readFileSync(file, 'utf8')) as JsonMap }
-function catalog(root: string) {
-  const file = workspaceConfigPath(root, 'sources.json')
-  if (lstatSync(file).isSymbolicLink()) throw new CreationError('path_rejected', '来源目录不能是符号链接')
-  const value = JSON.parse(readFileSync(file, 'utf8')) as { schema_version: string; sources: Record<string, JsonMap> }
-  if (value.schema_version !== '1.1' || !value.sources || typeof value.sources !== 'object') throw new CreationError('invalid_catalog', '来源目录格式无效')
-  return value
-}
+
 function pathExists(path: string) { try { lstatSync(path); return true } catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw error } }
 
 /** 复用 dsh-dev init 生成标准来源；完整角色准备并校验后再一次落入仓库。 */
@@ -50,18 +43,17 @@ export async function createAgent(rootPath: string, payload: JsonMap, signal?: A
       if (!stat.isDirectory() || stat.isSymbolicLink()) throw new CreationError('path_rejected', '资产目录必须是仓库内的实体目录')
     }
     if (/[\r\n]/.test(name)) throw new CreationError('invalid_request', '名称必须为单行')
-    if (pathExists(join(root, 'agents', agentId)) || Object.values(catalog(root).sources).some(item => item.agent_id === agentId)) throw new CreationError('conflict', 'Agent ID 已存在，未覆盖已有资产')
+    if (pathExists(join(root, 'agents', agentId)) || Object.values(versionSources(root).sources).some(item => item.agent_id === agentId)) throw new CreationError('conflict', 'Agent ID 已存在，未覆盖已有资产')
     cancelled(signal)
     temporary = mkdtempSync(join(root, '.platform-agent-create-'))
-    for (const path of ['agents', 'evolution/experiments', dirname(CATALOG)]) mkdirSync(join(temporary, path), { recursive: true })
-    writeFileSync(join(temporary, CATALOG), JSON.stringify({ schema_version: '1.1', sources: {} }))
+    for (const path of ['agents', 'evolution/experiments']) mkdirSync(join(temporary, path), { recursive: true })
     phase = 'dsh-dev-init'
-    // 只运行本仓库的创建函数；在临时根中完成初始登记，不让 CLI 改写真实 sources.json。
+    // 只运行本仓库的创建函数，在隔离根中准备新角色。
     const code = [
       'import json,runpy,sys', 'from pathlib import Path',
       'module=runpy.run_path(sys.argv[1])',
       'stage=Path(sys.argv[2])',
-      'print(json.dumps(module["create_harness"](sys.argv[3],repo=stage,sources=stage/"config/sources.json",lock_path=Path(sys.argv[4]))))',
+      'print(json.dumps(module["create_harness"](sys.argv[3],repo=stage,lock_path=Path(sys.argv[4]))))',
     ].join('\n')
     const result = await execute(process.env.HARNESS_PYTHON || 'python3', ['-c', code, join(programRoot(), CLI), temporary, agentId, join(programRoot(), 'runtime/adapters/dsh-container/source.lock.json')], { cwd: root, env: { ...process.env, HARNESS_ASSET_ROOT: temporary, HARNESS_PROGRAM_ROOT: programRoot() }, signal, timeout: 30_000, maxBuffer: 1024 * 1024 })
     const created = JSON.parse(result.stdout) as { experiment_id: string; source_id: string }
@@ -102,7 +94,7 @@ export async function createAgent(rootPath: string, payload: JsonMap, signal?: A
       `sys.path.insert(0,${JSON.stringify(join(programRoot(), 'runtime/adapters/dsh-container'))})`,
       'from source_contract import resolve',
       'stage=Path(sys.argv[1])',
-      'resolve("experiment:"+sys.argv[2],repo=stage,sources=stage/"config/sources.json",lock_path=Path(sys.argv[3]))',
+      'resolve("experiment:"+sys.argv[2],repo=stage,lock_path=Path(sys.argv[3]))',
       'module=runpy.run_path(sys.argv[4])',
       'result,status=module["validate"](stage/"evolution/experiments"/sys.argv[2])',
       'if status: raise ValueError("Experiment 校验失败: "+json.dumps(result,ensure_ascii=False))',
@@ -111,19 +103,13 @@ export async function createAgent(rootPath: string, payload: JsonMap, signal?: A
     await execute(process.env.HARNESS_PYTHON || 'python3', ['-c', validate, temporary, created.experiment_id, join(programRoot(), 'runtime/adapters/dsh-container/source.lock.json'), join(programRoot(), 'runtime/research/validate_experiment.py')], { cwd: root, env: { ...process.env, HARNESS_ASSET_ROOT: temporary, HARNESS_PROGRAM_ROOT: programRoot() }, signal, timeout: 30_000, maxBuffer: 1024 * 1024 })
     cancelled(signal)
     phase = 'publish'
-    const current = catalog(root), source = catalog(temporary).sources[created.experiment_id]
-    if (source?.agent_id !== agentId) throw new CreationError('creation_failed', '创建工具没有返回一致的来源登记')
+    const source = versionSource(temporary, created.experiment_id)
+    if (source?.agent_id !== agentId) throw new CreationError('creation_failed', '创建工具没有返回一致的版本身份')
     const targetAgent = join(root, 'agents', agentId), targetExperiment = join(root, 'evolution/experiments', created.experiment_id)
-    if (pathExists(targetAgent) || pathExists(targetExperiment) || Object.values(current.sources).some(item => item.agent_id === agentId)) throw new CreationError('conflict', '创建期间 Agent ID 被占用，未覆盖已有资产')
-    // 以下同步落盘不跨 await；读取最新目录后仅增加本条登记，不替换其他任务新增的来源。
+    if (pathExists(targetAgent) || pathExists(targetExperiment) || Object.values(versionSources(root).sources).some(item => item.agent_id === agentId)) throw new CreationError('conflict', '创建期间 Agent ID 被占用，未覆盖已有资产')
+    // 同步发布已校验的两棵目录；不改写其他版本。
     renameSync(agent, targetAgent); moved.push(targetAgent)
     renameSync(experiment, targetExperiment); moved.push(targetExperiment)
-    const catalogFile = workspaceConfigPath(root, 'sources.json')
-    const catalogTemporary = `${catalogFile}.${randomUUID()}.tmp`
-    try {
-      writeFileSync(catalogTemporary, JSON.stringify({ ...current, sources: { ...current.sources, [created.experiment_id]: source } }, null, 2) + '\n', { flag: 'wx', mode: lstatSync(catalogFile).mode & 0o777 })
-      renameSync(catalogTemporary, catalogFile)
-    } finally { rmSync(catalogTemporary, { force: true }) }
     moved.length = 0
     return { ok: true, value: { agent_id: agentId, experiment_id: created.experiment_id, source_id: created.source_id, name, status: 'created', started: false, note: '角色和首次研究版本已创建，使用当前标准 Runtime 来源；尚未启动实例或完成业务评测。' } }
   } catch (error) {

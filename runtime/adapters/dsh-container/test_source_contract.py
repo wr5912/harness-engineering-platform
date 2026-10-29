@@ -1,5 +1,7 @@
-"""来源合同只依赖 sources.json 描述：新增第二个 Harness 不改适配工具中的业务名。"""
+"""来源合同由版本内声明解析，不依赖全局登记。"""
 
+import yaml
+import shutil
 import hashlib
 from functools import partial
 import json
@@ -241,43 +243,23 @@ class SourceContractTest(unittest.TestCase):
         self.assertTrue(emergency.issubset(contract["optional_env_names"]))
         self.assertTrue(emergency.isdisjoint(contract["required_env_names"]))
 
-    def test_optional_environment_names_reject_invalid_or_required_duplicates(self):
+    def test_selected_manifest_validates_environment_names_and_paths(self):
         source = "EXP-security-operations-expert-007"
-        original = json.loads((ASSETS / "config/sources.json").read_text(encoding="utf-8"))
-        with tempfile.TemporaryDirectory(prefix="dsh-source-contract-") as location:
-            catalog_path = Path(location) / "sources.json"
-            for names, message in (
-                (["invalid-name"], "invalid environment name"),
-                (["POLICY_CONFIGURATION_MCP_URL"] * 2, "duplicate optional_env_names"),
-                (["DEEPSEEK_API_KEY"], "both required and optional"),
-            ):
-                catalog = json.loads(json.dumps(original))
-                catalog["sources"][source]["optional_env_names"] = names
-                catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            relative = Path("evolution/experiments") / source
+            shutil.copytree(ASSETS / relative, root / relative)
+            file = root / relative / "candidate/harness.yaml"
+            original = yaml.safe_load(file.read_text())
+            for field, value, message in (("credential_environment_keys", ["invalid-name"], "环境变量"),
+                                         ("profile_patch", "../other.yml", "相对路径"),
+                                         ("profile_manifest", "dsh/workspace/package.json", "profile manifest")):
+                manifest = json.loads(json.dumps(original))
+                if field == "credential_environment_keys": manifest[field] = value
+                else: manifest["loadable_assets"][field] = value
+                file.write_text(yaml.safe_dump(manifest))
                 with self.assertRaisesRegex(ValueError, message):
-                    resolve(source, sources=catalog_path)
-
-    def test_experiment_rejects_runtime_override_and_invalid_profile(self):
-        source = "EXP-security-operations-expert-007"
-        original = json.loads((ASSETS / "config/sources.json").read_text(encoding="utf-8"))
-        with tempfile.TemporaryDirectory(prefix="dsh-source-contract-") as location:
-            catalog_path = Path(location) / "sources.json"
-            for field, value, message in (
-                ("runtime_lock", "evolution/experiments/EXP-security-operations-expert-007/candidate/runtime.lock.json",
-                 "source fields differ from schema"),
-                ("profile_manifest", original["sources"]["EXP-security-operations-expert-001"]["candidate_root"],
-                 "invalid experiment profile manifest"),
-            ):
-                catalog = json.loads(json.dumps(original))
-                catalog["sources"][source][field] = value
-                catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
-                with self.assertRaisesRegex(ValueError, message):
-                    resolve(source, sources=catalog_path)
-            catalog = json.loads(json.dumps(original))
-            catalog["sources"][source]["evaluation_patch"] = "../other.patch.yml"
-            catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
-            with self.assertRaisesRegex(ValueError, "source fields differ from schema"):
-                resolve(source, sources=catalog_path)
+                    resolve(source, repo=root)
 
     def test_reference_root_requires_evaluation_source(self):
         with tempfile.TemporaryDirectory(prefix="dsh-source-contract-") as location:
@@ -306,7 +288,7 @@ class SourceContractTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "preset-id"):
             source_contract.preset_id("agent.cordis.yml")
 
-    def test_second_source_needs_catalog_data_only(self):
+    def test_second_source_needs_version_files_only(self):
         with tempfile.TemporaryDirectory(prefix="dsh-source-contract-") as location:
             repo = Path(location)
             source_id = "EXP-second-harness-002"
@@ -323,7 +305,10 @@ class SourceContractTest(unittest.TestCase):
                 "config_markers": ["second-harness"], "required_env_names": [],
             }}}
             catalog_path = repo / "sources.json"
-            catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+            item = catalog["sources"][source_id]
+            base = root.parent
+            (base.parent / "change.yaml").write_text(f"experiment_id: {source_id}\nagent_id: second-harness\n")
+            (base / "harness.yaml").write_text(yaml.safe_dump({"loadable_assets": {"workspace": "dsh/workspace", "preset_root": "dsh/presets", "managed_root": "dsh/managed", "preset_id": item["preset"].split("/")[0], "preset_file": item["preset"], "profile_patch": "dsh/managed/" + item["patch"]}, "credential_environment_keys": []}))
             result = resolve(source_id, repo=repo, sources=catalog_path)
             self.assertEqual(result["agent_id"], "second-harness")
             self.assertEqual(result["required_env_names"], [])
@@ -347,19 +332,19 @@ class SourceContractTest(unittest.TestCase):
                 "config_markers": ["second-harness"], "required_env_names": [],
             }}}
             catalog_path = repo / "sources.json"
-            catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+            item = catalog["sources"][source_id]
+            base = root.parent
+            (base.parent / "change.yaml").write_text(f"experiment_id: {source_id}\nagent_id: second-harness\n")
+            (base / "harness.yaml").write_text(yaml.safe_dump({"loadable_assets": {"workspace": "dsh/workspace", "preset_root": "dsh/presets", "managed_root": "dsh/managed", "preset_id": item["preset"].split("/")[0], "preset_file": item["preset"], "profile_patch": "dsh/managed/" + item["patch"]}, "credential_environment_keys": []}))
             result = resolve(source_id, repo=repo, sources=catalog_path)
             self.assertEqual(result["agent_id"], "second-harness")
             self.assertEqual(result["preset_id"], "second-harness-variant")
 
-    def test_wrong_experiment_directory_is_rejected(self):
-        with tempfile.TemporaryDirectory(prefix="dsh-source-contract-") as location:
-            catalog_path = Path(location) / "sources.json"
-            catalog = json.loads((ASSETS / "config/sources.json").read_text(encoding="utf-8"))
-            catalog["sources"][resolve()["experiment_id"]]["candidate_root"] = "evolution/experiments/other/candidate/dsh"
-            catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
-            with self.assertRaisesRegex(ValueError, "does not belong"):
-                resolve(sources=catalog_path)
+    def test_unrelated_or_malformed_registry_is_ignored(self):
+        with tempfile.TemporaryDirectory() as directory:
+            catalog = Path(directory) / "sources.json"
+            catalog.write_text("invalid old registry")
+            self.assertEqual(resolve(sources=catalog)["agent_id"], "security-operations-expert")
 
     def test_nested_source_file_symlink_is_rejected(self):
         with tempfile.TemporaryDirectory(prefix="dsh-source-contract-") as location:
@@ -381,7 +366,10 @@ class SourceContractTest(unittest.TestCase):
                 "config_markers": ["second-harness"], "required_env_names": [],
             }}}
             catalog_path = repo / "sources.json"
-            catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+            item = catalog["sources"][source_id]
+            base = root.parent
+            (base.parent / "change.yaml").write_text(f"experiment_id: {source_id}\nagent_id: second-harness\n")
+            (base / "harness.yaml").write_text(yaml.safe_dump({"loadable_assets": {"workspace": "dsh/workspace", "preset_root": "dsh/presets", "managed_root": "dsh/managed", "preset_id": item["preset"].split("/")[0], "preset_file": item["preset"], "profile_patch": "dsh/managed/" + item["patch"]}, "credential_environment_keys": []}))
             with self.assertRaisesRegex(ValueError, "unsafe source file"):
                 resolve(source_id, repo=repo, sources=catalog_path)
 
@@ -392,7 +380,8 @@ class SourceContractTest(unittest.TestCase):
             root = repo / "evolution/experiments" / source_id / "candidate/dsh"
             for name in ("workspace", "presets", "managed"):
                 (root / name).mkdir(parents=True)
-            (root / "presets/agent.cordis.yml").write_text("preset", encoding="utf-8")
+            (root / "presets/second-harness").mkdir()
+            (root / "presets/second-harness/agent.cordis.yml").write_text("preset", encoding="utf-8")
             patch = root / "managed/second.patch.yml"
             patch.write_text("[]", encoding="utf-8")
             os.link(patch, root / "managed/shared.patch.yml")
@@ -400,11 +389,14 @@ class SourceContractTest(unittest.TestCase):
                 "agent_id": "second-harness",
                 "candidate_root": f"evolution/experiments/{source_id}/candidate/dsh",
                 "profile": "web", "patch": "second.patch.yml",
-                "preset": "agent.cordis.yml", "guard": None,
+                "preset": "second-harness/agent.cordis.yml", "guard": None,
                 "config_markers": ["second-harness"], "required_env_names": [],
             }}}
             catalog_path = repo / "sources.json"
-            catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+            item = catalog["sources"][source_id]
+            base = root.parent
+            (base.parent / "change.yaml").write_text(f"experiment_id: {source_id}\nagent_id: second-harness\n")
+            (base / "harness.yaml").write_text(yaml.safe_dump({"loadable_assets": {"workspace": "dsh/workspace", "preset_root": "dsh/presets", "managed_root": "dsh/managed", "preset_id": item["preset"].split("/")[0], "preset_file": item["preset"], "profile_patch": "dsh/managed/" + item["patch"]}, "credential_environment_keys": []}))
             with self.assertRaisesRegex(ValueError, "source file"):
                 resolve(source_id, repo=repo, sources=catalog_path)
 

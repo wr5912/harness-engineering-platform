@@ -603,7 +603,10 @@ test('真实实例 handler 接收助手一次确认的冻结参数，策略过�
   const adapter = join(f.root, 'runtime/adapters/dsh-container')
   const callsPath = join(f.root, 'dsh-dev.calls')
   mkdirSync(adapter, { recursive: true })
-  writeFileSync(join(adapter, 'sources.json'), JSON.stringify({ sources: { 'EXP-real-agent-002': { agent_id: 'real-agent' } } }))
+  const versionRoot = join(f.root, 'evolution/experiments/EXP-real-agent-002')
+  mkdirSync(join(versionRoot, 'candidate'), { recursive: true })
+  writeFileSync(join(versionRoot, 'change.yaml'), 'experiment_id: EXP-real-agent-002\nagent_id: real-agent\n')
+  writeFileSync(join(versionRoot, 'candidate/harness.yaml'), 'loadable_assets:\n  workspace: dsh/workspace\n  preset_root: dsh/presets\n  managed_root: dsh/managed\n  preset_id: real-agent\n  profile_patch: dsh/managed/real.patch.yml\n')
   writeFileSync(join(adapter, 'dsh-dev'), `const fs = require('node:fs')
 const args = process.argv.slice(2)
 fs.appendFileSync(${JSON.stringify(callsPath)}, JSON.stringify(args) + '\\n')
@@ -771,6 +774,18 @@ test('MCP 配置使用数据仓库 revision，调试管理复用实际 dispatche
   assert.equal(calls.length, 1, '直接桥接拒绝凭据修改，不调用配置保存')
   await bridge('sources/list', { serverId: 'soc' }, signal)
   assert.equal(calls[1].action, 'sources')
+})
+
+test('源码变量式凭据引用可以编辑，读回正文和摘要保持一致', async t => {
+  const content = 'export const auth = options => `Bearer ${options.token}`;\n'
+  const f = fixture(t, endpoint => endpoint === 'agents/edit/read' ? { ok: true, value: { content, sha256: sha256(content), content_sha256: sha256(content), editable: true, redacted: false } } : undefined)
+  const id = (await f.rpc('session', {})).value.session_id
+  const read = await f.execute(id, 'agents', 'edit/read', { experiment_id: 'EXP-test-agent-001', path: 'candidate/dsh/managed/bridge.ts' })
+  assert.equal(read.result.value.content, content)
+  assert.equal(read.result.value.sha256, sha256(content))
+  const saved = await f.execute(id, 'agents', 'edit/apply', { experiment_id: 'EXP-test-agent-001', edits: [{ path: 'candidate/dsh/managed/bridge.ts', content, expected_sha256: sha256(content) }] })
+  assert.equal(saved.state, 'completed')
+  assert.equal(f.calls.find(call => call.endpoint === 'agents/edit/apply').input.edits[0].content, content)
 })
 
 test('完整融合方案经校验后执行并返回原工具，冻结的工具参数保持不变', async t => {
@@ -1250,8 +1265,8 @@ test('真实Git回退覆盖本任务编辑与装配，恢复配置和模式、�
   write(base + agentFile, original); write(base + preset, '[]\n'); write(base + 'dsh/managed/test.patch.yml', '[]\n')
   write(base + script, 'original executable asset\n'); chmodSync(join(root, base, script), 0o755)
   write(`evolution/experiments/${experiment}/change.yaml`, `experiment_id: ${experiment}\nagent_id: test-agent\nbaseline_ref: none:first-experiment\n`)
-  const sources = Object.fromEntries([experiment, donor].map(id => [id, { agent_id: 'test-agent', candidate_root: `evolution/experiments/${id}/candidate/dsh`, patch: 'test.patch.yml', preset: 'test-agent/agent.cordis.yml' }]))
-  write('config/sources.json', JSON.stringify({ sources }))
+  write(base + 'harness.yaml', 'loadable_assets:\n  workspace: dsh/workspace\n  preset_root: dsh/presets\n  managed_root: dsh/managed\n  preset_id: test-agent\n  profile_patch: dsh/managed/test.patch.yml\n')
+  write(`evolution/experiments/${donor}/change.yaml`, `experiment_id: ${donor}\nagent_id: test-agent\nbaseline_ref: none:first-experiment\n`)
   const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
   git('init'); git('add', '.'); git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-m', '固定回退父版')
   const sourceRef = `git:${git('rev-parse', 'HEAD')}`

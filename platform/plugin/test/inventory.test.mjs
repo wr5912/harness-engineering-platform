@@ -22,6 +22,7 @@ test('查询真实目录、Run 归属与来源，过滤不符合资产合同的�
     'evolution/experiments/EXP-test-agent-002', 'evolution/experiments/not-an-experiment']) {
     mkdirSync(join(root, path), { recursive: true })
   }
+  for (const id of ['EXP-test-agent-001', 'EXP-test-agent-002', 'EXP-test-agent-003-r123456789abc']) writeFileSync(join(root, `evolution/experiments/${id}/change.yaml`), `experiment_id: ${id}\nagent_id: test-agent\n`)
   writeFileSync(join(root, 'agents/file-agent'), '')
   const result = inventory(root)
   assert.equal(result.root, root)
@@ -45,6 +46,7 @@ test('空仓库是成功查询；缺失根与不可读取 Run 路径是失败', 
   assert.equal(missing.error.code, 'asset_read_failed')
   assert.equal(missing.error.details.filesystem_code, 'ENOENT')
   mkdirSync(join(root, 'evolution/experiments/EXP-test-agent-001'), { recursive: true })
+  writeFileSync(join(root, 'evolution/experiments/EXP-test-agent-001/change.yaml'), 'experiment_id: EXP-test-agent-001\nagent_id: test-agent\n')
   writeFileSync(join(root, 'evolution/experiments/EXP-test-agent-001/runs'), '')
   const unreadable = await createInventoryHandler(root)('inventory', {}, new AbortController().signal)
   assert.equal(unreadable.ok, false)

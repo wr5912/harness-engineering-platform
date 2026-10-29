@@ -1,6 +1,6 @@
 # DSH 容器薄适配层
 
-本目录固定官方 DeepSeek Harness（DSH）源码构建身份和卷装载方式；不开发、不复制 DSH Runtime 源码到本仓库，也不把宿主机 Codex 项目协作配置交给 DSH。`source.lock.json` 是全仓唯一的当前 DSH 版本声明；数据工作区的 `config/sources.json` 声明可选择的 Experiment Candidate。新增来源须提供自己的 Candidate 资产，不能只改卷路径。
+本目录固定官方 DeepSeek Harness（DSH）源码构建身份和卷装载方式；不开发、不复制 DSH Runtime 源码到本仓库，也不把宿主机 Codex 项目协作配置交给 DSH。`source.lock.json` 是全仓唯一的当前 DSH 版本声明；各 Experiment 的 `change.yaml` 声明版本身份，`candidate/harness.yaml` 声明装载资产，平台按版本目录发现可选 Candidate。
 
 ## 程序目录与数据工作区
 
@@ -12,7 +12,7 @@ export HARNESS_ASSET_ROOT="$HOME/harness-engineering-platform-data"
 /usr/bin/python3 runtime/adapters/dsh-container/dsh-dev --repo "$HARNESS_ASSET_ROOT" ps --all
 ```
 
-程序保留 `source.lock.json`、运行适配器与校验 Skill；数据工作区保留 `workspace.json`、`config/`、`agents/` 和 `evolution/`。初始化工作区只读取 `config/sources.json`，缺失时明确失败；没有 `workspace.json` 的历史 Git 树和隔离 fixture 才兼容旧的 `runtime/adapters/dsh-container/sources.json`。校验器从程序侧读取规范与实现，不要求把程序文档复制到数据仓库。评测工具使用 Python 3.10 或更新版本，TypeScript 入口需要 Node.js 24；检查 PATH 时应同时核对这两个版本。
+程序保留 `source.lock.json`、运行适配器与校验 Skill；数据工作区保留 `workspace.json`、`config/`、`agents/` 和 `evolution/`。当前装载不依赖全局来源表；固定历史提交的恢复只兼容该提交自身的旧声明，具体合同见[版本身份与装载声明](../../../docs/platform-design/03_存储架构与数据契约.md#版本身份与装载声明)。校验器从程序侧读取规范与实现，不要求把程序文档复制到数据仓库。评测工具使用 Python 3.10 或更新版本，TypeScript 入口需要 Node.js 24；检查 PATH 时应同时核对这两个版本。
 
 ## 源码与镜像身份
 
@@ -67,9 +67,9 @@ Web Profile manifest 与本地 module 路径由受控文件和空的 deny-layer 
 docker compose -f runtime/adapters/dsh-container/verification.compose.yaml config --quiet
 ```
 
-直接运行 Compose 只用于模板级检查；启动业务实例应使用 `dsh-dev up --source`，由它从 `config/sources.json` 解析镜像、Patch、三棵卷和 `required_env_names`，为每个来源生成独立 HOME 与环境变量透传清单。Compose 的变量覆盖不是独立的来源授权接口，不能仅靠替换路径后宣称完成另一 Agent 的装载验收。
+直接运行 Compose 只用于模板级检查；启动业务实例应使用 `dsh-dev up --source`，由它从选定版本的 `candidate/harness.yaml` 解析 Patch、三棵卷及可透传环境变量，并从 `source.lock.json` 解析标准镜像，为每个实例使用独立 HOME。MCP 缺失凭据不阻塞实例启动。Compose 的变量覆盖不是独立的来源授权接口，不能仅靠替换路径后宣称完成另一 Agent 的装载验收。
 
-实际 Agent 需要模型与 MCP 端点时，由调用环境提供相应配置。环境变量按名称传入，本适配器不读取或展开凭据值到 Compose。平台和实例凭据可以使用 Agent 的实例专用仓库文件；LLM API Key 只能来自被 Git 忽略的 `*.llm-api-key` 文件或其他受控运行时来源，不得进入 Git 历史或远端。不得把 `docker compose config` 的完整展开结果、启动 Token URL 或原始日志作为公开研究证据。当前 Candidate 声明为必需的 MCP 缺失时会启动失败，应如实记录依赖缺口。
+实际 Agent 需要模型与 MCP 端点时，由调用环境提供相应配置。环境变量按名称传入，本适配器不读取或展开凭据值到 Compose。平台和实例凭据可以使用 Agent 的实例专用仓库文件；LLM API Key 只能来自被 Git 忽略的 `*.llm-api-key` 文件或其他受控运行时来源，不得进入 Git 历史或远端。不得把 `docker compose config` 的完整展开结果、启动 Token URL 或原始日志作为公开研究证据。MCP 连接或凭据缺失仅影响对应工具，实例仍可启动和处理其他交互；工具调用时报告实际依赖缺口。
 
 `DSH_PERMISSION_MODE=read-only` 是官方 base Profile 的新 Session 进程后备预设；Web 中持久化的 General Settings 仍可能影响后续 Session，因此不能只凭该变量推断实际状态。三棵 Candidate 资产同时使用 Docker `read_only` bind mount。比较变更前后行为时，应在宿主核对 Git diff 和资产摘要，再用新的评测容器与 Session 重建加载。
 
@@ -126,7 +126,7 @@ docker exec -w /opt/dsh-managed/dsh-voice-hub <instance-name> \
 
 `dsh-dev` 是宿主侧实例启动器（只依赖 Python 3 标准库、Docker CLI 和 Compose），把受控 Compose 渲染成仓库外实例。新实例只支持 `--mode eval`（内部模式 `verification`）：`session_preset` 与 `target_preset` 都来自所选来源，注册工作区固定为 `/work/harness/workspace`，三棵 Candidate 资产全部只读，且不挂载判分材料。
 
-目标 Preset 由数据工作区 `config/sources.json` 的 `preset` 路径推出，适配层不内联业务 Agent 名。Harness 创建或修改由宿主开发会话通过项目技能完成，再启动新的评测实例观察结果。
+目标 Preset 由选定版本 `candidate/harness.yaml` 的 `loadable_assets.preset_id` 与可选 `preset_file` 指定，适配层不内联业务 Agent 名。Harness 创建或修改由宿主开发会话通过项目技能完成，再启动新的评测实例观察结果。
 
 ```bash
 python3 runtime/adapters/dsh-container/dsh-dev init test01
@@ -138,7 +138,7 @@ python3 runtime/adapters/dsh-container/dsh-dev logs security-operations-expert-e
 python3 runtime/adapters/dsh-container/dsh-dev down security-operations-expert-eval
 ```
 
-`init <agent-id>` 创建最小 Agent、`EXP-<agent-id>-001-r<12位随机十六进制>` Candidate，并把该 Experiment 登记到数据工作区的 `config/sources.json`；已有 Agent、Experiment 或来源登记时拒绝覆盖。旧编号 Experiment 继续可用。它只创建研究资产，不启动实例、不执行 Evaluation，也不创建 Research Release。
+`init <agent-id>` 创建最小 Agent、`EXP-<agent-id>-001-r<12位随机十六进制>` Candidate，包含该版本独立的装载声明；已有 Agent 或 Experiment 时拒绝覆盖。旧编号 Experiment 继续可用。它只创建研究资产，不启动实例、不执行 Evaluation，也不创建 Research Release。
 
 `--source` 和 `--mode` 始终由用户显式选择；缺失或无值时命令会列出当前可用值并以用法错误退出。`--name` 默认为 `<agent-id>-eval`。新业务智能体实例未指定 `--port` 时，在 `18500–28999` 内选第一个未监听且未被有效实例记录占用的端口；区间已满时明确失败，显式指定端口不受默认区间限制。探测包含仅绑定局域网地址的服务。实际启动时，宿主短期文件锁覆盖选端口到确认本容器持有监听，避免不同账户或数据根并发选中同一端口；已有同名实例复用记录端口。`--dry-run` 只给出建议，不预留端口、不写状态、不调用 Docker，也不要求运行时环境变量。
 

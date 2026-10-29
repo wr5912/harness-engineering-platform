@@ -106,7 +106,7 @@ test('中文与 emoji 按 UTF-8 字节预算完整截断，截断标记依据脱
     write(join(root, `evolution/experiments/${second}/candidate/large.json`), JSON.stringify({ api_key: '仅用于测试脱敏后的长度'.repeat(10000) }))
     const redacted = success(await readAssetDiff(root, { experiment_id: second, path: 'large.json' }))
     assert.equal(redacted.selected.truncated, false)
-    assert.match(redacted.selected.after, /REDACTED/)
+    assert.match(redacted.selected.after, /已隐藏/)
     assert.ok(Buffer.byteLength(redacted.selected.after) < 100)
   } finally { rmSync(root, { recursive: true, force: true }) }
 })
@@ -172,11 +172,12 @@ function createFixture() {
   const root = mkdtempSync(join(tmpdir(), 'new-agent-fixture-'))
   process.env.HARNESS_PROGRAM_ROOT = root
   process.env.HARNESS_ASSET_ROOT = root
-  const files = ['runtime/adapters/dsh-container/dsh-dev', 'runtime/adapters/dsh-container/source_contract.py', 'runtime/adapters/dsh-container/workspace_paths.py', 'runtime/adapters/dsh-container/scenario_analysis.py',
+  const files = ['runtime/adapters/dsh-container/dsh-dev', 'runtime/adapters/dsh-container/version-source.mts', 'platform/plugin/src/agents/version-source.ts', 'runtime/adapters/dsh-container/source_contract.py', 'runtime/adapters/dsh-container/workspace_paths.py', 'runtime/adapters/dsh-container/scenario_analysis.py',
     'runtime/adapters/dsh-container/source.lock.json', 'runtime/adapters/dsh-container/Dockerfile', 'runtime/adapters/dsh-container/apt-mirror.sh', 'runtime/adapters/dsh-container/build-image.sh', 'runtime/adapters/dsh-container/dsh-cli.sh',
     'runtime/adapters/dsh-container/verification-home-controls/locked-bootstrap.env', 'runtime/adapters/dsh-container/verification-home-controls/web-profile.package.json',
     'runtime/research/validate_experiment.py', 'runtime/research/evaluation_contract.py']
   for (const file of files) { mkdirSync(dirname(join(root, file)), { recursive: true }); copyFileSync(join(repo, file), join(root, file)) }
+  symlinkSync(join(plugin, 'node_modules'), join(root, 'platform/plugin/node_modules'), 'dir')
   for (const folder of ['agents', 'evolution/experiments']) mkdirSync(join(root, folder), { recursive: true })
   write(join(root, 'runtime/adapters/dsh-container/sources.json'), JSON.stringify({ schema_version: '1.1', sources: {} }))
   return root
@@ -200,9 +201,9 @@ test('新建向导复用真实 CLI 并保存角色、标准来源与用例，不
     assert.match(evaluation, /U-ROLE-001/); assert.match(evaluation, /日常工作助手/)
     for (const id of ['U-IDENTITY-001', 'U-ROLE-001', business.id]) assert.equal(evaluation.split(`#### ${id} `).length - 1, 1)
     assert.ok(evaluation.includes(business.expected_behavior))
-    const sources = JSON.parse(readFileSync(join(root, 'runtime/adapters/dsh-container/sources.json'), 'utf8'))
-    assert.equal(sources.sources[value.experiment_id].agent_id, input.agent_id)
-    assert.deepEqual(sources.sources[value.experiment_id].required_env_names, ['DEEPSEEK_API_KEY'])
+    const harness = loadYaml(readFileSync(join(experiment, 'candidate/harness.yaml'), 'utf8'))
+    assert.equal(harness.loadable_assets.preset_id, input.agent_id)
+    assert.deepEqual(harness.credential_environment_keys, ['DEEPSEEK_API_KEY'])
     assert.equal(readdirSync(root).some(name => name.startsWith('.platform-agent-create-')), false)
     const again = await createAgent(root, { ...input, role: 'different' })
     assert.equal(again.error.code, 'conflict'); assert.equal(readFileSync(join(experiment, 'candidate/dsh/workspace/AGENTS.md'), 'utf8'), role)
@@ -246,7 +247,8 @@ test('新建失败完整回滚，输入凭据、取消和并发重名不会覆�
     const results = await Promise.all([createAgent(root, input), createAgent(root, input)])
     assert.equal(results.filter(item => item.ok).length, 1)
     assert.equal(results.filter(item => !item.ok && item.error.code === 'conflict').length, 1)
-    assert.equal(Object.keys(JSON.parse(readFileSync(join(root, 'runtime/adapters/dsh-container/sources.json'), 'utf8')).sources).length, 1)
+    assert.equal(readdirSync(join(root, 'evolution/experiments')).length, 1)
+    assert.equal(readFileSync(join(root, 'runtime/adapters/dsh-container/sources.json'), 'utf8'), original)
   } finally { rmSync(root, { recursive: true, force: true }) }
 })
 

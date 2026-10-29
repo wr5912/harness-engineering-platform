@@ -50,6 +50,8 @@ function fixture() {
   for (const rel of [
     'runtime/adapters/dsh-container/dsh-eval',
     'runtime/adapters/dsh-container/source_contract.py',
+    'runtime/adapters/dsh-container/version-source.mts',
+    'platform/plugin/src/agents/version-source.ts',
     'runtime/adapters/dsh-container/workspace_paths.py',
     'runtime/adapters/dsh-container/scenario_analysis.py',
     'runtime/adapters/dsh-container/run_record.py',
@@ -59,6 +61,7 @@ function fixture() {
     'runtime/research/validate_repository.py',
     'runtime/research/inspect_source.py',
   ]) copyFixtureFile(root, rel)
+  symlinkSync(join(plugin, 'node_modules'), join(root, 'platform/plugin/node_modules'), 'dir')
   for (const name of ['Dockerfile', 'apt-mirror.sh', 'build-image.sh', 'dsh-cli.sh']) {
     write(join(root, 'runtime/adapters/dsh-container', name), `${name}\n`)
   }
@@ -94,7 +97,7 @@ function fixture() {
   write(join(root, 'evolution/experiments/EXP-test-agent-001/hypothesis.md'), '# Hypothesis\n\n验证基础资产。参考 EXP-test-agent-099 但不声明继承。\n')
   write(join(root, 'evolution/experiments/EXP-test-agent-001/evaluation/observations.md'), '# Observations\n\n尚未执行。\n')
   write(join(root, 'evolution/experiments/EXP-test-agent-001/decision.md'), '# Decision\n\n状态：continue\n')
-  write(join(root, 'evolution/experiments/EXP-test-agent-001/candidate/harness.yaml'), 'name: test\n')
+  write(join(root, 'evolution/experiments/EXP-test-agent-001/candidate/harness.yaml'), 'name: test\nloadable_assets:\n  workspace: dsh/workspace\n  preset_root: dsh/presets\n  managed_root: dsh/managed\n  preset_id: test-agent\n  preset_file: test-agent/preset.yml\n  profile_patch: dsh/managed/test-agent.patch.yml\ncredential_environment_keys: []\n')
   write(join(root, 'evolution/experiments/EXP-test-agent-001/candidate/roles/analyst/AGENTS.md'), '# Analyst\n')
   write(join(root, 'evolution/experiments/EXP-test-agent-001/candidate/dsh/workspace/input.txt'), 'workspace\n')
   write(join(root, 'evolution/experiments/EXP-test-agent-001/candidate/dsh/managed/test-agent.patch.yml'), 'patch: test\n')
@@ -117,6 +120,7 @@ function fixture() {
       },
     },
   }, null, 2) + '\n')
+  write(join(root, '.gitignore'), 'node_modules/\n__pycache__/\n')
   run(root, 'git', ['init'])
   run(root, 'git', ['config', 'user.email', 'test@example.invalid'])
   run(root, 'git', ['config', 'user.name', 'Test'])
@@ -188,18 +192,15 @@ test('版本枚举跳过仅有忽略产物的遗留目录，缺失真实清单�
   const untrackedBase = `evolution/experiments/${untrackedId}`
   write(join(root, untrackedBase, 'hypothesis.md'), '# 尚未写入版本清单\n')
   const untracked = await handler('list', {}, new AbortController().signal)
-  assert.equal(untracked.ok, false)
-  assert.equal(untracked.error.code, 'asset_read_failed')
-  assert.equal(untracked.error.message, '版本清单不存在')
-  assert.equal(untracked.error.details.path, `${untrackedBase}/change.yaml`)
+    assert.equal(untracked.ok, true)
+    assert.equal(untracked.value.experiments.find(item => item.id === untrackedId).status, 'unavailable')
+    assert.equal((await rpc(handler, 'detail', { agent_id: 'test-agent', experiment_id: 'EXP-test-agent-001' })).experiment.id, 'EXP-test-agent-001')
   await rm(join(root, untrackedBase), { recursive: true })
 
   await rm(join(root, 'evolution/experiments/EXP-test-agent-001/change.yaml'))
   const tracked = await handler('list', {}, new AbortController().signal)
-  assert.equal(tracked.ok, false)
-  assert.equal(tracked.error.code, 'asset_read_failed')
-  assert.equal(tracked.error.message, '版本清单不存在')
-  assert.equal(tracked.error.details.path, 'evolution/experiments/EXP-test-agent-001/change.yaml')
+  assert.equal(tracked.ok, true)
+  assert.equal(tracked.value.experiments.find(item => item.id === 'EXP-test-agent-001').status, 'unavailable')
 })
 
 test('agents detail reads manifest, selectable versions, real cases, refs and editable files', async () => {
@@ -208,7 +209,7 @@ test('agents detail reads manifest, selectable versions, real cases, refs and ed
   try {
     const detail = await rpc(createAgentsHandler(fx.root), 'detail', { agent_id: 'test-agent' })
     assert.equal(detail.agent.manifest.agent_id, 'test-agent')
-    assert.equal(detail.declared.catalog_source.candidate_root, 'evolution/experiments/EXP-test-agent-001/candidate/dsh')
+    assert.equal(detail.declared.loadable_source.candidate_root, 'evolution/experiments/EXP-test-agent-001/candidate/dsh')
     assert.equal(detail.loaded_instance.status, 'not_queried')
     assert.equal(detail.evaluation.cases[0].id, 'U-CASE-001')
     assert.equal(detail.fusion.status, 'declared')
@@ -227,7 +228,7 @@ test('智能体描述只投影已启用资产的名称、说明和发现的 Skil
   const fx = fixture()
   try {
     const base = 'evolution/experiments/EXP-test-agent-001/candidate'
-    write(join(fx.root, `${base}/harness.yaml`), 'agent:\n  name: 当前启用智能体\n')
+    write(join(fx.root, `${base}/harness.yaml`), readFileSync(join(fx.root, `${base}/harness.yaml`), 'utf8') + 'agent:\n  name: 当前启用智能体\n')
     write(join(fx.root, `${base}/dsh/presets/test-agent/preset.yml`), 'description: 业务资产说明\n')
     write(join(fx.root, `${base}/dsh/workspace/.agents/skills/check-state/SKILL.md`), '---\nname: 状态核对\ndescription: 查询当前状态\n---\n\n# 状态核对\n')
     addVersion(fx.root, 'EXP-test-agent-002', 'status: draft\n')
@@ -420,6 +421,8 @@ test('确认前不创建，固定来源路径随 Candidate 重定位，重复确
     const sources = JSON.parse(readFileSync(sourceFile, 'utf8'))
     sources.sources['EXP-test-agent-001'].profile_manifest = 'evolution/experiments/EXP-test-agent-001/candidate/dsh/managed/web-profile.package.json'
     write(sourceFile, JSON.stringify(sources))
+    const harnessPath = join(fx.root, 'evolution/experiments/EXP-test-agent-001/candidate/harness.yaml')
+    write(harnessPath, readFileSync(harnessPath, 'utf8').replace('  preset_id:', '  profile_manifest: dsh/managed/web-profile.package.json\n  preset_id:'))
     write(join(fx.root, sources.sources['EXP-test-agent-001'].profile_manifest), '{"name":"fixture-profile"}\n')
     run(fx.root, 'git', ['add', '.'])
     run(fx.root, 'git', ['commit', '-m', 'profile'])
@@ -430,8 +433,8 @@ test('确认前不创建，固定来源路径随 Candidate 重定位，重复确
     assert.equal((await rpc(handler, 'fusion/proposal', { agent_id: 'test-agent' })).proposal.assistant_session_id, 'session-fixture')
     const created = await rpc(handler, 'fusion/confirm', { preview_id: preview.preview_id, confirmed: true })
     assert.equal(created.creation_status, 'integrating')
-    const source = JSON.parse(readFileSync(sourceFile, 'utf8')).sources[created.experiment_id]
-    assert.equal(source.profile_manifest, `evolution/experiments/${created.experiment_id}/candidate/dsh/managed/web-profile.package.json`)
+    const source = loadYaml(readFileSync(join(fx.root, `evolution/experiments/${created.experiment_id}/candidate/harness.yaml`), 'utf8')).loadable_assets
+    assert.equal(source.profile_manifest, 'dsh/managed/web-profile.package.json')
     const status = await rpc(handler, 'fusion/status', { experiment_id: created.experiment_id })
     assert.equal(status.creation.assistant_session_id, 'session-fixture')
     assert.deepEqual(status.creation.plan.features, sampleFeatures)
@@ -566,124 +569,75 @@ test('未变化的融合预览可创建版本，但缺少真实验证不能完�
   }
 })
 
-test('create validation failure restores catalog and removes dangling source', async () => {
+test('派生只校验选定固定父版，不执行全仓、评测或当前登记表', async () => {
   const { createAgentsHandler } = await loadServer()
   const fx = fixture()
   try {
+    write(join(fx.root, 'runtime/research/validate_experiment.py'), 'raise RuntimeError("must not execute")\n')
+    write(join(fx.root, 'runtime/adapters/dsh-container/sources.json'), '{malformed')
+    write(join(fx.root, 'evolution/experiments/EXP-other-agent-001/change.yaml'), 'bad: [yaml')
     const handler = createAgentsHandler(fx.root)
-    const before = readFileSync(join(fx.root, 'runtime/adapters/dsh-container/sources.json'), 'utf8')
-    const detail = await rpc(handler, 'detail', { agent_id: 'test-agent' })
-    write(join(fx.root, 'runtime/research/validate_experiment.py'), 'import sys\nraise SystemExit("bad validator")\n')
-    await assert.rejects(
-      () => rpc(handler, 'create', {
-        agent_id: 'test-agent',
-        parent_ref: `git:${fx.commit}`,
-        parent_experiment_id: 'EXP-test-agent-001',
-        catalog_sha256: detail.declared.source_catalog_sha256,
-        research_question: '验证校验失败时不会留下 dangling source',
-      }),
-      /command_failed:/,
-    )
-    assert.equal(readFileSync(join(fx.root, 'runtime/adapters/dsh-container/sources.json'), 'utf8'), before)
-    const sources = JSON.parse(before).sources
-    assert.deepEqual(Object.keys(sources), ['EXP-test-agent-001'])
-  } finally {
-    await rm(fx.root, { recursive: true, force: true })
-  }
+    const created = await rpc(handler, 'create', { agent_id: 'test-agent', parent_ref: `git:${fx.commit}`, parent_experiment_id: 'EXP-test-agent-001', research_question: '只恢复选定父版' })
+    assert.equal(created.validation.scope, 'selected-version')
+    assert.equal(created.dry_run, undefined)
+    assert.equal(readFileSync(join(fx.root, 'runtime/adapters/dsh-container/sources.json'), 'utf8'), '{malformed')
+  } finally { await rm(fx.root, { recursive: true, force: true }) }
 })
 
-test('create source_contract failure restores catalog and removes dangling source', async () => {
+test('父版缺少装载入口时完整清理本次目录，不触碰其他版本', async () => {
   const { createAgentsHandler } = await loadServer()
   const fx = fixture()
   try {
-    const sourcesPath = join(fx.root, 'runtime/adapters/dsh-container/sources.json')
-    const badCatalog = JSON.parse(readFileSync(sourcesPath, 'utf8'))
-    badCatalog.sources['EXP-test-agent-001'].preset = 'missing/preset.yml'
-    write(sourcesPath, JSON.stringify(badCatalog, null, 2) + '\n')
-    run(fx.root, 'git', ['add', 'runtime/adapters/dsh-container/sources.json'])
-    run(fx.root, 'git', ['commit', '-m', 'bad preset catalog'])
-    const badCommit = run(fx.root, 'git', ['rev-parse', 'HEAD'])
-
-    const handler = createAgentsHandler(fx.root)
-    const before = readFileSync(sourcesPath, 'utf8')
-    const detail = await rpc(handler, 'detail', { agent_id: 'test-agent' })
-    await assert.rejects(
-      () => rpc(handler, 'create', {
-        agent_id: 'test-agent',
-        parent_ref: `git:${badCommit}`,
-        parent_experiment_id: 'EXP-test-agent-001',
-        catalog_sha256: detail.declared.source_catalog_sha256,
-        research_question: '验证 source_contract 失败时不会留下 dangling source',
-      }),
-      /command_failed:/,
-    )
-    assert.equal(readFileSync(sourcesPath, 'utf8'), before)
-    assert.deepEqual(Object.keys(JSON.parse(before).sources), ['EXP-test-agent-001'])
-  } finally {
-    await rm(fx.root, { recursive: true, force: true })
-  }
+    await rm(join(fx.root, 'evolution/experiments/EXP-test-agent-001/candidate/dsh/presets/test-agent/preset.yml'))
+    run(fx.root, 'git', ['add', '.']); run(fx.root, 'git', ['commit', '-m', 'missing entry'])
+    const commit = run(fx.root, 'git', ['rev-parse', 'HEAD'])
+    await assert.rejects(() => rpc(createAgentsHandler(fx.root), 'create', { agent_id: 'test-agent', parent_ref: `git:${commit}`, parent_experiment_id: 'EXP-test-agent-001', research_question: '验证失败恢复' }), /父版缺少装载入口/)
+    assert.deepEqual(readdirSync(join(fx.root, 'evolution/experiments')), ['EXP-test-agent-001'])
+  } finally { await rm(fx.root, { recursive: true, force: true }) }
 })
 
-test('create keeps files and returns needs_recovery when catalog changed after write', async () => {
+test('固定父版仅凭版本声明恢复，返回选定版本校验结果', async () => {
   const { createAgentsHandler } = await loadServer()
   const fx = fixture()
   try {
     const handler = createAgentsHandler(fx.root)
-    const detail = await rpc(handler, 'detail', { agent_id: 'test-agent' })
-    write(join(fx.root, 'runtime/research/validate_experiment.py'), [
-      'import json',
-      'from pathlib import Path',
-      'path = Path("runtime/adapters/dsh-container/sources.json")',
-      'data = json.loads(path.read_text(encoding="utf-8"))',
-      'data["external_change"] = True',
-      'path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")',
-      'raise SystemExit("bad validator with external catalog change")',
-      '',
-    ].join('\n'))
-    await assert.rejects(
-      () => rpc(handler, 'create', {
-        agent_id: 'test-agent',
-        parent_ref: `git:${fx.commit}`,
-        parent_experiment_id: 'EXP-test-agent-001',
-        catalog_sha256: detail.declared.source_catalog_sha256,
-        research_question: '验证外部 catalog 变化时保留恢复现场',
-      }),
-      /needs_recovery:/,
-    )
-    const catalog = JSON.parse(readFileSync(join(fx.root, 'runtime/adapters/dsh-container/sources.json'), 'utf8'))
-    const createdId = Object.keys(catalog.sources).find(id => id !== 'EXP-test-agent-001')
-    assert.ok(createdId)
-    assert.equal(existsSync(join(fx.root, 'evolution/experiments', createdId)), true)
-  } finally {
-    await rm(fx.root, { recursive: true, force: true })
-  }
-})
-
-test('create copies fixed git parent candidate, validates source and dry-runs dsh-eval', async () => {
-  const { createAgentsHandler } = await loadServer()
-  const fx = fixture()
-  try {
-    const handler = createAgentsHandler(fx.root)
-    const detail = await rpc(handler, 'detail', { agent_id: 'test-agent' })
     const created = await rpc(handler, 'create', {
       agent_id: 'test-agent',
       parent_ref: `git:${fx.commit}`,
       parent_experiment_id: 'EXP-test-agent-001',
-      catalog_sha256: detail.declared.source_catalog_sha256,
       research_question: '验证从当前版本派生新 Candidate 后仍能定位 DSH source',
     })
     assert.match(created.experiment_id, /^EXP-test-agent-002-r[0-9a-f]{12}$/)
     assert.equal(created.validation.valid, true)
-    assert.deepEqual(created.dry_run.case_ids, ['U-CASE-001'])
-    assert.equal(created.dry_run.preflight_scope, 'source-and-cases')
-    assert.equal(readFileSync(join(fx.root, `evolution/experiments/${created.experiment_id}/candidate/harness.yaml`), 'utf8'), 'name: test\n')
+    assert.equal(created.validation.scope, 'selected-version')
+    assert.equal(created.dry_run, undefined)
+    assert.equal(loadYaml(readFileSync(join(fx.root, `evolution/experiments/${created.experiment_id}/candidate/harness.yaml`), 'utf8')).loadable_assets.preset_file, 'test-agent/preset.yml')
     assert.equal(existsSync(join(fx.root, `evolution/experiments/${created.experiment_id}/candidate/RuntimeHOME/session.txt`)), false)
     const sources = JSON.parse(readFileSync(join(fx.root, 'runtime/adapters/dsh-container/sources.json'), 'utf8'))
-    assert.equal(sources.sources[created.experiment_id].candidate_root, `evolution/experiments/${created.experiment_id}/candidate/dsh`)
+    assert.equal(sources.sources[created.experiment_id], undefined)
     assert.equal(readFileSync(join(fx.root, `evolution/experiments/${created.experiment_id}/change.yaml`), 'utf8').includes('parent_experiment_id: "EXP-test-agent-001"'), true)
   } finally {
     await rm(fx.root, { recursive: true, force: true })
   }
+})
+
+test('派生版本沿用固定父版的自定义 Profile 清单路径', async () => {
+  const { createAgentsHandler } = await loadServer()
+  const fx = fixture()
+  try {
+    const manifest = join(fx.root, 'evolution/experiments/EXP-test-agent-001/candidate/harness.yaml')
+    writeFileSync(manifest, readFileSync(manifest, 'utf8').replace('  preset_id:', '  profile_manifest: dsh/managed/custom/profile.package.json\n  preset_id:'))
+    write(join(fx.root, 'evolution/experiments/EXP-test-agent-001/candidate/dsh/managed/custom/profile.package.json'), '{}\n')
+    run(fx.root, 'git', ['add', '.'])
+    run(fx.root, 'git', ['commit', '-m', 'custom profile'])
+    const commit = run(fx.root, 'git', ['rev-parse', 'HEAD'])
+    const created = await rpc(createAgentsHandler(fx.root), 'create', {
+      agent_id: 'test-agent', parent_ref: `git:${commit}`,
+      parent_experiment_id: 'EXP-test-agent-001', research_question: '保留固定父版装载路径',
+    })
+    assert.equal(created.validation.source.profile_manifest, `${created.path}/candidate/dsh/managed/custom/profile.package.json`)
+    assert.equal(readFileSync(join(fx.root, created.validation.source.profile_manifest), 'utf8'), '{}\n')
+  } finally { await rm(fx.root, { recursive: true, force: true }) }
 })
 
 for (const changedLock of [false, true]) test(`固定父版派生${changedLock ? '不借用锁已变化的依赖' : '复用匹配锁的忽略依赖并保持相对链接'}`, async () => {
@@ -753,15 +707,15 @@ test('edit reads existing content, uses preview hash, rejects unsafe writes and 
   try {
     const handler = createAgentsHandler(fx.root)
     const read = await rpc(handler, 'edit/read', { experiment_id: 'EXP-test-agent-001', path: 'candidate/harness.yaml' })
-    assert.equal(read.content, 'name: test\n')
+    assert.equal(read.content, 'name: test\nloadable_assets:\n  workspace: dsh/workspace\n  preset_root: dsh/presets\n  managed_root: dsh/managed\n  preset_id: test-agent\n  preset_file: test-agent/preset.yml\n  profile_patch: dsh/managed/test-agent.patch.yml\ncredential_environment_keys: []\n')
     await assert.rejects(
       () => rpc(handler, 'edit/apply', { experiment_id: 'EXP-test-agent-001', edits: [{ path: 'candidate/harness.yaml', content: 'name: changed\n', expected_sha256: 'bad' }] }),
       /conflict:/,
     )
-    const preview = await rpc(handler, 'edit/preview', { experiment_id: 'EXP-test-agent-001', edits: [{ path: 'candidate/harness.yaml', content: 'name: changed\n', expected_sha256: read.sha256 }] })
+    const preview = await rpc(handler, 'edit/preview', { experiment_id: 'EXP-test-agent-001', edits: [{ path: 'candidate/harness.yaml', content: read.content.replace('name: test', 'name: changed'), expected_sha256: read.sha256 }] })
     assert.equal(preview.edits[0].before_sha256, read.sha256)
-    await rpc(handler, 'edit/apply', { experiment_id: 'EXP-test-agent-001', edits: [{ path: 'candidate/harness.yaml', content: 'name: changed\n', expected_sha256: preview.edits[0].before_sha256 }] })
-    assert.equal(readFileSync(join(fx.root, 'evolution/experiments/EXP-test-agent-001/candidate/harness.yaml'), 'utf8'), 'name: changed\n')
+    await rpc(handler, 'edit/apply', { experiment_id: 'EXP-test-agent-001', edits: [{ path: 'candidate/harness.yaml', content: read.content.replace('name: test', 'name: changed'), expected_sha256: preview.edits[0].before_sha256 }] })
+    assert.equal(readFileSync(join(fx.root, 'evolution/experiments/EXP-test-agent-001/candidate/harness.yaml'), 'utf8'), read.content.replace('name: test', 'name: changed'))
     await assert.rejects(
       () => rpc(handler, 'edit/apply', { experiment_id: 'EXP-test-agent-001', edits: [{ path: 'evolution/experiments/EXP-test-agent-001/runs/run-11111111-1111-4111-8111-111111111111/run.json', content: '{}', expected_sha256: 'bad' }] }),
       /path_rejected:/,
@@ -799,8 +753,8 @@ test('edit reads existing content, uses preview hash, rejects unsafe writes and 
     ].join('\n') }] })
     assert.equal(evalPreview.edits[0].changed, true)
     assert.equal(evalPreview.dry_run.mode, 'dry')
-    assert.equal(evalPreview.dry_run.preflight_scope, 'source-and-cases')
-    assert.deepEqual(evalPreview.dry_run.case_ids, ['U-CASE-002'])
+    assert.equal(evalPreview.dry_run.preflight_scope, 'changed-files')
+    assert.equal(evalPreview.dry_run.case_ids, undefined)
     assert.match(readFileSync(join(fx.root, 'agents/test-agent/evaluation.md'), 'utf8'), /U-CASE-001/)
     assert.equal(readFileSync(join(fx.root, 'evolution/experiments/EXP-test-agent-001/runs/run-11111111-1111-4111-8111-111111111111/run.json'), 'utf8'), beforeRun)
   } finally {
@@ -835,7 +789,7 @@ test('资产树展示真实嵌套目录，二进制只读，排除运行目录�
   } finally { await rm(fx.root, { recursive: true, force: true }) }
 })
 
-test('直接保存也执行草稿 dry；格式或来源失败不写入，缺失环境仅提示，!!js 不执行', async () => {
+test('保存仅检查本次草稿；格式或装载声明失败不写入，!!js 不执行', async () => {
   const { createAgentsHandler } = await loadServer()
   const fx = fixture()
   try {
@@ -845,21 +799,44 @@ test('直接保存也执行草稿 dry；格式或来源失败不写入，缺失�
     const original = await rpc(handler, 'edit/read', { experiment_id, path })
     const apply = content => rpc(handler, 'edit/apply', { experiment_id, edits: [{ path, content, expected_sha256: original.sha256 }] })
     await assert.rejects(() => apply('name: [invalid\n'), /草稿格式无效/)
-    const catalogPath = join(fx.root, 'runtime/adapters/dsh-container/sources.json')
-    const catalog = JSON.parse(readFileSync(catalogPath, 'utf8'))
-    catalog.sources[experiment_id].preset = 'missing/preset.yml'
-    write(catalogPath, JSON.stringify(catalog))
-    await assert.rejects(() => apply('name: valid\n'), /草稿 dry 校验失败/)
+    await assert.rejects(() => apply('name: valid\n'), /装载声明无效/)
     assert.equal((await rpc(handler, 'edit/read', { experiment_id, path })).content, original.content)
-    catalog.sources[experiment_id].preset = 'test-agent/preset.yml'
-    catalog.sources[experiment_id].required_env_names = ['HARNESS_DRAFT_TEST_MISSING_ENV']
-    write(catalogPath, JSON.stringify(catalog))
-    const content = 'name: valid\nconfig: !!js |\n  (() => { throw new Error("must not execute") })()\n'
-    const saved = await apply(content)
-    assert.equal(saved.dry_run.mode, 'dry')
-    assert.deepEqual(saved.dry_run.missing_env_names, ['HARNESS_DRAFT_TEST_MISSING_ENV'])
-    assert.equal((await rpc(handler, 'edit/read', { experiment_id, path })).content, content)
+    const content = original.content + 'config: !!js |\n  (() => { throw new Error("must not execute") })()\n'
+    await assert.rejects(() => apply(content), /装载声明无效/)
+    const saved = await apply(original.content + 'description: valid draft\n')
+    assert.equal(saved.dry_run.preflight_scope, 'changed-files')
+    assert.equal((await rpc(handler, 'edit/read', { experiment_id, path })).content, original.content + 'description: valid draft\n')
     assert.equal(readFileSync(join(fx.root, 'evolution/experiments', experiment_id, 'runs/run-11111111-1111-4111-8111-111111111111/run.json'), 'utf8'), '{"status":"failed"}\n')
+  } finally { await rm(fx.root, { recursive: true, force: true }) }
+})
+
+test('源码变量式凭据引用原样读写，错误语法与脱敏预览不能覆盖文件', async () => {
+  const { createAgentsHandler } = await loadServer()
+  const fx = fixture()
+  try {
+    const handler = createAgentsHandler(fx.root), experiment_id = 'EXP-test-agent-001'
+    const path = 'candidate/dsh/managed/bridge.ts'
+    const file = join(fx.root, 'evolution/experiments', experiment_id, path)
+    const content = 'export const auth = (options: { token: string }) => `Bearer ${options.token}`;\n'
+    write(file, content)
+    const read = () => rpc(handler, 'edit/read', { experiment_id, path })
+    const value = await read()
+    assert.equal(value.content, content)
+    assert.equal(value.sha256, createHash('sha256').update(value.content).digest('hex'))
+    assert.equal(value.content_sha256, value.sha256)
+    assert.equal(value.editable, true)
+    const save = body => rpc(handler, 'edit/apply', { experiment_id, edits: [{ path, content: body, expected_sha256: value.sha256 }] })
+    await assert.rejects(() => save('export const broken = ;'), /草稿格式无效/)
+    assert.equal(readFileSync(file, 'utf8'), content)
+    await save(content + '// updated\n')
+    assert.equal((await read()).content, content + '// updated\n')
+    write(file, "export const token = 'fixture-secret-value-1234';\n")
+    const masked = await read()
+    assert.equal(masked.editable, false)
+    assert.equal(masked.redacted, true)
+    assert.notEqual(masked.sha256, masked.content_sha256)
+    await assert.rejects(() => rpc(handler, 'edit/apply', { experiment_id, edits: [{ path, content: masked.content, expected_sha256: masked.sha256 }] }), /只读预览/)
+    assert.equal(readFileSync(file, 'utf8'), "export const token = 'fixture-secret-value-1234';\n")
   } finally { await rm(fx.root, { recursive: true, force: true }) }
 })
 
@@ -879,7 +856,7 @@ test('JS 草稿预览和直接保存拒绝真实 Guard 属性片段，同批资�
       write(file, original)
       const read = await rpc(handler, 'edit/read', { experiment_id, path })
       const edits = [
-        { path: 'candidate/harness.yaml', content: 'name: must-not-write\n', expected_sha256: harness.sha256 },
+        { path: 'candidate/harness.yaml', content: harness.content.replace('name: test', 'name: must-not-write'), expected_sha256: harness.sha256 },
         { path, content: fragment, expected_sha256: read.sha256 },
       ]
       for (const endpoint of ['edit/preview', 'edit/apply']) {
@@ -944,8 +921,8 @@ test('edit apply rejects traversal, duplicate paths and concurrent same-hash wri
       ] }),
       /重复路径/,
     )
-    const first = rpc(handler, 'edit/apply', { experiment_id: 'EXP-test-agent-001', edits: [{ path: 'candidate/harness.yaml', content: 'name: one\n', expected_sha256: read.sha256 }] })
-    const second = rpc(handler, 'edit/apply', { experiment_id: 'EXP-test-agent-001', edits: [{ path: 'candidate/harness.yaml', content: 'name: two\n', expected_sha256: read.sha256 }] })
+    const first = rpc(handler, 'edit/apply', { experiment_id: 'EXP-test-agent-001', edits: [{ path: 'candidate/harness.yaml', content: read.content.replace('name: test', 'name: one'), expected_sha256: read.sha256 }] })
+    const second = rpc(handler, 'edit/apply', { experiment_id: 'EXP-test-agent-001', edits: [{ path: 'candidate/harness.yaml', content: read.content.replace('name: test', 'name: two'), expected_sha256: read.sha256 }] })
     const results = await Promise.allSettled([first, second])
     assert.equal(results.filter(item => item.status === 'fulfilled').length, 1)
     assert.equal(results.filter(item => item.status === 'rejected' && /conflict:/.test(item.reason.message)).length, 1)

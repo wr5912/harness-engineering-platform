@@ -1,0 +1,58 @@
+{
+  "at": "2026-10-29T03:44:09.619Z",
+  "platform": "http://172.16.138.228:18120/hep/",
+  "bridge": {
+    "path": "evolution/experiments/EXP-security-operations-expert-025-r3f8a8b3da3f1/candidate/dsh/managed/threat-analysis/mcp-group-bridge.ts",
+    "editable": true,
+    "redacted": false,
+    "bytes_match": true,
+    "sha256": "2cec7a66ece71df835f3c2429ee4ccf75b2dc9c109a6f84b739ab1482a992267",
+    "variable_reference_preserved": true
+  },
+  "versions": {
+    "count": 13,
+    "errors": {}
+  },
+  "sessions": {
+    "count": 201,
+    "target_preserved": true
+  },
+  "running_instances": [
+    {
+      "name": "emergency-action2",
+      "port": 18509,
+      "container": "56f3d127e377",
+      "unchanged": true
+    },
+    {
+      "name": "emergency-action8",
+      "port": 18518,
+      "container": "df0cb382ee56",
+      "unchanged": true
+    },
+    {
+      "name": "lite-local223-validation",
+      "port": 18513,
+      "container": "7f06cfe5c3eb",
+      "unchanged": true
+    },
+    {
+      "name": "sec-ops-v024-qwen35-4b-open",
+      "port": 18516,
+      "container": "2d4604765bac",
+      "unchanged": true
+    },
+    {
+      "name": "test-zhouyang-police",
+      "port": 18510,
+      "container": "b88fb6144e33",
+      "unchanged": true
+    },
+    {
+      "name": "threat-analysis-test001",
+      "port": 18517,
+      "container": "3962f72543d5",
+      "unchanged": true
+    }
+  ]
+}

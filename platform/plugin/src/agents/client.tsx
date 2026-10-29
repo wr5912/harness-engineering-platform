@@ -576,7 +576,7 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
   }
 
   async function doPreview() {
-    if (!detail || !editPath || !editHash) return
+    if (!detail || !editPath || !editHash || assetInfo?.editable === false) return
     const request = editRequest.current
     setEditBusy(true)
     setEditMessage('')
@@ -595,8 +595,8 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
   }
 
   async function doApply() {
-    if (!detail || !editHash) return
-    const request = detailRequest.current
+    if (!detail || !editHash || assetInfo?.editable === false) return
+    const selection = selectionRequest.current
     const edit = editRequest.current
     setEditBusy(true)
     setEditMessage('正在进行 dry 校验…')
@@ -605,17 +605,15 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
         experiment_id: detail.experiment.id,
         edits: [{ path: editPath, content: editBody, expected_sha256: editHash }],
       })
-      if (request !== detailRequest.current || edit !== editRequest.current) return
+      if (selection !== selectionRequest.current || edit !== editRequest.current) return
       setEditPreview(null)
-      if (!await loadEditFile(editPath) || request !== detailRequest.current) return
+      if (!await loadEditFile(editPath) || selection !== selectionRequest.current) return
       const currentEdit = editRequest.current
-      const refresh = detailRequest.current + 1
       await refreshDetail()
-      if (refresh !== detailRequest.current || currentEdit !== editRequest.current) return
-      const missing = value.dry_run.missing_env_names ?? []
-      setEditMessage(`dry 校验通过，已保存 ${value.written?.[0]?.path}${missing.length ? `；实际运行前需补齐环境变量：${missing.join('、')}` : ''}`)
+      if (selection !== selectionRequest.current || currentEdit !== editRequest.current) return
+      setEditMessage(`文件校验通过，已保存 ${value.written?.[0]?.path}`)
     } catch (err) {
-      if (request === detailRequest.current && edit === editRequest.current) setEditMessage(`${(err as Error).message}；草稿已保留。`)
+      if (selection === selectionRequest.current && edit === editRequest.current) setEditMessage(`${(err as Error).message}；草稿已保留。`)
     } finally { setEditBusy(false) }
   }
 
@@ -833,9 +831,9 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
             <div className="agent-evidence-stages"><article><span className="agent-badge">资产声明</span><h3>{detail.declared.source_contract.status === 'unavailable' ? '来源无法解析' : '已解析来源合同'}</h3><p>{detail.declared.source_contract.source_id || `experiment:${detail.experiment.id}`}</p></article><article><span className="agent-badge">实例装载</span><h3>{detail.loaded_instance.status === 'observed' ? `已观察 ${instances.length} 个实例` : '尚无装载观察'}</h3><p>{detail.loaded_instance.note || detail.loaded_instance.reason || '挂载观察不证明当前 Session 已调用能力。'}</p></article><article><span className="agent-badge">调用证据</span><h3>{versionRuns.length ? `${versionRuns.length} 条 Run 记录` : '尚无 Run'}</h3><p>具体能力与执行结果请在报告及轨迹中复核。</p></article></div>
             <h3>特性与关联证据</h3>{detail.features?.length ? <div className="agent-feature-list">{detail.features.map((feature: any) => <article key={feature.id}><h4>{feature.title}</h4><p>{feature.verification}</p>{feature.evidence.length ? <ul>{feature.evidence.map((evidence: any) => <li key={evidence.ref}><code>{evidence.ref}</code> · {evidence.present ? '引用存在，效果需复核' : '未找到证据'}</li>)}</ul> : <p>尚未记录验证证据。</p>}</article>)}</div> : <p>尚无已整理的特性。</p>}
             <details className="agent-source-details"><summary>来源与 Runtime 配置</summary><Fields items={[
-              ['Candidate', detail.declared.catalog_source?.candidate_root], ['Profile', detail.declared.catalog_source?.profile], ['Preset', detail.declared.catalog_source?.preset],
-              ['Patch', detail.declared.catalog_source?.patch], ['Guard', detail.declared.catalog_source?.guard ?? '无'], ['Runtime 版本', detail.declared.source_contract.image?.cli_version],
-              ['镜像', detail.declared.source_contract.image?.local_image_tag], ['环境变量名称', detail.declared.catalog_source?.required_env_names],
+              ['Candidate', detail.declared.loadable_source?.candidate_root], ['Profile', detail.declared.loadable_source?.profile], ['Preset', detail.declared.loadable_source?.preset],
+              ['Patch', detail.declared.loadable_source?.patch], ['Guard', detail.declared.loadable_source?.guard ?? '无'], ['Runtime 版本', detail.declared.source_contract.image?.cli_version],
+              ['镜像', detail.declared.source_contract.image?.local_image_tag], ['环境变量名称', detail.declared.loadable_source?.required_env_names],
             ]} /></details>
           </section>}
           {detail && <section role="tabpanel" id="agent-panel-compute-variants" aria-labelledby="agent-tab-compute-variants" tabIndex={-1} hidden={tab !== 'compute-variants'}>
@@ -858,7 +856,7 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
               <article><h3>资产详情</h3><p>{editPath || '请选择资产'}</p>{/(^|\/)evaluation(?:\.md|\/|$)/.test(editPath) && <p><button type="button" disabled={!onNavigate} onClick={() => openEvaluation('cases')}>到评测中心管理用例</button></p>}{/(^|\/)decision\.md$/.test(editPath) && <p><button type="button" disabled={!onNavigate} onClick={() => openEvaluation('compare')}>到评测中心比较结果与记录决策</button></p>}
                 {assetInfo && <>
                   <Fields items={[['类型', assetInfo.kind === 'directory' ? '目录' : assetInfo.kind === 'text' ? '文本' : '二进制或大文件（只读）'], ['大小（字节）', assetInfo.size], ['SHA-256', assetInfo.sha256]]} />
-                  {assetInfo.kind === 'text' && <><button type="button" disabled={!editHash} onClick={() => { setEditMessage(''); setEditOpen(true) }}>编辑</button><pre className="harness-asset-content">{assetInfo.content || '空文件'}</pre></>}
+                  {assetInfo.kind === 'text' && <><button type="button" disabled={!editHash || assetInfo.editable === false} onClick={() => { setEditMessage(''); setEditOpen(true) }}>编辑</button>{assetInfo.reason && <p role="status">{assetInfo.reason}</p>}<pre className="harness-asset-content">{assetInfo.content || '空文件'}</pre></>}
                   {assetInfo.kind === 'directory' && <p>展开左侧目录后选择文件。</p>}
                 </>}
                 {editMessage && <p role="status">{editMessage}</p>}
@@ -874,20 +872,20 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
           ]} /></details>}
           <dialog ref={editDialog} className="harness-asset-dialog" aria-labelledby="asset-edit-title" onCancel={event => { event.preventDefault(); closeEditor() }}>
             <h2 id="asset-edit-title">编辑资产</h2><div className="agent-dialog-body"><p>{editPath}</p>
-            <p>应用保存会先进行 dry 校验，再核对文件是否被他人修改。dry 不执行模型、业务工具或 Candidate 代码。</p>
+            <p>保存前仅检查本次文件的格式和语法，并核对文件是否被他人修改；不执行源码、评测或业务工具。</p>
             <label className="agent-field">编辑正文
-              <textarea value={editBody} disabled={!editHash || editBusy} onChange={event => { editRequest.current++; setEditBody(event.target.value); setEditPreview(null); setEditMessage('') }} rows={12} className="agent-editor" />
+              <textarea value={editBody} disabled={!editHash || editBusy || assetInfo?.editable === false} onChange={event => { editRequest.current++; setEditBody(event.target.value); setEditPreview(null); setEditMessage('') }} rows={12} className="agent-editor" />
             </label>
             {editBusy && <p role="status">正在进行 dry 校验…</p>}
             {editMessage && <p role="status">{editMessage}</p>}
-            {editPreview && <><p>校验通过：{editPreview.dry.checks.join('、')} · 评测用例 {editPreview.dry.case_ids.length} 个。</p>
-              {editPreview.dry.missing_env_names?.length > 0 && <p>运行前需补齐环境变量：{editPreview.dry.missing_env_names.join('、')}。当前 dry 可继续。</p>}
+            {editPreview && <><p>校验通过：{editPreview.dry.checks.join('、')}。</p>
+              <p>{editPreview.dry.note}</p>
               <pre className="harness-asset-content">{editPreview.diff}</pre></>}
             </div>
             <div className="agent-actions agent-dialog-actions">
               <button type="button" onClick={() => { if (discardAssetDraft()) void loadEditFile() }} disabled={editBusy}>重读文件</button>
-              <button type="button" onClick={() => void doPreview()} disabled={!editHash || editBusy}>dry 校验与预览</button>
-              <button type="button" onClick={() => void doApply()} disabled={!editHash || editBusy}>应用保存</button>
+              <button type="button" onClick={() => void doPreview()} disabled={!editHash || editBusy || assetInfo?.editable === false}>dry 校验与预览</button>
+              <button type="button" onClick={() => void doApply()} disabled={!editHash || editBusy || assetInfo?.editable === false}>应用保存</button>
               <button type="button" onClick={closeEditor} disabled={editBusy}>关闭</button>
             </div>
           </dialog>

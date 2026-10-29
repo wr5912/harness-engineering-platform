@@ -150,17 +150,10 @@ export function createPlatformEvents(assetRoot: string, options: Options = {}) {
     for (const [directory, watcher] of watchers) if (!existsSync(directory)) { watcher.close(); watchers.delete(directory) }
     observe(join(root, 'agents'), ['catalog', 'agents'], true)
     observe(join(root, 'evolution'), ['catalog', 'agents'], false)
-    observe(join(root, 'evolution/experiments'), ['catalog', 'agents'], true)
+    observe(join(root, 'evolution/experiments'), ['catalog', 'agents', 'instances'], true)
     observe(join(root, 'evolution/datasets'), ['agents'], true)
     observe(join(root, 'releases'), ['catalog', 'agents'], true)
-    const sourcesDirectory = dirname(workspaceConfigPath(root, 'sources.json'))
-    const compositionsDirectory = dirname(workspaceConfigPath(root, 'mcp-compositions.json'))
-    // 独立工作区将两份配置放在同一目录，只注册一个覆盖两种变化的观察器。
-    if (sourcesDirectory === compositionsDirectory) observe(sourcesDirectory, ['catalog', 'agents', 'instances', 'mcp'], false)
-    else {
-      observe(sourcesDirectory, ['catalog', 'agents', 'instances'], false, 'sources.json')
-      observe(compositionsDirectory, ['mcp'], false, 'mcp-compositions.json')
-    }
+    observe(dirname(workspaceConfigPath(root, 'mcp-compositions.json')), ['mcp'], false, 'mcp-compositions.json')
     observe(stateRoot, ['instances', 'agents'], true)
     // 尚无实例目录时，观察其既有父目录以捕获首次登记。
     if (!existsSync(stateRoot)) observe(resolve(stateRoot, '..'), ['instances', 'agents'], false, basename(stateRoot))

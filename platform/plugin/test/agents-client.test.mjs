@@ -21,12 +21,12 @@ function experiments() {
 function detail(agentId = 'first-agent', experimentId = `EXP-${agentId}-002`) {
   return { agent: { id: agentId, name: `名称 ${agentId}`, manifest: { description: '真实用途' } }, experiment: experiments().find(item => item.id === experimentId),
     versions: experiments().filter(item => item.agent_id === agentId).reverse().map(item => ({ id: item.id, status: item.status, baseline_ref: item.change.baseline_ref })), baseline: { ref: 'none:first-experiment' }, fusion: {}, related_references: [],
-    declared: { source_contract: {}, catalog_source: {} }, loaded_instance: { status: 'not_queried' }, features: [],
+    declared: { source_contract: {}, loadable_source: {} }, loaded_instance: { status: 'not_queried' }, features: [],
     verification: { runs: [{ id: 'run-11111111-1111-4111-8111-111111111111', status: 'failed' }] },
     assets: [{ name: 'candidate', path: 'candidate', kind: 'directory', children: [{ name: 'prompt.md', path: 'candidate/prompt.md', kind: 'text' }] }] }
 }
 
-function page({ active = true, target, intercept } = {}) {
+function page({ active = true, target, intercept, updates } = {}) {
   const states = [], dependencies = [], cleanups = []
   let cursor = 0, effects = [], changed = false, tree, confirm = false
   const calls = [], contexts = [], navigations = [], assistantTasks = [], listeners = new Map(), reveals = []
@@ -45,7 +45,7 @@ function page({ active = true, target, intercept } = {}) {
       return node ? { hidden: Boolean(node.props.hidden), focus() { reveals.push(`focus:${id}`) }, scrollIntoView() { reveals.push(`scroll:${id}`) } } : null
     } },
   })
-  const props = { active, target, onContext: context => contexts.push(context), onNavigate: value => { const { replace, ...destination } = value; navigations.push(value); if (replace) history[history.length - 1] = destination; else history.push(destination); props.target = destination; props.active = value.page === 'agents'; changed = true }, onAssistant: async (task, context) => { assistantTasks.push({ task, context }) },
+  const props = { active, target, updates, onContext: context => contexts.push(context), onNavigate: value => { const { replace, ...destination } = value; navigations.push(value); if (replace) history[history.length - 1] = destination; else history.push(destination); props.target = destination; props.active = value.page === 'agents'; changed = true }, onAssistant: async (task, context) => { assistantTasks.push({ task, context }) },
     rpc: { async call(channel, endpoint, payload) {
       calls.push({ channel, endpoint, payload })
       const override = intercept?.(endpoint, payload)
@@ -269,6 +269,26 @@ test('资产保存冲突保留草稿，取消放弃时关闭和切换均不丢�
   ui.setConfirm(true); ui.button('关闭').props.onClick(); ui.render()
   assert.equal(ui.nodes().find(node => node.type === 'textarea').props.value, '原始正文')
   assert.equal(ui.listeners.has('beforeunload'), false)
+})
+
+test('保存期间的资产实时刷新不丢弃同一文件的成功回执', async () => {
+  let notify, resolveSave
+  const pending = new Promise(resolve => { resolveSave = resolve })
+  const ui = page({ updates: {
+    subscribe(listener) { notify = listener; return () => {} },
+    getSnapshot() { return { domains: ['agents'] } },
+  }, intercept(endpoint) { if (endpoint === 'agents/edit/apply') return pending } })
+  await ui.settle()
+  ui.button('Harness 资产').props.onClick(); ui.render()
+  ui.button('prompt.md').props.onClick(); ui.render(); await ui.settle()
+  ui.button('编辑').props.onClick(); ui.render()
+  ui.button('应用保存').props.onClick(); ui.render()
+  notify(); await ui.settle()
+  resolveSave({ ok: true, value: { written: [{ path: 'candidate/prompt.md' }] } })
+  await ui.settle()
+  assert.match(ui.text(ui.render()), /文件校验通过，已保存 candidate\/prompt.md/)
+  assert.equal(ui.button('应用保存').props.disabled, false)
+  assert.equal(ui.nodes().find(node => node.type === 'textarea').props.value, '原始正文')
 })
 
 test('切换智能体后忽略上个目标迟到的详情响应', async () => {
@@ -712,4 +732,19 @@ test('旧列表请求迟到时不能把新名称覆盖回旧名称', async () =>
   finish({ ok: true, value: value('迟到的旧名称') }); await ui.settle()
   assert.match(ui.text(variantCards(ui)[0]), /更新后的名称/)
   assert.doesNotMatch(ui.text(variantCards(ui)[0]), /迟到的旧名称/)
+})
+
+
+test('凭据脱敏预览显示只读原因，不能进入编辑或保存', async () => {
+  const ui = page({ intercept(endpoint, payload) {
+    if (endpoint === 'agents/edit/read') return { ok: true, value: { kind: 'text', path: payload.path,
+      content: 'token: "[已隐藏]"', sha256: 'a'.repeat(64), content_sha256: 'b'.repeat(64), editable: false, redacted: true,
+      reason: '内容已脱敏，不能以预览替换源码。' } }
+  } })
+  await ui.settle()
+  ui.button('Harness 资产').props.onClick(); ui.render()
+  ui.button('prompt.md').props.onClick(); ui.render(); await ui.settle()
+  assert.match(ui.text(ui.render()), /内容已脱敏，不能以预览替换源码/)
+  assert.equal(ui.button('编辑').props.disabled, true)
+  assert.equal(ui.calls.some(call => ['agents/edit/preview', 'agents/edit/apply'].includes(call.endpoint)), false)
 })

@@ -57,7 +57,7 @@
 | Profile Patch、角色矩阵、工具名映射 | `candidate/dsh/managed/`（宿主侧复核后修改） |
 | 非秘密依赖声明 | 候选 `harness.yaml` 的适用字段；DSH 版本由仓库 `runtime/adapters/dsh-container/source.lock.json` 声明 |
 
-只有确实需要同一 Agent 同时保留多个运行时 preset ID 时，才把候选 `harness.yaml.preset_id`、`sources.json.preset` 和基础 patch 的 `agent-preset-registry.default` 显式改为同一个新 ID；业务 `agent_id`、Experiment 和研究定义不因此自动重命名。仓库校验器会核对这三处与实际 preset 目录一致。
+只有确实需要同一 Agent 同时保留多个运行时 preset ID 时，才把候选 `harness.yaml.loadable_assets.preset_id`、实际 Preset 目录和基础 patch 的 `agent-preset-registry.default` 显式改为同一个新 ID；业务 `agent_id`、Experiment 和研究定义不因此自动重命名。仓库校验器会核对装载声明、Patch 与实际 Preset 一致。
 
 受控的 `/opt/dsh-presets` 与 `/opt/dsh-managed` 在容器内始终只读：运行中的受控配置没有被这次创作改写，用户根只是额外的临时候选来源。
 

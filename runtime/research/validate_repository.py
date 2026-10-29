@@ -64,8 +64,8 @@ KEBAB_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 ADAPTER = Path(__file__).resolve().parents[1] / "adapters/dsh-container"
 if str(ADAPTER) not in sys.path:
     sys.path.insert(0, str(ADAPTER))
-from source_contract import EXPERIMENT as EXPERIMENT_RE
-from workspace_paths import PROGRAM_ROOT, source_catalog, workspace_id
+from source_contract import EXPERIMENT as EXPERIMENT_RE, resolve as resolve_version
+from workspace_paths import PROGRAM_ROOT, workspace_id
 SEMVER_RE = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$")
 RELEASE_RE = re.compile(r"^([a-z0-9]+(?:-[a-z0-9]+)*)-v(.+)$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -406,6 +406,10 @@ def validate_experiments(root: Path, errors: list[dict[str, str]], warnings: lis
                 visible = None
             if visible is not None and visible.returncode == 0 and not visible.stdout:
                 continue
+        try:
+            resolve_version(experiment.name, repo=root)
+        except (OSError, ValueError) as exc:
+            errors.append(issue("EXPERIMENT_LOAD", str(exc), relative(experiment / "candidate/harness.yaml", root)))
         payload, _ = validator.validate(experiment.resolve())
         for item in payload.get("errors", []):
             copied = dict(item)
@@ -565,10 +569,6 @@ def run(root: Path) -> tuple[dict[str, Any], int]:
     if split_workspace:
         try:
             workspace_id(root)
-            catalog = strict_json(source_catalog(root))
-            if not isinstance(catalog, dict) or catalog.get("schema_version") != "1.1" \
-                    or not isinstance(catalog.get("sources"), dict):
-                raise ValueError("config/sources.json 缺少有效的来源目录")
         except (OSError, ValueError, TypeError) as exc:
             errors.append(issue("WORKSPACE", str(exc), root / "workspace.json"))
     validate_retired_topology(root, errors)

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { workspaceConfigPath } from '../workspace.ts'
+import { versionIdentity } from '../agents/version-source.ts'
 
 export const EXPERIMENT = /^EXP-([a-z0-9]+(?:-[a-z0-9]+)*)-\d{3}(?:-r[0-9a-f]{12})?$/
 export const RUN = /^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
@@ -25,12 +25,10 @@ export function sourceInfo(root: string, source: string) {
   const id = typeof source === 'string' ? source.replace(/^experiment:/, '') : ''
   const match = EXPERIMENT.exec(id)
   if (!match) throw new Error('来源必须是固定 Experiment 身份')
-  const catalog = JSON.parse(readFileSync(workspaceConfigPath(root, 'sources.json'), 'utf8'))
-  const entry = catalog.sources?.[id]
-  if (!entry || entry.agent_id !== match[1] || entry.candidate_root !== `evolution/experiments/${id}/candidate/dsh`) throw new Error('来源登记与 Candidate 身份不一致')
+  const change = versionIdentity(root, id)
   const candidate = dataPath(root, `evolution/experiments/${id}/candidate`)
   if (!existsSync(candidate) || !lstatSync(candidate).isDirectory()) throw new Error('Candidate 不存在')
-  return { id, source: `experiment:${id}`, agent_id: entry.agent_id as string, candidate, entry }
+  return { id, source: `experiment:${id}`, agent_id: change.agent_id as string, candidate }
 }
 
 /** 与 run_record.candidate_digest 共用路径、执行位和内容摘要口径。 */

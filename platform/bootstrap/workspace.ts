@@ -12,7 +12,6 @@ export type SetupRequest = { action: 'existing' | 'clone' | 'new'; root: string;
 const configurations: Record<string, { label: string; value: () => unknown; valid: (value: any) => boolean }> = {
   'workspace.json': { label: '工作区身份', value: () => ({ schemaVersion: 1, id: `workspace-${randomUUID()}`, legacyRoots: [], extensions: [] }), valid: v => v?.schemaVersion === 1 && typeof v.id === 'string' && /^workspace-[a-zA-Z0-9-]+$/.test(v.id) && Array.isArray(v.legacyRoots ?? []) && (v.legacyRoots ?? []).every((p: unknown) => typeof p === 'string' && isAbsolute(p)) },
   'config/sites.json': { label: '站点配置', value: () => ({ assistant: '/assistant/', platform: '/hep/' }), valid: v => ['assistant', 'platform'].every(k => typeof v?.[k] === 'string' && /^\/[a-z][a-z0-9-]*\/$/.test(v[k])) },
-  'config/sources.json': { label: '来源目录', value: () => ({ schema_version: '1.1', sources: {} }), valid: v => v?.schema_version === '1.1' && v.sources && typeof v.sources === 'object' && !Array.isArray(v.sources) },
   'config/mcp-compositions.json': { label: '组合目录', value: () => ({ schema_version: '1.0', compositions: [] }), valid: v => v?.schema_version === '1.0' && Array.isArray(v.compositions) },
 }
 const accountFile = '.local/credentials/admin.json'

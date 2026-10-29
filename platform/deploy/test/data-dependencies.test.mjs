@@ -9,9 +9,12 @@ test('业务插件只装入目标资源中的依赖，缺项时拒绝离线包',
   const root = mkdtempSync(join(tmpdir(), 'hep-data-deps-'))
   try {
     const data = join(root, 'data'), assets = join(root, 'assets')
-    const relative = 'evolution/experiments/example/candidate/dsh/managed/voice'
+    const relative = 'evolution/experiments/EXP-example-001/candidate/dsh/managed/voice'
     mkdirSync(join(data, 'config'), { recursive: true })
-    writeFileSync(join(data, 'config/sources.json'), JSON.stringify({ sources: { example: { candidate_root: 'evolution/experiments/example/candidate/dsh' } } }))
+    const exp = join(data, 'evolution/experiments/EXP-example-001')
+    mkdirSync(join(exp, 'candidate'), { recursive: true })
+    writeFileSync(join(exp, 'change.yaml'), 'experiment_id: EXP-example-001\nagent_id: example\n')
+    writeFileSync(join(exp, 'candidate/harness.yaml'), 'loadable_assets:\n  workspace: dsh/workspace\n  preset_root: dsh/presets\n  managed_root: dsh/managed\n  preset_id: example\n  profile_patch: dsh/managed/example.patch.yml\n')
     mkdirSync(join(data, relative), { recursive: true })
     writeFileSync(join(data, relative, 'package.json'), JSON.stringify({ dependencies: { '@example/runtime': '1.0.0' },
       peerDependencies: { react: '18', optional: '1' }, peerDependenciesMeta: { optional: { optional: true } } }))

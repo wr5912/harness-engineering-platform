@@ -1,3 +1,4 @@
+import { versionSource, versionSources, VERSION_ID } from '../agents/version-source.ts'
 import { instanceStateRoot, programRoot, workspaceConfigPath, workspaceOwnsInstance } from '../workspace.ts'
 import { businessGatewayEntry } from '../business-control/entry.ts'
 import { prepareBusinessRuntimeFile } from '../business-control/secret-file.ts'
@@ -274,14 +275,8 @@ async function readJson(path: string): Promise<Record<string, unknown> | null> {
 }
 
 async function ensureRealSource(assetRoot: string, source: string): Promise<string> {
-  const catalog = await readJson(workspaceConfigPath(assetRoot, 'sources.json'))
-  const sources = catalog?.sources
-  const id = source.startsWith('experiment:') ? source.slice('experiment:'.length) : source
-  if (!sources || typeof sources !== 'object' || !(id in sources)) throw new Error(`未找到真实来源：${source}`)
-  const agentId = (sources as Record<string, unknown>)[id]
-  const selected = agentId && typeof agentId === 'object' ? (agentId as Record<string, unknown>).agent_id : undefined
-  if (typeof selected !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(selected)) throw new Error('来源缺少有效的业务智能体 ID')
-  return selected
+  return versionSource(assetRoot, source.replace(/^experiment:/, '')).agent_id
+
 }
 
 async function runUpWithModelPolicy(assetRoot: string, args: string[], agentId: string, provider: ModelPolicyProvider | undefined,
@@ -310,31 +305,12 @@ async function runUpWithModelPolicy(assetRoot: string, args: string[], agentId: 
 }
 
 async function listSources(assetRoot: string): Promise<{ sources: RegisteredSource[]; business_gateway_available: boolean }> {
-  const file = workspaceConfigPath(assetRoot, 'sources.json')
-  let catalog: Record<string, unknown>
-  try {
-    catalog = JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown>
-  } catch {
-    throw new Error('无法读取当前工作区的来源登记，请检查 config/sources.json')
-  }
-  if (!catalog || typeof catalog.sources !== 'object' || !catalog.sources || Array.isArray(catalog.sources)) {
-    throw new Error('当前工作区的 sources.json 缺少有效 sources 登记')
-  }
-  const sources = await Promise.all(Object.entries(catalog.sources).map(async ([experimentId, raw]): Promise<RegisteredSource> => {
-    const entry = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : {}
-    const agentId = typeof entry.agent_id === 'string' ? entry.agent_id : ''
-    const candidateRoot = typeof entry.candidate_root === 'string' ? entry.candidate_root : ''
-    const candidatePath = candidateRoot ? resolve(assetRoot, candidateRoot) : ''
-    const insideWorkspace = candidatePath && !relative(resolve(assetRoot), candidatePath).startsWith('..')
-    const candidatePresent = insideWorkspace && await stat(candidatePath).then(value => value.isDirectory(), () => false)
-    const selectable = Boolean(agentId && candidatePresent)
-    return {
-      source_id: `experiment:${experimentId}`,
-      experiment_id: experimentId,
-      agent_id: agentId,
-      selectable,
-      reason: selectable ? '已登记，Candidate 目录可读取；预览时仍需核对 Runtime 与环境' : !agentId ? '来源登记缺少智能体 ID' : 'Candidate 目录不可读取',
-    }
+  const catalog = versionSources(assetRoot)
+  const sources: RegisteredSource[] = [...new Set([...Object.keys(catalog.sources), ...Object.keys(catalog.errors)])].sort().map(experimentId => ({
+    source_id: `experiment:${experimentId}`, experiment_id: experimentId,
+    agent_id: catalog.sources[experimentId]?.agent_id ?? VERSION_ID.exec(experimentId)![1],
+    selectable: !catalog.errors[experimentId],
+    reason: catalog.errors[experimentId] ?? '版本装载声明可读取；预览时核对 Runtime 与当前模型配置',
   }))
   const businessGatewayAvailable = await businessAccess(assetRoot).then(() => true, () => false)
   return { sources: sources.sort((a, b) => a.agent_id.localeCompare(b.agent_id) || b.experiment_id.localeCompare(a.experiment_id, 'en', { numeric: true })),

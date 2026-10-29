@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { load as yaml } from 'js-yaml'
 import { candidateDigest, candidateFiles, sourceInfo } from './files.ts'
-import { workspaceConfigPath } from '../workspace.ts'
+import { versionSource, versionSources } from '../agents/version-source.ts'
 
 export interface CapabilityOptions {
   nativeServers?: () => any[]
@@ -17,14 +17,15 @@ export interface CapabilityOptions {
 /** 动态读取当前资产及原生 MCP 配置，只报告已发现事实，不把配置等同于可用性。 */
 export async function discoverTaskCapabilities(assetRoot: string, options: CapabilityOptions = {}) {
   options.signal?.throwIfAborted()
-  const catalog = JSON.parse(readFileSync(workspaceConfigPath(assetRoot, 'sources.json'), 'utf8'))
+  const catalog = versionSources(assetRoot)
   const sources = []
   const unavailable = []
-  for (const id of Object.keys(catalog.sources ?? {}).sort()) {
-    if (options.agent_id && catalog.sources[id].agent_id !== options.agent_id || options.source && options.source.replace(/^experiment:/, '') !== id) continue
+  for (const id of [...new Set([...Object.keys(catalog.sources), ...Object.keys(catalog.errors), ...(options.source ? [options.source.replace(/^experiment:/, '')] : [])])].sort()) {
+    if (options.agent_id && (catalog.sources[id]?.agent_id ?? id.slice(4).replace(/-\d{3}(?:-r[0-9a-f]{12})?$/, '')) !== options.agent_id || options.source && options.source.replace(/^experiment:/, '') !== id) continue
     options.signal?.throwIfAborted()
     try {
       const info = sourceInfo(assetRoot, id)
+      const entry = versionSource(assetRoot, id)
       const files = candidateFiles(info.candidate)
       const skills = files.filter(path => path.endsWith('/SKILL.md')).map(path => ({ path, name: path.split('/').at(-2), verification: 'discovered' as const }))
       function names(value: unknown): string[] {
@@ -41,9 +42,9 @@ export async function discoverTaskCapabilities(assetRoot: string, options: Capab
         } catch { return { path, name: path.split('/').at(-1), verification: 'invalid' as const } }
       })
       sources.push({ source: info.source, experiment_id: id, agent_id: info.agent_id,
-        candidate_sha256: candidateDigest(info.candidate), candidate_sha256_basis: 'run-content-path-mode', skills, plugins, preset: info.entry.preset,
-        required_env_names: info.entry.required_env_names ?? [] })
-    } catch { unavailable.push({ source: `experiment:${id}`, reason: '来源登记或资产不可读取' }) }
+        candidate_sha256: candidateDigest(info.candidate), candidate_sha256_basis: 'run-content-path-mode', skills, plugins, preset: entry.preset,
+        required_env_names: entry.required_env_names ?? [] })
+    } catch (error) { unavailable.push({ source: `experiment:${id}`, reason: (error as Error).message }) }
   }
   const discovered = await options.discoveredTools?.(options.server_id, options.signal) ?? []
   options.signal?.throwIfAborted()

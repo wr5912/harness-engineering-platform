@@ -575,7 +575,7 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
         const prepared = await preview(body, signal)
         if (body.expected_preview_sha256 && body.expected_preview_sha256 !== prepared.preview_sha256) throw new VariantError('conflict', '父版、Case 或计划已变化，请重新预览')
         const { plan, parent_experiment_id: parentId, parent_ref: parentRef } = prepared
-        const created = await services.createExperiment({ agent_id: prepared.agent_id, parent_experiment_id: parentId, parent_ref: parentRef, research_question: plan.strategy, ...(body.catalog_sha256 ? { catalog_sha256: body.catalog_sha256 } : {}) }) as Result
+        const created = await services.createExperiment({ agent_id: prepared.agent_id, parent_experiment_id: parentId, parent_ref: parentRef, research_question: plan.strategy }) as Result
         if (!created.ok) return created
         const id = created.value.experiment_id, next = experiment(root, id)
         next.change.compute_variant = plan; next.change.variant_kind = 'exploratory'; next.change.variant_name = prepared.variant_name

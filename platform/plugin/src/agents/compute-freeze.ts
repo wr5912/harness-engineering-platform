@@ -88,12 +88,6 @@ export function createComputeFreezeHandler(assetRoot: string) {
       if (containsLiteralLlmKey(path, content.toString('utf8'))) throw new FreezeError('secret_rejected', '冻结对象包含 LLM API Key 常量')
       entries.set(path, { content, mode: lstatSync(file).mode & 0o111 ? '100755' : '100644' })
     }
-    const sourcePath = relative(root, workspaceConfigPath(root, 'sources.json')).split('\\').join('/')
-    const originalSource = headFile(root, head, sourcePath)
-    if (!originalSource) throw new FreezeError('invalid_request', '来源目录缺少 Git 基准，不能局部冻结')
-    const catalog = JSON.parse(originalSource.toString()), currentCatalog = JSON.parse(readFileSync(dataPath(root, sourcePath), 'utf8'))
-    catalog.sources ??= {}; catalog.sources[source.id] = currentCatalog.sources[source.id]
-    entries.set(sourcePath, { content: Buffer.from(JSON.stringify(catalog, null, 2) + '\n'), mode: '100644' })
     const evaluationPath = `agents/${source.agent_id}/evaluation.md`, originalEvaluation = headFile(root, head, evaluationPath)
     if (!originalEvaluation) throw new FreezeError('invalid_request', '评测定义缺少 Git 基准，不能局部冻结')
     const evaluationBase = hash(originalEvaluation)
@@ -133,7 +127,7 @@ export function createComputeFreezeHandler(assetRoot: string) {
       const value = { experiment_id: source.id, branch, head, tree, case_ids: caseIds,
         case_hashes: Object.fromEntries(caseIds.map(id => [id, hash(canonical(currentCases.cases[id]))])),
         evaluation_base_sha256: evaluationBase, files, diff,
-        notes: ['仅冻结所列 Candidate、研究计划、当前来源条目和选定 Case；不推送、不运行 Git hooks。'] }
+        notes: ['仅冻结所列 Candidate、研究计划、版本装载说明和选定 Case；不推送、不运行 Git hooks。'] }
       const previewHash = hash(JSON.stringify(value))
       return { value: { ...value, preview_sha256: previewHash, freeze_input: { experiment_id: source.id, case_ids: caseIds, evaluation_base_sha256: evaluationBase, expected_preview_sha256: previewHash } }, entries, paths, deleted, temp, tempIndex, indexFile, indexBytes, branch, head, tree }
     } catch (error) { rmSync(temp, { recursive: true, force: true }); throw error }

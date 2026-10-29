@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join, relative, resolve, sep } from 'node:path'
 import { load as loadYaml } from 'js-yaml'
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
-import { redactRunText } from './run-files.ts'
+import { assetText } from './asset-text.ts'
 
 const execute = promisify(execFile)
 const EXPERIMENT = /^EXP-([a-z0-9]+(?:-[a-z0-9]+)*)-\d{3}(?:-r[0-9a-f]{12})?$/
@@ -21,14 +21,14 @@ export type AssetDiffView = {
   right: { label: string; source: string; experiment_id: string; digest: string }
   files: AssetDiffFile[]
   summary: { added: number; removed: number; modified: number; unchanged: number }
-  selected?: { path: string; kind: 'text' | 'binary'; before: string | null; after: string | null; diff: string; truncated: boolean }
+  selected?: { path: string; kind: 'text' | 'binary'; before: string | null; after: string | null; diff: string; truncated: boolean; redacted?: boolean }
   notes: string[]
 }
 export type FixedAssetView = {
   agent_id: string; experiment_id: string; ref: string; commit: string; candidate_digest: string
   candidate_digest_basis: 'git-object-path-mode'
   files: Array<Omit<Entry, 'file'>>
-  selected?: { path: string; object: string; size: number; kind: 'text' | 'binary' | 'oversize'; content: string | null; truncated: boolean; sha256?: string }
+  selected?: { path: string; object: string; size: number; kind: 'text' | 'binary' | 'oversize'; content: string | null; truncated: boolean; sha256?: string; redacted?: boolean; content_sha256?: string }
   notes: string[]
 }
 
@@ -123,10 +123,11 @@ function decode(buffer: Buffer): string | null {
   try { return new TextDecoder('utf-8', { fatal: true }).decode(buffer) } catch { return null }
 }
 function textPreview(text: string) {
-  const clean = redactRunText(text), data = Buffer.from(clean, 'utf8')
-  if (data.length <= PREVIEW_BYTES) return { content: clean, truncated: false }
+  const view = assetText('source', text), clean = view.content, data = Buffer.from(clean, 'utf8')
+  if (data.length <= PREVIEW_BYTES) return { ...view, truncated: false }
   // 流式解码保留末尾未完成字节，截断预览不会引入半个 UTF-8 字符。
-  return { content: new TextDecoder('utf-8', { fatal: true }).decode(data.subarray(0, PREVIEW_BYTES), { stream: true }), truncated: true }
+  const content = new TextDecoder('utf-8', { fatal: true }).decode(data.subarray(0, PREVIEW_BYTES), { stream: true })
+  return { ...view, content, content_sha256: hash(content), truncated: true, editable: false }
 }
 
 /** 读取固定提交中的 Candidate，不 checkout、不生成可编辑源码副本。 */
@@ -251,7 +252,7 @@ export async function readAssetDiff(rootPath: string, payload: JsonMap, signal?:
       else {
         const beforePreview = textPreview(beforeText), afterPreview = textPreview(afterText)
         value.selected = { path, kind: 'text', before: beforePreview.content, after: afterPreview.content,
-          diff: await previewDiff(beforePreview.content, afterPreview.content, path, signal), truncated: beforePreview.truncated || afterPreview.truncated }
+          diff: await previewDiff(beforePreview.content, afterPreview.content, path, signal), truncated: beforePreview.truncated || afterPreview.truncated, redacted: beforePreview.redacted || afterPreview.redacted }
       }
     }
     cancelled(signal)

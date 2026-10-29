@@ -449,39 +449,23 @@ def _atomic_replace(path: Path, data: bytes) -> None:
 
 def create_harness(agent_id: str, *, repo: Path = REPO, sources: Path | None = None,
                    lock_path: Path = ADAPTER / "source.lock.json") -> dict:
-    """创建最小 Agent、首次 Experiment 与可解析的 DSH 来源登记。"""
+    """创建最小 Agent、首次 Experiment 与自包含的 DSH 装载声明。"""
     if not NAME_RE.fullmatch(agent_id):
         raise ValueError("agent-id 必须是小写 kebab-case")
 
     sources = sources if sources is not None else source_catalog(repo)
     agent_dir = repo / "agents" / agent_id
-    original_catalog = sources.read_bytes()
-    catalog = strict_json(sources)
-    if catalog.get("schema_version") != "1.1" or not isinstance(catalog.get("sources"), dict):
-        raise ValueError("unsupported source catalog")
     for _ in range(5):
         experiment_id = f"EXP-{agent_id}-001-r{secrets.token_hex(6)}"
         experiment_dir = repo / "evolution/experiments" / experiment_id
-        if not experiment_dir.exists() and experiment_id not in catalog["sources"]:
+        if not experiment_dir.exists():
             break
     else:
         raise ValueError("无法生成未占用的 Experiment ID")
     collisions = [str(path.relative_to(repo)) for path in (agent_dir, experiment_dir) if path.exists()]
-    if experiment_id in catalog["sources"]:
-        collisions.append(f"sources.json:{experiment_id}")
     if collisions:
         raise ValueError("目标已存在，拒绝覆盖：" + "、".join(collisions))
 
-    source_item = {
-        "agent_id": agent_id,
-        "candidate_root": f"evolution/experiments/{experiment_id}/candidate/dsh",
-        "profile": "web",
-        "patch": f"{agent_id}.patch.yml",
-        "preset": f"{agent_id}/agent.cordis.yml",
-        "guard": None,
-        "config_markers": ["/opt/dsh-presets"],
-        "required_env_names": ["DEEPSEEK_API_KEY"],
-    }
     agent_files = {
         "manifest.yaml": f'''schema_version: "1.0"
 agent_id: {agent_id}
@@ -540,22 +524,12 @@ agent:
   lifecycle_status: experiment
   runtime_family: dsh
   load_mode: container-only
-experiment:
-  id: {experiment_id}
-  baseline_ref: none:first-experiment
-  status: active
 loadable_assets:
   workspace: dsh/workspace
   preset_root: dsh/presets
   managed_root: dsh/managed
   preset_id: {agent_id}
   profile_patch: dsh/managed/{agent_id}.patch.yml
-runtime_contract:
-  workspace_container_path: /work/harness/workspace
-  preset_container_path: /opt/dsh-presets
-  managed_container_path: /opt/dsh-managed
-  dsh_home_container_path: /var/lib/dsh
-  verification_candidate_mode: ro
 credential_environment_keys:
   - DEEPSEEK_API_KEY
 ''',
@@ -607,7 +581,6 @@ order: 10
     }
 
     moved: list[Path] = []
-    catalog_replaced = False
     try:
         with tempfile.TemporaryDirectory(prefix=".dsh-dev-init-", dir=repo) as temporary:
             stage = Path(temporary)
@@ -625,19 +598,8 @@ order: 10
             staged_experiment.replace(experiment_dir)
             moved.append(experiment_dir)
 
-        catalog["sources"][experiment_id] = source_item
-        _atomic_replace(
-            sources,
-            (json.dumps(catalog, ensure_ascii=False, indent=2) + "\n").encode("utf-8"),
-        )
-        catalog_replaced = True
         resolve(f"experiment:{experiment_id}", repo=repo, sources=sources, lock_path=lock_path)
     except Exception:
-        if catalog_replaced:
-            try:
-                _atomic_replace(sources, original_catalog)
-            except Exception as rollback_error:
-                raise RuntimeError("来源目录回滚失败；为避免悬空登记，已保留新建目录") from rollback_error
         for path in reversed(moved):
             shutil.rmtree(path)
         raise
@@ -1309,8 +1271,8 @@ def require_up_arguments(args: argparse.Namespace) -> None:
         return
     print("dsh-dev up 缺少必填参数：" + "、".join(f"--{option}" for option in missing), file=sys.stderr)
     if "source" in missing:
-        sources = strict_json(SOURCES).get("sources") or {}
-        print("可用 --source：" + "、".join(f"experiment:{name}" for name in sorted(sources)), file=sys.stderr)
+        sources = (REPO / "evolution/experiments").glob("EXP-*")
+        print("可用 --source：" + "、".join(f"experiment:{path.name}" for path in sorted(sources) if (path / "candidate/harness.yaml").is_file()), file=sys.stderr)
     if "mode" in missing:
         print("可用 --mode：eval", file=sys.stderr)
     raise SystemExit(2)
