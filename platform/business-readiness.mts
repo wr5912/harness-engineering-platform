@@ -8,7 +8,7 @@ const execute = promisify(execFile)
 export async function checkRunningBusinessEntries(programRoot: string, dataRoot: string): Promise<(BusinessEntryCheck & { name: string })[]> {
   const access = join(dataRoot, 'config/business-access.json')
   if (!existsSync(access) || !JSON.parse(readFileSync(access, 'utf8')).gateway?.instances?.length) return []
-  const { stdout } = await execute(join(programRoot, 'runtime/adapters/dsh-container/dsh-dev'), ['ps', '--all'], {
+  const { stdout } = await execute(process.env.HARNESS_PYTHON || 'python3', [join(programRoot, 'runtime/adapters/dsh-container/dsh-dev'), 'ps', '--all'], {
     env: { ...process.env, HARNESS_ASSET_ROOT: dataRoot, HARNESS_PROGRAM_ROOT: programRoot }, timeout: 30_000, maxBuffer: 4 * 1024 * 1024,
   })
   const observed = JSON.parse(stdout) as { instances: { name: string; agent_id: string; state: string; business_gateway: boolean }[] }

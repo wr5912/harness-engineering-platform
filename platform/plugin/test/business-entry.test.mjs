@@ -59,11 +59,14 @@ test('新网关与未重载 Runtime 不得通过入口核验；重载后恢复�
 
   const cli = join(root, 'runtime/adapters/dsh-container/dsh-dev')
   mkdirSync(dirname(cli), { recursive: true })
+  const previousPython = process.env.HARNESS_PYTHON
+  process.env.HARNESS_PYTHON = process.execPath
+  t.after(() => { if (previousPython === undefined) delete process.env.HARNESS_PYTHON; else process.env.HARNESS_PYTHON = previousPython })
   const observation = [
     { name: 'soc-business', agent_id: 'soc', state: 'running', business_gateway: true },
     { name: 'stopped', state: 'stopped', business_gateway: true },
   ]
-  const observe = () => writeFileSync(cli, `#!${process.execPath}\nconsole.log(${JSON.stringify(JSON.stringify({ instances: observation }))})\n`, { mode: 0o755 })
+  const observe = () => writeFileSync(cli, `#!/bin/false\nconsole.log(${JSON.stringify(JSON.stringify({ instances: observation }))})\n`, { mode: 0o755 })
   observe()
   assert.equal((await checkRunningBusinessEntries(root, root)).length, 1)
   assert.equal((await checkRunningBusinessEntries(root, root))[0].ready, true)
