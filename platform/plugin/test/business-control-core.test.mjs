@@ -34,7 +34,7 @@ function authenticatedSnapshot(control, instance = binding) {
 async function fixture(t, { remote = true, confirmation = false } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'business-control-test-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
-  const upstream = { denied: {}, version: 1, level: 'low', riskCalls: [], revoked: new Set(), trustGate: undefined, unavailable: false, requests: 0 }
+  const upstream = { denied: {}, version: 1, level: 'low', riskCalls: [], revoked: new Set(), trustGate: undefined, unavailable: false, requests: 0, assessInput: undefined }
   let origin
   {
     const server = createServer(async (request, response) => {
@@ -50,8 +50,10 @@ async function fixture(t, { remote = true, confirmation = false } = {}) {
         result = { valid: !upstream.revoked.has(body.credentialId), subjectId: body.subjectId, expiresAt: deadline() }
       } else {
         upstream.riskCalls.push(body)
+        const denied = upstream.assessInput ? upstream.assessInput(body) : upstream.denied[body.subjectId] ?? []
+        if (upstream.assessInput) upstream.version++
         result = { scope: { subjectId: body.subjectId, ...(body.sessionId ? { sessionId: body.sessionId } : {}) }, version: upstream.version,
-          expiresAt: deadline(), level: upstream.level, constraints: { deniedOperations: upstream.denied[body.subjectId] ?? [] }, reasons: ['synthetic_test'] }
+          expiresAt: deadline(), level: upstream.assessInput && denied.length ? 'high' : upstream.level, constraints: { deniedOperations: denied }, reasons: ['synthetic_test'] }
       }
       response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(result))
     })
@@ -91,7 +93,7 @@ test('独立 bundle 共用 singleton 与 ALS；未启用旧研究模式保留，
   assert.equal(await getBusinessControl(legacyRoot).execute(operation(), () => 'legacy'), 'legacy')
 })
 
-test('无需认证共享实例允许读取，发布模式仍执行适用的内容策略', async t => {
+test('无需认证共享实例允许读取，不运行本地内容判定，切换认证方式仍撤回旧主体', async t => {
   const f = await fixture(t)
   f.config.gateway.instances[0].accessMode = 'anonymous'
   writeFileSync(join(f.root, 'config/business-access.json'), JSON.stringify(f.config))
@@ -106,7 +108,8 @@ test('无需认证共享实例允许读取，发布模式仍执行适用的内�
   assert.equal(f.upstream.riskCalls.length, before)
   assert.equal(f.control.assert(guest, 'session:prompt').kind, 'allow')
   assert.equal(f.control.assert(guest, 'read').kind, 'allow')
-  await assert.rejects(f.control.inspect(guest, 'input', 'TEST-INJECT', undefined, 'session:prompt'), { code: 'content_restricted' })
+  assert.equal(await f.control.inspect(guest, 'input', 'TEST-INJECT', undefined, 'session:prompt'), undefined)
+  assert.deepEqual(f.control.status().riskFacts, [])
   f.config.gateway.instances[0].accessMode = 'authenticated'
   writeFileSync(join(f.root, 'config/business-access.json'), JSON.stringify(f.config))
   assert.throws(() => f.control.assert(guest, 'session:prompt'))
@@ -279,7 +282,7 @@ test('组合叶子重验与异步等待后的撤权均在派发前阻断', async
   assert.equal(f.upstream.requests, 1)
 })
 
-test('风险与限制版本持久单调，迟到事实不覆盖新事实，未知／过期保护动作拒绝', async t => {
+test('风险与限制版本持久单调，迟到事实不覆盖新事实，未知／过期按手动基础兜底', async t => {
   const f = await fixture(t)
   const fact = { id: 'fact-a', version: 5, scope: f.a.scope, status: 'assessed', signals: [{ code: 'deny-write', value: 'true', reason: 'test' }],
     source: 'fixture', observedAt: new Date().toISOString(), expiresAt: deadline() }
@@ -291,21 +294,26 @@ test('风险与限制版本持久单调，迟到事实不覆盖新事实，未�
   assert.equal(restored.status().restrictionVersion, version)
   authenticatedSnapshot(restored)
   restored.updateRisk({ ...fact, version: 6, status: 'unknown', signals: [] })
-  assert.throws(() => restored.assert(f.a, 'write'), { code: 'risk_fact_unavailable' })
+  assert.equal(restored.assert(f.a, 'write').kind, 'allow')
   assert.equal(restored.assert(f.a, 'read').kind, 'allow')
   restored.updateRisk({ ...fact, version: 7, signals: [], expiresAt: new Date(0).toISOString() })
-  assert.throws(() => restored.assert(f.a, 'write'), { code: 'risk_fact_unavailable' })
+  assert.equal(restored.assert(f.a, 'write').kind, 'allow')
 })
 
-test('输入、参数及报告无害标记在接收方之前拒绝；正常报告完整到达', async t => {
+test('输入、参数及报告按第三方明确拒绝阻断；第三方恢复后正常内容继续', async t => {
   const f = await fixture(t, { remote: true })
+  f.upstream.assessInput = body => JSON.stringify(body.input).includes('TEST-') ? ['*'] : []
   assert.equal(await f.run(f.a, operation('publish')), 'ok')
-  await assert.rejects(f.run(f.b, { ...operation('publish'), args: { content: 'TEST-SENSITIVE' } }), { code: 'content_restricted' })
+  await assert.rejects(f.run(f.b, { ...operation('publish'), args: { content: 'TEST-SENSITIVE' } }), { code: 'risk_restricted' })
   assert.equal(f.upstream.requests, 1)
   assert.equal(await f.run(f.b, operation('publish')), 'ok')
-  await assert.rejects(f.control.inspect(f.a, 'input', 'TEST-INJECT'), { code: 'content_restricted' })
-  assert.equal(f.control.assert(f.a, 'read').kind, 'allow')
-  assert.throws(() => f.control.assert(f.a, 'read', [], 'TEST-INJECT'), { code: 'risk_restricted' })
+  await assert.rejects(f.run(f.a, { ...operation('writeback'), args: { content: 'TEST-PARAM' } }), { code: 'risk_restricted' })
+  await f.control.inspect(f.a, 'input', 'TEST-INJECT')
+  assert.throws(() => f.control.assert(f.a, 'session:prompt'), { code: 'risk_restricted' })
+  await f.control.inspect(f.a, 'input', 'normal restored input')
+  assert.equal(f.control.assert(f.a, 'session:prompt').kind, 'allow')
+  assert.equal(f.upstream.requests, 2)
+  assert.ok(f.control.status().riskFacts.every(fact => !fact.source.startsWith('local-')))
 })
 
 test('两秒快照、回执、迟到和重启：未同步实例拒绝，版本不能倒退', async t => {
@@ -594,17 +602,91 @@ test('Agent认证与信任独立于用户凭据及风险版本，撤销、来源
   assert.throws(() => f.control.assert(f.b, 'read'), { code: 'agent_authentication_expired' })
 })
 
-test('必需风险提供方缺失或未有事实时拒绝写回和发布，读取未知不虚造low', async t => {
+test('风险未启用时正常执行静态许可，显式重评仍不可用；启用后无有效事实仍按手动基础兜底', async t => {
   const f = await fixture(t, { remote: false })
-  assert.throws(() => f.control.assert(f.a, 'write'), { code: 'risk_provider_unavailable' })
-  assert.throws(() => f.control.assert(f.a, 'publish'), { code: 'risk_provider_unavailable' })
-  await assert.rejects(f.control.inspect(f.a, 'input', 'normal'), { code: 'risk_provider_unavailable' })
-  await assert.rejects(f.control.inspect(f.a, 'report', 'normal'), { code: 'risk_provider_unavailable' })
-  assert.equal(f.control.assert(f.a, 'read').kind, 'allow')
+  assert.equal(f.control.assert(f.a, 'write').kind, 'allow')
+  assert.equal(f.control.assert(f.a, 'publish').kind, 'allow')
+  for (const [stage, input, action] of [['input', 'TEST-INJECT', 'session:prompt'], ['operation', 'TEST-PARAM', 'write'], ['report', 'TEST-SENSITIVE', 'publish']]) {
+    assert.equal(await f.control.inspect(f.a, stage, input, undefined, action), undefined)
+  }
+  assert.equal(await f.run(f.a), 'ok')
+  assert.equal(await f.run(f.a, { ...operation('writeback'), args: { value: 'TEST-PARAM' } }), 'ok')
+  assert.equal(await f.run(f.a, { ...operation('publish'), args: { value: 'TEST-SENSITIVE' } }), 'ok')
+  assert.equal(f.upstream.requests, 3)
+  assert.equal(f.upstream.riskCalls.length, 0)
   assert.deepEqual(f.control.status().riskFacts, [])
+  await assert.rejects(f.control.reassess(f.a), { code: 'risk_provider_unavailable' })
   const withProvider = await fixture(t)
-  assert.throws(() => withProvider.control.assert(withProvider.a, 'write'), { code: 'risk_fact_unavailable' })
+  assert.equal(withProvider.control.assert(withProvider.a, 'write').kind, 'allow')
   assert.equal(await withProvider.run(withProvider.a, operation('writeback')), 'ok')
+})
+
+test('关闭自动风险后旧拒绝事实和检测标记不参与许可，手工限制与静态策略仍生效', async t => {
+  const f = await fixture(t)
+  f.control.updateRisk({ id: 'retired-input-marker', version: 1, scope: f.a.scope, status: 'assessed', level: 'high', source: 'local-input-marker', observedAt: new Date().toISOString(), expiresAt: deadline(), signals: [{ code: 'deny-all', value: 'true', reason: 'retired' }] })
+  const fact = { version: 1, scope: f.a.scope, status: 'assessed', level: 'high', source: 'fixture', observedAt: new Date().toISOString(), expiresAt: deadline() }
+  f.control.updateRisk({ ...fact, id: 'old-global-risk', signals: [{ code: 'deny-all', value: 'true', reason: 'old-auto' }] })
+  f.control.updateRisk({ ...fact, id: 'old-operation-risk', signals: [{ code: 'deny-operation', value: 'query', reason: 'old-operation-auto' }] })
+  assert.throws(() => f.control.assert(f.a, 'read'), { code: 'risk_restricted' })
+  delete f.config.riskAssessment
+  const configPath = join(f.root, 'config', 'business-access.json')
+  const save = () => { writeFileSync(configPath, JSON.stringify(f.config)); f.control.configurationChanged() }
+  save()
+  const historical = f.control.status().riskFacts
+  assert.equal(f.control.assert(f.a, 'read', [], 'TEST-INJECT').kind, 'allow')
+  assert.equal(await f.run(f.a), 'ok', '操作ID的旧动态拒绝也不应生效')
+  assert.equal(await f.run(f.a, operation('writeback')), 'ok')
+  assert.equal(await f.run(f.a, operation('publish')), 'ok')
+  for (const [stage, input] of [['input', 'TEST-INJECT'], ['operation', 'TEST-PARAM'], ['report', 'TEST-SENSITIVE']]) assert.equal(await f.control.inspect(f.a, stage, input), undefined)
+  assert.deepEqual(f.control.status().riskFacts, historical, '关闭时保留历史，但不新增或续期自动标记事实')
+  const restriction = f.control.updateRestriction({ scope: f.a.scope, deniedActions: ['write'], active: true, reason: 'manual-remains' })
+  await assert.rejects(f.run(f.a, operation('writeback')), { code: 'risk_restricted' })
+  assert.equal(await f.run(f.a), 'ok')
+  assert.equal(await f.run(f.b, operation('writeback')), 'ok')
+  assert.equal(f.control.status().restrictions.find(value => value.id === restriction.id).active, true)
+  f.config.agents[0].actions = ['read']; save()
+  await assert.rejects(f.run(f.b, operation('writeback')), { code: 'action_forbidden' })
+  f.config.agents[0].actions = ['*']; f.config.agents[0].serverIds = ['soc']; save()
+  await assert.rejects(f.run(f.b, operation('publish')), { code: 'server_forbidden' })
+  await assert.rejects(f.run(f.b, { ...operation(), target: 'https://other.example/assets/asset-9' }), { code: 'operation_binding_changed' })
+  f.upstream.revoked.add('credential-b')
+  await assert.rejects(f.run(f.b), { code: 'identity_invalid' })
+  f.upstream.revoked.clear()
+  f.config.gateway.instances[0].sourceDigest = 'sha256:' + 'b'.repeat(64); save()
+  await assert.rejects(f.run(f.b), { code: 'agent_source_mismatch' })
+  assert.equal(f.upstream.riskCalls.length, 0)
+})
+
+test('风险开关往返不删除事实，重新开启恢复动态拒绝及未知过期时的手动兜底边界', async t => {
+  const f = await fixture(t), provider = { ...f.config.riskAssessment }
+  const setRisk = enabled => { if (enabled) f.config.riskAssessment = { ...provider }; else delete f.config.riskAssessment; writeFileSync(join(f.root, 'config', 'business-access.json'), JSON.stringify(f.config)); f.control.configurationChanged() }
+  f.upstream.denied['subject-a'] = ['write']
+  await assert.rejects(f.run(f.a, operation('writeback')), { code: 'risk_restricted' })
+  const denied = f.control.status().riskFacts
+  setRisk(false)
+  assert.equal(await f.run(f.a, operation('writeback')), 'ok')
+  assert.deepEqual(f.control.status().riskFacts, denied)
+  assert.equal(f.upstream.riskCalls.length, 1)
+  setRisk(true)
+  assert.throws(() => f.control.assert(f.a, 'write'), { code: 'risk_restricted' })
+  f.upstream.denied['subject-a'] = []; f.upstream.version++
+  assert.equal(await f.run(f.a, operation('writeback')), 'ok')
+  f.upstream.level = 'unknown'; f.upstream.version++
+  assert.equal(await f.run(f.a, operation('writeback')), 'ok')
+  const reads = f.upstream.riskCalls.length
+  setRisk(false); assert.equal(await f.run(f.a, operation('writeback')), 'ok')
+  assert.equal(f.upstream.riskCalls.length, reads)
+  setRisk(true); assert.equal(f.control.assert(f.a, 'write').kind, 'allow')
+  const current = f.control.status().riskFacts[0]
+  f.control.updateRisk({ ...current, version: current.version + 1, status: 'assessed', level: 'low', signals: [], expiresAt: new Date(0).toISOString() })
+  assert.equal(f.control.assert(f.a, 'write').kind, 'allow')
+  setRisk(false); assert.equal(f.control.assert(f.a, 'write').kind, 'allow')
+  setRisk(true); assert.equal(f.control.assert(f.a, 'write').kind, 'allow')
+  f.config.riskAssessment.requiredKinds = ['read']; writeFileSync(join(f.root, 'config', 'business-access.json'), JSON.stringify(f.config)); f.control.configurationChanged()
+  assert.equal(f.control.assert(f.a, 'read').kind, 'allow')
+  assert.equal(f.control.assert(f.a, 'write').kind, 'allow')
+  f.config.riskAssessment.endpoint = 'http://127.0.0.1:1/unavailable'; f.config.riskAssessment.requiredKinds = ['write']; writeFileSync(join(f.root, 'config', 'business-access.json'), JSON.stringify(f.config)); f.control.configurationChanged()
+  assert.equal(await f.run(f.a, operation('writeback')), 'ok')
 })
 
 test('同ID风险按最高版本合并，中心解除可恢复且未确认本地新拒绝仍保留', async t => {
@@ -634,10 +716,11 @@ test('同ID风险按最高版本合并，中心解除可恢复且未确认本地
   assert.equal(replica.assert(context, 'write').kind, 'allow')
 })
 
-test('报告Base64实际正文在首次发布前检查，敏感或无效内容接收计数为零', async t => {
+test('报告Base64正文交第三方评估，第三方拒绝或格式无效时接收计数为零', async t => {
   const f = await fixture(t), sensitive = Buffer.from('<html>TEST-SENSITIVE</html>').toString('base64')
+  f.upstream.assessInput = body => String(body.input).includes('TEST-SENSITIVE') ? ['publish'] : []
   for (const args of [{ fileContentBase64: sensitive }, { body: { fileContentBase64: sensitive } }]) {
-    await assert.rejects(f.run(f.a, { ...operation('publish'), args }), { code: 'content_restricted' })
+    await assert.rejects(f.run(f.a, { ...operation('publish'), args }), { code: 'risk_restricted' })
   }
   assert.equal(f.upstream.requests, 0)
   const normal = '<html>正常可发布报告</html>'

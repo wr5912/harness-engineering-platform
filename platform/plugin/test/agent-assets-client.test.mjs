@@ -13,15 +13,15 @@ async function component(name, file, props) {
     useRef(initial) { const at = cursor++; if (!(at in states)) states[at] = { current: initial }; return states[at] },
     useEffect(effect, deps) { const at = cursor++; if (!dependencies[at] || deps.some((value, index) => !Object.is(value, dependencies[at][index]))) { dependencies[at] = deps; effects.push(effect) } },
   }
-  const source = (await build({ entryPoints: [new URL(`../src/agents/${file}`, import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime'] })).outputFiles[0].text
+  const source = (await build({ entryPoints: [new URL(`../src/agents/${file}`, import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime', '@deepseek-ai/dsh-client-ui-primitives'] })).outputFiles[0].text
   const module = { exports: {} }
-  vm.runInNewContext(source, { module, exports: module.exports, require: name => name === 'react' ? react : require(name) })
+  vm.runInNewContext(source, { module, exports: module.exports, require: name => name === 'react' ? react : name === '@deepseek-ai/dsh-client-ui-primitives' ? { Modal: () => null } : require(name) })
   function render() { let count = 0; do { if (++count > 20) throw new Error('render loop'); cursor = 0; effects = []; changed = false; tree = module.exports[name](props); effects.forEach(effect => effect()) } while (changed); return tree }
   async function settle() { for (let i = 0; i < 3; i++) { await new Promise(resolve => setImmediate(resolve)); render() } }
   function nodes(value = tree) { if (Array.isArray(value)) return value.flatMap(nodes); if (!value || typeof value !== 'object') return []; return [value, ...(value.props?.children === undefined ? [] : nodes(value.props.children))] }
   function text(value = tree) { if (Array.isArray(value)) return value.map(text).join(''); return value && typeof value === 'object' ? text(value.props?.children ?? '') : String(value ?? '') }
   render()
-  return { nodes, text, render, settle, button: name => nodes().find(node => node.type === 'button' && text(node) === name) }
+  return { nodes, text, render, settle, setActive(value) { props.active = value; render() }, button: name => nodes().find(node => node.type === 'button' && text(node) === name) }
 }
 function deferred() { let resolve; const promise = new Promise(done => { resolve = done }); return { resolve, promise } }
 
@@ -52,7 +52,9 @@ test('新建智能体先预览，冲突保留填写，成功显示独立研究�
 test('资产差异来源切换忽略旧响应，文件选择读取对应只读补丁', async () => {
   const calls = [], firstResponse = deferred()
   const view = path => ({ left: { label: '父版', source: 'experiment:parent', digest: 'a' }, right: { label: '当前版', digest: 'b' }, notes: [], summary: { added: 0, removed: 0, modified: 1, unchanged: 1 }, files: [{ path: 'role.md', status: 'modified' }], ...(path ? { selected: { path, diff: '-old\n+new\n', truncated: false } } : {}) })
-  const ui = await component('AssetDiffPanel', 'asset-diff-client.tsx', { experimentId: 'EXP-first-agent-002-r222222222222', baseline: { ref: 'git:' + 'a'.repeat(40), parent_experiment_id: 'EXP-first-agent-001-r111111111111' }, versions: [{ id: 'EXP-first-agent-002-r222222222222' }, { id: 'EXP-first-agent-001-r111111111111' }], onClose() {}, rpc: { async call(channel, endpoint, payload) { calls.push({ endpoint, payload }); return calls.length === 1 ? firstResponse.promise : { ok: true, value: view(payload.path) } } } })
+  const ui = await component('AssetDiffPanel', 'asset-diff-client.tsx', { experimentId: 'EXP-first-agent-002-r222222222222', baseline: { ref: 'git:' + 'a'.repeat(40), parent_experiment_id: 'EXP-first-agent-001-r111111111111' }, versions: [{ id: 'EXP-first-agent-002-r222222222222' }, { id: 'EXP-first-agent-001-r111111111111' }], rpc: { async call(channel, endpoint, payload) { calls.push({ endpoint, payload }); return calls.length === 1 ? firstResponse.promise : { ok: true, value: view(payload.path) } } } })
+  assert.equal(ui.nodes().find(node => node.type === 'section' && node.props['aria-label'] === '资产差异').props.id, 'agent-asset-diff-panel')
+  assert.equal(ui.button('关闭差异'), undefined)
   ui.button('比较资产').props.onClick(); ui.render()
   ui.nodes().find(node => node.type === 'select').props.onChange({ target: { value: 'EXP-first-agent-001-r111111111111' } }); ui.render()
   ui.button('比较资产').props.onClick(); await ui.settle()
@@ -63,4 +65,11 @@ test('资产差异来源切换忽略旧响应，文件选择读取对应只读�
   assert.equal(calls.at(-1).payload.path, 'role.md')
   assert.match(ui.text(), /-old\n\+new/)
   assert.equal(calls.every(call => call.endpoint === 'agents/assets/diff'), true)
+  const source = () => ui.nodes().find(node => node.type?.name === 'DetailDrawer' && node.props.title === '本次来源摘要')
+  assert.equal(source().props.active, true)
+  assert.match(source().props.identity, /EXP-first-agent-002-r222222222222:EXP-first-agent-001-r111111111111/)
+  assert.match(ui.text(source()), /experiment:parent/)
+  assert.equal(ui.nodes().some(node => node.type === 'details'), false)
+  ui.setActive(false)
+  assert.equal(source().props.active, false)
 })

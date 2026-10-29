@@ -14,10 +14,12 @@ test('页面定位保留精确 Agent、版本、Run 与用例，未知地址回�
 })
 
 test('评测 Run 子视图可随 URL 往返，用例深链优先定位逐例结果', () => {
-  for (const run_tab of ['results', 'trace', 'files', 'datasets']) {
+  for (const run_tab of ['results', 'files', 'datasets']) {
     const target = { page: 'evaluation', tab: 'runs', run_id: 'run-11111111-1111-4111-8111-111111111111', run_tab }
     assert.deepEqual(readNavigation(navigationHash(target)), target)
   }
+  assert.equal(readNavigation('#/evaluation?tab=runs&run_id=run-11111111-1111-4111-8111-111111111111&run_tab=trace').run_tab, 'files')
+  assert.match(navigationHash({ page: 'evaluation', tab: 'runs', run_id: 'run-11111111-1111-4111-8111-111111111111', run_tab: 'trace' }), /run_tab=files/)
   const caseRoute = '#/evaluation?tab=runs&run_id=run-11111111-1111-4111-8111-111111111111&case_id=U-IDENTITY-001&run_tab=trace'
   assert.deepEqual(readNavigation(caseRoute), { page: 'evaluation', tab: 'runs', run_id: 'run-11111111-1111-4111-8111-111111111111', case_id: 'U-IDENTITY-001' })
   assert.deepEqual(readNavigation(navigationHash({ page: 'evaluation', tab: 'runs', run_id: 'run-11111111-1111-4111-8111-111111111111', case_id: 'U-IDENTITY-001', run_tab: 'trace' })), { page: 'evaluation', tab: 'runs', run_id: 'run-11111111-1111-4111-8111-111111111111', case_id: 'U-IDENTITY-001' })
@@ -82,7 +84,7 @@ const shellViews = {
 async function clientModule(path, exports, stubs) {
   const source = readFileSync(new URL(path, import.meta.url), 'utf8')
   return (await build({ stdin: { contents: source + '\n' + exports, resolveDir: new URL(path, import.meta.url).pathname.replace(/\/[^/]+$/, ''), loader: 'tsx' },
-    bundle: true, write: false, platform: 'node', format: 'cjs', jsx: 'automatic', external: ['react', 'react-dom', 'react/jsx-runtime'], logLevel: 'silent',
+    bundle: true, write: false, platform: 'node', format: 'cjs', jsx: 'automatic', external: ['react', 'react-dom', 'react/jsx-runtime', '@deepseek-ai/dsh-client-ui-primitives'], logLevel: 'silent',
     plugins: [{ name: 'isolated-child-views', setup(builder) {
       builder.onResolve({ filter: /.*/ }, args => stubs[args.path] === undefined ? undefined : { path: args.path, namespace: 'child-view' })
       builder.onLoad({ filter: /.*/, namespace: 'child-view' }, args => ({ contents: stubs[args.path], loader: 'js' }))
@@ -101,7 +103,7 @@ function renderPage(source, component, props, initialHash = '#/mcp') {
   const location = { hash: initialHash }, window = { location, addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: name => listeners.delete(name),
     history: { pushState(_state, _unused, hash) { location.hash = hash }, replaceState(_state, _unused, hash) { location.hash = hash } } }
   const module = { exports: {} }
-  vm.runInNewContext(source, { module, exports: module.exports, require: name => name === 'react' ? react : name === 'react-dom' ? {} : require(name),
+  vm.runInNewContext(source, { module, exports: module.exports, require: name => name === 'react' ? react : name === 'react-dom' ? {} : name === '@deepseek-ai/dsh-client-ui-primitives' ? { Tooltip: props => props.children } : require(name),
     window, URL, URLSearchParams, document: { baseURI: 'http://127.0.0.1:3090/', addEventListener() {}, removeEventListener() {} } })
   const render = () => { let count = 0; do { if (++count > 20) throw new Error('render loop'); cursor = 0; effects = []; changed = false; tree = module.exports[component](props); effects.forEach(effect => effect()) } while (changed); return tree }
   function nodes(value) { if (!arguments.length) value = tree; return Array.isArray(value) ? value.flatMap(item => nodes(item)) : value && typeof value === 'object' ? [value, ...nodes(value.props?.children)] : [] }
@@ -229,8 +231,8 @@ test('MCP 工作区仅保留四个工具页签，统一网关使用顶部一级�
   const state = { status: 'ready', revision: 'revision-1', value: {} }
   const ui = renderPage(source, 'McpPage', { form: { subscribe() {}, getSnapshot: () => state },
     rpc: { async call() { return { ok: true, value: {} } } } })
-  const tabs = ui.nodes().find(node => node.type === 'nav' && node.props.className === 'harness-mcp-tabs')
-  assert.deepEqual(Array.from(tabs.props.children, node => ui.text(node)), ['服务列表', '工具与资源分组', '工具与资源调试', '工具组合编排'])
+  const tabs = ui.nodes().find(node => node.type === 'nav' && node.props.className?.split(' ').includes('harness-mcp-tabs'))
+  assert.deepEqual(Array.from(tabs.props.children, node => ui.text(node)), ['服务列表', '工具与资源分组', '服务与分组 MCP 调试', '工具组合编排'])
   assert.equal(ui.nodes().some(node => node.type === 'button' && ui.text(node).includes('统一网关')), false)
   ui.button('工具组合编排').props.onClick(); ui.render()
   assert.equal(ui.button('工具组合编排').props['aria-current'], 'page')

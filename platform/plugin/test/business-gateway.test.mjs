@@ -25,6 +25,21 @@ const WebSocket = wsRequire('ws')
 const NativeRemotes = await import(wsRequire.resolve('@deepseek-ai/dsh-api-remotes'))
 const binding = { workspaceId: 'workspace-business-test', agentId: 'soc', instanceId: 'soc-business', runtimeGeneration: 'generation-1', sourceDigest: 'sha256:' + 'a'.repeat(64) }
 const identity = id => ({ subject: { id, kind: 'human', identitySource: 'http://identity-fixture.invalid' }, evidence: { issuer: 'http://identity-fixture.invalid', externalSubject: id, method: 'bearer', verifiedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 60000).toISOString(), credentialRef: `credential-${id}` }, expiresAt: new Date(Date.now() + 60000).toISOString() })
+function thirdPartyRiskFixture() {
+  const calls = [], versions = new Map()
+  return { calls, assess(input, expiresAt) {
+    calls.push(input)
+    // 测试输入的含义只由第三方 HTTP 夹具返回，平台没有本地标记检测。
+    const text = JSON.stringify(input.input) ?? ''
+    const deniedOperations = input.phase === 'input' && text.includes('MOCK_CONTROL_DENY_INPUT') ? ['*']
+      : input.phase === 'report' && text.includes('SYNTHETIC-BLOCK') ? ['publish'] : []
+    const scope = { subjectId: input.subjectId, ...(input.sessionId ? { sessionId: input.sessionId } : {}) }
+    const level = deniedOperations.length ? 'high' : 'low', key = JSON.stringify(scope), meaning = JSON.stringify([level, deniedOperations])
+    const previous = versions.get(key), version = previous ? previous.version + Number(previous.meaning !== meaning) : 1
+    versions.set(key, { version, meaning })
+    return { version, scope, level, constraints: { deniedOperations }, reasons: ['third-party-fixture'], expiresAt }
+  } }
+}
 const initializers = []
 function mark(name, options) { (options ? Remote(options) : Remote(name))(Fixture.prototype[name], { kind: 'method', name, private: false, static: false, addInitializer: fn => initializers.push(fn) }) }
 class Fixture extends Service {
@@ -40,13 +55,13 @@ class Fixture extends Service {
 mark('create'); mark('list'); mark('updateQueue'); mark('page', { resources: { session: request => request.address?.sessionId ?? request.address?.childSessionId ?? request.sessionId } }); mark('follow', { mode: 'stream', resources: { session: request => request.address?.sessionId ?? request.address?.childSessionId ?? request.sessionId } })
 async function setup(t, { localTools = [], emptyWorkspace = false, registrationFailure = false, sharedDevelopment = false, proxyOrigin } = {}) {
   const assetRoot = mkdtempSync(join(tmpdir(), 'business-native-')); mkdirSync(join(assetRoot, 'config'))
-  const revokedSubjects = new Set(), trustDelays = new Map(), trustCalls = new Map()
+  const revokedSubjects = new Set(), trustDelays = new Map(), trustCalls = new Map(), riskProvider = thirdPartyRiskFixture()
   const provider = createServer(async (req, res) => {
     let text = ''; for await (const bytes of req) text += bytes
     const input = JSON.parse(text), expiresAt = new Date(Date.now() + 60000).toISOString()
     if (req.url === '/trust') { trustCalls.set(input.subjectId, (trustCalls.get(input.subjectId) || 0) + 1); if (trustDelays.has(input.subjectId)) await new Promise(resolve => setTimeout(resolve, trustDelays.get(input.subjectId))) }
     res.setHeader('content-type', 'application/json')
-    res.end(JSON.stringify(req.url === '/risk' ? { version: 1, scope: { subjectId: input.subjectId, ...(input.sessionId ? { sessionId: input.sessionId } : {}) }, level: 'low', constraints: { deniedOperations: [] }, expiresAt } : { valid: !revokedSubjects.has(input.subjectId), subjectId: input.subjectId, expiresAt }))
+    res.end(JSON.stringify(req.url === '/risk' ? riskProvider.assess(input, expiresAt) : { valid: !revokedSubjects.has(input.subjectId), subjectId: input.subjectId, expiresAt }))
   }); provider.listen(0, '127.0.0.1'); await once(provider, 'listening'); t.after(() => new Promise(resolve => provider.close(resolve)))
   writeFileSync(join(assetRoot, 'config/business-access.json'), JSON.stringify({ schemaVersion: 1, enabled: true, authentication: { endpoint: `http://127.0.0.1:${provider.address().port}/auth` }, identityTrust: { endpoint: `http://127.0.0.1:${provider.address().port}/trust` }, riskAssessment: { endpoint: `http://127.0.0.1:${provider.address().port}/risk` }, operations: [{ serverId: 'writes', operationId: 'update', kind: 'write', method: 'POST', target: 'https://business.test/item', confirmation: true }], agents: [{ agentId: 'soc', enabled: true, sourceDigest: binding.sourceDigest, subjects: ['A', 'B'], actions: ['*'] }] }))
   const secret = randomBytes(48); const secretPath = join(assetRoot, 'business.secret'); writeFileSync(secretPath, secret)
@@ -91,7 +106,7 @@ async function setup(t, { localTools = [], emptyWorkspace = false, registrationF
   const context = id => { const value = sharedDevelopment ? sharedInstanceIdentity(binding) : identity(id); if (!sharedDevelopment) { value.subject.identitySource = `http://127.0.0.1:${provider.address().port}`; value.evidence.issuer = value.subject.identitySource }; return control.createContext(value, binding) }
   const headers = (id, path, method = 'POST') => signBusinessAssertion(secret, { binding, context: context(id), snapshot: coordinator.issueSnapshot(binding.instanceId), nonce: randomBytes(24).toString('base64url'), issuedAt: Date.now() }, method, path)
   const rpc = async (id, endpoint, request) => { const path = `/api/${endpoint}`; return fetch(`http://127.0.0.1:${ctx.webServer.port}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers(id, path) }, body: JSON.stringify({ type: 'client-request', rpcId: randomBytes(8).toString('hex'), method: endpoint, payload: { args: { request } } }) }) }
-  return { ctx, control, fixture, headers, rpc, context, secret, coordinator, gateway, workspacePath, workspaceRows, workspaceRegistry, registrationConnections, toolGuards, agents, trustCalls, delayTrust: (id, delay) => trustDelays.set(id, delay), revoke: id => revokedSubjects.add(id) }
+  return { ctx, control, fixture, headers, rpc, context, secret, coordinator, gateway, workspacePath, workspaceRows, workspaceRegistry, registrationConnections, toolGuards, agents, trustCalls, riskCalls: riskProvider.calls, delayTrust: (id, delay) => trustDelays.set(id, delay), revoke: id => revokedSubjects.add(id) }
 }
 test('门户代理保留路径并使用 HTTPS 来源连接原生 API 与 WebSocket，直连入口仍可用', { timeout: 5000 }, async t => {
   const { gateway } = await setup(t, { sharedDevelopment: true, proxyOrigin: 'https://portal.localhost:18060' })
@@ -364,8 +379,17 @@ test('业务 Profile 替换连接，保留来源对原生工具和自动化任�
 })
 
 
-test('原生 ApprovalService 暂停同一次调用，B不能回答A的确认且确认后只派发一次', async t => {
+for (const conditional of [false, true]) test(conditional
+  ? '第三方低风险条件经原生 ApprovalService 确认，A可见可答、B隔离且仅派发一次'
+  : '原生 ApprovalService 暂停同一次调用，B不能回答A的确认且确认后只派发一次', async t => {
   const { ctx, control, headers, rpc, context, coordinator } = await setup(t)
+  if (conditional) {
+    const configPath = join(control.assetRoot, 'config/business-access.json'), config = JSON.parse(readFileSync(configPath, 'utf8'))
+    config.operations.find(operation => operation.serverId === 'writes' && operation.operationId === 'update').confirmation = false
+    config.agents[0].toolPolicies = [{ serverId: 'writes', defaultEffect: 'deny', rules: [{ when: { riskLevels: ['low'] }, effect: 'confirm' }] }]
+    writeFileSync(configPath, JSON.stringify(config)); coordinator.configurationChanged()
+    await ctx.get('connection').refresh(); await ctx.get('connection').refresh()
+  }
   // 真实原生瀑布桥先注册；业务answerer须优先处理自己冻结的请求，不能等owner回答。
   await ctx.plugin(NativeRemotes)
   await ctx.plugin({ name: 'late-business-approval', inject: ['connection', 'webServer', 'approval'], apply(ctx) {
@@ -398,18 +422,20 @@ test('原生 ApprovalService 暂停同一次调用，B不能回答A的确认且�
   }
   let pending; const until = Date.now() + 1000; while (!pending && Date.now() < until) { pending = (await list('A')).items[0]; if (!pending) await new Promise(resolve => setTimeout(resolve, 10)) }
   assert.ok(pending); assert.equal(dispatched, 0); assert.deepEqual((await list('B')).items, [])
+  assert.match(pending.reason, conditional ? /第三方风险等级.*确认/ : /操作 update 的基础执行设置要求确认/)
   // 模拟本人阅读目标后作答，覆盖本地新事实观察及ACK的两个实际心跳周期。
   await new Promise(resolve => setTimeout(resolve, 1200)); assert.ok((await list('A')).items.some(item => item.id === pending.id)); assert.equal(dispatched, 0)
   const answer = (id, allow) => fetch(endpoint, { method: 'POST', headers: { ...headers(id, path), 'content-type': 'application/json' }, body: JSON.stringify({ id: pending.id, allow }) })
   assert.equal((await answer('B', true)).status, 403); assert.equal(dispatched, 0)
   assert.equal((await answer('A', true)).status, 200); assert.equal(await execution, 'done'); assert.equal(dispatched, 1)
   const audit = session.snapshotEvents().filter(event => event.type.startsWith('approval/')); assert.deepEqual(audit.map(event => event.type), ['approval/asked', 'approval/decided']); assert.equal(audit[1].data.outcome, 'allowed-once')
+  assert.match(audit[0].data.reason, conditional ? /第三方风险等级.*确认/ : /操作 update 的基础执行设置要求确认/, '核心确认原因经 Runtime 透传到真实原生审批事件')
   assert.equal((await answer('A', true)).status, 403)
 })
 
 
 test('受控报告首次读取、重读和下载均检查归属与最新限制，拒绝内容不流给用户', async t => {
-  const { ctx, control, headers, rpc, context, coordinator } = await setup(t); const created = await (await rpc('A', 'session/create', {})).json(); const sessionId = created.result.value.sessionId
+  const { ctx, control, headers, rpc, context, coordinator, riskCalls } = await setup(t); const created = await (await rpc('A', 'session/create', {})).json(); const sessionId = created.result.value.sessionId
   let requested = 0, content = '<html><body>正常报告</body></html>'
   const upstream = createServer((req, res) => { requested++; assert.equal(req.headers['x-test-run-id'], 'reports-fixture'); res.setHeader('content-type', 'text/html'); res.end(content) }); upstream.listen(0, '127.0.0.1'); await once(upstream, 'listening'); t.after(() => new Promise(resolve => upstream.close(resolve)))
   const origin = `http://127.0.0.1:${upstream.address().port}`, owner = control.sessionContext(context('A'), sessionId)
@@ -421,7 +447,8 @@ test('受控报告首次读取、重读和下载均检查归属与最新限制�
   const get = id => fetch(`http://127.0.0.1:${ctx.webServer.port}${path}`, { headers: headers(id, path, 'GET') })
   assert.equal((await get('B')).status, 403); assert.equal(requested, 0)
   const first = await get('A'), firstBody = await first.text(); assert.equal(first.status, 200, firstBody); assert.match(firstBody, /正常报告/); assert.match(first.headers.get('content-disposition'), /attachment/); assert.equal(requested, 1)
-  config.detection = { reportMarkers: ['SYNTHETIC-BLOCK'] }; writeFileSync(configPath, JSON.stringify(config)); content = '<html>SYNTHETIC-BLOCK</html>'; const blocked = await get('A'); assert.equal(blocked.status, 403); assert.ok(!(await blocked.text()).includes('SYNTHETIC-BLOCK')); assert.equal(requested, 2)
+  content = '<html>SYNTHETIC-BLOCK</html>'; const blocked = await get('A'); assert.equal(blocked.status, 403); assert.ok(!(await blocked.text()).includes('SYNTHETIC-BLOCK')); assert.equal(requested, 2)
+  assert.ok(riskCalls.some(call => call.phase === 'report' && call.input === content), '报告正文实际交给第三方提供方判断')
   content = '<html>恢复正常报告</html>'; assert.equal((await get('A')).status, 200); assert.equal(requested, 3)
   coordinator.updateRestriction({ scope: { workspaceId: binding.workspaceId, agentId: binding.agentId, subjectId: 'A' }, deniedActions: ['publish'], active: true, reason: 'test' }); control.acceptSnapshot(coordinator.issueSnapshot(binding.instanceId))
   assert.equal((await get('A')).status, 403); assert.equal(requested, 3)
@@ -446,6 +473,10 @@ test('独立业务监听真实认证和代理，清除自报主体及凭据，�
   let runtimeSnapshot; for (let round = 0; round < 2; round++) { const assertion = { binding, ...(runtimeSnapshot ? { snapshot: runtimeSnapshot } : {}), issuedAt: Date.now(), nonce: randomBytes(24).toString('base64url') }; const response = await fetch(origin + '/control/' + binding.instanceId, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(signBusinessAssertion(secret, assertion, 'POST', '/control/' + binding.instanceId)) }); assert.equal(response.status, 200); runtimeSnapshot = verifyBusinessAssertion(secret, await response.json(), 'RESPONSE', '/control/' + binding.instanceId, binding, new Map()).snapshot }
   const loggedOutPage = await (await frontFetch(origin + '/', { method: 'GET', headers })).text(); assert.ok(!loggedOutPage.includes('/agents/soc/')); assert.ok(!loggedOutPage.includes('/agents/hidden-agent/')); assert.match(loggedOutPage, /原生定时任务已开放/); const center = getBusinessControl(assetRoot); for (const who of ['A', 'B']) center.updateRisk({ id: `homepage-risk-${who}`, version: 1, scope: { workspaceId: binding.workspaceId, agentId: binding.agentId, subjectId: who }, status: 'assessed', source: 'fixture-source', observedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 60000).toISOString(), signals: [{ code: 'fixture-evidence', value: who, reason: who === 'A' ? '<script>risk-xss</script>' : 'B_PRIVATE_EVIDENCE' }] }); const ownDirectory = await (await frontFetch(origin + '/', { method: 'GET', headers: { ...headers, authorization: 'Bearer A' } })).text(); for (const label of ['智能体身份', '风险评估', '访问控制', '自动触发', 'Agent认证方式', '可信来源核验状态', 'hmac-sha256', '当前访问者']) assert.ok(ownDirectory.includes(label)); assert.ok(ownDirectory.includes('&lt;script&gt;risk-xss&lt;/script&gt;')); assert.ok(!ownDirectory.includes('<script>risk-xss</script>')); assert.ok(!ownDirectory.includes('B_PRIVATE_EVIDENCE')); assert.ok(ownDirectory.includes('/agents/soc/')); assert.ok(!ownDirectory.includes('/agents/hidden-agent/'));
   assert.match(ownDirectory, /127\.0\.0\.1:3090/)
+  config.accessAuthorization = { endpoint: `http://127.0.0.1:${provider.address().port}/access` }; save()
+  const externalDirectory = await (await frontFetch(origin + '/', { method: 'GET', headers: { ...headers, authorization: 'Bearer A' } })).text()
+  assert.match(externalDirectory, /第三方访问控制优先/); assert.match(externalDirectory, /手动兜底动作/); assert.match(externalDirectory, /正常工具许可由第三方按每次实际请求决定/)
+  delete config.accessAuthorization; save()
   config.gateway.managementUrl = 'http://127.0.0.1:18120'; save()
   const movedManagement = await (await frontFetch(origin + '/', { method: 'GET', headers: { ...headers, authorization: 'Bearer A' } })).text()
   assert.match(movedManagement, /127\.0\.0\.1:18120/)
@@ -733,27 +764,28 @@ test('报告身份撤销在上游读取前与正文释放前均重新验证', as
 
 
 test('公开入箱共同检测覆盖队列编辑且创建不能夹带初始消息，拒绝发生在原生处理器前', async t => {
-  const { rpc, control, fixture } = await setup(t); const created = await (await rpc('A', 'session/create', {})).json(), sessionId = created.result.value.sessionId
-  const configPath = join(control.assetRoot, 'config/business-access.json'), config = JSON.parse(readFileSync(configPath, 'utf8')); config.detection = { inputMarkers: ['MOCK_CONTROL_DENY_INPUT'] }; writeFileSync(configPath, JSON.stringify(config))
+  const { rpc, fixture, riskCalls } = await setup(t); const created = await (await rpc('A', 'session/create', {})).json(), sessionId = created.result.value.sessionId
   assert.equal((await rpc('A', 'session/updateQueue', { sessionId, itemId: 'queued-1', action: { kind: 'edit', content: [{ type: 'text', text: 'MOCK_CONTROL_DENY_INPUT' }] } })).status, 403); assert.equal(fixture.queued.length, 0)
+  assert.ok(riskCalls.some(call => call.phase === 'input' && JSON.stringify(call.input).includes('MOCK_CONTROL_DENY_INPUT')), '队列编辑经真实第三方风险请求后拒绝')
   const safe = await (await rpc('A', 'session/updateQueue', { sessionId, itemId: 'queued-1', action: { kind: 'edit', content: [{ type: 'text', text: '正常编辑内容' }] } })).json(); assert.equal(safe.result.ok, true); assert.equal(fixture.queued.length, 1)
   const removed = await (await rpc('A', 'session/updateQueue', { sessionId, itemId: 'queued-1', action: { kind: 'remove' } })).json(); assert.equal(removed.result.ok, true); assert.equal(fixture.queued.length, 2)
   assert.equal((await rpc('A', 'session/create', { content: [{ type: 'text', text: 'MOCK_CONTROL_DENY_INPUT' }] })).status, 403); assert.equal(fixture.seen.length, 1)
 })
 
 test('恢复队列在原生agent/created串行接缝检测失败，不清除旧输入', async t => {
-  const { ctx, control, rpc } = await setup(t); const created = await (await rpc('A', 'session/create', {})).json(), sessionId = created.result.value.sessionId
-  const configPath = join(control.assetRoot, 'config/business-access.json'), config = JSON.parse(readFileSync(configPath, 'utf8')); config.detection = { inputMarkers: ['MOCK_CONTROL_DENY_INPUT'] }; writeFileSync(configPath, JSON.stringify(config))
+  const { ctx, rpc, riskCalls } = await setup(t); const created = await (await rpc('A', 'session/create', {})).json(), sessionId = created.result.value.sessionId
   const original = [{ content: [{ type: 'text', text: 'MOCK_CONTROL_DENY_INPUT' }] }], agent = { session: { id: sessionId }, inbox: { nextTurn: original, nextStep: [] } }
   await assert.rejects(ctx.serial('agent/created', { agent, source: 'resume' })); assert.deepEqual(agent.inbox.nextTurn, original)
+  assert.ok(riskCalls.some(call => call.phase === 'input' && call.sessionId === sessionId && JSON.stringify(call.input).includes('MOCK_CONTROL_DENY_INPUT')), '持久化输入在原生恢复接缝交第三方评估')
   await assert.rejects(ctx.serial('agent/created', { agent: { session: { id: 'unassigned-history' }, inbox: { nextTurn: [{ content: [{ type: 'text', text: '正常历史输入' }] }], nextStep: [] } }, source: 'resume' }))
 })
 
 
 test('两个独立状态根经真实控制HTTP同步Session、检测事实、限制与实际版本回执', async t => {
   const root = mkdtempSync(join(tmpdir(), 'business-replica-http-')), centerRoot = join(root, 'center'), replicaRoot = join(root, 'replica'); mkdirSync(join(centerRoot, 'config'), { recursive: true }); mkdirSync(join(replicaRoot, 'config'), { recursive: true }); mkdirSync(join(centerRoot, '.local/instances/soc-business'), { recursive: true }); t.after(() => rmSync(root, { recursive: true, force: true }))
-  const provider = createServer(async (req, res) => { let text = ''; for await (const bytes of req) text += bytes; const input = JSON.parse(text); res.setHeader('content-type', 'application/json'); const expiresAt = new Date(Date.now() + 60000).toISOString(); res.end(JSON.stringify(req.url === '/risk' ? { version: 1, scope: { subjectId: input.subjectId, ...(input.sessionId ? { sessionId: input.sessionId } : {}) }, level: 'low', constraints: { deniedOperations: [] }, expiresAt } : { valid: true, subjectId: input.subjectId, expiresAt })) }); provider.listen(0, '127.0.0.1'); await once(provider, 'listening'); t.after(() => new Promise(resolve => provider.close(resolve))); const providerOrigin = `http://127.0.0.1:${provider.address().port}`
-  const config = { schemaVersion: 1, enabled: true, authentication: { endpoint: providerOrigin + '/auth' }, identityTrust: { endpoint: providerOrigin + '/trust' }, riskAssessment: { endpoint: providerOrigin + '/risk' }, agents: [{ agentId: 'soc', enabled: true, sourceDigest: binding.sourceDigest, subjects: ['A', 'B'], actions: ['*'] }], detection: { inputMarkers: ['MOCK_CONTROL_DENY_INPUT'] } }; writeFileSync(join(centerRoot, 'config/business-access.json'), JSON.stringify(config)); symlinkSync(join(centerRoot, 'config/business-access.json'), join(replicaRoot, 'config/business-access.json')); writeFileSync(join(centerRoot, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: binding.workspaceId }))
+  const riskProvider = thirdPartyRiskFixture()
+  const provider = createServer(async (req, res) => { let text = ''; for await (const bytes of req) text += bytes; const input = JSON.parse(text); res.setHeader('content-type', 'application/json'); const expiresAt = new Date(Date.now() + 60000).toISOString(); res.end(JSON.stringify(req.url === '/risk' ? riskProvider.assess(input, expiresAt) : { valid: true, subjectId: input.subjectId, expiresAt })) }); provider.listen(0, '127.0.0.1'); await once(provider, 'listening'); t.after(() => new Promise(resolve => provider.close(resolve))); const providerOrigin = `http://127.0.0.1:${provider.address().port}`
+  const config = { schemaVersion: 1, enabled: true, authentication: { endpoint: providerOrigin + '/auth' }, identityTrust: { endpoint: providerOrigin + '/trust' }, riskAssessment: { endpoint: providerOrigin + '/risk' }, agents: [{ agentId: 'soc', enabled: true, sourceDigest: binding.sourceDigest, subjects: ['A', 'B'], actions: ['*'] }] }; writeFileSync(join(centerRoot, 'config/business-access.json'), JSON.stringify(config)); symlinkSync(join(centerRoot, 'config/business-access.json'), join(replicaRoot, 'config/business-access.json')); writeFileSync(join(centerRoot, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: binding.workspaceId }))
   const secret = randomBytes(48), secretPath = join(root, 'business.secret'); writeFileSync(secretPath, secret); writeFileSync(join(centerRoot, '.local/instances/soc-business/instance.json'), JSON.stringify({ workspace_id: binding.workspaceId, asset_root: centerRoot, agent_id: binding.agentId, web_base_path: '/agents/soc/instances/soc-business/', business_control: { runtime_generation: binding.runtimeGeneration, source_digest: binding.sourceDigest, origin: 'http://127.0.0.1:1' } }))
   config.gateway = { host: '127.0.0.1', port: 0, publicOrigin: 'http://business.localhost:0', sharedSecretFile: secretPath, instances: [{ agentId: binding.agentId, instanceId: binding.instanceId }] }; writeFileSync(join(centerRoot, 'config/business-access.json'), JSON.stringify(config))
   const center = getBusinessControl(centerRoot); center.registerInstance(binding); const gateway = await startBusinessGateway(centerRoot, { host: '127.0.0.1', port: 0, publicOrigin: 'http://business.localhost:0', sharedSecretFile: secretPath, instances: [{ agentId: binding.agentId, instanceId: binding.instanceId }] }); t.after(() => gateway.close())
@@ -765,7 +797,9 @@ test('两个独立状态根经真实控制HTTP同步Session、检测事实、限
   const session = replica.bindSession(context, 'replica-created-session'); assert.equal(center.contextForSession(session.scope.sessionId), undefined); await connection.refresh(); assert.equal(center.contextForSession(session.scope.sessionId).subject.id, 'A')
   replica.bindSession(session, 'replica-child-session', session.scope.sessionId); await connection.refresh()
   assert.equal(center.parentSessionId(center.contextForSession(session.scope.sessionId), 'replica-child-session'), session.scope.sessionId)
-  await assert.rejects(replica.inspect(session, 'input', 'MOCK_CONTROL_DENY_INPUT')); const startedAt = Date.now(); await connection.refresh(); assert.ok(center.status().riskFacts.some(fact => fact.scope.sessionId === session.scope.sessionId && fact.source === 'local-input-marker')); assert.equal(center.status().instances[0].applied, false); await connection.refresh(); assert.equal(center.status().instances[0].applied, true); assert.ok(Date.now() - startedAt < 2000)
+  await replica.inspect(session, 'input', 'MOCK_CONTROL_DENY_INPUT'); assert.throws(() => replica.assert(session, 'session:prompt'), { code: 'risk_restricted' })
+  const startedAt = Date.now(); await connection.refresh(); assert.ok(center.status().riskFacts.some(fact => fact.scope.sessionId === session.scope.sessionId && fact.source === providerOrigin + '/risk' && fact.signals.some(signal => signal.value === '*'))); assert.equal(center.status().instances[0].applied, false); await connection.refresh(); assert.equal(center.status().instances[0].applied, true); assert.ok(Date.now() - startedAt < 2000)
+  await replica.inspect(session, 'input', '正常恢复输入'); assert.equal(replica.assert(session, 'session:prompt').kind, 'allow'); await connection.refresh(); await connection.refresh()
   const restriction = center.updateRestriction({ scope: { workspaceId: binding.workspaceId, agentId: binding.agentId, subjectId: 'A', sessionId: session.scope.sessionId }, deniedActions: ['write'], active: true, reason: 'session-write-test' }); await connection.refresh(); assert.throws(() => replica.assert(session, 'write')); assert.equal(replica.assert(session, 'read').kind, 'allow')
   const other = identity('B'); other.subject.identitySource = providerOrigin; other.evidence.issuer = providerOrigin; const otherContext = replica.bindSession(replica.createContext(other, binding), 'replica-other-session'); await replica.reassess(otherContext, undefined, 'write'); assert.equal(replica.assert(otherContext, 'write').kind, 'allow')
   const fresh = await center.reassess(center.contextForSession(session.scope.sessionId), undefined, 'write'); assert.equal(fresh.status, 'assessed'); center.updateRestriction({ ...restriction, active: false }); await connection.refresh(); assert.equal(replica.assert(session, 'write').kind, 'allow'); await connection.refresh(); assert.equal(center.status().instances[0].applied, true)

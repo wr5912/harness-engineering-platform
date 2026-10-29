@@ -8,7 +8,7 @@ const require = createRequire(import.meta.url)
 const compiled = await build({ entryPoints: [new URL('../src/evaluation/cases-editor.tsx', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime'] })
 function dialog(sourceRun, onCall) {
   const states = [], dependencies = [], cleanups = []
-  let cursor, effects, changed, tree, failSave = false, sha = 'initial', closed = 0
+  let cursor, effects, changed, tree, failSave = false, sha = 'initial', generatedId = 'U-NEW-001', closed = 0
   const calls = [], saved = [], listeners = new Set(), dirties = [], busyStates = []
   const modal = { open: false, showModal() { this.open = true }, close() { this.open = false } }
   const react = {
@@ -22,7 +22,7 @@ function dialog(sourceRun, onCall) {
   const props = { agentId: 'alpha', experimentId: 'EXP-alpha-001', sourceRun, active: true, onDirty: value => dirties.push(value), onBusy: value => busyStates.push(value), onSaved: value => saved.push(value), onClose: () => closed++, rpc: { call: async (_channel, endpoint, payload) => {
     calls.push({ endpoint, payload })
     await onCall?.(endpoint, payload)
-    if (endpoint.endsWith('create-context') || endpoint.endsWith('from-run')) return { ok: true, value: { agent_id: 'alpha', sha256: sha, scenes: ['基础'], ...(sourceRun ? { source_run_id: sourceRun.run_id, source_case_id: sourceRun.case_id } : {}), draft: { case_id: 'U-NEW-001', title: sourceRun ? '复现输入' : '', scene: '基础', inputs: [sourceRun ? '冻结的用户输入' : ''], expected_behavior: '', fast: false } } }
+    if (endpoint.endsWith('create-context') || endpoint.endsWith('from-run')) return { ok: true, value: { agent_id: 'alpha', sha256: sha, scenes: ['基础'], ...(sourceRun ? { source_run_id: sourceRun.run_id, source_case_id: sourceRun.case_id } : {}), draft: { case_id: generatedId, title: sourceRun ? '复现输入' : '', scene: '基础', inputs: [sourceRun ? '冻结的用户输入' : ''], expected_behavior: '', fast: false } } }
     if (failSave && endpoint.endsWith('cases/create')) return { ok: false, error: { code: 'conflict', message: '文件已被其他任务修改' } }
     if (endpoint.endsWith('create-preview')) return { ok: true, value: { diff: '+#### U-NEW-001 新用例' } }
     if (endpoint.endsWith('cases/create')) return { ok: true, value: { case: { ...payload, id: payload.case_id }, sha256: 'saved', path: 'agents/alpha/evaluation.md' } }
@@ -36,7 +36,7 @@ function dialog(sourceRun, onCall) {
   const button = title => nodes().find(node => node.type === 'button' && text(node) === title)
   function change(label, value) { byLabel(label).props.onChange({ target: { value, checked: value } }); render() }
   render()
-  return { settle, text, calls, saved, byLabel, button, change, listeners, modal, dirties, busyStates, get closed() { return closed }, setActive(value) { props.active = value; render() }, setFailSave(value) { failSave = value }, setSha(value) { sha = value }, cleanup() { cleanups.forEach(cleanup => cleanup?.()) } }
+  return { settle, text, calls, saved, byLabel, button, change, listeners, modal, dirties, busyStates, get closed() { return closed }, setActive(value) { props.active = value; render() }, setFailSave(value) { failSave = value }, setSha(value) { sha = value }, setGeneratedId(value) { generatedId = value }, cleanup() { cleanups.forEach(cleanup => cleanup?.()) } }
 }
 
 test('新增对话框先预览再确认，保存回调携带新 Case 供上层立即刷新选择', async () => {
@@ -44,14 +44,16 @@ test('新增对话框先预览再确认，保存回调携带新 Case 供上层�
   try {
     await ui.settle()
     assert.equal(ui.button('确认新增用例').props.disabled, true)
-    ui.change('新增用例名称', '基础新用例'); ui.change('新增用例第 1 轮输入', '请查询基础目录'); ui.change('新增用例预期行为', '展示基础目录'); ui.change('新增用例 ID', 'U-NEW-002')
+    assert.equal(ui.byLabel('新增用例 ID'), undefined)
+    assert.equal(ui.text(ui.byLabel('新增用例编号')), 'U-NEW-001')
+    ui.change('新增用例名称', '基础新用例'); ui.change('新增用例第 1 轮输入', '请查询基础目录'); ui.change('新增用例预期行为', '展示基础目录')
     await ui.button('预览差异').props.onClick(); await ui.settle()
     assert.equal(ui.button('确认新增用例').props.disabled, false)
     ui.change('新增用例预期行为', '展示目录并说明范围')
     assert.equal(ui.button('确认新增用例').props.disabled, true, '任何编辑都必须使旧预览失效')
     await ui.button('预览差异').props.onClick(); await ui.settle()
     await ui.button('确认新增用例').props.onClick(); await ui.settle()
-    assert.equal(ui.saved[0].case.id, 'U-NEW-002'); assert.equal(ui.closed, 1)
+    assert.equal(ui.saved[0].case.id, 'U-NEW-001'); assert.equal(ui.closed, 1)
     assert.equal(ui.calls.find(item => item.endpoint.endsWith('cases/create')).payload.expected_sha256, 'initial')
   } finally { ui.cleanup() }
 })
@@ -83,13 +85,15 @@ test('保存冲突保留全部草稿，显式重读后必须再次预览才可�
     assert.equal(ui.byLabel('新增用例名称').props.value, '必须保留的名称')
     assert.equal(ui.byLabel('新增用例预期行为').props.value, '人工判断的正确行为')
     assert.equal(ui.saved.length, 0); assert.equal(ui.closed, 0)
-    ui.setSha('new-version'); ui.setFailSave(false)
+    ui.setSha('new-version'); ui.setGeneratedId('U-NEW-002'); ui.setFailSave(false)
     await ui.button('保留草稿并重读最新版本').props.onClick(); await ui.settle()
     assert.equal(ui.byLabel('新增用例名称').props.value, '必须保留的名称')
+    assert.equal(ui.text(ui.byLabel('新增用例编号')), 'U-NEW-002', '新增用例编号冲突时由后端重新分配，用户内容保留')
     assert.equal(ui.button('确认新增用例').props.disabled, true)
     await ui.button('预览差异').props.onClick(); await ui.settle()
     await ui.button('确认新增用例').props.onClick(); await ui.settle()
     assert.equal(ui.calls.filter(item => item.endpoint.endsWith('cases/create')).at(-1).payload.expected_sha256, 'new-version')
+    assert.equal(ui.calls.filter(item => item.endpoint.endsWith('cases/create')).at(-1).payload.case_id, 'U-NEW-002')
     assert.equal(ui.saved.length, 1)
   } finally { ui.cleanup() }
 })

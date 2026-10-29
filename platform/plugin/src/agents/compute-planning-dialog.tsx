@@ -1,5 +1,8 @@
+import { LoadingIndicator } from '../components/loading-indicator.tsx'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { CHANNEL, type PlatformPageProps } from '../protocol.ts'
+
+export type TrainingModelSource = 'huggingface' | 'modelscope' | 'local' | 'unspecified'
 
 export type ComputePlanningRequest = {
   requestId: string
@@ -10,9 +13,6 @@ export type ComputePlanningRequest = {
   sourceRunIds: string[]
   tracePlanRequested: boolean
   medium?: {
-    baseModelMode: 'catalog' | 'custom' | 'suggest'
-    baseModelId: string
-    revision: string
     serverMode: 'registered' | 'new' | 'later'
     serverId: string
     host: string
@@ -21,6 +21,8 @@ export type ComputePlanningRequest = {
     workDir: string
     auth: 'ssh_key' | 'password'
     credentialRef: string
+    models?: Array<{ kind: 'llm' | 'decision'; source?: TrainingModelSource; baseModel: string; revision: string; purpose: string }>
+    combinationPreference?: string
   }
   low?: {
     uncovered: 'stop_and_report' | 'request_human'
@@ -29,18 +31,19 @@ export type ComputePlanningRequest = {
 }
 
 type PlanningType = ComputePlanningRequest['type']
+type ModelSuggestion = { id: number; kind: 'llm' | 'decision'; source: TrainingModelSource; baseModel: string; revision: string; purpose: string }
 type Draft = {
-  step: 1 | 2
-  type: PlanningType | null
+  type: PlanningType
   variantName: string
   goal: string
   advanced: string
   sourceRunIds: string[]
   tracePlanRequested: boolean
+  modelSuggestions: ModelSuggestion[]
+  combinationPreference: string
+  previousInferenceModel: string | null
+  previousInferenceRevision: string
   medium: {
-    baseModelMode: NonNullable<ComputePlanningRequest['medium']>['baseModelMode']
-    baseModelId: string
-    revision: string
     serverMode: NonNullable<ComputePlanningRequest['medium']>['serverMode']
     serverId: string
     serverName: string
@@ -55,9 +58,6 @@ type Draft = {
 }
 type Errors = Record<string, string>
 type SendStatus = 'idle' | 'sending' | 'failure' | 'unknown'
-type CatalogChoice = { id: string; name: string; provider: string; model: string }
-type ModelList = { catalog: { groups: Array<{ id: string; name?: string; models: Array<{ id: string; name?: string }> }> }; business_allowed: Array<{ provider: string; model: string }> }
-type CatalogState = { phase: 'idle' | 'loading' | 'ready' | 'error'; agentId: string; choices: CatalogChoice[]; message: string }
 type TrainingServer = { id: string; name: string; host: string; port: number; user: string; workDir: string; auth: 'ssh_key' | 'password'; credentialRef: string }
 type ServerList = { revision: string; servers: TrainingServer[] }
 type ServerState = { phase: 'idle' | 'loading' | 'ready' | 'error'; list: ServerList | null; message: string }
@@ -65,18 +65,6 @@ type ServerSaveStatus = 'idle' | 'saving' | 'error' | 'unknown' | 'success'
 type ConnectionCheck = { signature: string; status: 'probing' | 'ssh_reachable' | 'port_reachable_unverified' | 'unreachable' | 'unknown' | 'incomplete'; message: string; checkedAt?: string } | null
 type Run = { run_id: string; experiment_id: string; status: string; created_at: string; title?: string; effective_verdict?: 'passed' | 'failed' | 'inconclusive' | null }
 
-const mediumRoute = [
-  ['提炼决策样本', '从真实运行轨迹提取决策输入、动作与结果'],
-  ['训练决策模型', '选择基模型，在已配置服务器上训练'],
-  ['组装 LangGraph', '决策模型 + 状态流程 + 真实工具'],
-  ['独立比较验证', '比较效果、覆盖、延迟与资源开销'],
-]
-const lowRoute = [
-  ['提炼规则与分支', '从轨迹归纳决策规则和数据处理逻辑'],
-  ['编写 LangGraph 代码', '用明确的规则与流程实现决策'],
-  ['复用真实工具', '调用原有工具，不以假返回值替代'],
-  ['独立比较验证', '识别未覆盖场景，验证效果与资源开销'],
-]
 const typeLabel = (type: PlanningType | null) => type === 'medium' ? '中算力' : type === 'low' ? '低算力' : '尚未选择'
 const runPresentation = (run: Run) => {
   if (run.status === 'completed') {
@@ -92,15 +80,6 @@ const runTime = (value: string) => {
   const parsed = Date.parse(value)
   return Number.isFinite(parsed) ? new Date(parsed).toLocaleString('zh-CN') : '时间待核对'
 }
-
-export function catalogChoices(value: ModelList): CatalogChoice[] {
-  if (!value || !value.catalog || !Array.isArray(value.catalog.groups) || !Array.isArray(value.business_allowed)) throw new Error('模型目录响应格式不正确')
-  const allowed = new Set(value.business_allowed.filter(item => typeof item.provider === 'string' && typeof item.model === 'string')
-    .map(item => JSON.stringify([item.provider, item.model])))
-  return value.catalog.groups.flatMap(group => group.models.filter(model => allowed.has(JSON.stringify([group.id, model.id])))
-    .map(model => ({ id: JSON.stringify([group.id, model.id]), name: `${group.name || group.id} · ${model.name || model.id}`, provider: group.id, model: model.id })))
-}
-
 function serverList(value: unknown): ServerList {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('训练服务器列表响应格式不正确')
   const list = value as Partial<ServerList>
@@ -108,26 +87,25 @@ function serverList(value: unknown): ServerList {
   return { revision: list.revision, servers: list.servers }
 }
 
-function newServerErrors(medium: Draft['medium']): Errors {
+function newServerErrors(medium: Draft['medium'], partial = false): Errors {
   const errors: Errors = {}
-  if (!/^[a-zA-Z0-9][a-zA-Z0-9.:-]*$/.test(medium.host.trim()) || medium.host.trim().length > 255) errors.host = '请填写有效主机名或 IP，不含协议与空格。'
-  if (!/^\d+$/.test(medium.port) || Number(medium.port) < 1 || Number(medium.port) > 65535) errors.port = '端口范围为 1–65535。'
-  if (!/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(medium.user.trim())) errors.user = '请填写有效 SSH 用户名。'
-  if (!medium.workDir.trim().startsWith('/') || /[\x00-\x1f\x7f]/.test(medium.workDir)) errors.workDir = '请填写以 / 开头的绝对工作目录。'
+  if ((!partial || medium.host.trim()) && (!/^[a-zA-Z0-9][a-zA-Z0-9.:-]*$/.test(medium.host.trim()) || medium.host.trim().length > 255)) errors.host = '请填写有效主机名或 IP，不含协议与空格。'
+  if ((!partial || medium.port.trim()) && (!/^\d+$/.test(medium.port) || Number(medium.port) < 1 || Number(medium.port) > 65535)) errors.port = '端口范围为 1–65535。'
+  if ((!partial || medium.user.trim()) && !/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(medium.user.trim())) errors.user = '请填写有效 SSH 用户名。'
+  if ((!partial || medium.workDir.trim()) && (!medium.workDir.trim().startsWith('/') || /[\x00-\x1f\x7f]/.test(medium.workDir))) errors.workDir = '请填写以 / 开头的绝对工作目录。'
   if (medium.credentialRef && !/^ref:[A-Za-z0-9][A-Za-z0-9._/-]{0,119}$/.test(medium.credentialRef.trim())) errors.credentialRef = '只填写 ref: 开头的凭据引用，不要粘贴密码或私钥。'
   return errors
 }
 const initialDraft = (): Draft => ({
-  step: 1,
-  type: null,
+  type: 'medium',
   variantName: '',
   goal: '在保留当前版本关键行为的前提下，降低推理资源需求，并比较效果与资源开销。',
   advanced: '',
   sourceRunIds: [],
-  tracePlanRequested: false,
+  tracePlanRequested: true,
+  modelSuggestions: [], combinationPreference: '', previousInferenceModel: null, previousInferenceRevision: '',
   medium: {
-    baseModelMode: 'suggest', baseModelId: '', revision: '',
-    serverMode: 'new', serverId: '', serverName: '', host: '', port: '22', user: '',
+    serverMode: 'later', serverId: '', serverName: '', host: '', port: '22', user: '',
     workDir: '', auth: 'ssh_key', credentialRef: '',
   },
   low: { uncovered: 'stop_and_report', requirements: '' },
@@ -139,23 +117,33 @@ function readDraft(source: string): { draft: Draft; status: SendStatus; requestI
     const saved = JSON.parse(sessionStorage.getItem(draftStorageKey(source)) || 'null')
     if (!saved || typeof saved !== 'object' || !saved.draft || typeof saved.draft !== 'object') return fallback
     const candidate = saved.draft
-    const strings = [candidate.variantName, candidate.goal, candidate.medium?.baseModelId, candidate.medium?.revision,
-      candidate.medium?.serverId, candidate.medium?.serverName ?? '', candidate.medium?.host, candidate.medium?.port, candidate.medium?.user,
+    const strings = [candidate.variantName, candidate.goal, candidate.medium?.serverId, candidate.medium?.serverName ?? '', candidate.medium?.host, candidate.medium?.port, candidate.medium?.user,
       candidate.medium?.workDir, candidate.medium?.credentialRef, candidate.low?.requirements]
     if (!strings.every(value => typeof value === 'string') || typeof candidate.tracePlanRequested !== 'boolean'
       || !Array.isArray(candidate.sourceRunIds)
-      || !['catalog', 'custom', 'suggest'].includes(candidate.medium?.baseModelMode)
       || !['registered', 'new', 'later'].includes(candidate.medium?.serverMode)
       || !['ssh_key', 'password'].includes(candidate.medium?.auth)
       || !['stop_and_report', 'request_human'].includes(candidate.low?.uncovered)) return fallback
     const base = initialDraft()
+    const models: ModelSuggestion[] = Array.isArray(candidate.modelSuggestions)
+      ? candidate.modelSuggestions.filter((row: any) => row && ['llm', 'decision'].includes(row.kind) && ['baseModel', 'revision', 'purpose'].every(key => typeof row[key] === 'string'))
+        .map((row: any, id: number) => ({ ...row, id, source: ['huggingface', 'modelscope', 'local'].includes(row.source) ? row.source : 'unspecified' })) : []
+    const { baseModelMode: oldMode, baseModelId: oldId, revision: oldRevision, ...training } = candidate.medium
+    const legacyModel = typeof oldId === 'string' ? oldId : ''
+    const legacyRevision = typeof oldRevision === 'string' ? oldRevision : ''
+    if (oldMode === 'custom' && (legacyModel.trim() || legacyRevision.trim()) && !models.some(row => row.baseModel === legacyModel && row.revision === legacyRevision)) {
+      models.push({ id: models.length, kind: 'decision', source: 'unspecified', baseModel: legacyModel, revision: legacyRevision, purpose: '训练基模型参考' })
+    }
     const draft: Draft = {
       ...base, ...candidate,
       advanced: typeof candidate.advanced === 'string' ? candidate.advanced : '',
-      type: candidate.type === 'medium' || candidate.type === 'low' ? candidate.type : null,
-      step: candidate.step === 2 ? 2 : 1,
+      modelSuggestions: models,
+      combinationPreference: typeof candidate.combinationPreference === 'string' ? candidate.combinationPreference : '',
+      previousInferenceModel: typeof candidate.previousInferenceModel === 'string' ? candidate.previousInferenceModel : oldMode === 'catalog' && typeof oldId === 'string' && oldId ? oldId : null,
+      previousInferenceRevision: typeof candidate.previousInferenceRevision === 'string' ? candidate.previousInferenceRevision : oldMode === 'catalog' && typeof oldRevision === 'string' ? oldRevision : '',
+      type: candidate.type === 'low' ? 'low' : 'medium',
       sourceRunIds: candidate.sourceRunIds.filter((id: unknown) => typeof id === 'string'),
-      medium: { ...base.medium, ...candidate.medium },
+      medium: { ...base.medium, ...training },
       low: { ...base.low, ...candidate.low },
     }
     const requestId = typeof saved.requestId === 'string' && saved.requestId ? saved.requestId : null
@@ -167,13 +155,11 @@ function writeDraft(source: string, draft: Draft, status: SendStatus, requestId:
   try { sessionStorage.setItem(draftStorageKey(source), JSON.stringify({ draft, status, requestId })) } catch { /* 浏览器禁用会话存储时，当前挂载中的草稿仍可继续使用。 */ }
 }
 
-function Icon({ name }: { name: 'chip' | 'code' | 'server' | 'layers' | 'tool' | 'close' | 'send' }) {
+function Icon({ name }: { name: 'chip' | 'code' | 'server' | 'close' | 'send' }) {
   const path: Record<typeof name, JSX.Element> = {
     chip: <><rect x="6" y="6" width="12" height="12" rx="3" /><path d="M9 1v5m6-5v5M9 18v5m6-5v5M1 9h5m-5 6h5m12-6h5m-5 6h5" /><rect x="10" y="10" width="4" height="4" rx="1" /></>,
     code: <path d="m8 6-6 6 6 6m8-12 6 6-6 6m-3-15-2 18" />,
     server: <><rect x="3" y="3" width="18" height="7" rx="2" /><rect x="3" y="14" width="18" height="7" rx="2" /><path d="M7 6.5h.01M7 17.5h.01m4-11h6m-6 11h6" /></>,
-    layers: <path d="m12 3 10 5-10 5L2 8Zm-10 9 10 5 10-5m-20 5 10 5 10-5" />,
-    tool: <path d="M14.5 6.5a5 5 0 0 0-6 6L3 18l3 3 5.5-5.5a5 5 0 0 0 6-6l-3 3-3-3Z" />,
     close: <path d="m6 6 12 12M18 6 6 18" />,
     send: <><path d="m21 3-7 18-4-7-7-4Z" /><path d="m10 14 11-11" /></>,
   }
@@ -184,7 +170,7 @@ function FieldError({ text }: { text?: string }) {
   return text ? <span className="hep-plan-field-error" role="alert">{text}</span> : null
 }
 
-export function ComputePlanningDialog({ rpc, open, agentName, agentId, experimentId, versionLabel, parentRef, runs, onClose, onSend, onDirtyChange, themeScheme, onThemeToggle }: {
+export function ComputePlanningDialog({ rpc, open, agentName, agentId, experimentId, versionLabel, parentRef, runs, onClose, onSend, onDirtyChange }: {
   rpc: PlatformPageProps['rpc']
   open: boolean
   agentName: string
@@ -196,18 +182,19 @@ export function ComputePlanningDialog({ rpc, open, agentName, agentId, experimen
   onClose(): void
   onSend(request: ComputePlanningRequest): Promise<void>
   onDirtyChange?(dirty: boolean): void
-  themeScheme?: 'light' | 'dark'
-  onThemeToggle?(): void
 }): JSX.Element {
   const sourceKey = agentId + '\u0000' + experimentId
   const initial = useRef(readDraft(sourceKey))
   const [draft, setDraft] = useState<Draft>(initial.current.draft)
   const [errors, setErrors] = useState<Errors>({})
+  const modelSuggestions = draft.modelSuggestions
+  const combinationPreference = draft.combinationPreference
+  const [modelsOpen, setModelsOpen] = useState(false)
+  const [serverOpen, setServerOpen] = useState(false)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
   const [status, setStatus] = useState<SendStatus>(initial.current.status)
   const [sendMessage, setSendMessage] = useState('')
   const [requestId, setRequestId] = useState<string | null>(initial.current.requestId)
-  const [catalogState, setCatalogState] = useState<CatalogState>({ phase: 'idle', agentId: '', choices: [], message: '' })
-  const [catalogRetry, setCatalogRetry] = useState(0)
   const [serverState, setServerState] = useState<ServerState>({ phase: 'idle', list: null, message: '' })
   const [serverRetry, setServerRetry] = useState(0)
   const [serverSaveStatus, setServerSaveStatus] = useState<ServerSaveStatus>('idle')
@@ -225,7 +212,6 @@ export function ComputePlanningDialog({ rpc, open, agentName, agentId, experimen
   const availableRuns = useMemo(() => runs.filter(run => run.experiment_id === experimentId && run.run_id).sort((a, b) => b.created_at.localeCompare(a.created_at)), [runs, experimentId])
   const availableIds = useMemo(() => new Set(availableRuns.map(run => run.run_id)), [availableRuns])
   const selectedRunIds = draft.sourceRunIds.filter(id => availableIds.has(id))
-  const selectedCatalogModel = catalogState.agentId === agentId ? catalogState.choices.find(item => item.id === draft.medium.baseModelId) : undefined
   const selectedServer = serverState.list?.servers.find(item => item.id === draft.medium.serverId)
   const serverSignature = JSON.stringify(draft.medium.serverMode === 'registered'
     ? [draft.medium.serverMode, selectedServer?.id, selectedServer?.host, selectedServer?.port]
@@ -252,19 +238,7 @@ export function ComputePlanningDialog({ rpc, open, agentName, agentId, experimen
     writeDraft(sourceKey, draft, status, requestId)
   }, [sourceKey, draft, status, requestId])
 
-  useEffect(() => {
-    if (!open || draft.type !== 'medium') return
-    let active = true
-    setCatalogState({ phase: 'loading', agentId, choices: [], message: '' })
-    void rpc.call(CHANNEL, 'models/list', {}).then(result => {
-      if (!result.ok) throw new Error(result.error.message || '模型目录读取失败')
-      const choices = catalogChoices(result.value as ModelList)
-      if (active) setCatalogState({ phase: 'ready', agentId, choices, message: '' })
-    }).catch(error => {
-      if (active) setCatalogState({ phase: 'error', agentId, choices: [], message: error instanceof Error ? error.message : '模型目录读取失败' })
-    })
-    return () => { active = false }
-  }, [rpc, open, agentId, draft.type, catalogRetry])
+
 
   useEffect(() => {
     if (!open || draft.type !== 'medium') return
@@ -317,7 +291,7 @@ export function ComputePlanningDialog({ rpc, open, agentName, agentId, experimen
     bodyRef.current.scrollTop = 0
     const frame = requestAnimationFrame(() => { if (bodyRef.current) bodyRef.current.scrollTop = 0 })
     return () => cancelAnimationFrame(frame)
-  }, [open, draft.step])
+  }, [open])
 
   function change(update: (value: Draft) => Draft) {
     if (frozen) return
@@ -328,13 +302,11 @@ export function ComputePlanningDialog({ rpc, open, agentName, agentId, experimen
     if (status === 'failure') { setStatus('idle'); setSendMessage(''); setRequestId(null) }
   }
 
-  function next() {
-    if (!draft.type) {
-      setErrors({ type: '请选择一种算力变体。' })
-      return
-    }
-    titleRef.current?.focus({ preventScroll: true })
-    change(value => ({ ...value, step: 2 }))
+  function setModelSuggestions(update: ModelSuggestion[] | ((rows: ModelSuggestion[]) => ModelSuggestion[])) {
+    change(value => ({ ...value, modelSuggestions: typeof update === 'function' ? update(value.modelSuggestions) : update }))
+  }
+  function setCombinationPreference(value: string) {
+    change(draft => ({ ...draft, combinationPreference: value }))
   }
 
   function validate(): Errors {
@@ -344,10 +316,8 @@ export function ComputePlanningDialog({ rpc, open, agentName, agentId, experimen
     if (!draft.tracePlanRequested && selectedRunIds.length === 0) next.runs = '请至少选择一条当前版本轨迹，或选择由助手补充轨迹采集方案。'
     if (draft.type === 'medium') {
       const medium = draft.medium
-      if (medium.baseModelMode === 'catalog' && (!selectedCatalogModel || catalogState.phase !== 'ready')) next.baseModelId = '请选择当前业务可用目录中的模型；目录未就绪时可刷新或改请助手建议。'
-      if (medium.baseModelMode === 'custom' && !medium.baseModelId.trim()) next.baseModelId = '请填写模型标识或仓库地址。'
       if (medium.serverMode === 'registered' && (!selectedServer || serverState.phase !== 'ready')) next.serverId = '请选择仍在已登记列表中的训练服务器连接。'
-      if (medium.serverMode === 'new') Object.assign(next, newServerErrors(medium))
+      if (medium.serverMode === 'new') Object.assign(next, newServerErrors(medium, true))
     }
     return next
   }
@@ -443,6 +413,7 @@ export function ComputePlanningDialog({ rpc, open, agentName, agentId, experimen
     setErrors(found)
     const first = Object.keys(found)[0]
     if (first) {
+      if (['serverId', 'serverName', 'host', 'port', 'user', 'workDir', 'credentialRef'].includes(first)) setServerOpen(true)
       requestAnimationFrame(() => {
         const input = dialogRef.current?.querySelector<HTMLElement>('[data-plan-field="' + first + '"]')
         input?.focus()
@@ -462,10 +433,8 @@ export function ComputePlanningDialog({ rpc, open, agentName, agentId, experimen
       sourceRunIds: draft.tracePlanRequested ? [] : selectedRunIds,
       tracePlanRequested: draft.tracePlanRequested,
       ...(type === 'medium' ? { medium: {
-        baseModelMode: draft.medium.baseModelMode,
-        baseModelId: draft.medium.baseModelMode === 'suggest' ? '' : draft.medium.baseModelMode === 'catalog' && selectedCatalogModel
-          ? `${selectedCatalogModel.provider}/${selectedCatalogModel.model}` : draft.medium.baseModelId.trim(),
-        revision: draft.medium.revision.trim(),
+        models: modelSuggestions.map(row => ({ kind: row.kind, source: row.source, baseModel: row.baseModel.trim(), revision: row.revision.trim(), purpose: row.purpose.trim() })),
+        combinationPreference: combinationPreference.trim(),
         serverMode: draft.medium.serverMode,
         serverId: draft.medium.serverMode === 'registered' ? draft.medium.serverId : '',
         host: draft.medium.serverMode === 'registered' ? selectedServer?.host || '' : draft.medium.serverMode === 'new' ? draft.medium.host.trim() : '',
@@ -482,15 +451,18 @@ export function ComputePlanningDialog({ rpc, open, agentName, agentId, experimen
     setSendMessage('')
     try {
       await onSend(request)
-      sentRef.current = true
       try { sessionStorage.removeItem(draftStorageKey(sourceKey)) } catch { /* 当前页面仍清理内存草稿。 */ }
+      if (sourceKeyRef.current !== sourceKey) return
+      sentRef.current = true
       setDraft(initialDraft())
+      setModelsOpen(false); setServerOpen(false); setAdvancedOpen(false)
       setStatus('idle')
       setRequestId(null)
       setServerSaveStatus('idle')
       setServerSaveMessage('')
       onClose()
     } catch (error) {
+      if (sourceKeyRef.current !== sourceKey) return
       const knownUnsent = Boolean(error && typeof error === 'object' && ('definitelyNotSent' in error && error.definitelyNotSent === true))
       setStatus(knownUnsent ? 'failure' : 'unknown')
       setSendMessage(error instanceof Error ? error.message : '请求状态无法确认。')
@@ -502,8 +474,8 @@ export function ComputePlanningDialog({ rpc, open, agentName, agentId, experimen
   const pending: string[] = []
   if (draft.tracePlanRequested) pending.push('轨迹采集方案与样本覆盖')
   if (draft.type === 'medium') {
-    if (draft.medium.baseModelMode === 'suggest') pending.push('决策基模型选型')
-    if (!draft.medium.revision.trim()) pending.push('模型版本固定')
+    if (!modelSuggestions.some(row => row.baseModel.trim())) pending.push('小尺寸 LLM 与决策模型选型')
+    if (modelSuggestions.some(row => row.baseModel.trim() && !row.revision.trim())) pending.push('模型版本固定')
     pending.push('模型训练适配性评估')
     if (draft.medium.serverMode === 'later') pending.push('训练服务器与凭据配置')
     else {
@@ -515,83 +487,57 @@ export function ComputePlanningDialog({ rpc, open, agentName, agentId, experimen
   }
   pending.push('独立比较集与验收阈值')
 
-  return <dialog ref={dialogRef} className={'hep-compute-dialog' + (draft.step === 2 ? ' hep-plan-config' : '')} aria-modal="true" aria-labelledby="hep-plan-title" aria-describedby="hep-plan-subtitle" onCancel={event => { event.preventDefault(); if (!sendingRef.current && serverSaveStatus !== 'saving') onClose() }}>
+  return <dialog ref={dialogRef} className="hep-compute-dialog hep-plan-config" aria-modal="true" aria-labelledby="hep-plan-title" aria-describedby="hep-plan-subtitle" onCancel={event => { event.preventDefault(); if (!sendingRef.current && serverSaveStatus !== 'saving') onClose() }}>
     <header className="hep-plan-head">
       <div className="hep-plan-top">
-        <div><h2 id="hep-plan-title" tabIndex={-1} ref={titleRef}>请 AI 策划算力变体</h2><p id="hep-plan-subtitle">从当前版本的运行轨迹出发，让 AI 助手协助制定可验证的变体方案。</p></div>
+        <div><h2 id="hep-plan-title" tabIndex={-1} ref={titleRef}>策划算力变体</h2><p id="hep-plan-subtitle">补充目标与已有线索，交由平台助手制定可验证的方案。</p></div>
         <div className="hep-plan-top-actions">
-          {onThemeToggle && <button type="button" className="hep-plan-theme" aria-label={themeScheme === 'dark' ? '切换到浅色主题' : '切换到深色主题'} title={themeScheme === 'dark' ? '切换到浅色主题' : '切换到深色主题'} onClick={onThemeToggle}><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{themeScheme === 'dark' ? <><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></> : <path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"/>}</svg></button>}
           <button type="button" className="hep-plan-close" aria-label="暂存并关闭策划弹窗" disabled={status === 'sending' || serverSaveStatus === 'saving'} onClick={onClose}><Icon name="close" /></button>
         </div>
       </div>
-      <div className="hep-plan-stepper" aria-label={'第 ' + draft.step + ' 步，共 2 步'}>
-        <span data-active={draft.step === 1}><b>{draft.step === 2 ? '✓' : '1'}</b>{draft.step === 2 ? <button type="button" className="hep-plan-link" disabled={frozen} onClick={() => { titleRef.current?.focus({ preventScroll: true }); change(value => ({ ...value, step: 1 })) }}>选择类型</button> : '选择类型'}</span>
-        <i aria-hidden="true" />
-        <span data-active={draft.step === 2}><b>2</b>策划配置</span>
-        {draft.step === 2 && <em>{typeLabel(draft.type)}</em>}
-      </div>
-      <div className="hep-plan-source"><span>父版本</span><strong>{agentName} · {versionLabel}</strong><em>所选版本</em><details><summary>查看来源线索</summary><code>{agentId} · {experimentId} · {parentRef || 'Git 引用未记录'}</code></details></div>
+      <div className="hep-plan-source"><span>父版本</span><strong>{agentName}</strong><span className="hep-plan-version">{versionLabel}</span><details><summary>版本来源</summary><code>{agentId}<br/>{experimentId}<br/>{parentRef || 'Git 引用未记录'}</code></details></div>
     </header>
-    <form key={draft.step} id="hep-planning-form" ref={bodyRef} className="hep-plan-body" onSubmit={event => void submit(event)} noValidate>
-      {draft.step === 1 ? <>
-        <div className="hep-plan-choose-lead"><h3>请选择一种算力变体</h3><p>两种路线都基于当前版本的轨迹与工具；本次仅发送策划请求。</p></div>
-        {errors.type && <p className="hep-plan-error" role="alert" data-plan-field="type" tabIndex={-1}>{errors.type}</p>}
-        <div className="hep-plan-type-grid" role="radiogroup" aria-label="算力变体类型">
-          {(['medium', 'low'] as const).map(type => <label key={type} className="hep-plan-type-card" data-selected={draft.type === type}>
-            <input type="radio" name="compute-type" value={type} checked={draft.type === type} onChange={() => change(value => ({ ...value, type }))} />
-            <div className="hep-plan-type-heading"><span className="hep-plan-type-icon"><Icon name={type === 'medium' ? 'chip' : 'code'} /></span><div><h3>{typeLabel(type)}</h3><p>{type === 'medium' ? '决策模型 + 工具编排' : '规则代码 + 工具编排'}</p></div><span className="hep-plan-radio-mark" aria-hidden="true" /></div>
-            <p className="hep-plan-type-desc">{type === 'medium' ? '把轨迹中的决策经验转为训练样本，训练一个决策模型，再由 LangGraph 连接模型、流程和工具。' : '把轨迹中可归纳的决策行为转为规则、分支和数据处理代码，用 LangGraph 实现业务全链零 LLM。'}</p>
-            <ol className="hep-plan-route-list">{(type === 'medium' ? mediumRoute : lowRoute).map(([title, explanation], index) => <li key={title}><i>{index + 1}</i><div><strong>{title}</strong><small>{explanation}</small></div></li>)}</ol>
-            <div className="hep-plan-type-foot"><b>适合：</b>{type === 'medium' ? '需要模型参与决策，且有可用样本与训练资源的场景。' : '流程较稳定、决策可归纳为明确规则的场景。'}</div>
-          </label>)}
-        </div>
-        <div className="hep-plan-choose-notes"><p><strong>近似等效是待验证目标。</strong> 不以技术路线代替效果结论，后续须使用独立用例与原版本比较。</p><p><strong>“中 / 低”描述目标实现路线。</strong> 实际资源收益需验证；低算力未覆盖场景默认中止并报告。</p></div>
-      </> : <div className="hep-plan-config-layout">
+    <form id="hep-planning-form" ref={bodyRef} className="hep-plan-body" onSubmit={event => void submit(event)} noValidate>
+      <div className="hep-plan-config-layout">
         <div className="hep-plan-config-main">
           {status === 'failure' && <div className="hep-plan-notice hep-plan-error-notice" role="alert"><strong>明确未发送</strong><p>{sendMessage || '请求未离开本页。'}填写内容已保留，可以重试。</p></div>}
           {status === 'unknown' && <div className="hep-plan-notice hep-plan-warning-notice" role="alert"><strong>发送结果待核对，请勿重复发送</strong><p>请求编号 <code>{requestId}</code>。先在平台 AI 助手中核对该请求是否已送达。{sendMessage}</p><button type="button" onClick={() => { setStatus('failure'); setSendMessage('已由用户确认未送达。') }}>我已核对，确认未送达</button></div>}
           <fieldset disabled={frozen} className="hep-plan-fields">
+            <div className="hep-plan-mode-switch" role="group" aria-label="策划模式">
+              <button type="button" aria-label="中算力" aria-pressed={draft.type === 'medium'} data-active={draft.type === 'medium'} onClick={() => change(value => ({ ...value, type: 'medium' }))}><Icon name="chip" /><span><strong>中算力</strong><small>小模型训练与组合</small></span></button>
+              <button type="button" aria-label="低算力" aria-pressed={draft.type === 'low'} data-active={draft.type === 'low'} onClick={() => change(value => ({ ...value, type: 'low' }))}><Icon name="code" /><span><strong>低算力</strong><small>LangGraph 流程 · 全链零 LLM</small></span></button>
+            </div>
             <section className="hep-plan-form-section">
-              <h3><span>01</span>策划目标</h3>
-              <div className="hep-plan-field-grid">
+              <h3>策划目标</h3>
+              <div className="hep-plan-field-grid hep-plan-goal-fields">
                 <label className="hep-plan-field"><span>变体名称 <small>选填</small></span><input maxLength={60} value={draft.variantName} placeholder={agentName + ' · ' + typeLabel(draft.type) + '变体'} onChange={event => change(value => ({ ...value, variantName: event.target.value }))} /></label>
-                <div className="hep-plan-field"><span>父版本</span><div className="hep-plan-readonly">{agentName} <strong>{versionLabel}</strong><em>所选版本</em></div></div>
-                <label className="hep-plan-field hep-plan-wide">目标说明<textarea data-plan-field="goal" rows={3} maxLength={1000} aria-invalid={Boolean(errors.goal)} value={draft.goal} onChange={event => change(value => ({ ...value, goal: event.target.value }))} /><FieldError text={errors.goal} /></label>
+                <label className="hep-plan-field hep-plan-wide"><span>目标说明 <small>必填</small></span><textarea data-plan-field="goal" rows={2} maxLength={1000} aria-invalid={Boolean(errors.goal)} value={draft.goal} onChange={event => change(value => ({ ...value, goal: event.target.value }))} /><FieldError text={errors.goal} /></label>
               </div>
             </section>
-            <section className="hep-plan-form-section">
-              <h3><span>02</span>来源轨迹 <small>{versionLabel} · 当前版本</small></h3>
+            <section className="hep-plan-form-section hep-plan-traces">
+              <h3>来源轨迹 <small>当前版本</small></h3>
+              <div className="hep-plan-trace-control">{!draft.tracePlanRequested && <span>已选择 {selectedRunIds.length} 条轨迹 · 场景覆盖待分析</span>}<label><input type="checkbox" checked={draft.tracePlanRequested} onChange={event => change(value => ({ ...value, tracePlanRequested: event.target.checked }))} />先由助手补充轨迹采集方案</label></div>
+              {!draft.tracePlanRequested && <>
               <div className="hep-plan-trace-box" data-plan-field="runs" tabIndex={-1} aria-invalid={Boolean(errors.runs)}>
                 {availableRuns.length ? availableRuns.map(run => <label key={run.run_id} className="hep-plan-trace-row" data-disabled={draft.tracePlanRequested}>
                   <input type="checkbox" checked={selectedRunIds.includes(run.run_id)} disabled={draft.tracePlanRequested} onChange={() => change(value => ({ ...value, sourceRunIds: value.sourceRunIds.includes(run.run_id) ? value.sourceRunIds.filter(id => id !== run.run_id) : [...value.sourceRunIds, run.run_id] }))} />
-                  <span>{runTitle(run)}</span><em data-status={runPresentation(run).tone}>{runPresentation(run).label}</em><time>{runTime(run.created_at)}</time>
+                  <span>{runTitle(run)}<small>{run.run_id}</small></span><em data-status={runPresentation(run).tone}>{runPresentation(run).label}</em><time>{runTime(run.created_at)}</time>
                 </label>) : <p className="hep-plan-trace-empty">当前版本暂无可选轨迹。可先由助手策划采集范围。</p>}
               </div>
-              {availableRuns.length > 0 && <details className="hep-plan-trace-details"><summary>查看 Run ID 与来源</summary>{availableRuns.map(run => <code key={run.run_id}>{run.run_id} · {versionLabel} / {run.experiment_id}</code>)}</details>}
+              </>}
               <FieldError text={errors.runs} />
-              <div className="hep-plan-trace-control"><span>{draft.tracePlanRequested ? '本次暂不引用轨迹' : '已选择 ' + selectedRunIds.length + ' 条轨迹 · 场景覆盖待分析'}</span><label><input type="checkbox" checked={draft.tracePlanRequested} onChange={event => change(value => ({ ...value, tracePlanRequested: event.target.checked }))} />先由助手补充轨迹采集方案</label></div>
-              {draft.tracePlanRequested && <div className="hep-plan-notice hep-plan-warning-notice">本次暂不引用轨迹。助手会先策划采集范围与覆盖用例，再判断变体方案。</div>}
+
+              {draft.tracePlanRequested && <p className="hep-plan-hint">助手会先策划采集范围与覆盖用例，再判断变体方案。</p>}
             </section>
             {draft.type === 'medium' ? <section className="hep-plan-form-section" data-testid="medium-training">
-              <h3><span>03</span>中算力配置 <small>决策模型 + LangGraph + 真实工具</small></h3>
+              <h3>模型与训练资源 <small>选填</small></h3>
+              {(draft.previousInferenceModel || draft.previousInferenceRevision) && <div className="hep-plan-notice" role="status"><strong>旧草稿中的推理模型引用</strong><code>{draft.previousInferenceModel || '未填写模型引用'}</code>{draft.previousInferenceRevision && <small>原版本：{draft.previousInferenceRevision}</small>}<p>此引用不是训练模型权重，未纳入模型建议。请补充仓库或本地目录，或由助手重新建议。</p><button type="button" onClick={() => change(value => ({ ...value, previousInferenceModel: null, previousInferenceRevision: '' }))}>移除旧引用</button></div>}
               <div className="hep-plan-training-grid">
-                <div className="hep-plan-form-card" data-testid="base-model"><h4><Icon name="chip" />决策基模型</h4>
-                  <div className="hep-plan-segmented" role="group" aria-label="基模型来源">{([['catalog', '模型库'], ['custom', '自定义'], ['suggest', '请助手建议']] as const).map(([mode, label]) => <button type="button" key={mode} data-active={draft.medium.baseModelMode === mode} onClick={() => change(value => ({ ...value, medium: { ...value.medium, baseModelMode: mode, baseModelId: '' } }))}>{label}</button>)}</div>
-                  {draft.medium.baseModelMode === 'catalog' ? <>
-                    {catalogState.phase === 'loading' || catalogState.agentId !== agentId ? <div className="hep-plan-notice" role="status">正在读取统一业务可用模型…</div>
-                      : catalogState.phase === 'error' ? <div className="hep-plan-notice hep-plan-error-notice" role="alert">模型目录读取失败：{catalogState.message}。<button type="button" onClick={() => setCatalogRetry(value => value + 1)}>重试读取</button></div>
-                        : catalogState.choices.length ? <label className="hep-plan-field">决策基模型<select data-plan-field="baseModelId" value={selectedCatalogModel?.id || ''} aria-invalid={Boolean(errors.baseModelId)} onChange={event => change(value => ({ ...value, medium: { ...value.medium, baseModelId: event.target.value } }))}><option value="">请选择业务可用模型</option>{catalogState.choices.map(model => <option key={model.id} value={model.id}>{model.name}</option>)}</select></label>
-                          : <div className="hep-plan-notice">当前 DSH 目录暂无可用于业务实例的模型。请先到“设置 → 模型”配置模型，或选择“自定义”提交策划意向、“请助手建议”继续策划。</div>}
-                  </> : draft.medium.baseModelMode === 'custom' ? <label className="hep-plan-field">模型标识或仓库地址<input data-plan-field="baseModelId" value={draft.medium.baseModelId} aria-invalid={Boolean(errors.baseModelId)} onChange={event => change(value => ({ ...value, medium: { ...value.medium, baseModelId: event.target.value } }))} placeholder="填写真实模型标识或仓库地址" /><FieldError text={errors.baseModelId} /></label> : <div className="hep-plan-notice hep-plan-blue-notice">助手将结合轨迹、目标和训练资源建议候选基模型。</div>}
-                    {draft.medium.baseModelMode === 'catalog' && <><button type="button" className="hep-plan-link" disabled={catalogState.phase === 'loading'} onClick={() => setCatalogRetry(value => value + 1)}>刷新模型目录</button><FieldError text={errors.baseModelId} /></>}
-                  {draft.medium.baseModelMode !== 'suggest' && <label className="hep-plan-field"><span>版本 / Revision <small>选填</small></span><input value={draft.medium.revision} onChange={event => change(value => ({ ...value, medium: { ...value.medium, revision: event.target.value } }))} placeholder="待固定，可在策划时补充" /></label>}
-                  {draft.medium.baseModelMode !== 'suggest' && <span className="hep-plan-model-meta">训练适配性待评估</span>}
-                  <p className="hep-plan-hint">模型库引用共享的 DSH 推理目录；训练适配性、版本、许可与资源要求仍需核实。</p>
-                </div>
-                <div className="hep-plan-form-card" data-testid="training-server"><h4><Icon name="server" />训练服务器</h4>
+                <div className="hep-plan-form-card" data-testid="base-model"><details className="hep-plan-optional" open={modelsOpen} onToggle={event => setModelsOpen(event.currentTarget.open)}><summary>模型建议与分工 <small>{modelSuggestions.length ? `${modelSuggestions.length} 项草稿` : '由助手建议'}</small></summary><p className="hep-plan-hint">小尺寸 LLM 与决策模型均可引用 Hugging Face、ModelScope 仓库或实际加载环境中的本地模型目录。可暂留空交由助手建议；本次不下载或训练模型。</p><div className="hep-plan-model-suggestions">{modelSuggestions.map((row, index) => <div className="hep-plan-model-row" key={row.id}><div className="agent-section-heading"><strong>模型 {index + 1}</strong><button type="button" disabled={frozen} onClick={event => { const section = event.currentTarget.closest('.hep-plan-optional'); setModelSuggestions(rows => rows.filter(item => item.id !== row.id)); requestAnimationFrame(() => section?.querySelector<HTMLButtonElement>('.hep-plan-add-model')?.focus()) }}>移除模型 {index + 1}</button></div><label className="hep-plan-field">类型<select aria-label={`模型 ${index + 1} 类型`} value={row.kind} disabled={frozen} onChange={event => setModelSuggestions(rows => rows.map(item => item.id === row.id ? { ...item, kind: event.target.value as 'llm' | 'decision' } : item))}><option value="llm">小尺寸 LLM</option><option value="decision">决策模型</option></select></label><label className="hep-plan-field">模型来源<select aria-label={`模型 ${index + 1} 来源`} value={row.source} disabled={frozen} onChange={event => setModelSuggestions(rows => rows.map(item => item.id === row.id ? { ...item, source: event.target.value as TrainingModelSource } : item))}><option value="unspecified">待确定，由助手建议</option><option value="huggingface">Hugging Face</option><option value="modelscope">ModelScope</option><option value="local">本地模型目录</option></select></label><label className="hep-plan-field">{row.source === 'local' ? '本地模型目录' : '模型仓库 ID、链接或本地路径'}<input aria-label={`模型 ${index + 1} 基模型`} maxLength={300} value={row.baseModel} placeholder={row.source === 'local' ? '/path/to/downloaded-model' : row.source === 'modelscope' ? '组织/模型 或 https://modelscope.cn/models/组织/模型' : row.source === 'huggingface' ? '组织/模型 或 https://huggingface.co/组织/模型' : '填写模型仓库或路径，也可由助手建议'} disabled={frozen} onChange={event => setModelSuggestions(rows => rows.map(item => item.id === row.id ? { ...item, baseModel: event.target.value } : item))}/></label><label className="hep-plan-field">版本 / Revision<input aria-label={`模型 ${index + 1} 版本`} maxLength={160} value={row.revision} placeholder="选填" disabled={frozen} onChange={event => setModelSuggestions(rows => rows.map(item => item.id === row.id ? { ...item, revision: event.target.value } : item))}/></label><label className="hep-plan-field">用途与分工<textarea aria-label={`模型 ${index + 1} 用途`} maxLength={1000} rows={2} value={row.purpose} disabled={frozen} onChange={event => setModelSuggestions(rows => rows.map(item => item.id === row.id ? { ...item, purpose: event.target.value } : item))}/></label></div>)}<button type="button" className="hep-plan-add-model" disabled={frozen} onClick={event => { const section = event.currentTarget.closest('.hep-plan-optional'); setModelSuggestions(rows => [...rows, { id: Math.max(-1, ...rows.map(row => row.id)) + 1, kind: 'llm', source: 'unspecified', baseModel: '', revision: '', purpose: '' }]); requestAnimationFrame(() => { const fields = section?.querySelectorAll<HTMLInputElement>('.hep-plan-model-row input'); fields?.[Math.max(0, fields.length - 2)]?.focus() }) }}>添加模型</button><label className="hep-plan-field">组合偏好<textarea aria-label="模型组合偏好" maxLength={1500} rows={2} value={combinationPreference} disabled={frozen} onChange={event => setCombinationPreference(event.target.value)} placeholder="候选比较、分工协作或其他偏好"/></label></div></details></div>
+                <details className="hep-plan-form-card hep-plan-optional" data-testid="training-server" open={serverOpen} onToggle={event => setServerOpen(event.currentTarget.open)}><summary>训练服务器 <small>{draft.medium.serverMode === 'later' ? '稍后配置' : draft.medium.serverMode === 'new' ? '新连接建议' : selectedServer?.name || '待选择'}</small></summary><h4><Icon name="server" />训练服务器</h4>
                   <div className="hep-plan-segmented" role="group" aria-label="训练服务器来源">{([['registered', '已登记连接'], ['new', '新连接'], ['later', '稍后配置']] as const).map(([mode, label]) => <button type="button" key={mode} data-active={draft.medium.serverMode === mode} onClick={() => change(value => ({ ...value, medium: { ...value.medium, serverMode: mode } }))}>{label}</button>)}</div>
                   {draft.medium.serverMode === 'registered' ? <>
-                    {serverState.phase === 'loading' ? <div className="hep-plan-notice" role="status">正在读取已登记训练服务器…</div>
+                    {serverState.phase === 'loading' ? <LoadingIndicator label="读取训练服务器目录" block />
                       : serverState.phase === 'error' ? <div className="hep-plan-notice hep-plan-error-notice" role="alert">训练服务器列表读取失败：{serverState.message}。</div>
                         : serverState.list?.servers.length ? <>
                           <label className="hep-plan-field">连接记录<select data-plan-field="serverId" value={selectedServer?.id || ''} aria-invalid={Boolean(errors.serverId)} onChange={event => change(value => ({ ...value, medium: { ...value.medium, serverId: event.target.value } }))}><option value="">请选择已登记连接</option>{serverState.list.servers.map(server => <option key={server.id} value={server.id}>{server.name}</option>)}</select></label>
@@ -623,31 +569,26 @@ export function ComputePlanningDialog({ rpc, open, agentName, agentId, experimen
                       {serverSaveStatus === 'unknown' && <p className="hep-plan-warning-notice" role="alert">{serverSaveMessage}<button type="button" onClick={() => { setServerSaveStatus('idle'); setServerSaveMessage('') }}>我已核对，确认未保存</button></p>}
                     </div>
                   </>}
-                </div>
+                </details>
               </div>
             </section> : <section className="hep-plan-form-section">
-              <h3><span>03</span>低算力实现约束 <em>业务全链零 LLM</em></h3>
-              <div className="hep-plan-low-route"><div><Icon name="layers" /><strong>提炼规则与分支</strong><p>分析轨迹中的条件、动作与数据处理。</p></div><div><Icon name="code" /><strong>LangGraph 代码实现</strong><p>将决策流程转为可检查的代码。</p></div><div><Icon name="tool" /><strong>复用真实工具</strong><p>沿用工具接口与权限，保留真实调用。</p></div></div>
-              <div className="hep-plan-low-policy"><h4>未覆盖情况如何处理</h4><label className="hep-plan-field">处理策略<select value={draft.low.uncovered} onChange={event => change(value => ({ ...value, low: { ...value.low, uncovered: event.target.value as Draft['low']['uncovered'] } }))}><option value="stop_and_report">中止并报告（默认）</option><option value="request_human">暂停并请求人工处理</option></select></label><p>无法匹配规则、工具异常或输入越界时，明确报告原因；不会自动改用大模型。</p></div>
-              <label className="hep-plan-field"><span>实现要求与限制 <small>选填</small></span><textarea maxLength={1500} rows={3} value={draft.low.requirements} onChange={event => change(value => ({ ...value, low: { ...value.low, requirements: event.target.value } }))} placeholder="可补充必须保留的工具、输出格式与边界条件" /></label>
+              <h3>流程与未覆盖情况</h3>
+              <label className="hep-plan-field">优先规划的流程<textarea maxLength={1500} rows={3} value={draft.low.requirements} onChange={event => change(value => ({ ...value, low: { ...value.low, requirements: event.target.value } }))} placeholder="例如：查询任务 → 获取结果 → 整理报告" /></label>
+              <div className="hep-plan-low-policy"><h4>未覆盖情况如何处理</h4><label className="hep-plan-field">流程无法处理时<select value={draft.low.uncovered} onChange={event => change(value => ({ ...value, low: { ...value.low, uncovered: event.target.value as Draft['low']['uncovered'] } }))}><option value="stop_and_report">中止并报告（默认）</option><option value="request_human">暂停并请求人工处理</option></select></label><p>AI 助手将进一步规划节点、工具调用与异常处理。</p></div>
             </section>}
-            <details className="hep-plan-advanced">
+            <details className="hep-plan-advanced" open={advancedOpen} onToggle={event => setAdvancedOpen(event.currentTarget.open)}>
               <summary>更多策划补充（选填）</summary>
               <label className="hep-plan-field">其他限制与验收关注点<textarea data-plan-field="advanced" maxLength={1500} rows={3} value={draft.advanced} onChange={event => change(value => ({ ...value, advanced: event.target.value }))} placeholder="例如：必须覆盖的异常、资源预算或结果格式" /></label>
             </details>
+            <div className="hep-plan-pending"><strong>待补充与核验</strong><p>{pending.join('、')}。</p></div>
           </fieldset>
         </div>
-        <aside className="hep-plan-summary" aria-label="本次策划摘要"><small>本次策划摘要</small><h3>{typeLabel(draft.type)}变体</h3><p>{draft.type === 'medium' ? '决策模型 + 工具编排' : '规则代码 + 工具编排'}</p><dl>
-          <div><dt>父版本</dt><dd>{agentName} · {versionLabel}</dd></div>
-          <div><dt>轨迹依据</dt><dd>{draft.tracePlanRequested ? '由助手策划采集' : selectedRunIds.length + ' 条当前版本轨迹'}</dd></div>
-          {draft.type === 'medium' ? <><div><dt>决策基模型</dt><dd>{draft.medium.baseModelMode === 'suggest' ? '请助手建议' : draft.medium.baseModelMode === 'catalog' ? selectedCatalogModel?.name || '请选择业务可用模型' : draft.medium.baseModelId || '待填写'}</dd></div><div><dt>训练服务器</dt><dd>{draft.medium.serverMode === 'later' ? '稍后配置' : draft.medium.serverMode === 'registered' ? selectedServer?.name || '请选择已登记连接' : draft.medium.host ? draft.medium.host + ':' + draft.medium.port : '新连接待填写'}</dd></div></> : <><div><dt>工具调用</dt><dd>复用原有真实工具</dd></div><div><dt>未覆盖情况</dt><dd>{draft.low.uncovered === 'stop_and_report' ? '中止并报告' : '暂停并请求人工处理'}</dd></div></>}
-          {draft.advanced.trim() && <div><dt>其他限制</dt><dd className="hep-plan-summary-advanced">{draft.advanced.trim()}</dd></div>}
-        </dl><div className="hep-plan-notice hep-plan-blue-notice">发送后在平台 AI 助手中继续策划，不会启动训练或创建变体。</div><div className="hep-plan-pending"><strong>方案中待补充 / 验证</strong><ul>{pending.map(item => <li key={item}>{item}</li>)}</ul></div></aside>
-      </div>}
+
+      </div>
     </form>
     <footer className="hep-plan-footer">
-      <p><strong>{draft.step === 1 ? (draft.type ? '已选择' + typeLabel(draft.type) : '先选择一种技术路线') : typeLabel(draft.type) + ' · ' + (draft.tracePlanRequested ? '轨迹待采集' : selectedRunIds.length + ' 条轨迹') + ' · ' + pending.length + ' 项待补充 / 验证'}</strong><br />{draft.step === 1 ? '下一步补充轨迹依据与策划配置。' : '仅发送策划请求，配置可在助手中继续完善。'}</p>
-      <div><button type="button" disabled={status === 'sending'} onClick={onClose}>暂存并关闭</button>{draft.step === 1 ? <button key="next" type="button" className="hep-plan-primary" onClick={event => { event.preventDefault(); next() }}>下一步：策划配置 →</button> : <button key="send" type="submit" form="hep-planning-form" className="hep-plan-primary" disabled={frozen}><Icon name="send" />{status === 'sending' ? '正在发送…' : status === 'unknown' ? '等待核对发送结果' : '发送给平台 AI 助手'}</button>}</div>
+      <p>草稿自动保留；本次仅发送策划请求。</p>
+      <div><button type="button" disabled={status === 'sending' || serverSaveStatus === 'saving'} onClick={onClose}>暂存并关闭</button><button type="submit" form="hep-planning-form" className="hep-plan-primary" disabled={frozen}><Icon name="send" />{status === 'sending' ? '正在发送…' : status === 'unknown' ? '等待核对发送结果' : '发送策划请求'}</button></div>
     </footer>
   </dialog>
 }

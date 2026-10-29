@@ -4,7 +4,7 @@ import vm from 'node:vm'
 import test from 'node:test'
 import { build } from 'esbuild'
 const require = createRequire(import.meta.url)
-const compiled = await build({ entryPoints: [new URL('../src/evaluation/dataset-view.tsx', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime'] })
+const compiled = await build({ entryPoints: [new URL('../src/evaluation/dataset-view.tsx', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime', '@deepseek-ai/dsh-client-ui-primitives'] })
 const baseQuestion = { type: 'choice', instructions: '选择基本查询', criteria: { read: '读取基本状态', ask: '补充测试标识' } }
 const target = label => ({ label, provenance: { kind: 'model_suggestion', model: 'test-model' }, basis: '待核对的建议', status: 'suggested', decision_time_reviewed: false })
 const record = (id, instruction) => ({ state: { request: '查询基础测试资产' }, workflow: '安全事件处置', task: { id: '资产查询', semantics: 'recommended_decision' }, questions: { action: { ...baseQuestion, instructions: instruction }, needs_review: { type: 'noul', instructions: '是否需要人工复核？' } }, targets: { action: target('read'), needs_review: target(true) }, _meta: { id, source_group_id: 'fixed-task-basic', group_id: 'task-basic', split: 'unassigned', cutoff: { line: 141, session_log: 'session.v4.jsonl' }, trace_path: 'evidence/C-1/trace.jsonl', observed_action: { name: 'get_inspection_result' } } })
@@ -29,7 +29,7 @@ function workbench({ handler } = {}) {
   }
   const window = { confirm: text => { confirms.push(text); return answers.shift() ?? true }, document: { createElement: () => { const link = { click: () => downloads.push({ href: link.href, filename: link.download }) }; return link } } }
   const module = { exports: {} }
-  vm.runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, require: name => name === 'react' ? react : require(name), window, Blob, URL: { createObjectURL: blob => { blobs.push(blob); return `blob:${blobs.length}` }, revokeObjectURL() {} }, setTimeout: callback => { callback(); return 1 } })
+  vm.runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, require: name => name === 'react' ? react : name === '@deepseek-ai/dsh-client-ui-primitives' ? { Modal: () => null } : require(name), window, Blob, URL: { createObjectURL: blob => { blobs.push(blob); return `blob:${blobs.length}` }, revokeObjectURL() {} }, setTimeout: callback => { callback(); return 1 } })
   const result = value => ({ ...structuredClone(value), eligibility: eligibility(value.dataset) })
   const original = async (action, input) => {
     if (action === 'list') return { datasets: [...documents.values()].map(value => ({ id: value.dataset.id, created_at: '2026-10-16', count: value.dataset.records.length, reviewed: 0 })) }
@@ -200,4 +200,17 @@ test('损坏v2问题或目标保留原始数据与阻塞提示，不补成可编
       assert.equal(ui.calls.some(item => item.action === 'update'), false)
     } finally { ui.cleanup() }
   }
+})
+
+
+test('样本评审输入和导出异常原位显示，来源详情按样本身份进入抽屉', async () => {
+  const ui = workbench()
+  await ui.settle()
+  ui.change('样本批次', 'dataset-a'); await ui.settle()
+  const drawer = ui.nodes().find(node => node.type?.name === 'DetailDrawer' && node.props.title === '实际动作与证据定位')
+  assert.equal(drawer.props.identity, 'run-a:dataset-a:dataset-a-1')
+  assert.equal(drawer.props.active, true)
+  assert.equal(ui.nodes().some(node => node.type === 'details'), false)
+  assert.match(ui.text(), /决策前输入（各题共享）/)
+  assert.match(ui.text(), /固定来源与另一个留出批次关联/)
 })

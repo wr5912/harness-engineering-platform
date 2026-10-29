@@ -162,18 +162,32 @@ test('非空服务详情按原型层级呈现服务选择、状态摘要和真�
   const ui = editor({ fetch: async () => ({ ok: true, json: async () => ({ tools: [{ name: 'lookup', description: '读取测试资产' }], resources: { resources: [] } }) }) })
   assert.ok(ui.nodes().some(node => node.props?.className === 'mcp-mobile-service-picker'))
   const statusCards = () => ui.nodes().filter(node => node.type === 'article' && node.props?.children).map(ui.text)
-  assert.equal(statusCards().length, 3)
-  assert.match(statusCards()[2], /业务验证范围.*未验证.*请核对实际调用与目标业务结果/)
-  assert.match(ui.text(ui.render()), /待检查.*待核对.*尚未检查当前配置/)
+  assert.equal(statusCards().length, 2)
+  assert.equal(ui.button('最近检查'), undefined)
+  assert.match(ui.text(ui.render()), /待检查.*待核对.*实际调用和业务结果待验证/)
   ui.button('连接测试').props.onClick()
   await new Promise(resolve => setImmediate(resolve))
   ui.render()
   assert.match(ui.text(ui.render()), /连接状态.*规范已读取.*工具发现.*1 个工具.*已发现的工具.*lookup.*读取测试资产/)
-  assert.match(statusCards()[2], /业务验证范围.*未验证.*请核对实际调用与目标业务结果/)
+  assert.equal(ui.button('最近检查'), undefined)
+  assert.match(ui.text(ui.render()), /最近检查/)
   assert.match(ui.text(ui.render()), /实际调用和业务结果待验证/)
   ui.button('连接配置').props.onClick()
   ui.render()
   assert.ok(ui.input('ID'))
+})
+
+
+test('服务描述与名称相同时不重复展示，连接配置仍保留资料维护入口', () => {
+  const ui = editor()
+  ui.server.description = ui.server.id
+  ui.refreshValue()
+  const header = ui.nodes().find(node => node.props?.className === 'mcp-card-head' && ui.text(node).includes(ui.server.id))
+  assert.equal(ui.text(header).split(ui.server.id).length - 1, 1)
+  const selected = ui.serviceButton(ui.server.id)
+  assert.equal(ui.nodes(selected).some(node => node.props?.className === 'mcp-service-desc'), false)
+  ui.button('连接配置').props.onClick(); ui.render()
+  assert.equal(ui.input('描述（可选）').props.value, ui.server.id)
 })
 
 test('服务列表区分检查成功、失败和未保存配置', async () => {
@@ -798,4 +812,120 @@ test('分组调试使用已保存目标，切换目标或配置版本后丢弃�
   ui.setGroupId('removed')
   assert.match(ui.text(ui.render()), /调试目标不存在或尚未保存/)
   assert.equal(discover().props.disabled, true)
+})
+
+test('统一调试按对象与工具保留参数，切换类型不串用调用输入', async () => {
+  const requests = []
+  const ui = editor({ fetch: async (_url, request) => {
+    const payload = JSON.parse(request.body); requests.push(payload)
+    return { ok: true, json: async () => payload.action === 'test' ? { tools: [{ name: 'one' }, { name: 'two' }], resourceTemplates: { resourceTemplates: [{ name: 'template', uriTemplate: 'test:/{id}' }] }, resources: { resources: [] } } : { content: [{ type: 'text', text: 'actual-receipt' }] } }
+  } })
+  ui.setView('connection')
+  await ui.button('发现工具与资源').props.onClick(); ui.render()
+  const toolSelect = () => ui.nodes().find(node => node.type === 'select' && ui.nodes(node).some(child => child.props?.value === 'two'))
+  const args = () => ui.nodes().find(node => node.type === 'textarea' && node.props['aria-label'] === '调用参数 JSON')
+  args().props.onChange({ target: { value: '{"name":"first"}' } }); ui.render()
+  toolSelect().props.onChange({ target: { value: 'two' } }); ui.render()
+  assert.equal(args().props.value, '{}')
+  args().props.onChange({ target: { value: '{"name":"second"}' } }); ui.render()
+  toolSelect().props.onChange({ target: { value: 'one' } }); ui.render()
+  assert.equal(args().props.value, '{"name":"first"}')
+  ui.button('资源模板').props.onClick(); ui.render()
+  const template = ui.nodes().find(node => node.type === 'select' && ui.nodes(node).some(child => child.props?.value === 'test:/{id}'))
+  template.props.onChange({ target: { value: 'test:/{id}' } }); ui.render()
+  ui.nodes().find(node => node.type === 'textarea' && node.props['aria-label'] === '模板参数 JSON').props.onChange({ target: { value: '{"id":"resource"}' } }); ui.render()
+  ui.button('工具').props.onClick(); ui.render()
+  assert.equal(args().props.value, '{"name":"first"}')
+  ui.button('测试工具').props.onClick(); await new Promise(setImmediate); ui.render()
+  assert.equal(requests.at(-1).toolName, 'one')
+  assert.deepEqual(requests.at(-1).arguments, { name: 'first' })
+  ui.setGroupId('research'); await ui.button('发现工具与资源').props.onClick(); ui.render()
+  args().props.onChange({ target: { value: '{"scope":"group"}' } }); ui.render()
+  ui.setServerId('biz-soc-framework'); await ui.button('发现工具与资源').props.onClick(); ui.render()
+  assert.equal(args().props.value, '{"name":"first"}')
+})
+
+test('旧兼容管理结果随服务或保存版本失效，迟到回执不进入其他服务', async () => {
+  let delay = false, finish
+  const ui = editor({ fetch: async (_url, request) => {
+    const payload = JSON.parse(request.body)
+    if (delay) return new Promise(resolve => { finish = () => resolve({ ok: true, json: async () => ({ receipt: 'late-from-a' }) }) })
+    return { ok: true, json: async () => ({ receipt: `legacy-${payload.serverId}` }) }
+  } })
+  const servers = [{ ...ui.server, managementUrl: 'http://127.0.0.1:18080/legacy-a' },
+    { ...ui.server, id: 'legacy-b', managementUrl: 'http://127.0.0.1:18080/legacy-b' }]
+  ui.refreshValue({ servers, groups: ui.groups, sharedToken: 'fixture' })
+  ui.setServerId(ui.server.id); ui.setView('connection')
+  await ui.button('读取来源').props.onClick(); ui.render()
+  assert.match(ui.text(ui.render()), /legacy-biz-soc-framework/)
+  ui.setServerId('legacy-b')
+  assert.doesNotMatch(ui.text(ui.render()), /legacy-biz-soc-framework/)
+  await ui.button('读取来源').props.onClick(); ui.render()
+  assert.match(ui.text(ui.render()), /legacy-legacy-b/)
+  ui.refreshValue({ servers, groups: ui.groups, sharedToken: 'fixture' }, 'r2')
+  assert.doesNotMatch(ui.text(ui.render()), /legacy-legacy-b/)
+  ui.setServerId(ui.server.id); delay = true
+  const pending = ui.button('读取来源').props.onClick()
+  ui.setServerId('legacy-b')
+  finish(); await pending; ui.render()
+  assert.doesNotMatch(ui.text(ui.render()), /late-from-a/)
+})
+
+test('能力切换保留原调用身份，迟到成功只回到提交工具且不覆盖正在查看的工具', async () => {
+  const pending = new Map()
+  const ui = editor({ fetch: async (_url, request) => {
+    const payload = JSON.parse(request.body)
+    if (payload.action === 'test') return { ok: true, json: async () => ({ tools: [{ name: 'one' }, { name: 'two' }] }) }
+    return new Promise(resolve => pending.set(payload.toolName, () => resolve({ ok: true, json: async () => ({ receipt: `completed-${payload.toolName}` }) })))
+  } })
+  ui.setView('connection'); await ui.button('发现工具与资源').props.onClick(); ui.render()
+  const select = () => ui.nodes().find(node => node.type === 'select' && ui.nodes(node).some(child => child.props?.value === 'two'))
+  ui.button('测试工具').props.onClick(); ui.render()
+  select().props.onChange({ target: { value: 'two' } }); ui.render()
+  assert.equal(ui.button('测试工具').props.disabled, false)
+  ui.button('测试工具').props.onClick(); ui.render()
+  pending.get('one')(); await new Promise(setImmediate); ui.render()
+  assert.doesNotMatch(ui.text(ui.render()), /completed-one/)
+  assert.equal(ui.button('测试工具').props.disabled, true, 'one 完成不应解除 two 的忙状态')
+  select().props.onChange({ target: { value: 'one' } }); ui.render()
+  assert.match(ui.text(ui.render()), /completed-one/)
+  pending.get('two')(); await new Promise(setImmediate); ui.render()
+  assert.doesNotMatch(ui.text(ui.render()), /completed-two/)
+  select().props.onChange({ target: { value: 'two' } }); ui.render()
+  assert.match(ui.text(ui.render()), /completed-two/)
+  assert.equal(ui.button('测试工具').props.disabled, false)
+})
+
+test('连接工具范围从目录选择，筛选不改选择且连续勾选不丢目录', async () => {
+  let calls = 0
+  const ui = editor({ fetch: async () => { calls++; return { ok: true, json: async () => ({ tools: [{ name: 'one', description: '读取事件' }, { name: 'two', description: '更新事件' }] }) } } })
+  delete ui.server.specUrl
+  ui.server.url = 'http://127.0.0.1:18080/mcp'
+  ui.server.headers = []
+  ui.server.tools = { mode: 'selected', names: ['legacy'] }
+  ui.refreshValue()
+  ui.button('连接测试').props.onClick(); await new Promise(setImmediate); ui.render()
+  ui.button('连接配置').props.onClick(); ui.render()
+  const scope = () => ui.nodes().find(node => node.props?.['data-tool-scope'] === true)
+  const choices = () => ui.nodes(scope()).filter(node => node.props?.className === 'mcp-check')
+  const choose = (name, checked) => { const choice = choices().find(node => ui.text(node).startsWith(name)); ui.nodes(choice).find(node => node.type === 'input').props.onChange({ target: { checked } }); ui.render() }
+  assert.equal(ui.input('工具原名（逗号分隔）'), undefined)
+  assert.equal(choices().length, 3)
+  assert.match(ui.text(scope()), /legacy（尚未核对）/)
+  choose('one', true); choose('two', true)
+  assert.equal(choices().length, 3)
+  assert.equal(ui.nodes(scope()).filter(node => node.type === 'input' && node.props.checked).length, 3)
+  const search = ui.nodes(scope()).find(node => node.props?.type === 'search')
+  search.props.onChange({ target: { value: '读取' } }); ui.render()
+  assert.equal(choices().length, 1)
+  assert.equal(ui.nodes(choices()[0]).find(node => node.type === 'input').props.checked, true)
+  search.props.onChange({ target: { value: '' } }); ui.render()
+  assert.equal(choices().length, 3)
+  assert.equal(ui.nodes(scope()).filter(node => node.type === 'input' && node.props.checked).length, 3)
+  assert.equal(calls, 1, '选择与筛选不重新发现或执行工具')
+  assert.equal(ui.writes.length, 0)
+  ui.input('MCP URL').props.onChange({ target: { value: 'http://127.0.0.1:19090/mcp' } }); ui.render()
+  assert.match(ui.text(scope()), /请保存连接配置/)
+  assert.equal(choices().length, 3, '连接变化仍保留已有勾选，但不沿用旧目录')
+  assert.ok(choices().every(node => ui.text(node).includes('尚未核对')))
 })

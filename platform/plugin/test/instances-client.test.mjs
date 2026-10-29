@@ -5,7 +5,7 @@ import test from 'node:test'
 import { build } from 'esbuild'
 
 const require = createRequire(import.meta.url)
-const source = (await build({ entryPoints: [new URL('../src/instances/client.tsx', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime'] })).outputFiles[0].text
+const source = (await build({ entryPoints: [new URL('../src/instances/client.tsx', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react-dom', 'react/jsx-runtime', '@deepseek-ai/dsh-client-ui-primitives'] })).outputFiles[0].text
 
 const defaultModel = { provider: 'provider-a', model: 'base-model' }
 const alternateModel = { provider: 'provider-a', model: 'variant-model' }
@@ -22,7 +22,7 @@ function page({ instances = [{ name: 'basic-instance', agent_id: 'basic-agent', 
     useEffect(effect, deps) { const at = cursor++; if (!dependencies[at] || deps.some((value, index) => !Object.is(value, dependencies[at][index]))) { dependencies[at] = deps; effects.push(() => { cleanups[at]?.(); cleanups[at] = effect() }) } },
   }
   const module = { exports: {} }
-  vm.runInNewContext(source, { module, exports: module.exports, URL, require: name => name === 'react' ? react : require(name), window: { location: { hostname: '127.0.0.1' } }, navigator: { clipboard: { async writeText(value) { copied.push(value) } } } })
+  vm.runInNewContext(source, { module, exports: module.exports, URL, require: name => name === 'react' ? react : name === '@deepseek-ai/dsh-client-ui-primitives' ? { Modal: () => null } : require(name), window: { location: { hostname: '127.0.0.1' } }, navigator: { clipboard: { async writeText(value) { copied.push(value) } } } })
   const props = {
     target,
     onNavigate(target) { navigations.push(target) },
@@ -49,13 +49,13 @@ function page({ instances = [{ name: 'basic-instance', agent_id: 'basic-agent', 
   }
   function render() { let count = 0; do { if (++count > 30) throw new Error('render loop'); cursor = 0; effects = []; changed = false; tree = module.exports.InstancesPage(props); effects.forEach(effect => effect()) } while (changed); return tree }
   async function settle() { for (let index = 0; index < 5; index++) { await new Promise(resolve => setImmediate(resolve)); render() } }
-  function nodes(value) { if (!arguments.length) value = tree; if (Array.isArray(value)) return value.flatMap(nodes); if (!value || typeof value !== 'object' || value.props?.hidden) return []; if (typeof value.type === 'function') return nodes(value.type(value.props)); return [value, ...(value.props?.children === undefined ? [] : nodes(value.props.children))] }
+  function nodes(value) { if (!arguments.length) value = tree; if (Array.isArray(value)) return value.flatMap(nodes); if (!value || typeof value !== 'object' || value.props?.hidden) return []; if (value.type?.name === 'SearchSelect') return [{ ...value, props: { ...value.props, role: 'combobox', 'aria-label': value.props.label, onChange: event => { const typed = typeof event === 'string' ? event : event.target.value; const option = value.props.options.find(item => [item.value, item.label, `${item.label} · ${item.value}`].includes(typed)); value.props.onChange(option?.value ?? typed) } } }]; if (value.type?.name === 'DetailDrawer') return [value, ...nodes(value.props.children)]; if (typeof value.type === 'function') return nodes(value.type(value.props)); return [value, ...(value.props?.children === undefined ? [] : nodes(value.props.children))] }
   function text(value) { if (!arguments.length) value = tree; if (Array.isArray(value)) return value.map(text).join(''); return value && typeof value === 'object' ? value.props?.hidden ? '' : text(value.props?.children) : String(value ?? '') }
   const button = name => nodes().find(node => node.type === 'button' && text(node) === name && !node.props.disabled)
   const buttons = name => nodes().filter(node => node.type === 'button' && text(node) === name)
   const tab = name => nodes().find(node => node.props?.role === 'tab' && text(node) === name)
   render()
-  return { render, settle, text, nodes, button, buttons, tab, calls, copied, navigations, setTarget(next) { props.target = next; render() }, invalidate() { listener() } }
+  return { render, settle, text, nodes, button, buttons, tab, calls, copied, navigations, setActive(value) { props.active = value; render() }, setTarget(next) { props.target = next; render() }, invalidate() { listener() } }
 }
 
 function deferred() {
@@ -69,7 +69,7 @@ function openCreate(ui) {
 }
 
 function chooseAgent(ui, value) {
-  ui.nodes().find(node => node.type === 'input' && node.props['aria-label'] === '来源智能体')
+  ui.nodes().find(node => node.props.role === 'combobox' && node.props['aria-label'] === '来源智能体')
     .props.onChange({ target: { value } })
   ui.render()
 }
@@ -93,12 +93,80 @@ test('非空实例列表保留原型的搜索、状态筛选与表格层级，�
   await ui.settle()
   const filter = ui.nodes().find(node => node.props?.className === 'instance-filter-row')
   const labels = ui.nodes(filter).filter(node => node.type === 'label')
-  assert.deepEqual(labels.map(node => ui.text(node).slice(0, 2)), ['搜索', '状态'])
+  assert.deepEqual(labels.map(node => ui.text(node).slice(0, 2)), ['搜索', '状态', '登记'])
   assert.ok(ui.nodes().some(node => node.type === 'table' && node.props.className === 'instance-table'))
-  assert.match(ui.text(), /1 个业务实例.*basic-instance.*共 1 条记录/)
+  assert.match(ui.text(), /basic-instance.*共 1 条记录/)
   ui.nodes().find(node => node.type === 'input' && node.props['aria-label'] === '搜索实例').props.onChange({ target: { value: 'basic-agent' } })
   ui.render()
   assert.match(ui.text(), /basic-instance/)
+})
+
+test('实例状态分布按搜索与来源统计，状态筛选不改变分母，缺失及非标准状态可统一筛出', async () => {
+  const source_id = 'experiment:EXP-basic-001'
+  const ui = page({ instances: [
+    { name: 'running-instance', agent_id: 'basic-agent', state: 'running', source_id },
+    { name: 'stopped-instance', agent_id: 'basic-agent', state: 'stopped', source_id },
+    { name: 'absent-instance', agent_id: 'basic-agent', state: 'absent', source_id },
+    { name: 'unknown-instance', agent_id: 'basic-agent', state: 'unknown', source_id },
+    { name: 'missing-state', agent_id: 'basic-agent', source_id },
+    { name: 'unrecognized-state', agent_id: 'basic-agent', state: 'not-observed', source_id },
+    { name: 'other-instance', agent_id: 'other-agent', state: 'failed', source_id: 'experiment:EXP-other-002' },
+  ] })
+  const chart = () => ui.nodes().find(node => node.type === 'figure' && ui.text(node).includes('实例状态分布'))
+  const legend = () => ui.nodes(chart()).find(node => node.props?.['aria-label'] === '实例状态分布分类')
+  const counts = () => ui.nodes(legend()).filter(node => node.type === 'strong').map(node => ui.text(node))
+  const legendButton = label => ui.nodes(legend()).find(node => node.type === 'button' && ui.text(node).startsWith(label))
+  const listed = () => ui.nodes().filter(node => node.props?.className === 'instance-list-td instance-name').map(node => ui.text(node))
+  await ui.settle()
+  assert.deepEqual(counts(), ['1', '1', '1', '1', '3'])
+  assert.match(ui.text(chart()), /当前搜索与来源下共 7 项登记；状态仅筛选下方列表/)
+  ui.nodes().find(node => node.props?.['aria-label'] === '搜索实例').props.onChange({ target: { value: 'basic-agent' } }); ui.render()
+  assert.deepEqual(counts(), ['1', '1', '0', '1', '3'])
+  assert.match(ui.text(chart()), /当前搜索与来源下共 6 项登记/)
+  legendButton('状态未知').props.onClick(); ui.render()
+  assert.deepEqual(counts(), ['1', '1', '0', '1', '3'])
+  assert.deepEqual(listed().map(value => value.split('基础助手')[0]), ['unknown-instance', 'missing-state', 'unrecognized-state'])
+  assert.equal(legendButton('状态未知').props['aria-pressed'], true)
+  assert.equal(ui.nodes().find(node => node.props?.['aria-label'] === '状态筛选').props.value, 'unknown')
+  assert.equal(ui.nodes().filter(node => node.props?.className === 'instance-state-badge' && ui.text(node) === '状态未知').length, 3)
+  ui.nodes().find(node => node.props?.['aria-label'] === '实例登记来源筛选').props.onChange('experiment:EXP-other-002'); ui.render()
+  assert.deepEqual(counts(), ['0', '0', '0', '0', '0'])
+  assert.match(ui.text(chart()), /当前搜索与来源范围没有实例登记/)
+  ui.nodes().find(node => node.props?.['aria-label'] === '搜索实例').props.onChange({ target: { value: '' } }); ui.render()
+  assert.deepEqual(counts(), ['0', '0', '1', '0', '0'])
+  legendButton('异常').props.onClick(); ui.render()
+  assert.equal(listed().length, 1)
+  assert.match(listed()[0], /other-instance/)
+  assert.equal(ui.calls.some(call => call.endpoint === 'instances/run'), false)
+})
+
+test('实例分布首次读取未成功前不展示零结果，成功读取空列表后才展示空分布', async () => {
+  const first = deferred(); let fail = true
+  const ui = page({ instances: [], respond(endpoint) {
+    if (endpoint === 'instances/list' && fail) return first.promise
+  } })
+  const chart = () => ui.nodes().find(node => node.type === 'figure' && ui.text(node).includes('实例状态分布'))
+  await ui.settle()
+  assert.equal(chart(), undefined)
+  first.resolve({ ok: false, error: { message: '暂时无法读取登记' } }); await ui.settle()
+  assert.equal(chart(), undefined)
+  fail = false; ui.button('重新读取').props.onClick(); await ui.settle()
+  assert.match(ui.text(chart()), /当前搜索与来源范围没有实例登记/)
+})
+
+test('实例刷新失败仍保留已知分布并标记上次观察，不把未知读取画为零', async () => {
+  let fail = false
+  const ui = page({ respond(endpoint) { if (endpoint === 'instances/list' && fail) return { ok: false, error: { message: '读取中断' } } } })
+  const chart = () => ui.nodes().find(node => node.type === 'figure' && ui.text(node).includes('实例状态分布'))
+  await ui.settle()
+  const values = () => ui.nodes(chart()).filter(node => node.type === 'strong').map(node => ui.text(node))
+  assert.deepEqual(values(), ['1', '0', '0', '0', '0'])
+  fail = true; ui.button('刷新列表').props.onClick(); ui.render()
+  assert.deepEqual(values(), ['1', '0', '0', '0', '0'])
+  await ui.settle()
+  assert.deepEqual(values(), ['1', '0', '0', '0', '0'])
+  assert.match(ui.text(chart()), /上次观察；当前状态待核对/)
+  assert.match(ui.text(), /上次成功观察/)
 })
 
 test('实例列表实时刷新保留待确认预览，确认后仅执行原目标一次', async () => {
@@ -129,8 +197,8 @@ test('实时刷新后的显式取消仍关闭预览，不执行实例操作', as
 
 test('创建弹窗填写后只请求预览，返回修改与关闭均不创建实例', async () => {
   const ui = page()
-  const input = label => ui.nodes().find(node => node.type === 'input' && node.props['aria-label'] === label)
-  const select = label => ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === label)
+  const input = label => ui.nodes().find(node => (node.type === 'input' || node.props.role === 'combobox') && node.props['aria-label'] === label)
+  const select = label => ui.nodes().find(node => (node.type === 'select' || node.props.role === 'combobox') && node.props['aria-label'] === label)
   await ui.settle()
   assert.equal(input('实例名'), undefined)
   assert.equal(ui.button('新建实例').props['aria-expanded'], false)
@@ -179,7 +247,7 @@ test('单实例停止预览展示业务中断与数据保留影响，保持运�
 
 test('来源深链预选精确版本，刷新目录不改写用户后来选择的版本', async () => {
   const ui = page({ target: { page: 'instances', source_id: 'experiment:EXP-other-002', agent_id: 'other-agent' } })
-  const select = label => ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === label)
+  const select = label => ui.nodes().find(node => (node.type === 'select' || node.props.role === 'combobox') && node.props['aria-label'] === label)
   await ui.settle()
   assert.equal(select('选择来源版本').props.value, 'experiment:EXP-other-002')
   assert.match(ui.text(), /此版本尚无评测记录.*EXP-other-002/)
@@ -187,7 +255,7 @@ test('来源深链预选精确版本，刷新目录不改写用户后来选择�
   select('选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } }); await ui.settle()
   ui.nodes().find(node => node.type === 'button' && node.props['aria-label'] === '关闭创建实例').props.onClick(); ui.render()
   openCreate(ui); await ui.settle()
-  assert.match(ui.text(), /最近评测未通过.*EXP-basic-001.*3 项已选用例/)
+  assert.match(ui.text(), /最近评测未通过.*3 项已选用例.*EXP-basic-001/)
   assert.equal(select('选择来源版本').props.value, 'experiment:EXP-basic-001')
 })
 
@@ -203,7 +271,7 @@ test('来源评测读取失败保留准确来源并允许重新核对', async ()
   ui.button('重新核对评测').props.onClick()
   await ui.settle()
   assert.equal(ui.calls.filter(call => call.endpoint === 'agents/runs/index').length, 2)
-  assert.match(ui.text(), /最近评测未通过.*EXP-basic-001.*3 项已选用例/)
+  assert.match(ui.text(), /最近评测未通过.*3 项已选用例.*EXP-basic-001/)
   assert.doesNotMatch(ui.text(), /读取原因：评测索引暂不可用/)
 })
 
@@ -245,7 +313,7 @@ test('已成功读取的来源评测可手动刷新，展示新的最近 Run', a
 test('同页编辑保留选择；离开后再次从同一来源入口进入会恢复外部预选', async () => {
   const original = { page: 'instances', source_id: 'experiment:EXP-other-002', agent_id: 'other-agent' }
   const ui = page({ target: original })
-  const select = label => ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === label)
+  const select = label => ui.nodes().find(node => (node.type === 'select' || node.props.role === 'combobox') && node.props['aria-label'] === label)
   await ui.settle()
   chooseAgent(ui, '基础助手 · basic-agent')
   select('选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } }); await ui.settle()
@@ -259,8 +327,8 @@ test('同页编辑保留选择；离开后再次从同一来源入口进入会�
 
 test('创建自动端口从预览冻结到执行请求，失效预览不能执行', async () => {
   const ui = page()
-  const input = label => ui.nodes().find(node => node.type === 'input' && node.props['aria-label'] === label)
-  const select = label => ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === label)
+  const input = label => ui.nodes().find(node => (node.type === 'input' || node.props.role === 'combobox') && node.props['aria-label'] === label)
+  const select = label => ui.nodes().find(node => (node.type === 'select' || node.props.role === 'combobox') && node.props['aria-label'] === label)
   await ui.settle()
   openCreate(ui); await ui.settle()
   input('实例名').props.onChange({ target: { value: 'new-auto' } }); ui.render()
@@ -280,7 +348,7 @@ test('创建自动端口从预览冻结到执行请求，失效预览不能执�
   openCreate(invalid); await invalid.settle()
   invalid.nodes().find(node => node.type === 'input' && node.props['aria-label'] === '实例名').props.onChange({ target: { value: 'invalid-auto' } }); invalid.render()
   chooseAgent(invalid, '基础助手 · basic-agent')
-  invalid.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } }); await invalid.settle()
+  invalid.nodes().find(node => (node.type === 'select' || node.props.role === 'combobox') && node.props['aria-label'] === '选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } }); await invalid.settle()
   await invalid.button('查看创建预览').props.onClick(); await invalid.settle()
   assert.match(invalid.text(), /预览缺少有效端口/)
   assert.equal(invalid.button('确认创建'), undefined)
@@ -307,15 +375,15 @@ test('受控实例创建预览、列表、详情和回执显示网关深链与�
   } })
   await ui.settle()
   assert.match(ui.text(), /经统一网关 · 无需登录.*http:\/\/business\.example:53105\/agents\/basic-agent\/instances\/existing-guest\//)
-  ui.button('详情').props.onClick(); await ui.settle()
+  ui.button('查看详情').props.onClick(); await ui.settle()
   assert.match(ui.text(), /内部 Web 端口.*访问方式.*经过网关，无需认证\（共享数据和会话\）.*已登记网关入口.*http:\/\/business\.example:53105\/agents\/basic-agent\/instances\/existing-guest\//)
-  ui.button('关闭详情').props.onClick(); ui.render()
+  ui.button('返回实例列表').props.onClick(); ui.render()
   openCreate(ui); await ui.settle()
   ui.nodes().find(node => node.type === 'input' && node.props['aria-label'] === '实例名').props.onChange({ target: { value: 'new-guest' } }); ui.render()
   chooseAgent(ui, '基础助手 · basic-agent')
-  ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } }); await ui.settle()
-  ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '访问方式').props.onChange({ target: { value: 'anonymous' } }); ui.render()
-  assert.equal(ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '实例阶段').props.value, 'development')
+  ui.nodes().find(node => (node.type === 'select' || node.props.role === 'combobox') && node.props['aria-label'] === '选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } }); await ui.settle()
+  ui.nodes().find(node => (node.type === 'select' || node.props.role === 'combobox') && node.props['aria-label'] === '访问方式').props.onChange({ target: { value: 'anonymous' } }); ui.render()
+  assert.equal(ui.nodes().find(node => (node.type === 'select' || node.props.role === 'combobox') && node.props['aria-label'] === '实例阶段').props.value, 'development')
   assert.match(ui.text(), /内部 Runtime 端口（可选）/)
   await ui.button('查看创建预览').props.onClick(); await ui.settle()
   assert.equal(ui.calls.find(call => call.endpoint === 'instances/preview').payload.identity_mode, 'development')
@@ -340,7 +408,7 @@ test('创建回执到达后等待登记回读，并展示实际登记来源而�
   openCreate(ui); await ui.settle()
   ui.nodes().find(node => node.type === 'input' && node.props['aria-label'] === '实例名').props.onChange({ target: { value: 'readback-instance' } }); ui.render()
   chooseAgent(ui, '基础助手 · basic-agent')
-  ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } }); await ui.settle()
+  ui.nodes().find(node => (node.type === 'select' || node.props.role === 'combobox') && node.props['aria-label'] === '选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } }); await ui.settle()
   await ui.button('查看创建预览').props.onClick(); await ui.settle()
   holdReadback = true
   const execution = ui.button('确认创建').props.onClick()
@@ -376,7 +444,7 @@ test('创建回执成功但登记读取失败时保持未知，手动重读只�
   openCreate(ui); await ui.settle()
   ui.nodes().find(node => node.type === 'input' && node.props['aria-label'] === '实例名').props.onChange({ target: { value: 'retry-instance' } }); ui.render()
   chooseAgent(ui, '基础助手 · basic-agent')
-  ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } }); await ui.settle()
+  ui.nodes().find(node => (node.type === 'select' || node.props.role === 'combobox') && node.props['aria-label'] === '选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } }); await ui.settle()
   await ui.button('查看创建预览').props.onClick(); await ui.settle()
   await ui.button('确认创建').props.onClick(); await ui.settle()
   assert.match(ui.text(), /操作回执：成功 1 项/)
@@ -407,7 +475,7 @@ test('执行回读被实时列表刷新覆盖时仍使用本次回读结果核�
   openCreate(ui); await ui.settle()
   ui.nodes().find(node => node.type === 'input' && node.props['aria-label'] === '实例名').props.onChange({ target: { value: 'race-instance' } }); ui.render()
   chooseAgent(ui, '基础助手 · basic-agent')
-  ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } }); await ui.settle()
+  ui.nodes().find(node => (node.type === 'select' || node.props.role === 'combobox') && node.props['aria-label'] === '选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } }); await ui.settle()
   await ui.button('查看创建预览').props.onClick(); await ui.settle()
   const execution = ui.button('确认创建').props.onClick()
   await ui.settle()
@@ -439,8 +507,8 @@ test('停止成功后回读登记状态、来源和时间，仍仅执行一次�
 
 test('统一业务默认用于新实例预选，切换来源智能体仍共享可用范围', async () => {
   const ui = page()
-  const select = label => ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === label)
-  const input = label => ui.nodes().find(node => node.type === 'input' && node.props['aria-label'] === label)
+  const select = label => ui.nodes().find(node => (node.type === 'select' || node.props.role === 'combobox') && node.props['aria-label'] === label)
+  const input = label => ui.nodes().find(node => (node.type === 'input' || node.props.role === 'combobox') && node.props['aria-label'] === label)
   await ui.settle()
   const initialReads = ui.calls.filter(call => call.endpoint === 'models/list').length
   openCreate(ui); await ui.settle()
@@ -452,7 +520,7 @@ test('统一业务默认用于新实例预选，切换来源智能体仍共享�
   select('选择来源版本').props.onChange({ target: { value: 'experiment:EXP-other-002' } }); await ui.settle()
   assert.equal(select('新实例默认模型').props.value, JSON.stringify(['provider-a', 'base-model']))
   assert.equal(ui.buttons('查看创建预览')[0].props.disabled, false)
-  assert.deepEqual(ui.nodes(select('新实例默认模型')).filter(node => node.type === 'option' && node.props.value).map(node => node.props.value),
+  assert.deepEqual(JSON.parse(JSON.stringify(select('新实例默认模型').props.options.filter(node => !node.disabled).map(node => node.value))),
     [JSON.stringify(['provider-a', 'base-model']), JSON.stringify(['provider-a', 'variant-model']), JSON.stringify(['provider-b', 'other-model'])])
   select('新实例默认模型').props.onChange({ target: { value: JSON.stringify(['provider-b', 'other-model']) } }); ui.render()
   await ui.button('查看创建预览').props.onClick(); await ui.settle()
@@ -467,7 +535,7 @@ test('业务模型目录为空时创建入口说明原因且不派发预览', as
   openCreate(ui); await ui.settle()
   chooseAgent(ui, '基础助手 · basic-agent')
   ui.nodes().find(node => node.type === 'input' && node.props['aria-label'] === '实例名').props.onChange({ target: { value: 'new-instance' } }); ui.render()
-  ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } }); ui.render()
+  ui.nodes().find(node => (node.type === 'select' || node.props.role === 'combobox') && node.props['aria-label'] === '选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } }); ui.render()
   assert.match(ui.text(), /尚无可供业务实例使用的模型.*设置 → 模型/)
   assert.equal(ui.button('查看创建预览'), undefined)
   assert.equal(ui.calls.some(call => call.endpoint === 'instances/preview'), false)
@@ -476,13 +544,13 @@ test('业务模型目录为空时创建入口说明原因且不派发预览', as
 test('实例详情更改默认模型需预览重启或启动，回执冻结所选模型和配置摘要', async () => {
   const ui = page()
   await ui.settle()
-  await ui.button('详情').props.onClick(); await ui.settle()
+  await ui.button('查看详情').props.onClick(); await ui.settle()
   assert.match(ui.text(), /登记默认模型.*模型服务 A · 基础模型/)
   const beforeReads = ui.calls.filter(call => call.endpoint === 'models/list').length
   ui.button('更改默认模型').props.onClick(); await ui.settle()
   assert.ok(ui.calls.filter(call => call.endpoint === 'models/list').length > beforeReads, '打开实例模型编辑时重新读取授权')
   assert.equal(ui.button('预览并重启'), undefined, '与当前登记相同时无需重启')
-  const chooser = ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '实例默认模型')
+  const chooser = ui.nodes().find(node => (node.type === 'select' || node.props.role === 'combobox') && node.props['aria-label'] === '实例默认模型')
   chooser.props.onChange({ target: { value: JSON.stringify(['provider-a', 'variant-model']) } }); ui.render()
   await ui.button('预览并重启').props.onClick(); await ui.settle()
   assert.deepEqual(JSON.parse(JSON.stringify(ui.calls.find(call => call.endpoint === 'instances/preview').payload)), { operation: 'restart', name: 'basic-instance', model_selection: alternateModel })
@@ -494,9 +562,9 @@ test('实例详情更改默认模型需预览重启或启动，回执冻结所�
 
   const stopped = page({ instances: [{ name: 'stopped-instance', agent_id: 'basic-agent', state: 'stopped', source_id: 'experiment:EXP-basic-001', port: 3086, model_policy: { default: defaultModel } }] })
   await stopped.settle()
-  await stopped.button('详情').props.onClick(); await stopped.settle()
+  await stopped.button('查看详情').props.onClick(); await stopped.settle()
   stopped.button('更改默认模型').props.onClick(); await stopped.settle()
-  stopped.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '实例默认模型').props.onChange({ target: { value: JSON.stringify(['provider-a', 'variant-model']) } }); stopped.render()
+  stopped.nodes().find(node => (node.type === 'select' || node.props.role === 'combobox') && node.props['aria-label'] === '实例默认模型').props.onChange({ target: { value: JSON.stringify(['provider-a', 'variant-model']) } }); stopped.render()
   await stopped.button('预览并启动').props.onClick(); await stopped.settle()
   assert.equal(stopped.calls.find(call => call.endpoint === 'instances/preview').payload.operation, 'start')
 })
@@ -507,9 +575,9 @@ test('实例重启后回读到新登记默认模型才结束模型编辑', async
     if (endpoint === 'instances/run') instances[0] = { ...instances[0], model_policy: { default: payload.model_selection } }
   } })
   await ui.settle()
-  await ui.button('详情').props.onClick(); await ui.settle()
+  await ui.button('查看详情').props.onClick(); await ui.settle()
   ui.button('更改默认模型').props.onClick(); await ui.settle()
-  ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '实例默认模型').props.onChange({ target: { value: JSON.stringify(['provider-a', 'variant-model']) } }); ui.render()
+  ui.nodes().find(node => (node.type === 'select' || node.props.role === 'combobox') && node.props['aria-label'] === '实例默认模型').props.onChange({ target: { value: JSON.stringify(['provider-a', 'variant-model']) } }); ui.render()
   await ui.button('预览并重启').props.onClick(); await ui.settle()
   await ui.button('确认重启 1 项').props.onClick(); await ui.settle()
   assert.doesNotMatch(ui.text(), /尚未从实例登记核对到所选默认模型/)
@@ -528,7 +596,7 @@ test('模型目录读取失败或预览缺少模型摘要时不派发实例操�
   assert.match(ui.text(), /模型目录暂时不可用/)
   failModels = false
   ui.button('刷新模型').props.onClick(); await ui.settle()
-  const select = label => ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === label)
+  const select = label => ui.nodes().find(node => (node.type === 'select' || node.props.role === 'combobox') && node.props['aria-label'] === label)
   ui.nodes().find(node => node.type === 'input' && node.props['aria-label'] === '实例名').props.onChange({ target: { value: 'new-instance' } }); ui.render()
   chooseAgent(ui, '基础助手 · basic-agent')
   select('选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } }); await ui.settle()
@@ -541,8 +609,9 @@ test('模型目录读取失败或预览缺少模型摘要时不派发实例操�
 test('失效来源保持原值并显示字段错误，无可用版本时不能直接创建', async () => {
   const ui = page({ target: { page: 'instances', source_id: 'experiment:EXP-missing-003', agent_id: 'empty-agent' } })
   await ui.settle()
-  ui.button('手动输入来源表达式').props.onClick(); ui.render()
-  assert.equal(ui.nodes().find(node => node.type === 'input' && node.props['aria-label'] === '来源').props.value, 'experiment:EXP-missing-003')
+  assert.equal(ui.buttons('手动输入来源表达式').length, 0)
+  assert.equal(ui.nodes().some(node => node.type === 'input' && node.props['aria-label'] === '来源'), false)
+  assert.match(ui.text(), /原来源：experiment:EXP-missing-003/)
   assert.match(ui.text(), /该来源不在当前登记中/)
   assert.match(ui.text(), /没有可用的已登记来源/)
   assert.equal(ui.buttons('查看创建预览')[0].props.disabled, true)
@@ -569,7 +638,8 @@ test('批量预览失败不阻止其它目标；执行回执区分成功、失�
   assert.deepEqual(ui.calls.filter(call => call.endpoint === 'instances/run').map(call => call.payload.name), ['one', 'three', 'four'])
   ui.button('关闭').props.onClick(); ui.render()
   for (const [index, name, outcome] of [[0, 'one', '成功'], [1, 'two', '未派发'], [2, 'three', '失败'], [3, 'four', '结果未知'], [4, 'five', '未派发']]) {
-    await ui.buttons('详情')[index].props.onClick(); await ui.settle()
+    if (index > 0) { ui.button('返回实例列表').props.onClick(); ui.render() }
+    await ui.buttons('查看详情')[index].props.onClick(); await ui.settle()
     ui.tab('操作回执').props.onClick(); ui.render()
     const panel = ui.nodes().find(node => node.props?.id === 'instance-panel-receipts')
     assert.match(ui.text(panel), new RegExp(`${name} · 停止 · ${outcome}`))
@@ -588,7 +658,7 @@ test('操作回执仅在本页会话可回看，目标不符的成功响应按�
   assert.match(ui.text(), /结果未知 1 项/)
   assert.match(ui.text(), /操作回执目标与提交目标不一致/)
   ui.button('关闭').props.onClick(); ui.render()
-  await ui.button('详情').props.onClick(); await ui.settle()
+  await ui.button('查看详情').props.onClick(); await ui.settle()
   ui.tab('操作回执').props.onClick(); ui.render()
   const panel = ui.nodes().find(node => node.props?.id === 'instance-panel-receipts')
   assert.match(ui.text(panel), /basic-instance · 重启 · 结果未知/)
@@ -606,7 +676,7 @@ test('实例详情深链恢复指定页签，关闭后返回实例列表', async
   assert.equal(ui.tab('运行日志').props['aria-selected'], true)
   ui.tab('概览').props.onClick(); ui.render()
   assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { page: 'instances', instance_name: 'basic-instance', tab: 'overview' })
-  ui.button('关闭详情').props.onClick(); ui.render()
+  ui.button('返回实例列表').props.onClick(); ui.render()
   assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { page: 'instances' })
   assert.equal(ui.tab('概览'), undefined)
 })
@@ -616,16 +686,16 @@ test('无效实例深链提供返回列表入口并清除错误', async () => {
     if (endpoint === 'instances/detail') return { ok: false, error: { message: '实例不存在' } }
   } })
   await ui.settle()
-  assert.match(ui.text(), /登记已不存在|实例不存在/)
+  assert.match(ui.text(), /不存在或已移除/)
   ui.button('返回实例列表').props.onClick(); ui.render()
   assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { page: 'instances' })
-  assert.doesNotMatch(ui.text(), /登记已不存在|实例不存在/)
+  assert.doesNotMatch(ui.text(), /不存在或已移除/)
 })
 
 test('实例详情按任务切换页签，嵌入地址取自接口且刷新后保留代码与当前页签', async () => {
   const ui = page()
   await ui.settle()
-  await ui.button('详情').props.onClick(); await ui.settle()
+  await ui.button('查看详情').props.onClick(); await ui.settle()
   assert.ok(ui.nodes().some(node => node.props?.role === 'tablist' && node.props['aria-label'] === '实例详情'))
   assert.equal(ui.tab('概览').props['aria-selected'], true)
   assert.equal(ui.text().includes('basic-instance: runtime ready'), false, '默认概览不铺开运行日志')
@@ -651,12 +721,13 @@ test('切换实例重置为概览，不沿用前一个实例的嵌入代码或�
     { name: 'other-instance', state: 'running', source_id: 'experiment:EXP-other-002', port: 3085 },
   ] })
   await ui.settle()
-  await ui.buttons('详情')[0].props.onClick(); await ui.settle()
+  await ui.buttons('查看详情')[0].props.onClick(); await ui.settle()
   ui.tab('网站嵌入').props.onClick(); ui.render()
   await ui.button('生成 iframe 代码').props.onClick(); await ui.settle()
   ui.tab('运行日志').props.onClick(); ui.render()
   assert.match(ui.text(), /basic-instance: runtime ready/)
-  await ui.buttons('详情')[1].props.onClick(); await ui.settle()
+  ui.button('返回实例列表').props.onClick(); ui.render()
+  await ui.buttons('查看详情')[1].props.onClick(); await ui.settle()
   assert.equal(ui.tab('概览').props['aria-selected'], true)
   assert.equal(ui.text().includes('basic-instance: runtime ready'), false)
   ui.tab('网站嵌入').props.onClick(); ui.render()
@@ -674,11 +745,11 @@ test('关闭详情后忽略迟到的后台详情与嵌入地址回执', async ()
     if (endpoint === 'instances/url') return pendingUrl.promise
   } })
   await ui.settle()
-  await ui.button('详情').props.onClick(); await ui.settle()
+  await ui.button('查看详情').props.onClick(); await ui.settle()
   ui.tab('网站嵌入').props.onClick(); ui.render()
   ui.button('生成 iframe 代码').props.onClick(); await ui.settle()
   ui.invalidate(); await ui.settle()
-  ui.button('关闭详情').props.onClick(); ui.render()
+  ui.button('返回实例列表').props.onClick(); ui.render()
   pendingDetail.resolve({ ok: true, value: { instance: { name: 'basic-instance', state: 'running', port: 3084 }, runs: [], session_scope: { note: '迟到的详情' } } })
   pendingUrl.resolve({ ok: true, value: { url: 'http://127.0.0.1:3084/assistant/', lan_access: false } })
   await ui.settle()
@@ -696,14 +767,14 @@ test('实例登记消失时清理已生成的嵌入代码，也忽略进行中�
     if (endpoint === 'instances/url' && delayUrl) return pendingUrl.promise
   } })
   await ui.settle()
-  await ui.button('详情').props.onClick(); await ui.settle()
+  await ui.button('查看详情').props.onClick(); await ui.settle()
   ui.tab('网站嵌入').props.onClick(); ui.render()
   await ui.button('生成 iframe 代码').props.onClick(); await ui.settle()
   assert.ok(ui.button('复制嵌入代码'))
 
   registered = false
   ui.invalidate(); await ui.settle()
-  assert.match(ui.text(), /登记已不存在/)
+  assert.match(ui.text(), /不存在或已移除/)
   assert.equal(ui.button('复制嵌入代码'), undefined)
   assert.equal(ui.text().includes('<iframe'), false)
   assert.equal(ui.buttons('生成 iframe 代码')[0].props.disabled, true)
@@ -716,7 +787,7 @@ test('实例登记消失时清理已生成的嵌入代码，也忽略进行中�
   ui.invalidate(); await ui.settle()
   pendingUrl.resolve({ ok: true, value: { url: 'http://127.0.0.1:3084/assistant/', lan_access: false } })
   await ui.settle()
-  assert.match(ui.text(), /登记已不存在/)
+  assert.match(ui.text(), /不存在或已移除/)
   assert.equal(ui.button('复制嵌入代码'), undefined)
   assert.equal(ui.text().includes('<iframe'), false, '登记消失后迟到的地址不能重新形成嵌入代码')
   assert.equal(ui.buttons('生成 iframe 代码')[0].props.disabled, true)
@@ -731,7 +802,8 @@ test('日志失败保留详情概览，错误仅在运行日志中显示；未�
   } })
   await ui.settle()
   for (let index = 0; index < 2; index++) {
-    await ui.buttons('详情')[index].props.onClick(); await ui.settle()
+    if (index > 0) { ui.button('返回实例列表').props.onClick(); ui.render() }
+    await ui.buttons('查看详情')[index].props.onClick(); await ui.settle()
     assert.equal(ui.tab('概览').props['aria-selected'], true)
     assert.equal(ui.text().includes('container logs unavailable'), false)
     ui.tab('运行日志').props.onClick(); ui.render()
@@ -740,4 +812,92 @@ test('日志失败保留详情概览，错误仅在运行日志中显示；未�
     assert.equal(ui.buttons('生成 iframe 代码')[0].props.disabled, true)
   }
   assert.equal(ui.calls.some(call => call.endpoint === 'instances/url'), false)
+})
+
+test('来源选择自动建议可用实例名并带入登记版本，手工名称跨对象切换保留', async () => {
+  const ui = page()
+  await ui.settle(); openCreate(ui); await ui.settle()
+  chooseAgent(ui, 'basic-agent'); await ui.settle()
+  const field = label => ui.nodes().find(node => node.props?.['aria-label'] === label)
+  assert.equal(field('实例名').props.value, 'basic-agent-1')
+  assert.equal(field('选择来源版本').props.value, 'experiment:EXP-basic-001')
+  field('实例名').props.onChange({ target: { value: 'my-instance' } }); ui.render()
+  chooseAgent(ui, 'other-agent'); await ui.settle()
+  assert.equal(field('实例名').props.value, 'my-instance')
+  assert.equal(field('选择来源版本').props.value, 'experiment:EXP-other-002')
+})
+
+
+test('缺失实例深链不请求日志，提供保留对象的只读重试与返回', async () => {
+  const ui = page({ instances: [], target: { page: 'instances', instance_name: 'history-instance' }, respond(endpoint) {
+    if (endpoint === 'instances/detail') return { ok: false, error: { message: '未找到实例 history-instance' } }
+  } })
+  await ui.settle()
+  assert.match(ui.text(), /实例“history-instance”不存在或已移除/)
+  assert.equal(ui.calls.some(call => call.endpoint === 'instances/logs'), false)
+  const reads = ui.calls.filter(call => call.endpoint === 'instances/detail').length
+  ui.button('重新读取实例').props.onClick(); await ui.settle()
+  assert.equal(ui.calls.filter(call => call.endpoint === 'instances/detail').length, reads + 1)
+  assert.equal(ui.calls.filter(call => call.endpoint === 'instances/detail').at(-1).payload.name, 'history-instance')
+  ui.button('返回实例列表').props.onClick(); ui.render()
+  assert.equal(ui.nodes().some(node => node.props?.className === 'instance-detail-route-notice'), false)
+})
+
+test('实例来源运行历史在评测中心维护，实例页仅保留固定来源跳转', async () => {
+  const ui = page()
+  await ui.settle(); ui.button('查看详情').props.onClick(); await ui.settle()
+  assert.equal(ui.text().includes('来源版本的运行记录'), false)
+  assert.equal(ui.nodes().some(node => node.props?.className === 'instance-run-list'), false)
+  ui.button('查看来源版本评测').props.onClick()
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { page: 'evaluation', tab: 'runs', agent_id: 'basic-agent', experiment_id: 'EXP-basic-001' })
+})
+
+
+test('实例旁路资料绑定实例与活跃页签，主日志和编辑仍在工作面', async () => {
+  const ui = page({ target: { page: 'instances', instance_name: 'basic-instance' } })
+  await ui.settle()
+  const drawer = title => ui.nodes().find(node => node.type?.name === 'DetailDrawer' && node.props.title === title)
+  assert.equal(drawer('Runtime 与存储信息').props.identity, 'basic-instance')
+  assert.equal(drawer('Runtime 与存储信息').props.active, true)
+  assert.match(ui.text(drawer('Runtime 与存储信息')), /挂载配置/)
+  assert.equal(ui.nodes().some(node => node.type === 'details' && node.props.className === 'instance-detail-fold'), false)
+  ui.tab('网站嵌入').props.onClick(); ui.render()
+  assert.equal(drawer('Runtime 与存储信息'), undefined)
+  assert.equal(drawer('网站嵌入使用须知').props.active, true)
+  ui.setActive(false)
+  assert.equal(drawer('网站嵌入使用须知').props.active, false)
+})
+
+
+test('列表长网关地址保持完整值，使用单行入口打开同实例详情核对地址', async () => {
+  const access_url = 'http://gateway.example/hep/instance/' + 'very-long-instance-path-'.repeat(20)
+  const ui = page({ instances: [{ name: 'long-address', agent_id: 'basic-agent', state: 'running', source_id: 'experiment:EXP-basic-001', port: 3084, business_gateway: true, access_url, model_policy: { default: defaultModel } }] })
+  await ui.settle()
+  const address = ui.nodes().find(node => node.type === 'button' && node.props.className === 'instance-access-address')
+  assert.equal(address.props.title, access_url)
+  assert.equal(ui.text(address), access_url)
+  assert.equal(address.props['aria-label'], '查看 long-address 的完整访问地址')
+  address.props.onClick({ currentTarget: {} }); await ui.settle()
+  assert.equal(ui.calls.filter(call => call.endpoint === 'instances/detail').at(-1).payload.name, 'long-address')
+  assert.match(ui.text(), /已登记网关入口/)
+  assert.ok(ui.text().includes(access_url))
+})
+
+test('实例后台刷新保留原列表，入口显示轻量读取指示且不呈现加载段落', async () => {
+  let waiting = false
+  const pending = deferred()
+  const instances = [{ name: 'stable-instance', agent_id: 'basic-agent', state: 'running', source_id: 'experiment:EXP-basic-001', port: 3084 }]
+  const ui = page({ instances, respond(endpoint) { if (endpoint === 'instances/list' && waiting) return pending.promise } })
+  await ui.settle()
+  waiting = true
+  const refreshing = ui.button('刷新列表').props.onClick(); ui.render(); await ui.settle()
+  assert.match(ui.text(), /stable-instance/)
+  assert.match(ui.text(), /共 1 条记录/)
+  const refresh = ui.buttons('刷新列表')[0]
+  assert.equal(refresh.props.disabled, true)
+  assert.ok(ui.nodes(refresh).some(node => node.props?.['aria-label'] === '读取实例列表'))
+  assert.doesNotMatch(ui.text(), /正在读取实例|读取中…/)
+  pending.resolve({ ok: true, value: { instances } }); await refreshing; await ui.settle()
+  assert.equal(ui.buttons('刷新列表')[0].props.disabled, false)
+  assert.equal(ui.nodes(ui.buttons('刷新列表')[0]).some(node => node.props?.['aria-label'] === '读取实例列表'), false)
 })

@@ -121,7 +121,7 @@ await build({
   platform: 'browser',
   target: 'es2022',
   format: 'cjs',
-  loader: { '.svg': 'dataurl' },
+  loader: { '.svg': 'dataurl', '.woff2': 'dataurl' },
   external: ['react', 'react/jsx-runtime', 'react-dom', '@deepseek-ai/dsh-client-ui-primitives'],
   legalComments: 'none',
   plugins: [managerSources],

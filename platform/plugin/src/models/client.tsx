@@ -1,3 +1,4 @@
+import { LoadingIndicator } from '../components/loading-indicator.tsx'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
 import type { ModelCatalog, ModelSelection } from '@deepseek-ai/dsh-api-session-controller'
@@ -267,9 +268,9 @@ export function ModelsSettingsFooter({ rpc, changes }: { rpc: ClientConnectionRp
   return <section className="hep-model-sharing" aria-labelledby="hep-model-sharing-title" aria-busy={loading}>
     <style>{modelSettingsTheme}</style>
     <div className="hep-model-sharing-heading"><div><h3 id="hep-model-sharing-title">模型默认设置</h3><p className="hep-model-sharing-intro">平台助手和业务智能体共享上方 DSH 模型目录。业务实例可使用其中当前已配置且可路由的模型；账号登录模型仅供平台助手。</p></div>
-      <button type="button" disabled={loading} onClick={() => void read().catch(() => {})}>刷新</button></div>
+      <div className="hep-model-sharing-heading-actions">{loading && data && <LoadingIndicator label="刷新模型目录和业务设置" />}<button type="button" disabled={loading} onClick={() => void read().catch(() => {})}>刷新</button></div></div>
     {!online && <p className="hep-model-sharing-status" data-tone="warning" role="status">当前离线。草稿仍保留，连接恢复后刷新再保存。</p>}
-    {loading && !data && <p className="hep-model-sharing-status" role="status">正在读取模型目录和业务设置…</p>}
+    {loading && !data && <LoadingIndicator label="读取模型目录和业务设置" block />}
     {error && <p className="hep-model-sharing-status" data-tone="error" role="alert">读取失败：{error}。{data ? '显示上次成功读取的配置；请刷新后再保存。' : '请刷新重试。'}</p>}
     {data && <>
       {data.catalog.failures.length > 0 && <div className="hep-model-sharing-failures">以下提供方模型目录读取失败，不能新增选择：<ul>{data.catalog.failures.map(item => <li key={item.id}>{item.name}：{item.message}</li>)}</ul></div>}
