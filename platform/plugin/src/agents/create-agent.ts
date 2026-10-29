@@ -7,7 +7,7 @@ import { dirname, join, resolve } from 'node:path'
 import { dump as dumpYaml, load as loadYaml } from 'js-yaml'
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 import { redactRunText } from './run-files.ts'
-import { taskBusinessCasesSchema } from '../assistant/task.ts'
+import { businessCasesSchema } from './business-cases.ts'
 
 const execute = promisify(execFile)
 const CATALOG = 'config/sources.json'
@@ -42,7 +42,7 @@ export async function createAgent(rootPath: string, payload: JsonMap, signal?: A
     const root = resolve(rootPath), agentId = checkedText(payload, 'agent_id', 80)
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(agentId)) throw new CreationError('invalid_request', 'Agent ID 必须是小写 kebab-case')
     const name = checkedText(payload, 'name', 240), description = checkedText(payload, 'description', 4000), role = checkedText(payload, 'role', 60 * 1024)
-    const parsedCases = payload.evaluation_cases === undefined ? undefined : taskBusinessCasesSchema.safeParse(payload.evaluation_cases)
+    const parsedCases = payload.evaluation_cases === undefined ? undefined : businessCasesSchema.safeParse(payload.evaluation_cases)
     if (parsedCases && !parsedCases.success) throw new CreationError('invalid_request', parsedCases.error.issues.map(issue => issue.message).join('；'))
     const businessCases = parsedCases?.data ?? []
     for (const path of ['agents', 'evolution', 'evolution/experiments']) {
@@ -131,6 +131,7 @@ export async function createAgent(rootPath: string, payload: JsonMap, signal?: A
     if (error instanceof CreationError) return { ok: false, error: { code: error.code, message: error.message, details: {} } }
     if (signal?.aborted) return { ok: false, error: { code: 'aborted', message: '新建智能体已取消，未保存资产', details: {} } }
     const failure = error as Error & { stderr?: string }
-    return { ok: false, error: { code: 'creation_failed', message: '智能体创建或来源校验失败，本次新增资产已回滚；请核对 Python 及来源验证依赖', details: { phase, reason: redactRunText(failure.stderr || failure.message || 'unknown').slice(0, 4000) } } }
+    const message = phase === 'validation' ? '智能体资产合同校验失败，本次新增资产已回滚；请根据具体用例或来源错误修正后重试' : '智能体创建失败，本次新增资产已回滚；请根据失败阶段和具体原因排查'
+    return { ok: false, error: { code: 'creation_failed', message, details: { phase, reason: redactRunText(failure.stderr || failure.message || 'unknown').slice(0, 4000) } } }
   } finally { if (temporary) rmSync(temporary, { recursive: true, force: true }) }
 }

@@ -218,7 +218,7 @@ test('四类快捷任务仅凭描述进入对应意图，不预选智能体、�
 
 test('空白快捷任务先查询信息与确认范围，再执行实际操作', async () => {
   const build = homeTaskRequest('build', '')
-  assert.match(build.prompt, /业务智能体的用途/); assert.match(build.prompt, /经确认再创建、评测和交付/)
+  assert.match(build.prompt, /业务智能体的用途/); assert.match(build.prompt, /按已有授权创建、评测和交付/)
   const evaluation = homeTaskRequest('evaluate', '  ')
   assert.match(evaluation.prompt, /查询当前工作区/); assert.match(evaluation.prompt, /智能体、版本、已有测试用例和运行记录/)
   assert.match(evaluation.prompt, /集中询问必要信息/); assert.match(evaluation.prompt, /固定来源版本、测试用例和评判口径/)
@@ -226,8 +226,8 @@ test('空白快捷任务先查询信息与确认范围，再执行实际操作',
   assert.equal(evaluation.context.workflow, 'evaluation')
   const improvement = homeTaskRequest('improve', '')
   assert.match(improvement.prompt, /查询当前工作区/); assert.match(improvement.prompt, /原始证据与评判口径/)
-  assert.match(improvement.prompt, /整体确认/); assert.match(improvement.prompt, /最多 3 轮“分析问题→修改→复测”/); assert.match(improvement.prompt, /达到预算时如实停止/)
-  assert.equal(improvement.context.workflow, 'improvement'); assert.equal(improvement.context.max_repair_rounds, 3)
+  assert.match(improvement.prompt, /明确目标、评测和修改范围后按已有授权改进/); assert.match(improvement.prompt, /依据真实评测结果决定继续或停止/)
+  assert.equal(improvement.context.workflow, 'improvement'); assert.equal(improvement.context.max_repair_rounds, undefined)
   const manage = homeTaskRequest('manage', '')
   assert.match(manage.prompt, /实例与 MCP 工具状态/); assert.match(manage.prompt, /任何写操作须经确认/)
   for (const [label, action, request] of [['构建智能体', '开始构建', build], ['评测效果', '开始评测', evaluation], ['改进能力', '开始改进', improvement], ['管理实例与工具', '开始管理', manage]]) {

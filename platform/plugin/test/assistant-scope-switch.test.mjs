@@ -137,14 +137,12 @@ test('真实HTTP管理会话使用原生工具，专用切换与可信Skill可�
   const execute = (name, args = {}, target = agent) => ctx.tools.execute({ name, arguments: args, callId: `scope-call-${++sequence}`, agent: target, signal: new AbortController().signal })
   const assertManagement = async () => {
     const names = await schemas()
-    for (const name of ['platform_agents', 'platform_instances', 'platform_mcp', 'platform_task', 'skill', 'bash', 'read', 'write']) assert.ok(names.includes(name), `${name} 应可用`)
+    for (const name of ['platform_agents', 'platform_instances', 'platform_mcp', 'skill', 'bash', 'read', 'write']) assert.ok(names.includes(name), `${name} 应可用`)
   }
   const assertCompute = async () => {
-    assert.deepEqual(await schemas(), ['platform_agents', 'platform_task', 'skill'])
+    assert.deepEqual(await schemas(), ['platform_agents', 'skill'])
     assert.equal((await execute('skill', { name: 'compute-variant-research' })).isError, false)
     assert.equal((await execute('skill', { name: 'task-builder' })).isError, true)
-    const status = await execute('platform_task', { action: 'status', input: {} })
-    assert.equal(status.isError, false, JSON.stringify(status))
     for (const tool of ['platform_instances', 'platform_mcp', 'bash', 'read', 'write', 'spawn_agent']) assert.equal((await execute(tool)).isError, true)
   }
   await assertCompute()

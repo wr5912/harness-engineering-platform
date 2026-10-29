@@ -189,7 +189,7 @@ test('浮窗分别显示当前 A 与固定任务 B 的名称、重复版本和�
     { id: fixed, agent_id: 'agent-b', change: { variant_name: '远程维修' } },
   ] }
   const calls = []
-  const props = { assistant: { subscribe() {}, getSnapshot: () => ({ busy: false, status: { execution: { plan: { agent_id: 'agent-b', source: `experiment:${fixed}` } } } }), restore() {}, updateContext() {}, reveal() {} }, theme: themeStore(),
+  const props = { assistant: { subscribe() {}, getSnapshot: () => ({ busy: false, status: { task_context: { agent_id: 'agent-b', source_id: `experiment:${fixed}` } } }), restore() {}, updateContext() {}, reveal() {} }, theme: themeStore(),
     catalog: { subscribe() {}, getSnapshot: () => ({ inventory: { root: '/fixture-assets' } }) },
     updates: { subscribe() { return () => {} }, getSnapshot: () => ({ domains: [] }) },
     rpc: { async call(_channel, operation) { calls.push(operation); return { ok: true, value: operation === 'agents/list' ? rows : { username: 'operator' } } } },

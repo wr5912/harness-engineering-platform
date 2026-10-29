@@ -64,8 +64,10 @@ class BusinessStartupTest(unittest.TestCase):
                 dev.prepare_up(self.args(**changes))
         home = self.state / "business-test/dsh-home"
         home.mkdir(parents=True); (home / "old-session").write_text("preserve")
-        with self.helper(), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+        with self.helper(), mock.patch.object(dev, "read_model_policy", return_value={"source": "platform", "default": None}), \
+             contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
             dev.prepare_up(self.args())
+        self.assertIn("只有无需认证的开发调试实例可以复用保留的 HOME", error.getvalue())
         self.assertEqual((home / "old-session").read_text(), "preserve")
 
     def test_existing_registration_cannot_switch_business_boundary(self):
@@ -74,6 +76,56 @@ class BusinessStartupTest(unittest.TestCase):
             with mock.patch.object(dev, "existing_instance", return_value=(self.state, manifest)), \
                  mock.patch.object(dev, "validate_existing_identity"), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 dev.prepare_up(self.args(business_control=new_file))
+
+    def test_retained_home_only_reused_for_anonymous_development_without_writes(self):
+        home = self.state / "business-test/dsh-home"
+        home.mkdir(parents=True)
+        session = home / "old-session"
+        session.write_text("preserve")
+        for development, access_mode in [(True, "anonymous"), (True, "authenticated"), (False, "anonymous"), (False, "authenticated")]:
+            launch = {"assetRoot": str(self.root), "sourceDigest": "sha256:fixed", "development": development, "accessMode": access_mode}
+            with self.subTest(development=development, access_mode=access_mode), \
+                 mock.patch.object(dev, "business_helper", return_value=launch), \
+                 mock.patch.object(dev, "read_model_policy", return_value={"source": "platform", "default": None}):
+                if development and access_mode == "anonymous":
+                    contract, current = dev.prepare_up(self.args())
+                    self.assertIsNone(current)
+                    self.assertTrue(contract["business_control"]["runtime_generation"])
+                else:
+                    with contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
+                        dev.prepare_up(self.args())
+                    self.assertIn("只有无需认证的开发调试实例可以复用保留的 HOME", error.getvalue())
+            self.assertEqual(session.read_text(), "preserve")
+            self.assertEqual(list(home.parent.iterdir()), [home])
+        home.rename(self.root / "original-home")
+        home.symlink_to(self.root / "original-home", target_is_directory=True)
+        with mock.patch.object(dev, "business_helper", return_value={**launch, "development": True, "accessMode": "anonymous"}), \
+             mock.patch.object(dev, "read_model_policy", return_value={"source": "platform", "default": None}), \
+             contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
+            dev.prepare_up(self.args())
+        self.assertIn("只有无需认证的开发调试实例可以复用保留的 HOME", error.getvalue())
+
+    def test_creation_policy_validates_retained_home_before_gateway_registration(self):
+        home = self.state / "business-test/dsh-home"
+        home.mkdir(parents=True)
+        (home / "session").write_text("preserve")
+        for identity, access in [("development", "anonymous"), ("development", "authenticated"), ("published", "anonymous")]:
+            with self.subTest(identity=identity, access=access), self.helper(), \
+                 mock.patch.object(dev, "read_model_policy", return_value={"source": "platform", "default": None}):
+                args = self.args(business_access_mode=access, business_identity_mode=identity)
+                if identity == "development" and access == "anonymous":
+                    dev.prepare_up(args)
+                else:
+                    with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                        dev.prepare_up(args)
+        self.assertEqual((home / "session").read_text(), "preserve")
+        for changes in ({"business_control": None, "business_access_mode": "anonymous", "business_identity_mode": "development"},
+                        {"business_access_mode": "anonymous"}, {"business_identity_mode": "development"}):
+            with self.subTest(changes=changes), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                dev.prepare_up(self.args(**changes))
+        with mock.patch.object(dev, "existing_instance", return_value=(self.state, {})), \
+             contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            dev.prepare_up(self.args(business_access_mode="anonymous", business_identity_mode="development"))
 
     def test_development_refreshes_source_and_preserves_runtime_generation(self):
         manifest = {"port": 53191, "business_control": {"runtime_generation": "existing", "source_digest": "sha256:old"}}

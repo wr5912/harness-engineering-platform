@@ -9,6 +9,7 @@ import { installRuntime } from './runtime.mts'
 import { dockerAvailable, loadVerifiedImage } from './image.mts'
 import { assertRealWorkspace } from './data.mts'
 import { restoreRepository } from './repository.mts'
+import { prepareDeploymentFirewall } from './firewall.mts'
 
 export interface InstallOptions {
   bundleRoot: string
@@ -171,6 +172,16 @@ export function install(options: InstallOptions): InstallReport {
   }
 
   if (options.start) {
+    if (options.host) {
+      const gatewayPath = join(dataRoot, 'config/business-access.json')
+      const access = existsSync(gatewayPath) ? JSON.parse(readFileSync(gatewayPath, 'utf8')) : undefined
+      try {
+        warnings.push(prepareDeploymentFirewall(options.host, [options.port,
+          ...(access?.enabled === true && access.gateway ? [access.gateway.port] : [])]))
+      } catch (error) {
+        throw new Error(`安装目录已保留；${error instanceof Error ? error.message : '防火墙配置失败'}`)
+      }
+    }
     const args = options.host ? ['--host', options.host, '--port', String(options.port)] : []
     const started = spawnSync(join(prefix, 'platform', 'dsh-platform'), ['start', ...args], { cwd: prefix, env, stdio: 'inherit' })
     if (started.status !== 0) throw new Error(`平台启动失败（退出码 ${started.status}）；安装目录已保留，可重试 ${prefix}/platform/dsh-platform start`)

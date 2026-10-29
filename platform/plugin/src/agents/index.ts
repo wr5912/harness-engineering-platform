@@ -37,7 +37,6 @@ import { programRoot, workspaceConfigPath, workspaceLocalPath } from '../workspa
 import { discoverTaskCapabilities, type CapabilityOptions } from '../tasks/capabilities.ts'
 import { candidateFiles, dataPath, sourceInfo } from '../tasks/files.ts'
 import { previewTaskAssembly, applyTaskAssembly, type TaskAssemblyInput } from '../tasks/assembly.ts'
-import { verifyTaskDelivery, type TaskDeliveryInput } from '../tasks/delivery.ts'
 import { containsLiteralLlmKey } from '../tasks/llm-key.ts'
 import { createInstancesHandler } from '../instances/index.ts'
 import { inspectLegacy, readResearchReference, validateResearch } from './research.ts'
@@ -1655,11 +1654,6 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
           if (body.confirmed !== true) throw new RpcError('confirmation_required', '请先确认资产装配方案')
           return ok(await applyTaskAssembly(root, body as unknown as TaskAssemblyInput))
         }
-        case 'tasks/delivery': return ok(await verifyTaskDelivery(root, body as unknown as TaskDeliveryInput, signal, { instanceUrl: async () => {
-          const entry = await createInstancesHandler(root)('url', { name: body.instance_name }, signal, peer)
-          if (!entry.ok) throw new RpcError(entry.error.code, entry.error.message)
-          return (entry.value as { url: string }).url
-        } }))
         case 'list': return list(root)
         case 'description': return agentDescription(root, body)
         case 'detail': return await detail(root, body, signal)

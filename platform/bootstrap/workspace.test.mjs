@@ -13,6 +13,19 @@ function fixture(t) {
   return { directory, root: join(directory, 'user data'), account: { username: 'basic-user', password: 'fixture-private-password' } }
 }
 
+test('省略账号时使用约定默认值，显式无效账号仍拒绝，已有账号不覆盖', async t => {
+  const f = fixture(t)
+  await assert.rejects(() => initializeWorkspace({ action: 'new', root: f.root, account: { username: '', password: '' } }), /有效的首次登录账号/)
+  assert.equal(existsSync(f.root), false)
+  await initializeWorkspace({ action: 'new', root: f.root })
+  const file = join(f.root, '.local/credentials/admin.json')
+  assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), { username: 'admin', password: 'admin123' })
+  assert.equal(statSync(file).mode & 0o777, 0o600)
+  writeFileSync(file, JSON.stringify(f.account))
+  await initializeWorkspace({ action: 'existing', root: f.root })
+  assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), f.account)
+})
+
 test('新工作区预览无写入，初始化保持空业务并可复用账号，非空目录禁止覆盖', async t => {
   const f = fixture(t)
   const request = { action: 'new', root: f.root, account: f.account }

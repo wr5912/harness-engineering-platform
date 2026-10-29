@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path'
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import test from 'node:test'
-import { assistantConfiguration, managementSkill, managementSkills, taskBusinessSkill } from '../src/assistant/business-assets.ts'
+import { assistantConfiguration, managementSkill, managementSkills } from '../src/assistant/business-assets.ts'
 
 const require = createRequire(import.meta.url)
 const sdkRequire = createRequire(require.resolve('@deepseek-ai/dsh-api-session-controller'))
@@ -90,19 +90,4 @@ test('Candidate技能软链接不能替代管理技能，即使仍位于同一�
   f.provider.observeHostMutation(path)
   await assert.rejects(() => managementSkill(f.root, f.ctx.skills, 'user-facing-output'), /不在当前数据工作区/)
   assert.equal((await assistantConfiguration(f.root, f.ctx.skills)).core_ready, false)
-})
-
-
-test('构建任务允许声明扩展的真实技能，拒绝未声明和Candidate来源，核心技能不接受扩展替代', async t => {
-  const f = fixture(t)
-  writeFileSync(join(f.root, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: 'workspace-test', extensions: [{ id: 'business', path: 'extensions/business' }] }))
-  const path = join(f.root, 'extensions/business/skills/business-tool/SKILL.md')
-  mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, '业务扩展技能')
-  const registry = { async get(name) { return { name, path, content: '业务扩展技能' } } }
-  assert.equal((await taskBusinessSkill(f.root, registry, 'business-tool')).path, path)
-  await assert.rejects(() => taskBusinessSkill(f.root, registry, 'workspace-management'), /当前数据工作区装载/)
-  writeFileSync(join(f.root, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: 'workspace-test', extensions: [] }))
-  await assert.rejects(() => taskBusinessSkill(f.root, registry, 'business-tool'), /未声明|已声明/)
-  writeFileSync(join(f.root, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: 'workspace-test', extensions: [{ id: 'business', path: 'evolution/experiments/x/candidate' }] }))
-  await assert.rejects(() => taskBusinessSkill(f.root, registry, 'business-tool'), /已声明/)
 })

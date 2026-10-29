@@ -16,7 +16,7 @@ body .harness-platform[data-page=conversations],body .harness-platform :is(.harn
 .harness-confirmation-actions .harness-primary{background:#006eff;color:white;border-color:#006eff}
 .harness-assistant-proposals-dock .harness-assistant-proposals{max-height:clamp(180px,calc(100dvh - var(--harness-conversation-top,160px) - 190px),520px)}
 .harness-assistant-floating .harness-assistant-proposals{max-height:min(420px,calc(100dvh - 270px))}
-@media(max-width:680px){.harness-assistant-proposals-dock .harness-assistant-proposals{padding:8px}.harness-assistant-proposals .harness-operation-card{margin:6px 0;padding:10px}.harness-assistant-proposals .harness-operation-card header{gap:6px}.harness-confirmation-budget{padding:6px 8px;background:#edf5ff;border-radius:6px}.harness-confirmation-actions{padding-top:8px}}
+@media(max-width:680px){.harness-assistant-proposals-dock .harness-assistant-proposals{padding:8px}.harness-assistant-proposals .harness-operation-card{margin:6px 0;padding:10px}.harness-assistant-proposals .harness-operation-card header{gap:6px}.harness-confirmation-actions{padding-top:8px}}
 .harness-platform button.harness-assistant-toggle{position:relative;z-index:1;display:grid;place-items:center;flex-shrink:0;width:38px;height:38px;min-height:38px;padding:0;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--hep-brand)}
 .harness-assistant-toggle .harness-assistant-icon{display:block;width:28px;height:28px;pointer-events:none}
 .harness-platform button.harness-assistant-toggle:hover:enabled{border-color:var(--hep-border);background:var(--hep-surface-muted);color:var(--hep-link)}
@@ -42,8 +42,9 @@ body .harness-platform[data-page=conversations],body .harness-platform :is(.harn
 .harness-assistant-empty p{color:#728299}
 .harness-assistant-scope{margin:0;padding:8px 14px;border-bottom:1px solid #e3ebf5;color:#71829b;font-size:12px}
 .harness-assistant-error{margin:0;padding:8px 14px;border-bottom:1px solid #f2dddd;background:#fff8f8;font-size:12px}
-.harness-assistant-proposals-dock{box-sizing:border-box;width:100%;min-width:0;flex:none;padding-inline:calc(var(--dsh-composer-side-clearance) + 16px)}
-.harness-assistant-proposals{box-sizing:border-box;width:100%;min-width:0;max-width:var(--dsh-chat-content-width);margin:0 auto;font-size:12px;max-height:260px;overflow:auto;border:1px solid #d9e6f6;border-radius:9px;background:#f8fbff;padding:8px 10px}
+.harness-assistant-proposals-dock{box-sizing:border-box;display:flex;flex-direction:column;align-items:center;width:100%;min-width:0;flex:none;padding-inline:calc(var(--dsh-composer-side-clearance) + 16px)}
+.harness-assistant-proposals-dock>*{box-sizing:border-box;width:100%;min-width:0;max-width:var(--dsh-chat-content-width)}
+.harness-assistant-proposals{margin:0;font-size:12px;max-height:260px;overflow:auto;border:1px solid #d9e6f6;border-radius:9px;background:#f8fbff;padding:8px 10px}
 .harness-assistant-proposals>summary{cursor:pointer;color:#345071}
 .harness-operation-card button{padding:8px 12px;border:1px solid #dce6f2;border-radius:7px;cursor:pointer}
 .harness-operation-card{padding:14px;margin:8px 0;border:1px solid #d9e6f6;border-radius:9px;background:#f8fbff;font-size:13px;overflow-wrap:anywhere}
@@ -100,15 +101,8 @@ body .harness-platform[data-page=conversations],body .harness-platform :is(.harn
 .harness-assistant-floating .harness-operation-card button{background:var(--hep-surface);border-color:var(--hep-border);color:var(--hep-text)}
 .harness-assistant-floating .harness-operation-inline summary{color:var(--hep-link)}
 .harness-assistant-floating .harness-operation-inline [role=alert]{color:var(--hep-danger)}
-.harness-assistant-floating .harness-confirmation-actions,.harness-assistant-floating .harness-confirmation-budget{background:var(--hep-surface-muted)}
+.harness-assistant-floating .harness-confirmation-actions{background:var(--hep-surface-muted)}
 .harness-assistant-floating .harness-assistant-proposals-dock{max-height:min(40dvh,320px);overflow-y:auto}
-.harness-task-card-compact{margin:0 0 8px}
-.harness-task-card-compact .harness-task-goal{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin:8px 0}
-.harness-task-card-compact .harness-task-phase{font-weight:500;color:var(--hep-text);margin:8px 0}
-.harness-task-actions{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
-.harness-task-card-compact details{margin-top:8px;max-height:200px;overflow-y:auto}
-.harness-task-card-compact details summary{cursor:pointer;color:var(--hep-link)}
-.harness-task-card-compact details small{display:block;color:var(--hep-muted)}
 @media(max-width:1100px){.harness-assistant-floating{inset:0;right:0;bottom:0;max-width:none;width:100vw;height:100dvh;border:0;border-radius:0}.harness-platform button.harness-assistant-launch{display:none}.harness-platform button.harness-assistant-toggle{grid-column:3;grid-row:1;width:44px;height:44px;min-height:44px}.harness-assistant-toggle .harness-assistant-icon{width:34px;height:34px}.harness-platform button.harness-assistant-toggle[aria-expanded=true]{display:none}}
 @media(max-width:580px){.harness-assistant-heading{padding:10px}.harness-assistant-heading strong{font-size:13px}.harness-assistant-context{padding:6px 10px}.harness-assistant-floating .harness-assistant-proposals-dock{max-height:35dvh}}
 .harness-conversation-welcome{display:inline-flex;align-items:center;gap:12px;color:#223550;font-size:24px}

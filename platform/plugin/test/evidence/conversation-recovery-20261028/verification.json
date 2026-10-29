@@ -1,0 +1,102 @@
+{
+  "deployment": {
+    "backup": "/root/harness-engineering-platform-data/.local/backups/delivery-cleanup-20261029T020858Z",
+    "files": 54,
+    "deleted": 9,
+    "hashes_verified": true
+  },
+  "application": {
+    "mechanism": "native_plugin_reload",
+    "result": "applied",
+    "pid_before": 17778,
+    "pid_after": 17778,
+    "restarted": false
+  },
+  "agent_creation": {
+    "illegal_id_rejected_before_write": true,
+    "real_creation_validated": true,
+    "case_ids": [
+      "U-IDENTITY-001",
+      "U-ROLE-001",
+      "U-CHAT-GREET",
+      "U-CHAT-MOOD"
+    ],
+    "fast": [
+      "U-IDENTITY-001",
+      "U-CHAT-GREET",
+      "U-CHAT-MOOD"
+    ],
+    "actual_workspace_unchanged": true
+  },
+  "checks": {
+    "platform_targeted": {
+      "passed": 130,
+      "failed": 0
+    },
+    "runtime_node": {
+      "passed": 14,
+      "failed": 0
+    },
+    "runtime_python": {
+      "passed": 25,
+      "failed": 0
+    },
+    "build": "passed"
+  },
+  "limits": [
+    "Full platform suite was not entirely passing; unrelated baseline and parallel-change failures were retained.",
+    "Creation regression used an isolated temporary data root on the target host.",
+    "Target connectivity was lost after the recorded successful verification; current availability is not confirmed."
+  ],
+  "publication_candidate": {
+    "baseline_commit": "711fa4cd0daf37dfec3593802804b2cdf3462298",
+    "build_and_typecheck": "passed",
+    "deployment_tests": {
+      "passed": 32,
+      "failed": 0
+    },
+    "bootstrap_tests": {
+      "passed": 6,
+      "failed": 0,
+      "skipped": 7
+    },
+    "runtime_node_tests": {
+      "passed": 14,
+      "failed": 0
+    },
+    "runtime_python_tests": {
+      "passed": 12,
+      "failed": 0
+    },
+    "platform_full_suite": {
+      "total": 827,
+      "passed": 785,
+      "failed": 42
+    },
+    "baseline_comparison": {
+      "candidate_failures": 42,
+      "baseline_failures": 42,
+      "new_failures": [],
+      "changed_failure_messages": [],
+      "failed_files": [
+        "test/business-group-v2.test.mjs",
+        "test/business-mcp-enforcement.test.mjs",
+        "test/business-mcp-overlay.test.mjs",
+        "test/compute-build-freeze.test.mjs",
+        "test/compute-variants.test.mjs",
+        "test/inventory.test.mjs",
+        "test/mcp-group-v2.test.mjs",
+        "test/mcp-management-isolation.test.mjs",
+        "test/mcp-store.test.mjs",
+        "test/native-auth.test.mjs",
+        "test/native-composition-cancel.test.mjs",
+        "test/tool-input-recovery.test.mjs"
+      ]
+    },
+    "limits": [
+      "42 项失败在相同依赖环境下的修改前基线均复现，失败名称和首条错误一致；不表述为全量通过",
+      "此次提交前未重新打完整离线包、重装 170 或重跑业务评测",
+      "隔离候选排除并行的版本来源、源码编辑和业务研究改动"
+    ]
+  }
+}

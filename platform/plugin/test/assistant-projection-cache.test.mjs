@@ -11,7 +11,7 @@ const sdkRequire = createRequire(createRequire(import.meta.url).resolve('@deepse
 const { snapshotJsonValue } = await import(sdkRequire.resolve('@deepseek-ai/dsh-util-values'))
 const { createUserMessage } = await import(sdkRequire.resolve('@deepseek-ai/dsh-llm'))
 
-test('管理会话的用户输入、重试清理和任务收尾都可写入原生 JSON 检查点并冷恢复', async t => {
+test('管理会话的用户输入、重试清理和退役任务记录都可写入原生 JSON 检查点并冷恢复', async t => {
   const ctx = new Context()
   new SessionStore(ctx)
   new SessionProjectionRegistry(ctx)
@@ -49,7 +49,8 @@ test('管理会话的用户输入、重试清理和任务收尾都可写入原�
   const execution = { id: 'task-basic', owner_session_id: session.id, state: 'running', plan: { agent_id: 'inspection' } }
   record({ kind: 'execution', owner_session_id: session.id, execution })
   record({ kind: 'execution', owner_session_id: session.id, execution: { ...execution, state: 'completed' } })
-  assert.equal(state().closing_task_id, execution.id)
+  assert.equal(Object.hasOwn(state(), 'execution'), false)
+  assert.equal(Object.hasOwn(state(), 'closing_task_id'), false)
   user()
   assert.equal(Object.hasOwn(state(), 'closing_task_id'), false)
   record({ kind: 'execution', owner_session_id: session.id, execution: { ...execution, state: 'failed' } })

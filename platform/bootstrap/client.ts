@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { defaultAccount } from './workspace.ts'
 
 const harnessIcon = `data:image/svg+xml;base64,${readFileSync(new URL('../plugin/assets/harness-logo.svg', import.meta.url)).toString('base64')}`
 
@@ -199,7 +200,7 @@ export function bootstrapHtml(): string {
 <div class="actions"><button id="preview" type="submit" class="secondary">检查并预览</button><span class="hint">先核对路径与将发生的写入。</span></div></section>
 <section id="plan" class="card" hidden><h2>2. 确认初始化内容</h2><p class="path" id="planned-root"></p><ul id="plan-checks" class="checks"></ul><h3 class="hint">将执行</h3><ul id="changes"></ul><div id="extensions-section" class="subsection" hidden><h3>工作区扩展声明</h3><ul id="extensions"></ul></div><p class="notice">不会自动拉取外部插件或接入第三方服务。扩展缺失时按检查结果另行准备。</p></section>
 <section id="account" class="card"><h2>首次平台登录账号</h2><p class="hint">仅用于这个平台的登录。密码只在确认初始化时发送。</p><div class="account-grid">
-<label class="field"><span>账号</span><input id="username" type="text" autocomplete="username" required></label><label class="field"><span>密码</span><input id="password" type="password" autocomplete="new-password" required></label><label class="field"><span>再次填写密码</span><input id="password-confirm" type="password" autocomplete="new-password" required></label></div></section>
+<label class="field"><span>账号</span><input id="username" type="text" autocomplete="username" value="${defaultAccount.username}" required></label><label class="field"><span>密码</span><input id="password" type="password" autocomplete="new-password" value="${defaultAccount.password}" required></label><label class="field"><span>再次填写密码</span><input id="password-confirm" type="password" autocomplete="new-password" value="${defaultAccount.password}" required></label></div></section>
 <div id="error" class="error" role="alert" hidden></div><div id="progress" class="progress" hidden>正在准备，请勿重复提交。</div>
 <div class="actions"><button id="apply" type="button" class="primary" disabled>确认初始化并进入平台</button><span id="status" class="hint" role="status" aria-live="polite">正在读取状态…</span></div></form>
 <p class="footer">数据工作区独立保存，平台程序可单独更新。初始化完成后自动进入平台登录页面。</p>

@@ -19,7 +19,7 @@ export function computeGenerationContract() {
     },
     variant_name: 'preview/create 独立传 variant_name：1–80 字符的单行名称，只保存在 change.yaml.variant_name，不从 strategy/research_question 截取；生成时保留已有名称。rename 仅改名，携带最近 context/detail 的 change_sha256 作为 expected_change_sha256。',
     execution_mode: '低算力纯代码计划使用 execution_mode: code-only，要求 LangGraph 生成计划，业务主回合、工具背后和辅助处理均为零模型调用；不能同时声明模型变更。缺省保持已有编排方式。',
-    available_tools: ['skill', 'platform_agents', 'platform_task'],
+    available_tools: ['skill', 'platform_agents'],
     sdk: {
       module: '@harness-platform/workflow-runtime',
       exports: ['defineWorkflow', 'runWorkflow', 'registerWorkflowTool', 'registerCodeOnlyWorkflowAgent', 'fixedCompositionToolName', 'Annotation', 'StateGraph', 'START', 'END'],
@@ -42,11 +42,10 @@ export function computeGenerationContract() {
     operations: {
       preview_create: 'compute-variants/preview/create 使用同一 parent_experiment_id、git:<40位提交>、variant_name、strategy、case_ids 和 generation，低算力全链零调用另传 execution_mode: code-only；create 携带实际 preview_sha256 为 expected_preview_sha256，不能猜摘要。',
       edit: 'edit/read 后用 edit/preview、edit/apply 保存完整文件正文 edits[].content 及 expected_sha256；新文件须先取得 exists:false、sha256:null，保存传 expected_sha256:null。Preset 引用 Managed 源码对应的 /opt/dsh-managed/compute-workflow/*.mjs。',
-      task: '当前程序的算力变体专用作用域实际提供 skill、platform_agents、platform_task，支持通过 platform_task 管理生成任务。连续任务用 preview/start，kind=compute-variant、source=experiment:<已派生目标>、compute_variant={parent_experiment_id,parent_ref}，evaluation_case_ids 与冻结计划一致。读取 compute-variant-research；任务授权不代替本地冻结确认。',
       build: '保存后读取当前 candidate_sha256，以 expected_candidate_sha256 调 build-preview；build 保留该摘要和实际预览的 expected_preview_sha256。只做类型检查和固定 ESM 编译，不执行 Candidate，不证明装载。源码、runner、依赖或 ESM 变化后旧构建失效。',
       freeze: 'freeze-preview 返回真实差异与 freeze_input={experiment_id,case_ids,evaluation_base_sha256,expected_preview_sha256}；freeze 完整传回 freeze_input 并单独确认。仅本地冻结约定文件，不推送；两侧 Run 的提交须含同一计划。',
       evidence: '分别核对 context.workflow_status 的 generated/built/frozen/loaded/compared。新 Session 的真实图回执须与当前源码、build_digest、esm_sha256 及固定组合身份一致，且 complete=true、status=completed；构建通过或原子回退不等于装载成功。',
-      delivery: 'platform_task deliver 使用本任务实际启动的 parent_run_ids/variant_run_ids，服务端核对构建、冻结、装载与比较。完成不自动确认 end；human_confirmed 只能由用户在变体页面复核，不能由助手提交或改结论字段。',
+      delivery: '通过 compute-variants/compare 核对实际构建、冻结、装载与所选两侧 Run。human_confirmed 只能由用户在变体页面复核，不能由助手提交或改结论字段。',
     },
   }
 }

@@ -403,38 +403,6 @@ async function runCase(connection, payload, item, workspace, signal, traceState)
 }
 
 /** 交付实例的新业务 Session 使用同一 API 传输、身份检查与轨迹导出；不运行评审模型。 */
-export async function runDeliverySession(payload, item, signal, archiveCodec) {
-  const connection = await authenticate(payload.auth_url, signal)
-  connection.archiveCodec = archiveCodec
-  const workspace = await createWorkspace(connection, payload.workspace, signal)
-  const session = await createSession(connection, payload, workspace, payload.preset_id, signal, created => saveEvidence(payload.evidence_root, item,
-    { inputs: item.inputs, assistant_texts: [], session_id: created.session_id }, null, { ...created, completed: false, stage: 'delivery-session-created' }), `交付 ${item.case_id}`)
-  let completed, lastArchive, allCompleted = false
-  try {
-    for (let index = 0; index < item.inputs.length; index++) {
-      completed = await promptSession(connection, session.session_id, item.inputs[index], item.inputs.slice(0, index + 1), payload.timeout_ms, signal, archive => { lastArchive = archive })
-    }
-    allCompleted = completed?.turns.length === item.inputs.length && completed.turns.every(turn => turn.turn_reason === 'completed')
-  } finally {
-    if (!allCompleted) try { await rpc(connection, 'session/cancel', { request: { sessionId: session.session_id } }, AbortSignal.timeout(5000)) } catch { /* 采集失败不覆盖原始证据，交付检查仍按失败处理。 */ }
-    let turns = completed?.turns ?? []
-    if (lastArchive) try { turns = turnsFromTrace(lastArchive, item.inputs) ?? turns } catch { /* 身份或轮次失配保留原始轨迹，不阻断实际取消和失败记录。 */ }
-    await saveEvidence(payload.evidence_root, item, { inputs: item.inputs, assistant_texts: turns.map(turn => turn.assistant_text), session_id: session.session_id }, lastArchive ?? null,
-      { ...session, completed: allCompleted, root_session_log: lastArchive?.rootName ?? null })
-  }
-  const { archive, turns } = completed
-  const checks = { ...session, completed: turns.every(turn => turn.turn_reason === 'completed'), root_session_log: archive.rootName }
-  await saveEvidence(payload.evidence_root, item, { inputs: item.inputs, assistant_texts: turns.map(turn => turn.assistant_text), session_id: session.session_id }, archive, checks)
-  return { checks, session_id: session.session_id, trace: archive.trace,
-    async download(relative) {
-      const url = new URL(relative, connection.baseUrl)
-      if (url.origin !== connection.baseUrl.origin || !url.pathname.startsWith(connection.baseUrl.pathname + 'api/')) throw new Error('delivery-artifact-origin-mismatch')
-      const response = await fetch(url, { headers: { cookie: connection.cookie }, signal })
-      if (!response.ok) throw new Error('delivery-artifact-download-failed')
-      return new Uint8Array(await response.arrayBuffer())
-    } }
-}
-
 async function main() {
   const payload = await readInput()
   const connection = await authenticate(payload.auth_url)

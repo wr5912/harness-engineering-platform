@@ -1,4 +1,4 @@
-import { useContext, useState, useSyncExternalStore } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
@@ -6,10 +6,7 @@ import type { ConversationViewsProps } from '@deepseek-ai/dsh-client-ui-conversa
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
 import type { PropsRenderFactories, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { CHANNEL } from '../protocol.ts'
-import type { TaskExecution } from './task.ts'
-import { instanceWebUrl } from '../instances/url.ts'
 import { operationSummary, type OperationMeta } from './operation-summary.ts'
-import { FloatingAssistantPresentation } from './presentation.ts'
 
 type SessionId = Parameters<Context['sessions']['binding']>[0]
 type SessionReference = ReturnType<Context['sessions']['retain']>
@@ -31,7 +28,7 @@ interface AssistantSnapshot {
   busy: boolean
   error: string
   statusError?: string
-  status?: { running?: boolean; execution?: TaskExecution; proposals?: { id: string; state: OperationMeta['state']; domain: string; action: string; input?: Record<string, any>; preview?: unknown; result?: unknown; error?: string; continuation?: string }[] }
+  status?: { task_context?: Record<string, any>; running?: boolean; proposals?: { id: string; state: OperationMeta['state']; domain: string; action: string; input?: Record<string, any>; preview?: unknown; result?: unknown; error?: string; continuation?: string }[] }
 }
 
 /** 浏览器只保留当前会话引用，任务与业务结果由原生 Session 和后端维护。 */
@@ -206,7 +203,7 @@ export function AssistantConversation({ useSession, useConversation, renderFacto
   return renderFactorySlot('conversation.content', { variant: 'embedded', phase: hero ? 'hero' : 'active', hero }, { slots: { views: ChatView } })
 }
 
-const domainLabels: Record<string, string> = { agents: '智能体与评测', instances: '实例', mcp: 'MCP', task: '智能体交付任务' }
+const domainLabels: Record<string, string> = { agents: '智能体与评测', instances: '实例', mcp: 'MCP' }
 const labels: Record<string, string> = {
   agent_id: '智能体', experiment_id: '版本', baseline: '主父版', sources: '关联来源', features: '特性',
   action: '操作', operation: '操作', name: '名称', instance: '实例', instance_name: '实例', source: '来源',
@@ -218,7 +215,7 @@ const labels: Record<string, string> = {
 }
 const internalFields = new Set(['preview_id', 'proposal_id', 'assistant_session_id', 'catalog_hash', 'plan_ready', 'requires_confirmation', 'evaluation_sha256', 'candidate_sha256', 'source_sha256'])
 const technicalFields = new Set(['command', 'argv', 'cwd', 'stdout', 'stderr', 'logs', 'trace'])
-const actionLabels: Record<string, string> = { start: '开始交付任务', create: '从固定父版派生', 'tasks/assembly-apply': '装配复用能力', saveConfiguration: '保存 MCP 配置', callPublishedComposition: '执行固定版本工具组合', 'fusion/confirm': '新建融合版本', 'features/apply': '保存版本特性', 'datasets/apply': '保存待复核决策样本', 'cases/create': '新增测试用例', new: '新建智能体', 'edit/apply': '保存资产修改', 'eval/start': '执行评测', 'eval/cancel': '取消评测', run: '实例操作', batch: '批量实例操作' }
+const actionLabels: Record<string, string> = { create: '从固定父版派生', 'tasks/assembly-apply': '装配复用能力', saveConfiguration: '保存 MCP 配置', callPublishedComposition: '执行固定版本工具组合', 'fusion/confirm': '新建融合版本', 'features/apply': '保存版本特性', 'datasets/apply': '保存待复核决策样本', 'cases/create': '新增测试用例', new: '新建智能体', 'edit/apply': '保存资产修改', 'eval/start': '执行评测', 'eval/cancel': '取消评测', run: '实例操作', batch: '批量实例操作' }
 
 function unwrap(value: unknown): unknown {
   if (value && typeof value === 'object' && 'ok' in value && 'value' in value && value.ok === true) return value.value
@@ -249,8 +246,6 @@ function targetVersionLabel(value: unknown, data: any, input: Record<string, any
 }
 function confirmationAction(meta: OperationMeta) {
   const value = unwrap(meta.preview) as any
-  if (meta.domain === 'task' && meta.action === 'start' && value?.plan?.kind === 'compute-variant') return '开始生成并比较代码变体'
-  if (meta.domain === 'task' && meta.action === 'start') return value?.plan?.new_agent || value?.plan?.allowed_actions?.some((item: any) => ['new', 'create', 'edit/apply', 'tasks/assembly-apply'].includes(item.action)) ? '开始构建并验证' : '开始验证并交付'
   if (meta.action === 'datasets/apply') return `保存 ${value?.count ?? value?.records?.length ?? ''} 条样本`
   if (meta.domain === 'instances' && meta.action === 'run') return ({ create: '创建实例', start: '启动实例', stop: '停止实例', restart: '重启实例', delete: '删除实例' } as Record<string, string>)[meta.input?.operation ?? value?.operation ?? value?.input?.operation] ?? '执行实例操作'
   return ({ 'features/apply': '保存特性', 'decision/update': '保存研究结论', saveConfiguration: '保存 MCP 配置', 'fusion/confirm': '创建融合版本', create: '创建研究版本', new: '创建智能体', 'edit/apply': '保存修改', 'eval/start': '开始评测', callPublishedComposition: '执行工具组合', callTool: '调用工具', publishComposition: '发布工具组合', saveCompositionDraft: '保存组合草稿', 'cases/update': '保存测试用例', 'cases/create': '保存测试用例', 'compute-variants/create': '创建算力变体', 'compute-variants/build': '构建代码变体', 'compute-variants/freeze': '确认冻结本次数据差异' } as Record<string, string>)[meta.action] ?? actionLabels[meta.action] ?? '执行此操作'
@@ -262,21 +257,7 @@ function BusinessPreview({ value, meta }: { value: unknown; meta: OperationMeta 
   const input = meta.input ?? data?.input ?? {}
   const plan = data?.plan
   let summary: any
-  if (plan?.goal && Array.isArray(plan.evaluation_case_ids)) {
-    const parent = plan.source ? versionLabel(plan.source) : undefined
-    const name = data.agent_name ?? plan.agent_id
-    const declarations = [...(plan.artifact_paths ?? []), ...(plan.deliverables ?? [])].join('\n')
-    const products = [...(/markdown|\.md\b/i.test(declarations) ? ['Markdown 报告'] : []), ...(/\bcsv\b/i.test(declarations) ? ['设备 CSV'] : []), ...(plan.instance_name ? ['可访问的智能体实例'] : [])]
-    const lead = String(plan.goal).split(/[。；\n：]/)[0]
-    summary = <>
-      <p><strong>{lead}</strong></p>
-      <p>{plan.kind === 'compute-variant' ? `为“${name}”的${parent}生成实际工作流代码，并与固定父版比较` : plan.new_agent ? `新建“${plan.new_agent.name}”` : plan.allowed_actions.some((item: any) => item.action === 'create') ? `为“${name}”从${parent}派生新版本` : `${plan.allowed_actions.some((item: any) => ['edit/apply', 'tasks/assembly-apply'].includes(item.action)) ? '改进' : '验证'}“${name}”的${parent}`}，执行 {plan.evaluation_case_ids.length} 项测试。</p>
-      <p><strong>交付：</strong>{products.length ? products.join('、') : plan.deliverables.join('、')}。</p>
-      <p className="harness-confirmation-budget"><strong>上限：</strong>{plan.budget.timeout_minutes} 分钟、初测后最多修复 {plan.budget.max_repair_rounds} 轮、模型调用 {plan.budget.max_model_calls} 次。<small>暂停和重启不重置。助手逐次控制调用额度；外部评测按实际轨迹累计，不能实时硬封顶。</small></p>
-      <small>确认后在本方案内连续办理约定操作，范围详见完整方案。</small>
-      {plan.kind === 'compute-variant' && <p>数据 Git 提交会另行展示具体差异并确认；本任务完成不代表已确认近似等效或 end。</p>}
-    </>
-  } else if (data?.status === 'suggested' && Array.isArray(data.records)) summary = <>
+  if (data?.status === 'suggested' && Array.isArray(data.records)) summary = <>
     <p>将 <strong>{data.count ?? data.records.length} 条决策样本</strong>保存到本次运行的“决策样本”。</p>
     <p>业务范围：{[...new Set(data.records.map((record: any) => record.workflow).filter(Boolean))].join('、') || '当前固定运行中的业务决策'}；共 {data.records.reduce((count: number, record: any) => count + Object.keys(record.questions ?? {}).length, 0)} 道命名决策题。</p>
     <p>标签仍是 AI 建议，保存后待人员逐题复核，再明确训练或评测用途。</p>
@@ -402,77 +383,14 @@ export function PlatformOperationCard(props: ToolCallViewProps & { rpc: ClientCo
 
 /** 原生轨迹默认折叠；待确认操作直接出现在 Composer 上方。 */
 export function AssistantOperations({ assistant, rpc, sessionId }: PropsRuntime<'conversation.input.dock'> & { rpc: ClientConnectionRpc; assistant: Assistant }) {
-  const floating = useContext(FloatingAssistantPresentation)
   const state = useSyncExternalStore(assistant.subscribe, assistant.getSnapshot)
   if (state.sessionId !== sessionId) return null
   const proposals = state.status?.proposals ?? []
   const pending = proposals.filter(item => ['awaiting_confirmation', 'running'].includes(item.state))
-  const execution = state.status?.execution?.state === 'completed' || state.status?.execution?.state === 'cancelled' ? undefined : state.status?.execution
-  if (!pending.length && !execution && !state.statusError) return null
-  return <div className="harness-assistant-proposals-dock">{state.statusError && <p role="alert">{state.statusError} <button type="button" onClick={() => void assistant.refresh()}>重试读取</button></p>}{execution && <TaskCard task={execution} assistant={assistant} rpc={rpc} sessionId={sessionId} compact={floating}/>}{pending.length > 0 && <details className="harness-assistant-proposals" open>
+  if (!pending.length && !state.statusError) return null
+  return <div className="harness-assistant-proposals-dock">{state.statusError && <p role="alert">{state.statusError} <button type="button" onClick={() => void assistant.refresh()}>重试读取</button></p>}{pending.length > 0 && <details className="harness-assistant-proposals" open>
     <summary>{pending.some(item => item.state === 'awaiting_confirmation') ? '待处理的历史操作' : '平台操作进度'}</summary>
     <div>{pending.map(proposal => <OperationCard key={proposal.id} assistant={assistant} rpc={rpc} sessionId={sessionId}
       origin="dock" phase="result" toolName={`platform_${proposal.domain}`} meta={{ ...proposal, kind: 'platform-operation', proposal_id: proposal.id }}/>)}</div>
   </details>}</div>
-}
-
-function TaskCard({ task, assistant, rpc, sessionId, compact = false }: { task: TaskExecution; assistant: Assistant; rpc: ClientConnectionRpc; sessionId: SessionId; compact?: boolean }) {
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const statuses = { running: '正在执行', paused: '已暂停', cancelled: '已取消', budget_exhausted: '额度已用尽', unknown: '需要核对操作状态', completed: '已验证并交付' }
-  const act = async (action: string) => {
-    setBusy(true); setError('')
-    try {
-      const response = await rpc.call(CHANNEL, `assistant/task/${action}`, { session_id: sessionId })
-      if (!response.ok) throw new Error(response.error.message)
-    } catch (failure) { setError(failure instanceof Error ? failure.message : '任务操作失败') }
-    finally {
-      try { await assistant.refresh() } catch (failure) { setError(previous => previous || (failure instanceof Error ? failure.message : '无法刷新任务状态')) }
-      setBusy(false)
-    }
-  }
-  if (compact) {
-    const currentOperation = [...task.operations].reverse().find(item => item.state === 'running' || item.state === 'unknown')
-    const phase = currentOperation ? ({ 'eval/start': '运行评测', 'instances/run': '操作实例', 'edit/apply': '修改资产', 'tasks/assembly-apply': '应用资产' } as Record<string, string>)[currentOperation.action] ?? '核对当前操作'
-      : task.state === 'completed' ? '交付结果' : task.state === 'paused' ? '等待显式恢复' : task.state === 'unknown' ? '操作待核对' : '查看任务进展'
-    return <section className="harness-operation-card harness-task-card-compact" aria-label="智能体交付任务">
-      <header><strong>{task.plan.kind === 'compute-variant' && task.state === 'completed' ? '生成与比较已完成' : statuses[task.state]}</strong><span>{task.plan.new_agent?.name ?? task.plan.agent_id}</span></header>
-      <p className="harness-task-goal">{task.plan.goal}</p>
-      <p className="harness-task-phase">{phase}{task.reason ? ` · ${task.reason}` : ''}</p>
-      {task.delivery && <><p>{task.plan.kind === 'compute-variant' ? '已生成比较证据，请查看并复核结果。' : '已记录业务测试、实例和产物核验。'}</p>
-        {task.delivery.entry && <a href={instanceWebUrl(task.delivery.entry, window.location.hostname)} target="_blank" rel="noreferrer">打开智能体</a>}
-        {(task.delivery.artifacts ?? []).map((artifact: any) => <p key={artifact.path}><a href={(() => { const url = new URL('api/harness-platform/runs/download', document.baseURI); url.searchParams.set('run_id', task.delivery.run_id); url.searchParams.set('kind', 'file'); url.searchParams.set('path', artifact.run_path); return url.href })()} download>下载 {artifact.run_path?.split('/').at(-1) ?? '业务产物'}</a></p>)}
-        {(task.delivery.probe?.downloads ?? []).map((artifact: any) => <p key={artifact.format}><a href={instanceWebUrl({ ...task.delivery.entry, url: artifact.url }, window.location.hostname)} target="_blank" rel="noreferrer" download>{artifact.format === 'csv' ? '下载设备 CSV' : '下载 Markdown'}</a></p>)}
-      </>}
-      <div className="harness-task-actions">
-        {task.operations.some(item => ['running', 'unknown'].includes(item.state)) && <button disabled={busy} onClick={() => void act('checkpoint')}>核对运行状态</button>}
-        {task.state === 'running' && <button disabled={busy} onClick={() => void act('pause')}>暂停任务</button>}
-        {task.state === 'paused' && <button disabled={busy} onClick={() => void act('resume')}>恢复任务</button>}
-        {task.source_ref && task.operations.some(item => ['edit/apply', 'tasks/assembly-apply'].includes(item.action) && item.state === 'completed') && task.state !== 'completed' && <button disabled={busy} onClick={() => void act('rollback')}>恢复本任务资产修改</button>}
-        {!['completed', 'cancelled'].includes(task.state) && <button disabled={busy} onClick={() => void act('cancel')}>取消任务</button>}
-      </div>
-      <details><summary>查看完整计划、预算与核验依据</summary><p>{task.plan.goal}</p><p>修复 {task.repair_rounds}/{task.plan.budget.max_repair_rounds} 轮 · 已观测模型调用 {task.model_calls}/{task.plan.budget.max_model_calls} 次 · 截止 {new Date(task.deadline_at).toLocaleTimeString()}</p>
-        <small>含助手 {task.assistant_model_calls ?? task.model_calls} 次，业务、评审与重试按实际轨迹累计；在途或缺失统计不按零计。外部容器调用不能实时硬封顶。</small>
-        {task.delivery && <Details value={task.delivery}/>}</details>
-      {error && <p role="alert">{error}</p>}
-    </section>
-  }
-  return <section className="harness-operation-card" aria-label="智能体交付任务">
-    <header><strong>{task.plan.kind === 'compute-variant' && task.state === 'completed' ? '生成与比较已完成' : statuses[task.state]}</strong><span>{task.plan.new_agent?.name ?? task.plan.agent_id}</span></header>
-    <p>{task.plan.goal}</p>
-    <p>修复 {task.repair_rounds}/{task.plan.budget.max_repair_rounds} 轮 · 已观测模型调用 {task.model_calls}/{task.plan.budget.max_model_calls} 次 · 截止 {new Date(task.deadline_at).toLocaleTimeString()}</p>
-    <small>含助手 {task.assistant_model_calls ?? task.model_calls} 次，业务、评审与重试按实际轨迹累计；在途或缺失统计不按零计。外部容器调用不能实时硬封顶。</small>
-    {task.reason && <p role="status">{task.reason}</p>}
-    {task.operations.some(item => ['running', 'unknown'].includes(item.state)) && <button disabled={busy} onClick={() => void act('checkpoint')}>核对运行状态</button>}
-    {task.state === 'running' && <button disabled={busy} onClick={() => void act('pause')}>暂停任务</button>}
-    {task.state === 'paused' && <button disabled={busy} onClick={() => void act('resume')}>恢复任务</button>}
-    {task.source_ref && task.operations.some(item => ['edit/apply', 'tasks/assembly-apply'].includes(item.action) && item.state === 'completed') && task.state !== 'completed' && <button disabled={busy} onClick={() => void act('rollback')}>恢复本任务资产修改</button>}
-    {!['completed', 'cancelled'].includes(task.state) && <button disabled={busy} onClick={() => void act('cancel')}>取消任务</button>}
-    {task.delivery && <><p>{task.plan.kind === 'compute-variant' ? '已核对本任务生成、装载和比较证据；具体效果与资源结果请查看比较，end 仍需用户复核。' : '业务测试、目标实例及产物已核验。'}</p>
-      {task.delivery.entry && <p><a href={instanceWebUrl(task.delivery.entry, window.location.hostname)} target="_blank" rel="noreferrer">打开智能体</a></p>}
-      {(task.delivery.artifacts ?? []).map((artifact: any) => <p key={artifact.path}><a href={(() => { const url = new URL('api/harness-platform/runs/download', document.baseURI); url.searchParams.set('run_id', task.delivery.run_id); url.searchParams.set('kind', 'file'); url.searchParams.set('path', artifact.run_path); return url.href })()} download>下载 {artifact.run_path?.split('/').at(-1) ?? '业务产物'}</a></p>)}
-      {(task.delivery.probe?.downloads ?? []).map((artifact: any) => <p key={artifact.format}><a href={instanceWebUrl({ ...task.delivery.entry, url: artifact.url }, window.location.hostname)} target="_blank" rel="noreferrer" download>{artifact.format === 'csv' ? '下载设备 CSV' : '下载 Markdown'}</a></p>)}
-      <details><summary>查看验证结果与限制</summary><Details value={task.delivery}/></details></>}
-    {error && <p role="alert">{error}</p>}
-  </section>
 }

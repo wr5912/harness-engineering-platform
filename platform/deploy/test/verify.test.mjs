@@ -19,3 +19,23 @@ test('无关 HTTP 200 不通过在线工作区核验，也不向它发送登录�
     assert.equal(requests, 0)
   } finally { await new Promise(resolve => server.close(resolve)); rmSync(root, { recursive: true, force: true }) }
 })
+
+test('离线核验检查网关配置与本地密钥，关闭或配置不全不得通过', async t => {
+  const root = mkdtempSync(join(tmpdir(), 'hep-verify-gateway-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const { initializeBusinessGateway } = await import('../../plugin/src/business-control/configuration.ts')
+  const { readFileSync, writeFileSync } = await import('node:fs')
+  const file = join(root, 'config/business-access.json')
+  const check = async () => (await verifyDeployment({ prefix: join(root, 'program'), dataRoot: root })).checks.find(item => item.id === 'business-gateway')
+  assert.equal((await check()).status, 'mismatch')
+  initializeBusinessGateway(root, 'http://127.0.0.1:18120/hep/')
+  assert.equal((await check()).status, 'ok')
+  const access = JSON.parse(readFileSync(file))
+  writeFileSync(file, JSON.stringify({ ...access, enabled: false }))
+  assert.match((await check()).detail, /未启用/)
+  writeFileSync(file, JSON.stringify({ ...access, gateway: { instances: [] } }))
+  assert.match((await check()).detail, /配置不完整/)
+  writeFileSync(file, JSON.stringify(access))
+  writeFileSync(join(root, access.gateway.sharedSecretFile), 'short')
+  assert.match((await check()).detail, /密钥无效/)
+})

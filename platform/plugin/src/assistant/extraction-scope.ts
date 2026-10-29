@@ -1,4 +1,3 @@
-import { taskBusinessSkill, type NativeSkills } from './business-assets.ts'
 import { workspaceIdentity, workspaceOwnsCwd } from '../workspace.ts'
 import { decisionExtractionToolParameters } from '../evaluation/decision-dataset-contract.ts'
 
@@ -54,42 +53,9 @@ function belongsToTask(root: string, agent: any, state: any, skill: string) {
   return workspaceOwnsCwd(root, agent?.session?.header?.cwd) && (!state?.workspace_id || state.workspace_id === workspaceIdentity(root).id) && state?.task_context?.skill === skill
 }
 export const createExtractionScope = () => createTaskScope('decision-sample-extraction', '决策样本任务')
-export const createComputeVariantScope = () => createTaskScope('compute-variant-research', '算力变体研究', new Set([...allowedNames, 'platform_task']))
+export const createComputeVariantScope = () => createTaskScope('compute-variant-research', '算力变体研究')
 
 export const createFeatureScope = () => createTaskScope('agent-maintenance', '特性整理任务')
-export function createTaskBuilderScope(root: string, skills: NativeSkills) {
-  const names = new Set(['skill', 'platform_task', 'platform_agents', 'platform_instances', 'platform_mcp'])
-  const scopes = new Map<any, (() => void)[]>()
-  const release = (agent: any) => { for (const stop of (scopes.get(agent) ?? []).reverse()) stop(); scopes.delete(agent) }
-  return {
-    apply(agent: any) {
-      if (scopes.has(agent)) return
-      const tools = agent.ctx?.tools
-      if (!tools?.restrict || !tools?.guard || !tools?.presentAs) throw new Error('当前 Runtime 缺少平台管理工具作用域')
-      const cleanup: (() => void)[] = []
-      try {
-        cleanup.push(tools.restrict({ allow: [...names] }))
-        cleanup.push(tools.presentAs('native'))
-        const loaded = new WeakMap<object, string>()
-        cleanup.push(agent.ctx.on('tools/pre-execute', async (execution: any, next: any) => {
-          if (execution.name === 'skill') {
-            try {
-              await taskBusinessSkill(root, skills, execution.arguments?.name, agent, execution.signal)
-              loaded.set(execution, execution.arguments.name)
-            } catch { return { kind: 'deny', reason: '平台管理仅能读取当前数据工作区 .agents/skills 及已声明扩展中实际装载的业务技能' } }
-          }
-          return next()
-        }))
-        cleanup.push(tools.guard((execution: any) => names.has(execution.name)
-          && (execution.name !== 'skill' || loaded.get(execution) === execution.arguments?.name)
-          ? undefined : '平台管理仅通过平台工具和已核对来源的管理技能办理；不能绕过任务预算或目标范围'))
-        scopes.set(agent, cleanup)
-      } catch (error) { for (const stop of cleanup.reverse()) stop(); throw error }
-    }, release,
-    dispose() { for (const agent of scopes.keys()) release(agent) },
-  }
-}
-
 /** 专用任务复用 Runtime 工具作用域；动作与写入确认仍由各自平台接口负责。 */
 function createTaskScope(skill: string, label: string, names = allowedNames) {
   const scopes = new Map<any, (() => void)[]>()

@@ -6,7 +6,7 @@ import type { RecentRun } from './dashboard.ts'
 import { CHANNEL } from './protocol.ts'
 import type { PlatformUpdates } from './realtime/client.ts'
 import type { Assistant } from './assistant/client.tsx'
-import type { DeliveryProjection } from './assistant/delivery-history.ts'
+import type { AssistantView } from './assistant/index.ts'
 import type { RiskFact } from './business-control/contracts.ts'
 import { PlatformLogo } from './logo.tsx'
 import { GENERAL_PLACEHOLDER, DEMO_AGENT, DEMO_BUILD_PROMPT, DEMO_CASE, HOME_MODES, HOME_SUBTITLE, homeTaskRequest, type HomeMode } from './home-entry.ts'
@@ -32,7 +32,6 @@ interface EvaluationJob {
 }
 
 const jobStates: Record<string, string> = { queued: '排队中', running: '运行中', recovering: '正在恢复', completed: '已完成，查看结论', failed: '执行失败', cancelled: '已取消', unknown: '状态待核对' }
-const taskStates: Record<string, string> = { running: '上次运行中，继续核对', paused: '待恢复', unknown: '操作待核对', completed: '查看交付结果', cancelled: '已取消', budget_exhausted: '额度已用尽' }
 function riskOverview(phase: 'pending' | 'ready' | 'error', facts: RiskFact[]) {
   if (phase === 'pending') return { value: '—', note: '正在读取风险评估' }
   if (phase === 'error') return { value: '读取失败', note: '进入统一网关重新核对' }
@@ -215,10 +214,10 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
   const sessionTasks = assets ? sessionList.ids.flatMap(id => {
     const row = sessionList.byId[id]
     if (!row || ![assets.root, ...(assets.workspace?.legacyRoots ?? [])].includes(row.cwd ?? '')) return []
-    const projection = row.projectionValues?.harnessPlatformAssistant as DeliveryProjection | undefined
+    const projection = row.projectionValues?.harnessPlatformAssistant as AssistantView | undefined
     if (!projection || projection.session_id !== id || projection.workspace_id !== assets.workspace?.id) return []
-    if (!projection.task && !projection.pending_proposals && !projection.unknown_proposals) return []
-    const priority = projection.pending_proposals ? 0 : projection.unknown_proposals ? 1 : row.running ? 2 : projection.task?.state === 'paused' || projection.task?.state === 'unknown' ? 3 : 4
+    if (!row.running && !projection.pending_proposals && !projection.unknown_proposals) return []
+    const priority = projection.pending_proposals ? 0 : projection.unknown_proposals ? 1 : row.running ? 2 : 3
     return [{ id, row, projection, priority }]
   }).sort((a, b) => a.priority - b.priority || b.row.updatedAt - a.row.updatedAt) : []
   const runStatusLabel = (run: RecentRun) => ({ completed: '执行结束', failed: '执行失败', cancelled: '已取消', running: '运行中', planned: '计划中' } as Record<string, string>)[run.status ?? ''] ?? '执行状态未知'
@@ -286,7 +285,7 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
       if (!(result.value as any).evaluation?.cases?.some((item: any) => item.id === DEMO_CASE)) throw new Error('示例版本缺少完整分页与报告的业务测试，请先在评测中心核对。')
       await enterTask({ prompt: '请体验当前工作区已经绑定的基础资产台账巡检示例：先核对实际来源和 Mock 服务，按约定业务测试读取全部分页，交付本轮实际生成的完整报告及下载。只使用基础模拟台账，不修改设备，也不称为真实设备健康检测；服务不可用时如实说明。',
         context: { page: 'home', skill: 'task-builder', workflow: 'example', entry_intent: 'example', agent_id: DEMO_AGENT, experiment_id: source.experiment_id,
-          source: source.source, evaluation_case_ids: [DEMO_CASE], source_kind: 'basic_mock', max_repair_rounds: 3 } })
+          source: source.source, evaluation_case_ids: [DEMO_CASE], source_kind: 'basic_mock' } })
     } catch (error) { setExampleError(error instanceof Error ? error.message : '无法开始示例。') }
     finally { setSending(false) }
   }
@@ -332,10 +331,10 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
         {continuations.map(entry => {
           if (entry.kind === 'session') {
             const { id, row, projection } = entry.item
-            const status = projection.pending_proposals ? 'waiting' : projection.unknown_proposals ? 'unknown' : projection.task?.state ?? (row.running ? 'running' : 'unknown')
+            const status = projection.pending_proposals ? 'waiting' : projection.unknown_proposals ? 'unknown' : row.running ? 'running' : 'unknown'
             return <article className="harness-continue-item" key={id}>
           <ContinueIcon kind="session" tone={status === 'waiting' || status === 'unknown' ? 'warning' : 'blue'}/>
-          <div className="harness-continue-content"><div className="harness-continue-title"><strong>{row.displayTitle}</strong><span className="harness-run-state" data-status={status}>{projection.pending_proposals ? '待确认' : projection.unknown_proposals ? '操作待核对' : projection.task ? taskStates[projection.task.state] ?? '状态待核对' : row.running ? '运行中' : '待处理'}</span></div><small>管理任务 · {projection.task?.agent_id ?? '待确定对象'} · {new Date(row.updatedAt).toLocaleString()}</small></div>
+          <div className="harness-continue-content"><div className="harness-continue-title"><strong>{row.displayTitle}</strong><span className="harness-run-state" data-status={status}>{projection.pending_proposals ? '待确认' : projection.unknown_proposals ? '操作待核对' : row.running ? '运行中' : '待处理'}</span></div><small>管理任务 · {new Date(row.updatedAt).toLocaleString()}</small></div>
           <button type="button" onClick={() => { void assistant.select(id).then(() => navigate('conversations')).catch(error => setSessionError(error instanceof Error ? error.message : '无法打开原会话')) }}>继续原会话</button>
             </article>
           }

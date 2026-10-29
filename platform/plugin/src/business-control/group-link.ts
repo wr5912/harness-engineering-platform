@@ -1,9 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { workspaceConfigPath } from '../workspace.ts'
+import { initializeBusinessGateway } from './configuration.ts'
 
 /** 管理入口是可编辑来源；浏览器链接、公告与业务 Runtime 共用它。 */
-export function platformEntryUrl(assetRoot: string, startup?: { fallback: string; publicUrl?: string }): string {
+export function platformEntryUrl(assetRoot: string, startup?: { fallback: string; publicUrl?: string; host?: string }): string {
   const path = join(assetRoot, 'config', 'business-access.json')
   const access = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : { schemaVersion: 1, enabled: false, agents: [] }
   const configured = access.gateway?.managementUrl || startup?.publicUrl || startup?.fallback
@@ -18,14 +19,7 @@ export function platformEntryUrl(assetRoot: string, startup?: { fallback: string
   if (startup?.publicUrl && new URL(startup.publicUrl).href !== base.href) {
     throw new Error('DSH publicUrl 与 config/business-access.json 的 gateway.managementUrl 不一致，请统一平台入口')
   }
-  if (startup && !access.gateway?.managementUrl) {
-    access.gateway ??= {}
-    access.gateway.managementUrl = base.href
-    const temporary = `${path}.${process.pid}.tmp`
-    mkdirSync(join(assetRoot, 'config'), { recursive: true })
-    writeFileSync(temporary, `${JSON.stringify(access, null, 2)}\n`, { mode: 0o600 })
-    renameSync(temporary, path)
-  }
+  if (startup) initializeBusinessGateway(assetRoot, base.href, startup.host)
   return base.href
 }
 

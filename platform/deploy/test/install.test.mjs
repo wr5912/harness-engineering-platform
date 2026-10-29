@@ -76,14 +76,47 @@ test('安装 prepare 使用同一环境；失败清理后可以原命令重试',
   assert.equal(install(options(path, prefix)).prepare, 'ok')
 })
 
-test('安装后启动沿用目标主机与平台端口', () => {
+test('安装拒绝 Python 携带 glibc，工具版本失败保留具体命令和原因', () => {
+  const path = bundle('python-libc-bundle')
+  const libc = join(path, 'offline/python/lib/libc.so.6')
+  write(libc, '')
+  assert.throws(() => installRuntime(path, join(root, 'python-libc-program'), join(root, 'python-libc-data')), /使用目标系统 glibc/)
+  rmSync(libc)
+  write(join(path, 'offline/pnpm/bin/pnpm'), '#!/bin/sh\necho incompatible-runtime >&2\nexit 9\n', true)
+  assert.throws(() => installRuntime(path, join(root, 'pnpm-failed-program'), join(root, 'pnpm-failed-data')),
+    /pnpm.*退出码 9.*incompatible-runtime/)
+})
+
+test('安装后启动放行平台和网关端口；防火墙失败保留目录且不启动', () => {
   const path = bundle('start-bundle'), prefix = join(root, 'start-program'), output = join(root, 'start-arguments.json')
-  writeLauncher(path, 'import json, os, sys\nif sys.argv[1] == "start":\n    open(os.environ["HEP_TEST_START_FILE"], "w").write(json.dumps(sys.argv[2:]))\n')
+  writeLauncher(path, 'import json, os, sys\nif sys.argv[1] == "prepare":\n    config = os.path.join(os.environ["HARNESS_ASSET_ROOT"], "config")\n    os.makedirs(config, exist_ok=True)\n    open(os.path.join(config, "business-access.json"), "w").write(json.dumps({"enabled": True, "gateway": {"port": 53105}}))\nif sys.argv[1] == "start":\n    open(os.environ["HEP_TEST_START_FILE"], "w").write(json.dumps(sys.argv[2:]))\n')
+  const fakeBin = join(root, 'start-firewall-bin'), calls = join(root, 'start-firewall-calls.jsonl')
+  write(join(fakeBin, 'firewall-cmd'), `#!${process.execPath}\nconst fs=require('node:fs'),a=process.argv.slice(2);fs.appendFileSync(process.env.HEP_TEST_FIREWALL_LOG,JSON.stringify(a)+'\\n');if(a.includes('--state'))process.exit(0);if(a.some(x=>x.startsWith('--get-zone-of-interface'))){console.log('public');process.exit(0)}if(a.some(x=>x.startsWith('--query-port')))process.exit(1);process.exit(process.env.HEP_TEST_FIREWALL_DENY==='yes'?13:0);\n`, true)
+  write(join(fakeBin, 'ip'), `#!${process.execPath}\nconsole.log(JSON.stringify([{ifname:'lo',addr_info:[{local:'127.0.0.1'}]}]));\n`, true)
   manifest(path)
+  const previousPath = process.env.PATH
+  process.env.PATH = fakeBin + ':' + previousPath
   process.env.HEP_TEST_START_FILE = output
-  try { install({ ...options(path, prefix), host: '127.0.0.1', port: 18121, start: true }) }
-  finally { delete process.env.HEP_TEST_START_FILE }
-  assert.deepEqual(JSON.parse(readFileSync(output, 'utf8')), ['--host', '127.0.0.1', '--port', '18121'])
+  process.env.HEP_TEST_FIREWALL_LOG = calls
+  try {
+    install({ ...options(path, prefix), host: '127.0.0.1', port: 18121, start: true })
+    assert.deepEqual(JSON.parse(readFileSync(output, 'utf8')), ['--host', '127.0.0.1', '--port', '18121'])
+    const changes = readFileSync(calls, 'utf8').trim().split('\n').map(JSON.parse).filter(row => row.some(value => value.startsWith('--add-port')))
+    assert.deepEqual(changes, [
+      ['--zone=public', '--add-port=18121/tcp'], ['--zone=public', '--permanent', '--add-port=18121/tcp'],
+      ['--zone=public', '--add-port=53105/tcp'], ['--zone=public', '--permanent', '--add-port=53105/tcp'],
+    ])
+    rmSync(output)
+    process.env.HEP_TEST_FIREWALL_DENY = 'yes'
+    assert.throws(() => install({ ...options(path, prefix + '-denied'), host: '127.0.0.1', start: true }), /安装目录已保留.*防火墙配置失败/)
+    assert.ok(existsSync(prefix + '-denied') && existsSync(prefix + '-denied-data'))
+    assert.equal(existsSync(output), false)
+  } finally {
+    process.env.PATH = previousPath
+    delete process.env.HEP_TEST_START_FILE
+    delete process.env.HEP_TEST_FIREWALL_LOG
+    delete process.env.HEP_TEST_FIREWALL_DENY
+  }
 })
 
 test('包内 Git 可用时优先使用，包内和系统均不可用时明确失败', () => {

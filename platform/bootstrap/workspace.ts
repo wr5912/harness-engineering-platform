@@ -7,12 +7,12 @@ import { promisify } from 'node:util'
 
 const execute = promisify(execFile)
 export const defaultRepository = 'git@github.com:wr5912/harness-engineering-platform-data.git'
+export const defaultAccount = { username: 'admin', password: 'admin123' }
 export type Check = { id: string; label: string; status: 'ok' | 'missing' | 'invalid'; detail: string }
 export type SetupRequest = { action: 'existing' | 'clone' | 'new'; root: string; repositoryUrl?: string; previewRevision?: string; account?: { username: string; password: string } }
 const configurations: Record<string, { label: string; value: () => unknown; valid: (value: any) => boolean }> = {
   'workspace.json': { label: '工作区身份', value: () => ({ schemaVersion: 1, id: `workspace-${randomUUID()}`, legacyRoots: [], extensions: [] }), valid: v => v?.schemaVersion === 1 && typeof v.id === 'string' && /^workspace-[a-zA-Z0-9-]+$/.test(v.id) && Array.isArray(v.legacyRoots ?? []) && (v.legacyRoots ?? []).every((p: unknown) => typeof p === 'string' && isAbsolute(p)) },
   'config/sites.json': { label: '站点配置', value: () => ({ assistant: '/assistant/', platform: '/hep/' }), valid: v => ['assistant', 'platform'].every(k => typeof v?.[k] === 'string' && /^\/[a-z][a-z0-9-]*\/$/.test(v[k])) },
-  'config/sources.json': { label: '来源目录', value: () => ({ schema_version: '1.1', sources: {} }), valid: v => v?.schema_version === '1.1' && v.sources && typeof v.sources === 'object' && !Array.isArray(v.sources) },
   'config/mcp-compositions.json': { label: '组合目录', value: () => ({ schema_version: '1.0', compositions: [] }), valid: v => v?.schema_version === '1.0' && Array.isArray(v.compositions) },
 }
 const accountFile = '.local/credentials/admin.json'
@@ -62,7 +62,7 @@ export async function inspectWorkspace(rootValue: string) {
   if (existsSync(join(root, accountFile))) {
     try { readable(join(root, accountFile), root); accountStatus = accountValid(JSON.parse(readFileSync(join(root, accountFile), 'utf8'))) ? 'ok' : 'invalid' } catch { accountStatus = 'invalid' }
   }
-  checks.push({ id: 'account', label: '本地平台账号', status: accountStatus, detail: accountStatus === 'ok' ? '已配置，将复用现有账号' : accountStatus === 'invalid' ? '账号文件无效，请先修复；不会覆盖' : '首次初始化需要填写账号与密码' })
+  checks.push({ id: 'account', label: '本地平台账号', status: accountStatus, detail: accountStatus === 'ok' ? '已配置，将复用现有账号' : accountStatus === 'invalid' ? '账号文件无效，请先修复；不会覆盖' : '首次初始化使用默认账号，也可修改' })
   let extensions: { id: string; path: string }[] = []
   if (checks.find(c => c.id === 'workspace.json')?.status === 'ok') {
     const declared = JSON.parse(readFileSync(join(root, 'workspace.json'), 'utf8')).extensions ?? []
@@ -143,7 +143,8 @@ function writeMissing(root: string, relative: string, value: unknown) {
 export async function initializeWorkspace(input: SetupRequest) {
   const plan = await previewWorkspace(input)
   if (!plan.canApply) throw new Error('已有文件无效或 Git 不可用；请修复后重新预览')
-  if (plan.needsAccount && !accountValid(input.account)) throw new Error('请填写有效的首次登录账号与密码')
+  const account = input.account ?? defaultAccount
+  if (plan.needsAccount && !accountValid(account)) throw new Error('请填写有效的首次登录账号与密码')
   const { root } = plan
   let working = root, staging: string | undefined
   try {
@@ -161,7 +162,7 @@ export async function initializeWorkspace(input: SetupRequest) {
     for (const [relative, spec] of Object.entries(configurations)) writeMissing(working, relative, spec.value())
     const ignore = missingIgnoreRules(working)
     if (ignore.missing.length) appendFileSync(join(working, '.gitignore'), `${ignore.content && !ignore.content.endsWith('\n') ? '\n' : ''}${ignore.missing.join('\n')}\n`)
-    if (!existsSync(join(working, accountFile))) writeMissing(working, accountFile, { username: input.account!.username, password: input.account!.password })
+    if (!existsSync(join(working, accountFile))) writeMissing(working, accountFile, { username: account.username, password: account.password })
     const prepared = await inspectWorkspace(working)
     if (!prepared.ready) throw new Error('初始化后的工作区仍不完整，请修复后重试')
     if (staging) {

@@ -1,5 +1,5 @@
 import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
 export function run(command: string, args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv; input?: string; timeout?: number } = {}): string {
@@ -29,7 +29,7 @@ export function ensureEmptyDir(path: string): void {
 export function copyTree(source: string, target: string, filter?: (source: string, target: string) => boolean): void {
   mkdirSync(dirname(target), { recursive: true })
   if (!filter && !existsSync(target)) {
-    run('/bin/cp', ['-a', '--no-preserve=ownership', '--', source, target])
+    run('/bin/cp', ['-a', '--no-preserve=ownership', '--', source, target], { timeout: 0 })
     return
   }
   cpSync(source, target, {
@@ -63,8 +63,20 @@ export function safeRelative(value: string): string {
   return value
 }
 
+export function isGlibcLibrary(path: string): boolean {
+  return /^(?:ld-linux[^/]*\.so(?:\.[\d.]+)?|ld-[\d.]+\.so|lib(?:c|m|dl|pthread|rt|resolv|util|anl|nss_[\w-]+)(?:\.so(?:\.[\d.]+)?|-[\d.]+\.so))$/.test(basename(path))
+}
+
+export function assertNoBundledGlibc(directory: string): void {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name)
+    if (isGlibcLibrary(path)) throw new Error(`离线资源包含 glibc 或动态加载器：${path}；请重新收集资源，使用目标系统 glibc，避免跨发行版混用`)
+    if (entry.isDirectory()) assertNoBundledGlibc(path)
+  }
+}
+
 export function tarList(archive: string): string[] {
-  const output = run('tar', ['-tzf', archive])
+  const output = run('tar', ['-tzf', archive], { timeout: 0 })
   return output.split('\n').map(line => line.trim()).filter(Boolean)
 }
 
@@ -82,12 +94,13 @@ export function tarCreate(directory: string, archive: string): void {
   mkdirSync(dirname(archive), { recursive: true })
   writeFileSync(archive, '', { mode: 0o600 })
   chmodSync(archive, 0o600)
-  run('tar', ['-C', directory, '-czf', archive, '.'])
+  // 大包耗时由文件量和磁盘决定，不套用短命令的固定超时。
+  run('tar', ['-C', directory, '-czf', archive, '.'], { timeout: 0 })
 }
 
 export function tarExtract(archive: string, directory: string): void {
   mkdirSync(directory, { recursive: true })
-  run('tar', ['-xzf', archive, '-C', directory, '--no-same-owner'])
+  run('tar', ['-xzf', archive, '-C', directory, '--no-same-owner'], { timeout: 0 })
 }
 
 export function defaultSkippedNames(): Set<string> {

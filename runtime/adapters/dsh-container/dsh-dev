@@ -1418,6 +1418,10 @@ def prepare_up(args: argparse.Namespace) -> tuple[dict, tuple[Path, dict] | None
     if args.analysis_workspace and bool(getattr(args, "unsafe_no_auth", False)):
         fail("归因实例不能启用 --unsafe-no-auth")
     business_file = getattr(args, "business_control", None)
+    access_mode = getattr(args, "business_access_mode", None)
+    identity_mode = getattr(args, "business_identity_mode", None)
+    if (access_mode or identity_mode) and (not business_file or not access_mode or not identity_mode):
+        fail("创建访问方式与身份阶段必须同时提供，且仅用于业务控制模式")
     if business_file and (args.analysis_workspace or getattr(args, "migrate_home", False)
                           or getattr(args, "lan_access", False) or getattr(args, "unsafe_no_auth", False)):
         fail("业务控制模式不能与归因、HOME 迁移、LAN 直连或免认证开关并用")
@@ -1430,6 +1434,8 @@ def prepare_up(args: argparse.Namespace) -> tuple[dict, tuple[Path, dict] | None
     args.name = args.name or f"{contract['agent_id']}-{PURPOSES[args.mode]}"
     current = existing_instance(args.name)
     if current is not None:
+        if access_mode or identity_mode:
+            fail("既有实例沿用网关登记的访问方式和身份阶段，不能通过启动参数更改")
         _, manifest = current
         validate_existing_identity(args.name, manifest, contract, args.mode, args.analysis_workspace)
     if args.analysis_workspace:
@@ -1455,12 +1461,15 @@ def prepare_up(args: argparse.Namespace) -> tuple[dict, tuple[Path, dict] | None
         fail("不能在既有实例上切换业务控制边界；请使用新实例名和独立 HOME")
     if business_file:
         home = instance_dir(args.name) / "dsh-home"
-        if current is None and (home.is_symlink() or home.exists() and (not home.is_dir() or any(home.iterdir()))):
-            fail("首期业务控制模式只接受新的独立 HOME，不接管旧运行状态")
         launch = business_helper(business_file, {"name": args.name, "agentId": contract["agent_id"],
                                                "sourcePaths": {key: contract[key] for key in ("workspace", "presets", "managed")}})
         if launch["assetRoot"] != str(REPO):
             fail("业务启动配置的数据根必须与当前 --repo 一致")
+        development = identity_mode == "development" if identity_mode else launch.get("development")
+        anonymous = access_mode == "anonymous" if access_mode else launch.get("accessMode") == "anonymous"
+        if current is None and (home.is_symlink() or home.exists() and (not home.is_dir()
+                or any(home.iterdir()) and not (development and anonymous))):
+            fail("只有无需认证的开发调试实例可以复用保留的 HOME；认证或发布实例需要新的独立 HOME")
         contract["business_control"] = {
             "config_file": str(Path(business_file).resolve()), "source_digest": launch["sourceDigest"],
             "runtime_generation": (current[1]["business_control"]["runtime_generation"] if current else secrets.token_hex(16)),
@@ -2679,6 +2688,10 @@ def main() -> None:
                     help="平台生成的非秘密模型策略 JSON；未提供时只使用统一业务默认模型")
     up.add_argument("--business-control", metavar="CONFIG",
                     help="以独立 HOME 和私有 bridge 启动受管即时任务；CONFIG 指定数据根、共享密钥文件及可达协调器")
+    up.add_argument("--business-access-mode", choices=("anonymous", "authenticated"),
+                    help="新建网关实例的访问方式，用于启动前校验；与身份阶段同时传入")
+    up.add_argument("--business-identity-mode", choices=("development", "published"),
+                    help="新建网关实例的身份阶段；已有实例沿用网关登记")
     up.set_defaults(handler=command_up)
 
     ps_parser = commands.add_parser("ps", help="默认列出运行中的实例；加 --all 查看全部状态记录")

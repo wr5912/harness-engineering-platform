@@ -50,14 +50,11 @@ class EvaluationError(RuntimeError):
 
 
 _cancel_requested = False
-_deadline_exceeded = False
 _defer_cancellation = 0
 
 
 def request_cancellation(_signum, _frame) -> None:
-    global _cancel_requested, _deadline_exceeded
-    if _signum == signal.SIGALRM:
-        _deadline_exceeded = True
+    global _cancel_requested
     if _cancel_requested:
         return
     _cancel_requested = True
@@ -702,7 +699,7 @@ def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict
         instance_name = f"{contract['agent_id']}-eval-{uuid.uuid4().hex[:8]}"
         execution = {"schema_version": "1.0", "job_id": os.environ.get("HARNESS_EVAL_JOB_ID"),
                      "pid": os.getpid(), "run_id": run_id, "instance_name": instance_name,
-                     "status": "running", "deadline_at": os.environ.get("HARNESS_EVAL_DEADLINE_AT")}
+                     "status": "running"}
         write_json(run_dir / "execution.json", execution)
         up_attempted = False
         fatal_reason = None
@@ -773,7 +770,7 @@ def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict
                 raise EvaluationError(analysis["review_reason"])
     except KeyboardInterrupt:
         interrupted = True
-        fatal_reason = "budget-deadline-exceeded" if _deadline_exceeded else "evaluation-interrupted"
+        fatal_reason = "evaluation-interrupted"
     except EvaluationError as error:
         fatal_reason = str(error)
     except ProcessCleanupError as error:
@@ -843,7 +840,7 @@ def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict
 
 
 def main() -> None:
-    global _cancel_requested, _deadline_exceeded, REPO
+    global _cancel_requested, REPO
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", type=Path, default=REPO, help="用户数据工作区根目录")
     parser.add_argument("--source", required=True, help="experiment:<id> 或已登记 Experiment ID")
@@ -871,19 +868,9 @@ def main() -> None:
     if args.export_response_markdown and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.md", args.export_response_markdown):
         parser.error("--export-response-markdown 必须是不含目录的 .md 文件名")
     _cancel_requested = False
-    _deadline_exceeded = False
     previous_handlers = {name: signal.signal(name, request_cancellation)
-                         for name in (signal.SIGINT, signal.SIGTERM, signal.SIGALRM)}
+                         for name in (signal.SIGINT, signal.SIGTERM)}
     try:
-        deadline = os.environ.get("HARNESS_EVAL_DEADLINE_AT")
-        if deadline and not args.dry_run:
-            deadline_value = datetime.fromisoformat(deadline.replace("Z", "+00:00"))
-            if deadline_value.tzinfo is None:
-                raise EvaluationError("任务截止时间必须包含时区")
-            seconds = (deadline_value - datetime.now(timezone.utc)).total_seconds()
-            if seconds <= 0:
-                raise EvaluationError("budget-deadline-exceeded")
-            signal.setitimer(signal.ITIMER_REAL, seconds)
         raise SystemExit(execute(args))
     except KeyboardInterrupt:
         # 尚未进入拥有 Run/实例的执行区块，此时没有待清理的业务实例。
@@ -896,7 +883,6 @@ def main() -> None:
         emit_result(experiment_id, 0, executor=args.executor)
         raise SystemExit(2)
     finally:
-        signal.setitimer(signal.ITIMER_REAL, 0)
         for name, handler in previous_handlers.items():
             signal.signal(name, handler)
 

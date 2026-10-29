@@ -7,6 +7,7 @@ import { isIP } from 'node:net'
 import { setTimeout as delay } from 'node:timers/promises'
 import { defaultAssetRoot } from './plugin/src/workspace.ts'
 import { platformEntryUrl } from './plugin/src/business-control/group-link.ts'
+import { initializeBusinessGateway } from './plugin/src/business-control/configuration.ts'
 import { prepareBusinessRuntimeFile } from './plugin/src/business-control/secret-file.ts'
 
 const programRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -171,10 +172,7 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
     let saved: string | undefined
     // 数据尚未初始化时由浏览器引导建立配置，不能预先制造不完整数据根。
     if (existsSync(join(dataRoot, 'workspace.json'))) {
-      const access = before ? JSON.parse(before) : { schemaVersion: 1, enabled: false, agents: [] }
-      access.gateway ??= {}
-      access.gateway.managementUrl = address!.url
-      atomic(accessPath, access, true)
+      initializeBusinessGateway(dataRoot, address!.url, address!.host)
       saved = readFileSync(accessPath, 'utf8')
     }
     const log = join(service, 'platform.log')

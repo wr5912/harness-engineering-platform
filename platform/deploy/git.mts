@@ -1,7 +1,7 @@
 import { chmodSync, copyFileSync, existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { cpSync } from 'node:fs'
-import { run } from './fsutil.mts'
+import { assertNoBundledGlibc, isGlibcLibrary, run } from './fsutil.mts'
 
 function which(command: string): string {
   for (const directory of (process.env.PATH || '').split(':')) {
@@ -26,6 +26,13 @@ export interface GitBundleResult {
   path: string
 }
 
+export function assertGitBundle(source: string): void {
+  if (!existsSync(join(source, 'git')) || (existsSync(join(source, 'root')) && !existsSync(join(source, 'root', 'usr', 'bin', 'git')))) {
+    throw new Error('Git 离线资源缺少可执行入口或包内二进制')
+  }
+  if (existsSync(join(source, 'root'))) assertNoBundledGlibc(join(source, 'root'))
+}
+
 export function collectSystemGit(destination: string): GitBundleResult {
   const git = which('git')
   const version = run(git, ['--version']).trim()
@@ -37,7 +44,8 @@ export function collectSystemGit(destination: string): GitBundleResult {
   try { ldd = run('ldd', [git]) } catch { ldd = '' }
   for (const line of ldd.split('\n')) {
     const match = line.match(/=>\s+(\/\S+)/) || line.match(/^\s*(\/\S+)\s+\(/)
-    if (match) copyPreservingPath(match[1], join(destination, 'root'))
+    // ELF 使用目标系统加载器；不能把准备机的 glibc 注入该加载器。
+    if (match && !isGlibcLibrary(match[1])) copyPreservingPath(match[1], join(destination, 'root'))
   }
   const libDir = process.arch === 'arm64' ? 'aarch64' : 'x86_64'
   const wrapper = `#!/bin/sh
@@ -55,6 +63,7 @@ exec "$BASE/root${git}" "$@"
 
 export function copyGitBundle(source: string, destination: string): GitBundleResult {
   if (!existsSync(source)) throw new Error(`Git 离线资源不存在：${source}`)
+  assertGitBundle(source)
   cpSync(source, destination, { recursive: true, dereference: false, verbatimSymlinks: true, preserveTimestamps: true })
   const wrapper = join(destination, 'git')
   if (!existsSync(wrapper)) throw new Error(`Git 离线资源缺少 git 入口：${wrapper}`)

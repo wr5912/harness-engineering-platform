@@ -5,6 +5,8 @@ import { inspectDataRoot } from './data.mts'
 import { managedState, ownsPort } from '../lifecycle.mts'
 import { workspaceIdentity } from '../plugin/src/workspace.ts'
 import { sha256File, type Manifest } from './manifest.mts'
+import { validateBusinessGateway } from '../plugin/src/business-control/configuration.ts'
+import { resolveBusinessSecretFile } from '../plugin/src/business-control/secret-file.ts'
 
 export interface DeploymentCheck {
   id: string
@@ -33,6 +35,15 @@ export async function verifyDeployment(options: VerifyOptions): Promise<{ checks
     checks.push({ id: 'program-integrity', status: 'ok', detail: `安装来源 ${manifest.package.commit}` })
   } catch (error) { checks.push({ id: 'program-integrity', status: 'mismatch', detail: error instanceof Error ? error.message : '缺少安装清单' }) }
   const data = inspectDataRoot(dataRoot)
+  try {
+    const access = JSON.parse(readFileSync(join(dataRoot, 'config/business-access.json'), 'utf8'))
+    if (access.schemaVersion !== 1 || access.enabled !== true) throw new Error('业务网关未启用；业务实例不能创建为直连实例')
+    validateBusinessGateway(access.gateway)
+    if (readFileSync(resolveBusinessSecretFile(dataRoot, access.gateway.sharedSecretFile)).length < 32) throw new Error('业务网关本地共享密钥无效')
+    checks.push({ id: 'business-gateway', status: 'ok', detail: `网关配置和本地共享密钥完整，入口 ${access.gateway.publicOrigin}；监听状态需启动后核对` })
+  } catch (error) {
+    checks.push({ id: 'business-gateway', status: 'mismatch', detail: error instanceof Error ? error.message : '业务网关配置无效' })
+  }
   checks.push({
     id: 'workspace-assets',
     status: data.kind === 'workspace' ? 'ok' : 'missing',
@@ -55,12 +66,13 @@ export async function verifyDeployment(options: VerifyOptions): Promise<{ checks
     checks.push({ id: 'default-workspace', status: 'missing', detail: storage })
   } else {
     const value = JSON.parse(readFileSync(storage, 'utf8')) as any
-    const id = value?.global?.defaultWorkspaceId
-    const path = id ? value?.tables?.workspaces?.[id]?.path : undefined
+    // defaultWorkspaceId 仅标记原生首次使用；平台通过 registry.create 绑定唯一数据工作区。
+    const ids = value?.global?.workspaceIds
+    const path = Array.isArray(ids) && ids.length === 1 ? value?.tables?.workspaces?.[ids[0]]?.path : undefined
     checks.push({
       id: 'default-workspace',
-      status: path && resolve(path) === dataRoot ? 'ok' : 'mismatch',
-      detail: path ?? '没有 defaultWorkspaceId',
+      status: typeof path === 'string' && resolve(path) === dataRoot ? 'ok' : 'mismatch',
+      detail: typeof path === 'string' ? path : `原生工作区登记未唯一绑定到 ${dataRoot}`,
     })
   }
   const launcher = join(prefix, 'platform', 'dsh-platform')
@@ -92,6 +104,15 @@ export async function verifyDeployment(options: VerifyOptions): Promise<{ checks
     } catch (error) {
       checks.push({ id: 'online-workspace', status: 'mismatch', detail: error instanceof Error ? error.message : '在线核验失败' })
     }
+    try {
+      const state = managedState(dataRoot, prefix)
+      const access = JSON.parse(readFileSync(join(dataRoot, 'config/business-access.json'), 'utf8'))
+      if (!state || checks.find(check => check.id === 'business-gateway')?.status !== 'ok'
+        || !ownsPort(state.pid, access.gateway.host, access.gateway.port)) throw new Error('业务网关未由当前平台进程监听，请核对网关配置和启动日志')
+      checks.push({ id: 'online-business-gateway', status: 'ok', detail: `PID ${state.pid} 已监听业务网关 ${access.gateway.host}:${access.gateway.port}` })
+    } catch (error) {
+      checks.push({ id: 'online-business-gateway', status: 'mismatch', detail: error instanceof Error ? error.message : '业务网关监听核验失败' })
+    }
   }
-  return { checks, onlineVerified: Boolean(options.url && checks.find(check => check.id === 'online-workspace')?.status === 'ok'), ok: checks.every(check => check.status === 'ok') }
+  return { checks, onlineVerified: Boolean(options.url && ['online-workspace', 'online-business-gateway'].every(id => checks.find(check => check.id === id)?.status === 'ok')), ok: checks.every(check => check.status === 'ok') }
 }

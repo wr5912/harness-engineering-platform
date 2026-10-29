@@ -1,6 +1,6 @@
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { copyTree, run } from './fsutil.mts'
+import { assertNoBundledGlibc, copyTree, run } from './fsutil.mts'
 
 export interface InstalledRuntime {
   node: string
@@ -27,7 +27,7 @@ function firstFile(directory: string, suffix: string): string | undefined {
 }
 
 function toolVersion(command: string, args: string[] = ['--version'], env?: NodeJS.ProcessEnv): string {
-  try { return run(command, args, { env }).trim() } catch { return 'unknown' }
+  return run(command, args, { env }).trim()
 }
 
 function shellQuote(value: string): string {
@@ -46,7 +46,7 @@ export function installRuntime(bundle: string, prefix: string, dataRoot: string)
   const nodeArchive = firstFile(join(offline, 'node'), '.tar.xz')
   if (nodeArchive) {
     mkdirSync(nodeDirectory, { recursive: true })
-    run('tar', ['-xJf', nodeArchive, '-C', nodeDirectory, '--strip-components=1'])
+    run('tar', ['-xJf', nodeArchive, '-C', nodeDirectory, '--strip-components=1'], { timeout: 0 })
   } else if (existsSync(join(offline, 'node', 'bin', 'node'))) {
     copyTree(join(offline, 'node'), nodeDirectory)
   } else {
@@ -71,9 +71,10 @@ export function installRuntime(bundle: string, prefix: string, dataRoot: string)
     git = join(runtime, 'git', 'git')
     if (existsSync(git)) chmodSync(git, 0o755)
   }
-  if (!git || toolVersion(git) === 'unknown') {
-    throw new Error('安装包缺少可执行的 Git 客户端（git --version 失败）')
-  }
+  if (!git) throw new Error('安装包缺少可执行的 Git 客户端')
+  let gitVersion: string
+  try { gitVersion = toolVersion(git) }
+  catch (error) { throw new Error(`安装包缺少可执行的 Git 客户端：${error instanceof Error ? error.message : error}`) }
 
   let dsh: string | undefined
   if (existsSync(join(offline, 'dsh'))) {
@@ -89,13 +90,14 @@ export function installRuntime(bundle: string, prefix: string, dataRoot: string)
   const pythonTar = firstFile(portable, '.tar.gz')
   if (pythonTar) {
     mkdirSync(join(runtime, 'python'), { recursive: true })
-    run('tar', ['-xzf', pythonTar, '-C', join(runtime, 'python'), '--strip-components=1'])
+    run('tar', ['-xzf', pythonTar, '-C', join(runtime, 'python'), '--strip-components=1'], { timeout: 0 })
     python = join(runtime, 'python', 'bin', 'python3')
   } else if (existsSync(join(portable, 'bin', 'python3'))) {
     copyTree(portable, join(runtime, 'python'))
     python = join(runtime, 'python', 'bin', 'python3')
   }
   if (!python || !existsSync(python)) throw new Error('安装包缺少可移植 Python 3.10+')
+  assertNoBundledGlibc(join(runtime, 'python'))
 
   const pathParts: string[] = [join(nodeDirectory, 'bin')]
   if (pnpm) pathParts.push(dirname(pnpm))
@@ -156,9 +158,8 @@ exec "$BASE/../platform/dsh-platform" start "$@"
     python: toolVersion(python, ['--version'], env),
   }
   if (pnpm) versions.pnpm = toolVersion(pnpm, ['--version'], env)
-  if (git) versions.git = toolVersion(git)
-  if (dsh) versions.dsh = toolVersion(node, [dsh, '--version'])
-  if (Object.values(versions).some(version => version === 'unknown')) throw new Error('包内工具无法执行或无法读取版本')
+  versions.git = gitVersion
+  if (dsh) versions.dsh = toolVersion(node, [dsh, '--version'], env)
   run(node, ['-e', 'if(Number(process.versions.node.split(".")[0])<24) process.exit(1)'], { env })
   run(python, ['-c', 'import sys,yaml; assert sys.version_info >= (3,10)'], { env })
   const expected = JSON.parse(readFileSync(join(prefix, 'platform/plugin/package.json'), 'utf8')).peerDependencies['@deepseek-ai/dsh-client-connection']

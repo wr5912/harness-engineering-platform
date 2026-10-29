@@ -1,9 +1,9 @@
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
-import { copyTree, ensureEmptyDir, removeTree, run, tarCreate } from './fsutil.mts'
+import { assertNoBundledGlibc, copyTree, ensureEmptyDir, isGlibcLibrary, removeTree, run, tarCreate, tarList } from './fsutil.mts'
 import { collectEntries, sha256File, writeManifest, type Arch, type Manifest, type RuntimeEntry } from './manifest.mts'
-import { collectSystemGit } from './git.mts'
+import { assertGitBundle, collectSystemGit } from './git.mts'
 import { expectedImage, inspectImage, inspectImageArchive, saveImage, verifyImageInfo } from './image.mts'
 import { assertRealWorkspace, copyDataDependencies } from './data.mts'
 import { snapshotRepository } from './repository.mts'
@@ -46,7 +46,7 @@ function copyAsset(source: string, target: string): void {
   mkdirSync(dirname(target), { recursive: true })
   // 打包暂存只读；同一文件系统复用离线资源的 inode，避免重复复制大安装树。
   if (statSync(source).dev === statSync(dirname(target)).dev) {
-    try { run('/bin/cp', ['-al', '--', source, target]); return }
+    try { run('/bin/cp', ['-al', '--', source, target], { timeout: 0 }); return }
     catch { removeTree(target) }
   }
   copyTree(source, target)
@@ -137,9 +137,17 @@ export function pack(options: PackOptions): { archive: string; size: number } {
   const offline = join(staging, 'offline')
   mkdirSync(offline, { recursive: true })
   const runtime: Record<string, RuntimeEntry> = {}
+  console.error('pack: 正在收集目标架构离线资源')
   for (const name of ['node', 'pnpm', 'python', 'dsh', 'docker']) {
     const source = options.assetsDir ? join(options.assetsDir, name) : undefined
     if (source && existsSync(source)) {
+      if (name === 'python') {
+        assertNoBundledGlibc(source)
+        for (const archive of readdirSync(source).filter(name => name.endsWith('.tar.gz'))) {
+          const bundled = tarList(join(source, archive)).find(isGlibcLibrary)
+          if (bundled) throw new Error(`Python 离线归档包含 glibc 或动态加载器：${bundled}；请重新收集资源，使用目标系统 glibc`)
+        }
+      }
       copyAsset(source, join(offline, name))
       runtime[name] = { path: `offline/${name}` }
     }
@@ -149,12 +157,12 @@ export function pack(options: PackOptions): { archive: string; size: number } {
 
   const gitSource = options.assetsDir ? join(options.assetsDir, 'git') : undefined
   if (gitSource && existsSync(gitSource)) {
-    if (!existsSync(join(gitSource, 'git')) || (existsSync(join(gitSource, 'root')) && !existsSync(join(gitSource, 'root', 'usr', 'bin', 'git')))) {
-      throw new Error('Git 离线资源缺少可执行入口或包内二进制')
-    }
+    assertGitBundle(gitSource)
     copyAsset(gitSource, join(offline, 'git'))
     let version = 'unknown'
-    try { version = run(join(offline, 'git', 'git'), ['--version']).trim() } catch { /* 跨架构打包不能在当前主机执行目标架构 Git */ }
+    if (options.arch === (process.arch === 'arm64' ? 'arm64' : 'amd64')) {
+      version = run(join(offline, 'git', 'git'), ['--version']).trim()
+    }
     runtime.git = { path: 'offline/git', version, source: 'bundle' }
   } else {
     if (options.arch !== (process.arch === 'arm64' ? 'arm64' : 'amd64')) throw new Error('跨架构打包必须提供目标架构的 git 离线资源')
@@ -166,6 +174,7 @@ export function pack(options: PackOptions): { archive: string; size: number } {
   let dataCheck: ReturnType<typeof assertRealWorkspace> | undefined
   let dataRepository: ReturnType<typeof snapshotRepository> | undefined
   for (const name of ['python', 'dsh']) if (!existsSync(join(offline, name))) throw new Error(`安装包缺少离线 ${name} 资源`)
+  console.error('pack: 正在生成程序和数据仓库快照')
   copyProgram(programRoot, staging, options.assetsDir)
   copyTree(join(staging, 'program/platform/deploy/install.sh'), join(staging, 'install.sh'))
   if (dataRoot) {
@@ -173,7 +182,9 @@ export function pack(options: PackOptions): { archive: string; size: number } {
     dataRepository = copyData(dataRoot, staging)
     copyDataDependencies(join(staging, 'data'), options.assetsDir!)
   }
+  console.error('pack: 正在核对并收集标准 Runtime 镜像')
   const image = copyImage(options, staging)
+  console.error('pack: 正在计算文件清单与摘要；大量依赖文件可能耗时较长')
   const files = collectEntries(staging)
   const manifest: Manifest = {
     schemaVersion: 1,
@@ -200,7 +211,9 @@ export function pack(options: PackOptions): { archive: string; size: number } {
   }
   writeManifest(join(staging, 'manifest.json'), manifest)
   const archive = join(out, `${packageName}.tar.gz`)
+  console.error('pack: 正在压缩安装包')
   tarCreate(staging, archive)
+  console.error('pack: 正在计算安装包校验和')
   const checksum = `${sha256File(archive)}  ${basename(archive)}\n`
   writeFileSync(`${archive}.sha256`, checksum, { mode: 0o644 })
   const size = statSync(archive).size
