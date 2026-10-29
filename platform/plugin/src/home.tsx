@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
+import { Menu } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Catalog } from './catalog.ts'
 import type { PageId, PlatformNavigation, PlatformPageProps } from './protocol.ts'
 import type { RecentRun } from './dashboard.ts'
@@ -9,6 +10,9 @@ import type { Assistant } from './assistant/client.tsx'
 import type { AssistantView } from './assistant/index.ts'
 import type { RiskFact } from './business-control/contracts.ts'
 import { PlatformLogo } from './logo.tsx'
+import { LoadingIndicator } from './components/loading-indicator.tsx'
+import { DistributionChart } from './components/overview-charts.tsx'
+import { runOutcomeSegments } from './components/run-overview.ts'
 import { GENERAL_PLACEHOLDER, DEMO_AGENT, DEMO_BUILD_PROMPT, DEMO_CASE, HOME_MODES, HOME_SUBTITLE, homeTaskRequest, type HomeMode } from './home-entry.ts'
 export { PlatformLogo } from './logo.tsx'
 
@@ -32,9 +36,11 @@ interface EvaluationJob {
 }
 
 const jobStates: Record<string, string> = { queued: '排队中', running: '运行中', recovering: '正在恢复', completed: '已完成，查看结论', failed: '执行失败', cancelled: '已取消', unknown: '状态待核对' }
-function riskOverview(phase: 'pending' | 'ready' | 'error', facts: RiskFact[]) {
-  if (phase === 'pending') return { value: '—', note: '正在读取风险评估' }
+function riskOverview(phase: 'pending' | 'ready' | 'error', facts: RiskFact[], enabled?: boolean) {
+  if (phase === 'pending') return { value: '—', note: '' }
   if (phase === 'error') return { value: '读取失败', note: '进入统一网关重新核对' }
+  if (enabled === false) return { value: '自动评估已关闭', note: '按访问策略和人工限制执行' }
+  if (enabled !== true) return { value: '评估开关待核对', note: '进入统一网关核对评估配置' }
   if (!facts.length) return { value: '尚无评估', note: '进入统一网关核对当前范围' }
   const active = facts.filter(fact => Date.parse(fact.expiresAt) > Date.now())
   if (!active.length) return { value: '评估已过期', note: `${facts.length} 项历史事实需重新核对` }
@@ -71,7 +77,7 @@ function ContinueIcon({ kind, tone }: { kind: 'session' | 'job' | 'run'; tone: '
     {kind === 'session' ? <><path d="M12 3a9 9 0 1 0 9 9 9 9 0 0 0-9-9Z"/><path d="M12 7v5m0 4h.01"/></> : kind === 'job' ? <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></> : <><path d="M4 19V5m0 14h16M8 16v-4m4 4V8m4 8v-6"/></>}
   </svg></span>
 }
-export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate, startConversation }: PlatformPageProps & { catalog: Catalog; updates: PlatformUpdates; sessions: Context['sessions']; assistant: Assistant; navigate: (page: PageId | PlatformNavigation) => void; startConversation: (root: string, prompt: string, context?: Record<string, unknown>) => Promise<void> }) {
+export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate, startConversation, active = true }: PlatformPageProps & { catalog: Catalog; active?: boolean; updates: PlatformUpdates; sessions: Context['sessions']; assistant: Assistant; navigate: (page: PageId | PlatformNavigation) => void; startConversation: (root: string, prompt: string, context?: Record<string, unknown>) => Promise<void> }) {
   const state = useSyncExternalStore(catalog.subscribe, catalog.getSnapshot)
   const assets = state.inventory
   const workspaceScope = assets ? JSON.stringify([assets.workspace?.id ?? '', assets.root]) : ''
@@ -81,8 +87,16 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
   const [continueError, setContinueError] = useState('')
   const [jobs, setJobs] = useState<EvaluationJob[]>([])
   const [jobsLoaded, setJobsLoaded] = useState(false)
+  const [jobsObserved, setJobsObserved] = useState(false)
   const [revision, setRevision] = useState(0)
   const [continueRevision, setContinueRevision] = useState(0)
+  const [continueMenuOpen, setContinueMenuOpen] = useState(false)
+  useEffect(() => {
+    const close = () => setContinueMenuOpen(false)
+    window.addEventListener('hashchange', close); window.addEventListener('popstate', close)
+    return () => { window.removeEventListener('hashchange', close); window.removeEventListener('popstate', close) }
+  }, [])
+  useEffect(() => { setContinueMenuOpen(false) }, [active, workspaceScope])
   useEffect(() => updates.subscribe(() => {
     const snapshot = updates.getSnapshot()
     if (snapshot.domains.some(domain => domain === 'catalog' || domain === 'agents' || domain === 'instances' || domain === 'mcp')) setRevision(snapshot.revision)
@@ -91,7 +105,8 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
   const [runs, setRuns] = useState<RecentRun[]>()
   const [runPhase, setRunPhase] = useState<'pending' | 'ready' | 'error'>('pending')
   const [dashboard, setDashboard] = useState<Dashboard>()
-  const [riskState, setRiskState] = useState<{ phase: 'pending' | 'ready' | 'error'; facts: RiskFact[] }>({ phase: 'pending', facts: [] })
+  const [riskState, setRiskState] = useState<{ phase: 'pending' | 'ready' | 'error'; facts: RiskFact[]; enabled?: boolean; observed?: boolean }>({ phase: 'pending', facts: [] })
+  const [riskExpiryRevision, setRiskExpiryRevision] = useState(0)
   const [runError, setRunError] = useState('')
   const [refresh, setRefresh] = useState(0)
   const [mode, setMode] = useState<HomeMode>('general')
@@ -137,7 +152,7 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
     if (!input) return
     const resize = () => {
       input.style.height = 'auto'
-      if (input.value) input.style.height = `${input.scrollHeight}px`
+      if (input.value) input.style.height = `${Math.min(240, input.scrollHeight)}px`
     }
     resize()
     let width = input.getBoundingClientRect().width
@@ -178,7 +193,7 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
     setContinueError(''); setJobsLoaded(false)
     void rpc.call(CHANNEL, 'agents/eval/list', {}).then(result => {
       if (!active) return
-      if (result.ok) setJobs((result.value as { jobs: EvaluationJob[] }).jobs ?? [])
+      if (result.ok) { setJobs((result.value as { jobs: EvaluationJob[] }).jobs ?? []); setJobsObserved(true) }
       else setContinueError(result.error.message)
       setJobsLoaded(true)
     }).catch(() => { if (active) { setContinueError('评测任务暂不可读，请重试。'); setJobsLoaded(true) } })
@@ -201,16 +216,28 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
   }, [rpc, refresh, revision])
   useEffect(() => {
     let active = true
-    setRiskState({ phase: 'pending', facts: [] })
+    setRiskState(previous => ({ ...previous, phase: 'pending' }))
     void rpc.call(CHANNEL, 'mcp/control/status', {}).then(result => {
       if (!active) return
-      const value = result.ok ? result.value as { riskFacts?: RiskFact[] } : null
-      setRiskState(value && Array.isArray(value.riskFacts)
-        ? { phase: 'ready', facts: value.riskFacts }
-        : { phase: 'error', facts: [] })
-    }).catch(() => { if (active) setRiskState({ phase: 'error', facts: [] }) })
+      const value = result.ok ? result.value as { riskFacts?: RiskFact[]; configuration?: { riskAssessment?: { configured?: unknown } } } : null
+      const enabled = value?.configuration?.riskAssessment?.configured
+      setRiskState(previous => value && Array.isArray(value.riskFacts)
+        ? { phase: 'ready', facts: value.riskFacts, enabled: typeof enabled === 'boolean' ? enabled : undefined, observed: true }
+        : { ...previous, phase: 'error' })
+    }).catch(() => { if (active) setRiskState(previous => ({ ...previous, phase: 'error' })) })
     return () => { active = false }
   }, [rpc, refresh, revision])
+  useEffect(() => {
+    if (!active || riskState.enabled !== true || riskState.phase === 'error') return
+    const now = Date.now()
+    const nextExpiry = riskState.facts.reduce((next, fact) => {
+      const expiry = Date.parse(fact.expiresAt)
+      return expiry > now && expiry < next ? expiry : next
+    }, Infinity)
+    if (!Number.isFinite(nextExpiry)) return
+    const timer = window.setTimeout(() => setRiskExpiryRevision(value => value + 1), Math.min(nextExpiry - now + 1, 2_147_483_647))
+    return () => window.clearTimeout(timer)
+  }, [active, riskState.enabled, riskState.phase, riskState.facts, riskExpiryRevision])
   const sessionTasks = assets ? sessionList.ids.flatMap(id => {
     const row = sessionList.byId[id]
     if (!row || ![assets.root, ...(assets.workspace?.legacyRoots ?? [])].includes(row.cwd ?? '')) return []
@@ -224,12 +251,12 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
   const verdictLabel = (run: RecentRun) => run.status !== 'completed' ? '尚无业务结论' : ({ passed: '业务通过', failed: '业务未通过', inconclusive: '结论待核实' } as Record<string, string>)[run.effective_verdict ?? ''] ?? '业务结论未知'
   const versionName = (id: string) => '版本 ' + (/-([0-9]{3})(?:-r[0-9a-f]{12})?$/.exec(id)?.[1] ?? id)
   const uniqueRuns = (runs ?? []).filter((run, index, rows) => rows.findIndex(item => item.id === run.id) === index)
-  const attentionRuns = runPhase === 'ready' ? uniqueRuns.filter(run => run.status === 'failed' || run.status === 'completed' && run.effective_verdict !== 'passed') : []
+  const attentionRuns = runPhase !== 'error' ? uniqueRuns.filter(run => run.status === 'failed' || run.status === 'completed' && run.effective_verdict !== 'passed') : []
   const attentionRunIds = new Set(attentionRuns.map(run => run.id))
-  const terminalRunIds = new Set(runPhase === 'ready' ? uniqueRuns.filter(run => ['completed', 'failed', 'cancelled'].includes(run.status ?? '')).map(run => run.id) : [])
+  const terminalRunIds = new Set(runPhase !== 'error' ? uniqueRuns.filter(run => ['completed', 'failed', 'cancelled'].includes(run.status ?? '')).map(run => run.id) : [])
   const visibleJobs = jobs.filter(job => ['queued', 'running', 'recovering', 'unknown', 'failed', 'completed'].includes(job.status) && (!job.run_id || !terminalRunIds.has(job.run_id)))
   const linkedJobRunIds = new Set(visibleJobs.map(job => job.run_id).filter((id): id is string => Boolean(id)))
-  const recentWorkRuns = runPhase === 'ready' ? uniqueRuns.filter(run => !attentionRunIds.has(run.id) && !linkedJobRunIds.has(run.id)).slice(0, 2) : []
+  const recentWorkRuns = runPhase !== 'error' ? uniqueRuns.filter(run => !attentionRunIds.has(run.id) && !linkedJobRunIds.has(run.id)).slice(0, 2) : []
   const continuations = [
     ...sessionTasks.map(item => ({ kind: 'session' as const, priority: item.priority, updatedAt: item.row.updatedAt, item })),
     ...visibleJobs.map(item => ({ kind: 'job' as const,
@@ -237,7 +264,12 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
       updatedAt: Date.parse(item.updated_at ?? item.started_at ?? '') || 0, item })),
     ...attentionRuns.map(item => ({ kind: 'run' as const, priority: 1,
       updatedAt: Date.parse(item.finished_at ?? item.created_at ?? '') || 0, item })),
-  ].sort((a, b) => a.priority - b.priority || b.updatedAt - a.updatedAt).slice(0, 8)
+  ].sort((a, b) => a.priority - b.priority || b.updatedAt - a.updatedAt)
+  const visibleContinuations = continuations.slice(0, 4)
+  const hasSessionContinuations = continuations.some(entry => entry.kind === 'session')
+  const hasEvaluationContinuations = continuations.some(entry => entry.kind !== 'session')
+  const mixedContinuations = hasSessionContinuations && hasEvaluationContinuations
+  useEffect(() => { setContinueMenuOpen(false) }, [mixedContinuations])
   const selectedExample = exampleSources.find(source => source.source === exampleSource)
   async function enterTask(request: ReturnType<typeof homeTaskRequest>, completed?: () => void) {
     if (!assets) throw new Error('工作区尚未读取完成，请稍后重试。')
@@ -290,28 +322,31 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
     finally { setSending(false) }
   }
   const running = dashboard?.instances.ok ? dashboard.instances.value.instances.filter(item => item.state === 'running').length : undefined
-  const runningJobs = jobsLoaded && !continueError ? jobs.filter(job => ['queued', 'running', 'recovering'].includes(job.status)).length : undefined
+  const runningJobs = jobsObserved && !continueError ? jobs.filter(job => ['queued', 'running', 'recovering'].includes(job.status)).length : undefined
   const totalInstances = dashboard?.instances.ok ? dashboard.instances.value.instances.length : undefined
   const mcpConnections = dashboard?.mcp.ok ? dashboard.mcp.value.connections.length : undefined
-  const risk = riskOverview(riskState.phase, riskState.facts)
+  const risk = riskOverview(riskState.phase === 'pending' && riskState.observed ? 'ready' : riskState.phase, riskState.facts, riskState.enabled)
+  const continueLoading = sessionList.phase === 'pending' || !jobsLoaded || runPhase === 'pending'
   const fillExampleTask = () => {
     setMode('build')
     replaceDraft('build', DEMO_BUILD_PROMPT, 'build')
     promptRef.current?.scrollIntoView?.({ block: 'center' })
     promptRef.current?.focus()
   }
+  const continueAllButton = <button type="button" className="harness-home-view-all" aria-haspopup={mixedContinuations ? 'menu' : undefined} aria-expanded={mixedContinuations ? continueMenuOpen && active : undefined}
+    onClick={() => mixedContinuations ? setContinueMenuOpen(open => !open) : navigate(hasSessionContinuations ? 'conversations' : { page: 'evaluation', tab: 'runs' })}
+    onKeyDown={event => { if (mixedContinuations && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) { event.preventDefault(); setContinueMenuOpen(true) } }}>查看全部 →</button>
   return <main className="harness-home">
     <section className="harness-hero">
       <span className="harness-hero-kicker">工程工作台 · WORKSPACE</span>
       <h1>用 AI 构建和管理智能体</h1>
       <p>{HOME_SUBTITLE}</p>
       <div className="harness-task-composer">
-        <form className="harness-entry" onSubmit={event => { event.preventDefault(); void submitTask() }}>
+        <form className="harness-entry" aria-busy={draftPending} onSubmit={event => { event.preventDefault(); void submitTask() }}>
           <textarea ref={promptRef} rows={1} aria-label="业务任务" placeholder={mode === 'general' ? GENERAL_PLACEHOLDER : mode === 'build' ? '描述要构建的智能体用途和目标，例如整理模拟资产台账并生成报告。' : mode === 'evaluate' ? '描述要评测的智能体和业务能力，例如评测巡检助手能否完整统计全部设备。' : mode === 'improve' ? '描述希望改进的能力，例如让巡检报告覆盖全部设备。' : '描述要管理的实例或工具，例如核对实例来源或接入 MCP 工具。'} value={prompt} disabled={sending || draftPending}
             onChange={event => replaceDraft(mode, event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.nativeEvent.isComposing) { event.preventDefault(); void submitTask() } }}/>
-          <div className="harness-entry-footer"><span>{mode === 'general' ? '涉及变更时，先展示方案与影响。' : mode === 'build' ? '先了解目标与可复用资产，确认后再构建与验证。' : mode === 'evaluate' ? '先查询智能体和已有测试，确认范围后运行评测。' : mode === 'improve' ? '先查已有资产和记录，确认优化目标；最多修复 3 轮。' : '先核对实例与工具，再确认操作范围。'}</span><button className="harness-primary" type="submit" disabled={sending || draftPending || mode === 'general' && !prompt.trim()}>{sending ? '正在进入…' : modeInfo?.action ?? '开始任务'}</button></div>
+          <div className="harness-entry-footer"><span>{mode === 'general' ? '涉及变更时，先展示方案与影响。' : mode === 'build' ? '先了解目标与可复用资产，确认后再构建与验证。' : mode === 'evaluate' ? '先查询智能体和已有测试，确认范围后运行评测。' : mode === 'improve' ? '先查已有资产和记录，确认优化目标；最多修复 3 轮。' : '先核对实例与工具，再确认操作范围。'}</span><button className="harness-primary" type="submit" disabled={sending || draftPending || mode === 'general' && !prompt.trim()}>{draftPending && <LoadingIndicator label="恢复任务输入" />}{sending ? '正在进入…' : modeInfo?.action ?? '开始任务'}</button></div>
         </form>
-        {draftPending && <p role="status">正在恢复任务输入…</p>}
         {!draftPending && draftStatus === 'unavailable' && <p role="alert">当前输入无法自动保存；离开或刷新前请复制内容。</p>}
         {mode === 'evaluate' && assets && !assets.agents.length && <p>还没有业务智能体。<button type="button" disabled={draftPending} onClick={() => selectMode('build')}>先构建一个</button></p>}
         {entryError && <p role="alert">{entryError}</p>}
@@ -319,16 +354,16 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
       <div className="harness-home-shortcuts"><div className="harness-entry-modes" role="group" aria-label="快捷任务">{HOME_MODES.map(item => <button key={item.id} type="button" aria-pressed={mode === item.id && !draftPending} disabled={sending || draftPending} onClick={() => { selectMode(item.id); setEntryError(''); promptRef.current?.focus() }}><ShortcutIcon mode={item.id}/>{item.label}</button>)}</div>{mode !== 'general' && <button className="harness-free-mode" type="button" title="返回自由咨询" disabled={sending || draftPending} onClick={() => { selectMode('general'); setEntryError(''); promptRef.current?.focus() }}>自由咨询</button>}</div>
     </section>
     {state.status === 'error' && <p role="alert">{state.error}{assets && ' 保留上次查询结果。'}</p>}
-    {!assets && state.status !== 'error' && <p role="status">正在读取仓库…</p>}
-    <div className="harness-home-workspace"><div className="harness-home-primary"><section className="harness-card harness-continue" aria-label="继续处理">
-      <div className="harness-section-heading"><div><h2>继续处理</h2><p>先处理需要你参与的事项，再追踪运行进展</p></div><button type="button" onClick={() => { observedSessions.current.clear(); setRefresh(value => value + 1) }}>刷新</button></div>
+    {!assets && state.status !== 'error' && <LoadingIndicator label="读取仓库" block />}
+    <div className="harness-home-workspace"><div className="harness-home-primary"><section className="harness-card harness-continue" aria-label="继续处理" aria-busy={continueLoading}>
+      <div className="harness-section-heading"><div><h2>继续处理{continueLoading && continuations.length > 0 && <LoadingIndicator label="更新继续处理事项" />}</h2><p>先处理需要你参与的事项，再追踪运行进展</p></div>{mixedContinuations ? <Menu open={continueMenuOpen && active} anchor={continueAllButton} compact autoFocus align="end" listClassName="harness-home-more-menu" items={[{ id: 'sessions', label: '管理对话' }, { id: 'evaluation', label: '评测记录' }]} onClose={() => setContinueMenuOpen(false)} onSelect={id => { setContinueMenuOpen(false); navigate(id === 'sessions' ? 'conversations' : { page: 'evaluation', tab: 'runs' }) }} /> : continueAllButton}</div>
       {sessionError && <p role="alert">{sessionError}</p>}
       {continueError && <p role="alert">评测任务：{continueError}</p>}
       {runPhase === 'error' && <p role="alert">最近 Run：{runError}，继续处理暂无法核对全部结果。</p>}
-      {sessionList.phase === 'pending' || !jobsLoaded || runPhase === 'pending' ? <p role="status">正在读取已有会话、评测任务与 Run…</p> : null}
+      {continueLoading && !continuations.length && <LoadingIndicator label="读取继续处理事项" block />}
       {sessionList.phase === 'ready' && jobsLoaded && runPhase === 'ready' && !continuations.length && !sessionError && !continueError && <p>暂无需要继续的任务。可在上方描述新任务，或查看下方最近工作。</p>}
       <div className="harness-continue-list">
-        {continuations.map(entry => {
+        {visibleContinuations.map(entry => {
           if (entry.kind === 'session') {
             const { id, row, projection } = entry.item
             const status = projection.pending_proposals ? 'waiting' : projection.unknown_proposals ? 'unknown' : row.running ? 'running' : 'unknown'
@@ -344,35 +379,38 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
             return <article className="harness-continue-item" key={`run/${run.id}`}>
               <ContinueIcon kind="run" tone={failed ? 'danger' : 'warning'}/>
               <div className="harness-continue-content"><div className="harness-continue-title"><strong>{run.agent_name || run.agent_id} · {versionName(run.experiment_id)} 评测</strong><span className="harness-run-state" data-status={failed ? 'failed' : 'unknown'}>{run.status === 'failed' ? '执行失败' : run.effective_verdict === 'failed' ? '结果待处理' : run.effective_verdict === 'inconclusive' ? '结论待核实' : '结论待核对'}</span></div><small>最近 Run · {runStatusLabel(run)} · {verdictLabel(run)} · {run.finished_at || run.created_at ? new Date(run.finished_at || run.created_at || '').toLocaleString() : '时间未记录'}</small></div>
-              <button type="button" onClick={() => navigate({ page: 'evaluation', tab: 'runs', agent_id: run.agent_id, experiment_id: run.experiment_id, run_id: run.id })}>{run.status === 'failed' ? '查看记录' : '查看结果'}</button>
+              <button type="button" onClick={() => navigate({ page: 'evaluation', tab: 'runs', agent_id: run.agent_id, experiment_id: run.experiment_id, run_id: run.id })}>查看结果</button>
             </article>
           }
           const job = entry.item
           return <article className="harness-continue-item" key={job.job_id}>
           <ContinueIcon kind="job" tone={job.status === 'failed' ? 'danger' : job.status === 'unknown' ? 'warning' : 'blue'}/>
           <div className="harness-continue-content"><div className="harness-continue-title"><strong>{job.agent_id ? `智能体 ${job.agent_id}` : '来源待核对'} · {job.experiment_id ? versionName(job.experiment_id) : job.source}</strong><span className="harness-run-state" data-status={job.status}>{jobStates[job.status] ?? '状态待核对'}</span></div><small>评测任务 · {job.updated_at ? new Date(job.updated_at).toLocaleString() : '时间未记录'}</small></div>
-          <button type="button" onClick={() => navigate({ page: 'evaluation', tab: 'jobs', job_id: job.job_id, ...(job.agent_id ? { agent_id: job.agent_id } : {}), ...(job.experiment_id ? { experiment_id: job.experiment_id } : {}) })}>查看原任务</button>
+          <button type="button" onClick={() => navigate({ page: 'evaluation', tab: 'jobs', job_id: job.job_id, ...(job.agent_id ? { agent_id: job.agent_id } : {}), ...(job.experiment_id ? { experiment_id: job.experiment_id } : {}) })}>查看任务</button>
           </article>
         })}
       </div>
     </section>
-      <section className="harness-card harness-recent-work" aria-label="最近工作"><div className="harness-section-heading"><h2>最近工作</h2><button onClick={() => navigate('evaluation')}>查看全部 →</button></div>
-        {runPhase === 'error' && <p role="alert">{runError}</p>}{runPhase === 'pending' && <p role="status">正在读取 Run 记录…</p>}
+      <section className="harness-card harness-recent-work" aria-label="最近评测" aria-busy={runPhase === 'pending'}><div className="harness-section-heading"><h2>最近评测{runPhase === 'pending' && uniqueRuns.length > 0 && <LoadingIndicator label="更新最近评测" />}</h2><button type="button" className="harness-home-view-all" onClick={() => navigate({ page: 'evaluation', tab: 'runs' })}>查看全部 →</button></div>
+        {runPhase === 'error' && <p role="alert">{runError}</p>}{runPhase === 'pending' && !uniqueRuns.length && <LoadingIndicator label="读取最近评测" block />}
         {runPhase === 'ready' && uniqueRuns.length === 0 && <p>尚无 Run。进入评测中心选择用例并运行评测。</p>}
+        {uniqueRuns.length > 0 && <div className="harness-home-run-overview">
+          <DistributionChart title="近期评测分布" description={`${runPhase === 'ready' ? '本次读取' : runPhase === 'pending' ? '保留上次读取，更新中' : '上次读取，当前更新失败'} · 当前工作区最近 ${uniqueRuns.length} 条记录，最多 8 条；不代表累计通过率。`} segments={runOutcomeSegments(uniqueRuns)} totalLabel="条记录" />
+        </div>}
         {runPhase === 'ready' && uniqueRuns.length > 0 && recentWorkRuns.length === 0 && <p>需处理的最近 Run 已列在上方；暂无其他 Run 记录。</p>}
-        {recentWorkRuns.map(run => <div className="harness-run-row" key={`${run.experiment_id}/${run.id}`}><span className="harness-avatar">◷</span><div><strong>{run.agent_name || run.agent_id} · {versionName(run.experiment_id)}</strong><small>{run.created_at ? new Date(run.created_at).toLocaleString() : '创建时间未记录'}</small></div><div className="harness-run-labels"><span className="harness-run-state" data-status={run.status ?? 'unknown'}>{runStatusLabel(run)}</span><span className="harness-run-state" data-status={run.effective_verdict ?? 'unknown'}>{verdictLabel(run)}</span></div><button className="harness-run-action" type="button" onClick={() => navigate({ page: 'evaluation', tab: 'runs', agent_id: run.agent_id, experiment_id: run.experiment_id, run_id: run.id })}>查看记录 →</button></div>)}
+        {recentWorkRuns.length > 0 && <div><table className="harness-home-run-table"><thead><tr><th>任务与版本</th><th>执行</th><th>有效结论</th><th>操作</th></tr></thead><tbody>{recentWorkRuns.map(run => <tr className="harness-run-row" key={`${run.experiment_id}/${run.id}`}><td data-label="任务与版本"><strong>{run.agent_name || run.agent_id} · {versionName(run.experiment_id)}</strong><small>{run.created_at ? new Date(run.created_at).toLocaleString() : '创建时间未记录'}</small></td><td data-label="执行"><span className="harness-run-state" data-status={run.status ?? 'unknown'}>{runStatusLabel(run)}</span></td><td data-label="有效结论"><span className="harness-run-state" data-status={run.effective_verdict ?? 'unknown'}>{verdictLabel(run)}</span></td><td data-label="操作"><button className="harness-run-action" type="button" onClick={() => navigate({ page: 'evaluation', tab: 'runs', agent_id: run.agent_id, experiment_id: run.experiment_id, run_id: run.id })}>查看结果</button></td></tr>)}</tbody></table></div>}
     </section></div>
-    <aside className="harness-home-secondary"><section className="harness-card harness-workspace-summary" aria-label="工作区概况"><div className="harness-section-heading"><div><h2>工作区概况</h2><p>{dashboard && runPhase !== 'ready' ? runPhase === 'pending' ? '正在更新，显示上次观察' : '读取失败，显示上次观察' : '来自当前工作区的实际观察'}</p></div><button type="button" onClick={() => setRefresh(value => value + 1)}>刷新</button></div><div className="harness-stats">
-      {([{ label: '正在运行的评测', value: runningJobs, page: { page: 'evaluation', tab: 'jobs' }, note: runningJobs === undefined ? continueError ? '评测任务读取失败' : '正在读取评测任务' : `${runningJobs} 项任务` },
-        { label: '业务实例运行中', value: running === undefined ? undefined : `${running} / ${totalInstances}`, page: { page: 'instances' }, note: running === undefined ? '实例状态暂不可读' : '按最近一次实例观察' },
-        { label: 'MCP 已登记连接', value: mcpConnections, page: { page: 'mcp' }, note: mcpConnections === undefined ? '连接清单暂不可读' : '调用结果需在 MCP 页核对' },
-        { label: '网关风险评估', value: risk.value, page: { page: 'gateway', tab: 'risk' }, note: risk.note }] as const)
-        .map(item => <button type="button" className="harness-stat" key={item.label} onClick={() => navigate(item.page)}><span>{item.label}</span><strong>{item.value ?? '—'}</strong><small>{item.note}</small></button>)}
+    <aside className="harness-home-secondary"><section className="harness-card harness-workspace-summary" aria-label="工作区概况"><div className="harness-section-heading"><div><h2>工作区概况</h2><p>{dashboard && runPhase !== 'ready' ? runPhase === 'pending' ? '上次观察' : '读取失败，显示上次观察' : '来自当前工作区的实际观察'}</p></div><button type="button" aria-busy={runPhase === 'pending'} onClick={() => setRefresh(value => value + 1)}>{runPhase === 'pending' && <LoadingIndicator label="更新工作区概况" />}刷新</button></div><div className="harness-stats">
+      {([{ kind: 'number', label: '正在运行的评测', pending: !jobsLoaded && runningJobs === undefined, value: runningJobs, page: { page: 'evaluation', tab: 'jobs' }, note: runningJobs === undefined ? continueError ? '评测任务读取失败' : '' : '查看运行任务' },
+        { kind: 'number', label: '业务实例运行中', pending: !dashboard && runPhase === 'pending', value: running === undefined ? undefined : `${running} / ${totalInstances}`, page: { page: 'instances' }, note: running === undefined ? '实例状态暂不可读' : '按最近一次实例观察' },
+        { kind: 'number', label: 'MCP 已登记连接', pending: !dashboard && runPhase === 'pending', value: mcpConnections, page: { page: 'mcp' }, note: mcpConnections === undefined ? '连接清单暂不可读' : '调用结果需在 MCP 页核对' },
+        { kind: 'status', label: '网关风险评估', pending: riskState.phase === 'pending' && !riskState.observed, value: risk.value, page: { page: 'gateway', tab: 'risk' }, note: riskState.phase === 'pending' && riskState.observed ? `${risk.note} · 上次读取` : risk.note }] as const)
+        .map(item => <button type="button" className="harness-stat" data-value-kind={item.value === undefined || item.value === '—' ? 'unknown' : item.kind} key={item.label} onClick={() => navigate(item.page)}><span>{item.label}{item.label === '网关风险评估' && riskState.phase === 'pending' && riskState.observed ? <LoadingIndicator label="更新风险评估" /> : null}</span><strong>{item.pending ? <LoadingIndicator label={`读取${item.label}`} /> : item.value ?? '—'}</strong><small>{item.pending ? '' : item.note}</small></button>)}
     </div>{dashboard && !dashboard.instances.ok && <p role="alert">实例观察失败：{dashboard.instances.error.message}</p>}{dashboard && !dashboard.mcp.ok && <p role="alert">MCP 查询失败：{dashboard.mcp.error.message}</p>}</section>
     <section className="harness-card harness-start-guide" aria-label="开始可验证的任务"><span className="harness-guide-icon" aria-hidden="true">✧</span><h2>从一个可验证的目标开始</h2><p>先明确任务、工具与成功标准，再让智能体在证据中迭代。</p><button type="button" className="harness-guide-action" disabled={draftPending} onClick={fillExampleTask}>填写示例任务 →</button>
       <button className="harness-example-toggle" type="button" aria-expanded={exampleOpen} disabled={!assets || exampleLoading} onClick={() => void showExample()}>体验示例 <span aria-hidden="true">→</span></button>
       {exampleOpen && <div className="harness-example" aria-label="基础资产巡检体验示例"><strong>基础资产台账巡检</strong><p>读取五台基础模拟资产，处理分页并生成报告。使用 Mock 台账数据，不代表连接或检测真实设备。</p>
-        {exampleLoading ? <p role="status">正在核对当前工作区的示例资产…</p> : exampleSources.length ? <>{selectedExample && <p>将使用{versionName(selectedExample.experiment_id)}{selectedExample.active ? '（当前启用）' : ''}；开始后将核对服务和实际任务结果。</p>}{exampleSources.length > 1 && <details aria-label="可选示例版本"><summary>更换示例版本</summary><label>示例版本<select aria-label="巡检示例版本" value={exampleSource} onChange={event => setExampleSource(event.target.value)}>{exampleSources.map(source => <option key={source.source} value={source.source}>{versionName(source.experiment_id)}{source.active ? ' · 当前启用' : ''}</option>)}</select></label></details>}<button type="button" disabled={sending || !selectedExample} onClick={() => void launchExample()}>开始体验</button></> : exampleError ? <p>暂时无法核对示例资产，请稍后重新打开体验入口。</p> : <><p>当前工作区尚未安装带工具的巡检示例。可以先构建一个只整理用户给定模拟数据的智能体，或到智能体管理接入已有版本。</p><div><button type="button" onClick={() => { fillExampleTask(); setExampleOpen(false) }}>构建一个基础示例</button><button type="button" onClick={() => navigate('agents')}>查看智能体管理</button></div></>}
+        {exampleLoading ? <LoadingIndicator label="核对当前工作区的示例资产" block /> : exampleSources.length ? <>{selectedExample && <p>将使用{versionName(selectedExample.experiment_id)}{selectedExample.active ? '（当前启用）' : ''}；开始后将核对服务和实际任务结果。</p>}{exampleSources.length > 1 && <details aria-label="可选示例版本"><summary>更换示例版本</summary><label>示例版本<select aria-label="巡检示例版本" value={exampleSource} onChange={event => setExampleSource(event.target.value)}>{exampleSources.map(source => <option key={source.source} value={source.source}>{versionName(source.experiment_id)}{source.active ? ' · 当前启用' : ''}</option>)}</select></label></details>}<button type="button" disabled={sending || !selectedExample} onClick={() => void launchExample()}>开始体验</button></> : exampleError ? <p>暂时无法核对示例资产，请稍后重新打开体验入口。</p> : <><p>当前工作区尚未安装带工具的巡检示例。可以先构建一个只整理用户给定模拟数据的智能体，或到智能体管理接入已有版本。</p><div><button type="button" onClick={() => { fillExampleTask(); setExampleOpen(false) }}>构建一个基础示例</button><button type="button" onClick={() => navigate('agents')}>查看智能体管理</button></div></>}
         {exampleError && <p role="alert">{exampleError}</p>}
       </div>}
     </section></aside>

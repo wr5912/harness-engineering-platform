@@ -5,7 +5,7 @@ import vm from 'node:vm'
 import test from 'node:test'
 import { build } from 'esbuild'
 
-// 编译实际页面源码；只隔离原生管理器入口、React 调度和 RPC 网络边界。
+// 编译实际页面源码；只隔离原生管理器与提示/模态入口、React 调度和 RPC 网络边界。
 const compiled = await build({
   stdin: { contents: readFileSync(new URL('../src/mcp/client.tsx', import.meta.url), 'utf8') + '\nexport { CompositionPage };', resolveDir: new URL('../src/mcp/', import.meta.url).pathname, loader: 'tsx' },
   bundle: true, write: false, format: 'cjs', platform: 'node', packages: 'external', jsx: 'automatic',
@@ -28,7 +28,7 @@ function client() {
     useEffect(effect, next = []) { const index = cursor++; if (!deps[index] || next.some((value, at) => value !== deps[index][at])) { deps[index] = next; effects.push(() => { cleanups[index]?.(); cleanups[index] = effect() }) } },
   }
   const module = { exports: {} }
-  vm.runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, require: name => name === 'react' ? react : require(name), URL, Blob,
+  vm.runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, require: name => name === 'react' ? react : name === '@deepseek-ai/dsh-client-ui-primitives' ? { Tooltip: props => props.children, Modal: props => props.open ? props.children : null } : require(name), URL, Blob,
     window: { addEventListener() {}, removeEventListener() {} }, requestAnimationFrame: callback => callback(),
     document: { baseURI: 'http://127.0.0.1:3090/hep/' } })
   // 子组件通过实际页面元素传出，保持与生产引用相同的函数。
@@ -112,6 +112,8 @@ test('总组合固定子版本可编辑，切换引用清空旧版本，非法�
   select('已发布子组合').props.onChange({ target: { value: 'threat-infer' } })
   assert.equal(changed.steps[0].compositionId, 'threat-infer')
   assert.equal(changed.steps[0].versionId, '')
+  const stepInputs = editor.nodes().find(node => typeof node.type === 'function' && node.type.name === 'StepInputFields')
+  editor.mount(stepInputs.type, stepInputs.props)
   const mapping = editor.nodes().find(node => typeof node.type === 'function' && node.type.name === 'InputMapping')
   let accepted, validity
   editor.mount(mapping.type, { value: mapping.props.value, change: value => { accepted = value } })
@@ -171,4 +173,202 @@ test('切换运行后旧上下文响应不能覆盖新运行状态', async t => 
   assert.match(ui.text(), /run-next/)
   assert.match(ui.text(), /研判状态：model_failed/)
   assert.doesNotMatch(ui.text(), /run-first/)
+})
+
+
+async function modelEditor(value, rpc) {
+  const ui = await page({ call: async () => ({ ok: true, value: state }) })
+  ui.nodes().find(node => node.type === 'button' && ui.text(node).startsWith('threat-inferthreat-infer')).props.onClick(); ui.render()
+  ui.button('继续编辑草稿').props.onClick(); ui.render()
+  const fields = ui.nodes().find(node => typeof node.type === 'function' && node.type.name === 'ThreatConfigurationFields')
+  ui.mount(fields.type, { ...fields.props, value: { ...stage('infer', 'infer').draft, bindings: value }, rpc })
+  const bindings = ui.nodes().find(node => typeof node.type === 'function' && node.type.name === 'BindingsFields')
+  ui.mount(bindings.type, bindings.props)
+  const model = ui.nodes().find(node => typeof node.type === 'function' && node.type.name === 'ThreatModelField')
+  const changed = []
+  ui.mount(model.type, { ...model.props, change(value) { changed.push(value); ui.props().value = value } })
+  await tick(); ui.render()
+  return { ui, changed, select: label => ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === label) }
+}
+const platformModels = { catalog: { groups: [{ id: 'login-model', name: '平台登录', models: [{ id: 'account-model', name: '登录模型', reasoning: { defaultEffort: 'adaptive', efforts: [{ id: 'adaptive', name: '自动推理' }, { id: 'precise', name: '精确推理' }] } }] }], routableProviders: ['login-model'] }, business_allowed: [] }
+
+test('研判模型使用真实平台目录与模型推理档位，不受业务实例范围或硬编码默认限制', async t => {
+  const calls = []
+  const view = await modelEditor({ socConnectionId: 'soc', reportConnectionId: 'report' }, { call: async (_channel, endpoint) => { calls.push(endpoint); return { ok: true, value: platformModels } } })
+  const { ui, select, changed } = view; t.after(ui.dispose)
+  select('研判模型使用方式').props.onChange({ target: { value: 'explicit' } }); ui.render()
+  assert.deepEqual(JSON.parse(JSON.stringify(changed.at(-1).model)), { provider: '', model: '' })
+  assert.equal(select('研判模型').props.required, true)
+  assert.equal(select('研判模型').props.value, '')
+  assert.match(ui.text(), /登录模型/)
+  select('研判模型').props.onChange({ target: { value: JSON.stringify(['login-model', 'account-model']) } }); ui.render()
+  assert.deepEqual(JSON.parse(JSON.stringify(changed.at(-1).model)), { provider: 'login-model', model: 'account-model' })
+  const efforts = ui.nodes(select('研判推理档位')).filter(node => node.type === 'option').map(node => node.props.value)
+  assert.deepEqual(efforts, ['', 'adaptive', 'precise'])
+  select('研判推理档位').props.onChange({ target: { value: 'precise' } }); ui.render()
+  assert.equal(changed.at(-1).model.reasoningEffort, 'precise')
+  assert.equal(ui.nodes().some(node => node.type === 'input'), false)
+  assert.deepEqual(calls, ['models/list'])
+})
+
+test('失效研判模型或档位保留原路由，读取失败可重试且不会发起模型调用', async t => {
+  const calls = []; let failed = true
+  const original = { provider: 'missing-provider', model: 'old-model', reasoningEffort: 'old-effort' }
+  const { ui, select, changed } = await modelEditor({ socConnectionId: 'soc', reportConnectionId: 'report', model: original }, { call: async (_channel, endpoint) => {
+    calls.push(endpoint)
+    return failed ? { ok: false, error: { message: '目录暂不可用' } } : { ok: true, value: platformModels }
+  } }); t.after(ui.dispose)
+  assert.match(ui.text(), /目录暂不可用/)
+  assert.match(ui.text(), /missing-provider \/ old-model/)
+  assert.equal(select('研判模型').props.disabled, true)
+  assert.equal(select('研判推理档位').props.value, 'old-effort')
+  assert.equal(changed.length, 0)
+  failed = false; ui.button('重试读取模型').props.onClick(); ui.render(); await tick(); ui.render()
+  assert.equal(select('研判模型').props.disabled, false)
+  assert.match(ui.text(), /原模型当前不可选/)
+  assert.match(ui.text(), /原档位当前不可选：old-effort/)
+  assert.equal(changed.length, 0)
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.props().value.model)), original)
+  assert.deepEqual(calls, ['models/list', 'models/list'])
+})
+
+test('取证结果继续下一阶段只带入同一真实Run，不自动执行或选择另一连接', async t => {
+  const calls = []
+  const runId = 'run-00000000-0000-4000-8000-000000000001'
+  const other = stage('other-infer', 'infer'); other.draft.bindings.socConnectionId = 'another-soc'
+  const ui = await page({ call: async (_channel, endpoint, payload) => {
+    calls.push({ endpoint, payload })
+    if (endpoint === 'mcp/executeComposition') return { ok: true, value: { ok: true, result: { run_id: runId, phase_status: 'completed', status: 'evidence_ready', route: 'five_source' } } }
+    if (endpoint === 'mcp/dryRunComposition') return { ok: true, value: { mode: 'dry', graph, checks: [], unverified: [], upstreamRequests: 0 } }
+    return { ok: true, value: { ...state, compositions: [...state.compositions, other] } }
+  } }); t.after(ui.dispose)
+  ui.nodes().find(node => node.type === 'button' && ui.text(node).startsWith('threat-collectthreat-collect')).props.onClick(); ui.render()
+  ui.nodes().find(node => node.props?.['aria-label'] === '组合事件 ID').props.onChange({ target: { value: 'INC-20261015-000001' } }); ui.render()
+  ui.button('实际执行组合工具').props.onClick(); await tick(); ui.render()
+  const next = ui.nodes().find(node => node.props?.['aria-label'] === '继续当前运行')
+  assert.equal(ui.nodes(next).filter(node => node.type === 'button').length, 1)
+  assert.match(ui.text(next), /继续模型研判.*threat-infer/)
+  ui.nodes(next).find(node => node.type === 'button').props.onClick(); ui.render()
+  assert.match(ui.text(), /已带入上一阶段返回的运行/)
+  assert.equal(ui.nodes().find(node => node.props?.['aria-label'] === '组合运行 ID').props.value, runId)
+  assert.equal(calls.filter(call => call.endpoint === 'mcp/executeComposition').length, 1)
+  assert.equal(ui.nodes().some(node => node.props?.['aria-label'] === '组合事件 ID'), false)
+  ui.button('测试（dry）').props.onClick(); await tick(); ui.render()
+  const dry = calls.find(call => call.endpoint === 'mcp/dryRunComposition')
+  assert.equal(dry.payload.compositionId, 'threat-infer')
+  assert.deepEqual(JSON.parse(JSON.stringify(dry.payload.input)), { run_id: runId })
+  ui.nodes().find(node => node.type === 'button' && ui.text(node).startsWith('threat-reportthreat-report')).props.onClick(); ui.render()
+  assert.equal(ui.nodes().find(node => node.props?.['aria-label'] === '组合运行 ID').props.value, '')
+  assert.doesNotMatch(ui.text(), /已带入上一阶段返回的运行/)
+})
+
+test('失败阶段不提示普通续跑，快速完成分支直接准备回写而不补跑模型', async t => {
+  let succeeded = false
+  let returned = { run_id: 'run-real', phase_status: 'failed', status: 'evidence_failed', route: 'five_source' }
+  const calls = []
+  const ui = await page({ call: async (_channel, endpoint) => { calls.push(endpoint); return { ok: true, value: endpoint === 'mcp/executeComposition' ? { ok: succeeded, result: returned } : state } } }); t.after(ui.dispose)
+  ui.nodes().find(node => node.type === 'button' && ui.text(node).startsWith('threat-collectthreat-collect')).props.onClick(); ui.render()
+  ui.nodes().find(node => node.props?.['aria-label'] === '组合事件 ID').props.onChange({ target: { value: 'INC-20261015-000001' } }); ui.render()
+  ui.button('实际执行组合工具').props.onClick(); await tick(); ui.render()
+  assert.equal(ui.nodes().some(node => node.props?.['aria-label'] === '继续当前运行'), false)
+  returned = { ...returned, phase_status: 'completed', status: 'completed', route: 'fast_path' }
+  ui.button('实际执行组合工具').props.onClick(); await tick(); ui.render()
+  assert.equal(ui.nodes().some(node => node.props?.['aria-label'] === '继续当前运行'), false)
+  succeeded = true
+  ui.button('实际执行组合工具').props.onClick(); await tick(); ui.render()
+  const next = ui.nodes().find(node => node.props?.['aria-label'] === '继续当前运行')
+  assert.match(ui.text(next), /继续结果回写/)
+  assert.doesNotMatch(ui.text(next), /继续模型研判/)
+  assert.equal(calls.filter(endpoint => endpoint === 'mcp/executeComposition').length, 3)
+})
+
+async function stepEditor(config, entries) {
+  const ui = await page({ call: async () => ({ ok: true, value: state }) })
+  ui.button('继续编辑草稿').props.onClick(); ui.render()
+  const fields = ui.nodes().find(node => typeof node.type === 'function' && node.type.name === 'ThreatConfigurationFields')
+  let changed
+  ui.mount(fields.type, { ...fields.props, value: config, entries, change(value) { changed = value; ui.props().value = value } })
+  return { ui, changed: () => changed }
+}
+const pinnedStages = ['collect', 'infer'].map(phase => { const config = stage(`pinned-${phase}`, phase).draft; return { id: `pinned-${phase}`, published: config, versions: [{ versionId: `${phase}-v1`, config }] } })
+
+test('步骤key自动生成且不提供编辑，新子步骤按真实入参建立事件与前序Run映射', async t => {
+  const view = await stepEditor({ ...parent.draft, steps: [] }, pinnedStages)
+  const { ui } = view; t.after(ui.dispose)
+  ui.button('增加子步骤').props.onClick(); ui.render()
+  assert.equal(view.changed().steps[0].id, 'step1')
+  assert.equal(ui.nodes().some(node => node.type === 'input' && node.props.value === 'step1'), false)
+  const select = (title, at = 0) => ui.nodes(ui.nodes().filter(node => node.type === 'label' && ui.text(node).startsWith(title))[at]).find(node => node.type === 'select')
+  select('已发布子组合').props.onChange({ target: { value: 'pinned-collect' } }); ui.render()
+  assert.deepEqual(JSON.parse(JSON.stringify(view.changed().steps[0].inputMap)), { incident_id: '$input.incident_id' })
+  select('固定发布版本').props.onChange({ target: { value: 'collect-v1' } }); ui.render()
+  ui.button('增加子步骤').props.onClick(); ui.render()
+  assert.equal(view.changed().steps[1].id, 'step2')
+  select('已发布子组合', 1).props.onChange({ target: { value: 'pinned-infer' } }); ui.render()
+  assert.deepEqual(JSON.parse(JSON.stringify(view.changed().steps[1].inputMap)), { run_id: '$steps.step1.run_id' })
+  assert.equal(view.changed().steps[0].id, 'step1')
+})
+
+test('高级映射与旧步骤引用不改写；资产输入不从事件或未知输出推测', async t => {
+  const complex = { incident_id: { nested: '$steps.legacy.run_id' } }
+  const config = { ...parent.draft, steps: [{ id: 'old-key', compositionId: 'pinned-collect', versionId: 'collect-v1', inputMap: complex }] }
+  const { ui } = await stepEditor(config, pinnedStages); t.after(ui.dispose)
+  const component = ui.nodes().find(node => typeof node.type === 'function' && node.type.name === 'StepInputFields')
+  const changes = []
+  ui.mount(component.type, { ...component.props, change(value) { changes.push(value) } })
+  assert.match(ui.text(), /保留已有高级映射/)
+  const mapping = ui.nodes().find(node => typeof node.type === 'function' && node.type.name === 'InputMapping')
+  ui.mount(mapping.type, mapping.props)
+  assert.equal(ui.nodes().find(node => typeof node.type === 'function' && node.type.name === 'DetailDrawer').props.title, '高级输入映射')
+  assert.deepEqual(JSON.parse(JSON.stringify(mapping.props.value)), complex)
+  assert.equal(changes.length, 0)
+  const asset = { id: 'assets', published: { toolName: 'assets', title: '资产查询', description: '', connectionId: 'soc' }, versions: [] }
+  asset.versions.push({ versionId: 'asset-v1', config: asset.published })
+  ui.mount(component.type, { step: { id: 'asset-step', compositionId: 'assets', versionId: 'asset-v1', inputMap: { asset: '' } }, previous: config.steps, entries: [...pinnedStages, asset], change(value) { changes.push(value) } })
+  const options = ui.nodes().filter(node => node.type === 'option')
+  assert.equal(options.some(node => String(node.props.value).startsWith('$input') || String(node.props.value).startsWith('$steps')), false)
+  assert.match(ui.text(), /资产 ID、主机名或 IP/)
+})
+
+
+test('复合子链不承诺Run输出，常见来源不从复合结果自动制造运行引用', async t => {
+  const child = { ...parent.draft, steps: [{ id: 'assets', compositionId: 'assets', versionId: 'asset-v1', inputMap: { asset: '9106' } }] }
+  const composite = { id: 'child-chain', published: child, versions: [{ versionId: 'chain-v1', config: child }] }
+  const view = await stepEditor({ ...parent.draft, steps: [{ id: 'chain', compositionId: 'child-chain', versionId: 'chain-v1', inputMap: { incident_id: '$input.incident_id' } }, { id: 'next', compositionId: '', versionId: '', inputMap: {} }] }, [...pinnedStages, composite]); const { ui } = view; t.after(ui.dispose)
+  const label = ui.nodes().filter(node => node.type === 'label' && ui.text(node).startsWith('已发布子组合'))[1]
+  ui.nodes(label).find(node => node.type === 'select').props.onChange({ target: { value: 'pinned-infer' } }); ui.render()
+  assert.deepEqual(JSON.parse(JSON.stringify(view.changed().steps[1].inputMap)), { run_id: '' })
+  const input = ui.nodes().filter(node => typeof node.type === 'function' && node.type.name === 'StepInputFields')[1]
+  ui.mount(input.type, input.props)
+  assert.equal(ui.nodes().filter(node => node.type === 'option').some(node => node.props.value === '$steps.chain.run_id'), false)
+  assert.match(ui.text(), /前序步骤尚无可引用的运行结果/)
+})
+
+test('高级映射抽屉关页保留非法输入，错误向草稿保存回传而不提交旧映射', async t => {
+  const calls = []
+  const ui = await page({ call: async (_channel, endpoint) => { calls.push(endpoint); return { ok: true, value: state } } }); t.after(ui.dispose)
+  ui.button('继续编辑草稿').props.onClick(); ui.render()
+  const fields = ui.nodes().find(node => typeof node.type === 'function' && node.type.name === 'ThreatConfigurationFields')
+  fields.props.onValidityChange(false); ui.render()
+  assert.equal(ui.button('保存草稿').props.disabled, true)
+  assert.equal(ui.button('暂存并返回详情').props.disabled, true)
+  ui.nodes().find(node => node.type === 'form').props.onSubmit({ preventDefault() {} }); await tick(); ui.render()
+  assert.equal(calls.includes('mcp/saveCompositionDraft'), false)
+  fields.props.onValidityChange(true); ui.render()
+  assert.equal(ui.button('保存草稿').props.disabled, false)
+  let validity
+  ui.mount(fields.type, { ...fields.props, value: parent.draft, active: true, identity: 'parent:r1', onValidityChange(value) { validity = value } })
+  const step = ui.nodes().find(node => typeof node.type === 'function' && node.type.name === 'StepInputFields')
+  ui.mount(step.type, step.props)
+  const mapping = ui.nodes().find(node => typeof node.type === 'function' && node.type.name === 'InputMapping')
+  let error
+  ui.mount(mapping.type, { ...mapping.props, onValidityChange(value) { error = value } })
+  ui.nodes().find(node => node.type === 'textarea').props.onChange({ target: { value: '{bad' }, currentTarget: { setCustomValidity() {} } }); ui.render()
+  assert.equal(error, '输入映射必须是 JSON 对象')
+  ui.props().active = false; ui.render()
+  assert.equal(ui.nodes().find(node => node.type === 'textarea').props.value, '{bad')
+  const drawer = ui.nodes().find(node => typeof node.type === 'function' && node.type.name === 'DetailDrawer')
+  assert.equal(drawer.props.active, false)
+  assert.equal(drawer.props.identity, 'parent:r1:collect')
+  assert.match(ui.text(), /未完成的输入仍保留/)
 })

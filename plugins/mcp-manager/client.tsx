@@ -20,6 +20,9 @@ window.__ModuleLoader__.load({
       .mcp-manager{--mcp-ink:var(--hep-text,var(--dsw-alias-label-primary,#20344c));--mcp-muted:var(--hep-muted,var(--dsw-alias-label-secondary,#607186));--mcp-line:var(--hep-border,var(--dsw-alias-border-l3,#dfe6ee));--mcp-tint:var(--hep-surface-muted,color-mix(in srgb,var(--mcp-surface) 96%,#0075ca));--mcp-blue:var(--hep-primary,#0075ca);--mcp-link:var(--hep-link,#0075ca);--mcp-surface:var(--hep-surface,var(--dsw-alias-bg-layer-1,#fff));--mcp-active:var(--hep-primary-soft,color-mix(in srgb,var(--mcp-surface) 92%,var(--mcp-blue)));width:100%;max-width:1200px;margin:20px auto 40px;color:var(--mcp-ink);font-size:14px;line-height:1.6}
       body[data-ds-dark-theme] .mcp-manager{--mcp-link:var(--hep-link,var(--dsw-alias-link,#7aaaff))}
       .mcp-manager *{box-sizing:border-box}
+      .mcp-loading-indicator{display:inline-block;width:16px;height:16px;border:2px solid var(--mcp-line);border-top-color:var(--mcp-blue);border-radius:50%;animation:mcp-loading-spin .8s linear infinite}
+      @keyframes mcp-loading-spin{to{transform:rotate(360deg)}}
+      @media(prefers-reduced-motion:reduce){.mcp-loading-indicator{animation:none}}
       .mcp-manager button,.mcp-manager input,.mcp-manager select{font:inherit}
       .mcp-manager button{cursor:pointer;min-height:40px;padding:8px 12px;border:1px solid var(--mcp-line);border-radius:var(--hep-control-radius,8px);background:var(--mcp-surface);color:var(--mcp-ink);line-height:1.4;transition:background var(--hep-motion-fast,140ms),border-color var(--hep-motion-fast,140ms),box-shadow var(--hep-motion-fast,140ms),transform var(--hep-motion-fast,140ms)}
       .mcp-manager button:hover:not(:disabled){background:var(--mcp-tint);border-color:color-mix(in srgb,var(--mcp-blue) 32%,var(--mcp-line))}
@@ -51,7 +54,6 @@ window.__ModuleLoader__.load({
       .mcp-manager .mcp-service-facts{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px;color:var(--mcp-muted);font-size:12px}
       .mcp-manager .mcp-service-facts>span{overflow-wrap:anywhere}
       .mcp-manager .mcp-add{width:100%;margin-top:8px;border:1px dashed var(--mcp-line);background:transparent;color:var(--mcp-link);padding:10px;font-weight:500}
-      .mcp-manager .mcp-sidebar-note{margin:16px 0 0;padding:14px 0 0;border-top:1px solid var(--mcp-line);color:var(--mcp-muted);font-size:11px;line-height:1.8}
       .mcp-manager .mcp-card-head{display:flex;align-items:start;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-bottom:20px;border-bottom:1px solid var(--mcp-line)}
       .mcp-manager .mcp-card-head>div{min-width:0}.mcp-manager .mcp-card-head p{margin:6px 0 0}.mcp-manager .mcp-card-head .mcp-switch{flex:none;margin:0}
       .mcp-manager .mcp-card-head .mcp-actions{margin:0}.mcp-manager .mcp-card-head .mcp-switch{align-self:center}
@@ -66,8 +68,8 @@ window.__ModuleLoader__.load({
       .mcp-manager .mcp-discovered-list li>div{min-width:0;overflow-wrap:anywhere}.mcp-manager .mcp-discovered-list li p{margin:6px 0 0;font-size:12px}.mcp-manager .mcp-discovered-list li button{flex:none}
       .mcp-manager .mcp-section{padding-top:24px}.mcp-manager .mcp-section+.mcp-section{margin-top:24px;border-top:1px solid var(--mcp-line)}
       .mcp-manager .mcp-section h3{margin-bottom:16px}.mcp-manager .mcp-section>p{margin:0 0 16px}
-      .mcp-manager .mcp-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 24px}
-      .mcp-manager label.mcp-field{display:grid;gap:8px;min-width:0;color:var(--mcp-ink);font-weight:500}
+      .mcp-manager .mcp-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:16px 24px}
+      .mcp-manager label.mcp-field{display:grid;align-content:start;gap:8px;min-width:0;color:var(--mcp-ink);font-weight:500}
       .mcp-manager .mcp-field input,.mcp-manager .mcp-field select{width:100%;min-width:0;min-height:40px;padding:8px 12px;border:1px solid var(--mcp-line);border-radius:var(--hep-control-radius,8px);background:var(--mcp-surface);color:var(--mcp-ink);font-weight:400;transition:border-color var(--hep-motion-fast,140ms),box-shadow var(--hep-motion-fast,140ms)}
       .mcp-manager .mcp-field input:focus,.mcp-manager .mcp-field select:focus{border-color:var(--mcp-blue);box-shadow:0 0 0 3px var(--mcp-active)}
       .mcp-manager .mcp-field small{font-size:12px;color:var(--mcp-muted);font-weight:400}
@@ -101,10 +103,13 @@ window.__ModuleLoader__.load({
       @media(max-width:760px){.mcp-manager .mcp-selection-search{flex-basis:100%}}
       @media(max-width:760px){.mcp-manager .mcp-toolbar{align-items:start;flex-direction:column;padding:16px}.mcp-manager .mcp-tabs{gap:20px}.mcp-manager .mcp-layout{grid-template-columns:minmax(0,1fr)}.mcp-manager .mcp-service-layout>.mcp-sidebar{display:none}.mcp-manager .mcp-mobile-service-picker{display:flex;align-items:end;gap:8px;min-width:0}.mcp-manager .mcp-mobile-service-picker label{display:grid;gap:5px;min-width:0;flex:1;color:var(--mcp-muted);font-size:12px}.mcp-manager .mcp-mobile-service-picker select{width:100%;min-width:0;min-height:44px;padding:8px;border:1px solid var(--mcp-line);border-radius:var(--hep-control-radius,8px);background:var(--mcp-surface);color:var(--mcp-ink)}.mcp-manager .mcp-service-summary{grid-template-columns:minmax(0,1fr)}.mcp-manager .mcp-card-head .mcp-actions{width:100%}.mcp-manager .mcp-card-head .mcp-actions>button{flex:1}.mcp-manager .mcp-fields,.mcp-manager .mcp-tools{grid-template-columns:minmax(0,1fr)}.mcp-manager .mcp-card{padding:16px}}
       @media(pointer:coarse){.mcp-manager button,.mcp-manager .mcp-field input,.mcp-manager .mcp-field select{min-height:44px}.mcp-manager .mcp-switch input,.mcp-manager .mcp-check input{width:20px;height:20px}}
+      .mcp-manager .mcp-layout{grid-template-columns:224px minmax(0,1fr);gap:16px}.mcp-manager .mcp-sidebar{padding:16px}.mcp-manager .mcp-card{border-radius:10px;padding:18px}.mcp-manager .mcp-service-summary{display:flex;flex-wrap:wrap;gap:8px 20px;margin:0;padding:12px 0;background:var(--mcp-tint);border-bottom:1px solid var(--mcp-line)}.mcp-manager .mcp-service-summary article{display:flex;align-items:baseline;gap:7px;min-width:0;padding:0;border:0;background:transparent}.mcp-manager .mcp-service-summary strong{font-size:13px}.mcp-manager .mcp-service-summary small{font-size:12px}.mcp-manager .mcp-service-summary article>small:last-child{display:none}.mcp-manager .mcp-discovered-list li{border:0;border-bottom:1px solid var(--mcp-line);padding:14px 0;margin:0;border-radius:0}.mcp-manager .mcp-service-scope{border:0;background:transparent;padding:8px 0;font-size:12px}.mcp-manager .mcp-service-search{font-size:0;gap:0}.mcp-manager .mcp-service-search input{font-size:13px}.mcp-manager .mcp-list-item{border-radius:0;margin:8px -18px 0;width:calc(100% + 36px);padding:15px 16px;border-left:3px solid transparent}.mcp-manager .mcp-list-item[aria-current=true]{border-color:transparent;border-left-color:var(--mcp-blue)}
+      .mcp-manager .mcp-debug-target{display:flex;align-items:center;gap:16px;flex-wrap:wrap}.mcp-manager .mcp-debug-target>.hep-search-select,.mcp-manager .mcp-debug-target>label{width:min(350px,100%)}.mcp-manager .mcp-debug-target>div:not(.hep-search-select){flex:1;min-width:0}.mcp-manager .mcp-debug-target small{display:block;overflow-wrap:anywhere;margin-top:5px}.mcp-manager .mcp-debug-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-top:16px}.mcp-manager .mcp-debug-parameters>.mcp-field,.mcp-manager .mcp-debug-parameters>.hep-search-select{margin-top:16px}.mcp-manager .mcp-debug-parameters textarea{width:100%;resize:vertical;min-height:180px;font:13px/1.7 monospace;padding:12px;background:var(--mcp-tint);border:1px solid var(--mcp-line);border-radius:7px;color:var(--mcp-ink)}.mcp-manager .mcp-debug-schema{margin:16px 0;font-size:12px;color:var(--mcp-muted)}.mcp-manager .mcp-debug-schema summary{cursor:pointer;margin-bottom:10px}.mcp-manager .mcp-debug-schema pre{max-height:240px;overflow:auto}.mcp-manager .mcp-debug-result{min-height:400px}.mcp-manager .mcp-debug-result .mcp-result{margin-top:0;border:0;padding:14px;max-height:560px;white-space:pre}.mcp-manager .mcp-debug-result .mcp-empty{padding:80px 12px}.mcp-manager .mcp-debug-choice{text-align:left;width:100%}.mcp-manager .mcp-debug-choice small{display:block;overflow-wrap:anywhere}.mcp-manager .mcp-debug-choice[aria-pressed=true]{background:var(--mcp-active);border-color:var(--mcp-blue)}.mcp-manager .mcp-debug-legacy{margin-top:16px}.mcp-manager .mcp-debug-legacy>summary{cursor:pointer;color:var(--mcp-muted);font-size:12px}
+      @media(max-width:760px){.mcp-manager .mcp-layout,.mcp-manager .mcp-debug-layout{grid-template-columns:minmax(0,1fr)}.mcp-manager .mcp-debug-target{align-items:stretch}.mcp-manager .mcp-debug-target>.hep-search-select{width:100%}.mcp-manager .mcp-debug-result{min-height:240px}.mcp-manager .mcp-debug-target>button{margin-left:auto}}
       @media(prefers-reduced-motion:reduce){.mcp-manager button,.mcp-manager input,.mcp-manager select,.mcp-manager summary::before{transition:none}.mcp-manager button:active:not(:disabled){transform:none}}
     `
 
-    function Manager({ view, form, write, publishedService, selectedServerId, selectedGroupId, onSelectServerId, onSelectGroupId, onOpenView, onValidationError, toolbarTarget, renderToolbar, PasswordInput }) {
+    function Manager({ view, form, write, publishedService, selectedServerId, selectedGroupId, onSelectServerId, onSelectGroupId, onOpenView, onValidationError, toolbarTarget, renderToolbar, PasswordInput, SearchSelect }) {
       const state = form?.state
       const input = (value, change, props = {}) => props.type === 'password' && !props.readOnly && PasswordInput
         ? <PasswordInput value={value ?? ''} onChange={event => change(event.target.value)} {...props} />
@@ -116,6 +121,9 @@ window.__ModuleLoader__.load({
       const [selected, setSelected] = useState('')
       const [sources, setSources] = useState(null)
       const [sourceId, setSourceId] = useState('')
+      const [legacyToolName, setLegacyToolName] = useState('')
+      const [legacyArguments, setLegacyArguments] = useState('{}')
+      const [legacyResult, setLegacyResult] = useState(null)
       const [specName, setSpecName] = useState('')
       const [specUrl, setSpecUrl] = useState(defaultSpec)
       const [toolName, setToolName] = useState('')
@@ -133,18 +141,44 @@ window.__ModuleLoader__.load({
       const [activeServer, setActiveServer] = useState(0)
       const [serverQuery, setServerQuery] = useState('')
       const [selectionQueries, setSelectionQueries] = useState(new Map())
+      const [scopeQueries, setScopeQueries] = useState({})
       const [servicePane, setServicePane] = useState('tools')
       const [activeGroup, setActiveGroup] = useState(0)
       const [tokenVisible, setTokenVisible] = useState(false)
       const [templateUri, setTemplateUri] = useState('')
       const [templateArguments, setTemplateArguments] = useState('{}')
+      const [debugType, setDebugType] = useState('tools')
+      const [debugQuery, setDebugQuery] = useState('')
+      const [resultBasis, setResultBasis] = useState(null)
+      const diagnosticDrafts = React.useRef(new Map())
+      const diagnosticReceipts = React.useRef(new Map())
+      const capabilityRequests = React.useRef(new Map())
+      const diagnosticGeneration = React.useRef(0)
+      const diagnosticView = React.useRef('')
+      const previousDiagnostic = React.useRef('')
+      const diagnosticInputs = React.useRef(null)
+      const toolDrafts = React.useRef(new Map())
+      const templateDrafts = React.useRef(new Map())
+      const selectionKey = selected || state?.value?.servers?.[0]?.id || ''
+      if (!previousDiagnostic.current || previousDiagnostic.current === selectionKey) diagnosticInputs.current = { toolName, argumentsText, uriText, templateUri, templateArguments, debugType, result, resultBasis }
+      useEffect(() => {
+        if (previousDiagnostic.current === selectionKey) return
+        if (previousDiagnostic.current) diagnosticDrafts.current.set(previousDiagnostic.current, diagnosticInputs.current)
+        const saved = diagnosticDrafts.current.get(selectionKey)
+        previousDiagnostic.current = selectionKey
+        setToolName(initialTool.current || saved?.toolName || ''); initialTool.current = ''
+        setArgumentsText(saved?.argumentsText || '{}'); setUriText(saved?.uriText || '')
+        setTemplateUri(saved?.templateUri || ''); setTemplateArguments(saved?.templateArguments || '{}')
+        setDebugType(saved?.debugType || 'tools'); setResult(saved?.result || null); setResultBasis(saved?.resultBasis || null); setDebugQuery('')
+      }, [selectionKey])
       const diagnosticRequest = React.useRef(0)
       const diagnosticTarget = React.useRef('')
       const initialTool = React.useRef('')
+      useEffect(() => { setBusy(capabilityRequests.current.has(diagnosticView.current)); if (page === 'connection') setStatus('') }, [debugType, toolName, uriText, templateUri])
       const page = ['servers', 'groups', 'connection'].includes(view) ? view : localPage
       const setPage = next => { setLocalPage(next); if (next === 'servers') onValidationError?.() }
       const openGroupDiagnostic = groupId => { setSelected(`group:${groupId}`); if (onOpenView) onOpenView('connection', undefined, groupId); else setPage('connection') }
-      const openDiagnostic = (serverId, name) => { setSelected(serverId); initialTool.current = name ?? ''; if (name) setToolName(name); if (onOpenView) onOpenView('connection', serverId); else setPage('connection') }
+      const openDiagnostic = (serverId, name) => { if (name) { initialTool.current = name; setToolName(name); setArgumentsText(toolDrafts.current.get(`${serverId}:${name}`) || '{}'); setDebugType('tools'); setResult(null); setResultBasis(null) }; setSelected(serverId); if (onOpenView) onOpenView('connection', serverId); else setPage('connection') }
       const copy = async (key, value, onCopied = () => {}) => {
         try {
           await copyText(value)
@@ -194,11 +228,11 @@ window.__ModuleLoader__.load({
         if (index >= 0) setActiveGroup(index)
       }, [selectedGroupId, draft?.groups])
       useEffect(() => {
-        diagnosticRequest.current++
-        setBusy(false); setSources(null); setResult(null); setCatalog(null); if (page === 'connection') setStatus(''); setToolName(initialTool.current); initialTool.current = ''; setArgumentsText('{}'); setUriText(''); setTemplateUri(''); setTemplateArguments('{}')
+        diagnosticRequest.current++; diagnosticGeneration.current++; capabilityRequests.current.clear()
+        setBusy(false); setSources(null); setCatalog(null); setLegacyResult(null); if (page === 'connection') setStatus('')
       }, [selected, state?.revision])
       if (view === 'summary') return <>通过 OpenAPI 规范生成 MCP tools/resources，并管理分组链接。</>
-      if (!draft || !state) return <p>正在读取 MCP 配置…</p>
+      if (!draft || !state) return <div className="mcp-manager" role="status" aria-label="读取 MCP 配置" aria-busy="true"><style>{styles}</style><span className="mcp-loading-indicator" aria-hidden="true" /></div>
 
       const visibleServers = [...draft.servers, ...(publishedService ? [publishedService] : [])]
       const filteredServers = visibleServers.map((server, index) => ({ server, index })).filter(({ server }) =>
@@ -208,7 +242,7 @@ window.__ModuleLoader__.load({
       const serverDraftChanged = server => !server.platformComposition && JSON.stringify(server) !== JSON.stringify((state.value.servers ?? []).find(item => item.id === server.id))
       const checkOf = server => server && !serverDraftChanged(server) && checks[server.id]?.revision === state.revision ? checks[server.id] : null
       const editServer = (index, field, value) => {
-        clearCheck(draft.servers[index]?.id)
+        if (field !== 'tools') clearCheck(draft.servers[index]?.id)
         if (field === 'id' && selectedServerId === draft.servers[index]?.id) {
           setActiveServer(index)
           onSelectServerId?.(value)
@@ -244,10 +278,19 @@ window.__ModuleLoader__.load({
       const diagnosticServer = isGroup ? null : selected ? savedServers.find(server => server.id === selected) : savedServers[0]
       const diagnosticId = (isGroup ? diagnosticGroup : diagnosticServer)?.id ?? ''
       const targetKey = `${isGroup ? 'group' : 'server'}:${diagnosticId}:${state.revision}`
+      const diagnosticSignature = JSON.stringify(debugType === 'tools' ? { type: debugType, toolName, argumentsText } : debugType === 'templates' ? { type: debugType, templateUri, templateArguments } : { type: debugType, uriText })
       diagnosticTarget.current = targetKey
+      diagnosticView.current = `${selectionKey}:${debugType}:${debugType === 'tools' ? toolName : debugType === 'templates' ? templateUri : uriText}`
       const call = async (action, extra = {}) => {
         const requestId = ++diagnosticRequest.current
-        const current = () => diagnosticTarget.current === targetKey && diagnosticRequest.current === requestId
+        const generation = diagnosticGeneration.current
+        const execution = action === 'callTool' || action === 'readResource'
+        const capability = action === 'readResource' ? extra.uri || extra.uriTemplate : toolName
+        const receiptKey = `${selectionKey}:${debugType}:${capability}`
+        if (execution) capabilityRequests.current.set(receiptKey, requestId)
+        const current = () => diagnosticTarget.current === targetKey && diagnosticGeneration.current === generation
+          && (execution ? capabilityRequests.current.get(receiptKey) === requestId : diagnosticRequest.current === requestId)
+        const visible = () => !execution || diagnosticView.current === receiptKey
         setBusy(true)
         setStatus('')
         if (action === 'test') setCatalog(null)
@@ -260,13 +303,19 @@ window.__ModuleLoader__.load({
           const data = await response.json()
           if (!current()) return
           if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`)
-          setResult(action === 'test' ? null : data)
+          if (['sources', 'create', 'refresh', 'toggle', 'components', 'logs', 'preview', 'invoke'].includes(action)) setLegacyResult(data)
+          else if (execution) {
+            const basis = { targetKey, signature: diagnosticSignature, object: `${isGroup ? '分组' : '服务'} ${diagnosticId}`, capability, at: new Date().toLocaleString() }
+            diagnosticReceipts.current.set(receiptKey, { result: data, basis })
+            if (visible()) { setResult(data); setResultBasis(basis) }
+          }
           if (action === 'sources' || action === 'create' || action === 'refresh' || action === 'toggle') {
             const list = action === 'sources' ? data : await callSources(diagnosticId)
             if (!current()) return
             setSources(list)
           }
           if (action === 'test') {
+            if ((data.tools ?? []).length && !(data.tools ?? []).some(tool => tool.name === toolName)) { setToolName(data.tools[0].name); setArgumentsText(toolDrafts.current.get(`${selectionKey}:${data.tools[0].name}`) || '{}') }
             setCatalog({ targetKey, ...(isGroup ? { groupId: diagnosticId } : { serverId: diagnosticId }), data })
             if (!isGroup) {
             setDiscovered(previous => ({ ...previous,
@@ -279,10 +328,10 @@ window.__ModuleLoader__.load({
               kind: (state.value.servers ?? []).find(server => server.id === diagnosticId)?.specUrl ? 'openapi' : 'mcp' } }))
             }
           }
-          setStatus(action === 'test' ? (data.toolsUnavailable || data.resources?.unavailable || data.resourceTemplates?.unavailable ? '部分列表读取失败，已保留可用的发现结果；可重试发现。' : isGroup ? '已连接已发布分组端点并读取能力列表；业务效果请以实际调用结果为准。' : '配置解析与工具发现成功；新会话仍需单独验证。')
+          if (visible()) setStatus(action === 'test' ? (data.toolsUnavailable || data.resources?.unavailable || data.resourceTemplates?.unavailable ? '部分列表读取失败，已保留可用的发现结果；可重试发现。' : isGroup ? '已连接已发布分组端点并读取能力列表；业务效果请以实际调用结果为准。' : '配置解析与工具发现成功；新会话仍需单独验证。')
             : '上游操作已返回；请检查下方结果和新会话。')
-        } catch (error) { if (!current()) return; if (action === 'test' && !isGroup) setChecks(previous => ({ ...previous, [diagnosticId]: { at: new Date().toLocaleString(), revision: state.revision, failed: true } })); setStatus(String(error)) }
-        finally { if (current()) setBusy(false) }
+        } catch (error) { if (!current()) return; if (action === 'test' && !isGroup) setChecks(previous => ({ ...previous, [diagnosticId]: { at: new Date().toLocaleString(), revision: state.revision, failed: true } })); if (visible()) setStatus(String(error)) }
+        finally { if (current()) { if (execution) capabilityRequests.current.delete(receiptKey); if (visible()) setBusy(false) } }
       }
       const callSources = async serverId => {
         const response = await fetch(new URL('api/mcp-manager', document.baseURI), { method: 'POST', credentials: 'same-origin',
@@ -293,9 +342,15 @@ window.__ModuleLoader__.load({
         return data
       }
       const callTool = action => {
-        try { void call(action, { sourceId, toolName, arguments: JSON.parse(argumentsText) }) }
+        try { void call(action, { sourceId, toolName: action === 'callTool' ? toolName : legacyToolName, arguments: JSON.parse(action === 'callTool' ? argumentsText : legacyArguments) }) }
         catch (error) { setStatus(`工具参数 JSON 无效：${String(error)}`) }
       }
+      const restoreDiagnosticReceipt = (kind, name) => { const saved = diagnosticReceipts.current.get(`${selectionKey}:${kind}:${name}`); setResult(saved?.result ?? null); setResultBasis(saved?.basis ?? null) }
+      const selectDebugTool = name => { toolDrafts.current.set(`${selectionKey}:${toolName}`, argumentsText); setToolName(name); setArgumentsText(toolDrafts.current.get(`${selectionKey}:${name}`) || '{}'); restoreDiagnosticReceipt('tools', name) }
+      const selectDebugTemplate = uri => { templateDrafts.current.set(`${selectionKey}:${templateUri}`, templateArguments); setTemplateUri(uri); setTemplateArguments(templateDrafts.current.get(`${selectionKey}:${uri}`) || '{}'); restoreDiagnosticReceipt('templates', uri) }
+      const selectDebugType = kind => { setDebugType(kind); setDebugQuery(''); restoreDiagnosticReceipt(kind, kind === 'tools' ? toolName : kind === 'templates' ? templateUri : uriText) }
+      const objectSelect = props => SearchSelect ? <SearchSelect {...props}/> : <label className="mcp-field">{props.label}<select value={props.value} onChange={event => props.onChange(event.target.value)}><option value="">{props.placeholder || '请选择'}</option>{props.options.map(option => <option key={option.value} value={option.value} disabled={option.disabled}>{option.label}</option>)}</select></label>
+      const downloadResult = () => { const url = URL.createObjectURL(new Blob([JSON.stringify({ ...resultBasis, result }, null, 2)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = 'mcp-debug-result.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 0) }
       const save = async (value = draft) => {
         setBusy(true)
         setStatus('')
@@ -360,6 +415,16 @@ window.__ModuleLoader__.load({
       const editingServer = visibleServers[currentServerIndex]
       const currentCheck = checkOf(editingServer)
       const currentTools = currentCheck && !currentCheck.failed ? (catalog?.serverId === editingServer?.id ? catalog.data.tools ?? [] : discovered[editingServer?.id] ?? []) : []
+      // 工具范围草稿不改变连接目录；连接资料变化后仍需保存并重新发现。
+      const savedEditingServer = (state.value.servers ?? []).find(server => server.id === editingServer?.id)
+      const scopeCheck = checks[editingServer?.id]
+      const scopeCatalog = scopeCheck && !scopeCheck.failed && scopeCheck.revision === state.revision
+        && JSON.stringify({ ...editingServer, tools: undefined }) === JSON.stringify({ ...savedEditingServer, tools: undefined })
+        ? discovered[editingServer?.id] : undefined
+      const scopeQuery = scopeQueries[editingServer?.id] ?? ''
+      const scopeNames = editingServer?.tools?.names ?? []
+      const scopeOptions = [...(scopeCatalog ?? []), ...scopeNames.filter(name => !(scopeCatalog ?? []).some(tool => tool.name === name))
+        .map(name => ({ name, unavailable: true }))].filter(tool => `${tool.name} ${tool.description ?? ''}`.toLowerCase().includes(scopeQuery.trim().toLowerCase()))
       const editingGroup = draft.groups[activeGroup]
       const selectedNames = new Map()
       for (const member of editingGroup?.members ?? []) {
@@ -432,34 +497,31 @@ window.__ModuleLoader__.load({
                       : ['连接待检查', 'neutral']
                     return <button key={index} className="mcp-list-item" data-server-id={server.id} type="button" aria-current={currentServerIndex === index ? 'true' : undefined} onClick={() => { setActiveServer(index); setServicePane('tools'); onSelectServerId?.(server.id) }}>
                       <span className="mcp-service-title">{server.platformComposition ? server.description || '工具组合编排（已发布）' : server.serverName || server.id || '新服务器'}</span>
-                      <span className="mcp-service-desc">{server.platformComposition ? '由已发布组合生成' : server.description || '用途未填写'}</span>
+                      {server.platformComposition ? <span className="mcp-service-desc">由已发布组合生成</span> : server.description?.trim() && server.description.trim() !== (server.serverName || server.id || '').trim() && <span className="mcp-service-desc">{server.description}</span>}
                       <span className="mcp-service-badge" data-state={badge[1]}>{badge[0]}</span>
                     </button>
                   })}
                   {visibleServers.length > 0 && filteredServers.length === 0 && <p className="mcp-muted">没有匹配的服务，请调整搜索内容。</p>}
                   <button className="mcp-add" type="button" onClick={addServer}>＋ 新增服务器</button>
-                  <p className="mcp-sidebar-note">列表显示本页最近一次检查状态。工具发现和业务可用性请查看右侧详情并在目标环境验证。</p>
                 </aside>
                 <div className="mcp-mobile-service-picker"><label>当前服务<select value={editingServer ? currentServerIndex : -1} onChange={event => { const index = Number(event.target.value); setActiveServer(index); setServicePane('tools'); onSelectServerId?.(visibleServers[index]?.id) }}>
                   <option value={-1}>请选择服务</option>{visibleServers.map((server, index) => <option key={index} value={index}>{server.platformComposition ? server.description || server.id : server.serverName || server.id || '新服务器'}</option>)}
                 </select></label><button type="button" onClick={addServer}>接入服务</button></div>
                 {editingServer?.platformComposition ? <div className="mcp-card">
                   <div className="mcp-card-head"><div><h3>{editingServer.description || '工具组合编排（已发布）'}</h3><p className="mcp-muted">已发布组合生成的服务，在「工具组合编排」工作区管理版本与发布。</p></div></div>
-                  <div className="mcp-service-facts" aria-label="当前服务检查范围"><span>配置：已发布工具目录</span><span>连接与工具发现：待检查</span><span>最近检查：本页尚未检查当前配置</span><span>验证范围：已发布目录可见；实际连接、调用和业务结果待验证</span></div>
+                  <div className="mcp-service-facts" aria-label="当前服务检查范围"><span>配置：已发布工具目录</span><span>连接与工具调用：待验证</span></div>
                   <section className="mcp-section"><h3>已发布工具</h3>{editingServer.publishedTools?.length ? <ul className="mcp-catalog">{editingServer.publishedTools.map(tool => <li key={tool.toolName || tool.name}><strong>{tool.toolName || tool.name}</strong>{tool.description && <small>{tool.description}</small>}</li>)}</ul> : <p className="mcp-muted">当前目录没有可列出的工具。</p>}</section>
                 </div> : editingServer ? <div className="mcp-card">
-                  <div className="mcp-card-head"><div><h3>{editingServer.serverName || editingServer.id || '新服务器'}</h3><p className="mcp-muted">{editingServer.description || editingServer.id || '填写 ID 与 OpenAPI 规范地址后保存'}</p></div>
+                  <div className="mcp-card-head"><div><h3>{editingServer.serverName || editingServer.id || '新服务器'}</h3>{editingServer.description?.trim() && editingServer.description.trim() !== (editingServer.serverName || editingServer.id || '').trim() && <p className="mcp-muted">{editingServer.description}</p>}</div>
                     <div className="mcp-actions"><button type="button" disabled={busy || !editingServer.id || serverDraftChanged(editingServer) || editingServer.enabled === false} onClick={() => void callTest(editingServer.id)}>连接测试</button><button className="mcp-primary" type="button" disabled={!editingServer.id} onClick={() => openDiagnostic(editingServer.id)}>调试工具</button><label className="mcp-switch"><input type="checkbox" checked={editingServer.enabled !== false} onChange={event => editServer(currentServerIndex, 'enabled', event.target.checked)} />启用</label></div>
                   </div>
                   <div className="mcp-service-summary" aria-label="当前服务状态">
-                    <article><small>连接状态</small><strong>{serverDraftChanged(editingServer) ? '配置未保存' : currentCheck?.failed ? '检查失败' : currentCheck ? currentCheck.kind === 'openapi' ? '规范已读取' : '连接成功' : '待检查'}</strong><small>{currentCheck ? `最近检查 ${currentCheck.at}` : '本页尚未检查当前配置'}</small></article>
+                    <article><small>连接状态</small><strong>{serverDraftChanged(editingServer) ? '配置未保存' : currentCheck?.failed ? '检查失败' : currentCheck ? currentCheck.kind === 'openapi' ? '规范已读取' : '连接成功' : '待检查'}</strong></article>
                     <article><small>工具发现</small><strong>{currentCheck && !currentCheck.failed ? `${currentCheck.tools} 个工具` : '待核对'}</strong><small>{currentCheck && !currentCheck.failed ? '已枚举工具定义' : '尚无可用的发现结果'}</small></article>
-                    <article><small>业务验证范围</small><strong>未验证</strong><small>请核对实际调用与目标业务结果</small></article>
                   </div>
-                  <p className="mcp-service-scope">{serverDraftChanged(editingServer) ? '当前配置未保存，保存后可重新检查连接与工具。' : currentCheck?.failed ? '本次检查失败，连接与工具发现仍待核对；实际调用和业务结果待验证。' : currentCheck ? '仅确认接口读取或工具枚举；实际调用和业务结果待验证。' : '尚未检查当前配置；连接、工具发现和实际调用均待验证。'}</p>
-                  <nav className="mcp-service-tabs" aria-label="服务详情"><button type="button" aria-current={servicePane === 'tools' ? 'page' : undefined} onClick={() => setServicePane('tools')}>工具与调试</button><button type="button" aria-current={servicePane === 'connection' ? 'page' : undefined} onClick={() => setServicePane('connection')}>连接配置</button><button type="button" aria-current={servicePane === 'recent' ? 'page' : undefined} onClick={() => setServicePane('recent')}>最近检查</button></nav>
+                  <p className="mcp-service-scope">{currentCheck ? `最近检查 ${currentCheck.at}。` : ''}{serverDraftChanged(editingServer) ? '当前配置未保存，保存后可重新检查连接与工具。' : '连接检查只确认接口读取与工具枚举；实际调用和业务结果待验证。'}</p>
+                  <nav className="mcp-service-tabs" aria-label="服务详情"><button type="button" aria-current={servicePane === 'tools' ? 'page' : undefined} onClick={() => setServicePane('tools')}>工具与调试</button><button type="button" aria-current={servicePane === 'connection' ? 'page' : undefined} onClick={() => setServicePane('connection')}>连接配置</button></nav>
                   {servicePane === 'tools' && <section className="mcp-section"><h3>已发现的工具</h3>{currentTools.length ? <ul className="mcp-discovered-list">{currentTools.map(tool => <li key={tool.name}><div><strong>{tool.name}</strong>{tool.description && <p className="mcp-muted">{tool.description}</p>}</div><button type="button" onClick={() => openDiagnostic(editingServer.id, tool.name)}>调试</button></li>)}</ul> : <p className="mcp-muted">{currentCheck?.failed ? '最近一次检查失败，暂不能列出当前配置的工具。' : '当前配置尚无已验证的工具目录。保存配置后运行连接测试，才能显示实际发现的工具。'}</p>}</section>}
-                  {servicePane === 'recent' && <section className="mcp-section"><h3>最近检查</h3><p>{currentCheck ? `${currentCheck.at} · ${currentCheck.failed ? '检查失败，连接与工具发现待核对' : `${currentCheck.kind === 'openapi' ? '规范已读取' : '连接成功'}，发现 ${currentCheck.tools} 个工具`}` : '本页尚未检查当前配置。'}</p><p className="mcp-muted">检查结果只对应本次保存的服务配置；不代表工具调用或业务验证通过。</p></section>}
                   {servicePane === 'connection' && <>
                   <section className="mcp-section"><h3>基本信息</h3><div className="mcp-fields">
                     <label className="mcp-field">ID{input(editingServer.id, value => editServer(currentServerIndex, 'id', value), { placeholder: '例如 sec-ops-api' })}</label>
@@ -501,7 +563,16 @@ window.__ModuleLoader__.load({
                     <label className="mcp-field">开放方式<select value={editingServer.tools?.mode ?? 'all'} onChange={event => editServer(currentServerIndex, 'tools', { mode: event.target.value, names: editingServer.tools?.names ?? [] })}>
                       <option value="all">全部工具</option><option value="selected">仅指定工具</option>
                     </select></label>
-                    {editingServer.tools?.mode === 'selected' && <label className="mcp-field mcp-wide">工具原名（逗号分隔）{input((editingServer.tools.names ?? []).join(', '), value => editServer(currentServerIndex, 'tools', { mode: 'selected', names: value.split(',').map(name => name.trim()).filter(Boolean) }))}</label>}
+                    {editingServer.tools?.mode === 'selected' && <div className="mcp-wide" data-tool-scope>
+                      <label className="mcp-field">选择开放的工具<input type="search" value={scopeQuery} placeholder="搜索工具名称或说明" onChange={event => setScopeQueries(previous => ({ ...previous, [editingServer.id]: event.target.value }))} /></label>
+                      {scopeCatalog === undefined && <p className="mcp-muted">请保存连接配置后，在“工具与调试”中检查连接，再从目录勾选。已有选择继续保留。</p>}
+                      {scopeOptions.map(tool => <label className="mcp-check" key={tool.name}>
+                        <input type="checkbox" checked={scopeNames.includes(tool.name)} onChange={event => editServer(currentServerIndex, 'tools', { mode: 'selected', names: event.target.checked ? [...scopeNames, tool.name] : scopeNames.filter(name => name !== tool.name) })} />
+                        <span>{tool.name}{tool.unavailable ? '（尚未核对）' : tool.description ? ` · ${tool.description}` : ''}</span>
+                      </label>)}
+                      {!scopeOptions.length && <p className="mcp-muted">{scopeQuery.trim() ? '没有匹配的工具。' : scopeCatalog === undefined ? '尚未读取工具目录。' : '此服务未返回工具。'}</p>}
+                      {!scopeNames.length && <p className="mcp-muted">尚未选择工具；保存后此服务不开放工具。</p>}
+                    </div>}
                   </div><p className="mcp-muted">工具仍受业务 Guard 限制；子智能体的 toolFilter 可按角色进一步收紧。</p></section></>}
                   </>}
                   <div className="mcp-actions"><button className="mcp-danger" type="button" onClick={() => {
@@ -663,77 +734,48 @@ window.__ModuleLoader__.load({
                 </div> : <div className="mcp-card mcp-empty"><strong>暂无分组</strong><p>从左侧新增工具与资源分组。</p></div>}
               </div>
             </>}
-            {page === 'connection' && <>
-              <div className="mcp-card">
-                <h3>工具与资源调试</h3><p className="mcp-muted">使用上次保存的配置。分组通过已发布的 MCP v2 端点连接，未保存的编辑不会参与调试。</p>
-                <div className="mcp-fields"><label className="mcp-field">调试目标<select value={isGroup ? `group:${selected.slice(6)}` : `server:${diagnosticId}`} onChange={event => {
-                  const value = event.target.value
-                  if (value.startsWith('group:')) { setSelected(value); onSelectGroupId?.(value.slice(6)) }
-                  else { setSelected(value.slice(7)); onSelectServerId?.(value.slice(7)) }
-                }}>
-                  <optgroup label="服务器">{savedServers.map(server => <option key={server.id} value={`server:${server.id}`}>{server.serverName || server.id}</option>)}</optgroup>
-                  <optgroup label="已保存分组">{(state.value.groups ?? []).map(group => <option key={group.id} value={`group:${group.id}`}>{group.id}</option>)}</optgroup>
-                </select></label></div>
+            {page === 'connection' && <div className="mcp-debug-workbench">
+              <div className="mcp-card mcp-debug-target">
+                {objectSelect({ label: '调试对象', value: isGroup ? `group:${diagnosticId}` : `server:${diagnosticId}`, options: [...savedServers.map(server => ({ value: `server:${server.id}`, label: server.serverName || server.id, description: server.id, group: '服务' })), ...(state.value.groups ?? []).map(group => ({ value: `group:${group.id}`, label: group.id, group: '已保存分组' }))], onChange: value => { if (value.startsWith('group:')) { setSelected(value); onSelectGroupId?.(value.slice(6)) } else { setSelected(value.slice(7)); onSelectServerId?.(value.slice(7)) } } })}
+                <div><span className="mcp-muted">使用已保存配置{isDirty ? ' · 当前有未保存草稿' : ''}</span>{diagnosticGroup && <small className="mcp-muted">分组端点：{new URL(`mcp/groups/${diagnosticGroup.id}/v2`, state.publicUrl ?? document.baseURI).href}</small>}</div>
+                {button('发现工具与资源', () => call('test'), busy || !diagnosticId)}
                 {!diagnosticId && <p role="alert">调试目标不存在或尚未保存，请重新选择。</p>}
-                {diagnosticGroup && <p className="mcp-muted">分组：{diagnosticGroup.id}<br/>MCP 端点：<code>{new URL(`mcp/groups/${diagnosticGroup.id}/v2`, state.publicUrl ?? document.baseURI).href}</code></p>}
-                <div className="mcp-actions">{button('发现工具与资源', () => call('test'), busy || !diagnosticId)}</div>
               </div>
-              {!isGroup && (diagnosticServer?.specUrl ? <div className="mcp-card" style={{ marginTop: 16 }}>
-                <h3>OpenAPI 来源</h3><p className="mcp-muted">{diagnosticServer.specUrl}</p>
-              </div> : diagnosticServer?.managementUrl ? <div className="mcp-card" style={{ marginTop: 16 }}>
-                <div className="mcp-card-head"><div><h3>OpenAPI 来源</h3><p className="mcp-muted">管理 API：{diagnosticServer.managementUrl}</p></div>{button('读取来源', () => call('sources'), busy || !diagnosticId)}</div>
-                <section className="mcp-section"><h3>添加来源</h3><div className="mcp-fields">
-                  <label className="mcp-field">来源名称{input(specName, setSpecName)}</label>
-                  <label className="mcp-field">OpenAPI specification URL{input(specUrl, setSpecUrl)}</label>
-                </div><div className="mcp-actions">{button('创建来源', () => call('create', { name: specName, specUrl }), busy || !specName || !diagnosticId)}</div></section>
-                {sourceList.length > 0 && <section className="mcp-section"><h3>现有来源</h3>{sourceList.map(source => <div className="mcp-source" key={source.id}>
-                  <strong>{source.name}</strong><p className="mcp-muted">ID：{source.id} · {source.status ?? '状态未知'}</p>
-                  <div className="mcp-actions">{button('组件', () => { setSourceId(String(source.id)); void call('components', { sourceId: String(source.id) }) }, busy)}
-                    {button('刷新', () => call('refresh', { sourceId: String(source.id) }), busy)}
-                    {button(source.enabled ? '停用来源' : '启用来源', () => call('toggle', { sourceId: String(source.id), enabled: !source.enabled }), busy)}
-                    {button('日志', () => call('logs', { sourceId: String(source.id) }), busy)}</div>
-                </div>)}</section>}
-                <section className="mcp-section"><h3>工具操作</h3><div className="mcp-fields">
-                  <label className="mcp-field">来源 ID{input(sourceId, setSourceId)}</label>
-                  <label className="mcp-field">工具名称{input(toolName, setToolName)}</label>
-                  <label className="mcp-field mcp-wide">工具参数 JSON{input(argumentsText, setArgumentsText)}</label>
-                </div><div className="mcp-actions">{button('预览请求', () => callTool('preview'), busy || !sourceId || !toolName)}
-                  {button('执行工具', () => callTool('invoke'), busy || !sourceId || !toolName)}</div></section>
-              </div> : <div className="mcp-card" style={{ marginTop: 16 }}><h3>现成 MCP 连接</h3><p className="mcp-muted">该服务器按已保存的 MCP URL 和请求 Header 连接。</p></div>)}
-              {catalog?.targetKey === targetKey && <div className="mcp-card" style={{ marginTop: 16 }}>
-                <h3>{isGroup ? '分组实际发布的 MCP 能力' : diagnosticServer?.specUrl ? 'OpenAPI 生成的 MCP 能力' : '现成 MCP 服务的能力'}</h3>
-                {[
-                  { title: '工具', items: catalog.data.tools ?? [], unavailable: catalog.data.toolsUnavailable },
-                  { title: '资源 URI', items: catalog.data.resources?.resources ?? [], unavailable: catalog.data.resources?.unavailable },
-                  { title: '资源模板', items: catalog.data.resourceTemplates?.resourceTemplates ?? [], unavailable: catalog.data.resourceTemplates?.unavailable },
-                ].map(section => <section className="mcp-section" key={section.title}>
-                  <h3>{section.title}（{section.items.length}）</h3>
-                  {section.unavailable ? <p className="mcp-muted">服务未提供该列表，或读取失败。</p>
-                    : section.items.length ? <ul className="mcp-catalog">{section.items.map((item, index) => <li key={index}>
-                      <strong>{item.name || item.uri || item.uriTemplate}</strong>
-                      {item.inputSchema && <details><summary>参数定义</summary><pre className="mcp-result">{JSON.stringify(item.inputSchema, null, 2)}</pre></details>}
-                      {item.uri && button('选择资源', () => setUriText(item.uri), busy)}
-                      {item.uriTemplate && button('选择模板', () => { setTemplateUri(item.uriTemplate); setTemplateArguments('{}') }, busy)}
-                      {(item.uri || item.uriTemplate || item.description) && <small>{[item.uri || item.uriTemplate, item.description].filter(Boolean).join(' · ')}</small>}
-                    </li>)}</ul> : <p className="mcp-muted">没有可列出的项目。</p>}
-                </section>)}
-                <section className="mcp-section"><h3>调用工具</h3><div className="mcp-fields">
-                  <label className="mcp-field">工具<select value={toolName} onChange={event => setToolName(event.target.value)}><option value="">请选择工具</option>{(catalog.data.tools ?? []).map(tool => <option key={tool.name} value={tool.name}>{tool.name}</option>)}</select></label>
-                  <label className="mcp-field mcp-wide">调用参数 JSON{input(argumentsText, setArgumentsText)}</label>
-                </div><div className="mcp-actions">{button('测试工具', () => callTool('callTool'), busy || !toolName)}</div></section>
-                <section className="mcp-section"><h3>读取资源 URI</h3>
-                  <div className="mcp-fields"><label className="mcp-field mcp-wide">Resource URI{input(uriText, setUriText)}</label></div>
-                  <div className="mcp-actions">{button('读取资源', () => call('readResource', { uri: uriText }), busy || !uriText)}</div>
-                </section>
-                <section className="mcp-section"><h3>读取资源模板</h3>
-                  <div className="mcp-fields"><label className="mcp-field mcp-wide">资源模板<select value={templateUri} onChange={event => setTemplateUri(event.target.value)}><option value="">请选择模板</option>{(catalog.data.resourceTemplates?.resourceTemplates ?? []).map(item => <option key={item.uriTemplate} value={item.uriTemplate}>{item.name || item.uriTemplate}</option>)}</select></label>
-                  <label className="mcp-field mcp-wide">模板参数 JSON{input(templateArguments, setTemplateArguments)}</label></div>
-                  {templateUri && <p className="mcp-muted"><code>{templateUri}</code> · 按模板中的变量名称填写参数。</p>}
-                  <div className="mcp-actions">{button('读取模板资源', () => { try { void call('readResource', { uriTemplate: templateUri, arguments: JSON.parse(templateArguments) }) } catch { setStatus('模板参数 JSON 无效') } }, busy || !templateUri)}</div>
-                </section>
-              </div>}
-              {result && <div className="mcp-card" style={{ marginTop: 16 }}><h3>操作结果</h3><pre className="mcp-result">{JSON.stringify(result, null, 2)}</pre></div>}
-            </>}
+              <div className="mcp-debug-layout"><section className="mcp-card mcp-debug-parameters" aria-label="调试参数">
+                <nav className="mcp-service-tabs" aria-label="能力类型">{[['tools', '工具'], ['resources', '资源 URI'], ['templates', '资源模板']].map(([kind, label]) => <button key={kind} type="button" aria-current={debugType === kind ? 'page' : undefined} onClick={() => selectDebugType(kind)}>{label}</button>)}</nav>
+                {catalog?.targetKey !== targetKey ? <p className="mcp-empty">先发现当前对象的工具与资源。</p> : <>
+                  {debugType === 'tools' && <>
+                    {objectSelect({ label: '工具', value: toolName, placeholder: '请选择工具', options: (catalog.data.tools ?? []).map(tool => ({ value: tool.name, label: tool.title || tool.name, description: tool.description })), onChange: selectDebugTool })}
+                    {catalog.data.toolsUnavailable && <p className="mcp-muted">工具列表读取失败，可重新发现。</p>}
+                    {!catalog.data.toolsUnavailable && !catalog.data.tools?.length && <p className="mcp-muted">没有可调用的工具。</p>}
+                    {(catalog.data.tools ?? []).find(tool => tool.name === toolName)?.inputSchema && <details className="mcp-debug-schema"><summary>参数定义</summary><pre>{JSON.stringify(catalog.data.tools.find(tool => tool.name === toolName).inputSchema, null, 2)}</pre></details>}
+                    <label className="mcp-field">调用参数 JSON<textarea aria-label="调用参数 JSON" rows={12} spellCheck={false} value={argumentsText} onChange={event => setArgumentsText(event.target.value)}/></label>
+                    <div className="mcp-actions">{button('测试工具', () => callTool('callTool'), busy || !toolName || !(catalog.data.tools ?? []).some(tool => tool.name === toolName))}</div>
+                  </>}
+                  {debugType === 'resources' && <>
+                    <label className="mcp-field">查找资源<input type="search" value={debugQuery} onChange={event => setDebugQuery(event.target.value)} placeholder="按名称或 URI 筛选"/></label>
+                    {catalog.data.resources?.unavailable ? <p className="mcp-muted">资源列表未提供或读取失败，可在高级区填写已知 URI。</p> : <ul className="mcp-catalog">{(catalog.data.resources?.resources ?? []).filter(item => `${item.name ?? ''} ${item.uri}`.toLowerCase().includes(debugQuery.trim().toLowerCase())).map(item => <li key={item.uri}><button type="button" className="mcp-debug-choice" aria-pressed={uriText === item.uri} onClick={() => { setUriText(item.uri); restoreDiagnosticReceipt('resources', item.uri) }}>{item.name || item.uri}<small>{item.uri}</small></button></li>)}</ul>}
+                    {!catalog.data.resources?.unavailable && !(catalog.data.resources?.resources ?? []).some(item => `${item.name ?? ''} ${item.uri}`.toLowerCase().includes(debugQuery.trim().toLowerCase())) && <p className="mcp-muted">{catalog.data.resources?.resources?.length ? '没有匹配项。' : '没有可列出的资源。'}</p>}
+                    <details className="mcp-debug-schema" open={!!uriText}><summary>已选或已知资源 URI</summary><label className="mcp-field">Resource URI{input(uriText, setUriText)}</label><small>分组仍由已保存的发布范围核对 URI。</small></details>
+                    <div className="mcp-actions">{button('读取资源', () => call('readResource', { uri: uriText }), busy || !uriText)}</div>
+                  </>}
+                  {debugType === 'templates' && <>
+                    {objectSelect({ label: '资源模板', value: templateUri, placeholder: '请选择模板', options: (catalog.data.resourceTemplates?.resourceTemplates ?? []).map(item => ({ value: item.uriTemplate, label: item.name || item.uriTemplate, description: item.uriTemplate })), onChange: selectDebugTemplate })}
+                    {catalog.data.resourceTemplates?.unavailable ? <p className="mcp-muted">模板列表未提供或读取失败。</p> : !catalog.data.resourceTemplates?.resourceTemplates?.length && <p className="mcp-muted">没有可用的资源模板。</p>}
+                    {templateUri && <p className="mcp-muted"><code>{templateUri}</code> · 按模板变量名称填写参数。</p>}
+                    <label className="mcp-field">模板参数 JSON<textarea aria-label="模板参数 JSON" rows={10} spellCheck={false} value={templateArguments} onChange={event => setTemplateArguments(event.target.value)}/></label>
+                    <div className="mcp-actions">{button('读取模板资源', () => { try { void call('readResource', { uriTemplate: templateUri, arguments: JSON.parse(templateArguments) }) } catch { setStatus('模板参数 JSON 无效') } }, busy || !templateUri)}</div>
+                  </>}
+                </>}
+              </section><section className="mcp-card mcp-debug-result" aria-label="本次调试结果"><div className="mcp-card-head"><h3>结果</h3>{result && <div className="mcp-actions">{button('复制', () => copy('debug-result', JSON.stringify({ ...resultBasis, result }, null, 2)))}{button('下载', downloadResult)}</div>}</div>
+                {busy ? <p role="status">正在请求，等待本次回执…</p> : result ? <><p className="mcp-muted">{resultBasis?.object} · {resultBasis?.capability} · {resultBasis?.at}</p>{resultBasis && (resultBasis.targetKey !== targetKey || resultBasis.signature !== diagnosticSignature) && <p className="mcp-note">输入或保存范围已变化，以下是上次提交的结果。</p>}<pre className="mcp-result" tabIndex={0}>{JSON.stringify(result, null, 2)}</pre>{copyFeedback('debug-result', JSON.stringify({ ...resultBasis, result }, null, 2))}</> : <div className="mcp-empty">提交后在这里查看真实回执。</div>}
+              </section></div>
+              {!isGroup && diagnosticServer?.managementUrl && <details className="mcp-card mcp-debug-legacy"><summary>高级：旧兼容管理 API</summary><p className="mcp-muted">{diagnosticServer.managementUrl}</p><div className="mcp-actions">{button('读取来源', () => call('sources'), busy || !diagnosticId)}</div>
+                <section className="mcp-section"><h3>添加来源</h3><div className="mcp-fields"><label className="mcp-field">来源名称{input(specName, setSpecName)}</label><label className="mcp-field">OpenAPI specification URL{input(specUrl, setSpecUrl)}</label></div><div className="mcp-actions">{button('创建来源', () => call('create', { name: specName, specUrl }), busy || !specName || !diagnosticId)}</div></section>
+                {sourceList.map(source => <div className="mcp-source" key={source.id}><strong>{source.name}</strong><small>{source.id} · {source.status ?? '状态未知'}</small><div className="mcp-actions">{button('组件', () => { setSourceId(String(source.id)); void call('components', { sourceId: String(source.id) }) }, busy)}{button('刷新', () => call('refresh', { sourceId: String(source.id) }), busy)}{button(source.enabled ? '停用来源' : '启用来源', () => call('toggle', { sourceId: String(source.id), enabled: !source.enabled }), busy)}{button('日志', () => call('logs', { sourceId: String(source.id) }), busy)}</div></div>)}
+                <section className="mcp-section"><h3>兼容工具操作</h3><div className="mcp-fields"><label className="mcp-field">来源 ID{input(sourceId, setSourceId)}</label><label className="mcp-field">工具名称{input(legacyToolName, setLegacyToolName)}</label><label className="mcp-field mcp-wide">工具参数 JSON{input(legacyArguments, setLegacyArguments)}</label></div><div className="mcp-actions">{button('预览请求', () => callTool('preview'), busy || !sourceId || !legacyToolName)}{button('执行工具', () => callTool('invoke'), busy || !sourceId || !legacyToolName)}</div></section>
+{legacyResult && <pre className="mcp-result">{JSON.stringify(legacyResult, null, 2)}</pre>}              </details>}
+            </div>}
           </div>
         </div>
       </section>

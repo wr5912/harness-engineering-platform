@@ -25,11 +25,11 @@ function source(sourceUrl: string, expectedOrigin: string): URL {
   return url
 }
 /** 发布返回值转成受归属检查的下载入口；持久化只保存连接引用，不复制服务凭据。 */
-export function registerBusinessReport(assetRoot: string, context: BusinessContext, sourceUrl: string, expectedOrigin: string, upstream?: { serverId: string }): string {
+export function registerBusinessReport(assetRoot: string, context: BusinessContext, sourceUrl: string, expectedOrigin: string, upstream?: { serverId: string; operation?: BusinessOperation }): string {
   const control = getBusinessControl(assetRoot)
   if (!upstream?.serverId) throw new Error('业务报告缺少受管服务引用')
   const scoped = { ...context, scope: { ...context.scope, serverId: upstream.serverId } }
-  control.assert(scoped, 'publish')
+  control.assert(scoped, 'publish', upstream.operation?.resources, upstream.operation?.args, upstream.operation)
   if (!context.scope.sessionId || !context.scope.instanceId) throw new Error('业务报告必须有 Session 和实例归属')
   const url = source(sourceUrl, expectedOrigin), id = randomUUID()
   const value = records(assetRoot)
@@ -67,12 +67,15 @@ export async function readBusinessReport(assetRoot: string, context: BusinessCon
     const chunks: Uint8Array[] = []; let length = 0
     for await (const bytes of response.body) { length += bytes.length; if (length > 5 * 1024 * 1024) throw new Error('报告超过首期非流式传输上限'); chunks.push(bytes) }
     const body = Buffer.concat(chunks), text = body.toString('utf8')
-    await control.inspect(scoped, 'report', text, executionSignal, 'publish')
+    await control.inspect(scoped, 'report', text, executionSignal, 'publish', { serverId: operation.serverId, operationId: operation.operationId, kind: operation.kind, target: operation.target, method: operation.method })
+    await control.refreshOperationAuthorization(scoped, operation)
+    // 第三方可能已明确拒绝并取消当前下载，先反馈该结论，再进行身份重验。
+    control.assert(scoped, 'publish', resources, text, operation)
     await control.revalidateIdentity(scoped, executionSignal)
     executionSignal.throwIfAborted()
     connection.assertCurrent()
     control.assertOperation(scoped, operation)
-    control.assert(scoped, 'publish', resources, text)
+    control.assert(scoped, 'publish', resources, text, operation)
     return { body: new Uint8Array(body), contentType: 'text/html; charset=utf-8', filename: `${id}.html` }
   }, signal))
 }

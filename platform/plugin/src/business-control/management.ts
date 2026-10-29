@@ -4,7 +4,8 @@ import { prepareBusinessRuntimeFile } from './secret-file.ts'
 import { dirname, join } from 'node:path'
 import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
 import { BusinessControlError, getBusinessControl } from './core.ts'
-import { agentAccessActions, businessOperationMethods, type AgentAccessRule, type BusinessAccessConfig, type BusinessContext, type ControlScope, type OperationRule, type ProviderConfig, type Restriction, type RiskFact, type SessionTrustFact } from './contracts.ts'
+import { readProviderProtocol } from './protocol-documents.ts'
+import { agentAccessActions, businessOperationMethods, validAgentToolPolicies, type AgentAccessRule, type BusinessAccessConfig, type BusinessContext, type ControlScope, type OperationRule, type ProviderConfig, type Restriction, type RiskFact, type SessionTrustFact } from './contracts.ts'
 
 const actions = ['read', 'write', 'publish'] as const
 const scopeKeys = ['workspaceId', 'agentId', 'subjectId', 'instanceId', 'runtimeGeneration', 'sessionId', 'serverId']
@@ -98,7 +99,7 @@ function agentRules(value: unknown): AgentAccessRule[] {
     const row = object(input), agentId = text(row.agentId, 'Agent ID')
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(agentId) || seen.has(agentId)) return fail('invalid_request', 'Agent ID 无效或重复')
     seen.add(agentId)
-    if (Object.keys(row).some(key => !['agentId', 'enabled', 'subjects', 'actions', 'serverIds', 'sourceDigest', 'agentAuthentication', 'agentTrust'].includes(key))
+    if (Object.keys(row).some(key => !['agentId', 'enabled', 'subjects', 'actions', 'serverIds', 'sourceDigest', 'agentAuthentication', 'agentTrust', 'toolPolicies'].includes(key))
       || typeof row.enabled !== 'boolean' || !Array.isArray(row.subjects) || !Array.isArray(row.actions)) return fail('invalid_request', 'Agent 开放规则无效')
     const subjects = row.subjects.map(value => text(value, '主体 ID'))
     const allowedActions = row.actions.map(value => text(value, '基础动作'))
@@ -109,19 +110,21 @@ function agentRules(value: unknown): AgentAccessRule[] {
     if (authentication && (typeof authentication.enabled !== 'boolean' || authentication.method !== 'hmac-sha256'
       || Object.keys(authentication).some(key => !['enabled', 'method'].includes(key)))) return fail('invalid_request', 'Agent 认证只支持当前 HMAC SHA-256 方式及明确开关')
     if (trust && (typeof trust.enabled !== 'boolean' || Object.keys(trust).some(key => key !== 'enabled'))) return fail('invalid_request', '智能体身份只支持明确的启用或撤销状态')
+    if (row.toolPolicies !== undefined && !validAgentToolPolicies(row.toolPolicies)) return fail('invalid_request', '工具条件规则无效：请选择服务、允许/禁止/确认处理，并使用明确的风险等级、场景代码或操作标签')
     return { agentId, enabled: row.enabled, subjects: [...new Set(subjects)], actions: [...new Set(allowedActions)],
       ...(row.serverIds !== undefined ? { serverIds: (row.serverIds as unknown[]).map(value => text(value, 'MCP 服务 ID')) } : {}),
       ...(row.sourceDigest !== undefined ? { sourceDigest: text(row.sourceDigest, '来源摘要') } : {}),
       ...(authentication ? { agentAuthentication: { enabled: authentication.enabled as boolean, method: 'hmac-sha256' as const } } : {}),
-      ...(trust ? { agentTrust: { enabled: trust.enabled as boolean } } : {}) }
+      ...(trust ? { agentTrust: { enabled: trust.enabled as boolean } } : {}),
+      ...(row.toolPolicies !== undefined ? { toolPolicies: structuredClone(row.toolPolicies) as AgentAccessRule['toolPolicies'] } : {}) }
   })
 }
 
 export interface BusinessControlConfiguration {
   schemaVersion: 1; enabled: boolean; agents: AgentAccessRule[]
-  providers: { authentication: boolean; identityTrust: boolean; riskAssessment: boolean }
+  providers: { authentication: boolean; identityTrust: boolean; riskAssessment: boolean; accessAuthorization: boolean }
   operationCount: number
-  authentication: BusinessProviderView; identityTrust: BusinessProviderView; riskAssessment: BusinessProviderView & { requiredKinds: string[] }
+  authentication: BusinessProviderView; identityTrust: BusinessProviderView; riskAssessment: BusinessProviderView & { requiredKinds: string[] }; accessAuthorization: BusinessProviderView
   detection: { inputMarkers: string[]; operationMarkers: string[]; reportMarkers: string[] }
   operations: Array<OperationRule & { targetHidden?: boolean }>
 }
@@ -134,7 +137,7 @@ export interface BusinessControlManagementStatus {
   sessionTrustFacts: SessionTrustFact[]
   agentStatuses: ReturnType<ReturnType<typeof getBusinessControl>['agentStatuses']>
   coverage: { immediate: true; schedules: false; leaseMs: 2000; acknowledgementDeadlineMs: 2000 }
-  change?: { kind: string; currentPermission?: 'allow' | 'deny'; reason?: string; businessReplayed: false }
+  change?: { kind: string; currentPermission?: 'allow' | 'deny' | 'unknown'; reason?: string; source?: 'manual-fallback'; businessReplayed: false }
 }
 
 /** GUI 和管理助手只调用这一份管理入口；Peer 必须来自真实 Connection admission。 */
@@ -156,18 +159,20 @@ export function createBusinessControlHandler(assetRoot: string): ConnectionRpcHa
       return { ...value, identityMode,
         pinnedSourceDigest: row?.sourceDigest ?? (identityMode === 'published' ? config.agents.find(item => item.agentId === value.agentId)?.sourceDigest : undefined) }
     })
-    return { ...status, instances, revision,
+    return { ...status, events: status.events.map(event => ({ ...event, ...(event.authorization ? { authorization: { ...event.authorization, ...(event.authorization.provider ? { provider: 'external-provider' } : {}) } } : {}) })), instances, revision,
       sessionTrustFacts: control.sessionTrustFacts(),
       agentStatuses: control.agentStatuses(),
       riskFacts: status.riskFacts.map(fact => ({ ...fact, source: /^https?:\/\//i.test(fact.source) ? 'external-provider' : fact.source })),
       configuration: { schemaVersion: 1, enabled: config.enabled, agents: config.agents.map(rule => ({ agentId: rule.agentId,
         enabled: rule.enabled, subjects: [...rule.subjects], actions: [...rule.actions],
         ...(rule.serverIds ? { serverIds: [...rule.serverIds] } : {}), ...(rule.sourceDigest ? { sourceDigest: rule.sourceDigest } : {}),
-        ...(rule.agentAuthentication ? { agentAuthentication: { ...rule.agentAuthentication } } : {}), ...(rule.agentTrust ? { agentTrust: { ...rule.agentTrust } } : {}) })),
-        providers: { authentication: !!config.authentication, identityTrust: !!config.identityTrust, riskAssessment: !!config.riskAssessment },
+        ...(rule.agentAuthentication ? { agentAuthentication: { ...rule.agentAuthentication } } : {}), ...(rule.agentTrust ? { agentTrust: { ...rule.agentTrust } } : {}),
+        ...(rule.toolPolicies !== undefined ? { toolPolicies: structuredClone(rule.toolPolicies) } : {}) })),
+        providers: { authentication: !!config.authentication, identityTrust: !!config.identityTrust, riskAssessment: !!config.riskAssessment, accessAuthorization: !!config.accessAuthorization },
         operationCount: config.operations?.length ?? 0,
         authentication: providerView(config.authentication), identityTrust: providerView(config.identityTrust),
         riskAssessment: { ...providerView(config.riskAssessment, 'riskAssessment'), requiredKinds: config.riskAssessment?.requiredKinds ?? ['write', 'publish'] },
+        accessAuthorization: providerView(config.accessAuthorization),
         detection: { inputMarkers: config.detection?.inputMarkers ?? [], operationMarkers: config.detection?.operationMarkers ?? [], reportMarkers: config.detection?.reportMarkers ?? [] },
         operations: (config.operations ?? []).map(rule => ({ serverId: rule.serverId, operationId: rule.operationId, kind: rule.kind,
           target: publicUrl(rule.target), ...(!publicUrl(rule.target) ? { targetHidden: true } : {}), method: rule.method,
@@ -176,7 +181,7 @@ export function createBusinessControlHandler(assetRoot: string): ConnectionRpcHa
       coverage: { immediate: true, schedules: false, leaseMs: 2000, acknowledgementDeadlineMs: 2000 } }
   }
   function saveConfiguration(request: Record<string, unknown>): void {
-    if (Object.keys(request).some(key => !['revision', 'enabled', 'agents', 'authentication', 'identityTrust', 'riskAssessment', 'operations', 'detection'].includes(key))) return fail('invalid_request', '本入口只编辑统一网关的四项功能配置')
+    if (Object.keys(request).some(key => !['revision', 'enabled', 'agents', 'authentication', 'identityTrust', 'riskAssessment', 'accessAuthorization', 'operations', 'detection'].includes(key))) return fail('invalid_request', '本入口只编辑统一网关的四项功能配置')
     const revision = text(request.revision, '配置版本')
     if (typeof request.enabled !== 'boolean') return fail('invalid_request', '请明确是否开放即时业务访问')
     const agents = agentRules(request.agents)
@@ -193,7 +198,7 @@ export function createBusinessControlHandler(assetRoot: string): ConnectionRpcHa
       if (current.revision !== revision) return fail('conflict', '业务访问配置已在其他位置更新，当前草稿已保留，请读取最新状态后重试')
       control.config()
       const config: BusinessAccessConfig = { ...current.config, enabled: request.enabled, agents }
-      for (const key of ['authentication', 'identityTrust', 'riskAssessment'] as const) if (request[key] !== undefined) {
+      for (const key of ['authentication', 'identityTrust', 'riskAssessment', 'accessAuthorization'] as const) if (request[key] !== undefined) {
         const value = providerPatch(request[key], current.config[key])
         if (value) config[key] = value
         else delete config[key]
@@ -231,7 +236,7 @@ export function createBusinessControlHandler(assetRoot: string): ConnectionRpcHa
     }
     const agent = control.config().agents.find(rule => rule.agentId === scope.agentId)
     if (!agent?.subjects.includes(scope.subjectId)) return fail('invalid_scope', '主体未登记到该 Agent 的基础授权中')
-    if (scope.serverId && (agent.serverIds ? !agent.serverIds.includes(scope.serverId)
+    if (scope.serverId && (!control.config().accessAuthorization && agent.serverIds ? !agent.serverIds.includes(scope.serverId)
       : !control.config().operations?.some(rule => rule.serverId === scope.serverId))) return fail('invalid_scope', 'MCP 服务不属于该 Agent 的基础范围')
     return scope
   }
@@ -241,7 +246,7 @@ export function createBusinessControlHandler(assetRoot: string): ConnectionRpcHa
   }
   function requireBase(scope: ControlScope, deniedActions: string[]): void {
     const rule = control.config().agents.find(agent => agent.agentId === scope.agentId)
-    if (!rule?.enabled || !rule.subjects.includes(scope.subjectId!) || deniedActions.some(action => !rule.actions.includes('*') && !rule.actions.includes(action))) {
+    if (!rule?.enabled || !rule.subjects.includes(scope.subjectId!) || !control.config().accessAuthorization && deniedActions.some(action => !rule.actions.includes('*') && !rule.actions.includes(action))) {
       return fail('action_forbidden', '该主体或动作不在当前 Agent 的基础许可中')
     }
   }
@@ -252,7 +257,7 @@ export function createBusinessControlHandler(assetRoot: string): ConnectionRpcHa
   }
   async function probeProvider(request: Record<string, unknown>, signal: AbortSignal) {
     const kind = request.kind
-    if (kind !== 'authentication' && kind !== 'identityTrust' && kind !== 'riskAssessment') return fail('invalid_request', '请选择提供方种类')
+    if (kind !== 'authentication' && kind !== 'identityTrust' && kind !== 'riskAssessment' && kind !== 'accessAuthorization') return fail('invalid_request', '请选择提供方种类')
     if (Object.keys(request).some(key => !['kind', 'endpoint', 'timeoutMs'].includes(key))) return fail('invalid_request', '探测参数无效')
     const saved = readConfiguration().config[kind]
     const endpoint = editableUrl(request.endpoint === undefined ? saved?.endpoint : request.endpoint, true)
@@ -282,6 +287,10 @@ export function createBusinessControlHandler(assetRoot: string): ConnectionRpcHa
       signal.throwIfAborted()
       if (endpoint === 'status') return { ok: true, value: view() }
       const request = object(payload)
+      if (endpoint === 'providerProtocol') {
+        if (request.kind !== 'risk-assessment' && request.kind !== 'access-control') return fail('invalid_request', '请选择风险评估或访问控制接口规范')
+        return { ok: true, value: readProviderProtocol(request.kind) }
+      }
       if (endpoint === 'probeProvider') return { ok: true, value: await probeProvider(request, signal) }
       if (endpoint === 'saveConfiguration') { saveConfiguration(request); return { ok: true, value: view() } }
       if (endpoint === 'restrict') {
@@ -301,8 +310,28 @@ export function createBusinessControlHandler(assetRoot: string): ConnectionRpcHa
           if (!restriction?.active || !sameScope(restriction.scope, context)) return fail('invalid_scope', '限制与指定 Session 不匹配或已解除')
           if (!restriction.deniedActions.includes(action)) return fail('invalid_request', '恢复评估动作必须属于所选限制')
         }
-        for (const assessedAction of restriction?.deniedActions ?? [action]) {
-          const fact = await control.reassess(context, signal, assessedAction)
+        const permissionContext = restriction?.scope.serverId ? { ...context, scope: { ...context.scope, serverId: restriction.scope.serverId } } : context
+        let automaticAssessment = true, manualFallback = false
+        if (restriction && !control.config().riskAssessment) {
+          await control.revalidateIdentity(permissionContext, signal)
+          signal.throwIfAborted()
+          automaticAssessment = !!control.config().riskAssessment
+        }
+        if (!automaticAssessment && restriction) {
+          scopeFor(restriction.scope)
+          for (const deniedAction of restriction.deniedActions) control.assertBase(permissionContext, control.config().accessAuthorization ? 'agent:access' : deniedAction)
+        }
+        for (const assessedAction of automaticAssessment ? restriction?.deniedActions ?? [action] : []) {
+          let fact: RiskFact
+          try { fact = await control.reassess(context, signal, assessedAction) }
+          catch (cause) {
+            if (!restriction || !(cause instanceof BusinessControlError) || cause.code !== 'risk_provider_unavailable') throw cause
+            await control.revalidateIdentity(permissionContext, signal); signal.throwIfAborted()
+            scopeFor(restriction.scope)
+            for (const deniedAction of restriction.deniedActions) control.assertBase(permissionContext, control.config().accessAuthorization ? 'agent:access' : deniedAction)
+            manualFallback = true
+            break
+          }
           signal.throwIfAborted()
           if (restriction && (fact.status !== 'assessed' || Date.parse(fact.expiresAt) <= Date.now() || fact.signals.some(signal =>
             (signal.code === 'deny-all' && signal.value === 'true') || (signal.code === 'deny-operation' &&
@@ -316,10 +345,17 @@ export function createBusinessControlHandler(assetRoot: string): ConnectionRpcHa
           requireBase(restriction.scope, restriction.deniedActions)
           control.updateRestriction({ ...restriction, active: false })
         }
-        let currentPermission: 'allow' | 'deny' = 'allow', reason: string | undefined
-        try { control.assert(restriction?.scope.serverId ? { ...context, scope: { ...context.scope, serverId: restriction.scope.serverId } } : context, action) }
+        let currentPermission: 'allow' | 'deny' | 'unknown' = control.config().accessAuthorization ? 'unknown' : 'allow', reason: string | undefined = control.config().accessAuthorization ? 'external_authorization_required' : undefined
+        try {
+          if (control.config().accessAuthorization) {
+            control.assertBase(permissionContext, 'agent:access')
+            if (control.status().restrictions.some(item => item.active && sameScope(item.scope, permissionContext)
+              && (!item.scope.serverId || item.scope.serverId === permissionContext.scope.serverId)
+              && (item.deniedActions.includes('*') || item.deniedActions.includes(action)))) { currentPermission = 'deny'; reason = 'risk_restricted' }
+          } else control.assert(permissionContext, action)
+        }
         catch (error) { currentPermission = 'deny'; reason = error instanceof BusinessControlError ? error.code : 'control_unavailable' }
-        return { ok: true, value: { ...view(), change: { kind: restriction ? 'released' : 'reassessed', currentPermission, reason, businessReplayed: false } } }
+        return { ok: true, value: { ...view(), change: { kind: restriction ? 'released' : 'reassessed', currentPermission, reason, ...(manualFallback ? { source: 'manual-fallback' as const } : {}), businessReplayed: false } } }
       }
       return fail('not_found', '未知运行权限管理操作')
     } catch (error) {

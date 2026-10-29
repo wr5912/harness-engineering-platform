@@ -76,7 +76,7 @@ test('来源轨迹使用冻结任务标题和同一 Run 的业务结论，缺失
 })
 
 test('助手收到可读策划摘要，Run ID 与实际结论保留用于核对', async () => {
-  const client = await build({ entryPoints: [new URL('../src/agents/compute-variants.tsx', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime'] })
+  const client = await build({ entryPoints: [new URL('../src/agents/compute-variants.tsx', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime', '@deepseek-ai/dsh-client-ui-primitives'] })
   const states = [], deps = [], cleanups = [], calls = []
   let cursor = 0, effects = [], changed = false, tree
   const react = { ...require('react'),
@@ -85,7 +85,7 @@ test('助手收到可读策划摘要，Run ID 与实际结论保留用于核对'
     useEffect(effect, values) { const index = cursor++; if (!deps[index] || values.some((value, at) => value !== deps[index][at])) { deps[index] = values; effects.push(() => { cleanups[index]?.(); cleanups[index] = effect() }) } },
   }
   const module = { exports: {} }
-  vm.runInNewContext(client.outputFiles[0].text, { module, exports: module.exports, URLSearchParams, require: name => name === 'react' ? react : require(name) })
+  vm.runInNewContext(client.outputFiles[0].text, { module, exports: module.exports, URLSearchParams, require: name => name === 'react' ? react : name === '@deepseek-ai/dsh-client-ui-primitives' ? { Modal: () => null } : require(name) })
   const context = { experiment_id: experimentId, agent_id: 'alpha', parent_ref: `git:${'a'.repeat(40)}`, plan: null, cases: [], runs: [
     { run_id: ids.passed, experiment_id: experimentId, status: 'completed', effective_verdict: 'passed', title: '查询设备状态', created_at: '2026-10-20T09:00:00Z' },
     { run_id: ids.unknown, experiment_id: experimentId, status: 'completed', title: '超时恢复', created_at: '2026-10-19T09:00:00Z' },

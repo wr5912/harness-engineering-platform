@@ -5,9 +5,9 @@ import vm from 'node:vm'
 import { build } from 'esbuild'
 
 const require = createRequire(import.meta.url)
-const compiled = await build({ entryPoints: [new URL('../src/agents/variant-source.tsx', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime'] })
+const compiled = await build({ entryPoints: [new URL('../src/agents/variant-source.tsx', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime', '@deepseek-ai/dsh-client-ui-primitives'] })
 const module = { exports: {} }
-vm.runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, require })
+vm.runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, require: name => name === '@deepseek-ai/dsh-client-ui-primitives' ? { Modal: () => null } : require(name) })
 const { VariantSourcePanel, variantSourceInfo } = module.exports
 const fixed = `git:${'a'.repeat(40)}`
 const parent = { id: 'EXP-alpha-023', agent_id: 'alpha', change: {} }
@@ -20,17 +20,18 @@ function text(value) {
   return Array.isArray(value) ? value.map(text).join('') : value && typeof value === 'object' ? text(value.props?.children) : String(value ?? '')
 }
 
-test('生成来源默认收起，摘要保留父版、生成方式和固定引用定位', () => {
+test('来源统一进入当前版本抽屉，父版、生成方式和完整固定引用仍可定位', () => {
   const tree = VariantSourcePanel({ experiment: target({ parent_experiment_id: parent.id, parent_ref: fixed, compute_variant: { generation: { mode: 'langgraph-aot' } } }), experiments: [parent] })
-  const details = nodes(tree).find(node => node.type === 'details')
-  assert.equal(details.props.open, undefined)
-  const summary = nodes(details).find(node => node.type === 'summary')
-  assert.match(text(summary), /生成来源父版 EXP-alpha-023langgraph-aotgit:aaaaaaaaaaaa/)
-  assert.equal(nodes(summary).find(node => node.type === 'code').props.title, fixed)
+  const drawer = nodes(tree).find(node => node.props?.title === '版本来源与继承')
+  assert.equal(drawer.props.identity, 'EXP-alpha-024')
+  assert.equal(nodes(tree).some(node => node.type === 'details'), false)
+  assert.match(text(drawer), /EXP-alpha-023/)
+  assert.match(text(drawer), /langgraph-aot/)
+  assert.match(text(drawer), new RegExp(fixed))
   const first = VariantSourcePanel({ experiment: target({ baseline_ref: 'none:first-experiment' }), experiments: [] })
-  assert.equal(text(nodes(first).find(node => node.type === 'summary')), '生成来源首版本')
+  assert.match(text(first), /首版本（无既有对照）/)
   const unknown = VariantSourcePanel({ experiment: target({}), experiments: [] })
-  assert.equal(text(nodes(unknown).find(node => node.type === 'summary')), '生成来源父版本未记录')
+  assert.match(text(unknown), /父版本未记录/)
 })
 
 test('父版固定引用以 parent_ref 为准，旧合同仅在父 ID 已记录时使用 baseline_ref', () => {

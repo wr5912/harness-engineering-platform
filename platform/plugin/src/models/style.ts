@@ -13,6 +13,7 @@ export const modelSettingsTheme = `
 .hep-model-sharing select{display:block;width:100%;min-height:38px;padding:6px 10px;border:1px solid var(--dsw-alias-border-l3);border-radius:8px;background:var(--dsw-alias-settings-card-fill);color:var(--dsw-alias-label-primary)}
 .hep-model-sharing input[type=checkbox]{accent-color:var(--dsw-alias-button-primary-fill);flex:none;margin:3px 0 0}
 .hep-model-sharing-heading{display:flex;justify-content:space-between;align-items:start;gap:12px}
+.hep-model-sharing-heading-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex:none;min-width:90px}
 .hep-model-sharing-heading p,.hep-model-sharing-intro,.hep-model-sharing-note{color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.6}
 .hep-model-sharing-intro{margin-top:6px!important}
 .hep-model-sharing-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
@@ -21,6 +22,7 @@ export const modelSettingsTheme = `
 .hep-model-sharing-card-header span{flex:none;color:var(--dsw-alias-label-secondary);font-size:12px}
 .hep-model-sharing-field{display:grid;gap:6px;font-size:13px;font-weight:500}
 .hep-model-sharing-field>span{color:var(--dsw-alias-label-secondary)}
+.hep-model-sharing-card>.hep-model-sharing-field+.hep-model-sharing-field,.hep-model-sharing-card>.hep-model-sharing-connection-state+.hep-model-sharing-field{margin-top:14px}
 .hep-model-sharing-primary{background:var(--dsw-alias-button-primary-fill)!important;border-color:var(--dsw-alias-button-primary-fill)!important;color:var(--dsw-alias-label-primary-foreground)!important}
 .hep-model-sharing-status{margin-top:10px!important;font-size:12px;line-height:1.5}
 .hep-model-sharing-status[data-tone=success]{color:var(--dsw-alias-state-success-primary)}

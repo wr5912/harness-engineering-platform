@@ -13,31 +13,33 @@ export function managedDispatch(assetRoot: string): ManagedDispatch {
   const control = getBusinessControl(assetRoot)
   const execute: ManagedDispatch = async (operation, dispatch, signal) => {
     const actual = { ...operation, kind: control.operationKind(operation.serverId, operation.operationId, operation.kind) }
-    const result = await control.execute(actual, dispatch, signal)
-    const context = currentBusinessContext()
-    if (actual.kind !== 'publish' || !context || control.isManagement(context) || !control.enabled()) return result
-    const rewrite = (value: any): any => {
-      if (Array.isArray(value)) return value.map(rewrite)
-      if (!value || typeof value !== 'object') return value
-      return Object.fromEntries(Object.entries(value).map(([key, item]) => {
-        if (/^(download_?url|report_?url|report_?download_?url)$/i.test(key) && typeof item === 'string') {
-          return [key, registerBusinessReport(assetRoot, context, new URL(item, actual.target).href,
-            new URL(actual.target).origin, { serverId: actual.serverId })]
-        }
-        if (key === 'text' && typeof item === 'string') {
-          let parsed: unknown
-          try { parsed = JSON.parse(item) } catch { return [key, item] }
-          return [key, JSON.stringify(rewrite(parsed))]
-        }
-        return [key, rewrite(item)]
-      }))
-    }
-    if (result instanceof Response && result.ok && result.headers.get('content-type')?.includes('json')) {
-      const text = await limitedText(result.clone(), 1024 * 1024)
-      const headers = new Headers(result.headers); headers.delete('content-length')
-      return new Response(JSON.stringify(rewrite(JSON.parse(text))), { status: result.status, headers }) as Awaited<typeof result>
-    }
-    return rewrite(result)
+    return control.execute(actual, async executionSignal => {
+      const result = await dispatch(executionSignal)
+      const context = currentBusinessContext()
+      if (actual.kind !== 'publish' || !context || control.isManagement(context) || !control.enabled()) return result
+      const rewrite = (value: any): any => {
+        if (Array.isArray(value)) return value.map(rewrite)
+        if (!value || typeof value !== 'object') return value
+        return Object.fromEntries(Object.entries(value).map(([key, item]) => {
+          if (/^(download_?url|report_?url|report_?download_?url)$/i.test(key) && typeof item === 'string') {
+            return [key, registerBusinessReport(assetRoot, context, new URL(item, actual.target).href,
+              new URL(actual.target).origin, { serverId: actual.serverId, operation: actual })]
+          }
+          if (key === 'text' && typeof item === 'string') {
+            let parsed: unknown
+            try { parsed = JSON.parse(item) } catch { return [key, item] }
+            return [key, JSON.stringify(rewrite(parsed))]
+          }
+          return [key, rewrite(item)]
+        }))
+      }
+      if (result instanceof Response && result.ok && result.headers.get('content-type')?.includes('json')) {
+        const text = await limitedText(result.clone(), 1024 * 1024)
+        const headers = new Headers(result.headers); headers.delete('content-length')
+        return new Response(JSON.stringify(rewrite(JSON.parse(text))), { status: result.status, headers }) as Awaited<typeof result>
+      }
+      return rewrite(result)
+    }, signal)
   }
   execute.requestHeaders = (target): Record<string, string> => {
     const context = currentBusinessContext(), provider = control.config().riskAssessment

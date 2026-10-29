@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
@@ -19,6 +19,7 @@ import { navigationHash, readNavigation } from './navigation.ts'
 import { InstancesPage } from './instances/client.tsx'
 import { McpPage } from './mcp/client.tsx'
 import { BusinessControlPage } from './business-control/ui.tsx'
+import type { GatewayAssistantBridge } from './business-control/window.tsx'
 import { platformTheme } from './theme.ts'
 import { bindNewConversation, prepareConversation } from './conversation.ts'
 import { AssistantConversation, AssistantOperations, PlatformOperationCard, createAssistant, type Assistant, type AssistantContext } from './assistant/client.tsx'
@@ -79,6 +80,11 @@ function PlatformPage({ catalog, rpc, assistant, updates, theme, enterConversati
   const mountedPages = useRef(new Set<PageId>([page]))
   mountedPages.current.add(page)
   const [open, setOpen] = useState(false)
+  const [assistantReturnAction, setAssistantReturnAction] = useState<Parameters<NonNullable<GatewayAssistantBridge['onAssistantReturnChange']>>[0]>(null)
+  const onAssistantReturnChange = useCallback<NonNullable<GatewayAssistantBridge['onAssistantReturnChange']>>(action => setAssistantReturnAction(action), [])
+  useEffect(() => { setAssistantReturnAction(null) }, [page])
+  const [assistantWidth, setAssistantWidth] = useState(400)
+  const resizeStart = useRef<{ x: number; width: number } | null>(null)
   const [nativeMode, setNativeMode] = useState(false)
   const [unread, setUnread] = useState(false)
   const [account, setAccount] = useState<{ username: string; error?: string }>({ username: '' })
@@ -258,29 +264,35 @@ function PlatformPage({ catalog, rpc, assistant, updates, theme, enterConversati
     .filter((item): item is [string, string] => Boolean(item[1])) : []
   return <div ref={frame} className="harness-platform" data-page={page} data-assistant-open={floating || undefined}>
     <style>{platformTheme}</style>
-    <header className="harness-topbar"><a className="harness-brand" href={navigationHash({ page: 'home' })} aria-label="返回 Harness 工程平台首页" onClick={event => { event.preventDefault(); navigate('home') }}><PlatformLogo size={38}/><span><strong>Harness工程平台</strong><small>Harness Engineering Platform</small></span></a>
+    <header className="harness-topbar"><a className="harness-brand" href={navigationHash({ page: 'home' })} aria-label="返回 Harness 工程平台首页" onClick={event => { event.preventDefault(); navigate('home') }}><PlatformLogo size={38}/><span><strong>{full ? 'Harness工程平台' : 'Harness 工程平台'}</strong><small>{full ? 'Harness Engineering Platform' : 'ENGINEERING WORKSPACE'}</small></span></a>
       {navigation}
       <span className="harness-current-module" aria-label={`当前模块：${pages.find(item => item.id === page)?.label}`}>{pages.find(item => item.id === page)?.label}</span>
       <button type="button" className="harness-theme-toggle" aria-label={themeScheme === 'dark' ? '切换到浅色主题' : '切换到深色主题'} title={themeScheme === 'dark' ? '切换到浅色主题' : '切换到深色主题'} onClick={() => theme.setScheme(themeScheme === 'dark' ? 'light' : 'dark')}><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{themeScheme === 'dark' ? <><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></> : <path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"/>}</svg></button>
       {page !== 'home' && <button ref={toggleAssistant} type="button" className="harness-assistant-toggle" aria-expanded={visible} aria-label={visible ? '收起 AI 助手' : `打开 AI 助手${statusLabel === 'AI 助手' ? '' : `，${statusLabel}`}`} title={statusLabel === 'AI 助手' ? '平台 AI 助手' : `AI 助手 · ${statusLabel}`} data-status={waiting || status?.pendingInteraction ? 'waiting' : status?.running ? 'running' : unread || status?.completionUnread ? 'unread' : undefined} onClick={toggleAssistantOpen}><AssistantIcon/></button>}
       <div ref={accountMenu} className="harness-account" title={account.error ?? account.username ?? undefined} onKeyDown={event => { if (event.key === 'Escape') { setAccountMenuOpen(false); accountMenu.current?.querySelector<HTMLButtonElement>('.harness-account-toggle')?.focus() } }}>
-        <button type="button" className="harness-account-toggle" aria-label="平台菜单" aria-expanded={accountMenuOpen} aria-controls="harness-account-actions" onClick={() => setAccountMenuOpen(value => !value)}><span className="harness-avatar">{account.username ? Array.from(account.username)[0].toLocaleUpperCase() : '…'}</span><span className="harness-account-menu-label">账号</span><span className="harness-menu-icon" aria-hidden="true">☰</span></button>
+        <button type="button" className="harness-account-toggle" aria-label="平台菜单" aria-expanded={accountMenuOpen} aria-controls="harness-account-actions" onClick={() => setAccountMenuOpen(value => !value)}><span className="harness-avatar">{account.username ? Array.from(account.username)[0].toLocaleUpperCase() : '…'}</span><span className="harness-account-menu-label">{full ? '账号' : account.username || '账号'}</span><span className="harness-menu-icon" aria-hidden="true">☰</span></button>
         <div id="harness-account-actions" className="harness-account-actions" data-open={accountMenuOpen || undefined} onClick={event => { if ((event.target as HTMLElement).closest('button')) setAccountMenuOpen(false) }}><nav className="harness-menu-navigation" aria-label="移动平台导航">{pages.map(item => <button key={item.id} type="button" aria-current={page === item.id ? 'page' : undefined} onClick={() => navigate(item.id)}>{item.label}</button>)}</nav><span className="harness-avatar">{account.username ? Array.from(account.username)[0].toLocaleUpperCase() : '…'}</span><span className="harness-account-name">{account.error ? '账号暂不可读' : account.username || '读取账号中…'}</span><span id="harness-settings"/><form method="post" action={new URL('logout', document.baseURI).href}><button type="submit">退出登录</button></form></div>
       </div>
     </header>
     {page !== 'home' && page !== 'conversations' && <button type="button" className="harness-assistant-launch" aria-expanded={visible} aria-label={visible ? '收起 AI 助手' : `打开 AI 助手${statusLabel === 'AI 助手' ? '' : `，${statusLabel}`}`} title={statusLabel === 'AI 助手' ? '平台 AI 助手' : `AI 助手 · ${statusLabel}`} data-status={waiting || status?.pendingInteraction ? 'waiting' : status?.running ? 'running' : unread || status?.completionUnread ? 'unread' : undefined} onClick={toggleAssistantOpen}><AssistantIcon/></button>}
     <div className="harness-body">
       <div className="harness-content">
-        {page !== 'home' && <div className="harness-breadcrumb">工作空间 / {pages.find(item => item.id === page)?.label}</div>}
-        {mountedPages.current.has('home') && <div hidden={page !== 'home'}><HomePage catalog={catalog} rpc={rpc} updates={updates} sessions={sessions} assistant={assistant} navigate={navigate} startConversation={async (_root, prompt, context) => { await assistant.create(prompt, context ?? { page: 'home' }); collapseOnEntry.current = true }} /></div>}
-        {mountedPages.current.has('agents') && <div hidden={page !== 'agents'}><AgentsPage rpc={rpc} updates={updates} onAssistant={onAssistant} onContext={onContext} target={target} onNavigate={navigate} active={page === 'agents'} themeScheme={themeScheme} onThemeToggle={() => theme.setScheme(themeScheme === 'dark' ? 'light' : 'dark')} /></div>}
+        {full && <div className="harness-breadcrumb">工作空间 / 管理对话</div>}
+        {mountedPages.current.has('home') && <div hidden={page !== 'home'}><HomePage active={page === 'home'} catalog={catalog} rpc={rpc} updates={updates} sessions={sessions} assistant={assistant} navigate={navigate} startConversation={async (_root, prompt, context) => { await assistant.create(prompt, context ?? { page: 'home' }); collapseOnEntry.current = true }} /></div>}
+        {mountedPages.current.has('agents') && <div hidden={page !== 'agents'}><AgentsPage rpc={rpc} updates={updates} onAssistant={onAssistant} onContext={onContext} target={target} onNavigate={navigate} active={page === 'agents'} /></div>}
         {mountedPages.current.has('evaluation') && <div hidden={page !== 'evaluation'}><EvaluationPage rpc={rpc} updates={updates} onAssistant={onAssistant} onContext={onContext} target={target} onNavigate={navigate} active={page === 'evaluation'} /></div>}
-        {mountedPages.current.has('instances') && <div hidden={page !== 'instances'}><InstancesPage rpc={rpc} updates={updates} onContext={onContext} target={target} onNavigate={navigate} /></div>}
-        <div hidden={page !== 'gateway'}><BusinessControlPage rpc={rpc} updates={updates} active={page === 'gateway'} target={target} onNavigate={navigate} /></div>
+        {mountedPages.current.has('instances') && <div hidden={page !== 'instances'}><InstancesPage rpc={rpc} updates={updates} onContext={onContext} target={target} onNavigate={navigate} active={page === 'instances'} /></div>}
+        <div hidden={page !== 'gateway'}><BusinessControlPage rpc={rpc} updates={updates} active={page === 'gateway'} target={target} onNavigate={navigate} assistantVisible={floating} onAssistantVisibilityChange={setOpen} onAssistantReturnChange={onAssistantReturnChange} /></div>
         {mountedPages.current.has('mcp') && <div hidden={page !== 'mcp'}><McpPage rpc={rpc} updates={updates} onContext={onContext} target={target} onNavigate={navigate} active={page === 'mcp'} /></div>}
         <div ref={conversation} className="harness-conversation-viewport" hidden={!full}/>
-        <section className="harness-assistant harness-assistant-floating" hidden={!floating} aria-label="平台 AI 助手">
+        <section className="harness-assistant harness-assistant-floating" hidden={!floating} aria-label="平台 AI 助手" style={{ '--hep-assistant-width': `${assistantWidth}px` } as CSSProperties}>
+          <div className="hep-assistant-resize" role="separator" tabIndex={0} aria-label="调整助手宽度" aria-orientation="vertical" aria-valuemin={360} aria-valuemax={560} aria-valuenow={assistantWidth}
+            onPointerDown={event => { resizeStart.current = { x: event.clientX, width: assistantWidth }; event.currentTarget.setPointerCapture(event.pointerId); event.preventDefault() }}
+            onPointerMove={event => { const start = resizeStart.current; if (start) setAssistantWidth(Math.max(360, Math.min(560, start.width + start.x - event.clientX))) }}
+            onPointerUp={() => { resizeStart.current = null }} onLostPointerCapture={() => { resizeStart.current = null }}
+            onKeyDown={event => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) { event.preventDefault(); setAssistantWidth(width => event.key === 'Home' ? 360 : event.key === 'End' ? 560 : Math.max(360, Math.min(560, width + (event.key === 'ArrowLeft' ? 20 : -20)))) } }}/>
           <header className="harness-assistant-heading"><div><strong>平台 AI 助手</strong><small role="status">{assistantState.busy ? '正在准备会话…' : statusLabel}</small></div><div>
+            {page === 'gateway' && assistantReturnAction && <button type="button" onClick={() => { setAssistantReturnAction(null); assistantReturnAction.onReturn() }}>{assistantReturnAction.label}</button>}
             <button title="新建独立任务会话" disabled={assistantState.busy} onClick={() => { void assistant.create().catch(() => {}) }}>新任务</button>
             <button title="在管理对话中展开" onClick={() => navigate('conversations')}>展开</button>
             <button ref={closeAssistant} title="收起助手" onClick={() => { setOpen(false); requestAnimationFrame(() => toggleAssistant.current?.focus()) }}>收起</button>

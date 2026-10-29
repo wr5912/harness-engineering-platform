@@ -5,7 +5,7 @@ import test from 'node:test'
 import { build } from 'esbuild'
 
 const require = createRequire(import.meta.url)
-const source = (await build({ entryPoints: [new URL('../src/agents/client.tsx', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime'] })).outputFiles[0].text
+const source = (await build({ entryPoints: [new URL('../src/agents/client.tsx', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime', 'react-dom'], plugins: [{ name: 'page-components', setup(builder) { builder.onLoad({ filter: /detail-drawer\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function DetailDrawer(p) { return createElement('section', { 'data-drawer-title': p.title }, createElement('button', { type: 'button' }, p.trigger || p.title), p.children) }` })); builder.onLoad({ filter: /search-select\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function SearchSelect(p) { return createElement('select', { 'aria-label': p.label, value: p.value, onChange: e => p.onChange(e.target.value) }, p.options.map(o => createElement('option', { key:o.value, value:o.value }, o.label + ' ' + (o.description || '')))) }` })); builder.onLoad({ filter: /description-client\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function AgentDescriptionPanel(p) { return createElement('div', { 'data-description-version': p.detail.experiment.id }, '版本资料与技能') }` })) } }] })).outputFiles[0].text
 
 function experiments() {
   return ['first-agent', 'second-agent'].flatMap(agentId => [
@@ -22,12 +22,13 @@ function detail(agentId = 'first-agent', experimentId = `EXP-${agentId}-002`) {
   return { agent: { id: agentId, name: `名称 ${agentId}`, manifest: { description: '真实用途' } }, experiment: experiments().find(item => item.id === experimentId),
     versions: experiments().filter(item => item.agent_id === agentId).reverse().map(item => ({ id: item.id, status: item.status, baseline_ref: item.change.baseline_ref })), baseline: { ref: 'none:first-experiment' }, fusion: {}, related_references: [],
     declared: { source_contract: {}, loadable_source: {} }, loaded_instance: { status: 'not_queried' }, features: [],
+    repo_commit: 'c'.repeat(40), derivation: { parent_experiment_id: experimentId, parent_ref: `git:${'d'.repeat(40)}` },
     verification: { runs: [{ id: 'run-11111111-1111-4111-8111-111111111111', status: 'failed' }] },
     assets: [{ name: 'candidate', path: 'candidate', kind: 'directory', children: [{ name: 'prompt.md', path: 'candidate/prompt.md', kind: 'text' }] }] }
 }
 
 function page({ active = true, target, intercept, updates } = {}) {
-  const states = [], dependencies = [], cleanups = []
+  const states = [], dependencies = [], cleanups = [], dialogs = new Map(), resolvedComponents = new WeakMap()
   let cursor = 0, effects = [], changed = false, tree, confirm = false
   const calls = [], contexts = [], navigations = [], assistantTasks = [], listeners = new Map(), reveals = []
   const history = [target ?? { page: 'agents' }]
@@ -40,7 +41,7 @@ function page({ active = true, target, intercept, updates } = {}) {
   const module = { exports: {} }
   vm.runInNewContext(source, { module, exports: module.exports, URL, require: name => name === 'react' ? react : require(name),
     window: { location: { hostname: '127.0.0.1' }, confirm: () => confirm, addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: name => listeners.delete(name) },
-    document: { getElementById: id => {
+    document: { activeElement: { focus() {} }, getElementById: id => {
       const node = nodes(tree).find(item => item.props?.id === id)
       return node ? { hidden: Boolean(node.props.hidden), focus() { reveals.push(`focus:${id}`) }, scrollIntoView() { reveals.push(`scroll:${id}`) } } : null
     } },
@@ -59,22 +60,24 @@ function page({ active = true, target, intercept, updates } = {}) {
       return { ok: true, value: { proposal: null } }
     } },
   }
-  function render() { let count = 0; do { if (++count > 30) throw new Error('render loop'); cursor = 0; effects = []; changed = false; tree = module.exports.AgentsPage(props); effects.forEach(effect => effect()) } while (changed); return tree }
+  function rawNodes(value) { if (Array.isArray(value)) return value.flatMap(rawNodes); if (!value || typeof value !== 'object') return []; return [value, ...rawNodes(value.props?.children)] }
+  function render() { let count = 0; do { if (++count > 30) throw new Error('render loop'); cursor = 0; effects = []; changed = false; tree = module.exports.AgentsPage(props); for (const node of rawNodes(tree).filter(node => node.type === 'dialog')) { const id = node.props['aria-labelledby']; if (!dialogs.has(id)) dialogs.set(id, { open: false, showModal() { this.open = true }, close() { this.open = false } }); if (node.ref) node.ref.current = dialogs.get(id) }; effects.forEach(effect => effect()) } while (changed); return tree }
   async function settle() { for (let index = 0; index < 5; index++) { await new Promise(resolve => setImmediate(resolve)); render() } }
-  function nodes(value) { if (!arguments.length) value = tree; if (Array.isArray(value)) return value.flatMap(nodes); if (!value || typeof value !== 'object') return []; if (typeof value.type === 'function') return nodes(value.type(value.props)); return [value, ...(value.props?.children === undefined ? [] : nodes(value.props.children))] }
-  function text(value) { if (Array.isArray(value)) return value.map(text).join(''); return value && typeof value === 'object' ? text(value.props?.children) : String(value ?? '') }
+  function resolved(value) { if (!resolvedComponents.has(value)) resolvedComponents.set(value, value.type(value.props)); return resolvedComponents.get(value) }
+  function nodes(value) { if (!arguments.length) value = tree; if (Array.isArray(value)) return value.flatMap(nodes); if (!value || typeof value !== 'object') return []; if (value.type?.name === 'AssetDiffPanel') return [value]; if (typeof value.type === 'function') return nodes(resolved(value)); return [value, ...(value.props?.children === undefined ? [] : nodes(value.props.children))] }
+  function text(value) { if (Array.isArray(value)) return value.map(text).join(''); if (value && typeof value === 'object') return typeof value.type === 'function' && value.type.name !== 'AssetDiffPanel' ? text(resolved(value)) : text(value.props?.children); return typeof value === 'boolean' ? '' : String(value ?? '') }
   const button = name => nodes().find(node => node.type === 'button' && text(node) === name)
   render()
-  return { render, settle, nodes, text, button, calls, contexts, navigations, history, assistantTasks, props, listeners, reveals, setConfirm: value => { confirm = value } }
+  return { render, settle, nodes, text, button, calls, contexts, navigations, history, assistantTasks, props, listeners, reveals, dialogs, setConfirm: value => { confirm = value } }
 }
 
-test('智能体五个任务页签、搜索与默认最新版本保持登记版本独立', async () => {
+test('智能体四个任务页签、搜索与默认最新版本保持登记版本独立', async () => {
   const ui = page()
   await ui.settle()
-  assert.deepEqual(ui.nodes().filter(node => node.props?.role === 'tab' && node.props.id?.startsWith('agent-tab-')).map(node => ui.text(node)), ['概览', 'Harness 资产', '能力状态', '生成与比较', '运行情况'])
+  assert.deepEqual(ui.nodes().filter(node => node.props?.role === 'tab' && node.props.id?.startsWith('agent-tab-')).map(node => ui.text(node)), ['概览', '描述与技能', 'Harness 资产', '低算力变体'])
   assert.ok(ui.calls.some(call => call.endpoint === 'agents/detail' && call.payload.agent_id === 'first-agent' && call.payload.experiment_id === undefined))
   assert.match(ui.text(ui.render()), /EXP-first-agent-002/)
-  assert.match(ui.text(ui.render()), /登记版本版本 001/)
+  assert.ok(ui.nodes().some(node => node.type === 'dd' && ui.text(node) === 'EXP-first-agent-001'))
   const search = ui.nodes().find(node => node.props?.type === 'search')
   search.props.onChange({ target: { value: 'second-agent' } }); ui.render()
   const cards = ui.nodes().filter(node => node.props?.className === 'agent-list-card')
@@ -83,31 +86,22 @@ test('智能体五个任务页签、搜索与默认最新版本保持登记版�
   assert.equal(ui.nodes().some(node => node.props?.id === 'agent-panel-evaluation'), false)
 })
 
-test('版本导航使用实际 Run 与登记来源，切换只更改查看对象', async () => {
-  const ui = page({ intercept(endpoint, payload) {
-    if (endpoint === 'agents/runs/index') return { ok: true, value: { experiments: [
-      { experiment_id: `EXP-${payload.agent_id}-001`, runs: [{ run_id: 'run-11111111-1111-4111-8111-111111111111', status: 'completed', created_at: '2026-10-19T08:00:00Z' }] },
-      { experiment_id: `EXP-${payload.agent_id}-002`, runs: [{ run_id: 'run-22222222-2222-4222-8222-222222222222', status: 'completed', created_at: '2026-10-20T08:00:00Z' }] },
-    ] } }
-    if (endpoint === 'agents/runs/show') return { ok: true, value: { summary: { effective_verdict: 'failed' }, cases: [] } }
-  } })
-  await ui.settle()
-  const current = ui.nodes().find(node => node.props?.id === 'agent-version-card-EXP-first-agent-002')
-  const registered = ui.nodes().find(node => node.props?.id === 'agent-version-card-EXP-first-agent-001')
-  assert.equal(current.props['aria-pressed'], true)
-  assert.match(ui.text(current), /v002.*业务未通过.*first-agent 的省算力方案/s)
-  assert.match(ui.text(registered), /v001.*登记版本.*最近 Run：执行已结束/s)
-  registered.props.onClick(); ui.render(); await ui.settle()
-  assert.equal(ui.nodes().find(node => node.props?.id === 'agent-version-card-EXP-first-agent-001').props['aria-pressed'], true)
+test('唯一紧凑版本选择器切换查看对象，不更改登记来源', async () => {
+  const ui = page(); await ui.settle()
+  const selectors = ui.nodes().filter(node => node.type === 'select' && node.props['aria-label'] === '版本')
+  assert.equal(selectors.length, 1)
+  assert.equal(selectors[0].props.value, 'EXP-first-agent-002')
+  selectors[0].props.onChange({ target: { value: 'EXP-first-agent-001' } }); ui.render(); await ui.settle()
+  assert.equal(ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '版本').props.value, 'EXP-first-agent-001')
   assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { page: 'agents', agent_id: 'first-agent', experiment_id: 'EXP-first-agent-001', tab: 'overview' })
-  assert.equal(ui.nodes().find(node => node.props?.className === 'agent-identity').props.id, 'agent-identity')
+  assert.equal(ui.calls.some(call => /apply|activate/.test(call.endpoint)), false)
 })
 
-test('Run 索引不可读时版本导航显示读取失败，不把未证实结论当成业务通过', async () => {
+test('Run 索引不可读时概览显示读取失败，不把未证实结论当成业务通过', async () => {
   const ui = page({ intercept(endpoint) { if (endpoint === 'agents/runs/index') return { ok: false, error: { code: 'unavailable', message: '索引暂不可读' } } } })
   await ui.settle()
-  const current = ui.nodes().find(node => node.props?.id === 'agent-version-card-EXP-first-agent-002')
-  assert.match(ui.text(current), /评测读取失败/)
+  const current = ui.nodes().find(node => node.props?.className === 'agent-evaluation-summary')
+  assert.match(ui.text(current), /评测结果读取失败/)
   assert.doesNotMatch(ui.text(current), /业务通过/)
 })
 
@@ -116,13 +110,15 @@ test('智能体清单未返回前显示读取状态，不把暂时的零条目�
   const pending = page({ intercept(endpoint) {
     if (endpoint === 'agents/list') return new Promise(resolve => { resolveList = resolve })
   } })
-  assert.match(pending.text(pending.render()), /正在读取智能体列表/)
+  pending.render()
+  assert.ok(pending.nodes().some(node => node.props?.role === 'status' && node.props['aria-label'] === '读取智能体列表' && node.props.className.includes('hep-loading-block')))
+  assert.doesNotMatch(pending.text(pending.render()), /正在读取|正在更新/)
   assert.doesNotMatch(pending.text(pending.render()), /尚无智能体资产/)
-  assert.match(pending.text(pending.nodes().find(node => node.props?.id === 'agent-list-tab-agents')), /智能体列表\s*…/)
+  assert.match(pending.text(pending.nodes().find(node => node.props?.id === 'agent-list-tab-agents')), /智能体\s*…/)
   resolveList({ ok: true, value: { agents: [], experiments: [] } })
   await pending.settle()
   assert.match(pending.text(pending.render()), /尚无智能体资产/)
-  assert.doesNotMatch(pending.text(pending.render()), /正在读取智能体列表/)
+  assert.equal(pending.nodes().some(node => node.props?.['aria-label'] === '读取智能体列表'), false)
 
   const failed = page({ intercept(endpoint) { if (endpoint === 'agents/list') return { ok: false, error: { code: 'unavailable', message: '暂不可用' } } } })
   await failed.settle()
@@ -152,14 +148,168 @@ test('所选版本概览分开显示执行和业务结论，异常用例可回�
   const panel = ui.nodes().find(node => node.props?.id === 'agent-panel-overview')
   const all = ui.nodes()
   assert.ok(ui.nodes(panel).includes(overview), '所选版本结论位于概览首段')
-  assert.equal(panel.props.children[0].props.className, 'agent-evaluation-summary', '评测结论先于用途整理入口')
+  assert.ok(ui.nodes(panel).includes(overview), '最近评测位于所选版本概览')
   assert.equal(panel.props.hidden, false)
   assert.ok(all.indexOf(identity) < all.findIndex(node => node.props?.className === 'harness-agent-tabs')
     && all.findIndex(node => node.props?.className === 'harness-agent-tabs') < all.indexOf(overview)
     && all.indexOf(overview) < all.findIndex(node => node.props?.className === 'agent-variant-source'), '版本身份、页签、结论、技术来源依任务顺序呈现')
   assert.match(ui.text(overview), /执行已结束.*业务未通过.*1 项未通过，1 项无法判定.*完整读取分页台账.*台账服务异常处理/s)
-  ui.button('查看报告与证据').props.onClick()
+  ui.button('查看最近结果').props.onClick()
   assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { page: 'evaluation', agent_id: 'first-agent', experiment_id: 'EXP-first-agent-002', tab: 'runs', run_id: 'run-11111111-1111-4111-8111-111111111111' })
+})
+
+test('概览图表限定当前版本，未结束执行不计业务通过，混合与缺失逐例结果独立展示', async () => {
+  const currentRuns = [
+    { run_id: 'run-current', status: 'running', effective_verdict: 'passed', created_at: '2026-10-29T08:00:00Z' },
+    { run_id: 'run-passed', status: 'completed', effective_verdict: 'passed', created_at: '2026-10-28T08:00:00Z' },
+    { run_id: 'run-error', status: 'failed', effective_verdict: 'passed', created_at: '2026-10-27T08:00:00Z' },
+    { run_id: 'run-unreviewed', status: 'completed', created_at: '2026-10-26T08:00:00Z' },
+  ]
+  const ui = page({ intercept(endpoint) {
+    if (endpoint === 'agents/runs/index') return { ok: true, value: { experiments: [
+      { experiment_id: 'EXP-first-agent-001', runs: [{ run_id: 'run-foreign', status: 'completed', effective_verdict: 'passed' }] },
+      { experiment_id: 'EXP-first-agent-002', runs: currentRuns },
+    ] } }
+    if (endpoint === 'agents/runs/show') return { ok: true, value: { run_id: 'run-current', summary: { effective_verdict: 'passed' }, cases: [
+      { case_id: 'mixed', frozen: { title: '不同Trial结果' }, trials: [{ verdict: 'passed' }, { verdict: 'failed' }] },
+      { case_id: 'pending', trials: [] },
+      { case_id: 'reviewed', review: { reviewed_verdict: 'passed' }, trials: [{ verdict: 'failed' }] },
+      { case_id: 'inconclusive', trials: [{ verdict: 'inconclusive' }] },
+      { case_id: 'failed', trials: [{ verdict: 'failed' }] },
+    ] } }
+  } })
+  await ui.settle()
+  const charts = ui.nodes().filter(node => node.type === 'figure' && node.props.className === 'hep-overview-chart')
+  const runs = charts.find(node => ui.text(node).includes('版本 Run 分布'))
+  const cases = charts.find(node => node.props['data-variant'] === 'case-trend')
+  assert.deepEqual(ui.nodes(runs).filter(node => node.type === 'li').map(node => ui.text(node)), ['业务通过1', '结论待核对1', '执行失败1', '运行或待执行1'])
+  assert.deepEqual(ui.nodes(ui.nodes(cases).find(node => node.props?.className === 'agent-case-trend-legend')).filter(node => node.type === 'li').map(node => ui.text(node)), ['通过1', '未通过1', '无法判定1', '结果不一致1', '未记录结果1'])
+  const status = ui.nodes().find(node => node.props?.className === 'agent-result-status')
+  assert.match(ui.text(status), /运行中尚无业务结论/)
+  const attention = ui.nodes().find(node => node.props?.className === 'agent-result-cases')
+  assert.match(ui.text(attention), /结果不一致不同Trial结果/)
+  assert.doesNotMatch(ui.text(attention), /未通过不同Trial结果/)
+  const points = ui.nodes().filter(node => node.type === 'button' && node.props['aria-label']?.includes('，运行或待执行'))
+  assert.equal(points.length, 1)
+  points[0].props.onClick()
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { page: 'evaluation', agent_id: 'first-agent', experiment_id: 'EXP-first-agent-002', tab: 'runs', run_id: 'run-current' })
+  assert.equal(ui.calls.some(call => /run-foreign/.test(JSON.stringify(call.payload))), false)
+})
+
+test('三个版本Run与最近一次的一个选定用例分别标明范围，不共用统计分母', async () => {
+  const latest = { run_id: 'run-newest', status: 'completed', effective_verdict: 'inconclusive', created_at: '2026-10-16T09:09:50Z' }
+  const ui = page({ target: { page: 'agents', agent_id: 'first-agent', experiment_id: 'EXP-first-agent-001', tab: 'overview' }, intercept(endpoint) {
+    if (endpoint === 'agents/runs/index') return { ok: true, value: { experiments: [{ experiment_id: 'EXP-first-agent-001', runs: [
+      { run_id: 'run-old-1', status: 'completed', effective_verdict: 'passed', created_at: '2026-10-14T08:00:00Z' },
+      { run_id: 'run-old-2', status: 'completed', effective_verdict: 'failed', created_at: '2026-10-15T08:00:00Z' }, latest,
+    ] }] } }
+    if (endpoint === 'agents/runs/show') return { ok: true, value: { run_id: latest.run_id, cases: [{ case_id: 'CASE-only', frozen: { title: '仅本次运行用例' }, trials: [{ verdict: 'failed' }] }] } }
+  } })
+  await ui.settle()
+  const charts = ui.nodes().filter(node => node.type === 'figure' && node.props.className === 'hep-overview-chart')
+  const runs = charts.find(node => ui.text(node).includes('当前版本 Run 分布'))
+  const cases = charts.find(node => node.props['data-variant'] === 'case-trend')
+  const scopeTime = new Date(latest.created_at).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
+  assert.match(ui.text(runs), /当前版本全部已登记记录，共 3 次 Run/)
+  assert.ok(ui.nodes(runs).some(node => node.type === 'svg' && node.props['aria-label'] === '当前版本 Run 分布，共 3 次 Run'))
+  assert.ok(ui.text(ui.nodes().find(node => node.props?.className === 'agent-overview-latest-scope')).includes(`最近一次 Run（${scopeTime}）：共 1 个选定用例`))
+  assert.deepEqual(ui.nodes(ui.nodes(cases).find(node => node.props?.className === 'agent-case-trend-legend')).filter(node => node.type === 'li').map(node => ui.text(node)), ['通过0', '未通过1', '无法判定0', '结果不一致0', '未记录结果0'])
+  assert.doesNotMatch(ui.text(cases), /共 3 个选定用例/)
+  assert.equal(ui.nodes(cases).filter(node => node.props?.className === 'agent-case-trend-gap').length, 2, '未读取历史用例计数时保持缺口，不借用最近一次的一个用例')
+  assert.ok(ui.calls.filter(call => call.endpoint === 'agents/runs/show').every(call => call.payload.run_id === latest.run_id))
+  ui.button('查看最近结果').props.onClick()
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { page: 'evaluation', agent_id: 'first-agent', experiment_id: 'EXP-first-agent-001', tab: 'runs', run_id: latest.run_id })
+})
+
+test('逐例证据读取失败保留已读取版本分布，不伪造零用例结果', async () => {
+  const ui = page({ intercept: endpoint => endpoint === 'agents/runs/show' ? { ok: false, error: { code: 'offline', message: '逐例记录暂不可读' } } : undefined })
+  await ui.settle()
+  const overview = ui.nodes().find(node => node.props?.className === 'agent-evaluation-summary')
+  assert.match(ui.text(overview), /版本 Run 分布.*业务未通过1.*逐例证据暂不可读/s)
+  assert.equal(ui.nodes(overview).filter(node => node.type === 'svg' && node.props.role === 'img').length, 1)
+  assert.doesNotMatch(ui.text(overview), /未记录结果0|通过0|此版本尚无 Run/)
+})
+
+test('逐例详情未返回时保留索引图并显示读取指示，不先展示零用例', async () => {
+  let finish
+  const ui = page({ intercept: endpoint => endpoint === 'agents/runs/show' ? new Promise(resolve => { finish = resolve }) : undefined })
+  await ui.settle()
+  const overview = ui.nodes().find(node => node.props?.className === 'agent-evaluation-summary')
+  assert.ok(ui.nodes(overview).some(node => node.props?.role === 'status' && node.props['aria-label'] === '读取最近 Run 的逐例观察'))
+  assert.equal(ui.nodes(overview).filter(node => node.type === 'svg' && node.props.role === 'img').length, 1)
+  assert.doesNotMatch(ui.text(overview), /未记录结果0|通过0|此版本尚无 Run/)
+  finish({ ok: true, value: { cases: [] } }); await ui.settle()
+  const ready = ui.nodes().find(node => node.props?.className === 'agent-evaluation-summary')
+  assert.match(ui.text(ready), /未保存可统计的逐例观察/)
+  assert.equal(ui.nodes(ready).some(node => node.props?.['aria-label'] === '读取最近 Run 的逐例观察'), false)
+})
+
+test('此版本尚无Run时显示真实空图表，保留进入评测的固定对象', async () => {
+  const ui = page({ intercept: endpoint => endpoint === 'agents/runs/index' ? { ok: true, value: { experiments: [] } } : undefined })
+  await ui.settle()
+  const overview = ui.nodes().find(node => node.props?.className === 'agent-evaluation-summary')
+  assert.match(ui.text(overview), /此版本尚无 Run/)
+  assert.equal(ui.calls.some(call => call.endpoint === 'agents/runs/show'), false)
+  ui.nodes(overview).find(node => node.type === 'button' && ui.text(node) === '查看全部 →').props.onClick()
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { page: 'evaluation', agent_id: 'first-agent', experiment_id: 'EXP-first-agent-002', tab: 'runs' })
+})
+
+test('同版本刷新保留图表和逐例观察，读取失败标注旧观察并可刷新恢复', async () => {
+  let mode = 'ready', releaseIndex, releaseDetail
+  const ui = page({ intercept(endpoint) {
+    if (endpoint === 'agents/runs/index' && mode === 'index-pending') return new Promise(resolve => { releaseIndex = resolve })
+    if (endpoint === 'agents/runs/show' && mode === 'detail-pending') return new Promise(resolve => { releaseDetail = resolve })
+  } })
+  await ui.settle()
+  const summary = () => ui.nodes().find(node => node.props?.className === 'agent-evaluation-summary')
+  const oldCases = ui.text(ui.nodes(summary()).find(node => node.props?.className === 'agent-result-cases'))
+  mode = 'index-pending'; ui.button('刷新').props.onClick(); await ui.settle()
+  assert.equal(ui.text(ui.nodes(summary()).find(node => node.props?.className === 'agent-result-cases')), oldCases)
+  assert.ok(ui.nodes(summary()).some(node => node.props?.['aria-label'] === '更新此版本评测概况' && !node.props.className.includes('hep-loading-block')))
+  assert.match(ui.text(summary()), /上次观察/)
+  assert.equal(ui.nodes(summary()).some(node => node.props?.['aria-label'] === '读取此版本评测结果'), false)
+  releaseIndex({ ok: false, error: { code: 'offline', message: '刷新索引失败' } }); await ui.settle()
+  assert.match(ui.text(summary()), /读取失败，显示上次观察.*刷新索引失败/s)
+  assert.equal(ui.text(ui.nodes(summary()).find(node => node.props?.className === 'agent-result-cases')), oldCases)
+  assert.equal(summary().props['aria-busy'], false)
+  mode = 'ready'; ui.button('刷新').props.onClick(); await ui.settle()
+  assert.doesNotMatch(ui.text(summary()), /上次观察|刷新索引失败/)
+  mode = 'detail-pending'; ui.button('刷新').props.onClick(); await ui.settle()
+  assert.equal(ui.text(ui.nodes(summary()).find(node => node.props?.className === 'agent-result-cases')), oldCases)
+  assert.equal(ui.nodes(summary()).some(node => node.props?.['aria-label'] === '读取最近 Run 的逐例观察'), false)
+  releaseDetail({ ok: false, error: { code: 'offline', message: '刷新逐例失败' } }); await ui.settle()
+  assert.match(ui.text(summary()), /读取失败，显示上次观察.*刷新逐例失败/s)
+  assert.equal(ui.text(ui.nodes(summary()).find(node => node.props?.className === 'agent-result-cases')), oldCases)
+  mode = 'ready'; ui.button('刷新').props.onClick(); await ui.settle()
+  assert.doesNotMatch(ui.text(summary()), /上次观察|刷新逐例失败/)
+})
+
+test('同版本出现新Run时不复用旧逐例图，切版本后迟到详情也不能越界', async () => {
+  let changedRun = false, changingVersion = false, finishNewRun, finishVersion
+  const newRun = { run_id: 'run-new', status: 'completed', effective_verdict: 'passed', created_at: '2026-10-30T08:15:00Z' }
+  const versionRun = { run_id: 'run-version', status: 'completed', effective_verdict: 'inconclusive', created_at: '2026-10-30T09:15:00Z' }
+  const ui = page({ intercept(endpoint, payload) {
+    if (endpoint === 'agents/runs/index' && changingVersion) return new Promise(resolve => { finishVersion = resolve })
+    if (endpoint === 'agents/runs/index' && changedRun) return { ok: true, value: { experiments: [{ experiment_id: 'EXP-first-agent-002', runs: [newRun] }] } }
+    if (endpoint === 'agents/runs/show' && payload.run_id === 'run-new') return new Promise(resolve => { finishNewRun = resolve })
+    if (endpoint === 'agents/runs/show' && payload.run_id === 'run-version') return { ok: true, value: { cases: [{ case_id: 'new-version-case', frozen: { title: '当前版本用例' }, trials: [{ verdict: 'inconclusive' }] }] } }
+  } })
+  await ui.settle()
+  changedRun = true; ui.button('刷新').props.onClick(); await ui.settle()
+  const summary = () => ui.nodes().find(node => node.props?.className === 'agent-evaluation-summary')
+  assert.doesNotMatch(ui.text(summary()), /完整读取分页台账|台账服务异常处理/)
+  assert.ok(ui.nodes(summary()).some(node => node.props?.['aria-label'] === '读取最近 Run 的逐例观察'))
+  changingVersion = true
+  ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '版本').props.onChange({ target: { value: 'EXP-first-agent-001' } })
+  await ui.settle()
+  assert.ok(ui.nodes(summary()).some(node => node.props?.['aria-label'] === '读取此版本评测结果'))
+  assert.equal(ui.nodes(summary()).some(node => node.type === 'svg' && node.props.role === 'img'), false)
+  finishNewRun({ ok: true, value: { cases: [{ case_id: 'late-case', frozen: { title: '迟到的其他版本用例' }, trials: [{ verdict: 'failed' }] }] } }); await ui.settle()
+  assert.doesNotMatch(ui.text(summary()), /迟到的其他版本用例/)
+  changingVersion = false
+  finishVersion({ ok: true, value: { experiments: [{ experiment_id: 'EXP-first-agent-001', runs: [versionRun] }] } }); await ui.settle()
+  assert.match(ui.text(summary()), /版本 001 的评测概况.*当前版本用例/s)
+  assert.doesNotMatch(ui.text(summary()), /迟到的其他版本用例|完整读取分页台账/)
 })
 
 test('迟到的评测索引不能覆盖切换后的智能体结论', async () => {
@@ -174,16 +324,16 @@ test('迟到的评测索引不能覆盖切换后的智能体结论', async () =>
   const overview = ui.nodes().find(node => node.props?.className === 'agent-evaluation-summary')
   assert.match(ui.text(overview), /业务未通过/)
   assert.doesNotMatch(ui.text(overview), /业务通过/)
-  const version = ui.nodes().find(node => node.props?.id === 'agent-version-card-EXP-second-agent-002')
-  assert.match(ui.text(version), /业务未通过/)
-  assert.doesNotMatch(ui.text(version), /业务通过/)
+  const version = ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '版本')
+  assert.equal(version.props.value, 'EXP-second-agent-002')
 })
 
 test('导航精确定位研究版本、Run 报告，隐藏页不覆盖助手上下文', async () => {
   const ui = page({ target: { page: 'agents', agent_id: 'second-agent', experiment_id: 'EXP-second-agent-001', tab: 'runtime' } })
   await ui.settle()
-  assert.equal(ui.nodes().find(node => node.props?.id === 'agent-panel-runtime').props.hidden, false)
-  ui.button('查看报告').props.onClick()
+  assert.equal(ui.nodes().find(node => node.props?.id === 'agent-panel-overview').props.hidden, false)
+  assert.equal(ui.nodes().some(node => node.props?.id === 'agent-panel-runtime'), false)
+  ui.button('查看最近结果').props.onClick()
   assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { page: 'evaluation', agent_id: 'second-agent', experiment_id: 'EXP-second-agent-001', tab: 'runs', run_id: 'run-11111111-1111-4111-8111-111111111111' })
   const count = ui.contexts.length
   ui.props.active = false
@@ -206,14 +356,14 @@ test('详情深链、页签点击与变体选择将手机视口定位到目标�
 
   const ui = page()
   await ui.settle()
-  ui.button('能力状态').props.onClick(); ui.render(); await ui.settle()
-  assert.ok(ui.reveals.includes('scroll:agent-panel-capabilities'))
-  assert.ok(ui.reveals.includes('focus:agent-panel-capabilities'))
+  ui.button('描述与技能').props.onClick(); ui.render(); await ui.settle()
+  assert.ok(ui.reveals.includes('scroll:agent-panel-description'))
+  assert.ok(ui.reveals.includes('focus:agent-panel-description'))
   const scrolls = ui.reveals.filter(value => value.startsWith('scroll:agent-panel-')).length
   ui.nodes().find(node => node.props?.role === 'tablist' && node.props?.['aria-label'] === '智能体详情').props.onKeyDown({ key: 'ArrowRight', preventDefault() {} })
   ui.render(); await ui.settle()
   assert.equal(ui.reveals.filter(value => value.startsWith('scroll:agent-panel-')).length, scrolls)
-  assert.ok(ui.reveals.includes('focus:agent-tab-compute-variants'))
+  assert.ok(ui.reveals.includes('focus:agent-tab-assets'))
 })
 
 test('手机详情返回当前列表条目并恢复焦点，保留筛选和选中对象', async () => {
@@ -235,18 +385,20 @@ test('手机详情返回当前列表条目并恢复焦点，保留筛选和选�
   assert.deepEqual(ui.reveals.slice(-2), ['scroll:agent-variant-card-EXP-first-agent-002', 'focus:agent-variant-card-EXP-first-agent-002'])
 })
 
-test('运行情况从所选版本 Run 索引显示真实执行状态和时间，读取失败明确说明', async () => {
+test('概览唯一评测摘要显示真实执行状态和时间，读取失败明确说明', async () => {
   const ui = page()
   await ui.settle()
-  ui.button('运行情况').props.onClick(); ui.render(); await ui.settle()
-  const table = ui.nodes().find(node => node.type === 'table' && node.props?.['aria-label'] === '所选版本 Run')
-  assert.match(ui.text(table), /执行已结束.*2026/s)
-  assert.doesNotMatch(ui.text(table), /未记录|读取失败/)
+  ui.button('概览').props.onClick(); ui.render(); await ui.settle()
+  const summary = ui.nodes().find(node => node.props?.className === 'agent-evaluation-summary')
+  assert.match(ui.text(summary), /执行已结束.*2026/s)
+  const execution = ui.nodes(summary).find(node => node.props?.className === 'agent-result-status')
+  assert.doesNotMatch(ui.text(execution), /未记录|读取失败/)
+  assert.equal(ui.nodes().some(node => node.props?.['aria-label'] === '所选版本 Run'), false)
 
   const failed = page({ intercept: endpoint => endpoint === 'agents/runs/index' ? { ok: false, error: { code: 'offline', message: '索引暂不可读' } } : undefined })
   await failed.settle()
-  failed.button('运行情况').props.onClick(); failed.render(); await failed.settle()
-  assert.match(failed.text(failed.render()), /Run 状态与时间读取失败：offline: 索引暂不可读/)
+  failed.button('概览').props.onClick(); failed.render(); await failed.settle()
+  assert.match(failed.text(failed.render()), /评测结果读取失败：offline: 索引暂不可读/)
 })
 
 test('资产保存冲突保留草稿，取消放弃时关闭和切换均不丢失修改', async () => {
@@ -308,12 +460,24 @@ test('新版本继承盘点仍交由现有 AI 融合流程，保留目标和当�
   ui.button('新建研究版本').props.onClick(); ui.render()
   ui.nodes().find(node => node.type === 'textarea').props.onChange({ target: { value: '继承已有能力并改进摘要' } }); ui.render()
   ui.button('盘点继承来源').props.onClick(); await ui.settle()
+  assert.equal(ui.calls.find(call => call.endpoint === 'agents/fusion/preview').payload.parent_ref, `git:${'d'.repeat(40)}`, '自动使用经过 Candidate 核对的派生来源')
+  assert.equal(ui.nodes().some(node => node.type === 'input' && node.props.value === `git:${'d'.repeat(40)}`), false)
   await ui.button('请 AI 整理融合方案').props.onClick()
   assert.equal(ui.assistantTasks.length, 1)
   assert.match(ui.assistantTasks[0].task, /继承已有能力并改进摘要/)
   assert.equal(ui.assistantTasks[0].context.experiment_id, 'EXP-first-agent-002')
   assert.equal(ui.assistantTasks[0].context.fusion_request.preview_id, 'fusion-preview')
   assert.equal(ui.calls.some(call => call.endpoint === 'agents/versions/create'), false)
+})
+
+test('未固定来源时展示后端原因并阻止盘点，不以仓库提交替代所选版本', async () => {
+  const ui = page({ intercept: (endpoint, payload) => endpoint === 'agents/detail' ? { ok: true, value: { ...detail(payload.agent_id, payload.experiment_id), derivation: { parent_ref: null, note: '当前 Candidate 有未提交改动，请先固定来源。' } } } : undefined })
+  await ui.settle(); ui.button('新建研究版本').props.onClick(); ui.render()
+  ui.nodes().find(node => node.type === 'textarea').props.onChange({ target: { value: '改善查询结果' } }); ui.render()
+  assert.match(ui.text(ui.render()), /当前 Candidate 有未提交改动，请先固定来源/)
+  assert.equal(ui.button('盘点继承来源').props.disabled, true)
+  ui.button('盘点继承来源').props.onClick(); await ui.settle()
+  assert.equal(ui.calls.some(call => call.endpoint === 'agents/fusion/preview'), false)
 })
 
 test('更多操作进入子视图后收起，不遮挡版本栏', async () => {
@@ -339,7 +503,7 @@ function launchPage(instances = [], override) {
 
 test('新建实例进入实例管理的来源预选与结构化预览，不在智能体页直接写入', async () => {
   const ui = launchPage()
-  await ui.settle(); ui.button('启动智能体').props.onClick(); await ui.settle()
+  await ui.settle(); ui.button('进入对话').props.onClick(); await ui.settle()
   ui.button('前往实例管理创建').props.onClick(); await ui.settle()
   assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { page: 'instances', agent_id: 'first-agent', experiment_id: 'EXP-first-agent-002', source_id: 'experiment:EXP-first-agent-002' })
   assert.equal(ui.calls.some(call => call.endpoint === 'instances/run'), false)
@@ -349,7 +513,7 @@ test('新建实例进入实例管理的来源预选与结构化预览，不在�
 test('已停止实例交给实例管理预览，已运行实例只读取得对话入口', async () => {
   for (const state of ['stopped', 'running']) {
     const ui = launchPage([{ name: 'existing', source_id: 'experiment:EXP-first-agent-002', state }])
-    await ui.settle(); ui.button('启动智能体').props.onClick(); await ui.settle()
+    await ui.settle(); ui.button('进入对话').props.onClick(); await ui.settle()
     ui.button(state === 'running' ? '获取对话入口' : '在实例管理预览启动').props.onClick(); await ui.settle()
     assert.equal(ui.calls.filter(call => call.endpoint === 'instances/run').length, 0)
     assert.equal(ui.calls.filter(call => call.endpoint === 'instances/url').length, state === 'running' ? 1 : 0)
@@ -358,7 +522,7 @@ test('已停止实例交给实例管理预览，已运行实例只读取得对�
   }
 })
 
-test('版本栏同时展示当前查看、登记版本与其他版本的真实实例装载', async () => {
+test('版本来源保留查看与登记身份，实例信息只在实例管理查看', async () => {
   const ui = page({ intercept(endpoint, payload) {
     if (endpoint !== 'agents/detail') return undefined
     return { ok: true, value: { ...detail(payload.agent_id, payload.experiment_id), loaded_instance: { status: 'observed', instances: [], agent_instances: [
@@ -366,18 +530,21 @@ test('版本栏同时展示当前查看、登记版本与其他版本的真实�
     ] } } }
   } })
   await ui.settle()
-  const versionBar = ui.nodes().find(node => node.props?.className === 'agent-version-bar')
-  assert.match(ui.text(versionBar), /当前查看版本.*版本 002/s)
-  assert.ok(ui.nodes(ui.nodes().find(node => node.props?.className === 'agent-technical-details')).some(node => node.type === 'dd' && ui.text(node) === 'EXP-first-agent-002'))
-  assert.match(ui.text(versionBar), /登记版本.*版本 001/s)
-  assert.match(ui.text(versionBar), /实际实例装载.*当前查看版 0 个.*legacy-instance：版本 001/s)
+  const version = ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '版本')
+  assert.equal(version.props.value, 'EXP-first-agent-002')
+  const facts = ui.nodes(ui.nodes().find(node => node.props?.className === 'agent-variant-source'))
+  assert.ok(facts.some(node => node.type === 'dd' && ui.text(node) === 'EXP-first-agent-002'))
+  assert.ok(facts.some(node => node.type === 'dd' && ui.text(node) === 'EXP-first-agent-001'))
+  assert.doesNotMatch(ui.text(), /legacy-instance|实例与近期 Run|对象与来源 ID/)
+  ui.button('查看实例').props.onClick()
+  assert.deepEqual(plain(ui.navigations.at(-1)), { page: 'instances', agent_id: 'first-agent', experiment_id: 'EXP-first-agent-002' })
 })
 
 test('读取现有实例入口时快速双击只查询一次，期间不能丢弃在途回执', async () => {
   let finish
   const pending = new Promise(resolve => { finish = resolve })
   const ui = launchPage([{ name: 'existing', source_id: 'experiment:EXP-first-agent-002', state: 'running' }], endpoint => endpoint === 'instances/url' ? pending : undefined)
-  await ui.settle(); ui.button('启动智能体').props.onClick(); await ui.settle()
+  await ui.settle(); ui.button('进入对话').props.onClick(); await ui.settle()
   const click = ui.button('获取对话入口').props.onClick
   click(); click(); ui.render(); await ui.settle()
   assert.equal(ui.calls.filter(call => call.endpoint === 'instances/url').length, 1)
@@ -393,7 +560,7 @@ test('现有实例入口读取失败保留原实例并允许重试，不发起�
   const ui = launchPage([{ name: 'existing', source_id: 'experiment:EXP-first-agent-002', state: 'running' }], endpoint => {
     if (endpoint === 'instances/url' && !failed) { failed = true; return { ok: false, error: { code: 'failed', message: '入口暂不可读' } } }
   })
-  await ui.settle(); ui.button('启动智能体').props.onClick(); await ui.settle()
+  await ui.settle(); ui.button('进入对话').props.onClick(); await ui.settle()
   ui.button('获取对话入口').props.onClick(); await ui.settle()
   assert.match(ui.text(ui.render()), /入口暂不可读/)
   assert.equal(ui.nodes().some(node => node.type === 'a' && ui.text(node) === '打开智能体对话'), false)
@@ -407,7 +574,7 @@ test('切换智能体或版本后，迟到的实例入口不覆盖新对象', as
     let finish
     const pending = new Promise(resolve => { finish = resolve })
     const ui = launchPage([{ name: 'existing', source_id: 'experiment:EXP-first-agent-002', state: 'running' }], endpoint => endpoint === 'instances/url' ? pending : undefined)
-    await ui.settle(); ui.button('启动智能体').props.onClick(); await ui.settle()
+    await ui.settle(); ui.button('进入对话').props.onClick(); await ui.settle()
     ui.button('获取对话入口').props.onClick(); ui.render(); await ui.settle()
     if (next === 'agent') ui.nodes().find(node => node.props?.className === 'agent-list-card' && ui.text(node).includes('second-agent')).props.onClick()
     else ui.nodes().find(node => node.props?.['aria-label'] === '版本').props.onChange({ target: { value: 'EXP-first-agent-001' } })
@@ -428,14 +595,14 @@ test('智能体、版本和标签选择同步导航地址，后退精确恢复�
   const plain = value => JSON.parse(JSON.stringify(value))
   assert.deepEqual(plain(ui.navigations.at(-1)), { page: 'agents', agent_id: 'first-agent', experiment_id: 'EXP-first-agent-002', tab: 'overview', replace: true })
   assert.equal(ui.history.length, 1, '默认地址补全必须替换原历史条目')
-  ui.button('能力状态').props.onClick(); ui.render(); await ui.settle()
-  assert.equal(ui.props.target.tab, 'capabilities')
+  ui.button('描述与技能').props.onClick(); ui.render(); await ui.settle()
+  assert.equal(ui.props.target.tab, 'description')
   assert.equal(ui.navigations.at(-1).replace, undefined)
   assert.equal(ui.history.length, 2)
   const version = ui.nodes().find(node => node.props?.['aria-label'] === '版本')
   version.props.onChange({ target: { value: 'EXP-first-agent-001' } }); ui.render(); await ui.settle()
   const previous = plain(ui.props.target)
-  assert.deepEqual(previous, { page: 'agents', agent_id: 'first-agent', experiment_id: 'EXP-first-agent-001', tab: 'capabilities' })
+  assert.deepEqual(previous, { page: 'agents', agent_id: 'first-agent', experiment_id: 'EXP-first-agent-001', tab: 'description' })
   ui.nodes().find(node => node.props?.className === 'agent-list-card' && ui.text(node).includes('second-agent')).props.onClick(); ui.render(); await ui.settle()
   assert.deepEqual(plain(ui.props.target), { page: 'agents', agent_id: 'second-agent', experiment_id: 'EXP-second-agent-002', tab: 'overview' })
   assert.equal(ui.navigations.at(-1).replace, undefined, '显式切换智能体解析最新版后仍新增历史条目')
@@ -445,7 +612,7 @@ test('智能体、版本和标签选择同步导航地址，后退精确恢复�
   ui.render(); await ui.settle()
   assert.equal(ui.contexts.at(-1).agent_id, 'first-agent')
   assert.equal(ui.contexts.at(-1).experiment_id, 'EXP-first-agent-001')
-  assert.equal(ui.contexts.at(-1).tab, 'capabilities')
+  assert.equal(ui.contexts.at(-1).tab, 'description')
   assert.equal(ui.navigations.length, notified)
   for (let index = 0; index < 3; index++) {
     const callback = ui.props.onNavigate
@@ -473,8 +640,8 @@ test('后退或深链接切换遭草稿保护拒绝时恢复旧地址，确认�
   ui.props.target = deepTarget; ui.render(); await ui.settle()
   assert.equal(ui.contexts.at(-1).agent_id, 'second-agent')
   assert.equal(ui.contexts.at(-1).experiment_id, 'EXP-second-agent-001')
-  assert.equal(ui.contexts.at(-1).tab, 'runtime')
-  assert.deepEqual(JSON.parse(JSON.stringify(ui.props.target)), deepTarget)
+  assert.equal(ui.contexts.at(-1).tab, 'overview')
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.props.target)), { ...deepTarget, tab: 'overview' })
 })
 
 test('整理特性入口携带选定版本及维护Skill，后续页面变化不改发起上下文', async () => {
@@ -502,6 +669,15 @@ test('左右两层标签独立，切换列表保留右侧资产草稿且无需�
   ui.button('prompt.md').props.onClick(); await ui.settle()
   ui.button('编辑').props.onClick(); ui.render()
   ui.nodes().find(node => node.type === 'textarea').props.onChange({ target: { value: '列表切换保留草稿' } }); ui.render()
+  const expand = ui.button('展开资产差异')
+  assert.equal(expand.props['aria-expanded'], false)
+  assert.equal(expand.props['aria-controls'], 'agent-asset-diff-panel')
+  expand.props.onClick(); ui.render()
+  assert.equal(ui.button('收起资产差异').props['aria-expanded'], true)
+  assert.ok(ui.nodes().find(node => node.type?.name === 'AssetDiffPanel'))
+  ui.button('收起资产差异').props.onClick(); ui.render()
+  assert.equal(ui.nodes().some(node => node.type?.name === 'AssetDiffPanel'), false)
+  assert.equal(ui.nodes().find(node => node.type === 'textarea').props.value, '列表切换保留草稿')
   const before = ui.calls.length
   listTab(ui, 'variants').props.onClick(); ui.render(); await ui.settle()
   assert.equal(ui.props.target.list_view, 'variants')
@@ -523,7 +699,7 @@ test('变体汇总仅保留搜索与所属范围，两个列表分别保留搜�
   assert.equal(ui.nodes().some(node => node.props?.className === 'agent-variant-filters'), false)
   assert.equal(ui.nodes().some(node => node.props?.['aria-label']?.startsWith('筛选变体')), false)
   assert.equal(variantCards(ui).length, 1)
-  ui.button('查看全部').props.onClick(); ui.render()
+  ui.button('显示全部变体').props.onClick(); ui.render()
   assert.equal(variantCards(ui).length, 2, '普通研究版本不算作算力变体')
   ui.nodes().find(node => node.props?.placeholder === '变体名称、版本或来源 ID').props.onChange({ target: { value: 'EXP-second-agent-001' } }); ui.render()
   assert.equal(variantCards(ui).length, 1, '可按来源父版ID搜索')
@@ -590,7 +766,7 @@ test('来源Run定位父版报告，生成代码定位当前Candidate资产，�
     return { ok: true, value }
   } })
   await unknown.settle()
-  assert.match(unknown.text(unknown.nodes().find(node => node.props?.['aria-label'] === '生成来源')), /父版本未记录/)
+  assert.match(unknown.text(unknown.nodes().find(node => node.props?.['aria-label'] === '版本来源与继承')), /父版本未记录/)
   assert.equal(unknown.button('查看父版当前详情'), undefined)
 })
 
@@ -605,7 +781,7 @@ test('列表主标题使用独立名称，不截取策略或研究问题，名�
   assert.equal(variantCards(ui).length, 1)
   assert.match(ui.text(variantCards(ui)[0]), /EXP-first-agent-002/)
   const version = ui.nodes().find(node => node.props?.['aria-label'] === '版本')
-  assert.match(ui.text(version), /资产告警轻量版 · 版本 002/)
+  assert.match(ui.text(version), /资产告警轻量版 · v002/)
 })
 
 test('名称保存后回读列表与详情，冲突保留草稿并可重新核对而不改策略', async () => {
@@ -747,4 +923,57 @@ test('凭据脱敏预览显示只读原因，不能进入编辑或保存', async
   assert.match(ui.text(ui.render()), /内容已脱敏，不能以预览替换源码/)
   assert.equal(ui.button('编辑').props.disabled, true)
   assert.equal(ui.calls.some(call => ['agents/edit/preview', 'agents/edit/apply'].includes(call.endpoint)), false)
+})
+
+test('发布预览在页面失活时关闭原生 modal，返回时可继续核对', async () => {
+  const ui = page()
+  await ui.settle()
+  ui.button('发布版本').props.onClick(); ui.render()
+  const dialog = ui.dialogs.get('agent-publish-title')
+  assert.equal(dialog.open, true)
+  assert.equal(ui.button('发布版本（未接入）').props.disabled, true)
+  ui.props.active = false; ui.render()
+  assert.equal(dialog.open, false)
+  ui.props.active = true; ui.render()
+  assert.equal(dialog.open, true)
+  assert.equal(ui.calls.some(call => /publish/.test(call.endpoint)), false)
+})
+
+test('概览保留独有特性证据，来源唯一，Runtime信息归资产页', async () => {
+  const ui = page({ intercept(endpoint, payload) {
+    if (endpoint !== 'agents/detail') return
+    const value = detail(payload.agent_id, payload.experiment_id)
+    value.features = [{ id: 'pagination', title: '分页能力', description: '覆盖分页设备', source_refs: ['candidate/role.md'], verification: '已核对分页返回', evidence: [{ ref: 'runs/one/report.md', present: true }] }]
+    value.declared = { source_contract: { status: 'available', image: { cli_version: '0.2.1-rc.2' } }, loadable_source: { candidate_root: 'candidate', profile: 'main' } }
+    return { ok: true, value }
+  } }); await ui.settle()
+  const overview = ui.nodes().find(node => node.props?.id === 'agent-panel-overview')
+  assert.equal(ui.nodes(overview).filter(node => node.type === 'h4' && ui.text(node) === '分页能力').length, 1)
+  assert.match(ui.text(overview), /已核对分页返回.*runs\/one\/report.md/s)
+  assert.equal(ui.nodes().filter(node => node.props?.className === 'agent-variant-source').length, 1)
+  assert.equal(ui.nodes().some(node => node.props?.className === 'agent-legacy-evidence'), false)
+  const assets = ui.nodes().find(node => node.props?.id === 'agent-panel-assets')
+  assert.match(ui.nodes(assets).map(ui.text).join(''), /Runtime 版本0.2.1-rc.2/)
+  assert.match(ui.nodes(assets).map(ui.text).join(''), /CandidatecandidateProfilemain/)
+})
+
+
+test('刷新已有智能体清单时保留条目，仅在标题显示紧凑读取反馈', async () => {
+  let refreshing = false, release
+  const ui = page({ intercept(endpoint) { if (endpoint === 'agents/list' && refreshing) return new Promise(resolve => { release = resolve }) } })
+  await ui.settle()
+  const before = ui.nodes().filter(node => node.props?.className === 'agent-list-card').map(node => ui.text(node))
+  refreshing = true
+  ui.button('刷新').props.onClick(); ui.render()
+  assert.deepEqual(ui.nodes().filter(node => node.props?.className === 'agent-list-card').map(node => ui.text(node)), before)
+  const loading = ui.nodes().find(node => node.props?.['aria-label'] === '更新智能体列表')
+  assert.equal(loading.props.role, 'status')
+  const tabs = ui.nodes().find(node => node.props?.['aria-label'] === '浏览列表')
+  assert.ok(ui.nodes(tabs).some(node => node.props?.['aria-label'] === '更新智能体列表'), '刷新反馈应在可见页签栏，而非被隐藏的列表标题中')
+  assert.equal(loading.props.className.includes('hep-loading-block'), false)
+  assert.doesNotMatch(ui.text(ui.render()), /正在读取|正在更新/)
+  assert.equal(ui.nodes().some(node => node.props?.['aria-label'] === '读取智能体列表'), false)
+  release({ ok: true, value: { agents: [], experiments: [] } })
+  await ui.settle()
+  assert.match(ui.text(ui.render()), /尚无智能体资产/)
 })

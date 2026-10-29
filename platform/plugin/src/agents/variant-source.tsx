@@ -1,3 +1,6 @@
+import type { ReactNode } from 'react'
+import { DetailDrawer } from '../components/detail-drawer.tsx'
+
 export interface VariantSourceExperiment {
   id: string
   agent_id: string
@@ -40,16 +43,16 @@ export function variantSourceInfo(experiment: VariantSourceExperiment, experimen
   }
 }
 
-export function VariantSourcePanel({ experiment, experiments, onSelectSource, onOpenRun, onOpenCode }: {
+export function VariantSourcePanel({ experiment, experiments, onSelectSource, onOpenRun, onOpenCode, children, active = true }: {
   experiment: VariantSourceExperiment
   experiments: VariantSourceExperiment[]
   onSelectSource?(agentId: string, experimentId: string): void
   onOpenRun?(runId: string, agentId: string, experimentId: string): void
   onOpenCode?(path: string): void
+  children?: ReactNode
+  active?: boolean
 }) {
   const info = variantSourceInfo(experiment, experiments)
-  const summaryRef = info.parent.ref ?? (info.firstExperiment ? null : info.baselineRef)
-  const shortRef = summaryRef?.startsWith('git:') ? summaryRef.slice(0, 16) : summaryRef && summaryRef.length > 32 ? `${summaryRef.slice(0, 29)}…` : summaryRef
   function sourceDetails(source: Source, label: string) {
     return <>
       <p>{source.experimentId ?? '版本 ID 未记录'}</p>
@@ -59,14 +62,8 @@ export function VariantSourcePanel({ experiment, experiments, onSelectSource, on
       {source.experimentId && !source.available && <p className="agent-empty">当前工作区未找到该版本。</p>}
     </>
   }
-  return <section className="agent-variant-source" aria-label="生成来源">
-    <details key={experiment.id}>
-      <summary>
-        <strong>生成来源</strong>
-        <span>{info.parent.experimentId ? `父版 ${info.parent.experimentId}` : info.firstExperiment ? '首版本' : '父版本未记录'}</span>
-        {info.generationMode && <span>{info.generationMode}</span>}
-        {summaryRef && <code title={summaryRef}>{shortRef}</code>}
-      </summary>
+  return <section className="agent-variant-source" aria-label="版本来源与继承">
+    <DetailDrawer title="版本来源与继承" active={active} identity={experiment.id}>
     <dl className="harness-fields">
       <div><dt>直接父版</dt><dd>{info.parent.experimentId
         ? sourceDetails(info.parent, '查看父版当前详情')
@@ -75,13 +72,14 @@ export function VariantSourcePanel({ experiment, experiments, onSelectSource, on
       <div><dt>融合来源</dt><dd>{info.fusionSources.length
         ? <ul className="agent-source-list">{info.fusionSources.map((source, index) => <li key={`${source.experimentId}:${source.ref}:${index}`}>{sourceDetails(source, '查看融合来源当前详情')}</li>)}</ul>
         : '未记录'}</dd></div>
-      <div><dt>生成方式</dt><dd>{info.generationMode === 'langgraph-aot' ? 'LangGraph 代码生成（langgraph-aot）' : info.generationMode ?? '未记录'}</dd></div>
-      <div><dt>诊断 Run</dt><dd>{info.runIds.length ? <ul className="agent-source-list">{info.runIds.map(runId => <li key={runId}><code>{runId}</code>{info.diagnosticOwner
+      {info.generationMode && <div><dt>生成方式</dt><dd>{info.generationMode === 'langgraph-aot' ? 'LangGraph 代码生成（langgraph-aot）' : info.generationMode}</dd></div>}
+      {info.runIds.length > 0 && <div><dt>诊断 Run</dt><dd><ul className="agent-source-list">{info.runIds.map(runId => <li key={runId}><code>{runId}</code>{info.diagnosticOwner
         ? <button type="button" disabled={!onOpenRun} onClick={() => onOpenRun?.(runId, info.diagnosticOwner!.agentId, info.diagnosticOwner!.experimentId)}>查看诊断报告</button>
-        : <span> · 所属父版未记录</span>}</li>)}</ul> : '未记录'}</dd></div>
-      <div><dt>源码入口</dt><dd>{info.entryPath ? <><code>{info.entryPath}</code><p><button type="button" disabled={!info.codePath || !onOpenCode} onClick={() => info.codePath && onOpenCode?.(info.codePath)}>查看生成源码</button></p></> : '未记录'}</dd></div>
+        : <span> · 所属父版未记录</span>}</li>)}</ul></dd></div>}
+      {info.entryPath && <div><dt>源码入口</dt><dd><code>{info.entryPath}</code><p><button type="button" disabled={!info.codePath || !onOpenCode} onClick={() => info.codePath && onOpenCode?.(info.codePath)}>查看生成源码</button></p></dd></div>}
     </dl>
+    {children}
     {(info.parent.experimentId || info.fusionSources.length > 0) && <p className="agent-empty">固定引用记录生成时的来源；打开来源详情查看的是该版本当前可编辑的资产。</p>}
-    </details>
+    </DetailDrawer>
   </section>
 }

@@ -492,9 +492,10 @@ export async function apply(ctx: Context, config: BusinessRuntimeConfig): Promis
 
 interface PendingBusinessApproval {
   id: string; context: BusinessContext; operation: BusinessOperation; version: number; expiresAt: number
+  reason: string
   finish(outcome: ApprovalOutcome): void
 }
-/** 原生ApprovalService负责等待和日志；业务答复入口仅裁决同一条未派发调用。 */
+/** 工具回合复用原生批准与日志，独立下载复用同一业务待答复队列；均只裁决当前调用。 */
 export function createBusinessApprovalAdapter(ctx: Context, control: BusinessControl) {
   const pending = new Map<string, PendingBusinessApproval>()
   const bindings = new WeakMap<object, { context: BusinessContext; operation: BusinessOperation }>()
@@ -503,24 +504,43 @@ export function createBusinessApprovalAdapter(ctx: Context, control: BusinessCon
     if (exec.agent) liveAgents.set(exec.agent.session.id, exec.agent)
     return next()
   })
+  ;(ctx as any).on('agent/disposed', ({ agent }: { agent: ApprovalRequest['agent'] }) => {
+    if (liveAgents.get(agent.session.id) === agent) liveAgents.delete(agent.session.id)
+  })
+  const waitForApproval = (context: BusinessContext, operation: BusinessOperation, signal?: AbortSignal, reason?: string): Promise<ApprovalOutcome> => {
+    if (signal?.aborted) return Promise.resolve<ApprovalOutcome>('cancelled')
+    return new Promise<ApprovalOutcome>(resolve => {
+      const id = randomBytes(24).toString('base64url')
+      const finish = (outcome: ApprovalOutcome) => { pending.delete(id); clearTimeout(timer); signal?.removeEventListener('abort', cancel); resolve(outcome) }
+      const cancel = () => finish('cancelled')
+      const timer = setTimeout(() => finish('cancelled'), 120_000); timer.unref()
+      pending.set(id, { id, context: structuredClone(context), operation: structuredClone(operation), reason: reason ?? '此业务操作需要确认，请核对本次目标与参数', version: control.status().restrictionVersion, expiresAt: Date.now() + 120_000, finish })
+      signal?.addEventListener('abort', cancel, { once: true })
+    })
+  }
   ;(ctx as any).on('approval/request', (request: object, next: () => Promise<ApprovalOutcome>) => {
     const saved = bindings.get(request)
     if (!saved) return next()
     const typed = request as ApprovalRequest
-    if (typed.signal?.aborted) return Promise.resolve<ApprovalOutcome>('cancelled')
-    return new Promise<ApprovalOutcome>(resolve => {
-      const id = randomBytes(24).toString('base64url')
-      const finish = (outcome: ApprovalOutcome) => { pending.delete(id); clearTimeout(timer); typed.signal?.removeEventListener('abort', cancel); resolve(outcome) }
-      const cancel = () => finish('cancelled')
-      const timer = setTimeout(() => finish('cancelled'), 120_000); timer.unref()
-      pending.set(id, { id, context: structuredClone(saved.context), operation: structuredClone(saved.operation), version: control.status().restrictionVersion, expiresAt: Date.now() + 120_000, finish })
-      typed.signal?.addEventListener('abort', cancel, { once: true })
-    })
+    return waitForApproval(saved.context, saved.operation, typed.signal, typed.reason)
   }, { prepend: true })
-  control.setConfirmationHandler(async (context, operation, signal) => {
-    const agent = liveAgents.get(context.scope.sessionId || '')
-    if (!agent || agent.session.id !== context.scope.sessionId) throw new Error('业务确认没有真实执行Agent')
-    const request: ApprovalRequest = { agent, toolName: operation.operationId, reason: '此业务操作需要确认，请在业务确认栏核对目标与参数。', signal }
+  control.setConfirmationHandler(async (context, operation, signal, reason) => {
+    const sessionId = context.scope.sessionId
+    if (!sessionId) throw new Error('业务确认缺少 Session')
+    const assertOwner = () => control.assert(control.sessionContext(context, sessionId), 'session:read', [{ kind: 'session', id: sessionId }])
+    assertOwner(); signal.throwIfAborted()
+    // 独立报告下载没有模型执行回合；使用同一业务确认栏，不恢复 Agent 或伪造原生回合审计。
+    if (operation.kind === 'publish' && operation.method.toUpperCase() === 'GET' && operation.resources?.some(resource => resource.kind === 'report')) {
+      const outcome = await waitForApproval(context, operation, signal, reason)
+      signal.throwIfAborted(); assertOwner()
+      if (outcome !== 'allowed-once') throw new Error('业务操作未获确认')
+      return
+    }
+    let agent = (ctx as any).get('agents')?.get(sessionId) as ApprovalRequest['agent'] | undefined
+    agent ??= liveAgents.get(sessionId)
+    if (!agent || agent.session.id !== sessionId) throw new Error('业务确认没有当前 Session 的真实 Agent')
+    liveAgents.set(sessionId, agent)
+    const request: ApprovalRequest = { agent, toolName: operation.operationId, reason: reason ?? '此业务操作需要确认，请在业务确认栏核对目标与参数。', signal }
     bindings.set(request, { context: structuredClone(context), operation: structuredClone(operation) })
     try {
       const outcome = await (ctx as any).approval.request(request)
@@ -532,16 +552,16 @@ export function createBusinessApprovalAdapter(ctx: Context, control: BusinessCon
     try {
       const owned = control.sessionContext(context, request.context.scope.sessionId!)
       if (owned.subject.id !== request.context.subject.id || owned.subject.identitySource !== request.context.subject.identitySource) return false
-      control.assert(owned, request.operation.kind, request.operation.resources); return true
+      control.assert(owned, request.operation.kind, request.operation.resources, request.operation.args, request.operation); return true
     } catch { return false }
   }
   const send = (res: ServerResponse, status: number, value: unknown) => { res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(JSON.stringify(value)) }
   // 与原生UI共页；只使用自有受归属检查的接口，不能回答owner瀑布。
-  ctx.on('webserver/index-inject', table => { table.push({ kind: 'script', placement: 'body', text: `(function(){const base=${JSON.stringify((ctx.get('businessRuntime') as any).basePath)};const panel=document.createElement('aside');panel.setAttribute('aria-label','业务操作确认');panel.style.cssText='position:fixed;bottom:16px;right:16px;max-width:420px;background:Canvas;color:CanvasText;padding:16px;border:1px solid #888;z-index:9999;display:none';document.body.append(panel);let busy=false;async function poll(){if(busy)return;busy=true;try{const r=await fetch(base+'api/business-control/confirmations');if(!r.ok)return;const list=await r.json();panel.replaceChildren();panel.style.display=list.items.length?'block':'none';for(const item of list.items){const title=document.createElement('p');title.textContent='确认操作：'+item.operationId;const detail=document.createElement('pre');detail.style.cssText='white-space:pre-wrap;max-height:240px;overflow:auto';detail.textContent=item.target+'\\n'+JSON.stringify(item.args,null,2);panel.append(title,detail);for(const allow of [true,false]){const b=document.createElement('button');b.textContent=allow?'确认执行':'拒绝';b.onclick=async()=>{await fetch(base+'api/business-control/confirmations',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:item.id,allow})});poll()};panel.append(b)}}}finally{busy=false}}setInterval(()=>poll().catch(()=>{}),750);poll().catch(()=>{})})();` }) })
+  ctx.on('webserver/index-inject', table => { table.push({ kind: 'script', placement: 'body', text: `(function(){const base=${JSON.stringify((ctx.get('businessRuntime') as any).basePath)};const panel=document.createElement('aside');panel.setAttribute('aria-label','业务操作确认');panel.style.cssText='position:fixed;bottom:16px;right:16px;max-width:420px;background:Canvas;color:CanvasText;padding:16px;border:1px solid #888;z-index:9999;display:none';document.body.append(panel);let busy=false;async function poll(){if(busy)return;busy=true;try{const r=await fetch(base+'api/business-control/confirmations');if(!r.ok)return;const list=await r.json();panel.replaceChildren();panel.style.display=list.items.length?'block':'none';for(const item of list.items){const title=document.createElement('p');title.textContent='确认操作：'+item.operationId;const reason=document.createElement('p');reason.textContent=item.reason||'请核对本次操作目标与参数';const detail=document.createElement('pre');detail.style.cssText='white-space:pre-wrap;max-height:240px;overflow:auto';detail.textContent=item.target+'\\n'+JSON.stringify(item.args,null,2);panel.append(title,reason,detail);for(const allow of [true,false]){const b=document.createElement('button');b.textContent=allow?'确认执行':'拒绝';b.onclick=async()=>{await fetch(base+'api/business-control/confirmations',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:item.id,allow})});poll()};panel.append(b)}}}finally{busy=false}}setInterval(()=>poll().catch(()=>{}),750);poll().catch(()=>{})})();` }) })
   return {
     async handle(req: IncomingMessage, res: ServerResponse, context: BusinessContext): Promise<void> {
       control.assert(context, 'session:read')
-      if (req.method === 'GET') return send(res, 200, { items: [...pending.values()].filter(item => authorized(context, item)).map(item => ({ id: item.id, sessionId: item.context.scope.sessionId, operationId: item.operation.operationId, target: item.operation.target, args: item.operation.args, expiresAt: new Date(item.expiresAt).toISOString() })) })
+      if (req.method === 'GET') return send(res, 200, { items: [...pending.values()].filter(item => authorized(context, item)).map(item => ({ id: item.id, sessionId: item.context.scope.sessionId, operationId: item.operation.operationId, reason: item.reason, target: item.operation.target, args: item.operation.args, expiresAt: new Date(item.expiresAt).toISOString() })) })
       if (req.method !== 'POST') return send(res, 405, { error: '操作不支持' })
       const body = JSON.parse((await readBody(req)).toString()) as { id?: string; allow?: boolean }
       const item = typeof body.id === 'string' ? pending.get(body.id) : undefined

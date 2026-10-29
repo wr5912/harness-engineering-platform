@@ -120,6 +120,20 @@ test('同一specUrl和operationId改变真实目标或方法时，未授权请�
   assert.deepEqual(f.calls, [])
 })
 
+test('服务条件默认拒绝保留MCP目录发现与会话可用，只有真实工具执行被阻止', async t => {
+  const f = await fixture(t)
+  const path = join(f.root, 'config/business-access.json'), config = JSON.parse(await readFile(path, 'utf8'))
+  config.agents[0].toolPolicies = [{ serverId: 'soc', defaultEffect: 'deny', rules: [] }]
+  await writeFile(path, JSON.stringify(config)); f.control.configurationChanged()
+  const catalog = await f.run('a', { action: 'test' })
+  assert.equal(catalog.status, 200)
+  assert.ok(catalog.value.tools.some(tool => tool.name === 'writeback'))
+  assert.equal(f.control.assert(f.identities.a, 'session:prompt').kind, 'allow')
+  assert.equal((await f.run('a', { action: 'callTool', toolName: 'writeback', arguments: { body: {} } })).status, 400)
+  assert.equal(f.control.status().events.at(-1)?.reason, 'tool_policy_denied')
+  assert.deepEqual(f.calls, [])
+})
+
 test('独立handler调用也走相同控制，外部关联session_id不能赋予业务主体', async t => {
   const f = await fixture(t)
   const handler = f.module.createMcpHandler(f.root, { stateFile: join(f.root, 'connections.json') })

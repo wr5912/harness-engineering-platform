@@ -6,7 +6,7 @@ import { build } from 'esbuild'
 
 const require = createRequire(import.meta.url)
 const compiled = (await build({ entryPoints: [new URL('../src/mcp/client.tsx', import.meta.url).pathname], bundle: true,
-  write: false, platform: 'node', format: 'cjs', external: ['react', 'react-dom', 'react/jsx-runtime', 'harness-mcp-manager-client'] })).outputFiles[0].text
+  write: false, platform: 'node', format: 'cjs', external: ['react', 'react-dom', 'react/jsx-runtime', 'harness-mcp-manager-client', '@deepseek-ai/dsh-client-ui-primitives'] })).outputFiles[0].text
 const oldId = 'a'.repeat(64), currentId = 'b'.repeat(64)
 const oldConfig = { toolName: 'find_asset', title: '旧发布标题', description: '旧版说明', connectionId: 'source-one' }
 const currentConfig = { ...oldConfig, title: '当前发布标题', description: '当前说明' }
@@ -29,7 +29,7 @@ function workbench(initialTarget = { page: 'mcp', tab: 'composition', compositio
   vm.runInNewContext(`${compiled}\nmodule.exports.CompositionPage = CompositionPage;`, {
     module, exports: module.exports, URL, structuredClone, requestAnimationFrame: callback => callback(),
     require: name => name === 'react' ? react : name === 'react-dom' ? { createPortal: element => element }
-      : name === 'harness-mcp-manager-client' ? { Manager: () => null } : require(name),
+      : name === '@deepseek-ai/dsh-client-ui-primitives' ? { Tooltip: props => props.children } : name === 'harness-mcp-manager-client' ? { Manager: () => null } : require(name),
     window: { addEventListener() {}, removeEventListener() {} },
     navigator: { clipboard: { async writeText(value) { copied.push(value) } } },
     document: { baseURI: 'http://localhost:3090/hep/' },
@@ -66,6 +66,8 @@ test('组合深链恢复冻结发布版本，失效版本不回退到当前发�
   assert.match(ui.text(), /旧发布标题/)
   assert.match(ui.text(), /历史发布版本，只读查看/)
   assert.equal(ui.button('测试（dry）'), undefined)
+  assert.ok(ui.button('查看配置'))
+  assert.equal(ui.nodes().some(node => node.type === 'summary' && ui.text(node) === '冻结版本配置'), false)
   ui.setTarget({ page: 'mcp', tab: 'composition', composition_id: 'composition-one', version: 'published', version_id: currentId })
   await ui.settle()
   assert.match(ui.text(), /当前发布标题/)
@@ -80,7 +82,7 @@ test('组合深链恢复冻结发布版本，失效版本不回退到当前发�
 test('组合目录冲突后保留草稿，读取最新并手工重应用再保存', async () => {
   const ui = workbench({ page: 'mcp', tab: 'composition', composition_id: 'composition-one', version: 'published', version_id: currentId })
   await ui.settle()
-  ui.button('编辑为草稿').props.onClick(); ui.render()
+  ui.button('解锁编辑').props.onClick(); ui.render()
   const title = () => ui.nodes().find(node => node.type === 'input' && node.props.value?.includes('标题'))
   title().props.onChange({ target: { value: '我的草稿标题' } }); ui.render()
   const latest = { revision: 'r2', connections: [{ kind: 'openapi', id: 'source-one' }], extension: null,
@@ -128,4 +130,32 @@ test('执行 A 时路由切换到 B，旧回执不会显示在 B 或解除 B 的
   await ui.settle()
   assert.match(ui.text(), /B-marker/)
   assert.doesNotMatch(ui.text(), /A-marker/)
+})
+
+test('发布说明使用可聚焦图标，移除常驻面板并保留测试操作', async () => {
+  const ui = workbench({ page: 'mcp', tab: 'composition', composition_id: 'composition-one', version: 'published', version_id: currentId }); await ui.settle()
+  const icon = ui.nodes().find(node => node.type === 'button' && node.props?.['aria-label'] === '调用与发布说明')
+  assert.equal(icon.props.type, 'button')
+  const tooltip = ui.nodes().find(node => node.props?.openOnClick && node.props?.label?.includes('仅列出并执行已发布版本'))
+  assert.ok(tooltip.props.portal)
+  assert.equal(ui.nodes().some(node => node.props?.className === 'harness-composition-publish'), false)
+  assert.ok(ui.button('测试（dry）'))
+})
+
+test('编排首次读取不冒充空目录，刷新已有内容只在标题显示轻量状态', async () => {
+  const ui = workbench()
+  const loading = () => ui.nodes().filter(node => node.type?.name === 'LoadingIndicator')
+  assert.equal(loading().length, 1)
+  assert.equal(loading()[0].props.label, '读取编排目录')
+  assert.doesNotMatch(ui.text(), /正在读取|暂无编排/)
+  await ui.settle()
+  assert.match(ui.text(), /旧发布标题/)
+  ui.button('刷新').props.onClick(); ui.render()
+  assert.match(ui.text(), /旧发布标题/)
+  assert.equal(loading().length, 1)
+  assert.equal(loading()[0].props.label, '刷新编排目录')
+  assert.doesNotMatch(ui.text(), /正在处理|正在读取/)
+  await ui.settle()
+  assert.equal(loading().length, 0)
+  assert.match(ui.text(), /旧发布标题/)
 })

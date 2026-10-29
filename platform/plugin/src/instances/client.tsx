@@ -5,6 +5,11 @@ import type { PlatformNavigation, PlatformPageProps } from '../protocol.ts'
 import type { PlatformUpdates } from '../realtime/client.ts'
 import { instanceWebUrl } from './url.ts'
 import { instanceTheme } from './style.ts'
+import { SearchSelect } from '../components/search-select.tsx'
+import { DetailDrawer } from '../components/detail-drawer.tsx'
+import { LoadingIndicator } from '../components/loading-indicator.tsx'
+import { DistributionChart } from '../components/overview-charts.tsx'
+import { instanceState, instanceStateSegments, matchesInstanceState } from './overview.tsx'
 
 type Operation = 'create' | 'start' | 'stop' | 'restart' | 'delete'
 
@@ -146,12 +151,10 @@ function ModelChoice({ catalog, allowed, value, onChange, label }: { catalog: Mo
   const missing = Boolean(value && !modelRoute(catalog, value)) || Boolean(value && !modelAllowed(allowed, value))
   const reasoning = value && modelRoute(catalog, value)?.reasoning
   return <div className="instance-model-fields">
-    <label className="instance-field">{label}<select aria-label={label} className="instance-field-input" value={key} onChange={event => onChange(selectedModel(catalog, allowed, event.target.value))}>
-      <option value="">请选择业务可用模型</option>
-      {missing && value && <option value={key} disabled>原选择当前不可用：{value.provider} / {value.model}</option>}
-      {catalog.groups.map(group => <optgroup key={group.id} label={group.name}>{group.models.filter(model => modelAllowed(allowed, { provider: group.id, model: model.id })).map(model =>
-        <option key={model.id} value={modelKey({ provider: group.id, model: model.id })}>{model.name}{model.name === model.id ? '' : ` (${model.id})`}</option>)}</optgroup>)}
-    </select></label>
+    <label className="instance-field">{label}<SearchSelect label={label} className="instance-field-input" value={key} onChange={value => onChange(selectedModel(catalog, allowed, value))} placeholder="请选择业务可用模型" options={[
+      ...(missing && value ? [{ value: key, label: `原选择当前不可用：${value.provider} / ${value.model}`, disabled: true }] : []),
+      ...catalog.groups.flatMap(group => group.models.filter(model => modelAllowed(allowed, { provider: group.id, model: model.id })).map(model => ({ value: modelKey({ provider: group.id, model: model.id }), label: model.name, description: `${group.name} · ${model.id}`, group: group.name }))),
+    ]} /></label>
     {value && reasoning?.efforts.length ? <label className="instance-field">推理档位<select aria-label={`${label}推理档位`} className="instance-field-input" value={value.reasoningEffort ?? ''} onChange={event => onChange({ provider: value.provider, model: value.model, ...(event.target.value ? { reasoningEffort: event.target.value } : {}) })}>
       <option value="">使用模型默认档位</option>
       {value.reasoningEffort && !reasoning.efforts.some(item => item.id === value.reasoningEffort) && <option value={value.reasoningEffort} disabled>原档位当前不可用：{value.reasoningEffort}</option>}
@@ -160,7 +163,7 @@ function ModelChoice({ catalog, allowed, value, onChange, label }: { catalog: Mo
   </div>
 }
 
-export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: PlatformPageProps & { updates?: PlatformUpdates; target?: PlatformNavigation; onNavigate?(target: PlatformNavigation): void; onContext?(context: Record<string, unknown>): void }) {
+export function InstancesPage({ rpc, updates, onContext, target, onNavigate, active = true }: PlatformPageProps & { active?: boolean; updates?: PlatformUpdates; target?: PlatformNavigation; onNavigate?(target: PlatformNavigation): void; onContext?(context: Record<string, unknown>): void }) {
   const [instances, setInstances] = useState<InstanceRow[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState('existing')
@@ -203,9 +206,8 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
   const [sourceError, setSourceError] = useState('')
   const [sourceRun, setSourceRun] = useState<{ source: string; loading: boolean; error: string; latest: SourceRun | null; checkedAt?: string } | null>(null)
   const [sourceRunRefresh, setSourceRunRefresh] = useState(0)
-  const [agentSearch, setAgentSearch] = useState('')
+  const suggestedName = useRef('')
   const [selectedAgent, setSelectedAgent] = useState('')
-  const [advancedSource, setAdvancedSource] = useState(false)
   const [detail, setDetail] = useState<Detail | null>(null)
   const [detailTab, setDetailTab] = useState<typeof detailTabs[number]['id']>('overview')
   const [detailNotice, setDetailNotice] = useState('')
@@ -226,15 +228,21 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
   const detailSection = useRef<HTMLElement>(null)
   const detailNoticeSection = useRef<HTMLDivElement>(null)
   const detailOpener = useRef<HTMLElement | null>(null)
+  const listSection = useRef<HTMLElement>(null)
+  const focusListOnReturn = useRef(false)
   const focusDetail = useRef(false)
   const lastPreselectedSource = useRef('')
   const lastTargetPage = useRef<PlatformNavigation['page'] | undefined>(undefined)
   const embedCode = embedUrl ? `<iframe\n  src="${embedUrl.replaceAll('&', '&amp;').replaceAll('"', '&quot;')}"\n  title="DSH 智能体"\n  style="width: 100%; height: 700px; border: 0;"\n  allow="clipboard-write"\n></iframe>` : ''
 
-  const visible = useMemo(() => instances.filter(item => (!sourceFilter || item.source_id === sourceFilter) && (filter === 'all' || (filter === 'existing' ? item.state !== 'absent' : item.state === filter)) && `${item.name} ${item.agent_id ?? ''} ${item.source_id ?? ''}`.toLowerCase().includes(query.toLowerCase())), [instances, filter, query, sourceFilter])
+  const scopedInstances = useMemo(() => instances.filter(item => (!sourceFilter || item.source_id === sourceFilter)
+    && `${item.name} ${item.agent_id ?? ''} ${item.source_id ?? ''}`.toLowerCase().includes(query.toLowerCase())), [instances, query, sourceFilter])
+  const stateSegments = useMemo(() => instanceStateSegments(scopedInstances), [scopedInstances])
+  const visible = useMemo(() => scopedInstances.filter(item => matchesInstanceState(item.state, filter)), [scopedInstances, filter])
   const visibleSelected = visible.filter(item => selected.has(item.name)).length
   const sourceById = useMemo(() => new Map(sources.map(item => [item.source_id, item])), [sources])
   const agentName = (id?: string) => agents.find(item => item.id === id)?.name || id || '未记录智能体'
+  const versionLabel = (sourceId?: string) => { const id = sourceById.get(sourceId || '')?.experiment_id || sourceId; const number = id?.match(/-(\d{3})(?:-r[0-9a-f]{12})?$/)?.[1]; return number ? `v${number}` : id || '未记录来源' }
   const sourceLabel = (id?: string) => {
     if (!id) return '未记录来源'
     const source = sourceById.get(id)
@@ -250,7 +258,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
         : latestSourceRun?.status === 'completed' && latestSourceRun.effective_verdict === 'passed' ? 'passed'
           : latestSourceRun?.status === 'failed' || latestSourceRun?.status === 'completed' && latestSourceRun.effective_verdict === 'failed' ? 'failed' : 'pending'
   const sourceRunHeading = !chosenSource?.selectable ? `${chosenSource?.experiment_id} 当前不可用`
-    : currentSourceRun?.loading || !currentSourceRun ? '正在核对最近评测…'
+    : currentSourceRun?.loading || !currentSourceRun ? '最近评测'
       : currentSourceRun.error ? '最近评测读取失败'
         : !latestSourceRun ? '此版本尚无评测记录'
           : latestSourceRun.status === 'failed' ? '最近评测执行失败'
@@ -270,17 +278,27 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
   const globalDefault = models?.business_default
   const createModel = createModelDraft !== undefined ? createModelDraft
     : modelAllowed(createAllowed, globalDefault) ? globalDefault : null
-  const createModelIssue = models && !modelError ? modelIssue(models.catalog, createAllowed, createModel) : modelError || '正在读取业务模型目录…'
+  const createModelIssue = models && !modelError ? modelIssue(models.catalog, createAllowed, createModel) : modelError || '业务模型目录尚未就绪'
   const instanceAllowed = models?.business_allowed ?? []
   const instanceCurrentModel = detail?.instance.model_policy?.default ?? null
   const activeModelEdit = instanceModelEdit?.name === detail?.instance.name ? instanceModelEdit : null
-  const instanceEditIssue = activeModelEdit && models && !modelError ? modelIssue(models.catalog, instanceAllowed, activeModelEdit.selection) : modelError || '正在读取业务模型目录…'
+  const instanceEditIssue = activeModelEdit && models && !modelError ? modelIssue(models.catalog, instanceAllowed, activeModelEdit.selection) : modelError || '业务模型目录尚未就绪'
   const instanceEditStale = Boolean(activeModelEdit && !sameModel(activeModelEdit.base, instanceCurrentModel))
   const filteredAgents = useMemo(() => {
     const byId = new Map(agents.map(item => [item.id, item]))
     for (const source of sources) if (source.agent_id && !byId.has(source.agent_id)) byId.set(source.agent_id, { id: source.agent_id })
-    return [...byId.values()].filter(item => item.id === selectedAgent || `${item.name || ''} ${item.id}`.toLowerCase().includes(agentSearch.trim().toLowerCase()))
-  }, [agents, sources, agentSearch, selectedAgent])
+    return [...byId.values()]
+  }, [agents, sources])
+  function selectCreateAgent(id: string) {
+    setSelectedAgent(id)
+    const source = sources.find(item => item.agent_id === id && item.selectable)?.source_id ?? ''
+    const base = id.replace(/[^a-z0-9-]/g, '-').slice(0, 40) || 'agent'
+    let number = 1
+    while (instances.some(item => item.name === `${base}-${number}`)) number++
+    const name = `${base}-${number}`
+    updateForm({ ...form, source, name: !form.name || form.name === suggestedName.current ? name : form.name })
+    suggestedName.current = name
+  }
   const filteredSources = sources.filter(item => item.agent_id === selectedAgent)
 
   async function call<T>(endpoint: string, payload: unknown): Promise<T> {
@@ -348,7 +366,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
           embedRequest.current++
           setDetailLoading(false)
           setDetail(current => current ? { ...current, instance: { ...current.instance, state: 'unknown' } } : current)
-          setDetailNotice(`所选实例 ${detailName.current} 的登记已不存在，请重新选择。`)
+          setDetailNotice(`实例“${detailName.current}”不存在或已移除。请返回列表核对当前登记，或重新读取。`)
           setLogs('')
           setLogsError('')
           setEmbedUrl('')
@@ -405,7 +423,6 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
     setForm(current => ({ ...current, source: target.source_id! }))
     setSelectedAgent(target.agent_id || sourceById.get(target.source_id)?.agent_id || '')
     setCreateModelDraft(undefined)
-    setAgentSearch('')
   }, [target?.page, target?.source_id, target?.agent_id])
   useEffect(() => {
     const source = sourceById.get(form.source)
@@ -431,6 +448,14 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
     section.focus?.({ preventScroll: true })
   }, [detail, detailNotice, detailLoading, loading])
   useEffect(() => {
+    if (!focusListOnReturn.current || detailName.current || detailLoading) return
+    focusListOnReturn.current = false
+    const destination = detailOpener.current?.isConnected ? detailOpener.current : listSection.current
+    destination?.focus?.({ preventScroll: true })
+    destination?.scrollIntoView?.({ block: 'nearest' })
+    detailOpener.current = null
+  }, [detail, detailLoading, detailNotice])
+  useEffect(() => {
     onContext?.({ page: 'instances', instance_name: detail?.instance.name, selected_instances: [...selected] })
   }, [detail?.instance.name, selected, onContext])
   useEffect(() => {
@@ -451,11 +476,6 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
       createOpener.current = null
     }
   }, [creating, actionDialog])
-  useEffect(() => {
-    if (!selectedAgent || agentSearch || !agents.length) return
-    const agent = agents.find(item => item.id === selectedAgent)
-    if (agent) setAgentSearch(agent.name && agent.name !== agent.id ? `${agent.name} · ${agent.id}` : agent.id)
-  }, [agents, selectedAgent, agentSearch])
 
   function closeAction() {
     setActionDialog(null)
@@ -666,10 +686,9 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
     setDetailLoading(true)
     if (!background) setError('')
     try {
-      const [nextDetail, nextLogs] = await Promise.all([
-        call<Detail>('detail', { name }),
-        call<{ logs: string }>('logs', { name, tail: 200 }).then(value => ({ logs: value.logs, error: '' }), err => ({ logs: '', error: (err as Error).message })),
-      ])
+      const nextDetail = await call<Detail>('detail', { name })
+      if (request !== detailRequest.current || name !== detailName.current) return
+      const nextLogs = await call<{ logs: string }>('logs', { name, tail: 200 }).then(value => ({ logs: value.logs, error: '' }), err => ({ logs: '', error: (err as Error).message }))
       if (request !== detailRequest.current || name !== detailName.current) return
       setDetail(nextDetail)
       setDetailNotice('')
@@ -677,7 +696,8 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
       setLogsError(nextLogs.error)
     } catch (err) {
       if (request === detailRequest.current) {
-        setDetailNotice((err as Error).message)
+        const message = (err as Error).message
+        setDetailNotice(/(?:实例.*不存在|未找到实例|instance.*not.?found)/i.test(message) ? `实例“${name}”不存在或已移除。请返回列表核对当前登记，或重新读取。` : `实例“${name}”详情读取失败：${message}`)
       }
     } finally {
       if (request === detailRequest.current) setDetailLoading(false)
@@ -688,6 +708,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
     detailRequest.current++
     embedRequest.current++
     detailName.current = undefined
+    focusListOnReturn.current = true
     setDetail(null)
     setInstanceModelEdit(null)
     setDetailLoading(false)
@@ -699,9 +720,6 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
     setEmbedMessage('')
     setSourceCopyNotice('')
     if (!fromRoute) onNavigate?.({ page: 'instances', ...(sourceFilter ? { experiment_id: sourceFilter.slice('experiment:'.length) } : {}) })
-    detailOpener.current?.focus?.({ preventScroll: true })
-    detailOpener.current?.scrollIntoView?.({ block: 'nearest' })
-    detailOpener.current = null
   }
 
   function selectDetailTab(tab: typeof detailTabs[number]['id']) {
@@ -775,9 +793,6 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
 
   const selectedNames = [...selected]
   const missingSelections = selectedNames.filter(name => !instances.some(item => item.name === name))
-  const containerCount = instances.filter(item => ['running', 'stopped', 'failed'].includes(item.state ?? '')).length
-  const absentCount = instances.filter(item => item.state === 'absent').length
-  const unknownCount = instances.length - containerCount - absentCount
   const detailReceipts = receiptHistory.filter(item => item.name === detail?.instance.name)
   const needsRegistrationReadback = receipts.some(item => item.registration?.status === 'unknown'
     || item.registration?.status === 'verified' && !registrationMatchesReceipt(item))
@@ -814,31 +829,19 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
   return (
     <main className="harness-instances-page" aria-label="实例管理">
       <style>{instanceTheme}</style>
-      <header className="harness-page-heading instance-page-heading">
-        <div><h1>实例管理</h1><p>核对登记来源和容器状态，查看访问入口、日志与操作回执。</p><div className="instance-summary-stats">{listLoaded ? <>{containerCount} 个容器实例 · {absentCount} 个无容器登记{unknownCount > 0 && ` · ${unknownCount} 个状态未知`}{refreshError && ' · 上次读取结果，当前状态待核对'}</> : loading ? '正在读取实例…' : '实例状态尚未读取'}</div></div>
-        <button type="button" className="harness-primary" aria-haspopup="dialog" aria-expanded={creating} aria-controls="instance-create" disabled={busy} onClick={event => { createOpener.current = event.currentTarget; void loadModels(); void loadSources(); setCreating(true) }}>新建实例</button>
-      </header>
+
       <dialog ref={createDialog} id="instance-create" aria-labelledby="instance-create-title" className="instance-dialog instance-create-dialog" onCancel={event => { event.preventDefault(); setCreating(false) }}>
         {creating && !actionDialog && <>
         <header className="instance-dialog-heading instance-create-heading"><div><h2 id="instance-create-title">创建业务实例</h2><p>通过可读名称选择来源，再查看创建预览。</p></div><button type="button" onClick={() => setCreating(false)} className="instance-dialog-close" aria-label="关闭创建实例">×</button></header>
         <div className="instance-dialog-content instance-create-content">
         <div className="instance-source-picker" aria-label="选择实例来源">
           {sourceError && <p role="alert" className="instance-error">来源读取失败：{sourceError}</p>}
-          <label className="instance-field">来源智能体<input aria-label="来源智能体" list="instance-agent-options" value={agentSearch} onChange={event => {
-            const typed = event.target.value
-            setAgentSearch(typed)
-            const matching = agents.filter(agent => [agent.id, agent.name, agent.name && `${agent.name} · ${agent.id}`].includes(typed))
-            const next = matching.length === 1 ? matching[0].id : ''
-            if (next !== selectedAgent) { setSelectedAgent(next); updateForm({ ...form, source: '' }) }
-          }} placeholder="输入智能体名称或 ID 检索" autoComplete="off" className="instance-field-input" />
-            <datalist id="instance-agent-options">{filteredAgents.map(agent => <option key={agent.id} value={agent.name && agent.name !== agent.id ? `${agent.name} · ${agent.id}` : agent.id} />)}</datalist>
-            <span className="instance-field-hint">{selectedAgent ? `已选择 · Agent ID：${selectedAgent}` : '输入名称检索，再选择对应智能体。'}</span></label>
-          <label className="instance-field">来源版本<select aria-label="选择来源版本" value={form.source && filteredSources.some(item => item.source_id === form.source) ? form.source : ''} onChange={event => updateForm({ ...form, source: event.target.value })} className="instance-field-input">
-            <option value="">请选择已登记版本</option>{filteredSources.map(source => <option key={source.source_id} value={source.source_id} disabled={!source.selectable}>{source.experiment_id}{source.selectable ? '' : ` · 不可用：${source.reason}`}</option>)}
-          </select></label>
+          <label className="instance-field">来源智能体<SearchSelect label="来源智能体" value={selectedAgent} options={filteredAgents.map(agent => ({ value: agent.id, label: agent.name || agent.id, description: agent.id }))} onChange={selectCreateAgent} placeholder="选择智能体" /></label>
+          <label className="instance-field">来源版本<SearchSelect label="选择来源版本" value={form.source && filteredSources.some(item => item.source_id === form.source) ? form.source : ''} options={filteredSources.map(source => ({ value: source.source_id, label: versionLabel(source.source_id), description: `${source.experiment_id} · ${source.selectable ? source.reason : `不可用：${source.reason}`}`, disabled: !source.selectable }))} onChange={value => updateForm({ ...form, source: value })} placeholder="请选择装载版本" disabled={!selectedAgent || sourceLoading} /></label>
           {selectedAgent && sourcesLoaded && !sourceLoading && !sources.some(item => item.agent_id === selectedAgent && item.selectable) && <p role="status" className="instance-muted">此智能体没有可用的装载版本。请检查该版本的装载声明与 Candidate 目录。</p>}
-          {chosenSource && <div className="instance-source-verdict" data-state={sourceRunResult} role="status"><strong>{sourceRunHeading}</strong><span>{chosenSource.experiment_id} · {latestSourceRun?.title || chosenSource.reason}</span><span>验证范围：{currentSourceRun?.error ? '读取失败，请到评测中心核对' : sourceRunScope}{latestSourceRun && ` · ${sourceRunCases}`}</span>{currentSourceRun?.error && <span>读取原因：{currentSourceRun.error}。</span>}{currentSourceRun?.checkedAt && <span>{latestSourceRun?.created_at && `Run 记录于 ${new Date(latestSourceRun.created_at).toLocaleString('zh-CN')} · `}{currentSourceRun.error ? '读取尝试于' : '核对于'} {new Date(currentSourceRun.checkedAt).toLocaleString('zh-CN')}</span>}<button type="button" className="instance-button" disabled={currentSourceRun?.loading} onClick={() => setSourceRunRefresh(value => value + 1)}>重新核对评测</button><span>创建实例不代表业务验证通过。</span></div>}
-          {sourceFieldError && <p role="alert" className="instance-error">{sourceFieldError}</p>}
+          {chosenSource && <div className="instance-source-verdict" data-state={sourceRunResult} role="status"><strong>{sourceRunHeading}{chosenSource.selectable && (currentSourceRun?.loading || !currentSourceRun) ? <LoadingIndicator label="核对最近评测" /> : null}</strong><span>{currentSourceRun && !currentSourceRun.loading ? sourceRunScope : '—'}{latestSourceRun && ` · ${sourceRunCases}`}</span><div className="instance-source-readback"><p>{chosenSource.experiment_id} · {latestSourceRun?.title || chosenSource.reason}</p>{currentSourceRun?.error && <p>读取原因：{currentSourceRun.error}。</p>}{currentSourceRun?.checkedAt && <p>{latestSourceRun?.created_at && `Run 记录于 ${new Date(latestSourceRun.created_at).toLocaleString('zh-CN')} · `}{currentSourceRun.error ? '读取尝试于' : '核对于'} {new Date(currentSourceRun.checkedAt).toLocaleString('zh-CN')}</p>}<button type="button" className="instance-button" disabled={currentSourceRun?.loading} onClick={() => setSourceRunRefresh(value => value + 1)}>重新核对评测</button><p>创建实例不代表业务验证通过。</p></div></div>}
+
+          {sourceFieldError && <p role="alert" className="instance-error">{sourceFieldError}{!chosenSource && <> 原来源：<code>{form.source}</code></>}</p>}
         </div>
         <label className="instance-field">实例名称<input aria-label="实例名" placeholder="例如 my-agent" value={form.name}
           onChange={event => updateForm({ ...form, name: event.target.value })} className="instance-field-input" /></label>
@@ -851,27 +854,20 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
           <option value="authenticated">经过网关，需要登录</option><option value="anonymous">经过网关，无需认证（共享数据和会话）</option>
         </select><span className="instance-field-hint">无需登录时，所有访问者共享此实例的历史会话、任务与工作区数据。未发布实例不做风险评估，网关全部放行。</span></label>
         <div className="instance-create-model" aria-label="设置新实例默认模型">
-          <div className="instance-create-model-heading"><strong>此实例默认模型</strong>{modelError && <button type="button" className="instance-button" disabled={modelLoading} onClick={() => void loadModels()}>{modelLoading ? '读取中…' : '刷新模型'}</button>}</div>
+          <div className="instance-create-model-heading"><strong>此实例默认模型</strong>{modelError && <button type="button" className="instance-button" disabled={modelLoading} onClick={() => void loadModels()}>刷新模型{modelLoading ? <LoadingIndicator label="读取业务模型目录" /> : null}</button>}</div>
           <p className="instance-field-hint">预选“设置 → 模型”的业务统一默认；此实例也可另选已配置模型。</p>
           {modelError && <p role="alert" className="instance-model-warning">模型目录读取失败：{modelError}。请刷新模型后再预览。</p>}
           {models && <ModelChoice catalog={models.catalog} allowed={createAllowed} value={createModel || null} label="新实例默认模型" onChange={selection => { setCreateModelDraft(selection); setPreviews([]); setPending(null) }} />}
-          {createModelIssue && !modelError && <p role="status" className="instance-model-warning">{createModelIssue}</p>}
+          {modelLoading ? <LoadingIndicator label="读取业务模型目录" block={!models} /> : createModelIssue && !modelError && <p role="status" className="instance-model-warning">{createModelIssue}</p>}
         </div>
-        <details className="instance-create-advanced"><summary>高级设置 · 端口与来源表达式</summary><div className="instance-create-advanced-body"><label className="instance-field">内部 Runtime 端口（可选）<input aria-label="端口" placeholder="留空从 18500–28999 自动分配" value={form.port}
-          onChange={event => updateForm({ ...form, port: event.target.value })} className="instance-field-input" /></label><button type="button" className="instance-source-advanced" aria-expanded={advancedSource} onClick={() => setAdvancedSource(value => !value)}>{advancedSource ? '收起来源表达式' : '手动输入来源表达式'}</button>
-          {advancedSource && <label className="instance-field">来源表达式<input aria-label="来源" placeholder="experiment:EXP-..." value={form.source} onChange={event => {
-            const source = event.target.value.trim()
-            updateForm({ ...form, source })
-            const agent = sourceById.get(source)?.agent_id
-            if (agent && agent !== selectedAgent) { setSelectedAgent(agent); setAgentSearch(agentName(agent)) }
-          }} className="instance-field-input" /></label>}</div></details>
+        <details className="instance-create-advanced"><summary>高级设置 · 端口</summary><div className="instance-create-advanced-body"><label className="instance-field">内部 Runtime 端口（可选）<input aria-label="端口" placeholder="留空从 18500–28999 自动分配" value={form.port}
+          onChange={event => updateForm({ ...form, port: event.target.value })} className="instance-field-input" /></label></div></details>
         <p className="instance-create-impact">将创建独立实例；现有业务实例不会因创建操作而停止或切换版本。</p>
         </div>
         <footer className="instance-dialog-actions"><button type="button" onClick={() => setCreating(false)} className="instance-button">取消</button><button type="button" className="harness-primary" disabled={busy || !businessGatewayAvailable || !form.name || !form.source || Boolean(sourceFieldError) || sourceLoading || modelLoading || Boolean(createModelIssue) || !currentSourceRun || currentSourceRun.loading} onClick={() => prepare('create', [])}>查看创建预览</button></footer>
         </>}
       </dialog>
-      <section aria-label="实例筛选" className="instance-filter-panel">
-        {sourceFilter && <div className="instance-source-filter"><span>关联来源：{sourceFilter}</span><button type="button" onClick={() => { setSourceFilter(''); onNavigate?.({ page: 'instances' }) }}>查看全部实例</button></div>}
+      <section aria-label="实例筛选" className="instance-filter-panel" hidden={Boolean(detailName.current)}>
         <div className="instance-filter-row">
           <label className="instance-search-field">搜索<input aria-label="搜索实例" placeholder="搜索实例名或智能体 ID" value={query} onChange={event => setQuery(event.target.value)} className="instance-field-input" /></label>
           <label className="instance-filter-field">状态<select aria-label="状态筛选" value={filter} onChange={event => setFilter(event.target.value)} className="instance-field-input">
@@ -879,25 +875,31 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
             <option value="running">运行中</option><option value="stopped">已停止</option>
             <option value="absent">无容器（仅登记）</option><option value="failed">异常</option><option value="unknown">状态未知</option>
           </select></label>
-          <button type="button" onClick={() => void refresh()} disabled={loading} className="instance-button">{loading ? '读取中…' : '刷新'}</button>
-          <span className="instance-filter-count" role="status">{listLoaded ? `${visible.length} 个业务实例${refreshError ? ' · 上次读取' : ''}` : '实例状态待读取'}</span>
+          <label className="instance-filter-field">登记来源<SearchSelect label="实例登记来源筛选" value={sourceFilter} onChange={value => { setSourceFilter(value); if (!value) onNavigate?.({ page: 'instances' }) }} options={[{ value: '', label: '全部来源' }, ...sources.map(source => ({ value: source.source_id, label: source.experiment_id, description: agentName(source.agent_id) }))]} /></label>
+          <button type="button" className="instance-clear-filter" onClick={() => { setQuery(''); setFilter('existing'); setSourceFilter(''); onNavigate?.({ page: 'instances' }) }}>清除筛选</button>
+          <div className="instance-toolbar-actions"><button type="button" onClick={() => void refresh()} disabled={loading} className="instance-button">刷新列表{loading && listLoaded ? <LoadingIndicator label="读取实例列表" /> : null}</button>
+        <button type="button" className="harness-primary" aria-haspopup="dialog" aria-expanded={creating} aria-controls="instance-create" disabled={busy} onClick={event => { createOpener.current = event.currentTarget; void loadModels(); void loadSources(); setCreating(true) }}>新建实例</button></div>
         </div>
-        {selectedNames.length > 0 && <div aria-label="批量操作" className="instance-batch-bar">
+        {listLoaded && <div className="instance-state-overview" aria-busy={loading}><DistributionChart title="实例状态分布" description={`${refreshError ? '上次观察；当前状态待核对。' : ''}当前搜索与来源下共 ${scopedInstances.length} 项登记；状态仅筛选下方列表。`} variant="bars" totalLabel="项登记" emptyText="当前搜索与来源范围没有实例登记。"
+          segments={stateSegments} selectedKey={filter} onSelect={key => setFilter(current => current === key ? 'all' : key)} /></div>}
+        <div className="instance-filter-summary"><span>{lastListAt ? `${refreshError ? '上次成功观察' : '观察于'} ${lastListAt}${refreshError ? ' · 当前状态待核对' : ''}` : loading ? '' : '实例状态尚未读取'}</span></div>
+      </section>
+      <div aria-label="批量操作" className="instance-batch-bar" hidden={Boolean(detailName.current)}>
+        {selectedNames.length ? <>
           <strong>已选择 {selected.size} 个</strong>
           {selected.size > visibleSelected && <span className="instance-muted">其中 {selected.size - visibleSelected} 个不在当前列表</span>}
           {(['start', 'stop', 'restart', 'delete'] as Operation[]).map(operation => <button key={operation} type="button" disabled={busy || missingSelections.length > 0}
             onClick={() => prepare(operation, selectedNames)} className="instance-button">{labels[operation]}</button>)}
           <button type="button" disabled={busy} onClick={() => setSelected(new Set())} className="instance-button">取消选择</button>
           {missingSelections.length > 0 && <span role="status" className="instance-selection-notice">{missingSelections.length} 个所选登记已不存在。<button type="button" onClick={() => setSelected(current => new Set([...current].filter(name => !missingSelections.includes(name))))}>清除失效选择</button></span>}
-        </div>}
-      </section>
+        </> : <strong>勾选实例后可批量操作</strong>}</div>
 
       {error && !actionDialog ? <div role="alert" className="instance-error">{error}</div> : null}
       {refreshError && <div role="alert" className="instance-error">实例列表读取失败：{refreshError}。{listLoaded ? `当前显示 ${lastListAt} 读取的列表，实例状态待核对。` : '当前无法确认是否有实例。'} <button type="button" className="instance-button" disabled={loading} onClick={() => void refresh()}>重新读取</button></div>}
 
-      <section aria-label="实例列表" className="instance-list-panel">
+      <section ref={listSection} tabIndex={-1} aria-label="实例列表" className="instance-list-panel" hidden={Boolean(detailName.current)}>
         <div className="instance-table-wrap"><table className="instance-table">
-          <colgroup><col style={{ width: 44 }}/><col style={{ width: '19%' }}/><col style={{ width: '13%' }}/><col style={{ width: '20%' }}/><col style={{ width: 100 }}/><col style={{ width: 170 }}/><col/></colgroup>
+          <colgroup><col style={{ width: 44 }}/><col style={{ width: '26%' }}/><col style={{ width: '23%' }}/><col style={{ width: '12%' }}/><col style={{ width: '17%' }}/><col/></colgroup>
           <thead>
             <tr>
               <th className="instance-list-th">
@@ -913,7 +915,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
                     return next
                   })} />
               </th>
-              <th className="instance-list-th">实例名称</th><th className="instance-list-th">智能体</th><th className="instance-list-th">登记来源版本</th>
+              <th className="instance-list-th">实例 / 智能体</th><th className="instance-list-th">登记来源</th>
               <th className="instance-list-th">运行状态</th><th className="instance-list-th">访问入口</th><th className="instance-list-th">操作</th>
             </tr>
           </thead>
@@ -929,10 +931,9 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
                       return next
                     })} />
                 </td>
-                <td className="instance-list-td instance-name" data-label="实例名称">{item.name}</td>
-                <td className="instance-list-td" data-label="智能体">{agentName(item.agent_id)}</td>
-                <td className="instance-list-td instance-source" data-label="登记来源版本"><strong>{sourceById.get(item.source_id || '')?.experiment_id || item.source_id || '未记录来源'}</strong><small>实际装载须在目标 Session 核对</small></td>
-                <td className="instance-list-td" data-label="运行状态"><span className="instance-state-badge" data-state={item.state}>{stateLabels[item.state ?? 'unknown'] || item.state}</span></td>
+                <td className="instance-list-td instance-name" data-label="实例 / 智能体"><strong>{item.name}</strong><small>{agentName(item.agent_id)}{agentName(item.agent_id) !== item.agent_id ? ` · ${item.agent_id}` : ''}</small></td>
+                <td className="instance-list-td instance-source" data-label="登记来源版本"><strong>{versionLabel(item.source_id)}</strong><small>{sourceById.get(item.source_id || '')?.experiment_id || item.source_id}</small></td>
+                <td className="instance-list-td" data-label="运行状态"><span className="instance-state-badge" data-state={instanceState(item.state)}>{stateLabels[instanceState(item.state)]}</span></td>
                 <td className="instance-list-td" data-label="访问入口">
                   <button type="button" disabled={item.state !== 'running' || !item.port || opening.has(item.name)}
                     onClick={() => openWeb(item.name)} className="instance-button"
@@ -940,35 +941,35 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
                     {opening.has(item.name) ? '正在打开…' : '打开 Web'}
                   </button>
                   <div className="instance-muted instance-access-note">{item.state !== 'running' ? '实例运行后可访问' : !item.port ? '未记录端口' : item.business_gateway ? `${item.identity_mode === 'development' ? '开发调试' : '对外服务'} · 经统一网关 · ${item.access_mode === 'anonymous' ? '无需登录' : '需个人登录'}` : !item.lan_access ? '仅宿主机' : null}</div>
-                  {item.business_gateway && <div className="instance-muted instance-access-note">{item.access_url || '网关深链尚未核对'}</div>}
+                  {item.business_gateway && (item.access_url ? <button type="button" className="instance-access-address" title={item.access_url} aria-label={`查看 ${item.name} 的完整访问地址`} onClick={event => void openDetail(item.name, false, false, event.currentTarget)}>{item.access_url}</button> : <div className="instance-muted instance-access-note">网关深链尚未核对</div>)}
                 </td>
                 <td className="instance-list-td" data-label="操作"><div className="instance-actions">
-                  <button type="button" onClick={event => openDetail(item.name, false, false, event?.currentTarget)} disabled={detailLoading} className="instance-button">详情</button>
+                  <button type="button" onClick={event => openDetail(item.name, false, false, event?.currentTarget)} disabled={detailLoading} className="instance-button">查看详情</button>
                   {(item.state === 'running' ? ['stop', 'restart'] : item.state === 'stopped' || item.state === 'absent' ? ['start', 'delete'] : item.state === 'failed' ? ['start', 'stop'] : []).map(operation =>
                     <button type="button" key={operation} disabled={busy} onClick={() => prepare(operation as Operation, [item.name])} className="instance-button">{labels[operation as Operation]}</button>)}
                   {item.state === 'unknown' && <span>观察失败，请刷新</span>}
                 </div></td>
               </tr>
             ))}
-            {visible.length === 0 && <tr><td colSpan={7} className="instance-empty-list">{loading && !listLoaded ? '正在读取实例…' : !listLoaded ? '实例列表尚未读取，请重新读取。' : instances.length === 0 ? '暂无实例。点击右上角“新建实例”开始创建。' : '没有符合当前筛选条件的实例。请调整状态或搜索内容。'}</td></tr>}
+            {visible.length === 0 && <tr><td colSpan={6} className="instance-empty-list">{loading && !listLoaded ? <LoadingIndicator label="读取实例列表" block /> : !listLoaded ? '实例列表尚未读取，请重新读取。' : instances.length === 0 ? '暂无实例。点击右上角“新建实例”开始创建。' : '没有符合当前筛选条件的实例。请调整状态或搜索内容。'}</td></tr>}
           </tbody>
         </table></div>
-        <div className="instance-list-heading"><strong>实例列表</strong><span className="instance-muted">{listLoaded ? `共 ${visible.length} 条记录${refreshError ? '（上次读取）' : ''} · 运行状态不代表业务验证通过` : '等待读取实例状态'}</span></div>
+        <div className="instance-list-heading"><span className="instance-muted">{listLoaded ? `共 ${visible.length} 条记录${refreshError ? '（上次读取）' : ''} · 运行状态不代表业务验证通过` : loading ? '—' : '实例状态尚未读取'}</span></div>
       </section>
 
-      {detailLoading && !detail && <p role="status">正在读取实例详情…</p>}
-      {!detail && !detailLoading && detailName.current && detailNotice && <div ref={detailNoticeSection} tabIndex={-1} role="alert" className="instance-error instance-detail-route-notice">{detailNotice} <button type="button" className="instance-button" onClick={() => closeDetail()}>返回实例列表</button></div>}
+      {detailLoading && !detail && <LoadingIndicator label="读取实例详情" block />}
+      {!detail && !detailLoading && detailName.current && detailNotice && <div ref={detailNoticeSection} tabIndex={-1} role="alert" className="instance-error instance-detail-route-notice">{detailNotice} <button type="button" className="instance-button" onClick={() => void openDetail(detailName.current!, false, true)}>重新读取实例</button><button type="button" className="instance-button" onClick={() => closeDetail()}>返回实例列表</button></div>}
       {detail ? (
         <section ref={detailSection} tabIndex={-1} className="harness-instance-detail instance-panel" aria-label="实例详情">
           <header className="instance-detail-header">
             <div className="instance-heading-content"><small className="instance-muted">实例详情</small><div className="instance-detail-title">
               <h2>{detail.instance.name}</h2>
-              <span className="instance-state-badge" data-state={detail.instance.state}>{stateLabels[detail.instance.state ?? 'unknown'] || detail.instance.state}</span>
+              <span className="instance-state-badge" data-state={instanceState(detail.instance.state)}>{stateLabels[instanceState(detail.instance.state)]}</span>
             </div></div>
             <div className="instance-actions">
               <button type="button" className="harness-primary" disabled={detail.instance.state !== 'running' || !detail.instance.port || opening.has(detail.instance.name)} onClick={() => void openWeb(detail.instance.name)}>{opening.has(detail.instance.name) ? '正在打开…' : '访问 DSH Web'}</button>
-              <button type="button" className="instance-button" disabled={detailLoading} onClick={() => void openDetail(detail.instance.name, true)}>{detailLoading ? '刷新中…' : '刷新详情'}</button>
-              <button type="button" className="instance-button" onClick={() => closeDetail()}>关闭详情</button>
+              <button type="button" className="instance-button" disabled={detailLoading} onClick={() => void openDetail(detail.instance.name, true)}>刷新详情{detailLoading ? <LoadingIndicator label="刷新实例详情" /> : null}</button>
+              <button type="button" className="instance-button" onClick={() => closeDetail()}>返回实例列表</button>
             </div>
           </header>
           {detailNotice && <p role="alert" className="instance-detail-notice">{detailNotice}</p>}
@@ -990,13 +991,20 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
                 ['智能体', detail.instance.agent_id || '未记录'],
                 [detail.instance.business_gateway ? '内部 Web 端口' : '访问端口', detail.instance.port || '未记录'],
                 ...(detail.instance.business_gateway ? [['实例阶段', detail.instance.identity_mode === 'development' ? '开发调试，不要求发布身份签名' : '对外服务，验证智能体身份签名'], ['访问方式', detail.instance.access_mode === 'anonymous' ? '经过网关，无需认证（共享数据和会话）' : '经统一网关，需要个人登录'], ['已登记网关入口', detail.instance.access_url || '尚未核对，请刷新实例登记']] : []),
+              ].map(([label, value]) => <div key={label} className="instance-fact"><dt className="instance-muted">{label}</dt><dd className="instance-fact-value">{value}</dd></div>)}
+            </dl>
+            <p className="instance-muted">容器状态来自当前观察；来源和镜像为实例登记记录。当前 Session 的实际装载需通过运行观察核对。</p>
+            <DetailDrawer title="Runtime 与存储信息" active={active && detailTab === 'overview'} identity={detail.instance.name}><dl className="instance-detail-grid">{[
                 ['登记镜像', detail.instance.image_tag || '未记录'],
                 ['登记镜像 ID', detail.instance.image_id || '未记录'],
                 ['HOME 存储', String(detail.instance.home_directory || detail.session_scope.home_volume || detail.instance.home_volume || '未记录')],
                 ['HOME 保留状态', detail.session_scope.preserved === true ? '已保留' : detail.session_scope.preserved === false ? '未保留' : '尚未确认'],
-              ].map(([label, value]) => <div key={label} className="instance-fact"><dt className="instance-muted">{label}</dt><dd className="instance-fact-value">{value}</dd></div>)}
-            </dl>
-            <p className="instance-muted">容器状态来自当前观察；来源和镜像为实例登记记录。当前 Session 的实际装载需通过运行观察核对。</p>
+              ].map(([label, value]) => <div key={label} className="instance-fact"><dt className="instance-muted">{label}</dt><dd className="instance-fact-value">{value}</dd></div>)}</dl><h3>挂载配置 · {Object.keys(detail.instance.mounts || {}).length} 项</h3>
+              {Object.keys(detail.instance.mounts || {}).length ? <div className="instance-mount-scroll"><table className="instance-mount-table"><thead><tr><th className="instance-th">用途</th><th className="instance-th">来源路径</th><th className="instance-th">权限</th></tr></thead><tbody>{Object.entries(detail.instance.mounts || {}).map(([name, path]) => {
+                const mode = detail.instance.mount_modes?.[name]
+                return <tr key={name}><td className="instance-td">{name}</td><td className="instance-td instance-path">{path}</td><td className="instance-td">{mode === 'ro' ? '只读' : mode === 'rw' ? '读写' : mode || '未记录'}</td></tr>
+              })}</tbody></table></div> : <p className="instance-muted">暂无挂载配置。</p>}
+            </DetailDrawer>
             <div className="instance-model-panel" aria-label="管理实例默认模型">
               <div className="instance-source-heading"><strong>实例模型设置</strong><button type="button" className="instance-button" aria-expanded={Boolean(activeModelEdit)} disabled={!['running', 'stopped', 'absent'].includes(detail.instance.state || '')} onClick={() => {
                 if (activeModelEdit) setInstanceModelEdit(null)
@@ -1009,25 +1017,15 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
                 <p className="instance-muted">从已配置的业务模型中选择。确认后将{detail.instance.state === 'running' ? '重启' : '启动'}实例，新 Session 才使用新默认模型；已有 Session 的模型不会在此处自动切换。</p>
                 {models && <ModelChoice catalog={models.catalog} allowed={instanceAllowed} value={activeModelEdit.selection} label="实例默认模型" onChange={selection => setInstanceModelEdit(current => current?.name === detail.instance.name ? { ...current, selection } : current)} />}
                 {instanceEditStale && <p role="alert" className="instance-model-warning">此实例的登记默认模型已变化。请取消更改并重新核对。</p>}
-                {instanceEditIssue && <p role="status" className="instance-model-warning">{instanceEditIssue}</p>}
+                {modelLoading ? !models && <LoadingIndicator label="读取业务模型目录" block /> : instanceEditIssue && <p role="status" className="instance-model-warning">{instanceEditIssue}</p>}
                 {sameModel(activeModelEdit.selection, instanceCurrentModel) && !instanceEditStale && <p role="status" className="instance-muted">当前选择与本实例登记相同。</p>}
-                <div className="instance-model-actions"><button type="button" className="instance-button" disabled={modelLoading} onClick={() => void loadModels()}>{modelLoading ? '读取中…' : '刷新可用模型'}</button><button type="button" className="harness-primary" disabled={busy || modelLoading || Boolean(instanceEditIssue) || instanceEditStale || sameModel(activeModelEdit.selection, instanceCurrentModel)} onClick={() => void prepare(detail.instance.state === 'running' ? 'restart' : 'start', [detail.instance.name], activeModelEdit.selection!)}>预览并{detail.instance.state === 'running' ? '重启' : '启动'}</button></div>
+                <div className="instance-model-actions"><button type="button" className="instance-button" disabled={modelLoading} onClick={() => void loadModels()}>刷新可用模型{modelLoading && models ? <LoadingIndicator label="读取业务模型目录" /> : null}</button><button type="button" className="harness-primary" disabled={busy || modelLoading || Boolean(instanceEditIssue) || instanceEditStale || sameModel(activeModelEdit.selection, instanceCurrentModel)} onClick={() => void prepare(detail.instance.state === 'running' ? 'restart' : 'start', [detail.instance.name], activeModelEdit.selection!)}>预览并{detail.instance.state === 'running' ? '重启' : '启动'}</button></div>
               </> : <p className="instance-muted">本实例沿用自己的登记默认模型；修改统一默认模型不会改变已登记实例。</p>}
               {!['running', 'stopped', 'absent'].includes(detail.instance.state || '') && <p className="instance-model-warning">当前状态无法安全确认更改操作，请刷新或先处理实例状态。</p>}
             </div>
             <div className="instance-session-note"><strong>会话与数据</strong><p>{detail.session_scope.note || '未记录会话说明。'}</p></div>
-            <details className="instance-detail-fold"><summary className="instance-fold-title">挂载配置 · {Object.keys(detail.instance.mounts || {}).length} 项</summary>
-              {Object.keys(detail.instance.mounts || {}).length ? <div className="instance-mount-scroll"><table className="instance-mount-table"><thead><tr><th className="instance-th">用途</th><th className="instance-th">来源路径</th><th className="instance-th">权限</th></tr></thead><tbody>{Object.entries(detail.instance.mounts || {}).map(([name, path]) => {
-                const mode = detail.instance.mount_modes?.[name]
-                return <tr key={name}><td className="instance-td">{name}</td><td className="instance-td instance-path">{path}</td><td className="instance-td">{mode === 'ro' ? '只读' : mode === 'rw' ? '读写' : mode || '未记录'}</td></tr>
-              })}</tbody></table></div> : <p className="instance-muted">暂无挂载配置。</p>}
-            </details>
-            <details className="instance-detail-fold"><summary className="instance-fold-title">来源版本的运行记录 · {detail.runs.length} 条</summary>
-              {detail.runs.length ? <ul className="instance-run-list">{detail.runs.map(run => <li key={run.id} className="instance-run-item">
-                {onNavigate ? <button type="button" className="instance-run-link" onClick={() => onNavigate({ page: 'evaluation', run_id: run.id, agent_id: detail.instance.agent_id })}>{run.id}</button> : <code>{run.id}</code>}
-                <small className="instance-muted instance-path">{run.path}</small>
-              </li>)}</ul> : <p className="instance-muted">此来源版本暂无运行记录。</p>}
-            </details>
+
+            {onNavigate && <button type="button" className="instance-run-link" onClick={() => onNavigate({ page: 'evaluation', tab: 'runs', agent_id: detail.instance.agent_id, experiment_id: detail.instance.source_id?.startsWith('experiment:') ? detail.instance.source_id.slice('experiment:'.length) : sourceById.get(detail.instance.source_id || '')?.experiment_id })}>查看来源版本评测</button>}
           </section>
 
           <section id="instance-panel-embed" role="tabpanel" aria-labelledby="instance-tab-embed" hidden={detailTab !== 'embed'} className="instance-detail-body">
@@ -1036,12 +1034,12 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
             </div>
             {(detail.instance.state !== 'running' || !detail.instance.port) && <p role="status">实例运行且记录{detail.instance.business_gateway ? '内部 Runtime 端口' : '访问端口'}后，才可生成嵌入代码。</p>}
             {embedCode ? <div className="instance-code-box"><div className="instance-code-heading"><span>HTML 嵌入代码</span><button type="button" className="instance-button" onClick={() => void copyEmbed()}>复制嵌入代码</button></div><pre className="instance-embed-code">{embedCode}</pre></div> : <div className="instance-embed-empty">点击“生成 iframe 代码”，获取使用此实例实际访问地址的代码。</div>}
-            {embedMessage && <p role="status" className="instance-muted">{embedMessage}</p>}
-            <details className="instance-detail-fold"><summary className="instance-fold-title">使用须知</summary><ul className="instance-embed-notes">
+            {embedMessage === '正在读取实例地址…' ? <LoadingIndicator label="读取实例地址" /> : embedMessage && <p role="status" className="instance-muted">{embedMessage}</p>}
+            <DetailDrawer title="网站嵌入使用须知" trigger="使用须知" active={active && detailTab === 'embed'} identity={detail.instance.name}><ul className="instance-embed-notes">
               <li>网站访问者需要能连接到实例地址。供其他电脑访问时，使用局域网可达的地址；127.0.0.1 只指访问者自己的电脑。</li>
               <li>{detail.instance.business_gateway ? detail.instance.access_mode === 'anonymous' ? '无需认证时所有访问者共享此实例的数据和会话，无需登录或访客 Cookie；统一网关提供访问入口。' : '业务访问仍经统一网关，需要个人登录；跨站嵌入受浏览器 Cookie 限制，可同站点嵌入或直接打开网关入口。' : '嵌入沿用实例自身的登录设置，不会自动传递平台登录状态。跨站登录受浏览器 Cookie 限制时，可使用同站点反向代理或直接打开 DSH Web。'}</li>
               <li>HTTPS 网站需使用 HTTPS 实例入口，网站的 CSP 也需要允许该 iframe 来源。</li>
-            </ul></details>
+            </ul></DetailDrawer>
           </section>
 
           <section id="instance-panel-logs" role="tabpanel" aria-labelledby="instance-tab-logs" hidden={detailTab !== 'logs'} className="instance-detail-body">
@@ -1061,7 +1059,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate }: P
         {actionDialog && <>
         <header className="instance-dialog-heading instance-action-heading"><div><h2 id="instance-action-title">{actionDialog === 'create' ? '确认创建业务实例' : actionDialog === 'stop' ? '停止业务实例？' : `${actionDialog && labels[actionDialog]}业务实例`}</h2><p>{actionDialog === 'create' ? '核对来源、影响对象和验证范围后再执行。' : actionDialog === 'stop' ? '这是对业务实例的操作，不会取消独立的评测任务。' : '核对目标和实际影响，再确认执行。'}</p></div><button type="button" className="instance-dialog-close" aria-label="关闭操作预览" disabled={actionDialogLocked} onClick={closeAction}>×</button></header>
         <div className="instance-dialog-content">
-        {actionPhase && <p role="status">{actionPhase === 'preview' ? '正在读取操作预览…' : actionPhase === 'execute' ? `正在执行：已收到 ${receipts.filter(item => item.status !== 'not_dispatched').length} / ${pending?.items.length ?? 0} 项回执` : '操作回执已收到，正在读取实例登记；请勿重复提交操作。'}</p>}
+        {actionPhase === 'preview' ? <LoadingIndicator label="读取操作预览" block={!previews.length} /> : actionPhase && <p role="status">{actionPhase === 'execute' ? `正在执行：已收到 ${receipts.filter(item => item.status !== 'not_dispatched').length} / ${pending?.items.length ?? 0} 项回执` : '操作回执已收到，正在读取实例登记；请勿重复提交操作。'}</p>}
         {error && <div role="alert" className="instance-error">{error}</div>}
         {previews.length ? <section aria-label="操作预览">
           {!(previews.length === 1 && ['create', 'stop'].includes(actionDialog || '')) && <><p className="instance-preview-summary">共选择 {previews.length} 项 · 可确认 {pending?.items.length || 0} 项 · 预览失败 {previews.filter(item => !item.ok).length} 项</p><p className="instance-muted">确认只会派发下方可确认的目标。来源、模型与启动端口沿用本次预览；配置变化或端口占用时，本项会失败并提示重新预览。</p></>}

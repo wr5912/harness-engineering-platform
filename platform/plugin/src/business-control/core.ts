@@ -6,9 +6,10 @@ import { performance } from 'node:perf_hooks'
 import type {
   AccessDecision, AccessRequest, AgentAuthenticationEvidence, AgentInstanceStatus, AuthenticatedIdentity, AuthenticationInput, BusinessAccessConfig, BusinessContext,
   BusinessOperation, ControlEvent, ControlScope, ControlSnapshot, InstanceBinding, OperationKind,
-  ReplicaObservation, ResourceRef, Restriction, RiskFact, SessionBinding, SessionTrustFact,
+  ReplicaObservation, ResourceRef, Restriction, RiskFact, SessionBinding, SessionTrustFact, ToolPolicyEffect, ToolPolicyWhen, AuthorizationReceipt, ExternalAccessDecision,
 } from './contracts.js'
-import { HttpAuthenticationProvider, HttpIdentityTrustProvider, HttpRiskAssessmentProvider } from './providers.js'
+import { retiredLocalRiskFact, validAgentToolPolicies } from './contracts.js'
+import { HttpAuthenticationProvider, HttpIdentityTrustProvider, HttpRiskAssessmentProvider, HttpAccessAuthorizationProvider } from './providers.js'
 import { resolveBusinessSecretFile } from './secret-file.ts'
 
 export * from './contracts.js'
@@ -66,7 +67,15 @@ export function configureBusinessControlStateRoot(assetRoot: string, stateRoot: 
 }
 const noSignal = () => new AbortController().signal
 const iso = () => new Date().toISOString()
-const error = (code: string, status = 403): never => { throw new BusinessControlError(code, '当前请求未获业务许可', status) }
+const error = (code: string, status = 403, message?: string): never => {
+  const reasons: Record<string, string> = {
+    risk_provider_unavailable: '第三方风险评估未配置或未返回有效结果，请核对提供方后重试',
+    risk_fact_unavailable: '匹配的第三方评估缺失、未知或已过期，暂不执行需要有效评估的操作',
+    risk_restricted: '本次请求仍受人工限制或第三方明确拒绝约束，请核对对应用户、会话、服务与操作范围',
+    confirmation_invalid: '本次确认依据已变化、失效或过期，请重新核对目标与参数后确认，未派发本次请求',
+  }
+  throw new BusinessControlError(code, message ?? reasons[code] ?? '当前请求未获业务许可', status)
+}
 const matches = (scope: ControlScope, context: BusinessContext, serverId?: string): boolean =>
   Object.entries(scope).every(([key, value]) => value === undefined
     || (key === 'subjectId' ? context.subject.id : key === 'serverId' ? serverId : context.scope[key as keyof ControlScope]) === value)
@@ -125,10 +134,11 @@ export class BusinessControl {
   private issued = new Map<string, ControlSnapshot>()
   private acknowledgements = new Map<string, { restrictionVersion: number; leaseId: string; at: string }>()
   private synchronizations = new Map<string, { lastSuccessAt?: string; lastAttemptAt: string; lastError?: string }>()
-  private active = new Map<string, { context: BusinessContext; operation: BusinessOperation; controller: AbortController }>()
+  private active = new Map<string, { context: BusinessContext; operation: BusinessOperation; controller: AbortController; conditionFact?: RiskFact; policyVersion: string; confirmed: boolean; authorizationSource?: AuthorizationReceipt['source']; authorizationRiskDigest?: string; contentDigest?: string }>()
+  private executionAuthorization = new AsyncLocalStorage<{ external: boolean; riskUnavailable: boolean; lastRiskStatus?: RiskFact['status']; grant?: ExternalAccessDecision; configVersion?: string; operationDigest?: string; riskDigest?: string; id?: string; contentDigest?: string; refreshingRisk?: boolean; pendingRiskAuthorization?: boolean; refresh?: () => Promise<void>; operation?: BusinessOperation }>()
   private confirmations = new Map<string, Confirmation>()
   private agentAuthentications = new Map<string, { evidence: AgentAuthenticationEvidence; receivedAt: number }>()
-  private confirmationHandler?: (context: BusinessContext, operation: BusinessOperation, signal: AbortSignal) => Promise<void>
+  private confirmationHandler?: (context: BusinessContext, operation: BusinessOperation, signal: AbortSignal, reason?: string) => Promise<void>
   private confirmationSynchronizer?: (signal: AbortSignal) => Promise<void>
   private available = true
   private observedManagedGateway = false
@@ -154,7 +164,8 @@ export class BusinessControl {
     if (value.schemaVersion !== 1 || typeof value.enabled !== 'boolean' || !Array.isArray(value.agents)
       || value.agents.some(rule => !rule.agentId || typeof rule.enabled !== 'boolean' || !Array.isArray(rule.subjects) || !Array.isArray(rule.actions)
         || (rule.agentAuthentication !== undefined && (!rule.agentAuthentication || rule.agentAuthentication.method !== 'hmac-sha256' || typeof rule.agentAuthentication.enabled !== 'boolean'))
-        || (rule.agentTrust !== undefined && (!rule.agentTrust || typeof rule.agentTrust.enabled !== 'boolean')))
+        || (rule.agentTrust !== undefined && (!rule.agentTrust || typeof rule.agentTrust.enabled !== 'boolean'))
+        || (rule.toolPolicies !== undefined && !validAgentToolPolicies(rule.toolPolicies)))
       || (value.operations && (!Array.isArray(value.operations) || value.operations.some(rule =>
         !rule.serverId || !rule.operationId || !kinds.includes(rule.kind) || !rule.target || !rule.method)))) {
       return error('control_config_invalid', 503)
@@ -284,7 +295,15 @@ export class BusinessControl {
     for (const event of observation.events) {
       if (!event.id || !event.sessionId || !sessions.has(event.sessionId) || event.subjectId !== sessions.get(event.sessionId)!.subjectId
         || !['allowed', 'denied', 'completed', 'cancelled', 'unknown', 'applied'].includes(event.outcome)
-        || !Number.isSafeInteger(event.restrictionVersion)) return error('replica_event_invalid')
+        || !Number.isSafeInteger(event.restrictionVersion)
+        || (event.scope && Object.entries(event.scope).some(([key, value]) => !['workspaceId', 'agentId', 'subjectId', 'instanceId', 'runtimeGeneration', 'sessionId', 'serverId'].includes(key)
+          || typeof value !== 'string' || value.length > 500 || key !== 'serverId' && value !== (key === 'subjectId' ? event.subjectId : key === 'sessionId' ? event.sessionId : binding[key as keyof InstanceBinding])))
+        || (event.authorization && (!['third-party', 'manual-fallback', 'manual'].includes(event.authorization.source)
+          || !['allow', 'deny', 'confirm'].includes(event.authorization.decision)
+          || Object.keys(event.authorization).some(key => !['source', 'decision', 'policyVersion', 'reason', 'expiresAt', 'provider'].includes(key))
+          || [event.authorization.policyVersion, event.authorization.reason, event.authorization.expiresAt, event.authorization.provider].some(value => value !== undefined && (typeof value !== 'string' || value.length > 1500))
+          || event.authorization.expiresAt !== undefined && !Number.isFinite(Date.parse(event.authorization.expiresAt))
+          || event.authorization.provider !== undefined && (() => { try { const url = new URL(event.authorization!.provider!); return !['http:', 'https:'].includes(url.protocol) || url.origin !== event.authorization!.provider } catch { return true } })()))) return error('replica_event_invalid')
     }
     // 全部对象先校验，再写观察索引；重复上报不改已有归属或推进同一事实版本。
     for (const session of sessions.values()) {
@@ -306,10 +325,11 @@ export class BusinessControl {
     writeFileSync(temporary, JSON.stringify(this.state, null, 2) + '\n', { mode: 0o600 })
     renameSync(temporary, this.path)
   }
-  private record(action: string, outcome: ControlEvent['outcome'], context?: BusinessContext, operationId?: string, reason?: string): void {
+  private record(action: string, outcome: ControlEvent['outcome'], context?: BusinessContext, operationId?: string, reason?: string, authorization?: AuthorizationReceipt): void {
     this.state.events.push({ id: randomUUID(), at: iso(), requestId: context?.requestId,
       subjectId: context?.subject.id, sessionId: context?.scope.sessionId, operationId, action,
-      restrictionVersion: this.state.restrictionVersion, outcome, reason })
+      restrictionVersion: this.state.restrictionVersion, outcome, reason,
+      ...(context ? { scope: { ...context.scope } } : {}), ...(authorization ? { authorization: { ...authorization } } : {}) })
     this.state.events = this.state.events.slice(-1000)
     this.persist()
   }
@@ -481,7 +501,8 @@ export class BusinessControl {
     }
     return [...facts.values()]
   }
-  private assertBase(context: BusinessContext, action: string, resources: readonly ResourceRef[] = []): AccessDecision & { kind: 'allow' } {
+  /** 仅核对身份与静态基础许可；业务执行仍须经 assert/execute 叠加手工限制和自动风险。 */
+  assertBase(context: BusinessContext, action: string, resources: readonly ResourceRef[] = [], operation?: BusinessOperation): AccessDecision & { kind: 'allow' } {
     const config = this.config(), policyVersion = digest(config)
     const actionNames = action === 'resource' ? ['resource', 'read'] : [action]
     if (this.isManagement(context)) return { kind: 'allow', policyVersion, restrictionVersion: this.state.restrictionVersion }
@@ -510,39 +531,60 @@ export class BusinessControl {
     const pinnedDigest = registered?.sourceDigest ?? agent!.sourceDigest
     if ((!anonymous && !agent!.subjects.includes(context.subject.id))
       || (pinnedDigest && pinnedDigest !== context.sourceDigest)) return error('agent_forbidden')
-    if (!agent!.actions.includes('*') && !actionNames.some(value => agent!.actions.includes(value))) return error('action_forbidden')
+    if (!(operation && config.accessAuthorization && this.executionAuthorization.getStore()?.external !== false && kinds.includes(action as OperationKind))
+      && !agent!.actions.includes('*') && !actionNames.some(value => agent!.actions.includes(value))) return error('action_forbidden')
     resources.forEach(value => this.checkResource(context, value))
     return { kind: 'allow', policyVersion, restrictionVersion: this.state.restrictionVersion }
   }
-  assert(context: BusinessContext, action: string, resources: readonly ResourceRef[] = [], args?: unknown): AccessDecision & { kind: 'allow' } {
-    const decision = this.assertBase(context, action, resources)
+  assert(context: BusinessContext, action: string, resources: readonly ResourceRef[] = [], args?: unknown, operation?: BusinessOperation): AccessDecision & { kind: 'allow' } {
+    const execution = this.executionAuthorization.getStore()
+    if (operation && execution?.pendingRiskAuthorization) return error('authorization_changed', 403, '正文风险评估已变化，需要重新取得本次访问决定')
+    if (operation && execution?.grant && (!future(execution.grant.expiresAt) || execution.configVersion !== digest(this.config())
+      || execution.operationDigest !== digest(operation) || execution.riskDigest !== digest(this.authorizationRiskFacts(context, operation)))) return error('authorization_changed', 403, '本次访问决定已经过期或操作依据已变化，请重新请求')
+    const decision = this.assertBase(context, action, resources, operation)
     if (this.isManagement(context) || this.isDevelopmentContext(context)) return decision
     const config = this.config(), actionNames = action === 'resource' ? ['resource', 'read'] : [action]
-    const required = actionNames.some(value => (config.riskAssessment?.requiredKinds ?? ['write', 'publish']).includes(value as OperationKind))
-    if (required && !config.riskAssessment) return error('risk_provider_unavailable', 503)
-    let assessed = false
+    const serverId = operation?.serverId ?? context.scope.serverId
     for (const restriction of Object.values(this.state.restrictions)) {
-      if (restriction.active && matches(restriction.scope, context, context.scope.serverId)
+      if (restriction.active && matches(restriction.scope, context, serverId)
         && (restriction.deniedActions.includes('*') || actionNames.some(value => restriction.deniedActions.includes(value)))) return error('risk_restricted')
     }
+    if (!config.riskAssessment) return decision
     for (const fact of this.effectiveRiskFacts()) {
-      if (!matches(fact.scope, context, context.scope.serverId)) continue
+      if (retiredLocalRiskFact(fact)) continue
+      if (!matches(fact.scope, context, serverId)) continue
+      if (fact.operationBinding && (!operation || !this.matchesRiskOperation(fact, operation, context))) continue
       if (fact.contentDigest && (args === undefined || fact.contentDigest !== digest(args))) continue
-      if (required && (fact.status === 'unknown' || !future(fact.expiresAt))) return error('risk_fact_unavailable', 503)
-      if (fact.status === 'assessed' && future(fact.expiresAt)) assessed = true
       if (future(fact.expiresAt) && fact.signals.some(value => (value.code === 'deny-all' && value.value === 'true')
         || (actionNames.some(action => value.code === `deny-${action}`) && value.value === 'true')
         || (value.code === 'deny-operation' && (value.value === '*' || actionNames.includes(value.value))))) return error('risk_restricted')
     }
-    if (required && !assessed) return error('risk_fact_unavailable', 503)
     return decision
   }
   operationKind(serverId: string, operationId: string, fallback: OperationKind = 'write'): OperationKind {
     return this.config().operations?.find(value => value.serverId === serverId && value.operationId === operationId)?.kind ?? fallback
   }
   assertOperation(context: BusinessContext, operation: BusinessOperation): void {
-    this.assert(context, operation.kind, operation.resources, operation.args)
+    this.assert(context, operation.kind, operation.resources, operation.args, operation)
     this.operationRule(context, operation)
+  }
+  private authorizationRiskFacts(context: BusinessContext, operation: BusinessOperation): RiskFact[] {
+    if (!this.config().riskAssessment) return []
+    const contentDigest = this.executionAuthorization.getStore()?.contentDigest ?? digest(operation.kind === 'publish' ? reportInspectionInput(operation.args) : operation.args ?? null)
+    return this.effectiveRiskFacts().filter(fact => !retiredLocalRiskFact(fact) && future(fact.expiresAt)
+      && (!fact.contentDigest || fact.contentDigest === contentDigest)
+      && matches(fact.scope, context, operation.serverId) && this.matchesRiskOperation(fact, operation, context))
+  }
+  private matchesRiskOperation(fact: RiskFact, operation: BusinessOperation, context: BusinessContext): boolean {
+    const binding = fact.operationBinding
+    if (!binding) return true
+    const input = operation.kind === 'publish' ? reportInspectionInput(operation.args) : operation.args
+    const inputDigest = fact.contentDigest ? this.executionAuthorization.getStore()?.contentDigest : digest(input ?? null)
+    return fact.scope.workspaceId === context.scope.workspaceId && fact.scope.agentId === context.scope.agentId
+      && fact.scope.subjectId === context.subject.id && fact.scope.instanceId === context.scope.instanceId
+      && fact.scope.runtimeGeneration === context.scope.runtimeGeneration && fact.scope.sessionId === context.scope.sessionId
+      && fact.scope.serverId === operation.serverId && binding.serverId === operation.serverId && binding.operationId === operation.operationId && binding.method === operation.method
+      && binding.kind === operation.kind && binding.targetDigest === digest(operation.target) && binding.inputDigest === inputDigest
   }
   private operationRule(context: BusinessContext, operation: BusinessOperation, checkRisk = true): void {
     if (this.isDevelopmentContext(context)) return
@@ -551,8 +593,9 @@ export class BusinessControl {
     if (rule.kind !== operation.kind || !matchesOperationTarget(rule.target, operation.target, rule.queryParameters) || rule.method.toUpperCase() !== operation.method.toUpperCase()
       || (rule.schemaDigest !== undefined && rule.schemaDigest !== operation.schemaDigest)) return error('operation_binding_changed')
     const agent = config.agents.find(value => value.agentId === context.scope.agentId)
-    if (agent?.serverIds && !agent.serverIds.includes(operation.serverId)) return error('server_forbidden')
-    if (checkRisk && this.effectiveRiskFacts().some(fact => matches(fact.scope, context, operation.serverId) && future(fact.expiresAt)
+    if (!(config.accessAuthorization && this.executionAuthorization.getStore()?.external !== false)
+      && agent?.serverIds && !agent.serverIds.includes(operation.serverId)) return error('server_forbidden')
+    if (checkRisk && config.riskAssessment && this.effectiveRiskFacts().some(fact => !retiredLocalRiskFact(fact) && matches(fact.scope, context, operation.serverId) && future(fact.expiresAt) && (!fact.operationBinding || !fact.contentDigest || fact.contentDigest === (this.executionAuthorization.getStore()?.contentDigest ?? digest(operation.kind === 'publish' ? reportInspectionInput(operation.args) : operation.args ?? null))) && this.matchesRiskOperation(fact, operation, context)
       && fact.signals.some(value => value.code === 'deny-operation' && value.value === operation.operationId))) return error('risk_restricted')
   }
   updateRisk(fact: RiskFact): boolean {
@@ -574,14 +617,25 @@ export class BusinessControl {
     return true
   }
   private validRiskFact(fact: RiskFact): boolean {
+    const codes = (value: unknown) => Array.isArray(value) && value.length <= 64
+      && value.every(item => typeof item === 'string' && item.trim() === item && item.length > 0 && item.length <= 256)
+    const evidence = fact?.conditionEvidence
+    const binding = fact?.operationBinding
     return !!fact?.id && !['__proto__', 'constructor', 'prototype'].includes(fact.id)
       && Number.isSafeInteger(fact.version) && fact.version >= 0 && !!fact.scope?.workspaceId && !!fact.scope.agentId
       && ['assessed', 'unknown'].includes(fact.status) && Array.isArray(fact.signals)
       && (fact.level === undefined || ['low', 'high', 'unknown'].includes(fact.level))
       && fact.signals.every(value => typeof value.code === 'string' && typeof value.value === 'string' && typeof value.reason === 'string')
       && typeof fact.source === 'string' && Number.isFinite(Date.parse(fact.expiresAt))
+      && (evidence === undefined || !!evidence && typeof evidence === 'object' && !Array.isArray(evidence)
+        && Object.keys(evidence).every(key => ['scenarioIds', 'operationTags'].includes(key))
+        && (evidence.scenarioIds === undefined || codes(evidence.scenarioIds)) && (evidence.operationTags === undefined || codes(evidence.operationTags)))
+      && (binding === undefined || !!binding && typeof binding === 'object' && !Array.isArray(binding)
+        && Object.keys(binding).every(key => ['serverId', 'operationId', 'method', 'kind', 'targetDigest', 'inputDigest'].includes(key))
+        && [binding.serverId, binding.operationId, binding.method].every(value => typeof value === 'string' && value.length > 0)
+        && kinds.includes(binding.kind) && /^[a-f0-9]{64}$/.test(binding.targetDigest) && /^[a-f0-9]{64}$/.test(binding.inputDigest))
   }
-  private riskMeaning(fact: RiskFact): string { return digest([fact.scope, fact.status, fact.level, fact.signals, fact.source, fact.contentDigest]) }
+  private riskMeaning(fact: RiskFact): string { return digest([fact.scope, fact.status, fact.level, fact.signals, fact.source, fact.contentDigest, fact.conditionEvidence]) }
   updateRestriction(input: Omit<Restriction, 'id'> & { id?: string }): Restriction {
     if (this.requiredSnapshots.size) return error('coordinator_write_required')
     const value: Restriction = { ...input, id: input.id ?? randomUUID() }
@@ -592,43 +646,86 @@ export class BusinessControl {
   }
   /** 恢复修改限制后仍由最新基础授权、其他风险和实例许可共同决定。 */
   update(input: Omit<Restriction, 'id'> & { id?: string }): Restriction { return this.updateRestriction(input) }
-  async reassess(context: BusinessContext, signal = noSignal(), action = 'write', args?: unknown, operationBinding?: AccessRequest['operationBinding']): Promise<RiskFact> {
+  private toolPolicy(context: BusinessContext, operation: AccessRequest['operationBinding']) {
+    const policy = this.config().agents.find(agent => agent.agentId === context.scope.agentId)?.toolPolicies?.find(item => item.serverId === operation?.serverId)
+    return policy && operation ? { policy, rules: policy.rules.filter(rule => (!rule.operationIds || rule.operationIds.includes(operation.operationId))
+      && (!rule.kinds || rule.kinds.includes(operation.kind))) } : undefined
+  }
+  private requestedToolConditions(context: BusinessContext, operation: NonNullable<AccessRequest['operationBinding']>): ToolPolicyWhen | undefined {
+    const rules = this.toolPolicy(context, operation)?.rules ?? []
+    const result: ToolPolicyWhen = {}
+    for (const key of ['riskLevels', 'scenarioIds', 'operationTags'] as const) {
+      const values = [...new Set(rules.flatMap(rule => rule.when[key] ?? []))]
+      if (values.length) Object.assign(result, { [key]: values })
+    }
+    return Object.keys(result).length ? result : undefined
+  }
+  private toolPolicyDecision(context: BusinessContext, operation: BusinessOperation, fact?: RiskFact): { effect: ToolPolicyEffect; reason: string } {
+    const config = this.config(), selected = this.toolPolicy(context, operation)
+    if (!selected) return { effect: 'allow', reason: '按基础工具权限执行' }
+    const contentDigest = this.executionAuthorization.getStore()?.contentDigest
+    const applicable = this.authorizationRiskFacts(context, operation).filter(value => value.source === config.riskAssessment?.endpoint && value.operationBinding)
+    const candidates = [...applicable.filter(value => contentDigest && value.contentDigest === contentDigest),
+      ...(fact && applicable.some(value => value.id === fact!.id) ? [fact] : []), ...applicable]
+      .filter((value, index, values) => values.findIndex(item => item.id === value.id) === index)
+    if (config.riskAssessment && !candidates.length && selected.rules.some(rule => Object.keys(rule.when).length)) {
+      const state = this.executionAuthorization.getStore(); if (state) state.riskUnavailable = true
+    }
+    const rules = selected.rules.filter(rule => !Object.keys(rule.when).length || config.riskAssessment && candidates.length)
+    if (rules.some(rule => !Object.keys(rule.when).length && rule.effect === 'deny')) return { effect: 'deny', reason: `服务 ${operation.serverId} 的工具规则禁止执行 ${operation.operationId}` }
+    const matched = rules.filter(rule => {
+      if (!Object.keys(rule.when).length) return true
+      // 正文事实只覆盖其自身已提供的字段；其余操作条件仍使用同绑定的有效依据。
+      const basis = candidates.find(value => (!rule.when.riskLevels || value.level !== undefined)
+        && (!rule.when.scenarioIds || value.conditionEvidence?.scenarioIds !== undefined)
+        && (!rule.when.operationTags || value.conditionEvidence?.operationTags !== undefined))
+      if (!basis) { const state = this.executionAuthorization.getStore(); if (state) state.riskUnavailable = true; return false }
+      return (!rule.when.riskLevels || rule.when.riskLevels.includes(basis.level!))
+        && (!rule.when.scenarioIds || rule.when.scenarioIds.some(value => basis.conditionEvidence!.scenarioIds!.includes(value)))
+        && (!rule.when.operationTags || rule.when.operationTags.some(value => basis.conditionEvidence!.operationTags!.includes(value)))
+    })
+    const effect = (['deny', 'confirm', 'allow'] as const).find(value => matched.some(rule => rule.effect === value)) ?? selected.policy.defaultEffect
+    const reasons = [...new Set(matched.filter(rule => rule.effect === effect).flatMap(rule => [rule.when.riskLevels ? '第三方风险等级' : '', rule.when.scenarioIds ? '第三方业务场景' : '', rule.when.operationTags ? '第三方危险或敏感操作标签' : ''].filter(Boolean)))]
+    return { effect, reason: `${operation.serverId} / ${operation.operationId} ${matched.length ? `命中${reasons.join('、') || '工具或动作'}条件` : '采用该服务的默认处理'}：${effect === 'deny' ? '禁止执行' : effect === 'confirm' ? '需要执行前确认' : '按基础权限允许'}` }
+  }
+  async reassess(context: BusinessContext, signal = noSignal(), action = 'write', args?: unknown, operationBinding?: AccessRequest['operationBinding'], contentDigest?: string): Promise<RiskFact> {
     this.acceptContext(context)
     const config = this.config()
     if (!config.riskAssessment) return error('risk_provider_unavailable', 503)
     let fact: RiskFact
+    const requestedOperation = operationBinding ?? (contentDigest ? this.executionAuthorization.getStore()?.operation : undefined)
     try { fact = await new HttpRiskAssessmentProvider(config.riskAssessment).assess({ context, action,
-      resources: context.scope.sessionId ? [{ kind: 'session', id: context.scope.sessionId }] : [{ kind: 'agent', id: context.scope.agentId }], validatedArgs: args, operationBinding }, signal) }
+      resources: context.scope.sessionId ? [{ kind: 'session', id: context.scope.sessionId }] : [{ kind: 'agent', id: context.scope.agentId }], validatedArgs: args, operationBinding,
+      conditionRequest: requestedOperation ? this.requestedToolConditions(context, requestedOperation) ?? (config.accessAuthorization || contentDigest ? {} : undefined) : undefined }, signal) }
     catch { return error('risk_provider_unavailable', 503) }
-    this.updateRisk(fact)
+    const execution = this.executionAuthorization.getStore(), active = execution?.id ? this.active.get(execution.id) : undefined
+    if (contentDigest) fact = { ...fact, contentDigest }
+    if (execution) { execution.riskUnavailable = false; execution.lastRiskStatus = fact.status; if (contentDigest) execution.contentDigest = contentDigest }
+    if (execution && active) { execution.refreshingRisk = true; execution.grant = undefined; execution.pendingRiskAuthorization = true }
+    try { this.updateRisk(fact) } finally {
+      if (execution) execution.refreshingRisk = false
+      if (active) { active.contentDigest = execution?.contentDigest; active.authorizationRiskDigest = digest(this.authorizationRiskFacts(active.context, active.operation)) }
+    }
     return fact
   }
   async inspect(context: BusinessContext, stage: 'input' | 'operation' | 'report', input: unknown, signal = noSignal(), action: string = 'write', operationBinding?: AccessRequest['operationBinding']): Promise<RiskFact | undefined> {
     this.acceptContext(context)
     if (this.isDevelopmentContext(context)) return
     if (['anonymous', 'none'].includes(context.identity?.evidence.method ?? '') && !this.isSharedContext(context)) return error('identity_source_changed', 401)
-    const config = this.config(), inspected = stage === 'report' ? reportInspectionInput(input) : input
-    const text = typeof inspected === 'string' ? inspected : JSON.stringify(inspected)
-    const markers = stage === 'input' ? config.detection?.inputMarkers : stage === 'report' ? config.detection?.reportMarkers : config.detection?.operationMarkers
-    if (markers?.some(value => value && text?.includes(value))) {
-      const facts = this.requiredSnapshots.size ? this.state.localRiskFacts : this.state.riskFacts
-      const fact: RiskFact = { id: `local-${stage}-${digest(context.scope)}`, version: (facts[`local-${stage}-${digest(context.scope)}`]?.version ?? 0) + 1,
-        scope: { ...context.scope }, status: 'assessed', level: 'high', source: `local-${stage}-marker`, observedAt: iso(),
-        contentDigest: digest(input),
-        expiresAt: new Date(Date.now() + 300000).toISOString(), signals: [{ code: stage === 'report' ? 'deny-publish' : 'deny-all', value: 'true', reason: 'synthetic_marker' }] }
-      this.updateRisk(fact)
-      return error('content_restricted')
-    }
-    // 匿名基础聊天没有外部用户凭据；保留本地检测和既有访问限制，不调用要求认证主体的风险提供方。
+    const config = this.config()
+    if (!config.riskAssessment) return
+    const inspected = stage === 'report' ? reportInspectionInput(input) : input
+    // 旧 detection 字段只保留配置兼容；风险、业务场景和敏感性全部由第三方判定。
+    // 共享基础聊天没有外部用户凭据，不调用要求认证主体的风险提供方。
     if (stage === 'input' && this.isSharedContext(context)) return
     if (config.riskAssessment) {
-      try { return await this.reassess(context, signal, stage === 'report' ? 'publish' : stage === 'input' ? 'input' : action, inspected, operationBinding) }
+      try { return await this.reassess(context, signal, stage === 'report' ? 'publish' : stage === 'input' ? 'input' : action, inspected, operationBinding, stage === 'report' && (!operationBinding || !!this.active.get(this.executionAuthorization.getStore()?.id ?? '')) ? digest(inspected) : undefined) }
       catch (cause) {
-        const actionNames = action === 'resource' ? ['resource', 'read'] : [action]
-        if (stage !== 'operation' || actionNames.some(value => (config.riskAssessment!.requiredKinds ?? ['write', 'publish']).includes(value as OperationKind))) throw cause
+        if (signal.aborted) throw cause
+        const execution = this.executionAuthorization.getStore(); if (execution) { execution.riskUnavailable = true; if (execution.id && this.active.has(execution.id)) { execution.pendingRiskAuthorization = true; execution.grant = undefined } }
+        this.record('risk-assessment', 'unknown', context, operationBinding?.operationId, 'risk_provider_unavailable')
       }
     }
-    else if (stage !== 'operation' || ['write', 'publish'].includes(action)) return error('risk_provider_unavailable', 503)
   }
   async revalidateIdentity(context: BusinessContext, signal = noSignal()): Promise<void> {
     if (!this.enabled()) return error('business_disabled', 503)
@@ -644,16 +741,27 @@ export class BusinessControl {
     }
   }
   private cancelRestricted(): void {
+    const owner = this.executionAuthorization.getStore()
     for (const value of this.active.values()) {
-      try { this.assert(value.context, value.operation.kind, value.operation.resources, value.operation.args); this.operationRule(value.context, value.operation) }
-      catch { value.controller.abort(new BusinessControlError('permission_revoked', '当前操作许可已撤回')) }
+      this.executionAuthorization.run({ external: value.authorizationSource === 'third-party', riskUnavailable: !value.conditionFact, contentDigest: value.contentDigest }, () => {
+        try {
+          this.assert(value.context, value.operation.kind, value.operation.resources, value.operation.args, value.operation); this.operationRule(value.context, value.operation)
+          if (value.authorizationSource !== 'third-party') {
+            const fact = value.conditionFact && (this.effectiveRiskFacts().find(fact => fact.id === value.conditionFact!.id) ?? value.conditionFact)
+            const decision = this.toolPolicyDecision(value.context, value.operation, fact)
+            if (decision.effect === 'deny' || decision.effect === 'confirm' && (!value.confirmed || value.policyVersion !== digest(this.config()))) throw new Error('工具权限条件已变化')
+          }
+          if (value.policyVersion !== digest(this.config())) throw new Error('访问策略配置已变化')
+          if (!(owner?.refreshingRisk && this.active.get(owner.id!) === value) && value.authorizationSource === 'third-party' && value.authorizationRiskDigest !== digest(this.authorizationRiskFacts(value.context, value.operation))) throw new Error('外部决策的风险依据已变化')
+        } catch { value.controller.abort(new BusinessControlError('permission_revoked', '当前操作许可已撤回')) }
+      })
     }
   }
   private confirmationBinding(context: BusinessContext, operation: BusinessOperation): string {
     return digest([context.subject, { ...context.scope, serverId: operation.serverId }, context.sourceDigest, operation])
   }
   createConfirmation(context: BusinessContext, operation: BusinessOperation): { id: string; expiresAt: string } {
-    this.assert(context, operation.kind, operation.resources, operation.args); this.operationRule(context, operation)
+    this.assert(context, operation.kind, operation.resources, operation.args, operation); this.operationRule(context, operation)
     const id = randomUUID(), expiresAt = Date.now() + 120000
     this.confirmations.set(id, { id, subjectId: context.subject.id, binding: this.confirmationBinding(context, operation),
       version: this.state.restrictionVersion, expiresAt, confirmed: false })
@@ -665,7 +773,7 @@ export class BusinessControl {
     if (!value || value.subjectId !== context.subject.id || value.expiresAt <= Date.now() || value.version !== this.state.restrictionVersion) return error('confirmation_invalid')
     value.confirmed = true
   }
-  setConfirmationHandler(handler?: (context: BusinessContext, operation: BusinessOperation, signal: AbortSignal) => Promise<void>, synchronize?: (signal: AbortSignal) => Promise<void>): void {
+  setConfirmationHandler(handler?: (context: BusinessContext, operation: BusinessOperation, signal: AbortSignal, reason?: string) => Promise<void>, synchronize?: (signal: AbortSignal) => Promise<void>): void {
     this.confirmationHandler = handler
     this.confirmationSynchronizer = handler ? synchronize : undefined
   }
@@ -680,53 +788,138 @@ export class BusinessControl {
       this.assert(scoped, operation.kind, operation.resources, operation.args)
       return dispatch(signal)
     }
+    return this.executionAuthorization.run({ external: !!this.config().accessAuthorization, riskUnavailable: false },
+      () => this.executeAuthorized(scoped, operation, dispatch, signal))
+  }
+  private async executeAuthorized<T>(scoped: BusinessContext, operation: BusinessOperation,
+    dispatch: (signal: AbortSignal) => Promise<T> | T, signal: AbortSignal): Promise<T> {
+    const execution = this.executionAuthorization.getStore()!
     const operationBinding: AccessRequest['operationBinding'] = { serverId: operation.serverId, operationId: operation.operationId,
       target: operation.target, method: operation.method, kind: operation.kind }
     const controller = new AbortController(), executionSignal = AbortSignal.any([signal, controller.signal]), id = randomUUID()
-    let dispatched = false
+    const configVersion = digest(this.config()), operationDigest = digest(operation)
+    execution.id = id; execution.operation = operation
+    let dispatched = false, confirmed = false, receipt: AuthorizationReceipt | undefined, expiry: ReturnType<typeof setTimeout> | undefined
     try {
       executionSignal.throwIfAborted()
-      this.assertBase(scoped, operation.kind, operation.resources)
+      this.assertBase(scoped, operation.kind, operation.resources, operation)
       this.operationRule(scoped, operation, false)
       await this.revalidateIdentity(scoped, executionSignal)
-      await this.inspect(scoped, operation.kind === 'publish' ? 'report' : 'operation', operation.args, executionSignal, operation.kind, operationBinding)
+      let conditionFact = await this.inspect(scoped, operation.kind === 'publish' ? 'report' : 'operation', operation.args, executionSignal, operation.kind, operationBinding)
+      if (operationDigest !== digest(operation) || configVersion !== digest(this.config())) return error('authorization_changed', 403, '评估等待期间操作或策略已变化，请重新请求')
+      const decide = async (): Promise<{ effect: ToolPolicyEffect; reason: string }> => {
+        const config = this.config()
+        if (config.accessAuthorization) {
+          try {
+            const facts = this.authorizationRiskFacts(scoped, operation), riskDigest = digest(facts)
+            const grant = await new HttpAccessAuthorizationProvider(config.accessAuthorization).decide({ context: scoped, operation,
+              risk: { enabled: !!config.riskAssessment, status: !config.riskAssessment ? 'disabled' : execution.riskUnavailable ? 'unavailable'
+                : !facts.length ? 'unavailable' : (execution.lastRiskStatus ?? conditionFact?.status) === 'assessed' ? 'assessed' : 'unknown', facts: config.riskAssessment ? facts : [] } }, executionSignal)
+            if (riskDigest !== digest(this.authorizationRiskFacts(scoped, operation)) || configVersion !== digest(this.config()) || operationDigest !== digest(operation)) return error('authorization_changed', 403, '外部决策等待期间的风险、策略或操作已变化，请重新请求')
+            execution.external = true; execution.pendingRiskAuthorization = false; execution.grant = grant; execution.configVersion = configVersion; execution.operationDigest = operationDigest; execution.riskDigest = riskDigest
+            let provider: string | undefined
+            try { provider = new URL(config.accessAuthorization.endpoint).origin } catch { /* 无效地址走手动兜底。 */ }
+            receipt = { source: 'third-party', decision: grant.decision, policyVersion: grant.policyVersion,
+              reason: grant.reason, expiresAt: grant.expiresAt, ...(provider ? { provider } : {}) }
+            return { effect: grant.decision, reason: grant.reason }
+          } catch (cause) {
+            if (executionSignal.aborted || cause instanceof BusinessControlError && cause.code === 'authorization_changed') throw cause
+            execution.external = false; execution.pendingRiskAuthorization = false; execution.grant = undefined
+            receipt = { source: 'manual-fallback', decision: 'deny', policyVersion: configVersion,
+              reason: '访问控制服务未提供有效决定，按手动兜底策略执行' }
+          }
+        } else {
+          execution.external = false; execution.pendingRiskAuthorization = false; execution.grant = undefined
+          receipt = { source: execution.riskUnavailable ? 'manual-fallback' : 'manual', decision: 'deny', policyVersion: configVersion,
+            reason: execution.riskUnavailable ? '风险服务未提供有效结果，按手动策略执行并暂停无证据条件' : '未配置访问控制服务，按手动策略执行' }
+        }
+        this.assertBase(scoped, operation.kind, operation.resources, operation)
+        this.operationRule(scoped, operation, false)
+        const local = this.toolPolicyDecision(scoped, operation, conditionFact)
+        receipt.decision = local.effect
+        if (execution.riskUnavailable && receipt.source === 'manual') receipt.source = 'manual-fallback'
+        receipt.reason += `；${local.reason}`
+        return local
+      }
+      execution.refresh = async () => {
+        if (expiry) { clearTimeout(expiry); expiry = undefined }
+        executionSignal.throwIfAborted()
+        let next = await decide()
+        if (next.effect === 'deny') return error('tool_policy_denied', 403, next.reason)
+        if (next.effect === 'confirm') {
+          if (!this.confirmationHandler) return error('confirmation_required', 403, next.reason)
+          const previous = { source: receipt!.source, policyVersion: receipt!.policyVersion }
+          await this.confirmationSynchronizer?.(executionSignal)
+          const version = this.state.restrictionVersion
+          await this.confirmationHandler(structuredClone(scoped), structuredClone(operation), executionSignal, next.reason)
+          executionSignal.throwIfAborted(); execution.grant = undefined
+          await this.revalidateIdentity(scoped, executionSignal)
+          next = await decide()
+          if (next.effect === 'deny') return error('tool_policy_denied', 403, next.reason)
+          if (version !== this.state.restrictionVersion || previous.source !== receipt!.source || previous.policyVersion !== receipt!.policyVersion) return error('confirmation_invalid')
+          confirmed = true
+        }
+        this.assertOperation(scoped, operation)
+        const active = this.active.get(id)
+        if (active) { active.authorizationSource = receipt?.source; active.authorizationRiskDigest = execution.riskDigest; active.contentDigest = execution.contentDigest; active.confirmed = confirmed }
+        if (execution.grant) expiry = setTimeout(() => controller.abort(new BusinessControlError('authorization_expired', '本次访问决定已过期')),
+          Math.min(0x7fffffff, Math.max(1, Math.min(Date.parse(execution.grant.expiresAt), ...this.authorizationRiskFacts(scoped, operation).map(fact => Date.parse(fact.expiresAt))) - Date.now())))
+      }
+      let policyDecision = await decide()
       executionSignal.throwIfAborted()
+      if (policyDecision.effect === 'deny') return error('tool_policy_denied', 403, policyDecision.reason)
       const initialRule = this.config().operations?.find(value => value.serverId === operation.serverId && value.operationId === operation.operationId)
-      if (initialRule?.confirmation && this.confirmationHandler) {
-        const operationDigest = digest(operation)
-        // 本次检测事实先获中心接收并应用快照，再冻结供用户裁决的版本。
+      if ((!execution.external && initialRule?.confirmation || policyDecision.effect === 'confirm') && this.confirmationHandler) {
         await this.confirmationSynchronizer?.(executionSignal)
         executionSignal.throwIfAborted()
-        if (operationDigest !== digest(operation)) return error('confirmation_invalid')
+        if (operationDigest !== digest(operation) || configVersion !== digest(this.config())) return error('confirmation_invalid')
         this.assertOperation(scoped, operation)
-        const confirmationVersion = this.state.restrictionVersion
-        await this.confirmationHandler(structuredClone(scoped), structuredClone(operation), executionSignal)
+        const confirmationVersion = this.state.restrictionVersion, previous = { source: receipt!.source, policyVersion: receipt!.policyVersion }
+        await this.confirmationHandler(structuredClone(scoped), structuredClone(operation), executionSignal,
+          policyDecision.effect === 'confirm' ? policyDecision.reason : `操作 ${operation.operationId} 的基础执行设置要求确认，请核对本次目标与参数`)
         executionSignal.throwIfAborted()
+        execution.grant = undefined
         await this.revalidateIdentity(scoped, executionSignal)
-        if (this.config().riskAssessment) await this.inspect(scoped, operation.kind === 'publish' ? 'report' : 'operation', operation.args, executionSignal, operation.kind, operationBinding)
-        if (confirmationVersion !== this.state.restrictionVersion || operationDigest !== digest(operation)) return error('confirmation_invalid')
+        if (this.config().riskAssessment) conditionFact = await this.inspect(scoped, operation.kind === 'publish' ? 'report' : 'operation', operation.args, executionSignal, operation.kind, operationBinding)
+        if (confirmationVersion !== this.state.restrictionVersion || configVersion !== digest(this.config()) || operationDigest !== digest(operation)) return error('confirmation_invalid')
+        policyDecision = await decide()
+        if (policyDecision.effect === 'deny') return error('tool_policy_denied', 403, policyDecision.reason)
+        if (confirmationVersion !== this.state.restrictionVersion || operationDigest !== digest(operation)
+          || previous.source !== receipt!.source || previous.policyVersion !== receipt!.policyVersion) return error('confirmation_invalid')
+        confirmed = true
       }
-      // 异步等待全部结束后，在同一同步片段重验并直接派发，旧许可没有可插入窗口。
-      this.assert(scoped, operation.kind, operation.resources, operation.args); this.operationRule(scoped, operation)
+      executionSignal.throwIfAborted()
+      if (configVersion !== digest(this.config()) || operationDigest !== digest(operation)) return error('authorization_changed', 403, '访问策略或实际操作在等待期间已变化，请重新请求')
+      this.assert(scoped, operation.kind, operation.resources, operation.args, operation); this.operationRule(scoped, operation)
+      if (!execution.external) policyDecision = this.toolPolicyDecision(scoped, operation, conditionFact)
+      if (policyDecision.effect === 'deny') return error('tool_policy_denied', 403, policyDecision.reason)
       const rule = this.config().operations?.find(value => value.serverId === operation.serverId && value.operationId === operation.operationId)
-      if (rule?.confirmation && !this.confirmationHandler) {
+      if ((!execution.external && rule?.confirmation || policyDecision.effect === 'confirm') && !this.confirmationHandler) {
         const binding = this.confirmationBinding(scoped, operation)
         const confirmation = [...this.confirmations.values()].find(value => value.confirmed && value.binding === binding
           && value.version === this.state.restrictionVersion && value.expiresAt > Date.now())
-        if (!confirmation) return error('confirmation_required')
-        this.confirmations.delete(confirmation.id)
+        if (!confirmation) return error('confirmation_required', 403, policyDecision.effect === 'confirm' ? policyDecision.reason : `操作 ${operation.operationId} 要求执行前确认，请先核对本次目标与参数`)
+        this.confirmations.delete(confirmation.id); confirmed = true
       }
-      this.active.set(id, { context: scoped, operation, controller })
+      if (execution.grant) expiry = setTimeout(() => controller.abort(new BusinessControlError('authorization_expired', '本次访问决定已过期')),
+        Math.min(0x7fffffff, Math.max(1, Math.min(Date.parse(execution.grant.expiresAt), ...this.authorizationRiskFacts(scoped, operation).map(fact => Date.parse(fact.expiresAt))) - Date.now())))
+      this.active.set(id, { context: scoped, operation, controller, conditionFact, policyVersion: configVersion, confirmed, authorizationSource: receipt?.source, authorizationRiskDigest: execution.riskDigest })
       dispatched = true
       const result = await dispatch(executionSignal)
       this.record(operation.kind, 'completed', scoped, operation.operationId,
-        executionSignal.aborted ? 'completed_after_cancel_request' : undefined)
+        executionSignal.aborted ? 'completed_after_cancel_request' : undefined, receipt)
       return result
     } catch (cause) {
+      if (!dispatched && receipt && receipt.source !== 'third-party') { receipt.decision = 'deny'; receipt.reason = cause instanceof Error ? cause.message : '手动兜底未允许本次操作' }
       this.record(operation.kind, dispatched ? 'unknown' : executionSignal.aborted ? 'cancelled' : 'denied', scoped, operation.operationId,
-        cause instanceof BusinessControlError ? cause.code : dispatched ? 'upstream_result_unknown' : 'control_failed')
+        cause instanceof BusinessControlError ? cause.code : dispatched ? 'upstream_result_unknown' : 'control_failed', receipt)
       throw cause
-    } finally { this.active.delete(id) }
+    } finally { if (expiry) clearTimeout(expiry); this.active.delete(id) }
+  }
+  async refreshOperationAuthorization(context: BusinessContext, operation: BusinessOperation): Promise<void> {
+    const execution = this.executionAuthorization.getStore()
+    if (execution?.pendingRiskAuthorization && execution.refresh) await execution.refresh()
+    this.assertOperation(context, operation)
   }
   // 同时标记 Runtime 副本职责；开发模式保留会话单写入方，但不检查租约。
   requireSnapshot(instanceId: string): void { this.requiredSnapshots.add(instanceId) }

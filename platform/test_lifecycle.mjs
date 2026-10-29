@@ -56,7 +56,7 @@ test('浏览器选择其他数据根后迁移受管进程记录和安装默认�
 test('统一入口后台启停、重复启动、重启、只读预检与端口冲突', async () => {
   const root = mkdtempSync(join(tmpdir(), 'hep-lifecycle-'))
   const repo = join(root, 'program with spaces'), data = join(root, 'data')
-  for (const file of ['platform/dsh-platform', 'platform/tool-env.sh', 'platform/lifecycle.mts', 'platform/plugin/src/workspace.ts', 'platform/plugin/src/business-control/group-link.ts', 'platform/plugin/src/business-control/secret-file.ts']) {
+  for (const file of ['platform/dsh-platform', 'platform/tool-env.sh', 'platform/lifecycle.mts', 'platform/plugin/src/workspace.ts', 'platform/plugin/src/business-control/group-link.ts', 'platform/plugin/src/business-control/configuration.ts', 'platform/plugin/src/business-control/secret-file.ts']) {
     const target = join(repo, file)
     mkdirSync(dirname(target), { recursive: true })
     copyFileSync(new URL('../' + file, import.meta.url), target)
@@ -79,7 +79,7 @@ http.server.HTTPServer((host, port), Handler).serve_forever()
   const port = socket.address().port
   await new Promise(resolve => socket.close(resolve))
   const file = join(data, 'config/business-access.json')
-  writeFileSync(file, JSON.stringify({ gateway: { managementUrl: `http://127.0.0.1:${port}/hep/` } }))
+  writeFileSync(file, JSON.stringify({ schemaVersion: 1, enabled: true, agents: [], gateway: { managementUrl: `http://127.0.0.1:${port}/hep/` } }))
   const env = { ...process.env, HARNESS_ASSET_ROOT: data, HARNESS_PYTHON: '/usr/bin/python3' }
   const cli = (...args) => spawnSync(join(repo, 'platform/dsh-platform'), args, { env, encoding: 'utf8', timeout: 15_000 })
   const state = () => JSON.parse(cli('status', '--json').stdout)
@@ -87,7 +87,7 @@ http.server.HTTPServer((host, port), Handler).serve_forever()
     assert.equal(cli('start', '--dry-run').status, 0)
     assert.equal(managedState(data, repo), undefined)
     const first = cli('start')
-    assert.equal(first.status, 0, first.stderr)
+    assert.equal(first.status, 0, first.stderr || first.stdout)
     const pid = state().pid
     assert.equal(state().status, 'running')
     assert.equal(cli('start').status, 0)

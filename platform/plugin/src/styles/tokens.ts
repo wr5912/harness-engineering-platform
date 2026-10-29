@@ -27,3 +27,10 @@ body[data-ds-dark-theme],body[data-ds-dark-theme] :is(.harness-platform,.harness
 @keyframes hep-enter{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){:root,body,.harness-platform,.harness-assistant-proposals,.harness-operation-inline{--hep-motion-fast:0ms;--hep-motion:0ms}}
 `
+
+// 业务工作面和只读抽屉共用同一调色；原生管理对话继续使用 DSH 主题。
+export const workbenchTokens = `
+.harness-platform:not([data-page=conversations]),.hep-detail-drawer{--hep-bg:#f5f6f8;--hep-surface:#fff;--hep-surface-muted:#f7f8fa;--hep-text:#202d40;--hep-muted:#637186;--hep-border:#e2e7ee;--hep-primary:#0062ae;--hep-primary-soft:#eaf3fc;--hep-radius:10px;--hep-control-radius:7px;--hep-page-padding:24px;--hep-shadow:0 4px 16px #1423380a;font-family:HepNoto,system-ui,"Microsoft YaHei",sans-serif;line-height:1.55}
+body:not([data-ds-dark-theme]) .harness-platform[data-page=home]{--hep-bg:#f7f9fc}
+body[data-ds-dark-theme] .harness-platform:not([data-page=conversations]),body[data-ds-dark-theme] .hep-detail-drawer{--hep-bg:#111923;--hep-surface:#172333;--hep-surface-muted:#1b293a;--hep-text:#e4ebf3;--hep-muted:#a5b4c8;--hep-border:#344254;--hep-primary-soft:#203c58;--hep-link:#8bc5ff;--hep-link-hover:#b0d8ff}
+`
