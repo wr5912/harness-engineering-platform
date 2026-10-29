@@ -8,6 +8,7 @@ import { runtimeModule } from '../../../../runtime/adapters/dsh-web/src/resolve-
 import type { ApprovalRequest, ApprovalOutcome } from '@deepseek-ai/dsh-user-approval'
 import { getBusinessControl, configureBusinessControlStateRoot, currentBusinessContext, withBusinessContext, type BusinessControl } from './core.ts'
 import type { BusinessContext, BusinessOperation, InstanceBinding } from './contracts.ts'
+import { BUSINESS_TRANSPORT_HEADER, BUSINESS_TRANSPORT_VERSION } from './contracts.ts'
 import { readBusinessReport } from './reports.ts'
 import { HttpIdentityTrustProvider } from './providers.ts'
 import { businessAssertionHeaders, readBusinessAssertion, businessRpcDigest, readBusinessSecret, signBusinessAssertion, verifyBusinessAssertion, type RuntimeAssertion } from './gateway.ts'
@@ -157,9 +158,11 @@ export class BusinessConnection extends NativeConnection.HostConnectionService {
     return { peer: admitted.peer, release: admitted.release }
   }
   override authorizeIndex(request: ConnectionIndexRequest, response: ConnectionIndexResponse): boolean {
+    const actualResponse = response as ServerResponse
+    // 来自已装载模块，挂载目录中的文件更新不能冒充进程已更新。
+    actualResponse.setHeader(BUSINESS_TRANSPORT_HEADER, BUSINESS_TRANSPORT_VERSION)
     const admitted = this.admit(request)
     if ('rejection' in admitted) { response.writeHead(admitted.rejection); response.end('业务访问被拒绝'); return false }
-    const actualResponse = response as ServerResponse
     actualResponse.once?.('finish', () => { void admitted.release() })
     return true
   }

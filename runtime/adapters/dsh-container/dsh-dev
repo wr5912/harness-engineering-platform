@@ -1957,23 +1957,11 @@ def command_url(args: argparse.Namespace) -> None:
     require_docker_registration(args.name, manifest)
     if manifest.get("business_control"):
         running_container(args.name)
-        entry = business_command(["--entry", str(REPO), manifest["agent_id"], args.name])
-        url = entry["url"]
-        anonymous = entry.get("accessMode") == "anonymous"
-        try:
-            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirectHandler())
-            with opener.open(urllib.request.Request(url, headers={"Accept": "text/html"}, method="GET"), timeout=5) as response:
-                if anonymous and response.status == 200:
-                    print(url)
-                    return
-        except urllib.error.HTTPError as error:
-            if not anonymous and error.code == 401:
-                print(url)
-                return
-        except (OSError, urllib.error.URLError):
-            pass
-        expected = "匿名网页首帧成功" if anonymous else "未认证拒绝"
-        fail(f"业务网关未确认当前入口的{expected}；不返回内部 Runtime 或 owner 链接")
+        entry = business_command(["--check-entry", str(REPO), manifest["agent_id"], args.name])
+        if not entry.get("ready"):
+            fail(entry["detail"])
+        print(entry["url"])
+        return
     if manifest.get("profile") == "web-lan":
         running_container(args.name)
         deadline = time.monotonic() + 30.0

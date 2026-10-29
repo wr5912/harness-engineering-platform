@@ -9,6 +9,7 @@ import { defaultAssetRoot } from './plugin/src/workspace.ts'
 import { platformEntryUrl } from './plugin/src/business-control/group-link.ts'
 import { initializeBusinessGateway } from './plugin/src/business-control/configuration.ts'
 import { prepareBusinessRuntimeFile } from './plugin/src/business-control/secret-file.ts'
+import { reportBusinessReadiness } from './business-readiness.mts'
 
 const programRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 type State = { pid: number; birth: string; programRoot: string; dataRoot: string; url: string; host: string; port: number; log: string; phase: string; detached: boolean }
@@ -165,6 +166,7 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
       if (existing.url !== address!.url) throw new Error(`平台已使用 ${existing.url} 启动；请用 restart 修改地址`)
       if (!ownsPort(existing.pid, existing.host, existing.port)) throw new Error(`平台进程仍在启动但尚未监听；请检查日志 ${existing.log}`)
       console.log(`平台已启动：${existing.url}\nPID：${existing.pid}\n日志：${existing.log}`)
+      await reportBusinessReadiness(programRoot, dataRoot)
       return 0
     }
     const accessPath = join(dataRoot, 'config/business-access.json')
@@ -205,6 +207,7 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
               state.phase = response.headers.get('x-harness-bootstrap') ? 'initializing' : 'running'
               atomic(join(service, 'state.json'), state)
               console.log(`平台${state.phase === 'initializing' ? '等待初始化' : '已启动'}：${state.url}\nPID：${state.pid}\n日志：${log}`)
+              if (state.phase === 'running') await reportBusinessReadiness(programRoot, dataRoot)
               unlock()
               if (foreground) return await exited
               child.unref()
