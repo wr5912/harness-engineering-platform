@@ -214,3 +214,33 @@ test('样本评审输入和导出异常原位显示，来源详情按样本身�
   assert.match(ui.text(), /决策前输入（各题共享）/)
   assert.match(ui.text(), /固定来源与另一个留出批次关联/)
 })
+
+test('样本批次区分慢读、读取失败、成功空和恢复后的有记录状态', async () => {
+  let release, phase = 'pending'
+  const pending = new Promise(resolve => { release = resolve })
+  const ui = workbench({ handler: async (action, input, original) => {
+    if (action === 'list') {
+      if (phase === 'pending') await pending
+      if (phase === 'failed') throw new Error('read_error: 测试读取中断')
+      if (phase === 'empty') return { datasets: [] }
+    }
+    return original(action, input)
+  } })
+  try {
+    assert.match(ui.text(), /正在读取样本批次/)
+    assert.doesNotMatch(ui.text(), /此 Run 尚无样本/)
+    phase = 'failed'; release(); await ui.settle()
+    assert.match(ui.text(), /样本批次读取失败/)
+    assert.doesNotMatch(ui.text(), /此 Run 尚无样本/)
+    phase = 'empty'; ui.button('刷新样本').props.onClick(); await ui.settle()
+    assert.match(ui.text(), /此 Run 尚无样本/)
+    assert.doesNotMatch(ui.text(), /测试读取中断|样本批次读取失败/)
+    phase = 'ready'; ui.button('刷新样本').props.onClick(); await ui.settle()
+    assert.doesNotMatch(ui.text(), /此 Run 尚无样本|测试读取中断/)
+    assert.match(ui.text(), /2026/)
+    await open(ui); ui.change('决策业务流程', '保留编辑'); ui.setError('conflict: 并发冲突'); await ui.save()
+    assert.match(ui.text(), /并发冲突/)
+    ui.button('刷新样本').props.onClick(); await ui.settle()
+    assert.match(ui.text(), /并发冲突/, '列表成功不能清除独立的保存冲突')
+  } finally { ui.cleanup() }
+})

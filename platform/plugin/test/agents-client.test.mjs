@@ -977,3 +977,41 @@ test('刷新已有智能体清单时保留条目，仅在标题显示紧凑读�
   await ui.settle()
   assert.match(ui.text(ui.render()), /尚无智能体资产/)
 })
+
+test('Agents 隐藏只记脏，恢复及慢读取通知合并为顺序两批', async () => {
+  let listener, block = false, release, concurrent = 0, maximum = 0
+  const updates = { subscribe(fn) { listener = fn; return () => { listener = undefined } }, getSnapshot: () => ({ domains: ['agents'] }) }
+  const ui = page({ updates, intercept(endpoint) {
+    if (endpoint !== 'agents/list' || !block) return
+    concurrent++; maximum = Math.max(maximum, concurrent)
+    return new Promise(resolve => { release = () => { concurrent--; resolve({ ok: true, value: { agents: [], experiments: [] } }) } })
+  } })
+  await ui.settle(); const before = ui.calls.length
+  ui.props.active = false; ui.render()
+  listener(); listener(); listener(); await ui.settle()
+  assert.equal(ui.calls.length, before)
+  block = true; ui.props.active = true; ui.render(); await ui.settle()
+  assert.equal(concurrent, 1)
+  const started = ui.calls.filter(call => call.endpoint === 'agents/list').length
+  listener(); listener(); listener(); await ui.settle()
+  assert.equal(ui.calls.filter(call => call.endpoint === 'agents/list').length, started)
+  block = false; release(); await ui.settle()
+  assert.equal(ui.calls.filter(call => call.endpoint === 'agents/list').length, started + 1)
+  assert.equal(maximum, 1)
+})
+
+test('Agents 首次慢读取也纳入同一刷新队列，通知不能另起并行目录读取', async () => {
+  let listener, release, blocked = true, reads = 0
+  const updates = { subscribe(fn) { listener = fn; return () => {} }, getSnapshot: () => ({ domains: ['agents'] }) }
+  const ui = page({ updates, intercept(endpoint) {
+    if (endpoint !== 'agents/list') return
+    reads++
+    if (blocked) return new Promise(resolve => { release = () => resolve({ ok: true, value: { agents: [], experiments: [] } }) })
+    return { ok: true, value: { agents: [], experiments: [] } }
+  } })
+  assert.equal(reads, 1)
+  listener(); listener(); listener(); await ui.settle()
+  assert.equal(reads, 1)
+  blocked = false; release(); await ui.settle()
+  assert.equal(reads, 2)
+})

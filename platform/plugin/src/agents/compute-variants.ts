@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto'
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve, relative, sep } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { load as loadYaml, dump as dumpYaml } from 'js-yaml'
 import { parseEvaluationDocument } from '../evaluation/cases.ts'
 import { readRunEvidenceFile } from './run-files.ts'
-import { extractGraphExecutions, measureModelUsage, normalizeTokenUsage } from '../evaluation/model-usage.ts'
+import { extractGraphExecutions, measureModelUsage } from '../evaluation/model-usage.ts'
 import type { ModelAttempt } from '../evaluation/model-attempts.ts'
 import { inspectComputeBuild } from './compute-build.ts'
 import { computeGenerationContract } from './compute-generation-contract.ts'
@@ -49,9 +49,9 @@ function normalize(value: any): any {
   return Array.isArray(value) ? value.map(normalize) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, normalize(value[key])])) : value
 }
 const same = (left: any, right: any) => canonical(left) === canonical(right)
-// change_sha256 仅用于当次 Decision 的并发校验；写研究结论不改变实际比较事实。
+// 可编辑正文的摘要仅用于当次确认的并发校验；写研究结论不改变实际比较事实。
 function comparisonEvidence(result: Map) {
-  const { change_sha256: _change, comparison_sha256: _comparison, comparison_receipt: _receipt, ...evidence } = result
+  const { change_sha256: _change, decision_sha256: _decision, comparison_sha256: _comparison, comparison_receipt: _receipt, ...evidence } = result
   return { schema_version: 1, comparison: evidence }
 }
 function workflowLoadEvidence(graphs: ReturnType<typeof extractGraphExecutions>, receipt: Map) {
@@ -114,7 +114,9 @@ function experiment(root: string, id: string) {
 }
 function atomic(file: string, content: string) {
   const temporary = `${file}.compute-${process.pid}.tmp`
-  writeFileSync(temporary, content, { flag: 'wx' }); renameSync(temporary, file)
+  writeFileSync(temporary, content, { flag: 'wx' })
+  try { renameSync(temporary, file) }
+  finally { rmSync(temporary, { force: true }) }
 }
 function head(root: string) { const result = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }); return result.status === 0 ? result.stdout.trim() : null }
 async function casesFor(root: string, agentId: string, signal?: AbortSignal) {
@@ -150,7 +152,7 @@ function makePlan(body: Map, cases: Record<string, any>): ComputePlan {
     min_runs_per_case: minimum, max_pass_rate_drop_pp: number(body.max_pass_rate_drop_pp ?? 0, 0, 100, 'max_pass_rate_drop_pp'),
     resource_metric: metric, min_resource_reduction_pct: number(body.min_resource_reduction_pct ?? 10, 0.01, 100, 'min_resource_reduction_pct'), model_change: modelChange,
     ...(generation ? { generation } : {}), ...(body.execution_mode === 'code-only' ? { execution_mode: 'code-only' as const } : {}),
-    ...(generation || metric === 'actual_model_calls' ? { measurement_schema_version: 2 as const } : {}) }
+    measurement_schema_version: 2 }
 }
 
 /** 仅核算原始目标轨迹，包括已采集的子 Session；不将配置快照当作模型调用。 */
@@ -160,22 +162,16 @@ export function computeTraceMetrics(rows: Map[], collected: boolean, attempts: M
   if (!collected || !rows.length) return { values: empty, missing: ['目标轨迹缺失或采集完整性未确认'] }
   const groups = new Map<string, Map[]>()
   for (const row of rows) { const key = String(row.session_log ?? 'root'); const events = groups.get(key) ?? []; events.push(row.event ?? row); groups.set(key, events) }
-  let calls = 0, input = 0, output = 0, total = 0, inputKnown = true, outputKnown = true, totalKnown = true, callsKnown = true, elapsed = 0, elapsedKnown = true
+  let calls = 0, callsKnown = true, elapsed = 0, elapsedKnown = true
   for (const events of groups.values()) {
     const messages = events.filter(event => event.type === 'assistant/message')
     const attempts = events.filter(event => event.type === 'assistant/attempt')
     const starts = events.filter(event => event.type === 'step/start').length
     const ends = events.filter(event => event.type === 'step/end').length
     if (attempts.length || events.some(event => /retry|error/.test(event.type)) || starts !== ends || messages.length !== ends || messages.some(event => event.data?.interrupted === true)) {
-      callsKnown = false; inputKnown = false; outputKnown = false; totalKnown = false; missing.push('存在重试、未完成步骤或无法一一对应的模型响应，不能推算全部调用和 token')
+      callsKnown = false; missing.push('存在重试、未完成步骤或无法一一对应的模型响应，不能推算回复次数')
     }
     calls += messages.length
-    for (const event of messages) {
-      const usage = normalizeTokenUsage(event.data?.usage)
-      if (usage?.input !== null && usage?.input !== undefined) input += usage.input; else inputKnown = false
-      if (usage) output += usage.output; else outputKnown = false
-      if (usage?.total !== null && usage?.total !== undefined) total += usage.total; else totalKnown = false
-    }
     // 对每个 Case 仅取主 Session 的 turn 耗时；子 Session 并行时间不可再相加。
   }
   const rootKey = rows.find(row => (row.event ?? row).type === 'session' && (row.event ?? row).delegationDepth === 0)?.session_log ?? rows.find(row => (row.event ?? row).type === 'turn/start')?.session_log
@@ -191,19 +187,17 @@ export function computeTraceMetrics(rows: Map[], collected: boolean, attempts: M
     }
   }
   if (pending.size || !rootEvents.some(event => event.type === 'turn/end')) elapsedKnown = false
-  if (!messagesPresent(rows)) { callsKnown = false; inputKnown = false; outputKnown = false; totalKnown = false; missing.push('没有已完成的模型响应') }
+  if (!messagesPresent(rows)) { callsKnown = false; missing.push('没有已完成的模型响应') }
   if (!elapsedKnown) missing.push('缺少完整主 Session turn 起止时间')
   const measured = measureModelUsage([{ path: 'trace.jsonl', rows: rows as any }], { attempts })
-  const graphs = extractGraphExecutions(rows as any)
-  const hasGraphEvidence = attempts.length > 0 || graphs.executions.length > 0 || graphs.unknown_reasons.length > 0
-  // 普通和历史计划也可能调用图工具；有图事实时不能只核算外层响应而漏掉图内推理。
+  // 新旧计划共用全部请求的结算口径，包含压缩、标题、子 Session 与图内推理。
   const values = { actual_model_calls: measured.actual_model_calls, model_calls: callsKnown ? calls : null,
-    input_tokens: hasGraphEvidence ? measured.token_usage?.input_tokens ?? null : inputKnown ? input : null,
-    output_tokens: hasGraphEvidence ? measured.token_usage?.output_tokens ?? null : outputKnown ? output : null,
-    total_tokens: hasGraphEvidence ? measured.token_usage?.total_tokens ?? null : totalKnown ? total : null,
+    input_tokens: measured.token_usage?.input_tokens ?? null,
+    output_tokens: measured.token_usage?.output_tokens ?? null,
+    total_tokens: measured.token_usage?.total_tokens ?? null,
     elapsed_ms: elapsedKnown ? elapsed : null }
   if ([values.input_tokens, values.output_tokens, values.total_tokens].some(value => value === null)) missing.push('至少一个模型调用的供应商 token 用量缺失或分桶不一致')
-  if (hasGraphEvidence && !measured.model_calls_complete) missing.push(...measured.model_calls_unknown_reasons.map(reason => `关联图及模型请求用量未知：${reason}`))
+  if (!measured.model_calls_complete) missing.push(...measured.model_calls_unknown_reasons.map(reason => `模型请求用量未知：${reason}`))
   return { measurement: measured, values, missing: [...new Set(missing)] }
 }
 function messagesPresent(rows: Map[]) { return rows.some(row => (row.event ?? row).type === 'assistant/message') }
@@ -361,6 +355,8 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
   }
   async function compare(body: Map, signal?: AbortSignal) {
     const id = text(body, 'experiment_id'), { change, content } = experiment(root, id)
+    const decisionFile = safe(root, `evolution/experiments/${id}/decision.md`)
+    const decisionHash = existsSync(decisionFile) ? hash(readFileSync(decisionFile)) : null
     const plan = change.compute_variant as ComputePlan
     if (!plan || plan.schema_version !== 1 || !plan.case_hashes || !Number.isFinite(Date.parse(plan.created_at))) fail('当前版本尚未建立冻结的算力变体计划')
     if (plan.execution_mode !== undefined && plan.execution_mode !== 'code-only') fail('execution_mode 无效')
@@ -453,13 +449,6 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
             issues(`${caseId} 关联图或实际模型请求的完整性未知`)
             resourceLimits.push(`${runId}/${caseId}: 关联图或实际模型请求的完整性未知`)
           }
-          if (plan.measurement_schema_version === 2) {
-            metrics.values.actual_model_calls = usage.actual_model_calls
-            metrics.values.input_tokens = usage.token_usage?.input_tokens ?? null
-            metrics.values.output_tokens = usage.token_usage?.output_tokens ?? null
-            metrics.values.total_tokens = usage.token_usage?.total_tokens ?? null
-            if (!usage.model_calls_complete) resourceLimits.push(...usage.model_calls_unknown_reasons.map(message => `${runId}/${caseId}: ${message}`))
-          }
           if (side === 'variant' && workflowBuild) {
             const load = workflowLoadEvidence(graphs, workflowBuild.receipt ?? {})
             if (graphs.unknown_reasons.length || !load.artifacts) issues(`${caseId} 缺少本次构建工作流的真实装载与调用证据`)
@@ -541,12 +530,13 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
     const reduction = resources[plan.resource_metric].reduction_pct
     const resourcePassed = graphUsageComplete && codeOnlyEvidencePassed && reduction !== null && reduction >= plan.min_resource_reduction_pct
     if (reduction === null) resourceLimits.push('目标资源指标缺少完整数据或父版基数为零')
-    const result = { experiment_id: id, candidate_sha256: currentDigest, parent_candidate_sha256: parentDigest, plan, parent_run_ids: parentIds, variant_run_ids: variantIds, change_sha256: hash(content),
+    const result = { measurement_schema_version: 2, experiment_id: id, candidate_sha256: currentDigest, parent_candidate_sha256: parentDigest, plan, parent_run_ids: parentIds, variant_run_ids: variantIds, change_sha256: hash(content), decision_sha256: decisionHash,
       inputs: { parent_experiment_id: change.parent_experiment_id, parent_ref: change.baseline_ref, build: workflowBuild ? { verified: workflowBuild.verified, receipt: workflowBuild.receipt } : null },
       quality: { passed: qualityPassed, cases: caseRows }, resources, comparability: { passed: limits.length === 0, limits: [...new Set(limits)] },
       resource_evidence: { passed: resourcePassed, limits: [...new Set(resourceLimits)] },
       eligible_for_end: !limits.length && qualityPassed && resourcePassed,
       notes: ['结果仅适用于预先冻结的任务范围和所选独立 Run；不是对所有任务的统计等效证明。',
+        'model_calls 仅为会话回复次数；完整模型请求（包括压缩、标题和图内推理）使用 actual_model_calls，所有 Token 指标均包含已采集请求。',
         ...(plan.execution_mode === 'code-only' ? ['历史 model_calls 统计会话回复次数，包含本地代码适配器回复；业务零推理以完整 actual_model_calls 为零核验。'] : []),
         'token、模型响应次数与耗时属于已记录资源指标；未测量硬件算力、供应商费用或不可见的外部模型调用。', '人工确认需完整审阅原始输出和工具结果；表格只汇总证据，不替代业务判断。', '依赖环境记录仅含变量配置状态；外部数据状态、网络负载与供应商变化未被完整控制，资源改善不能单独归因于 Harness。'], proof }
     return { ...result, comparison_sha256: hash(canonical(result)) }
@@ -605,14 +595,20 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
         current.change.outcome = decision === 'end' ? 'adopt' : decision
         current.change.equivalence_evidence_refs = refs
         current.change.resource_evidence_refs = result.proof.filter(item => item.file.endsWith('/trace.jsonl')).map(item => item.file)
-        current.change.compute_variant_decision = { candidate_sha256: result.candidate_sha256, parent_run_ids: result.parent_run_ids, variant_run_ids: result.variant_run_ids, comparison_sha256: result.comparison_sha256, confirmed_at: new Date().toISOString(), ...(decision === 'end' ? { variant_ref: `git:${commit}` } : {}) }
+        current.change.compute_variant_decision = { measurement_schema_version: result.measurement_schema_version, candidate_sha256: result.candidate_sha256, parent_run_ids: result.parent_run_ids, variant_run_ids: result.variant_run_ids, comparison_sha256: result.comparison_sha256, confirmed_at: new Date().toISOString(), ...(decision === 'end' ? { variant_ref: `git:${commit}` } : {}) }
         // Decision 保留结论、解释和引用，逐次比较数字仍由不可变 Run 重新计算。
         const decisionFile = safe(root, `evolution/experiments/${id}/decision.md`)
         const decisionText = `# Decision\n\n状态：${current.change.outcome}\n\n${reason}\n\n变体类型：${current.change.variant_kind}。比较计划、所选 Run 和确认身份见 [change.yaml](change.yaml)。\n\n仅限冻结任务范围的观察性结论，不代表其他任务上的统计等效。\n`
         const oldDecision = existsSync(decisionFile) ? readFileSync(decisionFile, 'utf8') : null
+        if ((oldDecision === null ? null : hash(oldDecision)) !== result.decision_sha256) throw new VariantError('conflict', '研究结论在比较期间发生变化，请重新读取并比较')
         atomic(decisionFile, decisionText)
         try { atomic(current.file, dumpYaml(current.change, { lineWidth: -1, noRefs: true })) }
-        catch (error) { if (oldDecision !== null) atomic(decisionFile, oldDecision); throw error }
+        catch (error) {
+          if (!existsSync(decisionFile) || readFileSync(decisionFile, 'utf8') !== decisionText) throw new VariantError('needs_recovery', '保存失败且研究结论再次变化，请核对 decision.md 与 change.yaml')
+          if (oldDecision === null) rmSync(decisionFile)
+          else atomic(decisionFile, oldDecision)
+          throw error
+        }
         return { ok: true, value: { experiment_id: id, variant_kind: current.change.variant_kind, decision: current.change.outcome } }
       }
       return { ok: false, error: { code: 'method_not_found', message: '未知算力变体操作' } }

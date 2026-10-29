@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useQueuedRefresh } from '../realtime/refresh.ts'
 import type { ModelCatalog, ModelSelection } from '@deepseek-ai/dsh-api-session-controller'
 import { CHANNEL } from '../protocol.ts'
 import type { PlatformNavigation, PlatformPageProps } from '../protocol.ts'
@@ -360,7 +361,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
       setLastListAt(new Date().toLocaleString())
       setRefreshError('')
       if (detailName.current) {
-        if (rows.some(item => item.name === detailName.current)) void openDetail(detailName.current, true)
+        if (rows.some(item => item.name === detailName.current)) await openDetail(detailName.current, true)
         else {
           detailRequest.current++
           embedRequest.current++
@@ -383,9 +384,8 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
   }
 
   useEffect(() => {
-    void refresh()
-    void loadSources()
-    void loadModels()
+    for (const domain of ['instances', 'agents', 'catalog']) changedDomains.current.add(domain)
+    void refreshChanged()
     return () => { listRequest.current++; detailRequest.current++; sourceRequest.current++; sourceRunRequest.current++; modelRequest.current++ }
   }, [])
   useEffect(() => {
@@ -405,14 +405,23 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
     })
     return () => { sourceRunRequest.current++ }
   }, [form.source, sources, sourceRunRefresh])
-  useEffect(() => updates?.subscribe(() => {
-    const domains = updates.getSnapshot().domains
-    if (domains.includes('instances')) void refresh(true)
+  const changedDomains = useRef(new Set<string>())
+  const refreshChanged = useQueuedRefresh(active, async () => {
+    const domains = [...changedDomains.current]
+    changedDomains.current.clear()
+    const reads: Promise<unknown>[] = []
+    if (!domains.length || domains.includes('instances')) reads.push(refresh(true))
     if (domains.some(domain => ['agents', 'catalog'].includes(domain))) {
-      void loadSources()
-      void loadModels()
-      if (detailName.current) void openDetail(detailName.current, true)
+      reads.push(loadSources(), loadModels())
+      if (detailName.current && !domains.includes('instances')) reads.push(openDetail(detailName.current, true))
     }
+    await Promise.allSettled(reads)
+  })
+  useEffect(() => updates?.subscribe(() => {
+    const domains = updates.getSnapshot().domains.filter(domain => ['instances', 'agents', 'catalog'].includes(domain))
+    if (!domains.length) return
+    for (const domain of domains) changedDomains.current.add(domain)
+    void refreshChanged()
   }), [updates])
   useEffect(() => {
     const entering = lastTargetPage.current !== 'instances'
@@ -877,7 +886,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
           </select></label>
           <label className="instance-filter-field">登记来源<SearchSelect label="实例登记来源筛选" value={sourceFilter} onChange={value => { setSourceFilter(value); if (!value) onNavigate?.({ page: 'instances' }) }} options={[{ value: '', label: '全部来源' }, ...sources.map(source => ({ value: source.source_id, label: source.experiment_id, description: agentName(source.agent_id) }))]} /></label>
           <button type="button" className="instance-clear-filter" onClick={() => { setQuery(''); setFilter('existing'); setSourceFilter(''); onNavigate?.({ page: 'instances' }) }}>清除筛选</button>
-          <div className="instance-toolbar-actions"><button type="button" onClick={() => void refresh()} disabled={loading} className="instance-button">刷新列表{loading && listLoaded ? <LoadingIndicator label="读取实例列表" /> : null}</button>
+          <div className="instance-toolbar-actions"><button type="button" onClick={() => void refreshChanged()} disabled={loading} className="instance-button">刷新列表{loading && listLoaded ? <LoadingIndicator label="读取实例列表" /> : null}</button>
         <button type="button" className="harness-primary" aria-haspopup="dialog" aria-expanded={creating} aria-controls="instance-create" disabled={busy} onClick={event => { createOpener.current = event.currentTarget; void loadModels(); void loadSources(); setCreating(true) }}>新建实例</button></div>
         </div>
         {listLoaded && <div className="instance-state-overview" aria-busy={loading}><DistributionChart title="实例状态分布" description={`${refreshError ? '上次观察；当前状态待核对。' : ''}当前搜索与来源下共 ${scopedInstances.length} 项登记；状态仅筛选下方列表。`} variant="bars" totalLabel="项登记" emptyText="当前搜索与来源范围没有实例登记。"
@@ -895,7 +904,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
         </> : <strong>勾选实例后可批量操作</strong>}</div>
 
       {error && !actionDialog ? <div role="alert" className="instance-error">{error}</div> : null}
-      {refreshError && <div role="alert" className="instance-error">实例列表读取失败：{refreshError}。{listLoaded ? `当前显示 ${lastListAt} 读取的列表，实例状态待核对。` : '当前无法确认是否有实例。'} <button type="button" className="instance-button" disabled={loading} onClick={() => void refresh()}>重新读取</button></div>}
+      {refreshError && <div role="alert" className="instance-error">实例列表读取失败：{refreshError}。{listLoaded ? `当前显示 ${lastListAt} 读取的列表，实例状态待核对。` : '当前无法确认是否有实例。'} <button type="button" className="instance-button" disabled={loading} onClick={() => void refreshChanged()}>重新读取</button></div>}
 
       <section ref={listSection} tabIndex={-1} aria-label="实例列表" className="instance-list-panel" hidden={Boolean(detailName.current)}>
         <div className="instance-table-wrap"><table className="instance-table">

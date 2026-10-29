@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
+import fs from 'node:fs'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { syncBuiltinESMExports } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
@@ -11,8 +13,8 @@ import { load, dump } from 'js-yaml'
 process.env.HARNESS_PROGRAM_ROOT = new URL('../../../', import.meta.url).pathname
 process.env.HARNESS_PYTHON ||= '/usr/bin/python3'
 const buildRoot = mkdtempSync(join(tmpdir(), 'compute-variants-build-'))
-await build({ stdin: { contents: "export * from './src/agents/compute-variants.ts'; export { createComputeBuildHandler } from './src/agents/compute-build.ts'; export { candidateDigest } from './src/tasks/files.ts'", resolveDir: new URL('../', import.meta.url).pathname, loader: 'ts' }, outfile: join(buildRoot, 'variants.mjs'), bundle: true, platform: 'node', format: 'esm', external: ['@deepseek-ai/dsh-client-connection'] })
-const { createComputeVariantsHandler, computeTraceMetrics, createComputeBuildHandler, candidateDigest } = await import(`file://${join(buildRoot, 'variants.mjs')}`)
+await build({ stdin: { contents: "export * from './src/agents/compute-variants.ts'; export { createAgentsHandler } from './src/agents/index.ts'; export { createComputeBuildHandler } from './src/agents/compute-build.ts'; export { candidateDigest } from './src/tasks/files.ts'", resolveDir: new URL('../', import.meta.url).pathname, loader: 'ts' }, outfile: join(buildRoot, 'variants.mjs'), bundle: true, platform: 'node', format: 'esm', external: ['@deepseek-ai/dsh-client-connection'] })
+const { createAgentsHandler, createComputeVariantsHandler, computeTraceMetrics, createComputeBuildHandler, candidateDigest } = await import(`file://${join(buildRoot, 'variants.mjs')}`)
 const parent = 'EXP-alpha-001-r111111111111', variant = 'EXP-alpha-002-r222222222222'
 const parentRun = 'run-11111111-1111-4111-8111-111111111111', variantRun = 'run-22222222-2222-4222-8222-222222222222'
 const hash = value => createHash('sha256').update(value).digest('hex')
@@ -32,9 +34,13 @@ function trace(calls, tokens = 100) {
   return rows.map(event => ({ session_log: 'root', event }))
 }
 function success(result) { assert.equal(result.ok, true, JSON.stringify(result)); return result.value }
+function completeTrace(calls, tokens = 100, sessionId = 'fixture-session') {
+  return [{ session_log: 'root', event: { type: 'session', id: sessionId, delegationDepth: 0 } },
+    ...trace(calls, tokens).map((row, seq) => ({ ...row, event: { ...row.event, seq } }))]
+}
 test('输入资源使用完整 prompt，缓存命中差异不构成上下文优化', () => {
   const metrics = usage => {
-    const rows = trace(1)
+    const rows = completeTrace(1)
     rows.find(row => row.event.type === 'assistant/message').event.data.usage = usage
     return computeTraceMetrics(rows, true).values
   }
@@ -43,7 +49,7 @@ test('输入资源使用完整 prompt，缓存命中差异不构成上下文优�
     assert.equal(metrics({ inputTokens, cacheReadTokens, outputTokens: 50, totalTokens: 2466 }).input_tokens, 2416)
   }
   assert.equal(metrics({ inputTokens: 30, outputTokens: 10, totalTokens: 40 }).input_tokens, 30)
-  assert.equal(metrics({ inputTokens: 20, cacheReadTokens: 5, cacheWriteTokens: 3, outputTokens: 10, reasoningTokens: 7 }).input_tokens, 28)
+  assert.equal(metrics({ inputTokens: 20, cacheReadTokens: 5, cacheWriteTokens: 3, outputTokens: 10, reasoningTokens: 7 }).input_tokens, null)
   assert.equal(metrics({ inputTokens: 20, outputTokens: 10 }).input_tokens, null)
   for (const usage of [
     { inputTokens: 30, outputTokens: 10, totalTokens: 39 },
@@ -90,12 +96,14 @@ async function fixture(planOverrides = {}) {
     write(join(base, 'inputs.lock.json'), JSON.stringify(lock))
     for (const [key, file, value] of [['results_sha256', 'results.jsonl', '{}\n'], ['analysis_sha256', 'analysis.json', '{}'], ['report_sha256', 'report.md', '# 原始报告\n完整结果。']]) { write(join(base, file), value); manifest[key] = hash(value) }
     write(join(base, 'run.yaml'), dump(manifest))
-    write(join(base, 'evidence/U-ONE-001/trace.jsonl'), [{ session_log: 'root', event: { type: 'session', id: `session-${id.slice(4)}`, delegationDepth: 0, createdAt: Date.parse(manifest.created_at) + 10 } }, ...trace(calls)].map(row => JSON.stringify(row)).join('\n'))
+    const traceRows = completeTrace(calls, 100, `session-${id.slice(4)}`)
+    traceRows[0].event.createdAt = Date.parse(manifest.created_at) + 10
+    write(join(base, 'evidence/U-ONE-001/trace.jsonl'), traceRows.map(row => JSON.stringify(row)).join('\n'))
     write(join(base, 'evidence/U-ONE-001/checks.json'), JSON.stringify({ trace_available: true }))
     const view = { run_id: id, manifest, missing: [], image: { image_build_fingerprint: 'same-build', local_image_id: 'same-image' }, cases: [{ case_id: 'U-ONE-001', frozen: { case_id: 'U-ONE-001', title: '查询状态', inputs: ['查询模拟资产状态。'], expected_behavior: '准确返回状态。' }, trials: [{ execution_status: 'completed', verdict: 'passed' }], review: { reviewed_verdict: 'passed' }, actual_routes: [{ provider: 'deepseek', model: 'deepseek-flash', reasoningEffort: 'off' }], tool_calls: [{ name: 'mock_status', status: 'ok' }], load_observation: { session_id: `session-${id.slice(4)}`, preset_matches: true, workspace_matches: true }, evidence: [{ path: `evolution/experiments/${experimentId}/runs/${id}/report.md`, present: true }] }] }
     write(join(base, 'evidence/dsh-image.json'), JSON.stringify(view.image))
     write(join(base, 'evidence/U-ONE-001/response.json'), JSON.stringify({ assistant_texts: ['模拟资产状态正常。'], turns: [{ route: view.cases[0].actual_routes[0] }] }))
-    write(join(base, 'evidence/U-ONE-001/tools.jsonl'), trace(calls).filter(row => row.event.type.startsWith('tool/')).map(JSON.stringify).join('\n'))
+    write(join(base, 'evidence/U-ONE-001/tools.jsonl'), traceRows.filter(row => row.event.type.startsWith('tool/')).map(JSON.stringify).join('\n'))
     runs.set(id, view)
     return { base, lock, view }
   }
@@ -172,9 +180,9 @@ function addOrdinaryGraphEvidence(fx, invalidAssociation = false) {
   }
 }
 
-test('普通旧计划的token指标也包含关联MCP图内推理，不能以外层下降误报节省', () => withFixture(async fx => {
+test('普通计划的token指标也包含关联MCP图内推理，不能以外层下降误报节省', () => withFixture(async fx => {
   assert.equal(fx.created.plan.generation, undefined)
-  assert.equal(fx.created.plan.measurement_schema_version, undefined)
+  assert.equal(fx.created.plan.measurement_schema_version, 2)
   addOrdinaryGraphEvidence(fx)
   const result = success(await fx.handler('compare', fx.body))
   assert.deepEqual(result.comparability.limits, [])
@@ -275,6 +283,112 @@ test('改名拒绝陈旧change摘要，写入锁阻止与研究确认并发', ()
   assert.equal(load(readFileSync(file, 'utf8')).variant_name, '第一次命名')
 }))
 
+test('普通与旧计划均计入压缩用量，资源增加拒绝 end，旧比较回执不能恢复', () => withFixture(async fx => {
+  assert.equal(fx.created.plan.measurement_schema_version, 2)
+  const old = success(await fx.handler('compare', fx.body))
+  assert.equal(old.resources.total_tokens.parent, 220)
+  assert.equal(old.resources.total_tokens.variant, 110)
+  const oldReceipt = readFileSync(join(fx.root, old.comparison_receipt.path))
+  const file = join(fx.right.base, 'evidence/U-ONE-001/trace.jsonl')
+  const rows = readFileSync(file, 'utf8').split('\n').map(JSON.parse)
+  rows.splice(2, 0, ...[
+    { type: 'compaction/start', data: { compactionId: 'compact' } },
+    { type: 'compaction/summary', data: { compactionId: 'compact', llmStreamCall: true, usage: { inputTokens: 1000, outputTokens: 10, totalTokens: 1010 } } },
+    { type: 'compaction/end', data: { compactionId: 'compact' } },
+  ].map(event => ({ session_log: 'root', event })))
+  const save = () => write(file, rows.map((row, index) => JSON.stringify(index ? { ...row, event: { ...row.event, seq: index - 1 } } : row)).join('\n'))
+  save()
+  write(join(fx.right.base, 'evidence/U-ONE-001/tools.jsonl'), readFileSync(file, 'utf8').split('\n').map(JSON.parse).filter(row => row.event.type.startsWith('tool/')).map(JSON.stringify).join('\n'))
+  assert.equal(success(await fx.handler('context', { experiment_id: variant })).workflow_status.compared, false)
+  assert.deepEqual(readFileSync(join(fx.root, old.comparison_receipt.path)), oldReceipt)
+  for (const legacy of [false, true]) {
+    if (legacy) {
+      const path = join(fx.path(variant), 'change.yaml'), change = load(readFileSync(path, 'utf8'))
+      delete change.compute_variant.measurement_schema_version
+      write(path, dump(change)); git(fx.root, ['add', path]); git(fx.root, ['commit', '-m', 'legacy plan fixture'])
+      const commit = git(fx.root, ['rev-parse', 'HEAD'])
+      for (const side of [fx.left, fx.right]) { side.lock.git_version.commit = commit; write(join(side.base, 'inputs.lock.json'), JSON.stringify(side.lock)) }
+    }
+    const current = success(await fx.handler('compare', fx.body))
+    assert.deepEqual(current.resources.total_tokens, { parent: 220, variant: 1120, reduction_pct: (220 - 1120) / 220 * 100 })
+    assert.equal(current.resources.input_tokens.variant, 1100)
+    assert.equal(current.resources.output_tokens.variant, 20)
+    assert.equal(current.resource_evidence.passed, false)
+    assert.equal(current.eligible_for_end, false)
+    assert.equal((await fx.handler('confirm', { ...fx.body, human_confirmed: true, decision: 'end', comparison_sha256: current.comparison_sha256, reason: '不能确认资源增加。' })).ok, false)
+  }
+  delete rows.find(row => row.event.type === 'compaction/summary').event.data.usage
+  save()
+  const unknown = success(await fx.handler('compare', fx.body))
+  assert.equal(unknown.resources.total_tokens.variant, null)
+  assert.equal(unknown.eligible_for_end, false)
+}))
+
+test('Token 计量沿用继承边界并去重原生事件，辅助标题缺少用量时保持未知', () => {
+  const parentRows = completeTrace(1, 100, 'parent')
+  const history = trace(1), current = trace(1).map(row => ({ ...row, event: { ...row.event, data: { ...row.event.data, turn: 2 } } }))
+  const childRows = [{ session_log: 'child', event: { type: 'session', id: 'child', isSeeded: true } },
+    ...[...history, { event: { type: 'session/end-seed', data: { inherited: true } } }, ...current].map((row, seq) => ({ session_log: 'child', event: { ...row.event, seq } }))]
+  assert.equal(computeTraceMetrics([...parentRows, ...parentRows, ...childRows], true).values.total_tokens, 220)
+  const title = completeTrace(1)
+  title.push(...[
+    { type: 'session/title-llm-request', data: { titleProvider: 'llm', messageSeqs: [1], route: { provider: 'fixture', model: 'model' } } },
+    { type: 'session/title', data: { messageSeqs: [1], source: { kind: 'provider', provider: 'llm', model: { provider: 'fixture', model: 'model' } } } },
+  ].map((event, index) => ({ session_log: 'root', event: { ...event, seq: title.length - 1 + index } })))
+  assert.equal(computeTraceMetrics(title, true).values.actual_model_calls, 2)
+  assert.equal(computeTraceMetrics(title, true).values.total_tokens, null)
+})
+
+test('算力确认核对 Decision 摘要，并发正常保存成功后保留正文并显式冲突', () => withFixture(async fx => {
+  const compared = success(await fx.handler('compare', fx.body))
+  const decisionPath = join(fx.path(variant), 'decision.md'), beforeChange = readFileSync(join(fx.path(variant), 'change.yaml'))
+  let release, entered, held = false
+  const waiting = new Promise(resolve => { entered = resolve })
+  fx.setReadHook(() => { if (!held) { held = true; entered(); return new Promise(resolve => { release = resolve }) } })
+  const confirming = fx.handler('confirm', { ...fx.body, decision: 'end', human_confirmed: true, comparison_sha256: compared.comparison_sha256, reason: '核对当前比较。' })
+  await waiting
+  const content = '# Decision\n\n新保存的研究观察与适用限制。\n'
+  const handler = createAgentsHandler(fx.root)
+  success(await handler('decision/update', { experiment_id: variant, content, expected_sha256: hash(readFileSync(decisionPath)) }, new AbortController().signal))
+  release()
+  const confirmed = await confirming
+  assert.equal(confirmed.ok, false); assert.equal(confirmed.error.code, 'conflict', JSON.stringify(confirmed))
+  assert.equal(readFileSync(decisionPath, 'utf8'), content)
+  assert.deepEqual(readFileSync(join(fx.path(variant), 'change.yaml')), beforeChange)
+  fx.setReadHook(null)
+  const stale = await fx.handler('confirm', { ...fx.body, decision: 'continue', human_confirmed: true, comparison_sha256: compared.comparison_sha256, reason: '旧页面确认。' })
+  assert.equal(stale.ok, false); assert.equal(stale.error.code, 'conflict')
+}))
+
+test('算力确认写清单失败时恢复原 Decision 或移除本次新文件，并保留并发修改', async t => {
+  for (const mode of ['existing', 'missing', 'concurrent']) await t.test(mode, () => withFixture(async fx => {
+    const decisionFile = join(fx.path(variant), 'decision.md'), changeFile = join(fx.path(variant), 'change.yaml')
+    const oldDecision = readFileSync(decisionFile, 'utf8'), oldChange = readFileSync(changeFile)
+    if (mode === 'missing') rmSync(decisionFile)
+    const compared = success(await fx.handler('compare', fx.body))
+    const rename = fs.renameSync
+    const mocked = t.mock.method(fs, 'renameSync', (from, to) => {
+      if (to === changeFile) {
+        if (mode === 'concurrent') writeFileSync(decisionFile, '# 并发保存的研究观察\n')
+        throw Object.assign(new Error('fixture rename failed'), { code: 'EIO' })
+      }
+      return rename(from, to)
+    })
+    syncBuiltinESMExports()
+    let confirmed
+    try { confirmed = await fx.handler('confirm', { ...fx.body, decision: 'continue', human_confirmed: true, comparison_sha256: compared.comparison_sha256, reason: '应按原状态回滚。' }) }
+    finally { mocked.mock.restore(); syncBuiltinESMExports() }
+    assert.equal(confirmed.ok, false)
+    assert.deepEqual(readFileSync(changeFile), oldChange)
+    assert.equal(existsSync(`${changeFile}.compute-${process.pid}.tmp`), false)
+    if (mode === 'missing') assert.equal(existsSync(decisionFile), false, '不留下未保存成功的 Decision')
+    else assert.equal(readFileSync(decisionFile, 'utf8'), mode === 'concurrent' ? '# 并发保存的研究观察\n' : oldDecision)
+    if (mode === 'concurrent') assert.equal(confirmed.error.code, 'needs_recovery')
+    const latest = success(await fx.handler('compare', fx.body))
+    success(await fx.handler('confirm', { ...fx.body, decision: 'continue', human_confirmed: true, comparison_sha256: latest.comparison_sha256, reason: '故障恢复后可重新确认。' }))
+  }))
+})
+
 test('代码生成预览读取固定父版真实轨迹，拒绝把其他版本Run当来源', () => withFixture(async fx => {
   const input = { parent_experiment_id: parent, parent_ref: `git:${fx.parentCommit}`, strategy: '将固定查询顺序生成为 LangGraph 工具', case_ids: ['U-ONE-001'],
     generation: { mode: 'langgraph-aot', source_run_ids: [parentRun] } }
@@ -307,6 +421,12 @@ test('纯代码执行计划保存独立约束，拒绝缺少生成计划或同�
 }))
 
 test('新口径不能把缺少原生事件序号的旧响应统计当实际请求证据', () => withFixture(async fx => {
+  for (const side of [fx.left, fx.right]) {
+    const file = join(side.base, 'evidence/U-ONE-001/trace.jsonl')
+    const rows = readFileSync(file, 'utf8').split('\n').map(JSON.parse)
+    for (const row of rows) delete row.event.seq
+    write(file, rows.map(JSON.stringify).join('\n'))
+  }
   const result = success(await fx.handler('compare', fx.body))
   assert.equal(result.resources.model_calls.parent, 2)
   assert.equal(result.resources.actual_model_calls.parent, null)

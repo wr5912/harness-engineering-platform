@@ -6,11 +6,12 @@ import { performance } from 'node:perf_hooks'
 import type {
   AccessDecision, AccessRequest, AgentAuthenticationEvidence, AgentInstanceStatus, AuthenticatedIdentity, AuthenticationInput, BusinessAccessConfig, BusinessContext,
   BusinessOperation, ControlEvent, ControlScope, ControlSnapshot, InstanceBinding, OperationKind,
-  ReplicaObservation, ResourceRef, Restriction, RiskFact, SessionBinding, SessionTrustFact, ToolPolicyEffect, ToolPolicyWhen, AuthorizationReceipt, ExternalAccessDecision,
+  ReplicaBatch, ReplicaObservation, ResourceRef, Restriction, RiskFact, SessionBinding, SessionTrustFact, ToolPolicyEffect, ToolPolicyWhen, AuthorizationReceipt, ExternalAccessDecision,
 } from './contracts.js'
 import { retiredLocalRiskFact, validAgentToolPolicies } from './contracts.js'
 import { HttpAuthenticationProvider, HttpIdentityTrustProvider, HttpRiskAssessmentProvider, HttpAccessAuthorizationProvider } from './providers.js'
 import { resolveBusinessSecretFile } from './secret-file.ts'
+import { REPLICA_BATCH_BYTES } from './replica.ts'
 
 export * from './contracts.js'
 
@@ -134,6 +135,8 @@ export class BusinessControl {
   private issued = new Map<string, ControlSnapshot>()
   private acknowledgements = new Map<string, { restrictionVersion: number; leaseId: string; at: string }>()
   private synchronizations = new Map<string, { lastSuccessAt?: string; lastAttemptAt: string; lastError?: string }>()
+  private replicaTransfers = new Map<string, { id: string; at: number; parts: Array<ReplicaObservation | undefined> }>()
+  private completedReplicaTransfers = new Map<string, { id: string; digests: string[] }>()
   private active = new Map<string, { context: BusinessContext; operation: BusinessOperation; controller: AbortController; conditionFact?: RiskFact; policyVersion: string; confirmed: boolean; authorizationSource?: AuthorizationReceipt['source']; authorizationRiskDigest?: string; contentDigest?: string }>()
   private executionAuthorization = new AsyncLocalStorage<{ external: boolean; riskUnavailable: boolean; lastRiskStatus?: RiskFact['status']; grant?: ExternalAccessDecision; configVersion?: string; operationDigest?: string; riskDigest?: string; id?: string; contentDigest?: string; refreshingRisk?: boolean; pendingRiskAuthorization?: boolean; refresh?: () => Promise<void>; operation?: BusinessOperation }>()
   private confirmations = new Map<string, Confirmation>()
@@ -258,6 +261,35 @@ export class BusinessControl {
       && fact.scope.runtimeGeneration === binding.runtimeGeneration && (!fact.scope.sessionId || ids.has(fact.scope.sessionId)))
     return structuredClone({ binding, sessions, riskFacts: facts, events: this.state.events.filter(event => !!event.sessionId && ids.has(event.sessionId)).slice(-50) })
   }
+  importReplicaBatch(binding: InstanceBinding, batch: ReplicaBatch): boolean {
+    if (!batch || typeof batch.id !== 'string' || !/^[a-f0-9-]{36}$/.test(batch.id)
+      || !Number.isSafeInteger(batch.count) || batch.count < 1 || batch.count > 256
+      || !Number.isSafeInteger(batch.index) || batch.index < 0 || batch.index >= batch.count
+      || !batch.observation || digest(batch.observation.binding) !== digest(binding)
+      || !Array.isArray(batch.observation.sessions) || !Array.isArray(batch.observation.riskFacts) || !Array.isArray(batch.observation.events)
+      || Buffer.byteLength(JSON.stringify(batch.observation)) > REPLICA_BATCH_BYTES) return error('replica_batch_invalid')
+    const completed = this.completedReplicaTransfers.get(binding.instanceId)
+    if (completed?.id === batch.id) {
+      if (completed.digests.length !== batch.count || completed.digests[batch.index] !== digest(batch.observation)) return error('replica_batch_conflict')
+      return true
+    }
+    let transfer = this.replicaTransfers.get(binding.instanceId)
+    if (!transfer || transfer.id !== batch.id || Date.now() - transfer.at > 60_000) {
+      transfer = { id: batch.id, at: Date.now(), parts: new Array(batch.count) }
+      this.replicaTransfers.set(binding.instanceId, transfer)
+    }
+    if (transfer.parts.length !== batch.count) return error('replica_batch_conflict')
+    const previous = transfer.parts[batch.index]
+    if (previous && digest(previous) !== digest(batch.observation)) return error('replica_batch_conflict')
+    transfer.parts[batch.index] = structuredClone(batch.observation)
+    if (Array.from(transfer.parts).some(part => !part)) return false
+    const parts = transfer.parts as ReplicaObservation[]
+    this.importReplicaState(binding, { binding, sessions: parts.flatMap(part => part.sessions),
+      riskFacts: parts.flatMap(part => part.riskFacts), events: parts.flatMap(part => part.events) })
+    this.completedReplicaTransfers.set(binding.instanceId, { id: batch.id, digests: parts.map(part => digest(part)) })
+    this.replicaTransfers.delete(binding.instanceId)
+    return true
+  }
   importReplicaState(binding: InstanceBinding, observation: ReplicaObservation): void {
     if (this.requiredSnapshots.size || digest(this.state.instances[binding.instanceId]) !== digest(binding)
       || !observation || digest(observation.binding) !== digest(binding) || !Array.isArray(observation.sessions)
@@ -364,6 +396,7 @@ export class BusinessControl {
     this.state.instances[binding.instanceId] = { ...binding }
     this.agentAuthentications.delete(binding.instanceId); this.acknowledgements.delete(binding.instanceId)
     this.synchronizations.delete(binding.instanceId)
+    this.replicaTransfers.delete(binding.instanceId); this.completedReplicaTransfers.delete(binding.instanceId)
     this.persist()
   }
   registeredInstance(instanceId: string): InstanceBinding | undefined {
@@ -923,6 +956,16 @@ export class BusinessControl {
   }
   // 同时标记 Runtime 副本职责；开发模式保留会话单写入方，但不检查租约。
   requireSnapshot(instanceId: string): void { this.requiredSnapshots.add(instanceId) }
+  currentRestrictionVersion(): number { return this.state.restrictionVersion }
+  hasAcknowledgedSnapshot(instanceId: string): boolean {
+    const ack = this.acknowledgements.get(instanceId)
+    return !!ack && ack.restrictionVersion === this.state.restrictionVersion && Date.now() - Date.parse(ack.at) < 2000
+  }
+  hasCurrentSnapshot(instanceId: string, version: number): boolean {
+    const lease = this.leases.get(instanceId)
+    return !!lease && Number.isSafeInteger(version) && lease.snapshot.restrictionVersion >= version
+      && performance.now() - lease.receivedAt < lease.snapshot.leaseMs
+  }
   recordSynchronization(binding: InstanceBinding, lastError?: string): void {
     const previous = this.synchronizations.get(binding.instanceId)
     this.synchronizations.set(binding.instanceId, { lastSuccessAt: lastError ? previous?.lastSuccessAt : iso(), lastAttemptAt: iso(), ...(lastError ? { lastError } : {}) })

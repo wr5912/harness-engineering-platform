@@ -32,6 +32,12 @@ const runOutcome = (run: ComputeRun) => run.status === 'completed'
 function notSent(message: string) {
   return Object.assign(new Error(message), { definitelyNotSent: true })
 }
+const manualDrafts = new Map<string, Record<string, any>>()
+function readManualDraft(key: string): Record<string, any> {
+  if (manualDrafts.has(key)) return manualDrafts.get(key)!
+  try { const value = JSON.parse(window.sessionStorage.getItem(key) ?? 'null'); return value?.schema_version === 1 ? value : {} }
+  catch { return {} }
+}
 function ComputeIcon({ kind }: { kind: 'sparkle' | 'run' | 'info' }) {
   const paths = {
     sparkle: <><path d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4Z" /><path d="m19 2 .7 2.3L22 5l-2.3.7L19 8l-.7-2.3L16 5l2.3-.7Z" /></>,
@@ -67,6 +73,9 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
   const [parentRuns, setParentRuns] = useState<string[]>([]), [variantRuns, setVariantRuns] = useState<string[]>([])
   const [comparison, setComparison] = useState<any>(null), [humanConfirmed, setHumanConfirmed] = useState(false), [reason, setReason] = useState('')
   const [planningOpen, setPlanningOpen] = useState(false), [planningDirty, setPlanningDirty] = useState(false)
+  const draftKey = `harness-compute-manual:${agentId}:${experimentId}`
+  const draftReady = useRef(false)
+  const restoredManualDraft = useRef<Record<string, any> | null>(null)
   const selectedVariantName = currentVariantName === undefined ? context?.variant_name : currentVariantName
   const displayVersion = versionLabel || experimentId
   const displayAgent = agentName || agentId
@@ -86,7 +95,10 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
   }
   useEffect(() => {
     const request = ++generation.current
-    setBusy(true); setContext(null); setComparison(null); setParentRuns([]); setVariantRuns([]); setParent(experimentId); setVariantName(''); setStrategy(''); setSelectedCases([]); setCritical([]); setMinimum(2); setDrop(0); setMetric('total_tokens'); setReduction(10); setModelChange(false); setModel('deepseek-flash'); setReasoning('off'); setReason(''); setError(''); setMessage(''); setCreateOpen(false); setPlanningOpen(false); setPlanningDirty(false); setManualPreview(null); setHumanConfirmed(false); setGeneratedCode(null); setFreezePreview(null); setSourceRuns([]); setCodeMode(false); setCodeOnly(false)
+    const draft = readManualDraft(draftKey)
+    restoredManualDraft.current = draft
+    draftReady.current = false
+    setBusy(true); setContext(null); setComparison(null); setParentRuns([]); setVariantRuns([]); setParent(draft.parent ?? experimentId); setVariantName(draft.variantName ?? ''); setStrategy(draft.strategy ?? ''); setSelectedCases(draft.selectedCases ?? []); setCritical(draft.critical ?? []); setMinimum(draft.minimum ?? 2); setDrop(draft.drop ?? 0); setMetric(draft.metric ?? 'total_tokens'); setReduction(draft.reduction ?? 10); setModelChange(draft.modelChange ?? false); setModel(draft.model ?? 'deepseek-flash'); setReasoning(draft.reasoning ?? 'off'); setReason(draft.reason ?? ''); setError(''); setMessage(''); setCreateOpen(draft.createOpen ?? false); setPlanningOpen(false); setPlanningDirty(false); setManualPreview(null); setHumanConfirmed(false); setGeneratedCode(null); setFreezePreview(null); setSourceRuns(draft.sourceRuns ?? []); setCodeMode(draft.codeMode ?? false); setCodeOnly(draft.codeOnly ?? false)
     invoke('context', { experiment_id: experimentId }).then(value => {
       if (request !== generation.current) return
       restoreContext(value)
@@ -95,15 +107,38 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
     return () => { generation.current++ }
   }, [rpc, experimentId])
   useEffect(() => {
+    if (!draftReady.current) { draftReady.current = true; return }
+    const previous = readManualDraft(draftKey)
+    const caseScopeReady = parentContext?.experiment_id === parent || previous.parent === parent && previous.caseScopeReady === true
+    const draft = { schema_version: 1, createOpen, parent, variantName, strategy, selectedCases, critical, minimum, drop, metric, reduction, modelChange, model, reasoning, reason, sourceRuns, codeMode, codeOnly, caseScopeReady }
+    manualDrafts.set(draftKey, draft)
+    try { window.sessionStorage.setItem(draftKey, JSON.stringify(draft)) }
+    catch { /* 当前页面导航仍可从内存恢复；整页刷新另由未保存提示保护。 */ }
+  }, [draftKey, createOpen, parent, variantName, strategy, selectedCases, critical, minimum, drop, metric, reduction, modelChange, model, reasoning, reason, sourceRuns, codeMode, codeOnly, parentContext])
+  useEffect(() => {
+    const protect = (event: BeforeUnloadEvent) => {
+      if (!variantName && !strategy && !reason) return
+      try { if (window.sessionStorage.getItem(draftKey) === JSON.stringify(manualDrafts.get(draftKey))) return } catch {}
+      event.preventDefault(); event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', protect)
+    return () => window.removeEventListener('beforeunload', protect)
+  }, [draftKey, variantName, strategy, reason])
+  useEffect(() => {
     const request = ++parentRequest.current, owner = generation.current
-    setParentContext(null); setParentError(''); setManualPreview(null); setSelectedCases([]); setCritical([]); setSourceRuns([])
+    const draft = restoredManualDraft.current ?? readManualDraft(draftKey)
+    setParentContext(null); setParentError(''); setManualPreview(null)
     if (!createOpen) { setParentLoading(false); return }
     setParentLoading(true)
     invoke('context', { experiment_id: parent }).then((value: Context) => {
       if (request !== parentRequest.current || owner !== generation.current || selectedParent.current !== parent) return
       if (value.experiment_id !== parent || value.agent_id !== agentId) throw new Error('父版来源与所选版本不一致，请重新选择。')
-      setParentContext(value); setSelectedCases(value.cases.map(item => item.case_id))
-      setCritical((value.plan?.critical_case_ids ?? []).filter(id => value.cases.some(item => item.case_id === id)))
+      const restore = draft.parent === parent && draft.createOpen && draft.caseScopeReady
+      restoredManualDraft.current = null
+      const available = new Set(value.cases.map(item => item.case_id))
+      setParentContext(value); setSelectedCases(restore ? (draft.selectedCases ?? []).filter((id: string) => available.has(id)) : value.cases.map(item => item.case_id))
+      setCritical((restore ? draft.critical ?? [] : value.plan?.critical_case_ids ?? []).filter((id: string) => available.has(id)))
+      setSourceRuns(restore ? draft.sourceRuns ?? [] : [])
     }).catch(error => { if (request === parentRequest.current && owner === generation.current) setParentError(error.message) })
       .finally(() => { if (request === parentRequest.current && owner === generation.current) setParentLoading(false) })
     return () => { parentRequest.current++ }
@@ -267,7 +302,7 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
           const request = generation.current
           const value = await invoke('create', { ...manualPreview.input, expected_preview_sha256: manualPreview.value.preview_sha256 })
           if (request !== generation.current) return
-          setMessage(`已创建探索变体 ${value.experiment_id}。请实现策略并固定计划后评测。`); setCreateOpen(false); setManualPreview(null); onCreated?.(value.experiment_id); onChanged?.()
+          setMessage(`已创建探索变体 ${value.experiment_id}。请实现策略并固定计划后评测。`); setCreateOpen(false); setManualPreview(null); setVariantName(''); setStrategy(''); setSourceRuns([]); onCreated?.(value.experiment_id); onChanged?.()
         })}>确认创建探索性变体</button>
       </div>}
     </fieldset>}</details>
@@ -319,7 +354,7 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
         const request = generation.current
         const value = await invoke('confirm', { ...comparisonBody, decision, human_confirmed: humanConfirmed, reason, comparison_sha256: comparison.comparison_sha256 })
         if (request !== generation.current) return
-        setMessage(`已记录 Decision ${value.decision}，版本类型 ${value.variant_kind}。`); setComparison(null); setHumanConfirmed(false); const refreshed = await invoke('context', { experiment_id: experimentId }); if (request === generation.current) { restoreContext(refreshed); onChanged?.() }
+        setMessage(`已记录 Decision ${value.decision}，版本类型 ${value.variant_kind}。`); setComparison(null); setHumanConfirmed(false); setReason(''); const refreshed = await invoke('context', { experiment_id: experimentId }); if (request === generation.current) { restoreContext(refreshed); onChanged?.() }
       })}>{decision === 'end' ? '确认近似等效并标记 end' : decision === 'continue' ? '记录继续研究' : '记录证据不足'}</button>)}</div>
     </div>}
     {context && <ComputePlanningDialog rpc={rpc} open={planningOpen && active} agentName={displayAgent} agentId={agentId} experimentId={experimentId} versionLabel={displayVersion} parentRef={context.parent_ref} runs={selectedRuns} onClose={() => setPlanningOpen(false)} onSend={sendPlanning} onDirtyChange={setPlanningDirty} />}

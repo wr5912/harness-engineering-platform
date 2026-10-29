@@ -58,6 +58,7 @@ async function serve(t, handler) {
 
 async function fixtureMcp(t, id, reads, resourceOnly = false, duplicateTools = false, state = {}) {
   return serve(t, async (req, res) => {
+    if (state.hanging) return
     if (state.offline) return res.writeHead(503).end()
     const handler = createMcpHandler(() => {
       const mcp = new McpServer({ name: id, version: '1' }, { capabilities: { ...(resourceOnly ? {} : { tools: {} }), resources: {} } })
@@ -81,6 +82,31 @@ async function fixtureMcp(t, id, reads, resourceOnly = false, duplicateTools = f
     try { await toNodeHandler(handler)(req, res) } finally { await handler.close() }
   })
 }
+
+test('v2 调用按来源路由，健康工具与资源工具不等待无关挂起成员', async t => {
+  const manager = await managerModule(t), reads = [], other = { tools: [{ name: 'slow', inputSchema: { type: 'object' } }] }
+  const healthy = await fixtureMcp(t, 'healthy', reads)
+  const hanging = await fixtureMcp(t, 'other', reads, false, false, other)
+  const servers = [
+    { id: 'healthy', enabled: true, url: healthy, tools: { mode: 'all', names: [] } },
+    { id: 'other', enabled: true, url: hanging, tools: { mode: 'all', names: [] } },
+  ]
+  const groups = [{ id: 'isolation', members: [
+    { serverId: 'healthy', names: ['echo'], resourceUris: ['fixture:/same'], resourceTemplates: [] },
+    { serverId: 'other', names: ['slow'], resourceUris: [], resourceTemplates: [] },
+  ] }]
+  const { context } = await groupServer(t, manager, servers, groups)
+  // 原生直接调用不要求先对全部成员做发现。
+  other.hanging = true
+  const call = (name, args) => context.mcpSessionManager.callGroupTool('isolation', 2, name, args, undefined, { signal: AbortSignal.timeout(1500) })
+  assert.equal((await call('echo', { value: 'ok' })).content[0].text, 'healthy:ok')
+  other.hanging = false
+  const catalog = await context.mcpSessionManager.listGroupTools('isolation', 2)
+  assert.ok(catalog.tools.some(tool => tool.name === 'same'))
+  other.hanging = true
+  assert.equal((await call('same', {})).content[0].text, 'healthy')
+  await assert.rejects(call('slow', {}), /timeout|aborted/i, '只取消真正挂起的目标调用')
+})
 
 async function groupServer(t, manager, servers, groups, methods = [], rpcRequests = []) {
   const routes = []

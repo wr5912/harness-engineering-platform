@@ -80,7 +80,7 @@ const implementationFiles = ['definition.ts', 'compositions.ts', 'executor.ts', 
   .map(file => `platform/plugin/src/mcp/${file}`)
   .concat(['platform/plugin/build.mjs', 'platform/plugin/package.json', 'platform/plugin/pnpm-lock.yaml', 'platform/plugin/src/index.ts',
     'platform/plugin/src/evaluation/model-attempts.ts', 'platform/plugin/src/workflows/graph.ts',
-    ...['contracts.ts', 'core.ts', 'gateway.ts', 'group-link.ts', 'providers.ts', 'reports.ts', 'runtime.ts'].map(file => `platform/plugin/src/business-control/${file}`),
+    ...['contracts.ts', 'core.ts', 'gateway.ts', 'group-link.ts', 'providers.ts', 'replica.ts', 'reports.ts', 'runtime.ts'].map(file => `platform/plugin/src/business-control/${file}`),
     ...['index.ts', 'openapi.ts', 'connection.ts'].map(file => `plugins/mcp-manager/${file}`),
     'platform/plugin/src/mcp/store.ts'])
 const implementationHash = createHash('sha256')

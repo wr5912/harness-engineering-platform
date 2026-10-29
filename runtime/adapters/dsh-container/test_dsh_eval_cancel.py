@@ -60,6 +60,20 @@ def alive(pid):
 
 
 class EvaluationCancellationTest(unittest.TestCase):
+    def test_invalid_and_expired_deadlines_stop_before_source_or_runtime_access(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for deadline, cancelled in (("invalid", False), ("2020-01-01T00:00:00Z", True)):
+                with self.subTest(deadline=deadline):
+                    completed = subprocess.run([
+                        sys.executable, str(ADAPTER / "dsh-eval"), "--repo", str(root),
+                        "--source", "experiment:EXP-basic-001",
+                    ], env={**os.environ, "HARNESS_EVAL_DEADLINE_AT": deadline},
+                        capture_output=True, text=True, timeout=10)
+                    self.assertEqual(completed.returncode, 2, completed.stderr)
+                    self.assertEqual(json.loads(completed.stdout).get("cancelled", False), cancelled)
+                    self.assertFalse((root / "evolution").exists())
+
     def probe(self, mode):
         temporary = tempfile.TemporaryDirectory(prefix="dsh-eval-cancel-test-")
         self.addCleanup(temporary.cleanup)

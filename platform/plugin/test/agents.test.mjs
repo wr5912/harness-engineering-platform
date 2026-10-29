@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
-import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -327,6 +327,9 @@ test('算力 end 只在确认的 Candidate 和计划未改变时排除融合', a
     commitFixture(fx.root, 'confirm observed compute variant')
     const handler = createAgentsHandler(fx.root)
     const status = async () => (await rpc(handler, 'fusion/preview', versionRequest(fx.commit))).inventory.sources.find(row => row.experiment_id === id).status
+    assert.equal(await status(), 'needs_review', '旧计量结论须重新比较，不能自动排除仍需核对的来源')
+    write(changeFile, readFileSync(changeFile, 'utf8').replace('compute_variant_decision:\n', 'compute_variant_decision:\n  measurement_schema_version: 2\n'))
+    commitFixture(fx.root, 'confirm complete request measurement')
     assert.equal(await status(), 'excluded')
     write(join(fx.root, `evolution/experiments/${id}/candidate/dsh/workspace/later.md`), '确认后新增行为\n')
     commitFixture(fx.root, 'changed candidate requires review')
@@ -698,6 +701,70 @@ test('新建源码以 null 固定不存在状态，空文件并发创建后拒�
     assert.equal(existing.exists, true)
     await rpc(handler, 'edit/apply', { experiment_id: 'EXP-test-agent-001', edits: [{ ...edits[0], expected_sha256: existing.sha256 }] })
     assert.equal(readFileSync(actual, 'utf8'), edits[0].content)
+  } finally { await rm(fx.root, { recursive: true, force: true }) }
+})
+
+test('编辑保留普通文件权限和无变更权限，多文件失败恢复正文与执行位', async () => {
+  const { createAgentsHandler } = await loadServer()
+  const fx = fixture(), experiment_id = 'EXP-test-agent-001'
+  const base = join(fx.root, `evolution/experiments/${experiment_id}/candidate/dsh/managed`)
+  let lockedDirectory
+  try {
+    const handler = createAgentsHandler(fx.root)
+    for (const mode of [0o755, 0o644]) {
+      const path = `candidate/dsh/managed/script-${mode.toString(8)}.sh`, file = join(fx.root, `evolution/experiments/${experiment_id}`, path)
+      write(file, '#!/bin/sh\necho before\n'); chmodSync(file, mode)
+      for (const content of ['#!/bin/sh\necho after\n', '#!/bin/sh\necho after\n']) {
+        const before = await rpc(handler, 'edit/read', { experiment_id, path })
+        await rpc(handler, 'edit/apply', { experiment_id, edits: [{ path, content, expected_sha256: before.sha256 }] })
+        assert.equal(readFileSync(file, 'utf8'), content)
+        assert.equal(statSync(file).mode & 0o777, mode)
+      }
+    }
+    if (process.getuid?.() !== 0) {
+      const first = join(base, 'script-755.sh'), second = join(base, 'readonly/second.sh')
+      write(second, 'second before\n'); chmodSync(second, 0o755)
+      lockedDirectory = dirname(second); chmodSync(lockedDirectory, 0o555)
+      const before = readFileSync(first, 'utf8')
+      await assert.rejects(() => rpc(handler, 'edit/apply', { experiment_id, edits: [
+        { path: 'candidate/dsh/managed/script-755.sh', content: 'first changed\n', expected_sha256: createHash('sha256').update(before).digest('hex') },
+        { path: 'candidate/dsh/managed/readonly/second.sh', content: 'second changed\n', expected_sha256: createHash('sha256').update('second before\n').digest('hex') },
+      ] }))
+      assert.equal(readFileSync(first, 'utf8'), before)
+      assert.equal(statSync(first).mode & 0o777, 0o755)
+      assert.equal(readFileSync(second, 'utf8'), 'second before\n')
+      assert.equal(statSync(second).mode & 0o777, 0o755)
+    }
+  } finally {
+    if (lockedDirectory) chmodSync(lockedDirectory, 0o755)
+    await rm(fx.root, { recursive: true, force: true })
+  }
+})
+
+test('版本目录与清单身份错配时编辑和用例局部失败，不写入其他 Agent', async () => {
+  const { createAgentsHandler } = await loadServer()
+  const fx = fixture(), experiment_id = 'EXP-test-agent-001'
+  try {
+    const handler = createAgentsHandler(fx.root), changeFile = join(fx.root, `evolution/experiments/${experiment_id}/change.yaml`)
+    const before = readFileSync(changeFile, 'utf8'), evaluation = readFileSync(join(fx.root, 'agents/test-agent/evaluation.md'), 'utf8')
+    write(join(fx.root, 'agents/other-agent/evaluation.md'), evaluation)
+    write(join(fx.root, 'agents/other-agent/manifest.yaml'), 'agent_id: other-agent\n')
+    addVersion(fx.root, 'EXP-test-agent-002', 'status: active\n')
+    for (const changed of [before.replace('agent_id: test-agent', 'agent_id: other-agent'), before.replace(`experiment_id: ${experiment_id}`, 'experiment_id: EXP-test-agent-999')]) {
+      write(changeFile, changed)
+      for (const [endpoint, payload] of [
+        ['edit/read', { path: 'evaluation.md' }],
+        ['edit/apply', { edits: [{ path: 'evaluation.md', content: evaluation.replace('pong', 'changed'), expected_sha256: createHash('sha256').update(evaluation).digest('hex') }] }],
+        ['cases/create-context', {}],
+        ['decision/update', { content: '# 不应写入', expected_sha256: createHash('sha256').update(readFileSync(join(fx.root, `evolution/experiments/${experiment_id}/decision.md`))).digest('hex') }],
+      ]) await assert.rejects(() => rpc(handler, endpoint, { experiment_id, ...payload }), /invalid_request:/)
+      assert.equal(readFileSync(join(fx.root, 'agents/other-agent/evaluation.md'), 'utf8'), evaluation)
+      assert.equal(readFileSync(join(fx.root, 'agents/test-agent/evaluation.md'), 'utf8'), evaluation)
+      const list = await rpc(handler, 'list')
+      assert.ok(list.experiments.find(item => item.id === experiment_id).error)
+      assert.equal(list.experiments.find(item => item.id === 'EXP-test-agent-002').error, null)
+      assert.equal((await rpc(handler, 'detail', { agent_id: 'test-agent', experiment_id: 'EXP-test-agent-002' })).experiment.id, 'EXP-test-agent-002')
+    }
   } finally { await rm(fx.root, { recursive: true, force: true }) }
 })
 

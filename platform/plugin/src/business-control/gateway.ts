@@ -7,7 +7,7 @@ import { resolveBusinessInstance, type BusinessGatewayInstance, type RegisteredB
 import { readMcpSharedToken } from '../mcp/store.ts'
 export { resolveBusinessInstance } from './instance.ts'
 export type { BusinessGatewayInstance, RegisteredBusinessInstance } from './instance.ts'
-import type { BusinessContext, ControlSnapshot, InstanceBinding, ReplicaObservation, AuthenticatedIdentity, AgentAccessRule, RiskFact, Restriction, AgentInstanceStatus, OperationRule } from './contracts.ts'
+import type { BusinessContext, ControlSnapshot, InstanceBinding, ReplicaBatch, ReplicaObservation, AuthenticatedIdentity, AgentAccessRule, RiskFact, Restriction, AgentInstanceStatus, OperationRule } from './contracts.ts'
 
 const CONTEXT_HEADER = 'x-harness-business-context'
 const SIGNATURE_HEADER = 'x-harness-business-signature'
@@ -17,7 +17,7 @@ export interface BusinessGatewayConfig {
   proxyOrigin?: string
   instances: BusinessGatewayInstance[]; managementUrl?: string
 }
-export interface RuntimeAssertion { context?: BusinessContext; binding: InstanceBinding; snapshot?: ControlSnapshot; observation?: ReplicaObservation; requestDigest?: string; issuedAt?: number; nonce?: string }
+export interface RuntimeAssertion { context?: BusinessContext; binding: InstanceBinding; snapshot?: ControlSnapshot; snapshotVersion?: number; acknowledgement?: Pick<ControlSnapshot, 'restrictionVersion' | 'leaseId'>; observation?: ReplicaObservation; batch?: ReplicaBatch; synchronization?: { id: string; index: number; complete: boolean }; requestDigest?: string; issuedAt?: number; nonce?: string }
 
 export function businessAssertionHeaders(assertion: RuntimeAssertion): Record<string, string> {
   return { [CONTEXT_HEADER]: Buffer.from(JSON.stringify(assertion)).toString('base64url') }
@@ -26,7 +26,13 @@ export function readBusinessAssertion(headers: IncomingMessage['headers'], bindi
   try {
     const encoded = headers[CONTEXT_HEADER]
     if (typeof encoded !== 'string' || encoded.length > 256_000) throw new Error()
-    const assertion = JSON.parse(Buffer.from(encoded, 'base64url').toString()) as RuntimeAssertion
+    return readBusinessAssertionValue(JSON.parse(Buffer.from(encoded, 'base64url').toString()), binding)
+  } catch { throw new BusinessTransportError('binding', '业务上下文或实例绑定无效') }
+}
+/** 正文已按传输字节校验，无需转换成 Header 再施加编码长度限制。 */
+export function readBusinessAssertionValue(value: unknown, binding: InstanceBinding): RuntimeAssertion {
+  try {
+    const assertion = value as RuntimeAssertion
     if (!assertion?.binding || Object.entries(binding).some(([key, value]) => assertion.binding[key as keyof InstanceBinding] !== value)) throw new Error()
     if (assertion.context && (assertion.context.sourceDigest !== binding.sourceDigest
       || ['workspaceId', 'agentId', 'instanceId', 'runtimeGeneration'].some(key => assertion.context!.scope?.[key as keyof BusinessContext['scope']] !== binding[key as keyof InstanceBinding]))) throw new Error()
@@ -72,10 +78,28 @@ export function verifyBusinessAssertion(secret: Buffer, headers: IncomingMessage
   const supplied = Buffer.from(signature, 'base64url')
   if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) throw new Error('业务上下文签名无效')
   const assertion = readBusinessAssertion(headers, binding)
+  verifyFreshAssertion(assertion, nonces, now)
+  return assertion
+}
+function verifyFreshAssertion(assertion: RuntimeAssertion, nonces: Map<string, number>, now = Date.now()): void {
   if (typeof assertion.issuedAt !== 'number' || !Number.isSafeInteger(assertion.issuedAt) || Math.abs(now - assertion.issuedAt) > SIGNATURE_TTL_MS || typeof assertion.nonce !== 'string' || assertion.nonce.length < 16) throw new Error('业务上下文已失效')
   for (const [nonce, expiry] of nonces) if (expiry < now) nonces.delete(nonce)
   if (nonces.has(assertion.nonce)) throw new Error('业务上下文已使用')
   nonces.set(assertion.nonce, now + SIGNATURE_TTL_MS)
+}
+
+export function signBusinessControlAssertion(secret: Buffer, assertion: RuntimeAssertion, method: string, path: string): { assertion: RuntimeAssertion; signature: string } {
+  return { assertion, signature: createHmac('sha256', secret).update(`${method}\n${path}\n${JSON.stringify(assertion)}`).digest('base64url') }
+}
+export function verifyBusinessControlAssertion(secret: Buffer, body: Record<string, any>, method: string, path: string, binding: InstanceBinding, nonces: Map<string, number>): RuntimeAssertion {
+  // 已有控制调用仍可完成；新 Runtime 直接签 JSON 正文，不携带 Header 编码的观察。
+  if (body[CONTEXT_HEADER]) return verifyBusinessAssertion(secret, body, method, path, binding, nonces)
+  if (typeof body.signature !== 'string') throw new Error('缺少受信控制签名')
+  const expected = createHmac('sha256', secret).update(`${method}\n${path}\n${JSON.stringify(body.assertion)}`).digest()
+  const supplied = Buffer.from(body.signature, 'base64url')
+  if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) throw new Error('控制正文签名无效')
+  const assertion = readBusinessAssertionValue(body.assertion, binding)
+  verifyFreshAssertion(assertion, nonces)
   return assertion
 }
 
@@ -209,7 +233,7 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
   }
   const assertionFor = (instance: RegisteredBusinessInstance, context?: BusinessContext): RuntimeAssertion => control.isDevelopmentInstance(instance.binding)
     ? { binding: instance.binding, context }
-    : { binding: instance.binding, context, snapshot: control.issueSnapshot(instance.binding.instanceId), issuedAt: Date.now(), nonce: randomBytes(24).toString('base64url') }
+    : { binding: instance.binding, context, snapshotVersion: control.currentRestrictionVersion(), issuedAt: Date.now(), nonce: randomBytes(24).toString('base64url') }
   const prepare = async (req: IncomingMessage, transport: 'http' | 'websocket', res?: ServerResponse) => {
     const externalOrigin = assertOrigin(req)
     const url = new URL(req.url || '/', origin)
@@ -224,6 +248,14 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
     control.registerInstance(instance.binding)
     const context = control.createContext(identity, instance.binding)
     control.assert(context, 'agent:access', [{ kind: 'agent', id: selected.agentId }])
+    if (selected.identityMode !== 'development' && !control.hasAcknowledgedSnapshot(instance.binding.instanceId)) {
+      // Native Connection 的接入方法是同步的；转发前等待后台控制回读当前版本。
+      const deadline = Date.now() + 1500
+      while (!control.hasAcknowledgedSnapshot(instance.binding.instanceId) && Date.now() < deadline && !lifetime.signal.aborted) {
+        await new Promise(resolve => setTimeout(resolve, 20))
+      }
+      if (!control.hasAcknowledgedSnapshot(instance.binding.instanceId)) throw Object.assign(new Error('业务许可尚未同步，请稍后重试'), { httpStatus: 503 })
+    }
     const path = instance.basePath + route + url.search
     // 代理丢弃调用方凭据与伪造控制 Header，由此边界重建实例上下文。
     for (const name of Object.keys(req.headers)) if (name.startsWith('x-harness-') || ['authorization', 'cookie', 'forwarded', 'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto'].includes(name)) delete req.headers[name]
@@ -354,14 +386,19 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
         const development = selected.identityMode === 'development'
         if (development) requireBusinessToken(req.headers.authorization, assetRoot)
         const body = await readControlRequest(req)
-        const assertion = development ? readBusinessAssertion(businessAssertionHeaders(body as RuntimeAssertion), instance.binding)
-          : verifyBusinessAssertion(readBusinessSecret(config.sharedSecretFile), body, 'POST', req.url, instance.binding, controlNonces)
+        const assertion = development ? readBusinessAssertionValue(body, instance.binding)
+          : verifyBusinessControlAssertion(readBusinessSecret(config.sharedSecretFile), body, 'POST', req.url, instance.binding, controlNonces)
         control.recordAgentAuthentication(instance.binding)
-        if (!development && assertion.snapshot) control.acknowledge(instanceId, assertion.snapshot.restrictionVersion, assertion.snapshot.leaseId)
+        const acknowledgement = assertion.acknowledgement ?? assertion.snapshot
+        if (!development && acknowledgement) control.acknowledge(instanceId, acknowledgement.restrictionVersion, acknowledgement.leaseId)
+        const complete = assertion.batch ? control.importReplicaBatch(instance.binding, assertion.batch) : true
         if (assertion.observation) control.importReplicaState(instance.binding, assertion.observation)
-        if (development) control.recordSynchronization(instance.binding)
-        return json(res, 200, development ? { binding: instance.binding, synchronized: true }
-          : signBusinessAssertion(readBusinessSecret(config.sharedSecretFile), assertionFor(instance), 'RESPONSE', req.url))
+        if (complete) control.recordSynchronization(instance.binding)
+        const reply = { ...assertionFor(instance), ...(assertion.batch ? { synchronization: { id: assertion.batch.id, index: assertion.batch.index, complete } } : {}),
+          ...(complete && !development ? { snapshot: control.issueSnapshot(instanceId) } : {}) }
+        return json(res, 200, development ? { ...reply, synchronized: complete }
+          : body.assertion ? signBusinessControlAssertion(readBusinessSecret(config.sharedSecretFile), reply, 'RESPONSE', req.url)
+            : signBusinessAssertion(readBusinessSecret(config.sharedSecretFile), reply, 'RESPONSE', req.url))
       }
       const instance = await prepare(req, 'http', res)
       await proxy.web(req, res, { target: instance.origin })

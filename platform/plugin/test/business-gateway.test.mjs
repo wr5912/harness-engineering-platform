@@ -782,6 +782,8 @@ test('独立业务监听真实认证和代理，清除自报主体及凭据，�
   assert.equal((await frontFetch(origin + '/agents/soc/', { method: 'GET', headers })).status, 401, 'CLI 探针仍接收未认证拒绝')
   assert.equal((await frontFetch(origin + path, { method: 'POST', headers })).status, 401)
   assert.equal((await frontFetch(origin + path, { method: 'POST', headers: { ...headers, authorization: 'Bearer bad', 'x-harness-business-context': 'forged' } })).status, 401)
+  // 本用例的上游只验证签名；显式确认它已经装载本次最新控制版本。
+  const applied = center.issueSnapshot(binding.instanceId); center.acknowledge(binding.instanceId, applied.restrictionVersion, applied.leaseId)
   const valid = await frontFetch(origin + path, { method: 'POST', headers: { ...headers, authorization: 'Bearer A', 'x-harness-business-context': 'forged' } }); assert.equal(valid.status, 200); assert.deepEqual(await valid.json(), { subjectId: 'A', rawCredential: false, path })
   const login = await frontFetch(origin + '/session', { method: 'POST', headers: { ...headers, authorization: 'Bearer A' } }); assert.equal(login.status, 200); const cookie = login.headers.get('set-cookie').split(';')[0]
   const afterLogin = await frontFetch(origin + '/agents/soc/', { method: 'GET', headers: { ...headers, cookie, accept: 'text/html' } }); assert.equal(afterLogin.status, 200); assert.match(await afterLogin.text(), /\/agents\/soc\/instances\/soc-business\//)
@@ -842,6 +844,7 @@ test('独立业务监听真实认证和代理，清除自报主体及凭据，�
   delete config.gateway; save()
   assert.equal((await frontFetch(origin + secondPath, { method: 'POST', headers: { ...headers, cookie } })).status, 403)
   config.gateway = savedGateway; save()
+  for (const current of [binding, second]) { const applied = center.issueSnapshot(current.instanceId); center.acknowledge(current.instanceId, applied.restrictionVersion, applied.leaseId) }
   assert.equal((await frontFetch(origin + secondPath, { method: 'POST', headers: { ...headers, cookie } })).status, 200)
   assert.equal((await frontFetch(origin + '/agents/soc/instances/unknown/api/session/list', { method: 'POST', headers: { ...headers, cookie } })).status, 403)
   assert.equal((await frontFetch(origin + path, { method: 'POST', headers: { ...headers, cookie } })).status, 200)
@@ -1104,4 +1107,70 @@ test('两个独立状态根经真实控制HTTP同步Session、检测事实、限
 test('报告连接在解析后停用或下载等待中变化，分别阻止上游和正文释放', async t => {
   const before = await reportFixture(t); before.invalidateConnection(); assert.equal((await before.get()).status, 403); assert.equal(before.requested(), 0); before.release()
   const during = await reportFixture(t); const downloading = during.get(); await during.arrival; during.invalidateConnection(); during.release(); const blocked = await downloading; assert.equal(blocked.status, 403); assert.ok(!(await blocked.text()).includes('PRIVATE-REPORT-BODY')); assert.equal(during.requested(), 1)
+})
+
+test('开发控制观察分批同步：中途失败保留已确认状态，重试和重复批次不重复导入', { timeout: 15000 }, async t => {
+  const { ctx, control, coordinator, context, rpc } = await setup(t, { sharedDevelopment: true })
+  const base = context('A')
+  for (let index = 0; index < 700; index++) control.bindSession(base, `large-session-${index}`)
+  const observation = control.exportReplicaState(binding)
+  assert.ok(Buffer.byteLength(JSON.stringify(observation)) > 512 * 1024, '场景跨越旧正文限制')
+  const importBatch = coordinator.importReplicaBatch.bind(coordinator)
+  let requests = 0
+  coordinator.importReplicaBatch = (bound, batch) => {
+    requests++
+    if (batch.index === 1) throw new Error('模拟传输中断')
+    return importBatch(bound, batch)
+  }
+  await assert.rejects(ctx.get('connection').refresh(), /控制服务未确认同步/)
+  assert.ok(requests >= 2)
+  assert.equal(coordinator.sessionTrustFacts().length, 0, '完整确认前不发布部分观察')
+  assert.equal((await rpc('A', 'session/list', {})).status, 200, '开发原生交互不受同步失败限制')
+  coordinator.importReplicaBatch = importBatch
+  let completedBatch
+  coordinator.importReplicaBatch = (bound, batch) => {
+    const complete = importBatch(bound, batch)
+    if (complete) completedBatch = structuredClone(batch)
+    return complete
+  }
+  await ctx.get('connection').refresh()
+  assert.equal(coordinator.sessionTrustFacts().length, 700)
+  assert.equal(importBatch(binding, completedBatch), true, '最终回执丢失后，重发同一末批仍返回完整确认')
+  const conflicting = structuredClone(completedBatch)
+  conflicting.observation.sessions.push(observation.sessions[0])
+  await assert.rejects(async () => importBatch(binding, conflicting), /当前请求未获业务许可/, '复用批次身份修改内容仍拒绝')
+  await ctx.get('connection').refresh()
+  assert.equal(coordinator.sessionTrustFacts().length, 700, '重复同步保持记录身份')
+})
+
+test('已发布网关的有界请求头和版本恢复：累计风险后普通 HTTP 与新 WebSocket 仍可用', { timeout: 10000 }, async t => {
+  const { ctx, control, coordinator, gateway } = await setup(t, { proxyOrigin: 'http://portal.localhost:18060' })
+  const configPath = join(control.assetRoot, 'config/business-access.json'), config = JSON.parse(readFileSync(configPath, 'utf8'))
+  config.gateway.instances[0].accessMode = 'anonymous'
+  writeFileSync(configPath, JSON.stringify(config))
+  for (let index = 0; index < 80; index++) coordinator.updateRisk({ id: `unrelated-${index}`, version: 1,
+    scope: { workspaceId: binding.workspaceId, agentId: binding.agentId, subjectId: 'another-subject' },
+    status: 'assessed', source: 'fixture', observedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 60000).toISOString(),
+    signals: [{ code: 'unrelated', value: 'low', reason: 'x'.repeat(1000) }] })
+  const snapshotVersion = coordinator.currentRestrictionVersion()
+  assert.equal(control.hasCurrentSnapshot(binding.instanceId, snapshotVersion), false)
+  const seenHeaders = []
+  ctx.webServer.server.on('request', request => { if (request.headers['x-harness-business-context']) seenHeaders.push(request.headers) })
+  const origin = `http://127.0.0.1:${gateway.server.address().port}`, base = '/agents/soc/instances/soc-business/'
+  const response = await new Promise((resolve, reject) => {
+    const request = httpRequest(origin + base + 'api/session/list', { method: 'POST', headers: { host: 'business.localhost:0', 'content-type': 'application/json' } }, response => {
+      const chunks = []; response.on('data', chunk => chunks.push(chunk))
+      response.on('end', () => resolve({ status: response.statusCode, text: Buffer.concat(chunks).toString() }))
+    })
+    request.on('error', reject)
+    request.end(JSON.stringify({ type: 'client-request', rpcId: 'large-state', method: 'session/list', payload: { args: { request: {} } } }))
+  })
+  assert.equal(response.status, 200, response.text)
+  assert.ok(control.hasCurrentSnapshot(binding.instanceId, snapshotVersion), '新版本经控制通道收敛，无需手动刷新重试')
+  assert.ok(Buffer.byteLength(JSON.stringify(seenHeaders.at(-1))) < 4096)
+  const assertion = JSON.parse(Buffer.from(seenHeaders.at(-1)['x-harness-business-context'], 'base64url').toString())
+  assert.equal(assertion.snapshot, undefined)
+  assert.equal(assertion.snapshotVersion, snapshotVersion)
+  const socket = new WebSocket(origin.replace('http:', 'ws:') + base + 'api/remote.mux', { headers: { host: 'business.localhost:0' } })
+  await once(socket, 'open'); socket.close(); await once(socket, 'close')
 })

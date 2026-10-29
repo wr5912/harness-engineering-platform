@@ -130,7 +130,7 @@ cd harness-engineering-platform-*
 
 安装和 `verify` 默认使用当前用户的 `~/work/harness-engineering-platform-data` 作为程序目录、`~/harness-engineering-platform-data` 作为独立数据根；可通过 `--prefix`、`--data-root` 显式指定其他目录。
 
-安装包必须与目标机架构一致；当前先验证 ARM64，AMD64 打包/安装验证暂缓。`--data-root` 必须是包含 `AGENTS.md`、`.agents/skills`、`agents/`、`evolution/`、`config/` 和 `workspace.json` 的真实数据仓库；夹具数据根默认拒绝，仅测试可显式 `--allow-fixture-data`。安装后使用 `./platform/dsh-deploy verify --prefix <安装目录> --data-root <数据根> --url http://<host>:18120/hep/login` 核对工作区、管理 Skill、默认工作区和登录页。包格式、Git 客户端、路径映射和未验证项见[离线一键打包与安装](./docs/platform-design/23_离线一键打包与安装.md)。
+安装包必须与目标机架构一致；各架构的验证范围见[项目验收矩阵](./docs/ai-agent-harness项目验收矩阵.md)。`--data-root` 必须是包含 `AGENTS.md`、`.agents/skills`、`agents/`、`evolution/`、`config/` 和 `workspace.json` 的真实数据仓库；夹具数据根默认拒绝，仅测试可显式 `--allow-fixture-data`。安装后使用 `./platform/dsh-deploy verify --prefix <安装目录> --data-root <数据根> --url http://<host>:18120/hep/` 核对工作区、管理 Skill、默认工作区和登录页。包格式、Git 客户端、路径映射和未验证项见[离线一键打包与安装](./docs/platform-design/23_离线一键打包与安装.md)。
 
 ## 开发与研究方式
 

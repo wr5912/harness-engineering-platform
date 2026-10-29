@@ -11,7 +11,8 @@ import type { BusinessContext, BusinessOperation, InstanceBinding } from './cont
 import { BUSINESS_TRANSPORT_HEADER, BUSINESS_TRANSPORT_VERSION } from './contracts.ts'
 import { readBusinessReport } from './reports.ts'
 import { HttpIdentityTrustProvider } from './providers.ts'
-import { businessAssertionHeaders, readBusinessAssertion, businessRpcDigest, readBusinessSecret, signBusinessAssertion, verifyBusinessAssertion, type RuntimeAssertion } from './gateway.ts'
+import { businessAssertionHeaders, readBusinessAssertion, readBusinessAssertionValue, businessRpcDigest, readBusinessSecret, signBusinessAssertion, verifyBusinessAssertion, signBusinessControlAssertion, verifyBusinessControlAssertion, type RuntimeAssertion } from './gateway.ts'
+import { replicaBatches } from './replica.ts'
 import { readMcpSharedToken } from '../mcp/store.ts'
 import { platformGroupUrl } from './group-link.ts'
 
@@ -122,8 +123,10 @@ export class BusinessConnection extends NativeConnection.HostConnectionService {
     const path = prefix && !logicalPath.startsWith(prefix + '/') ? prefix + logicalPath : logicalPath
     if (this.control.isDevelopmentInstance(this.businessConfig.binding)) return readBusinessAssertion(headersOf(request), this.businessConfig.binding)
     const assertion = verifyBusinessAssertion(readBusinessSecret(this.businessConfig.sharedSecretFile), headersOf(request), method, path, this.businessConfig.binding, this.nonces)
-    if (!assertion.snapshot || !this.control.acceptSnapshot(assertion.snapshot)) throw new Error('业务许可快照无效')
-    this.latestSnapshot = assertion.snapshot
+    if (assertion.snapshot) {
+      if (!this.control.acceptSnapshot(assertion.snapshot)) throw new Error('业务许可快照无效')
+      this.latestSnapshot = assertion.snapshot
+    } else if (assertion.snapshotVersion === undefined || !this.control.hasCurrentSnapshot(this.businessConfig.binding.instanceId, assertion.snapshotVersion)) throw new Error('业务许可尚未同步')
     return assertion
   }
   override admit(request: ConnectionTrustRequest): BusinessAdmission {
@@ -198,20 +201,28 @@ export class BusinessConnection extends NativeConnection.HostConnectionService {
     if (this.disposedBusiness) return
     const url = new URL(`/control/${this.businessConfig.binding.instanceId}`, this.businessConfig.coordinatorOrigin)
     const development = this.control.isDevelopmentInstance(this.businessConfig.binding)
-    const assertion: RuntimeAssertion = { binding: this.businessConfig.binding, ...(!development ? { ...(this.latestSnapshot ? { snapshot: this.latestSnapshot } : {}), issuedAt: Date.now(), nonce: randomBytes(24).toString('base64url') } : {}), observation: this.control.exportReplicaState(this.businessConfig.binding) }
-    const response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', ...(development ? { authorization: `Bearer ${readMcpSharedToken(this.businessConfig.assetRoot)}` } : {}) }, body: JSON.stringify(development ? assertion : signBusinessAssertion(readBusinessSecret(this.businessConfig.sharedSecretFile), assertion, 'POST', url.pathname)), signal: AbortSignal.any([this.businessLifetime.signal, AbortSignal.timeout(1000)]) })
-    if (this.disposedBusiness) return
-    if (!response.ok) throw new Error('控制服务未确认同步')
-    const signed = await response.json() as Record<string, any>
-    if (development) {
-      readBusinessAssertion(businessAssertionHeaders(signed as unknown as RuntimeAssertion), this.businessConfig.binding)
-      if (signed.synchronized !== true) throw new Error('控制同步回执无效')
+    const batches = replicaBatches(this.control.exportReplicaState(this.businessConfig.binding))
+    for (const batch of batches) {
+      const assertion: RuntimeAssertion = { binding: this.businessConfig.binding, ...(!development ? { ...(this.latestSnapshot ? { acknowledgement: { leaseId: this.latestSnapshot.leaseId, restrictionVersion: this.latestSnapshot.restrictionVersion } } : {}), issuedAt: Date.now(), nonce: randomBytes(24).toString('base64url') } : {}), batch }
+      const response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', ...(development ? { authorization: `Bearer ${readMcpSharedToken(this.businessConfig.assetRoot)}` } : {}) }, body: JSON.stringify(development ? assertion : signBusinessControlAssertion(readBusinessSecret(this.businessConfig.sharedSecretFile), assertion, 'POST', url.pathname)), signal: AbortSignal.any([this.businessLifetime.signal, AbortSignal.timeout(1000)]) })
+      if (this.disposedBusiness) return
+      if (!response.ok) throw new Error('控制服务未确认同步')
+      const signed = await response.json() as Record<string, any>
+      const updated = development ? readBusinessAssertionValue(signed, this.businessConfig.binding)
+        : verifyBusinessControlAssertion(readBusinessSecret(this.businessConfig.sharedSecretFile), signed, 'RESPONSE', url.pathname, this.businessConfig.binding, this.nonces)
+      if (updated.synchronization?.id !== batch.id || updated.synchronization.index !== batch.index
+        || typeof updated.synchronization.complete !== 'boolean'
+        || batch.index === batch.count - 1 && !updated.synchronization.complete) throw new Error('控制同步回执无效')
+      if (!updated.synchronization.complete) continue
+      if (development) {
+        if (signed.synchronized !== true) throw new Error('控制同步回执无效')
+        return
+      }
+      if (!updated.snapshot || !this.control.acceptSnapshot(updated.snapshot)) throw new Error('控制服务快照无效')
+      this.latestSnapshot = updated.snapshot
+      this.refreshPeerTrust()
       return
     }
-    const updated = verifyBusinessAssertion(readBusinessSecret(this.businessConfig.sharedSecretFile), signed, 'RESPONSE', url.pathname, this.businessConfig.binding, this.nonces)
-    if (!updated.snapshot || !this.control.acceptSnapshot(updated.snapshot)) throw new Error('控制服务快照无效')
-    this.latestSnapshot = updated.snapshot
-    this.refreshPeerTrust()
   }
   private peerTrustKey(context: BusinessContext): string {
     const evidence = context.identity?.evidence

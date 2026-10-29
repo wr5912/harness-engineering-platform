@@ -232,3 +232,43 @@ test('历史交付截止时间不再取消评测，手动取消仍有效', async
   assert.equal(restored.cancel(started.job_id).status, 'cancelling')
   await waitFor(() => restored.status(started.job_id), job => job.status === 'cancelled')
 })
+
+test('同一请求并发与磁盘恢复只启动一次，改参数被拒绝，明确新请求可独立运行', async t => {
+  const fx = await fixture(t, 'console.log("done")')
+  let commands = 0, ready
+  const gate = new Promise(resolve => { ready = resolve })
+  const jobs = fx.create({ command: async () => { commands++; await gate; return { executable: process.execPath, args: [fx.script] } } })
+  const payload = { request_id: randomUUID(), source: 'experiment:EXP-test-agent-001', cases: ['U-CASE-001'], mode: 'full' }
+  const one = jobs.start(payload), duplicate = jobs.start({ ...payload })
+  await assert.rejects(jobs.start({ ...payload, mode: 'fast' }), error => error.code === 'conflict')
+  ready()
+  const [first, second] = await Promise.all([one, duplicate])
+  assert.equal(first.job_id, payload.request_id)
+  assert.equal(second.job_id, first.job_id)
+  assert.equal(commands, 1)
+  await waitFor(() => jobs.status(first.job_id), job => job.status === 'completed')
+  const recovered = await fx.create().start({ mode: payload.mode, cases: payload.cases, source: payload.source, request_id: payload.request_id })
+  assert.equal(recovered.job_id, first.job_id)
+  assert.equal(recovered.status, 'completed')
+  await assert.rejects(fx.create().start({ ...payload, cases: ['U-CASE-002'] }), error => error.code === 'conflict')
+  const fresh = await jobs.start({ ...payload, request_id: randomUUID() })
+  assert.notEqual(fresh.job_id, first.job_id)
+  assert.equal(commands, 2)
+  await waitFor(() => jobs.status(fresh.job_id), job => job.status === 'completed')
+})
+
+test('受理前准备失败允许同一请求重试且没有残留任务', async t => {
+  const fx = await fixture(t, '')
+  let fail = true
+  const jobs = fx.create({ command: () => {
+    if (fail) throw new Error('来源尚未就绪')
+    return { executable: process.execPath, args: [fx.script] }
+  } })
+  const payload = { request_id: randomUUID(), source: 'experiment:EXP-test-agent-001' }
+  await assert.rejects(jobs.start(payload), /来源尚未就绪/)
+  assert.deepEqual(jobs.list(), [])
+  fail = false
+  const accepted = await jobs.start(payload)
+  assert.equal(accepted.job_id, payload.request_id)
+  await waitFor(() => jobs.status(accepted.job_id), job => job.status === 'completed')
+})

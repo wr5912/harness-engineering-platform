@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -44,4 +44,28 @@ test('外部 Git 资源在复制前拒绝混用 glibc，包括符号链接和两
       rmSync(path)
     }
   } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
+test('不同 PATH 来源统一包内 Git 布局，复制后不依赖原二进制路径', async t => {
+  const root = mkdtempSync(join(tmpdir(), 'hep-git-path-'))
+  const originalPath = process.env.PATH
+  try {
+    for (const custom of [false, true]) await t.test(custom ? '自定义 PATH 中的真实 ELF' : '/usr/bin/git', () => {
+      const source = join(root, custom ? 'custom bin' : 'system bin')
+      mkdirSync(source)
+      copyFileSync('/usr/bin/git', join(source, 'git'))
+      process.env.PATH = custom ? `${source}:/usr/bin:/bin` : '/usr/bin:/bin'
+      const bundle = join(root, custom ? 'custom bundle' : 'system bundle')
+      const collected = collectSystemGit(bundle)
+      assertGitBundle(bundle)
+      const copied = copyGitBundle(bundle, `${bundle} copied`)
+      rmSync(source, { recursive: true, force: true })
+      assert.equal(run(collected.path, ['--version']).trim(), collected.version)
+      assert.equal(run(copied.path, ['--version']).trim(), collected.version)
+    })
+  } finally {
+    if (originalPath === undefined) delete process.env.PATH
+    else process.env.PATH = originalPath
+    rmSync(root, { recursive: true, force: true })
+  }
 })

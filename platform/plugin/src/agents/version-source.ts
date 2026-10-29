@@ -27,8 +27,13 @@ export function versionIdentity(root: string, id: string, commit?: string): MapV
   const match = VERSION_ID.exec(id)
   if (!match || commit && !/^[a-f0-9]{40}$/i.test(commit)) throw new Error('版本或固定提交格式无效')
   const change = load(versionFile(root, `evolution/experiments/${id}/change.yaml`, commit)!) as MapValue
-  if (change?.agent_id !== match[1] || change.experiment_id !== id) throw new Error('change.yaml 与版本身份不一致')
+  assertVersionIdentity(id, change)
   return change
+}
+
+export function assertVersionIdentity(id: string, change: MapValue) {
+  const match = VERSION_ID.exec(id)
+  if (!match || change?.agent_id !== match[1] || change.experiment_id !== id) throw new Error('change.yaml 与版本身份不一致')
 }
 
 /** 只读选定版本；固定父版的所有信息均来自同一提交。 */

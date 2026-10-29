@@ -1,5 +1,6 @@
 import { LoadingIndicator } from '../components/loading-indicator.tsx'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useQueuedRefresh } from '../realtime/refresh.ts'
 import { CHANNEL } from '../protocol.ts'
 import type { PlatformNavigation, PlatformPageProps } from '../protocol.ts'
 import type { PlatformUpdates } from '../realtime/client.ts'
@@ -115,6 +116,7 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
   const descriptionDirty = useRef(false)
   const detailRequest = useRef(0)
   const listRequest = useRef(0)
+  const changedList = useRef(true)
   const selectionRequest = useRef(0)
   const versionPreviewRequest = useRef(0)
   const launchRequest = useRef(0)
@@ -198,6 +200,7 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
     if (reveal) pendingReveal.current = reveal
     detailRequest.current++
     selectionRequest.current++
+    runOverviewRequest.current++
     versionPreviewRequest.current++
     launchRequest.current++
     pendingSelectionNavigation.current = notify && !experimentId
@@ -338,16 +341,15 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
     } finally { if (selection === selectionRequest.current) setNameBusy(false) }
   }
 
-  useEffect(() => { void refreshList() }, [])
-  useEffect(() => { void refreshDetail(selected, selectedExperiment) }, [selected, selectedExperiment])
-  useEffect(() => {
-    const experimentId = detail?.experiment?.id
+  useEffect(() => { void refreshChanged() }, [selected, selectedExperiment])
+  async function refreshRunOverview() {
+    const experimentId = selectedExperiment || detail?.experiment?.id
     if (!selected || !experimentId) return
     const agentId = selected, request = ++runOverviewRequest.current
     setRunOverview(current => current?.agentId === agentId && current.experimentId === experimentId && current.phase === 'ready'
       ? { ...current, refreshing: true, refreshError: undefined }
       : { agentId, experimentId, phase: 'loading', runs: [] })
-    void (async () => {
+    await (async () => {
       try {
         const index = await call('runs/index', { agent_id: agentId })
         if (request !== runOverviewRequest.current) return
@@ -383,8 +385,7 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
         }
       }
     })()
-    return () => { runOverviewRequest.current++ }
-  }, [selected, detail])
+  }
   useEffect(() => {
     if (active) onContext?.({ page: 'agents', agent_id: selected || undefined, experiment_id: detail?.experiment?.id, tab })
   }, [active, selected, detail?.experiment?.id, tab, onContext])
@@ -427,29 +428,24 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
     window.addEventListener('beforeunload', guard)
     return () => window.removeEventListener('beforeunload', guard)
   }, [editOpen, editBody, assetInfo?.content, nameOpen, nameDraft, nameInitial])
-  useEffect(() => {
+  const refreshChanged = useQueuedRefresh(active, async () => {
     const selection = selectionRequest.current
-    if (selected) void call('fusion/proposal', { agent_id: selected }).then(value => {
-      if (selection === selectionRequest.current) setVersionProposal(value.proposal)
-    }).catch(() => undefined)
-    if (detail?.experiment?.id) void call('features/proposal', { experiment_id: detail.experiment.id }).then(value => {
-      if (selection === selectionRequest.current) setFeatureProposal(value.proposal)
-    }).catch(() => undefined)
-  }, [selected, detail?.experiment?.id])
-  useEffect(() => updates?.subscribe(() => {
-    const snapshot = updates.getSnapshot()
-    if (!snapshot.domains.some(domain => ['agents', 'instances', 'catalog'].includes(domain))) return
-    const selection = selectionRequest.current
-    void refreshList()
-    void refreshDetail(selected, selectedExperiment)
-    if (selected) void call('fusion/proposal', { agent_id: selected }).then(value => { if (selection === selectionRequest.current) setVersionProposal(value.proposal) }).catch(() => undefined)
-    if (detail?.experiment?.id) void call('features/proposal', { experiment_id: detail.experiment.id }).then(value => { if (selection === selectionRequest.current) setFeatureProposal(value.proposal) }).catch(() => undefined)
+    const readList = changedList.current
+    changedList.current = false
+    const reads: Promise<unknown>[] = [refreshDetail(selected, selectedExperiment), refreshRunOverview()]
+    if (readList) reads.push(refreshList())
+    if (selected) reads.push(call('fusion/proposal', { agent_id: selected }).then(value => { if (selection === selectionRequest.current) setVersionProposal(value.proposal) }).catch(() => undefined))
+    if (selectedExperiment) reads.push(call('features/proposal', { experiment_id: selectedExperiment }).then(value => { if (selection === selectionRequest.current) setFeatureProposal(value.proposal) }).catch(() => undefined))
     if (editOpen && detail?.experiment?.id && editPath && editHash) {
       const request = editRequest.current
-      void call('edit/read', { experiment_id: detail.experiment.id, path: editPath }).then(value => { if (request === editRequest.current && value.sha256 !== editHash) setEditMessage('文件已被其他任务修改，编辑草稿已保留；保存前请核对最新内容。') }).catch(() => undefined)
+      reads.push(call('edit/read', { experiment_id: detail.experiment.id, path: editPath }).then(value => { if (request === editRequest.current && value.sha256 !== editHash) setEditMessage('文件已被其他任务修改，编辑草稿已保留；保存前请核对最新内容。') }).catch(() => undefined))
     }
-  }), [updates, selected, selectedExperiment, detail?.experiment?.id, editOpen, editPath, editHash])
-  useEffect(() => { void loadEditFile(editPath) }, [detail?.experiment?.id, editPath])
+    await Promise.allSettled(reads)
+  }, `${selected}:${selectedExperiment}`)
+  useEffect(() => updates?.subscribe(() => {
+    if (updates.getSnapshot().domains.some(domain => ['agents', 'instances', 'catalog'].includes(domain))) { changedList.current = true; void refreshChanged() }
+  }), [updates])
+  useEffect(() => { if (active) void loadEditFile(editPath) }, [active, detail?.experiment?.id, editPath])
   useEffect(() => {
     if (editOpen && active) editDialog.current?.showModal()
     else editDialog.current?.close()
@@ -678,7 +674,7 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
   return <main className="harness-agents" data-active-tab={tab} aria-label="智能体管理">
     <div className="agent-page-content">
       <header className="agent-page-heading">
-        <div className="agent-actions"><button type="button" className="agent-primary" onClick={() => setCreateOpen(true)}>新建智能体</button><button type="button" onClick={() => { void refreshList(); void refreshDetail() }}>刷新</button></div>
+        <div className="agent-actions"><button type="button" className="agent-primary" onClick={() => setCreateOpen(true)}>新建智能体</button><button type="button" onClick={() => { changedList.current = true; void refreshChanged() }}>刷新</button></div>
         {tab === 'compute-variants' && <button type="button" className="compute-page-back" onClick={returnToList}>返回智能体列表</button>}
       </header>
       {error && <p role="alert" className="agent-error">{error}</p>}

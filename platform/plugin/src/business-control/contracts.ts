@@ -1,6 +1,6 @@
 /** 业务控制的唯一公共合同；管理端与 Runtime 均引用本模块。 */
 // 仅在网关与 Runtime 的接入协议不兼容时递增，不随普通构建变化。
-export const BUSINESS_TRANSPORT_VERSION = '2'
+export const BUSINESS_TRANSPORT_VERSION = '3'
 export const BUSINESS_TRANSPORT_HEADER = 'x-harness-business-transport-version'
 export type PluginKind = 'authentication' | 'identity-trust' | 'risk-assessment' | 'access-authorization'
 export interface ControlPluginManifest {
@@ -196,3 +196,4 @@ export interface ControlEvent {
 export interface ReplicaObservation {
   binding: InstanceBinding; sessions: SessionBinding[]; riskFacts: RiskFact[]; events: ControlEvent[]
 }
+export interface ReplicaBatch { id: string; index: number; count: number; observation: ReplicaObservation }
