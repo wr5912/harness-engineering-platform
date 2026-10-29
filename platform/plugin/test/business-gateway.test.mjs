@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, symlinkSync, rmSyn
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomBytes } from 'node:crypto'
-import { once } from 'node:events'
+import { EventEmitter, once } from 'node:events'
 import { createServer, request as httpRequest } from 'node:http'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import ApprovalService from '@deepseek-ai/dsh-user-approval'
@@ -247,12 +247,128 @@ test('无需认证的开发实例保留完整原生访问能力及共享 Session
   assert.equal(created.result.ok, true, JSON.stringify(created))
   assert.deepEqual(fixture.seen, ['owner'])
   const connection = ctx.get('connection')
-  const remote = connection.createPeer({ principal: { kind: 'harness-business', context: context('A') } })
-  assert.throws(() => connection.contextForPeer(remote), /上下文缺失/, '未经业务 admission 的 Peer 不产生业务身份')
-  await remote.dispose()
+  assert.deepEqual(connection.admit({ method: 'GET', url: '/api', headers: {} }), { rejection: 403 }, '共享 owner 仍须逐请求验签')
   const list = await (await rpc('B', 'session/list', {})).json()
   assert.deepEqual(list.result.value.items.map(item => item.sessionId), [created.result.value.sessionId])
   assert.equal((await rpc('B', 'session/page', { sessionId: created.result.value.sessionId })).status, 200)
+})
+async function until(read, message) {
+  const deadline = Date.now() + 2000
+  while (!read() && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10))
+  assert.ok(read(), message)
+  return read()
+}
+async function nativeQuestions(t, fixture) {
+  const { ctx, headers } = fixture, events = []
+  let wake
+  ctx.effect(() => ctx.get('typertGateway').registerRemoteEvents(async function* (signal) {
+    const abort = () => wake?.()
+    signal.addEventListener('abort', abort, { once: true })
+    try {
+      while (!signal.aborted) {
+        while (events.length) yield events.shift()
+        await new Promise(resolve => { wake = resolve; if (signal.aborted) resolve() })
+      }
+    } finally { signal.removeEventListener('abort', abort) }
+  }, { home: '/native-fixture' }), 'native question regression source')
+  return {
+    async connect() {
+      const path = '/api/remote.mux', frames = []
+      const socket = new WebSocket(`ws://127.0.0.1:${ctx.webServer.port}${path}`, { headers: headers('shared', path, 'GET') })
+      t.after(() => socket.terminate())
+      socket.on('message', data => frames.push(JSON.parse(data.toString()).value))
+      await once(socket, 'open')
+      socket.send(JSON.stringify({ type: 'open', streamId: 'questions', endpoint: '$events', payload: { args: {} } }))
+      const ready = await until(() => frames.find(frame => frame?.type === 'ready'), '原生问答流 ready')
+      return { socket, frames, clientId: ready.clientId }
+    },
+    ask(signal) {
+      const outcomes = [], agent = {}
+      events.push({ event: 'probe-confirmation', context: { agentId: 'probe-agent', subject: agent, value: ctx },
+        request: { agent, title: '隔离问答测试', ...(signal ? { signal } : {}) },
+        resolve: outcome => outcomes.push(outcome), reject: error => outcomes.push({ error: error.message }) })
+      wake?.()
+      return outcomes
+    },
+    async answer(clientId, eventId) {
+      const path = '/api/$events/result'
+      const response = await fetch(`http://127.0.0.1:${ctx.webServer.port}${path}`, { method: 'POST',
+        headers: { 'content-type': 'application/json', ...headers('shared', path) },
+        body: JSON.stringify({ type: 'client-request', rpcId: randomBytes(8).toString('hex'), method: '$events/result',
+          payload: { args: { clientId, eventId, outcome: { kind: 'result', value: 'test-only' } } } }) })
+      assert.equal(response.status, 200)
+      const receipt = await response.json()
+      assert.equal(receipt.result.ok, true, JSON.stringify(receipt))
+    },
+  }
+}
+test('原生问答跨 HTTP、页面完成和多标签保持同一 Peer，重复回答只完成一次', async t => {
+  const fixture = await setup(t, { sharedDevelopment: true }), { ctx, headers, rpc } = fixture
+  const questions = await nativeQuestions(t, fixture), first = await questions.connect(), second = await questions.connect()
+  const outcomes = questions.ask()
+  const event = await until(() => first.frames.find(frame => frame?.type === 'waterfall'), '第一标签收到确认')
+  await until(() => second.frames.find(frame => frame?.eventId === event.eventId), '第二标签收到同一确认')
+  const response = new EventEmitter()
+  assert.equal(ctx.get('connection').authorizeIndex({ method: 'GET', url: '/', headers: headers('shared', '/', 'GET') }, response), true)
+  response.emit('finish')
+  assert.equal((await rpc('shared', 'session/create', {})).status, 200)
+  await questions.answer(first.clientId, event.eventId)
+  await questions.answer(second.clientId, event.eventId)
+  await questions.answer(first.clientId, event.eventId)
+  assert.deepEqual(outcomes, [{ kind: 'result', value: 'test-only' }])
+  const next = questions.ask()
+  await until(() => first.frames.filter(frame => frame?.type === 'waterfall').length === 2, '回答后原连接仍可收到后续问题')
+  assert.equal(first.socket.readyState, WebSocket.OPEN)
+  first.socket.close(); await once(first.socket, 'close')
+  second.socket.close(); await once(second.socket, 'close')
+  const reconnected = await questions.connect()
+  const pending = await until(() => reconnected.frames.find(frame => frame?.type === 'waterfall'), '重连恢复未完成问题')
+  assert.notEqual(pending.eventId, event.eventId, '已回答问题不再重投')
+  await questions.answer(reconnected.clientId, pending.eventId)
+  assert.equal(next.length, 1)
+  const cancelled = new AbortController(), cancelledOutcomes = questions.ask(cancelled.signal)
+  const cancelledFrame = await until(() => reconnected.frames.find(frame => frame?.type === 'waterfall' && frame.eventId !== pending.eventId), '取消前收到问题')
+  cancelled.abort(new Error('fixture cancelled'))
+  await until(() => cancelledOutcomes.length, '原生取消完成')
+  await questions.answer(reconnected.clientId, cancelledFrame.eventId)
+  assert.deepEqual(cancelledOutcomes, [{ error: 'fixture cancelled' }])
+})
+test('共享 Peer 不共享请求上下文，连接释放保留 Peer，配置撤销及服务卸载释放 Peer', async t => {
+  const { ctx, control, headers } = await setup(t, { sharedDevelopment: true }), connection = ctx.get('connection')
+  const request = () => ({ method: 'GET', url: '/api/remote.mux', headers: headers('shared', '/api/remote.mux', 'GET') })
+  const one = connection.admit(request()), two = connection.admit(request())
+  assert.ok('peer' in one && 'peer' in two)
+  assert.equal(one.peer, two.peer)
+  assert.notEqual(one.context.requestId, two.context.requestId)
+  assert.notEqual(one.context, two.context)
+  await one.release()
+  const socket = connection.admitConnection(request()); await socket.release()
+  assert.equal(one.peer.signal.aborted, false)
+  const unsigned = request(); unsigned.headers = {}
+  assert.deepEqual(connection.admit(unsigned), { rejection: 403 })
+  const replay = request(); connection.admit(replay)
+  assert.deepEqual(connection.admit({ ...replay }), { rejection: 403 })
+  const file = join(control.assetRoot, 'config/business-access.json'), original = readFileSync(file, 'utf8')
+  for (const edit of [
+    config => { config.gateway.instances[0].identityMode = 'published' },
+    config => { config.gateway.instances[0].accessMode = 'authenticated' },
+    config => { config.gateway.instances[0].sourceDigest = 'sha256:' + 'b'.repeat(64) },
+    config => { config.gateway.instances = [] },
+    config => { config.enabled = false },
+  ]) {
+    writeFileSync(file, original)
+    await connection.refresh(); await connection.refresh()
+    const admitted = connection.admit(request()); assert.ok('peer' in admitted)
+    const config = JSON.parse(original); edit(config); writeFileSync(file, JSON.stringify(config))
+    await until(() => admitted.peer.signal.aborted, '配置撤销须结束旧共享 Peer')
+  }
+  writeFileSync(file, original)
+  await connection.refresh(); await connection.refresh()
+  const current = connection.admit(request()); assert.ok('peer' in current)
+  assert.notEqual(current.peer, one.peer)
+  await ctx.fiber.dispose()
+  assert.equal(current.peer.signal.aborted, true)
+  assert.deepEqual(connection.admit(request()), { rejection: 401 })
 })
 test('空 HOME 启动前预登记固定工作区，浏览器无需目录选择即可创建业务 Session', async t => {
   const { ctx, rpc, fixture, workspacePath, workspaceRows, workspaceRegistry, registrationConnections } = await setup(t, { emptyWorkspace: true })
@@ -373,7 +489,7 @@ test('原生 ApprovalService 暂停同一次调用，B不能回答A的确认且�
     ctx.effect(() => ctx.webServer.register({ kind: 'exact', path: '/api/business-control/confirmations', handler: async (req, res) => {
       const admitted = ctx.get('connection').admit(req)
       if ('rejection' in admitted) { res.writeHead(admitted.rejection); res.end(); return }
-      try { await adapter.handle(req, res, admitted.peer.principal.context) } finally { await admitted.peer.dispose() }
+      try { await adapter.handle(req, res, admitted.context) } finally { await admitted.release() }
     } }), 'late business confirmation HTTP fixture')
   } })
   const injected = []
@@ -761,7 +877,7 @@ test('两个独立状态根经真实控制HTTP同步Session、检测事实、限
   await ctx.plugin({ name: 'replica-connection-test', apply(ctx) { connection = new Runtime.BusinessConnection(ctx, { assetRoot: replicaRoot, stateRoot: join(root, 'runtime-state'), sharedSecretFile: secretPath, coordinatorOrigin: `http://127.0.0.1:${gateway.server.address().port}`, binding }, replica) } })
   await connection.refresh(); await connection.refresh()
   const credential = identity('A'); credential.subject.identitySource = providerOrigin; credential.evidence.issuer = providerOrigin; const context = center.createContext(credential, binding), snapshot = center.issueSnapshot(binding.instanceId)
-  const admitted = connection.admit({ method: 'POST', url: '/api/session/create', headers: signBusinessAssertion(secret, { binding, context, snapshot, issuedAt: Date.now(), nonce: randomBytes(24).toString('base64url') }, 'POST', '/api/session/create') }); assert.ok(!('rejection' in admitted)); await admitted.peer.dispose()
+  const admitted = connection.admit({ method: 'POST', url: '/api/session/create', headers: signBusinessAssertion(secret, { binding, context, snapshot, issuedAt: Date.now(), nonce: randomBytes(24).toString('base64url') }, 'POST', '/api/session/create') }); assert.ok(!('rejection' in admitted)); await admitted.release()
   const session = replica.bindSession(context, 'replica-created-session'); assert.equal(center.contextForSession(session.scope.sessionId), undefined); await connection.refresh(); assert.equal(center.contextForSession(session.scope.sessionId).subject.id, 'A')
   replica.bindSession(session, 'replica-child-session', session.scope.sessionId); await connection.refresh()
   assert.equal(center.parentSessionId(center.contextForSession(session.scope.sessionId), 'replica-child-session'), session.scope.sessionId)

@@ -29,7 +29,7 @@ const generalReads = ['session/list', 'session/search', 'session/modelCatalog', 
 const scheduleActions = ['schedule/list', 'schedule/catalog', 'schedule/history', 'schedule/delete', 'schedule/update', 'event:schedule/changed']
 const sessionActions = ['session/page', 'session/follow', 'session/projections', 'session/attachment', 'session/prompt', 'session/cancel', 'session/updateQueue', 'session/rename', 'session/fork', 'session/selectModel']
 const sessionEvents = ['event:api-session/activity', 'event:api-session/added', 'event:api-session/error', 'event:api-session/removed', 'event:api-session/status']
-const requestContext = new WeakMap<object, { peer: PeerScope; context: BusinessContext }>()
+type BusinessAdmission = { peer: PeerScope; context: BusinessContext; release(): Promise<void> } | Extract<PeerAdmission, { rejection: number }>
 function headersOf(request: ConnectionTrustRequest): IncomingMessage['headers'] {
   return request.headers instanceof Headers ? Object.fromEntries(request.headers) : request.headers as IncomingMessage['headers']
 }
@@ -42,6 +42,8 @@ function requestAddress(request: ConnectionTrustRequest): { method: string; path
 export class BusinessConnection extends NativeConnection.HostConnectionService {
   private nonces = new Map<string, number>()
   private businessPeers = new Map<PeerScope, BusinessContext>()
+  private requestContext = new WeakMap<object, BusinessAdmission>()
+  private sharedDevelopmentPeer?: PeerScope
   private disposedBusiness = false
   private businessLifetime = new AbortController()
   private refreshing?: Promise<void>
@@ -56,7 +58,11 @@ export class BusinessConnection extends NativeConnection.HostConnectionService {
     control.requireSnapshot(businessConfig.binding.instanceId)
     const timer = setInterval(() => { void this.refresh().catch(() => { /* 租约到期由同步授权与Peer检查拒绝。 */ }) }, 500)
     const monitor = setInterval(() => { for (const [peer, context] of this.businessPeers) {
-      try { if (!control.enabled()) throw new Error('业务控制已关闭'); control.assert(context, 'agent:access', [{ kind: 'agent', id: context.scope.agentId }]) }
+      try {
+        if (!control.enabled()) throw new Error('业务控制已关闭')
+        if (peer === this.sharedDevelopmentPeer && (!control.isDevelopmentContext(context) || !control.isSharedContext(context))) throw new Error('共享开发访问已撤回')
+        control.assert(context, 'agent:access', [{ kind: 'agent', id: context.scope.agentId }])
+      }
       catch { void peer.dispose(); this.businessPeers.delete(peer) }
     } }, 100)
     timer.unref(); monitor.unref()
@@ -106,10 +112,10 @@ export class BusinessConnection extends NativeConnection.HostConnectionService {
     this.latestSnapshot = assertion.snapshot
     return assertion
   }
-  override admit(request: ConnectionTrustRequest): PeerAdmission {
+  override admit(request: ConnectionTrustRequest): BusinessAdmission {
     if (this.disposedBusiness) return { rejection: 401 }
-    const cached = requestContext.get(request)
-    if (cached) return { peer: cached.peer }
+    const cached = this.requestContext.get(request)
+    if (cached) return 'peer' in cached && cached.peer.signal.aborted ? { rejection: 403 } : cached
     try {
       const assertion = this.assertion(request)
       if (!assertion.context) return { rejection: 401 }
@@ -117,31 +123,35 @@ export class BusinessConnection extends NativeConnection.HostConnectionService {
       this.control.assert(context, 'agent:access', [{ kind: 'agent', id: context.scope.agentId }])
       // 无需认证的开发实例共享整个原生界面；已认证及已发布实例保留各自资源合同。
       const sharedDevelopment = this.control.isDevelopmentContext(context) && this.control.isSharedContext(context)
-      const peer = this.createPeer({ principal: sharedDevelopment ? { kind: 'owner' } : { kind: PRINCIPAL, context }, interactions: 'answer' })
-      this.businessPeers.set(peer, context); requestContext.set(request, { peer, context })
-      peer.signal.addEventListener('abort', () => this.businessPeers.delete(peer), { once: true })
-      return { peer }
+      // 原生问答按 Peer 对象关联事件流与回答，生命周期与实例连接服务一致。
+      const peer = sharedDevelopment && this.sharedDevelopmentPeer || this.createPeer({ principal: sharedDevelopment ? { kind: 'owner' } : { kind: PRINCIPAL, context }, interactions: 'answer' })
+      if (!this.businessPeers.has(peer)) {
+        if (sharedDevelopment) this.sharedDevelopmentPeer = peer
+        peer.signal.addEventListener('abort', () => {
+          this.businessPeers.delete(peer)
+          if (this.sharedDevelopmentPeer === peer) this.sharedDevelopmentPeer = undefined
+        }, { once: true })
+      }
+      this.businessPeers.set(peer, context)
+      const admitted = { peer, context, release: sharedDevelopment ? async () => {} : () => peer.dispose() }
+      this.requestContext.set(request, admitted)
+      return admitted
     } catch { return { rejection: 403 } }
   }
   override admitConnection(request: ConnectionTrustRequest): ConnectionAdmission {
     const admitted = this.admit(request)
     if ('rejection' in admitted) return admitted
-    return { peer: admitted.peer, release: () => admitted.peer.dispose() }
+    return { peer: admitted.peer, release: admitted.release }
   }
   override authorizeIndex(request: ConnectionIndexRequest, response: ConnectionIndexResponse): boolean {
     const admitted = this.admit(request)
     if ('rejection' in admitted) { response.writeHead(admitted.rejection); response.end('业务访问被拒绝'); return false }
     const actualResponse = response as ServerResponse
-    actualResponse.once?.('finish', () => { void admitted.peer.dispose() })
+    actualResponse.once?.('finish', () => { void admitted.release() })
     return true
   }
   override authorizeConnect(_request: ConnectionIndexRequest, response: ConnectionIndexResponse): void { response.writeHead(403); response.end('业务入口不提供 owner 接入') }
   override authenticatedUrl(base: string): string { return base }
-  contextForPeer(peer: PeerScope): BusinessContext {
-    const context = this.businessPeers.get(peer)
-    if (!context) throw new Error('业务连接上下文缺失')
-    return context
-  }
   refresh(): Promise<void> {
     if (this.refreshing) return this.refreshing
     const task = this.refreshOnce().finally(() => { if (this.refreshing === task) this.refreshing = undefined })
@@ -410,7 +420,7 @@ export async function apply(ctx: Context, config: BusinessRuntimeConfig): Promis
     const lifetime = new AbortController()
     res.once('close', () => lifetime.abort())
     try {
-      const base = connection.contextForPeer(admission.peer)
+      const base = admission.context
       const report = /^\/api\/business-control\/reports\/([a-f0-9-]{36})$/.exec(new URL(req.url || '/', 'http://runtime').pathname)
       if (report) {
         if (req.method !== 'GET') throw new Error('报告只允许读取')
@@ -452,7 +462,7 @@ export async function apply(ctx: Context, config: BusinessRuntimeConfig): Promis
       }
       await sendFetch(res, response)
     } catch { if (!res.headersSent) { res.writeHead(403, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: '业务请求被拒绝' })) } else res.destroy() }
-    finally { await admission.peer.dispose() }
+    finally { await admission.release() }
   } }), 'business Runtime: native API bridge')
 }
 

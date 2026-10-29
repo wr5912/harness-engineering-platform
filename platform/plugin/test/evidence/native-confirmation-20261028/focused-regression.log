@@ -1,0 +1,11 @@
+✔ 无需认证的开发实例保留完整原生访问能力及共享 Session 上下文 (144.046136ms)
+✔ 原生问答跨 HTTP、页面完成和多标签保持同一 Peer，重复回答只完成一次 (202.020185ms)
+✔ 共享 Peer 不共享请求上下文，连接释放保留 Peer，配置撤销及服务卸载释放 Peer (536.275294ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2190.02081

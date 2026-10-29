@@ -1,0 +1,42 @@
+{
+  "verifiedAt": "2026-10-29T01:48:54.122134+00:00",
+  "container": {
+    "id": "56f3d127e3779b79efe3a3674cd34483f45afa4b3804c469f4e4fd56bc273d35",
+    "image": "sha256:d90185713372e65b6c49555cf2ca633a3351e7f379c9b792804d8d79c7d4211b",
+    "startedAt": "2026-10-29T01:46:49.645735029Z",
+    "running": true,
+    "oomKilled": false,
+    "restartCount": 0
+  },
+  "runtimeArtifactSha256": "295f80b1e34a67bb3991fce1baf52ab41096206acd8a48ee6196896d43de6068",
+  "recordAndAccessConfigUnchanged": true,
+  "platformPidUnchanged": true,
+  "originalSession": {
+    "id": "session-04e40fa3-bdd8-45a6-9eac-600b1d7ed4df",
+    "historyPrefixUnchanged": true,
+    "rowsBefore": 51,
+    "rowsAfter": 54,
+    "appendedTypes": [
+      "step/end",
+      "turn/end",
+      "session/end-seed"
+    ],
+    "appendedToolCalls": [],
+    "journalSha256After": "9e37884604a4ef1254b1313a59d7d242b026c4770b72847eb06c0cd89eb4d296"
+  },
+  "readOnlyBrowser": {
+    "pageErrors": [],
+    "failedRequests": [],
+    "connections": 1,
+    "status": 200,
+    "sessionPage": {
+      "status": 200,
+      "ok": true,
+      "keys": [
+        "records",
+        "hasMore"
+      ],
+      "recordCount": 53
+    }
+  }
+}

@@ -1,0 +1,36 @@
+✔ 无需认证的开发实例保留完整原生访问能力及共享 Session 上下文 (1028.611603ms)
+✖ 原生问答跨 HTTP、页面完成和多标签保持同一 Peer，重复回答只完成一次 (127.757138ms)
+✖ 共享 Peer 不共享请求上下文，连接释放保留 Peer，配置撤销及服务卸载释放 Peer (34.260677ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 1
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2683.932003
+
+✖ failing tests:
+
+test at test/business-gateway.test.mjs:305:1
+✖ 原生问答跨 HTTP、页面完成和多标签保持同一 Peer，重复回答只完成一次 (127.757138ms)
+  AssertionError [ERR_ASSERTION]: {"type":"server-response","rpcId":"b45f0023988cb73a","result":{"ok":false,"error":{"code":"gateway/interactions-forbidden","message":"typert gateway: $events/result: Remote event result belongs to another Peer","details":{"endpoint":"$events/result"}}}}
+  
+  false !== true
+  
+      at Object.answer (file:///home/cmp/work/harness-engineering-platform/platform/plugin/test/business-gateway.test.mjs:301:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///home/cmp/work/harness-engineering-platform/platform/plugin/test/business-gateway.test.mjs:315:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/business-gateway.test.mjs:336:1
+✖ 共享 Peer 不共享请求上下文，连接释放保留 Peer，配置撤销及服务卸载释放 Peer (34.260677ms)
+  [Error: cannot get property "href" without inject]
