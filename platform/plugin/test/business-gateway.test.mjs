@@ -8,6 +8,7 @@ import { createServer, request as httpRequest } from 'node:http'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import ApprovalService from '@deepseek-ai/dsh-user-approval'
 import test from 'node:test'
+import { BUSINESS_TRANSPORT_HEADER, BUSINESS_TRANSPORT_VERSION } from '../src/business-control/contracts.ts'
 import { Context, Service } from '@deepseek-ai/cordis'
 import WebServer from '@deepseek-ai/dsh-host-webserver'
 import { createMountedWebServer } from '../../../runtime/adapters/dsh-web/lib/index.mjs'
@@ -346,7 +347,10 @@ test('原生问答跨 HTTP、页面完成和多标签保持同一 Peer，重复�
   const event = await until(() => first.frames.find(frame => frame?.type === 'waterfall'), '第一标签收到确认')
   await until(() => second.frames.find(frame => frame?.eventId === event.eventId), '第二标签收到同一确认')
   const response = new EventEmitter()
+  const responseHeaders = new Map()
+  response.setHeader = (key, value) => responseHeaders.set(key, value)
   assert.equal(ctx.get('connection').authorizeIndex({ method: 'GET', url: '/', headers: headers('shared', '/', 'GET') }, response), true)
+  assert.equal(responseHeaders.get(BUSINESS_TRANSPORT_HEADER), BUSINESS_TRANSPORT_VERSION)
   response.emit('finish')
   assert.equal((await rpc('shared', 'session/create', {})).status, 200)
   await questions.answer(first.clientId, event.eventId)

@@ -7,6 +7,7 @@ import { workspaceIdentity } from '../plugin/src/workspace.ts'
 import { sha256File, type Manifest } from './manifest.mts'
 import { validateBusinessGateway } from '../plugin/src/business-control/configuration.ts'
 import { resolveBusinessSecretFile } from '../plugin/src/business-control/secret-file.ts'
+import { checkRunningBusinessEntries } from '../business-readiness.mts'
 
 export interface DeploymentCheck {
   id: string
@@ -114,6 +115,13 @@ export async function verifyDeployment(options: VerifyOptions): Promise<{ checks
     } catch (error) {
       checks.push({ id: 'online-business-gateway', status: 'mismatch', detail: error instanceof Error ? error.message : '业务网关监听核验失败' })
     }
+    try {
+      if (!['online-workspace', 'online-business-gateway'].every(id => checks.find(check => check.id === id)?.status === 'ok')) throw new Error('平台与业务网关归属尚未通过核对，未执行实例入口检查')
+      const entries = await checkRunningBusinessEntries(prefix, dataRoot)
+      const failed = entries.filter(entry => !entry.ready)
+      checks.push({ id: 'online-business-instances', status: failed.length ? 'mismatch' : 'ok',
+        detail: failed.length ? failed.map(entry => `${entry.name}：${entry.detail}`).join('；') : `已核对 ${entries.length} 个运行中业务实例的网页入口与接入版本` })
+    } catch { checks.push({ id: 'online-business-instances', status: 'mismatch', detail: '运行中业务实例入口检查未完成；请核对平台归属、Docker 状态和实例登记' }) }
   }
-  return { checks, onlineVerified: Boolean(options.url && ['online-workspace', 'online-business-gateway'].every(id => checks.find(check => check.id === id)?.status === 'ok')), ok: checks.every(check => check.status === 'ok') }
+  return { checks, onlineVerified: Boolean(options.url && ['online-workspace', 'online-business-gateway', 'online-business-instances'].every(id => checks.find(check => check.id === id)?.status === 'ok')), ok: checks.every(check => check.status === 'ok') }
 }

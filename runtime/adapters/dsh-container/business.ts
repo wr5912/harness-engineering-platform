@@ -5,7 +5,7 @@ import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createBusinessRuntimePatch } from '../../../platform/plugin/src/business-control/patch.ts'
 import { platformGroupUrl } from '../../../platform/plugin/src/business-control/group-link.ts'
-import { businessGatewayEntry } from '../../../platform/plugin/src/business-control/entry.ts'
+import { businessGatewayEntry, checkBusinessGatewayEntry } from '../../../platform/plugin/src/business-control/entry.ts'
 
 const programRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const require = createRequire(join(programRoot, 'platform/plugin/package.json'))
@@ -216,6 +216,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       console.log(JSON.stringify({ url, accessMode: selected?.accessMode === 'anonymous' ? 'anonymous' : 'authenticated' }))
       process.exit(0)
     }
+    if (process.argv[2] === '--check-entry') {
+      console.log(JSON.stringify(await checkBusinessGatewayEntry(resolve(process.argv[3]!), process.argv[4]!, process.argv[5]!)))
+      process.exit(0)
+    }
     const text = readFileSync(0, 'utf8').trim(), input = text ? JSON.parse(text) : undefined
     const config = readBusinessLaunchConfig(resolve(process.argv[2]!), input)
     const access = JSON.parse(readFileSync(join(config.assetRoot, 'config/business-access.json'), 'utf8'))
@@ -242,7 +246,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       '业务 Runtime 必须使用本机或私网地址', '业务实例 Web 基址与实例入口不一致',
     ])
     const reason = error instanceof Error && known.has(error.message) ? error.message
-      : process.argv[2] === '--entry' ? '业务网页入口配置或实例登记读取失败，请核对当前数据工作区与网关登记'
+      : ['--entry', '--check-entry'].includes(process.argv[2]!) ? '业务网页入口配置或实例登记读取失败，请核对当前数据工作区与网关登记'
         : '业务启动配置或来源文件解析失败'
     console.error(`BUSINESS_STARTUP_ERROR:${reason}`)
     process.exitCode = 1
