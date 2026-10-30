@@ -12,6 +12,17 @@ htmlcov/
 .venv/
 node_modules/
 
+# 安装器生成的运行工具与启动入口
+/bin/dsh
+/bin/hep-env.sh
+/bin/hep-start
+/runtime/dsh/
+/runtime/git/
+/runtime/node/
+/runtime/pnpm/
+/runtime/python/
+/runtime/python-site/
+
 # 本地分析缓存
 .code-review-graph/
 

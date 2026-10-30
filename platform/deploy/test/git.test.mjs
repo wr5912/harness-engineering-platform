@@ -69,3 +69,48 @@ test('不同 PATH 来源统一包内 Git 布局，复制后不依赖原二进制
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('安装器生成工具与三个入口不污染程序Git，源码修改及普通新增文件仍可见', () => {
+  const root = mkdtempSync(join(tmpdir(), 'hep-installed-git-'))
+  try {
+    const git = args => run('git', ['-C', root, ...args])
+    git(['init', '-b', 'main'])
+    git(['config', 'core.excludesFile', '/dev/null'])
+    copyFileSync(new URL('../../../.gitignore', import.meta.url), join(root, '.gitignore'))
+    const source = 'runtime/adapters/dsh-container/evaluation-wait.mts'
+    mkdirSync(join(root, 'runtime/adapters/dsh-container'), { recursive: true })
+    copyFileSync(new URL('../../../' + source, import.meta.url), join(root, source))
+    git(['add', '.'])
+    git(['-c', 'core.hooksPath=/dev/null', '-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', '安装来源夹具'])
+    const python = process.env.HARNESS_PYTHON || process.env.HEP_PYTHON || 'python3'
+    const script = 'import json,sys; from pathlib import Path; sys.path.insert(0,sys.argv[1]); from run_record import git_version; print(json.dumps(git_version(Path(sys.argv[2]))))'
+    const version = () => JSON.parse(run(python, ['-c', script,
+      new URL('../../../runtime/adapters/dsh-container/', import.meta.url).pathname, root]))
+    const commit = git(['rev-parse', 'HEAD']).trim()
+    const clean = () => {
+      assert.equal(git(['status', '--porcelain']), '')
+      assert.deepEqual(version(), { commit, dirty: false, changed_path_count: 0 })
+    }
+    clean()
+    // 与 installRuntime 当前输出一致；文件仅模拟安装布局，不执行工具夹具。
+    for (const path of ['bin/dsh', 'bin/hep-env.sh', 'bin/hep-start', 'runtime/dsh/apps/cli/lib/bin.js',
+      'runtime/git/git', 'runtime/node/bin/node', 'runtime/pnpm/bin/pnpm', 'runtime/python/bin/python3',
+      'runtime/python-site/yaml/__init__.py']) {
+      mkdirSync(join(root, path, '..'), { recursive: true })
+      writeFileSync(join(root, path), 'installed runtime fixture\n')
+    }
+    clean()
+    writeFileSync(join(root, source), '修改已跟踪的适配器源码\n')
+    assert.equal(version().dirty, true)
+    assert.match(git(['status', '--porcelain']), /evaluation-wait\.mts/)
+    copyFileSync(new URL('../../../' + source, import.meta.url), join(root, source))
+    clean()
+    for (const path of ['bin/new-tool.mts', 'runtime/adapters/dsh-container/new-source.mts']) {
+      writeFileSync(join(root, path), 'export const source = true\n')
+      assert.equal(version().dirty, true)
+      assert.ok(git(['status', '--porcelain', '--untracked-files=all']).includes(path))
+      rmSync(join(root, path))
+      clean()
+    }
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
