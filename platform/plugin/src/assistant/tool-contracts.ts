@@ -106,7 +106,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['new', 'agent_id name description role evaluation_cases profile', '先查 tasks/capabilities 复用已有能力；evaluation_cases 使用实际业务测试，ID 以 U- 开头（如 U-CHAT-GREET），身份测试由平台创建；inputs 为单轮字符串或按轮次排列的字符串数组，多行文字不等于多轮。'],
     ['sdk/start', 'source instance_id input session_id request_id', '启动同容器官方 TypeScript SDK 调试。request_id 固定，重试必须保持同一请求；刷新只用 sdk/status 查询，不重放输入。'],
     ['sdk/status sdk/stop', 'operation_id', '停止会关闭本次 Runtime，保留 HOME；结果未知时核对原实例，不自动重跑。'],
-    ['sdk/list sdk/guide', 'source', '读取当前来源的调试记录或唯一 SDK 接入文档和 TypeScript 示例。'],
+    ['sdk/list sdk/guide', 'source', 'source 必须指向 SDK 型版本，返回该版本的调试记录或业务集成用 TypeScript 调用示例与接入说明。开发 DSH 插件和工具时，读取锁定 Runtime 的插件与工具公开合同。'],
     ['create', 'agent_id parent_experiment_id parent_ref research_question', 'parent_ref 使用固定 git:<40位commit>；创建版本不表示已融合验证。'],
     ['edit/read', 'experiment_id path'], ['edit/preview edit/apply', 'experiment_id edits', '先 edit/read，每次提交实际文件正文和原摘要；写入遵循 DSH 原生权限与当前任务范围。'],
     ['assets/diff', 'experiment_id path against baseline_experiment_id', '先省略 path 列差异，再用返回的 path 读完整差异；against=baseline 或指定比较方式。'], ['assets/read-fixed', 'agent_id experiment_id ref path', 'ref 必须为固定 git:<40位commit>；省略 path 可先列目录。'],
