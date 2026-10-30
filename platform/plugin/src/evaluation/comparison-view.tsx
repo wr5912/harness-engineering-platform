@@ -16,6 +16,8 @@ export function RunComparisonFacts({ comparison, onNavigate }: { comparison: any
     ['镜像 ID', comparison.left_image?.local_image_id, comparison.right_image?.local_image_id],
     ['镜像构建来源', comparison.left_image?.image_build_fingerprint, comparison.right_image?.image_build_fingerprint],
     ['评审方式', comparison.left_source?.review_mode, comparison.right_source?.review_mode],
+    ['固定运行来源', comparison.left_source?.source_ref ?? '当前工作树', comparison.right_source?.source_ref ?? '当前工作树'],
+    ['接口环境', comparison.left_source?.mcp_fixture ? `Mock：${comparison.left_source.mcp_fixture.sha256}；不代表真实业务系统` : '未声明 Mock 映射', comparison.right_source?.mcp_fixture ? `Mock：${comparison.right_source.mcp_fixture.sha256}；不代表真实业务系统` : '未声明 Mock 映射'],
     ['插件 / 依赖配置摘要', comparison.left_source?.candidate_trees?.managed?.tree_sha256, comparison.right_source?.candidate_trees?.managed?.tree_sha256],
     ['资源消耗 / 费用', '未记录', '未记录'],
   ]

@@ -63,7 +63,7 @@ def utc_now() -> str:
 
 def evaluation_implementation() -> dict:
     """冻结实际执行及评审资产身份；缺失文件保留 null，不用当前版本回填旧 Run。"""
-    names = ["dsh-eval", "dsh-eval-api.mjs", "dsh-eval-browser.mjs", "dsh-eval-common.mjs", "harness-runtime.mts",
+    names = ["dsh-eval", "dsh-dev", "source_contract.py", "version-source.mts", "evaluation-source.mts", "dsh-eval-api.mjs", "dsh-eval-browser.mjs", "dsh-eval-common.mjs", "harness-runtime.mts",
              "run_record.py", "scenario_analysis.py", "evaluation-judge-guard.mjs",
              "scenario-analysis-guard.mjs"]
     names += [path.relative_to(ADAPTER).as_posix()
@@ -71,7 +71,8 @@ def evaluation_implementation() -> dict:
     result = {name: hashlib.sha256((ADAPTER / name).read_bytes()).hexdigest()
               if (ADAPTER / name).is_file() else None for name in names}
     for name in ("platform/plugin/src/agents/asset-build.ts", "platform/plugin/src/agents/asset-build-core.ts",
-                 "platform/plugin/src/agents/asset-dependencies.ts", "platform/plugin/src/models/harness-runtime.ts"):
+                 "platform/plugin/src/agents/asset-dependencies.ts", "platform/plugin/src/agents/plugin-dependency-reuse.ts",
+                 "platform/plugin/src/agents/version-source.ts", "platform/plugin/src/models/harness-runtime.ts"):
         path = PROGRAM_ROOT / name
         result[name] = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
     return result
@@ -161,14 +162,20 @@ def verify_run_source(repo: Path, manifest: dict, inputs: dict) -> dict:
                        "expected_sha256": expected, "actual_sha256": actual,
                        **({"error_type": error_type} if error_type else {})})
 
-    candidate = repo / "evolution/experiments" / manifest["experiment_id"] / "candidate"
-    check("candidate", inputs.get("candidate_sha256"), lambda: candidate_digest(candidate))
     trees = inputs.get("harness_trees", {})
     contract = None
     try:
-        contract = resolve(inputs["source_id"], repo=repo)
+        contract = resolve(inputs["source_id"], repo=repo, source_ref=inputs.get("source_ref"))
     except (OSError, ValueError, KeyError, TypeError):
         pass
+    def source_candidate_digest() -> str:
+        if contract is None:
+            raise ValueError("Run source can no longer be resolved")
+        return candidate_digest(Path(contract["candidate_root"]).parent)
+    check("candidate", inputs.get("candidate_sha256"), source_candidate_digest)
+    if inputs.get("mcp_fixture"):
+        fixture = repo / "evolution/experiments" / manifest["experiment_id"] / "runs" / manifest["run_id"] / "evidence/mcp-fixture.json"
+        check("mcp_fixture", inputs["mcp_fixture"].get("sha256"), lambda: hashlib.sha256(fixture.read_bytes()).hexdigest())
 
     def snapshot_digest(value: dict) -> str:
         return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False,
@@ -257,7 +264,9 @@ def write_report(
     selection_mode: str | None = None,
     gaps: list[dict] | None = None,
     comparison_markdown: str | None = None,
+    inputs: dict | None = None,
 ) -> None:
+    inputs = inputs or {}
     def cell(value: object) -> str:
         return str(value).replace("\\", "\\\\").replace("|", "\\|").replace("\r", "").replace("\n", "<br>")
 
@@ -288,6 +297,10 @@ def write_report(
     ]
     if executor:
         lines.append(f"- 执行通道：`{executor}`")
+    if inputs.get("source_ref"):
+        lines.append(f"- 固定运行来源：`{inputs['source_ref']}`；当前数据仓库与运行来源分别记录。")
+    if inputs.get("mcp_fixture"):
+        lines.append(f"- 接口环境：`mock`；MCP fixture SHA-256：`{inputs['mcp_fixture']['sha256']}`。本报告不证明真实业务系统通过。")
     if selection_mode:
         lines.append(f"- Case 选择：`{selection_mode}`")
     source_verification = summary.get("source_verification")
@@ -628,12 +641,12 @@ def run_view(repo: Path, run_id: str, case_id: str | None = None) -> dict:
             "source_id", "baseline_ref", "git_version", "evaluation_sha256",
             "executor", "model", "created_at", "compare_to_run_id", "candidate_sha256",
             "review_mode", "configured_capabilities", "dependency_env",
-            "program_origin", "asset_origin", "evaluation_implementation", "declared_guard",
+            "program_origin", "asset_origin", "evaluation_implementation", "declared_guard", "source_ref", "source_snapshot_root", "mcp_fixture",
         )}, "candidate_trees": {key: {"tree_sha256": value.get("tree_sha256"),
                                         "file_count": value.get("file_count")}
                                   for key, value in inputs.get("harness_trees", {}).items()},
             "inputs_lock_path": (run_dir / "inputs.lock.json").relative_to(repo).as_posix()},
-        "candidate_path": f"evolution/experiments/{manifest['experiment_id']}/candidate",
+        "candidate_path": inputs.get("candidate_path", f"evolution/experiments/{manifest['experiment_id']}/candidate"),
         "image": image,
         "summary": summary,
         "uncovered_case_ids": [item["case_id"] for item in inputs.get("case_catalog", [])
@@ -661,6 +674,11 @@ def comparison_run_view(repo: Path, run_id: str, agent_id: str | None = None,
         actual = hashlib.sha256(path.read_bytes() if path.is_file() else b"").hexdigest()
         if actual != expected:
             raise ValueError(f"对照 Run {name} 摘要不匹配")
+    inputs = json.loads((run_dir / "inputs.lock.json").read_text(encoding="utf-8"))
+    if inputs.get("mcp_fixture"):
+        fixture = run_dir / "evidence/mcp-fixture.json"
+        if fixture.is_symlink() or not fixture.is_file() or hashlib.sha256(fixture.read_bytes()).hexdigest() != inputs["mcp_fixture"].get("sha256"):
+            raise ValueError("对照 Run MCP fixture 原始字节缺失或摘要不匹配")
     return run_view(repo, run_id, case_id)
 
 
@@ -839,7 +857,7 @@ def command_compare(repo: Path, args: argparse.Namespace) -> None:
 
 
 def command_init(repo: Path, args: argparse.Namespace) -> None:
-    contract = resolve(args.source, repo=repo)
+    contract = resolve(args.source, repo=repo, source_ref=getattr(args, "source_ref", None))
     experiment_id = contract.get("experiment_id")
     agent_id = contract.get("agent_id")
     match = EXPERIMENT_RE.fullmatch(experiment_id or "")
@@ -848,12 +866,12 @@ def command_init(repo: Path, args: argparse.Namespace) -> None:
     experiment = repo / "evolution/experiments" / experiment_id
     if not experiment.is_dir() or experiment.is_symlink():
         raise ValueError(f"unknown experiment: {experiment_id}")
-    change = read_change_yaml(experiment / "change.yaml")
+    change = read_change_yaml(Path(contract.get("change_path", experiment / "change.yaml")))
     baseline_ref = args.baseline_ref or change.get("baseline_ref", "")
     if not valid_baseline_ref(baseline_ref):
         raise ValueError("baseline_ref must be git:<commit>, release:<id> or none:first-experiment")
     evaluation_relative = Path("agents") / agent_id / "evaluation.md"
-    evaluation_path = repo / evaluation_relative
+    evaluation_path = Path(contract.get("evaluation_path", repo / evaluation_relative))
     evaluation = load_evaluation(evaluation_path)
     cases = execution_from(evaluation, args.case)
     catalog = evaluation["catalog"]
@@ -871,7 +889,8 @@ def command_init(repo: Path, args: argparse.Namespace) -> None:
     run_dir = experiment / "runs" / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
     try:
-        source_digest = candidate_digest(experiment / "candidate")
+        candidate = Path(contract["candidate_root"]).parent
+        source_digest = candidate_digest(candidate)
         inputs = {
             "schema_version": "2.0",
             "run_id": run_id,
@@ -901,11 +920,26 @@ def command_init(repo: Path, args: argparse.Namespace) -> None:
             "asset_origin": {**version, "workspace_id": workspace_id(repo),
                              "candidate_sha256": source_digest},
         }
-        inputs["harness_review"] = build_review_evidence(repo, experiment_id, change, source_digest)
-        if candidate_digest(experiment / "candidate") != source_digest:
+        if contract.get("source_ref"):
+            inputs.update({"source_ref": contract["source_ref"], "source_snapshot_root": Path(contract["source_snapshot_root"]).relative_to(repo).as_posix(),
+                           "candidate_path": candidate.relative_to(repo).as_posix()})
+        inputs["harness_review"] = build_review_evidence(Path(contract.get("source_snapshot_root", repo)), experiment_id, change, source_digest)
+        if candidate_digest(candidate) != source_digest:
             raise ValueError("Candidate changed while locking review inputs")
+        fixture_path = getattr(args, "mcp_fixture", None)
+        if fixture_path:
+            frozen_bytes = Path(fixture_path).read_bytes()
+            projected = subprocess.run(["node", str(ADAPTER / "evaluation-source.mts"), "fixture", str(candidate), fixture_path],
+                                       capture_output=True, text=True, timeout=30)
+            if projected.returncode:
+                raise ValueError(projected.stderr.strip() or "MCP fixture 无法映射到本次来源")
+            inputs["mcp_fixture"] = json.loads(projected.stdout)["metadata"]
+            if inputs["mcp_fixture"]["sha256"] != hashlib.sha256(frozen_bytes).hexdigest():
+                raise ValueError("MCP fixture 在创建 Run 时变化")
+            (run_dir / "evidence").mkdir(exist_ok=True)
+            (run_dir / "evidence/mcp-fixture.json").write_bytes(frozen_bytes)
         # 固定外部接口边界样本；两侧比较不能仅凭相同用户输入推定工具返回一致。
-        fixture = experiment / "candidate/dsh/managed/compute-workflow/fixtures.json"
+        fixture = candidate / "dsh/managed/compute-workflow/fixtures.json"
         if fixture.exists():
             if fixture.is_symlink() or not fixture.is_file():
                 raise ValueError("外部输入样本必须是 Candidate 内普通文件")
@@ -1103,6 +1137,7 @@ def command_finalize(repo: Path, args: argparse.Namespace) -> None:
         inputs.get("selection_mode"),
         gaps,
         comparison_markdown,
+        inputs,
     )
     manifest["results_sha256"] = hashlib.sha256(results.read_bytes() if results.is_file() else b"").hexdigest()
     manifest["summary_sha256"] = hashlib.sha256(summary_path.read_bytes()).hexdigest()
@@ -1126,6 +1161,8 @@ def main() -> None:
     commands = parser.add_subparsers(dest="command", required=True)
     init_parser = commands.add_parser("init", help="创建 Run 并记录输入身份")
     init_parser.add_argument("--source", required=True, help="当前支持 experiment:<id>")
+    init_parser.add_argument("--source-ref", help="固定来源 git:<40位提交>")
+    init_parser.add_argument("--mcp-fixture", help="本次 Runtime 的明确 Mock 连接映射 JSON，按原字节封存")
     init_parser.add_argument("--case", action="append", default=[], help="必须显式选择的 Case；可重复")
     init_parser.add_argument("--kind", default="research", choices=RUN_KINDS)
     init_parser.add_argument("--baseline-ref", help="默认读取 Experiment change.yaml")

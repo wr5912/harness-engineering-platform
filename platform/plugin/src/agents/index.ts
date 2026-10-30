@@ -1,3 +1,4 @@
+import { reuseParentDependencies } from './plugin-dependency-reuse.ts'
 import { assetText } from './asset-text.ts'
 import { createRequire } from 'node:module'
 import { execFile, spawnSync } from 'node:child_process'
@@ -8,13 +9,11 @@ import {
   existsSync,
   chmodSync,
   closeSync,
-  cpSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
   openSync,
   readFileSync,
-  readlinkSync,
   readSync,
   readdirSync,
   realpathSync,
@@ -46,6 +45,7 @@ import { discoverTaskCapabilities, type CapabilityOptions } from '../tasks/capab
 import { candidateFiles, dataPath, sourceInfo } from '../tasks/files.ts'
 import { previewTaskAssembly, applyTaskAssembly, type TaskAssemblyInput } from '../tasks/assembly.ts'
 import { containsLiteralLlmKey } from '../tasks/llm-key.ts'
+import { materializeEvaluationSource, validateMcpFixture } from '../../../../runtime/adapters/dsh-container/evaluation-source.mts'
 import { createInstancesHandler } from '../instances/index.ts'
 import { inheritedLoadableAssets, assertVersionIdentity, versionIdentity, versionSource, versionSources } from './version-source.ts'
 import { inspectLegacy, readResearchReference, validateResearch } from './research.ts'
@@ -953,64 +953,6 @@ async function copyGitCandidate(root: string, commit: string, parentExperiment: 
   return reuseParentDependencies(root, parentExperiment, join(targetExperimentRoot, 'candidate'))
 }
 
-function pluginLock(directory: string, manifest: JsonMap): string | null {
-  const manager = typeof manifest.packageManager === 'string' ? manifest.packageManager.split('@')[0] : null
-  const npm = ['npm-shrinkwrap.json', 'package-lock.json'].find(file => existsSync(join(directory, file)))
-  const options = [npm && { manager: 'npm', file: npm }, existsSync(join(directory, 'pnpm-lock.yaml')) && { manager: 'pnpm', file: 'pnpm-lock.yaml' },
-    existsSync(join(directory, 'yarn.lock')) && { manager: 'yarn', file: 'yarn.lock' }].filter((value): value is { manager: string; file: string } => Boolean(value))
-  return (manager ? options.find(option => option.manager === manager) : options.length === 1 ? options[0] : undefined)?.file ?? null
-}
-
-/** 依赖仍是被忽略的本地安装物；只复用与固定父版清单及锁逐字节一致的安装目录。 */
-function reuseParentDependencies(root: string, parentExperiment: string, candidate: string) {
-  const reused: JsonMap[] = [], skipped: JsonMap[] = []
-  const managed = join(candidate, 'dsh/managed')
-  if (!existsSync(managed)) return { reused, skipped }
-  for (const plugin of readdirSync(managed, { withFileTypes: true })) {
-    if (!plugin.isDirectory()) continue
-    const relativePlugin = `dsh/managed/${plugin.name}`, target = join(managed, plugin.name), manifestFile = join(target, 'package.json')
-    if (!existsSync(manifestFile) || !lstatSync(manifestFile).isFile()) continue
-    const manifest = JSON.parse(readFileSync(manifestFile, 'utf8')) as JsonMap
-    if (!Object.keys((manifest.dependencies as JsonMap | undefined) ?? {}).length) continue
-    const donor = join(root, 'evolution/experiments', parentExperiment, 'candidate', relativePlugin), modules = join(donor, 'node_modules'), destination = join(target, 'node_modules')
-    const unavailable = (reason: string) => skipped.push({ plugin: relativePlugin, reason })
-    if (existsSync(destination)) { unavailable('固定父版已有依赖目录，不覆盖来源资产'); continue }
-    try {
-      assertNoSymlinkPath(root, donor)
-      const donorManifest = join(donor, 'package.json'), selectedLock = pluginLock(target, manifest)
-      if (!selectedLock || !existsSync(donorManifest)) { unavailable('父版本地清单缺失、已变化或锁文件不明确'); continue }
-      assertNoSymlinkPath(root, donorManifest)
-      if (!readFileSync(donorManifest).equals(readFileSync(manifestFile))) { unavailable('父版本地清单缺失、已变化或锁文件不明确'); continue }
-      const donorLock = pluginLock(donor, JSON.parse(readFileSync(donorManifest, 'utf8'))), targetLock = join(target, selectedLock)
-      if (donorLock !== selectedLock || !existsSync(join(donor, selectedLock))) { unavailable('父版本地选定锁与固定父版不同'); continue }
-      assertNoSymlinkPath(root, targetLock); assertNoSymlinkPath(root, join(donor, selectedLock))
-      const manifestBytes = readFileSync(manifestFile), lockBytes = readFileSync(targetLock)
-      if (!readFileSync(join(donor, selectedLock)).equals(lockBytes) || !existsSync(modules)) { unavailable('父版本地锁已变化或依赖目录不可用'); continue }
-      const ignored = (path: string) => spawnSync('git', ['check-ignore', '-q', '--', relative(root, path).split(sep).join('/') + '/'], { cwd: root }).status === 0
-      if (!ignored(modules) || !ignored(destination)) { unavailable('本地依赖目录未被 Git 忽略'); continue }
-      const installed = realpathSync(modules)
-      if (!lstatSync(installed).isDirectory()) { unavailable('父版本地依赖不是可用目录'); continue }
-      const safeLinks = (directory: string): boolean => readdirSync(directory, { withFileTypes: true }).every(item => {
-        const path = join(directory, item.name)
-        if (item.isSymbolicLink()) {
-          const link = readlinkSync(path), resolved = relative(installed, realpathSync(path))
-          return !link.startsWith('/') && resolved !== '..' && !resolved.startsWith(`..${sep}`)
-        }
-        return !item.isDirectory() || safeLinks(path)
-      })
-      if (!safeLinks(installed)) { unavailable('依赖含无法随目录保持的外部链接'); continue }
-      cpSync(installed, destination, { recursive: true, dereference: false, verbatimSymlinks: true })
-      if (!readFileSync(donorManifest).equals(manifestBytes) || !readFileSync(join(donor, selectedLock)).equals(lockBytes)) {
-        rmSync(destination, { recursive: true, force: true }); unavailable('复制期间父版清单或锁发生变化'); continue
-      }
-      reused.push({ plugin: relativePlugin, lockfile: selectedLock, package_sha256: sha256(manifestBytes), lock_sha256: sha256(lockBytes), method: 'copy' })
-    } catch {
-      rmSync(destination, { recursive: true, force: true })
-      unavailable('父版本地依赖无法安全复用；仍需按既有依赖检查处理')
-    }
-  }
-  return { reused, skipped }
-}
 
 async function createExperiment(root: string, payload: JsonMap, variant?: ComputeVariantCreation) {
   if (!variant && isVariantIdentity('', payload)) throw new RpcError('invalid_request', '变体只能通过 compute-variants/create 创建')
@@ -1387,7 +1329,7 @@ async function updateCase(root: string, payload: JsonMap, signal?: AbortSignal) 
   return ok({ case: caseFromEvaluation(saved, caseId), sha256: saved.sha256, path: saved.path })
 }
 
-function evalArgs(payload: JsonMap, dryRun: boolean, modelPolicyPath?: string) {
+function evalArgs(payload: JsonMap, dryRun: boolean, modelPolicyPath?: string, mcpFixturePath?: string) {
   const source = stringField(payload, 'source')
   if (source.startsWith('experiment:')) experimentIdValue(source.slice('experiment:'.length), 'source')
   const args = [DSH_EVAL, '--source', source, '--mode', optionalString(payload, 'mode') ?? 'fast', '--executor', optionalString(payload, 'executor') ?? 'api', '--review', optionalString(payload, 'review') ?? 'none']
@@ -1397,6 +1339,11 @@ function evalArgs(payload: JsonMap, dryRun: boolean, modelPolicyPath?: string) {
   const compareTo = optionalString(payload, 'compare_to')
   if (model) args.push('--model', model)
   if (modelPolicyPath) args.push('--model-policy', modelPolicyPath)
+  if (payload.source_ref !== undefined) {
+    if (typeof payload.source_ref !== 'string' || !/^git:[a-f0-9]{40}$/.test(payload.source_ref)) throw new RpcError('invalid_request', 'source_ref 必须是 git:<40位提交>')
+    args.push('--source-ref', payload.source_ref)
+  }
+  if (mcpFixturePath) args.push('--mcp-fixture', mcpFixturePath)
   if (compareTo) args.push('--compare-to', compareTo)
   if (payload.artifact_export !== undefined) {
     const artifact = requireObject(payload.artifact_export)
@@ -1423,32 +1370,42 @@ function cleanupEvalPolicies(root: string, jobId: string) {
 async function evalCommand(root: string, payload: JsonMap, dryRun: boolean, modelPolicy?: EvalModelPolicyProvider,
   jobId = 'preview'): Promise<{ executable: string; args: string[]; environment?: NodeJS.ProcessEnv; dispose?: () => void }> {
   const selectedId = typeof payload.source === 'string' ? payload.source.replace(/^experiment:/, '') : ''
-  if (EXP_ID.test(selectedId) && existsSync(join(root, 'evolution/experiments', selectedId, 'candidate/harness.yaml'))
-    && versionSource(root, selectedId).profile === 'sdk') throw new RpcError('sdk_evaluation_unavailable', 'SDK 型版本请使用 SDK 调试入口；当前评测执行器使用 Web 会话协议')
-  if (!modelPolicy) {
+  if (!modelPolicy && payload.source_ref === undefined && payload.mcp_fixture === undefined) {
     if (payload.model_selection !== undefined) throw new RpcError('model_policy_unavailable', '当前执行入口没有原生模型投影，无法应用 model_selection')
+    if (EXP_ID.test(selectedId) && existsSync(join(root, 'evolution/experiments', selectedId, 'candidate/harness.yaml'))
+      && versionSource(root, selectedId).profile === 'sdk') throw new RpcError('sdk_evaluation_unavailable', 'SDK 型版本请使用 SDK 调试入口；当前评测执行器使用 Web 会话协议')
     return { executable: process.env.HARNESS_PYTHON || 'python3', args: programArgs(evalArgs(payload, dryRun)) }
   }
-  let projected: Awaited<ReturnType<EvalModelPolicyProvider>>
+  const ref = payload.source_ref
+  if (ref !== undefined && (typeof ref !== 'string' || !/^git:[a-f0-9]{40}$/.test(ref))) throw new RpcError('invalid_request', 'source_ref 必须是 git:<40位提交>')
+  const fixed = ref ? materializeEvaluationSource(root, selectedId, ref) : undefined
+  const source = fixed ? { id: selectedId, agent_id: fixed.agent_id, candidate: join(fixed.root, 'evolution/experiments', selectedId, 'candidate') }
+    : sourceInfo(root, stringField(payload, 'source'))
+  if (versionSource(fixed?.root ?? root, selectedId).profile === 'sdk') throw new RpcError('sdk_evaluation_unavailable', 'SDK 型版本请使用 SDK 调试入口；当前评测执行器使用 Web 会话协议')
+  const fixture = payload.mcp_fixture === undefined ? undefined : validateMcpFixture(payload.mcp_fixture)
+  if (!modelPolicy && payload.model_selection !== undefined) throw new RpcError('model_policy_unavailable', '当前执行入口没有原生模型投影，无法应用 model_selection')
+  let projected: Awaited<ReturnType<EvalModelPolicyProvider>> | undefined
   try {
-    const source = sourceInfo(root, stringField(payload, 'source'))
     let selection: Parameters<EvalModelPolicyProvider>[1]
     if (payload.model_selection !== undefined) {
       const value = requireObject(payload.model_selection)
       if (typeof value.provider !== 'string' || !value.provider || typeof value.model !== 'string' || !value.model || value.reasoningEffort !== undefined && typeof value.reasoningEffort !== 'string') throw new Error('model_selection 需要原生 provider/model/reasoningEffort')
       selection = { provider: value.provider, model: value.model, ...(value.reasoningEffort === undefined ? {} : { reasoningEffort: value.reasoningEffort as string }) }
     }
-    projected = await modelPolicy(source.agent_id, selection, source.candidate)
+    projected = await modelPolicy?.(source.agent_id, selection, source.candidate)
   }
   catch (error) { throw new RpcError('model_policy_unavailable', redact((error as Error).message)) }
+  if (!projected && !fixture) return { executable: process.env.HARNESS_PYTHON || 'python3', args: programArgs(evalArgs(payload, dryRun)) }
   const directory = workspaceLocalPath(root, 'evaluation-jobs', 'model-policies')
   mkdirSync(directory, { recursive: true, mode: 0o700 })
   const temporary = mkdtempSync(join(directory, `${jobId}-`))
   try {
     const file = join(temporary, 'policy.json')
-    writeFileSync(file, JSON.stringify(projected.policy), { mode: 0o600, flag: 'wx' })
-    return { executable: process.env.HARNESS_PYTHON || 'python3', args: programArgs(evalArgs(payload, dryRun, file)),
-      environment: projected.environment, dispose: () => rmSync(temporary, { recursive: true, force: true }) }
+    if (projected) writeFileSync(file, JSON.stringify(projected.policy), { mode: 0o600, flag: 'wx' })
+    const fixtureFile = fixture ? join(temporary, 'mcp-fixture.json') : undefined
+    if (fixtureFile) writeFileSync(fixtureFile, JSON.stringify(fixture, null, 2) + '\n', { mode: 0o600, flag: 'wx' })
+    return { executable: process.env.HARNESS_PYTHON || 'python3', args: programArgs(evalArgs(payload, dryRun, projected ? file : undefined, fixtureFile)),
+      environment: projected?.environment, dispose: () => rmSync(temporary, { recursive: true, force: true }) }
   } catch (error) { rmSync(temporary, { recursive: true, force: true }); throw error }
 }
 
@@ -1456,7 +1413,7 @@ async function evalPreview(root: string, payload: JsonMap, signal?: AbortSignal,
   const prepared = await evalCommand(root, payload, true, modelPolicy)
   try {
     const command = modelPolicy
-      ? [prepared.executable, ...programArgs(evalArgs(payload, true, '<平台模型投影>'))]
+      ? [prepared.executable, ...programArgs(evalArgs(payload, true, '<平台模型投影>', payload.mcp_fixture ? '<本次Mock连接映射>' : undefined))]
       : [prepared.executable, ...prepared.args]
     return ok({ command, result: await parseJsonCommandAsync(root, prepared.args, '评测预览失败', signal, undefined, prepared.environment) })
   } finally { prepared.dispose?.() }

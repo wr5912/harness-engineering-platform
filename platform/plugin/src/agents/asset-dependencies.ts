@@ -1,9 +1,10 @@
 import { spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, join, relative, resolve } from 'node:path'
+import { basename, dirname, join, relative, resolve } from 'node:path'
 import { candidateDigest, candidateFiles, dataPath, sourceInfo } from '../tasks/files.ts'
 import { programRoot } from '../workspace.ts'
+import { assertRuntimeCandidateOrigin } from '../models/harness-runtime.ts'
 
 type Body = Record<string, any>
 export type DependencyTarget = { image: string; image_id: string; python_version: string; python_abi: string; os: string; libc: string; architecture: string }
@@ -92,9 +93,11 @@ export function preparedAssetDependencyPackages(assetRoot: string, experimentId:
   }).filter((item): item is NonNullable<typeof item> => item !== null)
 }
 /** 只读验证，不探测 Docker，也不执行已准备模块。供实例和评测共用。 */
-export function resolvePreparedAssetDependencies(assetRoot: string, experimentId: string, expected: { image?: string; image_id?: string } = {}): PreparedAssetDependencies {
+export function resolvePreparedAssetDependencies(assetRoot: string, experimentId: string, expected: { image?: string; image_id?: string } = {}, candidatePath?: string): PreparedAssetDependencies {
   try {
-    const source = sourceInfo(assetRoot, experimentId), items = declarations(source.candidate)
+    const source = candidatePath ? { id: experimentId, candidate: assertRuntimeCandidateOrigin(assetRoot, candidatePath) } : sourceInfo(assetRoot, experimentId)
+    if (candidatePath && basename(dirname(source.candidate)) !== experimentId) throw new Error('依赖来源版本不一致')
+    const items = declarations(source.candidate)
     if (!items.length) return { status: 'ready', reasons: [], mounts: [], environment: {} }
     const root = dependencyRoot(assetRoot, source.id), pointer = JSON.parse(readFileSync(join(root, 'current.json'), 'utf8'))
     if (!/^[a-f0-9]{64}$/.test(pointer.digest)) throw new Error('无效依赖定位')

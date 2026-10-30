@@ -152,22 +152,26 @@ def validation_check(script: Path, target: str, *options: str) -> dict:
 
 
 def validate_before_run(contract: dict) -> dict:
+    selected_root = Path(contract.get("source_snapshot_root", REPO))
+    selected_experiment = selected_root / "evolution/experiments" / contract["experiment_id"] if contract.get("source_ref") else Path(contract["experiment_root"])
     return {
-        "repository": validation_check(VALIDATE_REPOSITORY, str(REPO), "--experiment",
+        "repository": validation_check(VALIDATE_REPOSITORY, str(selected_root), "--experiment",
                                        Path(contract["experiment_root"]).name),
-        "experiment": validation_check(VALIDATE_EXPERIMENT, contract["experiment_root"]),
+        "experiment": validation_check(VALIDATE_EXPERIMENT, str(selected_experiment)),
     }
 
 
 def validate_after_run(contract: dict) -> None:
-    check = validation_check(VALIDATE_EXPERIMENT, contract["experiment_root"])
+    selected_experiment = Path(contract["source_snapshot_root"]) / "evolution/experiments" / contract["experiment_id"] if contract.get("source_ref") else Path(contract["experiment_root"])
+    check = validation_check(VALIDATE_EXPERIMENT, str(selected_experiment))
     if not check["valid"]:
         detail = check.get("error") or ", ".join(str(code) for code in check.get("error_codes", []))
         raise EvaluationError(f"post-run-validation-failed（退出码 {check['exit_code']}）：{detail}")
 
 
 def initialize_run(source: str, cases: list[dict], executor: str, selection_mode: str, review_mode: str,
-                   model: str | None = None, compare_to: str | None = None) -> str:
+                   model: str | None = None, compare_to: str | None = None,
+                   source_ref: str | None = None, mcp_fixture: str | None = None) -> str:
     command = [
         sys.executable, str(RUN_RECORD), "--repo", str(REPO), "init",
         "--source", source, "--kind", "research", "--executor", executor,
@@ -179,6 +183,10 @@ def initialize_run(source: str, cases: list[dict], executor: str, selection_mode
         command.extend(("--model", model))
     if compare_to:
         command.extend(("--compare-to", compare_to))
+    if source_ref:
+        command.extend(("--source-ref", source_ref))
+    if mcp_fixture:
+        command.extend(("--mcp-fixture", mcp_fixture))
     completed = checked_process(command, label="创建 Run", timeout=180)
     run_id = completed.stdout.strip()
     if not run_id.startswith("run-"):
@@ -354,10 +362,15 @@ def dsh_dev_command() -> list[str]:
     return [override] if override is not None else [sys.executable, str(DSH_DEV)]
 
 
-def start_instance(source: str, name: str, model_policy_path: str | None = None) -> dict:
+def start_instance(source: str, name: str, model_policy_path: str | None = None,
+                   source_ref: str | None = None, mcp_fixture: str | None = None) -> dict:
     command = [*dsh_dev_command(), "up", "--source", source, "--mode", "eval", "--name", name]
     if model_policy_path:
         command.extend(("--model-policy", model_policy_path))
+    if source_ref:
+        command.extend(("--source-ref", source_ref))
+    if mcp_fixture:
+        command.extend(("--mcp-fixture", mcp_fixture))
     completed = checked_process(
         command,
         label="启动 DSH 评测实例", timeout=240, env=os.environ.copy(),
@@ -649,11 +662,14 @@ def emit_result(*args, **kwargs) -> None:
 
 
 def execute(args: argparse.Namespace) -> int:
+    if getattr(args, "mcp_fixture", None):
+        args.mcp_fixture = str(Path(args.mcp_fixture).expanduser().resolve())
     source_only = bool(getattr(args, "source_check", False))
     if source_only and (not args.dry_run or getattr(args, "model_policy", None) or getattr(args, "model", None)):
         raise EvaluationError("--source-check 只用于不指定模型的 --dry-run 来源与 Case 校验")
-    contract = resolve(args.source, repo=REPO)
-    evaluation_path = REPO / "agents" / contract["agent_id"] / "evaluation.md"
+    source_ref = getattr(args, "source_ref", None)
+    contract = resolve(args.source, repo=REPO, **({"source_ref": source_ref} if source_ref else {}))
+    evaluation_path = Path(contract.get("evaluation_path", REPO / "agents" / contract["agent_id"] / "evaluation.md"))
     catalog = load_evaluation(evaluation_path)
     selection_mode = "explicit" if args.case else args.mode
     if args.executor == "browser" and args.review == "ai":
@@ -668,6 +684,14 @@ def execute(args: argparse.Namespace) -> int:
                            source_only=source_only)
     if args.compare_to:
         plan["compare_to_run_id"] = args.compare_to
+    if source_ref:
+        plan["source_ref"] = source_ref
+        plan["source_snapshot_root"] = contract["source_snapshot_root"]
+    if getattr(args, "mcp_fixture", None):
+        projected = checked_process(["node", str(ADAPTER / "evaluation-source.mts"), "fixture",
+                                     str(Path(contract["candidate_root"]).parent), args.mcp_fixture],
+                                    label="核对 MCP Mock 映射", timeout=30)
+        plan["mcp_fixture"] = json.loads(projected.stdout)["metadata"]
     if args.dry_run:
         print(json.dumps(plan, ensure_ascii=False, indent=2))
         return 0
@@ -697,8 +721,9 @@ def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict
                       selection_mode: str, review_mode: str) -> int:
     progress("创建并锁定 Research Run")
     try:
+        selected_options = {key: getattr(args, key, None) for key in ("source_ref", "mcp_fixture") if getattr(args, key, None)}
         run_id = initialize_run(args.source, cases, args.executor, selection_mode, review_mode,
-                                args.model, args.compare_to)
+                                args.model, args.compare_to, **selected_options)
         run_dir = Path(contract["experiment_root"]) / "runs" / run_id
         # 初始化后的冻结输入是执行与评审共同使用的事实源。
         locked_inputs = json.loads((run_dir / "inputs.lock.json").read_text(encoding="utf-8"))
@@ -724,7 +749,12 @@ def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict
         with allow_cancellation():
             progress("启动独立 DSH 评测实例")
             up_attempted = True
-            image_identity = start_instance(args.source, instance_name, getattr(args, "model_policy", None))
+            runtime_options = {"source_ref": args.source_ref} if getattr(args, "source_ref", None) else {}
+            if locked_inputs.get("mcp_fixture"):
+                runtime_options["mcp_fixture"] = str(run_dir / "evidence/mcp-fixture.json")
+            image_identity = start_instance(args.source, instance_name, getattr(args, "model_policy", None), **runtime_options)
+            if locked_inputs.get("mcp_fixture") and image_identity.get("mcp_fixture") != locked_inputs["mcp_fixture"]:
+                raise EvaluationError("实际 MCP Mock 投影与冻结 Run 输入不一致")
             if image_identity["image_build_fingerprint"] != contract["image"]["build_fingerprint"]:
                 raise EvaluationError("DSH 实际镜像身份与本次来源合同不一致")
             write_json(run_dir / "evidence" / "dsh-image.json", {
@@ -854,6 +884,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", type=Path, default=REPO, help="用户数据工作区根目录")
     parser.add_argument("--source", required=True, help="experiment:<id> 或已登记 Experiment ID")
+    parser.add_argument("--source-ref", help="固定来源 git:<40位提交>，角色、Case 与运行资产读取同一提交")
+    parser.add_argument("--mcp-fixture", help="仅本次评测使用的明确 Mock MCP 连接映射 JSON")
     parser.add_argument("--mode", choices=("fast", "full"), default="fast", help="评测档位；默认 fast")
     parser.add_argument(
         "--case", action="append", default=[],

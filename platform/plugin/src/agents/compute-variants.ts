@@ -401,6 +401,13 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
         proof.push({ run_id: runId, file: frozen.path, sha256: frozen.source_sha256 })
       } catch { issues('inputs.lock.json 缺失或无法解析') }
       if (lock.candidate_sha256 !== (side === 'parent' ? parentDigest : currentDigest)) issues('实际 Candidate 与固定父版 / 当前变体不同')
+      if (lock.mcp_fixture) {
+        try {
+          const fixture = await readRunEvidenceFile(root, runId, 'evidence/mcp-fixture.json', signal)
+          proof.push({ run_id: runId, file: fixture.path, sha256: fixture.source_sha256 })
+          if (lock.mcp_fixture.mode !== 'mock' || fixture.source_sha256 !== lock.mcp_fixture.sha256) issues('Mock MCP 映射模式或实际封存字节不匹配')
+        } catch { issues('Mock MCP 映射原始文件缺失') }
+      }
       if (plan.generation?.fixture_sha256) {
         if (lock.external_inputs?.fixture_sha256 !== plan.generation.fixture_sha256 || !['mock-replay', 'replay'].includes(lock.external_inputs?.mode)) issues('外部输入样本或来源模式不符合冻结计划')
         try {
@@ -527,6 +534,7 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
     for (const row of rows) {
       for (const key of ['executor', 'review_mode', 'dependency_env']) if (row.lock[key] === undefined || !same(row.lock[key], first.lock[key])) limits.push(`${row.run.run_id}: ${key} 缺失或不同`)
       if (!same(row.lock.external_inputs ?? null, first.lock.external_inputs ?? null)) limits.push(`${row.run.run_id}: 外部输入样本或来源模式不同`)
+      if (!same(row.lock.mcp_fixture ?? null, first.lock.mcp_fixture ?? null)) limits.push(`${row.run.run_id}: Mock MCP 连接映射或环境不同`)
       const origin = row.lock.program_origin, base = first.lock.program_origin
       if (!origin?.commit || origin.dirty !== false || !base?.commit || origin.commit !== base.commit) limits.push(`${row.run.run_id}: 程序版本未冻结或不同`)
       for (const key of ['image_build_fingerprint', 'local_image_id']) if (!row.run.image?.[key] || row.run.image[key] !== first.run.image?.[key]) limits.push(`${row.run.run_id}: 实际镜像缺失或不同`)
@@ -557,8 +565,10 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
       inputs: { parent_experiment_id: change.parent_experiment_id, parent_ref: change.baseline_ref, build: workflowBuild ? { verified: workflowBuild.verified, receipt: workflowBuild.receipt } : null },
       quality: { passed: qualityPassed, cases: caseRows }, resources, comparability: { passed: limits.length === 0, limits: [...new Set(limits)] },
       resource_evidence: { passed: resourcePassed, limits: [...new Set(resourceLimits)] },
+      ...(first.lock.mcp_fixture ? { environment: { mode: 'mock', mcp_fixture: first.lock.mcp_fixture } } : {}),
       eligible_for_end: !limits.length && qualityPassed && resourcePassed,
       notes: ['结果仅适用于预先冻结的任务范围和所选独立 Run；不是对所有任务的统计等效证明。',
+        ...(first.lock.mcp_fixture ? ['本次连接使用明确 Mock 边界；比较结果不表示真实业务系统通过或已部署。'] : []),
         'model_calls 仅为会话回复次数；完整模型请求（包括压缩、标题和图内推理）使用 actual_model_calls，所有 Token 指标均包含已采集请求。',
         ...(plan.execution_mode === 'code-only' ? ['历史 model_calls 统计会话回复次数，包含本地代码适配器回复；业务零推理以完整 actual_model_calls 为零核验。'] : []),
         'token、模型响应次数与耗时属于已记录资源指标；未测量硬件算力、供应商费用或不可见的外部模型调用。', '人工确认需完整审阅原始输出和工具结果；表格只汇总证据，不替代业务判断。', '依赖环境记录仅含变量配置状态；外部数据状态、网络负载与供应商变化未被完整控制，资源改善不能单独归因于 Harness。'], proof }

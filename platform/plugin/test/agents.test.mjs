@@ -1206,6 +1206,51 @@ test('平台评测预览和 Job 共用当前模型投影，策略文件随任务
   } finally { await rm(fx.root, { recursive: true, force: true }) }
 })
 
+test('公开评测固定历史来源并给预览和Job传递同字节Mock映射，模型读取固定角色资产', async () => {
+  const { createAgentsHandler } = await loadServer()
+  const fx = fixture(), policyRoot = join(fx.root, '.local/evaluation-jobs/model-policies')
+  try {
+    write(join(fx.root, 'evolution/experiments/EXP-test-agent-001/candidate/roles/analyst/AGENTS.md'), '当前工作树的新角色\n')
+    write(join(fx.root, 'runtime/adapters/dsh-container/dsh-eval'), [
+      'import hashlib,json,sys',
+      'ref=sys.argv[sys.argv.index("--source-ref")+1]',
+      'path=sys.argv[sys.argv.index("--mcp-fixture")+1]',
+      'raw=open(path,"rb").read()',
+      'print(json.dumps({"source_ref":ref,"fixture":json.loads(raw),"fixture_sha256":hashlib.sha256(raw).hexdigest()}))',
+    ].join('\n'))
+    const selected = []
+    const handler = createAgentsHandler(fx.root, undefined, {}, async (agentId, _model, candidate) => {
+      selected.push({ agentId, candidate, role: readFileSync(join(candidate, 'roles/analyst/AGENTS.md'), 'utf8') })
+      return { policy: { agent_id: agentId, default: { provider: 'fixture', model: 'fixture' } }, environment: {} }
+    })
+    const mcp_fixture = { schema_version: 1, mode: 'mock', connections: [{ server_id: 'readonly', original_url: 'http://original.test/mcp', url: 'http://mock.test/mcp' }] }
+    const payload = { source: 'experiment:EXP-test-agent-001', source_ref: 'git:' + fx.commit, mcp_fixture, cases: ['U-CASE-001'] }
+    const preview = await rpc(handler, 'eval/preview', payload)
+    const started = await rpc(handler, 'eval/start', payload), final = await waitForJob(handler, started.job_id)
+    assert.equal(final.status, 'completed')
+    assert.deepEqual(final.result.fixture, mcp_fixture)
+    assert.equal(final.result.fixture_sha256, preview.result.fixture_sha256)
+    assert.equal(preview.result.source_ref, payload.source_ref)
+    assert.equal(selected.length, 2)
+    assert.ok(selected.every(item => item.role === '# Analyst\n' && item.candidate.includes('.local/evaluation-sources/')))
+    assert.deepEqual(readdirSync(policyRoot), [])
+    assert.match(readFileSync(join(fx.root, 'evolution/experiments/EXP-test-agent-001/candidate/roles/analyst/AGENTS.md'), 'utf8'), /当前工作树的新角色/)
+    const invalid = await handler('eval/preview', { ...payload, source_ref: 'main' }, new AbortController().signal)
+    assert.equal(invalid.ok, false)
+    const invalidFixture = await handler('eval/preview', { ...payload, mcp_fixture: { ...mcp_fixture, mode: 'production' } }, new AbortController().signal)
+    assert.equal(invalidFixture.ok, false)
+  } finally { await rm(fx.root, { recursive: true, force: true }) }
+})
+
+test('未配置模型投影且未选扩展参数时，评测仍保留原CLI来源解析入口', async () => {
+  const { createAgentsHandler } = await loadServer(), fx = fixture()
+  try {
+    write(join(fx.root, 'runtime/adapters/dsh-container/dsh-eval'), 'import json,sys\nprint(json.dumps({"source":sys.argv[sys.argv.index("--source")+1]}))\n')
+    const value = await rpc(createAgentsHandler(fx.root), 'eval/preview', { source: 'release:fixture-v1.0.0', cases: ['U-CASE-001'] })
+    assert.equal(value.result.source, 'release:fixture-v1.0.0', '来源是否可装载仍交由既有CLI判断，不增加前置缩窄')
+  } finally { await rm(fx.root, { recursive: true, force: true }) }
+})
+
 test('从 Run 转入的用例经过普通编辑仍保留来源引用，注释不进入输入与预期', async () => {
   const { createAgentsHandler } = await loadServer()
   const fx = fixture()

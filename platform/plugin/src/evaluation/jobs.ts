@@ -130,6 +130,7 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
       source: inputs.source_id, cases: inputs.evaluation_cases?.map((item: MapValue) => item.case_id),
       candidate_sha256: inputs.candidate_sha256, evaluation_sha256: inputs.evaluation_sha256,
       program_origin: inputs.program_origin, evaluation_implementation: inputs.evaluation_implementation,
+      source_ref: inputs.source_ref, mcp_fixture: inputs.mcp_fixture,
       sessions: [], instance_name: null })
     try {
       const execution = JSON.parse(readFileSync(join(run, 'execution.json'), 'utf8'))

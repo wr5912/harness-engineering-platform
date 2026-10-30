@@ -27,6 +27,20 @@ function compare(left, right) {
   return JSON.parse(result.stdout)
 }
 
+test('历史父版和当前变体允许不同source_ref，但只有同一Mock映射才可比较并明确环境', () => {
+  const left = view('parent'), right = view('variant')
+  left.source.source_ref = 'git:' + '1'.repeat(40)
+  left.source.mcp_fixture = right.source.mcp_fixture = { schema_version: 1, mode: 'mock', sha256: 'a'.repeat(64), connections: [] }
+  const same = compare(left, right)
+  assert.equal(same.causal_comparable, true)
+  assert.match(same.markdown, /mock；冻结连接映射/)
+  assert.match(same.markdown, /不代表真实业务系统/)
+  right.source.mcp_fixture = { ...right.source.mcp_fixture, sha256: 'b'.repeat(64) }
+  assert.ok(compare(left, right).limits.some(limit => limit.startsWith('mcp_fixture:')))
+  delete right.source.mcp_fixture
+  assert.equal(compare(left, right).causal_comparable, false)
+})
+
 test('完整相同路由保留观察性对照且显示实际provider、model和off', () => {
   const result = compare(view('old'), view('new'))
   assert.equal(result.comparable, true)

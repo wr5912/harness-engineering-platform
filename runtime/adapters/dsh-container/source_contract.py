@@ -255,7 +255,10 @@ def preset_id(preset_relative: str) -> str:
 
 def _resolve_experiment(source_id: str, *, repo: Path, sources: Path, lock_path: Path, require_assets: bool) -> dict:
     command = ["node", str(ADAPTER / "version-source.mts"), str(repo), source_id]
-    result = subprocess.run(command, capture_output=True, text=True, timeout=20)
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise ValueError("版本来源读取未完成，请核对运行环境后重试") from error
     if result.returncode:
         raise ValueError(result.stderr.strip() or "版本装载声明读取失败")
     item = json.loads(result.stdout)
@@ -306,8 +309,27 @@ def _resolve_release(release_name: str, *, repo: Path) -> dict:
 
 
 def resolve(source_id: str = DEFAULT_SOURCE, *, repo: Path = REPO, sources: Path | None = None,
-            lock_path: Path = LOCK, require_assets: bool = True) -> dict:
+            lock_path: Path = LOCK, require_assets: bool = True, source_ref: str | None = None) -> dict:
     repo = repo.expanduser().resolve()
+    if source_ref:
+        experiment_id = source_id.removeprefix("experiment:")
+        try:
+            result = subprocess.run(["node", str(ADAPTER / "evaluation-source.mts"), "source", str(repo), experiment_id, source_ref],
+                                    capture_output=True, text=True, timeout=120)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise ValueError("固定评测来源读取未完成，请核对运行环境后重试") from error
+        if result.returncode:
+            raise ValueError(result.stderr.strip() or "固定评测来源物化失败")
+        selected = json.loads(result.stdout)
+        frozen = Path(selected["root"])
+        contract = resolve(source_id, repo=frozen, lock_path=lock_path, require_assets=require_assets)
+        contract.update({"source_ref": source_ref, "source_snapshot_root": str(frozen),
+                         "candidate_source_root": str(Path(contract["candidate_root"]).parent),
+                         "evaluation_path": str(frozen / "agents" / contract["agent_id"] / "evaluation.md"),
+                         "change_path": str(frozen / "evolution/experiments" / experiment_id / "change.yaml"),
+                         "experiment_root": str(repo / "evolution/experiments" / experiment_id),
+                         "asset_root": str(repo), "workspace_id": workspace_id(repo)})
+        return contract
     sources = sources if sources is not None else source_catalog(repo)
     if not source_id:
         manifest = yaml.safe_load((repo / "agents/security-operations-expert/manifest.yaml").read_text(encoding="utf-8"))
@@ -363,6 +385,7 @@ def mount_plan(contract: dict, role: str, *, task_dir: str = None, output_dir: s
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", default=DEFAULT_SOURCE)
+    parser.add_argument("--source-ref", help="固定 Git 来源 git:<40位提交>；不改写当前 Candidate")
     parser.add_argument("--repo", type=Path, default=REPO, help="用户数据工作区根目录")
     parser.add_argument("--image-identity-for", choices=("linux/amd64", "linux/arm64"),
                         help="print the locked standard image identity for a target platform")
@@ -385,7 +408,7 @@ def main() -> None:
                 "fingerprint": fingerprint,
             }, separators=(",", ":")))
             return
-        contract = resolve(args.source, repo=args.repo, require_assets=not args.allow_missing_assets)
+        contract = resolve(args.source, repo=args.repo, require_assets=not args.allow_missing_assets, source_ref=args.source_ref)
         selected = sum(flag is not None and flag is not False
                        for flag in (args.field, args.image_input_digests, args.env_names, args.mount_plan))
         if selected > 1:

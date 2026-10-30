@@ -85,10 +85,22 @@ export function assertCandidatePath(candidate: string, file: string, directory =
   return target
 }
 
+export function assertRuntimeCandidateOrigin(assetRoot: string, candidatePath: string): string {
+  const candidate = resolve(candidatePath), root = resolve(assetRoot)
+  const selected = relative(root, candidate), current = /^evolution\/experiments\/([^/]+)\/candidate$/.exec(selected)
+  if (!current) {
+    const fixed = /^\.local\/evaluation-sources\/([a-f0-9]{40})\/([^/]+)\/evolution\/experiments\/([^/]+)\/candidate$/.exec(selected)
+    if (!fixed || fixed[2] !== fixed[3]) throw new Error('运行来源必须是所选工作区的 Candidate')
+    const manifest = JSON.parse(readFileSync(assertCandidatePath(root, `.local/evaluation-sources/${fixed[1]}/${fixed[2]}/snapshot.json`), 'utf8'))
+    if (manifest.commit !== fixed[1] || manifest.experiment_id !== fixed[2]) throw new Error('固定评测来源身份不一致')
+  }
+  assertCandidatePath(root, selected, true)
+  return candidate
+}
+
 export function resolveHarnessRuntime(assetRoot: string, agentId: string, candidatePath?: string): HarnessRuntime | undefined {
   if (!candidatePath) return undefined
-  const candidate = resolve(candidatePath), root = resolve(assetRoot)
-  if (!candidate.startsWith(`${root}/evolution/experiments/`) || !candidate.endsWith('/candidate')) throw new Error('运行来源必须是所选工作区的 Candidate')
+  const candidate = assertRuntimeCandidateOrigin(assetRoot, candidatePath)
   const change = object(load(readFileSync(assertCandidatePath(dirname(candidate), 'change.yaml'), 'utf8')))
   if (change.agent_id !== agentId) throw new Error('运行绑定的来源 Agent 不一致')
   const runtime = parseHarnessRuntime(readFileSync(assertCandidatePath(candidate, 'harness.yaml'), 'utf8'))

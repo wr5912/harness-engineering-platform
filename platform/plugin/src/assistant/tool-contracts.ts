@@ -23,6 +23,13 @@ export function allowedAssistantActions(domain: AssistantDomain, state: any): re
 
 const string = { type: 'string' }, strings = { type: 'array', items: string }, object = { type: 'object', additionalProperties: true }
 const fields: MapValue = {
+  source_ref: { type: 'string', pattern: '^git:[a-f0-9]{40}$', description: '可选固定来源；Candidate、Case、角色绑定均读取同一 Git 提交，Run 仍保存到原版本。' },
+  mcp_fixture: { type: 'object', required: ['schema_version', 'mode', 'connections'], additionalProperties: false, properties: {
+    schema_version: { const: 1 }, mode: { const: 'mock' }, connections: { type: 'array', minItems: 1, items: {
+      type: 'object', required: ['server_id', 'original_url', 'url'], additionalProperties: false,
+      properties: { server_id: string, original_url: string, url: string, enabled: { type: 'boolean' } },
+    } },
+  }, description: '显式 Mock 连接映射，只投影本次评测 Runtime。原地址必须精确匹配所选来源；保留工具公开名，禁止凭据字段。两侧比较使用相同映射字节。' },
   target: object, mapping: { type: 'array', items: object }, uncovered: strings, offset: { type: 'integer' }, model_bindings: object, project_workspace: object, role_instructions: object,
   resolutions: { type: 'array', items: object },
   declaration_paths: strings, target_platform: string, target_image: string, fingerprint: string,
@@ -106,7 +113,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['cases/list cases/create-context', 'agent_id experiment_id'], ['cases/read', 'agent_id experiment_id case_id'],
     ['cases/from-run', 'agent_id experiment_id run_id case_id'],
     ['cases/update cases/create-preview cases/create', 'agent_id experiment_id case_id title scene inputs expected_behavior fast expected_sha256 source_run_id source_case_id', '先读用例或 create-context；inputs 为非空字符串数组，expected_sha256 取原文件摘要。新建先 create-preview。'],
-    ['eval/preview eval/start', 'source cases mode executor review model model_selection compare_to artifact_export', 'source=experiment:<ID>；cases 为固定 Case ID 数组。model 是原有断言，model_selection 是本次主角色原生模型选择；省略时读取版本绑定。preview 不执行评测，start 返回 job_id。'],
+    ['eval/preview eval/start', 'source source_ref mcp_fixture cases mode executor review model model_selection compare_to artifact_export', 'source=experiment:<ID>；cases 为固定 Case ID 数组。source_ref 可固定历史来源；mcp_fixture 明确 Mock 边界并随 Run 封存，不修改原连接或 Candidate，不代表真实业务系统验收。model 是原有断言，model_selection 是本次主角色原生模型选择；省略时读取所选来源的版本绑定。preview 不执行评测，start 返回 job_id。'],
     ['eval/status eval/cancel', 'job_id'], ['runs/index', 'agent_id experiment_id'],
     ['runs/show', 'run_id case_id'], ['runs/report runs/files', 'run_id'], ['runs/read-file', 'run_id path'],
     ['runs/evidence', 'run_id case_id filename'], ['runs/compare', 'left right case_id'], ['runs/trace', 'run_id path source_sha256 cursor limit session_log'],

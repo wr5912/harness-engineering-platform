@@ -47,8 +47,9 @@ for (const field of ['review_mode', 'configured_capabilities', 'dependency_env',
   if (!a || !b) limit(`${field}: 未记录`);
   else if (!isDeepStrictEqual(a, b)) limit(`${field}: 不同`);
 }
+if (!isDeepStrictEqual(left.source.mcp_fixture ?? null, right.source.mcp_fixture ?? null)) limit('mcp_fixture: Mock 环境或冻结连接映射不同');
 for (const [side, run] of [['left', left], ['right', right]] as const) {
-  if (run.source.git_version?.dirty !== false) limit(`${side}: Git 来源不干净或未记录`);
+  if (!run.source.source_ref && run.source.git_version?.dirty !== false) limit(`${side}: Git 来源不干净或未记录`);
   if (!run.source.program_origin?.commit) limit(`${side}: 平台程序来源未记录`);
   if (run.source.program_origin?.dirty !== false) limit(`${side}: 平台程序来源不干净或未记录`);
   if (run.missing.length) limit(`${side}: 缺少证据或记录（${run.missing.join('；')}）`);
@@ -120,6 +121,8 @@ const sourceFacts = (run: View) => {
   return {
     'Run': link(`${run.run_path}/report.md`, run.run_id),
     'Git': `${cell(run.source.git_version?.commit)}；dirty=${cell(run.source.git_version?.dirty)}`,
+    '固定运行来源': cell(run.source.source_ref ?? '当前工作树'),
+    '接口环境': run.source.mcp_fixture ? `mock；冻结连接映射 ${cell(run.source.mcp_fixture.sha256)}，不代表真实业务系统` : '未声明 Mock 连接映射',
     '平台程序': `${cell(run.source.program_origin?.commit)}；dirty=${cell(run.source.program_origin?.dirty)}`,
     '执行与评审实现': run.source.evaluation_implementation
       ? link(`${run.run_path}/inputs.lock.json`, `已冻结 ${Object.keys(run.source.evaluation_implementation).length} 项文件`)

@@ -1244,6 +1244,10 @@ def assert_asset_dependencies(contract: dict, image_id: str | None = None) -> No
                contract["image"]["local_image_tag"]]
     if image_id:
         command.append(image_id)
+    if contract.get("source_ref"):
+        if not image_id:
+            command.append("")
+        command.append(str(Path(contract["candidate_root"]).parent))
     checked = run(command, check=False)
     try:
         dependencies = json.loads(checked.stdout)
@@ -1364,6 +1368,15 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
     local_routes = business["localModelRoutes"] if business else source_local_model_routes(contract) if analysis_workspace is None else None
     (target / "model.patch.yml").write_text(model_policy_patch(policy, local_routes, business=business is not None), encoding="utf-8")
     os.chmod(target / "model.patch.yml", 0o644)
+    if contract.get("mcp_fixture"):
+        fixture_patch = target / "mcp.fixture.patch.yml"
+        fixture_patch.write_text(contract["mcp_fixture_patch"], encoding="utf-8")
+        os.chmod(fixture_patch, 0o644)
+        projection = subprocess.run(["node", str(ADAPTER / "evaluation-source.mts"), "compose", str(fixture_patch)],
+                                    input=rendered, text=True, capture_output=True, timeout=30)
+        if projection.returncode:
+            fail("无法投影本次 MCP Mock Compose，未启动实例")
+        rendered = json.loads(projection.stdout)
     (target / "compose.yaml").write_text(rendered, encoding="utf-8")
     manifest = {
         "schema_version": INSTANCE_SCHEMA_VERSION,
@@ -1375,6 +1388,8 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
         "project": project_name(name),
         "source_id": contract["source_id"],
         "source_kind": contract["source_kind"],
+        **({"source_ref": contract["source_ref"]} if contract.get("source_ref") else {}),
+        **({"mcp_fixture": contract["mcp_fixture"]} if contract.get("mcp_fixture") else {}),
         "mode": mode,
         "purpose": PURPOSES[mode],
         "agent_id": contract["agent_id"],
@@ -1654,7 +1669,17 @@ def prepare_up(args: argparse.Namespace) -> tuple[dict, tuple[Path, dict] | None
     # 业务实例同样跳过 Web 预览版说明；网关默认放行后该弹窗会直接可见。
     args.skip_testing_notice = not args.analysis_workspace
     validate_trusted_host(getattr(args, "trusted_host", None))
-    contract = resolve(args.source, repo=REPO)
+    source_ref = getattr(args, "source_ref", None)
+    contract = resolve(args.source, repo=REPO, **({"source_ref": source_ref} if source_ref else {}))
+    fixture_file = getattr(args, "mcp_fixture", None)
+    if fixture_file:
+        if business_file or args.analysis_workspace:
+            fail("MCP fixture 只适用于独立被测实例，不能覆盖业务或归因实例")
+        projected = run(["node", str(ADAPTER / "evaluation-source.mts"), "fixture",
+                         str(Path(contract["candidate_root"]).parent), fixture_file])
+        fixture = json.loads(projected.stdout)
+        contract["mcp_fixture"] = fixture["metadata"]
+        contract["mcp_fixture_patch"] = fixture["patch"]
     if contract.get("profile") == "sdk":
         fail("SDK 版本使用 sdk-run 提交真实输入，不启动空闲 Web 服务")
     args.name = args.name or f"{contract['agent_id']}-{PURPOSES[args.mode]}"
@@ -1792,6 +1817,11 @@ def build_plan(args: argparse.Namespace, contract: dict) -> dict:
     }
     if contract["source_kind"] == "experiment" and not analysis_workspace:
         plan["evaluation_source_notice"] = "评测模式绑定当前宿主 Candidate；运行期间不要改写该来源，并在 Run 中记录实际 Git 与 dirty 状态。"
+        if contract.get("source_ref"):
+            plan["source_ref"] = contract["source_ref"]
+            plan["evaluation_source_notice"] = "运行资产与 Case 来自固定 Git 提交；不修改当前 Candidate。"
+        if contract.get("mcp_fixture"):
+            plan["mcp_fixture"] = contract["mcp_fixture"]
     if contract.get("business_control"):
         plan.update({"business_control": {"runtime_generation": contract["business_control"]["runtime_generation"],
                                          "source_digest": contract["business_control"]["source_digest"],
@@ -1982,6 +2012,8 @@ def _command_up(args: argparse.Namespace, contract: dict,
               "web_base_path": business_base,
               **({} if contract.get("business_control") else {"base_url": f"http://127.0.0.1:{args.port}{business_base}"}),
               "state_dir": str(target), "agent_id": contract["agent_id"],
+              **({"source_ref": contract["source_ref"]} if contract.get("source_ref") else {}),
+              **({"mcp_fixture": contract["mcp_fixture"]} if contract.get("mcp_fixture") else {}),
               "target_preset": target_preset(contract),
               "session_preset": session_preset(contract, args.mode, args.analysis_workspace),
               **({"model_policy": model_policy_summary(contract["model_policy"])}
@@ -3047,6 +3079,8 @@ def main() -> None:
 
     up = commands.add_parser("up", help="启动实例（可用 --dry-run 预览）")
     up.add_argument("--source", nargs="?", help="来源选择器；未提供值时列出可用的 experiment:<id>")
+    up.add_argument("--source-ref", help="固定 Git 来源 git:<40位提交>，不修改当前 Candidate")
+    up.add_argument("--mcp-fixture", help="独立被测实例的明确 Mock MCP 连接映射 JSON")
     up.add_argument("--mode", nargs="?", choices=MODE_CHOICES, metavar="{eval}", type=normalize_mode,
                     help="eval（被测模式）")
     up.add_argument("--name", help="实例名；默认 <agent-id>-eval")

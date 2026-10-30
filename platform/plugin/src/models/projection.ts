@@ -166,7 +166,7 @@ export async function projectModelPolicy(assetRoot: string, agentId: string, ser
   if (candidatePath) {
     const id = basename(dirname(candidatePath))
     if (runtime || existsSync(join(assetRoot, '.local/asset-dependencies', id, 'current.json'))) {
-      dependencies = resolvePreparedAssetDependencies(assetRoot, id)
+      dependencies = resolvePreparedAssetDependencies(assetRoot, id, {}, candidatePath)
       if (dependencies.status !== 'ready') throw new Error(`业务依赖尚未准备：${dependencies.reasons.join('；')}`)
     }
   }

@@ -11,9 +11,9 @@ try {
   }
   if (candidate === '--dependencies') {
     const { resolvePreparedAssetDependencies } = await import('../../../platform/plugin/src/agents/asset-dependencies.ts')
-    const [, root, id, image, imageId] = process.argv.slice(2)
+    const [, root, id, image, imageId, candidatePath] = process.argv.slice(2)
     if (!root || !id) throw new Error('缺少依赖来源参数')
-    const result = resolvePreparedAssetDependencies(root, id, { ...(image ? { image } : {}), ...(imageId ? { image_id: imageId } : {}) })
+    const result = resolvePreparedAssetDependencies(root, id, { ...(image ? { image } : {}), ...(imageId ? { image_id: imageId } : {}) }, candidatePath)
     process.stdout.write(JSON.stringify(result))
     process.exit(result.status === 'ready' ? 0 : 1)
   }

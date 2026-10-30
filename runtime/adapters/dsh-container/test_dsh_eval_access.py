@@ -53,6 +53,9 @@ class EvaluationAccessTest(unittest.TestCase):
             self.assertEqual(emit.call_args.args[0], identity)
 
     def setUp(self):
+        self.environment_patch = mock.patch.dict(os.environ, {})
+        self.environment_patch.start()
+        self.addCleanup(self.environment_patch.stop)
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
         (self.root / "config").mkdir()
