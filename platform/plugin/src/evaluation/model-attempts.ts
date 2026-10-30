@@ -76,10 +76,11 @@ export function observeLlm(llm: any, context: ModelAttemptContext, record: Attem
   }
 }
 
-/** 仅这些受控原生路由已证明完全本地执行，未知路由不能按零调用处理。 */
-export function isLocalModelRoute(route: any): boolean {
+/** 既有受控路由与本 Run 已核对的精确声明；未知名称不推断为本地执行。 */
+export function isLocalModelRoute(route: any, localModelRoutes: readonly Pick<Required<ModelAttempt>, 'provider' | 'model'>[] = []): boolean {
   return route?.provider === 'threat-analysis-delivery' && route?.model === 'fixed-summary'
     || route?.provider === 'threat-analysis-automation' && route?.model === 'scheduled-batch'
     || isCodeOnlyModelRoute(route)
     || isHybridWorkflowRoute(route)
+    || localModelRoutes.some(local => local.provider === route?.provider && local.model === route?.model)
 }

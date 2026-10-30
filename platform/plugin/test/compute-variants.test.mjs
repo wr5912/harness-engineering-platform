@@ -13,8 +13,8 @@ import { load, dump } from 'js-yaml'
 process.env.HARNESS_PROGRAM_ROOT = new URL('../../../', import.meta.url).pathname
 process.env.HARNESS_PYTHON ||= '/usr/bin/python3'
 const buildRoot = mkdtempSync(join(tmpdir(), 'compute-variants-build-'))
-await build({ stdin: { contents: "export * from './src/agents/compute-variants.ts'; export { createAgentsHandler } from './src/agents/index.ts'; export { createComputeBuildHandler } from './src/agents/compute-build.ts'; export { candidateDigest } from './src/tasks/files.ts'", resolveDir: new URL('../', import.meta.url).pathname, loader: 'ts' }, outfile: join(buildRoot, 'variants.mjs'), bundle: true, platform: 'node', format: 'esm', external: ['@deepseek-ai/dsh-client-connection'] })
-const { createAgentsHandler, createComputeVariantsHandler, computeTraceMetrics, createComputeBuildHandler, candidateDigest } = await import(`file://${join(buildRoot, 'variants.mjs')}`)
+await build({ stdin: { contents: "export * from './src/agents/compute-variants.ts'; export { createAgentsHandler } from './src/agents/index.ts'; export { createComputeBuildHandler } from './src/agents/compute-build.ts'; export { candidateDigest } from './src/tasks/files.ts'; export { measureRunModelUsage } from './src/evaluation/model-usage.ts'", resolveDir: new URL('../', import.meta.url).pathname, loader: 'ts' }, outfile: join(buildRoot, 'variants.mjs'), bundle: true, platform: 'node', format: 'esm', external: ['@deepseek-ai/dsh-client-connection'] })
+const { createAgentsHandler, createComputeVariantsHandler, computeTraceMetrics, createComputeBuildHandler, candidateDigest, measureRunModelUsage } = await import(`file://${join(buildRoot, 'variants.mjs')}`)
 const parent = 'EXP-alpha-001-r111111111111', variant = 'VAR-alpha-001-r222222222222'
 const parentRun = 'run-11111111-1111-4111-8111-111111111111', variantRun = 'run-22222222-2222-4222-8222-222222222222'
 const hash = value => createHash('sha256').update(value).digest('hex')
@@ -96,7 +96,7 @@ async function fixture(planOverrides = {}) {
   const addRun = (id, experimentId, calls) => {
     const base = join(path(experimentId), 'runs', id)
     const manifest = { run_id: id, experiment_id: experimentId, agent_id: 'alpha', status: 'completed', created_at: new Date(Date.now() + 1000).toISOString() }
-    const lock = { created_at: manifest.created_at, candidate_sha256: digest(experimentId), git_version: { commit: plannedCommit, dirty: false }, program_origin: { commit: 'c'.repeat(40), dirty: false }, executor: 'api', review_mode: 'ai', dependency_env: {}, evaluation_cases: [] }
+    const lock = { created_at: manifest.created_at, candidate_sha256: digest(experimentId), git_version: { commit: plannedCommit, dirty: false }, program_origin: { commit: 'c'.repeat(40), dirty: false }, executor: 'api', review_mode: 'ai', dependency_env: {}, evaluation_cases: [], harness_trees: { managed: { files: [] } } }
     write(join(base, 'inputs.lock.json'), JSON.stringify(lock))
     for (const [key, file, value] of [['results_sha256', 'results.jsonl', '{}\n'], ['analysis_sha256', 'analysis.json', '{}'], ['report_sha256', 'report.md', '# 原始报告\n完整结果。']]) { write(join(base, file), value); manifest[key] = hash(value) }
     write(join(base, 'run.yaml'), dump(manifest))
@@ -199,6 +199,87 @@ test('普通计划的token指标也包含关联MCP图内推理，不能以外层
   assert.equal(result.resource_evidence.passed, false)
   assert.equal(result.eligible_for_end, false)
 }))
+
+function freezeLocalDelivery(fx) {
+  const local = { provider: 'security-operation-delivery', model: 'fixed-operation-result' }
+  const content = JSON.stringify({ runtime_capabilities: { local_tools: [], local_model_routes: [local] } })
+  for (const side of [fx.left, fx.right]) {
+    side.lock.harness_trees.managed.files = [{ path: 'role-tool-matrix.yaml', sha256: hash(content), size: Buffer.byteLength(content) }]
+    side.lock.managed_role_snapshot = 'evidence/managed/role-tool-matrix.yaml'
+    write(join(side.base, 'inputs.lock.json'), JSON.stringify(side.lock))
+    write(join(side.base, side.lock.managed_role_snapshot), content)
+    write(join(side.base, 'evidence/analysis/harness.json'), JSON.stringify({ files: [{ tree: 'managed', path: 'role-tool-matrix.yaml', sha256: hash(content), content }] }))
+    const file = join(side.base, 'evidence/U-ONE-001/trace.jsonl'), rows = readFileSync(file, 'utf8').split('\n').map(JSON.parse)
+    const id = side.view.manifest.run_id, session = rows[0].event.id
+    const attempt = { ...local, reasoning_effort: 'off', execution_id: `local-${id}`, attempt_id: `delivery-${id}`,
+      role: 'target', session_id: session, tool_call_id: 'call-1' }
+    rows.find(row => row.event.type === 'tool/result').event.data.meta = { graph_execution: {
+      execution_id: attempt.execution_id, session_id: session, tool_call_id: 'call-1', complete: true, status: 'completed', model_attempts: [
+        { ...attempt, time: 1, status: 'started' },
+        { ...attempt, time: 2, status: 'completed', usage: { inputTokens: 1000, outputTokens: 10, totalTokens: 1010 } },
+      ],
+    } }
+    write(file, rows.map(JSON.stringify).join('\n'))
+    write(join(side.base, 'evidence/U-ONE-001/tools.jsonl'), rows.filter(row => row.event.type.startsWith('tool/')).map(JSON.stringify).join('\n'))
+  }
+  return content
+}
+
+test('比较与Job共用每Run封存声明，本地图不计LLM且legacy只接受同摘要原文', () => withFixture(async fx => {
+  freezeLocalDelivery(fx)
+  const result = success(await fx.handler('compare', fx.body))
+  assert.deepEqual(result.comparability.limits, [])
+  assert.equal(result.resources.actual_model_calls.parent, 2)
+  assert.equal(result.resources.actual_model_calls.variant, 1)
+  assert.equal(result.resources.total_tokens.parent, 220)
+  assert.equal(result.resources.total_tokens.variant, 110)
+  assert.equal(result.eligible_for_end, true)
+  for (const side of [fx.left, fx.right]) {
+    rmSync(join(side.base, side.lock.managed_role_snapshot))
+    delete side.lock.managed_role_snapshot
+    write(join(side.base, 'inputs.lock.json'), JSON.stringify(side.lock))
+  }
+  assert.deepEqual(success(await fx.handler('compare', fx.body)).resources, result.resources)
+}))
+
+test('比较的新声明快照缺损不回退legacy，未核对时所有资源指标未知且不能end', () => withFixture(async fx => {
+  const content = freezeLocalDelivery(fx)
+  for (const legacyLock of [false, true]) {
+    if (legacyLock) {
+      delete fx.right.lock.harness_trees
+      delete fx.right.lock.managed_role_snapshot
+      write(join(fx.right.base, 'inputs.lock.json'), JSON.stringify(fx.right.lock))
+    } else write(join(fx.right.base, fx.right.lock.managed_role_snapshot), content + ' ')
+    const result = success(await fx.handler('compare', fx.body))
+    for (const name of ['model_calls', 'actual_model_calls', 'input_tokens', 'output_tokens', 'total_tokens', 'elapsed_ms'])
+      assert.equal(result.resources[name].variant, null, `${name}不能使用默认无声明集合估计`)
+    assert.equal(result.resource_evidence.passed, false)
+    assert.equal(result.eligible_for_end, false)
+    assert.ok(result.resource_evidence.limits.some(message => message.includes('本地能力声明尚未核对')))
+  }
+}))
+
+test('资源比较仅目标与子会话，HUD全Run按role核对而不把独立Judge并入比较', () => {
+  const rows = completeTrace(1, 100, 'target-only')
+  const target = { path: '/run/evidence/U-ONE-001/trace.jsonl', rows }
+  const judge = { path: '/run/evidence/U-ONE-001/judge-trace.jsonl', rows: completeTrace(1, 100, 'independent-judge') }
+  const inputs = { harness_trees: { managed: { files: [] } } }
+  const targetMeasurement = measureRunModelUsage('/unused-run', inputs, [target])
+  const hud = measureRunModelUsage('/unused-run', inputs, [target, judge])
+  const metrics = computeTraceMetrics(rows, true, [], targetMeasurement)
+  assert.equal(metrics.values.actual_model_calls, hud.model_calls_by_role.target)
+  assert.equal(metrics.values.actual_model_calls, 1)
+  assert.equal(hud.actual_model_calls, 2)
+  assert.equal(hud.model_calls_by_role.judge, 1)
+  assert.equal(metrics.values.total_tokens, 110)
+  assert.equal(hud.token_usage.total_tokens, 220)
+  const unknown = measureRunModelUsage('/unused-run', {}, [target, judge])
+  assert.equal(unknown.actual_model_calls, null)
+  assert.equal(unknown.observed_model_calls, null)
+  const unavailable = computeTraceMetrics(rows, true, [], unknown)
+  assert.ok(Object.values(unavailable.values).every(value => value === null))
+  assert.ok(unavailable.missing.some(reason => reason.includes('local-model-routes-lock-missing')))
+})
 
 test('普通旧计划的图关联未知时token与实际调用保持未知，历史响应指标不能使比较成立', () => withFixture(async fx => {
   addOrdinaryGraphEvidence(fx, true)

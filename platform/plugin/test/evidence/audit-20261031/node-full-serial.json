@@ -1,0 +1,61 @@
+{
+  "status": "passed",
+  "exit_code": 0,
+  "tests": 1411,
+  "passed": 1411,
+  "failed": 0,
+  "skipped": 0,
+  "cancelled": 0,
+  "duration_ms": 352816.265808,
+  "command": "node --test --test-concurrency=1 test/*.test.mjs",
+  "environment": {
+    "HARNESS_PYTHON": "/usr/bin/python3.10",
+    "HARNESS_DSH_ENTRY": "/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/lib/bin.js",
+    "TMPDIR": "/home/admin/work/harness-engineering-platform/.local/audit-20261030/ts-meter-full-serial-tmp"
+  },
+  "build": {
+    "exit_code": 0,
+    "log": ".local/audit-20261030/model-local-routes-build-final.log",
+    "sha256": "58408c06c16d66d2f935d114aa2d574274d9dc1e087ff919836638cf166fac0d"
+  },
+  "log": {
+    "path": ".local/audit-20261030/model-local-routes-plugin-full-serial-final.log",
+    "sha256": "6ae6bdd6f1325c284c35748c3dbfff493ff0f6647ccaf54b9aeb70ab17bcfd81"
+  },
+  "producer_checks": {
+    "files": 10,
+    "changed": [],
+    "after": {
+      "runtime/adapters/dsh-container/run_record.py": "289c1c990c3302ccdf0671fa2b3d99d5bafdf7a50f4c12872e268f30fbd88f9d",
+      "runtime/adapters/dsh-container/scenario_analysis.py": "20dc7e1c86c76dd61d3c4f66e9ec36d05e70b185ee6dba641d3c82b2cf837654",
+      "runtime/adapters/dsh-container/business.ts": "e1180299693d3c5f3f5ca1f72379673585ec6901aef089e81d2d21898ade0f26",
+      "runtime/research/validate_experiment.py": "fdaecd57fae578a685931c9a2c74e587b04193bf2683269f566c0c16c617c3e7",
+      "platform/plugin/src/business-control/local-capabilities.ts": "89214f8031c724f5e2682388c525cc44ec53e18695c50ecd00831956205b309d",
+      "platform/plugin/src/evaluation/model-usage.ts": "b579fdc2c23092a70e59fd21db2c65e5d14d3839ff606d90fa4981e5d60f018d",
+      "platform/plugin/src/evaluation/model-attempts.ts": "7f38d3f71a7d84fb0ddcd52a74f9bdae6601944d2d69e9f7d34643fd22902f41",
+      "platform/plugin/src/evaluation/jobs.ts": "fd86a5059be4f84371c313352ae6ee37d1382ffca9c35fcdff5e9363e434127e",
+      "platform/plugin/src/agents/compute-variants.ts": "77e92626290c618541c6dd34ba3c87aa425c7891a697897a9d4b9debe2c6a73a",
+      "platform/plugin/src/workflows/runtime.ts": "f749cadfd64881284eb37d050b38a59879f952396f10658c82cd7fcb84ffcc92"
+    }
+  },
+  "temporary_cleanup": {
+    "mode": "0o700",
+    "in_use_pids": [],
+    "removed_files": 200,
+    "removed_file_allocated_bytes": 90279936,
+    "empty": true
+  },
+  "disk_after": {
+    "/": {
+      "total": 84151820288,
+      "used": 76089978880,
+      "free": 4414377984
+    },
+    "/home": {
+      "total": 528104091648,
+      "used": 502351249408,
+      "free": 3832397824
+    }
+  },
+  "scope": "该轮运行源码准确结果；后续Python历史source_ref消费者修正另行验证，不包含在本次1411中。"
+}

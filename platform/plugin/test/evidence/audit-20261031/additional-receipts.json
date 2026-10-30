@@ -1,0 +1,1043 @@
+{
+  "schema_version": 1,
+  "kind": "bounded-derived-receipts",
+  "observed_date": "2026-10-31",
+  "note": "以下是列明本地原始收据的有界字段摘要，不是完整trace，也不替代原始Run；source SHA标识原字节。未改写原始失败。",
+  "verbatim_receipts": {
+    "migration-seal-negatives.json": {
+      "local_source": ".local/audit-20261030/e2e/migration-seal-negatives.json",
+      "sha256": "21143586c118a144d908142f2b413c768d8713b9cab22f293986fbfd6450bb19",
+      "bytes": 4817
+    },
+    "decision-cas-live.json": {
+      "local_source": ".local/audit-20261030/e2e/decision-cas-live.json",
+      "sha256": "88e056bc26fba7d1b376a3ce7d996cde2c3cb77e97c1a67c3389cc5556795b79",
+      "bytes": 3081
+    },
+    "sdk-standalone-live.json": {
+      "local_source": ".local/audit-20261030/sdk-ready-full-live/receipt.json",
+      "sha256": "0f058ed2ceb2016820971dc18b800537a747a6290a531e41c4aff648a129b877",
+      "bytes": 7155
+    },
+    "web-standalone-gui.json": {
+      "local_source": ".local/audit-20261030/web-full-gui-final/receipt.json",
+      "sha256": "993aa1d83c25a5aa7bd8de97623872071bb3f412ff6793452c02c50523969658",
+      "bytes": 3565
+    },
+    "streaming-hash-memory.json": {
+      "local_source": ".local/audit-20261030/hash-memory/comparison.json",
+      "sha256": "bbb20f1dac3a12c34aef72d074eb57e4b45499b5bb50ec298566a7907a70fee2",
+      "bytes": 2969
+    },
+    "node-full-serial.json": {
+      "local_source": ".local/audit-20261030/model-local-routes-plugin-full-serial-receipt.json",
+      "sha256": "8fbb4da6ea0e66d7063f75ae6629ae47fcd75a484d7e1d08639c10c0c011369c",
+      "bytes": 2697
+    },
+    "python-adapters-final.json": {
+      "local_source": ".local/audit-variants-20261030/metering-python-adapters-serial-v3-receipt.json",
+      "sha256": "a9b3a3736c657ae6b0987e4c8df778837523e86472ce1b96dfd787d91e6b787e",
+      "bytes": 1876
+    },
+    "python-research-final.json": {
+      "local_source": ".local/audit-variants-20261030/metering-python-research-serial-v3-receipt.json",
+      "sha256": "70c3979f4df1f80c8e3130a517b5a2c702cae095c61e6e1d6b2e0bc2eaec60e9",
+      "bytes": 1852
+    }
+  },
+  "sdk_completed_stop": {
+    "source": "experiment:EXP-audit-e2e-assistant-sdk-003-rf7b3602a7c10",
+    "instance_id": "audit-e2e-sdk-migration-runtime",
+    "started_at": "2026-10-30T18:34:48.969Z",
+    "request_id": "b6c53754-b737-4858-896b-e089eddae997",
+    "finished_at": "2026-10-30T18:35:00.285Z",
+    "environment": {
+      "program_sha": "aa3c10ef7ad3c08c862a485e0720394813049421",
+      "data_sha": "707aab7befc2ff96db9ec54eb6db2dc3f6767411",
+      "platform_pid": 592272,
+      "platform_loaded_sha_reported_by_root": "aa3c10ef7ad3c08c862a485e0720394813049421"
+    },
+    "cleanup": {
+      "container_ids": [],
+      "network_ids": [],
+      "home_is_directory": true,
+      "home_inode": 2564382
+    },
+    "proof": {
+      "completed": true,
+      "response": "合计24元（单价8元 × 数量3件）。",
+      "expected_state": "completed",
+      "final_state": "absent",
+      "home_preserved": true,
+      "source_preserved": true,
+      "session_restored": true
+    },
+    "operation_id": "b6c53754-b737-4858-896b-e089eddae997",
+    "session_id": "session-32483235-0040-4fa5-9a6d-a59cb62f0748",
+    "preview": {
+      "source_id": "experiment:EXP-audit-e2e-assistant-sdk-003-rf7b3602a7c10",
+      "observed_state": "completed",
+      "observed_at": "2026-10-30T18:34:58.372Z"
+    },
+    "stop_request": {
+      "name": "audit-e2e-sdk-migration-runtime",
+      "operation": "stop",
+      "expected_source_id": "experiment:EXP-audit-e2e-assistant-sdk-003-rf7b3602a7c10",
+      "expected_state": "completed"
+    },
+    "stop_result": {
+      "name": "audit-e2e-sdk-migration-runtime",
+      "project": "dsh-dev-audit-e2e-sdk-migration-runtime",
+      "home_volume": null,
+      "home_preserved": true,
+      "containers": [],
+      "stopped": true,
+      "containers_removed": true
+    }
+  },
+  "sdk_native_async_delegation": {
+    "source": {
+      "local_source": ".local/audit-20261030/e2e/sdk-delegation-results.json",
+      "sha256": "083a7f12c458578a039cfccef312ecbb6acde86e277c0d3becac3a09c96d2ea4",
+      "bytes": 211772
+    },
+    "agent_id": "audit-e2e-assistant-sdk",
+    "experiment_id": "EXP-audit-e2e-assistant-sdk-004-r9d3069ba248b",
+    "instance_id": "audit-e2e-sdk-delegation",
+    "operation_id": "8eac18fe-7026-4287-8347-52c4edfdb551",
+    "proof": {
+      "root_session_id": "session-9cd5c900-6adb-482b-bd7a-685b589832ca",
+      "status": "completed",
+      "root_ends": [
+        {
+          "index": 33,
+          "seq": 23,
+          "reason": "completed"
+        },
+        {
+          "index": 44,
+          "seq": 31,
+          "reason": "completed"
+        }
+      ],
+      "child_ends": [
+        {
+          "session_id": "7e0c62a1-f3da-46ed-9d4a-78220c56e882",
+          "index": 36,
+          "seq": 16,
+          "reason": "completed"
+        }
+      ],
+      "root_before_child_before_final": true,
+      "final_response": "已收到子智能体的真实完成回报，SDK委派验收结果如下：\n\n- **1 到 70 的平方和：116795**（即 1² + 2² + … + 70² = 116795）\n- **验收码：SDK-CHILD-5927**\n\n子智能体逐项列出了 n = 1 到 70 每个整数的平方与累计平方和，第 70 项累计值为 116795，并用公式 n(n+1)(2n+1)/6 = 70×71×141÷6 = 116795 校验一致。",
+      "verification_code_present": true
+    },
+    "limitation": "官方SDK stdio及原生spawn子智能体技术验收；不是任意业务委派均通过。"
+  },
+  "web_native_schedule": {
+    "source": {
+      "local_source": ".local/audit-20261030/e2e/schedule-live-results.json",
+      "sha256": "53527c488f96253258e344e5c819fdf02dd8aecb2780eca28bde1f3fd6d1ed08",
+      "bytes": 460956
+    },
+    "agent_id": "audit-e2e-schedule",
+    "experiment_id": "EXP-audit-e2e-schedule-001-r82683feb2e78",
+    "instance_id": "audit-e2e-schedule-live",
+    "session_id": "session-9969af60-fff9-4e36-876f-b483ada4e438",
+    "proof": {
+      "experiment_id": "EXP-audit-e2e-schedule-001-r82683feb2e78",
+      "instance_id": "audit-e2e-schedule-live",
+      "session_id": "session-9969af60-fff9-4e36-876f-b483ada4e438",
+      "persistence_verified": true,
+      "fire_observed": true,
+      "fire_history_count": 1,
+      "cancel_absent": true,
+      "cancel_never_delivered": true
+    },
+    "first_timing_attempt": {
+      "source": {
+        "local_source": ".local/audit-20261030/e2e/schedule-first-timing-results.json",
+        "sha256": "83d255b120551688a2d2f3fd76c40443f36e3dfde23fcfc781d710b65f21c141",
+        "bytes": 81004
+      },
+      "outcome": "首批测试等待错误错过预定重启时机，不计入持久化通过；保留原始失败，第二批R2重新执行。"
+    },
+    "cleanup_source": {
+      "local_source": ".local/audit-20261030/e2e/schedule-cleanup-results.json",
+      "sha256": "ffff661cd497d4cd0f9b4c4ec24afd5aa5e885feacfb87170665b951942381fc",
+      "bytes": 80408
+    },
+    "limitation": "本轮独立Web实例的原生提醒，不代表SOC受控网关业务调度验收。"
+  },
+  "fusion": {
+    "source": {
+      "local_source": ".local/audit-20261030/e2e/fusion-completion-receipt.json",
+      "sha256": "b103c6d28e711a67b72763ca9657ab69feca43414e45d45fc8298bc1cf9e6f52",
+      "bytes": 63867
+    },
+    "experiment_id": "EXP-audit-e2e-assistant-web-004-r9c5e2e27d234",
+    "candidate_sha256": "960cc3ace2e978d0bd6f655be8572284f188f1bd6126f9d44dd0956a8c4f9177",
+    "status": "completed",
+    "sources": [
+      {
+        "experiment_id": "EXP-audit-e2e-assistant-web-001-r57f20304b3c4",
+        "ref": "git:02107eaccbc42a2cbdf64131e5f0bfb74e6233c1",
+        "decision": "inherit"
+      },
+      {
+        "experiment_id": "EXP-audit-e2e-assistant-web-002-ra2a3ad241109",
+        "ref": "git:2aadef23b3bb0694b43e276018408c6229c8e01c",
+        "decision": "inherit"
+      },
+      {
+        "experiment_id": "EXP-audit-e2e-assistant-web-003-r47233801b5a0",
+        "ref": "",
+        "decision": "omit"
+      }
+    ],
+    "checks": [
+      {
+        "id": "build-esm-syntax",
+        "kind": "build"
+      },
+      {
+        "id": "load-preset-and-tool",
+        "kind": "load"
+      },
+      {
+        "id": "cap-base-receipt",
+        "kind": "capability",
+        "case_ids": [
+          "U-RECEIPT-001",
+          "U-RECEIPT-002"
+        ]
+      },
+      {
+        "id": "cap-tool-receipt-total",
+        "kind": "capability",
+        "case_ids": [
+          "U-TOOL-001",
+          "U-TOOL-002"
+        ]
+      },
+      {
+        "id": "cap-session-memory",
+        "kind": "capability",
+        "case_ids": [
+          "U-FUSION-MEMORY-001"
+        ]
+      }
+    ],
+    "verified_receipts": [
+      {
+        "check_id": "build-esm-syntax",
+        "kind": "build",
+        "candidate_sha256": "960cc3ace2e978d0bd6f655be8572284f188f1bd6126f9d44dd0956a8c4f9177",
+        "verified_at": "2026-10-30T17:58:04.891Z",
+        "evidence": {
+          "command": [
+            "node",
+            "--check",
+            "dsh/managed/receipt-helper/index.mjs"
+          ],
+          "stdout": "",
+          "stderr": ""
+        }
+      },
+      {
+        "check_id": "load-preset-and-tool",
+        "kind": "load",
+        "candidate_sha256": "960cc3ace2e978d0bd6f655be8572284f188f1bd6126f9d44dd0956a8c4f9177",
+        "verified_at": "2026-10-30T18:13:53.875Z",
+        "evidence": {
+          "run_id": "run-83b2f055-b298-47ff-ad1b-5699842b3696",
+          "run_path": "evolution/experiments/EXP-audit-e2e-assistant-web-004-r9c5e2e27d234/runs/run-83b2f055-b298-47ff-ad1b-5699842b3696",
+          "run_sha256": "d3ba697f2f2304cf988a9e2e394ef055e9f55af2e4dba38bb2911570d906507d",
+          "case_ids": []
+        }
+      },
+      {
+        "check_id": "cap-base-receipt",
+        "kind": "capability",
+        "candidate_sha256": "960cc3ace2e978d0bd6f655be8572284f188f1bd6126f9d44dd0956a8c4f9177",
+        "verified_at": "2026-10-30T18:13:58.368Z",
+        "evidence": {
+          "run_id": "run-83b2f055-b298-47ff-ad1b-5699842b3696",
+          "run_path": "evolution/experiments/EXP-audit-e2e-assistant-web-004-r9c5e2e27d234/runs/run-83b2f055-b298-47ff-ad1b-5699842b3696",
+          "run_sha256": "d3ba697f2f2304cf988a9e2e394ef055e9f55af2e4dba38bb2911570d906507d",
+          "case_ids": [
+            "U-RECEIPT-001",
+            "U-RECEIPT-002"
+          ]
+        }
+      },
+      {
+        "check_id": "cap-tool-receipt-total",
+        "kind": "capability",
+        "candidate_sha256": "960cc3ace2e978d0bd6f655be8572284f188f1bd6126f9d44dd0956a8c4f9177",
+        "verified_at": "2026-10-30T18:14:01.939Z",
+        "evidence": {
+          "run_id": "run-83b2f055-b298-47ff-ad1b-5699842b3696",
+          "run_path": "evolution/experiments/EXP-audit-e2e-assistant-web-004-r9c5e2e27d234/runs/run-83b2f055-b298-47ff-ad1b-5699842b3696",
+          "run_sha256": "d3ba697f2f2304cf988a9e2e394ef055e9f55af2e4dba38bb2911570d906507d",
+          "case_ids": [
+            "U-TOOL-001",
+            "U-TOOL-002"
+          ]
+        }
+      },
+      {
+        "check_id": "cap-session-memory",
+        "kind": "capability",
+        "candidate_sha256": "960cc3ace2e978d0bd6f655be8572284f188f1bd6126f9d44dd0956a8c4f9177",
+        "verified_at": "2026-10-30T18:14:08.709Z",
+        "evidence": {
+          "run_id": "run-83b2f055-b298-47ff-ad1b-5699842b3696",
+          "run_path": "evolution/experiments/EXP-audit-e2e-assistant-web-004-r9c5e2e27d234/runs/run-83b2f055-b298-47ff-ad1b-5699842b3696",
+          "run_sha256": "d3ba697f2f2304cf988a9e2e394ef055e9f55af2e4dba38bb2911570d906507d",
+          "case_ids": [
+            "U-FUSION-MEMORY-001"
+          ]
+        }
+      }
+    ],
+    "run_id": "run-83b2f055-b298-47ff-ad1b-5699842b3696",
+    "run_summary": {
+      "schema_version": "3.0",
+      "run_id": "run-83b2f055-b298-47ff-ad1b-5699842b3696",
+      "trial_count": 5,
+      "execution_status_counts": {
+        "completed": 5,
+        "error": 0,
+        "skipped": 0
+      },
+      "machine_trial_verdict_counts": {
+        "passed": 4,
+        "failed": 0,
+        "inconclusive": 1
+      },
+      "machine_overall_verdict": "inconclusive",
+      "review_status": "completed",
+      "reviewed_case_count": 5,
+      "reviewed_case_verdict_counts": {
+        "passed": 5,
+        "failed": 0,
+        "inconclusive": 0
+      },
+      "reviewed_overall_verdict": "passed",
+      "effective_verdict": "passed",
+      "source_verification": {
+        "status": "matched",
+        "reason": null,
+        "checks": [
+          {
+            "component": "candidate",
+            "status": "matched",
+            "expected_sha256": "960cc3ace2e978d0bd6f655be8572284f188f1bd6126f9d44dd0956a8c4f9177",
+            "actual_sha256": "960cc3ace2e978d0bd6f655be8572284f188f1bd6126f9d44dd0956a8c4f9177"
+          },
+          {
+            "component": "workspace",
+            "status": "matched",
+            "expected_sha256": "e52fb487b4184529504056c18277313c478c57af988a208d9df38ae80dee778f",
+            "actual_sha256": "e52fb487b4184529504056c18277313c478c57af988a208d9df38ae80dee778f"
+          },
+          {
+            "component": "presets",
+            "status": "matched",
+            "expected_sha256": "487d1c578efdb8c94a8cc257fc4df4b73c404ad40eb7b6fadfead5d807d57a07",
+            "actual_sha256": "487d1c578efdb8c94a8cc257fc4df4b73c404ad40eb7b6fadfead5d807d57a07"
+          },
+          {
+            "component": "managed",
+            "status": "matched",
+            "expected_sha256": "f885fd3296be126810bc682fcff66f103632272471faab2144ace7e582171774",
+            "actual_sha256": "f885fd3296be126810bc682fcff66f103632272471faab2144ace7e582171774"
+          },
+          {
+            "component": "evaluation_implementation",
+            "status": "matched",
+            "expected_sha256": "e626c0d1318c2bdf7c3c9a5276389833a89726b8d5584bd26243ffe0a473ffc8",
+            "actual_sha256": "e626c0d1318c2bdf7c3c9a5276389833a89726b8d5584bd26243ffe0a473ffc8"
+          }
+        ]
+      }
+    },
+    "limitation": "来源002继承001，存在重叠；本次验证目标保留约定能力，不作为独立A/B等效比较。旧003因argv错误的verify失败原样保留，没有作为通过来源。"
+  },
+  "assistant_lost_accepted_receipt": {
+    "source": {
+      "local_source": ".local/audit-20261030/e2e/home-sdk-result.json",
+      "sha256": "acda23cf68c6ba92680644d2d5ccbc404a5caf8b7aefc5d0cef5bd64906918e4",
+      "bytes": 11640
+    },
+    "session_id": "session-3fedfddd-5854-401b-8262-6b68effa913d",
+    "before_session_count": 400,
+    "new_session_ids": [
+      "session-3fedfddd-5854-401b-8262-6b68effa913d"
+    ],
+    "submissions": [
+      {
+        "session_id": "session-3fedfddd-5854-401b-8262-6b68effa913d",
+        "request_id": "357db5cc-c11a-4426-b358-7e5f6a76b831"
+      }
+    ],
+    "injected_lost_receipt": true,
+    "experiment_id": "EXP-audit-e2e-assistant-sdk-001-rf5fad789b04e",
+    "candidate_sha256": "6cd7a18f0f83a25c56416540648c488e5316135c2cd2763115defe9f011a672a",
+    "model": {
+      "lastUsed": {
+        "provider": "xiaomi-token-plan-cn",
+        "model": "mimo-v2.6-pro",
+        "reasoningEffort": "high"
+      },
+      "next": {
+        "provider": "xiaomi-token-plan-cn",
+        "model": "mimo-v2.6-pro",
+        "reasoningEffort": "high"
+      }
+    },
+    "native_create_response_ids": [
+      "session-5e7f543a-a96a-4a2c-ae17-dc16e67b616c",
+      "session-3fedfddd-5854-401b-8262-6b68effa913d"
+    ],
+    "counts": {
+      "new_sessions_since_pre_submit_list": 1,
+      "task_submissions": 1,
+      "native_create_response_ids": 2
+    },
+    "limitation": "回调观察到的create响应ID不等于相对基线新增Session数；不据回调数推断创建次数。拦截在服务器受理后仅丢回执，未拦截原提交。"
+  },
+  "real_multi_turn_case": {
+    "source": {
+      "local_source": ".local/audit-20261030/e2e/multiturn-final-results.json",
+      "sha256": "18d10719cf8b844937bfdced00e467cfcc74e3263fcca07d39fab25ebea24119",
+      "bytes": 34703
+    },
+    "run_id": "run-55901154-c14c-41b6-a32f-22310fcff526",
+    "run_summary": {
+      "schema_version": "3.0",
+      "run_id": "run-55901154-c14c-41b6-a32f-22310fcff526",
+      "trial_count": 1,
+      "execution_status_counts": {
+        "completed": 1,
+        "error": 0,
+        "skipped": 0
+      },
+      "machine_trial_verdict_counts": {
+        "passed": 1,
+        "failed": 0,
+        "inconclusive": 0
+      },
+      "machine_overall_verdict": "passed",
+      "review_status": "completed",
+      "reviewed_case_count": 1,
+      "reviewed_case_verdict_counts": {
+        "passed": 1,
+        "failed": 0,
+        "inconclusive": 0
+      },
+      "reviewed_overall_verdict": "passed",
+      "effective_verdict": "passed",
+      "source_verification": {
+        "status": "matched",
+        "reason": null,
+        "checks": [
+          {
+            "component": "candidate",
+            "status": "matched",
+            "expected_sha256": "3d797e8949fe166db4778bbd4c898ed7de2a0be098545ad19a39b27ca5483eca",
+            "actual_sha256": "3d797e8949fe166db4778bbd4c898ed7de2a0be098545ad19a39b27ca5483eca"
+          },
+          {
+            "component": "workspace",
+            "status": "matched",
+            "expected_sha256": "57eb2efb3588fbf863a726d71597d79a538ee61bac7c9709d5a928f2dd27e047",
+            "actual_sha256": "57eb2efb3588fbf863a726d71597d79a538ee61bac7c9709d5a928f2dd27e047"
+          },
+          {
+            "component": "presets",
+            "status": "matched",
+            "expected_sha256": "9b714cbaf7806e6ebd5a1b3aef91006f7e6fd697a0b2798d0cdd96bbe9e7bc90",
+            "actual_sha256": "9b714cbaf7806e6ebd5a1b3aef91006f7e6fd697a0b2798d0cdd96bbe9e7bc90"
+          },
+          {
+            "component": "managed",
+            "status": "matched",
+            "expected_sha256": "f73cd9a6393014118dfc2a039206640c837a18d14ea389fd18624db446fa3128",
+            "actual_sha256": "f73cd9a6393014118dfc2a039206640c837a18d14ea389fd18624db446fa3128"
+          },
+          {
+            "component": "evaluation_implementation",
+            "status": "matched",
+            "expected_sha256": "42bec6616c183fb3278ee3eedaf7c477e51c7280cad9c93ab6b41735dba8e6a4",
+            "actual_sha256": "42bec6616c183fb3278ee3eedaf7c477e51c7280cad9c93ab6b41735dba8e6a4"
+          }
+        ]
+      }
+    },
+    "limitation": "一个Case的inputs数组为两条，原生同Session两次用户输入；不是把一条多行文本当作多轮。"
+  },
+  "controlled_external_tool_boundary": {
+    "source": {
+      "local_source": ".local/audit-20261030/e2e/mcp-live-results.json",
+      "sha256": "765d698bd77361ae537332a9739aff224af4694e9d1a8732d18f42806cf7b93b",
+      "bytes": 26311
+    },
+    "scope": "受控外部只读接口替身；不证明原SOC业务成功",
+    "composition_id": "composition-3ffe792c-37d9-4630-bd18-1fe9b5229fe5",
+    "execution_ok": true,
+    "failure_http_calls": [
+      {
+        "method": "GET",
+        "path": "/openapi.json",
+        "query": {}
+      },
+      {
+        "method": "GET",
+        "path": "/asset",
+        "query": {
+          "asset": "missing"
+        }
+      }
+    ],
+    "limitation": "独立只读OpenAPI替身，首步404时后续步骤跳过；原SOC来源凭据缺失或远端不可达未改写为通过。"
+  },
+  "web_complete_installer": {
+    "source": {
+      "local_source": ".local/audit-20261030/web-full-install-receipt.json",
+      "sha256": "56604334a7ebb6a3e1133c69a6128077077dd9bbca5e68d4981f9541621ccc8f",
+      "bytes": 328
+    },
+    "receipt": {
+      "exit_code": 0,
+      "prefix": "/home/admin/work/harness-engineering-platform/.local/audit-20261030/web-fixed-installed",
+      "source": "/home/admin/work/harness-engineering-platform/.local/audit-20261030/web-fixed-install-source",
+      "port": 18680,
+      "scope": "本机AMD64原生独立Web完整安装器，已有Docker/Compose"
+    },
+    "archive_source": {
+      "local_source": ".local/audit-20261030/web-full-install-source.json",
+      "sha256": "5b51141fa05093034f69e48f07dc7d35e025734cf3ee4e2087532b9e1ff47cdb",
+      "bytes": 347
+    },
+    "artifact": {
+      "archive_sha256": "f59cf26ee2c655eed163ccbf35849598616407ff0fa7fc82b784ea550bcf907c",
+      "image_sha256": "e48b529565430d4c5a28ffd5969bda2b6c8837884d56c1cd361fcb6d7948c323",
+      "image_hardlinked": true,
+      "all_file_checks_passed": true,
+      "source": "/home/admin/work/harness-engineering-platform/.local/audit-20261030/web-fixed-install-source"
+    }
+  },
+  "deployment_host_current_blocker": {
+    "target": {
+      "host": "47.109.184.146",
+      "port": 18120,
+      "path": "/hep/"
+    },
+    "http_source": {
+      "local_source": ".local/audit-20261030/platform-host-final-http-direct.json",
+      "sha256": "0875e704b8f9834cf3b7ea3712fba217f9fc4758ea6ce024c2da0a40c0da7603",
+      "bytes": 209
+    },
+    "http": {
+      "ok": false,
+      "error_type": "URLError",
+      "error": "<urlopen error timed out>",
+      "checked_at": "2026-10-30T19:14:31Z",
+      "elapsed_seconds": 6.004,
+      "transport": "direct; environment proxies disabled"
+    },
+    "ssh_source": {
+      "local_source": ".local/audit-20261030/platform-host-final-reprobe.log",
+      "sha256": "7e9fa900b417973182bb36836eb9301b42dcfb2fb85f6cd2e32c5accb5c78741",
+      "bytes": 93
+    },
+    "ssh_stderr": "Connection timed out during banner exchange\nConnection to 47.109.184.146 port 22 timed out\n",
+    "ssh_exit_code_reported_by_operator": 255,
+    "ssh_same_round_checked_at_reported_by_operator": "2026-10-30T19:14:31Z",
+    "excluded_proxy_probe": {
+      "source": {
+        "local_source": ".local/audit-20261030/platform-host-final-http.json",
+        "sha256": "532ae9e1aca086cc97a1ddaa51f828f8ef80321859dd66b24cee4007cc653824",
+        "bytes": 157
+      },
+      "interpretation": "默认urllib环境代理所得502保留原始记录，不作为目标主机响应。"
+    },
+    "limitation": "当前仅据禁用环境代理的直连超时及SSH banner超时说明最终复查受阻；不能据此判断目标服务内部状态或归因主机失联。"
+  },
+  "pending": {
+    "complete_platform_latest_package_install_run": "aa3/707原生完整平台包安装运行已通过；包含后续复核/计量producer的最终新版制品仍待负责人补收据。",
+    "final_compute_comparison": "最终同口径对照仍在执行，不主张业务等效、零模型或降本。",
+    "native_voice_hardware_and_external_services": "尚未取得物理设备/外部语音服务实测结果，不包含在已通过范围。",
+    "whole_data_validation": "最终新Run写入后的全数据总验待回执；此前MCP fixture第六来源项修正后的总验为valid=true/0errors/3条既有active outcome提示。"
+  },
+  "publication_scan": {
+    "known_local_credentials_compared": true,
+    "known_credential_matches": 0,
+    "credential_cookie_fields_in_verbatim_receipts": 0,
+    "protected_url_matches_in_verbatim_receipts": 0,
+    "omitted": "不发布专用凭据、包内凭据种子、HOME内容、browser-state、完整trace或完整操作事件。",
+    "directory_files_scanned": 10,
+    "credential_cookie_or_browser_state_findings": 0,
+    "protected_url_matches": 0,
+    "complete_trace_or_events_fields": 0,
+    "verbatim_receipt_digests_verified": true,
+    "readme_relative_links_verified": true,
+    "verbatim_receipt_count": 8
+  },
+  "compute_variant_research": {
+    "training_source": {
+      "repository": "harness-engineering-platform-data",
+      "path": "evolution/experiments/VAR-security-operations-expert-002-r79757f173c53/evaluation/compute-training/report.md",
+      "ref": "git:707aab7befc2ff96db9ec54eb6db2dc3f6767411",
+      "sha256": "c367ad17e30deb1c1d0117c80a06f3d03a06ea309989279c9f3492ec0127d1a3",
+      "bytes": 3773,
+      "matches_fixed_ref": true
+    },
+    "observation_source": {
+      "repository": "harness-engineering-platform-data",
+      "path": "evolution/experiments/VAR-security-operations-expert-002-r79757f173c53/evaluation/observations.md",
+      "ref": "git:707aab7befc2ff96db9ec54eb6db2dc3f6767411",
+      "sha256": "fd66b35c4d3fcb6213515b0814d20df0825cec8101ba50386bb6779315f85550",
+      "bytes": 3775,
+      "matches_fixed_ref": true
+    },
+    "experiment_id": "VAR-security-operations-expert-002-r79757f173c53",
+    "fixed_parent": "EXP-security-operations-expert-024-rad80a907c628",
+    "fixed_parent_ref": "git:1f162a1ce12025ffeb9d2e36c7a3ae283b41e421",
+    "source_run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+    "technical_evidence": {
+      "models": [
+        "Qwen/Qwen3.5-2B",
+        "jaredpalmer/kev-0.8b"
+      ],
+      "training_epochs": 8,
+      "optimizer_steps": 48,
+      "test_correct": 1,
+      "test_total": 4,
+      "deployment_gpu": "RTX 3090",
+      "qwen_kev_mimo_native_preflight_observed": true,
+      "reviewed_historical_samples": 82,
+      "exported_ir_samples": 37,
+      "source_partition": {
+        "training": 22,
+        "development": 4,
+        "calibration": 7,
+        "frozen_final_test": 4
+      }
+    },
+    "initial_fourteen_cases": {
+      "program_sha": "35ac5e6182b2635a7f8b66a7d8bbd67b27a172f9",
+      "parent": {
+        "run_id": "run-29c51dee-fadf-47e2-a4c3-d0fc6747a04e",
+        "passed": 6,
+        "failed": 2,
+        "inconclusive": 6
+      },
+      "variant": {
+        "run_id": "run-3c1aebe1-ad0d-4869-80e6-9a52213e4421",
+        "passed": 6,
+        "failed": 4,
+        "inconclusive": 4
+      },
+      "total_calls_and_tokens": "unknown",
+      "eligible_for_end": false,
+      "environment": "同字节Mock MCP连接映射；不是生产SOC。",
+      "limitations": "目标资产不在Mock目录导致部分404；U-FLT-001旧快照遗漏后代，不能据其比较模型优劣；现有hybrid外层MiMo不满足本地派发合同。",
+      "legacy_meter_observed_counts": {
+        "parent": 57,
+        "variant": 85
+      },
+      "meter_interpretation": "旧计量器observed数含未正确识别的本地固定交付器，不是实际LLM调用下界；原Run数值保留，总调用和Token未知，不能计算收益。"
+    },
+    "fault_tree_recapture": {
+      "program_sha": "d31f053f673226c374fd4e789e65425e54899161",
+      "parent_run_id": "run-71851ee6-512c-420a-9b33-ede51556e3b2",
+      "parent_verdict": "inconclusive",
+      "variant_run_id": "run-8a1aa32c-7177-4fb1-bea2-ec975478df08",
+      "variant_verdict": "failed",
+      "task_tree_complete": true,
+      "source_matched": true,
+      "total_calls_and_tokens": "unknown",
+      "limitation": "仅补受影响一例；未覆盖14Case，也不构成变体采纳。",
+      "meter_interpretation": "该历史Run同样使用旧计量口径；原值不补写，真实外部调用数不由旧计数推断。"
+    },
+    "conclusion": "真实训练与部署技术链路已执行，最终测试和业务比较不支持等效、改善或成本下降；最终新增对照仍待负责人收齐结果。"
+  },
+  "final_owned_cleanup": {
+    "source": {
+      "local_source": ".local/audit-20261030/e2e/final-owned-instance-cleanup.json",
+      "sha256": "4a4f7a432d315cddaeac40df2f96803bb0620c7364cde47a2c4c04c59aa3623c",
+      "bytes": 20148
+    },
+    "instances": [
+      "audit-e2e-web-runtime",
+      "audit-e2e-ui-sdk-runtime"
+    ],
+    "state": "absent",
+    "home_preserved": true,
+    "scope": "负责人在确认Web会话非running、SDK completed后公开preview→stop；没有操作原security/inspection实例。"
+  },
+  "audit_inputs": [
+    {
+      "filename": "harness-engineering-platform-audit-evidence-20261030.zip",
+      "sha256": "f0f6b7bbd9378b915c0840fcb44e1e23eccdbe01ff4bc38e5a3cc5e542eb3d82",
+      "bytes": 269001
+    },
+    {
+      "filename": "harness-engineering-platform-adversarial-review-20261030.docx",
+      "sha256": "17243ad57291718dbdec0c30b7558eba07e2a31f7dd92639b5f65383e34089dd",
+      "bytes": 65795
+    }
+  ],
+  "wiki_and_features": {
+    "sources": [
+      {
+        "local_source": ".local/audit-20261030/e2e/wiki-features-verified.json",
+        "sha256": "a24591de91115b1dbbf6c9d74cf4811f52f50a7745b6bec45759703ff73ea3da",
+        "bytes": 19047
+      },
+      {
+        "local_source": ".local/audit-20261030/e2e/features-real-ui.json",
+        "sha256": "fe0d5915a03dee7c3f409285d564dae67dd459500dd98a4d01fd98e8ed8a286e",
+        "bytes": 120
+      }
+    ],
+    "summary": {
+      "native_mimo_pro_sessions": 2,
+      "wiki_files": 10,
+      "original_source_sha256_count": 3,
+      "pdf_pages": 5,
+      "features_saved_and_reread": 6,
+      "feature_evidence_refs": [],
+      "candidate_changed": false,
+      "ui_reload_preserved": true,
+      "mobile_overflow": false,
+      "ui_errors": []
+    },
+    "limitation": "特性已整理保存，evidence_refs为空意味着尚未验证其业务效果；来源收据没有programSHA，不补造该字段。"
+  },
+  "complete_platform_aa3_installation": {
+    "source": {
+      "local_source": ".local/audit-20261030/platform-local-release-aa3c10ef7ad3/full-platform-aa3-verified.json",
+      "sha256": "c832219b174cd5a4a49c8ac8c2194d68c3eca298e33274acc09e3ec4e5ab1e30",
+      "bytes": 6532
+    },
+    "program_commit": "aa3c10ef7ad3c08c862a485e0720394813049421",
+    "data_commit": "707aab7befc2ff96db9ec54eb6db2dc3f6767411",
+    "archive_sha256": "ce60b931cb65f64a450ef60a0d2cc7014b293e6b43c97e39496014f5877e2c7a",
+    "started_at": "2026-10-30T19:22:43.338Z",
+    "scope": "AMD64 local complete native platform installer, isolated HOME/data/ports; package excludes later Python review producer changes",
+    "status": "passed",
+    "finished_at": "2026-10-30T19:22:43.730Z",
+    "initial_prompt_replayed": false,
+    "business": {
+      "name": "audit-local-platform-aa3-web",
+      "source": "experiment:EXP-audit-e2e-assistant-web-001-r57f20304b3c4",
+      "session_id": "session-49b64a43-c1f0-4492-9679-0cba64c98717",
+      "model_routes": [
+        {
+          "provider": "xiaomi-token-plan-cn",
+          "model": "mimo-v2.6-flash"
+        },
+        {
+          "provider": "xiaomi-token-plan-cn",
+          "model": "mimo-v2.6-flash"
+        }
+      ],
+      "amount": "**合计计算**\n\n单价 17.5 元/件 × 数量 4 件 = **合计 70 元**\n\n**收据编号**\n\n已在本会话记住收据编号：`PLATFORM-AA3-RECEIPT-20261010-41872`？不，按您提供的原文记录为：`PLATFORM-AA3-RECEIPT-20261031-41872`（原样保留，未改写）。\n\n说明：该编号仅在本次会话中记忆，未写入数据库或任何外部系统，也未执行持久化保存；本次会话之外无法查询到它。稍后您再次询问时，我会原样返回该编号。",
+      "recovery": "**收据编号（原样返回）**\n\n`PLATFORM-AA3-RECEIPT-20261031-41872`\n\n该编号已在本会话记住，仅限当前会话有效，未写入数据库或任何外部系统。\n\n**收据合计（再次给出）**\n\n单价 17.5 元/件 × 数量 4 件 = **合计 70 元**",
+      "amount_usage": [
+        {
+          "inputTokens": 2215,
+          "outputTokens": 390,
+          "totalTokens": 3117,
+          "cacheReadTokens": 512
+        }
+      ],
+      "recovery_usage": [
+        {
+          "inputTokens": 2633,
+          "outputTokens": 162,
+          "totalTokens": 3307,
+          "cacheReadTokens": 512
+        }
+      ],
+      "same_session_preserved": true,
+      "container_started_at_before_restart": "2026-10-30T19:17:57.273816006Z",
+      "container_started_at_after_restart": "2026-10-30T19:21:33.477793992Z",
+      "container_absent_after_public_stop": true,
+      "home_preserved": true,
+      "native_session_bytes": 13981,
+      "native_session_sha256": "a2ecff4a7077ee64f67574f16a1ce6348a3f3ccdd97243f7aebd1bb5e4c11549",
+      "zstd_frames": 11,
+      "both_completed_turns_present_after_stop": true,
+      "mounts_from_isolated_install": true
+    },
+    "management": {
+      "session_id": "session-be3c0fd7-b14f-4147-adf0-b33aeea74513",
+      "model_routes": [
+        {
+          "provider": "xiaomi-token-plan-cn",
+          "model": "mimo-v2.6-pro"
+        },
+        {
+          "provider": "xiaomi-token-plan-cn",
+          "model": "mimo-v2.6-pro"
+        }
+      ],
+      "tool_count": 4,
+      "data_git_status_preserved": true
+    },
+    "pages": [
+      {
+        "route": "home",
+        "label": "首页",
+        "desktop": {
+          "content_visible": true,
+          "overflow": false
+        },
+        "mobile": {
+          "overflow": false
+        }
+      },
+      {
+        "route": "conversations",
+        "label": "管理对话",
+        "desktop": {
+          "content_visible": true,
+          "overflow": false
+        },
+        "mobile": {
+          "overflow": false
+        }
+      },
+      {
+        "route": "agents",
+        "label": "智能体管理",
+        "desktop": {
+          "content_visible": true,
+          "overflow": false
+        },
+        "mobile": {
+          "overflow": false
+        }
+      },
+      {
+        "route": "evaluation",
+        "label": "评测中心",
+        "desktop": {
+          "content_visible": true,
+          "overflow": false
+        },
+        "mobile": {
+          "overflow": false
+        }
+      },
+      {
+        "route": "instances",
+        "label": "实例管理",
+        "desktop": {
+          "content_visible": true,
+          "overflow": false
+        },
+        "mobile": {
+          "overflow": false
+        }
+      },
+      {
+        "route": "gateway",
+        "label": "统一网关",
+        "desktop": {
+          "content_visible": true,
+          "overflow": false
+        },
+        "mobile": {
+          "overflow": false
+        }
+      },
+      {
+        "route": "mcp",
+        "label": "MCP 管理",
+        "desktop": {
+          "content_visible": true,
+          "overflow": false
+        },
+        "mobile": {
+          "overflow": false
+        }
+      }
+    ],
+    "build_proof": {
+      "head_sources": [
+        {
+          "path": "platform/plugin/src/workflows/runtime.ts",
+          "sha256": "f749cadfd64881284eb37d050b38a59879f952396f10658c82cd7fcb84ffcc92"
+        },
+        {
+          "path": "platform/plugin/src/agents/asset-build-core.ts",
+          "sha256": "1d58fa4380139f757b20c5f37e8c5d9104a5ddd402dc8091db2e1928f0121609"
+        }
+      ],
+      "fresh_artifacts": [
+        {
+          "path": "platform/plugin/lib/index.js",
+          "sha256": "d890d7f2e549000cba7e83297055979f308251488557126fc0eccdca7d2b5996",
+          "mtime": 1793387492.7384586
+        },
+        {
+          "path": "platform/plugin/lib/client.js",
+          "sha256": "5eba31619aff42055a808992b5d916e15dfbd2ecf3c928e8119fefb9e3407290",
+          "mtime": 1793387493.1464741
+        },
+        {
+          "path": "platform/plugin/lib/agent-deployment-worker.js",
+          "sha256": "3c42a854b5efa7b48f84de51e5360134591b000a3fb003eb89b267a602673b7c",
+          "mtime": 1793387492.8584633
+        }
+      ],
+      "composition_artifact_digest_verified": true,
+      "workflow_sdk_path": "Managed编译读取本安装program/platform/plugin/src/workflows/runtime.ts"
+    },
+    "isolated_platform_stopped": true,
+    "isolated_home_locator_verified": true,
+    "limitation": "本机AMD64、隔离HOME/数据/端口、原始完整平台安装器链；制品来源aa3/707，不含随后新增的复核与计量producer。18120原平台未停止；不代替47最终部署或后续新版包验收。"
+  },
+  "verification_attempts": {
+    "ts_targeted": {
+      "tests": 46,
+      "passed": 46,
+      "local_log": ".local/audit-20261030/model-local-routes-targeted.log"
+    },
+    "business_loading": {
+      "tests": 19,
+      "passed": 19,
+      "local_log": ".local/audit-20261030/model-local-routes-business.log"
+    },
+    "typecheck": "passed",
+    "first_plugin_full_attempt": {
+      "status": "failed",
+      "collected_tests": 1395,
+      "passed": 1277,
+      "failed": 118,
+      "skipped": 0,
+      "source": {
+        "local_source": ".local/audit-20261030/model-local-routes-plugin-full.log",
+        "sha256": "9e479f77b45167f538ba31184afdd333dcf72544a6eaca03ac97aa1a81684c14"
+      },
+      "observed_failures": [
+        "ENOSPC",
+        "未显式选择Python3.10而使用默认3.8",
+        "未显式指定锁定DSH入口"
+      ],
+      "limitation": "原始失败日志保留；本次不计通过，不据资源/环境失败修改业务或源码。等待资源窗口按完整集合串行复跑。"
+    },
+    "shared_targeted_first_attempt": {
+      "status": "failed",
+      "tests": 99,
+      "passed": 91,
+      "failed": 8,
+      "source": {
+        "local_source": ".local/audit-20261030/model-local-routes-shared-targeted.log",
+        "sha256": "5ab355673b4e1963cddefb5e0fe03c357950743c34c18ae2a3a3300f2191686e",
+        "bytes": 22044
+      },
+      "observed_failure": "Runtime轻模块的类型导入把宿主YAML模块带入独立Candidate严格编译，缺少其声明；失败保留。"
+    },
+    "shared_targeted_after_runtime_boundary_fix": {
+      "status": "passed",
+      "tests": 99,
+      "passed": 99,
+      "failed": 0,
+      "skipped": 0,
+      "source": {
+        "local_source": ".local/audit-20261030/model-local-routes-shared-targeted-fixed.log",
+        "sha256": "12e29ff7ae47419aaace91165829ac306a560d5bb39c9ba090958b91b102bd99",
+        "bytes": 9697
+      }
+    },
+    "compute_scope_final_retest": {
+      "status": "passed",
+      "tests": 53,
+      "passed": 53,
+      "failed": 0,
+      "skipped": 0,
+      "source": {
+        "local_source": ".local/audit-20261030/model-local-routes-compute-scope-final.log",
+        "sha256": "b6462c61d6781bff66ca1bb2776ad4b2ac0aab47b2241fa55222ee0586bb989d",
+        "bytes": 5348
+      },
+      "scope": "与99项有重叠；新增同role核对HUD全Run与目标比较的边界，不把两套项数相加。"
+    },
+    "typecheck_final": {
+      "status": "passed",
+      "source": {
+        "local_source": ".local/audit-20261030/model-local-routes-shared-check-final.log",
+        "sha256": "ee25c1f2b0813d481a18f4e91e58868750affcf7f5c0587189517f89be14ef97",
+        "bytes": 128
+      }
+    },
+    "cross_review": "最终运行源码经独立只读交叉审通过；未替代完整串行套件。",
+    "node_full_serial_final": {
+      "status": "passed",
+      "tests": 1411,
+      "passed": 1411,
+      "failed": 0,
+      "skipped": 0,
+      "cancelled": 0,
+      "exit_code": 0,
+      "raw_receipt": "node-full-serial.json",
+      "scope": "10个相关运行源码在本轮前后未变；后续Python历史source_ref消费者修正另行验证，不夸大成全部producer同一最终SHA。"
+    },
+    "python_after_historical_source_ref_fix": {
+      "provenance": "最终V3原始退出收据及只读历史锁核对收据；未复制.env正文或完整Run。",
+      "direct_tests": {
+        "tests": 15,
+        "passed": 15
+      },
+      "adapter": {
+        "tests": 267,
+        "passed": 267,
+        "exit_code": 0,
+        "source": {
+          "local_source": ".local/audit-variants-20261030/metering-python-adapters-serial-v3-receipt.json",
+          "sha256": "a9b3a3736c657ae6b0987e4c8df778837523e86472ce1b96dfd787d91e6b787e",
+          "bytes": 1876
+        },
+        "raw_receipt": "python-adapters-final.json",
+        "seconds": 29.653
+      },
+      "historical_source_read": {
+        "ref": "git:1f162a1ce12025ffeb9d2e36c7a3ae283b41e421",
+        "locked_files": 211,
+        "sha256_and_size_matched": 211,
+        "readable_files": 210,
+        "env_body_published": false,
+        "original_run_files_unchanged": 107,
+        "source": {
+          "local_source": ".local/audit-variants-20261030/historical-review-source-fixed-readonly-proof.json",
+          "sha256": "63bdf3cc4545c106c78d707f6bd7db6b07a3963beab9cae90f490b4393fbdf11",
+          "bytes": 68420
+        }
+      },
+      "research": {
+        "tests": 117,
+        "passed": 117,
+        "failed": 0,
+        "exit_code": 0,
+        "seconds": 388.048,
+        "raw_receipt": "python-research-final.json",
+        "source": {
+          "local_source": ".local/audit-variants-20261030/metering-python-research-serial-v3-receipt.json",
+          "sha256": "70c3979f4df1f80c8e3130a517b5a2c702cae095c61e6e1d6b2e0bc2eaec60e9",
+          "bytes": 1852
+        }
+      },
+      "js_production_source_changed": false,
+      "stage_sources_equal": true,
+      "temporary_directories_empty": true,
+      "scope": "后期Python历史source_ref消费者修正后的完整Python套件；JS六个相关源未改，沿用已完成的Node1411结果，不宣称Node在该Python修正后重跑。"
+    }
+  }
+}

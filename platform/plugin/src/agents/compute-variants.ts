@@ -8,7 +8,7 @@ import { load as loadYaml, dump as dumpYaml } from 'js-yaml'
 import { parseEvaluationDocument } from '../evaluation/cases.ts'
 import { caseObservation } from '../evaluation/case-observation.ts'
 import { readRunEvidenceFile } from './run-files.ts'
-import { extractGraphExecutions, measureModelUsage } from '../evaluation/model-usage.ts'
+import { extractGraphExecutions, measureModelUsage, measureRunModelUsage } from '../evaluation/model-usage.ts'
 import type { ModelAttempt } from '../evaluation/model-attempts.ts'
 import { inspectComputeBuild } from './compute-build.ts'
 import { computeCodeSource } from './compute-source.ts'
@@ -167,10 +167,12 @@ function makePlan(body: Map, cases: Record<string, any>): ComputePlan {
 }
 
 /** 仅核算原始目标轨迹，包括已采集的子 Session；不将配置快照当作模型调用。 */
-export function computeTraceMetrics(rows: Map[], collected: boolean, attempts: ModelAttempt[] = []) {
+export function computeTraceMetrics(rows: Map[], collected: boolean, attempts: ModelAttempt[] = [], measurement?: ReturnType<typeof measureRunModelUsage>) {
   const missing: string[] = []
   const empty = Object.fromEntries(METRICS.map(name => [name, null])) as Record<ComputeMetric, number | null>
-  if (!collected || !rows.length) return { values: empty, missing: ['目标轨迹缺失或采集完整性未确认'] }
+  if (!collected || !rows.length) return { measurement, values: empty, missing: ['目标轨迹缺失或采集完整性未确认'] }
+  if (measurement?.local_model_routes_verification === 'unverified') return { measurement, values: empty,
+    missing: ['本 Run 的本地能力声明尚未核对，全部资源指标未知', ...measurement.model_calls_unknown_reasons.map(reason => `模型请求用量未知：${reason}`)] }
   const groups = new Map<string, Map[]>()
   for (const row of rows) { const key = String(row.session_log ?? 'root'); const events = groups.get(key) ?? []; events.push(row.event ?? row); groups.set(key, events) }
   let calls = 0, callsKnown = true, elapsed = 0, elapsedKnown = true
@@ -200,7 +202,7 @@ export function computeTraceMetrics(rows: Map[], collected: boolean, attempts: M
   if (pending.size || !rootEvents.some(event => event.type === 'turn/end')) elapsedKnown = false
   if (!messagesPresent(rows)) { callsKnown = false; missing.push('没有已完成的模型响应') }
   if (!elapsedKnown) missing.push('缺少完整主 Session turn 起止时间')
-  const measured = measureModelUsage([{ path: 'trace.jsonl', rows: rows as any }], { attempts })
+  const measured = measurement ?? measureModelUsage([{ path: 'trace.jsonl', rows: rows as any }], { attempts })
   // 新旧计划共用全部请求的结算口径，包含压缩、标题、子 Session 与图内推理。
   const values = { actual_model_calls: measured.actual_model_calls, model_calls: callsKnown ? calls : null,
     input_tokens: measured.token_usage?.input_tokens ?? null,
@@ -391,6 +393,7 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
     const rows: { side: 'parent' | 'variant'; run: any; lock: any; cases: any[] }[] = []
     for (const [side, runIds] of [['parent', parentIds], ['variant', variantIds]] as const) for (const runId of runIds) {
       const run = await services.readRun(runId, signal)
+      const runDirectory = safe(root, `evolution/experiments/${side === 'parent' ? change.parent_experiment_id : id}/runs/${runId}`)
       const issues = (message: string) => limits.push(`${runId}: ${message}`)
       if (run.run_id !== runId || run.manifest?.agent_id !== change.agent_id || run.manifest?.experiment_id !== (side === 'parent' ? change.parent_experiment_id : id)) issues('Run 不属于所选父版 / 变体')
       if (run.manifest?.status !== 'completed') issues('Run 未成功封存')
@@ -463,10 +466,10 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
           const checks = JSON.parse(checksFile.data.toString())
           proof.push({ run_id: runId, file: trace.path, sha256: trace.source_sha256 }, { run_id: runId, file: checksFile.path, sha256: checksFile.source_sha256 })
           const traceRows = trace.data.toString().split('\n').filter(Boolean).map(line => JSON.parse(line))
-          const computed = computeTraceMetrics(traceRows, checks.trace_available === true)
+          const usage = measureRunModelUsage(runDirectory, lock, [{ path: trace.path, rows: traceRows }])
+          const computed = computeTraceMetrics(traceRows, checks.trace_available === true, [], usage)
           metrics = computed
           const graphs = extractGraphExecutions(traceRows)
-          const usage = computed.measurement ?? measureModelUsage([{ path: 'trace.jsonl', rows: traceRows }])
           if ((graphs.executions.length || graphs.unknown_reasons.length) && !usage.model_calls_complete) {
             graphUsageComplete = false
             issues(`${caseId} 关联图或实际模型请求的完整性未知`)
@@ -570,7 +573,7 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
       eligible_for_end: !limits.length && qualityPassed && resourcePassed,
       notes: ['结果仅适用于预先冻结的任务范围和所选独立 Run；不是对所有任务的统计等效证明。',
         ...(first.lock.mcp_fixture ? ['本次连接使用明确 Mock 边界；比较结果不表示真实业务系统通过或已部署。'] : []),
-        'model_calls 仅为会话回复次数；完整模型请求（包括压缩、标题和图内推理）使用 actual_model_calls，所有 Token 指标均包含已采集请求。',
+        'model_calls 仅为会话回复次数；actual_model_calls 与 Token 资源仅核算目标智能体及其子会话、图内推理，包括压缩与辅助标题，不含独立评测 Judge 和研究复核。',
         ...(plan.execution_mode === 'code-only' ? ['历史 model_calls 统计会话回复次数，包含本地代码适配器回复；业务零推理以完整 actual_model_calls 为零核验。'] : []),
         'token、模型响应次数与耗时属于已记录资源指标；未测量硬件算力、供应商费用或不可见的外部模型调用。', '人工确认需完整审阅原始输出和工具结果；表格只汇总证据，不替代业务判断。', '依赖环境记录仅含变量配置状态；外部数据状态、网络负载与供应商变化未被完整控制，资源改善不能单独归因于 Harness。'], proof }
     return { ...result, comparison_sha256: hash(canonical(result)) }

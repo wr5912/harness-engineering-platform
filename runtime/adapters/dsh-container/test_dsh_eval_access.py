@@ -88,6 +88,264 @@ class EvaluationAccessTest(unittest.TestCase):
 
 
 class ReviewTargetRouteTest(unittest.TestCase):
+    MIMO = {"provider": "xiaomi-token-plan-cn", "model": "mimo-v2.6-flash", "reasoningEffort": "off"}
+    QWEN = {"provider": "local-qwen", "model": "Qwen3.5-2B"}
+    LOCAL = [
+        {"provider": "security-operation-delivery", "model": "fixed-operation-result"},
+        {"provider": "threat-analysis-delivery", "model": "fixed-summary"},
+        {"provider": "threat-analysis-automation", "model": "scheduled-batch"},
+        {"provider": "harness-code-only", "model": "workflow-v1"},
+        {"provider": "harness-workflow", "model": "hybrid-v1"},
+    ]
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+
+    def write_case(self, name="U-FIRST", *, routes=None, final_route=None, extra=None):
+        case = {"case_id": name}
+        directory = self.root / "evidence" / name
+        directory.mkdir(parents=True, exist_ok=True)
+        response = {"session_id": "session-root", "turns": [{"route": final_route or self.MIMO}]}
+        (directory / "response.json").write_text(json.dumps({"response": response}))
+        events = [{"type": "session", "version": 4, "id": "session-root", "delegationDepth": 0}]
+        for index, route in enumerate(routes if routes is not None else [self.MIMO], 1):
+            events.extend([
+                {"type": "request/header", "seq": index * 2, "data": {"header": {"config": route}}},
+                {"type": "assistant/message", "seq": index * 2 + 1, "data": {"turn": 1, "step": index}},
+            ])
+        trace = [{"session_log": "session.v4.jsonl", "event": event} for event in events]
+        trace.extend(extra or [])
+        (directory / "trace.jsonl").write_text("".join(json.dumps(row) + "\n" for row in trace))
+        return case
+
+    def lock_local_routes(self, content=None):
+        content = content if content is not None else json.dumps({"runtime_capabilities": {"local_model_routes": self.LOCAL}})
+        digest = hashlib.sha256(content.encode()).hexdigest()
+        (self.root / "inputs.lock.json").write_text(json.dumps({"harness_trees": {"managed": {"files": [
+            {"path": "role-tool-matrix.yaml", "sha256": digest, "size": len(content.encode())},
+        ]}}}))
+        directory = self.root / "evidence" / "analysis"
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / "harness.json").write_text(json.dumps({"files": [
+            {"tree": "managed", "path": "role-tool-matrix.yaml", "sha256": digest, "content": content},
+        ]}))
+
+    def test_root_native_requests_preserve_mimo_despite_each_local_final_adapter(self):
+        import scenario_analysis
+        self.lock_local_routes()
+        for index, local in enumerate(self.LOCAL):
+            with self.subTest(local=local):
+                case = self.write_case(str(index), routes=[self.MIMO, self.MIMO, local], final_route=local)
+                self.assertEqual(scenario_analysis._target_route(self.root, [case]), self.MIMO)
+
+    def test_real_root_mixed_external_models_fail_even_when_final_reply_uses_mimo(self):
+        import scenario_analysis
+        self.lock_local_routes()
+        case = self.write_case(routes=[self.MIMO, self.QWEN, self.LOCAL[0]])
+        with self.assertRaisesRegex(ValueError, "target-route-mixed"):
+            scenario_analysis._target_route(self.root, [case])
+
+    def test_unknown_provider_and_external_route_without_usage_are_not_treated_as_local(self):
+        import scenario_analysis
+        self.lock_local_routes()
+        case = self.write_case(routes=[self.QWEN])
+        self.assertEqual(scenario_analysis._target_route(self.root, [case]), self.QWEN)
+        case = self.write_case(routes=[self.MIMO, {"provider": "security-operation-delivery", "model": "unknown-model"}])
+        with self.assertRaisesRegex(ValueError, "target-route-mixed"):
+            scenario_analysis._target_route(self.root, [case])
+
+    def test_failed_or_cancelled_external_request_is_retained_without_assistant_usage(self):
+        import scenario_analysis
+        case = self.write_case()
+        path = self.root / "evidence" / case["case_id"] / "trace.jsonl"
+        trace = [json.loads(line) for line in path.read_text().splitlines()]
+        for finish in ("error", "aborted"):
+            with self.subTest(finish=finish):
+                trace[-1]["event"] = {"type": "assistant/attempt", "data": {"finishReason": finish}}
+                path.write_text("".join(json.dumps(row) + "\n" for row in trace))
+                self.assertEqual(scenario_analysis._target_route(self.root, [case]), self.MIMO)
+        (path.parent / "response.json").write_text(json.dumps({"response": None, "error": "case-cancelled"}))
+        self.assertEqual(scenario_analysis._target_route(self.root, [case]), self.MIMO)
+
+    def test_native_request_missing_config_fails_instead_of_using_final_response(self):
+        import scenario_analysis
+        case = self.write_case(routes=[None])
+        with self.assertRaisesRegex(ValueError, "target-route-invalid"):
+            scenario_analysis._target_route(self.root, [case])
+
+    def test_child_role_model_does_not_replace_root_route_or_supply_missing_root_route(self):
+        import scenario_analysis
+        self.lock_local_routes()
+        child = [
+            {"session_log": "subagents/child.jsonl", "event": {"type": "session", "version": 4,
+             "id": "session-child", "parentSession": "session-root", "delegationDepth": 1, "agentPreset": "fault-analysis"}},
+            {"session_log": "subagents/child.jsonl", "event": {"type": "request/header", "data": {"header": {"config": self.QWEN}}}},
+        ]
+        case = self.write_case(extra=child)
+        self.assertEqual(scenario_analysis._target_route(self.root, [case]), self.MIMO)
+        case = self.write_case(routes=[self.LOCAL[4]], extra=child)
+        with self.assertRaisesRegex(ValueError, "target-route-missing"):
+            scenario_analysis._target_route(self.root, [case])
+
+    def test_pure_local_or_no_request_routes_fail_without_guessing_policy_default(self):
+        import scenario_analysis
+        self.lock_local_routes()
+        for routes in (self.LOCAL, []):
+            with self.subTest(routes=routes):
+                case = self.write_case(routes=routes)
+                with self.assertRaisesRegex(ValueError, "target-route-missing"):
+                    scenario_analysis._target_route(self.root, [case])
+
+    def test_trace_root_missing_ambiguous_or_child_identity_never_falls_back_to_response(self):
+        import scenario_analysis
+        case = self.write_case()
+        path = self.root / "evidence" / case["case_id"] / "trace.jsonl"
+        trace = [json.loads(line) for line in path.read_text().splitlines()]
+        for header in ({"type": "session", "id": "wrong-root"},
+                       {"type": "session", "id": "session-root", "parentSession": "parent"},
+                       {"type": "session", "id": "session-root", "delegationDepth": 1}):
+            with self.subTest(header=header):
+                trace[0]["event"] = header
+                path.write_text("".join(json.dumps(row) + "\n" for row in trace))
+                with self.assertRaisesRegex(ValueError, "target-session-invalid"):
+                    scenario_analysis._target_route(self.root, [case])
+        trace[0]["event"] = {"type": "session", "id": "session-root"}
+        for other in (trace[0],
+                      {"session_log": "other.jsonl", "event": {"type": "session", "id": "other-root"}},
+                      {"session_log": "session.v4.jsonl", "event": {"type": "session", "id": "other-root",
+                       "parentSession": "session-root"}}):
+            with self.subTest(other=other):
+                path.write_text("".join(json.dumps(row) + "\n" for row in [*trace, other]))
+                with self.assertRaisesRegex(ValueError, "target-session-invalid"):
+                    scenario_analysis._target_route(self.root, [case])
+
+    def test_frozen_local_declaration_missing_or_modified_fails(self):
+        import scenario_analysis
+        case = self.write_case()
+        self.lock_local_routes()
+        path = self.root / "evidence" / "analysis" / "harness.json"
+        original = json.loads(path.read_text())
+        source = original["files"][0]
+        for value in ({"files": []}, {"files": [dict(source, content="{}")]},
+                      {"files": [dict(source, content=source["content"].replace("security-operation-delivery", "security-operation-deliverx"))]},
+                      {"files": [dict(source, sha256="0" * 64)]}):
+            path.write_text(json.dumps(value))
+            with self.assertRaisesRegex(ValueError, "target-local-routes-(missing|digest-mismatch)"):
+                scenario_analysis._target_route(self.root, [case])
+        path.unlink()
+        with self.assertRaisesRegex(ValueError, "missing-evidence-harness.json"):
+            scenario_analysis._target_route(self.root, [case])
+
+    def test_absent_capability_declaration_is_distinct_from_invalid_declaration(self):
+        import scenario_analysis
+        case = self.write_case()
+        self.lock_local_routes("schema_version: '2.0'\n")
+        self.assertEqual(scenario_analysis._target_route(self.root, [case]), self.MIMO)
+        for capabilities in (None, {}, {"local_model_routes": [self.MIMO]}, {"local_model_routes": [None]}):
+            with self.subTest(capabilities=capabilities):
+                self.lock_local_routes(json.dumps({"runtime_capabilities": capabilities}))
+                with self.assertRaisesRegex(ValueError, "target-local-routes-invalid"):
+                    scenario_analysis._target_route(self.root, [case])
+        self.lock_local_routes("runtime_capabilities: [\n")
+        with self.assertRaisesRegex(ValueError, "target-local-routes-invalid"):
+            scenario_analysis._target_route(self.root, [case])
+
+    def test_frozen_declaration_excludes_local_legacy_response_route(self):
+        import scenario_analysis
+        self.lock_local_routes()
+        first = self.write_case(routes=[], final_route=self.LOCAL[0])
+        second = self.write_case("U-SECOND")
+        for case in (first, second):
+            (self.root / "evidence" / case["case_id"] / "trace.jsonl").unlink()
+        self.assertEqual(scenario_analysis._target_route(self.root, [first, second]), self.MIMO)
+
+    def test_new_role_snapshot_has_priority_and_preserves_crlf_bytes(self):
+        import scenario_analysis
+        self.lock_local_routes('# 原始声明\r\nruntime_capabilities:\r\n  local_model_routes:\r\n'
+                               '    - provider: security-operation-delivery\r\n      model: fixed-operation-result\r\n')
+        case = self.write_case(routes=[self.MIMO, self.LOCAL[0]])
+        inputs_path = self.root / "inputs.lock.json"
+        inputs = json.loads(inputs_path.read_text())
+        inputs["managed_role_snapshot"] = "evidence/managed/role-tool-matrix.yaml"
+        inputs_path.write_text(json.dumps(inputs))
+        harness = self.root / "evidence/analysis/harness.json"
+        content = json.loads(harness.read_text())["files"][0]["content"]
+        snapshot = self.root / inputs["managed_role_snapshot"]
+        snapshot.parent.mkdir(parents=True)
+        snapshot.write_bytes(content.encode())
+        harness.write_text("{}")
+        self.assertEqual(scenario_analysis._target_route(self.root, [case]), self.MIMO)
+
+    def test_new_role_snapshot_missing_damaged_or_wrong_pointer_cannot_use_legacy_harness(self):
+        import scenario_analysis
+        self.lock_local_routes()
+        case = self.write_case(routes=[self.MIMO, self.LOCAL[0]])
+        inputs_path = self.root / "inputs.lock.json"
+        inputs = json.loads(inputs_path.read_text())
+        original = json.loads((self.root / "evidence/analysis/harness.json").read_text())["files"][0]["content"].encode()
+        snapshot = self.root / "evidence/managed/role-tool-matrix.yaml"
+        snapshot.parent.mkdir(parents=True)
+        for state in ("missing", "damaged", "symlink", "wrong-pointer", "null-pointer", "parent-symlink"):
+            with self.subTest(state=state):
+                snapshot.unlink(missing_ok=True)
+                inputs["managed_role_snapshot"] = "evidence/managed/role-tool-matrix.yaml"
+                if state == "damaged":
+                    snapshot.write_bytes(original.replace(b"security-operation-delivery", b"security-operation-deliverx"))
+                elif state == "symlink":
+                    other = self.root / "role-original.yaml"
+                    other.write_bytes(original)
+                    snapshot.symlink_to(other)
+                elif state in {"wrong-pointer", "null-pointer"}:
+                    inputs["managed_role_snapshot"] = "other.yaml" if state == "wrong-pointer" else None
+                elif state == "parent-symlink":
+                    snapshot.write_bytes(original)
+                    original_directory = snapshot.parent.with_name("original-managed")
+                    snapshot.parent.rename(original_directory)
+                    snapshot.parent.symlink_to(original_directory, target_is_directory=True)
+                inputs_path.write_text(json.dumps(inputs))
+                with self.assertRaisesRegex(ValueError, "target-local-routes-(invalid|missing|digest-mismatch)"):
+                    scenario_analysis._target_route(self.root, [case])
+
+    def test_locked_harness_selects_frozen_history_separately_from_current_candidate(self):
+        import scenario_analysis
+        versions = {}
+        for label in ("current", "history"):
+            experiment = self.root / label
+            contract = {"experiment_root": str(self.root / "current"),
+                        "candidate_root": str(experiment / "candidate/dsh")}
+            trees = {}
+            for tree in ("workspace", "presets", "managed"):
+                directory = experiment / "candidate/dsh" / tree
+                directory.mkdir(parents=True)
+                content = f"{label} {tree}角色原文。\n".encode()
+                (directory / "role.md").write_bytes(content)
+                contract[tree] = str(directory)
+                trees[tree] = {"files": [{"path": "role.md", "size": len(content),
+                                          "sha256": hashlib.sha256(content).hexdigest()}]}
+            versions[label] = (contract, trees)
+        historical_ref = "git:" + "1" * 40
+
+        def resolve(_source, *, repo, source_ref=None):
+            self.assertEqual(repo, self.root)
+            return versions["history" if source_ref == historical_ref else "current"][0]
+
+        with mock.patch("source_contract.resolve", side_effect=resolve) as lookup:
+            for label, ref in (("current", None), ("history", historical_ref)):
+                inputs = {"source_id": "experiment:EXP-example-agent-001-r0123456789ab",
+                          "harness_trees": versions[label][1],
+                          "harness_review": {"schema_version": 1, "generated": [], "sources": []}}
+                if ref is not None:
+                    inputs["source_ref"] = ref
+                result = scenario_analysis._locked_harness(inputs, repo=self.root)
+                self.assertEqual(len(result), 3)
+                self.assertTrue(all(item["content"].startswith(label + " ") for item in result))
+                self.assertEqual({(item["tree"], item["path"], item["sha256"]) for item in result},
+                                 {(tree, "role.md", versions[label][1][tree]["files"][0]["sha256"])
+                                  for tree in ("workspace", "presets", "managed")})
+                self.assertEqual(lookup.call_args.kwargs.get("source_ref"), ref)
+
     def test_native_provider_routes_are_preserved_and_mixed_or_invalid_routes_fail(self):
         import scenario_analysis
         cases = [{"case_id": "U-FIRST"}, {"case_id": "U-SECOND"}]

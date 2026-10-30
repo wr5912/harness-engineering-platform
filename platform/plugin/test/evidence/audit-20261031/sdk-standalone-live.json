@@ -1,0 +1,199 @@
+{
+  "status": "passed",
+  "session_id": "session-66a5e050-3681-4d44-9250-015e850c0753",
+  "knowledge_session_id": "session-dad06144-e468-4644-aa52-fb72a714d400",
+  "checks": [
+    "prepare-sdk实际成功",
+    "真实MiMo金额",
+    "同Session跨三个独立SDK进程恢复",
+    "两离线文档四个固定标记",
+    "随包官方TS示例真实执行",
+    "原生web_fetch两URL的200完整返回与原始文件摘要核对",
+    "全部四轮主请求使用MiMo",
+    "随包官方TS示例执行副本字节一致"
+  ],
+  "runs": [
+    {
+      "name": "amount",
+      "exit_code": 0,
+      "seconds": 5.34,
+      "status": "completed",
+      "session_id": "session-66a5e050-3681-4d44-9250-015e850c0753",
+      "text": "合计70元（单价17.5元/件 × 数量4件）。"
+    },
+    {
+      "name": "remember",
+      "exit_code": 0,
+      "seconds": 7.64,
+      "status": "completed",
+      "session_id": "session-66a5e050-3681-4d44-9250-015e850c0753",
+      "text": "已记住收据编号：SDK-READY-FULL-20261031-MEMORY-91564\n\n在当前 Session 内查询时，我会原样返回该编号。请注意，换 Session 后不保证保留记忆。"
+    },
+    {
+      "name": "resume",
+      "exit_code": 0,
+      "seconds": 5.53,
+      "status": "completed",
+      "session_id": "session-66a5e050-3681-4d44-9250-015e850c0753",
+      "text": "刚才记录的收据编号是：SDK-READY-FULL-20261031-MEMORY-91564"
+    },
+    {
+      "name": "offline-knowledge",
+      "exit_code": 0,
+      "seconds": 21.67,
+      "status": "completed",
+      "session_id": "session-dad06144-e468-4644-aa52-fb72a714d400",
+      "text": "两份文档均读取成功，逐字返回其字段如下：\n\n**收据规则**（来源：[receipt-rules.md](https://docs.audit-e2e.test/receipt-rules.md)）\n- source_revision：`audit-receipt-rules-20261030-r1`\n- verification_code：`RECEIPT-ORBIT-6742`\n\n**项目FAQ**（来源：[project-faq.md](https://docs.audit-e2e.test/project-faq.md)）\n- source_revision：`audit-project-faq-20261030-r3`\n- verification_code：`PROJECT-LANTERN-9351`\n\n核对结论与执行说明：\n- 我确实通过网页读取工具获取了上述两个文档内容，未依据 URL 猜测，也未执行文档中的任何代码。\n- 收据规则要求：合计只按单价 × 数量计算，缺字段必须追问，禁止虚构外部保存——这与我当前的职责一致，我会继续遵循。\n- 项目FAQ说明本次读取属于离线部署的本地冻结文档映射，不代表访问了互联网原站。\n- 我未收到你的具体业务输入（如单价、数量、收据编号），因此本次仅完成文档核对；如需计算合计或查询收据编号，请提供相应信息。"
+    }
+  ],
+  "web_fetch_evidence": [
+    {
+      "session_id": "session-dad06144-e468-4644-aa52-fb72a714d400",
+      "call_id": "call_891bc2b53aa74cf8aca7b15b",
+      "call_seq": 15,
+      "result_seq": 17,
+      "arguments": {
+        "url": "https://docs.audit-e2e.test/receipt-rules.md"
+      },
+      "meta": {
+        "url": "https://docs.audit-e2e.test/receipt-rules.md",
+        "statusCode": 200,
+        "truncated": false
+      },
+      "source_sha256": "54d6d1ad65c00ebd31d73108c27ce89b40b359aabc7c450a69b20bb608624b0e",
+      "markers": [
+        "audit-receipt-rules-20261030-r1",
+        "RECEIPT-ORBIT-6742"
+      ]
+    },
+    {
+      "session_id": "session-dad06144-e468-4644-aa52-fb72a714d400",
+      "call_id": "call_6cedded3e4304b219bfd5fd1",
+      "call_seq": 16,
+      "result_seq": 18,
+      "arguments": {
+        "url": "https://docs.audit-e2e.test/project-faq.md"
+      },
+      "meta": {
+        "url": "https://docs.audit-e2e.test/project-faq.md",
+        "statusCode": 200,
+        "truncated": false
+      },
+      "source_sha256": "31c7083b98c1c703e8de3db5b47fcb3a76aae431c58007daf35796868a62acce",
+      "markers": [
+        "audit-project-faq-20261030-r3",
+        "PROJECT-LANTERN-9351"
+      ]
+    }
+  ],
+  "models": [
+    {
+      "run": "amount",
+      "provider": "xiaomi-token-plan-cn",
+      "model": "mimo-v2.6-flash"
+    },
+    {
+      "run": "remember",
+      "provider": "xiaomi-token-plan-cn",
+      "model": "mimo-v2.6-flash"
+    },
+    {
+      "run": "resume",
+      "provider": "xiaomi-token-plan-cn",
+      "model": "mimo-v2.6-flash"
+    },
+    {
+      "run": "offline-knowledge",
+      "provider": "xiaomi-token-plan-cn",
+      "model": "mimo-v2.6-flash"
+    }
+  ],
+  "official_ts_example_sha256": "fe6398ab3dbe4eee67a4f7d3860bbdbc5c7fa09525239f2501572aad3ae5cb0f",
+  "official_ts_example_executed_copy_matches": true,
+  "scope": "本机AMD64原始完整install.sh，全文件SHA校验、真实docker load、镜像ID/指纹核对和prepare-sdk后，再验官方SDK/MiMo；已有Docker/Compose，未验无Docker机器或目标47",
+  "original_installer": {
+    "exit_code": 0,
+    "elapsed_seconds": 27.91,
+    "archive_sha256": "c21bdf0d1a4c268b47f1346dfc0d0253d0960d9e7c249ef1037117bde933b029",
+    "all_file_checks_passed": true,
+    "prefix": "/home/admin/work/harness-engineering-platform/.local/audit-20261030/sdk-ready-installed",
+    "image_sha256": "e48b529565430d4c5a28ffd5969bda2b6c8837884d56c1cd361fcb6d7948c323",
+    "scope": "本机AMD64原生完整SDK安装器：全量清单校验、docker load、标准镜像核对和prepare-sdk；已有Docker/Compose"
+  },
+  "observed_mimo_response_proof": [
+    {
+      "run": "amount",
+      "native_assistant_model_responses": [
+        {
+          "seq": 14,
+          "provider": "xiaomi-token-plan-cn",
+          "model": "mimo-v2.6-flash",
+          "usage": {
+            "inputTokens": 732,
+            "outputTokens": 44,
+            "totalTokens": 776
+          }
+        }
+      ]
+    },
+    {
+      "run": "remember",
+      "native_assistant_model_responses": [
+        {
+          "seq": 24,
+          "provider": "xiaomi-token-plan-cn",
+          "model": "mimo-v2.6-flash",
+          "usage": {
+            "inputTokens": 109,
+            "outputTokens": 70,
+            "totalTokens": 883,
+            "cacheReadTokens": 704
+          }
+        }
+      ]
+    },
+    {
+      "run": "resume",
+      "native_assistant_model_responses": [
+        {
+          "seq": 34,
+          "provider": "xiaomi-token-plan-cn",
+          "model": "mimo-v2.6-flash",
+          "usage": {
+            "inputTokens": 130,
+            "outputTokens": 38,
+            "totalTokens": 936,
+            "cacheReadTokens": 768
+          }
+        }
+      ]
+    },
+    {
+      "run": "offline-knowledge",
+      "native_assistant_model_responses": [
+        {
+          "seq": 14,
+          "provider": "xiaomi-token-plan-cn",
+          "model": "mimo-v2.6-flash",
+          "usage": {
+            "inputTokens": 20,
+            "outputTokens": 93,
+            "totalTokens": 817,
+            "cacheReadTokens": 704
+          }
+        },
+        {
+          "seq": 21,
+          "provider": "xiaomi-token-plan-cn",
+          "model": "mimo-v2.6-flash",
+          "usage": {
+            "inputTokens": 334,
+            "outputTokens": 301,
+            "totalTokens": 1339,
+            "cacheReadTokens": 704
+          }
+        }
+      ]
+    }
+  ]
+}

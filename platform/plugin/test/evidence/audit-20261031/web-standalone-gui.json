@@ -1,0 +1,107 @@
+{
+  "stage": "passed",
+  "source_test": "web-full-gui-recovered-verified/receipt.json",
+  "session_id": "session-a6dab19a-6c55-471a-8b48-3cd473aff072",
+  "workspace_id": "e3cd82ec-1118-4d73-b245-71ea9425198d",
+  "gui_requests": [
+    {
+      "method": "session/create",
+      "session_id": "session-44fea247-fd48-4a8b-b398-11729b9b2cc9",
+      "workspace_id": "e3cd82ec-1118-4d73-b245-71ea9425198d",
+      "input_contains_marker": false
+    },
+    {
+      "method": "session/create",
+      "workspace_id": "e3cd82ec-1118-4d73-b245-71ea9425198d",
+      "input_contains_marker": false
+    },
+    {
+      "method": "session/prompt",
+      "session_id": "session-a6dab19a-6c55-471a-8b48-3cd473aff072",
+      "request_id": "abe2fa71-f5c2-4193-b2e4-d6b672e6a022",
+      "input_contains_marker": true
+    },
+    {
+      "method": "session/create",
+      "session_id": "session-44fea247-fd48-4a8b-b398-11729b9b2cc9",
+      "workspace_id": "e3cd82ec-1118-4d73-b245-71ea9425198d",
+      "input_contains_marker": false
+    },
+    {
+      "method": "session/prompt",
+      "session_id": "session-a6dab19a-6c55-471a-8b48-3cd473aff072",
+      "request_id": "69d90c38-e638-47d9-9179-ad6c081ba210",
+      "input_contains_marker": false
+    }
+  ],
+  "page_errors": [],
+  "checks": [
+    "GUI新建请求绑定workspace并投递首轮；原生SessionId和MiMo完成回执一致",
+    "定向重启实际发生在两轮之间；同Session的GUI继续输入返回原编号，首轮未重投",
+    "真实恢复界面显示第二轮答复；1440/390无横向溢出、pageerror为0"
+  ],
+  "turns": [
+    {
+      "assistant_text": "好的，已在本会话记住收据编号：**WEB-GUI-VERIFIED-20261031-R8**。\n\n说明：这只是当前会话内的记忆，我没有进行任何外部写入，也未调用数据库或保存服务做持久化保存。如需查询，我会原样返回该编号。",
+      "route": {
+        "provider": "xiaomi-token-plan-cn",
+        "model": "mimo-v2.6-flash",
+        "reasoningEffort": "off"
+      },
+      "tool_names": [
+        "working_directory"
+      ],
+      "turn_reason": "completed",
+      "turn": 1,
+      "input_message_id": "73a64661-d306-4fa9-8c3b-d1fb7b948e46"
+    },
+    {
+      "assistant_text": "本会话记住的收据编号是：**WEB-GUI-VERIFIED-20261031-R8**（原样返回，未做任何改写或补全）。",
+      "route": {
+        "provider": "xiaomi-token-plan-cn",
+        "model": "mimo-v2.6-flash",
+        "reasoningEffort": "off"
+      },
+      "tool_names": [
+        "working_directory"
+      ],
+      "turn_reason": "completed",
+      "turn": 2,
+      "input_message_id": "6f5b5cd4-df63-4442-965c-ddb319b0cd89"
+    }
+  ],
+  "restart_proof": {
+    "container": "hep-agent-audit-e2e-assistant-web-1793382513-8279-dsh-1",
+    "started_at": "2026-10-30T18:24:04.492397819Z",
+    "first_turn_end": 1793384484631,
+    "second_user_input": 1793384657157,
+    "between_turns_verified": true
+  },
+  "native_mimo_responses": [
+    {
+      "seq": 16,
+      "provider": "xiaomi-token-plan-cn",
+      "model": "mimo-v2.6-flash",
+      "usage": {
+        "inputTokens": 806,
+        "outputTokens": 111,
+        "totalTokens": 1429,
+        "cacheReadTokens": 512
+      }
+    },
+    {
+      "seq": 27,
+      "provider": "xiaomi-token-plan-cn",
+      "model": "mimo-v2.6-flash",
+      "usage": {
+        "inputTokens": 164,
+        "outputTokens": 52,
+        "totalTokens": 1496,
+        "cacheReadTokens": 1280
+      }
+    }
+  ],
+  "restored_reply_visible": true,
+  "desktop_overflow": false,
+  "mobile_overflow": false
+}

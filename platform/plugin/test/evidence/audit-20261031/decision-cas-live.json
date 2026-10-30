@@ -1,0 +1,87 @@
+{
+  "agent_id": "audit-e2e-assistant-sdk",
+  "experiment_id": "EXP-audit-e2e-assistant-sdk-003-rf7b3602a7c10",
+  "before": {
+    "path": "evolution/experiments/EXP-audit-e2e-assistant-sdk-003-rf7b3602a7c10/decision.md",
+    "exists": false,
+    "sha256": null,
+    "content": ""
+  },
+  "empty_preview": {
+    "edits": [
+      {
+        "path": "evolution/experiments/EXP-audit-e2e-assistant-sdk-003-rf7b3602a7c10/decision.md",
+        "exists": false,
+        "before_sha256": null,
+        "after_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "changed": true,
+        "diff": "",
+        "redacted": false
+      }
+    ],
+    "dry_run": {
+      "mode": "dry",
+      "preflight_scope": "changed-files",
+      "checks": [
+        "草稿格式"
+      ],
+      "note": "仅检查本次文件；未执行源码、评测、模型或业务工具，未启动实例或创建 Run。"
+    }
+  },
+  "empty_saved": {
+    "written": [
+      {
+        "path": "evolution/experiments/EXP-audit-e2e-assistant-sdk-003-rf7b3602a7c10/decision.md",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "dry_run": {
+      "mode": "dry",
+      "preflight_scope": "changed-files",
+      "checks": [
+        "草稿格式"
+      ],
+      "note": "仅检查本次文件；未执行源码、评测、模型或业务工具，未启动实例或创建 Run。"
+    }
+  },
+  "empty": {
+    "path": "evolution/experiments/EXP-audit-e2e-assistant-sdk-003-rf7b3602a7c10/decision.md",
+    "exists": true,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "content": ""
+  },
+  "stale_null": {
+    "ok": false,
+    "error": {
+      "code": "conflict",
+      "message": "文件或存在状态已被修改",
+      "details": {
+        "path": "evolution/experiments/EXP-audit-e2e-assistant-sdk-003-rf7b3602a7c10/decision.md",
+        "expected_sha256": null,
+        "actual_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  },
+  "saved": {
+    "path": "evolution/experiments/EXP-audit-e2e-assistant-sdk-003-rf7b3602a7c10/decision.md",
+    "sha256": "39411a24b1a8d7b65d8030f8b644311e1658135abb1ef28a624d5a2314e71665"
+  },
+  "stale_empty": {
+    "ok": false,
+    "error": {
+      "code": "conflict",
+      "message": "文件或存在状态已被修改",
+      "details": {
+        "path": "evolution/experiments/EXP-audit-e2e-assistant-sdk-003-rf7b3602a7c10/decision.md",
+        "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "actual_sha256": "39411a24b1a8d7b65d8030f8b644311e1658135abb1ef28a624d5a2314e71665"
+      }
+    }
+  },
+  "after": {
+    "path": "evolution/experiments/EXP-audit-e2e-assistant-sdk-003-rf7b3602a7c10/decision.md",
+    "exists": true,
+    "sha256": "39411a24b1a8d7b65d8030f8b644311e1658135abb1ef28a624d5a2314e71665",
+    "content": "# Decision\n\n状态：inconclusive\n\n本轮仅验证SDK迁移运行方式和Decision保存合同，尚无SDK迁移业务等效Run证据。\n"
+  }
+}

@@ -895,6 +895,7 @@ class RunRecordTests(unittest.TestCase):
                             "user.email=test@example.invalid", "commit", "-qm", "initial"], check=True)
             contract = {"experiment_id": EXPERIMENT_ID, "agent_id": AGENT_ID,
                         "source_id": f"experiment:{EXPERIMENT_ID}", "source_kind": "experiment",
+                        "candidate_root": str(experiment / "candidate/dsh"),
                         "workspace": str(repo), "presets": str(repo), "managed": str(repo),
                         "config_markers": ["test"], "required_env_names": [], "optional_env_names": []}
             args = argparse.Namespace(source=f"experiment:{EXPERIMENT_ID}", baseline_ref=None,
@@ -1265,7 +1266,7 @@ class DshEvalTests(unittest.TestCase):
                 ] if name == "managed" else []}
                 for name in roots
             }}
-            contract = {**roots, "experiment_root": experiment}
+            contract = {**roots, "experiment_root": experiment, "candidate_root": candidate / "dsh"}
             with mock.patch.dict("sys.modules", {"source_contract": mock.Mock(resolve=lambda *_args, **_kwargs: contract)}):
                 legacy = module._locked_harness(inputs)
                 self.assertEqual(legacy[1]["content"], files["plugin.mjs"])
@@ -1668,7 +1669,12 @@ for index, item in enumerate(payload["cases"]):
             for _ in item["inputs"][1:]
         ],
     }) + "\\n")
-    (evidence / "trace.jsonl").write_text(json.dumps({"route": "local-qwen"}) + "\\n")
+    trace = [{"session_log": "session.v4.jsonl", "event": {
+        "type": "session", "version": 4, "id": f"target-session-{index}", "delegationDepth": 0,
+    }}, {"session_log": "session.v4.jsonl", "event": {
+        "type": "request/header", "seq": 1, "data": {"header": {"config": target_route}},
+    }}]
+    (evidence / "trace.jsonl").write_text("".join(json.dumps(row) + "\\n" for row in trace))
     (evidence / "tools.jsonl").write_text(
         json.dumps({"event": {
             "type": "tool/call", "name": "inspection", "arguments": {"case_id": item["case_id"]},

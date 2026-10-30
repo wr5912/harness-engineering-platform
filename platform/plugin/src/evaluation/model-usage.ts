@@ -1,9 +1,75 @@
 import { isLocalModelRoute, type ModelAttempt, type ModelRole } from './model-attempts.ts'
+import { parseLocalCapabilities, type LocalModelRoute } from '../business-control/local-capabilities.ts'
+import { createHash } from 'node:crypto'
+import { existsSync, lstatSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 export type { ModelAttempt } from './model-attempts.ts'
 type Event = { type: string; seq?: number; data?: Record<string, any>; [key: string]: any }
 type Role = ModelRole
 export type UsageTrace = { path: string; rows: { session_log?: string; event?: Event }[] }
 type Session = { id: string; seeded: boolean; role: Role; events: Map<number, Event> }
+
+/** 只读本次 Run 的原文字节；历史记录不从当前 Candidate 补写声明。 */
+function lockedLocalModelRoutes(run: string, inputs: Record<string, any>): LocalModelRoute[] {
+  const managed = inputs.harness_trees?.managed
+  if (!managed || !Array.isArray(managed.files) || managed.files.some((item: any) => !item || typeof item !== 'object'))
+    throw new Error('local-model-routes-lock-missing')
+  const declarations = managed.files.filter((item: any) => item.path === 'role-tool-matrix.yaml')
+  const marked = Object.hasOwn(inputs, 'managed_role_snapshot')
+  if (!declarations.length && !marked) return []
+  if (declarations.length !== 1) throw new Error('local-model-routes-lock-invalid')
+  const declaration = declarations[0]
+  if (!/^[0-9a-f]{64}$/.test(declaration.sha256 ?? '') || !Number.isSafeInteger(declaration.size)
+    || declaration.size < 0 || declaration.size > 64 * 1024) throw new Error('local-model-routes-lock-invalid')
+  let bytes: Buffer
+  if (marked) {
+    if (inputs.managed_role_snapshot !== 'evidence/managed/role-tool-matrix.yaml')
+      throw new Error('local-model-routes-snapshot-invalid')
+    if (['evidence', 'evidence/managed'].some(name => !existsSync(join(run, name)) || !lstatSync(join(run, name)).isDirectory()))
+      throw new Error('local-model-routes-snapshot-invalid')
+    const path = join(run, inputs.managed_role_snapshot)
+    if (!existsSync(path) || !lstatSync(path).isFile()) throw new Error('local-model-routes-snapshot-missing')
+    bytes = readFileSync(path)
+  } else {
+    if (['evidence', 'evidence/analysis'].some(name => !existsSync(join(run, name)) || !lstatSync(join(run, name)).isDirectory()))
+      throw new Error('local-model-routes-legacy-missing')
+    const path = join(run, 'evidence/analysis/harness.json')
+    if (!existsSync(path) || !lstatSync(path).isFile()) throw new Error('local-model-routes-legacy-missing')
+    let harness: Record<string, any>
+    try { harness = JSON.parse(readFileSync(path, 'utf8')) } catch { throw new Error('local-model-routes-legacy-invalid') }
+    const sources = Array.isArray(harness?.files) ? harness.files.filter((item: any) => item?.tree === 'managed'
+      && item.path === 'role-tool-matrix.yaml') : []
+    if (sources.length !== 1 || typeof sources[0].content !== 'string' || sources[0].sha256 !== declaration.sha256)
+      throw new Error('local-model-routes-legacy-invalid')
+    bytes = Buffer.from(sources[0].content, 'utf8')
+  }
+  if (bytes.length !== declaration.size || createHash('sha256').update(bytes).digest('hex') !== declaration.sha256)
+    throw new Error('local-model-routes-digest-mismatch')
+  const content = bytes.toString('utf8')
+  if (!Buffer.from(content, 'utf8').equals(bytes)) throw new Error('local-model-routes-invalid')
+  try { return parseLocalCapabilities(content).localModelRoutes }
+  catch { throw new Error('local-model-routes-invalid') }
+}
+
+/** 按封存声明核算一个 Run；无法核对时不把混有本地事件的数值当作调用下界。 */
+export function measureRunModelUsage(run: string, inputs: Record<string, any>, files: UsageTrace[]) {
+  try {
+    const localModelRoutes = lockedLocalModelRoutes(run, inputs)
+    return { ...measureModelUsage(files, { localModelRoutes }), local_model_routes_verification: 'verified' as const }
+  } catch (error) {
+    const measured = measureModelUsage(files)
+    const reason = error instanceof Error && /^local-model-routes-[a-z-]+$/.test(error.message)
+      ? error.message : 'local-model-routes-invalid'
+    return { ...measured, actual_model_calls: null, observed_model_calls: null,
+      failed_model_calls: null, observed_failed_model_calls: null, auxiliary_model_calls: null,
+      auxiliary_requests_observed: null, model_calls_by_role: null, model_calls_by_model_role: null,
+      model_calls_complete: false, local_model_routes_verification: 'unverified' as const,
+      model_calls_unknown_reasons: [...new Set([...measured.model_calls_unknown_reasons, reason])],
+      model_calls_basis: '本 Run 的本地能力声明尚未核对，实际模型调用及可核验下界未知；不从当前 Candidate 回填，也不把原记录数解释为真实 LLM 下界。',
+      token_usage: null, observed_token_usage: null, token_usage_complete: false,
+      token_usage_note: '本 Run 的本地能力声明尚未核对，总 Token 与可核验用量下界未知。' }
+  }
+}
 
 /** 只读取原始 tool/result 的结构化回执，核对其原生 Session/调用身份。 */
 export function extractGraphExecutions(rows: UsageTrace['rows']) {
@@ -79,7 +145,8 @@ export function normalizeTokenUsage(usage: Record<string, any> | undefined) {
 }
 
 /** 基于锁定 DSH 的持久请求尝试结算计数；不把配置头、Step 或 Token 样本推成请求。 */
-export function measureModelUsage(files: UsageTrace[], options: { attempts?: ModelAttempt[]; requireSessionTrace?: boolean } = {}) {
+export function measureModelUsage(files: UsageTrace[], options: { attempts?: ModelAttempt[]; requireSessionTrace?: boolean; localModelRoutes?: readonly LocalModelRoute[] } = {}) {
+  const localRoute = (route: any) => isLocalModelRoute(route, options.localModelRoutes)
   const sessions = new Map<string, Session>()
   const unknown = new Set<string>()
   const byRole: Partial<Record<Role, number>> & Record<'target' | 'judge' | 'analysis', number> = { target: 0, judge: 0, analysis: 0 }
@@ -141,7 +208,7 @@ export function measureModelUsage(files: UsageTrace[], options: { attempts?: Mod
     let route: any
     function finishAttempt() {
       if (step?.pendingAttempt) unknown.add('attempt-invocation-unproven')
-      if (step?.invocationProven && !step.counted && !isLocalModelRoute(route)) {
+      if (step?.invocationProven && !step.counted && !localRoute(route)) {
         // HTTP 已接受但尚无结算时仍保留调用下界，不能把在途请求当作零。
         byRole[session.role] = (byRole[session.role] ?? 0) + 1
         tokensKnown = false
@@ -157,6 +224,7 @@ export function measureModelUsage(files: UsageTrace[], options: { attempts?: Mod
       } else if (event.type === 'session/title' && data.source?.kind === 'user') {
         automaticTitlePending = false
       } else if (event.type === 'session/title-llm-request') {
+        if (localRoute(data.route)) { automaticTitlePending = false; continue }
         auxiliaryRequests++
         // 此记录先于 stream 前的 abort 检查，单独存在不能证明请求真正发出。
         const key = JSON.stringify([data.titleProvider, data.messageSeqs, data.route?.provider, data.route?.model])
@@ -164,6 +232,7 @@ export function measureModelUsage(files: UsageTrace[], options: { attempts?: Mod
       } else if (event.type === 'session/title' && data.source?.kind === 'provider') {
         automaticTitlePending = false
         if (!data.source.model) continue // 无模型的标题 Provider 不作为模型调用。
+        if (localRoute(data.source.model)) continue
         const key = JSON.stringify([data.source.provider, data.messageSeqs, data.source.model.provider, data.source.model.model])
         const pending = titleRequests.get(key) ?? 0
         if (!pending) unknown.add('auxiliary-title-request-boundary-missing')
@@ -171,7 +240,7 @@ export function measureModelUsage(files: UsageTrace[], options: { attempts?: Mod
           titleRequests.set(key, pending - 1)
           auxiliary++
           // 标题完成事件证明一次辅助调用完成；原生事件不保存标题 Token 用量。
-          if (data.model_invocation !== false && !isLocalModelRoute(data.source.model)) count(session, event)
+          if (data.model_invocation !== false) count(session, event)
         }
       } else if (event.type === 'turn/start') {
         if (turn !== undefined || step) unknown.add('turn-boundary-invalid')
@@ -187,7 +256,7 @@ export function measureModelUsage(files: UsageTrace[], options: { attempts?: Mod
       } else if (event.type === 'assistant/message' || event.type === 'assistant/attempt') {
         if (!step || step.turn !== data.turn || step.step !== data.step || step.state !== 'open') unknown.add('attempt-boundary-invalid')
         else {
-          if (data.model_invocation === false || isLocalModelRoute(route)) step.invocationProven = false
+          if (data.model_invocation === false || localRoute(route)) step.invocationProven = false
           else if (event.type === 'assistant/message' || data.model_invocation === true || step.invocationProven
             || normalizeTokenUsage(data.usage) !== null || Array.isArray(data.stream) && data.stream.some(item => typeof item?.chunk?.type === 'string')) {
             count(session, event); step.counted = true
@@ -217,7 +286,7 @@ export function measureModelUsage(files: UsageTrace[], options: { attempts?: Mod
       } else if (event.type === 'compaction/start') compacting.set(data.compactionId, false)
       else if (event.type === 'compaction/summary') {
         if (data.llmStreamCall === true) {
-          count(session, event)
+          if (!localRoute(data)) count(session, event)
           if (!compacting.has(data.compactionId)) unknown.add('compaction-boundary-missing')
           compacting.set(data.compactionId, true)
         } else unknown.add('compaction-request-count-unknown')
@@ -251,7 +320,7 @@ export function measureModelUsage(files: UsageTrace[], options: { attempts?: Mod
     const terminal = ordered.filter(row => ['completed', 'failed', 'cancelled', 'local'].includes(row.status))
     const last = terminal.at(-1)
     const started = ordered.some(row => row.status === 'started')
-    if (last?.status === 'local' || last?.model_invocation === false) continue
+    if (last?.status === 'local' || last?.model_invocation === false || localRoute(last ?? ordered.at(-1))) continue
     if (!started) { unknown.add('graph-attempt-start-missing'); continue }
     const role = rows[0].role ?? 'target'
     if (!['target', 'judge', 'analysis', 'generation'].includes(role)) { unknown.add('graph-attempt-role-invalid'); continue }

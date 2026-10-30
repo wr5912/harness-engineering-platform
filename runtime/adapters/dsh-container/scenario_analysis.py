@@ -137,28 +137,122 @@ def _case_evidence(run_dir: Path, case: dict, rows_by_case: dict[str, list[dict]
 
 
 def _target_route(run_dir: Path, cases: list[dict]) -> dict:
+    def checked_route(route: object) -> dict:
+        if not isinstance(route, dict) or not set(route) <= SUPPORTED_ROUTE_FIELDS \
+                or not isinstance(route.get("provider"), str) or not route["provider"] \
+                or not isinstance(route.get("model"), str) or not route["model"] \
+                or "maxTokens" in route and (not isinstance(route["maxTokens"], int)
+                                               or isinstance(route["maxTokens"], bool)
+                                               or route["maxTokens"] < 1) \
+                or "reasoningEffort" in route and not isinstance(route["reasoningEffort"], str):
+            raise ValueError("target-route-invalid")
+        return route
+
+    local_routes = set()
+    lock_path = run_dir / "inputs.lock.json"
+    if lock_path.exists() or lock_path.is_symlink():
+        inputs = _safe_json(lock_path)
+        if not isinstance(inputs, dict) or not isinstance(inputs.get("harness_trees", {}), dict):
+            raise ValueError("target-local-routes-invalid")
+        managed = inputs.get("harness_trees", {}).get("managed", {})
+        if not isinstance(managed, dict) or not isinstance(managed.get("files", []), list) \
+                or any(not isinstance(item, dict) for item in managed.get("files", [])):
+            raise ValueError("target-local-routes-invalid")
+        declared = [item for item in managed.get("files", [])
+                    if item.get("path") == "role-tool-matrix.yaml"]
+        has_snapshot = "managed_role_snapshot" in inputs
+        snapshot_ref = inputs.get("managed_role_snapshot")
+        if declared or has_snapshot:
+            # 本地适配器来自本次已锁 Harness，不能由当前默认模型或 Provider 名称推断。
+            import yaml
+            if len(declared) != 1:
+                raise ValueError("target-local-routes-missing")
+            if has_snapshot:
+                if snapshot_ref != "evidence/managed/role-tool-matrix.yaml":
+                    raise ValueError("target-local-routes-invalid")
+                path = run_dir / snapshot_ref
+                if not path.is_file() or any(item.is_symlink() for item in (path, path.parent, path.parent.parent)):
+                    raise ValueError("target-local-routes-missing")
+                content = path.read_bytes().decode("utf-8")
+            else:
+                # 历史 Run 只使用原有封存材料，不从当前 Candidate 补写声明。
+                harness = _safe_json(run_dir / "evidence" / "analysis" / "harness.json")
+                if not isinstance(harness, dict) or not isinstance(harness.get("files"), list) \
+                        or any(not isinstance(item, dict) for item in harness["files"]):
+                    raise ValueError("target-local-routes-invalid")
+                sources = [item for item in harness["files"]
+                           if item.get("tree") == "managed" and item.get("path") == "role-tool-matrix.yaml"]
+                if len(sources) != 1:
+                    raise ValueError("target-local-routes-missing")
+                content = sources[0].get("content")
+                if sources[0].get("sha256") != declared[0].get("sha256"):
+                    raise ValueError("target-local-routes-digest-mismatch")
+            if not isinstance(content, str) or len(content.encode()) != declared[0].get("size") \
+                    or hashlib.sha256(content.encode()).hexdigest() != declared[0].get("sha256"):
+                raise ValueError("target-local-routes-digest-mismatch")
+            try:
+                matrix = yaml.safe_load(content)
+            except yaml.YAMLError as error:
+                raise ValueError("target-local-routes-invalid") from error
+            if not isinstance(matrix, dict):
+                raise ValueError("target-local-routes-invalid")
+            if "runtime_capabilities" in matrix:
+                capabilities = matrix["runtime_capabilities"]
+                if not isinstance(capabilities, dict) or not isinstance(capabilities.get("local_model_routes"), list):
+                    raise ValueError("target-local-routes-invalid")
+                for route in capabilities["local_model_routes"]:
+                    if not isinstance(route, dict) or set(route) != {"provider", "model"}:
+                        raise ValueError("target-local-routes-invalid")
+                    checked_route(route)
+                    local_routes.add((route["provider"], route["model"]))
+
     routes = []
     for case in cases:
-        value = _safe_json(run_dir / "evidence" / case["case_id"] / "response.json")
+        root = run_dir / "evidence" / case["case_id"]
+        value = _safe_json(root / "response.json")
         if not isinstance(value, dict):
             raise ValueError("target-route-missing")
         response = value.get("response") if "response" in value else value
-        if response is None:
-            continue
-        if not isinstance(response, dict) or not isinstance(response.get("turns"), list):
+        if response is not None and not isinstance(response, dict):
             raise ValueError("target-route-missing")
-        for turn in response["turns"]:
-            route = turn.get("route") if isinstance(turn, dict) else None
-            if route is None:
+        trace_path = root / "trace.jsonl"
+        native_trace = trace_path.exists() or trace_path.is_symlink()
+        if native_trace:
+            if not trace_path.is_file() or trace_path.is_symlink():
+                raise ValueError("target-trace-invalid")
+            trace = [json.loads(line) for line in trace_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+            if any(not isinstance(row, dict) or not isinstance(row.get("session_log"), str)
+                   or not isinstance(row.get("event"), dict) for row in trace):
+                raise ValueError("target-trace-invalid")
+            sessions = [row for row in trace if row["event"].get("type") == "session"]
+            session_id = response.get("session_id") if response is not None else None
+            roots = [row for row in sessions if not row["event"].get("parentSession")]
+            if len(roots) != 1 or not isinstance(roots[0]["event"].get("id"), str) or not roots[0]["event"]["id"] \
+                    or roots[0]["event"].get("delegationDepth", 0) != 0 \
+                    or session_id is not None and session_id != roots[0]["event"]["id"] \
+                    or sum(row["session_log"] == roots[0]["session_log"] for row in sessions) != 1:
+                raise ValueError("target-session-invalid")
+            # 最终回复可能由固定交付器生成；只按根会话每次真实请求的选模复核，子角色不冒充主角色。
+            selected = []
+            for row in trace:
+                if row["session_log"] != roots[0]["session_log"] or row["event"].get("type") != "request/header":
+                    continue
+                data = row["event"].get("data")
+                header = data.get("header") if isinstance(data, dict) else None
+                selected.append(header.get("config") if isinstance(header, dict) else None)
+        else:
+            # 历史 Run 没有原生归档时保留原有回复路由合同；已有归档不降级猜测。
+            if response is None:
                 continue
-            if not isinstance(route, dict) or not set(route) <= SUPPORTED_ROUTE_FIELDS \
-                    or not isinstance(route.get("provider"), str) or not route["provider"] \
-                    or not isinstance(route.get("model"), str) or not route["model"] \
-                    or "maxTokens" in route and (not isinstance(route["maxTokens"], int)
-                                                   or isinstance(route["maxTokens"], bool)
-                                                   or route["maxTokens"] < 1) \
-                    or "reasoningEffort" in route and not isinstance(route["reasoningEffort"], str):
-                raise ValueError("target-route-invalid")
+            if not isinstance(response.get("turns"), list):
+                raise ValueError("target-route-missing")
+            selected = [turn.get("route") for turn in response["turns"] if isinstance(turn, dict)]
+        for route in selected:
+            if route is None and not native_trace:
+                continue
+            checked_route(route)
+            if (route["provider"], route["model"]) in local_routes:
+                continue
             routes.append(route)
     if not routes:
         raise ValueError("target-route-missing")
@@ -303,7 +397,8 @@ def _write_readable_views(run_dir: Path, groups: dict[str, list[str]]) -> dict[s
 def _locked_harness(inputs: dict, *, repo: Path | None = None) -> list[dict]:
     from source_contract import resolve
 
-    contract = resolve(inputs["source_id"], repo=repo if repo is not None else asset_root())
+    contract = resolve(inputs["source_id"], repo=repo if repo is not None else asset_root(),
+                       source_ref=inputs.get("source_ref"))
     result = []
     review = inputs.get("harness_review")
     generated = {}
@@ -342,7 +437,7 @@ def _locked_harness(inputs: dict, *, repo: Path | None = None) -> list[dict]:
                     (origin, file.get("path"), file.get("sha256")) not in available for file in files
                 ):
                     raise ValueError("harness-review-source-incomplete")
-    candidate = Path(contract["experiment_root"]) / "candidate" if review is not None else None
+    candidate = Path(contract["candidate_root"]).parent if review is not None else None
     seen_sources = set()
     for tree_name in ("workspace", "presets", "managed"):
         root = Path(contract[tree_name])

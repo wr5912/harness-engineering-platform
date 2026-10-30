@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
-import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash, randomUUID } from 'node:crypto'
+import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -271,4 +271,82 @@ test('受理前准备失败允许同一请求重试且没有残留任务', async
   const accepted = await jobs.start(payload)
   assert.equal(accepted.job_id, payload.request_id)
   await waitFor(() => jobs.status(accepted.job_id), job => job.status === 'completed')
+})
+
+const localRoute = { provider: 'security-operation-delivery', model: 'fixed-operation-result' }
+const remoteRoute = { provider: 'xiaomi-token-plan-cn', model: 'mimo-v2.6-flash' }
+const capabilityContent = routes => JSON.stringify({ runtime_capabilities: { local_tools: [], local_model_routes: routes } })
+async function measurementRun(t, { marker = true, legacy = false, declared = true, content = capabilityContent([localRoute]) } = {}) {
+  const fx = await fixture(t, '')
+  const jobs = fx.create(), started = await jobs.start({ source: 'experiment:EXP-test-agent-001' })
+  await waitFor(() => jobs.status(started.job_id), job => job.status === 'completed')
+  const run = join(fx.root, 'evolution/experiments/EXP-test-agent-001/runs', `run-${randomUUID()}`)
+  const evidence = join(run, 'evidence/U-CASE-001'), snapshot = join(run, 'evidence/managed/role-tool-matrix.yaml')
+  const harness = join(run, 'evidence/analysis/harness.json'), lock = join(run, 'inputs.lock.json')
+  mkdirSync(evidence, { recursive: true }); mkdirSync(join(run, 'evidence/managed')); mkdirSync(join(run, 'evidence/analysis'))
+  writeFileSync(join(run, 'run.yaml'), 'status: completed\n')
+  writeFileSync(join(run, 'execution.json'), JSON.stringify({ job_id: started.job_id }))
+  const sha256 = createHash('sha256').update(content).digest('hex')
+  const inputs = { source_id: 'experiment:EXP-test-agent-001', evaluation_cases: [{ case_id: 'U-CASE-001' }],
+    harness_trees: { managed: { files: declared ? [{ path: 'role-tool-matrix.yaml', sha256, size: Buffer.byteLength(content) }] : [] } },
+    ...(marker ? { managed_role_snapshot: 'evidence/managed/role-tool-matrix.yaml' } : {}) }
+  writeFileSync(lock, JSON.stringify(inputs))
+  if (declared && marker) writeFileSync(snapshot, content)
+  if (legacy) writeFileSync(harness, JSON.stringify({ files: [{ tree: 'managed', path: 'role-tool-matrix.yaml', sha256, content }] }))
+  const events = [{ type: 'session', id: 'actual-session' }]
+  let seq = 0
+  for (const [index, route] of [localRoute, remoteRoute].entries()) {
+    const turn = index + 1
+    for (const [type, data] of [['turn/start', { turn }], ['step/start', { turn, step: 1 }],
+      ['request/header', { header: { config: route } }], ['assistant/message', { turn, step: 1, usage: { inputTokens: 5, outputTokens: 2, totalTokens: 7 } }],
+      ['step/end', { turn, step: 1 }], ['turn/end', { turn }]]) events.push({ type, seq: seq++, data })
+  }
+  writeFileSync(join(evidence, 'trace.jsonl'), events.map(event => JSON.stringify({ session_log: 'session.v4.jsonl', event })).join('\n') + '\n')
+  return { ...fx, run, snapshot, harness, lock, content, inputs, status: () => fx.create().status(started.job_id) }
+}
+
+test('新Run按锁定普通快照排除纯本地请求，旧Run仅用同SHA原文，不读取当前Candidate', async t => {
+  for (const legacy of [false, true]) {
+    const fx = await measurementRun(t, { marker: !legacy, legacy })
+    const current = join(fx.root, 'evolution/experiments/EXP-test-agent-001/candidate/dsh/managed')
+    mkdirSync(current, { recursive: true }); writeFileSync(join(current, 'role-tool-matrix.yaml'), capabilityContent([remoteRoute]))
+    const beforeLock = readFileSync(fx.lock)
+    const status = fx.status()
+    assert.equal(status.local_model_routes_verification, 'verified')
+    assert.equal(status.actual_model_calls, 1)
+    assert.equal(status.observed_model_calls, 1)
+    assert.deepEqual(status.token_usage, { input_tokens: 5, output_tokens: 2, total_tokens: 7 })
+    assert.deepEqual(readFileSync(fx.lock), beforeLock, '查询不能改写旧Run')
+  }
+  const noDeclaration = await measurementRun(t, { marker: false, declared: false })
+  assert.equal(noDeclaration.status().actual_model_calls, 2, '锁中确无声明不凭provider名字排除')
+})
+
+test('新快照缺损不降级legacy，旧声明无可信原文时调用与用量下界保持未知', async t => {
+  const invalid = [
+    ['missing-snapshot', {}, fx => rmSync(fx.snapshot)],
+    ['changed-snapshot', {}, fx => writeFileSync(fx.snapshot, fx.content + ' ')],
+    ['snapshot-symlink', {}, fx => { const original = fx.snapshot + '.original'; renameSync(fx.snapshot, original); symlinkSync(original, fx.snapshot) }],
+    ['parent-symlink', {}, fx => { const folder = join(fx.run, 'evidence/managed'), original = folder + '.original'; renameSync(folder, original); symlinkSync(original, folder) }],
+    ['wrong-pointer', {}, fx => { fx.inputs.managed_role_snapshot = '../candidate/role-tool-matrix.yaml'; writeFileSync(fx.lock, JSON.stringify(fx.inputs)) }],
+    ['invalid-capabilities', { content: JSON.stringify({ runtime_capabilities: { local_model_routes: [localRoute] } }) }, () => {}],
+    ['missing-legacy', { marker: false, legacy: false }, () => {}],
+    ['changed-legacy', { marker: false }, fx => { const value = JSON.parse(readFileSync(fx.harness, 'utf8')); value.files[0].content += ' '; writeFileSync(fx.harness, JSON.stringify(value)) }],
+    ['legacy-symlink', { marker: false }, fx => { const original = fx.harness + '.original'; renameSync(fx.harness, original); symlinkSync(original, fx.harness) }],
+    ['missing-lock', {}, fx => { delete fx.inputs.harness_trees; writeFileSync(fx.lock, JSON.stringify(fx.inputs)) }],
+  ]
+  for (const [name, options, mutate] of invalid) await t.test(name, async t => {
+    const fx = await measurementRun(t, { legacy: true, ...options })
+    mutate(fx)
+    const status = fx.status()
+    assert.equal(status.local_model_routes_verification, 'unverified')
+    assert.equal(status.actual_model_calls, null)
+    assert.equal(status.observed_model_calls, null)
+    assert.equal(status.failed_model_calls, null)
+    assert.equal(status.observed_token_usage, null)
+    assert.equal(status.token_usage, null)
+    assert.equal(status.model_calls_complete, false)
+    assert.ok(status.model_calls_unknown_reasons.some(reason => reason.startsWith('local-model-routes-')))
+    assert.match(status.model_calls_basis, /声明尚未核对/)
+  })
 })

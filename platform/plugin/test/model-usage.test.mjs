@@ -206,6 +206,64 @@ test('受控本地交付不算模型调用；未知provider没有用量仍计调
   assert.equal(unknown.token_usage, null)
 })
 
+test('同一封存本地声明覆盖根与子会话、辅助标题，未声明的同名provider仍按外部请求核对', () => {
+  const local = { provider: 'security-operation-delivery', model: 'fixed-operation-result' }
+  const withRoute = (id, route, title = false) => trace(id, [
+    ...(title ? [event('session/title', { source: { kind: 'fallback' } }),
+      event('session/title-llm-request', { titleProvider: 'first-prompt', messageSeqs: [2], route })] : []),
+    ...turn().map(item => item.type === 'request/header' ? event(item.type, { header: { config: route } }) : item),
+    ...(title ? [event('session/title', { messageSeqs: [2], source: { kind: 'provider', provider: 'first-prompt', model: route } })] : []),
+  ])
+  const root = withRoute('root-local', local, true), child = withRoute('child-local', local)
+  child.rows.forEach(row => { row.session_log = 'subagents/child/session.v4.jsonl' })
+  const result = measureModelUsage([root, child], { localModelRoutes: [local] })
+  assert.equal(result.actual_model_calls, 0)
+  assert.equal(result.auxiliary_model_calls, 0)
+  assert.equal(result.auxiliary_requests_observed, 0)
+  assert.deepEqual(result.token_usage, { input_tokens: 0, output_tokens: 0, total_tokens: 0 })
+  assert.equal(measureModelUsage([root]).actual_model_calls, 2, '不得为暴露的provider补名称特判')
+  const different = withRoute('same-provider-other-model', { ...local, model: 'actual-remote-model' })
+  assert.equal(measureModelUsage([different], { localModelRoutes: [local] }).actual_model_calls, 1)
+  const remote = withRoute('real-provider', { provider: 'xiaomi-token-plan-cn', model: 'mimo-v2.6-flash' })
+  assert.equal(measureModelUsage([root, child, remote], { localModelRoutes: [local] }).actual_model_calls, 1)
+})
+
+test('图attempt与原生会话采用相同本地route排除，未知或失败远程请求不被吞掉', () => {
+  const local = { provider: 'audit-declared-local', model: 'fixed-result' }
+  const rows = (id, route, status = 'completed') => [
+    { ...route, attempt_id: id, execution_id: 'graph', role: 'target', time: 1, status: 'started', model_invocation: true },
+    { ...route, attempt_id: id, execution_id: 'graph', role: 'target', time: 2, status, model_invocation: true, ...(status === 'completed' ? { usage } : {}) },
+  ]
+  const result = measureModelUsage([], { requireSessionTrace: false, localModelRoutes: [local], attempts: [
+    ...rows('local', local), ...rows('remote', { provider: 'unknown-local-looking', model: 'fixed-result' }, 'cancelled'),
+  ] })
+  assert.equal(result.actual_model_calls, 1)
+  assert.equal(result.failed_model_calls, 1)
+  assert.equal(result.token_usage, null)
+  assert.equal(measureModelUsage([], { requireSessionTrace: false, localModelRoutes: [local], attempts: rows('only-local', local) }).actual_model_calls, 0)
+})
+
+test('压缩按原生summary自身路由核算，同声明本地不计LLM但仍检查结算边界', () => {
+  const local = { provider: 'security-operation-delivery', model: 'fixed-operation-result' }
+  const compact = (route, withStart = true, settledUsage = usage) => trace('compact-declared', [
+    ...turn().map(item => item.type === 'request/header' ? event(item.type, { header: { config: local } }) : item),
+    ...(withStart ? [event('compaction/start', { compactionId: 'one' })] : []),
+    event('compaction/summary', { compactionId: 'one', llmStreamCall: true, ...route, ...(settledUsage ? { usage: settledUsage } : {}) }),
+    event('compaction/end', { compactionId: 'one' }),
+  ])
+  const result = measureModelUsage([compact(local)], { localModelRoutes: [local] })
+  assert.equal(result.actual_model_calls, 0)
+  assert.deepEqual(result.token_usage, { input_tokens: 0, output_tokens: 0, total_tokens: 0 })
+  const remote = { provider: 'xiaomi-token-plan-cn', model: 'mimo-v2.6-flash' }
+  const positive = measureModelUsage([compact(remote)], { localModelRoutes: [local] })
+  assert.equal(positive.actual_model_calls, 1)
+  assert.deepEqual(positive.token_usage, { input_tokens: 5, output_tokens: 2, total_tokens: 7 })
+  assert.equal(measureModelUsage([compact(remote, true, null)], { localModelRoutes: [local] }).token_usage, null)
+  const missingBoundary = measureModelUsage([compact(local, false)], { localModelRoutes: [local] })
+  assert.equal(missingBoundary.actual_model_calls, null)
+  assert.ok(missingBoundary.model_calls_unknown_reasons.includes('compaction-boundary-missing'))
+})
+
 test('统一Token桶核对缓存、reasoning与缺失aggregate，缓存命中不是零输入', () => {
   assert.deepEqual(normalizeTokenUsage({ inputTokens: 20, cacheReadTokens: 5, cacheWriteTokens: 3, outputTokens: 10, reasoningTokens: 7, totalTokens: 38 }), { input: 28, output: 10, total: 38 })
   assert.deepEqual(normalizeTokenUsage({ inputTokens: 20, cacheReadTokens: 5, cacheWriteTokens: 3, outputTokens: 10 }), { input: 28, output: 10, total: null })

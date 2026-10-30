@@ -64,7 +64,7 @@ def utc_now() -> str:
 def evaluation_implementation() -> dict:
     """冻结实际执行及评审资产身份；缺失文件保留 null，不用当前版本回填旧 Run。"""
     names = ["dsh-eval", "dsh-dev", "source_contract.py", "version-source.mts", "evaluation-source.mts", "dsh-eval-api.mjs", "dsh-eval-browser.mjs", "dsh-eval-common.mjs", "harness-runtime.mts",
-             "run_record.py", "scenario_analysis.py", "evaluation-registry.patch.yml", "evaluation-wait.mts", "evaluation-judge-guard.mjs",
+             "run_record.py", "scenario_analysis.py", "business.ts", "evaluation-registry.patch.yml", "evaluation-wait.mts", "evaluation-judge-guard.mjs",
              "scenario-analysis-guard.mjs"]
     names += [path.relative_to(ADAPTER).as_posix()
               for path in sorted((ADAPTER / "evaluation-presets").rglob("*")) if path.is_file()]
@@ -72,7 +72,9 @@ def evaluation_implementation() -> dict:
               if (ADAPTER / name).is_file() else None for name in names}
     for name in ("platform/plugin/src/agents/asset-build.ts", "platform/plugin/src/agents/asset-build-core.ts",
                  "platform/plugin/src/agents/asset-dependencies.ts", "platform/plugin/src/agents/plugin-dependency-reuse.ts",
-                 "platform/plugin/src/agents/version-source.ts", "platform/plugin/src/models/harness-runtime.ts"):
+                 "platform/plugin/src/agents/version-source.ts", "platform/plugin/src/agents/compute-variants.ts", "platform/plugin/src/models/harness-runtime.ts",
+                 "platform/plugin/src/evaluation/jobs.ts", "platform/plugin/src/evaluation/model-usage.ts",
+                 "platform/plugin/src/evaluation/model-attempts.ts", "platform/plugin/src/business-control/local-capabilities.ts"):
         path = PROGRAM_ROOT / name
         result[name] = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
     return result
@@ -920,6 +922,22 @@ def command_init(repo: Path, args: argparse.Namespace) -> None:
             "asset_origin": {**version, "workspace_id": workspace_id(repo),
                              "candidate_sha256": source_digest},
         }
+        # 运行记录保存声明原字节，供复核与计量共用；摘要只引用已锁 Harness 条目。
+        role_path = Path(contract["managed"]) / "role-tool-matrix.yaml"
+        role_locks = [item for item in inputs["harness_trees"]["managed"].get("files", [])
+                      if item["path"] == "role-tool-matrix.yaml"]
+        if role_locks or role_path.exists() or role_path.is_symlink():
+            if len(role_locks) != 1 or not role_path.is_file() or role_path.is_symlink():
+                raise ValueError("本地能力声明必须与已锁 Harness 中的普通文件一致")
+            role_bytes = role_path.read_bytes()
+            if len(role_bytes) != role_locks[0]["size"] \
+                    or hashlib.sha256(role_bytes).hexdigest() != role_locks[0]["sha256"]:
+                raise ValueError("本地能力声明在创建 Run 时变化")
+            role_snapshot = "evidence/managed/role-tool-matrix.yaml"
+            target = run_dir / role_snapshot
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(role_bytes)
+            inputs["managed_role_snapshot"] = role_snapshot
         if contract.get("source_ref"):
             inputs.update({"source_ref": contract["source_ref"], "source_snapshot_root": Path(contract["source_snapshot_root"]).relative_to(repo).as_posix(),
                            "candidate_path": candidate.relative_to(repo).as_posix()})

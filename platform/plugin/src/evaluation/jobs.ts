@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameS
 import { join, resolve } from 'node:path'
 import { load as loadYaml } from 'js-yaml'
 import { workspaceIdentity, workspaceLocalPath, workspaceOwnsCwd } from '../workspace.ts'
-import { measureModelUsage, type UsageTrace } from './model-usage.ts'
+import { measureRunModelUsage, type UsageTrace } from './model-usage.ts'
 
 type MapValue = Record<string, any>
 type Job = {
@@ -156,7 +156,7 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
       }
     }
     walk(join(run, 'evidence'))
-    Object.assign(result, measureModelUsage(traces))
+    Object.assign(result, measureRunModelUsage(run, inputs, traces))
     result.sessions = [...sessions]
     try { result.summary = JSON.parse(readFileSync(join(run, 'summary.json'), 'utf8')) } catch {}
     try { result.artifacts = JSON.parse(readFileSync(join(run, 'artifacts/index.json'), 'utf8')).artifacts } catch {}

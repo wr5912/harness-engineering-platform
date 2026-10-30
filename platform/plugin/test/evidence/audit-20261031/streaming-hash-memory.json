@@ -1,0 +1,96 @@
+{
+  "observed_at": "2026-10-30T16:57:53.253777+00:00",
+  "input": {
+    "bytes": 268435456,
+    "allocated_bytes": 0,
+    "sha256sum": "a6d72ac7690f53be6ae46ba88506bd97302a093f7108472bd9efc3cefda06484"
+  },
+  "source_sha256": {
+    "old": "9eae5cc7d52f7a2fb3353e98a07c8758daa441ac1307435dc79252084fffb148",
+    "new": "f25715baf70b73d5e1ac0278729468616630fd1a5f47eea5318b09d34d857e3e"
+  },
+  "old": {
+    "variant": "old",
+    "exit_code": -9,
+    "seconds": 0.469,
+    "child_peak_rss_kib": 168664,
+    "cgroup_memory_max": "134217728",
+    "cgroup_swap_max": "0",
+    "cgroup_memory_peak": null,
+    "cgroup_events": "low 0\nhigh 0\nmax 5365\noom 1\noom_kill 1\n",
+    "stdout": [
+      {
+        "phase": "before",
+        "node": "v24.21.0",
+        "usage": {
+          "rss": 65732608,
+          "heapTotal": 11948032,
+          "heapUsed": 9748400,
+          "external": 11910437,
+          "arrayBuffers": 143651
+        }
+      }
+    ],
+    "stderr": ""
+  },
+  "new": {
+    "variant": "new",
+    "exit_code": 0,
+    "seconds": 0.887,
+    "child_peak_rss_kib": 70940,
+    "cgroup_memory_max": "134217728",
+    "cgroup_swap_max": "0",
+    "cgroup_memory_peak": null,
+    "cgroup_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\n",
+    "stdout": [
+      {
+        "phase": "before",
+        "node": "v24.21.0",
+        "usage": {
+          "rss": 64966656,
+          "heapTotal": 11685888,
+          "heapUsed": 9436168,
+          "external": 8946314,
+          "arrayBuffers": 209187
+        }
+      },
+      {
+        "phase": "after",
+        "digest": "a6d72ac7690f53be6ae46ba88506bd97302a093f7108472bd9efc3cefda06484",
+        "elapsed_ms": 771.827794,
+        "max_rss_kib": 70936,
+        "usage": {
+          "rss": 72638464,
+          "heapTotal": 12734464,
+          "heapUsed": 9986120,
+          "external": 9039838,
+          "arrayBuffers": 209187
+        }
+      }
+    ],
+    "stderr": ""
+  },
+  "containers": [
+    {
+      "variant": "old",
+      "id": "7d600e0fb1b74a4fd87cb87f79545fd242ab3450c896740ed24ee56e57ccd7c8",
+      "image": "sha256:6ea7cbe9e99a8a2f29e9918a5112d9092ae71642fe1dbf997a612b5edafb6ca4",
+      "memory_bytes": 134217728,
+      "memory_swap_bytes": 134217728,
+      "network_mode": "none",
+      "container_exit_code": 0
+    },
+    {
+      "variant": "new",
+      "id": "b69b655aad450b224fc16331757af43ac9fd0cd31ad6788e8da65e54da1cb2be",
+      "image": "sha256:6ea7cbe9e99a8a2f29e9918a5112d9092ae71642fe1dbf997a612b5edafb6ca4",
+      "memory_bytes": 134217728,
+      "memory_swap_bytes": 134217728,
+      "network_mode": "none",
+      "container_exit_code": 0
+    }
+  ],
+  "containers_removed": true,
+  "conclusion": "相同128MiB内存、零swap、同一镜像和稀疏输入下，旧实现发生cgroup OOM，新实现完成且摘要一致；不据此归因47主机失联。",
+  "peak_measurement": "child_peak_rss_kib为进程ru_maxrss；内核无cgroup memory.peak，保持null，不将进程RSS等同cgroup峰值。"
+}

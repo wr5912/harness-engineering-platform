@@ -1,0 +1,145 @@
+{
+  "experiment_id": "EXP-audit-e2e-migrate-001-r21862857f1d8",
+  "run_id": "run-9c86ea55-1217-466c-823d-2a139162b75b",
+  "fault_injection": "仅本轮独立audit Run，逐项注入后立即恢复原始字节",
+  "tests": [
+    {
+      "file": "summary.json",
+      "before_sha256": "92121df48e633b40e4e7ef7207eccbd0b05045f4967bb5777caf3c9ffe9b4f77",
+      "during_completed": false,
+      "runtime_verified": false,
+      "business_verified": false,
+      "reasons": [
+        "Run 封存或原始证据不可验证：对照 Run summary.json 摘要不匹配"
+      ],
+      "restored": true
+    },
+    {
+      "file": "results.jsonl",
+      "before_sha256": "1eb7dc39939af052015614b7e1862c00c4cf5edad5c9b598787e487abc477019",
+      "during_completed": false,
+      "runtime_verified": false,
+      "business_verified": false,
+      "reasons": [
+        "Run 封存或原始证据不可验证：对照 Run results.jsonl 摘要不匹配"
+      ],
+      "restored": true
+    },
+    {
+      "file": "analysis.json",
+      "before_sha256": "92202ff9135fe920650ab55ab4d4395bc90c31c76f93277150f882f8be4031fd",
+      "during_completed": false,
+      "runtime_verified": false,
+      "business_verified": false,
+      "reasons": [
+        "Run 封存或原始证据不可验证：对照 Run analysis.json 摘要不匹配"
+      ],
+      "restored": true
+    },
+    {
+      "file": "report.md",
+      "before_sha256": "fdfe86f391b9cfc12504a634161440522763796caaf4e12d03ed52a2821ad727",
+      "during_completed": false,
+      "runtime_verified": false,
+      "business_verified": false,
+      "reasons": [
+        "Run 封存或原始证据不可验证：对照 Run report.md 摘要不匹配"
+      ],
+      "restored": true
+    },
+    {
+      "file": "evidence/U-MIGRATE-001/trace.jsonl",
+      "during_completed": false,
+      "reasons": [
+        "U-MIGRATE-001 缺少原始执行证据 trace.jsonl",
+        "U-MIGRATE-001 缺少真实装载和响应观察"
+      ],
+      "restored": true
+    }
+  ],
+  "after": {
+    "operation_id": "migration-a7423dfa-9ac7-45e0-ae1e-c80cc3e2e00c",
+    "state": "published",
+    "agent_id": "audit-e2e-migrate",
+    "experiment_id": "EXP-audit-e2e-migrate-001-r21862857f1d8",
+    "published": true,
+    "candidate_sha256": "51269b9d49367c34ccaebbfe8167de298ae00ab3d79dbacfe21c240253c39fc5",
+    "candidate_changed_since_migration": false,
+    "source": {
+      "source_id": "source-8ceac24a-4261-4d3d-916f-32a4763b0384",
+      "fingerprint": "96fe3cf876f27b86ccde095e477d67f1ecf82667b09b95da8486bbede39cad6c",
+      "provenance": {
+        "kind": "text",
+        "name": "role.md",
+        "version": null
+      },
+      "frameworks": [],
+      "versions": {}
+    },
+    "receipt_path": "evolution/experiments/EXP-audit-e2e-migrate-001-r21862857f1d8/evaluation/evidence/migration.json",
+    "mapping": [
+      {
+        "source": "role.md",
+        "target": "dsh/workspace/AGENTS.md",
+        "status": "converted"
+      }
+    ],
+    "uncovered": [],
+    "scope_limitations": [],
+    "unresolved_items": [],
+    "required_case_ids": [
+      "U-MIGRATE-001"
+    ],
+    "resolution": {
+      "status": "none",
+      "resolutions": []
+    },
+    "build": {
+      "verified": false,
+      "reasons": [
+        "尚未构建该 Managed TypeScript 入口"
+      ],
+      "receipts": []
+    },
+    "instances": [
+      {
+        "name": "analysis-1684dc45",
+        "source_id": "experiment:EXP-audit-e2e-migrate-001-r21862857f1d8",
+        "recorded_status": null,
+        "live_verified": false,
+        "note": "实例登记可读；实时运行状态由实例管理查询。"
+      },
+      {
+        "name": "audit-e2e-migrate-eval-f9be3aa1",
+        "source_id": "experiment:EXP-audit-e2e-migrate-001-r21862857f1d8",
+        "recorded_status": null,
+        "live_verified": false,
+        "note": "实例登记可读；实时运行状态由实例管理查询。"
+      }
+    ],
+    "runs": [
+      {
+        "run_id": "run-9c86ea55-1217-466c-823d-2a139162b75b",
+        "status": "completed",
+        "executor": "api",
+        "candidate_sha256": "51269b9d49367c34ccaebbfe8167de298ae00ab3d79dbacfe21c240253c39fc5",
+        "candidate_matches": true,
+        "effective_verdict": "passed",
+        "runtime_verified": true,
+        "business_verified": true,
+        "covered_case_ids": [
+          "U-MIGRATE-001"
+        ],
+        "reasons": [],
+        "path": "evolution/experiments/EXP-audit-e2e-migrate-001-r21862857f1d8/runs/run-9c86ea55-1217-466c-823d-2a139162b75b"
+      }
+    ],
+    "runtime_verified": true,
+    "business_verified": true,
+    "completed": true,
+    "verification_reasons": [],
+    "error": null,
+    "resumable": false,
+    "note": "当前 Candidate 的关键行为已由真实 DSH API Run 验证；完成范围以固定迁移回执和用例为准。"
+  }
+}

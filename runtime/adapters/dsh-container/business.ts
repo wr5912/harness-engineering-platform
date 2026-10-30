@@ -7,6 +7,8 @@ import { createBusinessRuntimePatch } from '../../../platform/plugin/src/busines
 import { platformGroupUrl } from '../../../platform/plugin/src/business-control/group-link.ts'
 import { businessGatewayEntry, checkBusinessGatewayEntry } from '../../../platform/plugin/src/business-control/entry.ts'
 import { mcpCredentialPaths } from '../../../platform/plugin/src/mcp/credential-path.ts'
+import { parseLocalCapabilities, type LocalModelRoute } from '../../../platform/plugin/src/business-control/local-capabilities.ts'
+export { parseLocalCapabilities, type LocalModelRoute } from '../../../platform/plugin/src/business-control/local-capabilities.ts'
 
 const programRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const require = createRequire(join(programRoot, 'platform/plugin/package.json'))
@@ -37,29 +39,12 @@ interface BusinessTarget {
   startupModes?: { identity_mode: 'development' | 'published'; access_mode: 'anonymous' | 'authenticated' }
 }
 
-interface LocalModelRoute { provider: string; model: string }
-function readLocalCapabilities(managed: string): { localTools: string[]; localModelRoutes: LocalModelRoute[] } {
+export function readLocalCapabilities(managed: string): { localTools: string[]; localModelRoutes: LocalModelRoute[] } {
   const path = join(managed, 'role-tool-matrix.yaml')
   if (!existsSync(path)) return { localTools: [], localModelRoutes: [] }
   const state = lstatSync(path)
   if (!state.isFile() || state.size > 64 * 1024) throw new Error('业务本地能力声明必须是受控普通文件')
-  const value = yaml.load(readFileSync(path, 'utf8')) as any
-  const declared = value?.runtime_capabilities
-  if (declared === undefined) return { localTools: [], localModelRoutes: [] }
-  const namePattern = /^[A-Za-z][A-Za-z0-9_-]{0,127}$/
-  const providerPattern = /^[A-Za-z0-9][A-Za-z0-9._:/+@-]{0,255}$/
-  const modelPattern = /^[A-Za-z0-9/][A-Za-z0-9._:/+@-]{0,255}$/
-  const tools = declared?.local_tools, routes = declared?.local_model_routes
-  if (!declared || Array.isArray(declared) || Object.keys(declared).sort().join(',') !== 'local_model_routes,local_tools'
-    || !Array.isArray(tools) || tools.length > 32 || tools.some(name => typeof name !== 'string' || !namePattern.test(name))
-    || new Set(tools).size !== tools.length || !Array.isArray(routes) || routes.length > 16
-    || routes.some(route => !route || Array.isArray(route) || Object.keys(route).sort().join(',') !== 'model,provider'
-      || typeof route.provider !== 'string' || !providerPattern.test(route.provider)
-      || typeof route.model !== 'string' || !modelPattern.test(route.model))
-    || new Set(routes.map(route => `${route.provider}\0${route.model}`)).size !== routes.length) {
-    throw new Error('业务本地能力声明无效')
-  }
-  return { localTools: tools, localModelRoutes: routes }
+  return parseLocalCapabilities(readFileSync(path, 'utf8'))
 }
 
 /** 固定实际装载资产的内容身份；依赖按其锁文件纳入，安装缓存不回流资产。 */

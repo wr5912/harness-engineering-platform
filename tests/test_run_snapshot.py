@@ -45,7 +45,8 @@ def evaluation_text(case_id: str, stage: str) -> str:
 """
 
 
-def recorded_run(module, repo: Path, external_fixture: bytes | None = None) -> tuple[Path, dict]:
+def recorded_run(module, repo: Path, external_fixture: bytes | None = None,
+                 role_fixture: bytes | None = None) -> tuple[Path, dict]:
     experiment = fixtures.write_minimal_experiment(repo)
     if external_fixture is not None:
         fixture = experiment / "candidate/dsh/managed/compute-workflow/fixtures.json"
@@ -55,9 +56,12 @@ def recorded_run(module, repo: Path, external_fixture: bytes | None = None) -> t
         folder = experiment / "candidate" / name
         folder.mkdir()
         (folder / "role.md").write_text("基本测试角色。\n", encoding="utf-8")
+    if role_fixture is not None:
+        (experiment / "candidate/managed/role-tool-matrix.yaml").write_bytes(role_fixture)
     contract = {
         "source_id": f"experiment:{experiment.name}", "source_kind": "experiment",
         "experiment_id": experiment.name, "agent_id": "example-agent",
+        "candidate_root": str(experiment / "candidate/dsh"),
         **{name: str(experiment / "candidate" / name) for name in ("workspace", "presets", "managed")},
         "config_markers": [], "required_env_names": [], "optional_env_names": [],
     }
@@ -80,6 +84,49 @@ def recorded_run(module, repo: Path, external_fixture: bytes | None = None) -> t
 
 
 class FrozenRunSnapshotTests(unittest.TestCase):
+    def test_managed_role_snapshot_freezes_original_bytes_and_reuses_harness_digest(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            module = load_module(fixtures.RUN_RECORD, "managed_role_snapshot")
+            original = '# 原始本地声明\r\nruntime_capabilities:\r\n  local_tools: []\r\n  local_model_routes: []\r\n'.encode()
+            run_dir, contract = recorded_run(module, Path(temporary), role_fixture=original)
+            inputs = json.loads((run_dir / "inputs.lock.json").read_bytes())
+            self.assertEqual(inputs["managed_role_snapshot"], "evidence/managed/role-tool-matrix.yaml")
+            frozen = run_dir / inputs["managed_role_snapshot"]
+            self.assertEqual(frozen.read_bytes(), original)
+            entry = next(item for item in inputs["harness_trees"]["managed"]["files"]
+                         if item["path"] == "role-tool-matrix.yaml")
+            self.assertEqual((entry["size"], entry["sha256"]), (len(original), hashlib.sha256(original).hexdigest()))
+            Path(contract["managed"], "role-tool-matrix.yaml").write_bytes(b"later change\n")
+            self.assertEqual(frozen.read_bytes(), original)
+
+    def test_managed_role_snapshot_rejects_changes_after_tree_lock_without_partial_run(self) -> None:
+        for mutation in ("content", "missing", "symlink", "added"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as temporary:
+                repo = Path(temporary)
+                module = load_module(fixtures.RUN_RECORD, "managed_role_race")
+                original = b"runtime_capabilities: {}\n"
+                digest = module.tree_digest
+
+                def lock_then_change(root, path):
+                    result = digest(root, path)
+                    if path.name == "managed":
+                        role = path / "role-tool-matrix.yaml"
+                        if mutation in {"missing", "symlink"}:
+                            role.unlink()
+                        if mutation in {"content", "added"}:
+                            role.write_bytes(original.replace(b"{}", b"[]"))
+                        elif mutation == "symlink":
+                            external = repo / "outside.yaml"
+                            external.write_bytes(original)
+                            role.symlink_to(external)
+                    return result
+
+                with mock.patch.object(module, "tree_digest", side_effect=lock_then_change), \
+                        self.assertRaisesRegex(ValueError, "本地能力声明"):
+                    recorded_run(module, repo, role_fixture=None if mutation == "added" else original)
+                experiment = next((repo / "evolution/experiments").iterdir())
+                self.assertEqual(list((experiment / "runs").iterdir()), [])
+
     def test_experiment_index_skips_ignored_residue_but_reports_missing_visible_manifest(self) -> None:
         module = load_module(fixtures.RUN_RECORD, "ignored_experiment_residue")
         with tempfile.TemporaryDirectory() as temporary:
@@ -166,6 +213,8 @@ class FrozenRunSnapshotTests(unittest.TestCase):
             locked = json.loads((run_dir / "inputs.lock.json").read_text(encoding="utf-8"))
             self.assertNotIn("external_inputs", locked)
             self.assertFalse((run_dir / "evidence/external-inputs.json").exists())
+            self.assertNotIn("managed_role_snapshot", locked)
+            self.assertFalse((run_dir / "evidence/managed/role-tool-matrix.yaml").exists())
 
     def test_run_records_program_and_asset_versions_separately(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -182,7 +231,10 @@ class FrozenRunSnapshotTests(unittest.TestCase):
             self.assertEqual(inputs["harness_review"], {"schema_version": 1, "generated": [], "sources": []})
             for name in ("harness-runtime.mts", "platform/plugin/src/agents/asset-build.ts",
                          "platform/plugin/src/agents/asset-build-core.ts", "platform/plugin/src/agents/asset-dependencies.ts",
-                         "platform/plugin/src/models/harness-runtime.ts"):
+                         "platform/plugin/src/models/harness-runtime.ts", "business.ts",
+                         "platform/plugin/src/agents/compute-variants.ts",
+                         "platform/plugin/src/evaluation/jobs.ts", "platform/plugin/src/evaluation/model-usage.ts",
+                         "platform/plugin/src/evaluation/model-attempts.ts", "platform/plugin/src/business-control/local-capabilities.ts"):
                 self.assertRegex(inputs["evaluation_implementation"][name], r"^[a-f0-9]{64}$")
 
     def test_build_review_bridge_failure_or_candidate_mismatch_keeps_full_text_contract(self) -> None:
@@ -277,6 +329,7 @@ class FrozenRunSnapshotTests(unittest.TestCase):
             contract = {
                 "source_id": f"experiment:{experiment.name}", "source_kind": "experiment",
                 "experiment_id": experiment.name, "agent_id": "example-agent",
+                "candidate_root": str(experiment / "candidate/dsh"),
                 "workspace": str(experiment / "candidate"), "presets": str(experiment / "candidate"),
                 "managed": str(experiment / "candidate"), "config_markers": [],
                 "required_env_names": [], "optional_env_names": [],
