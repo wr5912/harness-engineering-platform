@@ -55,11 +55,19 @@ export const homePageTheme = `
 .harness-stat span{color:var(--hep-text);font-size:13px;font-weight:500}
 .harness-stat strong{grid-column:2;grid-row:1;font-size:13px;font-weight:500;line-height:1.5;color:var(--hep-text);white-space:nowrap}.harness-stat[data-value-kind=number] strong{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2;letter-spacing:-.025em}.harness-stat[data-value-kind=unknown] strong{font-size:18px;font-weight:400;color:var(--hep-muted)}.harness-stat[data-value-kind=status] strong{padding:3px 7px;border-radius:5px;background:var(--hep-surface-muted)}
 .harness-stat small{grid-column:1/-1;font-size:12px;line-height:1.5;color:var(--hep-muted)}
-.harness-start-guide{position:relative;background:linear-gradient(145deg,var(--hep-surface),var(--hep-primary-soft));border-color:color-mix(in srgb,var(--hep-primary) 14%,var(--hep-border));overflow:hidden}.harness-start-guide::after{content:"";position:absolute;right:-28px;top:-28px;width:112px;height:112px;border:1px solid color-mix(in srgb,var(--hep-primary) 10%,transparent);border-radius:50%;box-shadow:0 0 0 18px color-mix(in srgb,var(--hep-primary) 3%,transparent);pointer-events:none}
-.harness-guide-icon{display:grid;place-items:center;width:36px;height:36px;margin-bottom:16px;border:1px solid color-mix(in srgb,var(--hep-primary) 10%,var(--hep-border));border-radius:10px;background:var(--hep-surface);color:var(--hep-link);font-size:26px;box-shadow:0 2px 5px color-mix(in srgb,var(--hep-primary) 4%,transparent)}
+.harness-start-guide{position:relative;display:flex;flex-direction:column;background:linear-gradient(145deg,var(--hep-surface),var(--hep-primary-soft));border-color:color-mix(in srgb,var(--hep-primary) 14%,var(--hep-border));overflow:hidden}.harness-start-guide::after{content:"";position:absolute;right:-28px;top:-28px;width:112px;height:112px;border:1px solid color-mix(in srgb,var(--hep-primary) 10%,transparent);border-radius:50%;box-shadow:0 0 0 18px color-mix(in srgb,var(--hep-primary) 3%,transparent);pointer-events:none}
+.harness-guide-icon{display:grid;place-items:center;flex:none;width:36px;height:36px;margin-bottom:12px;border:1px solid color-mix(in srgb,var(--hep-primary) 10%,var(--hep-border));border-radius:10px;background:var(--hep-surface);color:var(--hep-link);font-size:26px;box-shadow:0 2px 5px color-mix(in srgb,var(--hep-primary) 4%,transparent)}
 .harness-start-guide h2{margin:0;font-size:17px;line-height:1.45}
-.harness-start-guide>p{margin:10px 0 16px;color:var(--hep-muted);font-size:13px;line-height:1.7}
-.harness-platform .harness-guide-action{color:var(--hep-link);border-color:transparent;background:color-mix(in srgb,var(--hep-primary) 10%,var(--hep-surface));font-weight:600}
+.harness-start-guide>p{margin:8px 0 0;color:var(--hep-muted);font-size:13px;line-height:1.7}
+.harness-guide-steps{display:grid;flex:none;gap:12px;margin:18px 0 20px;padding:0;list-style:none}
+.harness-guide-steps>li{display:grid;grid-template-columns:24px minmax(0,1fr);align-items:start;gap:10px}
+.harness-guide-steps>li>span{display:grid;place-items:center;height:24px;border-radius:6px;background:var(--hep-primary-soft);color:var(--hep-link);font-size:11px;font-weight:600;font-variant-numeric:tabular-nums}
+.harness-guide-steps strong{font-size:13px;font-weight:600;line-height:1.5}.harness-guide-steps p{margin:3px 0 0;color:var(--hep-muted);font-size:12px;line-height:1.65}
+.harness-guide-actions{display:grid;flex:none;gap:8px;margin-top:auto;padding-top:4px}
+.harness-platform .harness-guide-action{display:flex;align-items:center;justify-content:center;width:100%;min-height:max(40px,var(--hep-hit-target));padding:9px 12px;color:#fff;border-color:var(--hep-primary);background:var(--hep-primary);font-size:13px;font-weight:600}
+.harness-platform .harness-guide-action:hover:enabled{background:var(--hep-primary-hover);border-color:var(--hep-primary-hover)}
+.harness-start-guide .harness-example-toggle{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;min-height:max(32px,var(--hep-hit-target));margin:0;padding:6px 12px;font-size:12px}
+.harness-start-guide>.harness-example{flex:none}
 .harness-home .harness-run-row:last-child{border-bottom:0;padding-bottom:0}
 .harness-home .harness-run-row>div>small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .harness-home .harness-run-row{padding:12px 0}
@@ -67,11 +75,11 @@ export const homePageTheme = `
 .harness-run-row>.harness-run-labels{display:flex;align-items:center;gap:8px;flex:0 0 auto;flex-wrap:wrap}
 .harness-platform .harness-run-action{flex-shrink:0;padding:6px 8px;min-height:36px;border-color:transparent;background:transparent;color:var(--hep-link);font-size:12px;white-space:nowrap}
 .harness-platform .harness-run-action:hover:enabled{background:var(--hep-primary-soft);color:var(--hep-link)}
-.harness-home-run-overview{min-width:0;margin:0 0 20px;padding:0 0 20px;border-bottom:1px solid var(--hep-border)}
+.harness-home-run-overview{min-width:0;margin:0 0 12px;padding:0 0 12px;border-bottom:1px solid var(--hep-border)}
 .harness-home .harness-home-run-table .harness-run-row{display:table-row}.harness-home-run-table td{padding:14px 12px;vertical-align:middle}.harness-home-run-table th{font-size:12px;padding:10px 12px}.harness-home-run-table td:first-child{min-width:180px}.harness-home-run-table td small{display:block;color:var(--hep-muted);font-size:12px;margin-top:5px}.harness-home-run-table .harness-run-state{white-space:nowrap}
 @media(max-width:680px){.harness-home-run-table thead{display:none}.harness-home-run-table tbody,.harness-home .harness-home-run-table .harness-run-row{display:block}.harness-home-run-table td{display:grid;grid-template-columns:80px minmax(0,1fr);align-items:start;border:0;padding:7px 0}.harness-home-run-table td::before{content:attr(data-label);color:var(--hep-muted);font-size:12px}.harness-home-run-table td small{grid-column:2}.harness-home-run-table td:first-child{min-width:0}.harness-home-run-table td strong{white-space:normal}.harness-home-run-table td .harness-run-state{justify-self:start}.harness-home-run-table td .harness-run-action{justify-self:start;grid-column:2;padding:0}}
-/* 每列按真实内容排布，任务较少时最近评测仍可向上接续。 */
-@media(min-width:1101px){.harness-home-workspace{align-items:start}.harness-continue>.harness-section-heading,.harness-workspace-summary>.harness-section-heading{align-items:flex-start;min-height:48px;margin:0 0 12px}.harness-continue-item,.harness-platform .harness-workspace-summary .harness-stat{box-sizing:border-box;min-height:78px;padding:12px 0}}
+/* 桌面两列共享行高，卡片随内容增高并保持上下边缘对齐。 */
+@media(min-width:1101px){.harness-home-workspace{align-items:stretch}.harness-home-primary,.harness-home-secondary{grid-row:span 2;grid-template-rows:subgrid}.harness-continue>.harness-section-heading,.harness-workspace-summary>.harness-section-heading{align-items:flex-start;min-height:48px;margin:0 0 12px}.harness-continue-item,.harness-platform .harness-workspace-summary .harness-stat{box-sizing:border-box;min-height:78px;padding:12px 0}}
 @media(prefers-reduced-motion:no-preference){.harness-example{animation:hep-enter var(--hep-motion) var(--hep-ease)}}
 @media(hover:hover) and (prefers-reduced-motion:no-preference){.harness-platform .harness-stat:hover:enabled{background:var(--hep-surface-muted)}}
 @media(min-width:1101px){.harness-home{--hep-page-padding:36px}}

@@ -73,11 +73,12 @@ export const agentPageTheme = `
 .agent-evaluation-summary{padding:20px 0;margin:20px 0;border:0;border-top:1px solid var(--hep-border);border-bottom:1px solid var(--hep-border);border-radius:0;background:transparent}
 .agent-evaluation-summary .agent-section-heading{margin-bottom:10px}.agent-evaluation-summary p{margin:8px 0;line-height:1.6}
 .agent-overview-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.agent-overview-charts{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,.95fr) minmax(0,1.4fr);grid-template-rows:auto auto;gap:12px 20px;margin:20px 0}
-.agent-overview-charts>:is(.hep-overview-chart,.hep-overview-sequence){display:grid;grid-row:span 2;grid-template-rows:subgrid;gap:12px;min-width:0}
+.agent-overview-charts{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,.95fr) minmax(0,1.4fr);align-items:start;gap:16px;margin:12px 0}
+.agent-overview-charts>.hep-overview-sequence{display:grid;gap:8px}
 .agent-overview-charts .hep-overview-chart-body{align-content:start;align-items:start}
-.agent-overview-charts>.hep-overview-sequence>ol{margin:0;align-self:start}
-.agent-case-trend-body{display:grid;align-content:start;min-width:0;width:100%;max-width:420px}
+.agent-overview-charts>.hep-overview-sequence>ol{margin:0}
+.agent-case-trend-body{display:grid;align-content:start;min-width:0;width:100%;max-width:320px}
+@media(pointer:coarse){.agent-case-trend-body{max-width:420px}}
 .agent-case-trend-body>svg{display:block;width:100%;height:auto;overflow:visible}
 .agent-case-trend-axis line{stroke:var(--hep-border);stroke-width:1}
 .agent-case-trend-axis text{fill:var(--hep-muted);font-size:14px;text-anchor:end}
@@ -86,10 +87,10 @@ export const agentPageTheme = `
 .agent-case-trend-body [data-series] circle{fill:var(--hep-chart-color);stroke:var(--hep-surface);stroke-width:1}
 .agent-case-trend-dates{display:grid;min-width:0;list-style:none;padding:0 3.125% 0 8.75%;margin:0;gap:0}
 .agent-case-trend-dates>li{min-width:0}
-.harness-platform .agent-case-trend-dates button,.agent-case-trend-dates>li>span{display:block;width:100%;min-width:0;min-height:44px;padding:3px 1px;box-sizing:border-box;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--hep-text);font-size:11px;line-height:1.5;text-align:center;overflow-wrap:anywhere}
+.harness-platform .agent-case-trend-dates button,.agent-case-trend-dates>li>span{display:block;width:100%;min-width:0;min-height:max(36px,var(--hep-hit-target));padding:2px 1px;box-sizing:border-box;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--hep-text);font-size:11px;line-height:1.5;text-align:center;overflow-wrap:anywhere}
 .harness-platform .agent-case-trend-dates button:hover{border-color:var(--hep-border);background:var(--hep-surface-muted)}
 .agent-case-trend-dates small{display:block;color:var(--hep-muted);font-size:11px;line-height:1.5}
-.agent-case-trend-legend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;list-style:none;padding:0;margin:8px 0 0}
+.agent-case-trend-legend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;list-style:none;padding:0;margin:6px 0 0}
 .agent-case-trend-legend>li{display:inline-flex;align-items:center;gap:4px;font-size:12px;line-height:1.5;white-space:nowrap}
 .agent-case-trend-legend svg{flex:none;overflow:visible}.agent-case-trend-legend line{stroke:var(--hep-chart-color);stroke-width:1.7}.agent-case-trend-legend strong{font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
 .agent-evaluation-summary .agent-case-trend-note{color:var(--hep-muted);font-size:12px;line-height:1.6;margin:6px 0 0}
@@ -102,7 +103,7 @@ export const agentPageTheme = `
 .agent-evaluation-summary .agent-overview-latest-scope{font-size:12px;color:var(--hep-muted);line-height:1.7;margin:8px 0 0}
 .agent-deployment-dialog{width:min(680px,calc(100vw - 32px))}.agent-deployment-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.agent-deployment-url{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;display:block}.agent-deployment-issues{display:grid;gap:8px;padding-left:20px}.agent-deployment-download{display:inline-flex;text-decoration:none;padding:9px 16px;border-radius:6px}.agent-deployment-dialog .agent-dialog-body{display:grid;gap:14px}@media(max-width:560px){.agent-deployment-grid{grid-template-columns:1fr}}
 @media(max-width:1100px){.agent-overview-charts{grid-template-columns:repeat(2,minmax(0,1fr))}.agent-overview-charts>[data-variant=case-trend]{grid-column:1/-1}}
-@media(max-width:680px){.agent-overview-charts{grid-template-columns:minmax(0,1fr);grid-template-rows:none;gap:20px}.agent-overview-charts>:is(.hep-overview-chart,.hep-overview-sequence){grid-row:auto;grid-template-rows:auto 1fr}.agent-overview-charts>[data-variant=case-trend]{grid-column:auto}.agent-evaluation-summary>.agent-section-heading{flex-direction:column;gap:10px}.agent-overview-actions{width:100%;justify-content:space-between}}
+@media(max-width:680px){.agent-overview-charts{grid-template-columns:minmax(0,1fr);gap:16px}.agent-overview-charts>[data-variant=case-trend]{grid-column:auto}.agent-evaluation-summary>.agent-section-heading{flex-direction:column;gap:10px}.agent-overview-actions{width:100%;justify-content:space-between}}
 .agent-result-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.agent-result-status>span,.agent-result-cases>li>span{display:inline-flex;align-items:center;padding:4px 8px;border-radius:6px;background:var(--hep-surface);border:1px solid var(--hep-border);font-size:12px}.agent-result-status>span[data-status=failed],.agent-result-cases>li>span[data-status=failed]{color:var(--hep-danger);border-color:var(--hep-danger)}.agent-result-status>span[data-status=passed]{color:var(--hep-success);border-color:var(--hep-success)}.agent-result-status>span[data-status=inconclusive],.agent-result-cases>li>span[data-status=inconclusive]{color:var(--hep-warning);border-color:var(--hep-warning)}.agent-result-status small{color:var(--hep-muted);font-size:12px}
 .agent-result-cases{display:grid;gap:8px;list-style:none;margin:10px 0 0;padding:0}.agent-result-cases li{display:flex;align-items:center;gap:8px;min-width:0}.agent-result-cases strong{font-size:13px;font-weight:500;overflow-wrap:anywhere}.agent-result-cases small{margin-left:auto;color:var(--hep-muted);font-size:12px;white-space:nowrap}
 .agent-feature-list{display:grid;gap:0}.agent-feature-list article{padding:16px 0;border-bottom:1px solid var(--hep-border);min-width:0}.agent-feature-list article:first-child{padding-top:0}.agent-feature-list article:last-child{border-bottom:0;padding-bottom:0}

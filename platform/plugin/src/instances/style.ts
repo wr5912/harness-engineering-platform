@@ -28,14 +28,14 @@ export const instanceTheme = `
 .instance-search-field,.instance-filter-field{gap:0;font-size:0;line-height:0}
 .instance-search-field .instance-field-input,.instance-filter-field .instance-field-input{font-size:14px;line-height:1.4}
 .instance-filter-panel{padding:20px;margin-bottom:20px;border-radius:var(--hep-radius)}
-.instance-state-overview{min-width:0;margin-top:24px;padding-top:20px;border-top:1px solid var(--hep-border)}
-.instance-state-overview .hep-overview-chart{gap:16px}
-.instance-state-overview .hep-overview-chart-legend{grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
-.harness-instances-page .instance-state-overview .hep-overview-chart-legend>li>button{grid-template-columns:8px minmax(0,1fr);gap:8px;padding:14px 16px;border:1px solid var(--hep-border);border-radius:var(--hep-control-radius);background:var(--hep-surface)}
+.instance-state-overview{min-width:0;margin-top:16px;padding-top:16px;border-top:1px solid var(--hep-border)}
+.instance-state-overview .hep-overview-chart{gap:8px}
+.instance-state-overview .hep-overview-chart-legend{grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.harness-instances-page .instance-state-overview .hep-overview-chart-legend>li>button{grid-template-columns:8px minmax(0,1fr) auto;gap:6px 8px;padding:10px 12px;border:1px solid var(--hep-border);border-radius:var(--hep-control-radius);background:var(--hep-surface)}
 .harness-instances-page .instance-state-overview .hep-overview-chart-legend>li>button:hover{border-color:color-mix(in srgb,var(--hep-primary) 45%,var(--hep-border));background:var(--hep-primary-soft)}
 .harness-instances-page .instance-state-overview .hep-overview-chart-legend>li>button[aria-pressed=true]{border-color:var(--hep-primary);background:var(--hep-primary-soft);box-shadow:0 0 0 1px color-mix(in srgb,var(--hep-primary) 10%,transparent)}
-.instance-state-overview .hep-overview-chart-legend strong{grid-column:1/-1;grid-row:2;font-size:26px;line-height:1.25;letter-spacing:-.03em;margin-top:2px}
-.instance-state-overview .hep-overview-bar-track{grid-column:1/-1;margin-top:4px;height:3px}
+.instance-state-overview .hep-overview-chart-legend strong{grid-column:3;grid-row:1;font-size:22px;line-height:1.25;letter-spacing:-.03em;margin:0}
+.instance-state-overview .hep-overview-bar-track{grid-column:1/-1;margin-top:2px;height:3px}
 .instance-filter-row{align-items:center;justify-content:flex-start;gap:12px}.instance-toolbar-actions{display:flex;align-items:center;gap:8px;flex:none}.harness-instances-page .instance-filter-row :is(button,.instance-field-input){box-sizing:border-box;height:40px;min-height:max(40px,var(--hep-hit-target))}
 .instance-filter-field{min-width:min(100%,180px);flex:1 1 180px}
 .instance-search-field{flex:1.35 1 300px;min-width:min(100%,220px)}
@@ -164,8 +164,8 @@ export const instanceTheme = `
 @media(max-width:680px){
   .harness-instances-page{padding-top:20px;padding-bottom:20px}
 .instance-state-overview .hep-overview-chart-legend{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-.harness-instances-page .instance-state-overview .hep-overview-chart-legend>li>button{padding:12px}
-.instance-state-overview .hep-overview-chart-legend strong{font-size:23px}
+.harness-instances-page .instance-state-overview .hep-overview-chart-legend>li>button{padding:10px}
+.instance-state-overview .hep-overview-chart-legend strong{font-size:20px}
 .harness-instances-page .instance-page-heading h1{font-size:23px}
   .instance-filter-panel,.instance-detail-header,.instance-detail-body{padding:16px}
   .instance-list-heading{padding:16px}
