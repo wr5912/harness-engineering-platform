@@ -121,7 +121,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['features/read-source', 'experiment_id ref', '先省略 ref 获取来源文件，再逐个读取。'],
     ['features/preview', 'experiment_id features', '固定目标特性整理任务自动保存并回读；保留证据和未验证边界，不需人工确认。'],
     ['features/proposal', 'experiment_id'], ['features/apply fusion/confirm datasets/apply', 'preview_id', '此操作由既有确认或固定目标专项保存流程办理；不要绕过原预览身份。'],
-    ['fusion/preview', 'agent_id parent_experiment_id parent_ref research_question plan', '先省略 plan 读取 inventory。融合 plan={sources:[{experiment_id,ref,decision:inherit/omit,reason}],features,conflicts:[{description,resolution}],checks:[{id,kind:build/load/capability,command?,cwd?,case_ids?}],evaluation_case_ids,evaluation_sha256}；来源和评测摘要使用实际读取值。'],
+    ['fusion/preview', 'agent_id parent_experiment_id parent_ref research_question plan', '先省略 plan 读取 inventory。融合 plan={sources:[{experiment_id,ref,decision:inherit/omit,reason}],features,conflicts:[{description,resolution}],checks:[{id,kind:build/load/capability,command?,cwd?,case_ids?}],evaluation_case_ids,evaluation_sha256}；command 是 argv 数组，如 ["node","--check","candidate/plugin.mjs"]，不经过 shell，不能把整行命令作为一个数组元素；来源和评测摘要使用实际读取值。'],
     ['fusion/proposal', 'agent_id parent_experiment_id'], ['fusion/status', 'experiment_id'],
     ['fusion/finalize', 'experiment_id expected_candidate_sha256', '完成前读取 fusion/status 的当前 Candidate 摘要；所选构建、装载与能力验证回执都须对应这一摘要。'],
     ['fusion/verify', 'experiment_id expected_candidate_sha256 check_id run_id'],
