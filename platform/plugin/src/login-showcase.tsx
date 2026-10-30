@@ -1,82 +1,170 @@
-function ShowcaseIcon({ kind, size = 18 }: { kind: 'agent' | 'trace' | 'window' | 'code' | 'tools' | 'branch' | 'arrow'; size?: number }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    {kind === 'agent' ? <><rect x="5" y="6" width="14" height="13" rx="3" /><path d="M12 3v3M8 11h.01M16 11h.01M9 15h6M2 10v5m20-5v5" /></>
-      : kind === 'trace' ? <><path d="M7 4h13M7 12h13M7 20h13M3 4v16" /><circle cx="3" cy="4" r="1" /><circle cx="3" cy="12" r="1" /><circle cx="3" cy="20" r="1" /></>
-      : kind === 'window' ? <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18M7 6.5h.01M10 6.5h.01M8 13h8m-8 3h5" /></>
-      : kind === 'code' ? <><path d="m8 6-6 6 6 6m8-12 6 6-6 6m-3-15-2 18" /></>
-      : kind === 'tools' ? <><rect x="3" y="3" width="6" height="6" rx="1.5" /><rect x="15" y="15" width="6" height="6" rx="1.5" /><path d="M18 3v6m-3-3h6M3 18h6m-3-3v6M9 6h3v12h3" /></>
-      : kind === 'branch' ? <><circle cx="6" cy="5" r="2" /><circle cx="18" cy="6" r="2" /><circle cx="6" cy="19" r="2" /><path d="M6 7v10m0-5h5a7 7 0 0 0 7-4" /></>
-      : <path d="M4 12h16m-6-6 6 6-6 6" />}
-  </svg>
+import type { ReactNode } from 'react'
+
+type IconKind = 'agent' | 'chat' | 'folder' | 'document' | 'layers' | 'tools' | 'code' | 'window' | 'branch'
+
+function Icon({ kind, x, y, size = 24 }: { kind: IconKind; x: number; y: number; size?: number }) {
+  return <g transform={`translate(${x} ${y}) scale(${size / 24})`} className="login-scene-icon">
+    {kind === 'agent' ? <><rect x="4" y="5" width="16" height="15" rx="5" /><path d="M12 2v3M8 11v2m8-2v2m-8 3h8M1 10v6m22-6v6" /></>
+      : kind === 'chat' ? <><path d="M20 15a4 4 0 0 1-4 4H9l-6 3V7a4 4 0 0 1 4-4h9a4 4 0 0 1 4 4Z" /><path d="M7 8h9M7 12h6" /></>
+      : kind === 'folder' ? <><path d="M3 7V5a2 2 0 0 1 2-2h5l3 3h6a2 2 0 0 1 2 2v11H3Z" /><path d="M3 9h18" /></>
+      : kind === 'document' ? <><path d="M14 2H5v20h14V7Z" /><path d="M14 2v6h5M8 12h8m-8 4h6" /></>
+      : kind === 'layers' ? <><path d="m12 2 10 6-10 6L2 8Zm-10 10 10 6 10-6M2 16l10 6 10-6" /></>
+      : kind === 'tools' ? <><rect x="2" y="2" width="7" height="7" rx="2" /><rect x="15" y="15" width="7" height="7" rx="2" /><path d="M18.5 2v7M15 5.5h7M2 18.5h7M5.5 15v7M9 5.5h3v13h3" /></>
+      : kind === 'code' ? <><path d="m7 6-6 6 6 6m10-12 6 6-6 6m-3-16-4 20" /></>
+      : kind === 'window' ? <><rect x="2" y="3" width="20" height="18" rx="3" /><path d="M2 8h20M6 5.5h.01M9 5.5h.01M6 12h12m-12 4h8" /></>
+      : <><circle cx="6" cy="4" r="2" /><circle cx="18" cy="5" r="2" /><circle cx="6" cy="20" r="2" /><path d="M6 6v12m0-6h5a7 7 0 0 0 7-5" /></>}
+  </g>
+}
+
+function Surface({ x, y, width, height, children, main = false }: { x: number; y: number; width: number; height: number; children: ReactNode; main?: boolean }) {
+  return <g className={main ? 'login-scene-surface login-scene-main' : 'login-scene-surface'}>
+    <rect x={x} y={y} width={width} height={height} rx="16" />{children}
+  </g>
 }
 
 function BuildScene() {
   return <>
-    <div className="login-showcase-object"><span className="login-showcase-object-icon"><ShowcaseIcon kind="agent" /></span><div><strong>设备巡检助手</strong><span>智能体工作区</span></div><span className="login-showcase-outline">资产</span></div>
-    <div className="login-showcase-prompt"><span>业务目标</span><p>巡检设备与服务，整理异常与报告</p><i><ShowcaseIcon kind="arrow" size={14} /></i></div>
-    <div className="login-showcase-assets"><div><span><i />提示与技能</span><em>统一维护</em></div><div><span><i />检查工具</span><em>按需装配</em></div><div><span><i />验证用例</span><em>用于评测</em></div></div>
+    <path className="login-scene-link" d="M228 94h34q22 0 22 22v44h72M228 228h34q22 0 22-22v-46" />
+    <Surface x={60} y={48} width={168} height={88}><Icon kind="chat" x={78} y={66} /><text x="78" y="116">描述业务需求</text></Surface>
+    <Surface x={60} y={184} width={168} height={88}><Icon kind="folder" x={78} y={202} /><text x="78" y="252">迁入已有工程</text></Surface>
+    <rect className="login-scene-paper" x="344" y="82" width="184" height="172" rx="36" transform="rotate(-7 436 168)" />
+    <rect className="login-scene-agent-tile" x="360" y="64" width="184" height="172" rx="36" />
+    <g className="login-scene-inverse"><Icon kind="agent" x={414} y={98} size={76} /></g>
+    <text className="login-scene-inverse-label" x="452" y="209" textAnchor="middle">角色 · 技能 · 工具 · 模型</text>
+    <text className="login-scene-title" x="452" y="280" textAnchor="middle">专属智能体</text>
+    <text className="login-scene-caption" x="452" y="306" textAnchor="middle">构建 · 运行 · 任务验证</text>
+    <circle className="login-scene-node" cx="284" cy="160" r="6" />
   </>
 }
 
-function EvidenceScene() {
+function KnowledgeScene() {
   return <>
-    <div className="login-showcase-section"><strong>每一步，都有依据</strong><span>任务轨迹</span></div>
-    <div className="login-showcase-trace"><div><i /><span><strong>任务输入</strong><small>对象与检查范围</small></span><b>输入</b></div><div><i /><span><strong>工具调用</strong><small>参数与原始结果</small></span><b>过程</b></div><div><i /><span><strong>结果证据</strong><small>逐例查看与比较</small></span><b>证据</b></div></div>
-  </>
-}
-
-function RuntimeScene() {
-  return <>
-    <div className="login-showcase-section"><strong>让能力进入业务</strong><span>接入方式</span></div>
-    <div className="login-showcase-runtime"><div><ShowcaseIcon kind="window" size={22} /><strong>网页对话</strong><span>访问与嵌入</span></div><div><ShowcaseIcon kind="code" size={22} /><strong>应用内调用</strong><span>TypeScript SDK</span></div></div>
-    <div className="login-showcase-lifecycle"><span>实例生命周期</span><div><b>启动</b><i /><b>停止</b><i /><b>重启</b></div></div>
+    <path className="login-scene-link" d="M186 154h64M456 154h42q22 0 22-22v-22m-22 44q22 0 22 22v24" />
+    <g transform="rotate(-7 130 160)"><rect className="login-scene-paper" x="66" y="83" width="124" height="156" rx="12" /></g>
+    <Surface x={76} y={74} width={112} height={156}>
+      <Icon kind="document" x={96} y={94} size={30} /><path className="login-scene-rule" d="M98 145h66m-66 18h50m-50 18h60" /><text x="132" y="211" textAnchor="middle">业务文档</text>
+    </Surface>
+    <g className="login-scene-stack" transform="translate(353 160) rotate(-6)">
+      <rect className="login-scene-paper" x="-93" y="-101" width="186" height="214" rx="14" transform="rotate(-8)" />
+      <rect className="login-scene-paper" x="-93" y="-101" width="186" height="214" rx="14" transform="rotate(5)" />
+      <Surface x={-93} y={-101} width={186} height={214} main>
+        <path className="login-scene-rule" d="M-66-77H16m-82 11h55" />
+        <Icon kind="layers" x={-24} y={-35} size={48} />
+        <text className="login-scene-title" x="0" y="46" textAnchor="middle">知识资产</text>
+        <text className="login-scene-caption" x="0" y="79" textAnchor="middle">来源可追溯</text>
+      </Surface>
+    </g>
+    <circle className="login-scene-orbit" cx="530" cy="81" r="31" /><Icon kind="branch" x={518} y={69} /><text x="530" y="132" textAnchor="middle">继承</text>
+    <circle className="login-scene-orbit" cx="530" cy="221" r="31" /><Icon kind="layers" x={518} y={209} /><text x="530" y="273" textAnchor="middle">融合</text>
   </>
 }
 
 function ConnectionScene() {
   return <>
-    <div className="login-showcase-section"><strong>工具，连接为能力</strong><span>统一接入</span></div>
-    <div className="login-showcase-connections"><div className="login-showcase-sources"><span><ShowcaseIcon kind="code" size={16} />MCP 服务</span><span><ShowcaseIcon kind="window" size={16} />OpenAPI</span></div><svg className="login-showcase-inner-lines" viewBox="0 0 80 100" preserveAspectRatio="none"><path d="M0 24H26Q40 24 40 40V50H80M0 76H26Q40 76 40 60V50" /></svg><div className="login-showcase-hub"><ShowcaseIcon kind="agent" size={25} /><strong>智能体</strong></div></div>
-    <div className="login-showcase-tool-strip"><span>工具与资源</span><i /><span>分组与编排</span></div>
+    <circle className="login-scene-ring" cx="325" cy="160" r="116" />
+    <path className="login-scene-link" d="M186 92h28q27 0 43 27m-71 109h28q27 0 43-27M401 160h75" />
+    <rect className="login-scene-pill" x="68" y="66" width="118" height="52" rx="26" /><text className="login-scene-blue" x="127" y="98" textAnchor="middle">MCP</text>
+    <rect className="login-scene-pill" x="68" y="202" width="118" height="52" rx="26" /><text className="login-scene-blue" x="127" y="234" textAnchor="middle">OpenAPI</text>
+    <circle className="login-scene-hub" cx="325" cy="160" r="76" />
+    <Icon kind="agent" x={300} y={114} size={50} /><text className="login-scene-title" x="325" y="197" textAnchor="middle">智能体</text>
+    <g transform="translate(325 44)"><rect className="login-scene-pill" x="-22" y="-22" width="44" height="44" rx="12" /><Icon kind="tools" x={-12} y={-12} /></g>
+    <g transform="translate(325 276)"><rect className="login-scene-pill" x="-22" y="-22" width="44" height="44" rx="12" /><Icon kind="branch" x={-12} y={-12} /></g>
+    <g transform="translate(487 106)">
+      <rect className="login-scene-paper" width="96" height="104" rx="16" />
+      {[0, 1, 2, 3].map(i => <rect key={i} className="login-scene-tile" x={14 + i % 2 * 38} y={16 + Math.floor(i / 2) * 38} width="30" height="30" rx="8" />)}
+    </g>
+    <text x="535" y="242" textAnchor="middle">业务系统</text>
+    <circle className="login-scene-node" cx="441" cy="160" r="5" />
   </>
 }
 
-/** 原创能力示意：展示工作方式，不呈现账号状态或未经测量的效果数据。 */
+function EvaluationScene() {
+  return <>
+    <path className="login-scene-link" d="M212 72h226q30 0 30 30v116q0 30-30 30H212q-30 0-30-30V102q0-30 30-30Z" />
+    <path className="login-scene-arrow" d="m318 66 7 6-7 6m20 164-7 6 7 6" />
+    <circle className="login-scene-orbit" cx="325" cy="160" r="54" /><Icon kind="branch" x={309} y={127} size={32} /><text x="325" y="188" textAnchor="middle">持续改进</text>
+    <Surface x={80} y={40} width={174} height={92}><Icon kind="document" x={99} y={58} /><text x="99" y="110">业务用例</text></Surface>
+    <Surface x={398} y={40} width={174} height={92}><Icon kind="code" x={417} y={58} /><text x="417" y="110">执行与证据</text></Surface>
+    <Surface x={80} y={196} width={174} height={92}><Icon kind="chat" x={99} y={214} /><text x="99" y="266">问题与修改</text></Surface>
+    <Surface x={398} y={196} width={174} height={92}><Icon kind="layers" x={417} y={214} /><text x="417" y="266">版本比较</text></Surface>
+  </>
+}
+
+function ComputeScene() {
+  return <>
+    <path className="login-scene-link" d="M178 160h36q24 0 24-24V94q0-22 22-22h24m-70 88q24 0 24 24v42q0 22 22 22h24M478 72h28q24 0 24 24v128q0 24-24 24h-28M530 160h24" />
+    <circle className="login-scene-orbit" cx="123" cy="160" r="55" /><Icon kind="branch" x={108} y={125} size={30} /><text x="123" y="191" textAnchor="middle">固定父版</text>
+    <Surface x={284} y={32} width={194} height={96} main><Icon kind="agent" x={304} y={51} /><text x="304" y="104">中算力 · 模型协同</text></Surface>
+    <Surface x={284} y={200} width={194} height={96} main><Icon kind="code" x={304} y={219} /><text x="304" y="272">低算力 · 代码执行</text></Surface>
+    <circle className="login-scene-node" cx="214" cy="160" r="5" />
+    <text className="login-scene-caption" x="381" y="166" textAnchor="middle">样本 · 训练 · 部署</text>
+    <text className="login-scene-blue" x="570" y="149" textAnchor="middle">比较</text><text className="login-scene-blue" x="570" y="174" textAnchor="middle">验证</text>
+  </>
+}
+
+function DeliveryScene() {
+  return <>
+    <path className="login-scene-link" d="M246 118v24q0 16 16 16h128q16 0 16 16v24M456 118v24q0 16-16 16H262q-16 0-16 16v24" />
+    <text className="login-scene-caption" x="60" y="85">使用</text><text className="login-scene-caption" x="60" y="242">交付</text>
+    <Surface x={156} y={26} width={180} height={92} main><Icon kind="window" x={176} y={48} size={30} /><text className="login-scene-title" x="228" y="77">Web</text></Surface>
+    <Surface x={366} y={26} width={180} height={92} main><Icon kind="code" x={386} y={48} size={30} /><text className="login-scene-title" x="438" y="77">SDK</text></Surface>
+    <g transform="translate(175 193)">
+      <rect className="login-scene-paper" x="0" y="22" width="140" height="50" rx="12" />
+      <rect className="login-scene-paper" x="0" y="11" width="140" height="50" rx="12" />
+      <rect className="login-scene-hub" width="140" height="50" rx="12" />
+      <circle className="login-scene-node" cx="22" cy="25" r="5" /><path className="login-scene-rule" d="M42 25h76" />
+    </g>
+    <text x="245" y="296" textAnchor="middle">平台运行</text>
+    <g transform="translate(455 229)">
+      <path className="login-scene-package-top" d="m0-48 62 29-62 30-62-30Z" />
+      <path className="login-scene-package-left" d="m-62-19 62 30v45l-62-30Z" />
+      <path className="login-scene-package-right" d="m0 11 62-30v45L0 56Z" />
+      <path className="login-scene-rule" d="m-31-33 62 30v18" />
+    </g>
+    <text x="455" y="310" textAnchor="middle">独立智能体包</text>
+    <circle className="login-scene-node" cx="326" cy="158" r="6" />
+  </>
+}
+
+/** 原创关系插画；不把演示构图作为账号状态或已验证业务结果。 */
 export function LoginShowcase({ index }: { index: number }) {
-  const titles = ['智能体工作区', '评测与证据', '实例与接入', '工具与统一接入']
+  const Scene = [BuildScene, KnowledgeScene, ConnectionScene, EvaluationScene, ComputeScene, DeliveryScene][index] ?? BuildScene
   return <div className="login-showcase" data-scene={index} aria-hidden="true">
-    <div className="login-showcase-grid" />
-    <svg className="login-showcase-links" viewBox="0 0 600 300" preserveAspectRatio="none"><path d="M80 220H35V150Q35 130 55 130H110M440 72H545Q562 72 562 92V160H500" /><circle cx="80" cy="220" r="3" /><circle cx="500" cy="160" r="3" /><circle cx="110" cy="130" r="3" /><circle cx="440" cy="72" r="3" /></svg>
-    <div className="login-showcase-underlay" />
-    <div className="login-showcase-window">
-      <div className="login-showcase-titlebar"><span className="login-showcase-brand"><i /><i /><i /></span><span>{titles[index]}</span><span className="login-showcase-window-menu">···</span></div>
-      <div className="login-showcase-body">{index === 0 ? <BuildScene /> : index === 1 ? <EvidenceScene /> : index === 2 ? <RuntimeScene /> : <ConnectionScene />}</div>
-    </div>
-    <div className="login-showcase-float login-showcase-float-top">
-      <span className="login-showcase-float-icon"><ShowcaseIcon kind={index === 0 ? 'branch' : index === 1 ? 'trace' : index === 2 ? 'window' : 'tools'} /></span>
-      <strong>{['资产有来源', '同口径比较', '统一管理', '统一网关'][index]}</strong>
-      {index === 1 ? <div className="login-showcase-compare"><span>版本 A</span><i /><span>版本 B</span></div> : <span>{['版本与引用', '', '实例与来源', '身份 · 风险 · 访问'][index]}</span>}
-    </div>
-    <div className="login-showcase-float login-showcase-float-bottom">
-      <span className="login-showcase-float-eyebrow">{['业务需求', '改进依据', '按需接入', '组合编排'][index]}</span>
-      <strong>{['描述目标，交给助手', '从问题回到轨迹', '网页与应用，灵活接入', '让工具共同完成任务'][index]}</strong>
-      <div className="login-showcase-mini-flow"><span>{['目标', '问题', '任务', '输入'][index]}</span><ShowcaseIcon kind="arrow" size={14} /><span>{['能力', '证据', '智能体', '工具'][index]}</span><ShowcaseIcon kind="arrow" size={14} /><span>{['资产', '改进', '结果', '输出'][index]}</span></div>
-    </div>
-    <span className="login-showcase-note">能力示意</span>
+    <svg className="login-scene" viewBox="0 -12 650 344" fill="none" focusable="false">
+      <defs><radialGradient id={`login-scene-halo-${index}`}><stop stopColor="var(--hep-primary)" stopOpacity=".08" /><stop offset="1" stopColor="var(--hep-primary)" stopOpacity="0" /></radialGradient></defs>
+      <ellipse cx="330" cy="162" rx="292" ry="150" fill={`url(#login-scene-halo-${index})`} />
+      <g className="login-scene-content"><Scene /></g>
+    </svg>
   </div>
 }
 
 export const loginShowcaseStyle = `
-.login-showcase{position:relative;isolation:isolate;width:100%;height:296px;min-width:0;overflow:hidden;pointer-events:none;--showcase-line:color-mix(in srgb,var(--hep-primary) 20%,var(--hep-border));--showcase-shadow:0 16px 40px color-mix(in srgb,var(--hep-primary) 9%,transparent),0 2px 8px color-mix(in srgb,var(--hep-text) 4%,transparent)}
-.login-showcase-grid{position:absolute;inset:0;background-image:linear-gradient(color-mix(in srgb,var(--hep-primary) 8%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--hep-primary) 8%,transparent) 1px,transparent 1px);background-size:32px 32px;mask-image:radial-gradient(ellipse at center,#000 20%,transparent 72%);z-index:-3}.login-showcase::before{content:"";position:absolute;inset:6% 3% 5%;border-radius:50%;background:radial-gradient(ellipse,color-mix(in srgb,var(--hep-primary) 13%,transparent),transparent 70%);filter:blur(14px);z-index:-2}.login-showcase-links{position:absolute;inset:0;width:100%;height:100%;fill:var(--hep-surface);stroke:var(--showcase-line);stroke-width:1.2;stroke-dasharray:4 5;z-index:-1}.login-showcase-links circle{stroke-dasharray:none;fill:var(--hep-primary-soft)}
-.login-showcase-underlay{position:absolute;width:76%;height:210px;left:11%;top:36px;border:1px solid var(--showcase-line);border-radius:12px;background:color-mix(in srgb,var(--hep-primary-soft) 65%,var(--hep-surface));transform:perspective(900px) rotateY(-7deg) rotateX(4deg) rotate(-3deg) translate(-8px,5px);z-index:-1}
-.login-showcase-window{position:absolute;left:10%;top:28px;width:78%;height:220px;overflow:hidden;border:1px solid var(--showcase-line);border-radius:12px;background:var(--hep-surface);box-shadow:var(--showcase-shadow);transform:perspective(900px) rotateY(-5deg) rotateX(3deg) rotate(-1.3deg)}.login-showcase-titlebar{height:33px;display:flex;align-items:center;gap:10px;padding:0 12px;border-bottom:1px solid var(--hep-border);background:var(--hep-surface-muted);color:var(--hep-muted);font-size:11px;line-height:1}.login-showcase-brand{display:flex;gap:4px}.login-showcase-brand i{width:5px;height:5px;border-radius:50%;background:var(--hep-border)}.login-showcase-brand i:first-child{background:var(--hep-primary)}.login-showcase-window-menu{margin-left:auto;font-size:18px;letter-spacing:2px}.login-showcase-body{padding:14px 16px;font-size:12px;line-height:1.5;color:var(--hep-text)}
-.login-showcase-object{display:flex;align-items:center;gap:9px;min-width:0}.login-showcase-object-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:8px;background:var(--hep-primary-soft);color:var(--hep-link)}.login-showcase-object>div{display:grid;gap:1px}.login-showcase-object strong{font-size:13px;font-weight:600}.login-showcase-object>div>span{font-size:10px;color:var(--hep-muted)}.login-showcase-outline{margin-left:auto;padding:2px 7px;border:1px solid var(--hep-border);border-radius:6px;font-size:10px;color:var(--hep-muted)}.login-showcase-prompt{position:relative;margin:11px 0 8px;padding:8px 30px 8px 10px;border:1px solid var(--showcase-line);border-radius:8px;background:var(--hep-primary-soft)}.login-showcase-prompt>span{font-size:10px;color:var(--hep-link)}.login-showcase-prompt p{margin:1px 0 0;font-size:12px;line-height:1.5}.login-showcase-prompt>i{position:absolute;right:9px;top:50%;display:grid;place-items:center;width:19px;height:19px;border-radius:5px;background:var(--hep-primary);color:var(--hep-surface);transform:translateY(-50%)}.login-showcase-assets{display:grid;gap:5px}.login-showcase-assets>div{display:flex;justify-content:space-between;gap:8px;font-size:11px}.login-showcase-assets>div>span{display:flex;align-items:center;gap:6px}.login-showcase-assets i{width:4px;height:4px;border:1px solid var(--hep-primary);border-radius:1px}.login-showcase-assets em{font-style:normal;color:var(--hep-muted);font-size:10px}
-.login-showcase-section{display:flex;align-items:center;justify-content:space-between;gap:8px}.login-showcase-section>strong{font-size:13px;font-weight:600}.login-showcase-section>span{font-size:10px;color:var(--hep-muted)}.login-showcase-trace{display:grid;margin-top:13px;gap:11px}.login-showcase-trace>div{position:relative;display:flex;align-items:center;gap:10px}.login-showcase-trace>div>i{width:9px;height:9px;flex:none;border:2px solid var(--hep-primary);border-radius:50%;background:var(--hep-surface)}.login-showcase-trace>div:not(:last-child)::after{position:absolute;content:"";width:1px;height:34px;top:19px;left:4px;background:var(--showcase-line)}.login-showcase-trace span{display:grid;gap:0}.login-showcase-trace strong{font-weight:500;font-size:12px}.login-showcase-trace small{font-size:10px;color:var(--hep-muted)}.login-showcase-trace b{margin-left:auto;padding:3px 8px;border-radius:6px;background:var(--hep-primary-soft);color:var(--hep-link);font-size:10px;font-weight:400}
-.login-showcase-runtime{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:13px}.login-showcase-runtime>div{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:12px;border:1px solid var(--hep-border);border-radius:8px}.login-showcase-runtime svg{color:var(--hep-link)}.login-showcase-runtime strong{font-size:12px;font-weight:500}.login-showcase-runtime span{font-size:10px;color:var(--hep-muted)}.login-showcase-lifecycle{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:13px;padding-top:10px;border-top:1px solid var(--hep-border);font-size:10px;color:var(--hep-muted)}.login-showcase-lifecycle>div{display:flex;align-items:center;gap:6px}.login-showcase-lifecycle b{font-weight:400}.login-showcase-lifecycle i{width:3px;height:3px;border-radius:50%;background:var(--hep-border)}
-.login-showcase-connections{position:relative;display:grid;grid-template-columns:1fr 68px 1fr;align-items:center;margin:15px 0 10px;min-height:85px}.login-showcase-sources{display:grid;gap:12px}.login-showcase-sources>span{display:flex;align-items:center;gap:6px;padding:7px 8px;border:1px solid var(--hep-border);border-radius:6px;font-size:11px;white-space:nowrap}.login-showcase-sources svg{color:var(--hep-link)}.login-showcase-inner-lines{width:100%;height:80px;fill:none;stroke:var(--showcase-line);stroke-width:1.5}.login-showcase-hub{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;justify-self:center;width:78px;height:78px;border:1px solid var(--showcase-line);border-radius:16px;background:var(--hep-primary-soft);color:var(--hep-link);box-shadow:0 4px 12px color-mix(in srgb,var(--hep-primary) 6%,transparent)}.login-showcase-hub strong{font-size:12px;font-weight:500}.login-showcase-tool-strip{display:flex;justify-content:center;align-items:center;gap:12px;font-size:10px;color:var(--hep-muted)}.login-showcase-tool-strip i{width:20px;height:1px;background:var(--hep-border)}
-.login-showcase-float{position:absolute;display:grid;min-width:0;gap:5px;padding:13px 14px;border:1px solid var(--showcase-line);border-radius:10px;background:var(--hep-surface);box-shadow:0 8px 24px color-mix(in srgb,var(--hep-primary) 8%,transparent);line-height:1.5}.login-showcase-float strong{font-size:12px;font-weight:600}.login-showcase-float>span:not(.login-showcase-float-icon){font-size:10px;color:var(--hep-muted)}.login-showcase-float-top{top:12px;right:0;width:145px;transform:rotate(4deg)}.login-showcase-float-bottom{bottom:15px;left:0;width:195px;transform:rotate(2deg)}.login-showcase-float-icon{display:grid;place-items:center;width:28px;height:28px;border-radius:7px;color:var(--hep-link);background:var(--hep-primary-soft);margin-bottom:1px}.login-showcase-float-eyebrow{letter-spacing:.04em}.login-showcase-mini-flow{display:flex;align-items:center;gap:8px;margin-top:3px;font-size:10px;color:var(--hep-link)}.login-showcase-mini-flow>span{padding:3px 7px;border-radius:5px;background:var(--hep-primary-soft)}.login-showcase-mini-flow svg{flex:none;opacity:.6}.login-showcase-compare{display:flex;align-items:center;gap:7px;margin-top:3px;color:var(--hep-muted);font-size:10px}.login-showcase-compare i{height:1px;flex:1;background:var(--hep-border)}.login-showcase-note{position:absolute;bottom:4px;right:7px;font-size:10px;letter-spacing:.04em;color:var(--hep-muted)}
-@media(prefers-reduced-motion:no-preference){.login-feature-slide[data-active=true] .login-showcase-window{animation:login-showcase-enter 550ms var(--hep-ease) both}.login-showcase-float{animation:login-showcase-float 5s ease-in-out infinite alternate}.login-showcase-float-bottom{animation-delay:-2.5s}.login-feature-slide:not([data-active=true]) .login-showcase-float,[data-login-carousel][data-playing=false] .login-showcase-float{animation-play-state:paused}}
-@keyframes login-showcase-enter{from{opacity:0;translate:0 10px}to{opacity:1;translate:0 0}}@keyframes login-showcase-float{from{translate:0 0}to{translate:0 -5px}}
-@media(max-width:680px){.login-showcase{height:208px}.login-showcase-grid{background-size:24px 24px}.login-showcase-window{left:7%;top:18px;width:85%;height:176px;transform:rotate(-1deg)}.login-showcase-underlay{left:8%;top:23px;width:82%;height:167px;transform:rotate(-2deg)}.login-showcase-titlebar{height:27px;padding-inline:9px;font-size:10px;gap:7px}.login-showcase-body{padding:9px 10px}.login-showcase-object-icon{width:27px;height:27px}.login-showcase-object strong{font-size:12px}.login-showcase-prompt{margin:7px 0 6px;padding:5px 26px 5px 8px}.login-showcase-prompt p{font-size:11px}.login-showcase-assets{gap:3px}.login-showcase-assets>div{font-size:10px}.login-showcase-assets>div:last-child{display:none}.login-showcase-section>strong{font-size:12px}.login-showcase-section>span{display:none}.login-showcase-trace{margin-top:9px;gap:6px}.login-showcase-trace strong{font-size:11px}.login-showcase-trace small{font-size:9px}.login-showcase-trace>div:not(:last-child)::after{height:25px;top:17px}.login-showcase-trace b{font-size:9px;padding:2px 6px}.login-showcase-runtime{gap:7px;margin-top:9px}.login-showcase-runtime>div{padding:9px;gap:4px}.login-showcase-runtime>div>svg{width:18px;height:18px}.login-showcase-runtime span{font-size:9px}.login-showcase-lifecycle{margin-top:8px;padding-top:7px;font-size:9px}.login-showcase-connections{grid-template-columns:1fr 40px 1fr;margin:10px 0 6px;min-height:72px}.login-showcase-sources{gap:8px}.login-showcase-sources>span{font-size:10px;padding:6px}.login-showcase-inner-lines{height:70px}.login-showcase-hub{width:64px;height:64px;border-radius:12px}.login-showcase-hub>svg{width:20px;height:20px}.login-showcase-float{padding:8px 10px;gap:3px;border-radius:8px}.login-showcase-float-top{top:5px;right:0;width:109px}.login-showcase-float-icon{width:23px;height:23px;margin:0}.login-showcase-float-icon svg{width:15px;height:15px}.login-showcase-float-top>span:not(.login-showcase-float-icon),.login-showcase-compare{display:none}.login-showcase-float strong{font-size:10px}.login-showcase-float-bottom{bottom:4px;width:147px}.login-showcase-float-bottom>strong{font-size:10px}.login-showcase-float-eyebrow{display:none}.login-showcase-mini-flow{gap:4px;margin-top:1px;font-size:9px}.login-showcase-mini-flow>span{padding:2px 4px}.login-showcase-mini-flow svg{width:11px}.login-showcase-note{bottom:0;font-size:9px}}
+.login-showcase{display:grid;grid-template-rows:minmax(0,1fr);place-items:center;width:100%;height:320px;min-width:0;pointer-events:none;overflow:hidden}
+.login-scene{display:block;width:100%;max-width:680px;height:100%;overflow:visible}
+.login-scene text{fill:var(--hep-text);font:500 16px/1.5 system-ui,"Microsoft YaHei",sans-serif;letter-spacing:.01em}
+.login-scene .login-scene-title{font-size:22px;font-weight:600;letter-spacing:-.02em}
+.login-scene .login-scene-caption{fill:var(--hep-muted);font-size:13px;font-weight:400}
+.login-scene .login-scene-blue{fill:var(--hep-link);font-size:15px;font-weight:500}
+.login-scene-surface>rect:first-child{fill:var(--hep-surface);stroke:var(--hep-border);stroke-width:1.2;filter:drop-shadow(0 6px 12px color-mix(in srgb,var(--hep-primary) 5%,transparent))}
+.login-scene-main>rect:first-child{stroke:color-mix(in srgb,var(--hep-primary) 24%,var(--hep-border))}
+.login-scene-icon{fill:none;stroke:var(--hep-link);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.login-scene-orbit,.login-scene-pill{fill:var(--hep-primary-soft);stroke:color-mix(in srgb,var(--hep-primary) 18%,var(--hep-border));stroke-width:1}
+.login-scene-paper{fill:var(--hep-primary-soft);stroke:var(--hep-border)}
+.login-scene-agent-tile{fill:var(--hep-primary);stroke:var(--hep-primary-hover);filter:drop-shadow(0 12px 20px color-mix(in srgb,var(--hep-primary) 16%,transparent))}
+.login-scene-inverse .login-scene-icon{stroke:var(--hep-surface);stroke-width:1.2}
+.login-scene .login-scene-inverse-label{fill:var(--hep-surface);font-size:12px;font-weight:400}
+.login-scene-hub{fill:var(--hep-surface);stroke:color-mix(in srgb,var(--hep-primary) 26%,var(--hep-border));stroke-width:1.2;filter:drop-shadow(0 8px 16px color-mix(in srgb,var(--hep-primary) 8%,transparent))}
+.login-scene-ring{fill:none;stroke:color-mix(in srgb,var(--hep-primary) 18%,var(--hep-border));stroke-width:1;stroke-dasharray:3 6}
+.login-scene-tile{fill:var(--hep-surface);stroke:color-mix(in srgb,var(--hep-primary) 20%,var(--hep-border));stroke-width:1}
+.login-scene-package-top{fill:var(--hep-surface);stroke:color-mix(in srgb,var(--hep-primary) 25%,var(--hep-border));stroke-linejoin:round}
+.login-scene-package-left{fill:var(--hep-primary-soft);stroke:color-mix(in srgb,var(--hep-primary) 25%,var(--hep-border));stroke-linejoin:round}
+.login-scene-package-right{fill:color-mix(in srgb,var(--hep-primary) 12%,var(--hep-surface));stroke:color-mix(in srgb,var(--hep-primary) 25%,var(--hep-border));stroke-linejoin:round}
+.login-scene-link{fill:none;stroke:color-mix(in srgb,var(--hep-primary) 36%,var(--hep-border));stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.login-scene-rule{stroke:var(--hep-border);stroke-width:1.2;stroke-linecap:round}
+.login-scene-node{fill:var(--hep-primary);stroke:var(--hep-surface);stroke-width:3}
+.login-scene-arrow{stroke:var(--hep-link);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+@media(prefers-reduced-motion:no-preference){.login-feature-slide[data-active=true] .login-scene-content{animation:login-scene-enter 500ms var(--hep-ease) both}.login-scene-link{stroke-dasharray:5 5;animation:login-scene-flow 24s linear infinite}.login-feature-slide:not([data-active=true]) .login-scene-link,[data-login-carousel][data-playing=false] .login-scene-link{animation-play-state:paused}}
+@keyframes login-scene-enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes login-scene-flow{to{stroke-dashoffset:-120}}
+@media(max-width:680px){.login-showcase{height:230px}.login-scene text{font-size:20px}.login-scene .login-scene-title{font-size:25px}.login-scene .login-scene-caption{font-size:16px}.login-scene .login-scene-blue{font-size:18px}.login-scene .login-scene-inverse-label{display:none}.login-scene-inverse{transform:translateY(12px)}}
 `

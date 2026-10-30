@@ -1,0 +1,58 @@
+{
+  "live": true,
+  "errors": [],
+  "layouts": [
+    {
+      "width": 1440,
+      "form": {
+        "x": 980,
+        "y": 325.609375,
+        "width": 340,
+        "height": 348.765625
+      },
+      "slides": 6,
+      "overflow": false
+    },
+    {
+      "width": 1024,
+      "form": {
+        "x": 632,
+        "y": 325.609375,
+        "width": 340,
+        "height": 348.765625
+      },
+      "slides": 6,
+      "overflow": false
+    },
+    {
+      "width": 768,
+      "form": {
+        "x": 164,
+        "y": 100,
+        "width": 440,
+        "height": 345.96875
+      },
+      "slides": 6,
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "form": {
+        "x": 16,
+        "y": 114.640625,
+        "width": 358,
+        "height": 345.96875
+      },
+      "slides": 6,
+      "overflow": false
+    }
+  ],
+  "checks": [
+    "默认按钮隐藏；悬停暂停并显示；点击后移出恢复自动播放且收起按钮",
+    "键盘进入显示与暂停，方向键及首尾循环正常，焦点移出恢复",
+    "减少动态效果默认停止，仍可手动浏览全部能力",
+    "真实 Chromium 触屏横划仅翻一页，点按按钮可继续，闲置后收起",
+    "无 JavaScript 保留首项和登录表单",
+    "实际 CSP 允许新脚本，平台真实账号登录成功"
+  ]
+}

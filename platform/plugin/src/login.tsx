@@ -10,31 +10,27 @@ export const loginCarouselScript = `(${initializeLoginCarousel.toString()})();`
 export const loginCarouselScriptHash = createHash('sha256').update(loginCarouselScript).digest('base64')
 
 const features = [
-  { label: '构建', title: '从目标到智能体', description: '用自然语言描述目标，让平台助手协助构建智能体；也可迁移已有项目，统一管理资产、版本与演进来源。', tags: ['自然语言构建', '资产与版本', '项目迁移'] },
-  { label: '评测', title: '让改进有据可循', description: '围绕真实任务运行评测、查看轨迹与逐例结果，比较不同版本和算力变体，为后续改进提供依据。', tags: ['用例与轨迹', '版本比较', '算力变体'] },
-  { label: '运行', title: '灵活运行与交付', description: '创建并管理独立运行实例，支持网页访问与应用内调用；启停、重启和批量操作都有逐项回执。', tags: ['实例管理', '网页访问', '应用内调用'] },
-  { label: '连接', title: '统一连接工具与服务', description: '接入 MCP 与 OpenAPI 服务，组织工具和资源；通过统一网关管理智能体身份、风险与访问规则。', tags: ['MCP / OpenAPI', '组合编排', '统一网关'] },
+  { label: '构建迁移', title: '描述业务需求，构建专属智能体', description: '通过自然语言与管理助手协作，组织角色、技能、工具和模型。支持从已有工程迁入智能体，完成行为映射、资产生成与关键任务验证。', tags: ['对话式构建', '外部智能体迁移', '多角色协作'] },
+  { label: '知识资产', title: '沉淀业务知识，复用已有能力', description: '将文档整理为可追溯的知识资产，统一管理角色指令、技能和插件配置。通过版本继承、能力融合与差异比较，让已有成果服务于下一次构建。', tags: ['知识溯源', '版本继承', '能力融合'] },
+  { label: '业务连接', title: '连接业务系统，组合工具能力', description: '通过 MCP 与 OpenAPI 接入业务工具和资源，按场景分组、编排与调试。结合网关的身份与访问配置，将智能体能力接入实际业务流程。', tags: ['MCP / OpenAPI', '工具组合编排', '身份与访问控制'] },
+  { label: '评测改进', title: '用真实任务验证，让每次改进有据可依', description: '围绕业务用例执行评测，保留版本来源、运行轨迹和业务产物。通过逐例分析与版本对比，发现问题、验证修改，为后续迭代提供依据。', tags: ['业务用例评测', '运行证据追溯', '版本效果对比'] },
+  { label: '算力优化', title: '派生算力变体，验证更合适的执行方式', description: '从固定版本派生中算力、低算力变体，探索模型协同与代码执行。由管理助手串联决策样本、训练部署和对比评测，验证不同方案的业务适用性。', tags: ['中算力模型协同', '低算力代码执行', '训练部署与验证'] },
+  { label: '运行交付', title: '支持交互与集成，把智能体交付到业务环境', description: '通过 Web 与智能体交互，或使用官方 TypeScript SDK 集成应用。支持平台实例运行，并可将符合打包要求的选定版本导出为独立智能体包。', tags: ['Web / SDK 双模式', '会话持久化', '独立打包交付'] },
 ]
 
 function FeatureCarousel() {
-  return <section className="login-features" data-login-carousel role="region" aria-roledescription="轮播" aria-label="平台特性">
-    <div className="login-feature-heading"><span>平台能力</span><span data-carousel-position aria-label="当前特性序号">01 / {String(features.length).padStart(2, '0')}</span></div>
+  return <section className="login-features" data-login-carousel tabIndex={0} role="region" aria-roledescription="轮播" aria-label="平台核心能力，可使用左右方向键切换">
     <div className="login-feature-slides" data-carousel-content aria-live="off" aria-atomic="true">
-      {features.map((feature, index) => <article key={feature.title} className="login-feature-slide" id={`login-feature-${index}`} data-carousel-slide data-active={index === 0} aria-hidden={index !== 0} role="group" aria-roledescription="幻灯片" aria-label={`${index + 1} / ${features.length}`}>
-        <LoginShowcase index={index} /><div className="login-feature-title"><h3>{feature.title}</h3></div>
-        <p>{feature.description}</p>
-        <ul className="login-feature-tags">{feature.tags.map(tag => <li key={tag}>{tag}</li>)}</ul>
+      {features.map((feature, index) => <article key={feature.label} className="login-feature-slide" id={`login-feature-${index}`} data-carousel-slide data-active={index === 0} aria-hidden={index !== 0} role="group" aria-roledescription="幻灯片" aria-label={`${feature.label}，${index + 1} / ${features.length}`}>
+        <LoginShowcase index={index} />
+        <div className="login-feature-copy"><h3>{feature.title}</h3>
+          <p>{feature.description}</p>
+          <ul className="login-feature-tags">{feature.tags.map(tag => <li key={tag}>{tag}</li>)}</ul>
+        </div>
       </article>)}
     </div>
-    <div className="login-carousel-controls" data-carousel-controls hidden>
-      <div className="login-carousel-dots" role="group" aria-label="选择平台特性">{features.map((feature, index) => <button key={feature.title} type="button" data-carousel-to={index} aria-controls={`login-feature-${index}`} aria-label={`查看第 ${index + 1} 项：${feature.title}`} aria-current={index === 0 ? 'true' : undefined}><span className="login-carousel-number">{String(index + 1).padStart(2, '0')}</span><span>{feature.label}</span></button>)}</div>
-      <div className="login-carousel-actions">
-        <button type="button" data-carousel-previous aria-label="上一项特性"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m12 5-5 5 5 5" /></svg></button>
-        <button type="button" data-carousel-next aria-label="下一项特性"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m8 5 5 5-5 5" /></svg></button>
-        <button type="button" className="login-carousel-playback" data-carousel-playback aria-label="暂停自动轮播" aria-pressed="false">暂停</button>
-      </div>
-    </div>
-    <noscript><p className="login-feature-fallback">构建与迁移 · 评测与改进 · 实例交付 · 工具与网关</p></noscript>
+    <button type="button" className="login-carousel-arrow login-carousel-previous" data-carousel-previous hidden aria-label="上一项能力"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6" /></svg></button>
+    <button type="button" className="login-carousel-arrow login-carousel-next" data-carousel-next hidden aria-label="下一项能力"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m10 6 6 6-6 6" /></svg></button>
   </section>
 }
 
@@ -51,12 +47,13 @@ export function loginPage(action: string, error = ''): string {
       .login-field+.login-field{margin-top:20px}.login-panel label{display:block;margin:0 0 8px;font-weight:500}.login-panel form :is(input,button){width:100%;min-height:48px;padding:12px;border-radius:var(--hep-control-radius);font:inherit;line-height:1.55;transition:border-color var(--hep-motion-fast),box-shadow var(--hep-motion-fast),background-color var(--hep-motion-fast)}
       .login-panel input{display:block;border:1px solid var(--hep-border);background:var(--hep-surface);color:var(--hep-text)}.login-panel input:hover{border-color:color-mix(in srgb,var(--hep-border) 60%,var(--hep-muted))}.login-panel form button{margin-top:28px;background:var(--hep-primary);color:#fff;border:1px solid var(--hep-primary);box-shadow:0 1px 2px #183b701a,inset 0 1px 0 #ffffff1f;cursor:pointer;font-weight:600}.login-panel form button:hover{background:var(--hep-primary-hover);border-color:var(--hep-primary-hover)}
       :is(input,button):focus-visible{outline:2px solid var(--hep-focus);outline-offset:3px}.login-panel input:focus-visible{outline-offset:2px}.login-panel [role=alert]{color:var(--hep-danger);margin:16px 0 0;overflow-wrap:anywhere}
-      .login-features{min-width:0}.login-feature-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;font-size:12px;color:var(--hep-muted)}[data-carousel-position]{font-variant-numeric:tabular-nums;letter-spacing:.04em}.login-feature-slides{display:grid}.login-feature-slide{grid-area:1/1;min-width:0;visibility:hidden;opacity:0;pointer-events:none;transition:opacity var(--hep-motion) var(--hep-ease)}.login-feature-slide[data-active=true]{visibility:visible;opacity:1;pointer-events:auto}.login-feature-title{margin:20px 0 0}.login-feature-title h3{margin:0;font-size:24px;font-weight:600;line-height:1.4;letter-spacing:-.025em}.login-feature-slide>p{max-width:600px;font-size:14px;line-height:1.7;color:var(--hep-muted);margin:12px 0}.login-feature-tags{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none}.login-feature-tags li{padding:4px 8px;border-radius:6px;background:var(--hep-surface-muted);font-size:12px;line-height:1.6;color:var(--hep-muted)}
-      .login-carousel-controls{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-top:20px;padding-top:16px;border-top:1px solid var(--hep-border)}.login-features [hidden]{display:none!important}.login-carousel-dots{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));flex:1;min-width:260px;gap:12px}.login-carousel-actions{display:flex;align-items:center;gap:8px;margin-left:auto}.login-carousel-controls button{position:relative;display:flex;align-items:center;justify-content:center;gap:6px;min-width:36px;min-height:36px;padding:6px;border:1px solid transparent;border-radius:8px;color:var(--hep-muted);background:transparent;cursor:pointer;font:inherit;font-size:12px;transition:background-color var(--hep-motion-fast),color var(--hep-motion-fast)}.login-carousel-controls button:hover{background:var(--hep-primary-soft);color:var(--hep-link)}.login-carousel-dots button{justify-content:flex-start;padding:8px 4px;border-radius:0}.login-carousel-number{font-size:10px;opacity:.6;font-variant-numeric:tabular-nums}.login-carousel-dots button::after{content:"";position:absolute;left:0;right:0;bottom:-17px;height:2px;background:transparent;transition:background-color var(--hep-motion)}.login-carousel-dots button[aria-current=true]{color:var(--hep-link);font-weight:600}.login-carousel-dots button[aria-current=true]::after{background:var(--hep-primary)}.login-carousel-controls .login-carousel-playback{min-width:48px;padding-inline:8px;border-color:var(--hep-border)}.login-feature-fallback{margin:16px 0 0;color:var(--hep-muted);font-size:12px}
-      @media(pointer:coarse){.login-carousel-controls button{min-width:44px;min-height:44px}}
+      .login-features{position:relative;min-width:0;border-radius:12px;outline-offset:8px;touch-action:pan-y}.login-features:focus-visible{outline:2px solid var(--hep-focus)}.login-features [hidden]{display:none!important}
+      .login-feature-slides{display:grid}.login-feature-slide{grid-area:1/1;min-width:0;visibility:hidden;opacity:0;pointer-events:none;transition:opacity 400ms var(--hep-ease),visibility 400ms}.login-feature-slide[data-active=true]{visibility:visible;opacity:1;pointer-events:auto}.login-feature-copy{padding-top:22px}.login-feature-copy h3{margin:0;font-size:26px;font-weight:600;line-height:1.5;letter-spacing:-.025em;text-wrap:balance}.login-feature-copy>p{max-width:660px;font-size:14px;line-height:1.85;color:var(--hep-muted);margin:14px 0 0;text-wrap:pretty}.login-feature-tags{display:flex;flex-wrap:wrap;align-items:center;gap:8px 0;margin:22px 0 0;padding:0;list-style:none;color:var(--hep-muted);font-size:12px;line-height:1.6}.login-feature-tags li+li::before{content:"";display:inline-block;width:3px;height:3px;background:var(--hep-primary);opacity:.45;border-radius:50%;margin:0 12px;vertical-align:middle}
+      .login-carousel-arrow{position:absolute;top:160px;display:grid;place-items:center;width:44px;height:44px;padding:0;border:1px solid var(--hep-border);border-radius:50%;background:var(--hep-surface);color:var(--hep-text);box-shadow:0 4px 16px #18365a0a;cursor:pointer;opacity:0;pointer-events:none;transform:translateY(-50%) scale(.94);transition:opacity 180ms ease,transform 180ms ease,background-color 180ms ease;z-index:2}.login-carousel-previous{left:0}.login-carousel-next{right:0}.login-features[data-engaged=true] .login-carousel-arrow,.login-carousel-arrow:focus-visible{opacity:1;pointer-events:auto;transform:translateY(-50%) scale(1)}.login-carousel-arrow:hover{color:var(--hep-primary);background:var(--hep-primary-soft)}
+      @media(prefers-reduced-motion:reduce){.login-feature-slide,.login-carousel-arrow{transition:none}}
       @media(max-width:1100px){.login-shell{column-gap:40px}.login-story h2{font-size:32px}}
       @media(max-width:900px){body{padding:24px}.login-shell{max-width:440px;grid-template-columns:minmax(0,1fr);grid-template-areas:"brand" "form" "story";gap:36px}.login-story h2{display:none}.login-panel{max-width:none}.login-panel h1{font-size:22px}.login-story{padding-top:28px;border-top:1px solid var(--hep-border)}}
-      @media(max-width:680px){body{padding:24px 16px}.login-feature-title h3{font-size:22px}.login-carousel-dots{flex-basis:100%}.login-carousel-dots button::after{bottom:0}}
+      @media(max-width:680px){body{padding:24px 16px}.login-feature-copy{padding-top:18px}.login-feature-copy h3{font-size:22px}.login-feature-copy>p{font-size:13px}.login-feature-tags{margin-top:18px;font-size:11px}.login-feature-tags li+li::before{margin:0 8px}.login-carousel-arrow{top:115px}}
       ` }} /></head>
     <body className="harness-login"><div className="login-shell">
       <div className="login-wordmark"><PlatformLogo size={40} /><span>Harness 工程平台</span></div>
