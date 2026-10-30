@@ -16,6 +16,7 @@ import { workspaceIdentity } from './workspace.ts'
 import { createAgentsHandler } from './agents/index.ts'
 import { createExtractionScope, createComputeVariantScope, isDecisionExtraction, isComputeVariantResearch, createFeatureScope, isFeatureOrganization, createExclusiveTaskScopes, projectDecisionExtractionTools } from './assistant/extraction-scope.ts'
 import { createToolInputRecovery } from './assistant/tool-input-recovery.ts'
+import { guardToolArguments } from './assistant/tool-argument-guard.ts'
 import { createRunDownloadHandler } from './agents/run-files.ts'
 import { createInstancesHandler } from './instances/index.ts'
 import { createModelsHandler } from './models/index.ts'
@@ -266,7 +267,7 @@ export function applyTools(ctx: Context) {
   ctx.on('agent/request-error' as any, createToolInputRecovery(assetRoot, services.sessionProjections, extractionRecoveryLifetime.signal) as any)
   ctx.on('llm/stream' as any, (async function* (request: any, next: any) {
     if (request.sessionId) await assistant.beforeModelCall(String(request.sessionId))
-    yield* next()
+    yield* guardToolArguments(next())
   }) as any)
   ctx.on('agent/created' as any, (({ agent }: any) => {
     const state = services.sessionProjections.stateOf(agent.session, 'harnessPlatformAssistant')

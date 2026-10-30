@@ -56,7 +56,7 @@ test('浏览器选择其他数据根后迁移受管进程记录和安装默认�
 test('统一入口后台启停、重复启动、重启、只读预检与端口冲突', async () => {
   const root = mkdtempSync(join(tmpdir(), 'hep-lifecycle-'))
   const repo = join(root, 'program with spaces'), data = join(root, 'data')
-  for (const file of ['platform/dsh-platform', 'platform/tool-env.sh', 'platform/lifecycle.mts', 'platform/business-readiness.mts', 'platform/plugin/src/workspace.ts', ...['configuration.ts', 'entry.ts', 'contracts.ts', 'instance.ts', 'group-link.ts', 'secret-file.ts'].map(file => `platform/plugin/src/business-control/${file}`)]) {
+  for (const file of ['platform/dsh-platform', 'platform/tool-env.sh', 'platform/lifecycle.mts', 'platform/business-readiness.mts', 'platform/plugin/src/workspace.ts', 'platform/plugin/src/version-id.ts', ...['configuration.ts', 'entry.ts', 'contracts.ts', 'instance.ts', 'group-link.ts', 'secret-file.ts'].map(file => `platform/plugin/src/business-control/${file}`)]) {
     const target = join(repo, file)
     mkdirSync(dirname(target), { recursive: true })
     copyFileSync(new URL('../' + file, import.meta.url), target)
@@ -64,15 +64,23 @@ test('统一入口后台启停、重复启动、重启、只读预检与端口�
   mkdirSync(join(data, 'config'), { recursive: true })
   writeFileSync(join(data, 'workspace.json'), '{}')
   writeFileSync(join(data, 'config/sites.json'), '{"platform":"/hep/"}')
-  writeFileSync(join(repo, 'platform/dsh-platform-internal.py'), `import http.server, json, sys
+  const health = join(data, 'fixture-health.txt')
+  writeFileSync(join(repo, 'platform/dsh-platform-internal.py'), `import http.server, json, pathlib, sys, time
 host = sys.argv[sys.argv.index('--host')+1]
 port = int(sys.argv[sys.argv.index('--port')+1])
 if '--dry-run' in sys.argv:
     print(json.dumps({'dry': True})); sys.exit(0)
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
-        self.send_response(200); self.end_headers(); self.wfile.write(b'ready')
-http.server.HTTPServer((host, port), Handler).serve_forever()
+        path = pathlib.Path(${JSON.stringify(health)})
+        mode = path.read_text() if path.exists() else 'running'
+        if mode == 'stall': time.sleep(2)
+        self.send_response(503 if mode == 'failed' else 200)
+        if mode == 'initializing': self.send_header('x-harness-bootstrap', '1')
+        self.end_headers()
+        try: self.wfile.write(b'ready')
+        except BrokenPipeError: pass
+http.server.ThreadingHTTPServer((host, port), Handler).serve_forever()
 `)
   const socket = createServer()
   await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve))
@@ -84,7 +92,8 @@ http.server.HTTPServer((host, port), Handler).serve_forever()
   const cli = (...args) => spawnSync(join(repo, 'platform/dsh-platform'), args, { env, encoding: 'utf8', timeout: 15_000 })
   const state = () => JSON.parse(cli('status', '--json').stdout)
   try {
-    assert.equal(cli('start', '--dry-run').status, 0)
+    const dry = cli('start', '--dry-run')
+    assert.equal(dry.status, 0, dry.stderr || dry.stdout)
     assert.equal(managedState(data, repo), undefined)
     const first = cli('start')
     assert.equal(first.status, 0, first.stderr || first.stdout)
@@ -92,6 +101,20 @@ http.server.HTTPServer((host, port), Handler).serve_forever()
     assert.equal(state().status, 'running')
     assert.equal(cli('start').status, 0)
     assert.equal(state().pid, pid)
+    for (const mode of ['failed', 'stall']) {
+      writeFileSync(health, mode)
+      const before = readFileSync(file, 'utf8')
+      assert.equal(state().status, 'unavailable')
+      const unavailable = cli('start')
+      assert.notEqual(unavailable.status, 0)
+      assert.match(unavailable.stderr, /HTTP 未就绪/)
+      assert.equal(managedState(data, repo).pid, pid, '探测失败不能擅自终止原进程')
+      assert.equal(readFileSync(file, 'utf8'), before)
+    }
+    writeFileSync(health, 'initializing')
+    assert.equal(state().status, 'initializing')
+    assert.match(cli('start').stdout, /等待初始化/)
+    writeFileSync(health, 'running')
     assert.equal(cli('restart').status, 0)
     assert.notEqual(state().pid, pid)
     assert.equal(cli('stop').status, 0)
