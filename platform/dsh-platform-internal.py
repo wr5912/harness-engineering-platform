@@ -864,7 +864,7 @@ def initialize_from_browser(host, port):
         os.environ["HARNESS_ASSET_ROOT"] = selected
 
 
-def start(home, host, port, dry_run):
+def start(home, host, port, dry_run, public_url=None):
     state = bootstrap_state()
     if not state["ready"]:
         host = host or default_host()
@@ -886,6 +886,10 @@ def start(home, host, port, dry_run):
     # Launcher 选项必须先于 Web app 选项，否则 DSH 会将其透传给 Web。
     command = [executable, "--profile", PROFILE_NAME, "--patch", str(profile / PLATFORM_PATCH),
                "--host", host, "--port", str(port), "--no-open"]
+    if public_url:
+        from urllib.parse import urlsplit
+        command.extend(["--public-url", public_url, "--trusted-host", urlsplit(public_url).netloc,
+                        f"{host}:{port}", f"127.0.0.1:{port}", f"localhost:{port}"])
     if dry_run:
         print(json.dumps({
             "repository": str(REPO), "asset_root": str(asset_root()), "workspace_id": workspace["id"],
@@ -896,10 +900,11 @@ def start(home, host, port, dry_run):
             "client": str(PLUGIN / "lib" / "client.js"),
             "webserver": str(WEB / "lib" / "platform-webserver.mjs"),
             "base_url": f"http://{host}:{port}{base_path()}",
+            "public_url": public_url or f"http://{host}:{port}{base_path()}",
             "host": host, "port": port, "command": command,
         }, ensure_ascii=False, indent=2))
         return
-    print(f"平台地址：http://{host}:{port}{base_path()}（打开页面登录）", flush=True)
+    print(f"平台地址：{public_url or f'http://{host}:{port}{base_path()}'}（打开页面登录）", flush=True)
     print("平台运行中；使用 dsh-platform stop 停止，重启复用同一平台 HOME。", flush=True)
     os.chdir(asset_root())
     os.execvpe(executable, command, {**runtime_environment(home),
@@ -927,6 +932,7 @@ def main():
     start_parser = commands.add_parser("start", help="使用全局 DSH 前台启动平台")
     start_parser.add_argument("--port", type=port_value, default=18120, help="监听端口，默认 18120")
     start_parser.add_argument("--host", type=host_value, help="监听 IPv4，默认选择本机局域网地址")
+    start_parser.add_argument("--public-url", help="公开访问入口，与本机监听地址分开")
     start_parser.add_argument("--dry-run", action="store_true", help="只读检查并预览启动参数")
     args = parser.parse_args()
     try:
@@ -934,7 +940,7 @@ def main():
         if args.command == "prepare":
             prepare(home, offline=args.offline)
         else:
-            start(home, args.host, args.port, args.dry_run)
+            start(home, args.host, args.port, args.dry_run, args.public_url)
     except (PlatformError, OSError) as exc:
         print(f"dsh-platform: {exc}", file=sys.stderr)
         return 1

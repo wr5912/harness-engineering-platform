@@ -96,7 +96,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['documents/read', 'path cursor limit source_sha256', '只读当前数据工作区文档或当前会话附件。path 使用工作区相对路径或模型输入中原生附件 read_path；不传 Session ID。支持 Markdown/TXT、文本 PDF、DOCX。按 blocks 的页/段号及片段偏移引用来源；has_more=true 时用 next_cursor 与 source_sha256 连续读取，不能将首段当作全文。扫描件、图片及复杂排版以 warnings 为准；不执行文件，也不创建知识资产。'],
     ['research/read-reference', 'topic', 'topic=controlled-improvement/evaluation-and-evidence/inheritance-and-fusion/compute-variants/decision-samples。'],
     ['research/validate', 'experiment_id'], ['legacy/inspect', 'path', '仅检查 data evolution/history/imports 内的既有材料，不执行旧代码。'],
-    ['new', 'agent_id name description role evaluation_cases profile', '先查 tasks/capabilities 复用已有能力；evaluation_cases 使用实际业务测试，ID 以 U- 开头（如 U-CHAT-GREET），身份测试由平台创建。'],
+    ['new', 'agent_id name description role evaluation_cases profile', '先查 tasks/capabilities 复用已有能力；evaluation_cases 使用实际业务测试，ID 以 U- 开头（如 U-CHAT-GREET），身份测试由平台创建；inputs 为单轮字符串或按轮次排列的字符串数组，多行文字不等于多轮。'],
     ['sdk/start', 'source instance_id input session_id request_id', '启动同容器官方 TypeScript SDK 调试。request_id 固定，重试必须保持同一请求；刷新只用 sdk/status 查询，不重放输入。'],
     ['sdk/status sdk/stop', 'operation_id', '停止会关闭本次 Runtime，保留 HOME；结果未知时核对原实例，不自动重跑。'],
     ['sdk/list sdk/guide', 'source', '读取当前来源的调试记录或唯一 SDK 接入文档和 TypeScript 示例。'],

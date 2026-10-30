@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { prepareBusinessRuntimeFile } from '../plugin/src/business-control/secret-file.ts'
 import { initializeBusinessGateway } from '../plugin/src/business-control/configuration.ts'
+import { validatePlatformEntryUrl } from '../plugin/src/business-control/group-link.ts'
 
 export interface PathMapping {
   from: string
@@ -77,14 +78,14 @@ export function scanKnownOldPaths(dataRoot: string, patterns: string[]): Array<{
   return found
 }
 
-export function rewriteDeploymentAddress(dataRoot: string, host: string, port: number, gatewayPort?: number): boolean {
+export function rewriteDeploymentAddress(dataRoot: string, host: string, port: number, gatewayPort?: number, publicUrl?: string): boolean {
   const file = join(dataRoot, 'config', 'business-access.json')
   const sites = join(dataRoot, 'config/sites.json')
   const base = existsSync(sites) ? JSON.parse(readFileSync(sites, 'utf8')).platform : '/hep/'
   const previous = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : undefined
-  const management = new URL(previous?.gateway?.managementUrl ?? `http://${host}:${port}${base}`)
-  management.hostname = host
-  management.port = String(port)
+  const management = new URL(publicUrl ? validatePlatformEntryUrl(dataRoot, publicUrl) : previous?.gateway?.managementUrl ?? `http://${host}:${port}${base}`)
+  if (publicUrl && new URL(publicUrl).hash) throw new Error('--public-url 不能包含片段')
+  if (!publicUrl) { management.hostname = host; management.port = String(port) }
   initializeBusinessGateway(dataRoot, management.href, host, gatewayPort)
   const access = JSON.parse(readFileSync(file, 'utf8'))
   const gateway = access.gateway
@@ -92,14 +93,11 @@ export function rewriteDeploymentAddress(dataRoot: string, host: string, port: n
   if (gatewayPort !== undefined) gateway.port = gatewayPort
   if (gateway.publicOrigin) {
     const origin = new URL(gateway.publicOrigin)
-    origin.hostname = host
+    origin.hostname = management.hostname
     if (gatewayPort !== undefined) origin.port = String(gatewayPort)
     gateway.publicOrigin = origin.origin
   }
   if (gateway.managementUrl) {
-    const management = new URL(gateway.managementUrl)
-    management.hostname = host
-    management.port = String(port)
     gateway.managementUrl = management.href
   }
   writeFileSync(file, `${JSON.stringify(access, null, 2)}\n`, { mode: 0o600 })

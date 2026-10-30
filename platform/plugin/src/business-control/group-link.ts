@@ -3,24 +3,31 @@ import { join } from 'node:path'
 import { workspaceConfigPath } from '../workspace.ts'
 import { initializeBusinessGateway } from './configuration.ts'
 
+/** 公开入口与站点基址共用校验；不写配置或访问网络。 */
+export function validatePlatformEntryUrl(assetRoot: string, configured: string): string {
+  const base = new URL(configured)
+  const sitesPath = workspaceConfigPath(assetRoot, 'sites.json')
+  const basePath = existsSync(sitesPath) ? JSON.parse(readFileSync(sitesPath, 'utf8')).platform : base.pathname
+  if (typeof basePath !== 'string' || !/^\/(?:[A-Za-z0-9_-]+\/)*$/.test(basePath)) throw new Error('平台站点基址无效')
+  if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password || base.search
+    || ['0.0.0.0', '255.255.255.255', '[::]'].includes(base.hostname)
+    || base.pathname !== basePath) throw new Error('平台管理入口与站点基址不一致')
+  base.hash = ''
+  return base.href
+}
+
 /** 管理入口是可编辑来源；浏览器链接、公告与业务 Runtime 共用它。 */
 export function platformEntryUrl(assetRoot: string, startup?: { fallback: string; publicUrl?: string; host?: string }): string {
   const path = join(assetRoot, 'config', 'business-access.json')
   const access = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : { schemaVersion: 1, enabled: false, agents: [] }
   const configured = access.gateway?.managementUrl || startup?.publicUrl || startup?.fallback
   if (typeof configured !== 'string') throw new Error('业务网关缺少平台管理入口')
-  const base = new URL(configured)
-  const sitesPath = workspaceConfigPath(assetRoot, 'sites.json')
-  const basePath = existsSync(sitesPath) ? JSON.parse(readFileSync(sitesPath, 'utf8')).platform : base.pathname
-  if (typeof basePath !== 'string' || !/^\/(?:[A-Za-z0-9_-]+\/)*$/.test(basePath)) throw new Error('平台站点基址无效')
-  if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password || base.search
-    || base.pathname !== basePath) throw new Error('平台管理入口与站点基址不一致')
-  base.hash = ''
-  if (startup?.publicUrl && new URL(startup.publicUrl).href !== base.href) {
+  const entry = validatePlatformEntryUrl(assetRoot, configured)
+  if (startup?.publicUrl && new URL(startup.publicUrl).href !== entry) {
     throw new Error('DSH publicUrl 与 config/business-access.json 的 gateway.managementUrl 不一致，请统一平台入口')
   }
-  if (startup) initializeBusinessGateway(assetRoot, base.href, startup.host)
-  return base.href
+  if (startup) initializeBusinessGateway(assetRoot, entry, startup.host)
+  return entry
 }
 
 export function platformGroupUrl(assetRoot: string, groupId: string): string {

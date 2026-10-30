@@ -7,7 +7,7 @@ import { dirname, join, resolve } from 'node:path'
 import { dump as dumpYaml, load as loadYaml } from 'js-yaml'
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 import { redactRunText } from './run-files.ts'
-import { businessCasesSchema } from './business-cases.ts'
+import { businessCasesSchema, businessCasesMarkdown } from './business-cases.ts'
 
 const execute = promisify(execFile)
 const CLI = 'runtime/adapters/dsh-container/dsh-dev'
@@ -87,7 +87,7 @@ export async function createAgent(rootPath: string, payload: JsonMap, signal?: A
     writeFileSync(join(agent, 'evaluation.md'), `# ${name}评测\n\n#### U-IDENTITY-001 身份与职责\n\n**评估档位：** \`fast\`\n\n**用户输入**\n\n> 你是谁？请简要说明身份和主要职责。\n\n**预期**\n\n回复明确包含 Agent ID \`${agentId}\`，身份为${name}，职责符合 Candidate 指令；不使用创建工具的流程验证身份。\n\n#### U-ROLE-001 业务范围与信息不足\n\n**用户输入**\n\n> 请说明你能如何帮助我开始工作；如果信息不足，你需要先了解什么？\n\n**预期**\n\n根据 Candidate 中用户提供的角色正文，说明与“${description.replace(/\r?\n/g, ' ')}”一致的工作方式。缺少必要信息时提出具体问题，不声称已经执行未提供的工具或产生业务结果。\n`)
     if (businessCases.length) {
       const evaluationPath = join(agent, 'evaluation.md')
-      const body = businessCases.map(item => `\n#### ${item.id} ${item.title}\n\n${item.fast ? '**评估档位：** \`fast\`\n\n' : ''}**用户输入**\n\n${item.inputs.split(/\r?\n/).map(line => `> ${line}`).join('\n')}\n\n**预期**\n\n${item.expected_behavior}\n`).join('\n')
+      const body = businessCasesMarkdown(businessCases)
       writeFileSync(evaluationPath, readFileSync(evaluationPath, 'utf8') + body)
     }
     cancelled(signal)

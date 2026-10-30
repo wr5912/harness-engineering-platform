@@ -6,13 +6,13 @@ import { fileURLToPath } from 'node:url'
 import { isIP } from 'node:net'
 import { setTimeout as delay } from 'node:timers/promises'
 import { defaultAssetRoot } from './plugin/src/workspace.ts'
-import { platformEntryUrl } from './plugin/src/business-control/group-link.ts'
+import { platformEntryUrl, validatePlatformEntryUrl } from './plugin/src/business-control/group-link.ts'
 import { initializeBusinessGateway } from './plugin/src/business-control/configuration.ts'
 import { prepareBusinessRuntimeFile } from './plugin/src/business-control/secret-file.ts'
 import { reportBusinessReadiness } from './business-readiness.mts'
 
 const programRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-type State = { pid: number; birth: string; programRoot: string; dataRoot: string; url: string; host: string; port: number; log: string; phase: string; detached: boolean }
+type State = { pid: number; birth: string; programRoot: string; dataRoot: string; url: string; publicUrl?: string; host: string; port: number; log: string; phase: string; detached: boolean }
 const json = (path: string) => JSON.parse(readFileSync(path, 'utf8'))
 function atomic(path: string, value: unknown, business = false) {
   const temporary = `${path}.${process.pid}.tmp`
@@ -68,24 +68,36 @@ async function httpPhase(url: string): Promise<'running' | 'initializing' | 'una
   } catch { return 'unavailable' }
 }
 
-export function launchAddress(dataRoot: string, host?: string, port?: string): { host: string; port: number; url: string } {
+export function launchAddress(dataRoot: string, host?: string, port?: string, publicUrl?: string): { host: string; port: number; url: string; publicUrl: string } {
   let configured: URL | undefined
   const access = join(dataRoot, 'config/business-access.json')
   if (existsSync(access) && json(access).gateway?.managementUrl !== undefined) configured = new URL(platformEntryUrl(dataRoot))
-  if (!host && !configured) {
+  let previous: State | undefined
+  try {
+    const stored = json(join(dataRoot, '.local/platform-service/state.json')) as State
+    if (stored.programRoot === programRoot && stored.dataRoot === resolve(dataRoot)) previous = stored
+  } catch { /* 首次启动没有历史监听地址。 */ }
+  const local = (value: string) => Object.values(networkInterfaces()).flat().some(item => item?.address === value)
+  const separate = configured && (configured.protocol === 'https:' || !local(configured.hostname)
+    || previous?.publicUrl === configured.href && previous.publicUrl !== previous.url)
+  if (!host && separate && previous && local(previous.host)) host = previous.host
+  if (!host && (!configured || separate)) {
     const route = spawnSync('ip', ['-j', '-4', 'route', 'get', '1.1.1.1'], { encoding: 'utf8', timeout: 5000 })
     try { host = JSON.parse(route.stdout)[0].prefsrc } catch { throw new Error('无法确定本机 IPv4，请指定 --host') }
   }
   host ??= configured!.hostname
   if (isIP(host) !== 4 || host === '0.0.0.0' || host === '255.255.255.255' || Number(host.split('.')[0]) >= 224) throw new Error('--host 必须是具体 IPv4 地址')
-  if (!Object.values(networkInterfaces()).flat().some(item => item?.address === host)) throw new Error(`监听地址 ${host} 不属于本机；请用 --host 指定本机地址`)
-  const number = port === undefined ? Number(configured?.port || (configured?.protocol === 'https:' ? 443 : configured ? 80 : 18120)) : Number(port)
+  if (!local(host)) throw new Error(`监听地址 ${host} 不属于本机；请用 --host 指定本机地址`)
+  const number = port === undefined ? Number(separate ? previous?.port ?? 18120 : configured?.port || (configured ? 80 : 18120)) : Number(port)
   if (!Number.isInteger(number) || number < 1 || number > 65535) throw new Error('--port 必须是 1 至 65535 的整数')
-  if (configured?.protocol === 'https:') throw new Error('当前启动器直接提供 HTTP；请将 managementUrl 配置为本机 HTTP 入口')
   const sites = join(dataRoot, 'config/sites.json')
   const base = existsSync(sites) ? json(sites).platform : '/hep/'
   if (typeof base !== 'string' || !/^\/(?:[A-Za-z0-9_-]+\/)*$/.test(base)) throw new Error('config/sites.json 的平台基址无效')
-  return { host, port: number, url: `http://${host}:${number}${base}` }
+  const url = `http://${host}:${number}${base}`
+  if (publicUrl && new URL(publicUrl).hash) throw new Error('--public-url 不能包含片段')
+  const entry = validatePlatformEntryUrl(dataRoot, publicUrl ?? (separate ? configured!.href : url))
+  if (new URL(entry).pathname !== base) throw new Error('平台管理入口与站点基址不一致')
+  return { host, port: number, url, publicUrl: entry }
 }
 
 function privateArgs(args: string[]) { return [join(programRoot, 'platform/dsh-platform-internal.py'), ...args] }
@@ -118,7 +130,8 @@ async function stop(dataRoot: string) {
   try { process.kill(state.detached ? -state.pid : state.pid, 'SIGTERM') }
   catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error }
   for (let n = 0; n < 300; n++) {
-    if (processBirth(state.pid) !== state.birth) { rmSync(join(dataRoot, '.local/platform-service/state.json'), { force: true }); return }
+    // 保留上次监听地址，公开入口使用 NAT/反代时下次启动仍可复用原端口。
+    if (processBirth(state.pid) !== state.birth) return
     await delay(100)
   }
   throw new Error(`平台 PID ${state.pid} 未在 30 秒内退出；请检查日志 ${state.log}，未强制终止`)
@@ -127,17 +140,17 @@ async function stop(dataRoot: string) {
 export async function main(args = process.argv.slice(2)): Promise<number> {
   const [command, ...rest] = args
   if (!command || command === '--help') {
-    console.log('用法：dsh-platform prepare [--offline] | start [--foreground] [--host IPv4] [--port 18120] [--dry-run] | stop | restart [--host IPv4] [--port 18120] | status [--json]')
+    console.log('用法：dsh-platform prepare [--offline] | start [--foreground] [--host IPv4] [--port 18120] [--public-url URL] [--dry-run] | stop | restart [--host IPv4] [--port 18120] [--public-url URL] | status [--json]')
     return 0
   }
   const flags = new Set<string>(), values: Record<string, string> = {}
-  const allowed: Record<string, string[]> = { prepare: ['--offline'], start: ['--foreground', '--dry-run', '--host', '--port'], restart: ['--foreground', '--host', '--port'], stop: [], status: ['--json'] }
+  const allowed: Record<string, string[]> = { prepare: ['--offline'], start: ['--foreground', '--dry-run', '--host', '--port', '--public-url'], restart: ['--foreground', '--host', '--port', '--public-url'], stop: [], status: ['--json'] }
   if (!allowed[command]) throw new Error(`未知命令：${command}`)
   for (let n = 0; n < rest.length; n++) {
     const key = rest[n]
     if (!allowed[command].includes(key) || flags.has(key)) throw new Error(`不支持或重复的选项：${key}`)
     flags.add(key)
-    if (['--host', '--port'].includes(key)) {
+    if (['--host', '--port', '--public-url'].includes(key)) {
       if (!rest[n + 1] || rest[n + 1].startsWith('--')) throw new Error(`${key} 需要值`)
       values[key] = rest[++n]
     }
@@ -154,11 +167,11 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
     const state = managedState(dataRoot)
     let status = state ? 'starting' : 'stopped'
     if (state && ownsPort(state.pid, state.host, state.port)) status = await httpPhase(state.url)
-    console.log(flags.has('--json') ? JSON.stringify({ status, ...state }, null, 2) : `${status}${state ? ` ${state.url}\nPID：${state.pid}\n日志：${state.log}` : ''}`)
+    console.log(flags.has('--json') ? JSON.stringify({ status, ...state }, null, 2) : `${status}${state ? ` ${state.publicUrl ?? state.url}\nPID：${state.pid}\n日志：${state.log}` : ''}`)
     return 0
   }
-  const address = command === 'stop' ? undefined : launchAddress(dataRoot, values['--host'], values['--port'])
-  const startArgs = address ? ['start', '--host', address.host, '--port', String(address.port)] : []
+  const address = command === 'stop' ? undefined : launchAddress(dataRoot, values['--host'], values['--port'], values['--public-url'])
+  const startArgs = address ? ['start', '--host', address.host, '--port', String(address.port), '--public-url', address.publicUrl] : []
   if (flags.has('--dry-run')) return spawnSync(python(), privateArgs([...startArgs, '--dry-run']), { stdio: 'inherit' }).status ?? 1
   const service = join(dataRoot, '.local/platform-service')
   const unlock = await lock(join(service, 'operation.lock'))
@@ -168,10 +181,11 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
     const existing = managedState(dataRoot)
     if (existing) {
       if (existing.url !== address!.url) throw new Error(`平台已使用 ${existing.url} 启动；请用 restart 修改地址`)
+      if ((existing.publicUrl ?? existing.url) !== address!.publicUrl) throw new Error('平台公开入口已变化；请用 restart 应用地址')
       if (!ownsPort(existing.pid, existing.host, existing.port)) throw new Error(`平台进程仍在启动但尚未监听；请检查日志 ${existing.log}`)
       const phase = await httpPhase(existing.url)
       if (phase === 'unavailable') throw new Error(`平台进程仍在监听，但 HTTP 未就绪：${existing.url}；请检查日志 ${existing.log}`)
-      console.log(`平台${phase === 'initializing' ? '等待初始化' : '已启动'}：${existing.url}\nPID：${existing.pid}\n日志：${existing.log}`)
+      console.log(`平台${phase === 'initializing' ? '等待初始化' : '已启动'}：${existing.publicUrl ?? existing.url}\nPID：${existing.pid}\n日志：${existing.log}`)
       if (phase === 'running') await reportBusinessReadiness(programRoot, dataRoot)
       return 0
     }
@@ -180,7 +194,7 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
     let saved: string | undefined
     // 数据尚未初始化时由浏览器引导建立配置，不能预先制造不完整数据根。
     if (existsSync(join(dataRoot, 'workspace.json'))) {
-      initializeBusinessGateway(dataRoot, address!.url, address!.host)
+      initializeBusinessGateway(dataRoot, address!.publicUrl, address!.host)
       saved = readFileSync(accessPath, 'utf8')
     }
     const log = join(service, 'platform.log')
@@ -211,7 +225,7 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
           if (phase !== 'unavailable') {
             state.phase = phase
             atomic(join(service, 'state.json'), state)
-            console.log(`平台${state.phase === 'initializing' ? '等待初始化' : '已启动'}：${state.url}\nPID：${state.pid}\n日志：${log}`)
+            console.log(`平台${state.phase === 'initializing' ? '等待初始化' : '已启动'}：${state.publicUrl ?? state.url}\nPID：${state.pid}\n日志：${log}`)
             if (state.phase === 'running') await reportBusinessReadiness(programRoot, dataRoot)
             unlock()
             if (foreground) return await exited

@@ -912,6 +912,20 @@ if sys.argv[1:] == ["run", "build"]:
                              str(self.profile / "harness-platform.patch.yml"), "--host", "127.0.0.1"])
             self.assertEqual(call["args"][-1], "--no-open")
 
+    def test_public_entry_uses_native_dsh_flags_while_runtime_keeps_local_http(self):
+        self.prepare()
+        port = self.free_port()
+        public_url = "https://platform.example/hep/"
+        result = self.run_cli("start", "--dry-run", "--port", str(port), "--public-url", public_url)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        preview = json.loads(result.stdout)
+        self.assertEqual(preview["base_url"], f"http://127.0.0.1:{port}/hep/")
+        self.assertEqual(preview["public_url"], public_url)
+        command = preview["command"]
+        self.assertEqual(command[command.index("--public-url") + 1], public_url)
+        self.assertIn("platform.example", command[command.index("--trusted-host") + 1:])
+        self.assertIn(f"127.0.0.1:{port}", command[command.index("--trusted-host") + 1:])
+
     def test_stopped_server_time_wait_does_not_block_restart(self):
         self.prepare()
         with socket.socket() as listener:

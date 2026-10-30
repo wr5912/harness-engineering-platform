@@ -45,7 +45,7 @@ function validateOptions(command: string, options: Options): void {
     'agent-pack': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir', 'out', 'seed-file', 'expected-candidate-sha256'],
     'agent-prepare': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir', 'image-archive', 'docker-assets'],
     pack: ['out', 'program-root', 'data-root', 'assets-dir', 'image-archive', 'image-tag', 'image-id', 'image-fingerprint', 'arch'],
-    install: ['bundle-root', 'prefix', 'data-root', 'host', 'port', 'gateway-port'],
+    install: ['bundle-root', 'prefix', 'data-root', 'host', 'port', 'gateway-port', 'public-url'],
     verify: ['prefix', 'data-root', 'url'],
   }
   const flags: Record<string, string[]> = {
@@ -118,6 +118,7 @@ function usage(): string {
     --prefix <目录>              程序安装目录，默认 ~/work/harness-engineering-platform-data
     --data-root <目录>           数据根，默认 ~/harness-engineering-platform-data
     --host <IPv4>                平台与业务网关监听地址；跨主机恢复数据根时指定
+    --public-url <URL>           NAT 或反代后的平台公开入口；默认与监听地址相同
     --port <端口>                平台端口，默认 18120
     --gateway-port <端口>        业务网关端口；并行部署时指定空闲端口
     --dry-run                    只校验和展示计划，不写入
@@ -224,6 +225,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       }
       if (text(options, 'port') && !host) throw new Error('--port 需要同时指定 --host')
       if (text(options, 'gateway-port') && !host) throw new Error('--gateway-port 需要同时指定 --host')
+      if (text(options, 'public-url') && !host) throw new Error('--public-url 需要同时指定 --host')
       const report = install({
         bundleRoot: resolve(bundleRoot),
         prefix: resolve(text(options, 'prefix', join(homedir(), 'work', 'harness-engineering-platform-data')) as string),
@@ -231,6 +233,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
         host,
         port: installPort(text(options, 'port'), 'port', 18120),
         gatewayPort: text(options, 'gateway-port') ? installPort(text(options, 'gateway-port'), 'gateway-port', 0) : undefined,
+        publicUrl: text(options, 'public-url'),
         skipImage: flag(options, 'skip-image'),
         skipPrepare: flag(options, 'skip-prepare'),
         allowFixtureData: flag(options, 'allow-fixture-data'),

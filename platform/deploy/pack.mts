@@ -182,7 +182,7 @@ export function pack(options: PackOptions): { archive: string; size: number } {
     dataCheck = assertRealWorkspace(dataRoot, options.allowFixtureData)
     dataRepository = copyData(dataRoot, staging)
     copyDataDependencies(join(staging, 'data'), options.assetsDir!)
-    const knowledge = collectPlatformKnowledge(staging)
+    const knowledge = collectPlatformKnowledge(staging, join(options.assetsDir!, 'knowledge'))
     if (knowledge) runtime.knowledge = knowledge
   }
   console.error('pack: 正在核对并收集标准 Runtime 镜像')

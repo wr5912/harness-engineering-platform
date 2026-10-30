@@ -235,6 +235,17 @@ test('实际创建入口与工具参数共用 Case 合同，非法业务 Case �
   } finally { rmSync(root, { recursive: true, force: true }) }
 })
 
+test('实际创建的多轮 Case 保留每轮边界，单轮内换行不变成另一轮', async () => {
+  const root = createFixture()
+  try {
+    const turns = ['请记住订单编号 A-17。\n本轮不结算。', '刚才的订单编号是什么？']
+    success(await createAgent(root, { ...input, evaluation_cases: [{ id: 'U-CHAT-MEMORY', title: '跨轮记忆', inputs: turns, expected_behavior: '第二轮准确回答 A-17。' }] }))
+    const result = spawnSync(process.env.HARNESS_PYTHON ?? 'python3', ['-c', 'import sys,json;from pathlib import Path;sys.path.insert(0,sys.argv[1]);from evaluation_contract import load_evaluation;print(json.dumps(load_evaluation(Path(sys.argv[2]))["cases"]["U-CHAT-MEMORY"]["inputs"]))', join(root, 'runtime/research'), join(root, 'agents/daily-assistant/evaluation.md')], { encoding: 'utf8' })
+    assert.equal(result.status, 0, result.stderr)
+    assert.deepEqual(JSON.parse(result.stdout), turns)
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
 test('新建失败完整回滚，输入凭据、取消和并发重名不会覆盖资产', async () => {
   const root = createFixture()
   try {

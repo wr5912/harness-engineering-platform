@@ -76,6 +76,16 @@ test('安装 prepare 使用同一环境；失败清理后可以原命令重试',
   assert.equal(install(options(path, prefix)).prepare, 'ok')
 })
 
+test('安装公开入口先校验，干运行也拒绝凭据与片段且不创建目录', () => {
+  const path = bundle('public-url-bundle'), prefix = join(root, 'public-url-program')
+  writeLauncher(path, 'import sys\n')
+  manifest(path)
+  for (const publicUrl of ['https://user:password@platform.example/hep/', 'https://platform.example/hep/#fragment']) {
+    assert.throws(() => install({ ...options(path, prefix), host: '127.0.0.1', publicUrl, dryRun: true }))
+    assert.equal(existsSync(prefix), false)
+  }
+})
+
 test('安装拒绝 Python 携带 glibc，工具版本失败保留具体命令和原因', () => {
   const path = bundle('python-libc-bundle')
   const libc = join(path, 'offline/python/lib/libc.so.6')

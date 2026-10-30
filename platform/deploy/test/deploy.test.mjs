@@ -119,6 +119,23 @@ test('安装时将业务网关和管理入口绑定到目标主机与空闲端�
   } finally { close() }
 })
 
+test('NAT 安装分别保存本机监听与公开入口，管理与业务链接使用公网主机', () => {
+  const { root, close } = workspace()
+  try {
+    mkdirSync(join(root, 'config'))
+    writeFileSync(join(root, 'config/sites.json'), '{"platform":"/hep/"}')
+    rewriteDeploymentAddress(root, '127.0.0.1', 18121, 53106, 'https://platform.example/hep/')
+    const file = join(root, 'config/business-access.json'), before = readFileSync(file, 'utf8')
+    const result = JSON.parse(before)
+    assert.equal(result.gateway.host, '127.0.0.1')
+    assert.equal(result.gateway.port, 53106)
+    assert.equal(result.gateway.managementUrl, 'https://platform.example/hep/')
+    assert.equal(result.gateway.publicOrigin, 'http://platform.example:53106')
+    assert.throws(() => rewriteDeploymentAddress(root, '127.0.0.1', 18121, 53106, 'https://user:password@platform.example/hep/'))
+    assert.equal(readFileSync(file, 'utf8'), before)
+  } finally { close() }
+})
+
 test('敏感安装包归档仅允许打包用户读取，覆盖旧归档也保持权限', () => {
   const { root, close } = workspace()
   try {

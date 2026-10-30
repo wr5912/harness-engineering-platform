@@ -91,13 +91,13 @@ export async function verifyDeployment(options: VerifyOptions): Promise<{ checks
   if (options.url) {
     try {
       const state = managedState(dataRoot, prefix)
-      if (!state || new URL(options.url).href !== state.url || !ownsPort(state.pid, state.host, state.port)) throw new Error('地址未对应当前程序和数据根的受管监听进程')
+      if (!state || ![state.url, state.publicUrl].includes(new URL(options.url).href) || !ownsPort(state.pid, state.host, state.port)) throw new Error('地址未对应当前程序和数据根的受管监听进程')
       const account = JSON.parse(readFileSync(join(dataRoot, '.local/credentials/admin.json'), 'utf8'))
       const request = { redirect: 'manual' as const, signal: AbortSignal.timeout(10_000) }
-      const login = await fetch(new URL('login', state.url), { ...request, method: 'POST', headers: { origin: new URL(state.url).origin, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ username: account.username, password: account.password }) })
+      const login = await fetch(new URL('login', options.url), { ...request, method: 'POST', headers: { origin: new URL(options.url).origin, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ username: account.username, password: account.password }) })
       const cookie = login.headers.getSetCookie().map(value => value.split(';')[0]).join('; ')
       if (login.status !== 303 || !cookie) throw new Error('平台密码登录未成功')
-      const response = await fetch(new URL('harness-platform/inventory', state.url), { ...request, method: 'POST', headers: { origin: new URL(state.url).origin, cookie, 'content-type': 'application/json' }, body: JSON.stringify({ type: 'client-request', rpcId: 'deployment-verify', method: 'inventory', payload: {} }) })
+      const response = await fetch(new URL('harness-platform/inventory', options.url), { ...request, method: 'POST', headers: { origin: new URL(options.url).origin, cookie, 'content-type': 'application/json' }, body: JSON.stringify({ type: 'client-request', rpcId: 'deployment-verify', method: 'inventory', payload: {} }) })
       if (response.status !== 200) throw new Error(`清单 RPC 返回 ${response.status}`)
       const inventory = (await response.json() as any)?.result?.value
       const identity = workspaceIdentity(dataRoot)

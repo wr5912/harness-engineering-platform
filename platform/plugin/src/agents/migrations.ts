@@ -6,7 +6,7 @@ import { DEFAULT_SCHEMA, Type, dump, load } from 'js-yaml'
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 import { createAgent } from './create-agent.ts'
 import { assetText } from './asset-text.ts'
-import { businessCasesSchema } from './business-cases.ts'
+import { businessCasesSchema, businessCasesMarkdown } from './business-cases.ts'
 import { inheritedLoadableAssets, versionIdentity, versionSource } from './version-source.ts'
 import { VERSION_ID, assertInheritableVersion } from '../version-id.ts'
 import { candidateDigest, candidateFiles, dataPath, sha256 } from '../tasks/files.ts'
@@ -125,9 +125,6 @@ function copyFixedParent(root: string, parent: ReturnType<typeof parentTarget>, 
   harness.credential_environment_keys = [...new Set([...(parent.source.required_env_names ?? []), ...(parent.source.optional_env_names ?? [])])]
   writeYaml(file, harness)
 }
-function caseMarkdown(cases: MigrationMap[]) {
-  return cases.map(item => `\n#### ${item.id} ${item.title}\n\n${item.fast ? '**评估档位：** \`fast\`\n\n' : ''}**用户输入**\n\n${item.inputs.split(/\r?\n/).map((line: string) => `> ${line}`).join('\n')}\n\n**预期**\n\n${item.expected_behavior}\n`).join('\n')
-}
 function assertLoadable(stage: string, id: string) {
   const source = versionSource(stage, id)
   for (const path of [`${source.candidate_root}/presets/${source.preset}`, `${source.candidate_root}/managed/${source.patch}`, ...(source.guard ? [`${source.candidate_root}/managed/${source.guard}`] : [])]) {
@@ -237,7 +234,7 @@ export function createMigrationsHandler(rootPath: string) {
         if (caseIds.length) operation.evaluation_before_sha256 = existsSync(evaluation) ? sha256(before) : null
         if (cases.length) {
           for (const item of cases) if (new RegExp(`^####\\s+${item.id}(?:\\s|$)`, 'm').test(before)) fail(`评测用例 ${item.id} 已存在，请沿用已有用例或明确另设 ID`)
-          finalEvaluation = before + caseMarkdown(cases); operation.evaluation_after_sha256 = sha256(finalEvaluation)
+          finalEvaluation = before + businessCasesMarkdown(cases); operation.evaluation_after_sha256 = sha256(finalEvaluation)
           writeFileSync(join(directory, 'evaluation.after.md'), finalEvaluation)
         }
       }

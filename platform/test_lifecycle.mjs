@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { launchAddress, managedState, processBirth } from './lifecycle.mts'
 import { handoffService } from './bootstrap/server.ts'
+import { platformGroupUrl } from './plugin/src/business-control/group-link.ts'
 
 test('地址配置只读校验，允许已有多级站点基址', () => {
   const root = mkdtempSync(join(tmpdir(), 'hep-address-'))
@@ -21,6 +22,15 @@ test('地址配置只读校验，允许已有多级站点基址', () => {
     assert.equal(readFileSync(file, 'utf8'), before)
     assert.throws(() => launchAddress(root, '192.0.2.10'), /不属于本机/)
     assert.throws(() => launchAddress(root, '0.0.0.0'), /具体 IPv4/)
+    const nat = launchAddress(root, '127.0.0.1', '18221', 'https://platform.example/Tools/hep_1/')
+    assert.equal(nat.url, 'http://127.0.0.1:18221/Tools/hep_1/')
+    assert.equal(nat.publicUrl, 'https://platform.example/Tools/hep_1/')
+    for (const url of ['ftp://platform.example/Tools/hep_1/', 'https://user:pass@platform.example/Tools/hep_1/',
+      'https://platform.example/Tools/hep_1/?key=example', 'https://platform.example/Tools/hep_1/#section',
+      'https://platform.example/wrong/', 'http://0.0.0.0/Tools/hep_1/']) {
+      assert.throws(() => launchAddress(root, '127.0.0.1', '18221', url))
+    }
+    assert.equal(readFileSync(file, 'utf8'), before)
   } finally { rmSync(root, { recursive: true, force: true }) }
 })
 
@@ -117,8 +127,22 @@ http.server.ThreadingHTTPServer((host, port), Handler).serve_forever()
     writeFileSync(health, 'running')
     assert.equal(cli('restart').status, 0)
     assert.notEqual(state().pid, pid)
+    const publicUrl = 'https://platform.example/hep/'
+    const nat = cli('restart', '--host', '127.0.0.1', '--port', String(port), '--public-url', publicUrl)
+    assert.equal(nat.status, 0, nat.stderr || nat.stdout)
+    assert.equal(state().status, 'running', '健康检查访问本机监听，不请求不可达的公网示例地址')
+    assert.equal(state().url, `http://127.0.0.1:${port}/hep/`)
+    assert.equal(state().publicUrl, publicUrl)
+    assert.equal(platformGroupUrl(data, 'example'), publicUrl + 'mcp/groups/example/v2')
+    assert.equal(cli('restart').status, 0)
+    assert.equal(state().publicUrl, publicUrl)
+    assert.equal(state().port, port)
     assert.equal(cli('stop').status, 0)
     assert.equal(state().status, 'stopped')
+    assert.equal(cli('stop').status, 0)
+    assert.equal(cli('start').status, 0)
+    assert.equal(state().publicUrl, publicUrl, '停止后启动仍保留公开入口')
+    assert.equal(state().port, port, '停止后启动复用此前本机监听端口')
     assert.equal(cli('stop').status, 0)
     const foreground = spawn(join(repo, 'platform/dsh-platform'), ['start', '--foreground'], { env, stdio: 'ignore' })
     const foregroundExit = new Promise(resolve => foreground.once('exit', resolve))

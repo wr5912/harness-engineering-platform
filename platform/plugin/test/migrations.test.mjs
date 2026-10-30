@@ -31,6 +31,15 @@ function fixture(t) {
   return { root, source, handler: createMigrationsHandler(root) }
 }
 const cases = [{ id: 'U-MIGRATION-001', title: '保留工作职责', inputs: '请说明分析步骤。', expected_behavior: '先读取用户提供的材料，再给出分析步骤。', fast: true }]
+
+test('迁移新增多轮 Case 与权威解析器保持独立输入轮次', async t => {
+  const fx = fixture(t), turns = ['请记住编号 B-24。', '刚才的编号是什么？']
+  const { preview } = await sourceAndPreview(fx, { evaluation_cases: [{ ...cases[0], inputs: turns }] })
+  success(await fx.handler('apply', preview.apply_input))
+  const result = spawnSync(process.env.HARNESS_PYTHON ?? 'python3', ['-c', 'import json,sys;from pathlib import Path;sys.path.insert(0,sys.argv[1]);from evaluation_contract import load_evaluation;print(json.dumps(load_evaluation(Path(sys.argv[2]))["cases"]["U-MIGRATION-001"]["inputs"]))', join(program, 'runtime/research'), join(fx.root, 'agents/migrated-agent/evaluation.md')], { encoding: 'utf8' })
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(JSON.parse(result.stdout), turns)
+})
 async function sourceAndPreview(fx, overrides = {}) {
   write(fx.source, 'role.md', '先读取用户提供的材料，再给出分析步骤。\n')
   write(fx.source, 'lookup.dat', Buffer.from([0, 1, 2, 3, 255]))

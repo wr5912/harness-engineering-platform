@@ -20,10 +20,11 @@ export function managementKnowledgeRoots(dataRoot: string): KnowledgeRoot[] {
   return include.length ? [{ root, label: 'management', include }] : []
 }
 
-export function collectPlatformKnowledge(staging: string): RuntimeEntry | undefined {
+export function collectPlatformKnowledge(staging: string, cacheDir?: string): RuntimeEntry | undefined {
   const data = join(staging, 'data')
   const roots = managementKnowledgeRoots(data)
   if (!roots.length) return undefined
+  if (cacheDir && existsSync(cacheDir)) roots.push({ root: resolve(cacheDir), label: 'prepared-knowledge', include: [] })
   const input = join(staging, '.knowledge-input.json'), output = join(staging, '.knowledge-result.json')
   writeFileSync(input, JSON.stringify({ roots, mode: 'offline', outDir: join(data, 'knowledge/offline') }))
   try {

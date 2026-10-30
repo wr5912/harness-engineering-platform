@@ -10,6 +10,7 @@ import { dockerAvailable, loadVerifiedImage } from './image.mts'
 import { assertRealWorkspace } from './data.mts'
 import { restoreRepository } from './repository.mts'
 import { prepareDeploymentFirewall } from './firewall.mts'
+import { validatePlatformEntryUrl } from '../plugin/src/business-control/group-link.ts'
 
 export interface InstallOptions {
   bundleRoot: string
@@ -18,6 +19,7 @@ export interface InstallOptions {
   host?: string
   port: number
   gatewayPort?: number
+  publicUrl?: string
   skipImage: boolean
   skipPrepare: boolean
   allowFixtureData: boolean
@@ -53,6 +55,11 @@ export function install(options: InstallOptions): InstallReport {
   const prefix = resolve(options.prefix)
   const dataRoot = resolve(options.dataRoot)
   const manifest = readManifest(join(bundleRoot, 'manifest.json'))
+  if (options.publicUrl && !options.host) throw new Error('--public-url 需要同时指定 --host')
+  if (options.publicUrl) {
+    if (new URL(options.publicUrl).hash) throw new Error('--public-url 不能包含片段')
+    validatePlatformEntryUrl(manifest.data ? join(bundleRoot, 'data') : dataRoot, options.publicUrl)
+  }
   if (manifest.package.arch !== (process.arch === 'arm64' ? 'arm64' : 'amd64')) {
     throw new Error(`安装包架构为 ${manifest.package.arch}，当前主机为 ${process.arch}；请在对应架构重新打包`)
   }
@@ -111,7 +118,7 @@ export function install(options: InstallOptions): InstallReport {
       if (remaining.length && options.strictPaths) throw new Error(`数据根仍包含旧路径：\n${remaining.map(item => item.file + ':' + item.pattern).join('\n')}`)
       report.oldReferences.push(...remaining)
     }
-    if (options.host && rewriteDeploymentAddress(dataRoot, options.host, options.port, options.gatewayPort)) {
+    if (options.host && rewriteDeploymentAddress(dataRoot, options.host, options.port, options.gatewayPort, options.publicUrl)) {
       report.rewritten.push(join(dataRoot, 'config', 'business-access.json'))
     }
     report.pendingInstances = instanceNames(dataRoot)
@@ -182,7 +189,7 @@ export function install(options: InstallOptions): InstallReport {
         throw new Error(`安装目录已保留；${error instanceof Error ? error.message : '防火墙配置失败'}`)
       }
     }
-    const args = options.host ? ['--host', options.host, '--port', String(options.port)] : []
+    const args = options.host ? ['--host', options.host, '--port', String(options.port), ...(options.publicUrl ? ['--public-url', options.publicUrl] : [])] : []
     const started = spawnSync(join(prefix, 'platform', 'dsh-platform'), ['start', ...args], { cwd: prefix, env, stdio: 'inherit' })
     if (started.status !== 0) throw new Error(`平台启动失败（退出码 ${started.status}）；安装目录已保留，可重试 ${prefix}/platform/dsh-platform start`)
   }
