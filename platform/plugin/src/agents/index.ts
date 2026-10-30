@@ -36,6 +36,9 @@ import { VERSION_ID, isVariantIdentity, assertInheritableVersion } from '../vers
 import { createComputeVariantsHandler, type ComputeVariantCreation } from './compute-variants.ts'
 import { createTrainingServersHandler } from './training-servers.ts'
 import { createComputeBuildHandler } from './compute-build.ts'
+import { createAssetBuildHandler } from './asset-build.ts'
+import { createAssetDependenciesHandler } from './asset-dependencies.ts'
+import { createMigrationsHandler } from './migrations.ts'
 import { createComputeFreezeHandler } from './compute-freeze.ts'
 import { programRoot, workspaceConfigPath, workspaceLocalPath } from '../workspace.ts'
 import { discoverTaskCapabilities, type CapabilityOptions } from '../tasks/capabilities.ts'
@@ -50,7 +53,7 @@ import { createVariantIdentityMigrationHandler, currentVariantProjection } from 
 type JsonMap = Record<string, unknown>
 type SourceCatalog = { schema_version?: string; sources?: Record<string, JsonMap> }
 type RpcValue = JsonMap | JsonMap[] | string | number | boolean | null
-type EvalModelPolicyProvider = (agentId: string) => Promise<{ policy: unknown; environment: Record<string, string> }>
+type EvalModelPolicyProvider = (agentId: string, selection?: { provider: string; model: string; reasoningEffort?: string }, candidatePath?: string) => Promise<{ policy: unknown; environment: Record<string, string> }>
 
 const EXP_ID = VERSION_ID
 const RUN_ID = /^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
@@ -1423,9 +1426,21 @@ function cleanupEvalPolicies(root: string, jobId: string) {
 
 async function evalCommand(root: string, payload: JsonMap, dryRun: boolean, modelPolicy?: EvalModelPolicyProvider,
   jobId = 'preview'): Promise<{ executable: string; args: string[]; environment?: NodeJS.ProcessEnv; dispose?: () => void }> {
-  if (!modelPolicy) return { executable: process.env.HARNESS_PYTHON || 'python3', args: programArgs(evalArgs(payload, dryRun)) }
+  if (!modelPolicy) {
+    if (payload.model_selection !== undefined) throw new RpcError('model_policy_unavailable', '当前执行入口没有原生模型投影，无法应用 model_selection')
+    return { executable: process.env.HARNESS_PYTHON || 'python3', args: programArgs(evalArgs(payload, dryRun)) }
+  }
   let projected: Awaited<ReturnType<EvalModelPolicyProvider>>
-  try { projected = await modelPolicy(sourceInfo(root, stringField(payload, 'source')).agent_id) }
+  try {
+    const source = sourceInfo(root, stringField(payload, 'source'))
+    let selection: Parameters<EvalModelPolicyProvider>[1]
+    if (payload.model_selection !== undefined) {
+      const value = requireObject(payload.model_selection)
+      if (typeof value.provider !== 'string' || !value.provider || typeof value.model !== 'string' || !value.model || value.reasoningEffort !== undefined && typeof value.reasoningEffort !== 'string') throw new Error('model_selection 需要原生 provider/model/reasoningEffort')
+      selection = { provider: value.provider, model: value.model, ...(value.reasoningEffort === undefined ? {} : { reasoningEffort: value.reasoningEffort as string }) }
+    }
+    projected = await modelPolicy(source.agent_id, selection, source.candidate)
+  }
   catch (error) { throw new RpcError('model_policy_unavailable', redact((error as Error).message)) }
   const directory = workspaceLocalPath(root, 'evaluation-jobs', 'model-policies')
   mkdirSync(directory, { recursive: true, mode: 0o700 })
@@ -1588,6 +1603,9 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
   const previews = new Map<string, VersionPreview>()
   const datasets = createDecisionDatasetHandler(root)
   const computeBuild = createComputeBuildHandler(root)
+  const assetBuild = createAssetBuildHandler(root)
+  const assetDependencies = createAssetDependenciesHandler(root)
+  const migrations = createMigrationsHandler(root)
   const computeFreeze = createComputeFreezeHandler(root)
   const variantIdentity = createVariantIdentityMigrationHandler(root)
   const computeVariants = createComputeVariantsHandler(root, {
@@ -1618,6 +1636,15 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
     if (endpoint.startsWith('deployment/') && deployment) return deployment(endpoint.slice('deployment/'.length), payload, signal, peer)
     try {
       const body = payload === undefined ? {} : requireObject(payload)
+      if (endpoint.startsWith('migrations/')) return await migrations(endpoint.slice('migrations/'.length) as any, body, signal)
+      if (endpoint === 'assets/build-preview' || endpoint === 'assets/build') {
+        const result = await assetBuild(endpoint === 'assets/build-preview' ? 'preview' : 'build', body, signal)
+        return result.ok ? ok(result.value) : failure(new RpcError(result.error.code, result.error.message))
+      }
+      if (endpoint === 'assets/dependencies/prepare') {
+        const result = await assetDependencies(body, signal)
+        return result.ok ? ok(result.value) : failure(new RpcError(result.error.code, result.error.message))
+      }
       if (endpoint.startsWith('datasets/')) return ok(await datasets(endpoint, body, signal))
       if (endpoint.startsWith('training-servers/')) return trainingServers(endpoint.slice('training-servers/'.length), body, signal, peer)
       if (endpoint.startsWith('compute-variants/')) {

@@ -75,6 +75,8 @@ INSTANCE_SCHEMA_VERSION = "2.8"
 ANALYSIS_PRESET = "scenario-analysis"
 MODEL_RUNTIME_HOST = ADAPTER.parents[2] / "platform/plugin/lib/model-runtime.js"
 MODEL_RUNTIME_CONTAINER = "/opt/harness-model-runtime/model-runtime.mjs"
+MODEL_BINDING_HOST = ADAPTER.parents[2] / "platform/plugin/lib/model-binding-runtime.js"
+MODEL_BINDING_CONTAINER = "/opt/harness-model-runtime/model-binding-runtime.mjs"
 MODEL_PATCH_CONTAINER = "/opt/harness-model-runtime/model.patch.yml"
 MODEL_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+@-]{0,255}$")
 NODE_EXECUTABLE = shutil.which("node") or "node"
@@ -96,8 +98,9 @@ def instance_base_url(manifest: dict) -> str:
 
 
 # 业务 Runtime 使用 DSH 原生 workspaceRegistry.create 预登记固定工作区；普通实例仍由用户在 Web 登记。
-def web_cold_start_hint(mode: str, analysis_workspace: str | None = None, business_control: bool = False) -> str:
-    path = workspace_to_register(mode, analysis_workspace)
+def web_cold_start_hint(mode: str, analysis_workspace: str | None = None, business_control: bool = False,
+                        contract: dict | None = None) -> str:
+    path = workspace_to_register(mode, analysis_workspace, contract)
     if business_control:
         return f"业务实例启动时自动登记固定工作区“{path}”；打开网关链接后无需选择工作区或预设。"
     return (
@@ -165,7 +168,7 @@ def _public_model_config(value: object, *, depth: int = 0) -> None:
 
 def _model_policy(raw: object, agent_id: str, *, source: str, manifest_sha256: str | None) -> dict:
     if not isinstance(raw, dict) or raw.get("agent_id") != agent_id or not raw.keys() <= {
-        "agent_id", "allowed", "default", "patch", "credential_refs", "manifest_sha256", "business_model_revision"
+        "agent_id", "allowed", "default", "patch", "credential_refs", "manifest_sha256", "business_model_revision", "harness_runtime", "resolved_model_bindings", "asset_dependencies"
     }:
         fail("模型策略的 Agent 身份或字段与所选来源不一致")
     if source == "platform" and (not isinstance(raw.get("manifest_sha256"), str)
@@ -233,7 +236,39 @@ def _model_policy(raw: object, agent_id: str, *, source: str, manifest_sha256: s
     policy = {"agent_id": agent_id, "allowed": allowed, "default": default,
               "credential_refs": refs, "patch": patch, "source": source,
               "manifest_sha256": manifest_sha256, "business_model_revision": revision}
-    digest_input = {key: policy[key] for key in ("agent_id", "allowed", "default", "credential_refs", "patch", "source", "manifest_sha256", "business_model_revision")}
+    if raw.get("harness_runtime") is not None:
+        if not isinstance(raw["harness_runtime"], dict):
+            fail("Harness 运行投影必须是对象")
+        policy["harness_runtime"] = raw["harness_runtime"]
+        bindings = raw["harness_runtime"].get("model_bindings")
+        if bindings:
+            if not isinstance(bindings, dict) or not isinstance(bindings.get("presets", {}), dict):
+                fail("角色模型绑定格式无效")
+            main = _model_identity(bindings.get("main"), "main binding", default=True)
+            # 默认模型已按有效请求核对；来源 main 可被本次显式选择替代。
+            for item in bindings.get("presets", {}).values():
+                selected = _model_identity(item, "preset binding", default=True)
+                if (selected["provider"], selected["model"]) not in identities:
+                    fail("角色模型绑定不在当前可用模型目录中")
+    if raw.get("resolved_model_bindings") is not None:
+        effective = raw["resolved_model_bindings"]
+        declared = raw.get("harness_runtime", {}).get("model_bindings")
+        if not declared or not isinstance(effective, dict) or set(effective) != {"main", "presets"} \
+                or effective.get("main") != default or not isinstance(effective.get("presets"), dict) \
+                or set(effective["presets"]) != set(declared.get("presets", {})):
+            fail("实际角色模型投影与当前来源绑定不一致")
+        for preset, item in effective["presets"].items():
+            selected = _model_identity(item, "resolved preset binding", default=True)
+            original = declared["presets"][preset]
+            if selected["provider"] != original["provider"] or selected["model"] != original["model"] \
+                    or original.get("reasoningEffort") is not None and selected.get("reasoningEffort") != original["reasoningEffort"]:
+                fail("实际角色模型投影不能改写来源显式模型或推理档位")
+        policy["resolved_model_bindings"] = effective
+    if raw.get("asset_dependencies") is not None:
+        if not isinstance(raw["asset_dependencies"], dict) or raw["asset_dependencies"].get("status") != "ready":
+            fail("业务依赖尚未准备完成")
+        policy["asset_dependencies"] = raw["asset_dependencies"]
+    digest_input = dict(policy)
     policy["sha256"] = hashlib.sha256(json.dumps(digest_input, ensure_ascii=False, sort_keys=True,
                                                  separators=(",", ":")).encode()).hexdigest()
     return policy
@@ -298,8 +333,6 @@ def read_model_policy(path: str | None, agent_id: str, *, repo: Path = REPO,
         manifest_bytes = manifest.read_bytes()
     manifest_sha256 = hashlib.sha256(manifest_bytes).hexdigest() if manifest_bytes is not None else None
     business = read_business_model_policy(repo)
-    if business["migration_required"] or business["default"] is None:
-        fail("尚未确认业务智能体统一默认模型，请先在设置 → 模型中配置")
     if path:
         if manifest_bytes is None:
             fail("平台模型策略需要当前 Agent manifest")
@@ -313,9 +346,13 @@ def read_model_policy(path: str | None, agent_id: str, *, repo: Path = REPO,
         except (OSError, UnicodeError, ValueError):
             fail("--model-policy 不是有效的非秘密 JSON")
         policy = _model_policy(raw, agent_id, source="platform", manifest_sha256=manifest_sha256)
+        if not policy.get("harness_runtime", {}).get("model_bindings") and (business["migration_required"] or business["default"] is None):
+            fail("尚未确认业务智能体统一默认模型，请先在设置 → 模型中配置")
         if policy["business_model_revision"] != business["revision"]:
             fail("平台模型策略与当前业务默认模型配置修订不一致，请重新预览实例计划")
         return policy
+    if business["migration_required"] or business["default"] is None:
+        fail("尚未确认业务智能体统一默认模型，请先在设置 → 模型中配置")
     if selected is None:
         selected = business["default"]
     if selected != business["default"]:
@@ -396,13 +433,13 @@ def assert_model_policy_current(policy: dict, *, repo: Path = REPO) -> None:
             or hashlib.sha256(manifest.read_bytes()).hexdigest() != policy["manifest_sha256"]:
         fail("Agent manifest 已在启动过程中变化，请重新预览实例计划")
     business = read_business_model_policy(repo)
-    if business["migration_required"] or policy.get("business_model_revision") != business["revision"]:
+    if (business["migration_required"] and not policy.get("harness_runtime", {}).get("model_bindings")) or policy.get("business_model_revision") != business["revision"]:
         fail("业务默认模型配置已在启动过程中变化，请重新预览实例计划")
 
 
 def model_policy_patch(policy: dict, local_routes: list[dict] | None = None, *, business: bool = False) -> str:
     if policy["source"] == "analysis-runtime":
-        return "[]\n"
+        return json.dumps(policy["patch"], ensure_ascii=False, indent=2) + "\n" if policy["patch"] else "[]\n"
     config = {"agentId": policy["agent_id"], "allowed": policy["allowed"]}
     if business:
         config["assetRoot"] = "/opt/harness-business-assets"
@@ -425,12 +462,18 @@ def model_policy_summary(policy: dict) -> dict:
             "allowed_model_count": len(policy["allowed"]), "default": policy["default"],
             "credential_env_names": policy["credential_refs"],
             "enforced": policy["source"] != "analysis-runtime",
-            "platform_sync": policy["source"] == "platform"}
+            "platform_sync": policy["source"] == "platform",
+            **({"harness_runtime": policy["harness_runtime"]} if policy.get("harness_runtime") else {}),
+            **({"resolved_model_bindings": policy["resolved_model_bindings"]} if policy.get("resolved_model_bindings") else {}),
+            **({"asset_dependencies": policy["asset_dependencies"]} if policy.get("asset_dependencies") else {})}
 
 
-def analysis_model_policy(agent_id: str) -> dict:
-    """归因评审使用独立 Preset；其模型选择不属于被测业务 Agent 的授权范围。"""
-    return _model_policy({"agent_id": agent_id, "allowed": [], "default": None}, agent_id,
+def analysis_model_policy(agent_id: str, platform_policy: dict | None = None) -> dict:
+    """独立评审 Preset 复用本次模型连接，不装载业务 Harness 和运行依赖。"""
+    raw = {"agent_id": agent_id, "allowed": [], "default": None, "credential_refs": ["DEEPSEEK_API_KEY"]}
+    if platform_policy is not None:
+        raw.update({key: platform_policy[key] for key in ("allowed", "default", "patch", "credential_refs")})
+    return _model_policy(raw, agent_id,
                          source="analysis-runtime", manifest_sha256=None)
 
 
@@ -653,10 +696,10 @@ def validate_analysis_workspace(value: str | None, *, repo: Path = REPO) -> str 
     return str(resolved)
 
 
-def workspace_to_register(mode: str, analysis_workspace: str | None = None) -> str:
+def workspace_to_register(mode: str, analysis_workspace: str | None = None, contract: dict | None = None) -> str:
     """被测会话注册 Harness；归因会话注册只读 Run。"""
     normalize_mode(mode)
-    return CONTAINER_ANALYSIS_WORKSPACE if analysis_workspace else CONTAINER_WORKSPACE
+    return CONTAINER_ANALYSIS_WORKSPACE if analysis_workspace else (contract or {}).get("workspace_path", CONTAINER_WORKSPACE)
 
 
 def session_preset(contract: dict, mode: str, analysis_workspace: str | None = None) -> str:
@@ -728,7 +771,7 @@ def compose_env(contract: dict, mode: str, port: int, name: str,
         environment.update({
             "DSH_MANAGED_PATCH": contract["patch"],
             "DSH_WORKSPACE_HOST": contract["workspace"],
-            "DSH_PRESETS_HOST": contract["presets"],
+            "DSH_PRESETS_HOST": contract.get("runtime_presets_host", contract["presets"]),
             "DSH_MANAGED_HOST": contract["managed"],
         })
         if plugin_node_modules:
@@ -736,14 +779,22 @@ def compose_env(contract: dict, mode: str, port: int, name: str,
         if contract.get("runtime_managed_patch"):
             environment["DSH_RUNTIME_MANAGED_PATCH_HOST"] = contract["runtime_managed_patch"]
             environment["DSH_MANAGED_PATCH"] = "/opt/dsh-profile-compat/managed.patch.yml"
+        if contract.get("harness_runtime"):
+            environment["DSH_MODEL_BINDING_HOST"] = str(MODEL_BINDING_HOST)
+            environment["DSH_CANDIDATE_SOURCE_HOST"] = contract["candidate_source_root"]
+        if contract.get("project_workspace_host"):
+            environment["DSH_PROJECT_WORKSPACE_HOST"] = contract["project_workspace_host"]
     if contract.get("business_control"):
         environment["DSH_BUSINESS_PATCH_HOST"] = str(instance_dir(name) / "business.patch.yml")
+    if not analysis_workspace:
+        environment.update(contract.get("asset_dependencies", {}).get("environment", {}))
     return environment
 
 
 def required_env_names(contract: dict, analysis_workspace: str | None = None) -> list[str]:
-    source_required = ["DEEPSEEK_API_KEY"] if analysis_workspace else list(contract.get("required_env_names") or [])
     policy = contract.get("model_policy") or {}
+    source_required = ([] if policy.get("source") == "analysis-runtime" else ["DEEPSEEK_API_KEY"]) \
+        if analysis_workspace else list(contract.get("required_env_names") or [])
     if not analysis_workspace and policy.get("source") == "platform":
         source_required = [name for name in source_required if name not in SOURCE_MODEL_ENV_NAMES]
     return list(dict.fromkeys(source_required + list(policy.get("credential_refs") or [])))
@@ -761,7 +812,7 @@ def runtime_env_names(contract: dict, analysis_workspace: str | None = None) -> 
     if analysis_workspace:
         return required
     optional = [name for name in source_optional_env_names(contract) if os.environ.get(name)]
-    return list(dict.fromkeys(required + optional))
+    return list(dict.fromkeys(required + optional + list(contract.get("asset_dependencies", {}).get("environment", {}))))
 
 
 def existing_runtime_environment(args: argparse.Namespace, contract: dict,
@@ -828,7 +879,8 @@ def render_compose(template: str, *, mode: str, name: str, project: str, port: i
                    unsafe_no_auth: bool = False, skip_testing_notice: bool = False,
                    plugin_node_modules: bool = False, bind_home: bool = False,
                    image_fingerprint: str | None = None, schedule_compat: bool = False,
-                   managed_patch_compat: bool = False) -> str:
+                   managed_patch_compat: bool = False, harness_runtime: bool = False,
+                   project_workspace: bool = False, dependency_mounts: list[dict] = ()) -> str:
     """把受控 Compose 模板渲染为隔离的业务或归因实例配置。"""
     if mode not in MODES:
         fail("mode 只能是 verification")
@@ -882,6 +934,24 @@ def render_compose(template: str, *, mode: str, name: str, project: str, port: i
                         "      - type: bind\n"
                         "        source: ${DSH_MODEL_PATCH_HOST:?模型授权 Patch 由启动器注入}\n"
                         f"        target: {MODEL_PATCH_CONTAINER}\n        read_only: true\n")
+    if harness_runtime and not analysis_workspace:
+        text = text.replace(web_mount, web_mount + "      - type: bind\n"
+                            "        source: ${DSH_MODEL_BINDING_HOST:?角色绑定插件由启动器注入}\n"
+                            f"        target: {MODEL_BINDING_CONTAINER}\n        read_only: true\n"
+                            "      - type: bind\n"
+                            "        source: ${DSH_CANDIDATE_SOURCE_HOST:?Candidate 来源由启动器注入}\n"
+                            "        target: /opt/harness-candidate\n        read_only: true\n")
+    if project_workspace and not analysis_workspace:
+        text = text.replace(web_mount, web_mount + "      - type: bind\n"
+                            "        source: ${DSH_PROJECT_WORKSPACE_HOST:?业务工作副本由启动器注入}\n"
+                            "        target: /work/project\n        read_only: false\n")
+        text = text.replace("      - DSH_PERMISSION_MODE=read-only\n", "      - DSH_PERMISSION_MODE=workspace-write\n")
+    if not analysis_workspace:
+        for mount in dependency_mounts:
+            text = text.replace(web_mount, web_mount + "      - type: bind\n"
+                                f"        source: {json.dumps(mount['source']).replace('$', '$$')}\n"
+                                f"        target: {json.dumps(mount['target']).replace('$', '$$')}\n"
+                                "        read_only: true\n")
     if managed_patch_compat:
         text = text.replace(web_mount, web_mount + "      - type: bind\n"
                             "        source: ${DSH_RUNTIME_MANAGED_PATCH_HOST:?兼容 Patch 由启动器注入}\n"
@@ -890,7 +960,7 @@ def render_compose(template: str, *, mode: str, name: str, project: str, port: i
     if text.count(working_dir) != 1:
         fail("Compose 模板缺少唯一的 working_dir 锚点")
     selected_working_dir = (
-        f"    working_dir: {CONTAINER_ANALYSIS_WORKSPACE}\n" if analysis_workspace else working_dir
+        f"    working_dir: {CONTAINER_ANALYSIS_WORKSPACE}\n" if analysis_workspace else "    working_dir: /work/project\n" if project_workspace else working_dir
     )
     text = text.replace(working_dir, selected_working_dir + "    network_mode: host\n"
                         "    extra_hosts:\n      - host.docker.internal:host-gateway\n")
@@ -1032,6 +1102,141 @@ def project_name(name: str) -> str:
     return f"dsh-dev-{name}"
 
 
+def assert_project_workspace_origin(contract: dict, target: Path) -> None:
+    project = contract.get("harness_runtime", {}).get("project_workspace")
+    workspace = target / "project-workspace"
+    if not project:
+        if workspace.exists() or workspace.is_symlink():
+            fail("同名实例保留着业务工作副本，请使用新实例名；原文件已保留")
+        return
+    origin_file = target / "project-workspace-source.json"
+    origin = {"candidate_source_root": contract["candidate_source_root"], "project_path": project["path"]}
+    if workspace.is_symlink() or workspace.exists() and not workspace.is_dir():
+        fail("业务持久工作副本必须是普通目录；原文件已保留")
+    if origin_file.is_symlink() or origin_file.exists() and not origin_file.is_file():
+        fail("业务工作副本来源回执不是普通文件；原文件已保留")
+    if origin_file.exists():
+        try:
+            recorded_origin = json.loads(origin_file.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            fail("业务工作副本来源回执无法读取；原文件已保留")
+        if recorded_origin != origin:
+            fail("同名实例保留的业务工作副本属于其他来源，请使用新实例名；原文件已保留")
+    elif workspace.exists():
+        fail("保留的业务工作副本缺少来源回执，请先核对其归属；原文件已保留")
+
+
+def prepare_harness_projection(contract: dict, target: Path, *, copy_workspace: bool = True) -> dict:
+    """角色仍读取只读 Candidate；业务文件只在独立工作副本首次创建时复制。"""
+    runtime = contract.get("harness_runtime")
+    if not runtime:
+        return contract
+    assert_project_workspace_origin(contract, target)
+    candidate = Path(contract["candidate_source_root"])
+    if hashlib.sha256((candidate / "harness.yaml").read_bytes()).hexdigest() != runtime["harness_sha256"]:
+        fail("Harness 运行声明已变化，请重新预览实例计划")
+    if not MODEL_BINDING_HOST.is_file() or MODEL_BINDING_HOST.is_symlink():
+        fail("Harness 角色绑定插件尚未构建")
+    projected = dict(contract)
+    presets = target / "runtime-presets"
+    if presets.is_symlink():
+        fail("Preset 运行投影不能是符号链接")
+    if presets.exists():
+        shutil.rmtree(presets)
+    runtime_file = target / "harness-runtime.json"
+    # 保留来源声明用于摘要核对，本次显式主模型只进入不可编辑的运行投影。
+    effective_runtime = dict(runtime)
+    if runtime.get("model_bindings") and contract.get("model_policy", {}).get("resolved_model_bindings"):
+        effective_runtime["model_bindings"] = contract["model_policy"]["resolved_model_bindings"]
+    elif runtime.get("model_bindings") and contract.get("model_policy", {}).get("default"):
+        effective_runtime["model_bindings"] = {
+            **runtime["model_bindings"], "main": contract["model_policy"]["default"],
+        }
+    runtime_file.write_text(json.dumps(effective_runtime, ensure_ascii=False), encoding="utf-8")
+    run([NODE_EXECUTABLE, str(ADAPTER / "harness-runtime.mts"), str(candidate), str(presets), str(runtime_file)])
+    projected["runtime_presets_host"] = str(presets)
+    if runtime.get("project_workspace"):
+        seed = candidate / runtime["project_workspace"]["path"]
+        workspace = target / "project-workspace"
+        origin_file = target / "project-workspace-source.json"
+        origin = {"candidate_source_root": str(candidate), "project_path": runtime["project_workspace"]["path"]}
+        if seed.is_symlink() or not seed.is_dir() or seed.resolve() != seed:
+            fail("业务工作副本种子必须是普通 Candidate 目录")
+        for parent, directories, files in os.walk(seed, followlinks=False):
+            for name in directories + files:
+                item = Path(parent) / name
+                if item.is_symlink() or not (item.is_dir() or item.is_file()):
+                    fail("业务工作副本种子不能包含符号链接或特殊文件")
+        if not workspace.exists():
+            origin_file.write_text(json.dumps(origin, ensure_ascii=False), encoding="utf-8")
+            if copy_workspace:
+                staging = target / "project-workspace.pending"
+                if staging.is_symlink() or staging.exists() and not staging.is_dir():
+                    fail("业务工作副本暂存路径异常；原文件已保留")
+                if staging.exists():
+                    shutil.rmtree(staging)
+                try:
+                    shutil.copytree(seed, staging)
+                    for parent, directories, files in os.walk(staging):
+                        for item in [Path(parent), *(Path(parent) / name for name in files)]:
+                            item.chmod(item.stat().st_mode | stat.S_IWUSR | stat.S_IRUSR)
+                            if os.geteuid() == 0:
+                                os.chown(item, 1000, 1000)
+                    staging.rename(workspace)
+                finally:
+                    if staging.exists():
+                        shutil.rmtree(staging)
+            else:
+                workspace.mkdir()
+        projected["project_workspace_host"] = str(workspace)
+    return projected
+
+
+def assert_asset_dependencies(contract: dict, image_id: str | None = None) -> None:
+    """重用已准备的目标环境，不在实例启动过程中安装或执行来源包。"""
+    experiment_id = contract.get("experiment_id") or str(contract.get("source_id", "")).removeprefix("experiment:")
+    pointer = REPO / ".local/asset-dependencies" / experiment_id / "current.json"
+    if not contract.get("harness_runtime") and not pointer.exists() and not contract.get("model_policy", {}).get("asset_dependencies"):
+        return
+    command = [NODE_EXECUTABLE, str(ADAPTER / "harness-runtime.mts"), "--dependencies", str(REPO), experiment_id,
+               contract["image"]["local_image_tag"]]
+    if image_id:
+        command.append(image_id)
+    checked = run(command, check=False)
+    try:
+        dependencies = json.loads(checked.stdout)
+    except (ValueError, TypeError):
+        fail("业务依赖无法核对，请在智能体资产中重新准备依赖")
+    if checked.returncode or dependencies.get("status") != "ready":
+        fail("业务依赖尚未准备：" + "；".join(dependencies.get("reasons", [])))
+    projected = contract.get("model_policy", {}).get("asset_dependencies")
+    if projected is not None and projected != dependencies or projected is None and dependencies.get("mounts") and contract.get("model_policy", {}).get("source") == "platform":
+        fail("业务依赖准备回执已变化，请重新预览实例或评测")
+    if dependencies.get("mounts"):
+        contract["asset_dependencies"] = dependencies
+
+
+def asset_dependency_mounts(contract: dict) -> list[dict]:
+    """项目副本复用同一只读依赖，路径随其原生工作目录一起投影。"""
+    mounts = [dict(mount) for mount in contract.get("asset_dependencies", {}).get("mounts", [])]
+    project = contract.get("harness_runtime", {}).get("project_workspace", {}).get("path")
+    if not project:
+        return mounts
+    if project.startswith("dsh/workspace/"):
+        seed_target = "/work/harness/workspace/" + project.removeprefix("dsh/workspace/")
+    elif project.startswith("dsh/managed/"):
+        seed_target = "/opt/dsh-managed/" + project.removeprefix("dsh/managed/")
+    else:
+        seed_target = "/opt/harness-candidate/" + project
+    for mount in list(mounts):
+        target = mount.get("target", "")
+        if target.startswith(seed_target + "/"):
+            projected = {**mount, "target": "/work/project" + target[len(seed_target):]}
+            if projected not in mounts:
+                mounts.append(projected)
+    return mounts
+
+
 def write_instance(name: str, *, mode: str, contract: dict, port: int,
                    image_id: str | None = None, lan_access: bool = False,
                    analysis_workspace: str | None = None,
@@ -1042,6 +1247,8 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
         fail("归因实例只允许监听 127.0.0.1，不能启用 --lan-access")
     if contract.get("model_policy"):
         assert_model_policy_current(contract["model_policy"], repo=REPO)
+    if not analysis_workspace:
+        assert_asset_dependencies(contract, image_id)
     target = instance_dir(name)
     current = existing_instance(name)
     if current is not None:
@@ -1049,6 +1256,8 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
         validate_existing_identity(name, manifest, contract, mode, analysis_workspace)
     else:
         target.mkdir(parents=True, exist_ok=True)
+    if not analysis_workspace and contract.get("harness_runtime"):
+        contract.update(prepare_harness_projection(contract, target))
     original_profile = (str(ADAPTER / "verification-home-controls/web-profile.package.json")
                         if analysis_workspace else contract.get("profile_manifest", str(ADAPTER / "verification-home-controls/web-profile.package.json")))
     runtime_profile = original_profile
@@ -1095,6 +1304,9 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
         image_fingerprint=contract["image"].get("build_fingerprint"),
         schedule_compat=runtime_profile != original_profile,
         managed_patch_compat=bool(contract.get("runtime_managed_patch")),
+        harness_runtime=bool(contract.get("harness_runtime")) and not analysis_workspace,
+        project_workspace=bool(contract.get("project_workspace_host")) and not analysis_workspace,
+        dependency_mounts=asset_dependency_mounts(contract),
     )
     business = None
     if contract.get("business_control"):
@@ -1149,11 +1361,15 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
             "original_managed_patch": contract["patch"]} if contract.get("runtime_managed_patch") else {}),
         "mounts": ({"analysis_workspace": analysis_workspace} if analysis_workspace else {
             "workspace": contract["workspace"],
-            "presets": contract["presets"],
+            "presets": contract.get("runtime_presets_host", contract["presets"]),
             "managed": contract["managed"],
             **({"plugin_node_modules": plugin_node_modules} if plugin_node_modules else {}),
         }),
         "context_mounts": [],
+        **({"asset_dependencies": contract["asset_dependencies"]} if contract.get("asset_dependencies") and not analysis_workspace else {}),
+        **({"harness_runtime": contract["harness_runtime"], "candidate_source_root": contract["candidate_source_root"],
+            "workspace_path": contract.get("workspace_path", CONTAINER_WORKSPACE),
+            "project_workspace_host": contract.get("project_workspace_host")} if contract.get("harness_runtime") and not analysis_workspace else {}),
         "mount_modes": ({"analysis_workspace": "ro"} if analysis_workspace else {
             "workspace": "ro", "presets": "ro", "managed": "ro",
             **({"plugin_node_modules": "ro"} if plugin_node_modules else {}),
@@ -1191,6 +1407,9 @@ def instance_compose_env(manifest: dict) -> dict:
         "DSH_WEB_ADAPTER_HOST": manifest.get("web_adapter_root"),
         "DSH_MODEL_RUNTIME_HOST": str(MODEL_RUNTIME_HOST) if manifest.get("model_policy") else None,
         "DSH_MODEL_PATCH_HOST": str(instance_dir(str(manifest.get("name"))) / "model.patch.yml") if manifest.get("model_policy") else None,
+        "DSH_MODEL_BINDING_HOST": str(MODEL_BINDING_HOST) if manifest.get("harness_runtime") else None,
+        "DSH_CANDIDATE_SOURCE_HOST": manifest.get("candidate_source_root"),
+        "DSH_PROJECT_WORKSPACE_HOST": manifest.get("project_workspace_host"),
         "DSH_WEB_PROFILE_MANIFEST_HOST": manifest.get("web_profile_manifest"),
         "DSH_WEB_PROFILE_SEED_DIR_HOST": (
             manifest.get("web_profile_seed_directory") or
@@ -1217,6 +1436,7 @@ def instance_compose_env(manifest: dict) -> dict:
             values["DSH_REFERENCE_HOST"] = asset["host"]
     environment = dict(os.environ)
     environment.update({key: value for key, value in values.items() if value})
+    environment.update(manifest.get("asset_dependencies", {}).get("environment", {}))
     return environment
 
 
@@ -1401,9 +1621,9 @@ def prepare_up(args: argparse.Namespace) -> tuple[dict, tuple[Path, dict] | None
         _, manifest = current
         validate_existing_identity(args.name, manifest, contract, args.mode, args.analysis_workspace)
     if args.analysis_workspace:
-        if getattr(args, "model_policy", None):
-            fail("归因实例使用独立评审 Preset，不能传入业务 Agent 的 --model-policy")
-        contract["model_policy"] = analysis_model_policy(contract["agent_id"])
+        policy_file = getattr(args, "model_policy", None)
+        projected = read_model_policy(policy_file, contract["agent_id"], repo=REPO) if policy_file else None
+        contract["model_policy"] = analysis_model_policy(contract["agent_id"], projected)
     else:
         recorded_policy = current[1].get("model_policy") if current is not None else None
         recorded_default = recorded_policy.get("default") if isinstance(recorded_policy, dict) else None
@@ -1419,6 +1639,9 @@ def prepare_up(args: argparse.Namespace) -> tuple[dict, tuple[Path, dict] | None
         if current is not None and not isinstance(recorded_default, dict) and contract["model_policy"]["default"] is None:
             fail("此旧实例未登记默认模型；平台模型策略必须包含显式选择")
         assert_direct_model_available(contract, contract["model_policy"])
+        if contract.get("harness_runtime") != contract["model_policy"].get("harness_runtime"):
+            fail("所选来源的 Harness 运行声明与平台模型投影不一致，请重新预览；此来源需从平台启动")
+        assert_asset_dependencies(contract)
     if current is not None and bool(current[1].get("business_control")) != bool(business_file):
         fail("不能在既有实例上切换业务控制边界；请使用新实例名和独立 HOME")
     if business_file:
@@ -1484,7 +1707,7 @@ def build_plan(args: argparse.Namespace, contract: dict) -> dict:
         "skip_testing_notice": skip_testing_notice,
         "trusted_host": getattr(args, "trusted_host", None),
         "listen_host": "0.0.0.0" if lan_access else "127.0.0.1",
-        "workspace_to_register": workspace_to_register(args.mode, analysis_workspace),
+        "workspace_to_register": workspace_to_register(args.mode, analysis_workspace, contract),
         "grading_material_mounted": analysis_workspace is not None,
         "web_base_path": base_path,
         **({} if contract.get("business_control") else {"base_url": f"http://127.0.0.1:{args.port}{base_path}"}),
@@ -1498,12 +1721,14 @@ def build_plan(args: argparse.Namespace, contract: dict) -> dict:
             {"container": "/work/harness/workspace", "mode": "ro"},
             {"container": "/opt/dsh-presets", "mode": "ro"},
             {"container": "/opt/dsh-managed", "mode": "ro"},
+            *([{"container": "/opt/harness-candidate", "mode": "ro"}] if contract.get("harness_runtime") else []),
+            *([{"container": "/work/project", "mode": "rw"}] if contract.get("harness_runtime", {}).get("project_workspace") else []),
             *([{"container": "/opt/node_modules", "mode": "ro"}]
               if getattr(args, "plugin_node_modules", None) else []),
         ]),
         "web_adapter_mount": {"host": str(WEB_ADAPTER), "container": "/opt/dsh-web", "mode": "ro"},
         "context_assets": [],
-        "web_cold_start": web_cold_start_hint(args.mode, analysis_workspace, bool(contract.get("business_control"))),
+        "web_cold_start": web_cold_start_hint(args.mode, analysis_workspace, bool(contract.get("business_control")), contract),
         "network": "host (0.0.0.0, LAN exposed)" if lan_access else "host (127.0.0.1 only)",
         "required_env_names": required_names,
         "model_policy": model_policy_summary(contract["model_policy"]),
@@ -1557,6 +1782,7 @@ def render_business_instance(contract: dict, name: str, port: int, compose: str)
         "managedPatch": str(Path(contract["managed"]) / Path(contract["patch"]).relative_to("/opt/dsh-managed")),
         "port": port, "compose": compose, "profileManifest": contract.get("profile_manifest", str(ADAPTER / "verification-home-controls/web-profile.package.json")),
         "presetId": session_preset(contract, "verification"),
+        "workspacePath": workspace_to_register("verification", contract=contract),
         "runtimeSettings": str(instance_dir(name) / "dsh-home/profiles/web/cordis.patch.yml"),
         "basePath": f"/agents/{contract['agent_id']}/instances/{name}/", "sourcePaths": {key: contract[key] for key in ("workspace", "presets", "managed")},
     })
@@ -1652,6 +1878,8 @@ def command_up(args: argparse.Namespace) -> None:
 
 def _command_up(args: argparse.Namespace, contract: dict,
                 current: tuple[Path, dict] | None) -> None:
+    if getattr(args, "analysis_workspace", None) is None:
+        assert_project_workspace_origin(contract, instance_dir(args.name))
     if getattr(args, "dry_run", False):
         print(json.dumps(build_plan(args, contract), ensure_ascii=False, indent=2, sort_keys=True))
         return
@@ -1668,6 +1896,8 @@ def _command_up(args: argparse.Namespace, contract: dict,
     else:
         check_environment(contract, args.analysis_workspace)
     identity = validate_image_identity(contract, current=current, replace=getattr(args, "replace", False))
+    if args.analysis_workspace is None:
+        assert_asset_dependencies(contract, identity["image_id"])
     # Compose 插值与模板结构都可以在停旧实例前检查；明显无效的新配置不得先触发停机。
     preflight_new_instance(args, contract)
     if contract.get("model_policy"):
@@ -1741,7 +1971,7 @@ def _command_up(args: argparse.Namespace, contract: dict,
     print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
     print(json.dumps({
         "hint": web_cold_start_hint(args.mode, args.analysis_workspace, bool(contract.get("business_control"))),
-        "workspace_to_register": workspace_to_register(args.mode, args.analysis_workspace),
+        "workspace_to_register": workspace_to_register(args.mode, args.analysis_workspace, contract),
     },
                      ensure_ascii=False), file=sys.stderr)
 
@@ -2361,7 +2591,7 @@ def delete_instance(name: str, manifest: dict) -> dict:
         report["detail"] = "删除后 HOME 卷未保留；拒绝删除登记"
         print(json.dumps(report, ensure_ascii=False), file=sys.stderr)
         raise SystemExit(1)
-    if manifest.get("home_directory"):
+    if manifest.get("home_directory") or manifest.get("project_workspace_host"):
         # HOME 位于登记目录之下；删除实例不能同时删除 Session 和原生 MCP 设置。
         (target / "instance.json").unlink()
         (target / "compose.yaml").unlink(missing_ok=True)
@@ -2401,7 +2631,7 @@ def existing_instance(name: str) -> tuple[Path, dict] | None:
         return None
     manifest_path = target / "instance.json"
     if not manifest_path.is_file():
-        if set(path.name for path in target.iterdir()) <= {"dsh-home", "model.patch.yml", "profile-compat"}:
+        if set(path.name for path in target.iterdir()) <= {"dsh-home", "model.patch.yml", "profile-compat", "runtime-presets", "harness-runtime.json", "project-workspace", "project-workspace-source.json", "project-workspace.pending"}:
             return None
         fail(f"实例目录已存在但缺少 instance.json：{target}")
     return load_instance(name)
@@ -2439,6 +2669,8 @@ def preflight_new_instance(args: argparse.Namespace, contract: dict) -> None:
         check_managed_plugin_dependencies(contract, getattr(args, "plugin_node_modules", None))
     with tempfile.TemporaryDirectory(prefix="dsh-dev-preflight-") as location:
         root = Path(location)
+        if not analysis_workspace:
+            contract = prepare_harness_projection(contract, root, copy_workspace=False)
         rendered = render_compose(
             (ADAPTER / f"{args.mode}.compose.yaml").read_text(encoding="utf-8"),
             mode=args.mode,
@@ -2455,6 +2687,9 @@ def preflight_new_instance(args: argparse.Namespace, contract: dict) -> None:
             bind_home=home_directory is not None,
             image_fingerprint=contract["image"].get("build_fingerprint"),
             schedule_compat=not analysis_workspace and needs_schedule_compat(contract.get("profile_manifest")),
+            harness_runtime=bool(contract.get("harness_runtime")) and not analysis_workspace,
+            project_workspace=bool(contract.get("project_workspace_host")) and not analysis_workspace,
+            dependency_mounts=asset_dependency_mounts(contract),
         )
         business = None
         if contract.get("business_control"):
@@ -2484,6 +2719,10 @@ def check_managed_plugin_dependencies(contract: dict, external_modules: str | No
             roots = (manifest.parent / "node_modules", managed / "node_modules")
             if external_modules:
                 roots += (Path(external_modules),)
+            for mount in contract.get("asset_dependencies", {}).get("mounts", []):
+                expected = "/opt/dsh-managed/" + manifest.parent.relative_to(managed).as_posix() + "/node_modules"
+                if mount.get("target") in (expected, "/opt/dsh-managed/node_modules"):
+                    roots += (Path(mount["source"]),)
             if not any((root / name).is_dir() for root in roots):
                 fail(f"插件 {manifest.parent.name} 缺少运行依赖 {name}；"
                      f"请在 {manifest.parent} 按 package-lock.json 执行 npm ci 后重试")

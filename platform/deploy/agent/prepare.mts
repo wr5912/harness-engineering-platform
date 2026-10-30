@@ -101,17 +101,21 @@ export async function prepareAgentResources(input: PrepareAgentInput, hooks: Age
     chmodSync(join(docker, 'docker-compose'), 0o755)
     rmSync(extracted, { recursive: true })
 
-    const snapshot = inspectAgentSnapshot({ ...input, resourcesDir: input.resourcesDir ?? target })
+    const snapshot = inspectAgentSnapshot({ ...input, resourcesDir: input.resourcesDir ?? target }, { tag: expected.tag, id: info.id })
     const dependencies: AgentResourceManifest['dependencies'] = []
     for (const dependency of snapshot.dependencies) {
       hooks.signal?.throwIfAborted()
       hooks.onProgress?.({ stage: 'dependencies', message: `正在收集业务依赖 ${dependency.name}` })
       if (!dependency.ready || !dependency.modulesPath) throw new Error(`业务依赖尚未准备：${dependency.path}；${dependency.reason ?? '请在目标架构按该包锁文件安装依赖后重试'}`)
+      if (dependency.preparedTarget && (dependency.preparedTarget.imageId !== info.id || dependency.preparedTarget.image !== expected.tag)) throw new Error(`业务依赖对应另一标准镜像：${dependency.name}；请针对当前镜像重新准备`)
       assertDependencyArchitecture(dependency.modulesPath, input.arch)
       const destination = join(staging, 'dependencies', dependency.path, dependency.kind === 'python' ? 'site-packages' : 'node_modules')
       mkdirSync(dirname(destination), { recursive: true })
       await agentCommand('/bin/cp', ['-a', '--no-preserve=ownership', '--', dependency.modulesPath, destination], { signal: hooks.signal })
-      dependencies.push({ path: dependency.path, lockSha256: dependency.lockSha256, files: dependencyEntries(destination) })
+      const files = dependencyEntries(destination)
+      if (dependency.preparedFiles && JSON.stringify(files) !== JSON.stringify(dependency.preparedFiles)) throw new Error(`业务依赖在准备期间变化：${dependency.name}，请重试`)
+      dependencies.push({ path: dependency.path, lockSha256: dependency.lockSha256, files,
+        ...(dependency.preparedTarget ? { preparedTarget: dependency.preparedTarget } : {}) })
     }
     const manifest: AgentResourceManifest = { schemaVersion: 1, arch: input.arch, createdAt: new Date().toISOString(),
       image: { tag: expected.tag, id: info.id, fingerprint: expected.fingerprint, arch: input.arch, archive: imageArchive },

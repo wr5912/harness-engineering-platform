@@ -179,6 +179,23 @@ class FrozenRunSnapshotTests(unittest.TestCase):
             self.assertEqual(inputs["asset_origin"]["candidate_sha256"], inputs["candidate_sha256"])
             self.assertEqual(inputs["program_origin"]["root"], str(module.PROGRAM_ROOT))
             self.assertNotEqual(str(repo), inputs["program_origin"]["root"])
+            self.assertEqual(inputs["harness_review"], {"schema_version": 1, "generated": [], "sources": []})
+            for name in ("harness-runtime.mts", "platform/plugin/src/agents/asset-build.ts",
+                         "platform/plugin/src/agents/asset-build-core.ts", "platform/plugin/src/agents/asset-dependencies.ts",
+                         "platform/plugin/src/models/harness-runtime.ts"):
+                self.assertRegex(inputs["evaluation_implementation"][name], r"^[a-f0-9]{64}$")
+
+    def test_build_review_bridge_failure_or_candidate_mismatch_keeps_full_text_contract(self) -> None:
+        module = load_module(fixtures.RUN_RECORD, "review_bridge_fallback")
+        empty = {"schema_version": 1, "generated": [], "sources": []}
+        for result in (subprocess.CompletedProcess([], 1, stdout="", stderr="unavailable"),
+                       subprocess.CompletedProcess([], 0, stdout="not-json", stderr=""),
+                       subprocess.CompletedProcess([], 0, stdout=json.dumps({
+                           "schema_version": 1, "generated": [{"path": "generated.mjs"}], "sources": [],
+                           "candidate_sha256": "other",
+                       }), stderr="")):
+            with self.subTest(result=result), mock.patch.object(module.subprocess, "run", return_value=result):
+                self.assertEqual(module.build_review_evidence(Path("."), "EXP-test-001", {"asset_builds": {"entry": {}}}, "frozen"), empty)
 
     def test_finalize_verifies_frozen_source_and_preserves_real_case_results(self) -> None:
         for mutation in ("unchanged", "content", "directory_permission", "unresolvable"):

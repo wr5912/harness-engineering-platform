@@ -322,14 +322,14 @@ def validate_jsonl(path: Path, errors: list[dict[str, str]]) -> None:
         errors.append(issue("JSONL", str(exc), path))
 
 
-def validate_agents(root: Path, errors: list[dict[str, str]]) -> None:
+def validate_agents(root: Path, errors: list[dict[str, str]], agent_id: str | None = None) -> None:
     agents = root / "agents"
-    if not agents.exists():
+    if not agents.exists() and agent_id is None:
         return
     if not agents.is_dir() or agents.is_symlink():
         errors.append(issue("AGENTS_ROOT", "agents 必须是实体目录"))
         return
-    for agent in sorted(agents.iterdir()):
+    for agent in [agents / agent_id] if agent_id else sorted(agents.iterdir()):
         if not agent.is_dir() or agent.is_symlink() or not KEBAB_RE.fullmatch(agent.name):
             errors.append(issue("AGENT_DIR", "Agent 必须是小写 kebab-case 实体目录", relative(agent, root)))
             continue
@@ -379,9 +379,10 @@ def load_research_validator(root: Path):
     return module
 
 
-def validate_experiments(root: Path, errors: list[dict[str, str]], warnings: list[dict[str, str]]) -> None:
+def validate_experiments(root: Path, errors: list[dict[str, str]], warnings: list[dict[str, str]],
+                         experiment_id: str | None = None) -> None:
     experiments = root / "evolution/experiments"
-    if not experiments.exists():
+    if not experiments.exists() and experiment_id is None:
         return
     if not experiments.is_dir() or experiments.is_symlink():
         errors.append(issue("EXPERIMENTS_ROOT", "evolution/experiments 必须是实体目录"))
@@ -391,11 +392,11 @@ def validate_experiments(root: Path, errors: list[dict[str, str]], warnings: lis
     except Exception as exc:  # noqa: BLE001 - 转为稳定 JSON 合同
         errors.append(issue("RESEARCH_VALIDATOR", str(exc)))
         return
-    for experiment in sorted(experiments.iterdir()):
+    for experiment in [experiments / experiment_id] if experiment_id else sorted(experiments.iterdir()):
         if not experiment.is_dir() or experiment.is_symlink():
             errors.append(issue("EXPERIMENT_DIR", "experiments/ 只能包含实体目录", relative(experiment, root)))
             continue
-        if not (experiment / "change.yaml").exists() and EXPERIMENT_RE.fullmatch(experiment.name):
+        if experiment_id is None and not (experiment / "change.yaml").exists() and EXPERIMENT_RE.fullmatch(experiment.name):
             try:
                 visible = subprocess.run(
                     ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--",
@@ -529,8 +530,8 @@ def validate_retired_topology(root: Path, errors: list[dict[str, str]]) -> None:
         errors.append(issue("BASELINES_FORBIDDEN", "项目不维护 evolution/baselines", relative(baseline, root)))
 
 
-def validate_asset_nodes(root: Path, errors: list[dict[str, str]]) -> None:
-    for name in ("agents", "evolution", "extensions", "plugins", "platform", "releases"):
+def validate_asset_nodes(root: Path, errors: list[dict[str, str]], paths: tuple[str, ...] | None = None) -> None:
+    for name in paths if paths is not None else ("agents", "evolution", "extensions", "plugins", "platform", "releases"):
         base = root / name
         if not base.exists() or not base.is_dir():
             continue
@@ -557,9 +558,14 @@ def validate_asset_nodes(root: Path, errors: list[dict[str, str]]) -> None:
                     errors.append(issue("ASSET_SPECIAL", "研究资产只能是普通文件或目录", relative(path, root)))
 
 
-def run(root: Path) -> tuple[dict[str, Any], int]:
+def run(root: Path, experiment_id: str | None = None) -> tuple[dict[str, Any], int]:
     errors: list[dict[str, str]] = []
     warnings: list[dict[str, str]] = []
+    selected = EXPERIMENT_RE.fullmatch(experiment_id) if isinstance(experiment_id, str) else None
+    if experiment_id is not None and selected is None:
+        return {"schema_version": SCHEMA_VERSION, "valid": False,
+                "errors": [issue("EXPERIMENT_SELECTION", "--experiment 必须是有效的 EXP/VAR 身份")],
+                "warnings": [], "scope": "指定 Experiment 的项目与资产合同"}, 1
     split_workspace = (root / "workspace.json").exists()
     program = PROGRAM_ROOT if split_workspace else root
     validate_required_files(program, errors)
@@ -572,16 +578,21 @@ def run(root: Path) -> tuple[dict[str, Any], int]:
         except (OSError, ValueError, TypeError) as exc:
             errors.append(issue("WORKSPACE", str(exc), root / "workspace.json"))
     validate_retired_topology(root, errors)
-    validate_asset_nodes(root, errors)
-    validate_agents(root, errors)
-    validate_experiments(root, errors, warnings)
-    validate_releases(root, errors)
+    agent_id = selected.group(1) if selected else None
+    paths = ("extensions", "plugins", "platform", f"agents/{agent_id}", f"evolution/experiments/{experiment_id}") \
+        if experiment_id else None
+    validate_asset_nodes(root, errors, paths)
+    validate_agents(root, errors, agent_id)
+    validate_experiments(root, errors, warnings, experiment_id)
+    if experiment_id is None:
+        validate_releases(root, errors)
     payload = {
         "schema_version": SCHEMA_VERSION,
         "valid": not errors,
         "errors": errors,
         "warnings": warnings,
-        "scope": "仅校验项目与 Harness 资产合同；不代表 Experiment 结果或生产验收",
+        "scope": (f"校验项目、共享资产及 {experiment_id} 与所属 Agent；不校验其他版本或 Release" if experiment_id else
+                  "仅校验项目与 Harness 资产合同；不代表 Experiment 结果或生产验收"),
     }
     return payload, 0 if not errors else 1
 
@@ -589,13 +600,14 @@ def run(root: Path) -> tuple[dict[str, Any], int]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("repo", nargs="?", type=Path, default=Path.cwd())
+    parser.add_argument("--experiment", help="只核对指定 Experiment、所属 Agent、项目与共享资产；默认核对全库")
     args = parser.parse_args(argv)
     root = args.repo.resolve()
     if not root.is_dir():
         print(json.dumps({"schema_version": SCHEMA_VERSION, "valid": False, "errors": [issue("REPO", "仓库目录不存在", root)], "warnings": []}, ensure_ascii=False, indent=2))
         return 2
     try:
-        payload, code = run(root)
+        payload, code = run(root, args.experiment)
     except Exception as exc:  # noqa: BLE001 - 顶层始终维持 JSON 输出
         payload = {"schema_version": SCHEMA_VERSION, "valid": False, "errors": [issue("VALIDATOR", str(exc))], "warnings": []}
         code = 2

@@ -5,10 +5,10 @@ import ts from 'typescript'
 import { DEFAULT_SCHEMA, Type, load as loadYaml } from 'js-yaml'
 import { McpConfigStore } from '../mcp/store.ts'
 import { COMPOSITION_SERVICE_ID, readCompositions, type CompositionEntry, type CompositionVersion } from '../mcp/compositions.ts'
-import { versionSource } from '../agents/version-source.ts'
+import { versionSource, assertStandaloneVersionSupported } from '../agents/version-source.ts'
 import { workspaceConfigPath } from '../workspace.ts'
 
-type ModelProjection = (agentId: string) => Promise<{ policy: any; environment: Record<string, string> }>
+type ModelProjection = (agentId: string, selection?: { provider: string; model: string; reasoningEffort?: string }, candidatePath?: string) => Promise<{ policy: any; environment: Record<string, string> }>
 type Document = { name: string; content: string }
 type FixedReference = { compositionId: string; versionId: string }
 const staticYaml = DEFAULT_SCHEMA.extend(new Type('tag:yaml.org,2002:js', { kind: 'scalar', construct: value => value }))
@@ -80,6 +80,7 @@ function fixedReferences(documents: Document[]): FixedReference[] {
 export function createDeploymentSeed(assetRoot: string, modelProjection: ModelProjection) {
   return async (input: { agent_id: string; experiment_id: string }, signal: AbortSignal) => {
     const source = versionSource(assetRoot, input.experiment_id)
+    assertStandaloneVersionSupported(source)
     if (source.agent_id !== input.agent_id) throw new Error('所选版本不属于当前智能体')
     const candidate = join(assetRoot, source.candidate_root)
     const documents: Document[] = []
@@ -101,7 +102,7 @@ export function createDeploymentSeed(assetRoot: string, modelProjection: ModelPr
     for (const name of source.optional_env_names ?? []) if (process.env[name] !== undefined) environment[name] = process.env[name]!
     const notices: string[] = []
     let projected: Awaited<ReturnType<ModelProjection>> | undefined
-    try { projected = await modelProjection(input.agent_id); Object.assign(environment, projected.environment) }
+    try { projected = await modelProjection(input.agent_id, undefined, join(assetRoot, 'evolution/experiments', input.experiment_id, 'candidate')); Object.assign(environment, projected.environment) }
     catch { notices.push('当前模型连接未能完整导出，可在目标环境通过 agent configure 配置；本地业务 Provider 仍保留。') }
     signal.throwIfAborted()
     let configuration: any = { servers: [], groups: [], sharedToken: '' }

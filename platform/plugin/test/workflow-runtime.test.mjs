@@ -105,6 +105,40 @@ function nativeFixture(t, llm) {
   }
 }
 
+test('真实Cordis仅注入tools可执行确定性图，infer才要求llm且纯代码限制优先', async t => {
+  const f = nativeFixture(t)
+  await f.ctx.plugin(LlmRuntime)
+  f.register('tools_only_child', args => ({ quantity: args.quantity }))
+  let registration, forbidden
+  await f.ctx.plugin({ name: 'workflow-tools-only', inject: ['tools'], apply(ctx) {
+    registration = ctx
+    registerWorkflowTool(ctx, defineWorkflow({ id: 'tools-only', toolName: 'tools_only_graph', description: '零模型图', inputSchema: { type: 'object' },
+      async run(context) {
+        const value = await context.callTool('tools_only_child', { quantity: 12 })
+        return { route: value.quantity >= 10 ? 'bulk' : 'regular' }
+      } }))
+    registerWorkflowTool(ctx, defineWorkflow({ id: 'tools-only-infer', toolName: 'tools_only_infer', description: '缺少模型注入', inputSchema: { type: 'object' },
+      run: context => context.infer({ provider: 'not-dispatched', model: 'not-dispatched' }, { messages: [] }) }))
+    registerWorkflowTool(ctx, defineWorkflow({ id: 'tools-only-forbidden', toolName: 'tools_only_forbidden', description: '纯代码限制', inputSchema: { type: 'object' },
+      async run(context) {
+        try { return await context.infer({}, { messages: [] }) } catch (error) { forbidden = error.message; throw error }
+      } }), { executionMode: 'code-only' })
+  } })
+  assert.throws(() => registration.llm, /cannot get property "llm" without inject/)
+  const result = await f.execute('tools_only_graph')
+  assert.equal(result.isError, false, JSON.stringify(result)); assert.equal(result.value.ok, true)
+  assert.deepEqual(result.value.result, { route: 'bulk' })
+  assert.equal(result.value.graph_execution.trace[0].node, 'tools_only_child')
+  assert.deepEqual(result.value.graph_execution.model_attempts, [])
+  const missing = (await f.execute('tools_only_infer')).value
+  assert.equal(missing.ok, false); assert.equal(missing.error_code, 'WORKFLOW_MODEL_UNAVAILABLE')
+  assert.match(missing.error, /使用 infer 的插件需要声明 llm 注入/)
+  assert.equal(missing.graph_execution.status, 'failed'); assert.deepEqual(missing.graph_execution.model_attempts, [])
+  const rejected = (await f.execute('tools_only_forbidden')).value
+  assert.equal(rejected.ok, false); assert.equal(forbidden, '纯代码工作流禁止模型调用')
+  assert.deepEqual(rejected.graph_execution.model_attempts, [])
+})
+
 test('真实ToolRuntime拒绝业务undefined；工作流返回明确失败并保留两次原生子调用图回执', async t => {
   const f = nativeFixture(t), calls = []
   const invalidResult = { steps: [{ operation: 'get_asset', detail: undefined }] }

@@ -250,6 +250,43 @@ class SourceInspectorTests(unittest.TestCase):
 
 
 class RepositoryValidatorTests(unittest.TestCase):
+    def test_selected_experiment_keeps_target_checks_without_blocking_on_other_drafts(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = copy_repository(Path(temporary))
+            draft = write_minimal_experiment(root)
+            (root / "agents/example-agent/manifest.yaml").write_text("agent_id: example-agent\n", encoding="utf-8")
+            with (draft / "candidate/harness.yaml").open("a", encoding="utf-8") as output:
+                output.write("role_instructions:\n  example-agent: dsh/workspace/missing-role.md\n")
+            selected = root / "evolution/experiments" / EXPERIMENT_ID
+            _, full = run_json(VALIDATE_REPOSITORY, root)
+            self.assertFalse(full["valid"])
+            self.assertTrue(any(item["code"] == "EXPERIMENT_LOAD" and draft.name in item.get("path", "")
+                                for item in full["errors"]))
+            completed, scoped = run_json(VALIDATE_REPOSITORY, root, "--experiment", EXPERIMENT_ID)
+            self.assertEqual(completed.returncode, 0, scoped)
+            self.assertTrue(scoped["valid"])
+            self.assertIn(EXPERIMENT_ID, scoped["scope"])
+            _, draft_result = run_json(VALIDATE_REPOSITORY, root, "--experiment", draft.name)
+            self.assertIn("EXPERIMENT_LOAD", error_codes(draft_result))
+
+            harness = selected / "candidate/harness.yaml"
+            with harness.open("a", encoding="utf-8") as output:
+                output.write(f"role_instructions:\n  {AGENT_ID}: dsh/workspace/missing-role.md\n")
+            _, target_failure = run_json(VALIDATE_REPOSITORY, root, "--experiment", EXPERIMENT_ID)
+            self.assertIn("EXPERIMENT_LOAD", error_codes(target_failure))
+            self.assertFalse(any(draft.name in item.get("path", "") for item in target_failure["errors"]))
+            (selected / "candidate/unsafe-link").symlink_to(harness)
+            _, unsafe = run_json(VALIDATE_REPOSITORY, root, "--experiment", EXPERIMENT_ID)
+            self.assertIn("ASSET_SYMLINK", error_codes(unsafe))
+            manifest = root / "agents" / AGENT_ID / "manifest.yaml"
+            manifest.write_text("agent_id: wrong-agent\n", encoding="utf-8")
+            _, wrong_agent = run_json(VALIDATE_REPOSITORY, root, "--experiment", EXPERIMENT_ID)
+            self.assertIn("AGENT_ID", error_codes(wrong_agent))
+
+    def test_selected_experiment_must_have_a_valid_identity(self) -> None:
+        _, payload = run_json(VALIDATE_REPOSITORY, ROOT, "--experiment", "../outside")
+        self.assertIn("EXPERIMENT_SELECTION", error_codes(payload))
+
     def test_experiment_validator_ignores_only_retired_cache_directories(self) -> None:
         spec = importlib.util.spec_from_file_location("experiment_cache_validator", VALIDATE_REPOSITORY)
         module = importlib.util.module_from_spec(spec)
@@ -1194,6 +1231,78 @@ class DshEvalTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "harness-lock-digest-mismatch"):
                     module._locked_harness(inputs)
 
+    def test_locked_harness_uses_verified_sources_without_reinterpreting_legacy_runs(self) -> None:
+        spec = importlib.util.spec_from_file_location("scenario_analysis_build_test", SCENARIO_ANALYSIS)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as temp:
+            experiment = Path(temp) / "experiment"
+            candidate = experiment / "candidate"
+            roots = {name: candidate / "dsh" / name for name in ("workspace", "presets", "managed")}
+            for root in roots.values():
+                root.mkdir(parents=True)
+            files = {"plugin.ts": "export const business = 42\n", "plugin.mjs": "/* vendor */" * 5000,
+                     "handwritten.mjs": "export const handwritten = true\n"}
+            for path, content in files.items():
+                (roots["managed"] / path).write_text(content, encoding="utf-8")
+            digest = lambda text: hashlib.sha256(text.encode()).hexdigest()
+            source_path = "dsh/managed/plugin.ts"
+            sdk_path = "platform/plugin/src/workflows/runtime.ts"
+            sdk_content = "export const sdk = true\n"
+            build = {"esm_sha256": digest(files["plugin.mjs"]), "source_inputs_version": 1,
+                     "source_files": [{"path": source_path, "sha256": digest(files["plugin.ts"])}],
+                     "platform_sources": [{"path": sdk_path, "sha256": digest(sdk_content)}]}
+            review = {"schema_version": 1, "candidate_sha256": "frozen-candidate", "generated": [{
+                "path": "dsh/managed/plugin.mjs", "sha256": build["esm_sha256"], "build": build,
+            }], "sources": [
+                {"origin": "candidate", "path": source_path, "sha256": digest(files["plugin.ts"]), "content": files["plugin.ts"]},
+                {"origin": "platform", "path": sdk_path, "sha256": digest(sdk_content), "content": sdk_content},
+            ]}
+            inputs = {"source_id": "experiment:test", "candidate_sha256": "frozen-candidate", "harness_trees": {
+                name: {"files": [
+                    {"path": path, "size": len(content.encode()), "sha256": digest(content)}
+                    for path, content in files.items()
+                ] if name == "managed" else []}
+                for name in roots
+            }}
+            contract = {**roots, "experiment_root": experiment}
+            with mock.patch.dict("sys.modules", {"source_contract": mock.Mock(resolve=lambda *_args, **_kwargs: contract)}):
+                legacy = module._locked_harness(inputs)
+                self.assertEqual(legacy[1]["content"], files["plugin.mjs"])
+                self.assertNotIn("classification", legacy[1])
+                new_inputs = {**inputs, "harness_review": review}
+                current = module._locked_harness(new_inputs)
+                self.assertEqual(current[0]["content"], files["plugin.ts"])
+                self.assertEqual(current[1]["classification"], "generated")
+                self.assertIsNone(current[1]["content"])
+                self.assertEqual(current[1]["sha256"], build["esm_sha256"])
+                self.assertEqual(current[1]["build"], build)
+                self.assertEqual(current[2]["content"], files["handwritten.mjs"])
+                self.assertEqual(current[3]["content"], sdk_content)
+                self.assertEqual(len(current), 4)
+                fallback = module._locked_harness({**inputs, "harness_review": {
+                    "schema_version": 1, "generated": [], "sources": [],
+                }})
+                self.assertEqual(fallback[1]["content"], files["plugin.mjs"])
+                for mutation, expected in (("missing-sdk", "harness-review-source-incomplete"),
+                                           ("changed-source", "harness-review-source-mismatch"),
+                                           ("changed-candidate", "harness-review-candidate-mismatch"),
+                                           ("protected-source", "harness-review-protected-source")):
+                    changed = json.loads(json.dumps(review))
+                    if mutation == "missing-sdk":
+                        changed["sources"].pop()
+                    elif mutation == "changed-source":
+                        changed["sources"][0]["content"] = "changed"
+                    elif mutation == "protected-source":
+                        changed["sources"][0]["path"] = "dsh/managed/.env.json"
+                    else:
+                        changed["candidate_sha256"] = "changed"
+                    with self.subTest(mutation=mutation), self.assertRaisesRegex(ValueError, expected):
+                        module._locked_harness({**inputs, "harness_review": changed})
+                (roots["managed"] / "plugin.mjs").write_text("changed", encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "harness-lock-digest-mismatch"):
+                    module._locked_harness(new_inputs)
+
     def test_readable_view_preserves_json_and_deduplicates_tool_content(self) -> None:
         spec = importlib.util.spec_from_file_location("scenario_analysis_view_test", SCENARIO_ANALYSIS)
         module = importlib.util.module_from_spec(spec)
@@ -1340,6 +1449,36 @@ class DshEvalTests(unittest.TestCase):
         raw["tool_accesses"][1]["result"]["read"]["offset"] = 2
         with self.assertRaisesRegex(ValueError, "analysis-tools-invalid"):
             module._validate_evidence_access(raw, required)
+
+    def test_analysis_access_keeps_recovered_parameter_errors_without_counting_failed_reads(self) -> None:
+        spec = importlib.util.spec_from_file_location("scenario_analysis_retry_test", SCENARIO_ANALYSIS)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        path = "evidence/analysis/readable/scene-01/part-001.txt"
+        required = [{"bundle": "scene-01", "path": path, "total_lines": 2, "sha256": "0" * 64}]
+        failed = {"name": "read", "arguments": {"file_path": path, "offset": "1</tool_call>"},
+                  "result": {"is_error": True, "error_code": "INVALID_ARGS", "recovered_by": 1}}
+        success = {"name": "read", "arguments": {"file_path": f"/work/evaluation-run/{path}"},
+                   "result": {"is_error": False, "read": {
+                       "path": path, "offset": 1, "line_numbers": [1, 2], "total_lines": 2}}}
+        raw = {"tool_names": ["glob", "grep", "read"], "tool_accesses": [failed, success]}
+        module._validate_evidence_access(raw, required)
+        for mutation in ("unrecovered", "different-file", "prior-success", "wrong-tool", "wrong-error", "partial"):
+            value = json.loads(json.dumps(raw))
+            if mutation == "unrecovered":
+                value["tool_accesses"].pop()
+            elif mutation == "different-file":
+                value["tool_accesses"][1]["arguments"]["file_path"] = "evidence/other.json"
+            elif mutation == "prior-success":
+                value["tool_accesses"][0]["result"]["recovered_by"] = 0
+            elif mutation == "wrong-tool":
+                value["tool_accesses"][0]["name"] = "grep"
+            elif mutation == "wrong-error":
+                value["tool_accesses"][0]["result"]["error_code"] = "FAILED"
+            else:
+                value["tool_accesses"][1]["result"]["read"]["line_numbers"] = [1]
+            with self.subTest(mutation=mutation), self.assertRaisesRegex(ValueError, "analysis-"):
+                module._validate_evidence_access(value, required)
 
     def runtime_fixture(self, root: Path, *, mode: str = "pass") -> tuple[Path, dict[str, str], Path]:
         repository = copy_repository(root)
@@ -1493,6 +1632,11 @@ if payload.get("operation") == "review":
             accesses[0]["result"] = {"is_error": True}
         elif analysis_mode == "partial-read":
             accesses[0]["result"]["read"]["line_numbers"].pop()
+        elif analysis_mode == "read-recovered":
+            accesses.insert(0, {
+                "name": "read", "arguments": {"file_path": required[0]["path"], "offset": "1</tool_call>"},
+                "result": {"is_error": True, "error_code": "INVALID_ARGS", "recovered_by": 1},
+            })
         if analysis_mode == "repair-output" and not repairing:
             text = json.dumps({"case_reviews": reviews, "findings": [finding], "unexpected": True})
         results.append({
@@ -1886,6 +2030,25 @@ print(json.dumps({"schema_version": "1.0", "rows": rows}))
         self.assertEqual(analysis["review_status"], "completed")
         self.assertEqual(analysis["reviewed_case_count"], 1)
         self.assertEqual(commands, ["up", "url", "up", "url", "down", "down"])
+
+    def test_review_recovered_read_is_preserved_in_evidence_and_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repository, env, _ = self.runtime_fixture(Path(temp))
+            env["TEST_ANALYSIS_MODE"] = "read-recovered"
+            completed, payload = self.run_eval(repository, env, "U-INS-001", review="ai")
+            run_dir = (repository / payload["summary"]).parent
+            analysis = json.loads((run_dir / "analysis.json").read_text())
+            scene = next(item for item in analysis["scenes"] if item["selected_case_ids"])
+            access = json.loads((run_dir / scene["analysis_session"]["evidence_ref"]).read_text())["tool_accesses"]
+            report = (run_dir / "report.md").read_text()
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(analysis["review_status"], "completed")
+        self.assertTrue(access[0]["result"]["is_error"])
+        self.assertEqual(access[0]["result"]["recovered_by"], 1)
+        self.assertNotIn("read", access[0]["result"])
+        self.assertIn("已恢复 1 次只读参数错误", report)
+        self.assertIn("[阅读核对记录]", report)
+        self.assertIn(scene["analysis_session"]["evidence_ref"], report)
 
     def test_full_review_repairs_invalid_output_in_same_session(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

@@ -63,6 +63,7 @@ interface RegisteredSource {
   agent_id: string
   selectable: boolean
   reason: string
+  model_binding?: ModelSelection
 }
 
 type InstanceRecord = Record<string, unknown> & {
@@ -73,7 +74,7 @@ type InstanceRecord = Record<string, unknown> & {
   home_preserved?: unknown
 }
 
-type ModelPolicyProvider = (agentId: string, selected?: ModelSelection) => Promise<{ policy: unknown; environment: Record<string, string> }>
+type ModelPolicyProvider = (agentId: string, selected?: ModelSelection, candidatePath?: string) => Promise<{ policy: unknown; environment: Record<string, string> }>
 
 function ok<T>(value: T): ConnectionRpcResult<T> {
   return { ok: true, value }
@@ -287,7 +288,10 @@ async function runUpWithModelPolicy(assetRoot: string, args: string[], agentId: 
     if (selected || expectedHash) throw new Error('当前实例入口无法核对模型选择，请刷新页面后重试')
     return { result: await runDsh(assetRoot, args, signal) }
   }
-  const projected = await provider(agentId, selected)
+  const source = args[args.indexOf('--source') + 1]
+  const version = source && source.replace(/^experiment:/, '')
+  const projected = await provider(agentId, selected, version && VERSION_ID.test(version)
+    ? join(assetRoot, 'evolution/experiments', version, 'candidate') : undefined)
   const policy = projected.policy && typeof projected.policy === 'object' && !Array.isArray(projected.policy)
     ? projected.policy as Record<string, unknown> : {}
   const effective = modelSelection(policy.default)
@@ -313,6 +317,8 @@ async function listSources(assetRoot: string): Promise<{ sources: RegisteredSour
     agent_id: catalog.sources[experimentId]?.agent_id ?? VERSION_ID.exec(experimentId)![1],
     selectable: !catalog.errors[experimentId],
     reason: catalog.errors[experimentId] ?? '版本装载声明可读取；预览时核对 Runtime 与当前模型配置',
+    ...(catalog.sources[experimentId]?.harness_runtime?.model_bindings?.main
+      ? { model_binding: catalog.sources[experimentId].harness_runtime!.model_bindings!.main } : {}),
   }))
   const businessGatewayAvailable = await businessAccess(assetRoot).then(() => true, () => false)
   return { sources: sources.sort((a, b) => a.agent_id.localeCompare(b.agent_id) || b.experiment_id.localeCompare(a.experiment_id, 'en', { numeric: true })),

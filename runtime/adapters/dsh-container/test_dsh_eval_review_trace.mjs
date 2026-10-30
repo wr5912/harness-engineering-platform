@@ -36,7 +36,7 @@ function toolPair(callId, name, sessionId, options = {}) {
 function archive(session, options, snapshot) {
   const events = session.prompts.flatMap((prompt, index) => [
     { type: 'user/message', data: { id: `user-${index}`, source: { kind: 'user' }, content: [{ type: 'text', text: prompt }] } },
-    { type: 'request/header', data: { header: { config: options.routeMismatch ? { ...route, model: 'unexpected-model' } : route, tools: ['glob', 'grep', 'read'].map(name => ({ name })) } } },
+    { type: 'request/header', data: { header: { config: options.routeMismatch ? { ...(session.route ?? route), model: 'unexpected-model' } : session.route ?? route, tools: ['glob', 'grep', 'read'].map(name => ({ name })) } } },
     ...toolPair(`${session.id}-read-${index}`, options.invalidTools ? 'shell' : 'read', session.id, options),
     ...(options.nativeTools ? toolPair(`${session.id}-grep-${index}`, 'grep', session.id, options) : []),
     { type: 'assistant/message', data: { message: { content: [{ type: 'text', text: `归因结果 ${index + 1}` }] } } },
@@ -48,10 +48,11 @@ function archive(session, options, snapshot) {
     ...toolPair(`${session.id}-child-glob`, 'glob', session.id, options),
   ]
   const encode = rows => strToU8(`${rows.map(row => JSON.stringify(row)).join('\n')}\n`)
-  return zipSync({ [`${session.id}.jsonl`]: encode(events), 'descendants/review-child.jsonl': encode(descendants) })
+  return zipSync({ [`${session.id}.jsonl`]: encode(events), 'descendants/review-child.jsonl': encode(descendants),
+    ...(options.childReadRetry ? { 'z-descendants/read-retry.jsonl': encode(toolPair(`${session.id}-child-retry`, 'read', session.id, { nativeTools: true })) } : {}) })
 }
 
-async function fixture(t, scenario = () => ({})) {
+async function fixture(t, scenario = () => ({}), selectedRoute = route) {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-review-trace-'))
   // 原始两份运行模块保持逐字节一致，依赖通过临时 node_modules 链接解析。
   for (const name of ['dsh-eval-api.mjs', 'dsh-eval-common.mjs']) await copyFile(join(adapter, name), join(directory, name))
@@ -113,6 +114,7 @@ async function fixture(t, scenario = () => ({})) {
       else if (method === 'session/selectModel') {
         const { sessionId, ...selected } = args.request
         assert.ok(sessions.has(sessionId))
+        sessions.get(sessionId).route = selectedRoute
         value = { selected }
       } else if (method === 'session/prompt') {
         const session = sessions.get(args.request.sessionId)
@@ -145,7 +147,7 @@ async function fixture(t, scenario = () => ({})) {
       child.on('close', (code, signal) => code === 0 ? resolve() : reject(new Error(`实际评测驱动失败: ${code ?? signal} ${Buffer.concat(stderr).toString('utf8')}`)))
     })
     child.stdin.end(JSON.stringify({ operation, auth_url: `http://127.0.0.1:${server.address().port}/assistant/`, workspace,
-      preset_id: 'target', judge_preset_id: 'reviewer', evidence_root: evidenceRoot, timeout_ms: timeoutMs, cases: operation === 'review' ? [] : scenes, scenes: operation === 'review' ? scenes : [], model_route: route }))
+      preset_id: 'target', judge_preset_id: 'reviewer', evidence_root: evidenceRoot, timeout_ms: timeoutMs, cases: operation === 'review' ? [] : scenes, scenes: operation === 'review' ? scenes : [], model_route: selectedRoute }))
     try { await completion } finally { clearTimeout(timer) }
     return JSON.parse(Buffer.concat(stdout).toString('utf8'))
   }
@@ -229,6 +231,18 @@ test('真实 review 驱动保存根与子 Session 轨迹，同 Session repair �
   assert.deepEqual(await runtime.evidence('scene-1', 1), before)
 })
 
+test('证据复核沿用实际非DeepSeek路由与推理档位，仍核对原生选择和请求轨迹', async t => {
+  const selected = { provider: 'xiaomi-token-plan-cn', model: 'mimo-v2.6-flash', reasoningEffort: 'off' }
+  const runtime = await fixture(t, () => ({}), selected)
+  const result = await runtime.run([{ scene_id: 'scene-1', prompt: firstPrompt }])
+  assert.equal(result.results[0].error, undefined)
+  assert.deepEqual(result.results[0].route, selected)
+  assert.deepEqual(runtime.requests.find(row => row.method === 'session/selectModel').args.request,
+    { sessionId: result.results[0].session_id, ...selected })
+  const saved = await runtime.evidence('scene-1')
+  assert.deepEqual(saved.trace.find(row => row.event.type === 'request/header').event.data.header.config, selected)
+})
+
 test('归因 route 或工具校验失败仍保存已经取得的原始轨迹及工具事件', async t => {
   const runtime = await fixture(t, prompt => ({ routeMismatch: prompt === '错误路由', invalidTools: prompt === '越界工具' }))
   const response = await runtime.run([{ scene_id: 'scene-1', prompt: '错误路由' }, { scene_id: 'scene-2', prompt: '越界工具' }])
@@ -258,6 +272,46 @@ test('DSH v4 原生工具回执保留调用关联及 read 行覆盖，支持 rea
   const saved = await runtime.evidence('scene-9')
   assert.equal(saved.checks.status, 'completed')
   assert.ok(saved.tools.filter(row => row.event.type === 'tool/result').every(row => row.event.data.message.role === 'tool'))
+})
+
+test('原生read参数错误必须由同文件的后续成功读取恢复，失败尝试保留且不计覆盖', async t => {
+  const runtime = await fixture(t, prompt => ({ nativeTools: true, childReadRetry: prompt === 'other-session', mutateTool: (rows, name) => {
+    if (prompt === 'grep-error') {
+      if (name === 'grep') {
+        rows[1].data.message.isError = true
+        rows[1].data.error = { name: 'ToolArgsError', code: 'INVALID_ARGS' }
+        rows.push(...toolPair(`${rows[0].data.callId}-retry`, 'grep', 'retry', { nativeTools: true }))
+      }
+      return
+    }
+    if (name !== 'read') return
+    const call = rows[0].data
+    call.arguments = JSON.stringify({ file_path: 'evidence/checks.json', offset: '1</tool_call>' })
+    rows[1].data.message.isError = true
+    rows[1].data.error = { name: 'ToolArgsError', code: prompt === 'other-error' ? 'FAILED' : 'INVALID_ARGS' }
+    delete rows[1].data.meta
+    if (prompt === 'unrecovered' || prompt === 'other-session') return
+    const retry = toolPair(`${call.callId}-retry`, 'read', 'retry evidence', { nativeTools: true })
+    if (prompt === 'different-file') retry[0].data.arguments = JSON.stringify({ file_path: 'evidence/other.json' })
+    if (prompt === 'outside-run') call.arguments = JSON.stringify({ file_path: '/etc/hostname', offset: '1' })
+    if (prompt === 'prior-success') rows.unshift(...retry)
+    else rows.push(...retry)
+  } }))
+  const recovered = await runtime.run([{ scene_id: 'scene-1', prompt: 'recovered' }])
+  assert.equal(recovered.results[0].error, undefined)
+  const accesses = recovered.results[0].tool_accesses
+  const failed = accesses.findIndex(access => access.result.is_error === true)
+  assert.ok(failed >= 0)
+  assert.deepEqual(accesses[failed].result, { is_error: true, error_code: 'INVALID_ARGS', recovered_by: failed + 1 })
+  assert.equal(accesses[failed + 1].result.is_error, false)
+  assert.equal(accesses[failed].result.read, undefined)
+  const saved = await runtime.evidence('scene-1')
+  assert.ok(saved.tools.some(row => row.event.type === 'tool/result' && row.event.data.message.isError === true))
+  assert.ok(saved.tools.some(row => row.event.type === 'tool/result' && row.event.data.message.isError === false))
+  for (const [index, reason] of ['unrecovered', 'different-file', 'prior-success', 'other-error', 'outside-run', 'other-session', 'grep-error'].entries()) {
+    const response = await runtime.run([{ scene_id: `scene-${index + 2}`, prompt: reason }])
+    assert.equal(response.results[0].error, 'analysis-tools-invalid', reason)
+  }
 })
 
 test('DSH v4 回执异常关联、错误、歧义嵌套或缺少读取元数据不能成为有效证据', async t => {

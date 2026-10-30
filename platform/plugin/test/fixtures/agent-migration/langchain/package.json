@@ -1,0 +1,1 @@
+{"name":"migration-source-langchain","version":"1.0.0","private":true,"type":"module","dependencies":{"langchain":"1.6.0","zod":"4.4.3"}}

@@ -4,7 +4,9 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { candidateFiles } from '../../plugin/src/tasks/files.ts'
-import { versionSource } from '../../plugin/src/agents/version-source.ts'
+import { versionSource, assertStandaloneVersionSupported } from '../../plugin/src/agents/version-source.ts'
+import { assetDependencyDeclarations, preparedAssetDependencyPackages } from '../../plugin/src/agents/asset-dependencies.ts'
+import { expectedImage } from '../image.mts'
 import { collectEntries, sha256File } from '../manifest.mts'
 import { isGlibcLibrary } from '../fsutil.mts'
 import type { AgentPackageInput, AgentSourceSnapshot, DependencyPackage } from './types.mts'
@@ -56,7 +58,7 @@ export function assertDependencyArchitecture(root: string, arch: string): void {
 
 function pythonPackages(candidate: string, input: AgentPackageInput): DependencyPackage[] {
   const result: DependencyPackage[] = []
-  let preparedPackages: Array<{ path: string; lockSha256?: string }> = []
+  let preparedPackages: Array<{ path: string; lockSha256?: string; preparedTarget?: DependencyPackage['preparedTarget'] }> = []
   try { preparedPackages = JSON.parse(readFileSync(join(input.resourcesDir!, 'resources.json'), 'utf8')).dependencies ?? [] } catch { /* 未准备的资源保持明确缺口。 */ }
   for (const declaration of candidateFiles(candidate, ['.venv', 'venv'])) {
     if (!/^dsh\/(?:workspace|managed)\//.test(declaration) || declaration.split('/').some(name => omittedPart.has(name))) continue
@@ -91,7 +93,8 @@ function pythonPackages(candidate: string, input: AgentPackageInput): Dependency
     const names = entries.map(line => /^\s*([A-Za-z0-9][A-Za-z0-9_.-]*)/.exec(line)?.[1]).filter((name): name is string => Boolean(name))
     const unresolved = filename.endsWith('.txt') ? entries.some(line => !/^\s*[A-Za-z0-9][A-Za-z0-9_.-]*/.test(line)) : declared === undefined
     const prepared = input.resourcesDir ? join(input.resourcesDir, 'dependencies', path, 'site-packages') : ''
-    const preparedMatches = preparedPackages.some(item => item.path === path && item.lockSha256 === lockSha256)
+    const preparedPackage = preparedPackages.find(item => item.path === path && item.lockSha256 === lockSha256)
+    const preparedMatches = Boolean(preparedPackage)
     const vendor = ['vendor/site-packages', 'site-packages'].map(name => join(directory, name)).find(existsSync)
     let native = false
     if (vendor) {
@@ -119,7 +122,7 @@ function pythonPackages(candidate: string, input: AgentPackageInput): Dependency
     if (ready) { try { assertDependencyArchitecture(modulesPath!, input.arch) } catch { ready = false } }
     result.push({ kind: 'python', path, name: `Python 环境（${relative(join(candidate, 'dsh'), directory).split(sep).join('/')}）`,
       sourceFile: declaration, dependencies: names.length ? names : ['Python 项目声明'], lockSha256,
-      ...(modulesPath ? { modulesPath } : {}), ready,
+      ...(modulesPath ? { modulesPath } : {}), ...(modulesPath === prepared && preparedPackage?.preparedTarget ? { preparedTarget: preparedPackage.preparedTarget } : {}), ready,
       ...(!ready ? { reason: unresolved ? 'Python 声明含未解析的环境/引用，需先准备明确的便携依赖，不能按零依赖出包'
         : native ? '含原生 Python 扩展，需要与目标 DSH 镜像兼容的已准备依赖；不会复制宿主 venv 或执行安装 Hook'
         : modulesPath ? '已有 Python 库目录未包含全部声明包，或目标架构不匹配，请补齐后重试'
@@ -129,43 +132,44 @@ function pythonPackages(candidate: string, input: AgentPackageInput): Dependency
 }
 
 function dependencyPackages(candidate: string, input: AgentPackageInput): DependencyPackage[] {
-  const managed = join(candidate, 'dsh/managed'), result: DependencyPackage[] = []
-  let preparedPackages: Array<{ path: string; lockSha256?: string }> = []
+  const result: DependencyPackage[] = []
+  let preparedPackages: Array<{ path: string; lockSha256?: string; preparedTarget?: DependencyPackage['preparedTarget'] }> = []
   if (input.resourcesDir) {
     try { preparedPackages = JSON.parse(readFileSync(join(input.resourcesDir, 'resources.json'), 'utf8')).dependencies ?? [] }
     catch { /* 未生成清单的目录不能冒充已核对的依赖缓存。 */ }
   }
-  const walk = (directory: string) => {
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      if (!entry.isDirectory() || omittedPart.has(entry.name)) continue
-      const path = join(directory, entry.name), manifest = join(path, 'package.json')
-      if (existsSync(manifest)) {
-        const pkg = JSON.parse(readFileSync(manifest, 'utf8'))
-        const dependencies = [...new Set([...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.peerDependencies ?? {}).filter(name => !pkg.peerDependenciesMeta?.[name]?.optional)])]
-        if (dependencies.length) {
-          const relativePath = relative(join(candidate, 'dsh'), path).split(sep).join('/')
-          const lock = ['pnpm-lock.yaml', 'package-lock.json', 'npm-shrinkwrap.json'].map(name => join(path, name)).find(existsSync)
-          const lockSha256 = lock ? sha256File(lock) : createHash('sha256').update(readFileSync(manifest)).digest('hex')
-          const prepared = input.resourcesDir ? join(input.resourcesDir, 'dependencies', relativePath, 'node_modules') : ''
-          const local = join(path, 'node_modules')
-          const preparedMatches = preparedPackages.some(item => item.path === relativePath && item.lockSha256 === lockSha256)
-          const modules = prepared && preparedMatches && existsSync(prepared) ? prepared : localArch() === input.arch && existsSync(local) ? local : undefined
-          let ready = Boolean(modules && dependencies.every(name => existsSync(join(modules, name))))
-          if (ready) { try { assertDependencyArchitecture(modules!, input.arch) } catch { ready = false } }
-          result.push({ path: relativePath, name: pkg.name ?? entry.name, dependencies, lockSha256, ...(modules ? { modulesPath: modules } : {}), ready })
-        }
+  const walk = (path: string) => {
+    const manifest = join(path, 'package.json')
+    if (existsSync(manifest)) {
+      const pkg = JSON.parse(readFileSync(manifest, 'utf8'))
+      const dependencies = [...new Set([...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.peerDependencies ?? {}).filter(name => !pkg.peerDependenciesMeta?.[name]?.optional
+        && !(name.startsWith('@deepseek-ai/') && existsSync(join(input.programRoot, 'platform/plugin/node_modules', name, 'package.json'))))])]
+      if (dependencies.length) {
+        const relativePath = relative(join(candidate, 'dsh'), path).split(sep).join('/')
+        const lock = ['pnpm-lock.yaml', 'package-lock.json', 'npm-shrinkwrap.json'].map(name => join(path, name)).find(existsSync)
+        const lockSha256 = lock ? sha256File(lock) : createHash('sha256').update(readFileSync(manifest)).digest('hex')
+        const prepared = input.resourcesDir ? join(input.resourcesDir, 'dependencies', relativePath, 'node_modules') : ''
+        const local = join(path, 'node_modules')
+        const preparedPackage = preparedPackages.find(item => item.path === relativePath && item.lockSha256 === lockSha256)
+        const preparedMatches = Boolean(preparedPackage)
+        const modules = prepared && preparedMatches && existsSync(prepared) ? prepared : localArch() === input.arch && existsSync(local) ? local : undefined
+        let ready = Boolean(modules && dependencies.every(name => existsSync(join(modules, name))))
+        if (ready) { try { assertDependencyArchitecture(modules!, input.arch) } catch { ready = false } }
+        result.push({ path: relativePath, name: pkg.name ?? relativePath, dependencies, lockSha256, ...(modules ? { modulesPath: modules } : {}),
+          ...(modules === prepared && preparedPackage?.preparedTarget ? { preparedTarget: preparedPackage.preparedTarget } : {}), ready })
       }
-      walk(path)
     }
+    for (const entry of readdirSync(path, { withFileTypes: true })) if (entry.isDirectory() && !omittedPart.has(entry.name)) walk(join(path, entry.name))
   }
-  if (existsSync(managed)) walk(managed)
+  for (const name of ['dsh/managed', 'dsh/workspace']) if (existsSync(join(candidate, name))) walk(join(candidate, name))
   return result
 }
 
-export function inspectAgentSnapshot(input: AgentPackageInput): AgentSourceSnapshot {
+export function inspectAgentSnapshot(input: AgentPackageInput, targetImage?: { tag: string; id: string }): AgentSourceSnapshot {
   if (!['amd64', 'arm64'].includes(input.arch) || !['online', 'offline'].includes(input.mode)) throw new Error('部署架构或模式无效')
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(input.agentId)) throw new Error('智能体身份无效')
   const source = versionSource(input.assetRoot, input.experimentId)
+  assertStandaloneVersionSupported(source)
   if (source.agent_id !== input.agentId) throw new Error('所选版本不属于当前智能体')
   const candidate = resolve(input.assetRoot, source.candidate_root, '..')
   const { load } = createRequire(join(input.programRoot, 'platform/plugin/package.json'))('js-yaml')
@@ -185,8 +189,26 @@ export function inspectAgentSnapshot(input: AgentPackageInput): AgentSourceSnaps
   }
   for (const [prefix] of allowedRoots) if (!existsSync(join(candidate, prefix)) || !lstatSync(join(candidate, prefix)).isDirectory()) throw new Error(`来源缺少装载目录：${prefix}`)
   if (!files.some(file => file.sourcePath === `dsh/managed/${source.patch}`) || !files.some(file => file.sourcePath === `dsh/presets/${source.preset}`)) throw new Error('来源缺少实际 Profile Patch 或 Preset')
+  const dependencies = [...dependencyPackages(candidate, input), ...pythonPackages(candidate, input)]
+  let image: { tag?: string; id?: string } = targetImage ?? {}
+  if (!targetImage && input.resourcesDir) try { image = JSON.parse(readFileSync(join(input.resourcesDir, 'resources.json'), 'utf8')).image ?? {} } catch { /* 运行资源缺失由调用方报告。 */ }
+  const matchesTarget = (dependency: DependencyPackage) => !dependency.preparedTarget || !image.id || dependency.preparedTarget.imageId === image.id && dependency.preparedTarget.image === image.tag
+  // 普通实例与独立部署复用同一份已核对依赖；不回拷到 Candidate 或复制宿主 venv。
+  const preparedPackages = assetDependencyDeclarations(candidate).length ? preparedAssetDependencyPackages(input.assetRoot, input.experimentId, input.arch, { image: expectedImage(input.programRoot, input.arch).tag }) : []
+  for (const prepared of preparedPackages) {
+    const index = dependencies.findIndex(item => item.path === prepared.path)
+    if (index >= 0 && dependencies[index].lockSha256 !== prepared.lockSha256) continue
+    if (index >= 0 && dependencies[index].ready && matchesTarget(dependencies[index]) && input.resourcesDir && dependencies[index].modulesPath?.startsWith(resolve(input.resourcesDir) + sep)) continue
+    assertDependencyArchitecture(prepared.modulesPath, input.arch)
+    const frozen = { ...prepared, preparedFiles: dependencyEntries(prepared.modulesPath) }
+    if (index >= 0) dependencies[index] = { ...dependencies[index], ...frozen, reason: undefined }
+    else dependencies.push(frozen)
+  }
+  for (const dependency of dependencies) if (!matchesTarget(dependency)) {
+    dependency.ready = false; dependency.reason = '已准备业务依赖对应另一标准镜像，需要针对当前运行资源重新准备'
+  }
   return { agentId: input.agentId, experimentId: input.experimentId, candidate, candidateSha256: digest, source, files, omitted,
-    dependencies: [...dependencyPackages(candidate, input), ...pythonPackages(candidate, input)], git: gitState(input.assetRoot) }
+    dependencies, git: gitState(input.assetRoot) }
 }
 
 export function copyAgentSnapshot(snapshot: AgentSourceSnapshot, staging: string, signal?: AbortSignal): void {

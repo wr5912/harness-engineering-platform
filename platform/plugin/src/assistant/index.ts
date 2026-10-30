@@ -19,6 +19,7 @@ import { TOOL_INPUT_JSON_RETRY_POLICY, toolInputJsonRetrySchema } from './tool-i
 import { decisionExtractionModelContract, normalizeDecisionModelSubmission } from '../evaluation/decision-dataset-contract.ts'
 import type { DocumentReader } from './documents.ts'
 import { collectDecisionReviewInput } from './decision-review-input.ts'
+import { assistantModelCatalog } from './model-catalog.ts'
 
 type MapValue = Record<string, any>
 type Domain = AssistantDomain
@@ -50,6 +51,7 @@ export interface AssistantServices {
 const readActions = new Set(['research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'tasks/capabilities', 'tasks/assembly-preview', 'list', 'detail', 'edit/read', 'edit/preview', 'cases/list', 'cases/read', 'eval/preview', 'eval/status', 'runs/index', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/source', 'compute-variants/identity-preview', 'compute-variants/preview', 'compute-variants/build-preview', 'compute-variants/freeze-preview', 'compute-variants/compare', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'datasets/source', 'datasets/preview', 'datasets/list', 'datasets/read', 'datasets/export', 'features/read-source', 'features/preview', 'features/proposal', 'fusion/preview', 'fusion/proposal', 'fusion/status', 'url', 'logs', 'preview', 'batch-preview', 'configuration', 'test', 'resources', 'resourceTemplates', 'readResource', 'sources/list', 'sources/components', 'sources/logs', 'sources/preview', 'dryRunComposition', 'compositionRun', 'compositionArtifact', 'compositionSource'])
 readActions.add('control/status')
 readActions.add('documents/read')
+for (const action of ['migrations/inspect', 'migrations/read', 'migrations/preview', 'migrations/status', 'assets/build-preview']) readActions.add(action)
 const recordType = 'plugin:harness-platform/assistant'
 const projectionKey = 'harnessPlatformAssistant'
 
@@ -387,6 +389,13 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
       if (!preview.ok) return wireValue(preview)
       input = freezeInstancePreview(action, input, preview)
     }
+    if (domain === 'agents' && action === 'assets/build' && input.expected_preview_sha256 === undefined) {
+      preview = await dispatch(domain, 'assets/build-preview', input, signal)
+      if (!preview.ok) return wireValue(preview)
+      const hash = preview.value?.preview_sha256
+      if (typeof hash !== 'string' || !/^[a-f0-9]{64}$/.test(hash)) throw new Error('构建预览缺少实际来源与产物摘要')
+      input = { ...input, expected_candidate_sha256: preview.value.candidate_sha256, expected_preview_sha256: hash }
+    }
     signal.throwIfAborted()
     // 工具执行已通过 DSH 原生权限链，平台只核对业务预览与执行结果。
     const proposal = { kind: 'proposal', id: randomUUID(), owner_session_id: id, domain, action, input, preview, state: 'running' }
@@ -641,7 +650,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
   function registerTools(registry: { register(tool: any): any }) {
     for (const domain of Object.keys(actions) as Domain[]) registry.register({
       name: `platform_${domain}`,
-      description: `平台${domain}工具。context 读取固定任务与页面上下文；describe(input.action=操作名)读取单个操作的参数合同。优先查已有对象和能力，再执行；工具权限遵循 DSH 原生设置，写入前核对预览与目标。`,
+      description: `平台${domain}工具。context 读取固定任务与页面上下文${domain === 'agents' ? '，普通管理会话还返回 model_catalog 中业务可选的实际 provider/model 和推理档位' : ''}；describe(input.action=操作名)读取单个操作的参数合同。优先查已有对象和能力，再执行；工具权限遵循 DSH 原生设置，写入前核对预览与目标。`,
       parameters: { type: 'object', properties: { action: { type: 'string', enum: ['context', 'describe', ...actions[domain]] }, input: { type: 'object', additionalProperties: true } }, required: ['action', 'input'], additionalProperties: false },
       output: { schema: { type: 'object', additionalProperties: true }, render: (args: any, value: any) => [{ type: 'text', text: JSON.stringify(modelToolValue(domain, args.action, value)) }], presentationMeta: (args: any, value: any) => {
         const projected = modelToolValue(domain, args.action, value)
@@ -681,7 +690,12 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
               : state.task_context.skill === 'agent-maintenance' && state.task_context.workflow === 'features' ? ['inheritance-and-fusion', 'controlled-improvement'] : undefined
           if (topics && !topics.includes(args.input?.topic)) throw new Error('研究资料主题不属于当前专项任务')
         }
-        if (args.action === 'context') return wireValue({ ok: true, value: { workspace: workspaceIdentity(root), assistant: { session_id: id, model: state.model ?? null }, context: state.context, task_context: state.task_context, available_actions: allowedAssistantActions(domain, state), next: state.task_context.skill === 'decision-sample-extraction' ? 'datasets/source 读取固定 Run 的来源目录与 extraction_contract' : 'describe(input.action=操作名)可读取单个动作的参数合同' } })
+        if (args.action === 'context') {
+          const modelCatalog = domain === 'agents' && allowedAssistantActions(domain, state).includes('migrations/preview')
+            ? await assistantModelCatalog(() => platform('models/list', {}, exec.signal, managementPeer), exec.signal) : undefined
+          return wireValue({ ok: true, value: { workspace: workspaceIdentity(root), assistant: { session_id: id, model: state.model ?? null }, context: state.context, task_context: state.task_context,
+            ...(modelCatalog ? { model_catalog: modelCatalog } : {}), available_actions: allowedAssistantActions(domain, state), next: state.task_context.skill === 'decision-sample-extraction' ? 'datasets/source 读取固定 Run 的来源目录与 extraction_contract' : 'describe(input.action=操作名)可读取单个动作的参数合同' } })
+        }
         if (!actions[domain].includes(args.action)) throw new Error('未知的领域操作')
         const input = domain === 'agents' && args.action === 'datasets/preview' && state.task_context.skill === 'decision-sample-extraction'
           ? normalizeDecisionModelSubmission({ ...object(args.input) }) : { ...object(args.input) }

@@ -635,6 +635,52 @@ class ModelPolicyTest(unittest.TestCase):
             entry = dev.instance_entry(target, state, {"projects": {}, "homes": {}})
             self.assertEqual(entry["model_policy"]["sha256"], state["model_policy"]["sha256"])
 
+    def test_analysis_reuses_projected_model_connections_without_business_runtime(self):
+        selected = {"provider": "xiaomi-token-plan-cn", "model": "mimo-v2.6-flash", "reasoningEffort": "off"}
+        projected = {
+            "allowed": [{"provider": selected["provider"], "model": selected["model"]}],
+            "default": selected, "credential_refs": ["XIAOMI_TOKEN_PLAN_CN_API_KEY"],
+            "patch": [
+                {"id": "agent-default-model", "config": selected},
+                {"id": "llm-pi-ai", "config": {"providers": {selected["provider"]: {
+                    "apiKeyEnv": "XIAOMI_TOKEN_PLAN_CN_API_KEY", "models": [{"id": selected["model"]}],
+                }}}},
+            ],
+            "harness_runtime": {"role_instructions": {"main": "dsh/workspace/AGENTS.md"}},
+            "asset_dependencies": {"status": "ready"},
+        }
+        policy = dev.analysis_model_policy("example-agent", projected)
+        self.assertEqual(policy["default"], selected)
+        self.assertNotIn("harness_runtime", policy)
+        self.assertNotIn("asset_dependencies", policy)
+        self.assertEqual(json.loads(dev.model_policy_patch(policy)), projected["patch"])
+        contract = EvaluationModeContractTest().contract(model_policy=policy,
+                                                       required_env_names=["DEEPSEEK_API_KEY", "OPS_MCP_URL"])
+        self.assertEqual(dev.required_env_names(contract, "/fixture/analysis"), ["XIAOMI_TOKEN_PLAN_CN_API_KEY"])
+        self.assertEqual(dev.runtime_env_names(contract, "/fixture/analysis"), ["XIAOMI_TOKEN_PLAN_CN_API_KEY"])
+        args = types.SimpleNamespace(source="experiment:EXP-example-agent-001", mode="verification",
+                                     name="analysis-mimo", port=3082, model_policy="/fixture/model-policy.json",
+                                     analysis_workspace="/fixture/analysis")
+        with mock.patch.object(dev, "resolve", return_value=contract), \
+                mock.patch.object(dev, "existing_instance", return_value=None), \
+                mock.patch.object(dev, "validate_analysis_workspace", return_value="/fixture/analysis"), \
+                mock.patch.object(dev, "read_model_policy", return_value=projected) as reader, \
+                mock.patch.object(dev, "assert_asset_dependencies") as dependencies:
+            prepared, current = dev.prepare_up(args)
+            reader.assert_called_once_with("/fixture/model-policy.json", contract["agent_id"], repo=dev.REPO)
+            dependencies.assert_not_called()
+            self.assertIsNone(current)
+            self.assertEqual(prepared["model_policy"]["source"], "analysis-runtime")
+            self.assertEqual(prepared["model_policy"]["default"], selected)
+        with tempfile.TemporaryDirectory() as temporary, mock.patch.object(dev, "STATE_ROOT", Path(temporary)):
+            target = dev.write_instance("analysis-mimo", mode="verification", contract=contract, port=3082,
+                                        analysis_workspace="/fixture/analysis")
+            compose = (target / "compose.yaml").read_text()
+            self.assertIn("      - XIAOMI_TOKEN_PLAN_CN_API_KEY\n", compose)
+            self.assertNotIn("      - DEEPSEEK_API_KEY\n", compose)
+            self.assertNotIn("      - OPS_MCP_URL\n", compose)
+            self.assertEqual(json.loads((target / "model.patch.yml").read_text()), projected["patch"])
+
     def test_eval_source_reads_candidate_local_routes_without_expanding_external_catalog(self):
         with tempfile.TemporaryDirectory() as temporary:
             managed = Path(temporary) / "managed"

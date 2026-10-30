@@ -84,6 +84,31 @@ class EvaluationAccessTest(unittest.TestCase):
                     evaluation.authentication_url("probe")
 
 
+class ReviewTargetRouteTest(unittest.TestCase):
+    def test_native_provider_routes_are_preserved_and_mixed_or_invalid_routes_fail(self):
+        import scenario_analysis
+        cases = [{"case_id": "U-FIRST"}, {"case_id": "U-SECOND"}]
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            def write(route, case):
+                target = root / "evidence" / case["case_id"] / "response.json"
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(json.dumps({"response": {"turns": [{"route": route}]}}))
+            for provider, model in (("deepseek-official", "deepseek-flash"),
+                                    ("xiaomi-token-plan-cn", "mimo-v2.6-flash"),
+                                    ("local-qwen", "Qwen3.5-2B")):
+                route = {"provider": provider, "model": model, "reasoningEffort": "off"}
+                for case in cases:
+                    write(route, case)
+                self.assertEqual(scenario_analysis._target_route(root, cases), route)
+            write({"provider": "xiaomi-token-plan-cn", "model": "mimo-v2.6-pro"}, cases[1])
+            with self.assertRaisesRegex(ValueError, "target-route-mixed"):
+                scenario_analysis._target_route(root, cases)
+            write({"provider": "", "model": "mimo-v2.6-flash"}, cases[0])
+            with self.assertRaisesRegex(ValueError, "target-route-invalid"):
+                scenario_analysis._target_route(root, cases)
+
+
 class EvaluationModelPolicyTest(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
@@ -295,6 +320,7 @@ class EvaluationInterpreterTest(unittest.TestCase):
             "validate_repository.py", "validate_experiment.py", "validate_experiment.py",
             "run_record.py", "run_record.py", "run_record.py", "dsh-dev", "dsh-dev", "dsh-dev",
         ])
+        self.assertEqual(calls[0]["args"], [str(self.root), "--experiment", self.root.name])
         self.assertEqual({row["python"] for row in calls}, {sys.executable})
         self.assertEqual([row["args"][0] for row in calls[-3:]], ["up", "url", "down"])
 
@@ -315,10 +341,12 @@ class EvaluationInterpreterTest(unittest.TestCase):
                 evaluation.authentication_url("fixture")
                 self.assertTrue(evaluation.stop_instance("fixture"))
             run = self.root / "evolution/experiments/EXP-fixture-001/runs" / str(custom)
-            scenario_analysis.review_full(run, [], {"run_id": "run-fixture", "source_id": "fixture", "evaluation_cases": [], "case_catalog": []})
+            scenario_analysis.review_full(run, [], {"run_id": "run-fixture", "source_id": "fixture", "evaluation_cases": [], "case_catalog": []},
+                                          model_policy_path=str(self.root / "model-policy.json") if custom else None)
         calls = self.calls()
         self.assertEqual([row["args"][0] for row in calls], ["up", "url", "down"] * 3)
         self.assertEqual({row["python"] for row in calls}, {sys.executable})
+        self.assertEqual(calls[6]["args"][-2:], ["--model-policy", str(self.root / "model-policy.json")])
 
     def test_validator_failure_keeps_exit_status_and_safe_diagnostic_in_progress(self):
         self.children()

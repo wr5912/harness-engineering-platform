@@ -121,6 +121,8 @@ await build({ entryPoints: ['src/business-control/core.ts'], outfile: 'lib/busin
   platform: 'node', target: 'node24', format: 'esm', packages: 'external', legalComments: 'none' })
 await build({ entryPoints: ['src/models/runtime.ts'], outfile: 'lib/model-runtime.js', bundle: true,
   platform: 'node', target: 'node24', format: 'esm', packages: 'external', legalComments: 'none' })
+await build({ entryPoints: ['src/models/binding-runtime.ts'], outfile: 'lib/model-binding-runtime.js', bundle: true,
+  platform: 'node', target: 'node24', format: 'esm', packages: 'external', legalComments: 'none' })
 // Worker 与主插件同目录，源码运行则直接使用相邻的 worker.ts。
 await build({ entryPoints: { 'document-parser': 'src/documents/index.ts', 'document-parser-worker': 'src/documents/worker.ts' }, outdir: 'lib', bundle: true,
   platform: 'node', target: 'node24', format: 'esm', packages: 'external', legalComments: 'none' })

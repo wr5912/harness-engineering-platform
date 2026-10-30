@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { randomUUID } from 'node:crypto'
-import { join } from 'node:path'
+import { join, posix } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import {
   SAFETY_STOP_REASONS,
@@ -34,7 +34,7 @@ async function readInput() {
     const route = payload.model_route
     if (!route || typeof route !== 'object' || Array.isArray(route)
       || Object.keys(route).some(key => !ROUTE_FIELDS.includes(key))
-      || route.provider !== 'deepseek-official'
+      || typeof route.provider !== 'string' || route.provider === ''
       || typeof route.model !== 'string' || route.model === ''
       || (Object.hasOwn(route, 'maxTokens')
         && (!Number.isInteger(route.maxTokens) || route.maxTokens < 1))
@@ -264,9 +264,10 @@ function analysisToolAccesses(archive, toolNames) {
     throw new Error('analysis-tools-invalid')
   }
   const calls = new Map()
+  const sessionLogs = new Map()
   const completed = new Set()
   const accesses = []
-  for (const { event } of toolEvents(archive)) {
+  for (const { event, session_log } of toolEvents(archive)) {
     if (event?.type === 'tool/call') {
       const { callId, name, arguments: encoded } = event.data ?? {}
       if (typeof callId !== 'string' || calls.has(callId) || !ANALYSIS_TOOLS.includes(name)
@@ -282,12 +283,15 @@ function analysisToolAccesses(archive, toolNames) {
       }
       const access = { name, arguments: args }
       calls.set(callId, access)
+      sessionLogs.set(access, session_log)
       accesses.push(access)
     } else if (event?.type === 'tool/result') {
       const source = event.data?.message?.source
       const callId = source?.kind === 'tool' ? source.callId : undefined
       if (typeof callId !== 'string' || !calls.has(callId) || completed.has(callId)
-        || event.data?.error !== undefined) throw new Error('analysis-tools-invalid')
+        || sessionLogs.get(calls.get(callId)) !== session_log) {
+        throw new Error('analysis-tools-invalid')
+      }
       const message = event.data?.message
       // DSH v4 使用 tool 消息；旧轨迹是 user 消息中的嵌套 tool-result。
       const nativeResult = message?.role === 'tool'
@@ -296,10 +300,22 @@ function analysisToolAccesses(archive, toolNames) {
         || (nativeResult ? message.content.some(block => block?.type === 'tool-result')
           : message.role !== 'user' || message.content.length !== 1 || result?.type !== 'tool-result')
         || result.toolCallId !== callId
-        || typeof result.isError !== 'boolean' || result.isError) {
+        || typeof result.isError !== 'boolean') {
         throw new Error('analysis-tools-invalid')
       }
       const access = calls.get(callId)
+      if (result.isError) {
+        // 原生参数校验可能拒绝一次只读尝试；仅在同一文件随后成功重读时恢复。
+        if (!nativeResult || access.name !== 'read'
+          || event.data?.error?.name !== 'ToolArgsError' || event.data.error.code !== 'INVALID_ARGS') {
+          throw new Error('analysis-tools-invalid')
+        }
+        analysisReadPath(access.arguments.file_path)
+        access.result = { is_error: true, error_code: 'INVALID_ARGS', recovered_by: null }
+        completed.add(callId)
+        continue
+      }
+      if (event.data?.error !== undefined) throw new Error('analysis-tools-invalid')
       access.result = { is_error: false }
       if (access.name === 'read') {
         const { path, offset, lines, totalLines } = event.data?.meta ?? {}
@@ -321,7 +337,26 @@ function analysisToolAccesses(archive, toolNames) {
     }
   }
   if (!accesses.length || completed.size !== calls.size) throw new Error('analysis-tools-invalid')
+  for (const [index, access] of accesses.entries()) {
+    if (!access.result.is_error) continue
+    const path = analysisReadPath(access.arguments.file_path)
+    const recovered = accesses.findIndex((item, next) => next > index && item.name === 'read'
+      && item.result.is_error === false && sessionLogs.get(item) === sessionLogs.get(access)
+      && analysisReadPath(item.arguments.file_path) === path)
+    if (recovered < 0) throw new Error('analysis-tools-invalid')
+    access.result.recovered_by = recovered
+  }
   return accesses
+}
+
+function analysisReadPath(value) {
+  if (typeof value !== 'string' || !value.trim()) throw new Error('analysis-tools-invalid')
+  let path = posix.normalize(value)
+  if (path.startsWith('/work/evaluation-run/')) path = path.slice('/work/evaluation-run/'.length)
+  if (posix.isAbsolute(path) || ['.', '..'].includes(path) || path.startsWith('../')) {
+    throw new Error('analysis-tools-invalid')
+  }
+  return path
 }
 
 async function runCase(connection, payload, item, workspace, signal, traceState) {

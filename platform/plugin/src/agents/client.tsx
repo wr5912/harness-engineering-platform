@@ -7,6 +7,7 @@ import type { PlatformUpdates } from '../realtime/client.ts'
 import { instanceWebUrl } from '../instances/url.ts'
 import { AssetDiffPanel } from './asset-diff-client.tsx'
 import { CreateAgentDialog } from './create-agent-client.tsx'
+import { ImportAgentDialog, type MigrationEntryTarget } from './import-agent-client.tsx'
 import { ComputeVariantsPanel, canDeriveVersion, isVariantVersion } from './compute-variants.tsx'
 import { VariantSourcePanel } from './variant-source.tsx'
 import { AgentDescriptionPanel } from './description-client.tsx'
@@ -113,6 +114,8 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
   const [launchMessage, setLaunchMessage] = useState('')
   const [launchBusy, setLaunchBusy] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
+  const [migrationOpen, setMigrationOpen] = useState(false)
+  const [migrationTarget, setMigrationTarget] = useState<MigrationEntryTarget>()
   const [deploymentOpen, setDeploymentOpen] = useState(false)
   const [deploymentTarget, setDeploymentTarget] = useState<{ agent_id: string; experiment_id: string; label: string } | null>(null)
   const [moreActionsOpen, setMoreActionsOpen] = useState(false)
@@ -710,7 +713,7 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
   return <main className="harness-agents" data-active-tab={tab} aria-label="智能体管理">
     <div className="agent-page-content">
       <header className="agent-page-heading">
-        <div className="agent-actions"><button type="button" className="agent-primary" onClick={() => setCreateOpen(true)}>新建智能体</button><button type="button" onClick={() => { changedList.current = true; void refreshChanged() }}>刷新</button></div>
+        <div className="agent-actions"><button type="button" className="agent-primary" onClick={() => setCreateOpen(true)}>新建智能体</button><button type="button" disabled={!onAssistant} onClick={() => { setMigrationTarget(derivable && /^git:[0-9a-f]{40}$/.test(versionParent) ? { agent_id: selected, experiment_id: detail.experiment.id, parent_ref: versionParent, name: detail.agent.name || selected } : undefined); setMigrationOpen(true) }}>导入 / 迁移</button><button type="button" onClick={() => { changedList.current = true; void refreshChanged() }}>刷新</button></div>
         {tab === 'compute-variants' && <button type="button" className="compute-page-back" onClick={returnToList}>返回智能体列表</button>}
       </header>
       {error && <p role="alert" className="agent-error">{error}</p>}
@@ -882,6 +885,7 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
         </section>
       </section>
       {createOpen && <CreateAgentDialog rpc={rpc} active={active} onClose={() => setCreateOpen(false)} onCreated={() => { void refreshList() }} onSelect={receipt => { if (selectVersion(receipt.agent_id, receipt.experiment_id)) setCreateOpen(false) }} />}
+      {migrationOpen && onAssistant && <ImportAgentDialog active={active} target={migrationTarget} onClose={() => setMigrationOpen(false)} onAssistant={onAssistant} />}
       {deploymentTarget && <DeploymentDialog rpc={rpc} active={active && deploymentOpen} target={deploymentTarget} onClose={() => setDeploymentOpen(false)} />}
     </div>
   </main>

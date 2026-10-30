@@ -126,9 +126,9 @@ def checked_process(
     return completed
 
 
-def validation_check(script: Path, target: str) -> dict:
+def validation_check(script: Path, target: str, *options: str) -> dict:
     try:
-        completed = run_process([sys.executable, str(script), target], timeout=180)
+        completed = run_process([sys.executable, str(script), target, *options], timeout=180)
     except (OSError, subprocess.TimeoutExpired) as error:
         return {"exit_code": None, "valid": False, "error": type(error).__name__}
     try:
@@ -153,7 +153,8 @@ def validation_check(script: Path, target: str) -> dict:
 
 def validate_before_run(contract: dict) -> dict:
     return {
-        "repository": validation_check(VALIDATE_REPOSITORY, str(REPO)),
+        "repository": validation_check(VALIDATE_REPOSITORY, str(REPO), "--experiment",
+                                       Path(contract["experiment_root"]).name),
         "experiment": validation_check(VALIDATE_EXPERIMENT, contract["experiment_root"]),
     }
 
@@ -443,7 +444,7 @@ def run_driver(
     payload = {
         "schema_version": "1.0",
         "auth_url": auth_url,
-        "workspace": "/work/harness/workspace",
+        "workspace": contract.get("workspace_path", "/work/harness/workspace"),
         "preset_id": contract["preset_id"],
         "timeout_ms": timeout_seconds * 1000,
         "evidence_root": container_evidence,
@@ -770,7 +771,8 @@ def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict
             rows = [json.loads(line) for line in (run_dir / "results.jsonl").read_text(encoding="utf-8").splitlines()]
             if review_mode == "ai":
                 progress("启动独立 DSH 分析实例，逐场景复核全部 Case 证据")
-                analysis = review_full(run_dir, rows, inputs, timeout_seconds=args.timeout_seconds)
+                analysis = review_full(run_dir, rows, inputs, timeout_seconds=args.timeout_seconds,
+                                       model_policy_path=getattr(args, "model_policy", None))
             else:
                 analysis = analyze(run_dir, rows, inputs, status="completed")
             write_json(run_dir / "analysis.json", analysis)

@@ -38,6 +38,8 @@ export interface DependencyPackage {
   sourceFile?: string
   reason?: string
   ready: boolean
+  preparedTarget?: { image: string; imageId: string }
+  preparedFiles?: FileEntry[]
 }
 export interface AgentSourceSnapshot {
   agentId: string
@@ -56,7 +58,7 @@ export interface AgentResourceManifest {
   createdAt: string
   image: ImageEntry
   docker: { version?: string; composeVersion?: string; files: FileEntry[] }
-  dependencies: Array<{ path: string; lockSha256?: string; files: FileEntry[] }>
+  dependencies: Array<{ path: string; lockSha256?: string; files: FileEntry[]; preparedTarget?: DependencyPackage['preparedTarget'] }>
 }
 export interface AgentPackageManifest {
   schemaVersion: 1

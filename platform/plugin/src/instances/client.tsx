@@ -81,6 +81,7 @@ interface SourceOption {
   agent_id: string
   selectable: boolean
   reason: string
+  model_binding?: ModelSelection
 }
 
 interface AgentOption { id: string; name?: string }
@@ -278,7 +279,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
   const createAllowed = models?.business_allowed ?? []
   const globalDefault = models?.business_default
   const createModel = createModelDraft !== undefined ? createModelDraft
-    : modelAllowed(createAllowed, globalDefault) ? globalDefault : null
+    : chosenSource?.model_binding ?? (modelAllowed(createAllowed, globalDefault) ? globalDefault : null)
   const createModelIssue = models && !modelError ? modelIssue(models.catalog, createAllowed, createModel) : modelError || '业务模型目录尚未就绪'
   const instanceAllowed = models?.business_allowed ?? []
   const instanceCurrentModel = detail?.instance.model_policy?.default ?? null
@@ -494,6 +495,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
   }
 
   function updateForm(next: typeof form) {
+    if (next.source !== form.source) setCreateModelDraft(undefined)
     setForm(next)
     setPreviews([])
     setPending(null)
@@ -508,7 +510,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
       business_control: true,
       access_mode: form.access_mode,
       identity_mode: form.identity_mode,
-      ...(createModel ? { model_selection: createModel } : {}),
+      ...(createModel && (createModelDraft !== undefined || !chosenSource?.model_binding) ? { model_selection: createModel } : {}),
     }
   }
 
@@ -864,7 +866,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
         </select><span className="instance-field-hint">无需登录时，所有访问者共享此实例的历史会话、任务与工作区数据。未发布实例不做风险评估，网关全部放行。</span></label>
         <div className="instance-create-model" aria-label="设置新实例默认模型">
           <div className="instance-create-model-heading"><strong>此实例默认模型</strong>{modelError && <button type="button" className="instance-button" disabled={modelLoading} onClick={() => void loadModels()}>刷新模型{modelLoading ? <LoadingIndicator label="读取业务模型目录" /> : null}</button>}</div>
-          <p className="instance-field-hint">预选“设置 → 模型”的业务统一默认；此实例也可另选已配置模型。</p>
+          <p className="instance-field-hint">{chosenSource?.model_binding && createModelDraft === undefined ? '使用所选版本的主角色模型绑定；此实例也可另选已配置模型。' : '版本未绑定模型时使用“设置 → 模型”的业务统一默认；此实例也可另选已配置模型。'}</p>
           {modelError && <p role="alert" className="instance-model-warning">模型目录读取失败：{modelError}。请刷新模型后再预览。</p>}
           {models && <ModelChoice catalog={models.catalog} allowed={createAllowed} value={createModel || null} label="新实例默认模型" onChange={selection => { setCreateModelDraft(selection); setPreviews([]); setPending(null) }} />}
           {modelLoading ? <LoadingIndicator label="读取业务模型目录" block={!models} /> : createModelIssue && !modelError && <p role="status" className="instance-model-warning">{createModelIssue}</p>}

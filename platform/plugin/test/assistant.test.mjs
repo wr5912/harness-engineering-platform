@@ -1710,3 +1710,57 @@ test('普通管理上下文提供当前真实复核主体，冷恢复保持原�
   assert.deepEqual(value.assistant, { session_id: id, model })
   assert.equal(JSON.stringify(value).includes('fixture-private-key'), false)
 })
+
+test('普通管理context从原生公共目录投影业务路由、推理档位和默认值，不泄露连接凭据', async t => {
+  const rawSecret = 'private-connection-material', catalog = {
+    groups: [{ id: 'business-provider', name: '业务模型连接', apiKey: rawSecret, models: [
+      { id: 'deepseek-flash', name: 'Flash', reasoning: { efforts: [{ id: 'high', name: '高', token: rawSecret }, { id: 'max', name: '最高' }], defaultEffort: 'max' }, headers: { authorization: rawSecret } },
+    ] }, { id: 'missing-key', models: [{ id: 'another-model' }] }, { id: 'platform-account', models: [{ id: 'account-only-model' }] }],
+    failures: [{ message: rawSecret }],
+  }
+  const f = fixture(t, endpoint => endpoint === 'models/list' ? { ok: true, value: {
+    catalog, business_allowed: [{ provider: 'business-provider', model: 'deepseek-flash' }, { provider: 'missing-key', model: 'another-model' }],
+    business_default: { provider: 'business-provider', model: 'deepseek-flash', reasoningEffort: 'max', apiKey: rawSecret },
+    provider_readiness: { 'business-provider': { state: 'runtime_check', message: rawSecret }, 'missing-key': { state: 'missing_api_key', message: rawSecret } },
+    connections: { endpoint: 'https://private.invalid', apiKey: rawSecret },
+  } } : undefined)
+  const id = (await f.rpc('session', { task: '迁移外部智能体', context: { workflow: 'migration' } })).value.session_id
+  const result = (await f.execute(id, 'agents', 'context')).value.model_catalog
+  assert.equal(result.status, 'available'); assert.equal(result.source, 'models/list'); assert.equal(result.runtime_verified, false)
+  assert.deepEqual(result.models[0], { provider: 'business-provider', model: 'deepseek-flash', provider_name: '业务模型连接', name: 'Flash',
+    reasoning: { efforts: [{ id: 'high', name: '高' }, { id: 'max', name: '最高' }], defaultEffort: 'max' }, readiness: 'runtime_check' })
+  assert.equal(result.models[1].readiness, 'missing_api_key')
+  assert.equal(result.models.some(model => model.model === 'account-only-model'), false)
+  assert.deepEqual(result.business_default, { provider: 'business-provider', model: 'deepseek-flash', reasoningEffort: 'max' })
+  assert.equal(result.partial, true)
+  assert.doesNotMatch(JSON.stringify(result), /private-connection-material|private\.invalid|apiKey|authorization/)
+  assert.equal((await f.status(id)).proposals.length, 0)
+  assert.deepEqual(f.calls.map(call => call.endpoint), ['models/list'])
+  assert.equal(f.peers[0].peer.principal.kind, 'owner')
+  assert.match(f.tools.get('platform_agents').description, /model_catalog/)
+  assert.match(assistantActionContract('agents', 'migrations/inspect').instructions, /model_catalog/)
+  assert.equal(assistantActionContract('agents', 'migrations/preview').input_schema.properties.scope_limitations.items.type, 'string')
+  assert.deepEqual(assistantActionContract('agents', 'migrations/resolve').input_schema.properties.resolutions.items.properties.disposition.enum, ['converted', 'native', 'outside-scope'])
+  catalog.groups[0].models[0].reasoning.defaultEffort = 'high'
+  assert.equal((await f.execute(id, 'agents', 'context')).value.model_catalog.models[0].reasoning.defaultEffort, 'high')
+  const extraction = (await f.rpc('session', { task: '抽取限定Run', context: { skill: 'decision-sample-extraction', run_id: 'run-fixed' } })).value.session_id
+  const before = f.calls.length, context = (await f.execute(extraction, 'agents', 'context')).value
+  assert.equal(context.model_catalog, undefined); assert.equal(f.calls.length, before)
+})
+
+test('原生模型目录读取失败保留管理上下文并明确未知，取消不被转换为空目录', async t => {
+  const cancel = new AbortController()
+  let cancelled = false
+  const f = fixture(t, endpoint => {
+    if (endpoint !== 'models/list') return undefined
+    if (cancelled) cancel.abort()
+    throw new Error('Authorization: private-model-directory-credential')
+  })
+  const id = (await f.rpc('session', { task: '迁移智能体', context: { workflow: 'migration', agent_id: 'source-agent' } })).value.session_id
+  const context = (await f.execute(id, 'agents', 'context')).value
+  assert.equal(context.task_context.agent_id, 'source-agent')
+  assert.equal(context.model_catalog.status, 'unavailable'); assert.deepEqual(context.model_catalog.models, [])
+  assert.doesNotMatch(JSON.stringify(context.model_catalog), /private-model-directory-credential|Authorization/)
+  cancelled = true
+  await assert.rejects(() => f.execute(id, 'agents', 'context', {}, cancel.signal), /abort/i)
+})

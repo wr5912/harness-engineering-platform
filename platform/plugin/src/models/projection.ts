@@ -1,15 +1,18 @@
-import { lstatSync, readFileSync } from 'node:fs'
+import { existsSync, lstatSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { load as loadYaml } from 'js-yaml'
 import type { ModelCatalog } from '@deepseek-ai/dsh-api-session-controller'
 import { readBusinessDefault } from './business-default.ts'
 import { businessCatalogRoutes } from './catalog.ts'
+import { resolveHarnessRuntime, type HarnessRuntime } from './harness-runtime.ts'
+import { resolvePreparedAssetDependencies, type PreparedAssetDependencies } from '../agents/asset-dependencies.ts'
+export { resolveHarnessRuntime } from './harness-runtime.ts'
 
 type Route = { provider: string; model: string }
 type Selection = Route & { reasoningEffort?: string }
 type SettingsView = { ns: string; value: unknown }
-type ModelPolicy = { agent_id: string; manifest_sha256: string; business_model_revision: string; allowed: Route[]; default: Selection; patch: unknown[]; credential_refs: string[] }
+type ModelPolicy = { agent_id: string; manifest_sha256: string; business_model_revision: string; allowed: Route[]; default: Selection; patch: unknown[]; credential_refs: string[]; harness_runtime?: HarnessRuntime; resolved_model_bindings?: NonNullable<HarnessRuntime['model_bindings']>; asset_dependencies?: PreparedAssetDependencies }
 export type ProviderReadiness = { state: 'ready' | 'runtime_check' | 'missing_api_key' | 'platform_only' | 'unknown'; message: string }
 type Services = {
   sessionController: { modelCatalog(): Promise<ModelCatalog> }
@@ -156,12 +159,21 @@ function checkedManifest(assetRoot: string, agentId: string) {
 }
 
 /** 平台原生设置是模型目录与连接配置的唯一来源；实例 Patch 只是一份启动投影。 */
-export async function projectModelPolicy(assetRoot: string, agentId: string, services: Services, requestedSelection?: Selection | null): Promise<{ policy: ModelPolicy; environment: Record<string, string> }> {
+export async function projectModelPolicy(assetRoot: string, agentId: string, services: Services, requestedSelection?: Selection | null, candidatePath?: string): Promise<{ policy: ModelPolicy; environment: Record<string, string> }> {
   const { sha256 } = checkedManifest(assetRoot, agentId)
+  const runtime = resolveHarnessRuntime(assetRoot, agentId, candidatePath)
+  let dependencies: PreparedAssetDependencies | undefined
+  if (candidatePath) {
+    const id = basename(dirname(candidatePath))
+    if (runtime || existsSync(join(assetRoot, '.local/asset-dependencies', id, 'current.json'))) {
+      dependencies = resolvePreparedAssetDependencies(assetRoot, id)
+      if (dependencies.status !== 'ready') throw new Error(`业务依赖尚未准备：${dependencies.reasons.join('；')}`)
+    }
+  }
   const business = readBusinessDefault(assetRoot)
-  if (business.migrationRequired) throw new Error('请先在设置 → 模型中确认业务智能体统一默认模型；旧配置不会自动生效')
-  if (!business.default) throw new Error('请先在设置 → 模型中选择业务智能体统一默认模型')
-  const selected = selection(requestedSelection === undefined ? business.default : requestedSelection)
+  if (!runtime?.model_bindings && business.migrationRequired) throw new Error('请先在设置 → 模型中确认业务智能体统一默认模型；旧配置不会自动生效')
+  if (!runtime?.model_bindings && !business.default) throw new Error('请先在设置 → 模型中选择业务智能体统一默认模型')
+  const selected = selection(requestedSelection === undefined ? runtime?.model_bindings?.main ?? business.default : requestedSelection)
   if (!selected) throw new Error('请为此实例选择默认模型')
   const catalog = await services.sessionController.modelCatalog()
   const namespaces = services.settingsController.describe().namespaces
@@ -174,18 +186,37 @@ export async function projectModelPolicy(assetRoot: string, agentId: string, ser
   }
   const platformOnly = new Set([...connections].filter(([, connection]) => connection.readiness.state === 'platform_only').map(([provider]) => provider))
   const routes = businessCatalogRoutes(catalog, platformOnly)
-  if (!routes.some(item => sameRoute(item, selected))) throw new Error('此实例默认模型不在当前业务可用目录中；请重新选择')
-  const selectedModel = catalog.groups.find(group => group.id === selected.provider)?.models.find(model => model.id === selected.model)
-  if (selected.reasoningEffort && !selectedModel?.reasoning?.efforts.some(item => item.id === selected.reasoningEffort)) {
-    throw new Error('此实例默认模型的推理档位已不可用，请刷新模型设置')
+  const required = [selected, ...Object.values(runtime?.model_bindings?.presets ?? {})]
+  const requiredProviders = new Set(required.map(item => item.provider))
+  for (const binding of required) {
+    if (!routes.some(item => sameRoute(item, binding))) throw new Error(`此实例默认模型或角色绑定 ${binding.provider}/${binding.model} 不在当前业务可用目录中；请重新选择`)
+    const selectedModel = catalog.groups.find(group => group.id === binding.provider)?.models.find(model => model.id === binding.model)
+    if (binding.reasoningEffort && !selectedModel?.reasoning?.efforts.some(item => item.id === binding.reasoningEffort)) {
+      throw new Error(`此实例默认模型或角色绑定 ${binding.provider}/${binding.model} 的推理档位已不可用，请刷新模型设置`)
+    }
   }
+  const resolvedBindings = runtime?.model_bindings ? {
+    main: selected,
+    presets: Object.fromEntries(Object.entries(runtime.model_bindings.presets).map(([id, binding]) => {
+      const metadata = catalog.groups.find(group => group.id === binding.provider)?.models.find(model => model.id === binding.model)
+      const effort = binding.reasoningEffort ?? metadata?.reasoning?.defaultEffort
+      if (effort !== undefined && !metadata?.reasoning?.efforts.some(item => item.id === effort)) {
+        throw new Error(`角色 ${id} 的原生默认推理档位已不可用，请刷新模型设置`)
+      }
+      // 原生委派对相同 route 继承父 effort；显式投影目录默认值，保持 descriptor、冷恢复与实际请求一致。
+      if (effort === undefined && required.some(parent => sameRoute(parent, binding) && parent.reasoningEffort !== undefined)) {
+        throw new Error(`角色 ${id} 与其他角色共用模型但省略推理档位，原生目录未提供默认档位；请为该角色明确选择`)
+      }
+      return [id, { ...binding, ...(effort === undefined ? {} : { reasoningEffort: effort }) }]
+    })),
+  } : undefined
 
   const refs = new Set<string>()
-  const environment: Record<string, string> = {}
+  const environment: Record<string, string> = { ...dependencies?.environment }
   for (const provider of new Set(routes.map(item => item.provider))) {
     const connection = connections.get(provider)!
     if (connection.readiness.state !== 'ready' && connection.readiness.state !== 'runtime_check') {
-      if (provider === selected.provider) throw new Error(connection.readiness.message)
+      if (requiredProviders.has(provider)) throw new Error(connection.readiness.message)
       continue
     }
     connection.credentialRefs.forEach(ref => refs.add(ref))
@@ -197,7 +228,7 @@ export async function projectModelPolicy(assetRoot: string, agentId: string, ser
     const configured = modelEntries(deepseek.models)
     const models = official.map(item => configured.find(model => model.id === item.model) ?? { id: item.model })
     const config: Record<string, unknown> = { ...safeFields(deepseek, ['apiKeyEnv', 'baseURL', 'thinking', 'reasoningEffort', 'maxTokens', 'defaultContextWindow', 'retryPolicy']), models }
-    patch.push({ id: 'llm-deepseek', config: publicConfigWithResolvedRefs(config, refs, selected.provider === 'deepseek-official') })
+    patch.push({ id: 'llm-deepseek', config: publicConfigWithResolvedRefs(config, refs, requiredProviders.has('deepseek-official')) })
   } else patch.push({ id: 'llm-deepseek', disabled: true })
   if (routes.some(item => item.provider === 'deepseek-account')) {
     throw new Error('DeepSeek 账号模型的登录授权仅属于平台进程；业务智能体请选择可通过 API Key 装载的模型')
@@ -211,11 +242,11 @@ export async function projectModelPolicy(assetRoot: string, agentId: string, ser
     for (const provider of customProviders) {
       const entry = directory.find(item => item.provider === provider && item.settingsNs === 'llm-pi-ai')
       if (!entry || !Object.hasOwn(configuredProviders, provider)) {
-        if (provider === selected.provider) throw new Error(`模型提供方 ${provider} 的平台设置不可读取，请先检查设置 → 模型`)
+        if (requiredProviders.has(provider)) throw new Error(`模型提供方 ${provider} 的平台设置不可读取，请先检查设置 → 模型`)
         continue
       }
       const source = record(configuredProviders[provider])
-      if (Object.keys(record(source.headers)).length && provider === selected.provider) {
+      if (Object.keys(record(source.headers)).length && requiredProviders.has(provider)) {
         throw new Error(`模型提供方 ${provider} 使用静态请求头；请改用凭据引用后再装载业务实例`)
       }
       const configured = modelEntries(source.models)
@@ -226,11 +257,13 @@ export async function projectModelPolicy(assetRoot: string, agentId: string, ser
         return { id: item.model, ...record(overrides[item.model]) }
       })
       const config: Record<string, unknown> = { ...safeFields(source, ['apiKeyEnv', 'displayName', 'api', 'baseURL', 'compat', 'reasoning', 'defaultContextWindow', 'defaultMaxTokens', 'retryPolicy']), models }
-      providers[provider] = publicConfigWithResolvedRefs(config, refs, provider === selected.provider)
+      providers[provider] = publicConfigWithResolvedRefs(config, refs, requiredProviders.has(provider))
     }
     patch.push({ id: 'llm-pi-ai', config: { ...safeFields(pi, ['retryPolicy']), providers } })
   } else patch.push({ id: 'llm-pi-ai', config: { providers: {} } })
 
   return { policy: { agent_id: agentId, manifest_sha256: sha256, business_model_revision: business.revision,
-    allowed: routes, default: selected, patch, credential_refs: [...refs] }, environment }
+    allowed: routes, default: selected, patch, credential_refs: [...refs], ...(runtime ? { harness_runtime: runtime } : {}),
+    ...(resolvedBindings ? { resolved_model_bindings: resolvedBindings } : {}),
+    ...(dependencies?.mounts.length ? { asset_dependencies: dependencies } : {}) }, environment }
 }

@@ -1,0 +1,1 @@
+{"$schema":"https://opencode.ai/config.json","model":"xiaomi-token-plan-cn/mimo-v2.6-flash","agent":{"fixer":{"mode":"primary","description":"修复独立项目中的金额计算错误","prompt":"按照 AGENTS.md 修复指定项目；完成前调用 reviewer 子角色复核实际修改。"},"reviewer":{"mode":"subagent","model":"deepseek-official/deepseek-flash","description":"复核实际改动","prompt":"读取项目和测试，指出错误或确认计算、舍入和用例均符合要求。不要修改文件。"}}}

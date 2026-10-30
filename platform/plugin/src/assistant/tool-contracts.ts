@@ -4,8 +4,9 @@ import { DECISION_EXTRACTION_CONTRACT } from '../evaluation/decision-dataset-con
 
 export type AssistantDomain = 'agents' | 'instances' | 'mcp'
 type MapValue = Record<string, any>
+const migrationActions = ['migrations/inspect', 'migrations/read', 'migrations/preview', 'migrations/apply', 'migrations/status', 'migrations/resolve', 'assets/build-preview', 'assets/build', 'assets/dependencies/prepare']
 export const assistantActions: Record<AssistantDomain, readonly string[]> = {
-  agents: ['documents/read', 'research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'list', 'detail', 'edit/read', 'edit/preview', 'edit/apply', 'cases/list', 'cases/read', 'cases/update', 'eval/preview', 'eval/start', 'eval/status', 'eval/cancel', 'runs/index', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/source', 'compute-variants/identity-preview', 'compute-variants/identity-apply', 'compute-variants/preview', 'compute-variants/create', 'compute-variants/rename', 'compute-variants/build-preview', 'compute-variants/build', 'compute-variants/freeze-preview', 'compute-variants/freeze', 'compute-variants/compare', 'new', 'create', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'cases/create', 'datasets/source', 'datasets/preview', 'datasets/apply', 'datasets/list', 'datasets/read', 'datasets/review', 'datasets/export', 'decision/update', 'features/read-source', 'features/preview', 'features/proposal', 'features/apply', 'fusion/preview', 'fusion/proposal', 'fusion/confirm', 'fusion/status', 'fusion/verify', 'fusion/finalize', 'tasks/capabilities', 'tasks/assembly-preview', 'tasks/assembly-apply'],
+  agents: [...migrationActions, 'documents/read', 'research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'list', 'detail', 'edit/read', 'edit/preview', 'edit/apply', 'cases/list', 'cases/read', 'cases/update', 'eval/preview', 'eval/start', 'eval/status', 'eval/cancel', 'runs/index', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/source', 'compute-variants/identity-preview', 'compute-variants/identity-apply', 'compute-variants/preview', 'compute-variants/create', 'compute-variants/rename', 'compute-variants/build-preview', 'compute-variants/build', 'compute-variants/freeze-preview', 'compute-variants/freeze', 'compute-variants/compare', 'new', 'create', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'cases/create', 'datasets/source', 'datasets/preview', 'datasets/apply', 'datasets/list', 'datasets/read', 'datasets/review', 'datasets/export', 'decision/update', 'features/read-source', 'features/preview', 'features/proposal', 'features/apply', 'fusion/preview', 'fusion/proposal', 'fusion/confirm', 'fusion/status', 'fusion/verify', 'fusion/finalize', 'tasks/capabilities', 'tasks/assembly-preview', 'tasks/assembly-apply'],
   instances: ['list', 'detail', 'url', 'logs', 'preview', 'batch-preview', 'run', 'batch'],
   mcp: ['list', 'configuration', 'saveConfiguration', 'test', 'resources', 'resourceTemplates', 'readResource', 'callTool', 'sources/list', 'sources/create', 'sources/refresh', 'sources/toggle', 'sources/components', 'sources/logs', 'sources/preview', 'sources/invoke', 'saveCompositionDraft', 'publishComposition', 'executeComposition', 'dryRunComposition', 'callPublishedComposition', 'compositionRun', 'compositionArtifact', 'compositionSource', 'seedThreatCompositions', 'control/status', 'control/saveConfiguration', 'control/restrict', 'control/reassess', 'control/release'],
 }
@@ -22,6 +23,10 @@ export function allowedAssistantActions(domain: AssistantDomain, state: any): re
 
 const string = { type: 'string' }, strings = { type: 'array', items: string }, object = { type: 'object', additionalProperties: true }
 const fields: MapValue = {
+  target: object, mapping: { type: 'array', items: object }, uncovered: strings, offset: { type: 'integer' }, model_bindings: object, project_workspace: object, role_instructions: object,
+  resolutions: { type: 'array', items: object },
+  declaration_paths: strings, target_platform: string, target_image: string, fingerprint: string,
+  model_selection: { type: 'object', required: ['provider', 'model'], properties: { provider: string, model: string, reasoningEffort: string }, description: '原生模型选择，覆盖本次主角色选择；未传时使用指定版本绑定，再回落业务默认。' },
   case_ids: strings, critical_case_ids: strings, cases: strings, inputs: strings, artifacts: strings, parent_run_ids: strings, variant_run_ids: strings,
   fast: { type: 'boolean' }, enabled: { type: 'boolean' }, allow_missing_env: { type: 'boolean' },
   business_control: { type: 'boolean', description: '创建业务实例默认且必须经过统一网关；不能用 false 绕过网关。已有实例的生命周期沿用其登记。' },
@@ -55,7 +60,7 @@ type Hint = [actions: string, input: string, note?: string]
 const hints: Record<AssistantDomain, Hint[]> = {
   instances: [
     ['list', ''], ['detail url', 'name'], ['logs', 'name tail'],
-    ['preview run', 'name operation source port allow_missing_env business_control access_mode identity_mode', 'operation=create/start/stop/restart/delete；创建必须传明确的 experiment:<ID> 来源。创建业务实例默认且必须经过统一网关，默认 access_mode=anonymous、identity_mode=development；可明确选择 authenticated 或 published。网关不可用时说明原因并修复配置，禁止省略参数或传 false 改为直连。独立研究评测使用 agents/eval 入口，不用业务实例创建接口绕过网关。用户要求最新版本时，先用 agents/detail 的 versions[0].id 确定版本，再作为 source 传入；默认 detail.experiment 可能是已启用版本，不等于最新版本。直接调用 run 即可由平台内部预览并核对模型、业务来源摘要与访问设置，按 DSH 原生权限执行；无需另调 preview 或额外索取确认。业务实例创建后用 instances/url 取统一网关入口，不要把容器直连端口当作业务链接。'],
+    ['preview run', 'name operation source port allow_missing_env business_control access_mode identity_mode model_selection', 'operation=create/start/stop/restart/delete；创建必须传明确的 experiment:<ID> 来源。创建业务实例默认且必须经过统一网关，默认 access_mode=anonymous、identity_mode=development；可明确选择 authenticated 或 published。网关不可用时说明原因并修复配置，禁止省略参数或传 false 改为直连。独立研究评测使用 agents/eval 入口，不用业务实例创建接口绕过网关。用户要求最新版本时，先用 agents/detail 的 versions[0].id 确定版本，再作为 source 传入；默认 detail.experiment 可能是已启用版本，不等于最新版本。直接调用 run 即可由平台内部预览并核对模型、业务来源摘要与访问设置，按 DSH 原生权限执行；无需另调 preview 或额外索取确认。业务实例创建后用 instances/url 取统一网关入口，不要把容器直连端口当作业务链接。'],
     ['batch-preview batch', 'items', 'items 为多个与 run 相同的操作对象；逐项核对结果，部分失败不能称为全部完成。'],
   ],
   mcp: [
@@ -78,6 +83,14 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['control/release', 'restrictionId sessionId action', '重新评估后仅解除所选限制，其他约束保留；未知副作用先查实际结果，不能以恢复操作补发业务。'],
   ],
   agents: [
+    ['migrations/inspect', 'source', 'source 为来源描述对象：本地目录、Git 仓库、归档或文本材料。固定来源后仅清点，不执行来源脚本；本地/归档用path，Git用url/ref，文本用text/filename；沿返回的 source_id 和 fingerprint 读取。模型绑定先读取 platform_agents context 的 model_catalog，使用实际业务 provider/model 与 reasoning 档位，不读取内部运行配置猜测。'],
+    ['migrations/read', 'source_id fingerprint path offset limit', '使用 inspect 返回的真实来源身份和路径；文本按回执继续读取，二进制仅返回摘要等元信息。'],
+    ['migrations/preview', 'source_id fingerprint target files mapping case_ids evaluation_cases model_bindings project_workspace role_instructions uncovered scope_limitations', '先完整清点关键引用，再提交目标与完整资产修改。target.kind=new-agent 或 new-version；既有 Agent 使用明确的可继承 EXP 和固定 Git 来源。case_ids 引用已有代表 Case，evaluation_cases 追加新 Case，两者合并验证。uncovered 只列待实现的关键来源行为；未做原框架A/B、固定来源样例未使用的框架能力放 scope_limitations，框架包被DSH替代等非目标资产用 omitted、required:false准确标明。files 使用正文或固定 source_path；返回固定目标和 operation_id、preview_sha256，不表示已迁移完成。'],
+    ['migrations/apply', 'operation_id expected_preview_sha256', '原样使用 preview 的 apply_input；中断或结果未知先查 migrations/status，沿同一 operation_id 续作，不另建目标。'],
+    ['migrations/status', 'operation_id experiment_id', '读取迁移目标、发布、构建、实例及 Run 的真实进度；资产变化后旧验证不代表当前版本通过。'],
+    ['migrations/resolve', 'operation_id experiment_id expected_candidate_sha256 resolutions', '在原迁移版本核对待办，用当前Candidate摘要和resolutions提交依据。沿status.unresolved_items原索引提供mapping_index或uncovered_index之一、notes和实际case_ids。disposition=converted（默认）表示已转换，native表示已由原生能力承接，可带target；outside-scope仅处理当前明确范围之外的限制，不能改source/target或声称已实现，保留原状态并由status.scope_limitations单列。不得将遗漏的关键来源行为排除出用户目标。原关键Case和解决项Case仍须由当前真实Run全部通过。结果未知先查status，同一来源不重复创建版本。'],
+    ['assets/build-preview assets/build', 'experiment_id entry_path expected_candidate_sha256 expected_preview_sha256', '普通业务 EXP 的 Managed TypeScript 受控构建。先预览，执行使用返回的候选与预览摘要；不执行来源 package scripts。'],
+    ['assets/dependencies/prepare', 'experiment_id target_image target_platform declaration_paths', '从实际 Candidate 的锁定依赖声明自动准备标准 Runtime 依赖；declaration_paths 可选，用于核对完整发现清单，不用于跳过部分依赖。target_image 只接受当前标准镜像，target_platform=linux/amd64 或 linux/arm64。不执行来源安装 Hook；回执明确目标环境、准备结果与缺口，不代表业务通过。'],
     ['list', ''], ['detail', 'agent_id experiment_id', '明确指定版本；未传 experiment_id 时 detail.experiment 优先是已启用版本，用户要求最新版本时应读取 versions[0].id。有固定任务目标时不要改成最新版本。'],
     ['documents/read', 'path cursor limit source_sha256', '只读当前数据工作区文档或当前会话附件。path 使用工作区相对路径或模型输入中原生附件 read_path；不传 Session ID。支持 Markdown/TXT、文本 PDF、DOCX。按 blocks 的页/段号及片段偏移引用来源；has_more=true 时用 next_cursor 与 source_sha256 连续读取，不能将首段当作全文。扫描件、图片及复杂排版以 warnings 为准；不执行文件，也不创建知识资产。'],
     ['research/read-reference', 'topic', 'topic=controlled-improvement/evaluation-and-evidence/inheritance-and-fusion/compute-variants/decision-samples。'],
@@ -89,7 +102,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['cases/list cases/create-context', 'agent_id experiment_id'], ['cases/read', 'agent_id experiment_id case_id'],
     ['cases/from-run', 'agent_id experiment_id run_id case_id'],
     ['cases/update cases/create-preview cases/create', 'agent_id experiment_id case_id title scene inputs expected_behavior fast expected_sha256 source_run_id source_case_id', '先读用例或 create-context；inputs 为非空字符串数组，expected_sha256 取原文件摘要。新建先 create-preview。'],
-    ['eval/preview eval/start', 'source cases mode executor review model compare_to artifact_export', 'source=experiment:<ID>；cases 为固定 Case ID 数组。preview 不执行评测，start 返回 job_id。'],
+    ['eval/preview eval/start', 'source cases mode executor review model model_selection compare_to artifact_export', 'source=experiment:<ID>；cases 为固定 Case ID 数组。model 是原有断言，model_selection 是本次主角色原生模型选择；省略时读取版本绑定。preview 不执行评测，start 返回 job_id。'],
     ['eval/status eval/cancel', 'job_id'], ['runs/index', 'agent_id experiment_id'],
     ['runs/show', 'run_id case_id'], ['runs/report runs/files', 'run_id'], ['runs/read-file', 'run_id path'],
     ['runs/evidence', 'run_id case_id filename'], ['runs/compare', 'left right case_id'], ['runs/trace', 'run_id path source_sha256 cursor limit session_log'],
@@ -127,6 +140,34 @@ export function assistantActionContract(domain: AssistantDomain, action: string)
     properties.cursor = { type: 'string', description: '上一次回执的 next_cursor，绑定原文件摘要与位置。' }
     properties.limit = { type: 'integer', description: '本次最多返回的正文字符数，512–32768，默认16000。' }
   }
+  if (action === 'migrations/inspect') properties.source = { type: 'object', required: ['kind'], properties: {
+    kind: { type: 'string', enum: ['local', 'git', 'archive', 'text'] }, path: { ...string, description: 'local/archive 使用本机绝对路径，git 也可用本地仓库路径。' },
+    url: { ...string, description: 'git 远程仓库地址，不能包含凭据。' }, ref: { ...string, description: 'git 分支或提交，服务端固定实际提交；省略为 HEAD。' },
+    text: { ...string, description: 'text 来源的完整材料。' }, filename: { ...string, description: 'text 来源的相对文件名，省略为 source.txt。' },
+  } }
+  if (action === 'migrations/preview') {
+    properties.scope_limitations = { ...strings, description: '本次明确范围边界，如默认未执行原框架A/B、固定来源样例未使用的框架能力；不替代关键来源行为的 uncovered。' }
+    properties.target = { type: 'object', required: ['kind', 'agent_id'], properties: {
+      kind: { type: 'string', enum: ['new-agent', 'new-version'] }, agent_id: string,
+      name: { ...string, description: 'new-agent 必填名称。' }, description: { ...string, description: 'new-agent 必填用途。' }, role: { ...string, description: 'new-agent 必填角色正文。' },
+      parent_experiment_id: { ...string, description: 'new-version 必填可继承普通 EXP。' }, parent_ref: { ...string, description: 'new-version 必填固定 git:<40位提交>。' }, research_question: { ...string, description: 'new-version 必填本次迁移的业务问题。' },
+    } }
+    properties.files = { type: 'array', items: { type: 'object', required: ['path'], properties: {
+      path: { ...string, description: '相对 Candidate；harness.yaml 或 dsh/workspace、dsh/presets、dsh/managed 内文件。' },
+      content: { ...string, description: '完整 UTF-8 正文，与 source_path 二选一。' }, source_path: { ...string, description: '本次来源清点 entries[].path 的 POSIX 相对路径，例如 version_tool.py；不能使用绝对路径，与 content 二选一。' },
+      source_sha256: { ...string, description: '复制来源文件时必须使用清点返回的摘要。' }, executable: { type: 'boolean' },
+    } } }
+    properties.mapping = { type: 'array', items: { type: 'object', required: ['source', 'target', 'status'], properties: {
+      source: string, target: string, status: { type: 'string', enum: ['converted', 'native', 'pending', 'omitted'] }, notes: string, required: { type: 'boolean' },
+    } } }
+    properties.model_bindings = { type: 'object', required: ['main'], properties: { main: fields.model_selection, presets: { type: 'object', additionalProperties: fields.model_selection } } }
+    properties.project_workspace = { type: 'object', required: ['path'], properties: { path: { ...string, description: 'Candidate 内已选入的项目种子目录，如 dsh/workspace/project。' } } }
+    properties.role_instructions = { type: 'object', additionalProperties: string, description: 'Preset ID 到 Candidate 内角色文件的映射；主角色默认指向 dsh/workspace/AGENTS.md。' }
+  }
+  if (action === 'migrations/resolve') properties.resolutions = { type: 'array', items: { type: 'object', required: ['notes', 'case_ids'], properties: {
+    mapping_index: { type: 'integer', description: 'status.unresolved_items返回的原mapping索引，与uncovered_index二选一。' }, uncovered_index: { type: 'integer', description: 'status.unresolved_items返回的原uncovered索引，与mapping_index二选一。' },
+    disposition: { type: 'string', enum: ['converted', 'native', 'outside-scope'], description: '省略为converted；outside-scope只说明当前明确范围，不表示实现，不允许提供target，仍须保留真实Case依据。' }, target: string, notes: string, case_ids: strings,
+  } } }
   return { domain, action, input_schema: { type: 'object', properties, additionalProperties: true },
     instructions: hint[2] ?? '使用先前实际返回的对象标识；缺少目标先查询目录。输入由原业务接口校验，错误时核对具体字段，不重放结果未知的写操作。' }
 }
@@ -137,7 +178,8 @@ function nativeSchema(schema: MapValue): MapValue {
   const constraints: string[] = []
   for (const [key, value] of Object.entries(schema)) {
     if (key === 'properties') result.properties = Object.fromEntries(Object.entries(value).map(([name, child]) => [name, nativeSchema(child as MapValue)]))
-    else if (['items', 'additionalProperties'].includes(key) && typeof value === 'object') result[key] = nativeSchema(value)
+    else if (key === 'additionalProperties' && typeof value === 'object') { result.additionalProperties = true; constraints.push(`动态属性的值合同=${JSON.stringify(value)}`) }
+    else if (key === 'items' && typeof value === 'object') result[key] = nativeSchema(value)
     else if (key === 'type' && Array.isArray(value)) result.oneOf = value.map(type => ({ type }))
     else if (['oneOf', 'anyOf'].includes(key)) result.oneOf = value.map(nativeSchema)
     else if (['type', 'required', 'additionalProperties', 'enum', 'const', 'description', 'title', 'default', 'examples'].includes(key)) result[key] = value

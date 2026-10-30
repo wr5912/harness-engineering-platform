@@ -11,7 +11,7 @@ export interface NativeSkill {
 export interface NativeSkills {
   get(name: string, options: { cwd: string; scope?: any; signal?: AbortSignal }): Promise<NativeSkill | undefined>
 }
-export const managementSkills = ['workspace-management', 'task-builder', 'agent-maintenance', 'mcp-composition', 'compute-variant-research', 'decision-sample-extraction', 'harness-evolution', 'harness-experiment-fusion', 'research-eval', 'legacy-asset-intake', 'reviewing-agent-skills', 'user-facing-output'] as const
+export const managementSkills = ['workspace-management', 'task-builder', 'agent-maintenance', 'agent-migration', 'mcp-composition', 'compute-variant-research', 'decision-sample-extraction', 'harness-evolution', 'harness-experiment-fusion', 'research-eval', 'legacy-asset-intake', 'reviewing-agent-skills', 'user-facing-output'] as const
 const coreSkills = ['workspace-management', 'user-facing-output']
 export const managementSkillRoot = (root: string) => join(root, '.agents/skills')
 const digest = (content: string) => createHash('sha256').update(content).digest('hex')

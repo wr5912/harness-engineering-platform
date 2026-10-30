@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { build } from 'esbuild'
+import { dump } from 'js-yaml'
 
 const bundled = mkdtempSync(join(tmpdir(), 'models-projection-module-'))
 await build({ entryPoints: [new URL('../src/models/projection.ts', import.meta.url).pathname], outfile: join(bundled, 'projection.mjs'),
@@ -38,6 +39,52 @@ function fixture(access) {
   writeFileSync(defaultFile, `${JSON.stringify({ schema_version: '1.2', default: access.default })}\n`)
   return { root, manifest, defaultFile, cleanup: () => rmSync(root, { recursive: true, force: true }) }
 }
+
+test('版本主模型优先业务默认，显式运行覆盖主模型且保留来源与独立子模型', async t => {
+  const global = { provider: 'deepseek-official', model: 'global' }, main = { provider: 'deepseek-official', model: 'source', reasoningEffort: 'high' }
+  const override = { provider: 'deepseek-official', model: 'override', reasoningEffort: 'off' }, reviewer = { provider: 'deepseek-official', model: 'reviewer' }
+  const source = fixture({ default: global }); t.after(source.cleanup)
+  const candidate = join(source.root, 'evolution/experiments/EXP-example-agent-001-r0123456789ab/candidate')
+  for (const preset of ['example-agent', 'reviewer']) {
+    mkdirSync(join(candidate, 'dsh/presets', preset), { recursive: true })
+    writeFileSync(join(candidate, 'dsh/presets', preset, 'agent.cordis.yml'), '[]\n')
+  }
+  writeFileSync(join(candidate, '../change.yaml'), 'agent_id: example-agent\nexperiment_id: EXP-example-agent-001-r0123456789ab\n')
+  const harness = { loadable_assets: { preset_id: 'example-agent' }, model_bindings: { main, presets: { reviewer } } }
+  writeFileSync(join(candidate, 'harness.yaml'), dump(harness))
+  let defaultEffort
+  const services = {
+    sessionController: { modelCatalog: async () => ({ default: global, routableProviders: ['deepseek-official'], failures: [], groups: [{ id: 'deepseek-official', models: ['global', 'source', 'override', 'reviewer'].map(id => ({ id, reasoning: { efforts: [{ id: 'off' }, { id: 'high' }], ...(defaultEffort ? { defaultEffort } : {}) } })) }] }) },
+    settingsController: { describe: () => ({ namespaces: [{ ns: 'llm-deepseek', value: {} }] }) },
+    credentials: { resolve: async () => ({ value: 'fixture-key' }) },
+    llm: { listConfigurableProviders: () => [] },
+  }
+  const inherited = await projectModelPolicy(source.root, 'example-agent', services, undefined, candidate)
+  assert.deepEqual(inherited.policy.default, main)
+  const explicit = await projectModelPolicy(source.root, 'example-agent', services, override, candidate)
+  assert.deepEqual(explicit.policy.default, override)
+  assert.deepEqual(explicit.policy.harness_runtime.model_bindings, { main, presets: { reviewer } })
+  assertDshPolicyAccepted(explicit.policy, source.root)
+  const sameRouteReviewer = { provider: main.provider, model: main.model }
+  harness.model_bindings.presets.reviewer = sameRouteReviewer
+  writeFileSync(join(candidate, 'harness.yaml'), dump(harness))
+  defaultEffort = 'off'
+  const resolved = await projectModelPolicy(source.root, 'example-agent', services, undefined, candidate)
+  assert.deepEqual(resolved.policy.resolved_model_bindings.presets.reviewer, { ...sameRouteReviewer, reasoningEffort: 'off' })
+  assert.deepEqual(resolved.policy.harness_runtime.model_bindings.presets.reviewer, sameRouteReviewer)
+  assertDshPolicyAccepted(resolved.policy, source.root)
+  defaultEffort = undefined
+  await assert.rejects(projectModelPolicy(source.root, 'example-agent', services, undefined, candidate), /明确选择/)
+  harness.model_bindings.presets.reviewer = reviewer
+  harness.model_bindings.main = { provider: 'retired-provider', model: 'retired-model' }
+  writeFileSync(join(candidate, 'harness.yaml'), dump(harness))
+  await assert.rejects(projectModelPolicy(source.root, 'example-agent', services, undefined, candidate), /角色绑定.*不在当前业务可用目录/)
+  const replacement = await projectModelPolicy(source.root, 'example-agent', services, override, candidate)
+  assertDshPolicyAccepted(replacement.policy, source.root)
+  harness.model_bindings.presets.reviewer = { provider: 'deepseek-official', model: 'missing' }
+  writeFileSync(join(candidate, 'harness.yaml'), dump(harness))
+  await assert.rejects(projectModelPolicy(source.root, 'example-agent', services, override, candidate), /reviewer|missing/)
+})
 
 test('平台投影从当前目录派生业务可选模型与凭据引用，忽略 Agent 旧标记', async () => {
   const source = fixture({ allowed: [{ provider: 'deepseek-official', model: 'deepseek-flash' }, { provider: 'acme', model: 'small' }], default: { provider: 'acme', model: 'small' } })

@@ -63,13 +63,40 @@ def utc_now() -> str:
 
 def evaluation_implementation() -> dict:
     """冻结实际执行及评审资产身份；缺失文件保留 null，不用当前版本回填旧 Run。"""
-    names = ["dsh-eval", "dsh-eval-api.mjs", "dsh-eval-browser.mjs", "dsh-eval-common.mjs",
+    names = ["dsh-eval", "dsh-eval-api.mjs", "dsh-eval-browser.mjs", "dsh-eval-common.mjs", "harness-runtime.mts",
              "run_record.py", "scenario_analysis.py", "evaluation-judge-guard.mjs",
              "scenario-analysis-guard.mjs"]
     names += [path.relative_to(ADAPTER).as_posix()
               for path in sorted((ADAPTER / "evaluation-presets").rglob("*")) if path.is_file()]
-    return {name: hashlib.sha256((ADAPTER / name).read_bytes()).hexdigest()
-            if (ADAPTER / name).is_file() else None for name in names}
+    result = {name: hashlib.sha256((ADAPTER / name).read_bytes()).hexdigest()
+              if (ADAPTER / name).is_file() else None for name in names}
+    for name in ("platform/plugin/src/agents/asset-build.ts", "platform/plugin/src/agents/asset-build-core.ts",
+                 "platform/plugin/src/agents/asset-dependencies.ts", "platform/plugin/src/models/harness-runtime.ts"):
+        path = PROGRAM_ROOT / name
+        result[name] = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
+    return result
+
+
+def build_review_evidence(repo: Path, experiment_id: str, change: dict, candidate_sha256: str) -> dict:
+    """只读复用受控构建核验；无法证明来源时，所有资产继续原文审读。"""
+    empty = {"schema_version": 1, "generated": [], "sources": []}
+    if not change.get("asset_builds"):
+        return empty
+    try:
+        completed = subprocess.run(
+            [os.environ.get("HARNESS_NODE", "node"), "--experimental-transform-types", str(ADAPTER / "harness-runtime.mts"),
+             "--build-evidence", str(repo), experiment_id], text=True, capture_output=True, check=False, timeout=60,
+            env={**os.environ, "HARNESS_PROGRAM_ROOT": str(PROGRAM_ROOT), "HARNESS_ASSET_ROOT": str(repo)},
+        )
+        value = json.loads(completed.stdout)
+        if completed.returncode or not isinstance(value, dict) or value.get("schema_version") != 1 \
+                or not isinstance(value.get("generated"), list) or not isinstance(value.get("sources"), list):
+            return empty
+        if value["generated"] and value.get("candidate_sha256") != candidate_sha256:
+            return empty
+        return value
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return empty
 
 
 def valid_baseline_ref(value: str) -> bool:
@@ -312,7 +339,13 @@ def write_report(
                 f"{counts['not_executed']} | {scene.get('review_status', scene.get('status'))} | "
                 f"{reviewed['passed']}/{reviewed['failed']}/{reviewed['inconclusive']} |"
             )
-        lines.extend(["### 缺口与归因", ""])
+        lines.append("")
+        for scene in analysis["scenes"]:
+            session = scene.get("analysis_session") or {}
+            reference = session.get("evidence_ref")
+            link = f" [阅读核对记录]({reference})" if reference else ""
+            lines.append(f"- {cell(scene['scene'])}：{cell(scene.get('review_reason', ''))}{link}")
+        lines.extend(["", "### 缺口与归因", ""])
         findings = [(scene["scene"], item) for scene in analysis["scenes"] for item in scene.get("findings", [])]
         if not findings:
             lines.extend(["未形成结构化缺口与根因假设；这不表示不存在缺口。", ""])
@@ -868,6 +901,9 @@ def command_init(repo: Path, args: argparse.Namespace) -> None:
             "asset_origin": {**version, "workspace_id": workspace_id(repo),
                              "candidate_sha256": source_digest},
         }
+        inputs["harness_review"] = build_review_evidence(repo, experiment_id, change, source_digest)
+        if candidate_digest(experiment / "candidate") != source_digest:
+            raise ValueError("Candidate changed while locking review inputs")
         # 固定外部接口边界样本；两侧比较不能仅凭相同用户输入推定工具返回一致。
         fixture = experiment / "candidate/dsh/managed/compute-workflow/fixtures.json"
         if fixture.exists():

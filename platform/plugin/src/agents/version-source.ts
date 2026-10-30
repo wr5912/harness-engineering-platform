@@ -3,6 +3,12 @@ import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { load } from 'js-yaml'
 import { VERSION_ID } from '../version-id.ts'
+import { parseHarnessRuntime } from '../models/harness-runtime.ts'
+
+/** 独立运行器尚未承接这些投影时，预览与打包明确保留能力边界。 */
+export function assertStandaloneVersionSupported(source: { harness_runtime?: unknown }): void {
+  if (source.harness_runtime !== undefined) throw new Error('此版本包含角色模型绑定、角色指令或业务项目运行声明，当前独立运行包尚未适配这些投影；请使用平台实例运行。')
+}
 
 export { VERSION_ID } from '../version-id.ts'
 type MapValue = Record<string, any>
@@ -74,6 +80,7 @@ export function versionSource(root: string, id: string, commit?: string): MapVal
   else if (assets && read(`${base}/candidate/${conventionalProfile}`, true) !== undefined) profile = conventionalProfile
   return {
     agent_id: change.agent_id, candidate_root: `${base}/candidate/dsh`, profile: 'web',
+    ...(text && parseHarnessRuntime(text) ? { harness_runtime: parseHarnessRuntime(text) } : {}),
     patch: patch.slice('dsh/managed/'.length),
     preset: assets ? relative(assets.preset_file ?? `${presetId}/agent.cordis.yml`) : relative(legacy!.preset),
     guard: assets?.guard ? relative(assets.guard) : legacy?.guard ?? null,

@@ -1,16 +1,15 @@
-import { createRequire } from 'node:module'
 import { existsSync, readFileSync, readdirSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import { load, dump } from 'js-yaml'
 import { candidateDigest, dataPath, sourceInfo } from '../tasks/files.ts'
 import { programRoot } from '../workspace.ts'
+import { AssetCompileError, compileManagedAsset } from './asset-build-core.ts'
 
 type Body = Record<string, any>
 type Result = { ok: true; value: any } | { ok: false; error: { code: string; message: string } }
 const hash = (value: string | Uint8Array) => createHash('sha256').update(value).digest('hex')
 const ENTRY = 'dsh/managed/compute-workflow/index.ts'
-const ALIAS = '@harness-platform/workflow-runtime'
 const RUNTIME_RESOLVER = 'runtime/adapters/dsh-web/src/resolve-runtime.ts'
 class BuildError extends Error { constructor(readonly code: string, message: string) { super(message) } }
 function atomic(file: string, value: string | Uint8Array) {
@@ -60,53 +59,24 @@ export function createComputeBuildHandler(assetRoot: string) {
     const changeFile = dataPath(root, `evolution/experiments/${source.id}/change.yaml`)
     const changeText = readFileSync(changeFile, 'utf8'), change = load(changeText) as Body
     if (change?.experiment_id !== source.id || change.agent_id !== source.agent_id || !change.compute_variant) throw new BuildError('invalid_request', '仅能构建已建立算力比较计划的目标版本')
-    const program = programRoot(), runtime = join(program, 'platform/plugin/src/workflows/runtime.ts')
-    const require = createRequire(join(program, 'platform/plugin/package.json'))
-    const ts = require('typescript') as typeof import('typescript')
-    const esbuild = require('esbuild') as typeof import('esbuild')
-    const options: import('typescript').CompilerOptions = {
-      target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler,
-      strict: true, skipLibCheck: true, noEmit: true, allowImportingTsExtensions: true, esModuleInterop: true,
-      baseUrl: program, paths: { [ALIAS]: [runtime] }, types: ['node'],
-      typeRoots: [join(program, 'platform/plugin/node_modules/@types')],
-    }
-    const compiler = ts.createProgram([entry], options)
-    const diagnostics = ts.getPreEmitDiagnostics(compiler)
-    if (diagnostics.length) throw new BuildError('build_failed', `TypeScript 检查失败：${diagnostics.slice(0, 8).map(item => ts.flattenDiagnosticMessageText(item.messageText, ' ')).join('；')}`)
-    const entryModule = compiler.getTypeChecker().getSymbolAtLocation(compiler.getSourceFile(entry)!)
-    const exports = entryModule ? compiler.getTypeChecker().getExportsOfModule(entryModule).map(item => item.name) : []
-    if (!['name', 'inject', 'apply'].every(name => exports.includes(name))) throw new BuildError('build_failed', '工作流入口必须导出 DSH 插件的 name、inject 和 apply')
-    signal?.throwIfAborted()
-    const sources = compiler.getSourceFiles().map(item => {
-      const file = resolve(item.fileName), rel = relative(source.candidate, file)
-      return !rel.startsWith('..') && !rel.startsWith('/') ? { path: rel, sha256: hash(readFileSync(file)) } : null
-    }).filter((item): item is { path: string; sha256: string } => item !== null).sort((a, b) => a.path.localeCompare(b.path))
-    const baseReceipt = { schema_version: 1, entry_path: entryPath, output_path: outputPath,
-      source_sha256: hash(JSON.stringify(sources)), source_files: sources, ...runtimeDigests(),
-      compiler: { typescript: ts.version, esbuild: esbuild.version } }
-    const buildDigest = hash(JSON.stringify(baseReceipt))
-    const built = await esbuild.build({ entryPoints: [entry], outfile: output, bundle: true, write: false, metafile: true,
-      platform: 'node', target: 'node24', format: 'esm', packages: 'bundle', logLevel: 'silent',
-      alias: { [ALIAS]: runtime }, nodePaths: [join(program, 'platform/plugin/node_modules')],
-      define: { __WORKFLOW_BUILD_DIGEST__: JSON.stringify(buildDigest), __WORKFLOW_SOURCE_DIGEST__: JSON.stringify(baseReceipt.source_sha256) } })
-    signal?.throwIfAborted()
-    const artifact = built.outputFiles?.find(file => file.path === output)
-    if (!artifact) throw new BuildError('build_failed', '编译器没有产生约定 ESM')
-    for (const input of Object.keys(built.metafile!.inputs)) {
-      const file = resolve(input), inCandidate = !relative(source.candidate, file).startsWith('..')
-      const shared = file.startsWith(join(program, 'platform/plugin/src/workflows') + '/')
-        || file === join(program, 'platform/plugin/src/evaluation/model-attempts.ts')
-        || file === join(program, RUNTIME_RESOLVER)
-      const lockedDependency = file.startsWith(join(program, 'platform/plugin/node_modules') + '/')
-      if (!inCandidate && !shared && !lockedDependency) throw new BuildError('invalid_request', '工作流不能导入其他 Candidate 或未固定的外部源码')
-    }
+    let baseReceipt!: { schema_version: number; entry_path: string; output_path: string; source_sha256: string;
+      source_files: { path: string; sha256: string }[]; runner_sha256: string; deps_sha256: string; compiler: { typescript: string; esbuild: string } }
+    let buildDigest!: string
+    const built = await compileManagedAsset({ candidate: source.candidate, entry, output, legacyWorkflow: true,
+      beforeBundle(sources, compiler) {
+        baseReceipt = { schema_version: 1, entry_path: entryPath, output_path: outputPath,
+          source_sha256: hash(JSON.stringify(sources)), source_files: sources, ...runtimeDigests(), compiler }
+        buildDigest = hash(JSON.stringify(baseReceipt))
+        return { __WORKFLOW_BUILD_DIGEST__: JSON.stringify(buildDigest), __WORKFLOW_SOURCE_DIGEST__: JSON.stringify(baseReceipt.source_sha256) }
+      } }, signal)
+    const sources = built.sources
     const currentRuntime = runtimeDigests()
     if (currentRuntime.runner_sha256 !== baseReceipt.runner_sha256 || currentRuntime.deps_sha256 !== baseReceipt.deps_sha256
       || sources.some(item => hash(readFileSync(dataPath(source.candidate, item.path))) !== item.sha256)) throw new BuildError('conflict', '编译期间工作流、共享运行器或依赖发生变化，请重新预览')
-    const receipt = { ...baseReceipt, build_digest: buildDigest, esm_sha256: hash(artifact.contents) }
+    const receipt = { ...baseReceipt, build_digest: buildDigest, esm_sha256: hash(built.artifact) }
     const value = { experiment_id: source.id, candidate_sha256: before, ...receipt,
       notes: ['仅执行 TypeScript 检查和固定编译；尚未执行 Candidate、启动 DSH 或证明业务效果。'] }
-    return { source, before, changeFile, changeText, change, output, artifact: artifact.contents, receipt,
+    return { source, before, changeFile, changeText, change, output, artifact: built.artifact, receipt,
       value: { ...value, preview_sha256: hash(JSON.stringify(value)) } }
   }
   return async (method: string, body: Body, signal?: AbortSignal): Promise<Result> => {
@@ -132,8 +102,8 @@ export function createComputeBuildHandler(assetRoot: string) {
         throw error
       }
     } catch (error) {
-      return { ok: false, error: { code: signal?.aborted ? 'aborted' : error instanceof BuildError ? error.code : 'build_failed',
-        message: signal?.aborted ? '构建已取消' : error instanceof BuildError ? error.message : '工作流构建失败，请检查入口、依赖与类型' } }
+      return { ok: false, error: { code: signal?.aborted ? 'aborted' : (error instanceof BuildError || error instanceof AssetCompileError) ? error.code : 'build_failed',
+        message: signal?.aborted ? '构建已取消' : (error instanceof BuildError || error instanceof AssetCompileError) ? error.message : '工作流构建失败，请检查入口、依赖与类型' } }
     } finally { if (method === 'build') busy = false }
   }
 }

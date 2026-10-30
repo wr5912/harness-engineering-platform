@@ -11,6 +11,9 @@ export interface OperationMeta {
 }
 
 const titles: Record<string, string> = {
+  'migrations/inspect': '清点迁移来源', 'migrations/read': '读取迁移来源文件', 'migrations/preview': '核对迁移资产映射', 'migrations/apply': '生成迁移资产', 'migrations/status': '查询迁移进度',
+  'migrations/resolve': '记录迁移待办解决依据',
+  'assets/build-preview': '核对资产构建', 'assets/build': '构建智能体插件', 'assets/dependencies/prepare': '准备智能体依赖',
   'documents/read': '读取知识文档',
   'research/read-reference': '读取研究方法', 'research/validate': '检查研究资产', 'legacy/inspect': '清点导入来源', 'decision/preview': '核对研究结论', 'decision/update': '保存研究结论',
   context: '读取工作区与任务目标', describe: '读取操作用法', list: '查询智能体', detail: '读取智能体详情',
@@ -89,6 +92,15 @@ export function operationSummary(meta: OperationMeta, phase = 'result') {
   else if (action === 'research/read-reference' && value?.content) outcome = '已读取当前数据工作区中的研究方法'
   else if (action === 'research/validate' && typeof value?.valid === 'boolean') outcome = value.valid ? '研究资产格式检查通过；业务效果需依据实际评测' : '研究资产检查发现问题，请查看实际回执'
   else if (action === 'legacy/inspect' && value) outcome = '来源清点已返回；未执行导入内容'
+  else if (action === 'migrations/inspect' && value) outcome = '已固定并清点来源；等待行为映射'
+  else if (action === 'migrations/read' && value) outcome = '已读取来源文件；请核对引用与后续内容'
+  else if (action === 'migrations/preview' && value) outcome = '已核对迁移计划和目标；尚未生成资产'
+  else if (action === 'migrations/apply' && value) outcome = '迁移资产已生成；装载与任务验证继续办理'
+  else if (action === 'migrations/status' && value) outcome = value.completed === true ? '已取得当前资产的迁移验证结果，请核对适用范围' : '已读取实际迁移进度与待办项'
+  else if (action === 'migrations/resolve' && value) outcome = '已记录当前资产的解决依据；关键任务验证仍以真实 Run 为准'
+  else if (action === 'assets/build-preview' && value) outcome = '已核对源码、依赖及构建产物；尚未写入'
+  else if (action === 'assets/build' && value) outcome = '构建已返回；实际装载与业务效果仍需验证'
+  else if (action === 'assets/dependencies/prepare' && value) outcome = '依赖准备已返回；请核对目标环境与缺口'
   else if (action === 'assets/read-fixed' && value?.files) outcome = value.selected ? '已读取固定文件内容' : `已列出 ${value.files.length} 个固定版本文件`
   else if (action === 'context') outcome = '已读取当前工作区与固定任务目标'
   else if (action === 'runs/index' && Array.isArray(value?.experiments)) outcome = `查到 ${value.experiments.length} 个版本、${value.experiments.reduce((count: number, experiment: any) => count + (Array.isArray(experiment.runs) ? experiment.runs.length : 0), 0)} 条运行记录`

@@ -541,6 +541,33 @@ test('业务模型目录为空时创建入口说明原因且不派发预览', as
   assert.equal(ui.calls.some(call => call.endpoint === 'instances/preview'), false)
 })
 
+test('版本模型绑定用于新实例默认，未主动改选不提交全局默认覆盖', async () => {
+  const ui = page({ respond(endpoint, payload) {
+    if (endpoint === 'instances/sources') return { ok: true, value: { business_gateway_available: true, sources: [{ source_id: 'experiment:EXP-basic-001', experiment_id: 'EXP-basic-001', agent_id: 'basic-agent', selectable: true, reason: '已登记', model_binding: alternateModel }] } }
+    if (endpoint === 'instances/preview') return { ok: true, value: { operation: payload.operation, name: payload.name, plan: { source_id: payload.source, port: 3199, business_control: { source_digest: 'sha256:' + 'a'.repeat(64) } }, access_mode: payload.access_mode, identity_mode: payload.identity_mode, model_selection: payload.model_selection ?? alternateModel, model_policy_hash: previewHash } }
+  } })
+  const select = label => ui.nodes().find(node => node.props['aria-label'] === label && node.props.role === 'combobox')
+  await ui.settle(); openCreate(ui); await ui.settle(); chooseAgent(ui, '基础助手 · basic-agent')
+  ui.nodes().find(node => node.type === 'input' && node.props['aria-label'] === '实例名').props.onChange({ target: { value: 'bound-instance' } }); ui.render()
+  select('选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } }); await ui.settle()
+  assert.equal(select('新实例默认模型').props.value, JSON.stringify(['provider-a', 'variant-model']))
+  assert.match(ui.text(), /使用所选版本的主角色模型绑定/)
+  await ui.button('查看创建预览').props.onClick(); await ui.settle()
+  assert.equal(ui.calls.find(call => call.endpoint === 'instances/preview').payload.model_selection, undefined)
+  assert.ok(ui.text().includes('变体模型'))
+})
+
+test('版本绑定模型不可用时保留该模型并说明原因，不能回落全局默认', async () => {
+  const ui = page({ respond(endpoint) {
+    if (endpoint === 'instances/sources') return { ok: true, value: { business_gateway_available: true, sources: [{ source_id: 'experiment:EXP-basic-001', experiment_id: 'EXP-basic-001', agent_id: 'basic-agent', selectable: true, reason: '已登记', model_binding: { provider: 'missing', model: 'missing' } }] } }
+  } })
+  await ui.settle(); openCreate(ui); await ui.settle(); chooseAgent(ui, '基础助手 · basic-agent')
+  ui.nodes().find(node => node.props['aria-label'] === '选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } }); await ui.settle()
+  assert.match(ui.text(), /所选模型已不在当前业务模型目录/)
+  assert.equal(ui.button('查看创建预览'), undefined)
+  assert.equal(ui.calls.some(call => call.endpoint === 'instances/preview'), false)
+})
+
 test('实例详情更改默认模型需预览重启或启动，回执冻结所选模型和配置摘要', async () => {
   const ui = page()
   await ui.settle()

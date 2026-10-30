@@ -1,0 +1,14 @@
+- id: agent-default-model
+  config: { provider: xiaomi-token-plan-cn, model: mimo-v2.6-flash, reasoningEffort: 'off' }
+- insert:
+    - id: preset-quote
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: quote
+        name: 报价助手
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config: { prefix: '按照工作区 AGENTS.md 和 quote 技能办理报价。' }
+          - id: quote-tools
+            name: ./tools.ts

@@ -49,6 +49,7 @@ export interface WorkflowToolOptions {
   executionMode?: 'code-only' | 'hybrid'
   modelRoles?: WorkflowModelRoles
 }
+class WorkflowModelUnavailableError extends Error {}
 
 /** 顺序节点共用 LangGraph；业务条件和参数来源留在业务源码。 */
 export async function runWorkflow(context: WorkflowContext, steps: { id: string; run(values: Record<string, any>, context: WorkflowContext): Promise<any> }[]) {
@@ -88,15 +89,23 @@ export function registerWorkflowTool(ctx: any, definition: WorkflowDefinition, o
       const identity = { execution_id: executionId, role: 'target' as const,
         ...(exec.agent?.session?.id ? { session_id: exec.agent.session.id } : {}), ...(exec.callId ? { tool_call_id: exec.callId } : {}),
         ...(exec.parent_run_id ? { parent_run_id: exec.parent_run_id } : {}), ...(exec.case_id ? { case_id: exec.case_id } : {}) }
-      const llm = options.executionMode === 'hybrid' && ctx.llm ? { async prepareCall(...args: any[]) {
-        const prepared = await ctx.llm.prepareCall(...args)
-        if (!matchesWorkflowModelBinding({ ...prepared.config, reasoning_effort: prepared.config?.reasoningEffort }, modelRoles!.language)) throw new Error('装配后的语言模型不符合混合工作流角色绑定')
-        return prepared
-      } } : ctx.llm
-      const observed = options.executionMode !== 'code-only' && llm ? observeLlm(llm, { ...identity,
-        ...(options.executionMode === 'hybrid' ? { model_role: 'language' as const, ...Object.fromEntries(Object.entries(modelRoles!.language).filter(([key]) => key.endsWith('_sha256'))) } : {}) }, (event: ModelAttempt) => {
-        attempts.push(Object.fromEntries(Object.entries(event).filter(([, value]) => value !== undefined)) as ModelAttempt)
-      }) : null
+      let observed: ReturnType<typeof observeLlm> | undefined
+      function modelObserver() {
+        if (observed) return observed
+        let native: any
+        try { native = ctx.llm } catch { /* Cordis 未声明注入时同样按模型服务不可用报告。 */ }
+        if (!native || typeof native.prepareCall !== 'function') throw new WorkflowModelUnavailableError('工作流模型服务未装载；使用 infer 的插件需要声明 llm 注入')
+        const llm = options.executionMode === 'hybrid' ? { async prepareCall(...args: any[]) {
+          const prepared = await native.prepareCall(...args)
+          if (!matchesWorkflowModelBinding({ ...prepared.config, reasoning_effort: prepared.config?.reasoningEffort }, modelRoles!.language)) throw new Error('装配后的语言模型不符合混合工作流角色绑定')
+          return prepared
+        } } : native
+        observed = observeLlm(llm, { ...identity,
+          ...(options.executionMode === 'hybrid' ? { model_role: 'language' as const, ...Object.fromEntries(Object.entries(modelRoles!.language).filter(([key]) => key.endsWith('_sha256'))) } : {}) }, (event: ModelAttempt) => {
+          attempts.push(Object.fromEntries(Object.entries(event).filter(([, value]) => value !== undefined)) as ModelAttempt)
+        })
+        return observed
+      }
       async function invokeTool(name: string, args: Record<string, any>) {
         exec.signal.throwIfAborted()
         const callId = `${exec.callId}:workflow:${trace.length}:${randomUUID()}`
@@ -122,7 +131,7 @@ export function registerWorkflowTool(ctx: any, definition: WorkflowDefinition, o
         async infer(config, payload) {
           if (options.executionMode === 'code-only') throw new Error('纯代码工作流禁止模型调用')
           if (options.executionMode === 'hybrid' && !matchesWorkflowModelBinding({ ...config, reasoning_effort: config.reasoningEffort }, modelRoles!.language)) throw new Error('语言推理路由不符合混合工作流角色绑定')
-          if (!observed) throw new Error('工作流模型服务未装载')
+          const observed = modelObserver()
           const prepared = await observed.prepareCall(config, exec.signal)
           let content = '', completed = false, failure: Error | undefined
           for await (const chunk of prepared.stream({ ...prepared.config, ...(payload.system === undefined ? {} : { system: payload.system }), messages: payload.messages,
@@ -197,6 +206,9 @@ export function registerWorkflowTool(ctx: any, definition: WorkflowDefinition, o
         }
       } catch (error) {
         failure = exec.signal.aborted ? '工作流已取消' : '工作流执行失败，请查看节点回执'
+        if (!exec.signal.aborted && error instanceof WorkflowModelUnavailableError) {
+          failure = error.message; errorCode = 'WORKFLOW_MODEL_UNAVAILABLE'
+        }
         if (!exec.signal.aborted && error instanceof LlmError) {
           const detail = error.failure
           modelFailure = { code: detail.code, message: detail.message, ...(detail.status === undefined ? {} : { status: detail.status }),

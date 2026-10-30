@@ -5,7 +5,7 @@ import { collectEntries, sha256File, verifyEntries } from '../manifest.mts'
 import { inspectImageArchive, verifyImageInfo } from '../image.mts'
 import { safeRelative } from '../fsutil.mts'
 import { inspectKnowledge, collectKnowledge } from '../knowledge/index.mts'
-import { inspectAgentSnapshot, copyAgentSnapshot, assertDependencyArchitecture } from './snapshot.mts'
+import { inspectAgentSnapshot, copyAgentSnapshot, assertDependencyArchitecture, dependencyEntries } from './snapshot.mts'
 import { inspectAgentResources, defaultAgentResourcesDir } from './prepare.mts'
 import { agentSeed } from './seed.mts'
 import { agentCommand } from './process.mts'
@@ -76,6 +76,7 @@ export async function packAgent(input: AgentPackageInput, hooks: AgentPackageHoo
     copyAgentSnapshot(snapshot, staging, hooks.signal)
     for (const dependency of snapshot.dependencies) {
       hooks.signal?.throwIfAborted()
+      if (dependency.preparedTarget && (dependency.preparedTarget.imageId !== image.id || dependency.preparedTarget.image !== resourceManifest.image.tag)) throw new Error(`业务依赖对应另一标准镜像：${dependency.name}；请重新准备`)
       const prepared = resourceManifest.dependencies.find(item => item.path === dependency.path)
       if (dependency.modulesPath?.startsWith(resourcesDir) && (!prepared || prepared.lockSha256 !== dependency.lockSha256)) throw new Error(`依赖锁已变化，请重新准备 ${dependency.name}`)
       if (prepared && dependency.modulesPath?.startsWith(resourcesDir)) {
@@ -85,6 +86,7 @@ export async function packAgent(input: AgentPackageInput, hooks: AgentPackageHoo
       assertDependencyArchitecture(dependency.modulesPath!, input.arch)
       const destination = dependency.kind === 'python' ? join(staging, 'runtime', dependency.path, 'site-packages') : join(staging, 'assets', dependency.path, 'node_modules')
       await copy(dependency.modulesPath!, destination, hooks)
+      if (dependency.preparedFiles && JSON.stringify(dependencyEntries(destination)) !== JSON.stringify(dependency.preparedFiles)) throw new Error(`业务依赖在导出期间变化：${dependency.name}，请重试`)
       if (prepared && dependency.modulesPath?.startsWith(resourcesDir) && verifyEntries(destination, prepared.files).length) throw new Error(`业务依赖在导出期间变化：${dependency.name}，请重试`)
     }
     hooks.onProgress?.({ stage: 'knowledge', message: input.mode === 'offline' ? '正在收集离线知识引用' : '正在核对已有本地知识' })

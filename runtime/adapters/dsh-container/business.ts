@@ -27,7 +27,7 @@ export interface BusinessLaunchConfig {
 export interface BusinessRenderInput {
   name: string; agentId: string; workspaceId: string; sourceDigest: string; runtimeGeneration?: string
   identityMode?: 'development' | 'published'
-  port: number; compose: string; profileManifest: string; basePath: string; presetId?: string; runtimeSettings?: string; managedPatch?: string
+  port: number; compose: string; profileManifest: string; basePath: string; presetId?: string; workspacePath?: string; runtimeSettings?: string; managedPatch?: string
   sourcePaths?: { managed: string }
 }
 
@@ -147,7 +147,7 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
   const runtimeConfig = {
     assetRoot: containerAssets, stateRoot: '/var/lib/dsh/business-control-state', ...(!development ? { sharedSecretFile: containerSecret } : {}),
     coordinatorOrigin: config.coordinatorOrigin, basePath: businessBasePath,
-    workspacePath: '/work/harness/workspace', presetId: input.presetId ?? input.agentId,
+    workspacePath: input.workspacePath ?? '/work/harness/workspace', presetId: input.presetId ?? input.agentId,
     localTools: capabilities.localTools,
     binding: { workspaceId: input.workspaceId, agentId: input.agentId, instanceId: input.name,
       runtimeGeneration, sourceDigest: input.sourceDigest },

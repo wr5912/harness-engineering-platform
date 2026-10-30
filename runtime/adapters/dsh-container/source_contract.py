@@ -227,6 +227,20 @@ def _experiment_contract(
         "optional_env_names": optional_env_names,
         "image": image,
     }
+    if item.get("harness_runtime"):
+        runtime = item["harness_runtime"]
+        candidate = root.parent
+        if require_assets:
+            for file in [*runtime["preset_files"].values(), *runtime["role_instructions"].values()]:
+                if not real_file_below(candidate, safe_relative(file)):
+                    raise ValueError("missing or unsafe Harness runtime asset")
+            if runtime.get("project_workspace"):
+                project = candidate / safe_relative(runtime["project_workspace"]["path"])
+                if project.is_symlink() or not project.is_dir() or project.resolve() != project:
+                    raise ValueError("project workspace seed must be a plain Candidate directory")
+        contract["harness_runtime"] = runtime
+        contract["candidate_source_root"] = str(candidate)
+        contract["workspace_path"] = "/work/project" if runtime.get("project_workspace") else "/work/harness/workspace"
     contract.update(_agent_asset_roots(repo, item["agent_id"]))
     return contract
 
