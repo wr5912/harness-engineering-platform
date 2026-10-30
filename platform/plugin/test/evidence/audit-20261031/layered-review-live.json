@@ -1,0 +1,179 @@
+{
+  "scope": "新Run分别评价业务效果与源码诊断；原始失败、超时及未核范围保留",
+  "runs": [
+    {
+      "run_id": "run-e94134da-05cd-40e8-8642-b2cd4163c37a",
+      "summary_schema": "4.0",
+      "effect": {
+        "review_status": "completed",
+        "effective_verdict": "failed",
+        "case_reviews": [
+          {
+            "case_id": "U-EMG-MISSING-TARGET",
+            "machine_verdict": "failed",
+            "reviewed_verdict": "failed"
+          },
+          {
+            "case_id": "U-QA-001",
+            "machine_verdict": "passed",
+            "reviewed_verdict": "passed"
+          }
+        ]
+      },
+      "source_diagnosis": {
+        "status": "incomplete",
+        "conclusion": "inconclusive",
+        "reason": "源码诊断未完成（session）：source-diagnosis-session-invalid；未核实范围保持未知。",
+        "required_parts": 191,
+        "read_parts": 0
+      },
+      "source_session_id": null,
+      "diagnostic_reason": "source-diagnosis-session-invalid",
+      "sources": [
+        {
+          "repository": "harness-engineering-platform-data",
+          "commit": "e9f78cf96ac2ff1ebf29bc2cbd3b81baf4787bb1",
+          "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e94134da-05cd-40e8-8642-b2cd4163c37a/summary.json",
+          "sha256": "3651b35b3f40c207440a6450effcd094346c385884a58a623ae1d814dd560f90"
+        },
+        {
+          "repository": "harness-engineering-platform-data",
+          "commit": "e9f78cf96ac2ff1ebf29bc2cbd3b81baf4787bb1",
+          "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e94134da-05cd-40e8-8642-b2cd4163c37a/analysis.json",
+          "sha256": "b1e0bc8ec97e48e8b6a9ea949eafb5875d7ee939d2e875904753bf3e9baeeb1d"
+        }
+      ]
+    },
+    {
+      "run_id": "run-61f812e3-90ab-40fa-89a1-f1bb97a9008b",
+      "summary_schema": "4.0",
+      "effect": {
+        "review_status": "completed",
+        "effective_verdict": "passed",
+        "case_reviews": [
+          {
+            "case_id": "U-EMG-MISSING-TARGET",
+            "machine_verdict": "inconclusive",
+            "reviewed_verdict": "passed"
+          },
+          {
+            "case_id": "U-QA-001",
+            "machine_verdict": "passed",
+            "reviewed_verdict": "passed"
+          }
+        ]
+      },
+      "source_diagnosis": {
+        "status": "incomplete",
+        "conclusion": "inconclusive",
+        "reason": "源码诊断未完成（session）：source-diagnosis-session-invalid；未核实范围保持未知。",
+        "required_parts": 191,
+        "read_parts": 0
+      },
+      "source_session_id": null,
+      "diagnostic_reason": "source-diagnosis-session-invalid",
+      "sources": [
+        {
+          "repository": "harness-engineering-platform-data",
+          "commit": "e9f78cf96ac2ff1ebf29bc2cbd3b81baf4787bb1",
+          "path": "evolution/experiments/EXP-security-operations-expert-026-r6aebbb22df61/runs/run-61f812e3-90ab-40fa-89a1-f1bb97a9008b/summary.json",
+          "sha256": "e988fb98e54a03932b68e395b53e00f2b247a46237c81f43deb30c2485445914"
+        },
+        {
+          "repository": "harness-engineering-platform-data",
+          "commit": "e9f78cf96ac2ff1ebf29bc2cbd3b81baf4787bb1",
+          "path": "evolution/experiments/EXP-security-operations-expert-026-r6aebbb22df61/runs/run-61f812e3-90ab-40fa-89a1-f1bb97a9008b/analysis.json",
+          "sha256": "d09e877adad326f23b14404ffdede1f2681bf5fcdc3f59f6f600582682ebb577"
+        }
+      ]
+    },
+    {
+      "run_id": "run-403db09b-c724-4514-96f0-c95a59f1fdd1",
+      "summary_schema": "4.0",
+      "effect": {
+        "review_status": "completed",
+        "effective_verdict": "passed",
+        "case_reviews": [
+          {
+            "case_id": "U-QA-001",
+            "machine_verdict": "passed",
+            "reviewed_verdict": "passed"
+          }
+        ]
+      },
+      "source_diagnosis": {
+        "status": "incomplete",
+        "conclusion": "inconclusive",
+        "reason": "源码诊断超过时限，已取得的阅读范围保留，未核部分未知。",
+        "required_parts": 186,
+        "read_parts": 12
+      },
+      "source_session_id": "session-77d03398-bf4b-4c25-9c2c-c54eb2bccb7d",
+      "diagnostic_reason": "case-hard-timeout",
+      "sources": [
+        {
+          "repository": "harness-engineering-platform-data",
+          "commit": "e9f78cf96ac2ff1ebf29bc2cbd3b81baf4787bb1",
+          "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-403db09b-c724-4514-96f0-c95a59f1fdd1/summary.json",
+          "sha256": "cf39afffaf9ffc4e1fa9e3d533bee6450d6c6f7511b0051b75bbcbd990cd7a3f"
+        },
+        {
+          "repository": "harness-engineering-platform-data",
+          "commit": "e9f78cf96ac2ff1ebf29bc2cbd3b81baf4787bb1",
+          "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-403db09b-c724-4514-96f0-c95a59f1fdd1/analysis.json",
+          "sha256": "18dffd6974091450aa9e4645621802938d0622b9e99be579d132b6dcdae739af"
+        }
+      ]
+    }
+  ],
+  "real_UI": {
+    "widths": [
+      1440,
+      390
+    ],
+    "screens": 18,
+    "page_errors": [],
+    "overflow": [],
+    "scope": "真实HTTP+真实页面；列表/详情/材料分片范围展开/本Run证据跳转/普通刷新/新旧Run对照；无模型/写入/Mock"
+  },
+  "program_commit_at_UI": "90f3381f739d58df8fea793494069ceb1f09bedd",
+  "analysis_originals_preserved": [
+    {
+      "run_id": "run-403db09b-c724-4514-96f0-c95a59f1fdd1",
+      "analysis_sha256": "18dffd6974091450aa9e4645621802938d0622b9e99be579d132b6dcdae739af",
+      "unchanged_after_UI": true
+    },
+    {
+      "run_id": "run-61f812e3-90ab-40fa-89a1-f1bb97a9008b",
+      "analysis_sha256": "d09e877adad326f23b14404ffdede1f2681bf5fcdc3f59f6f600582682ebb577",
+      "unchanged_after_UI": true
+    },
+    {
+      "run_id": "run-e2fcc6f8-5a91-4ed1-aaad-b21bad701b65",
+      "analysis_sha256": "a84a93ca868d5ac01ce26644383486193523987e4f828d3facf02ef137eaef60",
+      "unchanged_after_UI": true
+    },
+    {
+      "run_id": "run-e94134da-05cd-40e8-8642-b2cd4163c37a",
+      "analysis_sha256": "b1e0bc8ec97e48e8b6a9ea949eafb5875d7ee939d2e875904753bf3e9baeeb1d",
+      "unchanged_after_UI": true
+    }
+  ],
+  "historical_compatibility": "两份C3原0/191及session-null记录保持；C1旧复核文案保持，不从新trace回填旧记录",
+  "readonly_replay_boundary": "C3失败归档的21次成功read可只读核对14/191；该重算不等同C4新Run实际12/186，均不写回旧Run",
+  "limitations": [
+    "C4新Run只覆盖U-QA-001的业务通过；源码诊断case-hard-timeout保持incomplete，未核部分未知",
+    "两Case的C3对照仅为所列输入效果，不支持一般业务等效、采纳或成本收益",
+    "C3应急Case父版请求字段无效，新026取得实际404；错误路径不同，不据此认定同一404处理改善"
+  ],
+  "sources": [
+    {
+      "path": ".local/audit-20261030/c4-layered-real-ui-verified.json",
+      "sha256": "ea28727eae1c2047629ad71a4a683fa6d3317e5fa17e606b874424ee9289ef82"
+    },
+    {
+      "path": ".local/audit-20261030/c4-publication/c4-timeout-facts-and-layout.json",
+      "sha256": "4450cffc36f166a15cc27e1d814eea9fe2de7b1e96104408a4ce9ac4153353c6"
+    }
+  ]
+}

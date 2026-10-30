@@ -1,0 +1,229 @@
+{
+  "scope": "本轮源码验证、实际装载和既有Run原件保持；各阶段分别保留版本，不合并成最终源码全量重跑",
+  "C3": {
+    "program_commit": "d961b809d0f3343c5023aae73365e6f6aaf48e89",
+    "node": {
+      "build_exit_code": 0,
+      "test_exit_code": 0,
+      "tests": 1425,
+      "passed": 1425,
+      "failed": 0,
+      "skipped": 0,
+      "cancelled": 0,
+      "duration_ms": 352542.897481,
+      "file_count": 108,
+      "command": "node --test --test-concurrency=1 test/*.test.mjs",
+      "python": "3.10",
+      "dsh_entry": "/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/lib/bin.js",
+      "source_checks": {
+        "evaluation_implementation": 31,
+        "typescript_sources": 213,
+        "test_files": 108,
+        "changed": {
+          "evaluation_implementation": [],
+          "typescript_sources": [],
+          "node_test_files": []
+        }
+      },
+      "temporary_directory_empty": true
+    },
+    "python": {
+      "adapters": {
+        "tests": 284,
+        "exit_code": 0,
+        "seconds": 37.887
+      },
+      "research": {
+        "tests": 124,
+        "exit_code": 0,
+        "wrapper_seconds": 418.633,
+        "unittest_seconds": 411.515
+      },
+      "failed": 0,
+      "skipped": 0,
+      "source_snapshots_identical": true,
+      "evaluation_implementation_files": 31,
+      "direct_source_and_test_files": 5,
+      "temporary_directories_empty": true
+    }
+  },
+  "C4": {
+    "program_commit": "dd5f4b5a57f4655e21b540d14f6bacbd3fefeced",
+    "verification": {
+      "native_api_tests": 14,
+      "native_api_failed": 0,
+      "native_api_skipped": 0,
+      "python_direct_tests": 14,
+      "python_adapters": 287,
+      "adapter_exit_code": 0,
+      "adapter_skipped": 0,
+      "adapter_unittest_seconds": 29.671,
+      "adapter_wrapper_seconds": 36.82138089102227,
+      "source_checks": {
+        "evaluation_implementation": 31,
+        "direct_sources_and_tests": 6,
+        "built_modules": 2,
+        "before_after_identical": true
+      },
+      "private_tmp_empty": true
+    },
+    "evaluation_client": {
+      "tests": 77,
+      "passed": 77,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 2177.053462
+    },
+    "boundary": "受影响回归与构建；未重跑C3完整Node1425或研究124"
+  },
+  "C5": {
+    "program_commit": "90f3381f739d58df8fea793494069ceb1f09bedd",
+    "scope": "安装器生成目录的Git工作树边界；不改变git_version、比较门槛或安装状态。",
+    "tests": 6,
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0,
+    "generated_entries": [
+      "/bin/dsh",
+      "/bin/hep-env.sh",
+      "/bin/hep-start"
+    ],
+    "generated_directories": [
+      "/runtime/dsh/",
+      "/runtime/git/",
+      "/runtime/node/",
+      "/runtime/pnpm/",
+      "/runtime/python/",
+      "/runtime/python-site/"
+    ],
+    "regression": {
+      "root_gitignore_copied": true,
+      "tracked_adapter_source_copied": true,
+      "generated_layout_clean": true,
+      "modified_tracked_source_dirty": true,
+      "new_bin_source_dirty": true,
+      "new_adapter_source_dirty": true
+    },
+    "committed_gitignore_and_test_match_receipt": true,
+    "boundary": "本机真实Git与Python消费者回归；最终47完整安装后的Git clean检查由真实安装验收另行记录。"
+  },
+  "actual_platform_load": {
+    "program_commit": "d961b809d0f3343c5023aae73365e6f6aaf48e89",
+    "pid": 977931,
+    "port": 18120,
+    "effective_prepare_exit_code": 0,
+    "restart_exit_code": 0,
+    "loaded_builds": {
+      "platform/plugin/lib/index.js": "683b92c00648d946c4fde40900a891e01d32242a563cd47e33e2e056629ced37",
+      "platform/plugin/lib/client.js": "701b093522e025e4a7ab2f018615b50f01fd662a2554ebd696f8c591b6534581"
+    },
+    "preserved": {
+      "management_session_ids_preserved": 406,
+      "native_session_files_sha_unchanged": 812,
+      "original_containers_unchanged": 9,
+      "business_instances_not_restarted": true
+    }
+  },
+  "C1_originals": {
+    "runs": [
+      {
+        "run_id": "run-e2fcc6f8-5a91-4ed1-aaad-b21bad701b65",
+        "files": 403,
+        "unchanged": true,
+        "differences": []
+      },
+      {
+        "run_id": "run-028a9199-2c68-45be-b0e8-26b83852283f",
+        "files": 404,
+        "unchanged": true,
+        "differences": []
+      },
+      {
+        "run_id": "run-fda3aa24-5a81-4319-b7eb-d3977dd9f873",
+        "files": 207,
+        "unchanged": true,
+        "differences": []
+      },
+      {
+        "run_id": "run-50416fc7-d53d-4877-ac45-7b88b9098c27",
+        "files": 17,
+        "unchanged": true,
+        "differences": []
+      }
+    ],
+    "total_files": 1031,
+    "all_unchanged": true,
+    "limitation": "仅证明四个C1 Run原件逐SHA和大小未改。旧AI材料读取失败、业务失败与不确定结论均保留，不按新方法重写。"
+  },
+  "C2_readonly_metering": {
+    "run_id": "run-50416fc7-d53d-4877-ac45-7b88b9098c27",
+    "C1_recorded": {
+      "actual": 3,
+      "target": 2,
+      "judge": 1,
+      "language": 0,
+      "decision": 1
+    },
+    "remeasured": {
+      "actual": 4,
+      "observed": 4,
+      "by_role": {
+        "target": 3,
+        "judge": 1,
+        "analysis": 0
+      },
+      "by_model_role": {
+        "language": 1,
+        "decision": 1
+      },
+      "local_model_routes_verification": "verified",
+      "token_usage": null,
+      "token_usage_complete": false,
+      "unknown": []
+    },
+    "meaning": "本地注册HTTP适配器仍可实际执行Qwen/KEV推理；原始阳性调用与正用量不能被注册位置折为零。同attempt重复回执只计一次。",
+    "kev": {
+      "fixed_variant_ref": "git:b49b83aabb66c265e848ab3ffb102e6e686d7250",
+      "model_invocation": true,
+      "usage_observed": {
+        "inputTokens": 470,
+        "outputTokens": 119
+      },
+      "input_semantics": "编码输入长度；不证明cache命中或新增计算Token。",
+      "output_semantics": "prefill决策的billing-style JSON回执长度，不能称为自回归生成Token。",
+      "aggregate": "固定上游未提供total/cache字段，保持总Token未知，不补输入输出求和或cache=0。",
+      "evidence_boundary": "C1原始HTTP body未单独封存；现有图回执、固定服务源码及同服务既有raw probe支持该响应合同。"
+    },
+    "limitation": "只读重算与固定源码观察，原Run保持，不支持业务等效或收益结论"
+  },
+  "sources": [
+    {
+      "path": ".local/audit-20261030/c3-publication/c3-source-validation.json",
+      "sha256": "60cf924faffe21dac350b2feb18b62f2895635e98a591c8e27062ee4fcf079aa"
+    },
+    {
+      "path": ".local/audit-20261030/c3-publication/c3-runtime-loaded.json",
+      "sha256": "06738b92d2740d4848e592045e200ac5dbcd2fe8062322bb37f86c95e726b499"
+    },
+    {
+      "path": ".local/audit-20261030/c3-publication/c1-original-runs-preserved.json",
+      "sha256": "95a5241d9673a37363a2cf6cd9fcbcb8482620a8623ccccf98b8723e5d4c20e1"
+    },
+    {
+      "path": ".local/audit-20261030/c3-publication/c2-readonly-metering-boundaries.json",
+      "sha256": "e848c12017df7960c52781be4a4f7bd5b930353d40f274d1d2a5e464d8ebcd8b"
+    },
+    {
+      "path": ".local/audit-20261030/c4-publication/c4-affected-validation.json",
+      "sha256": "7fdb0d8b144b3cbbf0114f65696cf0d450efcd74508346493df46618ed411154"
+    },
+    {
+      "path": ".local/audit-20261030/review-client-layout-final.log",
+      "sha256": "2038cf1ef052f81ef8db9566c4c035ee998310c6fd3c4bd21ec8c9c83bf11793"
+    },
+    {
+      "path": ".local/audit-20261030/installed-runtime-git-regression-receipt.json",
+      "sha256": "08302a0a1f25ee4fe8931f4715e98685a3a6c0fba006d5264039bece50abbee4"
+    }
+  ]
+}

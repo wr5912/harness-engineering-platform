@@ -1,0 +1,261 @@
+{
+  "scope": "独立SDK/Web与完整平台制品各自限定范围；按用户决定停止47后续验收",
+  "sdk_on_47": {
+    "status": "passed",
+    "native_install": {
+      "archive_sha256": "c21bdf0d1a4c268b47f1346dfc0d0253d0960d9e7c249ef1037117bde933b029",
+      "archive_bytes": 1181809347,
+      "manifest_sha256": "6163871e418cfa00a26f1b51d95b8957e9466eb631b2461aca34b5a637deb607",
+      "installer_exit_code": 0,
+      "installer_seconds": 59.21,
+      "all_manifest_files_verified": true,
+      "scope": "原始install.sh，完整清单SHA、真实docker load/镜像架构身份指纹核对、prepare-sdk；未跳过镜像或准备"
+    },
+    "bundle_declared_source": {
+      "agentId": "audit-e2e-assistant-sdk",
+      "experimentId": "EXP-audit-e2e-assistant-sdk-002-r24252c76625d",
+      "candidateSha256": "5790f0975a0b41f31b2caae55e15eb675df591f4930db40f9a2ad2eeba22a892",
+      "commit": "e75e8d7d2762fd6e488eabbaabb7567b1493a4db",
+      "dirty": true,
+      "profile": "sdk"
+    },
+    "source_boundary": "commit与dirty按该独立SDK包的实际声明保留，不视为C3/C4平台程序提交。",
+    "amount_and_session_restore": {
+      "processes": 3,
+      "same_session": true,
+      "session_id": "session-bbfadd4c-0765-4cf3-b295-12f8acd62811",
+      "outcomes": [
+        {
+          "name": "amount",
+          "exit_code": 0,
+          "status": "completed"
+        },
+        {
+          "name": "remember",
+          "exit_code": 0,
+          "status": "completed"
+        },
+        {
+          "name": "resume",
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "amount_checked": 70,
+      "native_completed_turns": 3
+    },
+    "offline_reference_tool_evidence": [
+      {
+        "status_code": 200,
+        "truncated": false,
+        "source_sha256": "54d6d1ad65c00ebd31d73108c27ce89b40b359aabc7c450a69b20bb608624b0e",
+        "marker_count": 2
+      },
+      {
+        "status_code": 200,
+        "truncated": false,
+        "source_sha256": "31c7083b98c1c703e8de3db5b47fcb3a76aae431c58007daf35796868a62acce",
+        "marker_count": 2
+      }
+    ],
+    "offline_boundary": "两条外层文档URL由包内冻结材料映射，经原生web_fetch实际取回共4个标记；不说明外部原网站可用。",
+    "official_typescript_example": {
+      "exit_code": 0,
+      "sha256": "fe6398ab3dbe4eee67a4f7d3860bbdbc5c7fa09525239f2501572aad3ae5cb0f",
+      "executed_copy_matches": true
+    },
+    "native_session_receipts": [
+      {
+        "name": "amount-and-memory",
+        "sha256": "651dfa7637667359add3f27da4b8e5ca44aa327418d37fb9f30bdbd876c67a64",
+        "bytes": 8089,
+        "zstd_frames": 14,
+        "completed_turns": 3,
+        "observed_mimo_responses": 3
+      },
+      {
+        "name": "offline-knowledge",
+        "sha256": "e92df96689232bf8bcfc3a18194cdf820eced9ada45d4e677909e0cc22cc65e6",
+        "bytes": 7424,
+        "zstd_frames": 10,
+        "completed_turns": 1,
+        "observed_mimo_responses": 2
+      },
+      {
+        "name": "official-ts-example",
+        "sha256": "a19adaede96ce6cccbf596c634c9a996afb62cddadfc30e689fe7ec7448e892c",
+        "bytes": 4153,
+        "zstd_frames": 6,
+        "completed_turns": 1,
+        "observed_mimo_responses": 1
+      }
+    ],
+    "cleanup": {
+      "containers_absent": true,
+      "networks_absent": true,
+      "home_preserved": true,
+      "native_sessions_unchanged_after_cleanup": true,
+      "existing_containers_preserved": true
+    },
+    "initial_preparation_attempt": {
+      "status": "failed",
+      "boundary": "初次准备脚本对归档根目录的假设失败，未执行原生install或重放业务prompt；失败原件保留。"
+    },
+    "limitation": "47已有Docker/Compose的AMD64独立SDK包验收。额外Web独立包与最终完整平台包不在本附件范围。"
+  },
+  "web_on_47": {
+    "status": "partial",
+    "package": {
+      "job_id": "c0eaf57b-a138-4974-88ab-61c06b35ca12",
+      "sha256": "f59cf26ee2c655eed163ccbf35849598616407ff0fa7fc82b784ea550bcf907c",
+      "bytes": 1194819801,
+      "candidate_sha256": "c18d568075899f63b7f6858e3257a1c79bc417ca04e653ca31a598ec9b6725e3"
+    },
+    "native_installer_exit": 0,
+    "native_installer_seconds": 66.85,
+    "manifest_verified": true,
+    "docker_load_and_native_prepare_executed": true,
+    "transport": "专属SSH转发保留原公开Origin；不表示公网可达",
+    "completed_turns": 2,
+    "first_observed_amount": 20,
+    "explicit_correction_amount": 70,
+    "correction_same_session": true,
+    "correction_full_text_asserted": true,
+    "original_input_integrity": "未定；原拟17.5实际首输入为5，未取得足以判明脚本或产品原因的焦点/时序证据",
+    "native_restart": {
+      "before": {
+        "started_at": "2026-10-30T23:20:31.220166368Z"
+      },
+      "after": {
+        "started_at": "2026-10-30T23:42:01.128463798Z"
+      },
+      "new_model_prompt_after_restart": false,
+      "gui_reopen_failure": {
+        "stage": "restore-same-session",
+        "name": "TimeoutError"
+      }
+    },
+    "third_prompt_sent": false,
+    "public_direct_access_passed": false,
+    "remote_cleanup_completed": false,
+    "remaining": "第三轮恢复、输入保真调查、原生持久帧独立核验及本次容器/网络收尾未完成；依用户决定跳过，不继续连接或重放输入"
+  },
+  "final_complete_platform_bundle": {
+    "program_commit": "90f3381f739d58df8fea793494069ceb1f09bedd",
+    "data_commit": "e9f78cf96ac2ff1ebf29bc2cbd3b81baf4787bb1",
+    "archive_name": "harness-engineering-platform-0.7.0-90f3381f739d-amd64.tar.gz",
+    "sha256": "6bb6efe0f595f73bfdf7ae0bd8d796e75d6dcda8b1689d3439914b6422d1b37a",
+    "bytes": 2297652963,
+    "mode": "0600",
+    "manifest_sha256": "30d34c85306f09fa20628651ba567e9ed57786ff25146e7f181e32afdf4e84cf",
+    "manifest_file_count": 111592,
+    "archive_non_directory_count": 111593,
+    "tar_listing_exit_code": 0,
+    "knowledge": {
+      "sources": 63,
+      "required_document_references": 64,
+      "all_source_file_hashes_matched": true,
+      "required_reference_closure_complete": true,
+      "missing": 0,
+      "warning_count": 35,
+      "all_warnings_non_required": true,
+      "warning_codes": {
+        "external_service": 6,
+        "unclassified_reference": 26,
+        "static_coverage": 1,
+        "pdf_text_only": 1,
+        "empty_pdf_page": 1
+      }
+    },
+    "program_clean": true,
+    "data_original_three_uncommitted_files_preserved": true,
+    "staging_retired": true,
+    "staging_reclaimed_bytes": 1479217152,
+    "uploaded_to_47": false,
+    "installed_final_bundle": false,
+    "last_ssh_preflight_exit": 255,
+    "user_decision": "47性能低且连接受阻；训练服务器现为缺Docker及所需能力的外层容器。按用户决定跳过两处部署；未上传或执行skip-image安装。",
+    "preserved_manifest": ".local/audit-20261030/platform-final-90f3381f739d-e9f78cf96ac2/manifest.native.json",
+    "manifest_location_boundary": "原staging已按授权退役；本路径保留原始manifest字节，不引用已删除的staging文件"
+  },
+  "remaining_scope": [
+    "真实securityAgent来源的独立导出、安装与业务任务未验收，自建probe不替代",
+    "本轮ARM64、缺Docker新系统、真实SOC及语音服务/物理设备未验收",
+    "PA-11 Research Release完整复现状态不变",
+    "GPU恢复与新VAR Run待独立结果，不提前计为通过"
+  ],
+  "sources": [
+    {
+      "path": ".local/audit-20261030/c4-publication/remote-sdk-native-install-run.json",
+      "sha256": "0d083f5dc4c7e955de7f2ace0b845b3663a68d327508619cd1e317725ede2f5b"
+    },
+    {
+      "path": ".local/audit-20261030/remote-sdk-ready-c3/live/verified-receipt.json",
+      "sha256": "af883f79de312597af5e883d542ee1c8b6b327798ca016f6b9be03606a86d53f"
+    },
+    {
+      "path": ".local/audit-20261030/remote-web-ready-c4/partial-receipt.json",
+      "sha256": "aa237f938cfb110161bfb0e84a1fb69895ad2a34efef4f8923c550e5046805e6"
+    },
+    {
+      "path": ".local/audit-20261030/platform-final-90f3381f739d-e9f78cf96ac2/pack-final-verification.json",
+      "sha256": "4129a9610c2c8a8b89b23037151d14d503baf0da978e8f125a36c9595310a24c"
+    },
+    {
+      "path": ".local/audit-20261030/platform-final-90f3381f739d-e9f78cf96ac2/staging-retirement-receipt.json",
+      "sha256": "9a61c0eb5525452820563ff57843fe4fc5b972d11e26c5fa2afbfebb9b492a53"
+    },
+    {
+      "path": ".local/audit-20261030/platform-final-90f3381f739d-e9f78cf96ac2/remote-preflight-attempt02-receipt.json",
+      "sha256": "264544966da6d64e1422eb4246b2f8667d5ad709b1a5a37f56dedb7591aa1afb"
+    },
+    {
+      "path": ".local/audit-variants-20261030/region-deployment-readonly-facts.json",
+      "sha256": "576311c788b385be6c261db95f2c6c3b88424844cc0d2f9843818fef6047fed3"
+    },
+    {
+      "path": ".local/audit-variants-20261030/security-package-current-scope-proof.json",
+      "sha256": "5a59bf663d71480872ac8ee9c1e57088a74b3c37aa28b481e2c0728fcea914ca"
+    },
+    {
+      "path": ".local/audit-20261030/platform-final-90f3381f739d-e9f78cf96ac2/manifest.native.json",
+      "sha256": "30d34c85306f09fa20628651ba567e9ed57786ff25146e7f181e32afdf4e84cf"
+    }
+  ],
+  "training_server_deployment": {
+    "observed_at_utc": "2026-10-30T23:53:38Z",
+    "architecture": "x86_64",
+    "pid1": "bash",
+    "environment": "既有容器",
+    "docker_command_present": false,
+    "dockerd_present": false,
+    "docker_socket_present": false,
+    "CAP_SYS_ADMIN": false,
+    "CAP_NET_ADMIN": false,
+    "bundle_uploaded": false,
+    "installer_executed": false,
+    "user_decision": "不满足当前标准容器部署条件，跳过；未安装嵌套Docker或改安装源码"
+  },
+  "actual_security_agent": {
+    "performed": "公开只读deployment/preview",
+    "selections": [
+      {
+        "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+        "candidate_sha256": "d2572e8c4a89db14c9fa042b21c77ff98284e16805aa2c6ea7a003b6678eb2af",
+        "resource_ready": true
+      },
+      {
+        "experiment_id": "EXP-security-operations-expert-026-r6aebbb22df61",
+        "candidate_sha256": "82eb6bd4ddcb8773c22269d98e2120ebc0bf1490a8efd381b715159abe26e312",
+        "resource_ready": true
+      }
+    ],
+    "current024_same_as_requested_e6_parent": false,
+    "not_performed": [
+      "独立导出",
+      "安装",
+      "真实独立业务运行"
+    ],
+    "boundary": "依赖准备就绪的preview和自建Web/SDK探针均不证明真实安全运营Harness独立交付通过"
+  }
+}
