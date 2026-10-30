@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
 import { fixture, write, command } from './agent-fixture.mjs'
@@ -88,6 +88,13 @@ test('SDK 包完整承接主子角色模型投影及 Candidate 外层业务项�
   const compose = JSON.parse(readFileSync(join(root, 'runtime/compose.yaml'), 'utf8'))
   assert.ok(compose.services.dsh.volumes.some(volume => volume.target === '/opt/dsh-presets' && volume.source === './runtime/projections/presets'))
   assert.ok(compose.services.dsh.volumes.some(volume => volume.target === '/opt/harness-candidate' && volume.source === './assets/candidate'))
+  for (const name of ['workspace', 'presets', 'managed']) {
+    assert.deepEqual(readdirSync(join(root, 'assets/candidate/dsh', name)), [], '只读父层内须预建空的子挂载点')
+  }
+  const candidateMounts = compose.services.dsh.volumes.filter(volume => volume.target.startsWith('/opt/harness-candidate'))
+  assert.equal(candidateMounts[0].target, '/opt/harness-candidate')
+  assert.ok(candidateMounts.every(volume => volume.read_only))
+  assert.equal(agentCandidateDigest(f.candidate), snapshot.candidateSha256)
   assert.ok(compose.services.dsh.volumes.some(volume => volume.target === '/opt/harness-model-runtime/model-binding-runtime.mjs'))
 })
 

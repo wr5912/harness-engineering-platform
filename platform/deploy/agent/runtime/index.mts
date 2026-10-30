@@ -36,8 +36,12 @@ export async function writeRuntimeBundle(staging: string, options: RuntimeBundle
   ]
   if (sdk) volume.push({ type: 'bind', source: './state/home/profiles/node_modules', target: '/opt/node_modules', read_only: true })
   if (sdk && options.harnessRuntime) {
+    if (existsSync(join(staging, 'assets/candidate'))) {
+      // Docker 不能在只读父挂载内创建子挂载点；仅在制品中准备空目录，源资产不变。
+      for (const name of ['workspace', 'presets', 'managed']) mkdirSync(join(staging, 'assets/candidate/dsh', name), { recursive: true })
+      volume.push({ type: 'bind', source: './assets/candidate', target: '/opt/harness-candidate', read_only: true })
+    }
     for (const name of ['workspace', 'presets', 'managed']) volume.push({ type: 'bind', source: `./assets/${name}`, target: `/opt/harness-candidate/dsh/${name}`, read_only: true })
-    if (existsSync(join(staging, 'assets/candidate'))) volume.push({ type: 'bind', source: './assets/candidate', target: '/opt/harness-candidate', read_only: true })
     volume.push({ type: 'bind', source: './runtime/model-binding-runtime.js', target: '/opt/harness-model-runtime/model-binding-runtime.mjs', read_only: true })
   }
   const common = { image: options.imageTag, pull_policy: 'never', working_dir: '/work/harness/workspace', volumes: volume,
