@@ -536,6 +536,7 @@ export function BusinessControlPage({ rpc, updates, active = true, target, onNav
   }
   return <GatewayWindows assistantVisible={assistantVisible} onAssistantVisibilityChange={onAssistantVisibilityChange} onAssistantReturnChange={onAssistantReturnChange}><main className="harness-mcp-page harness-gateway-page" aria-label="统一网关管理">
       <style>{businessControlStyle}</style>
+      <header className="harness-page-heading harness-gateway-page-heading"><div><span className="harness-gateway-kicker">身份与运行保障</span><h1>统一网关</h1><p>核对智能体身份、风险与访问决定，追踪实例的配置应用。</p></div><span className="harness-gateway-heading-mark" aria-hidden="true"><GatewayIcon kind="shield" /></span></header>
       {error && <p role="alert">{error}</p>}
       {loadError && <p role="alert">{loadError}{data && `；以下为上次成功读取的状态（${lastStatusAt || '时间未知'}），当前许可需重新核对。`}</p>}
       {notice && <div role="status"><p>{notice}</p>{missingInstance && <button type="button" onClick={() => onNavigate?.({ page: 'instances' })}>前往实例列表</button>}</div>}

@@ -797,6 +797,9 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
   </>
 
   return <main className="harness-evaluation" aria-label="评测中心">
+    <header className="harness-page-heading harness-eval-page-heading">
+      <div><span className="harness-eval-eyebrow"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 15V9m6 6V5m6 10V2M2 18h16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>验证 · 比较 · 改进</span><h1>评测中心</h1><p>选择测试用例，运行评测，并比较各版本的结果。</p></div>
+    </header>
     {evalPending && !evalBusy && <section className="harness-eval-limits" role="status" aria-label="待核对的评测请求"><strong>评测受理结果待核对</strong><p>原目标：{agentName(evalPending.agentId)} · {versionName(evalPending.experimentId)}（{evalPending.experimentId}）。请求可能已经执行；核对和继续均沿用原参数与同一请求身份。</p><button type="button" onClick={() => void startEvaluation(evalPending)}>核对原评测请求</button></section>}
     <header className="harness-eval-toolbar"><div role="tablist" aria-label="评测工作区" className="harness-eval-tabs" onKeyDown={event => {
       const index = tabs.findIndex(item => item.id === (tab === 'jobs' ? 'runs' : tab))

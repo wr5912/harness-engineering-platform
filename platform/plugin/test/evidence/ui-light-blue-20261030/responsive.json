@@ -1,0 +1,98 @@
+[
+  {
+    "contentScroll": 380,
+    "contentWidth": 380,
+    "error": null,
+    "page": "home",
+    "scroll": 390,
+    "width": 390
+  },
+  {
+    "contentScroll": 380,
+    "contentWidth": 380,
+    "error": null,
+    "page": "agents",
+    "scroll": 390,
+    "width": 390
+  },
+  {
+    "contentScroll": 380,
+    "contentWidth": 380,
+    "error": null,
+    "page": "evaluation",
+    "scroll": 390,
+    "width": 390
+  },
+  {
+    "contentScroll": 380,
+    "contentWidth": 380,
+    "error": null,
+    "page": "instances",
+    "scroll": 390,
+    "width": 390
+  },
+  {
+    "contentScroll": 380,
+    "contentWidth": 380,
+    "error": null,
+    "page": "gateway",
+    "scroll": 390,
+    "width": 390
+  },
+  {
+    "contentScroll": 380,
+    "contentWidth": 380,
+    "error": null,
+    "page": "mcp",
+    "scroll": 390,
+    "width": 390
+  },
+  {
+    "contentScroll": 758,
+    "contentWidth": 758,
+    "error": null,
+    "page": "home",
+    "scroll": 768,
+    "width": 768
+  },
+  {
+    "contentScroll": 758,
+    "contentWidth": 758,
+    "error": null,
+    "page": "agents",
+    "scroll": 768,
+    "width": 768
+  },
+  {
+    "contentScroll": 758,
+    "contentWidth": 758,
+    "error": null,
+    "page": "evaluation",
+    "scroll": 768,
+    "width": 768
+  },
+  {
+    "contentScroll": 758,
+    "contentWidth": 758,
+    "error": null,
+    "page": "instances",
+    "scroll": 768,
+    "width": 768
+  },
+  {
+    "contentScroll": 758,
+    "contentWidth": 758,
+    "error": null,
+    "page": "gateway",
+    "scroll": 768,
+    "width": 768
+  },
+  {
+    "contentScroll": 768,
+    "contentWidth": 768,
+    "error": null,
+    "page": "mcp",
+    "scroll": 768,
+    "width": 768
+  }
+]

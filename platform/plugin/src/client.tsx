@@ -102,6 +102,12 @@ function PlatformPage({ catalog, rpc, assistant, updates, theme, enterConversati
   const collapseOnEntry = useRef(true)
   const activePage = useRef(page)
   activePage.current = page
+  // 各模块共用滚动容器；切换模块时从标题开始，具体结果深链仍由页面定位。
+  useLayoutEffect(() => {
+    if (page === 'conversations') return
+    const content = frame.current?.querySelector<HTMLElement>('.harness-content')
+    if (content) content.scrollTop = 0
+  }, [page])
   useEffect(() => { setAccountMenuOpen(false) }, [page])
   useEffect(() => {
     if (!accountMenuOpen) return
