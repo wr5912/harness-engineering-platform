@@ -5,7 +5,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { credentialKey, type CredentialRecord } from '@deepseek-ai/dsh-credentials'
 import type { ConnectionTrustRequest } from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-host-webserver'
-import { loginPage } from './login.tsx'
+import { loginCarouselScriptHash, loginPage } from './login.tsx'
 import { workspaceLocalPath } from './workspace.ts'
 
 declare module '@deepseek-ai/dsh-host-webserver' {
@@ -137,7 +137,7 @@ export async function applyAuthentication(ctx: Context, assetRoot: string) {
     res.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store',
       // no-referrer 会使浏览器表单的 Origin 变成 null，导致同源登录被拒绝。
       'referrer-policy': 'same-origin', 'x-content-type-options': 'nosniff',
-      'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; img-src data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'" })
+      'content-security-policy': `default-src 'none'; script-src 'sha256-${loginCarouselScriptHash}'; style-src 'unsafe-inline'; img-src data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'` })
     res.end(loginPage(ctx.webServer.publicPath('/login'), error))
   }
   for (const path of ['/login', '/logout']) {

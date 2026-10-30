@@ -1,0 +1,69 @@
+{
+  "mode": "cloud Chrome; product SSR with matching script hash CSP in meta; responsive same-origin iframes; fine pointer",
+  "viewports": [
+    {
+      "width": 1440,
+      "scrollWidth": 1440,
+      "form": {
+        "x": 960,
+        "y": 345.640625,
+        "width": 380,
+        "height": 408.703125
+      },
+      "featuresY": 377.71875,
+      "stableAcrossFourSlides": true
+    },
+    {
+      "width": 768,
+      "scrollWidth": 768,
+      "form": {
+        "x": 164,
+        "y": 102.90625,
+        "width": 440,
+        "height": 381.609375
+      },
+      "featuresY": 508.515625,
+      "stableAcrossFourSlides": true
+    },
+    {
+      "width": 390,
+      "scrollWidth": 390,
+      "form": {
+        "x": 16,
+        "y": 126.3125,
+        "width": 358,
+        "height": 373.609375
+      },
+      "featuresY": 523.921875,
+      "stableAcrossFourSlides": true
+    }
+  ],
+  "responsiveFrameHeight": 1100,
+  "mobileFirstOpen": {
+    "frameWidth": 390,
+    "frameHeight": 900,
+    "scrollTop": 0,
+    "formTop": 80
+  },
+  "manualControls": {
+    "namedSelection": true,
+    "previous": true,
+    "arrowRightWrap": true,
+    "pausesAutomatic": true
+  },
+  "automatic": {
+    "intervalMs": 7000,
+    "before": "01 / 04",
+    "after7600ms": "02 / 04"
+  },
+  "floatingAnimation": {
+    "automatic": "running",
+    "manualSelection": "paused"
+  },
+  "credentialsEnteredInBrowser": false,
+  "noJavaScriptAndReducedMotion": "covered by emitted-script deterministic tests; browser preference not emulated",
+  "notes": [
+    "Browser extension metadata forwarding errors were observed; no application error observed.",
+    "Final deliverable preview disables credential entry/submission at its host boundary; product login remains tested with real applyAuthentication HTTP."
+  ]
+}
