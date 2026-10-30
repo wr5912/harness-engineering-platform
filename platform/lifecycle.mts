@@ -59,6 +59,15 @@ export function ownsPort(pid: number, host: string, port: number): boolean {
   return false
 }
 
+async function httpPhase(url: string): Promise<'running' | 'initializing' | 'unavailable'> {
+  try {
+    const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(1000) })
+    void response.body?.cancel().catch(() => {})
+    return [200, 302, 303].includes(response.status)
+      ? (response.headers.get('x-harness-bootstrap') ? 'initializing' : 'running') : 'unavailable'
+  } catch { return 'unavailable' }
+}
+
 export function launchAddress(dataRoot: string, host?: string, port?: string): { host: string; port: number; url: string } {
   let configured: URL | undefined
   const access = join(dataRoot, 'config/business-access.json')
@@ -144,12 +153,7 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
   if (command === 'status') {
     const state = managedState(dataRoot)
     let status = state ? 'starting' : 'stopped'
-    if (state && ownsPort(state.pid, state.host, state.port)) {
-      try {
-        const response = await fetch(state.url, { redirect: 'manual', signal: AbortSignal.timeout(1000) })
-        status = [200, 302, 303].includes(response.status) ? (response.headers.get('x-harness-bootstrap') ? 'initializing' : 'running') : 'unavailable'
-      } catch { status = 'unavailable' }
-    }
+    if (state && ownsPort(state.pid, state.host, state.port)) status = await httpPhase(state.url)
     console.log(flags.has('--json') ? JSON.stringify({ status, ...state }, null, 2) : `${status}${state ? ` ${state.url}\nPID：${state.pid}\n日志：${state.log}` : ''}`)
     return 0
   }
@@ -165,8 +169,10 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
     if (existing) {
       if (existing.url !== address!.url) throw new Error(`平台已使用 ${existing.url} 启动；请用 restart 修改地址`)
       if (!ownsPort(existing.pid, existing.host, existing.port)) throw new Error(`平台进程仍在启动但尚未监听；请检查日志 ${existing.log}`)
-      console.log(`平台已启动：${existing.url}\nPID：${existing.pid}\n日志：${existing.log}`)
-      await reportBusinessReadiness(programRoot, dataRoot)
+      const phase = await httpPhase(existing.url)
+      if (phase === 'unavailable') throw new Error(`平台进程仍在监听，但 HTTP 未就绪：${existing.url}；请检查日志 ${existing.log}`)
+      console.log(`平台${phase === 'initializing' ? '等待初始化' : '已启动'}：${existing.url}\nPID：${existing.pid}\n日志：${existing.log}`)
+      if (phase === 'running') await reportBusinessReadiness(programRoot, dataRoot)
       return 0
     }
     const accessPath = join(dataRoot, 'config/business-access.json')
@@ -201,19 +207,17 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
       while (Date.now() < deadline) {
         if (failure || processBirth(state.pid) !== state.birth) throw new Error(`平台启动失败；日志：${log}`)
         if (ownsPort(state.pid, state.host, state.port)) {
-          try {
-            const response = await fetch(state.url, { redirect: 'manual', signal: AbortSignal.timeout(1000) })
-            if ([200, 302, 303].includes(response.status)) {
-              state.phase = response.headers.get('x-harness-bootstrap') ? 'initializing' : 'running'
-              atomic(join(service, 'state.json'), state)
-              console.log(`平台${state.phase === 'initializing' ? '等待初始化' : '已启动'}：${state.url}\nPID：${state.pid}\n日志：${log}`)
-              if (state.phase === 'running') await reportBusinessReadiness(programRoot, dataRoot)
-              unlock()
-              if (foreground) return await exited
-              child.unref()
-              return 0
-            }
-          } catch { /* HTTP 尚未就绪。 */ }
+          const phase = await httpPhase(state.url)
+          if (phase !== 'unavailable') {
+            state.phase = phase
+            atomic(join(service, 'state.json'), state)
+            console.log(`平台${state.phase === 'initializing' ? '等待初始化' : '已启动'}：${state.url}\nPID：${state.pid}\n日志：${log}`)
+            if (state.phase === 'running') await reportBusinessReadiness(programRoot, dataRoot)
+            unlock()
+            if (foreground) return await exited
+            child.unref()
+            return 0
+          }
         }
         await delay(100)
       }
