@@ -464,6 +464,8 @@ test('分层评估的列表保留业务通过，源码未完成和历史未单�
     const rows = ui.nodes().filter(node => node.type === 'tr' && node.props?.['data-selected'] !== undefined)
     const rowFor = id => rows.find(row => ui.nodes(row).some(node => node.type === 'button' && node.props.title === id))
     assert.match(ui.text(rowFor(runA)), /通过业务效果复核：已完成源码诊断：未完成 · 源码未核实完整/)
+    assert.ok(ui.nodes(rowFor(runA)).some(node => node.type === 'small' && node.props.className === 'harness-eval-review-status'))
+    assert.equal(ui.nodes(rowFor(runB)).some(node => node.props?.className === 'harness-eval-review-status'), false)
     assert.doesNotMatch(ui.text(rowFor(runB)), /源码诊断：|业务效果复核：/)
   } finally { ui.cleanup() }
 })
@@ -481,6 +483,8 @@ test('分层评估详情展示源码范围、未核实限制及证据入口，�
       const component = ui.nodes().find(node => node.type?.name === 'RunReviewAssessment')
       assert.ok(component)
       const rendered = component.type(component.props)
+      assert.ok(rendered.props.className.split(' ').includes('harness-eval-review-assessment'))
+      assert.equal(component.type({ ...component.props, view: { ...component.props.view, source: {} } }), null, '旧Run无独立诊断区，不改变其比较行数')
       assert.match(ui.text(rendered), new RegExp(expected))
       assert.match(ui.text(rendered), /workflow\.ts.*该材料分片尚未完整读取.*已读行：1–5 \/ 共 20 行/)
       assert.match(ui.text(rendered), /不改变业务效果判定；未审读部分尚未核实/)

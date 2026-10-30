@@ -6,7 +6,7 @@ export function RunReviewAssessment({ view, onEvidence }: { view: any; onEvidenc
   const scope = diagnosis?.scope ?? []
   const evidence = [...new Set([diagnosis?.analysis_session?.evidence_ref, diagnosis?.diagnostic?.evidence_ref,
     ...(diagnosis?.findings ?? []).flatMap(item => item.evidence_refs)].filter((path): path is string => Boolean(path)))]
-  return <section className="harness-eval-case-evidence-summary" aria-label="业务效果与源码诊断">
+  return <section className="harness-eval-case-evidence-summary harness-eval-review-assessment" aria-label="业务效果与源码诊断">
     <dl className="harness-eval-facts">
       <div><dt>业务效果复核</dt><dd>{effectReviewLabel(view.summary?.review_status)}</dd></div>
       <div><dt>源码诊断</dt><dd>{sourceDiagnosisLabel(diagnosis)}</dd></div>

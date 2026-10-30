@@ -760,6 +760,16 @@ def _source_diagnose(run_dir: Path, rows: list[dict], inputs: dict, sources: lis
         raw = response["results"][0]
         response_path = target / "response.json"
         response_path.write_text(json.dumps(raw, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        if isinstance(raw.get("error"), str):
+            # 失败身份或阅读信息不完整不能覆盖原始超时原因；仅保留已核验的部分事实。
+            if isinstance(raw.get("session_id"), str) and raw["session_id"] and raw["session_id"] not in used_sessions:
+                result["analysis_session"] = {"session_id": raw["session_id"], "route": raw.get("route"),
+                                              "evidence_ref": response_path.relative_to(run_dir).as_posix()}
+                try:
+                    result["scope"] = _evidence_access_scope(raw, required)
+                except ValueError:
+                    pass
+            raise ValueError(raw["error"] if re.fullmatch(r"[a-z0-9-]+", raw["error"]) else "source-diagnosis-session-error")
         if not isinstance(raw.get("session_id"), str) or not raw["session_id"] \
                 or raw["session_id"] in used_sessions or raw.get("route") != route:
             raise ValueError("source-diagnosis-session-invalid")
@@ -782,7 +792,8 @@ def _source_diagnose(run_dir: Path, rows: list[dict], inputs: dict, sources: lis
         reason = str(error) if str(error) else type(error).__name__
         diagnostic = target / "diagnostic.json"
         diagnostic.write_text(json.dumps({"stage": stage, "reason": reason}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        result["reason"] = f"源码诊断未完成（{stage}）：{reason}；未核实范围保持未知。"
+        result["reason"] = ("源码诊断超过时限，已取得的阅读范围保留，未核部分未知。" if reason == "case-hard-timeout"
+                            else f"源码诊断未完成（{stage}）：{reason}；未核实范围保持未知。")
         result["diagnostic"] = {"stage": stage, "reason": reason,
                                 "evidence_ref": diagnostic.relative_to(run_dir).as_posix()}
     return result
@@ -1544,11 +1555,12 @@ def _validate_source_diagnosis(value: object, run_dir: Path, inputs: dict, used_
     if session is not None:
         if not isinstance(session, dict) or set(session) != {"session_id", "route", "evidence_ref"} \
                 or not isinstance(session["session_id"], str) or not session["session_id"] \
-                or session["session_id"] in used_sessions or session["route"] != route \
+                or session["session_id"] in used_sessions \
+                or value["status"] == "completed" and session["route"] != route \
                 or session["evidence_ref"] != "evidence/analysis/source-diagnosis/response.json":
             raise ValueError("source-diagnosis-session-invalid")
         raw = _safe_json(run_dir / session["evidence_ref"])
-        if raw.get("session_id") != session["session_id"] or raw.get("route") != route:
+        if raw.get("session_id") != session["session_id"] or raw.get("route") != session["route"]:
             raise ValueError("source-diagnosis-session-invalid")
     else:
         raw = None
@@ -1566,7 +1578,7 @@ def _validate_source_diagnosis(value: object, run_dir: Path, inputs: dict, used_
             raise ValueError("source-diagnosis-scope-mismatch")
     if value["status"] == "completed":
         if raw is None or not value["scope"] or not all(item["complete"] for item in value["scope"]) \
-                or value["diagnostic"] is not None:
+                or value["diagnostic"] is not None or "error" in raw or raw.get("evidence_partial") is True:
             raise ValueError("source-diagnosis-incomplete")
         output = _parse_json_output(raw.get("text", ""))
         if not isinstance(output, dict) or set(output) != {"findings"} \

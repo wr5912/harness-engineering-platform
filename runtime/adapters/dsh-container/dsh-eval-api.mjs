@@ -266,7 +266,7 @@ async function promptSession(connection, sessionId, input, inputs, timeoutMs, si
   return { archive, turns }
 }
 
-function analysisToolAccesses(archive, toolNames) {
+export function analysisToolAccesses(archive, toolNames, { partial = false, issues = [] } = {}) {
   if (!Array.isArray(toolNames) || toolNames.length !== new Set(toolNames).size
     || [...toolNames].sort().join(',') !== ANALYSIS_TOOLS.join(',')) {
     throw new Error('analysis-tools-invalid')
@@ -275,74 +275,99 @@ function analysisToolAccesses(archive, toolNames) {
   const sessionLogs = new Map()
   const completed = new Set()
   const accesses = []
+  const callIds = new Map()
+  const invalid = new Set()
   for (const { event, session_log } of toolEvents(archive)) {
-    if (event?.type === 'tool/call') {
-      const { callId, name, arguments: encoded } = event.data ?? {}
-      if (typeof callId !== 'string' || calls.has(callId) || !ANALYSIS_TOOLS.includes(name)
-        || typeof encoded !== 'string') throw new Error('analysis-tools-invalid')
-      let args
-      try {
-        args = JSON.parse(encoded)
-      } catch {
-        throw new Error('analysis-tools-invalid')
-      }
-      if (!args || typeof args !== 'object' || Array.isArray(args)) {
-        throw new Error('analysis-tools-invalid')
-      }
-      const access = { name, arguments: args }
-      calls.set(callId, access)
-      sessionLogs.set(access, session_log)
-      accesses.push(access)
-    } else if (event?.type === 'tool/result') {
-      const source = event.data?.message?.source
-      const callId = source?.kind === 'tool' ? source.callId : undefined
-      if (typeof callId !== 'string' || !calls.has(callId) || completed.has(callId)
-        || sessionLogs.get(calls.get(callId)) !== session_log) {
-        throw new Error('analysis-tools-invalid')
-      }
-      const message = event.data?.message
-      // DSH v4 使用 tool 消息；旧轨迹是 user 消息中的嵌套 tool-result。
-      const nativeResult = message?.role === 'tool'
-      const result = nativeResult ? message : message?.content?.[0]
-      if (!Array.isArray(message?.content) || message.content.length === 0
-        || (nativeResult ? message.content.some(block => block?.type === 'tool-result')
-          : message.role !== 'user' || message.content.length !== 1 || result?.type !== 'tool-result')
-        || result.toolCallId !== callId
-        || typeof result.isError !== 'boolean') {
-        throw new Error('analysis-tools-invalid')
-      }
-      const access = calls.get(callId)
-      if (result.isError) {
-        // 原生参数校验可能拒绝一次只读尝试；仅在同一文件随后成功重读时恢复。
-        if (!nativeResult || access.name !== 'read'
-          || event.data?.error?.name !== 'ToolArgsError' || event.data.error.code !== 'INVALID_ARGS') {
+    const observedId = event.type === 'tool/call' ? event.data?.callId : event.data?.message?.source?.callId
+    try {
+      if (event?.type === 'tool/call') {
+        const { callId, name, arguments: encoded } = event.data ?? {}
+        if (typeof callId !== 'string' || calls.has(callId) || !ANALYSIS_TOOLS.includes(name)
+          || typeof encoded !== 'string') throw new Error('analysis-tools-invalid')
+        let args
+        try {
+          args = JSON.parse(encoded)
+        } catch {
           throw new Error('analysis-tools-invalid')
         }
-        analysisReadPath(access.arguments.file_path)
-        access.result = { is_error: true, error_code: 'INVALID_ARGS', recovered_by: null }
+        if (!args || typeof args !== 'object' || Array.isArray(args)) {
+          throw new Error('analysis-tools-invalid')
+        }
+        const access = { name, arguments: args }
+        calls.set(callId, access)
+        callIds.set(access, callId)
+        sessionLogs.set(access, session_log)
+        accesses.push(access)
+      } else if (event?.type === 'tool/result') {
+        const source = event.data?.message?.source
+        const callId = source?.kind === 'tool' ? source.callId : undefined
+        if (typeof callId !== 'string' || !calls.has(callId) || completed.has(callId)
+          || sessionLogs.get(calls.get(callId)) !== session_log) {
+          throw new Error('analysis-tools-invalid')
+        }
+        const message = event.data?.message
+        // DSH v4 使用 tool 消息；旧轨迹是 user 消息中的嵌套 tool-result。
+        const nativeResult = message?.role === 'tool'
+        const result = nativeResult ? message : message?.content?.[0]
+        if (!Array.isArray(message?.content) || message.content.length === 0
+          || (nativeResult ? message.content.some(block => block?.type === 'tool-result')
+            : message.role !== 'user' || message.content.length !== 1 || result?.type !== 'tool-result')
+          || result.toolCallId !== callId
+          || typeof result.isError !== 'boolean') {
+          throw new Error('analysis-tools-invalid')
+        }
+        const access = calls.get(callId)
+        if (result.isError) {
+          if (partial) {
+            access.result = { is_error: true }
+            completed.add(callId)
+            issues.push({ kind: 'failed', session_log, call_id: callId, name: access.name,
+              error_name: event.data?.error?.name ?? null, error_code: event.data?.error?.code ?? null })
+            continue
+          }
+          // 原生参数校验可能拒绝一次只读尝试；仅在同一文件随后成功重读时恢复。
+          if (!nativeResult || access.name !== 'read'
+            || event.data?.error?.name !== 'ToolArgsError' || event.data.error.code !== 'INVALID_ARGS') {
+            throw new Error('analysis-tools-invalid')
+          }
+          analysisReadPath(access.arguments.file_path)
+          access.result = { is_error: true, error_code: 'INVALID_ARGS', recovered_by: null }
+          completed.add(callId)
+          continue
+        }
+        if (event.data?.error !== undefined) throw new Error('analysis-tools-invalid')
+        access.result = { is_error: false }
+        if (access.name === 'read') {
+          const { path, offset, lines, totalLines } = event.data?.meta ?? {}
+          if (typeof path !== 'string' || path === '' || !Number.isInteger(offset) || offset < 1
+            || !Number.isInteger(totalLines) || totalLines < 0 || !Array.isArray(lines)
+            || (totalLines === 0 && (offset !== 1 || lines.length !== 0))
+            || lines.some((line, index) => !line || typeof line !== 'object'
+              || line.number !== offset + index || typeof line.text !== 'string')
+          || lines.length > 0 && lines.at(-1).number > totalLines
+          || analysisReadPath(path) !== analysisReadPath(access.arguments.file_path)) {
+            throw new Error('analysis-tools-invalid')
+          }
+          access.result.read = {
+            path,
+            offset,
+            line_numbers: lines.map(line => line.number),
+            total_lines: totalLines,
+          }
+        }
         completed.add(callId)
-        continue
       }
-      if (event.data?.error !== undefined) throw new Error('analysis-tools-invalid')
-      access.result = { is_error: false }
-      if (access.name === 'read') {
-        const { path, offset, lines, totalLines } = event.data?.meta ?? {}
-        if (typeof path !== 'string' || path === '' || !Number.isInteger(offset) || offset < 1
-          || !Number.isInteger(totalLines) || totalLines < 0 || !Array.isArray(lines)
-          || (totalLines === 0 && (offset !== 1 || lines.length !== 0))
-          || lines.some((line, index) => !line || typeof line !== 'object'
-            || line.number !== offset + index || typeof line.text !== 'string')) {
-          throw new Error('analysis-tools-invalid')
-        }
-        access.result.read = {
-          path,
-          offset,
-          line_numbers: lines.map(line => line.number),
-          total_lines: totalLines,
-        }
-      }
-      completed.add(callId)
+    } catch (error) {
+      if (!partial) throw error
+      if (typeof observedId === 'string') invalid.add(observedId)
+      issues.push({ kind: 'invalid', session_log, call_id: typeof observedId === 'string' ? observedId : null,
+        error_code: 'analysis-tools-invalid' })
     }
+  }
+  if (partial) {
+    for (const [callId, access] of calls) if (!completed.has(callId) && !invalid.has(callId))
+      issues.push({ kind: 'pending', session_log: sessionLogs.get(access), call_id: callId, name: access.name })
+    return accesses.filter(access => access.result?.is_error === false && !invalid.has(callIds.get(access)))
   }
   if (!accesses.length || completed.size !== calls.size) throw new Error('analysis-tools-invalid')
   for (const [index, access] of accesses.entries()) {
@@ -509,6 +534,7 @@ async function main() {
             archive => { latestArchive = archive },
           ),
           payload.timeout_ms,
+          true,
         )
         const turn = turnsFromTrace(completed.archive, inputs)?.at(-1)
         if (!turn || turn.turn_reason !== 'completed') throw new Error('analysis-turn-invalid')
@@ -529,7 +555,28 @@ async function main() {
       } catch (error) {
         const reason = /^[a-z0-9-]+$/.test(error?.message ?? '') ? error.message : 'scene-review-error'
         failure = reason
-        results.push({ scene_id: scene.scene_id, session_id: sessionId, error: reason })
+        const observed = { scene_id: scene.scene_id, session_id: sessionId, error: reason,
+          evidence_partial: true, route: null, tool_names: [], tool_accesses: [], tool_issues: [] }
+        // 只使用 abort 已收尾后的同一归档；不拿期望路由或未完成工具补事实。
+        const headers = latestArchive?.root?.filter(event => event.type === 'session') ?? []
+        if (headers.length === 1 && headers[0].id === sessionId && !headers[0].parentSession
+          && (headers[0].delegationDepth === undefined || headers[0].delegationDepth === 0)) {
+          const header = latestArchive.root.filter(event => event.type === 'request/header').at(-1)?.data?.header
+          const config = header?.config
+          if (config && typeof config.provider === 'string' && config.provider && typeof config.model === 'string' && config.model
+            && (!Object.hasOwn(config, 'reasoningEffort') || typeof config.reasoningEffort === 'string')
+            && (!Object.hasOwn(config, 'maxTokens') || Number.isInteger(config.maxTokens) && config.maxTokens > 0))
+            observed.route = Object.fromEntries(ROUTE_FIELDS.filter(key => Object.hasOwn(config, key)).map(key => [key, config[key]]))
+          observed.tool_names = Array.isArray(header?.tools) ? header.tools.map(tool => tool?.name) : []
+          try {
+            observed.tool_accesses = analysisToolAccesses({ ...latestArchive,
+              trace: latestArchive.trace.filter(row => row.session_log === latestArchive.rootName) }, observed.tool_names,
+            { partial: true, issues: observed.tool_issues })
+          } catch {
+            observed.tool_issues.push({ kind: 'invalid', error_code: 'analysis-tools-invalid' })
+          }
+        } else observed.tool_issues.push({ kind: 'invalid', error_code: 'analysis-session-identity-unverified' })
+        results.push(observed)
       } finally {
         await saveSessionTrace(join(payload.evidence_root, scene.scene_id, `attempt-${String(attempt).padStart(2, '0')}`), latestArchive, {
           operation: 'review', session_id: sessionId, attempt,

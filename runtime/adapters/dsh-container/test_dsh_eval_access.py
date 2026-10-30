@@ -783,6 +783,9 @@ class SeparateReviewTest(unittest.TestCase):
         self.tasks = []
         self.partial = set()
         self.same_session = False
+        self.source_error = None
+        self.unknown_source_route = False
+        self.first_source_part_complete = False
 
     def write_inputs(self):
         (self.run / "inputs.lock.json").write_text(json.dumps(self.inputs, ensure_ascii=False))
@@ -794,9 +797,9 @@ class SeparateReviewTest(unittest.TestCase):
             task = value["review_task"]
             self.tasks.append(task)
             accesses = []
-            for item in value["required_evidence"]:
+            for index, item in enumerate(value["required_evidence"]):
                 lines = list(range(1, item["total_lines"] + 1))
-                if task in self.partial:
+                if task in self.partial and not (task == "source" and self.first_source_part_complete and index == 0):
                     lines = lines[:-1]
                 accesses.append({"name": "read", "arguments": {"file_path": item["path"]},
                                  "result": {"is_error": False, "read": {"path": item["path"], "offset": 1, "line_numbers": lines, "total_lines": item["total_lines"]}}})
@@ -809,9 +812,15 @@ class SeparateReviewTest(unittest.TestCase):
                 self.assertNotIn("SOURCE-BODY-ONLY", json.dumps(projection))
                 self.assertEqual(projection["inputs"]["harness_review"]["sources"][0]["sha256"], "d" * 64)
                 self.assertIn("evidence/U-ONE-001/trace.jsonl", value["evidence_sources"])
-            results.append({"scene_id": prompt["scene_id"], "session_id": "effect-scene-01" if self.same_session else f"{task}-{prompt['scene_id']}",
-                            "route": route, "text": json.dumps(output), "tool_names": self.analysis.ANALYSIS_TOOLS,
-                            "tool_accesses": accesses})
+            raw = {"scene_id": prompt["scene_id"], "session_id": "effect-scene-01" if self.same_session else f"{task}-{prompt['scene_id']}",
+                   "route": route, "text": json.dumps(output), "tool_names": self.analysis.ANALYSIS_TOOLS,
+                   "tool_accesses": accesses}
+            if task == "source" and self.source_error:
+                raw.update({"error": self.source_error, "evidence_partial": True,
+                            "tool_issues": [{"kind": "failed", "name": "grep", "error_code": "SEARCH_INVALID_PATTERN"}]})
+                if self.unknown_source_route:
+                    raw["route"] = None
+            results.append(raw)
         return {"operation": "review", "results": results}
 
     def review(self, *, source_error=None):
@@ -934,6 +943,42 @@ class SeparateReviewTest(unittest.TestCase):
         self.analysis.validate_analysis(result, self.run, self.rows, self.inputs)
         self.assertEqual(result["review_status"], "not_requested")
         self.assertEqual(result["source_diagnosis"]["status"], "not_requested")
+
+    def test_source_timeout_preserves_original_reason_and_verified_partial_coverage(self):
+        self.source_error = "case-hard-timeout"
+        self.partial = {"source"}
+        self.first_source_part_complete = True
+        result = self.review()
+        source = result["source_diagnosis"]
+        self.assertEqual(result["review_status"], "completed")
+        self.assertEqual(source["status"], "incomplete")
+        self.assertEqual(source["diagnostic"]["reason"], "case-hard-timeout")
+        self.assertIn("源码诊断超过时限", source["reason"])
+        self.assertEqual(sum(item["complete"] for item in source["scope"]), 1)
+        self.assertTrue(any(item["read_ranges"] for item in source["scope"] if not item["complete"]))
+        raw = self.analysis._safe_json(self.run / source["analysis_session"]["evidence_ref"])
+        self.assertEqual(raw["tool_issues"][0]["error_code"], "SEARCH_INVALID_PATTERN")
+
+    def test_failed_source_route_stays_unknown_instead_of_using_expected_route(self):
+        self.source_error = "case-hard-timeout"
+        self.unknown_source_route = True
+        result = self.review()
+        source = result["source_diagnosis"]
+        self.assertEqual(source["status"], "incomplete")
+        self.assertIsNone(source["analysis_session"]["route"])
+        self.assertTrue(all(item["complete"] for item in source["scope"]))
+        self.assertEqual(source["diagnostic"]["reason"], "case-hard-timeout")
+
+    def test_timeout_cannot_become_complete_even_when_every_part_and_json_exist(self):
+        self.source_error = "case-hard-timeout"
+        result = self.review()
+        source = result["source_diagnosis"]
+        self.assertTrue(all(item["complete"] for item in source["scope"]))
+        self.assertEqual(source["conclusion"], "inconclusive")
+        self.assertEqual(source["findings"], [])
+        source.update({"status": "completed", "conclusion": "no_findings", "diagnostic": None})
+        with self.assertRaisesRegex(ValueError, "source-diagnosis-incomplete"):
+            self.analysis.validate_analysis(result, self.run, self.rows, self.inputs)
 
 
 if __name__ == "__main__":
