@@ -32,7 +32,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from source_contract import IMAGE_LABEL_KEY, REPO, SOURCES, resolve, strict_json  # noqa: E402
+from source_contract import EXPERIMENT, IMAGE_LABEL_KEY, REPO, SOURCES, resolve, strict_json  # noqa: E402
 from workspace_paths import instance_belongs_to_workspace, instances_root, sites_config, source_catalog, workspace_descriptor, workspace_id
 
 ADAPTER = Path(__file__).resolve().parent
@@ -643,7 +643,7 @@ def validate_analysis_workspace(value: str | None, *, repo: Path = REPO) -> str 
     except ValueError:
         fail("--analysis-workspace 必须位于本仓库 evolution/experiments 下")
     if len(relative.parts) != 3 or relative.parts[1] != "runs" \
-            or not relative.parts[0].startswith("EXP-") or not RUN_ID_RE.fullmatch(relative.parts[2]):
+            or not EXPERIMENT.fullmatch(relative.parts[0]) or not RUN_ID_RE.fullmatch(relative.parts[2]):
         fail("--analysis-workspace 必须精确指向 Experiment 的 run-UUID 目录")
     try:
         if any(item.is_symlink() for item in resolved.rglob("*")):
@@ -1271,8 +1271,8 @@ def require_up_arguments(args: argparse.Namespace) -> None:
         return
     print("dsh-dev up 缺少必填参数：" + "、".join(f"--{option}" for option in missing), file=sys.stderr)
     if "source" in missing:
-        sources = (REPO / "evolution/experiments").glob("EXP-*")
-        print("可用 --source：" + "、".join(f"experiment:{path.name}" for path in sorted(sources) if (path / "candidate/harness.yaml").is_file()), file=sys.stderr)
+        sources = (REPO / "evolution/experiments").glob("*")
+        print("可用 --source：" + "、".join(f"experiment:{path.name}" for path in sorted(sources) if EXPERIMENT.fullmatch(path.name) and (path / "candidate/harness.yaml").is_file()), file=sys.stderr)
     if "mode" in missing:
         print("可用 --mode：eval", file=sys.stderr)
     raise SystemExit(2)

@@ -74,7 +74,7 @@ function page({ active = true, target, intercept, updates } = {}) {
 test('智能体四个任务页签、搜索与默认最新版本保持登记版本独立', async () => {
   const ui = page()
   await ui.settle()
-  assert.deepEqual(ui.nodes().filter(node => node.props?.role === 'tab' && node.props.id?.startsWith('agent-tab-')).map(node => ui.text(node)), ['概览', '描述与技能', 'Harness 资产', '低算力变体'])
+  assert.deepEqual(ui.nodes().filter(node => node.props?.role === 'tab' && node.props.id?.startsWith('agent-tab-')).map(node => ui.text(node)), ['概览', '描述与技能', 'Harness 资产', '算力变体'])
   assert.ok(ui.calls.some(call => call.endpoint === 'agents/detail' && call.payload.agent_id === 'first-agent' && call.payload.experiment_id === undefined))
   assert.match(ui.text(ui.render()), /EXP-first-agent-002/)
   assert.ok(ui.nodes().some(node => node.type === 'dd' && ui.text(node) === 'EXP-first-agent-001'))
@@ -423,6 +423,39 @@ test('资产保存冲突保留草稿，取消放弃时关闭和切换均不丢�
   assert.equal(ui.listeners.has('beforeunload'), false)
 })
 
+test('同版本迟到详情使用当前文件和编辑状态，不关闭刚打开的编辑器或丢草稿', async () => {
+  let notify, releaseDetail, detailReads = 0
+  const ui = page({ updates: {
+    subscribe(listener) { notify = listener; return () => {} },
+    getSnapshot() { return { domains: ['agents'] } },
+  }, intercept(endpoint, payload) {
+    if (endpoint !== 'agents/detail') return undefined
+    const value = detail(payload.agent_id, payload.experiment_id)
+    value.assets[0].children.push({ name: 'index.ts', path: 'candidate/index.ts', kind: 'text' })
+    if (++detailReads === 2) return new Promise(resolve => { releaseDetail = () => {
+      // 刷新开始时选择的旧文件已移除，当前新选择仍在同一对象的目录中。
+      value.assets[0].children = value.assets[0].children.filter(node => node.name === 'index.ts')
+      resolve({ ok: true, value })
+    } })
+    return { ok: true, value }
+  } })
+  await ui.settle()
+  ui.button('Harness 资产').props.onClick(); ui.render()
+  ui.button('prompt.md').props.onClick(); ui.render(); await ui.settle()
+  notify(); await ui.settle()
+  assert.equal(typeof releaseDetail, 'function')
+  ui.button('index.ts').props.onClick(); ui.render(); await ui.settle()
+  ui.button('编辑').props.onClick(); ui.render()
+  ui.nodes().find(node => node.type === 'textarea').props.onChange({ target: { value: '尚未保存的工作流源码' } }); ui.render()
+  const before = ui.calls.length
+  releaseDetail(); await ui.settle()
+  assert.equal(ui.dialogs.get('asset-edit-title').open, true)
+  assert.equal(ui.nodes().find(node => node.type === 'textarea').props.value, '尚未保存的工作流源码')
+  assert.equal(ui.button('index.ts').props['aria-pressed'], true)
+  assert.equal(ui.calls.slice(before).some(call => call.endpoint === 'agents/edit/read' && call.payload.path === 'candidate'), false)
+  assert.equal(ui.calls.some(call => call.endpoint === 'agents/edit/apply'), false)
+})
+
 test('保存期间的资产实时刷新不丢弃同一文件的成功回执', async () => {
   let notify, resolveSave
   const pending = new Promise(resolve => { resolveSave = resolve })
@@ -444,18 +477,21 @@ test('保存期间的资产实时刷新不丢弃同一文件的成功回执', as
 })
 
 test('切换智能体后忽略上个目标迟到的详情响应', async () => {
-  let resolveFirst
-  const pending = new Promise(resolve => { resolveFirst = resolve })
-  const ui = page({ intercept: (endpoint, payload) => endpoint === 'agents/detail' && payload.agent_id === 'first-agent' ? pending : undefined })
-  await ui.settle()
-  ui.nodes().find(node => node.props?.className === 'agent-list-card' && ui.text(node).includes('second-agent')).props.onClick(); ui.render(); await ui.settle()
-  resolveFirst({ ok: true, value: detail('first-agent') }); await ui.settle()
-  assert.equal(ui.contexts.at(-1).agent_id, 'second-agent')
-  assert.equal(ui.contexts.at(-1).experiment_id, 'EXP-second-agent-002')
+  for (const failed of [false, true]) {
+    let resolveFirst
+    const pending = new Promise(resolve => { resolveFirst = resolve })
+    const ui = page({ intercept: (endpoint, payload) => endpoint === 'agents/detail' && payload.agent_id === 'first-agent' ? pending : undefined })
+    await ui.settle()
+    ui.nodes().find(node => node.props?.className === 'agent-list-card' && ui.text(node).includes('second-agent')).props.onClick(); ui.render(); await ui.settle()
+    resolveFirst(failed ? { ok: false, error: { code: 'offline', message: '旧对象迟到错误' } } : { ok: true, value: detail('first-agent') }); await ui.settle()
+    assert.equal(ui.contexts.at(-1).agent_id, 'second-agent')
+    assert.equal(ui.contexts.at(-1).experiment_id, 'EXP-second-agent-002')
+    assert.doesNotMatch(ui.text(ui.render()), /旧对象迟到错误/)
+  }
 })
 
 test('新版本继承盘点仍交由现有 AI 融合流程，保留目标和当前版本上下文', async () => {
-  const ui = page({ intercept: endpoint => endpoint === 'agents/fusion/preview' ? { ok: true, value: { inventory: { sources: [] }, preview_id: 'fusion-preview' } } : undefined })
+  const ui = page({ target: { page: 'agents', agent_id: 'first-agent', experiment_id: 'EXP-first-agent-001' }, intercept: endpoint => endpoint === 'agents/fusion/preview' ? { ok: true, value: { inventory: { sources: [] }, preview_id: 'fusion-preview' } } : undefined })
   await ui.settle()
   ui.button('新建研究版本').props.onClick(); ui.render()
   ui.nodes().find(node => node.type === 'textarea').props.onChange({ target: { value: '继承已有能力并改进摘要' } }); ui.render()
@@ -465,13 +501,13 @@ test('新版本继承盘点仍交由现有 AI 融合流程，保留目标和当�
   await ui.button('请 AI 整理融合方案').props.onClick()
   assert.equal(ui.assistantTasks.length, 1)
   assert.match(ui.assistantTasks[0].task, /继承已有能力并改进摘要/)
-  assert.equal(ui.assistantTasks[0].context.experiment_id, 'EXP-first-agent-002')
+  assert.equal(ui.assistantTasks[0].context.experiment_id, 'EXP-first-agent-001')
   assert.equal(ui.assistantTasks[0].context.fusion_request.preview_id, 'fusion-preview')
   assert.equal(ui.calls.some(call => call.endpoint === 'agents/versions/create'), false)
 })
 
 test('未固定来源时展示后端原因并阻止盘点，不以仓库提交替代所选版本', async () => {
-  const ui = page({ intercept: (endpoint, payload) => endpoint === 'agents/detail' ? { ok: true, value: { ...detail(payload.agent_id, payload.experiment_id), derivation: { parent_ref: null, note: '当前 Candidate 有未提交改动，请先固定来源。' } } } : undefined })
+  const ui = page({ target: { page: 'agents', agent_id: 'first-agent', experiment_id: 'EXP-first-agent-001' }, intercept: (endpoint, payload) => endpoint === 'agents/detail' ? { ok: true, value: { ...detail(payload.agent_id, payload.experiment_id), derivation: { parent_ref: null, note: '当前 Candidate 有未提交改动，请先固定来源。' } } } : undefined })
   await ui.settle(); ui.button('新建研究版本').props.onClick(); ui.render()
   ui.nodes().find(node => node.type === 'textarea').props.onChange({ target: { value: '改善查询结果' } }); ui.render()
   assert.match(ui.text(ui.render()), /当前 Candidate 有未提交改动，请先固定来源/)
@@ -480,8 +516,27 @@ test('未固定来源时展示后端原因并阻止盘点，不以仓库提交�
   assert.equal(ui.calls.some(call => call.endpoint === 'agents/fusion/preview'), false)
 })
 
+test('VAR和历史变体保持查看及评测入口，禁止进入新版本继承与融合', async () => {
+  for (const id of ['VAR-first-agent-001-rabcdef123456', 'EXP-first-agent-002']) {
+    const ui = page({ target: { page: 'agents', agent_id: 'first-agent', experiment_id: id }, intercept(endpoint) {
+      if (endpoint !== 'agents/detail') return undefined
+      const value = detail('first-agent', 'EXP-first-agent-002')
+      return { ok: true, value: { ...value, experiment: { ...value.experiment, id }, versions: [...value.versions.filter(row => row.id !== id), { id, is_variant: true, derivable: false }], derivation: { derivable: false, reason: 'variant', parent_ref: null, note: '变体不能作为新版本的继承来源。' } } }
+    } })
+    await ui.settle()
+    assert.equal(ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '版本').props.value, id)
+    assert.equal(ui.button('新建研究版本').props.disabled, true)
+    ui.button('新建研究版本').props.onClick(); ui.render()
+    assert.equal(ui.nodes().some(node => node.props?.['aria-label'] === '新建智能体版本'), false)
+    assert.equal(ui.calls.some(call => call.endpoint === 'agents/fusion/preview'), false)
+    assert.equal(ui.button('发起评测').props.disabled, false)
+    assert.match(ui.text(ui.render()), /变体不能作为新版本、融合或其他变体的继承来源/)
+    if (id.startsWith('VAR-')) assert.match(ui.text(ui.render()), /变体 001/)
+  }
+})
+
 test('更多操作进入子视图后收起，不遮挡版本栏', async () => {
-  const ui = page()
+  const ui = page({ target: { page: 'agents', agent_id: 'first-agent', experiment_id: 'EXP-first-agent-001' } })
   await ui.settle()
   const menu = () => ui.nodes().find(node => node.props?.className === 'agent-more-actions')
   ui.nodes().find(node => node.type === 'summary' && ui.text(node) === '更多操作').props.onClick({ preventDefault() {} }); ui.render()
@@ -1014,4 +1069,80 @@ test('Agents 首次慢读取也纳入同一刷新队列，通知不能另起并�
   assert.equal(reads, 1)
   blocked = false; release(); await ui.settle()
   assert.equal(reads, 2)
+})
+
+test('旧EXP深链明确历史归属，跳转当前VAR不重写旧Run身份', async () => {
+  const old = 'EXP-first-agent-002', current = 'VAR-first-agent-001-r123456789abc'
+  const ui = page({ target: { page: 'agents', agent_id: 'first-agent', experiment_id: old }, intercept(endpoint, payload) {
+    if (endpoint === 'agents/list') return { ok: true, value: { agents: [{ id: 'first-agent', name: '名称 first-agent' }], experiments: [{ ...experiments()[0] }, { ...experiments()[1], id: current }], historical_experiments: [{ ...experiments()[1], current_variant_id: current, is_current: false }] } }
+    if (endpoint === 'agents/detail') {
+      const value = detail('first-agent', old)
+      value.versions = [{ id: 'EXP-first-agent-001', derivable: true }, { id: current, is_variant: true, derivable: false }]
+      if (payload.experiment_id === current) value.experiment = { ...value.experiment, id: current }
+      else { value.is_current = false; value.current_variant_id = current }
+      return { ok: true, value }
+    }
+  } })
+  await ui.settle()
+  assert.match(ui.text(ui.render()), /当前查看历史变体记录，资产和 Run 保留原身份/)
+  assert.equal(variantCards(ui).length, 1)
+  assert.match(ui.text(variantCards(ui)[0]), /VAR-first-agent-001-r123456789abc/)
+  assert.doesNotMatch(ui.text(variantCards(ui)[0]), /EXP-first-agent-002/)
+  assert.equal(ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '版本').props.value, old)
+  assert.equal(ui.nodes().some(node => node.type === 'option' && node.props.value === old), true)
+  ui.button('查看当前变体').props.onClick(); await ui.settle()
+  assert.equal(ui.calls.filter(call => call.endpoint === 'agents/detail').at(-1).payload.experiment_id, current)
+  assert.doesNotMatch(ui.text(ui.render()), /当前查看历史变体记录/)
+  assert.equal(ui.calls.some(call => /apply|create|freeze|identity-/.test(call.endpoint)), false)
+})
+
+test('后台映射旧EXP到VAR时保留已打开编辑器和草稿，跳转仍遵守放弃草稿确认', async () => {
+  let mapped = false, notify
+  const old = 'EXP-first-agent-002', current = 'VAR-first-agent-001-r123456789abc'
+  const ui = page({ target: { page: 'agents', agent_id: 'first-agent', experiment_id: old }, updates: { subscribe(listener) { notify = listener; return () => {} }, getSnapshot() { return { domains: ['agents'] } } }, intercept(endpoint, payload) {
+    if (endpoint === 'agents/detail') {
+      const value = detail('first-agent', old)
+      if (mapped) { value.is_current = false; value.current_variant_id = current; value.versions = [{ id: current, is_variant: true, derivable: false }] }
+      return { ok: true, value }
+    }
+  } })
+  await ui.settle()
+  ui.button('Harness 资产').props.onClick(); ui.render()
+  ui.button('prompt.md').props.onClick(); await ui.settle()
+  ui.button('编辑').props.onClick(); ui.render()
+  ui.nodes().find(node => node.type === 'textarea').props.onChange({ target: { value: '历史对象未保存草稿' } }); ui.render()
+  mapped = true; notify(); await ui.settle()
+  assert.match(ui.text(ui.render()), /当前查看历史变体记录/)
+  assert.equal(ui.dialogs.get('asset-edit-title').open, true)
+  assert.equal(ui.nodes().find(node => node.type === 'textarea').props.value, '历史对象未保存草稿')
+  ui.button('查看当前变体').props.onClick(); await ui.settle()
+  assert.equal(ui.calls.filter(call => call.endpoint === 'agents/detail').at(-1).payload.experiment_id, old)
+  assert.equal(ui.nodes().find(node => node.type === 'textarea').props.value, '历史对象未保存草稿')
+  assert.equal(ui.calls.some(call => /apply|create|freeze/.test(call.endpoint)), false)
+})
+
+test('代码入口切Harness资产并展开完整目录，定位路径进入深链且刷新仍选同一文件', async () => {
+  const id = 'EXP-first-agent-002', prefix = `evolution/experiments/${id}/candidate`, folder = `${prefix}/dsh/managed/compute-workflow`, entry = `${folder}/index.ts`
+  const files = ['index.ts', ...Array.from({ length: 10 }, (_, i) => `helper-${i}.ts`), 'index.mjs']
+  const assets = [{ name: 'candidate', path: prefix, kind: 'directory', children: [{ name: 'dsh', path: `${prefix}/dsh`, kind: 'directory', children: [{ name: 'managed', path: `${prefix}/dsh/managed`, kind: 'directory', children: [{ name: 'compute-workflow', path: folder, kind: 'directory', children: files.map(name => ({ name, path: `${folder}/${name}`, kind: 'text' })) }] }] }] }]
+  const intercept = (endpoint, payload) => endpoint === 'agents/detail' ? { ok: true, value: { ...detail(payload.agent_id, payload.experiment_id), assets } } : undefined
+  const ui = page({ target: { page: 'agents', agent_id: 'first-agent', experiment_id: id, tab: 'overview' }, intercept })
+  await ui.settle()
+  ui.button('算力变体').props.onClick(); await ui.settle()
+  const rawNodes = value => Array.isArray(value) ? value.flatMap(rawNodes) : value && typeof value === 'object' ? [value, ...rawNodes(value.props?.children)] : []
+  const panel = rawNodes(ui.render()).find(node => node.type?.name === 'ComputeVariantsPanel')
+  assert.ok(panel)
+  panel.props.onOpenCode(entry); await ui.settle()
+  assert.equal(ui.nodes().find(node => node.type === 'button' && ui.text(node) === 'Harness 资产').props['aria-selected'], true)
+  assert.equal(ui.button('index.ts').props['aria-pressed'], true)
+  assert.equal(ui.calls.filter(call => call.endpoint === 'agents/edit/read').at(-1).payload.path, entry)
+  const nav = ui.nodes().find(node => node.type === 'nav' && node.props['aria-label'] === '智能体资产目录')
+  assert.equal(ui.nodes(nav).filter(node => node.type === 'details').every(node => node.props.open === true), true)
+  assert.equal(ui.nodes(nav).filter(node => node.type === 'button').length, files.length + 4)
+  const destination = ui.navigations.at(-1)
+  assert.equal(destination.asset_path, entry); assert.equal(destination.experiment_id, id); assert.equal(destination.tab, 'assets')
+  const refreshed = page({ target: destination, intercept }); await refreshed.settle()
+  assert.equal(refreshed.button('index.ts').props['aria-pressed'], true)
+  assert.equal(refreshed.calls.filter(call => call.endpoint === 'agents/edit/read').at(-1).payload.path, entry)
+  assert.equal(refreshed.calls.some(call => /apply|preview|create/.test(call.endpoint)), false)
 })

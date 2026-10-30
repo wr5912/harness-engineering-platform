@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, symlinkSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readdirSync, writeFileSync, readFileSync, symlinkSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomBytes } from 'node:crypto'
@@ -19,6 +19,8 @@ import WorkspaceController from '@deepseek-ai/dsh-api-workspace-controller'
 import { bindTypertRemote, Remote } from '@deepseek-ai/dsh-typert-protocol'
 import { createRequire } from 'node:module'
 import * as Runtime from '../lib/business-runtime.js'
+import { McpConfigStore } from '../src/mcp/store.ts'
+import { mcpCredentialPaths } from '../src/mcp/credential-path.ts'
 import { getBusinessControl, withBusinessContext, configureBusinessControlStateRoot, sharedInstanceIdentity } from '../lib/business-control.js'
 import { businessAssertionHeaders, readBusinessAssertion, signBusinessAssertion, verifyBusinessAssertion, registerBusinessReport, setBusinessReportHeaderResolver, allowedBusinessPath, startBusinessGateway } from '../lib/business-gateway.js'
 const wsRequire = createRequire(createRequire(import.meta.url).resolve('@deepseek-ai/dsh-api-gateway/package.json'))
@@ -73,8 +75,10 @@ class Fixture extends Service {
   async *follow(request, signal) { yield { sessionId: request.address?.sessionId ?? request.sessionId, kind: this.ctx.invocation.peer.principal.kind }; await new Promise(resolve => signal.addEventListener('abort', resolve, { once: true })) }
 }
 mark('create'); mark('list'); mark('updateQueue'); mark('page', { resources: { session: request => request.address?.sessionId ?? request.address?.childSessionId ?? request.sessionId } }); mark('follow', { mode: 'stream', resources: { session: request => request.address?.sessionId ?? request.address?.childSessionId ?? request.sessionId } })
-async function setup(t, { localTools = [], emptyWorkspace = false, registrationFailure = false, sharedDevelopment = false, development = sharedDevelopment, noSecret = false, proxyOrigin, nativeSessions = false } = {}) {
-  const assetRoot = mkdtempSync(join(tmpdir(), 'business-native-')); mkdirSync(join(assetRoot, 'config'))
+async function setup(t, { localTools = [], emptyWorkspace = false, registrationFailure = false, sharedDevelopment = false, development = sharedDevelopment, noSecret = false, proxyOrigin, nativeSessions = false, runtimeInputsOnly = false } = {}) {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), 'business-native-'))
+  const assetRoot = runtimeInputsOnly ? join(fixtureRoot, 'runtime-inputs') : fixtureRoot
+  mkdirSync(join(assetRoot, 'config'), { recursive: true })
   const revokedSubjects = new Set(), trustDelays = new Map(), trustCalls = new Map(), riskProvider = thirdPartyRiskFixture()
   const provider = createServer(async (req, res) => {
     let text = ''; for await (const bytes of req) text += bytes
@@ -84,30 +88,31 @@ async function setup(t, { localTools = [], emptyWorkspace = false, registrationF
     res.end(JSON.stringify(req.url === '/risk' ? riskProvider.assess(input, expiresAt) : { valid: !revokedSubjects.has(input.subjectId), subjectId: input.subjectId, expiresAt }))
   }); provider.listen(0, '127.0.0.1'); await once(provider, 'listening'); t.after(() => new Promise(resolve => provider.close(resolve)))
   writeFileSync(join(assetRoot, 'config/business-access.json'), JSON.stringify({ schemaVersion: 1, enabled: true, authentication: { endpoint: `http://127.0.0.1:${provider.address().port}/auth` }, identityTrust: { endpoint: `http://127.0.0.1:${provider.address().port}/trust` }, riskAssessment: { endpoint: `http://127.0.0.1:${provider.address().port}/risk` }, operations: [{ serverId: 'writes', operationId: 'update', kind: 'write', method: 'POST', target: 'https://business.test/item', confirmation: true }], agents: [{ agentId: 'soc', enabled: true, sourceDigest: binding.sourceDigest, subjects: ['A', 'B'], actions: ['*'] }] }))
-  const secret = randomBytes(48); const secretPath = join(assetRoot, 'business.secret'); writeFileSync(secretPath, secret)
+  const secret = randomBytes(48); const secretPath = join(fixtureRoot, 'business.secret'); writeFileSync(secretPath, secret)
   if (noSecret) rmSync(secretPath)
-  mkdirSync(join(assetRoot, '.local/credentials'), { recursive: true })
-  writeFileSync(join(assetRoot, '.local/credentials/mcp-manager.json'), JSON.stringify({ sharedToken: 'fixture-token' }))
+  const mcpFile = runtimeInputsOnly ? mcpCredentialPaths(assetRoot).file : join(assetRoot, '.local/credentials/mcp-manager.json')
+  mkdirSync(runtimeInputsOnly ? mcpCredentialPaths(assetRoot).directory : join(assetRoot, '.local/credentials'), { recursive: true })
+  writeFileSync(mcpFile, JSON.stringify({ sharedToken: 'fixture-token' }))
   const setupConfigPath = join(assetRoot, 'config/business-access.json'), setupConfig = JSON.parse(readFileSync(setupConfigPath, 'utf8'))
   setupConfig.gateway = { host: '127.0.0.1', port: 0, publicOrigin: 'http://business.localhost:0', sharedSecretFile: secretPath, instances: [{ agentId: binding.agentId, instanceId: binding.instanceId }] }
   if (proxyOrigin) setupConfig.gateway.proxyOrigin = proxyOrigin
   if (sharedDevelopment) Object.assign(setupConfig.gateway.instances[0], { accessMode: 'anonymous', identityMode: 'development', sourceDigest: binding.sourceDigest })
   if (development) Object.assign(setupConfig.gateway.instances[0], { identityMode: 'development', sourceDigest: binding.sourceDigest })
   writeFileSync(setupConfigPath, JSON.stringify(setupConfig))
-  const ctx = new Context(); t.after(async () => { await ctx.fiber.dispose(); rmSync(assetRoot, { recursive: true, force: true }) })
+  const ctx = new Context(); t.after(async () => { await ctx.fiber.dispose(); rmSync(fixtureRoot, { recursive: true, force: true }) })
   const basePath = proxyOrigin ? '/agents/soc/instances/soc-business/' : undefined
   await ctx.plugin(basePath ? createMountedWebServer(WebServer, basePath) : WebServer, { host: '127.0.0.1', port: 0 }); await ctx.plugin(TypertRegistry); if (!nativeSessions) ctx.typert.resources.register('session', { field: 'sessionId' }); await ctx.plugin(RemoteAccessService)
   const toolGuards = []
   const agents = new Map()
   let NativeSessionController
-  if (nativeSessions) NativeSessionController = await nativeSessionServices(ctx, assetRoot)
+  if (nativeSessions) NativeSessionController = await nativeSessionServices(ctx, fixtureRoot)
   else {
     await ctx.plugin({ name: 'fixture-tools', apply(ctx) { ctx.provide('tools', { guard(check) { toolGuards.push(check) } }) } })
     await ctx.plugin({ name: 'fixture-agents', apply(ctx) { ctx.provide('agents', { get: id => agents.get(id) }) } })
     await ctx.plugin(SessionStore)
   }
   await ctx.plugin(ApprovalService, { policy: 'ask' })
-  const workspacePath = join(assetRoot, 'workspace'); mkdirSync(workspacePath)
+  const workspacePath = join(fixtureRoot, 'workspace'); mkdirSync(workspacePath)
   const workspaceRows = emptyWorkspace ? [] : [
     { id: 'native-fixed-workspace', path: workspacePath, title: '固定业务工作区', sessionIds: [], createdAt: Date.now(), updatedAt: Date.now() },
     { id: 'native-hidden-workspace', path: join(assetRoot, 'other'), title: 'OTHER_PRIVATE_WORKSPACE', sessionIds: [], createdAt: Date.now(), updatedAt: Date.now() },
@@ -123,9 +128,9 @@ async function setup(t, { localTools = [], emptyWorkspace = false, registrationF
   }, archivedSessionIds: [], pinnedSessionIds: [] }
   await ctx.plugin({ name: 'fixture-workspace-storage', apply(ctx) { ctx.provide('workspaceRegistry', workspaceRegistry) } })
   if (NativeSessionController) await ctx.plugin(NativeSessionController, { nativeOpen: false })
-  const centerRoot = join(assetRoot, 'center-assets'); mkdirSync(join(centerRoot, 'config'), { recursive: true }); mkdirSync(join(centerRoot, '.local/instances/soc-business'), { recursive: true }); symlinkSync(join(assetRoot, 'config/business-access.json'), join(centerRoot, 'config/business-access.json')); writeFileSync(join(centerRoot, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: binding.workspaceId })); writeFileSync(join(centerRoot, '.local/instances/soc-business/instance.json'), JSON.stringify({ workspace_id: binding.workspaceId, asset_root: centerRoot, agent_id: binding.agentId, web_base_path: '/agents/soc/instances/soc-business/', business_control: { runtime_generation: binding.runtimeGeneration, source_digest: binding.sourceDigest, origin: `http://127.0.0.1:${ctx.webServer.port}` } })); const coordinator = getBusinessControl(centerRoot); coordinator.registerInstance(binding); const gateway = await startBusinessGateway(centerRoot, { ...setupConfig.gateway, sharedSecretFile: secretPath }); t.after(() => gateway.close())
-  mkdirSync(join(centerRoot, '.local/credentials'), { recursive: true }); symlinkSync(join(assetRoot, '.local/credentials/mcp-manager.json'), join(centerRoot, '.local/credentials/mcp-manager.json'))
-  const loaded = ctx.plugin(Runtime, { assetRoot, stateRoot: join(assetRoot, 'runtime-state'), ...(!noSecret ? { sharedSecretFile: secretPath } : {}), coordinatorOrigin: `http://127.0.0.1:${gateway.server.address().port}`, basePath, workspacePath, binding, localTools })
+  const centerRoot = join(fixtureRoot, 'center-assets'); mkdirSync(join(centerRoot, 'config'), { recursive: true }); mkdirSync(join(centerRoot, '.local/instances/soc-business'), { recursive: true }); symlinkSync(join(assetRoot, 'config/business-access.json'), join(centerRoot, 'config/business-access.json')); writeFileSync(join(centerRoot, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: binding.workspaceId })); writeFileSync(join(centerRoot, '.local/instances/soc-business/instance.json'), JSON.stringify({ workspace_id: binding.workspaceId, asset_root: centerRoot, agent_id: binding.agentId, web_base_path: '/agents/soc/instances/soc-business/', business_control: { runtime_generation: binding.runtimeGeneration, source_digest: binding.sourceDigest, origin: `http://127.0.0.1:${ctx.webServer.port}` } })); const coordinator = getBusinessControl(centerRoot); coordinator.registerInstance(binding); const gateway = await startBusinessGateway(centerRoot, { ...setupConfig.gateway, sharedSecretFile: secretPath }); t.after(() => gateway.close())
+  mkdirSync(join(centerRoot, '.local/credentials'), { recursive: true }); writeFileSync(join(centerRoot, '.local/credentials/mcp-manager.json'), readFileSync(mcpFile))
+  const loaded = ctx.plugin(Runtime, { assetRoot, stateRoot: join(fixtureRoot, 'runtime-state'), ...(!noSecret ? { sharedSecretFile: secretPath } : {}), coordinatorOrigin: `http://127.0.0.1:${gateway.server.address().port}`, basePath, workspacePath, binding, localTools })
   if (registrationFailure) {
     await assert.rejects(async () => { await loaded }, /业务固定工作区登记失败.*EACCES/)
     return { ctx, workspaceRows, registrationConnections }
@@ -140,6 +145,76 @@ async function setup(t, { localTools = [], emptyWorkspace = false, registrationF
   const rpc = async (id, endpoint, request) => { const path = `/api/${endpoint}`; return fetch(`http://127.0.0.1:${ctx.webServer.port}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers(id, path) }, body: JSON.stringify({ type: 'client-request', rpcId: randomBytes(8).toString('hex'), method: endpoint, payload: { args: { request } } }) }) }
   return { ctx, control, fixture, headers, rpc, context, secret, coordinator, gateway, workspacePath, workspaceRows, workspaceRegistry, registrationConnections, toolGuards, agents, trustCalls, riskCalls: riskProvider.calls, delayTrust: (id, delay) => trustDelays.set(id, delay), revoke: id => revokedSubjects.add(id) }
 }
+test('仅配置与 MCP 专用目录可装载真实 Runtime 和 manager，分组与直连保留凭据原子热更新', async t => {
+  const { ctx, control, context } = await setup(t, { sharedDevelopment: true, noSecret: true, runtimeInputsOnly: true })
+  const root = control.assetRoot, paths = mcpCredentialPaths(root), calls = []
+  let origin
+  const upstream = createServer(async (request, response) => {
+    response.setHeader('content-type', 'application/json')
+    if (/^\/[ab]\/spec$/.test(request.url)) {
+      const prefix = request.url.slice(0, 2)
+      return response.end(JSON.stringify({ openapi: '3.0.0', info: { title: '直连 fixture', version: '1' },
+        servers: [{ url: origin }], paths: { [`${prefix}/echo`]: { get: { operationId: 'echo', responses: { 200: { description: 'ok' } } } } } }))
+    }
+    if (request.url === '/hep/mcp/groups/remote/v2') {
+      calls.push({ kind: 'group', currentToken: request.headers.authorization === `Bearer ${'b'.repeat(64)}`,
+        initialToken: request.headers.authorization === `Bearer ${'a'.repeat(64)}`,
+        hasContext: typeof request.headers['x-harness-business-context'] === 'string' })
+      for await (const _chunk of request) { /* 真实 Runtime 发送的 MCP 请求体已由 groupFetch 读取校验。 */ }
+      return response.end(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { tools: [] } }))
+    }
+    if (/^\/[ab]\/echo$/.test(request.url)) {
+      calls.push({ kind: 'direct', path: request.url, currentKey: request.headers.authorization === 'fixture-new-key' })
+      return response.end(JSON.stringify({ ok: true }))
+    }
+    response.writeHead(404).end()
+  })
+  await new Promise(resolve => upstream.listen(0, '127.0.0.1', resolve))
+  t.after(async () => { upstream.closeAllConnections(); await new Promise(resolve => upstream.close(resolve)) })
+  origin = `http://127.0.0.1:${upstream.address().port}`
+  const accessPath = join(root, 'config/business-access.json'), access = JSON.parse(readFileSync(accessPath, 'utf8'))
+  access.gateway.managementUrl = `${origin}/hep/`
+  writeFileSync(accessPath, JSON.stringify(access))
+  writeFileSync(join(root, 'config/sites.json'), JSON.stringify({ platform: '/hep/' }))
+  writeFileSync(join(root, 'config/mcp-compositions.json'), JSON.stringify({ schema_version: '1.0', compositions: [] }))
+  writeFileSync(join(root, 'config/mcp-manager.json'), JSON.stringify({ schemaVersion: 1, servers: [
+    { id: 'source', enabled: true, specUrl: `${origin}/a/spec`, authType: 'credential', tools: { mode: 'all', names: [] } },
+  ], groups: [] }))
+  writeFileSync(paths.file, JSON.stringify({ schemaVersion: 1, sharedToken: 'a'.repeat(64),
+    servers: { source: { apiKey: 'fixture-old-key' } } }), { mode: 0o600 })
+  const previousRoot = process.env.HARNESS_ASSET_ROOT
+  process.env.HARNESS_ASSET_ROOT = root
+  t.after(() => { if (previousRoot === undefined) delete process.env.HARNESS_ASSET_ROOT; else process.env.HARNESS_ASSET_ROOT = previousRoot })
+  const manager = await import('../lib/mcp-manager.js')
+  await ctx.plugin({ name: 'projected-real-business-manager', inject: ['businessRuntime', 'webServer', 'connection', 'tools'], apply(inner) {
+    manager.apply(inner, { servers: { get: () => [{ id: 'source', serverName: 'candidate-source', enabled: true,
+      specUrl: 'http://127.0.0.1:1/old', tools: { mode: 'all', names: [] } }] },
+    groups: { get: () => [{ id: 'candidate', members: [{ serverId: 'source', names: ['echo'] }] }] }, sharedToken: { get: () => '' } })
+  } })
+  const sessionId = 'projected-real-session'
+  control.bindSession(context('A'), sessionId)
+  const runtime = ctx.get('businessRuntime')
+  const group = () => runtime.groupFetch('remote', sessionId)(runtime.groupUrl('remote'), { method: 'POST',
+    headers: { authorization: 'Bearer forged', 'content-type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }) })
+  assert.equal((await group()).status, 200)
+  assert.deepEqual(calls.at(-1), { kind: 'group', currentToken: false, initialToken: true, hasContext: true })
+  const store = new McpConfigStore(root, () => {})
+  store.mutate([{ op: 'set', path: ['sharedToken'], value: 'b'.repeat(64) },
+    { op: 'set', path: ['servers', '0', 'specUrl'], value: `${origin}/b/spec` },
+    { op: 'set', path: ['servers', '0', 'apiKey'], value: 'fixture-new-key' }], store.view().revision)
+  assert.equal((await group()).status, 200)
+  assert.deepEqual(calls.at(-1), { kind: 'group', currentToken: true, initialToken: false, hasContext: true })
+  const discovery = await ctx.mcpSessionManager.listGroupTools('candidate', 2)
+  const result = await ctx.mcpSessionManager.callGroupTool('candidate', 2, 'echo', {}, discovery._meta,
+    { agent: { session: { id: sessionId } }, callId: 'projected-real-direct', signal: new AbortController().signal })
+  assert.notEqual(result.isError, true, JSON.stringify(result))
+  assert.deepEqual(calls.at(-1), { kind: 'direct', path: '/b/echo', currentKey: true })
+  assert.deepEqual(readdirSync(root).sort(), ['.local', 'config'])
+  assert.deepEqual(readdirSync(join(root, '.local')), ['credentials'])
+  assert.deepEqual(readdirSync(join(root, '.local/credentials')), ['mcp-manager'])
+})
+
 test('门户代理保留路径并使用 HTTPS 来源连接原生 API 与 WebSocket，直连入口仍可用', { timeout: 5000 }, async t => {
   const { gateway } = await setup(t, { sharedDevelopment: true, proxyOrigin: 'https://portal.localhost:18060' })
   const target = `http://127.0.0.1:${gateway.server.address().port}`, base = '/agents/soc/instances/soc-business/'

@@ -1,15 +1,16 @@
 import assert from 'node:assert/strict'
 import { createHash, randomBytes } from 'node:crypto'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import test from 'node:test'
-import { getBusinessControl } from '../lib/business-control.js'
+import { configureBusinessControlStateRoot, getBusinessControl } from '../lib/business-control.js'
 import { resolveBusinessInstance } from '../lib/business-gateway.js'
 import { McpConfigStore } from '../src/mcp/store.ts'
+import { mcpCredentialPaths } from '../src/mcp/credential-path.ts'
 
 const sdkRequire = createRequire(process.env.HARNESS_DSH_ENTRY || new URL('../package.json', import.meta.url))
 const [{ Context }, { SystemPrompt }, { ToolRuntime }, { createScope, scopeParentOf }] = await Promise.all([
@@ -33,12 +34,15 @@ test('受控业务仅投影 Candidate 重叠连接，平台保存收缩新目录
     rmSync(root, { recursive: true, force: true })
   })
   mkdirSync(join(root, 'config'))
-  mkdirSync(join(root, '.local', 'credentials'), { recursive: true })
+  mkdirSync(mcpCredentialPaths(root).directory, { recursive: true })
+  const stateRoot = mkdtempSync(join(tmpdir(), 'business-mcp-state-'))
+  t.after(() => rmSync(stateRoot, { recursive: true, force: true }))
+  configureBusinessControlStateRoot(root, stateRoot)
   writeFileSync(join(root, 'config', 'sites.json'), JSON.stringify({ platform: '/hep/' }))
   writeFileSync(join(root, 'config', 'business-access.json'), JSON.stringify({ schemaVersion: 1, enabled: false,
     agents: [], gateway: { managementUrl: 'http://127.0.0.1:18120/hep/' } }))
   const publicFile = join(root, 'config', 'mcp-manager.json')
-  const secretFile = join(root, '.local', 'credentials', 'mcp-manager.json')
+  const secretFile = mcpCredentialPaths(root).file
   const sourceA = 'http://127.0.0.1:18101/openapi.json'
   const sourceB = 'http://127.0.0.1:18102/openapi.json'
   const secret = 'fixture-private-credential'
@@ -108,10 +112,15 @@ test('受控业务仅投影 Candidate 重叠连接，平台保存收缩新目录
   assert.equal(restarted.platformMcp.servers.get()[0].enabled, false, '业务实例重启时缺少同 ID 平台服务仍须停用')
   assert.equal(restarted.platformMcp.servers.get()[0].specUrl, undefined)
   assert.equal(restarted.platformMcp.servers.get()[1].url, businessRuntime.groupUrl('candidate-only'), '重启仍使用当前平台入口')
+  assert.deepEqual(readdirSync(root).sort(), ['.local', 'config'])
+  assert.deepEqual(readdirSync(join(root, '.local')), ['credentials'])
+  assert.deepEqual(readdirSync(join(root, '.local/credentials')), ['mcp-manager'])
 })
 
 test('平台保存后的新业务 Session 装载当前连接，旧 Session 在目标变化和停用时拒绝调用', async t => {
-  const root = mkdtempSync(join(tmpdir(), 'business-mcp-session-'))
+  const directory = mkdtempSync(join(tmpdir(), 'business-mcp-session-'))
+  const root = join(directory, 'runtime-inputs')
+  mkdirSync(root)
   const previousRoot = process.env.HARNESS_ASSET_ROOT
   const previousEntry = process.env.HARNESS_DSH_ENTRY
   process.env.HARNESS_ASSET_ROOT = root
@@ -128,10 +137,10 @@ test('平台保存后的新业务 Session 装载当前连接，旧 Session 在�
     else process.env.HARNESS_ASSET_ROOT = previousRoot
     if (previousEntry === undefined) delete process.env.HARNESS_DSH_ENTRY
     else process.env.HARNESS_DSH_ENTRY = previousEntry
-    rmSync(root, { recursive: true, force: true })
+    rmSync(directory, { recursive: true, force: true })
   })
   mkdirSync(join(root, 'config'))
-  mkdirSync(join(root, '.local', 'credentials'), { recursive: true })
+  mkdirSync(mcpCredentialPaths(root).directory, { recursive: true })
   mkdirSync(join(root, '.local', 'instances', 'soc-instance'), { recursive: true })
   const calls = []
   let origin
@@ -158,7 +167,7 @@ test('平台保存后的新业务 Session 装载当前连接，旧 Session 在�
   t.after(async () => { source.closeAllConnections(); await new Promise(resolve => source.close(resolve)) })
   origin = `http://127.0.0.1:${source.address().port}`
   const publicFile = join(root, 'config', 'mcp-manager.json')
-  const secretFile = join(root, '.local', 'credentials', 'mcp-manager.json')
+  const secretFile = mcpCredentialPaths(root).file
   writeFileSync(publicFile, JSON.stringify({ schemaVersion: 1, servers: [
     { id: 'source', serverName: 'platform-name', enabled: true, specUrl: `${origin}/a/openapi.json`,
       authType: 'credential', tools: { mode: 'all', names: [] } },
@@ -176,11 +185,13 @@ test('平台保存后的新业务 Session 装载当前连接，旧 Session 在�
     identityTrust: { endpoint: `${origin}/trust` },
     operations: [{ serverId: 'source', operationId: 'echo', kind: 'resource', target: `${origin}/b/echo`, method: 'GET' }],
     gateway: { instances: [{ agentId: 'soc', instanceId: 'soc-instance', sourceDigest }],
-      sharedSecretFile: join(root, 'business.secret'), managementUrl: 'http://127.0.0.1:18120/hep/' },
+      sharedSecretFile: join(directory, 'business.secret'), managementUrl: 'http://127.0.0.1:18120/hep/' },
   }))
   writeFileSync(join(root, 'config', 'sites.json'), JSON.stringify({ platform: '/hep/' }))
-  writeFileSync(join(root, 'business.secret'), randomBytes(48))
+  writeFileSync(join(directory, 'business.secret'), randomBytes(48))
   const { binding } = resolveBusinessInstance(root, { agentId: 'soc', instanceId: 'soc-instance' })
+  rmSync(join(root, '.local/instances'), { recursive: true })
+  configureBusinessControlStateRoot(root, join(directory, 'business-state'))
   const control = getBusinessControl(root)
   control.setAvailable(true)
   control.registerInstance(binding)
@@ -258,4 +269,7 @@ test('平台保存后的新业务 Session 装载当前连接，旧 Session 在�
   const third = await newSession('session-C')
   for (let i = 0; i < 300 && ctx.tools.get(name, third); i++) await new Promise(resolve => setTimeout(resolve, 10))
   assert.equal(ctx.tools.get(name, third), undefined, '停用后的新 Session 不得装载工具')
+  assert.deepEqual(readdirSync(root).sort(), ['.local', 'config'], '业务读取根仅含真实挂载输入，不含 workspace.json/研究材料')
+  assert.deepEqual(readdirSync(join(root, '.local')), ['credentials'])
+  assert.deepEqual(readdirSync(join(root, '.local/credentials')), ['mcp-manager'])
 })

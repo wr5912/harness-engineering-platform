@@ -15,7 +15,7 @@ process.env.HARNESS_PYTHON ||= '/usr/bin/python3'
 const buildRoot = mkdtempSync(join(tmpdir(), 'compute-variants-build-'))
 await build({ stdin: { contents: "export * from './src/agents/compute-variants.ts'; export { createAgentsHandler } from './src/agents/index.ts'; export { createComputeBuildHandler } from './src/agents/compute-build.ts'; export { candidateDigest } from './src/tasks/files.ts'", resolveDir: new URL('../', import.meta.url).pathname, loader: 'ts' }, outfile: join(buildRoot, 'variants.mjs'), bundle: true, platform: 'node', format: 'esm', external: ['@deepseek-ai/dsh-client-connection'] })
 const { createAgentsHandler, createComputeVariantsHandler, computeTraceMetrics, createComputeBuildHandler, candidateDigest } = await import(`file://${join(buildRoot, 'variants.mjs')}`)
-const parent = 'EXP-alpha-001-r111111111111', variant = 'EXP-alpha-002-r222222222222'
+const parent = 'EXP-alpha-001-r111111111111', variant = 'VAR-alpha-001-r222222222222'
 const parentRun = 'run-11111111-1111-4111-8111-111111111111', variantRun = 'run-22222222-2222-4222-8222-222222222222'
 const hash = value => createHash('sha256').update(value).digest('hex')
 const modelRoles = {
@@ -81,10 +81,10 @@ async function fixture(planOverrides = {}) {
     candidateDigest: digest,
     gitCandidateDigest: (id, ref) => { const result = spawnSync('git', ['show', `${ref.slice(4)}:evolution/experiments/${id}/candidate/AGENTS.md`], { cwd: root }); return result.status === 0 ? hash(result.stdout) : null },
     readRun: async id => { await readHook?.(id); return runs.get(id) },
-    createExperiment: async payload => {
+    createExperiment: async (payload, variantCreation) => {
       assert.equal(payload.parent_ref, `git:${parentCommit}`)
       cpSync(join(path(parent), 'candidate'), join(path(variant), 'candidate'), { recursive: true })
-      write(join(path(variant), 'change.yaml'), dump({ experiment_id: variant, agent_id: 'alpha', baseline_ref: payload.parent_ref, parent_ref: payload.parent_ref, parent_experiment_id: parent }))
+      write(join(path(variant), 'change.yaml'), dump({ experiment_id: variant, agent_id: 'alpha', baseline_ref: payload.parent_ref, parent_ref: payload.parent_ref, parent_experiment_id: parent, compute_variant: variantCreation.plan, variant_kind: 'exploratory', variant_name: variantCreation.name }))
       write(join(path(variant), 'decision.md'), '# Decision\n\ninconclusive\n')
       return { ok: true, value: { experiment_id: variant } }
     },
@@ -918,3 +918,22 @@ test('轨迹按模型响应统计，配置头不增调用，重试/缺采集完�
 })
 
 test.after(() => rmSync(buildRoot, { recursive: true, force: true }))
+
+test('source公开合同列出当前生成工作流全部文件并按目录SHA读取，context保留目录且不写资产', () => withFixture(async fx => {
+  const directory = 'dsh/managed/compute-workflow', base = join(fx.root, `evolution/experiments/${variant}`), changeFile = join(base, 'change.yaml')
+  const change = load(readFileSync(changeFile, 'utf8'))
+  change.compute_variant.generation = { mode: 'langgraph-aot', entry_path: `${directory}/index.ts`, source_run_ids: [parentRun] }
+  write(changeFile, dump(change))
+  for (const name of ['index', 'context', 'integration']) write(join(base, `candidate/${directory}/${name}.ts`), `export const name=${JSON.stringify(name)}`)
+  write(join(base, `candidate/${directory}/index.mjs`), 'export const compiled=true')
+  const before = readFileSync(changeFile, 'utf8')
+  const catalog = success(await fx.handler('source', { experiment_id: variant }))
+  assert.equal(catalog.files.length, 4); assert.equal(catalog.files[0].entry, true)
+  assert.deepEqual(success(await fx.handler('context', { experiment_id: variant })).generated_files, catalog)
+  for (const file of catalog.files) {
+    const value = success(await fx.handler('source', { experiment_id: variant, path: file.path, expected_sha256: file.sha256 }))
+    assert.equal(hash(value.content), file.sha256); assert.equal(value.complete, true)
+  }
+  assert.equal((await fx.handler('source', { experiment_id: variant, path: 'AGENTS.md', expected_sha256: 'b'.repeat(64) })).ok, false)
+  assert.equal(readFileSync(changeFile, 'utf8'), before)
+}))

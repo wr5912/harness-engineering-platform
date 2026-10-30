@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
-import { chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, openSync, closeSync, unlinkSync, rmSync, statSync } from 'node:fs'
-import { spawnSync } from 'node:child_process'
+import { chmodSync, existsSync, linkSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, writeFileSync, openSync, closeSync, unlinkSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { McpConfigStore } from '../src/mcp/store.ts'
+import { McpConfigStore, readMcpSharedToken } from '../src/mcp/store.ts'
+import { mcpCredentialPaths } from '../src/mcp/credential-path.ts'
 import { connectionIssue, assertConnectionReady } from '../../../plugins/mcp-manager/connection.ts'
 
 process.env.HARNESS_DSH_ENTRY ??= new URL('../package.json', import.meta.url).pathname
@@ -45,25 +45,56 @@ test('MCP 保存共用数据仓库版本，凭据只进本地文件，旧版本�
   assert.equal(store.view().value.groups.length, 1)
 })
 
-test('root 初始化保留其他凭据私有，业务 UID 可在保存前后读取 MCP 凭据', { skip: process.geteuid?.() !== 0 }, t => {
+test('Runtime Store 构造和读取不修改目录权限、凭据归属或其他本地文件', t => {
   const { root, secretFile } = fixture(t)
-  chmodSync(root, 0o755)
   for (const directory of [join(root, '.local'), join(root, '.local/credentials')]) chmodSync(directory, 0o700)
   const admin = join(root, '.local/credentials/admin.json')
   writeFileSync(admin, '{}', { mode: 0o600 })
+  const files = [root, join(root, '.local'), join(root, '.local/credentials'), secretFile, admin]
+  const snapshot = () => files.map(path => { const state = statSync(path); return [state.mode, state.uid, state.gid, state.mtimeMs] })
+  const before = snapshot()
   const store = new McpConfigStore(root, () => {})
-  function check() {
-    const result = spawnSync('/bin/cat', [secretFile], { uid: 1000, gid: 1000 })
-    assert.equal(result.status, 0, result.error?.message || result.stderr?.toString())
-    assert.equal(statSync(secretFile).mode & 0o777, 0o600)
-    assert.equal(statSync(secretFile).uid, 1000)
-    assert.equal(statSync(admin).mode & 0o777, 0o600)
-    assert.equal(statSync(admin).uid, 0)
-    assert.equal(statSync(join(root, '.local')).mode & 0o777, 0o711)
-  }
-  check()
-  store.mutate([{ op: 'set', path: ['sharedToken'], value: 'b'.repeat(64) }], store.view().revision)
-  check()
+  assert.equal(store.view().value.sharedToken, 'a'.repeat(64))
+  assert.equal(readMcpSharedToken(root), 'a'.repeat(64))
+  assert.deepEqual(snapshot(), before)
+})
+
+test('prepare 迁移后已构造的 Store 使用同一 canonical 凭据和锁，旧读取入口保留', t => {
+  const { root, secretFile, store } = fixture(t)
+  const paths = mcpCredentialPaths(root), before = store.view()
+  mkdirSync(paths.directory)
+  linkSync(secretFile, paths.file)
+  unlinkSync(secretFile)
+  symlinkSync('mcp-manager/credentials.json', secretFile)
+  symlinkSync('mcp-manager/credentials.lock', paths.legacyLock)
+  assert.equal(existsSync(paths.legacyLock), false, '无保存操作时旧锁引用可正常悬空')
+  const fd = openSync(paths.lock, 'wx', 0o600)
+  try {
+    assert.equal(existsSync(paths.legacyLock), true, '旧运行中 Runtime 仍能看到同一个保存锁')
+    assert.throws(() => store.view(), /正在保存/)
+  } finally { closeSync(fd); unlinkSync(paths.lock) }
+  const saved = store.mutate([{ op: 'set', path: ['sharedToken'], value: 'b'.repeat(64) }], before.revision)
+  assert.equal(saved.value.sharedToken, 'b'.repeat(64))
+  assert.equal(readMcpSharedToken(root), 'b'.repeat(64))
+  assert.equal(JSON.parse(readFileSync(secretFile)).sharedToken, 'b'.repeat(64))
+  assert.equal(readlinkSync(secretFile), 'mcp-manager/credentials.json')
+  assert.ok(lstatSync(paths.legacyLock).isSymbolicLink())
+  assert.equal(existsSync(paths.legacyLock), false)
+  assert.deepEqual(store.view(), saved)
+})
+
+test('凭据读取拒绝未受信旧引用、并存文件和悬空 canonical 引用，不执行迁移', t => {
+  const { root, secretFile } = fixture(t), paths = mcpCredentialPaths(root)
+  mkdirSync(paths.directory)
+  writeFileSync(paths.file, readFileSync(secretFile))
+  assert.throws(() => new McpConfigStore(root, () => {}).view(), /新旧凭据并存/)
+  unlinkSync(paths.file)
+  symlinkSync('absent.json', paths.file)
+  assert.throws(() => readMcpSharedToken(root), /实体文件/)
+  unlinkSync(paths.file)
+  unlinkSync(secretFile)
+  symlinkSync('admin.json', secretFile)
+  assert.throws(() => readMcpSharedToken(root), /不是受信迁移引用/)
 })
 
 test('MCP 保存锁阻止并行写；未知字段与地址凭据不能进入公开配置', t => {

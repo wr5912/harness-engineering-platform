@@ -20,6 +20,11 @@ const loadedEsmSha256 = createHash('sha256').update(readFileSync(fileURLToPath(i
 const toolsManifest = '/opt/dsh/packages/core/tools/package.json'
 const { snapshotJsonValue } = await runtimeModule('@deepseek-ai/dsh-util-values', existsSync(toolsManifest) ? toolsManifest
   : runtimeRequire('@deepseek-ai/dsh-api-session-controller').resolve('@deepseek-ai/dsh-api-session-controller'))
+const nativeLlm = await runtimeModule('@deepseek-ai/dsh-llm', existsSync(toolsManifest) ? toolsManifest
+  : runtimeRequire('@deepseek-ai/dsh-api-session-controller').resolve('@deepseek-ai/dsh-api-session-controller'))
+/** 原生 Provider 适配器复用当前 Runtime 的归属头和结构化错误。 */
+export const LlmError: new (message: string, code: string, options?: { status?: number; requestId?: string; cause?: unknown }) => Error & { readonly failure: Record<string, unknown> } = nativeLlm.LlmError
+export const attributionHeaders: () => Record<string, string> = nativeLlm.attributionHeaders
 
 export interface WorkflowContext {
   input: Record<string, any>
@@ -119,11 +124,23 @@ export function registerWorkflowTool(ctx: any, definition: WorkflowDefinition, o
           if (options.executionMode === 'hybrid' && !matchesWorkflowModelBinding({ ...config, reasoning_effort: config.reasoningEffort }, modelRoles!.language)) throw new Error('语言推理路由不符合混合工作流角色绑定')
           if (!observed) throw new Error('工作流模型服务未装载')
           const prepared = await observed.prepareCall(config, exec.signal)
-          let content = '', completed = false
-          for await (const chunk of prepared.stream({ ...prepared.config, ...(payload.system === undefined ? {} : { system: payload.system }), messages: payload.messages, signal: exec.signal })) {
+          let content = '', completed = false, failure: Error | undefined
+          for await (const chunk of prepared.stream({ ...prepared.config, ...(payload.system === undefined ? {} : { system: payload.system }), messages: payload.messages,
+            sessionId: identity.session_id, signal: exec.signal })) {
             if (chunk.type === 'text-delta') content += chunk.text
-            if (chunk.type === 'finish') { if (chunk.reason?.kind !== 'stop') throw new Error('工作流模型响应未完成'); completed = true }
+            if (chunk.type === 'finish') {
+              if (chunk.reason?.kind === 'stop') completed = true
+              else {
+                const detail = chunk.reason?.failure
+                const error = detail ? new LlmError(detail.message, detail.code, { status: detail.status, requestId: detail.requestId })
+                  : new Error('工作流模型响应未完成')
+                if (chunk.reason?.kind !== 'error' || !detail) throw error
+                // 先让观察器结算原生失败终态及用量，再将同一失败交给业务调用方。
+                failure = error
+              }
+            }
           }
+          if (failure) throw failure
           if (!completed) throw new Error('工作流模型响应未完成')
           return { content }
         },
@@ -146,14 +163,14 @@ export function registerWorkflowTool(ctx: any, definition: WorkflowDefinition, o
             const requests = new Map<string, any>()
             for (const request of value.model_requests) {
               if (!request || typeof request.request_id !== 'string' || !request.request_id.trim() || !['completed', 'failed', 'cancelled'].includes(request.status)
-                || typeof request.model_invocation !== 'boolean' || !matchesWorkflowModelBinding(request, binding)
+                || request.model_invocation !== undefined && typeof request.model_invocation !== 'boolean' || !matchesWorkflowModelBinding(request, binding)
                 || request.status === 'completed' && request.model_invocation !== true
                 || request.model_invocation === false && request.usage !== undefined) throw new Error('类型化决策模型回执与绑定不一致')
               if (requests.has(request.request_id) && JSON.stringify(requests.get(request.request_id)) !== JSON.stringify(request)) throw new Error('模型请求身份存在冲突')
               if (requests.has(request.request_id)) continue
               requests.set(request.request_id, request)
               const attempt = { ...identity, model_role: 'decision' as const, kind: 'typed_decision' as const, ...binding,
-                attempt_id: `${executionId}:${request.request_id}`, model_invocation: request.model_invocation, time: Date.now() }
+                attempt_id: `${executionId}:${request.request_id}`, ...(request.model_invocation !== undefined ? { model_invocation: request.model_invocation } : {}), time: Date.now() }
               if (request.model_invocation) attempts.push({ ...attempt, status: 'started' })
               const usage = request.usage && Object.fromEntries(['inputTokens', 'outputTokens', 'totalTokens', 'cacheReadTokens', 'cacheWriteTokens', 'reasoningTokens']
                 .filter(key => typeof request.usage[key] === 'number').map(key => [key, request.usage[key]]))
@@ -171,19 +188,26 @@ export function registerWorkflowTool(ctx: any, definition: WorkflowDefinition, o
           }
         },
       }
-      let result: any, failure: string | undefined, errorCode: string | undefined
+      let result: any, failure: string | undefined, errorCode: string | undefined, modelFailure: Record<string, unknown> | undefined
       try {
         result = snapshotJsonValue(await definition.run(context))
         if (result === undefined) {
           failure = '工作流返回值不是无损 JSON；请修复业务源码中的 undefined 或其他非 JSON 值'
           errorCode = 'WORKFLOW_INVALID_RESULT'
         }
-      } catch { failure = exec.signal.aborted ? '工作流已取消' : '工作流执行失败，请查看节点回执' }
+      } catch (error) {
+        failure = exec.signal.aborted ? '工作流已取消' : '工作流执行失败，请查看节点回执'
+        if (!exec.signal.aborted && error instanceof LlmError) {
+          const detail = error.failure
+          modelFailure = { code: detail.code, message: detail.message, ...(detail.status === undefined ? {} : { status: detail.status }),
+            ...(detail.requestId === undefined ? {} : { requestId: detail.requestId }) }
+        }
+      }
       const graph_execution = { ...identity, workflow_id: definition.id, complete: true,
         ...(options.executionMode ? { execution_mode: options.executionMode } : {}),
         ...(typeof __WORKFLOW_BUILD_DIGEST__ === 'string' ? { build_digest: __WORKFLOW_BUILD_DIGEST__, source_digest: __WORKFLOW_SOURCE_DIGEST__ } : {}),
         esm_sha256: loadedEsmSha256,
-        status: failure ? exec.signal.aborted ? 'cancelled' : 'failed' : 'completed', trace, model_attempts: attempts }
+        status: failure ? exec.signal.aborted ? 'cancelled' : 'failed' : 'completed', ...(modelFailure ? { failure: modelFailure } : {}), trace, model_attempts: attempts }
       // 失败也返回完整结构化证据；上层必须检查 ok，不能用工具文字流畅代替成功。
       return { ok: !failure, ...(failure ? { error: failure, ...(errorCode ? { error_code: errorCode } : {}) } : { result }), graph_execution }
     },

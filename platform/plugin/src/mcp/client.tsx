@@ -1,3 +1,4 @@
+import { GeneratedCodeBrowser } from '../components/generated-code-browser.tsx'
 import { useEffect, useRef, useState } from 'react'
 import { useCallback } from 'react'
 import { createPortal } from 'react-dom'
@@ -410,10 +411,18 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
           </section>
         </>}
       </>}
-      {preview && <div className="harness-composition-modal-backdrop" onClick={event => { if (event.target === event.currentTarget) setPreview(null) }}><div ref={previewRef} tabIndex={-1} className="harness-composition-modal" role="dialog" aria-modal="true" aria-label={preview === 'config' ? '查看编排配置' : '查看生成代码'} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); setPreview(null) }; if (event.key === 'Tab') { const elements = previewRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled),pre[tabindex]'); if (!elements?.length) return; const first = elements[0], last = elements[elements.length - 1]; if (event.shiftKey && (document.activeElement === first || document.activeElement === previewRef.current)) { event.preventDefault(); last.focus() } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() } } }}>
-        <header><h2>{preview === 'config' ? '编排配置' : '生成代码'}</h2><button type="button" onClick={() => setPreview(null)} aria-label="关闭编排预览">×</button></header>
-        <div><p>{config?.title} · {historical ? '历史发布版本' : selection?.version === 'published' ? '当前发布版本' : '已保存草稿'}</p>{preview === 'config' ? <pre tabIndex={0}>{JSON.stringify(config, null, 2)}</pre> : <p role="status">当前平台尚未接入生成源码的保存与读取。此编排按已保存配置构建 LangGraph，可在画布查看流程，或查看真实配置。</p>}</div>
-        <footer>{preview === 'config' ? <><button type="button" onClick={() => exportDraft(config!, false, '配置')}>复制配置</button><button type="button" onClick={() => exportDraft(config!, true, '配置')}>下载配置</button></> : <button type="button" disabled>生成并保存源码 · 未接入</button>}<button type="button" onClick={() => setPreview(null)}>关闭</button></footer>
+      {preview && <div className="harness-composition-modal-backdrop" onClick={event => { if (event.target === event.currentTarget) setPreview(null) }}><div ref={previewRef} tabIndex={-1} className="harness-composition-modal" role="dialog" aria-modal="true" aria-label={preview === 'config' ? '查看编排配置' : '查看生成代码'} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); setPreview(null) }; if (event.key === 'Tab') { const elements = previewRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled),select:not(:disabled),summary,pre[tabindex],a[href]'); if (!elements?.length) return; const first = elements[0], last = elements[elements.length - 1]; if (event.shiftKey && (document.activeElement === first || document.activeElement === previewRef.current)) { event.preventDefault(); last.focus() } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() } } }}>
+        <header><h2>{preview === 'config' ? '编排配置' : '编排使用的实现源码'}</h2><button type="button" onClick={() => setPreview(null)} aria-label="关闭编排预览">×</button></header>
+        <div><p>{config?.title} · {historical ? '历史发布版本' : selection?.version === 'published' ? '当前发布版本' : '已保存草稿'}</p>{preview === 'config' ? <pre tabIndex={0}>{JSON.stringify(config, null, 2)}</pre> : <GeneratedCodeBrowser identity={`composition:${selection?.id}:${selection?.version}:${selection?.versionId ?? ''}:${data?.revision ?? ''}`} loadCatalog={async () => {
+          const result = await rpc.call(CHANNEL, 'mcp/compositionSource', { selection })
+          if (!result.ok) throw new Error(result.error.message)
+          return result.value as any
+        }} loadFile={async file => {
+          const result = await rpc.call(CHANNEL, 'mcp/compositionSource', { selection, path: file.path, expected_sha256: file.sha256 })
+          if (!result.ok) throw new Error(result.error.message)
+          return result.value as any
+        }} />}</div>
+        <footer>{preview === 'config' ? <><button type="button" onClick={() => exportDraft(config!, false, '配置')}>复制配置</button><button type="button" onClick={() => exportDraft(config!, true, '配置')}>下载配置</button></> : null}<button type="button" onClick={() => setPreview(null)}>关闭</button></footer>
       </div></div>}
     </section>
   </div>

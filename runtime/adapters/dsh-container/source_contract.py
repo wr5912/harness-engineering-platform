@@ -29,7 +29,7 @@ SOURCES = source_catalog(REPO)
 LOCK = ADAPTER / "source.lock.json"
 DEFAULT_SOURCE = ""
 NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-_EXPERIMENT_BASE = r"^EXP-([a-z0-9]+(?:-[a-z0-9]+)*)-[0-9]{3}"
+_EXPERIMENT_BASE = r"^(?:EXP|VAR)-([a-z0-9]+(?:-[a-z0-9]+)*)-[0-9]{3}"
 # 解析器保留历史格式；新建与仓库校验另按 NEW_EXPERIMENT 和固定兼容集合判断。
 EXPERIMENT = re.compile(_EXPERIMENT_BASE + r"(?:-r[0-9a-f]{12})?$")
 NEW_EXPERIMENT = re.compile(_EXPERIMENT_BASE + r"-r[0-9a-f]{12}$")

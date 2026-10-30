@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
@@ -37,6 +37,28 @@ const source = `import {defineWorkflow, registerWorkflowTool, runWorkflow} from 
 export const name='compute-workflow'; export const inject=['tools','llm'];
 const workflow=defineWorkflow({id:'asset-alerts',toolName:'query_asset_alerts',description:'查询',inputSchema:{type:'object'},async run(context){return runWorkflow(context,[{id:'asset',run:(_v,c)=>c.callTool('get_asset',c.input)},{id:'alerts',run:(v,c)=>c.callTool('list_alerts',{assetId:v.asset.id})}])}});
 export function apply(ctx:any){registerWorkflowTool(ctx,workflow)}\n`
+test('VAR身份可独立构建和冻结，保留计划及原始资产身份', async t => {
+  const f = fixture(t), variant = 'VAR-alpha-001-r123456abcdef', variantExp = `evolution/experiments/${variant}`, candidate = `${variantExp}/candidate`
+  const change = f.change()
+  renameSync(join(f.root, exp), join(f.root, variantExp))
+  write(f.root, `${variantExp}/change.yaml`, dump({ ...change, experiment_id: variant }))
+  write(f.root, `${candidate}/dsh/managed/compute-workflow/index.ts`, source)
+  const handler = createComputeBuildHandler(f.root)
+  const digest = candidateDigest(join(f.root, candidate))
+  const preview = await handler('preview', { experiment_id: variant, expected_candidate_sha256: digest })
+  assert.equal(preview.ok, true, JSON.stringify(preview))
+  const built = await handler('build', { experiment_id: variant, expected_candidate_sha256: digest, expected_preview_sha256: preview.value.preview_sha256 })
+  assert.equal(built.ok, true, JSON.stringify(built))
+  assert.equal(built.value.experiment_id, variant)
+  const freeze = createComputeFreezeHandler(f.root), frozenPreview = await freeze('preview', { experiment_id: variant })
+  assert.equal(frozenPreview.ok, true, JSON.stringify(frozenPreview))
+  const frozen = await freeze('freeze', frozenPreview.value.freeze_input)
+  assert.equal(frozen.ok, true, JSON.stringify(frozen))
+  const fixed = load(git(f.root, ['show', `HEAD:${variantExp}/change.yaml`]))
+  assert.equal(fixed.experiment_id, variant)
+  assert.deepEqual(fixed.compute_variant.case_hashes, change.compute_variant.case_hashes)
+})
+
 test('固定编译不执行Candidate，生成的独立ESM可真实导入并执行LangGraph', async t => {
   const f = fixture(t), handler = createComputeBuildHandler(f.root), path = `${base}/dsh/managed/compute-workflow/index.ts`
   write(f.root, path, source)
@@ -132,6 +154,42 @@ test('拒绝目标暂存、陈旧HEAD和他人的index锁，绝不清理别人�
   rmSync(join(f.root, '.git/index.lock'))
   git(f.root, ['commit', '--allow-empty', '-m', 'parallel commit'])
   assert.equal((await freeze('freeze', preview.value.freeze_input)).error.code, 'conflict')
+})
+test('研究资料随目标冻结并可恢复，监督数据不进入Candidate且运行记录与其他对象不入提交', async t => {
+  const f = fixture(t), freeze = createComputeFreezeHandler(f.root)
+  const archive = `${exp}/evaluation/evidence/kev-training/train.jsonl`, report = `${exp}/evaluation/observations.md`
+  write(f.root, archive, '{"state":"输入","label":"query"}\n')
+  write(f.root, report, '# 观察\n本轮功能验证\n')
+  write(f.root, `${exp}/runs/run-current/evidence.json`, '{"observed":true}\n')
+  write(f.root, `${exp}/evaluation/cache/transient.txt`, '临时状态\n')
+  write(f.root, 'evolution/experiments/EXP-other-001/evaluation/report.json', '{"other":true}\n')
+  write(f.root, 'unrelated.txt', '无关暂存\n'); git(f.root, ['add', 'unrelated.txt']); write(f.root, 'unrelated.txt', '无关工作树\n')
+  const indexBefore = git(f.root, ['show', ':unrelated.txt'])
+  const preview = await freeze('preview', { experiment_id: id })
+  assert.equal(preview.ok, true, JSON.stringify(preview))
+  assert.equal(preview.value.files.find(item => item.path === archive)?.sha256, hash(readFileSync(join(f.root, archive))))
+  assert.ok(preview.value.files.some(item => item.path === report))
+  assert.equal(preview.value.files.some(item => /\/runs\/|\/cache\/|EXP-other/.test(item.path)), false)
+  assert.equal((await freeze('freeze', preview.value.freeze_input)).ok, true)
+  assert.equal(git(f.root, ['show', `HEAD:${archive}`]), '{"state":"输入","label":"query"}')
+  assert.match(git(f.root, ['show', `HEAD:${report}`]), /功能验证/)
+  const committed = git(f.root, ['diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD'])
+  assert.doesNotMatch(committed, /\/runs\/|\/cache\/|EXP-other|unrelated\.txt/)
+  assert.equal(git(f.root, ['show', ':unrelated.txt']), indexBefore)
+  assert.equal(readFileSync(join(f.root, 'unrelated.txt'), 'utf8'), '无关工作树\n')
+  assert.equal(existsSync(join(f.root, base, 'train.jsonl')), false)
+})
+test('评估归档变化会使旧冻结预览失效，不移动HEAD或污染索引', async t => {
+  const f = fixture(t), freeze = createComputeFreezeHandler(f.root), archive = `${exp}/evaluation/evidence/report.json`
+  write(f.root, archive, '{"accuracy":0.5}\n')
+  const head = git(f.root, ['rev-parse', 'HEAD']), preview = await freeze('preview', { experiment_id: id })
+  assert.equal(preview.ok, true, JSON.stringify(preview))
+  write(f.root, archive, '{"accuracy":0.25}\n')
+  const result = await freeze('freeze', preview.value.freeze_input)
+  assert.equal(result.ok, false); assert.equal(result.error.code, 'conflict')
+  assert.equal(git(f.root, ['rev-parse', 'HEAD']), head)
+  assert.equal(git(f.root, ['diff', '--cached', '--name-only']), '')
+  assert.equal(readFileSync(join(f.root, archive), 'utf8'), '{"accuracy":0.25}\n')
 })
 test('共同基准可显式选真实Case批量冻结240个文件，无须伪造算力计划', { timeout: 45_000 }, async t => {
   const f = fixture(t), freeze = createComputeFreezeHandler(f.root), change = f.change()

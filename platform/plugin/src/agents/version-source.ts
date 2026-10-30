@@ -2,8 +2,9 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { load } from 'js-yaml'
+import { VERSION_ID } from '../version-id.ts'
 
-export const VERSION_ID = /^EXP-([a-z0-9]+(?:-[a-z0-9]+)*)-\d{3}(?:-r[0-9a-f]{12})?$/
+export { VERSION_ID } from '../version-id.ts'
 type MapValue = Record<string, any>
 
 function versionFile(root: string, path: string, commit?: string, optional = false): string | undefined {
@@ -34,6 +35,7 @@ export function versionIdentity(root: string, id: string, commit?: string): MapV
 export function assertVersionIdentity(id: string, change: MapValue) {
   const match = VERSION_ID.exec(id)
   if (!match || change?.agent_id !== match[1] || change.experiment_id !== id) throw new Error('change.yaml 与版本身份不一致')
+  if (id.startsWith('VAR-') && (!change.compute_variant || typeof change.compute_variant !== 'object' || Array.isArray(change.compute_variant))) throw new Error('VAR 版本必须声明 compute_variant')
 }
 
 /** 只读选定版本；固定父版的所有信息均来自同一提交。 */
@@ -63,7 +65,13 @@ export function versionSource(root: string, id: string, commit?: string): MapVal
   if (!patch.startsWith('dsh/managed/')) throw new Error('profile_patch 必须位于 dsh/managed')
   const names = harness?.credential_environment_keys ?? [...(legacy?.required_env_names ?? []), ...(legacy?.optional_env_names ?? [])]
   if (!Array.isArray(names) || names.some(name => typeof name !== 'string' || !/^[A-Z][A-Z0-9_]*$/.test(name))) throw new Error('credential_environment_keys 必须是环境变量名称列表')
-  const profile = assets?.profile_manifest ?? legacy?.profile_manifest?.replace(`${base}/candidate/`, '')
+  // 完整Candidate中约定位置的Profile也是该版本资产；旧声明未列出时仍须继承。
+  // 固定提交经同一read读取，不能从当前工作树或另一份登记补齐。
+  const conventionalProfile = 'dsh/managed/web-profile.package.json'
+  let profile: string | undefined
+  if (assets && Object.hasOwn(assets, 'profile_manifest')) profile = relative(assets.profile_manifest)
+  else if (legacy?.profile_manifest !== undefined) profile = relative(legacy.profile_manifest.replace(`${base}/candidate/`, ''))
+  else if (assets && read(`${base}/candidate/${conventionalProfile}`, true) !== undefined) profile = conventionalProfile
   return {
     agent_id: change.agent_id, candidate_root: `${base}/candidate/dsh`, profile: 'web',
     patch: patch.slice('dsh/managed/'.length),

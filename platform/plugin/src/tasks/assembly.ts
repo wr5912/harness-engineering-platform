@@ -3,7 +3,8 @@ import { dirname } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { load as yaml } from 'js-yaml'
 import { assertAssetPath, candidateDigest, dataPath, sha256, sourceInfo } from './files.ts'
-import { versionSource } from '../agents/version-source.ts'
+import { assertInheritableVersion } from '../version-id.ts'
+import { versionIdentity, versionSource } from '../agents/version-source.ts'
 import { containsLiteralLlmKey } from './llm-key.ts'
 
 export interface TaskAssemblyInput {
@@ -21,6 +22,7 @@ function prepare(root: string, input: TaskAssemblyInput) {
   const seen = new Set<string>()
   const files = input.files.map(item => {
     const source = sourceInfo(root, item.source)
+    if (source.id !== target.id) assertInheritableVersion(source.id, versionIdentity(root, source.id))
     const targetPath = item.target_path ?? item.path
     assertAssetPath(item.path); assertAssetPath(targetPath)
     const from = dataPath(source.candidate, item.path), to = dataPath(target.candidate, targetPath)

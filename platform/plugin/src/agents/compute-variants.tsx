@@ -21,6 +21,12 @@ type Context = {
   comparison?: any
   workflow_status?: { generated: boolean; built: boolean; frozen: boolean; loaded: boolean; compared: boolean }
 }
+export type DerivationVersion = { id: string; is_variant?: boolean; derivable?: boolean; change?: Record<string, any> }
+export function isVariantVersion(version: DerivationVersion) {
+  return version.id.startsWith('VAR-') || version.is_variant === true || Boolean(version.change?.compute_variant)
+    || ['exploratory', 'end'].includes(version.change?.variant_kind) || version.change?.kind === 'end' || version.change?.variant === 'end'
+}
+export const canDeriveVersion = (version: DerivationVersion) => version.derivable !== false && !isVariantVersion(version)
 const labels: Record<ComputeMetric | 'actual_model_calls', string> = { actual_model_calls: '实际模型请求次数（含重试）', model_calls: '会话回复次数（历史口径）', input_tokens: '输入 token（含缓存）', output_tokens: '输出 token', total_tokens: '总 token', elapsed_ms: '主 Session 耗时（毫秒）' }
 const display = (value: number | null | undefined) => value === null || value === undefined ? '未知' : Number.isInteger(value) ? String(value) : value.toFixed(2)
 const percentage = (value: number | null | undefined) => value === null || value === undefined ? '未知' : `${display(value)}%`
@@ -47,10 +53,11 @@ function ComputeIcon({ kind }: { kind: 'sparkle' | 'run' | 'info' }) {
   return <svg className="compute-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[kind]}</svg>
 }
 
-export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, versionLabel, currentVariantName, versions, onCreated, onChanged, onAssistant, active = true }: PlatformPageProps & {
-  agentId: string; experimentId: string; versions: Array<{ id: string }>; onCreated?: (experimentId: string) => void; onChanged?: () => void
+export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, versionLabel, currentVariantName, versions, onCreated, onChanged, onAssistant, onOpenCode, active = true }: PlatformPageProps & {
+  agentId: string; experimentId: string; versions: DerivationVersion[]; onCreated?: (experimentId: string) => void; onChanged?: () => void
   agentName?: string; versionLabel?: string; active?: boolean
   currentVariantName?: string | null
+  onOpenCode?(path: string): void
   onAssistant?(task: string, context: Record<string, unknown>): Promise<void>
 }) {
   const generation = useRef(0)
@@ -63,13 +70,15 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
   const [parentContext, setParentContext] = useState<Context | null>(null)
   const [parentLoading, setParentLoading] = useState(false), [parentError, setParentError] = useState('')
   const [parentReload, setParentReload] = useState(0)
-  const creationContext = parentContext?.experiment_id === parent && parentContext.agent_id === agentId ? parentContext : null
+  const parentVersions = versions.filter(version => canDeriveVersion(version) && !(version.id === experimentId && context?.plan))
+  const parentIds = parentVersions.map(version => version.id).join('\n')
+  const creationContext = parentVersions.some(version => version.id === parent) && parentContext?.experiment_id === parent && parentContext.agent_id === agentId && !parentContext.plan ? parentContext : null
   const parentRef = creationContext?.freeze?.candidate_matches ? creationContext.parent_ref : ''
   const [variantName, setVariantName] = useState(''), [strategy, setStrategy] = useState(''), [selectedCases, setSelectedCases] = useState<string[]>([]), [critical, setCritical] = useState<string[]>([])
   const [minimum, setMinimum] = useState(2), [drop, setDrop] = useState(0), [metric, setMetric] = useState<ComputeMetric>('total_tokens'), [reduction, setReduction] = useState(10)
   const [modelChange, setModelChange] = useState(false), [model, setModel] = useState('deepseek-flash'), [reasoning, setReasoning] = useState('off')
   const [codeMode, setCodeMode] = useState(false), [codeOnly, setCodeOnly] = useState(false), [sourceRuns, setSourceRuns] = useState<string[]>([])
-  const [generatedCode, setGeneratedCode] = useState<any>(null), [freezePreview, setFreezePreview] = useState<any>(null)
+  const [freezePreview, setFreezePreview] = useState<any>(null)
   const [parentRuns, setParentRuns] = useState<string[]>([]), [variantRuns, setVariantRuns] = useState<string[]>([])
   const [comparison, setComparison] = useState<any>(null), [humanConfirmed, setHumanConfirmed] = useState(false), [reason, setReason] = useState('')
   const [planningOpen, setPlanningOpen] = useState(false), [planningDirty, setPlanningDirty] = useState(false)
@@ -79,6 +88,7 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
   const selectedVariantName = currentVariantName === undefined ? context?.variant_name : currentVariantName
   const displayVersion = versionLabel || experimentId
   const displayAgent = agentName || agentId
+  const canStartPlanning = !context?.plan && canDeriveVersion(versions.find(version => version.id === experimentId) ?? { id: experimentId })
   const selectedRuns = context?.runs.filter(run => run.experiment_id === experimentId).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))) ?? []
   const latestRun = selectedRuns[0]
   const targetReduction = context?.plan ? comparison?.resources?.[context.plan.resource_metric]?.reduction_pct : null
@@ -98,7 +108,7 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
     const draft = readManualDraft(draftKey)
     restoredManualDraft.current = draft
     draftReady.current = false
-    setBusy(true); setContext(null); setComparison(null); setParentRuns([]); setVariantRuns([]); setParent(draft.parent ?? experimentId); setVariantName(draft.variantName ?? ''); setStrategy(draft.strategy ?? ''); setSelectedCases(draft.selectedCases ?? []); setCritical(draft.critical ?? []); setMinimum(draft.minimum ?? 2); setDrop(draft.drop ?? 0); setMetric(draft.metric ?? 'total_tokens'); setReduction(draft.reduction ?? 10); setModelChange(draft.modelChange ?? false); setModel(draft.model ?? 'deepseek-flash'); setReasoning(draft.reasoning ?? 'off'); setReason(draft.reason ?? ''); setError(''); setMessage(''); setCreateOpen(draft.createOpen ?? false); setPlanningOpen(false); setPlanningDirty(false); setManualPreview(null); setHumanConfirmed(false); setGeneratedCode(null); setFreezePreview(null); setSourceRuns(draft.sourceRuns ?? []); setCodeMode(draft.codeMode ?? false); setCodeOnly(draft.codeOnly ?? false)
+    setBusy(true); setContext(null); setComparison(null); setParentRuns([]); setVariantRuns([]); setParent(draft.parent ?? experimentId); setVariantName(draft.variantName ?? ''); setStrategy(draft.strategy ?? ''); setSelectedCases(draft.selectedCases ?? []); setCritical(draft.critical ?? []); setMinimum(draft.minimum ?? 2); setDrop(draft.drop ?? 0); setMetric(draft.metric ?? 'total_tokens'); setReduction(draft.reduction ?? 10); setModelChange(draft.modelChange ?? false); setModel(draft.model ?? 'deepseek-flash'); setReasoning(draft.reasoning ?? 'off'); setReason(draft.reason ?? ''); setError(''); setMessage(''); setCreateOpen(draft.createOpen ?? false); setPlanningOpen(false); setPlanningDirty(false); setManualPreview(null); setHumanConfirmed(false); setFreezePreview(null); setSourceRuns(draft.sourceRuns ?? []); setCodeMode(draft.codeMode ?? false); setCodeOnly(draft.codeOnly ?? false)
     invoke('context', { experiment_id: experimentId }).then(value => {
       if (request !== generation.current) return
       restoreContext(value)
@@ -106,6 +116,14 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
       .finally(() => { if (request === generation.current) setBusy(false) })
     return () => { generation.current++ }
   }, [rpc, experimentId])
+  useEffect(() => {
+    if (!context || parentVersions.some(version => version.id === parent)) return
+    const next = parentVersions.find(version => version.id === context.parent_experiment_id)?.id
+      ?? parentVersions.find(version => version.id === experimentId)?.id ?? parentVersions[0]?.id ?? ''
+    if (next === parent) return
+    selectedParent.current = next; setParent(next); setParentContext(null); setManualPreview(null)
+    setSelectedCases([]); setCritical([]); setSourceRuns([]); restoredManualDraft.current = null
+  }, [context, parent, parentIds, experimentId])
   useEffect(() => {
     if (!draftReady.current) { draftReady.current = true; return }
     const previous = readManualDraft(draftKey)
@@ -128,21 +146,22 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
     const request = ++parentRequest.current, owner = generation.current
     const draft = restoredManualDraft.current ?? readManualDraft(draftKey)
     setParentContext(null); setParentError(''); setManualPreview(null)
-    if (!createOpen) { setParentLoading(false); return }
+    if (!createOpen || !context || !parentVersions.some(version => version.id === parent)) { setParentLoading(false); return }
     setParentLoading(true)
     invoke('context', { experiment_id: parent }).then((value: Context) => {
       if (request !== parentRequest.current || owner !== generation.current || selectedParent.current !== parent) return
       if (value.experiment_id !== parent || value.agent_id !== agentId) throw new Error('父版来源与所选版本不一致，请重新选择。')
+      if (value.plan) throw new Error('变体不能作为继承来源，请选择业务版本。')
       const restore = draft.parent === parent && draft.createOpen && draft.caseScopeReady
       restoredManualDraft.current = null
       const available = new Set(value.cases.map(item => item.case_id))
       setParentContext(value); setSelectedCases(restore ? (draft.selectedCases ?? []).filter((id: string) => available.has(id)) : value.cases.map(item => item.case_id))
-      setCritical((restore ? draft.critical ?? [] : value.plan?.critical_case_ids ?? []).filter((id: string) => available.has(id)))
+      setCritical((restore ? draft.critical ?? [] : []).filter((id: string) => available.has(id)))
       setSourceRuns(restore ? draft.sourceRuns ?? [] : [])
     }).catch(error => { if (request === parentRequest.current && owner === generation.current) setParentError(error.message) })
       .finally(() => { if (request === parentRequest.current && owner === generation.current) setParentLoading(false) })
     return () => { parentRequest.current++ }
-  }, [rpc, agentId, experimentId, parent, createOpen, parentReload])
+  }, [rpc, agentId, experimentId, parent, createOpen, parentReload, context, parentIds])
   async function action(task: () => Promise<void>) {
     const request = generation.current
     setBusy(true); setError(''); setMessage('')
@@ -155,6 +174,7 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
   }
   async function sendPlanning(request: ComputePlanningRequest) {
     if (!context || !onAssistant) throw notSent('平台 AI 助手暂不可用，请稍后重试。')
+    if (!canStartPlanning) throw notSent('变体不能作为策划来源，请选择业务版本。')
     const requestGeneration = generation.current
     const allowedRuns = new Set(context.runs.filter(run => run.experiment_id === experimentId).map(run => run.run_id))
     const sourceRunIds = request.tracePlanRequested ? [] : request.sourceRunIds.filter(id => allowedRuns.has(id))
@@ -238,16 +258,16 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
     <h3>所选 Run 的完整报告与工具证据</h3>{parentRuns.length || variantRuns.length ? <ul>{[...parentRuns, ...variantRuns].map(runId => <li key={runId}><a href={navigationHash({ page: 'evaluation', tab: 'runs', agent_id: agentId, experiment_id: context?.runs.find(run => run.run_id === runId)?.experiment_id, run_id: runId })} target="_blank" rel="noopener noreferrer">{runId}</a></li>)}</ul> : <p>尚未选择比较 Run。</p>}
   </DetailDrawer>
   return <section aria-label="算力变体" className="compute-variant-panel">
-    <header className="compute-heading"><h3>算力变体</h3><div className="compute-heading-actions"><span className="compute-source-tag">基于 {displayVersion} 策划</span><button className="compute-refresh" aria-label="刷新计划与 Run" title="更新当前计划和封存 Run 列表" disabled={busy} onClick={() => void action(async () => {
+    <header className="compute-heading"><h3>算力变体</h3><div className="compute-heading-actions"><span className="compute-source-tag">{context?.plan ? '当前变体' : '策划来源'} · {displayVersion}</span><button className="compute-refresh" aria-label="刷新计划与 Run" title="更新当前计划和封存 Run 列表" disabled={busy} onClick={() => void action(async () => {
       const request = generation.current, value = await invoke('context', { experiment_id: experimentId })
       if (request !== generation.current) return
-      restoreContext(value); if (createOpen) setParentReload(value => value + 1); setFreezePreview(null); setGeneratedCode(null); setMessage('已更新计划与封存 Run 列表。')
+      restoreContext(value); if (createOpen) setParentReload(value => value + 1); setFreezePreview(null); setMessage('已更新计划与封存 Run 列表。')
     })}>刷新</button></div></header>
     <div className="compute-guidance"><div className="compute-guidance-eyebrow"><ComputeIcon kind="sparkle" /><strong>让运行经验成为更轻量的实现</strong></div><h4>{!context ? error ? '当前版本暂不可用' : '算力变体策划' : context.plan ? '围绕已有计划继续研究' : '先定义路线，再验证效果'}</h4>{!context && !error ? <LoadingIndicator label="读取计划与封存 Run" block /> : <p>{!context ? '读取失败，请查看提示并刷新重试。' : context.plan ? '查看已保存计划和真实 Run，再独立比较效果与资源；近似等效仍需评测和人工复核。' : '选择中算力或低算力路线，由平台 AI 助手根据已有轨迹策划实现与比较方案。近似等效是待验证目标。'}</p>}<div className="compute-actions">
-    <button type="button" className="compute-primary" disabled={busy || !context || !onAssistant} onClick={() => context?.plan ? void action(async () => {
+    <button type="button" className="compute-primary" disabled={busy || !context || !onAssistant || !context.plan && !canStartPlanning} onClick={() => context?.plan ? void action(async () => {
       await onAssistant?.('请使用 compute-variant-research 分析当前算力变体的冻结计划、实际资产和已有 Run；解释效果与资源差异、可比性和缺口，提出下一步。先只读取证，不修改计划、不运行评测，不替我确认近似等效或 end。',
         { page: 'agents', tab: 'compute-variants', agent_id: agentId, experiment_id: experimentId, skill: 'compute-variant-research', workflow: 'compute-variants', variant_name: selectedVariantName ?? null, parent_run_ids: parentRuns, variant_run_ids: variantRuns })
-    }) : setPlanningOpen(true)}>{context?.plan ? '请 AI 分析算力变体' : <><ComputeIcon kind="sparkle" />请 AI 策划算力变体</>}</button>
+    }) : canStartPlanning && setPlanningOpen(true)}>{context?.plan ? '请 AI 分析算力变体' : <><ComputeIcon kind="sparkle" />请 AI 策划算力变体</>}</button>
       {context?.plan && context.generation && <button type="button" disabled={busy || !onAssistant} onClick={() => void action(async () => {
         await onAssistant?.('请使用 compute-variant-research，在当前已派生目标生成并验证 LangGraph TypeScript 代码变体。保留已确定的 variant_name，不用策略正文替换名称；从当前上下文回读名称，名称缺失时先说明。核对已保存计划、固定父版、实际工具schema和来源轨迹；execution_mode=code-only 时使用公开纯代码会话适配器，业务全链不得调用模型。按 DSH 原生权限保存实际代码、构建、展示真实数据Git差异并单独确认冻结，执行两侧固定Case并核对装载与完整资源记录。完成用实际Run比较，不替我确认end。', { page: 'agents', tab: 'compute-variants', skill: 'compute-variant-research', workflow: 'compute-variants', agent_id: agentId, experiment_id: experimentId, variant_name: selectedVariantName ?? null, execution_mode: context.plan?.execution_mode ?? null, generation_intent: 'implement' })
       })}>请 AI 生成代码变体</button>}
@@ -256,13 +276,14 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
     {context && <div className="compute-related-run"><ComputeIcon kind="run" /><div><strong>{displayVersion} · {latestRun?.title || (latestRun ? '最近封存 Run' : '运行轨迹')}</strong><p>{latestRun ? <>运行记录 <a href={navigationHash({ page: 'evaluation', tab: 'runs', agent_id: agentId, experiment_id: experimentId, run_id: latestRun.run_id })} target="_blank" rel="noopener noreferrer">{latestRun.run_id}</a> · {latestRun.created_at || '时间未记录'}；可作为本次策划的诊断轨迹，比较仍需新 Run。</> : '当前版本尚无封存 Run，可先在评测中心采集轨迹。'}</p></div><span className="compute-run-status" data-status={latestRun?.status === 'completed' ? latestRun.effective_verdict === 'passed' ? 'completed' : latestRun.effective_verdict === 'failed' ? 'failed' : 'empty' : latestRun?.status || 'empty'}>{latestRun ? runOutcome(latestRun) : '待采集'}</span></div>}
     {context && !context.plan && <p className="compute-empty-variants"><ComputeIcon kind="info" />当前版本尚未保存算力变体计划。</p>}
     {error && <p role="alert">{error}</p>}{message && <p role="status">{message}</p>}
-    <details key={experimentId} className="compute-more"><summary>其他策划方式</summary><div className="compute-alternate-action"><button type="button" className="compute-secondary" aria-expanded={createOpen} aria-controls="compute-manual-plan" disabled={busy || !context} onClick={() => { setCreateOpen(value => !value); setManualPreview(null) }}>{createOpen ? '收起手动计划' : context?.plan ? '手动派生新变体' : '手动制定计划'}</button></div>
+    {context && !canStartPlanning && <p className="agent-muted">变体不能作为继承或新策划来源；创建其他变体时请选择完整业务版本。</p>}
+    <details key={experimentId} className="compute-more"><summary>其他策划方式</summary><div className="compute-alternate-action"><button type="button" className="compute-secondary" aria-expanded={createOpen} aria-controls="compute-manual-plan" disabled={busy || !context || !parentVersions.length} onClick={() => { setCreateOpen(value => !value); setManualPreview(null) }}>{createOpen ? '收起手动计划' : context?.plan ? '从业务版本创建变体' : '手动制定计划'}</button></div>
     {createOpen && context && <fieldset id="compute-manual-plan" className="compute-form" disabled={busy} onChange={() => setManualPreview(null)}>
       <legend>手动制定比较计划</legend>
       <p className="agent-muted">与 AI 策划使用同一派生流程。填写后先检查预览，再确认创建。</p>
       <div className="harness-fields">
         <label className="agent-field agent-field-wide">变体名称<input aria-label="变体名称" required value={variantName} onChange={event => setVariantName(event.target.value)} placeholder="例如：资产告警轻量版" /></label>
-        <label className="agent-field">完整父版<select aria-label="完整父版" value={parent} onChange={event => { selectedParent.current = event.target.value; setParent(event.target.value); setParentContext(null); setManualPreview(null); setSelectedCases([]); setCritical([]); setSourceRuns([]) }}>{versions.map(version => <option key={version.id} value={version.id}>{version.id}</option>)}</select></label>
+        <label className="agent-field">完整父版<select aria-label="完整父版" value={parent} onChange={event => { if (!parentVersions.some(version => version.id === event.target.value)) return; selectedParent.current = event.target.value; setParent(event.target.value); setParentContext(null); setManualPreview(null); setSelectedCases([]); setCritical([]); setSourceRuns([]) }}>{!parentVersions.length && <option value="">没有可继承的业务版本</option>}{parentVersions.map(version => <option key={version.id} value={version.id}>{version.id}</option>)}</select></label>
         <label className="agent-field agent-field-wide">策略与研究问题<textarea aria-label="策略与研究问题" value={strategy} onChange={event => setStrategy(event.target.value)} placeholder="例如减少重复查询和上下文，完整保留查询结果；说明哪些行为允许变化。" rows={3} /></label>
       </div>
       {parentLoading ? <LoadingIndicator label="核对父版来源与任务" block /> : parentError ? <p role="alert">{parentError}<button type="button" onClick={() => setParentReload(value => value + 1)}>重新核对父版</button></p> : creationContext && <p className="agent-muted">{parentRef ? '来源已固定，平台将自动继承所选父版。' : '所选父版尚未固定或有未提交改动，请先固定当前 Candidate，再刷新核对。'}</p>}
@@ -299,6 +320,7 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
         <p>任务 {Object.keys(manualPreview.value.plan.case_hashes).length} 项，每侧至少 {manualPreview.value.plan.min_runs_per_case} 次独立 Run；{labels[manualPreview.value.plan.resource_metric as ComputeMetric]} 目标改善 {manualPreview.value.plan.min_resource_reduction_pct}%。</p>
         <p className="agent-muted">将完整继承固定父版并保存研究计划。创建后仍需实现优化策略和独立评测。</p>
         <button className="compute-primary" onClick={() => void action(async () => {
+          if (!creationContext || manualPreview.input.parent_experiment_id !== parent) return
           const request = generation.current
           const value = await invoke('create', { ...manualPreview.input, expected_preview_sha256: manualPreview.value.preview_sha256 })
           if (request !== generation.current) return
@@ -317,13 +339,8 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
       {context.generation && <section aria-label="代码变体生成进度"><ol>{([['generated', '代码已保存'], ['built', '构建已核对'], ['frozen', '数据提交已冻结'], ['loaded', '新 Session 已装载'], ['compared', '实际 Run 已比较']] as const).map(([key, title]) => <li key={key}>{title}：{context.workflow_status?.[key] === true || key === 'compared' && comparison?.comparison_receipt ? '已验证' : '尚未验证'}</li>)}</ol>
         <p className="agent-muted">状态来自实际文件、构建回执和 Run；保存源码不代表已装载或已节省资源。</p>
         {context.build?.error && <p role="alert">{context.build.error}</p>}
-        <button disabled={busy || !context.workflow_status?.generated} onClick={() => void action(async () => {
-          const result = await rpc.call(CHANNEL, 'agents/edit/read', { experiment_id: experimentId, path: `candidate/${context.generation!.entry_path}` }) as Result
-          if (!result.ok) throw new Error(result.error.message)
-          setGeneratedCode(result.value)
-        })}>查看生成代码</button>
+        <button disabled={busy || !context.workflow_status?.generated || !onOpenCode} onClick={() => onOpenCode?.(`evolution/experiments/${experimentId}/candidate/${context.generation!.entry_path}`)}>查看生成代码</button>
         <button disabled={busy || !context.workflow_status?.built} onClick={() => void action(async () => { setFreezePreview(await invoke('freeze-preview', { experiment_id: experimentId, ...(context.candidate_sha256 ? { expected_candidate_sha256: context.candidate_sha256 } : {}) })) })}>预览冻结差异</button>
-        {generatedCode && <details open><summary>生成的 TypeScript 源码</summary><pre>{generatedCode.content}</pre></details>}
         {freezePreview && <div><p>将预览列出的计划、生成源码和产物固定到本地数据 Git。</p><details open><summary>查看本次冻结的实际差异</summary><pre>{freezePreview.diff ?? JSON.stringify(freezePreview.files ?? freezePreview, null, 2)}</pre></details><button disabled={busy || !freezePreview.preview_sha256} onClick={() => void action(async () => {
           await invoke('freeze', { ...(freezePreview.freeze_input ?? {}), experiment_id: experimentId, expected_preview_sha256: freezePreview.preview_sha256, confirmed: true }); setFreezePreview(null); restoreContext(await invoke('context', { experiment_id: experimentId })); onChanged?.()
         })}>确认冻结本次差异</button></div>}

@@ -1,3 +1,4 @@
+import { VERSION_ID } from '../version-id.ts'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { createHash } from 'node:crypto'
@@ -9,7 +10,7 @@ import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 import { assetText } from './asset-text.ts'
 
 const execute = promisify(execFile)
-const EXPERIMENT = /^EXP-([a-z0-9]+(?:-[a-z0-9]+)*)-\d{3}(?:-r[0-9a-f]{12})?$/
+const EXPERIMENT = VERSION_ID
 const EXCLUDED = new Set(['node_modules', '.git', '__pycache__', 'RuntimeHOME', 'history', 'sessions', 'cache', 'runs'])
 const PREVIEW_BYTES = 128 * 1024
 type JsonMap = Record<string, unknown>

@@ -26,7 +26,8 @@ export function computeGenerationContract() {
     available_tools: ['skill', 'platform_agents'],
     sdk: {
       module: '@harness-platform/workflow-runtime',
-      exports: ['defineWorkflow', 'runWorkflow', 'registerWorkflowTool', 'registerCodeOnlyWorkflowAgent', 'registerHybridWorkflowAgent', 'fixedCompositionToolName', 'Annotation', 'StateGraph', 'START', 'END'],
+      exports: ['defineWorkflow', 'runWorkflow', 'registerWorkflowTool', 'registerCodeOnlyWorkflowAgent', 'registerHybridWorkflowAgent', 'fixedCompositionToolName', 'Annotation', 'StateGraph', 'START', 'END', 'LlmError', 'attributionHeaders'],
+      provider_adapter: '自定义模型适配器复用当前锁定 DSH 的 attributionHeaders()；已取得真实 HTTP status/requestId 的失败使用 LlmError(message,code,{status,requestId})，有效 usage 如实保留。没有响应的网络错误保持调用未知，不补造 Token、服务 ID 或模型版本。',
       types: ['WorkflowDefinition', 'WorkflowContext', 'WorkflowModelBinding', 'WorkflowModelRoles', 'FixedCompositionBinding'],
       plugin: '入口导出 name、inject、apply(ctx)，普通模式在 apply 内调用 registerWorkflowTool(ctx, workflow)；code-only/hybrid 模式只调用对应 register*WorkflowAgent，它会注册工作流工具，不能重复注册。普通模式 inject 包含 tools；使用 infer 时加 llm，使用固定组合时加 webServer、mcpSessionManager。',
       registerCodeOnlyWorkflowAgent: 'registerCodeOnlyWorkflowAgent(ctx,{presetId,workflow,renderResult?})：入口 inject 包含 tools、llm、sessionTitle，llm 仅注册原生本地适配器；本轮用户文本进入图 context.input.request，默认从真实结果读取非空 reply。所有输入均通过图处理；context.infer 在此模式拒绝。使用确定性标题，并在目标 Profile/Preset 禁用 session-title-llm、compaction-basic 和 command-compact。Candidate dsh/managed/role-tool-matrix.yaml 的 runtime_capabilities.local_tools 声明工作流及原工具，local_model_routes 声明 {provider: harness-code-only, model: workflow-v1}；原工具 Guard 须允许工作流及其真实子工具，禁止绕过。',
@@ -54,7 +55,7 @@ export function computeGenerationContract() {
       preview_create: 'compute-variants/preview/create 使用同一 parent_experiment_id、git:<40位提交>、variant_name、strategy、case_ids 和 generation；全链零调用传 execution_mode:code-only，双模型传 execution_mode:hybrid 和 model_roles。create 携带实际 preview_sha256 为 expected_preview_sha256，不能猜摘要。',
       edit: 'edit/read 后用 edit/preview、edit/apply 保存完整文件正文 edits[].content 及 expected_sha256；新文件须先取得 exists:false、sha256:null，保存传 expected_sha256:null。Preset 引用 Managed 源码对应的 /opt/dsh-managed/compute-workflow/*.mjs。',
       build: '保存后读取当前 candidate_sha256，以 expected_candidate_sha256 调 build-preview；build 保留该摘要和实际预览的 expected_preview_sha256。只做类型检查和固定 ESM 编译，不执行 Candidate，不证明装载。源码、runner、依赖或 ESM 变化后旧构建失效。',
-      freeze: 'freeze-preview 返回真实差异与 freeze_input={experiment_id,case_ids,evaluation_base_sha256,expected_preview_sha256}；freeze 完整传回 freeze_input 并单独确认。仅本地冻结约定文件，不推送；两侧 Run 的提交须含同一计划。',
+      freeze: 'freeze-preview 返回 Candidate、研究计划、本版本 evaluation 研究资料和选定 Case 的真实差异与 freeze_input={experiment_id,case_ids,evaluation_base_sha256,expected_preview_sha256}；freeze 完整传回 freeze_input。训练监督数据与评估报告保存在本版本 evaluation，不能放入 Runtime 挂载的 Candidate。仅本地冻结约定文件，不推送；两侧 Run 的提交须含同一计划。',
       evidence: '分别核对 context.workflow_status 的 generated/built/frozen/loaded/compared。新 Session 的真实图回执须与当前源码、build_digest、esm_sha256 及固定组合身份一致，且 complete=true、status=completed；构建通过或原子回退不等于装载成功。',
       delivery: '通过 compute-variants/compare 核对实际构建、冻结、装载与所选两侧 Run。human_confirmed 只能由用户在变体页面复核，不能由助手提交或改结论字段。',
     },

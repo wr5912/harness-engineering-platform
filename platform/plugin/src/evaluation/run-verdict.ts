@@ -1,7 +1,8 @@
+import { VERSION_ID } from '../version-id.ts'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-const EXPERIMENT = /^EXP-[a-z0-9]+(?:-[a-z0-9]+)*-\d{3}(?:-r[0-9a-f]{12})?$/
+const EXPERIMENT = VERSION_ID
 const RUN = /^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
 /** 整体结论只属于已完成的 Run；中断 Run 的 summary 可作为部分证据保留。 */

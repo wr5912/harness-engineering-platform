@@ -1,5 +1,5 @@
 import { build } from 'esbuild'
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
@@ -82,10 +82,17 @@ const implementationFiles = ['definition.ts', 'compositions.ts', 'executor.ts', 
     'platform/plugin/src/evaluation/model-attempts.ts', 'platform/plugin/src/workflows/graph.ts',
     ...['contracts.ts', 'core.ts', 'gateway.ts', 'group-link.ts', 'providers.ts', 'replica.ts', 'reports.ts', 'runtime.ts'].map(file => `platform/plugin/src/business-control/${file}`),
     ...['index.ts', 'openapi.ts', 'connection.ts'].map(file => `plugins/mcp-manager/${file}`),
-    'platform/plugin/src/mcp/store.ts'])
+    'platform/plugin/src/mcp/store.ts', 'platform/plugin/src/mcp/credential-path.ts',
+    'platform/plugin/assets/mcp-credential-layout.json'])
 const implementationHash = createHash('sha256')
-for (const file of implementationFiles) implementationHash.update(file).update('\0').update(await readFile(new URL('../../' + file, import.meta.url)))
-const implementationDefine = { __PLATFORM_MCP_IMPLEMENTATION_DIGEST__: JSON.stringify(implementationHash.digest('hex')) }
+const implementationSources = []
+for (const file of implementationFiles) {
+  const bytes = await readFile(new URL('../../' + file, import.meta.url))
+  implementationHash.update(file).update('\0').update(bytes)
+  implementationSources.push({ path: file, sha256: createHash('sha256').update(bytes).digest('hex') })
+}
+const implementationDigest = implementationHash.digest('hex')
+const implementationDefine = { __PLATFORM_MCP_IMPLEMENTATION_DIGEST__: JSON.stringify(implementationDigest) }
 await build({
   entryPoints: ['src/index.ts'],
   outfile: 'lib/index.js',
@@ -99,6 +106,9 @@ await build({
   define: implementationDefine,
   plugins: [managerSources],
 })
+// 构建投影仅记录实际参与实现摘要的文件，不作为可编辑来源。
+await writeFile('lib/composition-source-index.json', JSON.stringify({ schema_version: 1, source_digest: implementationDigest, files: implementationSources,
+  artifacts: [{ path: 'platform/plugin/lib/index.js', sha256: createHash('sha256').update(await readFile('lib/index.js')).digest('hex') }] }, null, 2) + '\n')
 await build({ entryPoints: ['src/mcp/manager.ts'], outfile: 'lib/mcp-manager.js', bundle: true,
   platform: 'node', target: 'node24', format: 'esm', packages: 'external', plugins: [managerSources], legalComments: 'none', define: implementationDefine })
 await build({ entryPoints: ['src/mcp/platform-manager.ts'], outfile: 'lib/platform-mcp-manager.js', bundle: true,

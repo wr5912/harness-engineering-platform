@@ -292,3 +292,121 @@ test('来源集合固定身份、冻结Case、采集副文件以及不存在状�
   assert.match(invalid.source_bundle.issues.join(' '), /尚未封存/)
   assert.match(invalid.source_bundle.issues.join(' '), /没有确认可用/)
 })
+
+function delegatedRows() {
+  const rootId = 'root-bound-session', childId = 'child-bound-session', rootLog = 'session.v4.jsonl'
+  const childLog = `subagents/${childId}/session.v4.jsonl`, prompt = '只查询资产A的已有状态。', delegatedText = `${prompt}\n回传给父智能体，不执行写入。`
+  const native = (log, event) => ({ session_log: log, event })
+  const headers = [native(rootLog, { type: 'session', version: 4, id: rootId, createdAt: 100, delegationDepth: 0, isSeeded: false, agentPreset: 'alpha' })]
+  const parent = [
+    row('user/message', { role: 'user', ...user('真人根任务：调查资产A，不授权执行。') }, 0, rootLog),
+    row('request/header', { header: { messages: [{ role: 'user', source: { kind: 'user' }, content: '真人根任务：调查资产A，不授权执行。' }], tools: [{ name: 'delegate_fault_analysis' }] } }, 1, rootLog),
+    row('tool/call', { callId: 'delegate-call', name: 'delegate_fault_analysis', arguments: JSON.stringify({ prompt }) }, 2, rootLog),
+    row('subagent/catalog', { version: 0, childId, childCreatedAt: 200, mode: 'continuable', label: '只读调查' }, 3, rootLog),
+    row('tool/result', { message: { role: 'tool', source: { kind: 'tool', callId: 'delegate-call' }, toolCallId: 'delegate-call', content: [{ type: 'text', text: `started subagent ${childId}` }], isError: false } }, 4, rootLog),
+  ]
+  const child = [
+    native(childLog, { type: 'session', version: 4, id: childId, createdAt: 200, parentSession: rootId, delegationDepth: 1, isSeeded: false, origin: 'subagent', agentPreset: 'alpha-readonly' }),
+    row('agent-preset/selected', { agentPreset: 'alpha-readonly' }, 0, childLog),
+    row('subagent/descriptor', { version: 3, mode: 'continuable', provider: 'spawn', label: '只读调查' }, 1, childLog),
+    native(childLog, { type: 'user/message', seq: 2, data: { role: 'user', ...user(delegatedText) }, surfaceOp: 'append' }),
+    row('step/start', { turn: 1, step: 1 }, 3, childLog),
+    row('request/header', { header: { config: { provider: 'fixture', model: 'fixture' }, tools: [{ name: 'read_asset', parameters: { type: 'object' } }] } }, 4, childLog),
+    row('tool/call', { callId: 'read-call', name: 'read_asset', arguments: { id: 'asset-A' } }, 5, childLog),
+    row('tool/result', { message: { role: 'tool', source: { kind: 'tool', callId: 'read-call' }, content: [{ type: 'text', text: 'FUTURE_ASSET_RESULT' }] } }, 6, childLog),
+  ]
+  return { rows: [...headers, ...parent, ...child], rootId, childId, rootLog, childLog, delegatedText }
+}
+function parseDelegated(value, extra = {}) {
+  return api.parseTraceText(encode(value.rows), { path: 'evidence/C-1/trace.jsonl', role: 'target', collection_status: 'available',
+    root_identity: { session_id: value.rootId, session_log: value.rootLog, agent_preset: 'alpha' }, ...extra })
+}
+
+test('可信采集根、父子header与委派callId回执共同恢复子决策，父任务不冒充真人且同源分组', () => {
+  const value = delegatedRows(), raw = encode(value.rows)
+  const [parent, child] = api.buildDecisionSlices(parseDelegated(value))
+  assert.equal(parent.eligible, true); assert.equal(child.eligible, true)
+  assert.equal(child.role, 'target')
+  assert.equal(child.lineage.actor_session_id, value.childId)
+  assert.equal(child.lineage.root_session_id, value.rootId)
+  assert.equal(child.lineage.parent_session_id, value.rootId)
+  assert.equal(child.lineage.delegation.call_id, 'delegate-call')
+  assert.equal(child.lineage.delegation.task_content_sha256, hash(value.delegatedText))
+  assert.equal(child.anchor.source_sha256, hash(raw), '不改写原始trace摘要')
+  assert.equal(child.state.messages[0].content[0].text, value.delegatedText)
+  assert.equal(child.state.messages[0].source.kind, 'subagent')
+  assert.equal(child.state.messages[0].source.senderSessionId, value.rootId)
+  assert.equal(child.state.messages[0].source.delegationCallId, 'delegate-call')
+  assert.equal(JSON.stringify(child.state).includes('真人根任务'), false)
+  assert.equal(JSON.stringify(child.state).includes('FUTURE_ASSET_RESULT'), false)
+  assert.equal(child.source_group_id, `task-${hash(JSON.stringify(parent.state.messages[0].content).normalize('NFKC').replace(/\s+/g, ' ').trim()).slice(0, 24)}`)
+  assert.equal(parent.source_group_id, undefined, '未受影响root不增加分组覆盖字段')
+  assert.equal(child.outcome.refs.length, 1)
+})
+
+test('缺采集身份、错父子header、错catalog、错callId或伪任务不能靠subagents目录取得target身份', () => {
+  const changes = [
+    value => { value.rows[0].event.id = 'another-root' },
+    value => { value.rows.find(row => row.session_log === value.childLog && row.event.type === 'session').event.parentSession = 'another-parent' },
+    value => { value.rows.find(row => row.event.type === 'subagent/catalog').event.data.childId = 'another-child' },
+    value => { value.rows.find(row => row.event.type === 'subagent/catalog').event.data.childCreatedAt++ },
+    value => { value.rows.find(row => row.event.type === 'tool/result').event.data.message.source.callId = 'another-call' },
+    value => { value.rows.find(row => row.event.type === 'subagent/descriptor').event.data.provider = 'unknown' },
+    value => { value.rows.find(row => row.event.type === 'agent-preset/selected').event.data.agentPreset = 'another-preset' },
+    value => { value.rows.find(row => row.session_log === value.childLog && row.event.type === 'user/message').event.data.content[0].text = '伪造的其他任务' },
+    value => { value.rows = value.rows.filter(row => row.event.type !== 'subagent/catalog') },
+    value => { value.rows.find(row => row.session_log === value.childLog && row.event.type === 'session').event.isSeeded = true },
+  ]
+  for (const change of changes) {
+    const value = delegatedRows(); change(value)
+    const child = api.buildDecisionSlices(parseDelegated(value)).at(-1)
+    assert.equal(child.role, 'unknown'); assert.equal(child.eligible, false)
+    assert.equal(child.lineage, undefined)
+  }
+  assert.equal(api.buildDecisionSlices(parseDelegated(delegatedRows(), { root_identity: undefined })).at(-1).role, 'unknown')
+  for (const role of ['judge', 'analysis', 'unknown']) assert.equal(api.buildDecisionSlices(parseDelegated(delegatedRows(), { role })).at(-1).role, 'unknown')
+  const flat = delegatedRows()
+  flat.rows = flat.rows.filter(row => row.event.type !== 'subagent/catalog')
+  for (const row of flat.rows) if (row.session_log === flat.childLog) row.session_log = 'orphan-flat.jsonl'
+  assert.equal(api.buildDecisionSlices(parseDelegated(flat)).at(-1).role, 'unknown', '无可信链的flat日志也不能继承target')
+})
+
+test('可信子树仍按各自前缀完整性判断，不补未来结果或把未知执行写成成功', () => {
+  const missing = delegatedRows()
+  missing.rows.pop()
+  const child = api.buildDecisionSlices(parseDelegated(missing)).at(-1)
+  assert.equal(child.eligible, true, '完整前缀可保留已观察动作，不声称结果已取得')
+  assert.equal(child.outcome.status, 'missing')
+  assert.match(child.limitations.join(' '), /子工具结果未保存/)
+  const bad = delegatedRows(), raw = encode(bad.rows)
+  const childAt = raw.indexOf(JSON.stringify(bad.rows.find(row => row.session_log === bad.childLog && row.event.type === 'step/start')))
+  const text = raw.slice(0, childAt) + '{broken}\n' + raw.slice(childAt)
+  const parsed = api.parseTraceText(text, { path: 'evidence/C-1/trace.jsonl', role: 'target', collection_status: 'available', root_identity: { session_id: bad.rootId, session_log: bad.rootLog, agent_preset: 'alpha' } })
+  assert.equal(api.buildDecisionSlices(parsed).at(-1).eligible, false)
+})
+
+test('实际Run来源使用checks固定根身份，未登记到冻结Case的来源不提升子树', async t => {
+  const f = fixture(t), value = delegatedRows()
+  write(f.file, encode(value.rows))
+  write(join(f.base, 'evidence/C-1/checks.json'), JSON.stringify({ trace_available: true, session_id: value.rootId, root_session_log: value.rootLog, session_preset: 'alpha' }))
+  const loaded = await api.loadRunTrace(f.root, { run_id: runId, path: f.path })
+  assert.equal(api.buildDecisionSlices(loaded.events).at(-1).eligible, true)
+  write(join(f.base, 'evidence/C-1/checks.json'), JSON.stringify({ trace_available: true, session_id: 'wrong-root', root_session_log: value.rootLog, session_preset: 'alpha' }))
+  assert.equal(api.buildDecisionSlices((await api.loadRunTrace(f.root, { run_id: runId, path: f.path })).events).at(-1).eligible, false)
+})
+
+test('单来源读取保持完整来源集合与决策，不枚举无关Case；仍核对角色、摘要和路径', async t => {
+  const f = fixture(t)
+  write(f.file, encode([row('user/message', user('读取当前巡检目录')), row('tool/call', { callId: 'read-current', name: 'list_inspections', arguments: {} }, 2)]))
+  const catalog = await api.loadRunTrace(f.root, { run_id: runId, path: f.path })
+  const selected = await api.loadRunTrace(f.root, { run_id: runId, path: f.path }, undefined, false)
+  assert.deepEqual(selected.source_bundle, catalog.source_bundle)
+  assert.deepEqual(selected.events, catalog.events)
+  assert.deepEqual(selected.source, catalog.source)
+  symlinkSync('/missing-unrelated-source', join(f.base, 'evidence/unrelated-case'))
+  const withoutUnrelated = await api.loadRunTrace(f.root, { run_id: runId, path: 'evidence/C-1/trace.jsonl' }, undefined, false)
+  assert.deepEqual(withoutUnrelated.source_bundle, catalog.source_bundle)
+  await assert.rejects(() => api.loadRunTrace(f.root, { run_id: runId, path: f.path, source_sha256: '0'.repeat(64) }, undefined, false), /轨迹在读取期间发生变化/)
+  await assert.rejects(() => api.loadRunTrace(f.root, { run_id: runId, path: 'inputs.lock.json' }, undefined, false), /不是 Session 轨迹/)
+  await assert.rejects(() => api.loadRunTrace(f.root, { run_id: runId, path: '../outside/trace.jsonl' }, undefined, false), error => ['path_rejected', 'not_found'].includes(error.code))
+})

@@ -82,7 +82,9 @@ export function createComputeFreezeHandler(assetRoot: string) {
       || planHashes && (selected.some(id => !planHashes[id]) || selected.length !== Object.keys(planHashes).length)) throw new FreezeError('invalid_request', '请明确选择真实 Case；变体 Case 必须完整对应本次确认计划')
     const caseIds = [...selected].sort()
     const entries = new Map<string, { content: Buffer; mode: string }>()
-    for (const path of [...candidateFiles(source.candidate).map(path => `${base}/candidate/${path}`), ...['change.yaml', 'hypothesis.md', 'decision.md'].map(path => `${base}/${path}`)]) {
+    const researchRoot = dataPath(root, `${base}/evaluation`)
+    const researchFiles = existsSync(researchRoot) ? candidateFiles(researchRoot).map(path => `${base}/evaluation/${path}`) : []
+    for (const path of [...candidateFiles(source.candidate).map(path => `${base}/candidate/${path}`), ...['change.yaml', 'hypothesis.md', 'decision.md'].map(path => `${base}/${path}`), ...researchFiles]) {
       const file = dataPath(root, path)
       const content = readFileSync(file)
       if (containsLiteralLlmKey(path, content.toString('utf8'))) throw new FreezeError('secret_rejected', '冻结对象包含 LLM API Key 常量')
@@ -127,7 +129,7 @@ export function createComputeFreezeHandler(assetRoot: string) {
       const value = { experiment_id: source.id, branch, head, tree, case_ids: caseIds,
         case_hashes: Object.fromEntries(caseIds.map(id => [id, hash(canonical(currentCases.cases[id]))])),
         evaluation_base_sha256: evaluationBase, files, diff,
-        notes: ['仅冻结所列 Candidate、研究计划、版本装载说明和选定 Case；不推送、不运行 Git hooks。'] }
+        notes: ['仅冻结所列 Candidate、研究计划、本版本 evaluation 研究资料和选定 Case；运行记录与其他版本不进入提交，不推送、不运行 Git hooks。'] }
       const previewHash = hash(JSON.stringify(value))
       return { value: { ...value, preview_sha256: previewHash, freeze_input: { experiment_id: source.id, case_ids: caseIds, evaluation_base_sha256: evaluationBase, expected_preview_sha256: previewHash } }, entries, paths, deleted, temp, tempIndex, indexFile, indexBytes, branch, head, tree }
     } catch (error) { rmSync(temp, { recursive: true, force: true }); throw error }

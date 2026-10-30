@@ -13,18 +13,26 @@ const directory = mkdtempSync(join(tmpdir(), 'workflow-runtime-test-'))
 const file = join(directory, 'runtime.mjs')
 await build({ entryPoints: [new URL('../src/workflows/runtime.ts', import.meta.url).pathname], outfile: file, bundle: true,
   platform: 'node', format: 'esm', banner: { js: `import { createRequire as __createRequire } from 'node:module'; const require=__createRequire(import.meta.url);` } })
-const { defineWorkflow, registerWorkflowTool, registerCodeOnlyWorkflowAgent, registerHybridWorkflowAgent, runWorkflow } = await import(`file://${file}`)
+const { defineWorkflow, registerWorkflowTool, registerCodeOnlyWorkflowAgent, registerHybridWorkflowAgent, runWorkflow, LlmError, attributionHeaders } = await import(`file://${file}`)
 const modelRoles = {
   language: { provider: 'qwen', model: 'qwen3.5-2b', reasoning_effort: 'off' },
   decision: { provider: 'kev', model: 'kev-0.8b', reasoning_effort: 'off', checkpoint_sha256: 'a'.repeat(64), state_constructor_sha256: 'b'.repeat(64), calibration_sha256: 'c'.repeat(64) },
 }
+
 const require = createRequire(import.meta.url)
 const sdkRequire = createRequire(require.resolve('@deepseek-ai/dsh-api-session-controller'))
 const sdk = name => import(pathToFileURL(sdkRequire.resolve(name)).href)
-const [{ Context }, { ToolRuntime }, { SystemPrompt }, { createScope }] = await Promise.all([
-  sdk('@deepseek-ai/cordis'), sdk('@deepseek-ai/dsh-tools'), sdk('@deepseek-ai/dsh-system-prompt'), sdk('@deepseek-ai/dsh-scope'),
+const [{ Context }, { ToolRuntime }, { SystemPrompt }, { createScope }, { LlmRuntime }] = await Promise.all([
+  sdk('@deepseek-ai/cordis'), sdk('@deepseek-ai/dsh-tools'), sdk('@deepseek-ai/dsh-system-prompt'), sdk('@deepseek-ai/dsh-scope'), sdk('@deepseek-ai/dsh-llm'),
 ])
 test.after(() => rmSync(directory, { recursive: true, force: true }))
+test('生成适配器复用锁定Runtime的真实Provider错误事实和归属头', () => {
+  const failure = new LlmError('模型服务返回失败', 'PROVIDER_FAILURE', { status: 503, requestId: 'actual-response-id' })
+  assert.equal(failure.failure.status, 503)
+  assert.equal(failure.failure.requestId, 'actual-response-id')
+  const headers = attributionHeaders()
+  assert.ok(headers && typeof headers === 'object' && Object.keys(headers).length > 0)
+})
 
 function fixture(dispatch, llm) {
   let tool
@@ -188,6 +196,86 @@ test('真实ToolRuntime中图模型派发前中间件失败保留原始attempt�
   assert.equal(measured.actual_model_calls, null)
   assert.equal(measured.observed_model_calls, 0)
   assert.ok(measured.model_calls_unknown_reasons.includes('graph-attempt-invocation-unproven'))
+})
+
+test('原生LLM错误终态保留结构化失败并将已返回用量结算为failed', async t => {
+  const f = nativeFixture(t)
+  await f.ctx.plugin(LlmRuntime)
+  f.registration.llm = f.ctx.llm
+  const card = { provider: 'qwen', id: 'qwen3.5-2b', name: '本地测试模型', reasoning: { efforts: [{ id: 'off', name: '关闭' }] } }
+  let responseReceived = true
+  f.ctx.llm.registerAdapter(['qwen'], {
+    providerInfo: provider => ({ id: provider, name: '本地测试适配器' }), providerRetryPolicy: () => undefined, imageRequestPricing: () => undefined,
+    async listModels() { return [card] }, async resolveModel() { return card },
+    async prepareCall() { return { model: card, async *stream() {
+      if (responseReceived) {
+        yield { type: 'usage', usage: { inputTokens: 9, outputTokens: 2, totalTokens: 11 } }
+        throw new LlmError('QWEN_HTTP_503', 'QWEN_HTTP_503', { status: 503, requestId: 'provider-failed-request', providerRetryAfterMs: 250, cause: new Error('私有Provider诊断') })
+      }
+      throw new TypeError('fetch failed')
+    } } },
+  })
+  registerWorkflowTool(f.registration, defineWorkflow({ id: 'native-error-finish', toolName: 'native_error_finish', description: '原生失败终态', inputSchema: { type: 'object' },
+    run: context => context.infer({ ...modelRoles.language, reasoningEffort: 'off' }, { messages: [] }) }), { executionMode: 'hybrid', modelRoles })
+  const result = await f.execute('native_error_finish')
+  assert.equal(result.isError, false, JSON.stringify(result))
+  assert.equal(result.value.ok, false)
+  assert.deepEqual(result.value.graph_execution.failure, { message: 'QWEN_HTTP_503', code: 'QWEN_HTTP_503', status: 503, requestId: 'provider-failed-request' })
+  assert.equal(JSON.stringify(result).includes('私有Provider诊断'), false)
+  const attempts = result.value.graph_execution.model_attempts
+  assert.deepEqual(attempts.map(row => row.status), ['preparing', 'started', 'failed'])
+  assert.deepEqual(attempts.at(-1).usage, { inputTokens: 9, outputTokens: 2, totalTokens: 11 })
+  assert.equal(attempts.at(-1).model_invocation, true)
+  assert.equal(new Set(attempts.map(row => row.attempt_id)).size, 1)
+  const measured = measureModelUsage([], { attempts, requireSessionTrace: false })
+  assert.equal(measured.actual_model_calls, 1)
+  assert.equal(measured.failed_model_calls, 1)
+  assert.equal(measured.token_usage.total_tokens, 11)
+
+  responseReceived = false
+  const unknown = (await f.execute('native_error_finish')).value
+  assert.equal(unknown.ok, false)
+  assert.deepEqual(unknown.graph_execution.failure, { message: 'fetch failed', code: 'UNKNOWN' })
+  const uncertain = unknown.graph_execution.model_attempts
+  assert.deepEqual(uncertain.map(row => row.status), ['preparing', 'started', 'failed'])
+  assert.equal(Object.hasOwn(uncertain.at(-1), 'model_invocation'), false)
+  assert.equal(Object.hasOwn(uncertain.at(-1), 'usage'), false)
+  const unmeasured = measureModelUsage([], { attempts: uncertain, requireSessionTrace: false })
+  assert.equal(unmeasured.actual_model_calls, null)
+  assert.equal(unmeasured.observed_model_calls, 0)
+  assert.equal(unmeasured.token_usage, null)
+})
+
+test('infer缺失结构化失败或finish仍报未完成，原生取消保持cancelled', async () => {
+  for (const kind of ['error-without-failure', 'missing-finish', 'aborted']) {
+    const controller = new AbortController()
+    let captured
+    const f = fixture(async () => assert.fail('无工具调用'), { async prepareCall(config) { return { config, async *stream() {
+      yield { type: 'usage', usage: { inputTokens: 1, outputTokens: 0, totalTokens: 1 } }
+      if (kind === 'aborted') {
+        controller.abort()
+        yield { type: 'finish', reason: { kind: 'aborted', failure: { message: '请求已取消', code: 'ABORTED' } } }
+      } else if (kind === 'error-without-failure') yield { type: 'finish', reason: { kind: 'error' } }
+    } } } })
+    const name = kind.replaceAll('-', '_')
+    registerWorkflowTool(f.ctx, defineWorkflow({ id: name, toolName: name, description: '未完成响应', inputSchema: { type: 'object' },
+      async run(context) {
+        try { return await context.infer({ ...modelRoles.language, reasoningEffort: 'off' }, { messages: [] }) }
+        catch (error) { captured = error; throw error }
+      } }), { executionMode: 'hybrid', modelRoles })
+    const result = await f.tool().execute({}, { ...f.identity, signal: controller.signal })
+    assert.equal(result.ok, false)
+    assert.equal(result.graph_execution.status, kind === 'aborted' ? 'cancelled' : 'failed')
+    assert.equal(Object.hasOwn(result.graph_execution, 'failure'), false)
+    if (kind === 'aborted') {
+      assert.ok(captured instanceof LlmError)
+      assert.equal(captured.failure.code, 'ABORTED')
+      assert.equal(result.graph_execution.model_attempts.at(-1).status, 'cancelled')
+    } else {
+      assert.equal(captured.name, 'Error')
+      assert.equal(captured.message, '工作流模型响应未完成')
+    }
+  }
 })
 
 test('纯代码工作流拒绝infer，保留失败图且不准备任何模型请求', async t => {
@@ -420,6 +508,9 @@ test('混合工作流拒绝未绑定路由、错产物、丢失和失败决策�
   const partialUsage = measureModelUsage([], { attempts: partial.graph_execution.model_attempts, requireSessionTrace: false })
   assert.equal(partialUsage.actual_model_calls, null)
   assert.equal(partialUsage.observed_model_calls, 1, '回执不完整仍保留已证明请求下界')
+  const uncertain = partial.graph_execution.model_attempts.find(item => item.attempt_id.endsWith(':uncertain-request'))
+  assert.equal(uncertain.status, 'cancelled', '派发未知也保留原始请求身份和取消事实')
+  assert.equal(Object.hasOwn(uncertain, 'model_invocation'), false, '未知不写成false或undefined属性')
   response = args => ({ typed_decision: null, model_execution: args.model_execution,
     model_requests: [{ ...modelRoles.decision, request_id: 'pre-aborted', status: 'cancelled', model_invocation: false }] })
   const notDispatched = (await f.execute('typed_receipt')).value
@@ -439,4 +530,35 @@ test('混合语言模型装配改变路由时在stream前停止，不调用隐�
   assert.equal(streams, 0)
   const measured = measureModelUsage([], { attempts: result.graph_execution.model_attempts, requireSessionTrace: false })
   assert.equal(measured.actual_model_calls, 0)
+})
+
+test('混合infer只向原生stream传递exec真实Session，自报身份不能替换或补造归属', async t => {
+  const requests = []
+  const f = nativeFixture(t, { async prepareCall(config) {
+    return { config, async *stream(options) {
+      requests.push(options)
+      yield { type: 'text-delta', text: '原生身份已保留' }
+      yield { type: 'finish', reason: { kind: 'stop' } }
+    } }
+  } })
+  const definition = name => defineWorkflow({ id: name, toolName: name, description: '模型请求身份', inputSchema: { type: 'object' },
+    run: context => context.infer({ provider: 'qwen', model: 'qwen3.5-2b', reasoningEffort: 'off', sessionId: 'forged-from-config' },
+      { system: '真实请求', messages: [{ role: 'user', content: [] }], sessionId: 'forged-from-payload' }) })
+  registerWorkflowTool(f.registration, definition('trusted_session_infer'), { executionMode: 'hybrid', modelRoles })
+  const actual = await f.execute('trusted_session_infer')
+  assert.equal(actual.value.ok, true, JSON.stringify(actual))
+  assert.equal(requests[0].sessionId, f.agent.session.id)
+  assert.equal(actual.value.graph_execution.model_attempts.at(-1).session_id, f.agent.session.id)
+
+  const noAgent = await f.ctx.tools.execute({ name: 'trusted_session_infer', arguments: {}, callId: 'standalone-infer', signal: new AbortController().signal })
+  assert.equal(noAgent.value.ok, true, JSON.stringify(noAgent))
+  assert.equal(requests[1].sessionId, undefined, '没有exec Session时不得采用config或payload自报身份')
+  assert.equal(Object.hasOwn(noAgent.value.graph_execution, 'session_id'), false)
+
+  registerWorkflowTool(f.registration, defineWorkflow({ id: 'identity-not-authority', toolName: 'identity_not_authority', description: '身份不改变模型角色', inputSchema: { type: 'object' },
+    run: context => context.infer({ provider: 'unbound', model: 'fallback', reasoningEffort: 'off', sessionId: f.agent.session.id }, { messages: [] }) }), { executionMode: 'hybrid', modelRoles })
+  const refused = await f.execute('identity_not_authority')
+  assert.equal(refused.value.ok, false)
+  assert.equal(requests.length, 2, '真实Session也不能授权计划外模型')
+  assert.deepEqual(refused.value.graph_execution.model_attempts, [])
 })

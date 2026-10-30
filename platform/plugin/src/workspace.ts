@@ -1,3 +1,4 @@
+import { VERSION_ID } from './version-id.ts'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -40,7 +41,7 @@ export function workspaceOwnsInstance(assetRoot: string, manifest: Record<string
   // UUID 可随 Git 克隆；缺少路径的旧登记仍须由 Candidate 挂载确认。
   if (manifest.asset_root != null) return true
   if (!initialized) return true
-  if (typeof manifest.source_id !== 'string' || !/^experiment:EXP-[a-z0-9-]+-\d{3}(?:-r[0-9a-f]{12})?$/.test(manifest.source_id)) return false
+  if (typeof manifest.source_id !== 'string' || !manifest.source_id.startsWith('experiment:') || !VERSION_ID.test(manifest.source_id.slice('experiment:'.length))) return false
   const mounts = manifest.mounts as Record<string, unknown> | undefined
   const values = ['workspace', 'presets', 'managed'].map(key => mounts?.[key])
   if (values.some(value => value != null && (typeof value !== 'string' || !isAbsolute(value)))) return false

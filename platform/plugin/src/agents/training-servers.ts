@@ -5,10 +5,11 @@ import { dirname, resolve } from 'node:path'
 import type { ConnectionRpcHandler, ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 import { workspaceConfigPath } from '../workspace.ts'
 
-type Server = {
+export type TrainingServer = {
   id: string; name: string; host: string; port: number; user: string
   workDir: string; auth: 'ssh_key' | 'password'; credentialRef: string
 }
+type Server = TrainingServer
 type Directory = { schemaVersion: 1; servers: Server[] }
 
 const EMPTY = JSON.stringify({ schemaVersion: 1, servers: [] }, null, 2) + '\n'
@@ -17,7 +18,8 @@ const result = (value: Record<string, unknown>): ConnectionRpcResult<Record<stri
 const failure = (code: string, message: string): ConnectionRpcResult<never> => ({ ok: false, error: { code, message, details: {} } })
 
 class DirectoryError extends Error {
-  constructor(readonly code: string, message: string) { super(message) }
+  readonly code: string
+  constructor(code: string, message: string) { super(message); this.code = code }
 }
 
 function directoryFile(root: string): string {
@@ -114,6 +116,19 @@ function readDirectory(root: string, underLock = false): { file: string; text: s
   catch { throw new DirectoryError('invalid_asset', '训练连接配置条目无效') }
   if (new Set(servers.map(item => item.id)).size !== servers.length) throw new DirectoryError('invalid_asset', '训练连接 ID 重复')
   return { file, text, revision: digest(text), directory: { schemaVersion: 1, servers } }
+}
+
+/** CLI与页面读取同一连接目录；不返回凭据正文。 */
+export function readTrainingServerDirectory(root: string) {
+  const current = readDirectory(realpathSync(resolve(root)))
+  return { revision: current.revision, servers: current.directory.servers }
+}
+
+/** SSH执行只解析这一明确专用引用，不为任意ref猜测文件位置。 */
+export function resolveTrainingServerCredentialPath(root: string, reference: string): string {
+  const slug = /^ref:training-server\/([a-z0-9][a-z0-9-]{0,63})$/.exec(reference)?.[1]
+  if (!slug) throw new DirectoryError('invalid_credential_reference', 'SSH执行需要 ref:training-server/<slug> 专用凭据引用')
+  return resolve(realpathSync(root), '.local/credentials/training-servers', `${slug}.json`)
 }
 
 async function probe(host: string, port: number, signal?: AbortSignal): Promise<'ssh_reachable' | 'port_reachable_unverified' | 'unreachable'> {

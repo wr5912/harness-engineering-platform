@@ -1,12 +1,13 @@
 import { z } from 'zod'
 import { businessCasesSchema } from '../agents/business-cases.ts'
+import { DECISION_EXTRACTION_CONTRACT } from '../evaluation/decision-dataset-contract.ts'
 
 export type AssistantDomain = 'agents' | 'instances' | 'mcp'
 type MapValue = Record<string, any>
 export const assistantActions: Record<AssistantDomain, readonly string[]> = {
-  agents: ['documents/read', 'research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'list', 'detail', 'edit/read', 'edit/preview', 'edit/apply', 'cases/list', 'cases/read', 'cases/update', 'eval/preview', 'eval/start', 'eval/status', 'eval/cancel', 'runs/index', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/preview', 'compute-variants/create', 'compute-variants/rename', 'compute-variants/build-preview', 'compute-variants/build', 'compute-variants/freeze-preview', 'compute-variants/freeze', 'compute-variants/compare', 'new', 'create', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'cases/create', 'datasets/source', 'datasets/preview', 'datasets/apply', 'datasets/list', 'datasets/read', 'datasets/export', 'decision/update', 'features/read-source', 'features/preview', 'features/proposal', 'features/apply', 'fusion/preview', 'fusion/proposal', 'fusion/confirm', 'fusion/status', 'fusion/verify', 'fusion/finalize', 'tasks/capabilities', 'tasks/assembly-preview', 'tasks/assembly-apply'],
+  agents: ['documents/read', 'research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'list', 'detail', 'edit/read', 'edit/preview', 'edit/apply', 'cases/list', 'cases/read', 'cases/update', 'eval/preview', 'eval/start', 'eval/status', 'eval/cancel', 'runs/index', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/source', 'compute-variants/identity-preview', 'compute-variants/identity-apply', 'compute-variants/preview', 'compute-variants/create', 'compute-variants/rename', 'compute-variants/build-preview', 'compute-variants/build', 'compute-variants/freeze-preview', 'compute-variants/freeze', 'compute-variants/compare', 'new', 'create', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'cases/create', 'datasets/source', 'datasets/preview', 'datasets/apply', 'datasets/list', 'datasets/read', 'datasets/review', 'datasets/export', 'decision/update', 'features/read-source', 'features/preview', 'features/proposal', 'features/apply', 'fusion/preview', 'fusion/proposal', 'fusion/confirm', 'fusion/status', 'fusion/verify', 'fusion/finalize', 'tasks/capabilities', 'tasks/assembly-preview', 'tasks/assembly-apply'],
   instances: ['list', 'detail', 'url', 'logs', 'preview', 'batch-preview', 'run', 'batch'],
-  mcp: ['list', 'configuration', 'saveConfiguration', 'test', 'resources', 'resourceTemplates', 'readResource', 'callTool', 'sources/list', 'sources/create', 'sources/refresh', 'sources/toggle', 'sources/components', 'sources/logs', 'sources/preview', 'sources/invoke', 'saveCompositionDraft', 'publishComposition', 'executeComposition', 'dryRunComposition', 'callPublishedComposition', 'compositionRun', 'compositionArtifact', 'seedThreatCompositions', 'control/status', 'control/saveConfiguration', 'control/restrict', 'control/reassess', 'control/release'],
+  mcp: ['list', 'configuration', 'saveConfiguration', 'test', 'resources', 'resourceTemplates', 'readResource', 'callTool', 'sources/list', 'sources/create', 'sources/refresh', 'sources/toggle', 'sources/components', 'sources/logs', 'sources/preview', 'sources/invoke', 'saveCompositionDraft', 'publishComposition', 'executeComposition', 'dryRunComposition', 'callPublishedComposition', 'compositionRun', 'compositionArtifact', 'compositionSource', 'seedThreatCompositions', 'control/status', 'control/saveConfiguration', 'control/restrict', 'control/reassess', 'control/release'],
 }
 
 export const featureActions = ['research/read-reference', 'detail', 'edit/read', 'assets/diff', 'assets/read-fixed', 'features/read-source', 'features/preview', 'features/proposal', 'runs/index', 'runs/show', 'runs/report', 'runs/files', 'runs/read-file', 'runs/trace']
@@ -32,7 +33,11 @@ const fields: MapValue = {
   port: { type: 'integer' }, tail: { type: 'integer' }, cursor: { type: 'integer' }, limit: { type: 'integer' },
   arguments: { ...object, description: '使用 test 或 sources/components 返回的真实工具 inputSchema，不猜测参数。' },
   input: { ...object, description: '业务工具输入，使用当前工具目录返回的 inputSchema。' },
-  plan: object,
+  plan: object, selection: { ...object, description: '固定编排来源 {id,version:draft/published/version,versionId?}，使用实际目录返回的身份。' },
+  workflow: string, task: { ...object, description: '沿用 datasets/read 的 {id,semantics}；semantics=recommended_decision 或 observed_action。' },
+  questions: { ...object, description: '沿用公开决策合同的命名问题映射，每题含 type/instructions/criteria?。' },
+  targets: { ...object, description: '与 questions 名称精确对应；每题只含 label、basis、probabilities?、status(reviewed/rejected)、decision_time_reviewed。' },
+  split: { type: 'string', enum: ['unassigned', 'train', 'development', 'calibration', 'test'] },
   evaluation_cases: z.toJSONSchema(businessCasesSchema, { io: 'input' }),
   edits: { type: 'array', items: { type: 'object', required: ['path', 'content', 'expected_sha256'], additionalProperties: false,
     properties: { path: string, content: { ...string, description: '修改后完整文件正文，不能省略或只提供补丁。' }, expected_sha256: { type: ['string', 'null'], description: 'edit/read 返回的原始摘要；新文件为 null。' } } } },
@@ -64,6 +69,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['saveCompositionDraft', 'compositionId revision draft', 'revision 来自 list；新编排省略 compositionId，更新时必须指定已有 ID。'],
     ['publishComposition executeComposition dryRunComposition', 'compositionId version revision input', '先保存草稿；version=draft/published，发布只接受 draft；使用当前 revision。'],
     ['callPublishedComposition', 'toolName input', '服务器从当前目录固定实际已发布版本，按 DSH 原生权限执行。'],
+    ['compositionSource', 'selection path expected_sha256', '省略 path 列实际源码目录；selection 固定编排与 draft/published/version 身份，path 和 expected_sha256 使用目录回执。仅读实际文件，不执行。'],
     ['compositionRun', 'run_id'], ['compositionArtifact', 'run_id artifactId'], ['seedThreatCompositions', 'revision bindings', '仅在业务扩展实际装载且用户要求时使用。'],
     ['control/status', '', '读取基础许可、风险事实、限制与真实实例回执；定时任务不在首期覆盖范围。'],
     ['control/saveConfiguration', 'revision enabled agents', '使用 control/status 的字符串 revision 和当前 agents 规则；只修改开放与基础授权，不发送凭据。'],
@@ -94,9 +100,14 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['fusion/preview', 'agent_id parent_experiment_id parent_ref research_question plan', '先省略 plan 读取 inventory。融合 plan={sources:[{experiment_id,ref,decision:inherit/omit,reason}],features,conflicts:[{description,resolution}],checks:[{id,kind:build/load/capability,command?,cwd?,case_ids?}],evaluation_case_ids,evaluation_sha256}；来源和评测摘要使用实际读取值。'],
     ['fusion/proposal', 'agent_id parent_experiment_id'], ['fusion/status fusion/finalize', 'experiment_id'],
     ['fusion/verify', 'experiment_id expected_candidate_sha256 check_id run_id'],
-    ['datasets/source', 'run_id path source_sha256 cursor', '先省略 path 列来源及 extraction_contract，再逐页读取 target 轨迹。'],
-    ['datasets/preview', 'run_id path source_sha256 samples skipped', '遵循 datasets/source 的 extraction_contract；固定 Run 专项自动保存并回读，样本仍为 suggested。'],
-    ['datasets/list', 'run_id'], ['datasets/read', 'dataset_id'], ['datasets/export', 'dataset_id mode', 'mode=candidates/training/development/calibration/test。candidates 可导出候选，其余仅导出符合对应用途且已由人员逐题复核的题目。'],
+    ['datasets/source', 'run_id path source_sha256 source_identity_sha256 cursor limit decision_id content_sha256', `所有续读保留source_sha256与完整source_identity_sha256；指定path后不重复目录。大决策按read_input读取fragment，另保留content_sha256并完整拼接；来源Agent/版本/Run及Candidate/dirty由服务器固定。${DECISION_EXTRACTION_CONTRACT.source.limits}分片回执的read_input非空时直接用它续读，不扩大limit。`],
+    ['datasets/preview', 'run_id path source_sha256 source_identity_sha256 samples skipped', '遵循 datasets/source 的 extraction_contract；可携来源页的完整身份摘要防止读取后改绑。固定 Run 专项自动保存并回读，样本仍为 suggested。'],
+    ['datasets/list', 'run_id'], ['datasets/read', 'dataset_id'],
+    ['datasets/review', 'dataset_id expected_sha256 record_id workflow task questions targets group_id split', 'AI 委托逐题复核，用于 functional_validation。先读取真实批次及完整决策前输入；大回执的 state_omitted 需按 read_input 调 datasets/source 完整续读后再判断。可同次修改题目与标签。每题 targets 只提供 label、basis、可选 probabilities、status(reviewed/rejected)、decision_time_reviewed；不提交 provenance、review、Session、模型或时间。身份及完整输入读取证据由真实会话记录；必须在读完后下一轮模型请求中判断，不能同一步并发读取与复核。不冒称人工或独立真值；没有概率证据时省略。保留原 group_id/split，除非用户已授权用途调整。'],
+    ['datasets/export', 'dataset_id mode', 'mode=candidates/training/development/calibration/test。candidates 可导出候选，其余仅导出符合对应用途且已逐题复核的题目；保留实际复核方式，AI 委托复核用于功能验证，不等同人工或独立真值。'],
+    ['compute-variants/identity-preview', 'experiment_id current_variant_id', '将存量 EXP 算力变体迁移到当前 VAR 身份；省略 current_variant_id 由平台分配新 VAR，明确关联已有 VAR 时须同 Agent、固定业务父版和研究任务。预览不会写入。'],
+    ['compute-variants/identity-apply', 'experiment_id current_variant_id expected_preview_sha256', '使用 identity-preview 返回的 apply_input 原样执行。只在旧 change.yaml 保存 current_variant_id；已有 VAR 的当前资产不覆盖，历史 Run/Git/Session 不改、不充作新 Run。结果未知时先回读 detail/current_variant_id，重复执行只返回已完成映射；无需额外人工确认。'],
+    ['compute-variants/source', 'experiment_id path expected_sha256', '省略 path 列实际生成文件目录；读取时使用目录返回的 path 和 sha256（expected_sha256），源码只读，不执行。'],
     ['compute-variants/context', 'experiment_id', '先读取 generation_contract 和固定父版；不凭空编造 SDK 能力。'],
     ['compute-variants/preview compute-variants/create', 'agent_id parent_experiment_id parent_ref variant_name strategy case_ids critical_case_ids min_runs_per_case max_pass_rate_drop_pp resource_metric min_resource_reduction_pct allow_model_change variant_model variant_reasoning_effort execution_mode model_roles generation', '使用 context 返回的生成合同；名称与策略分别提供。hybrid 双模型身份与单模型变更互斥。'],
     ['compute-variants/rename', 'experiment_id variant_name expected_change_sha256'],

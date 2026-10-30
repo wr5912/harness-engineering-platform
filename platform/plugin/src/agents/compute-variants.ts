@@ -1,3 +1,5 @@
+import { VERSION_ID, isVariantIdentity } from '../version-id.ts'
+import { assertVersionIdentity, versionIdentity } from './version-source.ts'
 import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve, relative, sep } from 'node:path'
@@ -8,6 +10,7 @@ import { readRunEvidenceFile } from './run-files.ts'
 import { extractGraphExecutions, measureModelUsage } from '../evaluation/model-usage.ts'
 import type { ModelAttempt } from '../evaluation/model-attempts.ts'
 import { inspectComputeBuild } from './compute-build.ts'
+import { computeCodeSource } from './compute-source.ts'
 import { computeGenerationContract } from './compute-generation-contract.ts'
 import { isCodeOnlyModelRoute, isHybridWorkflowRoute } from '../workflows/code-only-route.ts'
 import { matchesWorkflowModelBinding, validateWorkflowModelRoles, type WorkflowModelRoles } from '../workflows/model-roles.ts'
@@ -15,7 +18,7 @@ import { matchesWorkflowModelBinding, validateWorkflowModelRoles, type WorkflowM
 type Map = Record<string, any>
 type Result = { ok: true; value: any } | { ok: false; error: { code: string; message: string } }
 export interface ComputeVariantServices {
-  createExperiment(payload: Map): Promise<unknown>
+  createExperiment(payload: Map, variant: ComputeVariantCreation): Promise<unknown>
   readRun(runId: string, signal?: AbortSignal): Promise<any>
   candidateDigest(experimentId: string): string
   gitCandidateDigest(experimentId: string, ref: string): string | null
@@ -38,7 +41,8 @@ export interface ComputePlan {
   measurement_schema_version?: 2
   generation?: GenerationPlan
 }
-const EXP = /^EXP-([a-z0-9]+(?:-[a-z0-9]+)*)-\d{3}(?:-r[0-9a-f]{12})?$/
+export interface ComputeVariantCreation { plan: ComputePlan; name: string }
+const EXP = VERSION_ID
 const RUN = /^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 const METRICS: ComputeMetric[] = ['model_calls', 'actual_model_calls', 'input_tokens', 'output_tokens', 'total_tokens', 'elapsed_ms']
 // DSH 21638c563 TokenUsage 的输入/缓存桶互不重叠，reasoning 已包含在输出中。
@@ -112,7 +116,7 @@ function experiment(root: string, id: string) {
   if (!EXP.test(id)) fail('experiment_id 格式无效')
   const file = safe(root, `evolution/experiments/${id}/change.yaml`)
   const content = readFileSync(file, 'utf8'), change = loadYaml(content) as Map
-  if (change?.experiment_id !== id || change.agent_id !== EXP.exec(id)![1]) fail('研究版本身份不一致')
+  assertVersionIdentity(id, change)
   return { file, content, change }
 }
 function atomic(file: string, content: string) {
@@ -317,7 +321,7 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
     const generated = Boolean(generation && existsSync(safe(root, `evolution/experiments/${id}/candidate/${generation.entry_path}`)))
     const comparison = await restoredComparison(id, change, digest, buildState, signal)
     return { experiment_id: id, agent_id: change.agent_id, variant_name: change.variant_name ?? null, parent_ref: `git:${commit ?? ''}`, parent_experiment_id: change.parent_experiment_id ?? null, fixed_parent_ref: change.baseline_ref ?? null, plan: change.compute_variant ?? null,
-      candidate_sha256: digest, generation, generation_contract: computeGenerationContract(), build: { ...(buildState.receipt ?? {}), verified: buildState.verified, reasons: buildState.reasons }, freeze,
+      candidate_sha256: digest, generation, generated_files: generation ? computeCodeSource(root, id, generation, buildState.receipt) : null, generation_contract: computeGenerationContract(), build: { ...(buildState.receipt ?? {}), verified: buildState.verified, reasons: buildState.reasons }, freeze,
       loaded: { verified: loadedRuns.length > 0, run_ids: loadedRuns }, comparison,
       workflow_status: { generated, built: buildState.verified, frozen: freeze.candidate_matches && freeze.plan_matches, loaded: loadedRuns.length > 0,
         compared: comparison !== null },
@@ -328,9 +332,11 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
   async function preview(body: Map, signal?: AbortSignal) {
     const name = body.variant_name === undefined ? body.generation ? 'LangGraph 代码变体' : '算力变体' : variantName(body)
     const parentId = text(body, 'parent_experiment_id'), parent = experiment(root, parentId)
+    if (isVariantIdentity(parentId, parent.change)) fail('变体不能作为新版本的继承来源')
     const parsed = await casesFor(root, parent.change.agent_id, signal), plan = makePlan(body, parsed.cases)
     const parentRef = text(body, 'parent_ref')
     if (!/^git:[0-9a-f]{40}$/.test(parentRef) || !services.gitCandidateDigest(parentId, parentRef)) fail('父版必须是能完整恢复的固定 Git 提交')
+    if (isVariantIdentity(parentId, versionIdentity(root, parentId, parentRef.slice(4)))) fail('变体不能作为新版本的继承来源')
     if (plan.generation) {
       const evidence: NonNullable<GenerationPlan['source_evidence']> = []
       for (const runId of plan.generation.source_run_ids) {
@@ -565,6 +571,10 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
     try {
       if (signal?.aborted) throw new VariantError('aborted', '变体操作已取消')
       if (method === 'context') return { ok: true, value: await context(body, signal) }
+      if (method === 'source') {
+        const id = text(body, 'experiment_id'), { change } = experiment(root, id)
+        return { ok: true, value: computeCodeSource(root, id, change.compute_variant?.generation, inspectComputeBuild(root, id).receipt, body) }
+      }
       if (method === 'preview') return { ok: true, value: await preview(body, signal) }
       if (method === 'rename') {
         const id = text(body, 'experiment_id'), name = variantName(body)
@@ -582,11 +592,8 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
         const prepared = await preview(body, signal)
         if (body.expected_preview_sha256 && body.expected_preview_sha256 !== prepared.preview_sha256) throw new VariantError('conflict', '父版、Case 或计划已变化，请重新预览')
         const { plan, parent_experiment_id: parentId, parent_ref: parentRef } = prepared
-        const created = await services.createExperiment({ agent_id: prepared.agent_id, parent_experiment_id: parentId, parent_ref: parentRef, research_question: plan.strategy }) as Result
+        const created = await services.createExperiment({ agent_id: prepared.agent_id, parent_experiment_id: parentId, parent_ref: parentRef, research_question: plan.strategy }, { plan, name: prepared.variant_name }) as Result
         if (!created.ok) return created
-        const id = created.value.experiment_id, next = experiment(root, id)
-        next.change.compute_variant = plan; next.change.variant_kind = 'exploratory'; next.change.variant_name = prepared.variant_name
-        atomic(next.file, dumpYaml(next.change, { lineWidth: -1, noRefs: true }))
         return { ok: true, value: { ...created.value, plan, variant_kind: 'exploratory', variant_name: prepared.variant_name } }
       }
       if (method === 'compare') {

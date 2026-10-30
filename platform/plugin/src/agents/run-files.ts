@@ -1,3 +1,4 @@
+import { VERSION_ID } from '../version-id.ts'
 import { createHash } from 'node:crypto'
 import { lstat, readdir, readFile, open } from 'node:fs/promises'
 import { join, relative, resolve, sep } from 'node:path'
@@ -5,7 +6,7 @@ import { load as loadYaml } from 'js-yaml'
 import { zip, type AsyncZippable } from 'fflate'
 
 const RUN_ID = /^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
-const EXP_ID = /^EXP-[a-z0-9]+(?:-[a-z0-9]+)*-\d{3}(?:-r[0-9a-f]{12})?$/
+const EXP_ID = VERSION_ID
 const PREVIEW_LIMIT = 64 * 1024
 const FINAL_STATUSES = new Set(['completed', 'failed', 'cancelled'])
 type JsonMap = Record<string, unknown>
@@ -13,7 +14,9 @@ type RunLocation = { root: string; directory: string; path: string; id: string }
 type FileEntry = { path: string; local: string; size: number; kind: 'text' | 'binary' }
 
 export class RunFileError extends Error {
-  constructor(readonly code: string, message: string, readonly details: JsonMap = {}) { super(message) }
+  readonly code: string
+  readonly details: JsonMap
+  constructor(code: string, message: string, details: JsonMap = {}) { super(message); this.code = code; this.details = details }
 }
 
 function checkCancelled(signal?: AbortSignal) {

@@ -11,7 +11,7 @@ const oldId = 'a'.repeat(64), currentId = 'b'.repeat(64)
 const oldConfig = { toolName: 'find_asset', title: '旧发布标题', description: '旧版说明', connectionId: 'source-one' }
 const currentConfig = { ...oldConfig, title: '当前发布标题', description: '当前说明' }
 
-function workbench(initialTarget = { page: 'mcp', tab: 'composition', composition_id: 'composition-one', version: 'published', version_id: oldId }, { execute, action, readCatalog, extraCompositions = [] } = {}) {
+function workbench(initialTarget = { page: 'mcp', tab: 'composition', composition_id: 'composition-one', version: 'published', version_id: oldId }, { execute, action, readCatalog, source, extraCompositions = [] } = {}) {
   const states = [], dependencies = [], cleanups = [], calls = [], navigations = [], copied = []
   let cursor, effects, changed, tree, listener
   let catalog = { revision: 'r1', connections: [{ kind: 'openapi', id: 'source-one' }], extension: null,
@@ -40,6 +40,7 @@ function workbench(initialTarget = { page: 'mcp', tab: 'composition', compositio
     rpc: { async call(_channel, endpoint, payload) {
       calls.push({ endpoint, payload })
       if (endpoint === 'mcp/list') return readCatalog ? readCatalog(catalog) : { ok: true, value: structuredClone(catalog) }
+      if (endpoint === 'mcp/compositionSource' && source) return source(payload)
       if (action && ['mcp/dryRunComposition', 'mcp/publishComposition', 'mcp/executeComposition'].includes(endpoint)) return action(endpoint, payload)
       if (endpoint === 'mcp/saveCompositionDraft') {
         if (payload.revision !== catalog.revision) return { ok: false, error: { message: '编排目录已变化，请刷新后重试' } }
@@ -221,4 +222,23 @@ test('阶段组合按已有运行恢复时，在途运行ID同样不可更换', 
   assert.equal(input().props.value, 'run-A')
   release({ ok: false, error: { message: 'fixture：阶段校验结束' } }); await ui.settle()
   assert.equal(input().props.disabled, false)
+})
+
+test('查看实现源码复用多文件浏览器，并将固定历史版本和文件SHA交给只读接口', async () => {
+  const ui = workbench(undefined, { source: payload => ({ ok: true, value: payload.path ? { identity: 'fixed', path: payload.path, sha256: payload.expected_sha256, content: 'actual source' } : { identity: 'fixed', files: [], notes: [] } }) })
+  await ui.settle()
+  ui.button('查看生成代码').props.onClick(); await ui.settle()
+  assert.match(ui.text(), /编排使用的实现源码/)
+  assert.doesNotMatch(ui.text(), /尚未接入生成源码|生成并保存源码/)
+  const browser = ui.nodes().find(node => typeof node.type === 'function' && node.type.name === 'GeneratedCodeBrowser')
+  assert.ok(browser)
+  await browser.props.loadCatalog()
+  await browser.props.loadFile({ path: 'platform/plugin/src/mcp/executor.ts', sha256: 'c'.repeat(64) })
+  const calls = ui.calls.filter(call => call.endpoint === 'mcp/compositionSource')
+  assert.equal(calls.length, 2)
+  assert.equal(calls[0].payload.selection.versionId, oldId)
+  assert.equal(calls[1].payload.expected_sha256, 'c'.repeat(64))
+  assert.equal(ui.calls.some(call => /save|publish|execute/i.test(call.endpoint)), false)
+  ui.setTarget({ page: 'mcp', tab: 'composition', composition_id: 'composition-one', version: 'published', version_id: currentId }); await ui.settle()
+  assert.equal(ui.nodes().some(node => typeof node.type === 'function' && node.type.name === 'GeneratedCodeBrowser'), false)
 })

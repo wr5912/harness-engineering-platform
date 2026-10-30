@@ -1,14 +1,34 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { versionSource, versionSources } from '../src/agents/version-source.ts'
 import { assetText } from '../src/agents/asset-text.ts'
+import { VERSION_ID, isVariantIdentity } from '../src/version-id.ts'
 
 const id = 'EXP-test-agent-001'
 const manifest = 'loadable_assets:\n  workspace: dsh/workspace\n  preset_root: dsh/presets\n  managed_root: dsh/managed\n  preset_id: test-agent\n  profile_patch: dsh/managed/test.patch.yml\ncredential_environment_keys: [TEST_TOKEN]\n'
+test('EXP与VAR共享来源读取并保留Agent捕获，VAR必须声明变体计划', t => {
+  const root = mkdtempSync(join(tmpdir(), 'variant-source-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const variant = 'VAR-test-agent-001-r123456abcdef', exp = join(root, 'evolution/experiments', variant)
+  assert.equal(VERSION_ID.exec(variant)[1], 'test-agent')
+  assert.equal(VERSION_ID.exec(variant)[2], '001')
+  mkdirSync(join(exp, 'candidate'), { recursive: true })
+  writeFileSync(join(exp, 'candidate/harness.yaml'), manifest)
+  const identity = `agent_id: test-agent\nexperiment_id: ${variant}\n`
+  writeFileSync(join(exp, 'change.yaml'), identity)
+  assert.throws(() => versionSource(root, variant), /必须声明 compute_variant/)
+  writeFileSync(join(exp, 'change.yaml'), identity + 'compute_variant: {strategy: 保留查询}\n')
+  assert.equal(versionSource(root, variant).agent_id, 'test-agent')
+  assert.ok(versionSources(root).sources[variant])
+  assert.equal(isVariantIdentity(variant), true)
+  assert.equal(isVariantIdentity(id), false)
+  for (const metadata of [{ compute_variant: {} }, { variant_kind: 'exploratory' }, { variant_kind: 'end' }, { kind: 'end' }, { variant: 'end' }]) assert.equal(isVariantIdentity(id, metadata), true)
+})
+
 test('版本当前解析不依赖登记，固定提交不借用工作树，历史登记仅从同一提交兼容', t => {
   const root = mkdtempSync(join(tmpdir(), 'version-source-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
@@ -57,4 +77,38 @@ test('源码变量引用原样可编辑，凭据常量只读且正文摘要与�
   assert.equal(masked.redacted, true)
   assert.notEqual(masked.sha256, masked.content_sha256)
   assert.equal(masked.content.includes(secret), false)
+})
+
+test('完整Candidate的约定Profile从同一版本补齐，显式错误不退回，固定提交不借当前文件', t => {
+  const root = mkdtempSync(join(tmpdir(), 'version-profile-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const exp = join(root, 'evolution/experiments', id), managed = join(exp, 'candidate/dsh/managed')
+  mkdirSync(managed, { recursive: true })
+  writeFileSync(join(exp, 'change.yaml'), `agent_id: test-agent\nexperiment_id: ${id}\n`)
+  const file = join(exp, 'candidate/harness.yaml'), profile = join(managed, 'web-profile.package.json')
+  writeFileSync(file, manifest)
+  const git = args => {
+    const value = spawnSync('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgSign=false', ...args], { cwd: root, encoding: 'utf8' })
+    assert.equal(value.status, 0, value.stderr); return value.stdout.trim()
+  }
+  git(['init']); git(['config', 'user.name', 'Fixture']); git(['config', 'user.email', 'fixture@example.invalid'])
+  git(['add', '.']); git(['commit', '-m', 'without profile'])
+  const absent = git(['rev-parse', 'HEAD'])
+  assert.equal(versionSource(root, id).profile_manifest, undefined)
+  writeFileSync(profile, '{"dsh":{"profile":{"bundles":["candidate-profile"]}}}')
+  writeFileSync(join(managed, 'web-profile.seed.patch.yml'), '- id: candidate-mcp-provider\n')
+  git(['add', '.']); git(['commit', '-m', 'complete candidate with conventional profile'])
+  const present = git(['rev-parse', 'HEAD']), expected = `evolution/experiments/${id}/candidate/dsh/managed/web-profile.package.json`
+  assert.equal(versionSource(root, id).profile_manifest, expected)
+  assert.equal(versionSource(root, id, absent).profile_manifest, undefined)
+  rmSync(profile)
+  assert.equal(versionSource(root, id).profile_manifest, undefined)
+  assert.equal(versionSource(root, id, present).profile_manifest, expected)
+  for (const value of ['""', 'null', '../outside']) {
+    writeFileSync(file, manifest.replace('  profile_patch:', `  profile_manifest: ${value}\n  profile_patch:`))
+    assert.throws(() => versionSource(root, id), /相对路径/)
+  }
+  writeFileSync(file, manifest)
+  symlinkSync(join(managed, 'web-profile.seed.patch.yml'), profile)
+  assert.throws(() => versionSource(root, id), /符号链接/)
 })

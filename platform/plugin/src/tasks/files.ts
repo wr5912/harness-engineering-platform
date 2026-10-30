@@ -1,9 +1,10 @@
+import { VERSION_ID } from '../version-id.ts'
 import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { versionIdentity } from '../agents/version-source.ts'
 
-export const EXPERIMENT = /^EXP-([a-z0-9]+(?:-[a-z0-9]+)*)-\d{3}(?:-r[0-9a-f]{12})?$/
+export const EXPERIMENT = VERSION_ID
 export const RUN = /^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 const EXCLUDED = new Set(['runs', 'history', 'RuntimeHOME', 'sessions', 'cache', '.git', 'node_modules', '__pycache__'])
 export const sha256 = (value: string | Buffer) => createHash('sha256').update(value).digest('hex')

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -33,6 +33,25 @@ function assemblyInput(root) {
   const path = 'dsh/workspace/.agents/skills/inspection/SKILL.md'
   return { target_source: `experiment:${targetId}`, expected_candidate_sha256: candidateDigest(join(root, `evolution/experiments/${targetId}/candidate`)), files: [{ source: `experiment:${sourceId}`, path, expected_source_sha256: sha256(readFileSync(join(root, `evolution/experiments/${sourceId}/candidate/${path}`))), expected_target_sha256: null }] }
 }
+
+test('装配拒绝VAR与历史EXP变体作为其他来源，但VAR目标可继续装配和编辑', async t => {
+  const root = fixture(t), input = assemblyInput(root)
+  const sourceChange = join(root, `evolution/experiments/${sourceId}/change.yaml`)
+  const original = readFileSync(sourceChange, 'utf8')
+  writeFileSync(sourceChange, original + 'compute_variant: {strategy: 保留查询}\n')
+  await assert.rejects(() => previewTaskAssembly(root, input), /变体不能作为新版本的继承来源/)
+  await assert.rejects(() => applyTaskAssembly(root, input), /变体不能作为新版本的继承来源/)
+  writeFileSync(sourceChange, original)
+  const variantId = 'VAR-inspection-task-001-r123456abcdef'
+  const variantBase = `evolution/experiments/${variantId}`
+  cpSync(join(root, `evolution/experiments/${sourceId}`), join(root, variantBase), { recursive: true })
+  write(root, `${variantBase}/change.yaml`, `experiment_id: ${variantId}\nagent_id: inspection-task\ncompute_variant: {strategy: 保留查询}\n`)
+  await assert.rejects(() => previewTaskAssembly(root, { ...input, files: [{ ...input.files[0], source: `experiment:${variantId}` }] }), /变体不能作为新版本的继承来源/)
+  const target = { ...input, target_source: `experiment:${variantId}`, expected_candidate_sha256: candidateDigest(join(root, variantBase, 'candidate')), files: [{ ...input.files[0], target_path: 'dsh/workspace/reused.md' }] }
+  assert.equal((await applyTaskAssembly(root, target)).experiment_id, variantId)
+  const same = { ...target, expected_candidate_sha256: candidateDigest(join(root, variantBase, 'candidate')), files: [{ ...target.files[0], source: `experiment:${variantId}`, target_path: 'dsh/workspace/copied.md' }] }
+  assert.equal((await previewTaskAssembly(root, same)).experiment_id, variantId)
+})
 
 test('能力目录读取实际来源和原生 MCP，区分发现与验证并过滤凭据', async t => {
   const root = fixture(t)

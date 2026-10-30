@@ -41,6 +41,17 @@ elif sys.argv[1]=="url": print("http://127.0.0.1:3081/?token=fixture-only")
 
 
 class EvaluationAccessTest(unittest.TestCase):
+    def test_preflight_error_keeps_variant_identity_in_result(self):
+        identity = "VAR-example-agent-001-r0123456789ab"
+        for source in (identity, "experiment:" + identity):
+            with self.subTest(source=source), mock.patch.object(sys, "argv", ["dsh-eval", "--source", source]), \
+                    mock.patch.object(evaluation, "execute", side_effect=evaluation.EvaluationError("synthetic")), \
+                    mock.patch.object(evaluation, "emit_result") as emit, redirect_stderr(io.StringIO()), \
+                    self.assertRaises(SystemExit) as stopped:
+                evaluation.main()
+            self.assertEqual(stopped.exception.code, 2)
+            self.assertEqual(emit.call_args.args[0], identity)
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)

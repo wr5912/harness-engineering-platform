@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { chmodSync, closeSync, existsSync, fchmodSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { closeSync, existsSync, fchmodSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { prepareBusinessRuntimeFile } from '../business-control/secret-file.ts'
+import { mcpCredentialFile, mcpCredentialPaths } from './credential-path.ts'
 
 type Document = { schemaVersion: 1; servers: any[]; groups: any[] }
 type Secrets = { schemaVersion: 1; sharedToken: string; servers: Record<string, {
@@ -12,7 +13,7 @@ export type McpConfigurationView = { revision: string; value: McpConfiguration; 
 
 /** Runtime 只读取平台已有分组凭据，不把它投影进 Candidate。 */
 export function readMcpSharedToken(assetRoot: string): string {
-  const { value } = readJson(join(assetRoot, '.local', 'credentials', 'mcp-manager.json'))
+  const { value } = readJson(mcpCredentialFile(assetRoot))
   if (typeof value?.sharedToken !== 'string' || !value.sharedToken) throw new Error('MCP 分组凭据不可用')
   return value.sharedToken
 }
@@ -138,21 +139,17 @@ function atomicReplace(path: string, content: string, mode: number, business = f
 /** 数据仓库保存服务和分组，本地忽略文件只保存凭据；原生 Profile 不承载当前事实。 */
 export class McpConfigStore {
   private readonly publicFile: string
-  private readonly secretFile: string
-  private readonly lockFile: string
+  private readonly assetRoot: string
   private readonly validate: (value: McpConfiguration) => void
   constructor(assetRoot: string, validate: (value: McpConfiguration) => void) {
+    this.assetRoot = assetRoot
     this.publicFile = join(assetRoot, 'config', 'mcp-manager.json')
-    this.secretFile = join(assetRoot, '.local', 'credentials', 'mcp-manager.json')
-    this.lockFile = join(assetRoot, '.local', 'credentials', 'mcp-manager.lock')
     this.validate = validate
-    if (process.geteuid?.() === 0 && existsSync(this.secretFile)) {
-      // 容器只需穿过目录读取指定凭据；不开放目录列表或其他私有文件。
-      for (const directory of [join(assetRoot, '.local'), dirname(this.secretFile)]) {
-        chmodSync(directory, (statSync(directory).mode & 0o777) | 0o111)
-      }
-      prepareBusinessRuntimeFile(this.secretFile)
-    }
+  }
+  private get secretFile(): string { return mcpCredentialFile(this.assetRoot) }
+  private get lockFile(): string {
+    const paths = mcpCredentialPaths(this.assetRoot)
+    return this.secretFile === paths.legacyFile ? paths.legacyLock : paths.lock
   }
   private readView(publicData = readJson(this.publicFile), privateData = readJson(this.secretFile)): McpConfigurationView {
     checkDocument(publicData.value, privateData.value)
@@ -174,14 +171,15 @@ export class McpConfigStore {
   }
   mutate(ops: any[], revision: string): McpConfigurationView {
     if (!Array.isArray(ops) || typeof revision !== 'string') throw new Error('MCP 保存需要原始版本和修改操作')
+    const lockFile = this.lockFile
     let lock: number
-    try { lock = openSync(this.lockFile, 'wx', 0o600) }
+    try { lock = openSync(lockFile, 'wx', 0o600) }
     catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new Error('MCP 配置正在保存或保存锁未释放，请稍后重试')
       throw error
     }
     try { return this.mutateLocked(ops, revision) }
-    finally { closeSync(lock); unlinkSync(this.lockFile) }
+    finally { closeSync(lock); unlinkSync(lockFile) }
   }
   private mutateLocked(ops: any[], revision: string): McpConfigurationView {
     const current = this.readView()

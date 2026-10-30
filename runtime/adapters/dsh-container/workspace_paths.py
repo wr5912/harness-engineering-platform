@@ -76,7 +76,7 @@ def instance_belongs_to_workspace(root: Path, manifest: dict) -> bool:
     if descriptor is None:
         return True  # 尚无描述符的历史工作区保持原合同，不接纳其他已绑定身份。
     source = manifest.get("source_id", "")
-    if not isinstance(source, str) or not re.fullmatch(r"experiment:EXP-[a-z0-9-]+-\d{3}(?:-r[0-9a-f]{12})?", source):
+    if not isinstance(source, str) or not re.fullmatch(r"experiment:(?:EXP|VAR)-[a-z0-9]+(?:-[a-z0-9]+)*-\d{3}(?:-r[0-9a-f]{12})?", source):
         return False
     mounts = manifest.get("mounts") or {}
     if not isinstance(mounts, dict):

@@ -357,6 +357,10 @@ test('普通操作确认显示业务摘要和完整事实，旧任务状态不�
   const freezeDetails = render(view(), true)
   assert.ok(freezeDetails.includes(fullFreezeDiff), '原生确认界面使用持久完整差异，不使用模型投影或截断版本')
   assert.match(freezeDetails, /确认冻结本次数据差异/)
+  proposal = { id: 'variant-eval', domain: 'agents', action: 'eval/start', state: 'awaiting_confirmation', input: { source: 'experiment:VAR-alpha-001-rabcdef123456' }, preview: { source: 'experiment:VAR-alpha-001-rabcdef123456', cases: ['U-ONE-001'] } }
+  const variant = render(view())
+  assert.match(variant, /智能体“alpha”的变体 001/)
+  assert.doesNotMatch(variant, /版本 001/)
   proposal = undefined
   execution = { state: 'budget_exhausted', reason: '任务总时限已耗尽', plan: { budget: { max_model_calls: 60 } } }
   assert.equal(view(), null, '历史任务额度不再绘制卡片或恢复按钮')

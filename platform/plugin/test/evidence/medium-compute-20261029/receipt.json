@@ -1,0 +1,1381 @@
+{
+  "observed_at": "2026-10-30T03:07:00.932684+00:00",
+  "source": {
+    "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+    "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+    "historical_version": {
+      "candidate_sha256": "3e03b643cc65535b0cbbe763ec86878e35b56294a7de921372826877c6660b7e",
+      "git_version": {
+        "commit": "1f162a1ce12025ffeb9d2e36c7a3ae283b41e421",
+        "dirty": true
+      }
+    }
+  },
+  "platform": {
+    "port": 18120,
+    "base_path": "/hep/",
+    "session_id": "session-29c69f91-016c-4af7-b886-f5ea0f6cfa4a",
+    "extraction_session_id": "session-faf71479-9b15-4980-8590-bc583fd94c80",
+    "reload": {
+      "stage": "enable",
+      "target": "include:security-operations-compositions",
+      "enabled": true,
+      "changed": false,
+      "application": "applied",
+      "warnings": []
+    },
+    "source_pagination": {
+      "observed_at": "2026-10-29T12:56:50.167Z",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "files": 130,
+      "pages": 17,
+      "max_page_characters": 5501,
+      "source_version": {
+        "candidate_sha256": "3e03b643cc65535b0cbbe763ec86878e35b56294a7de921372826877c6660b7e",
+        "git_version": {
+          "commit": "1f162a1ce12025ffeb9d2e36c7a3ae283b41e421",
+          "dirty": true
+        }
+      },
+      "decision_count": 5,
+      "selected_path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-INS-001/trace.jsonl",
+      "fragment_count": 11,
+      "reassembled_characters": 40590,
+      "content_sha256_verified": true
+    },
+    "browser": {
+      "at": "2026-10-29T13:17:56.368Z",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "dataset_id": "decision-dataset-47a9ae29-87b5-4e18-a8f0-61a2600c7d00",
+      "source_identifiers_visible": true,
+      "reviewed_automatically": false,
+      "source_navigation_preserves_dataset": true,
+      "mobile_width": {
+        "viewport": 390,
+        "document": 390
+      },
+      "page_errors": []
+    },
+    "review_input_protocol": {
+      "schema_version": "native-input-proof/v1",
+      "result": "verified",
+      "datasets": 82,
+      "records": 82,
+      "questions": 82,
+      "reviewed": 82,
+      "rejected": 0,
+      "sessions": 16,
+      "readback_matches": 82,
+      "unresolved_writes": 0,
+      "split": "unassigned",
+      "proof": "datasets/source-fragments",
+      "model": {
+        "provider": "deepseek-official",
+        "model": "deepseek-flash"
+      },
+      "audit_sha256": "f05601789f73558457a9ee7b9062a6590d342549ebbb2fe4d2020b28ffc95f72"
+    },
+    "collector": {
+      "session_id": "session-21bddccf-ab0f-41f6-b7b8-44b3a2167217",
+      "native_job_id": "bash-3bd32ba3c2f14348",
+      "records": 82,
+      "http_receipts": 1259,
+      "sha256_checked": true,
+      "manifest_sha256": "1f52e4eca9a067f7ca64342616286babb4fc18a56fe772e47af16923e205c3d7"
+    },
+    "management_actor_context": {
+      "fields": [
+        "session_id",
+        "model"
+      ],
+      "source": "current native Session projection",
+      "loaded": true
+    },
+    "generated_code_ui": {
+      "started_at": "2026-10-30T01:30:16.714Z",
+      "checks": [
+        {
+          "label": "compute-asset-jump",
+          "passed": true,
+          "url": "http://10.0.160.32:18120/hep/#/agents?agent_id=security-operations-expert&experiment_id=VAR-security-operations-expert-001-r66152e077843&tab=assets&asset_path=evolution%2Fexperiments%2FVAR-security-operations-expert-001-r66152e077843%2Fcandidate%2Fdsh%2Fmanaged%2Fcompute-workflow%2Findex.ts&list_view=variants"
+        },
+        {
+          "label": "esm-asset-entry",
+          "path": "dsh/managed/compute-workflow/index.mjs",
+          "passed": true
+        },
+        {
+          "label": "compute-assets-desktop",
+          "metrics": {
+            "viewport": 1440,
+            "right": 1415,
+            "articleRight": 1394
+          }
+        },
+        {
+          "label": "compute-assets-mobile",
+          "metrics": {
+            "viewport": 390,
+            "right": 377,
+            "articleRight": 360
+          }
+        },
+        {
+          "label": "asset-deeplink-reload",
+          "url": "http://10.0.160.32:18120/hep/#/agents?agent_id=security-operations-expert&experiment_id=VAR-security-operations-expert-001-r66152e077843&tab=assets&asset_path=evolution%2Fexperiments%2FVAR-security-operations-expert-001-r66152e077843%2Fcandidate%2Fdsh%2Fmanaged%2Fcompute-workflow%2Findex.ts&list_view=variants",
+          "passed": true
+        },
+        {
+          "label": "unsaved-draft-route-protection",
+          "draft_sha256": "deae1e2f2f6dfe637bf0845cad1f790d114c36031e2bded92fde593982cacb58",
+          "passed": true
+        },
+        {
+          "label": "mcp-read-failure-retry",
+          "injected_transport_response": true,
+          "actual_retry_source_sha256": "42cc5eff14ea1a632fdcec3b9e2fa06b7141eea0a30542bf736e162d5f2b671f",
+          "passed": true
+        },
+        {
+          "label": "mcp-native-keyboard-select",
+          "value": "workspace/extensions/security-operations/src/index.ts"
+        },
+        {
+          "label": "composition-desktop",
+          "metrics": {
+            "viewport": 1440,
+            "left": 331,
+            "right": 1109,
+            "width": 778,
+            "articleRight": 1109
+          }
+        },
+        {
+          "label": "composition-mobile",
+          "metrics": {
+            "viewport": 390,
+            "left": 37,
+            "right": 353,
+            "width": 316,
+            "articleRight": 353,
+            "preClient": 316,
+            "preScroll": 1245
+          }
+        }
+      ],
+      "writes": [],
+      "rendered_file_reads": 14,
+      "compute_source_files": 11,
+      "composition_files": 44,
+      "file_roles_after_reload": {
+        "ok": true,
+        "observed_at": "2026-10-30T01:41:04.771Z",
+        "url": "http://10.0.160.32:18120/hep/",
+        "selection": {
+          "id": "security-asset-related-alerts-readonly",
+          "version": "published",
+          "versionId": "fd2c27b47da1e6e5a717fc68dec5fbf0ec39e6aab9bf5861878b38066c480554"
+        },
+        "source_digest": "88a3a4093c984e457026e463bf1ae368a8a700f0851b757d66b04a3f53739878",
+        "files": 44,
+        "build_scripts": [
+          {
+            "path": "platform/plugin/build.mjs",
+            "kind": "support",
+            "language": "mjs",
+            "entry": false,
+            "bytes": 13331,
+            "sha256": "32fababceacc821128e6041566f6b01c4660361a745bb0b90c8e48d16fbf5223",
+            "built_sha256": "32fababceacc821128e6041566f6b01c4660361a745bb0b90c8e48d16fbf5223",
+            "matches_build": true
+          },
+          {
+            "path": "workspace/extensions/security-operations/build.mjs",
+            "kind": "support",
+            "language": "mjs",
+            "entry": false,
+            "bytes": 2703,
+            "sha256": "c73ab1783f7a07ea0325f11835ffb8e45ea927bf9b72519f462e973fce28432d"
+          }
+        ],
+        "artifacts": [
+          {
+            "path": "platform/plugin/lib/index.js",
+            "kind": "artifact",
+            "language": "js",
+            "entry": false,
+            "bytes": 1067397,
+            "sha256": "9c1acbd81044d100d19e9d992a2aa3e6b2246489b75df9972e29599ca3cafc7b",
+            "built_sha256": "9c1acbd81044d100d19e9d992a2aa3e6b2246489b75df9972e29599ca3cafc7b",
+            "matches_build": true
+          }
+        ],
+        "checks": {
+          "build_scripts_support": true,
+          "unique_lib_artifact": true,
+          "loaded_source_digest_unchanged": true,
+          "artifact_matches_build": true
+        },
+        "operations": [
+          "mcp/list",
+          "mcp/compositionSource"
+        ],
+        "writes": 0,
+        "model_calls": 0
+      },
+      "legacy_entry_navigation": {
+        "observed_at": "2026-10-30T01:42:06.450Z",
+        "old_experiment_id": "EXP-security-operations-expert-025-r36771c9bf2a5",
+        "current_variant_id": "VAR-security-operations-expert-001-r66152e077843",
+        "detail_reads": [
+          {
+            "experiment_id": "EXP-security-operations-expert-025-r36771c9bf2a5",
+            "current_variant_id": "VAR-security-operations-expert-001-r66152e077843",
+            "is_current": false
+          },
+          {
+            "experiment_id": "EXP-security-operations-expert-025-r36771c9bf2a5",
+            "current_variant_id": "VAR-security-operations-expert-001-r66152e077843",
+            "is_current": false
+          },
+          {
+            "experiment_id": "VAR-security-operations-expert-001-r66152e077843",
+            "current_variant_id": null,
+            "is_current": true
+          }
+        ],
+        "writes": [],
+        "current_variant_inventory": [
+          {
+            "id": "VAR-inspection-delivery-demo-001-rfac75f4cb946",
+            "agent_id": "inspection-delivery-demo",
+            "is_current": true
+          },
+          {
+            "id": "VAR-security-operations-expert-001-r66152e077843",
+            "agent_id": "security-operations-expert",
+            "is_current": true
+          }
+        ],
+        "old_url": "http://10.0.160.32:18120/hep/#/agents?agent_id=security-operations-expert&experiment_id=EXP-security-operations-expert-025-r36771c9bf2a5&tab=compute-variants&list_view=variants",
+        "history_notice": "当前查看历史变体记录，资产和 Run 保留原身份。查看当前变体VAR-security-operations-expert-001-r66152e077843",
+        "new_url": "http://10.0.160.32:18120/hep/#/agents?agent_id=security-operations-expert&experiment_id=VAR-security-operations-expert-001-r66152e077843&tab=compute-variants&list_view=variants",
+        "current_readback": {
+          "experiment_id": "VAR-security-operations-expert-001-r66152e077843",
+          "agent_id": "security-operations-expert",
+          "is_current": true
+        },
+        "ok": true,
+        "model_calls": 0
+      },
+      "large_files": {
+        "compute_esm_bytes": 2592978,
+        "compute_esm": "asset_tree_metadata_only_over_1_MiB",
+        "compute_typescript_full_readback": 11,
+        "composition_artifact": "bounded_preview_with_explicit_truncated_indicator"
+      },
+      "ready_state_screenshots": {
+        "observed_at": "2026-10-30T01:45:38.985Z",
+        "readiness": [
+          {
+            "kind": "compute",
+            "viewport": 1440,
+            "file": "evolution/experiments/VAR-security-operations-expert-001-r66152e077843/candidate/dsh/managed/compute-workflow/index.ts",
+            "sha256": "912e7443e9489e47d23fd4966642a62c5fe346301196802633cfd85b3dd0a743",
+            "body_sha256": "912e7443e9489e47d23fd4966642a62c5fe346301196802633cfd85b3dd0a743",
+            "complete": true,
+            "selected": true,
+            "variant_cards": [
+              "VAR-inspection-delivery-demo-001-rfac75f4cb946",
+              "VAR-security-operations-expert-001-r66152e077843"
+            ],
+            "visible": true,
+            "characters": 1981,
+            "client_width": 812,
+            "scroll_width": 812
+          },
+          {
+            "kind": "compute",
+            "viewport": 390,
+            "file": "evolution/experiments/VAR-security-operations-expert-001-r66152e077843/candidate/dsh/managed/compute-workflow/index.ts",
+            "sha256": "912e7443e9489e47d23fd4966642a62c5fe346301196802633cfd85b3dd0a743",
+            "body_sha256": "912e7443e9489e47d23fd4966642a62c5fe346301196802633cfd85b3dd0a743",
+            "complete": true,
+            "selected": true,
+            "variant_cards": [
+              "VAR-inspection-delivery-demo-001-rfac75f4cb946",
+              "VAR-security-operations-expert-001-r66152e077843"
+            ],
+            "visible": true,
+            "characters": 1981,
+            "client_width": 298,
+            "scroll_width": 298
+          },
+          {
+            "kind": "composition",
+            "viewport": 1440,
+            "file": "workspace/extensions/security-operations/src/index.ts",
+            "sha256": "90696aa94e43800678ff433f02f925abc6bdeb67ab0500e92c77c3722418726e",
+            "body_sha256": "90696aa94e43800678ff433f02f925abc6bdeb67ab0500e92c77c3722418726e",
+            "complete": true,
+            "select_blurred": true,
+            "loading": false,
+            "visible": true,
+            "focus_on_code": true,
+            "characters": 1412,
+            "client_width": 548,
+            "scroll_width": 1245
+          },
+          {
+            "kind": "composition",
+            "viewport": 390,
+            "file": "workspace/extensions/security-operations/src/index.ts",
+            "sha256": "90696aa94e43800678ff433f02f925abc6bdeb67ab0500e92c77c3722418726e",
+            "body_sha256": "90696aa94e43800678ff433f02f925abc6bdeb67ab0500e92c77c3722418726e",
+            "complete": true,
+            "select_blurred": true,
+            "loading": false,
+            "visible": true,
+            "focus_on_code": true,
+            "characters": 1412,
+            "client_width": 316,
+            "scroll_width": 1245
+          }
+        ],
+        "screenshots": [
+          "final-compute-assets-desktop.png",
+          "final-compute-assets-mobile.png",
+          "final-composition-desktop.png",
+          "final-composition-mobile.png"
+        ],
+        "writes": [],
+        "scope": {
+          "compute_typescript_full_verified": 11,
+          "compute_large_esm": "资产页大于1MiB ESM仅核对入口与元信息，未验证完整正文",
+          "mcp_large_artifact": "截断预览明确标识，旧回执保留"
+        },
+        "current_variant_inventory": [
+          {
+            "id": "VAR-inspection-delivery-demo-001-rfac75f4cb946",
+            "agent_id": "inspection-delivery-demo"
+          },
+          {
+            "id": "VAR-security-operations-expert-001-r66152e077843",
+            "agent_id": "security-operations-expert"
+          }
+        ],
+        "ok": true,
+        "model_calls": 0
+      }
+    },
+    "variant_identity": {
+      "security": {
+        "legacy": "EXP-security-operations-expert-025-r36771c9bf2a5",
+        "current": "VAR-security-operations-expert-001-r66152e077843",
+        "candidate_unchanged": true
+      },
+      "inspection": {
+        "legacy": "EXP-inspection-delivery-demo-003-r1c42f11c4f9a",
+        "current": "VAR-inspection-delivery-demo-001-rfac75f4cb946",
+        "legacy_run_count": 7,
+        "new_variant_run_count": 0,
+        "build_digest": "657ea4afd0782dd0e7f201ac35398fc94798795156f8be60fac569514de42dab"
+      },
+      "management_session_id": "session-62f02019-711c-4722-aecc-8b748c72bf73",
+      "active_business_versions_unchanged": true,
+      "verified_at": "2026-10-30T01:33:36.999Z",
+      "native_apply_calls": 2,
+      "freeze_calls": 0,
+      "management_turn_settled": true,
+      "old_run_verification": [
+        {
+          "old_experiment_id": "EXP-security-operations-expert-025-r36771c9bf2a5",
+          "current_variant_id": "VAR-security-operations-expert-001-r66152e077843",
+          "old_run_tracked_files_checked": 0,
+          "old_run_public_readback": {
+            "run_id": "run-f2221194-2bfd-4d3e-bd86-d83948a0b2cd",
+            "manifest_experiment_id": "EXP-security-operations-expert-025-r36771c9bf2a5",
+            "run_path": "evolution/experiments/EXP-security-operations-expert-025-r36771c9bf2a5/runs/run-f2221194-2bfd-4d3e-bd86-d83948a0b2cd",
+            "candidate_path": "evolution/experiments/EXP-security-operations-expert-025-r36771c9bf2a5/candidate",
+            "original_identity_preserved": true
+          }
+        },
+        {
+          "old_experiment_id": "EXP-inspection-delivery-demo-003-r1c42f11c4f9a",
+          "current_variant_id": "VAR-inspection-delivery-demo-001-rfac75f4cb946",
+          "old_run_tracked_files_checked": 238,
+          "old_run_public_readback": {
+            "run_id": "run-1a666623-a876-4138-8910-03a58836301a",
+            "manifest_experiment_id": "EXP-inspection-delivery-demo-003-r1c42f11c4f9a",
+            "run_path": "evolution/experiments/EXP-inspection-delivery-demo-003-r1c42f11c4f9a/runs/run-1a666623-a876-4138-8910-03a58836301a",
+            "candidate_path": "evolution/experiments/EXP-inspection-delivery-demo-003-r1c42f11c4f9a/candidate",
+            "original_identity_preserved": true
+          }
+        }
+      ]
+    }
+  },
+  "hardware": {
+    "gpu": "NVIDIA GeForce RTX 2080 Ti",
+    "memory_mib": 11264,
+    "compute_capability": "7.5",
+    "bf16_native": false,
+    "torch": "2.8.0+cu128",
+    "transformers": "5.17.0"
+  },
+  "replay": {
+    "frozen_sources": {
+      "state": "5d01d43bdfd5220977ad62ad6f2cf7510e266e0200925b358a28189bff8515f0",
+      "questions": "26c147cc0af061cc78932403dd638674e2af4b9b1d2e767558e3f33d10154145",
+      "language": "195b1f3a26de313b9ecc7c72cae42bf7ca48a1fb22418cf5d9f7e23e3ea19ea3",
+      "replay": "7d4177ed2a9174bef5ec4c11df5d01dab8259ad44f299cd56d2238df7b6127ea"
+    },
+    "ready_source_records": 60,
+    "skipped_source_records": 22,
+    "unique_nlu_requests": 52,
+    "new_nlu_http_responses": 51,
+    "same_wire_reused_responses": 1,
+    "unlabeled_ir_records": 40,
+    "invalid_qwen_records": 20,
+    "encoding_unique_requests": 35,
+    "encoding_admitted_requests": 34,
+    "encoding_admitted_ir_records": 39,
+    "encoding_rejected_ir_records": 1,
+    "encoding_rejection": {
+      "state_tokens": 661,
+      "max_state": 384,
+      "model_invocation": false
+    },
+    "ir_review": {
+      "status": "complete",
+      "records": 39,
+      "kind": "ai_delegated",
+      "purpose": "functional_validation",
+      "annotations_sha256": "9c24fa50523b021cb858451a3bafb642f2923809d3568fcfe8034f5a68e5cdd4",
+      "manifest_sha256": "527620e2f0528c9721368ec3b77be9a78cea2abf20e473a05743b6bc4b242bb1"
+    },
+    "formal_training": {
+      "status": "complete",
+      "recipe": "cuda-fp32-lora",
+      "training_records": 22,
+      "optimizer_steps": 3,
+      "rejected_records": 0,
+      "truncated_records": 0,
+      "wall_seconds": 16.75,
+      "peak_device_bytes": 3522364416,
+      "calibration_temperature": 0.25,
+      "test": {
+        "records": 4,
+        "correct": 2,
+        "accuracy": 0.5,
+        "nll": 2.1875,
+        "ece": 0.52525,
+        "brier": 0.83127
+      },
+      "checkpoint_sha256": "2c9d86707f6f4bb6283d0201aaf5c66359b7734fd5c906d73a1c02ed5f22fbbd",
+      "calibration_sha256": "2af0cbc77cec56ee85cd53fe0de790b609cc27fcae5badaf2c03d8c0f995e1b2",
+      "handoff_sha256": "1eedefe33e9119e96abd8a12d355e67476b5cd9587a8d2a54aab858fd461fdd5",
+      "management_session_id": "session-a553f0cc-82cd-4f67-b6cb-bbd382ef7f33",
+      "human_truth": false,
+      "equivalence_proven": false
+    },
+    "candidate_archival": {
+      "experiment_id": "VAR-security-operations-expert-001-r66152e077843",
+      "status": "built_and_frozen",
+      "legacy_experiment_id": "EXP-security-operations-expert-025-r36771c9bf2a5",
+      "training_supervision_location": "evaluation/evidence/kev-training",
+      "checkpoint_location": "candidate/dsh/managed/compute-workflow/model"
+    },
+    "business_equivalence": "not_established",
+    "formal_data": {
+      "records": 37,
+      "source_families": 32,
+      "excluded_development_probe_records": 2,
+      "excluded_encoding_records": 1,
+      "fractions": [
+        0.6,
+        0.1,
+        0.2,
+        0.1
+      ],
+      "seed": 20261029,
+      "train": {
+        "records": 22,
+        "families": 17
+      },
+      "dev": {
+        "records": 4,
+        "families": 4
+      },
+      "calib": {
+        "records": 7,
+        "families": 7
+      },
+      "test": {
+        "records": 4,
+        "families": 4
+      },
+      "audit_ok": true
+    },
+    "model_deployment": {
+      "status": "served_runtime_graph_verified",
+      "serving_temperature": 0.25,
+      "dtype": "float32",
+      "backend": "torch",
+      "device": "cuda",
+      "handoff_sha256": "2c44fd8cd6317a5e2eb32112fe292709bd89380035d53031a312446886406503",
+      "encoder_revision": "2074cc44256200bb37540103fa4572901faa10f3",
+      "encoder_source_sha256": "2ff3b2e67c048e3bc5a0d1a32aafe50804ed315a5564fce06bb4b95697c5271c",
+      "admission_source_sha256": "73cba319c6213c0b605c07fa83f2ac3ed88b70d751b7fa0e5009e8357e06ba66",
+      "container_reachable": "verified_by_clean_session_actual_inference",
+      "management_session_id": "session-2f28c4f6-b51f-4f6f-910a-c04cdd630aff",
+      "verified_session_id": "session-31891a1a-26e5-4a75-b1dd-162b4de009cd",
+      "verified_container_id": "61f44c2478c463dfa76e31d1b3485ec8cba97dc4b2f28c47b1a2a9e3105658eb",
+      "verification_actor_session_id": "session-d3e777e0-170c-40ad-a305-9aa4903d9ba1"
+    }
+  },
+  "initial_technical_probe": {
+    "qwen": {
+      "scope": "technical_compatibility_only",
+      "model": "Qwen/Qwen3.5-2B",
+      "source_revision": "c00cc5fd7803c60b7788e053dcce33d0d26b11ef",
+      "config_sha256": "ed1c1723241f23f7f4e23430759cbd7dcfb4103cbdfe052bfe7626b57c2615b4",
+      "dtype": "torch.float16",
+      "attention": "eager",
+      "use_kernels": false,
+      "compile": false,
+      "input_tokens": 19,
+      "forward_shape": [
+        1,
+        1,
+        248320
+      ],
+      "generated_token_ids": [
+        95887,
+        248046,
+        198,
+        248044
+      ],
+      "generated_text": "好\n",
+      "elapsed_seconds": 5.748684681952,
+      "peak_allocated_bytes": 4465256448,
+      "peak_reserved_bytes": 4580179968
+    },
+    "kev": {
+      "scope": "technical_compatibility_only",
+      "source_mapping": {
+        "schema_version": "technical-kev-checkpoint-source/v1",
+        "scope": "technical_compatibility_only",
+        "checkpoint": {
+          "repository": "jaredpalmer/kev-0.8b",
+          "revision": "bf75a6a8848ea6960ff2ed108d9ed44c2941174f",
+          "local_path": "/root/autodl-tmp/hep-medium-security/hub/models--jaredpalmer--kev-0.8b/snapshots/bf75a6a8848ea6960ff2ed108d9ed44c2941174f",
+          "files": {
+            "adapter_config.json": {
+              "bytes": 1273,
+              "sha256": "748acb2cda88454cb1ba69d745ba336f3fcb5486eac349e90960c8b8d8d3e854"
+            },
+            "adapter_model.safetensors": {
+              "bytes": 43338624,
+              "sha256": "9b908623acb162118575f4e7a94524f9c139c335be4bfb74d6cfceca01e1885a"
+            },
+            "head.pt": {
+              "bytes": 2103999,
+              "sha256": "f400bd12802b2b105ae45d6b03774a158a3db4fccff42413734ddca2e5c920b6"
+            },
+            "training_config.json": {
+              "bytes": 1767,
+              "sha256": "3ec3d92146248265652d4387f8eb65ee8defaed4dd9173b049e7b5193045ece6"
+            }
+          }
+        },
+        "base": {
+          "repository": "Qwen/Qwen3.5-0.8B-Base",
+          "revision": "dc7cdfe2ee4154fa7e30f5b51ca41bfa40174e68"
+        },
+        "code": {
+          "repository": "https://github.com/jaredpalmer/kev",
+          "commit": "2074cc44256200bb37540103fa4572901faa10f3"
+        },
+        "business_context": {
+          "parent_experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+          "source_run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "sample_usage": "context_only; technical-only.jsonl contains no business or source-Run samples"
+        },
+        "previous_attempt": {
+          "entrypoint": "kev-fp32-smoke.sh",
+          "exit_code": 1,
+          "log": "/root/autodl-tmp/hep-medium-security/logs/kev-probe.log",
+          "error": "huggingface_hub.errors.OfflineModeIsEnabled while listing jaredpalmer/kev-0.8b tree at fixed revision",
+          "observation": "failure retained; no compatibility or training-success conclusion"
+        }
+      },
+      "init_source": {
+        "init_from": "/root/autodl-tmp/hep-medium-security/hub/models--jaredpalmer--kev-0.8b/snapshots/bf75a6a8848ea6960ff2ed108d9ed44c2941174f",
+        "resolved": "/root/autodl-tmp/hep-medium-security/hub/models--jaredpalmer--kev-0.8b/snapshots/bf75a6a8848ea6960ff2ed108d9ed44c2941174f",
+        "weights_sha256": "9b908623acb162118575f4e7a94524f9c139c335be4bfb74d6cfceca01e1885a",
+        "head_sha256": "f400bd12802b2b105ae45d6b03774a158a3db4fccff42413734ddca2e5c920b6",
+        "tensors": 372
+      },
+      "metrics": {
+        "wall_seconds": 4.407777786254883,
+        "records_seen": 8,
+        "requested_records": 8,
+        "truncated_records": 0,
+        "rejected_records": 0,
+        "optimizer_steps": 1,
+        "forward_tokens": 566,
+        "step_seconds": [
+          4.408
+        ],
+        "optimizer_seconds": 0.06686949729919434,
+        "resume_seconds": [],
+        "resume_write_seconds": [],
+        "world_size": 1,
+        "backbone_save_seconds": 0.1,
+        "snapshots": [],
+        "grad_norm": [
+          {
+            "epoch": 0,
+            "steps": 1,
+            "mean": 0.239087,
+            "max": 0.239087,
+            "clipped_steps": 0
+          }
+        ],
+        "weights": "lora",
+        "peak_device_bytes": 3156182528,
+        "device": "cuda",
+        "dtype": "fp32",
+        "batch": 1,
+        "peak_rss_bytes": 5728481280
+      },
+      "artifacts": {
+        "head.pt": "f8f14c9fbea50fba460f6dd3d2b630e72fc965508f61e90606ded5e2d9060fb8",
+        "adapter_model.safetensors": "340050021442286dcba1a4573478d4a0698093d58e4d7b7a2a0de2bda7970d4f",
+        "training_config.json": "6045e53f9368a3530a8268db0302650f2f0b86d8d92041720e688a5039723ddd",
+        "training_metrics.json": "d5f4a865130ede35fd2657f6b0d4a9992c8440f1af90a9447dd3b27e74fec04d"
+      }
+    },
+    "co_resident_http": {
+      "scope": "technical_compatibility_only",
+      "results": [
+        {
+          "role": "language",
+          "http_status": 200,
+          "elapsed_seconds": 1.411252100020647,
+          "usage": {
+            "completion_tokens": 4,
+            "prompt_tokens": 19,
+            "total_tokens": 23
+          },
+          "response": {
+            "content": "好",
+            "role": "assistant"
+          }
+        },
+        {
+          "role": "decision",
+          "http_status": 200,
+          "elapsed_seconds": 0.45266497507691383,
+          "usage": {
+            "input_tokens": 35,
+            "output_tokens": 51
+          },
+          "response": {
+            "letter": {
+              "type": "choice",
+              "choice": "A",
+              "confidence": 0.351,
+              "probabilities": {
+                "A": 0.6755,
+                "B": 0.3245
+              }
+            }
+          }
+        }
+      ],
+      "gpu": "7778 MiB, 3 %"
+    },
+    "scope": "historical_technical_compatibility_only",
+    "limits": [
+      "technical_compatibility_only",
+      "training_records_are_eight_technical_inputs_not_source_run_samples",
+      "no_formal_domain_training_or_calibration",
+      "no_completed_variant_candidate_or_equivalence_evaluation",
+      "unmodified_pretrained_weights_are_git_ignored"
+    ],
+    "snapshot_at": "2026-10-29T19:39:15.669398+00:00"
+  },
+  "schema_version": "medium-compute-platform-validation/v2",
+  "variant": {
+    "experiment_id": "VAR-security-operations-expert-001-r66152e077843",
+    "parent_experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+    "parent_ref": "git:d499a1a3e3484bf97f6b5646a8d80e20313a7120",
+    "parent_candidate_sha256": "d2572e8c4a89db14c9fa042b21c77ff98284e16805aa2c6ea7a003b6678eb2af",
+    "freeze_commit": "608093a91b3d07eb19419c40fd8e0c1711448977",
+    "candidate_sha256": "d02595895b8c2c4fd8a81fe34b8744bc8e94764c5947ed89a1cc12e29838e877",
+    "build_digest": "18d1f5abd256d2f46b6004b55898520d7f2eaf35f375d2afa61d79c9f9520b1c",
+    "esm_sha256": "92dc7ecc8249594082b31750f3b5a40d411f28ebb2eb7a6e080f5173fd9acae3",
+    "source_files": 11,
+    "checkpoint_files": 9,
+    "checkpoint_total_bytes": 65450991,
+    "archived_training_evidence_files": 46,
+    "git_artifact_rows_verified": 55,
+    "archive_manifest_sha256": "eedfe8b0b9d377170501659f3b67b488df65f8c76105431fbfa8916fceb9efbd",
+    "variant_inheritance_allowed": false,
+    "legacy_identity": {
+      "experiment_id": "EXP-security-operations-expert-025-r36771c9bf2a5",
+      "current_variant_id": "VAR-security-operations-expert-001-r66152e077843",
+      "is_current": false,
+      "historical_runs_preserved": true
+    },
+    "generation_diagnostic_run_ids": [
+      "run-f62533d0-87fe-4258-8ca2-cb76adbecbb5"
+    ],
+    "training_seed_run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+    "source_compatibility_receipt_sha256": "2c8f277da60e8251a7a3bcc882a0c6341fe7fd7b58fce05a2c8bf2f6c6eaa5d4"
+  },
+  "runtime": {
+    "technical_probe": {
+      "session_id": "session-76364a19-066d-4c38-b2c1-19b416d87717",
+      "workflow_id": "workflow-3ff279ac-66ad-4251-8985-b83848ea175e",
+      "status": "completed",
+      "complete": true,
+      "actual_model_calls": 3,
+      "stages": [
+        "qwen_language_understanding",
+        "kev_typed_decision",
+        "qwen_answer"
+      ],
+      "runtime_mount_isolation_verified": false
+    },
+    "clean_instance_and_independent_comparison": "completed_not_eligible_for_end",
+    "management_model_failure": {
+      "session_id": "session-f466d4f2-82ea-4742-89e0-cf2e1d5bc91a",
+      "observed_at": "2026-10-30T01:38:47.736Z",
+      "turn_end_seq": [
+        399,
+        408
+      ],
+      "code": "QUOTA",
+      "status": 402,
+      "message": "Insufficient Balance",
+      "read_only_before_failure": true,
+      "candidate_write": false,
+      "instance_restart": false,
+      "fresh_evaluation_started": false,
+      "recovery": "mimo_v2_6_pro_high_native_request_completed"
+    },
+    "management_model_recovery": {
+      "session_id": "session-d3e777e0-170c-40ad-a305-9aa4903d9ba1",
+      "provider": "xiaomi-token-plan-cn",
+      "model": "mimo-v2.6-pro",
+      "reasoningEffort": "high",
+      "request_header_seq": 18,
+      "assistant_response_seq": 23,
+      "turn_end_seq": 25,
+      "status": "completed",
+      "business_model_roles_unchanged": true
+    },
+    "current_instance": {
+      "observed_at": "2026-10-30T02:00:30.052638+00:00",
+      "container_id": "61f44c2478c463dfa76e31d1b3485ec8cba97dc4b2f28c47b1a2a9e3105658eb",
+      "previous_container_id": "bf5a747091b48fc04bb582adf0ffee58d2de26e58aeed65857456ddeeb55fd41",
+      "running": true,
+      "image": "sha256:6ea7cbe9e99a8a2f29e9918a5112d9092ae71642fe1dbf997a612b5edafb6ca4",
+      "port": 18516,
+      "mount_count": 21,
+      "checks": {
+        "new_running_container": true,
+        "same_home_source": true,
+        "home_read_write": true,
+        "port_18516_preserved": true,
+        "locked_standard_image": true,
+        "only_config_and_mcp_credential_projection": true,
+        "no_whole_data_or_evolution_or_evaluation_ancestor_bind": true,
+        "no_archive_or_original_source_reachable_by_bind": true,
+        "archive_manifest_original_sha_preserved": true,
+        "nine_model_files_readable_at_runtime": true,
+        "forbidden_runtime_paths_absent": true
+      },
+      "archive_manifest_sha256": "eedfe8b0b9d377170501659f3b67b488df65f8c76105431fbfa8916fceb9efbd",
+      "runtime_model_files": 9,
+      "supervision_files": 46,
+      "forbidden_path_probes": 98,
+      "independent_audit_sha256": "6754240c1a281d5e4a3637d7ae7db188a29f7132987787507aab6c3a4cc4438a",
+      "model_inference_verified_by_this_audit": false,
+      "restart_actor": {
+        "management_session_id": "session-d3e777e0-170c-40ad-a305-9aa4903d9ba1",
+        "native_tool": "platform_instances",
+        "action": "run",
+        "operation": "restart",
+        "call_seq": 115,
+        "result_seq": 119,
+        "operation_state": "completed",
+        "home_preserved": true
+      }
+    },
+    "clean_session": {
+      "session_id": "session-31891a1a-26e5-4a75-b1dd-162b4de009cd",
+      "request_id": "62d7ca9d-7cb3-45f3-b8a2-d2b19a2df9d2",
+      "native_job_id": "bash-5825bfe697b545fa",
+      "workflow_tool_call_id": "hybrid-aa560946-e763-4ee4-9286-11fb5d7c27b1",
+      "workflow_call_seq": 18,
+      "workflow_result_seq": 19,
+      "prompt": "SEC-KB-078 SOAR 剧本是什么？",
+      "status": "technical_chain_verified",
+      "observed_at": "2026-10-30T02:19:21.147Z",
+      "independent_proof_sha256": "3f2f3101d8de385b390d5a5de7c57e4c3ed7351d1205715b786af99d81d616d8",
+      "archive_bytes": 29579,
+      "archive_sha256": "6de09c6595e22b4b1a185d2da4c8abfd73fcd24cb24ea0f6517fca2b35246bbe",
+      "checks": {
+        "session_id_exact": true,
+        "one_original_user_input": true,
+        "input_request_id_exact": true,
+        "input_text_exact": true,
+        "tool_call_id_and_sequence": true,
+        "graph_matches_native_id": true,
+        "graph_deduplication_valid": true,
+        "graph_complete_and_succeeded": true,
+        "build_digest_matches_expected": true,
+        "source_digest_matches_current_receipt": true,
+        "esm_matches_expected": true,
+        "three_complete_actual_calls": true,
+        "call_order_language_decision_language": true,
+        "original_request_in_context": true,
+        "turn_completed": true,
+        "assistant_matches_graph_reply": true,
+        "answer_hash_matches_reported": true
+      },
+      "graph": {
+        "execution_id": "workflow-6cf5aec7-5ab3-4a55-abaa-c3bdcb1aa731",
+        "session_id": "session-31891a1a-26e5-4a75-b1dd-162b4de009cd",
+        "tool_call_id": "hybrid-aa560946-e763-4ee4-9286-11fb5d7c27b1",
+        "workflow_id": "security-ops-medium-v1",
+        "complete": true,
+        "execution_mode": "hybrid",
+        "build_digest": "18d1f5abd256d2f46b6004b55898520d7f2eaf35f375d2afa61d79c9f9520b1c",
+        "source_digest": "9bcb62b649c25f5231fc90981e3a02668d012c1e10757b117a1957cc41c67d4f",
+        "esm_sha256": "92dc7ecc8249594082b31750f3b5a40d411f28ebb2eb7a6e080f5173fd9acae3",
+        "status": "completed"
+      },
+      "graph_error_code": null,
+      "model_usage": {
+        "actual_model_calls": 3,
+        "observed_model_calls": 3,
+        "failed_model_calls": 0,
+        "observed_failed_model_calls": 0,
+        "auxiliary_model_calls": 0,
+        "auxiliary_requests_observed": 0,
+        "model_calls_by_role": {
+          "target": 3,
+          "judge": 0,
+          "analysis": 0
+        },
+        "model_calls_by_model_role": {
+          "language": 2,
+          "decision": 1
+        },
+        "model_calls_complete": true,
+        "model_calls_basis": "锁定 DSH 的主请求尝试/retry、压缩、辅助标题与关联图模型尝试；Session ID/seq 和图 attempt ID 去重，受控本地路由不计远程模型请求。",
+        "model_calls_unknown_reasons": [],
+        "token_usage": null,
+        "observed_token_usage": {
+          "input_tokens": 540,
+          "output_tokens": 336,
+          "total_tokens": 876
+        },
+        "token_usage_complete": false,
+        "token_usage_note": "总 Token 未知；observed_token_usage 仅为已采集且有供应商结算的用量下界，辅助标题不保存 Token 结算，在途或缺失用量不按零计。",
+        "hard_cap_supported": false
+      },
+      "native_scope": {
+        "session_header_seeded": false,
+        "root_tool_calls": [
+          {
+            "seq": 18,
+            "name": "security_ops_medium_workflow"
+          }
+        ],
+        "root_native_llm_event_count": 0,
+        "call_evidence": "原生ToolRuntime回执中的model_attempts按attempt_id去重；两次Qwen经过原生LLM适配器，一次KEV带typed_decision和HTTP模型回执。root JSONL本身没有独立llm/*事件。"
+      },
+      "answer_observation": {
+        "seq": 24,
+        "characters": 519,
+        "sha256": "e66dee3f6591275795355f17c8975c04f3599ac49f8f7611de96e23c2e92ee63",
+        "contains_unsubstantiated_specific_script_claim": true,
+        "acknowledges_missing_script_material": true,
+        "observed_gap": "本轮只有本地上下文和KEV决策工具，没有知识库检索结果或文档来源；回答先断言SEC-KB-078是具体剧本，随后承认缺少该剧本材料。技术完成不构成U-QA-001业务通过。"
+      },
+      "business_equivalence_proven": false
+    }
+  },
+  "limits": [
+    "functional_ai_labels_are_not_human_truth",
+    "fixed_unique_test_correct_2_of_4",
+    "main_route_only_other_12_sites_not_covered",
+    "business_equivalence_not_established",
+    "unmodified_pretrained_weights_are_git_ignored",
+    "program_worktrees_have_uncommitted_task_changes"
+  ],
+  "initial_checks": {
+    "scope": "initial_validation_snapshot",
+    "plugin_typecheck": true,
+    "plugin_targeted_tests": 136,
+    "training_tool_tests": 63,
+    "git_diff_check": true
+  },
+  "current_ui_checks": {
+    "typecheck": true,
+    "navigation_and_code_browser": {
+      "passed": 108,
+      "failed": 0,
+      "log": "asset-link-tests.log"
+    },
+    "file_role": {
+      "passed": 4,
+      "failed": 0,
+      "log": "file-role-tests.log"
+    },
+    "actual_browser": {
+      "passed": true,
+      "receipt": "live-receipt.json",
+      "rendered_file_reads": 14,
+      "checks": 10,
+      "writes": 0,
+      "viewports": [
+        1440,
+        390
+      ],
+      "role_classification_before_small_fix": true,
+      "final_role_classification_readback": "role-receipt.json",
+      "compute_large_esm_verified": "入口与元信息；未验证完整ESM正文"
+    },
+    "diff_check": true
+  },
+  "evaluation": {
+    "observed_at": "2026-10-30T02:41:10.792Z",
+    "independent_proof_sha256": "ddd0fb2805d58c5a79d595fae407fca38359c2b280234a3ba0550164b54f6015",
+    "fixed_variant_parent": {
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "ref": "git:d499a1a3e3484bf97f6b5646a8d80e20313a7120",
+      "candidate_sha256": "d2572e8c4a89db14c9fa042b21c77ff98284e16805aa2c6ea7a003b6678eb2af",
+      "git_object_digest_independently_recomputed": true,
+      "git_candidate_file_count": 223,
+      "digest_order": "candidateFiles recursive per-directory sorted names, executable modes normalized to 0755/0644"
+    },
+    "plan": {
+      "created_at": "2026-10-29T23:53:08.291Z",
+      "case_hashes": {
+        "U-INS-002": "696e8e5bef4358a7ef9e0d3b9ce29b0d837662f02ca683ac6f0aa5026740181d",
+        "U-QA-001": "4f7ddfc111de4ace3285a693b09b1544d1daefda74bf6979c497d9d409bb248a"
+      },
+      "min_runs_per_case": 1,
+      "max_pass_rate_drop_pp": 0,
+      "resource_metric": "actual_model_calls",
+      "min_resource_reduction_pct": 10
+    },
+    "checks": {
+      "all_jobs_terminal_completed": true,
+      "all_runs_sealed_completed": true,
+      "both_jobs_report_exit_1": true,
+      "candidate_identities_match": true,
+      "same_evaluation_sha256": true,
+      "all_case_hashes_match_frozen_plan": true,
+      "eight_distinct_unseeded_sessions": true,
+      "review_none_has_no_posthoc_analysis": true
+    },
+    "comparison_scope": {
+      "parent_declared_model": {
+        "provider": "local-qwen",
+        "model": "Qwen3.8-27B"
+      },
+      "parent_actual_model": {
+        "provider": "xiaomi-token-plan-cn",
+        "model": "mimo-v2.6-flash",
+        "reasoningEffort": "off"
+      },
+      "parent_judge_same_model_as_target": true,
+      "variant_actual_roles": [
+        "transformers-serve Qwen3.5-2B",
+        "kev-serving kev-latest"
+      ],
+      "variant_judge": {
+        "provider": "xiaomi-token-plan-cn",
+        "model": "mimo-v2.6-flash",
+        "reasoningEffort": "off"
+      },
+      "business_target_calls": {
+        "parent": 6,
+        "variant": 5
+      },
+      "case_judge_calls": {
+        "parent": 2,
+        "variant": 2
+      },
+      "whole_run_calls": {
+        "parent": 8,
+        "variant": 7
+      },
+      "metrics_contract": "eval/status counts the whole Run including case judge. compute-variants comparison reads only evidence/<case>/trace.jsonl and computes target requests, excluding judge-trace.jsonl (src/agents/compute-variants.ts:452-458). No compare RPC was issued by this audit because it persists a comparison receipt.",
+      "limitations": [
+        "This evaluates the parent asset under current MiMo Flash default environment, not its declared Qwen3.8-27B environment.",
+        "Parent judge is a fresh no-tool Session but same model/route as target; same_route_as_target is true and results retain self-evaluation qualification.",
+        "Variant target has 5 actual requests and 2 case judge requests; 7 must not be presented as business request cost.",
+        "Variant token usage remains incomplete because typed decision receipts do not fully settle aggregate token buckets.",
+        "Both Run executions completed but business outcomes failed; parent U-QA-001 is inconclusive after requirement-evidence validation (raw model verdict passed).",
+        "A current resource observation is not proof of equivalence or an accepted optimization."
+      ]
+    },
+    "runs": [
+      {
+        "side": "parent",
+        "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+        "run_id": "run-b4846065-1e39-4bd6-9894-4ba27ded6e04",
+        "job_id": "f5e7bb9d-e1f8-4afa-afb8-ee3ac814433b",
+        "candidate_sha256": "d2572e8c4a89db14c9fa042b21c77ff98284e16805aa2c6ea7a003b6678eb2af",
+        "job": {
+          "job_id": "f5e7bb9d-e1f8-4afa-afb8-ee3ac814433b",
+          "status": "completed",
+          "run_id": "run-b4846065-1e39-4bd6-9894-4ba27ded6e04",
+          "exit_code": 1,
+          "started_at": "2026-10-30T02:29:56.076Z",
+          "updated_at": "2026-10-30T02:34:44.546Z",
+          "run_status": "completed",
+          "instance_stopped": true,
+          "actual_model_calls": 8,
+          "model_calls_complete": true,
+          "model_calls_by_role": {
+            "target": 6,
+            "judge": 2,
+            "analysis": 0
+          },
+          "model_calls_unknown_reasons": []
+        },
+        "manifest": {
+          "status": "completed",
+          "created_at": "2026-10-30T02:30:04Z",
+          "finished_at": "2026-10-30T02:34:44Z"
+        },
+        "sealed_hashes_match": {
+          "results.jsonl": true,
+          "summary.json": true,
+          "report.md": true,
+          "analysis.json": true
+        },
+        "source": {
+          "source_id": "experiment:EXP-security-operations-expert-024-rad80a907c628",
+          "source_kind": "experiment",
+          "baseline_ref": "git:c903724269be0ef249182e2fd7024325c7124629",
+          "candidate_sha256": "d2572e8c4a89db14c9fa042b21c77ff98284e16805aa2c6ea7a003b6678eb2af",
+          "candidate_matches_expected": true,
+          "evaluation_sha256": "8b8e0a58f81d841ccbf046f20af72fe85f000c569282ee7102d6d2f072786d91",
+          "git_version": {
+            "commit": "608093a91b3d07eb19419c40fd8e0c1711448977",
+            "dirty": true,
+            "changed_path_count": 125
+          },
+          "program_origin": {
+            "commit": "6935910612241b5d6a7aca6d7087486b47bea789",
+            "dirty": true,
+            "changed_path_count": 69,
+            "root": "/home/admin/work/harness-engineering-platform"
+          },
+          "selection_mode": "explicit",
+          "review_mode": "none",
+          "executor": "api",
+          "source_verification": {
+            "status": "matched",
+            "reason": null,
+            "checks": [
+              {
+                "component": "candidate",
+                "status": "matched",
+                "expected_sha256": "d2572e8c4a89db14c9fa042b21c77ff98284e16805aa2c6ea7a003b6678eb2af",
+                "actual_sha256": "d2572e8c4a89db14c9fa042b21c77ff98284e16805aa2c6ea7a003b6678eb2af"
+              },
+              {
+                "component": "workspace",
+                "status": "matched",
+                "expected_sha256": "e1f6ae3d718b1ba48db3faeb7dc1c27358c5154bd1bd2b6e6d42230cd9bccc35",
+                "actual_sha256": "e1f6ae3d718b1ba48db3faeb7dc1c27358c5154bd1bd2b6e6d42230cd9bccc35"
+              },
+              {
+                "component": "presets",
+                "status": "matched",
+                "expected_sha256": "94a8f13418cbfab2c1c09ef4eaadc9ca2cc54ab987c55de75d6389702743c6a1",
+                "actual_sha256": "94a8f13418cbfab2c1c09ef4eaadc9ca2cc54ab987c55de75d6389702743c6a1"
+              },
+              {
+                "component": "managed",
+                "status": "matched",
+                "expected_sha256": "6845dbedabb0f8b9e4bb2bb88d6269c4034a542023c845b22acf06ece3693496",
+                "actual_sha256": "6845dbedabb0f8b9e4bb2bb88d6269c4034a542023c845b22acf06ece3693496"
+              },
+              {
+                "component": "evaluation_implementation",
+                "status": "matched",
+                "expected_sha256": "9c58a30066b57d2be7876f7257b1102d01f966d5889411cd5a839a430efcec8a",
+                "actual_sha256": "9c58a30066b57d2be7876f7257b1102d01f966d5889411cd5a839a430efcec8a"
+              }
+            ]
+          }
+        },
+        "summary": {
+          "trial_count": 2,
+          "execution_status_counts": {
+            "completed": 2,
+            "error": 0,
+            "skipped": 0
+          },
+          "machine_trial_verdict_counts": {
+            "passed": 0,
+            "failed": 1,
+            "inconclusive": 1
+          },
+          "effective_verdict": "failed",
+          "review_status": "not_requested"
+        },
+        "execution": {
+          "status": "completed",
+          "instance_name": "security-operations-expert-eval-8d81bedc",
+          "instance_stopped": true
+        },
+        "cases": [
+          {
+            "case_id": "U-INS-002",
+            "frozen_case_sha256": "696e8e5bef4358a7ef9e0d3b9ce29b0d837662f02ca683ac6f0aa5026740181d",
+            "matches_plan_case": true,
+            "execution_status": "completed",
+            "verdict": "failed",
+            "observation": "语义判定：被测 Session 本轮并未调用要求的 `list_executable_inspections`：可核对到的实际调用是 `skill` 加载（索引2）以及 `list_mcp_resources`/`list_mcp_resource_templates`（索引4、6，均返回 `mcp-client(inspection): server is disconnected`），冻结要求“只调用 `list_executable_inspections`”未被满足。另一方面，回答确未调用 `start_inspection`，并对巡检服务断连、未取得任何模板/巡检项如实说明且未编造目录内容（索引0，且与索引4、6 的真实错误回执一致），这部分满足预期的失败兜底条款；但 Skill 的“工具缺失即停止”只能解释失败，不能改变冻结要求，故整体判定 failed。 同一路由自评，仅作研究辅助。"
+          },
+          {
+            "case_id": "U-QA-001",
+            "frozen_case_sha256": "4f7ddfc111de4ace3285a693b09b1544d1daefda74bf6979c497d9d409bb248a",
+            "matches_plan_case": true,
+            "execution_status": "completed",
+            "verdict": "inconclusive",
+            "observation": "语义判定：评审未为全部冻结要求提供可定位的结果证据。 同一路由自评，仅作研究辅助。"
+          }
+        ]
+      },
+      {
+        "side": "variant",
+        "experiment_id": "VAR-security-operations-expert-001-r66152e077843",
+        "run_id": "run-91b77922-a32e-4dcd-9de6-e62dcfb1beff",
+        "job_id": "c43beeca-5617-4fbc-8629-3dce4c39da74",
+        "candidate_sha256": "d02595895b8c2c4fd8a81fe34b8744bc8e94764c5947ed89a1cc12e29838e877",
+        "job": {
+          "job_id": "c43beeca-5617-4fbc-8629-3dce4c39da74",
+          "status": "completed",
+          "run_id": "run-91b77922-a32e-4dcd-9de6-e62dcfb1beff",
+          "exit_code": 1,
+          "started_at": "2026-10-30T02:29:57.627Z",
+          "updated_at": "2026-10-30T02:32:30.051Z",
+          "run_status": "completed",
+          "instance_stopped": true,
+          "actual_model_calls": 7,
+          "model_calls_complete": true,
+          "model_calls_by_role": {
+            "target": 5,
+            "judge": 2,
+            "analysis": 0
+          },
+          "model_calls_unknown_reasons": []
+        },
+        "manifest": {
+          "status": "completed",
+          "created_at": "2026-10-30T02:30:05Z",
+          "finished_at": "2026-10-30T02:32:29Z"
+        },
+        "sealed_hashes_match": {
+          "results.jsonl": true,
+          "summary.json": true,
+          "report.md": true,
+          "analysis.json": true
+        },
+        "source": {
+          "source_id": "experiment:VAR-security-operations-expert-001-r66152e077843",
+          "source_kind": "experiment",
+          "baseline_ref": "git:d499a1a3e3484bf97f6b5646a8d80e20313a7120",
+          "candidate_sha256": "d02595895b8c2c4fd8a81fe34b8744bc8e94764c5947ed89a1cc12e29838e877",
+          "candidate_matches_expected": true,
+          "evaluation_sha256": "8b8e0a58f81d841ccbf046f20af72fe85f000c569282ee7102d6d2f072786d91",
+          "git_version": {
+            "commit": "608093a91b3d07eb19419c40fd8e0c1711448977",
+            "dirty": true,
+            "changed_path_count": 125
+          },
+          "program_origin": {
+            "commit": "6935910612241b5d6a7aca6d7087486b47bea789",
+            "dirty": true,
+            "changed_path_count": 69,
+            "root": "/home/admin/work/harness-engineering-platform"
+          },
+          "selection_mode": "explicit",
+          "review_mode": "none",
+          "executor": "api",
+          "source_verification": {
+            "status": "matched",
+            "reason": null,
+            "checks": [
+              {
+                "component": "candidate",
+                "status": "matched",
+                "expected_sha256": "d02595895b8c2c4fd8a81fe34b8744bc8e94764c5947ed89a1cc12e29838e877",
+                "actual_sha256": "d02595895b8c2c4fd8a81fe34b8744bc8e94764c5947ed89a1cc12e29838e877"
+              },
+              {
+                "component": "workspace",
+                "status": "matched",
+                "expected_sha256": "e1f6ae3d718b1ba48db3faeb7dc1c27358c5154bd1bd2b6e6d42230cd9bccc35",
+                "actual_sha256": "e1f6ae3d718b1ba48db3faeb7dc1c27358c5154bd1bd2b6e6d42230cd9bccc35"
+              },
+              {
+                "component": "presets",
+                "status": "matched",
+                "expected_sha256": "4abcfd943f2d9ceb0550e09b47f6633ec94a34fa17c218e30d9c2926f5f0f66c",
+                "actual_sha256": "4abcfd943f2d9ceb0550e09b47f6633ec94a34fa17c218e30d9c2926f5f0f66c"
+              },
+              {
+                "component": "managed",
+                "status": "matched",
+                "expected_sha256": "41c5e5a9ce4997e1cd8d8e268f94f758c46a2532c7a9aa3475092773070adacd",
+                "actual_sha256": "41c5e5a9ce4997e1cd8d8e268f94f758c46a2532c7a9aa3475092773070adacd"
+              },
+              {
+                "component": "evaluation_implementation",
+                "status": "matched",
+                "expected_sha256": "9c58a30066b57d2be7876f7257b1102d01f966d5889411cd5a839a430efcec8a",
+                "actual_sha256": "9c58a30066b57d2be7876f7257b1102d01f966d5889411cd5a839a430efcec8a"
+              }
+            ]
+          }
+        },
+        "summary": {
+          "trial_count": 2,
+          "execution_status_counts": {
+            "completed": 2,
+            "error": 0,
+            "skipped": 0
+          },
+          "machine_trial_verdict_counts": {
+            "passed": 0,
+            "failed": 2,
+            "inconclusive": 0
+          },
+          "effective_verdict": "failed",
+          "review_status": "not_requested"
+        },
+        "execution": {
+          "status": "completed",
+          "instance_name": "security-operations-expert-eval-c6cbe84f",
+          "instance_stopped": true
+        },
+        "cases": [
+          {
+            "case_id": "U-INS-002",
+            "frozen_case_sha256": "696e8e5bef4358a7ef9e0d3b9ce29b0d837662f02ca683ac6f0aa5026740181d",
+            "matches_plan_case": true,
+            "execution_status": "completed",
+            "verdict": "failed",
+            "observation": "语义判定：预期要求只调用 `list_executable_inspections` 并基于真实回执列出可执行模板及巡检项。被测回执显示的能力目录中只有 `schedule_list`，从未调用 `list_executable_inspections`，也未取得任何巡检模板数据；被测回答明确说明“未发现巡检目录查询的可调用工具”且未编造目录内容，因此“查询失败时如实说明、不编造”一项成立，但前两项核心要求（调用指定工具、列出真实返回的模板及巡检项）均未满足，故整体判定不通过。"
+          },
+          {
+            "case_id": "U-QA-001",
+            "frozen_case_sha256": "4f7ddfc111de4ace3285a693b09b1544d1daefda74bf6979c497d9d409bb248a",
+            "matches_plan_case": true,
+            "execution_status": "completed",
+            "verdict": "failed",
+            "observation": "语义判定：预期要求二选一：要么依据 SEC-KB-078 真实知识库内容作答并给出可核对的文档/分块来源，要么明确说明检索不到且不以常识冒充内部知识。被测 Session 中唯一工具调用 security_ops_medium_workflow（tool/result 索引 2，is_error=false）返回的是 outcome=language_answer、route=direct_answer 的语言模型回答，其 decision_record 明确列出 uncovered_sites 包含 material_answer，未返回任何 SEC-KB-078 的知识库正文、文档标识或分块来源，因此第一项要求完全未满足，回答中也未给出任何可核对来源。同时，回答开头直接断言“SEC-KB-078 剧本是 SOAR 框架中……一个具体剧本”并罗列“触发条件、自动化动作、决策逻辑”等内容，属于以常识冒充内部知识的具体内容描述，虽然随后附有材料缺失说明，但前置断言仍构成对内部知识的冒充，第二项要求也不能判为满足。故整体判定 failed。"
+          }
+        ]
+      }
+    ]
+  },
+  "comparison": {
+    "management_session_id": "session-d3e777e0-170c-40ad-a305-9aa4903d9ba1",
+    "native_call_seq": 395,
+    "native_result_seq": 396,
+    "receipt_path": "evolution/experiments/VAR-security-operations-expert-001-r66152e077843/evaluation/compute-comparison-d28806898b5f64b84416f73a6b52b6a0b27d9cb324de07fb5b20deaa5882e7d6.json",
+    "receipt_sha256": "d28806898b5f64b84416f73a6b52b6a0b27d9cb324de07fb5b20deaa5882e7d6",
+    "comparison_sha256": "71cb7c3d2e75a7df07ee23f1d28bd3f03151090c4b8761fd9f4bad2e5c4092f4",
+    "comparability": {
+      "limits": [
+        "run-b4846065-1e39-4bd6-9894-4ba27ded6e04: U-INS-002 工具结果失败或未知",
+        "run-b4846065-1e39-4bd6-9894-4ba27ded6e04: U-INS-002 原始工具回执失败、未知或不能配对",
+        "run-b4846065-1e39-4bd6-9894-4ba27ded6e04: U-QA-001 工具结果失败或未知",
+        "run-b4846065-1e39-4bd6-9894-4ba27ded6e04: U-QA-001 功能结论未确定",
+        "run-b4846065-1e39-4bd6-9894-4ba27ded6e04: U-QA-001 原始工具回执失败、未知或不能配对",
+        "run-b4846065-1e39-4bd6-9894-4ba27ded6e04: 程序版本未冻结或不同",
+        "run-91b77922-a32e-4dcd-9de6-e62dcfb1beff: 程序版本未冻结或不同"
+      ],
+      "passed": false
+    },
+    "quality_passed": false,
+    "resource_evidence": {
+      "limits": [
+        "run-91b77922-a32e-4dcd-9de6-e62dcfb1beff/U-INS-002: 至少一个模型调用的供应商 token 用量缺失或分桶不一致",
+        "run-91b77922-a32e-4dcd-9de6-e62dcfb1beff/U-QA-001: 至少一个模型调用的供应商 token 用量缺失或分桶不一致"
+      ],
+      "passed": true
+    },
+    "resource_metric": "actual_model_calls",
+    "business_calls": {
+      "parent": 6,
+      "variant": 5
+    },
+    "business_calls_per_case_mean": {
+      "parent": 3,
+      "variant": 2.5
+    },
+    "observed_reduction_pct": 16.666666666666664,
+    "eligible_for_end": false,
+    "notes": [
+      "结果仅适用于预先冻结的任务范围和所选独立 Run；不是对所有任务的统计等效证明。",
+      "model_calls 仅为会话回复次数；完整模型请求（包括压缩、标题和图内推理）使用 actual_model_calls，所有 Token 指标均包含已采集请求。",
+      "token、模型响应次数与耗时属于已记录资源指标；未测量硬件算力、供应商费用或不可见的外部模型调用。",
+      "人工确认需完整审阅原始输出和工具结果；表格只汇总证据，不替代业务判断。",
+      "依赖环境记录仅含变量配置状态；外部数据状态、网络负载与供应商变化未被完整控制，资源改善不能单独归因于 Harness。"
+    ]
+  },
+  "closure": {
+    "management_session_id": "session-d3e777e0-170c-40ad-a305-9aa4903d9ba1",
+    "model": {
+      "provider": "xiaomi-token-plan-cn",
+      "model": "mimo-v2.6-pro",
+      "reasoningEffort": "high"
+    },
+    "preview_seq": 517,
+    "preview_result_seq": 518,
+    "apply_seq": 522,
+    "apply_result_seq": 525,
+    "readback_result_seq": [
+      530,
+      532
+    ],
+    "turn_end_seq": 538,
+    "management_turn_status": "completed",
+    "management_running": false,
+    "decision": "inconclusive",
+    "decision_actor": "ai",
+    "end_marked": false,
+    "human_confirmed": false,
+    "candidate_unchanged": true,
+    "research_documents": [
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-001-r66152e077843/evaluation/observations.md",
+        "sha256": "26b6c2392f86b363ae87ba2f2e19ad5e2668896b57908b769db2d2e63f7e31f6"
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-001-r66152e077843/decision.md",
+        "sha256": "7f8d9ae3087b84186787ec12a517c9e505ac34df831426a00ca55f4a836d5488"
+      }
+    ]
+  }
+}

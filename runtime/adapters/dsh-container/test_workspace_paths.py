@@ -9,10 +9,25 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from workspace_paths import asset_root, instances_root, source_catalog, sites_config, workspace_id
+from workspace_paths import asset_root, instance_belongs_to_workspace, instances_root, source_catalog, sites_config, workspace_id
 
 
 class WorkspacePathsTests(unittest.TestCase):
+    def test_variant_legacy_registration_is_bound_to_its_candidate(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "workspace.json").write_text('{"schemaVersion":1,"id":"workspace-fixture"}')
+            identity = "VAR-example-agent-001-r0123456789ab"
+            candidate = root / "evolution/experiments" / identity / "candidate"
+            manifest = {"source_id": "experiment:" + identity,
+                        "mounts": {"workspace": str(candidate / "dsh/workspace")}}
+            self.assertTrue(instance_belongs_to_workspace(root, manifest))
+            manifest["mounts"]["managed"] = str(root / "another-candidate")
+            self.assertFalse(instance_belongs_to_workspace(root, manifest))
+            manifest["mounts"].pop("managed")
+            manifest["source_id"] = "experiment:VAR-example--agent-001-r0123456789ab"
+            self.assertFalse(instance_belongs_to_workspace(root, manifest))
+
     def test_first_agent_can_be_created_in_empty_external_workspace(self):
         adapter = Path(__file__).resolve().parent
         with tempfile.TemporaryDirectory() as temporary:

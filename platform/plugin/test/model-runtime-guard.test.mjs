@@ -13,7 +13,7 @@ await Promise.all([
     bundle: true, platform: 'node', format: 'esm' }),
 ])
 const { apply } = await import(`file://${join(bundled, 'runtime.mjs')}`)
-const { getBusinessControl } = await import(`file://${join(bundled, 'core.mjs')}`)
+const { getBusinessControl, sharedInstanceIdentity } = await import(`file://${join(bundled, 'core.mjs')}`)
 test.after(() => rmSync(bundled, { recursive: true, force: true }))
 
 test('同一业务实例的目标与评测 Session 均只可调用启动时业务目录模型', async () => {
@@ -92,4 +92,25 @@ test('无需认证的共享 Session 可用主模型和固定本地路由，未�
       for await (const _ of stream({ provider: 'threat-analysis-delivery', model: 'fixed-summary', sessionId }, next)) {}
     }, /缺少受信 Session 归属|缺少当前 Session/)
   }
+})
+
+test('开发实例的真实共享Session可调用声明的本地Qwen路径，未知Session和未声明路由仍拒绝', async t => {
+  const root = mkdtempSync(join(tmpdir(), 'development-qwen-route-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  mkdirSync(join(root, 'config'))
+  const binding = { workspaceId: 'workspace-local-qwen', agentId: 'soc', instanceId: 'soc-medium', runtimeGeneration: 'generation-local-qwen', sourceDigest: 'sha256:' + 'b'.repeat(64) }
+  writeFileSync(join(root, 'config/business-access.json'), JSON.stringify({ schemaVersion: 1, enabled: true, agents: [],
+    gateway: { instances: [{ ...binding, accessMode: 'anonymous', identityMode: 'development' }] } }))
+  const control = getBusinessControl(root)
+  control.registerInstance(binding); control.recordAgentAuthentication(binding)
+  const context = control.createContext(sharedInstanceIdentity(binding), binding)
+  control.bindSession(context, 'shared-medium-session')
+  const allowed = [{ provider: 'catalog', model: 'chat' }], route = { provider: 'transformers-serve', model: '/root/models/Qwen3.5-2B' }, listeners = new Map()
+  apply({ on: (event, listener) => listeners.set(event, listener) }, { agentId: binding.agentId, assetRoot: root, allowed, localRoutes: [route] })
+  const stream = listeners.get('llm/stream'), next = async function* () { yield 'dispatched' }, received = []
+  for await (const chunk of stream({ ...route, sessionId: 'shared-medium-session' }, next)) received.push(chunk)
+  assert.deepEqual(received, ['dispatched'])
+  assert.deepEqual(allowed, [{ provider: 'catalog', model: 'chat' }])
+  for (const sessionId of ['unknown-session', undefined]) await assert.rejects(async () => { for await (const _ of stream({ ...route, sessionId }, next)) {} }, /缺少受信 Session 归属|缺少当前 Session/)
+  await assert.rejects(async () => { for await (const _ of stream({ provider: route.provider, model: '/root/models/other', sessionId: 'shared-medium-session' }, next)) {} }, /当前不可使用模型/)
 })

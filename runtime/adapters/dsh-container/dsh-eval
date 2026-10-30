@@ -32,7 +32,7 @@ for import_root in (ADAPTER, EVALUATION_SCRIPTS):
 
 from evaluation_contract import execution_for, load_evaluation
 from scenario_analysis import ProcessCleanupError, analyze, review_full, run_cancellable_process
-from source_contract import resolve, strict_json
+from source_contract import EXPERIMENT, resolve, strict_json
 
 
 RUN_RECORD = ADAPTER / "run_record.py"
@@ -900,7 +900,7 @@ def main() -> None:
     except (EvaluationError, ValueError) as error:
         progress(f"dsh-eval failed: {error}")
         source = args.source.removeprefix("experiment:")
-        experiment_id = source if source.startswith("EXP-") else None
+        experiment_id = source if EXPERIMENT.fullmatch(source) else None
         emit_result(experiment_id, 0, executor=args.executor)
         raise SystemExit(2)
     finally:

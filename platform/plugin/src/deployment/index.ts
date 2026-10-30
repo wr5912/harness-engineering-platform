@@ -1,3 +1,4 @@
+import { VERSION_ID } from '../version-id.ts'
 import { fork } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream, existsSync } from 'node:fs'
@@ -11,7 +12,7 @@ import { programRoot, workspaceLocalPath } from '../workspace.ts'
 
 type State = 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted'
 type Job = { id: string, agent_id: string, experiment_id: string, arch: string, mode: string, state: State, created_at: string, updated_at: string, progress?: unknown, error?: string, size?: number, sha256?: string, archive?: string, request_sha256?: string }
-const selection = z.object({ agent_id: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/), experiment_id: z.string().regex(/^EXP-[a-z0-9-]+-\d{3}(?:-r[0-9a-f]{12})?$/), arch: z.enum(['amd64', 'arm64']).default(process.arch === 'arm64' ? 'arm64' : 'amd64'), mode: z.enum(['online', 'offline']).default('online'), expected_candidate_sha256: z.string().regex(/^[0-9a-f]{64}$/).optional(), request_id: z.string().uuid().optional(), knowledge_sources: z.array(z.object({ url: z.url(), path: z.string().min(1) }).strict()).max(100).optional() }).strict()
+const selection = z.object({ agent_id: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/), experiment_id: z.string().regex(VERSION_ID), arch: z.enum(['amd64', 'arm64']).default(process.arch === 'arm64' ? 'arm64' : 'amd64'), mode: z.enum(['online', 'offline']).default('online'), expected_candidate_sha256: z.string().regex(/^[0-9a-f]{64}$/).optional(), request_id: z.string().uuid().optional(), knowledge_sources: z.array(z.object({ url: z.url(), path: z.string().min(1) }).strict()).max(100).optional() }).strict()
 const identity = z.object({ job_id: z.string().uuid() }).strict()
 export interface DeploymentServices {
   seed(input: { agent_id: string; experiment_id: string }, signal: AbortSignal): Promise<{ seed: Record<string, any>; notices?: string[] }>

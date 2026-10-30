@@ -802,6 +802,21 @@ class EvaluationModeContractTest(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 dev.validate_analysis_workspace(str(run), repo=repository)
 
+    def test_variant_run_analysis_and_source_help_are_available(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            identity = "VAR-example-agent-001-r0123456789ab"
+            experiment = root / "evolution/experiments" / identity
+            run = experiment / "runs/run-00000000-0000-4000-8000-000000000000"
+            run.mkdir(parents=True)
+            self.assertEqual(dev.validate_analysis_workspace(str(run), repo=root), str(run))
+            (experiment / "candidate").mkdir()
+            (experiment / "candidate/harness.yaml").write_text("loadable_assets: {}\n")
+            output = io.StringIO()
+            with mock.patch.object(dev, "REPO", root), contextlib.redirect_stderr(output), self.assertRaises(SystemExit):
+                dev.require_up_arguments(types.SimpleNamespace(source=None, mode="eval"))
+            self.assertIn("experiment:" + identity, output.getvalue())
+
     def test_templates_declare_no_business_agent_identity(self):
         """通用启动器模板不得内联某个业务 Agent 的路径、preset 或 patch 名。"""
         text = (ADAPTER / "verification.compose.yaml").read_text(encoding="utf-8")

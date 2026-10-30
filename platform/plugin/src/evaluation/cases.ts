@@ -1,3 +1,4 @@
+import { VERSION_ID } from '../version-id.ts'
 import { programRoot } from '../workspace.ts'
 import { assertVersionIdentity } from '../agents/version-source.ts'
 import { createHash } from 'node:crypto'
@@ -11,7 +12,7 @@ import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
 
 type JsonMap = Record<string, unknown>
 const execute = promisify(execFile)
-const EXPERIMENT_ID = /^EXP-[a-z0-9]+(?:-[a-z0-9]+)*-\d{3}(?:-r[0-9a-f]{12})?$/
+const EXPERIMENT_ID = VERSION_ID
 const AGENT_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const CASE_ID = /^U-[A-Z0-9]+(?:-[A-Z0-9]+)*$/
 const RUN_ID = /^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/

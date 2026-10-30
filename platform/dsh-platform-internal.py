@@ -317,9 +317,59 @@ def normalized_mcp_patch(profile, source=None):
     return source
 
 
-def mcp_store_paths():
+def mcp_credential_paths():
+    layout = json.loads((PLUGIN / "assets/mcp-credential-layout.json").read_text(encoding="utf-8"))
     root = asset_root()
-    return root / "config/mcp-manager.json", root / ".local/credentials/mcp-manager.json"
+    directory = root / layout["directory"]
+    return {"directory": directory, "file": directory / layout["file"], "lock": directory / layout["lock"],
+            "legacyFile": root / layout["legacyFile"], "legacyLock": root / layout["legacyLock"]}
+
+
+def mcp_store_paths():
+    return asset_root() / "config/mcp-manager.json", mcp_credential_paths()["file"]
+
+
+def mcp_legacy_alias(path, target):
+    expected = os.path.relpath(target, path.parent)
+    if path.is_symlink():
+        if os.readlink(path) != expected:
+            raise PlatformError("MCP 旧路径不是受信迁移引用；保留现有文件。")
+        return
+    temporary = path.with_name(path.name + f".{os.getpid()}.{secrets.token_hex(6)}.link")
+    created = False
+    try:
+        temporary.symlink_to(expected)
+        created = True
+        os.replace(temporary, path)
+    finally:
+        if created:
+            temporary.unlink(missing_ok=True)
+
+
+def migrate_mcp_credentials_locked(paths):
+    for directory in (asset_root() / ".local", paths["directory"].parent, paths["directory"]):
+        if directory.is_symlink() or directory.exists() and not directory.is_dir():
+            raise PlatformError("MCP 凭据目录必须是实体目录；保留现有文件。")
+    for key, target in (("legacyFile", paths["file"]), ("legacyLock", paths["lock"])):
+        path = paths[key]
+        if path.is_symlink() and os.readlink(path) != os.path.relpath(target, path.parent):
+            raise PlatformError("MCP 旧路径不是受信迁移引用；保留现有文件。")
+    current, legacy = paths["file"], paths["legacyFile"]
+    if current.is_symlink() or current.exists() and not current.is_file() \
+            or legacy.exists() and not legacy.is_file():
+        raise PlatformError("MCP 凭据必须是实体文件或受信旧引用；保留现有文件。")
+    if current.exists() and legacy.exists() and not legacy.is_symlink() and current.read_bytes() != legacy.read_bytes():
+        raise PlatformError("MCP 新旧凭据冲突；保留两侧文件，请核对后重试。")
+    paths["directory"].mkdir(parents=True, exist_ok=True, mode=0o700)
+    if not paths["legacyLock"].is_symlink():
+        try:
+            os.link(paths["legacyLock"], paths["lock"])
+        except FileExistsError:
+            raise PlatformError("MCP 配置正在保存；保留现有文件并稍后重试。") from None
+        mcp_legacy_alias(paths["legacyLock"], paths["lock"])
+    if not current.exists() and legacy.exists():
+        os.link(legacy, current)  # 保留原始字节与 inode，再原子替换旧入口，不产生读取缺失窗。
+    mcp_legacy_alias(legacy, current)
 
 
 def legacy_mcp_row(source):
@@ -501,7 +551,7 @@ def check_mcp_store():
                for member in group.get("members", [])):
             raise PlatformError("公开 MCP 分组成员包含未知字段；保留原配置。")
     if not private_path.is_file():
-        raise PlatformError("本地 MCP 凭据缺失；请运行平台 prepare 初始化，或从备份恢复 .local/credentials/mcp-manager.json。")
+        raise PlatformError("本地 MCP 凭据缺失；请运行平台 prepare 初始化，或从备份恢复 .local/credentials/mcp-manager/credentials.json。")
     private = read_mcp_store(private_path, "本地 MCP 凭据")
     if set(private) != {"schemaVersion", "sharedToken", "servers"} \
             or not isinstance(private.get("sharedToken"), str) or not isinstance(private.get("servers"), dict):
@@ -559,17 +609,37 @@ def mcp_row_removed(source, row):
 
 
 def migrate_mcp_patch(profile):
-    lock = asset_root() / ".local/credentials/mcp-manager.lock"
+    paths = mcp_credential_paths()
+    for directory in (asset_root() / ".local", paths["directory"].parent, paths["directory"]):
+        if directory.is_symlink() or directory.exists() and not directory.is_dir():
+            raise PlatformError("MCP 凭据目录必须是实体目录；保留现有文件。")
+    legacy_lock = paths["legacyLock"]
+    if legacy_lock.is_symlink() and os.readlink(legacy_lock) != os.path.relpath(paths["lock"], legacy_lock.parent):
+        raise PlatformError("MCP 旧锁不是受信迁移引用；保留现有文件。")
+    lock = paths["lock"] if legacy_lock.is_symlink() else legacy_lock
     lock.parent.mkdir(parents=True, exist_ok=True)
     try:
         handle = os.open(lock, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     except FileExistsError:
         raise PlatformError("MCP 配置正在保存或保存锁未释放；保留原配置并稍后重试。") from None
     try:
+        migrate_mcp_credentials_locked(paths)
+        lock = paths["lock"]
         migrate_mcp_patch_locked(profile)
+        private = paths["file"]
+        if os.geteuid() == 0:
+            for directory in (asset_root() / ".local", private.parent.parent, private.parent):
+                os.chmod(directory, stat.S_IMODE(directory.stat().st_mode) | 0o111)
+            os.chown(private, 1000, 1000)
+        os.chmod(private, 0o600)
     finally:
+        owned = os.fstat(handle)
         os.close(handle)
-        lock.unlink()
+        for candidate in (paths["lock"], paths["legacyLock"]):
+            if candidate.is_file() and not candidate.is_symlink():
+                state = candidate.stat()
+                if (state.st_dev, state.st_ino) == (owned.st_dev, owned.st_ino):
+                    candidate.unlink()
 
 
 def migrate_mcp_patch_locked(profile):

@@ -16,7 +16,7 @@ try {
 } catch {
   throw new Error('missing or invalid selected DSH source contract')
 }
-const sourceSelector = /^experiment:EXP-[a-z0-9]+(?:-[a-z0-9]+)*-[0-9]{3}(?:-r[0-9a-f]{12})?$/
+const sourceSelector = /^experiment:(?:EXP|VAR)-[a-z0-9]+(?:-[a-z0-9]+)*-[0-9]{3}(?:-r[0-9a-f]{12})?$/
 const sourceKinds = new Set(['experiment'])
 if (source?.schema_version !== '2.1' || !sourceSelector.test(source.source_id) || !sourceKinds.has(source.source_kind)
   || source.profile !== 'web' || !source.patch?.startsWith('/opt/dsh-managed/')

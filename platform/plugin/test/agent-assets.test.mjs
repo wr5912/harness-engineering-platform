@@ -172,7 +172,7 @@ function createFixture() {
   const root = mkdtempSync(join(tmpdir(), 'new-agent-fixture-'))
   process.env.HARNESS_PROGRAM_ROOT = root
   process.env.HARNESS_ASSET_ROOT = root
-  const files = ['runtime/adapters/dsh-container/dsh-dev', 'runtime/adapters/dsh-container/version-source.mts', 'platform/plugin/src/agents/version-source.ts', 'runtime/adapters/dsh-container/source_contract.py', 'runtime/adapters/dsh-container/workspace_paths.py', 'runtime/adapters/dsh-container/scenario_analysis.py',
+  const files = ['runtime/adapters/dsh-container/dsh-dev', 'runtime/adapters/dsh-container/version-source.mts', 'platform/plugin/src/agents/version-source.ts', 'platform/plugin/src/version-id.ts', 'runtime/adapters/dsh-container/source_contract.py', 'runtime/adapters/dsh-container/workspace_paths.py', 'runtime/adapters/dsh-container/scenario_analysis.py',
     'runtime/adapters/dsh-container/source.lock.json', 'runtime/adapters/dsh-container/Dockerfile', 'runtime/adapters/dsh-container/apt-mirror.sh', 'runtime/adapters/dsh-container/build-image.sh', 'runtime/adapters/dsh-container/dsh-cli.sh',
     'runtime/adapters/dsh-container/verification-home-controls/locked-bootstrap.env', 'runtime/adapters/dsh-container/verification-home-controls/web-profile.package.json',
     'runtime/research/validate_experiment.py', 'runtime/research/evaluation_contract.py']

@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { businessSourceDigest, readBusinessLaunchConfig, renderBusinessInstance } from './business.ts'
+import { mcpCredentialPaths } from '../../../platform/plugin/src/mcp/credential-path.ts'
 const require = createRequire(new URL('../../../platform/plugin/package.json', import.meta.url))
 const yaml = require('js-yaml')
 
@@ -17,6 +18,9 @@ function fixture(t) {
   writeFileSync(join(pluginRoot, 'lib/business-runtime.js'), ''); writeFileSync(join(pluginRoot, 'lib/mcp-manager.js'), '')
   for (const name of ['package.json', 'runtime.js', 'mcp-manager.js']) writeFileSync(join(pluginRoot, 'business', name), name === 'package.json' ? '{}' : '')
   writeFileSync(join(assetRoot, 'config/business-access.json'), JSON.stringify({ schemaVersion: 1, enabled: true }))
+  const mcp = mcpCredentialPaths(assetRoot)
+  mkdirSync(mcp.directory, { recursive: true })
+  writeFileSync(mcp.file, JSON.stringify({ schemaVersion: 1, sharedToken: 'fixture-token', servers: {} }))
   const secret = join(root, 'business-secret'); writeFileSync(secret, 'a'.repeat(32))
   const file = join(root, 'launch.json'), config = { assetRoot, pluginRoot, sharedSecretFile: secret, coordinatorOrigin: 'http://host.docker.internal:53190' }
   writeFileSync(file, JSON.stringify(config))
@@ -171,6 +175,16 @@ test('业务渲染改独立bridge和回环映射，标准镜像及MCP配置保�
   assert.equal(result.registration.scheduling_supported, true)
   assert.equal(result.registration.origin, 'http://127.0.0.1:53191')
   assert.ok(!result.patch.includes('a'.repeat(32)))
+  assert.ok(!compose.services.dsh.volumes.some(item => item.source === f.config.assetRoot || item.target === '/opt/harness-business-assets'))
+  assert.ok(compose.services.dsh.volumes.some(item => item.source === join(f.config.assetRoot, 'config') && item.target === '/opt/harness-business-assets/config' && item.read_only))
+  assert.ok(compose.services.dsh.volumes.some(item => item.source === mcpCredentialPaths(f.config.assetRoot).directory && item.target === mcpCredentialPaths('/opt/harness-business-assets').directory && item.read_only))
+  assert.ok(!compose.services.dsh.volumes.some(item => /\/(?:agents|evolution|credentials)$/.test(item.source)))
+})
+
+test('未迁移的凭据拒绝生成研究挂载，不回退到整个数据根', t => {
+  const f = fixture(t)
+  rmSync(mcpCredentialPaths(f.config.assetRoot).directory, { recursive: true })
+  assert.throws(() => renderBusinessInstance(f.config, f.input), /平台 prepare/)
 })
 
 test('业务公开根使用网关来源和实例子路径，不暴露容器监听地址', t => {
@@ -204,6 +218,7 @@ test('业务bridge保留宿主别名及既有映射，不重复通用启动器�
 test('开发来源无 MCP seed 或 manager 时沿用 DSH 原生来源装载', t => {
   const f = fixture(t), seed = join(f.managed, 'web-profile.seed.patch.yml')
   rmSync(seed)
+  rmSync(mcpCredentialPaths(f.config.assetRoot).directory, { recursive: true })
   for (const source of ['absent', 'native-only']) {
     if (source === 'native-only') writeFileSync(seed, yaml.dump([{ insert: [{ id: 'native-example', name: '/opt/dsh-managed/native-example.mjs' }] }]))
     const result = renderBusinessInstance(readBusinessLaunchConfig(f.file), f.input)
@@ -212,6 +227,7 @@ test('开发来源无 MCP seed 或 manager 时沿用 DSH 原生来源装载', t 
     assert.ok(patch.flatMap(item => item.insert ?? []).some(item => item.id === 'business-runtime'))
     assert.ok(!patch.some(item => item.id === 'mcp-session-manager' || item.id === 'mcp-manager'))
     assert.ok(!patch.flatMap(item => item.insert ?? []).some(item => item.id === 'business-mcp-manager'))
+    assert.ok(!compose.services.dsh.volumes.some(item => item.source === mcpCredentialPaths(f.config.assetRoot).directory))
   }
 })
 
@@ -279,6 +295,26 @@ runtime_capabilities:
   assert.notEqual(businessSourceDigest({ managed: f.managed }), before)
   writeFileSync(matrix, `runtime_capabilities:\n  local_tools: [skill, skill]\n  local_model_routes: []\n`)
   assert.throws(() => renderBusinessInstance(f.config, f.input), /业务本地能力声明无效/)
+})
+
+test('本地适配器声明保留绝对模型ID，provider与非法字符仍按既有边界校验', t => {
+  const f = fixture(t), matrix = join(f.managed, 'role-tool-matrix.yaml')
+  const route = { provider: 'transformers-serve', model: '/root/autodl-tmp/hep-medium-security/models/Qwen3.5-2B' }
+  const declare = routes => writeFileSync(matrix, yaml.dump({ runtime_capabilities: { local_tools: ['read_security_ops_context'], local_model_routes: routes } }))
+  declare([{ provider: 'harness-workflow', model: 'hybrid-v1' }, route])
+  const originalConfig = readFileSync(f.file)
+  const rendered = renderBusinessInstance(f.config, { ...f.input, sourcePaths: { managed: f.managed } })
+  assert.deepEqual(rendered.localModelRoutes, [{ provider: 'harness-workflow', model: 'hybrid-v1' }, route])
+  assert.deepEqual(readFileSync(f.file), originalConfig, '本地适配器装配不改平台启动配置')
+  for (const invalid of [
+    { ...route, provider: '/transformers-serve' },
+    { ...route, provider: 'transformers serve' },
+    { ...route, model: '/root/models/Qwen 3.5-2B' },
+    { ...route, model: '/root/models/Qwen3.5-2B?revision=main' },
+  ]) {
+    declare([invalid])
+    assert.throws(() => renderBusinessInstance(f.config, { ...f.input, sourcePaths: { managed: f.managed } }), /业务本地能力声明无效/)
+  }
 })
 
 

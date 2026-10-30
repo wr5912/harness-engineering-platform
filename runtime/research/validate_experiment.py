@@ -483,10 +483,10 @@ def validate(experiment: Path) -> tuple[dict, int]:
     warnings: list[dict[str, str]] = []
     match = EXPERIMENT_RE.fullmatch(experiment.name)
     if not experiment.is_dir() or experiment.is_symlink() or not match:
-        payload = {"schema_version": "1.0", "valid": False, "errors": [issue("EXPERIMENT_PATH", "输入必须是 EXP-<agent-id>-NNN-r<12位十六进制> 或旧编号实体目录", experiment)], "warnings": []}
+        payload = {"schema_version": "1.0", "valid": False, "errors": [issue("EXPERIMENT_PATH", "输入必须是 EXP/VAR-<agent-id>-NNN-r<12位十六进制> 或旧编号实体目录", experiment)], "warnings": []}
         return payload, 2
     if not NEW_EXPERIMENT.fullmatch(experiment.name) and experiment.name not in LEGACY_EXPERIMENT_IDS:
-        errors.append(issue("EXPERIMENT_NAME", "新 Experiment 必须使用 EXP-<agent-id>-NNN-r<12位小写十六进制>；无后缀名称仅兼容固定历史身份", experiment))
+        errors.append(issue("EXPERIMENT_NAME", "新业务版本使用 EXP-、变体使用 VAR-，均须包含 -r<12位小写十六进制>；无后缀名称仅兼容固定历史身份", experiment))
     agent_id = match.group(1)
     repository = experiment.parents[2]
     evaluation_path = repository / "agents" / agent_id / "evaluation.md"
@@ -512,6 +512,8 @@ def validate(experiment: Path) -> tuple[dict, int]:
     for key, expected in required.items():
         if change.get(key) != expected:
             errors.append(issue("CHANGE_IDENTITY", f"{key} 必须是 {expected}", change_path))
+    if experiment.name.startswith("VAR-") and not isinstance(change.get("compute_variant"), dict):
+        errors.append(issue("COMPUTE_VARIANT", "VAR 变体必须声明 compute_variant", change_path))
     if not valid_baseline_ref(change.get("baseline_ref")):
         errors.append(issue("BASELINE_REF", "baseline_ref 必须是 git:<commit>、release:<id> 或 none:first-experiment", change_path))
     status = change.get("status")

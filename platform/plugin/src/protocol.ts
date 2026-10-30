@@ -24,6 +24,7 @@ export interface PlatformNavigation {
   intent?: 'start_eval'
   list_view?: 'agents' | 'variants'
   tab?: string
+  asset_path?: string
 }
 export interface PlatformPageProps {
   rpc: ClientConnectionRpc

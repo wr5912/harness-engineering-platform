@@ -236,10 +236,11 @@ function BusinessPreviewDetails({ value }: { value: unknown }) {
 
 function versionLabel(value: unknown) {
   const text = String(value ?? '')
-  return /-(\d{3})(?:-r[0-9a-f]{12})?$/.exec(text)?.[1] ? `版本 ${/-(\d{3})(?:-r[0-9a-f]{12})?$/.exec(text)![1]}` : text
+  const number = /-(\d{3})(?:-r[0-9a-f]{12})?$/.exec(text)?.[1]
+  return number ? `${/^(?:experiment:)?VAR-/.test(text) ? '变体' : '版本'} ${number}` : text
 }
 function targetVersionLabel(value: unknown, data: any, input: Record<string, any>) {
-  const match = /^(?:experiment:)?EXP-([a-z0-9]+(?:-[a-z0-9]+)*)-\d{3}(?:-r[0-9a-f]{12})?$/.exec(String(value ?? ''))
+  const match = /^(?:experiment:)?(?:EXP|VAR)-([a-z0-9]+(?:-[a-z0-9]+)*)-\d{3}(?:-r[0-9a-f]{12})?$/.exec(String(value ?? ''))
   const agent = data?.agent_name ?? data?.agent_id ?? input.agent_name ?? input.agent_id ?? match?.[1]
   const version = versionLabel(value) || '所选版本'
   return agent ? `智能体“${agent}”的${version}` : version

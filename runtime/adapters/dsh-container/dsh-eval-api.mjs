@@ -132,6 +132,34 @@ async function rpc(connection, method, args, signal) {
   return body.result.value
 }
 
+/** 只保留原生装载诊断的插件定位与缺失服务，不复制任意异常正文或配置。 */
+function presetDiagnostics(broken) {
+  const diagnostics = []
+  let unknown_detail_count = 0
+  for (const line of broken.split('\n')) {
+    const row = /^([a-zA-Z0-9_./-]{1,100}) \(((?:file:\/\/)?\/opt\/[A-Za-z0-9_./-]+|@deepseek-ai\/[a-z0-9-]+|cordis:include)\): (never started|waiting for ([A-Za-z][A-Za-z0-9]*(?:, [A-Za-z][A-Za-z0-9]*)*))$/.exec(line)
+    if (!row) { unknown_detail_count++; continue }
+    diagnostics.push({ plugin: row[1], entrypoint: row[2], reason: row[4] ? 'waiting for services' : 'never started',
+      ...(row[4] ? { missing_services: row[4].split(', ') } : {}) })
+  }
+  return { diagnostics, ...(unknown_detail_count ? { unknown_detail_count } : {}) }
+}
+
+async function presetReadiness(connection, presetId, signal) {
+  try {
+    const bounded = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(5000)])
+    const roster = await rpc(connection, 'agentPresets/list', {}, bounded)
+    const selected = Array.isArray(roster?.presets) ? roster.presets.filter(row => row?.id === presetId) : []
+    if (selected.length !== 1 || selected[0].broken !== undefined && typeof selected[0].broken !== 'string') return { source: 'agentPresets/list', preset_id: presetId, status: 'unknown' }
+    return { source: 'agentPresets/list', preset_id: presetId,
+      status: selected[0].broken === undefined ? 'ready' : 'broken',
+      ...(selected[0].broken === undefined ? {} : presetDiagnostics(selected[0].broken)) }
+  } catch (error) {
+    return { source: 'agentPresets/list', preset_id: presetId, status: 'unknown',
+      ...(typeof error?.error_code === 'string' ? { error_code: error.error_code } : {}) }
+  }
+}
+
 async function exportSession(connection, sessionId, signal) {
   const url = new URL('api/session.export', connection.baseUrl)
   url.searchParams.set('sessionId', sessionId)
@@ -159,12 +187,14 @@ async function createWorkspace(connection, workspacePath, signal) {
 }
 
 async function createSession(connection, payload, workspace, presetId, signal, onCreated, title = `评测 ${presetId}`) {
-  const created = await rpc(connection, 'session/create', {
+  const preset_readiness = await presetReadiness(connection, presetId, signal)
+  let created
+  try { created = await rpc(connection, 'session/create', {
     request: { workspaceId: workspace.workspaceId, agentPreset: presetId },
-  }, signal)
+  }, signal) } catch (error) { error.preset_readiness = preset_readiness; throw error }
   if (typeof created?.sessionId === 'string') await onCreated?.({
     session_id: created.sessionId, workspace_id: workspace.workspaceId,
-    session_preset: created.agentPreset, session_workspace: payload.workspace,
+    session_preset: created.agentPreset, session_workspace: payload.workspace, preset_readiness,
   })
   if (typeof created?.sessionId !== 'string' || created.agentPreset !== presetId) {
     throw new Error('identity-drift')
@@ -183,6 +213,7 @@ async function createSession(connection, payload, workspace, presetId, signal, o
     session_id: created.sessionId,
     workspace_id: workspace.workspaceId,
     session_title: title,
+    preset_readiness,
     ...assertSessionIdentity(summary, presetId, payload.workspace),
   }
 }
@@ -385,7 +416,7 @@ async function runCase(connection, payload, item, workspace, signal, traceState)
       error.evaluation_context = {
         failure_stage: traceState.stage, last_successful_step: traceState.last_successful_step ?? null,
         rpc_method: error?.rpc_method ?? null, http_status: error?.http_status ?? null,
-        error_code: error?.error_code ?? null, runtime_diagnostic: error?.runtime_diagnostic,
+        error_code: error?.error_code ?? null, runtime_diagnostic: error?.runtime_diagnostic, preset_readiness: error?.preset_readiness,
         request_id: traceState.request_id ?? null,
       }
       throw error
@@ -491,6 +522,7 @@ async function main() {
           rpc_method: error?.rpc_method ?? null, http_status: error?.http_status ?? null,
           error_code: error?.error_code ?? (/^[a-z0-9-]+$/.test(error?.message ?? '') ? error.message : error?.name ?? 'Error'),
           runtime_diagnostic: error?.runtime_diagnostic,
+          preset_readiness: error?.preset_readiness ?? traceState.session?.preset_readiness,
           trace_available: Boolean(targetArchive) },
         traceState.judgeSession ? { response: null, archive: traceState.judgeArchive, checks: { ...traceState.judgeSession, unavailable_reason: reason, trace_available: Boolean(traceState.judgeArchive) } } : null)
       rows.push(result(item, 'error', 'inconclusive',

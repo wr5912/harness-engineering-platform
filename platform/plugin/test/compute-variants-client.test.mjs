@@ -7,7 +7,7 @@ import { build } from 'esbuild'
 const require = createRequire(import.meta.url)
 const compiled = await build({ entryPoints: [new URL('../src/agents/compute-variants.tsx', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime', '@deepseek-ai/dsh-client-ui-primitives'] })
 function panel(eligible = false, hasPlan = true, readContext, storage = new Map()) {
-  const states = [], deps = [], cleanups = [], calls = [], tasks = []
+  const states = [], deps = [], cleanups = [], calls = [], tasks = [], openedCode = []
   let cursor = 0, effects = [], changed = false, tree
   const react = { ...require('react'),
     useState(initial) { const index = cursor++; if (!(index in states)) states[index] = initial; return [states[index], value => { const next = typeof value === 'function' ? value(states[index]) : value; if (!Object.is(next, states[index])) { states[index] = next; changed = true } }] },
@@ -18,9 +18,9 @@ function panel(eligible = false, hasPlan = true, readContext, storage = new Map(
   vm.runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, URLSearchParams, window: { sessionStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) }, addEventListener() {}, removeEventListener() {} }, require: name => name === 'react' ? react : name === '@deepseek-ai/dsh-client-ui-primitives' ? { Modal: () => null } : require(name) })
   const context = { experiment_id: 'EXP-alpha-002', agent_id: 'alpha', freeze: { candidate_matches: true }, parent_ref: `git:${'a'.repeat(40)}`, parent_experiment_id: 'EXP-alpha-001', fixed_parent_ref: `git:${'a'.repeat(40)}`, variant_name: '资产告警轻量版', variant_kind: 'exploratory', decision: 'inconclusive', plan: { strategy: '减少重复调用', case_hashes: { 'U-ONE-001': 'digest' }, critical_case_ids: ['U-ONE-001'], min_runs_per_case: 2, max_pass_rate_drop_pp: 0, resource_metric: 'total_tokens', min_resource_reduction_pct: 10 }, cases: [{ case_id: 'U-ONE-001', title: '查询状态' }], runs: [{ run_id: 'parent-run', experiment_id: 'EXP-alpha-001', status: 'completed' }, { run_id: 'variant-run', experiment_id: 'EXP-alpha-002', status: 'completed' }] }
   if (!hasPlan) context.plan = null
-  const props = { onAssistant: async (task, context) => { tasks.push({task, context}) }, agentId: 'alpha', agentName: '资产告警助手', experimentId: 'EXP-alpha-002', versionLabel: 'v002', versions: [{ id: 'EXP-alpha-001' }, { id: 'EXP-alpha-002' }], rpc: { call: async (_channel, method, body) => {
+  const props = { onOpenCode: path => openedCode.push(path), onAssistant: async (task, context) => { tasks.push({task, context}) }, agentId: 'alpha', agentName: '资产告警助手', experimentId: 'EXP-alpha-002', versionLabel: 'v002', versions: [{ id: 'EXP-alpha-001', derivable: true, is_variant: false }, { id: 'EXP-alpha-002', derivable: !hasPlan, is_variant: hasPlan }], rpc: { call: async (_channel, method, body) => {
     calls.push({ method, body })
-    if (method.endsWith('/context')) return readContext ? readContext(context, body) : { ok: true, value: context }
+    if (method.endsWith('/context')) return readContext ? readContext(context, body) : { ok: true, value: body.experiment_id === context.experiment_id ? context : { ...context, experiment_id: body.experiment_id, plan: null, parent_ref: `git:${'b'.repeat(40)}`, runs: context.runs.filter(run => run.experiment_id === body.experiment_id) } }
     if (method.endsWith('/preview')) return { ok: true, value: { variant_name: body.variant_name, parent_experiment_id: body.parent_experiment_id, preview_sha256: 'preview-digest', plan: { strategy: body.strategy, case_hashes: { 'U-ONE-001': 'digest' }, min_runs_per_case: 2, resource_metric: 'total_tokens', min_resource_reduction_pct: 10 } } }
     if (method.endsWith('/create')) return { ok: true, value: { experiment_id: 'EXP-alpha-003' } }
     if (method.endsWith('/freeze-preview')) return { ok: true, value: { preview_sha256: 'freeze-digest', diff: '+ 实际TypeScript源码', freeze_input: { case_ids: ['U-ONE-001'], evaluation_base_sha256: 'case-base' } } }
@@ -42,7 +42,7 @@ function panel(eligible = false, hasPlan = true, readContext, storage = new Map(
   const planningDialog = () => nodes().find(node => typeof node.type === 'function' && node.type.name === 'ComputePlanningDialog')
   const change = (title, value) => { label(title).props.onChange({ target: { value, checked: value } }); render() }
   render()
-  return { settle, text, calls, tasks, change, button, planningDialog, nodes, render, props, storedContext: context, cleanup: () => cleanups.forEach(fn => fn?.()) }
+  return { settle, text, calls, tasks, openedCode, change, button, planningDialog, nodes, render, props, storedContext: context, cleanup: () => cleanups.forEach(fn => fn?.()) }
 }
 async function compare(ui) { await ui.settle(); ui.change('parent parent-run', true); ui.change('variant variant-run', true); ui.button('比较实际效果与资源').props.onClick(); await ui.settle() }
 
@@ -140,23 +140,24 @@ test('手动纯代码计划将零调用约束和百分之百改善传入派生�
 })
 
 test('手动切换父版独立回读固定来源、任务与轨迹，不覆盖当前比较工作区', async () => {
-  const ui = panel(true, true, (context, body) => ({ ok: true, value: body.experiment_id === 'EXP-alpha-001' ? {
+  const ui = panel(true, true, (context, body) => ({ ok: true, value: body.experiment_id === 'EXP-alpha-003' ? {
     ...context, experiment_id: body.experiment_id, parent_ref: `git:${'b'.repeat(40)}`, comparison: null,
-    cases: [{ case_id: 'U-PARENT-001', title: '父版独立任务' }], plan: { ...context.plan, critical_case_ids: ['U-PARENT-001'] },
+    cases: [{ case_id: 'U-PARENT-001', title: '父版独立任务' }], plan: null,
     runs: [{ run_id: 'selected-parent-run', experiment_id: body.experiment_id, status: 'completed' }],
-  } : context }))
+  } : body.experiment_id === context.experiment_id ? context : { ...context, experiment_id: body.experiment_id, plan: null, runs: context.runs.filter(run => run.experiment_id === body.experiment_id) } }))
+  ui.props.versions.push({ id: 'EXP-alpha-003', derivable: true })
   try {
     await compare(ui)
-    ui.button('手动派生新变体').props.onClick(); await ui.settle()
+    ui.button('从业务版本创建变体').props.onClick(); await ui.settle()
     ui.change('变体名称', '父版派生'); ui.change('策略与研究问题', '复用固定父版的流程')
-    ui.change('生成 LangGraph 代码变体', true); ui.change('生成来源 variant-run', true)
+    ui.change('生成 LangGraph 代码变体', true); ui.change('生成来源 parent-run', true)
     ui.button('预览派生计划').props.onClick(); await ui.settle()
     assert.ok(ui.button('确认创建探索性变体'))
-    ui.change('完整父版', 'EXP-alpha-001')
+    ui.change('完整父版', 'EXP-alpha-003')
     assert.equal(ui.button('确认创建探索性变体'), undefined)
-    assert.equal(ui.nodes().some(node => node.props?.['aria-label'] === '生成来源 variant-run'), false)
+    assert.equal(ui.nodes().some(node => node.props?.['aria-label'] === '生成来源 parent-run'), false)
     await ui.settle()
-    assert.equal(ui.nodes().find(node => node.props?.['aria-label'] === '关键 U-PARENT-001').props.checked, true)
+    assert.equal(ui.nodes().find(node => node.props?.['aria-label'] === '关键 U-PARENT-001').props.checked, false)
     assert.equal(ui.nodes().some(node => node.props?.['aria-label'] === '纳入 U-ONE-001'), false)
     assert.equal(ui.nodes().find(node => node.props?.['aria-label'] === 'parent parent-run').props.checked, true)
     assert.ok(ui.button('确认近似等效并标记 end'), '选择创建父版不能清除当前版本已回读的比较')
@@ -164,9 +165,9 @@ test('手动切换父版独立回读固定来源、任务与轨迹，不覆盖�
     ui.change('生成来源 selected-parent-run', true)
     ui.button('预览派生计划').props.onClick(); await ui.settle()
     const input = ui.calls.filter(call => call.method.endsWith('/preview')).at(-1).body
-    assert.equal(input.parent_experiment_id, 'EXP-alpha-001'); assert.equal(input.parent_ref, `git:${'b'.repeat(40)}`)
+    assert.equal(input.parent_experiment_id, 'EXP-alpha-003'); assert.equal(input.parent_ref, `git:${'b'.repeat(40)}`)
     assert.deepEqual(Array.from(input.case_ids), ['U-PARENT-001'])
-    assert.deepEqual(Array.from(input.critical_case_ids), ['U-PARENT-001'])
+    assert.deepEqual(Array.from(input.critical_case_ids), [])
     assert.deepEqual(Array.from(input.generation.source_run_ids), ['selected-parent-run'])
     assert.equal(ui.nodes().some(node => node.type === 'input' && node.props.placeholder === 'git:<40 位提交>'), false)
   } finally { ui.cleanup() }
@@ -251,7 +252,7 @@ test('代码变体入口只提出固定目标任务，构建和装载状态来�
     assert.doesNotMatch(ui.tasks[0].task, /platform_task|kind=compute-variant/)
     assert.match(ui.tasks[0].task, /DSH 原生权限/)
     assert.equal(ui.calls.some(call => /\/(build|freeze|create)$/.test(call.method)), false)
-    ui.button('查看生成代码').props.onClick(); await ui.settle(); assert.match(ui.text(), /export function apply/)
+    ui.button('查看生成代码').props.onClick(); await ui.settle(); assert.deepEqual(ui.openedCode, ['evolution/experiments/EXP-alpha-002/candidate/dsh/managed/compute-workflow/index.ts']); assert.equal(ui.nodes().some(node => typeof node.type === 'function' && node.type.name === 'GeneratedCodeBrowser'), false); assert.equal(ui.calls.some(call => call.method.endsWith('/edit/read') || call.method.endsWith('/source')), false)
     ui.button('预览冻结差异').props.onClick(); await ui.settle()
     assert.match(ui.text(), /实际TypeScript源码/); assert.equal(ui.calls.some(call => call.method.endsWith('/freeze')), false)
     ui.button('确认冻结本次差异').props.onClick(); await ui.settle()
@@ -386,11 +387,11 @@ test('默认未知模型与空引用交助手建议，不依赖系统推理目�
 })
 
 test('切换版本后清空上一版 Decision 和手动计划草稿', async () => {
-  const ui = panel(true, true, (context, body) => ({ ok: true, value: { ...context, experiment_id: body.experiment_id, comparison: context.comparison } }))
+  const ui = panel(true, true, (context, body) => ({ ok: true, value: { ...context, experiment_id: body.experiment_id, plan: body.experiment_id === 'EXP-alpha-001' ? null : context.plan, comparison: context.comparison } }))
   try {
     await compare(ui)
     ui.change('变体研究结论', '上一版的结论')
-    ui.button('手动派生新变体').props.onClick(); await ui.settle()
+    ui.button('从业务版本创建变体').props.onClick(); await ui.settle()
     ui.change('变体名称', '上一版草稿')
     ui.change('策略与研究问题', '上一版策略')
     ui.change('关键 U-ONE-001', true)
@@ -399,10 +400,10 @@ test('切换版本后清空上一版 Decision 和手动计划草稿', async () =
     ui.render(); await ui.settle()
     assert.equal(ui.nodes().find(node => node.props?.['aria-label'] === '变体研究结论').props.value, '')
     assert.equal(ui.nodes().find(node => node.props?.id === 'compute-manual-plan'), undefined)
-    ui.button('手动派生新变体').props.onClick(); await ui.settle()
+    ui.button('从业务版本创建变体').props.onClick(); await ui.settle()
     assert.equal(ui.nodes().find(node => node.props?.['aria-label'] === '变体名称').props.value, '')
     assert.equal(ui.nodes().find(node => node.props?.['aria-label'] === '策略与研究问题').props.value, '')
-    assert.equal(ui.nodes().find(node => node.props?.['aria-label'] === '关键 U-ONE-001').props.checked, true, '按新父版计划恢复关键任务，不继承上一版草稿')
+    assert.equal(ui.nodes().find(node => node.props?.['aria-label'] === '关键 U-ONE-001').props.checked, false, '普通父版不继承其他变体计划的关键任务或上一版草稿')
     assert.equal(ui.nodes().find(node => node.type === 'details' && node.props.className === 'compute-more').props.open, undefined)
   } finally { ui.cleanup() }
 })
@@ -496,7 +497,7 @@ test('详情回读改名后立即同步展示与AI上下文，不重读context�
   const ui = panel(true)
   try {
     await compare(ui)
-    ui.button('手动派生新变体').props.onClick(); await ui.settle()
+    ui.button('从业务版本创建变体').props.onClick(); await ui.settle()
     ui.change('变体名称', '下一版草稿')
     ui.change('策略与研究问题', '保留正在编辑的策略正文')
     const reads = ui.calls.filter(call => call.method.endsWith('/context')).length
@@ -583,8 +584,9 @@ test('手动计划卸载与整页重新装载按版本恢复名称、策略、�
   const first = panel(true, true, undefined, storage)
   await compare(first)
   first.change('变体研究结论', '待补充的研究结论')
-  first.button('手动派生新变体').props.onClick(); await first.settle()
+  first.button('从业务版本创建变体').props.onClick(); await first.settle()
   first.change('变体名称', '人工草稿名称'); first.change('策略与研究问题', '待验证的策略正文')
+  first.change('关键 U-ONE-001', true)
   first.change('关键 U-ONE-001', false)
   first.cleanup()
   const second = panel(true, true, undefined, storage)
@@ -601,16 +603,60 @@ test('手动计划卸载与整页重新装载按版本恢复名称、策略、�
 
 test('父版慢读取期间再次卸载不以加载空态覆盖已暂存研究范围和诊断Run', async () => {
   const storage = new Map(), key = 'harness-compute-manual:alpha:EXP-alpha-002'
-  storage.set(key, JSON.stringify({ schema_version: 1, createOpen: true, parent: 'EXP-alpha-002', variantName: '固定范围草稿', strategy: '保留所选范围', selectedCases: ['U-ONE-001'], critical: [], sourceRuns: ['variant-run'], codeMode: true, caseScopeReady: true }))
+  storage.set(key, JSON.stringify({ schema_version: 1, createOpen: true, parent: 'EXP-alpha-001', variantName: '固定范围草稿', strategy: '保留所选范围', selectedCases: ['U-ONE-001'], critical: [], sourceRuns: ['parent-run'], codeMode: true, caseScopeReady: true }))
   const slow = panel(false, true, () => new Promise(() => {}), storage)
   await slow.settle(); slow.cleanup()
   assert.deepEqual(JSON.parse(storage.get(key)).selectedCases, ['U-ONE-001'])
-  assert.deepEqual(JSON.parse(storage.get(key)).sourceRuns, ['variant-run'])
+  assert.deepEqual(JSON.parse(storage.get(key)).sourceRuns, ['parent-run'])
   assert.equal(JSON.parse(storage.get(key)).caseScopeReady, true)
   const restored = panel(false, true, undefined, storage)
   try {
     await restored.settle()
     assert.equal(restored.nodes().find(node => node.props?.['aria-label'] === '关键 U-ONE-001').props.checked, false)
-    assert.equal(restored.nodes().find(node => node.props?.['aria-label'] === '生成来源 variant-run').props.checked, true)
+    assert.equal(restored.nodes().find(node => node.props?.['aria-label'] === '生成来源 parent-run').props.checked, true)
   } finally { restored.cleanup() }
+})
+
+test('VAR与旧变体不进入父版选项，残留草稿自动改用真实普通父版并重新回读', async () => {
+  const id = 'VAR-alpha-001-rabcdef123456', storage = new Map()
+  storage.set(`harness-compute-manual:alpha:${id}`, JSON.stringify({ schema_version: 1, createOpen: true, parent: id, variantName: '保留名称', strategy: '保留目标', selectedCases: ['OLD'], sourceRuns: ['old-variant-run'], caseScopeReady: true }))
+  const ui = panel(false, true, (context, body) => ({ ok: true, value: body.experiment_id === id ? { ...context, experiment_id: id, generation: { mode: 'langgraph-aot' } }
+    : { ...context, experiment_id: body.experiment_id, plan: null, parent_ref: `git:${'b'.repeat(40)}`, cases: [{ case_id: 'U-PARENT-001', title: '固定业务任务' }], runs: [{ run_id: 'parent-source', experiment_id: body.experiment_id }] } }), storage)
+  ui.props.experimentId = id
+  ui.props.versions = [{ id }, { id: 'EXP-alpha-002', is_variant: true, derivable: false }, { id: 'EXP-alpha-001', is_variant: false, derivable: true }]
+  try {
+    ui.render(); await ui.settle()
+    const selector = ui.nodes().find(node => node.props?.['aria-label'] === '完整父版')
+    assert.deepEqual(Array.from(selector.props.children.flat().filter(Boolean).map(node => node.props.value)), ['EXP-alpha-001'])
+    assert.equal(selector.props.value, 'EXP-alpha-001')
+    assert.equal(ui.nodes().some(node => node.props?.['aria-label'] === '纳入 OLD'), false)
+    assert.equal(ui.nodes().find(node => node.props?.['aria-label'] === '变体名称').props.value, '保留名称')
+    ui.change('生成 LangGraph 代码变体', true)
+    assert.equal(ui.button('预览派生计划').props.disabled, true, '旧VAR轨迹不能随着草稿迁入普通父版')
+    ui.change('生成来源 parent-source', true)
+    ui.button('预览派生计划').props.onClick(); await ui.settle()
+    const input = ui.calls.find(call => call.method.endsWith('/preview')).body
+    assert.equal(input.parent_experiment_id, 'EXP-alpha-001')
+    assert.equal(input.parent_ref, `git:${'b'.repeat(40)}`)
+    assert.deepEqual(Array.from(input.case_ids), ['U-PARENT-001'])
+    assert.deepEqual(Array.from(input.generation.source_run_ids), ['parent-source'])
+    ui.button('请 AI 生成代码变体').props.onClick(); await ui.settle()
+    assert.equal(ui.tasks.at(-1).context.experiment_id, id, '已有VAR仍可生成代码')
+    assert.equal(ui.tasks.at(-1).context.generation_intent, 'implement')
+  } finally { ui.cleanup() }
+})
+
+test('VAR即使缺少计划也不能发起新策划，后端标记的旧变体同样禁止', async () => {
+  for (const id of ['VAR-alpha-001-rabcdef123456', 'EXP-alpha-002']) {
+    const ui = panel(false, false, context => ({ ok: true, value: { ...context, experiment_id: id } }))
+    ui.props.experimentId = id
+    ui.props.versions = [{ id, is_variant: id.startsWith('EXP-'), derivable: id.startsWith('VAR-') }]
+    try {
+      ui.render(); await ui.settle()
+      assert.equal(ui.button('请 AI 策划算力变体').props.disabled, true)
+      await assert.rejects(ui.planningDialog().props.onSend({}), /变体不能作为策划来源/)
+      assert.equal(ui.tasks.length, 0)
+      assert.equal(ui.button('手动制定计划').props.disabled, true)
+    } finally { ui.cleanup() }
+  }
 })

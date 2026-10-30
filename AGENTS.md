@@ -176,7 +176,7 @@ AI 开发工具在创建分支前必须读取本节，根据**任务名称、任
 ## 文件与命名
 
 - Agent ID、技能名和普通目录使用小写 kebab-case。
-- 新 Experiment 使用 `EXP-<agent-id>-NNN-r<12位随机十六进制>`，由创建工具生成并检查本地占用，避免并行分支目录重名；既有 `EXP-<agent-id>-NNN` 保持原名和引用。Research Release 使用 `<agent-id>-v<semver>`。
+- 业务智能体版本使用 `EXP-<agent-id>-NNN-r<12位随机十六进制>`，变体使用 `VAR-<agent-id>-NNN-r<12位随机十六进制>`，由创建工具生成并检查本地占用。两类对象沿用现有 Experiment/Candidate/Run 文件合同；变体不得作为新版本、融合或另一变体的继承来源。既有 ID 和历史引用保持原样。Research Release 使用 `<agent-id>-v<semver>`。
 - Agent 的需求、任务、测试数据、评估方法和测试验收按主要消费方式保存在一个 Markdown 或一个 JSONL；没有真实内容时不创建。
 - 研究 Run 位于 `evolution/experiments/<experiment-id>/runs/<run-uuid>/`。
 - 只有出现真实内容时才创建目录，不创建空 Agent、空 Eval、空报告、空证据或占位平台。

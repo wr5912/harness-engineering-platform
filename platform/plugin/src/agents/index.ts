@@ -1,7 +1,7 @@
 import { assetText } from './asset-text.ts'
 import { createRequire } from 'node:module'
 import { execFile, spawnSync } from 'node:child_process'
-import { isDeepStrictEqual, promisify } from 'node:util'
+import { promisify } from 'node:util'
 import { DEFAULT_SCHEMA, Type, load as loadYaml, dump as dumpYaml } from 'js-yaml'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import {
@@ -32,7 +32,8 @@ import { createEvaluationJobs, EvaluationJobError, redactKnownValues } from '../
 import { caseSourceReferences, createCaseManagementHandler, type RunCaseSource } from '../evaluation/cases.ts'
 import { readAssetDiff, readFixedAsset } from './asset-diff.ts'
 import { createAgent } from './create-agent.ts'
-import { createComputeVariantsHandler } from './compute-variants.ts'
+import { VERSION_ID, isVariantIdentity, assertInheritableVersion } from '../version-id.ts'
+import { createComputeVariantsHandler, type ComputeVariantCreation } from './compute-variants.ts'
 import { createTrainingServersHandler } from './training-servers.ts'
 import { createComputeBuildHandler } from './compute-build.ts'
 import { createComputeFreezeHandler } from './compute-freeze.ts'
@@ -42,15 +43,16 @@ import { candidateFiles, dataPath, sourceInfo } from '../tasks/files.ts'
 import { previewTaskAssembly, applyTaskAssembly, type TaskAssemblyInput } from '../tasks/assembly.ts'
 import { containsLiteralLlmKey } from '../tasks/llm-key.ts'
 import { createInstancesHandler } from '../instances/index.ts'
-import { assertVersionIdentity, versionSource, versionSources } from './version-source.ts'
+import { assertVersionIdentity, versionIdentity, versionSource, versionSources } from './version-source.ts'
 import { inspectLegacy, readResearchReference, validateResearch } from './research.ts'
+import { createVariantIdentityMigrationHandler, currentVariantProjection } from './variant-identity.ts'
 
 type JsonMap = Record<string, unknown>
 type SourceCatalog = { schema_version?: string; sources?: Record<string, JsonMap> }
 type RpcValue = JsonMap | JsonMap[] | string | number | boolean | null
 type EvalModelPolicyProvider = (agentId: string) => Promise<{ policy: unknown; environment: Record<string, string> }>
 
-const EXP_ID = /^EXP-([a-z0-9]+(?:-[a-z0-9]+)*)-(\d{3})(?:-r[0-9a-f]{12})?$/
+const EXP_ID = VERSION_ID
 const RUN_ID = /^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 const AGENT_ID = /^[a-z0-9][a-z0-9-]*$/
 const DSH_EVAL = 'runtime/adapters/dsh-container/dsh-eval'
@@ -311,6 +313,7 @@ function experimentInfo(root: string, id: string) {
     status: change.status ?? null,
     change,
     change_sha256: sha256(content),
+    ...currentVariantProjection(root, id, change),
   }
 }
 
@@ -325,7 +328,7 @@ function listExperiments(root: string, agentId?: string) {
     })
     .map(id => {
       try { return { ...experimentInfo(root, id), error: null as string | null } }
-      catch (error) { return { id, path: `evolution/experiments/${id}`, agent_id: EXP_ID.exec(id)![1], status: 'unavailable', baseline_ref: null, change: {} as JsonMap, change_sha256: null, error: (error as Error).message } }
+      catch (error) { return { id, path: `evolution/experiments/${id}`, agent_id: EXP_ID.exec(id)![1], status: 'unavailable', baseline_ref: null, change: {} as JsonMap, change_sha256: null, current_variant_id: null, is_current: true, error: (error as Error).message } }
     })
     .filter(item => !agentId || item.agent_id === agentId)
 }
@@ -374,7 +377,7 @@ function relatedRefs(root: string, experimentId: string) {
   const files = ['hypothesis.md', 'decision.md', 'evaluation/observations.md']
   const refs = new Set<string>()
   for (const rel of files) {
-    for (const match of readText(join(root, 'evolution/experiments', experimentId, rel)).matchAll(/EXP-[a-z0-9-]+-\d{3}(?:-[a-z0-9-]+)?/g)) {
+    for (const match of readText(join(root, 'evolution/experiments', experimentId, rel)).matchAll(/(?:EXP|VAR)-[a-z0-9-]+-\d{3}(?:-[a-z0-9-]+)?/g)) {
       if (match[0] !== experimentId) refs.add(match[0])
     }
   }
@@ -399,13 +402,15 @@ function assertUniqueResolved(edits: { rel: string }[]) {
 
 function list(root: string) {
   const source = catalog(root)
-  const experiments = listExperiments(root)
+  const allExperiments = listExperiments(root)
+  const experiments = allExperiments.filter(item => item.is_current)
   return ok({
     schema_version: '1.0',
     root,
     observed_at: new Date().toISOString(),
     agents: listAgents(root, experiments),
     experiments,
+    historical_experiments: allExperiments.filter(item => !item.is_current),
     releases: listDirs(join(root, 'releases')).map(id => ({ id, path: `releases/${id}` })),
     source_catalog: { path: 'evolution/experiments/*/candidate/harness.yaml', schema_version: '2.0', count: Object.keys(source.parsed.sources ?? {}).length, errors: source.errors },
   })
@@ -629,8 +634,7 @@ function gitCandidateDigest(root: string, id: string, ref: string): string | nul
 }
 
 function fusionInventory(root: string, agentId: string, parentId: string, parentRef: string) {
-  const versions = listExperiments(root, agentId)
-  const byId = new Map(versions.map(version => [version.id, version]))
+  const versions = listExperiments(root, agentId).filter(version => !isVariantIdentity(version.id, version.change))
   type FixedVersion = { id: string; ref: string; change: JsonMap; digest: string; sourceHash: string }
   const fixed = new Map<string, FixedVersion | null>()
   const snapshot = (id: string, ref: string): FixedVersion | null => {
@@ -645,7 +649,7 @@ function fusionInventory(root: string, agentId: string, parentId: string, parent
       const change = requireObject(loadYaml(shown.stdout))
       const source = versionSource(root, id, ref.slice(4))
       const digest = gitCandidateDigest(root, id, ref)
-      if (change.agent_id !== agentId || change.experiment_id !== id || source?.agent_id !== agentId || !digest) return null
+      if (change.agent_id !== agentId || change.experiment_id !== id || source?.agent_id !== agentId || !digest || isVariantIdentity(id, change)) return null
       const value = { id, ref, change, digest, sourceHash: sha256(JSON.stringify(source)) }
       fixed.set(key, value)
       return value
@@ -686,26 +690,10 @@ function fusionInventory(root: string, agentId: string, parentId: string, parent
   }))
   const rows = versions.filter(version => !covered.has(version.id)).map(version => {
     const change = version.change
-    const end = change.variant_kind === 'end' || change.kind === 'end' || change.variant === 'end'
-    const refs = Array.isArray(change.equivalence_evidence_refs) ? change.equivalence_evidence_refs : []
-    let fixedEndParent = false
-    if (end && typeof change.baseline_ref === 'string' && typeof change.parent_experiment_id === 'string' && byId.has(change.parent_experiment_id)) {
-      fixedEndParent = Boolean(snapshot(change.parent_experiment_id, change.baseline_ref))
-    }
-    const resourceRefs = Array.isArray(change.resource_evidence_refs) ? change.resource_evidence_refs : []
-    const hasEvidence = (values: unknown[]) => values.length > 0 && values.every(ref => typeof ref === 'string' && !ref.startsWith('/') && !ref.split('/').includes('..') && existsSync(join(root, ref)) && lstatSync(join(root, ref)).isFile() && readText(join(root, ref)).trim())
-    const computeDecision = change.compute_variant_decision as JsonMap | undefined
-    const confirmedVariant = change.compute_variant && typeof computeDecision?.variant_ref === 'string'
-      ? snapshot(version.id, computeDecision.variant_ref) : null
-    // 算力变体的结论只适用于确认时的计划与 Candidate；后续编辑需要重新比较。
-    const computeEndCurrent = !change.compute_variant || Boolean(computeDecision?.measurement_schema_version === 2 && confirmedVariant
-      && confirmedVariant.digest === currentDigests.get(version.id)
-      && isDeepStrictEqual(confirmedVariant.change.compute_variant, change.compute_variant))
-    const endVerified = end && fixedEndParent && currentFixed.get(version.id) && computeEndCurrent && change.end_confirmed === true && hasEvidence(refs) && hasEvidence(resourceRefs)
     const decision = change.outcome ?? change.decision
-    const excluded = endVerified || decision === 'reject'
-    const uncertain = !excluded && (end || decision !== 'adopt' || !currentFixed.get(version.id))
-    return { experiment_id: version.id, baseline_ref: version.baseline_ref, status: excluded ? 'excluded' : uncertain ? 'needs_review' : 'recommended', reason: endVerified ? '已固定父版且用户已确认效果等效及资源差异的 end 版本' : decision === 'reject' ? '研究 Decision 已否决' : end ? 'end 声明缺少完整等效或资源差异确认，需判断' : version.id === parentId ? '当前版本与所选固定父版不同或尚未完成验证，需确认其变化' : uncertain ? '仍在探索、工作树已变化或继承关系未确认，需判断' : '主父版未覆盖的并行能力', features: featureView(root, version.id, change) }
+    const excluded = decision === 'reject'
+    const uncertain = !excluded && (decision !== 'adopt' || !currentFixed.get(version.id))
+    return { experiment_id: version.id, baseline_ref: version.baseline_ref, status: excluded ? 'excluded' : uncertain ? 'needs_review' : 'recommended', reason: decision === 'reject' ? '研究 Decision 已否决' : version.id === parentId ? '当前版本与所选固定父版不同或尚未完成验证，需确认其变化' : uncertain ? '仍在探索、工作树已变化或继承关系未确认，需判断' : '主父版未覆盖的并行能力', features: featureView(root, version.id, change) }
   })
   const candidates = rows.filter(row => row.status !== 'excluded')
   const frontier = candidates.filter(row => !candidates.some(other => other.experiment_id !== row.experiment_id && currentClosures.get(other.experiment_id)?.has(row.experiment_id) && !currentClosures.get(row.experiment_id)?.has(other.experiment_id)))
@@ -872,7 +860,8 @@ function fusionFinalize(root: string, body: JsonMap) {
 async function detail(root: string, payload: JsonMap, signal?: AbortSignal) {
   const agentId = agentIdField(payload)
   const manifest = readYamlMap(root, repoPath(root, `agents/${agentId}/manifest.yaml`))
-  const versions = listExperiments(root, agentId).sort((left, right) => right.id.localeCompare(left.id, 'en', { numeric: true }))
+  const allVersions = listExperiments(root, agentId).sort((left, right) => right.id.localeCompare(left.id, 'en', { numeric: true }))
+  const versions = allVersions.filter(item => item.is_current)
   const explicitExperiment = optionalString(payload, 'experiment_id')
   const activeExperiment = typeof manifest.active_experiment === 'string' ? manifest.active_experiment : undefined
   const rawExperimentId = explicitExperiment ?? activeExperiment ?? versions[0]?.id
@@ -888,11 +877,14 @@ async function detail(root: string, payload: JsonMap, signal?: AbortSignal) {
   const decision = readText(repoPath(root, `evolution/experiments/${experimentId}/decision.md`))
   const assets = assetTree(root, experimentId)
   const commit = gitHead(root)
-  let derivation: JsonMap = { parent_experiment_id: experimentId, parent_ref: null, note: '当前提交尚不能恢复所选版本，请先固定完整来源；baseline_ref 是该版本的祖先，不能代替所选版本。' }
-  if (commit) try {
+  const variant = isVariantIdentity(experimentId, exp.change)
+  let derivation: JsonMap = variant
+    ? { parent_experiment_id: experimentId, parent_ref: null, is_variant: true, derivable: false, reason: 'variant', note: '变体不能作为新版本的继承来源。' }
+    : { parent_experiment_id: experimentId, parent_ref: null, is_variant: false, derivable: true, note: '业务版本可作为继承来源，但当前提交尚不能恢复所选版本，请先固定完整来源；baseline_ref 是该版本的祖先，不能代替所选版本。' }
+  if (commit && !variant) try {
     validateGitParent(root, agentId, `git:${commit}`, experimentId)
     const fixedDigest = gitCandidateDigest(root, experimentId, `git:${commit}`)
-    if (fixedDigest && fixedDigest === candidateDigest(root, experimentId)) derivation = { parent_experiment_id: experimentId, parent_ref: `git:${commit}`, note: '所选 Candidate 与固定提交一致，派生前用 assets/read-fixed 核对；baseline_ref/experiment.change.parent_ref 指向该版本的祖先。' }
+    if (fixedDigest && fixedDigest === candidateDigest(root, experimentId)) derivation = { parent_experiment_id: experimentId, parent_ref: `git:${commit}`, is_variant: false, derivable: true, note: '所选 Candidate 与固定提交一致，派生前用 assets/read-fixed 核对；baseline_ref/experiment.change.parent_ref 指向该版本的祖先。' }
     else if (fixedDigest) derivation.note = '所选 Candidate 有未提交改动，请先固定当前 Candidate；不能用 HEAD 的旧资产或祖先提交冒充当前版本。'
   } catch { /* 新建但尚未提交的版本不能冒用其祖先提交派生。 */ }
   let readableCandidateDigest: string | null = null
@@ -901,10 +893,13 @@ async function detail(root: string, payload: JsonMap, signal?: AbortSignal) {
   return ok({
     agent: { id: agentId, name: agentDisplayName(root, experimentId) ?? agentId, manifest, path: `agents/${agentId}` },
     experiment: exp,
+    current_variant_id: exp.current_variant_id,
+    is_current: exp.is_current,
+    historical_versions: allVersions.filter(item => !item.is_current).map(item => ({ id: item.id, current_variant_id: item.current_variant_id, is_current: false, is_variant: true, derivable: false })),
     change_sha256: exp.change_sha256,
     candidate_sha256: readableCandidateDigest,
     selection: { basis: explicitExperiment ? 'explicit' : activeExperiment ? 'active_experiment' : 'latest_experiment', experiment_id: experimentId },
-    versions: versions.map(item => ({ id: item.id, status: item.status, baseline_ref: item.baseline_ref, ...(item.error ? { error: item.error } : {}) })),
+    versions: versions.map(item => ({ id: item.id, is_current: item.is_current, current_variant_id: item.current_variant_id, is_variant: isVariantIdentity(item.id, item.change), derivable: !isVariantIdentity(item.id, item.change), status: item.status, baseline_ref: item.baseline_ref, ...(item.error ? { error: item.error } : {}) })),
     baseline: { ref: exp.baseline_ref, parent_experiment_id: exp.change.parent_experiment_id ?? null, source: exp.baseline_ref ? 'change.yaml' : 'unknown' },
     fusion: declaredFusion(exp.change),
     related_references: relatedRefs(root, experimentId),
@@ -930,7 +925,11 @@ function validateGitParent(root: string, agentId: string, parentRef: string, par
   const check = spawnSync('git', ['cat-file', '-e', `${commit}^{commit}`], { cwd: root, encoding: 'utf8' })
   if (check.status !== 0) throw new RpcError('invalid_request', '父提交不存在', { parent_ref: parentRef })
   let source: JsonMap
-  try { source = versionSource(root, parentExperiment, commit) }
+  try {
+    assertInheritableVersion(parentExperiment, versionIdentity(root, parentExperiment))
+    assertInheritableVersion(parentExperiment, versionIdentity(root, parentExperiment, commit))
+    source = versionSource(root, parentExperiment, commit)
+  }
   catch (error) { throw new RpcError('invalid_request', (error as Error).message, { parent_experiment_id: parentExperiment, parent_ref: parentRef }) }
   if (source.agent_id !== agentId) throw new RpcError('invalid_request', '父 Experiment 与 Agent 不匹配', { agent_id: agentId, parent_experiment_id: parentExperiment })
   return { commit, source }
@@ -1008,7 +1007,8 @@ function reuseParentDependencies(root: string, parentExperiment: string, candida
   return { reused, skipped }
 }
 
-async function createExperiment(root: string, payload: JsonMap) {
+async function createExperiment(root: string, payload: JsonMap, variant?: ComputeVariantCreation) {
+  if (!variant && isVariantIdentity('', payload)) throw new RpcError('invalid_request', '变体只能通过 compute-variants/create 创建')
   const agentId = agentIdField(payload)
   const parentRef = stringField(payload, 'parent_ref')
   const manifest = readYamlMap(root, repoPath(root, `agents/${agentId}/manifest.yaml`))
@@ -1016,10 +1016,11 @@ async function createExperiment(root: string, payload: JsonMap) {
   const rawParentExperiment = optionalString(payload, 'parent_experiment_id') ?? defaultParent
   const parentExperiment = rawParentExperiment ? experimentIdValue(rawParentExperiment, 'parent_experiment_id') : undefined
   if (!parentExperiment) throw new RpcError('invalid_request', '缺少 parent_experiment_id')
-  const nextNumber = Math.max(0, ...listExperiments(root, agentId).map(item => Number(EXP_ID.exec(item.id)?.[2] ?? 0))) + 1
+  const prefix = variant ? 'VAR' : 'EXP'
+  const nextNumber = Math.max(0, ...listExperiments(root, agentId).filter(item => item.id.startsWith(`${prefix}-`)).map(item => Number(EXP_ID.exec(item.id)?.[2] ?? 0))) + 1
   let experimentId = ''
   do {
-    experimentId = `EXP-${agentId}-${String(nextNumber).padStart(3, '0')}-r${randomBytes(6).toString('hex')}`
+    experimentId = `${prefix}-${agentId}-${String(nextNumber).padStart(3, '0')}-r${randomBytes(6).toString('hex')}`
   } while (existsSync(join(root, 'evolution/experiments', experimentId)))
 
   const experimentRoot = repoPath(root, `evolution/experiments/${experimentId}`)
@@ -1049,6 +1050,7 @@ async function createExperiment(root: string, payload: JsonMap) {
       parent_experiment_id: parentExperiment,
       parent_ref: parentRef,
       status: 'active',
+      ...(variant ? { compute_variant: variant.plan, variant_kind: 'exploratory', variant_name: variant.name } : {}),
     })
     writeFileSync(join(experimentRoot, 'hypothesis.md'), `# ${experimentId}\n\n固定父版与继承来源见 [change.yaml](change.yaml)。\n\n研究问题：${researchQuestion}\n`)
     mkdirSync(join(experimentRoot, 'evaluation'), { recursive: true })
@@ -1587,8 +1589,9 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
   const datasets = createDecisionDatasetHandler(root)
   const computeBuild = createComputeBuildHandler(root)
   const computeFreeze = createComputeFreezeHandler(root)
+  const variantIdentity = createVariantIdentityMigrationHandler(root)
   const computeVariants = createComputeVariantsHandler(root, {
-    createExperiment: payload => createExperiment(root, payload),
+    createExperiment: (payload, variant) => createExperiment(root, payload, variant),
     candidateDigest: id => candidateDigest(root, id),
     gitCandidateDigest: (id, ref) => gitCandidateDigest(root, id, ref),
     readRun: async (runId, signal) => {
@@ -1619,7 +1622,8 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
       if (endpoint.startsWith('training-servers/')) return trainingServers(endpoint.slice('training-servers/'.length), body, signal, peer)
       if (endpoint.startsWith('compute-variants/')) {
         const method = endpoint.slice('compute-variants/'.length)
-        const result = ['build-preview', 'build'].includes(method) ? await computeBuild(method === 'build-preview' ? 'preview' : 'build', body, signal)
+        const result = ['identity-preview', 'identity-apply'].includes(method) ? await variantIdentity(method, body, signal)
+          : ['build-preview', 'build'].includes(method) ? await computeBuild(method === 'build-preview' ? 'preview' : 'build', body, signal)
           : ['freeze-preview', 'freeze'].includes(method) ? await computeFreeze(method === 'freeze-preview' ? 'preview' : 'freeze', body, signal)
             : await computeVariants(method, body, signal)
         return result.ok ? ok(result.value) : failure(new RpcError(result.error.code, result.error.message))

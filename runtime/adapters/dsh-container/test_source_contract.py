@@ -32,6 +32,7 @@ class SourceContractTest(unittest.TestCase):
         self.assertEqual(source_contract.LEGACY_EXPERIMENT_IDS, expected_legacy)
         self.assertEqual(len(source_contract.LEGACY_EXPERIMENT_IDS), 16)
         self.assertIsNotNone(source_contract.NEW_EXPERIMENT.fullmatch("EXP-example-agent-021-r0123456789ab"))
+        self.assertEqual(source_contract.NEW_EXPERIMENT.fullmatch("VAR-example-agent-021-r0123456789ab").group(1), "example-agent")
         for identity in (*expected_legacy, "EXP-example-agent-001", "EXP-security-operations-expert-021"):
             with self.subTest(identity=identity):
                 self.assertIsNone(source_contract.NEW_EXPERIMENT.fullmatch(identity))
@@ -64,12 +65,40 @@ class SourceContractTest(unittest.TestCase):
             "EXP-security-operations-expert-014-r8b1bd54e8be7",
             "EXP-security-operations-expert-014-r8b1bd54e8be",
             "EXP-security-operations-expert-014-r8b1bd54e8be70",
+            "VAR-security-operations-expert-014-r8b1bd54e8be7",
+            "VAR-security-operations-expert-014-r8b1bd54e8be",
+            "VAR-security--operations-expert-014-r8b1bd54e8be7",
         ):
             self.assertEqual(
                 re.fullmatch(pattern, "experiment:" + value) is not None,
                 source_contract.EXPERIMENT.fullmatch(value) is not None,
                 value,
             )
+
+    def test_variant_source_fully_resolves_and_requires_compute_declaration(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "agents").mkdir()
+            (root / "evolution/experiments").mkdir(parents=True)
+            result = subprocess.run([sys.executable, str(source_contract.ADAPTER / "dsh-dev"),
+                                     "--repo", str(root), "init", "example-agent"],
+                                    capture_output=True, text=True, check=True)
+            ordinary = json.loads(result.stdout)["experiment_id"]
+            variant = ordinary.replace("EXP-", "VAR-", 1)
+            experiment = root / "evolution/experiments" / variant
+            (root / "evolution/experiments" / ordinary).rename(experiment)
+            change = yaml.safe_load((experiment / "change.yaml").read_text())
+            change.update(experiment_id=variant, compute_variant={"kind": "medium"})
+            (experiment / "change.yaml").write_text(yaml.safe_dump(change), encoding="utf-8")
+            contract = source_contract.resolve("experiment:" + variant, repo=root)
+            self.assertEqual(contract["experiment_id"], variant)
+            self.assertEqual(contract["agent_id"], "example-agent")
+            self.assertEqual(contract["source_id"], "experiment:" + variant)
+            self.assertTrue(contract["workspace"].startswith(str(experiment / "candidate")))
+            del change["compute_variant"]
+            (experiment / "change.yaml").write_text(yaml.safe_dump(change), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "compute_variant"):
+                source_contract.resolve("experiment:" + variant, repo=root)
 
     def test_env_name_cli_outputs_names_only(self):
         completed = subprocess.run(
@@ -260,6 +289,30 @@ class SourceContractTest(unittest.TestCase):
                 file.write_text(yaml.safe_dump(manifest))
                 with self.assertRaisesRegex(ValueError, message):
                     resolve(source, repo=root)
+
+    def test_candidate_conventional_profile_keeps_its_seed_without_manifest_field(self):
+        source = "EXP-security-operations-expert-007"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            relative = Path("evolution/experiments") / source
+            shutil.copytree(ASSETS / relative, root / relative)
+            candidate = root / relative / "candidate"
+            manifest_file = candidate / "harness.yaml"
+            manifest = yaml.safe_load(manifest_file.read_text())
+            manifest["loadable_assets"].pop("profile_manifest", None)
+            manifest_file.write_text(yaml.safe_dump(manifest))
+            profile = candidate / "dsh/managed/web-profile.package.json"
+            seed = profile.parent / "web-profile.seed.patch.yml"
+            seed.write_text("- insert: [{id: exact-candidate-seed}]\n")
+            original = manifest_file.read_bytes()
+            contract = resolve(source, repo=root)
+            self.assertEqual(contract["profile_manifest"], str(profile))
+            self.assertEqual(Path(contract["profile_manifest"]).parent / seed.name, seed)
+            self.assertEqual(seed.read_text(), "- insert: [{id: exact-candidate-seed}]\n")
+            self.assertEqual(manifest_file.read_bytes(), original)
+            profile.unlink()
+            fallback = resolve(source, repo=root)
+            self.assertEqual(fallback["profile_manifest"], str(source_contract.ADAPTER / "verification-home-controls/web-profile.package.json"))
 
     def test_reference_root_requires_evaluation_source(self):
         with tempfile.TemporaryDirectory(prefix="dsh-source-contract-") as location:

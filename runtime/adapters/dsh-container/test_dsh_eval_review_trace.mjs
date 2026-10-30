@@ -85,7 +85,12 @@ async function fixture(t, scenario = () => ({})) {
       const args = envelope.payload.args
       requests.push({ method, args })
       let value
-      if (method === 'workspace/create') value = { workspace: { workspaceId: 'review-workspace', path: args.request.path } }
+      if (method === 'agentPresets/list') {
+        const options = scenario(undefined, { preset: 'target', prompts: [] })
+        if (options.readinessUnavailable) { response.writeHead(503); response.end(); return }
+        value = { presets: [{ id: 'target', isDefault: true, ...(options.presetBroken === undefined ? {} : { broken: options.presetBroken }) }, { id: 'reviewer', isDefault: false }] }
+      }
+      else if (method === 'workspace/create') value = { workspace: { workspaceId: 'review-workspace', path: args.request.path } }
       else if (method === 'session/create') {
         const error = scenario(undefined, { preset: args.request.agentPreset, prompts: [] }).createError
         if (error) {
@@ -170,6 +175,31 @@ test('真实 session/create 失败保留原生错误码与插件定位，不把�
   assert.equal(saved.checks.trace_available, false)
   assert.equal(JSON.stringify(saved).includes('不得复制此配置正文'), false)
   assert.equal(runtime.requests.some(request => request.method === 'session/prompt'), false)
+})
+
+test('原生Preset roster保留多插件missing service诊断，Session失败仍保存真实阶段与error_code', async t => {
+  const reason = 'security-operations-guard (/opt/dsh-managed/security-operations-guard.mjs): waiting for mcpSessionManager\npolicy-selection-runtime (/opt/dsh-managed/policy-selection-runtime.mjs): waiting for mcpSessionManager, userQuestions'
+  const runtime = await fixture(t, () => ({ presetBroken: reason, createError: { code: 'agent-preset/invalid', message: reason, details: { reason } } }))
+  await runtime.runTarget([{ case_id: 'U-LOAD-002', inputs: [firstPrompt], expected_behavior: '目标需真实装载。' }])
+  const saved = await runtime.evidence('U-LOAD-002', null)
+  assert.equal(saved.checks.failure_stage, 'target-session-create')
+  assert.equal(saved.checks.error_code, 'agent-preset/invalid')
+  assert.equal(saved.checks.preset_readiness.status, 'broken')
+  assert.deepEqual(saved.checks.preset_readiness.diagnostics.map(row => row.missing_services), [['mcpSessionManager'], ['mcpSessionManager', 'userQuestions']])
+  assert.ok(runtime.requests.findIndex(row => row.method === 'agentPresets/list') < runtime.requests.findIndex(row => row.method === 'session/create'))
+})
+
+test('任意broken正文与配置不进入证据，readiness接口失败保持unknown而不假报ready', async t => {
+  const secret = 'Bearer unit-private-do-not-copy'
+  const broken = await fixture(t, () => ({ presetBroken: `arbitrary error password=${secret}`, createError: { code: 'agent-preset/invalid', message: secret, details: { configuration: secret } } }))
+  await broken.runTarget([{ case_id: 'U-LOAD-003', inputs: [firstPrompt], expected_behavior: '来源不冒充。' }])
+  const hidden = await broken.evidence('U-LOAD-003', null)
+  assert.equal(hidden.checks.preset_readiness.status, 'broken')
+  assert.equal(hidden.checks.preset_readiness.unknown_detail_count, 1)
+  assert.equal(JSON.stringify(hidden).includes(secret), false)
+  const missing = await fixture(t, () => ({ readinessUnavailable: true, createError: { code: 'agent-preset/invalid', message: secret } }))
+  await missing.runTarget([{ case_id: 'U-LOAD-004', inputs: [firstPrompt], expected_behavior: '未知不当作通过。' }])
+  assert.equal((await missing.evidence('U-LOAD-004', null)).checks.preset_readiness.status, 'unknown')
 })
 
 test('真实 review 驱动保存根与子 Session 轨迹，同 Session repair 使用独立 attempt 且保留首次证据', async t => {

@@ -42,7 +42,7 @@ import { bindConversationWorkspace } from './conversation-workspace.ts'
 const WebApp: typeof NativeWebApp = await runtimeModule('@deepseek-ai/dsh-web-app')
 
 export const name = 'harness-platform'
-export const inject = ['connection', 'webServer', 'credentials', 'platformMcp', 'workspaceRegistry', 'workspaceController', 'sessionController', 'settingsController', 'agentDefaultModel', 'llm', 'tools', 'agents', 'sessionProjections', 'systemPrompt', 'skills', 'attachments', 'fs']
+export const inject = ['connection', 'webServer', 'credentials', 'platformMcp', 'workspaceRegistry', 'workspaceController', 'sessionController', 'sessionQuery', 'settingsController', 'agentDefaultModel', 'llm', 'tools', 'agents', 'sessionProjections', 'systemPrompt', 'skills', 'attachments', 'fs']
 export const Config = WebApp.Config
 export type Config = NativeWebApp.Config
 
@@ -243,6 +243,13 @@ export function applyTools(ctx: Context) {
   const assistant = createAssistant(assetRoot, handler, {
     controller: services.sessionController,
     readDocument: createDocumentReader(assetRoot, services),
+    sessionEvents: async (id, signal) => {
+      signal.throwIfAborted()
+      const snapshot = await services.sessionQuery.readSession(id)
+      signal.throwIfAborted()
+      if (snapshot.session?.id !== id || !Array.isArray(snapshot.events)) throw new Error('原生管理会话的阅读记录身份不一致')
+      return snapshot.events
+    },
     scopeExtraction: agent => taskScopes.apply(agent, extractionScope),
     scopeComputeVariants: agent => taskScopes.apply(agent, computeVariantScope),
     scopeFeatures: agent => taskScopes.apply(agent, featureScope),

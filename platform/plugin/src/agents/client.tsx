@@ -7,7 +7,7 @@ import type { PlatformUpdates } from '../realtime/client.ts'
 import { instanceWebUrl } from '../instances/url.ts'
 import { AssetDiffPanel } from './asset-diff-client.tsx'
 import { CreateAgentDialog } from './create-agent-client.tsx'
-import { ComputeVariantsPanel } from './compute-variants.tsx'
+import { ComputeVariantsPanel, canDeriveVersion, isVariantVersion } from './compute-variants.tsx'
 import { VariantSourcePanel } from './variant-source.tsx'
 import { AgentDescriptionPanel } from './description-client.tsx'
 import { SearchSelect } from '../components/search-select.tsx'
@@ -19,12 +19,12 @@ type RpcResult = { ok: true; value: any } | { ok: false; error: { code: string; 
 type AgentRow = { id: string; name?: string; manifest?: Record<string, any>; active_experiment?: string | null; version_count?: number; latest_experiment_status?: string | null; instance_state?: string }
 type PreviewState = { path: string; body: string; before: string; diff: string; dry: any }
 type AssetNode = { name: string; path: string; kind: string; children?: AssetNode[] }
-type ExperimentRow = { id: string; agent_id: string; status?: string; change: Record<string, any> }
+type ExperimentRow = { id: string; agent_id: string; status?: string; is_variant?: boolean; derivable?: boolean; is_current?: boolean; change: Record<string, any> }
 type ListView = NonNullable<PlatformNavigation['list_view']>
 type RunOverview = AgentRunOverview
 
 function isComputeVariant(experiment: ExperimentRow) {
-  return Boolean(experiment.change?.compute_variant) || ['exploratory', 'end'].includes(experiment.change?.variant_kind)
+  return isVariantVersion(experiment)
 }
 
 function generationLabel(experiment: ExperimentRow) {
@@ -39,10 +39,13 @@ function variantName(experiment: ExperimentRow) {
 
 function AssetTree({ nodes, selected, onSelect }: { nodes: AssetNode[]; selected: string; onSelect(path: string): void }) {
   return <ul className="harness-asset-tree">{nodes.map(node => <li key={node.path}>
-    {node.children ? <details open={node.name === 'candidate'}><summary><button type="button" aria-pressed={selected === node.path} onClick={() => onSelect(node.path)}>{node.name}/</button></summary>
+    {node.children ? <details open={node.name === 'candidate' || selected.startsWith(node.path + '/')}><summary><button type="button" aria-pressed={selected === node.path} onClick={() => onSelect(node.path)}>{node.name}/</button></summary>
       <AssetTree nodes={node.children} selected={selected} onSelect={onSelect} /></details>
       : <button type="button" aria-pressed={selected === node.path} onClick={() => onSelect(node.path)}>{node.name}</button>}
   </li>)}</ul>
+}
+function containsAsset(nodes: AssetNode[], path: string): boolean {
+  return nodes.some(node => node.path === path || Boolean(node.children && containsAsset(node.children, path)))
 }
 
 function Fields({ items }: { items: [string, unknown][] }) {
@@ -56,14 +59,14 @@ function researchStatus(status?: string | null) {
 function versionLabel(id?: string | null) {
   if (!id) return '未记录'
   const number = /-(\d{3})(?:-r[0-9a-f]{12})?$/.exec(id)?.[1]
-  return number ? `版本 ${number}` : id
+  return number ? `${id.startsWith('VAR-') ? '变体' : '版本'} ${number}` : id
 }
 
 const tabs = [
   { id: 'overview', label: '概览' },
   { id: 'description', label: '描述与技能' },
   { id: 'assets', label: 'Harness 资产' },
-  { id: 'compute-variants', label: '低算力变体' },
+  { id: 'compute-variants', label: '算力变体' },
 ] as const
 
 export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNavigate, active = true }: PlatformPageProps & { target?: PlatformNavigation; onNavigate?(target: PlatformNavigation): void; active?: boolean; updates?: PlatformUpdates; onContext?(context: Record<string, unknown>): void; onAssistant?(task: string, context: Record<string, unknown>): Promise<void> }) {
@@ -95,10 +98,14 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
   const [assetInfo, setAssetInfo] = useState<any>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [editBusy, setEditBusy] = useState(false)
+  const currentEdit = useRef({ path: editPath, open: editOpen })
+  currentEdit.current = { path: editPath, open: editOpen }
+  const appliedAssetTarget = useRef('')
   const editDialog = useRef<HTMLDialogElement>(null)
   const [versionOpen, setVersionOpen] = useState(false)
   const [versionGoal, setVersionGoal] = useState('')
-  const versionParent = detail?.derivation?.parent_ref || ''
+  const derivable = detail && canDeriveVersion(detail.experiment) && detail.derivation?.derivable !== false
+  const versionParent = derivable ? detail?.derivation?.parent_ref || '' : ''
   const [versionInventory, setVersionInventory] = useState<any>(null)
   const [versionProposal, setVersionProposal] = useState<any>(null)
   const [featureProposal, setFeatureProposal] = useState<any>(null)
@@ -137,10 +144,14 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
   function navigateSelection(agentId: string, experimentId: string | undefined, nextTab = tab, replace = false, nextListView = navigation.current.listView) {
     const current = navigation.current
     if (!current.active || !agentId || !experimentId) return
+    const sameObject = agentId === selected && experimentId === (selectedExperiment || detail?.experiment?.id)
+    const requested = current.target?.agent_id === agentId && current.target?.experiment_id === experimentId ? current.target.asset_path : undefined
+    const pendingAsset = requested && appliedAssetTarget.current !== JSON.stringify([agentId, experimentId, requested])
+    const asset = nextTab === 'assets' && sameObject ? pendingAsset ? requested : currentEdit.current.path || requested : undefined
     if (current.target?.page === 'agents' && current.target.agent_id === agentId
       && current.target.experiment_id === experimentId && current.target.tab === nextTab
-      && (current.target.list_view ?? 'agents') === nextListView) return
-    current.onNavigate?.({ page: 'agents', agent_id: agentId, experiment_id: experimentId, tab: nextTab, ...(nextListView === 'variants' ? { list_view: nextListView } : {}), ...(replace ? { replace: true } : {}) })
+      && current.target.asset_path === asset && (current.target.list_view ?? 'agents') === nextListView) return
+    current.onNavigate?.({ page: 'agents', agent_id: agentId, experiment_id: experimentId, tab: nextTab, ...(asset ? { asset_path: asset } : {}), ...(nextListView === 'variants' ? { list_view: nextListView } : {}), ...(replace ? { replace: true } : {}) })
   }
 
   function selectListView(next: ListView) {
@@ -183,6 +194,9 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
     setTab(nextTab)
     navigateSelection(selected, detail?.experiment?.id, nextTab)
     if (nextTab === tab && reveal) { pendingReveal.current = null; revealSelection('panel', nextTab) }
+  }
+  function openCode(path: string) {
+    if (discardAssetDraft()) { selectEditFile(path); selectTab('assets') }
   }
 
   function selectVersion(agentId: string, experimentId = '', notify = true, detailTab?: (typeof tabs)[number]['id'], reveal?: 'identity' | 'panel') {
@@ -238,6 +252,7 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
 
   function selectEditFile(path: string) {
     editRequest.current++
+    currentEdit.current = { path, open: false }
     setEditPath(path)
     setEditBody('')
     setEditHash('')
@@ -272,20 +287,23 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
   async function refreshDetail(agentId = selected, experimentId = selectedExperiment) {
     if (!agentId) return
     const request = ++detailRequest.current
+    const owner = selectionRequest.current
     setError('')
     try {
       const payload = experimentId ? { agent_id: agentId, experiment_id: experimentId } : { agent_id: agentId }
       const value = await call('detail', payload)
-      if (request !== detailRequest.current) return
+      if (request !== detailRequest.current || owner !== selectionRequest.current) return
       setDetail(value)
       if (!experimentId) setSelectedExperiment(current => current || value.experiment.id)
       // 默认版本必须使用服务端实际解析结果，不能用登记版本填充地址。
       navigateSelection(agentId, value.experiment.id, navigation.current.tab, !pendingSelectionNavigation.current)
       pendingSelectionNavigation.current = false
-      const containsPath = (nodes: AssetNode[]): boolean => nodes.some(node => node.path === editPath || (node.children && containsPath(node.children)))
-      if (!containsPath(value.assets ?? []) && !editOpen) selectEditFile(value.assets?.[0]?.path ?? '')
+      const editing = currentEdit.current
+      const target = navigation.current.target
+      const requested = target?.page === 'agents' && target.agent_id === agentId && target.experiment_id === value.experiment.id && target.tab === 'assets' ? target.asset_path : undefined
+      if (!containsAsset(value.assets ?? [], editing.path) && !editing.open) selectEditFile(requested && containsAsset(value.assets ?? [], requested) ? requested : value.assets?.[0]?.path ?? '')
     } catch (err) {
-      if (request === detailRequest.current) setError((err as Error).message)
+      if (request === detailRequest.current && owner === selectionRequest.current) setError((err as Error).message)
     }
   }
 
@@ -392,6 +410,16 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
   useEffect(() => {
     if (active) onContext?.({ page: 'agents', agent_id: selected || undefined, experiment_id: detail?.experiment?.id, tab })
   }, [active, selected, detail?.experiment?.id, tab, onContext])
+  useEffect(() => {
+    if (!active || !detail || target?.page !== 'agents' || target.tab !== 'assets' || !target.asset_path || target.agent_id !== selected || target.experiment_id !== detail.experiment.id) return
+    const key = JSON.stringify([target.agent_id, target.experiment_id, target.asset_path])
+    if (appliedAssetTarget.current === key) return
+    appliedAssetTarget.current = key
+    if (currentEdit.current.path === target.asset_path) return
+    if (!containsAsset(detail.assets ?? [], target.asset_path)) { setError('当前版本的资产目录中没有此路径，请重新选择文件。'); return }
+    if (!discardAssetDraft()) { navigateSelection(selected, detail.experiment.id, 'assets', true); return }
+    selectEditFile(target.asset_path)
+  }, [active, detail?.experiment?.id, detail?.assets, target?.page, target?.tab, target?.agent_id, target?.experiment_id, target?.asset_path, selected])
   useEffect(() => { if (!active) setMoreActionsOpen(false) }, [active])
   useEffect(() => {
     if (!active || !target || target.page !== 'agents') return
@@ -472,12 +500,15 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
   }
 
   async function askVersionPlan() {
-    if (!versionInventory || !onAssistant) return
+    if (!derivable || !versionInventory || !onAssistant) return
     await onAssistant(`为当前智能体创建新版本。改进目标：${versionGoal.trim()}`, { page: 'agents', agent_id: selected, experiment_id: detail.experiment.id, skill: 'agent-maintenance', workflow: 'research', fusion_request: versionInventory })
   }
 
   async function confirmVersion() {
-    if (!versionProposal) return
+    if (!derivable || !versionProposal || versionProposal.parent_experiment_id !== detail.experiment.id || versionProposal.parent_ref !== versionParent) return
+    if (versionProposal.plan.sources.some((source: any) => source.decision === 'inherit' && !canDeriveVersion(experiments.find(item => item.id === source.experiment_id) ?? { ...source, id: source.experiment_id }))) {
+      setError('变体不能作为新版本的继承来源。'); return
+    }
     const selection = selectionRequest.current
     try {
       const { value } = await confirmBusinessProposal('fusion/confirm', versionProposal)
@@ -603,8 +634,10 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
   const assetDirty = assetInfo?.kind === 'text' && editBody !== assetInfo.content
   const nameDirty = nameOpen && nameDraft !== nameInitial
   const visibleAgents = agents.filter(agent => `${agent.name ?? agent.manifest?.name ?? ''} ${agent.id}`.toLowerCase().includes(search.trim().toLowerCase()))
-  const variants = experiments.filter(isComputeVariant)
-  const agentVersions = (detail?.agent?.id === selected ? detail.versions : experiments.filter(item => item.agent_id === selected))
+  const variants = experiments.filter(item => item.is_current !== false && isComputeVariant(item))
+  const currentVersions = (detail?.agent?.id === selected ? detail.versions : experiments.filter(item => item.agent_id === selected))
+  const agentVersions = detail?.is_current === false && !currentVersions.some((item: any) => item.id === detail.experiment.id)
+    ? [...currentVersions, { ...detail.experiment, is_current: false }] : currentVersions
     .slice().sort((left: any, right: any) => String(right.id).localeCompare(String(left.id), 'en', { numeric: true }))
   const visibleVariants = variants.filter(variant => {
     const agent = agents.find(item => item.id === variant.agent_id)
@@ -735,10 +768,11 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
           {detail && <section className="agent-identity" id="agent-identity" tabIndex={-1}>
             <button type="button" className="agent-back-to-list" onClick={returnToList}>← 返回{listView === 'variants' ? '变体列表' : '智能体列表'}</button>
             <div className="agent-identity-top">
-              <div className="agent-identity-title"><h2>{detail.agent.name || detail.agent.manifest.name || selectedAgent?.name || selected}</h2><SearchSelect className="agent-version-choice" label="版本" value={selectedExperiment || detail.experiment.id} options={agentVersions.map((version: any) => { const metadata = version.id === detail.experiment.id ? detail.experiment : experiments.find(item => item.id === version.id) ?? version; const name = versionLabel(version.id).replace(/^版本 /, 'v'); const disambiguation = agentVersions.filter((item: any) => versionLabel(item.id) === versionLabel(version.id)).length > 1 ? ` · ${version.id.slice(-6)}` : ''; return { value: version.id, label: isComputeVariant(metadata) ? `${variantName(metadata)} · ${name}${disambiguation}` : `${name}${disambiguation}`, description: version.id } })} onChange={value => selectVersion(selected, value)}/><span className="agent-badge">研究版本</span></div>
-              <div className="agent-actions agent-main-actions"><button type="button" className="agent-primary" disabled={!onNavigate} onClick={startEvaluation}>发起评测</button><button type="button" disabled={launchBusy} onClick={() => void launchVersion()}>进入对话</button><button type="button" onClick={() => setPublishOpen(true)}>发布版本</button><details className="agent-more-actions" open={moreActionsOpen}><summary onClick={event => { event.preventDefault(); setMoreActionsOpen(!moreActionsOpen) }}>更多操作</summary><div><button type="button" onClick={() => { setMoreActionsOpen(false); setDeploymentTarget({ agent_id: selected, experiment_id: detail.experiment.id, label: `${detail.agent.name || selected} · ${versionLabel(detail.experiment.id)}` }); setDeploymentOpen(true) }}>导出独立运行包</button><button type="button" disabled={!onNavigate} onClick={() => { setMoreActionsOpen(false); openEvaluation() }}>查看评测</button><button type="button" disabled={!onNavigate} onClick={() => { setMoreActionsOpen(false); onNavigate?.({ page: 'instances', agent_id: selected, experiment_id: detail.experiment.id }) }}>查看实例</button><button type="button" onClick={() => { setMoreActionsOpen(false); setVersionOpen(true); resetVersionPreview() }}>新建研究版本</button><button type="button" disabled={!onNavigate} onClick={() => { setMoreActionsOpen(false); onNavigate?.({ page: 'instances', agent_id: selected, experiment_id: detail.experiment.id, source_id: `experiment:${detail.experiment.id}` }) }}>创建实例</button></div></details></div>
+              {detail.is_current === false && detail.current_variant_id && <p className="agent-notice" role="status">当前查看历史变体记录，资产和 Run 保留原身份。<button type="button" onClick={() => selectVersion(selected, detail.current_variant_id, true, tab)}>查看当前变体</button><code>{detail.current_variant_id}</code></p>}
+              <div className="agent-identity-title"><h2>{detail.agent.name || detail.agent.manifest.name || selectedAgent?.name || selected}</h2><SearchSelect className="agent-version-choice" label="版本" value={selectedExperiment || detail.experiment.id} options={agentVersions.map((version: any) => { const metadata = version.id === detail.experiment.id ? detail.experiment : experiments.find(item => item.id === version.id) ?? version; const name = versionLabel(version.id).replace(/^版本 /, 'v'); const disambiguation = agentVersions.filter((item: any) => versionLabel(item.id) === versionLabel(version.id)).length > 1 ? ` · ${version.id.slice(-6)}` : ''; return { value: version.id, label: isComputeVariant(metadata) ? `${variantName(metadata)} · ${name}${disambiguation}` : `${name}${disambiguation}`, description: version.id } })} onChange={value => selectVersion(selected, value)}/><span className="agent-badge">{isComputeVariant(detail.experiment) ? "算力变体" : "业务版本"}</span></div>
+              <div className="agent-actions agent-main-actions"><button type="button" className="agent-primary" disabled={!onNavigate} onClick={startEvaluation}>发起评测</button><button type="button" disabled={launchBusy} onClick={() => void launchVersion()}>进入对话</button><button type="button" onClick={() => setPublishOpen(true)}>发布版本</button><details className="agent-more-actions" open={moreActionsOpen}><summary onClick={event => { event.preventDefault(); setMoreActionsOpen(!moreActionsOpen) }}>更多操作</summary><div><button type="button" onClick={() => { setMoreActionsOpen(false); setDeploymentTarget({ agent_id: selected, experiment_id: detail.experiment.id, label: `${detail.agent.name || selected} · ${versionLabel(detail.experiment.id)}` }); setDeploymentOpen(true) }}>导出独立运行包</button><button type="button" disabled={!onNavigate} onClick={() => { setMoreActionsOpen(false); openEvaluation() }}>查看评测</button><button type="button" disabled={!onNavigate} onClick={() => { setMoreActionsOpen(false); onNavigate?.({ page: 'instances', agent_id: selected, experiment_id: detail.experiment.id }) }}>查看实例</button><button type="button" disabled={!derivable} title={derivable ? undefined : "变体不能作为新版本的继承来源。"} onClick={() => { if (!derivable) return; setMoreActionsOpen(false); setVersionOpen(true); resetVersionPreview() }}>新建研究版本</button><button type="button" disabled={!onNavigate} onClick={() => { setMoreActionsOpen(false); onNavigate?.({ page: 'instances', agent_id: selected, experiment_id: detail.experiment.id, source_id: `experiment:${detail.experiment.id}` }) }}>创建实例</button></div></details></div>
             </div>
-            {isComputeVariant(detail.experiment) && <div className="agent-variant-name"><h3>{variantName(detail.experiment)}</h3><button type="button" disabled={nameBusy || nameOpen} onClick={editVariantName}>修改变体名称</button></div>}
+            {!derivable && <p className="agent-muted">变体不能作为新版本、融合或其他变体的继承来源。</p>}{isComputeVariant(detail.experiment) && <div className="agent-variant-name"><h3>{variantName(detail.experiment)}</h3><button type="button" disabled={nameBusy || nameOpen} onClick={editVariantName}>修改变体名称</button></div>}
             {nameOpen && <form className="agent-name-form" aria-label="修改变体名称" onSubmit={event => { event.preventDefault(); void saveVariantName() }}>
               <label className="agent-field">变体名称<input aria-label="变体名称" value={nameDraft} disabled={nameBusy} onChange={event => setNameDraft(event.target.value)} required /></label>
               <div className="agent-actions"><button type="submit" disabled={nameBusy || !nameDraft.trim() || !nameHash}>保存名称</button><button type="button" disabled={nameBusy} onClick={() => void saveVariantName(true)}>重新核对</button><button type="button" disabled={nameBusy} onClick={closeNameEditor}>取消改名</button></div>
@@ -746,13 +780,13 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
             {nameMessage && <p role="status">{nameMessage}</p>}
             {detail.creation && <p role="status" className="agent-notice">{detail.creation.status === 'completed' ? '新版本创建成功' : '融合中：等待资产集成与约定验证'}{detail.creation.status !== 'completed' && <button type="button" disabled={!onAssistant} onClick={() => void onAssistant?.('继续完成当前版本的融合。', { page: 'agents', agent_id: selected, experiment_id: detail.experiment.id, skill: 'agent-maintenance', workflow: 'research', session_id: detail.creation.assistant_session_id })}>继续融合</button>}</p>}
           </section>}
-          {versionOpen && detail && <section className="agent-inline-form" aria-label="新建智能体版本">
+          {versionOpen && detail && derivable && <section className="agent-inline-form" aria-label="新建智能体版本">
             <h2>新建 {selected} 版本</h2>
             <label className="agent-field">改进目标<textarea value={versionGoal} onChange={event => { setVersionGoal(event.target.value); resetVersionPreview() }} rows={3} /></label>
             <p className="agent-muted">{versionParent ? '来源已固定，平台将自动继承所选版本。' : detail.derivation?.note || '当前版本尚未固定，请先固定完整来源后再创建研究版本。'}</p>
             <p>当前主父版：{detail.experiment.id}。先核对未继承的并行能力及取舍，确认后再建立新版本。</p>
             <div className="agent-actions"><button type="button" disabled={!versionGoal.trim() || !versionParent} onClick={() => void previewVersion()}>盘点继承来源</button><button type="button" onClick={() => { versionPreviewRequest.current++; setVersionOpen(false) }}>关闭</button></div>
-            {versionInventory && <><h3>主父版尚未覆盖的来源</h3>{versionInventory.inventory.sources.length ? <ul>{versionInventory.inventory.sources.map((source: any) => <li key={source.experiment_id}><strong>{source.experiment_id}</strong> · {source.status === 'recommended' ? '建议继承' : source.status === 'excluded' ? '默认排除' : '待判断'}<p>{source.reason}</p></li>)}</ul> : <p>没有发现尚未覆盖的并行来源。</p>}
+            {versionInventory && <><h3>主父版尚未覆盖的来源</h3>{versionInventory.inventory.sources.length ? <ul>{versionInventory.inventory.sources.filter((source: any) => canDeriveVersion(experiments.find(item => item.id === source.experiment_id) ?? { ...source, id: source.experiment_id })).map((source: any) => <li key={source.experiment_id}><strong>{source.experiment_id}</strong> · {source.status === 'recommended' ? '建议继承' : source.status === 'excluded' ? '默认排除' : '待判断'}<p>{source.reason}</p></li>)}</ul> : <p>没有发现尚未覆盖的并行来源。</p>}
               <button type="button" disabled={!onAssistant} onClick={() => void askVersionPlan()}>请 AI 整理融合方案</button></>}
             {versionProposal && versionProposal.parent_experiment_id === detail.experiment.id && versionProposal.parent_ref === versionParent && versionProposal.research_question === versionGoal && <>
               <h3>待确认方案</h3><p>{versionProposal.research_question}</p>
@@ -794,25 +828,25 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
             <VariantSourcePanel active={active && tab === 'overview'} experiment={{ ...detail.experiment, agent_id: selected }} experiments={experiments}
             onSelectSource={(agentId, experimentId) => selectVersion(agentId, experimentId, true, 'overview', 'identity')}
             onOpenRun={(runId, agentId, experimentId) => onNavigate?.({ page: 'evaluation', agent_id: agentId, experiment_id: experimentId, tab: 'runs', run_id: runId })}
-            onOpenCode={path => { if (discardAssetDraft()) { selectEditFile(path); selectTab('assets') } }} >
+            onOpenCode={openCode} >
               <Fields items={[['Agent ID', selected], ['查看版本 ID', detail.experiment.id], ['登记版本 ID', selectedAgent?.active_experiment || '未登记'], ['研究状态', researchStatus(detail.experiment.status)], ['相关引用', detail.related_references ?? []]]} />
             </VariantSourcePanel>
           </section>}
           {detail && <section role="tabpanel" id="agent-panel-description" aria-labelledby="agent-tab-description" tabIndex={-1} hidden={tab !== 'description'}>{descriptionVisited && <AgentDescriptionPanel key={detail.experiment.id} active={active && tab === 'description'} rpc={rpc} detail={detail} agentId={selected} onSaved={() => { void refreshDetail(); void refreshList() }} onEditAsset={path => { if (discardAssetDraft() && (!descriptionDirty.current || window.confirm('放弃未保存资料并查看原始资产？'))) { descriptionDirty.current = false; selectEditFile(path); selectTab('assets') } }} onDirtyChange={dirty => { descriptionDirty.current = dirty }} onAssistant={onAssistant}/>}</section>}
           {detail && <section role="tabpanel" id="agent-panel-compute-variants" aria-labelledby="agent-tab-compute-variants" tabIndex={-1} hidden={tab !== 'compute-variants'}>
             {tab === 'compute-variants' && <ComputeVariantsPanel key={detail.experiment.id} active={active} rpc={rpc} agentId={selected} agentName={detail.agent.name || detail.agent.manifest.name || selected} versionLabel={versionLabel(detail.experiment.id).replace(/^版本 /, 'v')} experimentId={detail.experiment.id} versions={detail.versions} currentVariantName={detail.experiment.change.variant_name ?? null} onAssistant={onAssistant}
-              onCreated={id => { void refreshList(); selectVersion(selected, id) }} onChanged={() => { void refreshDetail() }} />}
+              onCreated={id => { void refreshList(); selectVersion(selected, id) }} onChanged={() => { void refreshDetail() }} onOpenCode={openCode} />}
           </section>}
           {detail && <section role="tabpanel" id="agent-panel-assets" aria-labelledby="agent-tab-assets" tabIndex={-1} hidden={tab !== 'assets'}>
             <div className="agent-quality-summary"><div><strong>版本质量评价</strong><p>暂无正式质量报告；分析结果可在独立助手会话查看，报告持久保存尚未接入。</p></div><button type="button" disabled={!onAssistant || qualityBusy} onClick={() => void requestQualityReview()}>{qualityBusy ? '正在核对来源…' : '请 AI 助手评价'}</button></div>{qualityMessage && <p role="status">{qualityMessage}</p>}
             <div className="agent-section-heading"><h2>智能体资产</h2><button type="button" aria-expanded={diffOpen} aria-controls="agent-asset-diff-panel" onClick={() => setDiffOpen(value => !value)}>{diffOpen ? '收起资产差异' : '展开资产差异'}</button></div>
             {diffOpen && <AssetDiffPanel key={detail.experiment.id} active={active && tab === 'assets'} rpc={rpc} experimentId={detail.experiment.id} versions={detail.versions} baseline={detail.baseline} />}
             <div className="harness-asset-layout">
-              <nav aria-label="智能体资产目录"><AssetTree nodes={detail.assets ?? []} selected={editPath} onSelect={path => { if (path !== editPath && discardAssetDraft()) selectEditFile(path) }} /></nav>
+              <nav aria-label="智能体资产目录"><AssetTree nodes={detail.assets ?? []} selected={editPath} onSelect={path => { if (path !== editPath && discardAssetDraft()) { selectEditFile(path); navigateSelection(selected, detail.experiment.id, 'assets') } }} /></nav>
               <article><h3>资产详情</h3><p>{editPath || '请选择资产'}</p>{/(^|\/)evaluation(?:\.md|\/|$)/.test(editPath) && <p><button type="button" disabled={!onNavigate} onClick={() => openEvaluation('cases')}>到评测中心管理用例</button></p>}{/(^|\/)decision\.md$/.test(editPath) && <p><button type="button" disabled={!onNavigate} onClick={() => openEvaluation('compare')}>到评测中心比较结果与记录决策</button></p>}
                 {assetInfo && <>
                   <Fields items={[['类型', assetInfo.kind === 'directory' ? '目录' : assetInfo.kind === 'text' ? '文本' : '二进制或大文件（只读）'], ['大小（字节）', assetInfo.size], ['SHA-256', assetInfo.sha256]]} />
-                  {assetInfo.kind === 'text' && <><button type="button" disabled={!editHash || assetInfo.editable === false} onClick={() => { setEditMessage(''); setEditOpen(true) }}>编辑</button>{assetInfo.reason && <p role="status">{assetInfo.reason}</p>}<pre className="harness-asset-content">{assetInfo.content || '空文件'}</pre></>}
+                  {assetInfo.kind === 'text' && <><button type="button" disabled={!editHash || assetInfo.editable === false} onClick={() => { currentEdit.current.open = true; setEditMessage(''); setEditOpen(true) }}>编辑</button>{assetInfo.reason && <p role="status">{assetInfo.reason}</p>}<pre className="harness-asset-content">{assetInfo.content || '空文件'}</pre></>}
                   {assetInfo.kind === 'directory' && <p>展开左侧目录后选择文件。</p>}
                 </>}
                 {editMessage && <p role="status">{editMessage}</p>}

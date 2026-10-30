@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createBusinessRuntimePatch } from '../../../platform/plugin/src/business-control/patch.ts'
 import { platformGroupUrl } from '../../../platform/plugin/src/business-control/group-link.ts'
 import { businessGatewayEntry, checkBusinessGatewayEntry } from '../../../platform/plugin/src/business-control/entry.ts'
+import { mcpCredentialPaths } from '../../../platform/plugin/src/mcp/credential-path.ts'
 
 const programRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const require = createRequire(join(programRoot, 'platform/plugin/package.json'))
@@ -40,13 +41,14 @@ function readLocalCapabilities(managed: string): { localTools: string[]; localMo
   const declared = value?.runtime_capabilities
   if (declared === undefined) return { localTools: [], localModelRoutes: [] }
   const namePattern = /^[A-Za-z][A-Za-z0-9_-]{0,127}$/
-  const modelPattern = /^[A-Za-z0-9][A-Za-z0-9._:/+@-]{0,255}$/
+  const providerPattern = /^[A-Za-z0-9][A-Za-z0-9._:/+@-]{0,255}$/
+  const modelPattern = /^[A-Za-z0-9/][A-Za-z0-9._:/+@-]{0,255}$/
   const tools = declared?.local_tools, routes = declared?.local_model_routes
   if (!declared || Array.isArray(declared) || Object.keys(declared).sort().join(',') !== 'local_model_routes,local_tools'
     || !Array.isArray(tools) || tools.length > 32 || tools.some(name => typeof name !== 'string' || !namePattern.test(name))
     || new Set(tools).size !== tools.length || !Array.isArray(routes) || routes.length > 16
     || routes.some(route => !route || Array.isArray(route) || Object.keys(route).sort().join(',') !== 'model,provider'
-      || typeof route.provider !== 'string' || !modelPattern.test(route.provider)
+      || typeof route.provider !== 'string' || !providerPattern.test(route.provider)
       || typeof route.model !== 'string' || !modelPattern.test(route.model))
     || new Set(routes.map(route => `${route.provider}\0${route.model}`)).size !== routes.length) {
     throw new Error('业务本地能力声明无效')
@@ -190,9 +192,21 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
   service.environment.push(`HARNESS_ASSET_ROOT=${containerAssets}`)
   service.environment.push(`HARNESS_BUSINESS_AGENT_ID=${input.agentId}`)
   service.environment.push(`HARNESS_BUSINESS_INSTANCE_ID=${input.name}`)
+  const configDirectory = join(config.assetRoot, 'config'), credentials = mcpCredentialPaths(config.assetRoot)
+  const usesMcpCredentials = development || Boolean(manager)
+  const hasMcpCredentials = existsSync(credentials.file)
+  if (lstatSync(configDirectory).isSymbolicLink() || !lstatSync(configDirectory).isDirectory()
+    || usesMcpCredentials && (hasMcpCredentials
+      ? lstatSync(credentials.directory).isSymbolicLink() || !lstatSync(credentials.directory).isDirectory()
+        || lstatSync(credentials.file).isSymbolicLink() || !lstatSync(credentials.file).isFile()
+      : Boolean(manager) || existsSync(credentials.legacyFile))) {
+    throw new Error('业务 Runtime 配置或 MCP 专用凭据目录尚未准备；请运行平台 prepare')
+  }
   service.volumes.push(
     { type: 'bind', source: pluginRoot, target: containerPlugin, read_only: true },
-    { type: 'bind', source: config.assetRoot, target: containerAssets, read_only: true },
+    { type: 'bind', source: configDirectory, target: `${containerAssets}/config`, read_only: true },
+    ...(usesMcpCredentials && hasMcpCredentials ? [{ type: 'bind', source: credentials.directory,
+      target: mcpCredentialPaths(containerAssets).directory, read_only: true }] : []),
     ...(!development ? [{ type: 'bind', source: config.sharedSecretFile!, target: containerSecret, read_only: true }] : []),
     { type: 'bind', source: '${DSH_BUSINESS_PATCH_HOST:?业务控制 Patch 由启动器注入}', target: containerPatch, read_only: true },
   )
@@ -236,6 +250,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       '业务实例身份模式无效',
       'bridge 容器不能使用宿主回环地址访问协调器；请配置可达宿主地址', '业务插件根路径无效',
       '业务 Runtime 插件尚未构建', '业务 MCP manager 插件尚未构建', '业务来源 MCP 配置种子无效',
+      '业务 Runtime 配置或 MCP 专用凭据目录尚未准备；请运行平台 prepare',
       '业务来源 MCP manager 声明冲突或配置无效', '业务来源配置 Patch 无效', '业务本地能力声明必须是受控普通文件',
       '业务本地能力声明无效', '业务资产在计划后已改变', '业务实例登记参数无效',
       '业务 Compose 缺少受控 dsh 网络入口', '业务 Runtime 必须关闭免认证并保留明确监听配置',

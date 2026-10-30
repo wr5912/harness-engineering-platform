@@ -18,6 +18,7 @@ import { assistantActions, assistantActionContract, allowedAssistantActions, pro
 import { TOOL_INPUT_JSON_RETRY_POLICY, toolInputJsonRetrySchema } from './tool-input-recovery.ts'
 import { decisionExtractionModelContract, normalizeDecisionModelSubmission } from '../evaluation/decision-dataset-contract.ts'
 import type { DocumentReader } from './documents.ts'
+import { collectDecisionReviewInput } from './decision-review-input.ts'
 
 type MapValue = Record<string, any>
 type Domain = AssistantDomain
@@ -42,10 +43,11 @@ export interface AssistantServices {
   notify(domains: string[], ids?: string[]): void
   mcp?: (action: string, input: MapValue, signal: AbortSignal) => Promise<any>
   readDocument?: DocumentReader
+  sessionEvents?(sessionId: string, signal: AbortSignal): Promise<readonly MapValue[]>
 }
 
 
-const readActions = new Set(['research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'tasks/capabilities', 'tasks/assembly-preview', 'list', 'detail', 'edit/read', 'edit/preview', 'cases/list', 'cases/read', 'eval/preview', 'eval/status', 'runs/index', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/preview', 'compute-variants/build-preview', 'compute-variants/freeze-preview', 'compute-variants/compare', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'datasets/source', 'datasets/preview', 'datasets/list', 'datasets/read', 'datasets/export', 'features/read-source', 'features/preview', 'features/proposal', 'fusion/preview', 'fusion/proposal', 'fusion/status', 'url', 'logs', 'preview', 'batch-preview', 'configuration', 'test', 'resources', 'resourceTemplates', 'readResource', 'sources/list', 'sources/components', 'sources/logs', 'sources/preview', 'dryRunComposition', 'compositionRun', 'compositionArtifact'])
+const readActions = new Set(['research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'tasks/capabilities', 'tasks/assembly-preview', 'list', 'detail', 'edit/read', 'edit/preview', 'cases/list', 'cases/read', 'eval/preview', 'eval/status', 'runs/index', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/source', 'compute-variants/identity-preview', 'compute-variants/preview', 'compute-variants/build-preview', 'compute-variants/freeze-preview', 'compute-variants/compare', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'datasets/source', 'datasets/preview', 'datasets/list', 'datasets/read', 'datasets/export', 'features/read-source', 'features/preview', 'features/proposal', 'fusion/preview', 'fusion/proposal', 'fusion/status', 'url', 'logs', 'preview', 'batch-preview', 'configuration', 'test', 'resources', 'resourceTemplates', 'readResource', 'sources/list', 'sources/components', 'sources/logs', 'sources/preview', 'dryRunComposition', 'compositionRun', 'compositionArtifact', 'compositionSource'])
 readActions.add('control/status')
 readActions.add('documents/read')
 const recordType = 'plugin:harness-platform/assistant'
@@ -75,7 +77,7 @@ declare module '@deepseek-ai/dsh-session' {
   interface PluginRecordMap { 'plugin:harness-platform/assistant': MapValue }
 }
 
-// 框架负责按 Session 增量折叠、冷恢复和 fork；本插件不再读取完整事件日志。
+// 框架负责按 Session 增量折叠、冷恢复和 fork；阅读证据按需通过原生只读查询核对。
 export const assistantProjection = {
   key: projectionKey, stateVersion: 8, stateSchema: assistantStateSchema,
   wire: { viewSchema: assistantViewSchema, view: state => ({ session_id: state.session_id,
@@ -149,21 +151,51 @@ function wireValue(value: any) {
   // 资产端点已标明脱敏/截断状态；二次日志脱敏不能改写可编辑源码。
   const document = value?.domain === 'agents' && value.action === 'documents/read'
   const source = document || value?.domain === 'agents' && ['edit/read', 'edit/preview', 'assets/read-fixed', 'assets/diff', 'features/read-source'].includes(value.action)
+  const decisionFragment = value?.domain === 'agents' && value.action === 'datasets/source' && value.result?.value?.kind === 'decision_fragment'
   const view = (item: any, key = ''): any => {
     if (document && item && typeof item === 'object' && ['page', 'paragraph'].includes(item.kind) && typeof item.text === 'string') {
       const text = assetText('document', item.text)
       return { ...item, text: text.content, redacted: item.redacted === true || text.redacted,
         ...(item.redacted === true || text.redacted ? { note: '此片段含凭据常量，已脱敏；偏移对应原始正文，请勿将此片段作为原文副本。' } : {}) }
     }
+    // Run 接口已脱敏并计算正文摘要；再次改写分片会使续读无法重组原文。
+    if (decisionFragment && key === 'fragment' && typeof item === 'string') return item
     if (typeof item === 'string') return source && ['content', 'diff', 'before', 'after'].includes(key) ? assetText('source', item).content : redactAssistant(item)
     if (Array.isArray(item)) return item.map(entry => view(entry))
     if (item && typeof item === 'object') return Object.fromEntries(Object.entries(item).map(([name, entry]) => [name, view(entry, name)]))
     return item
   }
-  return JSON.parse(JSON.stringify(source ? view(value) : redactAssistant(value)))
+  return JSON.parse(JSON.stringify(source || decisionFragment ? view(value) : redactAssistant(value)))
 }
 /** 完整冻结差异留在持久操作记录；模型按清单与摘要核对，不重复接收编译产物正文。 */
 function modelToolValue(domain: Domain, action: string, value: any) {
+  if (domain === 'agents' && ['datasets/read', 'datasets/review'].includes(action) && JSON.stringify(value).length > 12000) {
+    const compact = (item: any): any => {
+      if (!item || typeof item !== 'object') return item
+      if (item.dataset && Array.isArray(item.dataset.records)) {
+        const dataset = item.dataset
+        return { ...item, dataset: { ...dataset, records: dataset.records.map((entry: any) => {
+          const { state, ...record } = entry
+          return { ...record, ...(state === undefined ? {} : { state_sha256: createHash('sha256').update(JSON.stringify(state)).digest('hex') }),
+            state_omitted: true, read_input: { run_id: dataset.run_id, path: dataset.path, decision_id: entry._meta?.decision_id, cursor: 0, limit: 4000 } }
+        }) }, model_projection: '仅省略决策前 state 正文，题目、目标、身份和资格检查保留。复核前必须用每条 read_input 调 datasets/source，按返回的身份摘要和 next_cursor 读完全部分片；此回执不代表已经读取或核对完整输入。' }
+      }
+      return { ...item, ...(item.value ? { value: compact(item.value) } : {}), ...(item.result ? { result: compact(item.result) } : {}) }
+    }
+    return compact(value)
+  }
+  if (domain === 'agents' && ['datasets/preview', 'datasets/apply'].includes(action) && value?.action === 'datasets/apply'
+    && value.state === 'completed' && value.result?.ok && Array.isArray(value.result.value?.dataset?.records) && JSON.stringify(value).length > 12000) {
+    const saved = value.result.value, dataset = saved.dataset
+    // 模型只接收保存身份和下一步定位；是否回读由真实自动保存状态决定。
+    return { ...value, result: { ...value.result, value: { ...saved,
+      dataset: { schema_version: dataset.schema_version, id: dataset.id, agent_id: dataset.agent_id, experiment_id: dataset.experiment_id,
+        run_id: dataset.run_id, path: dataset.path, source_sha256: dataset.source_sha256, source_version: dataset.source_version,
+        records: dataset.records.map((entry: any) => ({ _meta: { id: entry._meta?.id, decision_id: entry._meta?.decision_id }, question_count: Object.keys(entry.questions ?? {}).length })) },
+      ...(saved.eligibility ? { eligibility: { counts: saved.eligibility.counts } } : {}),
+      model_projection: `${value.auto_saved === true ? '完整样本已保存并按完整内容回读核对。' : '样本保存接口返回成功；此回执不代表另行全文回读核对。'}这里只返回批次、样本和决策身份。state及题目正文在样本页面查看，决策前材料可由datasets/source按path/decision_id分片完整读取。`,
+    } } }
+  }
   if (domain !== 'agents' || !['compute-variants/freeze-preview', 'compute-variants/freeze'].includes(action)) return value
   const compact = (item: any): any => {
     if (Array.isArray(item)) return item.map(compact)
@@ -532,7 +564,9 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
       operationSignal.throwIfAborted()
       started = true
       // 浏览器请求断连不取消仍在运行的原工具；用户停止会话时由工具信号取消。
-      let receipt = await dispatch(proposal.domain, proposal.action, { ...proposal.input, confirmed: true }, operationSignal)
+      const operationInput = proposal.domain === 'agents' && proposal.action === 'compute-variants/identity-apply'
+        ? proposal.input : { ...proposal.input, confirmed: true }
+      let receipt = await dispatch(proposal.domain, proposal.action, operationInput, operationSignal)
       if (proposal.domain === 'instances' && ['create', 'start', 'restart'].includes(proposal.input.operation)
         && receipt.ok && proposal.input.business_control === true) {
         const entry = await dispatch('instances', 'url', { name: proposal.input.name }, operationSignal)
@@ -647,7 +681,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
               : state.task_context.skill === 'agent-maintenance' && state.task_context.workflow === 'features' ? ['inheritance-and-fusion', 'controlled-improvement'] : undefined
           if (topics && !topics.includes(args.input?.topic)) throw new Error('研究资料主题不属于当前专项任务')
         }
-        if (args.action === 'context') return wireValue({ ok: true, value: { workspace: workspaceIdentity(root), context: state.context, task_context: state.task_context, available_actions: allowedAssistantActions(domain, state), next: state.task_context.skill === 'decision-sample-extraction' ? 'datasets/source 读取固定 Run 的来源目录与 extraction_contract' : 'describe(input.action=操作名)可读取单个动作的参数合同' } })
+        if (args.action === 'context') return wireValue({ ok: true, value: { workspace: workspaceIdentity(root), assistant: { session_id: id, model: state.model ?? null }, context: state.context, task_context: state.task_context, available_actions: allowedAssistantActions(domain, state), next: state.task_context.skill === 'decision-sample-extraction' ? 'datasets/source 读取固定 Run 的来源目录与 extraction_contract' : 'describe(input.action=操作名)可读取单个动作的参数合同' } })
         if (!actions[domain].includes(args.action)) throw new Error('未知的领域操作')
         const input = domain === 'agents' && args.action === 'datasets/preview' && state.task_context.skill === 'decision-sample-extraction'
           ? normalizeDecisionModelSubmission({ ...object(args.input) }) : { ...object(args.input) }
@@ -675,17 +709,28 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
         if (domain === 'agents' && args.action.startsWith('compute-variants/') && input.human_confirmed !== undefined) throw new Error('人员复核只能在算力变体界面由用户完成，助手不得提供 human_confirmed')
         if (domain === 'agents' && args.action === 'compute-variants/rename' && ['decision', 'variant_kind', 'end_confirmed', 'outcome', 'compute_variant_decision'].some(key => input[key] !== undefined)) throw new Error('变体改名只允许修改 variant_name，不能更改研究结论或 end 状态')
         if (domain === 'agents' && args.action === 'features/preview' && state.task_context.workflow === 'features' && input.experiment_id !== state.task_context.experiment_id) throw new Error('特性整理目标与固定任务上下文不一致')
-        if (domain === 'agents' && args.action === 'datasets/preview') {
-          if (state.task_context.run_id && input.run_id !== state.task_context.run_id) throw new Error('抽取 Run 与固定任务上下文不一致')
+        if (domain === 'agents' && ['datasets/preview', 'datasets/review'].includes(args.action)) {
+          if (args.action === 'datasets/preview' && state.task_context.run_id && input.run_id !== state.task_context.run_id) throw new Error('抽取 Run 与固定任务上下文不一致')
           input.assistant_session_id = id
           input.assistant_model = state.model ?? null
+          if (args.action === 'datasets/review') {
+            // 这次内部读取只确定应核对的不可变输入，不能算作模型已经阅读。
+            const current = await dispatch('agents', 'datasets/read', { dataset_id: input.dataset_id }, exec.signal)
+            if (!current.ok) throw new Error('无法读取当前样本，请先重新读取批次后复核')
+            const dataset = current.value?.dataset, record = dataset?.records?.find((item: any) => item._meta?.id === input.record_id)
+            if (!record || !services.sessionEvents) throw new Error('当前样本或管理会话的输入阅读记录不可核对，未保存复核')
+            const events = await services.sessionEvents(id, exec.signal)
+            const evidence = collectDecisionReviewInput(events, id, dataset, record)
+            if (!evidence) throw new Error('该会话尚未完整读取本题决策输入，未保存复核；请读取完整 state，或按 datasets/source 每片 read_input 续读至 complete:true 后重新核对答案')
+            input.assistant_input_evidence = evidence
+          }
         }
         if (domain === 'agents' && ['features/preview', 'fusion/preview'].includes(args.action)) input.assistant_session_id = id
         if (!readActions.has(args.action) && !(domain === 'agents' && await confirmedFusion(id, args.action, input, exec.signal))) {
           return executeOperation(id, domain, args.action, input, exec.signal)
         }
         let receipt = await dispatch(domain, args.action, input, exec.signal)
-        if (domain === 'agents' && args.action === 'datasets/source' && state.task_context.skill === 'decision-sample-extraction' && receipt.ok) {
+        if (domain === 'agents' && args.action === 'datasets/source' && state.task_context.skill === 'decision-sample-extraction' && receipt.ok && receipt.value?.extraction_contract) {
           receipt = { ...receipt, value: { ...receipt.value, extraction_contract: decisionExtractionModelContract() } }
         }
         if (domain === 'agents') receipt = await recoverAutomaticRead(id, args.action, input, receipt, exec.signal)

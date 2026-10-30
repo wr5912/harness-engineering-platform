@@ -62,6 +62,27 @@ function workbench({ handler } = {}) {
 }
 async function open(ui, id = 'dataset-a') { await ui.settle(); ui.change('样本批次', id); await ui.settle() }
 
+test('AI 委托复核显示真实身份，不替用户勾选人工声明，改用途保留AI记录', async () => {
+  const ui = workbench()
+  try {
+    const review = { kind: 'ai_delegated', session_id: 'synthetic-review-session', model: { provider: 'fixture', model: 'reviewer', reasoningEffort: null }, reviewed_at: '2026-10-29T00:00:00.000Z', purpose: 'functional_validation' }
+    const item = ui.documents.get('dataset-a').dataset.records[0].targets.action
+    Object.assign(item, { status: 'reviewed', decision_time_reviewed: true, reviewed_at: review.reviewed_at, review, provenance: { kind: 'ai_annotation' } })
+    await open(ui)
+    assert.match(ui.text(), /AI 委托复核.*功能验证/)
+    assert.match(ui.text(), /待补齐输入复核/); assert.match(ui.text(), /0 \/ 2 题已复核/); assert.match(ui.text(), /尚缺完整输入的阅读证据/)
+    assert.match(ui.text(), /fixture\/reviewer/); assert.match(ui.text(), /synthetic-review-session/)
+    assert.equal(ui.byLabel('已核对第 1 题输入与监督目标').props.checked, false)
+    assert.equal(ui.button('确认第 1 题已复核').props.disabled, true)
+    ui.change('决策数据用途', 'train'); await ui.save()
+    const split = ui.calls.filter(call => call.action === 'update').at(-1).input
+    assert.deepEqual(JSON.parse(JSON.stringify(split.targets.action.review)), review)
+    assert.equal(split.targets.action.decision_time_reviewed, true)
+    ui.review(); await ui.save()
+    assert.equal(ui.calls.filter(call => call.action === 'update').at(-1).input.targets.action.review, null)
+  } finally { ui.cleanup() }
+})
+
 test('多命名题分离输入与目标，显示业务语义、实际动作、逐题来源和服务端限制', async () => {
   const ui = workbench()
   try {
@@ -70,6 +91,22 @@ test('多命名题分离输入与目标，显示业务语义、实际动作、�
     assert.match(ui.text(), /实际动作只供对照.*model_suggestion/s); assert.match(ui.text(ui.byLabel('样本决策时点')), /第 141 行.*session.v4.jsonl.*get_inspection_result/s)
     assert.match(ui.text(), /固定来源与另一个留出批次关联/); assert.match(ui.text(ui.byLabel('第 1 题导出限制')), /本题尚未合格/)
     ui.change('决策监督语义', 'observed_action'); assert.match(ui.text(), /不能因此认定该行为正确或最佳/)
+  } finally { ui.cleanup() }
+})
+
+test('样本来源显示固定历史版本与Run，dirty记录不展示成当前父版', async () => {
+  const ui = workbench()
+  try {
+    const value = ui.documents.get('dataset-a')
+    value.dataset.agent_id = 'security-operations-expert'
+    value.dataset.experiment_id = 'EXP-security-operations-expert-024-rad80a907c628'
+    value.dataset.run_id = 'run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408'
+    value.dataset.records[0]._meta = { ...value.dataset.records[0]._meta, ...Object.fromEntries(['agent_id', 'experiment_id', 'run_id'].map(key => [key, value.dataset[key]])), source_version: { git_version: { dirty: true } } }
+    await open(ui)
+    const text = ui.text(ui.byLabel('样本决策时点'))
+    assert.match(text, /EXP-security-operations-expert-024-rad80a907c628/)
+    assert.match(text, /run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/)
+    assert.match(text, /历史 Run 使用了未提交的 Candidate/)
   } finally { ui.cleanup() }
 })
 
@@ -120,6 +157,8 @@ test('非法JSON不发送更新，服务端分组跨用途错误显示且保留�
   const ui = workbench()
   try {
     await open(ui); ui.change('第 1 题规则 JSON', '{broken'); await ui.save(); assert.match(ui.text(), /草稿已保留/); assert.equal(ui.calls.filter(item => item.action === 'update').length, 0)
+    assert.match(ui.text(ui.nodes().find(node => node.props?.className === 'harness-dataset-savebar')), /第 1 题的候选或等级规则不是有效 JSON.*草稿已保留/s)
+    assert.equal(ui.nodes().filter(node => node.props?.role === 'alert').length, 1)
     ui.change('第 1 题规则 JSON', JSON.stringify(baseQuestion.criteria)); ui.change('决策数据用途', 'test'); ui.setError('invalid_dataset: 同源任务不能跨训练、开发、校准与测试用途'); await ui.save(); assert.match(ui.text(), /同源任务不能跨/); assert.equal(ui.byLabel('决策数据用途').props.value, 'test')
   } finally { ui.cleanup() }
 })
@@ -203,16 +242,90 @@ test('损坏v2问题或目标保留原始数据与阻塞提示，不补成可编
 })
 
 
-test('样本评审输入和导出异常原位显示，来源详情按样本身份进入抽屉', async () => {
+test('样本阅读按材料、逐题复核、保存组织，高级编辑默认收起且原文在详情中保留', async () => {
   const ui = workbench()
   await ui.settle()
   ui.change('样本批次', 'dataset-a'); await ui.settle()
   const drawer = ui.nodes().find(node => node.type?.name === 'DetailDrawer' && node.props.title === '实际动作与证据定位')
   assert.equal(drawer.props.identity, 'run-a:dataset-a:dataset-a-1')
   assert.equal(drawer.props.active, true)
-  assert.equal(ui.nodes().some(node => node.type === 'details'), false)
-  assert.match(ui.text(), /决策前输入（各题共享）/)
+  const advanced = ui.nodes().filter(node => node.type === 'details' && node.props.className === 'harness-dataset-advanced')
+  assert.ok(advanced.length > 0); assert.ok(advanced.every(node => !node.props.open))
+  assert.ok(ui.byLabel('决策前输入（各题共享）'))
+  assert.match(ui.text(), /查询基础测试资产/)
+  const body = ui.text(ui.byLabel('当前决策样本')); assert.ok(body.indexOf('当前可见任务材料') >= 0); assert.ok(body.indexOf('当前可见任务材料') < body.indexOf('逐题复核')); assert.ok(body.indexOf('逐题复核') < body.indexOf('保存与后续用途'))
+  assert.equal(ui.calls.find(call => call.action === 'list').input.include_eligibility, false)
+  assert.ok(ui.nodes().some(node => node.type?.name === 'DetailDrawer' && node.props.title === '完整原始输入与工具目录'))
   assert.match(ui.text(), /固定来源与另一个留出批次关联/)
+})
+
+test('可读答案控件保持choice和noul类型，保存后继续下一条不会串草稿', async () => {
+  const ui = workbench()
+  try {
+    await open(ui)
+    ui.change('第 1 题答案', 'ask'); ui.change('第 2 题答案', 'false')
+    assert.equal(ui.byLabel('第 1 题标签 JSON').props.value, '"ask"')
+    assert.equal(ui.byLabel('第 2 题标签 JSON').props.value, 'false')
+    ui.button('保存并查看下一条').props.onClick(); await ui.settle()
+    const sent = ui.calls.filter(call => call.action === 'update').at(-1).input
+    assert.equal(sent.record_id, 'dataset-a-1'); assert.equal(sent.targets.action.label, 'ask'); assert.equal(sent.targets.needs_review.label, false)
+    assert.equal(ui.byLabel('第 1 题问题').props.value, '第二题 0')
+    assert.equal(ui.byLabel('第 1 题答案').props.value, 'read')
+    assert.equal(ui.dirty.at(-1), false)
+  } finally { ui.cleanup() }
+})
+
+test('决策上下文保持原角色和顺序，最新用户请求直接可读，其余按需展开', async () => {
+  const ui = workbench()
+  try {
+    const source = ui.documents.get('dataset-a').dataset.records[0]
+    source.state = { messages: [{ role: 'system', content: '系统约定' }, { role: 'user', content: '上一轮请求' }, { role: 'tool', content: '工具结果' }, { role: 'user', content: '本轮用户请求' }], available_tools: [] }
+    await open(ui)
+    const messages = ui.nodes().filter(node => node.type === 'details' && node.props.className === 'harness-dataset-message')
+    assert.equal(messages.length, 4)
+    assert.equal(messages.filter(node => node.props.open).length, 1)
+    assert.match(ui.text(messages.find(node => node.props.open)), /用户角色消息（来源未记录）.*本轮用户请求/s)
+    const history = ui.nodes().find(node => node.props?.className === 'harness-dataset-history')
+    assert.equal(ui.byLabel('样本决策时点').props.open, undefined)
+    assert.match(ui.text(history), /系统约定.*上一轮请求.*工具结果/s)
+    assert.deepEqual(source.state.messages.map(message => message.role), ['system', 'user', 'tool', 'user'])
+  } finally { ui.cleanup() }
+})
+
+test('父委派与运行注入保持来源身份，不把role:user一概称为真人请求', async () => {
+  const ui = workbench()
+  try {
+    const source = ui.documents.get('dataset-a').dataset.records[0]
+    source.state = { messages: [
+      { role: 'user', source: { kind: 'user' }, content: '真人请求' },
+      { role: 'user', source: { kind: 'subagent', senderSessionId: 'synthetic-parent' }, content: '父智能体下发的子任务' },
+      { role: 'user', source: { kind: 'context' }, content: '运行状态更新' },
+      { role: 'user', source: { kind: 'skill-catalog' }, content: '技能目录更新' },
+    ], available_tools: [] }
+    await open(ui)
+    const messages = ui.nodes().filter(node => node.type === 'details' && node.props.className === 'harness-dataset-message')
+    const primary = messages.find(node => node.props.open)
+    assert.match(ui.text(primary), /父智能体委派.*父智能体下发的子任务/s)
+    assert.doesNotMatch(ui.text(primary), /用户请求/)
+    assert.match(ui.text(messages.find(node => ui.text(node).includes('运行状态更新'))), /运行上下文/)
+    assert.match(ui.text(messages.find(node => ui.text(node).includes('技能目录更新'))), /技能目录/)
+    assert.equal(source.state.messages[1].source.kind, 'subagent')
+  } finally { ui.cleanup() }
+})
+
+test('仅运行注入可见时仍展示可核对正文，并在正文前说明缺少用户请求', async () => {
+  const ui = workbench()
+  try {
+    const row = ui.documents.get('dataset-a').dataset.records[0]
+    row.state = { messages: [{ role: 'user', source: { kind: 'context' }, content: '合成当前待处理任务材料' }], available_tools: [] }
+    await open(ui)
+    const messages = ui.byLabel('决策前输入（各题共享）')
+    assert.match(ui.text(messages), /来源未记录用户请求.*运行上下文.*合成当前待处理任务材料/s)
+    const primary = ui.nodes(messages).find(node => node.type === 'details' && node.props.open)
+    assert.ok(primary)
+    assert.doesNotMatch(ui.text(primary), /用户请求/)
+    assert.equal(row.state.messages[0].source.kind, 'context')
+  } finally { ui.cleanup() }
 })
 
 test('样本批次区分慢读、读取失败、成功空和恢复后的有记录状态', async () => {
@@ -242,5 +355,23 @@ test('样本批次区分慢读、读取失败、成功空和恢复后的有记�
     assert.match(ui.text(), /并发冲突/)
     ui.button('刷新样本').props.onClick(); await ui.settle()
     assert.match(ui.text(), /并发冲突/, '列表成功不能清除独立的保存冲突')
+  } finally { ui.cleanup() }
+})
+
+test('所选批次读取失败后刷新恢复同一对象并清除已解决的错误', async () => {
+  let failing = true
+  const ui = workbench({ handler: async (action, input, original) => {
+    if (action === 'read' && failing) throw new Error('read_error: 测试读取中断')
+    return original(action, input)
+  } })
+  try {
+    await open(ui)
+    assert.match(ui.text(), /测试读取中断/)
+    assert.equal(ui.byLabel('样本批次').props.value, 'dataset-a')
+    assert.equal(ui.byLabel('当前决策样本'), undefined)
+    failing = false; ui.button('刷新样本').props.onClick(); await ui.settle()
+    assert.equal(ui.byLabel('样本批次').props.value, 'dataset-a')
+    assert.ok(ui.byLabel('当前决策样本'))
+    assert.doesNotMatch(ui.text(), /测试读取中断/)
   } finally { ui.cleanup() }
 })

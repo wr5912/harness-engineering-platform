@@ -63,6 +63,13 @@ function updatePayload(saved, record = saved.dataset.records[0], changes = {}) {
   return { dataset_id: saved.dataset.id, expected_sha256: saved.sha256, record_id: record._meta.id, workflow: record.workflow, task: record.task, questions: record.questions, targets: Object.fromEntries(Object.entries(record.targets).map(([key, value]) => [key, { ...value, status: 'reviewed', decision_time_reviewed: true }])), group_id: record._meta.group_id, split: 'train', ...changes }
 }
 const save = async fx => apply(fx, await preview(fx, await source(fx)))
+// Handler 单测的受信任注入夹具；原生会话到证明的核对由 decision-review-input.test 独立覆盖。
+function inputEvidence(saved, sessionId, record = saved.dataset.records[0]) {
+  return { schema_version: 1, session_id: sessionId, dataset_id: saved.dataset.id, record_id: record._meta.id,
+    run_id: saved.dataset.run_id, path: saved.dataset.path, trace_sha256: saved.dataset.source_sha256,
+    source_bundle_sha256: saved.dataset.source_bundle.sha256, state_sha256: createHash('sha256').update(JSON.stringify(record.state)).digest('hex'),
+    read_method: 'datasets/read', receipt_refs: [{ call_id: 'synthetic-read', call_seq: 2, result_seq: 3 }] }
+}
 const reviewed = async (fx, value, changes = {}) => fx.handle('datasets/update', updatePayload(value, undefined, changes))
 const exported = (fx, dataset, mode = 'training') => fx.handle('datasets/export', { dataset_id: dataset.id, mode })
 
@@ -166,7 +173,7 @@ test('人工改题/改标签/改依据撤销该题复核，再次复核保留原
 
 test('未完成输入可答性核对不能复核，AI不能在update伪造来源', () => withFixture(async fx => {
   const saved = await save(fx), targetBefore = saved.dataset.records[0].targets.route
-  for (const decision_time_reviewed of [undefined, false, 'true']) await assert.rejects(() => fx.handle('datasets/update', updatePayload(saved, undefined, { targets: { route: { ...targetBefore, status: 'reviewed', decision_time_reviewed } } })), /人工核对|逐题复核/)
+  for (const decision_time_reviewed of [undefined, false, 'true']) await assert.rejects(() => fx.handle('datasets/update', updatePayload(saved, undefined, { targets: { route: { ...targetBefore, status: 'reviewed', decision_time_reviewed } } })), /核对|逐题复核/)
   await assert.rejects(() => fx.handle('datasets/update', updatePayload(saved, undefined, { targets: { route: { ...targetBefore, provenance: { kind: 'human_annotation' }, status: 'reviewed', decision_time_reviewed: true } } })), /来源/)
 }))
 
@@ -190,6 +197,7 @@ test('角色、采集状态、Run身份和Case归属不足不能预览', () => w
   ]
   for (const [path, value] of mutations) {
     fx.createRun(runId); write(join(fx.root, fx.base(runId), path), value)
+    if (path === 'run.yaml') { await assert.rejects(() => source(fx), /Run.*身份不一致/); continue }
     const src = await source(fx); assert.ok(src.decisions.every(item => !item.eligible))
     await assert.rejects(() => preview(fx, src), /来源不足/)
   }
@@ -559,4 +567,147 @@ test('逐题适配不修JSON或放宽来源与标签校验，错误输入不会�
     { task: { id: 'actual-action', semantics: 'observed_action' }, target: target({ label: 'get_inspection_status' }) },
   ]) await assert.rejects(() => fx.handle('datasets/preview', { ...normalizeDecisionModelSubmission({ ...flat, ...change }), assistant_session_id: owner, assistant_model: { provider: 'fixture', model: 'basic-model' } }))
   assert.equal((await fx.handle('datasets/list', {})).datasets.length, 0)
+}))
+
+test('可信child来源完整lineage只入监督元数据，与根任务同组；长path大前缀仍可分片保存', () => withFixture(async fx => {
+  const caseId = `U-${'LONG'.repeat(50)}`, rootLog = 'session.v4.jsonl', childLog = 'descendants/child-session/session.v4.jsonl'
+  const tracePath = `${fx.base(runId)}/evidence/${caseId}/trace.jsonl`, childTask = `核对已授权的子任务。${'x'.repeat(18000)}`
+  const message = text => ({ role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text }] })
+  const rootTask = '根任务用户原文，不应补入子任务输入。'
+  const header = (log, meta) => ({ session_log: log, event: { type: 'session', seq: 0, ...meta } })
+  const rows = [
+    header(rootLog, { id: 'root-session', delegationDepth: 0, agentPreset: 'root-preset', createdAt: 100 }),
+    envelope('user/message', message(rootTask), 1, rootLog), envelope('step/start', { turn: 1, step: 1 }, 2, rootLog),
+    envelope('request/header', { header: { messages: [message(rootTask)], tools: [{ name: 'delegate_fault_analysis' }] } }, 3, rootLog),
+    envelope('tool/call', { callId: 'delegate-call', name: 'delegate_fault_analysis', arguments: { prompt: '核对已授权的子任务。' } }, 4, rootLog),
+    envelope('subagent/catalog', { version: 0, childId: 'child-session', childCreatedAt: 200, mode: 'continuable' }, 5, rootLog),
+    envelope('tool/result', { message: { role: 'tool', toolCallId: 'delegate-call', source: { kind: 'tool', callId: 'delegate-call' }, content: [{ type: 'text', text: 'started subagent child-session' }] } }, 6, rootLog),
+    header(childLog, { id: 'child-session', origin: 'subagent', parentSession: 'root-session', delegationDepth: 1, agentPreset: 'fault-preset', isSeeded: false, createdAt: 200 }),
+    envelope('subagent/descriptor', { version: 3, provider: 'spawn', mode: 'continuable' }, 1, childLog),
+    envelope('user/message', message(childTask), 2, childLog), envelope('step/start', { turn: 1, step: 1 }, 3, childLog),
+    envelope('request/header', { header: { messages: [message(childTask)], tools: [{ name: 'get_asset_status' }] } }, 4, childLog),
+    envelope('tool/call', { callId: 'child-read', name: 'get_asset_status', arguments: { asset_id: 'observed-asset' } }, 5, childLog),
+    envelope('tool/result', { message: { role: 'tool', toolCallId: 'child-read', source: { kind: 'tool', callId: 'child-read' }, content: [{ type: 'text', text: '实际子查询结果' }] } }, 6, childLog),
+  ]
+  write(join(fx.root, fx.base(runId), 'inputs.lock.json'), JSON.stringify({ run_id: runId, evaluation_cases: [{ case_id: caseId }] }))
+  write(join(fx.root, fx.base(runId), `evidence/${caseId}/checks.json`), JSON.stringify({ trace_available: true, session_id: 'root-session', root_session_log: rootLog, session_preset: 'root-preset' }))
+  const raw = rows.map(JSON.stringify).join('\n') + '\n'; write(join(fx.root, tracePath), raw)
+  const src = await source(fx, { path: tracePath })
+  assert.ok(JSON.stringify(src).length <= 16000)
+  const child = src.decisions.find(decision => decision.anchor.session_log === childLog)
+  assert.equal(child.eligible, true); assert.equal(child.detail_required, true)
+  assert.equal(child.lineage, undefined, 'descriptor不重复整份长lineage')
+  assert.equal(child.lineage_required, true); assert.equal(child.actor_kind, 'delegated_task')
+  let cursor = 0, text = ''
+  do {
+    const page = await source(fx, { ...child.read_input, cursor })
+    assert.ok(JSON.stringify(page).length <= 16000)
+    text += page.fragment; cursor = page.next_cursor
+  } while (cursor !== null)
+  const full = JSON.parse(text)
+  assert.equal(full.lineage.actor_session_id, 'child-session')
+  assert.equal(full.lineage.delegation.call_id, 'delegate-call')
+  assert.equal(full.lineage.delegation.task_content_sha256, createHash('sha256').update(childTask).digest('hex'))
+  assert.equal(full.state.messages.find(item => item.role === 'user').source.kind, 'subagent')
+  assert.equal(JSON.stringify(full.state).includes(rootTask), false)
+  assert.equal(full.state.lineage, undefined)
+  const childPreview = await preview(fx, src, [draft(src, { decision_id: child.decision_id, action_name: child.observed_action.name })])
+  const childSaved = await apply(fx, childPreview)
+  const rootPreview = await preview(fx, src, [draft(src, { decision_id: src.decisions[0].decision_id, action_name: src.decisions[0].observed_action.name })])
+  const rootSaved = await apply(fx, rootPreview)
+  assert.deepEqual(childSaved.dataset.records[0]._meta.lineage, full.lineage)
+  assert.equal(rootSaved.dataset.records[0]._meta.lineage, undefined)
+  assert.equal(childSaved.dataset.records[0]._meta.source_group_id, rootSaved.dataset.records[0]._meta.source_group_id)
+  const stored = join(fx.root, childSaved.file), tampered = JSON.parse(readFileSync(stored, 'utf8'))
+  tampered.records[0]._meta.lineage.actor_session_id = 'forged-actor'; write(stored, JSON.stringify(tampered))
+  const read = await fx.handle('datasets/read', { dataset_id: tampered.id })
+  assert.ok(read.eligibility.records[0].reasons.some(reason => /主体或委派来源/.test(reason)))
+  assert.equal(readFileSync(join(fx.root, tracePath), 'utf8'), raw)
+}))
+
+test('受托AI复核真实记录身份，改标可同次复核且保留原始来源，不伪装人工', () => withFixture(async fx => {
+  const saved = await save(fx), original = saved.dataset.records[0].targets.route.provenance
+  const input = updatePayload(saved), model = { provider: 'fixture-reviewer', model: 'review-model' }
+  input.targets = { route: { label: 'get_inspection_status', basis: '按当前输入和工具能力复核巡检查询；仅用于功能验证。', status: 'reviewed', decision_time_reviewed: true } }
+  const evidence = inputEvidence(saved, 'session-actual-reviewer')
+  const result = await fx.handle('datasets/review', { ...input, assistant_session_id: 'session-actual-reviewer', assistant_model: model, assistant_input_evidence: evidence })
+  const target = result.dataset.records[0].targets.route
+  assert.equal(target.provenance.kind, 'ai_annotation'); assert.deepEqual(target.provenance.origin, original)
+  assert.equal(target.provenance.session_id, 'session-actual-reviewer'); assert.deepEqual(target.provenance.model, model)
+  assert.equal(target.status, 'reviewed'); assert.equal(target.decision_time_reviewed, true)
+  assert.deepEqual(target.review, { kind: 'ai_delegated', session_id: 'session-actual-reviewer', model, purpose: 'functional_validation', reviewed_at: target.reviewed_at, input_evidence: evidence })
+  assert.equal(result.eligibility.counts.training, 1)
+  const exported = await fx.handle('datasets/export', { dataset_id: result.dataset.id, mode: 'training' })
+  const exportedRecord = JSON.parse(exported.content.trim())
+  assert.deepEqual(exportedRecord.targets.route.review.input_evidence, evidence)
+  assert.equal(exportedRecord._meta.dataset_id, result.dataset.id)
+  assert.equal(exportedRecord._meta.source_bundle_sha256, result.dataset.source_bundle.sha256)
+  assert.equal(result.dataset.records[0]._meta.dataset_id, undefined, '导出身份投影不回写固定原件')
+  const regrouped = await fx.handle('datasets/update', updatePayload(result, undefined, { split: 'development' }))
+  assert.deepEqual(regrouped.dataset.records[0].targets.route.review, target.review, '仅改用途不能冒充人工复核')
+  const human = updatePayload(regrouped)
+  human.targets.route.review = null
+  await new Promise(resolve => setTimeout(resolve, 5))
+  const confirmed = await fx.handle('datasets/update', human)
+  assert.equal(confirmed.dataset.records[0].targets.route.review, undefined)
+  assert.notEqual(confirmed.dataset.records[0].targets.route.reviewed_at, target.reviewed_at, '明确人工接管使用本次复核时间')
+}))
+
+test('受托复核拒绝伪造身份字段、缺失真实会话或时点核对，并沿用来源与并发检查', () => withFixture(async fx => {
+  const saved = await save(fx), input = updatePayload(saved)
+  input.targets = { route: { label: 'get_asset_status', basis: saved.dataset.records[0].targets.route.basis, status: 'reviewed', decision_time_reviewed: true } }
+  const context = { assistant_session_id: 'session-reviewer', assistant_model: { provider: 'fixture', model: 'reviewer' }, assistant_input_evidence: inputEvidence(saved, 'session-reviewer') }
+  await assert.rejects(() => fx.handle('datasets/review', input), /Session/)
+  await assert.rejects(() => fx.handle('datasets/review', { ...input, ...context, assistant_input_evidence: undefined }), /完整输入读取证据/)
+  for (const change of [{ session_id: 'forged' }, { dataset_id: 'forged' }, { state_sha256: 'f'.repeat(64) }, { source_bundle_sha256: 'f'.repeat(64) }]) {
+    await assert.rejects(() => fx.handle('datasets/review', { ...input, ...context, assistant_input_evidence: { ...context.assistant_input_evidence, ...change } }), /完整输入读取证据/)
+  }
+  for (const change of [{ provenance: { kind: 'human_annotation' } }, { review: { kind: 'human' } }, { status: 'suggested' }, { decision_time_reviewed: false }]) {
+    await assert.rejects(() => fx.handle('datasets/review', { ...input, ...context, targets: { route: { ...input.targets.route, ...change } } }), /受托|核对|复核/)
+  }
+  const result = await fx.handle('datasets/review', { ...input, ...context })
+  assert.equal(result.dataset.records[0].targets.route.provenance.kind, 'model_suggestion', '未改标签仍保留原模型建议来源')
+  await assert.rejects(() => fx.handle('datasets/review', { ...input, ...context }), /其他任务修改/)
+  const forged = updatePayload(result); forged.targets.route.review = { ...result.dataset.records[0].targets.route.review, session_id: 'forged' }
+  await assert.rejects(() => fx.handle('datasets/update', forged), /复核身份|input_evidence.session_id/)
+  write(join(fx.root, fx.path), fx.raw + '\n')
+  await assert.rejects(() => fx.handle('datasets/review', { ...input, ...context, expected_sha256: result.sha256 }), /来源|摘要|轨迹/)
+}))
+
+test('旧AI复核缺少输入证明保持原件，列表与导出不视为完成', () => withFixture(async fx => {
+  const saved = await save(fx), value = JSON.parse(readFileSync(join(fx.root, saved.file), 'utf8'))
+  const target = value.records[0].targets.route
+  Object.assign(target, { status: 'reviewed', decision_time_reviewed: true, reviewed_at: '2026-10-26T00:00:00.000Z',
+    review: { kind: 'ai_delegated', session_id: 'legacy-ai-reviewer', model: { provider: 'fixture', model: 'reviewer' }, reviewed_at: '2026-10-26T00:00:00.000Z', purpose: 'functional_validation' } })
+  const original = JSON.stringify(value)
+  write(join(fx.root, saved.file), original)
+  const read = await fx.handle('datasets/read', { dataset_id: value.id })
+  assert.equal(read.dataset.records[0].targets.route.review.session_id, 'legacy-ai-reviewer')
+  assert.equal(read.eligibility.counts.training, 0)
+  assert.ok(read.eligibility.records[0].question_reasons.route.some(reason => /读取|阅读|输入/.test(reason)))
+  const list = await fx.handle('datasets/list', { include_eligibility: false })
+  assert.equal(list.datasets[0].reviewed, 0)
+  await assert.rejects(() => exported(fx, value), /尚无符合/)
+  assert.equal(readFileSync(join(fx.root, saved.file), 'utf8'), original)
+}))
+
+test('批次导航可只读存储摘要，不能把未核对的列表计数当作训练资格', () => withFixture(async fx => {
+  const saved = await reviewed(fx, await save(fx))
+  write(join(fx.root, fx.path), fx.raw + '\n')
+  const listed = await fx.handle('datasets/list', { run_id: runId, include_eligibility: false })
+  assert.equal(listed.datasets[0].path, fx.path)
+  assert.equal(listed.datasets[0].reviewed, 1)
+  assert.equal(listed.datasets[0].eligibility_checked, false)
+  assert.equal(listed.datasets[0].eligibility, undefined)
+  const selected = await fx.handle('datasets/read', { dataset_id: saved.dataset.id })
+  assert.equal(selected.eligibility.counts.training, 0)
+  await assert.rejects(() => fx.handle('datasets/list', { include_eligibility: 'false' }), /布尔值/)
+}))
+
+test('人工修改拒绝理由仍保留排除状态，不因内容变化回到候选', () => withFixture(async fx => {
+  const saved = await save(fx), input = updatePayload(saved)
+  input.targets.route = { ...input.targets.route, basis: '这道题的条件不足，应排除。', status: 'rejected', decision_time_reviewed: false }
+  const result = await fx.handle('datasets/update', input)
+  assert.equal(result.dataset.records[0].targets.route.status, 'rejected')
+  assert.equal(result.eligibility.counts.candidates, 0)
 }))

@@ -132,7 +132,8 @@ if sys.argv[1:] == ["run", "build"]:
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def remove_mcp_store(self):
-        for path in (self.assets / "config/mcp-manager.json", self.assets / ".local/credentials/mcp-manager.json"):
+        for path in (self.assets / "config/mcp-manager.json", self.assets / ".local/credentials/mcp-manager.json",
+                     self.assets / ".local/credentials/mcp-manager/credentials.json"):
             path.unlink(missing_ok=True)
 
     def mcp_store(self):
@@ -503,7 +504,7 @@ if sys.argv[1:] == ["run", "build"]:
     def test_missing_private_mcp_credentials_are_initialized_for_ui_setup(self):
         self.prepare()
         public_path = self.assets / "config/mcp-manager.json"
-        private_path = self.assets / ".local/credentials/mcp-manager.json"
+        private_path = self.assets / ".local/credentials/mcp-manager/credentials.json"
         public = {"schemaVersion": 1, "servers": [{"id": "saved", "enabled": False,
                  "tools": {"mode": "all", "names": []}}], "groups": []}
         public_path.write_text(json.dumps(public))
@@ -517,6 +518,94 @@ if sys.argv[1:] == ["run", "build"]:
         self.assertEqual(json.loads(public_path.read_text()), public)
         started = self.run_cli("start", "--dry-run", "--port", str(self.free_port()))
         self.assertEqual(started.returncode, 0, started.stderr)
+
+    def test_mcp_credentials_migrate_bytes_and_share_save_lock_with_legacy_readers(self):
+        self.prepare()
+        namespace = runpy.run_path(str(self.launcher))
+        with mock.patch.dict(os.environ, self.env):
+            paths = namespace["mcp_credential_paths"]()
+            paths["legacyFile"].unlink()
+            paths["file"].rename(paths["legacyFile"])
+            paths["legacyLock"].unlink()
+            original = paths["legacyFile"].read_bytes()
+            migrate = namespace["migrate_mcp_patch"]
+            locked = migrate.__globals__["migrate_mcp_patch_locked"]
+
+            def inspect_locked(profile):
+                self.assertTrue(paths["legacyLock"].exists())
+                self.assertTrue(paths["legacyLock"].is_symlink())
+                self.assertEqual(paths["legacyLock"].stat().st_ino, paths["lock"].stat().st_ino)
+                self.assertEqual(paths["legacyFile"].read_bytes(), original)
+                locked(profile)
+
+            with mock.patch.dict(migrate.__globals__, {"migrate_mcp_patch_locked": inspect_locked}):
+                migrate(self.profile)
+            self.assertEqual(os.readlink(paths["legacyFile"]), "mcp-manager/credentials.json")
+            self.assertEqual(os.readlink(paths["legacyLock"]), "mcp-manager/credentials.lock")
+            self.assertFalse(paths["legacyLock"].exists())
+            self.assertFalse(paths["lock"].exists())
+            self.assertEqual(paths["file"].read_bytes(), original)
+            self.assertEqual(sorted(path.name for path in paths["directory"].iterdir()), ["credentials.json"])
+            self.assertEqual(stat.S_IMODE(paths["file"].stat().st_mode), 0o600)
+            if os.geteuid() == 0:
+                self.assertEqual(paths["file"].stat().st_uid, 1000)
+                self.assertEqual(stat.S_IMODE(paths["directory"].stat().st_mode), 0o711)
+            migrate(self.profile)
+            self.assertEqual(paths["file"].read_bytes(), original)
+            self.assertTrue(paths["legacyFile"].is_symlink())
+
+    def test_mcp_credentials_converge_identical_files_and_preserve_conflicts(self):
+        self.prepare()
+        namespace = runpy.run_path(str(self.launcher))
+        with mock.patch.dict(os.environ, self.env):
+            paths = namespace["mcp_credential_paths"]()
+            original = paths["file"].read_bytes()
+            paths["legacyFile"].unlink()
+            paths["legacyFile"].write_bytes(original)
+            namespace["migrate_mcp_patch"](self.profile)
+            self.assertTrue(paths["legacyFile"].is_symlink())
+            paths["legacyFile"].unlink()
+            conflict = original + b" \n"
+            paths["legacyFile"].write_bytes(conflict)
+            with self.assertRaisesRegex(namespace["PlatformError"], "新旧凭据冲突"):
+                namespace["migrate_mcp_patch"](self.profile)
+            self.assertEqual(paths["file"].read_bytes(), original)
+            self.assertEqual(paths["legacyFile"].read_bytes(), conflict)
+            self.assertFalse(paths["lock"].exists())
+            self.assertTrue(paths["legacyLock"].is_symlink())
+
+    def test_mcp_credentials_reject_untrusted_directory_before_creating_any_lock(self):
+        self.prepare()
+        namespace = runpy.run_path(str(self.launcher))
+        with mock.patch.dict(os.environ, self.env):
+            paths = namespace["mcp_credential_paths"]()
+            paths["directory"].rename(paths["directory"].with_name("saved-mcp"))
+            outside = self.root / "outside-credentials"
+            outside.mkdir()
+            paths["directory"].symlink_to(outside, target_is_directory=True)
+            with self.assertRaisesRegex(namespace["PlatformError"], "实体目录"):
+                namespace["migrate_mcp_patch"](self.profile)
+            self.assertEqual(list(outside.iterdir()), [])
+            self.assertTrue(paths["legacyLock"].is_symlink())
+
+    def test_mcp_credentials_preserve_other_writer_lock_and_release_own_failed_save(self):
+        self.prepare()
+        namespace = runpy.run_path(str(self.launcher))
+        with mock.patch.dict(os.environ, self.env):
+            paths = namespace["mcp_credential_paths"]()
+            paths["lock"].write_text("fixture-held-lock")
+            with self.assertRaisesRegex(namespace["PlatformError"], "正在保存"):
+                namespace["migrate_mcp_patch"](self.profile)
+            self.assertEqual(paths["lock"].read_text(), "fixture-held-lock")
+            paths["lock"].unlink()
+            patch = self.profile / "cordis.patch.yml"
+            patch.write_text("- id: mcp-session-manager\n  name: unrelated.mjs\n")
+            with self.assertRaises(namespace["PlatformError"]):
+                namespace["migrate_mcp_patch"](self.profile)
+            self.assertFalse(paths["lock"].exists())
+            self.assertTrue(paths["legacyLock"].is_symlink())
+            patch.write_text("[]\n")
+            namespace["migrate_mcp_patch"](self.profile)
 
     def test_sensitive_query_in_legacy_url_is_not_written_to_public_config(self):
         self.prepare()

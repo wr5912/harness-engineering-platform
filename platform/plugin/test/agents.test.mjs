@@ -52,6 +52,7 @@ function fixture() {
     'runtime/adapters/dsh-container/source_contract.py',
     'runtime/adapters/dsh-container/version-source.mts',
     'platform/plugin/src/agents/version-source.ts',
+    'platform/plugin/src/version-id.ts',
     'runtime/adapters/dsh-container/workspace_paths.py',
     'runtime/adapters/dsh-container/scenario_analysis.py',
     'runtime/adapters/dsh-container/run_record.py',
@@ -291,6 +292,7 @@ test('算力变体通过统一智能体路由预览和派生，原父版保持�
     assert.equal(preview.plan.min_runs_per_case, 2)
     assert.equal(preview.plan.model_change, null)
     const created = await rpc(handler, 'compute-variants/create', { ...input, expected_preview_sha256: preview.preview_sha256 })
+    assert.match(created.experiment_id, /^VAR-test-agent-001-r[0-9a-f]{12}$/)
     const variant = await rpc(handler, 'compute-variants/context', { experiment_id: created.experiment_id })
     assert.equal(variant.parent_experiment_id, 'EXP-test-agent-001')
     assert.equal(variant.fixed_parent_ref, `git:${fx.commit}`)
@@ -311,10 +313,55 @@ test('算力变体通过统一智能体路由预览和派生，原父版保持�
     const refreshed = (await rpc(handler, 'list')).experiments.find(item => item.id === created.experiment_id)
     assert.equal(refreshed.change.variant_name, renamed.variant_name)
     assert.equal(refreshed.change_sha256, renamed.change_sha256)
+    const detail = await rpc(handler, 'detail', { agent_id: 'test-agent', experiment_id: created.experiment_id })
+    assert.equal(detail.derivation.is_variant, true)
+    assert.equal(detail.derivation.derivable, false)
+    assert.equal(detail.derivation.reason, 'variant')
+    assert.equal(detail.derivation.parent_ref, null)
+    assert.deepEqual(detail.versions.filter(item => item.id === created.experiment_id).map(item => [item.is_variant, item.derivable]), [[true, false]])
+    const ordinary = await rpc(handler, 'create', versionRequest(fx.commit))
+    assert.match(ordinary.experiment_id, /^EXP-test-agent-002-r[0-9a-f]{12}$/)
   } finally { await rm(fx.root, { recursive: true, force: true }) }
 })
 
-test('算力 end 只在确认的 Candidate 和计划未改变时排除融合', async () => {
+test('VAR与历史EXP变体禁止普通派生、融合主父版、融合附加来源和另一变体派生', async t => {
+  const { createAgentsHandler } = await loadServer()
+  const fx = fixture(); t.after(() => rm(fx.root, { recursive: true, force: true }))
+  const legacy = 'EXP-test-agent-002', variant = 'VAR-test-agent-001-r123456abcdef'
+  addVersion(fx.root, legacy, 'status: active\n')
+  const ordinaryCommit = commitFixture(fx.root, 'ordinary version before variant declaration')
+  const legacyFile = join(fx.root, `evolution/experiments/${legacy}/change.yaml`)
+  const ordinaryChange = readFileSync(legacyFile, 'utf8')
+  write(legacyFile, ordinaryChange + 'compute_variant: {strategy: 只读查询}\n')
+  addVersion(fx.root, variant, 'status: active\ncompute_variant: {strategy: 只读查询}\n')
+  const commit = commitFixture(fx.root, 'fixed variant identities')
+  const handler = createAgentsHandler(fx.root)
+  const compute = { variant_name: '查询变体', strategy: '保留只读查询', case_ids: ['U-CASE-001'], critical_case_ids: ['U-CASE-001'], resource_metric: 'model_calls', min_resource_reduction_pct: 10 }
+  for (const id of [legacy, variant]) {
+    const selected = versionRequest(commit, { parent_experiment_id: id })
+    const detail = await rpc(handler, 'detail', { agent_id: 'test-agent', experiment_id: id })
+    assert.equal(detail.derivation.derivable, false)
+    assert.equal(detail.derivation.is_variant, true)
+    assert.doesNotMatch(detail.derivation.note, /尚不能恢复|未提交改动/)
+    await assert.rejects(() => rpc(handler, 'create', selected), /变体不能作为新版本的继承来源/)
+    await assert.rejects(() => rpc(handler, 'fusion/preview', selected), /变体不能作为新版本的继承来源/)
+    await assert.rejects(() => rpc(handler, 'compute-variants/preview', { ...selected, ...compute }), /变体不能作为新版本的继承来源/)
+    await assert.rejects(() => rpc(handler, 'fusion/preview', versionRequest(commit, { plan: fusionPlan([{ experiment_id: id, ref: `git:${commit}`, decision: 'inherit', reason: '复用查询' }]) })), /变体不能作为新版本的继承来源/)
+  }
+  const inventory = await rpc(handler, 'fusion/preview', versionRequest(commit))
+  assert.equal(inventory.inventory.sources.some(row => [legacy, variant].includes(row.experiment_id)), false)
+  // 固定提交与工作树分别核对，删除当前声明或选择声明前的提交都不能绕过。
+  write(legacyFile, ordinaryChange)
+  await assert.rejects(() => rpc(handler, 'create', versionRequest(commit, { parent_experiment_id: legacy })), /变体不能作为新版本的继承来源/)
+  await assert.rejects(() => rpc(handler, 'compute-variants/preview', { ...versionRequest(commit, { parent_experiment_id: legacy }), ...compute }), /变体不能作为新版本的继承来源/)
+  write(legacyFile, ordinaryChange + 'compute_variant: {strategy: 只读查询}\n')
+  await assert.rejects(() => rpc(handler, 'create', versionRequest(ordinaryCommit, { parent_experiment_id: legacy })), /变体不能作为新版本的继承来源/)
+  await assert.rejects(() => rpc(handler, 'create', { ...versionRequest(commit), compute_variant: { strategy: '伪装普通版本' } }), /compute-variants\/create/)
+  const readable = await rpc(handler, 'edit/read', { experiment_id: variant, path: 'candidate/harness.yaml' })
+  assert.ok(readable.content.includes('loadable_assets'))
+})
+
+test('历史EXP变体始终不进入融合来源，确认状态和Candidate变化不改变身份', async () => {
   const { createAgentsHandler } = await loadServer()
   const fx = fixture()
   try {
@@ -326,15 +373,42 @@ test('算力 end 只在确认的 Candidate 和计划未改变时排除融合', a
     write(changeFile, readFileSync(changeFile, 'utf8') + `compute_variant_decision:\n  variant_ref: git:${confirmed}\n`)
     commitFixture(fx.root, 'confirm observed compute variant')
     const handler = createAgentsHandler(fx.root)
-    const status = async () => (await rpc(handler, 'fusion/preview', versionRequest(fx.commit))).inventory.sources.find(row => row.experiment_id === id).status
-    assert.equal(await status(), 'needs_review', '旧计量结论须重新比较，不能自动排除仍需核对的来源')
+    const status = async () => (await rpc(handler, 'fusion/preview', versionRequest(fx.commit))).inventory.sources.find(row => row.experiment_id === id)
+    assert.equal(await status(), undefined)
     write(changeFile, readFileSync(changeFile, 'utf8').replace('compute_variant_decision:\n', 'compute_variant_decision:\n  measurement_schema_version: 2\n'))
     commitFixture(fx.root, 'confirm complete request measurement')
-    assert.equal(await status(), 'excluded')
+    assert.equal(await status(), undefined)
     write(join(fx.root, `evolution/experiments/${id}/candidate/dsh/workspace/later.md`), '确认后新增行为\n')
     commitFixture(fx.root, 'changed candidate requires review')
-    assert.equal(await status(), 'needs_review')
+    assert.equal(await status(), undefined)
   } finally { await rm(fx.root, { recursive: true, force: true }) }
+})
+
+test('身份迁移RPC将存量变体移出当前目录，旧详情跳转事实与Run索引保留原身份', async t => {
+  const { createAgentsHandler } = await loadServer(), fx = fixture()
+  t.after(() => rm(fx.root, { recursive: true, force: true }))
+  const old = 'EXP-test-agent-002', runId = 'run-33333333-3333-4333-8333-333333333333'
+  addVersion(fx.root, old, `status: active\nparent_experiment_id: EXP-test-agent-001\nparent_ref: git:${fx.commit}\nbaseline_ref: git:${fx.commit}\ncompute_variant:\n  strategy: 查询只读状态\n  case_hashes: {U-CASE-001: frozen}\n`)
+  write(join(fx.root, `evolution/experiments/${old}/runs/${runId}/run.yaml`), `run_id: ${runId}\nexperiment_id: ${old}\nagent_id: test-agent\nstatus: failed\n`)
+  const handler = createAgentsHandler(fx.root)
+  const preview = await rpc(handler, 'compute-variants/identity-preview', { experiment_id: old })
+  assert.equal(existsSync(join(fx.root, `evolution/experiments/${preview.current_variant_id}`)), false)
+  const result = await rpc(handler, 'compute-variants/identity-apply', preview.apply_input), current = result.current_variant_id
+  assert.match(current, /^VAR-test-agent-001-r[0-9a-f]{12}$/)
+  const listed = await rpc(handler, 'list')
+  assert.equal(listed.experiments.some(item => item.id === old), false)
+  assert.ok(listed.experiments.some(item => item.id === current && item.is_current))
+  assert.equal(listed.historical_experiments.find(item => item.id === old).current_variant_id, current)
+  const historical = await rpc(handler, 'detail', { agent_id: 'test-agent', experiment_id: old })
+  assert.equal(historical.experiment.id, old)
+  assert.equal(historical.current_variant_id, current); assert.equal(historical.is_current, false)
+  assert.equal(historical.versions.some(item => item.id === old), false)
+  assert.equal(historical.historical_versions.find(item => item.id === old).current_variant_id, current)
+  assert.ok(historical.verification.runs.some(item => item.id === runId))
+  const runs = await rpc(handler, 'runs/index', { agent_id: 'test-agent' })
+  assert.ok(runs.experiments.find(item => item.experiment_id === old).runs.some(item => item.run_id === runId))
+  const fresh = await rpc(handler, 'detail', { agent_id: 'test-agent', experiment_id: current })
+  assert.equal(fresh.is_current, true); assert.equal(fresh.verification.runs.length, 0)
 })
 
 test('特性确认使用嵌套 YAML 唯一来源，Run index 与新 Run 仍能读取，过时草稿不覆盖资产', async () => {
@@ -359,7 +433,7 @@ test('特性确认使用嵌套 YAML 唯一来源，Run index 与新 Run 仍能�
   } finally { await rm(fx.root, { recursive: true, force: true }) }
 })
 
-test('融合盘点使用固定来源图，end 必须用户确认等效和资源证据，去掉可恢复的重复祖先', async () => {
+test('融合盘点使用固定业务版本图，过滤全部变体并去掉可恢复的重复祖先', async () => {
   const { createAgentsHandler } = await loadServer()
   const fx = fixture()
   try {
@@ -380,9 +454,9 @@ test('融合盘点使用固定来源图，end 必须用户确认等效和资源�
     assert.deepEqual(value.inventory.superseded, ['EXP-test-agent-002'])
     assert.equal(value.inventory.sources.find(row => row.experiment_id.endsWith('003')).status, 'recommended')
     assert.equal(value.inventory.sources.find(row => row.experiment_id.endsWith('004')).status, 'excluded')
-    assert.equal(value.inventory.sources.find(row => row.experiment_id.endsWith('005')).status, 'needs_review')
-    assert.equal(value.inventory.sources.find(row => row.experiment_id.endsWith('006')).status, 'needs_review')
-    assert.equal(value.inventory.sources.find(row => row.experiment_id.endsWith('007')).status, 'excluded')
+    assert.equal(value.inventory.sources.some(row => row.experiment_id.endsWith('005')), false)
+    assert.equal(value.inventory.sources.some(row => row.experiment_id.endsWith('006')), false)
+    assert.equal(value.inventory.sources.some(row => row.experiment_id.endsWith('007')), false)
     assert.equal(value.inventory.sources.some(row => row.experiment_id.endsWith('099')), false)
     assert.equal(value.plan_ready, false)
   } finally { await rm(fx.root, { recursive: true, force: true }) }

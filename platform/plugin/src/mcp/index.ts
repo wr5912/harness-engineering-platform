@@ -3,6 +3,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { ConnectionRpcHandler, ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 import { readFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
+import { compositionCodeSource } from './source.ts'
 import { compositionInputSchema, compositionReadonly } from './definition.ts'
 import { compositionConfig, publishCompositionVersion, publishedCompositionService, readCompositions, selectedComposition, versionConfig, writeCompositions } from './compositions.ts'
 import { workspaceConfigPath } from '../workspace.ts'
@@ -215,6 +216,7 @@ export function createMcpHandler(assetRoot: string, options: { stateFile?: strin
         }
       }
       if (endpoint === 'list') return success(await listState(registry, assetRoot, compositionsFile))
+      if (endpoint === 'compositionSource') return success(compositionCodeSource(assetRoot, readCompositions(compositionsFile).catalog, registry.extension, payload, undefined, (await compositionVersion(assetRoot, undefined, registry.extension)).sourceDigest))
       if (endpoint === 'compositionRun' || endpoint === 'compositionArtifact') {
         if (!registry.threat) throw new Error('威胁分析运行器尚未装载')
         const request = payload as any

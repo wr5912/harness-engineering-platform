@@ -40,6 +40,17 @@ test('Run 来源目录保留历史格式并仅接受十二位随机后缀', asyn
   await assert.rejects(() => api.readRunReport(root, runId), error => error.code === 'conflict')
 })
 
+test('VAR Run保留真实目录身份并可读取报告与证据', async t => {
+  const root = mkdtempSync(join(tmpdir(), 'variant-run-files-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const path = `evolution/experiments/VAR-test-agent-001-r123456abcdef/runs/${runId}`
+  write(join(root, path, 'report.md'), '变体报告。')
+  write(join(root, path, 'run.yaml'), `run_id: ${runId}\nstatus: completed\n`)
+  write(join(root, path, 'evidence/U-CASE-001/trace.jsonl'), '{"event":"variant"}\n')
+  assert.deepEqual(await api.readRunReport(root, runId), { path: `${path}/report.md`, content: '变体报告。', present: true })
+  assert.ok((await api.listRunFiles(root, runId)).files.some(row => row.path.endsWith('trace.jsonl')))
+})
+
 test('报告缺失保持可读，动态列出实际归因文件，未封存拒绝完整包', async t => {
   const { root, run } = fixture('running')
   t.after(() => rm(root, { recursive: true, force: true }))

@@ -15,7 +15,7 @@ import { managementSkills } from '../src/assistant/business-assets.ts'
 import { assistantMcp } from '../src/assistant/mcp.ts'
 import { sha256 } from '../src/tasks/files.ts'
 import { assistantActions, assistantActionContract, projectAssistantTools } from '../src/assistant/tool-contracts.ts'
-import { DECISION_EXTRACTION_CONTRACT } from '../src/evaluation/decision-dataset-contract.ts'
+import { DECISION_EXTRACTION_CONTRACT, decisionExtractionToolParameters } from '../src/evaluation/decision-dataset-contract.ts'
 import { businessCasesSchema } from '../src/agents/business-cases.ts'
 import { workspaceIdentity } from '../src/workspace.ts'
 import { initializeBusinessGateway } from '../src/business-control/configuration.ts'
@@ -56,6 +56,7 @@ function fixture(t, responder, root) {
     cancel() { return { accepted: true } },
   }
   const services = { controller, skills, projections: ctx.sessionProjections, systemPrompt: ctx.systemPrompt,
+    async sessionEvents(id) { return [...(sessions.get(id)?.events ?? [])] },
     record(session, type, data) { appendPluginRecord(session, type, data) }, notify() {} }
   const platform = async (endpoint, input, signal, peer) => {
     calls.push({ endpoint, input })
@@ -976,6 +977,27 @@ test('变体改名经原生权限后调用唯一名称接口，不自动修改�
   }
 })
 
+test('普通管理助手可预览并执行身份迁移及只读生成源码，不增加人工确认门槛', async t => {
+  const digest = 'a'.repeat(64), old = 'EXP-basic-002', current = 'VAR-basic-001-r123456abcdef'
+  const input = { experiment_id: old, expected_preview_sha256: digest }
+  const f = fixture(t, endpoint => endpoint === 'agents/compute-variants/identity-preview'
+    ? { ok: true, value: { current_variant_id: current, preview_sha256: digest, apply_input: input } }
+    : endpoint === 'agents/compute-variants/identity-apply' ? { ok: true, value: { experiment_id: old, current_variant_id: current } } : undefined)
+  const id = (await f.rpc('session', { task: '将已有变体改为VAR当前身份并查看代码' })).value.session_id
+  assert.equal(assistantActionContract('agents', 'compute-variants/identity-preview').input_schema.properties.current_variant_id.type, 'string')
+  assert.equal(assistantActionContract('agents', 'compute-variants/identity-apply').input_schema.properties.expected_preview_sha256.type, 'string')
+  await f.execute(id, 'agents', 'compute-variants/identity-preview', { experiment_id: old, current_variant_id: current })
+  assert.equal((await f.status(id)).proposals.length, 0, '身份预览保持只读')
+  const receipt = await f.execute(id, 'agents', 'compute-variants/identity-apply', input)
+  assert.equal(receipt.state, 'completed')
+  const calls = f.calls.filter(call => call.endpoint === 'agents/compute-variants/identity-apply')
+  assert.equal(calls.length, 1); assert.deepEqual(calls[0].input, input)
+  assert.equal(calls[0].input.confirmed, undefined); assert.equal(calls[0].input.human_confirmed, undefined)
+  await f.execute(id, 'agents', 'compute-variants/source', { experiment_id: current })
+  await f.execute(id, 'mcp', 'compositionSource', { selection: { id: 'query-assets', version: 'published' } })
+  assert.equal((await f.status(id)).proposals.length, 1, '两个源码查询不产生写操作')
+})
+
 test('算力变体预览失败或确认时配置已变，助手不宣称创建完成', async t => {
   let invalidPreview = true
   const f = fixture(t, endpoint => endpoint === 'agents/compute-variants/preview'
@@ -1375,6 +1397,145 @@ test('逐题抽样仅适配模型工具入口，固定Run与原公开source和�
   assert.deepEqual((await f.execute(general, 'agents', 'datasets/source', { run_id })).result.value.extraction_contract, DECISION_EXTRACTION_CONTRACT)
 })
 
+test('抽样正文分片不重复合同或目录，专项保留服务器来源身份及续读摘要', async t => {
+  const run_id = 'run-11111111-1111-4111-8111-111111111111'
+  const fragment = { kind: 'decision_fragment', agent_id: 'alpha', experiment_id: 'EXP-alpha-001-r0123456789ab', run_id,
+    path: 'evidence/U-BASIC-001/trace.jsonl', source_sha256: 'a'.repeat(64), decision_id: 'decision-real',
+    content_sha256: 'b'.repeat(64), cursor: 0, next_cursor: 4000, complete: false, fragment: '{"state":"Authorization: Bearer [REDACTED]"' }
+  const f = fixture(t, endpoint => endpoint === 'agents/datasets/source' ? { ok: true, value: fragment } : undefined)
+  const id = (await f.rpc('session', { task: '读取完整决策', context: { skill: 'decision-sample-extraction', run_id } })).value.session_id
+  const value = (await f.execute(id, 'agents', 'datasets/source', { path: fragment.path, source_sha256: fragment.source_sha256, decision_id: fragment.decision_id, cursor: 0 })).result.value
+  assert.deepEqual(value, fragment)
+  assert.equal(value.extraction_contract, undefined)
+  assert.equal(value.files, undefined)
+  const parameters = decisionExtractionToolParameters(['datasets/source'])
+  assert.equal(parameters.properties.input.properties.content_sha256.type, 'string')
+  assert.equal(parameters.properties.input.properties.source_identity_sha256.type, 'string')
+  assert.equal(parameters.properties.input.properties.limit.type, 'integer')
+})
+
+test('大样本自动保存仍按全文回读校验，原生模型输出只投影保存身份且不再次溢出', async t => {
+  const run_id = 'run-11111111-1111-4111-8111-111111111111', dataset_id = 'decision-dataset-33333333-3333-4333-8333-333333333333'
+  const records = [{ state: { messages: [{ role: 'user', content: '完整决策前缀'.repeat(9000) }] }, questions: { route: { type: 'noul', instructions: '材料是否足够？' } },
+    targets: { route: { label: true, status: 'suggested' } }, _meta: { id: 'decision-source-record', decision_id: 'source-cutoff' } }]
+  let reads = 0, writes = 0
+  const dataset = { schema_version: 2, id: dataset_id, agent_id: 'alpha', experiment_id: 'EXP-alpha-001-r0123456789ab', run_id, path: 'trace.jsonl', source_sha256: 'a'.repeat(64), records }
+  const f = fixture(t, endpoint => {
+    if (endpoint === 'agents/datasets/preview') return { ok: true, value: { preview_id: 'large-preview', run_id, records, count: 1, file: `evolution/datasets/${dataset_id}.json` } }
+    if (endpoint === 'agents/datasets/apply') { writes++; return { ok: true, value: { dataset } } }
+    if (endpoint === 'agents/datasets/read') { reads++; return { ok: true, value: { dataset, sha256: 'saved-dataset-sha', eligibility: { counts: { candidates: 1, training: 0 }, records: [{ record_id: 'decision-source-record' }] } } } }
+  })
+  const id = (await f.rpc('session', { task: '保存完整前缀', context: { skill: 'decision-sample-extraction', run_id } })).value.session_id
+  const result = await f.execute(id, 'agents', 'datasets/preview', { samples: [] })
+  assert.equal(result.state, 'completed'); assert.equal(writes, 1); assert.equal(reads, 1)
+  assert.deepEqual(result.result.value.dataset.records, records, '自动保存与回读保留全文')
+  const output = f.tools.get('platform_agents').output
+  const rendered = JSON.parse(output.render({ action: 'datasets/preview' }, result)[0].text)
+  assert.ok(JSON.stringify(rendered).length < 12000)
+  assert.equal(rendered.result.value.dataset.records[0]._meta.id, 'decision-source-record')
+  assert.equal(rendered.result.value.dataset.records[0]._meta.decision_id, 'source-cutoff')
+  assert.equal(rendered.result.value.dataset.records[0].state, undefined)
+  assert.equal(rendered.result.value.dataset.experiment_id, dataset.experiment_id)
+  assert.equal(rendered.result.value.sha256, 'saved-dataset-sha')
+  assert.deepEqual(rendered.result.value.eligibility.counts, { candidates: 1, training: 0 })
+  assert.match(rendered.result.value.model_projection, /完整样本已保存.*回读核对/)
+  assert.equal(output.presentationMeta({ action: 'datasets/preview' }, result).result.value.dataset.records[0].state, undefined)
+})
+
+function reviewDataset(state = { messages: [{ role: 'user', content: '人工合成的决策前任务' }], available_tools: [] }) {
+  const dataset = { id: 'synthetic-dataset', run_id: 'synthetic-run', path: 'evidence/U-1/trace.jsonl', source_sha256: 'a'.repeat(64), source_bundle: { sha256: 'b'.repeat(64) }, extractor: { session_id: 'extractor' } }
+  dataset.records = [{ state, workflow: '流程', task: { id: 'route', semantics: 'recommended_decision' }, questions: { route: { type: 'noul' } }, targets: { route: { label: true } },
+    _meta: { id: 'record-1', decision_id: 'cutoff-1', run_id: dataset.run_id, trace_path: dataset.path, trace_sha256: dataset.source_sha256 } }]
+  return dataset
+}
+function nativeReadResult(session, callId, action, input, value) {
+  session.append('tool/call', { callId, name: 'platform_agents', arguments: { action, input } })
+  session.append('tool/result', { message: { id: `${callId}-result`, role: 'tool', toolCallId: callId, isError: false, source: { kind: 'tool', callId }, content: [{ type: 'text', text: JSON.stringify({ domain: 'agents', action, state: 'completed', result: { ok: true, value } }) }] } }, { surfaceOp: 'append' })
+}
+
+test('普通管理助手受托复核注入真实会话模型及阅读证明，抽取专项不能调用', async t => {
+  const dataset = reviewDataset(), f = fixture(t, endpoint => endpoint === 'agents/datasets/read' ? { ok: true, value: { dataset } } : undefined)
+  const id = (await f.rpc('session', { task: '按授权复核候选，仅功能验证' })).value.session_id
+  const session = f.sessions.get(id).session
+  session.append('request/header', { header: { config: { provider: 'fixture', model: 'reviewer', reasoningEffort: 'high' } }, reason: 'initial' })
+  const input = { dataset_id: dataset.id, expected_sha256: 'a'.repeat(64), record_id: 'record-1', workflow: '合成流程',
+    task: { id: 'route', semantics: 'recommended_decision' }, questions: { route: { type: 'noul', instructions: '是否继续？' } },
+    targets: { route: { label: true, basis: '合成依据', status: 'reviewed', decision_time_reviewed: true } }, group_id: 'synthetic-group', split: 'unassigned',
+    assistant_session_id: 'forged-session', assistant_model: { provider: 'forged', model: 'forged' }, assistant_input_evidence: { session_id: 'forged' } }
+  await assert.rejects(() => f.execute(id, 'agents', 'datasets/review', input), /尚未完整读取/)
+  assert.equal(f.calls.some(call => call.endpoint === 'agents/datasets/review'), false, '内部读取不能冒充模型已阅读')
+  nativeReadResult(session, 'synthetic-complete-read', 'datasets/read', { dataset_id: dataset.id }, { dataset })
+  await assert.rejects(() => f.execute(id, 'agents', 'datasets/review', input), /尚未完整读取/, '同一步生成的复核参数尚未看到新读取')
+  session.append('step/start', { id: 'synthetic-review-step' })
+  assert.equal((await f.execute(id, 'agents', 'datasets/review', input)).state, 'completed')
+  const sent = f.calls.find(call => call.endpoint === 'agents/datasets/review').input
+  assert.equal(sent.assistant_session_id, id)
+  assert.deepEqual(sent.assistant_model, { provider: 'fixture', model: 'reviewer', reasoningEffort: 'high' })
+  assert.equal(sent.assistant_input_evidence.session_id, id)
+  assert.equal(sent.assistant_input_evidence.state_sha256, sha256(JSON.stringify(dataset.records[0].state)))
+  assert.equal(sent.assistant_input_evidence.receipt_refs[0].call_id, 'synthetic-complete-read')
+  const contract = assistantActionContract('agents', 'datasets/review')
+  assert.equal(contract.input_schema.properties.targets.type, 'object')
+  assert.equal(contract.input_schema.properties.assistant_session_id, undefined)
+  assert.match(contract.instructions, /AI 委托.*functional_validation/)
+  const scoped = (await f.rpc('session', { task: '抽取候选', context: { skill: 'decision-sample-extraction', run_id: 'run-fixed' } })).value.session_id
+  await assert.rejects(() => f.execute(scoped, 'agents', 'datasets/review', input), /仅允许/)
+  assert.equal(f.calls.filter(call => call.endpoint === 'agents/datasets/review').length, 1)
+})
+
+test('大样本read及review保留监督和身份，仅模型投影省略state并提供完整来源续读入口', async t => {
+  const state = { messages: [{ role: 'user', content: '真实决策前材料'.repeat(9000) }], available_tools: [] }
+  const dataset = reviewDataset(state)
+  const f = fixture(t, endpoint => ['agents/datasets/read', 'agents/datasets/review'].includes(endpoint) ? { ok: true, value: { dataset, sha256: 'actual-read-sha', eligibility: { counts: { training: 0 } } } } : undefined)
+  const id = (await f.rpc('session', { task: '读取再复核' })).value.session_id
+  const session = f.sessions.get(id).session
+  session.append('step/start', { id: 'synthetic-source-read-step' })
+  const content = JSON.stringify({ run_id: dataset.run_id, decision_id: 'cutoff-1', state }), contentHash = sha256(content), identity = 'c'.repeat(64)
+  for (let cursor = 0; cursor < content.length; cursor += 4000) {
+    const end = Math.min(cursor + 4000, content.length)
+    nativeReadResult(session, `synthetic-fragment-${cursor}`, 'datasets/source', { run_id: dataset.run_id, path: dataset.path, decision_id: 'cutoff-1', cursor, limit: 4000,
+      source_sha256: dataset.source_sha256, source_identity_sha256: identity, content_sha256: contentHash },
+    { kind: 'decision_fragment', run_id: dataset.run_id, path: dataset.path, decision_id: 'cutoff-1', source_sha256: dataset.source_sha256, source_identity_sha256: identity,
+      content_sha256: contentHash, fragment: content.slice(cursor, end), total_characters: content.length, cursor, next_cursor: end < content.length ? end : null, complete: end === content.length })
+  }
+  session.append('step/start', { id: 'synthetic-after-source-read-step' })
+  for (const action of ['datasets/read', 'datasets/review']) {
+    const result = await f.execute(id, 'agents', action, { dataset_id: dataset.id, record_id: 'record-1' })
+    assert.deepEqual(result.result.value.dataset.records[0].state, state, '实际持久操作回执保留全文')
+    const output = f.tools.get('platform_agents').output
+    const rendered = JSON.parse(output.render({ action }, result)[0].text).result.value
+    assert.ok(JSON.stringify(rendered).length < 12000)
+    assert.equal(rendered.sha256, 'actual-read-sha')
+    assert.deepEqual(rendered.dataset.records[0].questions, dataset.records[0].questions)
+    assert.deepEqual(rendered.dataset.records[0].targets, dataset.records[0].targets)
+    assert.equal(rendered.dataset.records[0].state, undefined)
+    assert.equal(rendered.dataset.records[0].state_sha256, sha256(JSON.stringify(state)))
+    assert.deepEqual(rendered.dataset.records[0].read_input, { run_id: dataset.run_id, path: dataset.path, decision_id: 'cutoff-1', cursor: 0, limit: 4000 })
+    assert.match(rendered.model_projection, /不代表已经读取或核对完整输入/)
+    assert.equal(output.presentationMeta({ action }, result).result.value.dataset.records[0].state, undefined)
+  }
+})
+
+test('普通大样本apply只报告实际保存成功，不冒称专项全文回读已完成', async t => {
+  const dataset = { id: 'decision-dataset-33333333-3333-4333-8333-333333333333', run_id: 'run-11111111-1111-4111-8111-111111111111',
+    records: [{ state: { messages: [{ role: 'user', content: '原始状态'.repeat(9000) }] }, questions: { route: { type: 'noul' } }, _meta: { id: 'ordinary-record', decision_id: 'ordinary-decision' } }] }
+  let writes = 0, reads = 0
+  const f = fixture(t, endpoint => {
+    if (endpoint === 'agents/datasets/apply') { writes++; return { ok: true, value: { dataset, sha256: 'ordinary-saved-sha' } } }
+    if (endpoint === 'agents/datasets/read') { reads++; assert.fail('普通apply不应为文案补造回读') }
+  })
+  const id = (await f.rpc('session', { task: '保存已预览批次' })).value.session_id
+  const result = await f.execute(id, 'agents', 'datasets/apply', { preview_id: 'ordinary-preview', assistant_session_id: id })
+  assert.equal(result.state, 'completed'); assert.equal(writes, 1); assert.equal(reads, 0)
+  const output = f.tools.get('platform_agents').output
+  const rendered = JSON.parse(output.render({ action: 'datasets/apply' }, result)[0].text)
+  assert.equal(rendered.result.value.dataset.records[0]._meta.id, 'ordinary-record')
+  assert.equal(rendered.result.value.sha256, 'ordinary-saved-sha')
+  assert.match(rendered.result.value.model_projection, /保存接口返回成功.*不代表另行全文回读核对/)
+  assert.doesNotMatch(rendered.result.value.model_projection, /已保存并按完整内容回读核对/)
+  assert.equal(output.presentationMeta({ action: 'datasets/apply' }, result).result.value.model_projection, rendered.result.value.model_projection)
+})
+
 test('显式切换固定目标后，旧自动保存只读核实不能代替新目标预览', async t => {
   for (const dataset of [false, true]) for (const readable of [false, true]) await t.test(`${dataset ? '跨Run' : '跨Experiment'}：旧回执${readable ? '可核实' : '仍未知'}`, async t => {
     const oldId = dataset ? 'run-11111111-1111-4111-8111-111111111111' : 'EXP-basic-001'
@@ -1535,4 +1696,17 @@ test('文档变量引用在工具与呈现中保留原文，凭据启发式脱�
   const presentation = f.tools.get('platform_agents').output.presentationMeta({ action: 'documents/read', input: { path: 'guide.txt' } }, receipt)
   assert.equal(presentation.result.value.blocks[0].text, technical)
   assert.equal(presentation.result.value.blocks[1].redacted, true)
+})
+
+
+test('普通管理上下文提供当前真实复核主体，冷恢复保持原生模型事实且不泄露配置凭据', async t => {
+  const f = fixture(t)
+  const id = (await f.rpc('session', { task: '端到端IR功能复核', context: { assistant: { session_id: 'forged', model: 'forged' } } })).value.session_id
+  assert.deepEqual((await f.execute(id, 'agents', 'context')).value.assistant, { session_id: id, model: null })
+  const model = { provider: 'fixture', model: 'actual-reviewer', reasoningEffort: 'high' }
+  f.sessions.get(id).session.append('request/header', { header: { config: { ...model, apiKey: 'fixture-private-key' } }, reason: 'initial' })
+  await f.reload()
+  const value = (await f.execute(id, 'agents', 'context')).value
+  assert.deepEqual(value.assistant, { session_id: id, model })
+  assert.equal(JSON.stringify(value).includes('fixture-private-key'), false)
 })

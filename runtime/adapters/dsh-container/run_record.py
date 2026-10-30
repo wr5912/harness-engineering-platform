@@ -728,7 +728,7 @@ def run_index_facts(run_dir: Path, manifest: dict) -> dict:
 def agent_experiments(repo: Path, agent: str, errors: list[dict] | None = None) -> list[dict]:
     errors = errors if errors is not None else []
     experiments = []
-    for root in sorted((repo / "evolution/experiments").glob(f"EXP-{agent}-*")):
+    for root in sorted((repo / "evolution/experiments").glob("*")):
         match = EXPERIMENT_RE.fullmatch(root.name)
         if not root.is_dir() or root.is_symlink() or not match or match.group(1) != agent:
             continue

@@ -505,6 +505,23 @@ class RepositoryValidatorTests(unittest.TestCase):
 
 
 class ResearchEvalTests(unittest.TestCase):
+    def test_variant_declaration_and_repository_load_share_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            identity = "VAR-example-agent-001-r0123456789ab"
+            experiment = write_minimal_experiment(root, experiment_id=identity)
+            completed, payload = run_json(VALIDATE_EXPERIMENT, experiment)
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertEqual(error_codes(payload), {"COMPUTE_VARIANT"})
+            change = experiment / "change.yaml"
+            change.write_text(change.read_text() + "compute_variant: {kind: medium}\n", encoding="utf-8")
+            (root / "agents/example-agent/manifest.yaml").write_text(f"agent_id: example-agent\nactive_experiment: {identity}\n")
+            (root / "workspace.json").write_text('{"schemaVersion":1,"id":"workspace-fixture"}')
+            (root / "config").mkdir()
+            (root / "config/sources.json").write_text('{"schema_version":"1.1","sources":{}}')
+            completed, payload = run_json(VALIDATE_REPOSITORY, root)
+            self.assertEqual(completed.returncode, 0, payload)
+
     def test_new_unsuffixed_experiment_is_rejected_even_after_git_commit(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             repository = Path(temp)
@@ -725,6 +742,23 @@ class ResearchEvalTests(unittest.TestCase):
 
 
 class RunRecordTests(unittest.TestCase):
+    def test_run_index_includes_exp_and_var_for_only_the_requested_agent(self) -> None:
+        spec = importlib.util.spec_from_file_location("variant_run_index", RUN_RECORD)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for identity in ("EXP-example-agent-001-r0123456789ab", "VAR-example-agent-002-r0123456789ab",
+                             "VAR-other-agent-001-r0123456789ab", "VAR-example-agent-child-001-r0123456789ab"):
+                experiment = root / "evolution/experiments" / identity
+                experiment.mkdir(parents=True)
+                (experiment / "change.yaml").write_text("status: active\ncompute_variant: {kind: medium}\n")
+            escaped = root / "evolution/experiments/VAR-example-agent-003-r0123456789ab"
+            escaped.symlink_to(root / "evolution/experiments/VAR-other-agent-001-r0123456789ab", target_is_directory=True)
+            rows = module.agent_experiments(root, "example-agent")
+            self.assertEqual([row["experiment_id"] for row in rows],
+                             ["EXP-example-agent-001-r0123456789ab", "VAR-example-agent-002-r0123456789ab"])
+
     def test_finalization_detects_evaluator_implementation_change(self) -> None:
         spec = importlib.util.spec_from_file_location("run_record_implementation_test", RUN_RECORD)
         module = importlib.util.module_from_spec(spec)

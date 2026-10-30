@@ -238,3 +238,13 @@ test('MCP 工作区仅保留四个工具页签，统一网关使用顶部一级�
   assert.equal(ui.button('工具组合编排').props['aria-current'], 'page')
   assert.equal(ui.nodes().some(node => node.type?.name === 'BusinessControlPage'), false)
 })
+
+test('智能体资产深链保留完整相对路径，仅资产页接收且拒绝越界段', () => {
+  const target = { page: 'agents', agent_id: 'security-operations-expert', experiment_id: 'VAR-security-operations-expert-001-r123456789abc', tab: 'assets', asset_path: 'evolution/experiments/VAR-security-operations-expert-001-r123456789abc/candidate/dsh/managed/compute-workflow/index.ts' }
+  assert.deepEqual(readNavigation(navigationHash(target)), target)
+  for (const path of ['../outside', '/outside', 'candidate/../secret', 'candidate\\secret', 'candidate//index.ts']) {
+    assert.equal(readNavigation('#/agents?tab=assets&asset_path=' + encodeURIComponent(path)).asset_path, undefined)
+  }
+  assert.equal(readNavigation('#/agents?tab=overview&asset_path=candidate%2Findex.ts').asset_path, undefined)
+  assert.equal(navigationHash({ ...target, tab: 'overview' }).includes('asset_path'), false)
+})

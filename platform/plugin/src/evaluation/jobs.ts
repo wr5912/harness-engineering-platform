@@ -1,3 +1,4 @@
+import { VERSION_ID } from '../version-id.ts'
 import { spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, writeFileSync } from 'node:fs'
@@ -99,7 +100,7 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
     if (!existsSync(experiments)) return undefined
     const selected = job.source.startsWith('experiment:') ? [job.source.slice('experiment:'.length)] : readdirSync(experiments)
     for (const experiment of selected) {
-      if (!/^EXP-[a-z0-9-]+-\d{3}(?:-r[0-9a-f]{12})?$/.test(experiment)) continue
+      if (!VERSION_ID.test(experiment)) continue
       const runs = join(experiments, experiment, 'runs')
       if (!existsSync(runs)) continue
       for (const name of job.run_id ? [job.run_id] : readdirSync(runs)) {
