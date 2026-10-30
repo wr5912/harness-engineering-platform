@@ -2027,6 +2027,48 @@ class UpPortOwnershipTest(unittest.TestCase):
         self.assertEqual(args.port, 3090)
         probe.assert_not_called()
 
+    def test_pending_business_start_restores_recorded_modes_and_preserves_session_home(self):
+        home = dev.STATE_ROOT / "probe/dsh-home"
+        home.mkdir(parents=True)
+        session = home / "session.v4.jsonl"
+        session.write_text("retained-session-bytes", encoding="utf-8")
+        self.write_existing(business_control={"runtime_generation": "generation", "access_mode": "anonymous", "identity_mode": "development"}, home_directory=str(home))
+        helper = mock.Mock(return_value={"assetRoot": str(dev.REPO), "sourceDigest": "sha256:fixed", "development": True, "accessMode": "anonymous", "registered": False})
+        with mock.patch.object(dev, "resolve", return_value=self.contract()), mock.patch.object(dev, "business_helper", helper):
+            contract, current = dev.prepare_up(self.args(business_control="/fixture/launch.json"))
+        self.assertIsNotNone(current)
+        self.assertEqual(helper.call_args.args[1]["startupModes"], {"access_mode": "anonymous", "identity_mode": "development"})
+        self.assertEqual(contract["business_control"]["access_mode"], "anonymous")
+        self.assertEqual(contract["business_control"]["identity_mode"], "development")
+        self.assertEqual(session.read_text(encoding="utf-8"), "retained-session-bytes")
+
+    def test_legacy_unregistered_business_requires_explicit_modes_and_no_home_files(self):
+        home = dev.STATE_ROOT / "probe/dsh-home/profiles/web"
+        home.mkdir(parents=True)
+        self.write_existing(business_control={"runtime_generation": "generation"}, home_directory=str(home.parents[1]))
+        helper = mock.Mock(return_value={"assetRoot": str(dev.REPO), "sourceDigest": "sha256:fixed", "development": True, "accessMode": "anonymous", "registered": False})
+        with mock.patch.object(dev, "resolve", return_value=self.contract()), mock.patch.object(dev, "business_helper", helper):
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                dev.prepare_up(self.args(business_control="/fixture/launch.json"))
+            contract, _ = dev.prepare_up(self.args(business_control="/fixture/launch.json", business_access_mode="anonymous", business_identity_mode="development"))
+            self.assertEqual(contract["business_control"]["access_mode"], "anonymous")
+            retained = home / "retained-session.json"
+            retained.write_text("do-not-expose-or-replace", encoding="utf-8")
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                dev.prepare_up(self.args(business_control="/fixture/launch.json", business_access_mode="anonymous", business_identity_mode="development"))
+            self.assertEqual(retained.read_text(encoding="utf-8"), "do-not-expose-or-replace")
+            for kind in ("file", "symlink"):
+                name = "invalid-home-" + kind
+                invalid = dev.STATE_ROOT / name / "dsh-home"
+                self.write_existing(name=name, business_control={"runtime_generation": "generation"}, home_directory=str(invalid))
+                if kind == "file":
+                    invalid.write_text("retained-home-file", encoding="utf-8")
+                else:
+                    invalid.symlink_to(self._managed, target_is_directory=True)
+                with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                    dev.prepare_up(self.args(name=name, business_control="/fixture/launch.json", business_access_mode="anonymous", business_identity_mode="development"))
+                self.assertTrue(invalid.is_symlink() if kind == "symlink" else invalid.read_text(encoding="utf-8") == "retained-home-file")
+
     def test_direct_start_rejects_unprojected_business_default_before_port_selection(self):
         selected = {"provider": "xiaomi-token-plan-cn", "model": "MiMo-V2.6-Flash"}
         policy = dev._model_policy({"agent_id": "security-operations-expert", "allowed": [selected],
@@ -2413,7 +2455,10 @@ from unittest import mock
 adapter, directory, name, port = sys.argv[1:]
 spec = importlib.util.spec_from_loader('startup_probe', SourceFileLoader('startup_probe', str(Path(adapter) / 'dsh-dev')))
 dev = importlib.util.module_from_spec(spec); spec.loader.exec_module(dev)
-base = Path(directory); dev.STATE_ROOT = base / name / 'instances'
+base = Path(directory); dev.REPO = base / name; dev.REPO.mkdir()
+dev.STATE_ROOT = dev.REPO / 'instances'
+(dev.REPO / 'config').mkdir()
+(dev.REPO / 'config/sites.json').write_text(json.dumps({'assistant':'/assistant/'}))
 dev.STARTUP_LOCK = base / 'startup.lock'; dev.AUTO_PORT_START = int(port); dev.AUTO_PORT_END = int(port) + 1
 contract = {'source_id':'experiment:EXP-fixture-001','source_kind':'experiment','agent_id':'fixture',
  'preset_id':'fixture','workspace':'/tmp/ws','presets':'/tmp/presets','managed':'/tmp/managed',

@@ -1685,8 +1685,6 @@ def prepare_up(args: argparse.Namespace) -> tuple[dict, tuple[Path, dict] | None
     args.name = args.name or f"{contract['agent_id']}-{PURPOSES[args.mode]}"
     current = existing_instance(args.name)
     if current is not None:
-        if access_mode or identity_mode:
-            fail("既有实例沿用网关登记的访问方式和身份阶段，不能通过启动参数更改")
         _, manifest = current
         validate_existing_identity(args.name, manifest, contract, args.mode, args.analysis_workspace)
     if args.analysis_workspace:
@@ -1715,20 +1713,29 @@ def prepare_up(args: argparse.Namespace) -> tuple[dict, tuple[Path, dict] | None
         fail("不能在既有实例上切换业务控制边界；请使用新实例名和独立 HOME")
     if business_file:
         home = instance_dir(args.name) / "dsh-home"
+        previous_modes = {key: current[1]["business_control"].get(key) for key in ("access_mode", "identity_mode")} if current else {}
+        recorded_modes = previous_modes if current and any(key in current[1]["business_control"] for key in previous_modes) else None
         launch = business_helper(business_file, {"name": args.name, "agentId": contract["agent_id"],
                                                **({"identityMode": identity_mode} if identity_mode else {}),
+                                               **({"accessMode": access_mode} if access_mode else {}),
+                                               **({"startupModes": recorded_modes} if recorded_modes else {}),
                                                "sourcePaths": {key: contract[key] for key in ("workspace", "presets", "managed")}})
         if launch["assetRoot"] != str(REPO):
             fail("业务启动配置的数据根必须与当前 --repo 一致")
         development = identity_mode == "development" if identity_mode else launch.get("development")
         anonymous = access_mode == "anonymous" if access_mode else launch.get("accessMode") == "anonymous"
+        if current and not launch.get("registered") and not recorded_modes:
+            # 旧失败启动可能只留下 mkdir 的空父目录；已有 HOME 内容不能按默认模式恢复。
+            if not access_mode or not identity_mode or home.is_symlink() or home.exists() and (not home.is_dir() or any(not item.is_dir() or item.is_symlink() for item in home.rglob("*"))):
+                fail("此未登记实例缺少原创建模式；保留 HOME，不能按默认访问方式或身份阶段恢复")
         if current is None and (home.is_symlink() or home.exists() and (not home.is_dir()
                 or any(home.iterdir()) and not (development and anonymous))):
             fail("只有无需认证的开发调试实例可以复用保留的 HOME；认证或发布实例需要新的独立 HOME")
         contract["business_control"] = {
             "config_file": str(Path(business_file).resolve()), "source_digest": launch["sourceDigest"],
             "runtime_generation": (current[1]["business_control"]["runtime_generation"] if current else secrets.token_hex(16)),
-            **({"identity_mode": identity_mode} if identity_mode else {}),
+            "identity_mode": "development" if launch.get("development") else "published",
+            "access_mode": launch["accessMode"],
         }
         if current is not None and current[1]["business_control"].get("source_digest") != launch["sourceDigest"] and not launch.get("development"):
             fail("业务来源资产与实例固定摘要不一致；保留旧实例及 Session，请以新实例名创建新版本")
@@ -1852,6 +1859,7 @@ def render_business_instance(contract: dict, name: str, port: int, compose: str)
     return business_helper(config["config_file"], {
         "name": name, "agentId": contract["agent_id"], "workspaceId": workspace_id(REPO),
         **({"identityMode": config["identity_mode"]} if config.get("identity_mode") else {}),
+        **({"accessMode": config["access_mode"]} if config.get("access_mode") else {}),
         "sourceDigest": config["source_digest"], "runtimeGeneration": config["runtime_generation"],
         "managedPatch": str(Path(contract["managed"]) / Path(contract["patch"]).relative_to("/opt/dsh-managed")),
         "port": port, "compose": compose, "profileManifest": contract.get("profile_manifest", str(ADAPTER / "verification-home-controls/web-profile.package.json")),
@@ -2347,6 +2355,8 @@ def instance_entry(target: Path, manifest: dict, observation: dict | None = None
         "session_preset": manifest.get("session_preset"),
         "profile": manifest.get("profile", "web"),
         "business_gateway": bool(manifest.get("business_control")),
+        **({key: manifest["business_control"][key] for key in ("access_mode", "identity_mode")
+            if key in manifest["business_control"]} if manifest.get("business_control") else {}),
         "lan_access": bool(manifest.get("lan_access", False)),
         "unsafe_no_auth": bool(manifest.get("unsafe_no_auth", False)),
         "skip_testing_notice": bool(manifest.get("skip_testing_notice", False)),

@@ -354,8 +354,8 @@ async function listInstances(assetRoot: string, signal?: AbortSignal): Promise<{
     state_root: instanceStateRoot(assetRoot),
     instances: (parsed.instances || []).map(instance => ({ observed_at: observedAt, ...instance,
       ...(instance.business_gateway ? {
-        access_mode: gatewayRows.find(row => row.instanceId === instance.name && row.agentId === instance.agent_id)?.accessMode ?? 'authenticated',
-        identity_mode: gatewayRows.find(row => row.instanceId === instance.name && row.agentId === instance.agent_id)?.identityMode ?? 'published',
+        access_mode: gatewayRows.find(row => row.instanceId === instance.name && row.agentId === instance.agent_id)?.accessMode ?? instance.access_mode,
+        identity_mode: gatewayRows.find(row => row.instanceId === instance.name && row.agentId === instance.agent_id)?.identityMode ?? instance.identity_mode,
         access_url: gatewayUrl(instance),
       } : {}) }) as InstanceRecord),
   }
@@ -398,7 +398,7 @@ async function requestForUp(assetRoot: string, request: InstanceActionRequest, r
   if (request.identity_mode && (!businessControl || request.operation !== 'create')) throw new Error('智能体身份验证阶段只能在创建网关实例时选择')
   const registered = (access?.gateway.instances as Record<string, unknown>[] | undefined)
     ?.find(row => row.instanceId === request.name && row.agentId === manifest?.agent_id)
-  const recordedBusiness = manifest?.business_control as { launch_config_file?: unknown; config_file?: unknown } | undefined
+  const recordedBusiness = manifest?.business_control as { launch_config_file?: unknown; config_file?: unknown; access_mode?: string; identity_mode?: string } | undefined
   if (recordedBusiness && typeof recordedBusiness.launch_config_file !== 'string' && typeof recordedBusiness.config_file !== 'string') {
     throw new Error('此旧受控实例未记录启动配置路径；请先核对原启动配置，不自动替换为当前网关配置')
   }
@@ -406,8 +406,8 @@ async function requestForUp(assetRoot: string, request: InstanceActionRequest, r
     ...request, manifest,
     business_control: businessControl,
     ...(businessControl ? {
-      access_mode: request.access_mode ?? (manifest ? registered?.accessMode === 'anonymous' ? 'anonymous' : 'authenticated' : 'anonymous'),
-      identity_mode: request.identity_mode ?? (manifest ? registered?.identityMode === 'development' ? 'development' : 'published' : 'development'),
+      access_mode: request.access_mode ?? (manifest ? (registered?.accessMode ?? recordedBusiness?.access_mode) === 'anonymous' ? 'anonymous' : 'authenticated' : 'anonymous'),
+      identity_mode: request.identity_mode ?? (manifest ? (registered?.identityMode ?? recordedBusiness?.identity_mode) === 'development' ? 'development' : 'published' : 'development'),
     } : {}),
     source: request.source || (manifest ? assertSource(manifest.source_id) : undefined),
     port: request.port ?? optionalPort(manifest?.port),
@@ -542,7 +542,7 @@ async function runOne(assetRoot: string, request: InstanceActionRequest, signal?
           }
           await preflightGatewayRegistration(assetRoot, { agentId, instanceId: name, sourceId: source,
             sourceDigest: request.expected_source_digest,
-            ...(request.operation === 'create' ? { accessMode: prepared.access_mode, identityMode: prepared.identity_mode } : {}) }, false, previousSourceDigest)
+            accessMode: prepared.access_mode, identityMode: prepared.identity_mode }, false, previousSourceDigest)
         }
         const projected = await runUpWithModelPolicy(assetRoot, upArgs(assetRoot, { ...prepared, name, source }), agentId,
           modelPolicy, prepared.model_selection, request.expected_model_policy_hash, registeredModelSnapshot(prepared.manifest), signal)
@@ -556,7 +556,7 @@ async function runOne(assetRoot: string, request: InstanceActionRequest, signal?
               throw new Error('受控实例启动后来源登记与预览不一致')
             }
             await updateGatewayRegistration(assetRoot, { agentId, instanceId: name, sourceId: source, sourceDigest,
-              ...(request.operation === 'create' ? { accessMode: prepared.access_mode, identityMode: prepared.identity_mode } : {}) }, false, previousSourceDigest)
+              accessMode: prepared.access_mode, identityMode: prepared.identity_mode }, false, previousSourceDigest)
             businessGatewayEntry(assetRoot, agentId, name)
           } catch (error) {
             try { await runDsh(assetRoot, ['down', name], signal) }

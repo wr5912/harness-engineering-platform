@@ -63,8 +63,9 @@ const out = value => process.stdout.write(JSON.stringify(value, null, 2) + '\\n'
 if (args[0] === 'ps') {
   const stateRoot = process.env.HARNESS_INSTANCE_STATE_ROOT || (process.env.XDG_STATE_HOME ? require('node:path').join(process.env.XDG_STATE_HOME, 'dsh-dev') : require('node:path').join(process.env.HARNESS_ASSET_ROOT, '.local/instances'))
   const newBusinessFile = require('node:path').join(stateRoot, 'new-business', 'instance.json')
+  const newManifest = require('node:fs').existsSync(newBusinessFile) ? JSON.parse(require('node:fs').readFileSync(newBusinessFile)) : null
   const newBusiness = require('node:fs').existsSync(newBusinessFile)
-    ? [{name:'new-business', state:'running', source_id:'experiment:EXP-real-agent-001', agent_id:'real-agent', port:3199, business_gateway:true}]
+    ? [{name:'new-business', state:require('node:fs').existsSync(require('node:path').join(__dirname,'startup-failed'))?'absent':'running', source_id:'experiment:EXP-real-agent-001', agent_id:'real-agent', port:3199, business_gateway:true,access_mode:newManifest.business_control.access_mode,identity_mode:newManifest.business_control.identity_mode}]
     : []
   out({schema_version:'1.0', instances:[
     {name:'running-one', state:'running', source_id:'experiment:EXP-real-agent-001', source_kind:'experiment', image_tag:'dsh:locked', agent_id:'real-agent', port:3181, home_volume:'home-running', home_preserved:true, container_name:'running-one', observed_at:'2026-10-13T00:00:00.000Z', mounts:{workspace:'/x'}, mount_modes:{workspace:'ro'}},
@@ -83,8 +84,14 @@ if (args[0] === 'ps') {
     if (business) {
       const stateRoot = process.env.HARNESS_INSTANCE_STATE_ROOT || (process.env.XDG_STATE_HOME ? require('node:path').join(process.env.XDG_STATE_HOME, 'dsh-dev') : require('node:path').join(process.env.HARNESS_ASSET_ROOT, '.local/instances'))
       const file = require('node:path').join(stateRoot, name, 'instance.json')
+      const prior = require('node:fs').existsSync(file) ? JSON.parse(require('node:fs').readFileSync(file)).business_control : {}
+      const accessMode = args.includes('--business-access-mode') ? args[args.indexOf('--business-access-mode')+1] : prior.access_mode || 'authenticated'
+      const identityMode = args.includes('--business-identity-mode') ? args[args.indexOf('--business-identity-mode')+1] : prior.identity_mode || 'published'
       require('node:fs').mkdirSync(require('node:path').dirname(file), {recursive:true})
-      require('node:fs').writeFileSync(file, JSON.stringify({name, source_id:source, agent_id:'real-agent', asset_root:process.env.HARNESS_ASSET_ROOT, port:3199, web_base_path:'/agents/real-agent/instances/' + name + '/', business_control:{source_digest:sourceDigest, runtime_generation:'generation-new', origin:'http://127.0.0.1:3199', launch_config_file:args[args.indexOf('--business-control')+1]}}))
+      require('node:fs').writeFileSync(file, JSON.stringify({name, source_id:source, agent_id:'real-agent', asset_root:process.env.HARNESS_ASSET_ROOT, port:3199, web_base_path:'/agents/real-agent/instances/' + name + '/', business_control:{source_digest:sourceDigest, runtime_generation:'generation-new', origin:'http://127.0.0.1:3199',access_mode:accessMode,identity_mode:identityMode,launch_config_file:args[args.indexOf('--business-control')+1]}}))
+      const failure = require('node:path').join(__dirname,'fail-next-start'), failed = require('node:path').join(__dirname,'startup-failed')
+      if(require('node:fs').existsSync(failure)){require('node:fs').unlinkSync(failure);require('node:fs').writeFileSync(failed,'network unavailable');process.stderr.write('network unavailable');process.exit(1)}
+      require('node:fs').rmSync(failed,{force:true})
     }
     process.stdout.write(JSON.stringify({warning:'first'}) + '\\n' + JSON.stringify({name, dsh_running:true, token:'receipt-secret'}) + '\\n'); process.stderr.write(JSON.stringify({hint:'not a receipt'}) + '\\n') }
 } else if (args[0] === 'down') {
@@ -251,6 +258,40 @@ test('业务实例 Web 入口使用已登记网关地址并拒绝地址漂移', 
   assert.match((await request()).error.message, /来源与网关登记不一致/)
   writeFileSync(accessPath, JSON.stringify({ ...access, gateway: { ...access.gateway, instances: [] } }))
   assert.match((await request()).error.message, /实例未向业务网关开放/)
+})
+
+for (const [access_mode, identity_mode] of [['anonymous', 'development'], ['authenticated', 'published']]) test(`首次启动失败后沿原模式恢复并保留HOME：${access_mode}/${identity_mode}`, async t => {
+  const { module, cleanup } = await loadModule(), fx = fixture(), previous = process.env.XDG_STATE_HOME
+  process.env.XDG_STATE_HOME = fx.state
+  t.after(() => { previous === undefined ? delete process.env.XDG_STATE_HOME : process.env.XDG_STATE_HOME = previous; cleanup(); fx.cleanup() })
+  const handler = module.createInstancesHandler(fx.root), signal = new AbortController().signal
+  const item = { operation: 'create', name: 'new-business', source: 'experiment:EXP-real-agent-001', access_mode, identity_mode }
+  const marker = join(fx.root, 'runtime/adapters/dsh-container/fail-next-start')
+  writeFileSync(marker, 'simulate Docker failure after state persistence')
+  const preview = await handler('preview', item, signal)
+  assert.equal(preview.ok, true, JSON.stringify(preview))
+  const failed = await handler('run', { ...item, expected_source_id: item.source, expected_source_digest: preview.value.plan.business_control.source_digest }, signal)
+  assert.equal(failed.value.ok, false)
+  const accessFile = join(fx.root, 'config/business-access.json')
+  assert.equal(JSON.parse(readFileSync(accessFile)).gateway.instances.length, 0, '失败不冒充已登记')
+  const manifest = JSON.parse(readFileSync(join(fx.state, 'dsh-dev/new-business/instance.json')))
+  assert.equal(manifest.business_control.access_mode, access_mode)
+  assert.equal(manifest.business_control.identity_mode, identity_mode)
+  const listed = await handler('list', {}, signal), pending = listed.value.instances.find(row => row.name === item.name)
+  assert.equal(pending.state, 'absent')
+  assert.equal(pending.access_mode, access_mode)
+  assert.equal(pending.identity_mode, identity_mode)
+  const home = join(fx.state, 'dsh-dev/new-business/dsh-home')
+  mkdirSync(home); writeFileSync(join(home, 'session.v4.jsonl'), 'retained-session')
+  const next = { operation: 'start', name: item.name }, retry = await handler('preview', next, signal)
+  assert.equal(retry.value.access_mode, access_mode)
+  assert.equal(retry.value.identity_mode, identity_mode)
+  const resumed = await handler('run', { ...next, expected_source_id: item.source, expected_source_digest: retry.value.plan.business_control.source_digest }, signal)
+  assert.equal(resumed.value.ok, true, JSON.stringify(resumed))
+  const registered = JSON.parse(readFileSync(accessFile)).gateway.instances[0]
+  assert.equal(registered.accessMode, access_mode)
+  assert.equal(registered.identityMode, identity_mode)
+  assert.equal(readFileSync(join(home, 'session.v4.jsonl'), 'utf8'), 'retained-session')
 })
 
 test('平台省略网关参数仍创建匿名开发网关实例，原子登记来源并沿用入口', async t => {

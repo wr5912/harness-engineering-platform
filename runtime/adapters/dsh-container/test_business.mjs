@@ -58,6 +58,32 @@ test('开发模式从数据根登记读取，不依赖启动配置副本', t => 
   }
 })
 
+test('首次启动失败后的创建模式快照可恢复，网关登记始终优先且不同模式不能覆盖', t => {
+  const f = fixture(t), access = join(f.config.assetRoot, 'config/business-access.json')
+  const read = target => JSON.parse(execFileSync(process.execPath, [new URL('./business.ts', import.meta.url).pathname, f.file], { input: JSON.stringify(target), encoding: 'utf8' }))
+  for (const identity_mode of ['development', 'published']) for (const access_mode of ['anonymous', 'authenticated']) {
+    const target = { agentId: f.input.agentId, name: f.input.name, startupModes: { identity_mode, access_mode } }
+    const restored = read(target)
+    assert.equal(restored.registered, false)
+    assert.equal(restored.identityMode, identity_mode)
+    assert.equal(restored.accessMode, access_mode)
+    const rendered = renderBusinessInstance(readBusinessLaunchConfig(f.file, target), { ...f.input, identityMode: identity_mode, accessMode: access_mode })
+    assert.equal(rendered.registration.access_mode, access_mode)
+    assert.equal(rendered.registration.identity_mode, identity_mode)
+    assert.throws(() => readBusinessLaunchConfig(f.file, { ...target, identityMode: identity_mode === 'development' ? 'published' : 'development' }), /身份模式无效/)
+    assert.throws(() => readBusinessLaunchConfig(f.file, { ...target, accessMode: access_mode === 'anonymous' ? 'authenticated' : 'anonymous' }), /访问方式无效/)
+  }
+  const target = { agentId: f.input.agentId, name: f.input.name, startupModes: { identity_mode: 'development', access_mode: 'anonymous' } }
+  assert.throws(() => readBusinessLaunchConfig(f.file, { ...target, startupModes: { identity_mode: 'development' } }), /创建模式快照无效/)
+  writeFileSync(access, JSON.stringify({ schemaVersion: 1, enabled: true, gateway: { instances: [{ agentId: target.agentId, instanceId: target.name, identityMode: 'published', accessMode: 'authenticated' }] } }))
+  const authoritative = read(target)
+  assert.equal(authoritative.registered, true)
+  assert.equal(authoritative.identityMode, 'published')
+  assert.equal(authoritative.accessMode, 'authenticated')
+  assert.equal(read({ ...target, startupModes: { identity_mode: 'development' } }).identityMode, 'published', '已有网关登记不受旧启动快照缺失字段干扰')
+  assert.throws(() => readBusinessLaunchConfig(f.file, { ...target, accessMode: 'anonymous' }), /访问方式无效/)
+})
+
 test('开发实例两种访问方式均无需签名文件和挂载，混合登记仍只核对当前实例', t => {
   const f = fixture(t), file = join(f.config.assetRoot, 'config/business-access.json')
   rmSync(f.config.sharedSecretFile)

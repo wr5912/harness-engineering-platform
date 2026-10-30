@@ -27,8 +27,14 @@ export interface BusinessLaunchConfig {
 export interface BusinessRenderInput {
   name: string; agentId: string; workspaceId: string; sourceDigest: string; runtimeGeneration?: string
   identityMode?: 'development' | 'published'
+  accessMode?: 'anonymous' | 'authenticated'
   port: number; compose: string; profileManifest: string; basePath: string; presetId?: string; workspacePath?: string; runtimeSettings?: string; managedPatch?: string
   sourcePaths?: { managed: string }
+}
+
+interface BusinessTarget {
+  agentId: string; name: string; identityMode?: 'development' | 'published'; accessMode?: 'anonymous' | 'authenticated'
+  startupModes?: { identity_mode: 'development' | 'published'; access_mode: 'anonymous' | 'authenticated' }
 }
 
 interface LocalModelRoute { provider: string; model: string }
@@ -72,7 +78,7 @@ export function businessSourceDigest(paths: Record<string, string>): string {
 }
 
 /** 启动配置只定位程序、事实源和受信通道，不复制授权规则或连接清单。 */
-export function readBusinessLaunchConfig(file: string, target?: { agentId: string; name: string; identityMode?: 'development' | 'published' }): BusinessLaunchConfig {
+export function readBusinessLaunchConfig(file: string, target?: BusinessTarget): BusinessLaunchConfig {
   const saved = JSON.parse(readFileSync(file, 'utf8')) as BusinessLaunchConfig & { gateway?: { publicOrigin?: string; sharedSecretFile?: string } }
   // 平台以业务访问配置作为唯一可编辑来源；历史独立 launch 文件仍可用于既有实例。
   const assetRoot = dirname(dirname(file)), secretFile = saved.gateway?.sharedSecretFile
@@ -100,13 +106,23 @@ export function readBusinessLaunchConfig(file: string, target?: { agentId: strin
   return { ...config, pluginRoot }
 }
 
-function isDevelopmentLaunch(access: any, target?: { agentId: string; name: string; identityMode?: string }): boolean {
+function businessLaunchModes(access: any, target?: BusinessTarget) {
   const selected = access.gateway?.instances?.find((item: any) => item.agentId === target?.agentId && item.instanceId === target?.name)
-  if ([selected?.identityMode, target?.identityMode].some(mode => mode !== undefined && !['development', 'published'].includes(mode))
-    || selected && target?.identityMode && (selected.identityMode ?? 'published') !== target.identityMode) throw new Error('业务实例身份模式无效')
-  // 新建实例在启动成功后登记；已有登记始终优先，不能用启动参数切换阶段。
-  return (selected ? selected.identityMode : target?.identityMode) === 'development'
+  if (!selected && target?.startupModes && (!['development', 'published'].includes(target.startupModes.identity_mode)
+    || !['anonymous', 'authenticated'].includes(target.startupModes.access_mode))) throw new Error('业务实例创建模式快照无效')
+  // 网关是当前事实源；首次启动尚未登记时，沿用持久化的创建选择。
+  const previous = selected ? { identityMode: selected.identityMode ?? 'published', accessMode: selected.accessMode ?? 'authenticated' }
+    : target?.startupModes ? { identityMode: target.startupModes.identity_mode, accessMode: target.startupModes.access_mode } : undefined
+  if ([previous?.identityMode, target?.identityMode].some(mode => mode !== undefined && !['development', 'published'].includes(mode))
+    || previous && target?.identityMode && previous.identityMode !== target.identityMode) throw new Error('业务实例身份模式无效')
+  if ([previous?.accessMode, target?.accessMode].some(mode => mode !== undefined && !['anonymous', 'authenticated'].includes(mode))
+    || previous && target?.accessMode && previous.accessMode !== target.accessMode) throw new Error('业务实例访问方式无效')
+  const identityMode = previous?.identityMode ?? target?.identityMode ?? 'published'
+  return { registered: Boolean(selected), development: identityMode === 'development', identityMode,
+    accessMode: previous?.accessMode ?? target?.accessMode ?? 'authenticated' }
 }
+
+function isDevelopmentLaunch(access: any, target?: BusinessTarget): boolean { return businessLaunchModes(access, target).development }
 
 function validateSigningKey(config: BusinessLaunchConfig): void {
   const path = config.sharedSecretFile
@@ -212,6 +228,7 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
   )
   return { compose: yaml.dump(compose, { lineWidth: -1, noRefs: true }), patch: yaml.dump(patch, { lineWidth: -1, noRefs: true, schema: patchSchema }),
     registration: { runtime_generation: runtimeGeneration, source_digest: input.sourceDigest,
+      access_mode: businessLaunchModes(access, input).accessMode, identity_mode: development ? 'development' : 'published',
       origin: `http://127.0.0.1:${input.port}`, scheduling_supported: true },
     runtimeConfig, localModelRoutes: capabilities.localModelRoutes }
 }
@@ -237,17 +254,18 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const text = readFileSync(0, 'utf8').trim(), input = text ? JSON.parse(text) : undefined
     const config = readBusinessLaunchConfig(resolve(process.argv[2]!), input)
     const access = JSON.parse(readFileSync(join(config.assetRoot, 'config/business-access.json'), 'utf8'))
-    const selected = access.gateway?.instances?.find((row: any) => row.agentId === input?.agentId && row.instanceId === input?.name)
-    const development = isDevelopmentLaunch(access, input)
+    const modes = businessLaunchModes(access, input)
     if (input?.compose && input?.sourcePaths && businessSourceDigest(input.sourcePaths) !== input.sourceDigest) throw new Error('业务资产在计划后已改变')
     console.log(JSON.stringify(input?.compose ? renderBusinessInstance(config, input) : {
-      valid: true, assetRoot: config.assetRoot, pluginRoot: config.pluginRoot, development, accessMode: selected?.accessMode === 'anonymous' ? 'anonymous' : 'authenticated',
+      valid: true, assetRoot: config.assetRoot, pluginRoot: config.pluginRoot, ...modes,
       ...(input?.sourcePaths ? { sourceDigest: businessSourceDigest(input.sourcePaths) } : {}),
     }))
   } catch (error) {
     const known = new Set([
       '业务数据根或共享密钥文件无效', '业务访问配置尚未启用', '协调器必须使用不含路径和凭据的 HTTP 来源地址',
       '业务实例身份模式无效',
+      '业务实例访问方式无效',
+      '业务实例创建模式快照无效',
       'bridge 容器不能使用宿主回环地址访问协调器；请配置可达宿主地址', '业务插件根路径无效',
       '业务 Runtime 插件尚未构建', '业务 MCP manager 插件尚未构建', '业务来源 MCP 配置种子无效',
       '业务 Runtime 配置或 MCP 专用凭据目录尚未准备；请运行平台 prepare',
