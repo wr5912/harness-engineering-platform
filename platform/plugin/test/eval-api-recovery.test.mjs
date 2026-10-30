@@ -14,7 +14,7 @@ const delay = milliseconds => new Promise(resolve => setTimeout(resolve, millise
 async function fixture(t, failure) {
   const directory = mkdtempSync(join(tmpdir(), 'eval-api-recovery-'))
   t.after(() => rmSync(directory, { recursive: true, force: true }))
-  for (const name of ['dsh-eval-api.mjs', 'dsh-eval-common.mjs']) copyFileSync(join(adapter, name), join(directory, name))
+  for (const name of ['dsh-eval-api.mjs', 'dsh-eval-common.mjs', 'evaluation-wait.mts']) copyFileSync(join(adapter, name), join(directory, name))
   symlinkSync(modules, join(directory, 'node_modules'))
   const evidence = join(directory, 'evidence')
   mkdirSync(evidence)
@@ -27,6 +27,14 @@ async function fixture(t, failure) {
     const method = new URL(request.url, 'http://localhost').pathname.slice('/assistant/api/'.length)
     const reply = value => { response.setHeader('content-type', 'application/json'); response.end(JSON.stringify({ result: { ok: true, value } })) }
     if (method.split('?')[0] === failure || failure === 'judge-create' && method === 'session/create' && sessions.size === 1) { response.writeHead(503); response.end(); return }
+    if (method === 'evaluation.wait') {
+      if (failure === 'partial') return
+      const sessionId = new URL(request.url, 'http://localhost').searchParams.get('sessionId')
+      assert.ok(sessions.has(sessionId))
+      response.setHeader('content-type', 'application/json')
+      response.end(JSON.stringify({ session_id: sessionId, settled: true }))
+      return
+    }
     if (method === 'workspace/create') return reply({ workspace: { workspaceId: 'workspace-test', path: '/work/harness/workspace' } })
     if (method === 'session/create') {
       const sessionId = `session-${sessions.size + 1}`
@@ -82,6 +90,7 @@ for (const [failure, stage, session] of [
   ['session/list', 'target-session-verify', 'session-1'],
   ['session/rename', 'target-session-verify', 'session-1'],
   ['session.export', 'target-trace-export', 'session-1'],
+  ['evaluation.wait', 'target-trace-export', 'session-1'],
 ]) test(`API ${failure} 失败保留阶段、请求和已创建的 Session`, async t => {
   const fx = await fixture(t, failure)
   const result = await fx.completed

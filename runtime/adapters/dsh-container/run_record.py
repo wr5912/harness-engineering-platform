@@ -64,7 +64,7 @@ def utc_now() -> str:
 def evaluation_implementation() -> dict:
     """冻结实际执行及评审资产身份；缺失文件保留 null，不用当前版本回填旧 Run。"""
     names = ["dsh-eval", "dsh-dev", "source_contract.py", "version-source.mts", "evaluation-source.mts", "dsh-eval-api.mjs", "dsh-eval-browser.mjs", "dsh-eval-common.mjs", "harness-runtime.mts",
-             "run_record.py", "scenario_analysis.py", "evaluation-judge-guard.mjs",
+             "run_record.py", "scenario_analysis.py", "evaluation-registry.patch.yml", "evaluation-wait.mts", "evaluation-judge-guard.mjs",
              "scenario-analysis-guard.mjs"]
     names += [path.relative_to(ADAPTER).as_posix()
               for path in sorted((ADAPTER / "evaluation-presets").rglob("*")) if path.is_file()]

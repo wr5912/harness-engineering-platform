@@ -43,6 +43,21 @@ assert.throws(
   /evidence-cross-turn/,
 )
 
+const delegatedArchive = archive([
+  { type: 'turn/start', data: { turn: 1 } }, user('delegate-input', '委派检查。'), header([]), assistant('已委派，等待子任务。'), end(1),
+  { type: 'turn/start', data: { turn: 2 } },
+  { type: 'user/message', data: { id: 'child-result', source: { kind: 'subagent' }, content: [{ type: 'text', text: '子任务结果' }] } },
+  header([{ name: 'read' }]), assistant('根据子任务结果完成检查。'), end(2),
+  { type: 'turn/start', data: { turn: 3 } }, user('next-input', '下一条输入。'), header([]), assistant('下一条完成。'), end(3),
+])
+const delegatedTurns = turnsFromTrace(delegatedArchive, ['委派检查。', '下一条输入。'])
+assert.deepEqual(delegatedTurns.map(turn => [turn.turn, turn.assistant_text]), [[2, '根据子任务结果完成检查。'], [3, '下一条完成。']])
+assert.equal(delegatedTurns[0].input_message_id, 'delegate-input')
+assert.equal(turnsFromTrace(archive(delegatedArchive.root.slice(0, 9)), ['委派检查。']), null, '后续根回合已开始但未结束不能取首次完成')
+const delegatedFailure = structuredClone(delegatedArchive)
+delegatedFailure.root[9].data.reason.kind = 'error'
+assert.equal(turnsFromTrace(delegatedFailure, ['委派检查。', '下一条输入。'])[0].turn_reason, 'error', '最终根失败不能被首次completed覆盖')
+
 const rc2Failure = JSON.parse(await readFile(new URL('./fixtures/rc2-prompt-render-failure.json', import.meta.url), 'utf8'))
 const failedBeforeSurface = turnsFromTrace(archive(rc2Failure.events), [rc2Failure.input])
 assert.equal(failedBeforeSurface[0].turn_reason, 'error', '真实 rc.2 前置错误不应被误判为仍在等待模型')
@@ -76,6 +91,14 @@ const successThenError = turnsFromTrace(archive([
 assert.equal(successThenError[1].turn_reason, 'error')
 assert.equal(successThenError[1].route, null, '前置失败不得继承上一轮实际模型')
 assert.equal(successThenError[1].tool_names, null, '前置失败不得继承上一轮可用工具')
+const delegatedThenError = turnsFromTrace(archive([
+  ...delegatedArchive.root.slice(0, 10),
+  ...rc2Failure.events.map(event => ({ ...event, data: { ...event.data, ...(event.data.turn === 1 ? { turn: 3 } : {}) } })),
+]), ['委派检查。', rc2Failure.input])
+assert.equal(delegatedThenError[0].assistant_text, '根据子任务结果完成检查。', '次轮前置错误不能截掉首轮的委派回报')
+assert.equal(delegatedThenError[0].turn, 2)
+assert.equal(delegatedThenError[1].turn_reason, 'error')
+assert.equal(delegatedThenError[1].route, null)
 
 const targetArchive = archive([
   user('u1', '执行一次常规巡检。'), header([{ name: 'inspection.run' }]),

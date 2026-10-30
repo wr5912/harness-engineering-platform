@@ -11,6 +11,7 @@ import {
   saveCaseResult,
   saveEvidence,
   turnsFromTrace,
+  waitForSessionTree,
   withCaseTimeout,
 } from './dsh-eval-common.mjs'
 
@@ -167,11 +168,18 @@ async function send(page, text, timeoutMs) {
 
 async function waitForTurns(page, sessionId, inputs, timeoutMs, signal) {
   let archive
-  const turns = await poll(async () => {
-    archive = await exportSession(page, sessionId)
-    return turnsFromTrace(archive, inputs)
-  }, value => value !== null, timeoutMs, signal)
-  return { archive, turns }
+  const cookies = await page.context().cookies(page.url())
+  try {
+    await waitForSessionTree({ baseUrl: new URL(page.url()), cookie: cookies.map(row => `${row.name}=${row.value}`).join('; ') }, sessionId, timeoutMs, signal, async () => {
+      try { archive = await exportSession(page, sessionId) }
+      catch (error) { if (SAFETY_STOP_REASONS.has(error?.message) || signal?.aborted) throw error }
+    })
+    const turns = await poll(async () => {
+      archive = await exportSession(page, sessionId)
+      return turnsFromTrace(archive, inputs)
+    }, value => value !== null, timeoutMs, signal)
+    return { archive, turns }
+  } catch (error) { error.archive = archive; throw error }
 }
 
 async function waitForDisplayedTurn(page, sessionId, turn, timeoutMs, signal) {

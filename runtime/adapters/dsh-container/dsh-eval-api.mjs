@@ -14,6 +14,7 @@ import {
   saveSessionTrace,
   toolEvents,
   turnsFromTrace,
+  waitForSessionTree,
   withCaseTimeout,
 } from './dsh-eval-common.mjs'
 
@@ -250,6 +251,13 @@ async function promptSession(connection, sessionId, input, inputs, timeoutMs, si
   if (accepted?.accepted !== true) throw new Error('prompt-not-accepted')
   onStep?.('trace-export', { last_successful_step: 'prompt-accepted' })
   let archive
+  await waitForSessionTree(connection, sessionId, timeoutMs, signal, async () => {
+    try {
+      archive = await exportSession(connection, sessionId, signal)
+      await onArchive?.(archive)
+    } catch (error) { if (SAFETY_STOP_REASONS.has(error?.message) || signal?.aborted) throw error }
+  })
+  // 原生等待完成后重新导出；export 自身刷新根及后代 Session 的持久化屏障。
   const turns = await poll(async () => {
     archive = await exportSession(connection, sessionId, signal)
     await onArchive?.(archive)

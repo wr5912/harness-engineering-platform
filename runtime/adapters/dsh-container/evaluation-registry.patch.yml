@@ -11,6 +11,9 @@
     default: !!js process.env.DSH_EVAL_TARGET_PRESET
 
 - insert:
+    - id: harness-evaluation-wait
+      name: /opt/dsh-adapter/evaluation-wait.mts
+
     - id: preset-evaluation-judge
       name: '@deepseek-ai/dsh-agent-preset'
       config:

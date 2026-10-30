@@ -1,5 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+export { waitForSessionTree } from './evaluation-wait.mts'
 
 export const SAFETY_STOP_REASONS = new Set([
   'identity-drift', 'evidence-cross-turn', 'case-hard-timeout',
@@ -93,13 +94,17 @@ export function turnsFromTrace(archive, inputs) {
     throw safetyError('evidence-cross-turn', archive)
   }
   const turns = []
-  for (const { event: user, index: start, endIndex } of users) {
-    const offset = endIndex === undefined
-      ? archive.root.slice(start + 1).findIndex(event => event.type === 'turn/end')
-      : endIndex - start - 1
-    if (offset < 0) return null
-    const events = archive.root.slice(start + 1, start + 2 + offset)
-    const header = (endIndex === undefined ? archive.root.slice(0, start + 2 + offset) : events)
+  for (const [inputIndex, { event: user, index: start, endIndex }] of users.entries()) {
+    const next = users[inputIndex + 1]
+    // 原生委派可以在首个根回合结束后回报并唤醒后续根回合，它们仍属于同一条用户输入。
+    // 下一条真实用户输入的 turn/start 属于下一组，不能被视为本组仍未结束。
+    const nextStart = next && next.endIndex === undefined ? archive.root.slice(start + 1, next.index).findLastIndex(event => event.type === 'turn/start') : -1
+    const limit = next ? nextStart < 0 ? next.index : start + 1 + nextStart : archive.root.length
+    const grouped = archive.root.slice(start + 1, limit)
+    const lastEnd = endIndex === undefined ? grouped.findLastIndex(event => event.type === 'turn/end') : endIndex - start - 1
+    if (lastEnd < 0 || grouped.slice(lastEnd + 1).some(event => event.type === 'turn/start')) return null
+    const events = grouped.slice(0, lastEnd + 1)
+    const header = (endIndex === undefined ? archive.root.slice(0, start + 2 + lastEnd) : events)
       .filter(event => event.type === 'request/header').at(-1)?.data?.header
     const assistants = events.filter(event => event.type === 'assistant/message')
     turns.push({

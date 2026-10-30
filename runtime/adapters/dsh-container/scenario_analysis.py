@@ -541,6 +541,7 @@ def _review_driver(prompts: list[dict], auth_url: str, image_ref: str,
             "--entrypoint", "node",
             "--mount", f"type=bind,src={driver},dst=/opt/dsh/apps/web/dsh-eval-api.mjs,readonly",
             "--mount", f"type=bind,src={ADAPTER / 'dsh-eval-common.mjs'},dst=/opt/dsh/apps/web/dsh-eval-common.mjs,readonly",
+            "--mount", f"type=bind,src={ADAPTER / 'evaluation-wait.mts'},dst=/opt/dsh/apps/web/evaluation-wait.mts,readonly",
             "--mount", f"type=bind,src={evidence_root.resolve()},dst=/evidence",
             image_ref, "/opt/dsh/apps/web/dsh-eval-api.mjs",
         ]

@@ -437,6 +437,7 @@ def driver_command(executor: str, image: str, evidence_root: Path) -> tuple[list
         "--entrypoint", "node",
         "--mount", f"type=bind,src={driver},dst={container_driver},readonly",
         "--mount", f"type=bind,src={COMMON_DRIVER},dst=/opt/dsh/apps/web/dsh-eval-common.mjs,readonly",
+        "--mount", f"type=bind,src={ADAPTER / 'evaluation-wait.mts'},dst=/opt/dsh/apps/web/evaluation-wait.mts,readonly",
         "--mount", f"type=bind,src={evidence_root},dst=/work/evidence",
         image, container_driver,
     ], "/work/evidence")

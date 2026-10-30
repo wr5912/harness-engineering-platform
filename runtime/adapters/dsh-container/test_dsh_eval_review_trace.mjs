@@ -42,11 +42,21 @@ function archive(session, options, snapshot) {
     { type: 'assistant/message', data: { message: { content: [{ type: 'text', text: `归因结果 ${index + 1}` }] } } },
     ...(!options.incomplete && !(options.incompleteLast && index === session.prompts.length - 1) ? [{ type: 'turn/end', data: { reason: { kind: 'completed' }, turn: index + 1 } }] : []),
   ])
+  const delegatedComplete = options.delegated && session.treeSettled === session.prompts.length
+  if (delegatedComplete) events.push(
+    { type: 'turn/start', data: { turn: session.prompts.length + 1 } },
+    { type: 'user/message', data: { id: 'child-report', source: { kind: 'subagent', sessionId: 'delegated-child' }, content: [{ type: 'text', text: '子任务最终报告' }] } },
+    { type: 'request/header', data: { header: { config: session.route ?? route, tools: ['glob', 'grep', 'read'].map(name => ({ name })) } } },
+    { type: 'assistant/message', data: { message: { content: [{ type: 'text', text: '委派后最终回答' }] } } },
+    { type: 'turn/end', data: { reason: { kind: options.rootFinalFailure ? 'error' : 'completed' }, turn: session.prompts.length + 1 } },
+  )
   if (options.crossTurn) events.push({ type: 'user/message', data: { id: 'unexpected-user', source: { kind: 'user' }, content: [{ type: 'text', text: '不属于本次请求的额外用户输入' }] } })
   const descendants = [
     { type: 'fixture/snapshot', data: { snapshot } },
     ...toolPair(`${session.id}-child-glob`, 'glob', session.id, options),
   ]
+  if (delegatedComplete) descendants.push({ type: 'request/usage', data: { usage: { inputTokens: 37, outputTokens: 11 } } },
+    { type: 'turn/end', data: { reason: { kind: 'completed' }, turn: 1 } })
   const encode = rows => strToU8(`${rows.map(row => JSON.stringify(row)).join('\n')}\n`)
   return zipSync({ [`${session.id}.jsonl`]: encode(events), 'descendants/review-child.jsonl': encode(descendants),
     ...(options.childReadRetry ? { 'z-descendants/read-retry.jsonl': encode(toolPair(`${session.id}-child-retry`, 'read', session.id, { nativeTools: true })) } : {}) })
@@ -55,14 +65,27 @@ function archive(session, options, snapshot) {
 async function fixture(t, scenario = () => ({}), selectedRoute = route) {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-review-trace-'))
   // 原始两份运行模块保持逐字节一致，依赖通过临时 node_modules 链接解析。
-  for (const name of ['dsh-eval-api.mjs', 'dsh-eval-common.mjs']) await copyFile(join(adapter, name), join(directory, name))
+  for (const name of ['dsh-eval-api.mjs', 'dsh-eval-common.mjs', 'evaluation-wait.mts']) await copyFile(join(adapter, name), join(directory, name))
   await symlink(join(plugin, 'node_modules'), join(directory, 'node_modules'), 'dir')
-  const sessions = new Map(), requests = [], exportCounts = new Map()
+  const sessions = new Map(), requests = [], exportCounts = new Map(), treeWaits = []
   const server = createServer(async (request, response) => {
     try {
       const url = new URL(request.url, 'http://fixture')
       if (url.pathname === '/assistant/' && request.method === 'GET') {
         response.end('fixture runtime')
+        return
+      }
+      if (url.pathname === '/assistant/api/evaluation.wait') {
+        const sessionId = url.searchParams.get('sessionId')
+        const session = sessions.get(sessionId)
+        assert.ok(session, '任务树等待只能使用已经创建的会话')
+        treeWaits.push(sessionId)
+        const options = scenario(session.prompts.at(-1), session)
+        if (options.incomplete || options.incompleteLast) return
+        if (options.delegated) await new Promise(resolve => setTimeout(resolve, 650))
+        session.treeSettled = session.prompts.length
+        response.writeHead(200, { 'content-type': 'application/json' })
+        response.end(JSON.stringify({ session_id: sessionId, settled: true }))
         return
       }
       if (url.pathname === '/assistant/api/session.export') {
@@ -161,7 +184,7 @@ async function fixture(t, scenario = () => ({}), selectedRoute = route) {
     const trace = (await readFile(join(base, 'judge-trace.jsonl'), 'utf8')).split('\n').filter(Boolean).map(line => JSON.parse(line))
     return { trace, ...JSON.parse(await readFile(join(base, 'judge.json'), 'utf8')) }
   }
-  return { run, runTarget: (cases, timeoutMs) => run(cases, timeoutMs, 'evaluate'), evidence, judgeEvidence, sessions, requests, exportCounts }
+  return { run, runTarget: (cases, timeoutMs) => run(cases, timeoutMs, 'evaluate'), evidence, judgeEvidence, sessions, requests, exportCounts, treeWaits, evidenceRoot }
 }
 
 test('真实 session/create 失败保留原生错误码与插件定位，不把配置正文写入证据', async t => {
@@ -415,8 +438,33 @@ test('业务语义评审超时独立保存 judge 的部分轨迹，不覆盖目�
   assert.equal(target.trace.filter(row => row.event.type === 'turn/end').length, 1)
   assert.equal(judge.trace.some(row => row.event.type === 'turn/end'), false)
   assert.equal(judge.checks.session_id, 'review-2')
-  assert.equal(judge.checks.unavailable_reason, 'poll-timeout')
+  assert.equal(judge.checks.unavailable_reason, 'task-tree-wait-timeout')
   assert.equal(judge.trace.find(row => row.event.type === 'fixture/snapshot').event.data.snapshot, runtime.exportCounts.get('review-2'))
+})
+
+test('根首轮结束后仍等待委派及根后续回合，封存最终回复和子任务用量', async t => {
+  const runtime = await fixture(t, (_prompt, session) => ({ delegated: session.preset === 'target' }))
+  const response = await runtime.runTarget([{ case_id: 'U-DELEGATE-001', inputs: [firstPrompt], expected_behavior: '等待实际子任务结果。' }])
+  assert.equal(response.rows[0].execution_status, 'completed')
+  const saved = await runtime.evidence('U-DELEGATE-001', null)
+  const reply = JSON.parse(await readFile(join(runtime.evidenceRoot, 'U-DELEGATE-001', 'response.json'), 'utf8'))
+  assert.deepEqual(reply.assistant_texts, ['委派后最终回答'])
+  assert.equal(reply.turns[0].turn, 2)
+  assert.equal(saved.trace.filter(row => row.event.type === 'turn/end' && row.session_log === 'review-1.jsonl').length, 2)
+  assert.ok(saved.trace.some(row => row.event.type === 'request/usage' && row.session_log === 'descendants/review-child.jsonl'))
+  assert.ok(runtime.exportCounts.get('review-1') >= 3, '首轮快照已经完成也不能提前结束等待')
+  assert.deepEqual(runtime.treeWaits, ['review-1', 'review-2'])
+  assert.equal(runtime.requests.filter(row => row.method === 'session/prompt' && row.args.request.sessionId === 'review-1').length, 1, '等待不得重放原输入')
+})
+
+test('委派回报后的根回合失败保留失败，不由首个completed覆盖', async t => {
+  const runtime = await fixture(t, (_prompt, session) => ({ delegated: session.preset === 'target', rootFinalFailure: true }))
+  const response = await runtime.runTarget([{ case_id: 'U-DELEGATE-002', inputs: [firstPrompt], expected_behavior: '最终根回合必须成功。' }])
+  assert.equal(response.rows[0].execution_status, 'error')
+  assert.equal(response.rows[0].failure_reason, 'turn-not-completed')
+  const saved = await runtime.evidence('U-DELEGATE-002', null)
+  assert.equal(saved.checks.completed, false)
+  assert.equal(runtime.sessions.size, 1, '最终失败不启动语义评审')
 })
 
 test('judge 的跨轮安全错误保留原始归属，目标 trace 与 judge-trace 各自指向正确 Session', async t => {
