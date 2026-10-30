@@ -146,8 +146,14 @@ async function connectWorkspace(page, workspace, timeoutMs) {
   }, value => value.ready || value.chooser, timeoutMs)
   if (state.ready) return { testing_notice_dismissed: noticeDismissed, workspace_action: 'already-registered' }
   noticeDismissed = await clickAfterNotice(page, chooser, timeoutMs) || noticeDismissed
-  await page.getByRole('menuitem', { name: /^(Add workspace|添加工作区)/ }).click({ timeout: timeoutMs })
   const dialog = page.getByRole('dialog').last()
+  const addWorkspace = page.getByRole('menuitem', { name: /^(Add workspace|添加工作区)/ })
+  // 原生空列表直接打开目录选择器；已有工作区时才通过菜单新增。
+  const selection = await poll(async () => ({
+    dialog: await dialog.isVisible().catch(() => false),
+    menu: await addWorkspace.isVisible().catch(() => false),
+  }), value => value.dialog || value.menu, timeoutMs)
+  if (!selection.dialog) await addWorkspace.click({ timeout: timeoutMs })
   await dialog.getByRole('button', { name: /^(Edit path|编辑路径)$/ }).click()
   const pathInput = dialog.getByRole('textbox', { name: /^(Edit path|编辑路径)$/ })
   await pathInput.fill(workspace)
