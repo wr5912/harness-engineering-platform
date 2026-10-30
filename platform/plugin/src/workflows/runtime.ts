@@ -269,7 +269,12 @@ function registerWorkflowAgent(ctx: any, options: CodeOnlyWorkflowAgent | Hybrid
   registerWorkflowTool(ctx, workflow, { executionMode: mode, ...('modelRoles' in options ? { modelRoles: options.modelRoles } : {}) })
   const turns = new Map<string, CodeOnlyTurn>()
   const sessionId = (agent: any): string => agent.session.id
-  const isSubject = (agent: any): boolean => agent?.session?.header?.agentPreset === options.presetId
+  const isSubject = (agent: any): boolean => {
+    if (!agent?.session) return false
+    // SDK 根会话通过原生选择事件绑定 Preset；Header 只作为旧会话的兼容来源。
+    const selected = ctx.get?.('sessionProjections')?.stateOf(agent.session, 'agentPreset')
+    return (selected ?? agent.session.header?.agentPreset) === options.presetId
+  }
   const route = { provider: providerId, model: modelId, reasoningEffort: 'off' }
   const unknown = '工作流执行结果未知，已停止；请核对本轮工具回执后继续。'
 

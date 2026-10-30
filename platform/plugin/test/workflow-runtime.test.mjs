@@ -327,9 +327,13 @@ test('纯代码工作流拒绝infer，保留失败图且不准备任何模型请
 
 function codeOnlyFixture(t, run, renderResult, hybrid) {
   const f = nativeFixture(t), hooks = new Map(), adapters = new Map(), titles = []
+  const selectedPresets = new Map()
   const events = [], agent = { ...f.agent, session: { id: 'workflow-session', header: { agentPreset: 'code-preset' }, snapshotEvents: () => events } }
   const registration = { ...f.registration,
     on(name, handler) { hooks.set(name, [...(hooks.get(name) ?? []), handler]) },
+    get(name) { return name === 'sessionProjections' ? { stateOf(session, key) {
+      assert.equal(key, 'agentPreset'); return selectedPresets.get(session.id)
+    } } : undefined },
     llm: { registerAdapter(providers, adapter) { for (const provider of providers) adapters.set(provider, adapter) },
       prepareCall: hybrid?.prepareCall ?? (() => assert.fail('纯代码回合不能使用远程模型服务')) },
     sessionTitle: { register(provider) { titles.push(provider) } },
@@ -369,7 +373,7 @@ function codeOnlyFixture(t, run, renderResult, hybrid) {
     events.push({ type: 'assistant/message', data: { turn, message: { role: 'assistant', source: { kind: 'model',
       provider: response.route.provider, model: response.route.model }, content: [{ type: 'text', text: response.text }] } } })
   }
-  return { ...f, agent, hooks, hook, events, titles, adapters, enter, enterMessages, commitReply, stream, execute }
+  return { ...f, agent, hooks, hook, events, titles, adapters, selectedPresets, enter, enterMessages, commitReply, stream, execute }
 }
 
 // 与真实原生完成通知保持相同source与三段文本结构；正文保留证据不足的终态限定。
@@ -385,6 +389,35 @@ const nativeSettlement = () => ({ role: 'user', id: '3fc55a52-9bd7-408a-beb3-88a
 
 for (const mode of ['code-only', 'hybrid']) {
   const hybrid = mode === 'hybrid' ? { prepareCall: () => assert.fail('原生通知不能新增模型调用') } : undefined
+  test(`${mode}按原生Preset投影识别SDK根，投影优先于空或陈旧Header且随选择变化`, async t => {
+    const requests = [], f = codeOnlyFixture(t, async context => { requests.push(context.input.request); return { reply: context.input.request } }, undefined, hybrid)
+    f.agent.session.header = {}
+    f.selectedPresets.set(f.agent.session.id, 'code-preset')
+    let entered = await f.enter(20, 'SDK根会话'), first = await f.stream(20); entered.commit()
+    assert.equal(first.route.provider, mode === 'hybrid' ? 'harness-workflow' : 'harness-code-only')
+    await f.execute(20, first)
+    assert.equal((await f.stream(20)).text, 'SDK根会话')
+    f.agent.session.header.agentPreset = 'stale-preset'
+    entered = await f.enter(21, '已选择的当前Preset'); first = await f.stream(21); entered.commit(); await f.execute(21, first)
+    assert.equal((await f.stream(21)).text, '已选择的当前Preset')
+    f.agent.session.header.agentPreset = 'code-preset'
+    f.selectedPresets.set(f.agent.session.id, 'ordinary-preset')
+    assert.deepEqual((await f.stream(22)).route, { provider: 'remote', model: 'remote' }, '其他已选Preset不被陈旧Header接管')
+    assert.deepEqual(requests, ['SDK根会话', '已选择的当前Preset'])
+  })
+
+  test(`${mode}既有Web和原生child的Header仍兼容，不接管尚无任何Preset身份的会话`, async t => {
+    const f = codeOnlyFixture(t, async () => ({ reply: '完成' }), undefined, hybrid)
+    const child = { ...f.agent, session: { ...f.agent.session, id: 'native-child', header: { agentPreset: 'code-preset', parentSession: f.agent.session.id } } }
+    let entered = await f.enter(23, 'Web请求'), first = await f.stream(23); entered.commit()
+    assert.equal(first.route.provider, mode === 'hybrid' ? 'harness-workflow' : 'harness-code-only')
+    await f.execute(23, first)
+    await f.enter(24, 'child请求', child)
+    assert.equal((await f.stream(24, child)).route.provider, first.route.provider)
+    const unknown = { ...f.agent, session: { ...f.agent.session, id: 'unselected-sdk', header: {} } }
+    assert.deepEqual((await f.stream(25, unknown)).route, { provider: 'remote', model: 'remote' })
+  })
+
   test(`${mode}原生子任务完成通知本地投递正文和来源，不重跑图或工具`, async t => {
     let graphs = 0
     const f = codeOnlyFixture(t, async () => { graphs++; return { reply: '不得执行' } }, undefined, hybrid)
