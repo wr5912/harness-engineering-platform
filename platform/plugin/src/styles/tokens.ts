@@ -30,7 +30,20 @@ body[data-ds-dark-theme],body[data-ds-dark-theme] :is(.harness-platform,.harness
 
 // 业务工作面和只读抽屉共用同一调色；原生管理对话继续使用 DSH 主题。
 export const workbenchTokens = `
-.harness-platform:not([data-page=conversations]),.hep-detail-drawer{--hep-bg:#f5f6f8;--hep-surface:#fff;--hep-surface-muted:#f7f8fa;--hep-text:#202d40;--hep-muted:#637186;--hep-border:#e2e7ee;--hep-primary:#0062ae;--hep-primary-soft:#eaf3fc;--hep-radius:10px;--hep-control-radius:7px;--hep-page-padding:24px;--hep-shadow:0 4px 16px #1423380a;font-family:HepNoto,system-ui,"Microsoft YaHei",sans-serif;line-height:1.55}
-body:not([data-ds-dark-theme]) .harness-platform[data-page=home]{--hep-bg:#f7f9fc}
-body[data-ds-dark-theme] .harness-platform:not([data-page=conversations]),body[data-ds-dark-theme] .hep-detail-drawer{--hep-bg:#111923;--hep-surface:#172333;--hep-surface-muted:#1b293a;--hep-text:#e4ebf3;--hep-muted:#a5b4c8;--hep-border:#344254;--hep-primary-soft:#203c58;--hep-link:#8bc5ff;--hep-link-hover:#b0d8ff}
+.harness-platform:not([data-page=conversations]),.hep-detail-drawer,.harness-login{
+  --hep-brand:#2563eb;--hep-primary:#2563eb;--hep-primary-hover:#1d4ed8;
+  --hep-link:#2459cf;--hep-link-hover:#1d4ed8;--hep-focus:#3b82f6;
+  --hep-bg:#f5f8fc;--hep-surface:#fff;--hep-surface-muted:#f8fafc;
+  --hep-primary-soft:#edf4ff;--hep-text:#182235;--hep-muted:#66758b;--hep-border:#e3e9f2;
+  --hep-radius:12px;--hep-control-radius:8px;--hep-page-padding:28px;
+  --hep-shadow:0 1px 3px #182b4e05,0 4px 16px #182b4e03;
+  --hep-success:#168151;--hep-warning:#8c610c;--hep-danger:#c43a40;
+  font-family:HepNoto,system-ui,"Microsoft YaHei",sans-serif;line-height:1.55;
+}
+body[data-ds-dark-theme] .harness-platform:not([data-page=conversations]),body[data-ds-dark-theme] .hep-detail-drawer{
+  --hep-brand:#6da3ff;--hep-bg:#101722;--hep-surface:#172130;--hep-surface-muted:#1c2839;
+  --hep-text:#e8eff8;--hep-muted:#a0b2ca;--hep-border:#2a3b52;--hep-primary:#2563eb;--hep-primary-hover:#1d4ed8;
+  --hep-primary-soft:#203859;--hep-link:#9cc6ff;--hep-link-hover:#c0ddff;--hep-focus:#8ac8ff;
+  --hep-shadow:0 1px 4px #0002;--hep-success:#88dfab;--hep-warning:#fbd57f;--hep-danger:#ffaca4;
+}
 `

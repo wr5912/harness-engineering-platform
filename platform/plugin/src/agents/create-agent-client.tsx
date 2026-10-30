@@ -23,15 +23,15 @@ export function CreateAgentDialog({ rpc, active, onClose, onCreated, onSelect }:
     } catch (error) { setError((error as Error).message) }
     finally { setBusy(false) }
   }
-  return <dialog ref={dialog} className="harness-asset-dialog" aria-labelledby="new-agent-title" onCancel={event => { event.preventDefault(); if (!busy) onClose() }}>
+  return <dialog ref={dialog} className="harness-asset-dialog agent-create-dialog" aria-labelledby="new-agent-title" onCancel={event => { event.preventDefault(); if (!busy) onClose() }}>
     <h2 id="new-agent-title">新建智能体</h2>
     {receipt ? <><div className="agent-dialog-body"><p role="status">{receipt.note}</p><dl className="harness-fields"><div><dt>智能体</dt><dd>{receipt.name} · {receipt.agent_id}</dd></div><div><dt>首次研究版本</dt><dd>{receipt.experiment_id}</dd></div></dl></div><div className="agent-actions agent-dialog-actions"><button type="button" onClick={() => onSelect(receipt)}>查看新智能体</button><button type="button" onClick={onClose}>关闭</button></div></> : <form className="agent-dialog-form" onSubmit={event => { event.preventDefault(); if (step === 'edit' && valid) setStep('review'); else if (step === 'review') void create() }}>
       <div className="agent-dialog-body">
-      <p>填写用途和角色指令后，创建独立的首次研究版本。创建不会启动实例，也不会复制任何已有智能体的会话或凭据。</p>
-      <p className="agent-muted">{step === 'edit' ? '第 1 步：定义身份与职责' : '第 2 步：核对将保存的内容'}</p>
+      <p>描述智能体的职责与工作方式，创建首次研究版本。保存后可继续配置能力、发起评测或创建实例。</p>
+      <p className="agent-create-step"><span aria-hidden="true">{step === 'edit' ? '01' : '02'}</span>{step === 'edit' ? '定义身份与职责' : '核对将保存的内容'}</p>
         {step === 'edit' ? <>
-          <label className="agent-field">Agent ID<input required pattern="[a-z0-9]+(-[a-z0-9]+)*" maxLength={80} value={agentId} placeholder="例如 daily-assistant" onChange={event => setAgentId(event.target.value)} /></label>
-          <label className="agent-field">智能体名称<input required maxLength={120} value={name} onChange={event => setName(event.target.value)} /></label>
+          <div className="agent-create-identity-fields"><label className="agent-field">Agent ID<input required pattern="[a-z0-9]+(-[a-z0-9]+)*" maxLength={80} value={agentId} placeholder="例如 daily-assistant" onChange={event => setAgentId(event.target.value)} /></label>
+          <label className="agent-field">智能体名称<input required maxLength={120} value={name} onChange={event => setName(event.target.value)} /></label></div>
           <label className="agent-field">用途说明<textarea required maxLength={2000} rows={2} value={description} onChange={event => setDescription(event.target.value)} /></label>
           <label className="agent-field">角色与工作指令<textarea required maxLength={20000} rows={9} value={role} placeholder="说明要帮助用户完成什么、如何工作、信息不足时怎样补问。不要填写 API Key。" onChange={event => setRole(event.target.value)} /></label>
         </> : <><dl className="harness-fields"><div><dt>Agent ID</dt><dd>{agentId}</dd></div><div><dt>名称</dt><dd>{name}</dd></div><div><dt>用途</dt><dd>{description}</dd></div></dl><h3>角色正文</h3><pre className="harness-asset-content">{role}</pre><p>将使用当前标准 DSH Runtime 来源。角色写入新 Candidate，已有身份装载用例同步替换为该角色的身份和职责检查。</p></>}

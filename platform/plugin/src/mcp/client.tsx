@@ -100,9 +100,12 @@ export function McpPage({ rpc, updates, onContext, target, onNavigate, active = 
       ...(next !== 'composition' ? target?.group_id || lastGroup.current ? { group_id: target?.group_id ?? lastGroup.current } : { server_id: target?.server_id ?? lastServer.current } : {}) })
   }
   return <main className="harness-mcp-page" aria-label="MCP 管理">
+    <header className="harness-page-heading harness-mcp-page-heading">
+      <div><span className="harness-mcp-kicker">工具与连接</span><h1>MCP 管理</h1><p>接入服务、组织工具与资源，在同一工作区完成调试和组合编排。</p></div>
+      <button type="button" className="harness-primary" disabled={state.status !== 'ready'} onClick={() => { selectTab('servers'); requestAnimationFrame(() => managerRoot.current?.querySelector<HTMLButtonElement>('.mcp-service-layout .mcp-add')?.click()) }}>＋ 接入服务</button>
+    </header>
     <div className="harness-mcp-module-toolbar">
       <nav className="harness-mcp-toolbar harness-mcp-tabs" aria-label="MCP 工作区">{tabs.map(tab => <button key={tab.id} type="button" aria-current={page === tab.id ? 'page' : undefined} onClick={() => selectTab(tab.id)}>{tab.title}</button>)}</nav>
-      <button type="button" className="harness-primary" disabled={state.status !== 'ready'} onClick={() => { selectTab('servers'); requestAnimationFrame(() => managerRoot.current?.querySelector<HTMLButtonElement>('.mcp-service-layout .mcp-add')?.click()) }}>＋ 接入服务</button>
     </div>
     <div className="harness-mcp-actions harness-mcp-save-actions" ref={setToolbarTarget} />
     {state.error && <p role="alert">{state.error}</p>}
@@ -329,7 +332,7 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
   return <div className="harness-composition-workspace">
     <style>{threatEditorStyle}</style>
     <nav ref={listRef} className="harness-card harness-composition-sidebar" aria-label="工具编排列表">
-      <h2>工具组合编排{data && (catalogLoading || busy && pendingAction === 'list') && <LoadingIndicator label="刷新编排目录" />}</h2><div className="harness-mcp-actions"><button type="button" disabled={busy || !!editor || !data} onClick={() => setEditor({ revision: data.revision, value: { toolName: '', title: '资产相关告警查询', description: '查询资产后查询相关告警的两步只读组合', connectionId: connections[0]?.id ?? '' } })}>新建编排</button>
+      <h2>工具组合编排{data && (catalogLoading || busy && pendingAction === 'list') && <LoadingIndicator label="刷新编排目录" />}</h2><div className="harness-mcp-actions"><button className="harness-primary" type="button" disabled={busy || !!editor || !data} onClick={() => setEditor({ revision: data.revision, value: { toolName: '', title: '资产相关告警查询', description: '查询资产后查询相关告警的两步只读组合', connectionId: connections[0]?.id ?? '' } })}>新建编排</button>
         <button type="button" disabled={busy || !!editor} onClick={() => void refreshCatalog()}>刷新</button></div>
       <section aria-label="全部编排"><h3>全部编排（{entries.length}）</h3>
         {!data ? null : entries.length ? <ul>{entries.map(item => {
@@ -355,7 +358,7 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
         }}>以最新版本继续编辑</button>}</div>
       </section>}
       {recoveryDraft && <section className="harness-composition-conflict" role="status"><h3>保留的本地草稿</h3><p>原草稿基于版本 <code>{recoveryDraft.revision.slice(0, 12)}</code>；重新读取目录后请逐项核对并手工重应用。刷新页面前请复制或下载。</p><div className="harness-mcp-actions"><button type="button" onClick={() => exportDraft(recoveryDraft.value, false)}>复制保留草稿</button><button type="button" onClick={() => exportDraft(recoveryDraft.value, true)}>下载保留草稿</button><button type="button" onClick={() => setRecoveryDraft(null)}>放弃保留草稿</button></div></section>}
-      {!config && !editor ? !data ? !error && <LoadingIndicator label="读取编排目录" block /> : <p>{selection ? `所选编排 ${selection.id} 的${selection.version === 'draft' ? '草稿' : selection.versionId ? `发布版本 ${selection.versionId}` : '当前发布版本'}已不存在，请重新选择。` : '选择一个编排查看，或新建编排。'}</p> : <>
+      {!config && !editor ? !data ? !error && <LoadingIndicator label="读取编排目录" block /> : <div className="harness-composition-empty"><svg width="36" height="36" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="3" y="12" width="8" height="8" rx="2"/><rect x="21" y="3" width="8" height="8" rx="2"/><rect x="21" y="21" width="8" height="8" rx="2"/><path d="M11 16h5V7h5m-5 9v9h5"/></svg><h3>{selection ? '重新选择工具组合' : '从一组工具开始编排'}</h3><p>{selection ? `所选编排 ${selection.id} 的${selection.version === 'draft' ? '草稿' : selection.versionId ? `发布版本 ${selection.versionId}` : '当前发布版本'}已不存在，请重新选择。` : '在左侧选择一个工具组合，或点击“新建编排”开始。'}</p></div> : <>
         <div className="harness-composition-heading"><h2>{editor ? (editor.id ? '编辑草稿' : '新建编排') : config?.title}</h2>{!editor && <Tooltip disabled={!active} label={`MCP 入口：${new URL('api/harness-platform/mcp', document.baseURI).href}。入口受平台登录认证保护，仅列出并执行已发布版本。草稿供查看与测试，发布后调用方需重新发现工具。`} side="bottom" align="end" portal maxWidth={400} openOnClick><button type="button" className="harness-composition-help" aria-label="调用与发布说明"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M10 9v5M10 5.5v1"/></svg></button></Tooltip>}</div>
         {editor ? <form onSubmit={event => { event.preventDefault(); if (!mappingValid) return; void action('saveCompositionDraft', { compositionId: editor.id, revision: editor.revision, draft: editor.value }) }} className="harness-composition-editor">
           <p>{isThreatComposition(editor.value) ? '编辑阶段连接或固定子版本，保存草稿后进行 dry 校验和发布。' : '复用当前 LangGraph 两步只读流程：查询资产 → 查询相关告警。保存草稿后进行 dry 测试和发布。'}</p>
@@ -373,7 +376,7 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
             <option value="">请选择服务器</option>{editor.value.alertsConnectionId && !connections.some((item: any) => item.id === editor.value.alertsConnectionId) && <option value={editor.value.alertsConnectionId}>{editor.value.alertsConnectionId}（尚未接入）</option>}
             {connections.map((item: any) => <option key={item.id} value={item.id}>{item.name || item.id}（{item.id}）</option>)}
           </select></label>}</>}
-          <div className="harness-mcp-actions"><button disabled={busy || conflict || !mappingValid} type="submit">保存草稿</button><button disabled={busy || !mappingValid} type="button" onClick={() => { setRecoveryDraft(editor); setEditor(null); setError('草稿已暂存于当前页面。刷新或关闭前请复制或下载，继续编辑时请手工核对最新目录。') }}>暂存并返回详情</button></div>
+          <div className="harness-mcp-actions"><button className="harness-primary" disabled={busy || conflict || !mappingValid} type="submit">保存草稿</button><button disabled={busy || !mappingValid} type="button" onClick={() => { setRecoveryDraft(editor); setEditor(null); setError('草稿已暂存于当前页面。刷新或关闭前请复制或下载，继续编辑时请手工核对最新目录。') }}>暂存并返回详情</button></div>
           <p>草稿保存到仓库编排目录；已发布版本继续供 MCP 调用。</p>
         </form> : <>
           <div className="harness-mcp-actions" aria-label="编排版本">{(['draft', 'published'] as const).filter(version => entry?.[version]).map(version => <button key={version} disabled={busy} aria-pressed={selection?.version === version && (version === 'draft' || !selection.versionId || selection.versionId === entry?.publishedVersionId)} onClick={() => select(entry!, version, version === 'published' ? entry?.publishedVersionId : undefined, false)}>{version === 'draft' ? '编辑草稿' : '当前发布版本'}</button>)}

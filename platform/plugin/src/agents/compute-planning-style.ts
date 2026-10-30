@@ -1,9 +1,9 @@
 // 策划窗口继承全局主题，正文按任务顺序组织；标题和操作区始终可达。
 export const computePlanningTheme = `
-.hep-compute-dialog{width:min(880px,calc(100vw - 48px));max-width:none;max-height:min(880px,calc(100dvh - 48px));height:auto;margin:auto;padding:0;overflow:hidden;border:1px solid var(--hep-border);border-radius:12px;background:var(--hep-surface);color:var(--hep-text);box-shadow:0 20px 64px #10283e24;font-size:14px;line-height:1.6}
+.hep-compute-dialog{width:min(880px,calc(100vw - 48px));max-width:none;max-height:min(880px,calc(100dvh - 48px));height:auto;margin:auto;padding:0;overflow:hidden;border:1px solid var(--hep-border);border-radius:16px;background:var(--hep-surface);color:var(--hep-text);box-shadow:0 28px 88px #10283e2b;font-size:14px;line-height:1.6}
 
 .hep-compute-dialog[open]{display:flex;flex-direction:column}
-.hep-compute-dialog::backdrop{background:#14273e66}
+.hep-compute-dialog::backdrop{background:#14273e55}
 
 .hep-compute-dialog *{box-sizing:border-box}
 .hep-compute-dialog :is(h2,h3,h4,p){margin:0}
@@ -14,43 +14,43 @@ export const computePlanningTheme = `
 .hep-compute-dialog button:disabled{cursor:default;opacity:.5}
 .hep-plan-icon{width:18px;height:18px;flex:none}
 
-.hep-plan-head{flex:none;padding:22px 24px 18px;border-bottom:1px solid var(--hep-border)}
+.hep-plan-head{flex:none;padding:26px 28px 20px;border-bottom:1px solid var(--hep-border);background:var(--hep-surface)}
 .hep-plan-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
 .hep-plan-top>div:first-child{min-width:0}
-.hep-plan-head h2{font-size:20px;line-height:1.4;font-weight:600}
-.hep-plan-top p{font-size:13px;color:var(--hep-muted);margin-top:6px}
+.hep-plan-head h2{font-size:23px;line-height:1.4;font-weight:600;letter-spacing:-.02em}
+.hep-plan-top p{font-size:13px;color:var(--hep-muted);margin-top:8px;line-height:1.7}
 .hep-plan-top-actions{flex:none}
 
-.harness-platform .hep-plan-close{display:grid;place-items:center;width:max(36px,var(--hep-hit-target));height:max(36px,var(--hep-hit-target));min-height:36px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--hep-muted)}
+.harness-platform .hep-plan-close{display:grid;place-items:center;width:max(36px,var(--hep-hit-target));height:max(36px,var(--hep-hit-target));min-height:36px;padding:0;border:1px solid var(--hep-border);border-radius:10px;background:var(--hep-surface);color:var(--hep-muted)}
 .harness-platform .hep-plan-close:hover:enabled{background:var(--hep-surface-muted);color:var(--hep-text)}
 
 .hep-plan-source{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;margin-top:14px;color:var(--hep-muted);font-size:12px}
 .hep-plan-source strong{color:var(--hep-text);font-weight:500;overflow-wrap:anywhere}
-.hep-plan-version{padding:2px 7px;border:1px solid var(--hep-border);border-radius:5px;background:var(--hep-surface-muted)}
+.hep-plan-version{padding:3px 8px;border:1px solid var(--hep-border);border-radius:6px;background:var(--hep-surface);font-variant-numeric:tabular-nums}
 .hep-plan-source details{min-width:0}
 .hep-plan-source summary{color:var(--hep-link);cursor:pointer;padding:3px 0}
 .hep-plan-source details[open]{flex-basis:100%}
 .hep-plan-source code{display:block;padding:10px 12px;margin-top:6px;border-radius:6px;background:var(--hep-surface-muted);font-size:12px;line-height:1.7;overflow-wrap:anywhere}
 
-.hep-plan-body{min-height:0;flex:1;overflow:auto;overscroll-behavior:contain;overflow-anchor:none;padding:24px;scrollbar-width:thin}
+.hep-plan-body{min-height:0;flex:1;overflow:auto;overscroll-behavior:contain;overflow-anchor:none;padding:26px 28px;scrollbar-width:thin}
 .hep-plan-config-layout,.hep-plan-config-main{min-width:0}
-.hep-plan-fields{display:grid;gap:22px;min-width:0;margin:0;padding:0;border:0}
+.hep-plan-fields{display:grid;gap:26px;min-width:0;margin:0;padding:0;border:0}
 
 .hep-plan-mode-switch{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.harness-platform .hep-plan-mode-switch button{display:flex;align-items:center;justify-content:flex-start;gap:12px;min-width:0;padding:14px 16px;border:1px solid var(--hep-border);border-radius:8px;background:var(--hep-surface);text-align:left;color:var(--hep-text)}
-.hep-plan-mode-switch button>span{display:grid;gap:3px;min-width:0}
-.hep-plan-mode-switch strong{font-size:14px;font-weight:600}
+.harness-platform .hep-plan-mode-switch button{display:flex;align-items:center;justify-content:flex-start;gap:12px;min-width:0;padding:18px 16px;border:1px solid var(--hep-border);border-radius:var(--hep-control-radius);background:var(--hep-surface);text-align:left;color:var(--hep-text)}
+.hep-plan-mode-switch button>span{display:grid;gap:4px;min-width:0}.hep-plan-mode-switch button::after{content:"";width:16px;height:16px;flex:none;margin-left:auto;border:1.5px solid var(--hep-border);border-radius:50%;background:var(--hep-surface)}.hep-plan-mode-switch button[data-active=true]::after{border-color:var(--hep-primary);background:var(--hep-primary);box-shadow:inset 0 0 0 3px var(--hep-surface)}
+.hep-plan-mode-switch strong{font-size:15px;font-weight:600}
 .hep-plan-mode-switch small{font-size:12px;font-weight:400;color:var(--hep-muted);line-height:1.5}
 .hep-plan-mode-switch .hep-plan-icon{color:var(--hep-muted)}
-.harness-platform .hep-plan-mode-switch button[data-active=true]{border-color:var(--hep-primary);background:var(--hep-primary-soft);color:var(--hep-link)}
+.harness-platform .hep-plan-mode-switch button[data-active=true]{border-color:var(--hep-primary);background:var(--hep-primary-soft);color:var(--hep-link);box-shadow:0 0 0 1px color-mix(in srgb,var(--hep-primary) 15%,transparent)}
 .hep-plan-mode-switch button[data-active=true] .hep-plan-icon{color:var(--hep-link)}
 
-.hep-plan-form-section{display:grid;gap:14px;min-width:0;padding-bottom:22px;border-bottom:1px solid var(--hep-border)}
+.hep-plan-form-section{display:grid;gap:16px;min-width:0;padding-bottom:26px;border-bottom:1px solid var(--hep-border)}
 .hep-plan-form-section>h3{display:flex;align-items:baseline;gap:10px;font-size:16px;line-height:1.5;font-weight:600}
 .hep-plan-form-section>h3 small{font-size:12px;color:var(--hep-muted);font-weight:400}
 .hep-plan-field{display:grid;min-width:0;gap:7px;color:var(--hep-text);font-size:13px;line-height:1.5}
 .hep-plan-field span>small,.hep-plan-field>small{font-weight:400;color:var(--hep-muted);font-size:12px}
-.hep-plan-field :is(input,select,textarea){width:100%;min-width:0;max-width:100%;border:1px solid var(--hep-border);border-radius:7px;background:var(--hep-surface);color:var(--hep-text);padding:9px 11px;font-size:14px;line-height:1.5}
+.hep-plan-field :is(input,select,textarea){width:100%;min-width:0;max-width:100%;border:1px solid var(--hep-border);border-radius:var(--hep-control-radius);background:var(--hep-surface-muted);color:var(--hep-text);padding:10px 12px;font-size:14px;line-height:1.5}
 .hep-plan-field :is(input,select){min-height:max(40px,var(--hep-hit-target))}
 .hep-plan-field textarea{resize:vertical;min-height:80px}
 .hep-plan-field :is(input,textarea)::placeholder{color:var(--hep-muted)}
@@ -77,12 +77,12 @@ export const computePlanningTheme = `
 .hep-plan-advanced{border:0}
 .hep-plan-advanced>.hep-plan-field{margin-top:6px}
 
-.hep-plan-segmented{display:flex;gap:4px;padding:4px;border-radius:7px;background:var(--hep-surface-muted)}
-.harness-platform .hep-plan-segmented button{flex:1;min-height:max(36px,var(--hep-hit-target));padding:6px 10px;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--hep-muted);font-size:13px}
+.hep-plan-segmented{display:flex;gap:4px;padding:4px;border-radius:var(--hep-control-radius);background:var(--hep-surface-muted)}
+.harness-platform .hep-plan-segmented button{flex:1;min-height:max(36px,var(--hep-hit-target));padding:6px 10px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--hep-muted);font-size:13px}
 .harness-platform .hep-plan-segmented button[data-active=true]{border-color:var(--hep-border);background:var(--hep-surface);color:var(--hep-link);font-weight:500}
 .hep-plan-hint,.hep-plan-model-meta{font-size:12px;line-height:1.7;color:var(--hep-muted)}
 .hep-plan-model-suggestions{display:grid;gap:16px}
-.hep-plan-model-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:16px;border:1px solid var(--hep-border);border-radius:7px;background:var(--hep-surface-muted)}
+.hep-plan-model-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:18px;border:1px solid var(--hep-border);border-radius:var(--hep-control-radius);background:var(--hep-surface-muted)}
 .hep-plan-model-row>.agent-section-heading{grid-column:1/-1;margin:0}
 .hep-plan-model-row>.hep-plan-field:last-child{grid-column:1/-1}
 .hep-plan-model-row strong{font-size:13px;font-weight:500}
@@ -92,9 +92,9 @@ export const computePlanningTheme = `
 .hep-plan-trace-control{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--hep-muted)}
 .hep-plan-trace-control>label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--hep-text);cursor:pointer}
 .hep-plan-trace-control input,.hep-plan-trace-row input{flex:none;width:16px;height:16px;accent-color:var(--hep-primary)}
-.hep-plan-trace-box{min-width:0;max-height:272px;overflow:auto;border:1px solid var(--hep-border);border-radius:7px;background:var(--hep-surface);scrollbar-width:thin}
+.hep-plan-trace-box{min-width:0;max-height:272px;overflow:auto;border:1px solid var(--hep-border);border-radius:var(--hep-control-radius);background:var(--hep-surface);scrollbar-width:thin}
 .hep-plan-trace-row{display:grid;grid-template-columns:16px minmax(0,1fr) auto;align-items:start;gap:6px 10px;padding:12px;border-bottom:1px solid var(--hep-border);cursor:pointer}
-.hep-plan-trace-row:last-child{border-bottom:0}
+.hep-plan-trace-row:last-child{border-bottom:0}.hep-plan-trace-row:has(input:checked){background:var(--hep-primary-soft)}.hep-plan-trace-row:not(:has(input:checked)):hover{background:var(--hep-surface-muted)}
 .hep-plan-trace-row input{margin-top:4px}
 .hep-plan-trace-row>span{font-size:13px;overflow-wrap:anywhere}
 .hep-plan-trace-row small{display:block;font-size:12px;color:var(--hep-muted);margin-top:3px;overflow-wrap:anywhere}
@@ -115,7 +115,7 @@ export const computePlanningTheme = `
 .hep-plan-connection-actions [data-status=ssh_reachable]{color:var(--hep-success)}
 .hep-plan-connection-actions [data-status=unreachable]{color:var(--hep-danger)}
 
-.hep-plan-notice{padding:12px 14px;border:1px solid var(--hep-border);border-radius:7px;background:var(--hep-surface-muted);font-size:13px;line-height:1.7;color:var(--hep-muted)}
+.hep-plan-notice{padding:14px 16px;border:1px solid var(--hep-border);border-radius:var(--hep-control-radius);background:var(--hep-surface-muted);font-size:13px;line-height:1.7;color:var(--hep-muted)}
 .hep-plan-notice strong{display:block;color:var(--hep-text);font-weight:500}
 .hep-plan-notice p{margin-top:4px}
 .hep-plan-notice code{overflow-wrap:anywhere}
@@ -133,14 +133,14 @@ export const computePlanningTheme = `
 .hep-plan-low-policy h4{font-size:14px;font-weight:500}
 .hep-plan-low-policy>p{font-size:12px;color:var(--hep-muted)}
 
-.hep-plan-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;flex:none;padding:16px 24px;border-top:1px solid var(--hep-border);background:var(--hep-surface)}
+.hep-plan-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;flex:none;padding:18px 28px;border-top:1px solid var(--hep-border);background:var(--hep-surface);box-shadow:none}
 .hep-plan-footer>p{font-size:12px;line-height:1.6;color:var(--hep-muted)}
 .hep-plan-footer>div{display:flex;align-items:center;gap:10px;flex:none}
 .harness-platform .hep-plan-footer button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:max(40px,var(--hep-hit-target));padding:8px 14px;font-size:13px;white-space:nowrap}
 .harness-platform .hep-plan-primary{border-color:var(--hep-primary);background:var(--hep-primary);color:#fff}
 .harness-platform .hep-plan-primary:hover:enabled{border-color:var(--hep-primary-hover);background:var(--hep-primary-hover);color:#fff}
 
-@media(max-width:600px){.hep-compute-dialog{width:calc(100vw - 24px);max-height:calc(100dvh - 24px);margin:auto;border-radius:10px}
+@media(max-width:600px){.hep-compute-dialog{width:calc(100vw - 24px);max-height:calc(100dvh - 24px);margin:auto;border-radius:16px}
 .hep-plan-head{padding:16px}
 .hep-plan-head h2{font-size:18px}
 .hep-plan-top p{font-size:12px;line-height:1.6}
@@ -148,7 +148,7 @@ export const computePlanningTheme = `
 .hep-plan-body{padding:18px 16px}
 .hep-plan-fields{gap:18px}
 .hep-plan-mode-switch{gap:8px}
-.harness-platform .hep-plan-mode-switch button{padding:12px 10px;gap:8px;align-items:flex-start}
+.harness-platform .hep-plan-mode-switch button{padding:13px 10px;gap:8px;align-items:flex-start}.hep-plan-mode-switch button::after{width:13px;height:13px;margin-top:3px}.hep-plan-mode-switch strong{font-size:14px}
 .hep-plan-mode-switch small{font-size:12px}
 .hep-plan-mode-switch .hep-plan-icon{width:16px;height:16px;margin-top:3px}
 .hep-plan-field-grid,.hep-plan-field-grid.hep-plan-three,.hep-plan-model-row{grid-template-columns:minmax(0,1fr)}

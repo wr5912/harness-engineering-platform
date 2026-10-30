@@ -838,6 +838,9 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
   return (
     <main className="harness-instances-page" aria-label="实例管理">
       <style>{instanceTheme}</style>
+      <header className="harness-page-heading instance-page-heading">
+        <div><span className="instance-eyebrow"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="3" y="2.5" width="14" height="6" rx="2" stroke="currentColor" strokeWidth="1.5" /><rect x="3" y="11.5" width="14" height="6" rx="2" stroke="currentColor" strokeWidth="1.5" /><path d="M6 5.5h.01M6 14.5h.01m4-9h4m-4 9h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>运行 · 交付 · 观察</span><h1>实例管理</h1><p>管理智能体的运行实例，随时核对来源、状态与访问入口。</p></div>
+      </header>
 
       <dialog ref={createDialog} id="instance-create" aria-labelledby="instance-create-title" className="instance-dialog instance-create-dialog" onCancel={event => { event.preventDefault(); setCreating(false) }}>
         {creating && !actionDialog && <>
