@@ -94,7 +94,10 @@ export function generateProfile(config: StandaloneConfig, home: string, root: st
         { id: 'harness-sdk-preset', name: join(root, 'runtime/sdk-preset.mts'), config: { presetId: config.presetId } },
       ] : [
         { id: 'webserver', name: join(root, 'runtime/web/container-webserver.mjs'), disabled: false, inject: ['webStartup'], config: { host: { __dshExpression: "ctx.webStartup.host ?? '127.0.0.1'" }, port: { __dshExpression: 'ctx.webStartup.port ?? 3080' } } },
-        { id: 'web-runtime', name: join(root, 'runtime/web/container-web-app.mjs'), disabled: false, config: { openBrowser: false, printUrl: false } },
+        { id: 'web-runtime', name: join(root, 'runtime/web/container-web-app.mjs'), disabled: false, inject: ['webStartup'], config: {
+          openBrowser: false, printUrl: false, surfaceContext: true,
+          publicUrl: { __dshExpression: 'ctx.webStartup.publicUrl' },
+        } },
       ]),
     ] },
   ]

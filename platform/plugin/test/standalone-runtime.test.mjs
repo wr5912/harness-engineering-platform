@@ -3,6 +3,7 @@ import test from 'node:test'
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { load, FAILSAFE_SCHEMA, Type } from 'js-yaml'
 process.env.HARNESS_DSH_ENTRY ??= '/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/package.json'
 import { initializeStandalone, configureStandalone, projectManagedPatch, prepareStandaloneSdk } from '../src/standalone/bootstrap.ts'
 import { readStandaloneConfig } from '../src/standalone/config.ts'
@@ -34,6 +35,10 @@ test('新 HOME 原生初始化一次，冻结业务配置保留，模型与 MCP 
   assert.match(runtime, /business-tools/)
   assert.doesNotMatch(runtime, /mcp-manager\.mjs|provider: old|business-runtime/)
   assert.match(runtime, /standalone-plugin\.js/)
+  const schema = FAILSAFE_SCHEMA.extend([new Type('tag:yaml.org,2002:js', { kind: 'scalar', construct: expression => expression })])
+  const web = load(runtime, { schema }).flatMap(row => row.insert ?? []).find(row => row.id === 'web-runtime')
+  assert.deepEqual(web.inject, ['webStartup'])
+  assert.equal(web.config.publicUrl, 'ctx.webStartup.publicUrl')
   const changed = { ...first, mcp: { ...first.mcp, sharedToken: 'b'.repeat(64) } }
   writeFileSync(join(f.home, 'standalone/config.json'), JSON.stringify(changed))
   writeFileSync(join(f.home, 'profiles/standalone/cordis.patch.yml'), '# 原生UI保存的新模型\n[]\n')
