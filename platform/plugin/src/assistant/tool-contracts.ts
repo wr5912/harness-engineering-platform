@@ -25,7 +25,7 @@ const string = { type: 'string' }, strings = { type: 'array', items: string }, o
 const fields: MapValue = {
   source_ref: { type: 'string', pattern: '^git:[a-f0-9]{40}$', description: '可选固定来源；Candidate、Case、角色绑定均读取同一 Git 提交，Run 仍保存到原版本。' },
   mcp_fixture: { type: 'object', required: ['schema_version', 'mode', 'connections'], additionalProperties: false, properties: {
-    schema_version: { const: 1 }, mode: { const: 'mock' }, connections: { type: 'array', minItems: 1, items: {
+    schema_version: { type: 'integer', const: 1 }, mode: { type: 'string', const: 'mock' }, connections: { type: 'array', minItems: 1, items: {
       type: 'object', required: ['server_id', 'original_url', 'url'], additionalProperties: false,
       properties: { server_id: string, original_url: string, url: string, enabled: { type: 'boolean' } },
     } },
