@@ -38,7 +38,12 @@ class BusinessStartupTest(unittest.TestCase):
         return types.SimpleNamespace(**defaults)
 
     def helper(self):
-        return mock.patch.object(dev, "business_helper", return_value={"assetRoot": str(self.root), "sourceDigest": "sha256:fixed"})
+        def launch(_file, target):
+            identity = target.get("identityMode", "published")
+            return {"assetRoot": str(self.root), "sourceDigest": "sha256:fixed", "registered": False,
+                    "development": identity == "development", "identityMode": identity,
+                    "accessMode": target.get("accessMode", "authenticated")}
+        return mock.patch.object(dev, "business_helper", side_effect=launch)
 
     def test_business_dry_run_preserves_tree_and_closes_direct_flags(self):
         args = self.args()
@@ -82,7 +87,8 @@ class BusinessStartupTest(unittest.TestCase):
         session = home / "old-session"
         session.write_text("preserve")
         for development, access_mode in [(True, "anonymous"), (True, "authenticated"), (False, "anonymous"), (False, "authenticated")]:
-            launch = {"assetRoot": str(self.root), "sourceDigest": "sha256:fixed", "development": development, "accessMode": access_mode}
+            launch = {"assetRoot": str(self.root), "sourceDigest": "sha256:fixed", "registered": False,
+                      "development": development, "identityMode": "development" if development else "published", "accessMode": access_mode}
             with self.subTest(development=development, access_mode=access_mode), \
                  mock.patch.object(dev, "business_helper", return_value=launch), \
                  mock.patch.object(dev, "read_model_policy", return_value={"source": "platform", "default": None}):
@@ -134,7 +140,8 @@ class BusinessStartupTest(unittest.TestCase):
                  mock.patch.object(dev, "existing_instance", return_value=(self.state, manifest)), \
                  mock.patch.object(dev, "validate_existing_identity"), \
                  mock.patch.object(dev, "read_model_policy", return_value=policy), \
-                 mock.patch.object(dev, "business_helper", return_value={"assetRoot": str(self.root), "sourceDigest": "sha256:new", "development": development}):
+                 mock.patch.object(dev, "business_helper", return_value={"assetRoot": str(self.root), "sourceDigest": "sha256:new", "registered": True,
+                      "development": development, "identityMode": "development" if development else "published", "accessMode": "authenticated"}):
                 args = self.args(model_policy="policy.json", replace=True)
                 if development:
                     contract, _ = dev.prepare_up(args)
@@ -148,10 +155,12 @@ class BusinessStartupTest(unittest.TestCase):
         with self.helper() as helper, mock.patch.object(dev, "read_model_policy", return_value={"source": "platform", "default": None}):
             contract, _ = dev.prepare_up(self.args(business_access_mode="anonymous", business_identity_mode="development"))
             self.assertEqual(helper.call_args.args[1]["identityMode"], "development")
+            self.assertEqual(helper.call_args.args[1]["accessMode"], "anonymous")
             contract["patch"] = "/opt/dsh-managed/managed.patch.yml"
             with mock.patch.object(dev, "workspace_id", return_value="workspace-fixture"):
                 dev.render_business_instance(contract, "business-test", 53191, "compose-fixture")
             self.assertEqual(helper.call_args.args[1]["identityMode"], "development")
+            self.assertEqual(helper.call_args.args[1]["accessMode"], "anonymous")
 
     def test_business_environment_uses_instance_patch_in_current_and_historical_operations(self):
         contract = {**self.contract, "patch": "managed.patch.yml", "evaluation_patch": "evaluation.patch.yml", "business_control": {"source_digest": "fixed"}}
