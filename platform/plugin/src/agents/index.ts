@@ -29,6 +29,7 @@ import { readRunTrace } from '../evaluation/trace.ts'
 import { createDecisionDatasetHandler } from '../evaluation/datasets.ts'
 import { createEvaluationJobs, EvaluationJobError, redactKnownValues } from '../evaluation/jobs.ts'
 import { caseSourceReferences, createCaseManagementHandler, type RunCaseSource } from '../evaluation/cases.ts'
+import { caseObservation } from '../evaluation/case-observation.ts'
 import { readAssetDiff, readFixedAsset } from './asset-diff.ts'
 import { createAgent } from './create-agent.ts'
 import { createSdkHandler } from '../sdk/operations.ts'
@@ -824,7 +825,11 @@ async function fusionVerify(root: string, body: JsonMap, signal?: AbortSignal) {
       if (image.source_id !== `experiment:${id}` || !image.local_image_id || !cases.some(row => { const observed = row.load_observation as JsonMap | null; const raw = row.raw_evidence as JsonMap | undefined; return observed?.session_id && observed.preset_matches === true && observed.workspace_matches === true && (raw?.['trace.jsonl'] as JsonMap)?.present === true })) throw new RpcError('verification_failed', 'Run 缺少实际镜像、Session 和装载匹配证据')
     } else {
       const summary = requireObject(run.summary)
-      if ((summary.effective_verdict ?? summary.overall_verdict) !== 'passed' || check.case_ids!.some(caseId => !cases.some(row => row.case_id === caseId && Array.isArray(row.trials) && row.trials.length > 0 && row.trials.every(trial => (trial as JsonMap).verdict === 'passed') && (row.evidence as JsonMap[]).every(ref => ref.present === true)))) throw new RpcError('verification_failed', '约定能力没有已通过且证据完整的 Run')
+      const reviewed = source.review_mode === 'ai'
+      if ((summary.effective_verdict ?? summary.overall_verdict) !== 'passed' || reviewed && summary.review_status !== 'completed'
+        || check.case_ids!.some(caseId => !cases.some(row => row.case_id === caseId && Array.isArray(row.trials) && row.trials.length > 0
+          && row.trials.every(trial => (trial as JsonMap).execution_status === 'completed') && caseObservation(row, reviewed).value === 'passed'
+          && Array.isArray(row.evidence) && row.evidence.length > 0 && (row.evidence as JsonMap[]).every(ref => ref.present === true)))) throw new RpcError('verification_failed', '约定能力没有已通过且证据完整的 Run')
     }
     evidence = { run_id: runId, run_path: run.run_path, run_sha256: runEvidenceDigest(root, id, runId), case_ids: check.case_ids ?? [] }
   }

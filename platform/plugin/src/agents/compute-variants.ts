@@ -6,6 +6,7 @@ import { join, resolve, relative, sep } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { load as loadYaml, dump as dumpYaml } from 'js-yaml'
 import { parseEvaluationDocument } from '../evaluation/cases.ts'
+import { caseObservation } from '../evaluation/case-observation.ts'
 import { readRunEvidenceFile } from './run-files.ts'
 import { extractGraphExecutions, measureModelUsage } from '../evaluation/model-usage.ts'
 import type { ModelAttempt } from '../evaluation/model-attempts.ts'
@@ -446,7 +447,7 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
         // 一个 Case 的证据目录只记录一次执行；不能把重复结果行当成独立重复试验。
         if (item.trials?.length !== 1) issues(`${caseId} 需要每 Run 一次且证据独立的 Trial`)
         const trial = item.trials?.[0]
-        const verdict = item.review?.reviewed_verdict ?? trial?.verdict
+        const verdict = caseObservation(item, lock.review_mode === 'ai').value
         if (trial?.execution_status !== 'completed' || !['passed', 'failed'].includes(verdict)) issues(`${caseId} 功能结论未确定`)
         const originalFiles = new Map<string, Buffer>()
         for (const file of ['response.json', 'tools.jsonl']) {

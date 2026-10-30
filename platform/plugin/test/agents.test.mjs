@@ -559,6 +559,32 @@ test('融合必须有封存 Run 的目标来源、资产 hash 与实际 Session 
     await rpc(handler, 'fusion/verify', { ...expected, check_id: 'route-behavior', run_id: runId })
     const finished = await rpc(handler, 'fusion/finalize', expected)
     assert.equal(finished.creation_status, 'completed')
+    // 隔离夹具模拟已封存的逐例复核；真实 Run 仍由执行器产生，测试不调用模型。
+    const names = ['inputs.lock.json', 'results.jsonl', 'analysis.json', 'summary.json', 'run.yaml']
+    const originals = new Map(names.map(name => [name, readFileSync(join(base, name), 'utf8')]))
+    const reseal = () => {
+      let manifest = originals.get('run.yaml')
+      for (const [key, file] of [['inputs_sha256', 'inputs.lock.json'], ['results_sha256', 'results.jsonl'], ['analysis_sha256', 'analysis.json'], ['summary_sha256', 'summary.json']]) {
+        const hash = createHash('sha256').update(readFileSync(join(base, file))).digest('hex')
+        manifest = manifest.replace(new RegExp(`^${key}:.*$`, 'm'), `${key}: ${hash}`)
+      }
+      write(join(base, 'run.yaml'), manifest)
+    }
+    const inputs = JSON.parse(originals.get('inputs.lock.json'))
+    write(join(base, 'inputs.lock.json'), JSON.stringify({ ...inputs, review_mode: 'ai' }))
+    const trial = JSON.parse(originals.get('results.jsonl').trim())
+    write(join(base, 'results.jsonl'), JSON.stringify({ ...trial, verdict: 'inconclusive' }) + '\n')
+    const summary = JSON.parse(originals.get('summary.json'))
+    write(join(base, 'summary.json'), JSON.stringify({ ...summary, effective_verdict: 'passed', review_status: 'completed' }))
+    for (const reviewed of ['passed', 'failed', undefined]) {
+      const analysis = JSON.parse(originals.get('analysis.json'))
+      analysis.scenes[0].case_reviews = reviewed ? [{ case_id: 'U-CASE-001', reviewed_verdict: reviewed }] : []
+      write(join(base, 'analysis.json'), JSON.stringify(analysis)); reseal()
+      const verify = () => rpc(handler, 'fusion/verify', { ...expected, check_id: 'route-behavior', run_id: runId })
+      if (reviewed === 'passed') await verify()
+      else await assert.rejects(verify, /verification_failed/)
+    }
+    for (const [name, content] of originals) write(join(base, name), content)
     const evaluation = join(fx.root, 'agents/test-agent/evaluation.md')
     const originalEvaluation = readFileSync(evaluation, 'utf8')
     write(evaluation, originalEvaluation.replace('返回 pong。', '返回新标准。'))

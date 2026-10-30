@@ -44,6 +44,10 @@ test('智能体与评测概览共用逐例判定，混合或缺失观察不伪�
   assert.equal(caseObservation({ trials: [] }).value, 'pending')
   assert.equal(caseObservation({ review: { reviewed_verdict: 'inconclusive' }, trials: [{ verdict: 'failed' }] }).value, 'inconclusive')
   assert.equal(caseObservation({ review: { reviewed_verdict: 'invalid' }, trials: [{ verdict: 'passed' }] }).value, 'passed')
+  assert.equal(caseObservation({ trials: [{ verdict: 'passed' }] }, true).value, 'pending')
+  assert.equal(caseObservation({ review: { reviewed_verdict: 'invalid' }, trials: [{ verdict: 'passed' }] }, true).value, 'pending')
+  assert.equal(caseObservation({ review: { reviewed_verdict: 'passed' }, trials: [{ verdict: 'inconclusive' }] }, true).value, 'passed')
+  assert.equal(caseObservation({ review: { reviewed_verdict: 'failed' }, trials: [{ verdict: 'passed' }] }, true).value, 'failed')
 })
 
 test('图表在真实React渲染中保留可读分类，零总数不生成无效SVG或进度比例', () => {

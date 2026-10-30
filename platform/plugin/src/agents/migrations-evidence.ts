@@ -5,6 +5,7 @@ import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { dataPath } from '../tasks/files.ts'
 import { parseEvaluationDocument } from '../evaluation/cases.ts'
+import { caseObservation } from '../evaluation/case-observation.ts'
 import { canonical, type MigrationMap } from './migrations-source.ts'
 
 const execute = promisify(execFile)
@@ -76,7 +77,7 @@ export async function migrationRunEvidence(root: string, id: string, agent: stri
         }
         if (!failures.some(reason => reason.startsWith(`${caseId} 缺少原始执行证据`)) && checks?.preset_matches === true && checks.workspace_matches === true && typeof checks.session_id === 'string' && checks.session_id && Array.isArray(output) && output.some((item: unknown) => typeof item === 'string' && item.trim())) loaded++
         else { failures.push(`${caseId} 缺少真实装载和响应观察`); continue }
-        const caseVerdict = inputs.review_mode === 'ai' ? evidence.review?.reviewed_verdict : selected.every(row => row.verdict === 'passed') ? 'passed' : 'inconclusive'
+        const caseVerdict = caseObservation(evidence, inputs.review_mode === 'ai').value
         if (caseVerdict === 'passed') passed++
         else failures.push(`${caseId} 有效判定未通过或未知`)
       }
