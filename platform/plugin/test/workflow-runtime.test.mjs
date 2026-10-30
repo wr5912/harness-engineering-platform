@@ -339,11 +339,14 @@ function codeOnlyFixture(t, run, renderResult, hybrid) {
     inputSchema: { type: 'object', properties: { request: { type: 'string' } }, required: ['request'], additionalProperties: false }, run }) })
   const signal = new AbortController().signal
   const hook = (name, ...args) => hooks.get(name)?.at(-1)(...args)
-  async function enter(turn, text, target = agent) {
-    const messages = text === undefined ? [] : [{ role: 'user', id: `message-${turn}`, source: { kind: 'user' }, content: [{ type: 'text', text }] }]
-    if (text !== undefined) events.push({ type: 'turn/start', data: { turn } })
+  async function enterMessages(turn, messages, { target = agent, start = true } = {}) {
+    if (start) events.push({ type: 'turn/start', data: { turn } })
     const decision = await hook('agent/pre-step', { agent: target, turn }, async () => ({ kind: 'enter', messages }))
     return { decision, commit() { for (const message of messages) events.push({ type: 'user/message', data: message }) } }
+  }
+  async function enter(turn, text, target = agent) {
+    const messages = text === undefined ? [] : [{ role: 'user', id: `message-${turn}`, source: { kind: 'user' }, content: [{ type: 'text', text }] }]
+    return enterMessages(turn, messages, { target, start: text !== undefined })
   }
   async function stream(turn, target = agent, currentSignal = signal) {
     const route = await hook('agent/request', { agent: target, turn, step: events.length, signal: currentSignal }, async () => ({ provider: 'remote', model: 'remote' }))
@@ -362,8 +365,168 @@ function codeOnlyFixture(t, run, renderResult, hybrid) {
       source: { kind: 'tool', callId: call.id, name: call.name }, content: result.content, ...(result.isError ? { isError: true } : {}) }, ...(result.isError ? { error: { code: 'TOOL_FAILED' } } : {}) } })
     return result
   }
-  return { ...f, agent, hooks, hook, events, titles, adapters, enter, stream, execute }
+  function commitReply(turn, response) {
+    events.push({ type: 'assistant/message', data: { turn, message: { role: 'assistant', source: { kind: 'model',
+      provider: response.route.provider, model: response.route.model }, content: [{ type: 'text', text: response.text }] } } })
+  }
+  return { ...f, agent, hooks, hook, events, titles, adapters, enter, enterMessages, commitReply, stream, execute }
 }
+
+// 与真实原生完成通知保持相同source与三段文本结构；正文保留证据不足的终态限定。
+const nativeSettlement = () => ({ role: 'user', id: '3fc55a52-9bd7-408a-beb3-88ab496a017a', source: {
+  kind: 'subagent-settled', form: 'notice',
+  summary: 'Background subagent 7234629b-6616-43f9-976a-39c5ff083227 finished and will do no further work unless you send it more.',
+  senderSessionId: '7234629b-6616-43f9-976a-39c5ff083227',
+}, content: [
+  { type: 'text', text: 'Background subagent 7234629b-6616-43f9-976a-39c5ff083227 finished and will do no further work unless you send it more.' },
+  { type: 'text', text: 'Its closing message:' },
+  { type: 'text', text: '排查查询已完成。核心结论：在当前可见的 SOC 数据源中，两端 IP 均无任何资产、拓扑或流量记录，无法据此定位故障原因。' },
+] })
+
+for (const mode of ['code-only', 'hybrid']) {
+  const hybrid = mode === 'hybrid' ? { prepareCall: () => assert.fail('原生通知不能新增模型调用') } : undefined
+  test(`${mode}原生子任务完成通知本地投递正文和来源，不重跑图或工具`, async t => {
+    let graphs = 0
+    const f = codeOnlyFixture(t, async () => { graphs++; return { reply: '不得执行' } }, undefined, hybrid)
+    const message = nativeSettlement(), messages = [message, structuredClone(message)]
+    const before = structuredClone(messages), entered = await f.enterMessages(2, messages)
+    assert.equal(entered.decision.messages, messages)
+    assert.deepEqual(messages, before)
+    entered.commit()
+    const response = await f.stream(2)
+    assert.equal(response.route.provider, mode === 'hybrid' ? 'harness-workflow' : 'harness-code-only')
+    assert.match(response.text, /子任务回执（7234629b-6616-43f9-976a-39c5ff083227）/)
+    assert.equal(response.text.split('Its closing message:').length - 1, 1, '重复同一原生消息只投递一次')
+    assert.ok(response.text.endsWith(message.content.at(-1).text))
+    assert.equal(response.chunks.some(chunk => chunk.blockType === 'tool-call'), false)
+    assert.equal(graphs, 0)
+    assert.match((await f.stream(2)).text, /回执已投递/)
+  })
+
+  test(`${mode}通知恢复只消费当前回合，已投递正文和旧通知不可重放`, async t => {
+    const f = codeOnlyFixture(t, async () => assert.fail('恢复通知不能执行图'), undefined, hybrid)
+    const message = nativeSettlement(), entered = await f.enterMessages(3, [message]); entered.commit()
+    f.hook('agent/disposed', { agent: f.agent })
+    const response = await f.stream(3)
+    assert.ok(response.text.endsWith(message.content.at(-1).text))
+    f.commitReply(3, response)
+    f.hook('agent/disposed', { agent: f.agent })
+    assert.match((await f.stream(3)).text, /回执已投递/)
+    f.hook('session/event', f.agent.session, { type: 'turn/end', data: { turn: 3 } })
+    f.events.push({ type: 'turn/end', data: { turn: 3 } })
+    const duplicate = await f.enterMessages(4, [structuredClone(message)]); duplicate.commit()
+    assert.doesNotMatch((await f.stream(4)).text, /Its closing message:|无法据此定位/)
+    assert.equal((await f.stream(4)).chunks.some(chunk => chunk.blockType === 'tool-call'), false)
+  })
+
+  test(`${mode}人类请求与原生通知并存时，图仅接收用户请求并保留通知正文`, async t => {
+    const requests = [], f = codeOnlyFixture(t, async context => { requests.push(context.input.request); return { reply: '已处理用户新请求' } }, undefined, hybrid)
+    const message = nativeSettlement(), user = { id: 'human-mixed', source: { kind: 'user' }, content: [{ type: 'text', text: '请查询新的台账' }] }
+    const messages = [message, user], entered = await f.enterMessages(5, messages), first = await f.stream(5)
+    assert.equal(entered.decision.messages, messages)
+    assert.deepEqual(JSON.parse(first.chunks.find(chunk => chunk.type === 'tool-call-delta').argumentsDelta), { request: '请查询新的台账' })
+    entered.commit(); await f.execute(5, first)
+    f.hook('agent/disposed', { agent: f.agent })
+    const response = await f.stream(5)
+    assert.match(response.text, /^已处理用户新请求/)
+    assert.ok(response.text.endsWith(message.content.at(-1).text))
+    assert.deepEqual(requests, ['请查询新的台账'])
+    f.commitReply(5, response); f.hook('agent/disposed', { agent: f.agent })
+    assert.doesNotMatch((await f.stream(5)).text, /Its closing message:/)
+    assert.deepEqual(requests, ['请查询新的台账'], '恢复只能消费原图回执')
+  })
+}
+
+test('正在执行用户图时接收原生通知不覆盖原请求，取消终态不改成成功', async t => {
+  let graphs = 0
+  const f = codeOnlyFixture(t, async context => { graphs++; return { reply: `用户结果：${context.input.request}` } })
+  const entered = await f.enter(6, '继续原任务'), first = await f.stream(6); entered.commit()
+  const message = nativeSettlement()
+  message.content[0].text = message.source.summary = 'Background subagent child was stopped before it finished.'
+  message.content[2].text = '未取得完整结果，原业务操作状态未知。'
+  const notified = await f.enterMessages(6, [message], { start: false }); notified.commit()
+  await f.execute(6, first)
+  const response = await f.stream(6)
+  assert.match(response.text, /^用户结果：继续原任务/)
+  assert.match(response.text, /was stopped before it finished/)
+  assert.ok(response.text.endsWith('未取得完整结果，原业务操作状态未知。'))
+  assert.equal(graphs, 1)
+})
+
+test('同回合用户接续保留尚未交付的通知；已交付通知不夹入后续普通请求', async t => {
+  const requests = [], f = codeOnlyFixture(t, async context => { requests.push(context.input.request); return { reply: context.input.request } })
+  const message = nativeSettlement(), notice = await f.enterMessages(7, [message]); notice.commit()
+  const user = { id: 'human-after-notice', source: { kind: 'user' }, content: [{ type: 'text', text: '当前用户任务' }] }
+  const entered = await f.enterMessages(7, [user], { start: false }), first = await f.stream(7); entered.commit()
+  await f.execute(7, first)
+  const response = await f.stream(7)
+  assert.match(response.text, /^当前用户任务/)
+  assert.ok(response.text.endsWith(message.content.at(-1).text))
+  f.commitReply(7, response)
+  const next = await f.enterMessages(7, [{ ...user, id: 'human-next', content: [{ type: 'text', text: '第二个用户任务' }] }], { start: false })
+  const second = await f.stream(7); next.commit(); await f.execute(7, second)
+  assert.equal((await f.stream(7)).text, '第二个用户任务')
+  assert.deepEqual(requests, ['当前用户任务', '第二个用户任务'])
+})
+
+test('同子会话新完成通知即使正文相同也不能被旧回复吞掉，恢复仍按消息先后消费', async t => {
+  const f = codeOnlyFixture(t, async () => assert.fail('原生通知不能执行图'))
+  const first = nativeSettlement(), entered = await f.enterMessages(8, [first]); entered.commit()
+  const response = await f.stream(8); f.commitReply(8, response)
+  const second = { ...structuredClone(first), id: 'second-real-notice' }
+  const next = await f.enterMessages(8, [second], { start: false }); next.commit()
+  f.hook('agent/disposed', { agent: f.agent })
+  const restored = await f.stream(8)
+  assert.ok(restored.text.endsWith(second.content.at(-1).text), '新ID的通知不受之前同正文assistant消息影响')
+  f.commitReply(8, restored); f.hook('agent/disposed', { agent: f.agent })
+  assert.match((await f.stream(8)).text, /回执已投递/)
+})
+
+test('同回合新用户与通知已入日志但尚未发图调用时，恢复不消费旧用户的图回执', async t => {
+  const requests = [], f = codeOnlyFixture(t, async context => { requests.push(context.input.request); return { reply: `结果：${context.input.request}` } })
+  let entered = await f.enter(9, '第一个用户任务'), first = await f.stream(9); entered.commit(); await f.execute(9, first)
+  f.commitReply(9, await f.stream(9))
+  const message = nativeSettlement(), user = { id: 'human-restored-batch', source: { kind: 'user' }, content: [{ type: 'text', text: '第二个用户任务' }] }
+  entered = await f.enterMessages(9, [user, message], { start: false }); entered.commit()
+  f.hook('agent/disposed', { agent: f.agent })
+  const restored = await f.stream(9)
+  assert.deepEqual(JSON.parse(restored.chunks.find(chunk => chunk.type === 'tool-call-delta').argumentsDelta), { request: '第二个用户任务' })
+  await f.execute(9, restored)
+  const response = await f.stream(9)
+  assert.match(response.text, /^结果：第二个用户任务/)
+  assert.ok(response.text.endsWith(message.content.at(-1).text))
+  assert.deepEqual(requests, ['第一个用户任务', '第二个用户任务'])
+})
+
+test('用户结果已交付后同回合恢复新通知，只投递通知而不重复旧用户结果', async t => {
+  let graphs = 0
+  const f = codeOnlyFixture(t, async () => { graphs++; return { reply: '旧用户结果' } })
+  let entered = await f.enter(10, '原任务'), first = await f.stream(10); entered.commit(); await f.execute(10, first)
+  f.commitReply(10, await f.stream(10))
+  entered = await f.enterMessages(10, [nativeSettlement()], { start: false }); entered.commit()
+  f.hook('agent/disposed', { agent: f.agent })
+  const response = await f.stream(10)
+  assert.match(response.text, /^### 子任务回执/)
+  assert.doesNotMatch(response.text, /旧用户结果/)
+  assert.equal(graphs, 1)
+})
+
+test('原生本地派发的tool-call assistant不是最终文本回复，恢复必须消费图结果并投递通知', async t => {
+  let graphs = 0
+  const f = codeOnlyFixture(t, async () => { graphs++; return { reply: '本轮用户图已完成' } })
+  const user = { id: 'human-native-call', source: { kind: 'user' }, content: [{ type: 'text', text: '查询当前台账' }] }
+  const message = nativeSettlement(), entered = await f.enterMessages(11, [user, message]), first = await f.stream(11); entered.commit()
+  f.events.push({ type: 'assistant/message', data: { turn: 11, step: 1, message: { role: 'assistant',
+    source: { kind: 'model', provider: first.route.provider, model: first.route.model },
+    content: [first.chunks.find(chunk => chunk.type === 'block-end' && chunk.block.type === 'tool-call').block] } } })
+  await f.execute(11, first)
+  f.hook('agent/disposed', { agent: f.agent })
+  const response = await f.stream(11)
+  assert.match(response.text, /^本轮用户图已完成/)
+  assert.ok(response.text.endsWith(message.content.at(-1).text))
+  assert.equal(response.chunks.some(chunk => chunk.blockType === 'tool-call'), false)
+  assert.equal(graphs, 1)
+})
 
 test('纯代码原生回合将当前输入交给LangGraph和真实工具，再按同轮回执本地回复', async t => {
   const f = codeOnlyFixture(t, context => runWorkflow(context, [

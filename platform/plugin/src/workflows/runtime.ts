@@ -240,8 +240,12 @@ interface CodeOnlyTurn {
   callId: string
   issued: boolean
   replied: boolean
+  notices?: WorkflowNotice[]
+  noticeOnly?: boolean
   pending?: { kind: 'tool' } | { kind: 'text'; text: string }
 }
+
+interface WorkflowNotice { id: string; senderSessionId: string; text: string }
 
 const textContent = (message: any): string => (message?.content ?? [])
   .filter((block: any) => block.type === 'text').map((block: any) => block.text).join('\n')
@@ -269,13 +273,61 @@ function registerWorkflowAgent(ctx: any, options: CodeOnlyWorkflowAgent | Hybrid
   const route = { provider: providerId, model: modelId, reasoningEffort: 'off' }
   const unknown = '工作流执行结果未知，已停止；请核对本轮工具回执后继续。'
 
+  function notice(message: any): WorkflowNotice | undefined {
+    if (message?.source?.kind !== 'subagent-settled' || message.source.form !== 'notice'
+      || typeof message.id !== 'string' || !message.id
+      || typeof message.source.senderSessionId !== 'string' || !message.source.senderSessionId
+      || !Array.isArray(message.content) || !message.content.length
+      || message.content.some((block: any) => block?.type !== 'text' || typeof block.text !== 'string')) return undefined
+    const text = textContent(message)
+    return text.trim() ? { id: message.id, senderSessionId: message.source.senderSessionId, text } : undefined
+  }
+
+  const noticeText = (value: WorkflowNotice): string => `### 子任务回执（${value.senderSessionId}）\n\n${value.text}`
+  const renderNotices = (values: WorkflowNotice[] = []): string => values.map(noticeText).join('\n\n')
+
+  function currentNotices(agent: any, turn: number, messages: any[]): { notices: WorkflowNotice[]; eligible: boolean } {
+    const events = agent.session.snapshotEvents()
+    const start = events.findLastIndex((event: any) => event.type === 'turn/start' && event.data.turn === turn)
+    const previous = start < 0 ? events : events.slice(0, start)
+    const old = new Set(previous.filter((event: any) => event.type === 'user/message').map((event: any) => notice(event.data)?.id).filter(Boolean))
+    const current = start < 0 ? [] : events.slice(start)
+    const ended = current.some((event: any) => event.type === 'turn/end' && event.data.turn === turn)
+    const replies: Array<{ index: number; text: string }> = current.flatMap((event: any, index: number) => event.type === 'assistant/message' && event.data.turn === turn
+      && event.data.message?.source?.provider === providerId && event.data.message?.source?.model === modelId
+      ? [{ index, text: textContent(event.data.message) }] : [])
+    const state = turns.get(sessionId(agent))
+    const delivered = state?.turn === turn && state.replied ? new Set(state.notices?.map(value => value.id)) : new Set<string>()
+    const values = new Map<string, WorkflowNotice>()
+    for (const message of messages) {
+      const value = notice(message)
+      if (value && !old.has(value.id)) values.set(value.id, value)
+    }
+    return { eligible: !ended && values.size > 0,
+      notices: ended ? [] : [...values.values()].filter(value => {
+        // 同一子会话可以再次给出相同正文，只有本条消息入日志之后的回复才证明已交付。
+        const input = current.findIndex((event: any) => event.type === 'user/message' && event.data.id === value.id)
+        return !delivered.has(value.id) && !(input >= 0 && replies.some(reply => reply.index > input && reply.text.includes(noticeText(value))))
+      }) }
+  }
+
   ctx.on('agent/pre-step', async ({ agent, turn }: any, next: () => Promise<any>) => {
     const decision = await next()
     if (!isSubject(agent) || decision.kind !== 'enter') return decision
     const messages = decision.messages.filter((message: any) => message.source?.kind === 'user')
+    const previous = turns.get(sessionId(agent))
+    const current = decision.messages.some((message: any) => notice(message))
+      ? currentNotices(agent, turn, decision.messages) : { notices: [], eligible: false }
+    const notices = [...new Map([...(previous && previous.turn === turn && !previous.replied ? previous.notices ?? [] : []),
+      ...current.notices].map(value => [value.id, value])).values()]
     if (messages.length) turns.set(sessionId(agent), {
       turn, request: messages.map(textContent).join('\n'), callId: `${mode}-${randomUUID()}`, issued: false, replied: false,
+      notices,
     })
+    else if (current.notices.length) {
+      if (previous && previous.turn === turn && !previous.replied && (previous.request || previous.callId || previous.noticeOnly)) previous.notices = notices
+      else turns.set(sessionId(agent), { turn, request: '', callId: '', issued: true, replied: false, notices, noticeOnly: true })
+    }
     return decision
   })
 
@@ -284,10 +336,21 @@ function registerWorkflowAgent(ctx: any, options: CodeOnlyWorkflowAgent | Hybrid
     const start = events.findLastIndex((event: any) => event.type === 'turn/start' && event.data.turn === turn)
     if (start < 0) return undefined
     const current = events.slice(start)
-    const call = current.findLast((event: any) => event.type === 'tool/call' && event.data.turn === turn && event.data.name === workflow.toolName)
-    const request = current.filter((event: any) => event.type === 'user/message' && event.data.source?.kind === 'user').map((event: any) => textContent(event.data)).join('\n')
-    if (!request && !call) return undefined
-    return { turn, request, callId: call?.data.callId ?? `${mode}-${randomUUID()}`, issued: Boolean(call), replied: false }
+    const human = current.findLastIndex((event: any) => event.type === 'user/message' && event.data.source?.kind === 'user')
+    const boundary = current.findLastIndex((event: any, index: number) => index < human
+      && ['step/start', 'step/end', 'tool/call', 'tool/result', 'assistant/message'].includes(event.type))
+    const batch = current.slice(boundary + 1)
+    const call = batch.findLast((event: any) => event.type === 'tool/call' && event.data.turn === turn && event.data.name === workflow.toolName)
+    const request = batch.filter((event: any) => event.type === 'user/message' && event.data.source?.kind === 'user').map((event: any) => textContent(event.data)).join('\n')
+    const messages = current.filter((event: any) => event.type === 'user/message').map((event: any) => event.data)
+    const { notices, eligible } = messages.some((message: any) => notice(message))
+      ? currentNotices(agent, turn, messages) : { notices: [], eligible: false }
+    const reply = current.findLastIndex((event: any) => event.type === 'assistant/message' && event.data.turn === turn
+      && event.data.message?.source?.provider === providerId && event.data.message?.source?.model === modelId
+      && textContent(event.data.message).trim())
+    if (eligible && human <= reply) return { turn, request: '', callId: '', issued: true, replied: !notices.length, notices, noticeOnly: true }
+    if (!request && !call) return eligible ? { turn, request: '', callId: '', issued: true, replied: !notices.length, notices, noticeOnly: true } : undefined
+    return { turn, request, callId: call?.data.callId ?? `${mode}-${randomUUID()}`, issued: Boolean(call), replied: false, notices }
   }
 
   function resultText(agent: any, state: CodeOnlyTurn): string {
@@ -319,7 +382,9 @@ function registerWorkflowAgent(ctx: any, options: CodeOnlyWorkflowAgent | Hybrid
     if (!state) {
       state = { turn, request: '', callId: '', issued: true, replied: false, pending: { kind: 'text', text: unknown } }
       turns.set(id, state)
-    } else state.pending = state.issued ? { kind: 'text', text: state.replied ? '本轮工作流已结束，请提交新的任务。' : resultText(agent, state) } : { kind: 'tool' }
+    } else if (state.noticeOnly) state.pending = { kind: 'text', text: state.replied ? '本轮子任务回执已投递。' : renderNotices(state.notices) }
+    else state.pending = state.issued ? { kind: 'text', text: state.replied ? '本轮工作流已结束，请提交新的任务。'
+      : [resultText(agent, state), renderNotices(state.notices)].filter(Boolean).join('\n\n') } : { kind: 'tool' }
     return route
   })
 
