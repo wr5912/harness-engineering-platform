@@ -225,3 +225,31 @@ test('合法环境引用能冻结，LLM API Key常量拒绝且不输出值', asy
   assert.equal(containsLiteralLlmKey('config.yaml', 'OPENAI_API_KEY: !!js process.env.OPENAI_API_KEY'), false)
   assert.equal(containsLiteralLlmKey('local.llm-api-key', '{}'), true)
 })
+
+test('新增未分组Case放在首个场景前，同名场景与未选Case原文不被改变', async t => {
+  const f = fixture(t), freeze = createComputeFreezeHandler(f.root), change = f.change()
+  delete change.compute_variant
+  write(f.root, `${exp}/change.yaml`, dump(change))
+  const original = readFileSync(join(f.root, 'agents/alpha/evaluation.md'), 'utf8')
+  const content = '# 评测\n\n' + block('U-NEW-001', '未分组新增') + original.slice(original.indexOf('## 查询')) + '\n## 查询\n\n' + block('U-NEW-002', '同名场景新增') + block('U-UNSELECTED-001', '不应固定')
+  write(f.root, 'agents/alpha/evaluation.md', content)
+  const preview = await freeze('preview', { experiment_id: id, case_ids: ['U-NEW-001', 'U-NEW-002'] })
+  assert.equal(preview.ok, true, JSON.stringify(preview))
+  const frozen = await freeze('freeze', preview.value.freeze_input)
+  assert.equal(frozen.ok, true, JSON.stringify(frozen))
+  const fixed = git(f.root, ['show', 'HEAD:agents/alpha/evaluation.md'])
+  assert.ok(fixed.indexOf('U-NEW-001') < fixed.indexOf('## 查询'))
+  assert.match(fixed, /U-NEW-002/);assert.doesNotMatch(fixed, /U-UNSELECTED-001/)
+  assert.ok(fixed.includes(block('U-OTHER-001', '其他').trimEnd()), '未选Case保持原文')
+  assert.equal(readFileSync(join(f.root, 'agents/alpha/evaluation.md'), 'utf8'), content)
+})
+
+test('未产生Decision的活跃版本可冻结，已删除的旧研究文件不会残留在固定来源', async t => {
+  const f = fixture(t), freeze = createComputeFreezeHandler(f.root)
+  rmSync(join(f.root, `${exp}/decision.md`))
+  const preview = await freeze('preview', { experiment_id: id })
+  assert.equal(preview.ok, true, JSON.stringify(preview))
+  assert.equal(preview.value.files.find(item => item.path === `${exp}/decision.md`).operation, 'delete')
+  assert.equal((await freeze('freeze', preview.value.freeze_input)).ok, true)
+  assert.equal(spawnSync('git', ['cat-file', '-e', `HEAD:${exp}/decision.md`], { cwd: f.root }).status, 128)
+})

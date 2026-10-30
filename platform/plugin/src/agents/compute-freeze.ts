@@ -34,7 +34,7 @@ function cases(content: string) {
     return [item[1], { start, end, text: content.slice(start, end) }]
   }))
 }
-function selectCases(base: string, current: string, selected: string[]) {
+function selectCases(base: string, current: string, selected: string[], catalog: { case_id: string; scene: string }[]) {
   const original = cases(base), changed = cases(current)
   if (selected.some(id => !changed.has(id))) throw new FreezeError('invalid_request', '所选 Case 正文缺失')
   let value = base
@@ -42,16 +42,18 @@ function selectCases(base: string, current: string, selected: string[]) {
     const entry = original.get(id)!
     value = value.slice(0, entry.start) + changed.get(id)!.text + value.slice(entry.end)
   }
-  const headings = [...current.matchAll(/^## ([^\r\n]+)\r?$/gm)]
   for (const id of selected.filter(id => !original.has(id))) {
-    const block = changed.get(id)!
-    const scene = [...headings].reverse().find(item => item.index! < block.start)
-    if (!scene) throw new FreezeError('invalid_request', '新增 Case 缺少可定位的场景章节')
+    const block = changed.get(id)!, scene = catalog.find(item => item.case_id === id)?.scene
+    if (!scene) throw new FreezeError('invalid_request', '新增 Case 缺少有效的场景合同')
     const targetHeadings = [...value.matchAll(/^## ([^\r\n]+)\r?$/gm)]
-    const section = targetHeadings.findIndex(item => item[1] === scene[1])
-    const position = section < 0 ? value.length : targetHeadings[section + 1]?.index ?? value.length
-    const addition = `${section < 0 ? `## ${scene[1]}\n\n` : ''}${block.text.trimEnd()}\n\n`
-    value = value.slice(0, position).trimEnd() + '\n\n' + addition + value.slice(position)
+    const section = targetHeadings.findIndex(item => item[1].trim() === scene)
+    // 权威解析器将首个二级标题前的 Case 归为“未分组”；插入时保持这项语义。
+    const position = section >= 0 ? targetHeadings[section + 1]?.index ?? value.length
+      : scene === '未分组' ? targetHeadings[0]?.index ?? value.length : value.length
+    const heading = section < 0 && scene !== '未分组' ? `## ${scene}\n\n` : ''
+    const prefix = value.slice(0, position)
+    const separator = prefix.endsWith('\n\n') ? '' : prefix.endsWith('\n') ? '\n' : '\n\n'
+    value = prefix + separator + heading + block.text.trimEnd() + '\n\n' + value.slice(position)
   }
   return value
 }
@@ -84,7 +86,9 @@ export function createComputeFreezeHandler(assetRoot: string) {
     const entries = new Map<string, { content: Buffer; mode: string }>()
     const researchRoot = dataPath(root, `${base}/evaluation`)
     const researchFiles = existsSync(researchRoot) ? candidateFiles(researchRoot).map(path => `${base}/evaluation/${path}`) : []
-    for (const path of [...candidateFiles(source.candidate).map(path => `${base}/candidate/${path}`), ...['change.yaml', 'hypothesis.md', 'decision.md'].map(path => `${base}/${path}`), ...researchFiles]) {
+    const researchDocuments = ['hypothesis.md', 'decision.md'].map(path => `${base}/${path}`)
+    const existingDocuments = researchDocuments.filter(path => existsSync(dataPath(root, path)))
+    for (const path of [...candidateFiles(source.candidate).map(path => `${base}/candidate/${path}`), `${base}/change.yaml`, ...existingDocuments, ...researchFiles]) {
       const file = dataPath(root, path)
       const content = readFileSync(file)
       if (containsLiteralLlmKey(path, content.toString('utf8'))) throw new FreezeError('secret_rejected', '冻结对象包含 LLM API Key 常量')
@@ -95,16 +99,17 @@ export function createComputeFreezeHandler(assetRoot: string) {
     const evaluationBase = hash(originalEvaluation)
     if (body.evaluation_base_sha256 && body.evaluation_base_sha256 !== evaluationBase) throw new FreezeError('conflict', '评测 Git 基准已变化，请重新预览')
     const currentEvaluation = readFileSync(dataPath(root, evaluationPath), 'utf8')
-    const projectedEvaluation = selectCases(originalEvaluation.toString(), currentEvaluation, caseIds)
-    const [currentCases, projectedCases] = await Promise.all([parseEvaluationDocument(root, currentEvaluation, signal), parseEvaluationDocument(root, projectedEvaluation, signal)])
+    const currentCases = await parseEvaluationDocument(root, currentEvaluation, signal)
+    const projectedEvaluation = selectCases(originalEvaluation.toString(), currentEvaluation, caseIds, currentCases.catalog)
+    const projectedCases = await parseEvaluationDocument(root, projectedEvaluation, signal)
     for (const id of caseIds) if (!currentCases.cases[id] || planHashes && hash(canonical(currentCases.cases[id])) !== planHashes[id]
       || canonical(currentCases.cases[id]) !== canonical(projectedCases.cases[id])
       || canonical(currentCases.catalog.find(item => item.case_id === id)) !== canonical(projectedCases.catalog.find(item => item.case_id === id))) throw new FreezeError('conflict', '所选 Case 与冻结计划或章节口径不同，请重新确认计划')
     entries.set(evaluationPath, { content: Buffer.from(projectedEvaluation), mode: '100644' })
     // 删除只属于当前 Candidate 的旧文件；运行记录与其他 Experiment 均不进入提交。
     const trackedPaths = new Set(git(root, ['ls-tree', '-r', '-z', '--name-only', head]).toString().split('\0').filter(Boolean))
-    const trackedCandidate = [...trackedPaths].filter(path => path.startsWith(`${base}/candidate/`))
-    const deleted = trackedCandidate.filter(path => !entries.has(path) && !existsSync(dataPath(root, path)))
+    const trackedOwned = [...trackedPaths].filter(path => path.startsWith(`${base}/candidate/`) || researchDocuments.includes(path))
+    const deleted = trackedOwned.filter(path => !entries.has(path) && !existsSync(dataPath(root, path)))
     const paths = [...entries.keys(), ...deleted].sort()
     const staged = git(root, ['diff', '--cached', '--name-only', '-z', '--', ...paths]).toString().split('\0').filter(Boolean)
     if (staged.length) throw new FreezeError('conflict', '冻结目标已有暂存修改，请先处理这些路径的暂存状态')

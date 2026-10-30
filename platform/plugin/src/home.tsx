@@ -5,6 +5,7 @@ import type { Catalog } from './catalog.ts'
 import type { PageId, PlatformNavigation, PlatformPageProps } from './protocol.ts'
 import type { RecentRun } from './dashboard.ts'
 import { CHANNEL } from './protocol.ts'
+import { useQueuedRefresh } from './realtime/refresh.ts'
 import type { PlatformUpdates } from './realtime/client.ts'
 import type { Assistant } from './assistant/client.tsx'
 import type { AssistantView } from './assistant/index.ts'
@@ -88,8 +89,11 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
   const [jobs, setJobs] = useState<EvaluationJob[]>([])
   const [jobsLoaded, setJobsLoaded] = useState(false)
   const [jobsObserved, setJobsObserved] = useState(false)
-  const [revision, setRevision] = useState(0)
-  const [continueRevision, setContinueRevision] = useState(0)
+  const changedDomains = useRef(new Set(['agents']))
+  const homeRequest = useRef(0), currentScope = useRef(workspaceScope)
+  currentScope.current = workspaceScope
+  const currentPage = useRef({ active, workspaceScope })
+  currentPage.current = { active, workspaceScope }
   const [continueMenuOpen, setContinueMenuOpen] = useState(false)
   useEffect(() => {
     const close = () => setContinueMenuOpen(false)
@@ -97,11 +101,6 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
     return () => { window.removeEventListener('hashchange', close); window.removeEventListener('popstate', close) }
   }, [])
   useEffect(() => { setContinueMenuOpen(false) }, [active, workspaceScope])
-  useEffect(() => updates.subscribe(() => {
-    const snapshot = updates.getSnapshot()
-    if (snapshot.domains.some(domain => domain === 'catalog' || domain === 'agents' || domain === 'instances' || domain === 'mcp')) setRevision(snapshot.revision)
-    if (snapshot.domains.includes('agents')) setContinueRevision(snapshot.revision)
-  }), [updates])
   const [runs, setRuns] = useState<RecentRun[]>()
   const [runPhase, setRunPhase] = useState<'pending' | 'ready' | 'error'>('pending')
   const [dashboard, setDashboard] = useState<Dashboard>()
@@ -170,14 +169,16 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
   const [exampleSource, setExampleSource] = useState('')
   const [sending, setSending] = useState(false)
   const [entryError, setEntryError] = useState('')
-  useEffect(() => { void catalog.refresh() }, [catalog, refresh])
+  useEffect(() => { if (active) void catalog.refresh() }, [catalog, refresh, active])
   useEffect(() => {
-    let active = true
+    if (!active) return
+    let current = true
     setSessionError('')
-    void sessions.refresh().catch(() => { if (active) setSessionError('会话列表暂不可读，请重试。') })
-    return () => { active = false }
-  }, [sessions, refresh])
+    void sessions.refresh().catch(() => { if (current) setSessionError('会话列表暂不可读，请重试。') })
+    return () => { current = false }
+  }, [sessions, refresh, active])
   useEffect(() => {
+    if (!active) return
     const roots = state.inventory ? [state.inventory.root, ...(state.inventory.workspace?.legacyRoots ?? [])] : []
     const pending = sessionList.ids.filter(id => roots.includes(sessionList.byId[id]?.cwd ?? '') && !observedSessions.current.has(id))
     pending.forEach(id => observedSessions.current.add(id))
@@ -187,46 +188,46 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
         await sessions.refreshProjections(id).catch(() => setSessionError('部分会话任务状态暂不可读，请刷新重试。'))
       }
     }))
-  }, [sessions, sessionList, state.inventory?.root])
-  useEffect(() => {
-    let active = true
-    setContinueError(''); setJobsLoaded(false)
-    void rpc.call(CHANNEL, 'agents/eval/list', {}).then(result => {
-      if (!active) return
-      if (result.ok) { setJobs((result.value as { jobs: EvaluationJob[] }).jobs ?? []); setJobsObserved(true) }
-      else setContinueError(result.error.message)
-      setJobsLoaded(true)
-    }).catch(() => { if (active) { setContinueError('评测任务暂不可读，请重试。'); setJobsLoaded(true) } })
-    return () => { active = false }
-  }, [rpc, refresh, continueRevision])
-  useEffect(() => {
-    let active = true
+  }, [sessions, sessionList, state.inventory?.root, active])
+  const refreshHome = useQueuedRefresh(active, async () => {
+    const request = ++homeRequest.current, scope = workspaceScope
+    const readJobs = changedDomains.current.has('agents')
+    changedDomains.current.clear()
+    const current = () => request === homeRequest.current && currentScope.current === scope
+    if (readJobs) { setContinueError(''); setJobsLoaded(false) }
     setRunError(''); setRunPhase('pending')
-    void rpc.call(CHANNEL, 'home', {}).then(result => {
-      if (!active) return
-      if (result.ok) {
-        const data = result.value as Dashboard
-        setRuns(data.recent_runs)
-        setDashboard(data)
-        setRunPhase('ready')
-      }
-      else { setRunError(result.error.message); setRunPhase('error') }
-    }).catch(() => { if (active) { setRunError('无法连接 Run 查询，请刷新重试。'); setRunPhase('error') } })
-    return () => { active = false }
-  }, [rpc, refresh, revision])
-  useEffect(() => {
-    let active = true
     setRiskState(previous => ({ ...previous, phase: 'pending' }))
-    void rpc.call(CHANNEL, 'mcp/control/status', {}).then(result => {
-      if (!active) return
-      const value = result.ok ? result.value as { riskFacts?: RiskFact[]; configuration?: { riskAssessment?: { configured?: unknown } } } : null
-      const enabled = value?.configuration?.riskAssessment?.configured
-      setRiskState(previous => value && Array.isArray(value.riskFacts)
-        ? { phase: 'ready', facts: value.riskFacts, enabled: typeof enabled === 'boolean' ? enabled : undefined, observed: true }
-        : { ...previous, phase: 'error' })
-    }).catch(() => { if (active) setRiskState(previous => ({ ...previous, phase: 'error' })) })
-    return () => { active = false }
-  }, [rpc, refresh, revision])
+    await Promise.allSettled([
+      ...(readJobs ? [rpc.call(CHANNEL, 'agents/eval/list', {}).then(result => {
+        if (!current()) return
+        if (result.ok) { setJobs((result.value as { jobs: EvaluationJob[] }).jobs ?? []); setJobsObserved(true) }
+        else setContinueError(result.error.message)
+        setJobsLoaded(true)
+      }).catch(() => { if (current()) { setContinueError('评测任务暂不可读，请重试。'); setJobsLoaded(true) } })] : []),
+      rpc.call(CHANNEL, 'home', {}).then(result => {
+        if (!current()) return
+        if (result.ok) {
+          const data = result.value as Dashboard
+          setRuns(data.recent_runs); setDashboard(data); setRunPhase('ready')
+        } else { setRunError(result.error.message); setRunPhase('error') }
+      }).catch(() => { if (current()) { setRunError('无法连接 Run 查询，请刷新重试。'); setRunPhase('error') } }),
+      rpc.call(CHANNEL, 'mcp/control/status', {}).then(result => {
+        if (!current()) return
+        const value = result.ok ? result.value as { riskFacts?: RiskFact[]; configuration?: { riskAssessment?: { configured?: unknown } } } : null
+        const enabled = value?.configuration?.riskAssessment?.configured
+        setRiskState(previous => value && Array.isArray(value.riskFacts)
+          ? { phase: 'ready', facts: value.riskFacts, enabled: typeof enabled === 'boolean' ? enabled : undefined, observed: true }
+          : { ...previous, phase: 'error' })
+      }).catch(() => { if (current()) setRiskState(previous => ({ ...previous, phase: 'error' })) }),
+    ])
+  }, workspaceScope)
+  useEffect(() => { changedDomains.current.add('agents'); void refreshHome(); return () => { homeRequest.current++ } }, [workspaceScope, refresh])
+  useEffect(() => updates.subscribe(() => {
+    const domains = updates.getSnapshot().domains.filter(domain => ['catalog', 'agents', 'instances', 'mcp'].includes(domain))
+    if (!domains.length) return
+    for (const domain of domains) changedDomains.current.add(domain)
+    void refreshHome()
+  }), [updates])
   useEffect(() => {
     if (!active || riskState.enabled !== true || riskState.phase === 'error') return
     const now = Date.now()
@@ -273,9 +274,11 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
   const selectedExample = exampleSources.find(source => source.source === exampleSource)
   async function enterTask(request: ReturnType<typeof homeTaskRequest>, completed?: () => void) {
     if (!assets) throw new Error('工作区尚未读取完成，请稍后重试。')
+    const scope = workspaceScope
     await startConversation(assets.root, request.prompt, request.context)
+    if (currentPage.current.workspaceScope !== scope) return
     completed?.()
-    navigate('conversations')
+    if (currentPage.current.active) navigate('conversations')
   }
   async function submitTask() {
     if (sending || draftPending) return

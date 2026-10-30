@@ -110,7 +110,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['eval/status eval/cancel', 'job_id'], ['runs/index', 'agent_id experiment_id'],
     ['runs/show', 'run_id case_id'], ['runs/report runs/files', 'run_id'], ['runs/read-file', 'run_id path'],
     ['runs/evidence', 'run_id case_id filename'], ['runs/compare', 'left right case_id'], ['runs/trace', 'run_id path source_sha256 cursor limit session_log'],
-    ['decision/preview decision/update', 'experiment_id content expected_sha256 status outcome expected_change_sha256', '修改 status/outcome 时还须 detail 返回的 change 摘要；status=active/completed，outcome=adopt/continue/reject/inconclusive。'],
+    ['decision/preview decision/update', 'experiment_id content expected_sha256 status outcome expected_change_sha256', 'expected_sha256 原样使用 detail.decision.sha256；缺文件为 null，已有空文件仍为实际摘要。修改 status/outcome 时还须 detail 返回的 change 摘要；status=active/completed，outcome=adopt/continue/reject/inconclusive。'],
     ['features/read-source', 'experiment_id ref', '先省略 ref 获取来源文件，再逐个读取。'],
     ['features/preview', 'experiment_id features', '固定目标特性整理任务自动保存并回读；保留证据和未验证边界，不需人工确认。'],
     ['features/proposal', 'experiment_id'], ['features/apply fusion/confirm datasets/apply', 'preview_id', '此操作由既有确认或固定目标专项保存流程办理；不要绕过原预览身份。'],
@@ -145,6 +145,7 @@ export function assistantActionContract(domain: AssistantDomain, action: string)
     properties.cursor = { type: 'string', description: '上一次回执的 next_cursor，绑定原文件摘要与位置。' }
     properties.limit = { type: 'integer', description: '本次最多返回的正文字符数，512–32768，默认16000。' }
   }
+  if (action === 'decision/preview' || action === 'decision/update') properties.expected_sha256 = { type: ['string', 'null'], description: 'detail.decision.sha256；缺文件为 null，已有空文件使用返回的实际摘要。' }
   if (action === 'migrations/inspect') properties.source = { type: 'object', required: ['kind'], properties: {
     kind: { type: 'string', enum: ['local', 'git', 'archive', 'text'] }, path: { ...string, description: 'local/archive 使用本机绝对路径，git 也可用本地仓库路径。' },
     url: { ...string, description: 'git 远程仓库地址，不能包含凭据。' }, ref: { ...string, description: 'git 分支或提交，服务端固定实际提交；省略为 HEAD。' },

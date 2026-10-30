@@ -63,6 +63,7 @@ const assistantStateSchema = z.object({
   extraction_json_retry: toolInputJsonRetrySchema.optional(),
   automatic_save: z.record(z.string(), z.any()).optional(),
   tool_contracts: z.record(z.string(), z.string()).default({}),
+  submissions: z.record(z.string(), z.record(z.string(), z.any())).default({}),
 })
 type AssistantState = z.infer<typeof assistantStateSchema>
 const requiredContext = (state: AssistantState) => normalizeManagementContext(state.task_context)
@@ -81,12 +82,12 @@ declare module '@deepseek-ai/dsh-session' {
 
 // 框架负责按 Session 增量折叠、冷恢复和 fork；阅读证据按需通过原生只读查询核对。
 export const assistantProjection = {
-  key: projectionKey, stateVersion: 8, stateSchema: assistantStateSchema,
+  key: projectionKey, stateVersion: 9, stateSchema: assistantStateSchema,
   wire: { viewSchema: assistantViewSchema, view: state => ({ session_id: state.session_id,
     ...(state.workspace_id ? { workspace_id: state.workspace_id } : {}),
     pending_proposals: state.proposals.filter(item => item.state === 'awaiting_confirmation').length,
     unknown_proposals: state.proposals.filter(item => item.state === 'unknown').length }) },
-  init: (header, inheritedEventCount) => ({ session_id: header.id, inherited_event_count: inheritedEventCount, active: false, context: {}, task_context: {}, proposals: [], running: false, tool_contracts: {} }),
+  init: (header, inheritedEventCount) => ({ session_id: header.id, inherited_event_count: inheritedEventCount, active: false, context: {}, task_context: {}, proposals: [], running: false, tool_contracts: {}, submissions: {} }),
   apply(state, event) {
     if (event.type === 'request/header') {
       const config = (event.data as any)?.header?.config
@@ -113,6 +114,7 @@ export const assistantProjection = {
       else next.task = data.task
       return next
     }
+    if (data.kind === 'submission' && data.owner_session_id === state.session_id && pluginRecord.seq >= state.inherited_event_count) return { ...state, submissions: { ...state.submissions, [data.request_id]: data } }
     if (data.kind === 'context') return { ...state, active: true, context: normalizeManagementContext(data.context ?? {}) }
     if (data.kind === 'workspace') return { ...state, active: true }
     if (data.kind === 'tool-contract') return { ...state, tool_contracts: { ...state.tool_contracts, [data.domain]: data.action } }
@@ -310,7 +312,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
     else if (state.task_context.skill === 'compute-variant-research') services.scopeComputeVariants?.(found.agent)
     else if (state.task_context.skill === 'agent-maintenance' && state.task_context.workflow === 'features') services.scopeFeatures?.(found.agent)
     else services.releaseTaskScope?.(found.agent)
-    return { session, state }
+    return { session, state, agent: found.agent }
   }
   async function record(id: string, value: MapValue) {
     const { session } = await inspect(id)
@@ -613,21 +615,50 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
           id = (await services.controller.create({ cwd: workspaceIdentity(root).root, agentPreset: 'standard' })).sessionId
           await record(id, { kind: 'workspace' })
         }
-        if (body.context) await record(id, { kind: 'context', context: redactAssistant(object(body.context)) })
-        if (body.task) {
-          await record(id, { kind: 'task', task: String(body.task), context: redactAssistant(body.context ?? taskContext) })
-          await inspect(id, signal)
-          await services.controller.prompt({ sessionId: id, requestId: randomUUID(), mode: 'queue', content: [{ type: 'text', text: String(body.task) }] }, signal)
-        }
-        return result(true, { session_id: id }) as any
+        const requestId = body.request_id === undefined ? randomUUID() : body.request_id
+        if (typeof requestId !== 'string' || !/^[a-zA-Z0-9_-]{1,120}$/.test(requestId)) throw new Error('任务提交标识无效')
+        return await locked(`submission:${id}`, async () => {
+          const { state } = await inspect(id, signal)
+          const fingerprint = createHash('sha256').update(JSON.stringify({ task: body.task ?? null, context: normalizeManagementContext(object(body.context ?? taskContext)) })).digest('hex')
+          const previous = state.submissions?.[requestId]
+          if (previous && previous.fingerprint !== fingerprint) throw new Error('同一任务提交标识的内容已改变，未重复投递')
+          if (previous?.state === 'accepted') return result(true, { session_id: id, request_id: requestId, accepted: true }) as any
+          if (!previous) {
+            if (body.context) await record(id, { kind: 'context', context: redactAssistant(object(body.context)) })
+            if (body.task) await record(id, { kind: 'task', task: String(body.task), context: redactAssistant(body.context ?? taskContext) })
+            await record(id, { kind: 'submission', owner_session_id: id, request_id: requestId, fingerprint, state: 'pending' })
+          }
+          try {
+            if (body.task) {
+              await inspect(id, signal)
+              // 锁定版 DSH 按 requestId 核对收件箱和 user/message，重试沿用原生去重身份。
+              await services.controller.prompt({ sessionId: id, requestId, mode: 'queue', content: [{ type: 'text', text: String(body.task) }] }, signal)
+            }
+            await record(id, { kind: 'submission', owner_session_id: id, request_id: requestId, fingerprint, state: 'accepted' })
+          } catch (error) {
+            await record(id, { kind: 'submission', owner_session_id: id, request_id: requestId, fingerprint, state: 'unknown' })
+            throw error
+          }
+          return result(true, { session_id: id, request_id: requestId, accepted: true }) as any
+        })
       }
       const id = String(body.session_id ?? '')
-      const { session, state } = await inspect(id, signal)
+      const { session, state, agent } = await inspect(id, signal)
       if (endpoint === 'context') { await record(id, { kind: 'context', context: redactAssistant(object(body.context)) }); return result(true, { session_id: id }) as any }
-      if (endpoint === 'status') return result(true, { ...state, workspace: { ...workspaceIdentity(root), session_cwd: session.header.cwd },
-        proposals: state.proposals.map(proposal => proposal.state === 'running' && !busy.has(proposal.id)
-          ? { ...proposal, state: 'unknown', error: '原进程已中断，未收到完整回执，请核对实际状态。' } : proposal),
-        running: services.running ? services.running(id) : state.running }) as any
+      if (endpoint === 'status') {
+        let submission = typeof body.request_id === 'string' ? state.submissions?.[body.request_id] ?? { request_id: body.request_id, state: 'not_received' } : undefined
+        if (submission && submission.state !== 'accepted') {
+          const matches = (message: any) => message?.source?.kind === 'user' && message.source.rpcId === body.request_id
+          const accepted = [...(agent.inbox?.nextTurn ?? []), ...(agent.inbox?.nextStep ?? [])].some(matches)
+            || session.snapshotEvents().some(event => event.type === 'user/message' && matches(event.data))
+          if (accepted) submission = { ...submission, state: 'accepted' }
+          else if (submission.state === 'pending') submission = { ...submission, state: 'unknown' }
+        }
+        return result(true, { ...state, ...(submission ? { submission } : {}), workspace: { ...workspaceIdentity(root), session_cwd: session.header.cwd },
+          proposals: state.proposals.map(proposal => proposal.state === 'running' && !busy.has(proposal.id)
+            ? { ...proposal, state: 'unknown', error: '原进程已中断，未收到完整回执，请核对实际状态。' } : proposal),
+          running: services.running ? services.running(id) : state.running }) as any
+      }
       if (endpoint === 'cancel') {
         const receipt = await services.controller.cancel({ sessionId: id })
         await Promise.all(state.proposals.filter(proposal => proposal.state === 'awaiting_confirmation' && !busy.has(proposal.id)).map(proposal => record(id, { ...proposal, kind: 'settlement', state: 'cancelled', error: '会话已取消，未执行此操作。' })))

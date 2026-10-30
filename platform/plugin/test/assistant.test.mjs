@@ -1190,6 +1190,14 @@ test('所有管理业务可以逐动作发现参数；原生下一轮装配使�
       assert.doesNotThrow(() => assertSupportedJsonSchema(projectAssistantTools([{ name: `platform_${domain}` }], { tool_contracts: { [domain]: action } })[0].parameters))
     }
   }
+  for (const action of ['decision/preview', 'decision/update']) {
+    const described = assistantActionContract('agents', action)
+    assert.deepEqual(described.input_schema.properties.expected_sha256.type, ['string', 'null'])
+    const native = projectAssistantTools([{ name: 'platform_agents' }], { tool_contracts: { agents: action } })[0].parameters
+    assert.equal(validateJsonSchemaValue(native, { action, input: { experiment_id: 'EXP-alpha-001', content: '首次研究决策', expected_sha256: null } }).length, 0)
+  }
+  const caseEdit = projectAssistantTools([{ name: 'platform_agents' }], { tool_contracts: { agents: 'cases/update' } })[0].parameters
+  assert.ok(validateJsonSchemaValue(caseEdit, { action: 'cases/update', input: { expected_sha256: null } }).length > 0)
   assert.equal(f.tools.has('platform_task'), false)
   assert.equal(f.calls.length, 0, 'describe 不伪装公共业务 RPC，也不执行业务')
   await f.execute(id, 'agents', 'describe', { action: 'edit/apply' })
@@ -1763,4 +1771,39 @@ test('原生模型目录读取失败保留管理上下文并明确未知，取�
   assert.doesNotMatch(JSON.stringify(context.model_catalog), /private-model-directory-credential|Authorization/)
   cancelled = true
   await assert.rejects(() => f.execute(id, 'agents', 'context', {}, cancel.signal), /abort/i)
+})
+
+test('助手稳定提交身份跨并发和服务恢复只投递一次，内容变化明确拒绝', async t => {
+  const f = fixture(t), request = { task: '读取既有业务版本', request_id: 'submission-fixed', context: { page: 'agents' } }
+  const first = await f.rpc('session', request)
+  assert.equal(first.ok, true)
+  const session_id = first.value.session_id
+  await Promise.all([f.rpc('session', { ...request, session_id }), f.rpc('session', { ...request, session_id })])
+  assert.equal(f.prompts.length, 1)
+  assert.equal(f.prompts[0].requestId, request.request_id)
+  await f.reload()
+  const status = await f.rpc('status', { session_id, request_id: request.request_id })
+  assert.equal(status.value.submission.state, 'accepted')
+  assert.equal((await f.rpc('session', { ...request, session_id })).ok, true)
+  assert.equal(f.prompts.length, 1)
+  const changed = await f.rpc('session', { ...request, session_id, task: '不同的任务' })
+  assert.equal(changed.ok, false)
+  assert.match(changed.error.message, /内容已改变/)
+  assert.equal(f.prompts.length, 1)
+})
+
+test('原生受理后写回执失败可由实际user/message恢复；未知身份不冒充已受理', async t => {
+  const f = fixture(t)
+  const session_id = (await f.rpc('session', {})).value.session_id
+  f.services.controller.prompt = async request => {
+    f.prompts.push(request)
+    f.sessions.get(session_id).session.append('user/message', { id: 'submitted-message', role: 'user', source: { kind: 'user', rpcId: request.requestId }, content: [{ type: 'text', text: '已受理正文' }] }, { surfaceOp: 'append' })
+    throw new Error('模拟原生受理后回执中断')
+  }
+  const submitted = await f.rpc('session', { session_id, request_id: 'recover-native', task: '已受理正文' })
+  assert.equal(submitted.ok, false)
+  const found = await f.rpc('status', { session_id, request_id: 'recover-native' })
+  assert.equal(found.value.submission.state, 'accepted')
+  const missing = await f.rpc('status', { session_id, request_id: 'not-sent' })
+  assert.equal(missing.value.submission.state, 'not_received')
 })

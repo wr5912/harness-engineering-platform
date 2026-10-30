@@ -7,7 +7,7 @@ import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 import { createAgent } from './create-agent.ts'
 import { assetText } from './asset-text.ts'
 import { businessCasesSchema } from './business-cases.ts'
-import { versionIdentity, versionSource } from './version-source.ts'
+import { inheritedLoadableAssets, versionIdentity, versionSource } from './version-source.ts'
 import { VERSION_ID, assertInheritableVersion } from '../version-id.ts'
 import { candidateDigest, candidateFiles, dataPath, sha256 } from '../tasks/files.ts'
 import { instanceStateRoot, workspaceOwnsInstance } from '../workspace.ts'
@@ -121,7 +121,7 @@ function copyFixedParent(root: string, parent: ReturnType<typeof parentTarget>, 
   // 与普通版本创建保持同一装载格式，旧固定提交中的来源声明只读解析。
   const file = join(candidate, 'harness.yaml'), harness = existsSync(file) ? yaml(file) : {}
   delete harness.experiment; delete harness.runtime_contract
-  harness.loadable_assets = { workspace: 'dsh/workspace', preset_root: 'dsh/presets', managed_root: 'dsh/managed', preset_id: String(parent.source.preset).split('/')[0], preset_file: parent.source.preset, profile_patch: `dsh/managed/${parent.source.patch}`, ...(parent.source.guard ? { guard: parent.source.guard } : {}), ...(parent.source.profile_manifest ? { profile_manifest: String(parent.source.profile_manifest).slice(prefix.length) } : {}) }
+  harness.loadable_assets = inheritedLoadableAssets(parent.source, parent.id)
   harness.credential_environment_keys = [...new Set([...(parent.source.required_env_names ?? []), ...(parent.source.optional_env_names ?? [])])]
   writeYaml(file, harness)
 }
@@ -398,7 +398,7 @@ export function createMigrationsHandler(rootPath: string) {
       return { ...(await status({ experiment_id: id })), already_resolved: already }
     } finally { busy.delete(key) }
   }
-  async function status(body: MigrationMap) {
+  async function status(body: MigrationMap, signal?: AbortSignal) {
     const { operation, id, experiment } = migrationTarget(body)
     const exists = existsSync(join(experiment, 'change.yaml'))
     if (!exists) return { operation_id: operation?.operation_id, state: operation?.state ?? 'not-found', agent_id: operation?.agent_id, experiment_id: id, published: false, error: operation?.error ?? null, resumable: Boolean(operation?.preview_sha256), runtime_verified: false, business_verified: false, note: '目标 EXP 尚未发布；操作回执保留已分配身份和准备结果。' }
@@ -420,7 +420,7 @@ export function createMigrationsHandler(rootPath: string) {
       ...(receipt.uncovered ?? []).flatMap((description: string, index: number) => !currentResolutions.some((resolution: MigrationMap) => resolution.uncovered_index === index)
         ? [{ uncovered_index: index, description, required: true }] : []),
     ]
-    const verification = await migrationRunEvidence(root, id, change.agent_id, currentDigest, resolved.effective, builds, evaluationSnapshot)
+    const verification = await migrationRunEvidence(root, id, change.agent_id, currentDigest, resolved.effective, builds, evaluationSnapshot, signal)
     const instances: MigrationMap[] = [], instanceRoot = instanceStateRoot(root)
     if (existsSync(instanceRoot)) for (const name of readdirSync(instanceRoot).sort()) {
       try {
@@ -446,7 +446,7 @@ export function createMigrationsHandler(rootPath: string) {
   return async (method: MigrationMethod | string, body: MigrationMap, signal?: AbortSignal): Promise<ConnectionRpcResult<any>> => {
     try {
       if (signal?.aborted) fail('迁移操作已取消', 'aborted')
-      const value = method === 'inspect' ? await inspectMigrationSource(root, body, signal) : method === 'read' ? readMigrationSource(root, body) : method === 'preview' ? await preview(body, signal) : method === 'apply' ? await apply(body, signal) : method === 'resolve' ? await resolvePending(body, signal) : method === 'status' ? await status(body) : fail('未知迁移操作', 'method_not_found')
+      const value = method === 'inspect' ? await inspectMigrationSource(root, body, signal) : method === 'read' ? readMigrationSource(root, body) : method === 'preview' ? await preview(body, signal) : method === 'apply' ? await apply(body, signal) : method === 'resolve' ? await resolvePending(body, signal) : method === 'status' ? await status(body, signal) : fail('未知迁移操作', 'method_not_found')
       return { ok: true, value }
     } catch (error) { return { ok: false, error: { ...safeFailure(error, signal), details: {} } } }
   }

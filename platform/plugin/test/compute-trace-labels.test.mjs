@@ -10,7 +10,7 @@ import { build } from 'esbuild'
 import { dump } from 'js-yaml'
 
 process.env.HARNESS_PROGRAM_ROOT = new URL('../../../', import.meta.url).pathname
-process.env.HARNESS_PYTHON ||= '/usr/bin/python3.10'
+process.env.HARNESS_PYTHON ??= 'python3'
 const require = createRequire(import.meta.url)
 const source = new URL('../src/agents/compute-variants.ts', import.meta.url).pathname
 const built = mkdtempSync(join(tmpdir(), 'compute-trace-labels-build-'))

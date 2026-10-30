@@ -187,7 +187,7 @@ test('普通EXP生成制品复用原生Cordis、消息工厂与工具输出校�
   assert.equal(inspectAssetBuild(f.root, id).verified, true)
 })
 function fakeEnvironment(f, extra = {}) {
-  const identity = spawnSync('/usr/bin/python3.10', [join(process.env.HARNESS_PROGRAM_ROOT, 'runtime/adapters/dsh-container/source_contract.py'), '--image-identity-for', 'linux/amd64'], { encoding: 'utf8' })
+  const identity = spawnSync(process.env.HARNESS_PYTHON ?? 'python3', [join(process.env.HARNESS_PROGRAM_ROOT, 'runtime/adapters/dsh-container/source_contract.py'), '--image-identity-for', 'linux/amd64'], { encoding: 'utf8' })
   assert.equal(identity.status, 0, identity.stderr)
   const parsed = JSON.parse(identity.stdout), tag = extra.sourceTag ?? parsed.tag, fingerprint = parsed.fingerprint, calls = [], imageId = `sha256:${'a'.repeat(64)}`
   const command = async (name, args, options) => {
@@ -315,7 +315,7 @@ test('未准备Python和本地安装来源保持真实pending，不执行来源�
   assert.equal(existsSync(join(f.candidate, 'dsh/managed/python/requirements.lock.txt')), false)
 })
 test('Python extras声明按目标ABI下载wheel，生成锁后与普通实例及独立部署共用', async t => {
-  const f = fixture(t), python = '/usr/bin/python3.10', declaration = 'dsh/managed/python/pyproject.toml'
+  const f = fixture(t), python = process.env.HARNESS_PYTHON ?? 'python3', declaration = 'dsh/managed/python/pyproject.toml'
   write(f.root, `${base}/${declaration}`, '[project]\nname="python-tool"\nversion="1.0.0"\ndependencies = ["quote-tool[extra]==1.2.3"]\n[build-system]\nbuild-backend="must-not-execute"\n')
   const env = fakeEnvironment(f, { command(name, args) {
     if (args.includes('download')) {

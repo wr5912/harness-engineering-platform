@@ -12,13 +12,18 @@ import { agentCommand } from './process.mts'
 import { stageSelectedExtensions } from './extensions.mts'
 import { writeRuntimeBundle } from './runtime/index.mts'
 import { stageSdkRuntime } from './runtime/sdk.mts'
-import type { AgentPackageHooks, AgentPackageInput, AgentPackageManifest } from './types.mts'
+import type { AgentPackageHooks, AgentPackageInput, AgentPackageManifest, AgentSourceSnapshot } from './types.mts'
 
 export { defaultAgentResourcesDir } from './prepare.mts'
 export { agentSeed } from './seed.mts'
 export type { AgentPackageInput, AgentPackageHooks, AgentPackageManifest } from './types.mts'
 
-const knowledgeRoots = (base: string) => ['workspace', 'presets', 'managed'].map(name => ({ root: join(base, name), label: name }))
+const knowledgeRoots = (snapshot: AgentSourceSnapshot, staging?: string) => [{
+  root: staging ? join(staging, 'assets') : snapshot.candidate,
+  label: 'candidate',
+  include: snapshot.files.filter(file => file.path.startsWith('assets/'))
+    .map(file => staging ? file.path.slice('assets/'.length) : file.sourcePath),
+}]
 
 /** 预览只公开摘要和缺口，不返回连接 Header、模型 Key 或配置种子。 */
 export function previewAgentPackage(input: AgentPackageInput) {
@@ -26,7 +31,7 @@ export function previewAgentPackage(input: AgentPackageInput) {
   const snapshot = inspectAgentSnapshot(normalized)
   const resources = inspectAgentResources(normalized)
   const issues = [...resources.issues, ...snapshot.dependencies.filter(item => !item.ready).map(item => ({ code: 'dependencies_missing', message: `业务依赖尚未准备：${item.name}${item.reason ? `；${item.reason}` : ''}`, path: item.sourceFile ?? item.path }))]
-  const knowledge = inspectKnowledge({ roots: knowledgeRoots(join(snapshot.candidate, 'dsh')), mode: input.mode })
+  const knowledge = inspectKnowledge({ roots: knowledgeRoots(snapshot), mode: input.mode })
   return {
     agentId: snapshot.agentId, experimentId: snapshot.experimentId, profile: snapshot.source.profile ?? 'web', arch: input.arch, mode: input.mode,
     candidateSha256: snapshot.candidateSha256, dirty: snapshot.git.dirty,
@@ -97,7 +102,7 @@ export async function packAgent(input: AgentPackageInput, hooks: AgentPackageHoo
       if (!file) throw new Error('提供的离线资料不在当前版本已冻结的资产中')
       return { url: item.url, path: join(staging, file.path) }
     })
-    const knowledge = await collectKnowledge({ roots: knowledgeRoots(join(staging, 'assets')), mode: input.mode,
+    const knowledge = await collectKnowledge({ roots: knowledgeRoots(snapshot, staging), mode: input.mode,
       outDir: join(staging, 'assets/workspace/knowledge/offline'), signal: hooks.signal,
       localSources,
       onProgress: (progress: any) => hooks.onProgress?.({ stage: 'knowledge', message: progress.message ?? '正在收集引用资料' }) })

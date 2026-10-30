@@ -2101,6 +2101,7 @@ class UpPortOwnershipTest(unittest.TestCase):
         with mock.patch.object(dev, "resolve", return_value=self.contract()), \
                 mock.patch.object(dev, "port_in_use", side_effect=[False, True]), \
                 mock.patch.object(dev, "preflight_new_instance"), \
+                mock.patch.object(dev, "project_containers", return_value=[]), \
                 mock.patch.object(dev, "running_instance_service", return_value=None), \
                 mock.patch.object(dev, "write_instance") as writer, \
                 contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(io.StringIO()):
@@ -2131,6 +2132,7 @@ class UpPortOwnershipTest(unittest.TestCase):
         with mock.patch.object(dev, "resolve", return_value=self.contract()), \
                 mock.patch.object(dev, "port_in_use", return_value=True), \
                 mock.patch.object(dev, "preflight_new_instance"), \
+                mock.patch.object(dev, "project_containers", return_value=[]), \
                 mock.patch.object(dev, "running_instance_service", return_value=None), \
                 contextlib.redirect_stderr(stderr):
             with self.assertRaises(SystemExit):

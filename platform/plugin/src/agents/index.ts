@@ -47,7 +47,7 @@ import { candidateFiles, dataPath, sourceInfo } from '../tasks/files.ts'
 import { previewTaskAssembly, applyTaskAssembly, type TaskAssemblyInput } from '../tasks/assembly.ts'
 import { containsLiteralLlmKey } from '../tasks/llm-key.ts'
 import { createInstancesHandler } from '../instances/index.ts'
-import { assertVersionIdentity, versionIdentity, versionSource, versionSources } from './version-source.ts'
+import { inheritedLoadableAssets, assertVersionIdentity, versionIdentity, versionSource, versionSources } from './version-source.ts'
 import { inspectLegacy, readResearchReference, validateResearch } from './research.ts'
 import { createVariantIdentityMigrationHandler, currentVariantProjection } from './variant-identity.ts'
 
@@ -878,7 +878,8 @@ async function detail(root: string, payload: JsonMap, signal?: AbortSignal) {
     loadEvaluation(root, agentId, signal).catch(error => ({ path: `agents/${agentId}/evaluation.md`, sha256: null, cases: [], error: redact((error as Error).message) })),
     sourceContract(root, experimentId, signal),
   ])
-  const decision = readText(repoPath(root, `evolution/experiments/${experimentId}/decision.md`))
+  const decisionPath = repoPath(root, `evolution/experiments/${experimentId}/decision.md`)
+  const decisionExists = existsSync(decisionPath), decision = readText(decisionPath)
   const assets = assetTree(root, experimentId)
   const commit = gitHead(root)
   const variant = isVariantIdentity(experimentId, exp.change)
@@ -913,7 +914,7 @@ async function detail(root: string, payload: JsonMap, signal?: AbortSignal) {
     assets,
     editable_files: editableFiles(assets),
     evaluation: { path: evaluation.path, sha256: evaluation.sha256, cases: evaluation.cases, ...('error' in evaluation ? { error: evaluation.error } : {}) },
-    decision: { path: `evolution/experiments/${experimentId}/decision.md`, sha256: sha256(decision), content: decision },
+    decision: { path: `evolution/experiments/${experimentId}/decision.md`, exists: decisionExists, sha256: decisionExists ? sha256(decision) : null, content: decision },
     features: featureView(root, exp.id, exp.change),
     creation: creationView(root, experimentId, exp.change),
     repo_commit: commit,
@@ -1064,14 +1065,7 @@ async function createExperiment(root: string, payload: JsonMap, variant?: Comput
     const harness = existsSync(harnessFile) ? readYamlMap(root, harnessFile) : {}
     delete harness.experiment
     delete harness.runtime_contract
-    harness.loadable_assets = {
-      workspace: 'dsh/workspace', preset_root: 'dsh/presets', managed_root: 'dsh/managed',
-      ...(parentSource.profile === 'sdk' ? { profile: 'sdk' } : {}),
-      preset_id: String(parentSource.preset).split('/')[0], preset_file: parentSource.preset,
-      profile_patch: `dsh/managed/${parentSource.patch}`,
-      ...(parentSource.guard ? { guard: parentSource.guard } : {}),
-      ...(parentSource.profile_manifest ? { profile_manifest: String(parentSource.profile_manifest).slice(`evolution/experiments/${parentExperiment}/candidate/`.length) } : {}),
-    }
+    harness.loadable_assets = inheritedLoadableAssets(parentSource, parentExperiment)
     harness.credential_environment_keys = [...new Set([...(parentSource.required_env_names as string[] ?? []), ...(parentSource.optional_env_names as string[] ?? [])])]
     writeYamlMap(harnessFile, harness)
     const source = versionSource(root, experimentId)
@@ -1547,10 +1541,15 @@ function decisionChange(root: string, payload: JsonMap) {
   return { file, before, after, current, updated, expectedChange }
 }
 
+function decisionExpected(payload: JsonMap): string | null {
+  if (payload.expected_sha256 === null) return null
+  return stringField(payload, 'expected_sha256')
+}
+
 async function decisionPreview(root: string, payload: JsonMap, signal?: AbortSignal) {
   const id = experimentIdField(payload)
   const change = payload.status === undefined && payload.outcome === undefined ? undefined : decisionChange(root, payload)
-  const result = await previewEdit(root, { experiment_id: id, edits: [{ path: 'decision.md', content: textField(payload, 'content'), expected_sha256: stringField(payload, 'expected_sha256') }] }, signal)
+  const result = await previewEdit(root, { experiment_id: id, edits: [{ path: 'decision.md', content: textField(payload, 'content'), expected_sha256: decisionExpected(payload) }] }, signal)
   if (!result.ok || !change) return result
   return ok({ ...result.value, change: { path: repoRelative(root, change.file), before: { status: change.current.status, outcome: change.current.outcome ?? null },
     after: { status: change.updated.status, outcome: change.updated.outcome ?? null }, before_sha256: sha256(change.before), after_sha256: sha256(change.after) } })
@@ -1559,7 +1558,7 @@ async function decisionPreview(root: string, payload: JsonMap, signal?: AbortSig
 async function decisionUpdate(root: string, payload: JsonMap, signal?: AbortSignal) {
   const id = experimentIdField(payload)
   const content = textField(payload, 'content')
-  const expected = stringField(payload, 'expected_sha256')
+  const expected = decisionExpected(payload)
   // 原有编辑器仅维护说明；结构化结论通过两个摘要共同确认。
   if (payload.status === undefined && payload.outcome === undefined) {
     const result = await applyEdit(root, { experiment_id: id,
@@ -1571,8 +1570,8 @@ async function decisionUpdate(root: string, payload: JsonMap, signal?: AbortSign
   }
   const decision = editablePath(root, { experiment_id: id }, 'decision.md')
   const { file: changeFile, before: beforeChange, after: afterChange, updated } = decisionChange(root, payload)
-  const beforeDecision = editableText(decision.file)
-  if (sha256(beforeDecision) !== expected) throw new RpcError('conflict', '研究结论已变化，请重新读取后确认')
+  const beforeDecision = existsSync(decision.file) ? editableText(decision.file) : null
+  if ((beforeDecision === null ? null : sha256(beforeDecision)) !== expected) throw new RpcError('conflict', '研究结论已变化，请重新读取后确认')
   if (rejectsLlmApiKey(decision.rel, content)) throw new RpcError('secret_rejected', '拒绝写入 LLM API Key')
   if (signal?.aborted) throw new RpcError('aborted', '研究结论保存已取消')
   let wroteDecision = false, wroteChange = false
@@ -1590,7 +1589,7 @@ async function decisionUpdate(root: string, payload: JsonMap, signal?: AbortSign
       if ((wroteDecision && sha256(readFileSync(decision.file)) !== sha256(content)) || (wroteChange && sha256(readFileSync(changeFile)) !== sha256(afterChange))) {
         throw new Error('concurrent-change')
       }
-      if (wroteDecision) atomicWrite(decision.file, beforeDecision)
+      if (wroteDecision) { if (beforeDecision === null) rmSync(decision.file); else atomicWrite(decision.file, beforeDecision) }
       if (wroteChange) atomicWrite(changeFile, beforeChange)
     } catch { throw new RpcError('needs_recovery', '结论保存失败且文件又有变化，请核对 decision.md 与 change.yaml', { experiment_id: id }) }
     throw error

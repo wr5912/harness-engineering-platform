@@ -13,9 +13,9 @@ import { collectKnowledge } from '../../deploy/knowledge/index.mts'
 import { managementKnowledgeRoots } from '../../deploy/knowledge/platform.mts'
 
 // 与独立 Runtime 的其他原生接缝验收共用锁定安装来源，不替换 Web 或工具注册表。
-const anchor = '/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/package.json', sdk = createRequire(anchor)
+const anchor = process.env.HARNESS_DSH_ENTRY ?? '/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/package.json', sdk = createRequire(anchor)
 const lock = JSON.parse(await readFile(new URL('../../../runtime/adapters/dsh-container/source.lock.json', import.meta.url), 'utf8'))
-assert.equal(JSON.parse(await readFile(anchor, 'utf8')).version, lock.cli_version, '原生 SDK 的 CLI 版本须与 Runtime 来源锁一致')
+assert.equal(JSON.parse(await readFile(sdk.resolve('@deepseek-ai/dsh/package.json'), 'utf8')).version, lock.cli_version, '原生 SDK 的 CLI 版本须与 Runtime 来源锁一致')
 const [{ Context }, { default: WebRuntime }, { default: ToolRuntime }, { default: SystemPrompt }, HttpFetch, ToolWeb] = await Promise.all([
   '@deepseek-ai/cordis', '@deepseek-ai/dsh-web', '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-system-prompt', '@deepseek-ai/dsh-web-fetch-http', '@deepseek-ai/dsh-tool-web',
 ].map(name => import(pathToFileURL(sdk.resolve(name)).href)))

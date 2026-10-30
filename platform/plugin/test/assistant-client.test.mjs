@@ -197,7 +197,7 @@ test('列表通知未到时先完成原生登记与绑定，再向同一Session�
   open()
   await creating
   assert.deepEqual(calls.filter(([endpoint]) => endpoint === 'assistant/session'), [
-    ['assistant/session', { task: '你好', context: { page: 'home' }, session_id: 'session-race' }],
+    ['assistant/session', { task: '你好', context: { page: 'home' }, session_id: 'session-race', request_id: calls.find(([endpoint]) => endpoint === 'assistant/session')[1].request_id }],
   ])
   assert.deepEqual(f.nativeCreates, [{ workspaceId: 'project' }])
   assert.equal(f.assistant.getSnapshot().sessionId, 'session-race')
@@ -428,5 +428,133 @@ test('确认回执优先于在途旧状态，刷新失败保持结算且显式�
   assert.equal(f.assistant.getSnapshot().status.proposals[0].state, 'completed')
   hold = false; fail = false; await f.assistant.refresh()
   assert.equal(f.assistant.getSnapshot().statusError, '')
+  f.assistant.dispose()
+})
+
+function submissionStorage() {
+  const values = new Map()
+  return { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key), values }
+}
+function withSubmissionStorage(storage, operation) {
+  const previous = globalThis.sessionStorage
+  globalThis.sessionStorage = storage
+  try { return operation() } finally { if (previous === undefined) delete globalThis.sessionStorage; else globalThis.sessionStorage = previous }
+}
+
+test('受理回执丢失后读取原提交，确认已受理不另建会话或重复投递', async () => {
+  const storage = submissionStorage(), calls = [], accepted = new Set()
+  const f = withSubmissionStorage(storage, () => fixture(async (_channel, endpoint, body) => {
+    calls.push({ endpoint, body })
+    if (endpoint === 'assistant/session') {
+      assert.ok([...storage.values.values()].some(value => JSON.parse(value).requestId === body.request_id), '投递前已持久保存身份')
+      accepted.add(body.request_id); throw new Error('受理后连接断开')
+    }
+    return { ok: true, value: { proposals: [], ...(body.request_id ? { submission: { request_id: body.request_id, state: accepted.has(body.request_id) ? 'accepted' : 'not_received' } } : {}) } }
+  }))
+  await f.assistant.create('迁移既有工程', { page: 'agents', workflow: 'migration' })
+  assert.equal(f.nativeCreates.length, 1)
+  assert.equal(calls.filter(x => x.endpoint === 'assistant/session').length, 1)
+  assert.equal(f.assistant.getSnapshot().sessionId, 'session-1')
+  assert.equal(f.assistant.getSnapshot().pendingSubmission, undefined)
+  assert.equal(storage.values.size, 0)
+  f.assistant.dispose()
+})
+
+test('受理前断连和整页重挂沿用原会话及请求；恢复不抢占另一个当前会话', async () => {
+  const storage = submissionStorage(), rows = {}, submissions = [], accepted = new Set()
+  let online = false, releaseStatus, hold = false
+  const call = async (_channel, endpoint, body) => {
+    if (endpoint === 'assistant/session') {
+      submissions.push(body)
+      if (!online) throw new Error('发送前网络断开')
+      accepted.add(body.request_id)
+      return { ok: true, value: { session_id: body.session_id, request_id: body.request_id } }
+    }
+    if (body.request_id && hold) await new Promise(resolve => { releaseStatus = resolve })
+    return { ok: true, value: { proposals: [], ...(body.request_id ? { submission: { request_id: body.request_id, state: accepted.has(body.request_id) ? 'accepted' : 'not_received' } } : {}) } }
+  }
+  const first = withSubmissionStorage(storage, () => fixture(call, undefined, rows))
+  const context = { page: 'home' }
+  await assert.rejects(first.assistant.create('核对版本', context), /网络断开/)
+  assert.equal(first.nativeCreates.length, 1)
+  const original = submissions[0]
+  assert.ok(first.assistant.getSnapshot().pendingSubmission)
+  first.assistant.dispose()
+  const restored = withSubmissionStorage(storage, () => fixture(call, undefined, rows))
+  restored.assistant.restore()
+  assert.equal(restored.assistant.getSnapshot().pendingSubmission.requestId, original.request_id)
+  await assert.rejects(restored.assistant.create('另一个任务', context), /上一项任务/)
+  online = true
+  await restored.assistant.retrySubmission()
+  assert.equal(restored.nativeCreates.length, 0)
+  assert.equal(submissions.length, 2)
+  assert.equal(submissions[1].session_id, original.session_id)
+  assert.equal(submissions[1].request_id, original.request_id)
+  assert.equal(storage.values.size, 0)
+  restored.assistant.dispose()
+
+  // 原任务已受理，但状态回执迟到时用户已选择其他原生会话。
+  storage.setItem('harness-platform:assistant-submission:v1:/repo', JSON.stringify({ root: '/repo', sessionId: original.session_id, requestId: original.request_id, task: '核对版本', context }))
+  rows.other = { cwd: '/repo' }
+  const racing = withSubmissionStorage(storage, () => fixture(call, undefined, rows))
+  racing.assistant.restore(); hold = true
+  const recovery = racing.assistant.recoverSubmission()
+  await Promise.resolve()
+  await racing.assistant.select('other', false)
+  hold = false; releaseStatus(); await recovery
+  assert.equal(racing.assistant.getSnapshot().sessionId, 'other')
+  assert.deepEqual(racing.opened, [])
+  assert.equal(submissions.length, 2)
+  racing.assistant.dispose()
+})
+
+test('浏览器无法保存恢复身份时不投递，原生会话仍可定位', async () => {
+  const calls = []
+  const storage = { getItem: () => null, setItem() { throw new Error('storage blocked') } }
+  const f = withSubmissionStorage(storage, () => fixture(async (_channel, endpoint) => { calls.push(endpoint); return { ok: true, value: {} } }))
+  await assert.rejects(f.assistant.create('核对任务'), /无法保存任务恢复信息/)
+  assert.equal(f.nativeCreates.length, 1)
+  assert.equal(calls.includes('assistant/session'), false)
+  f.assistant.dispose()
+})
+
+test('明确新建才清理原提交恢复身份，保留原生会话；旧组件迟到回执不删除新提交', async () => {
+  const storage = submissionStorage(), rows = {}, pending = []
+  const call = async (_channel, endpoint, body) => {
+    if (endpoint === 'assistant/session') return new Promise(resolve => pending.push({ body, resolve }))
+    return { ok: true, value: { proposals: [], submission: { request_id: body.request_id, state: 'unknown' } } }
+  }
+  const first = withSubmissionStorage(storage, () => fixture(call, undefined, rows))
+  const creating = first.assistant.create('原任务')
+  while (!pending.length) await new Promise(resolve => setImmediate(resolve))
+  await assert.rejects(first.assistant.startNewTask(), /任务正在/)
+  first.assistant.dispose()
+  const next = withSubmissionStorage(storage, () => fixture(call, undefined, rows, { sessionIds: ['session-explicit-new'] }))
+  next.assistant.restore()
+  const fresh = next.assistant.startNewTask({ page: 'instances' })
+  while (pending.length < 2) await new Promise(resolve => setImmediate(resolve))
+  assert.notEqual(pending[0].body.request_id, pending[1].body.request_id)
+  pending[0].resolve({ ok: true, value: { session_id: pending[0].body.session_id } }); await creating
+  assert.equal(JSON.parse([...storage.values.values()][0]).requestId, pending[1].body.request_id)
+  assert.ok(rows[pending[0].body.session_id])
+  pending[1].resolve({ ok: true, value: { session_id: pending[1].body.session_id } }); await fresh
+  assert.equal(next.nativeCreates.length, 1)
+  assert.equal(next.assistant.getSnapshot().sessionId, 'session-explicit-new')
+  next.assistant.dispose()
+})
+
+test('受理回执迟到时页面已切到其他对象，不自动打开原Session', async () => {
+  let release
+  const f = fixture(async (_channel, endpoint, body) => {
+    if (endpoint === 'assistant/session') return new Promise(resolve => { release = () => resolve({ ok: true, value: { session_id: body.session_id } }) })
+    return { ok: true, value: { proposals: [] } }
+  })
+  const task = f.assistant.create('核对固定版本', { page: 'agents', experiment_id: 'EXP-a' })
+  while (!release) await new Promise(resolve => setImmediate(resolve))
+  f.assistant.updateContext({ page: 'instances', instance_name: 'other' })
+  release(); await task
+  assert.deepEqual(f.opened, [])
+  assert.equal(f.nativeCreates.length, 1)
+  assert.equal(f.assistant.getSnapshot().pendingSubmission, undefined)
   f.assistant.dispose()
 })

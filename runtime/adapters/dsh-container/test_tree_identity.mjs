@@ -19,7 +19,7 @@ test('Node and Python produce the same exact mount tree digest', () => {
       writeFileSync(join(root, '中文 子目录', 'a.bin'), Buffer.from([0, 1, 127, 255]))
       chmodSync(join(root, 'z.txt'), 0o755)
       const nodeDigest = fileSnapshot(root).tree_sha256
-      const pythonDigest = execFileSync('python3', ['-c', [
+      const pythonDigest = execFileSync(process.env.HARNESS_PYTHON ?? 'python3', ['-c', [
         'import runpy,sys', 'from pathlib import Path',
         'sys.path.insert(0,sys.argv[1])',
         'module=runpy.run_path(str(Path(sys.argv[1])/"mutation-receipt.py"))',

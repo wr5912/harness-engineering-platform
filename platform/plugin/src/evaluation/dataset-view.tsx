@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { CHANNEL, type PlatformPageProps } from '../protocol.ts'
 import type { PlatformUpdates } from '../realtime/client.ts'
+import { useQueuedRefresh } from '../realtime/refresh.ts'
 import { DetailDrawer } from '../components/detail-drawer.tsx'
 import { validateDecisionQuestions, validateDecisionTargets, validateDecisionTask, isDecisionTargetReviewed } from './decision-dataset-contract.ts'
 
@@ -86,7 +87,7 @@ export function DecisionDatasetView({ rpc, runId, active, updates, onDirty, onBu
     if (!result.ok) throw new Error(`${result.error.code}: ${result.error.message}`)
     return result.value
   }
-  async function refresh() {
+  async function readBatch() {
     const target = current.current.runId
     const refreshId = ++refreshSequence.current
     const request = generation.current, selectedId = current.current.id
@@ -109,9 +110,10 @@ export function DecisionDatasetView({ rpc, runId, active, updates, onDirty, onBu
       else { setListPhase('error'); setListError((e as Error).message) }
     } }
   }
+  const refresh = useQueuedRefresh(active && Boolean(runId), readBatch, runId)
   useEffect(() => { generation.current++; setId(''); setDocument(null); setRecordId(''); setDraft(null); setList([]); setListPhase('loading'); setListError(''); setError(''); setMessage(''); return () => { generation.current++ } }, [runId])
-  useEffect(() => { if (active && runId) void refresh() }, [active, runId])
-  useEffect(() => updates?.subscribe(() => { if (active && updates.getSnapshot().domains.includes('agents')) void refresh() }), [updates, active, runId])
+  useEffect(() => { if (runId) void refresh() }, [runId])
+  useEffect(() => updates?.subscribe(() => { if (updates.getSnapshot().domains.includes('agents')) void refresh() }), [updates])
   async function open(next: string) {
     if (busy || dirty && !window.confirm('样本有未保存的修改，丢弃后切换？')) return
     const request = ++generation.current

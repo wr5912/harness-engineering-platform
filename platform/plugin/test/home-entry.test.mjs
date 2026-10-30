@@ -28,7 +28,7 @@ function localClock(initial = Date.parse('2026-10-29T08:00:00Z')) {
     advance(duration) { now += duration; for (const [id, timer] of timers) if (timer.at <= now) { timers.delete(id); timer.callback() } },
   }
 }
-function home({ example = false, exampleCase = true, exampleExtra = false, exampleActive = 'EXP-daily-inspection-assistant-002-r222222222222', noRuns = false, runVerdict = 'passed', runStatus = 'completed', runsFixture, failStart = false, sessionFixture, jobsFixture = [], active = true, intercept, storage = memoryStorage(), username = 'admin', workspaceRoot = '/test-assets', workspaceId = 'workspace-test', accountError = false, clock } = {}) {
+function home({ example = false, exampleCase = true, exampleExtra = false, exampleActive = 'EXP-daily-inspection-assistant-002-r222222222222', noRuns = false, runVerdict = 'passed', runStatus = 'completed', runsFixture, failStart = false, sessionFixture, jobsFixture = [], active = true, intercept, storage = memoryStorage(), username = 'admin', workspaceRoot = '/test-assets', workspaceId = 'workspace-test', accountError = false, clock, beforeStart } = {}) {
   const states = [], dependencies = [], cleanups = [], calls = [], tasks = [], navigations = [], assistantSelections = [], projectionRefreshes = []
   let cursor = 0, effects = [], changed = false, tree
   const react = { ...require('react'),
@@ -51,7 +51,7 @@ function home({ example = false, exampleCase = true, exampleExtra = false, examp
     sessions: { list: { subscribe() { return () => {} }, getSnapshot() { return sessionSnapshot } }, refresh: async () => {}, refreshProjections: async id => { projectionRefreshes.push(id) } },
     assistant: { select: async id => { assistantSelections.push(id) } },
     updates, navigate: target => navigations.push(target),
-    startConversation: async (root, prompt, context) => { if (failStart) throw new Error('会话服务暂不可用'); tasks.push({ root, prompt, context }) },
+    startConversation: async (root, prompt, context) => { await beforeStart?.(); if (failStart) throw new Error('会话服务暂不可用'); tasks.push({ root, prompt, context }) },
     rpc: { call: async (_channel, method, body) => {
       calls.push({ method, body })
       const intercepted = intercept?.(method, body)
@@ -165,8 +165,8 @@ test('首页不可见时取消风险到期计时，恢复时直接显示正确�
   try {
     await ui.settle()
     assert.equal(clock.pending(), 0)
-    const requests = ui.calls.length
     ui.setActive(true); await ui.settle()
+    const requests = ui.calls.length
     assert.equal(clock.pending(), 1)
     ui.setActive(false); await ui.settle()
     assert.equal(clock.pending(), 0)
@@ -345,7 +345,8 @@ test('首页突出任务输入、同层快捷入口和继续工作，登录承�
   const ui = home()
   try { await ui.settle(); assert.match(ui.text(), /用 AI 构建和管理智能体/); assert.ok(ui.text().includes(HOME_SUBTITLE)); assert.equal(ui.label('业务任务').props.placeholder, GENERAL_PLACEHOLDER); assert.equal(ui.label('业务任务').props.rows, 1); assert.equal(ui.button('开始任务').props.disabled, true); assert.equal(ui.text().includes(PLATFORM_SLOGAN), false); assert.ok(ui.nodes().some(node => node.props?.className === 'harness-home-workspace')); assert.ok(ui.nodes().some(node => node.props?.className === 'harness-home-shortcuts')); assert.equal(ui.button('自由咨询'), undefined, '默认输入即自由咨询，不额外占用手机首屏'); const layout = ui.nodes().find(node => node.props?.className === 'harness-home-workspace'); assert.deepEqual(Array.from(layout.props.children, child => child.props.className), ['harness-home-primary', 'harness-home-secondary']); assert.match(ui.text(layout.props.children[0]), /继续处理.*最近评测/s); assert.match(ui.text(layout.props.children[1]), /工作区概况.*从一个可验证的目标开始/s); await ui.click('查看结果'); assert.deepEqual({ ...ui.navigations.at(-1) }, { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: experiment, run_id: runId }) } finally { ui.cleanup() }
   const module = { exports: {} }; vm.runInNewContext(loginSource, { module, exports: module.exports, require })
-  assert.match(module.exports.loginPage('/hep/login'), /让智能体真正可用，持续变好。/)
+  const slogan = module.exports.loginPage('/hep/login').match(/<h2>([\s\S]*?)<\/h2>/)?.[1].replace(/<[^>]+>/g, '')
+  assert.equal(slogan, PLATFORM_SLOGAN)
 })
 
 test('通用入口保留需求原文且不预设构建流程，空输入和会话失败不假跳转', async () => {
@@ -743,4 +744,45 @@ test('摘要刷新保留条目和已知数字，加载状态不插入正文且�
     assert.equal(JSON.stringify(chart().props.segments), distribution)
     assert.match(chart().props.description, /上次读取，当前更新失败/)
   } finally { ui.cleanup() }
+})
+
+test('首页隐藏只记脏，首次慢请求及在途通知共用单批刷新，恢复补一次', async () => {
+  const waiting = [], endpoints = new Set(['home', 'agents/eval/list', 'mcp/control/status'])
+  let slow = true, activeReads = 0, maximum = 0
+  const ui = home({ active: false, intercept(method) {
+    if (!slow || !endpoints.has(method)) return
+    activeReads++; maximum = Math.max(maximum, activeReads)
+    return new Promise(resolve => waiting.push(() => { activeReads--; resolve(method === 'home' ? { ok: true, value: { recent_runs: [], instances: { ok: true, value: { instances: [] } }, mcp: { ok: true, value: { connections: [] } } } } : method === 'agents/eval/list' ? { ok: true, value: { jobs: [] } } : { ok: true, value: { riskFacts: [] } }) }))
+  } })
+  try {
+    await ui.settle(); const before = ui.calls.length
+    for (let n = 0; n < 3; n++) { ui.invalidate(['agents']); await ui.settle() }
+    assert.equal(ui.calls.length, before)
+    ui.setActive(true); await ui.settle(); assert.equal(activeReads, 3)
+    const started = ui.calls.length
+    for (let n = 0; n < 3; n++) { ui.invalidate(['agents']); await ui.settle() }
+    assert.equal(ui.calls.length, started)
+    slow = false; waiting.splice(0).forEach(release => release()); await ui.settle()
+    assert.equal(ui.calls.length, started + 3)
+    assert.equal(maximum, 3, '同一批三个不同端点并行，不启动第二批')
+    ui.setActive(false); await ui.settle(); const hidden = ui.calls.length
+    ui.invalidate(['agents']); ui.invalidate(['instances']); await ui.settle(); assert.equal(ui.calls.length, hidden)
+    ui.setActive(true); await ui.settle(); assert.equal(ui.calls.length, hidden + 3)
+  } finally { ui.cleanup() }
+})
+
+test('首页任务回执迟到时已离开页面不抢回导航，跨工作区不清除新草稿', async () => {
+  for (const switchWorkspace of [false, true]) {
+    let release
+    const ui = home({ beforeStart: () => new Promise(resolve => { release = resolve }) })
+    try {
+      await ui.settle(); ui.change('业务任务', '原工作区任务'); await ui.submit()
+      assert.equal(typeof release, 'function')
+      if (switchWorkspace) { ui.switchWorkspace('/other-workspace', 'workspace-other'); await ui.settle(); ui.change('业务任务', '新工作区草稿') }
+      else ui.setActive(false)
+      release(); await ui.settle()
+      assert.equal(ui.navigations.length, 0)
+      assert.equal(ui.label('业务任务').props.value, switchWorkspace ? '新工作区草稿' : '')
+    } finally { ui.cleanup() }
+  }
 })

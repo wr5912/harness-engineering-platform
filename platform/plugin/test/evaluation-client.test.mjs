@@ -1675,3 +1675,21 @@ test('自动回读先确认受理后，旧恢复按钮的迟到点击不得创�
     assert.equal(accepted, 2, '只有明确新建评测才产生第二个请求')
   } finally { ui.cleanup() }
 })
+
+test('首次Decision不存在时正文可编辑并以null创建，读到空文件仍使用其摘要', async () => {
+  for (const hash of [null, 'empty-file-sha256']) {
+    const ui = workbench({ target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA, run_id: runA }, handler: async (action, payload, original) => {
+      if (action === 'detail') return { ...await original(action, payload), decision: { exists: hash !== null, content: '', sha256: hash } }
+      return original(action, payload)
+    } })
+    try {
+      await ui.settle(); ui.button('记录研究决策').props.onClick(); await ui.settle()
+      assert.equal(ui.byLabel('Decision 正文').props.disabled, false)
+      ui.change('Decision 正文', '# Decision\n\n尚未完成业务评测，结论 inconclusive。')
+      assert.equal(ui.button('保存研究决策').props.disabled, false)
+      ui.button('保存研究决策').props.onClick(); await ui.settle()
+      assert.equal(ui.calls.find(call => call.action === 'decision/update').payload.expected_sha256, hash)
+      assert.match(ui.text(), /研究决策已保存/)
+    } finally { ui.cleanup() }
+  }
+})

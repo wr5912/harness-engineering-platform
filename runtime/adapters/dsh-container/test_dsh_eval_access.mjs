@@ -55,6 +55,7 @@ test('研究入口的上下文、运行、比较与实例子进程沿用 HARNESS
   for (const directory of [adapter, workspace, bin]) mkdirSync(directory, { recursive: true })
   copyFileSync(new URL('./research-tool.mts', import.meta.url), join(adapter, 'research-tool.mts'))
   copyFileSync(new URL('../../../platform/plugin/src/workspace.ts', import.meta.url), join(workspace, 'workspace.ts'))
+  copyFileSync(new URL('../../../platform/plugin/src/version-id.ts', import.meta.url), join(workspace, 'version-id.ts'))
   const python = execFileSync(process.env.HARNESS_PYTHON || 'python3', ['-c', 'import sys;print(sys.executable)'], { encoding: 'utf8' }).trim()
   writeFileSync(join(bin, 'python3'), '#!/bin/sh\necho unavailable-python3 >&2\nexit 77\n', { mode: 0o755 })
   writeFileSync(join(bin, 'git'), '#!/bin/sh\nif [ "$1" = rev-parse ]; then echo fixture-commit; fi\n', { mode: 0o755 })

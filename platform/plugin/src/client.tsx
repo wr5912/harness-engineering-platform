@@ -146,6 +146,10 @@ function PlatformPage({ catalog, rpc, assistant, updates, theme, enterConversati
     contexts.current[contextPage] = context
     if (contextPage === activePage.current) assistant.updateContext(context)
   }, [assistant])
+  const newAssistantTask = (context?: AssistantContext) => {
+    if (assistantState.pendingSubmission && !window.confirm('上一任务的受理结果仍待核对。新建会保留原会话，但可能重复办理同一任务，仍要继续？')) return
+    void assistant.startNewTask(context).catch(() => {})
+  }
   const onAssistant = async (task: string, context: AssistantContext) => {
     setOpen(true)
     await assistant.create(task, context)
@@ -299,21 +303,22 @@ function PlatformPage({ catalog, rpc, assistant, updates, theme, enterConversati
             onKeyDown={event => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) { event.preventDefault(); setAssistantWidth(width => event.key === 'Home' ? 360 : event.key === 'End' ? 560 : Math.max(360, Math.min(560, width + (event.key === 'ArrowLeft' ? 20 : -20)))) } }}/>
           <header className="harness-assistant-heading"><div><strong>平台 AI 助手</strong><small role="status">{assistantState.busy ? '正在准备会话…' : statusLabel}</small></div><div>
             {page === 'gateway' && assistantReturnAction && <button type="button" onClick={() => { setAssistantReturnAction(null); assistantReturnAction.onReturn() }}>{assistantReturnAction.label}</button>}
-            <button title="新建独立任务会话" disabled={assistantState.busy} onClick={() => { void assistant.create().catch(() => {}) }}>新任务</button>
+            <button title="新建独立任务会话" disabled={assistantState.busy} onClick={() => newAssistantTask()}>新任务</button>
             <button title="在管理对话中展开" onClick={() => navigate('conversations')}>展开</button>
             <button ref={closeAssistant} title="收起助手" onClick={() => { setOpen(false); requestAnimationFrame(() => toggleAssistant.current?.focus()) }}>收起</button>
           </div></header>
           <div className="harness-assistant-context">
             <div className="harness-assistant-context-row"><span>{sameObject ? '当前查看与任务对象' : '当前查看'}：<strong>{viewedObject}</strong></span><a href={navigationHash(target)} onClick={event => { event.preventDefault(); setOpen(false); navigate(target) }}>定位当前对象</a></div>
             {fixedObject && !sameObject && <div className="harness-assistant-context-row"><span>原任务固定对象：<strong>{fixedObject}</strong></span>{fixedTarget && <a href={navigationHash(fixedTarget)} onClick={event => { event.preventDefault(); setOpen(false); navigate(fixedTarget) }}>查看任务对象</a>}</div>}
-            {fixedObject && !sameObject && hasViewedObject && <button type="button" disabled={assistantState.busy} onClick={() => { void assistant.create(undefined, { ...target, page }).catch(() => {}) }}>以当前对象新建任务</button>}
+            {fixedObject && !sameObject && hasViewedObject && <button type="button" disabled={assistantState.busy} onClick={() => newAssistantTask({ ...target, page })}>以当前对象新建任务</button>}
             {(viewedIds.length > 0 || fixedIds.length > 0) && <details className="harness-assistant-context-ids"><summary>查看完整对象 ID</summary><dl>{viewedIds.map(([label, value]) => <div key={`viewed-${label}`}><dt>当前查看 · {label}</dt><dd><code>{value}</code></dd></div>)}{!sameObject && fixedIds.map(([label, value]) => <div key={`fixed-${label}`}><dt>任务对象 · {label}</dt><dd><code>{value}</code></dd></div>)}</dl></details>}
           </div>
           {assistantState.sessionId && assistantState.platformContext === false && <p className="harness-assistant-scope">当前为其他工作区会话。平台操作请使用“新任务”。</p>}
           {assistantState.error && <p className="harness-assistant-error" role="alert">{assistantState.error}</p>}
+          {assistantState.pendingSubmission && <div className="harness-assistant-scope" role="status">任务受理结果待核对。<button type="button" disabled={assistantState.busy} onClick={() => void assistant.recoverSubmission()}>核对原任务</button><button type="button" disabled={assistantState.busy} onClick={() => void assistant.retrySubmission().catch(() => {})}>重试原提交</button></div>}
           <div className="harness-assistant-workspace">
             <div className="harness-assistant-chat">
-              {floating && assistantState.reference ? <SessionProvider session={assistantState.reference} empty={() => <p role="status">正在连接会话…</p>}>{renderSlot('harness.assistant.conversation', {})}</SessionProvider> : <div className="harness-assistant-empty"><PlatformLogo size={48}/><h2>开始新的平台任务</h2><p>管理智能体版本、评测、实例和 MCP。</p><button className="harness-primary" disabled={assistantState.busy} onClick={() => { void assistant.create().catch(() => {}) }}>新建任务会话</button></div>}
+              {floating && assistantState.reference ? <SessionProvider session={assistantState.reference} empty={() => <p role="status">正在连接会话…</p>}>{renderSlot('harness.assistant.conversation', {})}</SessionProvider> : <div className="harness-assistant-empty"><PlatformLogo size={48}/><h2>开始新的平台任务</h2><p>管理智能体版本、评测、实例和 MCP。</p><button className="harness-primary" disabled={assistantState.busy} onClick={() => newAssistantTask()}>新建任务会话</button></div>}
             </div>
           </div>
         </section>

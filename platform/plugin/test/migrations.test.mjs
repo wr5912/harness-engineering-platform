@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import fs, { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, lstatSync } from 'node:fs'
 import { syncBuiltinESMExports } from 'node:module'
 import { spawnSync } from 'node:child_process'
@@ -12,14 +12,17 @@ import { dump, load } from 'js-yaml'
 
 const program = resolve(new URL('../../../', import.meta.url).pathname)
 process.env.HARNESS_PROGRAM_ROOT = program
-process.env.HARNESS_PYTHON = '/usr/bin/python3.10'
+process.env.HARNESS_PYTHON ??= 'python3'
 const built = mkdtempSync(join(tmpdir(), 'migrations-module-'))
 await build({ entryPoints: [new URL('../src/agents/migrations.ts', import.meta.url).pathname], outfile: join(built, 'migrations.mjs'), bundle: true, platform: 'node', format: 'esm' })
 const { createMigrationsHandler } = await import(`file://${join(built, 'migrations.mjs')}`)
 await build({ entryPoints: [new URL('../src/agents/asset-build.ts', import.meta.url).pathname], outfile: join(built, 'asset-build.mjs'), bundle: true, platform: 'node', format: 'esm' })
 const { createAssetBuildHandler } = await import(`file://${join(built, 'asset-build.mjs')}`)
+await build({ stdin: { contents: "export {createAgent} from './src/agents/create-agent.ts'; export {createAgentsHandler} from './src/agents/index.ts'; export {versionSource} from './src/agents/version-source.ts';", resolveDir: new URL('../', import.meta.url).pathname, loader: 'ts' }, outfile: join(built, 'versions.mjs'), bundle: true, platform: 'node', format: 'esm', external: ['@deepseek-ai/dsh-client-connection'] })
+const { createAgent, createAgentsHandler, versionSource } = await import(`file://${join(built, 'versions.mjs')}`)
 test.after(() => rmSync(built, { recursive: true, force: true }))
 const success = result => { assert.equal(result.ok, true, JSON.stringify(result)); return result.value }
+const agentsHandler = root => { const handler = createAgentsHandler(root); return (endpoint, payload) => handler(endpoint, payload, new AbortController().signal) }
 const write = (root, path, content) => { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), content) }
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'migration-data-')), source = mkdtempSync(join(tmpdir(), 'migration-source-'))
@@ -44,20 +47,31 @@ function appendCase(fx, id, expected) {
   const file = join(fx.root, 'agents/migrated-agent/evaluation.md')
   writeFileSync(file, `${readFileSync(file, 'utf8')}\n#### ${id} 补齐迁移行为\n\n**用户输入**\n\n> 请执行并说明：${expected}\n\n**预期**\n\n${expected}\n`)
 }
-function recordedRun(fx, id, digest, caseIds, run = 'run-22222222-2222-4222-8222-222222222222') {
-  // 这里构造既有 Run 文件合同，以验证完成状态消费逻辑；并非真实模型验收。
-  const parsed = spawnSync('/usr/bin/python3.10', ['-c', 'import json,sys;from pathlib import Path;sys.path.insert(0,sys.argv[1]);from evaluation_contract import load_evaluation;print(json.dumps(load_evaluation(Path(sys.argv[2]))))', join(program, 'runtime/research'), join(fx.root, 'agents/migrated-agent/evaluation.md')], { encoding: 'utf8' })
+function sealRecordedRun(fx, id, run) {
+  const directory = join(fx.root, `evolution/experiments/${id}/runs/${run}`)
+  const manifest = load(readFileSync(join(directory, 'run.yaml'), 'utf8'))
+  for (const [field, file] of [['results_sha256', 'results.jsonl'], ['summary_sha256', 'summary.json'], ['analysis_sha256', 'analysis.json'], ['report_sha256', 'report.md']]) manifest[field] = createHash('sha256').update(readFileSync(join(directory, file))).digest('hex')
+  writeFileSync(join(directory, 'run.yaml'), dump(manifest))
+}
+function recordedRun(fx, id, digest, caseIds, run = `run-${randomUUID()}`) {
+  // 构造完整封存合同与外部执行观察夹具，核对消费者；不宣称真实模型验收。
+  const parsed = spawnSync(process.env.HARNESS_PYTHON, ['-c', 'import json,sys;from pathlib import Path;sys.path.insert(0,sys.argv[1]);from evaluation_contract import load_evaluation;print(json.dumps(load_evaluation(Path(sys.argv[2]))))', join(program, 'runtime/research'), join(fx.root, 'agents/migrated-agent/evaluation.md')], { encoding: 'utf8' })
   assert.equal(parsed.status, 0, parsed.stderr)
   const contracts = JSON.parse(parsed.stdout).cases, path = `evolution/experiments/${id}/runs/${run}`
   const json = (file, value) => write(fx.root, `${path}/${file}`, JSON.stringify(value))
-  write(fx.root, `${path}/run.yaml`, dump({ run_id: run, experiment_id: id, agent_id: 'migrated-agent', source_id: `experiment:${id}`, status: 'completed' }))
+  write(fx.root, `${path}/run.yaml`, dump({ run_id: run, experiment_id: id, agent_id: 'migrated-agent', source_id: `experiment:${id}`, evaluation_ref: 'agents/migrated-agent/evaluation.md', status: 'completed' }))
   json('inputs.lock.json', { source_id: `experiment:${id}`, executor: 'api', candidate_sha256: digest, evaluation_cases: caseIds.map(caseId => contracts[caseId]), review_mode: 'none' })
   json('summary.json', { run_id: run, effective_verdict: 'passed', source_verification: { status: 'matched' } })
-  write(fx.root, `${path}/results.jsonl`, caseIds.map(caseId => JSON.stringify({ run_id: run, input_id: caseId, execution_status: 'completed', verdict: 'passed' })).join('\n') + '\n')
+  json('analysis.json', { review_status: 'not_requested', scenes: [] })
+  write(fx.root, `${path}/report.md`, '# 合成外部观察夹具的封存报告\n')
+  write(fx.root, `${path}/results.jsonl`, caseIds.map(caseId => JSON.stringify({ run_id: run, input_id: caseId, execution_status: 'completed', verdict: 'passed', evidence_ref: `evidence/${caseId}` })).join('\n') + '\n')
   for (const caseId of caseIds) {
     json(`evidence/${caseId}/checks.json`, { session_id: `dsh-session-${caseId}`, preset_matches: true, workspace_matches: true })
     json(`evidence/${caseId}/response.json`, { assistant_texts: ['按用例完成当前任务。'] })
+    write(fx.root, `${path}/evidence/${caseId}/trace.jsonl`, JSON.stringify({ event: { type: 'session', createdAt: 1 } }) + '\n')
+    write(fx.root, `${path}/evidence/${caseId}/tools.jsonl`, '')
   }
+  sealRecordedRun(fx, id, run)
 }
 
 test('迁移用例输入错误指出具体字段，未创建目标资产', async t => {
@@ -344,23 +358,16 @@ test('迁移完成必须由当前Candidate的真实API冻结Case、装载证据�
   const fx = fixture(t), { preview } = await sourceAndPreview(fx)
   const applied = success(await fx.handler('apply', preview.apply_input)), id = preview.experiment_id
   const run = 'run-11111111-1111-4111-8111-111111111111', path = `evolution/experiments/${id}/runs/${run}`, caseId = cases[0].id
-  const parse = spawnSync('/usr/bin/python3.10', ['-c', 'import json,sys;from pathlib import Path;sys.path.insert(0,sys.argv[1]);from evaluation_contract import load_evaluation;print(json.dumps(load_evaluation(Path(sys.argv[2]))))', join(program, 'runtime/research'), join(fx.root, 'agents/migrated-agent/evaluation.md')], { encoding: 'utf8' })
-  assert.equal(parse.status, 0, parse.stderr)
-  const contract = JSON.parse(parse.stdout).cases[caseId]
+  recordedRun(fx, id, applied.candidate_sha256, [caseId], run)
   const json = (file, value) => write(fx.root, `${path}/${file}`, JSON.stringify(value))
-  write(fx.root, `${path}/run.yaml`, dump({ run_id: run, experiment_id: id, agent_id: 'migrated-agent', source_id: `experiment:${id}`, status: 'completed' }))
-  const inputs = { source_id: `experiment:${id}`, executor: 'api', candidate_sha256: applied.candidate_sha256, evaluation_cases: [contract], review_mode: 'none' }
-  json('inputs.lock.json', inputs)
-  const summary = { run_id: run, effective_verdict: 'passed', source_verification: { status: 'matched' } }
-  json('summary.json', summary)
-  write(fx.root, `${path}/results.jsonl`, JSON.stringify({ run_id: run, input_id: caseId, execution_status: 'completed', verdict: 'passed' }) + '\n')
-  json(`evidence/${caseId}/checks.json`, { session_id: 'actual-dsh-session', preset_matches: true, workspace_matches: true })
-  json(`evidence/${caseId}/response.json`, { assistant_texts: ['先读取材料，再给出分析步骤。'] })
+  const manifest = load(readFileSync(join(fx.root, path, 'run.yaml'), 'utf8'))
+  const inputs = JSON.parse(readFileSync(join(fx.root, path, 'inputs.lock.json'), 'utf8'))
+  const summary = JSON.parse(readFileSync(join(fx.root, path, 'summary.json'), 'utf8'))
   const state = () => fx.handler('status', { experiment_id: id }).then(success)
   assert.equal((await state()).completed, true)
-  write(fx.root, `${path}/run.yaml`, dump({ run_id: 'run-99999999-9999-4999-8999-999999999999', experiment_id: id, agent_id: 'migrated-agent', source_id: `experiment:${id}`, status: 'completed' }))
+  write(fx.root, `${path}/run.yaml`, dump({ ...manifest, run_id: 'run-99999999-9999-4999-8999-999999999999' }))
   assert.equal((await state()).runtime_verified, false)
-  write(fx.root, `${path}/run.yaml`, dump({ run_id: run, experiment_id: id, agent_id: 'migrated-agent', source_id: `experiment:${id}`, status: 'completed' }))
+  write(fx.root, `${path}/run.yaml`, dump(manifest))
   json('summary.json', { ...summary, effective_verdict: 'unknown' }); assert.equal((await state()).completed, false)
   json('summary.json', summary)
   json('inputs.lock.json', { ...inputs, candidate_sha256: 'f'.repeat(64) }); assert.equal((await state()).runtime_verified, false)
@@ -374,10 +381,11 @@ test('迁移完成必须由当前Candidate的真实API冻结Case、装载证据�
 
 test('目标装载已核实时保留运行证据，后续复核失败仍阻止完成', async t => {
   const fx = fixture(t), { preview } = await sourceAndPreview(fx), applied = success(await fx.handler('apply', preview.apply_input))
-  const run = 'run-22222222-2222-4222-8222-222222222222', base = `evolution/experiments/${preview.experiment_id}/runs/${run}`
+  const run = `run-${randomUUID()}`, base = `evolution/experiments/${preview.experiment_id}/runs/${run}`
   recordedRun(fx, preview.experiment_id, applied.candidate_sha256, ['U-MIGRATION-001'], run)
-  write(fx.root, `${base}/run.yaml`, dump({ run_id: run, experiment_id: preview.experiment_id, agent_id: 'migrated-agent', source_id: `experiment:${preview.experiment_id}`, status: 'failed' }))
+  write(fx.root, `${base}/run.yaml`, dump({ ...load(readFileSync(join(fx.root, base, 'run.yaml'), 'utf8')), status: 'failed' }))
   write(fx.root, `${base}/summary.json`, JSON.stringify({ run_id: run, effective_verdict: 'inconclusive', review_status: 'failed', source_verification: { status: 'matched' } }))
+  sealRecordedRun(fx, preview.experiment_id, run)
   const status = success(await fx.handler('status', { experiment_id: preview.experiment_id }))
   assert.equal(status.runtime_verified, true); assert.equal(status.business_verified, false); assert.equal(status.completed, false)
   assert.ok(status.verification_reasons.every(reason => !reason.includes('尚无覆盖当前 Candidate')))
@@ -653,4 +661,82 @@ test('改正同一Candidate的处置类型不会移除已绑定的关键Case', a
   assert.deepEqual(corrected.resolution.resolutions[0].case_ids, ['U-MIGRATION-001', 'U-MIGRATION-002'])
   recordedRun(fx, id, applied.candidate_sha256, ['U-MIGRATION-001'])
   assert.equal(success(await fx.handler('status', { experiment_id: id })).completed, false)
+})
+
+
+test('迁移与普通派生共同继承SDK运行方式，显式切换Web仍按实际声明处理', async t => {
+  const fx = fixture(t)
+  const created = success(await createAgent(fx.root, { agent_id: 'migrated-agent', name: 'SDK分析助手', description: '分析材料', role: '读取材料并说明分析步骤', profile: 'sdk' }))
+  git(fx.root, ['init']); git(fx.root, ['config', 'user.name', 'Fixture']); git(fx.root, ['config', 'user.email', 'fixture@example.invalid'])
+  git(fx.root, ['add', '.']); git(fx.root, ['commit', '-m', '固定SDK父版'])
+  const handler = agentsHandler(fx.root), parent_ref = `git:${git(fx.root, ['rev-parse', 'HEAD'])}`
+  const normal = success(await handler('create', { agent_id: 'migrated-agent', parent_experiment_id: created.experiment_id, parent_ref, research_question: '保留SDK父版分析能力' }))
+  const source = success(await fx.handler('inspect', { source: { kind: 'text', filename: 'role.md', text: '增加材料分析说明' } }))
+  const input = { source_id: source.source_id, fingerprint: source.fingerprint,
+    target: { kind: 'new-version', agent_id: 'migrated-agent', parent_experiment_id: created.experiment_id, parent_ref, research_question: '迁入材料分析职责' },
+    files: [{ path: 'dsh/workspace/AGENTS.md', content: '读取材料后，说明分析步骤。' }], mapping: [{ source: 'role.md', target: 'dsh/workspace/AGENTS.md', status: 'converted' }], evaluation_cases: cases }
+  const preview = success(await fx.handler('preview', input)), migrated = success(await fx.handler('apply', preview.apply_input))
+  for (const id of [created.experiment_id, normal.experiment_id, migrated.experiment_id]) {
+    const selected = versionSource(fx.root, id)
+    assert.equal(selected.profile, 'sdk')
+    assert.match(selected.profile_manifest, /sdk-profile\.package\.json$/)
+    assert.equal(success(await handler('sdk/guide', { source: `experiment:${id}` })).profile, 'sdk')
+  }
+  const firstHarness = load(readFileSync(join(fx.root, `evolution/experiments/${created.experiment_id}/candidate/harness.yaml`), 'utf8'))
+  firstHarness.loadable_assets.profile = 'web'
+  const explicit = success(await fx.handler('preview', { ...input, evaluation_cases: undefined, case_ids: ['U-MIGRATION-001'], files: [...input.files, { path: 'harness.yaml', content: dump(firstHarness) }] }))
+  const switched = success(await fx.handler('apply', explicit.apply_input))
+  assert.equal(versionSource(fx.root, switched.experiment_id).profile, 'web')
+})
+
+test('迁移完成与比较读取共同拒绝封存摘要漂移，缺失原始Case证据也不得完成', async t => {
+  const fx = fixture(t), { preview } = await sourceAndPreview(fx), applied = success(await fx.handler('apply', preview.apply_input))
+  const id = preview.experiment_id, run = 'run-33333333-3333-4333-8333-333333333333', base = `evolution/experiments/${id}/runs/${run}`
+  recordedRun(fx, id, applied.candidate_sha256, ['U-MIGRATION-001'], run)
+  const state = () => fx.handler('status', { experiment_id: id }).then(success)
+  assert.equal((await state()).completed, true)
+  const strictRead = () => {
+    const code = 'import sys;from pathlib import Path;sys.path.insert(0,sys.argv[1]);from run_record import comparison_run_view;comparison_run_view(Path(sys.argv[2]),sys.argv[3])'
+    return spawnSync(process.env.HARNESS_PYTHON, ['-c', code, join(program, 'runtime/adapters/dsh-container'), fx.root, run], { encoding: 'utf8' })
+  }
+  for (const [file, content] of [['summary.json', JSON.stringify({ run_id: run, effective_verdict: 'failed' })], ['results.jsonl', '{}\n'], ['analysis.json', '{}'], ['report.md', '# 被编辑的报告']]) {
+    const path = join(fx.root, base, file), before = readFileSync(path)
+    writeFileSync(path, content)
+    const result = await state()
+    assert.equal(result.completed, false, file)
+    assert.equal(result.runtime_verified, false, file)
+    assert.match(result.runs[0].reasons.join(' '), /摘要不匹配/, file)
+    assert.notEqual(strictRead().status, 0, file)
+    writeFileSync(path, before)
+  }
+  for (const file of ['report.md', 'analysis.json', 'evidence/U-MIGRATION-001/trace.jsonl', 'evidence/U-MIGRATION-001/response.json', 'evidence/U-MIGRATION-001/checks.json', 'evidence/U-MIGRATION-001/tools.jsonl']) {
+    const path = join(fx.root, base, file), before = readFileSync(path)
+    rmSync(path)
+    assert.equal((await state()).completed, false, file)
+    writeFileSync(path, before)
+  }
+  // 合法封存的 failed Run 保持有效失败，不能因加入校验而丢失已执行观察。
+  const summaryPath = join(fx.root, base, 'summary.json'), summary = JSON.parse(readFileSync(summaryPath, 'utf8'))
+  writeFileSync(summaryPath, JSON.stringify({ ...summary, effective_verdict: 'failed' }));sealRecordedRun(fx, id, run)
+  assert.equal(strictRead().status, 0)
+  const failed = await state();assert.equal(failed.completed, false);assert.equal(failed.runtime_verified, true)
+})
+
+test('标准创建及迁移的初始无Decision版本可预览冻结，新增未分组Case保持权威语义', async t => {
+  const fx = fixture(t), created = success(await createAgent(fx.root, { agent_id: 'migrated-agent', name: '材料助手', description: '分析材料', role: '阅读材料后说明分析步骤' }))
+  git(fx.root, ['init']);git(fx.root, ['config', 'user.name', 'Fixture']);git(fx.root, ['config', 'user.email', 'fixture@example.invalid']);git(fx.root, ['add', '.']);git(fx.root, ['commit', '-m', '固定标准创建来源'])
+  const handler = agentsHandler(fx.root)
+  assert.equal(existsSync(join(fx.root, `evolution/experiments/${created.experiment_id}/decision.md`)), false)
+  assert.equal((await handler('compute-variants/freeze-preview', { experiment_id: created.experiment_id, case_ids: ['U-IDENTITY-001'] })).ok, true)
+  const source = success(await fx.handler('inspect', { source: { kind: 'text', filename: 'role.md', text: '说明分析步骤' } }))
+  const preview = success(await fx.handler('preview', { source_id: source.source_id, fingerprint: source.fingerprint,
+    target: { kind: 'new-version', agent_id: 'migrated-agent', parent_experiment_id: created.experiment_id, parent_ref: `git:${git(fx.root, ['rev-parse', 'HEAD'])}`, research_question: '增加材料分析职责' },
+    files: [{ path: 'dsh/workspace/AGENTS.md', content: '读取材料并说明步骤。' }], mapping: [{ source: 'role.md', target: 'dsh/workspace/AGENTS.md', status: 'converted' }], evaluation_cases: cases }))
+  const applied = success(await fx.handler('apply', preview.apply_input))
+  assert.equal(existsSync(join(fx.root, `evolution/experiments/${applied.experiment_id}/decision.md`)), false)
+  const frozen = success(await handler('compute-variants/freeze-preview', { experiment_id: applied.experiment_id, case_ids: ['U-MIGRATION-001'] }))
+  assert.ok(!frozen.files.some(item => item.path.endsWith('/decision.md')))
+  assert.equal((await handler('compute-variants/freeze', frozen.freeze_input)).ok, true)
+  const fixed = git(fx.root, ['show', 'HEAD:agents/migrated-agent/evaluation.md'])
+  assert.match(fixed, /U-MIGRATION-001/);assert.doesNotMatch(fixed, /^## /m)
 })

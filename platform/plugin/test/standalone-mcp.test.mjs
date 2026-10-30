@@ -10,7 +10,7 @@ import { pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
 import { McpServer, createMcpHandler } from '@modelcontextprotocol/server'
 import { toNodeHandler } from '@modelcontextprotocol/node'
-const sdk = createRequire('/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/package.json')
+const sdk = createRequire(process.env.HARNESS_DSH_ENTRY ?? '/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/package.json')
 const [{ Context }, { ToolRuntime }, { SystemPrompt }, { McpResourceRuntime }, { createScope }] = await Promise.all([
   '@deepseek-ai/cordis', '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-system-prompt', '@deepseek-ai/dsh-mcp-resources', '@deepseek-ai/dsh-scope',
 ].map(name => import(pathToFileURL(sdk.resolve(name)).href)))

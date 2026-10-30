@@ -44,6 +44,18 @@ export function assertVersionIdentity(id: string, change: MapValue) {
   if (id.startsWith('VAR-') && (!change.compute_variant || typeof change.compute_variant !== 'object' || Array.isArray(change.compute_variant))) throw new Error('VAR 版本必须声明 compute_variant')
 }
 
+/** 普通派生与迁移共同保留固定父版的运行方式及装载入口。 */
+export function inheritedLoadableAssets(source: MapValue, parentId: string): MapValue {
+  return {
+    workspace: 'dsh/workspace', preset_root: 'dsh/presets', managed_root: 'dsh/managed',
+    ...(source.profile === 'sdk' ? { profile: 'sdk' } : {}),
+    preset_id: String(source.preset).split('/')[0], preset_file: source.preset,
+    profile_patch: `dsh/managed/${source.patch}`,
+    ...(source.guard ? { guard: source.guard } : {}),
+    ...(source.profile_manifest ? { profile_manifest: String(source.profile_manifest).slice(`evolution/experiments/${parentId}/candidate/`.length) } : {}),
+  }
+}
+
 /** 只读选定版本；固定父版的所有信息均来自同一提交。 */
 export function versionSource(root: string, id: string, commit?: string): MapValue {
   const change = versionIdentity(root, id, commit)

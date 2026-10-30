@@ -7,6 +7,7 @@ import { agentCandidateDigest, inspectAgentSnapshot } from '../agent/snapshot.mt
 import { sha256File } from '../manifest.mts'
 import { packAgent, previewAgentPackage } from '../agent/pack.mts'
 import { tarExtract } from '../fsutil.mts'
+import { createOfflineKnowledgeProvider } from '../../plugin/src/standalone-knowledge/index.ts'
 
 function sdkFixture(t) {
   const f = fixture(t), harness = join(f.candidate, 'harness.yaml')
@@ -106,6 +107,40 @@ test('SDK 运行资产缺失、未知 Profile 与导出期间变化明确拒绝'
   await assert.rejects(packAgent(f.input, { onProgress(progress) {
     if (progress.stage === 'snapshot') write(join(f.candidate, 'dsh/workspace/AGENTS.md'), '导出时变化')
   } }), /版本资产在导出期间变化/)
+})
+
+for (const location of ['roles/main.md', 'project/README.md', 'dsh/workspace/AGENTS.md', 'dsh/presets/reference.md', 'dsh/managed/reference.md']) {
+  test(`离线 SDK 包按实际冻结清单收集 ${location} 的参考，提供方可按原 URL 读取`, async t => {
+    const f = sdkFixture(t), harness = join(f.candidate, 'harness.yaml')
+    const declaration = location.startsWith('roles/') ? '\nrole_instructions:\n  alpha-main: roles/main.md\n'
+      : location.startsWith('project/') ? '\nproject_workspace:\n  path: project\n' : ''
+    write(harness, readFileSync(harness, 'utf8') + declaration)
+    const url = 'https://docs.agent-fixture.test/business-rules.md'
+    write(join(f.candidate, location), `# 业务正文\n\n任务前阅读[业务规则](${url})。\n`)
+    write(join(f.candidate, 'dsh/workspace/reference.md'), '# 固定规则\n\n输出必须保留 source_revision。\n')
+    write(join(f.candidate, 'unselected.md'), '不属于装载资产的参考 https://docs.agent-fixture.test/unselected.md\n')
+    write(join(f.program, 'platform/plugin/lib/model-binding-runtime.js'), 'export {}\n')
+    const input = { ...f.input, mode: 'offline', knowledgeSources: [{ url, path: 'dsh/workspace/reference.md' }] }
+    const preview = previewAgentPackage(input)
+    assert.deepEqual(preview.knowledge.references.filter(ref => ref.required).map(ref => ref.url), [url])
+    const result = await packAgent(input), root = join(f.root, 'offline-sdk')
+    tarExtract(result.archive, root)
+    assert.equal(result.manifest.knowledge.sources.length, 1)
+    assert.equal(result.manifest.knowledge.references.some(ref => ref.url.endsWith('/unselected.md')), false)
+    const fetched = await createOfflineKnowledgeProvider(join(root, 'assets/workspace/knowledge/offline/index.json')).fetch({ url })
+    assert.equal(fetched.statusCode, 200)
+    assert.match(fetched.body.content, /source_revision/)
+    await assert.rejects(packAgent({ ...input, knowledgeSources: [{ url, path: '../outside.md' }] }), /已冻结/)
+  })
+}
+
+test('外层角色的必需离线参考缺失时明确拒绝出包', async t => {
+  const f = sdkFixture(t), harness = join(f.candidate, 'harness.yaml')
+  write(harness, readFileSync(harness, 'utf8') + '\nrole_instructions:\n  alpha-main: roles/main.md\n')
+  write(join(f.candidate, 'roles/main.md'), '请阅读[必需规则](https://docs.agent-fixture.test/missing.md)。\n')
+  write(join(f.program, 'platform/plugin/lib/model-binding-runtime.js'), 'export {}\n')
+  assert.equal(previewAgentPackage({ ...f.input, mode: 'offline' }).knowledge.references.filter(ref => ref.required).length, 1)
+  await assert.rejects(packAgent({ ...f.input, mode: 'offline' }), /运行必需的离线知识尚未补齐/)
 })
 
 test('SDK 外层项目的 Node 与 Python 依赖不会被当作零依赖，已准备依赖按项目位置打包', async t => {

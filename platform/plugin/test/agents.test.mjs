@@ -1684,3 +1684,41 @@ test('取消 Decision 校验不阻塞事件循环并恢复两文件', async () =
     assert.equal(readFileSync(join(fx.root, detail.decision.path), 'utf8'), detail.decision.content)
   } finally { await rm(fx.root, { recursive: true, force: true }) }
 })
+
+test('Decision明确缺文件和空文件，首次保存与并发创建采用同一存在性CAS', async () => {
+  const { createAgentsHandler } = await loadServer(), fx = fixture()
+  try {
+    const handler = createAgentsHandler(fx.root), experiment_id = 'EXP-test-agent-001'
+    const file = join(fx.root, `evolution/experiments/${experiment_id}/decision.md`)
+    await rm(file)
+    const detail = await rpc(handler, 'detail', { agent_id: 'test-agent', experiment_id })
+    assert.equal(detail.decision.exists, false);assert.equal(detail.decision.sha256, null);assert.equal(detail.decision.content, '')
+    const payload = { experiment_id, content: '# Decision\n\n当前证据不足，继续比较。\n', expected_sha256: null }
+    assert.equal((await rpc(handler, 'decision/preview', payload)).edits[0].before_sha256, null)
+    // 读取后另一个任务先创建空文件，也必须判定为并发创建，不能吞掉存在性变化。
+    writeFileSync(file, '')
+    await assert.rejects(() => rpc(handler, 'decision/update', payload), /conflict/)
+    const empty = await rpc(handler, 'detail', { agent_id: 'test-agent', experiment_id })
+    assert.equal(empty.decision.exists, true);assert.equal(empty.decision.sha256, createHash('sha256').update('').digest('hex'))
+    await rm(file)
+    const saved = await rpc(handler, 'decision/update', payload)
+    assert.equal(saved.sha256, createHash('sha256').update(payload.content).digest('hex'))
+    await assert.rejects(() => rpc(handler, 'decision/update', payload), /conflict/)
+    const latest = await rpc(handler, 'detail', { agent_id: 'test-agent', experiment_id })
+    writeFileSync(file, '# 并行修改\n')
+    await assert.rejects(() => rpc(handler, 'decision/update', { ...payload, expected_sha256: latest.decision.sha256 }), /conflict/)
+    assert.equal(readFileSync(file, 'utf8'), '# 并行修改\n')
+  } finally { await rm(fx.root, { recursive: true, force: true }) }
+})
+
+test('缺Decision的结构化保存失败恢复为缺文件，不生成空Decision副本', async () => {
+  const { createAgentsHandler } = await loadServer(), fx = fixture()
+  try {
+    const handler = createAgentsHandler(fx.root), experiment_id = 'EXP-test-agent-001'
+    const base = join(fx.root, `evolution/experiments/${experiment_id}`), decision = join(base, 'decision.md'), change = join(base, 'change.yaml')
+    await rm(decision)
+    const before = readFileSync(change), expected_change_sha256 = createHash('sha256').update(before).digest('hex')
+    await assert.rejects(() => rpc(handler, 'decision/update', { experiment_id, content: '# Decision\n', expected_sha256: null, expected_change_sha256, status: 'completed', outcome: 'inconclusive' }), /validation_failed/)
+    assert.equal(existsSync(decision), false);assert.deepEqual(readFileSync(change), before)
+  } finally { await rm(fx.root, { recursive: true, force: true }) }
+})

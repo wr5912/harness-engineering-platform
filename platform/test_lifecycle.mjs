@@ -88,7 +88,7 @@ http.server.ThreadingHTTPServer((host, port), Handler).serve_forever()
   await new Promise(resolve => socket.close(resolve))
   const file = join(data, 'config/business-access.json')
   writeFileSync(file, JSON.stringify({ schemaVersion: 1, enabled: true, agents: [], gateway: { managementUrl: `http://127.0.0.1:${port}/hep/` } }))
-  const env = { ...process.env, HARNESS_ASSET_ROOT: data, HARNESS_PYTHON: '/usr/bin/python3' }
+  const env = { ...process.env, HARNESS_ASSET_ROOT: data, HARNESS_PYTHON: process.env.HARNESS_PYTHON ?? 'python3' }
   const cli = (...args) => spawnSync(join(repo, 'platform/dsh-platform'), args, { env, encoding: 'utf8', timeout: 15_000 })
   const state = () => JSON.parse(cli('status', '--json').stdout)
   try {
@@ -126,7 +126,7 @@ http.server.ThreadingHTTPServer((host, port), Handler).serve_forever()
     assert.equal(state().status, 'running')
     assert.equal(cli('stop').status, 0)
     await foregroundExit
-    const occupied = spawn('/usr/bin/python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1'], { stdio: 'ignore' })
+    const occupied = spawn(process.env.HARNESS_PYTHON ?? 'python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1'], { stdio: 'ignore' })
     try {
       await new Promise(resolve => setTimeout(resolve, 200))
       const before = readFileSync(file, 'utf8')

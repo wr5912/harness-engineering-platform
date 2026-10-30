@@ -12,7 +12,7 @@ await build({ entryPoints: [new URL('../src/sdk/operations.ts', import.meta.url)
 await build({ entryPoints: [new URL('../src/sdk/worker.ts', import.meta.url).pathname], outfile: join(compiled, 'worker.mjs'), bundle: true, platform: 'node', format: 'esm' })
 const { createSdkHandler } = await import(`file://${join(compiled, 'operations.mjs')}`)
 process.env.HARNESS_PROGRAM_ROOT = program
-process.env.HARNESS_PYTHON = '/usr/bin/python3.10'
+process.env.HARNESS_PYTHON ??= 'python3'
 const source = 'experiment:EXP-sdk-test-001-r123456abcdef'
 function fixture(t, { slow = false, fail = false, modelPolicy } = {}) {
   const root = mkdtempSync(join(base, 'workspace-'))

@@ -375,3 +375,26 @@ test('所选批次读取失败后刷新恢复同一对象并清除已解决的�
     assert.doesNotMatch(ui.text(), /测试读取中断/)
   } finally { ui.cleanup() }
 })
+
+test('样本隐藏通知只记脏，恢复与首次慢读取通知单飞合并；失败可再恢复', async () => {
+  const waiting = []
+  let slow = true, fail = false, concurrent = 0, maximum = 0
+  const ui = workbench({ handler(action, input, original) {
+    if (action !== 'list') return original(action, input)
+    if (fail) throw new Error('unavailable: 样本列表暂不可读')
+    if (!slow) return original(action, input)
+    concurrent++; maximum = Math.max(maximum, concurrent)
+    return new Promise(resolve => waiting.push(async () => { concurrent--; resolve(await original(action, input)) }))
+  } })
+  try {
+    await ui.settle(); assert.equal(concurrent, 1)
+    ui.notify(); ui.notify(); ui.notify(); await ui.settle(); assert.equal(concurrent, 1)
+    const before = ui.calls.length; slow = false; waiting.splice(0).forEach(release => release()); await ui.settle()
+    assert.equal(ui.calls.length, before + 1); assert.equal(maximum, 1)
+    ui.setActive(false); ui.notify(); ui.notify(); await ui.settle(); const hidden = ui.calls.length
+    ui.notify(); await ui.settle(); assert.equal(ui.calls.length, hidden)
+    ui.setActive(true); await ui.settle(); assert.equal(ui.calls.length, hidden + 1)
+    fail = true; ui.notify(); await ui.settle(); assert.match(ui.text(), /样本列表暂不可读/)
+    fail = false; ui.notify(); await ui.settle(); assert.doesNotMatch(ui.text(), /样本列表暂不可读/)
+  } finally { ui.cleanup() }
+})
