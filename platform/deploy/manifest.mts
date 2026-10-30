@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto'
-import { spawnSync } from 'node:child_process'
-import { lstatSync, readFileSync, readlinkSync, readdirSync, writeFileSync } from 'node:fs'
+import { closeSync, lstatSync, openSync, readFileSync, readlinkSync, readSync, readdirSync, writeFileSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 
 export type Arch = 'amd64' | 'arm64'
@@ -62,16 +61,19 @@ export interface Manifest {
   sensitivePaths?: string[]
 }
 
+// 同步调用共用小缓冲，不随文件大小或文件数量重新分配读取内存。
+const fileHashBuffer = Buffer.allocUnsafe(64 * 1024)
+
 export function sha256File(path: string): string {
-  // Node readFileSync 有 2GiB 上限；安装包本身可能超过该值，大文件用系统 sha256sum。
-  if (lstatSync(path).size > 1024 * 1024 * 1024) {
-    const result = spawnSync('sha256sum', [path], { encoding: 'utf8', maxBuffer: 1024 * 1024 })
-    if (result.status !== 0) throw new Error(`sha256sum 失败：${path}`)
-    const digest = result.stdout.trim().split(/\s+/)[0]
-    if (!/^[0-9a-f]{64}$/.test(digest)) throw new Error(`sha256sum 输出无效：${path}`)
-    return digest
-  }
-  return createHash('sha256').update(readFileSync(path)).digest('hex')
+  const fd = openSync(path, 'r')
+  try {
+    const hash = createHash('sha256')
+    let length: number
+    while ((length = readSync(fd, fileHashBuffer, 0, fileHashBuffer.length, null)) > 0) {
+      hash.update(fileHashBuffer.subarray(0, length))
+    }
+    return hash.digest('hex')
+  } finally { closeSync(fd) }
 }
 
 export function sha256Text(value: string): string {

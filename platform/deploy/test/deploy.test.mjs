@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, truncateSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { spawnSync } from 'node:child_process'
-import { collectEntries, verifyEntries } from '../manifest.mts'
+import { collectEntries, sha256File, verifyEntries } from '../manifest.mts'
 import { copyTree, run, tarCreate, tarExtract } from '../fsutil.mts'
 import { rewriteDeploymentAddress, rewriteKnownPaths, scanKnownOldPaths } from '../paths.mts'
 import { ensureDshScopeLink } from '../runtime.mts'
@@ -16,6 +17,54 @@ function workspace() {
   const root = mkdtempSync(join(tmpdir(), 'hep-deploy-test-'))
   return { root, close: () => rmSync(root, { recursive: true, force: true }) }
 }
+
+test('文件 SHA 保留空文件、二进制、跨块末尾和连续调用的完整摘要', () => {
+  const { root, close } = workspace()
+  try {
+    for (const size of [0, 1, 65535, 65536, 65537, 131089]) {
+      const bytes = Buffer.alloc(size)
+      for (let index = 0; index < size; index++) bytes[index] = index % 251
+      const file = join(root, `binary ${size}.bin`)
+      writeFileSync(file, bytes)
+      const expected = createHash('sha256').update(bytes).digest('hex')
+      assert.equal(sha256File(file), expected)
+      assert.equal(sha256File(file), expected)
+    }
+    symlinkSync('binary 65537.bin', join(root, 'linked.bin'))
+    assert.equal(sha256File(join(root, 'linked.bin')), sha256File(join(root, 'binary 65537.bin')))
+    assert.throws(() => sha256File(join(root, 'missing.bin')), error => error.code === 'ENOENT')
+    assert.throws(() => sha256File(root), error => error.code === 'EISDIR')
+  } finally { close() }
+})
+
+test('256MiB 文件散列不增加整文件大小的进程峰值内存', () => {
+  const { root, close } = workspace()
+  try {
+    const file = join(root, 'sparse.bin')
+    writeFileSync(file, '')
+    truncateSync(file, 256 * 1024 * 1024)
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+      const {sha256File}=await import(process.argv[1]);
+      const before=process.resourceUsage().maxRSS;
+      const digest=sha256File(process.argv[2]);
+      console.log(JSON.stringify({digest,extraPeakKiB:process.resourceUsage().maxRSS-before}));
+    `, new URL('../manifest.mts', import.meta.url).href, file], { encoding: 'utf8' })
+    assert.equal(result.status, 0, result.stderr)
+    const observed = JSON.parse(result.stdout)
+    assert.equal(observed.digest, 'a6d72ac7690f53be6ae46ba88506bd97302a093f7108472bd9efc3cefda06484')
+    assert.ok(observed.extraPeakKiB < 32 * 1024, `散列额外峰值 ${observed.extraPeakKiB} KiB 超过固定缓冲预算`)
+  } finally { close() }
+})
+
+test('超过2GiB的稀疏文件仍包含最后不足一块的全部字节', () => {
+  const { root, close } = workspace()
+  try {
+    const file = join(root, 'large.bin')
+    writeFileSync(file, '')
+    truncateSync(file, 2 * 1024 * 1024 * 1024 + 17)
+    assert.equal(sha256File(file), 'd9378e43c0e666027848e63668ba0a821b4726843e366626946e3823b477299e')
+  } finally { close() }
+})
 
 test('部署核对检查唯一绑定的原生工作区，不要求首次使用标记', async () => {
   const { root, close } = workspace()
