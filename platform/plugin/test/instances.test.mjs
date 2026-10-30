@@ -61,6 +61,8 @@ const args = process.argv.slice(2)
 require('node:fs').appendFileSync(require('node:path').join(__dirname, 'dsh-dev.calls'), JSON.stringify(args) + '\\n')
 const out = value => process.stdout.write(JSON.stringify(value, null, 2) + '\\n')
 if (args[0] === 'ps') {
+  const statesFile = require('node:path').join(__dirname,'observed-states.json')
+  const observedStates = require('node:fs').existsSync(statesFile) ? JSON.parse(require('node:fs').readFileSync(statesFile)) : {}
   const stateRoot = process.env.HARNESS_INSTANCE_STATE_ROOT || (process.env.XDG_STATE_HOME ? require('node:path').join(process.env.XDG_STATE_HOME, 'dsh-dev') : require('node:path').join(process.env.HARNESS_ASSET_ROOT, '.local/instances'))
   const newBusinessFile = require('node:path').join(stateRoot, 'new-business', 'instance.json')
   const newManifest = require('node:fs').existsSync(newBusinessFile) ? JSON.parse(require('node:fs').readFileSync(newBusinessFile)) : null
@@ -68,7 +70,7 @@ if (args[0] === 'ps') {
     ? [{name:'new-business', state:require('node:fs').existsSync(require('node:path').join(__dirname,'startup-failed'))?'absent':'running', source_id:'experiment:EXP-real-agent-001', agent_id:'real-agent', port:3199, business_gateway:true,access_mode:newManifest.business_control.access_mode,identity_mode:newManifest.business_control.identity_mode}]
     : []
   out({schema_version:'1.0', instances:[
-    {name:'running-one', state:'running', source_id:'experiment:EXP-real-agent-001', source_kind:'experiment', image_tag:'dsh:locked', agent_id:'real-agent', port:3181, home_volume:'home-running', home_preserved:true, container_name:'running-one', observed_at:'2026-10-13T00:00:00.000Z', mounts:{workspace:'/x'}, mount_modes:{workspace:'ro'}},
+    {name:'running-one', state:observedStates['running-one']??'running', source_id:'experiment:EXP-real-agent-001', source_kind:'experiment', image_tag:'dsh:locked', agent_id:'real-agent', port:3181, home_volume:'home-running', home_preserved:true, container_name:'running-one', observed_at:'2026-10-13T00:00:00.000Z', mounts:{workspace:'/x'}, mount_modes:{workspace:'ro'}},
     {name:'unknown-one', state:'unknown', source_id:'experiment:EXP-real-agent-001', image_tag:'dsh:locked', agent_id:'real-agent', port:3182, home_volume:null, home_preserved:null, container_name:'unknown-one', observed_at:'2026-10-13T00:00:00.000Z'},
     {name:'absent-one', state:'absent', source_id:'experiment:EXP-real-agent-001', home_volume:'home-absent', home_preserved:true},
     ...newBusiness
@@ -166,6 +168,35 @@ test('直接地址和操作预览在调用 CLI 前拒绝其它工作区的实例
     assert.match(result.error.message, /不属于当前工作区/)
   }
   assert.throws(() => readFileSync(join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls')), /ENOENT/)
+})
+
+test('读取与停止共用平台状态词表，SDK完成态可原样确认，未知和原始Docker状态不被误认', async t => {
+  const { module, cleanup } = await loadModule(), fx = fixture(), previous = process.env.XDG_STATE_HOME
+  process.env.XDG_STATE_HOME = fx.state
+  t.after(() => { fx.cleanup(); cleanup(); previous === undefined ? delete process.env.XDG_STATE_HOME : process.env.XDG_STATE_HOME = previous })
+  const handler = module.createInstancesHandler(fx.root), signal = new AbortController().signal
+  const statesFile = join(fx.root, 'runtime/adapters/dsh-container/observed-states.json')
+  for (const state of ['running', 'stopped', 'completed', 'failed', 'absent']) {
+    writeFileSync(statesFile, JSON.stringify({ 'running-one': state }))
+    const preview = await handler('preview', { operation: 'stop', name: 'running-one' }, signal)
+    assert.equal(preview.value.observed_state, state)
+    const stopped = await handler('run', { operation: 'stop', name: 'running-one', expected_source_id: preview.value.source_id, expected_state: preview.value.observed_state }, signal)
+    assert.equal(stopped.value.ok, true, `${state}: ${JSON.stringify(stopped)}`)
+  }
+  const callsFile = join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls')
+  const downCount = () => readFileSync(callsFile, 'utf8').split('\n').filter(line => line.includes('"down"')).length
+  for (const state of ['created', 'exited', 'restarting', 'paused', 'dead', 'removing', 'unknown', 'unexpected', '', null]) {
+    writeFileSync(statesFile, JSON.stringify({ 'running-one': state ?? 'unknown' }))
+    const listed = await handler('list', {}, signal)
+    assert.equal(listed.value.instances.find(row => row.name === 'running-one').state, 'unknown')
+    const preview = await handler('preview', { operation: 'stop', name: 'running-one' }, signal)
+    assert.equal(preview.ok, false)
+    assert.match(preview.error.message, /状态.*(?:未知|无法确认)/)
+    const before = downCount()
+    const rejected = await handler('run', { operation: 'stop', name: 'running-one', expected_state: state }, signal)
+    assert.equal(rejected.ok, false, `${state}: ${JSON.stringify(rejected)}`)
+    assert.equal(downCount(), before)
+  }
 })
 
 test('确认实例操作沿用预览来源，来源被替换时在任何CLI调用前拒绝', async t => {

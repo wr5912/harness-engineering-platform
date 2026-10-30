@@ -1,9 +1,5 @@
-export type InstanceState = 'running' | 'stopped' | 'completed' | 'failed' | 'absent' | 'unknown'
-
-/** 登记缺失或尚不能识别的状态统一保留为未知，统计和筛选共用同一口径。 */
-export function instanceState(value: unknown): InstanceState {
-  return value === 'running' || value === 'stopped' || value === 'completed' || value === 'failed' || value === 'absent' ? value : 'unknown'
-}
+import { instanceState, type InstanceState } from './state.ts'
+export { instanceState, type InstanceState } from './state.ts'
 
 export function matchesInstanceState(value: unknown, filter: string): boolean {
   const state = instanceState(value)

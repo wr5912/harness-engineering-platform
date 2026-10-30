@@ -1242,6 +1242,14 @@ class ImageIdentityAndPsStateTest(unittest.TestCase):
         self.assertEqual(dev.normalized_instance_state([{"service": "dsh", "state": "exited", "exit_code": 0}]), "stopped")
         self.assertEqual(dev.normalized_instance_state(None), "unknown")
         self.assertIsNone(dev.compose_ps_containers("not-json"))
+        for state, exit_code, expected in [("created", None, "stopped"), ("running", 0, "running"),
+                ("exited", 0, "stopped"), ("exited", 17, "failed"), ("dead", 0, "failed"),
+                ("restarting", None, "unknown"), ("paused", None, "unknown"), ("removing", 0, "unknown"),
+                ("restarting", 1, "unknown"), ("paused", 1, "unknown"), ("removing", 1, "unknown"),
+                ("unexpected", 0, "unknown"), ("", None, "unknown")]:
+            with self.subTest(state=state, exit_code=exit_code):
+                containers = dev.compose_ps_containers(json.dumps({"State": state, "ExitCode": exit_code, "Service": "dsh"}))
+                self.assertEqual(dev.normalized_instance_state(containers), expected)
 
     def test_validate_image_identity_returns_immutable_reference(self):
         fingerprint = "sha256:" + "2" * 64

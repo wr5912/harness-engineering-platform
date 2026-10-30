@@ -3,6 +3,7 @@ import { instanceStateRoot, programRoot, workspaceConfigPath, workspaceOwnsInsta
 import { businessGatewayEntry } from '../business-control/entry.ts'
 import { prepareBusinessRuntimeFile } from '../business-control/secret-file.ts'
 import { validateBusinessGateway } from '../business-control/configuration.ts'
+import { instanceState as normalizeInstanceState } from './state.ts'
 import { execFile as execFileCallback } from 'node:child_process'
 import { createHmac, randomBytes } from 'node:crypto'
 import { mkdtemp, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
@@ -352,7 +353,7 @@ async function listInstances(assetRoot: string, signal?: AbortSignal): Promise<{
     schema_version: '1.0',
     observed_at: observedAt,
     state_root: instanceStateRoot(assetRoot),
-    instances: (parsed.instances || []).map(instance => ({ observed_at: observedAt, ...instance,
+    instances: (parsed.instances || []).map(instance => ({ observed_at: observedAt, ...instance, state: normalizeInstanceState(instance.state),
       ...(instance.business_gateway ? {
         access_mode: gatewayRows.find(row => row.instanceId === instance.name && row.agentId === instance.agent_id)?.accessMode ?? instance.access_mode,
         identity_mode: gatewayRows.find(row => row.instanceId === instance.name && row.agentId === instance.agent_id)?.identityMode ?? instance.identity_mode,
@@ -655,10 +656,11 @@ function actionRequest(payload: unknown): InstanceActionRequest {
     request.expected_source_digest = object.expected_source_digest
   }
   if (object.expected_state !== undefined) {
-    if (request.operation !== 'stop' || !['running', 'stopped', 'absent', 'failed'].includes(String(object.expected_state))) {
+    const state = normalizeInstanceState(object.expected_state)
+    if (request.operation !== 'stop' || state === 'unknown') {
       throw new Error('预览的实例状态无效，请重新预览')
     }
-    request.expected_state = object.expected_state as string
+    request.expected_state = state
   }
   if (object.model_selection !== undefined) request.model_selection = modelSelection(object.model_selection)
   if (object.expected_model_policy_hash !== undefined) {

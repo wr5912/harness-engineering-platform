@@ -587,8 +587,8 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
           frozen.push({ ...item, model_selection: selected, expected_model_policy_hash: hash, expected_source_id: source,
             ...(typeof sourceDigest === 'string' ? { expected_source_digest: sourceDigest } : {}), port: plannedPort as number })
         } else if (operation === 'stop') {
-          const state = result.value.observed_state
-          if (!state || state === 'unknown' || !result.value.observed_at) {
+          const state = instanceState(result.value.observed_state)
+          if (state === 'unknown' || !result.value.observed_at) {
             const message = '预览缺少当前实例状态，请重新预览；本项不会执行。'
             skipped.push({ ...item, ok: false, status: 'not_dispatched', error: { message } })
             return { ...result, ok: false, error: { message } }

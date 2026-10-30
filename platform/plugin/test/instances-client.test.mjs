@@ -87,6 +87,34 @@ test('SDK实例完成为正常状态，列表和详情提供SDK入口并省略We
   assert.doesNotMatch(ui.text(), /访问端口|内部 Web 端口|更改默认模型/)
 })
 
+test('已完成SDK停止预览保留completed事实并原样提交，未知Docker状态预览不派发', async () => {
+  for (const state of ['completed', 'exited', 'created', 'restarting', 'paused', 'dead', 'removing']) {
+    const sdk = { name: 'sdk-completed', agent_id: 'basic-agent', profile: 'sdk', state: 'completed', source_id: 'experiment:EXP-basic-001' }
+    let stopped = false
+    const ui = page({ instances: [sdk], respond(endpoint, payload) {
+      if (endpoint === 'instances/list') return { ok: true, value: { instances: [{ ...sdk, state: stopped ? 'absent' : 'completed' }] } }
+      if (endpoint === 'instances/detail') return { ok: true, value: { instance: { ...sdk, state: stopped ? 'absent' : 'completed' }, runs: [], session_scope: { preserved: true, note: '停止后保留 HOME 与会话。' } } }
+      if (endpoint === 'instances/preview') return { ok: true, value: { name: sdk.name, operation: 'stop', source_id: sdk.source_id, observed_state: state, observed_at: '2026-10-31T00:00:00Z', retention: { home: '保留', sessions: '保留在 HOME' } } }
+      if (endpoint === 'instances/run') { stopped = true; return { ok: true, value: { ...payload, ok: true } } }
+    } })
+    await ui.settle()
+    ui.nodes().find(node => node.type === 'input' && node.props['aria-label'] === '全选当前列表实例').props.onChange({ target: { checked: true } })
+    ui.render()
+    await ui.button('停止').props.onClick(); await ui.settle()
+    if (state === 'completed') {
+      assert.match(ui.text(), /本次预览状态.*执行完成/)
+      await ui.button('确认停止').props.onClick(); await ui.settle()
+      const sent = ui.calls.filter(call => call.endpoint === 'instances/run')
+      assert.equal(sent.length, 1)
+      assert.equal(sent[0].payload.expected_state, 'completed')
+      assert.match(ui.text(), /无容器/)
+    } else {
+      assert.equal(ui.button('确认停止'), undefined)
+      assert.equal(ui.calls.some(call => call.endpoint === 'instances/run'), false)
+    }
+  }
+})
+
 test('SDK来源创建不依赖HTTP网关，不显示Web访问方式与端口设置', async () => {
   const ui = page({ respond(endpoint) {
     if (endpoint === 'instances/sources') return { ok: true, value: { business_gateway_available: false, sources: [{ source_id: 'experiment:EXP-basic-001', experiment_id: 'EXP-basic-001', agent_id: 'basic-agent', profile: 'sdk', selectable: true, reason: 'SDK 来源' }] } }

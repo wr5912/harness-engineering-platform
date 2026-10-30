@@ -2290,12 +2290,14 @@ def normalized_instance_state(containers: list[dict] | None) -> str:
     dsh = [item for item in containers if item.get("service") == "dsh"]
     if not dsh:
         return "absent"
+    if any(item.get("state") not in {"created", "running", "exited", "dead", "restarting", "paused", "removing"} for item in dsh):
+        return "unknown"
     if any(item.get("state") == "running" for item in dsh):
         return "running"
+    if any(item.get("state") in {"restarting", "paused", "removing"} for item in dsh):
+        return "unknown"
     if any(item.get("state") == "dead" or item.get("exit_code", 0) not in (None, 0) for item in dsh):
         return "failed"
-    if any(item.get("state") in {"restarting", "paused"} for item in dsh):
-        return "unknown"
     return "stopped"
 
 
