@@ -1,4 +1,5 @@
 import { VERSION_ID } from '../version-id.ts'
+import { separatedReview } from '../evaluation/review-state.ts'
 import { createHash } from 'node:crypto'
 import { lstat, readdir, readFile, open } from 'node:fs/promises'
 import { join, relative, resolve, sep } from 'node:path'
@@ -159,6 +160,7 @@ async function coverage(location: RunLocation, files: FileEntry[], signal?: Abor
   const tracePresent = traceFiles.length > 0
   if (!tracePresent) notes.push('该 Run 未保存可用的非空 Session 轨迹；不能据此推断工具调用过程。')
   let attributionStatus = 'unknown'
+  let reviewCoverage: JsonMap | undefined
   if (paths.has('inputs.lock.json')) {
     try {
       const inputs = JSON.parse((await readLocalFile(location, 'inputs.lock.json', signal)).data.toString()) as JsonMap
@@ -170,17 +172,34 @@ async function coverage(location: RunLocation, files: FileEntry[], signal?: Abor
       }
       if (reviewMode === 'none') attributionStatus = 'not_requested'
       else if (reviewMode === 'ai') {
-        const available = traceFiles.some(file => file.local.startsWith('evidence/analysis/'))
-        attributionStatus = available ? 'collected' : 'missing'
-        if (!available) missing.push('evidence/analysis/（场景归因轨迹未采集）')
+        const split = separatedReview(inputs.review_contract)
+        const methodKnown = inputs.review_contract === undefined || split
+        const available = traceFiles.some(file => file.local.startsWith('evidence/analysis/') && (!split || !file.local.startsWith('evidence/analysis/source-diagnosis/')))
+        attributionStatus = methodKnown ? available ? 'collected' : 'missing' : 'unknown'
+        if (methodKnown && !available) missing.push(split ? 'evidence/analysis/（业务效果复核轨迹未采集）' : 'evidence/analysis/（场景归因轨迹未采集）')
+        if (split) {
+          const sourceTrace = traceFiles.some(file => file.local.startsWith('evidence/analysis/source-diagnosis/'))
+          let sourceStatus = 'unknown'
+          try {
+            const analysis = JSON.parse((await readLocalFile(location, 'analysis.json', signal)).data.toString()) as JsonMap
+            const diagnosis = analysis.source_diagnosis as JsonMap | undefined
+            if (['completed', 'incomplete', 'not_requested'].includes(String(diagnosis?.status))) sourceStatus = String(diagnosis?.status)
+          } catch (error) {
+            if (error instanceof RunFileError && error.code !== 'not_found') throw error
+            notes.push('源码诊断记录缺失或无法解析，其完成状态待核对。')
+          }
+          reviewCoverage = { effect: { trace_status: attributionStatus }, source: { trace_status: sourceTrace ? 'collected' : 'missing', status: sourceStatus } }
+          if (!sourceTrace) missing.push('evidence/analysis/source-diagnosis/（源码诊断轨迹未采集）')
+          notes.push('业务效果复核与源码诊断独立保存；轨迹已采集不代表源码已读完整，也不代表业务通过。')
+        } else if (inputs.review_contract !== undefined) notes.push('评估方法标记无法识别，不能确认业务与源码的独立采集范围。')
       }
     } catch (error) {
       if (error instanceof RunFileError) throw error
       notes.push('冻结输入无法解析，场景归因的请求范围未知。')
     }
   }
-  if (attributionStatus === 'unknown') notes.push('旧 Run 未记录复核模式，场景归因采集范围未知。')
-  return { scope: 'Run 目录内所有已保存普通文件', missing: [...new Set(missing)], trace_present: tracePresent, attribution_status: attributionStatus, notes }
+  if (attributionStatus === 'unknown') notes.push('复核采集范围尚未确认，请核对冻结输入与实际证据。')
+  return { scope: 'Run 目录内所有已保存普通文件', missing: [...new Set(missing)], trace_present: tracePresent, attribution_status: attributionStatus, ...(reviewCoverage ? { review_coverage: reviewCoverage } : {}), notes }
 }
 
 async function readLocalFile(location: RunLocation, path: string, signal?: AbortSignal, maxBytes?: number) {

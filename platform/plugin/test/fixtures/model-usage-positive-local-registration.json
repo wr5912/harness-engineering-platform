@@ -1,0 +1,843 @@
+{
+  "kind": "bounded-original-event-projection",
+  "run_id": "run-50416fc7-d53d-4877-ac45-7b88b9098c27",
+  "source_program": "162b144aac7205d697759ed4cc474e0a869a12f1",
+  "source_sha256": {
+    "evidence/U-QA-001/trace.jsonl": "2c649a0357fb9ee1de730034f4be3870bd3fee37f67b28c6bdbbb0551686b9e0",
+    "evidence/U-QA-001/judge-trace.jsonl": "73be7b4ddffe87c6185cfc5157cc96f8f32ab802d1a152735bf91866fe342e4d"
+  },
+  "role_snapshot_sha256": "f01f49529ac9d6d0a9586749ae243d1fe9fd994d25269d9eb615277f65f9c48d",
+  "projection": "原事件seq/身份/用量/调用事实保留；剔除提示词、正文、replayState、参数和其它业务载荷。此文件不是完整trace，也不是原件副本。",
+  "local_model_routes": [
+    {
+      "provider": "harness-workflow",
+      "model": "hybrid-v1"
+    },
+    {
+      "provider": "qwen35-audit",
+      "model": "/root/autodl-tmp/hep-medium-security/audit-20261030/models/Qwen3.5-2B"
+    },
+    {
+      "provider": "threat-analysis-delivery",
+      "model": "fixed-summary"
+    },
+    {
+      "provider": "security-operation-delivery",
+      "model": "fixed-operation-result"
+    }
+  ],
+  "recorded_C1": {
+    "total": 3,
+    "target": 2,
+    "judge": 1
+  },
+  "expected": {
+    "total": 4,
+    "target": 3,
+    "judge": 1,
+    "language": 1,
+    "decision": 1,
+    "token_usage_complete": false
+  },
+  "traces": [
+    {
+      "path": "/run/evidence/U-QA-001/trace.jsonl",
+      "rows": [
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "session",
+            "id": "session-caca74d8-b9d1-4b85-9bc7-725622f021c2",
+            "version": 4,
+            "isSeeded": false,
+            "createdAt": 1793391655224,
+            "delegationDepth": 0
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "permission/preset",
+            "seq": 0,
+            "time": 1793391655233
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "sandbox/mode",
+            "seq": 1,
+            "time": 1793391655236
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "approval/policy",
+            "seq": 2,
+            "time": 1793391655237
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "session/title",
+            "seq": 3,
+            "time": 1793391655707,
+            "data": {
+              "messageSeqs": [],
+              "source": {
+                "kind": "user"
+              }
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "agent/inbox/spliced",
+            "seq": 4,
+            "time": 1793391655723
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "turn/start",
+            "seq": 5,
+            "time": 1793391655725,
+            "data": {
+              "turn": 1
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "agent/inbox/spliced",
+            "seq": 6,
+            "time": 1793391655728
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "step/start",
+            "seq": 7,
+            "time": 1793391655802,
+            "data": {
+              "turn": 1,
+              "step": 1
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "system/message",
+            "seq": 8,
+            "time": 1793391655808,
+            "data": {
+              "turn": 1,
+              "step": 1,
+              "message": {
+                "source": {
+                  "kind": "system-prompt"
+                }
+              }
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "user/message",
+            "seq": 9,
+            "time": 1793391655809,
+            "data": {
+              "source": {
+                "kind": "user"
+              }
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "user/message",
+            "seq": 10,
+            "time": 1793391655810,
+            "data": {
+              "source": {
+                "kind": "agent-instructions"
+              }
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "user/message",
+            "seq": 11,
+            "time": 1793391655811,
+            "data": {
+              "source": {
+                "kind": "runtime-context"
+              }
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "user/message",
+            "seq": 12,
+            "time": 1793391655811,
+            "data": {
+              "source": {
+                "kind": "skill-catalog"
+              }
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "user/message",
+            "seq": 13,
+            "time": 1793391655812,
+            "data": {
+              "source": {
+                "kind": "time-context"
+              }
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "request/header",
+            "seq": 14,
+            "time": 1793391655816,
+            "data": {
+              "header": {
+                "config": {
+                  "provider": "harness-workflow",
+                  "model": "hybrid-v1",
+                  "reasoningEffort": "off"
+                }
+              }
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "request/context",
+            "seq": 15,
+            "time": 1793391655818
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "assistant/message",
+            "seq": 16,
+            "time": 1793391655827,
+            "data": {
+              "turn": 1,
+              "step": 1,
+              "message": {
+                "source": {
+                  "kind": "model",
+                  "provider": "harness-workflow",
+                  "model": "hybrid-v1"
+                }
+              },
+              "stream": [
+                {
+                  "chunk": {
+                    "type": "block-start"
+                  }
+                },
+                {
+                  "chunk": {}
+                },
+                {
+                  "chunk": {
+                    "type": "block-end"
+                  }
+                },
+                {
+                  "chunk": {
+                    "type": "finish",
+                    "reason": {
+                      "kind": "tool-calls"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "tool/call",
+            "seq": 17,
+            "time": 1793391655829,
+            "data": {
+              "turn": 1,
+              "step": 1,
+              "callId": "hybrid-0673155a-d034-4772-9280-1531ef31655c",
+              "name": "security_ops_medium_workflow"
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "tool/result",
+            "seq": 18,
+            "time": 1793391657185,
+            "data": {
+              "turn": 1,
+              "step": 1,
+              "message": {
+                "source": {
+                  "kind": "tool",
+                  "callId": "hybrid-0673155a-d034-4772-9280-1531ef31655c"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"graph_execution\": {\"execution_id\": \"workflow-2a6b7298-44af-45c5-9580-4fbab15939ae\", \"session_id\": \"session-caca74d8-b9d1-4b85-9bc7-725622f021c2\", \"tool_call_id\": \"hybrid-0673155a-d034-4772-9280-1531ef31655c\", \"complete\": true, \"status\": \"completed\", \"workflow_id\": \"security-ops-medium-v1\", \"execution_mode\": \"hybrid\", \"model_attempts\": [{\"execution_id\": \"workflow-2a6b7298-44af-45c5-9580-4fbab15939ae\", \"attempt_id\": \"5d4a7f73-215d-44ae-823a-95bcacb5c037\", \"role\": \"target\", \"session_id\": \"session-caca74d8-b9d1-4b85-9bc7-725622f021c2\", \"tool_call_id\": \"hybrid-0673155a-d034-4772-9280-1531ef31655c\", \"model_role\": \"language\", \"status\": \"preparing\", \"provider\": \"qwen35-audit\", \"model\": \"/root/autodl-tmp/hep-medium-security/audit-20261030/models/Qwen3.5-2B\", \"reasoning_effort\": \"off\", \"time\": 1793391655876}, {\"execution_id\": \"workflow-2a6b7298-44af-45c5-9580-4fbab15939ae\", \"attempt_id\": \"5d4a7f73-215d-44ae-823a-95bcacb5c037\", \"role\": \"target\", \"session_id\": \"session-caca74d8-b9d1-4b85-9bc7-725622f021c2\", \"tool_call_id\": \"hybrid-0673155a-d034-4772-9280-1531ef31655c\", \"model_role\": \"language\", \"status\": \"started\", \"provider\": \"qwen35-audit\", \"model\": \"/root/autodl-tmp/hep-medium-security/audit-20261030/models/Qwen3.5-2B\", \"reasoning_effort\": \"off\", \"time\": 1793391655877}, {\"execution_id\": \"workflow-2a6b7298-44af-45c5-9580-4fbab15939ae\", \"attempt_id\": \"5d4a7f73-215d-44ae-823a-95bcacb5c037\", \"role\": \"target\", \"session_id\": \"session-caca74d8-b9d1-4b85-9bc7-725622f021c2\", \"tool_call_id\": \"hybrid-0673155a-d034-4772-9280-1531ef31655c\", \"model_role\": \"language\", \"status\": \"completed\", \"provider\": \"qwen35-audit\", \"model\": \"/root/autodl-tmp/hep-medium-security/audit-20261030/models/Qwen3.5-2B\", \"reasoning_effort\": \"off\", \"time\": 1793391656686, \"usage\": {\"inputTokens\": 659, \"outputTokens\": 17, \"totalTokens\": 676}, \"model_invocation\": true}, {\"execution_id\": \"workflow-2a6b7298-44af-45c5-9580-4fbab15939ae\", \"attempt_id\": \"workflow-2a6b7298-44af-45c5-9580-4fbab15939ae:kev-5b399780-68f9-45ad-bc1b-cbc1680eb76a\", \"role\": \"target\", \"session_id\": \"session-caca74d8-b9d1-4b85-9bc7-725622f021c2\", \"tool_call_id\": \"hybrid-0673155a-d034-4772-9280-1531ef31655c\", \"model_role\": \"decision\", \"kind\": \"typed_decision\", \"checkpoint_sha256\": \"f3922c86857bd956ff2ed4a9a54dadcb095fa2299f7299a6708ac8899510b13f\", \"state_constructor_sha256\": \"5d01d43bdfd5220977ad62ad6f2cf7510e266e0200925b358a28189bff8515f0\", \"calibration_sha256\": \"1f76bfb32bb536ca0fae79c94fb8bfcb5ce9b8888a3d46cdbd48a2aa4e37dfc0\", \"status\": \"started\", \"provider\": \"kev-serving-audit\", \"model\": \"kev-latest\", \"reasoning_effort\": \"off\", \"time\": 1793391657169, \"model_invocation\": true}, {\"execution_id\": \"workflow-2a6b7298-44af-45c5-9580-4fbab15939ae\", \"attempt_id\": \"workflow-2a6b7298-44af-45c5-9580-4fbab15939ae:kev-5b399780-68f9-45ad-bc1b-cbc1680eb76a\", \"role\": \"target\", \"session_id\": \"session-caca74d8-b9d1-4b85-9bc7-725622f021c2\", \"tool_call_id\": \"hybrid-0673155a-d034-4772-9280-1531ef31655c\", \"model_role\": \"decision\", \"kind\": \"typed_decision\", \"checkpoint_sha256\": \"f3922c86857bd956ff2ed4a9a54dadcb095fa2299f7299a6708ac8899510b13f\", \"state_constructor_sha256\": \"5d01d43bdfd5220977ad62ad6f2cf7510e266e0200925b358a28189bff8515f0\", \"calibration_sha256\": \"1f76bfb32bb536ca0fae79c94fb8bfcb5ce9b8888a3d46cdbd48a2aa4e37dfc0\", \"status\": \"completed\", \"provider\": \"kev-serving-audit\", \"model\": \"kev-latest\", \"reasoning_effort\": \"off\", \"time\": 1793391657169, \"usage\": {\"inputTokens\": 470, \"outputTokens\": 119}, \"model_invocation\": true}]}}"
+                  }
+                ]
+              },
+              "meta": {
+                "graph_execution": {
+                  "execution_id": "workflow-2a6b7298-44af-45c5-9580-4fbab15939ae",
+                  "session_id": "session-caca74d8-b9d1-4b85-9bc7-725622f021c2",
+                  "tool_call_id": "hybrid-0673155a-d034-4772-9280-1531ef31655c",
+                  "complete": true,
+                  "status": "completed",
+                  "workflow_id": "security-ops-medium-v1",
+                  "execution_mode": "hybrid",
+                  "model_attempts": [
+                    {
+                      "execution_id": "workflow-2a6b7298-44af-45c5-9580-4fbab15939ae",
+                      "attempt_id": "5d4a7f73-215d-44ae-823a-95bcacb5c037",
+                      "role": "target",
+                      "session_id": "session-caca74d8-b9d1-4b85-9bc7-725622f021c2",
+                      "tool_call_id": "hybrid-0673155a-d034-4772-9280-1531ef31655c",
+                      "model_role": "language",
+                      "status": "preparing",
+                      "provider": "qwen35-audit",
+                      "model": "/root/autodl-tmp/hep-medium-security/audit-20261030/models/Qwen3.5-2B",
+                      "reasoning_effort": "off",
+                      "time": 1793391655876
+                    },
+                    {
+                      "execution_id": "workflow-2a6b7298-44af-45c5-9580-4fbab15939ae",
+                      "attempt_id": "5d4a7f73-215d-44ae-823a-95bcacb5c037",
+                      "role": "target",
+                      "session_id": "session-caca74d8-b9d1-4b85-9bc7-725622f021c2",
+                      "tool_call_id": "hybrid-0673155a-d034-4772-9280-1531ef31655c",
+                      "model_role": "language",
+                      "status": "started",
+                      "provider": "qwen35-audit",
+                      "model": "/root/autodl-tmp/hep-medium-security/audit-20261030/models/Qwen3.5-2B",
+                      "reasoning_effort": "off",
+                      "time": 1793391655877
+                    },
+                    {
+                      "execution_id": "workflow-2a6b7298-44af-45c5-9580-4fbab15939ae",
+                      "attempt_id": "5d4a7f73-215d-44ae-823a-95bcacb5c037",
+                      "role": "target",
+                      "session_id": "session-caca74d8-b9d1-4b85-9bc7-725622f021c2",
+                      "tool_call_id": "hybrid-0673155a-d034-4772-9280-1531ef31655c",
+                      "model_role": "language",
+                      "status": "completed",
+                      "provider": "qwen35-audit",
+                      "model": "/root/autodl-tmp/hep-medium-security/audit-20261030/models/Qwen3.5-2B",
+                      "reasoning_effort": "off",
+                      "time": 1793391656686,
+                      "usage": {
+                        "inputTokens": 659,
+                        "outputTokens": 17,
+                        "totalTokens": 676
+                      },
+                      "model_invocation": true
+                    },
+                    {
+                      "execution_id": "workflow-2a6b7298-44af-45c5-9580-4fbab15939ae",
+                      "attempt_id": "workflow-2a6b7298-44af-45c5-9580-4fbab15939ae:kev-5b399780-68f9-45ad-bc1b-cbc1680eb76a",
+                      "role": "target",
+                      "session_id": "session-caca74d8-b9d1-4b85-9bc7-725622f021c2",
+                      "tool_call_id": "hybrid-0673155a-d034-4772-9280-1531ef31655c",
+                      "model_role": "decision",
+                      "kind": "typed_decision",
+                      "checkpoint_sha256": "f3922c86857bd956ff2ed4a9a54dadcb095fa2299f7299a6708ac8899510b13f",
+                      "state_constructor_sha256": "5d01d43bdfd5220977ad62ad6f2cf7510e266e0200925b358a28189bff8515f0",
+                      "calibration_sha256": "1f76bfb32bb536ca0fae79c94fb8bfcb5ce9b8888a3d46cdbd48a2aa4e37dfc0",
+                      "status": "started",
+                      "provider": "kev-serving-audit",
+                      "model": "kev-latest",
+                      "reasoning_effort": "off",
+                      "time": 1793391657169,
+                      "model_invocation": true
+                    },
+                    {
+                      "execution_id": "workflow-2a6b7298-44af-45c5-9580-4fbab15939ae",
+                      "attempt_id": "workflow-2a6b7298-44af-45c5-9580-4fbab15939ae:kev-5b399780-68f9-45ad-bc1b-cbc1680eb76a",
+                      "role": "target",
+                      "session_id": "session-caca74d8-b9d1-4b85-9bc7-725622f021c2",
+                      "tool_call_id": "hybrid-0673155a-d034-4772-9280-1531ef31655c",
+                      "model_role": "decision",
+                      "kind": "typed_decision",
+                      "checkpoint_sha256": "f3922c86857bd956ff2ed4a9a54dadcb095fa2299f7299a6708ac8899510b13f",
+                      "state_constructor_sha256": "5d01d43bdfd5220977ad62ad6f2cf7510e266e0200925b358a28189bff8515f0",
+                      "calibration_sha256": "1f76bfb32bb536ca0fae79c94fb8bfcb5ce9b8888a3d46cdbd48a2aa4e37dfc0",
+                      "status": "completed",
+                      "provider": "kev-serving-audit",
+                      "model": "kev-latest",
+                      "reasoning_effort": "off",
+                      "time": 1793391657169,
+                      "usage": {
+                        "inputTokens": 470,
+                        "outputTokens": 119
+                      },
+                      "model_invocation": true
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "step/end",
+            "seq": 19,
+            "time": 1793391657187,
+            "data": {
+              "turn": 1,
+              "step": 1
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "step/start",
+            "seq": 20,
+            "time": 1793391657211,
+            "data": {
+              "turn": 1,
+              "step": 2
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "request/header",
+            "seq": 21,
+            "time": 1793391657216,
+            "data": {
+              "header": {
+                "config": {
+                  "provider": "xiaomi-token-plan-cn",
+                  "model": "mimo-v2.6-flash",
+                  "reasoningEffort": "off"
+                }
+              }
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "developer/message",
+            "seq": 22,
+            "time": 1793391657218,
+            "data": {
+              "turn": 1,
+              "step": 2,
+              "message": {
+                "source": {
+                  "kind": "tool-registry"
+                }
+              }
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "request/context",
+            "seq": 23,
+            "time": 1793391657218
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "assistant/message",
+            "seq": 24,
+            "time": 1793391674338,
+            "data": {
+              "turn": 1,
+              "step": 2,
+              "usage": {
+                "inputTokens": 20338,
+                "outputTokens": 482,
+                "totalTokens": 20820
+              },
+              "message": {
+                "source": {
+                  "kind": "model",
+                  "provider": "xiaomi-token-plan-cn",
+                  "model": "mimo-v2.6-flash"
+                }
+              },
+              "stream": [
+                {
+                  "chunk": {
+                    "type": "block-start"
+                  }
+                },
+                {
+                  "chunk": {}
+                },
+                {
+                  "chunk": {
+                    "type": "block-start"
+                  }
+                },
+                {
+                  "chunk": {}
+                },
+                {
+                  "chunk": {
+                    "type": "block-end"
+                  }
+                },
+                {
+                  "chunk": {
+                    "type": "block-end"
+                  }
+                },
+                {
+                  "chunk": {
+                    "type": "usage",
+                    "usage": {
+                      "inputTokens": 20338,
+                      "outputTokens": 482,
+                      "totalTokens": 20820
+                    }
+                  }
+                },
+                {
+                  "chunk": {
+                    "type": "finish",
+                    "reason": {
+                      "kind": "stop"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "step/end",
+            "seq": 25,
+            "time": 1793391674341,
+            "data": {
+              "turn": 1,
+              "step": 2
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "turn/end",
+            "seq": 26,
+            "time": 1793391674342,
+            "data": {
+              "turn": 1,
+              "reason": {
+                "kind": "completed"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "path": "/run/evidence/U-QA-001/judge-trace.jsonl",
+      "rows": [
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "session",
+            "id": "session-046d6994-8c34-41c2-afa3-d0be2eac7db6",
+            "version": 4,
+            "isSeeded": false,
+            "createdAt": 1793391674395,
+            "delegationDepth": 0
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "permission/preset",
+            "seq": 0,
+            "time": 1793391674400
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "sandbox/mode",
+            "seq": 1,
+            "time": 1793391674400
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "approval/policy",
+            "seq": 2,
+            "time": 1793391674400
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "session/title",
+            "seq": 3,
+            "time": 1793391674722,
+            "data": {
+              "messageSeqs": [],
+              "source": {
+                "kind": "user"
+              }
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "agent/inbox/spliced",
+            "seq": 4,
+            "time": 1793391674734
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "turn/start",
+            "seq": 5,
+            "time": 1793391674735,
+            "data": {
+              "turn": 1
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "agent/inbox/spliced",
+            "seq": 6,
+            "time": 1793391674737
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "step/start",
+            "seq": 7,
+            "time": 1793391674752,
+            "data": {
+              "turn": 1,
+              "step": 1
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "system/message",
+            "seq": 8,
+            "time": 1793391674755,
+            "data": {
+              "turn": 1,
+              "step": 1,
+              "message": {
+                "source": {
+                  "kind": "system-prompt"
+                }
+              }
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "user/message",
+            "seq": 9,
+            "time": 1793391674755,
+            "data": {
+              "source": {
+                "kind": "user"
+              }
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "user/message",
+            "seq": 10,
+            "time": 1793391674756,
+            "data": {
+              "source": {
+                "kind": "runtime-context"
+              }
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "request/header",
+            "seq": 11,
+            "time": 1793391674757,
+            "data": {
+              "header": {
+                "config": {
+                  "provider": "xiaomi-token-plan-cn",
+                  "model": "mimo-v2.6-flash",
+                  "reasoningEffort": "off"
+                }
+              }
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "request/context",
+            "seq": 12,
+            "time": 1793391674757
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "assistant/message",
+            "seq": 13,
+            "time": 1793391682149,
+            "data": {
+              "turn": 1,
+              "step": 1,
+              "usage": {
+                "inputTokens": 10483,
+                "outputTokens": 324,
+                "totalTokens": 11319,
+                "cacheReadTokens": 512
+              },
+              "message": {
+                "source": {
+                  "kind": "model",
+                  "provider": "xiaomi-token-plan-cn",
+                  "model": "mimo-v2.6-flash"
+                }
+              },
+              "stream": [
+                {
+                  "chunk": {
+                    "type": "block-start"
+                  }
+                },
+                {
+                  "chunk": {}
+                },
+                {
+                  "chunk": {
+                    "type": "block-start"
+                  }
+                },
+                {
+                  "chunk": {}
+                },
+                {
+                  "chunk": {
+                    "type": "block-end"
+                  }
+                },
+                {
+                  "chunk": {
+                    "type": "block-end"
+                  }
+                },
+                {
+                  "chunk": {
+                    "type": "usage",
+                    "usage": {
+                      "inputTokens": 10483,
+                      "outputTokens": 324,
+                      "totalTokens": 11319,
+                      "cacheReadTokens": 512
+                    }
+                  }
+                },
+                {
+                  "chunk": {
+                    "type": "finish",
+                    "reason": {
+                      "kind": "stop"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "step/end",
+            "seq": 14,
+            "time": 1793391682150,
+            "data": {
+              "turn": 1,
+              "step": 1
+            }
+          }
+        },
+        {
+          "session_log": "session.v4.jsonl",
+          "event": {
+            "type": "turn/end",
+            "seq": 15,
+            "time": 1793391682151,
+            "data": {
+              "turn": 1,
+              "reason": {
+                "kind": "completed"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

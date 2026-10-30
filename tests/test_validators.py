@@ -1483,6 +1483,16 @@ class DshEvalTests(unittest.TestCase):
 
     def runtime_fixture(self, root: Path, *, mode: str = "pass") -> tuple[Path, dict[str, str], Path]:
         repository = copy_repository(root)
+        review_route = {"provider": "deepseek-official", "model": "deepseek-flash", "reasoningEffort": "off"}
+        policy_file = root / "review-model-policy.json"
+        policy_file.write_text(json.dumps({
+            "agent_id": AGENT_ID,
+            "manifest_sha256": hashlib.sha256((repository / "agents" / AGENT_ID / "manifest.yaml").read_bytes()).hexdigest(),
+            "business_model_revision": hashlib.sha256((repository / "config/business-model-default.json").read_bytes()).hexdigest(),
+            "allowed": [{key: review_route[key] for key in ("provider", "model")}],
+            "default": review_route, "credential_refs": [],
+            "patch": [{"id": "agent-default-model", "config": review_route}],
+        }), encoding="utf-8")
         python_bin = root / "python-bin"
         python_bin.mkdir()
         (python_bin / "python3").symlink_to(sys.executable)
@@ -1548,7 +1558,7 @@ if payload.get("operation") == "review":
     if payload.get("workspace") != "/work/evaluation-run" \
             or payload.get("preset_id") != "scenario-analysis" \
             or payload.get("judge_preset_id") != "scenario-analysis" \
-            or payload.get("model_route") != target_route:
+            or payload.get("model_route") != {key: target_route[key] for key in ("provider", "model", "reasoningEffort")}:
         raise SystemExit(6)
     results = []
     for scene_index, scene in enumerate(payload["scenes"]):
@@ -1567,13 +1577,12 @@ if payload.get("operation") == "review":
         ):
             raise SystemExit(8)
         required = review_input["required_evidence"]
-        expected = ["inputs.lock.json", "results.jsonl", "evidence/analysis/harness.json"] + [
-            f"evidence/{item['case_id']}/{name}"
-            for item in cases
-            for name in ("response.json", "checks.json", "tools.jsonl")
-        ]
+        task = review_input.get("review_task")
+        sources = review_input.get("evidence_sources")
         bundle = scene["scene_id"]
-        if review_input.get("evidence_sources") != expected \
+        if task not in {"effect", "source"} or not isinstance(sources, list) or not sources \
+                or task == "effect" and any(path in sources for path in ("inputs.lock.json", "evidence/analysis/harness.json")) \
+                or task == "source" and "evidence/analysis/harness.json" not in sources \
                 or "harness_files" in review_input or any(
             set(item) != {"bundle", "path", "total_lines", "sha256"}
             or item["bundle"] != bundle
@@ -1606,10 +1615,9 @@ if payload.get("operation") == "review":
             "alternative": "也可能由外部工具测试数据造成。",
             "falsification": "固定工具数据后重跑该场景并比较完整证据。",
         }
-        text = json.dumps({
-            "case_reviews": reviews,
-            "findings": [finding],
-        })
+        if task == "source":
+            finding["evidence_refs"].append("evidence/analysis/harness.json")
+        text = json.dumps({"findings": [finding]} if task == "source" else {"case_reviews": reviews, "findings": []})
         accesses = [
             {
                 "name": "read",
@@ -1631,19 +1639,19 @@ if payload.get("operation") == "review":
             accesses.pop()
         elif analysis_mode == "failed-read":
             accesses[0]["result"] = {"is_error": True}
-        elif analysis_mode == "partial-read":
+        elif analysis_mode == "partial-read" or analysis_mode == "source-partial-read" and task == "source":
             accesses[0]["result"]["read"]["line_numbers"].pop()
         elif analysis_mode == "read-recovered":
             accesses.insert(0, {
                 "name": "read", "arguments": {"file_path": required[0]["path"], "offset": "1</tool_call>"},
                 "result": {"is_error": True, "error_code": "INVALID_ARGS", "recovered_by": 1},
             })
-        if analysis_mode == "repair-output" and not repairing:
+        if analysis_mode == "repair-output" and not repairing and task == "effect":
             text = json.dumps({"case_reviews": reviews, "findings": [finding], "unexpected": True})
         results.append({
             "scene_id": scene["scene_id"],
-            "session_id": scene.get("session_id", f"judge-session-{scene_index}"),
-            "route": target_route,
+            "session_id": scene.get("session_id", f"judge-session-{scene['scene_id']}"),
+            "route": payload["model_route"],
             "tool_names": ["glob", "grep", "read"],
             "tool_accesses": accesses,
             "text": text,
@@ -1664,7 +1672,7 @@ for index, item in enumerate(payload["cases"]):
         "inputs": item["inputs"],
         "assistant_texts": ["模型连通"],
         "session_id": f"target-session-{index}",
-        "turns": [{"assistant_text": "模型连通", "route": target_route}] + [
+        "turns": [{"assistant_text": "模型连通", "route": None if mode == "no-target-model" else target_route}] + [
             {"assistant_text": "继续处理", "route": None}
             for _ in item["inputs"][1:]
         ],
@@ -1674,6 +1682,8 @@ for index, item in enumerate(payload["cases"]):
     }}, {"session_log": "session.v4.jsonl", "event": {
         "type": "request/header", "seq": 1, "data": {"header": {"config": target_route}},
     }}]
+    if mode == "no-target-model":
+        trace = trace[:1]
     (evidence / "trace.jsonl").write_text("".join(json.dumps(row) + "\\n" for row in trace))
     (evidence / "tools.jsonl").write_text(
         json.dumps({"event": {
@@ -1730,6 +1740,7 @@ print(json.dumps({"schema_version": "1.0", "rows": rows}))
             "TEST_DSH_LOG": str(command_log),
             "TEST_BROWSER_MODE": mode,
             "TEST_ANALYSIS_MODE": "valid",
+            "TEST_MODEL_POLICY_FILE": str(policy_file),
             "TEST_BROWSER_READY": str(root / "browser-ready"),
             "PATH": str(python_bin) + os.pathsep + os.environ.get("PATH", ""),
         }
@@ -1755,6 +1766,8 @@ print(json.dumps({"schema_version": "1.0", "rows": rows}))
             "--executor", executor,
             "--timeout-seconds", "10",
         ]
+        if env.get("TEST_MODEL_POLICY_FILE"):
+            command.extend(("--model-policy", env["TEST_MODEL_POLICY_FILE"]))
         if mode:
             command.extend(("--mode", mode))
         if compare_to:
@@ -2005,7 +2018,10 @@ print(json.dumps({"schema_version": "1.0", "rows": rows}))
             len({scene["analysis_session"]["session_id"] for scene in selected_scenes}),
             len(selected_scenes),
         )
-        self.assertTrue(all(scene["findings"] for scene in selected_scenes))
+        self.assertTrue(all(not scene["findings"] for scene in selected_scenes))
+        self.assertTrue(analysis["source_diagnosis"]["findings"])
+        self.assertEqual(analysis["source_diagnosis"]["status"], "completed")
+        self.assertEqual(summary["schema_version"], "4.0")
         self.assertNotIn("### 证据复核", report)
         self.assertIn("## Case 结果与证据复核", report)
         self.assertIn("原始机器观察保留在 [`results.jsonl`](results.jsonl)", report)
@@ -2036,6 +2052,35 @@ print(json.dumps({"schema_version": "1.0", "rows": rows}))
         self.assertEqual(analysis["review_status"], "completed")
         self.assertEqual(analysis["reviewed_case_count"], 1)
         self.assertEqual(commands, ["up", "url", "up", "url", "down", "down"])
+
+    def test_independent_review_does_not_require_target_model_request(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repository, env, _ = self.runtime_fixture(Path(temp), mode="no-target-model")
+            completed, payload = self.run_eval(repository, env, "U-INS-001", review="ai")
+            run_dir = (repository / payload["summary"]).parent
+            inputs = json.loads((run_dir / "inputs.lock.json").read_text())
+            analysis = json.loads((run_dir / "analysis.json").read_text())
+            trace = [json.loads(line) for line in (run_dir / "evidence/U-INS-001/trace.jsonl").read_text().splitlines()]
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertFalse(any(row["event"]["type"] == "request/header" for row in trace))
+        self.assertEqual(analysis["review_status"], "completed")
+        session = next(scene["analysis_session"] for scene in analysis["scenes"] if scene["selected_case_ids"])
+        self.assertEqual(session["route"], inputs["review_contract"]["model_route"])
+
+    def test_incomplete_source_diagnosis_preserves_completed_effect_review(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repository, env, _ = self.runtime_fixture(Path(temp))
+            env["TEST_ANALYSIS_MODE"] = "source-partial-read"
+            completed, payload = self.run_eval(repository, env, "U-INS-001", review="ai")
+            run_dir = (repository / payload["summary"]).parent
+            summary = json.loads((run_dir / "summary.json").read_text())
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(summary["schema_version"], "4.0")
+        self.assertEqual(summary["review_status"], "completed")
+        self.assertEqual(summary["effective_verdict"], "passed")
+        self.assertEqual(summary["source_diagnosis"]["status"], "incomplete")
+        self.assertEqual(summary["source_diagnosis"]["conclusion"], "inconclusive")
+        self.assertLess(summary["source_diagnosis"]["read_parts"], summary["source_diagnosis"]["required_parts"])
 
     def test_review_recovered_read_is_preserved_in_evidence_and_report(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

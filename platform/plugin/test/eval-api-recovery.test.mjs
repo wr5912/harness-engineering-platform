@@ -1,15 +1,31 @@
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import test from 'node:test'
 import { strToU8, zipSync } from 'fflate'
 
 const adapter = new URL('../../../runtime/adapters/dsh-container/', import.meta.url).pathname
 const modules = new URL('../node_modules', import.meta.url).pathname
 const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds))
+
+test('原生review输入接受固定源码任务和既有场景，拒绝任意目录或任务名称', () => {
+  const payload = { auth_url: 'http://127.0.0.1:1/', workspace: '/work/evaluation-run', preset_id: 'scenario-analysis',
+    judge_preset_id: 'scenario-analysis', evidence_root: '/evidence', timeout_ms: 1000, cases: [], operation: 'review',
+    model_route: { provider: 'fixture', model: 'review' } }
+  const source = `import { readInput } from ${JSON.stringify(pathToFileURL(join(adapter, 'dsh-eval-api.mjs')).href)}; readInput().then(value => process.stdout.write(value.scenes[0].scene_id)).catch(error => { process.stderr.write(error.message); process.exitCode = 2 })`
+  for (const id of ['source-diagnosis', 'scene-01', '../source-diagnosis', 'source-diagnosis/child', 'arbitrary']) {
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', source], {
+      input: JSON.stringify({ ...payload, scenes: [{ scene_id: id, prompt: '{}' }] }), encoding: 'utf8',
+    })
+    assert.equal(result.status, ['source-diagnosis', 'scene-01'].includes(id) ? 0 : 2, result.stderr)
+    if (result.status === 0) assert.equal(result.stdout, id)
+    else assert.equal(result.stderr, 'invalid-scene')
+  }
+})
 
 async function fixture(t, failure) {
   const directory = mkdtempSync(join(tmpdir(), 'eval-api-recovery-'))

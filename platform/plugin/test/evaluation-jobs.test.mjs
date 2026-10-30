@@ -276,7 +276,8 @@ test('受理前准备失败允许同一请求重试且没有残留任务', async
 const localRoute = { provider: 'security-operation-delivery', model: 'fixed-operation-result' }
 const remoteRoute = { provider: 'xiaomi-token-plan-cn', model: 'mimo-v2.6-flash' }
 const capabilityContent = routes => JSON.stringify({ runtime_capabilities: { local_tools: [], local_model_routes: routes } })
-async function measurementRun(t, { marker = true, legacy = false, declared = true, content = capabilityContent([localRoute]) } = {}) {
+async function measurementRun(t, { marker = true, legacy = false, declared = true, content = capabilityContent([localRoute]),
+  localProof = { usage: { inputTokens: 5, outputTokens: 2, totalTokens: 7 } } } = {}) {
   const fx = await fixture(t, '')
   const jobs = fx.create(), started = await jobs.start({ source: 'experiment:EXP-test-agent-001' })
   await waitFor(() => jobs.status(started.job_id), job => job.status === 'completed')
@@ -298,14 +299,15 @@ async function measurementRun(t, { marker = true, legacy = false, declared = tru
   for (const [index, route] of [localRoute, remoteRoute].entries()) {
     const turn = index + 1
     for (const [type, data] of [['turn/start', { turn }], ['step/start', { turn, step: 1 }],
-      ['request/header', { header: { config: route } }], ['assistant/message', { turn, step: 1, usage: { inputTokens: 5, outputTokens: 2, totalTokens: 7 } }],
+      ['request/header', { header: { config: route } }], ['assistant/message', { turn, step: 1,
+        ...(index === 0 ? localProof : { usage: { inputTokens: 5, outputTokens: 2, totalTokens: 7 } }) }],
       ['step/end', { turn, step: 1 }], ['turn/end', { turn }]]) events.push({ type, seq: seq++, data })
   }
   writeFileSync(join(evidence, 'trace.jsonl'), events.map(event => JSON.stringify({ session_log: 'session.v4.jsonl', event })).join('\n') + '\n')
   return { ...fx, run, snapshot, harness, lock, content, inputs, status: () => fx.create().status(started.job_id) }
 }
 
-test('新Run按锁定普通快照排除纯本地请求，旧Run仅用同SHA原文，不读取当前Candidate', async t => {
+test('新旧Run核对锁定注册声明但仍计代理真实推理，不读取当前Candidate', async t => {
   for (const legacy of [false, true]) {
     const fx = await measurementRun(t, { marker: !legacy, legacy })
     const current = join(fx.root, 'evolution/experiments/EXP-test-agent-001/candidate/dsh/managed')
@@ -313,13 +315,18 @@ test('新Run按锁定普通快照排除纯本地请求，旧Run仅用同SHA原�
     const beforeLock = readFileSync(fx.lock)
     const status = fx.status()
     assert.equal(status.local_model_routes_verification, 'verified')
-    assert.equal(status.actual_model_calls, 1)
-    assert.equal(status.observed_model_calls, 1)
-    assert.deepEqual(status.token_usage, { input_tokens: 5, output_tokens: 2, total_tokens: 7 })
+    assert.equal(status.actual_model_calls, 2)
+    assert.equal(status.observed_model_calls, 2)
+    assert.deepEqual(status.token_usage, { input_tokens: 10, output_tokens: 4, total_tokens: 14 })
     assert.deepEqual(readFileSync(fx.lock), beforeLock, '查询不能改写旧Run')
   }
   const noDeclaration = await measurementRun(t, { marker: false, declared: false })
   assert.equal(noDeclaration.status().actual_model_calls, 2, '锁中确无声明不凭provider名字排除')
+  const none = await measurementRun(t, { localProof: { model_invocation: false } })
+  assert.equal(none.status().actual_model_calls, 1, '明确无调用与注册身份区分')
+  const unknown = await measurementRun(t, { localProof: {} })
+  assert.equal(unknown.status().actual_model_calls, null)
+  assert.equal(unknown.status().observed_model_calls, 1)
 })
 
 test('新快照缺损不降级legacy，旧声明无可信原文时调用与用量下界保持未知', async t => {

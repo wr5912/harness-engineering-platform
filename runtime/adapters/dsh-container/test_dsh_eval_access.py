@@ -156,6 +156,107 @@ class ReviewTargetRouteTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "target-route-mixed"):
             scenario_analysis._target_route(self.root, [case])
 
+    def test_registered_proxy_with_actual_invocation_is_a_review_candidate(self):
+        import scenario_analysis
+        self.lock_local_routes(json.dumps({"runtime_capabilities": {"local_model_routes": [*self.LOCAL, self.QWEN]}}))
+        for evidence in ({"model_invocation": True},
+                         {"usage": {"inputTokens": 659, "outputTokens": 17, "totalTokens": 676}},
+                         {"usage": {"inputTokens": 470, "outputTokens": 119}},
+                         {"usage": {"inputTokens": 1.0, "outputTokens": 0.0}},
+                         {"stream": [{"type": "chunk", "chunk": {"type": "usage", "usage": {
+                             "inputTokens": 0, "outputTokens": 1, "cacheReadTokens": 4}}}]}):
+            with self.subTest(evidence=evidence):
+                case = self.write_case(routes=[self.QWEN])
+                path = self.root / "evidence" / case["case_id"] / "trace.jsonl"
+                trace = [json.loads(line) for line in path.read_text().splitlines()]
+                trace[-1]["event"]["data"].update(evidence, message={"role": "assistant", "source": {
+                    "kind": "model", **self.QWEN, "replayState": {"response": {"kind": "pi-ai"}}}})
+                path.write_text("".join(json.dumps(row) + "\n" for row in trace))
+                self.assertEqual(scenario_analysis._target_route(self.root, [case]), self.QWEN)
+
+    def test_registration_zero_or_invalid_usage_does_not_prove_a_review_model(self):
+        import scenario_analysis
+        self.lock_local_routes(json.dumps({"runtime_capabilities": {"local_model_routes": [self.QWEN]}}))
+        for evidence in ({}, {"model_invocation": False},
+                         {"usage": {"inputTokens": 0, "outputTokens": 0, "totalTokens": 0}},
+                         {"usage": {"inputTokens": True, "outputTokens": 1}},
+                         {"usage": {"inputTokens": 1.5, "outputTokens": 1}},
+                         {"usage": {"inputTokens": 2 ** 53, "outputTokens": 1}},
+                         {"usage": {"inputTokens": -1, "outputTokens": 2}},
+                         {"usage": {"inputTokens": 3, "outputTokens": 2, "totalTokens": 4}},
+                         {"usage": {"inputTokens": 1, "outputTokens": 2, "reasoningTokens": 3}}):
+            with self.subTest(evidence=evidence):
+                case = self.write_case(routes=[self.QWEN])
+                path = self.root / "evidence" / case["case_id"] / "trace.jsonl"
+                trace = [json.loads(line) for line in path.read_text().splitlines()]
+                trace[-1]["event"]["data"].update(evidence)
+                path.write_text("".join(json.dumps(row) + "\n" for row in trace))
+                with self.assertRaisesRegex(ValueError, "target-route-missing"):
+                    scenario_analysis._target_route(self.root, [case])
+
+    def test_actual_proxy_and_mimo_in_root_are_mixed_including_unchanged_header(self):
+        import scenario_analysis
+        self.lock_local_routes(json.dumps({"runtime_capabilities": {"local_model_routes": [self.QWEN]}}))
+        for headers in ([self.QWEN, self.MIMO], [self.MIMO, self.MIMO]):
+            with self.subTest(headers=headers):
+                case = self.write_case(routes=headers)
+                path = self.root / "evidence" / case["case_id"] / "trace.jsonl"
+                trace = [json.loads(line) for line in path.read_text().splitlines()]
+                trace[2]["event"]["data"].update(model_invocation=True, message={"source": {"kind": "model", **self.QWEN}})
+                if headers[0] == headers[1]:
+                    trace.pop(3)  # 原生 Header 只在配置改变时持久化。
+                path.write_text("".join(json.dumps(row) + "\n" for row in trace))
+                with self.assertRaisesRegex(ValueError, "target-route-mixed"):
+                    scenario_analysis._target_route(self.root, [case])
+
+    def test_settled_source_overrides_header_and_only_matching_identity_keeps_options(self):
+        import scenario_analysis
+        for header, source, expected in ((self.MIMO, self.QWEN, self.QWEN),
+                                         (self.LOCAL[0], self.MIMO, {key: self.MIMO[key] for key in ("provider", "model")}),
+                                         (self.MIMO, self.MIMO, self.MIMO)):
+            with self.subTest(header=header, source=source):
+                self.lock_local_routes()
+                case = self.write_case(routes=[header])
+                path = self.root / "evidence" / case["case_id"] / "trace.jsonl"
+                trace = [json.loads(line) for line in path.read_text().splitlines()]
+                trace[-1]["event"]["data"].update(usage={"inputTokens": 4, "outputTokens": 2},
+                    message={"source": {"kind": "model", **{key: source[key] for key in ("provider", "model")}}})
+                path.write_text("".join(json.dumps(row) + "\n" for row in reversed(trace)))
+                self.assertEqual(scenario_analysis._target_route(self.root, [case]), expected)
+
+    def test_invocation_false_conflicting_with_positive_usage_is_not_routable(self):
+        import scenario_analysis
+        for local in (False, True):
+            with self.subTest(local=local):
+                if local:
+                    self.lock_local_routes(json.dumps({"runtime_capabilities": {"local_model_routes": [self.QWEN]}}))
+                case = self.write_case(routes=[self.QWEN])
+                path = self.root / "evidence" / case["case_id"] / "trace.jsonl"
+                trace = [json.loads(line) for line in path.read_text().splitlines()]
+                trace[-1]["event"]["data"].update(model_invocation=False, usage={"inputTokens": 2, "outputTokens": 1})
+                path.write_text("".join(json.dumps(row) + "\n" for row in trace))
+                with self.assertRaisesRegex(ValueError, "target-route-evidence-conflict"):
+                    scenario_analysis._target_route(self.root, [case])
+
+    def test_positive_child_or_graph_does_not_promote_registered_root(self):
+        import scenario_analysis
+        self.lock_local_routes()
+        extra = [
+            {"session_log": "subagents/child.jsonl", "event": {"type": "session", "id": "child",
+             "parentSession": "session-root", "delegationDepth": 1}},
+            {"session_log": "subagents/child.jsonl", "event": {"type": "request/header", "seq": 0,
+             "data": {"header": {"config": self.MIMO}}}},
+            {"session_log": "subagents/child.jsonl", "event": {"type": "assistant/message", "seq": 1,
+             "data": {"model_invocation": True, "usage": {"inputTokens": 20, "outputTokens": 3}}}},
+            {"session_log": "session.v4.jsonl", "event": {"type": "tool/result", "seq": 8,
+             "data": {"meta": {"graph_execution": {"model_attempts": [{"provider": self.LOCAL[4]["provider"],
+                 "model": self.LOCAL[4]["model"], "model_invocation": True,
+                 "usage": {"inputTokens": 20, "outputTokens": 3}}]}}}}},
+        ]
+        case = self.write_case(routes=[self.LOCAL[4]], extra=extra)
+        with self.assertRaisesRegex(ValueError, "target-route-missing"):
+            scenario_analysis._target_route(self.root, [case])
+
     def test_failed_or_cancelled_external_request_is_retained_without_assistant_usage(self):
         import scenario_analysis
         case = self.write_case()
@@ -163,7 +264,8 @@ class ReviewTargetRouteTest(unittest.TestCase):
         trace = [json.loads(line) for line in path.read_text().splitlines()]
         for finish in ("error", "aborted"):
             with self.subTest(finish=finish):
-                trace[-1]["event"] = {"type": "assistant/attempt", "data": {"finishReason": finish}}
+                trace[-1]["event"] = {"type": "assistant/attempt", "seq": 3,
+                                    "data": {"turn": 1, "step": 1, "finishReason": finish}}
                 path.write_text("".join(json.dumps(row) + "\n" for row in trace))
                 self.assertEqual(scenario_analysis._target_route(self.root, [case]), self.MIMO)
         (path.parent / "response.json").write_text(json.dumps({"response": None, "error": "case-cancelled"}))
@@ -634,6 +736,204 @@ class EvaluationInterpreterTest(unittest.TestCase):
         self.assertNotIn("fixture-private-value", stderr.getvalue())
         self.assertNotIn("fixture-secret", stderr.getvalue())
         self.assertNotIn("JSONDecodeError", stderr.getvalue())
+
+
+class SeparateReviewTest(unittest.TestCase):
+    ROUTE = {"provider": "fixture-review", "model": "review-model", "reasoningEffort": "off"}
+
+    def setUp(self):
+        import scenario_analysis
+        self.analysis = scenario_analysis
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.run = self.root / "evolution/experiments/EXP-audit-001/runs/run-audit"
+        self.evidence = self.run / "evidence/U-ONE-001"
+        self.evidence.mkdir(parents=True)
+        self.inputs = {"run_id": "run-audit", "source_id": "experiment:EXP-audit-001", "review_mode": "ai",
+                       "evaluation_cases": [{"case_id": "U-ONE-001", "inputs": ["第一轮", "第二轮"], "expected_behavior": "保留编号并返回真实产物"}],
+                       "case_catalog": [{"case_id": "U-ONE-001", "scene": "业务场景"}],
+                       "harness_trees": {"managed": {"files": [{"path": "guard.ts", "sha256": "c" * 64, "size": 100}]}},
+                       "harness_review": {"schema_version": 1, "generated": [], "sources": [{"origin": "platform", "path": "sdk.ts", "sha256": "d" * 64, "content": "SOURCE-BODY-ONLY" * 12000}]}}
+        self.rows = [{"input_id": "U-ONE-001", "execution_status": "completed", "verdict": "inconclusive", "evidence_ref": "evidence/U-ONE-001/checks.json"}]
+        for name, content in {"response.json": {"assistant_texts": ["第一轮编号A", "第二轮保留A"], "turns": [{"input": "第一轮"}, {"input": "第二轮"}]},
+                              "checks.json": {"trace_available": True, "preset_matches": True, "workspace_matches": True}}.items():
+            (self.evidence / name).write_text(json.dumps(content, ensure_ascii=False))
+        (self.evidence / "tools.jsonl").write_text(json.dumps({"event": {"type": "tool/result", "data": {"arguments": {"id": "A"}, "result": {"id": "A", "value": 70}}}}) + "\n")
+        (self.evidence / "trace.jsonl").write_text(json.dumps({"session_log": "root", "event": {"type": "turn/end", "seq": 9, "data": {"turn": 2}}}) + "\n")
+        (self.run / "results.jsonl").write_text(json.dumps(self.rows[0]) + "\n")
+        loader = SourceFileLoader("separate_review_fixture_dev", str(Path(__file__).with_name("dsh-dev")))
+        module_spec = importlib.util.spec_from_loader(loader.name, loader)
+        dev = importlib.util.module_from_spec(module_spec)
+        loader.exec_module(dev)
+        raw_policy = {"agent_id": "audit", "manifest_sha256": "a" * 64, "business_model_revision": "b" * 64,
+                      "allowed": [{"provider": self.ROUTE["provider"], "model": self.ROUTE["model"]}], "default": self.ROUTE,
+                      "patch": [{"id": "agent-default-model", "config": self.ROUTE}], "credential_refs": []}
+        policy = dev.analysis_model_policy("audit", dev._model_policy(raw_policy, "audit", source="platform", manifest_sha256="a" * 64))
+        policy_path = self.run / "evidence/analysis/model-policy.json"
+        policy_path.parent.mkdir()
+        policy_path.write_text(json.dumps(raw_policy))
+        self.inputs["review_contract"] = {"schema_version": 1, "effect_scope": "business-evidence", "source_scope": "frozen-harness",
+                                         "model_route": self.ROUTE, "model_policy_sha256": policy["sha256"],
+                                         "model_policy_snapshot": {"path": "evidence/analysis/model-policy.json", "sha256": hashlib.sha256(policy_path.read_bytes()).hexdigest()}}
+        self.write_inputs()
+        self.lock_before = (self.run / "inputs.lock.json").read_bytes()
+        self.source_files = [{"tree": "managed", "path": "guard.ts", "sha256": "c" * 64,
+                              "content": "SOURCE-BODY-ONLY" * 12000, "classification": "source"}]
+        self.tasks = []
+        self.partial = set()
+        self.same_session = False
+
+    def write_inputs(self):
+        (self.run / "inputs.lock.json").write_text(json.dumps(self.inputs, ensure_ascii=False))
+
+    def driver(self, prompts, _url, _image, route, _timeout, _root):
+        results = []
+        for prompt in prompts:
+            value = json.loads(prompt["prompt"])
+            task = value["review_task"]
+            self.tasks.append(task)
+            accesses = []
+            for item in value["required_evidence"]:
+                lines = list(range(1, item["total_lines"] + 1))
+                if task in self.partial:
+                    lines = lines[:-1]
+                accesses.append({"name": "read", "arguments": {"file_path": item["path"]},
+                                 "result": {"is_error": False, "read": {"path": item["path"], "offset": 1, "line_numbers": lines, "total_lines": item["total_lines"]}}})
+            output = {"findings": []}
+            if task == "effect":
+                output["case_reviews"] = [{"case_id": case["case_id"], "reviewed_verdict": "passed", "reason": "完整业务执行证据符合冻结预期"} for case in value["cases"]]
+                self.assertNotIn("inputs.lock.json", value["evidence_sources"])
+                self.assertNotIn("evidence/analysis/harness.json", value["evidence_sources"])
+                projection = self.analysis._safe_json(self.run / "evidence/analysis/effect-inputs.json")
+                self.assertNotIn("SOURCE-BODY-ONLY", json.dumps(projection))
+                self.assertEqual(projection["inputs"]["harness_review"]["sources"][0]["sha256"], "d" * 64)
+                self.assertIn("evidence/U-ONE-001/trace.jsonl", value["evidence_sources"])
+            results.append({"scene_id": prompt["scene_id"], "session_id": "effect-scene-01" if self.same_session else f"{task}-{prompt['scene_id']}",
+                            "route": route, "text": json.dumps(output), "tool_names": self.analysis.ANALYSIS_TOOLS,
+                            "tool_accesses": accesses})
+        return {"operation": "review", "results": results}
+
+    def review(self, *, source_error=None):
+        def run(command, **_kwargs):
+            if "up" in command:
+                self.assertIn(str((self.run / "evidence/analysis/model-policy.json").resolve()), command)
+                return json.dumps({"image_ref": "image@sha256:fixture"})
+            return "http://127.0.0.1:3081/?token=fixture-only" if "url" in command else ""
+        with mock.patch.object(self.analysis, "_run", side_effect=run), \
+                mock.patch.object(self.analysis, "_locked_harness", side_effect=source_error, return_value=self.source_files), \
+                mock.patch.object(self.analysis, "_target_route", side_effect=AssertionError("新方法不能从业务模型猜评审路由")), \
+                mock.patch.object(self.analysis, "_review_driver", side_effect=self.driver):
+            result = self.analysis.review_full(self.run, self.rows, self.inputs)
+            self.analysis.validate_analysis(result, self.run, self.rows, self.inputs)
+        self.assertEqual((self.run / "inputs.lock.json").read_bytes(), self.lock_before)
+        return result
+
+    def test_source_incomplete_does_not_erase_complete_effect_and_true_read_scope(self):
+        self.partial = {"source"}
+        result = self.review()
+        self.assertEqual(self.tasks, ["effect", "source"])
+        self.assertEqual(result["schema_version"], "3.0")
+        self.assertEqual(result["review_status"], "completed")
+        self.assertEqual(self.analysis.summarize_review(result)["overall_verdict"], "passed")
+        source = result["source_diagnosis"]
+        self.assertEqual((source["status"], source["conclusion"]), ("incomplete", "inconclusive"))
+        self.assertTrue(any(item["read_ranges"] for item in source["scope"]))
+        self.assertTrue(any(not item["complete"] for item in source["scope"]))
+        self.assertEqual(source["findings"], [])
+        self.assertNotEqual(source["analysis_session"]["session_id"], result["scenes"][0]["analysis_session"]["session_id"])
+
+    def test_source_complete_is_scoped_no_findings_not_code_passed(self):
+        result = self.review()
+        self.assertEqual(result["source_diagnosis"]["conclusion"], "no_findings")
+        summary = self.analysis.summarize_source_diagnosis(result)
+        self.assertEqual(summary["status"], "completed")
+        self.assertEqual(summary["required_parts"], summary["read_parts"])
+
+    def test_source_completion_cannot_upgrade_unread_effect(self):
+        self.partial = {"effect"}
+        result = self.review()
+        self.assertEqual(result["review_status"], "failed")
+        self.assertEqual(result["source_diagnosis"]["status"], "completed")
+        self.assertEqual(result["reviewed_case_count"], 0)
+
+    def test_missing_source_bytes_only_mark_source_unknown(self):
+        result = self.review(source_error=ValueError("harness-lock-digest-mismatch"))
+        self.assertEqual(self.tasks, ["effect"])
+        self.assertEqual(result["review_status"], "completed")
+        self.assertEqual(result["source_diagnosis"]["status"], "incomplete")
+        self.assertEqual(result["source_diagnosis"]["scope"], [])
+
+    def test_shared_session_is_rejected_without_changing_effect(self):
+        self.same_session = True
+        result = self.review()
+        self.assertEqual(result["review_status"], "completed")
+        self.assertEqual(result["source_diagnosis"]["status"], "incomplete")
+        self.assertIsNone(result["source_diagnosis"]["analysis_session"])
+
+    def test_failed_effect_session_also_cannot_be_reused_for_source(self):
+        self.same_session = True
+        self.partial = {"effect"}
+        result = self.review()
+        self.assertEqual(result["review_status"], "failed")
+        self.assertEqual(result["source_diagnosis"]["status"], "incomplete")
+        self.assertIsNone(result["source_diagnosis"]["analysis_session"])
+
+    def test_forged_source_coverage_or_effect_verdict_is_rejected(self):
+        result = self.review()
+        result["source_diagnosis"]["scope"][0]["read_ranges"] = []
+        with self.assertRaisesRegex(ValueError, "scope-mismatch"):
+            self.analysis.validate_analysis(result, self.run, self.rows, self.inputs)
+        result["source_diagnosis"]["scope"][0]["read_ranges"] = [[1, result["source_diagnosis"]["scope"][0]["total_lines"]]]
+        result["scenes"][0]["case_reviews"][0]["reviewed_verdict"] = "failed"
+        with self.assertRaisesRegex(ValueError, "effect-review-output-mismatch"):
+            self.analysis.validate_analysis(result, self.run, self.rows, self.inputs)
+
+    def test_snapshot_missing_or_marker_invalid_never_falls_back_to_target(self):
+        path = self.run / self.inputs["review_contract"]["model_policy_snapshot"]["path"]
+        path.unlink()
+        with self.assertRaisesRegex(ValueError, "snapshot-missing"):
+            self.analysis._review_route(self.run, self.inputs)
+        self.inputs["review_contract"]["schema_version"] = True
+        with self.assertRaisesRegex(ValueError, "review-contract-invalid"):
+            self.analysis._review_route(self.run, self.inputs)
+
+    def test_actual_artifact_is_required_and_tampering_is_not_effect_success(self):
+        artifact = self.run / "artifacts/U-ONE-001/report.md"
+        artifact.parent.mkdir(parents=True)
+        artifact.write_text("实际报告A，金额70元。")
+        index = {"schema_version": "1.0", "artifacts": [{"case_id": "U-ONE-001", "path": "artifacts/U-ONE-001/report.md", "sha256": hashlib.sha256(artifact.read_bytes()).hexdigest(), "size": artifact.stat().st_size}]}
+        (self.run / "artifacts/index.json").write_text(json.dumps(index))
+        result = self.review()
+        self.assertEqual(result["review_status"], "completed")
+        projected = self.analysis._safe_json(self.run / "evidence/analysis/business-artifacts.json")
+        self.assertEqual(projected["artifacts"][0]["content"], artifact.read_text())
+        artifact.write_text("伪造产物")
+        with self.assertRaisesRegex(ValueError, "mismatch"):
+            self.analysis.validate_analysis(result, self.run, self.rows, self.inputs)
+
+    def test_manifest_cannot_omit_required_execution_or_harness_sources(self):
+        result = self.review()
+        manifest_path = self.run / "evidence/analysis/readable/manifest.json"
+        original = manifest_path.read_bytes()
+        for bundle, source in [("scene-01", "evidence/U-ONE-001/trace.jsonl"),
+                               ("source-diagnosis", "evidence/analysis/harness.json")]:
+            with self.subTest(bundle=bundle):
+                manifest = json.loads(original)
+                group = next(item for item in manifest["groups"] if item["bundle"] == bundle)
+                group["sources"] = [item for item in group["sources"] if item["source"] != source]
+                manifest_path.write_text(json.dumps(manifest))
+                with self.assertRaisesRegex(ValueError, "source-coverage-invalid"):
+                    self.analysis.validate_analysis(result, self.run, self.rows, self.inputs)
+                manifest_path.write_bytes(original)
+
+    def test_none_mode_has_two_explicit_not_requested_states(self):
+        self.inputs["review_mode"] = "none"
+        self.write_inputs()
+        result = self.analysis.analyze(self.run, self.rows, self.inputs, status="completed")
+        self.analysis.validate_analysis(result, self.run, self.rows, self.inputs)
+        self.assertEqual(result["review_status"], "not_requested")
+        self.assertEqual(result["source_diagnosis"]["status"], "not_requested")
 
 
 if __name__ == "__main__":

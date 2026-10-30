@@ -83,6 +83,114 @@ def recorded_run(module, repo: Path, external_fixture: bytes | None = None,
     return run_dir, contract
 
 
+class ReviewContractSnapshotTests(unittest.TestCase):
+    ROUTE = {"provider": "xiaomi-token-plan-cn", "model": "mimo-v2.6-flash", "reasoningEffort": "off"}
+
+    def policy(self, repo: Path) -> Path:
+        manifest = repo / "agents/example-agent/manifest.yaml"
+        manifest.parent.mkdir(parents=True)
+        manifest.write_text("agent_id: example-agent\n", encoding="utf-8")
+        business = repo / "config/business-model-default.json"
+        business.parent.mkdir()
+        business.write_text(json.dumps({"schema_version": "1.2", "default": self.ROUTE}))
+        policy = repo / "policy.json"
+        policy.write_text(json.dumps({
+            "agent_id": "example-agent", "manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
+            "business_model_revision": hashlib.sha256(business.read_bytes()).hexdigest(),
+            "allowed": [{key: self.ROUTE[key] for key in ("provider", "model")}],
+            "default": self.ROUTE, "patch": [{"id": "agent-default-model", "config": self.ROUTE}],
+            "credential_refs": [], "harness_runtime": {"execution_mode": "code-only"},
+            "asset_dependencies": {"status": "ready"},
+        }))
+        return policy
+
+    def test_explicit_policy_freezes_independent_review_model_without_business_assets(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            module = load_module(fixtures.RUN_RECORD, "separated_review_policy")
+            source = self.policy(repo)
+            run = repo / "run"
+            run.mkdir()
+            contract = module.freeze_review_contract(repo, "example-agent", run, str(source))
+            snapshot = run / contract["model_policy_snapshot"]["path"]
+            frozen = json.loads(snapshot.read_bytes())
+            self.assertEqual(contract["model_route"], self.ROUTE)
+            self.assertEqual(contract["effect_scope"], "business-evidence")
+            self.assertEqual(contract["source_scope"], "frozen-harness")
+            self.assertNotIn("harness_runtime", frozen)
+            self.assertNotIn("asset_dependencies", frozen)
+            self.assertEqual(hashlib.sha256(snapshot.read_bytes()).hexdigest(), contract["model_policy_snapshot"]["sha256"])
+            import scenario_analysis
+            self.assertEqual(scenario_analysis._review_route(run, {"review_contract": contract}), self.ROUTE)
+            source.write_text("{}")
+            self.assertEqual(scenario_analysis._review_route(run, {"review_contract": contract}), self.ROUTE)
+
+    def test_existing_configured_default_is_preserved_without_new_required_cli_flag(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            module = load_module(fixtures.RUN_RECORD, "configured_review_policy")
+            policy = self.policy(repo)
+            first, second = repo / "first", repo / "second"
+            first.mkdir(); second.mkdir()
+            explicit = module.freeze_review_contract(repo, "example-agent", first, str(policy))
+            configured = module.freeze_review_contract(repo, "example-agent", second, None)
+            self.assertEqual(configured["model_route"], self.ROUTE)
+            self.assertEqual(configured["model_policy_sha256"], explicit["model_policy_sha256"])
+
+    def test_missing_actual_default_does_not_invent_a_review_model(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            module = load_module(fixtures.RUN_RECORD, "missing_review_policy")
+            self.policy(repo)
+            (repo / "config/business-model-default.json").write_text(json.dumps({"schema_version": "1.2", "default": None}))
+            run = repo / "run"; run.mkdir()
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaisesRegex(ValueError, "模型策略"):
+                module.freeze_review_contract(repo, "example-agent", run, None)
+            self.assertFalse((run / "evidence/analysis/model-policy.json").exists())
+
+    def test_policy_change_during_freeze_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            module = load_module(fixtures.RUN_RECORD, "changing_review_policy")
+            policy = self.policy(repo)
+            run = repo / "run"; run.mkdir()
+            read = Path.read_text
+
+            def changing(path, *args, **kwargs):
+                value = read(path, *args, **kwargs)
+                if path == policy:
+                    policy.write_text(value + "\n")
+                return value
+
+            with mock.patch.object(Path, "read_text", changing), self.assertRaisesRegex(ValueError, "创建 Run 时变化"):
+                module.freeze_review_contract(repo, "example-agent", run, str(policy))
+
+    def test_run_index_keeps_effect_and_source_status_separate_and_unknown_on_bad_summary(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            module = load_module(fixtures.RUN_RECORD, "review_index_facts")
+            policy = self.policy(repo)
+            run = repo / "run"; run.mkdir()
+            contract = module.freeze_review_contract(repo, "example-agent", run, str(policy))
+            (run / "inputs.lock.json").write_text(json.dumps({"review_contract": contract, "evaluation_cases": []}))
+            diagnosis = {"status": "incomplete", "conclusion": "inconclusive", "reason": "源码未读完整",
+                         "required_parts": 3, "read_parts": 1}
+            summary = run / "summary.json"
+            summary.write_text(json.dumps({"schema_version": "4.0", "run_id": "run-example",
+                "review_status": "completed", "source_diagnosis": diagnosis, "effective_verdict": "passed"}))
+            manifest = {"run_id": "run-example", "status": "completed"}
+            facts = module.run_index_facts(run, manifest)
+            self.assertEqual(facts["review_contract"], contract)
+            self.assertEqual(facts["review_status"], "completed")
+            self.assertEqual(facts["source_diagnosis"], diagnosis)
+            self.assertEqual(facts["effective_verdict"], "passed")
+            summary.write_text("{")
+            facts = module.run_index_facts(run, manifest)
+            self.assertIsNone(facts["review_status"])
+            self.assertIsNone(facts["source_diagnosis"])
+            self.assertIsNone(facts["effective_verdict"])
+
+
 class FrozenRunSnapshotTests(unittest.TestCase):
     def test_managed_role_snapshot_freezes_original_bytes_and_reuses_harness_digest(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

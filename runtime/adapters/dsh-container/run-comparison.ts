@@ -18,6 +18,7 @@ type Case = {
 type View = {
   run_id: string; run_path: string; manifest: { agent_id: string; status: string };
   source: Record<string, any>; image: Record<string, any> | null;
+  summary?: Record<string, any>; source_diagnosis?: Record<string, any> | null;
   cases: Case[]; missing: string[];
 };
 
@@ -47,6 +48,10 @@ for (const field of ['review_mode', 'configured_capabilities', 'dependency_env',
   if (!a || !b) limit(`${field}: 未记录`);
   else if (!isDeepStrictEqual(a, b)) limit(`${field}: 不同`);
 }
+// 快照路径属于各自 Run；评审范围、模型与连接策略才是比较方法。
+const reviewMethod = (source: View['source']) => source.review_contract === undefined ? null
+  : Object.fromEntries(['schema_version', 'effect_scope', 'source_scope', 'model_route', 'model_policy_sha256'].map(key => [key, source.review_contract?.[key]]));
+if (!isDeepStrictEqual(reviewMethod(left.source), reviewMethod(right.source))) limit('review_contract: 业务效果评估方法或评审模型策略不同');
 if (!isDeepStrictEqual(left.source.mcp_fixture ?? null, right.source.mcp_fixture ?? null)) limit('mcp_fixture: Mock 环境或冻结连接映射不同');
 for (const [side, run] of [['left', left], ['right', right]] as const) {
   if (!run.source.source_ref && run.source.git_version?.dirty !== false) limit(`${side}: Git 来源不干净或未记录`);
@@ -129,6 +134,9 @@ const sourceFacts = (run: View) => {
       : '未记录',
     'Candidate': trees,
     '执行器 / 预期模型': `${cell(run.source.executor)} / ${cell(run.source.model)}`,
+    '评审方法': run.source.review_contract ? '业务效果与源码分别评估' : run.source.review_mode === 'ai' ? '历史综合证据复核' : cell(run.source.review_mode),
+    '业务效果复核': cell(run.summary?.review_status),
+    '源码诊断': run.source.review_contract ? `${cell((run.source_diagnosis ?? run.summary?.source_diagnosis)?.status)}；仅限所列审读范围，不改变业务效果判定` : '未单独记录',
     '实际模型路由': cell(actualModels),
     '实际镜像': `${cell(run.image?.image_build_fingerprint)}；${cell(run.image?.local_image_id)}`,
     '插件配置 / 依赖变量': `${cell(run.source.candidate_trees?.managed?.tree_sha256)}；${cell(JSON.stringify(run.source.dependency_env || {}))}`,

@@ -27,6 +27,29 @@ function compare(left, right) {
   return JSON.parse(result.stdout)
 }
 
+test('分层与历史综合复核不可归因，同方法不比较Run私有快照路径但核对评审策略摘要', () => {
+  const left = view('old'), right = view('new')
+  left.source.review_mode = right.source.review_mode = 'ai'
+  const contract = { schema_version: 1, effect_scope: 'business-evidence', source_scope: 'frozen-harness', model_route: { provider: 'mimo', model: 'MiMoFlash', reasoningEffort: 'off' }, model_policy_sha256: '1'.repeat(64), model_policy_snapshot: { path: 'old/policy.json', sha256: '2'.repeat(64) } }
+  right.source.review_contract = structuredClone(contract)
+  assert.ok(compare(left, right).limits.some(item => item.startsWith('review_contract:')))
+  left.source.review_contract = structuredClone(contract)
+  right.source.review_contract.model_policy_snapshot.path = 'new/policy.json'
+  assert.equal(compare(left, right).causal_comparable, true)
+  right.source.review_contract.model_policy_sha256 = '3'.repeat(64)
+  assert.ok(compare(left, right).limits.some(item => item.startsWith('review_contract:')))
+})
+
+test('源码诊断未完成不替换业务Case结论或判为业务差异', () => {
+  const left = view('old'), right = view('new')
+  left.summary = right.summary = { review_status: 'completed', effective_verdict: 'passed' }
+  left.source_diagnosis = { status: 'completed', conclusion: 'no_findings' }
+  right.source_diagnosis = { status: 'incomplete', conclusion: 'inconclusive' }
+  const result = compare(left, right)
+  assert.equal(result.cases[0].observed_change, '记录相同')
+  assert.equal(result.causal_comparable, true)
+})
+
 test('历史父版和当前变体允许不同source_ref，但只有同一Mock映射才可比较并明确环境', () => {
   const left = view('parent'), right = view('variant')
   left.source.source_ref = 'git:' + '1'.repeat(40)

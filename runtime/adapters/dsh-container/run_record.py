@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import importlib.util
+from importlib.machinery import SourceFileLoader
 import json
 import os
 import re
@@ -27,7 +28,7 @@ for import_root in (ADAPTER, EVALUATION_SCRIPTS):
         sys.path.insert(0, str(import_root))
 
 from evaluation_contract import cases_digest, execution_from, load_evaluation
-from scenario_analysis import analyze, summarize_review, validate_analysis
+from scenario_analysis import analyze, summarize_review, summarize_source_diagnosis, validate_analysis
 from source_contract import EXPERIMENT as EXPERIMENT_RE, resolve
 
 
@@ -78,6 +79,37 @@ def evaluation_implementation() -> dict:
         path = PROGRAM_ROOT / name
         result[name] = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
     return result
+
+
+def freeze_review_contract(repo: Path, agent_id: str, run_dir: Path, policy_path: str | None) -> dict:
+    """用已有显式模型策略冻结独立评审配置，不从被测模型调用推选。"""
+    spec = importlib.util.spec_from_loader("run_review_dsh_dev", SourceFileLoader(
+        "run_review_dsh_dev", str(ADAPTER / "dsh-dev")))
+    dev = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(dev)
+    source = Path(policy_path) if policy_path else repo / "config/business-model-default.json"
+    try:
+        original = source.read_bytes() if source.exists() else b""
+        policy = dev.read_model_policy(policy_path, agent_id, repo=repo)
+        if (source.read_bytes() if source.exists() else b"") != original:
+            raise ValueError("评测模型策略在创建 Run 时变化")
+        fields = ("agent_id", "manifest_sha256", "business_model_revision", "allowed", "default", "patch", "credential_refs")
+        projected = {key: policy[key] for key in fields if key in policy}
+        content = (json.dumps(projected, ensure_ascii=False, indent=2) + "\n").encode()
+        relative = "evidence/analysis/model-policy.json"
+        target = run_dir / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
+        target.chmod(0o444)
+        review_policy = dev.analysis_model_policy(agent_id, dev.read_model_policy(str(target.resolve()), agent_id, repo=repo))
+    except SystemExit as error:
+        raise ValueError("评测模型策略无法按当前显式配置装载") from error
+    route = review_policy.get("default")
+    if not isinstance(route, dict) or not route.get("provider") or not route.get("model"):
+        raise ValueError("评测模型策略没有明确可用的默认评审模型")
+    return {"schema_version": 1, "effect_scope": "business-evidence", "source_scope": "frozen-harness",
+            "model_route": route, "model_policy_sha256": review_policy["sha256"],
+            "model_policy_snapshot": {"path": relative, "sha256": hashlib.sha256(content).hexdigest()}}
 
 
 def build_review_evidence(repo: Path, experiment_id: str, change: dict, candidate_sha256: str) -> dict:
@@ -297,6 +329,14 @@ def write_report(
         f"- 开始时间：`{manifest['created_at']}`",
         f"- 完成时间：`{manifest['finished_at']}`",
     ]
+    if inputs.get("review_contract"):
+        diagnosis = summary.get("source_diagnosis") or {}
+        lines.extend([
+            "- 复核方法：业务效果与源码诊断分别评估；有效结论来自业务结果与效果复核。",
+            f"- 源码诊断：`{diagnosis.get('status', 'not_requested')}`；"
+            f"已完整读取 {diagnosis.get('read_parts', 0)}/{diagnosis.get('required_parts', 0)} 个源码证据分包。",
+            "- 源码诊断完成仅表示本次声明范围已审读，不表示所有代码正确或业务通过。",
+        ])
     if executor:
         lines.append(f"- 执行通道：`{executor}`")
     if inputs.get("source_ref"):
@@ -362,6 +402,13 @@ def write_report(
             lines.append(f"- {cell(scene['scene'])}：{cell(scene.get('review_reason', ''))}{link}")
         lines.extend(["", "### 缺口与归因", ""])
         findings = [(scene["scene"], item) for scene in analysis["scenes"] for item in scene.get("findings", [])]
+        if inputs.get("review_contract"):
+            diagnosis = analysis.get("source_diagnosis") or {}
+            session = diagnosis.get("analysis_session") or {}
+            reference = session.get("evidence_ref")
+            link = f" [源码阅读记录]({reference})" if reference else ""
+            lines.extend([f"源码诊断：{cell(diagnosis.get('reason', '尚未请求。'))}{link}", ""])
+            findings.extend(("源码诊断", item) for item in diagnosis.get("findings", []))
         if not findings:
             lines.extend(["未形成结构化缺口与根因假设；这不表示不存在缺口。", ""])
         for scene_name, finding in findings:
@@ -548,7 +595,8 @@ def run_view(repo: Path, run_id: str, case_id: str | None = None) -> dict:
     analysis = json.loads(analysis_path.read_text(encoding="utf-8")) if analysis_path.is_file() else {}
     reviews = {item["case_id"]: item for scene in analysis.get("scenes", [])
                for item in scene.get("case_reviews", [])}
-    findings = [item for scene in analysis.get("scenes", []) for item in scene.get("findings", [])]
+    findings = (analysis.get("source_diagnosis", {}).get("findings", []) if inputs.get("review_contract") else
+                [item for scene in analysis.get("scenes", []) for item in scene.get("findings", [])])
     summary_path = run_dir / "summary.json"
     summary = json.loads(summary_path.read_text(encoding="utf-8")) if summary_path.is_file() else None
     image_path = run_dir / "evidence/dsh-image.json"
@@ -644,13 +692,15 @@ def run_view(repo: Path, run_id: str, case_id: str | None = None) -> dict:
             "executor", "model", "created_at", "compare_to_run_id", "candidate_sha256",
             "review_mode", "configured_capabilities", "dependency_env",
             "program_origin", "asset_origin", "evaluation_implementation", "declared_guard", "source_ref", "source_snapshot_root", "mcp_fixture",
-        )}, "candidate_trees": {key: {"tree_sha256": value.get("tree_sha256"),
+        )}, **({"review_contract": inputs["review_contract"]} if "review_contract" in inputs else {}),
+            "candidate_trees": {key: {"tree_sha256": value.get("tree_sha256"),
                                         "file_count": value.get("file_count")}
                                   for key, value in inputs.get("harness_trees", {}).items()},
             "inputs_lock_path": (run_dir / "inputs.lock.json").relative_to(repo).as_posix()},
         "candidate_path": inputs.get("candidate_path", f"evolution/experiments/{manifest['experiment_id']}/candidate"),
         "image": image,
         "summary": summary,
+        **({"source_diagnosis": analysis.get("source_diagnosis")} if "review_contract" in inputs else {}),
         "uncovered_case_ids": [item["case_id"] for item in inputs.get("case_catalog", [])
                                if item["case_id"] not in frozen],
         "cases": cases,
@@ -719,6 +769,14 @@ def run_index_facts(run_dir: Path, manifest: dict) -> dict:
         inputs = None
     if not isinstance(inputs, dict):
         return facts
+    if "review_contract" in inputs:
+        valid_summary = isinstance(summary, dict) and summary.get("schema_version") == "4.0" \
+            and summary.get("run_id") == manifest.get("run_id")
+        facts.update({"review_contract": inputs["review_contract"],
+                      "review_status": summary.get("review_status") if valid_summary else None,
+                      "source_diagnosis": summary.get("source_diagnosis") if valid_summary else None})
+        if not valid_summary or summary.get("effective_verdict") not in VERDICTS:
+            facts["effective_verdict"] = None
     frozen = inputs.get("evaluation_cases")
     if isinstance(frozen, list):
         selected = [item for item in frozen if isinstance(item, dict) and isinstance(item.get("case_id"), str)]
@@ -922,6 +980,8 @@ def command_init(repo: Path, args: argparse.Namespace) -> None:
             "asset_origin": {**version, "workspace_id": workspace_id(repo),
                              "candidate_sha256": source_digest},
         }
+        if inputs["review_mode"] == "ai":
+            inputs["review_contract"] = freeze_review_contract(repo, agent_id, run_dir, getattr(args, "model_policy", None))
         # 运行记录保存声明原字节，供复核与计量共用；摘要只引用已锁 Harness 条目。
         role_path = Path(contract["managed"]) / "role-tool-matrix.yaml"
         role_locks = [item for item in inputs["harness_trees"]["managed"].get("files", [])
@@ -1123,7 +1183,7 @@ def command_finalize(repo: Path, args: argparse.Namespace) -> None:
         else "inconclusive"
     )
     summary = {
-        "schema_version": "3.0",
+        "schema_version": "4.0" if "review_contract" in inputs else "3.0",
         "run_id": args.run,
         "trial_count": sum(execution_counts.values()),
         "execution_status_counts": execution_counts,
@@ -1136,6 +1196,8 @@ def command_finalize(repo: Path, args: argparse.Namespace) -> None:
         "effective_verdict": effective,
         "source_verification": source_verification,
     }
+    if "review_contract" in inputs:
+        summary["source_diagnosis"] = summarize_source_diagnosis(analysis)
     gaps = load_gaps(run_dir, args.run)
     summary_path = run_dir / "summary.json"
     with summary_path.open("w", encoding="utf-8") as handle:
@@ -1185,6 +1247,7 @@ def main() -> None:
     init_parser.add_argument("--kind", default="research", choices=RUN_KINDS)
     init_parser.add_argument("--baseline-ref", help="默认读取 Experiment change.yaml")
     init_parser.add_argument("--model", help="可选的预期模型标识，不改变 Runtime 设置")
+    init_parser.add_argument("--model-policy", help="本次明确评测模型策略；省略时读取已配置业务默认模型，AI 复核时冻结独立评审配置")
     init_parser.add_argument("--executor", help="可选的执行通道标识")
     init_parser.add_argument("--compare-to", help="已封存的同 Agent Run ID，封存时在报告中加入对照")
     init_parser.add_argument("--selection-mode", choices=("fast", "full", "explicit"), default="explicit")

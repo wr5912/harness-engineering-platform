@@ -14,9 +14,37 @@ export type ModelAttempt = ModelAttemptContext & {
 }
 export type AttemptRecorder = (attempt: ModelAttempt) => void | Promise<void>
 
-function hasProviderResponse(failure: any) {
-  return Number.isInteger(failure?.status) && failure.status >= 100 && failure.status <= 599
-    || typeof failure?.requestId === 'string' && failure.requestId.length > 0
+/** 原生输入与缓存桶互斥，reasoning 已包含在 output，缺失 aggregate 不补造。 */
+export function normalizeTokenUsage(usage: Record<string, any> | undefined) {
+  const count = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+  if (!usage || !count(usage.inputTokens) || !count(usage.outputTokens)) return null
+  const { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, totalTokens, reasoningTokens } = usage
+  if ([cacheReadTokens, cacheWriteTokens].some(value => value !== undefined && !count(value))
+    || reasoningTokens !== undefined && (!count(reasoningTokens) || reasoningTokens > outputTokens)) return null
+  const knownInput = inputTokens + (cacheReadTokens ?? 0) + (cacheWriteTokens ?? 0)
+  if (!count(knownInput)) return null
+  const completeCache = cacheReadTokens !== undefined && cacheWriteTokens !== undefined
+  if (totalTokens !== undefined) {
+    const input = totalTokens - outputTokens
+    if (!count(totalTokens) || !count(input) || input < knownInput || completeCache && input !== knownInput) return null
+    return { input, output: outputTokens, total: totalTokens }
+  }
+  return { input: completeCache ? knownInput : null, output: outputTokens, total: null }
+}
+
+export type ModelInvocationFact = { model_invocation?: boolean; usage?: Record<string, any>; status?: string }
+
+/** 正用量才是推理证据；全零快照不证明调用，也不证明未调用。 */
+export function hasPositiveTokenUsage(usage: Record<string, any> | undefined): boolean {
+  return normalizeTokenUsage(usage) !== null && ['inputTokens', 'outputTokens', 'totalTokens', 'cacheReadTokens', 'cacheWriteTokens', 'reasoningTokens']
+    .some(key => typeof usage?.[key] === 'number' && usage[key] > 0)
+}
+
+/** 注册位置不参与是否推理的判断；相反事实同时存在时保留未知。 */
+export function modelInvocationEvidence(route: any, facts: readonly ModelInvocationFact[]): 'invoked' | 'none' | 'unknown' | 'conflict' {
+  const positive = facts.some(fact => fact.model_invocation === true || hasPositiveTokenUsage(fact.usage))
+  const negative = isLocalModelRoute(route) || facts.some(fact => fact.model_invocation === false || fact.status === 'local')
+  return positive && negative ? 'conflict' : positive ? 'invoked' : negative ? 'none' : 'unknown'
 }
 
 /** 观察实际 prepared stream；不改变固定源码的输入、返回值和原生模型装配。 */
@@ -27,7 +55,7 @@ export function observeLlm(llm: any, context: ModelAttemptContext, record: Attem
         ...Object.fromEntries(['parent_run_id', 'case_id', 'session_id', 'tool_call_id', 'model_role', 'kind', 'checkpoint_sha256', 'state_constructor_sha256', 'calibration_sha256'].flatMap(key => {
           const value = context[key as keyof ModelAttemptContext]
           return value === undefined ? [] : [[key, value]]
-        })), ...(typeof context.model_invocation === 'boolean' ? { model_invocation: context.model_invocation } : {}) }
+        })), ...(context.model_invocation === false ? { model_invocation: false } : {}) }
       const event = (status: ModelAttempt['status'], route = config, extra: Partial<ModelAttempt> = {}) => record({ ...identity,
         provider: route.provider, model: route.model, ...(route.reasoningEffort === undefined ? {} : { reasoning_effort: route.reasoningEffort }),
         status, time: Date.now(), ...extra })
@@ -45,30 +73,28 @@ export function observeLlm(llm: any, context: ModelAttemptContext, record: Attem
           let usage: Record<string, any> | undefined
           let finished = false, settled = false
           const local = context.model_invocation === false
-          let invocationProven = context.model_invocation === true
+          let invocationProven = false
           await event(local ? 'local' : 'started', prepared.config)
           try {
             for await (const chunk of stream) {
               // started 只证明进入原生 stream；中间件、附件或认证仍可能在 Provider 前失败。
-              if (['block-start', 'text-delta', 'reasoning-delta', 'tool-call-delta', 'block-end', 'usage'].includes(chunk.type)
-                || chunk.type === 'finish' && (!['error', 'aborted'].includes(chunk.reason?.kind) || hasProviderResponse(chunk.reason?.failure))) invocationProven = true
-              // 原生 usage 是完整调用快照，后续快照替换而不是累加。
+              if (chunk.type === 'usage' && hasPositiveTokenUsage(chunk.usage)) invocationProven = true
+              // 原生 usage 是累计快照，后续替换而不累加；最终完整性另核终态。
               if (chunk.type === 'usage') usage = Object.fromEntries(['inputTokens', 'outputTokens', 'totalTokens', 'cacheReadTokens', 'cacheWriteTokens', 'reasoningTokens']
-                .filter(key => typeof chunk.usage?.[key] === 'number').map(key => [key, chunk.usage[key]]))
+                .filter(key => chunk.usage?.[key] !== undefined).map(key => [key, typeof chunk.usage[key] === 'number' ? chunk.usage[key] : null]))
               if (chunk.type === 'finish') finished = !['error', 'aborted'].includes(chunk.reason?.kind)
               yield chunk
             }
             await event(local ? 'local' : finished ? 'completed' : 'failed', prepared.config,
-              { ...(invocationProven && !local ? { model_invocation: true } : {}), ...(usage ? { usage } : {}), ...(!finished ? { error_type: 'IncompleteModelStream' } : {}) })
+              { ...(invocationProven ? { model_invocation: true } : {}), ...(usage ? { usage } : {}), ...(!finished ? { error_type: 'IncompleteModelStream' } : {}) })
             settled = true
           } catch (error) {
-            if (hasProviderResponse((error as any)?.failure)) invocationProven = true
             await event(local ? 'local' : signal?.aborted || options.signal?.aborted ? 'cancelled' : 'failed', prepared.config,
-              { ...(invocationProven && !local ? { model_invocation: true } : {}), ...(usage ? { usage } : {}), error_type: error instanceof Error ? error.name : 'Error' })
+              { ...(invocationProven ? { model_invocation: true } : {}), ...(usage ? { usage } : {}), error_type: error instanceof Error ? error.name : 'Error' })
             settled = true
             throw error
           } finally {
-            if (!settled) await event(local ? 'local' : 'cancelled', prepared.config, { ...(invocationProven && !local ? { model_invocation: true } : {}), ...(usage ? { usage } : {}), error_type: 'ModelStreamClosed' })
+            if (!settled) await event(local ? 'local' : 'cancelled', prepared.config, { ...(invocationProven ? { model_invocation: true } : {}), ...(usage ? { usage } : {}), error_type: 'ModelStreamClosed' })
           }
         })()
       } }
@@ -76,11 +102,10 @@ export function observeLlm(llm: any, context: ModelAttemptContext, record: Attem
   }
 }
 
-/** 既有受控路由与本 Run 已核对的精确声明；未知名称不推断为本地执行。 */
-export function isLocalModelRoute(route: any, localModelRoutes: readonly Pick<Required<ModelAttempt>, 'provider' | 'model'>[] = []): boolean {
+/** 已有受控无推理实现；本地注册声明不等于这项执行证明。 */
+export function isLocalModelRoute(route: any): boolean {
   return route?.provider === 'threat-analysis-delivery' && route?.model === 'fixed-summary'
     || route?.provider === 'threat-analysis-automation' && route?.model === 'scheduled-batch'
     || isCodeOnlyModelRoute(route)
     || isHybridWorkflowRoute(route)
-    || localModelRoutes.some(local => local.provider === route?.provider && local.model === route?.model)
 }

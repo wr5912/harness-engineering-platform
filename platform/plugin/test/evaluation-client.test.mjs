@@ -10,6 +10,7 @@ const compiled = await build({ entryPoints: [new URL('../src/evaluation/client.t
 const runA = 'run-11111111-1111-4111-8111-111111111111'
 const runB = 'run-22222222-2222-4222-8222-222222222222'
 const expA = 'EXP-alpha-001'
+const reviewContract = { schema_version: 1, effect_scope: 'business-evidence', source_scope: 'frozen-harness', model_route: { provider: 'mimo', model: 'MiMoFlash', reasoningEffort: 'off' }, model_policy_sha256: 'a'.repeat(64), model_policy_snapshot: { path: 'evidence/analysis/model-policy.json', sha256: 'b'.repeat(64) } }
 const doc = { case: { id: 'C-1', title: '测试一', inputs: ['第一轮'], expected_behavior: '正确回答', scene: '场景一', tier: 'fast' }, sha256: 'case-v1', path: 'agents/alpha/evaluation.md' }
 const detail = { experiment: { id: expA }, versions: [{ id: expA }], evaluation: { path: doc.path, sha256: doc.sha256, cases: [{ id: 'C-1', title: '测试一', scene: '场景一', tier: 'fast', input_preview: '第一轮' }, { id: 'C-2', title: '测试二', scene: '场景二', tier: 'full', input_preview: '第二轮' }] }, decision: { content: '# Decision\ncontinue', sha256: 'decision-v1' } }
 const overview = entries => ({ agents: entries.map(([agentId, experiments]) => ({ agent_id: agentId, experiments })) })
@@ -450,6 +451,47 @@ test('Run 列表将执行完成和有效失败、无法判定分别显示', asyn
   } finally { ui.cleanup() }
 })
 
+test('分层评估的列表保留业务通过，源码未完成和历史未单列状态不会混为一谈', async () => {
+  const ui = workbench({ handler: async (action, payload, original) => {
+    if (action === 'runs/overview') return alphaOverview([{ experiment_id: expA, runs: [
+      { run_id: runA, status: 'completed', effective_verdict: 'passed', review_contract: reviewContract, review_status: 'completed', source_diagnosis: { status: 'incomplete', conclusion: 'inconclusive' } },
+      { run_id: runB, status: 'completed', effective_verdict: 'failed' },
+    ] }])
+    return original(action, payload)
+  } })
+  try {
+    await ui.settle()
+    const rows = ui.nodes().filter(node => node.type === 'tr' && node.props?.['data-selected'] !== undefined)
+    const rowFor = id => rows.find(row => ui.nodes(row).some(node => node.type === 'button' && node.props.title === id))
+    assert.match(ui.text(rowFor(runA)), /通过业务效果复核：已完成源码诊断：未完成 · 源码未核实完整/)
+    assert.doesNotMatch(ui.text(rowFor(runB)), /源码诊断：|业务效果复核：/)
+  } finally { ui.cleanup() }
+})
+
+test('分层评估详情展示源码范围、未核实限制及证据入口，源码完成也不表示整体代码通过', async () => {
+  for (const [status, conclusion, expected] of [['incomplete', 'inconclusive', '未完成 · 源码未核实完整'], ['completed', 'no_findings', '所列范围未形成发现']]) {
+    const evidence = 'evidence/analysis/source-diagnosis/trace.jsonl'
+    const ui = workbench({ target: { page: 'evaluation', tab: 'runs', run_id: runA }, handler: async (action, payload, original) => {
+      const value = await original(action, payload)
+      if (action === 'runs/files') return { ...value, files: [...value.files, { path: `evolution/experiments/${expA}/runs/${runA}/${evidence}`, kind: 'text', size: 20 }] }
+      return action === 'runs/show' ? { ...value, source: { ...value.source, review_contract: reviewContract }, summary: { effective_verdict: 'passed', review_status: 'completed' }, source_diagnosis: { status, conclusion, reason: '仅完成所列范围审读', scope: [{ bundle: 'harness', path: 'workflow.ts', total_lines: 20, sha256: 'c'.repeat(64), read_ranges: [[1, 5]], complete: false }], findings: [], analysis_session: { session_id: 'source-session', route: reviewContract.model_route, evidence_ref: evidence } } } : value
+    } })
+    try {
+      await ui.settle()
+      const component = ui.nodes().find(node => node.type?.name === 'RunReviewAssessment')
+      assert.ok(component)
+      const rendered = component.type(component.props)
+      assert.match(ui.text(rendered), new RegExp(expected))
+      assert.match(ui.text(rendered), /workflow\.ts.*该材料分片尚未完整读取.*已读行：1–5 \/ 共 20 行/)
+      assert.match(ui.text(rendered), /不改变业务效果判定；未审读部分尚未核实/)
+      assert.doesNotMatch(ui.text(rendered), /整体代码通过|源码通过/)
+      const button = ui.nodes(rendered).find(node => node.type === 'button')
+      button.props.onClick(); await ui.settle()
+      assert.ok(ui.calls.some(call => call.action === 'runs/read-file' && call.payload.path.endsWith(`/${evidence}`)))
+    } finally { ui.cleanup() }
+  }
+})
+
 test('Run 详情优先展示保存的结论、用例观察和异常证据入口', async () => {
   const ui = workbench({ target: { page: 'evaluation', tab: 'runs', run_id: runA }, handler: async (action, payload, original) => {
     if (action !== 'runs/show') return original(action, payload)
@@ -547,7 +589,7 @@ test('未完成 Run 的部分通过摘要不成为列表、详情或对照的整
     for (const run of partial) {
       const row = rows.find(node => ui.nodes(node).some(child => child.type === 'button' && child.props.title === run.run_id))
       assert.match(ui.text(row), /尚无结论/)
-      assert.equal(ui.nodes(row).find(node => node.type === 'td' && node.props['data-label'] === '评测结论').props.children.at(-1).props['data-state'], 'unknown')
+      assert.equal(ui.nodes(ui.nodes(row).find(node => node.type === 'td' && node.props['data-label'] === '评测结论')).find(node => node.props?.className === 'harness-eval-badge').props['data-state'], 'unknown')
     }
     assert.match(ui.text(rows.find(node => ui.nodes(node).some(child => child.type === 'button' && child.props.title === runB))), /1 通过 \/ 0 未通过 \/ 0 无法判定 \/ 1 待核对.*部分记录，非最终结论/)
     assert.match(ui.text(rows.find(node => ui.nodes(node).some(child => child.type === 'button' && child.props.title === runA))), /通过/)
@@ -560,8 +602,8 @@ test('未完成 Run 的部分通过摘要不成为列表、详情或对照的整
     ui.nodes().find(node => node.props?.id === 'evaluation-tab-compare').props.onClick(); await ui.settle()
     ui.change('左侧 Run', runB); ui.change('右侧 Run', runA)
     ui.button('开始比较').props.onClick(); await ui.settle()
-    const comparisonFacts = ui.nodes().filter(node => node.type?.name === 'Facts' && node.props.items.some(([name]) => name === '结论'))
-    assert.deepEqual(comparisonFacts.map(node => node.props.items.find(([name]) => name === '结论')[1]), ['尚无结论', '通过'])
+    const comparisonFacts = ui.nodes().filter(node => node.type?.name === 'Facts' && node.props.items.some(([name]) => name === '业务效果'))
+    assert.deepEqual(comparisonFacts.map(node => node.props.items.find(([name]) => name === '业务效果')[1]), ['尚无结论', '通过'])
   } finally { ui.cleanup() }
 })
 
@@ -918,6 +960,32 @@ test('比较证据入口一次导航到运行标签和对应 Run，并打开实�
   assert.equal(ui.nodes().find(node => node.props?.id === 'evaluation-run-tab-files').props['aria-selected'], true)
   assert.ok(ui.calls.some(call => call.action === 'runs/read-file' && call.payload.run_id === runA))
   ui.cleanup()
+})
+
+test('对照源码证据回到已选中的同一Run时仍打开准确文件', async () => {
+  const runC = 'run-33333333-3333-4333-8333-333333333333'
+  const evidence = `evolution/experiments/${expA}/runs/${runA}/evidence/analysis/source-diagnosis/response.json`
+  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', run_id: runA }, handler: async (action, payload, original) => {
+    if (action === 'runs/overview') return alphaOverview([{ experiment_id: expA, runs: [{ run_id: runA, status: 'completed' }, { run_id: runC, status: 'completed' }] }])
+    if (action === 'runs/compare') return { left_run: runA, right_run: runC, left_only: [], right_only: [], limits: [], cases: [] }
+    const value = await original(action, payload)
+    if (action === 'runs/files') return { ...value, files: [...value.files, { path: evidence, kind: 'text', size: 20 }] }
+    if (action === 'runs/show') return { ...value, source: { ...value.source, review_contract: reviewContract }, source_diagnosis: { status: 'incomplete', conclusion: 'inconclusive', reason: '范围未完成', scope: [], findings: [] } }
+    return value
+  } })
+  try {
+    await ui.settle()
+    ui.nodes().find(node => node.props?.id === 'evaluation-tab-compare').props.onClick(); await ui.settle()
+    ui.change('左侧 Run', runA); ui.change('右侧 Run', runC)
+    ui.button('开始比较').props.onClick(); await ui.settle()
+    const summary = ui.nodes().find(node => node.props?.className === 'harness-eval-compare-grid harness-eval-compare-summary-grid')
+    const comparison = ui.nodes(summary).find(node => node.type?.name === 'RunReviewAssessment' && node.props.view.run_id === runA)
+    assert.ok(comparison)
+    comparison.props.onEvidence(evidence); await ui.settle()
+    assert.equal(ui.navigations.at(-1).run_id, runA)
+    assert.equal(ui.navigations.at(-1).run_tab, 'files')
+    assert.ok(ui.calls.some(call => call.action === 'runs/read-file' && call.payload.path === evidence))
+  } finally { ui.cleanup() }
 })
 
 test('深链切换智能体会取消旧比较选择并隔离迟到的比较响应', async () => {

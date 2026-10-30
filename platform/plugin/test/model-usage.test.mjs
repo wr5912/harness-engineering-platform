@@ -1,10 +1,23 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { extractGraphExecutions, measureModelUsage, normalizeTokenUsage } from '../src/evaluation/model-usage.ts'
-import { observeLlm } from '../src/evaluation/model-attempts.ts'
+import { hasPositiveTokenUsage, modelInvocationEvidence, observeLlm } from '../src/evaluation/model-attempts.ts'
 
 const usage = { inputTokens: 5, outputTokens: 2, totalTokens: 7 }
 const event = (type, data = {}) => ({ type, data })
+
+test('真实VAR50416的本地注册代理仍计Qwen/KEV推理，同attempt重复回执不重计', () => {
+  const fixture = JSON.parse(readFileSync(new URL('./fixtures/model-usage-positive-local-registration.json', import.meta.url), 'utf8'))
+  const actual = measureModelUsage(fixture.traces, { localModelRoutes: fixture.local_model_routes })
+  assert.equal(actual.actual_model_calls, fixture.expected.total)
+  assert.equal(actual.model_calls_by_role.target, fixture.expected.target)
+  assert.equal(actual.model_calls_by_role.judge, fixture.expected.judge)
+  assert.equal(actual.model_calls_by_model_role.language, fixture.expected.language)
+  assert.equal(actual.model_calls_by_model_role.decision, fixture.expected.decision)
+  assert.equal(actual.token_usage_complete, false)
+  assert.equal(actual.token_usage, null)
+})
 function trace(id, body, path = '/run/evidence/U-CASE-001/trace.jsonl', seeded = false) {
   return { path, rows: [{ session_log: 'session.v4.jsonl', event: { type: 'session', id, isSeeded: seeded } },
     ...body.map((item, seq) => ({ session_log: 'session.v4.jsonl', event: { ...item, seq } }))] }
@@ -58,12 +71,14 @@ test('空attempt可能来自Provider前的中间件失败，既不补成一次�
   assert.deepEqual(result.observed_token_usage, { input_tokens: 5, output_tokens: 2, total_tokens: 7 })
 })
 
-test('HTTP接受证明空失败已调用；其它Session、旧水位、错误代次不能替代当次发出证据', () => {
+test('只有Session水位的HTTP接受不能归属当前step或并发标题，空失败保持未知', () => {
   // turn() 占 seq0..5，失败 Step 从 seq7 开始，标记必须覆盖本次边界。
   const result = measureModelUsage([failedTurn([delivery('failed', 7), emptyAttempt()])])
-  assert.equal(result.actual_model_calls, 2)
-  assert.equal(result.failed_model_calls, 1)
-  assert.equal(result.token_usage, null, '失败没有供应商Token结算，不能按零补齐')
+  assert.equal(result.actual_model_calls, null)
+  assert.equal(result.observed_model_calls, 1)
+  assert.equal(result.failed_model_calls, null)
+  assert.ok(result.model_calls_unknown_reasons.includes('delivery-request-association-unproven'))
+  assert.equal(result.token_usage, null)
   for (const marker of [delivery('other', 7), delivery('failed', 5), delivery('failed', 7, 3), delivery('failed', 8)]) {
     const invalid = measureModelUsage([failedTurn([marker, emptyAttempt()])])
     assert.equal(invalid.actual_model_calls, null)
@@ -71,20 +86,21 @@ test('HTTP接受证明空失败已调用；其它Session、旧水位、错误代
   }
   const auxiliary = measureModelUsage([failedTurn([titleRequest(), delivery('failed', 8), emptyAttempt(), titleResult()])])
   assert.equal(auxiliary.actual_model_calls, null, '只有Session身份的并发标题接受标记不能归到主尝试')
-  assert.equal(auxiliary.observed_model_calls, 2)
+  assert.equal(auxiliary.observed_model_calls, 1)
 })
 
-test('匹配retry证明前次空失败；retry-started不证明新调用，也不复用上次HTTP接受', () => {
+test('retry可来自本地dispatch前失败，不能把未知attempt或替代请求补成调用', () => {
   const retry = [event('llm/retry', { turn: 2, step: 1 }), event('llm/retry-started', { turn: 2, step: 1 })]
   const completed = measureModelUsage([failedTurn([emptyAttempt(), ...retry, event('assistant/message', { turn: 2, step: 1, usage })])])
-  assert.equal(completed.actual_model_calls, 3)
-  assert.equal(completed.failed_model_calls, 1)
+  assert.equal(completed.actual_model_calls, null)
+  assert.equal(completed.observed_model_calls, 2)
+  assert.equal(completed.observed_failed_model_calls, 0)
   assert.deepEqual(completed.observed_token_usage, { input_tokens: 10, output_tokens: 4, total_tokens: 14 })
   for (const prefix of [[], [delivery('failed', 7)]]) {
     const unresolved = measureModelUsage([failedTurn([...prefix, emptyAttempt(), ...retry, emptyAttempt()])])
     assert.equal(unresolved.actual_model_calls, null)
-    assert.equal(unresolved.observed_model_calls, 2)
-    assert.equal(unresolved.observed_failed_model_calls, 1)
+    assert.equal(unresolved.observed_model_calls, 1)
+    assert.equal(unresolved.observed_failed_model_calls, 0)
     assert.ok(unresolved.model_calls_unknown_reasons.includes('attempt-invocation-unproven'))
   }
   const invalid = measureModelUsage([failedTurn([emptyAttempt(), event('llm/retry', { turn: 2, step: 2 })])])
@@ -92,26 +108,35 @@ test('匹配retry证明前次空失败；retry-started不证明新调用，也�
   assert.equal(invalid.observed_model_calls, 1)
 })
 
-test('已发出但未结算的请求保留下界，retry-started后尚未发出不补造新调用', () => {
+test('仅HTTP弱观察或retry-started不证明已发推理，保留在途未知', () => {
   const open = trace('failed', [event('turn/start', { turn: 1 }), event('step/start', { turn: 1, step: 1 }), delivery('failed', 1)])
   const result = measureModelUsage([open, open])
   assert.equal(result.actual_model_calls, null)
-  assert.equal(result.observed_model_calls, 1)
+  assert.equal(result.observed_model_calls, 0)
   assert.equal(result.observed_failed_model_calls, 0)
   assert.ok(result.model_calls_unknown_reasons.includes('request-lifecycle-in-progress'))
   const retry = measureModelUsage([failedTurn([emptyAttempt(), event('llm/retry', { turn: 2, step: 1 }), event('llm/retry-started', { turn: 2, step: 1 })])])
   assert.equal(retry.actual_model_calls, null)
-  assert.equal(retry.observed_model_calls, 2)
-  assert.equal(retry.observed_failed_model_calls, 1)
+  assert.equal(retry.observed_model_calls, 1)
+  assert.equal(retry.observed_failed_model_calls, 0)
 })
 
-test('显式已调用或实际流chunk证明失败调用，显式本地失败不凭错误文本猜远程请求', () => {
+test('明确调用或正用量证明失败调用，普通finish及HTTP错误阶段不明仍为unknown', () => {
   for (const attempt of [event('assistant/attempt', { turn: 2, step: 1, stream: [], model_invocation: true }),
-    event('assistant/attempt', { turn: 2, step: 1, stream: [{ chunk: { type: 'finish', reason: { kind: 'error' } } }] })]) {
+    event('assistant/attempt', { turn: 2, step: 1, stream: [{ chunk: { type: 'usage', usage } }] })]) {
     const result = measureModelUsage([failedTurn([attempt])])
     assert.equal(result.actual_model_calls, 2)
     assert.equal(result.failed_model_calls, 1)
     assert.equal(result.token_usage, null)
+    if (attempt.data.stream.some(item => item.chunk.type === 'usage'))
+      assert.deepEqual(result.observed_token_usage, { input_tokens: 10, output_tokens: 4, total_tokens: 14 })
+  }
+  for (const failure of [{ status: 503 }, { requestId: 'provider-preflight-request' }]) {
+    const result = measureModelUsage([failedTurn([event('assistant/attempt', { turn: 2, step: 1,
+      stream: [{ chunk: { type: 'finish', reason: { kind: 'aborted', failure } } }] })])])
+    assert.equal(result.actual_model_calls, null, 'Files API等推理之前的请求同样可能携HTTP错误')
+    assert.equal(result.observed_model_calls, 1)
+    assert.equal(result.observed_failed_model_calls, 0)
   }
   const local = measureModelUsage([failedTurn([event('assistant/attempt', { turn: 2, step: 1, stream: [], model_invocation: false })])])
   assert.equal(local.actual_model_calls, 1)
@@ -148,16 +173,17 @@ test('fork继承的历史请求不再次计数，缺Token用量不伪造费用',
   const result = measureModelUsage([trace('parent', old), child])
   assert.equal(result.actual_model_calls, 2)
   const noUsage = trace('no-usage', turn().map(item => item.type === 'assistant/message' ? event(item.type, { turn: 1, step: 1 }) : item))
-  assert.equal(measureModelUsage([noUsage]).actual_model_calls, 1)
+  assert.equal(measureModelUsage([noUsage]).actual_model_calls, null)
+  assert.equal(measureModelUsage([noUsage]).observed_model_calls, 0)
   assert.equal(measureModelUsage([noUsage]).token_usage, null)
 })
 
 const titleRequest = () => event('session/title-llm-request', { titleProvider: 'first-prompt', messageSeqs: [2], route: { provider: 'provider', model: 'model' } })
-const titleResult = () => event('session/title', { messageSeqs: [2], source: { kind: 'provider', provider: 'first-prompt', model: { provider: 'provider', model: 'model' } } })
+const titleResult = (proof = {}) => event('session/title', { ...proof, messageSeqs: [2], source: { kind: 'provider', provider: 'first-prompt', model: { provider: 'provider', model: 'model' } } })
 
-test('业务和评审的成功辅助标题计入角色总数，重复导出不重复计且总Token保持未知', () => {
-  const target = trace('target-title', [titleRequest(), ...turn(), titleResult()])
-  const judge = trace('judge-title', [titleRequest(), ...turn(), titleResult()], '/run/evidence/U-CASE-001/judge-trace.jsonl')
+test('带明确推理回执的业务/评审标题计入角色，重复导出不重计、缺Token仍未知', () => {
+  const target = trace('target-title', [titleRequest(), ...turn(), titleResult({ model_invocation: true })])
+  const judge = trace('judge-title', [titleRequest(), ...turn(), titleResult({ model_invocation: true })], '/run/evidence/U-CASE-001/judge-trace.jsonl')
   const result = measureModelUsage([target, judge, target])
   assert.equal(result.actual_model_calls, 4)
   assert.equal(result.auxiliary_model_calls, 2)
@@ -179,7 +205,7 @@ test('辅助标题只有预发送记录时不假定已发出或失败为零，�
   assert.deepEqual(result.observed_token_usage, { input_tokens: 5, output_tokens: 2, total_tokens: 7 })
   const retry = measureModelUsage([trace('title-retry', [titleRequest(), titleRequest(), ...turn(), titleResult()])])
   assert.equal(retry.actual_model_calls, null)
-  assert.equal(retry.observed_model_calls, 2)
+  assert.equal(retry.observed_model_calls, 1)
   const preparing = measureModelUsage([trace('title-preparing', [event('session/title', { source: { kind: 'fallback' } }), ...turn()])])
   assert.equal(preparing.actual_model_calls, null, '标题仍在prepareCall且尚未写请求记录，主Turn结束也不能宣称总调用已封闭')
   assert.equal(preparing.observed_model_calls, 1)
@@ -192,7 +218,7 @@ test('手动固定标题不增加模型调用，fork继承标题不重算', () =
   assert.equal(measureModelUsage([child]).auxiliary_model_calls, 0)
 })
 
-test('受控本地交付不算模型调用；未知provider没有用量仍计调用并保留Token未知', () => {
+test('受控无推理实现保持0；未知provider只有文字结算时不猜调用数', () => {
   const withRoute = route => trace('local', turn().map(item => item.type === 'request/header'
     ? event(item.type, { header: { config: route } }) : item.type === 'assistant/message' ? event(item.type, { turn: 1, step: 1 }) : item))
   for (const route of [{ provider: 'threat-analysis-delivery', model: 'fixed-summary' }, { provider: 'harness-code-only', model: 'workflow-v1', reasoningEffort: 'off' }, { provider: 'harness-workflow', model: 'hybrid-v1', reasoningEffort: 'off' }]) {
@@ -202,66 +228,124 @@ test('受控本地交付不算模型调用；未知provider没有用量仍计调
     assert.deepEqual(local.token_usage, { input_tokens: 0, output_tokens: 0, total_tokens: 0 })
   }
   const unknown = measureModelUsage([withRoute({ provider: 'unknown-local-looking-provider', model: 'fixed-summary' })])
-  assert.equal(unknown.actual_model_calls, 1)
+  assert.equal(unknown.actual_model_calls, null)
+  assert.equal(unknown.observed_model_calls, 0)
   assert.equal(unknown.token_usage, null)
 })
 
-test('同一封存本地声明覆盖根与子会话、辅助标题，未声明的同名provider仍按外部请求核对', () => {
-  const local = { provider: 'security-operation-delivery', model: 'fixed-operation-result' }
-  const withRoute = (id, route, title = false) => trace(id, [
-    ...(title ? [event('session/title', { source: { kind: 'fallback' } }),
-      event('session/title-llm-request', { titleProvider: 'first-prompt', messageSeqs: [2], route })] : []),
-    ...turn().map(item => item.type === 'request/header' ? event(item.type, { header: { config: route } }) : item),
-    ...(title ? [event('session/title', { messageSeqs: [2], source: { kind: 'provider', provider: 'first-prompt', model: route } })] : []),
-  ])
-  const root = withRoute('root-local', local, true), child = withRoute('child-local', local)
+test('本地注册不证明无推理，根/子/标题的强阳性均保留，只有注册项无证据为unknown', () => {
+  const registered = { provider: 'audit-local-proxy', model: 'remote-gpu-model' }
+  const withRoute = (id, proof) => trace(id, turn().map(item => item.type === 'request/header'
+    ? event(item.type, { header: { config: registered } })
+    : item.type === 'assistant/message' ? event(item.type, { turn: 1, step: 1, ...proof }) : item))
+  const root = withRoute('root-local', { usage }), child = withRoute('child-local', { model_invocation: true })
   child.rows.forEach(row => { row.session_log = 'subagents/child/session.v4.jsonl' })
-  const result = measureModelUsage([root, child], { localModelRoutes: [local] })
-  assert.equal(result.actual_model_calls, 0)
-  assert.equal(result.auxiliary_model_calls, 0)
-  assert.equal(result.auxiliary_requests_observed, 0)
-  assert.deepEqual(result.token_usage, { input_tokens: 0, output_tokens: 0, total_tokens: 0 })
-  assert.equal(measureModelUsage([root]).actual_model_calls, 2, '不得为暴露的provider补名称特判')
-  const different = withRoute('same-provider-other-model', { ...local, model: 'actual-remote-model' })
-  assert.equal(measureModelUsage([different], { localModelRoutes: [local] }).actual_model_calls, 1)
-  const remote = withRoute('real-provider', { provider: 'xiaomi-token-plan-cn', model: 'mimo-v2.6-flash' })
-  assert.equal(measureModelUsage([root, child, remote], { localModelRoutes: [local] }).actual_model_calls, 1)
-})
-
-test('图attempt与原生会话采用相同本地route排除，未知或失败远程请求不被吞掉', () => {
-  const local = { provider: 'audit-declared-local', model: 'fixed-result' }
-  const rows = (id, route, status = 'completed') => [
-    { ...route, attempt_id: id, execution_id: 'graph', role: 'target', time: 1, status: 'started', model_invocation: true },
-    { ...route, attempt_id: id, execution_id: 'graph', role: 'target', time: 2, status, model_invocation: true, ...(status === 'completed' ? { usage } : {}) },
-  ]
-  const result = measureModelUsage([], { requireSessionTrace: false, localModelRoutes: [local], attempts: [
-    ...rows('local', local), ...rows('remote', { provider: 'unknown-local-looking', model: 'fixed-result' }, 'cancelled'),
-  ] })
-  assert.equal(result.actual_model_calls, 1)
-  assert.equal(result.failed_model_calls, 1)
+  const title = trace('title-local', [
+    event('session/title-llm-request', { titleProvider: 'first-prompt', messageSeqs: [2], route: registered }),
+    event('session/title', { model_invocation: true, messageSeqs: [2], source: { kind: 'provider', provider: 'first-prompt', model: registered } }),
+  ])
+  const result = measureModelUsage([root, child, title], { localModelRoutes: [registered] })
+  assert.equal(result.actual_model_calls, 3)
+  assert.equal(result.auxiliary_model_calls, 1)
+  assert.equal(result.auxiliary_requests_observed, 1)
   assert.equal(result.token_usage, null)
-  assert.equal(measureModelUsage([], { requireSessionTrace: false, localModelRoutes: [local], attempts: rows('only-local', local) }).actual_model_calls, 0)
+  for (const proof of [{}, { usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 } }]) {
+    const uncertain = measureModelUsage([withRoute('only-registered', proof)], { localModelRoutes: [registered] })
+    assert.equal(uncertain.actual_model_calls, null)
+    assert.equal(uncertain.observed_model_calls, 0)
+  }
+  const none = measureModelUsage([withRoute('explicit-zero', { model_invocation: false })], { localModelRoutes: [registered] })
+  assert.equal(none.actual_model_calls, 0)
 })
 
-test('压缩按原生summary自身路由核算，同声明本地不计LLM但仍检查结算边界', () => {
-  const local = { provider: 'security-operation-delivery', model: 'fixed-operation-result' }
-  const compact = (route, withStart = true, settledUsage = usage) => trace('compact-declared', [
-    ...turn().map(item => item.type === 'request/header' ? event(item.type, { header: { config: local } }) : item),
+test('graph强阳性胜过注册项，重复同attempt去重；相反事实为unknown不折0', () => {
+  const registered = { provider: 'audit-local-proxy', model: 'remote-gpu-model' }
+  const rows = (id, proof) => [
+    { ...registered, attempt_id: id, execution_id: 'graph', role: 'target', time: 1, status: 'started' },
+    { ...registered, attempt_id: id, execution_id: 'graph', role: 'target', time: 2, status: 'completed', ...proof },
+  ]
+  const attempts = rows('positive', { model_invocation: true, usage })
+  const result = measureModelUsage([], { requireSessionTrace: false, localModelRoutes: [registered], attempts: [...attempts, ...attempts] })
+  assert.equal(result.actual_model_calls, 1)
+  assert.deepEqual(result.token_usage, { input_tokens: 5, output_tokens: 2, total_tokens: 7 })
+  const conflict = measureModelUsage([], { requireSessionTrace: false, attempts: rows('conflict', { model_invocation: false, usage }) })
+  assert.equal(conflict.actual_model_calls, null)
+  assert.ok(conflict.model_calls_unknown_reasons.includes('model-invocation-evidence-conflict'))
+  for (const proof of [{}, { usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 } }])
+    assert.equal(measureModelUsage([], { requireSessionTrace: false, localModelRoutes: [registered], attempts: rows('unknown', proof) }).actual_model_calls, null)
+  assert.equal(measureModelUsage([], { requireSessionTrace: false, attempts: rows('zero', { model_invocation: false }) }).actual_model_calls, 0)
+})
+
+test('压缩自身正用量不被注册项排除，llmStreamCall仅框架事实且边界仍核对', () => {
+  const registered = { provider: 'audit-local-proxy', model: 'remote-gpu-model' }
+  const compact = (route, proof, withStart = true) => trace('compact-declared', [
     ...(withStart ? [event('compaction/start', { compactionId: 'one' })] : []),
-    event('compaction/summary', { compactionId: 'one', llmStreamCall: true, ...route, ...(settledUsage ? { usage: settledUsage } : {}) }),
+    event('compaction/summary', { compactionId: 'one', llmStreamCall: true, ...route, ...proof }),
     event('compaction/end', { compactionId: 'one' }),
   ])
-  const result = measureModelUsage([compact(local)], { localModelRoutes: [local] })
-  assert.equal(result.actual_model_calls, 0)
-  assert.deepEqual(result.token_usage, { input_tokens: 0, output_tokens: 0, total_tokens: 0 })
-  const remote = { provider: 'xiaomi-token-plan-cn', model: 'mimo-v2.6-flash' }
-  const positive = measureModelUsage([compact(remote)], { localModelRoutes: [local] })
-  assert.equal(positive.actual_model_calls, 1)
-  assert.deepEqual(positive.token_usage, { input_tokens: 5, output_tokens: 2, total_tokens: 7 })
-  assert.equal(measureModelUsage([compact(remote, true, null)], { localModelRoutes: [local] }).token_usage, null)
-  const missingBoundary = measureModelUsage([compact(local, false)], { localModelRoutes: [local] })
-  assert.equal(missingBoundary.actual_model_calls, null)
-  assert.ok(missingBoundary.model_calls_unknown_reasons.includes('compaction-boundary-missing'))
+  assert.equal(measureModelUsage([compact(registered, { usage })], { localModelRoutes: [registered] }).actual_model_calls, 1)
+  assert.equal(measureModelUsage([compact(registered, {})], { localModelRoutes: [registered] }).actual_model_calls, null)
+  const pure = { provider: 'harness-code-only', model: 'workflow-v1' }
+  assert.equal(measureModelUsage([compact(pure, {})]).actual_model_calls, 0)
+  const conflict = measureModelUsage([compact(registered, { usage, model_invocation: false })])
+  assert.equal(conflict.actual_model_calls, null)
+  assert.ok(conflict.model_calls_unknown_reasons.includes('model-invocation-evidence-conflict'))
+  const missing = measureModelUsage([compact(registered, { usage }, false)])
+  assert.equal(missing.actual_model_calls, null)
+  assert.ok(missing.model_calls_unknown_reasons.includes('compaction-boundary-missing'))
+})
+
+test('原生结算用实际source核对，图内或多份Header不能把当前外部响应折成零', () => {
+  const pure = { provider: 'harness-workflow', model: 'hybrid-v1' }
+  const external = { provider: 'actual-proxy', model: 'remote' }
+  const input = trace('source-route', [event('turn/start', { turn: 1 }), event('step/start', { turn: 1, step: 1 }),
+    event('request/header', { header: { config: pure } }),
+    event('assistant/message', { turn: 1, step: 1, usage, message: { source: { kind: 'model', ...external } } }),
+    event('step/end', { turn: 1, step: 1 }), event('turn/end', { turn: 1 })])
+  assert.equal(measureModelUsage([input]).actual_model_calls, 1)
+  const local = structuredClone(input)
+  Object.assign(local.rows.find(row => row.event.type === 'assistant/message').event.data, {
+    usage: undefined, message: { source: { kind: 'model', ...pure } },
+  })
+  assert.equal(measureModelUsage([local]).actual_model_calls, 0)
+  const conflict = structuredClone(input)
+  conflict.rows.find(row => row.event.type === 'assistant/message').event.data.model_invocation = false
+  assert.ok(measureModelUsage([conflict]).model_calls_unknown_reasons.includes('model-invocation-evidence-conflict'))
+  const ambiguous = trace('ambiguous-header', [event('turn/start', { turn: 1 }), event('step/start', { turn: 1, step: 1 }),
+    event('request/header', { header: { config: pure } }), event('request/header', { header: { config: external } }),
+    event('assistant/message', { turn: 1, step: 1 }), event('step/end', { turn: 1, step: 1 }), event('turn/end', { turn: 1 })])
+  assert.equal(measureModelUsage([ambiguous]).actual_model_calls, null)
+})
+
+test('强用量严格核对数值，零快照与损坏快照均不升级为推理证据', () => {
+  assert.equal(hasPositiveTokenUsage({ inputTokens: 1, outputTokens: 0 }), true)
+  for (const value of [{ inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+    { ...usage, inputTokens: true }, { ...usage, outputTokens: -1 }, { ...usage, outputTokens: 0.5 },
+    { ...usage, inputTokens: Number.MAX_SAFE_INTEGER + 1 }, { ...usage, reasoningTokens: true },
+    { ...usage, totalTokens: 1 }]) assert.equal(hasPositiveTokenUsage(value), false)
+  assert.equal(modelInvocationEvidence({}, [{ model_invocation: false, usage }]), 'conflict')
+  assert.equal(modelInvocationEvidence({ provider: 'harness-code-only', model: 'workflow-v1' }, [{ usage }]), 'conflict')
+  const started = { attempt_id: 'started-intent', execution_id: 'graph', time: 1, status: 'started', model_invocation: true }
+  assert.equal(measureModelUsage([], { requireSessionTrace: false, attempts: [started, { ...started, time: 2, status: 'completed', model_invocation: undefined }] }).observed_model_calls, 0)
+})
+
+test('标题结算同样拒绝相反证据，实际阳性不被请求注册位置覆盖', () => {
+  const result = measureModelUsage([trace('title-conflict', [titleRequest(), titleResult({ model_invocation: false, usage })])])
+  assert.equal(result.actual_model_calls, null)
+  assert.ok(result.model_calls_unknown_reasons.includes('model-invocation-evidence-conflict'))
+})
+
+test('同attempt前面的正用量不被末次零值或损坏快照覆盖，调用与Token完整性分开', () => {
+  const input = proof => trace('all-usage', [event('turn/start', { turn: 1 }), event('step/start', { turn: 1, step: 1 }),
+    event('assistant/message', { turn: 1, step: 1, ...proof }), event('step/end', { turn: 1, step: 1 }), event('turn/end', { turn: 1 })])
+  const conflict = measureModelUsage([input({ model_invocation: false, usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+    stream: [{ chunk: { type: 'usage', usage } }] })])
+  assert.equal(conflict.actual_model_calls, null)
+  assert.ok(conflict.model_calls_unknown_reasons.includes('model-invocation-evidence-conflict'))
+  const proven = measureModelUsage([input({ stream: [{ chunk: { type: 'usage', usage } },
+    { chunk: { type: 'usage', usage: { inputTokens: -1, outputTokens: 0 } } }] })])
+  assert.equal(proven.actual_model_calls, 1)
+  assert.equal(proven.token_usage, null)
 })
 
 test('统一Token桶核对缓存、reasoning与缺失aggregate，缓存命中不是零输入', () => {
@@ -320,23 +404,49 @@ test('prepare成功后stream在Provider前失败或取消保留尝试，但实�
   }
 })
 
-test('图内错误响应和取消只有保留实际Provider证据时才计入调用下界', async () => {
+test('observer不凭文本、普通finish或调用意图造true，纯本地与相反用量分别保留', async () => {
+  for (const mode of ['plain', 'intent', 'zero', 'contradiction', 'malformed']) {
+    const attempts = []
+    const context = { execution_id: mode, ...(mode === 'intent' ? { model_invocation: true }
+      : ['zero', 'contradiction'].includes(mode) ? { model_invocation: false } : {}) }
+    const observed = observeLlm({ async prepareCall() { return { config: { provider: 'registered', model: 'adapter' }, async *stream() {
+      if (mode === 'contradiction') yield { type: 'usage', usage }
+      if (mode === 'malformed') yield { type: 'usage', usage: { ...usage, reasoningTokens: 'private-invalid-value' } }
+      yield { type: 'text-delta', text: '固定输出同样可产文字' }
+      yield { type: 'finish', reason: { kind: 'stop' } }
+    } } } }, context, row => attempts.push(row))
+    const prepared = await observed.prepareCall({})
+    for await (const _chunk of prepared.stream({})) {}
+    const result = measureModelUsage([], { attempts, requireSessionTrace: false })
+    assert.equal(result.actual_model_calls, mode === 'zero' ? 0 : null)
+    if (mode === 'contradiction') assert.ok(result.model_calls_unknown_reasons.includes('model-invocation-evidence-conflict'))
+    else assert.notEqual(attempts.at(-1).model_invocation, true)
+    assert.doesNotMatch(JSON.stringify(attempts), /private-invalid-value|固定输出/)
+  }
+})
+
+test('图内错误和取消保留调用阳性，单独HTTP状态或requestId不证明已发推理', async () => {
   for (const kind of ['http-error', 'request-id', 'chunk-then-error', 'consumer-close']) {
     const attempts = []
     const model = observeLlm({ async prepareCall() { return { config: {}, async *stream() {
       if (kind === 'http-error' || kind === 'request-id') {
         yield { type: 'finish', reason: { kind: 'error', failure: kind === 'http-error' ? { status: 503 } : { requestId: 'provider-request' } } }; return
       }
+      yield { type: 'usage', usage }
       yield { type: 'text-delta', text: '实际响应' }
       throw new Error('响应中断')
     } } } }, { execution_id: `proven-${kind}` }, row => attempts.push(row))
     const prepared = await model.prepareCall({})
     try { for await (const _chunk of prepared.stream({})) { if (kind === 'consumer-close') break } } catch {}
-    assert.equal(attempts.at(-1).model_invocation, true)
+    const proven = ['chunk-then-error', 'consumer-close'].includes(kind)
+    assert.equal(attempts.at(-1).model_invocation, proven ? true : undefined)
     const result = measureModelUsage([], { attempts, requireSessionTrace: false })
-    assert.equal(result.actual_model_calls, 1)
-    assert.equal(result.failed_model_calls, 1)
+    assert.equal(result.actual_model_calls, proven ? 1 : null)
+    assert.equal(result.failed_model_calls, proven ? 1 : null)
+    assert.equal(result.observed_model_calls, proven ? 1 : 0)
     assert.equal(result.token_usage, null)
+    if (['chunk-then-error', 'consumer-close'].includes(kind))
+      assert.deepEqual(result.observed_token_usage, { input_tokens: 5, output_tokens: 2, total_tokens: 7 })
   }
 })
 

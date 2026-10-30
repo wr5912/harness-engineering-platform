@@ -21,7 +21,7 @@ import {
 const ANALYSIS_TOOLS = ['glob', 'grep', 'read']
 const ROUTE_FIELDS = ['maxTokens', 'model', 'provider', 'reasoningEffort']
 
-async function readInput() {
+export async function readInput() {
   const chunks = []
   for await (const chunk of process.stdin) chunks.push(chunk)
   const payload = JSON.parse(Buffer.concat(chunks).toString('utf8'))
@@ -46,7 +46,7 @@ async function readInput() {
       const fields = scene && typeof scene === 'object' ? Object.keys(scene).sort().join(',') : ''
       const repair = fields === 'prior_prompts,prompt,scene_id,session_id'
       if (!scene || typeof scene !== 'object' || (!repair && fields !== 'prompt,scene_id')
-        || !/^scene-[0-9]+$/.test(scene.scene_id ?? '')
+        || !(scene.scene_id === 'source-diagnosis' || /^scene-[0-9]+$/.test(scene.scene_id ?? ''))
         || typeof scene.prompt !== 'string' || scene.prompt === ''
         || (repair && (typeof scene.session_id !== 'string' || scene.session_id === ''
           || !Array.isArray(scene.prior_prompts) || scene.prior_prompts.length === 0
@@ -529,7 +529,7 @@ async function main() {
       } catch (error) {
         const reason = /^[a-z0-9-]+$/.test(error?.message ?? '') ? error.message : 'scene-review-error'
         failure = reason
-        results.push({ scene_id: scene.scene_id, error: reason })
+        results.push({ scene_id: scene.scene_id, session_id: sessionId, error: reason })
       } finally {
         await saveSessionTrace(join(payload.evidence_root, scene.scene_id, `attempt-${String(attempt).padStart(2, '0')}`), latestArchive, {
           operation: 'review', session_id: sessionId, attempt,

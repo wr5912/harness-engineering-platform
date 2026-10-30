@@ -1,4 +1,5 @@
 import type { PlatformNavigation } from '../protocol.ts'
+import { effectReviewLabel, reviewMethodLabel, separatedReview, sourceDiagnosisLabel } from './review-state.ts'
 
 const show = (value: unknown) => value === undefined || value === null || value === '' ? '未记录' : typeof value === 'object' ? JSON.stringify(value) : String(value)
 function actualModels(view: any) {
@@ -15,7 +16,11 @@ export function RunComparisonFacts({ comparison, onNavigate }: { comparison: any
     ['实际工具调用', tools(comparison.left_view), tools(comparison.right_view)],
     ['镜像 ID', comparison.left_image?.local_image_id, comparison.right_image?.local_image_id],
     ['镜像构建来源', comparison.left_image?.image_build_fingerprint, comparison.right_image?.image_build_fingerprint],
-    ['评审方式', comparison.left_source?.review_mode, comparison.right_source?.review_mode],
+    ['评审方式', reviewMethodLabel(comparison.left_source), reviewMethodLabel(comparison.right_source)],
+    ...(separatedReview(comparison.left_source?.review_contract) || separatedReview(comparison.right_source?.review_contract) ? [
+      ['业务效果复核', effectReviewLabel(comparison.left_view?.summary?.review_status), effectReviewLabel(comparison.right_view?.summary?.review_status)],
+      ['源码诊断', separatedReview(comparison.left_source?.review_contract) ? sourceDiagnosisLabel(comparison.left_view?.source_diagnosis ?? comparison.left_view?.summary?.source_diagnosis) : '未单独记录', separatedReview(comparison.right_source?.review_contract) ? sourceDiagnosisLabel(comparison.right_view?.source_diagnosis ?? comparison.right_view?.summary?.source_diagnosis) : '未单独记录'],
+    ] as [string, unknown, unknown][] : []),
     ['固定运行来源', comparison.left_source?.source_ref ?? '当前工作树', comparison.right_source?.source_ref ?? '当前工作树'],
     ['接口环境', comparison.left_source?.mcp_fixture ? `Mock：${comparison.left_source.mcp_fixture.sha256}；不代表真实业务系统` : '未声明 Mock 映射', comparison.right_source?.mcp_fixture ? `Mock：${comparison.right_source.mcp_fixture.sha256}；不代表真实业务系统` : '未声明 Mock 映射'],
     ['插件 / 依赖配置摘要', comparison.left_source?.candidate_trees?.managed?.tree_sha256, comparison.right_source?.candidate_trees?.managed?.tree_sha256],

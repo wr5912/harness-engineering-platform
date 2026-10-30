@@ -135,3 +135,36 @@ test('采集覆盖区分空轨迹、采集失败与未请求场景归因', async
   assert.equal(files.coverage.trace_present, true)
   assert.equal(files.coverage.attribution_status, 'collected')
 })
+
+test('分层评估的源码轨迹不能冒充业务复核，ZIP保留两类原始证据及各自采集状态', async t => {
+  const { root, run } = fixture()
+  t.after(() => rm(root, { recursive: true, force: true }))
+  write(join(run, 'inputs.lock.json'), JSON.stringify({ review_mode: 'ai', review_contract: { schema_version: 1, effect_scope: 'business-evidence', source_scope: 'frozen-harness' } }))
+  write(join(run, 'analysis.json'), JSON.stringify({ schema_version: 3, source_diagnosis: { status: 'incomplete', conclusion: 'inconclusive' } }))
+  const source = 'evidence/analysis/source-diagnosis/attempt-01/trace.jsonl'
+  write(join(run, source), '{"event":"source"}\n')
+  let files = await api.listRunFiles(root, runId)
+  assert.equal(files.coverage.attribution_status, 'missing')
+  assert.deepEqual(files.coverage.review_coverage, { effect: { trace_status: 'missing' }, source: { trace_status: 'collected', status: 'incomplete' } })
+  const effect = 'evidence/analysis/scene-01/attempt-01/trace.jsonl'
+  write(join(run, effect), '{"event":"effect"}\n')
+  files = await api.listRunFiles(root, runId)
+  assert.equal(files.coverage.review_coverage.effect.trace_status, 'collected')
+  assert.equal(files.coverage.review_coverage.source.status, 'incomplete')
+  const response = await api.createRunDownloadHandler(root)(request('kind=archive'))
+  assert.equal(response.status, 200)
+  const archive = unzipSync(new Uint8Array(await response.arrayBuffer()))
+  assert.ok(archive[`${runId}/${source}`]); assert.ok(archive[`${runId}/${effect}`])
+  assert.equal(JSON.parse(Buffer.from(archive['export-manifest.json']).toString()).coverage.review_coverage.source.status, 'incomplete')
+})
+
+test('无法识别的方法标记不按历史综合复核回填采集状态', async t => {
+  const { root, run } = fixture()
+  t.after(() => rm(root, { recursive: true, force: true }))
+  write(join(run, 'inputs.lock.json'), JSON.stringify({ review_mode: 'ai', review_contract: { schema_version: 999 } }))
+  write(join(run, 'evidence/analysis/source-diagnosis/trace.jsonl'), '{"event":"source"}\n')
+  const files = await api.listRunFiles(root, runId)
+  assert.equal(files.coverage.attribution_status, 'unknown')
+  assert.equal(files.coverage.review_coverage, undefined)
+  assert.ok(files.coverage.notes.some(note => note.includes('评估方法标记无法识别')))
+})

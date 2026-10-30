@@ -264,7 +264,8 @@ test('原生LLM错误终态保留结构化失败并将已返回用量结算为fa
   const measured = measureModelUsage([], { attempts, requireSessionTrace: false })
   assert.equal(measured.actual_model_calls, 1)
   assert.equal(measured.failed_model_calls, 1)
-  assert.equal(measured.token_usage.total_tokens, 11)
+  assert.equal(measured.token_usage, null, '失败前的用量快照不能证明供应商最终完整结算')
+  assert.equal(measured.observed_token_usage.total_tokens, 11)
 
   responseReceived = false
   const unknown = (await f.execute('native_error_finish')).value
@@ -689,7 +690,8 @@ test('混合原生回合只本地派发，图内语言推理与类型化决策�
   assert.equal(measured.actual_model_calls, 3)
   assert.equal(measured.failed_model_calls, 1)
   assert.deepEqual(measured.model_calls_by_model_role, { language: 1, decision: 2 })
-  assert.equal(measured.token_usage.total_tokens, 19)
+  assert.equal(measured.token_usage, null, '失败重试的快照只能证明已观察用量下界')
+  assert.equal(measured.observed_token_usage.total_tokens, 19)
   f.hook('agent/disposed', { agent: f.agent })
   assert.equal((await f.stream(1)).text, '决定：read_asset')
   assert.equal((await f.stream(1)).chunks.some(chunk => chunk.blockType === 'tool-call'), false)

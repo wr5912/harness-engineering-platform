@@ -537,6 +537,8 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
     const first = rows[0]
     for (const row of rows) {
       for (const key of ['executor', 'review_mode', 'dependency_env']) if (row.lock[key] === undefined || !same(row.lock[key], first.lock[key])) limits.push(`${row.run.run_id}: ${key} 缺失或不同`)
+      const reviewMethod = (lock: Record<string, any>) => lock.review_contract === undefined ? null : Object.fromEntries(['schema_version', 'effect_scope', 'source_scope', 'model_route', 'model_policy_sha256'].map(key => [key, lock.review_contract?.[key]]))
+      if (!same(reviewMethod(row.lock), reviewMethod(first.lock))) limits.push(`${row.run.run_id}: review_contract 业务效果评估方法或评审模型策略不同`)
       if (!same(row.lock.external_inputs ?? null, first.lock.external_inputs ?? null)) limits.push(`${row.run.run_id}: 外部输入样本或来源模式不同`)
       if (!same(row.lock.mcp_fixture ?? null, first.lock.mcp_fixture ?? null)) limits.push(`${row.run.run_id}: Mock MCP 连接映射或环境不同`)
       const origin = row.lock.program_origin, base = first.lock.program_origin

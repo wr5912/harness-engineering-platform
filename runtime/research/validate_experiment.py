@@ -18,7 +18,7 @@ from evaluation_contract import cases_digest, load_evaluation
 ADAPTER = Path(__file__).resolve().parents[1] / "adapters/dsh-container"
 if str(ADAPTER) not in sys.path:
     sys.path.insert(0, str(ADAPTER))
-from scenario_analysis import summarize_review, validate_analysis
+from scenario_analysis import summarize_review, summarize_source_diagnosis, validate_analysis
 from source_contract import EXPERIMENT as EXPERIMENT_RE, LEGACY_EXPERIMENT_IDS, NEW_EXPERIMENT
 
 try:
@@ -397,7 +397,8 @@ def validate_run(
             errors.append(issue("RUN_SUMMARY", f"summary.json 无效：{exc}", summary_path))
         else:
             expected_summary = legacy_summary
-            if isinstance(summary, dict) and summary.get("schema_version") == "3.0":
+            if isinstance(summary, dict) and summary.get("schema_version") in {"3.0", "4.0"}:
+                analysis_for_summary = {}
                 try:
                     analysis_for_summary = json.loads((run_dir / "analysis.json").read_text(encoding="utf-8"))
                     review = summarize_review(analysis_for_summary)
@@ -409,7 +410,7 @@ def validate_run(
                     else "inconclusive"
                 )
                 expected_summary = {
-                    "schema_version": "3.0",
+                    "schema_version": "4.0" if "review_contract" in locked_inputs else "3.0",
                     "run_id": run_dir.name,
                     "trial_count": len(rows),
                     "execution_status_counts": execution_counts,
@@ -421,6 +422,12 @@ def validate_run(
                     "reviewed_overall_verdict": review["overall_verdict"],
                     "effective_verdict": effective,
                 }
+                if "review_contract" in locked_inputs:
+                    try:
+                        expected_summary["source_diagnosis"] = summarize_source_diagnosis(analysis_for_summary)
+                    except (KeyError, TypeError, ValueError, AttributeError):
+                        expected_summary["source_diagnosis"] = None
+                        errors.append(issue("RUN_SUMMARY_CONTENT", "源码诊断摘要与本 Run 记录不一致", summary_path))
                 if "source_verification" in summary:
                     verification = summary["source_verification"]
                     if not valid_source_verification(verification, isinstance(locked_inputs.get("evaluation_implementation"), dict),
@@ -474,7 +481,7 @@ def validate_run(
                     try:
                         analysis = json.loads(analysis_path.read_text(encoding="utf-8"))
                         validate_analysis(analysis, run_dir, rows, locked_inputs)
-                        if analysis.get("schema_version") == "2.0" \
+                        if analysis.get("schema_version") in {"2.0", "3.0"} \
                                 and status == "completed" and review_mode == "ai" \
                                 and analysis.get("review_status") != "completed":
                             raise ValueError("已请求 AI 复核的 completed Run 必须完成全部证据复核")

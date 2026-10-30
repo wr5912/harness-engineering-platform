@@ -116,6 +116,21 @@ async function fixture(planOverrides = {}) {
 }
 async function withFixture(task, planOverrides = {}) { const fx = await fixture(planOverrides); try { await task(fx) } finally { rmSync(fx.root, { recursive: true, force: true }) } }
 
+test('变体效果比较区分分层评估方法，忽略Run私有策略路径但不忽略评审模型策略', () => withFixture(async fx => {
+  const contract = { schema_version: 1, effect_scope: 'business-evidence', source_scope: 'frozen-harness', model_route: { provider: 'mimo', model: 'MiMoFlash', reasoningEffort: 'off' }, model_policy_sha256: 'a'.repeat(64), model_policy_snapshot: { path: 'left/policy.json', sha256: 'b'.repeat(64) } }
+  const save = side => write(join(side.base, 'inputs.lock.json'), JSON.stringify(side.lock))
+  fx.right.lock.review_contract = structuredClone(contract); save(fx.right)
+  let result = success(await fx.handler('compare', fx.body))
+  assert.ok(result.comparability.limits.some(message => message.includes('review_contract')))
+  fx.left.lock.review_contract = structuredClone(contract); save(fx.left)
+  fx.right.lock.review_contract.model_policy_snapshot.path = 'right/policy.json'; save(fx.right)
+  result = success(await fx.handler('compare', fx.body))
+  assert.equal(result.comparability.limits.some(message => message.includes('review_contract')), false)
+  fx.right.lock.review_contract.model_policy_sha256 = 'c'.repeat(64); save(fx.right)
+  result = success(await fx.handler('compare', fx.body))
+  assert.ok(result.comparability.limits.some(message => message.includes('review_contract')))
+}))
+
 test('context 在数据技能迁出后仍返回当前代码生成接口合同，读取不改变研究资产', () => withFixture(async fx => {
   assert.equal(existsSync(join(fx.root, '.agents/skills')), false)
   const change = readFileSync(join(fx.path(variant), 'change.yaml'))
@@ -200,7 +215,7 @@ test('普通计划的token指标也包含关联MCP图内推理，不能以外层
   assert.equal(result.eligible_for_end, false)
 }))
 
-function freezeLocalDelivery(fx) {
+function freezeLocalDelivery(fx, positive = false) {
   const local = { provider: 'security-operation-delivery', model: 'fixed-operation-result' }
   const content = JSON.stringify({ runtime_capabilities: { local_tools: [], local_model_routes: [local] } })
   for (const side of [fx.left, fx.right]) {
@@ -216,7 +231,9 @@ function freezeLocalDelivery(fx) {
     rows.find(row => row.event.type === 'tool/result').event.data.meta = { graph_execution: {
       execution_id: attempt.execution_id, session_id: session, tool_call_id: 'call-1', complete: true, status: 'completed', model_attempts: [
         { ...attempt, time: 1, status: 'started' },
-        { ...attempt, time: 2, status: 'completed', usage: { inputTokens: 1000, outputTokens: 10, totalTokens: 1010 } },
+        { ...attempt, time: 2, status: 'completed', ...(positive
+          ? { model_invocation: true, usage: { inputTokens: 1000, outputTokens: 10, totalTokens: 1010 } }
+          : { model_invocation: false }) },
       ],
     } }
     write(file, rows.map(JSON.stringify).join('\n'))
@@ -225,7 +242,7 @@ function freezeLocalDelivery(fx) {
   return content
 }
 
-test('比较与Job共用每Run封存声明，本地图不计LLM且legacy只接受同摘要原文', () => withFixture(async fx => {
+test('比较与Job共用每Run封存声明，明确无推理才按零且legacy只接受同摘要原文', () => withFixture(async fx => {
   freezeLocalDelivery(fx)
   const result = success(await fx.handler('compare', fx.body))
   assert.deepEqual(result.comparability.limits, [])
@@ -240,6 +257,17 @@ test('比较与Job共用每Run封存声明，本地图不计LLM且legacy只接�
     write(join(side.base, 'inputs.lock.json'), JSON.stringify(side.lock))
   }
   assert.deepEqual(success(await fx.handler('compare', fx.body)).resources, result.resources)
+}))
+
+test('比较同样保留本地注册代理的正向推理，不能用声明产生虚假节省', () => withFixture(async fx => {
+  freezeLocalDelivery(fx, true)
+  const result = success(await fx.handler('compare', fx.body))
+  assert.equal(result.resources.actual_model_calls.parent, 3)
+  assert.equal(result.resources.actual_model_calls.variant, 2)
+  assert.equal(result.resources.total_tokens.parent, 1230)
+  assert.equal(result.resources.total_tokens.variant, 1120)
+  assert.equal(result.resource_evidence.passed, false)
+  assert.equal(result.eligible_for_end, false)
 }))
 
 test('比较的新声明快照缺损不回退legacy，未核对时所有资源指标未知且不能end', () => withFixture(async fx => {
@@ -420,6 +448,9 @@ test('Token 计量沿用继承边界并去重原生事件，辅助标题缺少�
     { type: 'session/title-llm-request', data: { titleProvider: 'llm', messageSeqs: [1], route: { provider: 'fixture', model: 'model' } } },
     { type: 'session/title', data: { messageSeqs: [1], source: { kind: 'provider', provider: 'llm', model: { provider: 'fixture', model: 'model' } } } },
   ].map((event, index) => ({ session_log: 'root', event: { ...event, seq: title.length - 1 + index } })))
+  assert.equal(computeTraceMetrics(title, true).values.actual_model_calls, null, '标题请求及本地可生成的结果未证明模型调用')
+  assert.equal(computeTraceMetrics(title, true).values.total_tokens, null)
+  title.at(-1).event.data.model_invocation = true
   assert.equal(computeTraceMetrics(title, true).values.actual_model_calls, 2)
   assert.equal(computeTraceMetrics(title, true).values.total_tokens, null)
 })
@@ -608,7 +639,10 @@ async function codeOnlyFixture(fx) {
     const route = { provider: 'harness-code-only', model: 'workflow-v1', reasoningEffort: 'off' }
     for (const row of rows) {
       if (row.event.type === 'request/header') row.event.data.header.config = route
-      if (row.event.type === 'assistant/message') delete row.event.data.usage
+      if (row.event.type === 'assistant/message') {
+        delete row.event.data.usage
+        row.event.data.message.source = { kind: 'model', provider: route.provider, model: route.model }
+      }
     }
     fx.right.view.cases[0].actual_routes = [route]
     write(join(fx.right.base, 'evidence/U-ONE-001/response.json'), JSON.stringify({ assistant_texts: ['模拟资产状态正常。'], turns: [{ route }] }))
@@ -642,7 +676,10 @@ async function hybridFixture(fx) {
     const file = join(fx.right.base, 'evidence/U-ONE-001/trace.jsonl')
     const rows = readFileSync(file, 'utf8').split('\n').map(JSON.parse)
     const route = { provider: 'harness-workflow', model: 'hybrid-v1', reasoningEffort: 'off' }
-    for (const row of rows) if (row.event.type === 'request/header') row.event.data.header.config = route
+    for (const row of rows) {
+      if (row.event.type === 'request/header') row.event.data.header.config = route
+      if (row.event.type === 'assistant/message') row.event.data.message.source = { kind: 'model', provider: route.provider, model: route.model }
+    }
     fx.right.view.cases[0].actual_routes = [route]
     write(join(fx.right.base, 'evidence/U-ONE-001/response.json'), JSON.stringify({ assistant_texts: ['模拟资产状态正常。'], turns: [{ route }] }))
     write(file, rows.map(JSON.stringify).join('\n'))

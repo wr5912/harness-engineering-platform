@@ -171,7 +171,8 @@ def validate_after_run(contract: dict) -> None:
 
 def initialize_run(source: str, cases: list[dict], executor: str, selection_mode: str, review_mode: str,
                    model: str | None = None, compare_to: str | None = None,
-                   source_ref: str | None = None, mcp_fixture: str | None = None) -> str:
+                   source_ref: str | None = None, mcp_fixture: str | None = None,
+                   model_policy: str | None = None) -> str:
     command = [
         sys.executable, str(RUN_RECORD), "--repo", str(REPO), "init",
         "--source", source, "--kind", "research", "--executor", executor,
@@ -187,6 +188,8 @@ def initialize_run(source: str, cases: list[dict], executor: str, selection_mode
         command.extend(("--source-ref", source_ref))
     if mcp_fixture:
         command.extend(("--mcp-fixture", mcp_fixture))
+    if model_policy:
+        command.extend(("--model-policy", model_policy))
     completed = checked_process(command, label="创建 Run", timeout=180)
     run_id = completed.stdout.strip()
     if not run_id.startswith("run-"):
@@ -722,7 +725,7 @@ def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict
                       selection_mode: str, review_mode: str) -> int:
     progress("创建并锁定 Research Run")
     try:
-        selected_options = {key: getattr(args, key, None) for key in ("source_ref", "mcp_fixture") if getattr(args, key, None)}
+        selected_options = {key: getattr(args, key, None) for key in ("source_ref", "mcp_fixture", "model_policy") if getattr(args, key, None)}
         run_id = initialize_run(args.source, cases, args.executor, selection_mode, review_mode,
                                 args.model, args.compare_to, **selected_options)
         run_dir = Path(contract["experiment_root"]) / "runs" / run_id

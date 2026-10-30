@@ -1,8 +1,9 @@
-import { isLocalModelRoute, type ModelAttempt, type ModelRole } from './model-attempts.ts'
+import { isLocalModelRoute, modelInvocationEvidence, normalizeTokenUsage, type ModelAttempt, type ModelRole } from './model-attempts.ts'
 import { parseLocalCapabilities, type LocalModelRoute } from '../business-control/local-capabilities.ts'
 import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+export { normalizeTokenUsage } from './model-attempts.ts'
 export type { ModelAttempt } from './model-attempts.ts'
 type Event = { type: string; seq?: number; data?: Record<string, any>; [key: string]: any }
 type Role = ModelRole
@@ -126,27 +127,8 @@ export function extractGraphExecutions(rows: UsageTrace['rows']) {
   return { executions: [...executions.values()], attempts: [...executions.values()].flatMap(value => value.model_attempts) as ModelAttempt[], unknown_reasons: [...unknown] }
 }
 
-/** 原生输入与缓存桶互斥，reasoning 已包含在 output，缺失 aggregate 不补造。 */
-export function normalizeTokenUsage(usage: Record<string, any> | undefined) {
-  const count = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
-  if (!usage || !count(usage.inputTokens) || !count(usage.outputTokens)) return null
-  const { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, totalTokens, reasoningTokens } = usage
-  if ([cacheReadTokens, cacheWriteTokens].some(value => value !== undefined && !count(value))
-    || reasoningTokens !== undefined && (!count(reasoningTokens) || reasoningTokens > outputTokens)) return null
-  const knownInput = inputTokens + (cacheReadTokens ?? 0) + (cacheWriteTokens ?? 0)
-  if (!count(knownInput)) return null
-  const completeCache = cacheReadTokens !== undefined && cacheWriteTokens !== undefined
-  if (totalTokens !== undefined) {
-    const input = totalTokens - outputTokens
-    if (!count(totalTokens) || !count(input) || input < knownInput || completeCache && input !== knownInput) return null
-    return { input, output: outputTokens, total: totalTokens }
-  }
-  return { input: completeCache ? knownInput : null, output: outputTokens, total: null }
-}
-
 /** 基于锁定 DSH 的持久请求尝试结算计数；不把配置头、Step 或 Token 样本推成请求。 */
 export function measureModelUsage(files: UsageTrace[], options: { attempts?: ModelAttempt[]; requireSessionTrace?: boolean; localModelRoutes?: readonly LocalModelRoute[] } = {}) {
-  const localRoute = (route: any) => isLocalModelRoute(route, options.localModelRoutes)
   const sessions = new Map<string, Session>()
   const unknown = new Set<string>()
   const byRole: Partial<Record<Role, number>> & Record<'target' | 'judge' | 'analysis', number> = { target: 0, judge: 0, analysis: 0 }
@@ -187,118 +169,119 @@ export function measureModelUsage(files: UsageTrace[], options: { attempts?: Mod
     tokens.total_tokens += value.total
     tokenSamples++
   }
+  function sampleOf(data: any) {
+    return data?.usage ?? [...(Array.isArray(data?.stream) ? data.stream : [])].reverse()
+      .find(item => item?.chunk?.type === 'usage')?.chunk?.usage
+  }
+  function factsOf(data: any) {
+    const stream = Array.isArray(data?.stream) ? data.stream : []
+    return [{ model_invocation: data?.model_invocation },
+    ...[data?.usage, ...stream.filter((item: any) => item?.chunk?.type === 'usage').map((item: any) => item.chunk.usage)]
+      .filter(usage => usage !== undefined).map(usage => ({ usage }))]
+  }
   function count(session: Session, event: Event) {
     byRole[session.role] = (byRole[session.role] ?? 0) + 1
-    if (event.type === 'assistant/attempt' || event.data?.interrupted === true) failed++
-    const sample = event.data?.usage ?? [...(event.data?.stream ?? [])].reverse().find(item => item?.chunk?.type === 'usage')?.chunk?.usage
-    addUsage(sample)
+    if (event.type === 'assistant/attempt' || event.data?.interrupted === true) { failed++; tokensKnown = false }
+    addUsage(sampleOf(event.data))
   }
+  function settle(session: Session, event: Event, route: any, reason: string) {
+    const evidence = modelInvocationEvidence(route, factsOf(event.data))
+    if (evidence === 'invoked') count(session, event)
+    else if (evidence !== 'none') {
+      unknown.add(evidence === 'conflict' ? 'model-invocation-evidence-conflict' : reason)
+      tokensKnown = false
+    }
+    return evidence
+  }
+  const sessionsWithGraphs = new Set(graphs.flatMap(graph => graph.executions.map(execution => execution.session_id)))
   for (const session of sessions.values()) {
     const all = [...session.events].sort(([a], [b]) => a - b).map(([, event]) => event)
     const marker = all.find(event => event.type === 'session/end-seed' && event.data?.inherited === true)
     if (session.seeded && !marker) { unknown.add('seed-boundary-missing'); continue }
     const events = marker ? all.filter(event => event.seq! > marker.seq!) : all
     let previousSeq = marker?.seq ?? -1
-    let turn: number | undefined
-    let step: { turn: number; step: number; state: 'open' | 'message' | 'attempt' | 'retry'; startSeq: number;
-      invocationProven: boolean; counted: boolean; pendingAttempt?: Event } | undefined
+    let turn: number | undefined, nativeRoute: any
+    let step: { turn: number; step: number; state: 'open' | 'message' | 'attempt' | 'retry'; headers: any[] } | undefined
     const compacting = new Map<string, boolean>()
-    const titleRequests = new Map<string, number>()
+    const titleRequests = new Map<string, { count: number; controlled: boolean }>()
     let automaticTitlePending = false
-    let route: any
-    function finishAttempt() {
-      if (step?.pendingAttempt) unknown.add('attempt-invocation-unproven')
-      if (step?.invocationProven && !step.counted && !localRoute(route)) {
-        // HTTP 已接受但尚无结算时仍保留调用下界，不能把在途请求当作零。
-        byRole[session.role] = (byRole[session.role] ?? 0) + 1
-        tokensKnown = false
-      }
+    function settledRoute(data: any) {
+      const source = data.message?.source
+      // 图调用可能更新同一 Session 的 Header；结算里的实际模型身份优先。
+      if (source?.kind === 'model' && typeof source.provider === 'string' && source.provider
+        && typeof source.model === 'string' && source.model) return { provider: source.provider, model: source.model }
+      if (sessionsWithGraphs.has(session.id)) return undefined
+      const candidates = [...new Map((step?.headers ?? []).map(route => [JSON.stringify(route), route])).values()]
+      return candidates.length === 1 ? candidates[0] : candidates.length === 0 ? nativeRoute : undefined
     }
     for (const event of events) {
       if (event.seq !== previousSeq + 1) unknown.add('session-events-incomplete')
       previousSeq = event.seq!
       const data = event.data ?? {}
-      if (event.type === 'request/header') route = data.header?.config
+      if (event.type === 'request/header' && step?.state === 'open') step.headers.push(data.header?.config)
       if (event.type === 'session/title' && data.source?.kind === 'fallback') {
         automaticTitlePending = true
       } else if (event.type === 'session/title' && data.source?.kind === 'user') {
         automaticTitlePending = false
       } else if (event.type === 'session/title-llm-request') {
-        if (localRoute(data.route)) { automaticTitlePending = false; continue }
-        auxiliaryRequests++
-        // 此记录先于 stream 前的 abort 检查，单独存在不能证明请求真正发出。
+        const controlled = isLocalModelRoute(data.route)
+        if (controlled) automaticTitlePending = false
+        else auxiliaryRequests++
         const key = JSON.stringify([data.titleProvider, data.messageSeqs, data.route?.provider, data.route?.model])
-        titleRequests.set(key, (titleRequests.get(key) ?? 0) + 1)
+        const previous = titleRequests.get(key)
+        titleRequests.set(key, { count: (previous?.count ?? 0) + 1, controlled })
       } else if (event.type === 'session/title' && data.source?.kind === 'provider') {
         automaticTitlePending = false
-        if (!data.source.model) continue // 无模型的标题 Provider 不作为模型调用。
-        if (localRoute(data.source.model)) continue
+        if (!data.source.model) continue
         const key = JSON.stringify([data.source.provider, data.messageSeqs, data.source.model.provider, data.source.model.model])
-        const pending = titleRequests.get(key) ?? 0
-        if (!pending) unknown.add('auxiliary-title-request-boundary-missing')
+        const pending = titleRequests.get(key)
+        if (!pending?.count) unknown.add('auxiliary-title-request-boundary-missing')
         else {
-          titleRequests.set(key, pending - 1)
-          auxiliary++
-          // 标题完成事件证明一次辅助调用完成；原生事件不保存标题 Token 用量。
-          if (data.model_invocation !== false) count(session, event)
+          pending.count--
+          if (settle(session, event, data.source.model, 'auxiliary-title-invocation-unproven') === 'invoked') auxiliary++
         }
       } else if (event.type === 'turn/start') {
         if (turn !== undefined || step) unknown.add('turn-boundary-invalid')
         turn = data.turn
       } else if (event.type === 'step/start') {
-        if (step || turn !== data.turn) { finishAttempt(); unknown.add('step-boundary-invalid') }
-        step = { turn: data.turn, step: data.step, state: 'open', startSeq: event.seq!, invocationProven: false, counted: false }
+        if (step || turn !== data.turn) unknown.add('step-boundary-invalid')
+        step = { turn: data.turn, step: data.step, state: 'open', headers: [] }
       } else if (event.type === 'session-log-deepseek/delivery-accepted') {
-        // 原生标记只证明上传所属 Session 的一次 HTTP 2xx；不借用旧水位或并发辅助请求。
-        if (step?.state === 'open' && data.sessionId === session.id && data.sessionFormatVersion === 4
-          && Number.isSafeInteger(data.throughSeq) && data.throughSeq >= step.startSeq && data.throughSeq < event.seq!
-          && !automaticTitlePending && ![...titleRequests.values()].some(count => count > 0) && !compacting.size) step.invocationProven = true
+        // 只有 Session/水位的 HTTP 接受不能唯一归属某个原生、标题或图尝试。
+        if (data.sessionId === session.id && data.sessionFormatVersion === 4 && Number.isSafeInteger(data.throughSeq))
+          unknown.add('delivery-request-association-unproven')
       } else if (event.type === 'assistant/message' || event.type === 'assistant/attempt') {
         if (!step || step.turn !== data.turn || step.step !== data.step || step.state !== 'open') unknown.add('attempt-boundary-invalid')
         else {
-          if (data.model_invocation === false || localRoute(route)) step.invocationProven = false
-          else if (event.type === 'assistant/message' || data.model_invocation === true || step.invocationProven
-            || normalizeTokenUsage(data.usage) !== null || Array.isArray(data.stream) && data.stream.some(item => typeof item?.chunk?.type === 'string')) {
-            count(session, event); step.counted = true
-          } else step.pendingAttempt = event
+          const route = settledRoute(data)
+          settle(session, event, route, 'attempt-invocation-unproven')
+          nativeRoute = route
           step.state = event.type === 'assistant/message' ? 'message' : 'attempt'
         }
       } else if (event.type === 'llm/retry') {
         if (!step || step.turn !== data.turn || step.step !== data.step || step.state !== 'attempt') unknown.add('retry-boundary-invalid')
-        else {
-          // SDK 仅在收到 error/aborted finish 后进入 request-error 并写 retry；它证明前次调用失败。
-          if (step.pendingAttempt) { count(session, step.pendingAttempt); step.counted = true; step.pendingAttempt = undefined }
-          step.state = 'retry'
-        }
+        else step.state = 'retry' // 本地 adapter 错误也可重试；重试事件不补造模型调用。
       } else if (event.type === 'llm/retry-started') {
         if (!step || step.turn !== data.turn || step.step !== data.step || step.state !== 'retry') unknown.add('retry-boundary-invalid')
-        else {
-          // retry-started 写在下一次 prepareRequest 之前，不能证明替代请求已到达 Provider。
-          step.state = 'open'; step.startSeq = event.seq!; step.invocationProven = false; step.counted = false
-        }
+        else { step.state = 'open'; step.headers = [] }
       } else if (event.type === 'step/end') {
         if (!step || step.turn !== data.turn || step.step !== data.step || step.state === 'open') unknown.add('attempt-settlement-missing')
-        finishAttempt()
         step = undefined
       } else if (event.type === 'turn/end') {
         if (turn !== data.turn || step) unknown.add('turn-boundary-invalid')
         turn = undefined
       } else if (event.type === 'compaction/start') compacting.set(data.compactionId, false)
       else if (event.type === 'compaction/summary') {
-        if (data.llmStreamCall === true) {
-          if (!localRoute(data)) count(session, event)
-          if (!compacting.has(data.compactionId)) unknown.add('compaction-boundary-missing')
-          compacting.set(data.compactionId, true)
-        } else unknown.add('compaction-request-count-unknown')
+        settle(session, event, data, 'compaction-request-count-unknown')
+        if (!compacting.has(data.compactionId)) unknown.add('compaction-boundary-missing')
+        compacting.set(data.compactionId, true)
       } else if (event.type === 'compaction/end') {
         if (!compacting.get(data.compactionId) || data.error !== undefined) unknown.add('compaction-request-count-unknown')
         compacting.delete(data.compactionId)
       }
     }
-    finishAttempt()
     if (step || turn !== undefined || compacting.size) unknown.add('request-lifecycle-in-progress')
-    if ([...titleRequests.values()].some(count => count > 0)) unknown.add('auxiliary-title-request-outcome-missing')
-    // 标题可能仍在 prepareCall，采集后才发出；不能用主 Turn 已结束推定总调用已封闭。
+    if ([...titleRequests.values()].some(item => item.count > 0 && !item.controlled)) unknown.add('auxiliary-title-request-outcome-missing')
     if (automaticTitlePending) unknown.add('auxiliary-title-generation-unsettled')
   }
   // 图事实用全局 attempt ID 合并生命周期；重复回执和重复导出不会再次收费。
@@ -320,8 +303,6 @@ export function measureModelUsage(files: UsageTrace[], options: { attempts?: Mod
     const terminal = ordered.filter(row => ['completed', 'failed', 'cancelled', 'local'].includes(row.status))
     const last = terminal.at(-1)
     const started = ordered.some(row => row.status === 'started')
-    if (last?.status === 'local' || last?.model_invocation === false || localRoute(last ?? ordered.at(-1))) continue
-    if (!started) { unknown.add('graph-attempt-start-missing'); continue }
     const role = rows[0].role ?? 'target'
     if (!['target', 'judge', 'analysis', 'generation'].includes(role)) { unknown.add('graph-attempt-role-invalid'); continue }
     const modelRole = rows[0].model_role
@@ -332,17 +313,21 @@ export function measureModelUsage(files: UsageTrace[], options: { attempts?: Mod
         || ['checkpoint_sha256', 'state_constructor_sha256', 'calibration_sha256'].some(key => !/^[0-9a-f]{64}$/.test((rows[0] as any)[key] ?? '')))) {
       unknown.add('graph-attempt-model-role-invalid'); continue
     }
-    const invocationProven = ordered.some(row => row.model_invocation === true || row.status === 'completed' || normalizeTokenUsage(row.usage) !== null)
-    if (!invocationProven) {
-      unknown.add('graph-attempt-invocation-unproven'); tokensKnown = false
+    const evidence = modelInvocationEvidence(last ?? ordered.at(-1), ordered.map(row => ({ ...row,
+      model_invocation: ['preparing', 'started'].includes(row.status) ? undefined : row.model_invocation })))
+    if (evidence === 'none') continue
+    if (evidence !== 'invoked') {
+      unknown.add(evidence === 'conflict' ? 'model-invocation-evidence-conflict' : 'graph-attempt-invocation-unproven')
+      tokensKnown = false
       if (!last) unknown.add('graph-attempt-unsettled')
       continue
     }
+    if (!started) unknown.add('graph-attempt-start-missing')
     byRole[role] = (byRole[role] ?? 0) + 1
     if (modelRole) byModelRole[modelRole]++
     if (!last) { unknown.add('graph-attempt-unsettled'); tokensKnown = false; continue }
-    if (last.status !== 'completed') failed++
-    if (terminal.some(row => row.status !== last.status || JSON.stringify(row.usage) !== JSON.stringify(last.usage))) unknown.add('graph-attempt-settlement-conflict')
+    if (last.status !== 'completed') { failed++; tokensKnown = false }
+    if (terminal.some(row => row.status !== last.status || row.provider !== last.provider || row.model !== last.model || JSON.stringify(row.usage) !== JSON.stringify(last.usage))) unknown.add('graph-attempt-settlement-conflict')
     addUsage(last.usage)
   }
   if (options.requireSessionTrace !== false && (!files.length || !sessions.size)) unknown.add('session-trace-missing')
@@ -351,7 +336,7 @@ export function measureModelUsage(files: UsageTrace[], options: { attempts?: Mod
     failed_model_calls: unknown.size ? null : failed, observed_failed_model_calls: failed,
     auxiliary_model_calls: auxiliary, auxiliary_requests_observed: auxiliaryRequests,
     model_calls_by_role: byRole, model_calls_by_model_role: byModelRole, model_calls_complete: unknown.size === 0,
-    model_calls_basis: '锁定 DSH 的主请求尝试/retry、压缩、辅助标题与关联图模型尝试；Session ID/seq 和图 attempt ID 去重，受控本地路由不计远程模型请求。',
+    model_calls_basis: '按实际调用标记与正向供应商用量核对根/子请求、压缩、标题和图尝试；Session/seq与attempt去重，注册位置不证明零推理，重试、HTTP错误或未归属HTTP记录不补调用。',
     model_calls_unknown_reasons: [...unknown], token_usage: tokensKnown && !unknown.size ? tokens : null,
     observed_token_usage: tokenSamples ? tokens : null,
     token_usage_complete: tokensKnown && !unknown.size,
