@@ -65,7 +65,7 @@ export interface AgentPackageManifest {
   kind: 'standalone-agent'
   package: { name: string; arch: Arch; mode: DeploymentMode; createdAt: string; sensitive: true }
   source: {
-    agentId: string; experimentId: string; candidateSha256: string; commit: string; dirty: boolean
+    agentId: string; experimentId: string; candidateSha256: string; commit: string; dirty: boolean; profile?: 'web' | 'sdk'
     paths: { workspace: string; presets: string; managed: string; profilePatch: string; preset: string }
     files: AgentSourceSnapshot['files']; omitted: string[]
   }

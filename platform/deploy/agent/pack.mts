@@ -11,6 +11,7 @@ import { agentSeed } from './seed.mts'
 import { agentCommand } from './process.mts'
 import { stageSelectedExtensions } from './extensions.mts'
 import { writeRuntimeBundle } from './runtime/index.mts'
+import { stageSdkRuntime } from './runtime/sdk.mts'
 import type { AgentPackageHooks, AgentPackageInput, AgentPackageManifest } from './types.mts'
 
 export { defaultAgentResourcesDir } from './prepare.mts'
@@ -27,7 +28,7 @@ export function previewAgentPackage(input: AgentPackageInput) {
   const issues = [...resources.issues, ...snapshot.dependencies.filter(item => !item.ready).map(item => ({ code: 'dependencies_missing', message: `业务依赖尚未准备：${item.name}${item.reason ? `；${item.reason}` : ''}`, path: item.sourceFile ?? item.path }))]
   const knowledge = inspectKnowledge({ roots: knowledgeRoots(join(snapshot.candidate, 'dsh')), mode: input.mode })
   return {
-    agentId: snapshot.agentId, experimentId: snapshot.experimentId, arch: input.arch, mode: input.mode,
+    agentId: snapshot.agentId, experimentId: snapshot.experimentId, profile: snapshot.source.profile ?? 'web', arch: input.arch, mode: input.mode,
     candidateSha256: snapshot.candidateSha256, dirty: snapshot.git.dirty,
     files: snapshot.files.map(file => ({ path: file.path, sha256: file.sha256 })),
     omitted: snapshot.omitted,
@@ -74,6 +75,7 @@ export async function packAgent(input: AgentPackageInput, hooks: AgentPackageHoo
     // 与资产一起冻结环境；后续知识下载期间不再读取源 .env。
     const supplied = agentSeed(snapshot, input.seed)
     copyAgentSnapshot(snapshot, staging, hooks.signal)
+    if (snapshot.source.profile === 'sdk') stageSdkRuntime(staging, resolve(input.programRoot), snapshot)
     for (const dependency of snapshot.dependencies) {
       hooks.signal?.throwIfAborted()
       if (dependency.preparedTarget && (dependency.preparedTarget.imageId !== image.id || dependency.preparedTarget.image !== resourceManifest.image.tag)) throw new Error(`业务依赖对应另一标准镜像：${dependency.name}；请重新准备`)
@@ -108,7 +110,7 @@ export async function packAgent(input: AgentPackageInput, hooks: AgentPackageHoo
     if (pythonPaths.length) environment.PYTHONPATH = [...pythonPaths, ...(environment.PYTHONPATH ? [environment.PYTHONPATH] : [])].join(':')
     const seed = { ...supplied, environment: undefined, agentId: input.agentId, experimentId: input.experimentId,
       extensions: extensions.extensions,
-      presetId: snapshot.source.preset_id, profilePatch: snapshot.source.patch,
+      presetId: snapshot.source.preset_id, profilePatch: snapshot.source.patch, profile: snapshot.source.profile ?? 'web',
       environmentKeys: Object.keys(environment), sourceDigest: snapshot.candidateSha256,
       ...(input.mode === 'offline' && knowledge.indexPath ? { offlineKnowledge: { indexPath: '/work/harness/workspace/knowledge/offline/index.json' } } : {}) }
     if (/\bsk-[A-Za-z0-9_-]{12,}/.test(JSON.stringify(seed.modelPatch ?? []))) throw new Error('模型凭据须通过专用环境配置引用，不可写入模型 Patch 常量')
@@ -119,6 +121,7 @@ export async function packAgent(input: AgentPackageInput, hooks: AgentPackageHoo
     await writeRuntimeBundle(staging, { programRoot: resolve(input.programRoot), imageTag: resourceManifest.image.tag!, imageId: resourceManifest.image.id,
       imageFingerprint: resourceManifest.image.fingerprint,
       arch: input.arch, agentId: input.agentId, experimentId: input.experimentId, presetId: snapshot.source.preset_id,
+      profile: snapshot.source.profile ?? 'web', harnessRuntime: snapshot.source.harness_runtime,
       profilePatch: snapshot.source.patch, bridgeRequired: Boolean((seed.mcp?.groups?.length ?? 0) || (seed.compositions as any)?.compositions?.length
         || seed.mcp?.servers?.some((server: any) => server.specUrl || server.transport === 'openapi')) })
     hooks.onProgress?.({ stage: 'image', message: '正在归档标准镜像与离线安装资源' })
@@ -128,7 +131,7 @@ export async function packAgent(input: AgentPackageInput, hooks: AgentPackageHoo
     const manifest: AgentPackageManifest = {
       schemaVersion: 1, kind: 'standalone-agent', package: { name, arch: input.arch, mode: input.mode, createdAt: new Date().toISOString(), sensitive: true },
       source: { agentId: input.agentId, experimentId: input.experimentId, candidateSha256: snapshot.candidateSha256,
-        commit: snapshot.git.commit, dirty: snapshot.git.dirty,
+        commit: snapshot.git.commit, dirty: snapshot.git.dirty, profile: snapshot.source.profile ?? 'web',
         paths: { workspace: 'assets/workspace', presets: 'assets/presets', managed: 'assets/managed',
           profilePatch: `assets/managed/${snapshot.source.patch}`, preset: `assets/presets/${snapshot.source.preset}` },
         files: snapshot.files, omitted: snapshot.omitted },

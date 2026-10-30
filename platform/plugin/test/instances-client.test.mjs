@@ -74,6 +74,30 @@ function chooseAgent(ui, value) {
   ui.render()
 }
 
+test('SDK实例完成为正常状态，列表和详情提供SDK入口并省略Web与网站嵌入', async () => {
+  const ui = page({ instances: [{ name: 'sdk-demo', agent_id: 'basic-agent', profile: 'sdk', state: 'completed', source_id: 'experiment:EXP-basic-001' }] })
+  await ui.settle()
+  assert.ok(ui.button('SDK 调试'))
+  assert.match(ui.text(), /执行完成/)
+  assert.equal(ui.button('打开 Web'), undefined)
+  ui.button('查看详情').props.onClick({ currentTarget: { focus() {} } }); ui.render(); await ui.settle()
+  assert.ok(ui.button('接入文档'))
+  assert.equal(ui.button('访问 DSH Web'), undefined)
+  assert.equal(ui.tab('网站嵌入'), undefined)
+  assert.doesNotMatch(ui.text(), /访问端口|内部 Web 端口|更改默认模型/)
+})
+
+test('SDK来源创建不依赖HTTP网关，不显示Web访问方式与端口设置', async () => {
+  const ui = page({ respond(endpoint) {
+    if (endpoint === 'instances/sources') return { ok: true, value: { business_gateway_available: false, sources: [{ source_id: 'experiment:EXP-basic-001', experiment_id: 'EXP-basic-001', agent_id: 'basic-agent', profile: 'sdk', selectable: true, reason: 'SDK 来源' }] } }
+  } })
+  await ui.settle(); openCreate(ui); ui.render(); await ui.settle(); chooseAgent(ui, 'basic-agent'); await ui.settle()
+  ui.nodes().find(node => node.props['aria-label'] === '实例名').props.onChange({ target: { value: 'sdk-demo' } }); ui.render()
+  assert.ok(ui.button('前往 SDK 调试'))
+  assert.doesNotMatch(ui.text(), /业务网关未启用|高级设置 · 端口|实例阶段/)
+  assert.equal(ui.calls.some(item => item.endpoint === 'instances/preview'), false)
+})
+
 test('实例首次读取失败不误报空列表，重试成功后才显示真实空态', async () => {
   let failed = true
   const ui = page({ instances: [], respond(endpoint) {

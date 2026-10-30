@@ -18,6 +18,7 @@ import json
 import os
 import re
 import secrets
+import signal
 import shutil
 import stat
 import subprocess
@@ -451,6 +452,7 @@ def model_policy_patch(policy: dict, local_routes: list[dict] | None = None, *, 
     return json.dumps(rows, ensure_ascii=False, indent=2) + "\n"
 
 
+
 def source_local_model_routes(contract: dict) -> list[dict]:
     """从同一 Candidate 声明读取固定本地适配器，不写入平台外部模型目录。"""
     return business_command(["--capabilities", contract["managed"]])["localModelRoutes"]
@@ -477,6 +479,7 @@ def analysis_model_policy(agent_id: str, platform_policy: dict | None = None) ->
                          source="analysis-runtime", manifest_sha256=None)
 
 
+
 def _atomic_replace(path: Path, data: bytes) -> None:
     """以同目录临时文件原子替换来源目录，并保留原权限。"""
     descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
@@ -491,10 +494,12 @@ def _atomic_replace(path: Path, data: bytes) -> None:
 
 
 def create_harness(agent_id: str, *, repo: Path = REPO, sources: Path | None = None,
-                   lock_path: Path = ADAPTER / "source.lock.json") -> dict:
+                   lock_path: Path = ADAPTER / "source.lock.json", profile: str = "web") -> dict:
     """创建最小 Agent、首次 Experiment 与自包含的 DSH 装载声明。"""
     if not NAME_RE.fullmatch(agent_id):
         raise ValueError("agent-id 必须是小写 kebab-case")
+    if profile not in {"web", "sdk"}:
+        raise ValueError("profile 只能是 web 或 sdk")
 
     sources = sources if sources is not None else source_catalog(repo)
     agent_dir = repo / "agents" / agent_id
@@ -623,6 +628,42 @@ order: 10
 ''',
     }
 
+    if profile == "sdk":
+        preset_file = f"candidate/dsh/presets/{agent_id}/agent.cordis.yml"
+        experiment_files[preset_file] = experiment_files[preset_file].replace("    suffix: 你的工作目录是 {{cwd}}。\n", "")
+        experiment_files["candidate/harness.yaml"] = experiment_files["candidate/harness.yaml"].replace(
+            "loadable_assets:\n", "loadable_assets:\n  profile: sdk\n  profile_manifest: dsh/managed/sdk-profile.package.json\n")
+        experiment_files["candidate/dsh/managed/sdk-profile.package.json"] = (
+            ADAPTER / "verification-home-controls/sdk-profile.package.json").read_text(encoding="utf-8")
+        experiment_files["change.yaml"] = experiment_files["change.yaml"].replace("Web Session", "SDK Session")
+        experiment_files["hypothesis.md"] = experiment_files["hypothesis.md"].replace("DSH Web Profile", "DSH SDK Profile").replace("Web 中无法选择目标 Preset", "SDK 无法装载目标 Preset")
+        experiment_files["candidate/sdk/example.ts"] = '''import { DeepSeekHarness } from '@deepseek-ai/dsh-sdk-client'
+import { readFileSync } from 'node:fs'
+
+// 运行配置由安装器从同一版本生成；示例与 DSH 在同一标准容器内运行。
+const options = JSON.parse(readFileSync(process.env.HARNESS_SDK_OPTIONS!, 'utf8'))
+await using harness = new DeepSeekHarness(options)
+const result = await harness.run(process.argv[2] ?? '你是谁？请用一句中文回答。')
+console.log(result.sessionId, result.finalResponse)
+'''
+        experiment_files["candidate/sdk/README.md"] = '''# TypeScript SDK 接入
+
+本智能体使用 DSH 官方 `@deepseek-ai/dsh-sdk-client`，应用和 DSH 在同一标准 Runtime 容器内运行。
+示例为同目录的 `example.ts`；安装器生成 `HARNESS_SDK_OPTIONS` 指向的启动配置。
+
+1. 在平台选择本版本，填写输入并执行“SDK 调试”。保存成功回执中的 `session_id`。
+2. 在容器内运行 TypeScript 示例，通过 `DeepSeekHarness` 装载生成配置。
+3. 同一 SDK 实例可多次调用；连续对话复用 `harness.session()` 返回的句柄。
+4. 关闭后恢复时，沿用同一 HOME 和工作目录，并显式调用 `await harness.resumeSession(sessionId)`。
+5. 使用 `await using` 或 `finally` 中的 `close()`，确保 DSH 子进程退出。
+
+SDK 通过本地 stdio JSON-RPC 访问子进程，无需业务 Web 地址。事件通知不等于逐 token 文本流。
+高层 `run()` 在根 Agent 首次空闲时返回；含子智能体的完整任务使用低层 `HarnessClient` 的 `session/wait`。
+官方协议不支持逐轮取消，停止会关闭整个 Runtime。请求超时或连接中断不能直接认定业务失败，不自动重放。
+需要 Web 人工审批或追问的路径未在 SDK 中承诺可用；可停止当前执行并核对事件。
+模型、MCP、业务依赖由当前实例或独立安装配置提供，接口就绪和模型回复不等于业务通过。
+'''
+
     moved: list[Path] = []
     try:
         with tempfile.TemporaryDirectory(prefix=".dsh-dev-init-", dir=repo) as temporary:
@@ -656,7 +697,7 @@ order: 10
 
 def command_init(args: argparse.Namespace) -> None:
     try:
-        result = create_harness(args.agent_id, repo=REPO, sources=SOURCES)
+        result = create_harness(args.agent_id, repo=REPO, sources=SOURCES, profile=getattr(args, "profile", "web"))
     except (OSError, ValueError, RuntimeError) as exc:
         fail(str(exc))
     print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -798,6 +839,7 @@ def required_env_names(contract: dict, analysis_workspace: str | None = None) ->
     if not analysis_workspace and policy.get("source") == "platform":
         source_required = [name for name in source_required if name not in SOURCE_MODEL_ENV_NAMES]
     return list(dict.fromkeys(source_required + list(policy.get("credential_refs") or [])))
+
 
 
 def source_optional_env_names(contract: dict) -> list[str]:
@@ -1613,6 +1655,8 @@ def prepare_up(args: argparse.Namespace) -> tuple[dict, tuple[Path, dict] | None
     args.skip_testing_notice = not args.analysis_workspace
     validate_trusted_host(getattr(args, "trusted_host", None))
     contract = resolve(args.source, repo=REPO)
+    if contract.get("profile") == "sdk":
+        fail("SDK 版本使用 sdk-run 提交真实输入，不启动空闲 Web 服务")
     args.name = args.name or f"{contract['agent_id']}-{PURPOSES[args.mode]}"
     current = existing_instance(args.name)
     if current is not None:
@@ -1976,6 +2020,142 @@ def _command_up(args: argparse.Namespace, contract: dict,
                      ensure_ascii=False), file=sys.stderr)
 
 
+def _sdk_cancel_requested(args: argparse.Namespace) -> bool:
+    marker = os.environ.get("HARNESS_SDK_STOP_FILE")
+    return bool(getattr(args, "sdk_cancelled", False) or marker and Path(marker).exists())
+
+
+
+def _sdk_cancel_checkpoint(args: argparse.Namespace) -> None:
+    if _sdk_cancel_requested(args):
+        args.sdk_cancelled = True
+        raise SystemExit(1)
+
+
+
+def command_sdk_run(args: argparse.Namespace) -> None:
+    handlers = {}
+    def cancel(_signum, _frame):
+        args.sdk_cancelled = True
+    for signum in (signal.SIGTERM, signal.SIGINT):
+        handlers[signum] = signal.signal(signum, cancel)
+    try:
+        _command_sdk_run(args)
+    except (SystemExit, OSError, ValueError) as error:
+        if not getattr(args, "sdk_process_started", False):
+            cancelled = _sdk_cancel_requested(args)
+            print(json.dumps({"type": "result", "profile": "sdk", "status": "stopped" if cancelled else "failed",
+                              "name": getattr(args, "instance", None), "runtime_started": False,
+                              "message": "SDK 准备已停止，尚未启动 Runtime" if cancelled else "SDK 执行准备失败，请核对来源、输入、镜像和模型设置；具体原因见错误信息"}, ensure_ascii=False))
+        raise
+    finally:
+        for signum, handler in handlers.items():
+            signal.signal(signum, handler)
+
+
+
+def _command_sdk_run(args: argparse.Namespace) -> None:
+    """复用来源、镜像、模型与运行投影校验，交由 TS SDK 应用管理进程。"""
+    _sdk_cancel_checkpoint(args)
+    contract = resolve(args.source, repo=REPO)
+    if contract.get("profile") != "sdk":
+        fail("sdk-run 仅接受声明 profile: sdk 的版本")
+    args.name = args.instance
+    if not NAME_RE.fullmatch(args.name):
+        fail("实例名必须是小写 kebab-case")
+    input_path = Path(args.input_file).expanduser()
+    if not input_path.is_file() or input_path.is_symlink() or input_path.stat().st_size > 2 * 1024 * 1024:
+        fail("SDK 输入必须来自不超过 2 MiB 的普通 JSON 文件")
+    payload = json.loads(input_path.read_text(encoding="utf-8"), object_pairs_hook=_unique_json)
+    if not isinstance(payload, dict) or not set(payload) <= {"input", "session_id"} \
+            or not isinstance(payload.get("input"), str) or not payload["input"].strip():
+        fail("SDK 输入必须包含非空 input 文本和可选 session_id")
+    if len(payload["input"].encode("utf-8")) > 1024 * 1024:
+        fail("SDK input 文本不能超过 1 MiB")
+    if "session_id" in payload and (not isinstance(payload["session_id"], str)
+                                    or not payload["session_id"].strip() or len(payload["session_id"]) > 256):
+        fail("SDK session_id 必须为非空字符串且不超过 256 个字符")
+    _sdk_cancel_checkpoint(args)
+    current = existing_instance(args.name)
+    if current is not None:
+        if current[1].get("profile") != "sdk":
+            fail("同名实例使用 Web Profile，请为 SDK 使用新的实例名")
+        validate_existing_identity(args.name, current[1], contract, "verification", None)
+        if selected_home_directory(args.name, current) is None:
+            fail("既有 SDK 实例缺少 HOME 登记；拒绝创建空 HOME 替代")
+        require_docker_registration(args.name, current[1])
+    else:
+        require_unused_docker_name(args.name)
+    target = instance_dir(args.name)
+    target.mkdir(parents=True, exist_ok=True)
+    with (target / "sdk.lock").open("w") as lock:
+        try:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            fail("此 SDK 实例已有执行，等待完成或停止后再试")
+        running_id, query_failed = running_dsh_image_id(args.name)
+        if query_failed or running_id:
+            fail("此实例容器仍在运行或无法确认状态，未启动另一执行")
+        policy = read_model_policy(getattr(args, "model_policy", None), contract["agent_id"], repo=REPO)
+        contract["model_policy"] = policy
+        assert_direct_model_available(contract, policy)
+        if contract.get("harness_runtime") != policy.get("harness_runtime"):
+            fail("SDK Harness 运行声明与平台模型投影不一致，请重新预览")
+        check_environment(contract, None)
+        identity = validate_image_identity(contract)
+        _sdk_cancel_checkpoint(args)
+        assert_asset_dependencies(contract, identity["image_id"])
+        contract.update(prepare_harness_projection(contract, target))
+        _sdk_cancel_checkpoint(args)
+        manifest = {"schema_version": INSTANCE_SCHEMA_VERSION, "asset_root": str(REPO),
+                    "workspace_id": workspace_id(REPO), "name": args.name, "container_name": args.name,
+                    "project": project_name(args.name), "source_id": contract["source_id"],
+                    "source_kind": contract["source_kind"], "agent_id": contract["agent_id"],
+                    "mode": "verification", "purpose": "sdk", "target_preset": contract["preset_id"],
+                    "session_preset": contract["preset_id"], "image_tag": contract["image"]["local_image_tag"],
+                    "sdk_operation_id": os.environ.get("HARNESS_SDK_OPERATION_ID") or secrets.token_hex(16),
+                    "image_id": identity["image_id"], "image_build_fingerprint": identity["image_build_fingerprint"],
+                    "mounts": {key: contract[key] for key in ("workspace", "presets", "managed")},
+                    "mount_modes": {key: "ro" for key in ("workspace", "presets", "managed")},
+                    "model_policy": model_policy_summary(policy)}
+        launch = {"target": str(target), "name": args.name, "project": project_name(args.name),
+                  "homeDirectory": selected_home_directory(args.name, current), "reuseHome": current is not None,
+                  "contract": contract, "identity": identity, "manifest": manifest, "input": payload,
+                  "selection": policy["default"] or policy.get("resolved_model_bindings", {}).get("main"), "environmentNames": runtime_env_names(contract),
+                  "dependencyMounts": asset_dependency_mounts(contract),
+                  "modelPatch": model_policy_patch(policy, source_local_model_routes(contract)),
+                  "modelRuntime": str(MODEL_RUNTIME_HOST), "modelBinding": str(MODEL_BINDING_HOST)}
+        launch_path = target / "sdk-launch.json"
+        launch_path.write_text(json.dumps(launch, ensure_ascii=False), encoding="utf-8")
+        launch_path.chmod(0o600)
+        _sdk_cancel_checkpoint(args)
+        handlers = {}
+        child = None
+        cancelled = None
+        def stop(signum, _frame):
+            nonlocal cancelled
+            cancelled = signum
+            args.sdk_cancelled = True
+            if child is not None:
+                child.send_signal(signum)
+        for signum in (signal.SIGTERM, signal.SIGINT):
+            handlers[signum] = signal.signal(signum, stop)
+        try:
+            _sdk_cancel_checkpoint(args)
+            child = subprocess.Popen([NODE_EXECUTABLE, str(ADAPTER / "sdk-instance.mts"), str(launch_path)],
+                                     env={**os.environ, **contract.get("asset_dependencies", {}).get("environment", {})})
+            args.sdk_process_started = True
+            if cancelled:
+                child.send_signal(cancelled)
+            code = child.wait()
+        finally:
+            for signum, handler in handlers.items():
+                signal.signal(signum, handler)
+        if code:
+            raise SystemExit(code)
+
+
+
 def command_ps(args: argparse.Namespace) -> None:
     show_all = bool(getattr(args, "all", False))
     entries = []
@@ -2107,6 +2287,8 @@ def instance_entry(target: Path, manifest: dict, observation: dict | None = None
         if observation is not None and not docker_registration_matches(name, projects.get(project, [])):
             ps_state, state, containers = "unknown", "unknown", None
             ps_detail = "同名 Docker 项目来自另一实例登记或无法确认归属；未认领该容器"
+    if manifest.get("profile") == "sdk" and state == "stopped" and manifest.get("status") == "completed":
+        state = "completed"
     observed_dsh = next(
         (item.get("name") for item in containers or []
          if item.get("service") == "dsh" and item.get("name")),
@@ -2184,6 +2366,10 @@ def running_container(name: str) -> tuple[str, str]:
 
 def command_url(args: argparse.Namespace) -> None:
     _, manifest = load_instance(args.name)
+    if manifest.get("profile") == "sdk":
+        print(json.dumps({"name": args.name, "profile": "sdk", "url": None,
+                          "note": "此实例通过官方 TypeScript SDK 的本地 stdio 调用，请查看 SDK 接入文档。"}, ensure_ascii=False))
+        return
     require_docker_registration(args.name, manifest)
     if manifest.get("business_control"):
         running_container(args.name)
@@ -2533,7 +2719,14 @@ def stop_instance(name: str, manifest: dict) -> dict:
 def command_down(args: argparse.Namespace) -> None:
     """停止实例并如实报告结果：命令失败、仍有容器运行或状态未知都不报告停止成功。"""
     _, manifest = load_instance(args.name)
-    print(json.dumps(stop_instance(args.name, manifest), ensure_ascii=False))
+    report = stop_instance(args.name, manifest)
+    if manifest.get("profile") == "sdk" and manifest.get("status") in {"starting", "running"}:
+        path = instance_dir(args.name) / "instance.json"
+        latest = json.loads(path.read_text(encoding="utf-8"))
+        if latest.get("sdk_operation_id") == manifest.get("sdk_operation_id"):
+            latest["status"] = "stopped"
+            _atomic_replace(path, (json.dumps(latest, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
+    print(json.dumps(report, ensure_ascii=False))
 
 
 def delete_instance(name: str, manifest: dict) -> dict:
@@ -2631,7 +2824,7 @@ def existing_instance(name: str) -> tuple[Path, dict] | None:
         return None
     manifest_path = target / "instance.json"
     if not manifest_path.is_file():
-        if set(path.name for path in target.iterdir()) <= {"dsh-home", "model.patch.yml", "profile-compat", "runtime-presets", "harness-runtime.json", "project-workspace", "project-workspace-source.json", "project-workspace.pending"}:
+        if set(path.name for path in target.iterdir()) <= {"dsh-home", "model.patch.yml", "profile-compat", "runtime-presets", "harness-runtime.json", "project-workspace", "project-workspace-source.json", "project-workspace.pending", "sdk.lock", "sdk-launch.json", "sdk-runtime"}:
             return None
         fail(f"实例目录已存在但缺少 instance.json：{target}")
     return load_instance(name)
@@ -2843,6 +3036,7 @@ def main() -> None:
 
     init = commands.add_parser("init", help="创建最小 Harness Agent 与首次 Experiment")
     init.add_argument("agent_id", help="小写 kebab-case Agent ID")
+    init.add_argument("--profile", choices=("web", "sdk"), default="web", help="Web 交互或官方 TypeScript SDK")
     init.set_defaults(handler=command_init)
 
     build = commands.add_parser("image", help="构建锁定 DSH 镜像")
@@ -2885,6 +3079,13 @@ def main() -> None:
     up.add_argument("--business-identity-mode", choices=("development", "published"),
                     help="新建网关实例的身份阶段；已有实例沿用网关登记")
     up.set_defaults(handler=command_up)
+
+    sdk = commands.add_parser("sdk-run", help="在标准容器中通过官方 TypeScript SDK 执行输入")
+    sdk.add_argument("--source", required=True)
+    sdk.add_argument("--instance", required=True, help="独立 SDK 实例名，复用其持久 HOME")
+    sdk.add_argument("--input-file", required=True, help="包含 input 和可选 session_id 的 JSON 文件")
+    sdk.add_argument("--model-policy", help="平台生成的当前非秘密模型投影")
+    sdk.set_defaults(handler=command_sdk_run)
 
     ps_parser = commands.add_parser("ps", help="默认列出运行中的实例；加 --all 查看全部状态记录")
     ps_parser.add_argument("-a", "--all", action="store_true", help="包含 stopped、absent（无容器登记）、failed、unknown 和损坏记录")

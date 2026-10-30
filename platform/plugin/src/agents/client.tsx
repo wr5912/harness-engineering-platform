@@ -8,6 +8,7 @@ import { instanceWebUrl } from '../instances/url.ts'
 import { AssetDiffPanel } from './asset-diff-client.tsx'
 import { CreateAgentDialog } from './create-agent-client.tsx'
 import { ImportAgentDialog, type MigrationEntryTarget } from './import-agent-client.tsx'
+import { SdkDebugDialog } from './sdk-client.tsx'
 import { ComputeVariantsPanel, canDeriveVersion, isVariantVersion } from './compute-variants.tsx'
 import { VariantSourcePanel } from './variant-source.tsx'
 import { AgentDescriptionPanel } from './description-client.tsx'
@@ -116,6 +117,8 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
   const [createOpen, setCreateOpen] = useState(false)
   const [migrationOpen, setMigrationOpen] = useState(false)
   const [migrationTarget, setMigrationTarget] = useState<MigrationEntryTarget>()
+  const [sdkOpen, setSdkOpen] = useState(false)
+  const [sdkTarget, setSdkTarget] = useState<{ source: string; agentId: string; label: string; tab: 'debug' | 'guide' } | null>(null)
   const [deploymentOpen, setDeploymentOpen] = useState(false)
   const [deploymentTarget, setDeploymentTarget] = useState<{ agent_id: string; experiment_id: string; label: string } | null>(null)
   const [moreActionsOpen, setMoreActionsOpen] = useState(false)
@@ -710,6 +713,13 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
     if (detail?.experiment?.id) onNavigate?.({ page: 'evaluation', agent_id: selected, experiment_id: detail.experiment.id, intent: 'start_eval' })
   }
 
+  const sdkProfile = detail?.declared?.loadable_source?.profile === 'sdk'
+  function openSdk(tab: 'debug' | 'guide' = 'debug') {
+    if (!detail) return
+    setSdkTarget({ source: `experiment:${detail.experiment.id}`, agentId: selected, label: `${detail.agent.name || selected} · ${versionLabel(detail.experiment.id)}`, tab })
+    setSdkOpen(true)
+  }
+
   return <main className="harness-agents" data-active-tab={tab} aria-label="智能体管理">
     <div className="agent-page-content">
       <header className="agent-page-heading">
@@ -773,8 +783,9 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
             <div className="agent-identity-top">
               {detail.is_current === false && detail.current_variant_id && <p className="agent-notice" role="status">当前查看历史变体记录，资产和 Run 保留原身份。<button type="button" onClick={() => selectVersion(selected, detail.current_variant_id, true, tab)}>查看当前变体</button><code>{detail.current_variant_id}</code></p>}
               <div className="agent-identity-title"><h2>{detail.agent.name || detail.agent.manifest.name || selectedAgent?.name || selected}</h2><SearchSelect className="agent-version-choice" label="版本" value={selectedExperiment || detail.experiment.id} options={agentVersions.map((version: any) => { const metadata = version.id === detail.experiment.id ? detail.experiment : experiments.find(item => item.id === version.id) ?? version; const name = versionLabel(version.id).replace(/^版本 /, 'v'); const disambiguation = agentVersions.filter((item: any) => versionLabel(item.id) === versionLabel(version.id)).length > 1 ? ` · ${version.id.slice(-6)}` : ''; return { value: version.id, label: isComputeVariant(metadata) ? `${variantName(metadata)} · ${name}${disambiguation}` : `${name}${disambiguation}`, description: version.id } })} onChange={value => selectVersion(selected, value)}/><span className="agent-badge">{isComputeVariant(detail.experiment) ? "算力变体" : "业务版本"}</span></div>
-              <div className="agent-actions agent-main-actions"><button type="button" className="agent-primary" disabled={!onNavigate} onClick={startEvaluation}>发起评测</button><button type="button" disabled={launchBusy} onClick={() => void launchVersion()}>进入对话</button><button type="button" onClick={() => setPublishOpen(true)}>发布版本</button><details className="agent-more-actions" open={moreActionsOpen}><summary onClick={event => { event.preventDefault(); setMoreActionsOpen(!moreActionsOpen) }}>更多操作</summary><div><button type="button" onClick={() => { setMoreActionsOpen(false); setDeploymentTarget({ agent_id: selected, experiment_id: detail.experiment.id, label: `${detail.agent.name || selected} · ${versionLabel(detail.experiment.id)}` }); setDeploymentOpen(true) }}>导出独立运行包</button><button type="button" disabled={!onNavigate} onClick={() => { setMoreActionsOpen(false); openEvaluation() }}>查看评测</button><button type="button" disabled={!onNavigate} onClick={() => { setMoreActionsOpen(false); onNavigate?.({ page: 'instances', agent_id: selected, experiment_id: detail.experiment.id }) }}>查看实例</button><button type="button" disabled={!derivable} title={derivable ? undefined : "变体不能作为新版本的继承来源。"} onClick={() => { if (!derivable) return; setMoreActionsOpen(false); setVersionOpen(true); resetVersionPreview() }}>新建研究版本</button><button type="button" disabled={!onNavigate} onClick={() => { setMoreActionsOpen(false); onNavigate?.({ page: 'instances', agent_id: selected, experiment_id: detail.experiment.id, source_id: `experiment:${detail.experiment.id}` }) }}>创建实例</button></div></details></div>
+              <div className="agent-actions agent-main-actions">{sdkProfile ? <><button type="button" className="agent-primary" onClick={() => openSdk()}>SDK 调试</button><button type="button" onClick={() => openSdk('guide')}>接入文档</button></> : <><button type="button" className="agent-primary" disabled={!onNavigate} onClick={startEvaluation}>发起评测</button><button type="button" disabled={launchBusy} onClick={() => void launchVersion()}>进入对话</button><button type="button" onClick={() => setPublishOpen(true)}>发布版本</button></>}<details className="agent-more-actions" open={moreActionsOpen}><summary onClick={event => { event.preventDefault(); setMoreActionsOpen(!moreActionsOpen) }}>更多操作</summary><div><button type="button" onClick={() => { setMoreActionsOpen(false); setDeploymentTarget({ agent_id: selected, experiment_id: detail.experiment.id, label: `${detail.agent.name || selected} · ${versionLabel(detail.experiment.id)}` }); setDeploymentOpen(true) }}>导出独立运行包</button><button type="button" disabled={!onNavigate} onClick={() => { setMoreActionsOpen(false); openEvaluation() }}>查看评测</button><button type="button" disabled={!onNavigate} onClick={() => { setMoreActionsOpen(false); onNavigate?.({ page: 'instances', agent_id: selected, experiment_id: detail.experiment.id }) }}>查看实例</button><button type="button" disabled={!derivable} title={derivable ? undefined : "变体不能作为新版本的继承来源。"} onClick={() => { if (!derivable) return; setMoreActionsOpen(false); setVersionOpen(true); resetVersionPreview() }}>新建研究版本</button><button type="button" disabled={!sdkProfile && !onNavigate} onClick={() => { setMoreActionsOpen(false); if (sdkProfile) openSdk(); else onNavigate?.({ page: 'instances', agent_id: selected, experiment_id: detail.experiment.id, source_id: `experiment:${detail.experiment.id}` }) }}>创建实例</button></div></details></div>
             </div>
+            {sdkProfile && <p className="agent-muted">使用方式：官方 TypeScript SDK · 在标准容器内调用</p>}
             {!derivable && <p className="agent-muted">变体不能作为新版本、融合或其他变体的继承来源。</p>}{isComputeVariant(detail.experiment) && <div className="agent-variant-name"><h3>{variantName(detail.experiment)}</h3><button type="button" disabled={nameBusy || nameOpen} onClick={editVariantName}>修改变体名称</button></div>}
             {nameOpen && <form className="agent-name-form" aria-label="修改变体名称" onSubmit={event => { event.preventDefault(); void saveVariantName() }}>
               <label className="agent-field">变体名称<input aria-label="变体名称" value={nameDraft} disabled={nameBusy} onChange={event => setNameDraft(event.target.value)} required /></label>
@@ -887,6 +898,7 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
       {createOpen && <CreateAgentDialog rpc={rpc} active={active} onClose={() => setCreateOpen(false)} onCreated={() => { void refreshList() }} onSelect={receipt => { if (selectVersion(receipt.agent_id, receipt.experiment_id)) setCreateOpen(false) }} />}
       {migrationOpen && onAssistant && <ImportAgentDialog active={active} target={migrationTarget} onClose={() => setMigrationOpen(false)} onAssistant={onAssistant} />}
       {deploymentTarget && <DeploymentDialog rpc={rpc} active={active && deploymentOpen} target={deploymentTarget} onClose={() => setDeploymentOpen(false)} />}
+      {sdkTarget && <SdkDebugDialog key={sdkTarget.source} rpc={rpc} active={active && sdkOpen} {...sdkTarget} initialTab={sdkTarget.tab} onClose={() => setSdkOpen(false)} />}
     </div>
   </main>
 }

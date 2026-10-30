@@ -2,9 +2,9 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 process.env.HARNESS_DSH_ENTRY ??= '/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/package.json'
-import { initializeStandalone, configureStandalone, projectManagedPatch } from '../src/standalone/bootstrap.ts'
+import { initializeStandalone, configureStandalone, projectManagedPatch, prepareStandaloneSdk } from '../src/standalone/bootstrap.ts'
 import { readStandaloneConfig } from '../src/standalone/config.ts'
 
 function fixture(t) {
@@ -118,4 +118,38 @@ test('MCP 重配使用真实管理器校验，坏地址和重复工具不会覆�
   writeFileSync(path, JSON.stringify({ mcp: { servers: [server], groups: [], sharedToken: 'a'.repeat(64) } }))
   await configureStandalone(path, f)
   assert.equal(readStandaloneConfig(f.home).mcp.servers[0].url, server.url, '保存格式合法配置不探测不可达的外部服务')
+})
+
+test('SDK 独立环境使用原生SDK组合和固定Preset，初始化及重配不自动提交输入', async t => {
+  const f = fixture(t)
+  f.seed.profile = 'sdk'
+  const sdk = join(dirname(f.installAnchor), 'node_modules/@deepseek-ai/dsh-sdk-client')
+  mkdirSync(sdk, { recursive: true })
+  writeFileSync(join(sdk, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-sdk-client', type: 'module' }))
+  writeFileSync(join(f.root, 'config-seed/standalone.json'), JSON.stringify(f.seed))
+  writeFileSync(join(f.root, 'runtime/sdk-profile.patch.yml'), readFileSync(new URL('../../../runtime/adapters/dsh-container/sdk-profile.patch.yml', import.meta.url)))
+  mkdirSync(join(f.root, 'sdk'), { recursive: true })
+  writeFileSync(join(f.root, 'sdk/example.ts'), 'import { DeepSeekHarness } from "@deepseek-ai/dsh-sdk-client"\n')
+  writeFileSync(join(f.root, 'assets/harness.yaml'), 'loadable_assets:\n  preset_id: demo\n')
+  initializeStandalone(f)
+  const manifest = JSON.parse(readFileSync(join(f.home, 'profiles/standalone/package.json'), 'utf8'))
+  assert.deepEqual(manifest.dsh.profile.bundles, ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-sdk-app'])
+  const runtime = readFileSync(join(f.home, 'standalone/runtime.patch.yml'), 'utf8')
+  assert.match(runtime, /sdk-preset.mts/)
+  assert.match(runtime, /host: 127\.0\.0\.1/)
+  assert.match(runtime, /port: 0/)
+  assert.doesNotMatch(runtime, /container-web-app|web-runtime|webStartup/)
+  assert.equal(existsSync(join(f.home, 'standalone/input.json')), false)
+  const options = prepareStandaloneSdk(f)
+  assert.equal(options.profile, 'standalone')
+  assert.equal(options.provider, 'api')
+  assert.equal(options.model, 'model-a')
+  assert.equal(JSON.stringify(options).includes('fixture-value'), false)
+  assert.deepEqual(JSON.parse(readFileSync(join(f.home, 'standalone/sdk-options.json'), 'utf8')), options)
+  assert.equal(existsSync(join(f.home, 'sessions')), false)
+  const config = join(f.root, 'new-model.json')
+  writeFileSync(config, JSON.stringify({ defaultModel: { provider: 'new-api', model: 'new-model' } }))
+  await configureStandalone(config, f)
+  assert.equal(prepareStandaloneSdk(f).model, 'new-model')
+  assert.equal(existsSync(join(f.home, 'standalone/input.json')), false)
 })

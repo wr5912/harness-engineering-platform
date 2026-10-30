@@ -26,6 +26,9 @@ if ! docker info >/dev/null 2>&1; then
   docker info >/dev/null 2>&1 || { echo 'Docker daemon 不可用或当前用户无权限，请修复后重新安装' >&2; exit 2; }
 fi
 if [ -d "$prefix" ] && [ -n "$(ls -A "$prefix")" ]; then echo '安装目录不是空目录；已有部署请使用其 agent 启动器' >&2; exit 2; fi
+if [ "${AGENT_PROFILE:-web}" = sdk ]; then
+  [ -z "$port$public_host" ] || { echo 'SDK 型智能体不发布 Web 地址，无需指定 --port 或 --host' >&2; exit 2; }
+else
 # Docker 可通过 NAT 发布端口而不创建宿主监听进程，需与全部 IPv4/IPv6 LISTEN 一起核对。
 declare -A occupied_ports=()
 proc_tables=(/proc/net/tcp)
@@ -50,6 +53,7 @@ fi
 [[ "$port" =~ ^[0-9]+$ ]] && [ "$port" -ge 1 ] && [ "$port" -le 65535 ] || { echo '没有可用端口或指定端口无效' >&2; exit 2; }
 port=$((10#$port))
 if [ -n "${occupied_ports[$port]:-}" ]; then echo '指定端口已被占用，请使用其他端口重新安装；安装目录未写入' >&2; exit 2; fi
+fi
 mkdir -p "$prefix"
 cp -a "$SOURCE"/. "$prefix"/
 chmod 700 "$prefix" "$prefix/install.sh" "$prefix/agent"
@@ -74,5 +78,10 @@ actual_id=$(docker image inspect "$IMAGE_TAG" --format '{{.Id}}')
 actual_fingerprint=$(docker image inspect "$IMAGE_TAG" --format '{{index .Config.Labels "org.ai-agent-harness.dsh.image-build-fingerprint"}}')
 [ -n "${IMAGE_ID:-}" ] && [ "$actual_id" = "$IMAGE_ID" ] || { echo '导入镜像身份不一致；安装结果已保留' >&2; exit 2; }
 [ -n "${IMAGE_FINGERPRINT:-}" ] && [ "$actual_fingerprint" = "$IMAGE_FINGERPRINT" ] || { echo '导入镜像指纹不一致；安装结果已保留' >&2; exit 2; }
-"$prefix/agent" start
-printf '安装目录：%s\n再次启动：%s/agent start\n' "$prefix" "$prefix"
+if [ "${AGENT_PROFILE:-web}" = sdk ]; then
+  "$prefix/agent" prepare-sdk
+  printf '安装目录：%s\nSDK 环境已准备，尚未提交任务。\n运行：%s/agent run --input-file <JSON文件>\n' "$prefix" "$prefix"
+else
+  "$prefix/agent" start
+  printf '安装目录：%s\n再次启动：%s/agent start\n' "$prefix" "$prefix"
+fi

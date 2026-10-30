@@ -1,8 +1,8 @@
-export type InstanceState = 'running' | 'stopped' | 'failed' | 'absent' | 'unknown'
+export type InstanceState = 'running' | 'stopped' | 'completed' | 'failed' | 'absent' | 'unknown'
 
 /** 登记缺失或尚不能识别的状态统一保留为未知，统计和筛选共用同一口径。 */
 export function instanceState(value: unknown): InstanceState {
-  return value === 'running' || value === 'stopped' || value === 'failed' || value === 'absent' ? value : 'unknown'
+  return value === 'running' || value === 'stopped' || value === 'completed' || value === 'failed' || value === 'absent' ? value : 'unknown'
 }
 
 export function matchesInstanceState(value: unknown, filter: string): boolean {
@@ -11,11 +11,12 @@ export function matchesInstanceState(value: unknown, filter: string): boolean {
 }
 
 export function instanceStateSegments(rows: readonly { state?: unknown }[]) {
-  const counts: Record<InstanceState, number> = { running: 0, stopped: 0, failed: 0, absent: 0, unknown: 0 }
+  const counts: Record<InstanceState, number> = { running: 0, stopped: 0, completed: 0, failed: 0, absent: 0, unknown: 0 }
   for (const row of rows) counts[instanceState(row.state)]++
   return [
     { key: 'running', label: '运行中', count: counts.running, tone: 'success' as const },
     { key: 'stopped', label: '已停止', count: counts.stopped, tone: 'neutral' as const },
+    ...(counts.completed ? [{ key: 'completed', label: '执行完成', count: counts.completed, tone: 'success' as const }] : []),
     { key: 'failed', label: '异常', count: counts.failed, tone: 'danger' as const },
     { key: 'absent', label: '无容器登记', count: counts.absent, tone: 'neutral' as const },
     { key: 'unknown', label: '状态未知', count: counts.unknown, tone: 'warning' as const },

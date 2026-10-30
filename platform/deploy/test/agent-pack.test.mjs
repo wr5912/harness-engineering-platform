@@ -34,8 +34,8 @@ test('单 Agent 快照读取实际未提交字节、保留来源身份，排除�
 test('未承接的迁移运行声明在独立包预览和打包前明确拒绝，不能静默改变行为', async t => {
   const f = fixture(t), harness = join(f.candidate, 'harness.yaml')
   write(harness, readFileSync(harness, 'utf8') + '\nrole_instructions:\n  alpha-main: dsh/workspace/AGENTS.md\n')
-  assert.throws(() => previewAgentPackage(f.input), /当前独立运行包尚未适配/)
-  await assert.rejects(packAgent(f.input), /当前独立运行包尚未适配/)
+  assert.throws(() => previewAgentPackage(f.input), /当前.*独立运行包尚未适配/)
+  await assert.rejects(packAgent(f.input), /当前.*独立运行包尚未适配/)
   assert.equal(existsSync(join(f.out, 'manifest.json')), false)
 })
 

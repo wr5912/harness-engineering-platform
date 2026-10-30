@@ -14,6 +14,22 @@ export HARNESS_ASSET_ROOT="$HOME/harness-engineering-platform-data"
 
 程序保留 `source.lock.json`、运行适配器与校验 Skill；数据工作区保留 `workspace.json`、`config/`、`agents/` 和 `evolution/`。当前装载不依赖全局来源表；固定历史提交的恢复只兼容该提交自身的旧声明，具体合同见[版本身份与装载声明](../../../docs/platform-design/03_存储架构与数据契约.md#版本身份与装载声明)。校验器从程序侧读取规范与实现，不要求把程序文档复制到数据仓库。评测工具使用 Python 3.10 或更新版本，TypeScript 入口需要 Node.js 24；检查 PATH 时应同时核对这两个版本。
 
+## SDK 无界面调用
+
+新建时使用 `dsh-dev init <agent-id> --profile sdk`；省略该选项仍创建 Web 版本。SDK 版本通过官方 TypeScript SDK 启动同一标准容器内的 DSH 子进程，保留独立 HOME，不发布业务 HTTP 端口。
+
+```bash
+/usr/bin/python3 runtime/adapters/dsh-container/dsh-dev init sdk-example --profile sdk
+# input.json：{"input":"你是谁？请用一句中文回答。"}；可选 session_id 表示显式恢复。
+/usr/bin/python3 runtime/adapters/dsh-container/dsh-dev sdk-run \
+  --source experiment:<版本ID> --instance sdk-example-dev --input-file ./input.json
+```
+
+平台使用当前模型投影和专用凭据运行调试；命令行可用 `--model-policy` 接收同一非秘密投影。调用示例和接入说明保存在版本 Candidate 的 `sdk/`。运行时生成官方依赖链接与配置，不安装另一份 DSH。新会话装载该版本的主 Preset，恢复时核对历史 Preset；有子智能体的任务等待后代及根会话后续回合完成。
+
+每个 SDK 实例同时执行一个任务。正常退出记录“执行完成”，不以端口监听作为成功条件；停止使用 `dsh-dev down <实例名>`，关闭本次应用及 SDK Runtime，HOME 和 Session 保留。官方 SDK 没有逐轮取消；超时和连接中断不自动重放输入。Web 评测路径仍按其现有合同执行，SDK 调试回执不替代业务 Evaluation。
+
+
 ## 源码与镜像身份
 
 `source.lock.json` 锁定官方仓库提交、Git tree、`pnpm-lock.yaml` 摘要、包管理器版本和 Node 基础镜像 OCI index digest；当前锁定 `v0.2.1-rc.2`，Web 组合原生包含 Schedule 服务和任务界面。所有 Experiment 共用这份锁。宿主来源解析将 Linux `x86_64`/`amd64` 映射为 `linux/amd64`，将 Linux `aarch64`/`arm64` 映射为 `linux/arm64`，其他系统或架构明确拒绝。构建指纹和本地镜像标签包含解析出的平台，因此同一锁定源码在两种架构上的镜像身份不同，不能混用。宿主来源解析脚本不进入 Runtime 镜像，因此不参与镜像构建指纹。`build-image.sh` 新建临时源码工作树，在宿主侧核对提交、tree 和锁摘要后用 BuildKit named context 构建。官方构建脚本支持显式 `DSH_CLIENT_COMMIT_HASH`；构建器不依赖 named context 是否携带 `.git`，只安装本地 C 编译及 musl 工具，最终镜像不保留这些构建工具或 `.git`。本仓库没有 DSH 源码副本。

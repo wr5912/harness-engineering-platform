@@ -174,8 +174,8 @@ def _experiment_contract(
             relative = safe_relative(item[key])
             if not real_file_below(root, Path(folder) / relative):
                 raise ValueError(f"missing or unsafe source file: {key}")
-    if item["profile"] != "web":
-        raise ValueError("only the verified DSH web profile is supported")
+    if item["profile"] not in {"web", "sdk"}:
+        raise ValueError("only the DSH web and sdk profiles are supported")
     for key in ("config_markers", "required_env_names", "optional_env_names"):
         values = item.get(key, [])
         if not isinstance(values, list) or (key == "config_markers" and not values) \
@@ -260,10 +260,10 @@ def _resolve_experiment(source_id: str, *, repo: Path, sources: Path, lock_path:
         raise ValueError(result.stderr.strip() or "版本装载声明读取失败")
     item = json.loads(result.stdout)
     experiment_root = Path("evolution/experiments") / source_id / "candidate"
-    profile_manifest = ADAPTER / "verification-home-controls/web-profile.package.json"
+    profile_manifest = ADAPTER / "verification-home-controls" / f"{item['profile']}-profile.package.json"
     if "profile_manifest" in item:
         relative = safe_relative(item["profile_manifest"])
-        if relative != experiment_root / "dsh/managed/web-profile.package.json" \
+        if relative != experiment_root / f"dsh/managed/{item['profile']}-profile.package.json" \
                 or not real_file_below(repo, relative):
             raise ValueError("invalid experiment profile manifest")
         profile_manifest = repo / relative

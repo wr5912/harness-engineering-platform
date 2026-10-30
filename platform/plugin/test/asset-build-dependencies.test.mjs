@@ -159,8 +159,9 @@ test('普通EXP生成制品复用原生Cordis、消息工厂与工具输出校�
   let result = await handler('build', { experiment_id: id, entry_path: entry, expected_candidate_sha256: preview.value.candidate_sha256, expected_preview_sha256: preview.value.preview_sha256 })
   assert.equal(result.ok, true, JSON.stringify(result))
   const plugin = await import(`file://${join(f.candidate, result.value.output_path)}`)
-  const require = createRequire(import.meta.url), nativeRequire = createRequire(require.resolve('@deepseek-ai/dsh-api-session-controller'))
-  const { Context } = await import(new URL(require.resolve('@deepseek-ai/cordis'), 'file:').href)
+  // 编译制品按实际 Runtime 共享模块；隔离检出的依赖目录不代表被选中的 Runtime。
+  const require = createRequire(import.meta.url), nativeRequire = createRequire(process.env.HARNESS_DSH_ENTRY || require.resolve('@deepseek-ai/dsh-api-session-controller'))
+  const { Context } = await import(new URL(nativeRequire.resolve('@deepseek-ai/cordis'), 'file:').href)
   const { createUserMessage } = await import(new URL(nativeRequire.resolve('@deepseek-ai/dsh-llm'), 'file:').href)
   const { validateJsonSchemaValue, ToolOutputError } = await import(new URL(nativeRequire.resolve('@deepseek-ai/dsh-tools'), 'file:').href)
   assert.deepEqual(plugin.apply(), { Context, createUserMessage, validateJsonSchemaValue, ToolOutputError })

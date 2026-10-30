@@ -30,12 +30,31 @@ function seed(f) {
   return createDeploymentSeed(f.data, async () => ({ policy: { patch: [] }, environment: {} }))({ agent_id: 'alpha', experiment_id: f.id }, signal())
 }
 
-test('尚未适配的角色运行声明不能回落全局模型后生成独立部署种子', async t => {
+test('Web角色运行声明仍拒绝独立部署，不回落全局模型或提前生成投影', async t => {
   const f = fixture(t), harness = join(f.candidate, 'harness.yaml')
   write(harness, readFileSync(harness, 'utf8') + '\nrole_instructions:\n  alpha-main: dsh/workspace/AGENTS.md\n')
   let projected = false
-  await assert.rejects(createDeploymentSeed(f.data, async () => { projected = true; return { policy: { patch: [] }, environment: {} } })({ agent_id: 'alpha', experiment_id: f.id }, signal()), /当前独立运行包尚未适配/)
+  await assert.rejects(createDeploymentSeed(f.data, async () => { projected = true; return { policy: { patch: [] }, environment: {} } })({ agent_id: 'alpha', experiment_id: f.id }, signal()), /当前 Web 独立运行包尚未适配这些投影；请使用平台实例运行/)
   assert.equal(projected, false)
+})
+
+test('SDK角色运行声明使用选定Candidate模型投影生成独立部署种子', async t => {
+  const f = fixture(t), harness = join(f.candidate, 'harness.yaml')
+  const original = readFileSync(harness, 'utf8').replace('loadable_assets:\n', 'loadable_assets:\n  profile: sdk\n')
+    + '\nrole_instructions:\n  alpha-main: dsh/workspace/AGENTS.md\n'
+  write(harness, original)
+  const selection = { provider: 'sdk-provider', model: 'sdk-model' }
+  const patch = [{ id: 'sdk-model-binding', config: { selection } }]
+  let requested
+  const result = await createDeploymentSeed(f.data, async (agentId, selected, candidatePath) => {
+    requested = { agentId, selected, candidatePath }
+    return { policy: { patch, default: selection }, environment: {} }
+  })({ agent_id: 'alpha', experiment_id: f.id }, signal())
+  assert.deepEqual(requested, { agentId: 'alpha', selected: undefined, candidatePath: f.candidate })
+  assert.deepEqual(result.seed.modelPatch, patch)
+  assert.deepEqual(result.seed.defaultModel, selection)
+  assert.deepEqual(result.notices, [])
+  assert.equal(readFileSync(harness, 'utf8'), original)
 })
 
 test('分组发布组合递归保留固定子版本及实际后端凭据，排除草稿、其他历史版和无关编排', async t => {

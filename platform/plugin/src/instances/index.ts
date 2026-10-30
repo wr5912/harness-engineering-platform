@@ -61,6 +61,7 @@ interface RegisteredSource {
   source_id: string
   experiment_id: string
   agent_id: string
+  profile: 'web' | 'sdk'
   selectable: boolean
   reason: string
   model_binding?: ModelSelection
@@ -315,6 +316,7 @@ async function listSources(assetRoot: string): Promise<{ sources: RegisteredSour
   const sources: RegisteredSource[] = [...new Set([...Object.keys(catalog.sources), ...Object.keys(catalog.errors)])].sort().map(experimentId => ({
     source_id: `experiment:${experimentId}`, experiment_id: experimentId,
     agent_id: catalog.sources[experimentId]?.agent_id ?? VERSION_ID.exec(experimentId)![1],
+    profile: catalog.sources[experimentId]?.profile === 'sdk' ? 'sdk' : 'web',
     selectable: !catalog.errors[experimentId],
     reason: catalog.errors[experimentId] ?? '版本装载声明可读取；预览时核对 Runtime 与当前模型配置',
     ...(catalog.sources[experimentId]?.harness_runtime?.model_bindings?.main
@@ -374,6 +376,11 @@ async function assertKnownForMutation(assetRoot: string, name: string, signal?: 
 async function requestForUp(assetRoot: string, request: InstanceActionRequest, requireRecordedModel: boolean): Promise<InstanceActionRequest & { manifest?: any }> {
   const manifest = request.operation === 'create' ? undefined : await manifestFor(assetRoot, request.name)
   if (request.operation !== 'create' && !manifest) throw new Error(`未找到实例 ${request.name}`)
+  const requestedSource = request.source || manifest?.source_id
+  if (manifest?.profile === 'sdk' || typeof requestedSource === 'string' && requestedSource.startsWith('experiment:')
+    && versionSource(assetRoot, requestedSource.slice(11)).profile === 'sdk') {
+    throw new Error('SDK 型智能体由 TypeScript 应用启动，请使用 SDK 调试入口提交输入；不创建 Web 实例')
+  }
   const registeredDefault = manifest?.model_policy && typeof manifest.model_policy === 'object' && !Array.isArray(manifest.model_policy)
     ? (manifest.model_policy as Record<string, unknown>).default : undefined
   if (requireRecordedModel && manifest && !request.model_selection && registeredDefault == null) {
@@ -690,6 +697,7 @@ export function createInstancesHandler(assetRoot: string, modelPolicy?: ModelPol
         const name = assertName(payloadObject(payload).name)
         const manifest = await manifestFor(assetRoot, name)
         if (!manifest) throw new Error(`未找到实例 ${name}`)
+        if (manifest.profile === 'sdk') throw new Error('SDK 型实例通过本地 stdio 调用，没有 Web 地址；请查看 SDK 接入文档')
         const port = optionalPort(manifest.port)
         if (!port) throw new Error('实例未记录有效 Web 端口')
         const result = await runDsh(assetRoot, ['url', name, '--non-interactive'], signal)

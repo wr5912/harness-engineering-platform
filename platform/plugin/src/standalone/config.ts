@@ -7,6 +7,7 @@ export interface StandaloneConfig {
   experimentId: string
   presetId: string
   profilePatch: string
+  profile?: 'web' | 'sdk'
   modelPatch: unknown[]
   defaultModel?: { provider: string; model: string; reasoningEffort?: string }
   environmentKeys?: string[]
@@ -27,6 +28,7 @@ export function validateStandaloneConfig(value: any): StandaloneConfig {
     || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value.presetId ?? '') || typeof value.profilePatch !== 'string'
     || value.profilePatch.startsWith('/') || value.profilePatch.split('/').some((part: string) => !part || ['.', '..'].includes(part))
     || value.profilePatch.includes('\\') || value.modelPatch !== undefined && !Array.isArray(value.modelPatch)
+    || value.profile !== undefined && !['web', 'sdk'].includes(value.profile)
     || !value.mcp || !Array.isArray(value.mcp.servers) || !Array.isArray(value.mcp.groups)) throw new Error('独立智能体配置无效，请核对模型与 MCP 配置文件')
   if (value.environmentKeys && (!Array.isArray(value.environmentKeys) || value.environmentKeys.some((key: any) => typeof key !== 'string' || !/^[A-Z][A-Z0-9_]*$/.test(key)))) throw new Error('独立智能体环境配置键无效')
   return { ...value, modelPatch: value.modelPatch || [], mcp: { ...value.mcp, sharedToken: value.mcp.sharedToken || randomBytes(32).toString('hex') } }

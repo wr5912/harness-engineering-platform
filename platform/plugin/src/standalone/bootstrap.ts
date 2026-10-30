@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -8,6 +8,8 @@ import { Writable } from 'node:stream'
 import { networkInterfaces } from 'node:os'
 import { dump, load, DEFAULT_SCHEMA, Type } from 'js-yaml'
 import { configPath, readEnvironment, readStandaloneConfig, runtimeRoot, validateStandaloneConfig, writeStandaloneConfig, type StandaloneConfig } from './config.ts'
+import { parseHarnessRuntime } from '../models/harness-runtime.ts'
+import { redactRunText } from '../agents/run-files.ts'
 
 const patchSchema = DEFAULT_SCHEMA.extend(new (Type as any)('tag:yaml.org,2002:js', { kind: 'scalar', construct: (value: string) => ({ __dshExpression: value }), represent: (value: any) => value.__dshExpression, predicate: (value: any) => Boolean(value && typeof value === 'object' && typeof value.__dshExpression === 'string') }))
 const forbidden = /(?:harness-platform|harness-business-runtime|harness-model-runtime|business-runtime\.js|platform-mcp-manager|business\/mcp-manager|\/business-control\/)/
@@ -48,9 +50,14 @@ export function projectManagedPatch(text: string, groupIds: string[] = []): any[
   return rows.map(project).filter(Boolean)
 }
 function write(path: string, content: string, mode = 0o600) { mkdirSync(dirname(path), { recursive: true, mode: 0o700 }); writeFileSync(path, content, { mode }) }
-function nativeFallback(home: string, installAnchor: string) {
+function nativeFallback(home: string, installAnchor: string, sharedPackages: string[] = []) {
   const require = createRequire(installAnchor)
   const pending = [installAnchor], seen = new Set<string>(), modules = join(home, 'profiles/node_modules')
+  for (const name of sharedPackages) {
+    const manifest = (require.resolve.paths(name) || []).map(directory => join(directory, name, 'package.json')).find(existsSync)
+    if (!manifest) throw new Error(`当前标准镜像缺少官方共享模块 ${name}`)
+    pending.push(manifest)
+  }
   mkdirSync(modules, { recursive: true })
   while (pending.length) {
     const manifest = pending.shift()!, directory = dirname(manifest), pkg = JSON.parse(readFileSync(manifest, 'utf8'))
@@ -71,21 +78,32 @@ function nativeFallback(home: string, installAnchor: string) {
 export function generateProfile(config: StandaloneConfig, home: string, root: string, updateModel = true) {
   const managed = join(root, 'assets/managed', config.profilePatch)
   const business = projectManagedPatch(readFileSync(managed, 'utf8'), config.mcp.groups.map(group => group.id))
+  const sdk = config.profile === 'sdk'
+  const sdkBase = sdk ? load(readFileSync(join(root, 'runtime/sdk-profile.patch.yml'), 'utf8'), { schema: patchSchema }) as any[] : []
   const runtimePatch = [
     { id: 'agent-preset-registry', config: { default: config.presetId } },
     { insert: [
       { id: 'legacy-prompt-variables', name: join(root, 'runtime/runtime-compat/index.ts') },
       { id: 'standalone-agent', name: join(root, 'runtime/standalone-plugin.js'), config: { home, root } },
-      { id: 'webserver', name: join(root, 'runtime/web/container-webserver.mjs'), disabled: false, inject: ['webStartup'], config: { host: { __dshExpression: "ctx.webStartup.host ?? '127.0.0.1'" }, port: { __dshExpression: 'ctx.webStartup.port ?? 3080' } } },
-      { id: 'web-runtime', name: join(root, 'runtime/web/container-web-app.mjs'), disabled: false, config: { openBrowser: false, printUrl: false } },
+      ...(sdk ? [
+        // 此 loopback 端点只承载容器内 MCP 分组，不发布业务 HTTP 或前端。
+        { id: 'standalone-mcp-server', name: '@deepseek-ai/dsh-host-webserver', config: { host: '127.0.0.1', port: 0 } },
+        { id: 'standalone-connection', name: '@deepseek-ai/dsh-client-connection' },
+        { id: 'standalone-workspace', name: '@deepseek-ai/dsh-workspace' },
+        { id: 'standalone-settings', name: '@deepseek-ai/dsh-api-settings-controller' },
+        { id: 'harness-sdk-preset', name: join(root, 'runtime/sdk-preset.mts'), config: { presetId: config.presetId } },
+      ] : [
+        { id: 'webserver', name: join(root, 'runtime/web/container-webserver.mjs'), disabled: false, inject: ['webStartup'], config: { host: { __dshExpression: "ctx.webStartup.host ?? '127.0.0.1'" }, port: { __dshExpression: 'ctx.webStartup.port ?? 3080' } } },
+        { id: 'web-runtime', name: join(root, 'runtime/web/container-web-app.mjs'), disabled: false, config: { openBrowser: false, printUrl: false } },
+      ]),
     ] },
   ]
   if ((config.offlineKnowledge as any)?.indexPath) runtimePatch.push(
     { insert: [{ id: 'harness-offline-knowledge', name: join(root, 'runtime/standalone-knowledge.js'), config: config.offlineKnowledge }] } as any,
     { id: 'web', config: { fetchProvider: 'harness-offline-knowledge' } } as any,
   )
-  write(join(home, 'standalone/runtime.patch.yml'), dump([...business, ...runtimePatch], { schema: patchSchema, noRefs: true, lineWidth: -1 } as any))
-  write(join(home, 'profiles/standalone/package.json'), JSON.stringify({ name: 'standalone-agent-profile', private: true, dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'], patchReload: 'startup' } } }, null, 2) + '\n')
+  write(join(home, 'standalone/runtime.patch.yml'), dump([...sdkBase, ...business, ...runtimePatch], { schema: patchSchema, noRefs: true, lineWidth: -1 } as any))
+  write(join(home, 'profiles/standalone/package.json'), JSON.stringify({ name: 'standalone-agent-profile', private: true, dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', sdk ? '@deepseek-ai/dsh-sdk-app' : '@deepseek-ai/dsh-web-app'], patchReload: 'startup' } } }, null, 2) + '\n')
   // 此处是当前原生模型设置；只在 seed 初始化或 configure 时生成，普通重启不重写。
   if (updateModel) write(join(home, 'profiles/standalone/cordis.patch.yml'), dump(config.modelPatch, { schema: patchSchema, noRefs: true, lineWidth: -1 } as any))
 }
@@ -113,11 +131,26 @@ export function initializeStandalone({ root = runtimeRoot(), home = process.env.
     seed.mcp.mountServerIds = [...new Set(enabled.map(server => server.id))]
     seed.mcp.mountOverrides = Object.fromEntries(enabled.map(server => [server.id, { ...(server.serverName ? { serverName: server.serverName } : {}), ...(server.tools ? { tools: server.tools } : {}) }]))
   }
-  nativeFallback(home, installAnchor)
+  nativeFallback(home, installAnchor, seed.profile === 'sdk' ? ['@deepseek-ai/dsh-sdk-client'] : [])
   writeStandaloneConfig(seed, home)
   const secret = join(root, 'config-seed/environment.llm-api-key')
   if (!existsSync(join(home, 'standalone/environment.llm-api-key'))) write(join(home, 'standalone/environment.llm-api-key'), existsSync(secret) ? readFileSync(secret, 'utf8') : '{}\n')
   generateProfile(seed, home, root)
+  if (seed.profile === 'sdk') {
+    const app = join(home, 'standalone/sdk-app')
+    mkdirSync(app, { recursive: true })
+    cpSync(join(root, 'sdk/example.ts'), join(app, 'example.ts'))
+    write(join(app, 'package.json'), JSON.stringify({ private: true, type: 'module', peerDependencies: { '@deepseek-ai/dsh-sdk-client': '*' } }) + '\n')
+    if (!existsSync(join(app, 'node_modules'))) symlinkSync(join(home, 'profiles/node_modules'), join(app, 'node_modules'), 'dir')
+    const harness = parseHarnessRuntime(readFileSync(join(root, 'assets/harness.yaml'), 'utf8'))
+    if (harness?.project_workspace) {
+      const project = join(home, 'standalone/project')
+      cpSync(join('/opt/harness-candidate', harness.project_workspace.path), project, { recursive: true })
+      const shared = join(project, 'node_modules/@deepseek-ai/dsh-sdk-client')
+      mkdirSync(dirname(shared), { recursive: true })
+      if (!existsSync(shared)) symlinkSync(join(home, 'profiles/node_modules/@deepseek-ai/dsh-sdk-client'), shared, 'dir')
+    }
+  }
   write(join(home, 'standalone/initialized.json'), JSON.stringify({ agentId: seed.agentId, experimentId: seed.experimentId, sourceDigest: seed.sourceDigest, initializedAt: new Date().toISOString() }) + '\n')
   return { initialized: true }
 }
@@ -143,7 +176,7 @@ export async function configureStandalone(file: string, { root = runtimeRoot(), 
   }
   writeStandaloneConfig(next, home)
   generateProfile(next, home, root, supplied.modelPatch !== undefined || supplied.defaultModel !== undefined)
-  return { configured: true, restartRequired: true }
+  return { configured: true, restartRequired: next.profile !== 'sdk' }
 }
 /** 交互入口只询问业务连接，不要求用户理解 Profile 插件 ID 或内部控制参数。 */
 export async function configureInteractive({ root = runtimeRoot(), home = process.env.DSH_HOME || '/var/lib/dsh' } = {}) {
@@ -176,7 +209,7 @@ export async function configureInteractive({ root = runtimeRoot(), home = proces
       }
       if (nextKey) { const key = provider.apiKeyEnv || 'STANDALONE_LLM_API_KEY'; provider.apiKeyEnv = key; environment[key] = nextKey }
       if (defaultRow) defaultRow.config = selected
-    } else console.log('当前智能体未使用可配置的 API 模型；原生 DSH 设置页面仍可新增模型。')
+    } else console.log(current.profile === 'sdk' ? '当前未配置 API 模型，请使用 ./agent configure --config-file <JSON> 提供模型配置。' : '当前智能体未使用可配置的 API 模型；原生 DSH 设置页面仍可新增模型。')
     const mcp = structuredClone(current.mcp)
     for (const server of mcp.servers) {
       const field = server.specUrl ? 'specUrl' : server.url ? 'url' : undefined
@@ -205,6 +238,7 @@ export async function configureInteractive({ root = runtimeRoot(), home = proces
 export async function startStandalone({ root = runtimeRoot(), home = process.env.DSH_HOME || '/var/lib/dsh' } = {}) {
   initializeStandalone({ root, home })
   const config = readStandaloneConfig(home)
+  if (config.profile === 'sdk') throw new Error('SDK 智能体由应用持有运行进程，请使用 ./agent run --input-file <JSON> 或 ./agent example')
   const environment = readEnvironment(join(home, 'standalone/environment.llm-api-key'))
   const host = Object.values(networkInterfaces()).flat().find(address => address && address.family === 'IPv4' && !address.internal)?.address
   if (!host) throw new Error('容器未取得可用于原生 DSH 的 IPv4 地址')
@@ -216,12 +250,60 @@ export async function startStandalone({ root = runtimeRoot(), home = process.env
   const code = await new Promise<number>((resolve, reject) => { child.once('error', reject); child.once('exit', code => resolve(code ?? 1)) })
   return code
 }
+
+/** 生成调用选项；模型仍以原生 Profile 为当前事实源，凭据不写入此文件。 */
+export function prepareStandaloneSdk({ root = runtimeRoot(), home = process.env.DSH_HOME || '/var/lib/dsh' } = {}) {
+  const config = readStandaloneConfig(home)
+  if (config.profile !== 'sdk') throw new Error('当前运行包不是 SDK 型智能体')
+  const harness = parseHarnessRuntime(readFileSync(join(root, 'assets/harness.yaml'), 'utf8'))
+  const modelPatch = load(readFileSync(join(home, 'profiles/standalone/cordis.patch.yml'), 'utf8'), { schema: patchSchema }) as any[]
+  const selected = harness?.model_bindings?.main ?? modelPatch.find(row => row?.id === 'agent-default-model')?.config
+  if (!selected || typeof selected.provider !== 'string' || typeof selected.model !== 'string') throw new Error('尚未配置 SDK 调用模型，请运行 ./agent configure --config-file <JSON>')
+  const options = { profile: 'standalone', dshHome: home, dshBin: '/opt/dsh/apps/cli/lib/bin.js',
+    cwd: harness?.project_workspace ? join(home, 'standalone/project') : '/work/harness/workspace',
+    patches: [join(home, 'standalone/runtime.patch.yml')], provider: selected.provider, model: selected.model,
+    ...(selected.reasoningEffort ? { reasoningEffort: selected.reasoningEffort } : {}) }
+  write(join(home, 'standalone/sdk-options.json'), JSON.stringify(options, null, 2) + '\n')
+  return options
+}
+
+export async function runStandaloneSdk(inputFile: string, exampleInput?: string, options: { root?: string; home?: string } = {}) {
+  const root = options.root ?? runtimeRoot(), home = options.home ?? process.env.DSH_HOME ?? '/var/lib/dsh'
+  prepareStandaloneSdk({ root, home })
+  const environment = readEnvironment(join(home, 'standalone/environment.llm-api-key'))
+  const args = exampleInput === undefined ? [join(root, 'runtime/sdk-runner.mts'), join(home, 'standalone/sdk-options.json'), inputFile]
+    : [join(home, 'standalone/sdk-app/example.ts'), exampleInput]
+  const child = spawn(process.execPath, args, { env: { ...process.env, ...environment, DSH_HOME: home, HARNESS_SDK_OPTIONS: join(home, 'standalone/sdk-options.json'), ...(readStandaloneConfig(home).offlineKnowledge ? { DSH_WEB_FETCH_PROVIDER: 'harness-offline-knowledge' } : {}) }, stdio: ['inherit', 'pipe', 'pipe'] })
+  const secrets = Object.entries(environment).filter(([key, value]) => /key|token|password|secret|cookie/i.test(key) && value).map(([, value]) => value)
+  const forward = async (input: NodeJS.ReadableStream, output: NodeJS.WritableStream) => {
+    const reader = createInterface({ input })
+    for await (const line of reader) {
+      let safe = redactRunText(line)
+      for (const secret of secrets) safe = safe.replaceAll(secret, '[REDACTED]')
+      try { safe = JSON.stringify(JSON.parse(safe)) } catch { /* 普通诊断保留文本格式。 */ }
+      output.write(safe + '\n')
+    }
+  }
+  const forwarded = [forward(child.stdout!, process.stdout), forward(child.stderr!, process.stderr)]
+  const stop = (signal: NodeJS.Signals) => child.kill(signal)
+  const int = () => stop('SIGINT'), term = () => stop('SIGTERM')
+  process.on('SIGINT', int); process.on('SIGTERM', term)
+  try {
+    const code = await new Promise<number>((resolve, reject) => { child.once('error', reject); child.once('exit', code => resolve(code ?? 1)) })
+    await Promise.all(forwarded)
+    return code
+  }
+  finally { process.removeListener('SIGINT', int); process.removeListener('SIGTERM', term) }
+}
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   try {
     const action = process.argv[2] || 'start'
     if (action === 'init') console.log(JSON.stringify(initializeStandalone()))
     else if (action === 'configure') console.log(JSON.stringify(process.argv[3] ? await configureStandalone(process.argv[3]) : await configureInteractive()))
     else if (action === 'start') process.exitCode = await startStandalone()
+    else if (action === 'sdk-prepare') { prepareStandaloneSdk(); console.log(JSON.stringify({ prepared: true })) }
+    else if (action === 'sdk-run') process.exitCode = await runStandaloneSdk(process.argv[3] || join(process.env.DSH_HOME || '/var/lib/dsh', 'standalone/input.json'))
+    else if (action === 'sdk-example') process.exitCode = await runStandaloneSdk('', process.argv[3] || '请介绍你的职责。')
     else throw new Error('未知独立运行命令')
   } catch (error) { console.error(error instanceof Error ? error.message : '独立智能体启动失败'); process.exitCode = 1 }
 }

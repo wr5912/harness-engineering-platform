@@ -1,0 +1,118 @@
+{
+  "kind": "sdk-offline-package-installation-v2",
+  "programRoot": "/home/admin/work/harness-engineering-platform/.local/sdk-release",
+  "archive": {
+    "path": "/home/admin/work/harness-engineering-platform/.local/sdk-offline-package-verification-v2/artifacts/sdk-native-check-faa41161dfe5-amd64-offline-0c821656.tar.gz",
+    "bytes": 1181803467,
+    "sha256": "a0403a3e7241844d0f72807d62dc933c764e8b20a3621d9447d19f317bb88cdd"
+  },
+  "source": {
+    "agentId": "sdk-native-check",
+    "experimentId": "EXP-sdk-native-check-001-r7cdafe2e543a",
+    "candidateSha256": "faa41161dfe57c8b5476eb4582586d4e1797a4570326d4433ff50ca50214abd8",
+    "commit": "adee516f355712d7ed0b45d3aa74d9469786f16d",
+    "dirty": true,
+    "profile": "sdk",
+    "paths": {
+      "workspace": "assets/workspace",
+      "presets": "assets/presets",
+      "managed": "assets/managed",
+      "profilePatch": "assets/managed/sdk-native-check.patch.yml",
+      "preset": "assets/presets/sdk-native-check/agent.cordis.yml"
+    },
+    "files": [
+      {
+        "path": "assets/managed/sdk-native-check.patch.yml",
+        "sourcePath": "dsh/managed/sdk-native-check.patch.yml",
+        "sha256": "23dba2965ea7f3a59356ed4f98333974e4b50040d9151642e6b3e45106d18d35",
+        "mode": 420
+      },
+      {
+        "path": "assets/managed/sdk-profile.package.json",
+        "sourcePath": "dsh/managed/sdk-profile.package.json",
+        "sha256": "b69137c53c5dcad612da3fb60ab04b2f161a7d4aa2d68318faf8ed38aa1e3b9e",
+        "mode": 420
+      },
+      {
+        "path": "assets/managed/verify-provider.mjs",
+        "sourcePath": "dsh/managed/verify-provider.mjs",
+        "sha256": "91cd1307c535369a1778e89ce988e17e32c4a1e01ae185ba8f8466ff063c3d58",
+        "mode": 420
+      },
+      {
+        "path": "assets/presets/sdk-native-check/agent.cordis.yml",
+        "sourcePath": "dsh/presets/sdk-native-check/agent.cordis.yml",
+        "sha256": "75aa81995451eaca86cb08dd1a976d15f7dbfd0d846002dfdea15b3d3abacca2",
+        "mode": 420
+      },
+      {
+        "path": "assets/presets/sdk-native-check/preset.yml",
+        "sourcePath": "dsh/presets/sdk-native-check/preset.yml",
+        "sha256": "553f33f73ccca647e9e95d178489e8e2f2c8052c5ade1b46c0626daa2e8dc8ef",
+        "mode": 420
+      },
+      {
+        "path": "assets/workspace/AGENTS.md",
+        "sourcePath": "dsh/workspace/AGENTS.md",
+        "sha256": "b0fcde0fd08095ae6f4795174e8892874f947439b5538eedcbe2a21f5008c6a4",
+        "mode": 420
+      },
+      {
+        "path": "assets/harness.yaml",
+        "sourcePath": "harness.yaml",
+        "sha256": "43626f350e0e7bc157c4033029e565f18e86a921ac7af7c286cc9dfb1d2d82f4",
+        "mode": 420
+      },
+      {
+        "path": "sdk/README.md",
+        "sourcePath": "sdk/README.md",
+        "sha256": "ca3ff321e218bcb6614bb836b5269b87608269a69a6c00cc4a28292735244e7a",
+        "mode": 420
+      },
+      {
+        "path": "sdk/example.ts",
+        "sourcePath": "sdk/example.ts",
+        "sha256": "c542b2df004694670232e6179948b497ae2317316a05d6e645d1a0b28fe69d7a",
+        "mode": 420
+      }
+    ],
+    "omitted": [
+      "dsh/workspace/.env"
+    ]
+  },
+  "image": {
+    "tag": "ai-agent-harness/dsh:687f282e8-amd64-cbfc10fa115b",
+    "id": "sha256:6ea7cbe9e99a8a2f29e9918a5112d9092ae71642fe1dbf997a612b5edafb6ca4",
+    "fingerprint": "sha256:cbfc10fa115bc246a5d99965d3c1f8b5bf345a324ccec926ccf4cae612f2de2c"
+  },
+  "checks": {
+    "checksum": true,
+    "archiveExtracted": true,
+    "sourceSdkBytesPreserved": true,
+    "sourceSdkDigestsMatch": true,
+    "installerSucceeded": true,
+    "actualDockerLoad": true,
+    "freshPrepareOptionsReadable": true,
+    "freshPrepareCreatedNoSession": true,
+    "homeExampleBytesPreserved": true,
+    "newSession": "completed",
+    "explicitResume": "completed",
+    "sameSession": true,
+    "session_id": "session-50713cfc-4f7f-4d93-b4e7-2f9e21403dba",
+    "candidateTypescriptExample": true,
+    "noPublishedPorts": true,
+    "stopped": true,
+    "exitCode": 0
+  },
+  "previousFullPackage": {
+    "sha256": "178970684478887cef6459b8b47c56305943234ae2a386d1e7b0d80c9ec0d6e7",
+    "scope": "修复前离线安装闭环，原包和原回执保留；本v2包覆盖SDK来源字节与prepare-sdk修复。"
+  },
+  "installed": "/home/admin/work/harness-engineering-platform/.local/sdk-offline-package-verification-v2/installed",
+  "limits": [
+    "AMD64 本机，Docker 原已安装；未覆盖缺 Docker 新系统安装",
+    "SDK示例仅加注释、README仅加辨识文字，角色与模型语义未修改",
+    "原生 LlmAdapter 确定性技术替身，未调用真实模型或外部 MCP，非业务质量验收",
+    "未执行 ARM64 安装验收"
+  ]
+}

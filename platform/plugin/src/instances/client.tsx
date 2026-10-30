@@ -11,11 +11,13 @@ import { DetailDrawer } from '../components/detail-drawer.tsx'
 import { LoadingIndicator } from '../components/loading-indicator.tsx'
 import { DistributionChart } from '../components/overview-charts.tsx'
 import { instanceState, instanceStateSegments, matchesInstanceState } from './overview.tsx'
+import { SdkDebugDialog } from '../agents/sdk-client.tsx'
 
 type Operation = 'create' | 'start' | 'stop' | 'restart' | 'delete'
 
 interface InstanceRow {
   name: string
+  profile?: 'web' | 'sdk'
   state?: string
   source_id?: string
   image_tag?: string
@@ -82,6 +84,7 @@ interface SourceOption {
   selectable: boolean
   reason: string
   model_binding?: ModelSelection
+  profile?: 'web' | 'sdk'
 }
 
 interface AgentOption { id: string; name?: string }
@@ -121,7 +124,7 @@ const impacts: Record<Operation, string> = {
 }
 
 const detailTabs = [{ id: 'overview', label: '概览' }, { id: 'embed', label: '网站嵌入' }, { id: 'logs', label: '运行日志' }, { id: 'receipts', label: '操作回执' }] as const
-const stateLabels: Record<string, string> = { running: '运行中', stopped: '已停止', absent: '无容器', failed: '异常', unknown: '状态未知' }
+const stateLabels: Record<string, string> = { running: '运行中', stopped: '已停止', completed: '执行完成', absent: '无容器', failed: '异常', unknown: '状态未知' }
 const modelKey = (value: ModelRef) => JSON.stringify([value.provider, value.model])
 const sameModel = (left?: ModelSelection | null, right?: ModelSelection | null) =>
   left === right || Boolean(left && right && left.provider === right.provider && left.model === right.model && left.reasoningEffort === right.reasoningEffort)
@@ -190,6 +193,8 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
   const [receiptHistory, setReceiptHistory] = useState<Receipt[]>([])
   const [actionDialog, setActionDialog] = useState<Operation | null>(null)
   const [creating, setCreating] = useState(false)
+  const [sdkOpen, setSdkOpen] = useState(false)
+  const [sdkTarget, setSdkTarget] = useState<{ source: string; agentId: string; label: string; initialInstance?: string; tab: 'debug' | 'guide' } | null>(null)
   const dialog = useRef<HTMLDialogElement>(null)
   const createDialog = useRef<HTMLDialogElement>(null)
   const actionOpener = useRef<HTMLElement | null>(null)
@@ -243,6 +248,14 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
   const visible = useMemo(() => scopedInstances.filter(item => matchesInstanceState(item.state, filter)), [scopedInstances, filter])
   const visibleSelected = visible.filter(item => selected.has(item.name)).length
   const sourceById = useMemo(() => new Map(sources.map(item => [item.source_id, item])), [sources])
+  const isSdk = (item: InstanceRow) => item.profile === 'sdk' || sourceById.get(item.source_id || '')?.profile === 'sdk'
+  const availableDetailTabs = detail && isSdk(detail.instance) ? detailTabs.filter(item => item.id !== 'embed') : detailTabs
+  function openSdk(item: Pick<InstanceRow, 'name' | 'source_id' | 'agent_id'>, tab: 'debug' | 'guide' = 'debug') {
+    if (!item.source_id || !item.agent_id) { setError('实例没有完整的 SDK 来源，请刷新登记后重试。'); return }
+    setSdkTarget({ source: item.source_id, agentId: item.agent_id, label: `${item.agent_id} · ${item.name || '新 SDK 实例'}`, ...(item.name ? { initialInstance: item.name } : {}), tab })
+    setSdkOpen(true)
+  }
+  useEffect(() => { if (detail && isSdk(detail.instance) && detailTab === 'embed') setDetailTab('overview') }, [detail, sourceById, detailTab])
   const agentName = (id?: string) => agents.find(item => item.id === id)?.name || id || '未记录智能体'
   const versionLabel = (sourceId?: string) => { const id = sourceById.get(sourceId || '')?.experiment_id || sourceId; const number = id?.match(/-(\d{3})(?:-r[0-9a-f]{12})?$/)?.[1]; return number ? `v${number}` : id || '未记录来源' }
   const sourceLabel = (id?: string) => {
@@ -515,6 +528,12 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
   }
 
   async function prepare(operation: Operation, names: string[], modelSelection?: ModelSelection) {
+    const sdkInstances = instances.filter(item => names.includes(item.name) && isSdk(item))
+    if ((operation === 'start' || operation === 'restart') && sdkInstances.length) {
+      if (names.length === 1) openSdk(sdkInstances[0])
+      else setError('SDK 实例需要逐个提交调试输入，请在对应实例中打开 SDK 调试。')
+      return
+    }
     if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) actionOpener.current = document.activeElement
     setActionDialog(operation)
     setReceipts([])
@@ -856,6 +875,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
         </div>
         <label className="instance-field">实例名称<input aria-label="实例名" placeholder="例如 my-agent" value={form.name}
           onChange={event => updateForm({ ...form, name: event.target.value })} className="instance-field-input" /></label>
+        {chosenSource?.profile === 'sdk' ? <p className="instance-field-hint">此版本通过官方 TypeScript SDK 调用。继续后输入测试内容，启动同一标准镜像中的 SDK 应用；实例不分配 Web 端口。</p> : <>
         <p className="instance-field-hint">此工作区的业务实例经统一网关访问，使用独立 HOME 与实例专属地址；已开放原生定时任务，任务到期按实例和会话的当前许可执行。</p>
         {sourcesLoaded && !businessGatewayAvailable && <div role="alert" className="instance-error">业务网关未启用或配置不完整，暂时无法创建业务实例。请核对数据目录 config/business-access.json 并启动网关，再重新检查；已填写内容会保留。<button type="button" className="instance-button" disabled={sourceLoading} onClick={() => void loadSources()}>{sourceLoading ? '检查中…' : '重新检查网关'}</button></div>}
         <label className="instance-field">实例阶段<select aria-label="实例阶段" value={form.identity_mode} onChange={event => updateForm({ ...form, identity_mode: event.target.value as 'development' | 'published' })} className="instance-field-input">
@@ -873,9 +893,10 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
         </div>
         <details className="instance-create-advanced"><summary>高级设置 · 端口</summary><div className="instance-create-advanced-body"><label className="instance-field">内部 Runtime 端口（可选）<input aria-label="端口" placeholder="留空从 18500–28999 自动分配" value={form.port}
           onChange={event => updateForm({ ...form, port: event.target.value })} className="instance-field-input" /></label></div></details>
+        </>}
         <p className="instance-create-impact">将创建独立实例；现有业务实例不会因创建操作而停止或切换版本。</p>
         </div>
-        <footer className="instance-dialog-actions"><button type="button" onClick={() => setCreating(false)} className="instance-button">取消</button><button type="button" className="harness-primary" disabled={busy || !businessGatewayAvailable || !form.name || !form.source || Boolean(sourceFieldError) || sourceLoading || modelLoading || Boolean(createModelIssue) || !currentSourceRun || currentSourceRun.loading} onClick={() => prepare('create', [])}>查看创建预览</button></footer>
+        <footer className="instance-dialog-actions"><button type="button" onClick={() => setCreating(false)} className="instance-button">取消</button>{chosenSource?.profile === 'sdk' ? <button type="button" className="harness-primary" disabled={busy || !form.name || !chosenSource.selectable || sourceLoading} onClick={() => { setCreating(false); openSdk({ name: form.name, source_id: form.source, agent_id: chosenSource.agent_id }) }}>前往 SDK 调试</button> : <button type="button" className="harness-primary" disabled={busy || !businessGatewayAvailable || !form.name || !form.source || Boolean(sourceFieldError) || sourceLoading || modelLoading || Boolean(createModelIssue) || !currentSourceRun || currentSourceRun.loading} onClick={() => prepare('create', [])}>查看创建预览</button>}</footer>
         </>}
       </dialog>
       <section aria-label="实例筛选" className="instance-filter-panel" hidden={Boolean(detailName.current)}>
@@ -884,6 +905,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
           <label className="instance-filter-field">状态<select aria-label="状态筛选" value={filter} onChange={event => setFilter(event.target.value)} className="instance-field-input">
             <option value="existing">现有容器</option><option value="all">全部登记</option>
             <option value="running">运行中</option><option value="stopped">已停止</option>
+            <option value="completed">执行完成</option>
             <option value="absent">无容器（仅登记）</option><option value="failed">异常</option><option value="unknown">状态未知</option>
           </select></label>
           <label className="instance-filter-field">登记来源<SearchSelect label="实例登记来源筛选" value={sourceFilter} onChange={value => { setSourceFilter(value); if (!value) onNavigate?.({ page: 'instances' }) }} options={[{ value: '', label: '全部来源' }, ...sources.map(source => ({ value: source.source_id, label: source.experiment_id, description: agentName(source.agent_id) }))]} /></label>
@@ -946,17 +968,17 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
                 <td className="instance-list-td instance-source" data-label="登记来源版本"><strong>{versionLabel(item.source_id)}</strong><small>{sourceById.get(item.source_id || '')?.experiment_id || item.source_id}</small></td>
                 <td className="instance-list-td" data-label="运行状态"><span className="instance-state-badge" data-state={instanceState(item.state)}>{stateLabels[instanceState(item.state)]}</span></td>
                 <td className="instance-list-td" data-label="访问入口">
-                  <button type="button" disabled={item.state !== 'running' || !item.port || opening.has(item.name)}
+                  {isSdk(item) ? <><button type="button" onClick={() => openSdk(item)} className="instance-button">SDK 调试</button><div className="instance-muted instance-access-note">官方 TypeScript SDK · 同容器调用</div></> : <><button type="button" disabled={item.state !== 'running' || !item.port || opening.has(item.name)}
                     onClick={() => openWeb(item.name)} className="instance-button"
                     title={item.state !== 'running' ? '实例运行后可访问' : item.business_gateway ? item.access_mode === 'anonymous' ? '经业务网关打开；无需登录' : '经业务网关打开；需要业务用户登录' : item.lan_access ? '在新标签页打开' : '仅宿主机浏览器可访问'}>
                     {opening.has(item.name) ? '正在打开…' : '打开 Web'}
                   </button>
                   <div className="instance-muted instance-access-note">{item.state !== 'running' ? '实例运行后可访问' : !item.port ? '未记录端口' : item.business_gateway ? `${item.identity_mode === 'development' ? '开发调试' : '对外服务'} · 经统一网关 · ${item.access_mode === 'anonymous' ? '无需登录' : '需个人登录'}` : !item.lan_access ? '仅宿主机' : null}</div>
-                  {item.business_gateway && (item.access_url ? <button type="button" className="instance-access-address" title={item.access_url} aria-label={`查看 ${item.name} 的完整访问地址`} onClick={event => void openDetail(item.name, false, false, event.currentTarget)}>{item.access_url}</button> : <div className="instance-muted instance-access-note">网关深链尚未核对</div>)}
+                  {item.business_gateway && (item.access_url ? <button type="button" className="instance-access-address" title={item.access_url} aria-label={`查看 ${item.name} 的完整访问地址`} onClick={event => void openDetail(item.name, false, false, event.currentTarget)}>{item.access_url}</button> : <div className="instance-muted instance-access-note">网关深链尚未核对</div>)}</>}
                 </td>
                 <td className="instance-list-td" data-label="操作"><div className="instance-actions">
                   <button type="button" onClick={event => openDetail(item.name, false, false, event?.currentTarget)} disabled={detailLoading} className="instance-button">查看详情</button>
-                  {(item.state === 'running' ? ['stop', 'restart'] : item.state === 'stopped' || item.state === 'absent' ? ['start', 'delete'] : item.state === 'failed' ? ['start', 'stop'] : []).map(operation =>
+                  {(isSdk(item) ? item.state === 'running' ? ['stop'] : ['delete'] : item.state === 'running' ? ['stop', 'restart'] : item.state === 'stopped' || item.state === 'absent' ? ['start', 'delete'] : item.state === 'failed' ? ['start', 'stop'] : []).map(operation =>
                     <button type="button" key={operation} disabled={busy} onClick={() => prepare(operation as Operation, [item.name])} className="instance-button">{labels[operation as Operation]}</button>)}
                   {item.state === 'unknown' && <span>观察失败，请刷新</span>}
                 </div></td>
@@ -978,7 +1000,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
               <span className="instance-state-badge" data-state={instanceState(detail.instance.state)}>{stateLabels[instanceState(detail.instance.state)]}</span>
             </div></div>
             <div className="instance-actions">
-              <button type="button" className="harness-primary" disabled={detail.instance.state !== 'running' || !detail.instance.port || opening.has(detail.instance.name)} onClick={() => void openWeb(detail.instance.name)}>{opening.has(detail.instance.name) ? '正在打开…' : '访问 DSH Web'}</button>
+              {isSdk(detail.instance) ? <><button type="button" className="harness-primary" onClick={() => openSdk(detail.instance)}>SDK 调试</button><button type="button" className="instance-button" onClick={() => openSdk(detail.instance, 'guide')}>接入文档</button></> : <button type="button" className="harness-primary" disabled={detail.instance.state !== 'running' || !detail.instance.port || opening.has(detail.instance.name)} onClick={() => void openWeb(detail.instance.name)}>{opening.has(detail.instance.name) ? '正在打开…' : '访问 DSH Web'}</button>}
               <button type="button" className="instance-button" disabled={detailLoading} onClick={() => void openDetail(detail.instance.name, true)}>刷新详情{detailLoading ? <LoadingIndicator label="刷新实例详情" /> : null}</button>
               <button type="button" className="instance-button" onClick={() => closeDetail()}>返回实例列表</button>
             </div>
@@ -986,13 +1008,13 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
           {detailNotice && <p role="alert" className="instance-detail-notice">{detailNotice}</p>}
           {(detail.instance.state === 'failed' || detail.instance.state === 'unknown') && <p role="alert" className="instance-detail-notice">实例状态异常，请先查看运行日志，再决定是否停止或删除。</p>}
           <div role="tablist" aria-label="实例详情" className="instance-detail-tabs" onKeyDown={event => {
-            const index = detailTabs.findIndex(item => item.id === detailTab)
-            const next = event.key === 'ArrowRight' ? (index + 1) % detailTabs.length : event.key === 'ArrowLeft' ? (index + detailTabs.length - 1) % detailTabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? detailTabs.length - 1 : undefined
+            const index = availableDetailTabs.findIndex(item => item.id === detailTab)
+            const next = event.key === 'ArrowRight' ? (index + 1) % availableDetailTabs.length : event.key === 'ArrowLeft' ? (index + availableDetailTabs.length - 1) % availableDetailTabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? availableDetailTabs.length - 1 : undefined
             if (next === undefined) return
             event.preventDefault()
-            selectDetailTab(detailTabs[next].id)
-            document.getElementById(`instance-tab-${detailTabs[next].id}`)?.focus()
-          }}>{detailTabs.map(item => <button key={item.id} id={`instance-tab-${item.id}`} type="button" role="tab" aria-selected={detailTab === item.id} aria-controls={`instance-panel-${item.id}`} tabIndex={detailTab === item.id ? 0 : -1} onClick={() => selectDetailTab(item.id)} className="instance-detail-tab">{item.label}</button>)}</div>
+            selectDetailTab(availableDetailTabs[next].id)
+            document.getElementById(`instance-tab-${availableDetailTabs[next].id}`)?.focus()
+          }}>{availableDetailTabs.map(item => <button key={item.id} id={`instance-tab-${item.id}`} type="button" role="tab" aria-selected={detailTab === item.id} aria-controls={`instance-panel-${item.id}`} tabIndex={detailTab === item.id ? 0 : -1} onClick={() => selectDetailTab(item.id)} className="instance-detail-tab">{item.label}</button>)}</div>
 
           <section id="instance-panel-overview" role="tabpanel" aria-labelledby="instance-tab-overview" hidden={detailTab !== 'overview'} className="instance-detail-body">
             <dl className="instance-detail-grid">
@@ -1000,7 +1022,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
               <div className="instance-fact"><dt className="instance-muted">登记默认模型</dt><dd className="instance-fact-value"><strong>{modelLabel(models?.catalog, instanceCurrentModel)}</strong>{instanceCurrentModel?.reasoningEffort && <small>推理档位：{instanceCurrentModel.reasoningEffort}</small>}<small>来自本实例登记，当前 Session 的实际模型需单独核对。</small></dd></div>
               {[
                 ['智能体', detail.instance.agent_id || '未记录'],
-                [detail.instance.business_gateway ? '内部 Web 端口' : '访问端口', detail.instance.port || '未记录'],
+                ...(isSdk(detail.instance) ? [['使用方式', '官方 TypeScript SDK · 同容器调用']] : [[detail.instance.business_gateway ? '内部 Web 端口' : '访问端口', detail.instance.port || '未记录']]),
                 ...(detail.instance.business_gateway ? [['实例阶段', detail.instance.identity_mode === 'development' ? '开发调试，不要求发布身份签名' : '对外服务，验证智能体身份签名'], ['访问方式', detail.instance.access_mode === 'anonymous' ? '经过网关，无需认证（共享数据和会话）' : '经统一网关，需要个人登录'], ['已登记网关入口', detail.instance.access_url || '尚未核对，请刷新实例登记']] : []),
               ].map(([label, value]) => <div key={label} className="instance-fact"><dt className="instance-muted">{label}</dt><dd className="instance-fact-value">{value}</dd></div>)}
             </dl>
@@ -1016,7 +1038,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
                 return <tr key={name}><td className="instance-td">{name}</td><td className="instance-td instance-path">{path}</td><td className="instance-td">{mode === 'ro' ? '只读' : mode === 'rw' ? '读写' : mode || '未记录'}</td></tr>
               })}</tbody></table></div> : <p className="instance-muted">暂无挂载配置。</p>}
             </DetailDrawer>
-            <div className="instance-model-panel" aria-label="管理实例默认模型">
+            {!isSdk(detail.instance) && <div className="instance-model-panel" aria-label="管理实例默认模型">
               <div className="instance-source-heading"><strong>实例模型设置</strong><button type="button" className="instance-button" aria-expanded={Boolean(activeModelEdit)} disabled={!['running', 'stopped', 'absent'].includes(detail.instance.state || '')} onClick={() => {
                 if (activeModelEdit) setInstanceModelEdit(null)
                 else {
@@ -1034,12 +1056,12 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
               </> : <p className="instance-muted">本实例沿用自己的登记默认模型；修改统一默认模型不会改变已登记实例。</p>}
               {!['running', 'stopped', 'absent'].includes(detail.instance.state || '') && <p className="instance-model-warning">当前状态无法安全确认更改操作，请刷新或先处理实例状态。</p>}
             </div>
-            <div className="instance-session-note"><strong>会话与数据</strong><p>{detail.session_scope.note || '未记录会话说明。'}</p></div>
+            }<div className="instance-session-note"><strong>会话与数据</strong><p>{detail.session_scope.note || '未记录会话说明。'}</p></div>
 
             {onNavigate && <button type="button" className="instance-run-link" onClick={() => onNavigate({ page: 'evaluation', tab: 'runs', agent_id: detail.instance.agent_id, experiment_id: detail.instance.source_id?.startsWith('experiment:') ? detail.instance.source_id.slice('experiment:'.length) : sourceById.get(detail.instance.source_id || '')?.experiment_id })}>查看来源版本评测</button>}
           </section>
 
-          <section id="instance-panel-embed" role="tabpanel" aria-labelledby="instance-tab-embed" hidden={detailTab !== 'embed'} className="instance-detail-body">
+          {!isSdk(detail.instance) && <section id="instance-panel-embed" role="tabpanel" aria-labelledby="instance-tab-embed" hidden={detailTab !== 'embed'} className="instance-detail-body">
             <div className="instance-embed-heading"><div><h3 className="instance-section-title">将智能体嵌入网站</h3><p className="instance-muted">生成 iframe 代码，粘贴到网站的 HTML 中即可展示此实例。</p></div>
               <button type="button" className="instance-button" disabled={detail.instance.state !== 'running' || !detail.instance.port} onClick={() => void generateEmbed(detail.instance.name)}>{embedCode ? '重新生成代码' : '生成 iframe 代码'}</button>
             </div>
@@ -1051,7 +1073,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
               <li>{detail.instance.business_gateway ? detail.instance.access_mode === 'anonymous' ? '无需认证时所有访问者共享此实例的数据和会话，无需登录或访客 Cookie；统一网关提供访问入口。' : '业务访问仍经统一网关，需要个人登录；跨站嵌入受浏览器 Cookie 限制，可同站点嵌入或直接打开网关入口。' : '嵌入沿用实例自身的登录设置，不会自动传递平台登录状态。跨站登录受浏览器 Cookie 限制时，可使用同站点反向代理或直接打开 DSH Web。'}</li>
               <li>HTTPS 网站需使用 HTTPS 实例入口，网站的 CSP 也需要允许该 iframe 来源。</li>
             </ul></DetailDrawer>
-          </section>
+          </section>}
 
           <section id="instance-panel-logs" role="tabpanel" aria-labelledby="instance-tab-logs" hidden={detailTab !== 'logs'} className="instance-detail-body">
             <h3 className="instance-section-title">运行日志</h3><p className="instance-muted">最近 200 行。点击右上角“刷新详情”获取最新日志。</p>
@@ -1136,6 +1158,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
         </footer>
         </>}
       </dialog>
+      {sdkTarget && <SdkDebugDialog key={`${sdkTarget.source}:${sdkTarget.initialInstance || ''}`} rpc={rpc} active={active && sdkOpen} {...sdkTarget} initialTab={sdkTarget.tab} onClose={() => { setSdkOpen(false); void refreshChanged() }} />}
     </main>
   )
 }

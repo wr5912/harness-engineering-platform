@@ -18,13 +18,20 @@ import * as plugin from '../lib/index.js'
 
 const require = createRequire(import.meta.url)
 const sdkRequire = createRequire(require.resolve('@deepseek-ai/dsh-api-session-controller'))
-const [{ ToolRuntime }, { createScope }, { createUserMessage }, { SkillRegistry }, { FileSystemSkillProvider }] = await Promise.all([
+const [{ ToolRuntime }, { createScope }, { createUserMessage }, { SkillRegistry }, { FileSystemSkillProvider }, { SessionQueryEngine }] = await Promise.all([
   import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/dsh-tools')).href),
   import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/dsh-scope')).href),
   import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/dsh-llm')).href),
   import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/dsh-skill')).href),
   import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/dsh-skill-filesystem')).href),
+  import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/dsh-session-query')).href),
 ])
+
+// 精确历史读取复用原生 QueryEngine 和真实 SessionStore；此项不验证全文检索后端。
+class ScopeSessionQuery extends SessionQueryEngine {
+  async searchSessions() { assert.fail('作用域切换测试不搜索 Session') }
+  async searchEvents() { assert.fail('作用域切换测试不搜索事件') }
+}
 
 test('真实HTTP管理会话使用原生工具，专用切换与可信Skill可用，普通DSH会话不受影响', async t => {
   const ctx = new Context()
@@ -67,6 +74,7 @@ test('真实HTTP管理会话使用原生工具，专用切换与可信Skill可�
       isAuthenticated: request => request.headers.authorization === 'Bearer fixture', authenticateApi: () => undefined,
     })
     new SessionStore(inner)
+    new ScopeSessionQuery(inner)
     new SessionProjectionRegistry(inner)
     new SystemPrompt(inner, {})
     new SkillRegistry(inner, {})

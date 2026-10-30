@@ -6,8 +6,8 @@ import { VERSION_ID } from '../version-id.ts'
 import { parseHarnessRuntime } from '../models/harness-runtime.ts'
 
 /** 独立运行器尚未承接这些投影时，预览与打包明确保留能力边界。 */
-export function assertStandaloneVersionSupported(source: { harness_runtime?: unknown }): void {
-  if (source.harness_runtime !== undefined) throw new Error('此版本包含角色模型绑定、角色指令或业务项目运行声明，当前独立运行包尚未适配这些投影；请使用平台实例运行。')
+export function assertStandaloneVersionSupported(source: { profile?: unknown; harness_runtime?: unknown }): void {
+  if (source.profile !== 'sdk' && source.harness_runtime !== undefined) throw new Error('此版本包含角色模型绑定、角色指令或业务项目运行声明，当前 Web 独立运行包尚未适配这些投影；请使用平台实例运行。')
 }
 
 export { VERSION_ID } from '../version-id.ts'
@@ -60,6 +60,8 @@ export function versionSource(root: string, id: string, commit?: string): MapVal
   }
   const assets = harness?.loadable_assets
   if (!assets && !legacy) throw new Error('版本缺少 candidate/harness.yaml 装载声明')
+  const runtimeProfile = assets?.profile ?? legacy?.profile ?? 'web'
+  if (runtimeProfile !== 'web' && runtimeProfile !== 'sdk') throw new Error('loadable_assets.profile 只支持 web 或 sdk')
   if (assets && (assets.workspace !== 'dsh/workspace' || assets.preset_root !== 'dsh/presets' || assets.managed_root !== 'dsh/managed')) throw new Error('装载目录必须位于 Candidate 的 dsh/workspace、dsh/presets 和 dsh/managed')
   const relative = (value: unknown): string => {
     if (typeof value !== 'string' || !value || value.startsWith('/') || value.includes('\\') || value.split('/').some(part => !part || part === '.' || part === '..')) throw new Error('装载入口必须是版本内的相对路径')
@@ -73,13 +75,13 @@ export function versionSource(root: string, id: string, commit?: string): MapVal
   if (!Array.isArray(names) || names.some(name => typeof name !== 'string' || !/^[A-Z][A-Z0-9_]*$/.test(name))) throw new Error('credential_environment_keys 必须是环境变量名称列表')
   // 完整Candidate中约定位置的Profile也是该版本资产；旧声明未列出时仍须继承。
   // 固定提交经同一read读取，不能从当前工作树或另一份登记补齐。
-  const conventionalProfile = 'dsh/managed/web-profile.package.json'
+  const conventionalProfile = `dsh/managed/${runtimeProfile}-profile.package.json`
   let profile: string | undefined
   if (assets && Object.hasOwn(assets, 'profile_manifest')) profile = relative(assets.profile_manifest)
   else if (legacy?.profile_manifest !== undefined) profile = relative(legacy.profile_manifest.replace(`${base}/candidate/`, ''))
   else if (assets && read(`${base}/candidate/${conventionalProfile}`, true) !== undefined) profile = conventionalProfile
   return {
-    agent_id: change.agent_id, candidate_root: `${base}/candidate/dsh`, profile: 'web',
+    agent_id: change.agent_id, candidate_root: `${base}/candidate/dsh`, profile: runtimeProfile,
     ...(text && parseHarnessRuntime(text) ? { harness_runtime: parseHarnessRuntime(text) } : {}),
     patch: patch.slice('dsh/managed/'.length),
     preset: assets ? relative(assets.preset_file ?? `${presetId}/agent.cordis.yml`) : relative(legacy!.preset),

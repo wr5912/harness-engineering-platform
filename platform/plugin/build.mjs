@@ -128,6 +128,8 @@ await build({ entryPoints: { 'document-parser': 'src/documents/index.ts', 'docum
   platform: 'node', target: 'node24', format: 'esm', packages: 'external', legalComments: 'none' })
 await build({ entryPoints: ['src/deployment/worker.ts'], outfile: 'lib/agent-deployment-worker.js', bundle: true,
   platform: 'node', target: 'node24', format: 'esm', packages: 'external', legalComments: 'none' })
+await build({ entryPoints: ['src/sdk/worker.ts'], outfile: 'lib/sdk-worker.js', bundle: true,
+  platform: 'node', target: 'node24', format: 'esm', packages: 'external', legalComments: 'none' })
 // 独立包复用镜像锁定的 DSH SDK；其余运行依赖随薄入口打入制品。
 const standaloneManagerSources = { name: 'standalone-mcp-sources', setup(build) {
   managerSources.setup({ ...build, onLoad(options, callback) {

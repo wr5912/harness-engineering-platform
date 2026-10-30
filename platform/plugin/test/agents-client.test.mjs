@@ -5,7 +5,7 @@ import test from 'node:test'
 import { build } from 'esbuild'
 
 const require = createRequire(import.meta.url)
-const source = (await build({ entryPoints: [new URL('../src/agents/client.tsx', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime', 'react-dom'], plugins: [{ name: 'page-components', setup(builder) { builder.onLoad({ filter: /detail-drawer\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function DetailDrawer(p) { return createElement('section', { 'data-drawer-title': p.title }, createElement('button', { type: 'button' }, p.trigger || p.title), p.children) }` })); builder.onLoad({ filter: /search-select\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function SearchSelect(p) { return createElement('select', { 'aria-label': p.label, value: p.value, onChange: e => p.onChange(e.target.value) }, p.options.map(o => createElement('option', { key:o.value, value:o.value }, o.label + ' ' + (o.description || '')))) }` })); builder.onLoad({ filter: /description-client\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function AgentDescriptionPanel(p) { return createElement('div', { 'data-description-version': p.detail.experiment.id }, '版本资料与技能') }` })) } }] })).outputFiles[0].text
+const source = (await build({ entryPoints: [new URL('../src/agents/client.tsx', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime', 'react-dom', '@deepseek-ai/dsh-client-ui-primitives'], plugins: [{ name: 'page-components', setup(builder) { builder.onLoad({ filter: /detail-drawer\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function DetailDrawer(p) { return createElement('section', { 'data-drawer-title': p.title }, createElement('button', { type: 'button' }, p.trigger || p.title), p.children) }` })); builder.onLoad({ filter: /search-select\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function SearchSelect(p) { return createElement('select', { 'aria-label': p.label, value: p.value, onChange: e => p.onChange(e.target.value) }, p.options.map(o => createElement('option', { key:o.value, value:o.value }, o.label + ' ' + (o.description || '')))) }` })); builder.onLoad({ filter: /description-client\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function AgentDescriptionPanel(p) { return createElement('div', { 'data-description-version': p.detail.experiment.id }, '版本资料与技能') }` })) } }] })).outputFiles[0].text
 
 function experiments() {
   return ['first-agent', 'second-agent'].flatMap(agentId => [
@@ -39,7 +39,7 @@ function page({ active = true, target, intercept, updates } = {}) {
     useEffect(effect, deps) { const at = cursor++; if (!dependencies[at] || deps.some((value, index) => !Object.is(value, dependencies[at][index]))) { dependencies[at] = deps; effects.push(() => { cleanups[at]?.(); cleanups[at] = effect() }) } },
   }
   const module = { exports: {} }
-  vm.runInNewContext(source, { module, exports: module.exports, URL, require: name => name === 'react' ? react : require(name),
+  vm.runInNewContext(source, { module, exports: module.exports, URL, require: name => name === 'react' ? react : name === '@deepseek-ai/dsh-client-ui-primitives' ? { MarkdownText: () => null } : require(name),
     window: { location: { hostname: '127.0.0.1' }, confirm: () => confirm, addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: name => listeners.delete(name) },
     document: { activeElement: { focus() {} }, getElementById: id => {
       const node = nodes(tree).find(item => item.props?.id === id)
@@ -84,6 +84,24 @@ test('智能体四个任务页签、搜索与默认最新版本保持登记版�
   assert.equal(cards.length, 1)
   assert.match(ui.text(cards[0]), /second-agent/)
   assert.equal(ui.nodes().some(node => node.props?.id === 'agent-panel-evaluation'), false)
+})
+
+test('SDK版本提供调试和接入文档，不展示Web对话或Web发布入口', async () => {
+  const ui = page({ intercept(endpoint, payload) {
+    if (endpoint === 'agents/detail') {
+      const value = detail(payload.agent_id, payload.experiment_id)
+      value.declared.loadable_source.profile = 'sdk'
+      return { ok: true, value }
+    }
+  } })
+  await ui.settle()
+  assert.ok(ui.button('SDK 调试'))
+  assert.ok(ui.button('接入文档'))
+  assert.equal(ui.button('进入对话'), undefined)
+  assert.equal(ui.button('发布版本'), undefined)
+  assert.equal(ui.button('发起评测'), undefined)
+  assert.ok(ui.button('导出独立运行包'))
+  assert.match(ui.text(ui.render()), /官方 TypeScript SDK/)
 })
 
 test('唯一紧凑版本选择器切换查看对象，不更改登记来源', async () => {

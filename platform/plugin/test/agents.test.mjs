@@ -52,6 +52,7 @@ function fixture() {
     'runtime/adapters/dsh-container/source_contract.py',
     'runtime/adapters/dsh-container/version-source.mts',
     'platform/plugin/src/agents/version-source.ts',
+    'platform/plugin/src/models/harness-runtime.ts',
     'platform/plugin/src/version-id.ts',
     'runtime/adapters/dsh-container/workspace_paths.py',
     'runtime/adapters/dsh-container/scenario_analysis.py',

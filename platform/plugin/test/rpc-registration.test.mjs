@@ -42,6 +42,7 @@ test('真实 Cordis 提供方 Fiber 无 webServer 注入时，插件仍经原生
     ctx.provide('workspaceRegistry', {})
     ctx.provide('workspaceController', {})
     ctx.provide('sessionController', {})
+    ctx.provide('sessionQuery', { async readSession() { assert.fail('注册测试不读取 Session 历史') } })
     ctx.provide('settingsController', {})
     ctx.provide('agentDefaultModel', {})
     ctx.provide('llm', { listConfigurableProviders: () => [] })

@@ -2,7 +2,7 @@ import { versionSource, versionSources } from './version-source.ts'
 import { programRoot } from '../workspace.ts'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { dump as dumpYaml, load as loadYaml } from 'js-yaml'
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
@@ -12,7 +12,7 @@ import { businessCasesSchema } from './business-cases.ts'
 const execute = promisify(execFile)
 const CLI = 'runtime/adapters/dsh-container/dsh-dev'
 type JsonMap = Record<string, unknown>
-export type NewAgentReceipt = { agent_id: string; experiment_id: string; source_id: string; name: string; status: 'created'; started: false; note: string }
+export type NewAgentReceipt = { agent_id: string; experiment_id: string; source_id: string; name: string; profile: 'web' | 'sdk'; status: 'created'; started: false; note: string }
 class CreationError extends Error { constructor(readonly code: string, message: string) { super(message) } }
 function checkedText(payload: JsonMap, key: string, limit: number) {
   const value = payload[key]
@@ -31,14 +31,18 @@ export async function createAgent(rootPath: string, payload: JsonMap, signal?: A
   let temporary = ''
   let phase = 'input'
   const moved: string[] = []
+  const createdDirectories: string[] = []
   try {
     const root = resolve(rootPath), agentId = checkedText(payload, 'agent_id', 80)
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(agentId)) throw new CreationError('invalid_request', 'Agent ID 必须是小写 kebab-case')
     const name = checkedText(payload, 'name', 240), description = checkedText(payload, 'description', 4000), role = checkedText(payload, 'role', 60 * 1024)
+    const profile = payload.profile ?? 'web'
+    if (profile !== 'web' && profile !== 'sdk') throw new CreationError('invalid_request', '使用方式只支持 Web 交互或 TypeScript SDK')
     const parsedCases = payload.evaluation_cases === undefined ? undefined : businessCasesSchema.safeParse(payload.evaluation_cases)
     if (parsedCases && !parsedCases.success) throw new CreationError('invalid_request', parsedCases.error.issues.map(issue => issue.message).join('；'))
     const businessCases = parsedCases?.data ?? []
     for (const path of ['agents', 'evolution', 'evolution/experiments']) {
+      if (!pathExists(join(root, path))) continue
       const stat = lstatSync(join(root, path))
       if (!stat.isDirectory() || stat.isSymbolicLink()) throw new CreationError('path_rejected', '资产目录必须是仓库内的实体目录')
     }
@@ -53,9 +57,9 @@ export async function createAgent(rootPath: string, payload: JsonMap, signal?: A
       'import json,runpy,sys', 'from pathlib import Path',
       'module=runpy.run_path(sys.argv[1])',
       'stage=Path(sys.argv[2])',
-      'print(json.dumps(module["create_harness"](sys.argv[3],repo=stage,lock_path=Path(sys.argv[4]))))',
+      'print(json.dumps(module["create_harness"](sys.argv[3],repo=stage,lock_path=Path(sys.argv[4]),profile=sys.argv[5])))',
     ].join('\n')
-    const result = await execute(process.env.HARNESS_PYTHON || 'python3', ['-c', code, join(programRoot(), CLI), temporary, agentId, join(programRoot(), 'runtime/adapters/dsh-container/source.lock.json')], { cwd: root, env: { ...process.env, HARNESS_ASSET_ROOT: temporary, HARNESS_PROGRAM_ROOT: programRoot() }, signal, timeout: 30_000, maxBuffer: 1024 * 1024 })
+    const result = await execute(process.env.HARNESS_PYTHON || 'python3', ['-c', code, join(programRoot(), CLI), temporary, agentId, join(programRoot(), 'runtime/adapters/dsh-container/source.lock.json'), profile], { cwd: root, env: { ...process.env, HARNESS_ASSET_ROOT: temporary, HARNESS_PROGRAM_ROOT: programRoot() }, signal, timeout: 30_000, maxBuffer: 1024 * 1024 })
     const created = JSON.parse(result.stdout) as { experiment_id: string; source_id: string }
     if (!new RegExp(`^EXP-${agentId}-001-r[0-9a-f]{12}$`).test(created.experiment_id) || created.source_id !== `experiment:${created.experiment_id}`) throw new CreationError('creation_failed', '创建工具返回的研究版本身份无效')
     const experiment = join(temporary, 'evolution/experiments', created.experiment_id), agent = join(temporary, 'agents', agentId)
@@ -107,13 +111,24 @@ export async function createAgent(rootPath: string, payload: JsonMap, signal?: A
     if (source?.agent_id !== agentId) throw new CreationError('creation_failed', '创建工具没有返回一致的版本身份')
     const targetAgent = join(root, 'agents', agentId), targetExperiment = join(root, 'evolution/experiments', created.experiment_id)
     if (pathExists(targetAgent) || pathExists(targetExperiment) || Object.values(versionSources(root).sources).some(item => item.agent_id === agentId)) throw new CreationError('conflict', '创建期间 Agent ID 被占用，未覆盖已有资产')
+    // 新工作区在真实资产准备完成后才建立父目录；并行创建也重新核对实体目录。
+    for (const path of ['agents', 'evolution', 'evolution/experiments']) {
+      const directory = join(root, path)
+      if (!pathExists(directory)) {
+        try { mkdirSync(directory); createdDirectories.push(directory) }
+        catch (error) { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error }
+      }
+      const stat = lstatSync(directory)
+      if (!stat.isDirectory() || stat.isSymbolicLink()) throw new CreationError('path_rejected', '资产目录必须是仓库内的实体目录')
+    }
     // 同步发布已校验的两棵目录；不改写其他版本。
     renameSync(agent, targetAgent); moved.push(targetAgent)
     renameSync(experiment, targetExperiment); moved.push(targetExperiment)
     moved.length = 0
-    return { ok: true, value: { agent_id: agentId, experiment_id: created.experiment_id, source_id: created.source_id, name, status: 'created', started: false, note: '角色和首次研究版本已创建，使用当前标准 Runtime 来源；尚未启动实例或完成业务评测。' } }
+    return { ok: true, value: { agent_id: agentId, experiment_id: created.experiment_id, source_id: created.source_id, name, profile, status: 'created', started: false, note: `角色和首次研究版本已创建，使用方式为${profile === 'sdk' ? '官方 TypeScript SDK' : 'Web 交互'}；尚未启动实例或完成业务评测。` } }
   } catch (error) {
     for (const path of moved.reverse()) rmSync(path, { recursive: true, force: true })
+    for (const path of createdDirectories.reverse()) { try { rmdirSync(path) } catch {} }
     if (error instanceof CreationError) return { ok: false, error: { code: error.code, message: error.message, details: {} } }
     if (signal?.aborted) return { ok: false, error: { code: 'aborted', message: '新建智能体已取消，未保存资产', details: {} } }
     const failure = error as Error & { stderr?: string }

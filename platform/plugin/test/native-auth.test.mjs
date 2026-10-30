@@ -57,6 +57,7 @@ test('平台登录保护原生 API、三个写入域与 MCP，旧 Token/Cookie �
     ctx.provide('workspaceRegistry', { async create(path) { assert.equal(path, assetRoot); return workspace }, list: () => [workspace] })
     ctx.provide('workspaceController', {})
     ctx.provide('sessionController', { async create() { assert.fail('认证测试不创建会话') } })
+    ctx.provide('sessionQuery', { async readSession() { assert.fail('认证测试不读取 Session 历史') } })
     ctx.provide('settingsController', {})
     ctx.provide('agentDefaultModel', {})
     ctx.provide('llm', { listConfigurableProviders: () => [] })

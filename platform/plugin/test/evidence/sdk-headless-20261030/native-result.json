@@ -1,0 +1,20 @@
+{
+  "checks": [
+    "原生SDK创建",
+    "真实模型完成",
+    "刷新不重放",
+    "显式恢复同Session并回忆原回复",
+    "接入文档与TS示例",
+    "390px文档无横向溢出",
+    "实例完成态正常展示"
+  ],
+  "source": "experiment:EXP-sdk-native-demo-001-reeed9f8ea613",
+  "model": {
+    "provider": "xiaomi-token-plan-cn",
+    "model": "mimo-v2.6-flash"
+  },
+  "session_id": "session-ebe8d66f-bc58-4250-acdd-433b4efed3b6",
+  "final_response": "SDK真实模型调用正常。",
+  "operation_id": "2643a060-b0a4-4e56-9493-bad51890e813",
+  "errors": []
+}

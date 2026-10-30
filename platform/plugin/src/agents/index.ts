@@ -32,6 +32,7 @@ import { createEvaluationJobs, EvaluationJobError, redactKnownValues } from '../
 import { caseSourceReferences, createCaseManagementHandler, type RunCaseSource } from '../evaluation/cases.ts'
 import { readAssetDiff, readFixedAsset } from './asset-diff.ts'
 import { createAgent } from './create-agent.ts'
+import { createSdkHandler } from '../sdk/operations.ts'
 import { VERSION_ID, isVariantIdentity, assertInheritableVersion } from '../version-id.ts'
 import { createComputeVariantsHandler, type ComputeVariantCreation } from './compute-variants.ts'
 import { createTrainingServersHandler } from './training-servers.ts'
@@ -1065,6 +1066,7 @@ async function createExperiment(root: string, payload: JsonMap, variant?: Comput
     delete harness.runtime_contract
     harness.loadable_assets = {
       workspace: 'dsh/workspace', preset_root: 'dsh/presets', managed_root: 'dsh/managed',
+      ...(parentSource.profile === 'sdk' ? { profile: 'sdk' } : {}),
       preset_id: String(parentSource.preset).split('/')[0], preset_file: parentSource.preset,
       profile_patch: `dsh/managed/${parentSource.patch}`,
       ...(parentSource.guard ? { guard: parentSource.guard } : {}),
@@ -1426,6 +1428,9 @@ function cleanupEvalPolicies(root: string, jobId: string) {
 
 async function evalCommand(root: string, payload: JsonMap, dryRun: boolean, modelPolicy?: EvalModelPolicyProvider,
   jobId = 'preview'): Promise<{ executable: string; args: string[]; environment?: NodeJS.ProcessEnv; dispose?: () => void }> {
+  const selectedId = typeof payload.source === 'string' ? payload.source.replace(/^experiment:/, '') : ''
+  if (EXP_ID.test(selectedId) && existsSync(join(root, 'evolution/experiments', selectedId, 'candidate/harness.yaml'))
+    && versionSource(root, selectedId).profile === 'sdk') throw new RpcError('sdk_evaluation_unavailable', 'SDK 型版本请使用 SDK 调试入口；当前评测执行器使用 Web 会话协议')
   if (!modelPolicy) {
     if (payload.model_selection !== undefined) throw new RpcError('model_policy_unavailable', '当前执行入口没有原生模型投影，无法应用 model_selection')
     return { executable: process.env.HARNESS_PYTHON || 'python3', args: programArgs(evalArgs(payload, dryRun)) }
@@ -1595,6 +1600,7 @@ async function decisionUpdate(root: string, payload: JsonMap, signal?: AbortSign
 export function createAgentsHandler(assetRoot: string, onChange?: () => void, capabilityOptions: CapabilityOptions = {},
   modelPolicy?: EvalModelPolicyProvider, deployment?: ConnectionRpcHandler): ConnectionRpcHandler {
   const root = rootOf(assetRoot)
+  const sdk = createSdkHandler(root, { modelPolicy, onChange })
   const jobs = createEvaluationJobs(root, {
     command: (payload, jobId) => evalCommand(root, payload, false, modelPolicy, jobId),
     environment: () => programEnvironment(root), redact: text => redact(text, 16 * 1024), onChange,
@@ -1645,6 +1651,7 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
         const result = await assetDependencies(body, signal)
         return result.ok ? ok(result.value) : failure(new RpcError(result.error.code, result.error.message))
       }
+      if (endpoint.startsWith('sdk/')) return await sdk(endpoint.slice(4), body, signal, peer)
       if (endpoint.startsWith('datasets/')) return ok(await datasets(endpoint, body, signal))
       if (endpoint.startsWith('training-servers/')) return trainingServers(endpoint.slice('training-servers/'.length), body, signal, peer)
       if (endpoint.startsWith('compute-variants/')) {

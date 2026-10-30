@@ -13,13 +13,67 @@ export AGENT_UID=${AGENT_UID:-1000}
 export AGENT_GID=${AGENT_GID:-1000}
 export COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-hep-agent-${AGENT_ID}}
 compose() { docker compose --project-directory "$ROOT" -f "$ROOT/runtime/compose.yaml" "$@"; }
+if [ "${AGENT_PROFILE:-web}" = sdk ]; then
+  case "${1:-status}" in
+    start|run|example|prepare-sdk|configure)
+      mkdir -p "$ROOT/state"
+      command -v flock >/dev/null || { echo 'SDK 启动需要系统 flock 命令，请安装 util-linux 后重试' >&2; exit 2; }
+      exec 9>"$ROOT/state/sdk.lock"
+      flock -n 9 || { echo '该 SDK 实例正在执行其他操作，请完成或停止后重试' >&2; exit 2; }
+      ;;
+  esac
+fi
+sdk_idle() {
+  [ -z "$(compose ps --status running -q dsh)" ] || { echo '该 SDK 实例仍在执行，请等待完成或先停止' >&2; exit 2; }
+  [ "$(docker inspect --format '{{.State.Running}}' "${COMPOSE_PROJECT_NAME}-sdk-example" 2>/dev/null || true)" != true ] || { echo '该 SDK 示例仍在执行，请等待完成或先停止' >&2; exit 2; }
+}
+sdk_prepare() { compose run --rm -T init; }
+sdk_run() {
+  sdk_idle
+  sdk_prepare
+  compose up --no-deps --abort-on-container-exit --exit-code-from dsh dsh
+}
 case "${1:-status}" in
-  start) compose up -d --wait dsh; echo "智能体已启动：http://${AGENT_HOST}:${AGENT_PORT}/assistant/"; echo "首次访问请使用受保护入口文件：$ROOT/state/home/standalone/open.html" ;;
-  stop) compose stop ;;
-  restart) compose restart dsh; compose up -d --wait dsh ;;
+  start)
+    if [ "${AGENT_PROFILE:-web}" = sdk ]; then
+      [ -f "$ROOT/state/home/standalone/input.json" ] || { echo '请使用 ./agent run --input-file <JSON文件> 提交 SDK 输入' >&2; exit 2; }
+      sdk_run
+    else compose up -d --wait dsh; echo "智能体已启动：http://${AGENT_HOST}:${AGENT_PORT}/assistant/"; echo "首次访问请使用受保护入口文件：$ROOT/state/home/standalone/open.html"; fi
+    ;;
+  prepare-sdk)
+    [ "${AGENT_PROFILE:-web}" = sdk ] || { echo '当前运行包不是 SDK 型智能体' >&2; exit 2; }
+    sdk_idle; sdk_prepare
+    compose run --rm --no-deps -T dsh sdk-prepare
+    echo 'SDK 环境已准备；可提交输入或运行 TypeScript 示例。'
+    ;;
+  run)
+    [ "${AGENT_PROFILE:-web}" = sdk ] || { echo '当前运行包不是 SDK 型智能体' >&2; exit 2; }
+    [ "${2:-}" = --input-file ] && [ -n "${3:-}" ] && [ "$#" = 3 ] || { echo '用法：./agent run --input-file <JSON文件>' >&2; exit 2; }
+    sdk_idle
+    input_file=$(realpath -- "$3"); test -f "$input_file"
+    mkdir -p "$ROOT/state/home/standalone"
+    cp -- "$input_file" "$ROOT/state/home/standalone/input.json"
+    chmod 600 "$ROOT/state/home/standalone/input.json"
+    if [ "$(id -u)" = 0 ]; then chown -R "$AGENT_UID:$AGENT_GID" "$ROOT/state/home"; fi
+    sdk_run
+    ;;
+  example)
+    [ "${AGENT_PROFILE:-web}" = sdk ] || { echo '当前运行包不是 SDK 型智能体' >&2; exit 2; }
+    sdk_idle; sdk_prepare
+    compose run --rm --no-deps -T --name "${COMPOSE_PROJECT_NAME}-sdk-example" dsh sdk-example "${2:-请介绍你的职责。}"
+    ;;
+  stop)
+    compose stop
+    if [ "${AGENT_PROFILE:-web}" = sdk ] && [ "$(docker inspect --format '{{.State.Running}}' "${COMPOSE_PROJECT_NAME}-sdk-example" 2>/dev/null || true)" = true ]; then docker stop --time 20 "${COMPOSE_PROJECT_NAME}-sdk-example" >/dev/null; fi
+    ;;
+  restart)
+    if [ "${AGENT_PROFILE:-web}" = sdk ]; then echo 'SDK 任务不会自动重放；请显式运行 ./agent run --input-file <JSON文件>' >&2; exit 2
+    else compose restart dsh; compose up -d --wait dsh; fi
+    ;;
   status) compose ps ;;
   logs) shift; compose logs --tail 150 "$@" dsh ;;
   open)
+    [ "${AGENT_PROFILE:-web}" != sdk ] || { echo "SDK 接入说明：$ROOT/SDK使用说明.md"; exit 0; }
     entry="$ROOT/state/home/standalone/open.html"
     [ -f "$entry" ] || { echo '访问入口尚未生成，请先启动智能体' >&2; exit 2; }
     if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && command -v xdg-open >/dev/null; then xdg-open "$entry" >/dev/null 2>&1 || echo "请使用浏览器打开受保护入口文件：$entry"; else echo "请使用浏览器打开受保护入口文件：$entry"; fi
@@ -40,7 +94,8 @@ case "${1:-status}" in
       rm -f "$staged_config"
       trap - EXIT
     fi
-    echo '模型与 MCP 配置已保存；请在当前任务结束后运行 ./agent restart 使配置生效。'
+    if [ "${AGENT_PROFILE:-web}" = sdk ]; then echo '模型与 MCP 配置已保存，后续 SDK 进程将使用新配置；没有重放任务。'
+    else echo '模型与 MCP 配置已保存；请在当前任务结束后运行 ./agent restart 使配置生效。'; fi
     ;;
-  *) echo '用法：./agent start|stop|restart|status|logs|configure|open' >&2; exit 2 ;;
+  *) echo '用法：./agent start|stop|restart|status|logs|configure|open|prepare-sdk|run --input-file <JSON>|example [输入]' >&2; exit 2 ;;
 esac

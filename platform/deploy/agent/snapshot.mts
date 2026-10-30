@@ -56,15 +56,20 @@ export function assertDependencyArchitecture(root: string, arch: string): void {
   walk(root)
 }
 
-function pythonPackages(candidate: string, input: AgentPackageInput): DependencyPackage[] {
+function portableDependencyPath(candidate: string, directory: string) {
+  const path = relative(join(candidate, 'dsh'), directory).split(sep).join('/')
+  return path === '..' || path.startsWith('../') ? `candidate/${relative(candidate, directory).split(sep).join('/')}` : path
+}
+
+function pythonPackages(candidate: string, input: AgentPackageInput, extraDirectories: string[] = []): DependencyPackage[] {
   const result: DependencyPackage[] = []
   let preparedPackages: Array<{ path: string; lockSha256?: string; preparedTarget?: DependencyPackage['preparedTarget'] }> = []
   try { preparedPackages = JSON.parse(readFileSync(join(input.resourcesDir!, 'resources.json'), 'utf8')).dependencies ?? [] } catch { /* 未准备的资源保持明确缺口。 */ }
   for (const declaration of candidateFiles(candidate, ['.venv', 'venv'])) {
-    if (!/^dsh\/(?:workspace|managed)\//.test(declaration) || declaration.split('/').some(name => omittedPart.has(name))) continue
+    if ((!/^dsh\/(?:workspace|managed)\//.test(declaration) && !extraDirectories.some(root => declaration.startsWith(root + '/'))) || declaration.split('/').some(name => omittedPart.has(name))) continue
     const filename = declaration.split('/').at(-1)!
     if (!/^(?:requirements(?:[-_.][A-Za-z0-9_-]+)?\.txt|pyproject\.toml)$/.test(filename)) continue
-    const path = `python/${relative(join(candidate, 'dsh'), dirname(join(candidate, declaration))).split(sep).join('/')}`
+    const path = `python/${portableDependencyPath(candidate, dirname(join(candidate, declaration)))}`
     // 同一目录只保留一个环境声明事实，pyproject 优先于附带的requirements投影。
     if (result.some(item => item.path === path)) continue
     const directory = dirname(join(candidate, declaration))
@@ -131,7 +136,7 @@ function pythonPackages(candidate: string, input: AgentPackageInput): Dependency
   return result
 }
 
-function dependencyPackages(candidate: string, input: AgentPackageInput): DependencyPackage[] {
+function dependencyPackages(candidate: string, input: AgentPackageInput, extraDirectories: string[] = [], sharedSdk = false): DependencyPackage[] {
   const result: DependencyPackage[] = []
   let preparedPackages: Array<{ path: string; lockSha256?: string; preparedTarget?: DependencyPackage['preparedTarget'] }> = []
   if (input.resourcesDir) {
@@ -143,9 +148,9 @@ function dependencyPackages(candidate: string, input: AgentPackageInput): Depend
     if (existsSync(manifest)) {
       const pkg = JSON.parse(readFileSync(manifest, 'utf8'))
       const dependencies = [...new Set([...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.peerDependencies ?? {}).filter(name => !pkg.peerDependenciesMeta?.[name]?.optional
-        && !(name.startsWith('@deepseek-ai/') && existsSync(join(input.programRoot, 'platform/plugin/node_modules', name, 'package.json'))))])]
+        && !(name.startsWith('@deepseek-ai/') && (sharedSdk && name === '@deepseek-ai/dsh-sdk-client' || existsSync(join(input.programRoot, 'platform/plugin/node_modules', name, 'package.json')))))])]
       if (dependencies.length) {
-        const relativePath = relative(join(candidate, 'dsh'), path).split(sep).join('/')
+        const relativePath = portableDependencyPath(candidate, path)
         const lock = ['pnpm-lock.yaml', 'package-lock.json', 'npm-shrinkwrap.json'].map(name => join(path, name)).find(existsSync)
         const lockSha256 = lock ? sha256File(lock) : createHash('sha256').update(readFileSync(manifest)).digest('hex')
         const prepared = input.resourcesDir ? join(input.resourcesDir, 'dependencies', relativePath, 'node_modules') : ''
@@ -162,6 +167,7 @@ function dependencyPackages(candidate: string, input: AgentPackageInput): Depend
     for (const entry of readdirSync(path, { withFileTypes: true })) if (entry.isDirectory() && !omittedPart.has(entry.name)) walk(join(path, entry.name))
   }
   for (const name of ['dsh/managed', 'dsh/workspace']) if (existsSync(join(candidate, name))) walk(join(candidate, name))
+  for (const path of extraDirectories) if (!/^dsh\/(?:managed|workspace)(?:\/|$)/.test(path)) walk(join(candidate, path))
   return result
 }
 
@@ -175,21 +181,36 @@ export function inspectAgentSnapshot(input: AgentPackageInput, targetImage?: { t
   const { load } = createRequire(join(input.programRoot, 'platform/plugin/package.json'))('js-yaml')
   const harness = load(readFileSync(join(candidate, 'harness.yaml'), 'utf8')) as any
   source.preset_id = harness.loadable_assets.preset_id
+  if (source.profile === 'sdk' && source.profile_manifest) {
+    const profile = JSON.parse(readFileSync(join(input.assetRoot, source.profile_manifest), 'utf8'))
+    const bundles = profile.dsh?.profile?.bundles
+    if (!Array.isArray(bundles) || JSON.stringify(bundles) !== JSON.stringify(['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-sdk-app'])) throw new Error('当前 SDK 独立运行包只支持原生 dsh-base 与 dsh-sdk-app Profile；额外或不同的 bundle 尚未承接，请使用平台实例运行')
+    if (Object.keys(profile.dependencies ?? {}).some(name => !['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-sdk-app'].includes(name))) throw new Error('当前 SDK 独立运行包尚未承接额外的 Profile 插件依赖，请使用平台实例运行')
+  }
   const digest = agentCandidateDigest(candidate)
   if (input.expectedCandidateSha256 && digest !== input.expectedCandidateSha256) throw new Error('版本资产已变化，请刷新预览后重试')
   const files: AgentSourceSnapshot['files'] = [], omitted: string[] = []
+  const sdkRuntime = source.profile === 'sdk' ? source.harness_runtime : undefined
+  const extraRoots: string[] = sdkRuntime ? [sdkRuntime.project_workspace?.path, ...Object.values(sdkRuntime.role_instructions ?? {})].filter((path): path is string => typeof path === 'string') : []
   for (const path of candidateFiles(candidate, ['.venv', 'venv'])) {
     if (path.split('/').some(part => omittedPart.has(part)) || path.endsWith('.llm-api-key')) { omitted.push(path); continue }
     let target: string | undefined
     if (path === 'harness.yaml') target = 'assets/harness.yaml'
+    if (source.profile === 'sdk' && path.startsWith('sdk/')) target = path
     for (const [prefix, destination] of allowedRoots) if (path.startsWith(prefix + '/')) target = `assets/${destination}/${path.slice(prefix.length + 1)}`
+    if (!target && extraRoots.some(root => path === root || path.startsWith(root + '/'))) target = `assets/candidate/${path}`
     if (!target) { omitted.push(path); continue }
     const file = join(candidate, path), stat = lstatSync(file)
     files.push({ path: target, sourcePath: path, sha256: sha256File(file), mode: stat.mode & 0o111 ? 0o755 : 0o644 })
   }
   for (const [prefix] of allowedRoots) if (!existsSync(join(candidate, prefix)) || !lstatSync(join(candidate, prefix)).isDirectory()) throw new Error(`来源缺少装载目录：${prefix}`)
   if (!files.some(file => file.sourcePath === `dsh/managed/${source.patch}`) || !files.some(file => file.sourcePath === `dsh/presets/${source.preset}`)) throw new Error('来源缺少实际 Profile Patch 或 Preset')
-  const dependencies = [...dependencyPackages(candidate, input), ...pythonPackages(candidate, input)]
+  if (source.profile === 'sdk') for (const path of ['sdk/README.md', 'sdk/example.ts']) {
+    if (!files.some(file => file.sourcePath === path)) throw new Error(`SDK 版本缺少接入资产：${path}`)
+  }
+  for (const path of extraRoots) if (!files.some(file => file.sourcePath === path || file.sourcePath.startsWith(path + '/'))) throw new Error(`SDK 运行资产未包含在快照中：${path}`)
+  const projectDirectories = sdkRuntime?.project_workspace ? [sdkRuntime.project_workspace.path] : []
+  const dependencies = [...dependencyPackages(candidate, input, projectDirectories, source.profile === 'sdk'), ...pythonPackages(candidate, input, projectDirectories)]
   let image: { tag?: string; id?: string } = targetImage ?? {}
   if (!targetImage && input.resourcesDir) try { image = JSON.parse(readFileSync(join(input.resourcesDir, 'resources.json'), 'utf8')).image ?? {} } catch { /* 运行资源缺失由调用方报告。 */ }
   const matchesTarget = (dependency: DependencyPackage) => !dependency.preparedTarget || !image.id || dependency.preparedTarget.imageId === image.id && dependency.preparedTarget.image === image.tag
