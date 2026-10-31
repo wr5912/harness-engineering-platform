@@ -182,7 +182,7 @@
     "真实securityAgent来源的独立导出、安装与业务任务未验收，自建probe不替代",
     "本轮ARM64、缺Docker新系统、真实SOC及语音服务/物理设备未验收",
     "PA-11 Research Release完整复现状态不变",
-    "GPU恢复与新VAR Run待独立结果，不提前计为通过"
+    "固定模型工件恢复与新VAR单例结果见final-variant-run.json；源码不完整、比较门槛不通过，不支持采纳或收益结论"
   ],
   "sources": [
     {

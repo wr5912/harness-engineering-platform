@@ -105,7 +105,7 @@
       "new_adapter_source_dirty": true
     },
     "committed_gitignore_and_test_match_receipt": true,
-    "boundary": "本机真实Git与Python消费者回归；最终47完整安装后的Git clean检查由真实安装验收另行记录。"
+    "boundary": "本机真实Git与Python消费者回归；最终包未实际安装，该现场Git clean检查按用户决定跳过。"
   },
   "actual_platform_load": {
     "program_commit": "d961b809d0f3343c5023aae73365e6f6aaf48e89",

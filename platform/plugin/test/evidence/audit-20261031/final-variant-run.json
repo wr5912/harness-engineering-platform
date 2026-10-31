@@ -1,0 +1,263 @@
+{
+  "scope": "固定工件恢复后的单例真实评测、只读UI及比较；不代表14Case等效、源码整体通过或资源收益",
+  "program_commit": "4693cca45b108c15e18e4a3da0ea11951421dc61",
+  "program_dirty_at_run": false,
+  "data_evidence_commit": "17d103098f80f46ab6de3ebb7f9f6ed029719a80",
+  "restoration": {
+    "gpu": "RTX 2080 Ti 11GiB / SM7.5",
+    "cgroup_memory_gib": 40,
+    "cpu_quota_cores": 12,
+    "qwen_repository": "Qwen/Qwen3.5-2B",
+    "qwen_revision": "c00cc5fd7803c60b7788e053dcce33d0d26b11ef",
+    "qwen_dtype": "float16",
+    "kev_base_revision": "dc7cdfe2ee4154fa7e30f5b51ca41bfa40174e68",
+    "kev_source_revision": "2074cc44256200bb37540103fa4572901faa10f3",
+    "kev_checkpoint_sha256": "f3922c86857bd956ff2ed4a9a54dadcb095fa2299f7299a6708ac8899510b13f",
+    "kev_dtype": "float32",
+    "training_performed": false,
+    "old_paths_modified": false,
+    "environment_difference": "旧3090 BF16与本次2080Ti Qwen FP16/KEV FP32不同；固定权重恢复，不重训",
+    "actual_inference_probes_verified": true,
+    "model_services_and_dedicated_forward_preserved": true,
+    "boundary": "仅模型服务恢复和真实推理；平台及独立业务容器部署依用户决定跳过"
+  },
+  "run": {
+    "run_id": "run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+    "experiment_id": "VAR-security-operations-expert-002-r79757f173c53",
+    "source_ref": "git:b49b83aabb66c265e848ab3ffb102e6e686d7250",
+    "case_id": "U-QA-001",
+    "execution": "completed",
+    "machine_verdict": "inconclusive",
+    "effect_status": "completed",
+    "effect_verdict": "passed",
+    "effective_verdict": "passed",
+    "source_verification": {
+      "status": "matched",
+      "components": [
+        "candidate",
+        "mcp_fixture",
+        "workspace",
+        "presets",
+        "managed",
+        "evaluation_implementation"
+      ]
+    },
+    "source_diagnosis": {
+      "status": "incomplete",
+      "conclusion": "inconclusive",
+      "reason": "源码诊断未完成（evidence-access）：analysis-required-evidence-not-read；未核实范围保持未知。",
+      "required_parts": 270,
+      "read_parts": 11
+    },
+    "source_not_timeout": true,
+    "native_source_successful_reads": 15,
+    "native_scope_equals_successful_pairs": true,
+    "evaluation_instance_stopped": true
+  },
+  "resource_scopes": {
+    "whole_run": {
+      "scope": "公开eval/status；目标、Judge、effect/source评审及所有已采集会话",
+      "actual_model_calls": 12,
+      "observed_model_calls": 12,
+      "model_calls_by_role": {
+        "target": 3,
+        "judge": 1,
+        "analysis": 8
+      },
+      "model_calls_by_model_role": {
+        "language": 1,
+        "decision": 1
+      },
+      "model_calls_complete": true,
+      "token_usage": null,
+      "token_usage_complete": false,
+      "local_model_routes_verification": "verified"
+    },
+    "target_only": {
+      "scope": "compute比较相同路径：仅evidence/U-QA-001/trace.jsonl，包含目标子会话与图推理；排除Judge与AI评审",
+      "actual_model_calls": 3,
+      "observed_model_calls": 3,
+      "model_calls_by_role": {
+        "target": 3,
+        "judge": 0,
+        "analysis": 0
+      },
+      "model_calls_by_model_role": {
+        "language": 1,
+        "decision": 1
+      },
+      "model_calls_complete": true,
+      "token_usage": null,
+      "token_usage_complete": false,
+      "local_model_routes_verification": "verified"
+    }
+  },
+  "comparison": {
+    "sha256": "2aad65f8654f24464b1f3c86a156b4fd9aa51be78b3d74b38a059952cfd6ee37",
+    "parent_run": "run-403db09b-c724-4514-96f0-c95a59f1fdd1",
+    "variant_run": "run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+    "method_fields_matched": {
+      "evaluation_implementation": true,
+      "review_contract": true,
+      "evaluation_sha256": true,
+      "evaluation_cases": true,
+      "mcp_fixture": true,
+      "executor": true
+    },
+    "method_implementation_differences": [],
+    "normal_contract_not_overridden": true,
+    "comparability_passed": false,
+    "resource_evidence_passed": false,
+    "quality_passed": false,
+    "eligible_for_end": false,
+    "QA_target_actual_model_calls": {
+      "parent": 2,
+      "reduction_pct": -50,
+      "variant": 3
+    },
+    "overall_resources": {
+      "actual_model_calls": {
+        "parent": null,
+        "reduction_pct": null,
+        "variant": null
+      },
+      "elapsed_ms": {
+        "parent": null,
+        "reduction_pct": null,
+        "variant": null
+      },
+      "input_tokens": {
+        "parent": null,
+        "reduction_pct": null,
+        "variant": null
+      },
+      "model_calls": {
+        "parent": null,
+        "reduction_pct": null,
+        "variant": null
+      },
+      "output_tokens": {
+        "parent": null,
+        "reduction_pct": null,
+        "variant": null
+      },
+      "total_tokens": {
+        "parent": null,
+        "reduction_pct": null,
+        "variant": null
+      }
+    },
+    "uncovered_planned_cases": 13,
+    "limits": [
+      "工作流源码、共享执行器或构建产物已变化 / 尚未构建",
+      "run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c: U-QA-001 混合变体的外层回合不是受控本地派发",
+      "run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c: 程序版本未冻结或不同",
+      "run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c/U-QA-001: 至少一个模型调用的供应商 token 用量缺失或分桶不一致",
+      "目标资源指标缺少完整数据或父版基数为零"
+    ],
+    "mode": "mock",
+    "conclusion": "固定测试仍1/4；不采纳、不结束，不声明业务等效或节省"
+  },
+  "real_UI": {
+    "screens": 8,
+    "widths": [
+      1440,
+      390
+    ],
+    "page_errors": [],
+    "overflow_count": 0,
+    "same_run_evidence_jumps": 4,
+    "original_run_files": 307,
+    "original_run_files_unchanged": true
+  },
+  "deterministic_validation": {
+    "program": {
+      "valid": true,
+      "errors": 0,
+      "warnings": 0
+    },
+    "data_and_variant": [
+      {
+        "name": "data-repository",
+        "valid": true,
+        "errors": 0,
+        "warnings": 3
+      },
+      {
+        "name": "var002",
+        "valid": true,
+        "errors": 0,
+        "warnings": 0
+      }
+    ],
+    "source_and_status_unchanged": true,
+    "temporary_directory_empty": true
+  },
+  "runtime_preserved": {
+    "original_containers": 9,
+    "original_containers_unchanged": true,
+    "platform_pid": 977931,
+    "platform_index_sha256": "683b92c00648d946c4fde40900a891e01d32242a563cd47e33e2e056629ced37",
+    "platform_client_sha256": "aa9f3ed96351cef2055ba3d81c4edaf70f16cb238b6d57c338d6f2994b0e482e",
+    "runtime_code_changed_after_90f3381": false,
+    "scope": "截至收据时间只读核对；本次未重启原平台或原9容器"
+  },
+  "sources": [
+    {
+      "path": ".local/audit-variants-20261030/region-restoration-ready-facts.json",
+      "sha256": "8066b60abdaf7f8e15b19dd335034c53345aa3feac158cfcf3e4898323008a2b"
+    },
+    {
+      "path": ".local/audit-variants-20261030/eval-region-separated-variant-terminal-proof.json",
+      "sha256": "31e964e33bf404697081e35f39289e860ece94aa88ce7d4fd0e77c9a4de051f7"
+    },
+    {
+      "path": ".local/audit-variants-20261030/eval-region-pair-method-readonly-proof.json",
+      "sha256": "39782ff79863a56d736d49fe97c2668f58c09387ac3b62b02ebc41652813aafd"
+    },
+    {
+      "path": ".local/audit-variants-20261030/region-final-deterministic-validation.json",
+      "sha256": "bf84a39d0a18afff4dde85c3359e1a7ffb975c7c39a4054080868e2deb2e6394"
+    },
+    {
+      "path": ".local/audit-20261030/var-971516-ui-verified.json",
+      "sha256": "c774dbc21b876b7ea6134a087c3c4cc92d1ac6e60515a548a4410d28497c24b3"
+    },
+    {
+      "path": ".local/audit-20261030/final-runtime-ownership-readonly.json",
+      "sha256": "7c22b0ea5f985db4a17a6dbdc1de0b67998a9ac3c612751a6adb3558a7a1dbc8"
+    },
+    {
+      "path": ".local/audit-20261030/program-after-evidence-validation.json",
+      "sha256": "9c2559dba44283f1e180a3a4de2b80dfbc37afc08aadd54016ac9ebf915b3b2d"
+    },
+    {
+      "path": ".local/audit-variants-20261030/region-cgroup-readonly-facts.json",
+      "sha256": "9692041bd6088f188266d5d7b4956278e764385f85d6de341330ab01afbc3e6b"
+    },
+    {
+      "repository": "harness-engineering-platform-data",
+      "commit": "17d103098f80f46ab6de3ebb7f9f6ed029719a80",
+      "path": "evolution/experiments/VAR-security-operations-expert-002-r79757f173c53/evaluation/compute-comparison-2aad65f8654f24464b1f3c86a156b4fd9aa51be78b3d74b38a059952cfd6ee37.json",
+      "sha256": "2aad65f8654f24464b1f3c86a156b4fd9aa51be78b3d74b38a059952cfd6ee37"
+    },
+    {
+      "repository": "harness-engineering-platform-data",
+      "commit": "17d103098f80f46ab6de3ebb7f9f6ed029719a80",
+      "path": "evolution/experiments/VAR-security-operations-expert-002-r79757f173c53/runs/run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c/summary.json",
+      "sha256": "20d33902b7795d9f931cfe9dd8d8e570c5c52186f87829b068fa425f461e658e"
+    },
+    {
+      "repository": "harness-engineering-platform-data",
+      "commit": "17d103098f80f46ab6de3ebb7f9f6ed029719a80",
+      "path": "evolution/experiments/VAR-security-operations-expert-002-r79757f173c53/runs/run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c/analysis.json",
+      "sha256": "3fe6a3a9b0517d5096c068d5b9e717b319e5ae8c3a5785817fd2a7f5ae5df6ce"
+    },
+    {
+      "repository": "harness-engineering-platform-data",
+      "commit": "17d103098f80f46ab6de3ebb7f9f6ed029719a80",
+      "path": "evolution/experiments/VAR-security-operations-expert-002-r79757f173c53/decision.md",
+      "sha256": "3522bd7a6db5b3e498b2e8c6aa78ea1f57c57ff2c3d8550dc4a69bb353e8c6ab"
+    }
+  ]
+}
