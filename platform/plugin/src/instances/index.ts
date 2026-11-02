@@ -11,6 +11,8 @@ import { tmpdir } from 'node:os'
 import { join, relative, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import type { ConnectionRpcHandler, ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
+import { createExternalInstancesHandler } from './external/index.ts'
+import { createAgentAccessManagement } from '../agent-access/index.ts'
 
 const execFile = promisify(execFileCallback)
 const RUN_ID = /^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
@@ -708,7 +710,11 @@ function invalidItem(item: unknown, error: unknown): InstanceActionReceipt {
 }
 
 export function createInstancesHandler(assetRoot: string, modelPolicy?: ModelPolicyProvider): ConnectionRpcHandler {
-  return async (endpoint, payload, signal) => {
+  const external = createExternalInstancesHandler(assetRoot)
+  const agentAccess = createAgentAccessManagement(assetRoot)
+  return async (endpoint, payload, signal, peer) => {
+    if (endpoint.startsWith('external/')) return external(endpoint.slice('external/'.length), payload, signal, peer)
+    if (endpoint.startsWith('agentAccess/')) return agentAccess(endpoint.slice('agentAccess/'.length), payload, signal, peer)
     if (signal.aborted) return failure('aborted', '实例操作已取消')
     try {
       if (endpoint === 'list') return ok(await listInstances(assetRoot, signal))

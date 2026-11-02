@@ -1,0 +1,302 @@
+{
+  "at": "2026-11-02T14:07:51.337Z",
+  "instanceId": "remote-agentscope-sample",
+  "scope": "真实AgentScope容器经Compose冷恢复；旧Session和新工具调用使用实际Runtime，模型及业务资源均为模拟",
+  "baseline": {
+    "capturedAt": "2026-11-02T14:04:42.211853+00:00",
+    "sessionId": "external-session-b38fb44a-93cc-4084-9c1c-59ebab238dbe",
+    "upstreamSessionId": "92979e4a205a467996ad229d3d91d421",
+    "agentId": "6b8687e485144c60bc85c846479d56b1",
+    "credentialId": "e513fcdd5cfa4cc58b8c5abdea252383",
+    "grant": [
+      {
+        "instanceId": "remote-agentscope-sample",
+        "resourceId": "sample-assets",
+        "scopes": [
+          "assets:read"
+        ],
+        "objects": [
+          "A-1"
+        ],
+        "enabled": true,
+        "version": 12
+      }
+    ],
+    "instanceCredentials": [
+      {
+        "id": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+        "clientId": "client-6b4f02f7-939b-4eef-a4ed-554a51dafd9d",
+        "instanceId": "remote-agentscope-sample",
+        "status": "active",
+        "createdAt": "2026-11-02T13:36:04.473Z",
+        "expiresAt": "2026-12-02T13:36:04.473Z",
+        "retireAt": null
+      }
+    ],
+    "revokedCredentialIds": []
+  },
+  "checks": [
+    {
+      "name": "原生Service API恢复",
+      "ok": true
+    },
+    {
+      "name": "重启前原生Session可读取",
+      "ok": true
+    },
+    {
+      "name": "平台旧Session绑定恢复",
+      "ok": true
+    },
+    {
+      "name": "签名与原认证MCP恢复",
+      "ok": true
+    },
+    {
+      "name": "冷恢复后签名资产实际工具完成",
+      "ok": true
+    },
+    {
+      "name": "冷恢复后原认证目录实际工具完成",
+      "ok": true
+    },
+    {
+      "name": "资源授予保持原版本与范围",
+      "ok": true
+    },
+    {
+      "name": "实例凭据身份与状态保持",
+      "ok": true
+    },
+    {
+      "name": "AgentScope容器恢复运行",
+      "ok": true
+    }
+  ],
+  "runs": [
+    {
+      "label": "冷恢复后签名资产",
+      "acceptedStage": "accepted",
+      "complete": true,
+      "messages": [
+        {
+          "name": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "冷恢复后调用 get_asset 查询 A-1 的状态。",
+              "id": "79c7b83384a94f4793407168f45793a8",
+              "created_at": "2026-11-02T14:07:51.810770",
+              "finished_at": null
+            }
+          ],
+          "role": "user",
+          "id": "0f8ed64e4e144548a72918bb4b4634e0",
+          "metadata": {},
+          "created_at": "2026-11-02T14:07:51.810869",
+          "usage": null,
+          "finished_at": null,
+          "finished_reason": null,
+          "structured_output": null,
+          "error": null
+        },
+        {
+          "name": "跨框架远程样本",
+          "content": [
+            {
+              "type": "tool_call",
+              "id": "call-fixture-tool",
+              "name": "mcp__protected_assets__get_asset",
+              "input": "{\"id\":\"A-1\"}",
+              "state": "finished",
+              "suggested_rules": [],
+              "created_at": "2026-11-02T14:07:52.130367",
+              "finished_at": "2026-11-02T14:07:52.131162"
+            },
+            {
+              "type": "tool_result",
+              "id": "call-fixture-tool",
+              "name": "mcp__protected_assets__get_asset",
+              "output": [
+                {
+                  "type": "text",
+                  "text": "{\"id\":\"A-1\",\"group\":\"A\",\"status\":\"正常\"}",
+                  "id": "2d6226d3926549f7b60752b6339832ef",
+                  "created_at": "2026-11-02T14:07:52.530295",
+                  "finished_at": null
+                }
+              ],
+              "state": "success",
+              "metadata": {},
+              "created_at": "2026-11-02T14:07:52.255661",
+              "finished_at": "2026-11-02T14:07:52.530423"
+            },
+            {
+              "type": "text",
+              "text": "模拟循环已完成，实际调用结果以工具返回为准。",
+              "id": "2ea6b84fc8b84793b77b76d8fd0f798b",
+              "created_at": "2026-11-02T14:07:52.706673",
+              "finished_at": "2026-11-02T14:07:52.707467"
+            }
+          ],
+          "role": "assistant",
+          "id": "816982fe8d914c5fb5eadfe9ce21d3f5",
+          "metadata": {},
+          "created_at": "2026-11-02T14:07:51.895598",
+          "usage": {
+            "input_tokens": 20,
+            "output_tokens": 20,
+            "cache_input_tokens": 0,
+            "cache_creation_input_tokens": 0
+          },
+          "finished_at": "2026-11-02T14:07:52.707695",
+          "finished_reason": "completed",
+          "structured_output": null,
+          "error": null
+        }
+      ]
+    },
+    {
+      "label": "冷恢复后原认证目录",
+      "acceptedStage": "accepted",
+      "complete": true,
+      "messages": [
+        {
+          "name": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "冷恢复后调用 get_catalog 查询目录 catalog。",
+              "id": "ada062376d2f4a6e80b58bebabbd7051",
+              "created_at": "2026-11-02T14:07:53.066489",
+              "finished_at": null
+            }
+          ],
+          "role": "user",
+          "id": "068ba808d5174f8381c5f35c71a8e64c",
+          "metadata": {},
+          "created_at": "2026-11-02T14:07:53.066586",
+          "usage": null,
+          "finished_at": null,
+          "finished_reason": null,
+          "structured_output": null,
+          "error": null
+        },
+        {
+          "name": "跨框架远程样本",
+          "content": [
+            {
+              "type": "tool_call",
+              "id": "call-fixture-tool",
+              "name": "mcp__native_catalog__get_catalog",
+              "input": "{}",
+              "state": "finished",
+              "suggested_rules": [],
+              "created_at": "2026-11-02T14:07:53.379372",
+              "finished_at": "2026-11-02T14:07:53.380465"
+            },
+            {
+              "type": "tool_result",
+              "id": "call-fixture-tool",
+              "name": "mcp__native_catalog__get_catalog",
+              "output": [
+                {
+                  "type": "text",
+                  "text": "{\"catalog\":[\"资产查询\"],\"authentication\":\"native\",\"harnessSignature\":false}",
+                  "id": "8b043e6da5314ee6b7b2ec22da8e7127",
+                  "created_at": "2026-11-02T14:07:53.695089",
+                  "finished_at": null
+                }
+              ],
+              "state": "success",
+              "metadata": {},
+              "created_at": "2026-11-02T14:07:53.513617",
+              "finished_at": "2026-11-02T14:07:53.695278"
+            },
+            {
+              "type": "text",
+              "text": "模拟循环已完成，实际调用结果以工具返回为准。",
+              "id": "1eb22485a7bb4b228d3dc1e17215357b",
+              "created_at": "2026-11-02T14:07:53.886773",
+              "finished_at": "2026-11-02T14:07:53.887821"
+            }
+          ],
+          "role": "assistant",
+          "id": "774bf0df03a5461e91aec9591665af9f",
+          "metadata": {},
+          "created_at": "2026-11-02T14:07:53.139305",
+          "usage": {
+            "input_tokens": 20,
+            "output_tokens": 20,
+            "cache_input_tokens": 0,
+            "cache_creation_input_tokens": 0
+          },
+          "finished_at": "2026-11-02T14:07:53.888194",
+          "finished_reason": "completed",
+          "structured_output": null,
+          "error": null
+        }
+      ]
+    }
+  ],
+  "mcps": [
+    {
+      "name": "protected_assets",
+      "healthy": true,
+      "tools": [
+        "mcp__protected_assets__get_asset"
+      ]
+    },
+    {
+      "name": "native_catalog",
+      "healthy": true,
+      "tools": [
+        "mcp__native_catalog__get_catalog"
+      ]
+    }
+  ],
+  "currentGrant": [
+    {
+      "instanceId": "remote-agentscope-sample",
+      "resourceId": "sample-assets",
+      "scopes": [
+        "assets:read"
+      ],
+      "objects": [
+        "A-1"
+      ],
+      "enabled": true,
+      "version": 12
+    }
+  ],
+  "currentCredentials": [
+    {
+      "id": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+      "clientId": "client-6b4f02f7-939b-4eef-a4ed-554a51dafd9d",
+      "instanceId": "remote-agentscope-sample",
+      "status": "active",
+      "createdAt": "2026-11-02T13:36:04.473Z",
+      "expiresAt": "2026-12-02T13:36:04.473Z"
+    }
+  ],
+  "revokedCredentialRecovery": {
+    "applicable": false,
+    "baselineCount": 0,
+    "allRemainRevoked": null,
+    "note": "基线无已撤销凭据时不据此声称实际冷恢复已证明撤销不复活"
+  },
+  "container": {
+    "Status": "running",
+    "Running": true,
+    "Paused": false,
+    "Restarting": false,
+    "OOMKilled": false,
+    "Dead": false,
+    "Pid": 1889789,
+    "ExitCode": 0,
+    "Error": "",
+    "StartedAt": "2026-11-02T14:05:45.892353461Z",
+    "FinishedAt": "0001-01-01T00:00:00Z"
+  },
+  "passed": true
+}

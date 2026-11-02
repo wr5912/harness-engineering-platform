@@ -107,3 +107,7 @@ Runtime 的 Session、设置、缓存和附件位于独立数据根，不进入 
 - Run 使用 `run-<UUIDv4>`。
 - 只有出现真实资产、观察或复用需求时才创建目录；不使用空文件或占位报告伪造完整性。
 - 外部来源原貌和迁移记录放在 `evolution/history/imports/`，不作为现行 Harness 的第二份可编辑事实源。
+
+## 跨框架已有实例接入
+
+2026-11-02 的明确需求将已有实例登记和统一访问扩展到 DSH、AgentScope、OpenCode。管理助手、默认 Harness 与 Research Mode 仍使用 DSH；接入对象保留原框架，不通过迁移 Candidate、伪造 manifest 或假定源码摘要接入。平台适配、机器凭据与模拟资源按工程验收验证，不自动创建业务 Experiment。本期采用真实框架模拟远程实例和模拟业务资源，不代表真实远程部署或业务服务兼容已经验证。具体合同由[核心接口](../platform-design/04_核心业务闭环与服务接口.md#cross-framework-access)及其引用维护。

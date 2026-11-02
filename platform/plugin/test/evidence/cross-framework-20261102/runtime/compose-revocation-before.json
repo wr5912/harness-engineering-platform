@@ -1,0 +1,8 @@
+{
+  "at": "2026-11-02T14:09:40.948Z",
+  "instanceId": "compose-revocation-probe",
+  "tokenPreviouslyActive": true,
+  "credentialRevoked": true,
+  "grantDisabled": true,
+  "issuedKid": "access-54596f07-7190-4f65-a8aa-2e4677a5ac0b"
+}

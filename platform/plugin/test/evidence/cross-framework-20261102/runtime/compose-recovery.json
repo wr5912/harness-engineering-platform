@@ -1,0 +1,78 @@
+{
+  "at": "2026-11-02T14:05:46.159Z",
+  "project": "hep-cross-framework-recovery",
+  "containers": [
+    {
+      "name": "hep-cross-framework-dsh",
+      "oldId": "0fac92ad16d0746b781af8ec9255331184f942723001c2174a1524b1b8c89344",
+      "id": "34194c4067a3d5ac0fd43f0e6d59ae435c42380b681878d06530fdfeab15c27c",
+      "image": "sha256:6ea7cbe9e99a8a2f29e9918a5112d9092ae71642fe1dbf997a612b5edafb6ca4",
+      "state": "running",
+      "running": true,
+      "user": "1000:1000",
+      "readOnlyRootfs": true
+    },
+    {
+      "name": "hep-cross-framework-dsh-connector",
+      "oldId": "d41dd91697bd81bd3bdebc310156d6b859cf884ed87f43ce1f37d845edb993bf",
+      "id": "93d114424428f8847a797d7b2e534b6e33af9674380058f65cdcdd20f213e8ca",
+      "image": "sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df",
+      "state": "running",
+      "running": true,
+      "user": "1000:1000",
+      "readOnlyRootfs": true
+    },
+    {
+      "name": "hep-cross-framework-agentscope",
+      "oldId": "b5356c3301cc9faadbffd19998308740272b5eaab6d4479d1ad98cd6966bea0f",
+      "id": "f84b670dc745ed7268ed10b45c6133f3b1eecd5ca10c3a4fde62d73faba23862",
+      "image": "sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff",
+      "state": "running",
+      "running": true,
+      "user": "",
+      "readOnlyRootfs": false
+    },
+    {
+      "name": "hep-cross-framework-agentscope-connector",
+      "oldId": "7d6b30ce40ad1768ae3bd31b9afa0294e1e02b13f1cce2e17c5575d3b82ebeb3",
+      "id": "16272e89f2fc051029fbc82d1555689f0ad92e67b9ee1898c1dadbfb235e74dc",
+      "image": "sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df",
+      "state": "running",
+      "running": true,
+      "user": "1000:1000",
+      "readOnlyRootfs": false
+    },
+    {
+      "name": "hep-cross-framework-redis",
+      "oldId": "c266c3f89e39b0634067386eb5ff21b3dde514735e65b1a3ba5cfe0fcae5a56e",
+      "id": "e1c8d01e9b63095a03215e69b977e96834ef693fdb620c06ee95f3d440598563",
+      "image": "sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf",
+      "state": "running",
+      "running": true,
+      "user": "",
+      "readOnlyRootfs": false
+    },
+    {
+      "name": "hep-cross-framework-opencode",
+      "oldId": "c6e6d1ba8af65f68747a53eeef36c9fe75ed2de009ca66ffb24f49eb9d38ea2d",
+      "id": "d1fb222d534bc8de2c5cd83634bfd95355c32c1f4b457d2b9e080f08a8a7edc8",
+      "image": "sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df",
+      "state": "running",
+      "running": true,
+      "user": "1000:1000",
+      "readOnlyRootfs": false
+    },
+    {
+      "name": "hep-cross-framework-opencode-connector",
+      "oldId": "7069f68e68a899d6be5cdcf081846f81a3e139a0a5d6cd847e4df6bcfa7137a5",
+      "id": "41aaaf340f128a9ea6f7362e3503edfca66e4bc041365660ba6f4dc46dac10b6",
+      "image": "sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df",
+      "state": "running",
+      "running": true,
+      "user": "1000:1000",
+      "readOnlyRootfs": true
+    }
+  ],
+  "runtimeApisVerified": false,
+  "note": "仅证明七个任务容器按原配置重新创建；API、授权撤销、资源调用与秘密读取边界须继续实际复验。"
+}

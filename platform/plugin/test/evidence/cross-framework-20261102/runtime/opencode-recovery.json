@@ -1,0 +1,19 @@
+{
+  "version": "2.2.5",
+  "nativePid": 1,
+  "oldSessionReadable": true,
+  "oldSession": "ses_e63857888ffe5A6lQ8m2SJNro4",
+  "mcp": [
+    {
+      "name": "native_catalog",
+      "status": "connected"
+    },
+    {
+      "name": "protected_assets",
+      "status": "connected"
+    }
+  ],
+  "initialMcpObservation": [],
+  "capabilityObservedAt": "2026-11-02T14:16:58.666353+00:00",
+  "coexistencePassed": true
+}

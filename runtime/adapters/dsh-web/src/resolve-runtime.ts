@@ -13,14 +13,21 @@ export function runtimeRequire(name: string, containerManifest?: string): NodeRe
   for (const entry of candidates) {
     if (!entry) continue
     let canonical: string
-    let require: NodeRequire
     try {
       canonical = realpathSync(entry)
-      require = createRequire(canonical)
-      require.resolve(name)
     } catch { continue }
-    if (!containerManifest) process.env.HARNESS_DSH_ENTRY = canonical
-    return require
+    const require = createRequire(canonical)
+    // 原生 CLI 只直接依赖启动入口；服务包由同一安装中的 bundle 或 Agent 持有。
+    // 按这些公开包的依赖解析，避免回退另一份 Runtime 并改写真正的启动来源。
+    const anchors = [require]
+    for (const owner of ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@deepseek-ai/dsh-sdk-app', '@deepseek-ai/dsh-agent']) {
+      try { anchors.push(createRequire(require.resolve(owner))) } catch { /* 当前组合可以不含此包。 */ }
+    }
+    for (const anchor of anchors) {
+      try { anchor.resolve(name) } catch { continue }
+      if (!containerManifest) process.env.HARNESS_DSH_ENTRY = canonical
+      return anchor
+    }
   }
   throw new Error(`Web 路径适配器无法从当前 Runtime 解析 ${name}`)
 }

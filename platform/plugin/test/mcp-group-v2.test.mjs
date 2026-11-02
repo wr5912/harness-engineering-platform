@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import { mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
-import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -10,6 +9,7 @@ import { build } from 'esbuild'
 import { Client, StreamableHTTPClientTransport, UriTemplate } from '@modelcontextprotocol/client'
 import { McpServer, createMcpHandler } from '@modelcontextprotocol/server'
 import { toNodeHandler } from '@modelcontextprotocol/node'
+import { runtimeModule } from '../../../runtime/adapters/dsh-web/src/resolve-runtime.ts'
 
 async function waitFor(check) {
   for (let i = 0; i < 300 && !check(); i++) await new Promise(resolve => setTimeout(resolve, 10))
@@ -252,10 +252,9 @@ test('v2 拒绝跨来源、上游重复和旧名冲突，离线来源不让出�
 test('业务 Session 跳过连接、鉴权和规范发现失败的 MCP 来源，仍校验本地配置', async t => {
   const manager = await managerModule(t)
   const duplicate = await fixtureMcp(t, 'duplicate', [], false, true)
-  const sdkRequire = createRequire(process.env.HARNESS_DSH_ENTRY || new URL('../package.json', import.meta.url))
   const [{ Context }, { ToolRuntime }, { createScope }, { SystemPrompt }] = await Promise.all([
     '@deepseek-ai/cordis', '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-scope', '@deepseek-ai/dsh-system-prompt',
-  ].map(name => import(pathToFileURL(sdkRequire.resolve(name)).href)))
+  ].map(name => runtimeModule(name)))
   const healthy = await serve(t, (req, res) => res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({
     openapi: '3.0.0', info: { title: 'healthy', version: '1' }, paths: {
       '/echo': { get: { operationId: 'echo', responses: { 200: { description: 'ok' } } } },
@@ -386,10 +385,9 @@ test('原始 OpenAPI 发现尊重调用方取消信号，包括登录授权过�
 
 test('原生 MCP 桥沿用 DSH 的非致命启动与无工具注册状态', async t => {
   const manager = await managerModule(t)
-  const sdkRequire = createRequire(process.env.HARNESS_DSH_ENTRY || new URL('../package.json', import.meta.url))
   const [{ Context }, { ToolRuntime }, { createScope }, { SystemPrompt }] = await Promise.all([
     '@deepseek-ai/cordis', '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-scope', '@deepseek-ai/dsh-system-prompt',
-  ].map(name => import(pathToFileURL(sdkRequire.resolve(name)).href)))
+  ].map(name => runtimeModule(name)))
   const routes = []
   const denied = await serve(t, (_request, response) => response.writeHead(401).end())
   const invalid = await serve(t, (_request, response) => response.writeHead(200, {
@@ -614,8 +612,7 @@ test('资源工具复用真实读取、参数约束和同进程分派，正文�
   assert.deepEqual(result.content, [{ type: 'text', text: 'source text' }])
   assert.equal(result.structuredContent.contents[0].uri.startsWith('mcp-group:/bridge/source/r/'), true)
   assert.equal(result.structuredContent.contents[0].text, 'source text')
-  const runtime = createRequire(process.env.HARNESS_DSH_ENTRY)
-  const { createMcpToolDefinition } = await import(pathToFileURL(runtime.resolve('@deepseek-ai/dsh-mcp-client')).href)
+  const { createMcpToolDefinition } = await runtimeModule('@deepseek-ai/dsh-mcp-client')
   const definition = createMcpToolDefinition({}, { name: fixed.name, rawName: fixed.name, inputSchema: fixed.inputSchema,
     call: args => context.mcpSessionManager.callGroupTool('bridge', 2, fixed.name, args, undefined, {}) })
   const value = await definition.execute({}, {})

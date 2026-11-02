@@ -1,0 +1,390 @@
+{
+  "at": "2026-11-02T13:57:16.519Z",
+  "instanceId": "remote-agentscope-sample",
+  "passed": false,
+  "results": [
+    {
+      "label": "正常签名资产",
+      "sessionId": "external-session-a16e51e6-02bb-4295-b89b-5bcddfac0af4",
+      "upstreamSessionId": "de08a908d60f4f10a08a4d645e7a9e20",
+      "promptStage": "accepted",
+      "complete": true,
+      "isRunning": false,
+      "succeeded": true,
+      "denied": false,
+      "calls": [
+        {
+          "type": "tool_call",
+          "id": "call-fixture-tool",
+          "name": "mcp__protected_assets__get_asset",
+          "input": "{\"id\":\"A-1\"}",
+          "state": "finished",
+          "suggested_rules": [],
+          "created_at": "2026-11-02T13:56:40.338144",
+          "finished_at": "2026-11-02T13:56:40.339256"
+        },
+        {
+          "type": "tool_result",
+          "id": "call-fixture-tool",
+          "name": "mcp__protected_assets__get_asset",
+          "output": [
+            {
+              "type": "text",
+              "text": "{\"id\":\"A-1\",\"group\":\"A\",\"status\":\"正常\"}",
+              "id": "13cead4d4aa549efb60e8d2ec52f4ddb",
+              "created_at": "2026-11-02T13:56:40.722034",
+              "finished_at": null
+            }
+          ],
+          "state": "success",
+          "metadata": {},
+          "created_at": "2026-11-02T13:56:40.469685",
+          "finished_at": "2026-11-02T13:56:40.722204"
+        }
+      ],
+      "events": [
+        {
+          "requestId": "1f34895c-143f-42ed-85c0-dc2835abd279",
+          "at": "2026-11-02T13:56:40.713Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "resourceId": "sample-assets",
+          "operation": "get_asset",
+          "jti": "77c2d684-f0b9-4330-96b4-d466883e9bfe",
+          "grantVersion": 8,
+          "stage": "response",
+          "httpStatus": 200
+        },
+        {
+          "requestId": "1f34895c-143f-42ed-85c0-dc2835abd279",
+          "at": "2026-11-02T13:56:40.710Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "resourceId": "sample-assets",
+          "operation": "get_asset",
+          "jti": "77c2d684-f0b9-4330-96b4-d466883e9bfe",
+          "grantVersion": 8,
+          "stage": "dispatched"
+        },
+        {
+          "requestId": "1f34895c-143f-42ed-85c0-dc2835abd279",
+          "at": "2026-11-02T13:56:40.708Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "resourceId": "sample-assets",
+          "operation": "get_asset",
+          "jti": "77c2d684-f0b9-4330-96b4-d466883e9bfe",
+          "grantVersion": 8,
+          "stage": "prepared"
+        },
+        {
+          "requestId": "ee95bc31-3be2-4fde-b656-6a6b730862a6",
+          "at": "2026-11-02T13:56:40.077Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "resourceId": "sample-assets",
+          "jti": "77c2d684-f0b9-4330-96b4-d466883e9bfe",
+          "grantVersion": 8,
+          "stage": "issued"
+        },
+        {
+          "requestId": "ee95bc31-3be2-4fde-b656-6a6b730862a6",
+          "at": "2026-11-02T13:56:40.072Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "stage": "authenticated"
+        }
+      ],
+      "finalTexts": [
+        "模拟循环已完成，实际调用结果以工具返回为准。"
+      ]
+    },
+    {
+      "label": "正常原认证目录",
+      "sessionId": "external-session-a16e51e6-02bb-4295-b89b-5bcddfac0af4",
+      "upstreamSessionId": "de08a908d60f4f10a08a4d645e7a9e20",
+      "promptStage": "accepted",
+      "complete": true,
+      "isRunning": false,
+      "succeeded": true,
+      "denied": false,
+      "calls": [
+        {
+          "type": "tool_call",
+          "id": "call-fixture-tool",
+          "name": "mcp__native_catalog__get_catalog",
+          "input": "{}",
+          "state": "finished",
+          "suggested_rules": [],
+          "created_at": "2026-11-02T13:56:41.468459",
+          "finished_at": "2026-11-02T13:56:41.469431"
+        },
+        {
+          "type": "tool_result",
+          "id": "call-fixture-tool",
+          "name": "mcp__native_catalog__get_catalog",
+          "output": [
+            {
+              "type": "text",
+              "text": "{\"catalog\":[\"资产查询\"],\"authentication\":\"native\",\"harnessSignature\":false}",
+              "id": "e59bcc8614d54fb18fd258c21b87aa32",
+              "created_at": "2026-11-02T13:56:41.788424",
+              "finished_at": null
+            }
+          ],
+          "state": "success",
+          "metadata": {},
+          "created_at": "2026-11-02T13:56:41.587331",
+          "finished_at": "2026-11-02T13:56:41.788527"
+        }
+      ],
+      "events": [],
+      "finalTexts": [
+        "模拟循环已完成，实际调用结果以工具返回为准。"
+      ]
+    },
+    {
+      "label": "撤签名授权后原认证目录",
+      "sessionId": "external-session-a16e51e6-02bb-4295-b89b-5bcddfac0af4",
+      "upstreamSessionId": "de08a908d60f4f10a08a4d645e7a9e20",
+      "promptStage": "accepted",
+      "complete": true,
+      "isRunning": false,
+      "succeeded": true,
+      "denied": false,
+      "calls": [
+        {
+          "type": "tool_call",
+          "id": "call-fixture-tool",
+          "name": "mcp__native_catalog__get_catalog",
+          "input": "{}",
+          "state": "finished",
+          "suggested_rules": [],
+          "created_at": "2026-11-02T13:56:42.597423",
+          "finished_at": "2026-11-02T13:56:42.598405"
+        },
+        {
+          "type": "tool_result",
+          "id": "call-fixture-tool",
+          "name": "mcp__native_catalog__get_catalog",
+          "output": [
+            {
+              "type": "text",
+              "text": "{\"catalog\":[\"资产查询\"],\"authentication\":\"native\",\"harnessSignature\":false}",
+              "id": "f58c3a4394114a5292569958156bcc41",
+              "created_at": "2026-11-02T13:56:42.890023",
+              "finished_at": null
+            }
+          ],
+          "state": "success",
+          "metadata": {},
+          "created_at": "2026-11-02T13:56:42.738325",
+          "finished_at": "2026-11-02T13:56:42.890131"
+        }
+      ],
+      "events": [
+        {
+          "requestId": "daf297ca-dc55-44f9-9919-dfb6140bfae8",
+          "at": "2026-11-02T13:56:42.968Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "stage": "authenticated"
+        },
+        {
+          "requestId": "a1532ddf-f0e4-485c-888d-d300fabf3335",
+          "at": "2026-11-02T13:56:42.905Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "stage": "authenticated"
+        },
+        {
+          "requestId": "cc5f7115-d692-42d3-950a-faaee55ea7d2",
+          "at": "2026-11-02T13:56:42.830Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "stage": "authenticated"
+        },
+        {
+          "requestId": "0fbaa147-c1dd-4f87-b633-d48f7699b01d",
+          "at": "2026-11-02T13:56:42.770Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "stage": "authenticated"
+        },
+        {
+          "requestId": "7c82a5d1-554b-4d9c-8b01-d4c9d7d47b4c",
+          "at": "2026-11-02T13:56:42.691Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "stage": "authenticated"
+        },
+        {
+          "requestId": "70cbf7ae-a66c-4467-bca4-b4db8f16f866",
+          "at": "2026-11-02T13:56:42.617Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "stage": "authenticated"
+        },
+        {
+          "requestId": "c4315d25-5676-4a42-9bc9-98442a3e6be0",
+          "at": "2026-11-02T13:56:42.546Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "stage": "authenticated"
+        },
+        {
+          "requestId": "9f0d128f-db66-40c9-b38d-2c1b22716018",
+          "at": "2026-11-02T13:56:42.490Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "stage": "authenticated"
+        },
+        {
+          "requestId": "a23b8cd0-ba8f-44ee-8c4a-eb45c570a3b5",
+          "at": "2026-11-02T13:56:42.433Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "stage": "authenticated"
+        }
+      ],
+      "finalTexts": [
+        "模拟循环已完成，实际调用结果以工具返回为准。"
+      ]
+    },
+    {
+      "label": "撤签名授权后资产拒绝",
+      "sessionId": "external-session-a16e51e6-02bb-4295-b89b-5bcddfac0af4",
+      "upstreamSessionId": "de08a908d60f4f10a08a4d645e7a9e20",
+      "promptStage": "accepted",
+      "complete": false,
+      "isRunning": false,
+      "succeeded": false,
+      "denied": false,
+      "calls": [],
+      "events": [
+        {
+          "requestId": "70c1fd1f-a91b-45ad-be09-c095957632ec",
+          "at": "2026-11-02T13:56:43.732Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "stage": "authenticated"
+        },
+        {
+          "requestId": "e23b7a68-2b26-49b6-a3bc-d6b8eabff74d",
+          "at": "2026-11-02T13:56:43.684Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "stage": "authenticated"
+        },
+        {
+          "requestId": "4f02d92a-2aed-4281-a7ff-9cb2f40ec763",
+          "at": "2026-11-02T13:56:43.636Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "stage": "authenticated"
+        }
+      ],
+      "finalTexts": [
+        "模拟模型收到消息。"
+      ]
+    },
+    {
+      "label": "恢复签名授权后资产",
+      "sessionId": "external-session-a16e51e6-02bb-4295-b89b-5bcddfac0af4",
+      "upstreamSessionId": "de08a908d60f4f10a08a4d645e7a9e20",
+      "promptStage": "accepted",
+      "complete": true,
+      "isRunning": false,
+      "succeeded": true,
+      "denied": false,
+      "calls": [
+        {
+          "type": "tool_call",
+          "id": "call-fixture-tool",
+          "name": "mcp__protected_assets__get_asset",
+          "input": "{\"id\":\"A-1\"}",
+          "state": "finished",
+          "suggested_rules": [],
+          "created_at": "2026-11-02T13:57:15.688568",
+          "finished_at": "2026-11-02T13:57:15.689553"
+        },
+        {
+          "type": "tool_result",
+          "id": "call-fixture-tool",
+          "name": "mcp__protected_assets__get_asset",
+          "output": [
+            {
+              "type": "text",
+              "text": "{\"id\":\"A-1\",\"group\":\"A\",\"status\":\"正常\"}",
+              "id": "6a65e3d93e6a46b0ac1b455a6d173cbf",
+              "created_at": "2026-11-02T13:57:16.021021",
+              "finished_at": null
+            }
+          ],
+          "state": "success",
+          "metadata": {},
+          "created_at": "2026-11-02T13:57:15.817610",
+          "finished_at": "2026-11-02T13:57:16.021222"
+        }
+      ],
+      "events": [
+        {
+          "requestId": "e7ca5a16-9bc3-4628-a1a1-2570117ede02",
+          "at": "2026-11-02T13:57:16.012Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "resourceId": "sample-assets",
+          "operation": "get_asset",
+          "jti": "cc0336cf-7dd5-4653-8f77-a439084a98e7",
+          "grantVersion": 10,
+          "stage": "response",
+          "httpStatus": 200
+        },
+        {
+          "requestId": "e7ca5a16-9bc3-4628-a1a1-2570117ede02",
+          "at": "2026-11-02T13:57:16.010Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "resourceId": "sample-assets",
+          "operation": "get_asset",
+          "jti": "cc0336cf-7dd5-4653-8f77-a439084a98e7",
+          "grantVersion": 10,
+          "stage": "dispatched"
+        },
+        {
+          "requestId": "e7ca5a16-9bc3-4628-a1a1-2570117ede02",
+          "at": "2026-11-02T13:57:16.008Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "resourceId": "sample-assets",
+          "operation": "get_asset",
+          "jti": "cc0336cf-7dd5-4653-8f77-a439084a98e7",
+          "grantVersion": 10,
+          "stage": "prepared"
+        },
+        {
+          "requestId": "83c309aa-36c0-45e9-98ed-dc62cf110a80",
+          "at": "2026-11-02T13:57:15.474Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "resourceId": "sample-assets",
+          "jti": "cc0336cf-7dd5-4653-8f77-a439084a98e7",
+          "grantVersion": 10,
+          "stage": "issued"
+        },
+        {
+          "requestId": "83c309aa-36c0-45e9-98ed-dc62cf110a80",
+          "at": "2026-11-02T13:57:15.468Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "stage": "authenticated"
+        }
+      ],
+      "finalTexts": [
+        "模拟循环已完成，实际调用结果以工具返回为准。"
+      ]
+    }
+  ],
+  "boundary": "真实 AgentScope 2.0.8 Service Runtime、独立容器模拟远程部署、确定性模拟推理与模拟业务资源；不构成真实模型、真实远程主机或业务效果验收",
+  "scope": "仅撤销并恢复 AgentScope sample-assets 授予；native_catalog 继续使用独立原生认证。模型文字不作为工具成功依据。"
+}

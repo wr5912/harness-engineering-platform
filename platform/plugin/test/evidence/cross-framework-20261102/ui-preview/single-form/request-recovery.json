@@ -1,0 +1,170 @@
+{
+  "at": "2026-11-02T15:23:31.599Z",
+  "scope": "实际React组件经真实管理handler与持久存储完成操作后，仅浏览器网络边界丢弃verify或enable响应；没有替换服务端逻辑",
+  "sources": [
+    {
+      "path": "platform/plugin/src/instances/external-client.tsx",
+      "sha256": "62ab7fa89c9c18d6149b5e7f2442c15713333f6ed08b41a4dbfcf0f059b35c60"
+    },
+    {
+      "path": "platform/plugin/src/instances/external-style.ts",
+      "sha256": "6773f585ca87f32c0a8c5f2895efae29481adc36c6f010f09ce2ba99bca15027"
+    },
+    {
+      "path": ".local/cross-framework/ui-preview/client.js",
+      "sha256": "1244f1c0c76b490c985a7d761432ae4472dd248f7f76c4698c530a5bb0455deb"
+    },
+    {
+      "path": ".local/cross-framework/plugin-lib/client.js",
+      "sha256": "6fff2d6c760f880460f2cf31ad989543be5322431cc58775e5577fdd2dccd7df"
+    }
+  ],
+  "checks": [
+    {
+      "name": "verify真实后端已执行后才丢弃网络响应",
+      "ok": true
+    },
+    {
+      "name": "verify未知结果期间字段禁用且无重新提交按钮",
+      "ok": true
+    },
+    {
+      "name": "verify关闭再编辑仍保留待核对状态",
+      "ok": true
+    },
+    {
+      "name": "verify回读准确匹配实际在途阶段请求ID",
+      "ok": true
+    },
+    {
+      "name": "verify不重复保存验证或自动继续启用",
+      "ok": true
+    },
+    {
+      "name": "verify回读显示真实入口状态",
+      "ok": true
+    },
+    {
+      "name": "enable真实后端已执行后才丢弃网络响应",
+      "ok": true
+    },
+    {
+      "name": "enable未知结果期间字段禁用且无重新提交按钮",
+      "ok": true
+    },
+    {
+      "name": "enable关闭再编辑仍保留待核对状态",
+      "ok": true
+    },
+    {
+      "name": "enable回读准确匹配实际在途阶段请求ID",
+      "ok": true
+    },
+    {
+      "name": "enable不重复保存验证或自动继续启用",
+      "ok": true
+    },
+    {
+      "name": "enable回读显示真实入口状态",
+      "ok": true
+    },
+    {
+      "name": "丢响应恢复过程无未捕获脚本异常",
+      "ok": true
+    }
+  ],
+  "phases": [
+    {
+      "phase": "verify",
+      "dropped": {
+        "requestId": "79183b38-1872-4254-9a0e-770b69c8583b",
+        "serverOk": true,
+        "entryState": "pending",
+        "revision": "32cd72f8a5108da272fef036932b886c801f24d993c864743c983e740f1baa5f"
+      },
+      "readbackRequestId": "79183b38-1872-4254-9a0e-770b69c8583b",
+      "requests": [
+        {
+          "endpoint": "instances/external/save",
+          "requestId": "902824b7-3d5a-47c4-ab32-96e7c4c269f3"
+        },
+        {
+          "endpoint": "instances/external/verify",
+          "requestId": "79183b38-1872-4254-9a0e-770b69c8583b"
+        },
+        {
+          "endpoint": "instances/external/request",
+          "requestId": "79183b38-1872-4254-9a0e-770b69c8583b"
+        },
+        {
+          "endpoint": "instances/external/list"
+        },
+        {
+          "endpoint": "instances/external/detail"
+        },
+        {
+          "endpoint": "instances/agentAccess/status"
+        }
+      ]
+    },
+    {
+      "phase": "enable",
+      "dropped": {
+        "requestId": "dcb539f1-0bf6-463e-8ea4-97974f0f4c3e",
+        "serverOk": true,
+        "entryState": "enabled",
+        "revision": "9623964d6168c8230828b058ea58bac0259b01ce6a93e708abbaf22c99380892"
+      },
+      "readbackRequestId": "dcb539f1-0bf6-463e-8ea4-97974f0f4c3e",
+      "requests": [
+        {
+          "endpoint": "instances/external/save",
+          "requestId": "9ec4e911-5af3-41c5-8e68-13f79f91f97c"
+        },
+        {
+          "endpoint": "instances/external/verify",
+          "requestId": "333b63be-9151-47ae-ad11-aca21ff29894"
+        },
+        {
+          "endpoint": "instances/external/enable",
+          "requestId": "dcb539f1-0bf6-463e-8ea4-97974f0f4c3e"
+        },
+        {
+          "endpoint": "instances/external/request",
+          "requestId": "dcb539f1-0bf6-463e-8ea4-97974f0f4c3e"
+        },
+        {
+          "endpoint": "instances/external/list"
+        },
+        {
+          "endpoint": "instances/external/detail"
+        },
+        {
+          "endpoint": "instances/agentAccess/status"
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "passed": true,
+  "validation": {
+    "command": "node --test test/external-instances-client.test.mjs test/external-instances-events.test.mjs test/instances-client.test.mjs test/realtime.test.mjs",
+    "cwd": "platform/plugin",
+    "tests": 71,
+    "passed": 71,
+    "failed": 0,
+    "typeCheck": {
+      "command": "pnpm run check",
+      "passed": true
+    },
+    "build": {
+      "command": "node build.mjs --out-dir ../../.local/cross-framework/plugin-lib",
+      "passed": true
+    }
+  },
+  "preview": {
+    "pid": 2059125,
+    "stoppedAt": "2026-11-02T15:24:22.334Z",
+    "stopMethod": "核对cmdline与cwd后定向SIGTERM；未操作正式平台"
+  }
+}

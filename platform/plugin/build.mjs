@@ -1,11 +1,17 @@
-import { build } from 'esbuild'
-import { readFile, writeFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { build as esbuild } from 'esbuild'
+import { readFile, writeFile, readdir } from 'node:fs/promises'
+import { resolve, join, relative } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
 
-execFileSync(process.execPath, [fileURLToPath(new URL('../../runtime/adapters/dsh-web/build.mjs', import.meta.url))], { stdio: 'inherit' })
+// 验收可显式指定产物目录，避免覆盖运行中平台正在观察的 lib。
+const outputArgument = process.argv.indexOf('--out-dir')
+const outputDirectory = outputArgument < 0 ? 'lib' : process.argv[outputArgument + 1]
+if (!outputDirectory || (process.argv.length !== 2 && (process.argv.length !== 4 || outputArgument !== 2))) throw new Error('用法：node build.mjs [--out-dir DIRECTORY]')
+const outputPath = path => path === 'lib' ? outputDirectory : path.startsWith('lib/') ? join(outputDirectory, path.slice(4)) : path === 'business' && outputArgument >= 0 ? join(outputDirectory, 'business') : path
+const build = options => esbuild({ ...options, ...(options.outfile ? { outfile: outputPath(options.outfile) } : {}), ...(options.outdir ? { outdir: outputPath(options.outdir) } : {}) })
+execFileSync(process.execPath, [fileURLToPath(new URL('../../runtime/adapters/dsh-web/build.mjs', import.meta.url)), ...(outputArgument >= 0 ? ['--out-dir', resolve(outputDirectory, 'dsh-web')] : [])], { stdio: 'inherit' })
 
 export const managerSource = fileURLToPath(new URL('../../plugins/mcp-manager', import.meta.url))
 export const managerSources = {
@@ -30,7 +36,7 @@ export { Manager };`
         contents = `import { appendQueryParameter } from ${JSON.stringify(resolve('src/mcp/openapi.ts'))};\nfunction platformTimeout(server: any) { const timeout = AbortSignal.timeout(server.platformTimeoutMs ?? 20_000); return server.platformSignal ? AbortSignal.any([server.platformSignal, timeout]) : timeout }\n${original.replaceAll('AbortSignal.timeout(20_000)', 'platformTimeout(server)').replace('const { response, credential } = await authorizedFetch(source.server', 'const server = source.server\n  const { response, credential } = await authorizedFetch(source.server').replace("if (parameter.in === 'query') for (const entry of Array.isArray(value) ? value : [value]) url.searchParams.append(parameter.name, String(entry))", "if (parameter.in === 'query') appendQueryParameter(url.searchParams, parameter, value)")}\nexport { execute };`
       } else {
         contents = (await readFile(resolve(managerSource, 'index.ts'), 'utf8'))
-          .replace("createRequire('/opt/dsh/packages/mcp/mcp-client/package.json')", "resolveRuntimeRequire('@deepseek-ai/schemastery', existsSync('/opt/dsh/packages/mcp/mcp-client/package.json') ? '/opt/dsh/packages/mcp/mcp-client/package.json' : undefined)")
+          .replace("createRequire('/opt/dsh/packages/mcp/mcp-client/package.json')", "createRequire(resolveRuntimeRequire('@deepseek-ai/dsh-mcp-client').resolve('@deepseek-ai/dsh-mcp-client'))")
           .replace("const z = runtimeRequire", "const platformRequire = createRequire(import.meta.url)\nconst z = runtimeRequire")
           .replaceAll("runtimeRequire('@modelcontextprotocol/", "platformRequire('@modelcontextprotocol/")
           .replace("from './openapi.mjs'", "from 'harness-mcp-manager-openapi'")
@@ -67,7 +73,7 @@ export { Manager };`
 `
         contents = contents.slice(0, dispatchStart) + `      const outcome = await platformDispatch(request)\n      return send(res, outcome.status, outcome.value)\n` + contents.slice(dispatchEnd)
         contents = contents.slice(0, adminStart) + dispatcher + contents.slice(adminStart)
-        contents = `import { existsSync } from 'node:fs';\nimport { runtimeRequire as resolveRuntimeRequire } from ${JSON.stringify(resolve('../../runtime/adapters/dsh-web/src/resolve-runtime.ts'))};\n${contents}`
+        contents = `import { runtimeRequire as resolveRuntimeRequire } from ${JSON.stringify(resolve('../../runtime/adapters/dsh-web/src/resolve-runtime.ts'))};\n${contents}`
       }
       return { contents, loader: path.endsWith('client') ? 'tsx' : 'ts', resolveDir: managerSource }
     })
@@ -78,12 +84,16 @@ const { name } = JSON.parse(await readFile(new URL('./package.json', import.meta
 // 固定已打包执行代码的身份，不能用运行时工作树替代实际装载制品。
 const implementationFiles = ['definition.ts', 'compositions.ts', 'executor.ts', 'index.ts', 'openapi.ts', 'native.ts', 'nested.ts', 'extension.ts', 'control.ts', 'manager.ts', 'platform-manager.ts']
   .map(file => `platform/plugin/src/mcp/${file}`)
-  .concat(['platform/plugin/build.mjs', 'platform/plugin/package.json', 'platform/plugin/pnpm-lock.yaml', 'platform/plugin/src/index.ts',
+  .concat(['runtime/adapters/dsh-web/src/resolve-runtime.ts', 'platform/plugin/build.mjs', 'platform/plugin/package.json', 'platform/plugin/pnpm-lock.yaml', 'platform/plugin/src/index.ts',
     'platform/plugin/src/evaluation/model-attempts.ts', 'platform/plugin/src/workflows/graph.ts',
     ...['contracts.ts', 'core.ts', 'gateway.ts', 'group-link.ts', 'providers.ts', 'replica.ts', 'reports.ts', 'runtime.ts'].map(file => `platform/plugin/src/business-control/${file}`),
     ...['index.ts', 'openapi.ts', 'connection.ts'].map(file => `plugins/mcp-manager/${file}`),
     'platform/plugin/src/mcp/store.ts', 'platform/plugin/src/mcp/credential-path.ts',
     'platform/plugin/assets/mcp-credential-layout.json'])
+for (const directory of ['agent-access', 'instances/external']) {
+  const base = `platform/plugin/src/${directory}`
+  for (const file of (await readdir(new URL('../../' + base + '/', import.meta.url))).filter(file => file.endsWith('.ts')).sort()) implementationFiles.push(`${base}/${file}`)
+}
 const implementationHash = createHash('sha256')
 const implementationSources = []
 for (const file of implementationFiles) {
@@ -107,12 +117,14 @@ await build({
   plugins: [managerSources],
 })
 // 构建投影仅记录实际参与实现摘要的文件，不作为可编辑来源。
-await writeFile('lib/composition-source-index.json', JSON.stringify({ schema_version: 1, source_digest: implementationDigest, files: implementationSources,
-  artifacts: [{ path: 'platform/plugin/lib/index.js', sha256: createHash('sha256').update(await readFile('lib/index.js')).digest('hex') }] }, null, 2) + '\n')
+await writeFile(outputPath('lib/composition-source-index.json'), JSON.stringify({ schema_version: 1, source_digest: implementationDigest, files: implementationSources,
+  artifacts: [{ path: relative(resolve('../..'), resolve(outputPath('lib/index.js'))), sha256: createHash('sha256').update(await readFile(outputPath('lib/index.js'))).digest('hex') }] }, null, 2) + '\n')
 await build({ entryPoints: ['src/mcp/manager.ts'], outfile: 'lib/mcp-manager.js', bundle: true,
   platform: 'node', target: 'node24', format: 'esm', packages: 'external', plugins: [managerSources], legalComments: 'none', define: implementationDefine })
 await build({ entryPoints: ['src/mcp/platform-manager.ts'], outfile: 'lib/platform-mcp-manager.js', bundle: true,
   platform: 'node', target: 'node24', format: 'esm', packages: 'external', plugins: [managerSources], legalComments: 'none', define: implementationDefine })
+await build({ entryPoints: ['src/agent-access/connector.ts'], outfile: 'lib/agent-access-connector.js', bundle: true,
+  platform: 'node', target: 'node24', format: 'esm', packages: 'external', legalComments: 'none' })
 await build({ entryPoints: ['src/business-control/runtime.ts'], outfile: 'lib/business-runtime.js', bundle: true,
   platform: 'node', target: 'node24', format: 'esm', packages: 'external', legalComments: 'none' })
 await build({ entryPoints: ['src/business-control/index.ts'], outfile: 'lib/business-gateway.js', bundle: true,
@@ -149,6 +161,10 @@ await build({ entryPoints: {
 // 独立业务 Host 包不声明管理客户端；薄入口继续复用同一份已构建实现。
 await build({ entryPoints: ['business/runtime.ts', 'business/mcp-manager.ts'], outdir: 'business', bundle: false,
   platform: 'node', target: 'node24', format: 'esm', legalComments: 'none' })
+if (outputArgument >= 0) for (const file of ['runtime.js', 'mcp-manager.js']) {
+  const path = join(outputDirectory, 'business', file)
+  await writeFile(path, (await readFile(path, 'utf8')).replaceAll('../lib/', '../'))
+}
 await build({
   entryPoints: ['src/client.tsx'],
   outfile: 'lib/client.js',

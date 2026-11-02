@@ -2,23 +2,18 @@ import assert from 'node:assert/strict'
 import { createHash, randomBytes } from 'node:crypto'
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
-import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
 import test from 'node:test'
 import { configureBusinessControlStateRoot, getBusinessControl } from '../lib/business-control.js'
 import { resolveBusinessInstance } from '../lib/business-gateway.js'
 import { McpConfigStore } from '../src/mcp/store.ts'
 import { mcpCredentialPaths } from '../src/mcp/credential-path.ts'
+import { runtimeModule } from '../../../runtime/adapters/dsh-web/src/resolve-runtime.ts'
 
-const sdkRequire = createRequire(process.env.HARNESS_DSH_ENTRY || new URL('../package.json', import.meta.url))
 const [{ Context }, { SystemPrompt }, { ToolRuntime }, { createScope, scopeParentOf }] = await Promise.all([
-  import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/cordis')).href),
-  import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/dsh-system-prompt')).href),
-  import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/dsh-tools')).href),
-  import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/dsh-scope')).href),
-])
+  '@deepseek-ai/cordis', '@deepseek-ai/dsh-system-prompt', '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-scope',
+].map(name => runtimeModule(name)))
 
 test('受控业务仅投影 Candidate 重叠连接，平台保存收缩新目录并拒绝旧分组目标', async t => {
   const root = mkdtempSync(join(tmpdir(), 'business-mcp-overlay-'))

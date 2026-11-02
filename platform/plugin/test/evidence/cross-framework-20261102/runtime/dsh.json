@@ -1,0 +1,107 @@
+{
+  "at": "2026-11-02T14:03:58.440Z",
+  "instanceId": "remote-dsh-sample",
+  "runtimeVersion": "0.2.1-rc.5",
+  "sourceCommit": "b830ec950faba0a46dda564be3e2d854afed94f1",
+  "sourceDirty": false,
+  "environment": "本机隔离容器模拟远程已有实例",
+  "model": "确定性模拟OpenAI模型；不证明真实模型或业务效果",
+  "resource": "模拟业务资源",
+  "conditions": {
+    "lifecycle": "externally-managed",
+    "usage": "shared",
+    "entry": "原生DSH HTTP RPC，未开放完整原生Web/WS",
+    "credentialDelivery": "专用上游Cookie仅服务端使用；Harness机器secret仅connector持有",
+    "runtimeImage": "已有镜像仅提供系统依赖，实际执行只读锁定rc.5源码构建制品和Node24.19.0"
+  },
+  "phases": [
+    {
+      "name": "签名资源正常调用",
+      "sessionId": "external-session-bb613422-3285-4850-bb0f-8d3925025ff0",
+      "upstreamSessionId": "session-cebc3a0f-6897-450d-9fe4-5d0d74a9f97f",
+      "accepted": true,
+      "toolCalls": [
+        {
+          "name": "mcp__sample_signed__get_asset",
+          "arguments": "{\"id\":\"A-1\"}"
+        }
+      ],
+      "toolError": false,
+      "verified": true
+    },
+    {
+      "name": "撤销授予后的签名调用",
+      "sessionId": "external-session-38b32ff4-df26-4947-8be5-59e222e01159",
+      "upstreamSessionId": "session-81723942-d08f-4a70-a3f2-876263c3e17e",
+      "accepted": true,
+      "toolCalls": [
+        {
+          "name": "mcp__sample_signed__get_asset",
+          "arguments": "{\"id\":\"A-1\"}"
+        }
+      ],
+      "toolError": true,
+      "verified": true
+    },
+    {
+      "name": "撤销期间原生认证服务",
+      "sessionId": "external-session-8fb7d081-b625-456f-aa51-85cbeade104f",
+      "upstreamSessionId": "session-6c73203b-25ed-45eb-97fe-fe9411e75d7c",
+      "accepted": true,
+      "toolCalls": [
+        {
+          "name": "mcp__sample_ordinary__get_catalog",
+          "arguments": "{}"
+        }
+      ],
+      "toolError": false,
+      "verified": true
+    },
+    {
+      "name": "恢复授予后的签名调用",
+      "sessionId": "external-session-c4d616e2-5401-4ff1-a469-a94331d6bb16",
+      "upstreamSessionId": "session-cbdb39e0-7eeb-403b-bbe6-8df434dee882",
+      "accepted": true,
+      "toolCalls": [
+        {
+          "name": "mcp__sample_signed__get_asset",
+          "arguments": "{\"id\":\"A-1\"}"
+        }
+      ],
+      "toolError": false,
+      "verified": true
+    }
+  ],
+  "isolation": {
+    "name": "真实 Bash 凭据隔离探针",
+    "sessionId": "external-session-15f35dfa-e33d-4a53-a860-37c9041ff3ec",
+    "toolNames": [
+      "bash"
+    ],
+    "actualToolExecuted": true,
+    "checks": [
+      {
+        "path": "/run/connector/instance.key",
+        "result": "UNREADABLE"
+      },
+      {
+        "path": "/run/connector/config.json",
+        "result": "UNREADABLE"
+      },
+      {
+        "path": "/run/instance/instance.secret",
+        "result": "UNREADABLE"
+      },
+      {
+        "path": "/var/run/docker.sock",
+        "result": "UNREADABLE"
+      }
+    ],
+    "taskCompleted": true
+  },
+  "boundaries": [
+    "真实DSH Runtime和本机容器模拟远程部署",
+    "确定性模拟模型和模拟资源，不证明真实模型效果或真实业务系统兼容",
+    "未开放DSH原生Web/WS、任务取消或全量出站控制"
+  ]
+}

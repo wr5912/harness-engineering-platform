@@ -1,0 +1,113 @@
+{
+  "observedAt": "2026-11-02T15:24:25.730Z",
+  "scope": "实际18120单表单只读核验与原生客户端热更新；不提交登记或发送模型请求",
+  "checks": [
+    {
+      "name": "原生客户端模块revision随制品更新",
+      "ok": true
+    },
+    {
+      "name": "平台进程与服务端制品保持一致",
+      "ok": true
+    },
+    {
+      "name": "登记在一个表单完成且无步骤按钮",
+      "ok": true
+    },
+    {
+      "name": "首屏说明必填与保存登记的区别",
+      "ok": true
+    },
+    {
+      "name": "遗漏名称给出说明并聚焦",
+      "ok": true
+    },
+    {
+      "name": "遗漏地址给出说明并聚焦",
+      "ok": true
+    },
+    {
+      "name": "opencode只展示当前必需字段",
+      "ok": true
+    },
+    {
+      "name": "opencode必填字段同时有语义与可见星号",
+      "ok": true
+    },
+    {
+      "name": "agentscope只展示当前必需字段",
+      "ok": true
+    },
+    {
+      "name": "agentscope必填字段同时有语义与可见星号",
+      "ok": true
+    },
+    {
+      "name": "dsh只展示当前必需字段",
+      "ok": true
+    },
+    {
+      "name": "dsh必填字段同时有语义与可见星号",
+      "ok": true
+    },
+    {
+      "name": "更多设置默认折叠",
+      "ok": true
+    },
+    {
+      "name": "可选项与默认访问主体可识别",
+      "ok": true
+    },
+    {
+      "name": "关闭并重新打开保留单表单草稿",
+      "ok": true
+    },
+    {
+      "name": "1440px单表单无整页横向溢出且操作可达",
+      "ok": true
+    },
+    {
+      "name": "768px单表单无整页横向溢出且操作可达",
+      "ok": true
+    },
+    {
+      "name": "390px单表单无整页横向溢出且操作可达",
+      "ok": true
+    }
+  ],
+  "errors": [],
+  "hotUpdate": {
+    "before": {
+      "observedAt": "2026-11-02T15:10:57.512Z",
+      "module": {
+        "graphRevision": "70e960759d21",
+        "platform": {
+          "id": "@ai-agent-harness/harness-platform",
+          "rev": "cdeb7589b00f",
+          "url": "plugins/??@ai-agent-harness/harness-platform/client.js&rev=cdeb7589b00f"
+        }
+      },
+      "artifacts": {
+        "client": "d5452d382e226e27ec47406ae4d6ead38965b7f028f9860fe604e70d3266b337",
+        "server": "c30160a2c08bb6e612874b699bf60477fef57c6f2fd54b8cc3e70b94a5ef9eb4"
+      },
+      "pid": 2005866
+    },
+    "after": {
+      "module": {
+        "graphRevision": "3017be3b5a5c",
+        "platform": {
+          "id": "@ai-agent-harness/harness-platform",
+          "rev": "84e25dba35fe",
+          "url": "plugins/??@ai-agent-harness/harness-platform/client.js&rev=84e25dba35fe"
+        }
+      },
+      "artifacts": {
+        "client": "6fff2d6c760f880460f2cf31ad989543be5322431cc58775e5577fdd2dccd7df",
+        "server": "c30160a2c08bb6e612874b699bf60477fef57c6f2fd54b8cc3e70b94a5ef9eb4"
+      },
+      "pid": 2005866
+    }
+  },
+  "passed": true
+}

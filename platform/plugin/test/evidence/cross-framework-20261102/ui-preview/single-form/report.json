@@ -1,0 +1,294 @@
+{
+  "at": "2026-11-02T15:17:49.784Z",
+  "scope": "真实页面组件 + 当前真实管理RPC与存储 + 模拟上游API；不代表正式18120或真实框架验收",
+  "sourceDigests": {
+    "at": "2026-11-02T15:17:27.084Z",
+    "files": [
+      {
+        "path": "platform/plugin/src/instances/external-client.tsx",
+        "sha256": "22f2145454b0d09d9b60a3eb4558961a26567be20112c32800e65798108cf4ef"
+      },
+      {
+        "path": "platform/plugin/src/instances/external-style.ts",
+        "sha256": "6773f585ca87f32c0a8c5f2895efae29481adc36c6f010f09ce2ba99bca15027"
+      },
+      {
+        "path": ".local/cross-framework/ui-preview/client.tsx",
+        "sha256": "550fe36e4fa02394b477c7b913a26fab9673414a748194e96324f70650679158"
+      },
+      {
+        "path": ".local/cross-framework/ui-preview/server.ts",
+        "sha256": "542305fe805e4332fc8d282eb2140be904c4a282b77ff0389f969ca2c5a7f9f2"
+      },
+      {
+        "path": ".local/cross-framework/ui-preview/client.js",
+        "sha256": "6572c8996b2cc16afe5cbc8fe39f9713b2fc8f7d207589f71468edef67169862"
+      },
+      {
+        "path": ".local/cross-framework/ui-preview/server.mjs",
+        "sha256": "df850a4ecd9327b5ffd9d7855345a154cd8f6a2f7a61047dfcbc87c142670134"
+      }
+    ]
+  },
+  "checks": [
+    {
+      "name": "单表单直接显示4个AgentScope必要控件",
+      "ok": true
+    },
+    {
+      "name": "更多设置默认折叠且无上下步按钮",
+      "ok": true
+    },
+    {
+      "name": "尚无逻辑对象时不显示关联选择",
+      "ok": true
+    },
+    {
+      "name": "必填星号同标签行并有required及aria-required",
+      "ok": true
+    },
+    {
+      "name": "缺名称明确说明并聚焦",
+      "ok": true
+    },
+    {
+      "name": "缺服务地址聚焦",
+      "ok": true
+    },
+    {
+      "name": "缺AgentScope Agent ID聚焦",
+      "ok": true
+    },
+    {
+      "name": "DSH显示5个必要控件且不暴露JSON选择器",
+      "ok": true
+    },
+    {
+      "name": "缺DSH工作区明确聚焦",
+      "ok": true
+    },
+    {
+      "name": "缺DSH Preset明确聚焦",
+      "ok": true
+    },
+    {
+      "name": "切回AgentScope保留其Agent ID",
+      "ok": true
+    },
+    {
+      "name": "切回DSH保留两个结构化字段",
+      "ok": true
+    },
+    {
+      "name": "OpenCode首屏仅3个必要控件",
+      "ok": true
+    },
+    {
+      "name": "最简OpenCode真实后端保存验证启用",
+      "ok": true
+    },
+    {
+      "name": "未展开设置的默认payload准确且不混用框架目标",
+      "ok": true
+    },
+    {
+      "name": "1440px单表单必要字段与操作可达且无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "768px单表单必要字段与操作可达且无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "390px单表单必要字段与操作可达且无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "清空主体自动展开更多并聚焦且不自动放权",
+      "ok": true
+    },
+    {
+      "name": "可选字段与默认授权准确标注",
+      "ok": true
+    },
+    {
+      "name": "390px更多设置底部字段可达",
+      "ok": true
+    },
+    {
+      "name": "关闭登记后恢复非秘密草稿",
+      "ok": true
+    },
+    {
+      "name": "自定义责任信息随草稿保留",
+      "ok": true
+    },
+    {
+      "name": "实际后端保存验证启用",
+      "ok": true
+    },
+    {
+      "name": "自定义字段真实保存回执保持",
+      "ok": true
+    },
+    {
+      "name": "真实凭据创建仅一次交付",
+      "ok": true
+    },
+    {
+      "name": "关闭秘密后普通详情无明文",
+      "ok": true
+    },
+    {
+      "name": "真实后端资源授予回读",
+      "ok": true
+    },
+    {
+      "name": "实际RPC经适配器访问模拟上游并读取结果",
+      "ok": true
+    },
+    {
+      "name": "768px 概览无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "768px 接入与能力无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "768px 访问授权无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "768px 访问记录无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "390px 概览无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "390px 接入与能力无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "390px 访问授权无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "390px 访问记录无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "390px资源授予操作可达",
+      "ok": true
+    },
+    {
+      "name": "关闭访问后输入保留",
+      "ok": true
+    },
+    {
+      "name": "停用入口后服务端实际拒绝",
+      "ok": true
+    },
+    {
+      "name": "Escape可关闭访问弹窗",
+      "ok": true
+    },
+    {
+      "name": "浏览器无脚本异常",
+      "ok": true
+    }
+  ],
+  "registrationReceipts": [
+    {
+      "revision": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "requestId": "31dc2f58-40f2-4355-a507-68f5c1084287",
+      "agent": {
+        "name": "最简OpenCode助手",
+        "system": "127.0.0.1",
+        "owner": "平台管理者"
+      },
+      "instance": {
+        "name": "最简OpenCode助手",
+        "framework": "opencode",
+        "endpoint": "http://127.0.0.1:32853",
+        "managementMode": "externally-managed",
+        "usageMode": "shared",
+        "description": "",
+        "location": ""
+      },
+      "policy": {
+        "subjects": [
+          "platform-owner"
+        ],
+        "actions": [
+          "agent:access",
+          "session:create",
+          "session:prompt",
+          "session:read",
+          "session:events"
+        ],
+        "enabled": true
+      }
+    },
+    {
+      "revision": "68a53c755a64336ebdebb0521a3945d80c7f8d3c2d5b86e232ba91f0cc2d4b23",
+      "requestId": "b9bfb1b6-876a-4f8d-8437-5ac6abe7f3f4",
+      "agent": {
+        "name": "跨框架远程模拟助手",
+        "system": "模拟业务系统",
+        "owner": "模拟实例责任组"
+      },
+      "instance": {
+        "name": "AgentScope 远程模拟实例与较长名称显示验证",
+        "framework": "agentscope",
+        "endpoint": "http://127.0.0.1:32853",
+        "selector": "sample-agent",
+        "declaredVersion": "preview-1",
+        "managementMode": "externally-managed",
+        "usageMode": "shared",
+        "description": "真实后端单表单登记验收",
+        "location": "本机独立网络，模拟远程部署",
+        "instanceOwner": "模拟运维责任组"
+      },
+      "policy": {
+        "subjects": [
+          "platform-owner"
+        ],
+        "actions": [
+          "agent:access",
+          "session:create",
+          "session:prompt",
+          "session:read",
+          "session:events"
+        ],
+        "enabled": true
+      }
+    }
+  ],
+  "errors": [],
+  "passed": true,
+  "isolatedClient": {
+    "path": "/home/admin/work/harness-engineering-platform/.local/cross-framework/plugin-lib/client.js",
+    "sha256": "7a721d8a289c55ec30cc9f61d1f71c27b5de0d460928d478b42c694af8e5d555"
+  },
+  "preview": {
+    "pid": 2047019,
+    "stoppedAt": "2026-11-02T15:18:55.157Z",
+    "stopMethod": "核对cmdline与cwd后定向SIGTERM；未操作正式平台"
+  },
+  "visualInspection": {
+    "viewports": [
+      1440,
+      768,
+      390
+    ],
+    "inspectedScreenshots": [
+      "1440-registration.png",
+      "390-registration.png",
+      "390-registration-more.png"
+    ],
+    "result": "标签与星号同行；更多设置折叠；390px表单内容可滚动且操作区可达"
+  }
+}

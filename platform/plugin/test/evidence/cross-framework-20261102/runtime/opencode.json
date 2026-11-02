@@ -1,0 +1,185 @@
+{
+  "instanceId": "remote-opencode-sample",
+  "created": {
+    "requestId": "277891fa-030a-47d8-9ad6-114fb472bbf5",
+    "stage": "responded",
+    "value": {
+      "data": {
+        "id": "ses_e63857888ffe5A6lQ8m2SJNro4",
+        "projectID": "bf309ff466f7bcd6b1ca4751d16d42627dbac2ee",
+        "cost": 0,
+        "tokens": {
+          "input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cache": {
+            "read": 0,
+            "write": 0
+          }
+        },
+        "time": {
+          "created": 1793626638205,
+          "updated": 1793626638205
+        },
+        "location": {
+          "directory": "/workspace"
+        }
+      }
+    },
+    "upstreamSessionId": "ses_e63857888ffe5A6lQ8m2SJNro4",
+    "sessionId": "external-session-ab7a3d70-6842-44e3-a30b-5be428972b84"
+  },
+  "accepted": {
+    "requestId": "033c970d-10d6-4a74-8e5b-dc3624985509",
+    "stage": "accepted",
+    "value": {
+      "data": {
+        "id": "msg_19c7a87e9001aFrFGQiUiAu5Rq",
+        "sessionID": "ses_e63857888ffe5A6lQ8m2SJNro4",
+        "time": {
+          "created": 1793626638318
+        },
+        "type": "user",
+        "payload": {
+          "text": "请调用 get_asset 查询 A-1，再依据工具结果给出状态。"
+        },
+        "delivery": "steer"
+      }
+    },
+    "upstreamSessionId": "ses_e63857888ffe5A6lQ8m2SJNro4",
+    "note": "上游已受理；请读取会话或订阅事件确认执行结果。",
+    "sessionId": "external-session-ab7a3d70-6842-44e3-a30b-5be428972b84"
+  },
+  "projection": {
+    "requestId": "f71f4d01-8e2e-4eb7-9139-0355b6756468",
+    "stage": "responded",
+    "value": {
+      "data": [
+        {
+          "id": "msg_19c7a89cd001MNFTKf9lIPxByb",
+          "time": {
+            "created": 1793626638797
+          },
+          "type": "idle",
+          "outcome": "succeeded"
+        },
+        {
+          "id": "msg_19c7a8987001yDkXB1o4Yg3Z4P",
+          "time": {
+            "created": 1793626638738,
+            "streamed": 1793626638782,
+            "completed": 1793626638788
+          },
+          "type": "assistant",
+          "agent": "build",
+          "model": {
+            "id": "cross-framework-fixture",
+            "providerID": "sample"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "已通过资源工具读取资产 A-1。"
+            }
+          ],
+          "finish": "stop",
+          "rawFinish": "stop",
+          "cost": 0,
+          "tokens": {
+            "input": 10,
+            "output": 10,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          }
+        },
+        {
+          "id": "msg_19c7a8886001gBjHlLoVDbc42H",
+          "time": {
+            "created": 1793626638484,
+            "streamed": 1793626638567,
+            "completed": 1793626638708
+          },
+          "type": "assistant",
+          "agent": "build",
+          "model": {
+            "id": "cross-framework-fixture",
+            "providerID": "sample"
+          },
+          "content": [
+            {
+              "type": "tool",
+              "id": "call-fixture-asset",
+              "name": "protected_assets_get_asset",
+              "executed": false,
+              "state": {
+                "status": "completed",
+                "input": {
+                  "id": "A-1"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"id\":\"A-1\",\"group\":\"A\",\"status\":\"正常\"}"
+                  }
+                ],
+                "metadata": {
+                  "truncated": false
+                }
+              },
+              "time": {
+                "created": 1793626638537,
+                "ran": 1793626638558,
+                "completed": 1793626638700
+              }
+            }
+          ],
+          "finish": "tool-calls",
+          "rawFinish": "tool_calls",
+          "cost": 0,
+          "tokens": {
+            "input": 10,
+            "output": 10,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          }
+        },
+        {
+          "id": "msg_19c7a87e9001aFrFGQiUiAu5Rq",
+          "time": {
+            "created": 1793626638367
+          },
+          "text": "请调用 get_asset 查询 A-1，再依据工具结果给出状态。",
+          "type": "user"
+        }
+      ],
+      "cursor": {
+        "previous": "eyJpZCI6Im1zZ18xOWM3YTg5Y2QwMDFNTkZUS2Y5bElQeEJ5YiIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+        "next": "eyJpZCI6Im1zZ18xOWM3YTg3ZTkwMDFhRnJGR1FpVWlBdTVScSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      }
+    },
+    "upstreamSessionId": "ses_e63857888ffe5A6lQ8m2SJNro4",
+    "sessionId": "external-session-ab7a3d70-6842-44e3-a30b-5be428972b84"
+  },
+  "complete": true,
+  "at": "2026-11-02T13:37:19.621Z",
+  "runtime": {
+    "name": "hep-cross-framework-opencode",
+    "id": "c6e6d1ba8af65f68747a53eeef36c9fe75ed2de009ca66ffb24f49eb9d38ea2d",
+    "port": 18655,
+    "version": "2.2.5",
+    "commit": "9bbb8ce18c80f099e0e448775f59d965ead40a21",
+    "channel": "local",
+    "imageId": "sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df",
+    "network": "hep-cross-framework-opencode",
+    "sourceReadOnly": true,
+    "dockerSocket": false,
+    "note": "锁定上游源码运行；版本常量来自该源码 package.json，不是官方发行二进制。"
+  },
+  "boundary": "真实 OpenCode 源码 Runtime、隔离容器模拟远程部署、模拟推理与模拟业务资源"
+}

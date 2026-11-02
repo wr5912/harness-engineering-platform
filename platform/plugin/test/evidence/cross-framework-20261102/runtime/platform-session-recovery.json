@@ -1,0 +1,413 @@
+{
+  "observedAt": "2026-11-02T15:02:29.713Z",
+  "layer": "正式18120最终进程：原生认证RPC与装载来源只读验收",
+  "process": {
+    "pid": 2005866,
+    "cwd": "/home/admin/harness-engineering-platform-data",
+    "entry": "/home/admin/work/cross-framework-sources/dsh/apps/cli/lib/bin.js",
+    "home": "/home/admin/harness-engineering-platform-data/.local/platform-home",
+    "runtimeVersion": "0.2.1-rc.5",
+    "modules": [
+      {
+        "name": "@deepseek-ai/dsh-web-app",
+        "entry": "/home/admin/work/cross-framework-sources/dsh/packages/bundle/web-app/lib/index.js",
+        "version": "0.2.1-rc.5"
+      },
+      {
+        "name": "@deepseek-ai/dsh-client-connection",
+        "entry": "/home/admin/work/cross-framework-sources/dsh/packages/client/connection/lib/index.js",
+        "version": "0.2.1-rc.5"
+      },
+      {
+        "name": "@deepseek-ai/dsh-session",
+        "entry": "/home/admin/work/cross-framework-sources/dsh/packages/core/session/lib/index.js",
+        "version": "0.2.1-rc.5"
+      }
+    ],
+    "moduleResolutionSource": "按运行进程HARNESS_DSH_ENTRY与正式resolver解析；未从普通配置输出凭据",
+    "sourceCommit": "b830ec950faba0a46dda564be3e2d854afed94f1",
+    "startedAt": "2026-11-02T14:58:40.217Z"
+  },
+  "login": {
+    "httpStatus": 303
+  },
+  "sessionIdentity": {
+    "beforeCount": 406,
+    "afterCount": 406,
+    "missing": [],
+    "extra": [],
+    "allRetained": true,
+    "identical": true
+  },
+  "oldSession": {
+    "sessionId": "session-5c4f16db-acce-4353-84bd-c713215a7efe",
+    "projectionKind": "sequenced",
+    "throughSeq": 665,
+    "pageHttpStatus": 200,
+    "pageOk": true,
+    "recordCount": 124,
+    "hasMore": true,
+    "recordsDigest": "acaf471bbe4466abe1e18c783d58956dad72364be1fcf72614a7c610ab42b656",
+    "contentStored": false,
+    "recordTypes": [
+      "assistant/message",
+      "tool/call",
+      "tool/result",
+      "step/end",
+      "step/start",
+      "job/registered",
+      "job/settled",
+      "plugin:harness-platform/assistant",
+      "request/header",
+      "workspace/changes",
+      "turn/end"
+    ]
+  },
+  "externalList": {
+    "httpStatus": 200,
+    "ok": true,
+    "instanceCount": 0,
+    "agentCount": 0
+  },
+  "agentAccessStatus": {
+    "httpStatus": 200,
+    "ok": false,
+    "instanceAvailable": false,
+    "errorCode": "invalid_instance",
+    "ordinaryResponseHasSecretFields": false,
+    "note": "正式根尚无接入实例；模块正确拒绝未登记实例，未写入样本"
+  },
+  "loadedArtifacts": {
+    "nativePluginManager": {
+      "httpStatus": 200,
+      "ok": true,
+      "modules": [
+        {
+          "entryId": "include:webserver",
+          "moduleName": "file:///home/admin/work/harness-engineering-platform/runtime/adapters/dsh-web/lib/platform-webserver.mjs",
+          "enabled": true,
+          "readOnlyReason": "unaddressable"
+        },
+        {
+          "entryId": "include:web-runtime",
+          "moduleName": "file:///home/admin/work/harness-engineering-platform/platform/plugin/lib/index.js",
+          "enabled": true,
+          "readOnlyReason": "unaddressable"
+        },
+        {
+          "entryId": "include:security-operations-compositions",
+          "moduleName": "file:///home/admin/harness-engineering-platform-data/.local/build-cache/security-operations/778ccfe23e1fa6c7f6b440997c72e178c4417a399879d0fda85a32689b959b1f/plugin.js",
+          "enabled": true
+        }
+      ]
+    },
+    "cliPatch": {
+      "path": "/home/admin/harness-engineering-platform-data/.local/platform-home/profiles/harness-platform/harness-platform.patch.yml",
+      "sha256": "e1e6ff33762d130a1574168f9f603035e645622fdfdd2226c75bae2de0c76213",
+      "modulePaths": [
+        "/home/admin/work/harness-engineering-platform/runtime/adapters/dsh-web/lib/platform-webserver.mjs",
+        "/home/admin/work/harness-engineering-platform/platform/plugin/lib/index.js",
+        "/home/admin/harness-engineering-platform-data/.local/build-cache/security-operations/778ccfe23e1fa6c7f6b440997c72e178c4417a399879d0fda85a32689b959b1f/plugin.js"
+      ],
+      "mtime": "2026-11-02T14:58:05.097Z"
+    },
+    "mainPlugin": {
+      "path": "/home/admin/work/harness-engineering-platform/platform/plugin/lib/index.js",
+      "nativeModulePresent": true,
+      "enabled": true,
+      "matchesCliPatch": true
+    },
+    "compositionIndex": {
+      "path": "/home/admin/work/harness-engineering-platform/platform/plugin/lib/composition-source-index.json",
+      "sha256": "da2cadbf209a19d8b4e85ff6fb3e45320f61a4e9efcf16d82b57ae0d0353109c",
+      "sourceDigest": "4b5892bf8dd87b3a2e910f26a02f6ea8f6623ffc9f72f0dd70cca34ceef328f3",
+      "recomputedSourceDigest": "4b5892bf8dd87b3a2e910f26a02f6ea8f6623ffc9f72f0dd70cca34ceef328f3",
+      "sourceDigestMatches": true,
+      "files": [
+        {
+          "path": "platform/plugin/src/mcp/definition.ts",
+          "expected": "74a0e74c5a219a5ddea9b2c7200f91b7d01346822c783993f67115b009bfe5c6",
+          "actual": "74a0e74c5a219a5ddea9b2c7200f91b7d01346822c783993f67115b009bfe5c6",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/mcp/compositions.ts",
+          "expected": "c37365406af2a3442eeaee681af16abcaada2f87962661012087e176d12d0416",
+          "actual": "c37365406af2a3442eeaee681af16abcaada2f87962661012087e176d12d0416",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/mcp/executor.ts",
+          "expected": "42cc5eff14ea1a632fdcec3b9e2fa06b7141eea0a30542bf736e162d5f2b671f",
+          "actual": "42cc5eff14ea1a632fdcec3b9e2fa06b7141eea0a30542bf736e162d5f2b671f",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/mcp/index.ts",
+          "expected": "ea7e261d10ef8f2187d33976265caf7530caa88946a898913e1958312ff43923",
+          "actual": "ea7e261d10ef8f2187d33976265caf7530caa88946a898913e1958312ff43923",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/mcp/openapi.ts",
+          "expected": "694339f1fbead8ddbe4befb8e80900001eb74aa52539bcb12aeb9732d4cf2608",
+          "actual": "694339f1fbead8ddbe4befb8e80900001eb74aa52539bcb12aeb9732d4cf2608",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/mcp/native.ts",
+          "expected": "2c1753eb378af9cbbaff6d9f7027700fd42df376c6f978a88ff574c522b86f95",
+          "actual": "2c1753eb378af9cbbaff6d9f7027700fd42df376c6f978a88ff574c522b86f95",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/mcp/nested.ts",
+          "expected": "ed7c076e469edd8629cb12a181084777be5f02c64f3c6618d98f4f5bcb75c987",
+          "actual": "ed7c076e469edd8629cb12a181084777be5f02c64f3c6618d98f4f5bcb75c987",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/mcp/extension.ts",
+          "expected": "b41e78ae354ec4370e324217c8df924127ce5458f3a74766855d821a4aa649d2",
+          "actual": "b41e78ae354ec4370e324217c8df924127ce5458f3a74766855d821a4aa649d2",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/mcp/control.ts",
+          "expected": "82dc5e5e5c680595c33eb7fd874275d28e7d1b0b15db6b69f2d40aed6ae59915",
+          "actual": "82dc5e5e5c680595c33eb7fd874275d28e7d1b0b15db6b69f2d40aed6ae59915",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/mcp/manager.ts",
+          "expected": "db4297ca3ab1c296a63ffbab514d17e7a2f703051814ca1f1e9a6531cb99791f",
+          "actual": "db4297ca3ab1c296a63ffbab514d17e7a2f703051814ca1f1e9a6531cb99791f",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/mcp/platform-manager.ts",
+          "expected": "1e1470c2ec4a273494e4a08f4177d76446a605edff3357413fa9fe5f924f0ad4",
+          "actual": "1e1470c2ec4a273494e4a08f4177d76446a605edff3357413fa9fe5f924f0ad4",
+          "matches": true
+        },
+        {
+          "path": "runtime/adapters/dsh-web/src/resolve-runtime.ts",
+          "expected": "69e91bb7ff19f8e6f79694988ccf54d49e1a0a19675c33f59b3f7cc64a55bf1b",
+          "actual": "69e91bb7ff19f8e6f79694988ccf54d49e1a0a19675c33f59b3f7cc64a55bf1b",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/build.mjs",
+          "expected": "a1dd05d92c9866839251a6fc92e4be28c07d7492e2e18ea2e5822b3af9e8058f",
+          "actual": "a1dd05d92c9866839251a6fc92e4be28c07d7492e2e18ea2e5822b3af9e8058f",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/package.json",
+          "expected": "7eee6070461fecf36c4463071d6f84039de69d83af866b93ff638cee7814d4cb",
+          "actual": "7eee6070461fecf36c4463071d6f84039de69d83af866b93ff638cee7814d4cb",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/pnpm-lock.yaml",
+          "expected": "a2931527e1fcd3591b38fd23b64c016eb1d6b5e1b5ab8d29207c06ef28ddcddf",
+          "actual": "a2931527e1fcd3591b38fd23b64c016eb1d6b5e1b5ab8d29207c06ef28ddcddf",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/index.ts",
+          "expected": "38444510688bfa5e42ca798e3a5e9a00edcec0733efc0be6ddbd63744d7bad9a",
+          "actual": "38444510688bfa5e42ca798e3a5e9a00edcec0733efc0be6ddbd63744d7bad9a",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/evaluation/model-attempts.ts",
+          "expected": "3f0a2d93c95a8396966a279bd07162f907eca7c725b62f004ac3aa3af564abe5",
+          "actual": "3f0a2d93c95a8396966a279bd07162f907eca7c725b62f004ac3aa3af564abe5",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/workflows/graph.ts",
+          "expected": "d8922a169e65a9ea5db488b45819375699867a0817512815a91c1f2cb71e4935",
+          "actual": "d8922a169e65a9ea5db488b45819375699867a0817512815a91c1f2cb71e4935",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/business-control/contracts.ts",
+          "expected": "15fbaeb56fc4fafb2b540231035a25010e85d11f7e56d46f9d2134a71e418410",
+          "actual": "15fbaeb56fc4fafb2b540231035a25010e85d11f7e56d46f9d2134a71e418410",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/business-control/core.ts",
+          "expected": "858bd430d6bd3447949a419ea69920c4f82e69f112922708e86e4413c85afbde",
+          "actual": "858bd430d6bd3447949a419ea69920c4f82e69f112922708e86e4413c85afbde",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/business-control/gateway.ts",
+          "expected": "8560691bd7c546510dabc0062f0bc10044ae1755ecaa18b3d4ddc58f696ab590",
+          "actual": "8560691bd7c546510dabc0062f0bc10044ae1755ecaa18b3d4ddc58f696ab590",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/business-control/group-link.ts",
+          "expected": "bc814a11f0e2e0f848df0d3b81d176a6ca4e07779b2bfd86769834f1bb276c65",
+          "actual": "bc814a11f0e2e0f848df0d3b81d176a6ca4e07779b2bfd86769834f1bb276c65",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/business-control/providers.ts",
+          "expected": "e92bfe1203b376f872c517bd61f8c2cdb15685398d5dc164b217026f0033ca91",
+          "actual": "e92bfe1203b376f872c517bd61f8c2cdb15685398d5dc164b217026f0033ca91",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/business-control/replica.ts",
+          "expected": "f47d7a1eb60fd0adb9be8ace0ef4fb2015c96b89d6db86f24833c4b5655a43bf",
+          "actual": "f47d7a1eb60fd0adb9be8ace0ef4fb2015c96b89d6db86f24833c4b5655a43bf",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/business-control/reports.ts",
+          "expected": "7b0b47eb94528d8ebf6f414e7d579bb5ffcb8d2989849be887feb5406b299580",
+          "actual": "7b0b47eb94528d8ebf6f414e7d579bb5ffcb8d2989849be887feb5406b299580",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/business-control/runtime.ts",
+          "expected": "2c0330fc332f3a55e4025e406190715c4728116e6779787ade364cdb064d0bb3",
+          "actual": "2c0330fc332f3a55e4025e406190715c4728116e6779787ade364cdb064d0bb3",
+          "matches": true
+        },
+        {
+          "path": "plugins/mcp-manager/index.ts",
+          "expected": "693fd1d35e7f2a6623ae16b75a8978b5db96fe8a95573ff25e57524891533902",
+          "actual": "693fd1d35e7f2a6623ae16b75a8978b5db96fe8a95573ff25e57524891533902",
+          "matches": true
+        },
+        {
+          "path": "plugins/mcp-manager/openapi.ts",
+          "expected": "d819b7e967ae763dbb7952523e3d894ad4171d47e311d07e105dd666aa2f5692",
+          "actual": "d819b7e967ae763dbb7952523e3d894ad4171d47e311d07e105dd666aa2f5692",
+          "matches": true
+        },
+        {
+          "path": "plugins/mcp-manager/connection.ts",
+          "expected": "09d66d933a12a12d500c606ce9744e10348a48eb732cf77ae56a68012098adf3",
+          "actual": "09d66d933a12a12d500c606ce9744e10348a48eb732cf77ae56a68012098adf3",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/mcp/store.ts",
+          "expected": "89448c708621518a97f23974845fd3ee0bb302aed1d8a721aab48146517ff192",
+          "actual": "89448c708621518a97f23974845fd3ee0bb302aed1d8a721aab48146517ff192",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/mcp/credential-path.ts",
+          "expected": "cbb3c5a99811e14573143e2813998fc02e9b6e0ad57df44feeee3adf6b6c5497",
+          "actual": "cbb3c5a99811e14573143e2813998fc02e9b6e0ad57df44feeee3adf6b6c5497",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/assets/mcp-credential-layout.json",
+          "expected": "2822050dbce01fa2726428ba2013f56693c7b0f2084219d8792662c310570a87",
+          "actual": "2822050dbce01fa2726428ba2013f56693c7b0f2084219d8792662c310570a87",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/agent-access/connector.ts",
+          "expected": "04c697ee45aaa905840ae037be4be8ab389d6287b77203c59de34048f9402152",
+          "actual": "04c697ee45aaa905840ae037be4be8ab389d6287b77203c59de34048f9402152",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/agent-access/contracts.ts",
+          "expected": "5d4cfc9c2ea2b40ae92a6b50904e415fbfe2a96f09c09064716c3a87b6a3d35f",
+          "actual": "5d4cfc9c2ea2b40ae92a6b50904e415fbfe2a96f09c09064716c3a87b6a3d35f",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/agent-access/index.ts",
+          "expected": "9fa4b97581e62d8a946a165e4129d3241667bd18cc36a4b2ef414d376c94adcc",
+          "actual": "9fa4b97581e62d8a946a165e4129d3241667bd18cc36a4b2ef414d376c94adcc",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/agent-access/service.ts",
+          "expected": "39a49cc8f8a65c0ee871125c25416082aaaa1b8d65326853b22dcac7d56ff091",
+          "actual": "39a49cc8f8a65c0ee871125c25416082aaaa1b8d65326853b22dcac7d56ff091",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/agent-access/store.ts",
+          "expected": "95e8e422fdf122aee3eeca64df75c61d57dd52a9e81d6362d89412dc5d80ebf7",
+          "actual": "95e8e422fdf122aee3eeca64df75c61d57dd52a9e81d6362d89412dc5d80ebf7",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/instances/external/access.ts",
+          "expected": "6ffab0f7bf331777871bbd23bcb96bf5f5e123ecf413e4e702874af449ed4258",
+          "actual": "6ffab0f7bf331777871bbd23bcb96bf5f5e123ecf413e4e702874af449ed4258",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/instances/external/adapters.ts",
+          "expected": "1088ed4b735108ac1e3e3663173eb7b8119a463eae8c87b4a0f88017af0bab61",
+          "actual": "1088ed4b735108ac1e3e3663173eb7b8119a463eae8c87b4a0f88017af0bab61",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/instances/external/index.ts",
+          "expected": "3a23774fd05cf61bb55524ec10293a9a61b148a915308d98f44bd776338cf0cc",
+          "actual": "3a23774fd05cf61bb55524ec10293a9a61b148a915308d98f44bd776338cf0cc",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/instances/external/registry.ts",
+          "expected": "86c71ae65405732135bfdd1e70f8138e3956607d2cc85d87262d4ffaa7d44e65",
+          "actual": "86c71ae65405732135bfdd1e70f8138e3956607d2cc85d87262d4ffaa7d44e65",
+          "matches": true
+        },
+        {
+          "path": "platform/plugin/src/instances/external/types.ts",
+          "expected": "b2653f4b51552db1f14d11c8c3f35b5462224a79dd1e4b0113d8f84b0df16192",
+          "actual": "b2653f4b51552db1f14d11c8c3f35b5462224a79dd1e4b0113d8f84b0df16192",
+          "matches": true
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "platform/plugin/lib/index.js",
+          "sha256": "c30160a2c08bb6e612874b699bf60477fef57c6f2fd54b8cc3e70b94a5ef9eb4",
+          "actual": "c30160a2c08bb6e612874b699bf60477fef57c6f2fd54b8cc3e70b94a5ef9eb4",
+          "matches": true,
+          "mtime": "2026-11-02T14:58:03.965Z",
+          "precedesProcessStart": true
+        }
+      ]
+    },
+    "dataExtensions": [
+      {
+        "entryId": "include:security-operations-compositions",
+        "moduleName": "file:///home/admin/harness-engineering-platform-data/.local/build-cache/security-operations/778ccfe23e1fa6c7f6b440997c72e178c4417a399879d0fda85a32689b959b1f/plugin.js",
+        "enabled": true,
+        "path": "/home/admin/harness-engineering-platform-data/.local/build-cache/security-operations/778ccfe23e1fa6c7f6b440997c72e178c4417a399879d0fda85a32689b959b1f/plugin.js",
+        "sha256": "1108443d1c4470b6af6dd2de053a72e38855ae650cd5e961910973cf7f6791c4",
+        "matchesCliPatch": true,
+        "mtime": "2026-11-02T14:58:04.917Z",
+        "precedesProcessStart": true
+      }
+    ],
+    "boundary": "原生pluginManager证明进程登记模块路径；文件摘要与CLI patch关联当前制品，未宣称内存字节的额外取证。数据扩展实际入口是plugin.js，按其真实名称记录。"
+  },
+  "scope": {
+    "readOnly": true,
+    "noPrompt": true,
+    "noSessionCreation": true,
+    "noExternalRegistration": true,
+    "conversationBodyNotStored": true
+  },
+  "passed": true
+}

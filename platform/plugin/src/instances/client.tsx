@@ -12,6 +12,8 @@ import { LoadingIndicator } from '../components/loading-indicator.tsx'
 import { DistributionChart } from '../components/overview-charts.tsx'
 import { instanceState, instanceStateSegments, matchesInstanceState } from './overview.tsx'
 import { SdkDebugDialog } from '../agents/sdk-client.tsx'
+import { ExternalInstancesPage } from './external-client.tsx'
+import { externalInstanceTheme } from './external-style.ts'
 
 type Operation = 'create' | 'start' | 'stop' | 'restart' | 'delete'
 
@@ -169,6 +171,8 @@ function ModelChoice({ catalog, allowed, value, onChange, label }: { catalog: Mo
 }
 
 export function InstancesPage({ rpc, updates, onContext, target, onNavigate, active = true }: PlatformPageProps & { active?: boolean; updates?: PlatformUpdates; target?: PlatformNavigation; onNavigate?(target: PlatformNavigation): void; onContext?(context: Record<string, unknown>): void }) {
+  const [instanceView, setInstanceView] = useState<'managed' | 'external'>(target?.tab?.startsWith('external') ? 'external' : 'managed')
+  const [externalVisited, setExternalVisited] = useState(Boolean(target?.tab?.startsWith('external')))
   const [instances, setInstances] = useState<InstanceRow[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState('existing')
@@ -420,7 +424,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
     return () => { sourceRunRequest.current++ }
   }, [form.source, sources, sourceRunRefresh])
   const changedDomains = useRef(new Set<string>())
-  const refreshChanged = useQueuedRefresh(active, async () => {
+  const refreshChanged = useQueuedRefresh(active && instanceView === 'managed', async () => {
     const domains = [...changedDomains.current]
     changedDomains.current.clear()
     const reads: Promise<unknown>[] = []
@@ -453,6 +457,8 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
   }, [sources, form.source, selectedAgent])
   useEffect(() => {
     if (target?.page !== 'instances') return
+    if (target.tab?.startsWith('external')) { setInstanceView('external'); setExternalVisited(true); return }
+    if (target.instance_name || target.source_id) setInstanceView('managed')
     const name = target.instance_name
     if (!name) {
       if (detailName.current) closeDetail(true)
@@ -479,26 +485,26 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
     detailOpener.current = null
   }, [detail, detailLoading, detailNotice])
   useEffect(() => {
-    onContext?.({ page: 'instances', instance_name: detail?.instance.name, selected_instances: [...selected] })
-  }, [detail?.instance.name, selected, onContext])
+    if (instanceView === 'managed') onContext?.({ page: 'instances', instance_name: detail?.instance.name, selected_instances: [...selected] })
+  }, [detail?.instance.name, selected, onContext, instanceView])
   useEffect(() => {
-    if (actionDialog) dialog.current?.showModal()
+    if (actionDialog && active && instanceView === 'managed') dialog.current?.showModal()
     else {
       dialog.current?.close()
       actionOpener.current?.focus?.({ preventScroll: true })
       actionOpener.current = null
     }
-  }, [actionDialog])
+  }, [actionDialog, active, instanceView])
   useEffect(() => {
     const element = createDialog.current
     if (!element) return
-    if (creating && !actionDialog && !element.open) element.showModal()
-    if ((!creating || actionDialog) && element.open) element.close()
+    if (creating && !actionDialog && active && instanceView === 'managed' && !element.open) element.showModal()
+    if ((!creating || actionDialog || !active || instanceView !== 'managed') && element.open) element.close()
     if (!creating && !actionDialog) {
       createOpener.current?.focus?.({ preventScroll: true })
       createOpener.current = null
     }
-  }, [creating, actionDialog])
+  }, [creating, actionDialog, active, instanceView])
 
   function closeAction() {
     setActionDialog(null)
@@ -859,9 +865,16 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
   return (
     <main className="harness-instances-page" aria-label="实例管理">
       <style>{instanceTheme}</style>
+      <style>{externalInstanceTheme}</style>
       <header className="harness-page-heading instance-page-heading">
         <div><span className="instance-eyebrow"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="3" y="2.5" width="14" height="6" rx="2" stroke="currentColor" strokeWidth="1.5" /><rect x="3" y="11.5" width="14" height="6" rx="2" stroke="currentColor" strokeWidth="1.5" /><path d="M6 5.5h.01M6 14.5h.01m4-9h4m-4 9h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>运行 · 交付 · 观察</span><h1>实例管理</h1><p>管理智能体的运行实例，随时核对来源、状态与访问入口。</p></div>
       </header>
+
+      <div className="instance-management-tabs" role="tablist" aria-label="实例管理方式">
+        <button type="button" role="tab" aria-selected={instanceView === 'managed'} onClick={() => { setInstanceView('managed'); onNavigate?.({ page: 'instances' }) }}>平台托管</button>
+        <button type="button" role="tab" aria-selected={instanceView === 'external'} onClick={() => { setExternalVisited(true); setInstanceView('external'); onNavigate?.({ page: 'instances', tab: 'external' }) }}>接入实例</button>
+      </div>
+      <div hidden={instanceView !== 'managed'} role="tabpanel" aria-label="平台托管">
 
       <dialog ref={createDialog} id="instance-create" aria-labelledby="instance-create-title" className="instance-dialog instance-create-dialog" onCancel={event => { event.preventDefault(); setCreating(false) }}>
         {creating && !actionDialog && <>
@@ -1161,7 +1174,9 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
         </footer>
         </>}
       </dialog>
-      {sdkTarget && <SdkDebugDialog key={`${sdkTarget.source}:${sdkTarget.initialInstance || ''}`} rpc={rpc} active={active && sdkOpen} {...sdkTarget} initialTab={sdkTarget.tab} onClose={() => { setSdkOpen(false); void refreshChanged() }} />}
+      {sdkTarget && <SdkDebugDialog key={`${sdkTarget.source}:${sdkTarget.initialInstance || ''}`} rpc={rpc} active={active && instanceView === 'managed' && sdkOpen} {...sdkTarget} initialTab={sdkTarget.tab} onClose={() => { setSdkOpen(false); void refreshChanged() }} />}
+      </div>
+      {externalVisited && <ExternalInstancesPage rpc={rpc} active={active && instanceView === 'external'} updates={updates} target={target} onNavigate={onNavigate} onContext={onContext} />}
     </main>
   )
 }

@@ -1,0 +1,174 @@
+{
+  "at": "2026-11-02T15:00:28.664Z",
+  "instanceId": "remote-dsh-sample",
+  "runtimeVersion": "0.2.1-rc.5",
+  "sourceCommit": "b830ec950faba0a46dda564be3e2d854afed94f1",
+  "composeAt": "2026-11-02T14:05:46.159Z",
+  "scope": "本机真实DSH容器Compose冷恢复后的原生API、原Session与新工具请求；模型及业务资源均为确定性模拟",
+  "checks": [
+    {
+      "name": "实际DSH为Compose重建后同一运行容器",
+      "ok": true
+    },
+    {
+      "name": "验收发生在Compose冷恢复之后",
+      "ok": true
+    },
+    {
+      "name": "原生Session API及重建前Session可用",
+      "ok": true
+    },
+    {
+      "name": "签名资产旧Session原生投影可读",
+      "ok": true
+    },
+    {
+      "name": "签名资产平台旧Session归属与内容保留",
+      "ok": true
+    },
+    {
+      "name": "签名资产新请求已受理",
+      "ok": true
+    },
+    {
+      "name": "签名资产新请求经过真实工具并完成",
+      "ok": true
+    },
+    {
+      "name": "原认证目录旧Session原生投影可读",
+      "ok": true
+    },
+    {
+      "name": "原认证目录平台旧Session归属与内容保留",
+      "ok": true
+    },
+    {
+      "name": "原认证目录新请求已受理",
+      "ok": true
+    },
+    {
+      "name": "原认证目录新请求经过真实工具并完成",
+      "ok": true
+    },
+    {
+      "name": "未新建或改绑Session及主体",
+      "ok": true
+    },
+    {
+      "name": "未修改资源授予版本或范围",
+      "ok": true
+    },
+    {
+      "name": "未替换身份或变更凭据状态",
+      "ok": true
+    }
+  ],
+  "runs": [
+    {
+      "label": "签名资产",
+      "sessionId": "external-session-bb613422-3285-4850-bb0f-8d3925025ff0",
+      "upstreamSessionId": "session-cebc3a0f-6897-450d-9fe4-5d0d74a9f97f",
+      "oldThroughSeq": 23,
+      "oldNativeRecordCount": 24,
+      "acceptedStage": "accepted",
+      "complete": true,
+      "resourceMatches": true,
+      "freshEventCount": 6,
+      "toolCalls": [
+        {
+          "seq": 34,
+          "name": "mcp__sample_signed__get_asset"
+        }
+      ],
+      "toolResults": [
+        {
+          "seq": 35,
+          "isError": false,
+          "digest": "3dddf27f2e13745799a1f129871c40d705feb905c9743e3f51d7f9cf89c9f3a1"
+        }
+      ],
+      "freshResultDigest": "b7f41458bbf9fa8dc141447cc58d572d59eb1134ac4498b2836ca6995db895f7",
+      "conversationBodyStored": false
+    },
+    {
+      "label": "原认证目录",
+      "sessionId": "external-session-8fb7d081-b625-456f-aa51-85cbeade104f",
+      "upstreamSessionId": "session-6c73203b-25ed-45eb-97fe-fe9411e75d7c",
+      "oldThroughSeq": 23,
+      "oldNativeRecordCount": 24,
+      "acceptedStage": "accepted",
+      "complete": true,
+      "resourceMatches": true,
+      "freshEventCount": 6,
+      "toolCalls": [
+        {
+          "seq": 34,
+          "name": "mcp__sample_ordinary__get_catalog"
+        }
+      ],
+      "toolResults": [
+        {
+          "seq": 35,
+          "isError": false,
+          "digest": "70c23e68b5cc9c550b13616bb65e881111b4aeadfb0b785f6bc0b73fac6b82b9"
+        }
+      ],
+      "freshResultDigest": "99958659f0a559bf7cc4851123ebb8b319c9f582ab1fb925e808c326522e9516",
+      "conversationBodyStored": false
+    }
+  ],
+  "baseline": {
+    "sessions": [
+      {
+        "sessionId": "external-session-bb613422-3285-4850-bb0f-8d3925025ff0",
+        "upstreamSessionId": "session-cebc3a0f-6897-450d-9fe4-5d0d74a9f97f"
+      },
+      {
+        "sessionId": "external-session-38b32ff4-df26-4947-8be5-59e222e01159",
+        "upstreamSessionId": "session-81723942-d08f-4a70-a3f2-876263c3e17e"
+      },
+      {
+        "sessionId": "external-session-8fb7d081-b625-456f-aa51-85cbeade104f",
+        "upstreamSessionId": "session-6c73203b-25ed-45eb-97fe-fe9411e75d7c"
+      },
+      {
+        "sessionId": "external-session-c4d616e2-5401-4ff1-a469-a94331d6bb16",
+        "upstreamSessionId": "session-cbdb39e0-7eeb-403b-bbe6-8df434dee882"
+      }
+    ],
+    "grants": [
+      {
+        "instanceId": "remote-dsh-sample",
+        "resourceId": "sample-assets",
+        "scopes": [
+          "assets:read"
+        ],
+        "objects": [
+          "A-1"
+        ],
+        "enabled": true,
+        "version": 9
+      }
+    ],
+    "credentials": [
+      {
+        "id": "credential-ebd92f08-6e20-4778-bd65-bb4c2f779e29",
+        "clientId": "client-66409a45-2c11-47c4-8865-bbf9278710c0",
+        "instanceId": "remote-dsh-sample",
+        "status": "active",
+        "createdAt": "2026-11-02T13:48:49.203Z",
+        "expiresAt": "2026-12-02T13:48:49.203Z"
+      }
+    ]
+  },
+  "passed": true,
+  "container": {
+    "id": "34194c4067a3d5ac0fd43f0e6d59ae435c42380b681878d06530fdfeab15c27c",
+    "state": "running",
+    "startedAt": "2026-11-02T14:05:42.513404335Z",
+    "image": "sha256:6ea7cbe9e99a8a2f29e9918a5112d9092ae71642fe1dbf997a612b5edafb6ca4",
+    "composeOldId": "0fac92ad16d0746b781af8ec9255331184f942723001c2174a1524b1b8c89344",
+    "composeId": "34194c4067a3d5ac0fd43f0e6d59ae435c42380b681878d06530fdfeab15c27c"
+  },
+  "nativeSessionCount": 13
+}

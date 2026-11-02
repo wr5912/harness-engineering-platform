@@ -1,0 +1,212 @@
+{
+  "at": "2026-11-02T14:07:27.043Z",
+  "instanceId": "remote-opencode-sample",
+  "passed": true,
+  "results": [
+    {
+      "label": "正常签名资产",
+      "sessionId": "external-session-6f3f95c2-c483-4d35-8d7d-68f9e4513657",
+      "upstreamSessionId": "ses_e6369fa8cffe9Whl7eqDuYQ6u0",
+      "promptStage": "accepted",
+      "idle": true,
+      "completed": true,
+      "failed": false,
+      "calls": [
+        {
+          "type": "tool",
+          "id": "call-fixture-tool",
+          "name": "protected_assets_get_asset",
+          "executed": false,
+          "state": {
+            "status": "completed",
+            "input": {
+              "id": "A-1"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"id\":\"A-1\",\"group\":\"A\",\"status\":\"正常\"}"
+              }
+            ],
+            "metadata": {
+              "truncated": false
+            }
+          },
+          "time": {
+            "created": 1793628440301,
+            "ran": 1793628440319,
+            "completed": 1793628440468
+          }
+        }
+      ],
+      "finalTexts": [
+        "模拟循环已完成，实际调用结果以工具返回为准。"
+      ]
+    },
+    {
+      "label": "正常原认证目录",
+      "sessionId": "external-session-59327e6e-2332-42a6-8eaa-d092ea8fca33",
+      "upstreamSessionId": "ses_e6369f4abffePqzAhSRuh8aKoM",
+      "promptStage": "accepted",
+      "idle": true,
+      "completed": true,
+      "failed": false,
+      "calls": [
+        {
+          "type": "tool",
+          "id": "call-fixture-tool",
+          "name": "native_catalog_get_catalog",
+          "executed": false,
+          "state": {
+            "status": "completed",
+            "input": {},
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"catalog\":[\"资产查询\"],\"authentication\":\"native\",\"harnessSignature\":false}"
+              }
+            ],
+            "metadata": {
+              "truncated": false
+            }
+          },
+          "time": {
+            "created": 1793628441672,
+            "ran": 1793628441681,
+            "completed": 1793628441792
+          }
+        }
+      ],
+      "finalTexts": [
+        "模拟循环已完成，实际调用结果以工具返回为准。"
+      ]
+    },
+    {
+      "label": "撤签名授权后原认证目录",
+      "sessionId": "external-session-8621fb70-862d-473e-9350-c3d25b37ea2c",
+      "upstreamSessionId": "ses_e6369ef05ffem06I9GxQ6Faoou",
+      "promptStage": "accepted",
+      "idle": true,
+      "completed": true,
+      "failed": false,
+      "calls": [
+        {
+          "type": "tool",
+          "id": "call-fixture-tool",
+          "name": "native_catalog_get_catalog",
+          "executed": false,
+          "state": {
+            "status": "completed",
+            "input": {},
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"catalog\":[\"资产查询\"],\"authentication\":\"native\",\"harnessSignature\":false}"
+              }
+            ],
+            "metadata": {
+              "truncated": false
+            }
+          },
+          "time": {
+            "created": 1793628443082,
+            "ran": 1793628443091,
+            "completed": 1793628443123
+          }
+        }
+      ],
+      "finalTexts": [
+        "模拟循环已完成，实际调用结果以工具返回为准。"
+      ]
+    },
+    {
+      "label": "撤签名授权后资产拒绝",
+      "sessionId": "external-session-7d6e450a-c424-4eba-a333-0fefc69987a6",
+      "upstreamSessionId": "ses_e6369e953ffeoAGES3Eqg43J9S",
+      "promptStage": "accepted",
+      "idle": true,
+      "completed": false,
+      "failed": true,
+      "calls": [
+        {
+          "type": "tool",
+          "id": "call-fixture-tool",
+          "name": "protected_assets_get_asset",
+          "executed": false,
+          "state": {
+            "status": "error",
+            "input": {
+              "id": "A-1"
+            },
+            "error": {
+              "type": "tool.execution",
+              "message": "MCP tool \"get_asset\" on server \"protected_assets\" failed: Error POSTing to endpoint: {\"error\":\"signed_resource_unavailable\",\"message\":\"该签名资源暂不可用；其他原有服务继续按原方式调用\"} (HTTP 503)"
+            }
+          },
+          "time": {
+            "created": 1793628444505,
+            "ran": 1793628444512,
+            "completed": 1793628444554
+          }
+        }
+      ],
+      "finalTexts": [
+        "模拟循环已完成，实际调用结果以工具返回为准。"
+      ]
+    },
+    {
+      "label": "恢复签名授权后资产",
+      "sessionId": "external-session-96137434-3259-4b8e-95bd-1f921bda2e55",
+      "upstreamSessionId": "ses_e6369e3e9ffeq9WFCwHmQT6Aua",
+      "promptStage": "accepted",
+      "idle": true,
+      "completed": true,
+      "failed": false,
+      "calls": [
+        {
+          "type": "tool",
+          "id": "call-fixture-tool",
+          "name": "protected_assets_get_asset",
+          "executed": false,
+          "state": {
+            "status": "completed",
+            "input": {
+              "id": "A-1"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"id\":\"A-1\",\"group\":\"A\",\"status\":\"正常\"}"
+              }
+            ],
+            "metadata": {
+              "truncated": false
+            }
+          },
+          "time": {
+            "created": 1793628445902,
+            "ran": 1793628445920,
+            "completed": 1793628446082
+          }
+        }
+      ],
+      "finalTexts": [
+        "模拟循环已完成，实际调用结果以工具返回为准。"
+      ]
+    }
+  ],
+  "scope": "仅撤销并恢复 OpenCode 的 sample-assets 授予；native_catalog 使用独立原生认证、原连接，不进入 Harness 签发链。",
+  "runtimeEvidence": {
+    "name": "hep-cross-framework-opencode",
+    "id": "c6e6d1ba8af65f68747a53eeef36c9fe75ed2de009ca66ffb24f49eb9d38ea2d",
+    "port": 18655,
+    "version": "2.2.5",
+    "commit": "9bbb8ce18c80f099e0e448775f59d965ead40a21",
+    "channel": "local",
+    "imageId": "sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df",
+    "network": "hep-cross-framework-opencode",
+    "sourceReadOnly": true,
+    "dockerSocket": false,
+    "note": "锁定上游源码运行；版本常量来自该源码 package.json，不是官方发行二进制。"
+  }
+}

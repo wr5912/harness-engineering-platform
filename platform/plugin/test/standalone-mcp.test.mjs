@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import test, { after } from 'node:test'
 import { createHash } from 'node:crypto'
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
-import { createRequire } from 'node:module'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -10,10 +9,10 @@ import { pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
 import { McpServer, createMcpHandler } from '@modelcontextprotocol/server'
 import { toNodeHandler } from '@modelcontextprotocol/node'
-const sdk = createRequire(process.env.HARNESS_DSH_ENTRY ?? '/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/package.json')
+import { runtimeModule } from '../../../runtime/adapters/dsh-web/src/resolve-runtime.ts'
 const [{ Context }, { ToolRuntime }, { SystemPrompt }, { McpResourceRuntime }, { createScope }] = await Promise.all([
   '@deepseek-ai/cordis', '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-system-prompt', '@deepseek-ai/dsh-mcp-resources', '@deepseek-ai/dsh-scope',
-].map(name => import(pathToFileURL(sdk.resolve(name)).href)))
+].map(name => runtimeModule(name)))
 const previousEntry = process.env.HARNESS_DSH_ENTRY
 process.env.HARNESS_DSH_ENTRY ??= '/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/package.json'
 after(() => { if (previousEntry === undefined) delete process.env.HARNESS_DSH_ENTRY; else process.env.HARNESS_DSH_ENTRY = previousEntry })

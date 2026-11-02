@@ -1,0 +1,7 @@
+{
+  "scope": "本轮变更与新增的可维护Markdown本地文件链接；原始sources输入保留原貌，不校验网络链接或锚点",
+  "pathEnumeration": "git diff --name-only -z + git ls-files --others --exclude-standard -z",
+  "markdownFiles": 15,
+  "broken": [],
+  "passed": true
+}

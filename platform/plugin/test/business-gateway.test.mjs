@@ -18,6 +18,7 @@ import TypertGateway from '@deepseek-ai/dsh-api-gateway'
 import WorkspaceController from '@deepseek-ai/dsh-api-workspace-controller'
 import { bindTypertRemote, Remote } from '@deepseek-ai/dsh-typert-protocol'
 import { createRequire } from 'node:module'
+import { runtimeModule } from '../../../runtime/adapters/dsh-web/src/resolve-runtime.ts'
 import * as Runtime from '../lib/business-runtime.js'
 import { McpConfigStore } from '../src/mcp/store.ts'
 import { mcpCredentialPaths } from '../src/mcp/credential-path.ts'
@@ -29,10 +30,8 @@ const NativeRemotes = await import(wsRequire.resolve('@deepseek-ai/dsh-api-remot
 const binding = { workspaceId: 'workspace-business-test', agentId: 'soc', instanceId: 'soc-business', runtimeGeneration: 'generation-1', sourceDigest: 'sha256:' + 'a'.repeat(64) }
 const identity = id => ({ subject: { id, kind: 'human', identitySource: 'http://identity-fixture.invalid' }, evidence: { issuer: 'http://identity-fixture.invalid', externalSubject: id, method: 'bearer', verifiedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 60000).toISOString(), credentialRef: `credential-${id}` }, expiresAt: new Date(Date.now() + 60000).toISOString() })
 async function nativeSessionServices(ctx, root) {
-  const sdkRequire = createRequire(process.env.HARNESS_DSH_ENTRY ?? '/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/package.json')
-  const sdk = name => import(sdkRequire.resolve(name))
   const modules = await Promise.all(['dsh-llm', 'dsh-session-projection', 'dsh-system-prompt', 'dsh-tools', 'dsh-agent', 'dsh-agent-loop',
-    'dsh-session-persistence-jsonl', 'dsh-session-query-sqlite', 'dsh-agent-default-model', 'dsh-api-session-controller'].map(name => sdk('@deepseek-ai/' + name)))
+    'dsh-session-persistence-jsonl', 'dsh-session-query-sqlite', 'dsh-agent-default-model', 'dsh-api-session-controller'].map(name => runtimeModule('@deepseek-ai/' + name)))
   const [llm, projections, prompt, tools, agents, loop, persistence, query, model, controller] = modules
   for (const plugin of [llm.default, SessionStore, projections.default, prompt.default, tools.default, agents.default]) await ctx.plugin(plugin)
   await ctx.plugin(loop.default, { agents: [] })
@@ -759,8 +758,7 @@ for (const mode of ['allow', 'queued', 'deny-after', 'reject', 'cancel', 'versio
   const origin = `http://127.0.0.1:${provider.address().port}`, sessionId = SessionId('cold-report-session')
   const prepared = ctx.sessions.prepare(sessionId, { meta: { cwd: workspacePath } })
   if (mode === 'queued') {
-    const sdkRequire = createRequire(process.env.HARNESS_DSH_ENTRY ?? '/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/package.json')
-    const { createUserMessage } = await import(sdkRequire.resolve('@deepseek-ai/dsh-llm'))
+    const { createUserMessage } = await runtimeModule('@deepseek-ai/dsh-llm')
     prepared.append('agent/inbox/spliced', { target: 'next-turn', start: 0, removedCount: 0,
       inserted: [createUserMessage({ content: [{ type: 'text', text: '原有待办必须保持不动' }], source: { kind: 'user' } })] })
   }

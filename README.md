@@ -202,3 +202,5 @@ python3 runtime/research/validate_experiment.py \
 | [VERSION.md](./VERSION.md) | 仓库治理版本，区别于 Harness Release 与 Git Tag |
 
 受控规范作为设计输入，按当前任务采用，不自动引入生产审批、固定 Case 数或发布门禁。历史实验、封存 Run、原始导入和既有摘要保留其原有身份与事实；历史容器内修改记录见 [dsh-dev-real-session-20260919.json](https://github.com/wr5912/harness-engineering-platform-data/blob/9afc8fd0047367deb9df5b51595f101835359044/evolution/experiments/EXP-security-operations-expert-001/evaluation/evidence/dsh-dev-real-session-20260919.json)，不代表当前实例支持容器内修改。
+
+已有跨框架实例的登记、指定资源访问与模拟验收入口见[跨框架接入使用说明](docs/platform-design/27_跨框架接入使用说明.md)。管理助手和默认 Harness 工作流继续使用 DSH；实际支持组合以项目验收矩阵为准。

@@ -1,0 +1,32 @@
+{
+  "nativeSession": "ses_e63857888ffe5A6lQ8m2SJNro4",
+  "shellHttpStatus": 204,
+  "passed": true,
+  "checkedPaths": [
+    "/run/instance/instance.secret",
+    "/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/opencode/connector/instance.secret",
+    "/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/platform/.local/agent-access/state.json",
+    "/var/run/docker.sock"
+  ],
+  "shell": {
+    "id": "msg_19c840746001Cwr1xI9uAT540V",
+    "metadata": {
+      "background": true
+    },
+    "time": {
+      "created": 1793627260742,
+      "completed": 1793627260851
+    },
+    "type": "shell",
+    "shellID": "sh_19c840739001gbQ0ZBncpvnsNr",
+    "command": "node -e 'for(const p of [\"/run/instance/instance.secret\", \"/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/opencode/connector/instance.secret\", \"/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/platform/.local/agent-access/state.json\", \"/var/run/docker.sock\"]){try{require(\"node:fs\").readFileSync(p);console.log(p+\" READABLE\")}catch(e){console.log(p+\" \"+e.code)}}'",
+    "status": "exited",
+    "exit": 0,
+    "output": {
+      "output": "/run/instance/instance.secret ENOENT\n/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/opencode/connector/instance.secret ENOENT\n/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/platform/.local/agent-access/state.json ENOENT\n/var/run/docker.sock ENOENT\n",
+      "cursor": 308,
+      "size": 308,
+      "truncated": false
+    }
+  }
+}

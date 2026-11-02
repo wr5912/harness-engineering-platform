@@ -1,0 +1,25 @@
+{
+  "scope": "实际18120只读核验，不登记样本到正式数据",
+  "checks": [
+    {
+      "name": "实际宿主显示接入页并完成列表RPC",
+      "ok": true
+    },
+    {
+      "name": "1440px无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "768px无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "390px无整页横向溢出",
+      "ok": true
+    }
+  ],
+  "errors": [],
+  "basePath": "/hep",
+  "loginStatus": 303,
+  "passed": true
+}

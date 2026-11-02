@@ -1,0 +1,37 @@
+{
+  "at": "2026-11-02T14:05:24.933Z",
+  "currentKid": "access-54596f07-7190-4f65-a8aa-2e4677a5ac0b",
+  "keys": [
+    {
+      "kid": "access-54596f07-7190-4f65-a8aa-2e4677a5ac0b",
+      "status": "active",
+      "publicKeyHash": "82c67a1fffafcabfe36aef643719c7f177b18327a3b1851a253b0368791ef619"
+    }
+  ],
+  "credentials": [
+    {
+      "id": "credential-0e1dfc00-f2c4-4d78-ab01-9ea423aaed43",
+      "clientId": "client-f38f5e42-8cff-4269-b52f-921e3cd7469f",
+      "instanceId": "remote-opencode-sample",
+      "status": "active",
+      "createdAt": "2026-11-02T13:34:38.129Z",
+      "expiresAt": "2026-12-02T13:34:38.129Z"
+    },
+    {
+      "id": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+      "clientId": "client-6b4f02f7-939b-4eef-a4ed-554a51dafd9d",
+      "instanceId": "remote-agentscope-sample",
+      "status": "active",
+      "createdAt": "2026-11-02T13:36:04.473Z",
+      "expiresAt": "2026-12-02T13:36:04.473Z"
+    },
+    {
+      "id": "credential-ebd92f08-6e20-4778-bd65-bb4c2f779e29",
+      "clientId": "client-66409a45-2c11-47c4-8865-bbf9278710c0",
+      "instanceId": "remote-dsh-sample",
+      "status": "active",
+      "createdAt": "2026-11-02T13:48:49.203Z",
+      "expiresAt": "2026-12-02T13:48:49.203Z"
+    }
+  ]
+}

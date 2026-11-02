@@ -5,6 +5,8 @@ import type { Duplex } from 'node:stream'
 import { sharedInstanceIdentity, getBusinessControl } from './core.ts'
 import { resolveBusinessInstance, type BusinessGatewayInstance, type RegisteredBusinessInstance } from './instance.ts'
 import { readMcpSharedToken } from '../mcp/store.ts'
+import { createAgentAccessHandler } from '../agent-access/index.ts'
+import { createExternalAccessHandler } from '../instances/external/index.ts'
 export { resolveBusinessInstance } from './instance.ts'
 export type { BusinessGatewayInstance, RegisteredBusinessInstance } from './instance.ts'
 import type { BusinessContext, ControlSnapshot, InstanceBinding, ReplicaBatch, ReplicaObservation, AuthenticatedIdentity, AgentAccessRule, RiskFact, Restriction, AgentInstanceStatus, OperationRule } from './contracts.ts'
@@ -268,8 +270,12 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
     req.headers.host = new URL(instance.origin).host
     return instance
   }
+  const machineAccess = createAgentAccessHandler(assetRoot)
+  const externalAccess = createExternalAccessHandler(assetRoot)
   const server = createServer(async (req, res) => {
     try {
+      // 专用接入入口自行认证；任何错误都不能进入既有 DSH 或管理身份回退。
+      if (await machineAccess(req, res) || await externalAccess(req, res)) return
       if (req.url === '/' && req.method === 'GET') {
         assertOrigin(req)
         const instances = currentInstances()
@@ -423,5 +429,5 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
   server.on('connection', socket => { connections.add(socket); socket.once('close', () => connections.delete(socket)) })
   server.on('upgrade', (req, socket, head) => { const sessionId = browserSessionId(req); void prepare(req, 'websocket').then(instance => { if (sessionId) { const owned = browserConnections.get(sessionId) ?? new Set<Duplex>(); owned.add(socket); browserConnections.set(sessionId, owned); socket.once('close', () => { owned.delete(socket); if (!owned.size) browserConnections.delete(sessionId) }) }; return proxy.ws(req, socket as import('node:net').Socket, { target: instance.origin }, head) }).catch(() => rejectSocket(socket)) })
   await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(config.port, config.host, () => { server.removeListener('error', reject); resolve() }) })
-  return { server, origin: origin.origin, async close() { lifetime.abort(); sessions.clear(); for (const socket of connections) socket.destroy(); await proxy.close(); await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())) } }
+  return { server, origin: origin.origin, async close() { externalAccess.close(); lifetime.abort(); sessions.clear(); for (const socket of connections) socket.destroy(); await proxy.close(); await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())) } }
 }

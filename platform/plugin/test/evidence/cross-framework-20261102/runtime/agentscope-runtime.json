@@ -1,0 +1,194 @@
+{
+  "at": "2026-11-02T13:51:28.344Z",
+  "instanceId": "remote-agentscope-sample",
+  "passed": false,
+  "failure": "fetch failed",
+  "results": [
+    {
+      "label": "正常签名资产",
+      "sessionId": "external-session-fce85087-2976-4489-a237-d8fce3aa5563",
+      "upstreamSessionId": "81d0d2dced974791a87ad404b51800c5",
+      "promptStage": "accepted",
+      "complete": true,
+      "isRunning": false,
+      "succeeded": true,
+      "denied": false,
+      "calls": [
+        {
+          "type": "tool_call",
+          "id": "call-fixture-tool",
+          "name": "mcp__protected_assets__get_asset",
+          "input": "{\"id\":\"A-1\"}",
+          "state": "finished",
+          "suggested_rules": [],
+          "created_at": "2026-11-02T13:51:11.714436",
+          "finished_at": "2026-11-02T13:51:11.715438"
+        },
+        {
+          "type": "tool_result",
+          "id": "call-fixture-tool",
+          "name": "mcp__protected_assets__get_asset",
+          "output": [
+            {
+              "type": "text",
+              "text": "{\"id\":\"A-1\",\"group\":\"A\",\"status\":\"正常\"}",
+              "id": "9d0e3aee9120406eba48bc700e6cef67",
+              "created_at": "2026-11-02T13:51:12.082409",
+              "finished_at": null
+            }
+          ],
+          "state": "success",
+          "metadata": {},
+          "created_at": "2026-11-02T13:51:11.879321",
+          "finished_at": "2026-11-02T13:51:12.082581"
+        }
+      ],
+      "events": [
+        {
+          "requestId": "4e62a8b8-4ce2-4e18-983d-b4cce8dce351",
+          "at": "2026-11-02T13:51:12.066Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "resourceId": "sample-assets",
+          "operation": "get_asset",
+          "jti": "93259b19-348f-483c-809a-9bd1f16056d3",
+          "grantVersion": 5,
+          "stage": "response",
+          "httpStatus": 200
+        },
+        {
+          "requestId": "4e62a8b8-4ce2-4e18-983d-b4cce8dce351",
+          "at": "2026-11-02T13:51:12.063Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "resourceId": "sample-assets",
+          "operation": "get_asset",
+          "jti": "93259b19-348f-483c-809a-9bd1f16056d3",
+          "grantVersion": 5,
+          "stage": "dispatched"
+        },
+        {
+          "requestId": "4e62a8b8-4ce2-4e18-983d-b4cce8dce351",
+          "at": "2026-11-02T13:51:12.055Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "resourceId": "sample-assets",
+          "operation": "get_asset",
+          "jti": "93259b19-348f-483c-809a-9bd1f16056d3",
+          "grantVersion": 5,
+          "stage": "prepared"
+        },
+        {
+          "requestId": "ccd7c415-8bb8-49f4-a682-db73736ffd3a",
+          "at": "2026-11-02T13:51:11.500Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "resourceId": "sample-assets",
+          "jti": "93259b19-348f-483c-809a-9bd1f16056d3",
+          "grantVersion": 5,
+          "stage": "issued"
+        },
+        {
+          "requestId": "ccd7c415-8bb8-49f4-a682-db73736ffd3a",
+          "at": "2026-11-02T13:51:11.494Z",
+          "instanceId": "remote-agentscope-sample",
+          "credentialId": "credential-7b36d1f2-978a-4a0f-9982-a0a2fe488a93",
+          "stage": "authenticated"
+        }
+      ],
+      "finalTexts": [
+        "已通过资源工具读取资产 A-1。"
+      ]
+    },
+    {
+      "label": "正常原认证目录",
+      "sessionId": "external-session-fce85087-2976-4489-a237-d8fce3aa5563",
+      "upstreamSessionId": "81d0d2dced974791a87ad404b51800c5",
+      "promptStage": "accepted",
+      "complete": true,
+      "isRunning": false,
+      "succeeded": true,
+      "denied": false,
+      "calls": [
+        {
+          "type": "tool_call",
+          "id": "call-fixture-tool",
+          "name": "mcp__native_catalog__get_catalog",
+          "input": "{}",
+          "state": "finished",
+          "suggested_rules": [],
+          "created_at": "2026-11-02T13:51:12.932390",
+          "finished_at": "2026-11-02T13:51:12.933386"
+        },
+        {
+          "type": "tool_result",
+          "id": "call-fixture-tool",
+          "name": "mcp__native_catalog__get_catalog",
+          "output": [
+            {
+              "type": "text",
+              "text": "{\"catalog\":[\"资产查询\"],\"authentication\":\"native\",\"harnessSignature\":false}",
+              "id": "4d9cc17be7234a539e3bd419e593ccdd",
+              "created_at": "2026-11-02T13:51:13.285056",
+              "finished_at": null
+            }
+          ],
+          "state": "success",
+          "metadata": {},
+          "created_at": "2026-11-02T13:51:13.084703",
+          "finished_at": "2026-11-02T13:51:13.285224"
+        }
+      ],
+      "events": [],
+      "finalTexts": [
+        "已通过资源工具读取资产 A-1。"
+      ]
+    },
+    {
+      "label": "撤签名授权后原认证目录",
+      "sessionId": "external-session-fce85087-2976-4489-a237-d8fce3aa5563",
+      "upstreamSessionId": "81d0d2dced974791a87ad404b51800c5",
+      "promptStage": "accepted",
+      "complete": true,
+      "isRunning": false,
+      "succeeded": true,
+      "denied": false,
+      "calls": [
+        {
+          "type": "tool_call",
+          "id": "call-fixture-tool",
+          "name": "mcp__native_catalog__get_catalog",
+          "input": "{}",
+          "state": "finished",
+          "suggested_rules": [],
+          "created_at": "2026-11-02T13:51:14.045809",
+          "finished_at": "2026-11-02T13:51:14.046804"
+        },
+        {
+          "type": "tool_result",
+          "id": "call-fixture-tool",
+          "name": "mcp__native_catalog__get_catalog",
+          "output": [
+            {
+              "type": "text",
+              "text": "{\"catalog\":[\"资产查询\"],\"authentication\":\"native\",\"harnessSignature\":false}",
+              "id": "6492f032ed9f418bad9917fc86d822dd",
+              "created_at": "2026-11-02T13:51:14.285107",
+              "finished_at": null
+            }
+          ],
+          "state": "success",
+          "metadata": {},
+          "created_at": "2026-11-02T13:51:14.148938",
+          "finished_at": "2026-11-02T13:51:14.285269"
+        }
+      ],
+      "events": [],
+      "finalTexts": [
+        "已通过资源工具读取资产 A-1。"
+      ]
+    }
+  ],
+  "boundary": "真实 AgentScope 2.0.8 Service Runtime、独立容器模拟远程部署、确定性模拟推理与模拟业务资源；不构成真实模型、真实远程主机或业务效果验收",
+  "scope": "仅撤销并恢复 AgentScope sample-assets 授予；native_catalog 继续使用独立原生认证。模型文字不作为工具成功依据。"
+}

@@ -1,0 +1,277 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-11-02T15:27:32.819Z",
+  "layer": "项目与工具链验收；本机真实Runtime模拟远程实例、确定性模型与模拟业务资源",
+  "input": {
+    "path": "docs/platform-design/sources/Harness工程平台_跨框架智能体统一纳管与安全访问_策划设计方案_V0.6_2026-11-02.md",
+    "sha256": "45d6b94919bc206c9ba1bc41f0e58bd1a49be7cbbca69617b5d08047070aaf02",
+    "downloadsInputDigestMatches": true,
+    "disposition": "保留原件身份；当前合同与路线维护在platform-design文档，用户后续确认本期模拟范围"
+  },
+  "regression": {
+    "initial": {
+      "tests": 277,
+      "passed": 270,
+      "failed": 7,
+      "skipped": 0,
+      "description": "保留初轮失败；业务网关原生依赖解析未执行成功",
+      "log": {
+        "path": ".local/cross-framework/regression.log",
+        "sha256": "e0e17ad1494bda701ac3f297ee0248e0f475dea102fd5418c78695280a1a6983",
+        "bytes": 38558
+      }
+    },
+    "baseline": {
+      "tests": 44,
+      "passed": 37,
+      "failed": 7,
+      "skipped": 0,
+      "description": "原始b26b7f2独立工作树与相同依赖环境复现相同7项失败",
+      "log": {
+        "path": ".local/cross-framework/baseline-gateway.log",
+        "sha256": "92e2f376fc7924b00a7c119cf297d79d79590a4c084d583cd42e7c55b7b3df23",
+        "bytes": 15675
+      }
+    },
+    "intermediatePython38": {
+      "tests": 276,
+      "passed": 251,
+      "failed": 25,
+      "skipped": 0,
+      "description": "默认Python3.8不支持str.removeprefix；失败保留，不作为最终通过",
+      "log": {
+        "path": ".local/cross-framework/final-regression.log",
+        "sha256": "441a852cfb6d96d2071768a35188b24b9caa30c27046419ec487048cbaa10b0d",
+        "bytes": 67696
+      }
+    },
+    "explicitPython310": {
+      "tests": 276,
+      "passed": 276,
+      "failed": 0,
+      "skipped": 0,
+      "description": "显式Python3.10后的同组回归",
+      "log": {
+        "path": ".local/cross-framework/final-regression-python310.log",
+        "sha256": "57c70d60758572879c749265fb5ae989007f3bf30fe398120f171b60eb222524",
+        "bytes": 28947
+      }
+    },
+    "finalServerAndAdjacentPaths": {
+      "tests": 343,
+      "passed": 343,
+      "failed": 0,
+      "skipped": 0,
+      "description": "同一CLI的公开bundle/Agent原生依赖闭包定位修复后完整受影响回归；不覆盖随后登记表单简化的界面修订",
+      "log": {
+        "path": ".local/cross-framework/final-all-regression.log",
+        "sha256": "5e0f700e7c1052424615e0f09363e3c49280d3ed1bae0494ead3aa1fe4f6604f",
+        "bytes": 36409
+      }
+    },
+    "finalBuildAndMcpAnchor": {
+      "tests": 3,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "description": "隔离构建2项与MCP原生作用域依赖定位1项；与343范围可能重叠，单列不累加",
+      "log": {
+        "path": ".local/cross-framework/final-build-resolver.log",
+        "sha256": "e6f511c112013148c88fd5e57c8a1cb92b6164035708873d3e9e075575293cc3",
+        "bytes": 427
+      }
+    },
+    "nativeWebResolver": {
+      "tests": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "exitCode": 0,
+      "recordSource": "主协作者本轮独立执行工具回执；此前实现协作者同命令亦2项通过",
+      "cwd": "runtime/adapters/dsh-web",
+      "command": "HARNESS_DSH_ENTRY=/home/admin/work/cross-framework-sources/dsh/apps/cli/lib/bin.js node --test test/resolve-runtime.test.mjs",
+      "countedIn343": false
+    },
+    "resolution": "dsh-scope与dsh-agent-loop在rc.5仍公开。原先CLI直接解析全部服务及回退改写HARNESS_DSH_ENTRY导致定位错误；通过同一Runtime的公开base/web-app/sdk-app/agent依赖锚点解析，保留CLI来源。业务断言未删改，业务网关44项实际通过。",
+    "aggregation": "不同组和复核可能重叠；不相加为单一总数",
+    "uiAndRealtime": {
+      "tests": 71,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "exitCode": 0,
+      "recordSource": "UI实现协作者执行回执及主协作者核验",
+      "command": "node --test test/external-instances-client.test.mjs test/instances-client.test.mjs test/realtime.test.mjs",
+      "cwd": "platform/plugin",
+      "description": "单表单、默认值、必填聚焦、公共信息与CAS、verify/enable响应丢失及pendingReadback限制；与343项等组单列不累加"
+    },
+    "finalUiTypecheck": {
+      "command": "pnpm run check",
+      "exitCode": 0,
+      "recordSource": "UI实现协作者执行回执及主协作者核验"
+    },
+    "finalUiIsolatedBuild": {
+      "passed": true,
+      "scope": "完整隔离构建后仅原子替换client.js；未重写正式后端制品或再次prepare",
+      "recordSource": "UI实现协作者执行回执及主协作者装载核验"
+    }
+  },
+  "runtime": {
+    "dsh": {
+      "version": "0.2.1-rc.5",
+      "commit": "b830ec950faba0a46dda564be3e2d854afed94f1",
+      "apiAndResourceCoexistence": "runtime/dsh.json",
+      "shellIsolation": "runtime/dsh.json",
+      "composeRecovery": "runtime/dsh-recovery.json",
+      "recoveryChecks": 14,
+      "recoveryPassed": true
+    },
+    "agentscope": {
+      "version": "2.0.8",
+      "commit": "ff8697ec4d59ee01f3766176e70cb24ee894d6c6",
+      "apiAndResourceCoexistence": "runtime/agentscope-runtime-2026-11-02T14-00-09-472Z.json",
+      "passed": true,
+      "isolationPassed": true,
+      "composeRecovery": "runtime/agentscope-recovery.json",
+      "recoveryPassed": true,
+      "initialFailuresRetained": [
+        "runtime/agentscope-runtime.json",
+        "runtime/agentscope-runtime-2026-11-02T13-54-14-350Z.json",
+        "runtime/agentscope-runtime-2026-11-02T13-56-39-589Z.json",
+        "runtime/agentscope-recovery-initial.json"
+      ]
+    },
+    "opencode": {
+      "version": "2.2.5",
+      "commit": "9bbb8ce18c80f099e0e448775f59d965ead40a21",
+      "apiAndResourceCoexistence": "runtime/opencode-coexistence.json",
+      "passed": true,
+      "shellIsolation": "runtime/opencode-shell-isolation.json",
+      "composeRecovery": "runtime/opencode-recovery.json",
+      "recoveryPassed": true
+    },
+    "compose": {
+      "containers": 7,
+      "receipt": "runtime/compose-recovery.json",
+      "containerRecreationPassed": true,
+      "identityComparison": "runtime/compose-identity-compare.json",
+      "revocationAfterRecovery": "runtime/compose-revocation-after.json",
+      "revocationPassed": true,
+      "note": "容器回执仅证明重建；三框架API与旧Session另有回执。初次身份比较基线无已撤凭据，不能代替单独撤销恢复探针。"
+    }
+  },
+  "browser": {
+    "componentBaseline": {
+      "report": "ui-preview/report.json",
+      "checks": 19,
+      "passed": 19,
+      "scriptErrors": 0,
+      "scope": "实际组件与后端、模拟上游；登记表单简化前"
+    },
+    "formalBaseline": {
+      "report": "formal-browser.json",
+      "checks": 4,
+      "passed": 4,
+      "scriptErrors": 0,
+      "scope": "正式18120只读：登录、列表RPC、1440/768/390布局；登记表单简化前"
+    },
+    "registrationSimplification": {
+      "status": "passed",
+      "component": {
+        "report": "ui-preview/single-form/report.json",
+        "sha256": "52b576b21ba34759b8b5d5f3afe47a1532cfcff88cc895c300caecd002eeff4e",
+        "checks": 42,
+        "passed": 42,
+        "scriptErrors": 0,
+        "scope": "真实页面组件 + 当前真实管理RPC与存储 + 模拟上游API；不代表正式18120或真实框架验收"
+      },
+      "requestRecovery": {
+        "report": "ui-preview/single-form/request-recovery.json",
+        "sha256": "f83751305644267ec473ce668b4b2dabba6a0037ac2acb2b03f404a0d48baa79",
+        "checks": 13,
+        "passed": 13,
+        "scriptErrors": 0,
+        "scope": "实际React组件经真实管理handler与持久存储完成操作后，仅浏览器网络边界丢弃verify或enable响应；没有替换服务端逻辑"
+      },
+      "formal": {
+        "report": "formal-registration.json",
+        "sha256": "97b3b331a41616ccea6f58d5b1231eff29326ba0a0ecf0a1904be652fd3710ce",
+        "checks": 18,
+        "passed": 18,
+        "scriptErrors": 0,
+        "scope": "实际18120单表单只读核验与原生客户端热更新；不提交登记或发送模型请求"
+      },
+      "mainScreenshotCount": 17,
+      "recoveryScreenshotCount": 2,
+      "description": "单一表单；OpenCode/AgentScope/DSH首屏分别3/4/5项，必填星号与语义、选填/默认、更多设置和草稿；真实handler丢响应后准确回读，不重放或续启。原19项和4项仅为历史基线。"
+    }
+  },
+  "formalPlatform": {
+    "url": "http://10.0.160.32:18120/hep/",
+    "pid": 2005866,
+    "startReceiptPassed": true,
+    "runtimeVersion": "0.2.1-rc.5",
+    "sourceCommit": "b830ec950faba0a46dda564be3e2d854afed94f1",
+    "runtimeEntry": "/home/admin/work/cross-framework-sources/dsh/apps/cli/lib/bin.js",
+    "systemGlobalVersion": "0.2.1-rc.2",
+    "globalInstallationChanged": false,
+    "homePreserved": true,
+    "sourcePathShim": ".local/cross-framework/runtime-bin/dsh",
+    "sessionAndArtifactVerificationStatus": "passed",
+    "sessionReceipt": "runtime/platform-session-recovery.json",
+    "restartReason": "最终prepare改变扩展build-cache路径；原生HMR复用启动时CLI overlay快照，定向重启使新路径生效",
+    "formalFixtureRegistration": false,
+    "sessionIdentity": {
+      "before": 406,
+      "after": 406,
+      "identical": true
+    },
+    "oldSessionRead": {
+      "records": 124,
+      "passed": true,
+      "bodyStored": false
+    },
+    "artifacts": {
+      "nativePluginManagerEnabled": true,
+      "mainModuleMatchesCliPatch": true,
+      "sourceDigestRecomputedMatches": true,
+      "dataExtensionsMatchCliPatch": true,
+      "boundary": "原生pluginManager证明进程登记模块路径；文件摘要与CLI patch关联当前制品，未宣称内存字节的额外取证。数据扩展实际入口是plugin.js，按其真实名称记录。",
+      "scope": "仅服务端主入口及数据扩展制品；不含后续热更新client.js",
+      "serverAndDataExtensionArtifactsPrecedeProcessStart": true
+    },
+    "externalListRpcPassed": true,
+    "unregisteredMachineStatus": "invalid_instance",
+    "clientHotUpdate": {
+      "receipt": "formal-registration.json",
+      "passed": true,
+      "method": "仅原子替换client.js，原生client-hmr发布新revision；不prepare、不重启",
+      "clientPublishedAfterProcessStart": true,
+      "processIdUnchanged": true,
+      "serverArtifactUnchanged": true,
+      "before": {
+        "moduleRevision": "cdeb7589b00f",
+        "clientSha256": "d5452d382e226e27ec47406ae4d6ead38965b7f028f9860fe604e70d3266b337"
+      },
+      "after": {
+        "moduleRevision": "84e25dba35fe",
+        "clientSha256": "6fff2d6c760f880460f2cf31ad989543be5322431cc58775e5577fdd2dccd7df"
+      },
+      "serverSha256": "c30160a2c08bb6e612874b699bf60477fef57c6f2fd54b8cc3e70b94a5ef9eb4"
+    }
+  },
+  "boundaries": [
+    "模型是确定性协议模拟，业务资源是模拟服务；不证明真实模型或业务效果",
+    "源码Runtime在本机独立容器模拟远程，未验证异地主机",
+    "未开放完整原生Web/WS代理、任务取消、远端进程控制或用户委托",
+    "共享原生工作区不等于逐用户记忆、文件或上游存储隔离",
+    "未证明生产稳定性、完整OAuth/OIDC或发送者约束；普通bearer可被复制重放"
+  ],
+  "documentation": {
+    "entry": "docs/platform-design/README.md#跨框架接入设计输入",
+    "usage": "docs/platform-design/27_跨框架接入使用说明.md",
+    "roadmap": "docs/platform-design/05_实施路线与迭代计划.md",
+    "slices": "docs/platform-design/09_首轮实施Backlog与工作切片.md",
+    "acceptance": "docs/ai-agent-harness项目验收矩阵.md#pa-14-跨框架接入与安全访问"
+  }
+}

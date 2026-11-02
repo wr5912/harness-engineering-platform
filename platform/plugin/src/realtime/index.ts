@@ -153,7 +153,18 @@ export function createPlatformEvents(assetRoot: string, options: Options = {}) {
     observe(join(root, 'evolution/experiments'), ['catalog', 'agents', 'instances'], true)
     observe(join(root, 'evolution/datasets'), ['agents'], true)
     observe(join(root, 'releases'), ['catalog', 'agents'], true)
-    observe(dirname(workspaceConfigPath(root, 'mcp-compositions.json')), ['mcp'], false, 'mcp-compositions.json')
+    // 登记与授权是接入列表的事实源；只发失效通知，不发送配置或凭据内容。
+    const configRoot = dirname(workspaceConfigPath(root, 'external-instances.json'))
+    const compositionRoot = dirname(workspaceConfigPath(root, 'mcp-compositions.json'))
+    if (compositionRoot === configRoot) observe(configRoot, ['mcp', 'instances'], false, ['mcp-compositions.json', 'external-instances.json', 'business-access.json'])
+    else {
+      observe(compositionRoot, ['mcp'], false, 'mcp-compositions.json')
+      observe(configRoot, ['instances'], false, ['external-instances.json', 'business-access.json'])
+    }
+    if (!existsSync(configRoot)) observe(root, ['instances'], false, basename(configRoot))
+    // 凭据变更仅触发身份元数据回读；监听不读取或广播秘密文件内容。
+    observePolling(join(root, '.local/agent-access'), ['instances'], 'state.json')
+    observePolling(join(root, '.local/external-instances/records'), ['instances'])
     observe(stateRoot, ['instances', 'agents'], true)
     // 尚无实例目录时，观察其既有父目录以捕获首次登记。
     if (!existsSync(stateRoot)) observe(resolve(stateRoot, '..'), ['instances', 'agents'], false, basename(stateRoot))

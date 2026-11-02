@@ -1,0 +1,96 @@
+{
+  "scope": "真实页面组件 + 真实管理RPC与存储 + 模拟上游API；不代表正式18120或真实框架验收",
+  "sourceDigests": [
+    {
+      "path": "platform/plugin/src/instances/external-client.tsx",
+      "sha256": "18ee68391cab6452b4efea0d6d64b6520b0f7fd4b0cff04ccaaeb130fe02d048"
+    },
+    {
+      "path": "platform/plugin/src/instances/external-style.ts",
+      "sha256": "f25a40116367a333723fd0cb1f3b8f9634fbaa98b97d6709573441dc3e9a1970"
+    },
+    {
+      "path": ".local/cross-framework/ui-preview/client.js",
+      "sha256": "23bf69333cdcabe20b5dbc53b010f4a8a88d0f5387662859aad41eb1f9ad583f"
+    }
+  ],
+  "checks": [
+    {
+      "name": "关闭登记后恢复非秘密草稿",
+      "ok": true
+    },
+    {
+      "name": "实际后端保存验证启用",
+      "ok": true
+    },
+    {
+      "name": "真实凭据创建仅一次交付",
+      "ok": true
+    },
+    {
+      "name": "关闭秘密后普通详情无明文",
+      "ok": true
+    },
+    {
+      "name": "真实后端资源授予回读",
+      "ok": true
+    },
+    {
+      "name": "实际RPC经适配器访问模拟上游并读取结果",
+      "ok": true
+    },
+    {
+      "name": "768px 概览无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "768px 接入与能力无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "768px 访问授权无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "768px 访问记录无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "390px 概览无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "390px 接入与能力无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "390px 访问授权无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "390px 访问记录无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "390px资源授予操作可达",
+      "ok": true
+    },
+    {
+      "name": "关闭访问后输入保留",
+      "ok": true
+    },
+    {
+      "name": "停用入口后服务端实际拒绝",
+      "ok": true
+    },
+    {
+      "name": "Escape可关闭访问弹窗",
+      "ok": true
+    },
+    {
+      "name": "浏览器无脚本异常",
+      "ok": true
+    }
+  ],
+  "errors": []
+}
