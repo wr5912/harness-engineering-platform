@@ -548,7 +548,22 @@ async function runOne(assetRoot: string, request: InstanceActionRequest, signal?
         signal?.throwIfAborted()
         // 写入开始后完成 CLI 与网关登记，连接中断不能中止父进程而遗留 Docker 操作和模型锁。
         const projected = await runUpWithModelPolicy(assetRoot, upArgs(assetRoot, { ...prepared, name, source }), agentId,
-          modelPolicy, prepared.model_selection, request.expected_model_policy_hash, registeredModelSnapshot(prepared.manifest))
+          modelPolicy, prepared.model_selection, request.expected_model_policy_hash, registeredModelSnapshot(prepared.manifest)).catch(async error => {
+          // CLI 可能先保存新来源再启动失败；同步已核对的登记，保留失败状态并允许原请求重试。
+          if (prepared.business_control && previousSourceDigest) {
+            const manifest = await manifestFor(assetRoot, name)
+            const digest = (manifest?.business_control as { source_digest?: string } | undefined)?.source_digest
+            if (manifest?.source_id === source && manifest?.agent_id === agentId && digest && digest === request.expected_source_digest) {
+              try {
+                await updateGatewayRegistration(assetRoot, { agentId, instanceId: name, sourceId: source, sourceDigest: digest,
+                  accessMode: prepared.access_mode, identityMode: prepared.identity_mode }, false, previousSourceDigest)
+              } catch (registrationError) {
+                throw new Error(`${(error as Error).message}；启动失败后的网关登记未同步，请核对后重试。${(registrationError as Error).message}`)
+              }
+            }
+          }
+          throw error
+        })
         if (prepared.business_control) {
           try {
             const manifest = await manifestFor(assetRoot, name)
