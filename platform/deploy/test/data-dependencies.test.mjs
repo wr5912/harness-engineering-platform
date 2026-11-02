@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -26,11 +26,19 @@ test('业务插件只装入目标资源中的依赖，缺项时拒绝离线包',
     assert.throws(() => copyDataDependencies(data, assets), /离线资源缺少业务插件依赖：.*react/)
     mkdirSync(join(assets, 'data', relative, 'node_modules/react'))
     writeFileSync(join(assets, 'data', relative, 'cache'), '不装入')
+    // 旧快照含实体目录，新资源改为包管理器链接，必须替换而不是合并。
+    mkdirSync(join(data, relative, 'node_modules/@example/runtime'), { recursive: true })
+    writeFileSync(join(data, relative, 'node_modules/old-native-module'), '旧架构')
+    mkdirSync(join(assets, 'data', relative, 'node_modules/@example/linked'))
+    symlinkSync('linked', join(assets, 'data', relative, 'node_modules/@example/link'))
+    mkdirSync(join(data, relative, 'node_modules/@example/link'))
     copyDataDependencies(data, assets)
     assert.ok(existsSync(join(data, relative, 'node_modules/@example/runtime')))
     assert.equal(statSync(join(data, relative, 'node_modules/@example/runtime')).mode & 0o777, 0o755)
     assert.equal(statSync(join(data, relative, 'node_modules/@example/runtime/index.js')).mode & 0o777, 0o644)
     assert.equal(statSync(dependency).mode & 0o777, 0o700)
     assert.equal(existsSync(join(data, relative, 'cache')), false)
+    assert.equal(existsSync(join(data, relative, 'node_modules/old-native-module')), false)
+    assert.equal(lstatSync(join(data, relative, 'node_modules/@example/link')).isSymbolicLink(), true)
   } finally { rmSync(root, { recursive: true, force: true }) }
 })

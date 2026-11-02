@@ -1,7 +1,7 @@
 import { versionSources } from '../plugin/src/agents/version-source.ts'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { copyTree, run, safeRelative } from './fsutil.mts'
+import { copyTree, removeTree, run, safeRelative } from './fsutil.mts'
 
 /** 依赖来自目标架构资源；不把开发机的原生模块混进跨架构包。 */
 export function copyDataDependencies(root: string, assets: string): void {
@@ -22,6 +22,8 @@ export function copyDataDependencies(root: string, assets: string): void {
       for (const dependency of dependencies) {
         if (!existsSync(join(prepared, safeRelative(dependency)))) throw new Error(`离线资源缺少业务插件依赖：${join(prepared, dependency)}`)
       }
+      // 依赖以目标架构资源为准，不能叠加快照中遗留的目录或链接。
+      removeTree(join(root, relative))
       copyTree(prepared, join(root, relative))
       run('chmod', ['-R', 'a+rX', join(root, relative)])
     }
