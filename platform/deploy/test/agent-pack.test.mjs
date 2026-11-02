@@ -58,6 +58,9 @@ test('单 Agent 包归档、SHA与安装脚本完整，凭据不进入 manifest 
   assert.equal(readFileSync(join(extracted, 'assets/workspace/AGENTS.md'), 'utf8'), '# 当前已保存且未提交的业务规则\n')
   assert.ok(existsSync(join(extracted, 'install.sh')))
   assert.ok(existsSync(join(extracted, 'agent')))
+  const healthcheck = JSON.parse(readFileSync(join(extracted, 'runtime/compose.yaml'), 'utf8')).services.dsh.healthcheck
+  assert.equal(healthcheck.start_period, '180s')
+  assert.equal(healthcheck.retries, 30)
   assert.deepEqual(verifyEntries(extracted, result.manifest.files, ['manifest.json', 'SHA256SUMS']), [])
   command('sha256sum', ['-c', 'SHA256SUMS', '--quiet'], extracted)
   assert.equal(JSON.parse(readFileSync(join(extracted, 'config-seed/environment.llm-api-key'), 'utf8')).TEST_MODEL_KEY, 'private-package-fixture')

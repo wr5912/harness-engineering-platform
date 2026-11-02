@@ -50,7 +50,7 @@ export async function writeRuntimeBundle(staging: string, options: RuntimeBundle
     init: { ...common, user: '0:0', network_mode: 'none', entrypoint: ['/bin/sh', '-c'], command: ['node /opt/standalone/runtime/standalone-bootstrap.js init && chown -R $$STANDALONE_UID:$$STANDALONE_GID /var/lib/dsh'] },
     dsh: { ...common, user: '${AGENT_UID:-1000}:${AGENT_GID:-1000}', init: true, depends_on: { init: { condition: 'service_completed_successfully' } },
       entrypoint: ['node', '/opt/standalone/runtime/standalone-bootstrap.js'], command: sdk ? ['sdk-run', '/var/lib/dsh/standalone/input.json'] : ['start'],
-      ...(!sdk ? { ports: ['${AGENT_PORT:-18500}:3080'], healthcheck: { test: ['CMD', 'node', '-e', "const ip=Object.values(require('node:os').networkInterfaces()).flat().find(a=>a&&a.family==='IPv4'&&!a.internal).address;fetch('http://'+ip+':3080/assistant/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"], interval: '2s', timeout: '3s', retries: 30 } } : {}),
+      ...(!sdk ? { ports: ['${AGENT_PORT:-18500}:3080'], healthcheck: { test: ['CMD', 'node', '-e', "const ip=Object.values(require('node:os').networkInterfaces()).flat().find(a=>a&&a.family==='IPv4'&&!a.internal).address;fetch('http://'+ip+':3080/assistant/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"], interval: '2s', timeout: '3s', start_period: '180s', retries: 30 } } : {}),
       extra_hosts: ['host.docker.internal:host-gateway'], stop_grace_period: '20s' },
   } }
   writeFileSync(join(root, 'compose.yaml'), JSON.stringify(compose, null, 2) + '\n')
