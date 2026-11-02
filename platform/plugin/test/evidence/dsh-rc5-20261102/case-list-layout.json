@@ -1,0 +1,123 @@
+{
+  "before": {
+    "at": "2026-11-02T10:34:09.229Z",
+    "phase": "before",
+    "viewports": [
+      {
+        "viewport": 1440,
+        "title": "常规巡检：KEV 选模板、展示授权后执行",
+        "titleWidth": 46,
+        "titleHeight": 145.578125,
+        "lineHeight": 20.8,
+        "id": "U-INS-001",
+        "idHeight": 41.59375,
+        "rowHeight": 216.171875,
+        "listWidth": 240,
+        "listScrollWidth": 198,
+        "listClientWidth": 198,
+        "pageWidth": 1440
+      }
+    ],
+    "count": 84,
+    "javascriptErrors": []
+  },
+  "after": {
+    "at": "2026-11-02T10:35:25.802Z",
+    "phase": "after",
+    "viewports": [
+      {
+        "viewport": 1440,
+        "title": "常规巡检：KEV 选模板、展示授权后执行",
+        "titleWidth": 246,
+        "titleHeight": 20.796875,
+        "lineHeight": 20.8,
+        "id": "U-INS-001",
+        "idHeight": 20.796875,
+        "rowHeight": 93.78125,
+        "listWidth": 320,
+        "listScrollWidth": 278,
+        "listClientWidth": 278,
+        "pageWidth": 1440
+      },
+      {
+        "viewport": 1280,
+        "title": "常规巡检：KEV 选模板、展示授权后执行",
+        "titleWidth": 246,
+        "titleHeight": 20.796875,
+        "lineHeight": 20.8,
+        "id": "U-INS-001",
+        "idHeight": 20.796875,
+        "rowHeight": 93.78125,
+        "listWidth": 320,
+        "listScrollWidth": 278,
+        "listClientWidth": 278,
+        "pageWidth": 1280
+      },
+      {
+        "viewport": 1101,
+        "title": "常规巡检：KEV 选模板、展示授权后执行",
+        "titleWidth": 246,
+        "titleHeight": 20.796875,
+        "lineHeight": 20.8,
+        "id": "U-INS-001",
+        "idHeight": 20.796875,
+        "rowHeight": 93.78125,
+        "listWidth": 320,
+        "listScrollWidth": 278,
+        "listClientWidth": 278,
+        "pageWidth": 1101
+      },
+      {
+        "viewport": 1100,
+        "title": "常规巡检：KEV 选模板、展示授权后执行",
+        "titleWidth": 970,
+        "titleHeight": 20.796875,
+        "lineHeight": 20.8,
+        "id": "U-INS-001",
+        "idHeight": 20.796875,
+        "rowHeight": 93.78125,
+        "listWidth": 1044,
+        "listScrollWidth": 1002,
+        "listClientWidth": 1002,
+        "pageWidth": 1100
+      },
+      {
+        "viewport": 768,
+        "title": "常规巡检：KEV 选模板、展示授权后执行",
+        "titleWidth": 638,
+        "titleHeight": 20.796875,
+        "lineHeight": 20.8,
+        "id": "U-INS-001",
+        "idHeight": 20.796875,
+        "rowHeight": 93.78125,
+        "listWidth": 712,
+        "listScrollWidth": 670,
+        "listClientWidth": 670,
+        "pageWidth": 768
+      },
+      {
+        "viewport": 390,
+        "title": "常规巡检：KEV 选模板、展示授权后执行",
+        "titleWidth": 312,
+        "titleHeight": 20.796875,
+        "lineHeight": 20.8,
+        "id": "U-INS-001",
+        "idHeight": 20.796875,
+        "rowHeight": 89.78125,
+        "listWidth": 366,
+        "listScrollWidth": 332,
+        "listClientWidth": 332,
+        "pageWidth": 390
+      }
+    ],
+    "count": 84,
+    "searchAndKeyboardSelection": true,
+    "filters": true,
+    "javascriptErrors": []
+  },
+  "verification": {
+    "build": "passed",
+    "affected_tests": 86,
+    "passed": 86
+  }
+}

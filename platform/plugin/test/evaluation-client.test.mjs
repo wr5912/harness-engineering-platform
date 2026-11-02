@@ -772,7 +772,7 @@ test('Case 冲突保留编辑框与下载草稿，读取最新后显式采用新
   } })
   try {
     await ui.settle()
-    ui.button('测试一C-1').props.onClick({ stopPropagation() {} }); await ui.settle()
+    ui.button('测试一C-1场景一 · fast').props.onClick({ stopPropagation() {} }); await ui.settle()
     ui.button('编辑用例').props.onClick(); ui.render()
     ui.change('用例名称', '我的标题')
     latest = true
@@ -831,7 +831,7 @@ test('用例行选择与执行复选框独立，编辑多轮输入保存回读�
   ui.byLabel('执行 C-1').props.onChange({ target: { checked: true } })
   await ui.settle()
   assert.equal(ui.calls.some(call => call.action === 'cases/read'), false)
-  ui.button('测试一C-1').props.onClick({ stopPropagation() {} })
+  ui.button('测试一C-1场景一 · fast').props.onClick({ stopPropagation() {} })
   await ui.settle()
   ui.button('编辑用例').props.onClick()
   ui.render()
@@ -848,7 +848,7 @@ test('用例行选择与执行复选框独立，编辑多轮输入保存回读�
   assert.match(ui.text(), /草稿已保留/)
   assert.equal(ui.byLabel('用例名称').props.value, '修改后的用例')
   ui.confirmationAnswers.push(false)
-  ui.button('测试二C-2').props.onClick({ stopPropagation() {} })
+  ui.button('测试二C-2场景二 · full').props.onClick({ stopPropagation() {} })
   ui.render()
   assert.equal(ui.byLabel('用例名称').props.value, '修改后的用例')
   assert.equal(ui.navigations.at(-1).case_id, 'C-1')
