@@ -31,6 +31,8 @@ test('v2 分组只接受固定实例签名与当前受信 Session，签名不降
   t.after(() => { if (previousRoot === undefined) delete process.env.HARNESS_ASSET_ROOT; else process.env.HARNESS_ASSET_ROOT = previousRoot
     if (previousEntry === undefined) delete process.env.HARNESS_DSH_ENTRY; else process.env.HARNESS_DSH_ENTRY = previousEntry
     rmSync(root, { recursive: true, force: true }) })
+  // 先完成原生 SDK 的同步冷装载，避免阻塞事件循环后复用已过期的 HTTP 连接。
+  const nativeMcp = createRequire(process.env.HARNESS_DSH_ENTRY)('@modelcontextprotocol/client')
   const { apply } = await import('../lib/mcp-manager.js')
   mkdirSync(join(root, 'config'))
   mkdirSync(join(root, '.local', 'instances', 'soc-instance'), { recursive: true })
@@ -148,7 +150,6 @@ test('v2 分组只接受固定实例签名与当前受信 Session，签名不降
     { signal: new AbortController().signal, timeout: 20_000 })).resources.length, 1)
   assert.equal((await throughRuntime.listResourceTemplates(undefined,
     { signal: new AbortController().signal, timeout: 20_000 })).resourceTemplates.length, 0)
-  const nativeMcp = createRequire(process.env.HARNESS_DSH_ENTRY)('@modelcontextprotocol/client')
   const nativeClient = new nativeMcp.Client({ name: 'native-business-test', version: '1' },
     { versionNegotiation: { mode: 'auto' } })
   await nativeClient.connect(new nativeMcp.StreamableHTTPClientTransport(url, { fetch: (input, init) => {
