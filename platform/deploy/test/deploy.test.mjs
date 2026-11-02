@@ -213,8 +213,6 @@ test('识别真实工作区与夹具数据根', () => {
   try {
     assert.equal(inspectDataRoot(root).kind, 'fixture')
     assert.throws(() => assertRealWorkspace(root), /不是完整工作区/)
-    mkdirSync(join(root, 'agents'), { recursive: true })
-    mkdirSync(join(root, 'evolution'), { recursive: true })
     mkdirSync(join(root, 'config'), { recursive: true })
     mkdirSync(join(root, '.agents', 'skills', 'demo'), { recursive: true })
     writeFileSync(join(root, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: 'workspace-test', legacyRoots: [] }))
@@ -223,6 +221,8 @@ test('识别真实工作区与夹具数据根', () => {
     const check = assertRealWorkspace(root)
     assert.equal(check.kind, 'workspace')
     assert.equal(check.skills, 1)
+    assert.equal(existsSync(join(root, 'agents')), false)
+    assert.equal(existsSync(join(root, 'evolution')), false)
   } finally { close() }
 })
 

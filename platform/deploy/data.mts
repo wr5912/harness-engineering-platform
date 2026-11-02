@@ -44,7 +44,7 @@ function countSkills(root: string): number {
 /** 识别数据根是否为可部署的真实工作区，而不是只够启动平台的最小夹具。 */
 export function inspectDataRoot(root: string): DataRootCheck {
   const missing: string[] = []
-  for (const name of ['workspace.json', 'AGENTS.md', 'agents', 'evolution', 'config']) {
+  for (const name of ['workspace.json', 'AGENTS.md', 'config']) {
     if (!existsSync(join(root, name))) missing.push(name)
   }
   const skills = countSkills(root)
