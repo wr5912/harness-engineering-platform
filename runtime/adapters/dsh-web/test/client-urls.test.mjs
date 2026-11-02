@@ -66,21 +66,31 @@ test('不把局部同名 fetch 当作浏览器 fetch，也不保留修改前的 
   assert.equal(transformClientUrls(shadowed), shadowed)
 })
 
-test('插件账号与代理请求跟随站点基址，保留外部和已挂载路径', () => {
+for (const base of ['/hep/', '/agents/example/instances/test/']) test(`${base} 插件账号、代理与更新请求跟随站点基址，保留外部和已挂载路径`, () => {
   const calls = execute(`
     const path='/plugins/dsh-openai-codex/auth/status';
     fetch(path);
     fetch('/plugins/dsh-openai-codex/proxy/test?proxyUrl=http%3A%2F%2F127.0.0.1%3A7897', {method:'POST'});
-    fetch('/hep/plugins/dsh-openai-codex/auth/accounts');
+    fetch('${base}plugins/dsh-openai-codex/auth/accounts');
     fetch('https://external.invalid/plugins/auth');
     fetch('/plugins-other/status');
-  `, '/hep/')
-  assert.equal(calls[0].input, 'http://fixture.local/hep/plugins/dsh-openai-codex/auth/status')
-  assert.equal(calls[1].input, 'http://fixture.local/hep/plugins/dsh-openai-codex/proxy/test?proxyUrl=http%3A%2F%2F127.0.0.1%3A7897')
+    fetch('/openai-codex/update');
+    fetch(new URL('/openai-codex/runtime','http://fixture.local'));
+    fetch('${base}openai-codex/update');
+    fetch('https://external.invalid/openai-codex/runtime');
+    fetch('/openai-codex-other/runtime');
+  `, base)
+  assert.equal(calls[0].input, `http://fixture.local${base}plugins/dsh-openai-codex/auth/status`)
+  assert.equal(calls[1].input, `http://fixture.local${base}plugins/dsh-openai-codex/proxy/test?proxyUrl=http%3A%2F%2F127.0.0.1%3A7897`)
   assert.equal(calls[1].init.method, 'POST')
-  assert.equal(calls[2].input, '/hep/plugins/dsh-openai-codex/auth/accounts')
+  assert.equal(calls[2].input, `${base}plugins/dsh-openai-codex/auth/accounts`)
   assert.equal(calls[3].input, 'https://external.invalid/plugins/auth')
   assert.equal(calls[4].input, '/plugins-other/status')
+  assert.equal(calls[5].input, `http://fixture.local${base}openai-codex/update`)
+  assert.equal(calls[6].input, `http://fixture.local${base}openai-codex/runtime`)
+  assert.equal(calls[7].input, `${base}openai-codex/update`)
+  assert.equal(calls[8].input, 'https://external.invalid/openai-codex/runtime')
+  assert.equal(calls[9].input, '/openai-codex-other/runtime')
 })
 
 test('循环与 switch 的局部绑定不阻止后续全局请求转换', () => {

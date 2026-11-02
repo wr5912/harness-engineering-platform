@@ -26,8 +26,8 @@ function bundle(name) {
   write(join(path, 'offline/python/site/yaml.py'), '# 外部解释器依赖夹具\n')
   write(join(path, 'offline/python/bin/python3'), '#!/bin/sh\nunset PYTHONHOME\nexec /usr/bin/python3 "$@"\n', true)
   write(join(path, 'offline/pnpm/bin/pnpm'), '#!/bin/sh\necho 11.28.5\n', true)
-  write(join(path, 'offline/dsh/apps/cli/lib/bin.js'), 'console.log("0.2.1-rc.2")\n')
-  write(join(path, 'program/platform/plugin/package.json'), JSON.stringify({peerDependencies:{'@deepseek-ai/dsh-client-connection':'0.2.1-rc.2'}}))
+  write(join(path, 'offline/dsh/apps/cli/lib/bin.js'), 'console.log("0.2.1-rc.5")\n')
+  write(join(path, 'program/platform/plugin/package.json'), JSON.stringify({peerDependencies:{'@deepseek-ai/dsh-client-connection':'0.2.1-rc.5'}}))
   writeLauncher(path, 'import os, sys\nsys.exit(int(os.environ.get("HEP_TEST_PREPARE_FAILURE", "0")))\n')
   return path
 }

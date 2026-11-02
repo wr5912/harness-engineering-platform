@@ -305,7 +305,7 @@ test('路径映射重写实例登记、Compose 与配置', () => {
   } finally { close() }
 })
 
-test('完整包携带原生用户设置和专用凭据，排除 HOME 运行态', () => {
+test('完整包携带原生设置及匹配的目标插件依赖，排除 HOME 运行态和准备机平台链接', () => {
   const { root, close } = workspace()
   try {
     const program = join(root, 'program'), data = join(root, 'data'), assets = join(root, 'assets')
@@ -324,13 +324,30 @@ test('完整包携带原生用户设置和专用凭据，排除 HOME 运行态',
     for (const path of ['node/stub', 'pnpm/stub', 'python/stub', 'dsh/apps/cli/lib/bin.js',
       'program/platform/plugin/node_modules/stub', 'program/runtime/adapters/dsh-web/node_modules/stub']) write(join(assets, path), '')
     write(join(assets, 'git/git'), '#!/bin/sh\necho git-fixture\n'); chmodSync(join(assets, 'git/git'), 0o755)
-    const result = pack({ programRoot: program, dataRoot: data, assetsDir: assets, out: join(root, 'out'), arch: 'amd64',
-      includeImage: false, includeData: true, allowDirty: true, keepStaging: false, allowFixtureData: true })
+    const profile = '.local/platform-home/profiles/harness-platform'
+    const manifest = JSON.stringify({ dependencies: { 'dsh-example': '1.0.0' }, dsh: { profile: { bundles: ['dsh-example'] } } })
+    write(join(data, profile, 'package.json'), manifest)
+    write(join(data, profile, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n')
+    const options = { programRoot: program, dataRoot: data, assetsDir: assets, out: join(root, 'out'), arch: 'amd64',
+      includeImage: false, includeData: true, allowDirty: true, keepStaging: false, allowFixtureData: true }
+    assert.throws(() => pack(options), /管理助手插件离线资源与当前配置不一致/)
+    write(join(assets, 'data', profile, 'package.json'), manifest)
+    write(join(assets, 'data', profile, 'pnpm-lock.yaml'), 'stale lock\n')
+    assert.throws(() => pack(options), /管理助手插件离线资源与当前配置不一致/)
+    write(join(assets, 'data', profile, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n')
+    assert.throws(() => pack(options), /离线资源缺少管理助手插件依赖：dsh-example/)
+    write(join(assets, 'data', profile, 'node_modules/dsh-example/index.js'), 'export default true\n')
+    const platformLink = join(assets, 'data', profile, 'node_modules/@ai-agent-harness/harness-platform')
+    mkdirSync(join(platformLink, '..'), { recursive: true }); symlinkSync(program, platformLink)
+    const result = pack(options)
     const unpacked = join(root, 'unpacked')
     tarExtract(result.archive, unpacked)
     assert.equal(readFileSync(join(unpacked, 'data', patch), 'utf8'), readFileSync(join(data, patch), 'utf8'))
     assert.equal(existsSync(join(unpacked, 'data/.local/platform-home/sessions')), false)
     assert.equal(existsSync(join(unpacked, 'data/.local/credentials/models.llm-api-key')), true)
+    assert.equal(readFileSync(join(unpacked, 'data', profile, 'package.json'), 'utf8'), manifest)
+    assert.equal(existsSync(join(unpacked, 'data', profile, 'node_modules/dsh-example/index.js')), true)
+    assert.equal(existsSync(join(unpacked, 'data', profile, 'node_modules/@ai-agent-harness/harness-platform')), false)
   } finally { close() }
 })
 

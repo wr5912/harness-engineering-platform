@@ -1187,8 +1187,11 @@ test('报告连接在解析后停用或下载等待中变化，分别阻止上�
 test('开发控制观察分批同步：中途失败保留已确认状态，重试和重复批次不重复导入', { timeout: 15000 }, async t => {
   const { ctx, control, coordinator, context, rpc } = await setup(t, { sharedDevelopment: true })
   const base = context('A')
-  for (let index = 0; index < 700; index++) control.bindSession(base, `large-session-${index}`)
+  control.bindSession(base, 'large-session-0')
   const observation = control.exportReplicaState(binding)
+  observation.sessions = Array.from({ length: 700 }, (_, index) => ({ ...structuredClone(observation.sessions[0]), sessionId: `large-session-${index}` }))
+  // 本用例核对传输协议，直接提供大观察，避免逐个持久化夹具阻塞控制通道。
+  control.exportReplicaState = () => structuredClone(observation)
   assert.ok(Buffer.byteLength(JSON.stringify(observation)) > 512 * 1024, '场景跨越旧正文限制')
   const importBatch = coordinator.importReplicaBatch.bind(coordinator)
   let requests = 0

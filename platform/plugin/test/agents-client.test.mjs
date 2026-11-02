@@ -1017,7 +1017,7 @@ test('概览保留独有特性证据，来源唯一，Runtime信息归资产页'
     if (endpoint !== 'agents/detail') return
     const value = detail(payload.agent_id, payload.experiment_id)
     value.features = [{ id: 'pagination', title: '分页能力', description: '覆盖分页设备', source_refs: ['candidate/role.md'], verification: '已核对分页返回', evidence: [{ ref: 'runs/one/report.md', present: true }] }]
-    value.declared = { source_contract: { status: 'available', image: { cli_version: '0.2.1-rc.2' } }, loadable_source: { candidate_root: 'candidate', profile: 'main' } }
+    value.declared = { source_contract: { status: 'available', image: { cli_version: '0.2.1-rc.5' } }, loadable_source: { candidate_root: 'candidate', profile: 'main' } }
     return { ok: true, value }
   } }); await ui.settle()
   const overview = ui.nodes().find(node => node.props?.id === 'agent-panel-overview')
@@ -1026,7 +1026,7 @@ test('概览保留独有特性证据，来源唯一，Runtime信息归资产页'
   assert.equal(ui.nodes().filter(node => node.props?.className === 'agent-variant-source').length, 1)
   assert.equal(ui.nodes().some(node => node.props?.className === 'agent-legacy-evidence'), false)
   const assets = ui.nodes().find(node => node.props?.id === 'agent-panel-assets')
-  assert.match(ui.nodes(assets).map(ui.text).join(''), /Runtime 版本0.2.1-rc.2/)
+  assert.match(ui.nodes(assets).map(ui.text).join(''), /Runtime 版本0.2.1-rc.5/)
   assert.match(ui.nodes(assets).map(ui.text).join(''), /CandidatecandidateProfilemain/)
 })
 

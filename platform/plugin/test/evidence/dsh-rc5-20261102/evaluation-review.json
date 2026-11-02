@@ -1,0 +1,71 @@
+{
+  "at": "2026-11-02T03:31:10.676Z",
+  "environment": "228",
+  "runtime": "0.2.1-rc.5",
+  "session_id": "session-45f13314-0c7b-438f-980a-b7e722dd003f",
+  "skill": {
+    "name": "evaluation-review",
+    "path": ".agents/skills/evaluation-review/SKILL.md",
+    "modelInvocable": true
+  },
+  "call": {
+    "seq": 19,
+    "time": "2026-11-02T03:31:17.777Z",
+    "call_id": "call_4ce02eae779d47e2949b3b27",
+    "name": "skill",
+    "arguments": {
+      "name": "evaluation-review"
+    }
+  },
+  "result": {
+    "seq": 20,
+    "isError": false
+  },
+  "tool_calls": 1,
+  "checks": {
+    "files": 14,
+    "unchanged_supporting_files": 12,
+    "links": "passed",
+    "lint": {
+      "errors": [],
+      "warnings": [
+        {
+          "path": "$.time_budget.seconds",
+          "code": "unset_time_budget",
+          "message": "A positive time limit has not been set."
+        },
+        {
+          "path": "$.open_questions",
+          "code": "open_questions",
+          "message": "Resolve the listed questions before marking the design ready."
+        },
+        {
+          "path": "$.open_questions[0]",
+          "code": "placeholder",
+          "message": "Unresolved placeholder (TODO, TBD, 待填写, or 待确认)."
+        },
+        {
+          "path": "$.open_questions[1]",
+          "code": "placeholder",
+          "message": "Unresolved placeholder (TODO, TBD, 待填写, or 待确认)."
+        },
+        {
+          "path": "$.open_questions[2]",
+          "code": "placeholder",
+          "message": "Unresolved placeholder (TODO, TBD, 待填写, or 待确认)."
+        }
+      ],
+      "error_count": 0,
+      "warning_count": 5,
+      "structural_status": "valid",
+      "semantic_review_required": true,
+      "execution_verdict": "not_run",
+      "strict": false
+    },
+    "strict_error_count": 5,
+    "wrong_reference_detected": true,
+    "native_case_id": "U-INS-001",
+    "native_fast": true
+  },
+  "evaluation_executed": false
+}

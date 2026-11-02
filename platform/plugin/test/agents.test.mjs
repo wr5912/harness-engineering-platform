@@ -76,7 +76,7 @@ function fixture() {
     package_manager: 'pnpm@10.0.0',
     node_base: `node:20@sha256:${'5'.repeat(64)}`,
     local_image_tag: 'ai-agent-harness/dsh:21638c563',
-    cli_version: '0.2.1-rc.2',
+    cli_version: '0.2.1-rc.5',
     cli_package: '@deepseek-ai/dsh',
   }, null, 2) + '\n')
   write(join(root, 'agents/test-agent/manifest.yaml'), 'schema_version: 1.0\nagent_id: test-agent\nactive_experiment: EXP-test-agent-001\n')

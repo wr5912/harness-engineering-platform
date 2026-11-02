@@ -22,7 +22,7 @@ from unittest import mock
 
 
 PLATFORM = Path(__file__).resolve().parent
-VERSION = "0.2.1-rc.2"
+VERSION = "0.2.1-rc.5"
 
 
 class PlatformLauncherTests(unittest.TestCase):
@@ -66,7 +66,7 @@ class PlatformLauncherTests(unittest.TestCase):
         self.write_executable("dsh", r'''
 import json, os, pathlib, signal, sys, time
 if sys.argv[1:] == ["--version"]:
-    print(os.environ.get("FAKE_DSH_VERSION", "0.2.1-rc.2"))
+    print(os.environ.get("FAKE_DSH_VERSION", "0.2.1-rc.5"))
 else:
     if sys.argv.index("--patch") > sys.argv.index("--host"):
         print("error: unknown option '--patch'", file=sys.stderr)
