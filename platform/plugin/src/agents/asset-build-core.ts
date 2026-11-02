@@ -38,6 +38,10 @@ export async function compileManagedAsset(input: { candidate: string; entry: str
   host.resolveModuleNames = (names, containing) => names.map(name => {
     const local = ts.resolveModuleName(name, containing, options, host).resolvedModule
     if (local) return local
+    if (!input.legacyWorkflow && name.startsWith('@deepseek-ai/')) {
+      const native = ts.resolveModuleName(name, join(program, 'platform/plugin/index.ts'), options, host).resolvedModule
+      if (native) return native
+    }
     for (const folder of roots) { const found = ts.resolveModuleName(name, join(folder, 'index.ts'), options, host).resolvedModule; if (found) return found }
     return undefined
   })
@@ -88,7 +92,11 @@ export async function compileManagedAsset(input: { candidate: string; entry: str
       build.onLoad({ filter: /.*/, namespace: 'native-dsh' }, args => {
         const values = dshExports.get(args.path) ?? []
         const named = values.filter(name => name !== 'default' && /^[A-Za-z_$][\w$]*$/.test(name))
-        return { contents: `import {runtimeModule} from ${JSON.stringify(join(program, RESOLVER))};const native=await runtimeModule(${JSON.stringify(args.path)});\n${named.map((name, index) => `const value${index}=native[${JSON.stringify(name)}];export {value${index} as ${name}};`).join('\n')}\n${values.includes('default') ? 'export default native.default;' : ''}`, loader: 'js', resolveDir: program }
+        const require = createRequire(join(program, 'platform/plugin/package.json'))
+        const metadata = JSON.parse(readFileSync(require.resolve(`${packageName(args.path)}/package.json`), 'utf8'))
+        // 标准镜像采用 workspace 包布局，CLI 的依赖目录不包含全部原生插件。
+        const manifest = metadata.repository?.directory ? `/opt/dsh/${metadata.repository.directory}/package.json` : ''
+        return { contents: `import {existsSync} from 'node:fs';import {runtimeModule} from ${JSON.stringify(join(program, RESOLVER))};const manifest=${JSON.stringify(manifest)};const native=await runtimeModule(${JSON.stringify(args.path)},existsSync(manifest)?manifest:undefined);\n${named.map((name, index) => `const value${index}=native[${JSON.stringify(name)}];export {value${index} as ${name}};`).join('\n')}\n${values.includes('default') ? 'export default native.default;' : ''}`, loader: 'js', resolveDir: program }
       })
       build.onLoad({ filter: /.*/, namespace: 'file' }, args => {
         const file = realpathSync(args.path)

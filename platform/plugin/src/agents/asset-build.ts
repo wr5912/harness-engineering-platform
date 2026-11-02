@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
+import { isBuiltin } from 'node:module'
 import { dump, load } from 'js-yaml'
 import { candidateDigest, dataPath, sourceInfo } from '../tasks/files.ts'
 import { programRoot } from '../workspace.ts'
@@ -39,8 +40,10 @@ export function inspectAssetBuild(assetRoot: string, experimentId: string, entry
         || hash(JSON.stringify(receipt.platform_sources)) !== receipt.platform_sources_sha256
         || receipt.platform_sources.some((item: Body) => hash(readFileSync(dataPath(programRoot(), item.path))) !== item.sha256)) reasons.push('共享运行器已变化')
       if (hash(readFileSync(dataPath(source.candidate, receipt.output_path))) !== receipt.esm_sha256) reasons.push('ESM 制品已变化')
-      const deps = resolvePreparedAssetDependencies(assetRoot, source.id)
-      if (deps.status !== 'ready' || (deps.receipt?.declarations_sha256 ?? null) !== receipt.dependencies_sha256) reasons.push('业务依赖尚未准备或声明已变化')
+      if (receipt.dependencies_sha256 !== null || !Array.isArray(receipt.runtime_imports) || receipt.runtime_imports.some((name: string) => !isBuiltin(name))) {
+        const deps = resolvePreparedAssetDependencies(assetRoot, source.id)
+        if (deps.status !== 'ready' || !receipt.dependencies_sha256 || deps.receipt?.declarations_sha256 !== receipt.dependencies_sha256) reasons.push('业务依赖尚未准备或声明已变化')
+      }
     }
     return { verified: !reasons.length, reasons: [...new Set(reasons)], receipts: selected }
   } catch { return { verified: false, reasons: ['构建来源、回执或制品无法完整读取'], receipts: [] } }
@@ -60,7 +63,7 @@ export function assetBuildReviewEvidence(assetRoot: string, experimentId: string
       const receipt = checked.receipts[0]
       if (receipt.source_inputs_version !== 1) continue
       const dependencies = resolvePreparedAssetDependencies(assetRoot, experimentId)
-      if (dependencies.status !== 'ready') continue
+      if (receipt.dependencies_sha256 !== null && dependencies.status !== 'ready') continue
       const material: Body[] = []
       for (const [origin, root, files] of [['candidate', source.candidate, receipt.source_files], ['platform', programRoot(), receipt.platform_sources]] as const) {
         for (const file of files) {
@@ -72,7 +75,7 @@ export function assetBuildReviewEvidence(assetRoot: string, experimentId: string
       }
       generated.push({ path: receipt.output_path, sha256: receipt.esm_sha256,
         build: { ...Object.fromEntries([...buildInputKeys, 'source_inputs_version', 'build_digest', 'runtime_imports', 'esm_sha256'].map(key => [key, receipt[key]])),
-          prepared_dependencies_sha256: hash(JSON.stringify(dependencies.receipt ?? null)) } })
+          prepared_dependencies_sha256: hash(JSON.stringify(receipt.dependencies_sha256 === null ? null : dependencies.receipt ?? null)) } })
       for (const item of material) sources.set(`${item.origin}:${item.path}`, item)
     }
     if (candidateDigest(source.candidate) !== before || readFileSync(changePath, 'utf8') !== changeText) throw new Error('审读来源已变化')
@@ -95,7 +98,6 @@ export function createAssetBuildHandler(assetRoot: string) {
     const changeFile = dataPath(root, `evolution/experiments/${source.id}/change.yaml`), changeText = readFileSync(changeFile, 'utf8'), change = load(changeText) as Body
     if (change.compute_variant) throw new BuildError('invalid_request', '该来源已建立算力变体计划，请使用原有工作流构建操作')
     const dependencies = resolvePreparedAssetDependencies(root, source.id)
-    if (dependencies.status !== 'ready') throw new BuildError('dependency_pending', dependencies.reasons.join('；'))
     const compilerReceipt = assetCompiler().receipt
     let receipts!: Body, buildDigest!: string
     const runtimeDirectory = dirname('/opt/dsh-managed/' + entryPath.slice('dsh/managed/'.length))
@@ -105,7 +107,7 @@ export function createAssetBuildHandler(assetRoot: string) {
       dependencyRoots,
       beforeBundle(sources, _compiler, platformSources) {
         receipts = { schema_version: 1, entry_path: entryPath, output_path: outputPath, compiler: compilerReceipt,
-          dependencies_sha256: dependencies.receipt?.declarations_sha256 ?? null, source_files: sources, source_sha256: hash(JSON.stringify(sources)),
+          dependencies_sha256: dependencyRoots.length ? dependencies.receipt?.declarations_sha256 ?? null : null, source_files: sources, source_sha256: hash(JSON.stringify(sources)),
           platform_sources: platformSources, platform_sources_sha256: hash(JSON.stringify(platformSources)), source_inputs_version: 1 }
         buildDigest = hash(JSON.stringify(receipts))
         return { __WORKFLOW_BUILD_DIGEST__: JSON.stringify(buildDigest), __WORKFLOW_SOURCE_DIGEST__: JSON.stringify(receipts.source_sha256) }
