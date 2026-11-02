@@ -48,6 +48,7 @@ export function defineWorkflow<T extends WorkflowDefinition>(definition: T): T {
 export interface WorkflowToolOptions {
   executionMode?: 'code-only' | 'hybrid'
   modelRoles?: WorkflowModelRoles
+  renderResult?(result: any): string
 }
 class WorkflowModelUnavailableError extends Error {}
 
@@ -81,7 +82,9 @@ export function registerWorkflowTool(ctx: any, definition: WorkflowDefinition, o
     output: {
       schema: { type: 'object', additionalProperties: true },
       render: (_args: any, value: any) => [{ type: 'text', text: JSON.stringify(value) }],
-      presentationMeta: (_args: any, value: any) => ({ graph_execution: value.graph_execution }),
+      presentationMeta: (_args: any, value: any) => ({ graph_execution: value.graph_execution,
+        ...(options.renderResult ? { workflow_result: { ok: value.ok, reply: value.ok ? options.renderResult(value.result) : '' } } : {}),
+      }),
     },
     isConcurrencySafe: () => false,
     async execute(input: Record<string, any>, exec: any) {
@@ -266,7 +269,9 @@ function registerWorkflowAgent(ctx: any, options: CodeOnlyWorkflowAgent | Hybrid
   const modelId = codeOnly ? CODE_ONLY_MODEL : HYBRID_WORKFLOW_MODEL
   if (!options.presetId.trim()) throw new Error(`${label}必须绑定 Preset`)
   const { workflow } = options
-  registerWorkflowTool(ctx, workflow, { executionMode: mode, ...('modelRoles' in options ? { modelRoles: options.modelRoles } : {}) })
+  registerWorkflowTool(ctx, workflow, { executionMode: mode, ...('modelRoles' in options ? { modelRoles: options.modelRoles } : {}),
+    renderResult: options.renderResult ?? (value => typeof value?.reply === 'string' ? value.reply : ''),
+  })
   const turns = new Map<string, CodeOnlyTurn>()
   const sessionId = (agent: any): string => agent.session.id
   const isSubject = (agent: any): boolean => {
@@ -365,12 +370,15 @@ function registerWorkflowAgent(ctx: any, options: CodeOnlyWorkflowAgent | Hybrid
     if (!receipt) return unknown
     if (receipt.data.message.isError || receipt.data.error) return '工作流工具执行失败，已停止；请查看本轮工具回执。'
     try {
-      const value = JSON.parse(textContent(receipt.data.message)), graph = value.graph_execution
+      // 原生 spill 只保留正文预览；回复和图身份从同一回执的持久化投影读取。
+      const projected = receipt.data.meta?.workflow_result
+      const value = projected ? { ...projected, graph_execution: receipt.data.meta.graph_execution } : JSON.parse(textContent(receipt.data.message))
+      const graph = value.graph_execution
       if (graph?.session_id !== sessionId(agent) || graph?.tool_call_id !== state.callId || graph.execution_mode !== mode
         || graph.complete !== true || graph.status !== 'completed' || !Array.isArray(graph.model_attempts)
         || codeOnly && graph.model_attempts.length) return `工作流未完成或执行证据不符合${label}要求，已停止；请查看本轮图回执。`
       if (value.ok !== true) return '工作流执行失败，已停止；请查看本轮图回执。'
-      const text = options.renderResult ? options.renderResult(value.result) : value.result?.reply
+      const text = projected ? value.reply : options.renderResult ? options.renderResult(value.result) : value.result?.reply
       return typeof text === 'string' && text.trim() ? text : '工作流未提供有效回复，已停止；请查看本轮图回执。'
     } catch { return '工作流回执无法解析，已停止；请查看本轮工具回执。' }
   }

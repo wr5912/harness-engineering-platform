@@ -67,7 +67,7 @@ test('审读分类复用实际构建核验，陈旧制品、依赖与回执回�
   const bridge = spawnSync(process.execPath, ['--experimental-transform-types', join(process.env.HARNESS_PROGRAM_ROOT, 'runtime/adapters/dsh-container/harness-runtime.mts'), '--build-evidence', f.root, id], { encoding: 'utf8', env: process.env })
   assert.equal(bridge.status, 0, bridge.stderr)
   assert.deepEqual(JSON.parse(bridge.stdout), evidence)
-  for (const mutation of ['esm', 'compiler', 'platform', 'build-digest', 'entry', 'dependencies']) {
+  for (const mutation of ['esm', 'compiler', 'platform', 'build-digest', 'entry', 'runtime-imports']) {
     const changed = load(change)
     const receipt = changed.asset_builds[entry]
     if (mutation === 'esm') writeFileSync(output, 'export const changed=true\n')
@@ -75,7 +75,7 @@ test('审读分类复用实际构建核验，陈旧制品、依赖与回执回�
     if (mutation === 'platform') receipt.platform_sources[0].sha256 = 'a'.repeat(64)
     if (mutation === 'build-digest') receipt.build_digest = 'a'.repeat(64)
     if (mutation === 'entry') receipt.source_files = []
-    if (mutation === 'dependencies') write(f.root, `${base}/dsh/managed/plugin/package.json`, '{"dependencies":{"example":"1.2.3"}}')
+    if (mutation === 'runtime-imports') receipt.runtime_imports = ['unprepared-business-module']
     writeFileSync(changePath, dump(changed, { lineWidth: -1, noRefs: true }))
     assert.deepEqual(assetBuildReviewEvidence(f.root, id).generated, [], mutation)
     writeFileSync(output, artifact)
@@ -94,6 +94,27 @@ test('审读分类复用实际构建核验，陈旧制品、依赖与回执回�
   const noReceipt = load(change); delete noReceipt.asset_builds
   writeFileSync(changePath, dump(noReceipt))
   assert.deepEqual(assetBuildReviewEvidence(f.root, id).generated, [])
+})
+test('仅使用原生模块的入口不被其他插件未准备的依赖阻塞', async t => {
+  const f = fixture(t), handler = createAssetBuildHandler(f.root)
+  write(f.root, `${base}/dsh/managed/other/package.json`, '{"dependencies":{"unprepared":"1.0.0"}}')
+  write(f.root, `${base}/${entry}`, "import {hasSpillNotice} from '@deepseek-ai/dsh-spill-policy/notice'; export function apply(text:string){return hasSpillNotice(text)}\n")
+  assert.equal(resolvePreparedAssetDependencies(f.root, id).status, 'pending')
+  const preview = await handler('preview', { experiment_id: id, entry_path: entry })
+  assert.equal(preview.ok, true, JSON.stringify(preview))
+  const result = await handler('build', { experiment_id: id, entry_path: entry, expected_candidate_sha256: preview.value.candidate_sha256, expected_preview_sha256: preview.value.preview_sha256 })
+  assert.equal(result.ok, true, JSON.stringify(result))
+  assert.equal(result.value.dependencies_sha256, null)
+  const artifact = join(f.candidate, result.value.output_path)
+  assert.match(readFileSync(artifact, 'utf8'), /\/opt\/dsh\/packages\/spill\/spill-policy\/package.json/)
+  const loaded = spawnSync(process.execPath, ['--input-type=module', '-e', `const {apply}=await import(${JSON.stringify(new URL(artifact, 'file:').href)});if(apply('result')!==false)throw new Error('native notice mismatch')`], {
+    env: { ...process.env, HARNESS_DSH_ENTRY: new URL('../package.json', import.meta.url).pathname }, encoding: 'utf8',
+  })
+  assert.equal(loaded.status, 0, loaded.stderr)
+  assert.equal(inspectAssetBuild(f.root, id, entry).verified, true)
+  assert.equal(assetBuildReviewEvidence(f.root, id).generated.length, 1)
+  write(f.root, `${base}/${entry}`, "import {value} from 'unprepared'; export function apply(){return value}\n")
+  assert.equal((await handler('preview', { experiment_id: id, entry_path: entry })).ok, false)
 })
 test('完整构建输入包含声明文件背后的实际JS和JSON，不执行源码', async t => {
   const f = fixture(t), handler = createAssetBuildHandler(f.root), marker = join(f.root, 'source-executed')
