@@ -2682,7 +2682,7 @@ process.stdout.write(JSON.stringify({owned}));
         return False
 
 
-def wait_for_instance_listener(name: str, port: int, timeout: float = 30.0) -> bool:
+def wait_for_instance_listener(name: str, port: int, timeout: float = 120.0) -> bool:
     _, manifest = load_instance(name)
     require_docker_registration(name, manifest)
     deadline = time.monotonic() + timeout

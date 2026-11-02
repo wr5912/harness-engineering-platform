@@ -1,0 +1,10 @@
+{
+  "session_id": "session-59a531ed-9ef0-47ff-acee-4a229bf0ce2a",
+  "skill": "evaluation-review",
+  "version": "V0.3",
+  "skill_loaded": true,
+  "template_read": true,
+  "response": "#### U-UI-001 查询状态\n\n**评估档位：** `fast`\n\n**用户输入 1**\n\n> 查询任务状态\n\n**用户输入 2**\n\n> 报告准备好了吗\n\n**预期**\n\n1. 查询当前任务，依据返回结果说明任务状态，并取得该任务的 `runId`。\n2. 第二轮仅使用上述同一 `runId` 查询报告状态。若报告未就绪，说明仍在处理。  \n   注：不能声称报告已完成，也不能重复启动任务。\n3. 报告就绪后，给出实际结果，并说明证据缺口。",
+  "sha256": "77fa49c7f5a9b0ace3ab36b2e4a7b8eb87314bd435f61b2ae11620ba3a1b73a7",
+  "scope": "Actual assistant called skill and read template/adapter; synthetic case output only, no business asset edits."
+}

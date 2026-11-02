@@ -2547,6 +2547,20 @@ listener.close()
 
 
 class ListenerReadinessTest(unittest.TestCase):
+    def test_cold_start_can_cross_thirty_seconds_and_still_requires_owned_listener(self):
+        clock = [0.0]
+        running = [{"id": "ours", "service": "dsh", "state": "running"}]
+        def advance(seconds):
+            clock[0] += seconds
+        with mock.patch.object(dev, "load_instance", return_value=(Path("/unused"), {})), \
+                mock.patch.object(dev, "require_docker_registration"), \
+                mock.patch.object(dev, "project_containers", return_value=running), \
+                mock.patch.object(dev.time, "monotonic", side_effect=lambda: clock[0]), \
+                mock.patch.object(dev.time, "sleep", side_effect=advance), \
+                mock.patch.object(dev, "container_owns_listener", side_effect=lambda *_: clock[0] >= 45):
+            self.assertTrue(dev.wait_for_instance_listener("ours", 3212))
+        self.assertEqual(clock[0], 45)
+
     def test_native_socket_probe_reads_real_owned_descriptor(self):
         """Docker exec 边界替换为本进程命名空间中的 Node，其余探测脚本真实执行。"""
         def execute(command, **kwargs):

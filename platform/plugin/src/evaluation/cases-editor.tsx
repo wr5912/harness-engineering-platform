@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { CaseExpectedPreview } from './case-expected.tsx'
 import { CHANNEL } from '../protocol.ts'
 import { LoadingIndicator } from '../components/loading-indicator.tsx'
 import type { PlatformPageProps } from '../protocol.ts'
@@ -109,6 +110,7 @@ export function CaseCreationDialog({ rpc, agentId, experimentId, sourceRun, acti
       <h3>多轮输入</h3>{draft.inputs.map((value, index) => <div className="harness-eval-input-turn" key={index}><label className="harness-eval-field">第 {index + 1} 轮<textarea aria-label={`新增用例第 ${index + 1} 轮输入`} rows={3} disabled={busy || loading} value={value} onChange={event => update({ ...draft, inputs: draft.inputs.map((item, at) => at === index ? event.target.value : item) })} /></label><button type="button" disabled={busy || loading || draft.inputs.length === 1} onClick={() => update({ ...draft, inputs: draft.inputs.filter((_, at) => at !== index) })}>移除第 {index + 1} 轮</button></div>)}
       <button type="button" disabled={busy || loading} onClick={() => update({ ...draft, inputs: [...draft.inputs, ''] })}>＋ 添加一轮输入</button>
       <label className="harness-eval-field">预期行为<textarea aria-label="新增用例预期行为" rows={5} disabled={busy || loading} value={draft.expected_behavior} placeholder="填写应如何判断正确行为，保留无法判断的条件。" onChange={event => update({ ...draft, expected_behavior: event.target.value })} /></label>
+      <CaseExpectedPreview text={draft.expected_behavior} />
       <label className="harness-eval-check"><input type="checkbox" disabled={busy || loading} checked={draft.fast} onChange={event => update({ ...draft, fast: event.target.checked })} />纳入快速评测（fast）</label>
     </div>}
     {message && <p role="status">{message}</p>}{preview && <details open><summary>新增用例差异</summary><pre className="harness-asset-content">{preview.diff}</pre></details>}

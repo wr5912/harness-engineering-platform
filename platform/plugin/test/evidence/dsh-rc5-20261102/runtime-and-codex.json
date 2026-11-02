@@ -1,0 +1,103 @@
+{
+  "runtime": {
+    "version": "0.2.1-rc.5",
+    "commit": "b830ec950faba0a46dda564be3e2d854afed94f1"
+  },
+  "recovery": {
+    "timestamp": "2026-11-02T04:17:49.293Z",
+    "url": "http://172.16.138.228:18120/hep/",
+    "elapsed_ms": 6198,
+    "results": [
+      {
+        "method": "session/list",
+        "ms": 2609,
+        "count": 280,
+        "running": []
+      },
+      {
+        "method": "models/list",
+        "ms": 236,
+        "platform": {
+          "provider": "xiaomi-token-plan-cn",
+          "model": "mimo-v2.6-pro",
+          "reasoningEffort": "high"
+        },
+        "business": {
+          "provider": "xiaomi-token-plan-cn",
+          "model": "mimo-v2.6-flash"
+        }
+      }
+    ]
+  },
+  "modelProbe": {
+    "at": "2026-11-02T04:29:09.362Z",
+    "defaults": {
+      "platform": {
+        "provider": "xiaomi-token-plan-cn",
+        "model": "mimo-v2.6-pro",
+        "reasoningEffort": "high"
+      },
+      "business": {
+        "provider": "xiaomi-token-plan-cn",
+        "model": "mimo-v2.6-flash"
+      }
+    },
+    "session": {
+      "sessionId": "session-24c09cd5-4224-430d-8abb-9fb10f52bf4b",
+      "agentPreset": "standard"
+    },
+    "elapsedMs": 41875,
+    "model": {
+      "lastUsed": {
+        "provider": "xiaomi-token-plan-cn",
+        "model": "mimo-v2.6-pro",
+        "reasoningEffort": "high"
+      },
+      "next": {
+        "provider": "xiaomi-token-plan-cn",
+        "model": "mimo-v2.6-pro",
+        "reasoningEffort": "high"
+      }
+    },
+    "turns": [
+      {
+        "turn": 1,
+        "seq": 4,
+        "prompt": "平台升级只读验收。请只回复“MiMo默认模型响应正常”，不要调用工具，不要修改文件。",
+        "response": "MiMo默认模型响应正常"
+      }
+    ],
+    "stats": {
+      "turns": 1,
+      "steps": 1,
+      "llmMs": 8596,
+      "toolMs": 0,
+      "ttftMs": 7156,
+      "ttftSteps": 1,
+      "decodeMs": 1440,
+      "decodeTokens": 43
+    }
+  },
+  "codex": {
+    "at": "2026-11-02T04:40:40.197Z",
+    "version": "0.2.0-alpha.11",
+    "commit": "c670d67c36be037c796123536cfcfa9803484244",
+    "routes": [
+      {
+        "path": "/hep/openai-codex/update",
+        "status": 200
+      },
+      {
+        "path": "/hep/plugins/dsh-openai-codex/auth/status",
+        "status": 200
+      },
+      {
+        "path": "/hep/openai-codex/runtime",
+        "status": 200
+      }
+    ],
+    "settingsSaveReloadRestore": true,
+    "originalRestored": true,
+    "expectation": "保存显示已保存；手动关闭后重新打开核对持久化；再次恢复原设置。"
+  }
+}

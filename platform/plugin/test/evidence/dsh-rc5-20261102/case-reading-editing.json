@@ -1,0 +1,47 @@
+{
+  "observed_at": "2026-11-02T10:02:30.498Z",
+  "host": "228",
+  "agent_id": "rc5-ui-acceptance-20261102",
+  "case_id": "U-NEW-001",
+  "create": {
+    "exact_readback": true,
+    "fast_preserved": true,
+    "inputs_preserved": true
+  },
+  "edit": {
+    "switch_cancelled_draft_preserved": true,
+    "conflict_recovery": true,
+    "reopened_exact": true,
+    "keyboard_preview": true
+  },
+  "read_failure": {
+    "message": "读取用例失败：command_failed: evaluation.md 合同解析失败。当前显示上次读取内容；草稿已保留。重试读取用例",
+    "draftPreserved": true,
+    "boundary": "Only this isolated acceptance agent evaluation.md was temporarily unavailable; restored in finally."
+  },
+  "retry_preserves_draft": true,
+  "narrow": {
+    "dark": {
+      "width": 329,
+      "scrollWidth": 329,
+      "color": "rgb(232, 239, 248)",
+      "background": "rgb(28, 40, 57)"
+    },
+    "light": {
+      "width": 329,
+      "scrollWidth": 329,
+      "color": "rgb(24, 34, 53)",
+      "background": "rgb(248, 250, 252)"
+    }
+  },
+  "historical_run": {
+    "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+    "case_id": "U-INS-001",
+    "contract_changed": true,
+    "frozen_sha256": "dbaad57589161aefc80c858cd53789dc8c5ac7b8104cda0065e2b9e4316d530c",
+    "current_sha256": "a32f395ccac9752c5c77cf56de9cc1fcdd213e998d1a92d19d71347c39d8f4de",
+    "rendered_frozen": true
+  },
+  "javascript_errors": [],
+  "scope": "Actual native UI and backend on isolated acceptance agent; historical Run read only. No business evaluation criterion rewritten."
+}

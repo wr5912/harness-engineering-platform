@@ -80,8 +80,8 @@ function workbench({ target, handler, onAssistant, storage = new Map() } = {}) {
     return tree
   }
   async function settle() { for (let index = 0; index < 8; index++) { render(); flushTimers(); await new Promise(resolve => setImmediate(resolve)) }; return render() }
-  function nodes(value) { if (!arguments.length) value = tree; if (Array.isArray(value)) return value.flatMap(item => nodes(item)); if (!value || typeof value !== 'object') return []; if (value.type?.name === 'DistributionChart') return nodes(value.type(value.props)); return [value, ...(value.props?.children === undefined ? [] : nodes(value.props.children))] }
-  function text(value) { if (!arguments.length) value = tree; if (typeof value === 'boolean') return ''; if (Array.isArray(value)) return value.map(text).join(''); if (value?.type?.name === 'DistributionChart') return text(value.type(value.props)); return value && typeof value === 'object' ? text(value.props?.children) : String(value ?? '') }
+  function nodes(value) { if (!arguments.length) value = tree; if (Array.isArray(value)) return value.flatMap(item => nodes(item)); if (!value || typeof value !== 'object') return []; if (['DistributionChart', 'CaseExpected', 'CaseExpectedPreview', 'RunCase'].includes(value.type?.name)) return [value, ...nodes(value.type(value.props))]; return [value, ...(value.props?.children === undefined ? [] : nodes(value.props.children))] }
+  function text(value) { if (!arguments.length) value = tree; if (typeof value === 'boolean') return ''; if (Array.isArray(value)) return value.map(text).join(''); if (['DistributionChart', 'CaseExpected', 'CaseExpectedPreview', 'RunCase'].includes(value?.type?.name)) return text(value.type(value.props)); return value && typeof value === 'object' ? text(value.props?.children) : String(value ?? '') }
   const button = title => nodes().find(node => node.type === 'button' && text(node) === title)
   const idButton = id => nodes().find(node => node.type === 'button' && node.props.title === id)
   const byLabel = title => nodes().find(node => node.props?.['aria-label'] === title || node.props?.label === title)
@@ -89,6 +89,51 @@ function workbench({ target, handler, onAssistant, storage = new Map() } = {}) {
   render()
   return { rpc: props.rpc, render, settle, nodes, text, button, idButton, byLabel, jobStatus: () => text(nodes().find(node => node.props?.className === 'harness-eval-job-title')?.props.children?.[1]), change, invalidate: updates.invalidate, calls, navigations, contexts, assistants, MarkdownText, beforeUnload, confirmations, confirmationAnswers, setFailSave: value => { failSave = value }, setTarget(value) { props.target = value; render() }, setModalOpen(value) { modalOpen = value }, setActive(value) { props.active = value; render() }, getTarget() { return props.target }, cleanup() { cleanups.forEach(cleanup => cleanup?.()); timers.clear() } }
 }
+
+test('当前用例和编辑预览保留同一 Markdown，保存重开不丢多轮输入与注释', async () => {
+  const ui = workbench({ target: { page: 'evaluation', tab: 'cases', agent_id: 'alpha', experiment_id: expA, case_id: 'C-1' } })
+  const expected = '主要检查点：\n\n1. **查询对象**，给出可观察结果。\n2. 保持顺序。\n\n> 注：缺少证据时说明限制。'
+  try {
+    await ui.settle(); ui.button('编辑用例').props.onClick(); await ui.settle()
+    ui.change('用例预期行为', expected)
+    ui.button('＋ 添加一轮输入').props.onClick(); await ui.settle(); ui.change('第 2 轮输入', '继续核对')
+    assert.ok(ui.nodes().some(node => node.type === ui.MarkdownText && node.props.text === expected))
+    ui.button('保存用例').props.onClick(); await ui.settle()
+    assert.ok(ui.nodes().some(node => node.type === ui.MarkdownText && node.props.text === expected))
+    ui.button('编辑用例').props.onClick(); await ui.settle()
+    assert.equal(ui.byLabel('用例预期行为').props.value, expected)
+    assert.equal(ui.byLabel('第 2 轮输入').props.value, '继续核对')
+  } finally { ui.cleanup() }
+})
+
+test('Run 仅渲染自己冻结的预期，缺失冻结口径时不回填当前用例', async () => {
+  for (const frozen of [{ inputs: ['冻结输入'], expected_behavior: '1. **历史口径**\n\n> 注：按当时约束核对。' }, undefined]) {
+    const ui = workbench({ target: { page: 'evaluation', tab: 'runs', run_id: runA, case_id: 'C-1' }, handler: async (action, payload, original) => {
+      if (action === 'runs/show') return { run_id: runA, manifest: { agent_id: 'alpha', experiment_id: expA, status: 'completed' }, summary: {}, cases: [{ case_id: 'C-1', frozen, contract_changed: true, output: ['实际回答'], trials: [] }] }
+      return original(action, payload)
+    } })
+    try {
+      await ui.settle()
+      const markdown = ui.nodes().filter(node => node.type === ui.MarkdownText).map(node => node.props.text)
+      if (frozen) assert.ok(markdown.includes(frozen.expected_behavior))
+      else assert.match(ui.text(), /历史 Run 未冻结用例定义/)
+      assert.ok(!markdown.includes(doc.case.expected_behavior))
+    } finally { ui.cleanup() }
+  }
+})
+
+test('用例读取失败显示可重试状态，重试后恢复当前口径', async () => {
+  let fail = true
+  const ui = workbench({ target: { page: 'evaluation', tab: 'cases', agent_id: 'alpha', experiment_id: expA, case_id: 'C-1' }, handler: async (action, payload, original) => {
+    if (action === 'cases/read' && fail) throw new Error('network: 连接暂时中断')
+    return original(action, payload)
+  } })
+  try {
+    await ui.settle(); assert.match(ui.text(), /读取用例失败/)
+    fail = false; ui.button('重试读取用例').props.onClick(); await ui.settle()
+    assert.ok(ui.nodes().some(node => node.type === ui.MarkdownText && node.props.text === doc.case.expected_behavior))
+  } finally { ui.cleanup() }
+})
 
 test('评测中心默认汇总全部智能体 Run，点击即读取报告并保留挂载前缀下载', async () => {
   const ui = workbench()

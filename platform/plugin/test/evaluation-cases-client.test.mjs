@@ -5,7 +5,7 @@ import test from 'node:test'
 import { build } from 'esbuild'
 
 const require = createRequire(import.meta.url)
-const compiled = await build({ entryPoints: [new URL('../src/evaluation/cases-editor.tsx', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime'] })
+const compiled = await build({ entryPoints: [new URL('../src/evaluation/cases-editor.tsx', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime', '@deepseek-ai/dsh-client-ui-primitives'] })
 function dialog(sourceRun, onCall) {
   const states = [], dependencies = [], cleanups = []
   let cursor, effects, changed, tree, failSave = false, sha = 'initial', generatedId = 'U-NEW-001', closed = 0
@@ -18,7 +18,7 @@ function dialog(sourceRun, onCall) {
     useEffect(effect, deps) { const index = cursor++; if (!dependencies[index] || deps.some((value, at) => value !== dependencies[index][at])) { dependencies[index] = deps; effects.push(() => { cleanups[index]?.(); cleanups[index] = effect() }) } },
   }
   const module = { exports: {} }
-  vm.runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, require: name => name === 'react' ? react : require(name), window: { confirm: () => true, addEventListener: (name, fn) => { if (name === 'beforeunload') listeners.add(fn) }, removeEventListener: (name, fn) => listeners.delete(fn) } })
+  vm.runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, require: name => name === 'react' ? react : name === '@deepseek-ai/dsh-client-ui-primitives' ? { MarkdownText: () => null } : require(name), window: { confirm: () => true, addEventListener: (name, fn) => { if (name === 'beforeunload') listeners.add(fn) }, removeEventListener: (name, fn) => listeners.delete(fn) } })
   const props = { agentId: 'alpha', experimentId: 'EXP-alpha-001', sourceRun, active: true, onDirty: value => dirties.push(value), onBusy: value => busyStates.push(value), onSaved: value => saved.push(value), onClose: () => closed++, rpc: { call: async (_channel, endpoint, payload) => {
     calls.push({ endpoint, payload })
     await onCall?.(endpoint, payload)
@@ -30,13 +30,13 @@ function dialog(sourceRun, onCall) {
   } } }
   function render() { let count = 0; do { if (++count > 50) throw new Error('render did not settle'); cursor = 0; changed = false; effects = []; tree = module.exports.CaseCreationDialog(props); effects.forEach(effect => effect()) } while (changed); return tree }
   async function settle() { for (let index = 0; index < 6; index++) { render(); await new Promise(resolve => setImmediate(resolve)) }; return render() }
-  function nodes(value) { if (!arguments.length) value = tree; if (Array.isArray(value)) return value.flatMap(item => nodes(item)); if (!value || typeof value !== 'object') return []; return [value, ...(value.props?.children === undefined ? [] : nodes(value.props.children))] }
+  function nodes(value) { if (!arguments.length) value = tree; if (Array.isArray(value)) return value.flatMap(item => nodes(item)); if (!value || typeof value !== 'object') return []; if (['CaseExpected', 'CaseExpectedPreview'].includes(value.type?.name)) return nodes(value.type(value.props)); return [value, ...(value.props?.children === undefined ? [] : nodes(value.props.children))] }
   function text(value) { if (!arguments.length) value = tree; return Array.isArray(value) ? value.map(item => text(item)).join('') : value && typeof value === 'object' ? text(value.props?.children) : String(value ?? '') }
   const byLabel = label => nodes().find(node => node.props?.['aria-label'] === label)
   const button = title => nodes().find(node => node.type === 'button' && text(node) === title)
   function change(label, value) { byLabel(label).props.onChange({ target: { value, checked: value } }); render() }
   render()
-  return { settle, text, calls, saved, byLabel, button, change, listeners, modal, dirties, busyStates, get closed() { return closed }, setActive(value) { props.active = value; render() }, setFailSave(value) { failSave = value }, setSha(value) { sha = value }, setGeneratedId(value) { generatedId = value }, cleanup() { cleanups.forEach(cleanup => cleanup?.()) } }
+  return { settle, text, nodes, calls, saved, byLabel, button, change, listeners, modal, dirties, busyStates, get closed() { return closed }, setActive(value) { props.active = value; render() }, setFailSave(value) { failSave = value }, setSha(value) { sha = value }, setGeneratedId(value) { generatedId = value }, cleanup() { cleanups.forEach(cleanup => cleanup?.()) } }
 }
 
 test('新增对话框先预览再确认，保存回调携带新 Case 供上层立即刷新选择', async () => {
@@ -122,5 +122,23 @@ test('保存待返回时向父页报告 busy 并阻止关闭，完成后回传�
     assert.equal(ui.busyStates.at(-1), true); assert.equal(ui.button('关闭').props.disabled, true)
     ui.button('关闭').props.onClick(); await ui.settle(); assert.equal(ui.closed, 0)
     release(); await ui.settle(); assert.equal(ui.saved.length, 1); assert.equal(ui.closed, 1); assert.equal(ui.busyStates.at(-1), false)
+  } finally { ui.cleanup() }
+})
+
+test('新增用例的阅读预览与保存共享完整 Markdown，不拆编号或约束注释', async () => {
+  const ui = dialog()
+  const expected = '主要检查点：\n\n1. **核对对象**，展示可观察结果。\n2. 保留前后顺序。\n\n> 注：证据不足时说明限制。\n\n[完整来源](https://example.com/' + 'long'.repeat(80) + ')'
+  try {
+    await ui.settle()
+    ui.change('新增用例名称', '多轮阅读'); ui.change('新增用例第 1 轮输入', '查询')
+    ui.button('＋ 添加一轮输入').props.onClick(); await ui.settle(); ui.change('新增用例第 2 轮输入', '继续')
+    ui.change('新增用例预期行为', expected)
+    assert.ok(ui.nodes().some(node => node.props?.text === expected), '阅读组件收到完整原文')
+    assert.equal(ui.nodes().find(node => node.props?.className === 'harness-eval-expected-preview').props.open, true)
+    await ui.button('预览差异').props.onClick(); await ui.settle()
+    await ui.button('确认新增用例').props.onClick(); await ui.settle()
+    const payload = ui.calls.find(item => item.endpoint.endsWith('cases/create')).payload
+    assert.equal(payload.expected_behavior, expected)
+    assert.deepEqual([...payload.inputs], ['查询', '继续'])
   } finally { ui.cleanup() }
 })

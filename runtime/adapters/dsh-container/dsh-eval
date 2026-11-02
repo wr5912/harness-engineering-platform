@@ -109,6 +109,16 @@ def run_process(
                                    timeout=timeout, env=env)
 
 
+def process_error_detail(stderr: str, fallback: str) -> str:
+    detail = (stderr.strip().splitlines() or [fallback])[-1]
+    for name, value in os.environ.items():
+        if value and re.search(r"KEY|TOKEN|PASSWORD|SECRET", name, re.IGNORECASE):
+            detail = detail.replace(value, "<redacted>")
+    detail = re.sub(r"(?i)(Bearer\s+|(?:api[_-]?key|token|password|secret)[\"']?\s*[:=]\s*[\"']?)[^\s\"'&]+",
+                    r"\1<redacted>", detail)
+    return detail[:500]
+
+
 def checked_process(
     command: list[str],
     *,
@@ -122,7 +132,8 @@ def checked_process(
     except (OSError, subprocess.TimeoutExpired) as error:
         raise EvaluationError(f"{label} 未完成：{type(error).__name__}") from error
     if completed.returncode != 0:
-        raise EvaluationError(f"{label} 失败（退出码 {completed.returncode}）")
+        detail = process_error_detail(completed.stderr, "子进程未提供错误说明")
+        raise EvaluationError(f"{label} 失败（退出码 {completed.returncode}）：{detail}")
     return completed
 
 
@@ -137,13 +148,8 @@ def validation_check(script: Path, target: str, *options: str) -> dict:
             raise ValueError("校验结果必须是 JSON 对象")
     except ValueError:
         # 只保留末行诊断，避免把完整 traceback 或环境凭据写入评测日志。
-        detail = (completed.stderr.strip().splitlines() or ["校验器未返回有效 JSON 对象"])[-1]
-        for name, value in os.environ.items():
-            if value and re.search(r"KEY|TOKEN|PASSWORD|SECRET", name, re.IGNORECASE):
-                detail = detail.replace(value, "<redacted>")
-        detail = re.sub(r"(?i)(Bearer\s+|(?:api[_-]?key|token|password|secret)[\"']?\s*[:=]\s*[\"']?)[^\s\"'&]+",
-                        r"\1<redacted>", detail)
-        return {"exit_code": completed.returncode, "valid": False, "error": detail[:500]}
+        detail = process_error_detail(completed.stderr, "校验器未返回有效 JSON 对象")
+        return {"exit_code": completed.returncode, "valid": False, "error": detail}
     return {
         "exit_code": completed.returncode,
         "valid": completed.returncode == 0 and payload.get("valid") is True,

@@ -41,6 +41,14 @@ elif sys.argv[1]=="url": print("http://127.0.0.1:3081/?token=fixture-only")
 
 
 class EvaluationAccessTest(unittest.TestCase):
+    def test_child_failure_explains_cause_without_leaking_credentials_or_traceback(self):
+        reply = subprocess.CompletedProcess([], 17, "", "Traceback: internal details\nDSH: listener failed token=example-secret secret-env-value")
+        with mock.patch.dict(os.environ, {"LLM_API_KEY": "secret-env-value"}), \
+                mock.patch.object(evaluation, "run_process", return_value=reply), \
+                self.assertRaises(evaluation.EvaluationError) as failed:
+            evaluation.checked_process(["unused"], label="启动 DSH 评测实例", timeout=240)
+        self.assertEqual(str(failed.exception), "启动 DSH 评测实例 失败（退出码 17）：DSH: listener failed token=<redacted> <redacted>")
+
     def test_preflight_error_keeps_variant_identity_in_result(self):
         identity = "VAR-example-agent-001-r0123456789ab"
         for source in (identity, "experiment:" + identity):
