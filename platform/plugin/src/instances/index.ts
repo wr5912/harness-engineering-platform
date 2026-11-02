@@ -545,8 +545,10 @@ async function runOne(assetRoot: string, request: InstanceActionRequest, signal?
             sourceDigest: request.expected_source_digest,
             accessMode: prepared.access_mode, identityMode: prepared.identity_mode }, false, previousSourceDigest)
         }
+        signal?.throwIfAborted()
+        // 写入开始后完成 CLI 与网关登记，连接中断不能中止父进程而遗留 Docker 操作和模型锁。
         const projected = await runUpWithModelPolicy(assetRoot, upArgs(assetRoot, { ...prepared, name, source }), agentId,
-          modelPolicy, prepared.model_selection, request.expected_model_policy_hash, registeredModelSnapshot(prepared.manifest), signal)
+          modelPolicy, prepared.model_selection, request.expected_model_policy_hash, registeredModelSnapshot(prepared.manifest))
         if (prepared.business_control) {
           try {
             const manifest = await manifestFor(assetRoot, name)
@@ -560,7 +562,7 @@ async function runOne(assetRoot: string, request: InstanceActionRequest, signal?
               accessMode: prepared.access_mode, identityMode: prepared.identity_mode }, false, previousSourceDigest)
             businessGatewayEntry(assetRoot, agentId, name)
           } catch (error) {
-            try { await runDsh(assetRoot, ['down', name], signal) }
+            try { await runDsh(assetRoot, ['down', name]) }
             catch { throw new Error(`实例已启动但网关登记失败，回退状态未知；请刷新实例与网关配置。${(error as Error).message}`) }
             throw new Error(`实例已停止并保留 HOME；网关登记失败，请修复配置后重启。${(error as Error).message}`)
           }
@@ -579,7 +581,8 @@ async function runOne(assetRoot: string, request: InstanceActionRequest, signal?
         registration = { agentId: before.agent_id, instanceId: name, sourceId: before.source_id, sourceDigest: beforeDigest }
         await preflightGatewayRegistration(assetRoot, registration, true)
       }
-      const result = await runDsh(assetRoot, [command, name], signal)
+      signal?.throwIfAborted()
+      const result = await runDsh(assetRoot, [command, name])
       if (registration) {
         try { await updateGatewayRegistration(assetRoot, registration, true) }
         catch (error) { throw new Error(`实例已由 DSH 删除，但业务网关登记清理未完成；请核对网关配置。${(error as Error).message}`) }

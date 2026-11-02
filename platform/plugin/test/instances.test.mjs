@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -83,6 +83,11 @@ if (args[0] === 'ps') {
   const source = args[args.indexOf('--source') + 1]
   if (dry) out({args, name, source_id:source, image_tag:'dsh:locked', port:3199, mounts:[{container:'/work/harness/workspace', mode:'ro'}], state_dir:'state', ...(business ? { business_control: { source_digest: sourceDigest } } : {})})
   else {
+    const delay = require('node:path').join(__dirname, 'delay-start')
+    if (require('node:fs').existsSync(delay)) {
+      require('node:fs').writeFileSync(delay + '.started', 'started')
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500)
+    }
     if (business) {
       const stateRoot = process.env.HARNESS_INSTANCE_STATE_ROOT || (process.env.XDG_STATE_HOME ? require('node:path').join(process.env.XDG_STATE_HOME, 'dsh-dev') : require('node:path').join(process.env.HARNESS_ASSET_ROOT, '.local/instances'))
       const file = require('node:path').join(stateRoot, name, 'instance.json')
@@ -289,6 +294,29 @@ test('业务实例 Web 入口使用已登记网关地址并拒绝地址漂移', 
   assert.match((await request()).error.message, /来源与网关登记不一致/)
   writeFileSync(accessPath, JSON.stringify({ ...access, gateway: { ...access.gateway, instances: [] } }))
   assert.match((await request()).error.message, /实例未向业务网关开放/)
+})
+
+test('实例写入开始后连接中断仍完成启动及网关登记，已取消请求不再写入', async t => {
+  const { module, cleanup } = await loadModule(), fx = fixture(), previous = process.env.XDG_STATE_HOME
+  process.env.XDG_STATE_HOME = fx.state
+  t.after(() => { previous === undefined ? delete process.env.XDG_STATE_HOME : process.env.XDG_STATE_HOME = previous; cleanup(); fx.cleanup() })
+  const handler = module.createInstancesHandler(fx.root), controller = new AbortController()
+  const item = { operation: 'create', name: 'new-business', source: 'experiment:EXP-real-agent-001' }
+  const preview = await handler('preview', item, controller.signal)
+  assert.equal(preview.ok, true)
+  const delay = join(fx.root, 'runtime/adapters/dsh-container/delay-start')
+  writeFileSync(delay, 'delay until the client disconnects')
+  const action = handler('run', { ...item, expected_source_digest: preview.value.plan.business_control.source_digest }, controller.signal)
+  const deadline = Date.now() + 10000
+  while (!existsSync(delay + '.started') && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10))
+  assert.equal(existsSync(delay + '.started'), true)
+  controller.abort()
+  const result = await action
+  assert.equal(result.value.ok, true, JSON.stringify(result))
+  assert.equal(JSON.parse(readFileSync(join(fx.root, 'config/business-access.json'))).gateway.instances[0].instanceId, item.name)
+  const calls = readFileSync(join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls'), 'utf8')
+  assert.equal((await handler('run', item, controller.signal)).ok, false)
+  assert.equal(readFileSync(join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls'), 'utf8'), calls)
 })
 
 for (const [access_mode, identity_mode] of [['anonymous', 'development'], ['authenticated', 'published']]) test(`首次启动失败后沿原模式恢复并保留HOME：${access_mode}/${identity_mode}`, async t => {
