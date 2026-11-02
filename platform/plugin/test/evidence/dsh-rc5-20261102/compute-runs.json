@@ -1,0 +1,140 @@
+[
+  {
+    "experiment": "EXP-security-operations-expert-024-rad80a907c628",
+    "run_id": "run-adca499b-846d-4426-a991-1709a9d1b805",
+    "summary_sha256": "c905e8261c92be19efd823751d0c374fd0290f9f283a971fb9158d1cc513e9c1",
+    "trial_count": 65,
+    "execution_status_counts": {
+      "completed": 59,
+      "error": 6,
+      "skipped": 0
+    },
+    "machine_trial_verdict_counts": {
+      "passed": 15,
+      "failed": 21,
+      "inconclusive": 29
+    },
+    "review_status": "failed",
+    "reviewed_case_count": 0,
+    "reviewed_case_verdict_counts": null,
+    "effective_verdict": "inconclusive",
+    "source_status": "changed"
+  },
+  {
+    "experiment": "EXP-security-operations-expert-024-rad80a907c628",
+    "run_id": "run-e41bebf2-ce52-4ef2-af60-b5755073d94d",
+    "summary_sha256": "bd9d4a4775a2ebb92b51a984604ba6bb103cc8a9dd024649c118ef21592f5356",
+    "trial_count": 65,
+    "execution_status_counts": {
+      "completed": 62,
+      "error": 3,
+      "skipped": 0
+    },
+    "machine_trial_verdict_counts": {
+      "passed": 20,
+      "failed": 20,
+      "inconclusive": 25
+    },
+    "review_status": "failed",
+    "reviewed_case_count": 0,
+    "reviewed_case_verdict_counts": null,
+    "effective_verdict": "inconclusive",
+    "source_status": "changed"
+  },
+  {
+    "experiment": "VAR-security-operations-expert-001-r144fbb173cad",
+    "run_id": "run-aa8359c6-0e23-42e8-a4c4-a46e90f436ce",
+    "summary_sha256": "2a7dbde897ff265cb114c1124369e59ed99acf74b07ef4f138567cfa7493e68c",
+    "trial_count": 65,
+    "execution_status_counts": {
+      "completed": 65,
+      "error": 0,
+      "skipped": 0
+    },
+    "machine_trial_verdict_counts": {
+      "passed": 2,
+      "failed": 59,
+      "inconclusive": 4
+    },
+    "review_status": "failed",
+    "reviewed_case_count": 35,
+    "reviewed_case_verdict_counts": {
+      "passed": 2,
+      "failed": 33,
+      "inconclusive": 0
+    },
+    "effective_verdict": "inconclusive",
+    "source_status": "matched"
+  },
+  {
+    "experiment": "VAR-security-operations-expert-001-r144fbb173cad",
+    "run_id": "run-89b231a7-6ad4-462d-8a52-ab943facfa87",
+    "summary_sha256": "d8eae696c4082e567ef3e73f43c74f03f92bc48af1381d4850db0ea7abc5d4ff",
+    "trial_count": 65,
+    "execution_status_counts": {
+      "completed": 65,
+      "error": 0,
+      "skipped": 0
+    },
+    "machine_trial_verdict_counts": {
+      "passed": 2,
+      "failed": 59,
+      "inconclusive": 4
+    },
+    "review_status": "failed",
+    "reviewed_case_count": 0,
+    "reviewed_case_verdict_counts": null,
+    "effective_verdict": "inconclusive",
+    "source_status": "matched"
+  },
+  {
+    "experiment": "VAR-security-operations-expert-002-r727f8750a82f",
+    "run_id": "run-764aa829-32cd-434e-a7fa-90c8effe36d6",
+    "summary_sha256": "aa134a296cfd381c4178b902bf8fb433d1e698136c89065524430fb4bfacf669",
+    "trial_count": 65,
+    "execution_status_counts": {
+      "completed": 65,
+      "error": 0,
+      "skipped": 0
+    },
+    "machine_trial_verdict_counts": {
+      "passed": 4,
+      "failed": 50,
+      "inconclusive": 11
+    },
+    "review_status": "failed",
+    "reviewed_case_count": 7,
+    "reviewed_case_verdict_counts": {
+      "passed": 0,
+      "failed": 3,
+      "inconclusive": 4
+    },
+    "effective_verdict": "inconclusive",
+    "source_status": "changed"
+  },
+  {
+    "experiment": "VAR-security-operations-expert-002-r727f8750a82f",
+    "run_id": "run-ca983615-a56c-40ca-adef-3fdba5c30ec1",
+    "summary_sha256": "1a618f0bd470878c7c9563a0eca49fdb34e53ce004b9194bdec6946d1c8fce7c",
+    "trial_count": 65,
+    "execution_status_counts": {
+      "completed": 65,
+      "error": 0,
+      "skipped": 0
+    },
+    "machine_trial_verdict_counts": {
+      "passed": 4,
+      "failed": 56,
+      "inconclusive": 5
+    },
+    "review_status": "failed",
+    "reviewed_case_count": 14,
+    "reviewed_case_verdict_counts": {
+      "passed": 0,
+      "failed": 10,
+      "inconclusive": 4
+    },
+    "effective_verdict": "inconclusive",
+    "source_status": "changed"
+  }
+]

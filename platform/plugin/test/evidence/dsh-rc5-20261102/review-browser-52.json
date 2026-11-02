@@ -1,0 +1,120 @@
+{
+  "at": "2026-11-02T10:58:34.029Z",
+  "results": [
+    {
+      "agent": "daily-inspection-assistant",
+      "case_count": 6,
+      "api_exact": 6,
+      "ui_sample": "U-ASSET-PAGES-001",
+      "editor_exact": true,
+      "light": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      },
+      "dark": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "agent": "security-operations-expert",
+      "case_count": 84,
+      "api_exact": 84,
+      "ui_sample": "U-THREAT-RULE-JSON3",
+      "editor_exact": true,
+      "light": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      },
+      "dark": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "agent": "test01",
+      "case_count": 1,
+      "api_exact": 1,
+      "ui_sample": "U-IDENTITY-001",
+      "editor_exact": true,
+      "light": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      },
+      "dark": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "agent": "multi-step-research-analyst",
+      "case_count": 4,
+      "api_exact": 4,
+      "ui_sample": "U-RESEARCH-001",
+      "editor_exact": true,
+      "light": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      },
+      "dark": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "agent": "inspection-delivery-demo",
+      "case_count": 4,
+      "api_exact": 4,
+      "ui_sample": "U-ASSET-PAGES-001",
+      "editor_exact": true,
+      "light": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      },
+      "dark": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "agent": "autonomous-training-researcher",
+      "case_count": 3,
+      "api_exact": 3,
+      "ui_sample": "U-TRAIN-PREFLIGHT-001",
+      "editor_exact": true,
+      "light": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      },
+      "dark": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      }
+    }
+  ],
+  "errors": []
+}

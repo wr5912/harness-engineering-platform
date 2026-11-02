@@ -1,0 +1,979 @@
+{
+  "at": "2026-11-02T11:08:42.946Z",
+  "results": [
+    {
+      "agent": "asset-discovery-assistant",
+      "experiment": "EXP-asset-discovery-assistant-001-r5802bc157e6d",
+      "cases": [
+        {
+          "id": "U-IDENTITY-001",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-ROLE-001",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-PROBE-IP-001",
+          "turns": 1,
+          "steps": 3,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-PROBE-KEYWORD-001",
+          "turns": 1,
+          "steps": 3,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-PROBE-DETAIL-001",
+          "turns": 1,
+          "steps": 3,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-PROBE-NOHIT-001",
+          "turns": 1,
+          "steps": 3,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-PROBE-FALLBACK-001",
+          "turns": 1,
+          "steps": 2,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-PROBE-REPORT-001",
+          "turns": 1,
+          "steps": 3,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-PROBE-CONFIRM-001",
+          "turns": 1,
+          "steps": 2,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-PROBE-IPMAC-001",
+          "turns": 1,
+          "steps": 2,
+          "api_exact": true,
+          "rendered_complete": true
+        }
+      ],
+      "preview": true,
+      "narrow": true,
+      "preview_case": "U-PROBE-IP-001",
+      "light": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      },
+      "dark": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "agent": "autonomous-training-researcher",
+      "experiment": "EXP-autonomous-training-researcher-001-redf6be6240bf",
+      "cases": [
+        {
+          "id": "U-IDENTITY-001",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-ROLE-001",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-TRAIN-PREFLIGHT-001",
+          "turns": 1,
+          "steps": 2,
+          "api_exact": true,
+          "rendered_complete": true
+        }
+      ],
+      "preview": true,
+      "narrow": true,
+      "preview_case": "U-TRAIN-PREFLIGHT-001",
+      "light": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      },
+      "dark": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "agent": "daily-inspection-assistant",
+      "experiment": "EXP-daily-inspection-assistant-001-r602ec12fd531",
+      "cases": [
+        {
+          "id": "U-IDENTITY-001",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-ROLE-001",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-SUMMARY-001",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-SUMMARY-002",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-ASSET-PAGES-001",
+          "turns": 1,
+          "steps": 3,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-ASSET-PARTIAL-001",
+          "turns": 1,
+          "steps": 2,
+          "api_exact": true,
+          "rendered_complete": true
+        }
+      ],
+      "preview": true,
+      "narrow": true,
+      "preview_case": "U-ASSET-PAGES-001",
+      "light": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      },
+      "dark": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "agent": "inspection-delivery-demo",
+      "experiment": "EXP-inspection-delivery-demo-001-rf841e4415364",
+      "cases": [
+        {
+          "id": "U-IDENTITY-001",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-ROLE-001",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-ASSET-PAGES-001",
+          "turns": 1,
+          "steps": 3,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-ASSET-PARTIAL-001",
+          "turns": 1,
+          "steps": 2,
+          "api_exact": true,
+          "rendered_complete": true
+        }
+      ],
+      "preview": true,
+      "narrow": true,
+      "preview_case": "U-ASSET-PAGES-001",
+      "light": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      },
+      "dark": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "agent": "multi-step-research-analyst",
+      "experiment": "EXP-multi-step-research-analyst-001-r97fa04b7c613",
+      "cases": [
+        {
+          "id": "U-IDENTITY-001",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-ROLE-001",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-RESEARCH-001",
+          "turns": 1,
+          "steps": 3,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-RESEARCH-INCOMPLETE-001",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        }
+      ],
+      "preview": true,
+      "narrow": true,
+      "preview_case": "U-RESEARCH-001",
+      "light": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      },
+      "dark": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "agent": "rc5-ui-acceptance-20261102",
+      "experiment": "EXP-rc5-ui-acceptance-20261102-001-rbf6b3633f11e",
+      "cases": [
+        {
+          "id": "U-IDENTITY-001",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-ROLE-001",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-NEW-001",
+          "turns": 2,
+          "steps": 2,
+          "api_exact": true,
+          "rendered_complete": true
+        }
+      ],
+      "preview": true,
+      "narrow": true,
+      "preview_case": "U-NEW-001",
+      "light": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      },
+      "dark": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "agent": "security-operations-expert",
+      "experiment": "EXP-security-operations-expert-024-rad80a907c628",
+      "cases": [
+        {
+          "id": "U-INS-002",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-INS-003",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-INS-004",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-INS-005",
+          "turns": 1,
+          "steps": 5,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-INS-006",
+          "turns": 1,
+          "steps": 3,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-INS-007",
+          "turns": 2,
+          "steps": 3,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-INS-008",
+          "turns": 1,
+          "steps": 4,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-NEW-008",
+          "turns": 1,
+          "steps": 4,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-NEW-009",
+          "turns": 1,
+          "steps": 3,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-EMG-001",
+          "turns": 1,
+          "steps": 2,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-EMG-002",
+          "turns": 1,
+          "steps": 2,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-EMG-003",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-NEW-001",
+          "turns": 1,
+          "steps": 4,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-POL-001",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-POL-002",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-POL-003",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-POL-004",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-POL-005",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-POL-006",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-POL-007",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-POL-008",
+          "turns": 4,
+          "steps": 3,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-POL-009",
+          "turns": 1,
+          "steps": 2,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-POL-010",
+          "turns": 1,
+          "steps": 2,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-POL-011",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-POL-012",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-NEW-003",
+          "turns": 1,
+          "steps": 5,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-NEW-005",
+          "turns": 1,
+          "steps": 3,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-NEW-006",
+          "turns": 1,
+          "steps": 4,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-FLT-MENTION",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-FLT-001",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-FLT-002",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-FLT-003",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-FLT-004",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-FLT-005",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-FLT-006",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-FLT-007",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-FLT-008",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-FLT-009",
+          "turns": 2,
+          "steps": 2,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-FLT-010",
+          "turns": 1,
+          "steps": 2,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-QA-001",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-QA-002",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-QA-003",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-QA-004",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-QA-005",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-QA-006",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-QA-007",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-QA-008",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-QA-009",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-QA-010",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-QA-011",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-QA-012",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-QA-013",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-QA-014",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-THREAT-MENTION",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-THREAT-FAST",
+          "turns": 1,
+          "steps": 3,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-THREAT-FULL",
+          "turns": 1,
+          "steps": 4,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-THREAT-CONTRACT",
+          "turns": 1,
+          "steps": 4,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-THREAT-WHITELIST",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-THREAT-MISSING",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-THREAT-FOLLOWUP",
+          "turns": 2,
+          "steps": 2,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-THREAT-RULE-REAL",
+          "turns": 1,
+          "steps": 4,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-THREAT-RULE-CONFIRMATION",
+          "turns": 1,
+          "steps": 4,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-NEW-002",
+          "turns": 1,
+          "steps": 6,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-THREAT-FAST-MANUAL-WHITELIST",
+          "turns": 1,
+          "steps": 4,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-THREAT-RULE-JSON3",
+          "turns": 1,
+          "steps": 11,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-THREAT-RULE-JSON3-FAILURE",
+          "turns": 1,
+          "steps": 6,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-NEW-004",
+          "turns": 1,
+          "steps": 4,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-NEW-007",
+          "turns": 1,
+          "steps": 5,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-SCHED-001",
+          "turns": 1,
+          "steps": 2,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-SCHED-002",
+          "turns": 1,
+          "steps": 2,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-SCHED-003",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-SCHED-004",
+          "turns": 2,
+          "steps": 3,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-SCHED-005",
+          "turns": 2,
+          "steps": 2,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-SCHED-006",
+          "turns": 2,
+          "steps": 2,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-SCHED-007",
+          "turns": 1,
+          "steps": 2,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-VOICE-001",
+          "turns": 1,
+          "steps": 2,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-VOICE-002",
+          "turns": 1,
+          "steps": 3,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-VOICE-003",
+          "turns": 1,
+          "steps": 3,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-VOICE-004",
+          "turns": 3,
+          "steps": 5,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-ASSET-ALERTS-001",
+          "turns": 1,
+          "steps": 3,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-ASSET-ALERTS-MISSING",
+          "turns": 1,
+          "steps": 2,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-ASSET-ALERTS-EMPTY",
+          "turns": 1,
+          "steps": 3,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-ASSET-ALERTS-FAIL",
+          "turns": 1,
+          "steps": 3,
+          "api_exact": true,
+          "rendered_complete": true
+        },
+        {
+          "id": "U-INS-001",
+          "turns": 1,
+          "steps": 7,
+          "api_exact": true,
+          "rendered_complete": true
+        }
+      ],
+      "preview": true,
+      "narrow": true,
+      "preview_case": "U-THREAT-RULE-JSON3",
+      "light": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      },
+      "dark": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "agent": "test01",
+      "experiment": "EXP-test01-001",
+      "cases": [
+        {
+          "id": "U-IDENTITY-001",
+          "turns": 1,
+          "steps": 0,
+          "api_exact": true,
+          "rendered_complete": true
+        }
+      ],
+      "preview": true,
+      "narrow": true,
+      "preview_case": "U-IDENTITY-001",
+      "light": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      },
+      "dark": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      }
+    }
+  ],
+  "errors": []
+}

@@ -1,0 +1,64 @@
+{
+  "agents": 8,
+  "cases": 115,
+  "case_identity_inputs_fast_scenes_preserved": true,
+  "frozen_execution_consumer_exact": true,
+  "results": [
+    {
+      "agent": "asset-discovery-assistant",
+      "cases": 10,
+      "fast": 8,
+      "sha256": "0bb9e2d42e7c1fd75b829a043b18ee9fea95a46b63c36b6f84bf9a0655fa2a04",
+      "execution_digest": "bd44ccfd167da4bc3f83d4c4b1ac11820376cfd071a12e873469cafcbb85fbf8"
+    },
+    {
+      "agent": "autonomous-training-researcher",
+      "cases": 3,
+      "fast": 2,
+      "sha256": "f9415c628cf435fc8c1765af29e22e5480a1ba780c4ef76073d1372e8ebc5c91",
+      "execution_digest": "53c97ac4c8acda727226db8673b1622a3fbf92d7e2240b18b37a46800f85aa40"
+    },
+    {
+      "agent": "daily-inspection-assistant",
+      "cases": 6,
+      "fast": 4,
+      "sha256": "e83f74a0f2bec93bec10376e5b2880b0bcdea255b1fa97916ace7505152ef753",
+      "execution_digest": "b0e63595da12515e610c47591714601b5212be1af39dd6bf9e8bd7df799febad"
+    },
+    {
+      "agent": "inspection-delivery-demo",
+      "cases": 4,
+      "fast": 3,
+      "sha256": "4f620e5fbfd2d454b01ff7d3ec7329ec22dd1060c2603e4088b5c3a66e6da3a4",
+      "execution_digest": "a28af80975faa32ea30308f0ef7ec059766046de4cdf57b3266280f42b49375e"
+    },
+    {
+      "agent": "multi-step-research-analyst",
+      "cases": 4,
+      "fast": 2,
+      "sha256": "12a604c1494cbd3fc9ec731a1249e28973fcd4116bd53085b2c398887f24269c",
+      "execution_digest": "668c47d234be056511b92f253ea4de312793b3a649a85971ad7a4497bcbd4082"
+    },
+    {
+      "agent": "rc5-ui-acceptance-20261102",
+      "cases": 3,
+      "fast": 2,
+      "sha256": "d83bd8cb7094cf3b281488ac4da494857d0fffa39ec928a963ed75b481dcb8bc",
+      "execution_digest": "4da0a079f7e684e548536f07f7f80cd284bc05810d1d4f48a65ce2b6cdea1c93"
+    },
+    {
+      "agent": "security-operations-expert",
+      "cases": 84,
+      "fast": 17,
+      "sha256": "30c109c2138466323b91d5cfee7aa60d3a51074dc16f09d0aac48c5840231a2a",
+      "execution_digest": "2db6fd8b079787ee1f2755d22837b1bcf826143be022cc4a79a09f37dae055a7"
+    },
+    {
+      "agent": "test01",
+      "cases": 1,
+      "fast": 1,
+      "sha256": "311bd13106b2db23dfac244b53038906e569e31717e1722b549eb0c03a47ec2b",
+      "execution_digest": "7fabc8e3536d756fffc456805f25c3ce4040aa296d653b2530be80259b5f178a"
+    }
+  ]
+}

@@ -1,0 +1,253 @@
+{
+  "at": "2026-11-02T11:12:26.717Z",
+  "host": "228",
+  "views": [
+    {
+      "mode": "current",
+      "width": 1440,
+      "scheme": "light",
+      "rows": [
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        }
+      ],
+      "sizes": {
+        "body": 1003,
+        "scroll": 1003,
+        "page": 1440,
+        "viewport": 1440
+      }
+    },
+    {
+      "mode": "current",
+      "width": 390,
+      "scheme": "light",
+      "rows": [
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        }
+      ],
+      "sizes": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "mode": "current",
+      "width": 390,
+      "scheme": "dark",
+      "rows": [
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        }
+      ],
+      "sizes": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "mode": "editor_preview",
+      "width": 1440,
+      "scheme": "light",
+      "rows": [
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": null
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        }
+      ]
+    },
+    {
+      "mode": "editor_preview",
+      "width": 390,
+      "scheme": "light",
+      "rows": [
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": null
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        }
+      ]
+    },
+    {
+      "mode": "editor_preview",
+      "width": 390,
+      "scheme": "dark",
+      "rows": [
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": null
+        },
+        {
+          "whiteSpace": "normal",
+          "lineHeight": 24,
+          "textOffset": 4,
+          "pOffset": 1
+        }
+      ]
+    }
+  ],
+  "agent": "security-operations-expert",
+  "case_id": "U-INS-001",
+  "draft_cancel_source_unchanged": true,
+  "historical_frozen_unchanged": true,
+  "frozen_list_items": [],
+  "errors": [],
+  "pass": true
+}

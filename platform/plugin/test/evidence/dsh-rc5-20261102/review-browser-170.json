@@ -1,0 +1,25 @@
+{
+  "at": "2026-11-02T10:58:13.051Z",
+  "results": [
+    {
+      "agent": "daily-chat",
+      "case_count": 2,
+      "api_exact": 2,
+      "ui_sample": "U-ROLE-001",
+      "editor_exact": true,
+      "light": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      },
+      "dark": {
+        "body": 329,
+        "scroll": 329,
+        "page": 390,
+        "viewport": 390
+      }
+    }
+  ],
+  "errors": []
+}

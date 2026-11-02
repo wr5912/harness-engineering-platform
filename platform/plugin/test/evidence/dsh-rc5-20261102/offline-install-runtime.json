@@ -1,0 +1,499 @@
+[
+  {
+    "receipt": "remote-platform-arm64-full.json",
+    "at": "2026-11-02T10:15:13.338Z",
+    "host": "172.16.138.52",
+    "models": {
+      "platform": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      },
+      "business": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      }
+    },
+    "pages": [
+      {
+        "name": "首页",
+        "visible": true,
+        "alerts": []
+      },
+      {
+        "name": "智能体管理",
+        "visible": true,
+        "alerts": []
+      },
+      {
+        "name": "评测中心",
+        "visible": true,
+        "alerts": []
+      },
+      {
+        "name": "实例管理",
+        "visible": true,
+        "alerts": []
+      },
+      {
+        "name": "统一网关",
+        "visible": true,
+        "alerts": []
+      },
+      {
+        "name": "MCP 管理",
+        "visible": true,
+        "alerts": []
+      },
+      {
+        "name": "管理对话",
+        "visible": true,
+        "alerts": []
+      }
+    ],
+    "sessionId": "session-d9763d0e-8dd5-4663-9c7d-f619c3dffc41",
+    "response": "离线平台模型运行正常",
+    "model": {
+      "lastUsed": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      },
+      "next": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      }
+    },
+    "stats": {
+      "turns": 1,
+      "steps": 1,
+      "llmMs": 1644,
+      "toolMs": 0,
+      "ttftMs": 1505,
+      "ttftSteps": 1,
+      "decodeMs": 139,
+      "decodeTokens": 6
+    },
+    "javascriptErrors": [],
+    "sessionsBefore": 6
+  },
+  {
+    "receipt": "remote-platform-arm64-minimal.json",
+    "at": "2026-11-02T09:50:18.507Z",
+    "host": "172.16.138.170",
+    "models": {
+      "platform": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      },
+      "business": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      }
+    },
+    "pages": [
+      {
+        "name": "首页",
+        "visible": true,
+        "alerts": []
+      },
+      {
+        "name": "智能体管理",
+        "visible": true,
+        "alerts": []
+      },
+      {
+        "name": "评测中心",
+        "visible": true,
+        "alerts": []
+      },
+      {
+        "name": "实例管理",
+        "visible": true,
+        "alerts": []
+      },
+      {
+        "name": "统一网关",
+        "visible": true,
+        "alerts": []
+      },
+      {
+        "name": "MCP 管理",
+        "visible": true,
+        "alerts": []
+      },
+      {
+        "name": "管理对话",
+        "visible": true,
+        "alerts": []
+      }
+    ],
+    "sessionId": "session-3ccc00ae-9123-44d5-97a4-1fad5d212486",
+    "response": "离线平台模型运行正常",
+    "model": {
+      "lastUsed": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      },
+      "next": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      }
+    },
+    "stats": {
+      "turns": 1,
+      "steps": 1,
+      "llmMs": 1574,
+      "toolMs": 0,
+      "ttftMs": 1196,
+      "ttftSteps": 1,
+      "decodeMs": 378,
+      "decodeTokens": 6
+    },
+    "javascriptErrors": [],
+    "sessionsBefore": 6
+  },
+  {
+    "receipt": "remote-platform-amd64-model-fixed.json",
+    "at": "2026-11-02T08:40:37.879Z",
+    "host": "172.16.138.232",
+    "models": {
+      "platform": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      },
+      "business": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      }
+    },
+    "pages": [
+      {
+        "name": "首页",
+        "visible": true,
+        "alerts": []
+      },
+      {
+        "name": "智能体管理",
+        "visible": true,
+        "alerts": []
+      },
+      {
+        "name": "评测中心",
+        "visible": true,
+        "alerts": []
+      },
+      {
+        "name": "实例管理",
+        "visible": true,
+        "alerts": []
+      },
+      {
+        "name": "统一网关",
+        "visible": true,
+        "alerts": []
+      },
+      {
+        "name": "MCP 管理",
+        "visible": true,
+        "alerts": []
+      },
+      {
+        "name": "管理对话",
+        "visible": true,
+        "alerts": []
+      }
+    ],
+    "sessionId": "session-8b54249b-2b00-4faa-870b-4c3ebe843471",
+    "response": "离线平台模型运行正常",
+    "model": {
+      "lastUsed": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      },
+      "next": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      }
+    },
+    "stats": {
+      "turns": 1,
+      "steps": 1,
+      "llmMs": 47220,
+      "toolMs": 0,
+      "ttftMs": 47215,
+      "ttftSteps": 1,
+      "decodeMs": 5,
+      "decodeTokens": 6
+    },
+    "javascriptErrors": [],
+    "transportInterruptions": 2,
+    "sessionsBefore": 4
+  },
+  {
+    "receipt": "standalone-native-amd64-grace.json",
+    "at": "2026-11-02T08:49:06.107Z",
+    "host": "172.16.138.232",
+    "arch": "amd64",
+    "port": 28625,
+    "sessionId": "session-1046898e-882a-461f-9669-9a6d2b309e2f",
+    "response": "离线安装模型运行正常",
+    "model": {
+      "lastUsed": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      },
+      "next": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      }
+    },
+    "stats": {
+      "turns": 1,
+      "steps": 1,
+      "llmMs": 4254,
+      "toolMs": 0,
+      "ttftMs": 3883,
+      "ttftSteps": 1,
+      "decodeMs": 371,
+      "decodeTokens": 6
+    },
+    "javascriptErrors": [],
+    "elapsedMs": 5485,
+    "source": "EXP-security-operations-expert-024-rad80a907c628",
+    "entryLoaded": true,
+    "sessionsBefore": 1
+  },
+  {
+    "receipt": "standalone-native-amd64-grace-restart.json",
+    "at": "2026-11-02T09:00:05.527Z",
+    "host": "172.16.138.232",
+    "arch": "amd64",
+    "port": 28625,
+    "sessionId": "session-1046898e-882a-461f-9669-9a6d2b309e2f",
+    "response": "离线安装模型运行正常",
+    "model": {
+      "lastUsed": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      },
+      "next": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      }
+    },
+    "stats": {
+      "turns": 1,
+      "steps": 1,
+      "llmMs": 4254,
+      "toolMs": 0,
+      "ttftMs": 3883,
+      "ttftSteps": 1,
+      "decodeMs": 371,
+      "decodeTokens": 6
+    },
+    "javascriptErrors": [],
+    "elapsedMs": 32,
+    "source": "EXP-security-operations-expert-024-rad80a907c628",
+    "entryLoaded": true,
+    "sessionsBefore": 2
+  },
+  {
+    "receipt": "standalone-native-arm64.json",
+    "at": "2026-11-02T10:20:51.571Z",
+    "host": "172.16.138.52",
+    "arch": "arm64",
+    "port": 28626,
+    "sessionId": "session-03daa26a-f7e1-481d-b90b-d88591747250",
+    "response": "离线安装模型运行正常",
+    "model": {
+      "lastUsed": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      },
+      "next": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      }
+    },
+    "stats": {
+      "turns": 1,
+      "steps": 1,
+      "llmMs": 3006,
+      "toolMs": 0,
+      "ttftMs": 2885,
+      "ttftSteps": 1,
+      "decodeMs": 121,
+      "decodeTokens": 6
+    },
+    "javascriptErrors": [],
+    "elapsedMs": 4115,
+    "source": "EXP-security-operations-expert-024-rad80a907c628",
+    "entryLoaded": true,
+    "sessionsBefore": 1
+  },
+  {
+    "receipt": "standalone-native-arm64-restart.json",
+    "at": "2026-11-02T10:23:35.114Z",
+    "host": "172.16.138.52",
+    "arch": "arm64",
+    "port": 28626,
+    "sessionId": "session-03daa26a-f7e1-481d-b90b-d88591747250",
+    "response": "离线安装模型运行正常",
+    "model": {
+      "lastUsed": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      },
+      "next": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      }
+    },
+    "stats": {
+      "turns": 1,
+      "steps": 1,
+      "llmMs": 3006,
+      "toolMs": 0,
+      "ttftMs": 2885,
+      "ttftSteps": 1,
+      "decodeMs": 121,
+      "decodeTokens": 6
+    },
+    "javascriptErrors": [],
+    "elapsedMs": 29,
+    "source": "EXP-security-operations-expert-024-rad80a907c628",
+    "entryLoaded": true,
+    "sessionsBefore": 2
+  },
+  {
+    "receipt": "remote-business-native-172.16.138.52.json",
+    "host": "172.16.138.52",
+    "name": "security-operations-expert",
+    "at": "2026-11-02T10:16:56.348Z",
+    "port": 18500,
+    "pageLoaded": true,
+    "priorSessions": 4,
+    "sessionId": "session-241c8912-a806-403f-b693-f47d342a9c09",
+    "response": "业务模型运行正常",
+    "model": {
+      "lastUsed": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      },
+      "next": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      }
+    },
+    "stats": {
+      "turns": 1,
+      "steps": 1,
+      "llmMs": 3590,
+      "toolMs": 0,
+      "ttftMs": 3475,
+      "ttftSteps": 1,
+      "decodeMs": 115,
+      "decodeTokens": 5
+    },
+    "javascriptErrors": [],
+    "completedAt": "2026-11-02T10:17:08.324Z"
+  },
+  {
+    "receipt": "remote-business-native-172.16.138.170.json",
+    "host": "172.16.138.170",
+    "name": "daily-chat",
+    "at": "2026-11-02T09:56:44.745Z",
+    "port": 18500,
+    "pageLoaded": true,
+    "priorSessions": 9,
+    "sessionId": "session-27926146-911d-4015-88f4-02c8589feed9",
+    "response": "业务模型运行正常",
+    "model": {
+      "lastUsed": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      },
+      "next": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      }
+    },
+    "stats": {
+      "turns": 1,
+      "steps": 1,
+      "llmMs": 1718,
+      "toolMs": 0,
+      "ttftMs": 1596,
+      "ttftSteps": 1,
+      "decodeMs": 122,
+      "decodeTokens": 5
+    },
+    "javascriptErrors": [],
+    "completedAt": "2026-11-02T09:56:53.524Z"
+  },
+  {
+    "receipt": "remote-business-native-172.16.138.232.json",
+    "host": "172.16.138.232",
+    "name": "hep-deploy-accept-amd64-final",
+    "at": "2026-11-02T08:58:15.107Z",
+    "port": 28622,
+    "pageLoaded": true,
+    "priorSessions": 79,
+    "sessionId": "session-c59bd14a-2fc3-4389-bab4-9a4ef48ff7a8",
+    "response": "业务模型运行正常",
+    "model": {
+      "lastUsed": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      },
+      "next": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      }
+    },
+    "stats": {
+      "turns": 1,
+      "steps": 1,
+      "llmMs": 4691,
+      "toolMs": 0,
+      "ttftMs": 4571,
+      "ttftSteps": 1,
+      "decodeMs": 120,
+      "decodeTokens": 5
+    },
+    "javascriptErrors": [],
+    "completedAt": "2026-11-02T08:59:25.715Z"
+  },
+  {
+    "receipt": "remote-business-native-172.16.138.232.json",
+    "host": "172.16.138.232",
+    "name": "secops-v24",
+    "at": "2026-11-02T08:58:15.111Z",
+    "port": 18500,
+    "pageLoaded": true,
+    "priorSessions": 13,
+    "sessionId": "session-f88e6fad-1f73-4030-a4ab-612627ea3149",
+    "response": "业务模型运行正常",
+    "model": {
+      "lastUsed": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      },
+      "next": {
+        "provider": "local",
+        "model": "Qwen3.8-27B"
+      }
+    },
+    "stats": {
+      "turns": 1,
+      "steps": 1,
+      "llmMs": 1843,
+      "toolMs": 0,
+      "ttftMs": 1733,
+      "ttftSteps": 1,
+      "decodeMs": 110,
+      "decodeTokens": 5
+    },
+    "javascriptErrors": [],
+    "completedAt": "2026-11-02T08:59:47.408Z"
+  }
+]
