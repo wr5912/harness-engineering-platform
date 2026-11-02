@@ -367,7 +367,8 @@ function codeOnlyFixture(t, run, renderResult, hybrid) {
     events.push({ type: 'tool/call', data: { turn, step: 1, callId: call.id, name: call.name, arguments: call.arguments } })
     const result = await f.ctx.tools.execute({ name: call.name, arguments: JSON.parse(call.arguments), callId: call.id, agent: target, signal })
     events.push({ type: 'tool/result', data: { turn, step: 1, message: { role: 'tool', toolCallId: call.id,
-      source: { kind: 'tool', callId: call.id, name: call.name }, content: result.content, ...(result.isError ? { isError: true } : {}) }, ...(result.isError ? { error: { code: 'TOOL_FAILED' } } : {}) } })
+      source: { kind: 'tool', callId: call.id, name: call.name }, content: result.content, ...(result.isError ? { isError: true } : {}) },
+      ...(result.meta ? { meta: result.meta } : {}), ...(result.isError ? { error: { code: 'TOOL_FAILED' } } : {}) } })
     return result
   }
   function commitReply(turn, response) {
@@ -590,6 +591,37 @@ test('纯代码原生回合将当前输入交给LangGraph和真实工具，再�
   const title = await f.titles[0].generate({ messages: [{ seq: 7, text: '请读取台账' }], signal: new AbortController().signal })
   assert.deepEqual(title, { title: '请读取台账', messageSeqs: [7] })
   assert.equal(Object.hasOwn(title, 'model'), false)
+})
+
+for (const mode of ['code-only', 'hybrid']) test(`${mode}：原生大结果落盘后按同一回执回复并支持恢复，失败图不伪装成功`, async t => {
+  const f = codeOnlyFixture(t, async context => {
+    await context.callTool('large_catalog', {})
+    if (context.input.request === '失败') throw new Error('受控业务失败')
+    return { summary: '实际目录已查询，未启动巡检。' }
+  }, value => value.summary, mode === 'hybrid' ? {} : undefined)
+  f.agent.session.header.id = f.agent.session.id
+  const saved = []
+  f.ctx.provide('spillStore', { async saveText(input) {
+    saved.push(input)
+    return { locator: '/tmp/controlled-workflow-spill.txt', retrievalHint: 'Use read with offset/limit.' }
+  } })
+  await f.ctx.plugin(await sdk('@deepseek-ai/dsh-spill-policy'), { maxInlineTokens: 256 })
+  f.register('large_catalog', () => ({ schema: '真实目录字段'.repeat(20000) }))
+  let entered = await f.enter(1, '查询'), first = await f.stream(1); entered.commit()
+  const executed = await f.execute(1, first)
+  assert.equal(executed.isError, false)
+  assert.ok(saved.length >= 1, '整图经原生策略落盘；原生策略不裁剪同进程子调用的值')
+  assert.throws(() => JSON.parse(executed.content.map(block => block.text ?? '').join('')), SyntaxError)
+  assert.equal((await f.stream(1)).text, '实际目录已查询，未启动巡检。')
+  f.hook('agent/disposed', { agent: f.agent })
+  assert.equal((await f.stream(1)).text, '实际目录已查询，未启动巡检。')
+  f.hook('agent/disposed', { agent: f.agent })
+  const receipt = f.events.at(-1).data
+  receipt.meta = { ...receipt.meta, graph_execution: { ...receipt.meta.graph_execution, session_id: 'another-session' } }
+  assert.match((await f.stream(1)).text, /执行证据/)
+  entered = await f.enter(2, '失败'); first = await f.stream(2); entered.commit()
+  await f.execute(2, first)
+  assert.match((await f.stream(2)).text, /未完成|失败/)
 })
 
 test('身份和未知输入也通过图，原生Guard失败时本地停止且不重放工具', async t => {
