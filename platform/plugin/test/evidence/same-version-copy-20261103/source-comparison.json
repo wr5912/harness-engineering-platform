@@ -1,0 +1,1030 @@
+{
+  "parent": "EXP-security-operations-expert-027-reab20c48f610",
+  "copy": "EXP-security-operations-expert-027-r0318e00a959b",
+  "parent_ref": "git:42b9ebc522d052279316669cff365c01674b5cc6",
+  "files_compared": 255,
+  "source_unchanged": true,
+  "copy_identical": true,
+  "checks": [
+    {
+      "path": "dsh/managed/continuation-helper.mjs",
+      "sha256": "d34d696361ba74f2ef33426886992f5d52d4c0d18eae401108baf73d03491221"
+    },
+    {
+      "path": "dsh/managed/control-boundary.yaml",
+      "sha256": "5abbc74260061cdbb141c81ca54ee0e88d8aca548e938d196d536b344f9a8a4b"
+    },
+    {
+      "path": "dsh/managed/disposition-runtime/index.mjs",
+      "sha256": "efee138b45f612fa081dd841d341124d4382d10d045027375d7af549289024f9"
+    },
+    {
+      "path": "dsh/managed/disposition-runtime/tool-resolver.mjs",
+      "sha256": "e0e238fb447678f13c0120d307739b122a91c22c12182e57fa83a42bfedbf421"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/LICENSE",
+      "sha256": "b03f61710dbaad309c46c443f56586fa0c9026371cb3948ab64208ca6a904f91"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/README.md",
+      "sha256": "a93c7e242693c875714432bb410789b972c9f13a284e0fee31a0d9900edf7856"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/assets/architecture.svg",
+      "sha256": "1dff425d6d17a8c675ff8feaeab6eac8e9c4410881bc6501efc936e9fa988668"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/assets/demo-voice-flow.gif",
+      "sha256": "1e4d5dd7f2a29e502a83da5e3ad271fa2d8cd707a2cdd983b2db0d93b93ee9bb"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/assets/duplex-banner.png",
+      "sha256": "f60f3f6f84c34673bcfa6debf02dd362e21ae09558f2fa2af6094a289a09ad23"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/assets/hero-banner-v2.png",
+      "sha256": "2954973e13613e529469c9dd55a6306938d76be929019ff2ac3edd4ecc591c47"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/assets/kws/LICENSE.sherpa-onnx",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/assets/kws/SHA256SUMS",
+      "sha256": "0625e97b0324610026d48548aa962fb9344710499c1a5dbf324f08bf326bb4cc"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/assets/kws/THIRD-PARTY-NOTICES.md",
+      "sha256": "6b048a6b908de1c199a8e417609e888058aa1035817cd6a27df934dd0f748b6d"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/assets/kws/kws-capture-worklet.js",
+      "sha256": "b80355c9eafd2d51bf8675e9cf8fb4a047663a71070d5a48d18f560bcb00f9f1"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/assets/kws/kws-worker.js",
+      "sha256": "a5e079357b30c0ca46cb0f7772f6322c5be625e44f895dae990bfc0997e1361a"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/assets/kws/sherpa-onnx-kws.js",
+      "sha256": "03b44e372795fd907e84eecd29419e1d052dc6704ac06935c9bf9fe19b3e3434"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/assets/kws/sherpa-onnx-wasm-kws-main.data",
+      "sha256": "3ec799f46247746484601b8f67f12d36369e9700fd191038f0f4f646ac9a5089"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/assets/kws/sherpa-onnx-wasm-kws-main.js",
+      "sha256": "aeea5586a77af01bbac882d81f2a57a61d81d766aafafc829c573dfacd9b8d6b"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/assets/kws/sherpa-onnx-wasm-kws-main.wasm",
+      "sha256": "952abe4768fbb12117e46259159b7c29c052703edea5fbe77dea5cdc7e58ee0d"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/assets/kws/tokens.txt",
+      "sha256": "72316508d9119696145abc6f1f8cdc46287535c34e5ce7e595f845cb1499cf2e"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/assets/settings-actions.png",
+      "sha256": "229e17bb565467eaacdcf14f6eeadfb4c579b17c1ddc6f1944169d3609132c79"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/assets/settings-panel.png",
+      "sha256": "2b60499c5283e5ad862bb524f19373523b2e461e78f9b8c42878ba5dc1902f77"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/assets/social-preview-card-1280x640.png",
+      "sha256": "ac27550c4a5816c918ff07ce9ce516a94eb6e0b39803abc14a8747b163476a98"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/assets/social-preview.png",
+      "sha256": "e557824ab2ef47f3b45eecb859d99105424e5ca0415bb0fa52817ed69f8e1120"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/build.mjs",
+      "sha256": "3fa8f6244a702f60a747497e712ae5595d4c4f3141623ec87465ee53f5c593b5"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/cordis.patch.yml",
+      "sha256": "9acbba5194a4175bca79cd0b0295d33a972cb7d7fa6135b93006e4793f7f62cb"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/lib/client.js",
+      "sha256": "91cd4848030bc7a2e173ebe777941fabf80fa42c0c51a12347ce6959a99bab51"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/lib/index.js",
+      "sha256": "61143e67f86f40c05efe99fd267812496154b25837061ff98c82820ac7e5f2e7"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/lib/msedge-tts.cjs",
+      "sha256": "07a3ecd3c6aaf993618c16ed6ad9a99e410c80ff131e6ef6e8d5e0fe2310258c"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/lib/sense-worker.mjs",
+      "sha256": "09227ecbc3729f142a3a488b40463499391813b7b8a8160ff9ab463b1cd9ff73"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/lib/tts-vits-worker.cjs",
+      "sha256": "6d38dd5bd766c12fd73faa4868719c1ca0497184d7e9dea0b9bd8bdc72028e67"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/lib/typert.host.d.ts",
+      "sha256": "5e2d26ee86d0fe170dac8cd3f5854e67bdea334c57f40a5766ace57b8304c17d"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/lib/typert.host.js",
+      "sha256": "a33e48a739e163385038498cee2b30b045d60a2ba3ab57c825fb76e830536b54"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/lib/typert.remote-client.d.ts",
+      "sha256": "41f1434ae66c8fe0187974cbd094f7fc097a64ac674684f186d1d8a18d1bd610"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/lib/typert.remote-client.js",
+      "sha256": "1655473bec7bc2957dbd92a400d6a2bf0ff17d9d2ac90b64feec4df21477197b"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/package-lock.json",
+      "sha256": "6f8254dfd11f8b9eede99072386326e62ac62b6192c395c49952f97d4f54963f"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/package.json",
+      "sha256": "ce123d865bf83ebaf02c78b02bdb2e17716f43aa7008aad847712d7f89e4723d"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/scripts/analyze-fixture.mjs",
+      "sha256": "638088753dddf62ff5c27449db5dce24968b399e2c9d30fd7bad93d1f09225ab"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/scripts/bench-asr.mjs",
+      "sha256": "d28ad890c6c1454beb9955ffeaca9e319f9f2ceba86e3c2d904521dfcc31a666"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/scripts/bench-echo-gate.mjs",
+      "sha256": "0c7ddb3e09d4e6e16951d3ff6637232caf63cc26b74440881474cb34e17136d9"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/scripts/check-anchors.mjs",
+      "sha256": "328217921f4460df19c98ddf625610dc0e5ee0c97fb76106ac6a93d72cfcf9bb"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/scripts/ensure-core.sh",
+      "sha256": "03da4106cb112d599efffdab3b2e30df0ebd84919c6110ed5ca97811851990ea"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/scripts/full-e2e.sh",
+      "sha256": "15da896004931c02127744fc99c60cf94770a03adc5129287fe788a909a7e46d"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/scripts/list-voices.mjs",
+      "sha256": "83221eb37dcbf3c90b9b704eb6bbfc3c0b8fa14a7cf221428e7097dfc5a39ae3"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/scripts/prefetch.mjs",
+      "sha256": "24af43ad30b4b0b149abc1afc8c3f9613605e2e6489dc341c2bd4444e1a1b526"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/scripts/smoke-client.mjs",
+      "sha256": "26db2950d655c868c092cb9342ba3c23b87e67eecea45a03e3e5cf5b138ebab7"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/scripts/smoke-runtime.sh",
+      "sha256": "094fbb13916d5b1f910726f740c5b20d0d2d3cfd4c6b17ce5dc6a8607b66f92c"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/scripts/typecheck-dual.sh",
+      "sha256": "8a1265a86bf1c85c1be6b01dd3945042e0e1f1d08178f47044f35f78dadbfeca"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/scripts/verify-dual.sh",
+      "sha256": "e00685ec3e43436e491e3c336c7e286bb17ff4856b359c64a115b614c044d438"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/scripts/verify-product.sh",
+      "sha256": "ca3889f2c4aae061850fd763b0b3d70fad7a31e28d1adff58de55abdb7ab8f84"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/scripts/verify.mjs",
+      "sha256": "bb85ca7efe407f3ada04fb28ebfae4f14328ad24bdc5fd2dcbd2f50a0e589618"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/aec.ts",
+      "sha256": "c62fc25c1f1a0292358be06fddbf1324527e283dc87619ae7efc6456f84c0618"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/ambient.d.ts",
+      "sha256": "502c0cbdf44c7a878e480da3a9bcc096f01ab1af030d25384f773cf64aeb5a74"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/asr-host.ts",
+      "sha256": "9c3afb0ca234cdd0b1b79bf0e989acba67826f5542e03e11a78eb9663c8c1bad"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/asr-remote.ts",
+      "sha256": "8491a9090690f320d5f70fa63c53b3f61da93a4332d9991e086e560c3d5f3ece"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/asr.ts",
+      "sha256": "8d37aa04f40d65f6a751aa11004bffd01ee3ca58d2dc45788dcc85961fab5d95"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/audio-worklet.ts",
+      "sha256": "f18ab1ce02c9110c7ed6b55f3093b7a6d5b617399b8eb3f7d54445bcf518720a"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/client.tsx",
+      "sha256": "c6c79c44733327bd5ac227f0f31d97c971b658c624ecf12df283ad35cd8643ce"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/emotion.ts",
+      "sha256": "92c51af23c3e60d9dfc45c0215acf07fdb03c88424f783a0f52a295cd802de7b"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/fixture-recorder.ts",
+      "sha256": "bd97e293f65ed71ffa250d24179e968a259a0c09375190565b76d9d3522d3afc"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/index.ts",
+      "sha256": "e37b0616ccdcf4f4c174d72aeecc348ed04abdc41c2756b1aa388351d20cea24"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/kws/audio-capture.ts",
+      "sha256": "1de352a789ee15c337c6278239d06c27a559a5b0e85c0c4d3a41898068b09812"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/kws/keyword-tokens.ts",
+      "sha256": "79c2ac58cd19935f4582dac14366b008dd36e3498923e05a3178e159bbf09aee"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/kws/model-tokens.ts",
+      "sha256": "8ef84cb654acf710ba799e0df15dbe45ab87fa7b9468f0cb098342406050f482"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/kws/sherpa-kws-engine.ts",
+      "sha256": "11838c71b877562222f7c2d7b41fbdf6b0362676a2c20c2bec11438e91a3bc7e"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/kws/types.ts",
+      "sha256": "7dc2283095f4cd59a96322376653ab152422d5ed18a2241d4b5be88889b015e3"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/models.ts",
+      "sha256": "9cc19cd2a04e235a0253c48ccc034ecfcd575223731cd0d8a1826b4ccd0b6df0"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/msedge-tts-compat.ts",
+      "sha256": "516795559a6177b5f59f0bab51397da979347152198761bb7dc8883de6274554"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/resample.ts",
+      "sha256": "b8f6c96e9b7c5b6bb98ed9b8079d3927976f5dee71624091fe9bfedfe31dc8bc"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/security.ts",
+      "sha256": "d911cf66eaad5bce96a0760e38c0ce075972e5ca60a171ab5743b41dc770eccb"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/segmenter.ts",
+      "sha256": "152eb1854993a596e7451a35dc736d20f85cae9ce07c6bc87787b636e4592ff5"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/send-command.ts",
+      "sha256": "cecac7d35c80db2bdc8bef96d75dd02eb6387cb2386e4456a3822f8e9e807d9b"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/sense-worker.ts",
+      "sha256": "427bf0fb3b05df18c19a5852b0e4eeac6b8b06aa7abe94aec7093bd193cffbc9"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/service-check.ts",
+      "sha256": "0c4ce239ad84c4e83db00f0e855ac6ee0f80f99ca1e9c1aedcfed7db9fc9aa58"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/service-config.ts",
+      "sha256": "d95d5fc2e5127acd1df69bf9c269bc65f594dd214af73c8640781fd402b266d3"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/service-settings.tsx",
+      "sha256": "3724689922a1360174c3d0cd147aa2ee1c9e31ded6bef827eb86c125359384ee"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/settings-form.tsx",
+      "sha256": "5da02ed6e8a8df97303bc47e560e1dc87c646e2ff056b25c0400f7ee3c56aca1"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/sherpa-onnx-node.d.ts",
+      "sha256": "5cdc1373849218404c3245d654598fa78452e51e63b4e2b7dc4cbded352a118d"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/speech-summary.ts",
+      "sha256": "8e6c2eb24873cbf03b3e6e3c8f00f542273929e0802d0f61e9c93ea523580558"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/strings.ts",
+      "sha256": "eb5deb3abf1b7f338c1354627bb0de54c918c70f4ecf06a35005fa89a6dcb2cb"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/tts-local.ts",
+      "sha256": "5d64603064d2b9a443a931b1f08f54867b5143244a16b6c088080ed4a5be558d"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/tts-queue.ts",
+      "sha256": "dc10c422f1c5cbcd783f4a5a444300d906c75603d9f7573f7f03ed3e20cfef9e"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/tts-remote.ts",
+      "sha256": "fbc41bb397c49eb53b41a8e520fd54a010c93d1c72342381e59ebe676b420adf"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/tts-vits-worker.ts",
+      "sha256": "85d67a347bc1da2bb8fc03c7f3189dcc4004a7b20a7b7f04754fc677657dbd1b"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/voice-remote.ts",
+      "sha256": "74b12026be1a83a4d579e1f4a78cbd7edda8eabf3f1b45287765021b755a279d"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/src/wakeword.ts",
+      "sha256": "365211f346a7ff6fb3804425f842ec069946ce068bdca4042bdbc20019623b25"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/aec.test.mjs",
+      "sha256": "66bb38cd1b988904a68cb54fc9a5fd2b6a8cdb594cb7a90cd833867d283149ec"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/asr-host-rebuild.test.mjs",
+      "sha256": "1d0503a8b683c24a8dc0c11b9e6019f5d8ae57c9ad24f657a3d3d71acfcb6df5"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/backchannel.test.mjs",
+      "sha256": "903026988bc4a362d0a403707cc8ccddde72129463f28bffc76716e6841bc979"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/barge-in-detect.test.mjs",
+      "sha256": "20dd600cca894edb752b0d47ce190a1ef9110cad3550a8730f5033f98b5f7238"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/barge-in-manual.test.mjs",
+      "sha256": "0af94466d81cdde7e11e963ee53770527cebd6ca3910fee3c74f09a60ddc85fd"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/browser-switch-sync.integration.mjs",
+      "sha256": "823ea1a029dfa7ed8541beca06d7e65c954419214b6c9507410e53ba7f6893ca"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/browser-voice.integration.mjs",
+      "sha256": "3b7bfa62b051d4491d9f4b66b30dabc6892a81672578e1ff046d9149ea3e1549"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/browser-wake-send.integration.mjs",
+      "sha256": "1c919a7b6c78f5c3a837f41dbf39b01b5b0044d6b72e6e6749b039416c8d9784"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/caption-a11y.test.mjs",
+      "sha256": "4bfbc765deb7ae082c16dfe57a8a8a1b8c55344e553b582935aa02e615446c45"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/deepseek-summary-bench.mjs",
+      "sha256": "7fcf46eb56261857376635f898084a5e445a5de6125813ef2781fa05b5221b38"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/detect-route.test.mjs",
+      "sha256": "0141a8ad9ef4f85051621115cc49b8b8b8163dcf5c8ea6fcd43507d97ce952fa"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/download.test.mjs",
+      "sha256": "5e2661b1a3b94771a96ca048d324303f95c231e631d07fdcebb2d7064857e23c"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/emotion-integration.test.mjs",
+      "sha256": "832d9f4647e4310a535c9f6626363371ac49e09896ec4d6c1bce89990eeabc51"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/emotion-tts-local.test.mjs",
+      "sha256": "f12ef1fe0f3b93b70776c898975fc7b389b338a65447257cd3f3cacd250ea01a"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/emotion.test.mjs",
+      "sha256": "720ea79401259b7f3862e81b2a00b15f84c7491201f5bdb67c1763bf97f3aa3d"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/endpoint-short.test.mjs",
+      "sha256": "3ae9c3309f64a01851e91e5ecd7c2cf35ff31ee22053e5d4503390e70daf22b4"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/endpoint.test.mjs",
+      "sha256": "e2776c61043c123903d40af21aa790e2f7f80b7b54261fa82a45e8d3ed90fb58"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/hold-clear.test.mjs",
+      "sha256": "eeb80eef8a3eca36051f69ce9398adb01566b453264d209c071daf8297082f69"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/integration-fork.mjs",
+      "sha256": "9bd002ae0d2000374f0d07c0e20d3886b1ab0a4a206678643f90129d0aa57dbc"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/matchBackchannel.test.mjs",
+      "sha256": "2d414ae426cb1a1c90fa2336fea41697985169831df2881ffa5a7796d05c2e0e"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/preview-error.test.mjs",
+      "sha256": "de4b07609fb42c73218c7c8b332dd41180151a60493f48fe828a81ea68da3e44"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/reasoning-wire-probe.mjs",
+      "sha256": "8c9bedb52845848257f4e1c0efc65a4ff59d0baad440cdfc4c08beb8b6fa0bb7"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/remote-endpoints.test.mjs",
+      "sha256": "73112d4ea9ee84c45c6f34e6bd2adefa40edbddf1241ded62888d07a42ad6f7c"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/remote-services.integration.mjs",
+      "sha256": "d6897d60f99d10abb7f698a0267f9a1f85ed21fea3a716a4c231251a890e49f7"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/resample.test.mjs",
+      "sha256": "e38ee9b601279ab9dc80eef44d0897a4bc583a07c9e50374755df432125807a0"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/runtime-summary-browser.ts",
+      "sha256": "b0133731b9e0a7e2200c290cb1449b6163281574a5ff3849aa5c330be1bf246a"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/runtime-summary-probe.ts",
+      "sha256": "e0ef856b4131f5d4026019d033dc2ba50bddd24816cc3c7e2ec88a7fe2da4b0c"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/segmenter.test.mjs",
+      "sha256": "daafb701f649fd2b44220c58927d29a72859602d0e3d735626b0726b734e7301"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/send-command.test.mjs",
+      "sha256": "3bf4a280993973d5b936a4d028a25aa073d5668441098d1b7ef719a0b3f440e4"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/sense-lang.test.mjs",
+      "sha256": "ff3ad158fc4fa85e869c1471e02f96015061e81b0896572514260d24410575fc"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/sense-worker.test.mjs",
+      "sha256": "bb3da6ae0d88305dd32ae0ff57f93026cee43f0f8bd9bff39d1ae5fb72bc5702"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/settings-load.test.mjs",
+      "sha256": "e67a4a4b175f0b72e5d7d08961c7beaff8144362a7b5c5ec9ccd05b4be34b5f4"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/speech-latency.test.mjs",
+      "sha256": "c55b9dd3af834713be310db4b0996b2dbb467e3e9d2ecace1a175ab692f10b37"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/speech-summary.test.mjs",
+      "sha256": "8638b397defd8098d9577749d3e2237db30f9f3f4aaee71aa167a315c2f7cea0"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/strings-coverage.test.mjs",
+      "sha256": "d0d632a36e696d9a0ba4144c935852cc486ba68ae3a848edfd808ad021fa63e5"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/summary-delivery.test.mjs",
+      "sha256": "cc9d61191f8041ce35f3c3fb1269a8d5c1d11f2c183ebc5d888eb9090e8eebbc"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/tts-playback.test.mjs",
+      "sha256": "efb41615884c2903a1ca5ce29376f0dd5696916917c11821085534c7aa5524cd"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/verify-bazong-path.mjs",
+      "sha256": "b95cd08556e361d5e3528a5e72f33d39f55c3fee714bcfe80ae99f6e0aecf7b6"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/verify-client.mjs",
+      "sha256": "43de477f2fc0a169218eb844ed700c77e880d6ae26d4e4af27f0d07043fa64b8"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/verify-kokoro.mjs",
+      "sha256": "07db889b3864619ebccdda901c9b6f1e6781de9b2ec03ada212df688e6f464cd"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/verify-preview-loop.mjs",
+      "sha256": "c63a9b6424772f6fa1349d2a09a5739f9328b65abfd0658e6e5d0df684cefd6c"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/verify-speaker-gender.mjs",
+      "sha256": "f6c0bd169daee3b05df45f79ee2696c4ea6f750f015960f5a00e90b2e1fdbbbc"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/wake-flow.test.mjs",
+      "sha256": "9e4bf61ff11ddde4363720fa3a85225b430d4c1e43582dd52f1c3dd492b91832"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/wake-standby.test.mjs",
+      "sha256": "3bb74bbe45d816329779003987dbaca924f967a2ccc8eb874e465b3c3abe8c0c"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/wakeword.test.mjs",
+      "sha256": "64c06ca271952bcc88b6f9951686a515006eb44f228f5bc1b101a799befdbc19"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/test/yield-ms-wiring.test.mjs",
+      "sha256": "8d16f422a56b4cee76fe93e20c7bef1de08a525c86a48ede2099b643aaf3564f"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/tsconfig.client.json",
+      "sha256": "d724c7d711d45ca22f5d27e1cc9a3980ad0b75a9a73c1e02a9ba923cc190a216"
+    },
+    {
+      "path": "dsh/managed/dsh-voice-hub/tsconfig.json",
+      "sha256": "6855e124934052391cce455e89551f65fa80b10a7c3f2c0d30687df6f64d4a28"
+    },
+    {
+      "path": "dsh/managed/emergency-action-guard.mjs",
+      "sha256": "c0d5d072f135664fbf413438c9c86fef7d795dc733ae84369d3c67e355979ce5"
+    },
+    {
+      "path": "dsh/managed/emergency-confirmation-runtime.mjs",
+      "sha256": "fb78f4ff841598ce4e538e97da8d5da2cfd7a02a86275b3e3e1a36f6652fef3e"
+    },
+    {
+      "path": "dsh/managed/inspection-preparation-runtime.mjs",
+      "sha256": "6bb645490e482ed6bbc3d8dc8a2fda58111c097d85772b63adca97300dbd3e00"
+    },
+    {
+      "path": "dsh/managed/inspection-preparation-runtime.ts",
+      "sha256": "933857e4f577d298b3502b0ae8765acb8a3dd1733b83f0dbd20d6d929e8c2d51"
+    },
+    {
+      "path": "dsh/managed/instance-confirmation-config.mjs",
+      "sha256": "c4aed476afcca786b9a289dabd5f9a26ce0c6346a4ce49fc07ab312abe5ddb35"
+    },
+    {
+      "path": "dsh/managed/mcp-manager/build.mjs",
+      "sha256": "29b2069251c86abbd43e96cd3f281fe1ba4ddb10fb1589a61a15202722da44b9"
+    },
+    {
+      "path": "dsh/managed/mcp-manager/client.js",
+      "sha256": "1395b2704d8ee0ecf2eeb832788b967e0677f556c1b7c5169c4e13d3d05b4737"
+    },
+    {
+      "path": "dsh/managed/mcp-manager/client.tsx",
+      "sha256": "8ca3d7557dc4e4eb159bd37624ec4c70c82f290d3c6322b73151d4597037026e"
+    },
+    {
+      "path": "dsh/managed/mcp-manager/index.mjs",
+      "sha256": "8bf9f5f940e0903d4513a9c93fd8358e049031b91bc56a62b3b91315a81a5125"
+    },
+    {
+      "path": "dsh/managed/mcp-manager/index.ts",
+      "sha256": "de644ff293bc15f5f23f935bb501321b5378afabac42247e7d25f0c07967367b"
+    },
+    {
+      "path": "dsh/managed/mcp-manager/openapi.mjs",
+      "sha256": "b386d226399ab52a5422da8710bccc0a32a3f668fbc67f93bad3bc8b5f39d2ad"
+    },
+    {
+      "path": "dsh/managed/mcp-manager/openapi.ts",
+      "sha256": "7f102e156e08cc5d3846e17cd36d9619a0b7cc98feafa5a4768838c4827b2df3"
+    },
+    {
+      "path": "dsh/managed/mcp-manager/package.json",
+      "sha256": "35f4ba118f7c0bb13ca62f382eda0cc16513158686305b2cbc8980bf77f6b738"
+    },
+    {
+      "path": "dsh/managed/mcp-tool-identity.mjs",
+      "sha256": "af03fc3f57b1422fd02c0ef147d1fc328a8c6ac0624de4130d78534e5035e5a8"
+    },
+    {
+      "path": "dsh/managed/native-operation-question.mjs",
+      "sha256": "6f1c40e87989b4877a57aecaca2e619d8ec1b87bdd7dc5dd79bb89e4cf9e4b79"
+    },
+    {
+      "path": "dsh/managed/operation-result-delivery.mjs",
+      "sha256": "0f9fd74c2c0517ff1de2ae709018e18c34345a53bf45be28b3a3db57e73308f0"
+    },
+    {
+      "path": "dsh/managed/policy-configuration-guard.mjs",
+      "sha256": "f1d3e32754edc4e9e1c2372a8ff11e33899c9693f3829192a1657faab86fa842"
+    },
+    {
+      "path": "dsh/managed/policy-confirmation-runtime.mjs",
+      "sha256": "7581755649e71a307f103bfbedb6a45b8c4f4a4b022d4cb5ee81eecdbdec293e"
+    },
+    {
+      "path": "dsh/managed/policy-department-guard.mjs",
+      "sha256": "1b68adc14789e6c74b4367788b35a97166173b61b93bafb48c2ddb4ad3dbf19b"
+    },
+    {
+      "path": "dsh/managed/policy-department-task-guard.mjs",
+      "sha256": "5124febc08cdff71e207b60f8d9b1f3055d56b04e3dbb2fce50e41ef1758bc40"
+    },
+    {
+      "path": "dsh/managed/policy-department-task-runtime.mjs",
+      "sha256": "4508419526da9f882c3f1e75d75c4c9858606f515bb6586cfe6c718755fb9fa5"
+    },
+    {
+      "path": "dsh/managed/policy-department-task-runtime.test.mjs",
+      "sha256": "a772c5d86455397f5fe651f28fcbbb94f996252cd8e5e67af1f72a812b1c1bac"
+    },
+    {
+      "path": "dsh/managed/policy-resource-identity.mjs",
+      "sha256": "860a49e52ddd6f0db675d4a50ca4b45be2676b20c3770619b0b27359de13b8a6"
+    },
+    {
+      "path": "dsh/managed/policy-selection-runtime.mjs",
+      "sha256": "43799c810027107f8379cd56002e65f01c4981efc008f2999124233536048cde"
+    },
+    {
+      "path": "dsh/managed/policy-selection-runtime.ts",
+      "sha256": "efa64de5c5645f52b9f53864f518186ba20e20ef3a484ea221cf6b64149f9c89"
+    },
+    {
+      "path": "dsh/managed/policy-tool-names.mjs",
+      "sha256": "386d6ab5b30b1a514de6b2b146bbfb03a865891e8f23105ac5619dcfa969eaf0"
+    },
+    {
+      "path": "dsh/managed/role-tool-matrix.yaml",
+      "sha256": "53c87f5154dca97affcd36ae5743ab397656df6524f14e44f005bee5576fc647"
+    },
+    {
+      "path": "dsh/managed/rule-review-request.mjs",
+      "sha256": "cc2b2079e7aff425ec06aafc5df74b892caecdf8649c7a0fb1f2b4b6e02f99fb"
+    },
+    {
+      "path": "dsh/managed/schemas/response-plan-input.schema.json",
+      "sha256": "d5835c248c2e624c39a50c44cd5fc9dd734700d23e8f2ef580c565cb1bd861ce"
+    },
+    {
+      "path": "dsh/managed/schemas/response-plan-output.schema.json",
+      "sha256": "c3d46e77f133bfee9ad8f6fd30b951f931013f4fee7e1381707d88d12e86c33d"
+    },
+    {
+      "path": "dsh/managed/security-operations-child-guard.mjs",
+      "sha256": "1bb1233945f0479407327b1497cb7745b7024d0b85024045e9f04ef5019573a4"
+    },
+    {
+      "path": "dsh/managed/security-operations-expert.development.patch.yml",
+      "sha256": "712f21d9ca27f818eb1a430529361975e295afb00851f2b258951c2cdeb75b72"
+    },
+    {
+      "path": "dsh/managed/security-operations-expert.patch.yml",
+      "sha256": "b5ffa02bfc4ef1267c7bee348027e2f726b8ac17a648e8f77d66fb9e1312adc8"
+    },
+    {
+      "path": "dsh/managed/security-operations-guard.mjs",
+      "sha256": "e7c6edade1baf072abfc70b0d533df72110156275bca29ce2c085a6d102d9131"
+    },
+    {
+      "path": "dsh/managed/security-operations-ui/assets.d.ts",
+      "sha256": "f86856eaaf8dfe002a19ae60815b36121bc7b0ec802dee637d3cb7ee58b5462d"
+    },
+    {
+      "path": "dsh/managed/security-operations-ui/assets/agent-avatar.png",
+      "sha256": "08174fb6cbd5eecc13abaa36b9d6b4771b47287483d4b56d5242674d0a691d0b"
+    },
+    {
+      "path": "dsh/managed/security-operations-ui/assets/live-chatbot.gif",
+      "sha256": "62c92e1cd212435d0c06dd1dffb5f7acbac835e3c502a6a6f24584f00e7afb70"
+    },
+    {
+      "path": "dsh/managed/security-operations-ui/assets/logo-v1.webp",
+      "sha256": "9bda9587c8b99fc488b93009d62c106625279ddef0d89fc2b4648f5c089627a7"
+    },
+    {
+      "path": "dsh/managed/security-operations-ui/client.js",
+      "sha256": "d3751dc8d6c24c343f06b64786a9c1cda32e14fc8f59db1527af3547cb99ae73"
+    },
+    {
+      "path": "dsh/managed/security-operations-ui/client.tsx",
+      "sha256": "db2ea08a1a565f0e0397853a58c8fef771d819ab79b82b8245ad69ca778b36fa"
+    },
+    {
+      "path": "dsh/managed/security-operations-ui/delegation.js",
+      "sha256": "c94030cb5dce33e410fcab8ab8c6406f2dfac758f1f2b19d2e2c9331d56759fe"
+    },
+    {
+      "path": "dsh/managed/security-operations-ui/delegation.ts",
+      "sha256": "997b5473fc27ff39786baacc61c44452d43b59d434289a0f85a350051c8d387c"
+    },
+    {
+      "path": "dsh/managed/security-operations-ui/index.js",
+      "sha256": "9ea4a8edb66b93502486f51c9cd600536abd0f8f24c3d343f2de7843654aa63d"
+    },
+    {
+      "path": "dsh/managed/security-operations-ui/package-lock.json",
+      "sha256": "da12c308ffb5808fcd5550b5ac846e7d606ec445a4422e8d597e364163ae3800"
+    },
+    {
+      "path": "dsh/managed/security-operations-ui/package.json",
+      "sha256": "b4b0c4a4d41cff8ac2117a59479be5396e0b9ef44a0f19b697fc6ac10542c2b6"
+    },
+    {
+      "path": "dsh/managed/security-operations-ui/test-overview.mjs",
+      "sha256": "2c7c2619f7cee1100d667153b944fd234142aa8e133039d1ace0345199ca6e83"
+    },
+    {
+      "path": "dsh/managed/security-operations-ui/test-ui.mjs",
+      "sha256": "5a425d0e1c0551e9bb0f7119b5074d0ca90c57e3b9c66ab4cfd9816a605f16c8"
+    },
+    {
+      "path": "dsh/managed/security-operations-ui/tsconfig.json",
+      "sha256": "ba7701def5ae3b5e48fd196b99f1b53d4d3f2a99529a4aab4f4b622c3ae1c9ae"
+    },
+    {
+      "path": "dsh/managed/threat-analysis.mjs",
+      "sha256": "eef5b62bd15b997974fd3e47c9747c14571efe393eb990a0792fee3c6f010f2a"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/build.mjs",
+      "sha256": "817d08ccfdde7f4468b7fa3f71ede7716a7e1e020179707c1dee77370393f1ef"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/catalog/.current-ai_soc_correlate-tools.local.json",
+      "sha256": "70bb3ddde32fd931ede5a7d5970400de754534305bad7559393e40c6f607cb4f"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/catalog/.current-ai_soc_detect-tools.local.json",
+      "sha256": "543cd68ab5e583c2421303729b84fc911b8ce1d50075537f449f95e28aab46be"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/catalog/.current-ai_soc_event-tools.local.json",
+      "sha256": "fea69791041ed82767b392c18a0928ee35e2486164d89a59375e319cf90b0652"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/catalog/.current-ai_soc_graph-tools.local.json",
+      "sha256": "9d9e3dcc77931aaf40653445a19140bd306448381e234ffd0b72380b899ae1e5"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/catalog/.current-ai_soc_ingest-tools.local.json",
+      "sha256": "4b3621e38e257daaecacdeddadeef36ffa275715e133955d65aa2021372465bc"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/catalog/.current-ai_soc_master-tools.local.json",
+      "sha256": "194e737dbd3e75df28192f732da1d5704604b96ae83e00738e11eab53c15480c"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/catalog/.current-resources.local.json",
+      "sha256": "5f28892988662d3d5d4cab1db23cace82b17d3c6ebfbbd9fb8833dd7d9dce9c8"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/domain_projection.py",
+      "sha256": "e8a8c278df9b483837f1bacd08ced25810a3f58a2a820dd1334ed318f324818b"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/dsh_runner.py",
+      "sha256": "bb48daf1cb1ef4334436814fba53fdab0d34c8ae1c550beeebf093ea6f8dd805"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/evidence_collection.py",
+      "sha256": "c57b921f3ff67981e9418f876b3a7f121c79413072e645099b5291a497d42bc6"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/fast_classification.py",
+      "sha256": "02fb220e67468d312723b7608d9ac41ff812cd9e2a3fca43fb1e2b72580aed8f"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/forced_output_contract.py",
+      "sha256": "63f75630c8cbbd6dc98bf6364bf1de5864cdc4fb6eff81b6bd5d47927bd1bdfc"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/fusion_contract.py",
+      "sha256": "8f7ec6ad564a60d3fe20b7d7ed1ec2bb1b3dab1c54ef63a7128c7b8c38c9e399"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/fusion_pipeline.py",
+      "sha256": "eaa006930bb8734cbdd850737411290522fc380a3162a24216b3ac59ca9e8843"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/incident_scope.py",
+      "sha256": "86add814e8b6b83f557424e0335ffce4de9e8c5c2af26d18a0569e0f65a2aa46"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/mcp-group-bridge.mjs",
+      "sha256": "b582d63688a8af9b40046189fb0f0680c8357e46a2ea6cfd00bb455cd4b02fcf"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/mcp-group-bridge.ts",
+      "sha256": "18d3c669422fa2fd6c897e6eaf1d403ba3e644ffe0a379e4fe1bbcbd665f8881"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/mcp_gateway.py",
+      "sha256": "65260fab722c65eba10d3b3f6738c802d54697326d5d52213e677ea271cd6ac1"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/model_inference.py",
+      "sha256": "c385e4f7166ae25e484352c89a68b1caa7649af0f971bb57f62398dede85434d"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/model_input_compaction.py",
+      "sha256": "0854d14a7ea6b6fe177e4c20420e07bdbb4417cdb659e2d95baef77c97558f19"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/package.json",
+      "sha256": "c1e692052d14b53c032bf97142b31641bc2b838f6a72736240dce2a1d9ee0bd4"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/prompts/threat-analysis-system.txt",
+      "sha256": "13371c8ada5e688cfe2de8d02fe058d3fdb97d35dcaa74b5f34d0ee8acf12e6b"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/report.css",
+      "sha256": "29e4f72e137d72091275d7fc7a5e9f03f3c096832421072652026d81b8d64bb8"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/result_delivery.py",
+      "sha256": "9c680a8b9010b15ae39233aa128f526338f0ada783489b18942c281b2388f830"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/result_storage.py",
+      "sha256": "d1188d158b3e998f83a0969b9d458ab7f06e874e2c0d696c1fdac1d7c8c7962b"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/rule-review-policy.json",
+      "sha256": "4bfc94de6966ad47e36d4997934c8862885674e1065c135e32961fc044755091"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/rule_candidates.py",
+      "sha256": "6c0aad964ee119b74a49f3736ec991ffde1b7caa8ddd3e2cf316379c4fc75437"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/rule_context.py",
+      "sha256": "a724e54bdb9568b553ff6a033d8c6aef2264afc5cfce92ab6e7f96ba242bf5f7"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/rule_evidence.py",
+      "sha256": "9fbbfc5598b2075b61edc7033cecdbe9405db6a6dfdd00892ca3779f6c972d80"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/rule_gate.py",
+      "sha256": "281043bab75b2e507abadce67a2d9969d07d2534592218f8bf9b9c9002341412"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/rule_optimization.py",
+      "sha256": "bbcf55daf0a45e01d1fa385ccfd7d1ddae3c753d514a2b33b8b95b7d7887a057"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/rule_report.py",
+      "sha256": "2adb49fdbff8a6e8be33a1771e72ad9b48a846d422928d6c598a2a832fc41bbc"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/rule_response.py",
+      "sha256": "13465a8b1c6d9a18ab9673e7fd6cc42aa43c4e85116b02609c3d77f4aaf3ac93"
+    },
+    {
+      "path": "dsh/managed/threat-analysis/rule_validation.py",
+      "sha256": "ea2cf57b1def5095d1ee756248e28a390ad42a8fc58a283adf2e5ed49bff9059"
+    },
+    {
+      "path": "dsh/managed/web-profile.package.json",
+      "sha256": "884be57eab2e30fda8f2c9a3383785e3e8943ebe741960962d278a2c2832815e"
+    },
+    {
+      "path": "dsh/managed/web-profile.seed.patch.yml",
+      "sha256": "ffa18580889dc1fb470f7145fbba20101bce33afc3df1f08c18ad2eaee3649ca"
+    },
+    {
+      "path": "dsh/presets/security-operations-expert/agent.cordis.yml",
+      "sha256": "f7b8e6772c5f1261b891f456b4f47bcb0ae4a5e3851f148aca0bcadf8d7c6e15"
+    },
+    {
+      "path": "dsh/presets/security-operations-expert/preset.yml",
+      "sha256": "e2edf722ed79cc54419a5ac4efcc13693856945347715562f8940c706faf8742"
+    },
+    {
+      "path": "dsh/presets/security-operations-fault-analysis/agent.cordis.yml",
+      "sha256": "ff0ccaad40e5b80273d61568cbae8791ff66ec36a37a5da8872d7643849e5d81"
+    },
+    {
+      "path": "dsh/presets/security-operations-response-planning/agent.cordis.yml",
+      "sha256": "18214d4048bcf2ef65cfb083446cee67846c082748ae15eea68350d94f6fc2a7"
+    },
+    {
+      "path": "dsh/presets/security-operations-threat-analysis/agent.cordis.yml",
+      "sha256": "64cb9b5ba085f9629ff755746b05dd497f87c1fd797b44801c6beaff80d2176e"
+    },
+    {
+      "path": "dsh/workspace/.agents/skills/emergency-action/SKILL.md",
+      "sha256": "3cab72b983e1b43336a8be66a4d6c8962709de9384527ee963caf50760b1d53c"
+    },
+    {
+      "path": "dsh/workspace/.agents/skills/fault-analysis/SKILL.md",
+      "sha256": "b9cc01c07629999fc167e5b7fa69c45d7b4e5762931d4c6c89042f2771e88631"
+    },
+    {
+      "path": "dsh/workspace/.agents/skills/playbook-impact-assessment/SKILL.md",
+      "sha256": "9293f326283bbf5b9f6c7a0105a73d218f906ebfdcad01f7834a6effbfb004cb"
+    },
+    {
+      "path": "dsh/workspace/.agents/skills/policy-configuration/SKILL.md",
+      "sha256": "40777fc688fff3f7a25f321062b0e4784a23e0d1bfaf96935ebe6719b3ed1d98"
+    },
+    {
+      "path": "dsh/workspace/.agents/skills/policy-configuration/references/department-policy.md",
+      "sha256": "18c3f3f43f159d51aec726dd5b1350423a336a45aa1226146e7fefcdf83c33f3"
+    },
+    {
+      "path": "dsh/workspace/.agents/skills/response-planning/SKILL.md",
+      "sha256": "76d84e82fd9c3edc85ec693a50b6881e54271eb89da77335ac11142998a056a4"
+    },
+    {
+      "path": "dsh/workspace/.agents/skills/security-inspection/SKILL.md",
+      "sha256": "f459d52f113f74c229210f1b3ec4b581c05355fbee7abe21c5d517989d8cfbd3"
+    },
+    {
+      "path": "dsh/workspace/.agents/skills/security-investigation/SKILL.md",
+      "sha256": "887a5b4e60d14d6d732618d41ce76324aef139226bc56896126f1097fbe5879c"
+    },
+    {
+      "path": "dsh/workspace/.agents/skills/threat-analysis/SKILL.md",
+      "sha256": "94904f9e254451630f9761033bc7ee0708b0e9f9a0b2f3ff1e7644a1b82d5e53"
+    },
+    {
+      "path": "dsh/workspace/.env",
+      "sha256": "e574f8d1faf66f9167c33055ae1e2f99c70b031811f64aaac5bae1be54a19489"
+    },
+    {
+      "path": "dsh/workspace/AGENTS.md",
+      "sha256": "1694572fdb12ffbc8cbfc9f8fafe488ac3f99a76598fdb9ffdf5dcff8a39f573"
+    },
+    {
+      "path": "harness.yaml",
+      "sha256": "3028b70c1e0f7f20220363c8d889112cef650c662a173dd47db971de6184370f"
+    },
+    {
+      "path": "tests/delegation-presentation.test.mjs",
+      "sha256": "dca6be28bf11d70caf7cb7eba0be5df6c330bad8a0c999c8287c5dc4c86699e3"
+    },
+    {
+      "path": "tests/disposition-tool-resolver.test.mjs",
+      "sha256": "7aed0d9289f2921c063dd03363de800446560e4c6a868a849f98a67e03ac5641"
+    },
+    {
+      "path": "tests/emergency-understanding.test.mjs",
+      "sha256": "ba224805b6de3251aeb54a97d1ef068212843a08ad0f43ebe1ee2616974aaad6"
+    },
+    {
+      "path": "tests/mcp-resources.test.mjs",
+      "sha256": "ff4e252619acbc1aabcbb169234258f763549684aab21dd4eba9cbef9565e91e"
+    },
+    {
+      "path": "tests/mcp-scope-guard.test.mjs",
+      "sha256": "f722e3f017195acd57725ae55056145ac3a0c98e993cf73dd7c5a3d2396e637d"
+    },
+    {
+      "path": "tests/policy-department-delivery.test.mjs",
+      "sha256": "5e4eb1c3b982ad704f80eaafc0170bf9c4a017dde0d3b868cb1ca90127e520db"
+    },
+    {
+      "path": "tests/policy-department-guard.test.mjs",
+      "sha256": "35d7cd0528f25e3d51f9c81bebe24dd94519b0d40346ebf969d23fda9d688db7"
+    },
+    {
+      "path": "tests/policy-department-integration.test.mjs",
+      "sha256": "d5a16f1e411edcccecf4931b2f249f426356ce0c989cbf84e5c312687c9b3be9"
+    },
+    {
+      "path": "tests/policy-department-task-delivery.test.mjs",
+      "sha256": "409ea840471ac1e4bcafcef4ee47b0663edbc3876f663e4eb5f390d8a5e5f041"
+    },
+    {
+      "path": "tests/policy-department-task-guard.test.mjs",
+      "sha256": "6aaf4afa697fddc2e5b6bdc55fbca5f7138868fcaecd7ced79a2275877f2fa53"
+    },
+    {
+      "path": "tests/policy-resource-identity.test.mjs",
+      "sha256": "f48e7588fea4ad9ce20caf6ba99f6226b549de9c2edf4495e15e9ecdc4bf1844"
+    },
+    {
+      "path": "tests/policy-runtime-contract.test.mjs",
+      "sha256": "dc18b018c59daca6ac45f9630b997bda35649c37977244e7c3f1de2b3f196e7b"
+    },
+    {
+      "path": "tests/policy-tool-resolver.test.mjs",
+      "sha256": "e234c6839955d93009c5f663bdb8c6fa07589339532116cff8891f20bbf90d94"
+    },
+    {
+      "path": "tests/security-operations-child-guard.test.mjs",
+      "sha256": "564aca9ef5a811da2a301e2a3cc463b2d3d3648267def57d9cc031bce412db69"
+    },
+    {
+      "path": "tests/security-operations-guard.test.mjs",
+      "sha256": "17b0c686ee06953f60c5ecd0367bad556ba2bf91fafe0f9b302151febbf77aad"
+    },
+    {
+      "path": "tests/test_threat_analysis_automation.py",
+      "sha256": "9714340052b5a2a8f6ca8d20201f7434822002befa07810e60ccb1949e906d62"
+    },
+    {
+      "path": "tests/threat-analysis-automation.test.mjs",
+      "sha256": "820807a72f5560efbf6f7ef39481b77ddbffbba812776a2ce3fcff6152e00746"
+    },
+    {
+      "path": "tests/threat-analysis-mcp-group-bridge.test.mjs",
+      "sha256": "80ab24e944f69258f672b8c4e5f4e59965ab4622dce207dbb2e6ce65fe5422b7"
+    }
+  ]
+}

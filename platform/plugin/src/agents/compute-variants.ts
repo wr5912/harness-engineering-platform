@@ -337,6 +337,20 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
       cases: Object.values(parsed.cases).map(item => ({ case_id: item.case_id, title: item.title })), runs: runs.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))),
       default_model: 'deepseek-flash', default_reasoning_effort: 'off' }
   }
+  async function planPreview(body: Map, signal?: AbortSignal) {
+    const id = text(body, 'experiment_id'), current = experiment(root, id), plan = current.change.compute_variant as ComputePlan
+    if (!plan?.case_hashes || !isVariantIdentity(id, current.change)) fail('所选版本没有算力变体计划')
+    if (current.change.end_confirmed || current.change.variant_kind === 'end') fail('已确认 end 的计划不能原位更新，请保留其研究结论')
+    const selected = ids(body.case_ids ?? Object.keys(plan.case_hashes), /^U-[A-Z0-9]+(?:-[A-Z0-9]+)*$/, 'case_ids').sort()
+    if (Object.keys(plan.case_hashes).some(id => !selected.includes(id))) fail('重新确认口径不能删除原计划 Case')
+    const parsed = await casesFor(root, current.change.agent_id, signal)
+    if (selected.some(id => !parsed.cases[id])) fail('所选 Case 不属于当前评测口径')
+    const caseHashes = Object.fromEntries(selected.map(id => [id, hash(canonical(parsed.cases[id]))]))
+    const value = { experiment_id: id, change_sha256: hash(current.content), case_hashes: caseHashes,
+      added_case_ids: selected.filter(id => !plan.case_hashes[id]),
+      changed_case_ids: selected.filter(id => plan.case_hashes[id] && plan.case_hashes[id] !== caseHashes[id]) }
+    return { ...value, preview_sha256: hash(canonical(value)) }
+  }
   async function preview(body: Map, signal?: AbortSignal) {
     const name = body.variant_name === undefined ? body.generation ? 'LangGraph 代码变体' : '算力变体' : variantName(body)
     const parentId = text(body, 'parent_experiment_id'), parent = experiment(root, parentId)
@@ -588,7 +602,7 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
     return { ...result, comparison_sha256: hash(canonical(result)) }
   }
   return async (method: string, body: Map, signal?: AbortSignal): Promise<Result> => {
-    const mutation = ['create', 'confirm', 'rename'].includes(method)
+    const mutation = ['create', 'confirm', 'rename', 'plan-apply'].includes(method)
     if (mutation && mutating) return { ok: false, error: { code: 'conflict', message: '算力变体写入正在进行，请稍后重试' } }
     if (mutation) mutating = true
     try {
@@ -599,6 +613,18 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
         return { ok: true, value: computeCodeSource(root, id, change.compute_variant?.generation, inspectComputeBuild(root, id).receipt, body) }
       }
       if (method === 'preview') return { ok: true, value: await preview(body, signal) }
+      if (method === 'plan-preview') return { ok: true, value: await planPreview(body, signal) }
+      if (method === 'plan-apply') {
+        const prepared = await planPreview(body, signal)
+        if (body.expected_change_sha256 !== prepared.change_sha256 || body.expected_preview_sha256 !== prepared.preview_sha256) throw new VariantError('conflict', '计划或 Case 已变化，请重新预览')
+        const current = experiment(root, prepared.experiment_id)
+        if (hash(current.content) !== prepared.change_sha256) throw new VariantError('conflict', '研究版本已被修改，请重新读取')
+        signal?.throwIfAborted()
+        if (!prepared.added_case_ids.length && !prepared.changed_case_ids.length) return { ok: true, value: { ...prepared, changed: false, plan: current.change.compute_variant } }
+        current.change.compute_variant = { ...current.change.compute_variant, created_at: new Date().toISOString(), case_hashes: prepared.case_hashes }
+        atomic(current.file, dumpYaml(current.change, { lineWidth: -1, noRefs: true }))
+        return { ok: true, value: { ...prepared, changed: true, change_sha256: hash(readFileSync(current.file)), plan: current.change.compute_variant, requires_new_runs: true } }
+      }
       if (method === 'rename') {
         const id = text(body, 'experiment_id'), name = variantName(body)
         const expected = text(body, 'expected_change_sha256')

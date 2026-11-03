@@ -38,6 +38,23 @@ test('公开模型身份、失败作业、零优化步、缺失日志和错误�
     assert.equal(result.verified, false); assert.match(result.reasons.join(), reason)
   })
 })
+test('原生 KEV 接受非空对象状态，保留原数据及跨分区输入核验', async t => {
+  const f = fixture(t)
+  for (const [split, row] of Object.entries(f.rows)) {
+    row.state = { '用户输入指令': `任务 ${split}`, '背景信息': [] }
+    f.receipt.datasets[split] = f.file(`${split}.jsonl`, JSON.stringify(row))
+  }
+  f.save()
+  assert.equal((await inspectDecisionTraining(f.root, f.plan)).verified, true)
+  f.rows.test.state = f.rows.train.state
+  f.receipt.datasets.test = f.file('test.jsonl', JSON.stringify(f.rows.test)); f.save()
+  assert.match((await inspectDecisionTraining(f.root, f.plan)).reasons.join(), /决策输入泄漏/)
+  for (const state of [null, '', '  ', {}, [], 1, false]) {
+    f.rows.test.state = state
+    f.receipt.datasets.test = f.file('test.jsonl', JSON.stringify(f.rows.test)); f.save()
+    assert.match((await inspectDecisionTraining(f.root, f.plan)).reasons.join(), /state\/questions/)
+  }
+})
 test('拒绝空分区、重复身份、来源组泄漏和不同身份下相同决策输入泄漏', async t => {
   for (const [name, change, reason] of [
     ['empty', f => { f.receipt.datasets.test = f.file('test.jsonl', '\n') }, /数据为空/],

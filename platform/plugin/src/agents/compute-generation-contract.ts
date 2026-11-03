@@ -11,6 +11,7 @@ export function computeGenerationContract() {
     generation: {
       mode: 'langgraph-aot',
       default_entry_path: 'dsh/managed/compute-workflow/index.ts',
+      code_directory: '新增算力实现以 entry_path 所在目录为归属目录；保持入口稳定，按实际职责建立必要子目录。继承的通用 Managed 插件保留原布局，目录整理方法由 compute-variant-research 维护。',
       fields: {
         entry_path: 'Candidate 内 dsh/managed/ 下的 .ts 文件；不能含空路径段、.、.. 或反斜线。',
         source_run_ids: '必填非空 Run ID 数组，引用所选固定父版的真实诊断轨迹；来源证据及摘要由 preview 核对。',
@@ -66,9 +67,12 @@ export function computeGenerationContract() {
     },
     operations: {
       preview_create: 'compute-variants/preview/create 使用同一 parent_experiment_id、git:<40位提交>、variant_name、strategy、case_ids 和 generation；全链零调用传 execution_mode:code-only，双模型传 execution_mode:hybrid 和 model_roles。create 携带实际 preview_sha256 为 expected_preview_sha256，不能猜摘要。',
-      edit: 'edit/read 后用 edit/preview、edit/apply 保存完整文件正文 edits[].content 及 expected_sha256；新文件须先取得 exists:false、sha256:null，保存传 expected_sha256:null。Preset 引用 Managed 源码对应的 /opt/dsh-managed/compute-workflow/*.mjs。',
+      replan: '共享 Case 修订后，已有探索性变体使用 plan-preview/plan-apply，case_ids 保留全部原 Case，可显式增加；apply 携带预览的 change_sha256 和 preview_sha256 作为 expected_change_sha256、expected_preview_sha256。只更新 Case 摘要和计划起始时间，父版、训练、模型、关键 Case 及全部比较阈值保持不变；重新冻结并执行新 Run，历史 Run 保持原样。',
+      edit: 'edit/read 后用 edit/preview、edit/apply 保存完整文件正文 edits[].content 及 expected_sha256；新文件须先取得 exists:false、sha256:null，保存传 expected_sha256:null。已有文件归拢使用 edits[].move_to 指向同一 Candidate 内已确认不存在的目标，同时提交完整正文及源摘要，并同批更新导入和配置引用；不留旧源码副本。Preset 引用受控构建实际 output_path 对应的 /opt/dsh-managed/ 路径。',
       build: '保存后读取当前 candidate_sha256，以 expected_candidate_sha256 调 build-preview；build 保留该摘要和实际预览的 expected_preview_sha256。只做类型检查和固定 ESM 编译，不执行 Candidate，不证明装载。源码、runner、依赖或 ESM 变化后旧构建失效。',
       freeze: 'freeze-preview 返回 Candidate、研究计划、本版本 evaluation 研究资料和选定 Case 的真实差异与 freeze_input={experiment_id,case_ids,evaluation_base_sha256,expected_preview_sha256}；freeze 完整传回 freeze_input。训练监督数据与评估报告保存在本版本 evaluation，不能放入 Runtime 挂载的 Candidate。仅本地冻结约定文件，不推送；两侧 Run 的提交须含同一计划。',
+      prepare: 'compute-variants/prepare {experiment_id,entry_path?} 连续核对或构建当前代码、预览并本地冻结，返回 source_ref 和逐阶段复用回执。失败后保留已完成步骤，使用同一目标重试；只有摘要仍匹配的构建与冻结可以复用，不执行 Candidate 或业务评测。',
+      evaluation: 'eval/batch-start {requests:[eval/start参数]} 先整批预检再启动最多8个独立Run；每项必须固定 git:<40位提交> 和不同的 UUIDv4 request_id。中断后原样重发整批参数，只查询或复用已受理任务，不重跑。单Run用 concurrency:1..8 和 parallel_cases 指定可独立执行的Case；未指定的Case独占执行，语义不确定或共享写资源不得并发。',
       evidence: '分别核对 context.workflow_status 的 generated/built/frozen/loaded/compared。新 Session 的真实图回执须与当前源码、build_digest、esm_sha256 及固定组合身份一致，且 complete=true、status=completed；构建通过或原子回退不等于装载成功。',
       delivery: '通过 compute-variants/compare 核对实际构建、冻结、装载与所选两侧 Run。human_confirmed 只能由用户在变体页面复核，不能由助手提交或改结论字段。',
     },

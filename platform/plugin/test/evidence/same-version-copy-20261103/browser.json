@@ -1,0 +1,53 @@
+{
+  "verified_at": "2026-11-03T06:38:27.071Z",
+  "platform_pid": 3707822,
+  "process_retained": true,
+  "application": "already applied",
+  "warnings": [],
+  "checks": [
+    {
+      "width": 1440,
+      "initial": "EXP-security-operations-expert-027-reab20c48f610",
+      "selected": "EXP-security-operations-expert-027-r0318e00a959b",
+      "metrics": {
+        "width": 240,
+        "scroll": 131,
+        "client": 131,
+        "bodyOverflow": false
+      },
+      "search_suffix": true,
+      "switch_and_refresh": true
+    },
+    {
+      "width": 768,
+      "initial": "EXP-security-operations-expert-027-reab20c48f610",
+      "selected": "EXP-security-operations-expert-027-r0318e00a959b",
+      "metrics": {
+        "width": 240,
+        "scroll": 131,
+        "client": 131,
+        "bodyOverflow": false
+      },
+      "search_suffix": true,
+      "switch_and_refresh": true
+    },
+    {
+      "width": 390,
+      "initial": "EXP-security-operations-expert-027-reab20c48f610",
+      "selected": "EXP-security-operations-expert-027-r0318e00a959b",
+      "metrics": {
+        "width": 240,
+        "scroll": 131,
+        "client": 131,
+        "bodyOverflow": false
+      },
+      "search_suffix": true,
+      "switch_and_refresh": true
+    }
+  ],
+  "page_errors": [],
+  "sources": {
+    "platform/plugin/src/agents/index.ts": "887a253672778c7439dab7cfc71e4446d8a49b22d3056db84cf477c6f8c2e7e5",
+    "platform/plugin/src/assistant/tool-contracts.ts": "1bdca387d7ff547dd43fb59092f74af78ffc1f29a0d91ed18f9dd6fe982b2647"
+  }
+}

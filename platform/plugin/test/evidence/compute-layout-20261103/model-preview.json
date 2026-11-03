@@ -1,0 +1,36 @@
+{
+  "at": "2026-11-03T08:14:13.529Z",
+  "experiment_id": "VAR-security-operations-expert-003-r6fcbc8e8f093",
+  "request": {
+    "source": "experiment:VAR-security-operations-expert-003-r6fcbc8e8f093",
+    "cases": [
+      "U-INS-001"
+    ],
+    "mode": "fast",
+    "executor": "api",
+    "review": "none",
+    "model_selection": {
+      "provider": "harness-workflow",
+      "model": "hybrid-v1",
+      "reasoningEffort": "off"
+    }
+  },
+  "ok": true,
+  "result": {
+    "schema_version": "1.0",
+    "preflight_scope": "source-cases-and-model-policy",
+    "source_id": "experiment:VAR-security-operations-expert-003-r6fcbc8e8f093",
+    "experiment_id": "VAR-security-operations-expert-003-r6fcbc8e8f093",
+    "executor": "api",
+    "requested_mode": "fast",
+    "selection_mode": "explicit",
+    "review_mode": "none",
+    "case_ids": [
+      "U-INS-001"
+    ],
+    "runtime_required": true,
+    "image": "ai-agent-harness/dsh:b830ec950-amd64-2ed0d15ad02e",
+    "image_build_fingerprint": "sha256:2ed0d15ad02e05605d5ffb34986f149efb399d1a9331d21eceae9735b4ebfaca",
+    "missing_env_names": []
+  }
+}

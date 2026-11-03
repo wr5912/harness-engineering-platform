@@ -1,0 +1,17 @@
+{
+  "at": "2026-11-03T08:45:18.379Z",
+  "operation": "pluginManager/setBundleEnabled",
+  "plugin": "@ai-agent-harness/harness-platform",
+  "enabled": true,
+  "response": {
+    "stage": "enable",
+    "target": "@ai-agent-harness/harness-platform",
+    "enabled": true,
+    "changed": false,
+    "application": "applied",
+    "warnings": []
+  },
+  "platform_pid_before": 3707822,
+  "platform_pid_after": 3707822,
+  "active_jobs_preserved": true
+}

@@ -66,7 +66,7 @@ def evaluation_implementation() -> dict:
     """冻结实际执行及评审资产身份；缺失文件保留 null，不用当前版本回填旧 Run。"""
     names = ["dsh-eval", "dsh-dev", "source_contract.py", "version-source.mts", "evaluation-source.mts", "dsh-eval-api.mjs", "dsh-eval-browser.mjs", "dsh-eval-common.mjs", "harness-runtime.mts",
              "run_record.py", "scenario_analysis.py", "business.ts", "evaluation-registry.patch.yml", "evaluation-wait.mts", "evaluation-judge-guard.mjs",
-             "scenario-analysis-guard.mjs"]
+             "scenario-analysis-guard.mjs", "evaluation-case-scheduler.mts"]
     names += [path.relative_to(ADAPTER).as_posix()
               for path in sorted((ADAPTER / "evaluation-presets").rglob("*")) if path.is_file()]
     result = {name: hashlib.sha256((ADAPTER / name).read_bytes()).hexdigest()
@@ -82,7 +82,7 @@ def evaluation_implementation() -> dict:
 
 
 def freeze_review_contract(repo: Path, agent_id: str, run_dir: Path, policy_path: str | None) -> dict:
-    """用已有显式模型策略冻结独立评审配置，不从被测模型调用推选。"""
+    """冻结业务统一默认模型供独立评审使用，不继承被测 Harness 的模型绑定。"""
     spec = importlib.util.spec_from_loader("run_review_dsh_dev", SourceFileLoader(
         "run_review_dsh_dev", str(ADAPTER / "dsh-dev")))
     dev = importlib.util.module_from_spec(spec)
@@ -91,10 +91,20 @@ def freeze_review_contract(repo: Path, agent_id: str, run_dir: Path, policy_path
     try:
         original = source.read_bytes() if source.exists() else b""
         policy = dev.read_model_policy(policy_path, agent_id, repo=repo)
+        business = dev.read_business_model_policy(repo)
+        route = business["default"]
+        if business["migration_required"] or route is None:
+            raise ValueError("评测模型策略没有明确可用的默认评审模型")
+        if not any(item["provider"] == route["provider"] and item["model"] == route["model"]
+                   for item in policy["allowed"]):
+            raise ValueError("业务默认评审模型不在当前可用模型范围中")
         if (source.read_bytes() if source.exists() else b"") != original:
             raise ValueError("评测模型策略在创建 Run 时变化")
         fields = ("agent_id", "manifest_sha256", "business_model_revision", "allowed", "default", "patch", "credential_refs")
         projected = {key: policy[key] for key in fields if key in policy}
+        projected["default"] = route
+        projected["patch"] = [{**entry, "config": route} if entry["id"] == "agent-default-model" else entry
+                              for entry in policy["patch"]]
         content = (json.dumps(projected, ensure_ascii=False, indent=2) + "\n").encode()
         relative = "evidence/analysis/model-policy.json"
         target = run_dir / relative
@@ -983,6 +993,8 @@ def command_init(repo: Path, args: argparse.Namespace) -> None:
         }
         if inputs["review_mode"] == "ai":
             inputs["review_contract"] = freeze_review_contract(repo, agent_id, run_dir, getattr(args, "model_policy", None))
+        elif args.executor == "api":
+            inputs["judge_contract"] = freeze_review_contract(repo, agent_id, run_dir, getattr(args, "model_policy", None))
         if getattr(args, "evaluation_source", None):
             inputs["evaluation_source"] = args.evaluation_source
         # 运行记录保存声明原字节，供复核与计量共用；摘要只引用已锁 Harness 条目。
@@ -1037,6 +1049,14 @@ def command_init(repo: Path, args: argparse.Namespace) -> None:
             inputs["model"] = args.model
         if args.executor:
             inputs["executor"] = args.executor
+        concurrency = getattr(args, "case_concurrency", 1)
+        parallel_cases = getattr(args, "parallel_case", [])
+        if not 1 <= concurrency <= 8 or len(set(parallel_cases)) != len(parallel_cases) or any(case_id not in [item["case_id"] for item in cases] for case_id in parallel_cases):
+            raise ValueError("Case 调度参数无效")
+        if concurrency != 1 or parallel_cases:
+            if args.executor != "api":
+                raise ValueError("Case 并发仅支持 API 执行器")
+            inputs["case_schedule"] = {"concurrency": concurrency, "parallel_cases": parallel_cases}
         if comparison_ref:
             inputs["compare_to_run_id"] = comparison_ref
         with (run_dir / "inputs.lock.json").open("w", encoding="utf-8") as handle:
@@ -1252,6 +1272,8 @@ def main() -> None:
     init_parser.add_argument("--baseline-ref", help="默认读取 Experiment change.yaml")
     init_parser.add_argument("--model", help="可选的预期模型标识，不改变 Runtime 设置")
     init_parser.add_argument("--model-policy", help="本次明确评测模型策略；省略时读取已配置业务默认模型，AI 复核时冻结独立评审配置")
+    init_parser.add_argument("--case-concurrency", type=int, default=1)
+    init_parser.add_argument("--parallel-case", action="append", default=[])
     init_parser.add_argument("--executor", help="可选的执行通道标识")
     init_parser.add_argument("--compare-to", help="已封存的同 Agent Run ID，封存时在报告中加入对照")
     init_parser.add_argument("--selection-mode", choices=("fast", "full", "explicit"), default="explicit")

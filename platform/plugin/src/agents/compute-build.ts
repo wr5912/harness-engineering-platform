@@ -47,7 +47,7 @@ export function inspectComputeBuild(assetRoot: string, experimentId: string) {
 export function createComputeBuildHandler(assetRoot: string) {
   const root = resolve(assetRoot)
   let busy = false
-  async function prepare(body: Body, signal?: AbortSignal) {
+  async function compile(body: Body, signal?: AbortSignal) {
     signal?.throwIfAborted()
     const source = sourceInfo(root, body.experiment_id)
     const before = candidateDigest(source.candidate)
@@ -78,6 +78,18 @@ export function createComputeBuildHandler(assetRoot: string) {
       notes: ['仅执行 TypeScript 检查和固定编译；尚未执行 Candidate、启动 DSH 或证明业务效果。'] }
     return { source, before, changeFile, changeText, change, output, artifact: built.artifact, receipt,
       value: { ...value, preview_sha256: hash(JSON.stringify(value)) } }
+  }
+  let cached: { key: string; prepared: Awaited<ReturnType<typeof compile>> } | undefined
+  async function prepare(body: Body, signal?: AbortSignal) {
+    signal?.throwIfAborted()
+    const source = sourceInfo(root, body.experiment_id), before = candidateDigest(source.candidate)
+    if (body.expected_candidate_sha256 && body.expected_candidate_sha256 !== before) throw new BuildError('conflict', 'Candidate 已变化，请重新预览构建')
+    const key = hash(JSON.stringify({ id: source.id, entry: body.entry_path ?? ENTRY, candidate: before,
+      change: hash(readFileSync(dataPath(root, `evolution/experiments/${source.id}/change.yaml`))), ...runtimeDigests() }))
+    if (cached?.key === key) return cached.prepared
+    const prepared = await compile(body, signal)
+    cached = { key, prepared }
+    return prepared
   }
   return async (method: string, body: Body, signal?: AbortSignal): Promise<Result> => {
     if (!['preview', 'build'].includes(method)) return { ok: false, error: { code: 'method_not_found', message: '未知工作流构建操作' } }

@@ -8,7 +8,8 @@ export const businessCaseSchema = z.object({
   id: z.string().regex(/^U-[A-Z0-9-]+$/, '业务用例 ID 必须以 U- 开头，只能包含大写字母、数字和连字符，例如 U-CHAT-GREET').refine(id => !automaticCaseIds.some(value => value === id), 'U-IDENTITY-001 和 U-ROLE-001 由平台自动创建；业务用例不能重新定义'),
   title: z.string().trim().min(1).max(240).refine(value => !/\r|\n/.test(value), '业务用例标题必须为单行'),
   inputs: z.union([caseText, z.array(caseText).min(1).max(20)]),
-  expected_behavior: caseText.refine(value => !/^#{1,6}\s/m.test(value), '业务用例预期正文不能包含额外 Markdown 标题'),
+  expected_behavior: caseText.refine(value => !/^#{1,6}\s/m.test(value), '业务用例预期正文不能包含额外 Markdown 标题')
+    .describe('描述版本与变体共用的业务处理过程和可观察结果模式；工具使用已核验 API 名称、operationId 或中文能力名，不绑定 MCP 运行时 ID、KEV 等实现路线或特定环境。'),
   fast: z.boolean().default(false),
 }).strict()
 /** 新建智能体与工具参数共用可执行业务用例合同。 */

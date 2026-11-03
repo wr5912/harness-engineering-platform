@@ -1,0 +1,82 @@
+[
+  {
+    "experiment_id": "VAR-security-operations-expert-003-r6fcbc8e8f093",
+    "schema_version": 1,
+    "entry_path": "dsh/managed/compute-workflow/business/inspection-preparation-runtime.ts",
+    "output_path": "dsh/managed/compute-workflow/business/inspection-preparation-runtime.mjs",
+    "source_sha256": "4d7ce8cb645030c8011dfa190eb004bac839b5346ff1892fb14c98688f65b4ec",
+    "source_files": [
+      {
+        "path": "dsh/managed/compute-workflow/business/inspection-preparation-runtime.ts",
+        "sha256": "f9a5307cca7ade807ef97e2a093c1e5d6a4546865112e73aec59ab6ff9d40168"
+      }
+    ],
+    "runner_sha256": "6ebaa65eaf36a6ecd45e55dd4bc3ea3b5cafef562655b93e1706ac7192250517",
+    "deps_sha256": "61aa7c1b2fe86d51b10607fe37c29d191e9ed00d925f19361a1d72d1bb2e80cd",
+    "compiler": {
+      "typescript": "5.9.3",
+      "esbuild": "0.25.12"
+    },
+    "build_digest": "60f8fb0465649daa8923e16b108e98056b730b3f76d43efadb26243cecedfa7c",
+    "esm_sha256": "16903babe7cdca98af98fee96a0d9a1fa1af149ff9faf5c9a749a271e7b7cae8",
+    "candidate_sha256": "5888323f2babaf7d81ec387da2048eae0e2dbbcec32c2c1d557bc282354424d4"
+  },
+  {
+    "experiment_id": "VAR-security-operations-expert-003-r6fcbc8e8f093",
+    "schema_version": 1,
+    "entry_path": "dsh/managed/compute-workflow/index.ts",
+    "output_path": "dsh/managed/compute-workflow/index.mjs",
+    "source_sha256": "6b31d750b295b112e5672ec5976c5496ecab8599faa3b5b293462689137c6ef5",
+    "source_files": [
+      {
+        "path": "dsh/managed/compute-workflow/business/business-continuation.ts",
+        "sha256": "dd72663513d80f90f00df7056bb5dc23dddd93392c0590d98cbe089c1b83a1e6"
+      },
+      {
+        "path": "dsh/managed/compute-workflow/business/business-contract.ts",
+        "sha256": "6c24e53a6ebb44989b0d3d8bb2442224e379b762777317102561030c67a06615"
+      },
+      {
+        "path": "dsh/managed/compute-workflow/index.ts",
+        "sha256": "0b8fd18f280381c969d337605f086a2cd79f5af556b9433ba000115b828a40c4"
+      },
+      {
+        "path": "dsh/managed/compute-workflow/kev-hybrid-draft.ts",
+        "sha256": "b2ea0d2220ceee9d2df115c84d11f52d12be712a9de432817d3a0d19827f4d48"
+      },
+      {
+        "path": "dsh/managed/compute-workflow/models/kev-typesafe-transport.ts",
+        "sha256": "c0bc462596128d9297378dc185b2ecb8db264e0656a5e31ccb680919e549091c"
+      },
+      {
+        "path": "dsh/managed/compute-workflow/models/qwen-language-adapter.ts",
+        "sha256": "6d40c86a4f82da896c2e907b72adc436a7cf4372a16e3a60929913a5deee10d9"
+      },
+      {
+        "path": "dsh/managed/compute-workflow/routing/business-context-projection.ts",
+        "sha256": "d285b174879066560e0444f029be3fd630f4e5f9320679e8d486083f72e6465a"
+      },
+      {
+        "path": "dsh/managed/compute-workflow/routing/inspection-triage.ts",
+        "sha256": "4cec9da5287df947db958c127e09bd9050bdb9cda2b0c0dad0504cdadde08495"
+      },
+      {
+        "path": "dsh/managed/compute-workflow/routing/routing-projection-v2.ts",
+        "sha256": "b32c06a1e567ad620243f0d82e106eb3c0175e51e601c8f245d1d713df38d4ac"
+      },
+      {
+        "path": "dsh/managed/compute-workflow/routing/routing-projection.ts",
+        "sha256": "1a57e4b9c2d51ecb30a9c6ee65bee52ab36ffa1ffb489d3b076689eb465f4ad4"
+      }
+    ],
+    "runner_sha256": "6ebaa65eaf36a6ecd45e55dd4bc3ea3b5cafef562655b93e1706ac7192250517",
+    "deps_sha256": "61aa7c1b2fe86d51b10607fe37c29d191e9ed00d925f19361a1d72d1bb2e80cd",
+    "compiler": {
+      "typescript": "5.9.3",
+      "esbuild": "0.25.12"
+    },
+    "build_digest": "be6ab63ea74208b2ed50cb0dbd6af31cf8c2abd0856c2c7fabbe4341d065f13d",
+    "esm_sha256": "d77c3252aebd2a5e75c4f2a6e5f0cab7bee3ed383bcd57c00e4c588e84c8bc6b",
+    "candidate_sha256": "6d4aab2896784d78489b1b380c65ef34676723868e6b748cded610edc620e65b"
+  }
+]

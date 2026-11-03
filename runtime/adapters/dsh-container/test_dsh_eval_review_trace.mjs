@@ -36,10 +36,13 @@ function toolPair(callId, name, sessionId, options = {}) {
 function archive(session, options, snapshot) {
   const events = session.prompts.flatMap((prompt, index) => [
     { type: 'user/message', data: { id: `user-${index}`, source: { kind: 'user' }, content: [{ type: 'text', text: prompt }] } },
-    { type: 'request/header', data: { header: { config: options.routeMismatch ? { ...(session.route ?? route), model: 'unexpected-model' } : session.route ?? route, tools: ['glob', 'grep', 'read'].map(name => ({ name })) } } },
-    ...toolPair(`${session.id}-read-${index}`, options.invalidTools ? 'shell' : 'read', session.id, options),
+    { type: 'request/header', data: { header: { config: options.routeMismatch ? { ...(session.route ?? route), model: 'unexpected-model' } : session.route ?? route, tools: (options.judge ? [] : ['glob', 'grep', 'read']).map(name => ({ name })) } } },
+    ...(options.judge ? [] : toolPair(`${session.id}-read-${index}`, options.invalidTools ? 'shell' : 'read', session.id, options)),
     ...(options.nativeTools ? toolPair(`${session.id}-grep-${index}`, 'grep', session.id, options) : []),
-    { type: 'assistant/message', data: { message: { content: [{ type: 'text', text: `归因结果 ${index + 1}` }] } } },
+    { type: 'assistant/message', data: { message: { content: [{ type: 'text', text: options.judge
+      ? JSON.stringify({ verdict: 'passed', reason: '已核对目标证据。', requirements: JSON.parse(prompt).requirements.map(requirement => ({
+        requirement, status: 'satisfied', evidence: [{ index: 0 }],
+      })) }) : `归因结果 ${index + 1}` }] } } },
     ...(!options.incomplete && !(options.incompleteLast && index === session.prompts.length - 1) ? [{ type: 'turn/end', data: { reason: { kind: 'completed' }, turn: index + 1 } }] : []),
   ])
   const delegatedComplete = options.delegated && session.treeSettled === session.prompts.length
@@ -53,7 +56,7 @@ function archive(session, options, snapshot) {
   if (options.crossTurn) events.push({ type: 'user/message', data: { id: 'unexpected-user', source: { kind: 'user' }, content: [{ type: 'text', text: '不属于本次请求的额外用户输入' }] } })
   const descendants = [
     { type: 'fixture/snapshot', data: { snapshot } },
-    ...toolPair(`${session.id}-child-glob`, 'glob', session.id, options),
+    ...(options.judge ? [] : toolPair(`${session.id}-child-glob`, 'glob', session.id, options)),
   ]
   if (delegatedComplete) descendants.push({ type: 'request/usage', data: { usage: { inputTokens: 37, outputTokens: 11 } } },
     { type: 'turn/end', data: { reason: { kind: 'completed' }, turn: 1 } })
@@ -65,7 +68,7 @@ function archive(session, options, snapshot) {
 async function fixture(t, scenario = () => ({}), selectedRoute = route) {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-review-trace-'))
   // 原始两份运行模块保持逐字节一致，依赖通过临时 node_modules 链接解析。
-  for (const name of ['dsh-eval-api.mjs', 'dsh-eval-common.mjs', 'evaluation-wait.mts']) await copyFile(join(adapter, name), join(directory, name))
+  for (const name of ['dsh-eval-api.mjs', 'dsh-eval-common.mjs', 'evaluation-wait.mts', 'evaluation-case-scheduler.mts']) await copyFile(join(adapter, name), join(directory, name))
   await symlink(join(plugin, 'node_modules'), join(directory, 'node_modules'), 'dir')
   const sessions = new Map(), requests = [], exportCounts = new Map(), treeWaits = []
   const server = createServer(async (request, response) => {
@@ -82,7 +85,7 @@ async function fixture(t, scenario = () => ({}), selectedRoute = route) {
         treeWaits.push(sessionId)
         const options = scenario(session.prompts.at(-1), session)
         if (options.incomplete || options.incompleteLast) return
-        if (options.delegated) await new Promise(resolve => setTimeout(resolve, 650))
+        if (options.delegated || options.delayMs) await new Promise(resolve => setTimeout(resolve, options.delayMs ?? 650))
         session.treeSettled = session.prompts.length
         response.writeHead(200, { 'content-type': 'application/json' })
         response.end(JSON.stringify({ session_id: sessionId, settled: true }))
@@ -159,7 +162,7 @@ async function fixture(t, scenario = () => ({}), selectedRoute = route) {
     await rm(directory, { recursive: true, force: true })
   })
   const evidenceRoot = join(directory, 'evidence')
-  async function run(scenes, timeoutMs = 2000, operation = 'review') {
+  async function run(scenes, timeoutMs = 2000, operation = 'review', schedule = {}) {
     const child = spawn(process.execPath, [join(directory, 'dsh-eval-api.mjs')], { stdio: ['pipe', 'pipe', 'pipe'] })
     const stdout = [], stderr = []
     child.stdout.on('data', chunk => stdout.push(chunk))
@@ -170,7 +173,7 @@ async function fixture(t, scenario = () => ({}), selectedRoute = route) {
       child.on('close', (code, signal) => code === 0 ? resolve() : reject(new Error(`实际评测驱动失败: ${code ?? signal} ${Buffer.concat(stderr).toString('utf8')}`)))
     })
     child.stdin.end(JSON.stringify({ operation, auth_url: `http://127.0.0.1:${server.address().port}/assistant/`, workspace,
-      preset_id: 'target', judge_preset_id: 'reviewer', evidence_root: evidenceRoot, timeout_ms: timeoutMs, cases: operation === 'review' ? [] : scenes, scenes: operation === 'review' ? scenes : [], model_route: selectedRoute }))
+      preset_id: 'target', judge_preset_id: 'reviewer', evidence_root: evidenceRoot, timeout_ms: timeoutMs, cases: operation === 'review' ? [] : scenes, scenes: operation === 'review' ? scenes : [], model_route: selectedRoute, judge_model_route: selectedRoute, ...schedule }))
     try { await completion } finally { clearTimeout(timer) }
     return JSON.parse(Buffer.concat(stdout).toString('utf8'))
   }
@@ -184,8 +187,24 @@ async function fixture(t, scenario = () => ({}), selectedRoute = route) {
     const trace = (await readFile(join(base, 'judge-trace.jsonl'), 'utf8')).split('\n').filter(Boolean).map(line => JSON.parse(line))
     return { trace, ...JSON.parse(await readFile(join(base, 'judge.json'), 'utf8')) }
   }
-  return { run, runTarget: (cases, timeoutMs) => run(cases, timeoutMs, 'evaluate'), evidence, judgeEvidence, sessions, requests, exportCounts, treeWaits, evidenceRoot }
+  return { run, runTarget: (cases, timeoutMs, schedule) => run(cases, timeoutMs, 'evaluate', schedule), evidence, judgeEvidence, sessions, requests, exportCounts, treeWaits, evidenceRoot }
 }
+
+test('真实HTTP驱动并发Case分别保存Session及评审证据，结果保持输入顺序', async t => {
+  const runtime = await fixture(t, (prompt, session) => ({ judge: session.preset === 'reviewer', delayMs: session.preset === 'target' ? prompt === 'slow' ? 300 : 20 : 0 }))
+  const cases = ['slow', 'fast', 'exclusive'].map((input, index) => ({ case_id: `U-PAR-00${index + 1}`, inputs: [input], expected_behavior: '展示真实执行证据。' }))
+  const response = await runtime.runTarget(cases, 3000, { concurrency: 2, parallel_cases: cases.slice(0, 2).map(item => item.case_id) })
+  assert.deepEqual(response.rows.map(row => row.case_id), cases.map(item => item.case_id))
+  const prompts = runtime.requests.filter(item => item.method === 'session/prompt').map(item => item.args.request)
+  assert.deepEqual(prompts.slice(0, 2).map(item => item.content[0].text).sort(), ['fast', 'slow'])
+  assert.equal(new Set(prompts.map(item => item.sessionId)).size, 6)
+  assert.equal(prompts.findIndex(item => item.content[0].text === 'exclusive'), 4, '独占用例须等待两例及其评审结束')
+  for (const item of cases) {
+    assert.equal(response.rows.find(row => row.case_id === item.case_id).verdict, 'passed')
+    assert.ok((await runtime.evidence(item.case_id, null)).checks.trace_available)
+    assert.ok((await runtime.judgeEvidence(item.case_id)).trace.length)
+  }
+})
 
 test('真实 session/create 失败保留原生错误码与插件定位，不把配置正文写入证据', async t => {
   const reason = 'security-operations-guard (/opt/dsh-managed/security-operations-guard.mjs): never started'
@@ -422,6 +441,23 @@ test('业务 Case 次轮一直无法导出时仍保留首轮成功取得的归�
   assert.deepEqual(saved.trace.filter(row => row.event.type === 'user/message').map(row => row.event.data.content[0].text), [firstPrompt])
   assert.equal(saved.trace.filter(row => row.event.type === 'turn/end').length, 1)
   assert.equal(saved.tools.length, 4)
+})
+
+test('业务Judge显式选择冻结普通模型，目标会话保留自身绑定，实际错路由不得判通过', async t => {
+  for (const mismatch of [false, true]) {
+    const runtime = await fixture(t, (_prompt, session) => ({ judge: session.preset === 'reviewer',
+      routeMismatch: mismatch && session.preset === 'reviewer' }))
+    const response = await runtime.runTarget([{ case_id: 'U-JUDGE-001', inputs: [firstPrompt], expected_behavior: '完成目标任务。' }])
+    const selection = runtime.requests.filter(row => row.method === 'session/selectModel')
+    assert.equal(selection.length, 1)
+    assert.equal(selection[0].args.request.sessionId, 'review-2')
+    assert.ok(runtime.requests.indexOf(selection[0]) < runtime.requests.findIndex(row => row.method === 'session/prompt' && row.args.request.sessionId === 'review-2'))
+    const judge = await runtime.judgeEvidence('U-JUDGE-001')
+    assert.equal(response.rows[0].verdict, mismatch ? 'inconclusive' : 'passed', JSON.stringify(judge.checks))
+    if (mismatch) assert.equal(judge.checks.unavailable_reason, 'judge-route-mismatch')
+    else assert.deepEqual(judge.checks.route, route)
+    assert.ok(judge.trace.some(row => row.event.type === 'request/header'))
+  }
 })
 
 test('业务语义评审超时独立保存 judge 的部分轨迹，不覆盖目标 Session', async t => {

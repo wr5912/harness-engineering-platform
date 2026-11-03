@@ -5,8 +5,9 @@ import { load as loadYaml } from 'js-yaml'
 import type { ModelCatalog } from '@deepseek-ai/dsh-api-session-controller'
 import { readBusinessDefault } from './business-default.ts'
 import { businessCatalogRoutes } from './catalog.ts'
-import { resolveHarnessRuntime, type HarnessRuntime } from './harness-runtime.ts'
+import { assertCandidatePath, resolveHarnessRuntime, type HarnessRuntime } from './harness-runtime.ts'
 import { resolvePreparedAssetDependencies, type PreparedAssetDependencies } from '../agents/asset-dependencies.ts'
+import { parseLocalCapabilities } from '../business-control/local-capabilities.ts'
 export { resolveHarnessRuntime } from './harness-runtime.ts'
 
 type Route = { provider: string; model: string }
@@ -162,6 +163,14 @@ function checkedManifest(assetRoot: string, agentId: string) {
 export async function projectModelPolicy(assetRoot: string, agentId: string, services: Services, requestedSelection?: Selection | null, candidatePath?: string): Promise<{ policy: ModelPolicy; environment: Record<string, string> }> {
   const { sha256 } = checkedManifest(assetRoot, agentId)
   const runtime = resolveHarnessRuntime(assetRoot, agentId, candidatePath)
+  const matrix = 'dsh/managed/role-tool-matrix.yaml'
+  let localRoutes: Route[] = []
+  if (candidatePath && existsSync(join(candidatePath, matrix))) {
+    const file = assertCandidatePath(candidatePath, matrix)
+    if (lstatSync(file).size > 64 * 1024) throw new Error('业务本地能力声明必须是受控普通文件')
+    // 本地路由由 Candidate 插件注册，仍由实际请求轨迹证明调用与用量。
+    localRoutes = parseLocalCapabilities(readFileSync(file, 'utf8')).localModelRoutes
+  }
   let dependencies: PreparedAssetDependencies | undefined
   if (candidatePath) {
     const id = basename(dirname(candidatePath))
@@ -185,13 +194,15 @@ export async function projectModelPolicy(assetRoot: string, agentId: string, ser
     if (!connections.has(group.id)) connections.set(group.id, await providerConnection(group.id, namespaces, directory, services.credentials))
   }
   const platformOnly = new Set([...connections].filter(([, connection]) => connection.readiness.state === 'platform_only').map(([provider]) => provider))
-  const routes = businessCatalogRoutes(catalog, platformOnly)
+  const routes = businessCatalogRoutes(catalog, platformOnly).filter(item => !localRoutes.some(local => sameRoute(item, local)))
+  const allowed = [...routes, ...localRoutes]
   const required = [selected, ...Object.values(runtime?.model_bindings?.presets ?? {})]
   const requiredProviders = new Set(required.map(item => item.provider))
   for (const binding of required) {
-    if (!routes.some(item => sameRoute(item, binding))) throw new Error(`此实例默认模型或角色绑定 ${binding.provider}/${binding.model} 不在当前业务可用目录中；请重新选择`)
+    if (!allowed.some(item => sameRoute(item, binding))) throw new Error(`此实例默认模型或角色绑定 ${binding.provider}/${binding.model} 不在当前业务可用目录中；请重新选择`)
     const selectedModel = catalog.groups.find(group => group.id === binding.provider)?.models.find(model => model.id === binding.model)
-    if (binding.reasoningEffort && !selectedModel?.reasoning?.efforts.some(item => item.id === binding.reasoningEffort)) {
+    const local = localRoutes.some(item => sameRoute(item, binding))
+    if (binding.reasoningEffort && !(local ? binding.reasoningEffort === 'off' : selectedModel?.reasoning?.efforts.some(item => item.id === binding.reasoningEffort))) {
       throw new Error(`此实例默认模型或角色绑定 ${binding.provider}/${binding.model} 的推理档位已不可用，请刷新模型设置`)
     }
   }
@@ -199,8 +210,9 @@ export async function projectModelPolicy(assetRoot: string, agentId: string, ser
     main: selected,
     presets: Object.fromEntries(Object.entries(runtime.model_bindings.presets).map(([id, binding]) => {
       const metadata = catalog.groups.find(group => group.id === binding.provider)?.models.find(model => model.id === binding.model)
-      const effort = binding.reasoningEffort ?? metadata?.reasoning?.defaultEffort
-      if (effort !== undefined && !metadata?.reasoning?.efforts.some(item => item.id === effort)) {
+      const local = localRoutes.some(item => sameRoute(item, binding))
+      const effort = binding.reasoningEffort ?? (local ? 'off' : metadata?.reasoning?.defaultEffort)
+      if (effort !== undefined && !(local ? effort === 'off' : metadata?.reasoning?.efforts.some(item => item.id === effort))) {
         throw new Error(`角色 ${id} 的原生默认推理档位已不可用，请刷新模型设置`)
       }
       // 原生委派对相同 route 继承父 effort；显式投影目录默认值，保持 descriptor、冷恢复与实际请求一致。
@@ -263,7 +275,7 @@ export async function projectModelPolicy(assetRoot: string, agentId: string, ser
   } else patch.push({ id: 'llm-pi-ai', config: { providers: {} } })
 
   return { policy: { agent_id: agentId, manifest_sha256: sha256, business_model_revision: business.revision,
-    allowed: routes, default: selected, patch, credential_refs: [...refs], ...(runtime ? { harness_runtime: runtime } : {}),
+    allowed, default: selected, patch, credential_refs: [...refs], ...(runtime ? { harness_runtime: runtime } : {}),
     ...(resolvedBindings ? { resolved_model_bindings: resolvedBindings } : {}),
     ...(dependencies?.mounts.length ? { asset_dependencies: dependencies } : {}) }, environment }
 }

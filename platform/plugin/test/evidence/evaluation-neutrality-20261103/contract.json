@@ -1,0 +1,143 @@
+{
+  "at": "2026-11-03",
+  "parser": "runtime/research/evaluation_contract.py:load_evaluation",
+  "agents": 8,
+  "cases": 117,
+  "fast": 40,
+  "original_cases": 115,
+  "original_fast": 38,
+  "existing_inputs_selection_preserved": true,
+  "local_links_checked": 14,
+  "files": [
+    {
+      "path": "agents/asset-discovery-assistant/evaluation.md",
+      "before_sha256": "0bb9e2d42e7c1fd75b829a043b18ee9fea95a46b63c36b6f84bf9a0655fa2a04",
+      "sha256": "17fb8199a6fe3ede58610571016e15b66d319621538546f68da79d92e68075db",
+      "cases": 10,
+      "fast": 8,
+      "changed_case_ids": [
+        "U-PROBE-IP-001",
+        "U-PROBE-KEYWORD-001",
+        "U-PROBE-CONFIRM-001"
+      ],
+      "parallel_added_cases": [],
+      "existing_ids_inputs_order_scenes_fast_preserved": true
+    },
+    {
+      "path": "agents/autonomous-training-researcher/evaluation.md",
+      "before_sha256": "f9415c628cf435fc8c1765af29e22e5480a1ba780c4ef76073d1372e8ebc5c91",
+      "sha256": "2856da7ac06aa5aaa1b2fe64c459d9f3dd6ea4ccda6fd0cc919fa1fdac7c629d",
+      "cases": 3,
+      "fast": 2,
+      "changed_case_ids": [
+        "U-TRAIN-PREFLIGHT-001"
+      ],
+      "parallel_added_cases": [],
+      "existing_ids_inputs_order_scenes_fast_preserved": true
+    },
+    {
+      "path": "agents/daily-inspection-assistant/evaluation.md",
+      "before_sha256": "e83f74a0f2bec93bec10376e5b2880b0bcdea255b1fa97916ace7505152ef753",
+      "sha256": "44e3f44388a5c6b28ff78655ca82727c7b96208d5a82cc1d9bf681edf6eaac26",
+      "cases": 6,
+      "fast": 4,
+      "changed_case_ids": [
+        "U-ASSET-PAGES-001"
+      ],
+      "parallel_added_cases": [],
+      "existing_ids_inputs_order_scenes_fast_preserved": true
+    },
+    {
+      "path": "agents/inspection-delivery-demo/evaluation.md",
+      "before_sha256": "4f620e5fbfd2d454b01ff7d3ec7329ec22dd1060c2603e4088b5c3a66e6da3a4",
+      "sha256": "71723c99626c1dbc4f943a8dafddcc5d1b16dd9ba81e88c42ebd7031c2058b9a",
+      "cases": 4,
+      "fast": 3,
+      "changed_case_ids": [
+        "U-ASSET-PAGES-001"
+      ],
+      "parallel_added_cases": [],
+      "existing_ids_inputs_order_scenes_fast_preserved": true
+    },
+    {
+      "path": "agents/multi-step-research-analyst/evaluation.md",
+      "before_sha256": "12a604c1494cbd3fc9ec731a1249e28973fcd4116bd53085b2c398887f24269c",
+      "sha256": "bddd77a806dab38ea4fe76eebd707497932e0e027a94580677794c6394b84c98",
+      "cases": 4,
+      "fast": 2,
+      "changed_case_ids": [
+        "U-RESEARCH-001"
+      ],
+      "parallel_added_cases": [],
+      "existing_ids_inputs_order_scenes_fast_preserved": true
+    },
+    {
+      "path": "agents/rc5-ui-acceptance-20261102/evaluation.md",
+      "before_sha256": "d83bd8cb7094cf3b281488ac4da494857d0fffa39ec928a963ed75b481dcb8bc",
+      "sha256": "d83bd8cb7094cf3b281488ac4da494857d0fffa39ec928a963ed75b481dcb8bc",
+      "cases": 3,
+      "fast": 2,
+      "changed_case_ids": [],
+      "parallel_added_cases": [],
+      "existing_ids_inputs_order_scenes_fast_preserved": true
+    },
+    {
+      "path": "agents/security-operations-expert/evaluation.md",
+      "before_sha256": "59516aad281642f7ab07e73bd842cce2efb7c3b6f3003a62bf3e7630e288cae9",
+      "sha256": "e704356d4a73f8f0b40c0c416676ddac0ac2408bf64a78bee9ceff81703aea42",
+      "cases": 86,
+      "fast": 18,
+      "changed_case_ids": [
+        "U-INS-001",
+        "U-INS-002",
+        "U-INS-004",
+        "U-INS-005",
+        "U-INS-006",
+        "U-INS-007",
+        "U-INS-008",
+        "U-NEW-008",
+        "U-NEW-009",
+        "U-EMG-002",
+        "U-NEW-003",
+        "U-NEW-005",
+        "U-NEW-006",
+        "U-QA-010",
+        "U-THREAT-MENTION",
+        "U-THREAT-FAST",
+        "U-THREAT-FULL",
+        "U-THREAT-CONTRACT",
+        "U-THREAT-RULE-REAL",
+        "U-THREAT-RULE-CONFIRMATION",
+        "U-THREAT-FAST-MANUAL-WHITELIST",
+        "U-THREAT-RULE-JSON3",
+        "U-THREAT-RULE-JSON3-FAILURE",
+        "U-NEW-007",
+        "U-SCHED-001",
+        "U-SCHED-002",
+        "U-SCHED-003",
+        "U-SCHED-004",
+        "U-SCHED-005",
+        "U-SCHED-006",
+        "U-VOICE-002",
+        "U-VOICE-004",
+        "U-ASSET-ALERTS-001"
+      ],
+      "parallel_added_cases": [
+        "U-INS-009",
+        "U-QA-015"
+      ],
+      "existing_ids_inputs_order_scenes_fast_preserved": true
+    },
+    {
+      "path": "agents/test01/evaluation.md",
+      "before_sha256": "311bd13106b2db23dfac244b53038906e569e31717e1722b549eb0c03a47ec2b",
+      "sha256": "311bd13106b2db23dfac244b53038906e569e31717e1722b549eb0c03a47ec2b",
+      "cases": 1,
+      "fast": 1,
+      "changed_case_ids": [],
+      "parallel_added_cases": [],
+      "existing_ids_inputs_order_scenes_fast_preserved": true
+    }
+  ],
+  "historical_runs_modified": false
+}

@@ -302,5 +302,37 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
     })
     return { job_id: id, status: job.status, started_at: now }
   }
-  return { start, status, cancel, list }
+  function lookup(payload: MapValue) {
+    const id = payload.request_id
+    pathFor(id)
+    const pending = starting.get(id)
+    if (pending) {
+      if (pending.digest !== requestDigest(payload)) throw new EvaluationJobError('conflict', '同一评测请求不能更换参数，请新建评测。')
+      return { job_id: id, status: 'starting' }
+    }
+    if (!existsSync(pathFor(id))) return undefined
+    const job = read(id)
+    if (job.request_sha256 !== requestDigest(payload)) throw new EvaluationJobError('conflict', '同一评测请求不能更换参数，请新建评测。')
+    return { job_id: id, status: job.status }
+  }
+  async function startBatch(requests: unknown, preview: (request: MapValue) => Promise<void>, signal?: AbortSignal) {
+    if (!Array.isArray(requests) || !requests.length || requests.length > 8
+      || requests.some(item => !item || typeof item !== 'object' || Array.isArray(item)
+        || typeof item.request_id !== 'string' || !UUID.test(item.request_id)
+        || typeof item.source_ref !== 'string' || !/^git:[0-9a-f]{40}$/.test(item.source_ref))
+      || new Set(requests.map(item => item.request_id)).size !== requests.length) throw new EvaluationJobError('invalid_request', '批量评测需要1–8个请求，各自提供不同的 UUID v4 request_id 与固定 source_ref')
+    // 全批先检查；已有任务不重新准备来源，也不重放已结束的 Run。
+    const existing = requests.map(lookup)
+    for (let index = 0; index < requests.length; index++) if (!existing[index]) {
+      signal?.throwIfAborted()
+      await preview(requests[index])
+    }
+    const results = []
+    for (const request of requests) {
+      signal?.throwIfAborted()
+      results.push(await start(request))
+    }
+    return results
+  }
+  return { start, status, cancel, list, lookup, startBatch }
 }

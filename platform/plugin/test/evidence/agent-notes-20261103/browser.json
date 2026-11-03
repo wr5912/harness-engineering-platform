@@ -1,0 +1,60 @@
+{
+  "verified_at": "2026-11-03T07:01:47.076Z",
+  "experiment_id": "EXP-rc5-ui-acceptance-20261102-001-rbf6b3633f11e",
+  "application": {
+    "stage": "enable",
+    "target": "@ai-agent-harness/harness-platform",
+    "enabled": true,
+    "changed": false,
+    "application": "applied",
+    "warnings": []
+  },
+  "platform_pid": 3707822,
+  "process_retained": true,
+  "direct_save": true,
+  "no_preview_button": true,
+  "optional": true,
+  "legacy_missing": true,
+  "cancel_unchanged": true,
+  "multiline_saved": true,
+  "refresh_readback": true,
+  "export_and_download": true,
+  "clear_saved": true,
+  "checks": [
+    {
+      "width": 1440,
+      "style": {
+        "opacity": "1",
+        "background": "rgb(255, 255, 255)",
+        "backgroundImage": "none"
+      },
+      "dialog_overflow": false,
+      "body_overflow": false
+    },
+    {
+      "width": 768,
+      "style": {
+        "opacity": "1",
+        "background": "rgb(255, 255, 255)",
+        "backgroundImage": "none"
+      },
+      "dialog_overflow": false,
+      "body_overflow": false
+    },
+    {
+      "width": 390,
+      "style": {
+        "opacity": "1",
+        "background": "rgb(255, 255, 255)",
+        "backgroundImage": "none"
+      },
+      "dialog_overflow": false,
+      "body_overflow": false
+    }
+  ],
+  "page_errors": [],
+  "sources": {
+    "platform/plugin/src/agents/description-client.tsx": "0fa2b8816a6dfb9228c3936d5192ef707744e865b5a9d5eb19f5cbfd005fed27",
+    "platform/plugin/src/agents/index.ts": "a3b9d969e9ec3296f80e49e784090f534e4f1c29825c0ea8fde29cd8e035bfae"
+  }
+}

@@ -18,6 +18,8 @@ import {
   withCaseTimeout,
 } from './dsh-eval-common.mjs'
 
+import { scheduleCases, validateCaseSchedule } from './evaluation-case-scheduler.mts'
+
 const ANALYSIS_TOOLS = ['glob', 'grep', 'read']
 const ROUTE_FIELDS = ['maxTokens', 'model', 'provider', 'reasoningEffort']
 
@@ -30,9 +32,8 @@ export async function readInput() {
     if (typeof payload[name] !== 'string' || payload[name] === '') throw new Error('invalid-payload')
   }
   if (!Number.isInteger(payload.timeout_ms) || payload.timeout_ms < 1) throw new Error('invalid-payload')
-  if (payload.operation === 'review') {
-    if (!Array.isArray(payload.scenes) || payload.scenes.length === 0) throw new Error('invalid-payload')
-    const route = payload.model_route
+  if (payload.operation === 'review' || payload.cases.length > 0) {
+    const route = payload.operation === 'review' ? payload.model_route : payload.judge_model_route
     if (!route || typeof route !== 'object' || Array.isArray(route)
       || Object.keys(route).some(key => !ROUTE_FIELDS.includes(key))
       || typeof route.provider !== 'string' || route.provider === ''
@@ -42,6 +43,9 @@ export async function readInput() {
       || (Object.hasOwn(route, 'reasoningEffort') && typeof route.reasoningEffort !== 'string')) {
       throw new Error('invalid-model-route')
     }
+  }
+  if (payload.operation === 'review') {
+    if (!Array.isArray(payload.scenes) || payload.scenes.length === 0) throw new Error('invalid-payload')
     for (const scene of payload.scenes) {
       const fields = scene && typeof scene === 'object' ? Object.keys(scene).sort().join(',') : ''
       const repair = fields === 'prior_prompts,prompt,scene_id,session_id'
@@ -63,6 +67,7 @@ export async function readInput() {
       throw new Error('invalid-case')
     }
   }
+  validateCaseSchedule(payload.cases, payload.concurrency ?? 1, payload.parallel_cases ?? [])
   return payload
 }
 
@@ -466,6 +471,8 @@ async function runCase(connection, payload, item, workspace, signal, traceState)
         }, `评审 ${item.case_id}`,
       )
       traceState.judgeSession = judgeSession
+      traceState.stage = 'judge-route-select'
+      await selectSessionRoute(connection, judgeSession.session_id, payload.judge_model_route, signal)
       const judged = await promptSession(
         connection, judgeSession.session_id, input, [input], payload.timeout_ms, signal,
         async archive => {
@@ -478,6 +485,10 @@ async function runCase(connection, payload, item, workspace, signal, traceState)
           Object.assign(traceState, metadata)
         },
       )
+      const turn = turnsFromTrace(judged.archive, [input])?.[0]
+      if (!turn?.route || Object.entries(payload.judge_model_route).some(([key, value]) => turn.route[key] !== value)) {
+        throw new Error('judge-route-mismatch')
+      }
       return { ...judged, session: judgeSession }
     } catch (error) {
       error.judge_evidence = { archive: traceState.judgeArchive, session: judgeSession ?? traceState.judgeSession }
@@ -588,15 +599,14 @@ async function main() {
     process.stdout.write(`${JSON.stringify({ schema_version: '1.0', operation: 'review', results })}\n`)
     return
   }
-  const rows = []
-  let stopReason
-  for (const item of payload.cases) {
+  const scheduled = await scheduleCases(payload.cases, payload.concurrency ?? 1, payload.parallel_cases ?? [], async item => {
+    let row, stopReason
     const traceState = { targetArchive: null, judgeArchive: null, judgeSession: null, session: null, stage: 'target-session-create' }
     try {
-      rows.push(await withCaseTimeout(
+      row = await withCaseTimeout(
         signal => runCase(connection, payload, item, workspace, signal, traceState),
         payload.timeout_ms * (item.inputs.length + 2), true,
-      ))
+      )
     } catch (error) {
       const reason = SAFETY_STOP_REASONS.has(error?.message) ? error.message : `api-${traceState.stage}-failed`
       const targetArchive = traceState.targetArchive ?? (traceState.judgeSession ? null : error?.archive ?? null)
@@ -615,22 +625,18 @@ async function main() {
           preset_readiness: error?.preset_readiness ?? traceState.session?.preset_readiness,
           trace_available: Boolean(targetArchive) },
         traceState.judgeSession ? { response: null, archive: traceState.judgeArchive, checks: { ...traceState.judgeSession, unavailable_reason: reason, trace_available: Boolean(traceState.judgeArchive) } } : null)
-      rows.push(result(item, 'error', 'inconclusive',
+      row = result(item, 'error', 'inconclusive',
         SAFETY_STOP_REASONS.has(reason) ? '评测身份或证据失配，已停止。' : `Runtime API 在 ${traceState.stage} 阶段未完成，未产生语义结论。`,
-        reason))
-      if (SAFETY_STOP_REASONS.has(reason)) {
-        stopReason = reason
-        await saveCaseResult(payload.evidence_root, rows.at(-1))
-        break
-      }
+        reason)
+      if (SAFETY_STOP_REASONS.has(reason)) stopReason = reason
     }
-    await saveCaseResult(payload.evidence_root, rows.at(-1))
-  }
+    await saveCaseResult(payload.evidence_root, row)
+    return { row, ...(stopReason ? { stop_reason: stopReason } : {}) }
+  })
   process.stdout.write(`${JSON.stringify({
     schema_version: '1.0',
     executor: 'api',
-    rows,
-    ...(stopReason ? { stop_reason: stopReason } : {}),
+    ...scheduled,
   })}\n`)
 }
 

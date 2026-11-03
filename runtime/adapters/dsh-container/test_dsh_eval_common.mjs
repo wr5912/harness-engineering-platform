@@ -128,6 +128,7 @@ const judged = await judgeCase(item, {
     assert.equal(request.indexed_evidence[2].content_index, 0)
     assert.equal(request.indexed_evidence[2].citation_allowed, true)
     assert.equal(request.indexed_evidence[1].citation_allowed, false)
+    assert.deepEqual(request.indexed_evidence.map(entry => entry.index), [0, 1, 2])
     assert.deepEqual(Object.keys(request.output_contract.requirements[0].evidence[0]), ['index'])
     return {
       session: { session_id: 'judge-session' },
@@ -153,6 +154,8 @@ for (const [name, expectedBehavior, expectedRequirements] of [
   ['嵌套中文引号内标点与换行逐字保留', '说明与“外层「内层『更内层；句。』原样」及‘单引号；句。\n换行’保持。”一致；结束。',
     ['说明与“外层「内层『更内层；句。』原样」及‘单引号；句。\n换行’保持。”一致', '结束']],
   ['未成对引号不吞掉后续要求', '前置“未闭合；后续。\n最后一项', ['前置“未闭合', '后续', '最后一项']],
+  ['真实 U-INS-003 逗号连接要求不另行拆分', '只返回一个可解析的 JSON 对象，准确保留给定事实并区分事实与建议，不添加输入中没有的动态数据，不调用巡检服务。',
+    ['只返回一个可解析的 JSON 对象，准确保留给定事实并区分事实与建议，不添加输入中没有的动态数据，不调用巡检服务']],
 ]) {
   const inputText = '请说明你能如何帮助我开始工作；如果信息不足，你需要先了解什么？'
   const splitArchive = archive([user('split-user', inputText), header([]), assistant('需求分段回归回答。'), end(1)])
@@ -160,6 +163,8 @@ for (const [name, expectedBehavior, expectedRequirements] of [
     { assistant_texts: ['需求分段回归回答。'], turns: turnsFromTrace(splitArchive, [inputText]) }, splitArchive, async input => {
       const request = JSON.parse(input)
       assert.deepEqual(request.requirements, expectedRequirements, name)
+      assert.deepEqual(request.output_contract.requirements.map(check => check.requirement), expectedRequirements,
+        '输出结构逐项绑定程序分段结果，不能让模型自行重组要求')
       assert.equal(request.case.expected, expectedBehavior, '需求分段不修改冻结原文')
       return { session: { session_id: 'split-judge' }, archive: archive([
         user('split-judge-user', input), header([]), assistant(JSON.stringify({ verdict: 'passed', reason: name,

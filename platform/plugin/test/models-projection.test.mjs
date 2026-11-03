@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -84,6 +84,51 @@ test('版本主模型优先业务默认，显式运行覆盖主模型且保留�
   harness.model_bindings.presets.reviewer = { provider: 'deepseek-official', model: 'missing' }
   writeFileSync(join(candidate, 'harness.yaml'), dump(harness))
   await assert.rejects(projectModelPolicy(source.root, 'example-agent', services, override, candidate), /reviewer|missing/)
+})
+
+test('Candidate 声明的本地路由进入实例目录，不投影虚假外部连接且拒绝未声明模型', async t => {
+  const external = { provider: 'deepseek-official', model: 'source' }
+  const hybrid = { provider: 'harness-workflow', model: 'hybrid-v1' }
+  const codeOnly = { provider: 'harness-code-only', model: 'workflow-v1' }
+  const source = fixture({ default: external }); t.after(source.cleanup)
+  const candidate = join(source.root, 'evolution/experiments/VAR-example-agent-001-r0123456789ab/candidate')
+  mkdirSync(join(candidate, 'dsh/presets/example-agent'), { recursive: true })
+  mkdirSync(join(candidate, 'dsh/presets/reviewer'), { recursive: true })
+  mkdirSync(join(candidate, 'dsh/managed'), { recursive: true })
+  for (const preset of ['example-agent', 'reviewer']) writeFileSync(join(candidate, 'dsh/presets', preset, 'agent.cordis.yml'), '[]\n')
+  writeFileSync(join(candidate, '../change.yaml'), 'agent_id: example-agent\nexperiment_id: VAR-example-agent-001-r0123456789ab\n')
+  writeFileSync(join(candidate, 'harness.yaml'), dump({ loadable_assets: { preset_id: 'example-agent' },
+    model_bindings: { main: external, presets: { reviewer: hybrid } } }))
+  const matrix = join(candidate, 'dsh/managed/role-tool-matrix.yaml')
+  const selected = { ...hybrid, reasoningEffort: 'off' }
+  const services = {
+    sessionController: { modelCatalog: async () => ({ default: external, routableProviders: ['deepseek-official'], failures: [],
+      groups: [{ id: 'deepseek-official', models: [{ id: external.model }] }] }) },
+    settingsController: { describe: () => ({ namespaces: [{ ns: 'llm-deepseek', value: {} }] }) },
+    credentials: { resolve: async ref => { assert.equal(ref, 'DEEPSEEK_API_KEY'); return { value: 'fixture-key' } } },
+    llm: { listConfigurableProviders: () => [] },
+  }
+  await assert.rejects(projectModelPolicy(source.root, 'example-agent', services, selected, candidate), /不在当前业务可用目录/)
+  const qwen = { provider: 'hep-qwen35-2b', model: 'Qwen3.5-2B' }
+  const declared = { runtime_capabilities: { local_tools: [], local_model_routes: [hybrid, codeOnly, qwen] } }
+  writeFileSync(matrix, dump(declared))
+  for (const main of [selected, { ...codeOnly, reasoningEffort: 'off' }, { ...qwen, reasoningEffort: 'off' }]) {
+    const result = await projectModelPolicy(source.root, 'example-agent', services, main, candidate)
+    assert.deepEqual(result.policy.default, main)
+    assert.deepEqual(result.policy.allowed, [external, hybrid, codeOnly, qwen])
+    assert.deepEqual(result.policy.resolved_model_bindings.presets.reviewer, selected)
+    assert.deepEqual(result.policy.patch.find(item => item.id === 'llm-pi-ai').config.providers, {})
+    assert.deepEqual(result.policy.credential_refs, ['DEEPSEEK_API_KEY'])
+    assertDshPolicyAccepted(result.policy, source.root)
+  }
+  await assert.rejects(projectModelPolicy(source.root, 'example-agent', services, { ...hybrid, reasoningEffort: 'high' }, candidate), /推理档位/)
+  await assert.rejects(projectModelPolicy(source.root, 'example-agent', services, { ...external, model: 'missing' }, candidate), /不在当前业务可用目录/)
+  await assert.rejects(projectModelPolicy(source.root, 'example-agent', { ...services, credentials: { resolve: async () => undefined } }, external, candidate), /API Key/)
+  writeFileSync(matrix, dump({ runtime_capabilities: { local_tools: [], local_model_routes: [hybrid, hybrid] } }))
+  await assert.rejects(projectModelPolicy(source.root, 'example-agent', services, selected, candidate), /本地能力声明无效/)
+  const outside = join(source.root, 'outside-matrix.yaml')
+  writeFileSync(outside, dump(declared)); rmSync(matrix); symlinkSync(outside, matrix)
+  await assert.rejects(projectModelPolicy(source.root, 'example-agent', services, selected, candidate), /符号链接/)
 })
 
 test('平台投影从当前目录派生业务可选模型与凭据引用，忽略 Agent 旧标记', async () => {

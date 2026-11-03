@@ -1,0 +1,27 @@
+{
+  "at": "2026-11-03T07:52:48.255Z",
+  "experiment_id": "VAR-security-operations-expert-003-r6fcbc8e8f093",
+  "entry_opened_from_compute_panel": true,
+  "folders": [
+    "routing/",
+    "models/",
+    "business/",
+    "training/"
+  ],
+  "unique_files": true,
+  "checks": [
+    {
+      "width": 1440,
+      "overflow": false
+    },
+    {
+      "width": 768,
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "overflow": false
+    }
+  ],
+  "page_errors": []
+}

@@ -157,7 +157,7 @@ test('context 在数据技能迁出后仍返回当前代码生成接口合同，
   assert.equal(context.loaded.verified, false, '返回生成指导不应伪造源码或装载证据')
 }))
 
-test('context 公布的 SDK 导入和节点调用可由真实固定编译器检查，不执行 Candidate', () => withFixture(async fx => {
+test('context 公布的 SDK 导入和节点调用可由真实固定编译器检查，不执行 Candidate', t => withFixture(async fx => {
   const { sdk, generation } = success(await fx.handler('context', { experiment_id: variant })).generation_contract
   const entry = join(fx.path(variant), 'candidate', generation.default_entry_path)
   write(join(fx.root, 'config/sources.json'), JSON.stringify({ sources: { [variant]: { agent_id: 'alpha', candidate_root: `evolution/experiments/${variant}/candidate/dsh` } } }))
@@ -176,7 +176,17 @@ export function apply(ctx:any){registerWorkflowTool(ctx,workflow); throw new Err
   const buildHandler = createComputeBuildHandler(fx.root), digest = candidateDigest(join(fx.path(variant), 'candidate'))
   const preview = success(await buildHandler('preview', { experiment_id: variant, expected_candidate_sha256: digest, entry_path: generation.default_entry_path }))
   assert.equal(preview.entry_path, generation.default_entry_path)
+  let compilerReads = 0
+  const read = fs.readFileSync
+  const spy = t.mock.method(fs, 'readFileSync', (file, ...args) => {
+    if (String(file).includes('/typescript/lib/lib.')) compilerReads++
+    return read(file, ...args)
+  })
+  syncBuiltinESMExports()
+  assert.equal(success(await buildHandler('preview', { experiment_id: variant, expected_candidate_sha256: digest, entry_path: generation.default_entry_path })).preview_sha256, preview.preview_sha256)
   const built = success(await buildHandler('build', { experiment_id: variant, expected_candidate_sha256: digest, expected_preview_sha256: preview.preview_sha256, entry_path: generation.default_entry_path }))
+  spy.mock.restore(); syncBuiltinESMExports()
+  assert.equal(compilerReads, 0, '相同预览和正式构建只编译一次')
   assert.match(built.esm_sha256, /^[a-f0-9]{64}$/)
   assert.equal(success(await fx.handler('context', { experiment_id: variant })).loaded.verified, false)
 }))
@@ -622,6 +632,36 @@ export function apply(ctx:any){registerWorkflowTool(ctx,workflow)}\n`)
   return { built, child, raw, wrapper, saveVariant }
 }
 
+test('连续准备复用当前构建和冻结，源码变化只重做受影响步骤', async t => {
+  const fx = await fixture()
+  t.after(() => rmSync(fx.root, { recursive: true, force: true }))
+  await generatedNestedFixture(fx)
+  const handler = createAgentsHandler(fx.root)
+  const first = success(await handler('compute-variants/prepare', { experiment_id: variant }, new AbortController().signal))
+  assert.equal(first.steps[0].reused, true)
+  assert.equal(first.steps[1].reused, true)
+  const entry = join(fx.path(variant), 'candidate/dsh/managed/compute-workflow/index.ts')
+  write(entry, readFileSync(entry, 'utf8') + '\nexport const revision = 2\n')
+  const changed = success(await handler('compute-variants/prepare', { experiment_id: variant }, new AbortController().signal))
+  assert.equal(changed.steps[0].reused, false)
+  assert.notEqual(changed.source_ref, first.source_ref)
+  assert.notEqual(changed.steps[0].build_digest, first.steps[0].build_digest)
+  const repeated = success(await handler('compute-variants/prepare', { experiment_id: variant }, new AbortController().signal))
+  assert.equal(repeated.source_ref, changed.source_ref)
+  assert.deepEqual(repeated.steps.map(step => step.reused), [true, true])
+  const evaluation = join(fx.root, 'agents/alpha/evaluation.md')
+  write(evaluation, readFileSync(evaluation, 'utf8').replace('U-ONE-001', 'U-REMOVED-001'))
+  const failed = await handler('compute-variants/prepare', { experiment_id: variant }, new AbortController().signal)
+  assert.equal(failed.ok, false)
+  assert.equal(failed.error.details.stage, 'freeze')
+  assert.equal(failed.error.details.completed_steps[0].reused, true)
+  assert.equal(git(fx.root, ['rev-parse', 'HEAD']), changed.source_ref.slice(4))
+  const abort = new AbortController(); abort.abort()
+  const cancelled = await handler('compute-variants/prepare', { experiment_id: variant }, abort.signal)
+  assert.equal(cancelled.ok, false)
+  assert.equal(git(fx.root, ['rev-parse', 'HEAD']), changed.source_ref.slice(4))
+})
+
 async function codeOnlyFixture(fx) {
   const generated = await generatedNestedFixture(fx)
   const changePath = join(fx.path(variant), 'change.yaml'), change = load(readFileSync(changePath, 'utf8'))
@@ -989,6 +1029,58 @@ test('原生工具冻结的多Case参数可预览，归一化不修改调用方�
   assert.deepEqual(Object.keys(preview.plan.case_hashes), ['U-ONE-001', 'U-TWO-001'])
   assert.deepEqual(preview.plan.critical_case_ids, ['U-ONE-001', 'U-TWO-001'])
   assert.deepEqual(body.case_ids, ['U-TWO-001', 'U-ONE-001'])
+}))
+
+test('重确认评测口径先只读预览，保存只更新 Case 摘要和计划时间，保留历史 Run', () => withFixture(async fx => {
+  const file = join(fx.path(variant), 'change.yaml'), before = readFileSync(file, 'utf8'), original = load(before)
+  const runFiles = [join(fx.left.base, 'inputs.lock.json'), join(fx.right.base, 'run.yaml')]
+  const runContents = runFiles.map(file => readFileSync(file))
+  const evaluation = join(fx.root, 'agents/alpha/evaluation.md')
+  write(evaluation, readFileSync(evaluation, 'utf8').replace('准确返回状态。', '准确返回状态和来源。'))
+  const preview = success(await fx.handler('plan-preview', { experiment_id: variant }))
+  assert.deepEqual(preview.changed_case_ids, ['U-ONE-001']); assert.deepEqual(preview.added_case_ids, [])
+  assert.equal(readFileSync(file, 'utf8'), before)
+  const applied = success(await fx.handler('plan-apply', { experiment_id: variant, expected_change_sha256: preview.change_sha256, expected_preview_sha256: preview.preview_sha256 }))
+  assert.equal(applied.changed, true); assert.equal(applied.requires_new_runs, true)
+  const after = load(readFileSync(file, 'utf8'))
+  assert.deepEqual(after, { ...original, compute_variant: { ...original.compute_variant, created_at: applied.plan.created_at, case_hashes: preview.case_hashes } })
+  assert.notDeepEqual(after.compute_variant.case_hashes, original.compute_variant.case_hashes)
+  runFiles.forEach((file, index) => assert.deepEqual(readFileSync(file), runContents[index]))
+  assert.equal(success(await fx.handler('compare', fx.body)).eligible_for_end, false, '旧口径 Run 不能用于新计划')
+}))
+
+test('重确认口径拒绝陈旧预览与并发修改，不能删除原计划 Case', () => withFixture(async fx => {
+  const evaluation = join(fx.root, 'agents/alpha/evaluation.md'), file = join(fx.path(variant), 'change.yaml')
+  const preview = success(await fx.handler('plan-preview', { experiment_id: variant }))
+  write(evaluation, readFileSync(evaluation, 'utf8').replace('准确返回状态。', '准确返回状态和来源。'))
+  const body = { experiment_id: variant, expected_change_sha256: preview.change_sha256, expected_preview_sha256: preview.preview_sha256 }
+  assert.equal((await fx.handler('plan-apply', body)).error.code, 'conflict')
+  const fresh = success(await fx.handler('plan-preview', { experiment_id: variant }))
+  const concurrent = readFileSync(file, 'utf8') + '\n# 并行修改\n'; write(file, concurrent)
+  assert.equal((await fx.handler('plan-apply', { ...body, expected_preview_sha256: fresh.preview_sha256 })).error.code, 'conflict')
+  assert.equal(readFileSync(file, 'utf8'), concurrent)
+  write(evaluation, readFileSync(evaluation, 'utf8') + '\n#### U-TWO-001 新查询\n\n**用户输入**\n\n> 查询摘要。\n\n**预期**\n\n返回摘要。\n')
+  assert.equal((await fx.handler('plan-preview', { experiment_id: variant, case_ids: ['U-TWO-001'] })).ok, false)
+}))
+
+test('重确认口径明确新增 Case，无变化时保持计划时间与字节不变，已 end 不改写', () => withFixture(async fx => {
+  const file = join(fx.path(variant), 'change.yaml'), before = readFileSync(file, 'utf8')
+  let preview = success(await fx.handler('plan-preview', { experiment_id: variant }))
+  const noop = success(await fx.handler('plan-apply', { experiment_id: variant, expected_change_sha256: preview.change_sha256, expected_preview_sha256: preview.preview_sha256 }))
+  assert.equal(noop.changed, false); assert.equal(readFileSync(file, 'utf8'), before)
+  const evaluation = join(fx.root, 'agents/alpha/evaluation.md')
+  write(evaluation, readFileSync(evaluation, 'utf8') + '\n#### U-TWO-001 新查询\n\n**用户输入**\n\n> 查询摘要。\n\n**预期**\n\n返回摘要。\n')
+  const case_ids = ['U-ONE-001', 'U-TWO-001']
+  preview = success(await fx.handler('plan-preview', { experiment_id: variant, case_ids }))
+  assert.deepEqual(preview.added_case_ids, ['U-TWO-001']); assert.deepEqual(preview.changed_case_ids, [])
+  const applied = success(await fx.handler('plan-apply', { experiment_id: variant, case_ids, expected_change_sha256: preview.change_sha256, expected_preview_sha256: preview.preview_sha256 }))
+  assert.deepEqual(applied.plan.critical_case_ids, ['U-ONE-001'])
+  assert.deepEqual(Object.keys(applied.plan.case_hashes), case_ids)
+  write(file, dump({ ...load(readFileSync(file, 'utf8')), variant_kind: 'end', end_confirmed: true }))
+  const ended = readFileSync(file, 'utf8')
+  assert.equal((await fx.handler('plan-preview', { experiment_id: variant })).ok, false)
+  assert.equal((await fx.handler('plan-apply', { experiment_id: variant, expected_change_sha256: hash(ended), expected_preview_sha256: preview.preview_sha256 })).ok, false)
+  assert.equal(readFileSync(file, 'utf8'), ended)
 }))
 
 test('旧 Session 改装到新 Run 仍不能作为预冻结后的执行', () => withFixture(async fx => {

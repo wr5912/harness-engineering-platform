@@ -37,6 +37,7 @@ import { VERSION_ID, isVariantIdentity, assertInheritableVersion } from '../vers
 import { createComputeVariantsHandler, type ComputeVariantCreation } from './compute-variants.ts'
 import { createTrainingServersHandler } from './training-servers.ts'
 import { createComputeBuildHandler } from './compute-build.ts'
+import { prepareComputeVariant } from './compute-prepare.ts'
 import { createAssetBuildHandler } from './asset-build.ts'
 import { createAssetDependenciesHandler } from './asset-dependencies.ts'
 import { createMigrationsHandler } from './migrations.ts'
@@ -265,7 +266,7 @@ function agentDescription(root: string, payload: JsonMap) {
   const agentId = agentIdField(payload)
   const manifest = readYamlMap(root, dataPath(root, `agents/${agentId}/manifest.yaml`))
   const experimentId = typeof manifest.active_experiment === 'string' ? manifest.active_experiment : ''
-  if (!experimentId) return ok({ agentId, source: null, name: null, description: null, skills: [] })
+  if (!experimentId) return ok({ agentId, source: null, name: null, description: null, notes: null, skills: [] })
   const source = sourceInfo(root, experimentId)
   if (source.agent_id !== agentId) throw new RpcError('invalid_source', '已启用版本不属于该 Agent')
   const base = `evolution/experiments/${experimentId}/candidate`
@@ -292,6 +293,7 @@ function agentDescription(root: string, payload: JsonMap) {
   })
   return ok({ agentId, source: { experimentId, basis: 'active_experiment' },
     name: typeof asset.name === 'string' ? asset.name : null,
+    notes: typeof asset.notes === 'string' ? asset.notes : null,
     description: typeof preset.description === 'string' ? preset.description : null, skills })
 }
 
@@ -969,7 +971,10 @@ async function createExperiment(root: string, payload: JsonMap, variant?: Comput
   const parentExperiment = rawParentExperiment ? experimentIdValue(rawParentExperiment, 'parent_experiment_id') : undefined
   if (!parentExperiment) throw new RpcError('invalid_request', '缺少 parent_experiment_id')
   const prefix = variant ? 'VAR' : 'EXP'
-  const nextNumber = Math.max(0, ...listExperiments(root, agentId).filter(item => item.id.startsWith(`${prefix}-`)).map(item => Number(EXP_ID.exec(item.id)?.[2] ?? 0))) + 1
+  const requestedNumber = payload.version_number
+  if (requestedNumber !== undefined && (typeof requestedNumber !== 'number' || !Number.isInteger(requestedNumber) || requestedNumber < 1 || requestedNumber > 999)) throw new RpcError('invalid_request', 'version_number 必须是 1–999 的整数')
+  const nextNumber = requestedNumber ?? Math.max(0, ...listExperiments(root, agentId).filter(item => item.id.startsWith(`${prefix}-`)).map(item => Number(EXP_ID.exec(item.id)?.[2] ?? 0))) + 1
+  if (nextNumber > 999) throw new RpcError('invalid_request', '版本编号已达 999，请用 version_number 指定编号并生成新后缀')
   let experimentId = ''
   do {
     experimentId = `${prefix}-${agentId}-${String(nextNumber).padStart(3, '0')}-r${randomBytes(6).toString('hex')}`
@@ -1116,8 +1121,26 @@ function edits(payload: JsonMap) {
     if (row.expected_sha256 !== undefined && row.expected_sha256 !== null && typeof row.expected_sha256 !== 'string') {
       throw new RpcError('invalid_request', 'expected_sha256 必须是文件摘要或新文件的 null')
     }
-    return { path, content: textField(row, 'content'), expected: row.expected_sha256 as string | null | undefined }
+    return { path, content: textField(row, 'content'), expected: row.expected_sha256 as string | null | undefined, moveTo: optionalString(row, 'move_to') }
   })
+}
+
+function editLocations(root: string, payload: JsonMap) {
+  const locations = edits(payload).map(edit => {
+    const source = editablePath(root, payload, edit.path)
+    const target = edit.moveTo ? editablePath(root, payload, edit.moveTo) : source
+    if (edit.moveTo) {
+      const candidate = `evolution/experiments/${experimentIdField(payload)}/candidate/`
+      if (!source.rel.startsWith(candidate) || !target.rel.startsWith(candidate) || source.file === target.file) {
+        throw new RpcError('path_rejected', '只能在同一 Candidate 内移动到不同文件路径')
+      }
+      if (!existsSync(source.file)) throw new RpcError('conflict', '待移动文件不存在', { path: source.rel })
+      if (existsSync(target.file)) throw new RpcError('conflict', '移动目标已存在，请重新读取并选择空路径', { path: target.rel })
+    }
+    return { edit, source, target }
+  })
+  assertUniqueResolved(locations.flatMap(({ source, target }) => source === target ? [source] : [source, target]))
+  return locations
 }
 
 function rejectsLlmApiKey(pathName: string, content: string) {
@@ -1195,17 +1218,15 @@ async function validateDraft(root: string, payload: JsonMap, drafts: { rel: stri
 }
 
 async function previewEdit(root: string, payload: JsonMap, signal?: AbortSignal) {
-  const raw = edits(payload)
-  const targets = raw.map(edit => ({ edit, target: editablePath(root, payload, edit.path) }))
-  assertUniqueResolved(targets.map(item => item.target))
-  const result = targets.map(({ edit, target }) => {
-    const before = editableText(target.file)
-    if (assetText(target.rel, before).redacted) throw new RpcError('path_rejected', '含凭据常量的资产仅提供只读预览，请在本地维护后重新读取')
-    const beforeHash = existsSync(target.file) ? sha256(before) : null
+  const targets = editLocations(root, payload)
+  const result = targets.map(({ edit, source, target }) => {
+    const before = editableText(source.file)
+    if (assetText(source.rel, before).redacted) throw new RpcError('path_rejected', '含凭据常量的资产仅提供只读预览，请在本地维护后重新读取')
+    const beforeHash = existsSync(source.file) ? sha256(before) : null
     if (edit.expected !== undefined && beforeHash !== edit.expected) throw new RpcError('conflict', '文件或存在状态已被修改', { path: target.rel, expected_sha256: edit.expected, actual_sha256: beforeHash })
     if (rejectsLlmApiKey(target.rel, edit.content)) throw new RpcError('secret_rejected', '拒绝写入 LLM API Key')
     if (target.rel.endsWith('/evaluation.md')) loadEvaluationPreview(root, edit.content)
-    return { path: target.rel, exists: beforeHash !== null, before_sha256: beforeHash, after_sha256: sha256(edit.content), changed: beforeHash === null || before !== edit.content, diff: simpleDiff(target.rel, assetText(target.rel, before).content, assetText(target.rel, edit.content).content), redacted: assetText(target.rel, before).redacted || assetText(target.rel, edit.content).redacted }
+    return { path: target.rel, ...(edit.moveTo ? { previous_path: source.rel } : {}), exists: beforeHash !== null, before_sha256: beforeHash, after_sha256: sha256(edit.content), changed: !!edit.moveTo || beforeHash === null || before !== edit.content, diff: simpleDiff(target.rel, assetText(source.rel, before).content, assetText(target.rel, edit.content).content), redacted: assetText(source.rel, before).redacted || assetText(target.rel, edit.content).redacted }
   })
   const dryRun = await validateDraft(root, payload, targets.map(({ edit, target }) => ({ rel: target.rel, content: edit.content })), signal)
   return ok({ edits: result, dry_run: dryRun })
@@ -1234,16 +1255,16 @@ function loadEvaluationPreview(root: string, content: string) {
 }
 
 async function applyEdit(root: string, payload: JsonMap, signal?: AbortSignal) {
-  const resolved = edits(payload).map(edit => {
-    const target = editablePath(root, payload, edit.path)
-    const before = editableText(target.file)
-    if (assetText(target.rel, before).redacted) throw new RpcError('path_rejected', '含凭据常量的资产仅提供只读预览，请在本地维护后重新读取')
+  const resolved = editLocations(root, payload).map(({ edit, source, target }) => {
+    const before = editableText(source.file)
+    if (assetText(source.rel, before).redacted) throw new RpcError('path_rejected', '含凭据常量的资产仅提供只读预览，请在本地维护后重新读取')
     if (edit.expected === undefined) throw new RpcError('invalid_request', '写入必须提供 expected_sha256，新文件使用 null', { path: target.rel })
-    const beforeHash = existsSync(target.file) ? sha256(before) : null
+    const beforeHash = existsSync(source.file) ? sha256(before) : null
     if (beforeHash !== edit.expected) throw new RpcError('conflict', '文件或存在状态已被修改', { path: target.rel, expected_sha256: edit.expected, actual_sha256: beforeHash })
     if (rejectsLlmApiKey(target.rel, edit.content)) throw new RpcError('secret_rejected', '拒绝写入 LLM API Key')
     if (target.rel.endsWith('/evaluation.md')) loadEvaluationPreview(root, edit.content)
-    return { ...target, content: edit.content, expected: edit.expected, before: beforeHash === null ? null : before }
+    return { ...target, source, moved: !!edit.moveTo, mode: beforeHash === null ? undefined : lstatSync(source.file).mode & 0o777,
+      content: edit.content, expected: edit.expected, before: beforeHash === null ? null : before }
   })
   assertUniqueResolved(resolved)
   const dryRun = await validateDraft(root, payload, resolved, signal)
@@ -1251,21 +1272,30 @@ async function applyEdit(root: string, payload: JsonMap, signal?: AbortSignal) {
   // dry 期间原文件可能变化；校验全部哈希后同步写入，避免异步交错。
   for (const item of resolved) {
     assertNoSymlinkPath(root, item.file)
-    if ((existsSync(item.file) ? sha256(editableText(item.file)) : null) !== item.expected) throw new RpcError('conflict', '文件或存在状态已被修改', { path: item.rel })
+    assertNoSymlinkPath(root, item.source.file)
+    if ((existsSync(item.source.file) ? sha256(editableText(item.source.file)) : null) !== item.expected || (item.moved && existsSync(item.file))) throw new RpcError('conflict', '文件或存在状态已被修改', { path: item.rel })
   }
   const written: typeof resolved = []
   try {
-    for (const item of resolved) { atomicWrite(item.file, item.content); written.push(item) }
+    for (const item of resolved) {
+      atomicWrite(item.file, item.content); written.push(item)
+      if (item.moved) { chmodSync(item.file, item.mode!); rmSync(item.source.file) }
+    }
   } catch (error) {
     for (const item of written.reverse()) {
       // 仅恢复本次实际写入且未被并行修改的内容。
       if (!existsSync(item.file) || sha256(editableText(item.file)) !== sha256(item.content)) continue
-      if (item.before === null) rmSync(item.file)
+      if (item.moved) {
+        if (existsSync(item.source.file)) {
+          if (sha256(editableText(item.source.file)) !== item.expected) continue
+        } else { atomicWrite(item.source.file, item.before!); chmodSync(item.source.file, item.mode!) }
+        rmSync(item.file)
+      } else if (item.before === null) rmSync(item.file)
       else atomicWrite(item.file, item.before)
     }
     throw error
   }
-  return ok({ written: resolved.map(item => ({ path: item.rel, sha256: sha256(item.content) })), dry_run: dryRun })
+  return ok({ written: resolved.map(item => ({ path: item.rel, ...(item.moved ? { previous_path: item.source.rel } : {}), sha256: sha256(item.content) })), dry_run: dryRun })
 }
 
 async function cases(root: string, payload: JsonMap, signal?: AbortSignal) {
@@ -1340,6 +1370,15 @@ function evalArgs(payload: JsonMap, dryRun: boolean, modelPolicyPath?: string, m
   const args = [DSH_EVAL, '--source', source, '--mode', optionalString(payload, 'mode') ?? 'fast', '--executor', optionalString(payload, 'executor') ?? 'api', '--review', optionalString(payload, 'review') ?? 'none']
   const cases = payload.cases
   if (Array.isArray(cases)) for (const item of cases) if (typeof item === 'string' && item) args.push('--case', item)
+  if (payload.concurrency !== undefined) {
+    if (typeof payload.concurrency !== 'number' || !Number.isInteger(payload.concurrency) || payload.concurrency < 1 || payload.concurrency > 8) throw new RpcError('invalid_request', 'Case 并发数必须为 1–8')
+    args.push('--concurrency', String(payload.concurrency))
+  }
+  if (payload.parallel_cases !== undefined) {
+    if (!Array.isArray(payload.parallel_cases) || new Set(payload.parallel_cases).size !== payload.parallel_cases.length
+      || payload.parallel_cases.some((id: unknown) => typeof id !== 'string' || !/^U-[A-Z0-9-]+$/.test(id))) throw new RpcError('invalid_request', 'parallel_cases 须为互不影响的独立 Case ID，不能重复')
+    for (const id of payload.parallel_cases) args.push('--parallel-case', id)
+  }
   const model = optionalString(payload, 'model')
   const compareTo = optionalString(payload, 'compare_to')
   if (model) args.push('--model', model)
@@ -1622,10 +1661,12 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
       if (endpoint.startsWith('compute-variants/')) {
         const method = endpoint.slice('compute-variants/'.length)
         const result = ['identity-preview', 'identity-apply'].includes(method) ? await variantIdentity(method, body, signal)
+          : method === 'prepare' ? await prepareComputeVariant(root, body, computeBuild, computeFreeze, signal)
           : ['build-preview', 'build'].includes(method) ? await computeBuild(method === 'build-preview' ? 'preview' : 'build', body, signal)
           : ['freeze-preview', 'freeze'].includes(method) ? await computeFreeze(method === 'freeze-preview' ? 'preview' : 'freeze', body, signal)
             : await computeVariants(method, body, signal)
-        return result.ok ? ok(result.value) : failure(new RpcError(result.error.code, result.error.message))
+        return result.ok ? ok(result.value) : failure(new RpcError(result.error.code, result.error.message,
+          'details' in result.error ? result.error.details as JsonMap : undefined))
       }
       switch (endpoint) {
         case 'research/read-reference': return ok(readResearchReference(root, body.topic))
@@ -1666,6 +1707,7 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
         case 'cases/create': return await caseManagement(endpoint, body, signal, peer)
         case 'eval/preview': return await evalPreview(root, body, signal, modelPolicy)
         case 'eval/start': return ok(await jobs.start(body))
+        case 'eval/batch-start': return ok({ jobs: await jobs.startBatch(body.requests, async request => { await evalPreview(root, request, signal, modelPolicy) }, signal) })
         case 'eval/list': return ok({ jobs: jobs.list().map(job => {
           const experimentId = job.source.startsWith('experiment:') ? job.source.slice('experiment:'.length) : null
           let agentId: string | null = null

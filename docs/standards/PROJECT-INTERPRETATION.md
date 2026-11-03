@@ -45,6 +45,7 @@ Evaluation 的规模由假设和拟得出的结论决定，不设固定 Case 数
 - 要扩大结论范围时，补充覆盖、反例和必要回归。
 - 同一次比较运行期间保持 Harness、输入和判断口径稳定；口径变化后重新运行受影响部分。
 - 每个 Agent 的当前业务测试只在 `evaluation.md` 维护；同一 Case 的名称、用户输入和预期结果聚合在一起。Experiment 不保存本地评测计划；Run 锁定所选 Case 的完整快照，作为不可编辑的执行事实而不是维护投影。
+- 版本与变体共用的业务预期、稳定 API 能力命名及环境适配，统一遵循数据工作区的[评测口径与输入](https://github.com/wr5912/harness-engineering-platform-data/blob/main/docs/harness-research/evaluation-and-evidence.md#口径与输入)；平台用例工具与生成说明引用该口径。
 - 原始观察不得为了形成漂亮结论而静默改写；重新执行使用新的 `run_id`。
 
 运行记录位于：

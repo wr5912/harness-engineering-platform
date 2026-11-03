@@ -1283,6 +1283,15 @@ def asset_dependency_mounts(contract: dict) -> list[dict]:
     return mounts
 
 
+def runtime_mounts(contract: dict, analysis_workspace: str | None = None) -> list[dict]:
+    mounts = asset_dependency_mounts(contract)
+    if analysis_workspace or contract.get("business_control") or not contract.get("experiment_id"):
+        return mounts
+    prepared = run([NODE_EXECUTABLE, str(ADAPTER / "harness-runtime.mts"), "--private-files",
+                    str(REPO), contract["experiment_id"]])
+    return mounts + json.loads(prepared.stdout)
+
+
 def write_instance(name: str, *, mode: str, contract: dict, port: int,
                    image_id: str | None = None, lan_access: bool = False,
                    analysis_workspace: str | None = None,
@@ -1352,7 +1361,7 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
         managed_patch_compat=bool(contract.get("runtime_managed_patch")),
         harness_runtime=bool(contract.get("harness_runtime")) and not analysis_workspace,
         project_workspace=bool(contract.get("project_workspace_host")) and not analysis_workspace,
-        dependency_mounts=asset_dependency_mounts(contract),
+        dependency_mounts=runtime_mounts(contract, analysis_workspace),
     )
     business = None
     if contract.get("business_control"):
@@ -2162,7 +2171,7 @@ def _command_sdk_run(args: argparse.Namespace) -> None:
                   "homeDirectory": selected_home_directory(args.name, current), "reuseHome": current is not None,
                   "contract": contract, "identity": identity, "manifest": manifest, "input": payload,
                   "selection": policy["default"] or policy.get("resolved_model_bindings", {}).get("main"), "environmentNames": runtime_env_names(contract),
-                  "dependencyMounts": asset_dependency_mounts(contract),
+                  "dependencyMounts": runtime_mounts(contract),
                   "modelPatch": model_policy_patch(policy, source_local_model_routes(contract)),
                   "modelRuntime": str(MODEL_RUNTIME_HOST), "modelBinding": str(MODEL_BINDING_HOST)}
         launch_path = target / "sdk-launch.json"
@@ -2926,7 +2935,7 @@ def preflight_new_instance(args: argparse.Namespace, contract: dict) -> None:
             schedule_compat=not analysis_workspace and needs_schedule_compat(contract.get("profile_manifest")),
             harness_runtime=bool(contract.get("harness_runtime")) and not analysis_workspace,
             project_workspace=bool(contract.get("project_workspace_host")) and not analysis_workspace,
-            dependency_mounts=asset_dependency_mounts(contract),
+            dependency_mounts=runtime_mounts(contract, analysis_workspace),
         )
         business = None
         if contract.get("business_control"):

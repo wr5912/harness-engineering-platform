@@ -1,0 +1,254 @@
+{
+  "at": "2026-11-03T07:48:10.192Z",
+  "experiment_id": "VAR-security-operations-expert-003-r6fcbc8e8f093",
+  "moves": {
+    "business-context-projection.ts": "compute-workflow/routing/business-context-projection.ts",
+    "business-continuation.ts": "compute-workflow/business/business-continuation.ts",
+    "business-contract.ts": "compute-workflow/business/business-contract.ts",
+    "inspection-preparation-runtime.ts": "compute-workflow/business/inspection-preparation-runtime.ts",
+    "inspection-preparation-runtime.mjs": "compute-workflow/business/inspection-preparation-runtime.mjs",
+    "inspection-triage.ts": "compute-workflow/routing/inspection-triage.ts",
+    "kev-hybrid-draft.ts": "compute-workflow/kev-hybrid-draft.ts",
+    "kev-typesafe-transport.ts": "compute-workflow/models/kev-typesafe-transport.ts",
+    "qwen-language-adapter.ts": "compute-workflow/models/qwen-language-adapter.ts",
+    "routing-projection-v2.ts": "compute-workflow/routing/routing-projection-v2.ts",
+    "routing-projection.ts": "compute-workflow/routing/routing-projection.ts",
+    "security-routing-training.py": "compute-workflow/training/security-routing-training.py",
+    "state-constructor.manifest.json": "compute-workflow/state-constructor.manifest.json"
+  },
+  "preview": {
+    "dry_run": {
+      "mode": "dry",
+      "preflight_scope": "changed-files",
+      "checks": [
+        "草稿格式",
+        "JavaScript 语法（仅本次草稿）"
+      ],
+      "note": "仅检查本次文件；未执行源码、评测、模型或业务工具，未启动实例或创建 Run。"
+    },
+    "edits": [
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/routing/business-context-projection.ts",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/business-context-projection.ts",
+        "exists": true,
+        "before_sha256": "d285b174879066560e0444f029be3fd630f4e5f9320679e8d486083f72e6465a",
+        "after_sha256": "d285b174879066560e0444f029be3fd630f4e5f9320679e8d486083f72e6465a",
+        "changed": true,
+        "redacted": false
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/business/business-continuation.ts",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/business-continuation.ts",
+        "exists": true,
+        "before_sha256": "9ce0dd191199c12547c7217725a7d2ef70ed33984c8d14dfbc036e64da0f433d",
+        "after_sha256": "dd72663513d80f90f00df7056bb5dc23dddd93392c0590d98cbe089c1b83a1e6",
+        "changed": true,
+        "redacted": false
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/business/business-contract.ts",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/business-contract.ts",
+        "exists": true,
+        "before_sha256": "6c24e53a6ebb44989b0d3d8bb2442224e379b762777317102561030c67a06615",
+        "after_sha256": "6c24e53a6ebb44989b0d3d8bb2442224e379b762777317102561030c67a06615",
+        "changed": true,
+        "redacted": false
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/business/inspection-preparation-runtime.ts",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/inspection-preparation-runtime.ts",
+        "exists": true,
+        "before_sha256": "933857e4f577d298b3502b0ae8765acb8a3dd1733b83f0dbd20d6d929e8c2d51",
+        "after_sha256": "f9a5307cca7ade807ef97e2a093c1e5d6a4546865112e73aec59ab6ff9d40168",
+        "changed": true,
+        "redacted": false
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/business/inspection-preparation-runtime.mjs",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/inspection-preparation-runtime.mjs",
+        "exists": true,
+        "before_sha256": "31432a4ddfd075c44e26b44c657d84a33aafc8cdb29693adae53c58fc5538bd7",
+        "after_sha256": "31432a4ddfd075c44e26b44c657d84a33aafc8cdb29693adae53c58fc5538bd7",
+        "changed": true,
+        "redacted": false
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/routing/inspection-triage.ts",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/inspection-triage.ts",
+        "exists": true,
+        "before_sha256": "4cec9da5287df947db958c127e09bd9050bdb9cda2b0c0dad0504cdadde08495",
+        "after_sha256": "4cec9da5287df947db958c127e09bd9050bdb9cda2b0c0dad0504cdadde08495",
+        "changed": true,
+        "redacted": false
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/kev-hybrid-draft.ts",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/kev-hybrid-draft.ts",
+        "exists": true,
+        "before_sha256": "9b4c156d8d52443f60eb717904c2e55174e854f170e420d13f80ef4452ba1e99",
+        "after_sha256": "b2ea0d2220ceee9d2df115c84d11f52d12be712a9de432817d3a0d19827f4d48",
+        "changed": true,
+        "redacted": false
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/models/kev-typesafe-transport.ts",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/kev-typesafe-transport.ts",
+        "exists": true,
+        "before_sha256": "a622960912e293c6b12ba0f3f0fad9176785e3b9c85af71a71e01e2deb612935",
+        "after_sha256": "c0bc462596128d9297378dc185b2ecb8db264e0656a5e31ccb680919e549091c",
+        "changed": true,
+        "redacted": false
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/models/qwen-language-adapter.ts",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/qwen-language-adapter.ts",
+        "exists": true,
+        "before_sha256": "6d40c86a4f82da896c2e907b72adc436a7cf4372a16e3a60929913a5deee10d9",
+        "after_sha256": "6d40c86a4f82da896c2e907b72adc436a7cf4372a16e3a60929913a5deee10d9",
+        "changed": true,
+        "redacted": false
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/routing/routing-projection-v2.ts",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/routing-projection-v2.ts",
+        "exists": true,
+        "before_sha256": "b32c06a1e567ad620243f0d82e106eb3c0175e51e601c8f245d1d713df38d4ac",
+        "after_sha256": "b32c06a1e567ad620243f0d82e106eb3c0175e51e601c8f245d1d713df38d4ac",
+        "changed": true,
+        "redacted": false
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/routing/routing-projection.ts",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/routing-projection.ts",
+        "exists": true,
+        "before_sha256": "1a57e4b9c2d51ecb30a9c6ee65bee52ab36ffa1ffb489d3b076689eb465f4ad4",
+        "after_sha256": "1a57e4b9c2d51ecb30a9c6ee65bee52ab36ffa1ffb489d3b076689eb465f4ad4",
+        "changed": true,
+        "redacted": false
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/training/security-routing-training.py",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/security-routing-training.py",
+        "exists": true,
+        "before_sha256": "9f81902896c71b5c0fd48df39b0a03adfb47ef3010d95daf8f025ea133d398a3",
+        "after_sha256": "9f81902896c71b5c0fd48df39b0a03adfb47ef3010d95daf8f025ea133d398a3",
+        "changed": true,
+        "redacted": false
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/state-constructor.manifest.json",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/state-constructor.manifest.json",
+        "exists": true,
+        "before_sha256": "47bf0c8e99616eda74bca94c42ebcbeed44c07d5280de7264adc9f524a4d72ee",
+        "after_sha256": "fd5b31caae579082989bf5581c686e0a11e885d1d1dd10ba8c5b3b8f7cda27fe",
+        "changed": true,
+        "redacted": false
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/index.ts",
+        "exists": true,
+        "before_sha256": "78564513448c1c362afb0d4ddf8bf90269461a99557bc4f57d469947dccd87f9",
+        "after_sha256": "0b8fd18f280381c969d337605f086a2cd79f5af556b9433ba000115b828a40c4",
+        "changed": true,
+        "redacted": false
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/presets/security-operations-expert/agent.cordis.yml",
+        "exists": true,
+        "before_sha256": "4e990b3c39b4234fe1d2729db8f15671915ccd6823705f07482a8ddb3a44802b",
+        "after_sha256": "1c94b8a79034fb90a47777d9f37f2f60837c9e985613f01b9624bcc114061668",
+        "changed": true,
+        "redacted": false
+      }
+    ]
+  },
+  "applied": {
+    "written": [
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/routing/business-context-projection.ts",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/business-context-projection.ts",
+        "sha256": "d285b174879066560e0444f029be3fd630f4e5f9320679e8d486083f72e6465a"
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/business/business-continuation.ts",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/business-continuation.ts",
+        "sha256": "dd72663513d80f90f00df7056bb5dc23dddd93392c0590d98cbe089c1b83a1e6"
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/business/business-contract.ts",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/business-contract.ts",
+        "sha256": "6c24e53a6ebb44989b0d3d8bb2442224e379b762777317102561030c67a06615"
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/business/inspection-preparation-runtime.ts",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/inspection-preparation-runtime.ts",
+        "sha256": "f9a5307cca7ade807ef97e2a093c1e5d6a4546865112e73aec59ab6ff9d40168"
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/business/inspection-preparation-runtime.mjs",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/inspection-preparation-runtime.mjs",
+        "sha256": "31432a4ddfd075c44e26b44c657d84a33aafc8cdb29693adae53c58fc5538bd7"
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/routing/inspection-triage.ts",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/inspection-triage.ts",
+        "sha256": "4cec9da5287df947db958c127e09bd9050bdb9cda2b0c0dad0504cdadde08495"
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/kev-hybrid-draft.ts",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/kev-hybrid-draft.ts",
+        "sha256": "b2ea0d2220ceee9d2df115c84d11f52d12be712a9de432817d3a0d19827f4d48"
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/models/kev-typesafe-transport.ts",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/kev-typesafe-transport.ts",
+        "sha256": "c0bc462596128d9297378dc185b2ecb8db264e0656a5e31ccb680919e549091c"
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/models/qwen-language-adapter.ts",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/qwen-language-adapter.ts",
+        "sha256": "6d40c86a4f82da896c2e907b72adc436a7cf4372a16e3a60929913a5deee10d9"
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/routing/routing-projection-v2.ts",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/routing-projection-v2.ts",
+        "sha256": "b32c06a1e567ad620243f0d82e106eb3c0175e51e601c8f245d1d713df38d4ac"
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/routing/routing-projection.ts",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/routing-projection.ts",
+        "sha256": "1a57e4b9c2d51ecb30a9c6ee65bee52ab36ffa1ffb489d3b076689eb465f4ad4"
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/training/security-routing-training.py",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/security-routing-training.py",
+        "sha256": "9f81902896c71b5c0fd48df39b0a03adfb47ef3010d95daf8f025ea133d398a3"
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/state-constructor.manifest.json",
+        "previous_path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/state-constructor.manifest.json",
+        "sha256": "fd5b31caae579082989bf5581c686e0a11e885d1d1dd10ba8c5b3b8f7cda27fe"
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/managed/compute-workflow/index.ts",
+        "sha256": "0b8fd18f280381c969d337605f086a2cd79f5af556b9433ba000115b828a40c4"
+      },
+      {
+        "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/candidate/dsh/presets/security-operations-expert/agent.cordis.yml",
+        "sha256": "1c94b8a79034fb90a47777d9f37f2f60837c9e985613f01b9624bcc114061668"
+      }
+    ],
+    "dry_run": {
+      "mode": "dry",
+      "preflight_scope": "changed-files",
+      "checks": [
+        "草稿格式",
+        "JavaScript 语法（仅本次草稿）"
+      ],
+      "note": "仅检查本次文件；未执行源码、评测、模型或业务工具，未启动实例或创建 Run。"
+    }
+  },
+  "old_paths_absent": true,
+  "new_content_verified": true,
+  "scope": "文件迁移与引用更新，尚未重新构建或验证装载"
+}

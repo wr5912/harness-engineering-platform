@@ -132,6 +132,33 @@ class HarnessRuntimeTest(unittest.TestCase):
         self.assertEqual(json.loads(result.stdout)["status"], "pending")
         self.assertNotIn("ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX", result.stderr)
 
+    def test_private_runtime_files_mount_readonly_without_copying_home_or_exposing_content(self):
+        identifier = "VAR-sample-001-r0123456789ab"
+        parent = self.root / ".local/verification-private-files"
+        folder = parent / identifier
+        folder.mkdir(parents=True, mode=0o700)
+        parent.chmod(0o700)
+        secret = folder / "api-key.secret"
+        secret.write_text("private-test-value")
+        secret.chmod(0o600)
+        contract = {"experiment_id": identifier}
+        with mock.patch.object(dev, "REPO", self.root):
+            mounts = dev.runtime_mounts(contract)
+            self.assertEqual(mounts, [{"source": str(folder), "target": "/var/lib/dsh/private", "read_only": True}])
+            rendered = dev.render_compose((ADAPTER / "verification.compose.yaml").read_text(), mode="verification", name="private-role", project=dev.project_name("private-role"), port=18501, dependency_mounts=mounts)
+            self.assertIn('target: "/var/lib/dsh/private"\n        read_only: true', rendered)
+            self.assertNotIn("private-test-value", rendered)
+            self.assertEqual(dev.runtime_mounts(contract, "analysis"), [])
+            self.assertEqual(dev.runtime_mounts({**contract, "business_control": {"configured": True}}), [])
+            self.assertEqual(dev.runtime_mounts({"experiment_id": "EXP-sample-002-r0123456789ab"}), [])
+            secret.chmod(0o644)
+            with self.assertRaises(SystemExit):
+                dev.runtime_mounts(contract)
+            secret.unlink()
+            secret.symlink_to(self.root / "outside")
+            with self.assertRaises(SystemExit):
+                dev.runtime_mounts(contract)
+
     def test_project_only_legacy_instance_uses_volume_home_without_key_error(self):
         manifest = {"name": "legacy", "project_workspace_host": str(self.target / "project-workspace")}
         with mock.patch.object(dev, "run", return_value=subprocess.CompletedProcess([], 0, stdout="", stderr="")):

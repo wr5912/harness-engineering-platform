@@ -1,0 +1,132 @@
+{
+  "at": "2026-11-03T08:41:25.556Z",
+  "api": [
+    {
+      "agent": "asset-discovery-assistant",
+      "cases": 10,
+      "ids_match": true
+    },
+    {
+      "agent": "autonomous-training-researcher",
+      "cases": 3,
+      "ids_match": true
+    },
+    {
+      "agent": "daily-inspection-assistant",
+      "cases": 6,
+      "ids_match": true
+    },
+    {
+      "agent": "inspection-delivery-demo",
+      "cases": 4,
+      "ids_match": true
+    },
+    {
+      "agent": "multi-step-research-analyst",
+      "cases": 4,
+      "ids_match": true
+    },
+    {
+      "agent": "rc5-ui-acceptance-20261102",
+      "cases": 3,
+      "ids_match": true
+    },
+    {
+      "agent": "security-operations-expert",
+      "cases": 86,
+      "ids_match": true
+    },
+    {
+      "agent": "test01",
+      "cases": 1,
+      "ids_match": true
+    }
+  ],
+  "verified": [
+    {
+      "case_id": "U-INS-001",
+      "api_body_matches": true,
+      "editor_body_inputs_match": true,
+      "preview_visible": true,
+      "cancelled_without_write": true
+    },
+    {
+      "case_id": "U-NEW-008",
+      "api_body_matches": true,
+      "editor_body_inputs_match": true,
+      "preview_visible": true,
+      "cancelled_without_write": true
+    },
+    {
+      "case_id": "U-SCHED-004",
+      "api_body_matches": true,
+      "editor_body_inputs_match": true,
+      "preview_visible": true,
+      "cancelled_without_write": true
+    },
+    {
+      "case_id": "U-QA-008",
+      "api_body_matches": true,
+      "editor_body_inputs_match": true,
+      "preview_visible": true,
+      "cancelled_without_write": true
+    },
+    {
+      "case_id": "U-INS-009",
+      "api_body_matches": true,
+      "editor_body_inputs_match": true,
+      "preview_visible": true,
+      "cancelled_without_write": true
+    },
+    {
+      "case_id": "U-QA-015",
+      "api_body_matches": true,
+      "editor_body_inputs_match": true,
+      "preview_visible": true,
+      "cancelled_without_write": true
+    },
+    {
+      "case_id": "U-THREAT-RULE-REAL",
+      "api_body_matches": true,
+      "editor_body_inputs_match": true,
+      "preview_visible": true,
+      "cancelled_without_write": true
+    },
+    {
+      "case_id": "U-THREAT-RULE-CONFIRMATION",
+      "api_body_matches": true,
+      "editor_body_inputs_match": true,
+      "preview_visible": true,
+      "cancelled_without_write": true
+    }
+  ],
+  "layouts": [
+    {
+      "viewport": 1440,
+      "scroll": 1440,
+      "li_top": 585.96875,
+      "text_top": 589.96875,
+      "paragraph_margin": 0,
+      "ordered_items": 5
+    },
+    {
+      "viewport": 768,
+      "scroll": 768,
+      "li_top": 913.34375,
+      "text_top": 917.34375,
+      "paragraph_margin": 0,
+      "ordered_items": 5
+    },
+    {
+      "viewport": 390,
+      "scroll": 390,
+      "li_top": 1015.84375,
+      "text_top": 1019.84375,
+      "paragraph_margin": 0,
+      "ordered_items": 5
+    }
+  ],
+  "page_errors": [],
+  "writes_performed": false,
+  "scope": "真实开发平台：8 个智能体目录、8 条用例读取和编辑预览、3 种屏宽；不代表业务 Run 通过"
+}

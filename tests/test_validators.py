@@ -889,6 +889,11 @@ class RunRecordTests(unittest.TestCase):
             (experiment / "change.yaml").write_text("baseline_ref: none:first-experiment\n", encoding="utf-8")
             (experiment / "candidate").mkdir()
             (experiment / "candidate/basic.txt").write_text("最小 Candidate\n", encoding="utf-8")
+            (repo / "config").mkdir()
+            (repo / "config/business-model-default.json").write_text(json.dumps({"schema_version": "1.2",
+                "default": {"provider": "fixture", "model": "judge"}}))
+            (repo / f"agents/{AGENT_ID}").mkdir(parents=True)
+            (repo / f"agents/{AGENT_ID}/manifest.yaml").write_text(f"agent_id: {AGENT_ID}\n")
             subprocess.run(["git", "init", "-q", str(repo)], check=True)
             subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
             subprocess.run(["git", "-C", str(repo), "-c", "user.name=Test", "-c",
@@ -1161,6 +1166,23 @@ class RunRecordTests(unittest.TestCase):
 
 
 class DshEvalTests(unittest.TestCase):
+    def test_concurrent_stop_keeps_ordered_completed_subset_and_checks_cause(self) -> None:
+        module = runpy.run_path(str(DSH_EVAL))
+        cases = [{"case_id": f"U-CASE-{index:03}"} for index in range(1, 5)]
+        rows = [{"case_id": item["case_id"], "execution_status": "error" if index == 0 else "completed",
+                 "verdict": "inconclusive" if index == 0 else "passed", "observation": "实际完成记录",
+                 "evidence_ref": "evidence/" + item["case_id"],
+                 **({"failure_reason": "identity-drift"} if index == 0 else {})}
+                for index, item in enumerate([cases[0], cases[2]])]
+        value = {"rows": rows, "stop_reason": "identity-drift"}
+        normalized, stop_reason = module["normalize_runtime_rows"](value, cases, "api")
+        self.assertEqual(list(normalized), ["U-CASE-001", "U-CASE-003"])
+        self.assertEqual(stop_reason, "identity-drift")
+        for invalid in ({**value, "rows": list(reversed(rows))}, {"rows": rows},
+                        {**value, "rows": [rows[1]]}):
+            with self.subTest(invalid=invalid), self.assertRaises(module["EvaluationError"]):
+                module["normalize_runtime_rows"](invalid, cases, "api")
+
     def test_markdown_export_prefers_verified_target_tool_artifact_and_rejects_bad_digest(self) -> None:
         module = runpy.run_path(str(DSH_EVAL))
         with tempfile.TemporaryDirectory() as temp:

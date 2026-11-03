@@ -45,9 +45,17 @@ def evaluation_text(case_id: str, stage: str) -> str:
 """
 
 
+def configure_business_model(repo: Path) -> None:
+    (repo / "config").mkdir(exist_ok=True)
+    (repo / "config/business-model-default.json").write_text(json.dumps({
+        "schema_version": "1.2", "default": ReviewContractSnapshotTests.ROUTE}))
+    (repo / "agents/example-agent/manifest.yaml").write_text("agent_id: example-agent\n")
+
+
 def recorded_run(module, repo: Path, external_fixture: bytes | None = None,
                  role_fixture: bytes | None = None) -> tuple[Path, dict]:
     experiment = fixtures.write_minimal_experiment(repo)
+    configure_business_model(repo)
     if external_fixture is not None:
         fixture = experiment / "candidate/dsh/managed/compute-workflow/fixtures.json"
         fixture.parent.mkdir(parents=True)
@@ -136,6 +144,29 @@ class ReviewContractSnapshotTests(unittest.TestCase):
             configured = module.freeze_review_contract(repo, "example-agent", second, None)
             self.assertEqual(configured["model_route"], self.ROUTE)
             self.assertEqual(configured["model_policy_sha256"], explicit["model_policy_sha256"])
+
+    def test_workflow_target_keeps_its_binding_while_judge_uses_frozen_business_default(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            module = load_module(fixtures.RUN_RECORD, "workflow_review_policy")
+            source = self.policy(repo)
+            policy = json.loads(source.read_bytes())
+            workflow = {"provider": "harness-workflow", "model": "hybrid-v1", "reasoningEffort": "off"}
+            policy["allowed"].append({key: workflow[key] for key in ("provider", "model")})
+            policy["default"] = workflow
+            policy["patch"][0]["config"] = workflow
+            policy["harness_runtime"] = {"execution_mode": "hybrid", "model_bindings": {"main": workflow}}
+            source.write_text(json.dumps(policy))
+            original = source.read_bytes()
+            run = repo / "run"; run.mkdir()
+            contract = module.freeze_review_contract(repo, "example-agent", run, str(source))
+            frozen = json.loads((run / contract["model_policy_snapshot"]["path"]).read_bytes())
+            self.assertEqual(contract["model_route"], self.ROUTE)
+            self.assertEqual(frozen["patch"][0]["config"], self.ROUTE)
+            self.assertEqual(source.read_bytes(), original)
+            (repo / "config/business-model-default.json").write_text("{}")
+            import scenario_analysis
+            self.assertEqual(scenario_analysis._review_route(run, {"review_contract": contract}), self.ROUTE)
 
     def test_missing_actual_default_does_not_invent_a_review_model(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -337,7 +368,7 @@ class FrozenRunSnapshotTests(unittest.TestCase):
             self.assertEqual(inputs["program_origin"]["root"], str(module.PROGRAM_ROOT))
             self.assertNotEqual(str(repo), inputs["program_origin"]["root"])
             self.assertEqual(inputs["harness_review"], {"schema_version": 1, "generated": [], "sources": []})
-            for name in ("harness-runtime.mts", "platform/plugin/src/agents/asset-build.ts",
+            for name in ("harness-runtime.mts", "evaluation-case-scheduler.mts", "platform/plugin/src/agents/asset-build.ts",
                          "platform/plugin/src/agents/asset-build-core.ts", "platform/plugin/src/agents/asset-dependencies.ts",
                          "platform/plugin/src/models/harness-runtime.ts", "business.ts",
                          "platform/plugin/src/agents/compute-variants.ts",
@@ -422,6 +453,7 @@ class FrozenRunSnapshotTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             repo = Path(temporary)
             experiment = fixtures.write_minimal_experiment(repo)
+            configure_business_model(repo)
             evaluation = repo / "agents/example-agent/evaluation.md"
             case_id = "U-EXAMPLE-001"
             evaluation.write_text(evaluation_text(case_id, "初始化读取"), encoding="utf-8")
@@ -444,7 +476,8 @@ class FrozenRunSnapshotTests(unittest.TestCase):
             }
             args = argparse.Namespace(source=contract["source_id"], baseline_ref=None, case=[case_id],
                                       selection_mode="fast", kind="research", model=None,
-                                      executor="api", review_mode="none", compare_to=None)
+                                      executor="api", review_mode="none", compare_to=None,
+                                      case_concurrency=3, parallel_case=[case_id])
             # 只隔离此最小夹具不提供的来源解析；初始化、解析、摘要和写入执行实际代码。
             with mock.patch.object(module, "resolve", return_value=contract), \
                     mock.patch.object(module, "load_evaluation", side_effect=read_then_change) as read, \
@@ -453,6 +486,9 @@ class FrozenRunSnapshotTests(unittest.TestCase):
             self.assertEqual(read.call_count, 1)
             run_dir = experiment / "runs" / output.getvalue().strip()
             locked = json.loads((run_dir / "inputs.lock.json").read_text(encoding="utf-8"))
+            self.assertEqual(locked["judge_contract"]["model_route"], ReviewContractSnapshotTests.ROUTE)
+            self.assertEqual(locked["case_schedule"], {"concurrency": 3, "parallel_cases": [case_id]})
+            self.assertNotIn("review_contract", locked)
             self.assertEqual(locked["evaluation_cases"], frozen_cases)
             self.assertEqual(locked["case_catalog"], before["catalog"])
             self.assertEqual(locked["evaluation_sha256"], module.cases_digest(frozen_cases))

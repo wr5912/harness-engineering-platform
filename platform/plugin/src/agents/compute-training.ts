@@ -44,7 +44,9 @@ export async function inspectDecisionTraining(root: string, plan: {
         ids.add(meta.id)
         require(!groups.has(group) || groups.get(group) === partition, '训练、开发、校准和测试存在跨用途来源组泄漏')
         groups.set(group, partition)
-        require(typeof row.state === 'string' && row.questions && Object.keys(row.questions).length, '训练数据缺少原生 KEV state/questions')
+        const state = row.state
+        require((typeof state === 'string' ? state.trim().length : state && typeof state === 'object' && !Array.isArray(state) && Object.keys(state).length)
+          && row.questions && typeof row.questions === 'object' && !Array.isArray(row.questions) && Object.keys(row.questions).length, '训练数据缺少原生 KEV state/questions')
         for (const question of Object.values(row.questions) as any[]) {
           const key = JSON.stringify([row.state, question.type, question.instructions, question.criteria])
           require(!inputs.has(key) || inputs.get(key) === partition, '训练、开发、校准和测试存在相同决策输入泄漏')

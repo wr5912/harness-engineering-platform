@@ -231,7 +231,7 @@ test('智能体描述只投影已启用资产的名称、说明和发现的 Skil
   const fx = fixture()
   try {
     const base = 'evolution/experiments/EXP-test-agent-001/candidate'
-    write(join(fx.root, `${base}/harness.yaml`), readFileSync(join(fx.root, `${base}/harness.yaml`), 'utf8') + 'agent:\n  name: 当前启用智能体\n')
+    write(join(fx.root, `${base}/harness.yaml`), readFileSync(join(fx.root, `${base}/harness.yaml`), 'utf8') + 'agent:\n  name: 当前启用智能体\n  notes: 当前版本的补充说明\n')
     write(join(fx.root, `${base}/dsh/presets/test-agent/preset.yml`), 'description: 业务资产说明\n')
     write(join(fx.root, `${base}/dsh/workspace/.agents/skills/check-state/SKILL.md`), '---\nname: 状态核对\ndescription: 查询当前状态\n---\n\n# 状态核对\n')
     addVersion(fx.root, 'EXP-test-agent-002', 'status: draft\n')
@@ -243,9 +243,10 @@ test('智能体描述只投影已启用资产的名称、说明和发现的 Skil
     assert.equal(description.source.experimentId, 'EXP-test-agent-001')
     assert.equal(description.name, '当前启用智能体')
     assert.equal(description.description, '业务资产说明')
+    assert.equal(description.notes, '当前版本的补充说明')
     assert.deepEqual(description.skills.map(value => ({ ...value })), [{ skillId: 'check-state', skillName: '状态核对', skillDescription: '查询当前状态', verification: 'discovered' }])
     write(join(fx.root, 'agents/test-agent/manifest.yaml'), 'schema_version: 1.0\nagent_id: test-agent\nactive_experiment: null\n')
-    assert.deepEqual({ ...(await rpc(handler, 'description', { agent_id: 'test-agent' })) }, { agentId: 'test-agent', source: null, name: null, description: null, skills: [] })
+    assert.deepEqual({ ...(await rpc(handler, 'description', { agent_id: 'test-agent' })) }, { agentId: 'test-agent', source: null, name: null, description: null, notes: null, skills: [] })
   } finally {
     await rm(fx.root, { recursive: true, force: true })
   }
@@ -689,6 +690,44 @@ test('派生只校验选定固定父版，不执行全仓、评测或当前登�
   } finally { await rm(fx.root, { recursive: true, force: true }) }
 })
 
+test('同编号可创建不同随机后缀的副本，默认创建仍递增且父版不变', async () => {
+  const { createAgentsHandler } = await loadServer()
+  const fx = fixture()
+  try {
+    const handler = createAgentsHandler(fx.root)
+    const payload = { agent_id: 'test-agent', parent_ref: `git:${fx.commit}`, parent_experiment_id: 'EXP-test-agent-001', research_question: '保留编号复制父版' }
+    const parentFile = join(fx.root, 'evolution/experiments/EXP-test-agent-001/candidate/dsh/workspace/input.txt')
+    const original = readFileSync(parentFile, 'utf8')
+    const first = await rpc(handler, 'create', { ...payload, version_number: 27 })
+    const second = await rpc(handler, 'create', { ...payload, version_number: 27 })
+    for (const created of [first, second]) {
+      assert.match(created.experiment_id, /^EXP-test-agent-027-r[0-9a-f]{12}$/)
+      const root = join(fx.root, created.path)
+      const change = loadYaml(readFileSync(join(root, 'change.yaml'), 'utf8'))
+      assert.equal(change.parent_experiment_id, payload.parent_experiment_id)
+      assert.equal(change.parent_ref, payload.parent_ref)
+      assert.equal(readFileSync(join(root, 'candidate/dsh/workspace/input.txt'), 'utf8'), original)
+      assert.equal(existsSync(join(root, 'runs')), false)
+      assert.equal(existsSync(join(root, 'candidate/RuntimeHOME')), false)
+    }
+    assert.notEqual(first.experiment_id, second.experiment_id)
+    assert.match((await rpc(handler, 'create', payload)).experiment_id, /^EXP-test-agent-028-r[0-9a-f]{12}$/)
+    assert.equal(readFileSync(parentFile, 'utf8'), original)
+  } finally { await rm(fx.root, { recursive: true, force: true }) }
+})
+
+test('非法指定编号在创建前拒绝，不留下版本目录', async () => {
+  const { createAgentsHandler } = await loadServer()
+  const fx = fixture()
+  try {
+    const handler = createAgentsHandler(fx.root)
+    for (const version_number of [0, -1, 1000, 27.5, '027', null]) {
+      await assert.rejects(() => rpc(handler, 'create', { agent_id: 'test-agent', parent_ref: `git:${fx.commit}`, parent_experiment_id: 'EXP-test-agent-001', research_question: '非法编号', version_number }), /version_number 必须是 1–999 的整数/)
+    }
+    assert.deepEqual(readdirSync(join(fx.root, 'evolution/experiments')), ['EXP-test-agent-001'])
+  } finally { await rm(fx.root, { recursive: true, force: true }) }
+})
+
 test('父版缺少装载入口时完整清理本次目录，不触碰其他版本', async () => {
   const { createAgentsHandler } = await loadServer()
   const fx = fixture()
@@ -804,6 +843,70 @@ test('新建源码以 null 固定不存在状态，空文件并发创建后拒�
     await rpc(handler, 'edit/apply', { experiment_id: 'EXP-test-agent-001', edits: [{ ...edits[0], expected_sha256: existing.sha256 }] })
     assert.equal(readFileSync(actual, 'utf8'), edits[0].content)
   } finally { await rm(fx.root, { recursive: true, force: true }) }
+})
+
+test('移动源码和更新引用同批完成，保留权限并拒绝摘要冲突、覆盖与交叉路径', async () => {
+  const { createAgentsHandler } = await loadServer()
+  const fx = fixture(), experiment_id = 'EXP-test-agent-001'
+  const root = join(fx.root, `evolution/experiments/${experiment_id}`)
+  try {
+    const handler = createAgentsHandler(fx.root)
+    const path = 'candidate/dsh/managed/adapter.ts', move_to = 'candidate/dsh/managed/compute-workflow/models/adapter.ts'
+    const entry = 'candidate/dsh/managed/compute-workflow/index.ts'
+    write(join(root, path), 'export const ready = true\n'); chmodSync(join(root, path), 0o755)
+    write(join(root, entry), "export { ready } from '../adapter.ts'\n")
+    const source = await rpc(handler, 'edit/read', { experiment_id, path })
+    assert.equal((await rpc(handler, 'edit/read', { experiment_id, path: move_to })).sha256, null)
+    const edits = [
+      { path, move_to, content: source.content, expected_sha256: source.sha256 },
+      { path: entry, content: "export { ready } from './models/adapter.ts'\n", expected_sha256: (await rpc(handler, 'edit/read', { experiment_id, path: entry })).sha256 },
+    ]
+    const preview = await rpc(handler, 'edit/preview', { experiment_id, edits })
+    assert.equal(preview.edits[0].previous_path, `evolution/experiments/${experiment_id}/${path}`)
+    assert.equal(preview.edits[0].changed, true)
+    assert.equal(existsSync(join(root, move_to)), false)
+    await assert.rejects(() => rpc(handler, 'edit/apply', { experiment_id, edits: [{ ...edits[0], expected_sha256: 'stale' }] }), /conflict:/)
+    write(join(root, move_to), 'parallel\n')
+    await assert.rejects(() => rpc(handler, 'edit/apply', { experiment_id, edits }), /conflict:/)
+    assert.equal(readFileSync(join(root, move_to), 'utf8'), 'parallel\n')
+    await rm(join(root, move_to))
+    await assert.rejects(() => rpc(handler, 'edit/apply', { experiment_id, edits: [edits[0], { path: move_to, content: 'duplicate', expected_sha256: null }] }), /重复路径/)
+    for (const destination of [path, 'decision.md', 'agents/test-agent/evaluation.md']) {
+      await assert.rejects(() => rpc(handler, 'edit/apply', { experiment_id, edits: [{ ...edits[0], move_to: destination }] }), /path_rejected:/)
+    }
+    await assert.rejects(() => rpc(handler, 'edit/apply', { experiment_id, edits: [{ ...edits[0], move_to: 'candidate/dsh/managed/compute-workflow/models/adapter.mjs', content: 'export const =' }] }), /语法校验失败/)
+    assert.equal(readFileSync(join(root, path), 'utf8'), source.content)
+    const saved = await rpc(handler, 'edit/apply', { experiment_id, edits })
+    assert.equal(saved.written[0].previous_path, preview.edits[0].previous_path)
+    assert.equal(existsSync(join(root, path)), false)
+    assert.equal(readFileSync(join(root, move_to), 'utf8'), source.content)
+    assert.equal(statSync(join(root, move_to)).mode & 0o777, 0o755)
+    assert.equal(readFileSync(join(root, entry), 'utf8'), edits[1].content)
+  } finally { await rm(fx.root, { recursive: true, force: true }) }
+})
+
+test('移动后同批写入失败恢复源文件、执行位与旧引用', async () => {
+  if (process.getuid?.() === 0) return
+  const { createAgentsHandler } = await loadServer()
+  const fx = fixture(), experiment_id = 'EXP-test-agent-001'
+  const root = join(fx.root, `evolution/experiments/${experiment_id}`)
+  const path = 'candidate/dsh/managed/script.sh', move_to = 'candidate/dsh/managed/compute-workflow/script.sh', second = 'candidate/dsh/managed/readonly/entry.ts'
+  const locked = dirname(join(root, second))
+  try {
+    const handler = createAgentsHandler(fx.root)
+    write(join(root, path), '#!/bin/sh\necho before\n'); chmodSync(join(root, path), 0o755)
+    write(join(root, second), "export const path = '../script.sh'\n")
+    chmodSync(locked, 0o555)
+    const edits = []
+    for (const item of [{ path, move_to, content: '#!/bin/sh\necho after\n' }, { path: second, content: "export const path = '../compute-workflow/script.sh'\n" }]) {
+      edits.push({ ...item, expected_sha256: (await rpc(handler, 'edit/read', { experiment_id, path: item.path })).sha256 })
+    }
+    await assert.rejects(() => rpc(handler, 'edit/apply', { experiment_id, edits }))
+    assert.equal(readFileSync(join(root, path), 'utf8'), '#!/bin/sh\necho before\n')
+    assert.equal(statSync(join(root, path)).mode & 0o777, 0o755)
+    assert.equal(existsSync(join(root, move_to)), false)
+    assert.equal(readFileSync(join(root, second), 'utf8'), "export const path = '../script.sh'\n")
+  } finally { chmodSync(locked, 0o755); await rm(fx.root, { recursive: true, force: true }) }
 })
 
 test('编辑保留普通文件权限和无变更权限，多文件失败恢复正文与执行位', async () => {

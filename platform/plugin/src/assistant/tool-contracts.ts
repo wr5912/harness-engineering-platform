@@ -7,7 +7,7 @@ export type AssistantDomain = 'agents' | 'instances' | 'mcp'
 type MapValue = Record<string, any>
 const migrationActions = ['migrations/inspect', 'migrations/read', 'migrations/preview', 'migrations/apply', 'migrations/status', 'migrations/resolve', 'assets/build-preview', 'assets/build', 'assets/dependencies/prepare']
 export const assistantActions: Record<AssistantDomain, readonly string[]> = {
-  agents: ['sdk/start', 'sdk/status', 'sdk/stop', 'sdk/list', 'sdk/guide', ...migrationActions, 'documents/read', 'research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'list', 'detail', 'edit/read', 'edit/preview', 'edit/apply', 'cases/list', 'cases/read', 'cases/update', 'eval/preview', 'eval/start', 'eval/status', 'eval/cancel', 'runs/index', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/source', 'compute-variants/identity-preview', 'compute-variants/identity-apply', 'compute-variants/preview', 'compute-variants/create', 'compute-variants/rename', 'compute-variants/build-preview', 'compute-variants/build', 'compute-variants/freeze-preview', 'compute-variants/freeze', 'compute-variants/compare', 'new', 'create', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'cases/create', 'datasets/source', 'datasets/preview', 'datasets/apply', 'datasets/list', 'datasets/read', 'datasets/review', 'datasets/export', 'decision/update', 'features/read-source', 'features/preview', 'features/proposal', 'features/apply', 'fusion/preview', 'fusion/proposal', 'fusion/confirm', 'fusion/status', 'fusion/verify', 'fusion/finalize', 'tasks/capabilities', 'tasks/assembly-preview', 'tasks/assembly-apply'],
+  agents: ['sdk/start', 'sdk/status', 'sdk/stop', 'sdk/list', 'sdk/guide', ...migrationActions, 'documents/read', 'research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'list', 'detail', 'edit/read', 'edit/preview', 'edit/apply', 'cases/list', 'cases/read', 'cases/update', 'eval/preview', 'eval/start', 'eval/batch-start', 'eval/status', 'eval/cancel', 'runs/index', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/source', 'compute-variants/identity-preview', 'compute-variants/identity-apply', 'compute-variants/preview', 'compute-variants/create', 'compute-variants/rename', 'compute-variants/plan-preview', 'compute-variants/plan-apply', 'compute-variants/prepare', 'compute-variants/build-preview', 'compute-variants/build', 'compute-variants/freeze-preview', 'compute-variants/freeze', 'compute-variants/compare', 'new', 'create', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'cases/create', 'datasets/source', 'datasets/preview', 'datasets/apply', 'datasets/list', 'datasets/read', 'datasets/review', 'datasets/export', 'decision/update', 'features/read-source', 'features/preview', 'features/proposal', 'features/apply', 'fusion/preview', 'fusion/proposal', 'fusion/confirm', 'fusion/status', 'fusion/verify', 'fusion/finalize', 'tasks/capabilities', 'tasks/assembly-preview', 'tasks/assembly-apply'],
   instances: ['list', 'detail', 'url', 'logs', 'preview', 'batch-preview', 'run', 'batch'],
   mcp: ['list', 'configuration', 'saveConfiguration', 'test', 'resources', 'resourceTemplates', 'readResource', 'callTool', 'sources/list', 'sources/create', 'sources/refresh', 'sources/toggle', 'sources/components', 'sources/logs', 'sources/preview', 'sources/invoke', 'saveCompositionDraft', 'publishComposition', 'executeComposition', 'dryRunComposition', 'callPublishedComposition', 'compositionRun', 'compositionArtifact', 'compositionSource', 'seedThreatCompositions', 'control/status', 'control/saveConfiguration', 'control/restrict', 'control/reassess', 'control/release'],
 }
@@ -24,6 +24,7 @@ export function allowedAssistantActions(domain: AssistantDomain, state: any): re
 
 const string = { type: 'string' }, strings = { type: 'array', items: string }, object = { type: 'object', additionalProperties: true }
 const fields: MapValue = {
+  version_number: { type: 'integer', minimum: 1, maximum: 999, description: '可选版本编号，如 27 表示 027；保留父版编号创建副本时传入该编号。省略时递增；完整 ID 的随机后缀始终由平台生成，同编号可存在多个不同后缀的版本。' },
   source_ref: { type: 'string', pattern: '^git:[a-f0-9]{40}$', description: '可选固定来源；Candidate、Case、角色绑定均读取同一 Git 提交，Run 仍保存到原版本。' },
   evaluation_source: { type: 'string', enum: ['source', 'current'], description: '默认 source 沿用所选来源的 Case；current 明确用当前工作区 Case 评测固定 Candidate，所选口径随 Run 冻结。' },
   mcp_fixture: { type: 'object', required: ['schema_version', 'mode', 'connections'], additionalProperties: false, properties: {
@@ -56,7 +57,7 @@ const fields: MapValue = {
   split: { type: 'string', enum: ['unassigned', 'train', 'development', 'calibration', 'test'] },
   evaluation_cases: z.toJSONSchema(businessCasesSchema, { io: 'input' }),
   edits: { type: 'array', items: { type: 'object', required: ['path', 'content', 'expected_sha256'], additionalProperties: false,
-    properties: { path: string, content: { ...string, description: '修改后完整文件正文，不能省略或只提供补丁。' }, expected_sha256: { type: ['string', 'null'], description: 'edit/read 返回的原始摘要；新文件为 null。' } } } },
+    properties: { path: string, move_to: { ...string, description: '可选：将 path 移动到同一 Candidate 内尚不存在的文件路径，同时保存 content；摘要仍取源文件，目标须先读取为不存在。' }, content: { ...string, description: '修改后完整文件正文，不能省略或只提供补丁。' }, expected_sha256: { type: ['string', 'null'], description: 'edit/read 返回的原始摘要；新文件为 null。' } } } },
   features: { type: 'array', items: { type: 'object', required: ['id', 'title', 'description'], additionalProperties: false,
     properties: { id: string, title: string, description: string, source_refs: strings, evidence_refs: strings, change: string } } },
   ops: { type: 'array', items: { type: 'object', properties: { op: { type: 'string', enum: ['set', 'unset'] }, path: strings, value: {} }, required: ['op', 'path'] } },
@@ -110,13 +111,14 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['sdk/start', 'source instance_id input session_id request_id', '启动同容器官方 TypeScript SDK 调试。request_id 固定，重试必须保持同一请求；刷新只用 sdk/status 查询，不重放输入。'],
     ['sdk/status sdk/stop', 'operation_id', '停止会关闭本次 Runtime，保留 HOME；结果未知时核对原实例，不自动重跑。'],
     ['sdk/list sdk/guide', 'source', 'source 必须指向 SDK 型版本，返回该版本的调试记录或业务集成用 TypeScript 调用示例与接入说明。开发 DSH 插件和工具时，读取锁定 Runtime 的插件与工具公开合同。'],
-    ['create', 'agent_id parent_experiment_id parent_ref research_question', 'parent_ref 使用固定 git:<40位commit>；创建版本不表示已融合验证。'],
-    ['edit/read', 'experiment_id path'], ['edit/preview edit/apply', 'experiment_id edits', '先 edit/read，每次提交实际文件正文和原摘要；写入遵循 DSH 原生权限与当前任务范围。'],
+    ['create', 'agent_id parent_experiment_id parent_ref research_question version_number', 'parent_ref 使用固定 git:<40位commit>；保留编号复制时传 version_number（如 27），平台生成不同的随机后缀，不需改为新编号；创建版本不表示已融合验证。'],
+    ['edit/read', 'experiment_id path'], ['edit/preview edit/apply', 'experiment_id edits', '先 edit/read，每次提交实际文件正文和原摘要；可用 edits[].move_to 在同一 Candidate 内移动文件到已读取确认不存在的路径，同批更新引用，目标已存在时拒绝覆盖。写入遵循 DSH 原生权限与当前任务范围。'],
     ['assets/diff', 'experiment_id path against baseline_experiment_id', '先省略 path 列差异，再用返回的 path 读完整差异；against=baseline 或指定比较方式。'], ['assets/read-fixed', 'agent_id experiment_id ref path', 'ref 必须为固定 git:<40位commit>；省略 path 可先列目录。'],
     ['cases/list cases/create-context', 'agent_id experiment_id'], ['cases/read', 'agent_id experiment_id case_id'],
     ['cases/from-run', 'agent_id experiment_id run_id case_id'],
-    ['cases/update cases/create-preview cases/create', 'agent_id experiment_id case_id title scene inputs expected_behavior fast expected_sha256 source_run_id source_case_id', '先读用例或 create-context；inputs 为非空字符串数组，expected_sha256 取原文件摘要。新建先 create-preview。'],
-    ['eval/preview eval/start', 'source source_ref evaluation_source mcp_fixture cases mode executor review model model_selection compare_to artifact_export', 'source=experiment:<ID>；cases 为固定 Case ID 数组。source_ref 可固定历史来源；evaluation_source=current 明确改用当前 Case，不改变固定 Candidate。mcp_fixture 明确 Mock 边界并随 Run 封存，不修改原连接或 Candidate，不代表真实业务系统验收。model 是原有断言，model_selection 是本次主角色原生模型选择；省略时读取所选来源的版本绑定。preview 不执行评测，start 返回 job_id。'],
+    ['cases/update cases/create-preview cases/create', 'agent_id experiment_id case_id title scene inputs expected_behavior fast expected_sha256 source_run_id source_case_id', '先读用例或 create-context，并按 evaluation-review 核对共用业务口径；预期写业务过程与结果模式，使用已核验 API 名称、operationId 或中文能力名，不绑定 MCP 运行时 ID、KEV 等实现路线或特定环境。inputs 为非空字符串数组，expected_sha256 取原文件摘要。新建先 create-preview。'],
+    ['eval/preview eval/start', 'source source_ref evaluation_source mcp_fixture cases mode executor review model model_selection compare_to artifact_export concurrency parallel_cases request_id', 'source=experiment:<ID>；cases 为固定 Case ID 数组。source_ref 可固定历史来源；evaluation_source=current 明确改用当前 Case，不改变固定 Candidate。mcp_fixture 明确 Mock 边界并随 Run 封存，不修改原连接或 Candidate，不代表真实业务系统验收。model 是原有断言，model_selection 是本次主角色原生模型选择；省略时读取所选来源的版本绑定。preview 不执行评测，start 返回 job_id。'],
+    ['eval/batch-start', 'requests', '连续预检并启动1–8个固定来源评测；requests内每项使用eval/start参数并必须提供不同的request_id和固定source_ref。恢复时原样重传整批，已结束或运行中的任务均不重放；来源、用例或模型变化另建请求。'],
     ['eval/status eval/cancel', 'job_id'], ['runs/index', 'agent_id experiment_id'],
     ['runs/show', 'run_id case_id'], ['runs/report runs/files', 'run_id'], ['runs/read-file', 'run_id path'],
     ['runs/evidence', 'run_id case_id filename'], ['runs/compare', 'left right case_id'], ['runs/trace', 'run_id path source_sha256 cursor limit session_log'],
@@ -139,6 +141,8 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['compute-variants/context', 'experiment_id', '先读取 generation_contract 和固定父版；不凭空编造 SDK 能力。'],
     ['compute-variants/preview compute-variants/create', 'agent_id parent_experiment_id parent_ref variant_name strategy case_ids critical_case_ids min_runs_per_case max_pass_rate_drop_pp resource_metric min_resource_reduction_pct allow_model_change variant_model variant_reasoning_effort execution_mode model_roles decision_training generation', '使用 context 返回的生成合同；名称与策略分别提供。hybrid 双模型身份与单模型变更互斥。'],
     ['compute-variants/rename', 'experiment_id variant_name expected_change_sha256'],
+    ['compute-variants/plan-preview compute-variants/plan-apply', 'experiment_id case_ids expected_change_sha256 expected_preview_sha256', '共享用例修订后重新确认已有探索性变体计划；保留全部原 Case，可明确新增 Case，不改变父版、训练、模型及质量和资源阈值。apply 传真实预览的两个摘要，随后重新冻结并执行新 Run；保留历史 Run。'],
+    ['compute-variants/prepare', 'experiment_id entry_path case_ids', '连续核对构建摘要，必要时构建，再本地冻结；返回固定source_ref和各步复用情况。源码审阅及研究计划确定后使用；不训练、不启动业务或评测。中断后重试核对当前摘要，不重复有效构建。'],
     ['compute-variants/build-preview compute-variants/build', 'experiment_id entry_path expected_candidate_sha256 expected_preview_sha256', '先读取源码后构建；执行时服务器生成并校验真实构建预览。'],
     ['compute-variants/freeze-preview compute-variants/freeze', 'experiment_id case_ids evaluation_base_sha256 expected_preview_sha256', '使用 freeze-preview 返回的 freeze_input，核对真实差异与摘要；冻结遵循 DSH 原生权限；不得用 human_confirmed 代替人员复核。'],
     ['compute-variants/compare', 'experiment_id parent_run_ids variant_run_ids', '比较固定父版与变体的真实 Run；助手不能确认 end。'],
@@ -147,10 +151,16 @@ const hints: Record<AssistantDomain, Hint[]> = {
   ],
 }
 
-export function assistantActionContract(domain: AssistantDomain, action: string) {
+export function assistantActionContract(domain: AssistantDomain, action: string): { domain: AssistantDomain; action: string; input_schema: MapValue; instructions: string } {
   const hint = hints[domain].find(([names]) => names.split(' ').includes(action))
   if (!hint) throw new Error('未知的领域操作合同')
   const properties = Object.fromEntries(hint[1].split(' ').filter(Boolean).map(key => [key, fields[key] ?? (/^(?:.*_id|.*_sha256|.*_ref|agent_id|source|target_source|name|description|role|path|ref|content|title|scene|expected_behavior|mode|executor|review|model|compare_to|left|right|filename|status|outcome|operation|serverId|sourceId|componentId|compositionId|artifactId|toolName|specUrl|uri|version|revision|topic|variant_name|strategy|resource_metric|variant_model|variant_reasoning_effort|entry_path|check_id)$/.test(key) ? string : {})]))
+  if (action === 'eval/preview' || action === 'eval/start') {
+    properties.concurrency = { type: 'integer', minimum: 1, maximum: 8, description: '独立 Case 并发上限，默认1；只并行 parallel_cases，其他用例独占执行。' }
+    properties.parallel_cases = { ...strings, description: '已确认互不影响的所选 Case ID；同一业务资源的写操作不得并行。' }
+    properties.request_id = { ...string, description: 'UUID v4；重试同一请求保留此值，参数变化另建请求；不会重放原任务。' }
+  }
+  if (action === 'eval/batch-start') properties.requests = { type: 'array', minItems: 1, maxItems: 8, items: { ...assistantActionContract('agents', 'eval/start').input_schema, required: ['source', 'source_ref', 'request_id'] } }
   if (action === 'sdk/start') properties.input = { type: 'string', description: '本次真实调试输入。' }
   if (action === 'documents/read') {
     properties.cursor = { type: 'string', description: '上一次回执的 next_cursor，绑定原文件摘要与位置。' }

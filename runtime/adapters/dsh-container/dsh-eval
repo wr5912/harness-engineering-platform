@@ -178,7 +178,8 @@ def validate_after_run(contract: dict) -> None:
 def initialize_run(source: str, cases: list[dict], executor: str, selection_mode: str, review_mode: str,
                    model: str | None = None, compare_to: str | None = None,
                    source_ref: str | None = None, mcp_fixture: str | None = None,
-                   model_policy: str | None = None, evaluation_source: str | None = None) -> str:
+                   model_policy: str | None = None, evaluation_source: str | None = None,
+                   concurrency: int = 1, parallel_cases: list[str] | None = None) -> str:
     command = [
         sys.executable, str(RUN_RECORD), "--repo", str(REPO), "init",
         "--source", source, "--kind", "research", "--executor", executor,
@@ -186,6 +187,10 @@ def initialize_run(source: str, cases: list[dict], executor: str, selection_mode
     ]
     for case in cases:
         command.extend(("--case", case["case_id"]))
+    if concurrency != 1 or parallel_cases:
+        command.extend(("--case-concurrency", str(concurrency)))
+        for case_id in parallel_cases or []:
+            command.extend(("--parallel-case", case_id))
     if model:
         command.extend(("--model", model))
     if compare_to:
@@ -449,6 +454,7 @@ def driver_command(executor: str, image: str, evidence_root: Path) -> tuple[list
         "--mount", f"type=bind,src={driver},dst={container_driver},readonly",
         "--mount", f"type=bind,src={COMMON_DRIVER},dst=/opt/dsh/apps/web/dsh-eval-common.mjs,readonly",
         "--mount", f"type=bind,src={ADAPTER / 'evaluation-wait.mts'},dst=/opt/dsh/apps/web/evaluation-wait.mts,readonly",
+        "--mount", f"type=bind,src={ADAPTER / 'evaluation-case-scheduler.mts'},dst=/opt/dsh/apps/web/evaluation-case-scheduler.mts,readonly",
         "--mount", f"type=bind,src={evidence_root},dst=/work/evidence",
         image, container_driver,
     ], "/work/evidence")
@@ -463,6 +469,7 @@ def run_driver(
     timeout_seconds: int,
     image_ref: str,
     on_case=None,
+    schedule=None,
 ) -> dict:
     evidence_root.mkdir(parents=True, exist_ok=True)
     command, container_evidence = driver_command(executor, image_ref, evidence_root)
@@ -476,8 +483,11 @@ def run_driver(
         "cases": cases,
         "declared_guard": contract.get("guard"),
     }
+    if schedule:
+        payload.update(schedule)
     if executor == "api":
         payload["judge_preset_id"] = "evaluation-judge"
+        payload["judge_model_route"] = contract["judge_model_route"]
     outer_timeout = timeout_seconds * sum(len(case["inputs"]) + 2 for case in cases) + 90
     def collect_results():
         if on_case is None:
@@ -497,7 +507,8 @@ def run_driver(
     except (OSError, subprocess.TimeoutExpired) as error:
         raise EvaluationError(f"{executor} 评测未完成：{type(error).__name__}") from error
     if completed.returncode != 0:
-        raise EvaluationError(f"{executor} 评测失败（退出码 {completed.returncode}）")
+        detail = process_error_detail(completed.stderr, "子进程未提供错误说明")
+        raise EvaluationError(f"{executor} 评测失败（退出码 {completed.returncode}）：{detail}")
     try:
         value = json.loads(completed.stdout)
     except json.JSONDecodeError as error:
@@ -544,10 +555,10 @@ def normalize_runtime_rows(
     if stop_reason is None and returned_order != expected_order:
         raise EvaluationError(f"{executor} 评测未覆盖全部用例")
     if stop_reason is not None:
-        if not returned_order or returned_order != expected_order[:len(returned_order)]:
+        if not returned_order or returned_order != [case_id for case_id in expected_order if case_id in normalized]:
             raise EvaluationError(f"{executor} 停止前的 Case 顺序无效")
-        if normalized[returned_order[-1]].get("failure_reason") != stop_reason:
-            raise EvaluationError(f"{executor} 停止原因与最后一个 Case 不一致")
+        if not any(row.get("failure_reason") == stop_reason for row in normalized.values()):
+            raise EvaluationError(f"{executor} 停止原因与 Case 不一致")
     return normalized, stop_reason
 
 
@@ -690,11 +701,18 @@ def execute(args: argparse.Namespace) -> int:
     review_mode = "none" if args.executor == "browser" else args.review or ("ai" if selection_mode == "full" else "none")
     case_ids = select_case_ids(catalog, args.case, args.mode)
     cases = execution_for(evaluation_path, case_ids)
+    concurrency = getattr(args, "concurrency", 1)
+    parallel_cases = getattr(args, "parallel_case", [])
+    if not 1 <= concurrency <= 8 or len(set(parallel_cases)) != len(parallel_cases) or any(case_id not in case_ids for case_id in parallel_cases):
+        raise EvaluationError("并发数须为 1–8，parallel-case 须为所选用例中互不影响的独立 Case ID，不能重复")
+    if args.executor != "api" and (concurrency != 1 or parallel_cases):
+        raise EvaluationError("Case 并发仅支持 API 执行器")
     model_policy_path = getattr(args, "model_policy", None)
     expected_model = getattr(args, "model", None)
     plan = dry_run_payload(contract, cases, args.executor, args.mode, selection_mode, review_mode,
                            model_policy_path, expected_model,
                            source_only=source_only)
+    plan["case_schedule"] = {"concurrency": concurrency, "parallel_cases": parallel_cases}
     if args.compare_to:
         plan["compare_to_run_id"] = args.compare_to
     if source_ref:
@@ -737,12 +755,17 @@ def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict
     progress("创建并锁定 Research Run")
     try:
         selected_options = {key: getattr(args, key, None) for key in ("source_ref", "evaluation_source", "mcp_fixture", "model_policy") if getattr(args, key, None)}
+        if getattr(args, "concurrency", 1) != 1 or getattr(args, "parallel_case", []):
+            selected_options.update(concurrency=args.concurrency, parallel_cases=args.parallel_case)
         run_id = initialize_run(args.source, cases, args.executor, selection_mode, review_mode,
                                 args.model, args.compare_to, **selected_options)
         run_dir = Path(contract["experiment_root"]) / "runs" / run_id
         # 初始化后的冻结输入是执行与评审共同使用的事实源。
         locked_inputs = json.loads((run_dir / "inputs.lock.json").read_text(encoding="utf-8"))
         cases = locked_inputs["evaluation_cases"]
+        if args.executor == "api":
+            judge_contract = locked_inputs.get("review_contract") or locked_inputs["judge_contract"]
+            contract = {**contract, "judge_model_route": judge_contract["model_route"]}
         progress(f"Research Run: {run_id}")
         recorded: set[str] = set()
         instance_name = f"{contract['agent_id']}-eval-{uuid.uuid4().hex[:8]}"
@@ -795,18 +818,16 @@ def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict
                 run_driver(
                     args.executor, auth_url, cases, contract,
                     run_dir / "evidence", args.timeout_seconds, image_identity["image_ref"], persist_case,
+                    **({"schedule": locked_inputs["case_schedule"]} if "case_schedule" in locked_inputs else {}),
                 ),
                 cases,
                 args.executor,
             )
-            stop_index = None
             if stop_reason is not None:
-                stopped_case = next(reversed(runtime_rows))
-                stop_index = next(index for index, case in enumerate(cases) if case["case_id"] == stopped_case)
                 progress(f"{args.executor} 执行器停止：{stop_reason}")
-            for index, case in enumerate(cases):
-                value = write_unfinished_evidence(run_dir, case, stop_reason, "skipped") \
-                    if stop_index is not None and index > stop_index else runtime_rows[case["case_id"]]
+            for case in cases:
+                value = runtime_rows[case["case_id"]] if case["case_id"] in runtime_rows else \
+                    write_unfinished_evidence(run_dir, case, stop_reason, "skipped")
                 persist_case(case["case_id"], value)
                 if _cancel_requested:
                     raise KeyboardInterrupt
@@ -907,6 +928,8 @@ def main() -> None:
         "--case", action="append", default=[],
         help="覆盖 --mode，显式选择业务 Case；支持通配符、可重复，按 evaluation.md 顺序执行",
     )
+    parser.add_argument("--concurrency", type=int, default=1, help="独立 Case 并发上限 1–8；其余 Case 独占执行")
+    parser.add_argument("--parallel-case", action="append", default=[], help="明确确认互不影响的独立 Case ID，可重复指定多个 ID；不重放未知动作")
     parser.add_argument("--executor", choices=("api", "browser"), default="api", help="执行通道")
     parser.add_argument("--review", choices=("ai", "none"), help="API 证据复核；默认 full 为 ai，其余为 none；浏览器仅支持 none")
     parser.add_argument("--model", help="记录本次 Session 预期使用的模型 ID，不改变 Runtime 设置")

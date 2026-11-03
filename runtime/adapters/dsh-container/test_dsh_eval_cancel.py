@@ -25,7 +25,7 @@ cases=[{"case_id":"U-BASIC-001","inputs":["查询基础状态"],"expected_behavi
 contract={"source_id":"experiment:EXP-basic-001","agent_id":"basic","experiment_id":"EXP-basic-001","experiment_root":str(experiment),"image":{"build_fingerprint":"fixture"}}
 def initialize(*args):
     run.mkdir(parents=True)
-    (run/"inputs.lock.json").write_text(json.dumps({"evaluation_cases":cases}))
+    (run/"inputs.lock.json").write_text(json.dumps({"evaluation_cases":cases,"judge_contract":{"model_route":{"provider":"fixture","model":"fixture"}}}))
     (run/"run.yaml").write_text("status: running\n")
     if mode=="initialize":
         (base/"ready").write_text("initializing")

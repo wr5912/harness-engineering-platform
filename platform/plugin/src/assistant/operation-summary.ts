@@ -25,6 +25,7 @@ const titles: Record<string, string> = {
   'runs/index': '查询运行记录', 'runs/show': '读取运行详情', 'runs/report': '读取评测报告', 'runs/read-file': '读取运行文件', 'runs/trace': '读取执行轨迹',
   'tasks/assembly-preview': '核对能力装配', 'tasks/assembly-apply': '装配复用能力',
   'compute-variants/context': '读取算力变体进度', 'compute-variants/preview': '核对算力变体计划', 'compute-variants/create': '创建探索性算力变体', 'compute-variants/rename': '修改变体名称',
+  'compute-variants/plan-preview': '核对更新后的评测口径', 'compute-variants/plan-apply': '重新确认算力比较口径',
   'compute-variants/build-preview': '核对工作流构建', 'compute-variants/build': '构建工作流代码', 'compute-variants/freeze-preview': '预览本地数据冻结差异', 'compute-variants/freeze': '冻结本次数据差异', 'compute-variants/compare': '比较任务效果与资源',
   'datasets/source': '读取决策样本来源', 'datasets/preview': '核对待保存决策样本', 'datasets/apply': '保存待复核决策样本', 'datasets/list': '查询决策样本集',
   new: '创建智能体资产', create: '从固定父版派生', configuration: '读取 MCP 配置', saveConfiguration: '保存 MCP 配置',

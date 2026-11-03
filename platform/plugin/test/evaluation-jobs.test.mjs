@@ -33,6 +33,31 @@ async function waitFor(fn, accept) {
   assert.fail(JSON.stringify(value))
 }
 
+test('整批预检后启动，恢复部分批次与终态任务均不重放', async t => {
+  const fx = await fixture(t, 'console.log(JSON.stringify({completed:true}))')
+  let launches = 0, failSecond = true, previews = 0
+  const jobs = fx.create({ command: payload => {
+    if (payload.source === 'experiment:two' && failSecond) throw new Error('训练服务暂不可用')
+    launches++
+    return { executable: process.execPath, args: [fx.script] }
+  } })
+  const requests = ['one', 'two'].map(source => ({ source: `experiment:${source}`, request_id: randomUUID(), source_ref: `git:${'a'.repeat(40)}` }))
+  await assert.rejects(jobs.startBatch(requests, async () => { if (++previews === 2) throw new Error('invalid source') }), /invalid source/)
+  assert.equal(launches, 0)
+  await assert.rejects(jobs.startBatch(requests, async () => {}), /暂不可用/)
+  assert.equal(launches, 1)
+  failSecond = false
+  previews = 0
+  const resumed = await jobs.startBatch(requests, async () => { previews++ })
+  assert.equal(launches, 2)
+  assert.equal(previews, 1)
+  for (const item of resumed) await waitFor(() => jobs.status(item.job_id), job => job.status === 'completed')
+  const restored = fx.create({ command: () => assert.fail('恢复不应启动进程') })
+  assert.deepEqual((await restored.startBatch(requests, async () => assert.fail('终态不应再次预检'))).map(item => item.status), ['completed', 'completed'])
+  await assert.rejects(restored.startBatch([{ ...requests[0], cases: ['U-NEW-001'] }, { ...requests[1], request_id: randomUUID() }], async () => assert.fail('冲突时不能开始新任务')), error => error.code === 'conflict')
+  await assert.rejects(restored.startBatch([requests[0], requests[0]], async () => {}), error => error.code === 'invalid_request')
+})
+
 test('新建管理器从磁盘查询并取消同一评测进程，回执继续保留', async t => {
   const fx = await fixture(t, [
     "process.on('SIGTERM',()=>{console.log(JSON.stringify({cancelled:true,instance_stopped:true}));process.exit(2)})",
