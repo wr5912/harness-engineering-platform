@@ -102,9 +102,9 @@ export const instanceTheme = `
 .instance-embed-notes{padding-left:20px;line-height:1.8}
 .instance-embed-notes li+li{margin-top:8px}
 .instance-log-content{margin:0;max-height:420px;min-height:160px;overflow:auto;padding:20px;border:1px solid var(--hep-border);border-radius:var(--hep-control-radius);font-size:13px;line-height:1.7;background:var(--hep-surface-muted);white-space:pre}
-.instance-dialog{box-sizing:border-box;width:min(640px,calc(100vw - 32px));max-height:85dvh;padding:0;border:1px solid var(--hep-border);border-radius:16px;color:var(--hep-text);background:var(--hep-surface);box-shadow:0 24px 72px #07182e29;overflow:hidden}
+.instance-dialog{box-sizing:border-box;width:min(640px,calc(100vw - 32px));max-height:85dvh;padding:0;border:1px solid var(--hep-border);border-radius:16px;color:var(--hep-text);background:var(--hep-popover-bg,var(--hep-surface));box-shadow:var(--hep-dialog-shadow,0 24px 72px #07182e29);overflow:hidden}
 .instance-dialog[open]{display:flex;flex-direction:column;animation:hep-enter var(--hep-motion) var(--hep-ease)}
-.instance-dialog::backdrop{background:#14273e55}
+.instance-dialog::backdrop{background:var(--hep-backdrop,#14273e55)}
 .instance-dialog-heading,.instance-dialog-actions{flex:none;padding:20px 24px}
 .instance-dialog-heading{border-bottom:1px solid var(--hep-border);background:var(--hep-surface)}
 .instance-dialog-heading h2{margin:0;font-size:18px}

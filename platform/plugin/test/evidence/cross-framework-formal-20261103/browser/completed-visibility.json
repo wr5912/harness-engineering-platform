@@ -1,0 +1,127 @@
+{
+  "at": "2026-11-03T01:34:47.821Z",
+  "scope": "正式UI只载入已有两Session并手动核对结果；仅滚动实际结果区/原始回执，没有修改DOM内容或创建/发送prompt",
+  "checks": [
+    {
+      "name": "实际owner登录",
+      "ok": true
+    },
+    {
+      "name": "remote-agentscope-sample仅回读已有准确Session",
+      "ok": true
+    },
+    {
+      "name": "remote-agentscope-sample实际结果概要可见",
+      "ok": true
+    },
+    {
+      "name": "agentscope-completed-summary-1440已知凭据无明文",
+      "ok": true
+    },
+    {
+      "name": "agentscope-completed-summary-1440无一次秘密交付",
+      "ok": true
+    },
+    {
+      "name": "remote-agentscope-sample asset实际工具名处于回执可视区域",
+      "ok": true
+    },
+    {
+      "name": "agentscope-asset-tool-receipt-1440已知凭据无明文",
+      "ok": true
+    },
+    {
+      "name": "agentscope-asset-tool-receipt-1440无一次秘密交付",
+      "ok": true
+    },
+    {
+      "name": "remote-agentscope-sample catalog实际工具名处于回执可视区域",
+      "ok": true
+    },
+    {
+      "name": "agentscope-catalog-tool-receipt-1440已知凭据无明文",
+      "ok": true
+    },
+    {
+      "name": "agentscope-catalog-tool-receipt-1440无一次秘密交付",
+      "ok": true
+    },
+    {
+      "name": "agentscope-completed-summary-390已知凭据无明文",
+      "ok": true
+    },
+    {
+      "name": "agentscope-completed-summary-390无一次秘密交付",
+      "ok": true
+    },
+    {
+      "name": "remote-opencode-sample仅回读已有准确Session",
+      "ok": true
+    },
+    {
+      "name": "remote-opencode-sample实际结果概要可见",
+      "ok": true
+    },
+    {
+      "name": "opencode-completed-summary-1440已知凭据无明文",
+      "ok": true
+    },
+    {
+      "name": "opencode-completed-summary-1440无一次秘密交付",
+      "ok": true
+    },
+    {
+      "name": "remote-opencode-sample asset实际工具名处于回执可视区域",
+      "ok": true
+    },
+    {
+      "name": "opencode-asset-tool-receipt-1440已知凭据无明文",
+      "ok": true
+    },
+    {
+      "name": "opencode-asset-tool-receipt-1440无一次秘密交付",
+      "ok": true
+    },
+    {
+      "name": "remote-opencode-sample catalog实际工具名处于回执可视区域",
+      "ok": true
+    },
+    {
+      "name": "opencode-catalog-tool-receipt-1440已知凭据无明文",
+      "ok": true
+    },
+    {
+      "name": "opencode-catalog-tool-receipt-1440无一次秘密交付",
+      "ok": true
+    },
+    {
+      "name": "opencode-completed-summary-390已知凭据无明文",
+      "ok": true
+    },
+    {
+      "name": "opencode-completed-summary-390无一次秘密交付",
+      "ok": true
+    },
+    {
+      "name": "只读核对未创建Session或重发prompt",
+      "ok": true
+    }
+  ],
+  "requests": [
+    {
+      "instanceId": "remote-agentscope-sample",
+      "operation": "session:read",
+      "externalSessionId": "external-session-7e42e8c8-10ef-4cb7-ac9f-d5d8d9079a20",
+      "requestId": "ui-1793669684310-l5kqkoxfmlk",
+      "at": "2026-11-03T01:34:44.320Z"
+    },
+    {
+      "instanceId": "remote-opencode-sample",
+      "operation": "session:read",
+      "externalSessionId": "external-session-693203ca-385d-4a08-b75b-d7bed6c124cf",
+      "requestId": "ui-1793669686447-9odm8av26zi",
+      "at": "2026-11-03T01:34:46.459Z"
+    }
+  ],
+  "passed": true
+}

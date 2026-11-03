@@ -1,0 +1,363 @@
+{
+  "at": "2026-11-03T02:57:40.647Z",
+  "checks": [
+    {
+      "name": "实际owner登录",
+      "ok": true
+    },
+    {
+      "name": "登记移除通用更多设置",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入目标选择器",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入工作区ID",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入AgentPreset",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入所属系统",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入责任主体",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入允许主体",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入开放操作",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入声明版本",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入实例运维责任",
+      "ok": true
+    },
+    {
+      "name": "1440登记无溢出",
+      "ok": true
+    },
+    {
+      "name": "768登记无溢出",
+      "ok": true
+    },
+    {
+      "name": "390登记无溢出",
+      "ok": true
+    },
+    {
+      "name": "AS发现唯一实际Agent并自动选中",
+      "ok": true
+    },
+    {
+      "name": "发现不覆盖用户显示名称",
+      "ok": true
+    },
+    {
+      "name": "登记关闭重开保留已选名称和目标",
+      "ok": true
+    },
+    {
+      "name": "OpenCode通过真实认证识别",
+      "ok": true
+    },
+    {
+      "name": "登记整页刷新保地址与已发现目标",
+      "ok": true
+    },
+    {
+      "name": "agentscope普通访问无会话ID输入",
+      "ok": true
+    },
+    {
+      "name": "agentscope移除旧协议按钮创建会话",
+      "ok": true
+    },
+    {
+      "name": "agentscope移除旧协议按钮发送请求",
+      "ok": true
+    },
+    {
+      "name": "agentscope移除旧协议按钮核对会话结果",
+      "ok": true
+    },
+    {
+      "name": "agentscope1440无溢出",
+      "ok": true
+    },
+    {
+      "name": "agentscope768无溢出",
+      "ok": true
+    },
+    {
+      "name": "agentscope390无溢出",
+      "ok": true
+    },
+    {
+      "name": "agentscope本次请求真实完成",
+      "ok": true
+    },
+    {
+      "name": "agentscope本次assistant结果",
+      "ok": true
+    },
+    {
+      "name": "agentscope本次工具真实完成",
+      "ok": true
+    },
+    {
+      "name": "agentscope首次只发送一次",
+      "ok": true
+    },
+    {
+      "name": "agentscope界面呈现本次完成",
+      "ok": true
+    },
+    {
+      "name": "agentscope会话ID只读详情",
+      "ok": true
+    },
+    {
+      "name": "agentscope关闭重开保输入和完成结果",
+      "ok": true
+    },
+    {
+      "name": "agentscope整页刷新保草稿",
+      "ok": true
+    },
+    {
+      "name": "agentscope整页刷新不重发",
+      "ok": true
+    },
+    {
+      "name": "opencode普通访问无会话ID输入",
+      "ok": true
+    },
+    {
+      "name": "opencode移除旧协议按钮创建会话",
+      "ok": true
+    },
+    {
+      "name": "opencode移除旧协议按钮发送请求",
+      "ok": true
+    },
+    {
+      "name": "opencode移除旧协议按钮核对会话结果",
+      "ok": true
+    },
+    {
+      "name": "opencode1440无溢出",
+      "ok": true
+    },
+    {
+      "name": "opencode768无溢出",
+      "ok": true
+    },
+    {
+      "name": "opencode390无溢出",
+      "ok": true
+    },
+    {
+      "name": "opencode本次请求真实完成",
+      "ok": true
+    },
+    {
+      "name": "opencode本次assistant结果",
+      "ok": false
+    }
+  ],
+  "errors": [],
+  "requests": [
+    {
+      "at": "2026-11-03T02:57:51.899Z",
+      "method": "instances/external/conversation/send",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793674671874-ur4s9p90iy"
+    },
+    {
+      "at": "2026-11-03T02:57:52.164Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793674671874-ur4s9p90iy"
+    },
+    {
+      "at": "2026-11-03T02:57:53.774Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793674671874-ur4s9p90iy"
+    },
+    {
+      "at": "2026-11-03T02:57:56.802Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793674671874-ur4s9p90iy"
+    },
+    {
+      "at": "2026-11-03T02:57:59.892Z",
+      "method": "instances/external/conversation/send",
+      "id": "remote-opencode-sample",
+      "requestId": "ui-1793674679880-w7ph4orea8e"
+    },
+    {
+      "at": "2026-11-03T02:58:02.273Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-opencode-sample",
+      "requestId": "ui-1793674679880-w7ph4orea8e"
+    }
+  ],
+  "results": [
+    {
+      "at": "2026-11-03T02:57:52.175Z",
+      "method": "instances/external/conversation/send",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793674671874-ur4s9p90iy",
+      "ok": true,
+      "value": {
+        "requestId": "ui-1793674671874-ur4s9p90iy",
+        "sessionId": "external-session-4c6f0db1-6590-4a61-84c2-01e93239a076",
+        "status": "running",
+        "messages": [],
+        "tools": [],
+        "note": "正在等待本次回复。",
+        "retryAfterMs": 1500
+      }
+    },
+    {
+      "at": "2026-11-03T02:57:52.274Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793674671874-ur4s9p90iy",
+      "ok": true,
+      "value": {
+        "requestId": "ui-1793674671874-ur4s9p90iy",
+        "sessionId": "external-session-4c6f0db1-6590-4a61-84c2-01e93239a076",
+        "status": "running",
+        "messages": [],
+        "tools": [],
+        "note": "正在等待本次回复。",
+        "retryAfterMs": 1500
+      }
+    },
+    {
+      "at": "2026-11-03T02:57:53.879Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793674671874-ur4s9p90iy",
+      "ok": true,
+      "value": {
+        "requestId": "ui-1793674671874-ur4s9p90iy",
+        "sessionId": "external-session-4c6f0db1-6590-4a61-84c2-01e93239a076",
+        "status": "completed",
+        "messages": [
+          {
+            "id": "d5f408898047461d82236a4c424f1ffa",
+            "role": "assistant",
+            "text": "模拟循环已完成，实际调用结果以工具返回为准。"
+          }
+        ],
+        "tools": [
+          {
+            "id": "call-fixture-tool",
+            "name": "mcp__protected_assets__get_asset",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "at": "2026-11-03T02:57:56.968Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793674671874-ur4s9p90iy",
+      "ok": true,
+      "value": {
+        "requestId": "ui-1793674671874-ur4s9p90iy",
+        "sessionId": "external-session-4c6f0db1-6590-4a61-84c2-01e93239a076",
+        "status": "completed",
+        "messages": [
+          {
+            "id": "d5f408898047461d82236a4c424f1ffa",
+            "role": "assistant",
+            "text": "模拟循环已完成，实际调用结果以工具返回为准。"
+          }
+        ],
+        "tools": [
+          {
+            "id": "call-fixture-tool",
+            "name": "mcp__protected_assets__get_asset",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "at": "2026-11-03T02:58:02.268Z",
+      "method": "instances/external/conversation/send",
+      "id": "remote-opencode-sample",
+      "requestId": "ui-1793674679880-w7ph4orea8e",
+      "ok": true,
+      "value": {
+        "requestId": "ui-1793674679880-w7ph4orea8e",
+        "sessionId": "external-session-baf9b137-edb4-4330-90bb-c765c771b7fc",
+        "status": "unknown",
+        "messages": [],
+        "tools": [],
+        "retryAfterMs": 1500,
+        "note": "尚未读到本轮结束事实，可继续读取；不会自动重发。"
+      }
+    },
+    {
+      "at": "2026-11-03T02:58:02.451Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-opencode-sample",
+      "requestId": "ui-1793674679880-w7ph4orea8e",
+      "ok": true,
+      "value": {
+        "requestId": "ui-1793674679880-w7ph4orea8e",
+        "sessionId": "external-session-baf9b137-edb4-4330-90bb-c765c771b7fc",
+        "status": "completed",
+        "messages": [
+          {
+            "id": "msg_19f579eaf001c9wDeqFYKM9ONy",
+            "role": "assistant",
+            "text": "模拟模型收到消息。"
+          }
+        ],
+        "tools": []
+      }
+    }
+  ],
+  "configurationWrites": [],
+  "screenshots": [
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-57-40-647Z/1440-registration.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-57-40-647Z/768-registration.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-57-40-647Z/390-registration.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-57-40-647Z/1440-registration-agentscope-discovered.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-57-40-647Z/1440-registration-opencode-discovered.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-57-40-647Z/1440-agentscope-access.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-57-40-647Z/768-agentscope-access.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-57-40-647Z/390-agentscope-access.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-57-40-647Z/1440-agentscope-completed.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-57-40-647Z/1440-agentscope-reload.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-57-40-647Z/1440-opencode-access.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-57-40-647Z/768-opencode-access.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-57-40-647Z/390-opencode-access.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-57-40-647Z/failure.png"
+  ],
+  "scope": "正式18120与真实框架容器，确定性模拟模型及资源；登记发现只读，访问创建新验收会话",
+  "failure": "opencode本次assistant结果",
+  "finishedAt": "2026-11-03T02:58:03.503Z",
+  "passed": false
+}

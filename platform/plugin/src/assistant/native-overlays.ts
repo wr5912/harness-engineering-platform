@@ -5,8 +5,8 @@ export const nativeOverlayTheme = `
 body:has(.harness-platform) [role="dialog"][data-shortcut-modal="settings"]{
   box-sizing:border-box;width:880px;max-width:calc(100vw - 48px);
   height:min(800px,calc(100dvh - 48px));min-height:0;
-  color:var(--hep-text);background:var(--hep-surface);
-  border:1px solid var(--hep-border);border-radius:var(--hep-radius);box-shadow:var(--hep-shadow);
+  color:var(--hep-text);background:var(--hep-popover-bg,var(--hep-surface));
+  border:1px solid var(--hep-border);border-radius:var(--hep-radius);box-shadow:var(--hep-dialog-shadow,var(--hep-shadow));
   --dsw-alias-state-business-primary:var(--hep-link);
   --dsw-alias-button-primary-fill:var(--hep-primary);
   --dsw-alias-button-primary-hover:var(--hep-primary-hover);
@@ -37,6 +37,10 @@ body:has(.harness-platform) [data-shortcut-modal="settings"] :is(button:not([rol
 body:has(.harness-platform) [data-shortcut-modal="settings"] button:is([class*="_primary_"],[class$="_primaryButton"]){
   --dsw-alias-label-primary-foreground:#fff;
 }
+/* 蓝底主按钮及选中反馈标签配白字；完成状态、勾选与附件亮底保留原生反色。 */
+body[data-ds-dark-theme]:has(.harness-platform) button:is([class$="_primary"],[class*="_primary "],[class$="_primaryButton"],[class*="_primaryButton "],[class$="_chipActive"],[class*="_chipActive "]){
+  --dsw-alias-label-primary-foreground:var(--hep-on-primary);
+}
 body:has(.harness-platform) [data-shortcut-modal="settings"] [class$="_close"]{width:44px;flex:none}
 body:has(.harness-platform) [data-shortcut-modal="settings"] button[role="switch"]{
   width:60px;height:44px;border:12px solid transparent;background-clip:padding-box;
@@ -58,8 +62,8 @@ body:has(.harness-platform) [data-shortcut-modal="settings"] :is([class$="_rowNa
 /* 菜单的定位、子菜单层级与关闭行为由 DSH 保持；仅调整原生语义表面。 */
 body:has(.harness-platform) [data-menu-material]:is([role="menu"],[role="group"]:has([role="menu"])){
   box-sizing:border-box;max-width:calc(100vw - 24px);padding:6px;
-  color:var(--hep-text);background:var(--hep-surface);
-  border:1px solid var(--hep-border);border-radius:var(--hep-radius);box-shadow:var(--hep-shadow);
+  color:var(--hep-text);background:var(--hep-popover-bg,var(--hep-surface));
+  border:1px solid var(--hep-border);border-radius:var(--hep-radius);box-shadow:var(--hep-dialog-shadow,var(--hep-shadow));
   --dsw-menu-surface-fill:var(--hep-surface);--dsw-menu-backdrop-filter:none;
   --dsw-alias-interactive-bg-hover:var(--hep-primary-soft);
 }

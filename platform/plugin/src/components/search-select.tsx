@@ -5,6 +5,7 @@ export type SearchSelectOption = { value: string; label: string; description?: s
 export type SearchSelectProps = {
   value: string
   options: readonly SearchSelectOption[]
+  groups?: readonly string[]
   onChange: (value: string) => void
   label: string
   placeholder?: string
@@ -16,26 +17,29 @@ export type SearchSelectProps = {
 }
 
 /** 搜索只影响候选展示，已选身份始终由调用方维护。 */
-export function SearchSelect({ value, options, onChange, label, placeholder = '请选择', disabled, required, className = '', id, name }: SearchSelectProps) {
+export function SearchSelect({ value, options, groups, onChange, label, placeholder = '请选择', disabled, required, className = '', id, name }: SearchSelectProps) {
   const uid = useId()
   const listId = `${uid}-options`
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [browseGroup, setBrowseGroup] = useState('')
   const [active, setActive] = useState(-1)
   const [position, setPosition] = useState({ left: 0, top: 0, width: 200, maxHeight: 300 })
   const trigger = useRef<HTMLButtonElement>(null)
   const popup = useRef<HTMLDivElement>(null)
   const search = useRef<HTMLInputElement>(null)
   const selected = options.find(item => item.value === value)
+  const availableGroups = groups?.filter(group => options.some(item => item.group === group)) ?? []
+  const currentGroup = availableGroups.includes(browseGroup) ? browseGroup : selected?.group ?? availableGroups[0]
   const needle = query.trim().toLocaleLowerCase()
-  const visible = options.filter(item => !needle || [item.label, item.value, item.description, item.group].some(text => text?.toLocaleLowerCase().includes(needle)))
+  const visible = options.filter(item => (!availableGroups.length || item.group === currentGroup) && (!needle || [item.label, item.value, item.description, item.group].some(text => text?.toLocaleLowerCase().includes(needle))))
   const close = (restore = false) => { setOpen(false); if (restore) trigger.current?.focus() }
   useLayoutEffect(() => {
     if (open && trigger.current && trigger.current.getClientRects().length === 0) setOpen(false)
   })
   function show() {
     if (disabled) return
-    setQuery(''); setActive(-1); setOpen(true)
+    setQuery(''); setBrowseGroup(selected?.group ?? availableGroups[0] ?? ''); setActive(-1); setOpen(true)
   }
   function choose(option: SearchSelectOption) {
     if (option.disabled) return
@@ -46,7 +50,7 @@ export function SearchSelect({ value, options, onChange, label, placeholder = '�
     const place = () => {
       const rect = trigger.current?.getBoundingClientRect()
       if (!rect) return
-      const width = Math.min(Math.max(rect.width, 240), window.innerWidth - 24)
+      const width = Math.min(Math.max(rect.width, availableGroups.length > 1 ? 320 : 240), window.innerWidth - 24)
       const below = window.innerHeight - rect.bottom - 12
       const above = rect.top - 12
       const upwards = below < 220 && above > below
@@ -89,13 +93,19 @@ export function SearchSelect({ value, options, onChange, label, placeholder = '�
     </button>
     {open && createPortal(<div ref={popup} className="hep-search-popup" style={position} onKeyDown={event => {
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(true) }
+      else if ((event.target as HTMLElement).closest('.hep-search-groups')) return
       else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); move(event.key === 'ArrowDown' ? 1 : -1) }
       else if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); if (active >= 0 && visible[active]) choose(visible[active]) }
     }}>
+      {availableGroups.length > 1 && <div className="hep-search-groups" role="group" aria-label={`${label}分类`}>
+        {availableGroups.map(group => <button type="button" key={group} aria-pressed={group === currentGroup} onClick={() => { setBrowseGroup(group); setQuery(''); setActive(-1); search.current?.focus() }}>
+          {group}<span>{options.filter(item => item.group === group).length}</span>
+        </button>)}
+      </div>}
       <div className="hep-search-input"><input ref={search} aria-label={`搜索${label}`} aria-controls={listId} aria-activedescendant={active >= 0 ? `${uid}-${active}` : undefined} value={query} placeholder={`搜索${label}`} onChange={event => { setQuery(event.target.value); setActive(-1) }}/>{query && <button type="button" aria-label="清空搜索" onClick={() => { setQuery(''); setActive(-1); search.current?.focus() }}>×</button>}</div>
       <div id={listId} role="listbox" aria-label={label}>
         {visible.length ? visible.map((option, index) => <button id={`${uid}-${index}`} data-option-index={index} type="button" role="option" key={option.value} aria-selected={option.value === value} disabled={option.disabled} data-active={active === index || undefined} onPointerMove={() => setActive(index)} onClick={() => choose(option)}>
-          <span><strong>{option.label}</strong>{(option.description || option.group) && <small>{[option.group, option.description].filter(Boolean).join(' · ')}</small>}</span>{option.value === value && <span aria-hidden="true">✓</span>}
+          <span><strong>{option.label}</strong>{(option.description || (!groups && option.group)) && <small>{[!groups && option.group, option.description].filter(Boolean).join(' · ')}</small>}</span>{option.value === value && <span aria-hidden="true">✓</span>}
         </button>) : <p role="status">没有匹配项</p>}
       </div>
     </div>, trigger.current?.closest('dialog') ?? document.body)}
@@ -104,5 +114,5 @@ export function SearchSelect({ value, options, onChange, label, placeholder = '�
 
 export const searchSelectTheme = `
 .hep-search-select{font-size:14px;line-height:1.55;display:inline-block;min-width:0;max-width:100%;vertical-align:middle}.hep-search-select>button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;text-align:left;min-height:36px}.hep-search-select>button>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hep-search-popup{position:fixed;z-index:1000;display:flex;flex-direction:column;box-sizing:border-box;overflow:hidden;border:1px solid #dce3ed;border-radius:8px;background:#fff;color:#1c2d43;box-shadow:0 8px 28px #16395926;font:14px/1.55 HepNoto,system-ui,"Microsoft YaHei",sans-serif}.hep-search-popup *{box-sizing:border-box}.hep-search-input{position:relative;flex:none;padding:8px;border-bottom:1px solid #dce3ed}.hep-search-input input{width:100%;min-width:0;padding:8px 30px 8px 10px;border:1px solid #dce3ed;border-radius:6px;background:transparent;color:inherit;font:inherit}.hep-search-input>button{position:absolute;right:13px;top:12px;border:0;background:transparent;color:inherit;font:20px/1 inherit;cursor:pointer}.hep-search-popup [role=listbox]{overflow:auto;min-height:0;padding:4px}.hep-search-popup [role=option]{display:flex;align-items:center;justify-content:space-between;width:100%;padding:9px 10px;border:0;border-radius:5px;background:transparent;color:inherit;text-align:left;cursor:pointer;font:inherit}.hep-search-popup strong{font-weight:500}.hep-search-popup small{display:block;color:#607187;font-size:12px;overflow-wrap:anywhere}.hep-search-popup [role=option]:is(:hover,[data-active=true],[aria-selected=true]){background:#eaf3fc;color:#0062ae}.hep-search-popup [role=option]:disabled{opacity:.45;cursor:default}.hep-search-popup p{padding:8px 10px;margin:0;color:#607187}.hep-search-popup :focus-visible{outline:2px solid #0086dd;outline-offset:-2px}body[data-ds-dark-theme] .hep-search-popup{background:#172333;color:#e4ebf3;border-color:#344254}body[data-ds-dark-theme] .hep-search-popup :is(input,.hep-search-input){border-color:#344254}body[data-ds-dark-theme] .hep-search-popup [role=option]:is(:hover,[data-active=true],[aria-selected=true]){background:#203c58;color:#94c9ff}body[data-ds-dark-theme] .hep-search-popup small{color:#acb9ca}
+.hep-search-popup{position:fixed;z-index:1000;display:flex;flex-direction:column;box-sizing:border-box;overflow:hidden;border:1px solid #dce3ed;border-radius:8px;background:#fff;color:#1c2d43;box-shadow:0 8px 28px #16395926;font:14px/1.55 HepNoto,system-ui,"Microsoft YaHei",sans-serif}.hep-search-popup *{box-sizing:border-box}.hep-search-input{position:relative;flex:none;padding:8px;border-bottom:1px solid #dce3ed}.hep-search-input input{width:100%;min-width:0;padding:8px 30px 8px 10px;border:1px solid #dce3ed;border-radius:6px;background:transparent;color:inherit;font:inherit}.hep-search-input>button{position:absolute;right:13px;top:12px;border:0;background:transparent;color:inherit;font:20px/1 inherit;cursor:pointer}.hep-search-groups{display:flex;gap:4px;flex:none;padding:8px 8px 0}.hep-search-groups>button{display:flex;align-items:center;justify-content:center;gap:8px;flex:1;min-width:0;min-height:36px;padding:7px 8px;border:0;border-radius:6px;background:transparent;color:var(--hep-muted,#66758b);font:inherit;cursor:pointer}.hep-search-groups>button[aria-pressed=true]{background:var(--hep-primary-soft,#edf4ff);color:var(--hep-link,#2459cf);font-weight:600}.hep-search-groups>button:not([aria-pressed=true]):hover{background:var(--hep-surface-hover,#f8fafc)}.hep-search-groups>button>span{font-size:12px;font-variant-numeric:tabular-nums}@media(pointer:coarse){.hep-search-groups>button{min-height:44px}}.hep-search-popup [role=listbox]{overflow:auto;min-height:0;padding:4px}.hep-search-popup [role=option]{display:flex;align-items:center;justify-content:space-between;width:100%;padding:9px 10px;border:0;border-radius:5px;background:transparent;color:inherit;text-align:left;cursor:pointer;font:inherit}.hep-search-popup strong{font-weight:500}.hep-search-popup small{display:block;color:#607187;font-size:12px;overflow-wrap:anywhere}.hep-search-popup [role=option]:is(:hover,[data-active=true],[aria-selected=true]){background:#eaf3fc;color:#0062ae}.hep-search-popup [role=option]:disabled{opacity:.45;cursor:default}.hep-search-popup p{padding:8px 10px;margin:0;color:#607187}.hep-search-popup :focus-visible{outline:2px solid #0086dd;outline-offset:-2px}body[data-ds-dark-theme] .hep-search-popup{background:var(--hep-popover-bg,var(--hep-surface));color:var(--hep-text);border-color:var(--hep-border);box-shadow:var(--hep-dialog-shadow,var(--hep-shadow))}body[data-ds-dark-theme] .hep-search-popup :is(input,.hep-search-input){border-color:var(--hep-border)}body[data-ds-dark-theme] .hep-search-popup [role=option]:is(:hover,[data-active=true],[aria-selected=true]){background:var(--hep-surface-hover);color:var(--hep-link)}body[data-ds-dark-theme] .hep-search-popup :is(small,p){color:var(--hep-muted)}body[data-ds-dark-theme] .hep-search-popup :focus-visible{outline-color:var(--hep-focus)}
 `

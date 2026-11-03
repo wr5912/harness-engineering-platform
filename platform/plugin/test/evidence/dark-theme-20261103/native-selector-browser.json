@@ -1,0 +1,36 @@
+{
+  "at": "2026-11-03T04:06:29.463Z",
+  "passed": true,
+  "compilerPattern": "[hash]_[local]",
+  "scope": "真实锁定CSSModule编译及公共材质，在隔离Chromium验证局部selector与原生反色；未访问运行平台",
+  "result": {
+    "primary": {
+      "class": "PsAsmW_button PsAsmW_primary PsAsmW_md",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(44, 83, 215)",
+      "foreground": "#fff",
+      "inverted": "rgb(53, 54, 56)"
+    },
+    "chip": {
+      "class": "_1VaocG_chip _1VaocG_chipActive",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(29, 48, 112)",
+      "foreground": "#fff",
+      "inverted": "rgb(53, 54, 56)"
+    },
+    "done": {
+      "class": "_9mYXta_step",
+      "color": "rgb(15, 17, 21)",
+      "background": "rgb(77, 219, 184)",
+      "foreground": "rgb(15, 17, 21)",
+      "inverted": "rgb(53, 54, 56)"
+    },
+    "remove": {
+      "class": "kCI1NW_remove",
+      "color": "rgb(53, 54, 56)",
+      "background": "rgb(249, 250, 251)",
+      "foreground": "rgb(15, 17, 21)",
+      "inverted": "rgb(53, 54, 56)"
+    }
+  }
+}

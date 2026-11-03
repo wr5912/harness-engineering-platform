@@ -1,0 +1,180 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-11-03T01:30:19.635Z",
+  "mode": "read-only native API and persisted metadata",
+  "instanceId": "remote-opencode-sample",
+  "externalSessionId": "external-session-693203ca-385d-4a08-b75b-d7bed6c124cf",
+  "nativeSessionId": "ses_e60faa3fbffeyNaC3asxrylYLx",
+  "nativeMessageCount": 8,
+  "nativeSessionOutcome": "succeeded",
+  "phases": [
+    {
+      "phase": "asset",
+      "uiRequestId": "ui-1793669291984-c9qe2gwgbo",
+      "sentAt": "2026-11-03T01:28:11.993Z",
+      "completedAt": "2026-11-03T01:28:13.339Z",
+      "toolName": "protected_assets_get_asset",
+      "toolMessageId": "msg_19f0560a5001EARtaeEozUcKuW",
+      "toolState": "completed",
+      "toolTime": {
+        "created": 1793669292310,
+        "ran": 1793669292338,
+        "completed": 1793669292503
+      },
+      "object": "A-1",
+      "finalMessageId": "msg_19f0562060013o7nZ61DsLd6eq",
+      "finalCompletedAt": 1793669292595,
+      "idleMessageId": "msg_19f05623c001nyG5IwdjCuZhOf",
+      "idleCreatedAt": 1793669292604,
+      "idleOutcome": "succeeded"
+    },
+    {
+      "phase": "catalog",
+      "uiRequestId": "ui-1793669293764-rsuxw8ln14n",
+      "sentAt": "2026-11-03T01:28:13.777Z",
+      "completedAt": "2026-11-03T01:28:14.071Z",
+      "toolName": "native_catalog_get_catalog",
+      "toolMessageId": "msg_19f056711001aMi0M47p0206TV",
+      "toolState": "completed",
+      "toolTime": {
+        "created": 1793669293884,
+        "ran": 1793669293892,
+        "completed": 1793669293920
+      },
+      "authentication": "native",
+      "harnessSignature": false,
+      "finalMessageId": "msg_19f0567750019YjgPUPKHzgf0T",
+      "finalCompletedAt": 1793669293993,
+      "idleMessageId": "msg_19f0567ae001ffyB7Ie4YsaSD5",
+      "idleCreatedAt": 1793669293998,
+      "idleOutcome": "succeeded"
+    }
+  ],
+  "machineCorrelation": {
+    "method": "同实例、同资源操作且记录时间完整落在该原生tool.created/completed区间，唯一requestId；原生工具结果不保留机器requestId",
+    "requestId": "4761608d-b948-450b-91d9-73dbd3f52232",
+    "records": [
+      {
+        "requestId": "4761608d-b948-450b-91d9-73dbd3f52232",
+        "at": "2026-11-03T01:28:12.439Z",
+        "instanceId": "remote-opencode-sample",
+        "credentialId": "credential-a2e6f808-4581-41f1-aef4-d9377a20ed31",
+        "resourceId": "sample-assets",
+        "operation": "get_asset",
+        "stage": "prepared"
+      },
+      {
+        "requestId": "4761608d-b948-450b-91d9-73dbd3f52232",
+        "at": "2026-11-03T01:28:12.444Z",
+        "instanceId": "remote-opencode-sample",
+        "credentialId": "credential-a2e6f808-4581-41f1-aef4-d9377a20ed31",
+        "resourceId": "sample-assets",
+        "operation": "get_asset",
+        "stage": "dispatched"
+      },
+      {
+        "requestId": "4761608d-b948-450b-91d9-73dbd3f52232",
+        "at": "2026-11-03T01:28:12.499Z",
+        "instanceId": "remote-opencode-sample",
+        "credentialId": "credential-a2e6f808-4581-41f1-aef4-d9377a20ed31",
+        "resourceId": "sample-assets",
+        "operation": "get_asset",
+        "stage": "response",
+        "httpStatus": 200
+      }
+    ]
+  },
+  "oldSessions": {
+    "expected": 11,
+    "preservedAndReadable": 11,
+    "checks": [
+      {
+        "id": "ses_e6369e3e9ffeq9WFCwHmQT6Aua",
+        "preserved": true,
+        "readable": true
+      },
+      {
+        "id": "ses_e6369e953ffeoAGES3Eqg43J9S",
+        "preserved": true,
+        "readable": true
+      },
+      {
+        "id": "ses_e6369ef05ffem06I9GxQ6Faoou",
+        "preserved": true,
+        "readable": true
+      },
+      {
+        "id": "ses_e6369f4abffePqzAhSRuh8aKoM",
+        "preserved": true,
+        "readable": true
+      },
+      {
+        "id": "ses_e6369fa8cffe9Whl7eqDuYQ6u0",
+        "preserved": true,
+        "readable": true
+      },
+      {
+        "id": "ses_e63857888ffe5A6lQ8m2SJNro4",
+        "preserved": true,
+        "readable": true
+      },
+      {
+        "id": "ses_e637d381effeIoIM8gWUJ88beU",
+        "preserved": true,
+        "readable": true
+      },
+      {
+        "id": "ses_e637d3dcfffe7PHpatNroLC4uZ",
+        "preserved": true,
+        "readable": true
+      },
+      {
+        "id": "ses_e637d431fffe44OVCnvM2DHK1b",
+        "preserved": true,
+        "readable": true
+      },
+      {
+        "id": "ses_e637d48eeffeq2OFJ6cQsxV9oM",
+        "preserved": true,
+        "readable": true
+      },
+      {
+        "id": "ses_e637d4ed3ffeDQdc5vWp5GrbLP",
+        "preserved": true,
+        "readable": true
+      }
+    ]
+  },
+  "nativeContainer": {
+    "name": "hep-cross-framework-opencode",
+    "pid": 1889354,
+    "startedAt": "2026-11-02T14:05:42.542487438Z",
+    "unchangedSinceReadiness": true
+  },
+  "activeSessionCount": 0,
+  "currentControls": {
+    "registration": "registered",
+    "entryState": "enabled",
+    "bindingVerificationMatches": true,
+    "policyEnabled": true,
+    "globalEntryEnabled": true,
+    "activationPolicyMatches": true,
+    "resourceGrantEnabled": true,
+    "scopes": [
+      "assets:read"
+    ],
+    "objects": [
+      "A-1"
+    ]
+  },
+  "actions": {
+    "prompts": 0,
+    "toolsCalls": 0,
+    "configurationWrites": 0,
+    "runtimeRestarts": 0
+  },
+  "limits": [
+    "真实源码Runtime、正式受控接入与本机确定性模型/模拟资源",
+    "记录时间关联不等同于跨系统分布式trace"
+  ]
+}

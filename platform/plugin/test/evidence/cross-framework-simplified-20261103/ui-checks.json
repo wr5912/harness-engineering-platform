@@ -1,0 +1,16 @@
+{
+  "at": "2026-11-03T03:03:22.657Z",
+  "kind": "tool-receipt-summary",
+  "source": "implement_ui agent terminal results; stdout was not redirected",
+  "command": "node --test test/external-instances-client.test.mjs",
+  "tests": 38,
+  "pass": 38,
+  "fail": 0,
+  "typecheck": {
+    "command": "pnpm run check",
+    "exitCode": 0
+  },
+  "limits": [
+    "不是原始stdout日志；没有为生成归档重复执行测试"
+  ]
+}

@@ -1,19 +1,20 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { workspaceConfigPath, workspaceLocalPath } from '../../workspace.ts'
+import { workspaceConfigPath, workspaceIdentity, workspaceLocalPath } from '../../workspace.ts'
 import type { ExternalAgent, ExternalDetail, ExternalInstance, ExternalList, ExternalPolicy, ExternalRecord, ExternalVerification } from './types.ts'
 
 interface Registry { schemaVersion: 1; agents: ExternalAgent[]; instances: ExternalInstance[]; requests: Array<{ id: string; digest: string; instanceId: string }> }
 export class ExternalAccessError extends Error { constructor(public code: string, message: string, public status = 400) { super(message) } }
 export const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
-export function externalBindingDigest(root: string, value: Pick<ExternalInstance, 'framework' | 'endpoint' | 'selector' | 'credentialRef'>, material?: Record<string, string>): string {
+export function externalBindingDigest(root: string, value: Pick<ExternalInstance, 'framework' | 'endpoint' | 'selector' | 'credentialRef' | 'connectionUserId'>, material?: Record<string, string>): string {
   let credentialDigest = ''
   if (value.credentialRef) {
     try { credentialDigest = digest(material ?? upstreamHeaders(root, value as ExternalInstance)) }
     catch { credentialDigest = 'unavailable' }
   }
-  return digest({ framework: value.framework, endpoint: value.endpoint, selector: value.selector ?? '', credentialRef: value.credentialRef ?? '', credentialDigest })
+  return digest({ framework: value.framework, endpoint: value.endpoint, selector: value.selector ?? '', credentialRef: value.credentialRef ?? '', credentialDigest,
+    ...(value.connectionUserId ? { connectionUserId: value.connectionUserId } : {}) })
 }
 export const object = (value: unknown): Record<string, any> => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ExternalAccessError('invalid_request', '请求参数必须是对象')
@@ -63,7 +64,7 @@ export function isExternalEnabled(root: string, instance: ExternalInstance): boo
 export function getExternalInstance(root: string, id: string): ExternalInstance | undefined { return read(root).registry.instances.find(value => value.id === id) }
 export function externalInstances(root: string): ExternalList {
   const { registry, revision } = read(root)
-  return { revision, agents: registry.agents, instances: registry.instances.filter(value => value.state !== 'removed').map(value => ({ ...value,
+  return { revision, workspaceId: workspaceIdentity(root).id, agents: registry.agents, instances: registry.instances.filter(value => value.state !== 'removed').map(value => ({ ...value,
     entryState: readExternalBusinessConfig(root).enabled !== true ? 'disabled' : value.entryState === 'enabled' && !isExternalEnabled(root, value) ? 'pending' : value.entryState })), observedAt: new Date().toISOString() }
 }
 export function readExternalRecords(root: string, id: string, limit = 100): ExternalRecord[] {
@@ -122,26 +123,32 @@ export function mutateExternal(root: string, operation: 'save' | 'verify' | 'ena
     if (payload.revision !== revision) throw new ExternalAccessError('conflict', '登记已在其他位置更新，草稿已保留，请刷新后重试', 409)
     let instance: ExternalInstance | undefined
     if (operation === 'save') {
-      const agentInput = object(payload.agent), input = object(payload.instance)
-      const instanceId = input.id ? identifier(input.id, '实例标识') : 'external-' + randomUUID(), agentId = input.agentId ? identifier(input.agentId, '智能体标识') : agentInput.id ? identifier(agentInput.id, '智能体标识') : 'external-agent-' + randomUUID()
+      const agentInput = object(payload.agent ?? {}), submitted = object(payload.instance)
+      const instanceId = submitted.id ? identifier(submitted.id, '实例标识') : 'external-' + randomUUID(), existing = registry.instances.find(value => value.id === instanceId)
+      const input: Record<string, any> = { ...submitted, framework: submitted.framework === undefined ? existing?.framework : submitted.framework }
+      const agentId = input.agentId ? identifier(input.agentId, '智能体标识') : existing?.agentId ?? (agentInput.id ? identifier(agentInput.id, '智能体标识') : 'external-agent-' + randomUUID())
+      if (existing?.state === 'removed' || existing && existing.agentId !== agentId) throw new ExternalAccessError('conflict', '不能恢复已移除实例或变更其智能体身份', 409)
+      if (!['dsh', 'agentscope', 'opencode'].includes(input.framework) || input.managementMode !== undefined && input.managementMode !== 'externally-managed' || input.usageMode !== undefined && input.usageMode !== 'shared') throw new ExternalAccessError('invalid_request', '请明确框架、外部生命周期责任及共享使用方式')
+      const endpointInput = input.endpoint === undefined ? existing?.endpoint : input.endpoint
+      const endpoint = endpointInput ? externalEndpoint(endpointInput) : '', credentialRef = text(input.credentialRef === undefined ? existing?.credentialRef : input.credentialRef, '凭据引用', true)
+      if (credentialRef) identifier(credentialRef, '凭据引用')
       let agent = registry.agents.find(value => value.id === agentId)
       if (!agent) {
-        agent = { id: agentId, name: text(agentInput.name, '智能体名称'), system: text(agentInput.system, '所属系统'), owner: text(agentInput.owner, '责任主体'), ...(agentInput.description ? { description: text(agentInput.description, '说明') } : {}) }
+        const frameworkName = ({ dsh: 'DSH', agentscope: 'AgentScope', opencode: 'OpenCode' } as Record<string, string>)[input.framework]
+        agent = { id: agentId, name: text(agentInput.name || `${frameworkName} 接入`, '智能体名称'), system: text(agentInput.system || (endpoint ? new URL(endpoint).hostname : '未填写'), '所属系统'), owner: text(agentInput.owner || '平台管理者', '责任主体'), ...(agentInput.description ? { description: text(agentInput.description, '说明') } : {}) }
         registry.agents.push(agent)
-      } else if (agentInput.name !== agent.name || agentInput.system !== agent.system || agentInput.owner !== agent.owner) throw new ExternalAccessError('conflict', '关联已有智能体时不能静默修改公共名称、所属系统或责任主体', 409)
-      if (!['dsh', 'agentscope', 'opencode'].includes(input.framework) || input.managementMode !== 'externally-managed' || input.usageMode !== 'shared') throw new ExternalAccessError('invalid_request', '请明确框架、外部生命周期责任及共享使用方式')
-      const endpoint = input.endpoint ? externalEndpoint(input.endpoint) : '', credentialRef = text(input.credentialRef, '凭据引用', true)
-      if (credentialRef) identifier(credentialRef, '凭据引用')
-      const selector = text(input.selector, '目标选择器', true), bindingDigest = externalBindingDigest(root, { framework: input.framework, endpoint, selector, credentialRef })
-      const existing = registry.instances.find(value => value.id === instanceId)
-      if (existing?.state === 'removed' || existing && existing.agentId !== agentId) throw new ExternalAccessError('conflict', '不能恢复已移除实例或变更其智能体身份', 409)
+      } else if (['name', 'system', 'owner'].some(key => agentInput[key] !== undefined && agentInput[key] !== agent![key as 'name' | 'system' | 'owner'])) throw new ExternalAccessError('conflict', '关联已有智能体时不能静默修改公共名称、所属系统或责任主体', 409)
+      const selector = text(input.selector === undefined ? existing?.framework === input.framework ? existing?.selector : undefined : input.selector, '目标选择器', true), connectionUserId = input.framework === 'agentscope' ? connectionUser(input.connectionUserId === undefined ? existing?.connectionUserId : input.connectionUserId) : ''
+      const bindingDigest = externalBindingDigest(root, { framework: input.framework, endpoint, selector, credentialRef, connectionUserId })
+      const declaredVersion = text(input.declaredVersion === undefined ? existing?.declaredVersion : input.declaredVersion, '声明版本', true)
+      const description = text(input.description === undefined ? existing?.description : input.description, '说明', true)
       const now = new Date().toISOString()
-      instance = { id: instanceId, agentId, name: text(input.name, '实例名称'), framework: input.framework, endpoint, ...(selector ? { selector } : {}), ...(credentialRef ? { credentialRef } : {}),
-        ...(input.declaredVersion ? { declaredVersion: text(input.declaredVersion, '声明版本') } : {}), ...(input.description ? { description: text(input.description, '说明') } : {}),
-        location: text(input.location, '运行位置', true), instanceOwner: text(input.instanceOwner ?? agent.owner, '实例责任主体'),
+      instance = { id: instanceId, agentId, name: text(input.name || existing?.name || agent.name, '实例名称'), framework: input.framework, endpoint, ...(selector ? { selector } : {}), ...(credentialRef ? { credentialRef } : {}), ...(connectionUserId ? { connectionUserId } : {}),
+        ...(declaredVersion ? { declaredVersion } : {}), ...(description ? { description } : {}),
+        location: text(input.location === undefined ? existing?.location : input.location, '运行位置', true), instanceOwner: text(input.instanceOwner === undefined ? existing?.instanceOwner ?? agent.owner : input.instanceOwner, '实例责任主体', true),
         managementMode: 'externally-managed', usageMode: 'shared', state: endpoint ? 'registered' : 'draft', revision: (existing?.revision ?? 0) + 1, bindingDigest, entryState: existing?.bindingDigest === bindingDigest ? existing.entryState : 'pending',
         ...(existing?.bindingDigest === bindingDigest && existing.verification ? { verification: existing.verification } : {}), createdAt: existing?.createdAt ?? now, updatedAt: now }
-      const policy = validPolicy(payload.policy, instanceId), businessPath = workspaceConfigPath(root, 'business-access.json')
+      const policy = validPolicy(payload.policy ?? (existing ? externalPolicy(root, instanceId) : { subjects: ['platform-owner'], actions: ['agent:access', 'session:create', 'session:prompt', 'session:read', 'session:events'], enabled: true }), instanceId), businessPath = workspaceConfigPath(root, 'business-access.json')
       withLock(businessPath, () => { const config = readExternalBusinessConfig(root); config.externalInstances = [...(config.externalInstances ?? []).filter((value: ExternalPolicy) => value.instanceId !== instanceId), policy]; atomic(businessPath, config) })
       if (existing?.bindingDigest === bindingDigest && existing.activation?.policyDigest === digest(policy)) instance.activation = existing.activation
       else instance.entryState = 'pending'
@@ -177,8 +184,27 @@ export function upstreamHeaders(root: string, instance: ExternalInstance): Recor
   const value = object(JSON.parse(readFileSync(path, 'utf8'))), headers = object(value.headers)
   const result: Record<string, string> = {}
   for (const [name, value] of Object.entries(headers)) {
-    if (!/^(authorization|x-api-key|cookie)$/i.test(name) || typeof value !== 'string' || /[\r\n]/.test(value)) throw new ExternalAccessError('invalid_credential', '上游专用凭据格式无效', 503)
+    if (!/^(authorization|x-api-key|cookie)$/i.test(name) && !(instance.framework === 'agentscope' && /^x-user-id$/i.test(name)) || typeof value !== 'string' || /[\r\n]/.test(value)) throw new ExternalAccessError('invalid_credential', '上游专用凭据格式无效', 503)
+    if (Object.keys(result).some(key => key.toLowerCase() === name.toLowerCase())) throw new ExternalAccessError('invalid_credential', '上游专用凭据包含重复请求头', 503)
     result[name] = value
   }
   return result
+}
+function connectionUser(value: unknown): string {
+  const result = text(value, '原系统用户标识', true)
+  if (result && (/[\x00-\x20\x7f-\x9f]/.test(result) || /[^\x00-\xff]/.test(result))) throw new ExternalAccessError('invalid_request', '原系统用户标识不能包含空白、控制字符或无法发送的请求头字符')
+  return result
+}
+/** 原生用户上下文不是认证；显式值与专用凭据头必须一致，旧登记保留原派生上下文。 */
+export function externalConnectionUserId(root: string, value: Pick<ExternalInstance, 'framework' | 'credentialRef' | 'connectionUserId'> & { id?: string }, material?: Record<string, string>): string {
+  const headers = material ?? upstreamHeaders(root, value as ExternalInstance), explicit = connectionUser(value.connectionUserId)
+  const supplied = connectionUser(Object.entries(headers).find(([name]) => name.toLowerCase() === 'x-user-id')?.[1])
+  if (explicit && supplied && explicit !== supplied) throw new ExternalAccessError('connection_identity_conflict', '原系统用户标识与所选连接凭据中的 X-User-ID 不一致，请核对后重试')
+  const selected = explicit || supplied || (value.id ? `harness-${value.id}` : '')
+  if (!selected) throw new ExternalAccessError('connection_identity_required', '原服务需要原系统用户上下文，请填写原系统账号或向管理员索取；这不替代认证凭据')
+  return selected
+}
+export function externalCredentialRefs(root: string): string[] {
+  const directory = join(resolve(root), '.local', 'credentials', 'external')
+  return existsSync(directory) ? readdirSync(directory).filter(name => /^[a-z0-9]+(?:-[a-z0-9]+)*\.json$/.test(name)).map(name => name.slice(0, -5)).sort() : []
 }

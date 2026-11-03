@@ -1,0 +1,25 @@
+{
+  "at": "2026-11-03T01:12:04.788Z",
+  "instances": [
+    {
+      "id": "remote-agentscope-sample",
+      "agentId": "external-agentscope-demo",
+      "framework": "agentscope",
+      "endpoint": "http://127.0.0.1:18652",
+      "selector": "6b8687e485144c60bc85c846479d56b1",
+      "state": "enabled",
+      "verified": true,
+      "observedAt": "2026-11-03T01:12:04.196Z"
+    },
+    {
+      "id": "remote-opencode-sample",
+      "agentId": "external-opencode-demo",
+      "framework": "opencode",
+      "endpoint": "http://127.0.0.1:18655",
+      "selector": "/workspace",
+      "state": "enabled",
+      "verified": true,
+      "observedAt": "2026-11-03T01:12:04.655Z"
+    }
+  ]
+}

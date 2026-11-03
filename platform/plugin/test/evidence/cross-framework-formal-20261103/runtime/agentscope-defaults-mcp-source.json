@@ -1,0 +1,11 @@
+{
+  "at": "2026-11-03T01:25:43.509242Z",
+  "file": "/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/agentscope/upstream-main.py",
+  "backup": "/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/agentscope/upstream-main-before-mcp-defaults-20261103T012543Z.py",
+  "beforeSha256": "bcebc05a6d53b7c3d481324b4eb165f9d4636cf306ac4c19a7b40125a3cbd3ea",
+  "afterSha256": "6dae547ada95da705dc43a0c66dfac1a9b20f9bd1414d2b1a595173ebbd53049",
+  "pyCompilePassed": true,
+  "boundary": "原生MCP库持久保存认证，workspace MCP选择按Session持久保存；只为专属user+agent新创建标记Session补缺两条既有库记录，已选项不重写，旧Session不变。",
+  "preliminaryDiagnosticCorrection": "先前将新Session列表为空误判为MCP未持久化；只读源码与GET /mcp已纠正，原生用户库两记录始终存在。",
+  "credentialsCopiedToSource": false
+}

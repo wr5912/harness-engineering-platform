@@ -5,7 +5,7 @@ import test from 'node:test'
 import { build } from 'esbuild'
 
 const require = createRequire(import.meta.url)
-const source = (await build({ entryPoints: [new URL('../src/agents/client.tsx', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime', 'react-dom', '@deepseek-ai/dsh-client-ui-primitives'], plugins: [{ name: 'page-components', setup(builder) { builder.onLoad({ filter: /detail-drawer\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function DetailDrawer(p) { return createElement('section', { 'data-drawer-title': p.title }, createElement('button', { type: 'button' }, p.trigger || p.title), p.children) }` })); builder.onLoad({ filter: /search-select\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function SearchSelect(p) { return createElement('select', { 'aria-label': p.label, value: p.value, onChange: e => p.onChange(e.target.value) }, p.options.map(o => createElement('option', { key:o.value, value:o.value }, o.label + ' ' + (o.description || '')))) }` })); builder.onLoad({ filter: /description-client\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function AgentDescriptionPanel(p) { return createElement('div', { 'data-description-version': p.detail.experiment.id }, '版本资料与技能') }` })) } }] })).outputFiles[0].text
+const source = (await build({ entryPoints: [new URL('../src/agents/client.tsx', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime', 'react-dom', '@deepseek-ai/dsh-client-ui-primitives'], plugins: [{ name: 'page-components', setup(builder) { builder.onLoad({ filter: /detail-drawer\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function DetailDrawer(p) { return createElement('section', { 'data-drawer-title': p.title }, createElement('button', { type: 'button' }, p.trigger || p.title), p.children) }` })); builder.onLoad({ filter: /search-select\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function SearchSelect(p) { const option = o => createElement('option', { key:o.value, value:o.value }, o.label + ' ' + (o.description || '')); return createElement('select', { 'aria-label': p.label, value: p.value, onChange: e => p.onChange(e.target.value) }, p.groups ? p.groups.map(group => createElement('optgroup', { key:group, label:group }, p.options.filter(o => o.group === group).map(option))) : p.options.map(option)) }` })); builder.onLoad({ filter: /description-client\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function AgentDescriptionPanel(p) { return createElement('div', { 'data-description-version': p.detail.experiment.id }, '版本资料与技能') }` })) } }] })).outputFiles[0].text
 
 function experiments() {
   return ['first-agent', 'second-agent'].flatMap(agentId => [
@@ -113,6 +113,52 @@ test('唯一紧凑版本选择器切换查看对象，不更改登记来源', as
   assert.equal(ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '版本').props.value, 'EXP-first-agent-001')
   assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { page: 'agents', agent_id: 'first-agent', experiment_id: 'EXP-first-agent-001', tab: 'overview' })
   assert.equal(ui.calls.some(call => /apply|activate/.test(call.endpoint)), false)
+})
+
+// 该桩验证页面传入的候选分类和身份，不替代 SearchSelect 真实浏览器交互。
+test('版本候选区分迭代版本和旧EXP算力变体，目录计数分别统计', async () => {
+  const ui = page(); await ui.settle()
+  const selector = ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '版本')
+  const groups = ui.nodes(selector).filter(node => node.type === 'optgroup')
+  assert.deepEqual(groups.map(group => group.props.label), ['迭代版本', '算力变体'])
+  assert.deepEqual(ui.nodes(groups[0]).filter(node => node.type === 'option').map(node => node.props.value), ['EXP-first-agent-001'])
+  const variant = ui.nodes(groups[1]).find(node => node.type === 'option')
+  assert.equal(variant.props.value, 'EXP-first-agent-002', '历史EXP格式不能被当作普通迭代版本')
+  assert.match(ui.text(variant), /^资产告警轻量版 基于 v001 · LangGraph 代码$/)
+  assert.doesNotMatch(ui.text(variant), /EXP-|v002/)
+  const card = ui.nodes().find(node => node.props?.id === 'agent-list-card-first-agent')
+  assert.match(ui.text(card), /1 个迭代版本/)
+  assert.doesNotMatch(ui.text(card), /2 个研究版本/)
+  assert.equal(ui.text(ui.nodes().find(node => node.props?.className === 'agent-variant-count')), '变体 1')
+})
+
+test('同名变体使用短ID区分，未声明父版的变体不推断来源', async () => {
+  const base = experiments().filter(item => item.agent_id === 'first-agent')
+  const rows = [...base,
+    { ...base[1], id: 'VAR-first-agent-001-r123456abcdef' },
+    { id: 'VAR-first-agent-002-r123456fedcba', agent_id: 'first-agent', status: 'active', change: { variant_name: '无来源变体' } },
+  ]
+  const ui = page({ intercept(endpoint, payload) {
+    if (endpoint === 'agents/list') return { ok: true, value: { agents: [{ id: 'first-agent', version_count: 4 }], experiments: rows } }
+    if (endpoint === 'agents/detail') {
+      const value = detail(payload.agent_id, payload.experiment_id)
+      value.versions = rows.map(row => ({ id: row.id, status: row.status }))
+      return { ok: true, value }
+    }
+  } })
+  await ui.settle()
+  const selector = ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '版本')
+  const variants = ui.nodes(ui.nodes(selector).find(node => node.type === 'optgroup' && node.props.label === '算力变体'))
+    .filter(node => node.type === 'option')
+  assert.equal(variants.length, 3)
+  const labels = variants.map(node => ui.text(node))
+  assert.ok(labels.some(label => label.startsWith('资产告警轻量版 · nt-002 ')))
+  assert.ok(labels.some(label => label.startsWith('资产告警轻量版 · abcdef ')))
+  assert.match(ui.text(variants.find(node => node.props.value === rows[3].id)), /^无来源变体 来源版本未记录$/)
+  assert.match(ui.text(ui.nodes().find(node => node.props?.id === 'agent-list-card-first-agent')), /1 个迭代版本/)
+  assert.equal(ui.text(ui.nodes().find(node => node.props?.className === 'agent-variant-count')), '变体 3')
+  assert.equal(selector.props.value, 'EXP-first-agent-002')
+  assert.equal(ui.calls.some(call => /apply|activate|create/.test(call.endpoint)), false)
 })
 
 test('Run 索引不可读时概览显示读取失败，不把未证实结论当成业务通过', async () => {
@@ -854,7 +900,8 @@ test('列表主标题使用独立名称，不截取策略或研究问题，名�
   assert.equal(variantCards(ui).length, 1)
   assert.match(ui.text(variantCards(ui)[0]), /EXP-first-agent-002/)
   const version = ui.nodes().find(node => node.props?.['aria-label'] === '版本')
-  assert.match(ui.text(version), /资产告警轻量版 · v002/)
+  assert.match(ui.text(version), /资产告警轻量版 基于 v001 · LangGraph 代码/)
+  assert.doesNotMatch(ui.text(version), /资产告警轻量版 · v002/)
 })
 
 test('名称保存后回读列表与详情，冲突保留草稿并可重新核对而不改策略', async () => {
@@ -1107,7 +1154,10 @@ test('旧EXP深链明确历史归属，跳转当前VAR不重写旧Run身份', as
   assert.match(ui.text(variantCards(ui)[0]), /VAR-first-agent-001-r123456789abc/)
   assert.doesNotMatch(ui.text(variantCards(ui)[0]), /EXP-first-agent-002/)
   assert.equal(ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '版本').props.value, old)
-  assert.equal(ui.nodes().some(node => node.type === 'option' && node.props.value === old), true)
+  const variantOptions = ui.nodes(ui.nodes().find(node => node.type === 'optgroup' && node.props.label === '算力变体'))
+  assert.equal(variantOptions.some(node => node.type === 'option' && node.props.value === old), true)
+  assert.match(ui.text(variantOptions.find(node => node.type === 'option' && node.props.value === old)), /历史记录/)
+  assert.equal(ui.nodes(ui.nodes().find(node => node.type === 'optgroup' && node.props.label === '迭代版本')).some(node => node.props?.value === old), false)
   ui.button('查看当前变体').props.onClick(); await ui.settle()
   assert.equal(ui.calls.filter(call => call.endpoint === 'agents/detail').at(-1).payload.experiment_id, current)
   assert.doesNotMatch(ui.text(ui.render()), /当前查看历史变体记录/)

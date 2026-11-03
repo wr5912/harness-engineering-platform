@@ -1,9 +1,10 @@
 import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { authenticateExternal, invokeExternal, streamExternal, type ExternalCaller } from './access.ts'
+import { authenticateExternal, invokeExternal, readExternalConversation, sendExternalConversation, streamExternal, type ExternalCaller } from './access.ts'
 import { probeExternal } from './adapters.ts'
-import { externalDetail, externalInstances, ExternalAccessError, getExternalInstance, mutateExternal, object, readExternalRecords, text } from './registry.ts'
-import type { ExternalInvocation } from './types.ts'
+import { discoverExternal } from './discovery.ts'
+import { externalCredentialRefs, externalDetail, externalInstances, ExternalAccessError, getExternalInstance, mutateExternal, object, readExternalRecords, text } from './registry.ts'
+import type { ExternalConversationSend, ExternalConversationStatus, ExternalDiscoveryRequest, ExternalInvocation } from './types.ts'
 export { authorizeExternalOperation } from './access.ts'
 export { getExternalInstance, externalInstances, externalDetail } from './registry.ts'
 
@@ -13,6 +14,8 @@ export function createExternalInstancesHandler(assetRoot: string): ConnectionRpc
       if (peer?.principal?.kind !== 'owner') throw new ExternalAccessError('forbidden', '接入管理仅供平台管理者使用', 403)
       signal.throwIfAborted()
       const input = object(payload ?? {})
+      if (endpoint === 'credentials') return { ok: true, value: { refs: externalCredentialRefs(assetRoot) } }
+      if (endpoint === 'discover') return { ok: true, value: await discoverExternal(assetRoot, input as ExternalDiscoveryRequest, signal) }
       if (endpoint === 'list') return { ok: true, value: externalInstances(assetRoot) }
       if (endpoint === 'detail') return { ok: true, value: externalDetail(assetRoot, text(input.id, '实例标识')) }
       if (endpoint === 'records') return { ok: true, value: { records: readExternalRecords(assetRoot, text(input.id, '实例标识')) } }
@@ -22,6 +25,10 @@ export function createExternalInstancesHandler(assetRoot: string): ConnectionRpc
         return { ok: true, value: instance ? { found: true, detail: externalDetail(assetRoot, instance.id) } : { found: false, note: '尚无匹配回执，请保留草稿与原请求标识。' } }
       }
       if (endpoint === 'invoke') return { ok: true, value: await invokeExternal(assetRoot, { subjectId: 'platform-owner', source: 'authenticated-platform-owner', expiresAt: new Date(Date.now() + 60000).toISOString() }, input as ExternalInvocation, signal) }
+      if (endpoint === 'conversation/send' || endpoint === 'conversation/status') {
+        const caller: ExternalCaller = { subjectId: 'platform-owner', source: 'authenticated-platform-owner', expiresAt: new Date(Date.now() + 60000).toISOString() }
+        return { ok: true, value: endpoint === 'conversation/send' ? await sendExternalConversation(assetRoot, caller, input as ExternalConversationSend, signal) : await readExternalConversation(assetRoot, caller, input as ExternalConversationStatus, signal) }
+      }
       if (endpoint === 'verify') {
         const instance = getExternalInstance(assetRoot, text(input.id, '实例标识'))
         if (!instance || instance.state === 'removed') throw new ExternalAccessError('not_found', '接入实例不存在', 404)

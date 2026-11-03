@@ -1,0 +1,185 @@
+{
+  "observedAt": "2026-11-03T01:15:02.107Z",
+  "scope": "仅AgentScope既有connector迁入正式机器身份；未发送prompt或tools/call，未修改正式登记/授权或原生模型/catalog/HOME/Session配置",
+  "instanceId": "remote-agentscope-sample",
+  "credentialMetadata": {
+    "id": "credential-1fa54d35-6d6c-45a6-b75d-6886a8ac626b",
+    "clientId": "client-8833889f-1e6b-4cfb-bdf3-f9d7b3cf8da3",
+    "expiresAt": "2026-12-03T01:13:28.930Z"
+  },
+  "targets": {
+    "tokenEndpoint": "http://10.0.160.32:53105/oauth/token",
+    "resourceUrl": "http://10.0.160.32:53105/api/agent-access/v1/resources/sample-assets/mcp",
+    "audience": "urn:harness:sample-assets",
+    "scopes": [
+      "assets:read"
+    ]
+  },
+  "files": {
+    "config": "/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/agentscope/connector/config.json",
+    "key": "/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/agentscope/connector/instance.key",
+    "sourceMetadata": "/home/admin/harness-engineering-platform-data/.local/credentials/external-connectors/remote-agentscope-sample/metadata.json",
+    "backupDirectory": "/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/agentscope/connector/before-formal-2026-11-03T01-14-50-536Z"
+  },
+  "containers": {
+    "before": [
+      {
+        "name": "hep-cross-framework-agentscope",
+        "id": "f84b670dc745ed7268ed10b45c6133f3b1eecd5ca10c3a4fde62d73faba23862",
+        "running": true,
+        "startedAt": "2026-11-02T14:05:45.892353461Z",
+        "image": "sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff",
+        "owner": "cross-framework-access"
+      },
+      {
+        "name": "hep-cross-framework-redis",
+        "id": "e1c8d01e9b63095a03215e69b977e96834ef693fdb620c06ee95f3d440598563",
+        "running": true,
+        "startedAt": "2026-11-02T14:05:42.543205326Z",
+        "image": "sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf",
+        "owner": "cross-framework-access"
+      },
+      {
+        "name": "hep-cross-framework-agentscope-connector",
+        "id": "16272e89f2fc051029fbc82d1555689f0ad92e67b9ee1898c1dadbfb235e74dc",
+        "running": true,
+        "startedAt": "2026-11-02T14:05:42.547020786Z",
+        "image": "sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df",
+        "owner": "cross-framework-access"
+      }
+    ],
+    "after": [
+      {
+        "name": "hep-cross-framework-agentscope",
+        "id": "f84b670dc745ed7268ed10b45c6133f3b1eecd5ca10c3a4fde62d73faba23862",
+        "running": true,
+        "startedAt": "2026-11-02T14:05:45.892353461Z",
+        "image": "sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff",
+        "owner": "cross-framework-access"
+      },
+      {
+        "name": "hep-cross-framework-redis",
+        "id": "e1c8d01e9b63095a03215e69b977e96834ef693fdb620c06ee95f3d440598563",
+        "running": true,
+        "startedAt": "2026-11-02T14:05:42.543205326Z",
+        "image": "sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf",
+        "owner": "cross-framework-access"
+      },
+      {
+        "name": "hep-cross-framework-agentscope-connector",
+        "id": "16272e89f2fc051029fbc82d1555689f0ad92e67b9ee1898c1dadbfb235e74dc",
+        "running": true,
+        "startedAt": "2026-11-03T01:15:01.007560322Z",
+        "image": "sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df",
+        "owner": "cross-framework-access"
+      }
+    ]
+  },
+  "native": {
+    "endpoint": "http://127.0.0.1:18652",
+    "agentId": "6b8687e485144c60bc85c846479d56b1",
+    "currentSessionId": "92979e4a205a467996ad229d3d91d421",
+    "messageCount": 20,
+    "sessions": [
+      {
+        "id": "81d0d2dced974791a87ad404b51800c5",
+        "owner": "harness-remote-agentscope-sample",
+        "isRunning": false,
+        "status": "idle",
+        "model": {
+          "type": "openai_chat_model",
+          "credential_id": "e513fcdd5cfa4cc58b8c5abdea252383",
+          "model": "cross-framework-fixture",
+          "parameters": {}
+        }
+      },
+      {
+        "id": "92979e4a205a467996ad229d3d91d421",
+        "owner": "harness-remote-agentscope-sample",
+        "isRunning": false,
+        "status": "idle",
+        "model": {
+          "type": "openai_chat_model",
+          "credential_id": "e513fcdd5cfa4cc58b8c5abdea252383",
+          "model": "cross-framework-fixture",
+          "parameters": {}
+        }
+      },
+      {
+        "id": "a8cb50822e1e415ba6f918efcf06d45d",
+        "owner": "harness-remote-agentscope-sample",
+        "isRunning": false,
+        "status": "awaiting_permission",
+        "model": {
+          "type": "openai_chat_model",
+          "credential_id": "e513fcdd5cfa4cc58b8c5abdea252383",
+          "model": "cross-framework-fixture",
+          "parameters": {}
+        }
+      },
+      {
+        "id": "d40cb18178f84537ae79fb5e2e4d1483",
+        "owner": "harness-remote-agentscope-sample",
+        "isRunning": false,
+        "status": "idle",
+        "model": {
+          "type": "openai_chat_model",
+          "credential_id": "e513fcdd5cfa4cc58b8c5abdea252383",
+          "model": "cross-framework-fixture",
+          "parameters": {}
+        }
+      },
+      {
+        "id": "de08a908d60f4f10a08a4d645e7a9e20",
+        "owner": "harness-remote-agentscope-sample",
+        "isRunning": false,
+        "status": "idle",
+        "model": {
+          "type": "openai_chat_model",
+          "credential_id": "e513fcdd5cfa4cc58b8c5abdea252383",
+          "model": "cross-framework-fixture",
+          "parameters": {}
+        }
+      }
+    ]
+  },
+  "selfStatus": {
+    "httpStatus": 200,
+    "instanceId": "remote-agentscope-sample"
+  },
+  "toolsList": {
+    "httpStatus": 200,
+    "tools": [
+      "get_asset"
+    ],
+    "error": null
+  },
+  "checks": [
+    {
+      "name": "仅connector重启且所有容器ID保留",
+      "ok": true
+    },
+    {
+      "name": "旧Session身份状态模型配置保留",
+      "ok": true
+    },
+    {
+      "name": "当前旧Session仍可读取",
+      "ok": true
+    },
+    {
+      "name": "正式身份状态认证成功",
+      "ok": true
+    },
+    {
+      "name": "connector经正式issuer发现签名工具",
+      "ok": true
+    },
+    {
+      "name": "专用key/config及备份均0600",
+      "ok": true
+    }
+  ],
+  "passed": true,
+  "pending": "等待root确认正式新风险与授权配置加载后再做完整业务调用"
+}

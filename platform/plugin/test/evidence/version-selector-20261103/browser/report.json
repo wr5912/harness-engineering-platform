@@ -1,0 +1,230 @@
+{
+  "at": "2026-11-03T04:45:33.422Z",
+  "checks": [
+    {
+      "name": "实际平台认证",
+      "ok": true
+    },
+    {
+      "name": "实际装载分类选择器",
+      "ok": true
+    },
+    {
+      "name": "目录当前迭代计数不包含变体",
+      "ok": true
+    },
+    {
+      "name": "1440/false 迭代候选只有两个版本号",
+      "ok": true
+    },
+    {
+      "name": "1440/false 当前类别搜索空态",
+      "ok": true
+    },
+    {
+      "name": "1440/false 变体候选独立且显示来源",
+      "ok": true
+    },
+    {
+      "name": "1440/false 切分类重置搜索",
+      "ok": true
+    },
+    {
+      "name": "1440/false 只浏览不切工作对象",
+      "ok": true
+    },
+    {
+      "name": "1440/false 弹层和页面无横向溢出",
+      "ok": true
+    },
+    {
+      "name": "768/false 迭代候选只有两个版本号",
+      "ok": true
+    },
+    {
+      "name": "768/false 当前类别搜索空态",
+      "ok": true
+    },
+    {
+      "name": "768/false 变体候选独立且显示来源",
+      "ok": true
+    },
+    {
+      "name": "768/false 切分类重置搜索",
+      "ok": true
+    },
+    {
+      "name": "768/false 只浏览不切工作对象",
+      "ok": true
+    },
+    {
+      "name": "768/false 弹层和页面无横向溢出",
+      "ok": true
+    },
+    {
+      "name": "390/false 迭代候选只有两个版本号",
+      "ok": true
+    },
+    {
+      "name": "390/false 当前类别搜索空态",
+      "ok": true
+    },
+    {
+      "name": "390/false 变体候选独立且显示来源",
+      "ok": true
+    },
+    {
+      "name": "390/false 切分类重置搜索",
+      "ok": true
+    },
+    {
+      "name": "390/false 只浏览不切工作对象",
+      "ok": true
+    },
+    {
+      "name": "390/false 弹层和页面无横向溢出",
+      "ok": true
+    },
+    {
+      "name": "1440/true 迭代候选只有两个版本号",
+      "ok": true
+    },
+    {
+      "name": "1440/true 当前类别搜索空态",
+      "ok": true
+    },
+    {
+      "name": "1440/true 变体候选独立且显示来源",
+      "ok": true
+    },
+    {
+      "name": "1440/true 切分类重置搜索",
+      "ok": true
+    },
+    {
+      "name": "1440/true 只浏览不切工作对象",
+      "ok": true
+    },
+    {
+      "name": "1440/true 弹层和页面无横向溢出",
+      "ok": true
+    },
+    {
+      "name": "768/true 迭代候选只有两个版本号",
+      "ok": true
+    },
+    {
+      "name": "768/true 当前类别搜索空态",
+      "ok": true
+    },
+    {
+      "name": "768/true 变体候选独立且显示来源",
+      "ok": true
+    },
+    {
+      "name": "768/true 切分类重置搜索",
+      "ok": true
+    },
+    {
+      "name": "768/true 只浏览不切工作对象",
+      "ok": true
+    },
+    {
+      "name": "768/true 弹层和页面无横向溢出",
+      "ok": true
+    },
+    {
+      "name": "390/true 迭代候选只有两个版本号",
+      "ok": true
+    },
+    {
+      "name": "390/true 当前类别搜索空态",
+      "ok": true
+    },
+    {
+      "name": "390/true 变体候选独立且显示来源",
+      "ok": true
+    },
+    {
+      "name": "390/true 切分类重置搜索",
+      "ok": true
+    },
+    {
+      "name": "390/true 只浏览不切工作对象",
+      "ok": true
+    },
+    {
+      "name": "390/true 弹层和页面无横向溢出",
+      "ok": true
+    },
+    {
+      "name": "键盘选择具体变体才切换对象",
+      "ok": true
+    },
+    {
+      "name": "展开定位当前变体类别",
+      "ok": true
+    },
+    {
+      "name": "浏览另一分类保留名称草稿",
+      "ok": true
+    },
+    {
+      "name": "拒绝放弃草稿保持对象与内容",
+      "ok": true
+    },
+    {
+      "name": "取消切换后重新展开仍定位实际变体",
+      "ok": true
+    },
+    {
+      "name": "分类按钮可用键盘切换",
+      "ok": true
+    },
+    {
+      "name": "键盘选择迭代版本",
+      "ok": true
+    },
+    {
+      "name": "旧EXP历史变体直接打开并归类",
+      "ok": true
+    },
+    {
+      "name": "历史记录仍可跳到当前变体",
+      "ok": true
+    },
+    {
+      "name": "只有一类时不显示多余分类",
+      "ok": true
+    },
+    {
+      "name": "共享选择器无分类消费者保持原列表",
+      "ok": true
+    },
+    {
+      "name": "共享选择器搜索保持",
+      "ok": true
+    },
+    {
+      "name": "页面无运行时异常",
+      "ok": true
+    }
+  ],
+  "errors": [],
+  "screenshots": [
+    ".local/version-select-20261103/browser-complete/1440-light-versions.png",
+    ".local/version-select-20261103/browser-complete/1440-light-variants.png",
+    ".local/version-select-20261103/browser-complete/768-light-versions.png",
+    ".local/version-select-20261103/browser-complete/768-light-variants.png",
+    ".local/version-select-20261103/browser-complete/390-light-versions.png",
+    ".local/version-select-20261103/browser-complete/390-light-variants.png",
+    ".local/version-select-20261103/browser-complete/1440-dark-versions.png",
+    ".local/version-select-20261103/browser-complete/1440-dark-variants.png",
+    ".local/version-select-20261103/browser-complete/768-dark-versions.png",
+    ".local/version-select-20261103/browser-complete/768-dark-variants.png",
+    ".local/version-select-20261103/browser-complete/390-dark-versions.png",
+    ".local/version-select-20261103/browser-complete/390-dark-variants.png",
+    ".local/version-select-20261103/browser-complete/historical-variant.png"
+  ],
+  "scope": "本机18120实际加载客户端；只读选择、搜索、未保存名称草稿与原生主题偏好，不保存业务修改或发起运行"
+}

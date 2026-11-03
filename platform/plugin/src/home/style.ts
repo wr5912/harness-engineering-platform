@@ -7,6 +7,12 @@ export const homePageTheme = `
 .harness-hero>p{max-width:720px;color:var(--hep-muted);margin:14px auto 26px;font-size:14px;line-height:1.75;text-wrap:pretty}
 .harness-task-composer{max-width:860px;margin:auto;padding:18px 22px 18px;background:var(--hep-surface);border:1px solid color-mix(in srgb,var(--hep-primary) 20%,var(--hep-border));border-radius:16px;box-shadow:0 8px 28px color-mix(in srgb,var(--hep-primary) 6%,transparent),0 1px 3px color-mix(in srgb,var(--hep-text) 4%,transparent);text-align:left;transition:border-color var(--hep-motion),box-shadow var(--hep-motion)}
 .harness-task-composer:focus-within{border-color:var(--hep-primary);box-shadow:0 0 0 3px var(--hep-primary-soft),var(--hep-shadow)}
+body[data-ds-dark-theme] .harness-hero::before{background:radial-gradient(ellipse at 42% 30%,color-mix(in srgb,var(--hep-brand) 13%,transparent),transparent 64%),radial-gradient(ellipse at 66% 48%,color-mix(in srgb,var(--hep-violet) 8%,transparent),transparent 60%);animation:hep-ambient 12s ease-in-out infinite}
+body[data-ds-dark-theme] .harness-task-composer{background:var(--hep-panel-bg);border-color:color-mix(in srgb,var(--hep-brand) 38%,var(--hep-border));box-shadow:inset 0 1px 0 #7bdcff0d,0 0 24px color-mix(in srgb,var(--hep-brand) 7%,transparent),0 12px 36px #0004}
+body[data-ds-dark-theme] .harness-task-composer:focus-within{border-color:var(--hep-focus);box-shadow:0 0 0 2px color-mix(in srgb,var(--hep-brand) 18%,transparent),0 0 24px color-mix(in srgb,var(--hep-brand) 10%,transparent)}
+body[data-ds-dark-theme] .harness-hero-kicker{background:var(--hep-control-bg);border-color:var(--hep-border)}
+@keyframes hep-ambient{0%,100%{opacity:.65}50%{opacity:1}}
+@media(prefers-reduced-motion:reduce){body[data-ds-dark-theme] .harness-hero::before{animation:none}}
 .harness-home-shortcuts{max-width:860px;margin:12px auto 0;display:flex;align-items:center;justify-content:center;gap:8px;text-align:left;flex-wrap:wrap}
 .harness-entry-modes{display:flex;flex:none;gap:8px;min-width:0}
 .harness-platform .harness-entry-modes button{display:flex;align-items:center;justify-content:center;gap:7px;flex:none;min-width:0;background:var(--hep-surface);border:1px solid var(--hep-border);border-radius:var(--hep-control-radius);font-size:12px;color:var(--hep-text);padding:8px 12px;box-shadow:0 1px 2px color-mix(in srgb,var(--hep-text) 3%,transparent)}

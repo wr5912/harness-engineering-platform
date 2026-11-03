@@ -1,0 +1,18 @@
+{"checks":21,"passed":21,"errors":[],"failure":"TimeoutError: locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: '切换到深色主题', exact: true }).first()\u001b[22m\n","report":".local/version-select-20261103/browser/report.json"}
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+locator.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for getByRole('button', { name: '切换到深色主题', exact: true }).first()[22m
+
+    at theme (/home/admin/work/harness-engineering-platform/.local/version-select-20261103/browser.mts:19:142)
+    at async file:///home/admin/work/harness-engineering-platform/.local/version-select-20261103/browser.mts:28:3 {
+  log: [
+    "  - waiting for getByRole('button', { name: '切换到深色主题', exact: true }).first()"
+  ],
+  name: 'TimeoutError'
+}
+
+Node.js v24.19.0

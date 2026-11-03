@@ -1,9 +1,9 @@
 // 策划窗口继承全局主题，正文按任务顺序组织；标题和操作区始终可达。
 export const computePlanningTheme = `
-.hep-compute-dialog{width:min(880px,calc(100vw - 48px));max-width:none;max-height:min(880px,calc(100dvh - 48px));height:auto;margin:auto;padding:0;overflow:hidden;border:1px solid var(--hep-border);border-radius:16px;background:var(--hep-surface);color:var(--hep-text);box-shadow:0 28px 88px #10283e2b;font-size:14px;line-height:1.6}
+.hep-compute-dialog{width:min(880px,calc(100vw - 48px));max-width:none;max-height:min(880px,calc(100dvh - 48px));height:auto;margin:auto;padding:0;overflow:hidden;border:1px solid var(--hep-border);border-radius:16px;background:var(--hep-popover-bg,var(--hep-surface));color:var(--hep-text);box-shadow:var(--hep-dialog-shadow,0 28px 88px #10283e2b);font-size:14px;line-height:1.6}
 
 .hep-compute-dialog[open]{display:flex;flex-direction:column}
-.hep-compute-dialog::backdrop{background:#14273e55}
+.hep-compute-dialog::backdrop{background:var(--hep-backdrop,#14273e55)}
 
 .hep-compute-dialog *{box-sizing:border-box}
 .hep-compute-dialog :is(h2,h3,h4,p){margin:0}

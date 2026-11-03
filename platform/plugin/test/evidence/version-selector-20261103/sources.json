@@ -1,0 +1,10 @@
+{
+  "at": "2026-11-03T04:47:39.690177+00:00",
+  "files": {
+    "platform/plugin/src/agents/client.tsx": "f1c86f8da717f164afc2c1fbac1b018cb417c3571c2eba349c075f18cd5a726f",
+    "platform/plugin/src/components/search-select.tsx": "bbcc346e557e2b15ed3390cf83fcf56d512e3496ad494e26b95dfafa8b1b5960",
+    "platform/plugin/test/agents-client.test.mjs": "75152bfa4732f2ba549594faa79d4fc2b9c417a42bb4f07a19ed46043ef6aaf1",
+    "docs/platform-design/06_界面与前后端渐进建设.md": "56496bf09e73470d659ebc3b231a9f9ddf3aa4cd10ae20822934081737445e3a",
+    "docs/platform-design/26_前端设计规范与原则.md": "dab107c0d3de0fafcf4a4893138fcd3717d78b2c6800f23cbf61a68340985dc4"
+  }
+}

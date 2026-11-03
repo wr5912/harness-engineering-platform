@@ -1,0 +1,92 @@
+[
+  {
+    "key": "--dsw-elevation-stroke-color",
+    "old": "#00000029",
+    "current": "rgba(0, 0, 0, 0.16)"
+  },
+  {
+    "key": "--dsw-alias-settings-card-stroke",
+    "old": "#00000029",
+    "current": "rgba(0, 0, 0, 0.16)"
+  },
+  {
+    "key": "--dsw-specific-menu",
+    "old": "#f8f9fa94",
+    "current": "rgba(248, 249, 250, 0.58)"
+  },
+  {
+    "key": "--dsw-elevation-prominent",
+    "old": "0 0 0 .5px #00000029, 0 3px 8px 0 #0000000a, 0 0 20px 0 #0000000d",
+    "current": "0 0 0 .5px rgba(0, 0, 0, 0.16), 0 3px 8px 0 #0000000a, 0 0 20px 0 #0000000d"
+  },
+  {
+    "key": "--dsw-alias-border-l1",
+    "old": "#0000000a",
+    "current": "rgba(0, 0, 0, 0.04)"
+  },
+  {
+    "key": "--dsw-alias-border-l2",
+    "old": "#0000001a",
+    "current": "rgba(0, 0, 0, 0.1)"
+  },
+  {
+    "key": "--dsw-alias-interactive-bg-hover-accent",
+    "old": "#26314824",
+    "current": "rgba(38, 49, 72, 0.14)"
+  },
+  {
+    "key": "--dsw-alias-bg-mask-1",
+    "old": "#0000003d",
+    "current": "rgba(0, 0, 0, 0.24)"
+  },
+  {
+    "key": "--dsw-alias-border-l4",
+    "old": "#00000029",
+    "current": "rgba(0, 0, 0, 0.16)"
+  },
+  {
+    "key": "--dsw-elevation-stroke",
+    "old": "0 0 0 .5px #00000029",
+    "current": "0 0 0 .5px rgba(0, 0, 0, 0.16)"
+  },
+  {
+    "key": "--dsw-alias-interactive-bg-active",
+    "old": "#2631481a",
+    "current": "rgba(38, 49, 72, 0.1)"
+  },
+  {
+    "key": "--dsw-alias-interactive-bg-hover",
+    "old": "#2631480f",
+    "current": "rgba(38, 49, 72, 0.06)"
+  },
+  {
+    "key": "--dsw-menu-surface-fill",
+    "old": "#f8f9fa94",
+    "current": "rgba(248, 249, 250, 0.58)"
+  },
+  {
+    "key": "--dsw-elevation-panel",
+    "old": "0 0 0 .5px #00000029, 0 3px 8px 0 #00000008, 0 0 16px 0 #00000005",
+    "current": "0 0 0 .5px rgba(0, 0, 0, 0.16), 0 3px 8px 0 #00000008, 0 0 16px 0 #00000005"
+  },
+  {
+    "key": "--dsw-alias-turn-trigger-bg-hover",
+    "old": "#2631480f",
+    "current": "rgba(38, 49, 72, 0.06)"
+  },
+  {
+    "key": "--dsw-elevation-soft",
+    "old": "0 0 0 .5px #00000029, 0 4px 16px 0 #00000008, 0 0 24px 0 #00000008",
+    "current": "0 0 0 .5px rgba(0, 0, 0, 0.16), 0 4px 16px 0 #00000008, 0 0 24px 0 #00000008"
+  },
+  {
+    "key": "--dsw-alias-border-l2-darkmode-thin",
+    "old": "#0000001a",
+    "current": "rgba(0, 0, 0, 0.1)"
+  },
+  {
+    "key": "--dsw-alias-border-l3",
+    "old": "#0000001f",
+    "current": "rgba(0, 0, 0, 0.12)"
+  }
+]

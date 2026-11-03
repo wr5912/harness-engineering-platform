@@ -1,0 +1,102 @@
+{
+  "at": "2026-11-03T04:43:11.605Z",
+  "checks": [
+    {
+      "name": "实际平台认证",
+      "ok": true
+    },
+    {
+      "name": "实际装载分类选择器",
+      "ok": true
+    },
+    {
+      "name": "目录当前迭代计数不包含变体",
+      "ok": true
+    },
+    {
+      "name": "1440/false 迭代候选只有两个版本号",
+      "ok": true
+    },
+    {
+      "name": "1440/false 当前类别搜索空态",
+      "ok": true
+    },
+    {
+      "name": "1440/false 变体候选独立且显示来源",
+      "ok": true
+    },
+    {
+      "name": "1440/false 切分类重置搜索",
+      "ok": true
+    },
+    {
+      "name": "1440/false 只浏览不切工作对象",
+      "ok": true
+    },
+    {
+      "name": "1440/false 弹层和页面无横向溢出",
+      "ok": true
+    },
+    {
+      "name": "768/false 迭代候选只有两个版本号",
+      "ok": true
+    },
+    {
+      "name": "768/false 当前类别搜索空态",
+      "ok": true
+    },
+    {
+      "name": "768/false 变体候选独立且显示来源",
+      "ok": true
+    },
+    {
+      "name": "768/false 切分类重置搜索",
+      "ok": true
+    },
+    {
+      "name": "768/false 只浏览不切工作对象",
+      "ok": true
+    },
+    {
+      "name": "768/false 弹层和页面无横向溢出",
+      "ok": true
+    },
+    {
+      "name": "390/false 迭代候选只有两个版本号",
+      "ok": true
+    },
+    {
+      "name": "390/false 当前类别搜索空态",
+      "ok": true
+    },
+    {
+      "name": "390/false 变体候选独立且显示来源",
+      "ok": true
+    },
+    {
+      "name": "390/false 切分类重置搜索",
+      "ok": true
+    },
+    {
+      "name": "390/false 只浏览不切工作对象",
+      "ok": true
+    },
+    {
+      "name": "390/false 弹层和页面无横向溢出",
+      "ok": true
+    }
+  ],
+  "errors": [],
+  "screenshots": [
+    ".local/version-select-20261103/browser/1440-light-versions.png",
+    ".local/version-select-20261103/browser/1440-light-variants.png",
+    ".local/version-select-20261103/browser/768-light-versions.png",
+    ".local/version-select-20261103/browser/768-light-variants.png",
+    ".local/version-select-20261103/browser/390-light-versions.png",
+    ".local/version-select-20261103/browser/390-light-variants.png",
+    ".local/version-select-20261103/browser/failure.png"
+  ],
+  "scope": "本机18120实际加载客户端；只读选择、搜索、未保存名称草稿与原生主题偏好，不保存业务修改或发起运行",
+  "failure": "TimeoutError: locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: '切换到深色主题', exact: true }).first()\u001b[22m\n",
+  "restoreFailure": "TimeoutError: locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: '切换到深色主题', exact: true }).first()\u001b[22m\n"
+}

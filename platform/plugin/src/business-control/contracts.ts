@@ -157,6 +157,8 @@ export interface BusinessAccessConfig {
   schemaVersion: 1; enabled: boolean
   authentication?: ProviderConfig; identityTrust?: ProviderConfig
   riskAssessment?: ProviderConfig & { requiredKinds?: OperationKind[] }
+  /** 仅供已有跨框架实例入口及其机器资源调用使用；省略时沿用全局风险提供方。 */
+  externalAccess?: { riskAssessment?: ProviderConfig }
   accessAuthorization?: ProviderConfig
   agents: AgentAccessRule[]; operations?: OperationRule[]
   detection?: { inputMarkers?: string[]; operationMarkers?: string[]; reportMarkers?: string[] }

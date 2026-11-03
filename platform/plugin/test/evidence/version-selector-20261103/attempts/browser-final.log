@@ -1,0 +1,17 @@
+{"checks":40,"passed":39,"errors":[],"failure":"AssertionError [ERR_ASSERTION]: 键盘选择具体变体才切换对象","report":".local/version-select-20261103/browser-final/report.json"}
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: 键盘选择具体变体才切换对象
+    at check (file:///home/admin/work/harness-engineering-platform/.local/version-select-20261103/browser.mts:10:78)
+    at file:///home/admin/work/harness-engineering-platform/.local/version-select-20261103/browser.mts:48:26 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.19.0

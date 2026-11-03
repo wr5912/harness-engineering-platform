@@ -1,0 +1,246 @@
+{
+  "observedAt": "2026-11-03T01:40:46.554Z",
+  "scope": "最终创建一次原生装配真实合同；普通读取继承原生，无复加MCP；仅probe临时移除/恢复，不触旧五或用户UI会话",
+  "source": {
+    "file": "/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/agentscope/upstream-main.py",
+    "sha256": "9991bcf191f632ce562a21dc98c18e84a57d263de0b89a87be0666c8bcdb2ace",
+    "loadedSha256": "9991bcf191f632ce562a21dc98c18e84a57d263de0b89a87be0666c8bcdb2ace"
+  },
+  "containers": {
+    "before": [
+      {
+        "name": "hep-cross-framework-agentscope",
+        "id": "f84b670dc745ed7268ed10b45c6133f3b1eecd5ca10c3a4fde62d73faba23862",
+        "running": true,
+        "startedAt": "2026-11-03T01:25:45.422503654Z"
+      },
+      {
+        "name": "hep-cross-framework-redis",
+        "id": "e1c8d01e9b63095a03215e69b977e96834ef693fdb620c06ee95f3d440598563",
+        "running": true,
+        "startedAt": "2026-11-02T14:05:42.543205326Z"
+      },
+      {
+        "name": "hep-cross-framework-agentscope-connector",
+        "id": "16272e89f2fc051029fbc82d1555689f0ad92e67b9ee1898c1dadbfb235e74dc",
+        "running": true,
+        "startedAt": "2026-11-03T01:15:01.007560322Z"
+      }
+    ],
+    "after": [
+      {
+        "name": "hep-cross-framework-agentscope",
+        "id": "f84b670dc745ed7268ed10b45c6133f3b1eecd5ca10c3a4fde62d73faba23862",
+        "running": true,
+        "startedAt": "2026-11-03T01:40:43.208631642Z"
+      },
+      {
+        "name": "hep-cross-framework-redis",
+        "id": "e1c8d01e9b63095a03215e69b977e96834ef693fdb620c06ee95f3d440598563",
+        "running": true,
+        "startedAt": "2026-11-02T14:05:42.543205326Z"
+      },
+      {
+        "name": "hep-cross-framework-agentscope-connector",
+        "id": "16272e89f2fc051029fbc82d1555689f0ad92e67b9ee1898c1dadbfb235e74dc",
+        "running": true,
+        "startedAt": "2026-11-03T01:15:01.007560322Z"
+      }
+    ]
+  },
+  "oldFiveIds": [
+    "92979e4a205a467996ad229d3d91d421",
+    "de08a908d60f4f10a08a4d645e7a9e20",
+    "d40cb18178f84537ae79fb5e2e4d1483",
+    "81d0d2dced974791a87ad404b51800c5",
+    "a8cb50822e1e415ba6f918efcf06d45d"
+  ],
+  "preexistingSessionIds": [
+    "7d1e02507cb944f0a7088461ffd54da9",
+    "01b5b5267f3d4c87aecd5eaf660b4fe7",
+    "92979e4a205a467996ad229d3d91d421",
+    "de08a908d60f4f10a08a4d645e7a9e20",
+    "d40cb18178f84537ae79fb5e2e4d1483",
+    "81d0d2dced974791a87ad404b51800c5",
+    "a8cb50822e1e415ba6f918efcf06d45d"
+  ],
+  "allPreexistingPreserved": true,
+  "userUiSessionId": "7d1e02507cb944f0a7088461ffd54da9",
+  "explicitSelectionProbe": {
+    "sessionId": "01b5b5267f3d4c87aecd5eaf660b4fe7",
+    "removedNames": [
+      "native_catalog"
+    ],
+    "secondReadNames": [
+      "native_catalog"
+    ],
+    "restoredNames": [
+      "native_catalog",
+      "protected_assets"
+    ]
+  },
+  "newSession": {
+    "id": "c050aea451bb4deaa97334eab60a774a",
+    "model": {
+      "type": "openai_chat_model",
+      "credential_id": "e513fcdd5cfa4cc58b8c5abdea252383",
+      "model": "cross-framework-fixture",
+      "parameters": {}
+    },
+    "permissionMode": "default",
+    "allowedTools": [
+      "mcp__protected_assets__get_asset",
+      "mcp__native_catalog__get_catalog"
+    ],
+    "mcp": [
+      {
+        "name": "protected_assets",
+        "isStateful": false,
+        "type": "http_mcp",
+        "healthy": true
+      },
+      {
+        "name": "native_catalog",
+        "isStateful": false,
+        "type": "http_mcp",
+        "healthy": true
+      }
+    ]
+  },
+  "checks": [
+    {
+      "name": "原有七Session配置权限状态保留",
+      "ok": true
+    },
+    {
+      "name": "仅AS重启且Redis/connector保持",
+      "ok": true
+    },
+    {
+      "name": "实际装载最终创建一次装配",
+      "ok": true
+    },
+    {
+      "name": "仅probe显式移除后普通get_workspace不重加",
+      "ok": true
+    },
+    {
+      "name": "probe已恢复原两项选择",
+      "ok": true
+    },
+    {
+      "name": "真正裸创建新Session继承fixture与DEFAULT精确权限",
+      "ok": true
+    },
+    {
+      "name": "创建时完成既有两stateless HTTP选择",
+      "ok": true
+    }
+  ],
+  "metadataPassed": true,
+  "runs": [
+    {
+      "phase": "asset",
+      "sessionId": "c050aea451bb4deaa97334eab60a774a",
+      "startedAt": "2026-11-03T01:41:54.242Z",
+      "completedAt": "2026-11-03T01:41:57.818Z",
+      "acceptedStatus": "started",
+      "complete": true,
+      "contentMatches": true,
+      "toolResults": [
+        {
+          "name": "mcp__protected_assets__get_asset",
+          "state": "success",
+          "output": [
+            {
+              "type": "text",
+              "text": "{\"id\":\"A-1\",\"group\":\"A\",\"status\":\"正常\"}",
+              "id": "8edbc6dd278842c7b51f6db642aced3c",
+              "created_at": "2026-11-03T01:41:57.674534",
+              "finished_at": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "catalog",
+      "sessionId": "c050aea451bb4deaa97334eab60a774a",
+      "startedAt": "2026-11-03T01:41:57.822Z",
+      "completedAt": "2026-11-03T01:41:58.881Z",
+      "acceptedStatus": "started",
+      "complete": true,
+      "contentMatches": true,
+      "toolResults": [
+        {
+          "name": "mcp__native_catalog__get_catalog",
+          "state": "success",
+          "output": [
+            {
+              "type": "text",
+              "text": "{\"catalog\":[\"资产查询\"],\"authentication\":\"native\",\"harnessSignature\":false}",
+              "id": "1a6fe6486f7b45d6ae89c5b449705763",
+              "created_at": "2026-11-03T01:41:58.244226",
+              "finished_at": null
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "passed": true,
+  "completedAt": "2026-11-03T01:41:58.881Z",
+  "currentScope": "仅专属user+agent+新建session_id/state皆None：缺模型填fixture，DEFAULT仅两精确MCP read allow，创建时一次选择原生库；read/update与显式模型/MCP配置沿用原生。",
+  "finalSessionStates": [
+    {
+      "id": "c050aea451bb4deaa97334eab60a774a",
+      "status": "idle",
+      "isRunning": false,
+      "permissionMode": "default"
+    },
+    {
+      "id": "7d1e02507cb944f0a7088461ffd54da9",
+      "status": "idle",
+      "isRunning": false,
+      "permissionMode": "default"
+    },
+    {
+      "id": "01b5b5267f3d4c87aecd5eaf660b4fe7",
+      "status": "idle",
+      "isRunning": false,
+      "permissionMode": "default"
+    },
+    {
+      "id": "92979e4a205a467996ad229d3d91d421",
+      "status": "idle",
+      "isRunning": false,
+      "permissionMode": "bypass"
+    },
+    {
+      "id": "de08a908d60f4f10a08a4d645e7a9e20",
+      "status": "idle",
+      "isRunning": false,
+      "permissionMode": "bypass"
+    },
+    {
+      "id": "d40cb18178f84537ae79fb5e2e4d1483",
+      "status": "idle",
+      "isRunning": false,
+      "permissionMode": "bypass"
+    },
+    {
+      "id": "81d0d2dced974791a87ad404b51800c5",
+      "status": "idle",
+      "isRunning": false,
+      "permissionMode": "bypass"
+    },
+    {
+      "id": "a8cb50822e1e415ba6f918efcf06d45d",
+      "status": "awaiting_permission",
+      "isRunning": false,
+      "permissionMode": "default"
+    }
+  ],
+  "noActiveRuns": true,
+  "originalPendingPreserved": true
+}

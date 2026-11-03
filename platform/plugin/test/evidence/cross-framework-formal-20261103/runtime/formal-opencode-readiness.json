@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-11-03T01:04:25.627Z",
+  "scope": "仅 OpenCode 已有源码 Runtime 就绪；未更改正式登记、策略或平台",
+  "source": {
+    "root": "/home/admin/work/cross-framework-sources/opencode",
+    "commit": "9bbb8ce18c80f099e0e448775f59d965ead40a21",
+    "version": "2.2.5",
+    "dirty": false,
+    "readOnlyMount": true,
+    "artifact": "cli-source",
+    "channel": "local"
+  },
+  "native": {
+    "endpoint": "http://127.0.0.1:18655",
+    "selector": "/workspace",
+    "infoStatus": 200,
+    "observedVersion": "2.2.5",
+    "activeStatus": 200,
+    "activeSessionCount": 0,
+    "sessionListStatus": 200,
+    "sessionCount": 11,
+    "messageChecks": [
+      {
+        "id": "ses_e6369e3e9ffeq9WFCwHmQT6Aua",
+        "status": 200,
+        "outcome": "succeeded",
+        "messageCount": 4,
+        "activeShellCount": 0,
+        "activeToolCount": 0
+      },
+      {
+        "id": "ses_e6369e953ffeoAGES3Eqg43J9S",
+        "status": 200,
+        "outcome": "succeeded",
+        "messageCount": 4,
+        "activeShellCount": 0,
+        "activeToolCount": 0
+      },
+      {
+        "id": "ses_e6369ef05ffem06I9GxQ6Faoou",
+        "status": 200,
+        "outcome": "succeeded",
+        "messageCount": 4,
+        "activeShellCount": 0,
+        "activeToolCount": 0
+      },
+      {
+        "id": "ses_e6369f4abffePqzAhSRuh8aKoM",
+        "status": 200,
+        "outcome": "succeeded",
+        "messageCount": 4,
+        "activeShellCount": 0,
+        "activeToolCount": 0
+      },
+      {
+        "id": "ses_e6369fa8cffe9Whl7eqDuYQ6u0",
+        "status": 200,
+        "outcome": "succeeded",
+        "messageCount": 4,
+        "activeShellCount": 0,
+        "activeToolCount": 0
+      },
+      {
+        "id": "ses_e63857888ffe5A6lQ8m2SJNro4",
+        "status": 200,
+        "outcome": "succeeded",
+        "messageCount": 6,
+        "activeShellCount": 0,
+        "activeToolCount": 0
+      },
+      {
+        "id": "ses_e637d381effeIoIM8gWUJ88beU",
+        "status": 200,
+        "outcome": "succeeded",
+        "messageCount": 4,
+        "activeShellCount": 0,
+        "activeToolCount": 0
+      },
+      {
+        "id": "ses_e637d3dcfffe7PHpatNroLC4uZ",
+        "status": 200,
+        "outcome": "succeeded",
+        "messageCount": 4,
+        "activeShellCount": 0,
+        "activeToolCount": 0
+      },
+      {
+        "id": "ses_e637d431fffe44OVCnvM2DHK1b",
+        "status": 200,
+        "outcome": "succeeded",
+        "messageCount": 4,
+        "activeShellCount": 0,
+        "activeToolCount": 0
+      },
+      {
+        "id": "ses_e637d48eeffeq2OFJ6cQsxV9oM",
+        "status": 200,
+        "outcome": "succeeded",
+        "messageCount": 4,
+        "activeShellCount": 0,
+        "activeToolCount": 0
+      },
+      {
+        "id": "ses_e637d4ed3ffeDQdc5vWp5GrbLP",
+        "status": 200,
+        "outcome": "succeeded",
+        "messageCount": 4,
+        "activeShellCount": 0,
+        "activeToolCount": 0
+      }
+    ],
+    "mcpStatus": 200,
+    "mcpServers": [
+      {
+        "name": "native_catalog",
+        "status": "connected"
+      },
+      {
+        "name": "protected_assets",
+        "status": "connected"
+      }
+    ]
+  },
+  "containers": [
+    {
+      "name": "hep-cross-framework-opencode",
+      "running": true,
+      "pid": 1889354,
+      "startedAt": "2026-11-02T14:05:42.542487438Z",
+      "image": "sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df",
+      "ownedLabel": "cross-framework-opencode",
+      "composeProject": "hep-cross-framework-recovery",
+      "composeService": "opencode"
+    },
+    {
+      "name": "hep-cross-framework-opencode-connector",
+      "running": true,
+      "pid": 1889383,
+      "startedAt": "2026-11-02T14:05:42.548079128Z",
+      "image": "sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df",
+      "ownedLabel": "cross-framework-opencode-connector",
+      "composeProject": "hep-cross-framework-recovery",
+      "composeService": "opencode-connector"
+    }
+  ],
+  "credentialReferences": {
+    "nativePassword": "/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/opencode/server-credential.json",
+    "isolatedUpstreamHeaders": "/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/platform/.local/credentials/external/sample-opencode.json",
+    "connectorConfig": "/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/opencode/connector/config.json",
+    "connectorSecret": "/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/opencode/connector/instance.secret"
+  },
+  "dependencies": {
+    "modelBaseURL": "http://172.17.0.1:18650/v1",
+    "model": "cross-framework-fixture",
+    "modelListStatus": 200,
+    "modelCompletionStatus": 200,
+    "modelToolRequestObserved": "get_asset",
+    "nativeCatalogURL": "http://172.17.0.1:18650/catalog/mcp"
+  },
+  "formalMigration": {
+    "state": "等待 root 提供正式 instanceId 与专用机器凭据配置",
+    "formalOriginReachableFromConnector": true,
+    "formalTokenRouteStatusBeforeReload": 404,
+    "minimumActions": [
+      "替换 connector 专用 instanceId/clientId/secretFile 内容与 tokenEndpoint/resourceUrl/audience/scopes",
+      "定向重启 connector 清理旧 token 缓存",
+      "从真实 OpenCode 新会话验证受控资产及独立原认证目录工具"
+    ],
+    "keepNativeMcpURL": "http://hep-cross-framework-opencode-connector:18700/mcp"
+  },
+  "actions": {
+    "restartedContainers": [],
+    "newSessionsCreated": 0,
+    "credentialsCreatedOrRotated": 0,
+    "formalConfigurationChanged": false
+  },
+  "limits": [
+    "真实锁定源码 Runtime + 本机确定性模型与模拟资源",
+    "未验证异地远程部署或真实业务效果"
+  ]
+}

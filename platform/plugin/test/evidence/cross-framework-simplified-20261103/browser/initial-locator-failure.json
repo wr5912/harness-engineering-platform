@@ -1,0 +1,267 @@
+{
+  "at": "2026-11-03T02:55:26.314Z",
+  "checks": [
+    {
+      "name": "实际owner登录",
+      "ok": true
+    },
+    {
+      "name": "登记移除通用更多设置",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入目标选择器",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入工作区ID",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入AgentPreset",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入所属系统",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入责任主体",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入允许主体",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入开放操作",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入声明版本",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入实例运维责任",
+      "ok": true
+    },
+    {
+      "name": "1440登记无溢出",
+      "ok": true
+    },
+    {
+      "name": "768登记无溢出",
+      "ok": true
+    },
+    {
+      "name": "390登记无溢出",
+      "ok": true
+    },
+    {
+      "name": "AS发现唯一实际Agent并自动选中",
+      "ok": true
+    },
+    {
+      "name": "发现不覆盖用户显示名称",
+      "ok": true
+    },
+    {
+      "name": "登记关闭重开保留已选名称和目标",
+      "ok": true
+    },
+    {
+      "name": "OpenCode通过真实认证识别",
+      "ok": true
+    },
+    {
+      "name": "登记整页刷新保地址与已发现目标",
+      "ok": true
+    },
+    {
+      "name": "agentscope普通访问无会话ID输入",
+      "ok": true
+    },
+    {
+      "name": "agentscope移除旧协议按钮创建会话",
+      "ok": true
+    },
+    {
+      "name": "agentscope移除旧协议按钮发送请求",
+      "ok": true
+    },
+    {
+      "name": "agentscope移除旧协议按钮核对会话结果",
+      "ok": true
+    },
+    {
+      "name": "agentscope1440无溢出",
+      "ok": true
+    },
+    {
+      "name": "agentscope768无溢出",
+      "ok": true
+    },
+    {
+      "name": "agentscope390无溢出",
+      "ok": true
+    },
+    {
+      "name": "agentscope本次请求真实完成",
+      "ok": true
+    },
+    {
+      "name": "agentscope本次assistant结果",
+      "ok": true
+    },
+    {
+      "name": "agentscope本次工具真实完成",
+      "ok": true
+    },
+    {
+      "name": "agentscope首次只发送一次",
+      "ok": true
+    },
+    {
+      "name": "agentscope界面呈现本次完成",
+      "ok": true
+    },
+    {
+      "name": "agentscope会话ID只读详情",
+      "ok": true
+    },
+    {
+      "name": "agentscope关闭重开保输入和完成结果",
+      "ok": true
+    }
+  ],
+  "errors": [],
+  "requests": [
+    {
+      "at": "2026-11-03T02:55:47.286Z",
+      "method": "instances/external/conversation/send",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793674547266-men13qbp2xh"
+    },
+    {
+      "at": "2026-11-03T02:55:47.562Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793674547266-men13qbp2xh"
+    },
+    {
+      "at": "2026-11-03T02:55:49.209Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793674547266-men13qbp2xh"
+    },
+    {
+      "at": "2026-11-03T02:55:52.216Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793674547266-men13qbp2xh"
+    }
+  ],
+  "results": [
+    {
+      "at": "2026-11-03T02:55:47.574Z",
+      "method": "instances/external/conversation/send",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793674547266-men13qbp2xh",
+      "ok": true,
+      "value": {
+        "requestId": "ui-1793674547266-men13qbp2xh",
+        "sessionId": "external-session-83906f35-3c49-4bef-b798-1f8e2e55338b",
+        "status": "running",
+        "messages": [],
+        "tools": [],
+        "note": "正在等待本次回复。",
+        "retryAfterMs": 1500
+      }
+    },
+    {
+      "at": "2026-11-03T02:55:47.707Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793674547266-men13qbp2xh",
+      "ok": true,
+      "value": {
+        "requestId": "ui-1793674547266-men13qbp2xh",
+        "sessionId": "external-session-83906f35-3c49-4bef-b798-1f8e2e55338b",
+        "status": "running",
+        "messages": [],
+        "tools": [],
+        "note": "正在等待本次回复。",
+        "retryAfterMs": 1500
+      }
+    },
+    {
+      "at": "2026-11-03T02:55:49.285Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793674547266-men13qbp2xh",
+      "ok": true,
+      "value": {
+        "requestId": "ui-1793674547266-men13qbp2xh",
+        "sessionId": "external-session-83906f35-3c49-4bef-b798-1f8e2e55338b",
+        "status": "completed",
+        "messages": [
+          {
+            "id": "2a90fb8441174affab2f86497dee2198",
+            "role": "assistant",
+            "text": "模拟循环已完成，实际调用结果以工具返回为准。"
+          }
+        ],
+        "tools": [
+          {
+            "id": "call-fixture-tool",
+            "name": "mcp__protected_assets__get_asset",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "at": "2026-11-03T02:55:52.352Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793674547266-men13qbp2xh",
+      "ok": true,
+      "value": {
+        "requestId": "ui-1793674547266-men13qbp2xh",
+        "sessionId": "external-session-83906f35-3c49-4bef-b798-1f8e2e55338b",
+        "status": "completed",
+        "messages": [
+          {
+            "id": "2a90fb8441174affab2f86497dee2198",
+            "role": "assistant",
+            "text": "模拟循环已完成，实际调用结果以工具返回为准。"
+          }
+        ],
+        "tools": [
+          {
+            "id": "call-fixture-tool",
+            "name": "mcp__protected_assets__get_asset",
+            "status": "completed"
+          }
+        ]
+      }
+    }
+  ],
+  "configurationWrites": [],
+  "screenshots": [
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-55-26-313Z/1440-registration.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-55-26-313Z/768-registration.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-55-26-313Z/390-registration.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-55-26-313Z/1440-registration-agentscope-discovered.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-55-26-313Z/1440-registration-opencode-discovered.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-55-26-313Z/1440-agentscope-access.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-55-26-313Z/768-agentscope-access.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-55-26-313Z/390-agentscope-access.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-55-26-313Z/1440-agentscope-completed.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T02-55-26-313Z/failure.png"
+  ],
+  "scope": "正式18120与真实框架容器，确定性模拟模型及资源；登记发现只读，访问创建新验收会话",
+  "failure": "locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('tab', { name: '概览', exact: true })\u001b[22m\n\u001b[2m    - locator resolved to <button role=\"tab\" type=\"button\" aria-selected=\"true\" class=\"instance-detail-tab\">概览</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <dialog open=\"\" class=\"instance-dialog external-dialog\" aria-labelledby=\"external-access-title\">…</dialog> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <dialog open=\"\" class=\"instance-dialog external-dialog\" aria-labelledby=\"external-access-title\">…</dialog> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    57 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is visible, enabled and stable\u001b[22m\n\u001b[2m       - scrolling into view if needed\u001b[22m\n\u001b[2m       - done scrolling\u001b[22m\n\u001b[2m       - <dialog open=\"\" class=\"instance-dialog external-dialog\" aria-labelledby=\"external-access-title\">…</dialog> intercepts pointer events\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n",
+  "finishedAt": "2026-11-03T02:56:22.451Z",
+  "passed": false
+}

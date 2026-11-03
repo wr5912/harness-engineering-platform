@@ -48,4 +48,16 @@ ${workbenchTokens}
 .harness-platform:not([data-page=conversations]) .harness-run-state:is([data-status=running],[data-status=queued],[data-status=recovering]){background:var(--hep-primary-soft)}
 .harness-platform:not([data-page=conversations]) .harness-guide{border-radius:12px;border-left:3px solid color-mix(in srgb,var(--hep-primary) 35%,var(--hep-border))}
 @media(max-width:680px){.harness-platform:not([data-page=conversations]) .harness-content :where(h1){font-size:22px}}
+
+/* 深色沿用当前工作面结构，以蓝青边界和低对比材质区分层级。 */
+body[data-ds-dark-theme] .harness-platform:not([data-page=conversations]) .harness-content{background:var(--hep-page-bg)}
+body[data-ds-dark-theme] .harness-platform .harness-topbar{background:linear-gradient(180deg,var(--hep-surface),var(--hep-bg));border-bottom-color:var(--hep-border);box-shadow:0 1px 0 color-mix(in srgb,var(--hep-brand) 12%,transparent),0 8px 28px #0003}
+body[data-ds-dark-theme] .harness-platform .harness-brand img{filter:drop-shadow(0 0 7px color-mix(in srgb,var(--hep-brand) 28%,transparent))}
+body[data-ds-dark-theme] .harness-platform .harness-nav button[aria-current=page]{color:var(--hep-link);background:linear-gradient(0deg,color-mix(in srgb,var(--hep-brand) 7%,transparent),transparent 75%)}
+body[data-ds-dark-theme] .harness-platform .harness-nav button[aria-current=page]::after{box-shadow:0 0 8px color-mix(in srgb,var(--hep-brand) 42%,transparent)}
+body[data-ds-dark-theme] .harness-platform:not([data-page=conversations]) :is(.harness-card,.harness-agent-list,.harness-agent-detail,.mcp-manager .mcp-card,.harness-composition-sidebar){background:var(--hep-panel-bg)}
+body[data-ds-dark-theme] .harness-platform .harness-account-actions{background:var(--hep-popover-bg);box-shadow:var(--hep-dialog-shadow)}
+body[data-ds-dark-theme] .harness-platform:not([data-page=conversations]) .harness-content :where(input:not([type=checkbox]):not([type=radio]),select,textarea):not(:where(.harness-assistant-chat *,.harness-entry *)){background:var(--hep-control-bg)}
+body[data-ds-dark-theme] .harness-platform:not([data-page=conversations]) .harness-content :where(input,select,textarea):not(:where(.harness-assistant-chat *,.harness-entry *)):focus-visible{border-color:var(--hep-focus);box-shadow:0 0 14px color-mix(in srgb,var(--hep-brand) 12%,transparent)}
+body[data-ds-dark-theme] .harness-platform .harness-primary{box-shadow:inset 0 1px 0 #ffffff18,0 0 18px color-mix(in srgb,var(--hep-primary) 16%,transparent)}
 `

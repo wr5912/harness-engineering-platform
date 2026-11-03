@@ -1,0 +1,37 @@
+{
+  "at": "2026-11-03T01:33:31.002Z",
+  "scope": "正式UI只载入已有两Session并手动核对结果；滚动实际结果区/原始回执，未修改DOM内容或创建/发送请求",
+  "checks": [
+    {
+      "name": "实际owner登录",
+      "ok": true
+    },
+    {
+      "name": "remote-agentscope-sample仅回读已有准确Session",
+      "ok": true
+    },
+    {
+      "name": "remote-agentscope-sample实际结果概要可见",
+      "ok": true
+    },
+    {
+      "name": "agentscope-completed-summary-1440已知凭据无明文",
+      "ok": true
+    },
+    {
+      "name": "agentscope-completed-summary-1440无一次秘密交付",
+      "ok": true
+    }
+  ],
+  "requests": [
+    {
+      "instanceId": "remote-agentscope-sample",
+      "operation": "session:read",
+      "externalSessionId": "external-session-7e42e8c8-10ef-4cb7-ac9f-d5d8d9079a20",
+      "requestId": "ui-1793669580477-qpr41cktyv",
+      "at": "2026-11-03T01:33:00.493Z"
+    }
+  ],
+  "passed": false,
+  "failure": "locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('dialog', { name: '访问 AgentScope 远程接入（模拟）', exact: true }).locator('details').filter({ has: getByRole('dialog', { name: '访问 AgentScope 远程接入（模拟）', exact: true }).locator('summary').filter({ hasText: '接口回执与关联信息' }) }).locator('summary')\u001b[22m\n"
+}

@@ -2,7 +2,8 @@ import { nativeOverlayTheme } from './native-overlays.ts'
 
 export const assistantTheme = `${nativeOverlayTheme}
 /* 管理对话继续使用原生会话的布局与控件尺寸。 */
-body .harness-platform[data-page=conversations],body .harness-platform :is(.harness-assistant-toggle,.harness-assistant-launch){--hep-link:var(--hep-primary);--hep-link-hover:var(--hep-primary-hover);--hep-hit-target:0px}
+body .harness-platform[data-page=conversations],body .harness-platform :is(.harness-assistant-toggle,.harness-assistant-launch){--hep-hit-target:0px}
+body:not([data-ds-dark-theme]) .harness-platform[data-page=conversations],body:not([data-ds-dark-theme]) .harness-platform :is(.harness-assistant-toggle,.harness-assistant-launch){--hep-link:var(--hep-primary);--hep-link-hover:var(--hep-primary-hover)}
 .harness-operation-inline{font-size:13px;line-height:1.6;overflow-wrap:anywhere}
 .harness-operation-inline>.harness-operation-result{margin:4px 0}
 .harness-operation-inline summary{cursor:pointer;color:#52657c}
@@ -103,6 +104,24 @@ body .harness-platform[data-page=conversations],body .harness-platform :is(.harn
 .harness-assistant-floating .harness-operation-inline [role=alert]{color:var(--hep-danger)}
 .harness-assistant-floating .harness-confirmation-actions{background:var(--hep-surface-muted)}
 .harness-assistant-floating .harness-assistant-proposals-dock{max-height:min(40dvh,320px);overflow-y:auto}
+body[data-ds-dark-theme] .harness-platform button.harness-assistant-launch{background:var(--hep-panel-bg,var(--hep-surface));border-color:var(--hep-border);box-shadow:var(--hep-shadow)}
+body[data-ds-dark-theme] .harness-platform button.harness-assistant-launch:hover:enabled{background:var(--hep-surface-hover);border-color:var(--hep-brand);box-shadow:0 0 18px color-mix(in srgb,var(--hep-brand) 16%,transparent),var(--hep-shadow)}
+body[data-ds-dark-theme] .harness-platform button.harness-assistant-launch[aria-expanded=true]{border-color:var(--hep-brand);box-shadow:0 0 0 3px color-mix(in srgb,var(--hep-brand) 12%,transparent),var(--hep-shadow)}
+body[data-ds-dark-theme] :is(.harness-assistant-toggle,.harness-assistant-launch)[data-status]::after{border-color:var(--hep-surface)}
+body[data-ds-dark-theme] :is(.harness-assistant-toggle,.harness-assistant-launch)[data-status=waiting]::after{background:var(--hep-warning)}
+body[data-ds-dark-theme] :is(.harness-assistant-toggle,.harness-assistant-launch)[data-status=unread]::after{background:var(--hep-brand)}
+body[data-ds-dark-theme] :is(.harness-assistant,.harness-assistant-proposals,.harness-operation-card){background:var(--hep-panel-bg,var(--hep-surface));border-color:var(--hep-border);color:var(--hep-text)}
+body[data-ds-dark-theme] .harness-assistant{box-shadow:var(--hep-dialog-shadow,var(--hep-shadow))}
+body[data-ds-dark-theme] :is(.harness-assistant-heading,.harness-confirmation-actions){background:var(--hep-surface-muted);border-color:var(--hep-border)}
+body[data-ds-dark-theme] :is(.harness-assistant-heading small,.harness-assistant-empty p,.harness-assistant-scope,.harness-operation-card header>span,.harness-fusion-confirmation small,.harness-operation-card dt){color:var(--hep-muted)}
+body[data-ds-dark-theme] .harness-assistant-scope{border-color:var(--hep-border)}
+body[data-ds-dark-theme] .harness-assistant-error{background:color-mix(in srgb,var(--hep-danger) 8%,var(--hep-surface));border-color:color-mix(in srgb,var(--hep-danger) 25%,var(--hep-border));color:var(--hep-danger)}
+body[data-ds-dark-theme] :is(.harness-assistant-proposals>summary,.harness-operation-inline summary){color:var(--hep-link)}
+body[data-ds-dark-theme] .harness-operation-inline [role=alert]{color:var(--hep-danger)}
+body[data-ds-dark-theme] .harness-operation-card button{background:var(--hep-surface);border-color:var(--hep-border);color:var(--hep-text)}
+body[data-ds-dark-theme] .harness-confirmation-actions .harness-primary{background:var(--hep-primary);border-color:var(--hep-primary);color:var(--hep-on-primary)}
+body[data-ds-dark-theme] .harness-confirmation-actions .harness-primary:hover:enabled{background:var(--hep-primary-hover);border-color:var(--hep-primary-hover)}
+body[data-ds-dark-theme] .harness-conversation-welcome{color:var(--hep-text)}
 @media(max-width:1100px){.harness-assistant-floating{inset:0;right:0;bottom:0;max-width:none;width:100vw;height:100dvh;border:0;border-radius:0}.harness-platform button.harness-assistant-launch{display:none}.harness-platform button.harness-assistant-toggle{grid-column:3;grid-row:1;width:44px;height:44px;min-height:44px}.harness-assistant-toggle .harness-assistant-icon{width:34px;height:34px}.harness-platform button.harness-assistant-toggle[aria-expanded=true]{display:none}}
 @media(max-width:580px){.harness-assistant-heading{padding:10px}.harness-assistant-heading strong{font-size:13px}.harness-assistant-context{padding:6px 10px}.harness-assistant-floating .harness-assistant-proposals-dock{max-height:35dvh}}
 .harness-conversation-welcome{display:inline-flex;align-items:center;gap:12px;color:#223550;font-size:24px}

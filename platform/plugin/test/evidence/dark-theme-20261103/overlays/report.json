@@ -1,0 +1,84 @@
+{
+  "at": "2026-11-03T04:15:32.427Z",
+  "checks": [
+    {
+      "name": "实际平台认证",
+      "ok": true
+    },
+    {
+      "name": "助手浮层为深色",
+      "ok": true
+    },
+    {
+      "name": "原生深色选择已持久",
+      "ok": true
+    },
+    {
+      "name": "减少动态效果关闭氛围动画",
+      "ok": true
+    },
+    {
+      "name": "减少动态效果关闭新过渡",
+      "ok": true
+    },
+    {
+      "name": "刷新保持深色选择",
+      "ok": true
+    },
+    {
+      "name": "刷新保持首页草稿",
+      "ok": true
+    },
+    {
+      "name": "切回浅色无暗色残留",
+      "ok": true
+    },
+    {
+      "name": "脚本无异常",
+      "ok": true
+    },
+    {
+      "name": "未投递业务或修改登记",
+      "ok": true
+    }
+  ],
+  "errors": [],
+  "screenshots": [
+    ".local/dark-theme-20261103/browser-2026-11-03T04-15-31-751Z/1440-assistant-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-15-31-751Z/1440-native-settings-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-15-31-751Z/1440-home-light-restored.png"
+  ],
+  "rpcMethods": [
+    "settings/describe",
+    "dynamicCordisRunner/syncInspectManifest",
+    "credentials/describe",
+    "dynamicCordisRunner/inventory",
+    "session/modelCatalog",
+    "inventory",
+    "session/list",
+    "agents/eval/list",
+    "home",
+    "mcp/control/status",
+    "auth/current",
+    "permissionPresets/catalog",
+    "agentPresets/list",
+    "instances/list",
+    "instances/sources",
+    "agents/list",
+    "models/list",
+    "session/create",
+    "session/projections",
+    "assistant/context",
+    "schedule/catalog",
+    "assistant/status",
+    "commands/list",
+    "skills/list",
+    "settings/mutate"
+  ],
+  "samples": [],
+  "scope": "本机18120实际客户端与原生主题，只读页面/打开表单；仅主题偏好切换，无业务投递",
+  "continuedFrom": "browser-2026-11-03T04-12-26-674Z/report.json",
+  "businessWrites": [],
+  "finishedAt": "2026-11-03T04:15:47.533Z",
+  "passed": true
+}

@@ -11,7 +11,7 @@ const local = resolve('.local/agent-access-tests'); mkdirSync(local, { recursive
 const compiled = mkdtempSync(join(local, 'build-'))
 symlinkSync(resolve('node_modules'), join(compiled, 'node_modules'), 'dir')
 await build({ entryPoints: { index: 'src/agent-access/index.ts', connector: 'src/agent-access/connector.ts', registry: 'src/instances/external/registry.ts' }, outdir: compiled, outExtension: { '.js': '.mjs' }, bundle: true, platform: 'node', format: 'esm', packages: 'external', logLevel: 'silent' })
-const { AgentAccessService, createAgentAccessHandler, createAgentAccessManagement } = await import(`file://${join(compiled, 'index.mjs')}`)
+const { AccessError, AgentAccessService, createAgentAccessHandler, createAgentAccessManagement } = await import(`file://${join(compiled, 'index.mjs')}`)
 const { createResourceConnector } = await import(`file://${join(compiled, 'connector.mjs')}`)
 const { externalBindingDigest } = await import(`file://${join(compiled, 'registry.mjs')}`)
 test.after(() => rmSync(compiled, { recursive: true, force: true }))
@@ -36,6 +36,14 @@ async function fixture(t) {
   const a = service.createCredential('agent-a'), b = service.createCredential('agent-b')
   const issue = async (entry = a) => service.issue(entry.credential.clientId, entry.secret, resources[0].audience, ['assets:read'])
   return { root, service, a, b, issue, options, instances, resources, advance: ms => { now += ms }, count: () => count, authorization: () => authorization, lastPath: () => lastPath }
+}
+
+function registerFixtureInstances(f) {
+  for (const row of f.instances.values()) {
+    Object.assign(row, { framework: 'opencode', endpoint: f.resources[0].endpoint, agentId: 'sample-agent', revision: 1 })
+    row.bindingDigest = externalBindingDigest(f.root, row); row.verification.bindingDigest = row.bindingDigest
+  }
+  writeFileSync(join(f.root, 'config/external-instances.json'), JSON.stringify({ schemaVersion: 1, agents: [], requests: [], instances: [...f.instances.values()] }))
 }
 
 test('独立机器凭据、自身状态、一次秘密交付与 owner 管理', async t => {
@@ -145,11 +153,7 @@ test('独立 connector 并发领证不串身份，撤销失败仅影响签名资
 
 test('默认机器授权复用登记与风险提供方，拒绝不会绕过到管理身份', async t => {
   const f = await fixture(t), observations = []
-  for (const row of f.instances.values()) {
-    Object.assign(row, { framework: 'opencode', endpoint: f.resources[0].endpoint, agentId: 'sample-agent', revision: 1 })
-    row.bindingDigest = externalBindingDigest(f.root, row); row.verification.bindingDigest = row.bindingDigest
-  }
-  writeFileSync(join(f.root, 'config/external-instances.json'), JSON.stringify({ schemaVersion: 1, agents: [], requests: [], instances: [...f.instances.values()].map(row => ({ ...row, agentId: 'sample-agent', revision: 1 })) }))
+  registerFixtureInstances(f)
   const risk = createServer(async (req, res) => {
     let body = ''; for await (const bytes of req) body += bytes
     const input = JSON.parse(body); observations.push(input); res.setHeader('content-type', 'application/json')
@@ -162,6 +166,75 @@ test('默认机器授权复用登记与风险提供方，拒绝不会绕过到�
   await assert.rejects(defaultService.dispatch(token, 'assets', 'get_asset', { id: 'A' }, new AbortController().signal), /风险规则/)
   assert.equal(f.count(), 0); assert.equal(observations.length, 1); assert.equal(observations[0].subject.kind, 'service')
   assert.equal(observations[0].subject.id, 'instance:agent-a')
+})
+
+test('最终 JWT 异步边界后复核真实风险配置，仅所选提供方变化阻止派发', async t => {
+  for (const scenario of [
+    { name: '全局风险保持有效', override: false },
+    { name: '全局风险变化', override: false, change: config => { config.riskAssessment.endpoint += '/changed' }, denied: true },
+    { name: '外部覆盖保持有效', override: true },
+    { name: '外部覆盖变化', override: true, change: config => { config.externalAccess.riskAssessment.endpoint += '/changed' }, denied: true },
+    { name: '移除外部覆盖改用全局', override: true, change: config => { delete config.externalAccess }, denied: true },
+    { name: '未选中的全局风险变化', override: true, change: config => { config.riskAssessment.endpoint += '/changed' } },
+  ]) await t.test(scenario.name, async t => {
+    const f = await fixture(t), observations = []
+    registerFixtureInstances(f)
+    const risk = createServer(async (req, res) => {
+      let body = ''; for await (const bytes of req) body += bytes
+      const input = JSON.parse(body); observations.push({ path: req.url, input }); res.setHeader('content-type', 'application/json')
+      res.end(JSON.stringify({ version: 1, scope: input.scope, level: 'low', expiresAt: new Date(Date.now() + 60000).toISOString(), constraints: { deniedOperations: [] } }))
+    })
+    risk.listen(0, '127.0.0.1'); await once(risk, 'listening'); t.after(() => { risk.closeAllConnections(); risk.close() })
+    const path = join(f.root, 'config/business-access.json'), config = JSON.parse(readFileSync(path, 'utf8')), base = `http://127.0.0.1:${risk.address().port}`
+    config.riskAssessment = { endpoint: base + '/global' }
+    if (scenario.override) config.externalAccess = { riskAssessment: { endpoint: base + '/external' } }
+    writeFileSync(path, JSON.stringify(config))
+    const token = (await f.issue()).access_token, service = new AgentAccessService(f.root), verify = service.verify.bind(service)
+    let checks = 0
+    service.verify = async (...args) => {
+      const current = await verify(...args)
+      if (++checks === 2) {
+        await Promise.resolve()
+        if (scenario.change) { scenario.change(config); writeFileSync(path, JSON.stringify(config)) }
+      }
+      return current
+    }
+    const request = service.dispatch(token, 'assets', 'get_asset', { id: 'A' }, new AbortController().signal)
+    if (scenario.denied) {
+      await assert.rejects(request, error => error instanceof AccessError && error.code === 'configuration_changed' && error.status === 409)
+      assert.equal(f.count(), 0)
+      const records = service.status('agent-a').records
+      assert.equal(records.some(row => row.stage === 'dispatched'), false)
+    } else { assert.equal((await request).isError, false); assert.equal(f.count(), 1) }
+    assert.equal(checks, 2)
+    assert.equal(observations.length, 1)
+    assert.equal(observations[0].path, scenario.override ? '/external' : '/global')
+    assert.equal(observations[0].input.subject.id, 'instance:agent-a')
+    assert.equal(observations[0].input.subject.kind, 'service')
+    assert.equal(observations[0].input.operation.target, f.resources[0].endpoint + '/assets/A')
+  })
+})
+
+test('风险事实在最终 JWT 校验期间过期时零派发', async t => {
+  const f = await fixture(t); registerFixtureInstances(f)
+  let expiresAt
+  const risk = createServer(async (req, res) => {
+    let body = ''; for await (const bytes of req) body += bytes
+    const input = JSON.parse(body); expiresAt = Date.now() + 1000; res.setHeader('content-type', 'application/json')
+    res.end(JSON.stringify({ version: 1, scope: input.scope, level: 'low', expiresAt: new Date(expiresAt).toISOString(), constraints: { deniedOperations: [] } }))
+  })
+  risk.listen(0, '127.0.0.1'); await once(risk, 'listening'); t.after(() => { risk.closeAllConnections(); risk.close() })
+  const path = join(f.root, 'config/business-access.json'), config = JSON.parse(readFileSync(path, 'utf8'))
+  config.riskAssessment = { endpoint: `http://127.0.0.1:${risk.address().port}/risk` }; writeFileSync(path, JSON.stringify(config))
+  const token = (await f.issue()).access_token, service = new AgentAccessService(f.root), verify = service.verify.bind(service)
+  let checks = 0
+  service.verify = async (...args) => {
+    const current = await verify(...args)
+    if (++checks === 2) await new Promise(resolve => setTimeout(resolve, Math.max(0, expiresAt - Date.now() + 10)))
+    return current
+  }
+  await assert.rejects(service.dispatch(token, 'assets', 'get_asset', { id: 'A' }, new AbortController().signal), error => error instanceof AccessError && error.code === 'authorization_expired' && error.status === 403)
+  assert.equal(checks, 2); assert.equal(f.count(), 0)
 })
 
 test('工具规格验证嵌套参数、路径遍历、重定向与已知秘密脱敏', async t => {

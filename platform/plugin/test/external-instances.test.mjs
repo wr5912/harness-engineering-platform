@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { once } from 'node:events'
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -11,9 +12,12 @@ const buildRoot = mkdtempSync(join(tmpdir(), 'external-build-'))
 await build({ entryPoints: ['src/instances/external/index.ts'], outfile: join(buildRoot, 'external.mjs'), bundle: true, platform: 'node', format: 'esm', packages: 'external', logLevel: 'silent' })
 await build({ entryPoints: ['src/instances/external/registry.ts'], outfile: join(buildRoot, 'registry.mjs'), bundle: true, platform: 'node', format: 'esm', packages: 'external', logLevel: 'silent' })
 await build({ entryPoints: ['src/instances/external/access.ts'], outfile: join(buildRoot, 'access.mjs'), bundle: true, platform: 'node', format: 'esm', packages: 'external', logLevel: 'silent' })
+await build({ entryPoints: ['src/business-control/providers.ts'], outfile: join(buildRoot, 'providers.mjs'), bundle: true, platform: 'node', format: 'esm', packages: 'external', logLevel: 'silent' })
 const external = await import(`file://${join(buildRoot, 'external.mjs')}`)
 const registry = await import(`file://${join(buildRoot, 'registry.mjs')}`)
 const access = await import(`file://${join(buildRoot, 'access.mjs')}`)
+const { HttpRiskAssessmentProvider } = await import(`file://${join(buildRoot, 'providers.mjs')}`)
+const { WebSocketServer } = createRequire(createRequire(import.meta.url).resolve('@deepseek-ai/dsh-api-gateway/package.json'))('ws')
 process.on('exit', () => rmSync(buildRoot, { recursive: true, force: true }))
 const owner = { principal: { kind: 'owner' } }, signal = () => new AbortController().signal
 const caller = (subjectId = 'A') => ({ subjectId, source: 'test-provider', expiresAt: new Date(Date.now() + 60000).toISOString() })
@@ -45,6 +49,7 @@ async function fixture(t) {
     }
     if (req.url === '/sessions/agentscope-session/messages?agent_id=agentscope-native') return res.end(JSON.stringify({ messages: [{ content: [{ type: 'text', text: 'AgentScope 结果' }] }] }))
     if (req.url === '/api/session/list') return res.end(JSON.stringify({ result: { ok: true, value: { items: [] } } }))
+    if (req.url === '/api/agentPresets/list') return res.end(JSON.stringify({ result: { ok: true, value: { presets: [{ id: 'standard', name: '标准助手' }] } } }))
     if (req.url === '/api/session/create') return res.end(JSON.stringify({ result: { ok: true, value: { sessionId: 'session-dsh-native' } } }))
     if (req.url === '/api/session/projections') return res.end(JSON.stringify({ result: { ok: true, value: { kind: 'sequenced', asOfSeq: 2, values: {} } } }))
     if (req.url === '/api/session/page') {
@@ -58,8 +63,13 @@ async function fixture(t) {
     if (/^\/api\/session\/ses_\d+\/message$/.test(req.url)) return res.end(JSON.stringify({ data: [{ text: '真实上游测试返回' }] }))
     res.writeHead(404); res.end('{}')
   })
+  const streams = new WebSocketServer({ noServer: true })
+  upstream.on('upgrade', (req, socket, head) => streams.handleUpgrade(req, socket, head, ws => ws.on('message', raw => {
+    const frame = JSON.parse(raw.toString())
+    if (frame.type === 'open' && frame.endpoint === 'workspace/follow') ws.send(JSON.stringify({ type: 'item', streamId: frame.streamId, value: { type: 'baseline', value: { items: [{ workspaceId: 'native-workspace', title: '原生工作区', path: '/workspace' }], archivedSessionIds: [], pinnedSessionIds: [] } } }))
+  })))
   upstream.listen(0, '127.0.0.1'); await once(upstream, 'listening')
-  t.after(() => { upstream.closeAllConnections(); upstream.close(); rmSync(root, { recursive: true, force: true }) })
+  t.after(() => { for (const ws of streams.clients) ws.terminate(); streams.close(); upstream.closeAllConnections(); upstream.close(); rmSync(root, { recursive: true, force: true }) })
   const endpoint = `http://127.0.0.1:${upstream.address().port}`, handler = external.createExternalInstancesHandler(root)
   async function rpc(action, payload = {}) { const result = await handler(action, payload, signal(), owner); if (!result.ok) throw Object.assign(new Error(result.error.message), { code: result.error.code }); return result.value }
   const revision = () => registry.externalInstances(root).revision
@@ -141,6 +151,111 @@ test('风险明确拒绝、无效时效与判断期间撤权不派发业务请�
   await assert.rejects(invoke(), error => error.code === 'risk_denied'); mode = 'nan'; await assert.rejects(invoke(), error => error.code === 'risk_unknown')
   mode = 'wait'; const started = new Promise(resolve => { waiting = resolve }), pending = invoke(); await started; await f.mutate('disable'); release(); await assert.rejects(pending, error => error.code === 'entry_disabled')
   assert.equal(f.calls.length, before)
+})
+
+async function riskProvider(t, respond = () => ({})) {
+  const requests = []
+  const server = createServer(async (req, res) => {
+    let text = ''; for await (const chunk of req) text += chunk
+    const input = JSON.parse(text); requests.push({ path: req.url, input })
+    const result = await respond(req.url, input)
+    res.writeHead(result.status ?? 200, { 'content-type': 'application/json' })
+    res.end(JSON.stringify({ version: 1, scope: input.scope, level: 'low', constraints: { deniedOperations: [] }, expiresAt: new Date(Date.now() + 60000).toISOString(), ...result.body }))
+  })
+  server.listen(0, '127.0.0.1'); await once(server, 'listening')
+  t.after(() => { server.closeAllConnections(); server.close() })
+  return { requests, endpoint: `http://127.0.0.1:${server.address().port}` }
+}
+
+test('外部风险覆盖供 owner、HTTP 与机器主体共用，既有 DSH 风险仍用全局提供方', async t => {
+  const f = await fixture(t); await f.enable(); const provider = await riskProvider(t)
+  const path = join(f.root, 'config/business-access.json'), config = JSON.parse(readFileSync(path))
+  config.riskAssessment = { endpoint: provider.endpoint + '/legacy', testRunId: 'legacy-fixture' }
+  config.externalAccess = { riskAssessment: { endpoint: provider.endpoint + '/external', testRunId: 'external-fixture' } }
+  writeFileSync(path, JSON.stringify(config))
+  assert.ok((await f.rpc('invoke', { id: 'remote-one', operation: 'session:create', requestId: 'override-owner' })).sessionId)
+  const handler = external.createExternalAccessHandler(f.root, { authenticate: async () => caller('B') })
+  const server = createServer((req, res) => void handler(req, res)); server.listen(0, '127.0.0.1'); await once(server, 'listening')
+  t.after(() => { handler.close(); server.closeAllConnections(); server.close() })
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/api/external-instances/v1/remote-one/invoke`, { method: 'POST', body: JSON.stringify({ operation: 'session:create', requestId: 'override-http' }) })
+  assert.equal(response.status, 200); assert.ok((await response.json()).sessionId)
+  await f.mutate('disable')
+  await access.authorizeExternalOperation(f.root, { instanceId: 'remote-one', operation: { serverId: 'sample-assets', operationId: 'get_asset', kind: 'read', target: 'http://resource.invalid/assets/A-1', method: 'GET' }, args: { id: 'A-1' } }, signal())
+  assert.deepEqual(provider.requests.map(row => row.path), ['/external', '/external', '/external'])
+  assert.deepEqual(provider.requests.map(row => row.input.subjectId), ['platform-owner', 'B', 'instance:remote-one'])
+  assert.equal(provider.requests[2].input.subject.kind, 'service')
+  for (const { input } of provider.requests) {
+    assert.equal(input.binding.kind, 'external-controlled'); assert.equal(input.scope.instanceId, 'remote-one')
+    assert.equal(input.testRunId, 'external-fixture'); assert.equal('sourceDigest' in input.binding, false); assert.equal('runtimeGeneration' in input.scope, false)
+  }
+  assert.equal(provider.requests[2].input.operation.operationId, 'get_asset'); assert.deepEqual(provider.requests[2].input.input, { id: 'A-1' })
+  const legacy = new HttpRiskAssessmentProvider(config.riskAssessment)
+  await legacy.assess({ context: { subject: { id: 'legacy-subject' }, scope: { workspaceId: 'legacy-workspace', agentId: 'legacy-agent', instanceId: 'legacy-instance', runtimeGeneration: 'legacy-generation', subjectId: 'legacy-subject' }, sourceDigest: 'legacy-source' }, action: 'read', validatedArgs: {} }, signal())
+  assert.equal(provider.requests.at(-1).path, '/legacy'); assert.equal(provider.requests.at(-1).input.testRunId, 'legacy-fixture')
+  assert.deepEqual(JSON.parse(readFileSync(path)).riskAssessment, config.riskAssessment)
+})
+
+test('显式外部风险拒绝、不可达或无效配置均不回退全局风险，也不派发业务', async t => {
+  const f = await fixture(t); await f.enable(); let mode = 'deny'
+  const provider = await riskProvider(t, path => path === '/external' ? mode === 'deny' ? { body: { constraints: { deniedOperations: ['*'] } } } : { status: 503 } : {})
+  const path = join(f.root, 'config/business-access.json'), config = JSON.parse(readFileSync(path)), before = f.calls.length
+  config.riskAssessment = { endpoint: provider.endpoint + '/legacy' }; config.externalAccess = { riskAssessment: { endpoint: provider.endpoint + '/external' } }
+  const invoke = () => access.invokeExternal(f.root, caller(), { id: 'remote-one', operation: 'session:create', requestId: `override-failure-${++serial}` }, signal())
+  writeFileSync(path, JSON.stringify(config)); await assert.rejects(invoke(), error => error.code === 'risk_denied')
+  mode = 'unavailable'; await assert.rejects(invoke(), error => error.code === 'provider_unavailable')
+  const reserved = createServer(); reserved.listen(0, '127.0.0.1'); await once(reserved, 'listening'); const port = reserved.address().port
+  await new Promise(resolve => reserved.close(resolve))
+  config.externalAccess = { riskAssessment: { endpoint: `http://127.0.0.1:${port}/unreachable` } }
+  writeFileSync(path, JSON.stringify(config)); await assert.rejects(invoke(), error => error.code === 'risk_unavailable')
+  for (const invalid of [null, false, [], { riskAssessment: null }, { riskAssessment: {} }, { riskAssessment: { endpoint: '' } }, { riskAssessment: { endpoint: 'ftp://invalid/risk' } }, { riskAssessment: { endpoint: provider.endpoint, timeoutMs: 0 } }, { riskAssessment: { endpoint: provider.endpoint, testRunId: false } }]) {
+    config.externalAccess = invalid; writeFileSync(path, JSON.stringify(config))
+    await assert.rejects(invoke(), error => error.code === 'invalid_provider_config')
+  }
+  assert.equal(provider.requests.some(row => row.path === '/legacy'), false); assert.equal(f.calls.length, before)
+})
+
+test('外部风险覆盖在途变化禁止派发，未选中的全局风险变化不误伤当前决定', async t => {
+  const f = await fixture(t); await f.enable(); let enter, release
+  const provider = await riskProvider(t, async () => { enter(); await new Promise(resolve => { release = resolve }); return {} })
+  const path = join(f.root, 'config/business-access.json'), config = JSON.parse(readFileSync(path))
+  config.riskAssessment = { endpoint: provider.endpoint + '/legacy' }; config.externalAccess = { riskAssessment: { endpoint: provider.endpoint + '/external' } }; writeFileSync(path, JSON.stringify(config))
+  let entered = new Promise(resolve => { enter = resolve })
+  const invoke = () => access.invokeExternal(f.root, caller(), { id: 'remote-one', operation: 'session:create', requestId: `override-change-${++serial}` }, signal())
+  const before = f.calls.length, pending = invoke(); await entered
+  config.externalAccess.riskAssessment.endpoint = provider.endpoint + '/replacement'; writeFileSync(path, JSON.stringify(config)); release()
+  await assert.rejects(pending, error => error.code === 'configuration_changed'); assert.equal(f.calls.length, before)
+  entered = new Promise(resolve => { enter = resolve }); const next = invoke(); await entered
+  config.riskAssessment.endpoint = provider.endpoint + '/legacy-updated'; writeFileSync(path, JSON.stringify(config)); release()
+  assert.ok((await next).sessionId)
+  assert.deepEqual(provider.requests.map(row => row.path), ['/external', '/replacement'])
+})
+
+test('无外部风险覆盖时继续使用现有全局风险配置', async t => {
+  const f = await fixture(t); await f.enable()
+  const provider = await riskProvider(t, () => ({ body: { constraints: { deniedOperations: ['*'] } } }))
+  const path = join(f.root, 'config/business-access.json'), config = JSON.parse(readFileSync(path))
+  config.riskAssessment = { endpoint: provider.endpoint + '/legacy' }
+  for (const externalAccess of [undefined, {}]) {
+    config.externalAccess = externalAccess; writeFileSync(path, JSON.stringify(config))
+    await assert.rejects(access.invokeExternal(f.root, caller(), { id: 'remote-one', operation: 'session:create', requestId: `legacy-risk-${++serial}` }, signal()), error => error.code === 'risk_denied')
+  }
+  assert.deepEqual(provider.requests.map(row => row.path), ['/legacy', '/legacy'])
+})
+
+test('机器授权返回的同步派发复核检查所选提供方、有效期与当前实例绑定', async t => {
+  const f = await fixture(t); await f.enable(); const provider = await riskProvider(t)
+  const path = join(f.root, 'config/business-access.json'), config = JSON.parse(readFileSync(path))
+  config.externalAccess = { riskAssessment: { endpoint: provider.endpoint + '/external' } }; writeFileSync(path, JSON.stringify(config))
+  const request = { instanceId: 'remote-one', operation: { serverId: 'sample-assets', operationId: 'get_asset', kind: 'read', target: 'http://resource.invalid/assets/A-1', method: 'GET' }, args: { id: 'A-1' } }
+  const check = await access.authorizeExternalOperation(f.root, request, signal())
+  assert.equal(typeof check, 'function'); check()
+  config.externalAccess.riskAssessment.endpoint = provider.endpoint + '/replacement'; writeFileSync(path, JSON.stringify(config))
+  assert.throws(check, error => error.code === 'configuration_changed')
+  const fresh = await access.authorizeExternalOperation(f.root, request, signal()), now = Date.now
+  try { Date.now = () => now() + 120000; assert.throws(fresh, error => error.code === 'authorization_expired') }
+  finally { Date.now = now }
+  await f.save({ selector: '/changed-after-authorization' })
+  assert.throws(fresh, error => error.code === 'configuration_changed')
 })
 
 test('HTTP 不接受目标替换，平台身份 Header 不透传到上游', async t => {

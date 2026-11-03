@@ -1,0 +1,57 @@
+{
+  "at": "2026-11-03T04:09:08.698Z",
+  "checks": [
+    {
+      "name": "实际平台认证",
+      "ok": true
+    },
+    {
+      "name": "浅色402原生变量保持",
+      "ok": false
+    }
+  ],
+  "errors": [],
+  "screenshots": [
+    ".local/dark-theme-20261103/browser-2026-11-03T04-09-07-914Z/failure.png"
+  ],
+  "rpcMethods": [
+    "settings/describe",
+    "dynamicCordisRunner/syncInspectManifest",
+    "credentials/describe",
+    "dynamicCordisRunner/inventory",
+    "session/modelCatalog",
+    "inventory",
+    "session/list",
+    "agents/eval/list",
+    "home",
+    "mcp/control/status",
+    "auth/current",
+    "permissionPresets/catalog",
+    "agentPresets/list"
+  ],
+  "samples": [],
+  "scope": "本机18120实际客户端与原生主题，只读页面/打开表单；仅主题偏好切换，无业务投递",
+  "lightAliasDifferences": [
+    "--dsw-elevation-stroke-color",
+    "--dsw-alias-settings-card-stroke",
+    "--dsw-specific-menu",
+    "--dsw-elevation-prominent",
+    "--dsw-alias-border-l1",
+    "--dsw-alias-border-l2",
+    "--dsw-alias-interactive-bg-hover-accent",
+    "--dsw-alias-bg-mask-1",
+    "--dsw-alias-border-l4",
+    "--dsw-elevation-stroke",
+    "--dsw-alias-interactive-bg-active",
+    "--dsw-alias-interactive-bg-hover",
+    "--dsw-menu-surface-fill",
+    "--dsw-elevation-panel",
+    "--dsw-alias-turn-trigger-bg-hover",
+    "--dsw-elevation-soft",
+    "--dsw-alias-border-l2-darkmode-thin",
+    "--dsw-alias-border-l3"
+  ],
+  "failure": "浅色402原生变量保持",
+  "finishedAt": "2026-11-03T04:09:17.799Z",
+  "passed": false
+}

@@ -1,0 +1,49 @@
+{
+  "at": "2026-11-03T02:55:29.084Z",
+  "pid": 2500377,
+  "dataRoot": "/home/admin/harness-engineering-platform-data",
+  "entry": "/home/admin/work/cross-framework-sources/dsh/apps/cli/lib/bin.js",
+  "home": "/home/admin/harness-engineering-platform-data/.local/platform-home",
+  "source": {
+    "implementationDigest": "2f558c98cd71bde4a5135b7bb83c4273a6d2ce8cfc58c5c9726b2404e1ed7d58",
+    "recomputedMatches": true,
+    "artifactsMatch": true,
+    "modules": [
+      {
+        "path": "/home/admin/work/harness-engineering-platform/platform/plugin/lib/index.js",
+        "enabled": true,
+        "inCliPatch": true,
+        "sha256": "3495a57f227a5aaab5c47db52f500ea891d6c5a977638a2d8ce36656cab67596"
+      },
+      {
+        "path": "/home/admin/harness-engineering-platform-data/.local/build-cache/security-operations/09c0e14a6da34ccd0a36bb4985dca5e4a36681643c7f1bd2af4d8053f72810e9/plugin.js",
+        "enabled": true,
+        "inCliPatch": true,
+        "sha256": "110bf667eb0c30579c870e89dc8f8bb5ad4d717dd6335cbc863aff42f67e2f1e"
+      }
+    ]
+  },
+  "preserved": {
+    "nativeIds": true,
+    "nativeCount": 406,
+    "historicalRecords": 124,
+    "historicalDigest": true,
+    "config": true,
+    "externalSessions": true,
+    "externalBindings": true
+  },
+  "external": [
+    {
+      "id": "remote-agentscope-sample",
+      "state": "enabled",
+      "verified": true
+    },
+    {
+      "id": "remote-opencode-sample",
+      "state": "enabled",
+      "verified": true
+    }
+  ],
+  "workspaceIdPresent": true,
+  "passed": true
+}

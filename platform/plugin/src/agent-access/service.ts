@@ -194,11 +194,12 @@ export class AgentAccessService {
     this.validateArgs(tool, args)
     if (current.grant.objects !== undefined && !tool.objectField) throw new AccessError('object_binding_missing', '此工具缺少对象绑定，不能落实当前对象授予', 503)
     if (tool.objectField && current.grant.objects !== undefined && !current.grant.objects.includes(String(args[tool.objectField]))) throw new AccessError('object_forbidden', '请求对象不在资源授予范围', 403)
+    let assertAuthorizationCurrent: void | (() => void)
     try {
-      if (this.options.authorize) await this.options.authorize({ instanceId: current.credential.instanceId, resource: current.resource, tool, args }, signal)
+      if (this.options.authorize) assertAuthorizationCurrent = await this.options.authorize({ instanceId: current.credential.instanceId, resource: current.resource, tool, args }, signal)
       else {
         const { authorizeExternalOperation } = await import('../instances/external/access.ts')
-        await authorizeExternalOperation(this.assetRoot, { instanceId: current.credential.instanceId, args, operation: { serverId: current.resource.id,
+        assertAuthorizationCurrent = await authorizeExternalOperation(this.assetRoot, { instanceId: current.credential.instanceId, args, operation: { serverId: current.resource.id,
           operationId: tool.name, kind: tool.method === 'GET' ? 'read' : 'write', target: this.target(current.resource, tool, args).href, method: tool.method } }, signal)
       }
     } catch (error) {
@@ -218,6 +219,12 @@ export class AgentAccessService {
       upstreamSecret = readFileSync(path, 'utf8').trim()
       if (!upstreamSecret || /[\r\n]/.test(upstreamSecret)) throw new AccessError('upstream_credential_invalid', '资源原生凭据无效', 503)
       headers.authorization = `Bearer ${upstreamSecret}`
+    }
+    // JWT 验签是最后的异步边界；风险、决定期限与接入绑定必须在其后同步复核。
+    try { signal.throwIfAborted(); assertAuthorizationCurrent?.() }
+    catch (error) {
+      if (error instanceof ExternalAccessError) throw new AccessError(error.code, error.message, error.status)
+      throw error
     }
     try { this.event({ ...event, stage: 'dispatched' }) }
     catch { throw new AccessError('record_unavailable', '必要记录不可写，本次未派发', 503) }

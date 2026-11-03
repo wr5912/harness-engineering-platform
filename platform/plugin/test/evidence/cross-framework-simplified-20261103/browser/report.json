@@ -1,0 +1,574 @@
+{
+  "at": "2026-11-03T03:26:32.694Z",
+  "checks": [
+    {
+      "name": "实际owner登录",
+      "ok": true
+    },
+    {
+      "name": "登记移除通用更多设置",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入目标选择器",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入工作区ID",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入AgentPreset",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入所属系统",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入责任主体",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入允许主体",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入开放操作",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入声明版本",
+      "ok": true
+    },
+    {
+      "name": "登记主流程移除接入实例运维责任",
+      "ok": true
+    },
+    {
+      "name": "1440登记无溢出",
+      "ok": true
+    },
+    {
+      "name": "768登记无溢出",
+      "ok": true
+    },
+    {
+      "name": "390登记无溢出",
+      "ok": true
+    },
+    {
+      "name": "AS发现唯一实际Agent并自动选中",
+      "ok": true
+    },
+    {
+      "name": "发现不覆盖用户显示名称",
+      "ok": true
+    },
+    {
+      "name": "登记关闭重开保留已选名称和目标",
+      "ok": true
+    },
+    {
+      "name": "OpenCode通过真实认证识别",
+      "ok": true
+    },
+    {
+      "name": "登记整页刷新保地址与已发现目标",
+      "ok": true
+    },
+    {
+      "name": "agentscope普通访问无会话ID输入",
+      "ok": true
+    },
+    {
+      "name": "agentscope移除旧协议按钮创建会话",
+      "ok": true
+    },
+    {
+      "name": "agentscope移除旧协议按钮发送请求",
+      "ok": true
+    },
+    {
+      "name": "agentscope移除旧协议按钮核对会话结果",
+      "ok": true
+    },
+    {
+      "name": "agentscope1440无溢出",
+      "ok": true
+    },
+    {
+      "name": "agentscope768无溢出",
+      "ok": true
+    },
+    {
+      "name": "agentscope390无溢出",
+      "ok": true
+    },
+    {
+      "name": "agentscope本次请求真实完成",
+      "ok": true
+    },
+    {
+      "name": "agentscope本次assistant结果",
+      "ok": true
+    },
+    {
+      "name": "agentscope本次工具真实完成",
+      "ok": true
+    },
+    {
+      "name": "agentscope首次只发送一次",
+      "ok": true
+    },
+    {
+      "name": "agentscope界面呈现本次完成",
+      "ok": true
+    },
+    {
+      "name": "agentscope会话ID只读详情",
+      "ok": true
+    },
+    {
+      "name": "agentscope关闭重开保输入和完成结果",
+      "ok": true
+    },
+    {
+      "name": "agentscope整页刷新保草稿",
+      "ok": true
+    },
+    {
+      "name": "agentscope整页刷新不重发",
+      "ok": true
+    },
+    {
+      "name": "opencode普通访问无会话ID输入",
+      "ok": true
+    },
+    {
+      "name": "opencode移除旧协议按钮创建会话",
+      "ok": true
+    },
+    {
+      "name": "opencode移除旧协议按钮发送请求",
+      "ok": true
+    },
+    {
+      "name": "opencode移除旧协议按钮核对会话结果",
+      "ok": true
+    },
+    {
+      "name": "opencode1440无溢出",
+      "ok": true
+    },
+    {
+      "name": "opencode768无溢出",
+      "ok": true
+    },
+    {
+      "name": "opencode390无溢出",
+      "ok": true
+    },
+    {
+      "name": "opencode本次请求真实完成",
+      "ok": true
+    },
+    {
+      "name": "opencode本次assistant结果",
+      "ok": true
+    },
+    {
+      "name": "opencode本次工具真实完成",
+      "ok": true
+    },
+    {
+      "name": "opencode首次只发送一次",
+      "ok": true
+    },
+    {
+      "name": "opencode界面呈现本次完成",
+      "ok": true
+    },
+    {
+      "name": "opencode会话ID只读详情",
+      "ok": true
+    },
+    {
+      "name": "opencode关闭重开保输入和完成结果",
+      "ok": true
+    },
+    {
+      "name": "opencode整页刷新保草稿",
+      "ok": true
+    },
+    {
+      "name": "opencode整页刷新不重发",
+      "ok": true
+    },
+    {
+      "name": "响应丢失由实际只读查询恢复",
+      "ok": true
+    },
+    {
+      "name": "响应丢失不新建会话或重发消息",
+      "ok": true
+    },
+    {
+      "name": "恢复的是本次原认证目录工具",
+      "ok": true
+    },
+    {
+      "name": "明确风险拒绝后输入可继续修改",
+      "ok": true
+    },
+    {
+      "name": "仅只读发现，不改正式登记授权",
+      "ok": true
+    },
+    {
+      "name": "页面脚本无异常",
+      "ok": true
+    }
+  ],
+  "errors": [],
+  "requests": [
+    {
+      "at": "2026-11-03T03:26:42.212Z",
+      "method": "instances/external/conversation/send",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793676402206-icu1vk9rph"
+    },
+    {
+      "at": "2026-11-03T03:26:42.804Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793676402206-icu1vk9rph"
+    },
+    {
+      "at": "2026-11-03T03:26:44.420Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793676402206-icu1vk9rph"
+    },
+    {
+      "at": "2026-11-03T03:26:52.862Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793676402206-icu1vk9rph"
+    },
+    {
+      "at": "2026-11-03T03:26:57.011Z",
+      "method": "instances/external/conversation/send",
+      "id": "remote-opencode-sample",
+      "requestId": "ui-1793676417001-dsjqthc65f5"
+    },
+    {
+      "at": "2026-11-03T03:26:57.362Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-opencode-sample",
+      "requestId": "ui-1793676417001-dsjqthc65f5"
+    },
+    {
+      "at": "2026-11-03T03:26:59.005Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-opencode-sample",
+      "requestId": "ui-1793676417001-dsjqthc65f5"
+    },
+    {
+      "at": "2026-11-03T03:27:05.948Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-opencode-sample",
+      "requestId": "ui-1793676417001-dsjqthc65f5"
+    },
+    {
+      "at": "2026-11-03T03:27:09.436Z",
+      "method": "instances/external/conversation/send",
+      "id": "remote-opencode-sample",
+      "requestId": "ui-1793676429426-6ez0acn9sga"
+    },
+    {
+      "at": "2026-11-03T03:27:09.814Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-opencode-sample",
+      "requestId": "ui-1793676429426-6ez0acn9sga"
+    },
+    {
+      "at": "2026-11-03T03:27:13.026Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793676402206-icu1vk9rph"
+    },
+    {
+      "at": "2026-11-03T03:27:13.320Z",
+      "method": "instances/external/conversation/send",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793676433307-7gyfcqkm5jn"
+    }
+  ],
+  "results": [
+    {
+      "at": "2026-11-03T03:26:42.804Z",
+      "method": "instances/external/conversation/send",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793676402206-icu1vk9rph",
+      "ok": true,
+      "value": {
+        "requestId": "ui-1793676402206-icu1vk9rph",
+        "sessionId": "external-session-ed84bdf4-8d33-43ea-86fe-d723d8f0c738",
+        "status": "running",
+        "messages": [],
+        "tools": [],
+        "note": "正在等待本次回复。",
+        "retryAfterMs": 1500
+      }
+    },
+    {
+      "at": "2026-11-03T03:26:42.924Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793676402206-icu1vk9rph",
+      "ok": true,
+      "value": {
+        "requestId": "ui-1793676402206-icu1vk9rph",
+        "sessionId": "external-session-ed84bdf4-8d33-43ea-86fe-d723d8f0c738",
+        "status": "running",
+        "messages": [],
+        "tools": [],
+        "note": "正在等待本次回复。",
+        "retryAfterMs": 1500
+      }
+    },
+    {
+      "at": "2026-11-03T03:26:45.844Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793676402206-icu1vk9rph",
+      "ok": true,
+      "value": {
+        "requestId": "ui-1793676402206-icu1vk9rph",
+        "sessionId": "external-session-ed84bdf4-8d33-43ea-86fe-d723d8f0c738",
+        "status": "completed",
+        "messages": [
+          {
+            "id": "5086f5b37f1e479ea456d221acba3af2",
+            "role": "assistant",
+            "text": "模拟循环已完成，实际调用结果以工具返回为准。"
+          }
+        ],
+        "tools": [
+          {
+            "id": "call-fixture-tool",
+            "name": "mcp__protected_assets__get_asset",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "at": "2026-11-03T03:26:53.079Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793676402206-icu1vk9rph",
+      "ok": true,
+      "value": {
+        "requestId": "ui-1793676402206-icu1vk9rph",
+        "sessionId": "external-session-ed84bdf4-8d33-43ea-86fe-d723d8f0c738",
+        "status": "completed",
+        "messages": [
+          {
+            "id": "5086f5b37f1e479ea456d221acba3af2",
+            "role": "assistant",
+            "text": "模拟循环已完成，实际调用结果以工具返回为准。"
+          }
+        ],
+        "tools": [
+          {
+            "id": "call-fixture-tool",
+            "name": "mcp__protected_assets__get_asset",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "at": "2026-11-03T03:26:57.373Z",
+      "method": "instances/external/conversation/send",
+      "id": "remote-opencode-sample",
+      "requestId": "ui-1793676417001-dsjqthc65f5",
+      "ok": true,
+      "value": {
+        "requestId": "ui-1793676417001-dsjqthc65f5",
+        "sessionId": "external-session-f3ceaa3e-abcb-4f84-97e1-23fb0b573ef6",
+        "status": "running",
+        "messages": [],
+        "tools": [],
+        "retryAfterMs": 1500,
+        "note": "正在等待本次回复。"
+      }
+    },
+    {
+      "at": "2026-11-03T03:26:57.504Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-opencode-sample",
+      "requestId": "ui-1793676417001-dsjqthc65f5",
+      "ok": true,
+      "value": {
+        "requestId": "ui-1793676417001-dsjqthc65f5",
+        "sessionId": "external-session-f3ceaa3e-abcb-4f84-97e1-23fb0b573ef6",
+        "status": "running",
+        "messages": [],
+        "tools": [
+          {
+            "id": "call-fixture-tool",
+            "name": "protected_assets_get_asset",
+            "status": "running"
+          }
+        ],
+        "retryAfterMs": 1500,
+        "note": "正在等待本次回复。"
+      }
+    },
+    {
+      "at": "2026-11-03T03:27:00.493Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-opencode-sample",
+      "requestId": "ui-1793676417001-dsjqthc65f5",
+      "ok": true,
+      "value": {
+        "requestId": "ui-1793676417001-dsjqthc65f5",
+        "sessionId": "external-session-f3ceaa3e-abcb-4f84-97e1-23fb0b573ef6",
+        "status": "completed",
+        "messages": [
+          {
+            "id": "msg_19f721a26001FGR7dWuYJFNPHH",
+            "role": "assistant",
+            "text": "模拟循环已完成，实际调用结果以工具返回为准。"
+          }
+        ],
+        "tools": [
+          {
+            "id": "call-fixture-tool",
+            "name": "protected_assets_get_asset",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "at": "2026-11-03T03:27:06.163Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-opencode-sample",
+      "requestId": "ui-1793676417001-dsjqthc65f5",
+      "ok": true,
+      "value": {
+        "requestId": "ui-1793676417001-dsjqthc65f5",
+        "sessionId": "external-session-f3ceaa3e-abcb-4f84-97e1-23fb0b573ef6",
+        "status": "completed",
+        "messages": [
+          {
+            "id": "msg_19f721a26001FGR7dWuYJFNPHH",
+            "role": "assistant",
+            "text": "模拟循环已完成，实际调用结果以工具返回为准。"
+          }
+        ],
+        "tools": [
+          {
+            "id": "call-fixture-tool",
+            "name": "protected_assets_get_asset",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "at": "2026-11-03T03:27:10.032Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-opencode-sample",
+      "requestId": "ui-1793676429426-6ez0acn9sga",
+      "ok": true,
+      "value": {
+        "requestId": "ui-1793676429426-6ez0acn9sga",
+        "sessionId": "external-session-f3ceaa3e-abcb-4f84-97e1-23fb0b573ef6",
+        "status": "completed",
+        "messages": [
+          {
+            "id": "msg_19f724989001gpbtr3I8og7qYW",
+            "role": "assistant",
+            "text": "模拟循环已完成，实际调用结果以工具返回为准。"
+          }
+        ],
+        "tools": [
+          {
+            "id": "call-fixture-tool",
+            "name": "native_catalog_get_catalog",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "at": "2026-11-03T03:27:13.154Z",
+      "method": "instances/external/conversation/status",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793676402206-icu1vk9rph",
+      "ok": true,
+      "value": {
+        "requestId": "ui-1793676402206-icu1vk9rph",
+        "sessionId": "external-session-ed84bdf4-8d33-43ea-86fe-d723d8f0c738",
+        "status": "completed",
+        "messages": [
+          {
+            "id": "5086f5b37f1e479ea456d221acba3af2",
+            "role": "assistant",
+            "text": "模拟循环已完成，实际调用结果以工具返回为准。"
+          }
+        ],
+        "tools": [
+          {
+            "id": "call-fixture-tool",
+            "name": "mcp__protected_assets__get_asset",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "at": "2026-11-03T03:27:13.375Z",
+      "method": "instances/external/conversation/send",
+      "id": "remote-agentscope-sample",
+      "requestId": "ui-1793676433307-7gyfcqkm5jn",
+      "ok": true,
+      "value": {
+        "requestId": "ui-1793676433307-7gyfcqkm5jn",
+        "sessionId": "external-session-ed84bdf4-8d33-43ea-86fe-d723d8f0c738",
+        "status": "failed",
+        "messages": [],
+        "tools": [],
+        "note": "风险规则禁止本次操作"
+      }
+    }
+  ],
+  "configurationWrites": [],
+  "screenshots": [
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T03-26-32-693Z/1440-registration.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T03-26-32-693Z/768-registration.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T03-26-32-693Z/390-registration.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T03-26-32-693Z/1440-registration-agentscope-discovered.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T03-26-32-693Z/1440-registration-opencode-discovered.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T03-26-32-693Z/1440-agentscope-access.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T03-26-32-693Z/768-agentscope-access.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T03-26-32-693Z/390-agentscope-access.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T03-26-32-693Z/1440-agentscope-completed.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T03-26-32-693Z/1440-agentscope-reload.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T03-26-32-693Z/1440-opencode-access.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T03-26-32-693Z/768-opencode-access.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T03-26-32-693Z/390-opencode-access.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T03-26-32-693Z/1440-opencode-completed.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T03-26-32-693Z/1440-opencode-reload.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T03-26-32-693Z/1440-opencode-response-recovered.png",
+    ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T03-26-32-693Z/1440-agentscope-rejected-editable.png"
+  ],
+  "scope": "正式18120与真实框架容器，确定性模拟模型及资源；登记发现只读，访问创建新验收会话",
+  "finishedAt": "2026-11-03T03:27:14.219Z",
+  "passed": true
+}

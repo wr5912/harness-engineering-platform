@@ -1,0 +1,43 @@
+{
+  "at": "2026-11-03T01:31:17.889Z",
+  "scope": "正式390px凭据元数据与资源授予滚动可达的只读截图补证，无Session或工具请求/配置/凭据写入",
+  "checks": [
+    {
+      "name": "owner登录成功",
+      "ok": true
+    },
+    {
+      "name": "remote-agentscope-sample390px机器凭据meta滚动可达",
+      "ok": true
+    },
+    {
+      "name": "remote-agentscope-sample普通详情无秘密交付内容",
+      "ok": true
+    },
+    {
+      "name": "remote-agentscope-sample390px资源授予行可达",
+      "ok": true
+    },
+    {
+      "name": "remote-agentscope-sample详情无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "remote-opencode-sample390px机器凭据meta滚动可达",
+      "ok": true
+    },
+    {
+      "name": "remote-opencode-sample普通详情无秘密交付内容",
+      "ok": true
+    },
+    {
+      "name": "remote-opencode-sample390px资源授予行可达",
+      "ok": true
+    },
+    {
+      "name": "remote-opencode-sample详情无整页横向溢出",
+      "ok": true
+    }
+  ],
+  "passed": true
+}

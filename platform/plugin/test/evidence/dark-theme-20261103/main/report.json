@@ -1,0 +1,520 @@
+{
+  "at": "2026-11-03T04:12:27.250Z",
+  "checks": [
+    {
+      "name": "实际平台认证",
+      "ok": true
+    },
+    {
+      "name": "浅色402原生变量绘制值保持",
+      "ok": true
+    },
+    {
+      "name": "浅色样式保持 .harness-topbar",
+      "ok": true
+    },
+    {
+      "name": "浅色样式保持 .harness-task-composer",
+      "ok": true
+    },
+    {
+      "name": "浅色样式保持 .harness-card",
+      "ok": true
+    },
+    {
+      "name": "浅色样式保持 .harness-entry-footer button",
+      "ok": true
+    },
+    {
+      "name": "深色共同色值已装载",
+      "ok": true
+    },
+    {
+      "name": "首页焦点强调可见",
+      "ok": true
+    },
+    {
+      "name": "1440 首页无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "1440 首页文字颜色有效",
+      "ok": true
+    },
+    {
+      "name": "1440 智能体管理无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "1440 智能体管理文字颜色有效",
+      "ok": true
+    },
+    {
+      "name": "1440 评测中心无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "1440 评测中心文字颜色有效",
+      "ok": true
+    },
+    {
+      "name": "1440 实例管理无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "1440 实例管理文字颜色有效",
+      "ok": true
+    },
+    {
+      "name": "1440 统一网关无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "1440 统一网关文字颜色有效",
+      "ok": true
+    },
+    {
+      "name": "1440 MCP 管理无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "1440 MCP 管理文字颜色有效",
+      "ok": true
+    },
+    {
+      "name": "1440 管理对话无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "1440 管理对话文字颜色有效",
+      "ok": true
+    },
+    {
+      "name": "768 首页无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "768 首页文字颜色有效",
+      "ok": true
+    },
+    {
+      "name": "768 智能体管理无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "768 智能体管理文字颜色有效",
+      "ok": true
+    },
+    {
+      "name": "768 评测中心无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "768 评测中心文字颜色有效",
+      "ok": true
+    },
+    {
+      "name": "768 实例管理无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "768 实例管理文字颜色有效",
+      "ok": true
+    },
+    {
+      "name": "768 统一网关无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "768 统一网关文字颜色有效",
+      "ok": true
+    },
+    {
+      "name": "768 MCP 管理无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "768 MCP 管理文字颜色有效",
+      "ok": true
+    },
+    {
+      "name": "768 管理对话无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "768 管理对话文字颜色有效",
+      "ok": true
+    },
+    {
+      "name": "390 首页无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "390 首页文字颜色有效",
+      "ok": true
+    },
+    {
+      "name": "390 智能体管理无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "390 智能体管理文字颜色有效",
+      "ok": true
+    },
+    {
+      "name": "390 评测中心无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "390 评测中心文字颜色有效",
+      "ok": true
+    },
+    {
+      "name": "390 实例管理无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "390 实例管理文字颜色有效",
+      "ok": true
+    },
+    {
+      "name": "390 统一网关无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "390 统一网关文字颜色有效",
+      "ok": true
+    },
+    {
+      "name": "390 MCP 管理无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "390 MCP 管理文字颜色有效",
+      "ok": true
+    },
+    {
+      "name": "390 管理对话无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "390 管理对话文字颜色有效",
+      "ok": true
+    },
+    {
+      "name": "下拉Portal使用深色渐变",
+      "ok": true
+    },
+    {
+      "name": "下拉搜索仍正常",
+      "ok": true
+    },
+    {
+      "name": "实例弹窗使用深色浮层",
+      "ok": true
+    },
+    {
+      "name": "手机创建弹窗无溢出",
+      "ok": true
+    },
+    {
+      "name": "接入弹窗继承统一材质",
+      "ok": true
+    },
+    {
+      "name": "跨页面保持首页草稿",
+      "ok": true
+    }
+  ],
+  "errors": [],
+  "screenshots": [
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/1440-home-light.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/1440-home-dark-focus.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/1440-home-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/1440-agents-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/1440-evaluation-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/1440-instances-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/1440-gateway-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/1440-mcp-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/1440-conversations-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/768-home-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/768-agents-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/768-evaluation-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/768-instances-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/768-gateway-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/768-mcp-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/768-conversations-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/390-home-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/390-agents-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/390-evaluation-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/390-instances-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/390-gateway-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/390-mcp-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/390-conversations-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/1440-search-portal-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/390-create-dialog-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/1440-evaluation-dialog-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/1440-external-dialog-dark.png",
+    ".local/dark-theme-20261103/browser-2026-11-03T04-12-26-674Z/failure.png"
+  ],
+  "rpcMethods": [
+    "settings/describe",
+    "dynamicCordisRunner/syncInspectManifest",
+    "credentials/describe",
+    "dynamicCordisRunner/inventory",
+    "session/modelCatalog",
+    "inventory",
+    "session/list",
+    "agents/eval/list",
+    "home",
+    "mcp/control/status",
+    "auth/current",
+    "permissionPresets/catalog",
+    "agentPresets/list",
+    "settings/mutate",
+    "agents/list",
+    "agents/runs/overview",
+    "instances/list",
+    "instances/sources",
+    "models/list",
+    "mcp/configuration",
+    "mcp/list",
+    "session/create",
+    "session/projections",
+    "assistant/context",
+    "assistant/status",
+    "commands/list",
+    "skills/list",
+    "agents/detail",
+    "agents/fusion/proposal",
+    "agents/runs/index",
+    "agents/features/proposal",
+    "agents/edit/read",
+    "instances/external/list",
+    "instances/external/credentials"
+  ],
+  "samples": [
+    {
+      "width": 1440,
+      "page": "home",
+      "background": "rgb(2, 7, 19) none repeat scroll 0% 0% / auto padding-box border-box",
+      "color": "rgb(215, 229, 250)",
+      "border": "0px none rgb(215, 229, 250)",
+      "boxShadow": "none",
+      "font": "14px / 21.7px HepNoto, system-ui, \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "width": 1440,
+      "page": "agents",
+      "background": "rgb(2, 7, 19) none repeat scroll 0% 0% / auto padding-box border-box",
+      "color": "rgb(215, 229, 250)",
+      "border": "0px none rgb(215, 229, 250)",
+      "boxShadow": "none",
+      "font": "14px / 21.7px HepNoto, system-ui, \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "width": 1440,
+      "page": "evaluation",
+      "background": "rgb(2, 7, 19) none repeat scroll 0% 0% / auto padding-box border-box",
+      "color": "rgb(215, 229, 250)",
+      "border": "0px none rgb(215, 229, 250)",
+      "boxShadow": "none",
+      "font": "14px / 21.7px HepNoto, system-ui, \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "width": 1440,
+      "page": "instances",
+      "background": "rgb(2, 7, 19) none repeat scroll 0% 0% / auto padding-box border-box",
+      "color": "rgb(215, 229, 250)",
+      "border": "0px none rgb(215, 229, 250)",
+      "boxShadow": "none",
+      "font": "14px / 21.7px HepNoto, system-ui, \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "width": 1440,
+      "page": "gateway",
+      "background": "rgb(2, 7, 19) none repeat scroll 0% 0% / auto padding-box border-box",
+      "color": "rgb(215, 229, 250)",
+      "border": "0px none rgb(215, 229, 250)",
+      "boxShadow": "none",
+      "font": "14px / 21.7px HepNoto, system-ui, \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "width": 1440,
+      "page": "mcp",
+      "background": "rgb(2, 7, 19) none repeat scroll 0% 0% / auto padding-box border-box",
+      "color": "rgb(215, 229, 250)",
+      "border": "0px none rgb(215, 229, 250)",
+      "boxShadow": "none",
+      "font": "14px / 21.7px HepNoto, system-ui, \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "width": 1440,
+      "page": "conversations",
+      "background": "rgba(0, 0, 0, 0) none repeat scroll 0% 0% / auto padding-box border-box",
+      "color": "rgb(215, 229, 250)",
+      "border": "0px none rgb(215, 229, 250)",
+      "boxShadow": "none",
+      "font": "14px / 22.4px system-ui, \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "width": 768,
+      "page": "home",
+      "background": "rgb(2, 7, 19) none repeat scroll 0% 0% / auto padding-box border-box",
+      "color": "rgb(215, 229, 250)",
+      "border": "0px none rgb(215, 229, 250)",
+      "boxShadow": "none",
+      "font": "14px / 21.7px HepNoto, system-ui, \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "width": 768,
+      "page": "agents",
+      "background": "rgb(2, 7, 19) none repeat scroll 0% 0% / auto padding-box border-box",
+      "color": "rgb(215, 229, 250)",
+      "border": "0px none rgb(215, 229, 250)",
+      "boxShadow": "none",
+      "font": "14px / 21.7px HepNoto, system-ui, \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "width": 768,
+      "page": "evaluation",
+      "background": "rgb(2, 7, 19) none repeat scroll 0% 0% / auto padding-box border-box",
+      "color": "rgb(215, 229, 250)",
+      "border": "0px none rgb(215, 229, 250)",
+      "boxShadow": "none",
+      "font": "14px / 21.7px HepNoto, system-ui, \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "width": 768,
+      "page": "instances",
+      "background": "rgb(2, 7, 19) none repeat scroll 0% 0% / auto padding-box border-box",
+      "color": "rgb(215, 229, 250)",
+      "border": "0px none rgb(215, 229, 250)",
+      "boxShadow": "none",
+      "font": "14px / 21.7px HepNoto, system-ui, \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "width": 768,
+      "page": "gateway",
+      "background": "rgb(2, 7, 19) none repeat scroll 0% 0% / auto padding-box border-box",
+      "color": "rgb(215, 229, 250)",
+      "border": "0px none rgb(215, 229, 250)",
+      "boxShadow": "none",
+      "font": "14px / 21.7px HepNoto, system-ui, \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "width": 768,
+      "page": "mcp",
+      "background": "rgb(2, 7, 19) none repeat scroll 0% 0% / auto padding-box border-box",
+      "color": "rgb(215, 229, 250)",
+      "border": "0px none rgb(215, 229, 250)",
+      "boxShadow": "none",
+      "font": "14px / 21.7px HepNoto, system-ui, \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "width": 768,
+      "page": "conversations",
+      "background": "rgba(0, 0, 0, 0) none repeat scroll 0% 0% / auto padding-box border-box",
+      "color": "rgb(215, 229, 250)",
+      "border": "0px none rgb(215, 229, 250)",
+      "boxShadow": "none",
+      "font": "14px / 22.4px system-ui, \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "width": 390,
+      "page": "home",
+      "background": "rgb(2, 7, 19) none repeat scroll 0% 0% / auto padding-box border-box",
+      "color": "rgb(215, 229, 250)",
+      "border": "0px none rgb(215, 229, 250)",
+      "boxShadow": "none",
+      "font": "14px / 21.7px HepNoto, system-ui, \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "width": 390,
+      "page": "agents",
+      "background": "rgb(2, 7, 19) none repeat scroll 0% 0% / auto padding-box border-box",
+      "color": "rgb(215, 229, 250)",
+      "border": "0px none rgb(215, 229, 250)",
+      "boxShadow": "none",
+      "font": "14px / 21.7px HepNoto, system-ui, \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "width": 390,
+      "page": "evaluation",
+      "background": "rgb(2, 7, 19) none repeat scroll 0% 0% / auto padding-box border-box",
+      "color": "rgb(215, 229, 250)",
+      "border": "0px none rgb(215, 229, 250)",
+      "boxShadow": "none",
+      "font": "14px / 21.7px HepNoto, system-ui, \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "width": 390,
+      "page": "instances",
+      "background": "rgb(2, 7, 19) none repeat scroll 0% 0% / auto padding-box border-box",
+      "color": "rgb(215, 229, 250)",
+      "border": "0px none rgb(215, 229, 250)",
+      "boxShadow": "none",
+      "font": "14px / 21.7px HepNoto, system-ui, \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "width": 390,
+      "page": "gateway",
+      "background": "rgb(2, 7, 19) none repeat scroll 0% 0% / auto padding-box border-box",
+      "color": "rgb(215, 229, 250)",
+      "border": "0px none rgb(215, 229, 250)",
+      "boxShadow": "none",
+      "font": "14px / 21.7px HepNoto, system-ui, \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "width": 390,
+      "page": "mcp",
+      "background": "rgb(2, 7, 19) none repeat scroll 0% 0% / auto padding-box border-box",
+      "color": "rgb(215, 229, 250)",
+      "border": "0px none rgb(215, 229, 250)",
+      "boxShadow": "none",
+      "font": "14px / 21.7px HepNoto, system-ui, \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "width": 390,
+      "page": "conversations",
+      "background": "rgba(0, 0, 0, 0) none repeat scroll 0% 0% / auto padding-box border-box",
+      "color": "rgb(215, 229, 250)",
+      "border": "0px none rgb(215, 229, 250)",
+      "boxShadow": "none",
+      "font": "14px / 22.4px system-ui, \"Microsoft YaHei\", sans-serif"
+    }
+  ],
+  "scope": "本机18120实际客户端与原生主题，只读页面/打开表单；仅主题偏好切换，无业务投递",
+  "lightRawAliasDifferences": [
+    "--dsw-elevation-stroke-color",
+    "--dsw-alias-settings-card-stroke",
+    "--dsw-specific-menu",
+    "--dsw-elevation-prominent",
+    "--dsw-alias-border-l1",
+    "--dsw-alias-border-l2",
+    "--dsw-alias-interactive-bg-hover-accent",
+    "--dsw-alias-bg-mask-1",
+    "--dsw-alias-border-l4",
+    "--dsw-elevation-stroke",
+    "--dsw-alias-interactive-bg-active",
+    "--dsw-alias-interactive-bg-hover",
+    "--dsw-menu-surface-fill",
+    "--dsw-elevation-panel",
+    "--dsw-alias-turn-trigger-bg-hover",
+    "--dsw-elevation-soft",
+    "--dsw-alias-border-l2-darkmode-thin",
+    "--dsw-alias-border-l3"
+  ],
+  "lightAliasDifferences": [],
+  "variables": {
+    "--hep-bg": "#020713",
+    "--hep-surface": "#061629",
+    "--hep-text": "#d7e5fa",
+    "--hep-muted": "#97aecf",
+    "--hep-brand": "#10baff",
+    "--dsw-alias-bg-base": "#020713"
+  },
+  "failure": "locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: '打开 AI 助手' }).last()\u001b[22m\n",
+  "finishedAt": "2026-11-03T04:13:33.571Z",
+  "passed": false
+}

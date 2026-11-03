@@ -31,7 +31,62 @@ export const inject = ['connection', 'remote', 'slots', 'layout', 'workspaces', 
 type ThemeScheme = 'light' | 'dark'
 type ThemeControls = { getScheme: () => ThemeScheme; setScheme: (scheme: ThemeScheme) => void; subscribe: (listener: () => void) => () => void }
 type ThemeChangeSource = { on(event: 'theme/change', listener: () => void): void }
-type ClientContext = Omit<Context, 'connection'> & { connection: ConnectionHandle; theme: { getTheme(): { active: { colorScheme: ThemeScheme } }; setTheme(scheme: ThemeScheme): void } }
+type ClientContext = Omit<Context, 'connection'> & { connection: ConnectionHandle; theme: { getTheme(): { active: { colorScheme: ThemeScheme } }; setTheme(scheme: ThemeScheme): void; overrideTokens(source: string, tokens: Record<string, { light: string; dark: string }>): () => void } }
+// 原生配色通过锁定版公开别名接入；light沿用design-platform.css，dark只消费平台共同颜色。
+export const nativeThemeOverrides = {
+  '--dsw-alias-bg-base': { light: 'var(--dsw-static-neutral-bluish-00)', dark: 'var(--hep-bg)' },
+  '--dsw-alias-bg-layer-1': { light: 'var(--dsw-static-neutral-bluish-00)', dark: 'var(--hep-surface)' },
+  '--dsw-alias-bg-layer-2': { light: 'var(--dsw-static-neutral-bluish-00)', dark: 'var(--hep-surface-muted)' },
+  '--dsw-alias-bg-layer-3': { light: 'var(--dsw-static-neutral-bluish-00)', dark: 'var(--hep-surface-hover)' },
+  '--dsw-alias-bg-module-platform': { light: 'var(--dsw-static-neutral-bluish-60)', dark: 'var(--hep-surface-muted)' },
+  '--dsw-alias-bg-overlay': { light: 'var(--dsw-static-neutral-bluish-150)', dark: 'var(--hep-surface-hover)' },
+  '--dsw-alias-bg-mask-1': { light: 'rgba(0, 0, 0, 0.24)', dark: 'var(--hep-backdrop)' },
+  '--dsw-alias-border-l1': { light: 'rgba(0, 0, 0, 0.04)', dark: 'color-mix(in srgb,var(--hep-border) 65%,transparent)' },
+  '--dsw-alias-border-l2': { light: 'rgba(0, 0, 0, 0.1)', dark: 'var(--hep-border)' },
+  '--dsw-alias-border-l2-darkmode-thin': { light: 'rgba(0, 0, 0, 0.1)', dark: 'var(--hep-border)' },
+  '--dsw-alias-border-l3': { light: 'rgba(0, 0, 0, 0.12)', dark: 'var(--hep-border)' },
+  '--dsw-alias-border-l4': { light: 'rgba(0, 0, 0, 0.16)', dark: 'color-mix(in srgb,var(--hep-link) 35%,var(--hep-border))' },
+  '--dsw-alias-label-primary': { light: 'var(--dsw-static-neutral-bluish-1000)', dark: 'var(--hep-text)' },
+  '--dsw-alias-label-primary-dimmed': { light: 'var(--dsw-static-neutral-bluish-950)', dark: 'var(--hep-text)' },
+  '--dsw-alias-label-secondary': { light: 'var(--dsw-static-neutral-bluish-700)', dark: 'var(--hep-muted)' },
+  '--dsw-alias-label-tertiary': { light: 'var(--dsw-static-neutral-bluish-600)', dark: 'var(--hep-muted)' },
+  '--dsw-alias-label-caption': { light: 'var(--dsw-static-neutral-bluish-400)', dark: 'var(--hep-muted)' },
+  '--dsw-alias-link': { light: 'var(--dsw-static-deepseek-500)', dark: 'var(--hep-link)' },
+  '--dsw-alias-brand-primary': { light: 'var(--dsw-static-neutral-bluish-1000)', dark: 'var(--hep-brand)' },
+  '--dsw-alias-brand-text': { light: 'var(--dsw-static-neutral-bluish-1000)', dark: 'var(--hep-text)' },
+  '--dsw-alias-button-primary-fill': { light: 'var(--dsw-alias-brand-primary)', dark: 'var(--hep-primary)' },
+  '--dsw-alias-button-primary-hover': { light: 'var(--dsw-static-neutral-bluish-750)', dark: 'var(--hep-primary-hover)' },
+  '--dsw-alias-button-info-fill': { light: 'var(--dsw-static-deepseek-500)', dark: 'var(--hep-primary)' },
+  '--dsw-alias-button-info-hover': { light: 'var(--dsw-static-deepseek-400)', dark: 'var(--hep-primary-hover)' },
+  '--dsw-alias-button-elevated-fill': { light: 'var(--dsw-static-neutral-bluish-00)', dark: 'var(--hep-surface)' },
+  '--dsw-alias-button-floating-fill': { light: 'var(--dsw-static-neutral-bluish-00)', dark: 'var(--hep-surface)' },
+  '--dsw-alias-button-floating-hover': { light: 'var(--dsw-static-neutral-bluish-75)', dark: 'var(--hep-surface-hover)' },
+  '--dsw-alias-button-ghost-active-fill': { light: 'var(--dsw-static-neutral-bluish-100)', dark: 'var(--hep-primary-soft)' },
+  '--dsw-alias-button-ghost-active-hover': { light: 'var(--dsw-static-neutral-bluish-150)', dark: 'var(--hep-surface-hover)' },
+  '--dsw-alias-interactive-bg-active': { light: 'rgba(38, 49, 72, 0.1)', dark: 'var(--hep-primary-soft)' },
+  '--dsw-alias-interactive-bg-hover-accent': { light: 'rgba(38, 49, 72, 0.14)', dark: 'var(--hep-surface-hover)' },
+  '--dsw-alias-interactive-bg-hover-solid': { light: 'var(--dsw-static-neutral-bluish-75)', dark: 'var(--hep-surface-hover)' },
+  '--dsw-alias-interactive-bg-hover': { light: 'rgba(38, 49, 72, 0.06)', dark: 'var(--hep-surface-hover)' },
+  '--dsw-alias-markdown-code-block': { light: 'var(--dsw-static-neutral-bluish-50)', dark: 'var(--hep-control-bg)' },
+  '--dsw-alias-markdown-code-block-banner': { light: 'var(--dsw-static-neutral-bluish-50)', dark: 'var(--hep-surface-muted)' },
+  '--dsw-alias-markdown-inline-code': { light: 'var(--dsw-static-neutral-50)', dark: 'var(--hep-surface-hover)' },
+  '--dsw-alias-markdown-tag': { light: 'var(--dsw-static-neutral-bluish-75)', dark: 'var(--hep-primary-soft)' },
+  '--dsw-alias-state-business-primary': { light: 'var(--dsw-static-deepseek-500)', dark: 'var(--hep-link)' },
+  '--dsw-alias-state-business-tertiary': { light: 'var(--dsw-static-deepseek-100)', dark: 'var(--hep-primary-soft)' },
+  '--dsw-alias-state-error-primary': { light: 'var(--dsw-static-red-600)', dark: 'var(--hep-danger)' },
+  '--dsw-alias-state-success-primary': { light: 'var(--dsw-static-green-500)', dark: 'var(--hep-success)' },
+  '--dsw-alias-state-warn-primary': { light: 'var(--dsw-static-amber-500)', dark: 'var(--hep-warning)' },
+  '--dsw-alias-state-idle-primary': { light: 'var(--dsw-static-neutral-300)', dark: 'var(--hep-muted)' },
+  '--dsw-menu-surface-fill': { light: 'rgba(248, 249, 250, 0.58)', dark: 'var(--hep-surface)' },
+  '--dsw-specific-input-major': { light: 'var(--dsw-static-neutral-bluish-00)', dark: 'var(--hep-control-bg)' },
+  '--dsw-specific-selector': { light: 'var(--dsw-static-neutral-bluish-60)', dark: 'var(--hep-surface-muted)' },
+  '--dsw-specific-sidebar-fill': { light: 'var(--dsw-static-neutral-bluish-50)', dark: 'var(--hep-surface)' },
+  '--dsw-specific-sidebar-nav-item-active': { light: 'var(--dsw-static-neutral-bluish-100)', dark: 'var(--hep-primary-soft)' },
+  '--dsw-specific-sidebar-nav-item-active-accent': { light: 'var(--dsw-static-deepseek-100)', dark: 'var(--hep-primary-soft)' },
+  '--dsw-specific-sidebar-nav-item-hover': { light: 'var(--dsw-static-neutral-bluish-75)', dark: 'var(--hep-surface-hover)' },
+  '--dsw-specific-bubble': { light: 'var(--dsw-static-deepseek-50)', dark: 'color-mix(in srgb,var(--hep-violet) 13%,var(--hep-surface))' },
+  '--dsw-specific-bubble-highlight': { light: 'var(--dsw-static-deepseek-200)', dark: 'color-mix(in srgb,var(--hep-violet) 24%,var(--hep-surface))' },
+}
 const pages: { id: PageId; label: string }[] = [
   { id: 'home', label: '首页' }, { id: 'conversations', label: '管理对话' }, { id: 'agents', label: '智能体管理' },
   { id: 'evaluation', label: '评测中心' },
@@ -356,6 +411,7 @@ function PlatformSettings({ openSettings, settingsOpen, settingsShortcut }: Sett
 }
 
 export function apply(ctx: ClientContext) {
+  ctx.effect(() => ctx.theme.overrideTokens('harness-platform-dark', nativeThemeOverrides))
   ctx.effect(() => bindNewConversation(ctx))
   let modelRevision = 0
   const modelListeners = new Set<() => void>()

@@ -1,0 +1,240 @@
+{
+  "observedAt": "2026-11-03T01:04:04.844Z",
+  "scope": "AgentScope既有Runtime就绪只读核验；未发送模型prompt、未重建或重启容器、未改正式登记或授权",
+  "containers": [
+    {
+      "name": "hep-cross-framework-agentscope",
+      "id": "f84b670dc745ed7268ed10b45c6133f3b1eecd5ca10c3a4fde62d73faba23862",
+      "running": true,
+      "startedAt": "2026-11-02T14:05:45.892353461Z",
+      "image": "sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff",
+      "project": "hep-cross-framework-recovery",
+      "service": "agentscope",
+      "ownerLabel": "cross-framework-access",
+      "mounts": [
+        {
+          "source": "/home/admin/work/agentscope/.venv/lib/python3.11/site-packages",
+          "destination": "/opt/deps",
+          "rw": false
+        },
+        {
+          "source": "/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/agentscope/upstream-main.py",
+          "destination": "/sample/main.py",
+          "rw": false
+        },
+        {
+          "source": "/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/agentscope/workspaces",
+          "destination": "/sample/workspaces",
+          "rw": true
+        },
+        {
+          "source": "/home/admin/work/agentscope/src",
+          "destination": "/opt/upstream/src",
+          "rw": false
+        }
+      ]
+    },
+    {
+      "name": "hep-cross-framework-redis",
+      "id": "e1c8d01e9b63095a03215e69b977e96834ef693fdb620c06ee95f3d440598563",
+      "running": true,
+      "startedAt": "2026-11-02T14:05:42.543205326Z",
+      "health": "healthy",
+      "image": "sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf",
+      "project": "hep-cross-framework-recovery",
+      "service": "redis",
+      "ownerLabel": "cross-framework-access",
+      "mounts": [
+        {
+          "source": "/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/agentscope/redis",
+          "destination": "/data",
+          "rw": true
+        }
+      ]
+    },
+    {
+      "name": "hep-cross-framework-agentscope-connector",
+      "id": "16272e89f2fc051029fbc82d1555689f0ad92e67b9ee1898c1dadbfb235e74dc",
+      "running": true,
+      "startedAt": "2026-11-02T14:05:42.547020786Z",
+      "image": "sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df",
+      "project": "hep-cross-framework-recovery",
+      "service": "agentscope-connector",
+      "ownerLabel": "cross-framework-access",
+      "mounts": [
+        {
+          "source": "/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/agentscope/connector",
+          "destination": "/run/connector",
+          "rw": false
+        },
+        {
+          "source": "/home/admin/work/harness-engineering-platform/.local/cross-framework/plugin-lib/agent-access-connector.js",
+          "destination": "/opt/connector.mjs",
+          "rw": false
+        }
+      ]
+    }
+  ],
+  "source": {
+    "root": "/home/admin/work/agentscope",
+    "head": "ff8697ec4d59ee01f3766176e70cb24ee894d6c6",
+    "trackedSourceUnchanged": true,
+    "runtime": {
+      "version": "2.0.8",
+      "moduleFile": "/opt/upstream/src/agentscope/__init__.py"
+    }
+  },
+  "native": {
+    "endpoint": "http://127.0.0.1:18652",
+    "selector": "6b8687e485144c60bc85c846479d56b1",
+    "requiredInstanceId": "remote-agentscope-sample",
+    "userContext": "harness-remote-agentscope-sample",
+    "nativeApiCredentialRef": null,
+    "nativeApiAuthentication": "原生Service无OpenAPI安全方案；平台适配器派生固定X-User-ID作为原生数据上下文，非Bearer认证。入口仅发布127.0.0.1:18652。"
+  },
+  "sessions": [
+    {
+      "id": "92979e4a205a467996ad229d3d91d421",
+      "owner": "harness-remote-agentscope-sample",
+      "agentId": "6b8687e485144c60bc85c846479d56b1",
+      "isRunning": false,
+      "status": "idle",
+      "model": {
+        "type": "openai_chat_model",
+        "credentialId": "e513fcdd5cfa4cc58b8c5abdea252383",
+        "model": "cross-framework-fixture"
+      }
+    },
+    {
+      "id": "de08a908d60f4f10a08a4d645e7a9e20",
+      "owner": "harness-remote-agentscope-sample",
+      "agentId": "6b8687e485144c60bc85c846479d56b1",
+      "isRunning": false,
+      "status": "idle",
+      "model": {
+        "type": "openai_chat_model",
+        "credentialId": "e513fcdd5cfa4cc58b8c5abdea252383",
+        "model": "cross-framework-fixture"
+      }
+    },
+    {
+      "id": "d40cb18178f84537ae79fb5e2e4d1483",
+      "owner": "harness-remote-agentscope-sample",
+      "agentId": "6b8687e485144c60bc85c846479d56b1",
+      "isRunning": false,
+      "status": "idle",
+      "model": {
+        "type": "openai_chat_model",
+        "credentialId": "e513fcdd5cfa4cc58b8c5abdea252383",
+        "model": "cross-framework-fixture"
+      }
+    },
+    {
+      "id": "81d0d2dced974791a87ad404b51800c5",
+      "owner": "harness-remote-agentscope-sample",
+      "agentId": "6b8687e485144c60bc85c846479d56b1",
+      "isRunning": false,
+      "status": "idle",
+      "model": {
+        "type": "openai_chat_model",
+        "credentialId": "e513fcdd5cfa4cc58b8c5abdea252383",
+        "model": "cross-framework-fixture"
+      }
+    },
+    {
+      "id": "a8cb50822e1e415ba6f918efcf06d45d",
+      "owner": "harness-remote-agentscope-sample",
+      "agentId": "6b8687e485144c60bc85c846479d56b1",
+      "isRunning": false,
+      "status": "awaiting_permission",
+      "model": {
+        "type": "openai_chat_model",
+        "credentialId": "e513fcdd5cfa4cc58b8c5abdea252383",
+        "model": "cross-framework-fixture"
+      }
+    }
+  ],
+  "currentSession": {
+    "platformSessionId": "external-session-b38fb44a-93cc-4084-9c1c-59ebab238dbe",
+    "nativeSessionId": "92979e4a205a467996ad229d3d91d421",
+    "messageCount": 20,
+    "isRunning": false
+  },
+  "pendingPermissionSessions": [
+    "a8cb50822e1e415ba6f918efcf06d45d"
+  ],
+  "model": {
+    "fixtureOrigin": "http://172.17.0.1:18650",
+    "model": "cross-framework-fixture",
+    "reachableFromContainer": true,
+    "credentialMetadataId": "e513fcdd5cfa4cc58b8c5abdea252383",
+    "secretFile": "/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/agentscope/model.llm-api-key"
+  },
+  "mcp": [
+    {
+      "name": "protected_assets",
+      "healthy": true,
+      "toolNames": [
+        "mcp__protected_assets__get_asset"
+      ]
+    },
+    {
+      "name": "native_catalog",
+      "healthy": true,
+      "toolNames": [
+        "mcp__native_catalog__get_catalog"
+      ]
+    }
+  ],
+  "connector": {
+    "configPath": "/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/agentscope/connector/config.json",
+    "secretPath": "/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/agentscope/connector/instance.key",
+    "instanceId": "remote-agentscope-sample",
+    "clientId": "client-6b4f02f7-939b-4eef-a4ed-554a51dafd9d",
+    "tokenEndpoint": "http://172.17.0.1:18656/oauth/token",
+    "resourceUrl": "http://172.17.0.1:18656/api/agent-access/v1/resources/sample-assets/mcp",
+    "audience": "urn:harness:sample-assets",
+    "scopes": [
+      "assets:read"
+    ],
+    "processRestartNeededAfterFormalRebind": true
+  },
+  "formalMigrationMinimum": [
+    "正式登记沿用remote-agentscope-sample，使派生原生X-User-ID与既有Agent/Session一致。",
+    "root提供正式机器身份、专用secret文件及token/resource地址；仅调整现有connector目录配置，保留原key的专用可恢复定位。",
+    "复用原connector DNS与8080/mcp；只定向重启AS connector清除旧issuer token缓存，无需重启AgentScope或Redis。",
+    "root完成登记/验证/入口与资源授予后再建立正式会话做真实工具闭环，旧样本原生Session保持。"
+  ],
+  "checks": [
+    {
+      "name": "本任务三个既有容器运行且归属正确",
+      "ok": true
+    },
+    {
+      "name": "锁定源码与实际加载版本",
+      "ok": true
+    },
+    {
+      "name": "原生目标可见",
+      "ok": true
+    },
+    {
+      "name": "目标旧Session可读取",
+      "ok": true
+    },
+    {
+      "name": "没有正在执行会话",
+      "ok": true
+    },
+    {
+      "name": "Runtime内部可达确定性模型依赖",
+      "ok": true
+    },
+    {
+      "name": "签名与原认证工具已连接",
+      "ok": true
+    }
+  ],
+  "passed": true,
+  "boundary": "真实AgentScope 2.0.8、本机容器模拟远程；确定性模拟模型和模拟资源，不宣称真实模型效果或远程主机验收。"
+}

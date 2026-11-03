@@ -1,0 +1,259 @@
+{
+  "createdAt": "2026-11-03T01:27:48.412Z",
+  "instances": [
+    {
+      "instanceId": "remote-agentscope-sample",
+      "createdAt": "2026-11-03T01:28:05.789Z",
+      "requests": [
+        {
+          "at": "2026-11-03T01:28:05.789Z",
+          "instanceId": "remote-agentscope-sample",
+          "operation": "session:create",
+          "requestId": "ui-1793669285771-6vcvh13u0h3",
+          "rpcId": "15826361-3457-4166-86bc-cb7fae89f19f",
+          "externalSessionId": "external-session-7e42e8c8-10ef-4cb7-ac9f-d5d8d9079a20",
+          "stage": "responded",
+          "httpStatus": 200,
+          "responseAt": "2026-11-03T01:28:05.892Z",
+          "nativeSessionId": "7d1e02507cb944f0a7088461ffd54da9"
+        },
+        {
+          "at": "2026-11-03T01:28:06.538Z",
+          "instanceId": "remote-agentscope-sample",
+          "operation": "session:read",
+          "requestId": "ui-1793669286522-4qz206hrpht",
+          "rpcId": "a6eb41b7-c1cc-40c6-8606-404a44a48dcb",
+          "externalSessionId": "external-session-7e42e8c8-10ef-4cb7-ac9f-d5d8d9079a20",
+          "stage": "responded",
+          "httpStatus": 200,
+          "responseAt": "2026-11-03T01:28:06.683Z",
+          "nativeSessionId": "7d1e02507cb944f0a7088461ffd54da9"
+        },
+        {
+          "at": "2026-11-03T01:28:06.908Z",
+          "instanceId": "remote-agentscope-sample",
+          "operation": "session:prompt",
+          "requestId": "ui-1793669286899-gy9hhee1fb7",
+          "rpcId": "7b269ece-cb02-4298-b7f6-c44bae67d4db",
+          "externalSessionId": "external-session-7e42e8c8-10ef-4cb7-ac9f-d5d8d9079a20",
+          "stage": "accepted",
+          "httpStatus": 200,
+          "responseAt": "2026-11-03T01:28:07.008Z",
+          "nativeSessionId": "7d1e02507cb944f0a7088461ffd54da9"
+        },
+        {
+          "at": "2026-11-03T01:28:07.107Z",
+          "instanceId": "remote-agentscope-sample",
+          "operation": "session:read",
+          "requestId": "ui-1793669287092-oyu6s9engr",
+          "rpcId": "f4618db8-d4e9-4fe1-9443-274baad72e43",
+          "externalSessionId": "external-session-7e42e8c8-10ef-4cb7-ac9f-d5d8d9079a20",
+          "stage": "responded",
+          "httpStatus": 200,
+          "responseAt": "2026-11-03T01:28:07.187Z",
+          "nativeSessionId": "7d1e02507cb944f0a7088461ffd54da9"
+        },
+        {
+          "at": "2026-11-03T01:28:08.241Z",
+          "instanceId": "remote-agentscope-sample",
+          "operation": "session:read",
+          "requestId": "ui-1793669288226-akvzjm3xk5d",
+          "rpcId": "12ffec9e-b07c-4c52-8e4c-9a8b62721a0b",
+          "externalSessionId": "external-session-7e42e8c8-10ef-4cb7-ac9f-d5d8d9079a20",
+          "stage": "responded",
+          "httpStatus": 200,
+          "responseAt": "2026-11-03T01:28:08.282Z",
+          "nativeSessionId": "7d1e02507cb944f0a7088461ffd54da9"
+        },
+        {
+          "at": "2026-11-03T01:28:08.444Z",
+          "instanceId": "remote-agentscope-sample",
+          "operation": "session:read",
+          "requestId": "ui-1793669288424-aa7b2o40r6s",
+          "rpcId": "f17b3068-c9e9-46b4-b192-a3bbc11fdf3c",
+          "externalSessionId": "external-session-7e42e8c8-10ef-4cb7-ac9f-d5d8d9079a20",
+          "stage": "responded",
+          "httpStatus": 200,
+          "responseAt": "2026-11-03T01:28:08.481Z",
+          "nativeSessionId": "7d1e02507cb944f0a7088461ffd54da9"
+        },
+        {
+          "at": "2026-11-03T01:28:08.633Z",
+          "instanceId": "remote-agentscope-sample",
+          "operation": "session:prompt",
+          "requestId": "ui-1793669288628-kcvexjiyp3s",
+          "rpcId": "eeb892d2-1140-4dbc-95fa-13adfca52d22",
+          "externalSessionId": "external-session-7e42e8c8-10ef-4cb7-ac9f-d5d8d9079a20",
+          "stage": "accepted",
+          "httpStatus": 200,
+          "responseAt": "2026-11-03T01:28:08.780Z",
+          "nativeSessionId": "7d1e02507cb944f0a7088461ffd54da9"
+        },
+        {
+          "at": "2026-11-03T01:28:08.863Z",
+          "instanceId": "remote-agentscope-sample",
+          "operation": "session:read",
+          "requestId": "ui-1793669288851-m3c8bwvu0n",
+          "rpcId": "0aa0cfab-ff43-415b-8809-78007f606710",
+          "externalSessionId": "external-session-7e42e8c8-10ef-4cb7-ac9f-d5d8d9079a20",
+          "stage": "responded",
+          "httpStatus": 200,
+          "responseAt": "2026-11-03T01:28:08.928Z",
+          "nativeSessionId": "7d1e02507cb944f0a7088461ffd54da9"
+        },
+        {
+          "at": "2026-11-03T01:28:09.965Z",
+          "instanceId": "remote-agentscope-sample",
+          "operation": "session:read",
+          "requestId": "ui-1793669289956-uxgigmqc6wk",
+          "rpcId": "5417c0da-cbcf-41a4-8d3e-48d1b9f0a524",
+          "externalSessionId": "external-session-7e42e8c8-10ef-4cb7-ac9f-d5d8d9079a20",
+          "stage": "responded",
+          "httpStatus": 200,
+          "responseAt": "2026-11-03T01:28:10.009Z",
+          "nativeSessionId": "7d1e02507cb944f0a7088461ffd54da9"
+        }
+      ],
+      "externalSessionId": "external-session-7e42e8c8-10ef-4cb7-ac9f-d5d8d9079a20",
+      "nativeSessionId": "7d1e02507cb944f0a7088461ffd54da9",
+      "stage": "responded",
+      "phases": [
+        {
+          "phase": "asset",
+          "requestId": "ui-1793669286899-gy9hhee1fb7",
+          "sentAt": "2026-11-03T01:28:06.908Z",
+          "stage": "completed",
+          "completedAt": "2026-11-03T01:28:08.282Z"
+        },
+        {
+          "phase": "catalog",
+          "requestId": "ui-1793669288628-kcvexjiyp3s",
+          "sentAt": "2026-11-03T01:28:08.633Z",
+          "stage": "completed",
+          "completedAt": "2026-11-03T01:28:10.009Z"
+        }
+      ]
+    },
+    {
+      "instanceId": "remote-opencode-sample",
+      "createdAt": "2026-11-03T01:28:10.961Z",
+      "requests": [
+        {
+          "at": "2026-11-03T01:28:10.961Z",
+          "instanceId": "remote-opencode-sample",
+          "operation": "session:create",
+          "requestId": "ui-1793669290943-vvx13xfn1uc",
+          "rpcId": "5656cccc-0de5-42a8-90a1-5fbabe940384",
+          "externalSessionId": "external-session-693203ca-385d-4a08-b75b-d7bed6c124cf",
+          "stage": "responded",
+          "httpStatus": 200,
+          "responseAt": "2026-11-03T01:28:11.060Z",
+          "nativeSessionId": "ses_e60faa3fbffeyNaC3asxrylYLx"
+        },
+        {
+          "at": "2026-11-03T01:28:11.855Z",
+          "instanceId": "remote-opencode-sample",
+          "operation": "session:read",
+          "requestId": "ui-1793669291841-utzzzfh2oj",
+          "rpcId": "ebd56992-e29b-4978-a06c-4169b000dff8",
+          "externalSessionId": "external-session-693203ca-385d-4a08-b75b-d7bed6c124cf",
+          "stage": "responded",
+          "httpStatus": 200,
+          "responseAt": "2026-11-03T01:28:11.906Z",
+          "nativeSessionId": "ses_e60faa3fbffeyNaC3asxrylYLx"
+        },
+        {
+          "at": "2026-11-03T01:28:11.993Z",
+          "instanceId": "remote-opencode-sample",
+          "operation": "session:prompt",
+          "requestId": "ui-1793669291984-c9qe2gwgbo",
+          "rpcId": "83e1f6da-887f-4576-8ae5-37f619746692",
+          "externalSessionId": "external-session-693203ca-385d-4a08-b75b-d7bed6c124cf",
+          "stage": "accepted",
+          "httpStatus": 200,
+          "responseAt": "2026-11-03T01:28:12.070Z",
+          "nativeSessionId": "ses_e60faa3fbffeyNaC3asxrylYLx"
+        },
+        {
+          "at": "2026-11-03T01:28:12.143Z",
+          "instanceId": "remote-opencode-sample",
+          "operation": "session:read",
+          "requestId": "ui-1793669292133-3kcxeejk92r",
+          "rpcId": "1d8db409-6a34-460c-be71-d972ba12276f",
+          "externalSessionId": "external-session-693203ca-385d-4a08-b75b-d7bed6c124cf",
+          "stage": "responded",
+          "httpStatus": 200,
+          "responseAt": "2026-11-03T01:28:12.248Z",
+          "nativeSessionId": "ses_e60faa3fbffeyNaC3asxrylYLx"
+        },
+        {
+          "at": "2026-11-03T01:28:13.290Z",
+          "instanceId": "remote-opencode-sample",
+          "operation": "session:read",
+          "requestId": "ui-1793669293272-2cedqaqmem1",
+          "rpcId": "87a12322-2e1a-4d09-9741-b930dfa8c68b",
+          "externalSessionId": "external-session-693203ca-385d-4a08-b75b-d7bed6c124cf",
+          "stage": "responded",
+          "httpStatus": 200,
+          "responseAt": "2026-11-03T01:28:13.339Z",
+          "nativeSessionId": "ses_e60faa3fbffeyNaC3asxrylYLx"
+        },
+        {
+          "at": "2026-11-03T01:28:13.484Z",
+          "instanceId": "remote-opencode-sample",
+          "operation": "session:read",
+          "requestId": "ui-1793669293474-a8l3c4oo13",
+          "rpcId": "5a3104ef-ff72-49dc-ade6-398fd47048e2",
+          "externalSessionId": "external-session-693203ca-385d-4a08-b75b-d7bed6c124cf",
+          "stage": "responded",
+          "httpStatus": 200,
+          "responseAt": "2026-11-03T01:28:13.646Z",
+          "nativeSessionId": "ses_e60faa3fbffeyNaC3asxrylYLx"
+        },
+        {
+          "at": "2026-11-03T01:28:13.777Z",
+          "instanceId": "remote-opencode-sample",
+          "operation": "session:prompt",
+          "requestId": "ui-1793669293764-rsuxw8ln14n",
+          "rpcId": "09602009-b4ca-4fbc-a673-59938648ef55",
+          "externalSessionId": "external-session-693203ca-385d-4a08-b75b-d7bed6c124cf",
+          "stage": "accepted",
+          "httpStatus": 200,
+          "responseAt": "2026-11-03T01:28:13.877Z",
+          "nativeSessionId": "ses_e60faa3fbffeyNaC3asxrylYLx"
+        },
+        {
+          "at": "2026-11-03T01:28:13.969Z",
+          "instanceId": "remote-opencode-sample",
+          "operation": "session:read",
+          "requestId": "ui-1793669293961-22l0q8rvybk",
+          "rpcId": "7decaf82-9864-4125-a2ff-c49dc27b0bf4",
+          "externalSessionId": "external-session-693203ca-385d-4a08-b75b-d7bed6c124cf",
+          "stage": "responded",
+          "httpStatus": 200,
+          "responseAt": "2026-11-03T01:28:14.071Z",
+          "nativeSessionId": "ses_e60faa3fbffeyNaC3asxrylYLx"
+        }
+      ],
+      "externalSessionId": "external-session-693203ca-385d-4a08-b75b-d7bed6c124cf",
+      "nativeSessionId": "ses_e60faa3fbffeyNaC3asxrylYLx",
+      "stage": "responded",
+      "phases": [
+        {
+          "phase": "asset",
+          "requestId": "ui-1793669291984-c9qe2gwgbo",
+          "sentAt": "2026-11-03T01:28:11.993Z",
+          "stage": "completed",
+          "completedAt": "2026-11-03T01:28:13.339Z"
+        },
+        {
+          "phase": "catalog",
+          "requestId": "ui-1793669293764-rsuxw8ln14n",
+          "sentAt": "2026-11-03T01:28:13.777Z",
+          "stage": "completed",
+          "completedAt": "2026-11-03T01:28:14.071Z"
+        }
+      ]
+    }
+  ]
+}

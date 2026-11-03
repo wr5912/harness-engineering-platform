@@ -1,0 +1,569 @@
+{
+  "startedAt": "2026-11-03T01:27:48.412Z",
+  "scope": "正式18120实际页面、管理RPC和原生Runtime；本机容器模拟远程，确定性模拟模型及业务资源",
+  "checks": [
+    {
+      "name": "实际owner登录成功",
+      "ok": true
+    },
+    {
+      "name": "正式登记包含两个指定框架实例",
+      "ok": true
+    },
+    {
+      "name": "1440px remote-agentscope-sample行框架与状态准确",
+      "ok": true
+    },
+    {
+      "name": "1440px remote-opencode-sample行框架与状态准确",
+      "ok": true
+    },
+    {
+      "name": "1440px两行目录无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "1440-list截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "remote-agentscope-sample详情精确对应逻辑对象与平台入口",
+      "ok": true
+    },
+    {
+      "name": "1440px remote-agentscope-sample来源和运行边界明确",
+      "ok": true
+    },
+    {
+      "name": "1440-agentscope-overview截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "1440px remote-agentscope-sample连接与机器元数据准确",
+      "ok": true
+    },
+    {
+      "name": "remote-agentscope-sample凭据元数据可见",
+      "ok": true
+    },
+    {
+      "name": "1440-agentscope-connection截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "1440px remote-agentscope-sample入口主体与资源范围分开核对",
+      "ok": true
+    },
+    {
+      "name": "1440-agentscope-authorization截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "remote-opencode-sample详情精确对应逻辑对象与平台入口",
+      "ok": true
+    },
+    {
+      "name": "1440px remote-opencode-sample来源和运行边界明确",
+      "ok": true
+    },
+    {
+      "name": "1440-opencode-overview截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "1440px remote-opencode-sample连接与机器元数据准确",
+      "ok": true
+    },
+    {
+      "name": "remote-opencode-sample凭据元数据可见",
+      "ok": true
+    },
+    {
+      "name": "1440-opencode-connection截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "1440px remote-opencode-sample入口主体与资源范围分开核对",
+      "ok": true
+    },
+    {
+      "name": "1440-opencode-authorization截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "768px remote-agentscope-sample行框架与状态准确",
+      "ok": true
+    },
+    {
+      "name": "768px remote-opencode-sample行框架与状态准确",
+      "ok": true
+    },
+    {
+      "name": "768px两行目录无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "768-list截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "remote-agentscope-sample详情精确对应逻辑对象与平台入口",
+      "ok": true
+    },
+    {
+      "name": "768px remote-agentscope-sample来源和运行边界明确",
+      "ok": true
+    },
+    {
+      "name": "768-agentscope-overview截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "768px remote-agentscope-sample连接与机器元数据准确",
+      "ok": true
+    },
+    {
+      "name": "remote-agentscope-sample凭据元数据可见",
+      "ok": true
+    },
+    {
+      "name": "768-agentscope-connection截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "768px remote-agentscope-sample入口主体与资源范围分开核对",
+      "ok": true
+    },
+    {
+      "name": "768-agentscope-authorization截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "remote-opencode-sample详情精确对应逻辑对象与平台入口",
+      "ok": true
+    },
+    {
+      "name": "768px remote-opencode-sample来源和运行边界明确",
+      "ok": true
+    },
+    {
+      "name": "768-opencode-overview截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "768px remote-opencode-sample连接与机器元数据准确",
+      "ok": true
+    },
+    {
+      "name": "remote-opencode-sample凭据元数据可见",
+      "ok": true
+    },
+    {
+      "name": "768-opencode-connection截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "768px remote-opencode-sample入口主体与资源范围分开核对",
+      "ok": true
+    },
+    {
+      "name": "768-opencode-authorization截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "390px remote-agentscope-sample行框架与状态准确",
+      "ok": true
+    },
+    {
+      "name": "390px remote-opencode-sample行框架与状态准确",
+      "ok": true
+    },
+    {
+      "name": "390px两行目录无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "390-list截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "remote-agentscope-sample详情精确对应逻辑对象与平台入口",
+      "ok": true
+    },
+    {
+      "name": "390px remote-agentscope-sample来源和运行边界明确",
+      "ok": true
+    },
+    {
+      "name": "390-agentscope-overview截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "390px remote-agentscope-sample连接与机器元数据准确",
+      "ok": true
+    },
+    {
+      "name": "remote-agentscope-sample凭据元数据可见",
+      "ok": true
+    },
+    {
+      "name": "390-agentscope-connection截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "390px remote-agentscope-sample入口主体与资源范围分开核对",
+      "ok": true
+    },
+    {
+      "name": "390-agentscope-authorization截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "remote-opencode-sample详情精确对应逻辑对象与平台入口",
+      "ok": true
+    },
+    {
+      "name": "390px remote-opencode-sample来源和运行边界明确",
+      "ok": true
+    },
+    {
+      "name": "390-opencode-overview截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "390px remote-opencode-sample连接与机器元数据准确",
+      "ok": true
+    },
+    {
+      "name": "remote-opencode-sample凭据元数据可见",
+      "ok": true
+    },
+    {
+      "name": "390-opencode-connection截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "390px remote-opencode-sample入口主体与资源范围分开核对",
+      "ok": true
+    },
+    {
+      "name": "390-opencode-authorization截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "remote-agentscope-sampleUI新建一次Session并获得外部原生映射",
+      "ok": true
+    },
+    {
+      "name": "1440px remote-agentscope-sample访问弹窗可达且无溢出",
+      "ok": true
+    },
+    {
+      "name": "1440-agentscope-access截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "768px remote-agentscope-sample访问弹窗可达且无溢出",
+      "ok": true
+    },
+    {
+      "name": "768-agentscope-access截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "390px remote-agentscope-sample访问弹窗可达且无溢出",
+      "ok": true
+    },
+    {
+      "name": "390-agentscope-access截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "remote-agentscope-sample asset实际工具成功完成，模型自述不作成功依据",
+      "ok": true
+    },
+    {
+      "name": "completed-agentscope-asset截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "remote-agentscope-sample catalog实际工具成功完成，模型自述不作成功依据",
+      "ok": true
+    },
+    {
+      "name": "completed-agentscope-catalog截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "remote-opencode-sampleUI新建一次Session并获得外部原生映射",
+      "ok": true
+    },
+    {
+      "name": "1440px remote-opencode-sample访问弹窗可达且无溢出",
+      "ok": true
+    },
+    {
+      "name": "1440-opencode-access截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "768px remote-opencode-sample访问弹窗可达且无溢出",
+      "ok": true
+    },
+    {
+      "name": "768-opencode-access截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "390px remote-opencode-sample访问弹窗可达且无溢出",
+      "ok": true
+    },
+    {
+      "name": "390-opencode-access截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "remote-opencode-sample asset实际工具成功完成，模型自述不作成功依据",
+      "ok": true
+    },
+    {
+      "name": "completed-opencode-asset截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "remote-opencode-sample catalog实际工具成功完成，模型自述不作成功依据",
+      "ok": true
+    },
+    {
+      "name": "completed-opencode-catalog截图无秘密交付弹窗",
+      "ok": true
+    },
+    {
+      "name": "浏览器无未捕获脚本异常",
+      "ok": true
+    }
+  ],
+  "errors": [],
+  "instances": [
+    {
+      "observedAt": "2026-11-03T01:27:59.848Z",
+      "width": 1440,
+      "instanceId": "remote-agentscope-sample",
+      "logicalAgentId": "external-agentscope-demo",
+      "framework": "agentscope",
+      "nativeEndpoint": "http://127.0.0.1:18652",
+      "selector": "6b8687e485144c60bc85c846479d56b1",
+      "entryState": "enabled",
+      "verified": true,
+      "credentialIds": [
+        "credential-1fa54d35-6d6c-45a6-b75d-6886a8ac626b"
+      ]
+    },
+    {
+      "observedAt": "2026-11-03T01:28:01.148Z",
+      "width": 1440,
+      "instanceId": "remote-opencode-sample",
+      "logicalAgentId": "external-opencode-demo",
+      "framework": "opencode",
+      "nativeEndpoint": "http://127.0.0.1:18655",
+      "selector": "/workspace",
+      "entryState": "enabled",
+      "verified": true,
+      "credentialIds": [
+        "credential-a2e6f808-4581-41f1-aef4-d9377a20ed31"
+      ]
+    },
+    {
+      "observedAt": "2026-11-03T01:28:02.167Z",
+      "width": 768,
+      "instanceId": "remote-agentscope-sample",
+      "logicalAgentId": "external-agentscope-demo",
+      "framework": "agentscope",
+      "nativeEndpoint": "http://127.0.0.1:18652",
+      "selector": "6b8687e485144c60bc85c846479d56b1",
+      "entryState": "enabled",
+      "verified": true,
+      "credentialIds": [
+        "credential-1fa54d35-6d6c-45a6-b75d-6886a8ac626b"
+      ]
+    },
+    {
+      "observedAt": "2026-11-03T01:28:02.998Z",
+      "width": 768,
+      "instanceId": "remote-opencode-sample",
+      "logicalAgentId": "external-opencode-demo",
+      "framework": "opencode",
+      "nativeEndpoint": "http://127.0.0.1:18655",
+      "selector": "/workspace",
+      "entryState": "enabled",
+      "verified": true,
+      "credentialIds": [
+        "credential-a2e6f808-4581-41f1-aef4-d9377a20ed31"
+      ]
+    },
+    {
+      "observedAt": "2026-11-03T01:28:03.882Z",
+      "width": 390,
+      "instanceId": "remote-agentscope-sample",
+      "logicalAgentId": "external-agentscope-demo",
+      "framework": "agentscope",
+      "nativeEndpoint": "http://127.0.0.1:18652",
+      "selector": "6b8687e485144c60bc85c846479d56b1",
+      "entryState": "enabled",
+      "verified": true,
+      "credentialIds": [
+        "credential-1fa54d35-6d6c-45a6-b75d-6886a8ac626b"
+      ]
+    },
+    {
+      "observedAt": "2026-11-03T01:28:04.591Z",
+      "width": 390,
+      "instanceId": "remote-opencode-sample",
+      "logicalAgentId": "external-opencode-demo",
+      "framework": "opencode",
+      "nativeEndpoint": "http://127.0.0.1:18655",
+      "selector": "/workspace",
+      "entryState": "enabled",
+      "verified": true,
+      "credentialIds": [
+        "credential-a2e6f808-4581-41f1-aef4-d9377a20ed31"
+      ]
+    }
+  ],
+  "phases": [
+    {
+      "instanceId": "remote-agentscope-sample",
+      "externalSessionId": "external-session-7e42e8c8-10ef-4cb7-ac9f-d5d8d9079a20",
+      "nativeSessionId": "7d1e02507cb944f0a7088461ffd54da9",
+      "phase": "asset",
+      "requestId": "ui-1793669286899-gy9hhee1fb7",
+      "acceptedStage": "accepted",
+      "proof": {
+        "complete": true,
+        "source": "actual-native-AgentScope-message-via-platform-adapter",
+        "isRunning": false,
+        "tools": [
+          {
+            "name": "mcp__protected_assets__get_asset",
+            "state": "success",
+            "toolCallId": "call-fixture-tool"
+          }
+        ],
+        "nativeFinalPresent": true
+      }
+    },
+    {
+      "instanceId": "remote-agentscope-sample",
+      "externalSessionId": "external-session-7e42e8c8-10ef-4cb7-ac9f-d5d8d9079a20",
+      "nativeSessionId": "7d1e02507cb944f0a7088461ffd54da9",
+      "phase": "catalog",
+      "requestId": "ui-1793669288628-kcvexjiyp3s",
+      "acceptedStage": "accepted",
+      "proof": {
+        "complete": true,
+        "source": "actual-native-AgentScope-message-via-platform-adapter",
+        "isRunning": false,
+        "tools": [
+          {
+            "name": "mcp__native_catalog__get_catalog",
+            "state": "success",
+            "toolCallId": "call-fixture-tool"
+          }
+        ],
+        "nativeFinalPresent": true
+      }
+    },
+    {
+      "instanceId": "remote-opencode-sample",
+      "externalSessionId": "external-session-693203ca-385d-4a08-b75b-d7bed6c124cf",
+      "nativeSessionId": "ses_e60faa3fbffeyNaC3asxrylYLx",
+      "phase": "asset",
+      "requestId": "ui-1793669291984-c9qe2gwgbo",
+      "acceptedStage": "accepted",
+      "proof": {
+        "complete": true,
+        "source": "actual-native-OpenCode-tool-state-via-platform-adapter; independent-native-readback-by-A",
+        "idle": true,
+        "tools": [
+          {
+            "name": "protected_assets_get_asset",
+            "state": "completed",
+            "toolCallId": "call-fixture-tool"
+          }
+        ]
+      }
+    },
+    {
+      "instanceId": "remote-opencode-sample",
+      "externalSessionId": "external-session-693203ca-385d-4a08-b75b-d7bed6c124cf",
+      "nativeSessionId": "ses_e60faa3fbffeyNaC3asxrylYLx",
+      "phase": "catalog",
+      "requestId": "ui-1793669293764-rsuxw8ln14n",
+      "acceptedStage": "accepted",
+      "proof": {
+        "complete": true,
+        "source": "actual-native-OpenCode-tool-state-via-platform-adapter; independent-native-readback-by-A",
+        "idle": true,
+        "tools": [
+          {
+            "name": "native_catalog_get_catalog",
+            "state": "completed",
+            "toolCallId": "call-fixture-tool"
+          }
+        ]
+      }
+    }
+  ],
+  "screenshots": [
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/1440-list.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/1440-agentscope-overview.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/1440-agentscope-connection.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/1440-agentscope-authorization.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/1440-opencode-overview.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/1440-opencode-connection.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/1440-opencode-authorization.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/768-list.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/768-agentscope-overview.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/768-agentscope-connection.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/768-agentscope-authorization.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/768-opencode-overview.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/768-opencode-connection.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/768-opencode-authorization.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/390-list.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/390-agentscope-overview.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/390-agentscope-connection.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/390-agentscope-authorization.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/390-opencode-overview.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/390-opencode-connection.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/390-opencode-authorization.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/1440-agentscope-access.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/768-agentscope-access.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/390-agentscope-access.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/completed-agentscope-asset.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/completed-agentscope-catalog.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/1440-opencode-access.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/768-opencode-access.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/390-opencode-access.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/completed-opencode-asset.png",
+    ".local/cross-framework/formal-onboarding/evidence-2026-11-03T01-27-48-411Z/completed-opencode-catalog.png"
+  ],
+  "writes": {
+    "sessionCreates": 2,
+    "sessionPrompts": 4,
+    "configuration": 0,
+    "credential": 0
+  },
+  "runtime": {
+    "service": 2303012,
+    "clientHash": "6fff2d6c760f880460f2cf31ad989543be5322431cc58775e5577fdd2dccd7df",
+    "serverHash": "39555eaea9759acf78dc58600c21ccff8eaf1b59a855778614e2a8a50c8dc652",
+    "gitHead": "da8ea79ceab272276140c345d990c3e992040dea",
+    "module": {
+      "graphRevision": "258e71580f58",
+      "platformRevision": "64aae9eeefc7"
+    }
+  },
+  "passed": true,
+  "finishedAt": "2026-11-03T01:28:14.350Z",
+  "mappingFile": ".local/cross-framework/formal-onboarding/ui-invocations.json"
+}

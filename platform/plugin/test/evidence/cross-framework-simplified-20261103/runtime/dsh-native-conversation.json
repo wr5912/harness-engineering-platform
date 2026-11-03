@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-11-03T02:35:53.689Z",
+  "scope": "隔离DSH真实锁定源码Runtime+确定性模型/模拟资源；不改formal AS/OpenCode",
+  "instanceId": "remote-dsh-sample",
+  "requestId": "conversation-native-dsh-d201549f-a5bb-4e1d-960a-5db04826d5c0",
+  "externalSessionId": "external-session-1490b369-15c5-4d9d-be13-a5f2cffb3847",
+  "nativeSessionId": "session-d1c4d18f-8961-4c8c-abb9-c398be880adc",
+  "transportState": "accepted",
+  "status": "completed",
+  "assistantMessageCount": 1,
+  "assistantText": [
+    "模拟循环已完成，实际调用结果以工具返回为准。"
+  ],
+  "tools": [
+    {
+      "id": "call-fixture-tool",
+      "name": "mcp__sample_signed__get_asset",
+      "status": "completed"
+    }
+  ],
+  "nativeProof": [
+    {
+      "type": "event",
+      "eventType": "turn/start",
+      "eventSeq": 4,
+      "turn": 1
+    },
+    {
+      "type": "event",
+      "eventType": "user/message",
+      "eventSeq": 8,
+      "sourceKind": "user",
+      "promptRequestId": "conversation-native-dsh-d201549f-a5bb-4e1d-960a-5db04826d5c0"
+    },
+    {
+      "type": "event",
+      "eventType": "user/message",
+      "eventSeq": 9,
+      "sourceKind": "runtime-context"
+    },
+    {
+      "type": "event",
+      "eventType": "user/message",
+      "eventSeq": 10,
+      "sourceKind": "time-context"
+    },
+    {
+      "type": "event",
+      "eventType": "assistant/message",
+      "eventSeq": 15,
+      "turn": 1,
+      "assistantContentTypes": [
+        "tool-call"
+      ]
+    },
+    {
+      "type": "event",
+      "eventType": "tool/call",
+      "eventSeq": 16,
+      "turn": 1
+    },
+    {
+      "type": "event",
+      "eventType": "tool/result",
+      "eventSeq": 18,
+      "turn": 1
+    },
+    {
+      "type": "event",
+      "eventType": "assistant/message",
+      "eventSeq": 21,
+      "turn": 1,
+      "assistantContentTypes": [
+        "text"
+      ]
+    },
+    {
+      "type": "event",
+      "eventType": "turn/end",
+      "eventSeq": 23,
+      "turn": 1,
+      "endReason": "completed"
+    }
+  ],
+  "promptReplayed": false
+}

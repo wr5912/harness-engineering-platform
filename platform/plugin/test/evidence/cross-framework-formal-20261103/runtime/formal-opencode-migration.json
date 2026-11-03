@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-11-03T01:18:13.097Z",
+  "instanceId": "remote-opencode-sample",
+  "clientId": "client-77b5450c-3758-479d-a78e-48551ac82314",
+  "credentialId": "credential-a2e6f808-4581-41f1-aef4-d9377a20ed31",
+  "materialDirectory": "/home/admin/harness-engineering-platform-data/.local/credentials/external-connectors/remote-opencode-sample",
+  "backupDirectory": "/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/opencode/connector-backups/formal-2026-11-03T01-17-31-713Z",
+  "connector": {
+    "name": "hep-cross-framework-opencode-connector",
+    "previousStartedAt": "2026-11-02T14:05:42.548079128Z",
+    "startedAt": "2026-11-03T01:17:42.308845515Z",
+    "pid": 2293014,
+    "tokenEndpoint": "http://10.0.160.32:53105/oauth/token",
+    "resourceUrl": "http://10.0.160.32:53105/api/agent-access/v1/resources/sample-assets/mcp",
+    "audience": "urn:harness:sample-assets",
+    "scopes": [
+      "assets:read"
+    ],
+    "secretFile": "/run/instance/instance.secret"
+  },
+  "native": {
+    "name": "hep-cross-framework-opencode",
+    "pid": 1889354,
+    "startedAt": "2026-11-02T14:05:42.542487438Z",
+    "endpoint": "http://127.0.0.1:18655",
+    "selector": "/workspace",
+    "processAndConfigurationUnchanged": true,
+    "inFlightBefore": 0
+  },
+  "checks": {
+    "businessToolsCalled": false,
+    "promptSubmitted": false,
+    "formalConfigChanged": false,
+    "selfStatus": {
+      "httpStatus": 200,
+      "instanceId": "remote-opencode-sample",
+      "registrationState": "registered",
+      "requestAuthentication": "verified",
+      "credentialState": "active",
+      "resourceAccessEnabled": true,
+      "endpointVerified": true
+    },
+    "connectorFileModes": [
+      {
+        "name": "config.json",
+        "mode": "600"
+      },
+      {
+        "name": "instance.secret",
+        "mode": "600"
+      }
+    ],
+    "toolsList": {
+      "httpStatus": 200,
+      "toolNames": [
+        "get_asset"
+      ]
+    },
+    "nativeAfter": {
+      "activeSessionStatus": 200,
+      "activeSessions": 0,
+      "sessionListStatus": 200,
+      "sessionCount": 11,
+      "mcpStatus": 200,
+      "mcpServers": [
+        {
+          "name": "native_catalog",
+          "status": "connected"
+        },
+        {
+          "name": "protected_assets",
+          "status": "connected"
+        }
+      ]
+    }
+  },
+  "state": "connector已迁移；等待正式新版本装载后业务验证"
+}

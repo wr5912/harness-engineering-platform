@@ -10,7 +10,7 @@ import { CreateAgentDialog } from './create-agent-client.tsx'
 import { ImportAgentDialog, type MigrationEntryTarget } from './import-agent-client.tsx'
 import { SdkDebugDialog } from './sdk-client.tsx'
 import { ComputeVariantsPanel, canDeriveVersion, isVariantVersion } from './compute-variants.tsx'
-import { VariantSourcePanel } from './variant-source.tsx'
+import { VariantSourcePanel, variantSourceInfo } from './variant-source.tsx'
 import { AgentDescriptionPanel } from './description-client.tsx'
 import { SearchSelect } from '../components/search-select.tsx'
 import { DetailDrawer } from '../components/detail-drawer.tsx'
@@ -646,6 +646,18 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
   const agentVersions = detail?.is_current === false && !currentVersions.some((item: any) => item.id === detail.experiment.id)
     ? [...currentVersions, { ...detail.experiment, is_current: false }] : currentVersions
     .slice().sort((left: any, right: any) => String(right.id).localeCompare(String(left.id), 'en', { numeric: true }))
+  const versionMetadata = agentVersions.map((version: any) => ({ ...version, ...(version.id === detail?.experiment.id ? detail.experiment : experiments.find(item => item.id === version.id)) }))
+  const versionOptions = versionMetadata.map((version: ExperimentRow) => {
+    const variant = isComputeVariant(version)
+    const name = variant ? variantName(version) : versionLabel(version.id).replace(/^版本 /, 'v')
+    const duplicate = versionMetadata.some((item: ExperimentRow) => item.id !== version.id && isComputeVariant(item) === variant && (variant ? variantName(item) : versionLabel(item.id).replace(/^版本 /, 'v')) === name)
+    const source = variantSourceInfo(version, experiments)
+    const description = variant
+      ? [source.parent.experimentId ? `基于 ${versionLabel(source.parent.experimentId).replace(/^版本 /, 'v')}` : '来源版本未记录', source.generationMode && generationLabel(version)]
+      : [researchStatus(version.status)]
+    if (version.is_current === false) description.push('历史记录')
+    return { value: version.id, label: `${name}${duplicate ? ` · ${version.id.slice(-6)}` : ''}`, group: variant ? '算力变体' : '迭代版本', description: description.filter(Boolean).join(' · ') }
+  })
   const visibleVariants = variants.filter(variant => {
     const agent = agents.find(item => item.id === variant.agent_id)
     const query = `${variantName(variant)} ${agent?.name ?? agent?.manifest?.name ?? ''} ${variant.agent_id} ${variant.id} ${variant.change.research_question ?? ''} ${variant.change.parent_experiment_id ?? ''}`.toLowerCase()
@@ -748,7 +760,7 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
               <span className="agent-list-card-title"><strong>{agent.name || agent.manifest?.name || agent.id}</strong><span className="agent-badge">{researchStatus(agent.latest_experiment_status)}</span></span>
               <span className="agent-id">{agent.id}</span>
               {agent.manifest?.description && <span className="agent-list-description" title={agent.manifest.description}>{agent.manifest.description}</span>}
-              <span className="agent-list-meta">{typeof agent.version_count === 'number' ? `${agent.version_count} 个研究版本` : '版本数量未读取'} · {agent.instance_state || '实例未观察'}</span>
+              <span className="agent-list-meta">{experiments.filter(item => item.agent_id === agent.id && item.is_current !== false && !isComputeVariant(item)).length} 个迭代版本 · {agent.instance_state || '实例未观察'}</span>
             </button><button type="button" className="agent-variant-count" onClick={() => showAgentVariants(agent.id)} aria-label={`查看 ${agent.name || agent.id} 的变体`}>变体 {variants.filter(variant => variant.agent_id === agent.id).length}</button></div>)}
             {agents.length > 0 && !visibleAgents.length && <p className="agent-empty">没有匹配的智能体。</p>}
             {listPhase === 'pending' && !agents.length && <LoadingIndicator label="读取智能体列表" block />}
@@ -783,7 +795,7 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
             <button type="button" className="agent-back-to-list" onClick={returnToList}>← 返回{listView === 'variants' ? '变体列表' : '智能体列表'}</button>
             <div className="agent-identity-top">
               {detail.is_current === false && detail.current_variant_id && <p className="agent-notice" role="status">当前查看历史变体记录，资产和 Run 保留原身份。<button type="button" onClick={() => selectVersion(selected, detail.current_variant_id, true, tab)}>查看当前变体</button><code>{detail.current_variant_id}</code></p>}
-              <div className="agent-identity-title"><span className="agent-identity-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9M8 5.25 16 9.8" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg></span><h2>{detail.agent.name || detail.agent.manifest.name || selectedAgent?.name || selected}</h2><SearchSelect className="agent-version-choice" label="版本" value={selectedExperiment || detail.experiment.id} options={agentVersions.map((version: any) => { const metadata = version.id === detail.experiment.id ? detail.experiment : experiments.find(item => item.id === version.id) ?? version; const name = versionLabel(version.id).replace(/^版本 /, 'v'); const disambiguation = agentVersions.filter((item: any) => versionLabel(item.id) === versionLabel(version.id)).length > 1 ? ` · ${version.id.slice(-6)}` : ''; return { value: version.id, label: isComputeVariant(metadata) ? `${variantName(metadata)} · ${name}${disambiguation}` : `${name}${disambiguation}`, description: version.id } })} onChange={value => selectVersion(selected, value)}/><span className="agent-badge">{isComputeVariant(detail.experiment) ? "算力变体" : "业务版本"}</span></div>
+              <div className="agent-identity-title"><span className="agent-identity-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9M8 5.25 16 9.8" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg></span><h2>{detail.agent.name || detail.agent.manifest.name || selectedAgent?.name || selected}</h2><SearchSelect className="agent-version-choice" label="版本" value={selectedExperiment || detail.experiment.id} groups={['迭代版本', '算力变体']} options={versionOptions} onChange={value => selectVersion(selected, value)}/><span className="agent-badge">{isComputeVariant(detail.experiment) ? "算力变体" : "迭代版本"}</span></div>
               <div className="agent-actions agent-main-actions">{sdkProfile ? <><button type="button" className="agent-primary" onClick={() => openSdk()}>SDK 调试</button><button type="button" onClick={() => openSdk('guide')}>接入文档</button></> : <><button type="button" className="agent-primary" disabled={!onNavigate} onClick={startEvaluation}>发起评测</button><button type="button" disabled={launchBusy} onClick={() => void launchVersion()}>进入对话</button><button type="button" onClick={() => setPublishOpen(true)}>发布版本</button></>}<details className="agent-more-actions" open={moreActionsOpen}><summary onClick={event => { event.preventDefault(); setMoreActionsOpen(!moreActionsOpen) }}>更多操作</summary><div><button type="button" onClick={() => { setMoreActionsOpen(false); setDeploymentTarget({ agent_id: selected, experiment_id: detail.experiment.id, label: `${detail.agent.name || selected} · ${versionLabel(detail.experiment.id)}` }); setDeploymentOpen(true) }}>导出独立运行包</button><button type="button" disabled={!onNavigate} onClick={() => { setMoreActionsOpen(false); openEvaluation() }}>查看评测</button><button type="button" disabled={!onNavigate} onClick={() => { setMoreActionsOpen(false); onNavigate?.({ page: 'instances', agent_id: selected, experiment_id: detail.experiment.id }) }}>查看实例</button><button type="button" disabled={!derivable} title={derivable ? undefined : "变体不能作为新版本的继承来源。"} onClick={() => { if (!derivable) return; setMoreActionsOpen(false); setVersionOpen(true); resetVersionPreview() }}>新建研究版本</button><button type="button" disabled={!sdkProfile && !onNavigate} onClick={() => { setMoreActionsOpen(false); if (sdkProfile) openSdk(); else onNavigate?.({ page: 'instances', agent_id: selected, experiment_id: detail.experiment.id, source_id: `experiment:${detail.experiment.id}` }) }}>创建实例</button></div></details></div>
             </div>
             {sdkProfile && <p className="agent-muted">使用方式：官方 TypeScript SDK · 在标准容器内调用</p>}

@@ -1,0 +1,9 @@
+{
+  "at": "2026-11-03T01:39:11.310087Z",
+  "file": "/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/agentscope/upstream-main.py",
+  "backup": "/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/agentscope/upstream-main-before-create-only-20261103T013911Z.py",
+  "beforeSha256": "6dae547ada95da705dc43a0c66dfac1a9b20f9bd1414d2b1a595173ebbd53049",
+  "afterSha256": "9991bcf191f632ce562a21dc98c18e84a57d263de0b89a87be0666c8bcdb2ace",
+  "pyCompilePassed": true,
+  "scope": "MCP默认选择只在专属新建分支初始化一次；普通get_workspace继承原生，无重复补齐、不恢复用户后来显式移除。无新ledger或平台API。"
+}

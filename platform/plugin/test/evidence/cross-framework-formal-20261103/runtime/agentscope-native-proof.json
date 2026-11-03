@@ -1,0 +1,83 @@
+{
+  "at": "2026-11-03T01:30:35.392Z",
+  "source": "原生AgentScope GET /sessions及messages，只读；没有新prompt/PATCH/权限批准",
+  "instanceId": "remote-agentscope-sample",
+  "externalSessionId": "external-session-7e42e8c8-10ef-4cb7-ac9f-d5d8d9079a20",
+  "nativeSessionId": "7d1e02507cb944f0a7088461ffd54da9",
+  "newSessionDefaults": {
+    "model": "cross-framework-fixture",
+    "modelCredentialMetadataId": "e513fcdd5cfa4cc58b8c5abdea252383",
+    "permissionMode": "default",
+    "allowedTools": [
+      "mcp__protected_assets__get_asset",
+      "mcp__native_catalog__get_catalog"
+    ]
+  },
+  "nativeStatus": {
+    "isRunning": false,
+    "status": "idle",
+    "messageCount": 4
+  },
+  "nativeToolProof": [
+    {
+      "name": "mcp__protected_assets__get_asset",
+      "state": "success",
+      "toolCallId": "call-fixture-tool",
+      "contentMatches": true
+    },
+    {
+      "name": "mcp__native_catalog__get_catalog",
+      "state": "success",
+      "toolCallId": "call-fixture-tool",
+      "contentMatches": true
+    }
+  ],
+  "oldSessions": [
+    {
+      "id": "92979e4a205a467996ad229d3d91d421",
+      "previousStatus": "idle",
+      "status": "idle",
+      "previousMode": "bypass",
+      "permissionMode": "bypass",
+      "isRunning": false,
+      "preserved": true
+    },
+    {
+      "id": "de08a908d60f4f10a08a4d645e7a9e20",
+      "previousStatus": "idle",
+      "status": "idle",
+      "previousMode": "bypass",
+      "permissionMode": "bypass",
+      "isRunning": false,
+      "preserved": true
+    },
+    {
+      "id": "d40cb18178f84537ae79fb5e2e4d1483",
+      "previousStatus": "idle",
+      "status": "idle",
+      "previousMode": "bypass",
+      "permissionMode": "bypass",
+      "isRunning": false,
+      "preserved": true
+    },
+    {
+      "id": "81d0d2dced974791a87ad404b51800c5",
+      "previousStatus": "idle",
+      "status": "idle",
+      "previousMode": "bypass",
+      "permissionMode": "bypass",
+      "isRunning": false,
+      "preserved": true
+    },
+    {
+      "id": "a8cb50822e1e415ba6f918efcf06d45d",
+      "previousStatus": "awaiting_permission",
+      "status": "awaiting_permission",
+      "previousMode": "default",
+      "permissionMode": "default",
+      "isRunning": false,
+      "preserved": true
+    }
+  ],
+  "passed": true
+}

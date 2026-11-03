@@ -1,0 +1,79 @@
+{
+  "at": "2026-11-03T02:31:38.262Z",
+  "scope": "当前源码只读发现，不登记、不创建Session或工作区、不发送模型请求",
+  "results": [
+    {
+      "instanceId": "remote-dsh-sample",
+      "result": {
+        "framework": "dsh",
+        "endpoint": "http://127.0.0.1:18651",
+        "observedAt": "2026-11-03T02:31:37.987Z",
+        "status": "selection_required",
+        "workspaces": {
+          "status": "ready",
+          "items": [
+            {
+              "id": "2d3603fb-5e41-4be1-a244-585c502e2de0",
+              "name": "workspace",
+              "path": "/home/admin/harness-engineering-platform-data/.local/cross-framework-samples/dsh/workspace"
+            }
+          ]
+        },
+        "presets": {
+          "status": "ready",
+          "items": [
+            {
+              "id": "standard",
+              "name": "standard",
+              "isDefault": true
+            },
+            {
+              "id": "ptc",
+              "name": "ptc",
+              "isDefault": false
+            },
+            {
+              "id": "minimal",
+              "name": "minimal",
+              "isDefault": false
+            },
+            {
+              "id": "cordis",
+              "name": "cordis",
+              "isDefault": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "instanceId": "remote-agentscope-sample",
+      "result": {
+        "framework": "agentscope",
+        "endpoint": "http://127.0.0.1:18652",
+        "observedAt": "2026-11-03T02:31:38.193Z",
+        "status": "selected",
+        "connectionUserId": "harness-remote-agentscope-sample",
+        "agents": {
+          "status": "ready",
+          "items": [
+            {
+              "id": "6b8687e485144c60bc85c846479d56b1",
+              "name": "跨框架远程样本"
+            }
+          ]
+        },
+        "selector": "6b8687e485144c60bc85c846479d56b1"
+      }
+    },
+    {
+      "instanceId": "remote-opencode-sample",
+      "result": {
+        "framework": "opencode",
+        "endpoint": "http://127.0.0.1:18655",
+        "observedAt": "2026-11-03T02:31:38.202Z",
+        "status": "selected"
+      }
+    }
+  ]
+}

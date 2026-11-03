@@ -1,0 +1,18 @@
+{
+  "at": "2026-11-03T04:24:11.156Z",
+  "reference": {
+    "name": "AI-SOC-曲面驾驶舱-完整版-V3.0.html",
+    "bytes": 29644499,
+    "sha256": "967e0bcd291c46e1a5cd80befc0dd27630873bf2f535cb6e8ab4aff883ec2264",
+    "preview": {
+      "viewport": [
+        1672,
+        941
+      ],
+      "javaScript": "分别关闭及开启预览",
+      "externalRequests": "阻止非file/data/blob协议",
+      "copiedToProduct": false
+    }
+  },
+  "sourceScope": "当前客户端主题，原生配色通过公开overrideTokens，未改业务Runtime源码"
+}

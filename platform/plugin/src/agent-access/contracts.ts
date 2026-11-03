@@ -60,8 +60,8 @@ export interface AccessEvent {
 export interface AgentAccessOptions {
   resolveInstance?: (id: string) => RegisteredMachine | undefined
   now?: () => number
-  /** 在具体操作执行前核对风险/授权，拒绝通过抛出 AccessError 表达。 */
-  authorize?: (input: { instanceId: string; resource: AccessResource; tool: ResourceTool; args: Record<string, unknown> }, signal: AbortSignal) => Promise<void>
+  /** 核对具体操作的风险/授权；可返回派发前同步复核函数，拒绝通过抛出 AccessError 表达。 */
+  authorize?: (input: { instanceId: string; resource: AccessResource; tool: ResourceTool; args: Record<string, unknown> }, signal: AbortSignal) => Promise<void | (() => void)>
   fetch?: typeof fetch
 }
 export class AccessError extends Error {

@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-11-03T03:29:15.345Z",
+  "scope": "仅只读定位本次OpenCode冷Location工具未发起，未重放请求",
+  "instanceId": "remote-opencode-sample",
+  "requestId": "ui-1793674679880-w7ph4orea8e",
+  "externalSessionId": "external-session-baf9b137-edb4-4330-90bb-c765c771b7fc",
+  "nativeSessionId": "ses_e60a86970ffesINNgkhu1Ng8sj",
+  "messageId": "msg_1a19f5796df00113d4d2a434eb422ba02a5b20ba51b733",
+  "native": {
+    "messagesHttpStatus": 200,
+    "contextHttpStatus": 200,
+    "contextSequence": [
+      {
+        "id": "msg_1a19f5796df00113d4d2a434eb422ba02a5b20ba51b733",
+        "type": "user",
+        "createdAt": 1793674682000,
+        "text": "调用 get_asset 查询 A-1 的状态。"
+      },
+      {
+        "id": "msg_19f579eaf001c9wDeqFYKM9ONy",
+        "type": "assistant",
+        "createdAt": 1793674682044,
+        "finish": "stop",
+        "text": "模拟模型收到消息。",
+        "toolCount": 0
+      },
+      {
+        "id": "msg_19f579f2e001pXoEWgdSNa7Nt6",
+        "type": "idle",
+        "createdAt": 1793674682158,
+        "outcome": "succeeded"
+      }
+    ],
+    "mcpStatus": 200,
+    "mcpServers": [
+      {
+        "name": "native_catalog",
+        "status": "connected"
+      },
+      {
+        "name": "protected_assets",
+        "status": "connected"
+      }
+    ],
+    "activeSessionCount": 0
+  },
+  "sourceEvidence": [
+    {
+      "path": "packages/core/src/mcp/index.ts",
+      "lines": "674-699",
+      "fact": "初始服务器连接异步启动，不阻塞Location启动"
+    },
+    {
+      "path": "packages/core/src/mcp/index.ts",
+      "lines": "807-820",
+      "fact": "MCP.tools只读当前entries工具，不等待连接startup"
+    },
+    {
+      "path": "packages/core/src/tool/mcp.ts",
+      "lines": "49-143",
+      "fact": "初次工具注册调用MCP.tools并结束flush；后续ToolsChanged经100ms debounce重新注册"
+    },
+    {
+      "path": "packages/core/src/session/context.ts",
+      "lines": "132-140",
+      "fact": "SessionContext只await首次McpTool.flush后读取Tool.snapshot"
+    },
+    {
+      "path": "packages/protocol/src/groups/mcp.ts",
+      "lines": "26-113",
+      "fact": "公开读取只有连接状态与资源catalog；connect/disconnect是改变连接的操作，没有公开工具注册flush入口"
+    },
+    {
+      "path": "packages/core/src/session/history.ts",
+      "lines": "242-280",
+      "fact": "原生上下文按持久序号构建，本次context实际保留user→assistant→idle"
+    },
+    {
+      "path": "packages/schema/src/session-message.ts",
+      "lines": "17-24",
+      "fact": "Msg ID公开校验为msg_前缀；未发现自定义消息ID使本次文本丢失的证据"
+    }
+  ],
+  "conclusion": {
+    "observed": "本次user文本完整，但本轮只产生assistant文本和idle，没有工具发起；随后同Location工具连接正常",
+    "inference": "锁定原生实现存在冷Location工具异步注册窗口，自动create后立即prompt可能先于MCP工具目录刷新",
+    "inferenceLimit": "未采集该次原始LLM请求工具定义，不能把本次工具列表为空写成已直接捕获的事实",
+    "publicReadinessBoundary": "未发现可可靠等待工具注册完成的公开只读API；connected不能等同工具目录刷新完成",
+    "currentAvailability": "root在当前Location已初始化后独立新Session浏览器57/57通过，get_asset/get_catalog均completed",
+    "warmBrowserEvidence": ".local/cross-framework/ui-simplification-20261103/browser-2026-11-03T03-26-32-693Z/report.json"
+  },
+  "actions": {
+    "prompts": 0,
+    "toolsCalls": 0,
+    "runtimeRestarts": 0,
+    "sourceChanges": 0,
+    "configurationChanges": 0
+  },
+  "limits": [
+    "真实锁定源码Runtime+本机确定性模型与模拟资源",
+    "保留冷初始化失败与已暖路径通过的区别，未修改外部源码、未新增固定sleep或等待服务"
+  ]
+}

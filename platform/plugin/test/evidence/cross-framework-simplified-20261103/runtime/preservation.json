@@ -1,0 +1,21 @@
+{
+  "at": "2026-11-03T03:30:06.777Z",
+  "idle": true,
+  "platform": {
+    "before": 406,
+    "after": 406,
+    "preserved": true
+  },
+  "agentscope": {
+    "before": 9,
+    "after": 13,
+    "preserved": true,
+    "parkedPreserved": true
+  },
+  "opencode": {
+    "before": 12,
+    "after": 14,
+    "preserved": true
+  },
+  "sameContainers": true
+}

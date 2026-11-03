@@ -1,0 +1,17 @@
+{
+  "at": "2026-11-03T04:26:01.877Z",
+  "first": {
+    "name": "hep-ambient",
+    "opacity": 0.65033
+  },
+  "second": {
+    "name": "hep-ambient",
+    "opacity": 0.761522
+  },
+  "reduced": {
+    "name": "none",
+    "opacity": 1
+  },
+  "passed": true,
+  "scope": "实际页面CSS动画时间采样，不证明帧率或性能提升"
+}

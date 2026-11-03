@@ -1,0 +1,47 @@
+{
+  "at": "2026-11-03T04:01:56.054Z",
+  "passed": true,
+  "tokenPairs": 52,
+  "checks": [
+    {
+      "name": "每项light保留锁定原生表达式",
+      "passed": true
+    },
+    {
+      "name": "dark只有共同HEP引用，不存第二套颜色",
+      "passed": true
+    },
+    {
+      "name": "注册层不写持久偏好",
+      "passed": true
+    },
+    {
+      "name": "light快照保持原表达式",
+      "passed": true
+    },
+    {
+      "name": "dark使用共同颜色",
+      "passed": true
+    },
+    {
+      "name": "切换只写原生preference",
+      "passed": true
+    },
+    {
+      "name": "返回light没有残留深色值",
+      "passed": true
+    },
+    {
+      "name": "dispose还原原生层且不写偏好",
+      "passed": true
+    },
+    {
+      "name": "HMR旧disposer不移除新层",
+      "passed": true
+    }
+  ],
+  "scope": "锁定原生ThemeRuntime真实计算/校验与平台颜色配对；仅UI视图、样式安装及宿主持久接口隔离，无真实平台写入",
+  "limits": [
+    "不代替浏览器计算样式、视觉及真实主题偏好恢复验收"
+  ]
+}

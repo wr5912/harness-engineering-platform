@@ -1,0 +1,257 @@
+{
+  "at": "2026-11-03T01:23:46.947Z",
+  "process": {
+    "beforePid": 2005866,
+    "pid": 2303012,
+    "restarted": true,
+    "cwd": "/home/admin/harness-engineering-platform-data",
+    "entry": "/home/admin/work/cross-framework-sources/dsh/apps/cli/lib/bin.js",
+    "home": "/home/admin/harness-engineering-platform-data/.local/platform-home",
+    "dataRoot": "/home/admin/harness-engineering-platform-data"
+  },
+  "sessions": {
+    "before": 406,
+    "after": 406,
+    "identical": true,
+    "historicalRecordCount": 124,
+    "historicalDigestMatches": true,
+    "conversationBodyStored": false
+  },
+  "source": {
+    "head": "da8ea79ceab272276140c345d990c3e992040dea",
+    "branch": "fix/PLATFORM-external-risk-provider",
+    "dirty": true,
+    "implementationDigest": "90c095a45a071e99e53baa2ff7c14679a112126948a9f9537de34f676dd1564b",
+    "recomputedDigestMatches": true,
+    "files": [
+      {
+        "path": "platform/plugin/src/mcp/definition.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/mcp/compositions.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/mcp/executor.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/mcp/index.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/mcp/openapi.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/mcp/native.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/mcp/nested.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/mcp/extension.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/mcp/control.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/mcp/manager.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/mcp/platform-manager.ts",
+        "matches": true
+      },
+      {
+        "path": "runtime/adapters/dsh-web/src/resolve-runtime.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/build.mjs",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/package.json",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/pnpm-lock.yaml",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/index.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/evaluation/model-attempts.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/workflows/graph.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/business-control/contracts.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/business-control/core.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/business-control/gateway.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/business-control/group-link.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/business-control/providers.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/business-control/replica.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/business-control/reports.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/business-control/runtime.ts",
+        "matches": true
+      },
+      {
+        "path": "plugins/mcp-manager/index.ts",
+        "matches": true
+      },
+      {
+        "path": "plugins/mcp-manager/openapi.ts",
+        "matches": true
+      },
+      {
+        "path": "plugins/mcp-manager/connection.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/mcp/store.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/mcp/credential-path.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/assets/mcp-credential-layout.json",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/agent-access/connector.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/agent-access/contracts.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/agent-access/index.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/agent-access/service.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/agent-access/store.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/instances/external/access.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/instances/external/adapters.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/instances/external/index.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/instances/external/registry.ts",
+        "matches": true
+      },
+      {
+        "path": "platform/plugin/src/instances/external/types.ts",
+        "matches": true
+      }
+    ],
+    "artifacts": [
+      {
+        "path": "platform/plugin/lib/index.js",
+        "sha256": "39555eaea9759acf78dc58600c21ccff8eaf1b59a855778614e2a8a50c8dc652",
+        "matches": true
+      }
+    ],
+    "modules": [
+      {
+        "path": "/home/admin/work/harness-engineering-platform/platform/plugin/lib/index.js",
+        "enabled": true,
+        "matchesCliPatch": true,
+        "sha256": "39555eaea9759acf78dc58600c21ccff8eaf1b59a855778614e2a8a50c8dc652"
+      },
+      {
+        "path": "/home/admin/harness-engineering-platform-data/.local/build-cache/security-operations/09c0e14a6da34ccd0a36bb4985dca5e4a36681643c7f1bd2af4d8053f72810e9/plugin.js",
+        "enabled": true,
+        "matchesCliPatch": true,
+        "sha256": "110bf667eb0c30579c870e89dc8f8bb5ad4d717dd6335cbc863aff42f67e2f1e"
+      }
+    ]
+  },
+  "configuration": {
+    "existingConfigurationPreserved": true,
+    "gatewayInstances": 20,
+    "controlledInstances": [
+      {
+        "id": "remote-agentscope-sample",
+        "framework": "agentscope",
+        "entryState": "enabled",
+        "verified": true
+      },
+      {
+        "id": "remote-opencode-sample",
+        "framework": "opencode",
+        "entryState": "enabled",
+        "verified": true
+      }
+    ],
+    "externalRiskEndpoint": "http://172.17.0.1:18650/risk",
+    "legacyRiskEndpoint": "http://172.17.0.1:53101/api/v1/control/risk/evaluate"
+  },
+  "identities": [
+    {
+      "instanceId": "remote-agentscope-sample",
+      "httpStatus": 200,
+      "expectedInstance": true,
+      "credentialActive": true,
+      "possessionVerified": true,
+      "endpointVerified": true
+    },
+    {
+      "instanceId": "remote-opencode-sample",
+      "httpStatus": 200,
+      "expectedInstance": true,
+      "credentialActive": true,
+      "possessionVerified": true,
+      "endpointVerified": true
+    }
+  ],
+  "passed": true
+}

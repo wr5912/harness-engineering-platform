@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-11-03T01:26:29.481Z",
+  "observedAt": "2026-11-03T01:26:30.104Z",
+  "instanceId": "remote-opencode-sample",
+  "resourceId": "sample-assets",
+  "formalOrigin": "http://10.0.160.32:53105",
+  "credentialId": "credential-a2e6f808-4581-41f1-aef4-d9377a20ed31",
+  "issuer": "http://10.0.160.32:53105/agent-access",
+  "tokenPolicy": {
+    "scope": "assets:read",
+    "expiresIn": 300,
+    "subject": "instance:remote-opencode-sample",
+    "keptOnlyInMemory": true
+  },
+  "directResource": {
+    "httpStatus": 200,
+    "requestId": "04e05f5f-3da7-475c-b265-9eed5e5b7fb8",
+    "asset": {
+      "id": "A-1",
+      "group": "A",
+      "status": "正常"
+    },
+    "isError": false
+  },
+  "objectBoundary": {
+    "requestedObject": "B-1",
+    "httpStatus": 403,
+    "error": "object_forbidden",
+    "sameReadToken": true,
+    "dispatchedForThisTokenBefore": 1,
+    "dispatchedForThisTokenAfter": 1,
+    "noAdditionalDispatch": true
+  },
+  "scopeBoundary": {
+    "requestedScope": "assets:write",
+    "httpStatus": 403,
+    "error": "invalid_scope",
+    "noTokenIssued": true,
+    "authenticatedRequestIds": [
+      "63284743-5a54-436a-862a-ad7fa22c54ac"
+    ],
+    "noIssuedOrDispatchedRecord": true
+  },
+  "connector": {
+    "container": "hep-cross-framework-opencode-connector",
+    "httpStatus": 200,
+    "requestId": "b684fb5e-9eee-47f7-93ed-dad1df32a0dc",
+    "asset": {
+      "id": "A-1",
+      "group": "A",
+      "status": "正常"
+    },
+    "isError": false
+  },
+  "machineRecords": [
+    {
+      "requestId": "04e05f5f-3da7-475c-b265-9eed5e5b7fb8",
+      "at": "2026-11-03T01:26:29.586Z",
+      "instanceId": "remote-opencode-sample",
+      "credentialId": "credential-a2e6f808-4581-41f1-aef4-d9377a20ed31",
+      "resourceId": "sample-assets",
+      "operation": "get_asset",
+      "grantVersion": 1,
+      "stage": "prepared"
+    },
+    {
+      "requestId": "04e05f5f-3da7-475c-b265-9eed5e5b7fb8",
+      "at": "2026-11-03T01:26:29.590Z",
+      "instanceId": "remote-opencode-sample",
+      "credentialId": "credential-a2e6f808-4581-41f1-aef4-d9377a20ed31",
+      "resourceId": "sample-assets",
+      "operation": "get_asset",
+      "grantVersion": 1,
+      "stage": "dispatched"
+    },
+    {
+      "requestId": "04e05f5f-3da7-475c-b265-9eed5e5b7fb8",
+      "at": "2026-11-03T01:26:29.631Z",
+      "instanceId": "remote-opencode-sample",
+      "credentialId": "credential-a2e6f808-4581-41f1-aef4-d9377a20ed31",
+      "resourceId": "sample-assets",
+      "operation": "get_asset",
+      "grantVersion": 1,
+      "stage": "response",
+      "httpStatus": 200
+    },
+    {
+      "requestId": "b684fb5e-9eee-47f7-93ed-dad1df32a0dc",
+      "at": "2026-11-03T01:26:30.030Z",
+      "instanceId": "remote-opencode-sample",
+      "credentialId": "credential-a2e6f808-4581-41f1-aef4-d9377a20ed31",
+      "resourceId": "sample-assets",
+      "operation": "get_asset",
+      "grantVersion": 1,
+      "stage": "prepared"
+    },
+    {
+      "requestId": "b684fb5e-9eee-47f7-93ed-dad1df32a0dc",
+      "at": "2026-11-03T01:26:30.032Z",
+      "instanceId": "remote-opencode-sample",
+      "credentialId": "credential-a2e6f808-4581-41f1-aef4-d9377a20ed31",
+      "resourceId": "sample-assets",
+      "operation": "get_asset",
+      "grantVersion": 1,
+      "stage": "dispatched"
+    },
+    {
+      "requestId": "b684fb5e-9eee-47f7-93ed-dad1df32a0dc",
+      "at": "2026-11-03T01:26:30.068Z",
+      "instanceId": "remote-opencode-sample",
+      "credentialId": "credential-a2e6f808-4581-41f1-aef4-d9377a20ed31",
+      "resourceId": "sample-assets",
+      "operation": "get_asset",
+      "grantVersion": 1,
+      "stage": "response",
+      "httpStatus": 200
+    }
+  ],
+  "mutations": {
+    "credentialsRevokedOrRotated": false,
+    "grantsChanged": false,
+    "nativeRuntimeChanged": false,
+    "promptsSubmitted": false
+  },
+  "limits": [
+    "真实锁定源码 OpenCode connector 与正式平台机器资源接口，模型和资源为本机确定性模拟边界",
+    "本步骤未通过原生模型发起 prompt，未更改旧 Session"
+  ]
+}

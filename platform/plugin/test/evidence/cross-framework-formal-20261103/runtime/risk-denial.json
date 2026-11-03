@@ -1,0 +1,23 @@
+{
+  "at": "2026-11-03T01:30:03.360Z",
+  "scope": "正式owner入口的模拟风险拒绝；不向原生Session发送该输入、不更改授予或配置",
+  "results": [
+    {
+      "instanceId": "remote-agentscope-sample",
+      "requestId": "f086b4f0-d7a8-4a22-a885-0937ffa56f03",
+      "denied": true,
+      "notDispatched": true,
+      "readAfterDenial": true,
+      "nativeSessionId": "7d1e02507cb944f0a7088461ffd54da9"
+    },
+    {
+      "instanceId": "remote-opencode-sample",
+      "requestId": "6ee8e4e7-d3d1-41f8-b480-34d07de8dccc",
+      "denied": true,
+      "notDispatched": true,
+      "readAfterDenial": true,
+      "nativeSessionId": "ses_e60faa3fbffeyNaC3asxrylYLx"
+    }
+  ],
+  "passed": true
+}
