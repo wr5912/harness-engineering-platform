@@ -1,0 +1,8 @@
+{
+  "childExit": 0,
+  "expected": "你好",
+  "actual": "���好",
+  "operationStatus": "completed",
+  "correct": false,
+  "stderrEmpty": true
+}

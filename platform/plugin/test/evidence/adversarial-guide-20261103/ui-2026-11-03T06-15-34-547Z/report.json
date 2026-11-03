@@ -1,0 +1,1828 @@
+{
+  "at": "2026-11-03T06:15:35.116Z",
+  "origin": "http://10.0.160.32:18120",
+  "scope": "实际18120；七模块，1440/390宽，浅/深主题；只读页面、详情、表单、搜索和切tab；禁止创建Session、修改原会话、发送消息或业务写操作",
+  "screens": [
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/deep-agent-light.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/deep-agent-light-version-filter.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/deep-agent-light-assets.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/deep-agent-light-390-assets.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/instance-overlays-light-create.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/instance-overlays-light-390-create.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/instance-overlays-light-register.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/instance-overlays-light-390-register.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/instance-overlays-light-external-detail.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/evaluation-overlay-light.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/evaluation-overlay-light-390.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/mcp-tabs-light-groups.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/mcp-tabs-light-390-groups.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/mcp-tabs-light-390-debug.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/mcp-tabs-light-add-server.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/gateway-tabs-light-智能体身份.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/gateway-tabs-light-风险评估.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/gateway-tabs-light-访问控制.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/gateway-tabs-light-390-control.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/deep-agent-dark.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/deep-agent-dark-version-filter.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/deep-agent-dark-assets.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/deep-agent-dark-390-assets.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/instance-overlays-dark-create.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/instance-overlays-dark-390-create.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/instance-overlays-dark-register.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/instance-overlays-dark-390-register.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/instance-overlays-dark-external-detail.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/evaluation-overlay-dark.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/evaluation-overlay-dark-390.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/mcp-tabs-dark-groups.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/mcp-tabs-dark-390-groups.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/mcp-tabs-dark-390-debug.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/mcp-tabs-dark-add-server.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/gateway-tabs-dark-智能体身份.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/gateway-tabs-dark-风险评估.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/gateway-tabs-dark-访问控制.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-15-34-547Z/gateway-tabs-dark-390-control.png"
+  ],
+  "checks": [
+    {
+      "phase": "deep-agent-light",
+      "name": "deep-agent-light",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "智能体管理",
+        "网络安全运营专家",
+        "用途与特性",
+        "版本 024 的评测概况",
+        "当前版本 Run 分布",
+        "最近 Run 结果",
+        "用例观察趋势",
+        "当前版本特性"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "deep-agent-light",
+      "name": "deep-agent-light-version-filter",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "智能体管理",
+        "网络安全运营专家",
+        "用途与特性",
+        "版本 024 的评测概况",
+        "当前版本 Run 分布",
+        "最近 Run 结果",
+        "用例观察趋势",
+        "当前版本特性"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "deep-agent-light",
+      "name": "deep-agent-light-assets",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "智能体管理",
+        "网络安全运营专家",
+        "智能体资产",
+        "资产详情"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "deep-agent-light",
+      "name": "deep-agent-light-390-assets",
+      "width": 390,
+      "documentWidth": 390,
+      "headings": [
+        "智能体管理",
+        "网络安全运营专家",
+        "智能体资产",
+        "资产详情"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "instance-overlays-light",
+      "name": "instance-overlays-light-create",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "实例管理",
+        "创建业务实例",
+        "实例状态分布"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "instance-overlays-light",
+      "name": "instance-overlays-light-390-create",
+      "width": 390,
+      "documentWidth": 390,
+      "headings": [
+        "实例管理",
+        "创建业务实例",
+        "实例状态分布"
+      ],
+      "alerts": [],
+      "overflow": [
+        {
+          "tag": "TABLE",
+          "class": "instance-table",
+          "left": 13,
+          "right": 913
+        },
+        {
+          "tag": "COLGROUP",
+          "class": "",
+          "left": 13,
+          "right": 913
+        },
+        {
+          "tag": "COL",
+          "class": "",
+          "left": 291,
+          "right": 498
+        },
+        {
+          "tag": "COL",
+          "class": "",
+          "left": 498,
+          "right": 606
+        },
+        {
+          "tag": "COL",
+          "class": "",
+          "left": 606,
+          "right": 759
+        },
+        {
+          "tag": "COL",
+          "class": "",
+          "left": 759,
+          "right": 913
+        },
+        {
+          "tag": "THEAD",
+          "class": "",
+          "left": 13,
+          "right": 913
+        },
+        {
+          "tag": "TR",
+          "class": "",
+          "left": 13,
+          "right": 913
+        },
+        {
+          "tag": "TH",
+          "class": "instance-list-th",
+          "left": 291,
+          "right": 498
+        },
+        {
+          "tag": "TH",
+          "class": "instance-list-th",
+          "left": 498,
+          "right": 606
+        },
+        {
+          "tag": "TH",
+          "class": "instance-list-th",
+          "left": 606,
+          "right": 759
+        },
+        {
+          "tag": "TH",
+          "class": "instance-list-th",
+          "left": 759,
+          "right": 913
+        }
+      ]
+    },
+    {
+      "phase": "instance-overlays-light",
+      "name": "instance-overlays-light-register",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "实例管理",
+        "AgentScope 远程接入（模拟）",
+        "OpenCode 远程接入（模拟）",
+        "登记已有智能体"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "instance-overlays-light",
+      "name": "instance-overlays-light-390-register",
+      "width": 390,
+      "documentWidth": 390,
+      "headings": [
+        "实例管理",
+        "AgentScope 远程接入（模拟）",
+        "OpenCode 远程接入（模拟）",
+        "登记已有智能体"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "instance-overlays-light",
+      "name": "instance-overlays-light-external-detail",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "实例管理",
+        "AgentScope 远程接入（模拟）",
+        "OpenCode 远程接入（模拟）",
+        "AgentScope 远程接入（模拟）"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "evaluation-overlay-light",
+      "name": "evaluation-overlay-light",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "评测中心",
+        "新建评测",
+        "验证目标与复核",
+        "评测范围"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "evaluation-overlay-light",
+      "name": "evaluation-overlay-light-390",
+      "width": 390,
+      "documentWidth": 390,
+      "headings": [
+        "评测中心",
+        "新建评测",
+        "验证目标与复核",
+        "评测范围"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "mcp-tabs-light",
+      "name": "mcp-tabs-light-groups",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "MCP 管理",
+        "统一访问 Token",
+        "inspection-readonly",
+        "选择工具与资源"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "mcp-tabs-light",
+      "name": "mcp-tabs-light-390-groups",
+      "width": 390,
+      "documentWidth": 390,
+      "headings": [
+        "MCP 管理",
+        "统一访问 Token",
+        "inspection-readonly",
+        "选择工具与资源"
+      ],
+      "alerts": [],
+      "overflow": [
+        {
+          "tag": "BUTTON",
+          "class": "",
+          "left": 389,
+          "right": 497
+        }
+      ]
+    },
+    {
+      "phase": "mcp-tabs-light",
+      "name": "mcp-tabs-light-390-debug",
+      "width": 390,
+      "documentWidth": 390,
+      "headings": [
+        "MCP 管理",
+        "结果"
+      ],
+      "alerts": [],
+      "overflow": [
+        {
+          "tag": "BUTTON",
+          "class": "",
+          "left": 381,
+          "right": 489
+        }
+      ]
+    },
+    {
+      "phase": "mcp-tabs-light",
+      "name": "mcp-tabs-light-add-server",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "MCP 管理",
+        "新服务器",
+        "基本信息",
+        "OpenAPI 接口"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "gateway-tabs-light",
+      "name": "gateway-tabs-light-智能体身份",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "统一网关"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "gateway-tabs-light",
+      "name": "gateway-tabs-light-风险评估",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "统一网关",
+        "Agent 风险评估提供方",
+        "智能体风险摘要",
+        "当前动态评估结果"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "gateway-tabs-light",
+      "name": "gateway-tabs-light-访问控制",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "统一网关",
+        "访问控制",
+        "第三方访问控制服务",
+        "当前访问决定与限制"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "gateway-tabs-light",
+      "name": "gateway-tabs-light-390-control",
+      "width": 390,
+      "documentWidth": 390,
+      "headings": [
+        "统一网关",
+        "访问控制",
+        "第三方访问控制服务",
+        "当前访问决定与限制"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "deep-agent-dark",
+      "name": "deep-agent-dark",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "智能体管理",
+        "网络安全运营专家",
+        "用途与特性",
+        "版本 024 的评测概况",
+        "当前版本 Run 分布",
+        "最近 Run 结果",
+        "用例观察趋势",
+        "当前版本特性"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "deep-agent-dark",
+      "name": "deep-agent-dark-version-filter",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "智能体管理",
+        "网络安全运营专家",
+        "用途与特性",
+        "版本 024 的评测概况",
+        "当前版本 Run 分布",
+        "最近 Run 结果",
+        "用例观察趋势",
+        "当前版本特性"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "deep-agent-dark",
+      "name": "deep-agent-dark-assets",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "智能体管理",
+        "网络安全运营专家",
+        "智能体资产",
+        "资产详情"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "deep-agent-dark",
+      "name": "deep-agent-dark-390-assets",
+      "width": 390,
+      "documentWidth": 390,
+      "headings": [
+        "智能体管理",
+        "网络安全运营专家",
+        "智能体资产",
+        "资产详情"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "name": "instance-overlays-dark-create",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "实例管理",
+        "创建业务实例",
+        "实例状态分布"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "name": "instance-overlays-dark-390-create",
+      "width": 390,
+      "documentWidth": 390,
+      "headings": [
+        "实例管理",
+        "创建业务实例",
+        "实例状态分布"
+      ],
+      "alerts": [],
+      "overflow": [
+        {
+          "tag": "TABLE",
+          "class": "instance-table",
+          "left": 13,
+          "right": 913
+        },
+        {
+          "tag": "COLGROUP",
+          "class": "",
+          "left": 13,
+          "right": 913
+        },
+        {
+          "tag": "COL",
+          "class": "",
+          "left": 291,
+          "right": 498
+        },
+        {
+          "tag": "COL",
+          "class": "",
+          "left": 498,
+          "right": 606
+        },
+        {
+          "tag": "COL",
+          "class": "",
+          "left": 606,
+          "right": 759
+        },
+        {
+          "tag": "COL",
+          "class": "",
+          "left": 759,
+          "right": 913
+        },
+        {
+          "tag": "THEAD",
+          "class": "",
+          "left": 13,
+          "right": 913
+        },
+        {
+          "tag": "TR",
+          "class": "",
+          "left": 13,
+          "right": 913
+        },
+        {
+          "tag": "TH",
+          "class": "instance-list-th",
+          "left": 291,
+          "right": 498
+        },
+        {
+          "tag": "TH",
+          "class": "instance-list-th",
+          "left": 498,
+          "right": 606
+        },
+        {
+          "tag": "TH",
+          "class": "instance-list-th",
+          "left": 606,
+          "right": 759
+        },
+        {
+          "tag": "TH",
+          "class": "instance-list-th",
+          "left": 759,
+          "right": 913
+        }
+      ]
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "name": "instance-overlays-dark-register",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "实例管理",
+        "AgentScope 远程接入（模拟）",
+        "OpenCode 远程接入（模拟）",
+        "AgentScope 远程接入（模拟）",
+        "登记已有智能体"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "name": "instance-overlays-dark-390-register",
+      "width": 390,
+      "documentWidth": 390,
+      "headings": [
+        "实例管理",
+        "AgentScope 远程接入（模拟）",
+        "OpenCode 远程接入（模拟）",
+        "AgentScope 远程接入（模拟）",
+        "登记已有智能体"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "name": "instance-overlays-dark-external-detail",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "实例管理",
+        "AgentScope 远程接入（模拟）",
+        "OpenCode 远程接入（模拟）",
+        "AgentScope 远程接入（模拟）"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "evaluation-overlay-dark",
+      "name": "evaluation-overlay-dark",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "评测中心",
+        "新建评测",
+        "验证目标与复核",
+        "评测范围"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "evaluation-overlay-dark",
+      "name": "evaluation-overlay-dark-390",
+      "width": 390,
+      "documentWidth": 390,
+      "headings": [
+        "评测中心",
+        "新建评测",
+        "验证目标与复核",
+        "评测范围"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "mcp-tabs-dark",
+      "name": "mcp-tabs-dark-groups",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "MCP 管理",
+        "统一访问 Token",
+        "inspection-readonly",
+        "选择工具与资源"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "mcp-tabs-dark",
+      "name": "mcp-tabs-dark-390-groups",
+      "width": 390,
+      "documentWidth": 390,
+      "headings": [
+        "MCP 管理",
+        "统一访问 Token",
+        "inspection-readonly",
+        "选择工具与资源"
+      ],
+      "alerts": [],
+      "overflow": [
+        {
+          "tag": "BUTTON",
+          "class": "",
+          "left": 389,
+          "right": 497
+        }
+      ]
+    },
+    {
+      "phase": "mcp-tabs-dark",
+      "name": "mcp-tabs-dark-390-debug",
+      "width": 390,
+      "documentWidth": 390,
+      "headings": [
+        "MCP 管理",
+        "结果"
+      ],
+      "alerts": [],
+      "overflow": [
+        {
+          "tag": "BUTTON",
+          "class": "",
+          "left": 381,
+          "right": 489
+        }
+      ]
+    },
+    {
+      "phase": "mcp-tabs-dark",
+      "name": "mcp-tabs-dark-add-server",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "MCP 管理",
+        "新服务器",
+        "基本信息",
+        "OpenAPI 接口"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "gateway-tabs-dark",
+      "name": "gateway-tabs-dark-智能体身份",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "统一网关"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "gateway-tabs-dark",
+      "name": "gateway-tabs-dark-风险评估",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "统一网关",
+        "Agent 风险评估提供方",
+        "智能体风险摘要",
+        "当前动态评估结果"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "gateway-tabs-dark",
+      "name": "gateway-tabs-dark-访问控制",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "统一网关",
+        "访问控制",
+        "第三方访问控制服务",
+        "当前访问决定与限制"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "gateway-tabs-dark",
+      "name": "gateway-tabs-dark-390-control",
+      "width": 390,
+      "documentWidth": 390,
+      "headings": [
+        "统一网关",
+        "访问控制",
+        "第三方访问控制服务",
+        "当前访问决定与限制"
+      ],
+      "alerts": [],
+      "overflow": []
+    }
+  ],
+  "errors": [],
+  "requests": [
+    {
+      "phase": "setup",
+      "path": "/hep/api/settings/describe",
+      "method": "settings/describe",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/api/dynamicCordisRunner/syncInspectManifest",
+      "method": "dynamicCordisRunner/syncInspectManifest",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/api/credentials/describe",
+      "method": "credentials/describe",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/api/dynamicCordisRunner/inventory",
+      "method": "dynamicCordisRunner/inventory",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/api/session/modelCatalog",
+      "method": "session/modelCatalog",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/harness-platform/inventory",
+      "method": "inventory",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/harness-platform/inventory",
+      "method": "inventory",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/harness-platform/agents/eval/list",
+      "method": "agents/eval/list",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/harness-platform/mcp/control/status",
+      "method": "mcp/control/status",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/harness-platform/auth/current",
+      "method": "auth/current",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/harness-platform/inventory",
+      "method": "inventory",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/api/credentials/describe",
+      "method": "credentials/describe",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/api/credentials/describe",
+      "method": "credentials/describe",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/api/credentials/describe",
+      "method": "credentials/describe",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/permissionPresets/catalog",
+      "method": "permissionPresets/catalog",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/inventory",
+      "method": "inventory",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/dynamicCordisRunner/inventory",
+      "method": "dynamicCordisRunner/inventory",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/agentPresets/list",
+      "method": "agentPresets/list",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/agentPresets/list",
+      "method": "agentPresets/list",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/session/modelCatalog",
+      "method": "session/modelCatalog",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/inventory",
+      "method": "inventory",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/settings/describe",
+      "method": "settings/describe",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/dynamicCordisRunner/syncInspectManifest",
+      "method": "dynamicCordisRunner/syncInspectManifest",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/agents/list",
+      "method": "agents/list",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/home",
+      "method": "home",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/agents/fusion/proposal",
+      "method": "agents/fusion/proposal",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/session/list",
+      "method": "session/list",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/auth/current",
+      "method": "auth/current",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/credentials/describe",
+      "method": "credentials/describe",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/credentials/describe",
+      "method": "credentials/describe",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/credentials/describe",
+      "method": "credentials/describe",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/session/list",
+      "method": "session/list",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/schedule/catalog",
+      "method": "schedule/catalog",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/assistant/status",
+      "method": "assistant/status",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/commands/list",
+      "method": "commands/list",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/skills/list",
+      "method": "skills/list",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/agents/detail",
+      "method": "agents/detail",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/agents/fusion/proposal",
+      "method": "agents/fusion/proposal",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/agents/features/proposal",
+      "method": "agents/features/proposal",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/agents/edit/read",
+      "method": "agents/edit/read",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/agents/runs/index",
+      "method": "agents/runs/index",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/agents/runs/show",
+      "method": "agents/runs/show",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/agents/detail",
+      "method": "agents/detail",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-light",
+      "path": "/hep/api/schedule/catalog",
+      "method": "schedule/catalog",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-light",
+      "path": "/hep/harness-platform/agents/list",
+      "method": "agents/list",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-light",
+      "path": "/hep/harness-platform/models/list",
+      "method": "models/list",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-light",
+      "path": "/hep/harness-platform/instances/sources",
+      "method": "instances/sources",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-light",
+      "path": "/hep/harness-platform/models/list",
+      "method": "models/list",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-light",
+      "path": "/hep/harness-platform/agents/list",
+      "method": "agents/list",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-light",
+      "path": "/hep/harness-platform/instances/sources",
+      "method": "instances/sources",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-light",
+      "path": "/hep/harness-platform/instances/list",
+      "method": "instances/list",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-light",
+      "path": "/hep/api/schedule/catalog",
+      "method": "schedule/catalog",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-light",
+      "path": "/hep/harness-platform/instances/external/list",
+      "method": "instances/external/list",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-light",
+      "path": "/hep/harness-platform/auth/current",
+      "method": "auth/current",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-light",
+      "path": "/hep/harness-platform/instances/external/credentials",
+      "method": "instances/external/credentials",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-light",
+      "path": "/hep/harness-platform/inventory",
+      "method": "inventory",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-light",
+      "path": "/hep/harness-platform/assistant/status",
+      "method": "assistant/status",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-light",
+      "path": "/hep/harness-platform/instances/external/list",
+      "method": "instances/external/list",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-light",
+      "path": "/hep/api/schedule/catalog",
+      "method": "schedule/catalog",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-light",
+      "path": "/hep/harness-platform/instances/external/detail",
+      "method": "instances/external/detail",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-light",
+      "path": "/hep/harness-platform/instances/agentAccess/status",
+      "method": "instances/agentAccess/status",
+      "status": 200
+    },
+    {
+      "phase": "evaluation-overlay-light",
+      "path": "/hep/harness-platform/agents/list",
+      "method": "agents/list",
+      "status": 200
+    },
+    {
+      "phase": "evaluation-overlay-light",
+      "path": "/hep/harness-platform/agents/eval/list",
+      "method": "agents/eval/list",
+      "status": 200
+    },
+    {
+      "phase": "evaluation-overlay-light",
+      "path": "/hep/harness-platform/agents/runs/overview",
+      "method": "agents/runs/overview",
+      "status": 200
+    },
+    {
+      "phase": "mcp-tabs-light",
+      "path": "/hep/api/schedule/catalog",
+      "method": "schedule/catalog",
+      "status": 200
+    },
+    {
+      "phase": "mcp-tabs-light",
+      "path": "/hep/harness-platform/mcp/configuration",
+      "method": "mcp/configuration",
+      "status": 200
+    },
+    {
+      "phase": "mcp-tabs-light",
+      "path": "/hep/harness-platform/mcp/list",
+      "method": "mcp/list",
+      "status": 200
+    },
+    {
+      "phase": "mcp-tabs-light",
+      "path": "/hep/api/schedule/catalog",
+      "method": "schedule/catalog",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-light",
+      "path": "/hep/api/session/modelCatalog",
+      "method": "session/modelCatalog",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-light",
+      "path": "/hep/harness-platform/mcp/control/status",
+      "method": "mcp/control/status",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-light",
+      "path": "/hep/harness-platform/agents/list",
+      "method": "agents/list",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-light",
+      "path": "/hep/harness-platform/instances/list",
+      "method": "instances/list",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-light",
+      "path": "/hep/harness-platform/mcp/control/status",
+      "method": "mcp/control/status",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-light",
+      "path": "/hep/harness-platform/mcp/control/status",
+      "method": "mcp/control/status",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-light",
+      "path": "/hep/harness-platform/agents/description",
+      "method": "agents/description",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-light",
+      "path": "/hep/harness-platform/mcp/control/status",
+      "method": "mcp/control/status",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-light",
+      "path": "/hep/harness-platform/mcp/control/status",
+      "method": "mcp/control/status",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-light",
+      "path": "/hep/harness-platform/mcp/configuration",
+      "method": "mcp/configuration",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-light",
+      "path": "/hep/harness-platform/mcp/list",
+      "method": "mcp/list",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-light",
+      "path": "/hep/harness-platform/mcp/control/status",
+      "method": "mcp/control/status",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-light",
+      "path": "/hep/api/schedule/catalog",
+      "method": "schedule/catalog",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-light",
+      "path": "/hep/harness-platform/mcp/control/status",
+      "method": "mcp/control/status",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/api/settings/mutate",
+      "method": "settings/mutate",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/agents/list",
+      "method": "agents/list",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/agents/fusion/proposal",
+      "method": "agents/fusion/proposal",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/agents/features/proposal",
+      "method": "agents/features/proposal",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/agents/edit/read",
+      "method": "agents/edit/read",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/api/session/modelCatalog",
+      "method": "session/modelCatalog",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/api/settings/describe",
+      "method": "settings/describe",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/inventory",
+      "method": "inventory",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/agents/runs/index",
+      "method": "agents/runs/index",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/assistant/status",
+      "method": "assistant/status",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/api/settings/describe",
+      "method": "settings/describe",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/agents/runs/show",
+      "method": "agents/runs/show",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/agents/detail",
+      "method": "agents/detail",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/api/credentials/describe",
+      "method": "credentials/describe",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/api/credentials/describe",
+      "method": "credentials/describe",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/api/credentials/describe",
+      "method": "credentials/describe",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/agents/list",
+      "method": "agents/list",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/agents/fusion/proposal",
+      "method": "agents/fusion/proposal",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/agents/features/proposal",
+      "method": "agents/features/proposal",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/agents/runs/index",
+      "method": "agents/runs/index",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/api/schedule/catalog",
+      "method": "schedule/catalog",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/instances/external/list",
+      "method": "instances/external/list",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/agents/runs/show",
+      "method": "agents/runs/show",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/agents/list",
+      "method": "agents/list",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/instances/sources",
+      "method": "instances/sources",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/models/list",
+      "method": "models/list",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/models/list",
+      "method": "models/list",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/agents/list",
+      "method": "agents/list",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/instances/sources",
+      "method": "instances/sources",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/instances/external/detail",
+      "method": "instances/external/detail",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/instances/agentAccess/status",
+      "method": "instances/agentAccess/status",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/agents/detail",
+      "method": "agents/detail",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/instances/list",
+      "method": "instances/list",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/api/schedule/catalog",
+      "method": "schedule/catalog",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/instances/external/list",
+      "method": "instances/external/list",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/instances/external/detail",
+      "method": "instances/external/detail",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/instances/agentAccess/status",
+      "method": "instances/agentAccess/status",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/instances/external/credentials",
+      "method": "instances/external/credentials",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/inventory",
+      "method": "inventory",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/assistant/status",
+      "method": "assistant/status",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/instances/external/list",
+      "method": "instances/external/list",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/instances/external/detail",
+      "method": "instances/external/detail",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/instances/agentAccess/status",
+      "method": "instances/agentAccess/status",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/api/schedule/catalog",
+      "method": "schedule/catalog",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/instances/external/detail",
+      "method": "instances/external/detail",
+      "status": 200
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/instances/agentAccess/status",
+      "method": "instances/agentAccess/status",
+      "status": 200
+    },
+    {
+      "phase": "evaluation-overlay-dark",
+      "path": "/hep/harness-platform/agents/list",
+      "method": "agents/list",
+      "status": 200
+    },
+    {
+      "phase": "evaluation-overlay-dark",
+      "path": "/hep/harness-platform/agents/eval/list",
+      "method": "agents/eval/list",
+      "status": 200
+    },
+    {
+      "phase": "evaluation-overlay-dark",
+      "path": "/hep/harness-platform/agents/runs/overview",
+      "method": "agents/runs/overview",
+      "status": 200
+    },
+    {
+      "phase": "mcp-tabs-dark",
+      "path": "/hep/api/schedule/catalog",
+      "method": "schedule/catalog",
+      "status": 200
+    },
+    {
+      "phase": "mcp-tabs-dark",
+      "path": "/hep/harness-platform/mcp/configuration",
+      "method": "mcp/configuration",
+      "status": 200
+    },
+    {
+      "phase": "mcp-tabs-dark",
+      "path": "/hep/harness-platform/mcp/list",
+      "method": "mcp/list",
+      "status": 200
+    },
+    {
+      "phase": "mcp-tabs-dark",
+      "path": "/hep/api/session/modelCatalog",
+      "method": "session/modelCatalog",
+      "status": 200
+    },
+    {
+      "phase": "mcp-tabs-dark",
+      "path": "/hep/api/schedule/catalog",
+      "method": "schedule/catalog",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-dark",
+      "path": "/hep/harness-platform/mcp/control/status",
+      "method": "mcp/control/status",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-dark",
+      "path": "/hep/harness-platform/agents/list",
+      "method": "agents/list",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-dark",
+      "path": "/hep/harness-platform/mcp/control/status",
+      "method": "mcp/control/status",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-dark",
+      "path": "/hep/harness-platform/instances/list",
+      "method": "instances/list",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-dark",
+      "path": "/hep/harness-platform/mcp/control/status",
+      "method": "mcp/control/status",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-dark",
+      "path": "/hep/harness-platform/agents/description",
+      "method": "agents/description",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-dark",
+      "path": "/hep/harness-platform/mcp/control/status",
+      "method": "mcp/control/status",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-dark",
+      "path": "/hep/harness-platform/mcp/control/status",
+      "method": "mcp/control/status",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-dark",
+      "path": "/hep/harness-platform/mcp/configuration",
+      "method": "mcp/configuration",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-dark",
+      "path": "/hep/harness-platform/mcp/control/status",
+      "method": "mcp/control/status",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-dark",
+      "path": "/hep/harness-platform/mcp/list",
+      "method": "mcp/list",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-dark",
+      "path": "/hep/harness-platform/mcp/control/status",
+      "method": "mcp/control/status",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-dark",
+      "path": "/hep/harness-platform/mcp/control/status",
+      "method": "mcp/control/status",
+      "status": 200
+    },
+    {
+      "phase": "gateway-tabs-dark",
+      "path": "/hep/api/schedule/catalog",
+      "method": "schedule/catalog",
+      "status": 200
+    }
+  ],
+  "blockedWrites": [
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "instance-overlays-light",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "instance-overlays-light",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "instance-overlays-light",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "evaluation-overlay-light",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "mcp-tabs-light",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "mcp-tabs-light",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "mcp-tabs-light",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "mcp-tabs-light",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "gateway-tabs-light",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "instance-overlays-dark",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "evaluation-overlay-dark",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "mcp-tabs-dark",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "mcp-tabs-dark",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "mcp-tabs-dark",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "mcp-tabs-dark",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "gateway-tabs-dark",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    }
+  ],
+  "failures": [],
+  "interactions": [
+    {
+      "name": "deep-agent-light",
+      "ok": true
+    },
+    {
+      "name": "instance-overlays-light",
+      "ok": true
+    },
+    {
+      "name": "evaluation-overlay-light",
+      "ok": true
+    },
+    {
+      "name": "mcp-tabs-light",
+      "ok": true
+    },
+    {
+      "name": "gateway-tabs-light",
+      "ok": true
+    },
+    {
+      "name": "deep-agent-dark",
+      "ok": true
+    },
+    {
+      "name": "instance-overlays-dark",
+      "ok": true
+    },
+    {
+      "name": "evaluation-overlay-dark",
+      "ok": true
+    },
+    {
+      "name": "mcp-tabs-dark",
+      "ok": true
+    },
+    {
+      "name": "gateway-tabs-dark",
+      "ok": true
+    }
+  ],
+  "existingNonPlatformSelection": true,
+  "themeRestored": true,
+  "finishedAt": "2026-11-03T06:16:39.777Z"
+}

@@ -1,0 +1,104 @@
+{
+  "listedBatches": 91,
+  "readOnly": true,
+  "qualificationSamples": [
+    {
+      "id": "decision-dataset-a23a2540-cef0-4bca-b28d-a0450eb952a0",
+      "kind": "legacy",
+      "schema": 1,
+      "run_id": "run-a994263a-68a8-458b-a619-09f3d2304c0a",
+      "counts": {
+        "candidates": 1,
+        "training": 0,
+        "development": 0,
+        "calibration": 0,
+        "test": 0
+      },
+      "reasons": [
+        {
+          "id": "decision-d83fc38813fc973e7bba8a047748159c",
+          "reasons": [
+            "旧格式只读候选；历史 reviewed 不会自动升级为新版合格样本，请重新抽取"
+          ],
+          "question_reasons": {}
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-2165e11e-516f-4e25-874f-1f9116d58d80",
+      "kind": "suggested",
+      "schema": 2,
+      "run_id": "run-05973a80-6b91-40e7-a0da-acca3a4ea696",
+      "counts": {
+        "candidates": 1,
+        "training": 0,
+        "development": 0,
+        "calibration": 0,
+        "test": 0
+      },
+      "reasons": [
+        {
+          "id": "decision-61f01928b8cbfb3039a7ca1f4e53834b",
+          "reasons": [
+            "state 与固定来源中的决策前材料不一致",
+            "尚未显式分配 train、development、calibration 或 test 用途；unassigned 不进入训练"
+          ],
+          "question_reasons": {
+            "complete_report_ready_now": [
+              "该题尚未逐题复核",
+              "该题尚未完成决策时点及输入可答性核对"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-011fc45a-915f-4fbc-afa2-e5ac32dc1fb9",
+      "kind": "reviewed",
+      "schema": 2,
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "counts": {
+        "candidates": 1,
+        "training": 0,
+        "development": 0,
+        "calibration": 0,
+        "test": 0
+      },
+      "reasons": [
+        {
+          "id": "decision-bc4017785a6a97199ac518c162be8317",
+          "reasons": [
+            "尚未显式分配 train、development、calibration 或 test 用途；unassigned 不进入训练"
+          ],
+          "question_reasons": {
+            "threat_full_after_delegation_reply": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-01c57be0-6a02-4dca-ad84-39bae4587459",
+      "kind": "delegated",
+      "schema": 2,
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "counts": {
+        "candidates": 1,
+        "training": 0,
+        "development": 0,
+        "calibration": 0,
+        "test": 0
+      },
+      "reasons": [
+        {
+          "id": "decision-bf5ffd27b8b87c421bde1b7b381c227a",
+          "reasons": [
+            "尚未显式分配 train、development、calibration 或 test 用途；unassigned 不进入训练"
+          ],
+          "question_reasons": {
+            "main_route_explain_lateral_movement_no_analysis": []
+          }
+        }
+      ]
+    }
+  ]
+}

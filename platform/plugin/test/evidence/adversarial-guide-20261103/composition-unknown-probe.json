@@ -1,0 +1,25 @@
+{
+  "accepted": 2,
+  "statusAfterLoss": "操作失败，请检查连接并重试。",
+  "retryEnabled": true,
+  "payloads": [
+    {
+      "compositionId": "stage-collect",
+      "version": "published",
+      "revision": "r1",
+      "input": {
+        "incident_id": "incident-probe"
+      }
+    },
+    {
+      "compositionId": "stage-collect",
+      "version": "published",
+      "revision": "r1",
+      "input": {
+        "incident_id": "incident-probe"
+      }
+    }
+  ],
+  "samePayload": true,
+  "confirmed": true
+}

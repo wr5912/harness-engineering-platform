@@ -1,0 +1,641 @@
+{
+  "at": "2026-11-03T06:18:10.580Z",
+  "origin": "http://10.0.160.32:18120",
+  "scope": "实际18120；七模块，1440/390宽，浅/深主题；只读页面、详情、表单、搜索和切tab；禁止创建Session、修改原会话、发送消息或业务写操作",
+  "screens": [
+    ".local/audit-guide-20261103/ui-2026-11-03T06-18-09-909Z/deep-agent-light.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-18-09-909Z/deep-agent-light-version-filter.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-18-09-909Z/deep-agent-light-assets.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-18-09-909Z/deep-agent-light-390-assets.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-18-09-909Z/agent-list-light-390-loaded.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-18-09-909Z/agent-list-light-390-filter-empty.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-18-09-909Z/agent-list-light-1440-loaded.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-18-09-909Z/deep-agent-dark.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-18-09-909Z/deep-agent-dark-version-filter.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-18-09-909Z/deep-agent-dark-assets.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-18-09-909Z/deep-agent-dark-390-assets.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-18-09-909Z/agent-list-dark-390-loaded.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-18-09-909Z/agent-list-dark-390-filter-empty.png",
+    ".local/audit-guide-20261103/ui-2026-11-03T06-18-09-909Z/agent-list-dark-1440-loaded.png"
+  ],
+  "checks": [
+    {
+      "phase": "deep-agent-light",
+      "name": "deep-agent-light",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "智能体管理",
+        "网络安全运营专家",
+        "用途与特性",
+        "版本 024 的评测概况",
+        "当前版本 Run 分布",
+        "最近 Run 结果",
+        "用例观察趋势",
+        "当前版本特性"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "deep-agent-light",
+      "name": "deep-agent-light-version-filter",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "智能体管理",
+        "网络安全运营专家",
+        "用途与特性",
+        "版本 024 的评测概况",
+        "当前版本 Run 分布",
+        "最近 Run 结果",
+        "用例观察趋势",
+        "当前版本特性"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "deep-agent-light",
+      "name": "deep-agent-light-assets",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "智能体管理",
+        "网络安全运营专家",
+        "智能体资产",
+        "资产详情"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "deep-agent-light",
+      "name": "deep-agent-light-390-assets",
+      "width": 390,
+      "documentWidth": 390,
+      "headings": [
+        "智能体管理",
+        "网络安全运营专家",
+        "智能体资产",
+        "资产详情"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "agent-list-light",
+      "name": "agent-list-light-390-loaded",
+      "width": 390,
+      "documentWidth": 390,
+      "headings": [
+        "智能体管理"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "agent-list-light",
+      "name": "agent-list-light-390-filter-empty",
+      "width": 390,
+      "documentWidth": 390,
+      "headings": [
+        "智能体管理"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "agent-list-light",
+      "name": "agent-list-light-1440-loaded",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "智能体管理",
+        "网络安全运营专家",
+        "智能体资产",
+        "资产详情"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "deep-agent-dark",
+      "name": "deep-agent-dark",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "智能体管理",
+        "网络安全运营专家",
+        "用途与特性",
+        "版本 024 的评测概况",
+        "当前版本 Run 分布",
+        "最近 Run 结果",
+        "用例观察趋势",
+        "当前版本特性"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "deep-agent-dark",
+      "name": "deep-agent-dark-version-filter",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "智能体管理",
+        "网络安全运营专家",
+        "用途与特性",
+        "版本 024 的评测概况",
+        "当前版本 Run 分布",
+        "最近 Run 结果",
+        "用例观察趋势",
+        "当前版本特性"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "deep-agent-dark",
+      "name": "deep-agent-dark-assets",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "智能体管理",
+        "网络安全运营专家",
+        "智能体资产",
+        "资产详情"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "deep-agent-dark",
+      "name": "deep-agent-dark-390-assets",
+      "width": 390,
+      "documentWidth": 390,
+      "headings": [
+        "智能体管理",
+        "网络安全运营专家",
+        "智能体资产",
+        "资产详情"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "agent-list-dark",
+      "name": "agent-list-dark-390-loaded",
+      "width": 390,
+      "documentWidth": 390,
+      "headings": [
+        "智能体管理"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "agent-list-dark",
+      "name": "agent-list-dark-390-filter-empty",
+      "width": 390,
+      "documentWidth": 390,
+      "headings": [
+        "智能体管理"
+      ],
+      "alerts": [],
+      "overflow": []
+    },
+    {
+      "phase": "agent-list-dark",
+      "name": "agent-list-dark-1440-loaded",
+      "width": 1440,
+      "documentWidth": 1440,
+      "headings": [
+        "智能体管理",
+        "网络安全运营专家",
+        "智能体资产",
+        "资产详情"
+      ],
+      "alerts": [],
+      "overflow": []
+    }
+  ],
+  "errors": [],
+  "requests": [
+    {
+      "phase": "setup",
+      "path": "/hep/api/settings/describe",
+      "method": "settings/describe",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/api/dynamicCordisRunner/syncInspectManifest",
+      "method": "dynamicCordisRunner/syncInspectManifest",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/api/credentials/describe",
+      "method": "credentials/describe",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/api/dynamicCordisRunner/inventory",
+      "method": "dynamicCordisRunner/inventory",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/api/session/modelCatalog",
+      "method": "session/modelCatalog",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/harness-platform/inventory",
+      "method": "inventory",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/harness-platform/inventory",
+      "method": "inventory",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/harness-platform/agents/eval/list",
+      "method": "agents/eval/list",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/harness-platform/mcp/control/status",
+      "method": "mcp/control/status",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/harness-platform/auth/current",
+      "method": "auth/current",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/harness-platform/inventory",
+      "method": "inventory",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/api/credentials/describe",
+      "method": "credentials/describe",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/api/credentials/describe",
+      "method": "credentials/describe",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/api/credentials/describe",
+      "method": "credentials/describe",
+      "status": 200
+    },
+    {
+      "phase": "setup",
+      "path": "/hep/api/permissionPresets/catalog",
+      "method": "permissionPresets/catalog",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/inventory",
+      "method": "inventory",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/dynamicCordisRunner/inventory",
+      "method": "dynamicCordisRunner/inventory",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/agentPresets/list",
+      "method": "agentPresets/list",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/agentPresets/list",
+      "method": "agentPresets/list",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/session/modelCatalog",
+      "method": "session/modelCatalog",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/inventory",
+      "method": "inventory",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/settings/describe",
+      "method": "settings/describe",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/dynamicCordisRunner/syncInspectManifest",
+      "method": "dynamicCordisRunner/syncInspectManifest",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/agents/list",
+      "method": "agents/list",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/home",
+      "method": "home",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/agents/fusion/proposal",
+      "method": "agents/fusion/proposal",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/auth/current",
+      "method": "auth/current",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/credentials/describe",
+      "method": "credentials/describe",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/credentials/describe",
+      "method": "credentials/describe",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/session/list",
+      "method": "session/list",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/credentials/describe",
+      "method": "credentials/describe",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/session/list",
+      "method": "session/list",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/agents/detail",
+      "method": "agents/detail",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/schedule/catalog",
+      "method": "schedule/catalog",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/assistant/status",
+      "method": "assistant/status",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/commands/list",
+      "method": "commands/list",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/api/skills/list",
+      "method": "skills/list",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/agents/fusion/proposal",
+      "method": "agents/fusion/proposal",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/agents/features/proposal",
+      "method": "agents/features/proposal",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/agents/edit/read",
+      "method": "agents/edit/read",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/agents/runs/index",
+      "method": "agents/runs/index",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/agents/runs/show",
+      "method": "agents/runs/show",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/agents/detail",
+      "method": "agents/detail",
+      "status": 200
+    },
+    {
+      "phase": "agent-list-light",
+      "path": "/hep/api/schedule/catalog",
+      "method": "schedule/catalog",
+      "status": 200
+    },
+    {
+      "phase": "agent-list-light",
+      "path": "/hep/api/schedule/catalog",
+      "method": "schedule/catalog",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/api/settings/mutate",
+      "method": "settings/mutate",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/api/session/modelCatalog",
+      "method": "session/modelCatalog",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/api/settings/describe",
+      "method": "settings/describe",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/inventory",
+      "method": "inventory",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/assistant/status",
+      "method": "assistant/status",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/agents/list",
+      "method": "agents/list",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/agents/fusion/proposal",
+      "method": "agents/fusion/proposal",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/agents/features/proposal",
+      "method": "agents/features/proposal",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/api/settings/describe",
+      "method": "settings/describe",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/api/credentials/describe",
+      "method": "credentials/describe",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/api/credentials/describe",
+      "method": "credentials/describe",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/agents/runs/index",
+      "method": "agents/runs/index",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/api/credentials/describe",
+      "method": "credentials/describe",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/agents/detail",
+      "method": "agents/detail",
+      "status": 200
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/agents/runs/show",
+      "method": "agents/runs/show",
+      "status": 200
+    },
+    {
+      "phase": "agent-list-dark",
+      "path": "/hep/api/schedule/catalog",
+      "method": "schedule/catalog",
+      "status": 200
+    }
+  ],
+  "blockedWrites": [
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "deep-agent-light",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "deep-agent-dark",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    }
+  ],
+  "failures": [],
+  "interactions": [
+    {
+      "name": "deep-agent-light",
+      "ok": true
+    },
+    {
+      "name": "agent-list-light",
+      "ok": true
+    },
+    {
+      "name": "deep-agent-dark",
+      "ok": true
+    },
+    {
+      "name": "agent-list-dark",
+      "ok": true
+    }
+  ],
+  "existingDifferentCwdSelection": true,
+  "themeRestored": true,
+  "finishedAt": "2026-11-03T06:18:36.419Z"
+}

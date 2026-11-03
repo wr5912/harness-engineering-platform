@@ -1,0 +1,4526 @@
+{
+  "agents": [
+    {
+      "id": "audit-e2e-assistant-sdk",
+      "active_experiment": "EXP-audit-e2e-assistant-sdk-001-rf5fad789b04e",
+      "manifestKeys": [
+        "schema_version",
+        "agent_id",
+        "runtime_family",
+        "research_status",
+        "active_experiment",
+        "name",
+        "description"
+      ],
+      "evaluationExists": true,
+      "evaluationBytes": 1978,
+      "headings": [
+        "SDK验收收据助手评测",
+        "U-IDENTITY-001 身份与职责",
+        "U-ROLE-001 业务范围与信息不足",
+        "U-RECEIPT-SDK-001 单价数量齐全时相乘返回合计并说明单位",
+        "U-RECEIPT-SDK-002 缺数量时追问且不猜数",
+        "U-RECEIPT-SDK-003 同一Session内记住并原样返回收据编号"
+      ]
+    },
+    {
+      "id": "audit-e2e-assistant-web",
+      "active_experiment": "EXP-audit-e2e-assistant-web-001-r57f20304b3c4",
+      "manifestKeys": [
+        "schema_version",
+        "agent_id",
+        "runtime_family",
+        "research_status",
+        "active_experiment",
+        "name",
+        "description"
+      ],
+      "evaluationExists": true,
+      "evaluationBytes": 3809,
+      "headings": [
+        "验收收据助手评测",
+        "U-IDENTITY-001 身份与职责",
+        "U-ROLE-001 业务范围与信息不足",
+        "U-RECEIPT-001 单价与数量齐全时计算合计并说明单位",
+        "U-RECEIPT-002 缺少数量时追问而不猜测",
+        "U-RECEIPT-003 会话内记住收据编号并在查询时原样返回",
+        "未分组",
+        "U-TOOL-001 用验收工具计算：真实调用 receipt_total 得到合计并说明单位",
+        "U-TOOL-002 用验收工具计算：数量为负时如实说明不可计算并要求有效数量",
+        "U-FUSION-MEMORY-001 同会话两轮记忆：第一轮记住编号，第二轮原样返回"
+      ]
+    },
+    {
+      "id": "audit-e2e-migrate",
+      "active_experiment": "EXP-audit-e2e-migrate-001-r21862857f1d8",
+      "manifestKeys": [
+        "schema_version",
+        "agent_id",
+        "runtime_family",
+        "research_status",
+        "active_experiment",
+        "name",
+        "description"
+      ],
+      "evaluationExists": true,
+      "evaluationBytes": 988,
+      "headings": [
+        "迁移收据验收助手评测",
+        "U-IDENTITY-001 身份与职责",
+        "U-ROLE-001 业务范围与信息不足",
+        "U-MIGRATE-001 迁入后保持精确合计"
+      ]
+    },
+    {
+      "id": "audit-e2e-multiturn",
+      "active_experiment": "EXP-audit-e2e-multiturn-001-r6d45ef5006be",
+      "manifestKeys": [
+        "schema_version",
+        "agent_id",
+        "runtime_family",
+        "research_status",
+        "active_experiment",
+        "name",
+        "description"
+      ],
+      "evaluationExists": true,
+      "evaluationBytes": 1346,
+      "headings": [
+        "多轮编号验收助手评测",
+        "U-IDENTITY-001 身份与职责",
+        "U-ROLE-001 业务范围与信息不足",
+        "未分组",
+        "U-MEMORY-001 真正跨轮记忆编号"
+      ]
+    },
+    {
+      "id": "audit-e2e-notice-code",
+      "active_experiment": "EXP-audit-e2e-notice-code-001-r72110ec28229",
+      "manifestKeys": [
+        "schema_version",
+        "agent_id",
+        "runtime_family",
+        "research_status",
+        "active_experiment",
+        "name",
+        "description"
+      ],
+      "evaluationExists": true,
+      "evaluationBytes": 863,
+      "headings": [
+        "原生通知code验收评测",
+        "U-IDENTITY-001 身份与职责",
+        "U-ROLE-001 业务范围与信息不足"
+      ]
+    },
+    {
+      "id": "audit-e2e-notice-hybrid",
+      "active_experiment": "EXP-audit-e2e-notice-hybrid-001-r66b0743f3a2f",
+      "manifestKeys": [
+        "schema_version",
+        "agent_id",
+        "runtime_family",
+        "research_status",
+        "active_experiment",
+        "name",
+        "description"
+      ],
+      "evaluationExists": true,
+      "evaluationBytes": 869,
+      "headings": [
+        "原生通知hybrid验收评测",
+        "U-IDENTITY-001 身份与职责",
+        "U-ROLE-001 业务范围与信息不足"
+      ]
+    },
+    {
+      "id": "audit-e2e-schedule",
+      "active_experiment": "EXP-audit-e2e-schedule-001-r82683feb2e78",
+      "manifestKeys": [
+        "schema_version",
+        "agent_id",
+        "runtime_family",
+        "research_status",
+        "active_experiment",
+        "name",
+        "description"
+      ],
+      "evaluationExists": true,
+      "evaluationBytes": 819,
+      "headings": [
+        "原生收据提醒验收助手评测",
+        "U-IDENTITY-001 身份与职责",
+        "U-ROLE-001 业务范围与信息不足"
+      ]
+    },
+    {
+      "id": "audit-e2e-ui-sdk",
+      "active_experiment": "EXP-audit-e2e-ui-sdk-001-rfdcad3b55999",
+      "manifestKeys": [
+        "schema_version",
+        "agent_id",
+        "runtime_family",
+        "research_status",
+        "active_experiment",
+        "name",
+        "description"
+      ],
+      "evaluationExists": true,
+      "evaluationBytes": 784,
+      "headings": [
+        "页面验收SDK助手评测",
+        "U-IDENTITY-001 身份与职责",
+        "U-ROLE-001 业务范围与信息不足"
+      ]
+    },
+    {
+      "id": "audit-e2e-ui-web",
+      "active_experiment": "EXP-audit-e2e-ui-web-001-r30e3861191ee",
+      "manifestKeys": [
+        "schema_version",
+        "agent_id",
+        "runtime_family",
+        "research_status",
+        "active_experiment",
+        "name",
+        "description"
+      ],
+      "evaluationExists": true,
+      "evaluationBytes": 784,
+      "headings": [
+        "页面验收WEB助手评测",
+        "U-IDENTITY-001 身份与职责",
+        "U-ROLE-001 业务范围与信息不足"
+      ]
+    },
+    {
+      "id": "autonomous-training-researcher",
+      "active_experiment": "EXP-autonomous-training-researcher-001-redf6be6240bf",
+      "manifestKeys": [
+        "schema_version",
+        "agent_id",
+        "runtime_family",
+        "research_status",
+        "active_experiment",
+        "name",
+        "description"
+      ],
+      "evaluationExists": true,
+      "evaluationBytes": 1402,
+      "headings": [
+        "自主训练研究助手评测",
+        "U-IDENTITY-001 身份与职责",
+        "U-ROLE-001 业务范围与信息不足",
+        "真实训练前提",
+        "U-TRAIN-PREFLIGHT-001 真实训练资源预检"
+      ]
+    },
+    {
+      "id": "daily-inspection-assistant",
+      "active_experiment": "EXP-daily-inspection-assistant-002-r9eba480e9d2a",
+      "manifestKeys": [
+        "schema_version",
+        "agent_id",
+        "runtime_family",
+        "research_status",
+        "active_experiment",
+        "name",
+        "description"
+      ],
+      "evaluationExists": true,
+      "evaluationBytes": 2975,
+      "headings": [
+        "日常巡检整理助手评测",
+        "U-IDENTITY-001 身份与职责",
+        "U-ROLE-001 业务范围与信息不足",
+        "基础巡检摘要",
+        "U-SUMMARY-001 基于给定基础数据整理摘要",
+        "未分组",
+        "U-SUMMARY-002 基础摘要按列输出",
+        "实际基础接口与报告交付",
+        "U-ASSET-PAGES-001 完整分页和报告",
+        "U-ASSET-PARTIAL-001 未读取完整时不得生成完整结论"
+      ]
+    },
+    {
+      "id": "inspection-delivery-demo",
+      "active_experiment": "EXP-inspection-delivery-demo-001-rf841e4415364",
+      "manifestKeys": [
+        "schema_version",
+        "agent_id",
+        "runtime_family",
+        "research_status",
+        "active_experiment",
+        "name",
+        "description"
+      ],
+      "evaluationExists": true,
+      "evaluationBytes": 1996,
+      "headings": [
+        "基础台账巡检助手评测",
+        "U-IDENTITY-001 身份与职责",
+        "U-ROLE-001 业务范围与信息不足",
+        "U-ASSET-PAGES-001 完整分页和报告",
+        "U-ASSET-PARTIAL-001 未读取完整时不得生成完整结论"
+      ]
+    },
+    {
+      "id": "migration-agentscope-demo",
+      "active_experiment": "EXP-migration-agentscope-demo-001-rd991aeb01b21",
+      "manifestKeys": [
+        "schema_version",
+        "agent_id",
+        "runtime_family",
+        "research_status",
+        "active_experiment",
+        "name",
+        "description"
+      ],
+      "evaluationExists": true,
+      "evaluationBytes": 2385,
+      "headings": [
+        "AgentScope Python工具迁移样例评测",
+        "U-IDENTITY-001 身份与职责",
+        "U-ROLE-001 业务范围与信息不足",
+        "U-VERSION-COMPARE 比较 1.9 与 1.10 并经 Python 工具给出较新版本",
+        "U-VERSION-INVALID 无效版本输入时说明工具错误，不捏造较新版本",
+        "U-VERSION-MISSING 只给一个版本时先补问另一个版本"
+      ]
+    },
+    {
+      "id": "migration-dsh-demo",
+      "active_experiment": "EXP-migration-dsh-demo-001-r20ef75d026f1",
+      "manifestKeys": [
+        "schema_version",
+        "agent_id",
+        "runtime_family",
+        "research_status",
+        "active_experiment",
+        "name",
+        "description"
+      ],
+      "evaluationExists": true,
+      "evaluationBytes": 1590,
+      "headings": [
+        "DSH 报价迁移样例评测",
+        "U-IDENTITY-001 身份与职责",
+        "U-ROLE-001 业务范围与信息不足",
+        "U-QUOTE-NORMAL 完整参数报价",
+        "U-QUOTE-MISSING 缺参数先补问"
+      ]
+    },
+    {
+      "id": "migration-langchain-demo",
+      "active_experiment": "EXP-migration-langchain-demo-001-rfa4065d93d85",
+      "manifestKeys": [
+        "schema_version",
+        "agent_id",
+        "runtime_family",
+        "research_status",
+        "active_experiment",
+        "name",
+        "description"
+      ],
+      "evaluationExists": true,
+      "evaluationBytes": 2267,
+      "headings": [
+        "LangChain 结构化换算迁移样例评测",
+        "U-IDENTITY-001 身份与职责",
+        "U-ROLE-001 业务范围与信息不足",
+        "U-LENGTH-M-TO-CM 2.5 米换算为厘米",
+        "U-LENGTH-CM-TO-M 125 厘米换算为米",
+        "U-LENGTH-MISSING 只有数值缺单位先补问"
+      ]
+    },
+    {
+      "id": "migration-langgraph-demo",
+      "active_experiment": "EXP-migration-langgraph-demo-001-rac1e3af8bc94",
+      "manifestKeys": [
+        "schema_version",
+        "agent_id",
+        "runtime_family",
+        "research_status",
+        "active_experiment",
+        "name",
+        "description"
+      ],
+      "evaluationExists": true,
+      "evaluationBytes": 3155,
+      "headings": [
+        "LangGraph 报价流程迁移样例评测",
+        "U-IDENTITY-001 身份与职责",
+        "U-ROLE-001 业务范围与信息不足",
+        "U-GRAPH-BULK bulk 分支并行报价（quantity=10, unit_price=12）",
+        "U-GRAPH-REGULAR regular 分支并行报价（quantity=2, unit_price=20）",
+        "U-GRAPH-MISSING 缺数量先补问不猜输入"
+      ]
+    },
+    {
+      "id": "migration-opencode-demo",
+      "active_experiment": "EXP-migration-opencode-demo-001-r2085b6b7a566",
+      "manifestKeys": [
+        "schema_version",
+        "agent_id",
+        "runtime_family",
+        "research_status",
+        "active_experiment",
+        "name",
+        "description"
+      ],
+      "evaluationExists": true,
+      "evaluationBytes": 2309,
+      "headings": [
+        "OpenCode 编码迁移样例评测",
+        "U-IDENTITY-001 身份与职责",
+        "U-ROLE-001 业务范围与信息不足",
+        "U-CODE-FIX 修复金额计算与舍入错误并经 reviewer 子角色复核"
+      ]
+    },
+    {
+      "id": "multi-step-research-analyst",
+      "active_experiment": "EXP-multi-step-research-analyst-001-r97fa04b7c613",
+      "manifestKeys": [
+        "schema_version",
+        "agent_id",
+        "runtime_family",
+        "research_status",
+        "active_experiment",
+        "name",
+        "description"
+      ],
+      "evaluationExists": true,
+      "evaluationBytes": 2117,
+      "headings": [
+        "多步骤业务调研助手评测",
+        "U-IDENTITY-001 身份与职责",
+        "U-ROLE-001 业务范围与信息不足",
+        "多步骤业务交付",
+        "U-RESEARCH-001 两来源调研报告",
+        "U-RESEARCH-INCOMPLETE-001 资料不全诚实交付"
+      ]
+    },
+    {
+      "id": "security-operations-expert",
+      "active_experiment": "EXP-security-operations-expert-024-rad80a907c628",
+      "manifestKeys": [
+        "schema_version",
+        "agent_id",
+        "runtime_family",
+        "research_status",
+        "active_experiment"
+      ],
+      "evaluationExists": true,
+      "evaluationBytes": 36845,
+      "headings": [
+        "security-operations-expert 评测",
+        "安全巡检",
+        "U-INS-001 常规巡检",
+        "U-INS-002 查询巡检项",
+        "U-INS-003 根据巡检事实生成 JSON",
+        "U-INS-004 创建巡检任务",
+        "U-INS-005 创建周期巡检任务",
+        "U-INS-006 指定资产巡检",
+        "U-INS-007 续查同一次巡检",
+        "独立应急指令",
+        "U-EMG-001 封禁草案",
+        "U-EMG-002 防火墙封禁草案",
+        "U-EMG-003 防火墙解封须绑定规则 UUID",
+        "U-EMG-MISSING-TARGET 应急目标不存在时保留业务原因",
+        "策略配置",
+        "U-POL-001 防火墙策略开通",
+        "U-POL-002 指定设备开通策略",
+        "U-POL-003 自动识别策略设备",
+        "U-POL-004 指定设备能力校验",
+        "U-POL-005 限时 UDP 策略",
+        "U-POL-006 端口业务开通",
+        "U-POL-007 异常对象不得强行开通",
+        "U-POL-008 多轮策略变更",
+        "U-POL-009 开通后验证与回退预览",
+        "U-POL-010 完整无状态 Preview",
+        "U-POL-011 阻断业务",
+        "U-POL-012 已确认参数的 ACL 预览",
+        "故障排查",
+        "U-FLT-MENTION 数字员工故障分析入口",
+        "U-FLT-001 连通故障分析与后续处置",
+        "U-FLT-002 离线设备分析",
+        "U-FLT-003 业务系统访问异常",
+        "U-FLT-004 主备切换后访问失败",
+        "U-FLT-005 换参数仍无法解决",
+        "U-FLT-006 变更后访问失败与配置漂移",
+        "U-FLT-007 主机安全配置与纳管异常",
+        "U-FLT-008 数据链路无数据",
+        "U-FLT-009 巡检异常根因报告",
+        "U-FLT-010 基于正式结果恢复服务",
+        "智能问答",
+        "U-QA-001 SOAR 剧本定义",
+        "U-QA-002 勒索软件知识库检索",
+        "U-QA-003 故障分析权限边界",
+        "U-QA-004 响应处置能力",
+        "U-QA-005 sec-ops 配置含义",
+        "U-QA-006 能力简介与追问",
+        "U-QA-007 CVE 基础概念",
+        "U-QA-008 CVSS、EPSS 与 KEV",
+        "U-QA-009 IOC、TTP、Technique、告警与事件",
+        "U-QA-010 操作入口与权限",
+        "U-QA-011 内部事件分级规范",
+        "U-QA-012 结论时效与证据冲突",
+        "U-QA-013 漏洞根因类型",
+        "U-QA-014 明确指定英语",
+        "威胁事件研判",
+        "U-THREAT-MENTION 数字员工威胁研判入口",
+        "U-THREAT-FAST 名单快速研判",
+        "U-THREAT-FULL 完整研判",
+        "U-THREAT-CONTRACT 基本模拟事件的研判输出合同",
+        "U-THREAT-WHITELIST 名单业务限制",
+        "U-THREAT-MISSING 缺少事件 ID",
+        "U-THREAT-FOLLOWUP 研判后普通问答",
+        "原生定时研判",
+        "U-SCHED-001 每天固定时刻研判",
+        "U-SCHED-002 每隔 N 分钟研判",
+        "U-SCHED-003 每隔 N 分钟从 SOC 拉取研判",
+        "U-SCHED-004 每天窗口内每 N 分钟",
+        "U-SCHED-005 修改周期",
+        "U-SCHED-006 删除任务",
+        "U-SCHED-007 受控业务实例不得误报定时可用",
+        "语音交互",
+        "U-VOICE-001 语音发送与回复",
+        "U-VOICE-002 自动摘要播报",
+        "U-VOICE-003 摘要队列与取消",
+        "U-VOICE-004 摘要播报响应时间与保真",
+        "资产关联告警代码变体研究",
+        "U-ASSET-ALERTS-001 资产关联告警正常查询",
+        "U-ASSET-ALERTS-MISSING 资产不存在时停止",
+        "U-ASSET-ALERTS-EMPTY 受控空告警结果",
+        "U-ASSET-ALERTS-FAIL 告警业务失败不冒充空结果"
+      ]
+    },
+    {
+      "id": "test01",
+      "active_experiment": "EXP-test01-002",
+      "manifestKeys": [
+        "schema_version",
+        "agent_id",
+        "runtime_family",
+        "research_status",
+        "active_experiment"
+      ],
+      "evaluationExists": true,
+      "evaluationBytes": 267,
+      "headings": [
+        "test01 评测",
+        "U-IDENTITY-001 身份装载"
+      ]
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-audit-e2e-assistant-sdk-001-rf5fad789b04e",
+      "agent_id": "audit-e2e-assistant-sdk",
+      "status": "active",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 0,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": false
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-audit-e2e-assistant-sdk-002-r24252c76625d",
+      "agent_id": "audit-e2e-assistant-sdk",
+      "status": "active",
+      "parent": "EXP-audit-e2e-assistant-sdk-001-rf5fad789b04e",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 0,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-audit-e2e-assistant-sdk-003-rf7b3602a7c10",
+      "agent_id": "audit-e2e-assistant-sdk",
+      "status": "active",
+      "parent": "EXP-audit-e2e-assistant-sdk-001-rf5fad789b04e",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 0,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-audit-e2e-assistant-sdk-004-r9d3069ba248b",
+      "agent_id": "audit-e2e-assistant-sdk",
+      "status": "active",
+      "parent": "EXP-audit-e2e-assistant-sdk-001-rf5fad789b04e",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 0,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-audit-e2e-assistant-web-001-r57f20304b3c4",
+      "agent_id": "audit-e2e-assistant-web",
+      "status": "active",
+      "outcome": "inconclusive",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 1,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-audit-e2e-assistant-web-002-ra2a3ad241109",
+      "agent_id": "audit-e2e-assistant-web",
+      "status": "active",
+      "outcome": "continue",
+      "parent": "EXP-audit-e2e-assistant-web-001-r57f20304b3c4",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 3,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-audit-e2e-assistant-web-003-r47233801b5a0",
+      "agent_id": "audit-e2e-assistant-web",
+      "status": "active",
+      "parent": "EXP-audit-e2e-assistant-web-001-r57f20304b3c4",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 0,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-audit-e2e-assistant-web-004-r9c5e2e27d234",
+      "agent_id": "audit-e2e-assistant-web",
+      "status": "completed",
+      "outcome": "continue",
+      "parent": "EXP-audit-e2e-assistant-web-001-r57f20304b3c4",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 1,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-audit-e2e-migrate-001-r21862857f1d8",
+      "agent_id": "audit-e2e-migrate",
+      "status": "active",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 1,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": false
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-audit-e2e-multiturn-001-r6d45ef5006be",
+      "agent_id": "audit-e2e-multiturn",
+      "status": "active",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 2,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": false
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-audit-e2e-notice-code-001-r72110ec28229",
+      "agent_id": "audit-e2e-notice-code",
+      "status": "active",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 0,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": false
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-audit-e2e-notice-hybrid-001-r66b0743f3a2f",
+      "agent_id": "audit-e2e-notice-hybrid",
+      "status": "active",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 0,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": false
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-audit-e2e-schedule-001-r82683feb2e78",
+      "agent_id": "audit-e2e-schedule",
+      "status": "active",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 0,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": false
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-audit-e2e-ui-sdk-001-rfdcad3b55999",
+      "agent_id": "audit-e2e-ui-sdk",
+      "status": "active",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 0,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": false
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-audit-e2e-ui-web-001-r30e3861191ee",
+      "agent_id": "audit-e2e-ui-web",
+      "status": "active",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 0,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": false
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-autonomous-training-researcher-001-redf6be6240bf",
+      "agent_id": "autonomous-training-researcher",
+      "status": "active",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 3,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-daily-inspection-assistant-001-r602ec12fd531",
+      "agent_id": "daily-inspection-assistant",
+      "status": "active",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 8,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-daily-inspection-assistant-002-r9eba480e9d2a",
+      "agent_id": "daily-inspection-assistant",
+      "status": "active",
+      "parent": "EXP-daily-inspection-assistant-001-r602ec12fd531",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 0,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-daily-inspection-assistant-003-r6fcb63b26bd9",
+      "agent_id": "daily-inspection-assistant",
+      "status": "active",
+      "parent": "EXP-daily-inspection-assistant-002-r9eba480e9d2a",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 1,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-daily-inspection-assistant-004-r965bc66e4614",
+      "agent_id": "daily-inspection-assistant",
+      "status": "active",
+      "parent": "EXP-daily-inspection-assistant-002-r9eba480e9d2a",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 1,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-daily-inspection-assistant-005-r0dae2ba1ebb1",
+      "agent_id": "daily-inspection-assistant",
+      "status": "active",
+      "parent": "EXP-daily-inspection-assistant-001-r602ec12fd531",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 3,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-inspection-delivery-demo-001-rf841e4415364",
+      "agent_id": "inspection-delivery-demo",
+      "status": "active",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 1,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-inspection-delivery-demo-002-r7430faf014e7",
+      "agent_id": "inspection-delivery-demo",
+      "status": "active",
+      "parent": "EXP-inspection-delivery-demo-001-rf841e4415364",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 3,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-inspection-delivery-demo-003-r1c42f11c4f9a",
+      "agent_id": "inspection-delivery-demo",
+      "status": "active",
+      "parent": "EXP-inspection-delivery-demo-002-r7430faf014e7",
+      "compute_variant": true,
+      "execution_mode": "code-only",
+      "sourceRuns": [
+        "run-424f67b4-bb0c-4ebb-bd92-38a267ca6e48"
+      ],
+      "trainingRef": null,
+      "runs": 7,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-migration-agentscope-demo-001-rd991aeb01b21",
+      "agent_id": "migration-agentscope-demo",
+      "status": "active",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 1,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": false
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-migration-dsh-demo-001-r20ef75d026f1",
+      "agent_id": "migration-dsh-demo",
+      "status": "active",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 4,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": false
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-migration-langchain-demo-001-rfa4065d93d85",
+      "agent_id": "migration-langchain-demo",
+      "status": "active",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 3,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": false
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-migration-langgraph-demo-001-rac1e3af8bc94",
+      "agent_id": "migration-langgraph-demo",
+      "status": "active",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 5,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": false
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-migration-opencode-demo-001-r2085b6b7a566",
+      "agent_id": "migration-opencode-demo",
+      "status": "active",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 4,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": false
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-multi-step-research-analyst-001-r97fa04b7c613",
+      "agent_id": "multi-step-research-analyst",
+      "status": "active",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 4,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-security-operations-expert-024-rad80a907c628",
+      "agent_id": "security-operations-expert",
+      "status": "active",
+      "parent": "EXP-security-operations-expert-022-r41bf6c2f0d3d",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 14,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-security-operations-expert-025-r36771c9bf2a5",
+      "agent_id": "security-operations-expert",
+      "status": "active",
+      "parent": "EXP-security-operations-expert-024-rad80a907c628",
+      "compute_variant": true,
+      "execution_mode": "hybrid",
+      "sourceRuns": [
+        "run-f62533d0-87fe-4258-8ca2-cb76adbecbb5"
+      ],
+      "trainingRef": null,
+      "runs": 1,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-security-operations-expert-026-r6aebbb22df61",
+      "agent_id": "security-operations-expert",
+      "status": "active",
+      "parent": "EXP-security-operations-expert-024-rad80a907c628",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 4,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-test01-001",
+      "agent_id": "test01",
+      "status": "active",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 0,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": false
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "EXP-test01-002",
+      "agent_id": "test01",
+      "status": "completed",
+      "outcome": "adopt",
+      "compute_variant": false,
+      "sourceRuns": [],
+      "trainingRef": null,
+      "runs": 2,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "VAR-inspection-delivery-demo-001-rfac75f4cb946",
+      "agent_id": "inspection-delivery-demo",
+      "status": "active",
+      "outcome": "inconclusive",
+      "parent": "EXP-inspection-delivery-demo-002-r7430faf014e7",
+      "compute_variant": true,
+      "execution_mode": "code-only",
+      "sourceRuns": [
+        "run-424f67b4-bb0c-4ebb-bd92-38a267ca6e48"
+      ],
+      "trainingRef": null,
+      "runs": 0,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "VAR-security-operations-expert-001-r66152e077843",
+      "agent_id": "security-operations-expert",
+      "status": "active",
+      "parent": "EXP-security-operations-expert-024-rad80a907c628",
+      "compute_variant": true,
+      "execution_mode": "hybrid",
+      "sourceRuns": [
+        "run-f62533d0-87fe-4258-8ca2-cb76adbecbb5"
+      ],
+      "trainingRef": null,
+      "runs": 1,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "VAR-security-operations-expert-002-r79757f173c53",
+      "agent_id": "security-operations-expert",
+      "status": "active",
+      "parent": "EXP-security-operations-expert-024-rad80a907c628",
+      "compute_variant": true,
+      "execution_mode": "hybrid",
+      "sourceRuns": [
+        "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408"
+      ],
+      "trainingRef": null,
+      "runs": 4,
+      "files": [
+        {
+          "path": "hypothesis.md",
+          "exists": true
+        },
+        {
+          "path": "decision.md",
+          "exists": true
+        },
+        {
+          "path": "candidate/harness.yaml",
+          "exists": true
+        }
+      ]
+    }
+  ],
+  "datasets": [
+    {
+      "id": "decision-dataset-011fc45a-915f-4fbc-afa2-e5ac32dc1fb9",
+      "file": "decision-dataset-011fc45a-915f-4fbc-afa2-e5ac32dc1fb9.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-THREAT-FULL/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-bc4017785a6a97199ac518c162be8317",
+          "split": "unassigned",
+          "source_group": "task-247a1886e6370f67d043b507",
+          "group": "task-247a1886e6370f67d043b507",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-01c57be0-6a02-4dca-ad84-39bae4587459",
+      "file": "decision-dataset-01c57be0-6a02-4dca-ad84-39bae4587459.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-THREAT-FOLLOWUP/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-bf5ffd27b8b87c421bde1b7b381c227a",
+          "split": "unassigned",
+          "source_group": "task-1c5c2ef9232e7d6e3505d39e",
+          "group": "task-1c5c2ef9232e7d6e3505d39e",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-02f3b9df-b710-4269-87f4-a862fcecc2d6",
+      "file": "decision-dataset-02f3b9df-b710-4269-87f4-a862fcecc2d6.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-EMG-002/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-5574bb3be911979c51ff7ea1beb52187",
+          "split": "unassigned",
+          "source_group": "task-86e3ed14d0d4a88688c1645b",
+          "group": "task-86e3ed14d0d4a88688c1645b",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-048d2812-6745-476b-ab69-d5a0a8e274f1",
+      "file": "decision-dataset-048d2812-6745-476b-ab69-d5a0a8e274f1.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-EMG-001/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-6b9cb42c142f00d6adf67911e3c34f20",
+          "split": "unassigned",
+          "source_group": "task-7184ca2a4e42f6bcb3481260",
+          "group": "task-7184ca2a4e42f6bcb3481260",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-0b9c5312-d561-44a1-b3d6-3503aae0a705",
+      "file": "decision-dataset-0b9c5312-d561-44a1-b3d6-3503aae0a705.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-POL-001/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-6f62bb8920f93ba296221354da52007f",
+          "split": "unassigned",
+          "source_group": "task-790a9b23a81cc1995a85ac50",
+          "group": "task-790a9b23a81cc1995a85ac50",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-0e1dc9ba-596e-458b-8d3c-84e122eb2677",
+      "file": "decision-dataset-0e1dc9ba-596e-458b-8d3c-84e122eb2677.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-POL-008/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-d20ce1465c5447482ec4733cb36d173a",
+          "split": "unassigned",
+          "source_group": "task-361cdffbd83a68a4457c619d",
+          "group": "task-361cdffbd83a68a4457c619d",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-0ea9b15b-1b13-40b6-ad14-28b83a322735",
+      "file": "decision-dataset-0ea9b15b-1b13-40b6-ad14-28b83a322735.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-QA-013/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-039c87580d55717944c0f813902a088d",
+          "split": "unassigned",
+          "source_group": "task-802f850689193c4616b111fe",
+          "group": "task-802f850689193c4616b111fe",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-12b19851-1ef7-448a-baf1-9689142df5f3",
+      "file": "decision-dataset-12b19851-1ef7-448a-baf1-9689142df5f3.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-POL-003/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-98fea336aca22dcdcf9c18abc5ac2b3e",
+          "split": "unassigned",
+          "source_group": "task-8a0ba2360b2358da13839f74",
+          "group": "task-8a0ba2360b2358da13839f74",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-1e31116e-e1a3-4138-babf-458e8056764f",
+      "file": "decision-dataset-1e31116e-e1a3-4138-babf-458e8056764f.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-INS-007/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-21d9c5df91cc798d99329bc06e65713c",
+          "split": "unassigned",
+          "source_group": "task-28717bb82249a08e5d2638b1",
+          "group": "task-28717bb82249a08e5d2638b1",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-1eaee51f-e2c3-4735-8020-2914f0391b73",
+      "file": "decision-dataset-1eaee51f-e2c3-4735-8020-2914f0391b73.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-SCHED-007/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-bbc47ebce94c276563fac7de63fa40a9",
+          "split": "unassigned",
+          "source_group": "task-89ca1c6571b837b6c3c49dc9",
+          "group": "task-89ca1c6571b837b6c3c49dc9",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-2165e11e-516f-4e25-874f-1f9116d58d80",
+      "file": "decision-dataset-2165e11e-516f-4e25-874f-1f9116d58d80.json",
+      "schema_version": 2,
+      "agent_id": null,
+      "experiment_id": null,
+      "run_id": "run-05973a80-6b91-40e7-a0da-acca3a4ea696",
+      "path": "evolution/experiments/EXP-inspection-delivery-demo-001-rf841e4415364/runs/run-05973a80-6b91-40e7-a0da-acca3a4ea696/evidence/U-ASSET-PARTIAL-001/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-61f01928b8cbfb3039a7ca1f4e53834b",
+          "split": "unassigned",
+          "source_group": "task-35a462594b78e41074a5bc12",
+          "group": "task-35a462594b78e41074a5bc12",
+          "run_id": "run-05973a80-6b91-40e7-a0da-acca3a4ea696",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "suggested",
+              "decision_time_reviewed": false,
+              "kind": "model_suggestion"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-2ffd1e30-5a18-49e5-88c0-8479bf729d37",
+      "file": "decision-dataset-2ffd1e30-5a18-49e5-88c0-8479bf729d37.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-POL-006/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-1a31de79790889a2e1420ef2be9f3c9a",
+          "split": "unassigned",
+          "source_group": "task-e28633585ecba616fd42d991",
+          "group": "task-e28633585ecba616fd42d991",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-32c658c6-5533-47f0-8b52-d771c27858c9",
+      "file": "decision-dataset-32c658c6-5533-47f0-8b52-d771c27858c9.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-QA-006/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-57526824a7cbf10025e21d14a5cb6be2",
+          "split": "unassigned",
+          "source_group": "task-4137e08cbcb935cd82f49578",
+          "group": "task-4137e08cbcb935cd82f49578",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-34e90e0e-7167-43a4-8d93-25014ba4ada2",
+      "file": "decision-dataset-34e90e0e-7167-43a4-8d93-25014ba4ada2.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-THREAT-MISSING/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-025e8ca363a79267185df06f4cc99195",
+          "split": "unassigned",
+          "source_group": "task-e5b9697079149d224c6663a8",
+          "group": "task-e5b9697079149d224c6663a8",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-36932e33-6d28-4c6e-97c7-6c3b7706ed33",
+      "file": "decision-dataset-36932e33-6d28-4c6e-97c7-6c3b7706ed33.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-THREAT-FAST/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-99410883bbd89e7f5808d50e2175ea6a",
+          "split": "unassigned",
+          "source_group": "task-1c5c2ef9232e7d6e3505d39e",
+          "group": "task-1c5c2ef9232e7d6e3505d39e",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-38a19325-aa87-4e53-bae6-9458f72bdbe7",
+      "file": "decision-dataset-38a19325-aa87-4e53-bae6-9458f72bdbe7.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-FLT-006/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-022eb42ebf8fe2042dc61e53af35d151",
+          "split": "unassigned",
+          "source_group": "task-2eb34413e4453eaa6d3334bd",
+          "group": "task-2eb34413e4453eaa6d3334bd",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-3ad5bf46-33d1-4a15-b951-d9ea2a1dfeb6",
+      "file": "decision-dataset-3ad5bf46-33d1-4a15-b951-d9ea2a1dfeb6.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-QA-008/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-4748e820e37365899cf9ec1cb852f775",
+          "split": "unassigned",
+          "source_group": "task-f4adc925f7ce293362a07a0c",
+          "group": "task-f4adc925f7ce293362a07a0c",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-3df04458-499c-4344-8de4-1d02ab8a4d4f",
+      "file": "decision-dataset-3df04458-499c-4344-8de4-1d02ab8a4d4f.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-SCHED-001/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-419870bc72b0cfb8117a92ba053c5027",
+          "split": "unassigned",
+          "source_group": "task-b843ed0a10df1235660ba7fc",
+          "group": "task-b843ed0a10df1235660ba7fc",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-401eea73-1ff5-4d76-8735-7da15929082d",
+      "file": "decision-dataset-401eea73-1ff5-4d76-8735-7da15929082d.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-FLT-008/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-20abe7bf499782b0bd5d632363d73e65",
+          "split": "unassigned",
+          "source_group": "task-dbeef2ccea58ba4bb88f5166",
+          "group": "task-dbeef2ccea58ba4bb88f5166",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-410d5e41-f2a0-4e49-acff-62d986cedeac",
+      "file": "decision-dataset-410d5e41-f2a0-4e49-acff-62d986cedeac.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-POL-007/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-52d6f29900857fa1d8a246bf0e3f7605",
+          "split": "unassigned",
+          "source_group": "task-89c545b260bad844e4aecef3",
+          "group": "task-89c545b260bad844e4aecef3",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-472edaef-2e48-4bd1-805f-036a4f2a0e9c",
+      "file": "decision-dataset-472edaef-2e48-4bd1-805f-036a4f2a0e9c.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-QA-011/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-97ecf4a684319039ef8c4329b9aa8dd0",
+          "split": "unassigned",
+          "source_group": "task-712321662444972c191a81e5",
+          "group": "task-712321662444972c191a81e5",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-47a9ae29-87b5-4e18-a8f0-61a2600c7d00",
+      "file": "decision-dataset-47a9ae29-87b5-4e18-a8f0-61a2600c7d00.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-INS-001/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-c4b87a1875c223f02e4d5f0a0e86580d",
+          "split": "unassigned",
+          "source_group": "task-b3fa075013ea4dbc5a1fd111",
+          "group": "task-b3fa075013ea4dbc5a1fd111",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-4cf122c9-1a1c-4837-b7dc-52ff81f30ff9",
+      "file": "decision-dataset-4cf122c9-1a1c-4837-b7dc-52ff81f30ff9.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-VOICE-003/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-52a77e21cd52657ae19faf652a98fc6b",
+          "split": "unassigned",
+          "source_group": "task-df81e5d21ff359e4ba52c077",
+          "group": "task-df81e5d21ff359e4ba52c077",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-4ebb8cb8-ba2b-4983-bb9c-9dfc10157618",
+      "file": "decision-dataset-4ebb8cb8-ba2b-4983-bb9c-9dfc10157618.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-INS-005/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-76066c8c8fc3d4f7e0648132bf65c92a",
+          "split": "unassigned",
+          "source_group": "task-1fe8b00a4ae8eb6afc36027b",
+          "group": "task-1fe8b00a4ae8eb6afc36027b",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-4ed52663-8349-4313-bdd0-91e1b16ab1a2",
+      "file": "decision-dataset-4ed52663-8349-4313-bdd0-91e1b16ab1a2.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-FLT-010/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-3eda5ac302ecd5edd25a0d4ad224c85e",
+          "split": "unassigned",
+          "source_group": "task-37f80c1d6c3ddcb44f065e2f",
+          "group": "task-37f80c1d6c3ddcb44f065e2f",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-4ef57849-3cff-4a36-9642-38b0e563bd92",
+      "file": "decision-dataset-4ef57849-3cff-4a36-9642-38b0e563bd92.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-EMG-003/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-d5e89ceaabe06cf2004ed9344841f73f",
+          "split": "unassigned",
+          "source_group": "task-984a8b435421d67f2dc34330",
+          "group": "task-984a8b435421d67f2dc34330",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-52b89862-8577-4e64-963e-e4c6f655e8c2",
+      "file": "decision-dataset-52b89862-8577-4e64-963e-e4c6f655e8c2.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-POL-010/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-3b2a7e6f51717ecf586b3536c6eace96",
+          "split": "unassigned",
+          "source_group": "task-749083fe46c522832e49b6f9",
+          "group": "task-749083fe46c522832e49b6f9",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-5bea8684-5489-4063-9d1f-96c474031f92",
+      "file": "decision-dataset-5bea8684-5489-4063-9d1f-96c474031f92.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-FLT-007/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-402594b1feb7491bb22eb692a0f71591",
+          "split": "unassigned",
+          "source_group": "task-b33e33b41b37c0a7d11b924e",
+          "group": "task-b33e33b41b37c0a7d11b924e",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-5c74491e-2fb4-4e74-831b-a468ce901fb0",
+      "file": "decision-dataset-5c74491e-2fb4-4e74-831b-a468ce901fb0.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-QA-002/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-edded2508dee0f37015f04d1fe63e79b",
+          "split": "unassigned",
+          "source_group": "task-11072af553ba77f90ae4bf0b",
+          "group": "task-11072af553ba77f90ae4bf0b",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-6088b801-7554-4c9f-b1f9-9457f597c53c",
+      "file": "decision-dataset-6088b801-7554-4c9f-b1f9-9457f597c53c.json",
+      "schema_version": 2,
+      "agent_id": null,
+      "experiment_id": null,
+      "run_id": "run-9521d681-a5c0-4d62-a620-ef1b3f0280f1",
+      "path": "evolution/experiments/EXP-daily-inspection-assistant-005-r0dae2ba1ebb1/runs/run-9521d681-a5c0-4d62-a620-ef1b3f0280f1/evidence/U-ASSET-PAGES-001/trace.jsonl",
+      "records": 3,
+      "entries": [
+        {
+          "id": "decision-fa38d4d61b6775de1eed19d051ec17e0",
+          "split": "unassigned",
+          "source_group": "task-c4cfe26fb9f655a1114c2ad8",
+          "group": "task-c4cfe26fb9f655a1114c2ad8",
+          "run_id": "run-9521d681-a5c0-4d62-a620-ef1b3f0280f1",
+          "semantics": "observed_action",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "suggested",
+              "decision_time_reviewed": false,
+              "kind": "observed_action"
+            }
+          ]
+        },
+        {
+          "id": "decision-3a3be39cfa32f0ae810e24fc573aea26",
+          "split": "unassigned",
+          "source_group": "task-c4cfe26fb9f655a1114c2ad8",
+          "group": "task-c4cfe26fb9f655a1114c2ad8",
+          "run_id": "run-9521d681-a5c0-4d62-a620-ef1b3f0280f1",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "suggested",
+              "decision_time_reviewed": false,
+              "kind": "model_suggestion"
+            }
+          ]
+        },
+        {
+          "id": "decision-c5bdd933097c0925dfca30374eab329a",
+          "split": "unassigned",
+          "source_group": "task-c4cfe26fb9f655a1114c2ad8",
+          "group": "task-c4cfe26fb9f655a1114c2ad8",
+          "run_id": "run-9521d681-a5c0-4d62-a620-ef1b3f0280f1",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 2,
+          "targets": [
+            {
+              "status": "suggested",
+              "decision_time_reviewed": false,
+              "kind": "human_annotation"
+            },
+            {
+              "status": "suggested",
+              "decision_time_reviewed": false,
+              "kind": "model_suggestion"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-61e47e45-16a0-49af-b41f-387289c29404",
+      "file": "decision-dataset-61e47e45-16a0-49af-b41f-387289c29404.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-SCHED-004/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-ecb9504752688e48a53fc8d40db260b3",
+          "split": "unassigned",
+          "source_group": "task-81085c33101eb6b42cb2442f",
+          "group": "task-81085c33101eb6b42cb2442f",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-620681f9-b5d4-4f2d-9439-65f527f4e9e3",
+      "file": "decision-dataset-620681f9-b5d4-4f2d-9439-65f527f4e9e3.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-FLT-006/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-272995f6ec7daf352466c8c5a35befaa",
+          "split": "unassigned",
+          "source_group": "task-2eb34413e4453eaa6d3334bd",
+          "group": "task-2eb34413e4453eaa6d3334bd",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-67a498df-9dd5-4563-bc8c-f2c8431f9a3e",
+      "file": "decision-dataset-67a498df-9dd5-4563-bc8c-f2c8431f9a3e.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-FLT-006/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-d23846ab2812c014e52363a4d5961b88",
+          "split": "unassigned",
+          "source_group": "task-2eb34413e4453eaa6d3334bd",
+          "group": "task-2eb34413e4453eaa6d3334bd",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-6df02426-77ce-4b15-8e49-0b0c36566c15",
+      "file": "decision-dataset-6df02426-77ce-4b15-8e49-0b0c36566c15.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-SCHED-005/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-19d19d26034e77e2a5229c248f2767f3",
+          "split": "unassigned",
+          "source_group": "task-c4b521902a0ff8da6aeef6b3",
+          "group": "task-c4b521902a0ff8da6aeef6b3",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-6f72e1b2-973d-4c5d-8294-d27e06fcee3d",
+      "file": "decision-dataset-6f72e1b2-973d-4c5d-8294-d27e06fcee3d.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-FLT-001/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-dff796ebdd93b5f316724fb672c6351d",
+          "split": "unassigned",
+          "source_group": "task-d4d9ef32c287768d424b2c02",
+          "group": "task-d4d9ef32c287768d424b2c02",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-71d23e96-b8c7-49b3-b053-ee717059f121",
+      "file": "decision-dataset-71d23e96-b8c7-49b3-b053-ee717059f121.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-THREAT-CONTRACT/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-a44821901a9b3ae4b416059267798040",
+          "split": "unassigned",
+          "source_group": "task-3a327ce223528bf91054cdf2",
+          "group": "task-3a327ce223528bf91054cdf2",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-729e145f-6852-4d2d-9a60-4cee6a46ea2e",
+      "file": "decision-dataset-729e145f-6852-4d2d-9a60-4cee6a46ea2e.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-FLT-002/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-2ea4b7a8098f3404db7b95ab33f9f489",
+          "split": "unassigned",
+          "source_group": "task-c4ae2f38cdc13f51c262d1bd",
+          "group": "task-c4ae2f38cdc13f51c262d1bd",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-731de1ed-0e12-4ce3-b4a0-9f30f51b7d1b",
+      "file": "decision-dataset-731de1ed-0e12-4ce3-b4a0-9f30f51b7d1b.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-POL-004/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-bff4b0a7ad77eab8b1c228201a4e298a",
+          "split": "unassigned",
+          "source_group": "task-43e979275e65b9cbc637fec8",
+          "group": "task-43e979275e65b9cbc637fec8",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-732621b7-4879-4abf-aa2e-2c7463bf3847",
+      "file": "decision-dataset-732621b7-4879-4abf-aa2e-2c7463bf3847.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-THREAT-MENTION/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-2dae2e69b329af011e02f16c9035fa67",
+          "split": "unassigned",
+          "source_group": "task-f0c71d0aa3c5e2bf2a44fb75",
+          "group": "task-f0c71d0aa3c5e2bf2a44fb75",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-733785be-8f3a-4e69-8ef6-ecb5fda58890",
+      "file": "decision-dataset-733785be-8f3a-4e69-8ef6-ecb5fda58890.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-SCHED-006/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-eda0f964332e248a0ceda7f87878f7cb",
+          "split": "unassigned",
+          "source_group": "task-c4b521902a0ff8da6aeef6b3",
+          "group": "task-c4b521902a0ff8da6aeef6b3",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-7337b559-3782-42c8-a9ff-2fb075fa359e",
+      "file": "decision-dataset-7337b559-3782-42c8-a9ff-2fb075fa359e.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-VOICE-004/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-f97b3dc3b8d935ae53708916b71582e9",
+          "split": "unassigned",
+          "source_group": "task-4dbb27a21bba2f3545075e46",
+          "group": "task-4dbb27a21bba2f3545075e46",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-76cf8052-5467-4689-b685-f439d40957aa",
+      "file": "decision-dataset-76cf8052-5467-4689-b685-f439d40957aa.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-POL-001/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-3f1febe42847e6d7287606a93478ce2c",
+          "split": "unassigned",
+          "source_group": "task-790a9b23a81cc1995a85ac50",
+          "group": "task-790a9b23a81cc1995a85ac50",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-77ca0791-f8f5-4165-b94c-f8995e14e610",
+      "file": "decision-dataset-77ca0791-f8f5-4165-b94c-f8995e14e610.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-FLT-010/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-12af60757785d6cf9102f6e79ff52fd7",
+          "split": "unassigned",
+          "source_group": "task-37f80c1d6c3ddcb44f065e2f",
+          "group": "task-37f80c1d6c3ddcb44f065e2f",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-79dfb874-a25a-4a01-b9c3-b1108bf247cf",
+      "file": "decision-dataset-79dfb874-a25a-4a01-b9c3-b1108bf247cf.json",
+      "schema_version": 2,
+      "agent_id": null,
+      "experiment_id": null,
+      "run_id": "run-05973a80-6b91-40e7-a0da-acca3a4ea696",
+      "path": "evolution/experiments/EXP-inspection-delivery-demo-001-rf841e4415364/runs/run-05973a80-6b91-40e7-a0da-acca3a4ea696/evidence/U-ASSET-PARTIAL-001/trace.jsonl",
+      "records": 3,
+      "entries": [
+        {
+          "id": "decision-569c531c7ee3de020cc32366e02aeff7",
+          "split": "unassigned",
+          "source_group": "task-35a462594b78e41074a5bc12",
+          "group": "task-35a462594b78e41074a5bc12",
+          "run_id": "run-05973a80-6b91-40e7-a0da-acca3a4ea696",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "suggested",
+              "decision_time_reviewed": false,
+              "kind": "model_suggestion"
+            }
+          ]
+        },
+        {
+          "id": "decision-be1a0455718844a48f271b0a79639ee0",
+          "split": "unassigned",
+          "source_group": "task-35a462594b78e41074a5bc12",
+          "group": "task-35a462594b78e41074a5bc12",
+          "run_id": "run-05973a80-6b91-40e7-a0da-acca3a4ea696",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "suggested",
+              "decision_time_reviewed": false,
+              "kind": "model_suggestion"
+            }
+          ]
+        },
+        {
+          "id": "decision-b34ce50f69f222a66ce6450ff4570400",
+          "split": "unassigned",
+          "source_group": "task-35a462594b78e41074a5bc12",
+          "group": "task-35a462594b78e41074a5bc12",
+          "run_id": "run-05973a80-6b91-40e7-a0da-acca3a4ea696",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "suggested",
+              "decision_time_reviewed": false,
+              "kind": "model_suggestion"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-7c046e25-6911-4139-9faf-4e54676bf857",
+      "file": "decision-dataset-7c046e25-6911-4139-9faf-4e54676bf857.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-THREAT-FOLLOWUP/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-3080bd4c15477b140dd4c1360f729467",
+          "split": "unassigned",
+          "source_group": "task-1c5c2ef9232e7d6e3505d39e",
+          "group": "task-1c5c2ef9232e7d6e3505d39e",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-7ef41b34-ae95-45c7-a7fc-a6eab9846fc5",
+      "file": "decision-dataset-7ef41b34-ae95-45c7-a7fc-a6eab9846fc5.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-POL-005/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-61e02b1471e20c53d59e0e3bf286abf7",
+          "split": "unassigned",
+          "source_group": "task-0e94fc2c75456f69de6a2123",
+          "group": "task-0e94fc2c75456f69de6a2123",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-83a33f89-0aca-4176-85d0-7e1732cf8f16",
+      "file": "decision-dataset-83a33f89-0aca-4176-85d0-7e1732cf8f16.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-FLT-009/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-c0094becb72a26b58f4a6cdcc3847d56",
+          "split": "unassigned",
+          "source_group": "task-b3fa075013ea4dbc5a1fd111",
+          "group": "task-b3fa075013ea4dbc5a1fd111",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-86ea162a-31b4-410e-89bb-ed4b8b8309c5",
+      "file": "decision-dataset-86ea162a-31b4-410e-89bb-ed4b8b8309c5.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-INS-003/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-d39c8c2d24674f32a201db6ad2897595",
+          "split": "unassigned",
+          "source_group": "task-f63a422fcb96e0a9da05c79e",
+          "group": "task-f63a422fcb96e0a9da05c79e",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-875a2614-453f-4a7e-a037-ca1a181c4001",
+      "file": "decision-dataset-875a2614-453f-4a7e-a037-ca1a181c4001.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-THREAT-MENTION/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-da9720866ea2715052d63f7db04bcfb2",
+          "split": "unassigned",
+          "source_group": "task-f0c71d0aa3c5e2bf2a44fb75",
+          "group": "task-f0c71d0aa3c5e2bf2a44fb75",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-884b8046-99b0-4f1b-bc1c-e950f0e067fd",
+      "file": "decision-dataset-884b8046-99b0-4f1b-bc1c-e950f0e067fd.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-FLT-002/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-b9d2356178225219d8a5a701bb577f76",
+          "split": "unassigned",
+          "source_group": "task-c4ae2f38cdc13f51c262d1bd",
+          "group": "task-c4ae2f38cdc13f51c262d1bd",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-8d10a55d-a700-41bf-bb17-d5ffa70649ac",
+      "file": "decision-dataset-8d10a55d-a700-41bf-bb17-d5ffa70649ac.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-FLT-MENTION/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-516894e620396b6c383a1686884967be",
+          "split": "unassigned",
+          "source_group": "task-5fcde4ed9d30509683231976",
+          "group": "task-5fcde4ed9d30509683231976",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-8dbf8443-b779-4904-b601-5193d204e69f",
+      "file": "decision-dataset-8dbf8443-b779-4904-b601-5193d204e69f.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-QA-009/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-3dd00f318c6cfabc8ddfe6e238228e2e",
+          "split": "unassigned",
+          "source_group": "task-436ef213365225eac9cc8c6d",
+          "group": "task-436ef213365225eac9cc8c6d",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-9666d1c1-c450-438d-be4c-1c8f3365df72",
+      "file": "decision-dataset-9666d1c1-c450-438d-be4c-1c8f3365df72.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-VOICE-004/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-9d4290ae06042f086e1a0b99937ecac2",
+          "split": "unassigned",
+          "source_group": "task-4dbb27a21bba2f3545075e46",
+          "group": "task-4dbb27a21bba2f3545075e46",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-9738e5e0-12c1-45a2-bdb9-3ef3e3e3675d",
+      "file": "decision-dataset-9738e5e0-12c1-45a2-bdb9-3ef3e3e3675d.json",
+      "schema_version": 2,
+      "agent_id": null,
+      "experiment_id": null,
+      "run_id": "run-05973a80-6b91-40e7-a0da-acca3a4ea696",
+      "path": "evolution/experiments/EXP-inspection-delivery-demo-001-rf841e4415364/runs/run-05973a80-6b91-40e7-a0da-acca3a4ea696/evidence/U-ASSET-PAGES-001/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-92178223c3d53686d26080f259aad6de",
+          "split": "unassigned",
+          "source_group": "task-c4cfe26fb9f655a1114c2ad8",
+          "group": "task-c4cfe26fb9f655a1114c2ad8",
+          "run_id": "run-05973a80-6b91-40e7-a0da-acca3a4ea696",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "suggested",
+              "decision_time_reviewed": false,
+              "kind": "model_suggestion"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-978fee8b-bc6e-4e93-a63e-0b8e3d9add49",
+      "file": "decision-dataset-978fee8b-bc6e-4e93-a63e-0b8e3d9add49.json",
+      "schema_version": 2,
+      "agent_id": null,
+      "experiment_id": null,
+      "run_id": "run-05973a80-6b91-40e7-a0da-acca3a4ea696",
+      "path": "evolution/experiments/EXP-inspection-delivery-demo-001-rf841e4415364/runs/run-05973a80-6b91-40e7-a0da-acca3a4ea696/evidence/U-ROLE-001/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-98c34ecd9188cd5485cb4362eb1512ec",
+          "split": "unassigned",
+          "source_group": "task-953e0866c7876bd48efe588a",
+          "group": "task-953e0866c7876bd48efe588a",
+          "run_id": "run-05973a80-6b91-40e7-a0da-acca3a4ea696",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "suggested",
+              "decision_time_reviewed": false,
+              "kind": "model_suggestion"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-9f7a78ef-3e4d-4027-b563-48803c69f33c",
+      "file": "decision-dataset-9f7a78ef-3e4d-4027-b563-48803c69f33c.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-SCHED-002/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-c44906b2131f39789efa69770b322557",
+          "split": "unassigned",
+          "source_group": "task-c4b521902a0ff8da6aeef6b3",
+          "group": "task-c4b521902a0ff8da6aeef6b3",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-a23a2540-cef0-4bca-b28d-a0450eb952a0",
+      "file": "decision-dataset-a23a2540-cef0-4bca-b28d-a0450eb952a0.json",
+      "schema_version": 1,
+      "agent_id": null,
+      "experiment_id": null,
+      "run_id": "run-a994263a-68a8-458b-a619-09f3d2304c0a",
+      "path": "evolution/experiments/EXP-daily-inspection-assistant-001-r602ec12fd531/runs/run-a994263a-68a8-458b-a619-09f3d2304c0a/evidence/U-SUMMARY-002/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-d83fc38813fc973e7bba8a047748159c",
+          "split": "unassigned",
+          "source_group": null,
+          "group": "task-a41992beba05d63967ea9728",
+          "run_id": "run-a994263a-68a8-458b-a619-09f3d2304c0a",
+          "semantics": null,
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": []
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-a58ffec2-4e65-4f30-a3dd-153a39aef82b",
+      "file": "decision-dataset-a58ffec2-4e65-4f30-a3dd-153a39aef82b.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-FLT-007/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-32e2d2ea5ad336b085a98eae2c64c2b3",
+          "split": "unassigned",
+          "source_group": "task-b33e33b41b37c0a7d11b924e",
+          "group": "task-b33e33b41b37c0a7d11b924e",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-b0e76e4e-9679-4cef-830d-6cff4fde4ce8",
+      "file": "decision-dataset-b0e76e4e-9679-4cef-830d-6cff4fde4ce8.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-INS-002/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-b87e79785d4718e71ea8b84a029cea7a",
+          "split": "unassigned",
+          "source_group": "task-23b052c200e7f27cd1cf5575",
+          "group": "task-23b052c200e7f27cd1cf5575",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-b1e01053-f34c-4f91-94c7-d5fdf9b82903",
+      "file": "decision-dataset-b1e01053-f34c-4f91-94c7-d5fdf9b82903.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-FLT-003/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-fc6144794b0d821dbee9fe01dc9f669d",
+          "split": "unassigned",
+          "source_group": "task-f71460227204c39493dd5ad4",
+          "group": "task-f71460227204c39493dd5ad4",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-b3450809-38ed-4b54-860b-be243aba7b78",
+      "file": "decision-dataset-b3450809-38ed-4b54-860b-be243aba7b78.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-QA-012/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-1a937d2c64ebe01ae025ac0a532e8a63",
+          "split": "unassigned",
+          "source_group": "task-fe5bf67ff69e6dee5ec5122a",
+          "group": "task-fe5bf67ff69e6dee5ec5122a",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-b3b83146-3e1e-40b9-97fa-5f9a9adf9209",
+      "file": "decision-dataset-b3b83146-3e1e-40b9-97fa-5f9a9adf9209.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-QA-010/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-4321fb094261233d1c93e66d9e356463",
+          "split": "unassigned",
+          "source_group": "task-c00ac2f40c48a60c00d1ea59",
+          "group": "task-c00ac2f40c48a60c00d1ea59",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-b64eb7a6-397c-4c0e-a4f0-c747b564d0ee",
+      "file": "decision-dataset-b64eb7a6-397c-4c0e-a4f0-c747b564d0ee.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-QA-004/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-2060ab3f8693bc3167d573b4854f8930",
+          "split": "unassigned",
+          "source_group": "task-9749ed22dd334f1914d0a0e1",
+          "group": "task-9749ed22dd334f1914d0a0e1",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-b8f473f1-0cd7-42cd-a0a1-b90771f1ebe4",
+      "file": "decision-dataset-b8f473f1-0cd7-42cd-a0a1-b90771f1ebe4.json",
+      "schema_version": 2,
+      "agent_id": null,
+      "experiment_id": null,
+      "run_id": "run-6544173e-0670-4cfd-af86-f0d27cad77d2",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-6544173e-0670-4cfd-af86-f0d27cad77d2/evidence/U-ASSET-ALERTS-FAIL/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-62288228eebf7818375bba80dc58b5c3",
+          "split": "unassigned",
+          "source_group": "task-93b495261aac68344eff39e1",
+          "group": "task-93b495261aac68344eff39e1",
+          "run_id": "run-6544173e-0670-4cfd-af86-f0d27cad77d2",
+          "semantics": "observed_action",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "suggested",
+              "decision_time_reviewed": false,
+              "kind": "observed_action"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-b977e77a-6f66-47aa-9a78-dd5d6631f552",
+      "file": "decision-dataset-b977e77a-6f66-47aa-9a78-dd5d6631f552.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-SCHED-003/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-a4b4a3e77353f27cb6a030217ef21113",
+          "split": "unassigned",
+          "source_group": "task-05ea5035a572fa074497ddc0",
+          "group": "task-05ea5035a572fa074497ddc0",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-ba27ebaf-079a-4cd2-94b2-e9b1f7e82b2b",
+      "file": "decision-dataset-ba27ebaf-079a-4cd2-94b2-e9b1f7e82b2b.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-POL-002/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-81eb0674b59c14f53f9b79eea05ef0b7",
+          "split": "unassigned",
+          "source_group": "task-b575dd8777ddf25dcab01a00",
+          "group": "task-b575dd8777ddf25dcab01a00",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-bcc1c246-216a-4b1c-bb5f-b3583c2c9492",
+      "file": "decision-dataset-bcc1c246-216a-4b1c-bb5f-b3583c2c9492.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-INS-006/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-4a42c132376dbe0963493c7553dab5f8",
+          "split": "unassigned",
+          "source_group": "task-49cf5d1d883a8052ec85f952",
+          "group": "task-49cf5d1d883a8052ec85f952",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-bce4cc3f-ea0b-4e0c-a9e2-743f566f4a71",
+      "file": "decision-dataset-bce4cc3f-ea0b-4e0c-a9e2-743f566f4a71.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-INS-004/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-bae11edd298347e90e164158966b1e8d",
+          "split": "unassigned",
+          "source_group": "task-2dd1bcbfe9564076f8c9d107",
+          "group": "task-2dd1bcbfe9564076f8c9d107",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-be807f89-3e64-40f1-8360-b7464acd0a53",
+      "file": "decision-dataset-be807f89-3e64-40f1-8360-b7464acd0a53.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-FLT-004/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-2647f0921c7cb324e6a6c169ed3beab6",
+          "split": "unassigned",
+          "source_group": "task-1141220aefee6fee487097a5",
+          "group": "task-1141220aefee6fee487097a5",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-bf4126d9-8f9a-481a-92a8-b0143902813f",
+      "file": "decision-dataset-bf4126d9-8f9a-481a-92a8-b0143902813f.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-POL-012/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-fbb5bddc4d5d2773ddceb9779578cfc1",
+          "split": "unassigned",
+          "source_group": "task-3926b626c69a8abf01860029",
+          "group": "task-3926b626c69a8abf01860029",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-c319943c-eca2-402e-9c08-61393f90dfd2",
+      "file": "decision-dataset-c319943c-eca2-402e-9c08-61393f90dfd2.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-POL-011/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-783c45c0d28561d363ba23afcf68f3e9",
+          "split": "unassigned",
+          "source_group": "task-c1570390cd11e2c2997f31f6",
+          "group": "task-c1570390cd11e2c2997f31f6",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-c329cf9e-755f-43c5-9270-bc476423324d",
+      "file": "decision-dataset-c329cf9e-755f-43c5-9270-bc476423324d.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-INS-001/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-ca5ea916ccfe36732ae1492426aec9bb",
+          "split": "unassigned",
+          "source_group": "task-b3fa075013ea4dbc5a1fd111",
+          "group": "task-b3fa075013ea4dbc5a1fd111",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-c34ebbac-c291-41e6-9ce3-d8d16700541c",
+      "file": "decision-dataset-c34ebbac-c291-41e6-9ce3-d8d16700541c.json",
+      "schema_version": 2,
+      "agent_id": null,
+      "experiment_id": null,
+      "run_id": "run-05973a80-6b91-40e7-a0da-acca3a4ea696",
+      "path": "evolution/experiments/EXP-inspection-delivery-demo-001-rf841e4415364/runs/run-05973a80-6b91-40e7-a0da-acca3a4ea696/evidence/U-ASSET-PAGES-001/trace.jsonl",
+      "records": 2,
+      "entries": [
+        {
+          "id": "decision-e9063ab0fce85f4168a83acde3ca28bb",
+          "split": "unassigned",
+          "source_group": "task-c4cfe26fb9f655a1114c2ad8",
+          "group": "task-c4cfe26fb9f655a1114c2ad8",
+          "run_id": "run-05973a80-6b91-40e7-a0da-acca3a4ea696",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "suggested",
+              "decision_time_reviewed": false,
+              "kind": "model_suggestion"
+            }
+          ]
+        },
+        {
+          "id": "decision-d571b33d03357af5642098d79b7a38d0",
+          "split": "unassigned",
+          "source_group": "task-c4cfe26fb9f655a1114c2ad8",
+          "group": "task-c4cfe26fb9f655a1114c2ad8",
+          "run_id": "run-05973a80-6b91-40e7-a0da-acca3a4ea696",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 2,
+          "targets": [
+            {
+              "status": "suggested",
+              "decision_time_reviewed": false,
+              "kind": "model_suggestion"
+            },
+            {
+              "status": "suggested",
+              "decision_time_reviewed": false,
+              "kind": "model_suggestion"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-c762d02a-7e41-4b0c-8ff8-8030c852f932",
+      "file": "decision-dataset-c762d02a-7e41-4b0c-8ff8-8030c852f932.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-VOICE-002/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-c5fb6bf0ac252816b0615061cab86275",
+          "split": "unassigned",
+          "source_group": "task-853402023cf9e682d2074a01",
+          "group": "task-853402023cf9e682d2074a01",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-c97653f1-6129-40f1-95cf-3357cd3b4268",
+      "file": "decision-dataset-c97653f1-6129-40f1-95cf-3357cd3b4268.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-THREAT-FULL/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-31231f5a0f47a8640c4f8b5e1256fdb7",
+          "split": "unassigned",
+          "source_group": "task-247a1886e6370f67d043b507",
+          "group": "task-247a1886e6370f67d043b507",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-c9971df0-293a-4856-8a51-8e5c34492fa5",
+      "file": "decision-dataset-c9971df0-293a-4856-8a51-8e5c34492fa5.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-QA-003/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-933e0e23d60a8f000d025ac5666077f2",
+          "split": "unassigned",
+          "source_group": "task-958e9f6a2201dda8a237b5af",
+          "group": "task-958e9f6a2201dda8a237b5af",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-ca9a84e0-8d65-4636-92d2-9fef85a9a968",
+      "file": "decision-dataset-ca9a84e0-8d65-4636-92d2-9fef85a9a968.json",
+      "schema_version": 2,
+      "agent_id": null,
+      "experiment_id": null,
+      "run_id": "run-1822acd1-3780-4554-8ae2-17d910aa5ee8",
+      "path": "evolution/experiments/EXP-daily-inspection-assistant-005-r0dae2ba1ebb1/runs/run-1822acd1-3780-4554-8ae2-17d910aa5ee8/evidence/U-ASSET-PAGES-001/trace.jsonl",
+      "records": 2,
+      "entries": [
+        {
+          "id": "decision-092c755b82b668825001d31eba30f57c",
+          "split": "unassigned",
+          "source_group": "task-c4cfe26fb9f655a1114c2ad8",
+          "group": "task-c4cfe26fb9f655a1114c2ad8",
+          "run_id": "run-1822acd1-3780-4554-8ae2-17d910aa5ee8",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 2,
+          "targets": [
+            {
+              "status": "suggested",
+              "decision_time_reviewed": false,
+              "kind": "model_suggestion"
+            },
+            {
+              "status": "suggested",
+              "decision_time_reviewed": false,
+              "kind": "model_suggestion"
+            }
+          ]
+        },
+        {
+          "id": "decision-ed155d2a064a90ff6c22a144a7239b81",
+          "split": "unassigned",
+          "source_group": "task-c4cfe26fb9f655a1114c2ad8",
+          "group": "task-c4cfe26fb9f655a1114c2ad8",
+          "run_id": "run-1822acd1-3780-4554-8ae2-17d910aa5ee8",
+          "semantics": "observed_action",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "suggested",
+              "decision_time_reviewed": false,
+              "kind": "observed_action"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-ce0d8b9d-cb6a-4c5c-a012-363afe734682",
+      "file": "decision-dataset-ce0d8b9d-cb6a-4c5c-a012-363afe734682.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-FLT-009/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-fbc7c730cd9e35d1ec685f7a6cdec966",
+          "split": "unassigned",
+          "source_group": "task-b3fa075013ea4dbc5a1fd111",
+          "group": "task-b3fa075013ea4dbc5a1fd111",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-ce9f0fb1-6318-4930-9ca4-cf4467f1c962",
+      "file": "decision-dataset-ce9f0fb1-6318-4930-9ca4-cf4467f1c962.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-FLT-001/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-756768cc9777fa85f53c0186466aa581",
+          "split": "unassigned",
+          "source_group": "task-d4d9ef32c287768d424b2c02",
+          "group": "task-d4d9ef32c287768d424b2c02",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-d25a4088-ee9d-48fb-be5a-068db9ad7aa2",
+      "file": "decision-dataset-d25a4088-ee9d-48fb-be5a-068db9ad7aa2.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-SCHED-004/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-40318424d187ace1e676300e4b7bb06c",
+          "split": "unassigned",
+          "source_group": "task-81085c33101eb6b42cb2442f",
+          "group": "task-81085c33101eb6b42cb2442f",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-d43ae0b4-da1c-4415-9fa8-14e501b6ca3e",
+      "file": "decision-dataset-d43ae0b4-da1c-4415-9fa8-14e501b6ca3e.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-FLT-007/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-43e96eef0739be5d8d01348c6f866b89",
+          "split": "unassigned",
+          "source_group": "task-b33e33b41b37c0a7d11b924e",
+          "group": "task-b33e33b41b37c0a7d11b924e",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-d8f3eb4c-e21a-4521-ad3c-407d1baa223e",
+      "file": "decision-dataset-d8f3eb4c-e21a-4521-ad3c-407d1baa223e.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-THREAT-MISSING/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-245cca13b611028d85c7d017817116b5",
+          "split": "unassigned",
+          "source_group": "task-e5b9697079149d224c6663a8",
+          "group": "task-e5b9697079149d224c6663a8",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-da82e26e-7b70-4542-8f02-bffb79c093d0",
+      "file": "decision-dataset-da82e26e-7b70-4542-8f02-bffb79c093d0.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-POL-001/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-5b09d404ca929bc299ce49d7582bca00",
+          "split": "unassigned",
+          "source_group": "task-790a9b23a81cc1995a85ac50",
+          "group": "task-790a9b23a81cc1995a85ac50",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-e0c176f9-d6cd-4af7-b7b0-3e53d18aeb06",
+      "file": "decision-dataset-e0c176f9-d6cd-4af7-b7b0-3e53d18aeb06.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-QA-014/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-e79df4c43e4ead0edf797a7ec2a2293f",
+          "split": "unassigned",
+          "source_group": "task-12035b3fe530042e0002417b",
+          "group": "task-12035b3fe530042e0002417b",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-e12ecaa4-67ef-4874-b94b-83ce235cfae9",
+      "file": "decision-dataset-e12ecaa4-67ef-4874-b94b-83ce235cfae9.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-VOICE-002/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-92e2443a5d22baa6aa798bc98146072e",
+          "split": "unassigned",
+          "source_group": "task-853402023cf9e682d2074a01",
+          "group": "task-853402023cf9e682d2074a01",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-e1602dbb-98d5-456f-bd1c-b7d1592bcf45",
+      "file": "decision-dataset-e1602dbb-98d5-456f-bd1c-b7d1592bcf45.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-POL-009/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-365447d6457d6e9d23f540ec1d69f955",
+          "split": "unassigned",
+          "source_group": "task-23ac863c35719f69f70a541b",
+          "group": "task-23ac863c35719f69f70a541b",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-e2441598-d2df-459d-b87d-149863c5cf1f",
+      "file": "decision-dataset-e2441598-d2df-459d-b87d-149863c5cf1f.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-QA-001/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-433000441bf41b2fe6d7959f189656a1",
+          "split": "unassigned",
+          "source_group": "task-c5fbf64e911e12dc531d447e",
+          "group": "task-c5fbf64e911e12dc531d447e",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-e800c84a-8ed2-40f4-91eb-a903d8324fdb",
+      "file": "decision-dataset-e800c84a-8ed2-40f4-91eb-a903d8324fdb.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-FLT-005/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-0742db6dc576af730ed2421a56944bf6",
+          "split": "unassigned",
+          "source_group": "task-6e595fd50f7de7294e4601ba",
+          "group": "task-6e595fd50f7de7294e4601ba",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-ebaa3aaf-c0c7-49d6-8b01-95b9b82e60ba",
+      "file": "decision-dataset-ebaa3aaf-c0c7-49d6-8b01-95b9b82e60ba.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-QA-005/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-42e309e9c3014e5045f0bf5e29c90011",
+          "split": "unassigned",
+          "source_group": "task-d8c52cf23aa26d7cbf6fd158",
+          "group": "task-d8c52cf23aa26d7cbf6fd158",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-f0051445-7c21-413f-bdbc-af7950743695",
+      "file": "decision-dataset-f0051445-7c21-413f-bdbc-af7950743695.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-VOICE-001/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-44e3523b7ad2968fe90c87c7c8882e45",
+          "split": "unassigned",
+          "source_group": "task-f0a692af8e12df97a6a09942",
+          "group": "task-f0a692af8e12df97a6a09942",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-dataset-f0c73651-d49b-4391-9d8d-06cfe5ac0f25",
+      "file": "decision-dataset-f0c73651-d49b-4391-9d8d-06cfe5ac0f25.json",
+      "schema_version": 2,
+      "agent_id": "security-operations-expert",
+      "experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+      "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "path": "evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/evidence/U-THREAT-WHITELIST/trace.jsonl",
+      "records": 1,
+      "entries": [
+        {
+          "id": "decision-4a2aab4c5a31379b695f8e8d90dea0f0",
+          "split": "unassigned",
+          "source_group": "task-6c8360d3cd0e3d7db5a127f7",
+          "group": "task-6c8360d3cd0e3d7db5a127f7",
+          "run_id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+          "semantics": "recommended_decision",
+          "stateMissing": false,
+          "questionCount": 1,
+          "targets": [
+            {
+              "status": "reviewed",
+              "decision_time_reviewed": true,
+              "kind": "ai_annotation",
+              "review": "ai_delegated",
+              "purpose": "functional_validation"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "knowledge": [
+    {
+      "path": "knowledge/audit-e2e-delivery/index.md",
+      "bytes": 3560
+    },
+    {
+      "path": "knowledge/audit-e2e-delivery/log.md",
+      "bytes": 2573
+    },
+    {
+      "path": "knowledge/audit-e2e-delivery/raw/delivery-r1.docx",
+      "bytes": 1158
+    },
+    {
+      "path": "knowledge/audit-e2e-delivery/raw/evidence-r1.pdf",
+      "bytes": 1537
+    },
+    {
+      "path": "knowledge/audit-e2e-delivery/raw/evidence-r2.pdf",
+      "bytes": 2286
+    },
+    {
+      "path": "knowledge/audit-e2e-delivery/readable/delivery-r1.md",
+      "bytes": 1417
+    },
+    {
+      "path": "knowledge/audit-e2e-delivery/readable/evidence-r1.md",
+      "bytes": 2036
+    },
+    {
+      "path": "knowledge/audit-e2e-delivery/readable/evidence-r2.md",
+      "bytes": 1476
+    },
+    {
+      "path": "knowledge/audit-e2e-delivery/wiki/evidence-boundary.md",
+      "bytes": 2471
+    },
+    {
+      "path": "knowledge/audit-e2e-delivery/wiki/usage-and-delivery.md",
+      "bytes": 2033
+    }
+  ],
+  "errors": [],
+  "training": [
+    {
+      "path": "evolution/experiments/VAR-security-operations-expert-001-r66152e077843/evaluation/evidence/kev-training/dataset/calibration.jsonl",
+      "rows": 7,
+      "metaKeys": [
+        "id",
+        "group_id",
+        "source",
+        "variant",
+        "ir_schema_version",
+        "decision_site_id",
+        "contract_version",
+        "implementation",
+        "label_status",
+        "label",
+        "observed_action",
+        "provenance",
+        "training_only",
+        "gold_eligible",
+        "input_hash_algorithm",
+        "ir_extra",
+        "input_sha256",
+        "native_input_sha256",
+        "native_input_hash_algorithm",
+        "split"
+      ],
+      "splits": [
+        "calibration"
+      ],
+      "platformRows": 0,
+      "sourceRunIds": [
+        null
+      ],
+      "hasAnswers": 7
+    },
+    {
+      "path": "evolution/experiments/VAR-security-operations-expert-001-r66152e077843/evaluation/evidence/kev-training/dataset/development.jsonl",
+      "rows": 4,
+      "metaKeys": [
+        "id",
+        "group_id",
+        "source",
+        "variant",
+        "ir_schema_version",
+        "decision_site_id",
+        "contract_version",
+        "implementation",
+        "label_status",
+        "label",
+        "observed_action",
+        "provenance",
+        "training_only",
+        "gold_eligible",
+        "input_hash_algorithm",
+        "ir_extra",
+        "input_sha256",
+        "native_input_sha256",
+        "native_input_hash_algorithm",
+        "split"
+      ],
+      "splits": [
+        "development"
+      ],
+      "platformRows": 0,
+      "sourceRunIds": [
+        null
+      ],
+      "hasAnswers": 4
+    },
+    {
+      "path": "evolution/experiments/VAR-security-operations-expert-001-r66152e077843/evaluation/evidence/kev-training/dataset/test.jsonl",
+      "rows": 4,
+      "metaKeys": [
+        "id",
+        "group_id",
+        "source",
+        "variant",
+        "ir_schema_version",
+        "decision_site_id",
+        "contract_version",
+        "implementation",
+        "label_status",
+        "label",
+        "observed_action",
+        "provenance",
+        "training_only",
+        "gold_eligible",
+        "input_hash_algorithm",
+        "ir_extra",
+        "input_sha256",
+        "native_input_sha256",
+        "native_input_hash_algorithm",
+        "split"
+      ],
+      "splits": [
+        "test"
+      ],
+      "platformRows": 0,
+      "sourceRunIds": [
+        null
+      ],
+      "hasAnswers": 4
+    },
+    {
+      "path": "evolution/experiments/VAR-security-operations-expert-001-r66152e077843/evaluation/evidence/kev-training/dataset/train.jsonl",
+      "rows": 22,
+      "metaKeys": [
+        "id",
+        "group_id",
+        "source",
+        "variant",
+        "ir_schema_version",
+        "decision_site_id",
+        "contract_version",
+        "implementation",
+        "label_status",
+        "label",
+        "observed_action",
+        "provenance",
+        "training_only",
+        "gold_eligible",
+        "input_hash_algorithm",
+        "ir_extra",
+        "input_sha256",
+        "native_input_sha256",
+        "native_input_hash_algorithm",
+        "split"
+      ],
+      "splits": [
+        "train"
+      ],
+      "platformRows": 0,
+      "sourceRunIds": [
+        null
+      ],
+      "hasAnswers": 22
+    }
+  ]
+}

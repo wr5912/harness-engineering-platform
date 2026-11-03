@@ -1,0 +1,6 @@
+{
+  "separatePublicUrlRejectedBeforeAuthentication": true,
+  "separatedError": "PLATFORM_SERVICE_WORKSPACE_MISMATCH",
+  "matchingBindUrlReachesAccountCheck": true,
+  "noNetworkOrCredentialsUsed": true
+}

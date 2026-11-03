@@ -1,0 +1,26 @@
+{
+  "at": "2026-11-03T06:25:08.767Z",
+  "scope": "原18120只读方法RPC，不创建会话",
+  "results": [
+    {
+      "topic": "evaluation-and-evidence",
+      "httpStatus": 200,
+      "sourceSha256": "db69b9f48cbbca32e12c982f8d15fa05325bbff0f83166b89877bbbf6888c652",
+      "returnedContentSha256": "db69b9f48cbbca32e12c982f8d15fa05325bbff0f83166b89877bbbf6888c652",
+      "fileBytesSha256": "db69b9f48cbbca32e12c982f8d15fa05325bbff0f83166b89877bbbf6888c652",
+      "returnedContentMatchesFile": true,
+      "returnedDigestMatchesContent": true,
+      "hasNewContent": true
+    },
+    {
+      "topic": "decision-samples",
+      "httpStatus": 200,
+      "sourceSha256": "15a727d9d7b553f52814d53b690a175ff3dad3aea8ff89e7293ca5e8d3dc2702",
+      "returnedContentSha256": "15a727d9d7b553f52814d53b690a175ff3dad3aea8ff89e7293ca5e8d3dc2702",
+      "fileBytesSha256": "15a727d9d7b553f52814d53b690a175ff3dad3aea8ff89e7293ca5e8d3dc2702",
+      "returnedContentMatchesFile": true,
+      "returnedDigestMatchesContent": true,
+      "hasNewContent": true
+    }
+  ]
+}

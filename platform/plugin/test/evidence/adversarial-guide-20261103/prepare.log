@@ -1,0 +1,5 @@
+离线模式：跳过 pnpm install，使用安装包内的 node_modules。
+构建平台插件与 Web 基址适配…
+平台准备完成：DSH 0.2.1-rc.5 (/home/admin/work/harness-engineering-platform/.local/cross-framework/runtime-bin/dsh)
+Profile：/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.local/platform-home/profiles/harness-platform
+启动：./platform/dsh-platform start

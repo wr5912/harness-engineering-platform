@@ -1,0 +1,524 @@
+[
+  {
+    "id": "EXP-audit-e2e-assistant-sdk-001-rf5fad789b04e",
+    "active": true,
+    "harness": true,
+    "loadable": {
+      "profile": "sdk",
+      "profile_manifest": "dsh/managed/sdk-profile.package.json",
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "audit-e2e-assistant-sdk",
+      "profile_patch": "dsh/managed/audit-e2e-assistant-sdk.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-audit-e2e-assistant-sdk-002-r24252c76625d",
+    "active": false,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "profile": "sdk",
+      "preset_id": "audit-e2e-assistant-sdk",
+      "preset_file": "audit-e2e-assistant-sdk/agent.cordis.yml",
+      "profile_patch": "dsh/managed/audit-e2e-assistant-sdk.patch.yml",
+      "profile_manifest": "dsh/managed/sdk-profile.package.json"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-audit-e2e-assistant-sdk-003-rf7b3602a7c10",
+    "active": false,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "profile": "sdk",
+      "preset_id": "audit-e2e-assistant-sdk",
+      "preset_file": "audit-e2e-assistant-sdk/agent.cordis.yml",
+      "profile_patch": "dsh/managed/audit-e2e-assistant-sdk.patch.yml",
+      "profile_manifest": "dsh/managed/sdk-profile.package.json"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-audit-e2e-assistant-sdk-004-r9d3069ba248b",
+    "active": false,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "profile": "sdk",
+      "preset_id": "audit-e2e-assistant-sdk",
+      "preset_file": "audit-e2e-assistant-sdk/agent.cordis.yml",
+      "profile_patch": "dsh/managed/audit-e2e-assistant-sdk.patch.yml",
+      "profile_manifest": "dsh/managed/sdk-profile.package.json"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-audit-e2e-assistant-web-001-r57f20304b3c4",
+    "active": true,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "audit-e2e-assistant-web",
+      "profile_patch": "dsh/managed/audit-e2e-assistant-web.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-audit-e2e-assistant-web-002-ra2a3ad241109",
+    "active": false,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "audit-e2e-assistant-web",
+      "preset_file": "audit-e2e-assistant-web/agent.cordis.yml",
+      "profile_patch": "dsh/managed/audit-e2e-assistant-web.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-audit-e2e-assistant-web-003-r47233801b5a0",
+    "active": false,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "audit-e2e-assistant-web",
+      "preset_file": "audit-e2e-assistant-web/agent.cordis.yml",
+      "profile_patch": "dsh/managed/audit-e2e-assistant-web.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-audit-e2e-assistant-web-004-r9c5e2e27d234",
+    "active": false,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "audit-e2e-assistant-web",
+      "preset_file": "audit-e2e-assistant-web/agent.cordis.yml",
+      "profile_patch": "dsh/managed/audit-e2e-assistant-web.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-audit-e2e-migrate-001-r21862857f1d8",
+    "active": true,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "audit-e2e-migrate",
+      "profile_patch": "dsh/managed/audit-e2e-migrate.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-audit-e2e-multiturn-001-r6d45ef5006be",
+    "active": true,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "audit-e2e-multiturn",
+      "profile_patch": "dsh/managed/audit-e2e-multiturn.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-audit-e2e-notice-code-001-r72110ec28229",
+    "active": true,
+    "harness": true,
+    "loadable": {
+      "profile": "sdk",
+      "profile_manifest": "dsh/managed/sdk-profile.package.json",
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "audit-e2e-notice-code",
+      "profile_patch": "dsh/managed/audit-e2e-notice-code.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-audit-e2e-notice-hybrid-001-r66b0743f3a2f",
+    "active": true,
+    "harness": true,
+    "loadable": {
+      "profile": "sdk",
+      "profile_manifest": "dsh/managed/sdk-profile.package.json",
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "audit-e2e-notice-hybrid",
+      "profile_patch": "dsh/managed/audit-e2e-notice-hybrid.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-audit-e2e-schedule-001-r82683feb2e78",
+    "active": true,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "audit-e2e-schedule",
+      "profile_patch": "dsh/managed/audit-e2e-schedule.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-audit-e2e-ui-sdk-001-rfdcad3b55999",
+    "active": true,
+    "harness": true,
+    "loadable": {
+      "profile": "sdk",
+      "profile_manifest": "dsh/managed/sdk-profile.package.json",
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "audit-e2e-ui-sdk",
+      "profile_patch": "dsh/managed/audit-e2e-ui-sdk.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-audit-e2e-ui-web-001-r30e3861191ee",
+    "active": true,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "audit-e2e-ui-web",
+      "profile_patch": "dsh/managed/audit-e2e-ui-web.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-autonomous-training-researcher-001-redf6be6240bf",
+    "active": true,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "autonomous-training-researcher",
+      "profile_patch": "dsh/managed/autonomous-training-researcher.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-daily-inspection-assistant-001-r602ec12fd531",
+    "active": false,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "daily-inspection-assistant",
+      "profile_patch": "dsh/managed/daily-inspection-assistant.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-daily-inspection-assistant-002-r9eba480e9d2a",
+    "active": true,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "daily-inspection-assistant",
+      "profile_patch": "dsh/managed/daily-inspection-assistant.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-daily-inspection-assistant-003-r6fcb63b26bd9",
+    "active": false,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "daily-inspection-assistant",
+      "profile_patch": "dsh/managed/daily-inspection-assistant.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-daily-inspection-assistant-004-r965bc66e4614",
+    "active": false,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "daily-inspection-assistant",
+      "profile_patch": "dsh/managed/daily-inspection-assistant.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-daily-inspection-assistant-005-r0dae2ba1ebb1",
+    "active": false,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "daily-inspection-assistant",
+      "profile_patch": "dsh/managed/daily-inspection-assistant.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-inspection-delivery-demo-001-rf841e4415364",
+    "active": true,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "inspection-delivery-demo",
+      "profile_patch": "dsh/managed/inspection-delivery-demo.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-inspection-delivery-demo-002-r7430faf014e7",
+    "active": false,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "inspection-delivery-demo",
+      "profile_patch": "dsh/managed/inspection-delivery-demo.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-inspection-delivery-demo-003-r1c42f11c4f9a",
+    "active": false,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "inspection-delivery-demo",
+      "profile_patch": "dsh/managed/inspection-delivery-demo.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-migration-agentscope-demo-001-rd991aeb01b21",
+    "active": true,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "migration-agentscope-demo",
+      "profile_patch": "dsh/managed/migration-agentscope-demo.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-migration-dsh-demo-001-r20ef75d026f1",
+    "active": true,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "migration-dsh-demo",
+      "profile_patch": "dsh/managed/migration-dsh-demo.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-migration-langchain-demo-001-rfa4065d93d85",
+    "active": true,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "migration-langchain-demo",
+      "profile_patch": "dsh/managed/migration-langchain-demo.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-migration-langgraph-demo-001-rac1e3af8bc94",
+    "active": true,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "migration-langgraph-demo",
+      "profile_patch": "dsh/managed/migration-langgraph-demo.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-migration-opencode-demo-001-r2085b6b7a566",
+    "active": true,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "migration-opencode-demo",
+      "profile_patch": "dsh/managed/migration-opencode-demo.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-multi-step-research-analyst-001-r97fa04b7c613",
+    "active": true,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "multi-step-research-analyst",
+      "profile_patch": "dsh/managed/multi-step-research-analyst.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-security-operations-expert-024-rad80a907c628",
+    "active": true,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "security-operations-expert",
+      "profile_patch": "dsh/managed/security-operations-expert.patch.yml"
+    },
+    "parentExists": false
+  },
+  {
+    "id": "EXP-security-operations-expert-025-r36771c9bf2a5",
+    "active": false,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "security-operations-expert",
+      "preset_file": "security-operations-expert/agent.cordis.yml",
+      "profile_patch": "dsh/managed/security-operations-expert.patch.yml",
+      "profile_manifest": "dsh/managed/web-profile.package.json"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-security-operations-expert-026-r6aebbb22df61",
+    "active": false,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "security-operations-expert",
+      "preset_file": "security-operations-expert/agent.cordis.yml",
+      "profile_patch": "dsh/managed/security-operations-expert.patch.yml",
+      "profile_manifest": "dsh/managed/web-profile.package.json"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-test01-001",
+    "active": false,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "test01",
+      "profile_patch": "dsh/managed/test01.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "EXP-test01-002",
+    "active": true,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "test01",
+      "profile_patch": "dsh/managed/test01.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "VAR-inspection-delivery-demo-001-rfac75f4cb946",
+    "active": false,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "inspection-delivery-demo",
+      "profile_patch": "dsh/managed/inspection-delivery-demo.patch.yml"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "VAR-security-operations-expert-001-r66152e077843",
+    "active": false,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "security-operations-expert",
+      "preset_file": "security-operations-expert/agent.cordis.yml",
+      "profile_patch": "dsh/managed/security-operations-expert.patch.yml",
+      "profile_manifest": "dsh/managed/web-profile.package.json"
+    },
+    "parentExists": true
+  },
+  {
+    "id": "VAR-security-operations-expert-002-r79757f173c53",
+    "active": false,
+    "harness": true,
+    "loadable": {
+      "workspace": "dsh/workspace",
+      "preset_root": "dsh/presets",
+      "managed_root": "dsh/managed",
+      "preset_id": "security-operations-expert",
+      "preset_file": "security-operations-expert/agent.cordis.yml",
+      "profile_patch": "dsh/managed/security-operations-expert.patch.yml",
+      "profile_manifest": "dsh/managed/web-profile.package.json"
+    },
+    "parentExists": true
+  }
+]

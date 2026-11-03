@@ -1,0 +1,8 @@
+{
+  "dataRoot": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data",
+  "programRoot": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/program",
+  "host": "127.0.0.1",
+  "port": 36111,
+  "origin": "http://127.0.0.1:36111",
+  "scope": "隔离管理助手；空业务目录、当前管理方法与专用本地模型凭据；不复制Session或HOME"
+}

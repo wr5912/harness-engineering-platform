@@ -1,0 +1,114 @@
+{
+  "httpStatus": 200,
+  "result": {
+    "ok": true,
+    "value": {
+      "ready": true,
+      "core_ready": true,
+      "missing": [],
+      "requested_skill": "workspace-management",
+      "message": "",
+      "assets": [
+        {
+          "name": "AGENTS.md",
+          "ready": true,
+          "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/AGENTS.md",
+          "sha256": "78a5330c5e2b726dbb551e73e5d6a2f83f75dc916beaecf132e56e3a53106c0e"
+        },
+        {
+          "name": "workspace-management",
+          "ready": true,
+          "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/workspace-management/SKILL.md",
+          "sha256": "8b3678013c42bc93d9bc59e48dc5cc6ae9a3b5f2b59f03012e01175a7779ccff"
+        },
+        {
+          "name": "task-builder",
+          "ready": true,
+          "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/task-builder/SKILL.md",
+          "sha256": "38acc30c15ed53193fad3261a99cb0f5457fbc13c3f054d08d609fce1681d51d"
+        },
+        {
+          "name": "agent-maintenance",
+          "ready": true,
+          "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/agent-maintenance/SKILL.md",
+          "sha256": "3960169b875b8afd9ca360d3909fcf2cc2a0c96c35aea005749ffdf857605b08"
+        },
+        {
+          "name": "agent-migration",
+          "ready": true,
+          "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/agent-migration/SKILL.md",
+          "sha256": "ea512b01aff1da169489c29d8e71c8ebd51764b47c5a7cebe025a8185c0299ac"
+        },
+        {
+          "name": "mcp-composition",
+          "ready": true,
+          "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/mcp-composition/SKILL.md",
+          "sha256": "465948c2453e87fce01c6b60a58619e03e51dd721596a166ce6c427c80ae2dd3"
+        },
+        {
+          "name": "compute-variant-research",
+          "ready": true,
+          "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/compute-variant-research/SKILL.md",
+          "sha256": "9b0dbeaa746e868fab380bae727106a16168a9d8d06ba37af5cc435b6915f7be"
+        },
+        {
+          "name": "decision-sample-extraction",
+          "ready": true,
+          "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/decision-sample-extraction/SKILL.md",
+          "sha256": "e4c57e1b0e359d78f81a8a5273f1e4a47570a7a565d524f67c9ac18dcddaeb82"
+        },
+        {
+          "name": "harness-evolution",
+          "ready": true,
+          "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/harness-evolution/SKILL.md",
+          "sha256": "e79cef123622addabad9753a677099f2e9a911c9d3ec6368523998a4c71ad0f1"
+        },
+        {
+          "name": "harness-experiment-fusion",
+          "ready": true,
+          "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/harness-experiment-fusion/SKILL.md",
+          "sha256": "d42d431595d0508088c17e6b5ca747dfc313f8c1aaee71976bd6ef85c6b6c887"
+        },
+        {
+          "name": "research-eval",
+          "ready": true,
+          "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/research-eval/SKILL.md",
+          "sha256": "552d803136dc1674ed04e5932517b9c08c23392c82dd8d29df92042ede5e6631"
+        },
+        {
+          "name": "legacy-asset-intake",
+          "ready": true,
+          "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/legacy-asset-intake/SKILL.md",
+          "sha256": "082bcf89d8c10815403165fad98574c109d16e5d1225cb8a0213e22074199299"
+        },
+        {
+          "name": "reviewing-agent-skills",
+          "ready": true,
+          "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/reviewing-agent-skills/SKILL.md",
+          "sha256": "bff6e05fc9b9ab6bb5a166cdc5ace6514ce206c712d2f948209b0f116d55df94"
+        },
+        {
+          "name": "user-facing-output",
+          "ready": true,
+          "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/user-facing-output/SKILL.md",
+          "sha256": "c3a0c9412dadc0a9ed015a440422a054fa067179a9cb61153979d0fae2d3cbab"
+        }
+      ],
+      "tasks": {
+        "workspace-management": true,
+        "task-builder": true,
+        "agent-maintenance": true,
+        "agent-migration": true,
+        "mcp-composition": true,
+        "compute-variant-research": true,
+        "decision-sample-extraction": true,
+        "harness-evolution": true,
+        "harness-experiment-fusion": true,
+        "research-eval": true,
+        "legacy-asset-intake": true,
+        "reviewing-agent-skills": true,
+        "user-facing-output": true
+      }
+    }
+  }
+}

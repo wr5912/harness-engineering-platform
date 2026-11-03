@@ -1,0 +1,137 @@
+{
+  "at": "2026-11-03T06:19:03.587Z",
+  "principlesSha256": "78a5330c5e2b726dbb551e73e5d6a2f83f75dc916beaecf132e56e3a53106c0e",
+  "sessions": [
+    {
+      "id": "readiness",
+      "sessionId": "session-c2a7cf02-6d92-42c1-81d1-83f14f973e50",
+      "principlesDigestMatches": true,
+      "calls": [
+        {
+          "name": "read",
+          "argument": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/docs/harness-research/README.md",
+          "resultIsError": false
+        },
+        {
+          "name": "platform_agents",
+          "action": "describe",
+          "argument": "",
+          "resultIsError": false
+        },
+        {
+          "name": "platform_agents",
+          "action": "research/read-reference",
+          "topic": "evaluation-and-evidence",
+          "argument": "",
+          "resultIsError": false
+        },
+        {
+          "name": "skill",
+          "argument": "",
+          "resultIsError": false
+        }
+      ]
+    },
+    {
+      "id": "holdout",
+      "sessionId": "session-05adb21e-f89b-488a-99f0-ae3e078fbee2",
+      "principlesDigestMatches": true,
+      "calls": [
+        {
+          "name": "skill",
+          "argument": "",
+          "resultIsError": false
+        },
+        {
+          "name": "read",
+          "argument": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/kev-dataset-audit/references/audit.md",
+          "resultIsError": false
+        },
+        {
+          "name": "glob",
+          "argument": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills",
+          "resultIsError": false
+        },
+        {
+          "name": "read",
+          "argument": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/kev-trace-pipeline/references/training-handoff.md",
+          "resultIsError": false
+        },
+        {
+          "name": "bash",
+          "argument": "ls -la; echo '---'; ls -la .agents/skills 2>/dev/null | head -30; echo '---'; ls evolution 2>/dev/null | head; echo '---'; ls agents 2>/dev/null | head; echo '---'; ls datasets 2>/dev/null | head; echo '---'; ls config 2>/dev/null | head",
+          "resultIsError": false
+        }
+      ]
+    },
+    {
+      "id": "attribution",
+      "sessionId": "session-9e1238a5-55d8-4099-a069-78befe422e13",
+      "principlesDigestMatches": true,
+      "calls": [
+        {
+          "name": "skill",
+          "argument": "",
+          "resultIsError": false
+        }
+      ]
+    },
+    {
+      "id": "ordinary",
+      "sessionId": "session-6886b5a9-5730-42cc-b26a-a2fbbfbb694e",
+      "principlesDigestMatches": true,
+      "calls": [
+        {
+          "name": "platform_instances",
+          "action": "describe",
+          "argument": "",
+          "resultIsError": false
+        },
+        {
+          "name": "platform_instances",
+          "action": "list",
+          "argument": "",
+          "resultIsError": false
+        },
+        {
+          "name": "bash",
+          "argument": "ls -la /home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.local/instances 2>&1 | head -40",
+          "resultIsError": false
+        }
+      ]
+    }
+  ],
+  "methodReads": [
+    {
+      "topic": "evaluation-and-evidence",
+      "keys": [
+        "topic",
+        "path",
+        "content",
+        "sha256"
+      ],
+      "containsNewContent": true,
+      "responseSha256": "6412f1eaea917f1335eca30303da8592b5ea3ccad436af9de16014b5ff723700"
+    },
+    {
+      "topic": "decision-samples",
+      "keys": [
+        "topic",
+        "path",
+        "content",
+        "sha256"
+      ],
+      "containsNewContent": true,
+      "responseSha256": "a4d8eb864a8f55e4b63f059676ef40fd5bcbe05341f77a5ab83273c6d17c7247"
+    }
+  ],
+  "list": {
+    "count": 4,
+    "sessionIds": [
+      "session-6886b5a9-5730-42cc-b26a-a2fbbfbb694e",
+      "session-9e1238a5-55d8-4099-a069-78befe422e13",
+      "session-05adb21e-f89b-488a-99f0-ae3e078fbee2",
+      "session-c2a7cf02-6d92-42c1-81d1-83f14f973e50"
+    ]
+  }
+}

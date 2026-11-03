@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-03T06:27:57.137465+00:00",
+  "artifact_kind": "本次核对来源的不可编辑摘要快照",
+  "file_bytes_sha256": {
+    "/home/admin/work/harness-engineering-platform/docs/项目审查原则.md": "20496e0d290f3a63dfc873aa0b5787bf73b86c47716f316bc6ac2c1306e8f342",
+    "/home/admin/work/harness-engineering-platform/docs/standards/SOURCES.md": "729d6ca00ff9e7f6da092665a61f47f421ba4302857806302e9ed7bbed7e697c",
+    "/home/admin/harness-engineering-platform-data/AGENTS.md": "e8fc8b81e60369ee0862eb28fd5cfdcdda9da6e6bf552fc7d38f71ec5fbc60cd",
+    "/home/admin/harness-engineering-platform-data/.agents/skills/workspace-management/SKILL.md": "2beabc551872a348bf33df02066f08975e3ed7b10dc12a3a0a3e9eaebaecaeeb",
+    "/home/admin/harness-engineering-platform-data/docs/harness-research/evaluation-and-evidence.md": "db69b9f48cbbca32e12c982f8d15fa05325bbff0f83166b89877bbbf6888c652",
+    "/home/admin/harness-engineering-platform-data/docs/harness-research/decision-samples.md": "15a727d9d7b553f52814d53b690a175ff3dad3aea8ff89e7293ca5e8d3dc2702"
+  },
+  "management_principles_content_sha256": "78a5330c5e2b726dbb551e73e5d6a2f83f75dc916beaecf132e56e3a53106c0e"
+}

@@ -1,0 +1,189 @@
+{
+  "partitions": {
+    "train": {
+      "records": 22,
+      "groups": 17,
+      "splitMatches": true,
+      "labelStatuses": {
+        "verified": 22
+      },
+      "wellTypedLabels": 22,
+      "sha256": "d0369d0f7e4bd7dcb621a739262b8aca0d73cd93f9dd5f591108573dd11f4154"
+    },
+    "development": {
+      "records": 4,
+      "groups": 4,
+      "splitMatches": true,
+      "labelStatuses": {
+        "verified": 4
+      },
+      "wellTypedLabels": 4,
+      "sha256": "c4e7fb06cfb4959fe4373894691d3ea8952409cd93953646a9e212bbb602a269"
+    },
+    "calibration": {
+      "records": 7,
+      "groups": 7,
+      "splitMatches": true,
+      "labelStatuses": {
+        "verified": 7
+      },
+      "wellTypedLabels": 7,
+      "sha256": "ee4b054e6b5b8363171034a6ddf321bd6456af3231d462e5d4339473b92fe251"
+    },
+    "test": {
+      "records": 4,
+      "groups": 4,
+      "splitMatches": true,
+      "labelStatuses": {
+        "verified": 4
+      },
+      "wellTypedLabels": 4,
+      "sha256": "d8b8e1ad716265779fa4287aea2dbd3e29fc8ecf4e8e1ee72e816675c1a07249"
+    }
+  },
+  "intersections": [
+    {
+      "a": "development",
+      "b": "train",
+      "key": "id",
+      "count": 0
+    },
+    {
+      "a": "development",
+      "b": "train",
+      "key": "group",
+      "count": 0
+    },
+    {
+      "a": "development",
+      "b": "train",
+      "key": "input",
+      "count": 0
+    },
+    {
+      "a": "development",
+      "b": "test",
+      "key": "id",
+      "count": 0
+    },
+    {
+      "a": "development",
+      "b": "test",
+      "key": "group",
+      "count": 0
+    },
+    {
+      "a": "development",
+      "b": "test",
+      "key": "input",
+      "count": 0
+    },
+    {
+      "a": "calibration",
+      "b": "train",
+      "key": "id",
+      "count": 0
+    },
+    {
+      "a": "calibration",
+      "b": "train",
+      "key": "group",
+      "count": 0
+    },
+    {
+      "a": "calibration",
+      "b": "train",
+      "key": "input",
+      "count": 0
+    },
+    {
+      "a": "calibration",
+      "b": "development",
+      "key": "id",
+      "count": 0
+    },
+    {
+      "a": "calibration",
+      "b": "development",
+      "key": "group",
+      "count": 0
+    },
+    {
+      "a": "calibration",
+      "b": "development",
+      "key": "input",
+      "count": 0
+    },
+    {
+      "a": "calibration",
+      "b": "test",
+      "key": "id",
+      "count": 0
+    },
+    {
+      "a": "calibration",
+      "b": "test",
+      "key": "group",
+      "count": 0
+    },
+    {
+      "a": "calibration",
+      "b": "test",
+      "key": "input",
+      "count": 0
+    },
+    {
+      "a": "test",
+      "b": "train",
+      "key": "id",
+      "count": 0
+    },
+    {
+      "a": "test",
+      "b": "train",
+      "key": "group",
+      "count": 0
+    },
+    {
+      "a": "test",
+      "b": "train",
+      "key": "input",
+      "count": 0
+    }
+  ],
+  "sourceHashes": [
+    {
+      "split": "train",
+      "indexMatches": true
+    },
+    {
+      "split": "development",
+      "indexMatches": true
+    },
+    {
+      "split": "calibration",
+      "indexMatches": true
+    },
+    {
+      "split": "test",
+      "indexMatches": true
+    }
+  ],
+  "knowledgeOriginals": [
+    {
+      "file": "delivery-r1.docx",
+      "exists": true,
+      "hashMatches": true
+    },
+    {
+      "file": "evidence-r1.pdf",
+      "exists": true,
+      "hashMatches": true
+    },
+    {
+      "file": "evidence-r2.pdf",
+      "exists": true,
+      "hashMatches": true
+    }
+  ]
+}

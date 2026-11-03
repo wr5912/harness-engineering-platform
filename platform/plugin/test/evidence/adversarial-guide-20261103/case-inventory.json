@@ -1,0 +1,321 @@
+[
+  {
+    "agent_id": "audit-e2e-assistant-sdk",
+    "case_count": 5,
+    "case_ids": [
+      "U-IDENTITY-001",
+      "U-ROLE-001",
+      "U-RECEIPT-SDK-001",
+      "U-RECEIPT-SDK-002",
+      "U-RECEIPT-SDK-003"
+    ],
+    "multi_turn": 0,
+    "input_bytes": 361,
+    "expected_bytes": 1057
+  },
+  {
+    "agent_id": "audit-e2e-assistant-web",
+    "case_count": 8,
+    "case_ids": [
+      "U-IDENTITY-001",
+      "U-ROLE-001",
+      "U-RECEIPT-001",
+      "U-RECEIPT-002",
+      "U-RECEIPT-003",
+      "U-TOOL-001",
+      "U-TOOL-002",
+      "U-FUSION-MEMORY-001"
+    ],
+    "multi_turn": 1,
+    "input_bytes": 560,
+    "expected_bytes": 2284
+  },
+  {
+    "agent_id": "audit-e2e-migrate",
+    "case_count": 3,
+    "case_ids": [
+      "U-IDENTITY-001",
+      "U-ROLE-001",
+      "U-MIGRATE-001"
+    ],
+    "multi_turn": 0,
+    "input_bytes": 188,
+    "expected_bytes": 473
+  },
+  {
+    "agent_id": "audit-e2e-multiturn",
+    "case_count": 3,
+    "case_ids": [
+      "U-IDENTITY-001",
+      "U-ROLE-001",
+      "U-MEMORY-001"
+    ],
+    "multi_turn": 1,
+    "input_bytes": 248,
+    "expected_bytes": 762
+  },
+  {
+    "agent_id": "audit-e2e-notice-code",
+    "case_count": 2,
+    "case_ids": [
+      "U-IDENTITY-001",
+      "U-ROLE-001"
+    ],
+    "multi_turn": 0,
+    "input_bytes": 144,
+    "expected_bytes": 506
+  },
+  {
+    "agent_id": "audit-e2e-notice-hybrid",
+    "case_count": 2,
+    "case_ids": [
+      "U-IDENTITY-001",
+      "U-ROLE-001"
+    ],
+    "multi_turn": 0,
+    "input_bytes": 144,
+    "expected_bytes": 510
+  },
+  {
+    "agent_id": "audit-e2e-schedule",
+    "case_count": 2,
+    "case_ids": [
+      "U-IDENTITY-001",
+      "U-ROLE-001"
+    ],
+    "multi_turn": 0,
+    "input_bytes": 144,
+    "expected_bytes": 454
+  },
+  {
+    "agent_id": "audit-e2e-ui-sdk",
+    "case_count": 2,
+    "case_ids": [
+      "U-IDENTITY-001",
+      "U-ROLE-001"
+    ],
+    "multi_turn": 0,
+    "input_bytes": 144,
+    "expected_bytes": 428
+  },
+  {
+    "agent_id": "audit-e2e-ui-web",
+    "case_count": 2,
+    "case_ids": [
+      "U-IDENTITY-001",
+      "U-ROLE-001"
+    ],
+    "multi_turn": 0,
+    "input_bytes": 144,
+    "expected_bytes": 428
+  },
+  {
+    "agent_id": "autonomous-training-researcher",
+    "case_count": 3,
+    "case_ids": [
+      "U-IDENTITY-001",
+      "U-ROLE-001",
+      "U-TRAIN-PREFLIGHT-001"
+    ],
+    "multi_turn": 0,
+    "input_bytes": 303,
+    "expected_bytes": 744
+  },
+  {
+    "agent_id": "daily-inspection-assistant",
+    "case_count": 6,
+    "case_ids": [
+      "U-IDENTITY-001",
+      "U-ROLE-001",
+      "U-SUMMARY-001",
+      "U-SUMMARY-002",
+      "U-ASSET-PAGES-001",
+      "U-ASSET-PARTIAL-001"
+    ],
+    "multi_turn": 0,
+    "input_bytes": 884,
+    "expected_bytes": 1259
+  },
+  {
+    "agent_id": "inspection-delivery-demo",
+    "case_count": 4,
+    "case_ids": [
+      "U-IDENTITY-001",
+      "U-ROLE-001",
+      "U-ASSET-PAGES-001",
+      "U-ASSET-PARTIAL-001"
+    ],
+    "multi_turn": 0,
+    "input_bytes": 473,
+    "expected_bytes": 1064
+  },
+  {
+    "agent_id": "migration-agentscope-demo",
+    "case_count": 5,
+    "case_ids": [
+      "U-IDENTITY-001",
+      "U-ROLE-001",
+      "U-VERSION-COMPARE",
+      "U-VERSION-INVALID",
+      "U-VERSION-MISSING"
+    ],
+    "multi_turn": 0,
+    "input_bytes": 286,
+    "expected_bytes": 1494
+  },
+  {
+    "agent_id": "migration-dsh-demo",
+    "case_count": 4,
+    "case_ids": [
+      "U-IDENTITY-001",
+      "U-ROLE-001",
+      "U-QUOTE-NORMAL",
+      "U-QUOTE-MISSING"
+    ],
+    "multi_turn": 0,
+    "input_bytes": 218,
+    "expected_bytes": 1005
+  },
+  {
+    "agent_id": "migration-langchain-demo",
+    "case_count": 5,
+    "case_ids": [
+      "U-IDENTITY-001",
+      "U-ROLE-001",
+      "U-LENGTH-M-TO-CM",
+      "U-LENGTH-CM-TO-M",
+      "U-LENGTH-MISSING"
+    ],
+    "multi_turn": 0,
+    "input_bytes": 225,
+    "expected_bytes": 1474
+  },
+  {
+    "agent_id": "migration-langgraph-demo",
+    "case_count": 5,
+    "case_ids": [
+      "U-IDENTITY-001",
+      "U-ROLE-001",
+      "U-GRAPH-BULK",
+      "U-GRAPH-REGULAR",
+      "U-GRAPH-MISSING"
+    ],
+    "multi_turn": 0,
+    "input_bytes": 245,
+    "expected_bytes": 2283
+  },
+  {
+    "agent_id": "migration-opencode-demo",
+    "case_count": 3,
+    "case_ids": [
+      "U-IDENTITY-001",
+      "U-ROLE-001",
+      "U-CODE-FIX"
+    ],
+    "multi_turn": 0,
+    "input_bytes": 602,
+    "expected_bytes": 1371
+  },
+  {
+    "agent_id": "multi-step-research-analyst",
+    "case_count": 4,
+    "case_ids": [
+      "U-IDENTITY-001",
+      "U-ROLE-001",
+      "U-RESEARCH-001",
+      "U-RESEARCH-INCOMPLETE-001"
+    ],
+    "multi_turn": 0,
+    "input_bytes": 456,
+    "expected_bytes": 1217
+  },
+  {
+    "agent_id": "security-operations-expert",
+    "case_count": 70,
+    "case_ids": [
+      "U-INS-001",
+      "U-INS-002",
+      "U-INS-003",
+      "U-INS-004",
+      "U-INS-005",
+      "U-INS-006",
+      "U-INS-007",
+      "U-EMG-001",
+      "U-EMG-002",
+      "U-EMG-003",
+      "U-EMG-MISSING-TARGET",
+      "U-POL-001",
+      "U-POL-002",
+      "U-POL-003",
+      "U-POL-004",
+      "U-POL-005",
+      "U-POL-006",
+      "U-POL-007",
+      "U-POL-008",
+      "U-POL-009",
+      "U-POL-010",
+      "U-POL-011",
+      "U-POL-012",
+      "U-FLT-MENTION",
+      "U-FLT-001",
+      "U-FLT-002",
+      "U-FLT-003",
+      "U-FLT-004",
+      "U-FLT-005",
+      "U-FLT-006",
+      "U-FLT-007",
+      "U-FLT-008",
+      "U-FLT-009",
+      "U-FLT-010",
+      "U-QA-001",
+      "U-QA-002",
+      "U-QA-003",
+      "U-QA-004",
+      "U-QA-005",
+      "U-QA-006",
+      "U-QA-007",
+      "U-QA-008",
+      "U-QA-009",
+      "U-QA-010",
+      "U-QA-011",
+      "U-QA-012",
+      "U-QA-013",
+      "U-QA-014",
+      "U-THREAT-MENTION",
+      "U-THREAT-FAST",
+      "U-THREAT-FULL",
+      "U-THREAT-CONTRACT",
+      "U-THREAT-WHITELIST",
+      "U-THREAT-MISSING",
+      "U-THREAT-FOLLOWUP",
+      "U-SCHED-001",
+      "U-SCHED-002",
+      "U-SCHED-003",
+      "U-SCHED-004",
+      "U-SCHED-005",
+      "U-SCHED-006",
+      "U-SCHED-007",
+      "U-VOICE-001",
+      "U-VOICE-002",
+      "U-VOICE-003",
+      "U-VOICE-004",
+      "U-ASSET-ALERTS-001",
+      "U-ASSET-ALERTS-MISSING",
+      "U-ASSET-ALERTS-EMPTY",
+      "U-ASSET-ALERTS-FAIL"
+    ],
+    "multi_turn": 8,
+    "input_bytes": 7539,
+    "expected_bytes": 21658
+  },
+  {
+    "agent_id": "test01",
+    "case_count": 1,
+    "case_ids": [
+      "U-IDENTITY-001"
+    ],
+    "multi_turn": 0,
+    "input_bytes": 39,
+    "expected_bytes": 114
+  }
+]

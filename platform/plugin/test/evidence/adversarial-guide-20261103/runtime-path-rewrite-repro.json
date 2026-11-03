@@ -1,0 +1,7 @@
+{
+  "scenario": "跨用户安装时显式选择源HOME下的新数据根",
+  "correct": false,
+  "actual": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/path-map-LgclTe/new-home/restored-data/.local/credentials/business.key",
+  "expected": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/path-map-LgclTe/old-home/restored-data/.local/credentials/business.key",
+  "oldReferenceCount": 0
+}

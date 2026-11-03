@@ -1,0 +1,33 @@
+{
+  "datasetIsolation": {
+    "beforeHealthyCount": 1,
+    "beforeReadRecords": 1,
+    "afterFilteredHealthyList": {
+      "error_code": "invalid_dataset",
+      "message": "Expected property name or '}' in JSON at position 1 (line 1 column 2)"
+    },
+    "afterHealthyRead": {
+      "message": "Expected property name or '}' in JSON at position 1 (line 1 column 2)"
+    }
+  },
+  "trainingSource": {
+    "declaredSourceRuns": [
+      "run-fixed"
+    ],
+    "actualRowSource": "run-foreign",
+    "rowLabelStatus": "suggested",
+    "invalidLabel": "NOT_A_DEFINED_CANDIDATE",
+    "result": {
+      "required": true,
+      "verified": true,
+      "reasons": [],
+      "receipt_sha256": "446a62cdf166902343e7c0fa515329e194ee3165518943688d7c80a5d5dfc07b",
+      "dataset_counts": {
+        "train": 1,
+        "development": 1,
+        "calibration": 1,
+        "test": 1
+      }
+    }
+  }
+}

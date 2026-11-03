@@ -1,0 +1,12 @@
+{
+  "at": "2026-11-03T05:58:03.333915+00:00",
+  "program_head": "41e66424b41729ca2c6fc86d65aeae95daa3159e",
+  "data_head": "b667e26e3d206da0daea41ddfd3a1889159db133",
+  "program_status": "",
+  "data_status": " M config/business-access.json\n?? evolution/datasets/decision-dataset-b8f473f1-0cd7-42cd-a0a1-b90771f1ebe4.json\n?? evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/evaluation/evidence/dsh-image-build-20261024T023237Z-3.json\n",
+  "preserved_files": {
+    "/home/admin/harness-engineering-platform-data/config/business-access.json": "870b8d91034b1eee9ff706d05e6346c38fea43204d88550a72701d4c953acd3e",
+    "/home/admin/harness-engineering-platform-data/evolution/datasets/decision-dataset-b8f473f1-0cd7-42cd-a0a1-b90771f1ebe4.json": "6abad71a779253cb9dc7e518919ab3043061762a835a1a6910280ac7da3dccab",
+    "/home/admin/harness-engineering-platform-data/evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/evaluation/evidence/dsh-image-build-20261024T023237Z-3.json": "eda22672b360ad06d0152bd08242d1d3faeb1120a4e699d014f887cd2cfc1da0"
+  }
+}

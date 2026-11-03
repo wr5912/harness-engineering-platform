@@ -1,0 +1,375 @@
+{
+  "at": "2026-11-03T06:13:11.703Z",
+  "scope": "独立真实DSH rc.5平台与数据根；四个新管理会话，不操作既有业务",
+  "cases": [
+    {
+      "id": "readiness",
+      "task": "这是一项仅分析、不保存不训练的数据质量复核。请先通过现有研究方法入口读取 evaluation-and-evidence：某智能体有1000条成功会话日志，80条已做AI委托功能复核，但未分配 train/development/calibration/test 用途，来源混有真实业务和模拟模型。能否直接视为高质量训练集并承诺效果提升？请给当前判断、关键核对与最短下一步；不创建数据、不改标签、不训练。",
+      "startedAt": "2026-11-03T06:13:12.171Z",
+      "sessionId": "session-c2a7cf02-6d92-42c1-81d1-83f14f973e50",
+      "accepted": true,
+      "historyComplete": true,
+      "running": false,
+      "eventTypes": [
+        "permission/preset",
+        "sandbox/mode",
+        "approval/policy",
+        "plugin:harness-platform/assistant",
+        "agent/inbox/spliced",
+        "turn/start",
+        "step/start",
+        "system/message",
+        "user/message",
+        "request/header",
+        "request/context",
+        "session/title",
+        "session/title-llm-request",
+        "session-log-deepseek/delivery-accepted",
+        "assistant/message",
+        "tool/call",
+        "tool/result",
+        "step/end",
+        "turn/end"
+      ],
+      "ended": true,
+      "assistant": [
+        "## 结论\n\n不能。以当前状态，这 1000 条材料更像是**尚未定型的候选语料**；把它称为“高质量训练集”或承诺效果，这两个命题都缺少证据。而且这四项条件彼此依赖，任一项不成立，整体结论就不能成立。\n\n按你描述的现状，能成立的只有：这些会话当时被标记为成功、其中 80 条做过一轮 AI 功能复核、材料里既有真实业务也有模拟产出。这些都属于**材料是否存在**层面的证据，不是**能否用于训练、能否带来收益**的证据。\n\n## 四项条件与当前判断\n\n| 条件 | 现状 | 实际能支持什么 | 阻断点 |\n|---|---|---|---|\n| 1000 条成功会话 | 只有“成功”标记 | 当时这些会话执行完成或被判成功 | 成功日志有幸存者偏差。失败、异常、恢复样本恰恰是最有区分力的部分，现在缺失。而且日志本身不是样本，需要切割到决策点，并绑定真实工具结果，才能形成监督信号 |\n| 80 条 AI 委托复核 | 8% 覆盖，AI 结论 | 只能支持 functional_validation 层面的功能可用性 | 复核对象是“功能是否跑通”还是“逐题标签是否正确”并不相同；标签仍属 AI 建议，不能当作人工或独立真值。如果请 AI 代做复核，还须保留实际模型、Session 与依据 |\n| 未分配 train/dev/calibration/test | 无用途划分 | 无 | 没有独立切分就没有泛化证据。切分必须按组（会话/任务/来源）进行；测试材料一旦被用于定向补训练样本，就永久失去独立性，改版本号也恢复不了 |\n| 真实业务与模拟模型混合 | 混放，无来源隔离 | 只说明材料有来源多样性 | 模拟成功不能替代真实业务验收。没有逐条来源标记，就算不出真实业务占比，无法按场景核对配额，也无法发现跨来源的重复与泄漏 |\n\n所以“1000 条”不是一个可用数量：去重、切决策点、按来源核验之后的有效条数，目前未知。\n\n## 关键核对：按此顺序，前四项决定是否值得继续\n\n1. **先确定用途，再看数据。** 先说清目标场景、任务节点和能力目标，再统计 1000 条里有多少真正落在该节点上，是否覆盖典型任务、必要边界和已知失败。脱离场景谈质量无法判断。\n2. **核对来源可追溯性。** 逐条核对真实与模拟的标记及比例、采集时间与当前环境能否被实际消费；再按“相同输入交集”去重，确定分组键。这一步直接决定能否做正确切分。\n3. **核对“成功”的判定标准。** 判定来自人工、规则、模型，还是仅仅“没有报错”？动作有没有配对的真实工具结果？如果状态里混入了未来证据、历史动作或参考答案，那就是泄漏，必须在 time 与契约上逐条排除。合法的上一步业务结果不算自动泄漏，但需要逐条核对。\n4. **核对标签证据密度。** 抽查高置信和分歧样本、少数类和短会话、多任务、阶段变化、失败恢复、域外与缺证据边界，确认每个动作有前置可见状态与结果支撑，不是事后合理化。分歧只作为检索线索，不作为结论。\n5. **只有确定要训练时才核对编码。** 固定 Kev 提交、基座 tokenizer、原生 renderer、长度过滤、候选洗牌映射和实际 loss；这些没做完，就写 `token_budget=not_checked`。编码通过也不等于训练完成，更不等于效果成立。\n\n## 最短下一步\n\n一次只读分层抽样核对，约 40 条：真实与模拟 × 场景 × 成功与近失败交叉分层，逐条确认“能否切出有证据的决策点”。输出四个数——可用于监督的决策点条数、真实业务占比、去重后有效条数、分组键可用性。\n\n判据：若监督点比例和真实覆盖能支撑目标场景，再进入用途切分与固定条件下的独立评测；若不能，就补数据或换任务，不进入训练。这一步不改标签、不写入数据库、不训练。\n\n要把它落到实际样本上，我需要你给出两件事：目标业务场景与任务节点、日志和那 80 条复核记录的可读位置。没有这两项，以上只是状态判断，不是对你这批材料的逐条核实。\n\n## 本次边界\n\n仅分析。我未读取你的实际会话日志与复核记录，未保存任何内容、未改标签、未创建数据、未训练。当前状态：结构未审、标签未作为真值复核、用途未分配、编码未验、训练未运行、任务效果未验证。效果提升只能由固定 Harness、模型、输入与判断标准下的独立 Run 对比给出，且数据本体改善与下游收益要分别报告；这两类证据目前都还不存在。"
+      ],
+      "tools": [
+        {
+          "name": "read"
+        },
+        {
+          "name": "platform_agents",
+          "action": "describe"
+        },
+        {
+          "name": "platform_agents",
+          "action": "research/read-reference",
+          "topic": "evaluation-and-evidence"
+        },
+        {
+          "name": "skill",
+          "skill": "kev-dataset-audit"
+        }
+      ],
+      "system": [
+        {
+          "sha256": "31e175e0d25ccb18f25a268b17db35b0151d019cce6a4809ac5972fdd36b5e62",
+          "principlesLoaded": true,
+          "newPrincipleLoaded": true,
+          "sourceSha256": "78a5330c5e2b726dbb551e73e5d6a2f83f75dc916beaecf132e56e3a53106c0e"
+        }
+      ],
+      "proposals": [],
+      "finishedAt": "2026-11-03T06:13:44.410Z"
+    },
+    {
+      "id": "holdout",
+      "task": "仅分析，不写资产：测试集的失败题已经被用来定向生成同一任务的训练改写样本，训练后还使用原测试题报告泛化能力提升。现在只要把文件和group_id改名，是否就能继续把原测试集称作独立测试？请核对独立性、需要保留的事实和最短处理路径，不改Case或原始记录。",
+      "startedAt": "2026-11-03T06:13:44.411Z",
+      "sessionId": "session-05adb21e-f89b-488a-99f0-ae3e078fbee2",
+      "accepted": true,
+      "historyComplete": true,
+      "running": false,
+      "eventTypes": [
+        "permission/preset",
+        "sandbox/mode",
+        "approval/policy",
+        "plugin:harness-platform/assistant",
+        "agent/inbox/spliced",
+        "turn/start",
+        "step/start",
+        "system/message",
+        "user/message",
+        "request/header",
+        "request/context",
+        "session/title",
+        "session/title-llm-request",
+        "session-log-deepseek/delivery-accepted",
+        "assistant/message",
+        "tool/call",
+        "tool/result",
+        "step/end",
+        "job/registered",
+        "job/settled",
+        "turn/end"
+      ],
+      "ended": true,
+      "assistant": [
+        "## 结论\n\n不能。把文件名和 `group_id` 改名，都不能把原测试集变回独立测试，继续以其结果声称“泛化能力提升”也不成立。\n\n独立测试的关键不是名称或分组编号，而是该来源从未参与失败分析、数据生成、样本选择、调参和早期评估。这批题已经作为失败种子被定向改写成训练样本，模型训练阶段就直接针对其失败模式优化，所以它只能降为开发/回归材料。[数据审计规则](.agents/skills/kev-trace-pipeline/references/training-handoff.md#L35) 明确写到：用于定向造数据的 test 应降为开发/回归材料，另设独立最终验收；版本号或新名称不能恢复独立性。\n\n## 独立性核对\n\n| 维度 | 本例判定 |\n|---|---|\n| 样本来源关系 | 不独立：原测试失败题 → 定向改写训练样本 → 训练，构成明确的派生关系 |\n| 选择通道 | 不独立：失败题被挑选出来作为生成种子，已参与数据构造和优化目标 |\n| 时间顺序 | 不独立：先做失败分析，再做训练，最后才评估；评估不再“未见” |\n| 分组切分 | 名义上能改、实质上无效：`group_id` 换字符串不会改变来源关系；按新组切分反而可能把同源样本拆入不同组，制造虚假独立 |\n| 对外表述 | 失效：原题上的提升只能表述为“定向修复后的回归表现/训练相关分布表现”，不能表述为泛化 |\n\n还有一个容易被忽略的点：即使只挑了一部分失败题改写，同一任务、同一模板的其余题目也在相关分布内，不能按“只污染了被选中的题”做局部豁免。\n\n## 改名能改变什么\n\n改名改变的是文件名、`group_id` 字符串和报告中的引用名；它不改变样本来源关系、模型是否见过这些内容、这些题是否被用作优化目标，也不改变训练与评估的先后关系以及指标的可比性。\n\n改名唯一合法的用途是作为“污染/降级”标签的辅助记录，前提是同时保留旧名与双向映射，并同步更正用途和口径。它不能作为独立性的证据，也不能用来规避污染记录。\n\n## 需要保留的事实\n\n1. 原测试集身份：原文件名/路径、原 `group_id`、内容哈希、题量。\n2. 失败题清单：哪些题失败、失败类型、何时被选中作为种子。\n3. 派生映射：每条训练改写样本对应哪道原失败题或哪段失败输出，改写时间与方式。\n4. 训练事实：Run、配方、模型版本、训练集确实包含这些派生样本的记录。\n5. 原评估事实：Run、模型、输入、指标、原始输出，以及“泛化提升”表述的原始位置。\n6. 改名事实（若已做）：旧名→新名的映射、新 `group_id` 的实际用途、执行时间。\n\n这些都可以在不改 Case、不改原始记录的前提下保留：新增审计说明与映射记录，不覆盖原文件。\n\n## 最短处理路径\n\n1. **零写入降级**：新增一份审计/更正说明，写明派生关系、原指标口径失效、原集用途改为 dev/regression；对外把原题结果改称“训练相关分布/定向修复回归”，不改动 Case 与历史 Run 原文。若已经发布过“泛化提升”，另发更正说明。\n2. **只有需要泛化结论时**才做第二步：从未参与失败分析、改写、选择、调参和早期评估的新来源构建 held-out 集，按来源关系整体切组，先固定评估口径再单次运行；旧集不再作为最终验收。\n3. 改名若仍要做，只作为第 1 步的辅助标签：保留映射，不据此做任何独立性声明。\n\n## 待复核点\n\n- 每条训练样本是否确实派生自测试失败题、覆盖比例多少。\n- `group_id` 是否曾被用于切分或分组统计；若曾使用，改名后相关历史统计结论也需重新判定。\n- 原报告中是否混有未受污染指标；不能把两类指标合并报告。\n\n本次未指定具体数据文件，以上是判定与流程。给出路径后，我可以只读核对派生映射、来源组边界和相同输入交集。"
+      ],
+      "tools": [
+        {
+          "name": "skill",
+          "skill": "kev-dataset-audit"
+        },
+        {
+          "name": "read"
+        },
+        {
+          "name": "glob"
+        },
+        {
+          "name": "read"
+        },
+        {
+          "name": "bash"
+        }
+      ],
+      "system": [
+        {
+          "sha256": "31e175e0d25ccb18f25a268b17db35b0151d019cce6a4809ac5972fdd36b5e62",
+          "principlesLoaded": true,
+          "newPrincipleLoaded": true,
+          "sourceSha256": "78a5330c5e2b726dbb551e73e5d6a2f83f75dc916beaecf132e56e3a53106c0e"
+        }
+      ],
+      "proposals": [],
+      "finishedAt": "2026-11-03T06:14:45.685Z"
+    },
+    {
+      "id": "attribution",
+      "task": "仅分析：某业务智能体的工具服务器断连，日志没有取得实际工具返回；业务报告失败。有人建议立刻把这次失败都归因为知识不足，生成更多知识训练样本即可解决。你如何判断和办理？请区分已知事实、替代解释与必要验证，不运行工具任务、训练或修改资产。",
+      "startedAt": "2026-11-03T06:14:45.686Z",
+      "sessionId": "session-9e1238a5-55d8-4099-a069-78befe422e13",
+      "accepted": true,
+      "historyComplete": true,
+      "running": false,
+      "eventTypes": [
+        "permission/preset",
+        "sandbox/mode",
+        "approval/policy",
+        "plugin:harness-platform/assistant",
+        "agent/inbox/spliced",
+        "turn/start",
+        "step/start",
+        "system/message",
+        "user/message",
+        "request/header",
+        "request/context",
+        "session/title",
+        "session/title-llm-request",
+        "session-log-deepseek/delivery-accepted",
+        "assistant/message",
+        "tool/call",
+        "tool/result",
+        "step/end",
+        "turn/end"
+      ],
+      "ended": true,
+      "assistant": [
+        "## 结论\n\n在现有证据下，把这次失败归因为“知识不足”，并没有证据支持。工具服务器断连，意味着那次运行中本来就没有可用的业务数据；报告失败，首先可以解释为“缺少输入”。断连属于连接、工具和观测层面的问题，增加知识样本既不会恢复连接，也无法证明模型缺少知识。更关键的是，如果用这次失败的输出去生成样本或标准答案，就等于把“没有拿到数据也能写报告”的行为教给模型。\n\n因此，按下面的顺序处理更稳妥：先按可靠性事件取证，再确定原因属于哪一层，最后只对已证实的原因动手。\n\n## 已知事实\n\n- 运行期间工具服务器断连，这属于连接或传输层面的失败，并非业务层返回了错误数据。\n- 日志没有取得实际工具返回，因此没有可判读的业务输入，也没有能证明模型“知情却答错”的材料。\n- 业务报告没有通过。\n\n这三条事实都是用户陈述，我尚未核对原始运行。其余内容，包括“知识不足”的说法，都属于假设，不是事实。\n\n## 未知但会改变结论的信息\n\n- 目标 Agent、版本、Run、实例，以及故障时实际装载的资产版本与程序版本，这些均待确认。\n- 断连的性质：是网络抖动、服务进程退出、端点和认证或协议不匹配，还是超时预算不足，或被记为断连的调用根本没被装载。\n- 断连是根因还是伴生现象，比如先超时、重试耗尽，再出现断连信号。\n- 智能体在断连后的实际行为：是否重试、是否显式报告缺失，还是把没有来源的数字写进了报告。\n- 该任务对这份工具数据的依赖程度，以及同期其他运行或实例是否也失败。\n- 报告失败由谁、按什么口径判定，失败点是内容错误、数据缺失，还是未完成。\n\n## 为什么现在不能判“知识不足”\n\n知识假设需要在“工具正常、数据齐全，但内容仍然错”的条件下才有判决力。本次运行连可判读的输入都没有，因此它对模型知识水平几乎没有提供信息。任何报告失败都可以由缺少数据完全解释，不必额外引入知识缺口。\n\n另外，断连发生在工具和传输层，扩充知识样本不会改变连接、超时、重试和日志观测。训练完成也不等于连接恢复。\n\n还有一个反向风险：失败的输出不是真值。如果因为“报告失败”就把它整理成训练样本，会同时造成标签污染和幻觉强化，而数量增长并不带来质量或业务收益。\n\n## 替代解释与判别线索\n\n| 层 | 可能原因 | 本次可见迹象 | 需要什么证据区分 |\n|---|---|---|---|\n| 观测 | 工具其实有返回，但被投影、裁剪或未写入日志 | 客户端没有记录，但服务端有响应 | 服务端和网关侧的请求与响应记录 |\n| 传输 | 进程退出、网络中断、认证过期、限流、协议版本不匹配 | 断连错误、同一时段其他调用方也失败 | 错误码、时间线、影响面 |\n| 装载 | 工具声明存在，但未实际装载、被禁用，或名称不匹配 | 调用未到达服务，请求工具目录与调用记录缺失 | 运行时的实际工具目录 |\n| 策略 | 超时阈值过短、没有重试或重试耗尽 | 时延与超时记录、重试计数 | 调用时延分布与策略配置 |\n| 智能体行为 | 断连后未重试、未求助，直接出结论或编造数据 | 报告中出现日志里没有来源的具体数值 | 报告内容与可用输入的逐项对照 |\n| 任务与知识 | 真实的业务知识缺口 | 目前没有项目提供 | 在工具健康、数据齐全时能否复现同类内容错误 |\n| 验收 | 把“未完成”判成“内容错误” | 评分标准与失败点描述 | 验收记录与判定口径 |\n\n第一行值得优先排查：整条推断都建立在“没有取得返回”之上。如果这其实是日志采集缺失，所有归因都要重来。\n\n## 必要验证（按顺序、只读、可证伪）\n\n1. **固定目标与版本。** 确认 Agent、Experiment 或版本、Run、实例，以及故障时的资产与程序版本，不拿最新编号或当前工作树替代。判据是能定位到可复现的固定来源。\n2. **事件序列取证。** 读该 Run 的轨迹与事件，做“调用→结果”配对，确定断连发生在请求前、请求中还是响应后，找出首个错误事件及其后的重试与降级行为。\n3. **观测完整性反证。** 核对服务端或网关是否有对应请求与响应。若服务端有返回而客户端无记录，结论就转向观测层，知识归因更不成立。\n4. **连接独立复测。** 在业务运行之外，对同一配置做只读连通性检查，区分配置性故障与瞬时故障，并查看同期其他运行的影响面。\n5. **行为审查。** 对照报告内容与可用输入，检查有无无来源数据、有无显式声明缺失。这一步决定修复点是连接层、行为约束还是评测口径。\n6. **同题对照。** 工具恢复后用同一冻结输入重跑一个新 Run，旧 Run 保持原样不改写。若工具正常即通过，知识假设被排除；仍复现同类内容错误，才进入知识归因。\n7. **知识评估。** 只有第 6 步给出健康条件下的内容错误，才讨论知识样本：明确场景、任务与能力，核对来源、用途、质量与独立效果，导出前逐题复核。\n\n第 6 步之前，任何“补知识”的工作都缺乏可验证的目标。\n\n## 办理建议\n\n现在应当做的是：把事件按可靠性或观测故障处理，保留原 Run 与日志，结论记为 inconclusive，不改动资产。\n\n修复应分两件事，且不要合并在一次改动里：\n\n- **连接与观测**：端点与认证、超时与重试、错误码可观测。这属于环境或配置修复，不需要新建 Experiment。\n- **工具不可用时的行为约束**：必须显式报告缺失、区分已完成与未取到、禁止用无来源数据填报告。这是 Harness 业务语义变化，应有独立 Experiment 与固定的“工具不可用”用例，并保留旧 Run 作为对照。\n\n知识样本是一个独立假设，必须等第 6 步的证据。届时样本来源应是已核对的知识材料，而非本次失败输出；标签复核、编码检查和效果验证仍要分别取证。\n\n## 需要你补充的最小信息\n\n目标 Agent 或 Run、实例标识，以及是否授权我做只读取证（轨迹事件、实例日志、MCP 连通性复测）。补齐后我可以按上述顺序出一份取证结论；不授权时，上面的判别标准也可直接交给处理故障的同事使用。"
+      ],
+      "tools": [
+        {
+          "name": "skill",
+          "skill": "workspace-management"
+        }
+      ],
+      "system": [
+        {
+          "sha256": "31e175e0d25ccb18f25a268b17db35b0151d019cce6a4809ac5972fdd36b5e62",
+          "principlesLoaded": true,
+          "newPrincipleLoaded": true,
+          "sourceSha256": "78a5330c5e2b726dbb551e73e5d6a2f83f75dc916beaecf132e56e3a53106c0e"
+        }
+      ],
+      "proposals": [],
+      "finishedAt": "2026-11-03T06:15:30.872Z"
+    },
+    {
+      "id": "ordinary",
+      "task": "只读查看当前工作区已有实例及其状态，不启动、停止或创建实例。",
+      "startedAt": "2026-11-03T06:15:30.873Z",
+      "sessionId": "session-6886b5a9-5730-42cc-b26a-a2fbbfbb694e",
+      "accepted": true,
+      "historyComplete": true,
+      "running": false,
+      "eventTypes": [
+        "permission/preset",
+        "sandbox/mode",
+        "approval/policy",
+        "plugin:harness-platform/assistant",
+        "agent/inbox/spliced",
+        "turn/start",
+        "step/start",
+        "system/message",
+        "user/message",
+        "request/header",
+        "request/context",
+        "session/title",
+        "session/title-llm-request",
+        "session-log-deepseek/delivery-accepted",
+        "assistant/message",
+        "tool/call",
+        "tool/result",
+        "step/end",
+        "job/registered",
+        "job/settled",
+        "turn/end"
+      ],
+      "ended": true,
+      "assistant": [
+        "当前工作区没有任何实例：对实例目录及状态的只读查询返回了空清单。\n\n- 查询时间：2026-11-03 14:15:35（+08:00）\n- 实例状态根目录：`.local/instances`。该目录目前还不存在，说明此工作区尚未创建或登记过实例，也不存在运行中、已停止或未发布的实例记录\n- 本次操作范围：只调用了实例的只读列表查询，并查看了对应的状态目录；没有启动、停止、创建或写入任何实例\n\n因此，没有需要处理的实例，也没有可查看的运行状态。若后续需要在本工作区启动业务智能体实例，需要先有对应的已构建业务版本，再走实例创建与启动流程；请确认需要针对哪个 Agent 与版本再操作。"
+      ],
+      "tools": [
+        {
+          "name": "platform_instances",
+          "action": "describe"
+        },
+        {
+          "name": "platform_instances",
+          "action": "list"
+        },
+        {
+          "name": "bash"
+        }
+      ],
+      "system": [
+        {
+          "sha256": "31e175e0d25ccb18f25a268b17db35b0151d019cce6a4809ac5972fdd36b5e62",
+          "principlesLoaded": true,
+          "newPrincipleLoaded": true,
+          "sourceSha256": "78a5330c5e2b726dbb551e73e5d6a2f83f75dc916beaecf132e56e3a53106c0e"
+        }
+      ],
+      "proposals": [],
+      "finishedAt": "2026-11-03T06:15:42.161Z"
+    }
+  ],
+  "configuration": {
+    "ready": true,
+    "core_ready": true,
+    "missing": [],
+    "requested_skill": "workspace-management",
+    "message": "",
+    "assets": [
+      {
+        "name": "AGENTS.md",
+        "ready": true,
+        "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/AGENTS.md",
+        "sha256": "78a5330c5e2b726dbb551e73e5d6a2f83f75dc916beaecf132e56e3a53106c0e"
+      },
+      {
+        "name": "workspace-management",
+        "ready": true,
+        "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/workspace-management/SKILL.md",
+        "sha256": "8b3678013c42bc93d9bc59e48dc5cc6ae9a3b5f2b59f03012e01175a7779ccff"
+      },
+      {
+        "name": "task-builder",
+        "ready": true,
+        "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/task-builder/SKILL.md",
+        "sha256": "38acc30c15ed53193fad3261a99cb0f5457fbc13c3f054d08d609fce1681d51d"
+      },
+      {
+        "name": "agent-maintenance",
+        "ready": true,
+        "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/agent-maintenance/SKILL.md",
+        "sha256": "3960169b875b8afd9ca360d3909fcf2cc2a0c96c35aea005749ffdf857605b08"
+      },
+      {
+        "name": "agent-migration",
+        "ready": true,
+        "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/agent-migration/SKILL.md",
+        "sha256": "ea512b01aff1da169489c29d8e71c8ebd51764b47c5a7cebe025a8185c0299ac"
+      },
+      {
+        "name": "mcp-composition",
+        "ready": true,
+        "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/mcp-composition/SKILL.md",
+        "sha256": "465948c2453e87fce01c6b60a58619e03e51dd721596a166ce6c427c80ae2dd3"
+      },
+      {
+        "name": "compute-variant-research",
+        "ready": true,
+        "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/compute-variant-research/SKILL.md",
+        "sha256": "9b0dbeaa746e868fab380bae727106a16168a9d8d06ba37af5cc435b6915f7be"
+      },
+      {
+        "name": "decision-sample-extraction",
+        "ready": true,
+        "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/decision-sample-extraction/SKILL.md",
+        "sha256": "e4c57e1b0e359d78f81a8a5273f1e4a47570a7a565d524f67c9ac18dcddaeb82"
+      },
+      {
+        "name": "harness-evolution",
+        "ready": true,
+        "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/harness-evolution/SKILL.md",
+        "sha256": "e79cef123622addabad9753a677099f2e9a911c9d3ec6368523998a4c71ad0f1"
+      },
+      {
+        "name": "harness-experiment-fusion",
+        "ready": true,
+        "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/harness-experiment-fusion/SKILL.md",
+        "sha256": "d42d431595d0508088c17e6b5ca747dfc313f8c1aaee71976bd6ef85c6b6c887"
+      },
+      {
+        "name": "research-eval",
+        "ready": true,
+        "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/research-eval/SKILL.md",
+        "sha256": "552d803136dc1674ed04e5932517b9c08c23392c82dd8d29df92042ede5e6631"
+      },
+      {
+        "name": "legacy-asset-intake",
+        "ready": true,
+        "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/legacy-asset-intake/SKILL.md",
+        "sha256": "082bcf89d8c10815403165fad98574c109d16e5d1225cb8a0213e22074199299"
+      },
+      {
+        "name": "reviewing-agent-skills",
+        "ready": true,
+        "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/reviewing-agent-skills/SKILL.md",
+        "sha256": "bff6e05fc9b9ab6bb5a166cdc5ace6514ce206c712d2f948209b0f116d55df94"
+      },
+      {
+        "name": "user-facing-output",
+        "ready": true,
+        "path": "/home/admin/work/harness-engineering-platform/.local/audit-guide-20261103/data/.agents/skills/user-facing-output/SKILL.md",
+        "sha256": "c3a0c9412dadc0a9ed015a440422a054fa067179a9cb61153979d0fae2d3cbab"
+      }
+    ],
+    "tasks": {
+      "workspace-management": true,
+      "task-builder": true,
+      "agent-maintenance": true,
+      "agent-migration": true,
+      "mcp-composition": true,
+      "compute-variant-research": true,
+      "decision-sample-extraction": true,
+      "harness-evolution": true,
+      "harness-experiment-fusion": true,
+      "research-eval": true,
+      "legacy-asset-intake": true,
+      "reviewing-agent-skills": true,
+      "user-facing-output": true
+    }
+  },
+  "model": {
+    "platform_default": {
+      "provider": "deepseek-official",
+      "model": "deepseek-flash",
+      "reasoningEffort": "max"
+    },
+    "provider_readiness": {
+      "deepseek-official": {
+        "state": "ready",
+        "message": "业务实例可解析 API Key；实际调用仍需启动核验。"
+      }
+    }
+  },
+  "businessFilesCreated": [
+    {
+      "name": "agents",
+      "exists": false,
+      "entries": []
+    },
+    {
+      "name": "evolution",
+      "exists": false,
+      "entries": []
+    }
+  ],
+  "finishedAt": "2026-11-03T06:15:42.161Z"
+}

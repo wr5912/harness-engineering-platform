@@ -1,0 +1,169 @@
+{
+  "at": "2026-11-03T06:31:58.448769+00:00",
+  "preservedFilesMatch": {
+    "/home/admin/harness-engineering-platform-data/config/business-access.json": true,
+    "/home/admin/harness-engineering-platform-data/evolution/datasets/decision-dataset-b8f473f1-0cd7-42cd-a0a1-b90771f1ebe4.json": true,
+    "/home/admin/harness-engineering-platform-data/evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/evaluation/evidence/dsh-image-build-20261024T023237Z-3.json": true
+  },
+  "localLinksChecked": 38,
+  "links": [
+    {
+      "source": "docs/项目审查原则.md",
+      "target": "../AGENTS.md"
+    },
+    {
+      "source": "docs/项目审查原则.md",
+      "target": "../AGENTS.md#项目定位与工作方式"
+    },
+    {
+      "source": "docs/项目审查原则.md",
+      "target": "../AGENTS.md#项目定位与工作方式"
+    },
+    {
+      "source": "docs/项目审查原则.md",
+      "target": "项目术语表.md"
+    },
+    {
+      "source": "docs/项目审查原则.md",
+      "target": "standards/SOURCES.md#智能体能力数据集建设参考"
+    },
+    {
+      "source": "docs/standards/SOURCES.md",
+      "target": "./PROJECT-INTERPRETATION.md"
+    },
+    {
+      "source": "docs/standards/SOURCES.md",
+      "target": "./Harness_Repo目录结构设计说明_v1.1.md"
+    },
+    {
+      "source": "docs/standards/SOURCES.md",
+      "target": "./Harness_Asset_Repository规范_v1.0.md"
+    },
+    {
+      "source": "docs/standards/SOURCES.md",
+      "target": "../../runtime/research/validate_repository.py"
+    },
+    {
+      "source": "docs/standards/SOURCES.md",
+      "target": "./PROJECT-INTERPRETATION.md"
+    },
+    {
+      "source": "docs/standards/SOURCES.md",
+      "target": "../项目审查原则.md#数据资产与能力效果"
+    },
+    {
+      "source": "docs/项目对抗性审查_2026-11-03.md",
+      "target": "../platform/plugin/test/evidence/adversarial-guide-20261103/README.md"
+    },
+    {
+      "source": "docs/项目对抗性审查_2026-11-03.md",
+      "target": "standards/SOURCES.md#智能体能力数据集建设参考"
+    },
+    {
+      "source": "docs/项目对抗性审查_2026-11-03.md",
+      "target": "项目审查原则.md#数据资产与能力效果"
+    },
+    {
+      "source": "platform/plugin/test/evidence/adversarial-guide-20261103/README.md",
+      "target": "../../../../../docs/项目对抗性审查_2026-11-03.md"
+    },
+    {
+      "source": "platform/plugin/test/evidence/adversarial-guide-20261103/README.md",
+      "target": "stream-initial-expiry-probe.json"
+    },
+    {
+      "source": "platform/plugin/test/evidence/adversarial-guide-20261103/README.md",
+      "target": "stream-initial-expiry-probe.mts"
+    },
+    {
+      "source": "platform/plugin/test/evidence/adversarial-guide-20261103/README.md",
+      "target": "composition-unknown-probe.json"
+    },
+    {
+      "source": "platform/plugin/test/evidence/adversarial-guide-20261103/README.md",
+      "target": "composition-unknown-probe.mjs"
+    },
+    {
+      "source": "platform/plugin/test/evidence/adversarial-guide-20261103/README.md",
+      "target": "data-repros.json"
+    },
+    {
+      "source": "platform/plugin/test/evidence/adversarial-guide-20261103/README.md",
+      "target": "data-repros.mts"
+    },
+    {
+      "source": "platform/plugin/test/evidence/adversarial-guide-20261103/README.md",
+      "target": "runtime-path-rewrite-repro.json"
+    },
+    {
+      "source": "platform/plugin/test/evidence/adversarial-guide-20261103/README.md",
+      "target": "runtime-path-rewrite-repro.mts"
+    },
+    {
+      "source": "platform/plugin/test/evidence/adversarial-guide-20261103/README.md",
+      "target": "runtime-public-url-repro.json"
+    },
+    {
+      "source": "platform/plugin/test/evidence/adversarial-guide-20261103/README.md",
+      "target": "runtime-public-url-repro.mts"
+    },
+    {
+      "source": "platform/plugin/test/evidence/adversarial-guide-20261103/README.md",
+      "target": "runtime-sdk-utf8-repro.json"
+    },
+    {
+      "source": "platform/plugin/test/evidence/adversarial-guide-20261103/README.md",
+      "target": "runtime-sdk-utf8-repro.mts"
+    },
+    {
+      "source": "AGENTS.md",
+      "target": ".agents/skills/user-facing-output/SKILL.md"
+    },
+    {
+      "source": "AGENTS.md",
+      "target": "docs/harness-research/README.md"
+    },
+    {
+      "source": "AGENTS.md",
+      "target": "/home/admin/work/harness-engineering-platform/docs/platform-design/20_业务访问与运行控制插件开发规范.md#当前访问语义"
+    },
+    {
+      "source": ".agents/skills/workspace-management/SKILL.md",
+      "target": "../../../docs/harness-research/evaluation-and-evidence.md#数据与任务表现"
+    },
+    {
+      "source": "docs/harness-research/evaluation-and-evidence.md",
+      "target": "../../.agents/skills/research-eval/references/experiment-contract.md"
+    },
+    {
+      "source": "docs/harness-research/evaluation-and-evidence.md",
+      "target": "/home/admin/work/harness-engineering-platform/docs/standards/SOURCES.md#智能体能力数据集建设参考"
+    },
+    {
+      "source": "docs/harness-research/decision-samples.md",
+      "target": "../../.agents/skills/decision-sample-extraction/SKILL.md"
+    },
+    {
+      "source": "docs/harness-research/decision-samples.md",
+      "target": "/home/admin/work/harness-engineering-platform/docs/standards/SOURCES.md#智能体能力数据集建设参考"
+    },
+    {
+      "source": "docs/harness-research/decision-samples.md",
+      "target": "README.md"
+    },
+    {
+      "source": "docs/harness-research/decision-samples.md",
+      "target": "compute-variants.md"
+    },
+    {
+      "source": "docs/harness-research/decision-samples.md",
+      "target": "kev-medium-variant-skills.md"
+    }
+  ],
+  "programHead": "41e66424b41729ca2c6fc86d65aeae95daa3159e",
+  "dataHead": "b667e26e3d206da0daea41ddfd3a1889159db133",
+  "mainPidAlive": true,
+  "isolatedStatus": {
+    "status": "stopped"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "scope": "隔离本地外部边界；真实登记、验证、HTTP事件代理，不操作现有服务",
+  "checks": [],
+  "httpStatus": 200,
+  "riskCalls": 1,
+  "riskExpiresAt": "2026-11-03T06:07:25.113Z",
+  "eventAfterExpiry": {
+    "type": "message",
+    "data": {
+      "sessionID": "ses_probe",
+      "n": 13,
+      "at": "2026-11-03T06:07:25.470Z"
+    }
+  },
+  "confirmed": true,
+  "overrunMs": 357
+}
