@@ -44,7 +44,11 @@ export function isDecisionExtraction(root: string, agent: any, state: any) {
   return belongsToTask(root, agent, state, 'decision-sample-extraction')
 }
 export function isComputeVariantResearch(root: string, agent: any, state: any) {
-  return belongsToTask(root, agent, state, 'compute-variant-research')
+  return belongsToTask(root, agent, state, 'compute-variant-research') && !isComputeVariantExecution(state)
+}
+export function isComputeVariantExecution(state: any) {
+  const task = state?.task_context
+  return task?.skill === 'compute-variant-research' && task.generation_intent === 'implement' && task.planning_intent !== 'plan_only'
 }
 export function isFeatureOrganization(root: string, agent: any, state: any) {
   return belongsToTask(root, agent, state, 'agent-maintenance') && state?.task_context?.workflow === 'features'

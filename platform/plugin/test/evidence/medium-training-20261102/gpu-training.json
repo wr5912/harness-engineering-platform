@@ -1,0 +1,110 @@
+{
+  "captured_at_utc": "2026-11-03T01:28:01.332422+00:00",
+  "source_session_id": "session-d69bd4a4-eeda-4eb8-bb9e-af4053a8c48e",
+  "parent_experiment_id": "EXP-security-operations-expert-024-rad80a907c628",
+  "source_run_ids": [
+    "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408"
+  ],
+  "training_result": {
+    "schema_version": 1,
+    "stage": "train",
+    "job_id": "pid:2438",
+    "pid": 2438,
+    "started_at_utc": "2026-11-03T01:24:31.980545+00:00",
+    "finished_at_utc": "2026-11-03T01:25:00.435196+00:00",
+    "exit_code": 0,
+    "log": {
+      "path": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103/execution/train/stdout.log",
+      "sha256": "a4f013ad1b076ae76b8f0bcfd6d5ae5fe3490e2933357f7eeb6bad06b6a65c7d",
+      "bytes": 2602
+    },
+    "peak_gpu_memory_used_mib": 3629
+  },
+  "training_metrics": {
+    "wall_seconds": 12.875657320022583,
+    "records_seen": 17,
+    "requested_records": 17,
+    "truncated_records": 0,
+    "rejected_records": 0,
+    "optimizer_steps": 3,
+    "forward_tokens": 10037,
+    "step_seconds": [
+      6.36,
+      5.785,
+      0.73
+    ],
+    "optimizer_seconds": 0.08986520767211914,
+    "resume_seconds": [],
+    "resume_write_seconds": [],
+    "world_size": 1,
+    "backbone_save_seconds": 0.1,
+    "snapshots": [],
+    "grad_norm": [
+      {
+        "epoch": 0,
+        "steps": 3,
+        "mean": 25.500207333333332,
+        "max": 34.685947,
+        "clipped_steps": 3
+      }
+    ],
+    "weights": "lora",
+    "peak_device_bytes": 3486417408,
+    "device": "cuda",
+    "dtype": "fp32",
+    "batch": 1,
+    "peak_rss_bytes": 5544476672
+  },
+  "encoding": {
+    "report_sha256": "3fd7a770df7e02859bd3ec5e404eec32225ce14cf6854e1650e910e4547cf7c7",
+    "status": "ready",
+    "failures": []
+  },
+  "checkpoint_before_calibration": {
+    "schema_version": 1,
+    "remote_dir": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103/actual-run-fp32-01/checkpoint",
+    "training_steps": 3,
+    "files": {
+      "README.md": {
+        "bytes": 5168,
+        "sha256": "279291cca3b1cada9ecf72a29c5d2566c48eaec4675f36221aaeb2ce6f844088"
+      },
+      "adapter_config.json": {
+        "bytes": 1273,
+        "sha256": "e173749195067f75cd77ea451e3c89bc48faf412d648c5b1310addc0ed1283ee"
+      },
+      "adapter_model.safetensors": {
+        "bytes": 43338624,
+        "sha256": "1d44eec14e8b03a937d18cec7f583745ef12009d2cc87767db380449e50572a2"
+      },
+      "chat_template.jinja": {
+        "bytes": 7755,
+        "sha256": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80"
+      },
+      "head.pt": {
+        "bytes": 2103032,
+        "sha256": "e31c975e3d17aca2e1e118d4c7acf560125846d288974e983cef501a5705ad75"
+      },
+      "tokenizer.json": {
+        "bytes": 19989339,
+        "sha256": "a5cd9732badce41de57e6efce8302930ded1c1188c5f81feb2bd6c24c4a1941f"
+      },
+      "tokenizer_config.json": {
+        "bytes": 1468,
+        "sha256": "feff6d976ea146cbf7a8570d636478dea2708a64375a35ad6ee470a8b593b656"
+      },
+      "training_config.json": {
+        "bytes": 2198,
+        "sha256": "b0369c7d2c176f02c1b4ef6188730e11ae9d50677d5f30f3794ae84990f1bc44"
+      },
+      "training_metrics.json": {
+        "bytes": 709,
+        "sha256": "74a077eb68c0981d633bbe7cda6ffd2792b070eef1bba113228b1d50ed9d1089"
+      }
+    }
+  },
+  "limits": [
+    "17 training records; three optimizer steps; not evidence of eight-class generalization",
+    "Calibration, frozen test, service deployment and paired business acceptance pending at capture"
+  ]
+}

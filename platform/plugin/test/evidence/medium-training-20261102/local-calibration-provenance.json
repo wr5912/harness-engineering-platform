@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "execution_location": "local-data-workspace",
+  "method": "AST extraction of unchanged fixed kev.calibrate workload_report/format_report + unchanged kev.metrics; stdlib JSON I/O instead of importing kev.suite",
+  "fixed_kev_git_commit": "2074cc44256200bb37540103fa4572901faa10f3",
+  "calibrate_py_sha256": "435ac98696fbd329c3a07f0c12633ba3c09a846f0e9c92e17540bbf8ba2986f8",
+  "metrics_py_sha256": "167a586334cfcced4adcc197758535c3bcda832b855c151095ef2d1968cf8983",
+  "calibration_rows_sha256": "f5c3889787e883b9241a21504df2505bfe028c5eb9b83bb20ca60c0e26a67f53",
+  "folds": 3,
+  "seed": 20261103,
+  "bootstrap_samples": 1000,
+  "local_report_sha256": "41887276fd1a252d658c6ade4a24804777c1c5b8b1afa4cfd8544915bfb639d5",
+  "remote_calibration_report_status": "unknown",
+  "checkpoint_temperature_write": "not_run",
+  "test_data_read": false
+}

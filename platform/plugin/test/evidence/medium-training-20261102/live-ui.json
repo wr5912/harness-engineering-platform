@@ -1,0 +1,42 @@
+{
+  "at": "2026-11-03T01:03:57.497Z",
+  "source": "actual local platform",
+  "submitted": false,
+  "views": [
+    {
+      "width": 880,
+      "viewport": 1440,
+      "overflow": false,
+      "buttons": [
+        {
+          "text": "仅发送策划请求",
+          "intent": "plan_only",
+          "disabled": false
+        },
+        {
+          "text": "生成并验证变体",
+          "intent": "implement",
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "width": 366,
+      "viewport": 390,
+      "overflow": false,
+      "buttons": [
+        {
+          "text": "仅发送策划请求",
+          "intent": "plan_only",
+          "disabled": false
+        },
+        {
+          "text": "生成并验证变体",
+          "intent": "implement",
+          "disabled": false
+        }
+      ]
+    }
+  ],
+  "page_errors": []
+}

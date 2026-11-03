@@ -212,6 +212,8 @@ test('算力研究真实原生作用域阻止 shell、读写及其他技能，�
   assert.equal(isComputeVariantResearch('/other', f.agent, state), false)
   assert.equal(isComputeVariantResearch('/project', f.agent, { task_context: {} }), false)
   assert.equal(isComputeVariantResearch('/project', f.agent, state), true)
+  assert.equal(isComputeVariantResearch('/project', f.agent, { task_context: { ...state.task_context, generation_intent: 'implement' } }), false)
+  assert.equal(isComputeVariantResearch('/project', f.agent, { task_context: { ...state.task_context, generation_intent: 'implement', planning_intent: 'plan_only' } }), true)
   f.scope.apply(f.agent)
   assert.deepEqual(await f.schemas(f.agent), ['platform_agents', 'skill'])
   for (const name of ['bash', 'read', 'write', 'spawn_agent']) assert.equal((await f.execute(name, { command: '此测试命令不得执行' })).isError, true)

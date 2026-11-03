@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-03T02:05:21.903Z",
+  "source": "actual local platform",
+  "experiment_id": "VAR-security-operations-expert-002-r727f8750a82f",
+  "operation": "read_only",
+  "decision_training": {
+    "required": true,
+    "verified": false,
+    "reasons": [
+      "决策模型训练尚未核验：缺少本次 KEV 决策模型的真实训练回执"
+    ]
+  },
+  "visible_warning": true,
+  "page_errors": []
+}

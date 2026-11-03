@@ -10,7 +10,6 @@ import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { build } from 'esbuild'
 import { createAssistant, redactAssistant } from '../src/assistant/index.ts'
-import { createInstancesHandler } from '../src/instances/index.ts'
 import { managementSkills } from '../src/assistant/business-assets.ts'
 import { assistantMcp } from '../src/assistant/mcp.ts'
 import { sha256 } from '../src/tasks/files.ts'
@@ -19,6 +18,12 @@ import { DECISION_EXTRACTION_CONTRACT, decisionExtractionToolParameters } from '
 import { businessCasesSchema } from '../src/agents/business-cases.ts'
 import { workspaceIdentity } from '../src/workspace.ts'
 import { initializeBusinessGateway } from '../src/business-control/configuration.ts'
+
+const instancesBuild = mkdtempSync(join(tmpdir(), 'assistant-instances-build-'))
+symlinkSync(new URL('../node_modules', import.meta.url), join(instancesBuild, 'node_modules'), 'dir')
+await build({ entryPoints: ['src/instances/index.ts'], outfile: join(instancesBuild, 'instances.mjs'), bundle: true, platform: 'node', format: 'esm', packages: 'external', logLevel: 'silent' })
+const { createInstancesHandler } = await import(`file://${join(instancesBuild, 'instances.mjs')}`)
+test.after(() => rmSync(instancesBuild, { recursive: true, force: true }))
 
 const expressionFixture = '先说明结果、影响和用户需要采取的行动。保留失败与未知事实。'
 function fixture(t, responder, root) {
@@ -1128,6 +1133,14 @@ test('专项研究文档按任务主题放行，拒绝借资料读取扩展动�
   const compute = (await f.rpc('session', { task: '算力', context: { skill: 'compute-variant-research' } })).value.session_id
   assert.equal((await f.execute(compute, 'agents', 'research/read-reference', { topic: 'evaluation-and-evidence' })).state, 'completed')
   await assert.rejects(() => f.execute(compute, 'agents', 'research/read-reference', { topic: 'decision-samples' }), /主题不属于/)
+  const plan = (await f.rpc('session', { task: '仅策划', context: { skill: 'compute-variant-research', planning_intent: 'plan_only' } })).value.session_id
+  for (const action of ['compute-variants/create', 'compute-variants/compare', 'edit/apply', 'eval/start', 'eval/cancel']) {
+    await assert.rejects(() => f.execute(plan, 'agents', action, {}), /仅策划请求不执行/)
+  }
+  await assert.rejects(() => f.execute(plan, 'agents', 'datasets/export', {}), /不允许此操作/)
+  const implement = (await f.rpc('session', { task: '生成并训练', context: { skill: 'compute-variant-research', generation_intent: 'implement' } })).value.session_id
+  assert.equal((await f.execute(implement, 'agents', 'datasets/list', {})).state, 'completed')
+  assert.equal(f.calls.some(call => call.endpoint === 'agents/datasets/list'), true)
   const general = (await f.rpc('session', { task: '检查' })).value.session_id
   assert.equal((await f.execute(general, 'agents', 'research/validate', { experiment_id: 'EXP-selected-001' })).state, 'completed')
   assert.equal((await f.status(general)).proposals.length, 0)

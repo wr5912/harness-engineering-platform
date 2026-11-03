@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "stage": "calibration-raw",
+  "job_id": "pid:3421",
+  "pid": 3421,
+  "started_at_utc": "2026-11-03T01:27:40.783823+00:00",
+  "finished_at_utc": "2026-11-03T01:27:56.996485+00:00",
+  "exit_code": 0,
+  "log": {
+    "path": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103/execution/calibration-raw/stdout.log",
+    "sha256": "c0d228568277d8d4563ff83bb5c4109cdd653a3ed5b86693551535966bf762c4",
+    "bytes": 2284
+  },
+  "peak_gpu_memory_used_mib": 3315
+}

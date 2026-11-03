@@ -81,7 +81,7 @@ function mountedDialog({ servers = [], saveResult, probeResult, onSend, storage 
   }
   render()
   return { medium, low, settle, render, nodes, textOf, button, byLabel, edit, field, fill, calls, sent, closed, dirty, storage, props, module,
-    submit: async () => { nodes().find(node => node.type === 'form').props.onSubmit({ preventDefault() {} }); await settle() },
+    submit: async (intent = 'plan_only') => { nodes().find(node => node.type === 'form').props.onSubmit({ preventDefault() {}, nativeEvent: { submitter: { getAttribute: () => intent } } }); await settle() },
     cleanup: () => cleanups.forEach(cleanup => cleanup?.()) }
 }
 
@@ -98,7 +98,7 @@ test('小尺寸 LLM 与决策模型按 HF、ModelScope、本地及待确定来�
     assert.equal(ui.button('模型库'), undefined)
     assert.equal(ui.field('baseModelId'), undefined)
     assert.match(ui.textOf(), /Hugging Face、ModelScope 仓库.*本地模型目录/)
-    assert.match(ui.textOf(), /本次不下载或训练模型/)
+    assert.match(ui.textOf(), /仅策划不下载或训练模型/)
     for (let index = 0; index < models.length; index++) {
       ui.button('添加模型').props.onClick({ currentTarget: { closest: () => null } }); await ui.settle()
       const prefix = `模型 ${index + 1}`
@@ -112,6 +112,7 @@ test('小尺寸 LLM 与决策模型按 HF、ModelScope、本地及待确定来�
     assert.equal(ui.byLabel('模型 3 基模型').props.placeholder, '/path/to/downloaded-model')
     await ui.submit()
     assert.equal(ui.sent.length, 1)
+    assert.equal(ui.sent[0].intent, 'plan_only')
     assert.deepEqual(JSON.parse(JSON.stringify(ui.sent[0].medium.models)), models)
     assert.equal('baseModelMode' in ui.sent[0].medium, false)
     assert.equal('baseModelId' in ui.sent[0].medium, false)
@@ -603,6 +604,21 @@ test('旧目录草稿无模型 ID 但有 Revision 仍可只读核对，再挂载
         assert.doesNotMatch(JSON.stringify(ui.sent[0]), /legacy-inference-revision-only|previousInference|baseModelMode|baseModelId/)
       }
       assert.equal(ui.calls.some(call => call.method === 'models/list'), false)
+    } finally { ui.cleanup() }
+  }
+})
+
+test('执行按钮显式发送 implement，仅策划按钮保持 plan_only，发送结果未知时两者均冻结', async () => {
+  for (const intent of ['plan_only', 'implement']) {
+    const ui = mountedDialog({ onSend: async () => { throw new Error('发送结果未知') } })
+    try {
+      await ui.medium(); ui.fill('goal', '降低资源开销')
+      await ui.submit(intent)
+      assert.equal(ui.sent[0].intent, intent)
+      const submits = ui.nodes().filter(node => node.type === 'button' && node.props.type === 'submit')
+      assert.deepEqual(submits.map(node => node.props.value), ['plan_only', 'implement'])
+      assert.equal(submits.every(node => node.props.disabled), true)
+      await ui.submit(intent); assert.equal(ui.sent.length, 1)
     } finally { ui.cleanup() }
   }
 })

@@ -14,6 +14,7 @@ const plugin = new URL('../', import.meta.url).pathname
 
 async function loadServer() {
   const outdir = mkdtempSync(join(tmpdir(), 'agents-build-'))
+  test.after(() => rm(outdir, { recursive: true, force: true }))
   const outfile = join(outdir, 'agents-server.mjs')
   await build({
     entryPoints: [join(plugin, 'src/agents/index.ts')],

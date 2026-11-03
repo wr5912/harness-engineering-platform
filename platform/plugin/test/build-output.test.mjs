@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
 import test from 'node:test'
 
@@ -10,7 +11,7 @@ const watched = ['platform/plugin/lib/index.js', 'platform/plugin/lib/client.js'
   'runtime/adapters/dsh-web/lib/index.mjs'].map(file => resolve(root, file))
 const snapshot = () => watched.map(file => existsSync(file) ? createHash('sha256').update(readFileSync(file)).digest('hex') : null)
 test('隔离构建不覆盖平台、业务薄入口或原生 Web 的已装载制品，且输出引用可解析', t => {
-  const directory = mkdtempSync(join(root, '.local/cross-framework/build-verification-'))
+  const directory = mkdtempSync(join(tmpdir(), 'hep-build-verification-'))
   t.after(() => rmSync(directory, { recursive: true, force: true }))
   const before = snapshot()
   execFileSync(process.execPath, ['build.mjs', '--out-dir', directory], { cwd: plugin, stdio: 'pipe' })

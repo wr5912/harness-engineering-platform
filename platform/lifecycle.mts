@@ -176,6 +176,10 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
   const service = join(dataRoot, '.local/platform-service')
   const unlock = await lock(join(service, 'operation.lock'))
   try {
+    if (command === 'restart') {
+      const checked = spawnSync(python(), privateArgs([...startArgs, '--dry-run']), { encoding: 'utf8' })
+      if (checked.error || checked.status !== 0) throw new Error(checked.stderr?.trim() || '启动检查未通过；原平台进程已保留')
+    }
     if (command === 'stop' || command === 'restart') await stop(dataRoot)
     if (command === 'stop') { console.log('平台已停止'); return 0 }
     const existing = managedState(dataRoot)

@@ -1,0 +1,59 @@
+Loading weights:   0%|          | 0/320 [00:00<?, ?it/s]Loading weights:  21%|██        | 66/320 [00:00<00:00, 653.02it/s]Loading weights:  41%|████▏     | 132/320 [00:00<00:00, 446.98it/s]Loading weights:  57%|█████▋    | 181/320 [00:00<00:00, 462.04it/s]Loading weights:  72%|███████▏  | 230/320 [00:00<00:00, 465.50it/s]Loading weights:  87%|████████▋ | 279/320 [00:00<00:00, 469.27it/s]Loading weights: 100%|██████████| 320/320 [00:00<00:00, 466.04it/s]
+[transformers] `causal_conv1d_fn` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[transformers] `chunk_gated_delta_rule` is falling back to its reference PyTorch implementation because `flash-linear-attention` is not installed. This is correct but much slower; install `flash-linear-attention` for the optimized kernel.
+{
+  "objective": -1.4881440827293968,
+  "clean": {
+    "n": 7,
+    "nll": 1.4881440827293968,
+    "acc": 0.42857142857142855,
+    "ece": 0.22126173007919347,
+    "brier": 0.7223236249214462,
+    "mean_conf": 0.35939330402034947,
+    "confident_error_rate": 0.0,
+    "coverage_at_0_9": 0.0,
+    "accuracy_at_0_9": null,
+    "coverage_at_5pct_error": 0.0,
+    "coverage_at_1pct_error": 0.0,
+    "aurc": 0.5078231292517007,
+    "error_rate_at_0_9": null,
+    "confidence_bias": -0.06917812455107908,
+    "top_bins": {
+      "0.9": {
+        "n": 0,
+        "errors": 0,
+        "error_rate": null
+      },
+      "0.95": {
+        "n": 0,
+        "errors": 0,
+        "error_rate": null
+      },
+      "0.99": {
+        "n": 0,
+        "errors": 0,
+        "error_rate": null
+      }
+    },
+    "selective": {
+      "0.5": {
+        "coverage": 0.5714285714285714,
+        "accuracy": 0.75,
+        "confidence_cutoff": 0.32954871531744034
+      },
+      "0.8": {
+        "coverage": 0.8571428571428571,
+        "accuracy": 0.5,
+        "confidence_cutoff": 0.28758397028818794
+      }
+    }
+  },
+  "coverage": {
+    "requested_records": 7,
+    "requested_questions": 7,
+    "evaluated_records": 7,
+    "evaluated_questions": 7,
+    "rejected_records": 0,
+    "truncated_records": 0
+  }
+}

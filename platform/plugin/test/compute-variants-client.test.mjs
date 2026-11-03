@@ -86,6 +86,25 @@ test('算力变体AI入口绑定专用Skill、版本与已选择Run，不直接�
   } finally { ui.cleanup() }
 })
 
+test('已有中算力变体交给原生执行并展示独立训练核验状态', async () => {
+  const ui = panel(false, true, context => ({ ok: true, value: { ...context,
+    plan: { ...context.plan, execution_mode: 'hybrid' },
+    generation: { source_run_ids: ['parent-run'] },
+    decision_training: { required: true, verified: false, reasons: ['缺少本次训练回执'] },
+  } }))
+  try {
+    await ui.settle()
+    assert.match(ui.text(), /尚未核验，不能认定本次训练完成/)
+    assert.match(ui.text(), /缺少本次训练回执/)
+    ui.button('请 AI 训练并验证中算力变体').props.onClick(); await ui.settle()
+    assert.equal(ui.tasks[0].context.generation_intent, 'implement')
+    assert.equal(ui.tasks[0].context.planning_intent, undefined)
+    assert.match(ui.tasks[0].task, /中算力默认实际训练 KEV/)
+    assert.match(ui.tasks[0].task, /不改写旧比较/)
+    assert.match(ui.tasks[0].task, /decision_training/)
+  } finally { ui.cleanup() }
+})
+
 
 test('AI为主入口，手动计划先预览后确认，表单修改使预览失效', async () => {
   const ui = panel(false, false)
@@ -315,10 +334,17 @@ test('中算力请求包含模型与 SSH 非敏感配置，拒绝失效 Run 和�
     assert.match(ui.tasks[0].task, /小型 LLM 或决策模型的训练与比较/)
     assert.match(ui.tasks[0].task, /Hugging Face、ModelScope 或本地权重的训练引用，不是系统推理供应商 API 路由/)
     assert.match(ui.tasks[0].task, /只策划，不连接服务器、下载模型、启动训练/)
+    await ui.planningDialog().props.onSend({ ...base, requestId: 'req-medium-implement', intent: 'implement' })
+    assert.equal(ui.tasks[1].context.generation_intent, 'implement')
+    assert.equal(ui.tasks[1].context.planning_intent, undefined)
+    assert.match(ui.tasks[1].task, /中算力默认实际训练 KEV 决策模型/)
+    assert.match(ui.tasks[1].task, /train\/development\/calibration\/test/)
+    assert.match(ui.tasks[1].task, /公开 checkpoint 只能作初始化/)
+    assert.match(ui.tasks[1].task, /decision_training/)
     assert.equal(ui.calls.some(call => call.method === 'models/list'), false)
     assert.doesNotMatch(ui.tasks[0].task, /决策基模型：/)
     await assert.rejects(ui.planningDialog().props.onSend({ ...base, requestId: 'req-medium-2', medium: { ...base.medium, credentialRef: 'raw-secret' } }), error => error.definitelyNotSent === true && /不发送密码或私钥原文/.test(error.message))
-    assert.equal(ui.tasks.length, 1)
+    assert.equal(ui.tasks.length, 2)
     assert.doesNotMatch(ui.tasks[0].task, /raw-secret/)
   } finally { ui.cleanup() }
 })

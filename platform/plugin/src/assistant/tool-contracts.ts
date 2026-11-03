@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { businessCasesSchema } from '../agents/business-cases.ts'
 import { DECISION_EXTRACTION_CONTRACT } from '../evaluation/decision-dataset-contract.ts'
+import { isComputeVariantExecution } from './extraction-scope.ts'
 
 export type AssistantDomain = 'agents' | 'instances' | 'mcp'
 type MapValue = Record<string, any>
@@ -17,7 +18,7 @@ export function allowedAssistantActions(domain: AssistantDomain, state: any): re
   if (context.skill === 'decision-sample-extraction') return domain === 'agents' ? ['research/read-reference', 'datasets/source', 'datasets/preview', 'datasets/list'] : []
   if (context.skill === 'agent-maintenance' && context.workflow === 'features') return domain === 'agents' ? featureActions : []
   if (context.skill === 'compute-variant-research') return domain === 'agents'
-    ? assistantActions.agents.filter(action => /^(compute-variants\/|research\/|assets\/|edit\/|eval\/|runs\/|decision\/|cases\/)/.test(action) || ['list', 'detail', 'tasks/capabilities'].includes(action)) : []
+    ? assistantActions.agents.filter(action => /^(compute-variants\/|research\/|assets\/|edit\/|eval\/|runs\/|decision\/|cases\/)/.test(action) || isComputeVariantExecution(state) && action.startsWith('datasets/') || ['list', 'detail', 'tasks/capabilities'].includes(action)) : []
   return assistantActions[domain]
 }
 
@@ -43,6 +44,7 @@ const fields: MapValue = {
   min_runs_per_case: { type: 'integer' }, max_pass_rate_drop_pp: { type: 'number' }, min_resource_reduction_pct: { type: 'number' }, allow_model_change: { type: 'boolean' }, generation: object,
   execution_mode: { type: 'string', enum: ['code-only', 'hybrid'] },
   model_roles: { ...object, description: 'hybrid 必填 {language,decision}；每项 provider/model/reasoning_effort，decision 另需 checkpoint_sha256/state_constructor_sha256/calibration_sha256。使用 generation_contract。' },
+  decision_training: { ...object, description: '中算力真实训练回执 {path,sha256}；按 generation_contract.decision_training 回收数据、日志与工件。缺失时不认定训练完成或具备 end 条件。' },
   port: { type: 'integer' }, tail: { type: 'integer' }, cursor: { type: 'integer' }, limit: { type: 'integer' },
   arguments: { ...object, description: '使用 test 或 sources/components 返回的真实工具 inputSchema，不猜测参数。' },
   input: { ...object, description: '业务工具输入，使用当前工具目录返回的 inputSchema。' },
@@ -134,7 +136,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['compute-variants/identity-apply', 'experiment_id current_variant_id expected_preview_sha256', '使用 identity-preview 返回的 apply_input 原样执行。只在旧 change.yaml 保存 current_variant_id；已有 VAR 的当前资产不覆盖，历史 Run/Git/Session 不改、不充作新 Run。结果未知时先回读 detail/current_variant_id，重复执行只返回已完成映射；无需额外人工确认。'],
     ['compute-variants/source', 'experiment_id path expected_sha256', '省略 path 列实际生成文件目录；读取时使用目录返回的 path 和 sha256（expected_sha256），源码只读，不执行。'],
     ['compute-variants/context', 'experiment_id', '先读取 generation_contract 和固定父版；不凭空编造 SDK 能力。'],
-    ['compute-variants/preview compute-variants/create', 'agent_id parent_experiment_id parent_ref variant_name strategy case_ids critical_case_ids min_runs_per_case max_pass_rate_drop_pp resource_metric min_resource_reduction_pct allow_model_change variant_model variant_reasoning_effort execution_mode model_roles generation', '使用 context 返回的生成合同；名称与策略分别提供。hybrid 双模型身份与单模型变更互斥。'],
+    ['compute-variants/preview compute-variants/create', 'agent_id parent_experiment_id parent_ref variant_name strategy case_ids critical_case_ids min_runs_per_case max_pass_rate_drop_pp resource_metric min_resource_reduction_pct allow_model_change variant_model variant_reasoning_effort execution_mode model_roles decision_training generation', '使用 context 返回的生成合同；名称与策略分别提供。hybrid 双模型身份与单模型变更互斥。'],
     ['compute-variants/rename', 'experiment_id variant_name expected_change_sha256'],
     ['compute-variants/build-preview compute-variants/build', 'experiment_id entry_path expected_candidate_sha256 expected_preview_sha256', '先读取源码后构建；执行时服务器生成并校验真实构建预览。'],
     ['compute-variants/freeze-preview compute-variants/freeze', 'experiment_id case_ids evaluation_base_sha256 expected_preview_sha256', '使用 freeze-preview 返回的 freeze_input，核对真实差异与摘要；冻结遵循 DSH 原生权限；不得用 human_confirmed 代替人员复核。'],

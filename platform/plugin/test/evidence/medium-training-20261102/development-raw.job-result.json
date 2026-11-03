@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "stage": "development-raw",
+  "job_id": "pid:2933",
+  "pid": 2933,
+  "started_at_utc": "2026-11-03T01:25:49.234795+00:00",
+  "finished_at_utc": "2026-11-03T01:26:03.449355+00:00",
+  "exit_code": 0,
+  "log": {
+    "path": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103/execution/development-raw/stdout.log",
+    "sha256": "dd4358a14ab2258bf072b1526ecdcf6135a8d873c221d63e0cb3fa5463f8ff1d",
+    "bytes": 2068
+  },
+  "peak_gpu_memory_used_mib": 3295
+}

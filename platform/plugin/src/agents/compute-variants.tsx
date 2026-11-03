@@ -20,6 +20,7 @@ type Context = {
   build?: { verified: boolean; error?: string } | null
   comparison?: any
   workflow_status?: { generated: boolean; built: boolean; frozen: boolean; loaded: boolean; compared: boolean }
+  decision_training?: { required: boolean; verified: boolean; reasons: string[]; dataset_counts?: Record<string, number> }
 }
 export type DerivationVersion = { id: string; is_variant?: boolean; derivable?: boolean; change?: Record<string, any> }
 export function isVariantVersion(version: DerivationVersion) {
@@ -192,6 +193,7 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
       if (!registeredServer || fields.some(field => registeredServer![field] !== request.medium![field])) throw notSent('已登记训练连接发生变化，请刷新连接列表并重新选择。')
     }
     const typeLabel = request.type === 'medium' ? '中算力' : '低算力'
+    const implement = request.intent === 'implement'
     const variantName = request.variantName.trim() || `${displayAgent} · ${typeLabel}变体`
     const route = request.type === 'medium'
       ? '从轨迹抽取训练样本，规划小型 LLM 或决策模型的训练与比较，再用 LangGraph 将模型与现有真实工具编排成近似等效变体。'
@@ -216,7 +218,7 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
       return run?.title ? `${run.title}（Run …${id.slice(-8)}；${runOutcome(run)}）` : `Run ${id}（${run ? runOutcome(run) : '结果待核对'}）`
     }).join('；')
     const task = [
-      `## ${typeLabel}变体策划请求`,
+      `## ${typeLabel}变体${implement ? '生成与验证' : '策划'}请求`,
       `- 对象：${displayAgent} · ${displayVersion}（${experimentId}）`,
       `- 变体：${variantName}`,
       `- 目标：${request.goal.trim().replace(/\s+/g, ' ')}`,
@@ -225,7 +227,8 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
       `- 工具与未覆盖：${request.type === 'medium' ? '复用现有真实工具；训练条件与未覆盖场景待核对' : `复用现有真实工具；未覆盖时${low?.uncovered_policy === 'request_human' ? '暂停并请求人工处理' : '中止并报告'}`}`,
       '- 待验证：场景覆盖、关键行为、独立比较和实际资源收益；近似等效尚未确认。',
       '',
-      `请使用 compute-variant-research，为 ${displayAgent} 的 ${displayVersion}（${experimentId}）策划${typeLabel}变体“${variantName}”。本次只策划，不连接服务器、下载模型、启动训练、生成或创建变体。`,
+      `请使用 compute-variant-research，为 ${displayAgent} 的 ${displayVersion}（${experimentId}）${implement ? '生成并验证' : '策划'}${typeLabel}变体“${variantName}”。${implement ? '按本次授权连续执行可办理步骤，核对真实回执；缺少必要输入时停止依赖步骤并保留恢复位置。' : '本次只策划，不连接服务器、下载模型、启动训练、生成或创建变体。'}`,
+      ...(implement && request.type === 'medium' ? ['中算力默认实际训练 KEV 决策模型：从固定评测轨迹识别决策点，抽取、复核并按来源组隔离 train/development/calibration/test；按需读取 kev-trace-pipeline、kev-dataset-audit、kev-training 和 kev-deploy。核对训练服务器真实认证、GPU 和固定模型版本，再执行训练、校准、冻结测试并回收日志和工件，绑定 decision_training 证据后生成代码、装载和执行两侧新 Run。公开 checkpoint 只能作初始化，不能替代本次训练；数据不足或训练失败时报告未完成，禁止标记训练成功。'] : []),
       `策划请求编号：${request.requestId}。如果发送结果未知，先按此编号核对已有会话，不自动重发。`,
       `技术路线：${route}`,
       `目标：${request.goal.trim()}`,
@@ -243,7 +246,7 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
     ].join('\n')
     await onAssistant(task, {
       page: 'agents', tab: 'compute-variants', skill: 'compute-variant-research', workflow: 'compute-variants',
-      planning_intent: 'plan_only', request_id: request.requestId,
+      ...(implement ? { generation_intent: 'implement' } : { planning_intent: 'plan_only' }), request_id: request.requestId,
       agent_id: agentId, agent_name: displayAgent, experiment_id: experimentId, version_label: displayVersion,
       source_ref_hint: context.parent_ref, variant_type: request.type, variant_name: variantName, goal: request.goal.trim(),
       source_run_ids: sourceRunIds, trace_collection_plan_requested: request.tracePlanRequested, advanced: request.advanced,
@@ -269,8 +272,8 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
         { page: 'agents', tab: 'compute-variants', agent_id: agentId, experiment_id: experimentId, skill: 'compute-variant-research', workflow: 'compute-variants', variant_name: selectedVariantName ?? null, parent_run_ids: parentRuns, variant_run_ids: variantRuns })
     }) : canStartPlanning && setPlanningOpen(true)}>{context?.plan ? '请 AI 分析算力变体' : <><ComputeIcon kind="sparkle" />请 AI 策划算力变体</>}</button>
       {context?.plan && context.generation && <button type="button" disabled={busy || !onAssistant} onClick={() => void action(async () => {
-        await onAssistant?.('请使用 compute-variant-research，在当前已派生目标生成并验证 LangGraph TypeScript 代码变体。保留已确定的 variant_name，不用策略正文替换名称；从当前上下文回读名称，名称缺失时先说明。核对已保存计划、固定父版、实际工具schema和来源轨迹；execution_mode=code-only 时使用公开纯代码会话适配器，业务全链不得调用模型。按 DSH 原生权限保存实际代码、构建、展示真实数据Git差异并单独确认冻结，执行两侧固定Case并核对装载与完整资源记录。完成用实际Run比较，不替我确认end。', { page: 'agents', tab: 'compute-variants', skill: 'compute-variant-research', workflow: 'compute-variants', agent_id: agentId, experiment_id: experimentId, variant_name: selectedVariantName ?? null, execution_mode: context.plan?.execution_mode ?? null, generation_intent: 'implement' })
-      })}>请 AI 生成代码变体</button>}
+        await onAssistant?.('请使用 compute-variant-research，在当前已派生目标生成并验证 LangGraph TypeScript 代码变体。保留已确定的 variant_name，不用策略正文替换名称；从当前上下文回读名称，名称缺失时先说明。核对已保存计划、固定父版、实际工具schema和来源轨迹；execution_mode=code-only 时使用公开纯代码会话适配器，业务全链不得调用模型。' + (context.plan?.execution_mode === 'hybrid' ? '中算力默认实际训练 KEV：按需加载 kev-trace-pipeline、kev-dataset-audit、kev-training 和 kev-deploy，从固定轨迹识别决策点、抽取并复核四分区数据，在真实训练服务器完成编码检查、训练、校准和冻结测试，回收日志与工件并绑定 decision_training。公开 checkpoint 仅作初始化，不能当作本次训练；已保存模型身份需要变化时，从固定完整父版准备新计划，不改写旧比较。' : '') + '按 DSH 原生权限保存实际代码、构建、展示真实数据Git差异并单独确认冻结，执行两侧固定Case并核对装载与完整资源记录。缺少输入或执行能力时保留未完成步骤和恢复位置。完成用实际Run比较，不替我确认end。', { page: 'agents', tab: 'compute-variants', skill: 'compute-variant-research', workflow: 'compute-variants', agent_id: agentId, experiment_id: experimentId, variant_name: selectedVariantName ?? null, execution_mode: context.plan?.execution_mode ?? null, generation_intent: 'implement' })
+      })}>{context.plan.execution_mode === 'hybrid' ? '请 AI 训练并验证中算力变体' : '请 AI 生成代码变体'}</button>}
     </div>{planningDirty && !planningOpen && !context?.plan && <p className="compute-draft-note">本次页面内有策划草稿，再次点击可继续填写。</p>}</div>
 
     {context && <div className="compute-related-run"><ComputeIcon kind="run" /><div><strong>{displayVersion} · {latestRun?.title || (latestRun ? '最近封存 Run' : '运行轨迹')}</strong><p>{latestRun ? <>运行记录 <a href={navigationHash({ page: 'evaluation', tab: 'runs', agent_id: agentId, experiment_id: experimentId, run_id: latestRun.run_id })} target="_blank" rel="noopener noreferrer">{latestRun.run_id}</a> · {latestRun.created_at || '时间未记录'}；可作为本次策划的诊断轨迹，比较仍需新 Run。</> : '当前版本尚无封存 Run，可先在评测中心采集轨迹。'}</p></div><span className="compute-run-status" data-status={latestRun?.status === 'completed' ? latestRun.effective_verdict === 'passed' ? 'completed' : latestRun.effective_verdict === 'failed' ? 'failed' : 'empty' : latestRun?.status || 'empty'}>{latestRun ? runOutcome(latestRun) : '待采集'}</span></div>}
@@ -333,6 +336,7 @@ export function ComputeVariantsPanel({ rpc, agentId, agentName, experimentId, ve
         <h4>变体名称：{selectedVariantName || '未命名变体'}</h4>
         <p>研究策略：{context.plan.strategy}</p>
         {context.plan.execution_mode === 'code-only' && <p>执行约束：业务全链零 LLM；会话调度、图内执行和辅助处理均须具备完整的零调用证据。</p>}
+        {context.plan.execution_mode === 'hybrid' && <div role="status"><p>决策模型训练：{context.decision_training?.verified ? '训练、校准、测试材料及模型绑定已核验' : '尚未核验，不能认定本次训练完成'}。</p>{context.decision_training?.reasons.map(reason => <p key={reason} className="agent-muted">{reason}</p>)}</div>}
         <p>父版：{context.parent_experiment_id || '未记录'}；当前阶段：{context.variant_kind === 'end' ? '已标记 end' : '探索性变体'}。</p>
         {!comparison && evidenceDrawer}
       </div>

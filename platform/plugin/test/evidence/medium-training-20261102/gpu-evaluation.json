@@ -1,0 +1,49 @@
+{
+  "captured_at_utc": "2026-11-03T01:36:21.661865+00:00",
+  "source_session_id": "session-d69bd4a4-eeda-4eb8-bb9e-af4053a8c48e",
+  "stages": {
+    "development-raw": {
+      "job_id": "pid:2933",
+      "exit_code": 0,
+      "report_file": "development-raw.report.json",
+      "report_sha256": "d490491c14c935e9e0241cb8c8229ea1179dca06b1172d2ec9d6991c5b31d022",
+      "evaluated_records": 5,
+      "accuracy": 0.8,
+      "calibration_applied": false
+    },
+    "calibration-raw": {
+      "job_id": "pid:3421",
+      "exit_code": 0,
+      "report_file": "calibration-raw.report.json",
+      "report_sha256": "e93e03234bfde98f7bbb6323f0eda7fa08ccf7698f1bc874e3de066a896fdabe",
+      "evaluated_records": 7,
+      "accuracy": 0.42857142857142855,
+      "calibration_applied": false
+    },
+    "local-calibration-report": {
+      "execution_location": "local-data-workspace",
+      "source_file": "local-calibration-provenance.json",
+      "report_file": "local-calibration-report.json",
+      "report_sha256": "41887276fd1a252d658c6ade4a24804777c1c5b8b1afa4cfd8544915bfb639d5",
+      "calibration_records": 7,
+      "folds": 3,
+      "seed": 20261103,
+      "workload_temperature": 0.7071067811865475,
+      "raw_nll": 1.4881440827293968,
+      "out_of_fold_nll": 2.385983482078292,
+      "checkpoint_temperature_write": "not_run",
+      "remote_job_status": "unknown"
+    }
+  },
+  "pending": [
+    "checkpoint calibration write; original remote calibration job outcome unknown",
+    "frozen test",
+    "deployed inference services",
+    "new variant and paired business Runs"
+  ],
+  "limits": [
+    "Raw benchmark accuracy is not business acceptance",
+    "Small samples and incomplete training class coverage; no eight-class generalization conclusion",
+    "Local fixed-source calibration report does not complete the remote job or modify a checkpoint; out-of-fold NLL worsened on this small calibration set"
+  ]
+}

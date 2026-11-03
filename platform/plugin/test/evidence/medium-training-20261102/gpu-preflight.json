@@ -1,0 +1,1 @@
+{"device": "NVIDIA GeForce RTX 2080 Ti", "capability": [7, 5], "native_bf16": false, "fp32_forward_backward": true, "torch": "2.6.0+cu124"}
