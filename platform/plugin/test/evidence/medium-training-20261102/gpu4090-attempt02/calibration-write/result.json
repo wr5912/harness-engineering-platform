@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "stage": "calibration-write",
+  "job_id": "pid:6524",
+  "exit_code": 0,
+  "started_at_utc": "2026-11-03T03:54:09.220736+00:00",
+  "finished_at_utc": "2026-11-03T03:54:15.323083+00:00",
+  "elapsed_seconds": 6.1,
+  "peak_total_gpu_used_mib_includes_other_processes": 15072,
+  "log": {
+    "path": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-retrain01/validation-01/stages/calibration-write/stdout.log",
+    "sha256": "92e1574f3a218d2f71d48da3cf7ac9fb84022e683ea918dd89bf45e89896e030",
+    "bytes": 1327
+  },
+  "training_result_sha256": "96094ff7c6803482bd7993394cff99d02f63e274022fe5c9b744639270ad55e9",
+  "plan_sha256": "24a9467ad5c24a43a903ddd6dcd986dadc7c2c815ccfeb87203ada66535bb619",
+  "artifact_status": "validated",
+  "artifacts": {
+    "calibrated_head": {
+      "path": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-retrain01/actual-run-fp32-02/checkpoint/head.pt",
+      "sha256": "1c288d83be995fde06ed52d435ecd4d1af9db9b8c1bf371611f85a7233f9b56c",
+      "bytes": 2105023
+    },
+    "precalibration_head_sha256": "d23268ecc9c1b5c153baef1252da021c87a6aee4fb99aa5c7e501d6c41547174",
+    "adapter_sha256": "c7d94cb9794ed10d2e60b5866bf6974c4796fc6e52275a342dc67e0ddf2bf9e3",
+    "notes": "in-distribution workload-heldout; inspect temperature_fit and reasons before final test"
+  }
+}

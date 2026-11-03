@@ -309,8 +309,11 @@ def _resolve_release(release_name: str, *, repo: Path) -> dict:
 
 
 def resolve(source_id: str = DEFAULT_SOURCE, *, repo: Path = REPO, sources: Path | None = None,
-            lock_path: Path = LOCK, require_assets: bool = True, source_ref: str | None = None) -> dict:
+            lock_path: Path = LOCK, require_assets: bool = True, source_ref: str | None = None,
+            evaluation_source: str = "source") -> dict:
     repo = repo.expanduser().resolve()
+    if evaluation_source not in {"source", "current"}:
+        raise ValueError("evaluation_source 必须是 source 或 current")
     if source_ref:
         experiment_id = source_id.removeprefix("experiment:")
         try:
@@ -325,7 +328,7 @@ def resolve(source_id: str = DEFAULT_SOURCE, *, repo: Path = REPO, sources: Path
         contract = resolve(source_id, repo=frozen, lock_path=lock_path, require_assets=require_assets)
         contract.update({"source_ref": source_ref, "source_snapshot_root": str(frozen),
                          "candidate_source_root": str(Path(contract["candidate_root"]).parent),
-                         "evaluation_path": str(frozen / "agents" / contract["agent_id"] / "evaluation.md"),
+                         "evaluation_path": str((repo if evaluation_source == "current" else frozen) / "agents" / contract["agent_id"] / "evaluation.md"),
                          "change_path": str(frozen / "evolution/experiments" / experiment_id / "change.yaml"),
                          "experiment_root": str(repo / "evolution/experiments" / experiment_id),
                          "asset_root": str(repo), "workspace_id": workspace_id(repo)})

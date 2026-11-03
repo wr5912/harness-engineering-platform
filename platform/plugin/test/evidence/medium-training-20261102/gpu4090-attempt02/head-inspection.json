@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "status": "verified_native_temperature_fit",
+  "head_sha256": "1c288d83be995fde06ed52d435ecd4d1af9db9b8c1bf371611f85a7233f9b56c",
+  "temperature": 0.7071067811865475,
+  "calibration_report_sha256": "a1144e4d4315365c5c4afafd9762b6ead777963c98e753785aa04daaa8e11651",
+  "development_report_sha256": "de25de03eb04fcb2469b8e727b09104f345168e1554e66472d98a01549c61441",
+  "train_result_sha256": "96094ff7c6803482bd7993394cff99d02f63e274022fe5c9b744639270ad55e9",
+  "write_result_sha256": "1310eb093e3c5ef231b3cca009d579c332ee795d7eca59ed76e5748411a65c4e",
+  "n": 7,
+  "independent_groups": 4,
+  "folds": 3,
+  "source": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-retrain01/actual-run-fp32-02/calibration-raw/rows.json",
+  "in_distribution": {
+    "allowed": true,
+    "problems": [
+      "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-retrain01/actual-run-fp32-02/calibration-raw/rows.json: cannot tell which suite these rows were scored on (no kev.benchmark report.json with a suite of this checkout beside them, not a trial's read)",
+      "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-retrain01/actual-run-fp32-02/checkpoint: cannot tell what this checkpoint was trained on (head.pt records no suite of this checkout and there is no provenance.json beside it)"
+    ]
+  },
+  "oof_adverse": {
+    "raw": {
+      "n": 7,
+      "ece": 0.2198173751514719,
+      "brier": 0.7199556100855558,
+      "nll": 1.480996950224618,
+      "confident_error_rate": 0.0,
+      "coverage_at_5pct_error": 0.0
+    },
+    "out_of_fold": {
+      "n": 7,
+      "ece": 0.5395673829566592,
+      "brier": 1.059766192526482,
+      "nll": 2.3993924032489633,
+      "confident_error_rate": 0.2857142857142857,
+      "coverage_at_5pct_error": 0.0
+    },
+    "fold_temperatures": [
+      0.25,
+      0.8122523963562355,
+      1.1224620483093728
+    ],
+    "separated": false
+  },
+  "interpretation": "Diagnostic workload-heldout calibration; OOF deteriorates; no quality-improvement claim or test-based threshold fit."
+}

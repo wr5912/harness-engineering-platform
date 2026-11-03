@@ -9,6 +9,7 @@ import posixpath
 import re
 import signal
 import subprocess
+import tempfile
 import time
 import sys
 import importlib.util
@@ -830,29 +831,34 @@ def run_cancellable_process(command: list[str], *, timeout: int, input_text: str
     driver_name = f"dsh-eval-driver-{uuid.uuid4().hex}" if command[:2] == ["docker", "run"] else None
     actual = command[:2] + ["--name", driver_name] + command[2:] if driver_name else command
     process = None
+    input_file = None
     try:
+        # 轮询 communicate 超时后不再接受新 input；文件输入避免丢失尚未写完的用例。
+        if input_text is not None:
+            input_file = tempfile.TemporaryFile(mode="w+", encoding="utf-8")
+            input_file.write(input_text)
+            input_file.seek(0)
         try:
             # 创建子进程并登记句柄期间只记信号，避免进程已创建而父进程尚无句柄时中断。
             with delay_signal_handlers():
-                process = subprocess.Popen(actual, cwd=cwd, text=True, stdin=subprocess.PIPE,
+                process = subprocess.Popen(actual, cwd=cwd, text=True, stdin=input_file or subprocess.DEVNULL,
                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
                                            start_new_session=True)
             if on_poll is None:
-                stdout, stderr = process.communicate(input_text, timeout=timeout)
+                stdout, stderr = process.communicate(timeout=timeout)
             else:
                 deadline = time.monotonic() + timeout
-                pending_input = input_text
                 while True:
                     on_poll()
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:
                         raise subprocess.TimeoutExpired(actual, timeout)
                     try:
-                        stdout, stderr = process.communicate(pending_input, timeout=min(0.2, remaining))
+                        stdout, stderr = process.communicate(timeout=min(0.2, remaining))
                         on_poll()
                         break
                     except subprocess.TimeoutExpired:
-                        pending_input = None
+                        pass
         except BaseException:
             if process is not None:
                 try:
@@ -870,6 +876,8 @@ def run_cancellable_process(command: list[str], *, timeout: int, input_text: str
             raise
         return subprocess.CompletedProcess(actual, process.returncode, stdout, stderr)
     finally:
+        if input_file is not None:
+            input_file.close()
         if driver_name:
             try:
                 with delay_signal_handlers():

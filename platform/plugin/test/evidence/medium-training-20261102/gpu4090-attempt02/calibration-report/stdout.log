@@ -1,0 +1,11 @@
+n=7  shipped T=1.00  workload T=0.71  folds T=[0.25, 0.81, 1.12]
+arm              acc    ece  brier    nll   conf  c-err  cov@5%   aurc
+raw            0.429  0.220  0.720  1.481  0.364  0.000    0.00  0.544
+shipped        0.429  0.220  0.720  1.481  0.364  0.000    0.00  0.544
+workload       0.429  0.220  0.718  1.447  0.456  0.000    0.00  0.544
+workload_oof   0.429  0.540  1.060  2.399  0.578  0.286    0.00  0.863
+workload_oof - shipped  ece                     +0.320  95% CI [-0.233, +0.665]
+workload_oof - shipped  brier                   +0.340  95% CI [+0.008, +0.621]
+workload_oof - shipped  coverage_at_5pct_error  +0.000  95% CI [-0.833, +0.000]
+workload_oof - shipped  aurc                    +0.319  95% CI [+0.000, +0.553]
+wrote /root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-retrain01/actual-run-fp32-02/calibration-report.json

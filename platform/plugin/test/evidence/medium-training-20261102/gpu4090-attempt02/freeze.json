@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "frozen_at_utc": "2026-11-03T04:03:56.206557+00:00",
+  "training_result_sha256": "96094ff7c6803482bd7993394cff99d02f63e274022fe5c9b744639270ad55e9",
+  "plan_sha256": "24a9467ad5c24a43a903ddd6dcd986dadc7c2c815ccfeb87203ada66535bb619",
+  "dataset_sha256": {
+    "train": "ab9cadf0ce775a925a85b30d842169b28a0f3ab88db56619d133f4883624de7a",
+    "development": "fe6dd726a0cd088e31515a205bd859a6e1e9c81eac246b0a8dd26faa47dc45d6",
+    "calibration": "955251d26b302680b84d3910bd6e8ce1860131ab79f48545b7b2f1bd027085ed",
+    "test": "6d342765c937774384ed8a56fa3c9e919d1fdce62558e8cb8afb3e603b4a5efe"
+  },
+  "adapter_sha256": "c7d94cb9794ed10d2e60b5866bf6974c4796fc6e52275a342dc67e0ddf2bf9e3",
+  "head_sha256": "1c288d83be995fde06ed52d435ecd4d1af9db9b8c1bf371611f85a7233f9b56c",
+  "temperature": 0.7071067811865475,
+  "dev_calibrated_report_sha256": "de25de03eb04fcb2469b8e727b09104f345168e1554e66472d98a01549c61441",
+  "model_and_builders": {
+    "kev_commit": "2074cc44256200bb37540103fa4572901faa10f3",
+    "parent_ref": "git:e9b9419011cef28779093855b72305fbd3cf7bc5"
+  },
+  "decision_policy": "Native Kev default selective reporting; no post-test threshold search; fixed 0.9 coverage reference."
+}

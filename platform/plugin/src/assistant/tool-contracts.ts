@@ -25,6 +25,7 @@ export function allowedAssistantActions(domain: AssistantDomain, state: any): re
 const string = { type: 'string' }, strings = { type: 'array', items: string }, object = { type: 'object', additionalProperties: true }
 const fields: MapValue = {
   source_ref: { type: 'string', pattern: '^git:[a-f0-9]{40}$', description: '可选固定来源；Candidate、Case、角色绑定均读取同一 Git 提交，Run 仍保存到原版本。' },
+  evaluation_source: { type: 'string', enum: ['source', 'current'], description: '默认 source 沿用所选来源的 Case；current 明确用当前工作区 Case 评测固定 Candidate，所选口径随 Run 冻结。' },
   mcp_fixture: { type: 'object', required: ['schema_version', 'mode', 'connections'], additionalProperties: false, properties: {
     schema_version: { type: 'integer', const: 1 }, mode: { type: 'string', const: 'mock' }, connections: { type: 'array', minItems: 1, items: {
       type: 'object', required: ['server_id', 'original_url', 'url'], additionalProperties: false,
@@ -115,7 +116,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['cases/list cases/create-context', 'agent_id experiment_id'], ['cases/read', 'agent_id experiment_id case_id'],
     ['cases/from-run', 'agent_id experiment_id run_id case_id'],
     ['cases/update cases/create-preview cases/create', 'agent_id experiment_id case_id title scene inputs expected_behavior fast expected_sha256 source_run_id source_case_id', '先读用例或 create-context；inputs 为非空字符串数组，expected_sha256 取原文件摘要。新建先 create-preview。'],
-    ['eval/preview eval/start', 'source source_ref mcp_fixture cases mode executor review model model_selection compare_to artifact_export', 'source=experiment:<ID>；cases 为固定 Case ID 数组。source_ref 可固定历史来源；mcp_fixture 明确 Mock 边界并随 Run 封存，不修改原连接或 Candidate，不代表真实业务系统验收。model 是原有断言，model_selection 是本次主角色原生模型选择；省略时读取所选来源的版本绑定。preview 不执行评测，start 返回 job_id。'],
+    ['eval/preview eval/start', 'source source_ref evaluation_source mcp_fixture cases mode executor review model model_selection compare_to artifact_export', 'source=experiment:<ID>；cases 为固定 Case ID 数组。source_ref 可固定历史来源；evaluation_source=current 明确改用当前 Case，不改变固定 Candidate。mcp_fixture 明确 Mock 边界并随 Run 封存，不修改原连接或 Candidate，不代表真实业务系统验收。model 是原有断言，model_selection 是本次主角色原生模型选择；省略时读取所选来源的版本绑定。preview 不执行评测，start 返回 job_id。'],
     ['eval/status eval/cancel', 'job_id'], ['runs/index', 'agent_id experiment_id'],
     ['runs/show', 'run_id case_id'], ['runs/report runs/files', 'run_id'], ['runs/read-file', 'run_id path'],
     ['runs/evidence', 'run_id case_id filename'], ['runs/compare', 'left right case_id'], ['runs/trace', 'run_id path source_sha256 cursor limit session_log'],

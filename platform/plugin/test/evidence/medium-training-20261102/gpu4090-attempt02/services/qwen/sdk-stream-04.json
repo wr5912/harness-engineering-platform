@@ -1,0 +1,20 @@
+{
+  "sdk_version": "2.8.1",
+  "status": "ok",
+  "event_count": 7,
+  "request_ids": [
+    "decd833d-4f29-4c80-9022-452bbfb8339e"
+  ],
+  "text": "\n\nSDK 已验证。",
+  "finish_reasons": [
+    "stop"
+  ],
+  "usage": {
+    "completion_tokens": 8,
+    "prompt_tokens": 19,
+    "total_tokens": 27,
+    "completion_tokens_details": null,
+    "prompt_tokens_details": null
+  },
+  "elapsed_seconds": 0.666
+}

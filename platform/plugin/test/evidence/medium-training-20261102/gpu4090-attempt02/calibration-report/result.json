@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "stage": "calibration-report",
+  "job_id": "pid:6221",
+  "exit_code": 0,
+  "started_at_utc": "2026-11-03T03:51:46.799986+00:00",
+  "finished_at_utc": "2026-11-03T03:51:52.918771+00:00",
+  "elapsed_seconds": 6.12,
+  "peak_total_gpu_used_mib_includes_other_processes": 15072,
+  "log": {
+    "path": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-retrain01/validation-01/stages/calibration-report/stdout.log",
+    "sha256": "b6888fa31867a2560a635fe4da8c4e459c5ab860bc0b2b247e599469d5ee7d94",
+    "bytes": 860
+  },
+  "training_result_sha256": "96094ff7c6803482bd7993394cff99d02f63e274022fe5c9b744639270ad55e9",
+  "plan_sha256": "24a9467ad5c24a43a903ddd6dcd986dadc7c2c815ccfeb87203ada66535bb619",
+  "artifact_status": "validated",
+  "artifacts": {
+    "report": {
+      "path": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-retrain01/actual-run-fp32-02/calibration-report.json",
+      "sha256": "a1144e4d4315365c5c4afafd9762b6ead777963c98e753785aa04daaa8e11651",
+      "bytes": 3459
+    },
+    "calibration_rows_sha256": "9f420e677813d01dabad6ccb5f90a29087b127780aba234102bb9930dae7d027",
+    "notes": "report-only; does not write head.pt; manual review before write"
+  }
+}

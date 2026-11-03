@@ -1,0 +1,27 @@
+{
+  "http_status": 200,
+  "x_request_id": "ef8c29fe-2937-4090-b798-e7233ab2c80e",
+  "response": {
+    "id": "ef8c29fe-2937-4090-b798-e7233ab2c80e",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "message": {
+          "content": "已就绪。",
+          "role": "assistant"
+        }
+      }
+    ],
+    "created": 1793679851,
+    "model": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-qwen35-2b/model@main",
+    "object": "chat.completion",
+    "usage": {
+      "completion_tokens": 6,
+      "prompt_tokens": 29,
+      "total_tokens": 35
+    }
+  },
+  "elapsed_seconds": 0.733,
+  "requested_model": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-qwen35-2b/model"
+}

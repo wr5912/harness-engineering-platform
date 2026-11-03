@@ -1241,9 +1241,10 @@ test('公开评测固定历史来源并给预览和Job传递同字节Mock映射�
     write(join(fx.root, 'runtime/adapters/dsh-container/dsh-eval'), [
       'import hashlib,json,sys',
       'ref=sys.argv[sys.argv.index("--source-ref")+1]',
+      'evaluation_source=sys.argv[sys.argv.index("--evaluation-source")+1]',
       'path=sys.argv[sys.argv.index("--mcp-fixture")+1]',
       'raw=open(path,"rb").read()',
-      'print(json.dumps({"source_ref":ref,"fixture":json.loads(raw),"fixture_sha256":hashlib.sha256(raw).hexdigest()}))',
+      'print(json.dumps({"source_ref":ref,"evaluation_source":evaluation_source,"fixture":json.loads(raw),"fixture_sha256":hashlib.sha256(raw).hexdigest()}))',
     ].join('\n'))
     const selected = []
     const handler = createAgentsHandler(fx.root, undefined, {}, async (agentId, _model, candidate) => {
@@ -1251,19 +1252,23 @@ test('公开评测固定历史来源并给预览和Job传递同字节Mock映射�
       return { policy: { agent_id: agentId, default: { provider: 'fixture', model: 'fixture' } }, environment: {} }
     })
     const mcp_fixture = { schema_version: 1, mode: 'mock', connections: [{ server_id: 'readonly', original_url: 'http://original.test/mcp', url: 'http://mock.test/mcp' }] }
-    const payload = { source: 'experiment:EXP-test-agent-001', source_ref: 'git:' + fx.commit, mcp_fixture, cases: ['U-CASE-001'] }
+    const payload = { source: 'experiment:EXP-test-agent-001', source_ref: 'git:' + fx.commit, evaluation_source: 'current', mcp_fixture, cases: ['U-CASE-001'] }
     const preview = await rpc(handler, 'eval/preview', payload)
     const started = await rpc(handler, 'eval/start', payload), final = await waitForJob(handler, started.job_id)
     assert.equal(final.status, 'completed')
     assert.deepEqual(final.result.fixture, mcp_fixture)
     assert.equal(final.result.fixture_sha256, preview.result.fixture_sha256)
     assert.equal(preview.result.source_ref, payload.source_ref)
+    assert.equal(preview.result.evaluation_source, 'current')
+    assert.equal(final.result.evaluation_source, 'current')
     assert.equal(selected.length, 2)
     assert.ok(selected.every(item => item.role === '# Analyst\n' && item.candidate.includes('.local/evaluation-sources/')))
     assert.deepEqual(readdirSync(policyRoot), [])
     assert.match(readFileSync(join(fx.root, 'evolution/experiments/EXP-test-agent-001/candidate/roles/analyst/AGENTS.md'), 'utf8'), /当前工作树的新角色/)
     const invalid = await handler('eval/preview', { ...payload, source_ref: 'main' }, new AbortController().signal)
     assert.equal(invalid.ok, false)
+    const invalidEvaluation = await handler('eval/preview', { ...payload, evaluation_source: 'other' }, new AbortController().signal)
+    assert.equal(invalidEvaluation.ok, false)
     const invalidFixture = await handler('eval/preview', { ...payload, mcp_fixture: { ...mcp_fixture, mode: 'production' } }, new AbortController().signal)
     assert.equal(invalidFixture.ok, false)
   } finally { await rm(fx.root, { recursive: true, force: true }) }

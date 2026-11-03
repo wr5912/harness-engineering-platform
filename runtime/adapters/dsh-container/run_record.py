@@ -691,7 +691,7 @@ def run_view(repo: Path, run_id: str, case_id: str | None = None) -> dict:
             "source_id", "baseline_ref", "git_version", "evaluation_sha256",
             "executor", "model", "created_at", "compare_to_run_id", "candidate_sha256",
             "review_mode", "configured_capabilities", "dependency_env",
-            "program_origin", "asset_origin", "evaluation_implementation", "declared_guard", "source_ref", "source_snapshot_root", "mcp_fixture",
+            "program_origin", "asset_origin", "evaluation_implementation", "declared_guard", "source_ref", "source_snapshot_root", "evaluation_source", "mcp_fixture",
         )}, **({"review_contract": inputs["review_contract"]} if "review_contract" in inputs else {}),
             "candidate_trees": {key: {"tree_sha256": value.get("tree_sha256"),
                                         "file_count": value.get("file_count")}
@@ -917,7 +917,8 @@ def command_compare(repo: Path, args: argparse.Namespace) -> None:
 
 
 def command_init(repo: Path, args: argparse.Namespace) -> None:
-    contract = resolve(args.source, repo=repo, source_ref=getattr(args, "source_ref", None))
+    contract = resolve(args.source, repo=repo, source_ref=getattr(args, "source_ref", None),
+                       **({"evaluation_source": args.evaluation_source} if getattr(args, "evaluation_source", None) else {}))
     experiment_id = contract.get("experiment_id")
     agent_id = contract.get("agent_id")
     match = EXPERIMENT_RE.fullmatch(experiment_id or "")
@@ -982,6 +983,8 @@ def command_init(repo: Path, args: argparse.Namespace) -> None:
         }
         if inputs["review_mode"] == "ai":
             inputs["review_contract"] = freeze_review_contract(repo, agent_id, run_dir, getattr(args, "model_policy", None))
+        if getattr(args, "evaluation_source", None):
+            inputs["evaluation_source"] = args.evaluation_source
         # 运行记录保存声明原字节，供复核与计量共用；摘要只引用已锁 Harness 条目。
         role_path = Path(contract["managed"]) / "role-tool-matrix.yaml"
         role_locks = [item for item in inputs["harness_trees"]["managed"].get("files", [])
@@ -1242,6 +1245,7 @@ def main() -> None:
     init_parser = commands.add_parser("init", help="创建 Run 并记录输入身份")
     init_parser.add_argument("--source", required=True, help="当前支持 experiment:<id>")
     init_parser.add_argument("--source-ref", help="固定来源 git:<40位提交>")
+    init_parser.add_argument("--evaluation-source", choices=("source", "current"), help="明确选择来源用例或当前用例，所选合同封存到 Run")
     init_parser.add_argument("--mcp-fixture", help="本次 Runtime 的明确 Mock 连接映射 JSON，按原字节封存")
     init_parser.add_argument("--case", action="append", default=[], help="必须显式选择的 Case；可重复")
     init_parser.add_argument("--kind", default="research", choices=RUN_KINDS)

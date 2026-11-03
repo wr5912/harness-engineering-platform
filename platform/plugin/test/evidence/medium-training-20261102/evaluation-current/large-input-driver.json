@@ -1,0 +1,8 @@
+{
+  "status": "passed",
+  "input_bytes": 819200,
+  "sha256": "4ee32f19704e41e312bf61935a69eeffb0af82ea616df7865207a2f2e19ae37b",
+  "image_ref": "ai-agent-harness/dsh:b830ec950-amd64-2ed0d15ad02e@sha256:c06d4e1fecc66f175a2fbeaa51e96ea0b2af8f58be22f89edac73df3c779bece",
+  "slow_start_ms": 500,
+  "path": "actual docker run --rm -i via shared run_cancellable_process"
+}

@@ -1,0 +1,24 @@
+{
+  "log_path": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-retrain01/serving/kev-service-01/stdout.log",
+  "bytes": 1563,
+  "sha256": "43229a13b1d6af4441c4150658d5e4fe9940fd1d5b603a0570abac5e414f1c7f",
+  "last_lines": [
+    "Loading weights:   0%|          | 0/320 [00:00<?, ?it/s]",
+    "Loading weights:   0%|          | 1/320 [00:00<01:19,  4.02it/s]",
+    "Loading weights: 100%|██████████| 320/320 [00:00<00:00, 1226.91it/s]",
+    "serving /root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-retrain01/serving/kev-service-01/checkpoint (/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-retrain01/serving/kev-service-01/checkpoint) on cuda via torch (float32) 127.0.0.1:18241; states over 65,536 tokens refused (422)",
+    "INFO:     Started server process [8338]",
+    "INFO:     Waiting for application startup.",
+    "INFO:     Application startup complete.",
+    "INFO:     Uvicorn running on http://127.0.0.1:18241 (Press CTRL+C to quit)",
+    "INFO:     127.0.0.1:47718 - \"GET /v1/models HTTP/1.1\" 200 OK",
+    "INFO:     127.0.0.1:47724 - \"GET /v1/models HTTP/1.1\" 401 Unauthorized",
+    "[transformers] `causal_conv1d_fn` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.",
+    "[transformers] `chunk_gated_delta_rule` is falling back to its reference PyTorch implementation because `flash-linear-attention` is not installed. This is correct but much slower; install `flash-linear-attention` for the optimized kernel.",
+    "INFO:     127.0.0.1:47734 - \"POST /v1/systemone HTTP/1.1\" 200 OK",
+    "INFO:     127.0.0.1:45048 - \"GET /v1/models HTTP/1.1\" 200 OK",
+    "INFO:     127.0.0.1:45064 - \"GET /v1/models HTTP/1.1\" 401 Unauthorized",
+    "INFO:     127.0.0.1:45078 - \"POST /v1/systemone HTTP/1.1\" 200 OK"
+  ],
+  "credential_value_logged": false
+}

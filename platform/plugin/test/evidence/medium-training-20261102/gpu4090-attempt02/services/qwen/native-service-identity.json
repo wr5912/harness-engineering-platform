@@ -1,0 +1,56 @@
+{
+  "pid": 9128,
+  "pid_cmdline_without_credentials": [
+    "/root/kev/.venv/bin/python",
+    "/root/kev/.venv/bin/transformers",
+    "serve",
+    "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-qwen35-2b/model",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "18772",
+    "--device",
+    "cuda:0",
+    "--dtype",
+    "bfloat16",
+    "--reasoning",
+    "off",
+    "--log-level",
+    "warning"
+  ],
+  "remote_files": {
+    "entrypoint": {
+      "path": "/root/kev/.venv/bin/transformers",
+      "bytes": 321,
+      "sha256": "94620c6868f5933b0ae112a54454ac1f7f14d1306e41f2df72cb88ef6fc38618"
+    },
+    "serve_cli": {
+      "path": "/root/kev/.venv/lib/python3.13/site-packages/transformers/cli/serve.py",
+      "bytes": 9711,
+      "sha256": "c84a7f629be6dbb172599011db801c0c5d1e3c5ad6412c31c5522c8fc34f2c12"
+    },
+    "server": {
+      "path": "/root/kev/.venv/lib/python3.13/site-packages/transformers/cli/serving/server.py",
+      "bytes": 5251,
+      "sha256": "a8510947790969b5887a01a45f72cf24d5519903aa10cdae93afc0af67cc9ae6"
+    },
+    "model_manager": {
+      "path": "/root/kev/.venv/lib/python3.13/site-packages/transformers/cli/serving/model_manager.py",
+      "bytes": 21026,
+      "sha256": "b04dcb8f90e055918a022baa82d590f3913e1cbc091196074674102296a07d8f"
+    },
+    "model_weight": {
+      "path": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-qwen35-2b/model/model.safetensors-00001-of-00001.safetensors",
+      "bytes": 4548221488,
+      "sha256": "aa33250c4fc64891ddfaba3a314fd9542ea371843c387178b425fbcc5ed680b1"
+    }
+  },
+  "gpu_compute_apps": [
+    "3616881, 15062 MiB",
+    "3697476, 4672 MiB",
+    "3702181, 3568 MiB",
+    "3707562, 4740 MiB"
+  ],
+  "gpu_probe_exit_code": 0,
+  "custom_task_pid": 7375
+}

@@ -1,0 +1,35 @@
+{
+  "status": "completed",
+  "forward_pid_from_runtime": 4159070,
+  "host_url": "http://127.0.0.1:18241/v1/systemone",
+  "models": {
+    "http_status": 200,
+    "request_id": "a37a20c23d61441abf847c98422e0873",
+    "model_names": [
+      "kev-latest",
+      "jev-latest"
+    ],
+    "kev_latest_base": "Qwen/Qwen3.5-0.8B-Base",
+    "temperature": 0.7071067811865475
+  },
+  "inference": {
+    "http_status": 200,
+    "client_sent_request_id": "host-kev-f25f202508e645c08ed1cdda830fc124",
+    "response_x_typesafe_request_id": "host-kev-f25f202508e645c08ed1cdda830fc124",
+    "response_confirmed": true,
+    "body_model": "kev-latest",
+    "answer_keys": [
+      "route",
+      "urgent"
+    ],
+    "route_choice": "billing",
+    "urgent_noul": 0.4811,
+    "usage": {
+      "input_tokens": 50,
+      "output_tokens": 74
+    },
+    "server_latency_ms": 58.6,
+    "elapsed_ms": 1032.96,
+    "error_type": null
+  }
+}
