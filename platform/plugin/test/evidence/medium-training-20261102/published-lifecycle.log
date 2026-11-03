@@ -1,0 +1,14 @@
+(node:4069132) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ 地址配置只读校验，允许已有多级站点基址 (43.227008ms)
+✔ 过期 PID 不归属服务；活动记录必须匹配程序和数据根 (35.070712ms)
+✔ 浏览器选择其他数据根后迁移受管进程记录和安装默认目录 (2.473626ms)
+✔ 统一入口后台启停、重复启动、重启、只读预检与端口冲突 (14476.453461ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14820.266125

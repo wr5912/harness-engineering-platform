@@ -1,0 +1,59 @@
+Loading weights:   0%|          | 0/320 [00:00<?, ?it/s]Loading weights:   0%|          | 1/320 [00:00<00:58,  5.49it/s]Loading weights: 100%|██████████| 320/320 [00:00<00:00, 1606.02it/s]
+[transformers] `causal_conv1d_fn` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[transformers] `chunk_gated_delta_rule` is falling back to its reference PyTorch implementation because `flash-linear-attention` is not installed. This is correct but much slower; install `flash-linear-attention` for the optimized kernel.
+{
+  "objective": -1.480996950224618,
+  "clean": {
+    "n": 7,
+    "nll": 1.480996950224618,
+    "acc": 0.42857142857142855,
+    "ece": 0.2198173751514719,
+    "brier": 0.7199556100855558,
+    "mean_conf": 0.36390686559010377,
+    "confident_error_rate": 0.0,
+    "coverage_at_0_9": 0.0,
+    "accuracy_at_0_9": null,
+    "coverage_at_5pct_error": 0.0,
+    "coverage_at_1pct_error": 0.0,
+    "aurc": 0.5435374149659864,
+    "error_rate_at_0_9": null,
+    "confidence_bias": -0.06466456298132478,
+    "top_bins": {
+      "0.9": {
+        "n": 0,
+        "errors": 0,
+        "error_rate": null
+      },
+      "0.95": {
+        "n": 0,
+        "errors": 0,
+        "error_rate": null
+      },
+      "0.99": {
+        "n": 0,
+        "errors": 0,
+        "error_rate": null
+      }
+    },
+    "selective": {
+      "0.5": {
+        "coverage": 0.5714285714285714,
+        "accuracy": 0.5,
+        "confidence_cutoff": 0.32728460735906484
+      },
+      "0.8": {
+        "coverage": 0.8571428571428571,
+        "accuracy": 0.5,
+        "confidence_cutoff": 0.29368896769285596
+      }
+    }
+  },
+  "coverage": {
+    "requested_records": 7,
+    "requested_questions": 7,
+    "evaluated_records": 7,
+    "evaluated_questions": 7,
+    "rejected_records": 0,
+    "truncated_records": 0
+  }
+}

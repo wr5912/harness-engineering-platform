@@ -1,0 +1,6 @@
+!!! IN DISTRIBUTION (--allow-in-distribution): /root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-retrain01/actual-run-fp32-02/calibration-raw/rows.json: cannot tell which suite these rows were scored on (no kev.benchmark report.json with a suite of this checkout beside them, not a trial's read)
+!!! IN DISTRIBUTION (--allow-in-distribution): /root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-retrain01/actual-run-fp32-02/checkpoint: cannot tell what this checkpoint was trained on (head.pt records no suite of this checkout and there is no provenance.json beside it)
+!!! This temperature is not held out: round 19's failure mode: a temperature fitted on held-out items of a checkpoint's own training corpus is in distribution (round 19 served its SFT arms at T 0.955 fitted on sft-v1 development rows: breadth-v1 ECE 0.059); fit on a pool of held-out datasets instead (round 20: breadth-v1 ECE 0.0085).
+fit rows     T=0.71  acc 0.429 -> 0.429 | brier 0.720 -> 0.718 | ece 0.220 -> 0.220 | conf-err 0.000 -> 0.000 | cov@5% 0.00 -> 0.00
+fit rows     OOF T=[0.25, 0.81, 1.12] ece raw 0.220 [0.076, 0.603] -> oof 0.540 [0.244, 0.787]  delta [-0.233, 0.665] separated=False
+wrote temperature 0.71 to /root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-retrain01/actual-run-fp32-02/checkpoint/head.pt

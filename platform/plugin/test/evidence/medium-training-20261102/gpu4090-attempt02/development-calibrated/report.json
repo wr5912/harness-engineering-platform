@@ -1,0 +1,257 @@
+{
+  "objective": -0.7073460951616122,
+  "paired_flip": null,
+  "unknowable": null,
+  "clean": {
+    "n": 5,
+    "nll": 0.7073460951616122,
+    "acc": 0.8,
+    "ece": 0.2592182010624366,
+    "brier": 0.3555643177005047,
+    "mean_conf": 0.5407817989375634,
+    "confident_error_rate": 0.0,
+    "coverage_at_0_9": 0.2,
+    "accuracy_at_0_9": 1.0,
+    "coverage_at_5pct_error": 0.6,
+    "coverage_at_1pct_error": 0.6,
+    "aurc": 0.09,
+    "error_rate_at_0_9": 0.0,
+    "confidence_bias": -0.25921820106243665,
+    "top_bins": {
+      "0.9": {
+        "n": 1,
+        "errors": 0,
+        "error_rate": 0.0
+      },
+      "0.95": {
+        "n": 0,
+        "errors": 0,
+        "error_rate": null
+      },
+      "0.99": {
+        "n": 0,
+        "errors": 0,
+        "error_rate": null
+      }
+    },
+    "selective": {
+      "0.5": {
+        "coverage": 0.6,
+        "accuracy": 1.0,
+        "confidence_cutoff": 0.4252188213639312
+      },
+      "0.8": {
+        "coverage": 0.8,
+        "accuracy": 0.75,
+        "confidence_cutoff": 0.3970423746055261
+      }
+    }
+  },
+  "tasks": {
+    "agent_route": {
+      "n": 5,
+      "nll": 0.7073460951616122,
+      "acc": 0.8,
+      "ece": 0.2592182010624366,
+      "brier": 0.3555643177005047,
+      "mean_conf": 0.5407817989375634,
+      "confident_error_rate": 0.0,
+      "coverage_at_0_9": 0.2,
+      "accuracy_at_0_9": 1.0,
+      "coverage_at_5pct_error": 0.6,
+      "coverage_at_1pct_error": 0.6,
+      "aurc": 0.09,
+      "error_rate_at_0_9": 0.0,
+      "confidence_bias": -0.25921820106243665,
+      "top_bins": {
+        "0.9": {
+          "n": 1,
+          "errors": 0,
+          "error_rate": 0.0
+        },
+        "0.95": {
+          "n": 0,
+          "errors": 0,
+          "error_rate": null
+        },
+        "0.99": {
+          "n": 0,
+          "errors": 0,
+          "error_rate": null
+        }
+      },
+      "selective": {
+        "0.5": {
+          "coverage": 0.6,
+          "accuracy": 1.0,
+          "confidence_cutoff": 0.4252188213639312
+        },
+        "0.8": {
+          "coverage": 0.8,
+          "accuracy": 0.75,
+          "confidence_cutoff": 0.3970423746055261
+        }
+      }
+    }
+  },
+  "variants": {
+    "clean": {
+      "n": 5,
+      "nll": 0.7073460951616122,
+      "acc": 0.8,
+      "ece": 0.2592182010624366,
+      "brier": 0.3555643177005047,
+      "mean_conf": 0.5407817989375634,
+      "confident_error_rate": 0.0,
+      "coverage_at_0_9": 0.2,
+      "accuracy_at_0_9": 1.0,
+      "coverage_at_5pct_error": 0.6,
+      "coverage_at_1pct_error": 0.6,
+      "aurc": 0.09,
+      "error_rate_at_0_9": 0.0,
+      "confidence_bias": -0.25921820106243665,
+      "top_bins": {
+        "0.9": {
+          "n": 1,
+          "errors": 0,
+          "error_rate": 0.0
+        },
+        "0.95": {
+          "n": 0,
+          "errors": 0,
+          "error_rate": null
+        },
+        "0.99": {
+          "n": 0,
+          "errors": 0,
+          "error_rate": null
+        }
+      },
+      "selective": {
+        "0.5": {
+          "coverage": 0.6,
+          "accuracy": 1.0,
+          "confidence_cutoff": 0.4252188213639312
+        },
+        "0.8": {
+          "coverage": 0.8,
+          "accuracy": 0.75,
+          "confidence_cutoff": 0.3970423746055261
+        }
+      }
+    }
+  },
+  "heldout_tasks": {},
+  "permutation": {
+    "n": 0,
+    "mean_max_delta": null,
+    "flip_rate": null
+  },
+  "temperature": 1.0,
+  "calibrated_clean": {
+    "n": 5,
+    "nll": 0.7073460951616122,
+    "acc": 0.8,
+    "ece": 0.2592182010624366,
+    "brier": 0.3555643177005047,
+    "mean_conf": 0.5407817989375634,
+    "confident_error_rate": 0.0,
+    "coverage_at_0_9": 0.2,
+    "accuracy_at_0_9": 1.0,
+    "coverage_at_5pct_error": 0.6,
+    "coverage_at_1pct_error": 0.6,
+    "aurc": 0.09,
+    "error_rate_at_0_9": 0.0,
+    "confidence_bias": -0.25921820106243665,
+    "top_bins": {
+      "0.9": {
+        "n": 1,
+        "errors": 0,
+        "error_rate": 0.0
+      },
+      "0.95": {
+        "n": 0,
+        "errors": 0,
+        "error_rate": null
+      },
+      "0.99": {
+        "n": 0,
+        "errors": 0,
+        "error_rate": null
+      }
+    },
+    "selective": {
+      "0.5": {
+        "coverage": 0.6,
+        "accuracy": 1.0,
+        "confidence_cutoff": 0.4252188213639312
+      },
+      "0.8": {
+        "coverage": 0.8,
+        "accuracy": 0.75,
+        "confidence_cutoff": 0.3970423746055261
+      }
+    }
+  },
+  "metric_policy": {
+    "version": 2,
+    "selective_ties": "whole_confidence_groups",
+    "coverage_at_error": "in-sample maximum over confidence thresholds; not a deployed error guarantee",
+    "aurc": "right-step integral over whole confidence groups",
+    "confident_error_rate": "high-confidence errors divided by all questions",
+    "error_rate_at_0_9": "errors divided by questions accepted at p_max >= 0.9",
+    "nll": "exact from logits when recorded; otherwise from floored probabilities",
+    "nll_floor": 1e-09,
+    "renormalize_returned_probabilities": true,
+    "raw_sums_outside_1e_5": 0,
+    "returned_zeros": 0
+  },
+  "coverage": {
+    "requested_records": 5,
+    "requested_questions": 5,
+    "evaluated_records": 5,
+    "evaluated_questions": 5,
+    "rejected_records": 0,
+    "truncated_records": 0
+  },
+  "latency_ms": {
+    "median": 85.86677722632885,
+    "p95": 246.61642778664825
+  },
+  "calibration": {
+    "inference_temperature": 0.7071067811865475,
+    "additional_temperature": 1.0,
+    "logits_recorded": true
+  },
+  "suite_sha256": "fe6dd726a0cd088e31515a205bd859a6e1e9c81eac246b0a8dd26faa47dc45d6",
+  "data": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-retrain01/dataset/development.jsonl",
+  "date_facts": false,
+  "rotations": 1,
+  "run": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-retrain01/actual-run-fp32-02/checkpoint",
+  "split": "custom",
+  "calibration_applied": true,
+  "environment": {
+    "packages": {
+      "torch": "2.8.0+cu128",
+      "transformers": "5.17.0",
+      "peft": "0.21.0",
+      "flash-linear-attention": null,
+      "triton": "3.4.0",
+      "causal-conv1d": null,
+      "mlx": null,
+      "mlx-lm": null
+    },
+    "device": "cuda",
+    "gpu": "NVIDIA GeForce RTX 4090",
+    "backend": "torch",
+    "dtype": "float32",
+    "triton_f32_default": null,
+    "attention": "sdpa",
+    "deltanet": {
+      "forward": "transformers.models.qwen3_5.modeling_qwen3_5.Qwen3_5GatedDeltaNet.forward",
+      "causal_conv1d_fn": "transformers.models.qwen3_5.modeling_qwen3_5.causal_conv1d_fn",
+      "torch_chunk_gated_delta_rule": "transformers.models.qwen3_5.modeling_qwen3_5.torch_chunk_gated_delta_rule"
+    }
+  },
+  "remote": null
+}

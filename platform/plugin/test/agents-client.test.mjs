@@ -132,6 +132,23 @@ test('版本候选区分迭代版本和旧EXP算力变体，目录计数分别�
   assert.equal(ui.text(ui.nodes().find(node => node.props?.className === 'agent-variant-count')), '变体 1')
 })
 
+test('迭代版本始终显示完整随机后缀，同号且末六位相同的版本也能准确切换', async () => {
+  const ids = ['EXP-first-agent-027-r123456abcdef', 'EXP-first-agent-027-r654321abcdef']
+  const rows = ids.map(id => ({ id, agent_id: 'first-agent', status: 'active', change: {} }))
+  const ui = page({ intercept(endpoint, payload) {
+    if (endpoint === 'agents/list') return { ok: true, value: { agents: [{ id: 'first-agent', version_count: 2 }], experiments: rows } }
+    if (endpoint === 'agents/detail') return { ok: true, value: { ...detail('first-agent'), experiment: rows.find(row => row.id === payload.experiment_id) ?? rows[0], versions: rows } }
+  } })
+  await ui.settle()
+  const selector = ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '版本')
+  const options = ui.nodes(selector).filter(node => node.type === 'option')
+  assert.deepEqual(options.map(node => ui.text(node)).sort(), ['v027-r123456abcdef 研究中', 'v027-r654321abcdef 研究中'])
+  selector.props.onChange({ target: { value: ids[1] } }); await ui.settle()
+  assert.equal(ui.calls.filter(call => call.endpoint === 'agents/detail').at(-1).payload.experiment_id, ids[1])
+  assert.equal(ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '版本').props.value, ids[1])
+  assert.equal(ui.calls.some(call => /apply|activate|create/.test(call.endpoint)), false)
+})
+
 test('同名变体使用短ID区分，未声明父版的变体不推断来源', async () => {
   const base = experiments().filter(item => item.agent_id === 'first-agent')
   const rows = [...base,

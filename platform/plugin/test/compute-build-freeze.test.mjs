@@ -81,6 +81,24 @@ test('固定编译不执行Candidate，生成的独立ESM可真实导入并执�
   assert.equal((await handler('preview', { experiment_id: id })).ok, true)
   assert.equal(existsSync(marker), false)
 })
+test('数据仓库中的工作流使用平台锁定的DSH类型和zod，类型检查与实际打包一致', async t => {
+  const f = fixture(t), handler = createComputeBuildHandler(f.root)
+  write(f.root, `${base}/dsh/managed/compute-workflow/index.ts`, `import type {SessionEvent} from '@deepseek-ai/dsh-session';
+import type {SessionProjectionRegistry} from '@deepseek-ai/dsh-session-projection';
+import {z} from 'zod';
+export type NativeTypes = [SessionEvent, SessionProjectionRegistry];
+export const parseRoute = (value: unknown) => z.enum(['policy_operations','inspection']).parse(value);
+` + source)
+  const candidate = candidateDigest(join(f.root, base))
+  const preview = await handler('preview', { experiment_id: id, expected_candidate_sha256: candidate })
+  assert.equal(preview.ok, true, JSON.stringify(preview))
+  const result = await handler('build', { experiment_id: id, expected_candidate_sha256: candidate, expected_preview_sha256: preview.value.preview_sha256 })
+  assert.equal(result.ok, true, JSON.stringify(result))
+  const plugin = await import(`file://${join(f.root, base, result.value.output_path)}`)
+  assert.equal(plugin.parseRoute('inspection'), 'inspection')
+  assert.throws(() => plugin.parseRoute('unknown'))
+})
+
 test('TypeScript错误与陈旧预览不得保存制品或回执', async t => {
   const f = fixture(t), handler = createComputeBuildHandler(f.root), path = `${base}/dsh/managed/compute-workflow/index.ts`
   write(f.root, path, 'export const value: number = "bad"\n')

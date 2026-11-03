@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "stage": "development-calibrated",
+  "job_id": "pid:6909",
+  "exit_code": 0,
+  "started_at_utc": "2026-11-03T03:55:49.793532+00:00",
+  "finished_at_utc": "2026-11-03T03:56:01.960525+00:00",
+  "elapsed_seconds": 12.17,
+  "peak_total_gpu_used_mib_includes_other_processes": 18657,
+  "log": {
+    "path": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-retrain01/validation-01/stages/development-calibrated/stdout.log",
+    "sha256": "286167c60bbfd267fa43fab62e97fc6472c678fa530d49731c9757b9d2c30414",
+    "bytes": 1884
+  },
+  "training_result_sha256": "96094ff7c6803482bd7993394cff99d02f63e274022fe5c9b744639270ad55e9",
+  "plan_sha256": "24a9467ad5c24a43a903ddd6dcd986dadc7c2c815ccfeb87203ada66535bb619",
+  "artifact_status": "validated",
+  "artifacts": {
+    "report": {
+      "path": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-retrain01/actual-run-fp32-02/development-calibrated/report.json",
+      "sha256": "de25de03eb04fcb2469b8e727b09104f345168e1554e66472d98a01549c61441",
+      "bytes": 6623
+    },
+    "rows": {
+      "path": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-retrain01/actual-run-fp32-02/development-calibrated/rows.json",
+      "sha256": "15acb1cd06b4107c78437b92ff72292e874445bae5c4b49bd562da6a444ede9c",
+      "bytes": 5903
+    },
+    "split": "development",
+    "valid_questions": 5,
+    "independent_groups": 3,
+    "clean": {
+      "acc": 0.8,
+      "nll": 0.7073460951616122,
+      "ece": 0.2592182010624366,
+      "brier": 0.3555643177005047
+    },
+    "temperature": 1.0,
+    "gpu": "NVIDIA GeForce RTX 4090",
+    "backend": "torch",
+    "dtype": "float32"
+  }
+}

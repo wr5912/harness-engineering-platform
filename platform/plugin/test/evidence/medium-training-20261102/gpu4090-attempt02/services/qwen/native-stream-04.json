@@ -1,0 +1,50 @@
+{
+  "http_status": 200,
+  "content_type": "text/event-stream; charset=utf-8",
+  "x_request_id": "dbafa95f-bd5e-4b3d-a67e-c4c962ec6265",
+  "chunk_count": 8,
+  "done_marker": false,
+  "text": "\n\n流式已验证。",
+  "usage_chunks": [
+    {
+      "completion_tokens": 8,
+      "prompt_tokens": 21,
+      "total_tokens": 29
+    }
+  ],
+  "first_chunk": {
+    "id": "dbafa95f-bd5e-4b3d-a67e-c4c962ec6265",
+    "choices": [
+      {
+        "delta": {
+          "role": "assistant"
+        },
+        "index": 0
+      }
+    ],
+    "created": 1793679906,
+    "model": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-qwen35-2b/model@main",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": ""
+  },
+  "last_chunk": {
+    "id": "dbafa95f-bd5e-4b3d-a67e-c4c962ec6265",
+    "choices": [
+      {
+        "delta": {},
+        "finish_reason": "stop",
+        "index": 0
+      }
+    ],
+    "created": 1793679906,
+    "model": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-qwen35-2b/model@main",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": "",
+    "usage": {
+      "completion_tokens": 8,
+      "prompt_tokens": 21,
+      "total_tokens": 29
+    }
+  },
+  "elapsed_seconds": 0.335
+}

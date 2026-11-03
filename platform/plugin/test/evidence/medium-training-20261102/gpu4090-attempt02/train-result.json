@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "stage": "train",
+  "job_id": "pid:4894",
+  "pid": 4894,
+  "supervisor_pid": 4893,
+  "started_at_utc": "2026-11-03T03:41:24.276910+00:00",
+  "finished_at_utc": "2026-11-03T03:41:48.659830+00:00",
+  "elapsed_seconds": 24.38,
+  "exit_code": 0,
+  "stdout_log": {
+    "path": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-retrain01/execution/train-attempt-02/stdout.log",
+    "bytes": 1352,
+    "sha256": "568e7da194a04ae3f104810a91bf6f7ce44241123ae267a62eb4cc913c77a675"
+  },
+  "gpu_before": {
+    "used_mib": 15072,
+    "free_mib": 33448
+  },
+  "peak_total_gpu_used_mib_includes_other_processes": 18969,
+  "checkpoint_status": "complete",
+  "checkpoint_files": {
+    "head.pt": {
+      "bytes": 2103423,
+      "sha256": "d23268ecc9c1b5c153baef1252da021c87a6aee4fb99aa5c7e501d6c41547174"
+    },
+    "adapter_model.safetensors": {
+      "bytes": 43338624,
+      "sha256": "c7d94cb9794ed10d2e60b5866bf6974c4796fc6e52275a342dc67e0ddf2bf9e3"
+    },
+    "adapter_config.json": {
+      "bytes": 1273,
+      "sha256": "95d3886d0d5d34f255271c40283a0ace1e853687414904d63807307d59e87911"
+    },
+    "training_config.json": {
+      "bytes": 2492,
+      "sha256": "93d853d94bcb3b7f9daf4456d2341eb3fc6d060c4b80ed6a2bddad8dc42f9b8b"
+    },
+    "training_metrics.json": {
+      "bytes": 708,
+      "sha256": "bad48a08e3c164336d017654fecff3bbaa56516278fec3838cc4097b3e3efac4"
+    },
+    "tokenizer.json": {
+      "bytes": 19989325,
+      "sha256": "06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523"
+    },
+    "tokenizer_config.json": {
+      "bytes": 1127,
+      "sha256": "e0792bce4d2d44981188cea9b75ceaa12ab0ae24a55473f032905fc6a782a771"
+    }
+  },
+  "training_metrics": {
+    "wall_seconds": 12.95625638961792,
+    "records_seen": 17,
+    "requested_records": 17,
+    "truncated_records": 0,
+    "rejected_records": 0,
+    "optimizer_steps": 3,
+    "forward_tokens": 10037,
+    "step_seconds": [
+      6.256,
+      5.955,
+      0.745
+    ],
+    "optimizer_seconds": 0.07290339469909668,
+    "resume_seconds": [],
+    "resume_write_seconds": [],
+    "world_size": 1,
+    "backbone_save_seconds": 0.1,
+    "snapshots": [],
+    "grad_norm": [
+      {
+        "epoch": 0,
+        "steps": 3,
+        "mean": 24.23787366666667,
+        "max": 32.66328,
+        "clipped_steps": 3
+      }
+    ],
+    "weights": "lora",
+    "peak_device_bytes": 3486417408,
+    "device": "cuda",
+    "dtype": "fp32",
+    "batch": 1,
+    "peak_rss_bytes": 5705232384
+  },
+  "calibration": "not_run",
+  "deployment": "not_run",
+  "test": "not_run"
+}

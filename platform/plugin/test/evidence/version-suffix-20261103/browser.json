@@ -1,0 +1,54 @@
+{
+  "verified_at": "2026-11-03T06:09:06.809Z",
+  "platform_pid": 3707822,
+  "process_retained": true,
+  "application": "applied",
+  "warnings": [],
+  "checks": [
+    {
+      "width": 1440,
+      "initial": "EXP-security-operations-expert-027-reab20c48f610",
+      "selected": "EXP-security-operations-expert-024-rad80a907c628",
+      "metrics": {
+        "width": 240,
+        "scroll": 131,
+        "client": 131,
+        "bodyOverflow": false
+      },
+      "search_suffix": true,
+      "switch_and_refresh": true
+    },
+    {
+      "width": 768,
+      "initial": "EXP-security-operations-expert-027-reab20c48f610",
+      "selected": "EXP-security-operations-expert-024-rad80a907c628",
+      "metrics": {
+        "width": 240,
+        "scroll": 131,
+        "client": 131,
+        "bodyOverflow": false
+      },
+      "search_suffix": true,
+      "switch_and_refresh": true
+    },
+    {
+      "width": 390,
+      "initial": "EXP-security-operations-expert-027-reab20c48f610",
+      "selected": "EXP-security-operations-expert-024-rad80a907c628",
+      "metrics": {
+        "width": 240,
+        "scroll": 131,
+        "client": 131,
+        "bodyOverflow": false
+      },
+      "search_suffix": true,
+      "switch_and_refresh": true
+    }
+  ],
+  "page_errors": [],
+  "sources": {
+    "platform/plugin/src/agents/client.tsx": "9fb9778012bad1b28984542d58d075141dabbe09275875739685231352158597",
+    "platform/plugin/src/agents/style.ts": "9cfac5b7d51bee6b29263ef28ab1171047a41e9a5cc5721d672feee0c692151c",
+    "platform/plugin/src/agents/asset-build-core.ts": "6bc13d704244fe9079e20e7dafdbfaa2d9bface27636edebc94099c63b8ca07d"
+  }
+}

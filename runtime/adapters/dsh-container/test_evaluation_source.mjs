@@ -114,3 +114,32 @@ test('真实 Run 初始化封存固定来源与同字节 Mock fixture，当前�
   const drift = spawnSync(process.env.HARNESS_PYTHON ?? 'python3', ['-c', 'import sys,json;from pathlib import Path;sys.path.insert(0,sys.argv[1]);from run_record import verify_run_source,read_flat_yaml;root=Path(sys.argv[2]);run=Path(sys.argv[3]);print(json.dumps(verify_run_source(root,read_flat_yaml(run/"run.yaml"),json.loads((run/"inputs.lock.json").read_text()))))', adapter, f.root, runDir], { encoding: 'utf8' })
   assert.equal(JSON.parse(drift.stdout).checks.find(item => item.component === 'mcp_fixture').status, 'changed')
 })
+
+test('明确选择当前用例时，历史 Candidate 配当前 Case 封存，预览与实际 Run 口径一致', t => {
+  const f = fixture(t)
+  write(f.candidate, 'dsh/workspace/AGENTS.md', '不能混入固定父版的新角色\n')
+  write(f.root, 'agents/alpha/evaluation.md', '# 评测\n\n#### U-CURRENT-001 新用例\n\n**用户输入**\n\n> 当前问题\n\n**预期**\n\n当前回答\n')
+  const args = ['--source', 'experiment:' + id, '--source-ref', f.ref, '--evaluation-source', 'current', '--case', 'U-CURRENT-001']
+  const preview = spawnSync(process.env.HARNESS_PYTHON ?? 'python3', [join(adapter, 'dsh-eval'), '--repo', f.root,
+    ...args, '--dry-run', '--source-check'], { encoding: 'utf8' })
+  assert.equal(preview.status, 0, preview.stderr)
+  const plan = JSON.parse(preview.stdout)
+  assert.equal(plan.evaluation_source, 'current')
+  const run = spawnSync(process.env.HARNESS_PYTHON ?? 'python3', [join(adapter, 'run_record.py'), '--repo', f.root,
+    'init', ...args, '--executor', 'api'], { encoding: 'utf8' })
+  assert.equal(run.status, 0, run.stderr)
+  const runDir = join(f.root, `evolution/experiments/${id}/runs/${run.stdout.trim()}`)
+  const locked = JSON.parse(readFileSync(join(runDir, 'inputs.lock.json')))
+  assert.equal(locked.evaluation_source, 'current')
+  assert.equal(locked.evaluation_cases[0].inputs[0], '当前问题')
+  assert.equal(locked.evaluation_cases[0].expected_behavior, '当前回答')
+  assert.equal(locked.source_ref, f.ref)
+  assert.equal(locked.candidate_sha256, materializeEvaluationSource(f.root, id, f.ref).candidate_sha256)
+  assert.equal(readFileSync(join(f.root, locked.candidate_path, 'dsh/workspace/AGENTS.md'), 'utf8'), '原角色\n')
+  const historical = spawnSync(process.env.HARNESS_PYTHON ?? 'python3', [join(adapter, 'dsh-eval'), '--repo', f.root,
+    '--source', 'experiment:' + id, '--source-ref', f.ref, '--case', 'U-CURRENT-001', '--dry-run', '--source-check'], { encoding: 'utf8' })
+  assert.notEqual(historical.status, 0)
+  assert.match(historical.stderr, /未匹配 Case/)
+  write(f.root, 'agents/alpha/evaluation.md', '后续编辑不能改写已冻结口径\n')
+  assert.deepEqual(JSON.parse(readFileSync(join(runDir, 'inputs.lock.json'))), locked)
+})

@@ -1,0 +1,42 @@
+{
+  "kind": "host-real-Node-OpenAI-SDK",
+  "sdk_version": "7.19.0",
+  "forward_pid_from_runtime": 4159070,
+  "requested_model": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-qwen35-2b/model",
+  "nonstream": {
+    "http_status": 200,
+    "response_x_request_id": "90f814d4-7592-4988-a445-e10b5266223e",
+    "body_id": "90f814d4-7592-4988-a445-e10b5266223e",
+    "model": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-qwen35-2b/model@main",
+    "content": "收到。",
+    "finish_reason": "stop",
+    "usage": {
+      "completion_tokens": 5,
+      "prompt_tokens": 21,
+      "total_tokens": 26
+    },
+    "elapsed_ms": 1041
+  },
+  "stream": {
+    "http_status": 200,
+    "sent_x_request_id": "4453101e-5f98-41df-bd5b-48beaa752c42",
+    "response_x_request_id": "4453101e-5f98-41df-bd5b-48beaa752c42",
+    "header_and_sent_match": true,
+    "sdk_completed_on_eof_without_done": true,
+    "event_count": 6,
+    "chunk_ids": [
+      "4453101e-5f98-41df-bd5b-48beaa752c42"
+    ],
+    "content": "\n\n已收到。",
+    "finish_reasons": [
+      "stop"
+    ],
+    "usage": {
+      "completion_tokens": 6,
+      "prompt_tokens": 23,
+      "total_tokens": 29
+    },
+    "elapsed_ms": 1145
+  },
+  "status": "completed"
+}

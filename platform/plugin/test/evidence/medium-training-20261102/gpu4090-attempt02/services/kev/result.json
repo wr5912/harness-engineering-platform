@@ -1,0 +1,50 @@
+{
+  "base_url": "http://127.0.0.1:18241",
+  "frozen_test_result_sha256": "1bfd79182a259eb26143378ca61bfb1e89d130c6f8c6461551972bfd2c77ad3c",
+  "http": {
+    "answer_keys": [
+      "route",
+      "urgent"
+    ],
+    "choice": {
+      "choice": "billing",
+      "confidence": 0.9873,
+      "probabilities": {
+        "billing": 0.9936,
+        "security": 0.0064
+      },
+      "type": "choice"
+    },
+    "http_elapsed_ms": 63.14,
+    "http_status": 200,
+    "model_latency_ms": 56.8,
+    "noul": {
+      "noul": 0.4811,
+      "type": "noul"
+    },
+    "request_id": "kev-service-01-a53ff94381974d2f8a68a5814e6c5f42",
+    "server_timing": "app;dur=60.5",
+    "usage": {
+      "input_tokens": 50,
+      "output_tokens": 74
+    }
+  },
+  "model": {
+    "backend": "torch",
+    "base": "Qwen/Qwen3.5-0.8B-Base",
+    "dtype": "float32",
+    "name": "kev-latest",
+    "run": "/root/autodl-tmp/hep-rc5-20261101/medium-kev-exp024-20261103-retrain01/serving/kev-service-01/checkpoint",
+    "temperature": 0.7071067811865475
+  },
+  "pid": 8338,
+  "port": 18241,
+  "runtime_manifest_sha256": "526e5f709fdacbb81deecb83dc17345b6446c84fc37af67900820c30cac101fc",
+  "schema_version": 1,
+  "snapshot_manifest_sha256": "cbfafd727889835fb4326251b62889f2b328834ce6785925a2275d540cfb21a8",
+  "stage": "kev-service",
+  "status": "serving_localhost_smoke_passed_not_business_equivalence",
+  "test_quality_not_implied_by_smoke": true,
+  "unauthenticated_http_status": 401,
+  "verified_at_utc": "2026-11-03T04:10:42.561143+00:00"
+}

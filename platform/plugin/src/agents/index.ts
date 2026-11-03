@@ -1348,6 +1348,10 @@ function evalArgs(payload: JsonMap, dryRun: boolean, modelPolicyPath?: string, m
     if (typeof payload.source_ref !== 'string' || !/^git:[a-f0-9]{40}$/.test(payload.source_ref)) throw new RpcError('invalid_request', 'source_ref 必须是 git:<40位提交>')
     args.push('--source-ref', payload.source_ref)
   }
+  if (payload.evaluation_source !== undefined) {
+    if (typeof payload.evaluation_source !== 'string' || !['source', 'current'].includes(payload.evaluation_source)) throw new RpcError('invalid_request', 'evaluation_source 必须是 source 或 current')
+    args.push('--evaluation-source', payload.evaluation_source)
+  }
   if (mcpFixturePath) args.push('--mcp-fixture', mcpFixturePath)
   if (compareTo) args.push('--compare-to', compareTo)
   if (payload.artifact_export !== undefined) {
