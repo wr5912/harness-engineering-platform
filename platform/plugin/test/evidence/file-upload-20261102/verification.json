@@ -1,0 +1,175 @@
+{
+  "verified_at": "2026-11-03T02:38:11.924Z",
+  "runtime": "0.2.1-rc.5",
+  "scope": "current development instances only",
+  "program_base": "da8ea79ceab272276140c345d990c3e992040dea",
+  "platform_restarted": false,
+  "remote_deployment_changed": false,
+  "regression": {
+    "business_gateway": {
+      "passed": 46,
+      "failed": 0,
+      "skipped": 0
+    },
+    "covers": [
+      "shared anonymous development upload",
+      "authenticated published upload",
+      "binary integrity over 2 MiB",
+      "Chinese filenames and native receipt resolution",
+      "foreign session denied before storage",
+      "native missing session and unsupported media errors"
+    ],
+    "full_plugin_worktree": {
+      "passed": 1506,
+      "failed": 0,
+      "skipped": 0,
+      "log_sha256": "c9e1c85b9889db9dac670d187e92e885ee034348b1b150e25ce8ac7d04179aa3",
+      "scope": "current worktree including parallel compute development changes"
+    },
+    "isolated_staged_source": {
+      "build": "passed",
+      "business_gateway_passed": 46,
+      "failed": 0,
+      "skipped": 0,
+      "log_sha256": "30d6858b91ab2c4d4d61259b50b6dba91859490489b1d643815c18430f6b98ab",
+      "scope": "HEAD plus staged upload fix; excludes parallel worktree modifications"
+    }
+  },
+  "instances": [
+    {
+      "instance": "security-ops-kev-single-turn-lab",
+      "http": 200,
+      "bytes": 2097165,
+      "sha256": "2f1540f1f4761bd23cb3cf3267d9b102974b11c34a30399e2d53b12bb71040f1",
+      "stored_sha256": "2f1540f1f4761bd23cb3cf3267d9b102974b11c34a30399e2d53b12bb71040f1",
+      "receipt": true,
+      "prior_sessions_preserved": 5,
+      "uploaded_at": "2026-11-03T02:38:03.105Z"
+    },
+    {
+      "instance": "exp-security-operations-expert-1103-cf",
+      "http": 200,
+      "bytes": 2097165,
+      "sha256": "c1c4f4c8ed662b44faa1d5d41817a04dd00fc8029394e72114faee3614eb9f33",
+      "stored_sha256": "c1c4f4c8ed662b44faa1d5d41817a04dd00fc8029394e72114faee3614eb9f33",
+      "receipt": true,
+      "prior_sessions_preserved": 4,
+      "uploaded_at": "2026-11-03T02:38:03.531Z"
+    },
+    {
+      "instance": "test-zhouyang-police-exp027",
+      "http": 200,
+      "bytes": 2097165,
+      "sha256": "6f7206ce766d80faeb4aae94098f929e2631403dc23977431ea06b105580b533",
+      "stored_sha256": "6f7206ce766d80faeb4aae94098f929e2631403dc23977431ea06b105580b533",
+      "receipt": true,
+      "prior_sessions_preserved": 13,
+      "uploaded_at": "2026-11-03T02:38:03.917Z"
+    },
+    {
+      "instance": "emergency-exp025-test-1030",
+      "http": 200,
+      "bytes": 2097165,
+      "sha256": "afc7854eed83e4d9f1bf472f6001f7097bb73ca261518fb1061b3ef4b7bde30d",
+      "stored_sha256": "afc7854eed83e4d9f1bf472f6001f7097bb73ca261518fb1061b3ef4b7bde30d",
+      "receipt": true,
+      "prior_sessions_preserved": 22,
+      "uploaded_at": "2026-11-03T02:38:04.207Z"
+    },
+    {
+      "instance": "test-zhouyang-disp14",
+      "http": 200,
+      "bytes": 2097165,
+      "sha256": "698d15b9173aff40a6e5011f32054f12a245af006be4f91c6d80d4ff9a3de5f9",
+      "stored_sha256": "698d15b9173aff40a6e5011f32054f12a245af006be4f91c6d80d4ff9a3de5f9",
+      "receipt": true,
+      "prior_sessions_preserved": 9,
+      "uploaded_at": "2026-11-03T02:38:06.435Z"
+    },
+    {
+      "instance": "threat-analysis-test001",
+      "http": 200,
+      "bytes": 2097165,
+      "sha256": "5f70fa0e91f4a2aa6e24eac22595619294a22e206c61927f8ee27f869959c85a",
+      "stored_sha256": "5f70fa0e91f4a2aa6e24eac22595619294a22e206c61927f8ee27f869959c85a",
+      "receipt": true,
+      "prior_sessions_preserved": 45,
+      "uploaded_at": "2026-11-03T02:38:06.829Z"
+    },
+    {
+      "instance": "lite-local223-validation",
+      "http": 200,
+      "bytes": 2097165,
+      "sha256": "dad17daf402c9696364369085f59660ee70f4cfb0cbcf201abf26630b03a2785",
+      "stored_sha256": "dad17daf402c9696364369085f59660ee70f4cfb0cbcf201abf26630b03a2785",
+      "receipt": true,
+      "prior_sessions_preserved": 15,
+      "uploaded_at": "2026-11-03T02:38:11.924Z"
+    }
+  ],
+  "reload": [
+    {
+      "instance": "test-zhouyang-police-exp027",
+      "native_missing_session_http": 400,
+      "same_container_image_mounts_ports": true,
+      "prior_session_count": 13,
+      "reloaded_before_batch_verification": true
+    },
+    {
+      "instance": "security-ops-kev-single-turn-lab",
+      "restart_seconds": 39.83,
+      "native_missing_session_http": 400,
+      "same_container_image_mounts_ports": true,
+      "prior_session_count": 5
+    },
+    {
+      "instance": "exp-security-operations-expert-1103-cf",
+      "restart_seconds": 6.72,
+      "native_missing_session_http": 400,
+      "same_container_image_mounts_ports": true,
+      "prior_session_count": 4
+    },
+    {
+      "instance": "emergency-exp025-test-1030",
+      "restart_seconds": 8.47,
+      "native_missing_session_http": 400,
+      "same_container_image_mounts_ports": true,
+      "prior_session_count": 22
+    },
+    {
+      "instance": "test-zhouyang-disp14",
+      "restart_seconds": 7.0,
+      "native_missing_session_http": 400,
+      "same_container_image_mounts_ports": true,
+      "prior_session_count": 9
+    },
+    {
+      "instance": "threat-analysis-test001",
+      "restart_seconds": 7.05,
+      "native_missing_session_http": 400,
+      "same_container_image_mounts_ports": true,
+      "prior_session_count": 45
+    },
+    {
+      "instance": "lite-local223-validation",
+      "restart_seconds": 7.73,
+      "native_missing_session_http": 400,
+      "same_container_image_mounts_ports": true,
+      "prior_session_count": 15
+    }
+  ],
+  "browser": {
+    "http": 200,
+    "filename": "hep-策略配置内容.xlsx",
+    "errors": [],
+    "attachment_visible": true,
+    "uploaded_at": "2026-11-03T02:39:29.701Z",
+    "bytes": 1434,
+    "sha256": "36f8025bb94e8d3e8da3ef6c5add0064dfa297a8524f3a83109a155fffd131e1",
+    "stored_bytes_match": true
+  },
+  "limits": [
+    "Synthetic files; no business policy execution",
+    "Current live instances use anonymous development mode; authenticated published behavior verified through native route integration tests"
+  ]
+}

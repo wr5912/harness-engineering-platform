@@ -1,0 +1,128 @@
+[
+  {
+    "name": "desktop",
+    "intent": "implement",
+    "sent": 1,
+    "actual": "implement",
+    "mode": "medium",
+    "viewport": {
+      "width": 1280,
+      "height": 1000
+    },
+    "buttons": [
+      {
+        "text": "暂存并关闭",
+        "left": 667.953125,
+        "right": 762.96875,
+        "top": 881.3230590820312,
+        "bottom": 921.3230590820312,
+        "width": 95.015625
+      },
+      {
+        "text": "仅发送策划请求",
+        "left": 772.96875,
+        "right": 893.984375,
+        "top": 881.3230590820312,
+        "bottom": 921.3230590820312,
+        "width": 121.015625
+      },
+      {
+        "text": "生成并验证变体",
+        "left": 903.984375,
+        "right": 1051,
+        "top": 881.3230590820312,
+        "bottom": 921.3230590820312,
+        "width": 147.015625
+      }
+    ],
+    "bodyWidth": 1280,
+    "dialogWidth": 878,
+    "dialogClient": 878,
+    "frozen": true,
+    "unknown": "发送结果待核对，请勿重复发送请求编号 050bd9b7-587c-4ebb-a25b-59f441984360。先在平台 AI 助手中核对该请求是否已送达。隔离验收：发送结果未知我已核对，确认未送达"
+  },
+  {
+    "name": "narrow",
+    "intent": "implement",
+    "sent": 1,
+    "actual": "implement",
+    "mode": "medium",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "buttons": [
+      {
+        "text": "暂存并关闭",
+        "left": 29,
+        "right": 179.6875,
+        "top": 721.0047607421875,
+        "bottom": 765.0047607421875,
+        "width": 150.6875
+      },
+      {
+        "text": "仅发送策划请求",
+        "left": 187.6875,
+        "right": 360.984375,
+        "top": 721.0047607421875,
+        "bottom": 765.0047607421875,
+        "width": 173.296875
+      },
+      {
+        "text": "生成并验证变体",
+        "left": 29,
+        "right": 360.984375,
+        "top": 773.0047607421875,
+        "bottom": 817.0047607421875,
+        "width": 331.984375
+      }
+    ],
+    "bodyWidth": 390,
+    "dialogWidth": 364,
+    "dialogClient": 364,
+    "frozen": true,
+    "unknown": "发送结果待核对，请勿重复发送请求编号 34206a20-2ab2-4e74-8b4e-23ff11d27202。先在平台 AI 助手中核对该请求是否已送达。隔离验收：发送结果未知我已核对，确认未送达"
+  },
+  {
+    "name": "plan",
+    "intent": "plan_only",
+    "sent": 1,
+    "actual": "plan_only",
+    "mode": "medium",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "buttons": [
+      {
+        "text": "暂存并关闭",
+        "left": 29,
+        "right": 179.6875,
+        "top": 721,
+        "bottom": 765,
+        "width": 150.6875
+      },
+      {
+        "text": "仅发送策划请求",
+        "left": 187.6875,
+        "right": 360.984375,
+        "top": 721,
+        "bottom": 765,
+        "width": 173.296875
+      },
+      {
+        "text": "生成并验证变体",
+        "left": 29,
+        "right": 360.984375,
+        "top": 773,
+        "bottom": 817,
+        "width": 331.984375
+      }
+    ],
+    "bodyWidth": 390,
+    "dialogWidth": 364,
+    "dialogClient": 364,
+    "frozen": true,
+    "unknown": "发送结果待核对，请勿重复发送请求编号 4083a0a4-d085-4ecb-a3b3-49cc8010e2e6。先在平台 AI 助手中核对该请求是否已送达。隔离验收：发送结果未知我已核对，确认未送达"
+  }
+]

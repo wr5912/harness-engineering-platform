@@ -24,6 +24,19 @@ export function computeGenerationContract() {
       semantics: '两角色必须使用不同的实际 provider/model。三个决策产物摘要均为 64 位小写 SHA-256，运行前冻结；语言模型只负责解释及必要文本，决策模型只通过类型化原生工具产生决定。实际图请求逐项核对角色、路由和产物身份，失败与每次重试均计量。',
     },
     available_tools: ['skill', 'platform_agents'],
+    execution_tools: 'generation_intent=implement 且非 plan_only 时复用 DSH 原生执行工具与 KEV 技能；仅策划保留 available_tools。平台不新增训练调度器，SSH banner 可达不表示认证、GPU 或训练成功。',
+    decision_training: {
+      binding: 'hybrid 默认实际训练 KEV；preview/create 传 decision_training={path,sha256}，引用数据根内回收的原始执行回执。可先保留未训练计划，但训练核验缺失不能成为 end。监督材料保存到 evaluation，Runtime 工件保存到 Candidate，冻结时一并保留。',
+      receipt: {
+        schema_version: 1, source_run_ids: ['与 generation.source_run_ids 相同的真实 Run'],
+        datasets: { train: '{path,sha256}', development: '{path,sha256}', calibration: '{path,sha256}', test: '{path,sha256}' },
+        training: { status: 'completed', exit_code: 0, job_id: '实际服务器作业或进程身份', optimizer_steps: '实际正整数', log: '{path,sha256}' },
+        calibration: { status: 'completed', exit_code: 0, report: '{path,sha256}' },
+        test: { status: 'completed', exit_code: 0, report: '{path,sha256}' },
+        artifacts: { checkpoint: '{path,sha256}', state_constructor: '{path,sha256}', calibration: '{path,sha256}' },
+      },
+      validation: '路径相对数据根，不接受符号链接；核对所有文件字节摘要、原生 KEV _meta.split/id/group_id（平台桥接使用 bridge_group_id）、四分区非空与隔离、训练成功退出和优化步骤、校准/测试完成及三个工件与 model_roles.decision 的摘要一致。复用 KEV 数据审计和编码检查，文件核验不代替实际执行、人员标签复核、业务效果或服务部署验证。',
+    },
     sdk: {
       module: '@harness-platform/workflow-runtime',
       exports: ['defineWorkflow', 'runWorkflow', 'registerWorkflowTool', 'registerCodeOnlyWorkflowAgent', 'registerHybridWorkflowAgent', 'fixedCompositionToolName', 'Annotation', 'StateGraph', 'START', 'END', 'LlmError', 'attributionHeaders'],

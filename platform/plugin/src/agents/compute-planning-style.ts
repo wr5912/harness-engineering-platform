@@ -158,6 +158,7 @@ export const computePlanningTheme = `
 .hep-plan-optional>summary small{max-width:50%;text-align:right}
 .hep-plan-footer{padding:14px 16px;gap:10px;flex-direction:column;align-items:stretch}
 .hep-plan-footer>div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:8px}
+.hep-plan-footer .hep-plan-primary{grid-column:1/-1}
 .harness-platform .hep-plan-footer button{min-height:44px;padding:8px 10px}
 .hep-plan-footer>p{font-size:12px}
 .hep-plan-pending{padding:12px}

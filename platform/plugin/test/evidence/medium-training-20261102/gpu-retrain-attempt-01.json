@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "stage": "new_server_training_attempt_01",
+  "status": "failed",
+  "started_at_utc": "2026-11-03T03:00:48.882430+00:00",
+  "finished_at_utc": "2026-11-03T03:01:01.019744+00:00",
+  "exit_code": 1,
+  "elapsed_seconds": 12.14,
+  "runtime": { "gpu": "RTX 4090", "dtype": "float32", "kev_commit": "2074cc44256200bb37540103fa4572901faa10f3" },
+  "base_model": { "bytes": 1746942600, "sha256": "c2b1e5a17d9c1e27685d92ed9b382911ebb99955ecd89052d1721241adfbab6c" },
+  "encoding": { "checked_records": 34, "failure_codes": [], "report_sha256": "49889c4d791c0797c37706b214d317251593f2502279828e78c6dd9512070cd7" },
+  "stdout": { "bytes": 3726, "sha256": "ad71dc6b4420e6a9c6b62369c1b16789260d7a8ff345ce47ad859fecc8defab0" },
+  "failure": "HF_HUB_OFFLINE=1 下，Hub 初始化引用仍进入 snapshot_download/api.list_repo_tree；所需目录缓存缺失。",
+  "recovery": "固定 KEV 源码支持本地 checkpoint 目录；使用已校验初始化快照启动新的独立尝试，保留首轮日志，不覆盖其结果。",
+  "acceptance": "未完成本服务器训练、校准、冻结测试、部署或业务验收。"
+}

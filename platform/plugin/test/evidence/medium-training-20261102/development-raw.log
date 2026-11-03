@@ -1,0 +1,59 @@
+Loading weights:   0%|          | 0/320 [00:00<?, ?it/s]Loading weights:  33%|███▎      | 106/320 [00:00<00:00, 1054.74it/s]Loading weights:  66%|██████▋   | 212/320 [00:00<00:00, 699.96it/s] Loading weights:  90%|█████████ | 289/320 [00:00<00:00, 514.88it/s]Loading weights: 100%|██████████| 320/320 [00:00<00:00, 538.93it/s]
+[transformers] `causal_conv1d_fn` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[transformers] `chunk_gated_delta_rule` is falling back to its reference PyTorch implementation because `flash-linear-attention` is not installed. This is correct but much slower; install `flash-linear-attention` for the optimized kernel.
+{
+  "objective": -0.9270991633615313,
+  "clean": {
+    "n": 5,
+    "nll": 0.9270991633615313,
+    "acc": 0.8,
+    "ece": 0.3619573783394685,
+    "brier": 0.45007270335946103,
+    "mean_conf": 0.4380426216605315,
+    "confident_error_rate": 0.0,
+    "coverage_at_0_9": 0.0,
+    "accuracy_at_0_9": null,
+    "coverage_at_5pct_error": 0.6,
+    "coverage_at_1pct_error": 0.6,
+    "aurc": 0.09,
+    "error_rate_at_0_9": null,
+    "confidence_bias": -0.36195737833946856,
+    "top_bins": {
+      "0.9": {
+        "n": 0,
+        "errors": 0,
+        "error_rate": null
+      },
+      "0.95": {
+        "n": 0,
+        "errors": 0,
+        "error_rate": null
+      },
+      "0.99": {
+        "n": 0,
+        "errors": 0,
+        "error_rate": null
+      }
+    },
+    "selective": {
+      "0.5": {
+        "coverage": 0.6,
+        "accuracy": 1.0,
+        "confidence_cutoff": 0.3307854732636966
+      },
+      "0.8": {
+        "coverage": 0.8,
+        "accuracy": 0.75,
+        "confidence_cutoff": 0.3301481026978126
+      }
+    }
+  },
+  "coverage": {
+    "requested_records": 5,
+    "requested_questions": 5,
+    "evaluated_records": 5,
+    "evaluated_questions": 5,
+    "rejected_records": 0,
+    "truncated_records": 0
+  }
+}

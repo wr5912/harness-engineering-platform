@@ -9,6 +9,7 @@ import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { build } from 'esbuild'
 import { load, dump } from 'js-yaml'
+import { trainingArtifacts, trainingDigest, trainingFixture } from './fixtures/decision-training.mjs'
 
 process.env.HARNESS_PROGRAM_ROOT = new URL('../../../', import.meta.url).pathname
 process.env.HARNESS_PYTHON ||= '/usr/bin/python3'
@@ -20,7 +21,7 @@ const parentRun = 'run-11111111-1111-4111-8111-111111111111', variantRun = 'run-
 const hash = value => createHash('sha256').update(value).digest('hex')
 const modelRoles = {
   language: { provider: 'qwen', model: 'qwen3.5-2b', reasoning_effort: 'off' },
-  decision: { provider: 'kev', model: 'kev-0.8b', reasoning_effort: 'off', checkpoint_sha256: 'a'.repeat(64), state_constructor_sha256: 'b'.repeat(64), calibration_sha256: 'c'.repeat(64) },
+  decision: { provider: 'kev', model: 'kev-0.8b', reasoning_effort: 'off', checkpoint_sha256: trainingDigest(trainingArtifacts.checkpoint), state_constructor_sha256: trainingDigest(trainingArtifacts.state_constructor), calibration_sha256: trainingDigest(trainingArtifacts.calibration) },
 }
 const write = (path, value) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, value) }
 function git(root, args) { const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' }); assert.equal(result.status, 0, result.stderr); return result.stdout.trim() }
@@ -658,6 +659,8 @@ async function hybridFixture(fx) {
   const changePath = join(fx.path(variant), 'change.yaml'), change = load(readFileSync(changePath, 'utf8'))
   change.compute_variant.execution_mode = 'hybrid'
   change.compute_variant.model_roles = modelRoles
+  const training = trainingFixture(fx.root, [parentRun])
+  change.compute_variant.decision_training = training.plan.decision_training
   change.compute_variant.min_resource_reduction_pct = 10
   write(changePath, dump(change))
   git(fx.root, ['add', `evolution/experiments/${variant}/change.yaml`]); git(fx.root, ['commit', '-m', 'freeze hybrid execution'])
@@ -686,7 +689,7 @@ async function hybridFixture(fx) {
     write(join(fx.right.base, 'evidence/U-ONE-001/tools.jsonl'), rows.filter(row => row.event.type.startsWith('tool/')).map(JSON.stringify).join('\n'))
   }
   saveHybrid()
-  return { ...generated, saveHybrid }
+  return { ...generated, saveHybrid, training }
 }
 
 test('混合比较仅接受固定角色、路由及决策产物，完整计量图内双模型', () => withFixture(async fx => {
@@ -697,6 +700,12 @@ test('混合比较仅接受固定角色、路由及决策产物，完整计量�
   assert.equal(compared.resources.total_tokens.variant, 14)
   assert.equal(compared.eligible_for_end, true)
   assert.equal(success(await fx.handler('context', { experiment_id: variant })).loaded.verified, true)
+  assert.equal(compared.inputs.decision_training.verified, true)
+  write(join(fx.root, generated.training.receipt.training.log.path), 'changed training log')
+  const untrained = success(await fx.handler('compare', fx.body))
+  assert.equal(untrained.eligible_for_end, false)
+  assert.ok(untrained.comparability.limits.some(message => message.includes('训练材料摘要不匹配')))
+  write(join(fx.root, generated.training.receipt.training.log.path), 'synthetic optimizer steps: 3\n')
   for (const field of ['checkpoint_sha256', 'state_constructor_sha256', 'calibration_sha256', 'model', 'model_role', 'kind']) {
     const original = generated.child.model_attempts.map(attempt => ({ ...attempt }))
     for (const attempt of generated.child.model_attempts) attempt[field] = field.endsWith('_sha256') ? 'd'.repeat(64) : 'unexpected'

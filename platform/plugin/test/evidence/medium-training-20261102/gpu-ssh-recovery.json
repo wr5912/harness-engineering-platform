@@ -1,0 +1,30 @@
+{
+  "at": "2026-11-03T02:24:09.845540+00:00",
+  "transport": "task-isolated SOCKS5 with native proxy DNS",
+  "authentication": [
+    {
+      "attempt": 1,
+      "authenticated": true,
+      "seconds": 6.188
+    },
+    {
+      "attempt": 2,
+      "authenticated": true,
+      "seconds": 3.912
+    },
+    {
+      "attempt": 3,
+      "authenticated": true,
+      "seconds": 4.626
+    }
+  ],
+  "stable_authenticated": true,
+  "diagnosis": {
+    "local_route_and_output_filter": "checked; no blocking rule found",
+    "direct_gpu_ssh": "TCP SYN left host without observed SYN-ACK",
+    "default_proxy": "domestic target selected DIRECT",
+    "isolated_proxy": "explicit upstream selection and remote DNS restored repeated SSH authentication",
+    "upstream_drop_location": "not identified"
+  },
+  "impact": "Only task proxy and task SSH execution changed; platform, global proxy and DNS were not restarted or reconfigured."
+}

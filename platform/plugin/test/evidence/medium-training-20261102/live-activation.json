@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-03T00:51:50.465Z",
+  "program_commit": "da8ea79",
+  "sessions_after_restart": 325,
+  "missing_sessions": [],
+  "new_backend_route": "instances/external/list",
+  "decision_training_partitions": [
+    "train",
+    "development",
+    "calibration",
+    "test"
+  ],
+  "management_task_resumed": true,
+  "boundary": "Actual local platform activation and session preservation; not training or business acceptance."
+}

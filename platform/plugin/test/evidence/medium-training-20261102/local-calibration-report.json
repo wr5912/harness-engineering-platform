@@ -1,0 +1,116 @@
+{
+  "n": 7,
+  "shipped_temperature": [
+    1.0
+  ],
+  "workload_temperature": 0.7071067811865475,
+  "fold_temperatures": [
+    0.25,
+    0.8122523963562355,
+    1.096824979694626
+  ],
+  "arms": {
+    "raw": {
+      "n": 7,
+      "acc": 0.42857142857142855,
+      "ece": 0.22126173007919347,
+      "brier": 0.7223236249214462,
+      "nll": 1.4881440827293968,
+      "mean_conf": 0.35939330402034947,
+      "confident_error_rate": 0.0,
+      "coverage_at_5pct_error": 0.0,
+      "aurc": 0.5078231292517007
+    },
+    "shipped": {
+      "n": 7,
+      "acc": 0.42857142857142855,
+      "ece": 0.22126173007919347,
+      "brier": 0.7223236249214462,
+      "nll": 1.4881440827293968,
+      "mean_conf": 0.35939330402034947,
+      "confident_error_rate": 0.0,
+      "coverage_at_5pct_error": 0.0,
+      "aurc": 0.5078231292517007
+    },
+    "workload": {
+      "n": 7,
+      "acc": 0.42857142857142855,
+      "ece": 0.2185130886787407,
+      "brier": 0.7191666623515639,
+      "nll": 1.4525095772505596,
+      "mean_conf": 0.45059182347923443,
+      "confident_error_rate": 0.0,
+      "coverage_at_5pct_error": 0.0,
+      "aurc": 0.5435374149659864
+    },
+    "workload_oof": {
+      "n": 7,
+      "acc": 0.42857142857142855,
+      "ece": 0.5386062504384891,
+      "brier": 1.052189135249647,
+      "nll": 2.385983482078292,
+      "mean_conf": 0.5731558802820607,
+      "confident_error_rate": 0.14285714285714285,
+      "coverage_at_5pct_error": 0.0,
+      "aurc": 0.8625850340136054
+    }
+  },
+  "oof_vs_shipped": {
+    "ece": {
+      "micro_ece_delta": 0.3173445203592956,
+      "ci95": [
+        -0.2309905955109604,
+        0.5798333963637845
+      ],
+      "samples": 1000,
+      "groups": 4,
+      "aggregation": "micro",
+      "unit": "source-stratified original record; sibling questions stay together",
+      "method": "paired cluster percentile bootstrap; full statistic recomputed in each resample"
+    },
+    "brier": {
+      "micro_brier_delta": 0.3298655103282008,
+      "ci95": [
+        0.0019479340419462088,
+        0.6082830762039648
+      ],
+      "samples": 1000,
+      "groups": 4,
+      "aggregation": "micro",
+      "unit": "source-stratified original record; sibling questions stay together",
+      "method": "paired cluster percentile bootstrap; full statistic recomputed in each resample"
+    },
+    "coverage_at_5pct_error": {
+      "micro_coverage_at_5pct_error_delta": 0.0,
+      "ci95": [
+        -0.8333333333333334,
+        0.0
+      ],
+      "samples": 1000,
+      "groups": 4,
+      "aggregation": "micro",
+      "unit": "source-stratified original record; sibling questions stay together",
+      "method": "paired cluster percentile bootstrap; full statistic recomputed in each resample"
+    },
+    "aurc": {
+      "micro_aurc_delta": 0.3547619047619047,
+      "ci95": [
+        0.0,
+        0.5533333333333332
+      ],
+      "samples": 1000,
+      "groups": 4,
+      "aggregation": "micro",
+      "unit": "source-stratified original record; sibling questions stay together",
+      "method": "paired cluster percentile bootstrap; full statistic recomputed in each resample"
+    }
+  },
+  "fit": {
+    "aggregation": "micro",
+    "points": 121
+  },
+  "folds": 3,
+  "seed": 20261103,
+  "note": "argmax and accuracy are temperature-invariant; workload is in-sample, workload_oof is the held-out estimate",
+  "rows": "/home/cmp/harness-engineering-platform-data/.local/compute-variants/EXP-security-operations-expert-024-rad80a907c628/medium-kev-20261103/calibration-raw-evidence/rows.json"
+}

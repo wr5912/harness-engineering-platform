@@ -13,7 +13,7 @@ import { mcpCredentialEdit } from './mcp.ts'
 // 助手工具在平台自己的管理会话内执行，不是外部客户端连接；以平台管理身份调用管理接口。
 const managementPeer = { principal: { kind: 'owner' } } as unknown as Parameters<ConnectionRpcHandler>[3]
 import { assistantConfiguration, assertAssistantConfigured, managementPrinciples, managementSkill, managementSkillRoot, normalizeManagementContext, type NativeSkills } from './business-assets.ts'
-import { DECISION_EXTRACTION_ACTIONS } from './extraction-scope.ts'
+import { DECISION_EXTRACTION_ACTIONS, isComputeVariantExecution } from './extraction-scope.ts'
 import { assistantActions, assistantActionContract, allowedAssistantActions, projectAssistantTools, featureActions, type AssistantDomain } from './tool-contracts.ts'
 import { TOOL_INPUT_JSON_RETRY_POLICY, toolInputJsonRetrySchema } from './tool-input-recovery.ts'
 import { decisionExtractionModelContract, normalizeDecisionModelSubmission } from '../evaluation/decision-dataset-contract.ts'
@@ -309,7 +309,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
     if (!state) throw new Error('助手会话投影尚未装载')
     if (state.workspace_id && state.workspace_id !== workspaceIdentity(root).id) throw new Error('助手会话属于另一个工作区身份')
     if (state.task_context.skill === 'decision-sample-extraction') services.scopeExtraction?.(found.agent)
-    else if (state.task_context.skill === 'compute-variant-research') services.scopeComputeVariants?.(found.agent)
+    else if (state.task_context.skill === 'compute-variant-research' && !isComputeVariantExecution(state)) services.scopeComputeVariants?.(found.agent)
     else if (state.task_context.skill === 'agent-maintenance' && state.task_context.workflow === 'features') services.scopeFeatures?.(found.agent)
     else services.releaseTaskScope?.(found.agent)
     return { session, state, agent: found.agent }
@@ -706,6 +706,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
           return wireValue({ ok: true, value: contract })
         }
         if (state.task_context.skill === 'compute-variant-research' && args.action !== 'context' && !allowedAssistantActions(domain, state).includes(args.action)) throw new Error('算力变体任务不允许此操作')
+        if (state.task_context.skill === 'compute-variant-research' && state.task_context.planning_intent === 'plan_only' && args.action !== 'context' && (!readActions.has(args.action) || args.action === 'compute-variants/compare')) throw new Error('仅策划请求不执行写入、训练或评测，请从生成并验证入口发起执行任务')
         if (state.task_context.skill === 'decision-sample-extraction') {
           if (domain !== 'agents' || !DECISION_EXTRACTION_ACTIONS.includes(args.action)) throw new Error('决策样本任务仅允许读取限定 Run 和提交候选预览')
           if (!['context', 'research/read-reference'].includes(args.action) && args.input?.run_id !== undefined && args.input.run_id !== state.task_context.run_id) throw new Error('读取 Run 与固定任务上下文不一致')

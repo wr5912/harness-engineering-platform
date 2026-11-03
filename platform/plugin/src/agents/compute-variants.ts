@@ -13,6 +13,7 @@ import type { ModelAttempt } from '../evaluation/model-attempts.ts'
 import { inspectComputeBuild } from './compute-build.ts'
 import { computeCodeSource } from './compute-source.ts'
 import { computeGenerationContract } from './compute-generation-contract.ts'
+import { inspectDecisionTraining, type TrainingFile } from './compute-training.ts'
 import { isCodeOnlyModelRoute, isHybridWorkflowRoute } from '../workflows/code-only-route.ts'
 import { matchesWorkflowModelBinding, validateWorkflowModelRoles, type WorkflowModelRoles } from '../workflows/model-roles.ts'
 
@@ -39,6 +40,7 @@ export interface ComputePlan {
   model_change: { model: string; reasoning_effort: string } | null
   execution_mode?: 'code-only' | 'hybrid'
   model_roles?: WorkflowModelRoles
+  decision_training?: TrainingFile
   measurement_schema_version?: 2
   generation?: GenerationPlan
 }
@@ -157,12 +159,14 @@ function makePlan(body: Map, cases: Record<string, any>): ComputePlan {
   if (body.execution_mode === 'code-only' && (modelChange || body.model_change || body.model_roles)) fail('纯代码执行不能指定模型变更')
   if (body.execution_mode === 'hybrid' && (!generation || !validateWorkflowModelRoles(body.model_roles) || modelChange || body.model_change)) fail('混合执行必须提供代码生成和完整的双模型角色身份，不能同时声明单模型变更')
   if (body.model_roles !== undefined && body.execution_mode !== 'hybrid') fail('双模型角色身份仅适用于混合执行')
+  if (body.decision_training !== undefined && (body.execution_mode !== 'hybrid' || !body.decision_training || typeof body.decision_training.path !== 'string' || !/^[a-f0-9]{64}$/.test(body.decision_training.sha256))) fail('decision_training 必须为中算力训练回执的 path/sha256 引用')
   return { schema_version: 1, created_at: new Date().toISOString(), strategy: text(body, 'strategy'),
     case_hashes: Object.fromEntries(selected.sort().map(id => [id, hash(canonical(cases[id]))])), critical_case_ids: critical.sort(),
     min_runs_per_case: minimum, max_pass_rate_drop_pp: number(body.max_pass_rate_drop_pp ?? 0, 0, 100, 'max_pass_rate_drop_pp'),
     resource_metric: metric, min_resource_reduction_pct: number(body.min_resource_reduction_pct ?? 10, 0.01, 100, 'min_resource_reduction_pct'), model_change: modelChange,
     ...(generation ? { generation } : {}), ...(body.execution_mode ? { execution_mode: body.execution_mode } : {}),
     ...(body.execution_mode === 'hybrid' ? { model_roles: structuredClone(body.model_roles) } : {}),
+    ...(body.decision_training ? { decision_training: structuredClone(body.decision_training) } : {}),
     measurement_schema_version: 2 }
 }
 
@@ -326,6 +330,7 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
     return { experiment_id: id, agent_id: change.agent_id, variant_name: change.variant_name ?? null, parent_ref: `git:${commit ?? ''}`, parent_experiment_id: change.parent_experiment_id ?? null, fixed_parent_ref: change.baseline_ref ?? null, plan: change.compute_variant ?? null,
       candidate_sha256: digest, generation, generated_files: generation ? computeCodeSource(root, id, generation, buildState.receipt) : null, generation_contract: computeGenerationContract(), build: { ...(buildState.receipt ?? {}), verified: buildState.verified, reasons: buildState.reasons }, freeze,
       loaded: { verified: loadedRuns.length > 0, run_ids: loadedRuns }, comparison,
+      decision_training: await inspectDecisionTraining(root, change.compute_variant ?? {}),
       workflow_status: { generated, built: buildState.verified, frozen: freeze.candidate_matches && freeze.plan_matches, loaded: loadedRuns.length > 0,
         compared: comparison !== null },
       variant_kind: change.variant_kind ?? 'exploratory', decision: change.outcome ?? 'inconclusive', change_sha256: hash(content),
@@ -388,6 +393,8 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
     let graphUsageComplete = true, codeOnlyEvidencePassed = true
     if (!parentDigest) limits.push('固定父版不能完整恢复')
     const workflowBuild = plan.generation ? inspectComputeBuild(root, id) : null
+    const training = await inspectDecisionTraining(root, plan)
+    if (training.required && !training.verified) limits.push(...training.reasons)
     if (workflowBuild && !workflowBuild.verified) limits.push('工作流源码、共享执行器或构建产物已变化 / 尚未构建')
     const observedSessions = new Set<string>()
     const rows: { side: 'parent' | 'variant'; run: any; lock: any; cases: any[] }[] = []
@@ -568,7 +575,7 @@ export function createComputeVariantsHandler(assetRoot: string, services: Comput
     const resourcePassed = graphUsageComplete && codeOnlyEvidencePassed && reduction !== null && reduction >= plan.min_resource_reduction_pct
     if (reduction === null) resourceLimits.push('目标资源指标缺少完整数据或父版基数为零')
     const result = { measurement_schema_version: 2, experiment_id: id, candidate_sha256: currentDigest, parent_candidate_sha256: parentDigest, plan, parent_run_ids: parentIds, variant_run_ids: variantIds, change_sha256: hash(content), decision_sha256: decisionHash,
-      inputs: { parent_experiment_id: change.parent_experiment_id, parent_ref: change.baseline_ref, build: workflowBuild ? { verified: workflowBuild.verified, receipt: workflowBuild.receipt } : null },
+      inputs: { parent_experiment_id: change.parent_experiment_id, parent_ref: change.baseline_ref, build: workflowBuild ? { verified: workflowBuild.verified, receipt: workflowBuild.receipt } : null, decision_training: training },
       quality: { passed: qualityPassed, cases: caseRows }, resources, comparability: { passed: limits.length === 0, limits: [...new Set(limits)] },
       resource_evidence: { passed: resourcePassed, limits: [...new Set(resourceLimits)] },
       ...(first.lock.mcp_fixture ? { environment: { mode: 'mock', mcp_fixture: first.lock.mcp_fixture } } : {}),

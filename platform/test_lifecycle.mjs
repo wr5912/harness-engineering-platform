@@ -79,6 +79,8 @@ test('统一入口后台启停、重复启动、重启、只读预检与端口�
 host = sys.argv[sys.argv.index('--host')+1]
 port = int(sys.argv[sys.argv.index('--port')+1])
 if '--dry-run' in sys.argv:
+    if pathlib.Path(${JSON.stringify(join(data, 'fixture-invalid.txt'))}).exists():
+        print('扩展尚未按当前来源构建', file=sys.stderr); sys.exit(1)
     print(json.dumps({'dry': True})); sys.exit(0)
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
@@ -125,6 +127,14 @@ http.server.ThreadingHTTPServer((host, port), Handler).serve_forever()
     assert.equal(state().status, 'initializing')
     assert.match(cli('start').stdout, /等待初始化/)
     writeFileSync(health, 'running')
+    const invalid = join(data, 'fixture-invalid.txt')
+    writeFileSync(invalid, 'stale')
+    const blocked = cli('restart')
+    assert.notEqual(blocked.status, 0)
+    assert.match(blocked.stderr, /扩展尚未按当前来源构建/)
+    assert.equal(state().pid, pid, '启动检查失败必须保留正在运行的平台')
+    assert.equal(state().status, 'running')
+    rmSync(invalid)
     assert.equal(cli('restart').status, 0)
     assert.notEqual(state().pid, pid)
     const publicUrl = 'https://platform.example/hep/'

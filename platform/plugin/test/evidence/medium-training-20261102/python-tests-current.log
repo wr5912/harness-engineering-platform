@@ -1,0 +1,44 @@
+test_actual_runtime_bytes_checked_despite_clean_git_status (test_encoding_contract.EncodingContractTests) ... ok
+test_bad_limits_are_malformed_contract (test_encoding_contract.EncodingContractTests) ... ok
+test_changed_checkpoint_metadata_blocks_before_native_imports (test_encoding_contract.EncodingContractTests) ... ok
+test_changed_dataset_hash_blocks_before_native_imports (test_encoding_contract.EncodingContractTests) ... ok
+test_changed_legacy_review_snapshot_blocks_before_native_imports (test_encoding_contract.EncodingContractTests) ... ok
+test_dirty_runtime_blocks_before_native_imports (test_encoding_contract.EncodingContractTests) ... ok
+test_encoding_failure_writes_readable_sidecar_without_overwriting_plan_report (test_encoding_contract.EncodingContractTests) ... ok
+test_existing_readable_report_also_prevents_overwrite (test_encoding_contract.EncodingContractTests) ... ok
+test_existing_report_is_never_overwritten (test_encoding_contract.EncodingContractTests) ... ok
+test_ignored_untracked_runtime_is_also_blocked (test_encoding_contract.EncodingContractTests) ... ok
+test_legacy_source_change_during_encoding_cannot_produce_ready (test_encoding_contract.EncodingContractTests) ... ok
+test_missing_dependencies_produce_explicit_not_run_report (test_encoding_contract.EncodingContractTests) ... ok
+test_native_label_coercion_cannot_accept_a_string_noul_label (test_encoding_contract.EncodingContractTests) ... ok
+test_record_count_is_checked_before_native_imports (test_encoding_contract.EncodingContractTests) ... ok
+test_soft_target_mapping_checked_by_name (test_encoding_contract.EncodingContractTests) ... ok
+test_stale_commit_pin_blocks_before_native_imports (test_encoding_contract.EncodingContractTests) ... ok
+test_unprepared_plan_is_malformed_contract (test_encoding_contract.EncodingContractTests) ... ok
+test_changed_legacy_review_snapshot_blocks_training_preparation (test_legacy_handoff.LegacyTrainingHandoffTests) ... ok
+test_legacy_cli_to_training_plan_retains_real_origin_without_run_fabrication (test_legacy_handoff.LegacyTrainingHandoffTests) ... ok
+test_review_snapshot_stays_bound_after_prepare_and_encoding (test_legacy_handoff.LegacyTrainingHandoffTests) ... ok
+test_calibration_report_does_not_claim_persisted_temperature (test_training_plan.TrainingPlanTests) ... ok
+test_checkpoint_revision_requires_real_hub_shape (test_training_plan.TrainingPlanTests) ... ok
+test_credentials_are_not_plan_fields (test_training_plan.TrainingPlanTests) ... ok
+test_different_json_with_same_native_input_cannot_cross_partitions (test_training_plan.TrainingPlanTests) ... ok
+test_encoding_report_must_bind_the_exact_plan_and_files (test_training_plan.TrainingPlanTests) ... ok
+test_final_test_is_separate_and_predictor_environment_is_fixed (test_training_plan.TrainingPlanTests) ... ok
+test_fold_count_uses_independent_groups (test_training_plan.TrainingPlanTests) ... ok
+test_full_weight_checkpoint_cannot_enter_lora_recipe (test_training_plan.TrainingPlanTests) ... ok
+test_missing_encoding_report_is_a_readable_failure (test_training_plan.TrainingPlanTests) ... ok
+test_plan_only_cannot_be_promoted_to_training_preparation (test_training_plan.TrainingPlanTests) ... ok
+test_precision_is_explicit_without_changing_default_or_weights (test_training_plan.TrainingPlanTests) ... ok
+test_prepare_cli_is_readable_and_preserves_machine_plan (test_training_plan.TrainingPlanTests) ... ok
+test_recipe_uses_only_train_without_changing_candidates (test_training_plan.TrainingPlanTests) ... ok
+test_reviewed_metadata_does_not_hide_split_overlap (test_training_plan.TrainingPlanTests) ... ok
+test_stale_checkpoint_metadata_is_blocked (test_training_plan.TrainingPlanTests) ... ok
+test_trace_sources_cannot_be_replaced_with_empty_run_ids (test_training_plan.TrainingPlanTests) ... ok
+test_complete_packages_and_licenses_match_fixed_manifests (test_vendor_references.VendorReferenceTests) ... ok
+test_official_local_helpers_resolve_sibling_imports_from_another_cwd (test_vendor_references.VendorReferenceTests) ... ok
+test_vendor_byte_change_still_blocks_training_preparation (test_vendor_references.VendorReferenceTests) ... ok
+
+----------------------------------------------------------------------
+Ran 39 tests in 3.658s
+
+OK

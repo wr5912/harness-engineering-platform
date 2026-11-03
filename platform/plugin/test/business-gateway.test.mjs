@@ -214,6 +214,45 @@ test('仅配置与 MCP 专用目录可装载真实 Runtime 和 manager，分组�
   assert.deepEqual(readdirSync(join(root, '.local/credentials')), ['mcp-manager'])
 })
 
+for (const sharedDevelopment of [true, false]) test(`原生二进制上传保留大文件、中文名称及回执，跨会话拒绝发生在存储前（共享开发=${sharedDevelopment}）`, async t => {
+  const { ctx, rpc, headers, agents } = await setup(t, { sharedDevelopment })
+  const { default: FileUploads } = await runtimeModule('@deepseek-ai/dsh-client-file-upload')
+  const stored = []
+  await ctx.plugin({ name: 'native-upload-storage-fixture', apply(inner) {
+    inner.provide('commands', { registerFileReceiptResolver: () => () => {} })
+    inner.provide('attachments', { isAttachmentError: () => false, async saveFileStream({ data, name, signal }) {
+      const chunks = []
+      for await (const chunk of data) { signal?.throwIfAborted(); chunks.push(Buffer.from(chunk)) }
+      stored.push({ bytes: Buffer.concat(chunks), name })
+      return { type: 'file', path: `/fixture/${stored.length}`, name }
+    } })
+  } })
+  await ctx.plugin(FileUploads)
+  const created = await (await rpc('A', 'session/create', {})).json()
+  const sessionId = created.result.value.sessionId
+  const agent = { id: sessionId, session: { id: sessionId, header: { origin: 'user' } } }
+  agents.set(sessionId, agent)
+  const bytes = randomBytes(2 * 1024 * 1024 + 13), name = '策略配置内容.xlsx'
+  const upload = async (id, query, body = bytes, contentType = 'application/octet-stream') => {
+    const path = `/api/session/uploadFileBinary?${new URLSearchParams(query)}`
+    return fetch(`http://127.0.0.1:${ctx.webServer.port}${path}`, { method: 'POST',
+      headers: { 'content-type': contentType, ...headers(id, path) }, body })
+  }
+  const result = await upload('A', { sessionId, name })
+  assert.equal(result.status, 200)
+  const receipt = await result.json()
+  assert.equal(receipt.ok, true, JSON.stringify(receipt))
+  assert.deepEqual(stored, [{ bytes, name }])
+  assert.deepEqual(ctx.get('fileUploads').resolve(agent, receipt.value.receiptId), receipt.value.file)
+  assert.equal(ctx.get('fileUploads').resolve({ session: {} }, receipt.value.receiptId), undefined)
+  assert.equal((await upload('A', { sessionId, name }, Buffer.alloc(0), 'text/plain')).status, 415)
+  assert.equal((await upload('A', { name }, Buffer.alloc(0))).status, 400)
+  assert.equal((await upload('A', { sessionId: 'foreign-session', name }, Buffer.alloc(0))).status, 403)
+  if (!sharedDevelopment) assert.equal((await upload('B', { sessionId, name }, Buffer.alloc(0))).status, 403)
+  assert.equal(stored.length, 1)
+  assert.equal((await rpc('A', 'session/page', { sessionId })).status, 200)
+})
+
 test('门户代理保留路径并使用 HTTPS 来源连接原生 API 与 WebSocket，直连入口仍可用', { timeout: 5000 }, async t => {
   const { gateway } = await setup(t, { sharedDevelopment: true, proxyOrigin: 'https://portal.localhost:18060' })
   const target = `http://127.0.0.1:${gateway.server.address().port}`, base = '/agents/soc/instances/soc-business/'
