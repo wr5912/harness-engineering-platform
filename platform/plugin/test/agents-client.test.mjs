@@ -124,8 +124,8 @@ test('版本候选区分迭代版本和旧EXP算力变体，目录计数分别�
   assert.deepEqual(ui.nodes(groups[0]).filter(node => node.type === 'option').map(node => node.props.value), ['EXP-first-agent-001'])
   const variant = ui.nodes(groups[1]).find(node => node.type === 'option')
   assert.equal(variant.props.value, 'EXP-first-agent-002', '历史EXP格式不能被当作普通迭代版本')
-  assert.match(ui.text(variant), /^资产告警轻量版 基于 v001 · LangGraph 代码$/)
-  assert.doesNotMatch(ui.text(variant), /EXP-|v002/)
+  assert.match(ui.text(variant), /^v002 资产告警轻量版 · 基于 v001 · LangGraph 代码$/)
+  assert.doesNotMatch(ui.text(variant), /EXP-/)
   const card = ui.nodes().find(node => node.props?.id === 'agent-list-card-first-agent')
   assert.match(ui.text(card), /1 个迭代版本/)
   assert.doesNotMatch(ui.text(card), /2 个研究版本/)
@@ -149,16 +149,17 @@ test('迭代版本始终显示完整随机后缀，同号且末六位相同的�
   assert.equal(ui.calls.some(call => /apply|activate|create/.test(call.endpoint)), false)
 })
 
-test('同名变体使用短ID区分，未声明父版的变体不推断来源', async () => {
+test('变体候选使用版本号与完整后缀，保留名称和来源信息', async () => {
   const base = experiments().filter(item => item.agent_id === 'first-agent')
   const rows = [...base,
     { ...base[1], id: 'VAR-first-agent-001-r123456abcdef' },
-    { id: 'VAR-first-agent-002-r123456fedcba', agent_id: 'first-agent', status: 'active', change: { variant_name: '无来源变体' } },
+    { id: 'VAR-first-agent-001-r654321abcdef', agent_id: 'first-agent', status: 'active', change: { variant_name: '无来源变体' } },
   ]
   const ui = page({ intercept(endpoint, payload) {
     if (endpoint === 'agents/list') return { ok: true, value: { agents: [{ id: 'first-agent', version_count: 4 }], experiments: rows } }
     if (endpoint === 'agents/detail') {
       const value = detail(payload.agent_id, payload.experiment_id)
+      value.experiment = rows.find(row => row.id === payload.experiment_id) ?? value.experiment
       value.versions = rows.map(row => ({ id: row.id, status: row.status }))
       return { ok: true, value }
     }
@@ -169,12 +170,15 @@ test('同名变体使用短ID区分，未声明父版的变体不推断来源', 
     .filter(node => node.type === 'option')
   assert.equal(variants.length, 3)
   const labels = variants.map(node => ui.text(node))
-  assert.ok(labels.some(label => label.startsWith('资产告警轻量版 · nt-002 ')))
-  assert.ok(labels.some(label => label.startsWith('资产告警轻量版 · abcdef ')))
-  assert.match(ui.text(variants.find(node => node.props.value === rows[3].id)), /^无来源变体 来源版本未记录$/)
+  assert.ok(labels.some(label => label.startsWith('v002 资产告警轻量版 · ')))
+  assert.ok(labels.some(label => label.startsWith('v001-r123456abcdef 资产告警轻量版 · ')))
+  assert.match(ui.text(variants.find(node => node.props.value === rows[3].id)), /^v001-r654321abcdef 无来源变体 · 来源版本未记录$/)
   assert.match(ui.text(ui.nodes().find(node => node.props?.id === 'agent-list-card-first-agent')), /1 个迭代版本/)
   assert.equal(ui.text(ui.nodes().find(node => node.props?.className === 'agent-variant-count')), '变体 3')
   assert.equal(selector.props.value, 'EXP-first-agent-002')
+  selector.props.onChange({ target: { value: rows[3].id } }); await ui.settle()
+  assert.equal(ui.calls.filter(call => call.endpoint === 'agents/detail').at(-1).payload.experiment_id, rows[3].id)
+  assert.equal(ui.nodes().find(node => node.props['aria-label'] === '版本').props.value, rows[3].id)
   assert.equal(ui.calls.some(call => /apply|activate|create/.test(call.endpoint)), false)
 })
 
@@ -917,7 +921,7 @@ test('列表主标题使用独立名称，不截取策略或研究问题，名�
   assert.equal(variantCards(ui).length, 1)
   assert.match(ui.text(variantCards(ui)[0]), /EXP-first-agent-002/)
   const version = ui.nodes().find(node => node.props?.['aria-label'] === '版本')
-  assert.match(ui.text(version), /资产告警轻量版 基于 v001 · LangGraph 代码/)
+  assert.match(ui.text(version), /v002 资产告警轻量版 · 基于 v001 · LangGraph 代码/)
   assert.doesNotMatch(ui.text(version), /资产告警轻量版 · v002/)
 })
 

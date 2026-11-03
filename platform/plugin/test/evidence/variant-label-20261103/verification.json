@@ -1,0 +1,10 @@
+{
+  "typecheck": {
+    "command": "pnpm exec tsc --noEmit",
+    "exitCode": 0
+  },
+  "sourceSha256": "b9410dd22f59ee94d44f4ebc98bc3a12237463db0ada09465ff400f310a67744",
+  "clientSha256": "4b7f1e663884d4ca9e50da14afa8058456884749343d7d8d4872c71d03e875e5",
+  "pid": 2500377,
+  "serverProfileAndMcpConfigUnchanged": true
+}

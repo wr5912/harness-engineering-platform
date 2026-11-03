@@ -1,0 +1,25 @@
+{
+  "scope": "真实18120只读版本选择；不写业务资产或调用模型/实例",
+  "variantId": "VAR-inspection-delivery-demo-001-rfac75f4cb946",
+  "expected": "v001-rfac75f4cb946",
+  "checks": [
+    {
+      "name": "真实认证",
+      "ok": true
+    },
+    {
+      "name": "light-1440 已选标签",
+      "ok": false
+    }
+  ],
+  "errors": [],
+  "blockedWrites": [
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    }
+  ],
+  "initialTheme": "light",
+  "failure": "light-1440 已选标签",
+  "finalTheme": "light"
+}

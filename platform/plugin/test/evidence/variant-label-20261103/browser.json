@@ -1,0 +1,164 @@
+{
+  "scope": "真实18120只读版本选择；不写业务资产或调用模型/实例",
+  "variantId": "VAR-inspection-delivery-demo-001-rfac75f4cb946",
+  "expected": "v001-rfac75f4cb946",
+  "checks": [
+    {
+      "name": "真实认证",
+      "ok": true
+    },
+    {
+      "name": "light-1440 已选标签",
+      "ok": true
+    },
+    {
+      "name": "light-1440 变体完整版本",
+      "ok": true
+    },
+    {
+      "name": "light-1440 名称和来源保留",
+      "ok": true
+    },
+    {
+      "name": "light-1440 名称可搜索",
+      "ok": true
+    },
+    {
+      "name": "light-1440 无横向溢出",
+      "ok": true
+    },
+    {
+      "name": "light-768 已选标签",
+      "ok": true
+    },
+    {
+      "name": "light-768 变体完整版本",
+      "ok": true
+    },
+    {
+      "name": "light-768 名称和来源保留",
+      "ok": true
+    },
+    {
+      "name": "light-768 名称可搜索",
+      "ok": true
+    },
+    {
+      "name": "light-768 无横向溢出",
+      "ok": true
+    },
+    {
+      "name": "light-390 已选标签",
+      "ok": true
+    },
+    {
+      "name": "light-390 变体完整版本",
+      "ok": true
+    },
+    {
+      "name": "light-390 名称和来源保留",
+      "ok": true
+    },
+    {
+      "name": "light-390 名称可搜索",
+      "ok": true
+    },
+    {
+      "name": "light-390 无横向溢出",
+      "ok": true
+    },
+    {
+      "name": "dark-1440 已选标签",
+      "ok": true
+    },
+    {
+      "name": "dark-1440 变体完整版本",
+      "ok": true
+    },
+    {
+      "name": "dark-1440 名称和来源保留",
+      "ok": true
+    },
+    {
+      "name": "dark-1440 名称可搜索",
+      "ok": true
+    },
+    {
+      "name": "dark-1440 无横向溢出",
+      "ok": true
+    },
+    {
+      "name": "dark-768 已选标签",
+      "ok": true
+    },
+    {
+      "name": "dark-768 变体完整版本",
+      "ok": true
+    },
+    {
+      "name": "dark-768 名称和来源保留",
+      "ok": true
+    },
+    {
+      "name": "dark-768 名称可搜索",
+      "ok": true
+    },
+    {
+      "name": "dark-768 无横向溢出",
+      "ok": true
+    },
+    {
+      "name": "dark-390 已选标签",
+      "ok": true
+    },
+    {
+      "name": "dark-390 变体完整版本",
+      "ok": true
+    },
+    {
+      "name": "dark-390 名称和来源保留",
+      "ok": true
+    },
+    {
+      "name": "dark-390 名称可搜索",
+      "ok": true
+    },
+    {
+      "name": "dark-390 无横向溢出",
+      "ok": true
+    },
+    {
+      "name": "迭代标签保持完整后缀",
+      "ok": true
+    },
+    {
+      "name": "切换迭代版本",
+      "ok": true
+    },
+    {
+      "name": "切回原变体身份",
+      "ok": true
+    },
+    {
+      "name": "刷新保持变体版本",
+      "ok": true
+    },
+    {
+      "name": "无页面异常",
+      "ok": true
+    }
+  ],
+  "errors": [],
+  "blockedWrites": [
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    }
+  ],
+  "initialTheme": "light",
+  "finalTheme": "light"
+}

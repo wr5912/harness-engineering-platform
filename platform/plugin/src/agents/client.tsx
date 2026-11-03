@@ -649,14 +649,13 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
   const versionMetadata = agentVersions.map((version: any) => ({ ...version, ...(version.id === detail?.experiment.id ? detail.experiment : experiments.find(item => item.id === version.id)) }))
   const versionOptions = versionMetadata.map((version: ExperimentRow) => {
     const variant = isComputeVariant(version)
-    const name = variant ? variantName(version) : versionLabel(version.id).replace(/^版本 /, 'v')
-    const duplicate = versionMetadata.some((item: ExperimentRow) => item.id !== version.id && isComputeVariant(item) === variant && (variant ? variantName(item) : versionLabel(item.id).replace(/^版本 /, 'v')) === name)
+    const name = versionLabel(version.id).replace(/^(?:版本|变体) /, 'v')
     const source = variantSourceInfo(version, experiments)
     const description = variant
-      ? [source.parent.experimentId ? `基于 ${versionLabel(source.parent.experimentId).replace(/^版本 /, 'v')}` : '来源版本未记录', source.generationMode && generationLabel(version)]
+      ? [variantName(version), source.parent.experimentId ? `基于 ${versionLabel(source.parent.experimentId).replace(/^版本 /, 'v')}` : '来源版本未记录', source.generationMode && generationLabel(version)]
       : [researchStatus(version.status)]
     if (version.is_current === false) description.push('历史记录')
-    return { value: version.id, label: `${name}${duplicate ? ` · ${version.id.slice(-6)}` : ''}`, group: variant ? '算力变体' : '迭代版本', description: description.filter(Boolean).join(' · ') }
+    return { value: version.id, label: name, group: variant ? '算力变体' : '迭代版本', description: description.filter(Boolean).join(' · ') }
   })
   const visibleVariants = variants.filter(variant => {
     const agent = agents.find(item => item.id === variant.agent_id)
