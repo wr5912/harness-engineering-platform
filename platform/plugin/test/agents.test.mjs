@@ -1269,6 +1269,40 @@ test('eval preview, case list, run index and decision update use existing backen
   }
 })
 
+test('隔离程序评测的预览与任务共用来源、模型投影和凭据，不改变平台程序根', async () => {
+  const { createAgentsHandler } = await loadServer()
+  const fx = fixture()
+  const isolated = mkdtempSync(join(tmpdir(), 'isolated-evaluation-'))
+  try {
+    write(join(isolated, 'runtime/adapters/dsh-container/dsh-eval'), [
+      'import json,os,sys',
+      'policy=json.load(open(sys.argv[sys.argv.index("--model-policy")+1]))',
+      'print(json.dumps({"program_root":os.environ["HARNESS_PROGRAM_ROOT"],"script":sys.argv[0],"key_present":bool(os.environ.get("MODEL_API_KEY")),"model":policy["default"]["model"]}))',
+    ].join('\n'))
+    const handler = createAgentsHandler(fx.root, undefined, {}, async () => ({
+      policy: { default: { model: 'actual-model' } }, environment: { MODEL_API_KEY: 'private-fixture-key' },
+    }))
+    const payload = { source: 'experiment:EXP-test-agent-001', program_root: isolated }
+    const preview = await rpc(handler, 'eval/preview', payload)
+    assert.equal(preview.command[1], join(isolated, 'runtime/adapters/dsh-container/dsh-eval'))
+    const started = await rpc(handler, 'eval/start', payload)
+    const finished = await waitForJob(handler, started.job_id)
+    assert.equal(finished.status, 'completed')
+    for (const result of [preview.result, finished.result]) {
+      assert.equal(result.program_root, isolated)
+      assert.equal(result.script, preview.command[1])
+      assert.equal(result.key_present, true)
+      assert.equal(result.model, 'actual-model')
+    }
+    assert.equal(process.env.HARNESS_PROGRAM_ROOT, fx.root)
+    for (const program_root of ['relative/path', join(isolated, 'missing')]) {
+      const rejected = await handler('eval/preview', { ...payload, program_root }, new AbortController().signal)
+      assert.equal(rejected.ok, false)
+      assert.equal(rejected.error.code, 'invalid_request')
+    }
+  } finally { await Promise.all([rm(fx.root, { recursive: true, force: true }), rm(isolated, { recursive: true, force: true })]) }
+})
+
 test('平台评测预览和 Job 共用当前模型投影，策略文件随任务退出清理，凭据仅进子进程环境', async () => {
   const { createAgentsHandler } = await loadServer()
   const fx = fixture()

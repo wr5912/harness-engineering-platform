@@ -247,7 +247,7 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
       }
       throw error
     }
-    const secrets = Object.values(command.environment ?? {}).filter((value): value is string => typeof value === 'string' && value.length > 0)
+    const secrets = Object.entries(command.environment ?? {}).filter(([key]) => key !== 'HARNESS_PROGRAM_ROOT').map(([, value]) => value).filter((value): value is string => typeof value === 'string' && value.length > 0)
     const redactJob = (value: string) => options.redact(redactKnownValues(value, secrets))
     let proc: ReturnType<typeof spawn>
     try {

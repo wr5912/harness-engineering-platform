@@ -117,7 +117,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['cases/list cases/create-context', 'agent_id experiment_id'], ['cases/read', 'agent_id experiment_id case_id'],
     ['cases/from-run', 'agent_id experiment_id run_id case_id'],
     ['cases/update cases/create-preview cases/create', 'agent_id experiment_id case_id title scene inputs expected_behavior fast expected_sha256 source_run_id source_case_id', '先读用例或 create-context，并按 evaluation-review 核对共用业务口径；预期写业务过程与结果模式，使用已核验 API 名称、operationId 或中文能力名，不绑定 MCP 运行时 ID、KEV 等实现路线或特定环境。inputs 为非空字符串数组，expected_sha256 取原文件摘要。新建先 create-preview。'],
-    ['eval/preview eval/start', 'source source_ref evaluation_source mcp_fixture cases mode executor review model model_selection compare_to artifact_export concurrency parallel_cases request_id', 'source=experiment:<ID>；cases 为固定 Case ID 数组。source_ref 可固定历史来源；evaluation_source=current 明确改用当前 Case，不改变固定 Candidate。mcp_fixture 明确 Mock 边界并随 Run 封存，不修改原连接或 Candidate，不代表真实业务系统验收。model 是原有断言，model_selection 是本次主角色原生模型选择；省略时读取所选来源的版本绑定。preview 不执行评测，start 返回 job_id。'],
+    ['eval/preview eval/start', 'source source_ref evaluation_source mcp_fixture cases mode executor review model model_selection compare_to artifact_export concurrency parallel_cases request_id program_root', 'source=experiment:<ID>；cases 为固定 Case ID 数组。source_ref 可固定历史来源；evaluation_source=current 明确改用当前 Case，不改变固定 Candidate。program_root 可指定已构建的隔离程序根，沿用平台模型投影和凭据注入；程序来源由 Run 如实封存。mcp_fixture 明确 Mock 边界并随 Run 封存，不修改原连接或 Candidate，不代表真实业务系统验收。model 是原有断言，model_selection 是本次主角色原生模型选择；省略时读取所选来源的版本绑定。preview 不执行评测，start 返回 job_id。'],
     ['eval/batch-start', 'requests', '连续预检并启动1–8个固定来源评测；requests内每项使用eval/start参数并必须提供不同的request_id和固定source_ref。恢复时原样重传整批，已结束或运行中的任务均不重放；来源、用例或模型变化另建请求。'],
     ['eval/status eval/cancel', 'job_id'], ['runs/index', 'agent_id experiment_id'],
     ['runs/show', 'run_id case_id'], ['runs/report runs/files', 'run_id'], ['runs/read-file', 'run_id path'],
@@ -156,6 +156,7 @@ export function assistantActionContract(domain: AssistantDomain, action: string)
   if (!hint) throw new Error('未知的领域操作合同')
   const properties = Object.fromEntries(hint[1].split(' ').filter(Boolean).map(key => [key, fields[key] ?? (/^(?:.*_id|.*_sha256|.*_ref|agent_id|source|target_source|name|description|role|path|ref|content|title|scene|expected_behavior|mode|executor|review|model|compare_to|left|right|filename|status|outcome|operation|serverId|sourceId|componentId|compositionId|artifactId|toolName|specUrl|uri|version|revision|topic|variant_name|strategy|resource_metric|variant_model|variant_reasoning_effort|entry_path|check_id)$/.test(key) ? string : {})]))
   if (action === 'eval/preview' || action === 'eval/start') {
+    properties.program_root = { ...string, description: '可选的已构建程序根绝对路径；省略时使用当前平台程序。评测保留原生模型策略和凭据注入。' }
     properties.concurrency = { type: 'integer', minimum: 1, maximum: 8, description: '独立 Case 并发上限，默认1；只并行 parallel_cases，其他用例独占执行。' }
     properties.parallel_cases = { ...strings, description: '已确认互不影响的所选 Case ID；同一业务资源的写操作不得并行。' }
     properties.request_id = { ...string, description: 'UUID v4；重试同一请求保留此值，参数变化另建请求；不会重放原任务。' }

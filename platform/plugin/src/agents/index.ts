@@ -21,7 +21,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs'
-import { dirname, extname, join, relative, resolve, sep } from 'node:path'
+import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { tmpdir } from 'node:os'
 import type { ConnectionRpcHandler, ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 import { RunFileError, readRunReport, listRunFiles, previewRunFile, redactRunText } from './run-files.ts'
@@ -178,7 +178,7 @@ function parseJsonCommand(root: string, args: string[], message = '命令执行�
 async function parseJsonCommandAsync(root: string, args: string[], message = '命令执行失败', signal?: AbortSignal, input?: string,
   extraEnvironment: NodeJS.ProcessEnv = {}) {
   let stdout: string
-  const secrets = Object.values(extraEnvironment).filter((value): value is string => typeof value === 'string' && !!value)
+  const secrets = Object.entries(extraEnvironment).filter(([key]) => key !== 'HARNESS_PROGRAM_ROOT').map(([, value]) => value).filter((value): value is string => typeof value === 'string' && !!value)
   const redactEnvironment = (value: string) => redact(redactKnownValues(value, secrets))
   try {
     const pending = promisify(execFile)(process.env.HARNESS_PYTHON || 'python3', programArgs(args), {
@@ -1417,12 +1417,16 @@ function cleanupEvalPolicies(root: string, jobId: string) {
 
 async function evalCommand(root: string, payload: JsonMap, dryRun: boolean, modelPolicy?: EvalModelPolicyProvider,
   jobId = 'preview'): Promise<{ executable: string; args: string[]; environment?: NodeJS.ProcessEnv; dispose?: () => void }> {
+  const executionRoot = optionalString(payload, 'program_root') ?? programRoot()
+  if (!isAbsolute(executionRoot) || !existsSync(join(executionRoot, DSH_EVAL))) throw new RpcError('invalid_request', 'program_root 必须是包含 dsh-eval 的程序根绝对路径')
+  const args = (policy?: string, fixture?: string) => [join(executionRoot, DSH_EVAL), ...evalArgs(payload, dryRun, policy, fixture).slice(1)]
+  const environment = { HARNESS_PROGRAM_ROOT: executionRoot }
   const selectedId = typeof payload.source === 'string' ? payload.source.replace(/^experiment:/, '') : ''
   if (!modelPolicy && payload.source_ref === undefined && payload.mcp_fixture === undefined) {
     if (payload.model_selection !== undefined) throw new RpcError('model_policy_unavailable', '当前执行入口没有原生模型投影，无法应用 model_selection')
     if (EXP_ID.test(selectedId) && existsSync(join(root, 'evolution/experiments', selectedId, 'candidate/harness.yaml'))
       && versionSource(root, selectedId).profile === 'sdk') throw new RpcError('sdk_evaluation_unavailable', 'SDK 型版本请使用 SDK 调试入口；当前评测执行器使用 Web 会话协议')
-    return { executable: process.env.HARNESS_PYTHON || 'python3', args: programArgs(evalArgs(payload, dryRun)) }
+    return { executable: process.env.HARNESS_PYTHON || 'python3', args: args(), environment }
   }
   const ref = payload.source_ref
   if (ref !== undefined && (typeof ref !== 'string' || !/^git:[a-f0-9]{40}$/.test(ref))) throw new RpcError('invalid_request', 'source_ref 必须是 git:<40位提交>')
@@ -1443,7 +1447,7 @@ async function evalCommand(root: string, payload: JsonMap, dryRun: boolean, mode
     projected = await modelPolicy?.(source.agent_id, selection, source.candidate)
   }
   catch (error) { throw new RpcError('model_policy_unavailable', redact((error as Error).message)) }
-  if (!projected && !fixture) return { executable: process.env.HARNESS_PYTHON || 'python3', args: programArgs(evalArgs(payload, dryRun)) }
+  if (!projected && !fixture) return { executable: process.env.HARNESS_PYTHON || 'python3', args: args(), environment }
   const directory = workspaceLocalPath(root, 'evaluation-jobs', 'model-policies')
   mkdirSync(directory, { recursive: true, mode: 0o700 })
   const temporary = mkdtempSync(join(directory, `${jobId}-`))
@@ -1452,8 +1456,8 @@ async function evalCommand(root: string, payload: JsonMap, dryRun: boolean, mode
     if (projected) writeFileSync(file, JSON.stringify(projected.policy), { mode: 0o600, flag: 'wx' })
     const fixtureFile = fixture ? join(temporary, 'mcp-fixture.json') : undefined
     if (fixtureFile) writeFileSync(fixtureFile, JSON.stringify(fixture, null, 2) + '\n', { mode: 0o600, flag: 'wx' })
-    return { executable: process.env.HARNESS_PYTHON || 'python3', args: programArgs(evalArgs(payload, dryRun, projected ? file : undefined, fixtureFile)),
-      environment: projected?.environment, dispose: () => rmSync(temporary, { recursive: true, force: true }) }
+    return { executable: process.env.HARNESS_PYTHON || 'python3', args: args(projected ? file : undefined, fixtureFile),
+      environment: { ...projected?.environment, ...environment }, dispose: () => rmSync(temporary, { recursive: true, force: true }) }
   } catch (error) { rmSync(temporary, { recursive: true, force: true }); throw error }
 }
 
@@ -1461,7 +1465,7 @@ async function evalPreview(root: string, payload: JsonMap, signal?: AbortSignal,
   const prepared = await evalCommand(root, payload, true, modelPolicy)
   try {
     const command = modelPolicy
-      ? [prepared.executable, ...programArgs(evalArgs(payload, true, '<平台模型投影>', payload.mcp_fixture ? '<本次Mock连接映射>' : undefined))]
+      ? [prepared.executable, prepared.args[0], ...evalArgs(payload, true, '<平台模型投影>', payload.mcp_fixture ? '<本次Mock连接映射>' : undefined).slice(1)]
       : [prepared.executable, ...prepared.args]
     return ok({ command, result: await parseJsonCommandAsync(root, prepared.args, '评测预览失败', signal, undefined, prepared.environment) })
   } finally { prepared.dispose?.() }
