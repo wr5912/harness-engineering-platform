@@ -31,7 +31,7 @@ for import_root in (ADAPTER, EVALUATION_SCRIPTS):
         sys.path.insert(0, str(import_root))
 
 from evaluation_contract import execution_for, load_evaluation
-from scenario_analysis import ProcessCleanupError, analyze, review_full, run_cancellable_process
+from scenario_analysis import ProcessCleanupError, analyze, review_full, run_cancellable_process, process_error_detail
 from source_contract import EXPERIMENT, resolve, strict_json
 
 
@@ -107,16 +107,6 @@ def run_process(
 ) -> subprocess.CompletedProcess[str]:
     return run_cancellable_process(command, cwd=REPO, input_text=input_text,
                                    timeout=timeout, env=env)
-
-
-def process_error_detail(stderr: str, fallback: str) -> str:
-    detail = (stderr.strip().splitlines() or [fallback])[-1]
-    for name, value in os.environ.items():
-        if value and re.search(r"KEY|TOKEN|PASSWORD|SECRET", name, re.IGNORECASE):
-            detail = detail.replace(value, "<redacted>")
-    detail = re.sub(r"(?i)(Bearer\s+|(?:api[_-]?key|token|password|secret)[\"']?\s*[:=]\s*[\"']?)[^\s\"'&]+",
-                    r"\1<redacted>", detail)
-    return detail[:500]
 
 
 def checked_process(

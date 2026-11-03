@@ -31,7 +31,7 @@ test('原生review输入接受固定源码任务和既有场景，拒绝任意�
 async function fixture(t, failure, options = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'eval-api-recovery-'))
   t.after(() => rmSync(directory, { recursive: true, force: true }))
-  for (const name of ['dsh-eval-api.mjs', 'dsh-eval-common.mjs', 'evaluation-wait.mts']) copyFileSync(join(adapter, name), join(directory, name))
+  for (const name of ['dsh-eval-api.mjs', 'dsh-eval-common.mjs', 'evaluation-wait.mts', 'evaluation-case-scheduler.mts']) copyFileSync(join(adapter, name), join(directory, name))
   if (options.parseDelayMs) {
     copyFileSync(join(directory, 'dsh-eval-common.mjs'), join(directory, 'dsh-eval-common-original.mjs'))
     writeFileSync(join(directory, 'dsh-eval-common.mjs'), `export * from './dsh-eval-common-original.mjs'; import { parseArchive as actual } from './dsh-eval-common-original.mjs'; export async function parseArchive(...args) { const value = await actual(...args); await new Promise(resolve => setTimeout(resolve, ${options.parseDelayMs})); return value }`)
@@ -97,6 +97,7 @@ async function fixture(t, failure, options = {}) {
   t.after(() => { server.closeAllConnections(); server.close() })
   const payload = { auth_url: `http://127.0.0.1:${server.address().port}/assistant/`, workspace: '/work/harness/workspace',
     preset_id: 'test-agent', judge_preset_id: 'evaluation-judge', timeout_ms: 1000, evidence_root: evidence,
+    judge_model_route: { provider: 'test', model: 'test', reasoningEffort: 'off' },
     cases: [{ case_id: 'U-CASE-001', inputs: ['请检查'], expected_behavior: '返回结果' }] }
   if (options.review) Object.assign(payload, { operation: 'review', cases: [],
     scenes: [{ scene_id: 'source-diagnosis', prompt: '只读源码诊断' }], timeout_ms: options.timeoutMs ?? 150,

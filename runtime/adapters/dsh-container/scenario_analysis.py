@@ -889,13 +889,27 @@ def run_cancellable_process(command: list[str], *, timeout: int, input_text: str
                 raise ProcessCleanupError("driver-container-stop-unconfirmed") from error
 
 
+def process_error_detail(stderr: str, fallback: str) -> str:
+    lines = stderr.strip().splitlines()
+    detail = next((line for line in reversed(lines)
+                   if re.search(r"(?i)(?:error|exception)(?:\b|\[|:)|failed|failure|fatal|错误|失败", line)),
+                  lines[-1] if lines else fallback)
+    for name, value in os.environ.items():
+        if value and re.search(r"KEY|TOKEN|PASSWORD|SECRET", name, re.IGNORECASE):
+            detail = detail.replace(value, "<redacted>")
+    detail = re.sub(r"(?i)(Bearer\s+|(?:api[_-]?key|token|password|secret)[\"']?\s*[:=]\s*[\"']?)[^\s\"'&]+",
+                    r"\1<redacted>", detail)
+    return detail[:500]
+
+
 def _run(command: list[str], *, stage: str, input_text: str | None = None, timeout: int) -> str:
     try:
         completed = run_cancellable_process(command, input_text=input_text, timeout=timeout)
     except (OSError, subprocess.TimeoutExpired) as error:
         raise RuntimeError(f"{stage}-{type(error).__name__.lower()}") from error
     if completed.returncode:
-        raise RuntimeError(f"{stage}-exit-{completed.returncode}")
+        detail = process_error_detail(completed.stderr, "子进程未提供错误说明")
+        raise RuntimeError(f"{stage}-exit-{completed.returncode}: {detail}")
     return completed.stdout.strip()
 
 
@@ -915,6 +929,7 @@ def _review_driver(prompts: list[dict], auth_url: str, image_ref: str,
             "--mount", f"type=bind,src={driver},dst=/opt/dsh/apps/web/dsh-eval-api.mjs,readonly",
             "--mount", f"type=bind,src={ADAPTER / 'dsh-eval-common.mjs'},dst=/opt/dsh/apps/web/dsh-eval-common.mjs,readonly",
             "--mount", f"type=bind,src={ADAPTER / 'evaluation-wait.mts'},dst=/opt/dsh/apps/web/evaluation-wait.mts,readonly",
+            "--mount", f"type=bind,src={ADAPTER / 'evaluation-case-scheduler.mts'},dst=/opt/dsh/apps/web/evaluation-case-scheduler.mts,readonly",
             "--mount", f"type=bind,src={evidence_root.resolve()},dst=/evidence",
             image_ref, "/opt/dsh/apps/web/dsh-eval-api.mjs",
         ]

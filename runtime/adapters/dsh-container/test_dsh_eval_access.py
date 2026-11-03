@@ -7,6 +7,7 @@ import os
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -48,6 +49,42 @@ class EvaluationAccessTest(unittest.TestCase):
                 self.assertRaises(evaluation.EvaluationError) as failed:
             evaluation.checked_process(["unused"], label="启动 DSH 评测实例", timeout=240)
         self.assertEqual(str(failed.exception), "启动 DSH 评测实例 失败（退出码 17）：DSH: listener failed token=<redacted> <redacted>")
+
+    def test_review_failure_keeps_node_cause_and_redacts_credentials(self):
+        import scenario_analysis
+        reply = subprocess.CompletedProcess([], 1, "", "Error [ERR_MODULE_NOT_FOUND]: missing dependency token=example-secret secret-env-value\n    at loader\nNode.js v24.0.0\n")
+        with mock.patch.dict(os.environ, {"LLM_API_KEY": "secret-env-value"}), \
+                mock.patch.object(scenario_analysis, "run_cancellable_process", return_value=reply), \
+                self.assertRaises(RuntimeError) as failed:
+            scenario_analysis._run(["unused"], stage="driver", timeout=10)
+        self.assertEqual(str(failed.exception), "driver-exit-1: Error [ERR_MODULE_NOT_FOUND]: missing dependency token=<redacted> <redacted>")
+
+    def test_target_and_review_mounts_load_the_actual_driver_dependencies(self):
+        import scenario_analysis
+        route = {"provider": "fixture", "model": "fixture"}
+        prompts = [{"scene_id": "scene-1", "prompt": "Review the evidence."}]
+        with mock.patch.dict(os.environ, {}, clear=True), mock.patch.object(scenario_analysis, "_run", return_value='{"operation":"review","results":[]}') as run:
+            scenario_analysis._review_driver(prompts, "http://127.0.0.1:3081/", "fixture", route, 10, self.root)
+            review_command = run.call_args.args[0]
+            payload = run.call_args.kwargs["input_text"]
+            target_command, _ = evaluation.driver_command("api", "fixture", self.root)
+        for name, command in (("target", target_command), ("review", review_command)):
+            with self.subTest(driver=name), tempfile.TemporaryDirectory() as isolated:
+                root = Path(isolated)
+                for index, argument in enumerate(command):
+                    if argument != "--mount":
+                        continue
+                    mount = dict(part.split("=", 1) for part in command[index + 1].split(",") if "=" in part)
+                    source = Path(mount["src"])
+                    if source.is_file():
+                        destination = root / mount["dst"].lstrip("/")
+                        destination.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copyfile(source, destination)
+                driver = root / "opt/dsh/apps/web/dsh-eval-api.mjs"
+                script = f"import {{readInput}} from {json.dumps(driver.as_uri())}; const input=await readInput(); console.log(input.scenes[0].scene_id)"
+                loaded = subprocess.run(["node", "--input-type=module", "-e", script], input=payload, text=True, capture_output=True, timeout=20)
+                self.assertEqual(loaded.returncode, 0, loaded.stderr)
+                self.assertEqual(loaded.stdout.strip(), "scene-1")
 
     def test_preflight_error_keeps_variant_identity_in_result(self):
         identity = "VAR-example-agent-001-r0123456789ab"
