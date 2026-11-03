@@ -38,7 +38,7 @@ export async function compileManagedAsset(input: { candidate: string; entry: str
   host.resolveModuleNames = (names, containing) => names.map(name => {
     const local = ts.resolveModuleName(name, containing, options, host).resolvedModule
     if (local) return local
-    if (!input.legacyWorkflow && name.startsWith('@deepseek-ai/')) {
+    if (input.legacyWorkflow || name.startsWith('@deepseek-ai/')) {
       const native = ts.resolveModuleName(name, join(program, 'platform/plugin/index.ts'), options, host).resolvedModule
       if (native) return native
     }

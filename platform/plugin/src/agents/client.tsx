@@ -60,7 +60,7 @@ function researchStatus(status?: string | null) {
 
 function versionLabel(id?: string | null) {
   if (!id) return '未记录'
-  const number = /-(\d{3})(?:-r[0-9a-f]{12})?$/.exec(id)?.[1]
+  const number = /-(\d{3}(?:-r[0-9a-f]{12})?)$/.exec(id)?.[1]
   return number ? `${id.startsWith('VAR-') ? '变体' : '版本'} ${number}` : id
 }
 
