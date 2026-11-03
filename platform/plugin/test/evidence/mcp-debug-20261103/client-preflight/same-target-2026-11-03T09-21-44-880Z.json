@@ -1,0 +1,68 @@
+{
+  "at": "2026-11-03T09:21:44.880Z",
+  "scope": "真实18120认证/配置/客户端；仅MCP发现和一个工具调用在浏览器HTTP边界模拟。无server_id默认目标与显式重选同ID的在途回执连续性；主题不变，无实际业务调用。",
+  "checks": [
+    {
+      "name": "真实平台认证",
+      "ok": true
+    },
+    {
+      "name": "初始入口未显式指定server_id",
+      "ok": true
+    },
+    {
+      "name": "实际浏览器装载client字节SHA匹配新激活制品",
+      "ok": false
+    }
+  ],
+  "errors": [],
+  "blockedWrites": [],
+  "scriptResponses": [
+    {
+      "path": "/hep/plugins/",
+      "status": 200,
+      "bytes": 46345,
+      "sha256": "dc37c3ee46ea48499cf67e42a5c722653b899207fbbb041ddbcdc6a751628f8c"
+    },
+    {
+      "path": "/hep/assets/vendor-DcuzkuQH.js",
+      "status": 200,
+      "bytes": 741114,
+      "sha256": "c14ba1089d78f48b8959a7bc42c9013b4a57aa4122e053d54f74c0a4d1d156a7"
+    },
+    {
+      "path": "/hep/assets/index-BXV-oxvX.js",
+      "status": 200,
+      "bytes": 941436,
+      "sha256": "0f3fc6b857e4f8bd4d69619ce1010240cdaaa443abf0826532a24ef8f6e32ef0"
+    },
+    {
+      "path": "/hep/plugins/",
+      "status": 200,
+      "bytes": 9146257,
+      "sha256": "c185986195a06d50c9c3567925ff8c8b3508c901a924dffea15d7890f996818c"
+    },
+    {
+      "path": "/hep/plugins/",
+      "status": 200,
+      "bytes": 4279800,
+      "sha256": "a5ae666c6fde87b5057690495b6ce5aac1cb4e60bf96ad7728ddae408b49bad3"
+    }
+  ],
+  "screenshots": [
+    ".local/mcp-debug-20261103/same-target-2026-11-03T09-21-44-880Z/same-target-failed.png"
+  ],
+  "toolCalls": 0,
+  "templateCalls": 0,
+  "discoveries": 0,
+  "subphases": [],
+  "expectedClientSha256": "02bc11983da68fbd2fb03ab85f3e0ede8a80c2e457e31c77ef9359c98d0a8a20",
+  "existingSessionSelected": true,
+  "initialThemePreference": "light",
+  "initialTargetLabel": "policy-configuration ⌄",
+  "matchingClientResponses": [],
+  "failure": "实际浏览器装载client字节SHA匹配新激活制品",
+  "finalThemePreference": "light",
+  "passed": false,
+  "finishedAt": "2026-11-03T09:21:53.107Z"
+}

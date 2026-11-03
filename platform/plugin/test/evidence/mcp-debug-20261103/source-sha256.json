@@ -1,0 +1,9 @@
+{
+  "platform/plugin/build.mjs": "f022ebbe4c3d5781602b07954d5b2c4aa33030fad53f1b215d20d6a7549fd3ca",
+  "platform/plugin/src/components/search-select.tsx": "d0e896e5f9409ac48f6575140ed103aa9fd940ed8e619035e889b7c6f1e55ebe",
+  "plugins/mcp-manager/client.tsx": "c41f6e92336ed95bc50da55f6f17019edddad5089dfe5eee83d365348e4375a6",
+  "plugins/mcp-manager/debug-parameters.tsx": "9ceb77e338db8ce190718a9d5b40ec7ebdf73394eb84a38d534079dbb3bf82ed",
+  "platform/plugin/test/mcp-client.test.mjs": "68a6b23ee5aa5f896e077693a9f95c9f0c66a7398aa388e81861d8a9cef56870",
+  "platform/plugin/test/mcp-debug-parameters.test.mjs": "3aa6975379d2375b1ac800a0e0cbff5391492afcfb44db764b72fbf7db9bf031",
+  "platform/plugin/test/search-select.test.mjs": "92344ffde7270ad0179a982f27b58920a4cafff9ca9ffc829f6dcf78f52604ba"
+}

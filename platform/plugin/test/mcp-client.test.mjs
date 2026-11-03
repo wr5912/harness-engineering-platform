@@ -804,7 +804,7 @@ test('分组调试使用已保存目标，切换目标或配置版本后丢弃�
   await second; ui.render()
   assert.match(ui.text(ui.render()), /group_tool.*incidentId/s)
   ui.nodes().find(node => node.type === 'select' && ui.nodes(node).some(child => child.props?.value === 'group_tool')).props.onChange({ target: { value: 'group_tool' } }); ui.render()
-  const calling = ui.button('测试工具').props.onClick()
+  const calling = ui.button('调用工具').props.onClick()
   assert.deepEqual(requests.at(-1), { groupId: 'research', action: 'callTool', toolName: 'group_tool', sourceId: '', arguments: {} })
   ui.refreshValue({ servers: [ui.server], groups: ui.groups, sharedToken: 'fixture' }, 'r2')
   pending.shift()({ content: [{ type: 'text', text: 'stale-receipt' }] }); await calling; ui.render()
@@ -823,20 +823,20 @@ test('统一调试按对象与工具保留参数，切换类型不串用调用�
   ui.setView('connection')
   await ui.button('发现工具与资源').props.onClick(); ui.render()
   const toolSelect = () => ui.nodes().find(node => node.type === 'select' && ui.nodes(node).some(child => child.props?.value === 'two'))
-  const args = () => ui.nodes().find(node => node.type === 'textarea' && node.props['aria-label'] === '调用参数 JSON')
-  args().props.onChange({ target: { value: '{"name":"first"}' } }); ui.render()
+  const args = () => ui.nodes().find(node => typeof node.type === 'function' && node.props.label === '调用参数')
+  args().props.onChange('{"name":"first"}'); ui.render()
   toolSelect().props.onChange({ target: { value: 'two' } }); ui.render()
   assert.equal(args().props.value, '{}')
-  args().props.onChange({ target: { value: '{"name":"second"}' } }); ui.render()
+  args().props.onChange('{"name":"second"}'); ui.render()
   toolSelect().props.onChange({ target: { value: 'one' } }); ui.render()
   assert.equal(args().props.value, '{"name":"first"}')
   ui.button('资源模板').props.onClick(); ui.render()
   const template = ui.nodes().find(node => node.type === 'select' && ui.nodes(node).some(child => child.props?.value === 'test:/{id}'))
   template.props.onChange({ target: { value: 'test:/{id}' } }); ui.render()
-  ui.nodes().find(node => node.type === 'textarea' && node.props['aria-label'] === '模板参数 JSON').props.onChange({ target: { value: '{"id":"resource"}' } }); ui.render()
+  ui.nodes().find(node => typeof node.type === 'function' && node.props.label === '模板参数').props.onChange('{"id":"resource"}'); ui.render()
   ui.button('工具').props.onClick(); ui.render()
   assert.equal(args().props.value, '{"name":"first"}')
-  ui.button('测试工具').props.onClick(); await new Promise(setImmediate); ui.render()
+  ui.button('调用工具').props.onClick(); await new Promise(setImmediate); ui.render()
   assert.equal(requests.at(-1).toolName, 'one')
   assert.deepEqual(requests.at(-1).arguments, { name: 'first' })
   ui.setGroupId('research'); await ui.button('发现工具与资源').props.onClick(); ui.render()
@@ -880,20 +880,20 @@ test('能力切换保留原调用身份，迟到成功只回到提交工具且�
   } })
   ui.setView('connection'); await ui.button('发现工具与资源').props.onClick(); ui.render()
   const select = () => ui.nodes().find(node => node.type === 'select' && ui.nodes(node).some(child => child.props?.value === 'two'))
-  ui.button('测试工具').props.onClick(); ui.render()
+  ui.button('调用工具').props.onClick(); ui.render()
   select().props.onChange({ target: { value: 'two' } }); ui.render()
-  assert.equal(ui.button('测试工具').props.disabled, false)
-  ui.button('测试工具').props.onClick(); ui.render()
+  assert.equal(ui.button('调用工具').props.disabled, false)
+  ui.button('调用工具').props.onClick(); ui.render()
   pending.get('one')(); await new Promise(setImmediate); ui.render()
   assert.doesNotMatch(ui.text(ui.render()), /completed-one/)
-  assert.equal(ui.button('测试工具').props.disabled, true, 'one 完成不应解除 two 的忙状态')
+  assert.equal(ui.button('调用工具').props.disabled, true, 'one 完成不应解除 two 的忙状态')
   select().props.onChange({ target: { value: 'one' } }); ui.render()
   assert.match(ui.text(ui.render()), /completed-one/)
   pending.get('two')(); await new Promise(setImmediate); ui.render()
   assert.doesNotMatch(ui.text(ui.render()), /completed-two/)
   select().props.onChange({ target: { value: 'two' } }); ui.render()
   assert.match(ui.text(ui.render()), /completed-two/)
-  assert.equal(ui.button('测试工具').props.disabled, false)
+  assert.equal(ui.button('调用工具').props.disabled, false)
 })
 
 test('连接工具范围从目录选择，筛选不改选择且连续勾选不丢目录', async () => {
@@ -928,4 +928,121 @@ test('连接工具范围从目录选择，筛选不改选择且连续勾选不�
   assert.match(ui.text(scope()), /请保存连接配置/)
   assert.equal(choices().length, 3, '连接变化仍保留已有勾选，但不沿用旧目录')
   assert.ok(choices().every(node => ui.text(node).includes('尚未核对')))
+})
+
+test('调试发现使用工具定义准备默认参数，刷新和换工具保留用户原文', async () => {
+  const calls = []
+  const tools = [{ name: 'query', title: '查询', description: '完整工具说明', inputSchema: { type: 'object', required: ['id'], properties: { id: { type: 'string' }, limit: { type: 'integer', default: 20 }, verbose: { type: 'boolean', default: false }, optional: { type: 'string' } } } }, { name: 'other', inputSchema: { type: 'object', properties: { offset: { type: 'integer', default: 0 } } } }]
+  const ui = editor({ fetch: async (_url, request) => {
+    const body = JSON.parse(request.body); calls.push(body)
+    return { ok: true, json: async () => body.action === 'test' ? { tools } : { content: [{ type: 'text', text: '完成' }] } }
+  } })
+  ui.setView('connection')
+  await ui.button('发现工具与资源').props.onClick(); ui.render()
+  const params = () => ui.nodes().find(node => typeof node.type === 'function' && node.props.label === '调用参数')
+  assert.deepEqual(JSON.parse(params().props.value), { limit: 20, verbose: false })
+  assert.match(ui.text(ui.render()), /完整工具说明/)
+  await ui.button('调用工具').props.onClick(); ui.render()
+  assert.equal(calls.filter(call => call.action === 'callTool').length, 0, '缺必填项不得派发')
+  assert.match(ui.text(ui.render()), /id.*必填/)
+  params().props.onChange('{"id":"kept","limit":0,"verbose":false}'); ui.render()
+  await ui.button('发现工具与资源').props.onClick(); ui.render()
+  assert.equal(params().props.value, '{"id":"kept","limit":0,"verbose":false}')
+  await ui.button('调用工具').props.onClick(); ui.render()
+  assert.deepEqual(calls.at(-1).arguments, { id: 'kept', limit: 0, verbose: false })
+  const select = () => ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '工具')
+  params().props.onChange('{"id":'); ui.render()
+  select().props.onChange({ target: { value: 'other' } }); ui.render()
+  assert.deepEqual(JSON.parse(params().props.value), { offset: 0 })
+  select().props.onChange({ target: { value: 'query' } }); ui.render()
+  assert.equal(params().props.value, '{"id":')
+})
+
+test('调试结果区分工具错误、HTTP拒绝和回执未知，不回放请求或显示旧成功', async () => {
+  let mode = 'success', count = 0
+  const ui = editor({ fetch: async (_url, request) => {
+    const body = JSON.parse(request.body)
+    if (body.action === 'test') return { ok: true, json: async () => ({ tools: [{ name: 'read', inputSchema: { type: 'object', properties: {} } }] }) }
+    count++
+    if (mode === 'lost') throw new Error('connection lost')
+    return { ok: mode !== 'reject', status: mode === 'reject' ? 400 : 200, json: async () => mode === 'reject' ? { error: '参数被拒绝' } : { isError: mode === 'tool' ? true : false, content: [{ type: 'text', text: mode === 'tool' ? '工具异常' : '旧成功内容' }] } }
+  } })
+  ui.setView('connection')
+  await ui.button('发现工具与资源').props.onClick(); ui.render()
+  await ui.button('调用工具').props.onClick(); ui.render()
+  assert.match(ui.text(ui.render()), /调用完成.*旧成功内容/)
+  mode = 'tool'; await ui.button('调用工具').props.onClick(); ui.render()
+  assert.match(ui.text(ui.render()), /工具返回错误/)
+  mode = 'reject'; await ui.button('调用工具').props.onClick(); ui.render()
+  assert.match(ui.text(ui.render()), /请求失败.*参数被拒绝/)
+  assert.doesNotMatch(ui.text(ui.render()), /旧成功内容/)
+  mode = 'lost'; await ui.button('调用工具').props.onClick(); ui.render()
+  assert.match(ui.text(ui.render()), /结果待核对.*远端可能已执行/)
+  assert.doesNotMatch(ui.text(ui.render()), /旧成功内容/)
+  assert.equal(count, 4)
+})
+
+test('刷新能力期间切换工具保持最新工具与参数成对，不被旧选择覆盖', async () => {
+  let resolveRefresh, delayed = false
+  const tools = [{ name: 'one', inputSchema: { type: 'object', properties: { id: { type: 'string', default: 'one' } } } }, { name: 'two', inputSchema: { type: 'object', properties: { id: { type: 'string', default: 'two' } } } }]
+  const requests = []
+  const ui = editor({ fetch: async (_url, request) => {
+    const body = JSON.parse(request.body); requests.push(body)
+    if (body.action === 'test' && delayed) await new Promise(resolve => { resolveRefresh = resolve })
+    return { ok: true, json: async () => body.action === 'test' ? { tools } : { content: [] } }
+  } })
+  ui.setView('connection')
+  await ui.button('发现工具与资源').props.onClick(); ui.render()
+  delayed = true
+  const pending = ui.button('发现工具与资源').props.onClick(); ui.render()
+  const select = () => ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '工具')
+  select().props.onChange({ target: { value: 'two' } }); ui.render()
+  const params = () => ui.nodes().find(node => typeof node.type === 'function' && node.props.label === '调用参数')
+  params().props.onChange('{"id":"two-user"}'); ui.render()
+  resolveRefresh(); await pending; ui.render()
+  assert.equal(select().props.value, 'two')
+  assert.equal(params().props.value, '{"id":"two-user"}')
+  await ui.button('调用工具').props.onClick(); ui.render()
+  assert.equal(requests.at(-1).toolName, 'two')
+  assert.deepEqual(requests.at(-1).arguments, { id: 'two-user' })
+})
+
+test('请求中离开调试对象再返回显示待核对，不恢复永久等待或重发', async () => {
+  let finish, calls = 0
+  const ui = editor({ fetch: async (_url, request) => {
+    const body = JSON.parse(request.body)
+    if (body.action === 'test') return { ok: true, json: async () => ({ tools: [{ name: 'read', inputSchema: { type: 'object', properties: {} } }] }) }
+    calls++
+    await new Promise(resolve => { finish = resolve })
+    return { ok: true, json: async () => ({ content: [{ type: 'text', text: 'late-response' }] }) }
+  } })
+  ui.refreshValue({ servers: [ui.server, { ...ui.server, id: 'second' }], groups: ui.groups, sharedToken: '' }, 'r1')
+  ui.setView('connection')
+  await ui.button('发现工具与资源').props.onClick(); ui.render()
+  const pending = ui.button('调用工具').props.onClick(); ui.render()
+  assert.match(ui.text(ui.render()), /正在请求/)
+  ui.setServerId('second'); ui.render()
+  finish(); await pending; ui.render()
+  ui.setServerId(ui.server.id); ui.render()
+  assert.match(ui.text(ui.render()), /结果待核对/)
+  assert.doesNotMatch(ui.text(ui.render()), /正在请求|late-response/)
+  assert.equal(calls, 1)
+})
+
+test('请求中重新选择默认服务不会丢弃同一目标的有效回执', async () => {
+  let finish, calls = 0
+  const ui = editor({ fetch: async (_url, request) => {
+    const body = JSON.parse(request.body)
+    if (body.action === 'test') return { ok: true, json: async () => ({ tools: [{ name: 'read', inputSchema: { type: 'object', properties: {} } }] }) }
+    calls++; await new Promise(resolve => { finish = resolve })
+    return { ok: true, json: async () => ({ content: [{ type: 'text', text: 'same-target-receipt' }] }) }
+  } })
+  ui.setView('connection')
+  await ui.button('发现工具与资源').props.onClick(); ui.render()
+  const pending = ui.button('调用工具').props.onClick(); ui.render()
+  ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '调试对象').props.onChange({ target: { value: `server:${ui.server.id}` } }); ui.render()
+  finish(); await pending; ui.render()
+  assert.match(ui.text(ui.render()), /调用完成.*same-target-receipt/)
+  assert.doesNotMatch(ui.text(ui.render()), /正在请求|结果待核对/)
+  assert.equal(calls, 1)
 })

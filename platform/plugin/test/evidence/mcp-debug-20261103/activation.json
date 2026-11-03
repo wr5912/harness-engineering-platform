@@ -1,0 +1,11 @@
+{
+  "pid": 2500377,
+  "clientSha256": "02bc11983da68fbd2fb03ab85f3e0ede8a80c2e457e31c77ef9359c98d0a8a20",
+  "indexUnchanged": true,
+  "profileSha256": "e1d441988108a4184cae19d2de63ff0a27d302b7a8744272db0a745d206a7f0b",
+  "activation": "仅原子替换客户端，原生HMR或刷新生效",
+  "finalClientIncludes": [
+    "同一默认目标重选保留在途回执",
+    "模板JSON数字数组不猜类型"
+  ]
+}

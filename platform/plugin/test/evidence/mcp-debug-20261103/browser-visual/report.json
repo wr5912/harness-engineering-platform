@@ -1,0 +1,604 @@
+{
+  "at": "2026-11-03T09:14:36.619Z",
+  "scope": "实际18120认证/配置/客户端与原生主题；MCP发现/调用HTTP响应为浏览器UI夹具，无真实MCP工具或业务写入；最后单独进行真实只读发现",
+  "checks": [
+    {
+      "phase": "setup",
+      "name": "真实平台认证",
+      "ok": true
+    },
+    {
+      "phase": "setup",
+      "name": "记录精确主题偏好",
+      "ok": true
+    },
+    {
+      "phase": "1440-light-layout-menu",
+      "name": "1440-light-form 无整页横向溢出",
+      "ok": true,
+      "detail": {
+        "width": 1440,
+        "documentWidth": 1440,
+        "selectionWidth": 1384,
+        "parameterWidth": 684,
+        "resultWidth": 684,
+        "parametersTop": 647.53125,
+        "resultTop": 647.53125,
+        "themeSource": "light"
+      }
+    },
+    {
+      "phase": "1440-light-layout-menu",
+      "name": "1440-light-form 宽屏输入结果并排",
+      "ok": true
+    },
+    {
+      "phase": "1440-light-layout-menu",
+      "name": "下拉受视口约束",
+      "ok": true,
+      "detail": {
+        "width": 1342,
+        "left": 49,
+        "right": 1391,
+        "viewport": 1440,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgb(255, 255, 255) none repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "1440-light-layout-menu",
+      "name": "下拉宽度满足上下文",
+      "ok": true,
+      "detail": {
+        "width": 1342,
+        "left": 49,
+        "right": 1391,
+        "viewport": 1440,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgb(255, 255, 255) none repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "1440-light-layout-menu",
+      "name": "摘要最多两行",
+      "ok": true,
+      "detail": {
+        "width": 1342,
+        "left": 49,
+        "right": 1391,
+        "viewport": 1440,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgb(255, 255, 255) none repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "1440-light-layout-menu",
+      "name": "完整描述参与搜索",
+      "ok": true
+    },
+    {
+      "phase": "1440-light-layout-menu",
+      "name": "键盘选择后焦点回选择框",
+      "ok": true
+    },
+    {
+      "phase": "1440-light-layout-menu",
+      "name": "完整工具说明可展开",
+      "ok": true
+    },
+    {
+      "phase": "1440-light-layout-menu",
+      "name": "Escape关闭菜单并返焦",
+      "ok": true
+    },
+    {
+      "phase": "768-light-layout-menu",
+      "name": "768-light-form 无整页横向溢出",
+      "ok": true,
+      "detail": {
+        "width": 768,
+        "documentWidth": 768,
+        "selectionWidth": 712,
+        "parameterWidth": 712,
+        "resultWidth": 712,
+        "parametersTop": 637.53125,
+        "resultTop": 2348.1875,
+        "themeSource": "light"
+      }
+    },
+    {
+      "phase": "768-light-layout-menu",
+      "name": "768-light-form 窄屏输入结果上下排列",
+      "ok": true
+    },
+    {
+      "phase": "768-light-layout-menu",
+      "name": "下拉受视口约束",
+      "ok": true,
+      "detail": {
+        "width": 674,
+        "left": 47,
+        "right": 721,
+        "viewport": 768,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgb(255, 255, 255) none repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "768-light-layout-menu",
+      "name": "下拉宽度满足上下文",
+      "ok": true,
+      "detail": {
+        "width": 674,
+        "left": 47,
+        "right": 721,
+        "viewport": 768,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgb(255, 255, 255) none repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "768-light-layout-menu",
+      "name": "摘要最多两行",
+      "ok": true,
+      "detail": {
+        "width": 674,
+        "left": 47,
+        "right": 721,
+        "viewport": 768,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgb(255, 255, 255) none repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "768-light-layout-menu",
+      "name": "完整描述参与搜索",
+      "ok": true
+    },
+    {
+      "phase": "768-light-layout-menu",
+      "name": "键盘选择后焦点回选择框",
+      "ok": true
+    },
+    {
+      "phase": "768-light-layout-menu",
+      "name": "完整工具说明可展开",
+      "ok": true
+    },
+    {
+      "phase": "768-light-layout-menu",
+      "name": "Escape关闭菜单并返焦",
+      "ok": true
+    },
+    {
+      "phase": "390-light-layout-menu",
+      "name": "390-light-form 无整页横向溢出",
+      "ok": true,
+      "detail": {
+        "width": 390,
+        "documentWidth": 390,
+        "selectionWidth": 366,
+        "parameterWidth": 366,
+        "resultWidth": 366,
+        "parametersTop": 693.015625,
+        "resultTop": 2438.046875,
+        "themeSource": "light"
+      }
+    },
+    {
+      "phase": "390-light-layout-menu",
+      "name": "390-light-form 窄屏输入结果上下排列",
+      "ok": true
+    },
+    {
+      "phase": "390-light-layout-menu",
+      "name": "下拉受视口约束",
+      "ok": true,
+      "detail": {
+        "width": 366,
+        "left": 12,
+        "right": 378,
+        "viewport": 390,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgb(255, 255, 255) none repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "390-light-layout-menu",
+      "name": "下拉宽度满足上下文",
+      "ok": true,
+      "detail": {
+        "width": 366,
+        "left": 12,
+        "right": 378,
+        "viewport": 390,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgb(255, 255, 255) none repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "390-light-layout-menu",
+      "name": "摘要最多两行",
+      "ok": true,
+      "detail": {
+        "width": 366,
+        "left": 12,
+        "right": 378,
+        "viewport": 390,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgb(255, 255, 255) none repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "390-light-layout-menu",
+      "name": "完整描述参与搜索",
+      "ok": true
+    },
+    {
+      "phase": "390-light-layout-menu",
+      "name": "键盘选择后焦点回选择框",
+      "ok": true
+    },
+    {
+      "phase": "390-light-layout-menu",
+      "name": "完整工具说明可展开",
+      "ok": true
+    },
+    {
+      "phase": "390-light-layout-menu",
+      "name": "Escape关闭菜单并返焦",
+      "ok": true
+    },
+    {
+      "phase": "1440-dark-layout-menu",
+      "name": "1440-dark-form 无整页横向溢出",
+      "ok": true,
+      "detail": {
+        "width": 1440,
+        "documentWidth": 1440,
+        "selectionWidth": 1384,
+        "parameterWidth": 684,
+        "resultWidth": 684,
+        "parametersTop": 647.53125,
+        "resultTop": 647.53125,
+        "themeSource": "dark"
+      }
+    },
+    {
+      "phase": "1440-dark-layout-menu",
+      "name": "1440-dark-form 宽屏输入结果并排",
+      "ok": true
+    },
+    {
+      "phase": "1440-dark-layout-menu",
+      "name": "下拉受视口约束",
+      "ok": true,
+      "detail": {
+        "width": 1342,
+        "left": 49,
+        "right": 1391,
+        "viewport": 1440,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgba(0, 0, 0, 0) linear-gradient(155deg, rgba(11, 36, 64, 0.98), rgba(3, 14, 32, 0.99)) repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "1440-dark-layout-menu",
+      "name": "下拉宽度满足上下文",
+      "ok": true,
+      "detail": {
+        "width": 1342,
+        "left": 49,
+        "right": 1391,
+        "viewport": 1440,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgba(0, 0, 0, 0) linear-gradient(155deg, rgba(11, 36, 64, 0.98), rgba(3, 14, 32, 0.99)) repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "1440-dark-layout-menu",
+      "name": "摘要最多两行",
+      "ok": true,
+      "detail": {
+        "width": 1342,
+        "left": 49,
+        "right": 1391,
+        "viewport": 1440,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgba(0, 0, 0, 0) linear-gradient(155deg, rgba(11, 36, 64, 0.98), rgba(3, 14, 32, 0.99)) repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "1440-dark-layout-menu",
+      "name": "完整描述参与搜索",
+      "ok": true
+    },
+    {
+      "phase": "1440-dark-layout-menu",
+      "name": "键盘选择后焦点回选择框",
+      "ok": true
+    },
+    {
+      "phase": "1440-dark-layout-menu",
+      "name": "完整工具说明可展开",
+      "ok": true
+    },
+    {
+      "phase": "1440-dark-layout-menu",
+      "name": "Escape关闭菜单并返焦",
+      "ok": true
+    },
+    {
+      "phase": "768-dark-layout-menu",
+      "name": "768-dark-form 无整页横向溢出",
+      "ok": true,
+      "detail": {
+        "width": 768,
+        "documentWidth": 768,
+        "selectionWidth": 712,
+        "parameterWidth": 712,
+        "resultWidth": 712,
+        "parametersTop": 637.53125,
+        "resultTop": 2348.1875,
+        "themeSource": "dark"
+      }
+    },
+    {
+      "phase": "768-dark-layout-menu",
+      "name": "768-dark-form 窄屏输入结果上下排列",
+      "ok": true
+    },
+    {
+      "phase": "768-dark-layout-menu",
+      "name": "下拉受视口约束",
+      "ok": true,
+      "detail": {
+        "width": 674,
+        "left": 47,
+        "right": 721,
+        "viewport": 768,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgba(0, 0, 0, 0) linear-gradient(155deg, rgba(11, 36, 64, 0.98), rgba(3, 14, 32, 0.99)) repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "768-dark-layout-menu",
+      "name": "下拉宽度满足上下文",
+      "ok": true,
+      "detail": {
+        "width": 674,
+        "left": 47,
+        "right": 721,
+        "viewport": 768,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgba(0, 0, 0, 0) linear-gradient(155deg, rgba(11, 36, 64, 0.98), rgba(3, 14, 32, 0.99)) repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "768-dark-layout-menu",
+      "name": "摘要最多两行",
+      "ok": true,
+      "detail": {
+        "width": 674,
+        "left": 47,
+        "right": 721,
+        "viewport": 768,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgba(0, 0, 0, 0) linear-gradient(155deg, rgba(11, 36, 64, 0.98), rgba(3, 14, 32, 0.99)) repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "768-dark-layout-menu",
+      "name": "完整描述参与搜索",
+      "ok": true
+    },
+    {
+      "phase": "768-dark-layout-menu",
+      "name": "键盘选择后焦点回选择框",
+      "ok": true
+    },
+    {
+      "phase": "768-dark-layout-menu",
+      "name": "完整工具说明可展开",
+      "ok": true
+    },
+    {
+      "phase": "768-dark-layout-menu",
+      "name": "Escape关闭菜单并返焦",
+      "ok": true
+    },
+    {
+      "phase": "390-dark-layout-menu",
+      "name": "390-dark-form 无整页横向溢出",
+      "ok": true,
+      "detail": {
+        "width": 390,
+        "documentWidth": 390,
+        "selectionWidth": 366,
+        "parameterWidth": 366,
+        "resultWidth": 366,
+        "parametersTop": 693.015625,
+        "resultTop": 2438.046875,
+        "themeSource": "dark"
+      }
+    },
+    {
+      "phase": "390-dark-layout-menu",
+      "name": "390-dark-form 窄屏输入结果上下排列",
+      "ok": true
+    },
+    {
+      "phase": "390-dark-layout-menu",
+      "name": "下拉受视口约束",
+      "ok": true,
+      "detail": {
+        "width": 366,
+        "left": 12,
+        "right": 378,
+        "viewport": 390,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgba(0, 0, 0, 0) linear-gradient(155deg, rgba(11, 36, 64, 0.98), rgba(3, 14, 32, 0.99)) repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "390-dark-layout-menu",
+      "name": "下拉宽度满足上下文",
+      "ok": true,
+      "detail": {
+        "width": 366,
+        "left": 12,
+        "right": 378,
+        "viewport": 390,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgba(0, 0, 0, 0) linear-gradient(155deg, rgba(11, 36, 64, 0.98), rgba(3, 14, 32, 0.99)) repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "390-dark-layout-menu",
+      "name": "摘要最多两行",
+      "ok": true,
+      "detail": {
+        "width": 366,
+        "left": 12,
+        "right": 378,
+        "viewport": 390,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgba(0, 0, 0, 0) linear-gradient(155deg, rgba(11, 36, 64, 0.98), rgba(3, 14, 32, 0.99)) repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "390-dark-layout-menu",
+      "name": "完整描述参与搜索",
+      "ok": true
+    },
+    {
+      "phase": "390-dark-layout-menu",
+      "name": "键盘选择后焦点回选择框",
+      "ok": true
+    },
+    {
+      "phase": "390-dark-layout-menu",
+      "name": "完整工具说明可展开",
+      "ok": true
+    },
+    {
+      "phase": "390-dark-layout-menu",
+      "name": "Escape关闭菜单并返焦",
+      "ok": true
+    },
+    {
+      "phase": "restore-theme",
+      "name": "精确恢复主题偏好",
+      "ok": true
+    }
+  ],
+  "phases": [
+    {
+      "name": "1440-light-layout-menu",
+      "ok": true
+    },
+    {
+      "name": "768-light-layout-menu",
+      "ok": true
+    },
+    {
+      "name": "390-light-layout-menu",
+      "ok": true
+    },
+    {
+      "name": "1440-dark-layout-menu",
+      "ok": true
+    },
+    {
+      "name": "768-dark-layout-menu",
+      "ok": true
+    },
+    {
+      "name": "390-dark-layout-menu",
+      "ok": true
+    }
+  ],
+  "errors": [],
+  "requests": [
+    {
+      "phase": "setup",
+      "boundary": "MCP UI fixture",
+      "action": "test",
+      "status": 200
+    }
+  ],
+  "screenshots": [
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-14-36-618Z/1440-light-form.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-14-36-618Z/1440-light-description-expanded.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-14-36-618Z/1440-light-menu.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-14-36-618Z/768-light-form.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-14-36-618Z/768-light-description-expanded.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-14-36-618Z/768-light-menu.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-14-36-618Z/390-light-form.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-14-36-618Z/390-light-description-expanded.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-14-36-618Z/390-light-menu.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-14-36-618Z/1440-dark-form.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-14-36-618Z/1440-dark-description-expanded.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-14-36-618Z/1440-dark-menu.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-14-36-618Z/768-dark-form.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-14-36-618Z/768-dark-description-expanded.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-14-36-618Z/768-dark-menu.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-14-36-618Z/390-dark-form.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-14-36-618Z/390-dark-description-expanded.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-14-36-618Z/390-dark-menu.png"
+  ],
+  "blockedWrites": [
+    {
+      "phase": "1440-light-layout-menu",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    }
+  ],
+  "mockedCalls": [],
+  "realDiscovery": null,
+  "existingSessionSelected": true,
+  "initialThemePreference": "light",
+  "initialDark": false,
+  "initialTarget": "policy-configuration ⌄",
+  "finalThemePreference": "light",
+  "finalDark": false,
+  "rerunScope": "仅补跑初次strict locator中断的6组视觉分支；先前功能阶段不重复",
+  "finishedAt": "2026-11-03T09:14:52.056Z",
+  "passed": true
+}

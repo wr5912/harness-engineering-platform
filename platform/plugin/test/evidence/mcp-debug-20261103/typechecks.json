@@ -1,0 +1,15 @@
+{
+  "checks": [
+    {
+      "command": "pnpm exec tsc --noEmit",
+      "cwd": "platform/plugin",
+      "exitCode": 0
+    },
+    {
+      "command": "node node_modules/typescript/bin/tsc --noEmit --strict --target ES2022 --module esnext --moduleResolution bundler --jsx react --skipLibCheck ../../plugins/mcp-manager/debug-parameters.tsx",
+      "cwd": "platform/plugin",
+      "exitCode": 0
+    }
+  ],
+  "scope": "项目类型检查和参数模块strict检查，无制品写入"
+}

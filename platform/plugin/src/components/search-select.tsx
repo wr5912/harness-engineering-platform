@@ -14,10 +14,12 @@ export type SearchSelectProps = {
   className?: string
   id?: string
   name?: string
+  descriptionLines?: number
+  popupMinWidth?: number
 }
 
 /** 搜索只影响候选展示，已选身份始终由调用方维护。 */
-export function SearchSelect({ value, options, groups, onChange, label, placeholder = '请选择', disabled, required, className = '', id, name }: SearchSelectProps) {
+export function SearchSelect({ value, options, groups, onChange, label, placeholder = '请选择', disabled, required, className = '', id, name, descriptionLines, popupMinWidth }: SearchSelectProps) {
   const uid = useId()
   const listId = `${uid}-options`
   const [open, setOpen] = useState(false)
@@ -50,7 +52,7 @@ export function SearchSelect({ value, options, groups, onChange, label, placehol
     const place = () => {
       const rect = trigger.current?.getBoundingClientRect()
       if (!rect) return
-      const width = Math.min(Math.max(rect.width, availableGroups.length > 1 ? 320 : 240), window.innerWidth - 24)
+      const width = Math.min(Math.max(rect.width, availableGroups.length > 1 ? 320 : 240, popupMinWidth ?? 0), window.innerWidth - 24)
       const below = window.innerHeight - rect.bottom - 12
       const above = rect.top - 12
       const upwards = below < 220 && above > below
@@ -61,7 +63,7 @@ export function SearchSelect({ value, options, groups, onChange, label, placehol
     window.addEventListener('resize', place)
     window.addEventListener('scroll', place, true)
     return () => { window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true) }
-  }, [open])
+  }, [open, popupMinWidth, availableGroups.length])
   useEffect(() => {
     if (!open) return
     const outside = (event: PointerEvent) => {
@@ -76,6 +78,7 @@ export function SearchSelect({ value, options, groups, onChange, label, placehol
     return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('focusin', focus); window.removeEventListener('popstate', navigate); window.removeEventListener('hashchange', navigate) }
   }, [open])
   useEffect(() => { if (disabled) setOpen(false) }, [disabled])
+  useEffect(() => { setOpen(false) }, [value])
   function move(direction: number) {
     const enabled = visible.map((item, index) => item.disabled ? -1 : index).filter(index => index >= 0)
     if (!enabled.length) return
@@ -105,7 +108,7 @@ export function SearchSelect({ value, options, groups, onChange, label, placehol
       <div className="hep-search-input"><input ref={search} aria-label={`搜索${label}`} aria-controls={listId} aria-activedescendant={active >= 0 ? `${uid}-${active}` : undefined} value={query} placeholder={`搜索${label}`} onChange={event => { setQuery(event.target.value); setActive(-1) }}/>{query && <button type="button" aria-label="清空搜索" onClick={() => { setQuery(''); setActive(-1); search.current?.focus() }}>×</button>}</div>
       <div id={listId} role="listbox" aria-label={label}>
         {visible.length ? visible.map((option, index) => <button id={`${uid}-${index}`} data-option-index={index} type="button" role="option" key={option.value} aria-selected={option.value === value} disabled={option.disabled} data-active={active === index || undefined} onPointerMove={() => setActive(index)} onClick={() => choose(option)}>
-          <span><strong>{option.label}</strong>{(option.description || (!groups && option.group)) && <small>{[!groups && option.group, option.description].filter(Boolean).join(' · ')}</small>}</span>{option.value === value && <span aria-hidden="true">✓</span>}
+          <span><strong>{option.label}</strong>{(option.description || (!groups && option.group)) && <small style={descriptionLines ? { display: '-webkit-box', WebkitLineClamp: descriptionLines, WebkitBoxOrient: 'vertical', overflow: 'hidden' } : undefined}>{[!groups && option.group, option.description].filter(Boolean).join(' · ')}</small>}</span>{option.value === value && <span aria-hidden="true">✓</span>}
         </button>) : <p role="status">没有匹配项</p>}
       </div>
     </div>, trigger.current?.closest('dialog') ?? document.body)}
@@ -114,5 +117,5 @@ export function SearchSelect({ value, options, groups, onChange, label, placehol
 
 export const searchSelectTheme = `
 .hep-search-select{font-size:14px;line-height:1.55;display:inline-block;min-width:0;max-width:100%;vertical-align:middle}.hep-search-select>button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;text-align:left;min-height:36px}.hep-search-select>button>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hep-search-popup{position:fixed;z-index:1000;display:flex;flex-direction:column;box-sizing:border-box;overflow:hidden;border:1px solid #dce3ed;border-radius:8px;background:#fff;color:#1c2d43;box-shadow:0 8px 28px #16395926;font:14px/1.55 HepNoto,system-ui,"Microsoft YaHei",sans-serif}.hep-search-popup *{box-sizing:border-box}.hep-search-input{position:relative;flex:none;padding:8px;border-bottom:1px solid #dce3ed}.hep-search-input input{width:100%;min-width:0;padding:8px 30px 8px 10px;border:1px solid #dce3ed;border-radius:6px;background:transparent;color:inherit;font:inherit}.hep-search-input>button{position:absolute;right:13px;top:12px;border:0;background:transparent;color:inherit;font:20px/1 inherit;cursor:pointer}.hep-search-groups{display:flex;gap:4px;flex:none;padding:8px 8px 0}.hep-search-groups>button{display:flex;align-items:center;justify-content:center;gap:8px;flex:1;min-width:0;min-height:36px;padding:7px 8px;border:0;border-radius:6px;background:transparent;color:var(--hep-muted,#66758b);font:inherit;cursor:pointer}.hep-search-groups>button[aria-pressed=true]{background:var(--hep-primary-soft,#edf4ff);color:var(--hep-link,#2459cf);font-weight:600}.hep-search-groups>button:not([aria-pressed=true]):hover{background:var(--hep-surface-hover,#f8fafc)}.hep-search-groups>button>span{font-size:12px;font-variant-numeric:tabular-nums}@media(pointer:coarse){.hep-search-groups>button{min-height:44px}}.hep-search-popup [role=listbox]{overflow:auto;min-height:0;padding:4px}.hep-search-popup [role=option]{display:flex;align-items:center;justify-content:space-between;width:100%;padding:9px 10px;border:0;border-radius:5px;background:transparent;color:inherit;text-align:left;cursor:pointer;font:inherit}.hep-search-popup strong{font-weight:500}.hep-search-popup small{display:block;color:#607187;font-size:12px;overflow-wrap:anywhere}.hep-search-popup [role=option]:is(:hover,[data-active=true],[aria-selected=true]){background:#eaf3fc;color:#0062ae}.hep-search-popup [role=option]:disabled{opacity:.45;cursor:default}.hep-search-popup p{padding:8px 10px;margin:0;color:#607187}.hep-search-popup :focus-visible{outline:2px solid #0086dd;outline-offset:-2px}body[data-ds-dark-theme] .hep-search-popup{background:var(--hep-popover-bg,var(--hep-surface));color:var(--hep-text);border-color:var(--hep-border);box-shadow:var(--hep-dialog-shadow,var(--hep-shadow))}body[data-ds-dark-theme] .hep-search-popup :is(input,.hep-search-input){border-color:var(--hep-border)}body[data-ds-dark-theme] .hep-search-popup [role=option]:is(:hover,[data-active=true],[aria-selected=true]){background:var(--hep-surface-hover);color:var(--hep-link)}body[data-ds-dark-theme] .hep-search-popup :is(small,p){color:var(--hep-muted)}body[data-ds-dark-theme] .hep-search-popup :focus-visible{outline-color:var(--hep-focus)}
+.hep-search-popup{position:fixed;z-index:1000;display:flex;flex-direction:column;box-sizing:border-box;overflow:hidden;border:1px solid #dce3ed;border-radius:8px;background:#fff;color:#1c2d43;box-shadow:0 8px 28px #16395926;font:14px/1.55 HepNoto,system-ui,"Microsoft YaHei",sans-serif}.hep-search-popup *{box-sizing:border-box}.hep-search-input{position:relative;flex:none;padding:8px;border-bottom:1px solid #dce3ed}.hep-search-input input{width:100%;min-width:0;padding:8px 30px 8px 10px;border:1px solid #dce3ed;border-radius:6px;background:transparent;color:inherit;font:inherit}.hep-search-input>button{position:absolute;right:13px;top:12px;border:0;background:transparent;color:inherit;font:20px/1 inherit;cursor:pointer}.hep-search-groups{display:flex;gap:4px;flex:none;padding:8px 8px 0}.hep-search-groups>button{display:flex;align-items:center;justify-content:center;gap:8px;flex:1;min-width:0;min-height:36px;padding:7px 8px;border:0;border-radius:6px;background:transparent;color:var(--hep-muted,#66758b);font:inherit;cursor:pointer}.hep-search-groups>button[aria-pressed=true]{background:var(--hep-primary-soft,#edf4ff);color:var(--hep-link,#2459cf);font-weight:600}.hep-search-groups>button:not([aria-pressed=true]):hover{background:var(--hep-surface-hover,#f8fafc)}.hep-search-groups>button>span{font-size:12px;font-variant-numeric:tabular-nums}@media(pointer:coarse){.hep-search-groups>button{min-height:44px}}.hep-search-popup [role=listbox]{overflow:auto;min-height:0;padding:4px}.hep-search-popup [role=option]{display:flex;align-items:center;justify-content:space-between;width:100%;padding:9px 10px;border:0;border-radius:5px;background:transparent;color:inherit;text-align:left;cursor:pointer;font:inherit}.hep-search-popup [role=option]>span:first-child{flex:1;min-width:0}.hep-search-popup [role=option]>span:last-child:not(:first-child){flex:none}.hep-search-popup strong{display:block;font-weight:500;overflow-wrap:anywhere}.hep-search-popup small{display:block;color:#607187;font-size:12px;overflow-wrap:anywhere}.hep-search-popup [role=option]:is(:hover,[data-active=true],[aria-selected=true]){background:#eaf3fc;color:#0062ae}.hep-search-popup [role=option]:disabled{opacity:.45;cursor:default}.hep-search-popup p{padding:8px 10px;margin:0;color:#607187}.hep-search-popup :focus-visible{outline:2px solid #0086dd;outline-offset:-2px}body[data-ds-dark-theme] .hep-search-popup{background:var(--hep-popover-bg,var(--hep-surface));color:var(--hep-text);border-color:var(--hep-border);box-shadow:var(--hep-dialog-shadow,var(--hep-shadow))}body[data-ds-dark-theme] .hep-search-popup :is(input,.hep-search-input){border-color:var(--hep-border)}body[data-ds-dark-theme] .hep-search-popup [role=option]:is(:hover,[data-active=true],[aria-selected=true]){background:var(--hep-surface-hover);color:var(--hep-link)}body[data-ds-dark-theme] .hep-search-popup :is(small,p){color:var(--hep-muted)}body[data-ds-dark-theme] .hep-search-popup :focus-visible{outline-color:var(--hep-focus)}
 `

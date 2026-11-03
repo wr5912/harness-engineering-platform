@@ -1,0 +1,264 @@
+✖ v2 调用按来源路由，健康工具与资源工具不等待无关挂起成员 (273.315275ms)
+✖ v2 分组名称与显示名解耦，资源代理隔离同 URI 来源并拒绝失效选择 (65.759064ms)
+✖ v2 分组保留可达来源，标出不可达来源；平台可关闭管理 Agent 自动装载 (85.145076ms)
+✖ v2 拒绝跨来源、上游重复和旧名冲突，离线来源不让出名称且不影响其他工具 (105.486486ms)
+✖ 业务 Session 跳过连接、鉴权和规范发现失败的 MCP 来源，仍校验本地配置 (106.062549ms)
+✔ 原始 OpenAPI 发现尊重调用方取消信号，包括登录授权过程 (276.447629ms)
+✖ 原生 MCP 桥沿用 DSH 的非致命启动与无工具注册状态 (30.230518ms)
+✖ 原生 MCP 的同名工具与资源不合并，冲突项不发布也不能通过旧名调用 (59.726249ms)
+✖ OpenAPI 同一操作只发布一个工具，保留资源读取与已选包装工具调用 (51.640597ms)
+✖ v2 分组可列出并读取包含多个普通变量的来源资源模板 (58.505811ms)
+✖ 旧分组可继续读取同一服务重复成员，v2 拒绝歧义来源 (42.372869ms)
+✖ 分组允许只有 Resource 能力的服务，工具发现不要求上游 tools 能力 (81.479825ms)
+✖ v2 工具代理将 SDK 取消传到实际来源 (38.463705ms)
+✖ 资源工具复用真实读取、参数约束和同进程分派，正文可供 DSH 模型读取 (49.081637ms)
+✖ OpenAPI 资源工具保留参数类型、必填查询参数与说明，并隔离未选操作 (39.891175ms)
+✖ 三类发现遍历全部分页，模板不支持与坏来源不阻塞其他资源工具，二进制保留原文 (27.932317ms)
+✖ 分组调试通过实际已发布 v2 端点发现、调用、读 URI 与模板，拒绝混淆目标 (26.022333ms)
+file:///home/admin/work/harness-engineering-platform/platform/plugin/lib/mcp-manager.js:48
+  throw new Error(`Web \u8DEF\u5F84\u9002\u914D\u5668\u65E0\u6CD5\u4ECE\u5F53\u524D Runtime \u89E3\u6790 ${name3}`);
+        ^
+
+Error: Web 路径适配器无法从当前 Runtime 解析 @deepseek-ai/dsh-mcp-client
+    at runtimeRequire (file:///home/admin/work/harness-engineering-platform/platform/plugin/lib/mcp-manager.js:48:9)
+    at file:///home/admin/work/harness-engineering-platform/platform/plugin/lib/mcp-manager.js:978:38
+    at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+    at async node:internal/modules/esm/loader:643:26
+    at async file:///home/admin/work/harness-engineering-platform/platform/plugin/test/mcp-store.test.mjs:11:35
+
+Node.js v24.19.0
+✖ test/mcp-store.test.mjs (1535.657476ms)
+✔ MCP 组合执行两次真实 HTTP 调用并映射参数 (1803.91729ms)
+✔ 前置失败时停止第二步 (354.446227ms)
+✔ 编译图作为结构来源；dry 校验不读取规格或调用上游 (831.587868ms)
+✔ LangGraph 缺少映射 ID 时结束图并保留第一步回执 (322.421016ms)
+✔ Gateway 生命周期发现和调用使用同一执行入口与 digest (640.521112ms)
+✔ 只读组合拒绝同名 POST 操作 (406.028962ms)
+✔ 连接登记可重载和删除，重启后状态回到 unknown (541.753864ms)
+✔ HTTP MCP 登记、发现 tools/list 与单工具试跑 (102.762502ms)
+✔ MCP 自定义凭据 Header 保持原始 secret 且错误脱敏 (68.596486ms)
+✔ OpenAPI 单工具试跑校验必填 header 和 body (34.180795ms)
+✔ 取消贯通规范加载，失败不写成成功状态 (172.653508ms)
+✔ 原生 Gateway 只注册 connection.fetch，不重复注册 RPC，且 GET 不支持 (36.038657ms)
+✔ 凭据不进入规范 URL、错误或运行结果 (387.419097ms)
+✔ OpenAPI 自定义凭据 Header 不加 Bearer 且结果按 literal 脱敏 (63.158841ms)
+✔ 同 ID 重新登记会排除另一种连接类型，默认状态写入工作区本地目录 (125.687741ms)
+✔ 平台接入传入仓库根目录时组合回执仍含实际实现摘要 (158.26464ms)
+✔ 多版本列表每次只读取四项 Git 来源，慢 Git 不阻塞事件循环且 dirty 实时更新 (1758.017195ms)
+✔ 平台 MCP 读取原插件的已保存配置，不建立第二份连接登记 (353.053833ms)
+✔ 编排草稿持久化，旧发布版保持可调用，dry 发布后 Gateway 切换版本 (1777.509451ms)
+✔ 已发布编排服务与 Gateway 共用工具和执行路径，草稿发布后即时切换 (843.935941ms)
+✔ 多个编排独立选择，未发布草稿不进入发现列表且使用自己的连接 (1475.636014ms)
+✔ 目录冲突、重复工具名及非法配置不覆盖草稿和已发布内容 (556.541825ms)
+✔ 空目录可新建草稿，损坏目录拒绝保存，未登记依赖发布失败保留草稿 (227.432203ms)
+✔ 未装载业务扩展时目录可读、业务工具不暴露且种子不写入；装载后恢复同一发布版本 (378.103328ms)
+✔ MCP元数据固定旧版本与实现，发布指针变化不换工具，连接或摘要变化在上游调用前拒绝 (1048.382208ms)
+✔ 实现摘要排除Git HEAD、dirty和发布时间，父组合递归锁子版本与扩展实现 (528.175206ms)
+✔ 阶段模型观察上下文由执行器传递，父子图回执合并同一执行身份 (283.678719ms)
+✔ Candidate固定工具复用原生组认证和官方MCP传输，发布后仍执行旧版并在实现冲突前阻止业务请求 (1871.493951ms)
+ℹ tests 46
+ℹ suites 0
+ℹ pass 29
+ℹ fail 17
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 17581.475499
+
+✖ failing tests:
+
+test at test/mcp-group-v2.test.mjs:86:1
+✖ v2 调用按来源路由，健康工具与资源工具不等待无关挂起成员 (273.315275ms)
+  Error: Web 路径适配器无法从当前 Runtime 解析 @deepseek-ai/dsh-mcp-client
+      at runtimeRequire (file:///tmp/mcp-group-v2-QTCLGL/manager.mjs:38:9)
+      at file:///tmp/mcp-group-v2-QTCLGL/manager.mjs:380:38
+      at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:643:26
+      at async TestContext.<anonymous> (file:///home/admin/work/harness-engineering-platform/platform/plugin/test/mcp-group-v2.test.mjs:87:19)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at test/mcp-group-v2.test.mjs:139:1
+✖ v2 分组名称与显示名解耦，资源代理隔离同 URI 来源并拒绝失效选择 (65.759064ms)
+  Error: Web 路径适配器无法从当前 Runtime 解析 @deepseek-ai/dsh-mcp-client
+      at runtimeRequire (file:///tmp/mcp-group-v2-7YgpM7/manager.mjs:38:9)
+      at file:///tmp/mcp-group-v2-7YgpM7/manager.mjs:380:38
+      at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:643:26
+      at async TestContext.<anonymous> (file:///home/admin/work/harness-engineering-platform/platform/plugin/test/mcp-group-v2.test.mjs:140:19)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+
+test at test/mcp-group-v2.test.mjs:196:1
+✖ v2 分组保留可达来源，标出不可达来源；平台可关闭管理 Agent 自动装载 (85.145076ms)
+  Error: Web 路径适配器无法从当前 Runtime 解析 @deepseek-ai/dsh-mcp-client
+      at runtimeRequire (file:///tmp/mcp-group-v2-2M83nL/manager.mjs:38:9)
+      at file:///tmp/mcp-group-v2-2M83nL/manager.mjs:380:38
+      at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:643:26
+      at async TestContext.<anonymous> (file:///home/admin/work/harness-engineering-platform/platform/plugin/test/mcp-group-v2.test.mjs:197:19)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+
+test at test/mcp-group-v2.test.mjs:221:1
+✖ v2 拒绝跨来源、上游重复和旧名冲突，离线来源不让出名称且不影响其他工具 (105.486486ms)
+  Error: Web 路径适配器无法从当前 Runtime 解析 @deepseek-ai/dsh-mcp-client
+      at runtimeRequire (file:///tmp/mcp-group-v2-j6yDQR/manager.mjs:38:9)
+      at file:///tmp/mcp-group-v2-j6yDQR/manager.mjs:380:38
+      at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:643:26
+      at async TestContext.<anonymous> (file:///home/admin/work/harness-engineering-platform/platform/plugin/test/mcp-group-v2.test.mjs:222:19)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+
+test at test/mcp-group-v2.test.mjs:252:1
+✖ 业务 Session 跳过连接、鉴权和规范发现失败的 MCP 来源，仍校验本地配置 (106.062549ms)
+  Error: Web 路径适配器无法从当前 Runtime 解析 @deepseek-ai/dsh-mcp-client
+      at runtimeRequire (file:///tmp/mcp-group-v2-zy27oJ/manager.mjs:38:9)
+      at file:///tmp/mcp-group-v2-zy27oJ/manager.mjs:380:38
+      at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:643:26
+      at async TestContext.<anonymous> (file:///home/admin/work/harness-engineering-platform/platform/plugin/test/mcp-group-v2.test.mjs:253:19)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+
+test at test/mcp-group-v2.test.mjs:386:1
+✖ 原生 MCP 桥沿用 DSH 的非致命启动与无工具注册状态 (30.230518ms)
+  Error: Web 路径适配器无法从当前 Runtime 解析 @deepseek-ai/dsh-mcp-client
+      at runtimeRequire (file:///tmp/mcp-group-v2-tmiXz0/manager.mjs:38:9)
+      at file:///tmp/mcp-group-v2-tmiXz0/manager.mjs:380:38
+      at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:643:26
+      at async TestContext.<anonymous> (file:///home/admin/work/harness-engineering-platform/platform/plugin/test/mcp-group-v2.test.mjs:387:19)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+
+test at test/mcp-group-v2.test.mjs:430:1
+✖ 原生 MCP 的同名工具与资源不合并，冲突项不发布也不能通过旧名调用 (59.726249ms)
+  Error: Web 路径适配器无法从当前 Runtime 解析 @deepseek-ai/dsh-mcp-client
+      at runtimeRequire (file:///tmp/mcp-group-v2-6UpzlB/manager.mjs:38:9)
+      at file:///tmp/mcp-group-v2-6UpzlB/manager.mjs:380:38
+      at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:643:26
+      at async TestContext.<anonymous> (file:///home/admin/work/harness-engineering-platform/platform/plugin/test/mcp-group-v2.test.mjs:431:19)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+
+test at test/mcp-group-v2.test.mjs:452:1
+✖ OpenAPI 同一操作只发布一个工具，保留资源读取与已选包装工具调用 (51.640597ms)
+  Error: Web 路径适配器无法从当前 Runtime 解析 @deepseek-ai/dsh-mcp-client
+      at runtimeRequire (file:///tmp/mcp-group-v2-DnqGRQ/manager.mjs:38:9)
+      at file:///tmp/mcp-group-v2-DnqGRQ/manager.mjs:380:38
+      at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:643:26
+      at async TestContext.<anonymous> (file:///home/admin/work/harness-engineering-platform/platform/plugin/test/mcp-group-v2.test.mjs:453:19)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+
+test at test/mcp-group-v2.test.mjs:507:1
+✖ v2 分组可列出并读取包含多个普通变量的来源资源模板 (58.505811ms)
+  Error: Web 路径适配器无法从当前 Runtime 解析 @deepseek-ai/dsh-mcp-client
+      at runtimeRequire (file:///tmp/mcp-group-v2-4l536i/manager.mjs:38:9)
+      at file:///tmp/mcp-group-v2-4l536i/manager.mjs:380:38
+      at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:643:26
+      at async TestContext.<anonymous> (file:///home/admin/work/harness-engineering-platform/platform/plugin/test/mcp-group-v2.test.mjs:508:19)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+
+test at test/mcp-group-v2.test.mjs:523:1
+✖ 旧分组可继续读取同一服务重复成员，v2 拒绝歧义来源 (42.372869ms)
+  Error: Web 路径适配器无法从当前 Runtime 解析 @deepseek-ai/dsh-mcp-client
+      at runtimeRequire (file:///tmp/mcp-group-v2-zF4jVE/manager.mjs:38:9)
+      at file:///tmp/mcp-group-v2-zF4jVE/manager.mjs:380:38
+      at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:643:26
+      at async TestContext.<anonymous> (file:///home/admin/work/harness-engineering-platform/platform/plugin/test/mcp-group-v2.test.mjs:524:19)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+
+test at test/mcp-group-v2.test.mjs:537:1
+✖ 分组允许只有 Resource 能力的服务，工具发现不要求上游 tools 能力 (81.479825ms)
+  Error: Web 路径适配器无法从当前 Runtime 解析 @deepseek-ai/dsh-mcp-client
+      at runtimeRequire (file:///tmp/mcp-group-v2-qkJEPm/manager.mjs:38:9)
+      at file:///tmp/mcp-group-v2-qkJEPm/manager.mjs:380:38
+      at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:643:26
+      at async TestContext.<anonymous> (file:///home/admin/work/harness-engineering-platform/platform/plugin/test/mcp-group-v2.test.mjs:538:19)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+
+test at test/mcp-group-v2.test.mjs:551:1
+✖ v2 工具代理将 SDK 取消传到实际来源 (38.463705ms)
+  Error: Web 路径适配器无法从当前 Runtime 解析 @deepseek-ai/dsh-mcp-client
+      at runtimeRequire (file:///tmp/mcp-group-v2-2wYJc1/manager.mjs:38:9)
+      at file:///tmp/mcp-group-v2-2wYJc1/manager.mjs:380:38
+      at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:643:26
+      at async TestContext.<anonymous> (file:///home/admin/work/harness-engineering-platform/platform/plugin/test/mcp-group-v2.test.mjs:552:19)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+
+test at test/mcp-group-v2.test.mjs:593:1
+✖ 资源工具复用真实读取、参数约束和同进程分派，正文可供 DSH 模型读取 (49.081637ms)
+  Error: Web 路径适配器无法从当前 Runtime 解析 @deepseek-ai/dsh-mcp-client
+      at runtimeRequire (file:///tmp/mcp-group-v2-qUzkX6/manager.mjs:38:9)
+      at file:///tmp/mcp-group-v2-qUzkX6/manager.mjs:380:38
+      at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:643:26
+      at async TestContext.<anonymous> (file:///home/admin/work/harness-engineering-platform/platform/plugin/test/mcp-group-v2.test.mjs:594:19)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+
+test at test/mcp-group-v2.test.mjs:633:1
+✖ OpenAPI 资源工具保留参数类型、必填查询参数与说明，并隔离未选操作 (39.891175ms)
+  Error: Web 路径适配器无法从当前 Runtime 解析 @deepseek-ai/dsh-mcp-client
+      at runtimeRequire (file:///tmp/mcp-group-v2-9EHdcE/manager.mjs:38:9)
+      at file:///tmp/mcp-group-v2-9EHdcE/manager.mjs:380:38
+      at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:643:26
+      at async TestContext.<anonymous> (file:///home/admin/work/harness-engineering-platform/platform/plugin/test/mcp-group-v2.test.mjs:634:19)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+
+test at test/mcp-group-v2.test.mjs:676:1
+✖ 三类发现遍历全部分页，模板不支持与坏来源不阻塞其他资源工具，二进制保留原文 (27.932317ms)
+  Error: Web 路径适配器无法从当前 Runtime 解析 @deepseek-ai/dsh-mcp-client
+      at runtimeRequire (file:///tmp/mcp-group-v2-DVopiF/manager.mjs:38:9)
+      at file:///tmp/mcp-group-v2-DVopiF/manager.mjs:380:38
+      at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:643:26
+      at async TestContext.<anonymous> (file:///home/admin/work/harness-engineering-platform/platform/plugin/test/mcp-group-v2.test.mjs:677:19)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+
+test at test/mcp-group-v2.test.mjs:720:1
+✖ 分组调试通过实际已发布 v2 端点发现、调用、读 URI 与模板，拒绝混淆目标 (26.022333ms)
+  Error: Web 路径适配器无法从当前 Runtime 解析 @deepseek-ai/dsh-mcp-client
+      at runtimeRequire (file:///tmp/mcp-group-v2-gqkw3K/manager.mjs:38:9)
+      at file:///tmp/mcp-group-v2-gqkw3K/manager.mjs:380:38
+      at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:643:26
+      at async TestContext.<anonymous> (file:///home/admin/work/harness-engineering-platform/platform/plugin/test/mcp-group-v2.test.mjs:721:19)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+
+test at test/mcp-store.test.mjs:1:1
+✖ test/mcp-store.test.mjs (1535.657476ms)
+  'test failed'

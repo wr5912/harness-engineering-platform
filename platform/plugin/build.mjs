@@ -29,6 +29,8 @@ export const managerSources = {
         contents = `import * as React from 'react'; const { useEffect, useState, useRef } = React;
 import { connectionIssue } from './connection.ts';
 import { copyText } from './clipboard.ts';
+import { createParameterEditor, initialArguments, parameterErrors, templateParameterSchema } from './debug-parameters.tsx';
+const ParameterEditor = createParameterEditor(React);
 ${client}
 export { Manager };`
       } else if (path.endsWith('openapi')) {

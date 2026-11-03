@@ -1,0 +1,12 @@
+{
+  "localClientSha256": "02bc11983da68fbd2fb03ab85f3e0ede8a80c2e457e31c77ef9359c98d0a8a20",
+  "localBytes": 2269491,
+  "adapter": "runtime/adapters/dsh-web/src/client-urls.ts:transformClientUrls",
+  "networkTargetInsertions": 3,
+  "servedClientSha256": "a26847b9183849f582972813f605cb5fc7a15e119f65bd69ca3626c6ff95996e",
+  "expectedHttpClientSha256": "a26847b9183849f582972813f605cb5fc7a15e119f65bd69ca3626c6ff95996e",
+  "servedBytes": 2269545,
+  "exactMatchAfterExistingUrlAdaptation": true,
+  "evidence": ".local/mcp-debug-20261103/same-target-2026-11-03T09-28-23-661Z/actual-client-extracted.js",
+  "scope": "比较实际浏览器HTTP聚合响应提取的完整平台注册片段；URL适配由既有运行适配器完成，不将聚合脚本摘要当作磁盘文件摘要"
+}

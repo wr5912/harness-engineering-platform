@@ -1,11 +1,13 @@
 import { connectionIssue } from './connection.ts'
 import { copyText } from './clipboard.ts'
+import { createParameterEditor, initialArguments, parameterErrors, templateParameterSchema } from './debug-parameters.tsx'
 
 window.__ModuleLoader__.load({
   id: 'dsh-web-mcp-manager',
   factory(require) {
     const React = require('react')
     const { useEffect, useState } = React
+    const ParameterEditor = createParameterEditor(React)
     const formName = 'mcp-session-manager'
     const defaultSpec = 'http://172.16.138.232:18087/v3/api-docs/mcp'
     const emptyServer = () => ({ id: '', description: '', specUrl: '', authType: 'credential',
@@ -104,8 +106,17 @@ window.__ModuleLoader__.load({
       @media(max-width:760px){.mcp-manager .mcp-toolbar{align-items:start;flex-direction:column;padding:16px}.mcp-manager .mcp-tabs{gap:20px}.mcp-manager .mcp-layout{grid-template-columns:minmax(0,1fr)}.mcp-manager .mcp-service-layout>.mcp-sidebar{display:none}.mcp-manager .mcp-mobile-service-picker{display:flex;align-items:end;gap:8px;min-width:0}.mcp-manager .mcp-mobile-service-picker label{display:grid;gap:5px;min-width:0;flex:1;color:var(--mcp-muted);font-size:12px}.mcp-manager .mcp-mobile-service-picker select{width:100%;min-width:0;min-height:44px;padding:8px;border:1px solid var(--mcp-line);border-radius:var(--hep-control-radius,8px);background:var(--mcp-surface);color:var(--mcp-ink)}.mcp-manager .mcp-service-summary{grid-template-columns:minmax(0,1fr)}.mcp-manager .mcp-card-head .mcp-actions{width:100%}.mcp-manager .mcp-card-head .mcp-actions>button{flex:1}.mcp-manager .mcp-fields,.mcp-manager .mcp-tools{grid-template-columns:minmax(0,1fr)}.mcp-manager .mcp-card{padding:16px}}
       @media(pointer:coarse){.mcp-manager button,.mcp-manager .mcp-field input,.mcp-manager .mcp-field select{min-height:44px}.mcp-manager .mcp-switch input,.mcp-manager .mcp-check input{width:20px;height:20px}}
       .mcp-manager .mcp-layout{grid-template-columns:224px minmax(0,1fr);gap:16px}.mcp-manager .mcp-sidebar{padding:16px}.mcp-manager .mcp-card{border-radius:10px;padding:18px}.mcp-manager .mcp-service-summary{display:flex;flex-wrap:wrap;gap:8px 20px;margin:0;padding:12px 0;background:var(--mcp-tint);border-bottom:1px solid var(--mcp-line)}.mcp-manager .mcp-service-summary article{display:flex;align-items:baseline;gap:7px;min-width:0;padding:0;border:0;background:transparent}.mcp-manager .mcp-service-summary strong{font-size:13px}.mcp-manager .mcp-service-summary small{font-size:12px}.mcp-manager .mcp-service-summary article>small:last-child{display:none}.mcp-manager .mcp-discovered-list li{border:0;border-bottom:1px solid var(--mcp-line);padding:14px 0;margin:0;border-radius:0}.mcp-manager .mcp-service-scope{border:0;background:transparent;padding:8px 0;font-size:12px}.mcp-manager .mcp-service-search{font-size:0;gap:0}.mcp-manager .mcp-service-search input{font-size:13px}.mcp-manager .mcp-list-item{border-radius:0;margin:8px -18px 0;width:calc(100% + 36px);padding:15px 16px;border-left:3px solid transparent}.mcp-manager .mcp-list-item[aria-current=true]{border-color:transparent;border-left-color:var(--mcp-blue)}
-      .mcp-manager .mcp-debug-target{display:flex;align-items:center;gap:16px;flex-wrap:wrap}.mcp-manager .mcp-debug-target>.hep-search-select,.mcp-manager .mcp-debug-target>label{width:min(350px,100%)}.mcp-manager .mcp-debug-target>div:not(.hep-search-select){flex:1;min-width:0}.mcp-manager .mcp-debug-target small{display:block;overflow-wrap:anywhere;margin-top:5px}.mcp-manager .mcp-debug-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-top:16px}.mcp-manager .mcp-debug-parameters>.mcp-field,.mcp-manager .mcp-debug-parameters>.hep-search-select{margin-top:16px}.mcp-manager .mcp-debug-parameters textarea{width:100%;resize:vertical;min-height:180px;font:13px/1.7 monospace;padding:12px;background:var(--mcp-tint);border:1px solid var(--mcp-line);border-radius:7px;color:var(--mcp-ink)}.mcp-manager .mcp-debug-schema{margin:16px 0;font-size:12px;color:var(--mcp-muted)}.mcp-manager .mcp-debug-schema summary{cursor:pointer;margin-bottom:10px}.mcp-manager .mcp-debug-schema pre{max-height:240px;overflow:auto}.mcp-manager .mcp-debug-result{min-height:400px}.mcp-manager .mcp-debug-result .mcp-result{margin-top:0;border:0;padding:14px;max-height:560px;white-space:pre}.mcp-manager .mcp-debug-result .mcp-empty{padding:80px 12px}.mcp-manager .mcp-debug-choice{text-align:left;width:100%}.mcp-manager .mcp-debug-choice small{display:block;overflow-wrap:anywhere}.mcp-manager .mcp-debug-choice[aria-pressed=true]{background:var(--mcp-active);border-color:var(--mcp-blue)}.mcp-manager .mcp-debug-legacy{margin-top:16px}.mcp-manager .mcp-debug-legacy>summary{cursor:pointer;color:var(--mcp-muted);font-size:12px}
-      @media(max-width:760px){.mcp-manager .mcp-layout,.mcp-manager .mcp-debug-layout{grid-template-columns:minmax(0,1fr)}.mcp-manager .mcp-debug-target{align-items:stretch}.mcp-manager .mcp-debug-target>.hep-search-select{width:100%}.mcp-manager .mcp-debug-result{min-height:240px}.mcp-manager .mcp-debug-target>button{margin-left:auto}}
+      .mcp-manager .mcp-debug-target{display:flex;align-items:center;gap:16px;flex-wrap:wrap}.mcp-manager .mcp-debug-target>.hep-search-select,.mcp-manager .mcp-debug-target>label{flex:1;min-width:200px}.mcp-manager .mcp-debug-target>div{min-width:0}.mcp-manager .mcp-debug-target small{display:block;overflow-wrap:anywhere;margin-top:4px}
+      .mcp-manager .mcp-debug-selection{margin-top:16px}.mcp-manager .mcp-debug-selector{display:grid;gap:8px;margin-top:16px}.mcp-manager .mcp-debug-selector>.hep-search-select{display:block;width:100%}.mcp-manager .mcp-debug-selector>span{font-weight:500}.mcp-manager .mcp-debug-selection .mcp-service-tabs{margin-bottom:0}
+      .mcp-manager .mcp-debug-description-text,.mcp-manager .mcp-debug-description p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;margin:12px 0 0}.mcp-manager .mcp-debug-description{margin-top:12px}.mcp-manager .mcp-debug-description summary{cursor:pointer;list-style:none}.mcp-manager .mcp-debug-description summary>span{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}.mcp-manager .mcp-debug-description summary>small{display:block;color:var(--mcp-link);margin-top:6px;font-size:14px}.mcp-manager .mcp-debug-description[open] summary>span,.mcp-manager .mcp-debug-description[open] summary>small{display:none}.mcp-manager .mcp-debug-description[open] summary::after{content:'收起说明';color:var(--mcp-link)}
+      .mcp-manager .mcp-debug-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-top:16px;align-items:start}.mcp-manager .mcp-debug-parameters>.mcp-field{margin-top:16px}.mcp-manager .mcp-debug-parameters textarea{width:100%;resize:vertical;font:12px/1.7 monospace;padding:12px;background:var(--hep-control-bg,var(--mcp-tint));border:1px solid var(--mcp-line);border-radius:8px;color:var(--mcp-ink)}.mcp-manager .mcp-debug-parameters .mcp-actions{margin-top:16px}.mcp-manager .mcp-debug-parameters .mcp-actions>button:first-child{background:var(--mcp-blue);border-color:var(--mcp-blue);color:#fff;font-weight:600}
+      .mcp-manager .mcp-debug-schema{margin:16px 0 0;font-size:12px;color:var(--mcp-muted)}.mcp-manager .mcp-debug-schema summary{cursor:pointer;font-size:14px}.mcp-manager .mcp-debug-schema pre{max-height:320px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;background:var(--mcp-tint);padding:12px;border-radius:8px}.mcp-manager .mcp-debug-result{min-height:280px}.mcp-manager .mcp-debug-result .mcp-result{margin-top:12px;border:0;padding:12px;max-height:560px;white-space:pre-wrap;font-size:12px}.mcp-manager .mcp-debug-result .mcp-empty{padding:64px 12px}.mcp-manager .mcp-debug-status{font-weight:600;color:var(--mcp-link)}.mcp-manager .mcp-debug-status[data-phase=received]{color:var(--hep-success,#168151)}.mcp-manager .mcp-debug-status:is([data-phase=failed],[data-phase=tool-error]){color:var(--hep-danger,#c43a40)}.mcp-manager .mcp-debug-status[data-phase=unknown]{color:var(--hep-warning,#8c610c)}
+      .mcp-manager .mcp-parameter-editor{margin-top:16px}.mcp-manager .mcp-parameter-modes{display:flex;gap:8px;flex-wrap:wrap}.mcp-manager .mcp-parameter-modes>button[aria-pressed=true]{background:var(--mcp-active);border-color:var(--mcp-blue);color:var(--mcp-link)}.mcp-manager .mcp-parameter-fields{display:grid;gap:16px}.mcp-manager .mcp-parameter-field{min-width:0;display:grid;gap:8px}.mcp-manager .mcp-parameter-label{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px;overflow-wrap:anywhere}.mcp-manager .mcp-parameter-label strong{font-weight:500}.mcp-manager .mcp-parameter-label [aria-label=必填]{color:var(--hep-danger,#c43a40)}.mcp-manager .mcp-parameter-meta{color:var(--mcp-muted);font-size:12px}.mcp-manager .mcp-parameter-description{margin:0;color:var(--mcp-muted);line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
+      .mcp-manager .mcp-parameter-field>:is(input,select){width:100%;min-width:0;min-height:40px;border:1px solid var(--mcp-line);border-radius:8px;background:var(--hep-control-bg,var(--mcp-surface));color:var(--mcp-ink);padding:8px 10px}.mcp-manager .mcp-parameter-hint{display:block;margin:8px 0;color:var(--mcp-muted);font-size:12px;line-height:1.6;overflow-wrap:anywhere}.mcp-manager .mcp-parameter-field>.mcp-parameter-hint{margin:0}.mcp-manager .mcp-parameter-error{margin:4px 0;color:var(--hep-danger,#c43a40);overflow-wrap:anywhere}.mcp-manager .mcp-parameter-object{border-left:2px solid var(--mcp-line);padding-left:12px;min-width:0}.mcp-manager .mcp-parameter-object>summary{cursor:pointer;color:var(--mcp-link);padding:4px 0 8px}.mcp-manager .mcp-parameter-array{display:grid;gap:12px}.mcp-manager .mcp-parameter-item{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:8px;border-left:2px solid var(--mcp-line);padding-left:12px}.mcp-manager .mcp-parameter-actions{margin-top:16px}.mcp-manager .mcp-parameter-actions>button,.mcp-manager .mcp-parameter-unset{border-color:transparent;background:transparent;color:var(--mcp-link);justify-self:start;padding:4px 0}.mcp-manager .mcp-parameter-raw{margin-top:8px}
+      .mcp-manager .mcp-debug-legacy{margin-top:16px}.mcp-manager .mcp-debug-legacy>summary{cursor:pointer;color:var(--mcp-muted);font-size:14px}
+      @media(max-width:1100px){.mcp-manager .mcp-debug-layout{grid-template-columns:minmax(0,1fr)}}
+      @media(max-width:760px){.mcp-manager .mcp-layout{grid-template-columns:minmax(0,1fr)}.mcp-manager .mcp-debug-target{align-items:stretch}.mcp-manager .mcp-debug-target>.hep-search-select{flex-basis:100%;width:100%}.mcp-manager .mcp-debug-result{min-height:200px}.mcp-manager .mcp-debug-target>button{margin-left:auto}.mcp-manager .mcp-parameter-item{grid-template-columns:minmax(0,1fr)}}
+      @media(pointer:coarse){.mcp-manager .mcp-parameter-field>:is(input,select){min-height:44px}}
       @media(prefers-reduced-motion:reduce){.mcp-manager button,.mcp-manager input,.mcp-manager select,.mcp-manager summary::before{transition:none}.mcp-manager button:active:not(:disabled){transform:none}}
     `
 
@@ -148,8 +159,9 @@ window.__ModuleLoader__.load({
       const [templateUri, setTemplateUri] = useState('')
       const [templateArguments, setTemplateArguments] = useState('{}')
       const [debugType, setDebugType] = useState('tools')
-      const [debugQuery, setDebugQuery] = useState('')
       const [resultBasis, setResultBasis] = useState(null)
+      const [parametersValid, setParametersValid] = useState(true)
+      const [parameterDrafts, setParameterDrafts] = useState(new Map())
       const diagnosticDrafts = React.useRef(new Map())
       const diagnosticReceipts = React.useRef(new Map())
       const capabilityRequests = React.useRef(new Map())
@@ -166,10 +178,14 @@ window.__ModuleLoader__.load({
         if (previousDiagnostic.current) diagnosticDrafts.current.set(previousDiagnostic.current, diagnosticInputs.current)
         const saved = diagnosticDrafts.current.get(selectionKey)
         previousDiagnostic.current = selectionKey
-        setToolName(initialTool.current || saved?.toolName || ''); initialTool.current = ''
-        setArgumentsText(saved?.argumentsText || '{}'); setUriText(saved?.uriText || '')
-        setTemplateUri(saved?.templateUri || ''); setTemplateArguments(saved?.templateArguments || '{}')
-        setDebugType(saved?.debugType || 'tools'); setResult(saved?.result || null); setResultBasis(saved?.resultBasis || null); setDebugQuery('')
+        const nextName = initialTool.current || saved?.toolName || ''
+        setToolName(nextName); initialTool.current = ''
+        setArgumentsText(toolDrafts.current.get(`${selectionKey}:${nextName}`) ?? (nextName === saved?.toolName ? saved.argumentsText : undefined) ?? '{}'); setUriText(saved?.uriText ?? '')
+        setTemplateUri(saved?.templateUri || ''); setTemplateArguments(saved?.templateArguments ?? '{}')
+        const kind = saved?.debugType || 'tools'
+        const name = kind === 'tools' ? nextName : kind === 'templates' ? saved?.templateUri : saved?.uriText
+        const receipt = diagnosticReceipts.current.get(`${selectionKey}:${kind}:${name}`)
+        setDebugType(kind); setResult(receipt?.result ?? saved?.result ?? null); setResultBasis(receipt?.basis ?? saved?.resultBasis ?? null)
       }, [selectionKey])
       const diagnosticRequest = React.useRef(0)
       const diagnosticTarget = React.useRef('')
@@ -178,7 +194,7 @@ window.__ModuleLoader__.load({
       const page = ['servers', 'groups', 'connection'].includes(view) ? view : localPage
       const setPage = next => { setLocalPage(next); if (next === 'servers') onValidationError?.() }
       const openGroupDiagnostic = groupId => { setSelected(`group:${groupId}`); if (onOpenView) onOpenView('connection', undefined, groupId); else setPage('connection') }
-      const openDiagnostic = (serverId, name) => { if (name) { initialTool.current = name; setToolName(name); setArgumentsText(toolDrafts.current.get(`${serverId}:${name}`) || '{}'); setDebugType('tools'); setResult(null); setResultBasis(null) }; setSelected(serverId); if (onOpenView) onOpenView('connection', serverId); else setPage('connection') }
+      const openDiagnostic = (serverId, name) => { if (name) { initialTool.current = serverId === selectionKey ? '' : name; setToolName(name); setArgumentsText(toolDrafts.current.get(`${serverId}:${name}`) ?? initialArguments(discovered[serverId]?.find(tool => tool.name === name)?.inputSchema)); setDebugType('tools'); setResult(null); setResultBasis(null) }; setSelected(serverId); if (onOpenView) onOpenView('connection', serverId); else setPage('connection') }
       const copy = async (key, value, onCopied = () => {}) => {
         try {
           await copyText(value)
@@ -228,9 +244,13 @@ window.__ModuleLoader__.load({
         if (index >= 0) setActiveGroup(index)
       }, [selectedGroupId, draft?.groups])
       useEffect(() => {
+        for (const [key, receipt] of diagnosticReceipts.current) {
+          if (receipt.basis.phase === 'running') diagnosticReceipts.current.set(key, { result: null, basis: { ...receipt.basis, phase: 'unknown', message: '调试对象或配置已切换，未继续接收原请求的回执。远端可能已执行，请先核对结果。' } })
+        }
         diagnosticRequest.current++; diagnosticGeneration.current++; capabilityRequests.current.clear()
+        if (resultBasis && !resultBasis.targetKey.endsWith(`:${state?.revision}`)) { setResult(null); setResultBasis(null) }
         setBusy(false); setSources(null); setCatalog(null); setLegacyResult(null); if (page === 'connection') setStatus('')
-      }, [selected, state?.revision])
+      }, [selectionKey, state?.revision])
       if (view === 'summary') return <>通过 OpenAPI 规范生成 MCP tools/resources，并管理分组链接。</>
       if (!draft || !state) return <div className="mcp-manager" role="status" aria-label="读取 MCP 配置" aria-busy="true"><style>{styles}</style><span className="mcp-loading-indicator" aria-hidden="true" /></div>
 
@@ -279,6 +299,15 @@ window.__ModuleLoader__.load({
       const diagnosticId = (isGroup ? diagnosticGroup : diagnosticServer)?.id ?? ''
       const targetKey = `${isGroup ? 'group' : 'server'}:${diagnosticId}:${state.revision}`
       const diagnosticSignature = JSON.stringify(debugType === 'tools' ? { type: debugType, toolName, argumentsText } : debugType === 'templates' ? { type: debugType, templateUri, templateArguments } : { type: debugType, uriText })
+      const currentCatalog = catalog?.targetKey === targetKey ? catalog.data : null
+      const currentTool = currentCatalog?.tools?.find(tool => tool.name === toolName)
+      const currentResource = currentCatalog?.resources?.resources?.find(item => item.uri === uriText)
+      const currentTemplate = currentCatalog?.resourceTemplates?.resourceTemplates?.find(item => item.uriTemplate === templateUri)
+      const parameterKey = `${selectionKey}:${debugType}:${debugType === 'tools' ? toolName : templateUri}`
+      const parameterSchema = debugType === 'tools' ? currentTool?.inputSchema : templateParameterSchema(templateUri)
+      const updateParameterDraft = value => setParameterDrafts(previous => new Map(previous).set(parameterKey, value))
+      const updateArguments = value => { toolDrafts.current.set(`${selectionKey}:${toolName}`, value); setArgumentsText(value) }
+      const updateTemplateArguments = value => { templateDrafts.current.set(`${selectionKey}:${templateUri}`, value); setTemplateArguments(value) }
       diagnosticTarget.current = targetKey
       diagnosticView.current = `${selectionKey}:${debugType}:${debugType === 'tools' ? toolName : debugType === 'templates' ? templateUri : uriText}`
       const call = async (action, extra = {}) => {
@@ -291,31 +320,45 @@ window.__ModuleLoader__.load({
         const current = () => diagnosticTarget.current === targetKey && diagnosticGeneration.current === generation
           && (execution ? capabilityRequests.current.get(receiptKey) === requestId : diagnosticRequest.current === requestId)
         const visible = () => !execution || diagnosticView.current === receiptKey
+        const basis = { targetKey, signature: diagnosticSignature, object: `${isGroup ? '分组' : '服务'} ${diagnosticId}`, capability, at: new Date().toLocaleString() }
+        const receipt = (phase, data = null, message = '') => {
+          const nextBasis = { ...basis, phase, message }
+          diagnosticReceipts.current.set(receiptKey, { result: data, basis: nextBasis })
+          if (visible()) { setResult(data); setResultBasis(nextBasis) }
+        }
         setBusy(true)
         setStatus('')
-        if (action === 'test') setCatalog(null)
+        if (execution) receipt('running')
+        let rejected = false
         try {
           const response = await fetch(new URL('api/mcp-manager', document.baseURI), {
             method: 'POST', credentials: 'same-origin',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ ...(isGroup ? { groupId: diagnosticId } : { serverId: diagnosticId }), action, ...extra }),
           })
+          rejected = !response.ok
           const data = await response.json()
           if (!current()) return
           if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`)
           if (['sources', 'create', 'refresh', 'toggle', 'components', 'logs', 'preview', 'invoke'].includes(action)) setLegacyResult(data)
-          else if (execution) {
-            const basis = { targetKey, signature: diagnosticSignature, object: `${isGroup ? '分组' : '服务'} ${diagnosticId}`, capability, at: new Date().toLocaleString() }
-            diagnosticReceipts.current.set(receiptKey, { result: data, basis })
-            if (visible()) { setResult(data); setResultBasis(basis) }
-          }
+          else if (execution) receipt(data?.isError ? 'tool-error' : 'received', data)
           if (action === 'sources' || action === 'create' || action === 'refresh' || action === 'toggle') {
             const list = action === 'sources' ? data : await callSources(diagnosticId)
             if (!current()) return
             setSources(list)
           }
           if (action === 'test') {
-            if ((data.tools ?? []).length && !(data.tools ?? []).some(tool => tool.name === toolName)) { setToolName(data.tools[0].name); setArgumentsText(toolDrafts.current.get(`${selectionKey}:${data.tools[0].name}`) || '{}') }
+            const latest = diagnosticInputs.current
+            const latestName = latest?.toolName ?? toolName
+            const latestArguments = latest?.argumentsText ?? argumentsText
+            const nextTool = data.tools?.find(tool => tool.name === latestName) ?? data.tools?.[0]
+            if (nextTool) {
+              const saved = toolDrafts.current.get(`${selectionKey}:${nextTool.name}`)
+              if (nextTool.name !== latestName) {
+                if (latestName) toolDrafts.current.set(`${selectionKey}:${latestName}`, latestArguments)
+                setToolName(nextTool.name); setArgumentsText(saved ?? initialArguments(nextTool.inputSchema)); restoreDiagnosticReceipt('tools', nextTool.name)
+              } else if (saved === undefined && latestArguments === '{}') setArgumentsText(initialArguments(nextTool.inputSchema))
+            }
             setCatalog({ targetKey, ...(isGroup ? { groupId: diagnosticId } : { serverId: diagnosticId }), data })
             if (!isGroup) {
             setDiscovered(previous => ({ ...previous,
@@ -329,8 +372,8 @@ window.__ModuleLoader__.load({
             }
           }
           if (visible()) setStatus(action === 'test' ? (data.toolsUnavailable || data.resources?.unavailable || data.resourceTemplates?.unavailable ? '部分列表读取失败，已保留可用的发现结果；可重试发现。' : isGroup ? '已连接已发布分组端点并读取能力列表；业务效果请以实际调用结果为准。' : '配置解析与工具发现成功；新会话仍需单独验证。')
-            : '上游操作已返回；请检查下方结果和新会话。')
-        } catch (error) { if (!current()) return; if (action === 'test' && !isGroup) setChecks(previous => ({ ...previous, [diagnosticId]: { at: new Date().toLocaleString(), revision: state.revision, failed: true } })); if (visible()) setStatus(String(error)) }
+            : execution ? '' : '上游操作已返回；请检查下方结果和新会话。')
+        } catch (error) { if (!current()) return; if (action === 'test' && !isGroup) setChecks(previous => ({ ...previous, [diagnosticId]: { at: new Date().toLocaleString(), revision: state.revision, failed: true } })); if (execution) receipt(rejected ? 'failed' : 'unknown', null, String(error)); else if (visible()) setStatus(String(error)) }
         finally { if (current()) { if (execution) capabilityRequests.current.delete(receiptKey); if (visible()) setBusy(false) } }
       }
       const callSources = async serverId => {
@@ -342,14 +385,26 @@ window.__ModuleLoader__.load({
         return data
       }
       const callTool = action => {
-        try { void call(action, { sourceId, toolName: action === 'callTool' ? toolName : legacyToolName, arguments: JSON.parse(action === 'callTool' ? argumentsText : legacyArguments) }) }
+        if (action === 'callTool') {
+          const errors = parameterErrors(currentTool?.inputSchema, argumentsText)
+          if (!parametersValid || errors.length) { setStatus(errors[0] || '请先修正参数中的格式错误。'); return }
+        }
+        try { return call(action, { sourceId, toolName: action === 'callTool' ? toolName : legacyToolName, arguments: JSON.parse(action === 'callTool' ? argumentsText : legacyArguments) }) }
         catch (error) { setStatus(`工具参数 JSON 无效：${String(error)}`) }
       }
       const restoreDiagnosticReceipt = (kind, name) => { const saved = diagnosticReceipts.current.get(`${selectionKey}:${kind}:${name}`); setResult(saved?.result ?? null); setResultBasis(saved?.basis ?? null) }
-      const selectDebugTool = name => { toolDrafts.current.set(`${selectionKey}:${toolName}`, argumentsText); setToolName(name); setArgumentsText(toolDrafts.current.get(`${selectionKey}:${name}`) || '{}'); restoreDiagnosticReceipt('tools', name) }
-      const selectDebugTemplate = uri => { templateDrafts.current.set(`${selectionKey}:${templateUri}`, templateArguments); setTemplateUri(uri); setTemplateArguments(templateDrafts.current.get(`${selectionKey}:${uri}`) || '{}'); restoreDiagnosticReceipt('templates', uri) }
-      const selectDebugType = kind => { setDebugType(kind); setDebugQuery(''); restoreDiagnosticReceipt(kind, kind === 'tools' ? toolName : kind === 'templates' ? templateUri : uriText) }
-      const objectSelect = props => SearchSelect ? <SearchSelect {...props}/> : <label className="mcp-field">{props.label}<select value={props.value} onChange={event => props.onChange(event.target.value)}><option value="">{props.placeholder || '请选择'}</option>{props.options.map(option => <option key={option.value} value={option.value} disabled={option.disabled}>{option.label}</option>)}</select></label>
+      const selectDebugTool = name => { toolDrafts.current.set(`${selectionKey}:${toolName}`, argumentsText); setToolName(name); setArgumentsText(toolDrafts.current.get(`${selectionKey}:${name}`) ?? initialArguments(currentCatalog?.tools?.find(tool => tool.name === name)?.inputSchema)); restoreDiagnosticReceipt('tools', name) }
+      const selectDebugTemplate = uri => { templateDrafts.current.set(`${selectionKey}:${templateUri}`, templateArguments); setTemplateUri(uri); setTemplateArguments(templateDrafts.current.get(`${selectionKey}:${uri}`) ?? initialArguments(templateParameterSchema(uri))); restoreDiagnosticReceipt('templates', uri) }
+      const selectDebugType = kind => { setDebugType(kind); restoreDiagnosticReceipt(kind, kind === 'tools' ? toolName : kind === 'templates' ? templateUri : uriText) }
+      const objectSelect = props => SearchSelect ? <SearchSelect key={`${targetKey}:${props.label}`} {...props}/> : <label className="mcp-field">{props.label}<select aria-label={props.label} value={props.value} onChange={event => props.onChange(event.target.value)}><option value="">{props.placeholder || '请选择'}</option>{props.options.map(option => <option key={option.value} value={option.value} disabled={option.disabled}>{option.label}</option>)}</select></label>
+      const description = (value, identity) => !value ? <p className="mcp-muted">服务未提供说明。</p> : value.length > 180 || value.split('\n').length > 3
+        ? <details key={identity} className="mcp-debug-description"><summary><span>{value}</span><small>展开完整说明</small></summary><p>{value}</p></details>
+        : <p className="mcp-debug-description-text">{value}</p>
+      const resultContent = value => {
+        const items = value?.content ?? value?.contents
+        return Array.isArray(items) ? <>{items.map((item, index) => <div key={index}>{item.uri && <p className="mcp-muted">{item.uri}</p>}{typeof item.text === 'string' ? <pre className="mcp-result">{item.text}</pre> : <p className="mcp-muted">{item.type || item.mimeType || '非文本内容'} · 完整内容见原始响应</p>}</div>)}{value.structuredContent !== undefined && <pre className="mcp-result">{JSON.stringify(value.structuredContent, null, 2)}</pre>}</>
+          : <pre className="mcp-result">{JSON.stringify(value, null, 2)}</pre>
+      }
       const downloadResult = () => { const url = URL.createObjectURL(new Blob([JSON.stringify({ ...resultBasis, result }, null, 2)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = 'mcp-debug-result.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 0) }
       const save = async (value = draft) => {
         setBusy(true)
@@ -741,34 +796,47 @@ window.__ModuleLoader__.load({
                 {button('发现工具与资源', () => call('test'), busy || !diagnosticId)}
                 {!diagnosticId && <p role="alert">调试目标不存在或尚未保存，请重新选择。</p>}
               </div>
-              <div className="mcp-debug-layout"><section className="mcp-card mcp-debug-parameters" aria-label="调试参数">
+              <section className="mcp-card mcp-debug-selection" aria-label="选择调试能力">
                 <nav className="mcp-service-tabs" aria-label="能力类型">{[['tools', '工具'], ['resources', '资源 URI'], ['templates', '资源模板']].map(([kind, label]) => <button key={kind} type="button" aria-current={debugType === kind ? 'page' : undefined} onClick={() => selectDebugType(kind)}>{label}</button>)}</nav>
-                {catalog?.targetKey !== targetKey ? <p className="mcp-empty">先发现当前对象的工具与资源。</p> : <>
+                {!currentCatalog ? <p className="mcp-empty">先发现当前对象的工具与资源。</p> : <>
                   {debugType === 'tools' && <>
-                    {objectSelect({ label: '工具', value: toolName, placeholder: '请选择工具', options: (catalog.data.tools ?? []).map(tool => ({ value: tool.name, label: tool.title || tool.name, description: tool.description })), onChange: selectDebugTool })}
-                    {catalog.data.toolsUnavailable && <p className="mcp-muted">工具列表读取失败，可重新发现。</p>}
-                    {!catalog.data.toolsUnavailable && !catalog.data.tools?.length && <p className="mcp-muted">没有可调用的工具。</p>}
-                    {(catalog.data.tools ?? []).find(tool => tool.name === toolName)?.inputSchema && <details className="mcp-debug-schema"><summary>参数定义</summary><pre>{JSON.stringify(catalog.data.tools.find(tool => tool.name === toolName).inputSchema, null, 2)}</pre></details>}
-                    <label className="mcp-field">调用参数 JSON<textarea aria-label="调用参数 JSON" rows={12} spellCheck={false} value={argumentsText} onChange={event => setArgumentsText(event.target.value)}/></label>
-                    <div className="mcp-actions">{button('测试工具', () => callTool('callTool'), busy || !toolName || !(catalog.data.tools ?? []).some(tool => tool.name === toolName))}</div>
+                    <div className="mcp-debug-selector"><span>工具</span>{objectSelect({ label: '工具', value: toolName, placeholder: '请选择工具', descriptionLines: 2, popupMinWidth: 560, options: (currentCatalog.tools ?? []).map(tool => ({ value: tool.name, label: tool.title && tool.title !== tool.name ? `${tool.title} · ${tool.name}` : tool.name, description: tool.description })), onChange: selectDebugTool })}</div>
+                    {currentCatalog.toolsUnavailable ? <p className="mcp-note">工具列表读取失败，可重新发现。</p> : !currentCatalog.tools?.length ? <p className="mcp-muted">没有可调用的工具。</p> : currentTool && description(currentTool.description, toolName)}
                   </>}
                   {debugType === 'resources' && <>
-                    <label className="mcp-field">查找资源<input type="search" value={debugQuery} onChange={event => setDebugQuery(event.target.value)} placeholder="按名称或 URI 筛选"/></label>
-                    {catalog.data.resources?.unavailable ? <p className="mcp-muted">资源列表未提供或读取失败，可在高级区填写已知 URI。</p> : <ul className="mcp-catalog">{(catalog.data.resources?.resources ?? []).filter(item => `${item.name ?? ''} ${item.uri}`.toLowerCase().includes(debugQuery.trim().toLowerCase())).map(item => <li key={item.uri}><button type="button" className="mcp-debug-choice" aria-pressed={uriText === item.uri} onClick={() => { setUriText(item.uri); restoreDiagnosticReceipt('resources', item.uri) }}>{item.name || item.uri}<small>{item.uri}</small></button></li>)}</ul>}
-                    {!catalog.data.resources?.unavailable && !(catalog.data.resources?.resources ?? []).some(item => `${item.name ?? ''} ${item.uri}`.toLowerCase().includes(debugQuery.trim().toLowerCase())) && <p className="mcp-muted">{catalog.data.resources?.resources?.length ? '没有匹配项。' : '没有可列出的资源。'}</p>}
-                    <details className="mcp-debug-schema" open={!!uriText}><summary>已选或已知资源 URI</summary><label className="mcp-field">Resource URI{input(uriText, setUriText)}</label><small>分组仍由已保存的发布范围核对 URI。</small></details>
-                    <div className="mcp-actions">{button('读取资源', () => call('readResource', { uri: uriText }), busy || !uriText)}</div>
+                    <div className="mcp-debug-selector"><span>资源</span>{objectSelect({ label: '资源', value: uriText, placeholder: '搜索资源名称、URI 或说明', descriptionLines: 2, popupMinWidth: 560, options: (currentCatalog.resources?.resources ?? []).map(item => ({ value: item.uri, label: item.name && item.name !== item.uri ? `${item.name} · ${item.uri}` : item.uri, description: item.description })), onChange: uri => { setUriText(uri); restoreDiagnosticReceipt('resources', uri) } })}</div>
+                    {currentCatalog.resources?.unavailable ? <p className="mcp-note">资源列表未提供或读取失败；可填写已知 URI。</p> : !currentCatalog.resources?.resources?.length ? <p className="mcp-muted">没有可列出的资源，可填写已知 URI。</p> : currentResource && description(currentResource.description, uriText)}
                   </>}
                   {debugType === 'templates' && <>
-                    {objectSelect({ label: '资源模板', value: templateUri, placeholder: '请选择模板', options: (catalog.data.resourceTemplates?.resourceTemplates ?? []).map(item => ({ value: item.uriTemplate, label: item.name || item.uriTemplate, description: item.uriTemplate })), onChange: selectDebugTemplate })}
-                    {catalog.data.resourceTemplates?.unavailable ? <p className="mcp-muted">模板列表未提供或读取失败。</p> : !catalog.data.resourceTemplates?.resourceTemplates?.length && <p className="mcp-muted">没有可用的资源模板。</p>}
-                    {templateUri && <p className="mcp-muted"><code>{templateUri}</code> · 按模板变量名称填写参数。</p>}
-                    <label className="mcp-field">模板参数 JSON<textarea aria-label="模板参数 JSON" rows={10} spellCheck={false} value={templateArguments} onChange={event => setTemplateArguments(event.target.value)}/></label>
-                    <div className="mcp-actions">{button('读取模板资源', () => { try { void call('readResource', { uriTemplate: templateUri, arguments: JSON.parse(templateArguments) }) } catch { setStatus('模板参数 JSON 无效') } }, busy || !templateUri)}</div>
+                    <div className="mcp-debug-selector"><span>资源模板</span>{objectSelect({ label: '资源模板', value: templateUri, placeholder: '请选择模板', descriptionLines: 2, popupMinWidth: 560, options: (currentCatalog.resourceTemplates?.resourceTemplates ?? []).map(item => ({ value: item.uriTemplate, label: item.name && item.name !== item.uriTemplate ? `${item.name} · ${item.uriTemplate}` : item.uriTemplate, description: item.description })), onChange: selectDebugTemplate })}</div>
+                    {currentCatalog.resourceTemplates?.unavailable ? <p className="mcp-note">模板列表未提供或读取失败，可重新发现。</p> : !currentCatalog.resourceTemplates?.resourceTemplates?.length ? <p className="mcp-muted">没有可用的资源模板。</p> : currentTemplate && <>{description(currentTemplate.description, templateUri)}<p className="mcp-muted"><code>{templateUri}</code></p></>}
                   </>}
                 </>}
-              </section><section className="mcp-card mcp-debug-result" aria-label="本次调试结果"><div className="mcp-card-head"><h3>结果</h3>{result && <div className="mcp-actions">{button('复制', () => copy('debug-result', JSON.stringify({ ...resultBasis, result }, null, 2)))}{button('下载', downloadResult)}</div>}</div>
-                {busy ? <p role="status">正在请求，等待本次回执…</p> : result ? <><p className="mcp-muted">{resultBasis?.object} · {resultBasis?.capability} · {resultBasis?.at}</p>{resultBasis && (resultBasis.targetKey !== targetKey || resultBasis.signature !== diagnosticSignature) && <p className="mcp-note">输入或保存范围已变化，以下是上次提交的结果。</p>}<pre className="mcp-result" tabIndex={0}>{JSON.stringify(result, null, 2)}</pre>{copyFeedback('debug-result', JSON.stringify({ ...resultBasis, result }, null, 2))}</> : <div className="mcp-empty">提交后在这里查看真实回执。</div>}
+              </section>
+              <div className="mcp-debug-layout"><section className="mcp-card mcp-debug-parameters" aria-label="调试参数">
+                <h3>{debugType === 'resources' ? '读取资源' : debugType === 'templates' ? '模板参数' : '调用参数'}</h3>
+                {!currentCatalog ? <p className="mcp-muted">发现能力后在这里填写参数。</p> : debugType === 'resources' ? <>
+                  <label className="mcp-field">资源 URI *{input(uriText, setUriText, { 'aria-label': '资源 URI', placeholder: '选择资源或填写已知 URI' })}</label>
+                  <div className="mcp-actions">{button('读取资源', () => call('readResource', { uri: uriText }), busy || !uriText)}</div>
+                </> : (debugType === 'tools' ? currentTool : currentTemplate) ? <>
+                  <ParameterEditor key={`${targetKey}:${parameterKey}`} schema={parameterSchema} value={debugType === 'tools' ? argumentsText : templateArguments} onChange={debugType === 'tools' ? updateArguments : updateTemplateArguments} label={debugType === 'tools' ? '调用参数' : '模板参数'} disabled={busy} draftState={parameterDrafts.get(parameterKey)} onDraftStateChange={updateParameterDraft} onValidityChange={setParametersValid}/>
+                  <div className="mcp-actions">{debugType === 'tools' ? button('调用工具', () => callTool('callTool'), busy || !parametersValid) : button('读取模板资源', () => {
+                    const errors = parameterErrors(parameterSchema, templateArguments)
+                    if (!parametersValid || errors.length) { setStatus(errors[0] || '请先修正模板参数中的格式错误。'); return }
+                    return call('readResource', { uriTemplate: templateUri, arguments: JSON.parse(templateArguments) })
+                  }, busy || !parametersValid)}</div>
+                  <details className="mcp-debug-schema"><summary>原始参数定义</summary><pre>{JSON.stringify(parameterSchema ?? {}, null, 2)}</pre></details>
+                </> : <p className="mcp-muted">请选择{debugType === 'tools' ? '工具' : '资源模板'}。</p>}
+              </section><section className="mcp-card mcp-debug-result" aria-label="本次调试结果"><div className="mcp-card-head"><h3>返回结果</h3>{resultBasis && <div className="mcp-actions">{button('复制', () => copy('debug-result', JSON.stringify({ ...resultBasis, result }, null, 2)))}{button('下载', downloadResult)}</div>}</div>
+                {resultBasis ? <>
+                  <p className="mcp-debug-status" data-phase={resultBasis.phase} role={['failed', 'unknown', 'tool-error'].includes(resultBasis.phase) ? 'alert' : 'status'}>{({ running: '正在请求，等待返回结果…', received: '调用完成', 'tool-error': '工具返回错误', failed: '请求失败', unknown: '结果待核对' })[resultBasis.phase] || '已收到响应'}</p>
+                  <p className="mcp-muted">{resultBasis.object} · {resultBasis.capability} · {resultBasis.at}</p>
+                  {(resultBasis.targetKey !== targetKey || resultBasis.signature !== diagnosticSignature) && <p className="mcp-note">输入或保存范围已变化，以下是上次提交的结果。</p>}
+                  {resultBasis.phase === 'unknown' && <p className="mcp-muted">未收到有效回执，远端可能已执行。请先核对远端结果，再决定是否重新调用。</p>}
+                  {resultBasis.message && <p className="mcp-muted">{resultBasis.message}</p>}
+                  {result !== null && <>{resultContent(result)}<details className="mcp-debug-schema"><summary>原始响应</summary><pre className="mcp-result">{JSON.stringify(result, null, 2)}</pre></details></>}
+                  {copyFeedback('debug-result', JSON.stringify({ ...resultBasis, result }, null, 2))}
+                </> : <div className="mcp-empty">尚未调用。{debugType === 'resources' ? '选择资源后点击“读取资源”。' : '填写参数后点击调用按钮。'}</div>}
               </section></div>
               {!isGroup && diagnosticServer?.managementUrl && <details className="mcp-card mcp-debug-legacy"><summary>高级：旧兼容管理 API</summary><p className="mcp-muted">{diagnosticServer.managementUrl}</p><div className="mcp-actions">{button('读取来源', () => call('sources'), busy || !diagnosticId)}</div>
                 <section className="mcp-section"><h3>添加来源</h3><div className="mcp-fields"><label className="mcp-field">来源名称{input(specName, setSpecName)}</label><label className="mcp-field">OpenAPI specification URL{input(specUrl, setSpecUrl)}</label></div><div className="mcp-actions">{button('创建来源', () => call('create', { name: specName, specUrl }), busy || !specName || !diagnosticId)}</div></section>

@@ -1,0 +1,866 @@
+{
+  "at": "2026-11-03T09:13:40.702Z",
+  "scope": "实际18120认证/配置/客户端与原生主题；MCP发现/调用HTTP响应为浏览器UI夹具，无真实MCP工具或业务写入；最后单独进行真实只读发现",
+  "checks": [
+    {
+      "phase": "setup",
+      "name": "真实平台认证",
+      "ok": true
+    },
+    {
+      "phase": "setup",
+      "name": "记录精确主题偏好",
+      "ok": true
+    },
+    {
+      "phase": "defaults-and-required",
+      "name": "工具标题同时显示原始工具名",
+      "ok": true
+    },
+    {
+      "phase": "defaults-and-required",
+      "name": "嵌套必填示例已填",
+      "ok": true
+    },
+    {
+      "phase": "defaults-and-required",
+      "name": "默认0保留",
+      "ok": true
+    },
+    {
+      "phase": "defaults-and-required",
+      "name": "默认false保留",
+      "ok": true
+    },
+    {
+      "phase": "defaults-and-required",
+      "name": "必填星号可见",
+      "ok": true
+    },
+    {
+      "phase": "defaults-and-required",
+      "name": "缺少必填值不派发调用",
+      "ok": true
+    },
+    {
+      "phase": "defaults-and-required",
+      "name": "无默认可选字段未提交",
+      "ok": true
+    },
+    {
+      "phase": "defaults-and-required",
+      "name": "JSON与表单输入一致",
+      "ok": true
+    },
+    {
+      "phase": "defaults-and-required",
+      "name": "非法JSON切回表单保留原文",
+      "ok": true
+    },
+    {
+      "phase": "defaults-and-required",
+      "name": "复杂字段保留局部JSON入口",
+      "ok": true
+    },
+    {
+      "phase": "tool-drafts-and-partial-input",
+      "name": "数值半输入可见且禁止调用",
+      "ok": true
+    },
+    {
+      "phase": "tool-drafts-and-partial-input",
+      "name": "未知业务ID保持未填",
+      "ok": true
+    },
+    {
+      "phase": "tool-drafts-and-partial-input",
+      "name": "返回工具保留数值半输入",
+      "ok": true
+    },
+    {
+      "phase": "tool-drafts-and-partial-input",
+      "name": "第二工具草稿保留",
+      "ok": true
+    },
+    {
+      "phase": "tool-drafts-and-partial-input",
+      "name": "首工具普通输入保留",
+      "ok": true
+    },
+    {
+      "phase": "tool-drafts-and-partial-input",
+      "name": "重新发现不覆盖草稿",
+      "ok": true
+    },
+    {
+      "phase": "success-result-copy-download",
+      "name": "文本结果直接可读",
+      "ok": true
+    },
+    {
+      "phase": "success-result-copy-download",
+      "name": "修改输入标识历史结果",
+      "ok": true
+    },
+    {
+      "phase": "success-result-copy-download",
+      "name": "复制反馈可见",
+      "ok": true
+    },
+    {
+      "phase": "success-result-copy-download",
+      "name": "下载结果为JSON",
+      "ok": true
+    },
+    {
+      "phase": "result-tool-error",
+      "name": "工具返回错误状态准确",
+      "ok": true
+    },
+    {
+      "phase": "result-reject",
+      "name": "请求失败状态准确",
+      "ok": true
+    },
+    {
+      "phase": "result-lost",
+      "name": "结果待核对状态准确",
+      "ok": true
+    },
+    {
+      "phase": "result-lost",
+      "name": "未知结果提示先核对远端",
+      "ok": true
+    },
+    {
+      "phase": "resource-and-template",
+      "name": "选中资源展示说明",
+      "ok": true
+    },
+    {
+      "phase": "resource-and-template",
+      "name": "选中模板展示说明",
+      "ok": true
+    },
+    {
+      "phase": "resource-and-template",
+      "name": "切换能力保留工具草稿",
+      "ok": true
+    },
+    {
+      "phase": "resource-and-template",
+      "name": "模板草稿独立保留",
+      "ok": true
+    },
+    {
+      "phase": "target-draft-isolation",
+      "name": "返回目标保留原草稿",
+      "ok": true
+    },
+    {
+      "phase": "1440-light-layout-menu",
+      "name": "1440-light-form 无整页横向溢出",
+      "ok": true,
+      "detail": {
+        "width": 1440,
+        "documentWidth": 1440,
+        "selectionWidth": 1384,
+        "parameterWidth": 684,
+        "resultWidth": 684,
+        "parametersTop": 715.328125,
+        "resultTop": 715.328125,
+        "themeSource": "light"
+      }
+    },
+    {
+      "phase": "1440-light-layout-menu",
+      "name": "1440-light-form 宽屏输入结果并排",
+      "ok": true
+    },
+    {
+      "phase": "1440-light-layout-menu",
+      "name": "下拉受视口约束",
+      "ok": true,
+      "detail": {
+        "width": 1342,
+        "left": 49,
+        "right": 1391,
+        "viewport": 1440,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgb(255, 255, 255) none repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "1440-light-layout-menu",
+      "name": "下拉宽度满足上下文",
+      "ok": true,
+      "detail": {
+        "width": 1342,
+        "left": 49,
+        "right": 1391,
+        "viewport": 1440,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgb(255, 255, 255) none repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "1440-light-layout-menu",
+      "name": "摘要最多两行",
+      "ok": true,
+      "detail": {
+        "width": 1342,
+        "left": 49,
+        "right": 1391,
+        "viewport": 1440,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgb(255, 255, 255) none repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "1440-light-layout-menu",
+      "name": "完整描述参与搜索",
+      "ok": true
+    },
+    {
+      "phase": "1440-light-layout-menu",
+      "name": "键盘选择后焦点回选择框",
+      "ok": true
+    },
+    {
+      "phase": "768-light-layout-menu",
+      "name": "768-light-form 无整页横向溢出",
+      "ok": true,
+      "detail": {
+        "width": 768,
+        "documentWidth": 768,
+        "selectionWidth": 712,
+        "parameterWidth": 712,
+        "resultWidth": 712,
+        "parametersTop": 1092.078125,
+        "resultTop": 2929.515625,
+        "themeSource": "light"
+      }
+    },
+    {
+      "phase": "768-light-layout-menu",
+      "name": "768-light-form 窄屏输入结果上下排列",
+      "ok": true
+    },
+    {
+      "phase": "768-light-layout-menu",
+      "name": "下拉受视口约束",
+      "ok": true,
+      "detail": {
+        "width": 674,
+        "left": 47,
+        "right": 721,
+        "viewport": 768,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgb(255, 255, 255) none repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "768-light-layout-menu",
+      "name": "下拉宽度满足上下文",
+      "ok": true,
+      "detail": {
+        "width": 674,
+        "left": 47,
+        "right": 721,
+        "viewport": 768,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgb(255, 255, 255) none repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "768-light-layout-menu",
+      "name": "摘要最多两行",
+      "ok": true,
+      "detail": {
+        "width": 674,
+        "left": 47,
+        "right": 721,
+        "viewport": 768,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgb(255, 255, 255) none repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "768-light-layout-menu",
+      "name": "完整描述参与搜索",
+      "ok": true
+    },
+    {
+      "phase": "768-light-layout-menu",
+      "name": "键盘选择后焦点回选择框",
+      "ok": true
+    },
+    {
+      "phase": "390-light-layout-menu",
+      "name": "390-light-form 无整页横向溢出",
+      "ok": true,
+      "detail": {
+        "width": 390,
+        "documentWidth": 390,
+        "selectionWidth": 366,
+        "parameterWidth": 366,
+        "resultWidth": 366,
+        "parametersTop": 760.8125,
+        "resultTop": 2678.21875,
+        "themeSource": "light"
+      }
+    },
+    {
+      "phase": "390-light-layout-menu",
+      "name": "390-light-form 窄屏输入结果上下排列",
+      "ok": true
+    },
+    {
+      "phase": "390-light-layout-menu",
+      "name": "下拉受视口约束",
+      "ok": true,
+      "detail": {
+        "width": 366,
+        "left": 12,
+        "right": 378,
+        "viewport": 390,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgb(255, 255, 255) none repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "390-light-layout-menu",
+      "name": "下拉宽度满足上下文",
+      "ok": true,
+      "detail": {
+        "width": 366,
+        "left": 12,
+        "right": 378,
+        "viewport": 390,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgb(255, 255, 255) none repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "390-light-layout-menu",
+      "name": "摘要最多两行",
+      "ok": true,
+      "detail": {
+        "width": 366,
+        "left": 12,
+        "right": 378,
+        "viewport": 390,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgb(255, 255, 255) none repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "390-light-layout-menu",
+      "name": "完整描述参与搜索",
+      "ok": true
+    },
+    {
+      "phase": "390-light-layout-menu",
+      "name": "键盘选择后焦点回选择框",
+      "ok": true
+    },
+    {
+      "phase": "1440-dark-layout-menu",
+      "name": "1440-dark-form 无整页横向溢出",
+      "ok": true,
+      "detail": {
+        "width": 1440,
+        "documentWidth": 1440,
+        "selectionWidth": 1384,
+        "parameterWidth": 684,
+        "resultWidth": 684,
+        "parametersTop": 1102.078125,
+        "resultTop": 1102.078125,
+        "themeSource": "dark"
+      }
+    },
+    {
+      "phase": "1440-dark-layout-menu",
+      "name": "1440-dark-form 宽屏输入结果并排",
+      "ok": true
+    },
+    {
+      "phase": "1440-dark-layout-menu",
+      "name": "下拉受视口约束",
+      "ok": true,
+      "detail": {
+        "width": 1342,
+        "left": 49,
+        "right": 1391,
+        "viewport": 1440,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgba(0, 0, 0, 0) linear-gradient(155deg, rgba(11, 36, 64, 0.98), rgba(3, 14, 32, 0.99)) repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "1440-dark-layout-menu",
+      "name": "下拉宽度满足上下文",
+      "ok": true,
+      "detail": {
+        "width": 1342,
+        "left": 49,
+        "right": 1391,
+        "viewport": 1440,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgba(0, 0, 0, 0) linear-gradient(155deg, rgba(11, 36, 64, 0.98), rgba(3, 14, 32, 0.99)) repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "1440-dark-layout-menu",
+      "name": "摘要最多两行",
+      "ok": true,
+      "detail": {
+        "width": 1342,
+        "left": 49,
+        "right": 1391,
+        "viewport": 1440,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgba(0, 0, 0, 0) linear-gradient(155deg, rgba(11, 36, 64, 0.98), rgba(3, 14, 32, 0.99)) repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "1440-dark-layout-menu",
+      "name": "完整描述参与搜索",
+      "ok": true
+    },
+    {
+      "phase": "1440-dark-layout-menu",
+      "name": "键盘选择后焦点回选择框",
+      "ok": true
+    },
+    {
+      "phase": "768-dark-layout-menu",
+      "name": "768-dark-form 无整页横向溢出",
+      "ok": true,
+      "detail": {
+        "width": 768,
+        "documentWidth": 768,
+        "selectionWidth": 712,
+        "parameterWidth": 712,
+        "resultWidth": 712,
+        "parametersTop": 705.328125,
+        "resultTop": 2542.765625,
+        "themeSource": "dark"
+      }
+    },
+    {
+      "phase": "768-dark-layout-menu",
+      "name": "768-dark-form 窄屏输入结果上下排列",
+      "ok": true
+    },
+    {
+      "phase": "768-dark-layout-menu",
+      "name": "下拉受视口约束",
+      "ok": true,
+      "detail": {
+        "width": 674,
+        "left": 47,
+        "right": 721,
+        "viewport": 768,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgba(0, 0, 0, 0) linear-gradient(155deg, rgba(11, 36, 64, 0.98), rgba(3, 14, 32, 0.99)) repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "768-dark-layout-menu",
+      "name": "下拉宽度满足上下文",
+      "ok": true,
+      "detail": {
+        "width": 674,
+        "left": 47,
+        "right": 721,
+        "viewport": 768,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgba(0, 0, 0, 0) linear-gradient(155deg, rgba(11, 36, 64, 0.98), rgba(3, 14, 32, 0.99)) repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "768-dark-layout-menu",
+      "name": "摘要最多两行",
+      "ok": true,
+      "detail": {
+        "width": 674,
+        "left": 47,
+        "right": 721,
+        "viewport": 768,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgba(0, 0, 0, 0) linear-gradient(155deg, rgba(11, 36, 64, 0.98), rgba(3, 14, 32, 0.99)) repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "768-dark-layout-menu",
+      "name": "完整描述参与搜索",
+      "ok": true
+    },
+    {
+      "phase": "768-dark-layout-menu",
+      "name": "键盘选择后焦点回选择框",
+      "ok": true
+    },
+    {
+      "phase": "390-dark-layout-menu",
+      "name": "390-dark-form 无整页横向溢出",
+      "ok": true,
+      "detail": {
+        "width": 390,
+        "documentWidth": 390,
+        "selectionWidth": 366,
+        "parameterWidth": 366,
+        "resultWidth": 366,
+        "parametersTop": 1575.90625,
+        "resultTop": 3493.3125,
+        "themeSource": "dark"
+      }
+    },
+    {
+      "phase": "390-dark-layout-menu",
+      "name": "390-dark-form 窄屏输入结果上下排列",
+      "ok": true
+    },
+    {
+      "phase": "390-dark-layout-menu",
+      "name": "下拉受视口约束",
+      "ok": true,
+      "detail": {
+        "width": 366,
+        "left": 12,
+        "right": 378,
+        "viewport": 390,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgba(0, 0, 0, 0) linear-gradient(155deg, rgba(11, 36, 64, 0.98), rgba(3, 14, 32, 0.99)) repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "390-dark-layout-menu",
+      "name": "下拉宽度满足上下文",
+      "ok": true,
+      "detail": {
+        "width": 366,
+        "left": 12,
+        "right": 378,
+        "viewport": 390,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgba(0, 0, 0, 0) linear-gradient(155deg, rgba(11, 36, 64, 0.98), rgba(3, 14, 32, 0.99)) repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "390-dark-layout-menu",
+      "name": "摘要最多两行",
+      "ok": true,
+      "detail": {
+        "width": 366,
+        "left": 12,
+        "right": 378,
+        "viewport": 390,
+        "lines": "2",
+        "summaryHeight": 37.1875,
+        "lineHeight": 18.6,
+        "background": "rgba(0, 0, 0, 0) linear-gradient(155deg, rgba(11, 36, 64, 0.98), rgba(3, 14, 32, 0.99)) repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    {
+      "phase": "390-dark-layout-menu",
+      "name": "完整描述参与搜索",
+      "ok": true
+    },
+    {
+      "phase": "390-dark-layout-menu",
+      "name": "键盘选择后焦点回选择框",
+      "ok": true
+    },
+    {
+      "phase": "real-readonly-discovery",
+      "name": "真实发现单独留存，不计入模拟业务通过",
+      "ok": true
+    },
+    {
+      "phase": "restore-theme",
+      "name": "精确恢复主题偏好",
+      "ok": true
+    }
+  ],
+  "phases": [
+    {
+      "name": "defaults-and-required",
+      "ok": true
+    },
+    {
+      "name": "tool-drafts-and-partial-input",
+      "ok": true
+    },
+    {
+      "name": "success-result-copy-download",
+      "ok": true
+    },
+    {
+      "name": "result-tool-error",
+      "ok": true
+    },
+    {
+      "name": "result-reject",
+      "ok": true
+    },
+    {
+      "name": "result-lost",
+      "ok": true
+    },
+    {
+      "name": "resource-and-template",
+      "ok": true
+    },
+    {
+      "name": "target-draft-isolation",
+      "ok": true
+    },
+    {
+      "name": "1440-light-layout-menu",
+      "ok": false,
+      "error": "locator.isVisible: Error: strict mode violation: locator('.mcp-debug-description').first().getByText('根据告警时间、严重程度以及资产范围检索告警。返回结果需要结合实际业务核对。\\n根据告警时间、严重程度以及资产范围检索告警。返回结果需要结合实际业务核对。\\n根据告警时间、严重程度以及资产范围检索告警。返回结果需要结合实际业务核对。\\n根据告警时间、严重程度以及资产范围检索告警"
+    },
+    {
+      "name": "768-light-layout-menu",
+      "ok": false,
+      "error": "locator.isVisible: Error: strict mode violation: locator('.mcp-debug-description').first().getByText('根据告警时间、严重程度以及资产范围检索告警。返回结果需要结合实际业务核对。\\n根据告警时间、严重程度以及资产范围检索告警。返回结果需要结合实际业务核对。\\n根据告警时间、严重程度以及资产范围检索告警。返回结果需要结合实际业务核对。\\n根据告警时间、严重程度以及资产范围检索告警"
+    },
+    {
+      "name": "390-light-layout-menu",
+      "ok": false,
+      "error": "locator.isVisible: Error: strict mode violation: locator('.mcp-debug-description').first().getByText('根据告警时间、严重程度以及资产范围检索告警。返回结果需要结合实际业务核对。\\n根据告警时间、严重程度以及资产范围检索告警。返回结果需要结合实际业务核对。\\n根据告警时间、严重程度以及资产范围检索告警。返回结果需要结合实际业务核对。\\n根据告警时间、严重程度以及资产范围检索告警"
+    },
+    {
+      "name": "1440-dark-layout-menu",
+      "ok": false,
+      "error": "locator.isVisible: Error: strict mode violation: locator('.mcp-debug-description').first().getByText('根据告警时间、严重程度以及资产范围检索告警。返回结果需要结合实际业务核对。\\n根据告警时间、严重程度以及资产范围检索告警。返回结果需要结合实际业务核对。\\n根据告警时间、严重程度以及资产范围检索告警。返回结果需要结合实际业务核对。\\n根据告警时间、严重程度以及资产范围检索告警"
+    },
+    {
+      "name": "768-dark-layout-menu",
+      "ok": false,
+      "error": "locator.isVisible: Error: strict mode violation: locator('.mcp-debug-description').first().getByText('根据告警时间、严重程度以及资产范围检索告警。返回结果需要结合实际业务核对。\\n根据告警时间、严重程度以及资产范围检索告警。返回结果需要结合实际业务核对。\\n根据告警时间、严重程度以及资产范围检索告警。返回结果需要结合实际业务核对。\\n根据告警时间、严重程度以及资产范围检索告警"
+    },
+    {
+      "name": "390-dark-layout-menu",
+      "ok": false,
+      "error": "locator.isVisible: Error: strict mode violation: locator('.mcp-debug-description').first().getByText('根据告警时间、严重程度以及资产范围检索告警。返回结果需要结合实际业务核对。\\n根据告警时间、严重程度以及资产范围检索告警。返回结果需要结合实际业务核对。\\n根据告警时间、严重程度以及资产范围检索告警。返回结果需要结合实际业务核对。\\n根据告警时间、严重程度以及资产范围检索告警"
+    },
+    {
+      "name": "real-readonly-discovery",
+      "ok": true
+    }
+  ],
+  "errors": [],
+  "requests": [
+    {
+      "phase": "setup",
+      "boundary": "MCP UI fixture",
+      "action": "test",
+      "status": 200
+    },
+    {
+      "phase": "tool-drafts-and-partial-input",
+      "boundary": "MCP UI fixture",
+      "action": "test",
+      "status": 200
+    },
+    {
+      "phase": "target-draft-isolation",
+      "boundary": "MCP UI fixture",
+      "action": "test",
+      "status": 200
+    },
+    {
+      "phase": "target-draft-isolation",
+      "boundary": "MCP UI fixture",
+      "action": "test",
+      "status": 200
+    }
+  ],
+  "screenshots": [
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-13-40-701Z/1440-light-form.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-13-40-701Z/1440-light-layout-menu-failed.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-13-40-701Z/768-light-form.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-13-40-701Z/768-light-layout-menu-failed.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-13-40-701Z/390-light-form.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-13-40-701Z/390-light-layout-menu-failed.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-13-40-701Z/1440-dark-form.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-13-40-701Z/1440-dark-layout-menu-failed.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-13-40-701Z/768-dark-form.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-13-40-701Z/768-dark-layout-menu-failed.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-13-40-701Z/390-dark-form.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-13-40-701Z/390-dark-layout-menu-failed.png",
+    ".local/mcp-debug-20261103/browser-2026-11-03T09-13-40-701Z/real-readonly-discovery.png"
+  ],
+  "blockedWrites": [
+    {
+      "phase": "defaults-and-required",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "target-draft-isolation",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "target-draft-isolation",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    }
+  ],
+  "mockedCalls": [
+    {
+      "phase": "success-result-copy-download",
+      "action": "callTool",
+      "toolName": "query_alerts",
+      "arguments": {
+        "body": {
+          "query": "真实页面输入，仅UI夹具",
+          "count": 3,
+          "includeClosed": false,
+          "tags": [
+            "界面核验标签"
+          ],
+          "advanced": {
+            "mode": "all"
+          }
+        },
+        "limit": 20,
+        "severity": "high"
+      },
+      "mode": "success"
+    },
+    {
+      "phase": "result-tool-error",
+      "action": "callTool",
+      "toolName": "query_alerts",
+      "arguments": {
+        "body": {
+          "query": "修改后的参数，尚未调用",
+          "count": 3,
+          "includeClosed": false,
+          "tags": [
+            "界面核验标签"
+          ],
+          "advanced": {
+            "mode": "all"
+          }
+        },
+        "limit": 20,
+        "severity": "high"
+      },
+      "mode": "tool-error"
+    },
+    {
+      "phase": "result-reject",
+      "action": "callTool",
+      "toolName": "query_alerts",
+      "arguments": {
+        "body": {
+          "query": "修改后的参数，尚未调用",
+          "count": 3,
+          "includeClosed": false,
+          "tags": [
+            "界面核验标签"
+          ],
+          "advanced": {
+            "mode": "all"
+          }
+        },
+        "limit": 20,
+        "severity": "high"
+      },
+      "mode": "reject"
+    },
+    {
+      "phase": "result-lost",
+      "action": "callTool",
+      "toolName": "query_alerts",
+      "arguments": {
+        "body": {
+          "query": "修改后的参数，尚未调用",
+          "count": 3,
+          "includeClosed": false,
+          "tags": [
+            "界面核验标签"
+          ],
+          "advanced": {
+            "mode": "all"
+          }
+        },
+        "limit": 20,
+        "severity": "high"
+      },
+      "mode": "lost"
+    },
+    {
+      "phase": "resource-and-template",
+      "action": "readResource",
+      "uri": "fixture://help",
+      "mode": "success"
+    },
+    {
+      "phase": "resource-and-template",
+      "action": "readResource",
+      "uriTemplate": "fixture://assets/{assetId}{?detail}",
+      "arguments": {
+        "assetId": "template-ui-value"
+      },
+      "mode": "success"
+    }
+  ],
+  "realDiscovery": {
+    "status": 400,
+    "tools": null,
+    "toolsUnavailable": false,
+    "resourceUnavailable": false,
+    "templateUnavailable": false,
+    "hasError": true,
+    "error": "policy-configuration: 访问凭据待补充，请在 MCP 管理中补全并保存"
+  },
+  "existingSessionSelected": true,
+  "initialThemePreference": "light",
+  "initialDark": false,
+  "initialTarget": "policy-configuration ⌄",
+  "finalThemePreference": "light",
+  "finalDark": false,
+  "finishedAt": "2026-11-03T09:14:01.760Z",
+  "passed": false
+}
