@@ -465,12 +465,16 @@ export async function apply(ctx: Context, config: BusinessRuntimeConfig): Promis
         res.writeHead(200, { 'content-type': result.contentType, 'cache-control': 'no-store', 'content-disposition': `attachment; filename="${result.filename}"`, 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; img-src data:" }); res.end(result.body); return
       }
       if (new URL(req.url || '/', 'http://runtime').pathname === '/api/business-control/confirmations') { await approvals.handle(req, res, base); return }
-      let body = ['POST', 'PUT', 'PATCH'].includes(req.method || '') ? await readBody(req) : undefined
+      const url = new URL(req.url || '/', 'http://runtime')
+      const endpoint = url.pathname.slice('/api/'.length)
+      const streaming = fetchHandler.requestBodyMode({ method: req.method || 'GET', url }) === 'streaming'
+      const upload = streaming && endpoint === 'session/uploadFileBinary'
+      let body = !streaming && ['POST', 'PUT', 'PATCH'].includes(req.method || '') ? await readBody(req) : undefined
       const envelope = body ? JSON.parse(body.toString()) : undefined
-      const endpoint = new URL(req.url || '/', 'http://runtime').pathname.slice('/api/'.length)
-      const session = endpoint === 'session/create' ? undefined : addressedSession(envelope?.payload?.args,
+      const session = upload ? url.searchParams.get('sessionId') || undefined : endpoint === 'session/create' ? undefined : addressedSession(envelope?.payload?.args,
         (parentId, childId) => assertChildAddress(control, base, config.binding, parentId, childId))
       const context = session ? control.sessionContext(base, session) : base
+      if (upload && session) control.assert(context, 'session:read', [{ kind: 'session', id: session }])
       if (endpoint === 'workspace/create') {
         if (!fixedWorkspaceRequest(envelope?.payload?.args, config.workspacePath)) throw new Error('业务工作区使用服务端固定路径')
         envelope.payload.args.request = { path: config.workspacePath }
@@ -486,8 +490,15 @@ export async function apply(ctx: Context, config: BusinessRuntimeConfig): Promis
       }
       const content = businessInboxContent(endpoint, envelope?.payload?.args)
       if (content) { await control.inspect(context, 'input', content, lifetime.signal, 'session:prompt'); control.assert(context, 'session:prompt', session ? [{ kind: 'session', id: session }] : []) }
-      const request = new Request(`http://runtime${req.url}`, { method: req.method, headers: req.headers as Record<string, string>, body: body?.toString('utf8'), signal: lifetime.signal })
-      let response = await withBusinessContext(context, () => fetchHandler.fetch(request, admission.peer))
+      // 原生流式路由保留二进制和背压，不套用 JSON RPC 的解析与大小限制。
+      const request = new Request(url, { method: req.method, headers: req.headers as Record<string, string>,
+        body: streaming ? Readable.toWeb(req) as ReadableStream<Uint8Array> : body?.toString('utf8'),
+        ...(streaming ? { duplex: 'half' } : {}), signal: lifetime.signal })
+      // 原生二进制入口仅接受 owner；仅在会话归属核对后为本次上传使用临时 Peer。
+      const uploadPeer = upload && admission.peer.principal.kind !== 'owner' ? connection.createPeer({ principal: { kind: 'owner' } }) : undefined
+      let response: Response
+      try { response = await withBusinessContext(context, () => fetchHandler.fetch(request, uploadPeer ?? admission.peer)) }
+      finally { await uploadPeer?.dispose() }
       if (endpoint === 'workspace/create') {
         const result = await response.clone().json() as { result?: { ok?: boolean; value?: { workspace?: { sessionIds?: string[] } } } }
         const workspace = result.result?.ok ? result.result.value?.workspace : undefined
