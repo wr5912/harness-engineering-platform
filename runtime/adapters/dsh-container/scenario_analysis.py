@@ -914,7 +914,7 @@ def _run(command: list[str], *, stage: str, input_text: str | None = None, timeo
 
 
 def _review_driver(prompts: list[dict], auth_url: str, image_ref: str,
-                   model_route: dict, timeout_seconds: int, evidence_root: Path) -> dict:
+                   model_route: dict, timeout_seconds: int, evidence_root: Path, concurrency: int = 1) -> dict:
     override = os.environ.get("DSH_EVAL_API_DRIVER")
     if override:
         command = [override]
@@ -937,6 +937,7 @@ def _review_driver(prompts: list[dict], auth_url: str, image_ref: str,
     payload = {
         "schema_version": "1.0",
         "operation": "review",
+        "concurrency": concurrency,
         "auth_url": auth_url,
         "workspace": ANALYSIS_ROOT,
         "preset_id": "scenario-analysis",
@@ -1272,7 +1273,8 @@ def review_full(run_dir: Path, rows: list[dict], inputs: dict, *, timeout_second
         auth_url = _run([*dev, "url", name, "--non-interactive"], stage="authentication", timeout=90)
         if not auth_url.startswith("http://127.0.0.1:") or "token=" not in auth_url:
             raise ValueError("authentication-url-invalid")
-        response = _review_driver(prompts, auth_url, image_ref, model_route, timeout_seconds, evidence_root)
+        response = _review_driver(prompts, auth_url, image_ref, model_route, timeout_seconds, evidence_root,
+                                  concurrency=inputs.get("case_schedule", {}).get("concurrency", 1))
         by_id = {
             item.get("scene_id"): item for item in response["results"]
             if isinstance(item, dict) and isinstance(item.get("scene_id"), str)

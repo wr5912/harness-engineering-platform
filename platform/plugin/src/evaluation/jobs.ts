@@ -44,6 +44,17 @@ export function redactKnownValues(value: string, secrets: readonly string[]): st
   return text
 }
 
+/** JSON 的类型与标识属于回执合同；短凭据仅匹配完整字符串，不能替换数字或 ID 中的字符。 */
+function redactReceipt(value: any, secrets: readonly string[], redact: (text: string) => string): any {
+  const text = (input: string) => redact(secrets.includes(input) ? '[REDACTED]'
+    : redactKnownValues(input, secrets.filter(secret => secret.length >= 4)))
+  if (typeof value === 'string') return text(value)
+  if (Array.isArray(value)) return value.map(item => redactReceipt(item, secrets, redact))
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value)
+    .map(([key, item]) => [text(key), redactReceipt(item, secrets, redact)]))
+  return value
+}
+
 export class EvaluationJobError extends Error {
   constructor(readonly code: string, message: string) { super(message) }
 }
@@ -262,10 +273,18 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
       throw new Error(job.error)
     }
     const pending = { stdout: '', stderr: '' }
+    let output = '', runLine = ''
     const active = { process: proc, job }
     live.set(id, active)
     proc.on('spawn', () => { job.pid = proc.pid; job.process_start = proc.pid ? processStart(proc.pid) : undefined; save(job) })
     const append = (field: 'stdout' | 'stderr', chunk: unknown) => {
+      // 先解析机器关联，再脱敏显示文本；原文只在当前子进程的内存中短暂保留。
+      if (field === 'stdout') output = (output + String(chunk)).slice(-LOG_LIMIT)
+      else {
+        runLine = (runLine + String(chunk)).slice(-LOG_LIMIT)
+        const run = runLine.match(/(?:^|\n)Research Run: (run-[0-9a-f-]+)(?:\n|$)/)?.[1]
+        if (run && RUN.test(run)) job.run_id = run
+      }
       const raw = secrets.reduce((text, secret) => text.replaceAll(secret, '[REDACTED]'), pending[field] + String(chunk))
       let held = 0
       for (const secret of secrets) for (let length = 1; length < secret.length; length += 1) {
@@ -275,8 +294,6 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
       const visible = raw.slice(0, raw.length - held)
       if (!visible) return
       job[field] = options.redact(job[field] + redactKnownValues(visible, secrets)).slice(-LOG_LIMIT)
-      const run = job.stderr.match(/(?:^|\n)Research Run: (run-[0-9a-f-]+)(?:\n|$)/)?.[1]
-      if (run && RUN.test(run)) job.run_id = run
       job.updated_at = new Date().toISOString()
       save(job)
     }
@@ -294,7 +311,11 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
       flushPending()
       job.exit_code = code
       job.updated_at = new Date().toISOString()
-      try { job.result = JSON.parse(job.stdout) } catch { job.result = null }
+      try {
+        job.result = redactReceipt(JSON.parse(output), secrets, options.redact)
+        job.stdout = JSON.stringify(job.result)
+      } catch { job.result = null }
+      output = ''; runLine = ''
       job.status = job.result?.cancelled === true ? job.result.instance_stopped === true ? 'cancelled' : 'failed' : code === 0 ? 'completed' : 'failed'
       if (job.result?.cancelled === true && job.result.instance_stopped !== true) job.error = '取消后的实例停止尚未确认，请核对 Run 与实例状态。'
       live.delete(id)

@@ -28,6 +28,24 @@ test('原生review输入接受固定源码任务和既有场景，拒绝任意�
   }
 })
 
+test('场景并发拒绝重复身份、同Session重入和无效上限', () => {
+  const payload = { auth_url: 'http://127.0.0.1:1/', workspace: '/work/evaluation-run', preset_id: 'scenario-analysis',
+    judge_preset_id: 'scenario-analysis', evidence_root: '/evidence', timeout_ms: 1000, cases: [], operation: 'review',
+    model_route: { provider: 'fixture', model: 'review' } }
+  const scene = {scene_id: 'scene-01', prompt: '只读复核'}
+  const repair = {...scene, session_id:'session-test', prior_prompts:['首次复核']}
+  const source = `import {readInput} from ${JSON.stringify(pathToFileURL(join(adapter, 'dsh-eval-api.mjs')).href)}; readInput().catch(error => {process.stderr.write(error.message);process.exitCode=2})`
+  for (const [scenes, concurrency, reason] of [
+    [[scene, scene], 2, 'invalid-case-schedule'],
+    [[repair, {...repair,scene_id:'scene-02'}], 2, 'duplicate-review-session'],
+    [[scene], 0, 'invalid-case-schedule'], [[scene], 9, 'invalid-case-schedule'],
+  ]) {
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', source], {input:JSON.stringify({...payload,scenes,concurrency}), encoding:'utf8'})
+    assert.equal(result.status, 2)
+    assert.equal(result.stderr, reason)
+  }
+})
+
 async function fixture(t, failure, options = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'eval-api-recovery-'))
   t.after(() => rmSync(directory, { recursive: true, force: true }))
@@ -40,6 +58,8 @@ async function fixture(t, failure, options = {}) {
   const evidence = join(directory, 'evidence')
   mkdirSync(evidence)
   const sessions = new Map()
+  const activeReviews = new Set(), finishedReviews = []
+  let maxActiveReviews = 0
   const server = createServer(async (request, response) => {
     if (request.url === '/assistant/') { response.end('ready'); return }
     const chunks = []
@@ -52,6 +72,11 @@ async function fixture(t, failure, options = {}) {
       if (failure === 'partial') return
       const sessionId = new URL(request.url, 'http://localhost').searchParams.get('sessionId')
       assert.ok(sessions.has(sessionId))
+      if (options.review && options.reviewConcurrency) {
+        await delay(sessionId === 'session-1' ? 180 : 30)
+        activeReviews.delete(sessionId)
+        if (!finishedReviews.includes(sessionId)) finishedReviews.push(sessionId)
+      }
       response.setHeader('content-type', 'application/json')
       response.end(JSON.stringify({ session_id: sessionId, settled: true }))
       return
@@ -72,6 +97,10 @@ async function fixture(t, failure, options = {}) {
     if (method === 'session/prompt') {
       assert.ok(sessions.get(input.request.sessionId).title, '必须在业务与评审 prompt 前固定已有 Case 标题')
       sessions.get(input.request.sessionId).inputs.push(input.request.content[0].text)
+      if (options.review && options.reviewConcurrency) {
+        activeReviews.add(input.request.sessionId)
+        maxActiveReviews = Math.max(maxActiveReviews, activeReviews.size)
+      }
       return reply({ accepted: true })
     }
     if (method.startsWith('session.export')) {
@@ -100,7 +129,8 @@ async function fixture(t, failure, options = {}) {
     judge_model_route: { provider: 'test', model: 'test', reasoningEffort: 'off' },
     cases: [{ case_id: 'U-CASE-001', inputs: ['请检查'], expected_behavior: '返回结果' }] }
   if (options.review) Object.assign(payload, { operation: 'review', cases: [],
-    scenes: [{ scene_id: 'source-diagnosis', prompt: '只读源码诊断' }], timeout_ms: options.timeoutMs ?? 150,
+    scenes: options.scenes ?? [{ scene_id: 'source-diagnosis', prompt: '只读源码诊断' }], timeout_ms: options.timeoutMs ?? 150,
+    concurrency: options.reviewConcurrency ?? 1,
     model_route: { provider: 'test', model: 'test', reasoningEffort: 'off' } })
   const proc = spawn(process.execPath, [join(directory, 'dsh-eval-api.mjs')], { stdio: ['pipe', 'pipe', 'pipe'] })
   let stdout = '', stderr = ''
@@ -109,7 +139,7 @@ async function fixture(t, failure, options = {}) {
   const completed = new Promise(resolve => proc.on('close', code => resolve({ code, stdout, stderr })))
   proc.stdin.end(JSON.stringify(payload))
   t.after(() => { if (proc.exitCode === null) proc.kill('SIGKILL') })
-  return { proc, completed, evidence, checks: () => JSON.parse(readFileSync(join(evidence, 'U-CASE-001/checks.json'), 'utf8')) }
+  return { proc, completed, evidence, reviewActivity: () => ({maxActiveReviews, finishedReviews}), checks: () => JSON.parse(readFileSync(join(evidence, 'U-CASE-001/checks.json'), 'utf8')) }
 }
 
 for (const [failure, stage, session] of [
@@ -177,6 +207,24 @@ for (const options of [{}, { observedRoute: null }, { observedRoute: { provider:
     assert.deepEqual(analysisToolAccesses({ trace: saved.filter(row => row.session_log === rootName) }, raw.tool_names, { partial: true, issues }), raw.tool_accesses)
     assert.deepEqual(issues, raw.tool_issues)
   })
+
+test('独立场景有界并发，乱序结束仍按输入封存且各自保存证据', async t => {
+  const scenes = ['scene-01', 'scene-02', 'scene-03', 'scene-04'].map(scene_id => ({scene_id, prompt: '只读场景复核'}))
+  const fx = await fixture(t, null, {review: true, scenes, reviewConcurrency: 2, timeoutMs: 1500})
+  const result = await fx.completed
+  assert.equal(result.code, 0, result.stderr)
+  const rows = JSON.parse(result.stdout).results
+  assert.deepEqual(rows.map(row => row.scene_id), scenes.map(scene => scene.scene_id))
+  assert.equal(new Set(rows.map(row => row.session_id)).size, 4)
+  assert.ok(rows.every(row => row.text === '完成' && !row.error))
+  assert.equal(fx.reviewActivity().maxActiveReviews, 2)
+  assert.notEqual(fx.reviewActivity().finishedReviews[0], 'session-1')
+  for (const scene of scenes) {
+    const checks = JSON.parse(readFileSync(join(fx.evidence, scene.scene_id, 'attempt-01/checks.json'), 'utf8'))
+    assert.equal(checks.status, 'completed')
+    assert.equal(checks.trace_available, true)
+  }
+})
 
 function nativeAccess(callId, name = 'read', overrides = {}) {
   const path = 'evidence/analysis/readable/source-diagnosis/part-001.txt'

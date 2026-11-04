@@ -64,7 +64,8 @@ class EvaluationAccessTest(unittest.TestCase):
         route = {"provider": "fixture", "model": "fixture"}
         prompts = [{"scene_id": "scene-1", "prompt": "Review the evidence."}]
         with mock.patch.dict(os.environ, {}, clear=True), mock.patch.object(scenario_analysis, "_run", return_value='{"operation":"review","results":[]}') as run:
-            scenario_analysis._review_driver(prompts, "http://127.0.0.1:3081/", "fixture", route, 10, self.root)
+            scenario_analysis._review_driver(prompts, "http://127.0.0.1:3081/", "fixture", route, 10, self.root, concurrency=4)
+            self.assertEqual(json.loads(run.call_args.kwargs["input_text"])["concurrency"], 4)
             review_command = run.call_args.args[0]
             payload = run.call_args.kwargs["input_text"]
             target_command, _ = evaluation.driver_command("api", "fixture", self.root)
@@ -835,7 +836,7 @@ class SeparateReviewTest(unittest.TestCase):
     def write_inputs(self):
         (self.run / "inputs.lock.json").write_text(json.dumps(self.inputs, ensure_ascii=False))
 
-    def driver(self, prompts, _url, _image, route, _timeout, _root):
+    def driver(self, prompts, _url, _image, route, _timeout, _root, concurrency=1):
         results = []
         for prompt in prompts:
             value = json.loads(prompt["prompt"])

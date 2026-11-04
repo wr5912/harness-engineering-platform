@@ -1630,23 +1630,19 @@ def model_policy_start_lock(repo: Path, timeout: float = 120.0):
     if not directory.is_dir() or directory.is_symlink():
         fail("业务模型配置目录无效")
     lock_file = directory / ".business-model-policy.lock"
-    descriptor = None
+    descriptor = os.open(lock_file, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
     deadline = time.monotonic() + timeout
-    while descriptor is None:
-        try:
-            descriptor = os.open(lock_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
-        except FileExistsError:
-            if time.monotonic() >= deadline:
-                fail("业务模型设置正在保存或实例正在启动；确认没有写入进程后处理 .business-model-policy.lock，再重试")
-            time.sleep(0.05)
     try:
+        while True:
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    fail("业务模型设置正在保存或实例正在启动，请稍后重试")
+                time.sleep(0.05)
         yield
     finally:
-        try:
-            if lock_file.stat().st_ino == os.fstat(descriptor).st_ino:
-                lock_file.unlink()
-        except FileNotFoundError:
-            pass
         os.close(descriptor)
 
 

@@ -58,6 +58,10 @@ export async function readInput() {
         throw new Error('invalid-scene')
       }
     }
+    const scenes = payload.scenes.map(scene => ({ case_id: scene.scene_id }))
+    validateCaseSchedule(scenes, payload.concurrency ?? 1, scenes.map(scene => scene.case_id))
+    const sessions = payload.scenes.flatMap(scene => scene.session_id === undefined ? [] : [scene.session_id])
+    if (new Set(sessions).size !== sessions.length) throw new Error('duplicate-review-session')
   }
   for (const item of payload.cases) {
     if (!item || typeof item !== 'object' || !/^U-[A-Z0-9-]+$/.test(item.case_id ?? '')
@@ -518,8 +522,9 @@ async function main() {
   const connection = await authenticate(payload.auth_url)
   const workspace = await createWorkspace(connection, payload.workspace)
   if (payload.operation === 'review') {
-    const results = []
-    for (const scene of payload.scenes) {
+    const scenes = payload.scenes.map(scene => ({ ...scene, case_id: scene.scene_id }))
+    const { rows: results } = await scheduleCases(scenes, payload.concurrency ?? 1, scenes.map(scene => scene.case_id), async scene => {
+      let row
       let latestArchive = null
       let sessionId = scene.session_id ?? null
       let failure = null
@@ -555,14 +560,14 @@ async function main() {
           throw new Error('analysis-route-mismatch')
         }
         const toolAccesses = analysisToolAccesses(completed.archive, turn.tool_names)
-        results.push({
+        row = {
           scene_id: scene.scene_id,
           text: turn.assistant_text,
           session_id: session.session_id,
           route: turn.route,
           tool_names: ANALYSIS_TOOLS,
           tool_accesses: toolAccesses,
-        })
+        }
       } catch (error) {
         const reason = /^[a-z0-9-]+$/.test(error?.message ?? '') ? error.message : 'scene-review-error'
         failure = reason
@@ -587,7 +592,7 @@ async function main() {
             observed.tool_issues.push({ kind: 'invalid', error_code: 'analysis-tools-invalid' })
           }
         } else observed.tool_issues.push({ kind: 'invalid', error_code: 'analysis-session-identity-unverified' })
-        results.push(observed)
+        row = observed
       } finally {
         await saveSessionTrace(join(payload.evidence_root, scene.scene_id, `attempt-${String(attempt).padStart(2, '0')}`), latestArchive, {
           operation: 'review', session_id: sessionId, attempt,
@@ -595,7 +600,8 @@ async function main() {
           trace_available: Boolean(latestArchive),
         })
       }
-    }
+      return { row }
+    })
     process.stdout.write(`${JSON.stringify({ schema_version: '1.0', operation: 'review', results })}\n`)
     return
   }

@@ -1,9 +1,10 @@
-import { closeSync, fstatSync, lstatSync, openSync, realpathSync, rmSync } from 'node:fs'
-import { basename, resolve } from 'node:path'
+import { closeSync, realpathSync } from 'node:fs'
+import { resolve } from 'node:path'
 import type { ConnectionRpcHandler, ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 import type { ModelCatalog, ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { ProviderReadiness } from './projection.ts'
 import { businessCatalogRoutes } from './catalog.ts'
+import { openModelLock, tryModelLock } from './file-lock.ts'
 import { BusinessDefaultError, businessPolicyLockFile, readBusinessDefault, saveBusinessDefault } from './business-default.ts'
 
 type ModelRoute = Pick<ModelSelection, 'provider' | 'model'>
@@ -63,23 +64,16 @@ function requireSelection(catalog: ModelCatalog, selected: ModelSelection) {
 }
 
 async function acquireLock(file: string, signal?: AbortSignal): Promise<number> {
-  for (let attempt = 0; attempt <= 2400; attempt++) {
-    if (signal?.aborted) throw new ModelsError('aborted', '模型操作已取消')
-    try { return openSync(file, 'wx', 0o600) }
-    catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
-      if (attempt === 2400) throw new ModelsError('busy', `业务默认模型配置正在保存或实例正在启动；确认没有进程持锁后移除 ${basename(file)}，再重试`)
+  const descriptor = openModelLock(file)
+  try {
+    for (let attempt = 0; attempt <= 2400; attempt++) {
+      if (signal?.aborted) throw new ModelsError('aborted', '模型操作已取消')
+      if (tryModelLock(descriptor)) return descriptor
+      if (attempt === 2400) throw new ModelsError('busy', '业务默认模型配置正在保存或实例正在启动，请稍后重试')
       await new Promise(resolve => setTimeout(resolve, 50))
     }
-  }
-  throw new ModelsError('busy', '业务默认模型配置锁未释放')
-}
-
-function releaseLock(file: string, descriptor: number) {
-  try {
-    try { if (lstatSync(file).ino === fstatSync(descriptor).ino) rmSync(file) }
-    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
-  } finally { closeSync(descriptor) }
+    throw new ModelsError('busy', '业务默认模型配置锁未释放')
+  } catch (error) { closeSync(descriptor); throw error }
 }
 
 const platformOnlyProviders = (readiness: Record<string, ProviderReadiness>) =>
@@ -128,7 +122,7 @@ export function createModelsHandler(assetRoot: string, deps: ModelsDependencies)
           const saved = await saveBusinessDefault(root, selected, current.revision, signal)
           return ok({ business_default: saved.default, business_model_revision: saved.revision,
             migration_required: false, legacy_default: null })
-        } finally { releaseLock(lockFile, lock) }
+        } finally { closeSync(lock) }
       }
       return fail('method_not_found', '未知模型操作')
     } catch (error) {

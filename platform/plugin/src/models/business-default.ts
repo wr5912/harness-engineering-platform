@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { chmodSync, closeSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, closeSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
+import { openModelLock, tryModelLock } from './file-lock.ts'
 
 type ModelRoute = Pick<ModelSelection, 'provider' | 'model'>
 export type BusinessDefault = { default: ModelSelection | null; revision: string; migrationRequired: boolean; legacyDefault: ModelSelection | null }
@@ -106,16 +107,20 @@ function decode(text: string | null): BusinessDefault {
 /** 旧 1.0/1.1 文件只供迁移显示，不产生新的默认选择。 */
 export function readBusinessDefault(root: string): BusinessDefault {
   const file = modelFile(root, false)
-  const lock = `${file}.lock`
-  const pause = new Int32Array(new SharedArrayBuffer(4))
-  for (let attempt = 0; attempt < 5; attempt++) {
-    if (fileText(lock) === null) {
-      const observed = fileText(file)
-      if (fileText(lock) === null && fileText(file) === observed) return decode(observed)
-    }
-    Atomics.wait(pause, 0, 0, 10)
+  let lock: number
+  try { lock = openModelLock(`${file}.lock`, false) }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return decode(fileText(file))
+    throw error
   }
-  throw new BusinessDefaultError('busy', '业务默认模型配置正在保存或保存锁未释放；确认没有写入进程后移除 business-model-default.json.lock，再重试')
+  const pause = new Int32Array(new SharedArrayBuffer(4))
+  try {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      if (tryModelLock(lock, true)) return decode(fileText(file))
+      Atomics.wait(pause, 0, 0, 10)
+    }
+    throw new BusinessDefaultError('busy', '业务默认模型配置正在保存，请稍后重试')
+  } finally { closeSync(lock) }
 }
 
 /** 调用方须先持有 config/.business-model-policy.lock，和实例启动互斥。 */
@@ -126,19 +131,13 @@ export async function saveBusinessDefault(root: string, defaultModel: ModelSelec
     throw new BusinessDefaultError('invalid_request', '请选择目录中可用于业务智能体的模型')
   }
   const file = modelFile(root, true)
-  const lockFile = `${file}.lock`
-  let lock: number | undefined
-  for (let attempt = 0; attempt <= 120; attempt++) {
-    if (signal?.aborted) throw new BusinessDefaultError('aborted', '模型操作已取消')
-    try { lock = openSync(lockFile, 'wx', 0o600); break }
-    catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
-      if (attempt === 120) throw new BusinessDefaultError('busy', '业务默认模型配置正在保存或保存锁未释放；确认没有写入进程后移除 business-model-default.json.lock，再重试')
+  const lock = openModelLock(`${file}.lock`)
+  try {
+    for (let attempt = 0; !tryModelLock(lock); attempt++) {
+      if (signal?.aborted) throw new BusinessDefaultError('aborted', '模型操作已取消')
+      if (attempt === 120) throw new BusinessDefaultError('busy', '业务默认模型配置正在保存，请稍后重试')
       await new Promise(resolve => setTimeout(resolve, 50))
     }
-  }
-  if (lock === undefined) throw new BusinessDefaultError('busy', '业务默认模型配置保存锁未释放')
-  try {
     const current = decode(fileText(file))
     if (current.revision !== revision) throw new BusinessDefaultError('conflict', '业务默认模型配置已变化，请刷新后重试')
     if (signal?.aborted) throw new BusinessDefaultError('aborted', '模型操作已取消')
@@ -151,5 +150,5 @@ export async function saveBusinessDefault(root: string, defaultModel: ModelSelec
       renameSync(temporary, file)
     } finally { rmSync(temporary, { force: true }) }
     return { default: selected, revision: revisionOf(text), migrationRequired: false, legacyDefault: null }
-  } finally { closeSync(lock); rmSync(lockFile, { force: true }) }
+  } finally { closeSync(lock) }
 }

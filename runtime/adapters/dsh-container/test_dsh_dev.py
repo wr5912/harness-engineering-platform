@@ -341,6 +341,31 @@ class RenderComposeTest(unittest.TestCase):
 
 
 class ModelPolicyTest(unittest.TestCase):
+    def test_model_policy_lock_is_released_when_owner_is_killed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            script = """import importlib.machinery, sys
+from pathlib import Path
+dev = importlib.machinery.SourceFileLoader('lock_dev', sys.argv[1]).load_module()
+with dev.model_policy_start_lock(Path(sys.argv[2])):
+ print('locked', flush=True)
+ sys.stdin.read()
+"""
+            process = subprocess.Popen([sys.executable, "-c", script, str(ADAPTER / "dsh-dev"), str(repo)],
+                                       stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+            try:
+                self.assertEqual(process.stdout.readline().strip(), "locked")
+                process.kill()
+                process.wait(timeout=5)
+                with dev.model_policy_start_lock(repo, timeout=0.01):
+                    self.assertTrue((repo / "config/.business-model-policy.lock").is_file())
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=5)
+                process.stdin.close()
+                process.stdout.close()
+
     def test_model_policy_start_lock_serializes_instance_startup_with_authorization_save(self):
         with tempfile.TemporaryDirectory() as temporary:
             repo = Path(temporary)
@@ -351,7 +376,7 @@ class ModelPolicyTest(unittest.TestCase):
                     with dev.model_policy_start_lock(repo, timeout=0.01):
                         self.fail("第二次启动不应越过模型策略锁")
                 self.assertIn("业务模型设置", error.getvalue())
-            self.assertFalse(lock.exists())
+            self.assertTrue(lock.is_file())
 
             args = types.SimpleNamespace(source="experiment:EXP-example-agent-001", dry_run=False,
                                          analysis_workspace=None)
@@ -364,7 +389,7 @@ class ModelPolicyTest(unittest.TestCase):
                     mock.patch.object(dev, "_command_up", side_effect=lambda *_: observed.append(lock.is_file())):
                 dev.command_up(args)
             self.assertEqual(observed, [True])
-            self.assertFalse(lock.exists())
+            self.assertTrue(lock.is_file())
 
     def policy(self, **changes):
         value = {
@@ -1670,7 +1695,9 @@ class RuntimeEnvironmentRetentionTest(unittest.TestCase):
                 return subprocess.CompletedProcess(command, 0, "fixture-container\n", "")
             if command[:2] == ["docker", "inspect"]:
                 return subprocess.CompletedProcess(command, 0, json.dumps(self.inspected_environment()), "")
-            if command[0] == "node":
+            if command[:3] == [dev.NODE_EXECUTABLE, str(ADAPTER / "harness-runtime.mts"), "--private-files"]:
+                return subprocess.CompletedProcess(command, 0, "[]", "")
+            if command[0] in {"node", dev.NODE_EXECUTABLE}:
                 return subprocess.CompletedProcess(command, 0, command[-1] + "\n", "")
             passed_environments.append(options["env"])
             return subprocess.CompletedProcess(command, 0, "", "")
@@ -1758,6 +1785,10 @@ class UpCommandStateTest(unittest.TestCase):
         base.update(overrides)
         return types.SimpleNamespace(**base)
 
+    def runtime_command(self, command, **_options):
+        private_files = command[:3] == [dev.NODE_EXECUTABLE, str(ADAPTER / "harness-runtime.mts"), "--private-files"]
+        return subprocess.CompletedProcess(command, 0, "[]" if private_files else "", "")
+
     def test_up_reports_failure_when_dsh_service_is_not_running(self):
         exited = subprocess.CompletedProcess(
             [], 0,
@@ -1767,7 +1798,7 @@ class UpCommandStateTest(unittest.TestCase):
                 mock.patch.object(dev, "preflight_new_instance"), \
                 mock.patch.object(dev, "check_environment"), \
                 mock.patch.object(dev, "compose_env", return_value={}), \
-                mock.patch.object(dev, "run", return_value=subprocess.CompletedProcess([], 0, stdout="", stderr="")), \
+                mock.patch.object(dev, "run", side_effect=self.runtime_command), \
                 mock.patch.object(dev, "wait_for_instance_listener", return_value=True), \
                 mock.patch.object(dev, "wait_for_service", return_value=[{
                     "id": "abc123", "state": "exited", "status": "Exited (1)",
@@ -1790,7 +1821,7 @@ class UpCommandStateTest(unittest.TestCase):
                 mock.patch.object(dev, "preflight_new_instance"), \
                 mock.patch.object(dev, "check_environment"), \
                 mock.patch.object(dev, "compose_env", return_value={}), \
-                mock.patch.object(dev, "run", return_value=subprocess.CompletedProcess([], 0, stdout="", stderr="")), \
+                mock.patch.object(dev, "run", side_effect=self.runtime_command), \
                 mock.patch.object(dev, "wait_for_instance_listener", return_value=True), \
                 mock.patch.object(dev, "wait_for_service", return_value=[
                     {"id": "abc123", "state": "running", "status": "Up 3 seconds",
@@ -1811,7 +1842,7 @@ class UpCommandStateTest(unittest.TestCase):
                 mock.patch.object(dev, "preflight_new_instance"), \
                 mock.patch.object(dev, "check_environment"), \
                 mock.patch.object(dev, "compose_env", return_value={}), \
-                mock.patch.object(dev, "run", return_value=subprocess.CompletedProcess([], 0, stdout="", stderr="")), \
+                mock.patch.object(dev, "run", side_effect=self.runtime_command), \
                 mock.patch.object(dev, "wait_for_service", return_value=None), \
                 contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             with self.assertRaises(SystemExit):

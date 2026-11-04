@@ -180,6 +180,27 @@ test('模型凭据拆成多个输出块时，运行中与完成后的 Job 日志
   assert.equal(persisted.includes(secret.slice(0, 12)), false)
 })
 
+test('短凭据脱敏不破坏机器回执、分块 Run 关联与取消结论', async t => {
+  const runId = 'run-11111111-1111-4111-8111-111111111111'
+  const fx = await fixture(t, [
+    `process.stderr.write('Research Run: ${runId.slice(0, 20)}')`,
+    `setTimeout(() => { process.stderr.write('${runId.slice(20)}\\n'); console.log(JSON.stringify({run_id:'${runId}', cancelled:true, instance_stopped:true, cases:{total:1}, credential:process.env.MODEL_API_KEY, nested:[{detail:'failure '+process.env.MODEL_TOKEN.slice(0,12)}]})); process.exit(2) }, 20)`,
+  ].join('\n'))
+  const jobs = fx.create({ command: () => ({ executable: process.execPath, args: [fx.script], environment: { MODEL_API_KEY: '1', MODEL_TOKEN: '8f327eafc0032b13642dd1ab938104' } }) })
+  const started = await jobs.start({ source: 'experiment:EXP-test-agent-001' })
+  const finished = await waitFor(() => jobs.status(started.job_id), job => job.status === 'cancelled')
+  assert.equal(finished.run_id, runId)
+  assert.equal(finished.result.run_id, runId)
+  assert.equal(JSON.parse(finished.stdout).cases.total, 1)
+  assert.equal(finished.result.credential, '[REDACTED]')
+  assert.equal(finished.result.nested[0].detail, 'failure [REDACTED]')
+  assert.equal(JSON.parse(finished.stdout).instance_stopped, true)
+  const restored = fx.create().status(started.job_id)
+  assert.equal(restored.status, 'cancelled')
+  assert.equal(restored.run_id, runId)
+  assert.equal(readFileSync(join(fx.root, '.local/evaluation-jobs', `${started.job_id}.json`), 'utf8').includes('"credential": "1"'), false)
+})
+
 test('业务未通过的已结束 Run 保持 completed 执行状态，列表可从磁盘恢复', async t => {
   const fx = await fixture(t, 'console.log(JSON.stringify({run_id:process.env.TEST_RUN_ID}));process.exit(1)')
   const runId = `run-${randomUUID()}`

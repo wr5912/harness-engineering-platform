@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
+import { once } from 'node:events'
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -27,6 +28,18 @@ const catalog = { default: one, routableProviders: ['provider-a', 'provider-b', 
   { id: 'deepseek-account', name: 'Account', models: [{ id: 'account-model' }] },
   { id: 'disabled-provider', name: 'Disabled', models: [{ id: 'disabled-model' }] },
 ] }
+
+async function holdLock(t, file) {
+  const child = spawn('python3', ['-c', `import fcntl,sys
+with open(sys.argv[1], 'a+') as stream:
+ fcntl.flock(stream, fcntl.LOCK_EX)
+ print('locked', flush=True)
+ sys.stdin.read()
+`, file])
+  t.after(() => child.kill('SIGKILL'))
+  await once(child.stdout, 'data')
+  return child
+}
 
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'models-handler-'))
@@ -153,9 +166,28 @@ test('配置额外字段、超大文件和符号链接拒绝加载；持锁不�
   rmSync(fx.file)
   writeFileSync(fx.file, JSON.stringify({ schema_version: '1.2', default: one }))
   writeFileSync(`${fx.file}.lock`, '')
+  assert.equal((await fx.rpc('list')).ok, true, '残留空文件不是活锁')
+  const holder = await holdLock(t, `${fx.file}.lock`)
   assert.equal((await fx.rpc('list')).error.code, 'busy')
-  rmSync(`${fx.file}.lock`)
+  holder.kill('SIGKILL')
+  await once(holder, 'close')
   assert.equal((await fx.rpc('list')).ok, true)
+})
+
+test('平台保存与 Python 启动共用内核锁，持有者崩溃后自动继续且不删除文件', async t => {
+  const fx = fixture(t)
+  mkdirSync(dirname(fx.file), { recursive: true })
+  const lock = join(fx.root, 'config/.business-model-policy.lock')
+  const holder = await holdLock(t, lock)
+  let finished = false
+  const saving = fx.rpc('saveBusinessDefault', { selection: one, revision: sha256('') }).then(value => { finished = true; return value })
+  await delay(100)
+  assert.equal(finished, false)
+  holder.kill('SIGKILL')
+  await once(holder, 'close')
+  assert.equal((await saving).ok, true)
+  assert.equal(existsSync(lock), true)
+  assert.deepEqual((await fx.rpc('list')).value.business_default, one)
 })
 
 test('并发进程用同一修订版保存默认模型时只有一方成功', async t => {
@@ -204,6 +236,6 @@ console.log(JSON.stringify(response))
   assert.equal(saved.ok, true, JSON.stringify(saved))
   assert.equal(stale.error.code, 'conflict', JSON.stringify(stale))
   assert.deepEqual(JSON.parse(readFileSync(fx.file, 'utf8')).default, { provider: 'provider-a', model: 'model-a' })
-  assert.equal(existsSync(join(fx.root, 'config/.business-model-policy.lock')), false)
-  assert.equal(existsSync(`${fx.file}.lock`), false)
+  assert.equal(existsSync(join(fx.root, 'config/.business-model-policy.lock')), true)
+  assert.equal(existsSync(`${fx.file}.lock`), true)
 })
