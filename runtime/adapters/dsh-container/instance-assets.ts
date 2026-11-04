@@ -87,7 +87,7 @@ function runtimeFiles(contract: RecordValue, manifest: RecordValue, projected: b
 function configuration(contract: RecordValue, manifest: RecordValue) {
   const { harness_sha256: _sourceText, ...runtime } = contract.harness_runtime ?? {}
   return {
-    source_id: manifest.source_id, source_ref: manifest.source_ref ?? null,
+    source_id: contract.source_id ?? manifest.source_id, source_ref: manifest.source_ref ?? null,
     image: contract.image?.build_fingerprint ?? manifest.image_build_fingerprint ?? manifest.image_id,
     runtime, patch: contract.patch, preset: manifest.target_preset, mode: manifest.mode,
     port: manifest.port, model: manifest.model_policy ? {

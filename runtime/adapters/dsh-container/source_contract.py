@@ -308,6 +308,27 @@ def _resolve_release(release_name: str, *, repo: Path) -> dict:
     raise ValueError("release sources resolve only after the first immutable Release is published and its container mapping is wired")
 
 
+def instance_desired_source(manifest: dict, *, repo: Path = REPO) -> str:
+    """保留实际加载登记，只在下一次未固定来源的装载中跟随当前身份。"""
+    source = manifest["source_id"]
+    if manifest.get("source_ref") or not source.startswith("experiment:"):
+        return source
+    identity = source.removeprefix("experiment:")
+    if not EXPERIMENT.fullmatch(identity):
+        raise ValueError("实例来源身份无效")
+    change = yaml.safe_load((repo / "evolution/experiments" / identity / "change.yaml").read_text(encoding="utf-8"))
+    target = change.get("current_version_id")
+    if not target:
+        return source
+    match = EXPERIMENT.fullmatch(target) if isinstance(target, str) else None
+    if not match or change.get("experiment_id") != identity or match[1] != change.get("agent_id"):
+        raise ValueError("实例来源的迁移指向无效，请核对版本身份")
+    current = yaml.safe_load((repo / "evolution/experiments" / target / "change.yaml").read_text(encoding="utf-8"))
+    if current.get("experiment_id") != target or current.get("agent_id") != change.get("agent_id") or current.get("current_version_id") or current.get("assets_retired"):
+        raise ValueError("实例来源的迁移指向无效，请核对版本身份")
+    return f"experiment:{target}"
+
+
 def resolve(source_id: str = DEFAULT_SOURCE, *, repo: Path = REPO, sources: Path | None = None,
             lock_path: Path = LOCK, require_assets: bool = True, source_ref: str | None = None,
             evaluation_source: str = "source") -> dict:

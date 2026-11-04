@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -958,6 +959,50 @@ test('已有实例继续使用登记的默认模型，显式选择只影响该�
   assert.equal(stale.value.ok, false)
   assert.match(stale.value.error.message, /模型设置或实例默认模型已变化/)
   assert.equal(upCount(), before, '登记的实例默认模型变化后不得按过期预览重启')
+})
+
+test('重载沿用版本 Candidate 的模型绑定，固定 Git 来源不混入工作树', async t => {
+  const { module, cleanup } = await loadModule()
+  const fx = fixture(), previous = process.env.XDG_STATE_HOME
+  process.env.XDG_STATE_HOME = fx.state
+  t.after(() => { fx.cleanup(); cleanup(); if (previous === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = previous })
+  const source = 'EXP-real-agent-001', candidate = join(fx.root, 'evolution/experiments', source, 'candidate')
+  const manifestPath = join(fx.state, 'dsh-dev/running-one/instance.json')
+  const model = { provider: 'fixture-provider', model: 'fixture-model' }
+  const manifest = { ...JSON.parse(readFileSync(manifestPath, 'utf8')), model_policy: { default: model } }
+  writeFileSync(manifestPath, JSON.stringify(manifest))
+  writeFileSync(join(candidate, 'binding.txt'), '固定角色绑定')
+  const paths = []
+  const provider = async (_agent, _selected, path) => {
+    paths.push(path)
+    assert.equal(readFileSync(join(path, 'binding.txt'), 'utf8'), '固定角色绑定')
+    return { policy: { default: model }, environment: {} }
+  }
+  const handler = module.createInstancesHandler(fx.root, provider), signal = new AbortController().signal
+  const request = { operation: 'reload', name: 'running-one' }
+  const current = await handler('preview', request, signal)
+  assert.equal(current.ok, true, JSON.stringify(current))
+  assert.equal(paths[0], candidate)
+  mkdirSync(join(fx.root, 'agents/real-agent'), { recursive: true })
+  writeFileSync(join(fx.root, 'agents/real-agent/manifest.yaml'), 'agent_id: real-agent\nactive_experiment: EXP-real-agent-001\n')
+  writeFileSync(join(fx.root, 'agents/real-agent/evaluation.md'), '# 固定评测\n')
+  const git = args => {
+    const result = spawnSync('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'user.name=验收', '-c', 'user.email=audit@example.test', ...args], { cwd: fx.root, encoding: 'utf8' })
+    assert.equal(result.status, 0, result.stderr)
+    return result.stdout.trim()
+  }
+  git(['init', '-q']); git(['add', '.']); git(['commit', '-qm', '固定来源'])
+  const commit = git(['rev-parse', 'HEAD'])
+  writeFileSync(manifestPath, JSON.stringify({ ...manifest, source_ref: `git:${commit}` }))
+  writeFileSync(join(candidate, 'binding.txt'), '工作树已修改的角色绑定')
+  const fixed = await handler('preview', request, signal)
+  assert.equal(fixed.ok, true, JSON.stringify(fixed))
+  assert.equal(paths[1], join(fx.root, '.local/evaluation-sources', commit, source, 'evolution/experiments', source, 'candidate'))
+  const run = await handler('run', { ...request, expected_model_policy_hash: fixed.value.model_policy_hash,
+    expected_asset_digest: fixed.value.plan.current_asset_digest, expected_generation_digest: fixed.value.plan.generation_digest }, signal)
+  assert.equal(run.value.ok, true, JSON.stringify(run))
+  assert.equal(paths[2], paths[1])
+  assert.equal(readFileSync(join(candidate, 'binding.txt'), 'utf8'), '工作树已修改的角色绑定')
 })
 
 test('历史实例未记录默认模型时必须显式选择，不能套用新的统一默认', async t => {

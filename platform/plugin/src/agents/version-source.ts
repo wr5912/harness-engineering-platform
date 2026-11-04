@@ -44,6 +44,17 @@ export function assertVersionIdentity(id: string, change: MapValue) {
   if (id.startsWith('VAR-') && (!change.compute_variant || typeof change.compute_variant !== 'object' || Array.isArray(change.compute_variant))) throw new Error('VAR 版本必须声明 compute_variant')
 }
 
+/** 实例仍记录实际加载身份；只有未固定的来源在下次装载时跟随身份迁移。 */
+export function instanceDesiredSource(root: string, manifest: MapValue): string {
+  const source = manifest.source_id
+  if (manifest.source_ref || typeof source !== 'string' || !source.startsWith('experiment:')) return source
+  const id = source.slice(11), identity = versionIdentity(root, id)
+  if (!identity.current_version_id) return source
+  const target = versionIdentity(root, identity.current_version_id)
+  if (target.agent_id !== identity.agent_id || target.current_version_id || target.assets_retired) throw new Error('实例来源的迁移指向无效，请核对版本身份')
+  return `experiment:${identity.current_version_id}`
+}
+
 /** 普通派生与迁移共同保留固定父版的运行方式及装载入口。 */
 export function inheritedLoadableAssets(source: MapValue, parentId: string): MapValue {
   return {

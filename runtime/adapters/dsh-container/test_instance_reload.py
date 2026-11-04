@@ -81,6 +81,34 @@ class InstanceReloadTest(unittest.TestCase):
         self.assertEqual(launch.model_policy, "/projection.json")
         self.assertEqual(launch.reload_manifest, self.manifest)
 
+    def test_migrated_identity_changes_next_launch_not_recorded_generation(self):
+        old = "EXP-fixture-027-r0123456789ab"
+        current = "EXP-fixture-027-m-r0123456789ab"
+        self.manifest["source_id"] = f"experiment:{old}"
+        del self.manifest["source_ref"]
+        for identity, extra in ((old, f"current_version_id: {current}\n"), (current, "")):
+            directory = dev.REPO / "evolution/experiments" / identity
+            directory.mkdir(parents=True)
+            (directory / "change.yaml").write_text(f"experiment_id: {identity}\nagent_id: fixture\n{extra}")
+        desired = dev.instance_desired_source(self.manifest, repo=dev.REPO)
+        self.assertEqual(desired, f"experiment:{current}")
+        self.manifest["source_ref"] = "git:" + "a" * 40
+        self.assertEqual(dev.instance_desired_source(self.manifest, repo=dev.REPO), f"experiment:{old}")
+        del self.manifest["source_ref"]
+        before = json.dumps(self.manifest)
+        with mock.patch.object(dev, "reload_snapshot", return_value=({"source_id": desired}, self.manifest, self.status)), \
+                mock.patch.object(dev, "command_up") as up:
+            dev.reload_one(self.args())
+            self.assertEqual(up.call_args.args[0].source, desired)
+        self.assertEqual(json.dumps(self.manifest), before)
+        with mock.patch.object(dev, "require_instance_workspace"):
+            dev.validate_existing_identity("exact-one", self.manifest, {"source_id": desired}, "eval")
+            with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+                dev.validate_existing_identity("exact-one", self.manifest, {"source_id": "experiment:EXP-fixture-028-m-r0123456789ab"}, "eval")
+        (dev.REPO / "evolution/experiments" / current / "change.yaml").write_text(f"experiment_id: {current}\nagent_id: other-agent\n")
+        with self.assertRaisesRegex(ValueError, "迁移指向无效"):
+            dev.instance_desired_source(self.manifest, repo=dev.REPO)
+
     def test_reload_snapshot_bypasses_status_cache_for_cas(self):
         with mock.patch.object(dev, "observe_generation", return_value=self.generation), \
                 mock.patch.object(dev, "asset_contract", return_value={}), \

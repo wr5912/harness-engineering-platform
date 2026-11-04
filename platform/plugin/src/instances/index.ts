@@ -1,4 +1,4 @@
-import { versionSource, versionSources, VERSION_ID } from '../agents/version-source.ts'
+import { instanceDesiredSource, versionSource, versionSources, VERSION_ID } from '../agents/version-source.ts'
 import { instanceStateRoot, programRoot, workspaceOwnsInstance } from '../workspace.ts'
 import { businessGatewayEntry } from '../business-control/entry.ts'
 import { businessAccessPath, businessAccess, preflightGatewayRegistration, deleteBusinessInstance } from '../business-control/registration.ts'
@@ -12,6 +12,7 @@ import { promisify } from 'node:util'
 import type { ConnectionRpcHandler, ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 import { createExternalInstancesHandler } from './external/index.ts'
 import { createAgentAccessManagement } from '../agent-access/index.ts'
+import { materializeEvaluationSource } from '../../../../runtime/adapters/dsh-container/evaluation-source.mts'
 
 const execFile = promisify(execFileCallback)
 const RUN_ID = /^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
@@ -234,21 +235,27 @@ async function readJson(path: string): Promise<Record<string, unknown> | null> {
   }
 }
 
-async function ensureRealSource(assetRoot: string, source: string): Promise<string> {
-  return versionSource(assetRoot, source.replace(/^experiment:/, '')).agent_id
-
+function instanceSourceRef(manifest?: Record<string, unknown> | null): string | undefined {
+  const ref = manifest?.source_ref
+  if (ref === undefined) return undefined
+  if (typeof ref !== 'string' || !/^git:[a-f0-9]{40}$/.test(ref)) throw new Error('实例固定来源必须是 git:<40位提交>')
+  return ref
 }
 
-async function runUpWithModelPolicy(assetRoot: string, args: string[], agentId: string, provider: ModelPolicyProvider | undefined,
+async function ensureRealSource(assetRoot: string, source: string, sourceRef?: string): Promise<string> {
+  return versionSource(assetRoot, source.replace(/^experiment:/, ''), sourceRef?.replace(/^git:/, '')).agent_id
+}
+
+async function runUpWithModelPolicy(assetRoot: string, args: string[], request: InstanceActionRequest & { manifest?: Record<string, unknown> }, agentId: string, provider: ModelPolicyProvider | undefined,
   selected?: ModelSelection, expectedHash?: string, registered?: ReturnType<typeof registeredModelSnapshot>, signal?: AbortSignal) {
   if (!provider) {
     if (selected || expectedHash) throw new Error('当前实例入口无法核对模型选择，请刷新页面后重试')
     return { result: await runDsh(assetRoot, args, signal) }
   }
-  const source = args[args.indexOf('--source') + 1]
-  const version = source && source.replace(/^experiment:/, '')
-  const projected = await provider(agentId, selected, version && VERSION_ID.test(version)
-    ? join(assetRoot, 'evolution/experiments', version, 'candidate') : undefined)
+  const version = request.source!.replace(/^experiment:/, '')
+  const ref = instanceSourceRef(request.manifest)
+  const sourceRoot = ref ? materializeEvaluationSource(assetRoot, version, ref).root : assetRoot
+  const projected = await provider(agentId, selected, join(sourceRoot, 'evolution/experiments', version, 'candidate'))
   const policy = projected.policy && typeof projected.policy === 'object' && !Array.isArray(projected.policy)
     ? projected.policy as Record<string, unknown> : {}
   const effective = modelSelection(policy.default)
@@ -332,9 +339,9 @@ async function assertKnownForMutation(assetRoot: string, name: string, signal?: 
 async function requestForUp(assetRoot: string, request: InstanceActionRequest, requireRecordedModel: boolean): Promise<InstanceActionRequest & { manifest?: any }> {
   const manifest = request.operation === 'create' ? undefined : await manifestFor(assetRoot, request.name)
   if (request.operation !== 'create' && !manifest) throw new Error(`未找到实例 ${request.name}`)
-  const requestedSource = request.source || manifest?.source_id
+  const requestedSource = request.source || (manifest ? instanceDesiredSource(assetRoot, manifest) : undefined)
   if (manifest?.profile === 'sdk' || typeof requestedSource === 'string' && requestedSource.startsWith('experiment:')
-    && versionSource(assetRoot, requestedSource.slice(11)).profile === 'sdk') {
+    && versionSource(assetRoot, requestedSource.slice(11), instanceSourceRef(manifest)?.slice(4)).profile === 'sdk') {
     throw new Error('SDK 型智能体由 TypeScript 应用启动，请使用 SDK 调试入口提交输入；不创建 Web 实例')
   }
   const registeredDefault = manifest?.model_policy && typeof manifest.model_policy === 'object' && !Array.isArray(manifest.model_policy)
@@ -367,7 +374,7 @@ async function requestForUp(assetRoot: string, request: InstanceActionRequest, r
       access_mode: accessMode,
       identity_mode: request.identity_mode ?? (manifest ? (registered?.identityMode ?? recordedBusiness?.identity_mode) === 'development' ? 'development' : 'published' : 'development'),
     } : {}),
-    source: request.source || (manifest ? assertSource(manifest.source_id) : undefined),
+    source: requestedSource ? assertSource(requestedSource) : undefined,
     port: request.port ?? optionalPort(manifest?.port),
     model_selection: request.model_selection ?? (registeredDefault == null ? undefined : modelSelection(registeredDefault)),
   }
@@ -381,6 +388,8 @@ function upArgs(assetRoot: string, request: InstanceActionRequest & { manifest?:
     args.push('--business-access-mode', request.access_mode!, '--business-identity-mode', request.identity_mode!)
   }
   if (request.port) args.push('--port', String(request.port))
+  const sourceRef = instanceSourceRef(request.manifest)
+  if (sourceRef) args.push('--source-ref', sourceRef)
   if (dryRun) args.push('--dry-run')
   if (request.operation === 'restart') args.push('--replace')
   if (request.allow_missing_env) args.push('--allow-missing-env')
@@ -410,8 +419,8 @@ function reloadArgs(request: InstanceActionRequest, dryRun = false): string[] {
 
 async function reloadWithPolicy(assetRoot: string, request: InstanceActionRequest, dryRun: boolean, modelPolicy?: ModelPolicyProvider, signal?: AbortSignal) {
   const prepared = await requestForUp(assetRoot, request, Boolean(modelPolicy))
-  const agentId = await ensureRealSource(assetRoot, prepared.source!)
-  return runUpWithModelPolicy(assetRoot, reloadArgs(request, dryRun), agentId, modelPolicy,
+  const agentId = await ensureRealSource(assetRoot, prepared.source!, instanceSourceRef(prepared.manifest))
+  return runUpWithModelPolicy(assetRoot, reloadArgs(request, dryRun), prepared, agentId, modelPolicy,
     prepared.model_selection, dryRun ? undefined : request.expected_model_policy_hash, registeredModelSnapshot(prepared.manifest), signal)
 }
 
@@ -426,8 +435,8 @@ async function previewOne(assetRoot: string, request: InstanceActionRequest, sig
     const prepared = await requestForUp(assetRoot, request, Boolean(modelPolicy))
     const source = prepared.source
     if (!source) throw new Error('创建、启动或重启需要来源')
-    const agentId = await ensureRealSource(assetRoot, source)
-    const projected = await runUpWithModelPolicy(assetRoot, upArgs(assetRoot, { ...prepared, name, source }, true), agentId,
+    const agentId = await ensureRealSource(assetRoot, source, instanceSourceRef(prepared.manifest))
+    const projected = await runUpWithModelPolicy(assetRoot, upArgs(assetRoot, { ...prepared, name, source }, true), prepared, agentId,
       modelPolicy, prepared.model_selection, undefined, registeredModelSnapshot(prepared.manifest), signal)
     return { operation: request.operation, name, plan: JSON.parse(projected.result.stdout), retention: retention(request.operation),
       ...(prepared.business_control ? { access_mode: prepared.access_mode, identity_mode: prepared.identity_mode } : {}),
@@ -522,10 +531,10 @@ async function runOne(assetRoot: string, request: InstanceActionRequest, signal?
         const prepared = await requestForUp(assetRoot, request, Boolean(modelPolicy))
         const source = prepared.source
         if (!source) throw new Error('创建、启动或重启需要来源')
-        const agentId = await ensureRealSource(assetRoot, source)
+        const agentId = await ensureRealSource(assetRoot, source, instanceSourceRef(prepared.manifest))
         const previousSourceDigest = (prepared.manifest?.business_control as { source_digest?: string } | undefined)?.source_digest
         if (prepared.business_control) {
-          const preview = await runUpWithModelPolicy(assetRoot, upArgs(assetRoot, { ...prepared, name, source }, true), agentId,
+          const preview = await runUpWithModelPolicy(assetRoot, upArgs(assetRoot, { ...prepared, name, source }, true), prepared, agentId,
             modelPolicy, prepared.model_selection, request.expected_model_policy_hash, registeredModelSnapshot(prepared.manifest), signal)
           const plan = JSON.parse(preview.result.stdout) as { business_control?: { source_digest?: string } }
           if (!request.expected_source_digest || plan.business_control?.source_digest !== request.expected_source_digest) {
@@ -537,7 +546,7 @@ async function runOne(assetRoot: string, request: InstanceActionRequest, signal?
         }
         signal?.throwIfAborted()
         // 写入开始后完成 CLI 与网关登记，连接中断不能中止父进程而遗留 Docker 操作和模型锁。
-        const projected = await runUpWithModelPolicy(assetRoot, upArgs(assetRoot, { ...prepared, name, source }), agentId,
+        const projected = await runUpWithModelPolicy(assetRoot, upArgs(assetRoot, { ...prepared, name, source }), prepared, agentId,
           modelPolicy, prepared.model_selection, request.expected_model_policy_hash, registeredModelSnapshot(prepared.manifest))
         if (prepared.business_control) {
           try {

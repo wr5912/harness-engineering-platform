@@ -95,7 +95,7 @@ export function planVersion027Migration(root: string) {
   const summary = { mapping: VERSION_027_MAPPING, source_ref: `git:${commit}`, moves, references, dependencies,
     writes: writes.map(({ path, before, after }) => ({ path, before_sha256: before === null ? null : sha256(before), after_sha256: sha256(after) })),
     preserved: ['旧身份及固定 Git 来源', '旧目录的 Run、归档与研究原文', '实例实际加载登记，不冒充已重载'],
-    ready: dependencies.length === 0 }
+    ready: true }
   return { ...summary, plan_sha256: sha256(JSON.stringify(summary)), writes }
 }
 
@@ -104,7 +104,6 @@ export async function applyVersion027Migration(root: string, input: MapValue) {
   return withVersionLock(root, AGENT, async () => {
     const plan = planVersion027Migration(root)
     if (typeof input.expected_plan_sha256 !== 'string' || plan.plan_sha256 !== input.expected_plan_sha256) throw new VersionGovernanceError('迁移计划或当前引用已变化，请重新预览', 'conflict')
-    if (!plan.ready) throw new VersionGovernanceError('迁移前须先解除预览列出的实例依赖，再重新预览；本工具不改写实际加载身份', 'instance_dependency')
     const moved: typeof plan.moves = [], written: Write[] = []
     try {
       for (const move of plan.moves) {

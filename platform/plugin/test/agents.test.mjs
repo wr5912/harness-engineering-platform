@@ -481,10 +481,11 @@ test('027 迁移提供精确映射与摘要 CAS，只更新当前引用，固定
   await assert.rejects(() => rpc(handler, 'versions/migration-apply', { expected_plan_sha256: plan.plan_sha256, confirmed: true }), /conflict/)
   const instanceFile = join(fx.root, '.local/instances/old-source/instance.json')
   write(instanceFile, JSON.stringify({ asset_root: fx.root, source_id: `experiment:${old}` }))
-  const blocked = await rpc(handler, 'versions/migration-plan')
-  assert.equal(blocked.ready, false)
-  await assert.rejects(() => rpc(handler, 'versions/migration-apply', { expected_plan_sha256: blocked.plan_sha256, confirmed: true }), /instance_dependency/)
-  await rm(instanceFile)
+  const withInstance = await rpc(handler, 'versions/migration-plan')
+  assert.equal(withInstance.ready, true)
+  assert.equal(withInstance.dependencies.length, 1)
+  assert.notEqual(withInstance.plan_sha256, plan.plan_sha256)
+  const actualInstance = readFileSync(instanceFile, 'utf8')
   const fresh = await rpc(handler, 'versions/migration-plan')
   const originalChanges = mapping.map(({ from }) => readFileSync(join(fx.root, `evolution/experiments/${from}/change.yaml`), 'utf8'))
   const originalWrite = fs.writeFileSync
@@ -510,6 +511,7 @@ test('027 迁移提供精确映射与摘要 CAS，只更新当前引用，固定
   }
   assert.equal((await rpc(handler, 'versions/migration-plan')).plan_sha256, fresh.plan_sha256, '中断恢复后仍可确认原方案')
   await rpc(handler, 'versions/migration-apply', { expected_plan_sha256: fresh.plan_sha256, confirmed: true })
+  assert.equal(readFileSync(instanceFile, 'utf8'), actualInstance, '迁移保留实例实际加载登记')
   for (const item of mapping) {
     assert.equal(existsSync(join(fx.root, `evolution/experiments/${item.from}/candidate`)), false)
     assert.equal(existsSync(join(fx.root, `evolution/experiments/${item.to}/candidate`)), true)

@@ -33,7 +33,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from source_contract import EXPERIMENT, IMAGE_LABEL_KEY, REPO, SOURCES, resolve, strict_json  # noqa: E402
+from source_contract import EXPERIMENT, IMAGE_LABEL_KEY, REPO, SOURCES, instance_desired_source, resolve, strict_json  # noqa: E402
 from workspace_paths import instance_belongs_to_workspace, instances_root, sites_config, source_catalog, workspace_descriptor, workspace_id
 
 ADAPTER = Path(__file__).resolve().parent
@@ -1969,7 +1969,7 @@ def asset_command(operation: str, contract: dict, manifest: dict, **extra):
 
 
 def asset_contract(manifest: dict) -> dict:
-    contract = resolve(manifest["source_id"], repo=REPO,
+    contract = resolve(instance_desired_source(manifest, repo=REPO), repo=REPO,
                        **({"source_ref": manifest["source_ref"]} if manifest.get("source_ref") else {}))
     assert_asset_dependencies(contract)
     return contract
@@ -2068,8 +2068,8 @@ def verify_load_receipt(name: str, contract: dict, expected: dict) -> dict:
 
 
 def reload_one(args: argparse.Namespace) -> None:
-    _, manifest, status = reload_snapshot(args.name)
-    plan = {"name": args.name, "source_id": manifest["source_id"], "port": manifest.get("port"),
+    contract, manifest, status = reload_snapshot(args.name)
+    plan = {"name": args.name, "source_id": manifest["source_id"], "desired_source_id": contract.get("source_id", manifest["source_id"]), "port": manifest.get("port"),
             "current_asset_digest": status["current_digest"], "generation_digest": status["generation_digest"],
             "asset_status": status, "model_policy": manifest.get("model_policy"),
             "retention": {"home": "保留", "sessions": "保留", "port": "保留", "model": "保留", "gateway_identity": "保留"}}
@@ -2083,7 +2083,7 @@ def reload_one(args: argparse.Namespace) -> None:
             fail("重载预览摘要无效")
     launch = argparse.Namespace(**{key: manifest.get(key) for key in
         ("trusted_host", "lan_access", "unsafe_no_auth", "skip_testing_notice", "source_ref")},
-        source=manifest["source_id"], mode=manifest["mode"], name=args.name, port=instance_recorded_port(manifest),
+        source=plan["desired_source_id"], mode=manifest["mode"], name=args.name, port=instance_recorded_port(manifest),
         analysis_workspace=manifest.get("mounts", {}).get("analysis_workspace"),
         plugin_node_modules=manifest.get("mounts", {}).get("plugin_node_modules"),
         business_control=manifest.get("business_control", {}).get("launch_config_file") or manifest.get("business_control", {}).get("config_file"),
@@ -3139,7 +3139,8 @@ def validate_existing_identity(name: str, manifest: dict, contract: dict, mode: 
     existing_source = manifest.get("source_id")
     existing_mode = manifest.get("mode")
     existing_analysis = (manifest.get("mounts") or {}).get("analysis_workspace")
-    if existing_source != contract["source_id"] or existing_mode != mode \
+    same_source = existing_source == contract["source_id"] or instance_desired_source(manifest, repo=REPO) == contract["source_id"]
+    if not same_source or existing_mode != mode \
             or existing_analysis != analysis_workspace:
         fail(
             f"实例 {name} 已存在且来源/模式不同或归因 Run 不同；"

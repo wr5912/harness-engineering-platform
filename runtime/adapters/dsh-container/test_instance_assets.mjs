@@ -169,3 +169,17 @@ test('跨进程状态检查复用派生缓存，CAS 与 source 绕过缓存，�
   rmSync(join(root, 'managed/plugin/added.js'))
   assert.equal(inspect().current_digest, initial)
 })
+
+
+test('身份迁移只改变期望来源，不改写实际加载回执', t => {
+  const { root, contract, manifest, source } = fixture(t)
+  const generation = { id: 'same-container', started_at: 'same-start', running: true }
+  contract.source_id = manifest.source_id
+  manifest.asset_load = { verification: 'runtime-observer', ok: true, source_id: manifest.source_id, preset_id: manifest.session_preset,
+    digest: source().digest, files_digest: digest([]), loaded_at: generation.started_at, pid: 10, container_id: generation.id, started_at: generation.started_at }
+  const loaded = JSON.stringify(manifest.asset_load)
+  assert.equal(assetStatus(contract, manifest, generation, 'running', root).status, 'current')
+  contract.source_id = 'experiment:EXP-demo-001-m-r0123456789ab'
+  assert.equal(assetStatus(contract, manifest, generation, 'running', root).status, 'pending_reload')
+  assert.equal(JSON.stringify(manifest.asset_load), loaded)
+})
