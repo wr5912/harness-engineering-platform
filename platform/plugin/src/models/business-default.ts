@@ -12,7 +12,8 @@ const revisionOf = (text: string) => createHash('sha256').update(text).digest('h
 const modelIdentifier = /^[A-Za-z0-9][A-Za-z0-9._:/+@-]{0,255}$/
 
 export class BusinessDefaultError extends Error {
-  constructor(readonly code: string, message: string) { super(message) }
+  readonly code: string
+  constructor(code: string, message: string) { super(message); this.code = code }
 }
 
 function configDirectory(root: string, create: boolean): string {

@@ -8,10 +8,17 @@ import { tarExtract } from '../fsutil.mts'
 import { previewAgentPackage, packAgent } from '../agent/pack.mts'
 import { agentCandidateDigest, assertDependencyArchitecture, copyAgentSnapshot, inspectAgentSnapshot } from '../agent/snapshot.mts'
 import { agentSeed } from '../agent/seed.mts'
+import { readBusinessDefault, BusinessDefaultError } from '../../plugin/src/models/business-default.ts'
 import { agentCommand } from '../agent/process.mts'
 import { candidateDigest, candidateFiles } from '../../plugin/src/tasks/files.ts'
 
 import { fixture, write, elf, command } from './agent-fixture.mjs'
+
+test('独立包 CLI 的业务默认模型读取可由原生 Node 直接装载', t => {
+  const f = fixture(t)
+  assert.equal(readBusinessDefault(f.root).default, null)
+  assert.equal(new BusinessDefaultError('busy', 'fixture').code, 'busy')
+})
 
 test('单 Agent 快照读取实际未提交字节、保留来源身份，排除其他 Agent 和运行态', t => {
   const f = fixture(t)
