@@ -1,13 +1,14 @@
 import type { BusinessControlManagementStatus } from './management.ts'
+import { isUnrestrictedBusinessAccess } from './contracts.ts'
 
 export type GatewayBucket = { key: string; label: string; count: number; tone: 'success' | 'blocked' | 'pending' | 'neutral' }
-/** 开发模式只有记录同步，不使用发布许可的短租约或 ACK。 */
-export function developmentSynchronized(instance: BusinessControlManagementStatus['instances'][number]) {
-  return instance.identityMode === 'development' && !instance.synchronization?.lastError
+/** 直接放行的实例只有记录同步，不使用发布许可的短租约或 ACK。 */
+export function unrestrictedSynchronized(instance: BusinessControlManagementStatus['instances'][number]) {
+  return isUnrestrictedBusinessAccess(instance) && !instance.synchronization?.lastError
     && Number.isFinite(Date.parse(instance.synchronization?.lastSuccessAt ?? ''))
 }
 export function identityBucket(instance: BusinessControlManagementStatus['instances'][number], status?: BusinessControlManagementStatus['agentStatuses'][number]) {
-  if (instance.identityMode === 'development' || status?.authentication.status === 'not_required') return 'development'
+  if (isUnrestrictedBusinessAccess(instance) || status?.authentication.status === 'not_required') return 'unrestricted'
   if (status?.authentication.status === 'verified' && status.trust.status === 'trusted') return 'verified'
   if (status?.authentication.status === 'disabled' || status?.trust.status === 'revoked' || status?.trust.status === 'mismatch') return 'abnormal'
   return 'unknown'

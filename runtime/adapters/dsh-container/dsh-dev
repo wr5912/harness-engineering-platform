@@ -1729,15 +1729,15 @@ def prepare_up(args: argparse.Namespace) -> tuple[dict, tuple[Path, dict] | None
             if not access_mode or not identity_mode or home.is_symlink() or home.exists() and (not home.is_dir() or any(not item.is_dir() or item.is_symlink() for item in home.rglob("*"))):
                 fail("此未登记实例缺少原创建模式；保留 HOME，不能按默认访问方式或身份阶段恢复")
         if current is None and (home.is_symlink() or home.exists() and (not home.is_dir()
-                or any(home.iterdir()) and not (development and anonymous))):
-            fail("只有无需认证的开发调试实例可以复用保留的 HOME；认证或发布实例需要新的独立 HOME")
+                or any(home.iterdir()) and not anonymous)):
+            fail("只有无需认证的实例可以复用保留的 HOME；需要认证的实例需要新的独立 HOME")
         contract["business_control"] = {
             "config_file": str(Path(business_file).resolve()), "source_digest": launch["sourceDigest"],
             "runtime_generation": (current[1]["business_control"]["runtime_generation"] if current else secrets.token_hex(16)),
             "identity_mode": "development" if launch.get("development") else "published",
             "access_mode": launch["accessMode"],
         }
-        if current is not None and current[1]["business_control"].get("source_digest") != launch["sourceDigest"] and not launch.get("development"):
+        if current is not None and current[1]["business_control"].get("source_digest") != launch["sourceDigest"] and not (development or anonymous):
             fail("业务来源资产与实例固定摘要不一致；保留旧实例及 Session，请以新实例名创建新版本")
     if args.port is None:
         if current is not None:
@@ -1943,6 +1943,7 @@ def validate_image_identity(contract: dict, current: tuple[Path, dict] | None = 
 
 
 def command_up(args: argparse.Namespace) -> None:
+    require_up_arguments(args)
     # 必须在选端口前加锁；仅锁写 instance.json 无法避免两个启动同时看到空闲端口。
     dry_run = bool(getattr(args, "dry_run", False))
     lock_business = not dry_run and not getattr(args, "analysis_workspace", None)

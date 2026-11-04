@@ -10,7 +10,7 @@ export type { BusinessGatewayConfig, BusinessGatewayHandle } from './gateway.ts'
 export async function applyBusinessGateway(ctx: Context, assetRoot: string): Promise<void> {
   const control = getBusinessControl(assetRoot)
   const gateway = control.config().gateway
-  if (!control.enabled() || !gateway) return
+  if (!gateway) return
   validateBusinessGateway(gateway)
   const config = gateway
   const handle = await startBusinessGateway(assetRoot, config)

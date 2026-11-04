@@ -81,15 +81,34 @@ test('开发记录同步采用真实同步事实，无发布 ACK 且超过租约
   let props = await f.props({ now: Date.now() + 10000 })
   assert.equal(props.data.instances[0].applied, false, '不得制造发布许可 ACK')
   let tree = render(props)
-  assert.match(text(tree), /开发记录已同步，无需发布许可回执/)
+  assert.match(text(tree), /运行记录已同步，无需发布许可回执/)
   assert.doesNotMatch(text(tree), /当前配置应用待核对|回执已过期/)
   f.control.recordSynchronization(binding, '记录同步失败')
   props = await f.props()
   tree = render(props)
-  assert.match(text(tree), /记录同步失败，不阻断开发交互/)
-  assert.doesNotMatch(text(tree), /开发记录已同步/)
+  assert.match(text(tree), /记录同步失败，不阻断交互/)
+  assert.doesNotMatch(text(tree), /运行记录已同步/)
   f.control.recordSynchronization(binding)
-  assert.match(text(render(await f.props())), /开发记录已同步，无需发布许可回执/)
+  assert.match(text(render(await f.props())), /运行记录已同步，无需发布许可回执/)
+})
+
+for (const identityMode of ['development', 'published']) test(`原则：${identityMode} 匿名实例不展示生效访问限制和待核验提示`, async t => {
+  const f = await fixture(t)
+  Object.assign(f.config.gateway.instances[0], { accessMode: 'anonymous', identityMode })
+  f.config.enabled = false
+  f.config.agents[0].enabled = false
+  f.save()
+  f.risk('old-risk', { signals: [{ code: 'deny-write', value: 'true', reason: 'old-risk' }] })
+  f.manual('old-deny')
+  f.control.recordSynchronization(binding)
+  const props = await f.props()
+  assert.equal(props.data.instances[0].accessMode, 'anonymous')
+  const tree = render(props)
+  assert.match(text(tree), /直接放行；认证、风险评估和访问限制不适用/)
+  assert.match(text(tree), /运行记录已同步，无需发布许可回执/)
+  assert.deepEqual(riskIds(tree), [])
+  assert.deepEqual(manualIds(tree), [])
+  assert.doesNotMatch(text(tree), /业务入口已关闭|业务访问已关闭|身份、归属与手动临时限制仍须满足|当前配置应用待核对|授权方式：|自动风险评估：|新请求会重新查询/)
 })
 
 test('动态区只投影已保存的拒绝信号，高等级本身不等于权限收紧，低等级有拒绝仍显示', async t => {

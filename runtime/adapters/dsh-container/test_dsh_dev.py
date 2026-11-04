@@ -208,6 +208,9 @@ class RenderComposeTest(unittest.TestCase):
             template, mode="verification", name="probe", project="dsh-dev-probe", port=3081)
         self.assertIn("name: dsh-dev-probe", rendered)
         self.assertIn("  dsh:\n    container_name: probe\n", rendered)
+        initializer, runtime = rendered.split("  dsh:\n", 1)
+        self.assertNotIn("restart:", initializer)
+        self.assertIn("    restart: unless-stopped\n", runtime)
         self.assertIn("    network_mode: host\n", rendered)
         self.assertIn("      - --host\n      - 127.0.0.1\n      - --port\n      - \"3081\"\n", rendered)
         self.assertIn("dsh-dev-probe-home", rendered)
@@ -353,7 +356,7 @@ class ModelPolicyTest(unittest.TestCase):
                 self.assertIn("业务模型设置", error.getvalue())
             self.assertFalse(lock.exists())
 
-            args = types.SimpleNamespace(source="experiment:EXP-example-agent-001", dry_run=False,
+            args = types.SimpleNamespace(source="experiment:EXP-example-agent-001", mode="eval", dry_run=False,
                                          analysis_workspace=None)
             observed = []
             with mock.patch.object(dev, "REPO", repo), \
@@ -1589,6 +1592,7 @@ class RuntimeEnvironmentRetentionTest(unittest.TestCase):
     @staticmethod
     def args(**values):
         return types.SimpleNamespace(**dict({
+            "source": "experiment:EXP-security-operations-expert-001",
             "name": "environment-probe", "mode": "verification", "analysis_workspace": None,
             "replace": True, "port": 3312, "allow_missing_env": False, "dry_run": False,
             "lan_access": True, "unsafe_no_auth": True, "skip_testing_notice": True,
@@ -2076,6 +2080,30 @@ class UpPortOwnershipTest(unittest.TestCase):
                 with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                     dev.prepare_up(self.args(name=name, business_control="/fixture/launch.json", business_access_mode="anonymous", business_identity_mode="development"))
                 self.assertTrue(invalid.is_symlink() if kind == "symlink" else invalid.read_text(encoding="utf-8") == "retained-home-file")
+
+    def test_anonymous_home_and_source_updates_do_not_depend_on_publication(self):
+        for phase in ("development", "published"):
+            with self.subTest(phase=phase):
+                name = "anonymous-" + phase
+                home = dev.STATE_ROOT / name / "dsh-home"
+                home.mkdir(parents=True)
+                session = home / "session.v4.jsonl"
+                session.write_text("retained-session", encoding="utf-8")
+                launch = {"assetRoot": str(dev.REPO), "sourceDigest": "sha256:new", "development": phase == "development",
+                          "accessMode": "anonymous", "registered": True}
+                args = self.args(name=name, business_control="/fixture/launch.json")
+                with mock.patch.object(dev, "resolve", side_effect=lambda *a, **kw: self.contract()), \
+                        mock.patch.object(dev, "business_helper", return_value=launch):
+                    contract, _ = dev.prepare_up(args)
+                    self.assertEqual(contract["business_control"]["identity_mode"], phase)
+                    self.write_existing(name=name, business_control={"source_digest": "sha256:old", "runtime_generation": "generation"})
+                    contract, _ = dev.prepare_up(args)
+                    self.assertEqual(contract["business_control"]["source_digest"], "sha256:new")
+                    self.assertEqual(session.read_text(encoding="utf-8"), "retained-session")
+                    if phase == "published":
+                        launch["accessMode"] = "authenticated"
+                        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                            dev.prepare_up(args)
 
     def test_direct_start_rejects_unprojected_business_default_before_port_selection(self):
         selected = {"provider": "xiaomi-token-plan-cn", "model": "MiMo-V2.6-Flash"}

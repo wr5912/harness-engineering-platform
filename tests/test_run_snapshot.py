@@ -286,6 +286,66 @@ class FrozenRunSnapshotTests(unittest.TestCase):
             example = next(agent for agent in result["agents"] if agent["agent_id"] == "example-agent")
             self.assertEqual(example["experiments"][0]["runs"][0]["run_id"], run_dir.name)
 
+    def test_incomplete_run_manifest_is_reported_without_hiding_valid_runs(self) -> None:
+        module = load_module(fixtures.RUN_RECORD, "incomplete_run_manifest")
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            run_dir, _ = recorded_run(module, repo)
+            bad_run = run_dir.parent / ("run-" + str(uuid.uuid4()))
+            bad_run.mkdir()
+            for content in ("", 'status: "running"\n',
+                            f'run_id: "{run_dir.name}"\nstatus: "running"\n',
+                            f'run_id: "{bad_run.name}"\n'):
+                with self.subTest(content=content):
+                    (bad_run / "run.yaml").write_text(content, encoding="utf-8")
+                    with contextlib.redirect_stdout(io.StringIO()) as output:
+                        module.command_overview(repo)
+                    result = json.loads(output.getvalue())
+                    runs = result["agents"][0]["experiments"][0]["runs"]
+                    self.assertEqual([run["run_id"] for run in runs], [run_dir.name])
+                    self.assertEqual(len(result["errors"]), 1)
+                    self.assertEqual(result["errors"][0]["run_id"], bad_run.name)
+                    self.assertEqual((bad_run / "run.yaml").read_text(encoding="utf-8"), content)
+                    with self.assertRaises(ValueError):
+                        module.load_run_manifest(repo, bad_run.name)
+
+    def test_unreadable_inputs_remain_unknown_in_read_only_run_view(self) -> None:
+        module = load_module(fixtures.RUN_RECORD, "unreadable_run_inputs")
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            run_dir, _ = recorded_run(module, repo)
+            manifest = module.read_run_manifest(run_dir / "run.yaml")
+            manifest.update(status="failed", recovery_note="仅按任务回执恢复身份，原始证据缺失。")
+            module.write_flat_yaml(run_dir / "run.yaml", manifest)
+            inputs = run_dir / "inputs.lock.json"
+            for content in (None, b"", b"{", b"[]"):
+                with self.subTest(content=content):
+                    if content is None:
+                        inputs.unlink()
+                    else:
+                        inputs.write_bytes(content)
+                    view = module.run_view(repo, run_dir.name)
+                    self.assertEqual(view["manifest"]["status"], "failed")
+                    self.assertEqual(view["cases"], [])
+                    self.assertIsNone(view["source"]["candidate_sha256"])
+                    self.assertIn("inputs.lock.json 无法读取，冻结来源与用例未知", view["missing"])
+                    self.assertIn(manifest["recovery_note"], view["missing"])
+                    self.assertEqual(inputs.read_bytes() if inputs.exists() else None, content)
+                    with self.assertRaisesRegex(ValueError, "对照 Run 缺少有效"):
+                        module.comparison_run_view(repo, run_dir.name)
+
+    def test_manifest_replace_failure_preserves_previous_file(self) -> None:
+        module = load_module(fixtures.RUN_RECORD, "atomic_run_manifest")
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "run.yaml"
+            module.write_flat_yaml(path, {"status": "running"})
+            before = path.read_bytes()
+            with mock.patch.object(Path, "replace", side_effect=OSError("写入中断")), \
+                    self.assertRaises(OSError):
+                module.write_flat_yaml(path, {"status": "completed"})
+            self.assertEqual(path.read_bytes(), before)
+            self.assertEqual(list(path.parent.iterdir()), [path])
+
     def test_external_inputs_freeze_original_bytes_and_explicit_mode(self) -> None:
         for mode in ("mock-replay", "replay"):
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as temporary:

@@ -2,6 +2,10 @@
 // 仅在网关与 Runtime 的接入协议不兼容时递增，不随普通构建变化。
 export const BUSINESS_TRANSPORT_VERSION = '3'
 export const BUSINESS_TRANSPORT_HEADER = 'x-harness-business-transport-version'
+/** 无需登录时直接放行；需要登录的开发实例沿用原生权限。 */
+export function isUnrestrictedBusinessAccess(mode: { accessMode?: string; identityMode?: string }): boolean {
+  return mode.accessMode === 'anonymous' || mode.identityMode === 'development'
+}
 export type PluginKind = 'authentication' | 'identity-trust' | 'risk-assessment' | 'access-authorization'
 export interface ControlPluginManifest {
   name: string; version: string; contractVersion: 1; kinds: readonly PluginKind[]

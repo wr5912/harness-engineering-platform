@@ -84,6 +84,30 @@ test('首次启动失败后的创建模式快照可恢复，网关登记始终�
   assert.throws(() => readBusinessLaunchConfig(f.file, { ...target, accessMode: 'anonymous' }), /访问方式无效/)
 })
 
+for (const identityMode of ['development', 'published']) test(`原则：无需登录的 ${identityMode} 实例启动和渲染均不需要签名密钥`, t => {
+  const f = fixture(t), file = join(f.config.assetRoot, 'config/business-access.json')
+  rmSync(f.config.sharedSecretFile)
+  delete f.config.sharedSecretFile
+  writeFileSync(f.file, JSON.stringify(f.config))
+  writeFileSync(file, JSON.stringify({ schemaVersion: 1, enabled: true, gateway: { instances: [
+    { agentId: f.input.agentId, instanceId: f.input.name, identityMode, accessMode: 'anonymous' },
+    { agentId: 'soc', instanceId: 'requires-login', identityMode: 'published', accessMode: 'authenticated' },
+  ] } }))
+  const config = readBusinessLaunchConfig(f.file, f.input)
+  const rendered = renderBusinessInstance(config, f.input), compose = yaml.load(rendered.compose), patch = yaml.load(rendered.patch)
+  const runtime = patch.flatMap(item => item.insert ?? []).find(item => item.id === 'business-runtime')
+  assert.equal(runtime.config.sharedSecretFile, undefined)
+  assert.ok(!compose.services.dsh.volumes.some(item => item.target === '/opt/harness-business/shared-secret'))
+  assert.equal(rendered.registration.identity_mode, identityMode, '保持实际发布状态')
+  assert.equal(rendered.registration.access_mode, 'anonymous')
+  assert.throws(() => readBusinessLaunchConfig(f.file, { agentId: 'soc', name: 'requires-login' }), /sharedSecretFile/, '需要登录的发布实例仍须配置签名密钥')
+  const access = JSON.parse(readFileSync(file, 'utf8'))
+  access.enabled = false
+  writeFileSync(file, JSON.stringify(access))
+  assert.doesNotThrow(() => renderBusinessInstance(readBusinessLaunchConfig(f.file, f.input), f.input), '关闭业务控制不阻止无需登录的实例启动')
+  assert.throws(() => readBusinessLaunchConfig(f.file, { agentId: 'soc', name: 'requires-login' }), /尚未启用/, '关闭接入仍阻止需要登录的实例启动')
+})
+
 test('开发实例两种访问方式均无需签名文件和挂载，混合登记仍只核对当前实例', t => {
   const f = fixture(t), file = join(f.config.assetRoot, 'config/business-access.json')
   rmSync(f.config.sharedSecretFile)

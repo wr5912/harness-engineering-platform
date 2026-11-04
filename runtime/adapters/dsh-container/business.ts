@@ -3,6 +3,7 @@ import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSyn
 import { createRequire } from 'node:module'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { isUnrestrictedBusinessAccess } from '../../../platform/plugin/src/business-control/contracts.ts'
 import { createBusinessRuntimePatch } from '../../../platform/plugin/src/business-control/patch.ts'
 import { platformGroupUrl } from '../../../platform/plugin/src/business-control/group-link.ts'
 import { businessGatewayEntry, checkBusinessGatewayEntry } from '../../../platform/plugin/src/business-control/entry.ts'
@@ -78,8 +79,9 @@ export function readBusinessLaunchConfig(file: string, target?: BusinessTarget):
   }
   if (!statSync(config.assetRoot).isDirectory()) throw new Error('业务数据根或共享密钥文件无效')
   const access = JSON.parse(readFileSync(join(config.assetRoot, 'config/business-access.json'), 'utf8'))
-  if (access.schemaVersion !== 1 || access.enabled !== true) throw new Error('业务访问配置尚未启用')
-  if (!isDevelopmentLaunch(access, target)) validateSigningKey(config)
+  if (access.schemaVersion !== 1 || typeof access.enabled !== 'boolean') throw new Error('业务访问配置无效')
+  if (!access.enabled && businessLaunchModes(access, target).accessMode !== 'anonymous') throw new Error('业务访问配置尚未启用')
+  if (!isUnrestrictedLaunch(access, target)) validateSigningKey(config)
   const origin = new URL(config.coordinatorOrigin)
   if (!['http:', 'https:'].includes(origin.protocol) || origin.username || origin.password || origin.pathname !== '/' || origin.search || origin.hash) throw new Error('协调器必须使用不含路径和凭据的 HTTP 来源地址')
   if (['127.0.0.1', 'localhost', '[::1]'].includes(origin.hostname)) throw new Error('bridge 容器不能使用宿主回环地址访问协调器；请配置可达宿主地址')
@@ -107,7 +109,7 @@ function businessLaunchModes(access: any, target?: BusinessTarget) {
     accessMode: previous?.accessMode ?? target?.accessMode ?? 'authenticated' }
 }
 
-function isDevelopmentLaunch(access: any, target?: BusinessTarget): boolean { return businessLaunchModes(access, target).development }
+function isUnrestrictedLaunch(access: any, target?: BusinessTarget): boolean { return isUnrestrictedBusinessAccess(businessLaunchModes(access, target)) }
 
 function validateSigningKey(config: BusinessLaunchConfig): void {
   const path = config.sharedSecretFile
@@ -121,8 +123,9 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
     || !input.sourceDigest || !input.workspaceId
     || !Number.isInteger(input.port) || input.port < 1 || input.port > 65535) throw new Error('业务实例登记参数无效')
   const access = JSON.parse(readFileSync(join(config.assetRoot, 'config/business-access.json'), 'utf8'))
-  const development = isDevelopmentLaunch(access, input)
-  if (!development) validateSigningKey(config)
+  const modes = businessLaunchModes(access, input)
+  const unrestricted = isUnrestrictedBusinessAccess(modes)
+  if (!unrestricted) validateSigningKey(config)
   const compose = yaml.load(input.compose)
   const service = compose?.services?.dsh
   if (!service || service.network_mode !== 'host') throw new Error('业务 Compose 缺少受控 dsh 网络入口')
@@ -146,7 +149,7 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
   const runtimeGeneration = input.runtimeGeneration ?? randomUUID()
   const businessBasePath = `/agents/${input.agentId}/instances/${input.name}/`
   const runtimeConfig = {
-    assetRoot: containerAssets, stateRoot: '/var/lib/dsh/business-control-state', ...(!development ? { sharedSecretFile: containerSecret } : {}),
+    assetRoot: containerAssets, stateRoot: '/var/lib/dsh/business-control-state', ...(!unrestricted ? { sharedSecretFile: containerSecret } : {}),
     coordinatorOrigin: config.coordinatorOrigin, basePath: businessBasePath,
     workspacePath: input.workspacePath ?? '/work/harness/workspace', presetId: input.presetId ?? input.agentId,
     localTools: capabilities.localTools,
@@ -194,7 +197,7 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
   service.environment.push(`HARNESS_BUSINESS_AGENT_ID=${input.agentId}`)
   service.environment.push(`HARNESS_BUSINESS_INSTANCE_ID=${input.name}`)
   const configDirectory = join(config.assetRoot, 'config'), credentials = mcpCredentialPaths(config.assetRoot)
-  const usesMcpCredentials = development || Boolean(manager)
+  const usesMcpCredentials = unrestricted || Boolean(manager)
   const hasMcpCredentials = existsSync(credentials.file)
   if (lstatSync(configDirectory).isSymbolicLink() || !lstatSync(configDirectory).isDirectory()
     || usesMcpCredentials && (hasMcpCredentials
@@ -208,12 +211,12 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
     { type: 'bind', source: configDirectory, target: `${containerAssets}/config`, read_only: true },
     ...(usesMcpCredentials && hasMcpCredentials ? [{ type: 'bind', source: credentials.directory,
       target: mcpCredentialPaths(containerAssets).directory, read_only: true }] : []),
-    ...(!development ? [{ type: 'bind', source: config.sharedSecretFile!, target: containerSecret, read_only: true }] : []),
+    ...(!unrestricted ? [{ type: 'bind', source: config.sharedSecretFile!, target: containerSecret, read_only: true }] : []),
     { type: 'bind', source: '${DSH_BUSINESS_PATCH_HOST:?业务控制 Patch 由启动器注入}', target: containerPatch, read_only: true },
   )
   return { compose: yaml.dump(compose, { lineWidth: -1, noRefs: true }), patch: yaml.dump(patch, { lineWidth: -1, noRefs: true, schema: patchSchema }),
     registration: { runtime_generation: runtimeGeneration, source_digest: input.sourceDigest,
-      access_mode: businessLaunchModes(access, input).accessMode, identity_mode: development ? 'development' : 'published',
+      access_mode: modes.accessMode, identity_mode: modes.identityMode,
       origin: `http://127.0.0.1:${input.port}`, scheduling_supported: true },
     runtimeConfig, localModelRoutes: capabilities.localModelRoutes }
 }

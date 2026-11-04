@@ -124,14 +124,14 @@ export function apply(ctx: Context, suppliedConfig: ManagerConfig) {
       } catch { throw new BusinessTransportError('binding', '业务分组上下文无效') }
       const gateway = control.config().gateway as Partial<BusinessGatewayConfig> | undefined
       const registered = gateway?.instances?.find(item => item.agentId === selected.agentId && item.instanceId === selected.instanceId)
-      if (!control.enabled() || !registered) throw new BusinessTransportError('registration', '业务实例未开放')
+      if (!registered || !control.enabled() && registered.accessMode !== 'anonymous') throw new BusinessTransportError('registration', '业务实例未开放')
       let instance: ReturnType<typeof resolveBusinessInstance>
       try { instance = resolveBusinessInstance(assetRoot, registered) }
       catch { throw new BusinessTransportError('binding', '业务实例来源或代次不匹配') }
       const logical = new URL(req.url || '/', 'http://localhost')
       const path = ctx.webServer.publicPath(logical.pathname) + logical.search
       let assertion: RuntimeAssertion
-      if (control.isDevelopmentInstance(instance.binding)) {
+      if (control.isUnrestrictedInstance(instance.binding)) {
         requireBusinessToken(req.headers.authorization, assetRoot)
         assertion = readBusinessAssertion(req.headers, instance.binding)
       } else {
@@ -147,10 +147,10 @@ export function apply(ctx: Context, suppliedConfig: ManagerConfig) {
     withGroupRequest: <T>(req: any, method: string, run: () => Promise<T>, rpcRequest: any) => {
       const assertion = businessGroupRequests.get(req)
       if (!assertion) return managementDispatch(assetRoot, run)
-      if (!control.enabled()) throw new BusinessTransportError('registration', '业务接入已关闭')
+      if (!control.enabled() && !control.isAnonymousInstance(assertion.binding)) throw new BusinessTransportError('registration', '业务接入已关闭')
       if (method === 'tools/list') return run()
       if (!assertion?.context?.scope.sessionId) throw new BusinessTransportError('context', '业务 MCP 请求缺少受信 Session')
-      if (!control.isDevelopmentInstance(assertion.binding) && assertion.requestDigest !== businessRpcDigest(rpcRequest)) throw new BusinessTransportError('signature', '业务 MCP 请求内容与签名不一致')
+      if (!control.isUnrestrictedInstance(assertion.binding) && assertion.requestDigest !== businessRpcDigest(rpcRequest)) throw new BusinessTransportError('signature', '业务 MCP 请求内容与签名不一致')
       return withSignedRuntimeSession(() => {
         let context: BusinessContext
         try {
@@ -176,7 +176,7 @@ export function apply(ctx: Context, suppliedConfig: ManagerConfig) {
       if ((ctx as any).get('businessRuntime') && !currentBusinessContext()) throw new Error('业务执行缺少受信任务上下文')
       return managementDispatch(assetRoot, run)
     },
-    ...(control.enabled() ? { withToolContext: async (execution: any, run: () => Promise<any>) => {
+    withToolContext: async (execution: any, run: () => Promise<any>) => {
       const runtime = (ctx as any).get('businessRuntime')
       const sessionId = execution.agent?.session?.id ?? (runtime ? undefined : execution.agent?.id)
       const context = typeof sessionId === 'string' ? control.contextForSession(sessionId) : undefined
@@ -194,7 +194,7 @@ export function apply(ctx: Context, suppliedConfig: ManagerConfig) {
       }
       if (currentBusinessContext()) return run()
       return managementDispatch(assetRoot, run)
-    } } : {}),
+    },
     groupUrl: (id: string) => platformGroupUrl(assetRoot, id),
     platformDispatch: (handler: NonNullable<ManagerConfig['dispatch']>) => { dispatch = handler }, servers: { get() {
     const servers = config.servers.get()

@@ -415,7 +415,7 @@ test('混合实例 UI 区分发布身份与开发同步，开发失联不显示�
   assert.match(ui.text(chart('配置同步')), /已同步1.*待核对1/s)
   assert.match(rendered, /配置同步失败/)
   assert.doesNotMatch(rendered, /回执已过期/)
-  assert.match(rendered, /开发调试，无需许可租约/)
+  assert.match(rendered, /直接放行，无需许可租约/)
   assert.match(rendered, /最近记录同步\s*尚无回执/)
   assert.match(rendered, /控制记录同步失败，请稍后核对/)
   assert.match(rendered, /同步失联不阻断交互/)
@@ -691,6 +691,33 @@ test('运行限制可多选已获准用户，按用户分别收紧且多选不�
   assert.deepEqual(calls.map(value => value.payload.scope.subjectId), ['subject-a', 'subject-b'])
   assert.ok(calls.every(value => !Object.hasOwn(value.payload.scope, 'sessionId')))
   assert.match(ui.text(ui.render()), /2 \/ 2 位接入用户的限制已保存/)
+})
+
+test('手动限制只选择需要登录的发布实例，切为匿名后立即停止派发限制', async () => {
+  for (const identityMode of ['development', 'published']) {
+    const status = uiStatus()
+    status.instances = [
+      { ...binding, identityMode, accessMode: 'anonymous' },
+      { ...binding, instanceId: 'login-development', identityMode: 'development', accessMode: 'authenticated' },
+      { ...binding, instanceId: 'login-published', identityMode: 'published', accessMode: 'authenticated' },
+    ]
+    const ui = page({ statusHandler: () => ({ ok: true, value: structuredClone(status) }), instanceHandler: () => ({ ok: true, value: { instances: status.instances.map(value => ({ name: value.instanceId, agent_id: value.agentId, state: 'running' })) } }) })
+    await ui.settle(); ui.tab('overview').props.onClick(); ui.render()
+    const form = () => ui.nodes().find(value => value.type === 'form' && value.props['aria-label'] === '手动运行限制配置')
+    const selector = () => ui.nodes(form()).find(value => value.type === 'select')
+    assert.deepEqual(ui.nodes(selector()).filter(value => value.type === 'option').map(value => value.props.value), ['', 'login-published'])
+    assert.equal(selector().props.value, 'login-published')
+    status.instances[2].accessMode = 'anonymous'
+    await ui.button('刷新状态').props.onClick(); await ui.settle()
+    assert.deepEqual(ui.nodes(selector()).filter(value => value.type === 'option').map(value => value.props.value), [''])
+    assert.equal(ui.button('收紧所选用户的动作').props.disabled, true)
+    assert.equal(ui.button('辅助重评当前 Session').props.disabled, true)
+    form().props.onSubmit({ preventDefault() {} }); await ui.settle()
+    assert.equal(ui.calls.some(value => ['mcp/control/restrict', 'mcp/control/reassess'].includes(value.endpoint)), false)
+    ui.tab('risk').props.onClick(); ui.render()
+    assert.match(ui.text(ui.render()), /直接放行，无需风险评估/)
+    assert.doesNotMatch(ui.text(ui.render()), /发布后按风险策略限制|未发布，无需风险评估/)
+  }
 })
 
 test('跨页保存先校验隐藏配置并定位错误页，HTTP 探测仅发送只读请求', async () => {
@@ -1020,7 +1047,7 @@ test('关闭自动评估后旧有效高风险仅作记录，概览不再催评�
   assert.match(ui.nodes(riskChart).find(node => node.type === 'svg').props['aria-label'], /条评估/)
   assert.match(ui.text(ui.render()), /manual-still-active/)
   assert.equal(ui.button('辅助重评当前 Session').props.disabled, true)
-  assert.match(ui.text(ui.render()), /辅助重评不可用；手动限制仍然可用/)
+  assert.match(ui.text(ui.render()), /辅助重评不可用；需要登录的发布实例仍可添加手动限制/)
   assert.equal(ui.nodes().some(node => node.props?.className === 'harness-gateway-risk-notice'), false)
   ui.tab('risk').props.onClick(); ui.render()
   assert.match(ui.text(ui.render()), /已记录评估（当前不参与许可）.*old-automatic-signal/s)
@@ -1169,7 +1196,7 @@ test('risk仅显示连接与结果，不提供内部要求或fixture输入，旧
 test('业务入口只在概览编辑，Agent高级设置无服务或无Agent时仍唯一可达', async () => {
   const ui = page(); await ui.settle()
   const entry = ui.nodes().find(node => node.props?.['aria-label'] === '业务入口')
-  assert.match(ui.text(entry), /所有业务实例.*不控制 DSH 工作区读写和会话权限.*不停止容器/)
+  assert.match(ui.text(entry), /需要登录的业务实例入口.*无需登录的实例始终放行.*不停止容器/)
   const toggle = ui.nodes(entry).find(node => node.props?.role === 'switch')
   toggle.props.onChange({ target: { checked: false } }); ui.render()
   assert.equal(ui.nodes(ui.tab('overview')).some(node => node.props?.['aria-label'] === '有未保存更改'), true)
