@@ -80,6 +80,6 @@ node --experimental-transform-types runtime/research/compute-assets.mts training
   --request /tmp/training-request.json --expected-preview-sha256 <训练预览摘要>
 ```
 
-归档使用既有 `evaluation/training/<来源回执摘要>/` 合同，保留原始回执和工件的相对目录关系；写入前重新核对同一预览摘要，完整回读后才更新 `decision_training`。新增恢复依赖进入回执 `supporting_files`。来源变化或归档冲突不覆盖旧材料；已归档且摘要相符时可重复回读，即使原 `.local` 已移除也能复用。
+归档使用既有 `evaluation/training/<来源回执摘要>/` 合同，保留原始回执和工件的相对目录关系；材料路径中的 `.local` 改为 `local-source`，避免 Git 忽略持久材料，后续补充归档复用该布局而不嵌套旧归档目录。写入前重新核对同一预览摘要，完整回读后才更新 `decision_training`。新增恢复依赖进入回执 `supporting_files`。来源变化或归档冲突不覆盖旧材料；已归档且摘要相符时可重复回读，即使原 `.local` 已移除也能复用。
 
 不递归复制 `.local`，不带入 Session、Runtime HOME、缓存、凭据文件或含凭据常量的受检文本。引用清单须只包含实际恢复必需的材料；原始业务轨迹、运维脚本和基础权重缓存不能因为同目录而整包归档。文件核验仅证明资产与摘要一致，不证明模型恢复、业务效果或训练结论。
