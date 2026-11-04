@@ -1,0 +1,7 @@
+{
+  "status": "stopped",
+  "checkedAt": "2026-11-04T03:48:03.508Z",
+  "port": 42445,
+  "listening": false,
+  "processExists": false
+}

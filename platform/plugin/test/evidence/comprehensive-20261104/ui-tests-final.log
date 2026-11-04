@@ -1,0 +1,30 @@
+✔ 登录页 CSS 保留原始文本，服务端渲染不转义布局语法 (33.223607ms)
+✔ 登录页静态输出六项平台能力，无 JavaScript 时首项可读且浮动按钮隐藏 (18.407543ms)
+▲ [WARNING] "import.meta" is not available with the "cjs" output format and will be empty [empty-import-meta]
+
+    platform/plugin/src/workspace.ts:10:88:
+      10 │ ...GRAM_ROOT || fileURLToPath(new URL('../../../', import.meta.url)))
+         ╵                                                    ~~~~~~~~~~~
+
+  You need to set the output format to "esm" for "import.meta" to work correctly.
+
+✔ 轮播控件为普通按钮，唯一提交入口仍属于用户名密码 POST 表单 (7.26954ms)
+✔ 登录跳转地址及服务端错误按 HTML 转义，不产生额外脚本或可执行错误标签 (6.609108ms)
+✔ 页面只内嵌唯一轮播脚本，其实际字节与 CSP 使用的 SHA256 摘要一致 (7.20698ms)
+✔ 真实脚本按七秒循环六页，鼠标进入显示按钮并暂停，离开收起并继续 (20.135263ms)
+✔ 鼠标手动翻页后离开仍恢复，按钮残留焦点不使轮播永久暂停 (13.92846ms)
+✔ 键盘进入展示区时暂停，方向键和首尾键翻页，焦点离开后继续 (7.439621ms)
+✔ 触屏横划切换、点按显示按钮，闲置收起恢复；纵向滚动和取消手势不翻页 (13.38245ms)
+✔ 触屏按钮拖出或手势取消不激活，辅助技术的无指针 click 仍可翻页 (15.758214ms)
+✔ 触屏或键盘操作后点击展示区之外即可收起，登录输入不被监听或读取 (11.93374ms)
+✔ 页面隐藏、退出清理计时，回到页面恢复且始终只有一个计时器 (12.531013ms)
+✔ 减少动态效果时停止自动播放而手动可用，偏好恢复后继续；无轮播安全降级 (19.919759ms)
+✔ 真实登录 HTTP 的 CSP 允许且仅允许当前脚本，错误登录、成功登录及退出保持原认证流程 (783.990181ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1328.883699

@@ -1,0 +1,56 @@
+✔ 无 EXP 登记、一对多、元数据修改、草稿和移除均不接管上游生命周期 (100.307965ms)
+✔ 管理 RPC 拒绝非 owner；幂等请求不重复登记，冲突与未知 schema 明确失败 (8.748835ms)
+✔ 配置修订和手工目标变更使旧验证失效；策略部分提交不能开放入口 (116.850721ms)
+✔ OpenCode v2 原生创建、受理和结果分开，幂等与会话归属服务端生效 (55.048961ms)
+✔ 未授权、停入口和缺失必要认证均在业务转发前拒绝 (29.126699ms)
+✔ 风险明确拒绝、无效时效与判断期间撤权不派发业务请求 (25.92086ms)
+✔ 外部风险覆盖供 owner、HTTP 与机器主体共用，既有 DSH 风险仍用全局提供方 (49.52407ms)
+✔ 显式外部风险拒绝、不可达或无效配置均不回退全局风险，也不派发业务 (23.522389ms)
+✔ 外部风险覆盖在途变化禁止派发，未选中的全局风险变化不误伤当前决定 (27.973975ms)
+✔ 无外部风险覆盖时继续使用现有全局风险配置 (19.260205ms)
+✔ 机器授权返回的同步派发复核检查所选提供方、有效期与当前实例绑定 (30.50723ms)
+✔ HTTP 不接受目标替换，平台身份 Header 不透传到上游 (40.789983ms)
+✔ OpenCode 全局 SSE 过滤其他会话，停入口关闭现有流且重连拒绝 (307.013503ms)
+✔ 上游专用秘密不进入适配结果或普通访问记录 (23.338612ms)
+✔ AgentScope 2.0.8 Msg数组与查询归属、DSH rc.5地址和游标遵循原生合同 (120.091366ms)
+✔ 风险事实在第三方授权等待期间到期时，不复用最初允许结果 (126.451925ms)
+✔ SSE授权等待中更换目标并重新启用，仍不得向原目标订阅 (53.420521ms)
+✔ 同一凭据引用的材料替换或丢失使验证失效，不将新权限带入旧绑定 (16.012555ms)
+✔ SSE对上游反射的实际认证材料脱敏，凭据更新后关闭原流 (304.155808ms)
+✔ 业务总开关关闭时新入口拒绝且已开放SSE结束，列表明确已停用 (305.289204ms)
+✖ 事件订阅首次派发复核风险有效期与配置，并准确记录未派发 (42.682249ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 20
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3443.914097
+
+✖ failing tests:
+
+test at test/external-instances.test.mjs:378:1
+✖ 事件订阅首次派发复核风险有效期与配置，并准确记录未派发 (42.682249ms)
+  AssertionError [ERR_ASSERTION]: The validation function is expected to return "true". Received false
+  
+  Caught error:
+  
+  TypeError: res.writeHead is not a function
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///home/admin/work/harness-engineering-platform/platform/plugin/test/external-instances.test.mjs:400:7)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: TypeError: res.writeHead is not a function
+        at Module.streamExternal (file:///tmp/external-build-vToHe1/access.mjs:831:9)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at async waitForActual (node:assert:646:5)
+        at async strict.rejects (node:assert:769:25)
+        at async TestContext.<anonymous> (file:///home/admin/work/harness-engineering-platform/platform/plugin/test/external-instances.test.mjs:400:7)
+        at async Test.run (node:internal/test_runner/test:1389:7)
+        at async Test.processPendingSubtests (node:internal/test_runner/test:960:7),
+    operator: 'rejects',
+    diff: 'simple'
+  }

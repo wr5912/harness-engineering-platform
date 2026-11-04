@@ -1,0 +1,4473 @@
+{
+  "at": "2026-11-04T03:53:35.543Z",
+  "part": "all",
+  "scope": "真实18120登录HTML/内联脚本/原生登录与客户端；普通读取全部真实，不模拟后端结果。只打开登记/导出窗口与读取当前/历史用例，不保存、不打包、不运行评测。主题偏好临时切换后精确恢复。",
+  "checks": [
+    {
+      "phase": "setup",
+      "name": "登录脚本CSP匹配实际HTML",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-0",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-0",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 980,
+          "y": 325.609375,
+          "width": 340,
+          "height": 348.765625
+        },
+        "current": {
+          "x": 980,
+          "y": 325.609375,
+          "width": 340,
+          "height": 348.765625
+        }
+      }
+    },
+    {
+      "phase": "login-1440-0",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-0",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-0",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-0",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-1440-1",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-1",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 980,
+          "y": 325.609375,
+          "width": 340,
+          "height": 348.765625
+        },
+        "current": {
+          "x": 980,
+          "y": 325.609375,
+          "width": 340,
+          "height": 348.765625
+        }
+      }
+    },
+    {
+      "phase": "login-1440-1",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-1",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-1",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-1",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-1440-2",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-2",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 980,
+          "y": 325.609375,
+          "width": 340,
+          "height": 348.765625
+        },
+        "current": {
+          "x": 980,
+          "y": 325.609375,
+          "width": 340,
+          "height": 348.765625
+        }
+      }
+    },
+    {
+      "phase": "login-1440-2",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-2",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-2",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-2",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-1440-3",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-3",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 980,
+          "y": 325.609375,
+          "width": 340,
+          "height": 348.765625
+        },
+        "current": {
+          "x": 980,
+          "y": 325.609375,
+          "width": 340,
+          "height": 348.765625
+        }
+      }
+    },
+    {
+      "phase": "login-1440-3",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-3",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-3",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-3",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-1440-4",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-4",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 980,
+          "y": 325.609375,
+          "width": 340,
+          "height": 348.765625
+        },
+        "current": {
+          "x": 980,
+          "y": 325.609375,
+          "width": 340,
+          "height": 348.765625
+        }
+      }
+    },
+    {
+      "phase": "login-1440-4",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-4",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-4",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-4",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-1440-5",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-5",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 980,
+          "y": 325.609375,
+          "width": 340,
+          "height": 348.765625
+        },
+        "current": {
+          "x": 980,
+          "y": 325.609375,
+          "width": 340,
+          "height": 348.765625
+        }
+      }
+    },
+    {
+      "phase": "login-1440-5",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-5",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-5",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-1440-5",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-768-0",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-768-0",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 164,
+          "y": 100,
+          "width": 440,
+          "height": 345.96875
+        },
+        "current": {
+          "x": 164,
+          "y": 100,
+          "width": 440,
+          "height": 345.96875
+        }
+      }
+    },
+    {
+      "phase": "login-768-0",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-768-0",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-768-0",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-768-0",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-768-1",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-768-1",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 164,
+          "y": 100,
+          "width": 440,
+          "height": 345.96875
+        },
+        "current": {
+          "x": 164,
+          "y": 100,
+          "width": 440,
+          "height": 345.96875
+        }
+      }
+    },
+    {
+      "phase": "login-768-1",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-768-1",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-768-1",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-768-1",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-768-2",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-768-2",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 164,
+          "y": 100,
+          "width": 440,
+          "height": 345.96875
+        },
+        "current": {
+          "x": 164,
+          "y": 100,
+          "width": 440,
+          "height": 345.96875
+        }
+      }
+    },
+    {
+      "phase": "login-768-2",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-768-2",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-768-2",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-768-2",
+      "name": "跨框架长标题自然换行",
+      "ok": true
+    },
+    {
+      "phase": "login-768-2",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-768-3",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-768-3",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 164,
+          "y": 100,
+          "width": 440,
+          "height": 345.96875
+        },
+        "current": {
+          "x": 164,
+          "y": 100,
+          "width": 440,
+          "height": 345.96875
+        }
+      }
+    },
+    {
+      "phase": "login-768-3",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-768-3",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-768-3",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-768-3",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-768-4",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-768-4",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 164,
+          "y": 100,
+          "width": 440,
+          "height": 345.96875
+        },
+        "current": {
+          "x": 164,
+          "y": 100,
+          "width": 440,
+          "height": 345.96875
+        }
+      }
+    },
+    {
+      "phase": "login-768-4",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-768-4",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-768-4",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-768-4",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-768-5",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-768-5",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 164,
+          "y": 100,
+          "width": 440,
+          "height": 345.96875
+        },
+        "current": {
+          "x": 164,
+          "y": 100,
+          "width": 440,
+          "height": 345.96875
+        }
+      }
+    },
+    {
+      "phase": "login-768-5",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-768-5",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-768-5",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-768-5",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-390-0",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-390-0",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 16,
+          "y": 100,
+          "width": 358,
+          "height": 345.96875
+        },
+        "current": {
+          "x": 16,
+          "y": 100,
+          "width": 358,
+          "height": 345.96875
+        }
+      }
+    },
+    {
+      "phase": "login-390-0",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-390-0",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-390-0",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-390-0",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-390-1",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-390-1",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 16,
+          "y": 100,
+          "width": 358,
+          "height": 345.96875
+        },
+        "current": {
+          "x": 16,
+          "y": 100,
+          "width": 358,
+          "height": 345.96875
+        }
+      }
+    },
+    {
+      "phase": "login-390-1",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-390-1",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-390-1",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-390-1",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-390-2",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-390-2",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 16,
+          "y": 100,
+          "width": 358,
+          "height": 345.96875
+        },
+        "current": {
+          "x": 16,
+          "y": 100,
+          "width": 358,
+          "height": 345.96875
+        }
+      }
+    },
+    {
+      "phase": "login-390-2",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-390-2",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-390-2",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-390-2",
+      "name": "跨框架长标题自然换行",
+      "ok": true
+    },
+    {
+      "phase": "login-390-2",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-390-3",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-390-3",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 16,
+          "y": 100,
+          "width": 358,
+          "height": 345.96875
+        },
+        "current": {
+          "x": 16,
+          "y": 100,
+          "width": 358,
+          "height": 345.96875
+        }
+      }
+    },
+    {
+      "phase": "login-390-3",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-390-3",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-390-3",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-390-3",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-390-4",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-390-4",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 16,
+          "y": 100,
+          "width": 358,
+          "height": 345.96875
+        },
+        "current": {
+          "x": 16,
+          "y": 100,
+          "width": 358,
+          "height": 345.96875
+        }
+      }
+    },
+    {
+      "phase": "login-390-4",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-390-4",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-390-4",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-390-4",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-390-5",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-390-5",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 16,
+          "y": 100,
+          "width": 358,
+          "height": 345.96875
+        },
+        "current": {
+          "x": 16,
+          "y": 100,
+          "width": 358,
+          "height": 345.96875
+        }
+      }
+    },
+    {
+      "phase": "login-390-5",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-390-5",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-390-5",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-390-5",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-320-0",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-320-0",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 16,
+          "y": 100,
+          "width": 288,
+          "height": 345.96875
+        },
+        "current": {
+          "x": 16,
+          "y": 100,
+          "width": 288,
+          "height": 345.96875
+        }
+      }
+    },
+    {
+      "phase": "login-320-0",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-320-0",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-320-0",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-320-0",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-320-1",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-320-1",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 16,
+          "y": 100,
+          "width": 288,
+          "height": 345.96875
+        },
+        "current": {
+          "x": 16,
+          "y": 100,
+          "width": 288,
+          "height": 345.96875
+        }
+      }
+    },
+    {
+      "phase": "login-320-1",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-320-1",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-320-1",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-320-1",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-320-2",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-320-2",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 16,
+          "y": 100,
+          "width": 288,
+          "height": 345.96875
+        },
+        "current": {
+          "x": 16,
+          "y": 100,
+          "width": 288,
+          "height": 345.96875
+        }
+      }
+    },
+    {
+      "phase": "login-320-2",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-320-2",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-320-2",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-320-2",
+      "name": "跨框架长标题自然换行",
+      "ok": true
+    },
+    {
+      "phase": "login-320-2",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-320-3",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-320-3",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 16,
+          "y": 100,
+          "width": 288,
+          "height": 345.96875
+        },
+        "current": {
+          "x": 16,
+          "y": 100,
+          "width": 288,
+          "height": 345.96875
+        }
+      }
+    },
+    {
+      "phase": "login-320-3",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-320-3",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-320-3",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-320-3",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-320-4",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-320-4",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 16,
+          "y": 100,
+          "width": 288,
+          "height": 345.96875
+        },
+        "current": {
+          "x": 16,
+          "y": 100,
+          "width": 288,
+          "height": 345.96875
+        }
+      }
+    },
+    {
+      "phase": "login-320-4",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-320-4",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-320-4",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-320-4",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-320-5",
+      "name": "能力全称与可访问名称一致",
+      "ok": true
+    },
+    {
+      "phase": "login-320-5",
+      "name": "表单位置与尺寸保持",
+      "ok": true,
+      "detail": {
+        "baseline": {
+          "x": 16,
+          "y": 100,
+          "width": 288,
+          "height": 345.96875
+        },
+        "current": {
+          "x": 16,
+          "y": 100,
+          "width": 288,
+          "height": 345.96875
+        }
+      }
+    },
+    {
+      "phase": "login-320-5",
+      "name": "切换能力保留已填写账号密码",
+      "ok": true
+    },
+    {
+      "phase": "login-320-5",
+      "name": "登录页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "login-320-5",
+      "name": "标题自然排版且未裁切",
+      "ok": true
+    },
+    {
+      "phase": "login-320-5",
+      "name": "SVG静止与入场字形都在画面内",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "phase": "login-native-interaction",
+      "name": "悬停暂停且箭头可达",
+      "ok": true
+    },
+    {
+      "phase": "login-native-interaction",
+      "name": "悬停7秒保持当前页",
+      "ok": true
+    },
+    {
+      "phase": "login-native-interaction",
+      "name": "实际7秒轮播推进一页",
+      "ok": true
+    },
+    {
+      "phase": "login-native-interaction",
+      "name": "键盘End到末页",
+      "ok": true
+    },
+    {
+      "phase": "login-native-interaction",
+      "name": "键盘首尾循环",
+      "ok": true
+    },
+    {
+      "phase": "login-native-interaction",
+      "name": "减少动态效果关闭自动轮播",
+      "ok": true
+    },
+    {
+      "phase": "login-native-interaction",
+      "name": "减少动效仍能手动切换",
+      "ok": true
+    },
+    {
+      "phase": "login-touch",
+      "name": "真实触屏横划只推进一页",
+      "ok": true
+    },
+    {
+      "phase": "login-touch",
+      "name": "触屏点按可以继续切页",
+      "ok": true
+    },
+    {
+      "phase": "login-no-javascript",
+      "name": "无JS保留首项与可提交表单",
+      "ok": true
+    },
+    {
+      "phase": "login-no-javascript",
+      "name": "真实平台账号认证",
+      "ok": true
+    },
+    {
+      "phase": "login-no-javascript",
+      "name": "保存精确主题偏好",
+      "ok": true
+    },
+    {
+      "phase": "home-1440-light",
+      "name": "首页统计明确是平台托管实例",
+      "ok": true
+    },
+    {
+      "phase": "home-1440-light",
+      "name": "首页去掉固定3轮建议",
+      "ok": true
+    },
+    {
+      "phase": "home-1440-light",
+      "name": "首页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "home-768-light",
+      "name": "首页统计明确是平台托管实例",
+      "ok": true
+    },
+    {
+      "phase": "home-768-light",
+      "name": "首页去掉固定3轮建议",
+      "ok": true
+    },
+    {
+      "phase": "home-768-light",
+      "name": "首页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "home-390-light",
+      "name": "首页统计明确是平台托管实例",
+      "ok": true
+    },
+    {
+      "phase": "home-390-light",
+      "name": "首页去掉固定3轮建议",
+      "ok": true
+    },
+    {
+      "phase": "home-390-light",
+      "name": "首页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "home-1440-dark",
+      "name": "首页统计明确是平台托管实例",
+      "ok": true
+    },
+    {
+      "phase": "home-1440-dark",
+      "name": "首页去掉固定3轮建议",
+      "ok": true
+    },
+    {
+      "phase": "home-1440-dark",
+      "name": "首页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "home-768-dark",
+      "name": "首页统计明确是平台托管实例",
+      "ok": true
+    },
+    {
+      "phase": "home-768-dark",
+      "name": "首页去掉固定3轮建议",
+      "ok": true
+    },
+    {
+      "phase": "home-768-dark",
+      "name": "首页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "home-390-dark",
+      "name": "首页统计明确是平台托管实例",
+      "ok": true
+    },
+    {
+      "phase": "home-390-dark",
+      "name": "首页去掉固定3轮建议",
+      "ok": true
+    },
+    {
+      "phase": "home-390-dark",
+      "name": "首页没有整页横向溢出",
+      "ok": true
+    },
+    {
+      "phase": "reader-opencode-register",
+      "name": "从实例入口找到OpenCode登记表单",
+      "ok": true
+    },
+    {
+      "phase": "reader-export-entry",
+      "name": "选定完整DSH版本后找到独立包入口",
+      "ok": true
+    },
+    {
+      "phase": "reader-current-and-frozen-case",
+      "name": "当前U-INS-001预期可读且匹配当前来源",
+      "ok": true
+    },
+    {
+      "phase": "reader-current-and-frozen-case",
+      "name": "指定历史Run冻结预期可读且匹配冻结来源",
+      "ok": true
+    },
+    {
+      "phase": "restore-theme",
+      "name": "精确恢复原主题偏好与实际明暗",
+      "ok": true
+    }
+  ],
+  "phases": [
+    {
+      "name": "login-1440-0",
+      "ok": true
+    },
+    {
+      "name": "login-1440-1",
+      "ok": true
+    },
+    {
+      "name": "login-1440-2",
+      "ok": true
+    },
+    {
+      "name": "login-1440-3",
+      "ok": true
+    },
+    {
+      "name": "login-1440-4",
+      "ok": true
+    },
+    {
+      "name": "login-1440-5",
+      "ok": true
+    },
+    {
+      "name": "login-768-0",
+      "ok": true
+    },
+    {
+      "name": "login-768-1",
+      "ok": true
+    },
+    {
+      "name": "login-768-2",
+      "ok": true
+    },
+    {
+      "name": "login-768-3",
+      "ok": true
+    },
+    {
+      "name": "login-768-4",
+      "ok": true
+    },
+    {
+      "name": "login-768-5",
+      "ok": true
+    },
+    {
+      "name": "login-390-0",
+      "ok": true
+    },
+    {
+      "name": "login-390-1",
+      "ok": true
+    },
+    {
+      "name": "login-390-2",
+      "ok": true
+    },
+    {
+      "name": "login-390-3",
+      "ok": true
+    },
+    {
+      "name": "login-390-4",
+      "ok": true
+    },
+    {
+      "name": "login-390-5",
+      "ok": true
+    },
+    {
+      "name": "login-320-0",
+      "ok": true
+    },
+    {
+      "name": "login-320-1",
+      "ok": true
+    },
+    {
+      "name": "login-320-2",
+      "ok": true
+    },
+    {
+      "name": "login-320-3",
+      "ok": true
+    },
+    {
+      "name": "login-320-4",
+      "ok": true
+    },
+    {
+      "name": "login-320-5",
+      "ok": true
+    },
+    {
+      "name": "login-native-interaction",
+      "ok": true
+    },
+    {
+      "name": "login-touch",
+      "ok": true
+    },
+    {
+      "name": "login-no-javascript",
+      "ok": true
+    },
+    {
+      "name": "home-1440-light",
+      "ok": true
+    },
+    {
+      "name": "home-768-light",
+      "ok": true
+    },
+    {
+      "name": "home-390-light",
+      "ok": true
+    },
+    {
+      "name": "home-1440-dark",
+      "ok": true
+    },
+    {
+      "name": "home-768-dark",
+      "ok": true
+    },
+    {
+      "name": "home-390-dark",
+      "ok": true
+    },
+    {
+      "name": "reader-opencode-register",
+      "ok": true
+    },
+    {
+      "name": "reader-export-entry",
+      "ok": true
+    },
+    {
+      "name": "reader-current-and-frozen-case",
+      "ok": true
+    }
+  ],
+  "errors": [],
+  "screenshots": [
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-1440-0.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-1440-1.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-1440-2.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-1440-3.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-1440-4.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-1440-5.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-768-0.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-768-1.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-768-2.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-768-3.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-768-4.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-768-5.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-390-0.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-390-1.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-390-2.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-390-3.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-390-4.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-390-5.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-320-0.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-320-1.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-320-2.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-320-3.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-320-4.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-320-5.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-touch-third.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/login-no-javascript.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/home-1440-light.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/home-768-light.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/home-390-light.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/home-1440-dark.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/home-768-dark.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/home-390-dark.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/reader-opencode-register.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/reader-opencode-register-390.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/reader-export-entry.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/reader-export-entry-390.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/reader-current-case.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/reader-frozen-case.png",
+    ".local/comprehensive-20261104/browser-2026-11-04T03-53-35-538Z/reader-frozen-case-390.png"
+  ],
+  "layouts": [
+    {
+      "viewport": 1440,
+      "scene": 0,
+      "documentWidth": 1440,
+      "form": {
+        "x": 980,
+        "y": 325.609375,
+        "width": 340,
+        "height": 348.765625
+      },
+      "heading": {
+        "height": 39,
+        "lineHeight": 39,
+        "width": 780,
+        "scrollWidth": 780,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "描述业务需求",
+          "left": 160.2325439453125,
+          "top": 112.51162719726562,
+          "right": 529.6112060546875,
+          "bottom": 189.4884033203125
+        },
+        {
+          "text": "迁入已有工程",
+          "left": 160.2325439453125,
+          "top": 239.02325439453125,
+          "right": 529.6112060546875,
+          "bottom": 62.97674560546875
+        },
+        {
+          "text": "角色 · 技能 · 工具 · 模型",
+          "left": 446.6004638671875,
+          "top": 202.02325439453125,
+          "right": 210.3214111328125,
+          "bottom": 103.97674560546875
+        },
+        {
+          "text": "专属智能体",
+          "left": 458.0223388671875,
+          "top": 260.06976318359375,
+          "right": 220.802001953125,
+          "bottom": 35.9302978515625
+        },
+        {
+          "text": "构建 · 运行 · 任务验证",
+          "left": 447.4598388671875,
+          "top": 291.255859375,
+          "right": 211.1807861328125,
+          "bottom": 13.744140625
+        }
+      ],
+      "settled": [
+        {
+          "text": "描述业务需求",
+          "left": 160.2325439453125,
+          "top": 105.06976318359375,
+          "right": 529.6112060546875,
+          "bottom": 196.93023681640625
+        },
+        {
+          "text": "迁入已有工程",
+          "left": 160.2325439453125,
+          "top": 231.5814208984375,
+          "right": 529.6112060546875,
+          "bottom": 70.4185791015625
+        },
+        {
+          "text": "角色 · 技能 · 工具 · 模型",
+          "left": 446.6004638671875,
+          "top": 194.5814208984375,
+          "right": 210.3214111328125,
+          "bottom": 111.4185791015625
+        },
+        {
+          "text": "专属智能体",
+          "left": 458.0223388671875,
+          "top": 252.62786865234375,
+          "right": 220.802001953125,
+          "bottom": 43.37213134765625
+        },
+        {
+          "text": "构建 · 运行 · 任务验证",
+          "left": 447.4598388671875,
+          "top": 283.81396484375,
+          "right": 211.1807861328125,
+          "bottom": 21.18603515625
+        }
+      ]
+    },
+    {
+      "viewport": 1440,
+      "scene": 1,
+      "documentWidth": 1440,
+      "form": {
+        "x": 980,
+        "y": 325.609375,
+        "width": 340,
+        "height": 348.765625
+      },
+      "heading": {
+        "height": 39,
+        "lineHeight": 39,
+        "width": 780,
+        "scrollWidth": 780,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "业务知识",
+          "left": 156.51162719726562,
+          "top": 118.093017578125,
+          "right": 563.3789978027344,
+          "bottom": 183.906982421875
+        },
+        {
+          "text": "MCP / OpenAPI",
+          "left": 156.51162719726562,
+          "top": 239.02325439453125,
+          "right": 511.6289978027344,
+          "bottom": 62.97674560546875
+        },
+        {
+          "text": "知识与工具资产",
+          "left": 359.7396545410156,
+          "top": 172.0465087890625,
+          "right": 315.0885009765625,
+          "bottom": 129.9534912109375
+        },
+        {
+          "text": "来源 · 版本 · 配置",
+          "left": 363.8412170410156,
+          "top": 206.6744384765625,
+          "right": 319.1900634765625,
+          "bottom": 99.3255615234375
+        },
+        {
+          "text": "继承",
+          "left": 565.6663818359375,
+          "top": 148.79071044921875,
+          "right": 184.2711181640625,
+          "bottom": 153.2093505859375
+        },
+        {
+          "text": "融合与复用",
+          "left": 543.1351318359375,
+          "top": 271.5814208984375,
+          "right": 161.7398681640625,
+          "bottom": 30.4185791015625
+        }
+      ],
+      "settled": [
+        {
+          "text": "业务知识",
+          "left": 156.51162719726562,
+          "top": 110.65115356445312,
+          "right": 563.3789978027344,
+          "bottom": 191.34884643554688
+        },
+        {
+          "text": "MCP / OpenAPI",
+          "left": 156.51162719726562,
+          "top": 231.5814208984375,
+          "right": 511.6289978027344,
+          "bottom": 70.4185791015625
+        },
+        {
+          "text": "知识与工具资产",
+          "left": 359.7396545410156,
+          "top": 164.6046142578125,
+          "right": 315.0885009765625,
+          "bottom": 137.3953857421875
+        },
+        {
+          "text": "来源 · 版本 · 配置",
+          "left": 363.8412170410156,
+          "top": 199.2325439453125,
+          "right": 319.1900634765625,
+          "bottom": 106.7674560546875
+        },
+        {
+          "text": "继承",
+          "left": 565.6663818359375,
+          "top": 141.34881591796875,
+          "right": 184.2711181640625,
+          "bottom": 160.65118408203125
+        },
+        {
+          "text": "融合与复用",
+          "left": 543.1351318359375,
+          "top": 264.1395263671875,
+          "right": 161.7398681640625,
+          "bottom": 37.8604736328125
+        }
+      ]
+    },
+    {
+      "viewport": 1440,
+      "scene": 2,
+      "documentWidth": 1440,
+      "form": {
+        "x": 980,
+        "y": 325.609375,
+        "width": 340,
+        "height": 348.765625
+      },
+      "heading": {
+        "height": 39,
+        "lineHeight": 39,
+        "width": 780,
+        "scrollWidth": 780,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "使用者",
+          "left": 176.97674560546875,
+          "top": 93.906982421875,
+          "right": 557.9451293945312,
+          "bottom": 208.093017578125
+        },
+        {
+          "text": "平台入口",
+          "left": 359.9452819824219,
+          "top": 79.02325439453125,
+          "right": 359.9453125,
+          "bottom": 222.97674560546875
+        },
+        {
+          "text": "身份 · 风险 · 授权",
+          "left": 341.515625,
+          "top": 104.279052734375,
+          "right": 341.515625,
+          "bottom": 200.720947265625
+        },
+        {
+          "text": "原生实例",
+          "left": 563.666259765625,
+          "top": 60.418609619140625,
+          "right": 156.224365234375,
+          "bottom": 241.58139038085938
+        },
+        {
+          "text": "DSH · AgentScope",
+          "left": 529.072509765625,
+          "top": 86.53488159179688,
+          "right": 121.630615234375,
+          "bottom": 217.46511840820312
+        },
+        {
+          "text": "OpenCode",
+          "left": 556.705322265625,
+          "top": 110.72091674804688,
+          "right": 149.263427734375,
+          "bottom": 193.27908325195312
+        },
+        {
+          "text": "原系统负责生命周期",
+          "left": 538.822509765625,
+          "top": 136.83721923828125,
+          "right": 131.380615234375,
+          "bottom": 168.16278076171875
+        },
+        {
+          "text": "指定资源授权",
+          "left": 344.921875,
+          "top": 209.25579833984375,
+          "right": 344.921875,
+          "bottom": 92.74420166015625
+        },
+        {
+          "text": "实例 key · 资源范围",
+          "left": 334.7265625,
+          "top": 233.5814208984375,
+          "right": 334.7265625,
+          "bottom": 71.4185791015625
+        },
+        {
+          "text": "资源",
+          "left": 176.97674560546875,
+          "top": 223.20928955078125,
+          "right": 572.9607543945312,
+          "bottom": 78.79071044921875
+        },
+        {
+          "text": "用户访问远端 · 远端访问指定资源",
+          "left": 298.6640625,
+          "top": 290.3255615234375,
+          "right": 298.6640625,
+          "bottom": 14.6744384765625
+        }
+      ],
+      "settled": [
+        {
+          "text": "使用者",
+          "left": 176.97674560546875,
+          "top": 86.46511840820312,
+          "right": 557.9451293945312,
+          "bottom": 215.53488159179688
+        },
+        {
+          "text": "平台入口",
+          "left": 359.9452819824219,
+          "top": 71.58139038085938,
+          "right": 359.9453125,
+          "bottom": 230.41860961914062
+        },
+        {
+          "text": "身份 · 风险 · 授权",
+          "left": 341.515625,
+          "top": 96.83721923828125,
+          "right": 341.515625,
+          "bottom": 208.16278076171875
+        },
+        {
+          "text": "原生实例",
+          "left": 563.666259765625,
+          "top": 52.97674560546875,
+          "right": 156.224365234375,
+          "bottom": 249.02325439453125
+        },
+        {
+          "text": "DSH · AgentScope",
+          "left": 529.072509765625,
+          "top": 79.093017578125,
+          "right": 121.630615234375,
+          "bottom": 224.906982421875
+        },
+        {
+          "text": "OpenCode",
+          "left": 556.705322265625,
+          "top": 103.279052734375,
+          "right": 149.263427734375,
+          "bottom": 200.720947265625
+        },
+        {
+          "text": "原系统负责生命周期",
+          "left": 538.822509765625,
+          "top": 129.39532470703125,
+          "right": 131.380615234375,
+          "bottom": 175.60467529296875
+        },
+        {
+          "text": "指定资源授权",
+          "left": 344.921875,
+          "top": 201.81396484375,
+          "right": 344.921875,
+          "bottom": 100.18603515625
+        },
+        {
+          "text": "实例 key · 资源范围",
+          "left": 334.7265625,
+          "top": 226.1395263671875,
+          "right": 334.7265625,
+          "bottom": 78.8604736328125
+        },
+        {
+          "text": "资源",
+          "left": 176.97674560546875,
+          "top": 215.7674560546875,
+          "right": 572.9607543945312,
+          "bottom": 86.2325439453125
+        },
+        {
+          "text": "用户访问远端 · 远端访问指定资源",
+          "left": 298.6640625,
+          "top": 282.88372802734375,
+          "right": 298.6640625,
+          "bottom": 22.11627197265625
+        }
+      ]
+    },
+    {
+      "viewport": 1440,
+      "scene": 3,
+      "documentWidth": 1440,
+      "form": {
+        "x": 980,
+        "y": 325.609375,
+        "width": 340,
+        "height": 348.765625
+      },
+      "heading": {
+        "height": 39,
+        "lineHeight": 39,
+        "width": 780,
+        "scrollWidth": 780,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "持续改进",
+          "left": 359.9452819824219,
+          "top": 179.4884033203125,
+          "right": 359.9453125,
+          "bottom": 122.51165771484375
+        },
+        {
+          "text": "业务用例",
+          "left": 179.7674560546875,
+          "top": 106.93023681640625,
+          "right": 540.1231994628906,
+          "bottom": 195.06976318359375
+        },
+        {
+          "text": "执行与证据",
+          "left": 475.58135986328125,
+          "top": 106.93023681640625,
+          "right": 229.29364013671875,
+          "bottom": 195.06976318359375
+        },
+        {
+          "text": "问题与修改",
+          "left": 179.7674560546875,
+          "top": 252.0465087890625,
+          "right": 525.1075744628906,
+          "bottom": 49.9534912109375
+        },
+        {
+          "text": "版本比较",
+          "left": 475.58135986328125,
+          "top": 252.0465087890625,
+          "right": 244.30926513671875,
+          "bottom": 49.9534912109375
+        }
+      ],
+      "settled": [
+        {
+          "text": "持续改进",
+          "left": 359.9452819824219,
+          "top": 172.0465087890625,
+          "right": 359.9453125,
+          "bottom": 129.9534912109375
+        },
+        {
+          "text": "业务用例",
+          "left": 179.7674560546875,
+          "top": 99.48837280273438,
+          "right": 540.1231994628906,
+          "bottom": 202.51162719726562
+        },
+        {
+          "text": "执行与证据",
+          "left": 475.58135986328125,
+          "top": 99.48837280273438,
+          "right": 229.29364013671875,
+          "bottom": 202.51162719726562
+        },
+        {
+          "text": "问题与修改",
+          "left": 179.7674560546875,
+          "top": 244.6046142578125,
+          "right": 525.1075744628906,
+          "bottom": 57.3953857421875
+        },
+        {
+          "text": "版本比较",
+          "left": 475.58135986328125,
+          "top": 244.6046142578125,
+          "right": 244.30926513671875,
+          "bottom": 57.3953857421875
+        }
+      ]
+    },
+    {
+      "viewport": 1440,
+      "scene": 4,
+      "documentWidth": 1440,
+      "form": {
+        "x": 980,
+        "y": 325.609375,
+        "width": 340,
+        "height": 348.765625
+      },
+      "heading": {
+        "height": 39,
+        "lineHeight": 39,
+        "width": 780,
+        "scrollWidth": 780,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "固定父版",
+          "left": 172.038330078125,
+          "top": 182.279052734375,
+          "right": 547.852294921875,
+          "bottom": 119.720947265625
+        },
+        {
+          "text": "中算力 · 模型协同",
+          "left": 370.4651184082031,
+          "top": 101.34881591796875,
+          "right": 289.722412109375,
+          "bottom": 200.65118408203125
+        },
+        {
+          "text": "低算力 · 代码执行",
+          "left": 370.4651184082031,
+          "top": 257.6279296875,
+          "right": 289.722412109375,
+          "bottom": 44.3720703125
+        },
+        {
+          "text": "样本 · 训练 · 部署",
+          "left": 393.6086120605469,
+          "top": 161.02325439453125,
+          "right": 289.422607421875,
+          "bottom": 143.97674560546875
+        },
+        {
+          "text": "比较",
+          "left": 603.8287963867188,
+          "top": 144.20928955078125,
+          "right": 148.01495361328125,
+          "bottom": 159.79071044921875
+        },
+        {
+          "text": "验证",
+          "left": 603.8287963867188,
+          "top": 167.465087890625,
+          "right": 148.01495361328125,
+          "bottom": 136.534912109375
+        }
+      ],
+      "settled": [
+        {
+          "text": "固定父版",
+          "left": 172.038330078125,
+          "top": 174.83721923828125,
+          "right": 547.852294921875,
+          "bottom": 127.16278076171875
+        },
+        {
+          "text": "中算力 · 模型协同",
+          "left": 370.4651184082031,
+          "top": 93.906982421875,
+          "right": 289.722412109375,
+          "bottom": 208.093017578125
+        },
+        {
+          "text": "低算力 · 代码执行",
+          "left": 370.4651184082031,
+          "top": 250.18603515625,
+          "right": 289.722412109375,
+          "bottom": 51.81396484375
+        },
+        {
+          "text": "样本 · 训练 · 部署",
+          "left": 393.6086120605469,
+          "top": 153.5814208984375,
+          "right": 289.422607421875,
+          "bottom": 151.4185791015625
+        },
+        {
+          "text": "比较",
+          "left": 603.8287963867188,
+          "top": 136.7674560546875,
+          "right": 148.01495361328125,
+          "bottom": 167.2325439453125
+        },
+        {
+          "text": "验证",
+          "left": 603.8287963867188,
+          "top": 160.02325439453125,
+          "right": 148.01495361328125,
+          "bottom": 143.97674560546875
+        }
+      ]
+    },
+    {
+      "viewport": 1440,
+      "scene": 5,
+      "documentWidth": 1440,
+      "form": {
+        "x": 980,
+        "y": 325.609375,
+        "width": 340,
+        "height": 348.765625
+      },
+      "heading": {
+        "height": 39,
+        "lineHeight": 39,
+        "width": 780,
+        "scrollWidth": 780,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "使用",
+          "left": 143.48837280273438,
+          "top": 85.67440795898438,
+          "right": 612.1053771972656,
+          "bottom": 219.32559204101562
+        },
+        {
+          "text": "交付",
+          "left": 143.48837280273438,
+          "top": 231.720947265625,
+          "right": 612.1053771972656,
+          "bottom": 73.279052734375
+        },
+        {
+          "text": "Web",
+          "left": 299.7674560546875,
+          "top": 71.2325439453125,
+          "right": 431.1075744628906,
+          "bottom": 224.7674560546875
+        },
+        {
+          "text": "SDK",
+          "left": 495.1162109375,
+          "top": 71.2325439453125,
+          "right": 236.9940185546875,
+          "bottom": 224.7674560546875
+        },
+        {
+          "text": "stdio 本地调用",
+          "left": 470.4542236328125,
+          "top": 104.34881591796875,
+          "right": 226.7332763671875,
+          "bottom": 201.65118408203125
+        },
+        {
+          "text": "平台托管实例",
+          "left": 270.5032653808594,
+          "top": 279.9534912109375,
+          "right": 419.3404846191406,
+          "bottom": 22.0465087890625
+        },
+        {
+          "text": "独立智能体包",
+          "left": 465.85205078125,
+          "top": 292.9766845703125,
+          "right": 223.99169921875,
+          "bottom": 9.02325439453125
+        }
+      ],
+      "settled": [
+        {
+          "text": "使用",
+          "left": 143.48837280273438,
+          "top": 78.2325439453125,
+          "right": 612.1053771972656,
+          "bottom": 226.7674560546875
+        },
+        {
+          "text": "交付",
+          "left": 143.48837280273438,
+          "top": 224.279052734375,
+          "right": 612.1053771972656,
+          "bottom": 80.720947265625
+        },
+        {
+          "text": "Web",
+          "left": 299.7674560546875,
+          "top": 63.79071044921875,
+          "right": 431.1075744628906,
+          "bottom": 232.20928955078125
+        },
+        {
+          "text": "SDK",
+          "left": 495.1162109375,
+          "top": 63.79071044921875,
+          "right": 236.9940185546875,
+          "bottom": 232.20928955078125
+        },
+        {
+          "text": "stdio 本地调用",
+          "left": 470.4542236328125,
+          "top": 96.906982421875,
+          "right": 226.7332763671875,
+          "bottom": 209.093017578125
+        },
+        {
+          "text": "平台托管实例",
+          "left": 270.5032653808594,
+          "top": 272.5115966796875,
+          "right": 419.3404846191406,
+          "bottom": 29.4884033203125
+        },
+        {
+          "text": "独立智能体包",
+          "left": 465.85205078125,
+          "top": 285.534912109375,
+          "right": 223.99169921875,
+          "bottom": 16.465087890625
+        }
+      ]
+    },
+    {
+      "viewport": 768,
+      "scene": 0,
+      "documentWidth": 768,
+      "form": {
+        "x": 164,
+        "y": 100,
+        "width": 440,
+        "height": 345.96875
+      },
+      "heading": {
+        "height": 39,
+        "lineHeight": 39,
+        "width": 440,
+        "scrollWidth": 440,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "描述业务需求",
+          "left": 52.80000305175781,
+          "top": 124.6307373046875,
+          "right": 321.51837158203125,
+          "bottom": 181.3692626953125
+        },
+        {
+          "text": "迁入已有工程",
+          "left": 52.80000305175781,
+          "top": 216.69232177734375,
+          "right": 321.51837158203125,
+          "bottom": 89.30767822265625
+        },
+        {
+          "text": "角色 · 技能 · 工具 · 模型",
+          "left": 261.2348327636719,
+          "top": 190.5845947265625,
+          "right": 89.29638671875,
+          "bottom": 119.4154052734375
+        },
+        {
+          "text": "专属智能体",
+          "left": 269.5238952636719,
+          "top": 232.6461181640625,
+          "right": 97.16769409179688,
+          "bottom": 69.3538818359375
+        },
+        {
+          "text": "构建 · 运行 · 任务验证",
+          "left": 261.7738952636719,
+          "top": 255.24615478515625,
+          "right": 89.7259521484375,
+          "bottom": 53.75384521484375
+        }
+      ],
+      "settled": [
+        {
+          "text": "描述业务需求",
+          "left": 52.80000305175781,
+          "top": 119.21539306640625,
+          "right": 321.51837158203125,
+          "bottom": 186.78460693359375
+        },
+        {
+          "text": "迁入已有工程",
+          "left": 52.80000305175781,
+          "top": 211.27691650390625,
+          "right": 321.51837158203125,
+          "bottom": 94.72308349609375
+        },
+        {
+          "text": "角色 · 技能 · 工具 · 模型",
+          "left": 261.2348327636719,
+          "top": 185.169189453125,
+          "right": 89.29638671875,
+          "bottom": 124.830810546875
+        },
+        {
+          "text": "专属智能体",
+          "left": 269.5238952636719,
+          "top": 227.23077392578125,
+          "right": 97.16769409179688,
+          "bottom": 74.76922607421875
+        },
+        {
+          "text": "构建 · 运行 · 任务验证",
+          "left": 261.7738952636719,
+          "top": 249.83074951171875,
+          "right": 89.7259521484375,
+          "bottom": 59.16925048828125
+        }
+      ]
+    },
+    {
+      "viewport": 768,
+      "scene": 1,
+      "documentWidth": 768,
+      "form": {
+        "x": 164,
+        "y": 100,
+        "width": 440,
+        "height": 345.96875
+      },
+      "heading": {
+        "height": 39,
+        "lineHeight": 39,
+        "width": 440,
+        "scrollWidth": 440,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "业务知识",
+          "left": 50.09230041503906,
+          "top": 128.69232177734375,
+          "right": 346.0987243652344,
+          "bottom": 177.30767822265625
+        },
+        {
+          "text": "MCP / OpenAPI",
+          "left": 50.09230041503906,
+          "top": 217.69232177734375,
+          "right": 308.47021484375,
+          "bottom": 89.30767822265625
+        },
+        {
+          "text": "知识与工具资产",
+          "left": 197.96490478515625,
+          "top": 167.953857421875,
+          "right": 165.41714477539062,
+          "bottom": 138.046142578125
+        },
+        {
+          "text": "来源 · 版本 · 配置",
+          "left": 200.93365478515625,
+          "top": 192.96923828125,
+          "right": 168.33599853515625,
+          "bottom": 116.03076171875
+        },
+        {
+          "text": "继承",
+          "left": 347.8316955566406,
+          "top": 152.03076171875,
+          "right": 70.23193359375,
+          "bottom": 154.96923828125
+        },
+        {
+          "text": "融合与复用",
+          "left": 331.4254455566406,
+          "top": 240.3846435546875,
+          "right": 53.8870849609375,
+          "bottom": 65.6153564453125
+        }
+      ],
+      "settled": [
+        {
+          "text": "业务知识",
+          "left": 50.09230041503906,
+          "top": 123.27691650390625,
+          "right": 346.0987243652344,
+          "bottom": 182.72308349609375
+        },
+        {
+          "text": "MCP / OpenAPI",
+          "left": 50.09230041503906,
+          "top": 212.27691650390625,
+          "right": 308.47021484375,
+          "bottom": 94.72308349609375
+        },
+        {
+          "text": "知识与工具资产",
+          "left": 197.96490478515625,
+          "top": 162.5384521484375,
+          "right": 165.41714477539062,
+          "bottom": 143.4615478515625
+        },
+        {
+          "text": "来源 · 版本 · 配置",
+          "left": 200.93365478515625,
+          "top": 187.5538330078125,
+          "right": 168.33599853515625,
+          "bottom": 121.4461669921875
+        },
+        {
+          "text": "继承",
+          "left": 347.8316955566406,
+          "top": 146.6153564453125,
+          "right": 70.23193359375,
+          "bottom": 160.3846435546875
+        },
+        {
+          "text": "融合与复用",
+          "left": 331.4254455566406,
+          "top": 234.96923828125,
+          "right": 53.8870849609375,
+          "bottom": 71.03076171875
+        }
+      ]
+    },
+    {
+      "viewport": 768,
+      "scene": 2,
+      "documentWidth": 768,
+      "form": {
+        "x": 164,
+        "y": 100,
+        "width": 440,
+        "height": 345.96875
+      },
+      "heading": {
+        "height": 78,
+        "lineHeight": 39,
+        "width": 440,
+        "scrollWidth": 440,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "使用者",
+          "left": 64.984619140625,
+          "top": 112.09228515625,
+          "right": 342.1427307128906,
+          "bottom": 194.90771484375
+        },
+        {
+          "text": "平台入口",
+          "left": 198.125,
+          "top": 100.26153564453125,
+          "right": 198.125,
+          "bottom": 205.73846435546875
+        },
+        {
+          "text": "身份 · 风险 · 授权",
+          "left": 184.6875,
+          "top": 119.18463134765625,
+          "right": 184.58218383789062,
+          "bottom": 189.81536865234375
+        },
+        {
+          "text": "原生实例",
+          "left": 346.3711242675781,
+          "top": 86.72308349609375,
+          "right": 49.87890625,
+          "bottom": 219.27691650390625
+        },
+        {
+          "text": "DSH · AgentScope",
+          "left": 321.2070617675781,
+          "top": 107,
+          "right": 24.71484375,
+          "bottom": 202
+        },
+        {
+          "text": "OpenCode",
+          "left": 341.3164367675781,
+          "top": 124.5999755859375,
+          "right": 44.82421875,
+          "bottom": 184.4000244140625
+        },
+        {
+          "text": "原系统负责生命周期",
+          "left": 328.2617492675781,
+          "top": 142.876953125,
+          "right": 31.6588134765625,
+          "bottom": 166.123046875
+        },
+        {
+          "text": "指定资源授权",
+          "left": 187.1875,
+          "top": 195.03076171875,
+          "right": 187.13088989257812,
+          "bottom": 110.96923828125
+        },
+        {
+          "text": "实例 key · 资源范围",
+          "left": 179.7421875,
+          "top": 213.27691650390625,
+          "right": 179.63333129882812,
+          "bottom": 95.72308349609375
+        },
+        {
+          "text": "资源",
+          "left": 64.984619140625,
+          "top": 205.18463134765625,
+          "right": 353.0790710449219,
+          "bottom": 100.81536865234375
+        },
+        {
+          "text": "用户访问远端 · 远端访问指定资源",
+          "left": 153.4765625,
+          "top": 254.5692138671875,
+          "right": 153.366455078125,
+          "bottom": 54.4307861328125
+        }
+      ],
+      "settled": [
+        {
+          "text": "使用者",
+          "left": 64.984619140625,
+          "top": 106.67694091796875,
+          "right": 342.1427307128906,
+          "bottom": 200.32305908203125
+        },
+        {
+          "text": "平台入口",
+          "left": 198.125,
+          "top": 94.84613037109375,
+          "right": 198.125,
+          "bottom": 211.15386962890625
+        },
+        {
+          "text": "身份 · 风险 · 授权",
+          "left": 184.6875,
+          "top": 113.76922607421875,
+          "right": 184.58218383789062,
+          "bottom": 195.23077392578125
+        },
+        {
+          "text": "原生实例",
+          "left": 346.3711242675781,
+          "top": 81.30767822265625,
+          "right": 49.87890625,
+          "bottom": 224.69232177734375
+        },
+        {
+          "text": "DSH · AgentScope",
+          "left": 321.2070617675781,
+          "top": 101.5845947265625,
+          "right": 24.71484375,
+          "bottom": 207.4154052734375
+        },
+        {
+          "text": "OpenCode",
+          "left": 341.3164367675781,
+          "top": 119.18463134765625,
+          "right": 44.82421875,
+          "bottom": 189.81536865234375
+        },
+        {
+          "text": "原系统负责生命周期",
+          "left": 328.2617492675781,
+          "top": 137.4615478515625,
+          "right": 31.6588134765625,
+          "bottom": 171.5384521484375
+        },
+        {
+          "text": "指定资源授权",
+          "left": 187.1875,
+          "top": 189.6153564453125,
+          "right": 187.13088989257812,
+          "bottom": 116.3846435546875
+        },
+        {
+          "text": "实例 key · 资源范围",
+          "left": 179.7421875,
+          "top": 207.861572265625,
+          "right": 179.63333129882812,
+          "bottom": 101.138427734375
+        },
+        {
+          "text": "资源",
+          "left": 64.984619140625,
+          "top": 199.76922607421875,
+          "right": 353.0790710449219,
+          "bottom": 106.23077392578125
+        },
+        {
+          "text": "用户访问远端 · 远端访问指定资源",
+          "left": 153.4765625,
+          "top": 249.15380859375,
+          "right": 153.366455078125,
+          "bottom": 59.84619140625
+        }
+      ]
+    },
+    {
+      "viewport": 768,
+      "scene": 3,
+      "documentWidth": 768,
+      "form": {
+        "x": 164,
+        "y": 100,
+        "width": 440,
+        "height": 345.96875
+      },
+      "heading": {
+        "height": 39,
+        "lineHeight": 39,
+        "width": 440,
+        "scrollWidth": 440,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "持续改进",
+          "left": 198.125,
+          "top": 173.3692626953125,
+          "right": 198.0660400390625,
+          "bottom": 132.63079833984375
+        },
+        {
+          "text": "业务用例",
+          "left": 67.015380859375,
+          "top": 120.5692138671875,
+          "right": 329.234619140625,
+          "bottom": 185.4307861328125
+        },
+        {
+          "text": "执行与证据",
+          "left": 282.27691650390625,
+          "top": 120.5692138671875,
+          "right": 102.977783203125,
+          "bottom": 185.4307861328125
+        },
+        {
+          "text": "问题与修改",
+          "left": 67.015380859375,
+          "top": 226.16925048828125,
+          "right": 318.23931884765625,
+          "bottom": 79.830810546875
+        },
+        {
+          "text": "版本比较",
+          "left": 282.27691650390625,
+          "top": 226.16925048828125,
+          "right": 113.91415405273438,
+          "bottom": 79.830810546875
+        }
+      ],
+      "settled": [
+        {
+          "text": "持续改进",
+          "left": 198.125,
+          "top": 167.953857421875,
+          "right": 198.0660400390625,
+          "bottom": 138.046142578125
+        },
+        {
+          "text": "业务用例",
+          "left": 67.015380859375,
+          "top": 115.15386962890625,
+          "right": 329.234619140625,
+          "bottom": 190.84619140625
+        },
+        {
+          "text": "执行与证据",
+          "left": 282.27691650390625,
+          "top": 115.15386962890625,
+          "right": 102.977783203125,
+          "bottom": 190.84619140625
+        },
+        {
+          "text": "问题与修改",
+          "left": 67.015380859375,
+          "top": 220.75384521484375,
+          "right": 318.23931884765625,
+          "bottom": 85.24615478515625
+        },
+        {
+          "text": "版本比较",
+          "left": 282.27691650390625,
+          "top": 220.75384521484375,
+          "right": 113.91415405273438,
+          "bottom": 85.24615478515625
+        }
+      ]
+    },
+    {
+      "viewport": 768,
+      "scene": 4,
+      "documentWidth": 768,
+      "form": {
+        "x": 164,
+        "y": 100,
+        "width": 440,
+        "height": 345.96875
+      },
+      "heading": {
+        "height": 39,
+        "lineHeight": 39,
+        "width": 440,
+        "scrollWidth": 440,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "固定父版",
+          "left": 61.38653564453125,
+          "top": 175.4000244140625,
+          "right": 334.8044738769531,
+          "bottom": 130.5999755859375
+        },
+        {
+          "text": "中算力 · 模型协同",
+          "left": 205.78460693359375,
+          "top": 116.5076904296875,
+          "right": 146.99664306640625,
+          "bottom": 189.4923095703125
+        },
+        {
+          "text": "低算力 · 代码执行",
+          "left": 205.78460693359375,
+          "top": 230.23077392578125,
+          "right": 146.94668579101562,
+          "bottom": 75.76922607421875
+        },
+        {
+          "text": "样本 · 训练 · 部署",
+          "left": 222.59521484375,
+          "top": 160.4769287109375,
+          "right": 146.6744384765625,
+          "bottom": 148.5230712890625
+        },
+        {
+          "text": "比较",
+          "left": 375.60394287109375,
+          "top": 147.96923828125,
+          "right": 43.9117431640625,
+          "bottom": 160.03076171875
+        },
+        {
+          "text": "验证",
+          "left": 375.60394287109375,
+          "top": 164.892333984375,
+          "right": 43.9117431640625,
+          "bottom": 143.107666015625
+        }
+      ],
+      "settled": [
+        {
+          "text": "固定父版",
+          "left": 61.38653564453125,
+          "top": 169.984619140625,
+          "right": 334.8044738769531,
+          "bottom": 136.015380859375
+        },
+        {
+          "text": "中算力 · 模型协同",
+          "left": 205.78460693359375,
+          "top": 111.09228515625,
+          "right": 146.99664306640625,
+          "bottom": 194.90771484375
+        },
+        {
+          "text": "低算力 · 代码执行",
+          "left": 205.78460693359375,
+          "top": 224.81536865234375,
+          "right": 146.94668579101562,
+          "bottom": 81.18463134765625
+        },
+        {
+          "text": "样本 · 训练 · 部署",
+          "left": 222.59521484375,
+          "top": 155.0615234375,
+          "right": 146.6744384765625,
+          "bottom": 153.9384765625
+        },
+        {
+          "text": "比较",
+          "left": 375.60394287109375,
+          "top": 142.5538330078125,
+          "right": 43.9117431640625,
+          "bottom": 165.4461669921875
+        },
+        {
+          "text": "验证",
+          "left": 375.60394287109375,
+          "top": 159.4769287109375,
+          "right": 43.9117431640625,
+          "bottom": 148.5230712890625
+        }
+      ]
+    },
+    {
+      "viewport": 768,
+      "scene": 5,
+      "documentWidth": 768,
+      "form": {
+        "x": 164,
+        "y": 100,
+        "width": 440,
+        "height": 345.96875
+      },
+      "heading": {
+        "height": 39,
+        "lineHeight": 39,
+        "width": 440,
+        "scrollWidth": 440,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "使用",
+          "left": 40.615386962890625,
+          "top": 105.64617919921875,
+          "right": 381.6033630371094,
+          "bottom": 203.35382080078125
+        },
+        {
+          "text": "交付",
+          "left": 40.615386962890625,
+          "top": 211.923095703125,
+          "right": 381.4996795654297,
+          "bottom": 97.076904296875
+        },
+        {
+          "text": "Web",
+          "left": 154.33843994140625,
+          "top": 95.23077392578125,
+          "right": 249.92715454101562,
+          "bottom": 206.76922607421875
+        },
+        {
+          "text": "SDK",
+          "left": 296.4922790527344,
+          "top": 95.23077392578125,
+          "right": 109.04278564453125,
+          "bottom": 206.76922607421875
+        },
+        {
+          "text": "stdio 本地调用",
+          "left": 278.5206604003906,
+          "top": 118.5076904296875,
+          "right": 101.16680908203125,
+          "bottom": 190.4923095703125
+        },
+        {
+          "text": "平台托管实例",
+          "left": 133.03366088867188,
+          "top": 246.4769287109375,
+          "right": 241.34133911132812,
+          "bottom": 59.5230712890625
+        },
+        {
+          "text": "独立智能体包",
+          "left": 275.1874694824219,
+          "top": 255.953857421875,
+          "right": 99.13088989257812,
+          "bottom": 50.046142578125
+        }
+      ],
+      "settled": [
+        {
+          "text": "使用",
+          "left": 40.615386962890625,
+          "top": 100.23077392578125,
+          "right": 381.6033630371094,
+          "bottom": 208.76922607421875
+        },
+        {
+          "text": "交付",
+          "left": 40.615386962890625,
+          "top": 206.5076904296875,
+          "right": 381.4996795654297,
+          "bottom": 102.4923095703125
+        },
+        {
+          "text": "Web",
+          "left": 154.33843994140625,
+          "top": 89.81536865234375,
+          "right": 249.92715454101562,
+          "bottom": 212.18463134765625
+        },
+        {
+          "text": "SDK",
+          "left": 296.4922790527344,
+          "top": 89.81536865234375,
+          "right": 109.04278564453125,
+          "bottom": 212.18463134765625
+        },
+        {
+          "text": "stdio 本地调用",
+          "left": 278.5206604003906,
+          "top": 113.09228515625,
+          "right": 101.16680908203125,
+          "bottom": 195.90771484375
+        },
+        {
+          "text": "平台托管实例",
+          "left": 133.03366088867188,
+          "top": 241.0615234375,
+          "right": 241.34133911132812,
+          "bottom": 64.9384765625
+        },
+        {
+          "text": "独立智能体包",
+          "left": 275.1874694824219,
+          "top": 250.5384521484375,
+          "right": 99.13088989257812,
+          "bottom": 55.4615478515625
+        }
+      ]
+    },
+    {
+      "viewport": 390,
+      "scene": 0,
+      "documentWidth": 390,
+      "form": {
+        "x": 16,
+        "y": 100,
+        "width": 358,
+        "height": 345.96875
+      },
+      "heading": {
+        "height": 33,
+        "lineHeight": 33,
+        "width": 358,
+        "scrollWidth": 358,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "描述业务需求",
+          "left": 42.959999084472656,
+          "top": 84.17230224609375,
+          "right": 248.36812591552734,
+          "bottom": 131.82769775390625
+        },
+        {
+          "text": "迁入已有工程",
+          "left": 42.959999084472656,
+          "top": 159.076904296875,
+          "right": 248.36812591552734,
+          "bottom": 56.923095703125
+        },
+        {
+          "text": "专属智能体",
+          "left": 215.26016235351562,
+          "top": 172.49847412109375,
+          "right": 74.84103393554688,
+          "bottom": 41.50152587890625
+        },
+        {
+          "text": "构建 · 运行 · 任务验证",
+          "left": 204.75234985351562,
+          "top": 190.8184814453125,
+          "right": 64.745849609375,
+          "bottom": 28.1815185546875
+        }
+      ],
+      "settled": [
+        {
+          "text": "描述业务需求",
+          "left": 42.959999084472656,
+          "top": 79.76617431640625,
+          "right": 248.36812591552734,
+          "bottom": 136.23382568359375
+        },
+        {
+          "text": "迁入已有工程",
+          "left": 42.959999084472656,
+          "top": 154.6707763671875,
+          "right": 248.36812591552734,
+          "bottom": 61.3292236328125
+        },
+        {
+          "text": "专属智能体",
+          "left": 215.26016235351562,
+          "top": 168.09228515625,
+          "right": 74.84103393554688,
+          "bottom": 45.90771484375
+        },
+        {
+          "text": "构建 · 运行 · 任务验证",
+          "left": 204.75234985351562,
+          "top": 186.41229248046875,
+          "right": 64.745849609375,
+          "bottom": 32.58770751953125
+        }
+      ]
+    },
+    {
+      "viewport": 390,
+      "scene": 1,
+      "documentWidth": 390,
+      "form": {
+        "x": 16,
+        "y": 100,
+        "width": 358,
+        "height": 345.96875
+      },
+      "heading": {
+        "height": 33,
+        "lineHeight": 33,
+        "width": 358,
+        "scrollWidth": 358,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "业务知识",
+          "left": 40.756919860839844,
+          "top": 87.4769287109375,
+          "right": 272.7899627685547,
+          "bottom": 128.5230712890625
+        },
+        {
+          "text": "MCP / OpenAPI",
+          "left": 40.756919860839844,
+          "top": 160.076904296875,
+          "right": 234.52432250976562,
+          "bottom": 56.923095703125
+        },
+        {
+          "text": "知识与工具资产",
+          "left": 153.32785034179688,
+          "top": 119.4215087890625,
+          "right": 126.89088439941406,
+          "bottom": 96.5784912109375
+        },
+        {
+          "text": "来源 · 版本 · 配置",
+          "left": 156.90597534179688,
+          "top": 140.147705078125,
+          "right": 130.3623504638672,
+          "bottom": 78.852294921875
+        },
+        {
+          "text": "继承",
+          "left": 280.7904968261719,
+          "top": 106.65228271484375,
+          "right": 54.975128173828125,
+          "bottom": 110.34771728515625
+        },
+        {
+          "text": "融合与复用",
+          "left": 264.1264343261719,
+          "top": 178.35382080078125,
+          "right": 38.311065673828125,
+          "bottom": 37.6461181640625
+        }
+      ],
+      "settled": [
+        {
+          "text": "业务知识",
+          "left": 40.756919860839844,
+          "top": 83.07073974609375,
+          "right": 272.7899627685547,
+          "bottom": 132.92926025390625
+        },
+        {
+          "text": "MCP / OpenAPI",
+          "left": 40.756919860839844,
+          "top": 155.6707763671875,
+          "right": 234.52432250976562,
+          "bottom": 61.3292236328125
+        },
+        {
+          "text": "知识与工具资产",
+          "left": 153.32785034179688,
+          "top": 115.015380859375,
+          "right": 126.89088439941406,
+          "bottom": 100.984619140625
+        },
+        {
+          "text": "来源 · 版本 · 配置",
+          "left": 156.90597534179688,
+          "top": 135.74151611328125,
+          "right": 130.3623504638672,
+          "bottom": 83.25848388671875
+        },
+        {
+          "text": "继承",
+          "left": 280.7904968261719,
+          "top": 102.24615478515625,
+          "right": 54.975128173828125,
+          "bottom": 114.75384521484375
+        },
+        {
+          "text": "融合与复用",
+          "left": 264.1264343261719,
+          "top": 173.94769287109375,
+          "right": 38.311065673828125,
+          "bottom": 42.05230712890625
+        }
+      ]
+    },
+    {
+      "viewport": 390,
+      "scene": 2,
+      "documentWidth": 390,
+      "form": {
+        "x": 16,
+        "y": 100,
+        "width": 358,
+        "height": 345.96875
+      },
+      "heading": {
+        "height": 66,
+        "lineHeight": 33,
+        "width": 358,
+        "scrollWidth": 358,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "使用者",
+          "left": 52.87384796142578,
+          "top": 74.15692138671875,
+          "right": 271.78240966796875,
+          "bottom": 142.84307861328125
+        },
+        {
+          "text": "平台入口",
+          "left": 156.7734375,
+          "top": 64.3446044921875,
+          "right": 156.77345275878906,
+          "bottom": 151.6553955078125
+        },
+        {
+          "text": "身份 · 风险 · 授权",
+          "left": 143.6875,
+          "top": 80.11383056640625,
+          "right": 143.58082580566406,
+          "bottom": 138.88616943359375
+        },
+        {
+          "text": "原生实例",
+          "left": 277.3918762207031,
+          "top": 53.3292236328125,
+          "right": 36.154998779296875,
+          "bottom": 162.6707763671875
+        },
+        {
+          "text": "DSH · AgentScope",
+          "left": 253.66531372070312,
+          "top": 70.20001220703125,
+          "right": 12.42840576171875,
+          "bottom": 148.79998779296875
+        },
+        {
+          "text": "OpenCode",
+          "left": 273.3059387207031,
+          "top": 84.52001953125,
+          "right": 32.069061279296875,
+          "bottom": 134.47998046875
+        },
+        {
+          "text": "原系统负责生命周期",
+          "left": 259.6340637207031,
+          "top": 99.3907470703125,
+          "right": 18.285491943359375,
+          "bottom": 119.6092529296875
+        },
+        {
+          "text": "指定资源授权",
+          "left": 145.6640625,
+          "top": 141.4522705078125,
+          "right": 145.66407775878906,
+          "bottom": 74.5477294921875
+        },
+        {
+          "text": "实例 key · 资源范围",
+          "left": 138.7421875,
+          "top": 156.6707763671875,
+          "right": 138.63221740722656,
+          "bottom": 62.3292236328125
+        },
+        {
+          "text": "资源",
+          "left": 52.87384796142578,
+          "top": 149.7138671875,
+          "right": 282.89178466796875,
+          "bottom": 66.2861328125
+        },
+        {
+          "text": "用户访问远端 · 远端访问指定资源",
+          "left": 112.4765625,
+          "top": 190.2677001953125,
+          "right": 112.364501953125,
+          "bottom": 28.7322998046875
+        }
+      ],
+      "settled": [
+        {
+          "text": "使用者",
+          "left": 52.87384796142578,
+          "top": 69.75079345703125,
+          "right": 271.78240966796875,
+          "bottom": 147.24920654296875
+        },
+        {
+          "text": "平台入口",
+          "left": 156.7734375,
+          "top": 59.9384765625,
+          "right": 156.77345275878906,
+          "bottom": 156.0615234375
+        },
+        {
+          "text": "身份 · 风险 · 授权",
+          "left": 143.6875,
+          "top": 75.70770263671875,
+          "right": 143.58082580566406,
+          "bottom": 143.29229736328125
+        },
+        {
+          "text": "原生实例",
+          "left": 277.3918762207031,
+          "top": 48.923095703125,
+          "right": 36.154998779296875,
+          "bottom": 167.076904296875
+        },
+        {
+          "text": "DSH · AgentScope",
+          "left": 253.66531372070312,
+          "top": 65.7938232421875,
+          "right": 12.42840576171875,
+          "bottom": 153.2061767578125
+        },
+        {
+          "text": "OpenCode",
+          "left": 273.3059387207031,
+          "top": 80.11383056640625,
+          "right": 32.069061279296875,
+          "bottom": 138.88616943359375
+        },
+        {
+          "text": "原系统负责生命周期",
+          "left": 259.6340637207031,
+          "top": 94.984619140625,
+          "right": 18.285491943359375,
+          "bottom": 124.015380859375
+        },
+        {
+          "text": "指定资源授权",
+          "left": 145.6640625,
+          "top": 137.046142578125,
+          "right": 145.66407775878906,
+          "bottom": 78.953857421875
+        },
+        {
+          "text": "实例 key · 资源范围",
+          "left": 138.7421875,
+          "top": 152.26458740234375,
+          "right": 138.63221740722656,
+          "bottom": 66.73541259765625
+        },
+        {
+          "text": "资源",
+          "left": 52.87384796142578,
+          "top": 145.30767822265625,
+          "right": 282.89178466796875,
+          "bottom": 70.69232177734375
+        },
+        {
+          "text": "用户访问远端 · 远端访问指定资源",
+          "left": 112.4765625,
+          "top": 185.861572265625,
+          "right": 112.364501953125,
+          "bottom": 33.138427734375
+        }
+      ]
+    },
+    {
+      "viewport": 390,
+      "scene": 3,
+      "documentWidth": 390,
+      "form": {
+        "x": 16,
+        "y": 100,
+        "width": 358,
+        "height": 345.96875
+      },
+      "heading": {
+        "height": 33,
+        "lineHeight": 33,
+        "width": 358,
+        "scrollWidth": 358,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "持续改进",
+          "left": 156.7734375,
+          "top": 123.82769775390625,
+          "right": 156.77345275878906,
+          "bottom": 92.17230224609375
+        },
+        {
+          "text": "业务用例",
+          "left": 54.526153564453125,
+          "top": 80.86767578125,
+          "right": 259.0207214355469,
+          "bottom": 135.13232421875
+        },
+        {
+          "text": "执行与证据",
+          "left": 229.6707763671875,
+          "top": 80.86767578125,
+          "right": 72.7667236328125,
+          "bottom": 135.13232421875
+        },
+        {
+          "text": "问题与修改",
+          "left": 54.526153564453125,
+          "top": 166.7877197265625,
+          "right": 247.91134643554688,
+          "bottom": 49.2122802734375
+        },
+        {
+          "text": "版本比较",
+          "left": 229.6707763671875,
+          "top": 166.7877197265625,
+          "right": 83.8760986328125,
+          "bottom": 49.2122802734375
+        }
+      ],
+      "settled": [
+        {
+          "text": "持续改进",
+          "left": 156.7734375,
+          "top": 119.4215087890625,
+          "right": 156.77345275878906,
+          "bottom": 96.5784912109375
+        },
+        {
+          "text": "业务用例",
+          "left": 54.526153564453125,
+          "top": 76.4615478515625,
+          "right": 259.0207214355469,
+          "bottom": 139.5384521484375
+        },
+        {
+          "text": "执行与证据",
+          "left": 229.6707763671875,
+          "top": 76.4615478515625,
+          "right": 72.7667236328125,
+          "bottom": 139.5384521484375
+        },
+        {
+          "text": "问题与修改",
+          "left": 54.526153564453125,
+          "top": 162.38153076171875,
+          "right": 247.91134643554688,
+          "bottom": 53.61846923828125
+        },
+        {
+          "text": "版本比较",
+          "left": 229.6707763671875,
+          "top": 162.38153076171875,
+          "right": 83.8760986328125,
+          "bottom": 53.61846923828125
+        }
+      ]
+    },
+    {
+      "viewport": 390,
+      "scene": 4,
+      "documentWidth": 390,
+      "form": {
+        "x": 16,
+        "y": 100,
+        "width": 358,
+        "height": 345.96875
+      },
+      "heading": {
+        "height": 33,
+        "lineHeight": 33,
+        "width": 358,
+        "scrollWidth": 358,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "固定父版",
+          "left": 45.51805114746094,
+          "top": 125.47998046875,
+          "right": 268.02881622314453,
+          "bottom": 90.52001953125
+        },
+        {
+          "text": "中算力 · 模型协同",
+          "left": 167.43385314941406,
+          "top": 77.56304931640625,
+          "right": 101.972412109375,
+          "bottom": 138.4368896484375
+        },
+        {
+          "text": "低算力 · 代码执行",
+          "left": 167.43385314941406,
+          "top": 170.09228515625,
+          "right": 101.972412109375,
+          "bottom": 45.90771484375
+        },
+        {
+          "text": "样本 · 训练 · 部署",
+          "left": 174.53054809570312,
+          "top": 113.71075439453125,
+          "right": 112.73779296875,
+          "bottom": 105.28924560546875
+        },
+        {
+          "text": "比较",
+          "left": 303.9306335449219,
+          "top": 103.34765625,
+          "right": 34.05377197265625,
+          "bottom": 114.65234375
+        },
+        {
+          "text": "验证",
+          "left": 303.9306335449219,
+          "top": 117.116943359375,
+          "right": 34.05377197265625,
+          "bottom": 100.883056640625
+        }
+      ],
+      "settled": [
+        {
+          "text": "固定父版",
+          "left": 45.51805114746094,
+          "top": 121.0738525390625,
+          "right": 268.02881622314453,
+          "bottom": 94.9261474609375
+        },
+        {
+          "text": "中算力 · 模型协同",
+          "left": 167.43385314941406,
+          "top": 73.15692138671875,
+          "right": 101.972412109375,
+          "bottom": 142.84307861328125
+        },
+        {
+          "text": "低算力 · 代码执行",
+          "left": 167.43385314941406,
+          "top": 165.6861572265625,
+          "right": 101.972412109375,
+          "bottom": 50.3138427734375
+        },
+        {
+          "text": "样本 · 训练 · 部署",
+          "left": 174.53054809570312,
+          "top": 109.30462646484375,
+          "right": 112.73779296875,
+          "bottom": 109.69537353515625
+        },
+        {
+          "text": "比较",
+          "left": 303.9306335449219,
+          "top": 98.9415283203125,
+          "right": 34.05377197265625,
+          "bottom": 119.0584716796875
+        },
+        {
+          "text": "验证",
+          "left": 303.9306335449219,
+          "top": 112.71075439453125,
+          "right": 34.05377197265625,
+          "bottom": 105.28924560546875
+        }
+      ]
+    },
+    {
+      "viewport": 390,
+      "scene": 5,
+      "documentWidth": 390,
+      "form": {
+        "x": 16,
+        "y": 100,
+        "width": 358,
+        "height": 345.96875
+      },
+      "heading": {
+        "height": 33,
+        "lineHeight": 33,
+        "width": 358,
+        "scrollWidth": 358,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "使用",
+          "left": 33.0461540222168,
+          "top": 69.09844970703125,
+          "right": 307.17259216308594,
+          "bottom": 149.90155029296875
+        },
+        {
+          "text": "交付",
+          "left": 33.0461540222168,
+          "top": 155.5692138671875,
+          "right": 307.06878662109375,
+          "bottom": 63.4307861328125
+        },
+        {
+          "text": "Web",
+          "left": 125.57537841796875,
+          "top": 60.69232177734375,
+          "right": 198.97364807128906,
+          "bottom": 153.30767822265625
+        },
+        {
+          "text": "SDK",
+          "left": 241.23690795898438,
+          "top": 60.69232177734375,
+          "right": 83.997314453125,
+          "bottom": 153.30767822265625
+        },
+        {
+          "text": "stdio 本地调用",
+          "left": 220.9945068359375,
+          "top": 79.5631103515625,
+          "right": 76.6929931640625,
+          "bottom": 139.4368896484375
+        },
+        {
+          "text": "平台托管实例",
+          "left": 101.60252380371094,
+          "top": 183.310791015625,
+          "right": 189.72560119628906,
+          "bottom": 32.689208984375
+        },
+        {
+          "text": "独立智能体包",
+          "left": 217.26406860351562,
+          "top": 191.02154541015625,
+          "right": 74.06402587890625,
+          "bottom": 24.97845458984375
+        }
+      ],
+      "settled": [
+        {
+          "text": "使用",
+          "left": 33.0461540222168,
+          "top": 64.69232177734375,
+          "right": 307.17259216308594,
+          "bottom": 154.30767822265625
+        },
+        {
+          "text": "交付",
+          "left": 33.0461540222168,
+          "top": 151.1630859375,
+          "right": 307.06878662109375,
+          "bottom": 67.8369140625
+        },
+        {
+          "text": "Web",
+          "left": 125.57537841796875,
+          "top": 56.2861328125,
+          "right": 198.97364807128906,
+          "bottom": 157.7138671875
+        },
+        {
+          "text": "SDK",
+          "left": 241.23690795898438,
+          "top": 56.2861328125,
+          "right": 83.997314453125,
+          "bottom": 157.7138671875
+        },
+        {
+          "text": "stdio 本地调用",
+          "left": 220.9945068359375,
+          "top": 75.15692138671875,
+          "right": 76.6929931640625,
+          "bottom": 143.84307861328125
+        },
+        {
+          "text": "平台托管实例",
+          "left": 101.60252380371094,
+          "top": 178.90460205078125,
+          "right": 189.72560119628906,
+          "bottom": 37.09539794921875
+        },
+        {
+          "text": "独立智能体包",
+          "left": 217.26406860351562,
+          "top": 186.6153564453125,
+          "right": 74.06402587890625,
+          "bottom": 29.3846435546875
+        }
+      ]
+    },
+    {
+      "viewport": 320,
+      "scene": 0,
+      "documentWidth": 320,
+      "form": {
+        "x": 16,
+        "y": 100,
+        "width": 288,
+        "height": 345.96875
+      },
+      "heading": {
+        "height": 33,
+        "lineHeight": 33,
+        "width": 288,
+        "scrollWidth": 288,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "描述业务需求",
+          "left": 34.55999755859375,
+          "top": 90.04925537109375,
+          "right": 199.70001220703125,
+          "bottom": 128.95074462890625
+        },
+        {
+          "text": "迁入已有工程",
+          "left": 34.55999755859375,
+          "top": 150.30767822265625,
+          "right": 199.70001220703125,
+          "bottom": 68.69232177734375
+        },
+        {
+          "text": "专属智能体",
+          "left": 173.16139221191406,
+          "top": 160.7138671875,
+          "right": 59.47520446777344,
+          "bottom": 55.2861328125
+        },
+        {
+          "text": "构建 · 运行 · 任务验证",
+          "left": 164.70828247070312,
+          "top": 176.23382568359375,
+          "right": 52.16673278808594,
+          "bottom": 44.76617431640625
+        }
+      ],
+      "settled": [
+        {
+          "text": "描述业务需求",
+          "left": 34.55999755859375,
+          "top": 86.504638671875,
+          "right": 199.70001220703125,
+          "bottom": 132.495361328125
+        },
+        {
+          "text": "迁入已有工程",
+          "left": 34.55999755859375,
+          "top": 146.7630615234375,
+          "right": 199.70001220703125,
+          "bottom": 72.2369384765625
+        },
+        {
+          "text": "专属智能体",
+          "left": 173.16139221191406,
+          "top": 157.169189453125,
+          "right": 59.47520446777344,
+          "bottom": 58.830810546875
+        },
+        {
+          "text": "构建 · 运行 · 任务验证",
+          "left": 164.70828247070312,
+          "top": 172.689208984375,
+          "right": 52.16673278808594,
+          "bottom": 48.310791015625
+        }
+      ]
+    },
+    {
+      "viewport": 320,
+      "scene": 1,
+      "documentWidth": 320,
+      "form": {
+        "x": 16,
+        "y": 100,
+        "width": 288,
+        "height": 345.96875
+      },
+      "heading": {
+        "height": 33,
+        "lineHeight": 33,
+        "width": 288,
+        "scrollWidth": 288,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "业务知识",
+          "left": 32.78769302368164,
+          "top": 92.70770263671875,
+          "right": 219.36831665039062,
+          "bottom": 126.29229736328125
+        },
+        {
+          "text": "MCP / OpenAPI",
+          "left": 32.78769302368164,
+          "top": 151.30767822265625,
+          "right": 188.58730697631836,
+          "bottom": 68.69232177734375
+        },
+        {
+          "text": "知识与工具资产",
+          "left": 123.31352233886719,
+          "top": 118.4061279296875,
+          "right": 101.99848937988281,
+          "bottom": 100.5938720703125
+        },
+        {
+          "text": "来源 · 版本 · 配置",
+          "left": 126.21975708007812,
+          "top": 135.47076416015625,
+          "right": 104.95211791992188,
+          "bottom": 85.52923583984375
+        },
+        {
+          "text": "继承",
+          "left": 225.8776397705078,
+          "top": 107.3292236328125,
+          "right": 44.17437744140625,
+          "bottom": 111.6707763671875
+        },
+        {
+          "text": "融合与复用",
+          "left": 212.45578002929688,
+          "top": 165.81536865234375,
+          "right": 30.794219970703125,
+          "bottom": 53.18463134765625
+        }
+      ],
+      "settled": [
+        {
+          "text": "业务知识",
+          "left": 32.78769302368164,
+          "top": 89.1630859375,
+          "right": 219.36831665039062,
+          "bottom": 129.8369140625
+        },
+        {
+          "text": "MCP / OpenAPI",
+          "left": 32.78769302368164,
+          "top": 147.7630615234375,
+          "right": 188.58730697631836,
+          "bottom": 72.2369384765625
+        },
+        {
+          "text": "知识与工具资产",
+          "left": 123.31352233886719,
+          "top": 114.861572265625,
+          "right": 101.99848937988281,
+          "bottom": 104.13848876953125
+        },
+        {
+          "text": "来源 · 版本 · 配置",
+          "left": 126.21975708007812,
+          "top": 131.9261474609375,
+          "right": 104.95211791992188,
+          "bottom": 89.0738525390625
+        },
+        {
+          "text": "继承",
+          "left": 225.8776397705078,
+          "top": 103.78460693359375,
+          "right": 44.17437744140625,
+          "bottom": 115.21539306640625
+        },
+        {
+          "text": "融合与复用",
+          "left": 212.45578002929688,
+          "top": 162.270751953125,
+          "right": 30.794219970703125,
+          "bottom": 56.729248046875
+        }
+      ]
+    },
+    {
+      "viewport": 320,
+      "scene": 2,
+      "documentWidth": 320,
+      "form": {
+        "x": 16,
+        "y": 100,
+        "width": 288,
+        "height": 345.96875
+      },
+      "heading": {
+        "height": 66,
+        "lineHeight": 33,
+        "width": 288,
+        "scrollWidth": 288,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "使用者",
+          "left": 42.53538513183594,
+          "top": 81.18768310546875,
+          "right": 218.5686264038086,
+          "bottom": 137.81231689453125
+        },
+        {
+          "text": "平台入口",
+          "left": 126.1015625,
+          "top": 74.09844970703125,
+          "right": 126.1015625,
+          "bottom": 144.90155029296875
+        },
+        {
+          "text": "身份 · 风险 · 授权",
+          "left": 115.5859375,
+          "top": 87.1754150390625,
+          "right": 115.5859375,
+          "bottom": 133.8245849609375
+        },
+        {
+          "text": "原生实例",
+          "left": 223.13540649414062,
+          "top": 65.2369384765625,
+          "right": 29.020599365234375,
+          "bottom": 153.7630615234375
+        },
+        {
+          "text": "DSH · AgentScope",
+          "left": 204.06509399414062,
+          "top": 79.20001220703125,
+          "right": 9.992767333984375,
+          "bottom": 141.79998779296875
+        },
+        {
+          "text": "OpenCode",
+          "left": 219.86978149414062,
+          "top": 90.719970703125,
+          "right": 25.79046630859375,
+          "bottom": 130.280029296875
+        },
+        {
+          "text": "原系统负责生命周期",
+          "left": 208.86196899414062,
+          "top": 102.68310546875,
+          "right": 14.794281005859375,
+          "bottom": 118.31695556640625
+        },
+        {
+          "text": "指定资源授权",
+          "left": 117.1484375,
+          "top": 136.12921142578125,
+          "right": 117.111572265625,
+          "bottom": 82.87078857421875
+        },
+        {
+          "text": "实例 key · 资源范围",
+          "left": 111.60936737060547,
+          "top": 148.7630615234375,
+          "right": 111.60939025878906,
+          "bottom": 72.2369384765625
+        },
+        {
+          "text": "资源",
+          "left": 42.53538513183594,
+          "top": 143.775390625,
+          "right": 227.51661682128906,
+          "bottom": 76.224609375
+        },
+        {
+          "text": "用户访问远端 · 远端访问指定资源",
+          "left": 90.46875,
+          "top": 175.790771484375,
+          "right": 90.46875,
+          "bottom": 45.209228515625
+        }
+      ],
+      "settled": [
+        {
+          "text": "使用者",
+          "left": 42.53538513183594,
+          "top": 77.64306640625,
+          "right": 218.5686264038086,
+          "bottom": 141.35693359375
+        },
+        {
+          "text": "平台入口",
+          "left": 126.1015625,
+          "top": 70.5538330078125,
+          "right": 126.1015625,
+          "bottom": 148.4461669921875
+        },
+        {
+          "text": "身份 · 风险 · 授权",
+          "left": 115.5859375,
+          "top": 83.6307373046875,
+          "right": 115.5859375,
+          "bottom": 137.3692626953125
+        },
+        {
+          "text": "原生实例",
+          "left": 223.13540649414062,
+          "top": 61.69232177734375,
+          "right": 29.020599365234375,
+          "bottom": 157.30767822265625
+        },
+        {
+          "text": "DSH · AgentScope",
+          "left": 204.06509399414062,
+          "top": 75.6553955078125,
+          "right": 9.992767333984375,
+          "bottom": 145.3446044921875
+        },
+        {
+          "text": "OpenCode",
+          "left": 219.86978149414062,
+          "top": 87.1754150390625,
+          "right": 25.79046630859375,
+          "bottom": 133.8245849609375
+        },
+        {
+          "text": "原系统负责生命周期",
+          "left": 208.86196899414062,
+          "top": 99.138427734375,
+          "right": 14.794281005859375,
+          "bottom": 121.861572265625
+        },
+        {
+          "text": "指定资源授权",
+          "left": 117.1484375,
+          "top": 132.5845947265625,
+          "right": 117.111572265625,
+          "bottom": 86.4154052734375
+        },
+        {
+          "text": "实例 key · 资源范围",
+          "left": 111.60936737060547,
+          "top": 145.21844482421875,
+          "right": 111.60939025878906,
+          "bottom": 75.78155517578125
+        },
+        {
+          "text": "资源",
+          "left": 42.53538513183594,
+          "top": 140.23077392578125,
+          "right": 227.51661682128906,
+          "bottom": 79.76922607421875
+        },
+        {
+          "text": "用户访问远端 · 远端访问指定资源",
+          "left": 90.46875,
+          "top": 172.24615478515625,
+          "right": 90.46875,
+          "bottom": 48.75384521484375
+        }
+      ]
+    },
+    {
+      "viewport": 320,
+      "scene": 3,
+      "documentWidth": 320,
+      "form": {
+        "x": 16,
+        "y": 100,
+        "width": 288,
+        "height": 345.96875
+      },
+      "heading": {
+        "height": 33,
+        "lineHeight": 33,
+        "width": 288,
+        "scrollWidth": 288,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "持续改进",
+          "left": 126.1015625,
+          "top": 121.95074462890625,
+          "right": 126.054443359375,
+          "bottom": 97.0491943359375
+        },
+        {
+          "text": "业务用例",
+          "left": 43.8646125793457,
+          "top": 87.3907470703125,
+          "right": 208.29139709472656,
+          "bottom": 131.6092529296875
+        },
+        {
+          "text": "执行与证据",
+          "left": 184.76307678222656,
+          "top": 87.3907470703125,
+          "right": 58.4449462890625,
+          "bottom": 131.6092529296875
+        },
+        {
+          "text": "问题与修改",
+          "left": 43.8646125793457,
+          "top": 156.5107421875,
+          "right": 199.34339904785156,
+          "bottom": 62.4892578125
+        },
+        {
+          "text": "版本比较",
+          "left": 184.76307678222656,
+          "top": 156.5107421875,
+          "right": 67.39292907714844,
+          "bottom": 62.4892578125
+        }
+      ],
+      "settled": [
+        {
+          "text": "持续改进",
+          "left": 126.1015625,
+          "top": 118.4061279296875,
+          "right": 126.054443359375,
+          "bottom": 100.5938720703125
+        },
+        {
+          "text": "业务用例",
+          "left": 43.8646125793457,
+          "top": 83.84613037109375,
+          "right": 208.29139709472656,
+          "bottom": 135.15386962890625
+        },
+        {
+          "text": "执行与证据",
+          "left": 184.76307678222656,
+          "top": 83.84613037109375,
+          "right": 58.4449462890625,
+          "bottom": 135.15386962890625
+        },
+        {
+          "text": "问题与修改",
+          "left": 43.8646125793457,
+          "top": 152.9661865234375,
+          "right": 199.34339904785156,
+          "bottom": 66.0338134765625
+        },
+        {
+          "text": "版本比较",
+          "left": 184.76307678222656,
+          "top": 152.9661865234375,
+          "right": 67.39292907714844,
+          "bottom": 66.0338134765625
+        }
+      ]
+    },
+    {
+      "viewport": 320,
+      "scene": 4,
+      "documentWidth": 320,
+      "form": {
+        "x": 16,
+        "y": 100,
+        "width": 288,
+        "height": 345.96875
+      },
+      "heading": {
+        "height": 33,
+        "lineHeight": 33,
+        "width": 288,
+        "scrollWidth": 288,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "固定父版",
+          "left": 36.60002136230469,
+          "top": 123.280029296875,
+          "right": 215.5559844970703,
+          "bottom": 95.719970703125
+        },
+        {
+          "text": "中算力 · 模型协同",
+          "left": 134.69537353515625,
+          "top": 84.7322998046875,
+          "right": 81.90237426757812,
+          "bottom": 134.2677001953125
+        },
+        {
+          "text": "低算力 · 代码执行",
+          "left": 134.69537353515625,
+          "top": 159.16925048828125,
+          "right": 81.90237426757812,
+          "bottom": 59.83074951171875
+        },
+        {
+          "text": "样本 · 训练 · 部署",
+          "left": 140.3982391357422,
+          "top": 114.20306396484375,
+          "right": 90.77362060546875,
+          "bottom": 106.79693603515625
+        },
+        {
+          "text": "比较",
+          "left": 244.4991455078125,
+          "top": 105.6707763671875,
+          "right": 27.3914794921875,
+          "bottom": 114.3292236328125
+        },
+        {
+          "text": "验证",
+          "left": 244.4991455078125,
+          "top": 116.7476806640625,
+          "right": 27.3914794921875,
+          "bottom": 103.2523193359375
+        }
+      ],
+      "settled": [
+        {
+          "text": "固定父版",
+          "left": 36.60002136230469,
+          "top": 119.7353515625,
+          "right": 215.5559844970703,
+          "bottom": 99.2646484375
+        },
+        {
+          "text": "中算力 · 模型协同",
+          "left": 134.69537353515625,
+          "top": 81.18768310546875,
+          "right": 81.90237426757812,
+          "bottom": 137.81231689453125
+        },
+        {
+          "text": "低算力 · 代码执行",
+          "left": 134.69537353515625,
+          "top": 155.6246337890625,
+          "right": 81.90237426757812,
+          "bottom": 63.3753662109375
+        },
+        {
+          "text": "样本 · 训练 · 部署",
+          "left": 140.3982391357422,
+          "top": 110.658447265625,
+          "right": 90.77362060546875,
+          "bottom": 110.341552734375
+        },
+        {
+          "text": "比较",
+          "left": 244.4991455078125,
+          "top": 102.12615966796875,
+          "right": 27.3914794921875,
+          "bottom": 117.87384033203125
+        },
+        {
+          "text": "验证",
+          "left": 244.4991455078125,
+          "top": 113.20306396484375,
+          "right": 27.3914794921875,
+          "bottom": 106.79693603515625
+        }
+      ]
+    },
+    {
+      "viewport": 320,
+      "scene": 5,
+      "documentWidth": 320,
+      "form": {
+        "x": 16,
+        "y": 100,
+        "width": 288,
+        "height": 345.96875
+      },
+      "heading": {
+        "height": 33,
+        "lineHeight": 33,
+        "width": 288,
+        "scrollWidth": 288,
+        "textOverflow": "clip"
+      },
+      "entering": [
+        {
+          "text": "使用",
+          "left": 26.584613800048828,
+          "top": 78.3138427734375,
+          "right": 247.10288619995117,
+          "bottom": 142.6861572265625
+        },
+        {
+          "text": "交付",
+          "left": 26.584613800048828,
+          "top": 147.87689208984375,
+          "right": 247.10288619995117,
+          "bottom": 73.12310791015625
+        },
+        {
+          "text": "Web",
+          "left": 101.02153778076172,
+          "top": 71.76922607421875,
+          "right": 160.11102294921875,
+          "bottom": 145.23077392578125
+        },
+        {
+          "text": "SDK",
+          "left": 194.06768798828125,
+          "top": 71.76922607421875,
+          "right": 68.22525024414062,
+          "bottom": 145.23077392578125
+        },
+        {
+          "text": "stdio 本地调用",
+          "left": 177.77745056152344,
+          "top": 86.7322998046875,
+          "right": 61.69129943847656,
+          "bottom": 134.2677001953125
+        },
+        {
+          "text": "平台托管实例",
+          "left": 81.70228576660156,
+          "top": 169.8031005859375,
+          "right": 152.55772399902344,
+          "bottom": 49.1968994140625
+        },
+        {
+          "text": "独立智能体包",
+          "left": 174.74842834472656,
+          "top": 176.006103515625,
+          "right": 59.51158142089844,
+          "bottom": 42.993896484375
+        }
+      ],
+      "settled": [
+        {
+          "text": "使用",
+          "left": 26.584613800048828,
+          "top": 74.76922607421875,
+          "right": 247.10288619995117,
+          "bottom": 146.23077392578125
+        },
+        {
+          "text": "交付",
+          "left": 26.584613800048828,
+          "top": 144.332275390625,
+          "right": 247.10288619995117,
+          "bottom": 76.667724609375
+        },
+        {
+          "text": "Web",
+          "left": 101.02153778076172,
+          "top": 68.224609375,
+          "right": 160.11102294921875,
+          "bottom": 148.775390625
+        },
+        {
+          "text": "SDK",
+          "left": 194.06768798828125,
+          "top": 68.224609375,
+          "right": 68.22525024414062,
+          "bottom": 148.775390625
+        },
+        {
+          "text": "stdio 本地调用",
+          "left": 177.77745056152344,
+          "top": 83.18768310546875,
+          "right": 61.69129943847656,
+          "bottom": 137.81231689453125
+        },
+        {
+          "text": "平台托管实例",
+          "left": 81.70228576660156,
+          "top": 166.25848388671875,
+          "right": 152.55772399902344,
+          "bottom": 52.7415771484375
+        },
+        {
+          "text": "独立智能体包",
+          "left": 174.74842834472656,
+          "top": 172.4615478515625,
+          "right": 59.51158142089844,
+          "bottom": 46.5384521484375
+        }
+      ]
+    }
+  ],
+  "rpcReads": [
+    {
+      "method": "settings/describe",
+      "status": 200
+    },
+    {
+      "method": "dynamicCordisRunner/syncInspectManifest",
+      "status": 200
+    },
+    {
+      "method": "credentials/describe",
+      "status": 200
+    },
+    {
+      "method": "dynamicCordisRunner/inventory",
+      "status": 200
+    },
+    {
+      "method": "session/modelCatalog",
+      "status": 200
+    },
+    {
+      "method": "inventory",
+      "status": 200
+    },
+    {
+      "method": "agents/eval/list",
+      "status": 200
+    },
+    {
+      "method": "mcp/control/status",
+      "status": 200
+    },
+    {
+      "method": "auth/current",
+      "status": 200
+    },
+    {
+      "method": "permissionPresets/catalog",
+      "status": 200
+    },
+    {
+      "method": "agentPresets/list",
+      "status": 200
+    },
+    {
+      "method": "home",
+      "status": 200
+    },
+    {
+      "method": "session/list",
+      "status": 200
+    },
+    {
+      "method": "settings/mutate",
+      "status": 200
+    },
+    {
+      "method": "instances/sources",
+      "status": 200
+    },
+    {
+      "method": "agents/list",
+      "status": 200
+    },
+    {
+      "method": "models/list",
+      "status": 200
+    },
+    {
+      "method": "instances/external/list",
+      "status": 200
+    },
+    {
+      "method": "instances/external/credentials",
+      "status": 200
+    },
+    {
+      "method": "instances/list",
+      "status": 200
+    },
+    {
+      "method": "schedule/catalog",
+      "status": 200
+    },
+    {
+      "method": "assistant/status",
+      "status": 200
+    },
+    {
+      "method": "commands/list",
+      "status": 200
+    },
+    {
+      "method": "skills/list",
+      "status": 200
+    },
+    {
+      "method": "agents/fusion/proposal",
+      "status": 200
+    },
+    {
+      "method": "agents/detail",
+      "status": 200
+    },
+    {
+      "method": "agents/features/proposal",
+      "status": 200
+    },
+    {
+      "method": "agents/edit/read",
+      "status": 200
+    },
+    {
+      "method": "agents/runs/index",
+      "status": 200
+    },
+    {
+      "method": "agents/runs/show",
+      "status": 200
+    },
+    {
+      "method": "agents/runs/overview",
+      "status": 200
+    },
+    {
+      "method": "agents/cases/read",
+      "status": 200
+    },
+    {
+      "method": "agents/runs/report",
+      "status": 200
+    },
+    {
+      "method": "agents/runs/files",
+      "status": 200
+    }
+  ],
+  "blockedWrites": [
+    {
+      "phase": "reader-opencode-register",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "reader-export-entry",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "reader-export-entry",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "reader-export-entry",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "reader-export-entry",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "reader-current-and-frozen-case",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "reader-current-and-frozen-case",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "reader-current-and-frozen-case",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "reader-current-and-frozen-case",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "reader-current-and-frozen-case",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    },
+    {
+      "phase": "reader-current-and-frozen-case",
+      "path": "/hep/harness-platform/assistant/context",
+      "method": "assistant/context"
+    }
+  ],
+  "sources": {
+    "current": {
+      "path": "/home/admin/harness-engineering-platform-data/agents/security-operations-expert/evaluation.md",
+      "sha256": "f0691cb6b29cb33650af40994cf2a9977e3d72aee9377f661b680fcf0ca7b8bb",
+      "expectedLength": 387
+    },
+    "frozen": {
+      "path": "/home/admin/harness-engineering-platform-data/evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/runs/run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408/inputs.lock.json",
+      "sha256": "824a53c3f0351e593fabb9debf688783cde93d96775b5463a6894749b5369e81",
+      "expectedLength": 387
+    },
+    "currentAndFrozenEqual": true
+  },
+  "loginSource": {
+    "status": 200,
+    "sha256": "53c1883373ab2d44d5a75d82093f22f76854cad3971c221f0e7888674d82aad7",
+    "inlineScriptSha256": "e1a7ff1b085c2b984248a09e8e83c517ef0b64ed77b7ba98532c52e26936d60f"
+  },
+  "existingSessionSelected": true,
+  "initialThemePreference": "light",
+  "initialDark": false,
+  "readerRegister": {
+    "steps": [
+      "首页",
+      "实例管理",
+      "接入实例",
+      "登记已有智能体",
+      "选择OpenCode"
+    ],
+    "saved": false
+  },
+  "readerExport": {
+    "steps": [
+      "智能体管理",
+      "安全运营专家",
+      "迭代版本EXP-024",
+      "更多操作",
+      "导出独立运行包"
+    ],
+    "experimentId": "EXP-security-operations-expert-024-rad80a907c628",
+    "sourceKind": "完整DSH版本",
+    "opened": true,
+    "previewed": false,
+    "packed": false
+  },
+  "readerCases": {
+    "current": {
+      "caseId": "U-INS-001",
+      "label": "当前用例预期行为",
+      "matchesSource": true,
+      "text": "先调用 list_executable_inspections，从本轮目录选出唯一匹配的已发布常规巡检任务，使用返回的 taskId、definitionVersion 和本次请求稳定的 requestId 调用一次 start_inspection，全量巡检不传 scope。之后只以同一 runId 调用 get_inspection_result 直到报告就绪，不重复发起。回复依据服务的 conclusionStatus、businessSummary 和完整 reportMarkdown，准确给出设备数量，不改写结论；设备数量缺失时说明缺口，该项不得判通过。仅当 reportDownloadUrl 非空时原样提供下载地址。运行中、工具失败或报告未就绪时不得声称完成；结果为 PARTIAL 时须说明证据缺口。"
+    },
+    "frozen": {
+      "runId": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "caseId": "U-INS-001",
+      "label": "本次 Run 冻结预期",
+      "matchesSource": true,
+      "text": "先调用 list_executable_inspections，从本轮目录选出唯一匹配的已发布常规巡检任务，使用返回的 taskId、definitionVersion 和本次请求稳定的 requestId 调用一次 start_inspection，全量巡检不传 scope。之后只以同一 runId 调用 get_inspection_result 直到报告就绪，不重复发起。回复依据服务的 conclusionStatus、businessSummary 和完整 reportMarkdown，准确给出设备数量，不改写结论；设备数量缺失时说明缺口，该项不得判通过。仅当 reportDownloadUrl 非空时原样提供下载地址。运行中、工具失败或报告未就绪时不得声称完成；结果为 PARTIAL 时须说明证据缺口。"
+    },
+    "equalAtVerification": true,
+    "evaluationStarted": false
+  },
+  "finalThemePreference": "light",
+  "finalDark": false,
+  "finishedAt": "2026-11-04T03:54:49.663Z",
+  "passed": true
+}

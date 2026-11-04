@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0",
+  "valid": true,
+  "errors": [],
+  "warnings": [
+    {
+      "code": "EXPERIMENT_ACTIVE_OUTCOME",
+      "message": "active Experiment 通常不应提前固定 outcome",
+      "path": "evolution/experiments/EXP-audit-e2e-assistant-web-001-r57f20304b3c4/change.yaml"
+    },
+    {
+      "code": "EXPERIMENT_ACTIVE_OUTCOME",
+      "message": "active Experiment 通常不应提前固定 outcome",
+      "path": "evolution/experiments/EXP-audit-e2e-assistant-web-002-ra2a3ad241109/change.yaml"
+    },
+    {
+      "code": "EXPERIMENT_ACTIVE_OUTCOME",
+      "message": "active Experiment 通常不应提前固定 outcome",
+      "path": "evolution/experiments/VAR-inspection-delivery-demo-001-rfac75f4cb946/change.yaml"
+    }
+  ],
+  "scope": "仅校验项目与 Harness 资产合同；不代表 Experiment 结果或生产验收"
+}

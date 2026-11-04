@@ -1,0 +1,7 @@
+{
+  "schema_version": "1.0",
+  "valid": true,
+  "errors": [],
+  "warnings": [],
+  "scope": "仅校验项目与 Harness 资产合同；不代表 Experiment 结果或生产验收"
+}

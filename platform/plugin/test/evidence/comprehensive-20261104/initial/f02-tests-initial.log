@@ -1,0 +1,773 @@
+✔ 组合深链恢复冻结发布版本，失效版本不回退到当前发布 (94.188737ms)
+✔ 组合目录冲突后保留草稿，读取最新并手工重应用再保存 (20.537853ms)
+✔ 执行 A 时路由切换到 B，旧回执不会显示在 B 或解除 B 的忙碌状态 (31.720813ms)
+✔ 发布说明使用可聚焦图标，移除常驻面板并保留测试操作 (8.154818ms)
+✔ 编排首次读取不冒充空目录，刷新已有内容只在标题显示轻量状态 (11.607923ms)
+✔ 组合 dryRunComposition 在途固定提交输入，完成后改输入清除回执 (11.375608ms)
+✔ 组合 publishComposition 在途固定提交输入，完成后改输入清除回执 (20.075341ms)
+✔ 组合 executeComposition 在途固定提交输入，完成后改输入清除回执 (11.779566ms)
+✔ 组合隐藏通知不读取，恢复补一批，在途多次更新只顺序补一批 (26.350773ms)
+✔ 阶段组合按已有运行恢复时，在途运行ID同样不可更换 (8.89031ms)
+✔ 查看实现源码复用多文件浏览器，并将固定历史版本和文件SHA交给只读接口 (8.363172ms)
+✔ 组合回执丢失后保留原执行身份，刷新只读恢复且不再次派发 (16.221493ms)
+✔ 服务端保留未知执行时可读取关联原运行，明确拒绝可修改输入 (50.015829ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ MCP 组合执行两次真实 HTTP 调用并映射参数 (123.485673ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ 前置失败时停止第二步 (37.646507ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ 编译图作为结构来源；dry 校验不读取规格或调用上游 (36.389713ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ LangGraph 缺少映射 ID 时结束图并保留第一步回执 (51.393844ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ Gateway 生命周期发现和调用使用同一执行入口与 digest (31.013102ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ 只读组合拒绝同名 POST 操作 (58.685046ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ 连接登记可重载和删除，重启后状态回到 unknown (21.938702ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ HTTP MCP 登记、发现 tools/list 与单工具试跑 (47.469701ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ MCP 自定义凭据 Header 保持原始 secret 且错误脱敏 (25.978285ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ OpenAPI 单工具试跑校验必填 header 和 body (21.356043ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ 取消贯通规范加载，失败不写成成功状态 (48.326428ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ 原生 Gateway 只注册 connection.fetch，不重复注册 RPC，且 GET 不支持 (31.470833ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ 凭据不进入规范 URL、错误或运行结果 (15.041578ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ OpenAPI 自定义凭据 Header 不加 Bearer 且结果按 literal 脱敏 (29.56215ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ 同 ID 重新登记会排除另一种连接类型，默认状态写入工作区本地目录 (22.628995ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ 平台接入传入仓库根目录时组合回执仍含实际实现摘要 (38.099717ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ 多版本列表每次只读取四项 Git 来源，慢 Git 不阻塞事件循环且 dirty 实时更新 (23.14582ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ 平台 MCP 读取原插件的已保存配置，不建立第二份连接登记 (51.504666ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ 编排草稿持久化，旧发布版保持可调用，dry 发布后 Gateway 切换版本 (34.130382ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ 已发布编排服务与 Gateway 共用工具和执行路径，草稿发布后即时切换 (27.769829ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ 多个编排独立选择，未发布草稿不进入发现列表且使用自己的连接 (27.529676ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ 目录冲突、重复工具名及非法配置不覆盖草稿和已发布内容 (44.99082ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ 空目录可新建草稿，损坏目录拒绝保存，未登记依赖发布失败保留草稿 (18.206881ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ 未装载业务扩展时目录可读、业务工具不暴露且种子不写入；装载后恢复同一发布版本 (25.145801ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ MCP元数据固定旧版本与实现，发布指针变化不换工具，连接或摘要变化在上游调用前拒绝 (26.322118ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ 实现摘要排除Git HEAD、dirty和发布时间，父组合递归锁子版本与扩展实现 (40.244178ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ 阶段模型观察上下文由执行器传递，父子图回执合并同一执行身份 (18.901279ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ Candidate固定工具复用原生组认证和官方MCP传输，发布后仍执行旧版并在实现冲突前阻止业务请求 (21.885309ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ 组合执行按预存身份回读，丢回执、并发和服务重建均不重复派发 (40.815709ms)
+✘ [ERROR] No matching export in "src/mcp/definition.ts" for import "compositionInput"
+
+    src/mcp/index.ts:7:9:
+      7 │ import { compositionInput, compositionInputSchema, compositionReado...
+        ╵          ~~~~~~~~~~~~~~~~
+
+✖ 嵌套组合的原生Run关联追加保存，阶段失败保持未知且不重放 (23.841721ms)
+ℹ tests 43
+ℹ suites 0
+ℹ pass 13
+ℹ fail 30
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1454.766751
+
+✖ failing tests:
+
+test at test/mcp.test.mjs:139:1
+✖ MCP 组合执行两次真实 HTTP 调用并映射参数 (123.485673ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:154:1
+✖ 前置失败时停止第二步 (37.646507ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:166:1
+✖ 编译图作为结构来源；dry 校验不读取规格或调用上游 (36.389713ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:188:1
+✖ LangGraph 缺少映射 ID 时结束图并保留第一步回执 (51.393844ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:201:1
+✖ Gateway 生命周期发现和调用使用同一执行入口与 digest (31.013102ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:234:1
+✖ 只读组合拒绝同名 POST 操作 (58.685046ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:258:1
+✖ 连接登记可重载和删除，重启后状态回到 unknown (21.938702ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:281:1
+✖ HTTP MCP 登记、发现 tools/list 与单工具试跑 (47.469701ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:328:1
+✖ MCP 自定义凭据 Header 保持原始 secret 且错误脱敏 (25.978285ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:357:1
+✖ OpenAPI 单工具试跑校验必填 header 和 body (21.356043ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:383:1
+✖ 取消贯通规范加载，失败不写成成功状态 (48.326428ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:397:1
+✖ 原生 Gateway 只注册 connection.fetch，不重复注册 RPC，且 GET 不支持 (31.470833ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:428:1
+✖ 凭据不进入规范 URL、错误或运行结果 (15.041578ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:440:1
+✖ OpenAPI 自定义凭据 Header 不加 Bearer 且结果按 literal 脱敏 (29.56215ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:469:1
+✖ 同 ID 重新登记会排除另一种连接类型，默认状态写入工作区本地目录 (22.628995ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:497:1
+✖ 平台接入传入仓库根目录时组合回执仍含实际实现摘要 (38.099717ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:507:1
+✖ 多版本列表每次只读取四项 Git 来源，慢 Git 不阻塞事件循环且 dirty 实时更新 (23.14582ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:562:1
+✖ 平台 MCP 读取原插件的已保存配置，不建立第二份连接登记 (51.504666ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:576:1
+✖ 编排草稿持久化，旧发布版保持可调用，dry 发布后 Gateway 切换版本 (34.130382ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:616:1
+✖ 已发布编排服务与 Gateway 共用工具和执行路径，草稿发布后即时切换 (27.769829ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:646:1
+✖ 多个编排独立选择，未发布草稿不进入发现列表且使用自己的连接 (27.529676ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:680:1
+✖ 目录冲突、重复工具名及非法配置不覆盖草稿和已发布内容 (44.99082ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:712:1
+✖ 空目录可新建草稿，损坏目录拒绝保存，未登记依赖发布失败保留草稿 (18.206881ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:731:1
+✖ 未装载业务扩展时目录可读、业务工具不暴露且种子不写入；装载后恢复同一发布版本 (25.145801ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:760:1
+✖ MCP元数据固定旧版本与实现，发布指针变化不换工具，连接或摘要变化在上游调用前拒绝 (26.322118ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:789:1
+✖ 实现摘要排除Git HEAD、dirty和发布时间，父组合递归锁子版本与扩展实现 (40.244178ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:814:1
+✖ 阶段模型观察上下文由执行器传递，父子图回执合并同一执行身份 (18.901279ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:846:1
+✖ Candidate固定工具复用原生组认证和官方MCP传输，发布后仍执行旧版并在实现冲突前阻止业务请求 (21.885309ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:914:1
+✖ 组合执行按预存身份回读，丢回执、并发和服务重建均不重复派发 (40.815709ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
+
+test at test/mcp.test.mjs:959:1
+✖ 嵌套组合的原生Run关联追加保存，阶段失败保持未知且不重放 (23.841721ms)
+  Error: Build failed with 1 error:
+  src/mcp/index.ts:7:9: ERROR: No matching export in "src/mcp/definition.ts" for import "compositionInput"
+      at failureErrorWithLog (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:878:52
+      at buildResponseToResult (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+      at /home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+      at responseCallbacks.<computed> (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+      at handleIncomingPacket (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+      at Socket.readFromStdout (/home/admin/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12) {
+    errors: [ { detail: undefined, id: '', location: [Object], notes: [], pluginName: '', text: 'No matching export in "src/mcp/definition.ts" for import "compositionInput"' } ],
+    warnings: []
+  }
