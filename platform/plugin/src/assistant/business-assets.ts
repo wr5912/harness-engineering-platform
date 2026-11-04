@@ -14,7 +14,7 @@ export interface NativeSkills {
 export const managementSkills = ['workspace-management', 'task-builder', 'agent-maintenance', 'agent-migration', 'mcp-composition', 'compute-variant-research', 'decision-sample-extraction', 'harness-evolution', 'harness-experiment-fusion', 'research-eval', 'legacy-asset-intake', 'reviewing-agent-skills', 'user-facing-output'] as const
 const coreSkills = ['workspace-management', 'user-facing-output']
 export const managementSkillRoot = (root: string) => join(root, '.agents/skills')
-const digest = (content: string) => createHash('sha256').update(content).digest('hex')
+const digest = (content: string | Uint8Array) => createHash('sha256').update(content).digest('hex')
 
 /** 引导入口已并入工作区管理；只规范当前上下文，不改写历史 Session 事件。 */
 export function normalizeManagementContext(context: Record<string, any>) {
@@ -31,9 +31,10 @@ function realWorkspaceFile(root: string, path: string) {
 }
 export function managementPrinciples(root: string) {
   const path = realWorkspaceFile(root, join(root, 'AGENTS.md'))
-  const content = readFileSync(path, 'utf8').trim()
+  const source = readFileSync(path)
+  const content = source.toString('utf8').trim()
   if (!content) throw new Error('管理助手 AGENTS.md 没有正文')
-  return { path, content, sha256: digest(content) }
+  return { path, content, sha256: digest(source) }
 }
 export async function managementSkill(root: string, skills: NativeSkills, name: string, scope?: any, signal?: AbortSignal) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) throw new Error('技能名称无效')
@@ -42,7 +43,7 @@ export async function managementSkill(root: string, skills: NativeSkills, name: 
   if (withinSkills === '..' || withinSkills.startsWith(`..${sep}`) || resolve(join(realpathSync(root), '.agents/skills'), withinSkills) !== expected) throw new Error('技能不在当前数据工作区 .agents/skills 中')
   const skill = await skills.get(name, { cwd: root, scope, signal })
   if (!skill?.path || realWorkspaceFile(root, skill.path) !== expected || !skill.content?.trim() || skill.name !== name || skill.invocation?.modelInvocable === false) throw new Error(`技能 ${name} 未从当前数据工作区装载`)
-  return { ...skill, path: expected, sha256: digest(skill.content) }
+  return { ...skill, path: expected, sha256: digest(readFileSync(expected)) }
 }
 export async function assistantConfiguration(root: string, skills: NativeSkills, context: Record<string, any> = {}, scope?: any, signal?: AbortSignal) {
   const assets: { name: string; ready: boolean; path: string; sha256?: string }[] = []

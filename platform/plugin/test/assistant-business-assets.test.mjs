@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import test from 'node:test'
-import { assistantConfiguration, managementSkill, managementSkills } from '../src/assistant/business-assets.ts'
+import { assistantConfiguration, managementPrinciples, managementSkill, managementSkills } from '../src/assistant/business-assets.ts'
 
 const require = createRequire(import.meta.url)
 const sdkRequire = createRequire(require.resolve('@deepseek-ai/dsh-api-session-controller'))
@@ -27,7 +28,7 @@ function fixture(t, { empty = false } = {}) {
     return path
   }
   if (!empty) {
-    writeFileSync(join(root, 'AGENTS.md'), '当前工作区的管理原则')
+    writeFileSync(join(root, 'AGENTS.md'), '\uFEFF当前工作区的管理原则\n')
     for (const name of managementSkills) writeSkill(name)
   }
   t.after(async () => { await provider.dispose(); await ctx.fiber.dispose(); rmSync(root, { recursive: true, force: true }) })
@@ -40,6 +41,8 @@ test('真实原生注册表装载全部管理技能，正文变更下一次读�
   assert.equal(config.ready, true)
   assert.equal(config.missing.length, 0)
   assert.equal(config.assets.length, managementSkills.length + 1)
+  for (const asset of config.assets) assert.equal(asset.sha256, createHash('sha256').update(readFileSync(asset.path)).digest('hex'), asset.name + ' 使用原文件摘要')
+  assert.equal(managementPrinciples(f.root).content, '当前工作区的管理原则')
   assert.equal(config.tasks['reviewing-agent-skills'], true)
   assert.ok(config.assets.filter(asset => asset.name !== 'AGENTS.md').every(asset => asset.path.startsWith(join(f.root, '.agents/skills'))))
   const previous = await managementSkill(f.root, f.ctx.skills, 'user-facing-output')
@@ -48,6 +51,7 @@ test('真实原生注册表装载全部管理技能，正文变更下一次读�
   assert.equal(changed.content, '改用用户任务结果开头。')
   assert.notEqual(changed.sha256, previous.sha256)
   assert.equal(changed.path, path)
+  assert.equal(changed.sha256, createHash('sha256').update(readFileSync(path)).digest('hex'))
   assert.match(readFileSync(path, 'utf8'), /name: user-facing-output/)
 })
 
