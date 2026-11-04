@@ -302,7 +302,7 @@ const labels: Record<string, string> = {
 }
 const internalFields = new Set(['preview_id', 'proposal_id', 'assistant_session_id', 'catalog_hash', 'plan_ready', 'requires_confirmation', 'evaluation_sha256', 'candidate_sha256', 'source_sha256'])
 const technicalFields = new Set(['command', 'argv', 'cwd', 'stdout', 'stderr', 'logs', 'trace'])
-const actionLabels: Record<string, string> = { create: '从固定父版派生', 'tasks/assembly-apply': '装配复用能力', saveConfiguration: '保存 MCP 配置', callPublishedComposition: '执行固定版本工具组合', 'fusion/confirm': '新建融合版本', 'features/apply': '保存版本特性', 'datasets/apply': '保存待复核决策样本', 'cases/create': '新增测试用例', new: '新建智能体', 'edit/apply': '保存资产修改', 'eval/start': '执行评测', 'eval/cancel': '取消评测', run: '实例操作', batch: '批量实例操作' }
+const actionLabels: Record<string, string> = { create: '从固定父版派生', 'tasks/assembly-apply': '装配复用能力', saveConfiguration: '保存 MCP 配置', callPublishedComposition: '执行固定版本工具组合', 'fusion/confirm': '应用融合方案', 'features/apply': '保存版本特性', 'datasets/apply': '保存待复核决策样本', 'cases/create': '新增测试用例', new: '新建智能体', 'edit/apply': '保存资产修改', 'eval/start': '执行评测', 'eval/cancel': '取消评测', run: '实例操作', batch: '批量实例操作' }
 
 function unwrap(value: unknown): unknown {
   if (value && typeof value === 'object' && 'ok' in value && 'value' in value && value.ok === true) return value.value
@@ -323,11 +323,11 @@ function BusinessPreviewDetails({ value }: { value: unknown }) {
 
 function versionLabel(value: unknown) {
   const text = String(value ?? '')
-  const number = /-(\d{3})(?:-r[0-9a-f]{12})?$/.exec(text)?.[1]
+  const number = /-(\d{3}(?:-[mf])?)(?:-r[0-9a-f]{12})?$/.exec(text)?.[1]
   return number ? `${/^(?:experiment:)?VAR-/.test(text) ? '变体' : '版本'} ${number}` : text
 }
 function targetVersionLabel(value: unknown, data: any, input: Record<string, any>) {
-  const match = /^(?:experiment:)?(?:EXP|VAR)-([a-z0-9]+(?:-[a-z0-9]+)*)-\d{3}(?:-r[0-9a-f]{12})?$/.exec(String(value ?? ''))
+  const match = /^(?:experiment:)?(?:EXP|VAR)-([a-z0-9]+(?:-[a-z0-9]+)*)-\d{3}(?:-[mf])?(?:-r[0-9a-f]{12})?$/.exec(String(value ?? ''))
   const agent = data?.agent_name ?? data?.agent_id ?? input.agent_name ?? input.agent_id ?? match?.[1]
   const version = versionLabel(value) || '所选版本'
   return agent ? `智能体“${agent}”的${version}` : version
@@ -336,7 +336,7 @@ function confirmationAction(meta: OperationMeta) {
   const value = unwrap(meta.preview) as any
   if (meta.action === 'datasets/apply') return `保存 ${value?.count ?? value?.records?.length ?? ''} 条样本`
   if (meta.domain === 'instances' && meta.action === 'run') return ({ create: '创建实例', start: '启动实例', stop: '停止实例', restart: '重启实例', reload: '重载实例资产', delete: '删除实例' } as Record<string, string>)[meta.input?.operation ?? value?.operation ?? value?.input?.operation] ?? '执行实例操作'
-  return ({ 'features/apply': '保存特性', 'decision/update': '保存研究结论', saveConfiguration: '保存 MCP 配置', 'fusion/confirm': '创建融合版本', create: '创建研究版本', new: '创建智能体', 'edit/apply': '保存修改', 'eval/start': '开始评测', callPublishedComposition: '执行工具组合', callTool: '调用工具', publishComposition: '发布工具组合', saveCompositionDraft: '保存组合草稿', 'cases/update': '保存测试用例', 'cases/create': '保存测试用例', 'compute-variants/create': '创建算力变体', 'compute-variants/build': '构建代码变体', 'compute-variants/freeze': '确认冻结本次数据差异' } as Record<string, string>)[meta.action] ?? actionLabels[meta.action] ?? '执行此操作'
+  return ({ 'features/apply': '保存特性', 'decision/update': '保存研究结论', saveConfiguration: '保存 MCP 配置', 'fusion/confirm': '确认融合方案', create: '创建研究版本', new: '创建智能体', 'edit/apply': '保存修改', 'eval/start': '开始评测', callPublishedComposition: '执行工具组合', callTool: '调用工具', publishComposition: '发布工具组合', saveCompositionDraft: '保存组合草稿', 'cases/update': '保存测试用例', 'cases/create': '保存测试用例', 'compute-variants/create': '创建算力变体', 'compute-variants/build': '构建代码变体', 'compute-variants/freeze': '确认冻结本次数据差异' } as Record<string, string>)[meta.action] ?? actionLabels[meta.action] ?? '执行此操作'
 }
 
 /** 确认的是动作、对象及后果；完整证据与字段保留在可展开详情中。 */

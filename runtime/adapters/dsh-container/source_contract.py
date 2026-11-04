@@ -29,10 +29,10 @@ SOURCES = source_catalog(REPO)
 LOCK = ADAPTER / "source.lock.json"
 DEFAULT_SOURCE = ""
 NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-_EXPERIMENT_BASE = r"^(?:EXP|VAR)-([a-z0-9]+(?:-[a-z0-9]+)*)-[0-9]{3}"
+_EXPERIMENT_BASE = r"^(?!VAR-.*-[0-9]{3}-[mf]-r[0-9a-f]{12}$)(?:EXP|VAR)-([a-z0-9]+(?:-[a-z0-9]+)*)-[0-9]{3}"
 # 解析器保留历史格式；新建与仓库校验另按 NEW_EXPERIMENT 和固定兼容集合判断。
-EXPERIMENT = re.compile(_EXPERIMENT_BASE + r"(?:-r[0-9a-f]{12})?$")
-NEW_EXPERIMENT = re.compile(_EXPERIMENT_BASE + r"-r[0-9a-f]{12}$")
+EXPERIMENT = re.compile(_EXPERIMENT_BASE + r"(?:-[mf]-r[0-9a-f]{12}|(?:-r[0-9a-f]{12})?)$")
+NEW_EXPERIMENT = re.compile(_EXPERIMENT_BASE + r"(?:-[mf])?-r[0-9a-f]{12}$")
 # d89ad8b 生效前的 14 个身份；013/020 是之后误建并已入库的历史违规，保留原始身份。
 # 不按“已经存在/已经提交”自动扩展，避免新无后缀 Experiment 再次被当作旧版放行。
 LEGACY_EXPERIMENT_IDS = frozenset(

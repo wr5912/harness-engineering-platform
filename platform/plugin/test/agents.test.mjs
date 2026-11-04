@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
+import fs from 'node:fs'
+import { syncBuiltinESMExports } from 'node:module'
 import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -31,6 +33,16 @@ function run(cwd, command, args) {
   const result = spawnSync(command === 'python3' ? process.env.HARNESS_PYTHON || command : command, args, { cwd, encoding: 'utf8' })
   assert.equal(result.status, 0, `${command} ${args.join(' ')}\n${result.stderr}\n${result.stdout}`)
   return result.stdout.trim()
+}
+
+function versionCli(root, action, input = {}) {
+  const result = spawnSync(process.execPath, ['--experimental-transform-types', join(plugin, 'src/agents/cli.ts'), action, '--asset-root', root, '--input', '-'], {
+    cwd: repo, input: JSON.stringify(input), encoding: 'utf8', env: { ...process.env, HARNESS_PROGRAM_ROOT: root, HARNESS_ASSET_ROOT: root },
+  })
+  assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`)
+  const response = JSON.parse(result.stdout)
+  assert.equal(response.ok, true)
+  return response.value
 }
 
 function write(file, body) {
@@ -280,6 +292,252 @@ function commitFixture(root, message) {
   run(root, 'git', ['commit', '-m', message])
   return run(root, 'git', ['rev-parse', 'HEAD'])
 }
+
+const managedMain = 'EXP-test-agent-027-m-r0123456789ab'
+const managedFeature = 'EXP-test-agent-027-f-r123456789abc'
+
+function managedFixture() {
+  const fx = fixture()
+  addVersion(fx.root, managedMain, 'status: active\n')
+  addVersion(fx.root, managedFeature, 'status: active\n')
+  write(join(fx.root, `evolution/experiments/${managedFeature}/candidate/dsh/workspace/input.txt`), 'feature\n')
+  return { ...fx, commit: commitFixture(fx.root, 'fixed current mainline and feature') }
+}
+
+function sealedFixtureRun(root, id) {
+  // 只模拟外部 Runtime 回执，测试真实 Run 封存及来源校验，不声称业务装载通过。
+  const args = ['runtime/adapters/dsh-container/run_record.py']
+  const runId = run(root, 'python3', [...args, 'init', '--source', `experiment:${id}`, '--case', 'U-CASE-001', '--review-mode', 'none'])
+  const base = join(root, `evolution/experiments/${id}/runs/${runId}`)
+  write(join(base, 'evidence/U-CASE-001/response.json'), '{"assistant_texts":["pong"]}')
+  write(join(base, 'evidence/U-CASE-001/trace.jsonl'), '{"event":{"type":"session/created","createdAt":1}}\n')
+  write(join(base, 'evidence/U-CASE-001/checks.json'), '{"session_id":"fixture-session","preset_matches":true,"workspace_matches":true}')
+  write(join(base, 'evidence/dsh-image.json'), JSON.stringify({ source_id: `experiment:${id}`, local_image_id: `sha256:${'1'.repeat(64)}` }))
+  write(join(root, 'trial.json'), JSON.stringify({ run_id: runId, trial_id: 'trial-1', input_id: 'U-CASE-001', execution_status: 'completed', verdict: 'passed', observation: '独立夹具模拟外部 Runtime 回执', evidence_ref: 'evidence/U-CASE-001/response.json' }))
+  run(root, 'python3', [...args, 'record', '--run', runId, 'trial.json'])
+  run(root, 'python3', [...args, 'finalize', '--run', runId, '--status', 'completed'])
+  return runId
+}
+
+test('m/f 治理允许最新代两种角色编辑、历史只读派生，同号复制且仅明确处置后升代', async t => {
+  const { createAgentsHandler } = await loadServer(), fx = managedFixture()
+  t.after(() => rm(fx.root, { recursive: true, force: true }))
+  const handler = createAgentsHandler(fx.root)
+  for (const id of [managedMain, managedFeature]) {
+    const detail = await rpc(handler, 'detail', { agent_id: 'test-agent', experiment_id: id })
+    assert.equal(detail.version_governance.editable, true)
+    const file = await rpc(handler, 'edit/read', { experiment_id: id, path: 'candidate/dsh/workspace/input.txt' })
+    assert.equal(file.editable, true)
+    await rpc(handler, 'edit/apply', { experiment_id: id, edits: [{ path: file.path, content: file.content + 'editable\n', expected_sha256: file.sha256 }] })
+  }
+  const historical = await rpc(handler, 'detail', { agent_id: 'test-agent', experiment_id: 'EXP-test-agent-001' })
+  assert.equal(historical.version_governance.editable, false)
+  assert.equal(historical.derivation.derivable, true)
+  await assert.rejects(() => rpc(handler, 'edit/apply', { experiment_id: 'EXP-test-agent-001', edits: [{ path: 'candidate/dsh/workspace/input.txt', content: 'bad', expected_sha256: 'a'.repeat(64) }] }), /历史代资产只读/)
+  const copy = await rpc(handler, 'create', versionRequest(fx.commit, { parent_experiment_id: managedFeature }))
+  assert.match(copy.experiment_id, /^EXP-test-agent-027-f-r[0-9a-f]{12}$/)
+  assert.equal(readFileSync(join(fx.root, `evolution/experiments/${copy.experiment_id}/candidate/dsh/workspace/input.txt`), 'utf8'), 'feature\n', '派生固定父版，不借用当前修改')
+  const fromHistory = await rpc(handler, 'create', versionRequest(fx.commit))
+  assert.match(fromHistory.experiment_id, /^EXP-test-agent-027-f-r[0-9a-f]{12}$/)
+  const next = versionRequest(fx.commit, { parent_experiment_id: managedMain, create_next_generation: true, version_role: 'm', version_number: 28 })
+  await assert.rejects(() => rpc(handler, 'create', next), /明确处置未合并特性/)
+  await assert.rejects(() => rpc(handler, 'create', versionRequest(fx.commit, { parent_experiment_id: managedMain, version_number: 28 })), /不能跳代/)
+  const current = await rpc(handler, 'detail', { agent_id: 'test-agent', experiment_id: managedMain })
+  assert.equal(current.version_governance.mainline_id, managedMain)
+  const dispositions = current.version_governance.unresolved_features.map(experiment_id => ({ experiment_id, decision: 'defer', reason: '本次明确保留在历史代，后续按固定来源重做' }))
+  await assert.rejects(() => rpc(handler, 'create', { ...next, feature_dispositions: dispositions, expected_governance_sha256: 'stale' }), /conflict/)
+  const created = await rpc(handler, 'create', { ...next, feature_dispositions: dispositions, expected_governance_sha256: current.version_governance.snapshot_sha256 })
+  assert.match(created.experiment_id, /^EXP-test-agent-028-m-r[0-9a-f]{12}$/)
+  assert.equal((await rpc(handler, 'detail', { agent_id: 'test-agent', experiment_id: managedMain })).version_governance.editable, false)
+  const change = loadYaml(readFileSync(join(fx.root, created.path, 'change.yaml'), 'utf8'))
+  assert.equal(change.feature_dispositions.length, 3)
+  assert.ok(change.feature_dispositions.every(row => /^[a-f0-9]{64}$/.test(row.candidate_sha256)))
+  assert.equal(change.creation, undefined)
+  const evaluation = await rpc(handler, 'edit/read', { experiment_id: managedMain, path: 'evaluation.md' })
+  assert.equal(evaluation.editable, true, 'Agent 共享评测文件不属于历史 Candidate')
+  await rpc(handler, 'edit/apply', { experiment_id: managedMain, edits: [{ path: evaluation.path, content: evaluation.content + '\n', expected_sha256: evaluation.sha256 }] })
+})
+
+test('m/f 融合实际写入同号现有 m、拒绝空采纳及过期 CAS，并以 m 自身 Run 独立完成', async t => {
+  const { createAgentsHandler } = await loadServer(), fx = managedFixture()
+  t.after(() => rm(fx.root, { recursive: true, force: true }))
+  const handler = createAgentsHandler(fx.root)
+  const request = versionRequest(fx.commit, { parent_experiment_id: managedFeature, target_experiment_id: managedMain })
+  const inventory = (await rpc(handler, 'fusion/preview', request)).inventory
+  const source = { experiment_id: managedFeature, ref: `git:${fx.commit}`, decision: 'inherit', reason: '合入特性工作区资产' }
+  const plan = fusionPlan([...inventory.sources.map(row => ({ experiment_id: row.experiment_id, ref: '', decision: 'omit', reason: '保留目标既有资产，不引入该来源' })), source])
+  plan.checks.unshift({ id: 'independent-build', kind: 'build', command: [process.execPath, '-e', "require('node:fs').writeFileSync('build-receipt.txt', 'm build')"] })
+  const targetFile = join(fx.root, `evolution/experiments/${managedMain}/candidate/dsh/workspace/input.txt`)
+  plan.edits = [{ path: 'candidate/dsh/workspace/input.txt', expected_sha256: createHash('sha256').update(readFileSync(targetFile)).digest('hex'), content: 'feature\n' }]
+  await assert.rejects(() => rpc(handler, 'fusion/preview', { ...request, plan: { ...plan, edits: [] } }), /实际资产 edits/)
+  await assert.rejects(() => rpc(handler, 'fusion/preview', { ...request, plan: { ...plan, checks: plan.checks.slice(1) } }), /独立构建/)
+  const adopt = async id => {
+    const detail = await rpc(handler, 'detail', { agent_id: 'test-agent', experiment_id: id })
+    return rpc(handler, 'decision/update', { experiment_id: id, content: '# Decision\n\n状态：adopt\n', expected_sha256: detail.decision.sha256, expected_change_sha256: detail.change_sha256, status: 'completed', outcome: 'adopt' })
+  }
+  await assert.rejects(() => adopt(managedFeature), /verification_incomplete/)
+  const stale = await rpc(handler, 'fusion/preview', { ...request, plan })
+  write(targetFile, 'concurrent change\n')
+  await assert.rejects(() => rpc(handler, 'fusion/confirm', { preview_id: stale.preview_id, confirmed: true }), /conflict/)
+  assert.equal(readFileSync(targetFile, 'utf8'), 'concurrent change\n')
+  write(targetFile, 'workspace\n')
+  const preview = await rpc(handler, 'fusion/preview', { ...request, plan })
+  assert.ok(preview.merge.difference.files.some(row => row.path.endsWith('input.txt')))
+  const count = readdirSync(join(fx.root, 'evolution/experiments')).length
+  // CLI 与助手跨进程仍核对同一摘要，不依赖内存预览 ID。
+  const evaluation = join(fx.root, 'agents/test-agent/evaluation.md'), originalEvaluation = readFileSync(evaluation, 'utf8')
+  write(evaluation, originalEvaluation.replace('返回 pong。', '返回新标准。'))
+  const changedEvaluation = spawnSync(process.execPath, ['--experimental-transform-types', join(plugin, 'src/agents/cli.ts'), 'fusion/confirm', '--asset-root', fx.root, '--input', '-'], {
+    cwd: repo, input: JSON.stringify({ ...request, plan, expected_plan_sha256: preview.plan_sha256, confirmed: true }), encoding: 'utf8',
+    env: { ...process.env, HARNESS_PROGRAM_ROOT: fx.root, HARNESS_ASSET_ROOT: fx.root },
+  })
+  assert.equal(changedEvaluation.status, 1, changedEvaluation.stdout)
+  assert.equal(JSON.parse(changedEvaluation.stdout).error.code, 'conflict')
+  assert.equal(readFileSync(targetFile, 'utf8'), 'workspace\n')
+  write(evaluation, originalEvaluation)
+  const merged = versionCli(fx.root, 'fusion/confirm', { ...request, plan, expected_plan_sha256: preview.plan_sha256, confirmed: true })
+  assert.equal(merged.experiment_id, managedMain)
+  assert.equal(readdirSync(join(fx.root, 'evolution/experiments')).length, count)
+  assert.equal(readFileSync(targetFile, 'utf8'), 'feature\n')
+  await assert.rejects(() => adopt(managedMain), /verification_incomplete/)
+  const expected = { experiment_id: managedMain, expected_candidate_sha256: merged.candidate_sha256 }
+  await assert.rejects(() => rpc(handler, 'fusion/finalize', expected), /verification_incomplete/)
+  const built = await rpc(handler, 'fusion/verify', { ...expected, check_id: 'independent-build' })
+  assert.equal(readFileSync(join(fx.root, `evolution/experiments/${managedMain}/candidate/build-receipt.txt`), 'utf8'), 'm build')
+  const afterBuild = { ...expected, expected_candidate_sha256: built.candidate_sha256 }
+  const featureRun = sealedFixtureRun(fx.root, managedFeature)
+  await assert.rejects(() => rpc(handler, 'fusion/verify', { ...afterBuild, check_id: 'actual-load', run_id: featureRun }), /当前目标的已封存 Run/)
+  const mainRun = sealedFixtureRun(fx.root, managedMain)
+  for (const check_id of ['actual-load', 'route-behavior']) await rpc(handler, 'fusion/verify', { ...afterBuild, check_id, run_id: mainRun })
+  const finalized = await rpc(handler, 'fusion/finalize', afterBuild)
+  assert.equal(finalized.mainline_id, managedMain)
+  assert.equal(finalized.creation_status, 'completed')
+  assert.deepEqual((await rpc(handler, 'detail', { agent_id: 'test-agent', experiment_id: managedMain })).version_governance.unresolved_features, [])
+  await adopt(managedFeature)
+  write(targetFile, 'changed after verification\n')
+  await assert.rejects(() => adopt(managedFeature), /verification_incomplete/)
+  write(targetFile, 'feature\n')
+  await assert.rejects(() => rpc(handler, 'fusion/finalize', { ...afterBuild, cleanup_features: true }), /confirmation_required/)
+  const featureFile = join(fx.root, `evolution/experiments/${managedFeature}/candidate/dsh/workspace/input.txt`)
+  write(featureFile, 'not included in the merge\n')
+  await assert.rejects(() => rpc(handler, 'fusion/finalize', { ...afterBuild, cleanup_features: true, confirmed: true }), /conflict/)
+  assert.ok(existsSync(featureFile))
+  write(featureFile, 'feature\n')
+  const instanceFile = join(fx.root, '.local/instances/feature/instance.json')
+  write(instanceFile, JSON.stringify({ asset_root: fx.root, source_id: `experiment:${managedFeature}` }))
+  await assert.rejects(() => rpc(handler, 'fusion/finalize', { ...afterBuild, cleanup_features: true, confirmed: true }), /instance_dependency/)
+  await rm(instanceFile)
+  const featureRunFile = join(fx.root, `evolution/experiments/${managedFeature}/runs/${featureRun}/run.yaml`)
+  const originalRun = readFileSync(featureRunFile, 'utf8')
+  const artifactFile = join(fx.root, `evolution/experiments/${managedFeature}/artifacts/original.txt`)
+  write(artifactFile, 'keep historical artifact\n')
+  const retired = await rpc(handler, 'fusion/finalize', { ...afterBuild, cleanup_features: true, confirmed: true })
+  assert.deepEqual(retired.retired_features, [managedFeature])
+  assert.equal(existsSync(featureFile), false)
+  assert.equal(readFileSync(featureRunFile, 'utf8'), originalRun)
+  assert.equal(readFileSync(artifactFile, 'utf8'), 'keep historical artifact\n')
+  const historical = await rpc(handler, 'detail', { agent_id: 'test-agent', experiment_id: managedFeature })
+  assert.equal(historical.version_governance.editable, false)
+  assert.equal(historical.experiment.change.archived_ref, `git:${fx.commit}`)
+  assert.equal(historical.derivation.derivable, true)
+  const restored = await rpc(handler, 'create', { agent_id: 'test-agent', parent_experiment_id: managedFeature, parent_ref: `git:${fx.commit}`, research_question: '从已清理特性固定来源恢复新副本' })
+  assert.match(restored.experiment_id, /^EXP-test-agent-027-f-r[a-f0-9]{12}$/)
+})
+
+test('027 迁移提供精确映射与摘要 CAS，只更新当前引用，固定来源及历史 Run 原文保留', async t => {
+  const { createAgentsHandler } = await loadServer(), fx = fixture()
+  t.after(() => rm(fx.root, { recursive: true, force: true }))
+  const agent = 'security-operations-expert'
+  const mapping = [['reab20c48f610', 'm'], ['r0318e00a959b', 'f'], ['r058697202fb8', 'f']].map(([suffix, role]) => ({ from: `EXP-${agent}-027-${suffix}`, to: `EXP-${agent}-027-${role}-${suffix}` }))
+  for (const { from } of mapping) {
+    addVersion(fx.root, from, 'status: active\n')
+    const change = join(fx.root, `evolution/experiments/${from}/change.yaml`)
+    write(change, readFileSync(change, 'utf8').replace('agent_id: test-agent', `agent_id: ${agent}`))
+  }
+  const old = mapping[0].from, current = mapping[0].to
+  write(join(fx.root, `agents/${agent}/manifest.yaml`), `agent_id: ${agent}\nactive_experiment: ${old}\nnotes: 说明中引用 ${old} 保持原文\n`)
+  cpSync(join(fx.root, 'agents/test-agent/evaluation.md'), join(fx.root, `agents/${agent}/evaluation.md`))
+  const historicalRun = `evolution/experiments/${old}/runs/run-33333333-3333-4333-8333-333333333333/run.yaml`
+  const historicalText = `experiment_id: ${old}\nsource_id: experiment:${old}\nstatus: failed\n`
+  write(join(fx.root, historicalRun), historicalText)
+  write(join(fx.root, `evolution/experiments/${old}/archive/original.md`), historicalText)
+  write(join(fx.root, 'config/business-runtime.json'), JSON.stringify({ selected: `experiment:${old}`, source_id: old, candidate_root: join(fx.root, `evolution/experiments/${old}/candidate/dsh`), fixed: `git:${fx.commit}:${old}`, text: `历史 ${old}` }))
+  const fixed = commitFixture(fx.root, 'fixed 027 identities before migration'), handler = createAgentsHandler(fx.root)
+  const ignored = join(fx.root, `evolution/experiments/${old}/candidate/dsh/workspace/ignored-source.txt`)
+  write(join(fx.root, '.git/info/exclude'), 'ignored-source.txt\n')
+  write(ignored, '未进入固定 Git 来源的唯一源码\n')
+  await assert.rejects(() => rpc(handler, 'versions/migration-plan'), /先固定完整 Candidate 再迁移/)
+  assert.equal(existsSync(join(fx.root, `evolution/experiments/${current}`)), false)
+  await rm(ignored)
+  const before = run(fx.root, 'git', ['status', '--porcelain'])
+  const plan = await rpc(handler, 'versions/migration-plan')
+  assert.equal(versionCli(fx.root, 'versions/migration-plan').plan_sha256, plan.plan_sha256)
+  assert.deepEqual(plan.mapping, mapping)
+  assert.equal(plan.ready, true)
+  assert.equal(run(fx.root, 'git', ['status', '--porcelain']), before, '预览不写资产')
+  assert.ok(plan.references.some(row => row.path === `agents/${agent}/manifest.yaml` && row.fields.includes('active_experiment')))
+  assert.equal(plan.writes.some(row => 'before' in row || 'after' in row), false, '摘要不回显配置正文')
+  write(join(fx.root, 'config/business-runtime.json'), readFileSync(join(fx.root, 'config/business-runtime.json'), 'utf8') + '\n')
+  await assert.rejects(() => rpc(handler, 'versions/migration-apply', { expected_plan_sha256: plan.plan_sha256, confirmed: true }), /conflict/)
+  const instanceFile = join(fx.root, '.local/instances/old-source/instance.json')
+  write(instanceFile, JSON.stringify({ asset_root: fx.root, source_id: `experiment:${old}` }))
+  const blocked = await rpc(handler, 'versions/migration-plan')
+  assert.equal(blocked.ready, false)
+  await assert.rejects(() => rpc(handler, 'versions/migration-apply', { expected_plan_sha256: blocked.plan_sha256, confirmed: true }), /instance_dependency/)
+  await rm(instanceFile)
+  const fresh = await rpc(handler, 'versions/migration-plan')
+  const originalChanges = mapping.map(({ from }) => readFileSync(join(fx.root, `evolution/experiments/${from}/change.yaml`), 'utf8'))
+  const originalWrite = fs.writeFileSync
+  let interruptedWrite = false
+  fs.writeFileSync = (file, ...args) => {
+    if (typeof file === 'string' && file.startsWith(join(fx.root, `evolution/experiments/${mapping[1].to}/change.yaml`) + '.')) {
+      interruptedWrite = true
+      originalWrite(file, '模拟未完整写入')
+      throw new Error('模拟迁移写入中断')
+    }
+    return originalWrite(file, ...args)
+  }
+  syncBuiltinESMExports()
+  try {
+    const interrupted = await handler('versions/migration-apply', { expected_plan_sha256: fresh.plan_sha256, confirmed: true }, new AbortController().signal)
+    assert.equal(interrupted.ok, false)
+    assert.equal(interruptedWrite, true)
+  } finally { fs.writeFileSync = originalWrite; syncBuiltinESMExports() }
+  for (const [index, item] of mapping.entries()) {
+    assert.equal(existsSync(join(fx.root, `evolution/experiments/${item.from}/candidate`)), true)
+    assert.equal(existsSync(join(fx.root, `evolution/experiments/${item.to}`)), false)
+    assert.equal(readFileSync(join(fx.root, `evolution/experiments/${item.from}/change.yaml`), 'utf8'), originalChanges[index])
+  }
+  assert.equal((await rpc(handler, 'versions/migration-plan')).plan_sha256, fresh.plan_sha256, '中断恢复后仍可确认原方案')
+  await rpc(handler, 'versions/migration-apply', { expected_plan_sha256: fresh.plan_sha256, confirmed: true })
+  for (const item of mapping) {
+    assert.equal(existsSync(join(fx.root, `evolution/experiments/${item.from}/candidate`)), false)
+    assert.equal(existsSync(join(fx.root, `evolution/experiments/${item.to}/candidate`)), true)
+    const alias = loadYaml(readFileSync(join(fx.root, `evolution/experiments/${item.from}/change.yaml`), 'utf8'))
+    assert.equal(alias.current_version_id, item.to)
+    assert.equal(alias.archived_ref, `git:${fixed}`)
+  }
+  const manifest = loadYaml(readFileSync(join(fx.root, `agents/${agent}/manifest.yaml`), 'utf8'))
+  assert.equal(manifest.active_experiment, current)
+  assert.equal(manifest.notes, `说明中引用 ${old} 保持原文`)
+  const runtime = JSON.parse(readFileSync(join(fx.root, 'config/business-runtime.json'), 'utf8'))
+  assert.equal(runtime.selected, `experiment:${current}`)
+  assert.equal(runtime.candidate_root, join(fx.root, `evolution/experiments/${current}/candidate/dsh`))
+  assert.equal(runtime.fixed, `git:${fx.commit}:${old}`)
+  assert.equal(runtime.text, `历史 ${old}`)
+  assert.equal(readFileSync(join(fx.root, historicalRun), 'utf8'), historicalText)
+  assert.equal(readFileSync(join(fx.root, `evolution/experiments/${old}/archive/original.md`), 'utf8'), historicalText)
+  const oldDetail = await rpc(handler, 'detail', { agent_id: agent, experiment_id: old })
+  assert.equal(oldDetail.experiment.change.current_version_id, current)
+  assert.equal(oldDetail.version_governance.editable, false)
+  assert.equal(oldDetail.derivation.derivable, true)
+  const currentDetail = await rpc(handler, 'detail', { agent_id: agent })
+  assert.equal(currentDetail.experiment.id, current)
+  assert.equal(currentDetail.version_governance.editable, true)
+  const copied = await rpc(handler, 'create', { agent_id: agent, parent_experiment_id: old, parent_ref: `git:${fixed}`, research_question: '由旧身份固定来源派生同号特性' })
+  assert.match(copied.experiment_id, /^EXP-security-operations-expert-027-f-r[a-f0-9]{12}$/)
+  assert.equal((await rpc(handler, 'detail', { agent_id: 'test-agent' })).experiment.id, 'EXP-test-agent-001')
+})
 
 test('算力变体通过统一智能体路由预览和派生，原父版保持不变', async () => {
   const { createAgentsHandler } = await loadServer()

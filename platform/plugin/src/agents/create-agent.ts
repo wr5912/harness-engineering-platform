@@ -61,7 +61,7 @@ export async function createAgent(rootPath: string, payload: JsonMap, signal?: A
     ].join('\n')
     const result = await execute(process.env.HARNESS_PYTHON || 'python3', ['-c', code, join(programRoot(), CLI), temporary, agentId, join(programRoot(), 'runtime/adapters/dsh-container/source.lock.json'), profile], { cwd: root, env: { ...process.env, HARNESS_ASSET_ROOT: temporary, HARNESS_PROGRAM_ROOT: programRoot() }, signal, timeout: 30_000, maxBuffer: 1024 * 1024 })
     const created = JSON.parse(result.stdout) as { experiment_id: string; source_id: string }
-    if (!new RegExp(`^EXP-${agentId}-001-r[0-9a-f]{12}$`).test(created.experiment_id) || created.source_id !== `experiment:${created.experiment_id}`) throw new CreationError('creation_failed', '创建工具返回的研究版本身份无效')
+    if (!new RegExp(`^EXP-${agentId}-001-m-r[0-9a-f]{12}$`).test(created.experiment_id) || created.source_id !== `experiment:${created.experiment_id}`) throw new CreationError('creation_failed', '创建工具返回的研究版本身份无效')
     const experiment = join(temporary, 'evolution/experiments', created.experiment_id), agent = join(temporary, 'agents', agentId)
     phase = 'role-assets'
     const identity = `你是${name}（Agent ID: ${agentId}）。`

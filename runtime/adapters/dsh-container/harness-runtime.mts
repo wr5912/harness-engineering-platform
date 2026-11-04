@@ -1,11 +1,12 @@
 import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { projectHarnessPresets } from '../../../platform/plugin/src/models/harness-runtime.ts'
+import { VERSION_ID } from '../../../platform/plugin/src/version-id.ts'
 
 try {
   const [candidate, destination, runtimeFile] = process.argv.slice(2)
   if (candidate === '--private-files') {
-    if (!destination || !runtimeFile || !/^(?:EXP|VAR)-[a-z0-9-]+-[0-9]{3}(?:-r[0-9a-f]{12})?$/.test(runtimeFile)) throw new Error('私有运行文件缺少有效的来源版本')
+    if (!destination || !runtimeFile || !VERSION_ID.test(runtimeFile)) throw new Error('私有运行文件缺少有效的来源版本')
     const parent = resolve(destination, '.local/verification-private-files'), folder = join(parent, runtimeFile)
     const privateDirectory = (path: string) => {
       const stat = lstatSync(path)

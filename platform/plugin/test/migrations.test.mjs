@@ -265,7 +265,7 @@ test('ZIP保留Unix执行位且排除链接与特殊项；重复路径不被后�
 
 test('新Agent由标准创建工具生成EXP，二进制引用复制，预览不发布，幂等且回执可复现', async t => {
   const fx = fixture(t), { preview } = await sourceAndPreview(fx)
-  assert.match(preview.experiment_id, /^EXP-migrated-agent-001-r[0-9a-f]{12}$/)
+  assert.match(preview.experiment_id, /^EXP-migrated-agent-001-m-r[0-9a-f]{12}$/)
   assert.equal(existsSync(join(fx.root, 'agents/migrated-agent')), false)
   const prepared = success(await fx.handler('status', { operation_id: preview.operation_id }))
   assert.equal(prepared.published, false); assert.equal(prepared.state, 'prepared')
@@ -338,7 +338,7 @@ test('部分发布后可凭持久回执恢复；并行修改不被回滚或覆�
   assert.equal(readFileSync(current, 'utf8'), '用户并行修改。')
 })
 
-test('已有Agent从固定EXP创建新版本，保持active；VAR和已变化暂存资产拒绝继承/发布', async t => {
+test('已有Agent从固定EXP创建同号f，保持active；VAR和已变化暂存资产拒绝继承/发布', async t => {
   const fx = fixture(t), { preview, source } = await sourceAndPreview(fx)
   success(await fx.handler('apply', preview.apply_input))
   git(fx.root, ['init']); git(fx.root, ['config', 'user.name', 'Fixture']); git(fx.root, ['config', 'user.email', 'fixture@example.invalid'])
@@ -346,7 +346,7 @@ test('已有Agent从固定EXP创建新版本，保持active；VAR和已变化暂
   const ref = `git:${git(fx.root, ['rev-parse', 'HEAD'])}`, manifestFile = join(fx.root, 'agents/migrated-agent/manifest.yaml'), manifestBefore = readFileSync(manifestFile)
   const input = { source_id: source.source_id, fingerprint: source.fingerprint, target: { kind: 'new-version', agent_id: 'migrated-agent', parent_experiment_id: preview.experiment_id, parent_ref: ref, research_question: '迁移后的职责能否保持。' }, files: [{ path: 'dsh/workspace/AGENTS.md', content: '保持职责，并明确解释分析依据。' }], mapping: [{ source: 'role.md', target: 'dsh/workspace/AGENTS.md', status: 'converted' }] }
   const next = success(await fx.handler('preview', input))
-  assert.match(next.experiment_id, /^EXP-migrated-agent-002-r[0-9a-f]{12}$/)
+  assert.match(next.experiment_id, /^EXP-migrated-agent-001-f-r[0-9a-f]{12}$/)
   success(await fx.handler('apply', next.apply_input))
   assert.deepEqual(readFileSync(manifestFile), manifestBefore)
   const nextChange = load(readFileSync(join(fx.root, 'evolution/experiments', next.experiment_id, 'change.yaml'), 'utf8'))

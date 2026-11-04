@@ -33,6 +33,12 @@ class SourceContractTest(unittest.TestCase):
         self.assertEqual(len(source_contract.LEGACY_EXPERIMENT_IDS), 16)
         self.assertIsNotNone(source_contract.NEW_EXPERIMENT.fullmatch("EXP-example-agent-021-r0123456789ab"))
         self.assertEqual(source_contract.NEW_EXPERIMENT.fullmatch("VAR-example-agent-021-r0123456789ab").group(1), "example-agent")
+        self.assertEqual(source_contract.NEW_EXPERIMENT.fullmatch("VAR-example-027-f-agent-021-r0123456789ab").group(1), "example-027-f-agent")
+        for role in ("m", "f"):
+            identity = f"EXP-example-agent-027-{role}-r0123456789ab"
+            self.assertEqual(source_contract.NEW_EXPERIMENT.fullmatch(identity).group(1), "example-agent")
+            self.assertIsNotNone(source_contract.EXPERIMENT.fullmatch(identity))
+            self.assertIsNone(source_contract.EXPERIMENT.fullmatch(identity.replace("EXP-", "VAR-", 1)))
         for identity in (*expected_legacy, "EXP-example-agent-001", "EXP-security-operations-expert-021"):
             with self.subTest(identity=identity):
                 self.assertIsNone(source_contract.NEW_EXPERIMENT.fullmatch(identity))
@@ -50,6 +56,8 @@ class SourceContractTest(unittest.TestCase):
             "EXP-security-operations-expert-013-r26ecd1295ab4f",
             "EXP-security-operations-expert-013-r26ECD1295AB4",
             "EXP-security-operations-expert-0013-r26ecd1295ab4",
+            "EXP-security-operations-expert-027-m",
+            "EXP-security-operations-expert-027-x-r26ecd1295ab4",
         ):
             self.assertIsNone(source_contract.EXPERIMENT.fullmatch(invalid))
         self.assertEqual(
@@ -63,6 +71,8 @@ class SourceContractTest(unittest.TestCase):
         for value in (
             "EXP-security-operations-expert-011",
             "EXP-security-operations-expert-014-r8b1bd54e8be7",
+            "EXP-security-operations-expert-027-m-r8b1bd54e8be7",
+            "EXP-security-operations-expert-027-f-r8b1bd54e8be7",
             "EXP-security-operations-expert-014-r8b1bd54e8be",
             "EXP-security-operations-expert-014-r8b1bd54e8be70",
             "VAR-security-operations-expert-014-r8b1bd54e8be7",
@@ -84,7 +94,7 @@ class SourceContractTest(unittest.TestCase):
                                      "--repo", str(root), "init", "example-agent"],
                                     capture_output=True, text=True, check=True)
             ordinary = json.loads(result.stdout)["experiment_id"]
-            variant = ordinary.replace("EXP-", "VAR-", 1)
+            variant = ordinary.replace("EXP-", "VAR-", 1).replace("-m-r", "-r")
             experiment = root / "evolution/experiments" / variant
             (root / "evolution/experiments" / ordinary).rename(experiment)
             change = yaml.safe_load((experiment / "change.yaml").read_text())

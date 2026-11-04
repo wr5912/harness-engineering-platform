@@ -13,7 +13,7 @@ const save = (path: string, value: unknown) => writeFileSync(path, JSON.stringif
 
 function validate(update: Update) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(update.agentId) || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(update.instance)
-    || !new RegExp(`^EXP-${update.agentId}-[0-9]+(?:-r[0-9a-f]{12})?$`).test(update.experimentId)) throw new Error('智能体、Experiment 或实例身份无效')
+    || !new RegExp(`^EXP-${update.agentId}-[0-9]+(?:-[mf]-r[0-9a-f]{12}|(?:-r[0-9a-f]{12})?)$`).test(update.experimentId)) throw new Error('智能体、Experiment 或实例身份无效')
   if (!Array.isArray(update.files) || !update.files.length || new Set(update.files.map(file => file.path)).size !== update.files.length) throw new Error('更新清单为空或包含重复路径')
   for (const file of update.files) {
     if (typeof file.path !== 'string' || file.path.split('/').some(part => !part || part === '.' || part === '..')

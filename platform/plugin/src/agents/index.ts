@@ -33,7 +33,8 @@ import { caseObservation } from '../evaluation/case-observation.ts'
 import { readAssetDiff, readFixedAsset } from './asset-diff.ts'
 import { createAgent } from './create-agent.ts'
 import { createSdkHandler } from '../sdk/operations.ts'
-import { VERSION_ID, isVariantIdentity, assertInheritableVersion } from '../version-id.ts'
+import { VERSION_ID, isVariantIdentity, assertInheritableVersion, versionRole } from '../version-id.ts'
+import { VersionGovernanceError, allocateVersion, assertVersionEditable, featureDispositions, featureDispositionsPending, governanceSnapshot, versionAccess, versionGovernance, versionInstanceDependencies, withVersionLock } from './version-governance.ts'
 import { createComputeVariantsHandler, type ComputeVariantCreation } from './compute-variants.ts'
 import { createTrainingServersHandler } from './training-servers.ts'
 import { createComputeBuildHandler } from './compute-build.ts'
@@ -44,7 +45,7 @@ import { createMigrationsHandler } from './migrations.ts'
 import { createComputeFreezeHandler } from './compute-freeze.ts'
 import { programRoot, workspaceConfigPath, workspaceLocalPath } from '../workspace.ts'
 import { discoverTaskCapabilities, type CapabilityOptions } from '../tasks/capabilities.ts'
-import { candidateFiles, dataPath, sourceInfo } from '../tasks/files.ts'
+import { atomicWrite, candidateFiles, dataPath, gitCandidateDigest, sourceInfo } from '../tasks/files.ts'
 import { previewTaskAssembly, applyTaskAssembly, type TaskAssemblyInput } from '../tasks/assembly.ts'
 import { containsLiteralLlmKey } from '../tasks/llm-key.ts'
 import { materializeEvaluationSource, validateMcpFixture } from '../../../../runtime/adapters/dsh-container/evaluation-source.mts'
@@ -52,6 +53,7 @@ import { createInstancesHandler } from '../instances/index.ts'
 import { inheritedLoadableAssets, assertVersionIdentity, versionIdentity, versionSource, versionSources } from './version-source.ts'
 import { inspectLegacy, readResearchReference, validateResearch } from './research.ts'
 import { createVariantIdentityMigrationHandler, currentVariantProjection } from './variant-identity.ts'
+import { applyVersion027Migration, version027MigrationPreview } from './version-migration.ts'
 
 type JsonMap = Record<string, unknown>
 type SourceCatalog = { schema_version?: string; sources?: Record<string, JsonMap> }
@@ -81,6 +83,7 @@ function ok<T extends RpcValue>(value: T): ConnectionRpcResult<T> {
 }
 
 function failure(error: unknown): ConnectionRpcResult<never> {
+  if (error instanceof VersionGovernanceError) return { ok: false, error: { code: error.code, message: error.message, details: {} } }
   if (error instanceof EvaluationJobError) return { ok: false, error: { code: error.code, message: error.message, details: {} } }
   if (error instanceof RpcError || error instanceof RunFileError) return { ok: false, error: { code: error.code, message: error.message, details: error.details } }
   const code = (error as NodeJS.ErrnoException).code ?? 'unknown'
@@ -229,18 +232,6 @@ function catalog(root: string) {
   return { parsed: { schema_version: '2.0', sources } as SourceCatalog, errors }
 }
 
-function atomicWrite(file: string, body: string | Buffer) {
-  mkdirSync(dirname(file), { recursive: true })
-  const tmp = `${file}.${process.pid}.${Date.now()}.${randomBytes(3).toString('hex')}.tmp`
-  const mode = existsSync(file) ? lstatSync(file).mode & 0o777 : undefined
-  try {
-    writeFileSync(tmp, body, { flag: 'wx', mode })
-    if (mode !== undefined) chmodSync(tmp, mode)
-    renameSync(tmp, file)
-  } finally { rmSync(tmp, { force: true }) }
-}
-
-
 function listDirs(file: string): string[] {
   try {
     return readdirSync(file, { withFileTypes: true }).filter(entry => entry.isDirectory()).map(entry => entry.name).sort()
@@ -329,6 +320,8 @@ function experimentInfo(root: string, id: string) {
     change,
     change_sha256: sha256(content),
     ...currentVariantProjection(root, id, change),
+    ...(change.current_version_id ? { current_version_id: change.current_version_id, is_current: false } : {}),
+    ...(change.assets_retired ? { is_current: false } : {}),
   }
 }
 
@@ -447,6 +440,7 @@ export interface FusionPlan {
   checks: { id: string; kind: 'build' | 'load' | 'capability'; command?: string[]; cwd?: string; case_ids?: string[] }[]
   evaluation_case_ids: string[]
   evaluation_sha256: string
+  edits?: JsonMap[]
 }
 
 type VersionPreview = { kind: 'features' | 'fusion'; snapshot: string; payload: JsonMap; value: JsonMap }
@@ -581,6 +575,7 @@ function creationView(root: string, id: string, change: JsonMap) {
 
 function featurePreview(root: string, body: JsonMap, previews: Map<string, VersionPreview>) {
   const id = experimentIdField(body)
+  assertVersionEditable(root, id)
   experimentInfo(root, id)
   const features = featureList(body.features).map(feature => ({ ...feature, evidence_refs: feature.evidence_refs.map(ref => featureReference(id, ref) ?? ref) }))
   const previewId = randomUUID()
@@ -608,44 +603,12 @@ function latestProposal(body: JsonMap, previews: Map<string, VersionPreview>, ki
 function featureApply(root: string, body: JsonMap, previews: Map<string, VersionPreview>) {
   const { id, preview } = confirmedPreview(body, previews, 'features')
   const experimentId = String(preview.payload.experiment_id)
+  assertVersionEditable(root, experimentId)
   if (featureSnapshot(root, experimentId) !== preview.snapshot) throw new RpcError('conflict', '资产或特性已变化，请重新整理和确认')
   const change = readYamlMap(root, changePath(root, experimentId))
   writeYamlMap(changePath(root, experimentId), { ...change, features: preview.value.features })
   previews.delete(id)
   return ok({ experiment_id: experimentId, features: featureView(root, experimentId, { ...change, features: preview.value.features }) })
-}
-
-function gitCandidateDigest(root: string, id: string, ref: string): string | null {
-  const base = `evolution/experiments/${id}/candidate/`
-  const listed = spawnSync('git', ['ls-tree', '-rz', '--full-tree', ref.slice(4), '--', base.slice(0, -1)], { cwd: root, encoding: 'buffer', maxBuffer: 10 * 1024 * 1024 })
-  if (listed.status !== 0) return null
-  const records = listed.stdout.toString('utf8').split('\0').filter(Boolean).map(row => {
-    const match = /^(\d+) blob ([0-9a-f]+)\t(.+)$/.exec(row)
-    return match ? { mode: Number.parseInt(match[1]!, 8) & 0o777, object: match[2]!, path: match[3]!.slice(base.length), symlink: match[1] === '120000' } : null
-  }).filter((row): row is NonNullable<typeof row> => row !== null)
-    .filter(row => !row.path.split('/').some(part => EXCLUDED_ASSETS.has(part) || part.endsWith('.llm-api-key')))
-  if (!records.length || records.some(row => row.symlink)) return null
-  // 与工作树扫描一致：按目录项排序后深度遍历，而非整条路径的字符串顺序。
-  records.sort((left, right) => {
-    const a = left.path.split('/'), b = right.path.split('/')
-    for (let index = 0; index < Math.min(a.length, b.length); index++) if (a[index] !== b[index]) return a[index]! < b[index]! ? -1 : 1
-    return a.length - b.length
-  })
-  const blobs = spawnSync('git', ['cat-file', '--batch'], { cwd: root, input: records.map(row => row.object).join('\n') + '\n', maxBuffer: 100 * 1024 * 1024 })
-  if (blobs.status !== 0) return null
-  const hash = createHash('sha256')
-  let offset = 0
-  for (const row of records) {
-    const end = blobs.stdout.indexOf(10, offset)
-    const header = blobs.stdout.subarray(offset, end).toString('ascii').split(' ')
-    const size = Number(header[2])
-    if (end < 0 || header[1] !== 'blob' || !Number.isSafeInteger(size) || size < 0) return null
-    const data = blobs.stdout.subarray(end + 1, end + 1 + size)
-    if (data.length !== size) return null
-    hash.update(JSON.stringify([row.path, row.mode, sha256(data)]))
-    offset = end + size + 2
-  }
-  return hash.digest('hex')
 }
 
 function fusionInventory(root: string, agentId: string, parentId: string, parentRef: string) {
@@ -753,20 +716,69 @@ function fusionSnapshot(root: string, agentId: string) {
   return sha256(JSON.stringify({ head: gitHead(root), versions }))
 }
 
-function fusionPreview(root: string, body: JsonMap, previews: Map<string, VersionPreview>) {
+function fusionTarget(root: string, body: JsonMap) {
+  if (body.target_experiment_id === undefined) return null
+  const target = experimentIdField(body, 'target_experiment_id'), parent = experimentIdField(body, 'parent_experiment_id')
+  const state = versionGovernance(root, agentIdField(body))
+  if (target !== state.mainline_id || versionRole(parent) !== 'f' || VERSION_ID.exec(parent)?.[1] !== state.agent_id
+    || Number(VERSION_ID.exec(parent)?.[2]) !== state.generation) throw new RpcError('invalid_request', '特性只能合入同号现有主线 m')
+  assertVersionEditable(root, target)
+  return target
+}
+
+function fusionSourcesCurrent(root: string, plan: FusionPlan) {
+  return plan.sources.filter(source => source.decision === 'inherit').map(source => {
+    const digest = candidateDigest(root, source.experiment_id)
+    if (gitCandidateDigest(root, source.experiment_id, source.ref) !== digest) throw new RpcError('conflict', '融合来源与固定提交不一致，请先固定完整 Candidate', { experiment_id: source.experiment_id })
+    return { experiment_id: source.experiment_id, ref: source.ref, candidate_sha256: digest }
+  })
+}
+
+async function fusionPreview(root: string, body: JsonMap, previews: Map<string, VersionPreview>) {
   const agentId = agentIdField(body)
+  const snapshot = fusionSnapshot(root, agentId)
   const parentId = experimentIdField(body, 'parent_experiment_id')
   const parentRef = stringField(body, 'parent_ref')
   validateGitParent(root, agentId, parentRef, parentId)
   const question = stringField(body, 'research_question')
   const inventory = fusionInventory(root, agentId, parentId, parentRef)
   const plan = body.plan ? normalizePlan(root, requireObject(body.plan), inventory, agentId) : null
-  const value = { preview_id: plan ? randomUUID() : null, agent_id: agentId, parent_experiment_id: parentId, parent_ref: parentRef, research_question: question, inventory, plan, plan_ready: Boolean(plan), requires_confirmation: true, assistant_session_id: optionalString(body, 'assistant_session_id') ?? null }
-  if (plan) previews.set(value.preview_id!, { kind: 'fusion', payload: body, snapshot: fusionSnapshot(root, agentId), value })
+  const target = fusionTarget(root, body)
+  let merge: JsonMap | null = null
+  if (target) {
+    const difference = await readAssetDiff(root, { experiment_id: parentId, against: target })
+    if (!difference.ok) return difference
+    merge = { target_experiment_id: target, expected_candidate_sha256: candidateDigest(root, target), difference: difference.value }
+    if (plan) {
+      if (!plan.sources.some(source => source.experiment_id === parentId && source.ref === parentRef && source.decision === 'inherit')) throw new RpcError('invalid_request', '合并方案必须采用当前特性的固定来源')
+      if (!plan.checks.some(check => check.kind === 'build')) throw new RpcError('invalid_request', '合并后的 m 必须独立构建、装载和验收')
+      const edits = requireObject(body.plan).edits
+      if (!Array.isArray(edits) || !edits.length) throw new RpcError('invalid_request', '合并方案需要实际资产 edits，不能只登记采纳')
+      plan.edits = edits.map(item => requireObject(item))
+      for (const edit of plan.edits) {
+        const path = stringField(edit, 'path')
+        if (path.startsWith('evolution/') || path.startsWith('agents/') || ['change.yaml', 'decision.md', 'hypothesis.md'].includes(path) || path.startsWith('evaluation/')) throw new RpcError('path_rejected', '融合 edits 仅可修改目标 Candidate 资产')
+      }
+      const edited = await previewEdit(root, { experiment_id: target, edits: plan.edits })
+      if (!edited.ok) return edited
+      if (!edited.value.edits.some((edit: JsonMap) => edit.changed)) throw new RpcError('invalid_request', '融合必须实际改变目标资产')
+      merge = { ...merge, sources: fusionSourcesCurrent(root, plan), edit_preview: edited.value }
+    }
+  }
+  const value = { preview_id: plan ? randomUUID() : null, plan_sha256: sha256(JSON.stringify({ body, snapshot, plan })), agent_id: agentId, parent_experiment_id: parentId, parent_ref: parentRef, ...(target ? { target_experiment_id: target, merge } : {}), research_question: question, inventory, plan, plan_ready: Boolean(plan), requires_confirmation: true, assistant_session_id: optionalString(body, 'assistant_session_id') ?? null }
+  if (fusionSnapshot(root, agentId) !== snapshot) throw new RpcError('conflict', '预览期间来源已变化，请重新读取差异')
+  if (plan) previews.set(value.preview_id!, { kind: 'fusion', payload: body, snapshot, value })
   return ok(value)
 }
 
 async function fusionConfirm(root: string, body: JsonMap, previews: Map<string, VersionPreview>) {
+  if (body.preview_id === undefined && body.plan && body.expected_plan_sha256) {
+    const { confirmed, expected_plan_sha256, ...request } = body
+    const current = await fusionPreview(root, request, previews)
+    if (!current.ok) return current
+    if (current.value.plan_sha256 !== expected_plan_sha256) throw new RpcError('conflict', '融合计划或来源已变化，请重新预览')
+    body = { preview_id: current.value.preview_id, confirmed }
+  }
   const { id, preview } = confirmedPreview(body, previews, 'fusion')
   const agentId = agentIdField(preview.payload)
   if (fusionSnapshot(root, agentId) !== preview.snapshot) throw new RpcError('conflict', '版本或来源已经变化，请重新预览')
@@ -774,6 +786,25 @@ async function fusionConfirm(root: string, body: JsonMap, previews: Map<string, 
   if (evaluationDigest(root, agentId, plan.evaluation_case_ids) !== plan.evaluation_sha256) throw new RpcError('conflict', '约定评测口径已变化，请重新确认方案')
   // 在 await 创建之前消费预览，重复点击不会生成两个版本。
   previews.delete(id)
+  const target = fusionTarget(root, preview.payload)
+  if (target) return withVersionLock(root, agentId, async () => {
+    if (fusionSnapshot(root, agentId) !== preview.snapshot) throw new RpcError('conflict', '主线或特性已变化，请重新预览')
+    const sources = fusionSourcesCurrent(root, plan)
+    const file = changePath(root, target), before = readText(file), change = readYamlMap(root, file)
+    const existing = Array.isArray(change.fusion_sources) ? change.fusion_sources as JsonMap[] : []
+    writeYamlMap(file, { ...change, features: plan.features,
+      fusion_sources: [...existing.filter(source => !sources.some(item => item.experiment_id === source.experiment_id)), ...sources],
+      creation: { status: 'integrating', target_experiment_id: target, confirmed_at: new Date().toISOString(), research_question: preview.value.research_question, assistant_session_id: preview.value.assistant_session_id, plan, receipts: [] } })
+    const integrating = readText(file)
+    const applyingSnapshot = fusionSnapshot(root, agentId)
+    try {
+      const applied = await applyEdit(root, { experiment_id: target, edits: plan.edits }, undefined, () => {
+        if (fusionSnapshot(root, agentId) !== applyingSnapshot || evaluationDigest(root, agentId, plan.evaluation_case_ids) !== plan.evaluation_sha256) throw new RpcError('conflict', '保存期间主线、来源或评测口径已变化，请重新预览')
+      })
+      if (!applied.ok) { if (readText(file) === integrating) atomicWrite(file, before); return applied }
+      return ok({ experiment_id: target, mainline_id: target, candidate_sha256: candidateDigest(root, target), creation_status: 'integrating', note: '资产已合入同号现有 m；必须对该 m 独立构建、实际装载及验收。' })
+    } catch (error) { if (readText(file) === integrating) atomicWrite(file, before); throw error }
+  })
   const created = await createExperiment(root, preview.payload)
   if (!created.ok) return created
   const experimentId = String(created.value.experiment_id)
@@ -790,6 +821,7 @@ function fusionStatus(root: string, body: JsonMap) {
 
 async function fusionVerify(root: string, body: JsonMap, signal?: AbortSignal) {
   const id = experimentIdField(body)
+  assertVersionEditable(root, id)
   const exp = experimentInfo(root, id)
   const creation = requireObject(exp.change.creation)
   const plan = creation.plan as unknown as FusionPlan
@@ -849,14 +881,54 @@ async function fusionVerify(root: string, body: JsonMap, signal?: AbortSignal) {
   const latest = requireObject(fresh.creation)
   if (JSON.stringify(latest.plan) !== JSON.stringify(creation.plan) || sha256(JSON.stringify(catalog(root).parsed.sources?.[id] ?? null)) !== sourceBefore || evaluationDigest(root, exp.agent_id, plan.evaluation_case_ids) !== plan.evaluation_sha256) throw new RpcError('conflict', '验证期间确认方案、来源配置或已选评测口径已变化')
   const receipt = { check_id: check.id, kind: check.kind, candidate_sha256: after, source_sha256: sha256(JSON.stringify(catalog(root).parsed.sources?.[id] ?? null)), evaluation_sha256: plan.evaluation_sha256, verified_at: new Date().toISOString(), evidence }
+  assertVersionEditable(root, id)
   const receipts = (Array.isArray(latest.receipts) ? latest.receipts as JsonMap[] : []).filter(item => item.check_id !== check.id)
   writeYamlMap(changePath(root, id), { ...fresh, creation: { ...latest, receipts: [...receipts, receipt] } })
   return ok({ experiment_id: id, receipt, candidate_sha256: after })
 }
 
-function fusionFinalize(root: string, body: JsonMap) {
+async function fusionFinalize(root: string, body: JsonMap) {
+  const exp = experimentInfo(root, experimentIdField(body))
+  return withVersionLock(root, exp.agent_id, () => finalizeFusionVersion(root, body))
+}
+
+function retireMergedFeatures(root: string, id: string, plan: FusionPlan, complete: () => void) {
+  const agent = VERSION_ID.exec(id)![1]!
+  const rows = plan.sources.filter(source => source.decision === 'inherit' && versionRole(source.experiment_id) === 'f').map(source => {
+    const file = changePath(root, source.experiment_id), before = readText(file), change = readYamlMap(root, file)
+    if (change.assets_retired) return null
+    if (VERSION_ID.exec(source.experiment_id)?.[2] !== VERSION_ID.exec(id)?.[2]
+      || candidateDigest(root, source.experiment_id) !== gitCandidateDigest(root, source.experiment_id, source.ref)) throw new RpcError('conflict', '清理前须固定当前特性完整源码，且须与已合并来源一致')
+    return { ...source, file, before, change }
+  }).filter((row): row is NonNullable<typeof row> => row !== null)
+  const dependencies = versionInstanceDependencies(root, rows.map(row => row.experiment_id))
+  const manifest = readYamlMap(root, repoPath(root, `agents/${agent}/manifest.yaml`))
+  if (dependencies.length || rows.some(row => row.experiment_id === manifest.active_experiment)) throw new RpcError('instance_dependency', '清理前先解除特性的实例绑定与启用依赖；本入口不改变实例实际加载', { dependencies })
+  const staging = workspaceLocalPath(root, 'version-governance')
+  mkdirSync(staging, { recursive: true })
+  const temporary = mkdtempSync(join(staging, 'retire-')), moved: typeof rows = []
+  let completed = false
+  try {
+    for (const row of rows) {
+      renameSync(repoPath(root, `evolution/experiments/${row.experiment_id}/candidate`), join(temporary, row.experiment_id)); moved.push(row)
+      atomicWrite(row.file, dumpYaml({ ...row.change, assets_retired: true, archived_ref: row.ref, retired_into: id }, { lineWidth: -1, noRefs: true }))
+    }
+    complete()
+    completed = true
+  } catch (error) {
+    for (const row of moved.reverse()) {
+      atomicWrite(row.file, row.before)
+      renameSync(join(temporary, row.experiment_id), repoPath(root, `evolution/experiments/${row.experiment_id}/candidate`))
+    }
+    throw error
+  } finally { if (completed || !readdirSync(temporary).length) rmSync(temporary, { recursive: true, force: true }) }
+  return rows.map(row => row.experiment_id)
+}
+
+async function finalizeFusionVersion(root: string, body: JsonMap) {
   const id = experimentIdField(body)
   const exp = experimentInfo(root, id)
+  assertVersionEditable(root, id)
   const creation = requireObject(exp.change.creation)
   const plan = creation.plan as unknown as FusionPlan
   if (evaluationDigest(root, exp.agent_id, plan.evaluation_case_ids) !== plan.evaluation_sha256) throw new RpcError('evaluation_conflict', '约定评测口径已变化，旧 Run 不能证明新口径通过')
@@ -872,8 +944,16 @@ function fusionFinalize(root: string, body: JsonMap) {
   if (missing.length) throw new RpcError('verification_incomplete', '构建、实际装载或约定能力尚未完成验证', { missing_checks: missing.map(check => check.id) })
   commandJson(root, [VALIDATE_EXPERIMENT, `evolution/experiments/${id}`])
   commandJson(root, [SOURCE_CONTRACT, '--source', `experiment:${id}`])
-  writeYamlMap(changePath(root, id), { ...exp.change, creation: { ...creation, status: 'completed', completed_at: new Date().toISOString(), candidate_sha256: digest, source_sha256: sourceHash } })
-  return ok({ experiment_id: id, creation_status: 'completed', candidate_sha256: digest })
+  const completedAt = new Date().toISOString()
+  const fusionSources = Array.isArray(exp.change.fusion_sources) ? exp.change.fusion_sources as JsonMap[] : []
+  const complete = () => writeYamlMap(changePath(root, id), { ...exp.change,
+    ...(creation.target_experiment_id === id ? { fusion_sources: fusionSources.map(source => plan.sources.some(item => item.decision === 'inherit' && item.experiment_id === source.experiment_id && item.ref === source.ref)
+      ? { ...source, merged_at: completedAt, verified_mainline_sha256: digest } : source) } : {}),
+    creation: { ...creation, status: 'completed', completed_at: completedAt, candidate_sha256: digest, source_sha256: sourceHash } })
+  if (body.cleanup_features !== undefined && typeof body.cleanup_features !== 'boolean') throw new RpcError('invalid_request', 'cleanup_features 必须为布尔值')
+  if (body.cleanup_features && (body.confirmed !== true || creation.target_experiment_id !== id)) throw new RpcError('confirmation_required', '仅同号 m 独立验收后可明确确认清理对应特性')
+  const retired = body.cleanup_features ? retireMergedFeatures(root, id, plan, complete) : (complete(), [])
+  return ok({ experiment_id: id, creation_status: 'completed', candidate_sha256: digest, retired_features: retired, ...(creation.target_experiment_id === id ? { mainline_id: id } : {}) })
 }
 
 async function detail(root: string, payload: JsonMap, signal?: AbortSignal) {
@@ -881,9 +961,10 @@ async function detail(root: string, payload: JsonMap, signal?: AbortSignal) {
   const manifest = readYamlMap(root, repoPath(root, `agents/${agentId}/manifest.yaml`))
   const allVersions = listExperiments(root, agentId).sort((left, right) => right.id.localeCompare(left.id, 'en', { numeric: true }))
   const versions = allVersions.filter(item => item.is_current)
+  const governance = versionGovernance(root, agentId)
   const explicitExperiment = optionalString(payload, 'experiment_id')
   const activeExperiment = typeof manifest.active_experiment === 'string' ? manifest.active_experiment : undefined
-  const rawExperimentId = explicitExperiment ?? activeExperiment ?? versions[0]?.id
+  const rawExperimentId = explicitExperiment ?? governance.mainline_id ?? activeExperiment ?? versions[0]?.id
   const experimentId = rawExperimentId ? experimentIdValue(rawExperimentId) : undefined
   if (!experimentId) throw new RpcError('invalid_request', '未指定 experiment_id，manifest 也没有 active_experiment')
   const exp = experimentInfo(root, experimentId)
@@ -901,25 +982,33 @@ async function detail(root: string, payload: JsonMap, signal?: AbortSignal) {
   let derivation: JsonMap = variant
     ? { parent_experiment_id: experimentId, parent_ref: null, is_variant: true, derivable: false, reason: 'variant', note: '变体不能作为新版本的继承来源。' }
     : { parent_experiment_id: experimentId, parent_ref: null, is_variant: false, derivable: true, note: '业务版本可作为继承来源，但当前提交尚不能恢复所选版本，请先固定完整来源；baseline_ref 是该版本的祖先，不能代替所选版本。' }
-  if (commit && !variant) try {
-    validateGitParent(root, agentId, `git:${commit}`, experimentId)
-    const fixedDigest = gitCandidateDigest(root, experimentId, `git:${commit}`)
-    if (fixedDigest && fixedDigest === candidateDigest(root, experimentId)) derivation = { parent_experiment_id: experimentId, parent_ref: `git:${commit}`, is_variant: false, derivable: true, note: '所选 Candidate 与固定提交一致，派生前用 assets/read-fixed 核对；baseline_ref/experiment.change.parent_ref 指向该版本的祖先。' }
+  const derivationRef = typeof exp.change.archived_ref === 'string' ? exp.change.archived_ref : commit ? `git:${commit}` : null
+  if (derivationRef && !variant) try {
+    validateGitParent(root, agentId, derivationRef, experimentId)
+    const fixedDigest = gitCandidateDigest(root, experimentId, derivationRef)
+    if ((exp.change.current_version_id || exp.change.assets_retired) && fixedDigest) derivation = { parent_experiment_id: experimentId, parent_ref: derivationRef, is_variant: false, derivable: true, note: '当前资产已迁移或清理，使用固定来源派生；历史 Run 保留原路径。' }
+    else if (fixedDigest && fixedDigest === candidateDigest(root, experimentId)) derivation = { parent_experiment_id: experimentId, parent_ref: derivationRef, is_variant: false, derivable: true, note: '所选 Candidate 与固定提交一致，派生前用 assets/read-fixed 核对；baseline_ref/experiment.change.parent_ref 指向该版本的祖先。' }
     else if (fixedDigest) derivation.note = '所选 Candidate 有未提交改动，请先固定当前 Candidate；不能用 HEAD 的旧资产或祖先提交冒充当前版本。'
   } catch { /* 新建但尚未提交的版本不能冒用其祖先提交派生。 */ }
+  if (!variant) try { allocateVersion(root, agentId, experimentId) }
+  catch (error) { derivation = { ...derivation, derivable: false, parent_ref: null, note: (error as Error).message } }
   let readableCandidateDigest: string | null = null
   try { if (existsSync(repoPath(root, `evolution/experiments/${experimentId}/candidate`))) readableCandidateDigest = candidateDigest(root, experimentId) }
   catch (error) { if (!(error instanceof RpcError && error.code === 'path_rejected')) throw error }
+  let governanceDigest: string | null = null
+  try { governanceDigest = governanceSnapshot(root, agentId) } catch { /* 无法固定的资产仍允许只读清点；创建和合并继续严格核对。 */ }
   return ok({
     agent: { id: agentId, name: agentDisplayName(root, experimentId) ?? agentId, manifest, path: `agents/${agentId}` },
     experiment: exp,
+    version_governance: { ...versionAccess(root, experimentId), managed: governance.managed, current_generation: governance.generation, snapshot_sha256: governanceDigest,
+      unresolved_features: governance.managed ? featureDispositionsPending(root, agentId) : [] },
     current_variant_id: exp.current_variant_id,
     is_current: exp.is_current,
-    historical_versions: allVersions.filter(item => !item.is_current).map(item => ({ id: item.id, current_variant_id: item.current_variant_id, is_current: false, is_variant: true, derivable: false })),
+    historical_versions: allVersions.filter(item => !item.is_current).map(item => ({ id: item.id, current_variant_id: item.current_variant_id, current_version_id: item.change.current_version_id ?? null, is_current: false, is_variant: isVariantIdentity(item.id, item.change), derivable: !isVariantIdentity(item.id, item.change) })),
     change_sha256: exp.change_sha256,
     candidate_sha256: readableCandidateDigest,
-    selection: { basis: explicitExperiment ? 'explicit' : activeExperiment ? 'active_experiment' : 'latest_experiment', experiment_id: experimentId },
-    versions: versions.map(item => ({ id: item.id, is_current: item.is_current, current_variant_id: item.current_variant_id, is_variant: isVariantIdentity(item.id, item.change), derivable: !isVariantIdentity(item.id, item.change), status: item.status, baseline_ref: item.baseline_ref, ...(item.error ? { error: item.error } : {}) })),
+    selection: { basis: explicitExperiment ? 'explicit' : governance.mainline_id ? 'current_mainline' : activeExperiment ? 'active_experiment' : 'latest_experiment', experiment_id: experimentId },
+    versions: versions.map(item => ({ id: item.id, governance: versionAccess(root, item.id), is_current: item.is_current, current_variant_id: item.current_variant_id, is_variant: isVariantIdentity(item.id, item.change), derivable: !isVariantIdentity(item.id, item.change), status: item.status, baseline_ref: item.baseline_ref, ...(item.error ? { error: item.error } : {}) })),
     baseline: { ref: exp.baseline_ref, parent_experiment_id: exp.change.parent_experiment_id ?? null, source: exp.baseline_ref ? 'change.yaml' : 'unknown' },
     fusion: declaredFusion(exp.change),
     related_references: relatedRefs(root, experimentId),
@@ -970,6 +1059,10 @@ async function copyGitCandidate(root: string, commit: string, parentExperiment: 
 
 
 async function createExperiment(root: string, payload: JsonMap, variant?: ComputeVariantCreation) {
+  return withVersionLock(root, agentIdField(payload), () => createVersion(root, payload, variant))
+}
+
+async function createVersion(root: string, payload: JsonMap, variant?: ComputeVariantCreation) {
   if (!variant && isVariantIdentity('', payload)) throw new RpcError('invalid_request', '变体只能通过 compute-variants/create 创建')
   const agentId = agentIdField(payload)
   const parentRef = stringField(payload, 'parent_ref')
@@ -982,16 +1075,18 @@ async function createExperiment(root: string, payload: JsonMap, variant?: Comput
   const requestedNumber = payload.version_number
   if (requestedNumber !== undefined && (typeof requestedNumber !== 'number' || !Number.isInteger(requestedNumber) || requestedNumber < 1 || requestedNumber > 999)) throw new RpcError('invalid_request', 'version_number 必须是 1–999 的整数')
   const nextNumber = requestedNumber ?? Math.max(0, ...listExperiments(root, agentId).filter(item => item.id.startsWith(`${prefix}-`)).map(item => Number(EXP_ID.exec(item.id)?.[2] ?? 0))) + 1
-  if (nextNumber > 999) throw new RpcError('invalid_request', '版本编号已达 999，请用 version_number 指定编号并生成新后缀')
+  if (variant && nextNumber > 999) throw new RpcError('invalid_request', '变体版本编号已达 999')
   let experimentId = ''
   do {
-    experimentId = `${prefix}-${agentId}-${String(nextNumber).padStart(3, '0')}-r${randomBytes(6).toString('hex')}`
+    experimentId = variant ? `${prefix}-${agentId}-${String(nextNumber).padStart(3, '0')}-r${randomBytes(6).toString('hex')}` : allocateVersion(root, agentId, parentExperiment, requestedNumber, payload)
   } while (existsSync(join(root, 'evolution/experiments', experimentId)))
 
   const experimentRoot = repoPath(root, `evolution/experiments/${experimentId}`)
   let parentSource: JsonMap
   let dependencyReuse: { reused: JsonMap[]; skipped: JsonMap[] } = { reused: [], skipped: [] }
   let created = false
+  const snapshot = variant ? null : governanceSnapshot(root, agentId)
+  if (!variant && payload.expected_governance_sha256 !== undefined && payload.expected_governance_sha256 !== snapshot) throw new RpcError('conflict', '当前代或特性已变化，请重新核对后创建')
   try {
     mkdirSync(dirname(experimentRoot), { recursive: true })
     mkdirSync(experimentRoot)
@@ -1000,6 +1095,7 @@ async function createExperiment(root: string, payload: JsonMap, variant?: Comput
       const parent = validateGitParent(root, agentId, parentRef, parentExperiment)
       parentSource = parent.source
       dependencyReuse = await copyGitCandidate(root, parent.commit, parentExperiment, experimentRoot)
+      if (!variant && governanceSnapshot(root, agentId, experimentId) !== snapshot) throw new RpcError('conflict', '创建期间版本或来源已变化，请重新读取')
     } else if (parentRef.startsWith('release:')) {
       throw new RpcError('unsupported_parent', 'Release 来源尚未接入现有不可变 Release 装载格式')
     } else {
@@ -1015,6 +1111,7 @@ async function createExperiment(root: string, payload: JsonMap, variant?: Comput
       parent_experiment_id: parentExperiment,
       parent_ref: parentRef,
       status: 'active',
+      ...(!variant && payload.create_next_generation === true ? { feature_dispositions: featureDispositions(root, agentId, payload.feature_dispositions) } : {}),
       ...(variant ? { compute_variant: variant.plan, variant_kind: 'exploratory', variant_name: variant.name } : {}),
     })
     writeFileSync(join(experimentRoot, 'hypothesis.md'), `# ${experimentId}\n\n固定父版与继承来源见 [change.yaml](change.yaml)。\n\n研究问题：${researchQuestion}\n`)
@@ -1137,6 +1234,7 @@ function editLocations(root: string, payload: JsonMap) {
   const locations = edits(payload).map(edit => {
     const source = editablePath(root, payload, edit.path)
     const target = edit.moveTo ? editablePath(root, payload, edit.moveTo) : source
+    if ([source.rel, target.rel].some(rel => rel.startsWith(`evolution/experiments/${experimentIdField(payload)}/`))) assertVersionEditable(root, experimentIdField(payload))
     if (edit.content === null) {
       const candidate = `evolution/experiments/${experimentIdField(payload)}/candidate/`
       if (!source.rel.startsWith(candidate) || edit.moveTo) throw new RpcError('path_rejected', '删除仅限当前 Candidate 内的单个文件，不能同时移动')
@@ -1166,12 +1264,13 @@ function readEditable(root: string, payload: JsonMap) {
   const path = optionalString(payload, 'path')
   if (!path) return ok({ files: editableFiles(assetTree(root, experimentIdField(payload))) })
   const target = editablePath(root, payload, path)
-  if (!existsSync(target.file)) return ok({ path: target.rel, exists: false, kind: 'missing', editable: true, content: '', sha256: null })
+  const access = target.rel.startsWith(`evolution/experiments/${experimentIdField(payload)}/`) ? versionAccess(root, experimentIdField(payload)) : { editable: true, reason: '' }
+  if (!existsSync(target.file)) return ok({ path: target.rel, exists: false, kind: 'missing', ...access, content: '', sha256: null })
   const stat = lstatSync(target.file)
   if (stat.isDirectory()) return ok({ path: target.rel, kind: 'directory', editable: false })
   const value = readAssetText(target.file)
   return ok({ path: target.rel, exists: true, kind: value === null ? 'binary' : 'text', size: stat.size,
-    ...(value === null ? { editable: false, sha256: sha256(readFileSync(target.file)) } : assetText(target.rel, value)) })
+    ...(value === null ? { editable: false, sha256: sha256(readFileSync(target.file)) } : { ...assetText(target.rel, value), ...(!access.editable ? { editable: false, reason: access.reason } : {}) }) })
 }
 
 function readAssetText(file: string): string | null {
@@ -1272,7 +1371,7 @@ function loadEvaluationPreview(root: string, content: string) {
   return JSON.parse(run.stdout) as JsonMap
 }
 
-async function applyEdit(root: string, payload: JsonMap, signal?: AbortSignal) {
+async function applyEdit(root: string, payload: JsonMap, signal?: AbortSignal, beforeWrite?: () => void) {
   const resolved = editLocations(root, payload).map(({ edit, source, target }) => {
     const before = edit.content === null ? readFileSync(source.file) : editableText(source.file)
     const beforeText = typeof before === 'string' ? before : readAssetText(source.file)
@@ -1290,6 +1389,8 @@ async function applyEdit(root: string, payload: JsonMap, signal?: AbortSignal) {
   if (signal?.aborted) throw new RpcError('aborted', '草稿保存已取消')
   if (payload.expected_candidate_sha256 !== undefined && candidateDigest(root, experimentIdField(payload)) !== payload.expected_candidate_sha256) throw new RpcError('conflict', 'Candidate 已变化，请重新预览')
   if (payload.expected_change_sha256 !== undefined && sha256(readText(changePath(root, experimentIdField(payload)))) !== payload.expected_change_sha256) throw new RpcError('conflict', '研究计划已变化，请重新预览')
+  editLocations(root, payload)
+  beforeWrite?.()
   // dry 期间原文件可能变化；校验全部哈希后同步写入，避免异步交错。
   for (const item of resolved) {
     assertNoSymlinkPath(root, item.file)
@@ -1562,6 +1663,7 @@ async function readRunEvidence(root: string, payload: JsonMap, signal?: AbortSig
 
 function decisionChange(root: string, payload: JsonMap) {
   const id = experimentIdField(payload)
+  assertVersionEditable(root, id)
   if (payload.status !== undefined && (typeof payload.status !== 'string' || !['active', 'completed'].includes(payload.status))) throw new RpcError('invalid_request', 'status 必须是 active 或 completed')
   if (payload.outcome !== undefined && (typeof payload.outcome !== 'string' || !['adopt', 'continue', 'reject', 'inconclusive'].includes(payload.outcome))) throw new RpcError('invalid_request', 'outcome 必须是 adopt、continue、reject 或 inconclusive')
   const expectedChange = stringField(payload, 'expected_change_sha256')
@@ -1570,6 +1672,15 @@ function decisionChange(root: string, payload: JsonMap) {
   const before = readFileSync(file, 'utf8')
   if (sha256(before) !== expectedChange) throw new RpcError('conflict', '研究版本状态已变化，请重新读取后确认')
   const current = readYamlMap(root, file, before)
+  if (payload.outcome === 'adopt' && versionRole(id) === 'f') {
+    const mainline = versionGovernance(root, String(current.agent_id)).mainline_id
+    const main = mainline ? readYamlMap(root, changePath(root, mainline)) : {}
+    const sources = Array.isArray(main.fusion_sources) ? main.fusion_sources as JsonMap[] : []
+    if (!mainline || !sources.some(source => source.experiment_id === id && source.merged_at && source.candidate_sha256 === candidateDigest(root, id)
+      && source.verified_mainline_sha256 === candidateDigest(root, mainline))) throw new RpcError('verification_incomplete', '先将特性资产融合到同号 m 并独立验收，再登记采纳')
+  }
+  if (payload.outcome === 'adopt' && versionRole(id) === 'm' && (current.creation as JsonMap | undefined)?.target_experiment_id === id
+    && creationView(root, id, current)?.status !== 'completed') throw new RpcError('verification_incomplete', '合并后的 m 须完成自己的构建、实际装载与能力验证，再登记采纳')
   const updated = { ...current, ...(payload.status === undefined ? {} : { status: payload.status }), ...(payload.outcome === undefined ? {} : { outcome: payload.outcome }) }
   if (updated.status === 'completed' && !['adopt', 'continue', 'reject', 'inconclusive'].includes(String(updated.outcome))) throw new RpcError('invalid_request', '完成研究时必须同时选择有效 outcome')
   const after = dumpYaml(updated, { forceQuotes: true, quotingType: '"', lineWidth: -1, noRefs: true })
@@ -1676,6 +1787,7 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
     if (endpoint.startsWith('deployment/') && deployment) return deployment(endpoint.slice('deployment/'.length), payload, signal, peer)
     try {
       const body = payload === undefined ? {} : requireObject(payload)
+      if (['assets/build', 'assets/dependencies/prepare'].includes(endpoint)) assertVersionEditable(root, experimentIdField(body))
       if (endpoint.startsWith('migrations/')) return await migrations(endpoint.slice('migrations/'.length) as any, body, signal)
       if (endpoint === 'assets/build-preview' || endpoint === 'assets/build') {
         const result = await assetBuild(endpoint === 'assets/build-preview' ? 'preview' : 'build', body, signal)
@@ -1699,6 +1811,12 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
           'details' in result.error ? result.error.details as JsonMap : undefined))
       }
       switch (endpoint) {
+        case 'versions/migration-plan': return ok(version027MigrationPreview(root))
+        case 'versions/migration-apply': {
+          const result = await applyVersion027Migration(root, body)
+          onChange?.()
+          return ok(result)
+        }
         case 'research/read-reference': return ok(readResearchReference(root, body.topic))
         case 'research/validate': return ok(await validateResearch(root, experimentIdField(body), signal))
         case 'legacy/inspect': return ok(await inspectLegacy(root, body.path, signal))
@@ -1719,12 +1837,12 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
         case 'features/preview': return featurePreview(root, body, previews)
         case 'features/proposal': return latestProposal(body, previews, 'features')
         case 'features/apply': return featureApply(root, body, previews)
-        case 'fusion/preview': return fusionPreview(root, body, previews)
+        case 'fusion/preview': return await fusionPreview(root, body, previews)
         case 'fusion/proposal': return latestProposal(body, previews, 'fusion')
         case 'fusion/confirm': return await fusionConfirm(root, body, previews)
         case 'fusion/status': return fusionStatus(root, body)
         case 'fusion/verify': return await fusionVerify(root, body, signal)
-        case 'fusion/finalize': return fusionFinalize(root, body)
+        case 'fusion/finalize': return await fusionFinalize(root, body)
         case 'edit/read': return readEditable(root, body)
         case 'edit/preview': return await previewEdit(root, body, signal)
         case 'edit/apply': return await applyEdit(root, body, signal)

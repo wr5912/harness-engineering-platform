@@ -104,7 +104,7 @@ function agentLabel(id: string, rows: IdentityRows | null) {
   return rows!.agents.some(agent => agent.id !== id && agent.name?.trim() === name) ? `${name}（${id}）` : name
 }
 
-function versionNumber(id: string) { return /-(\d{3})(?:-r[0-9a-f]{12})?$/.exec(id)?.[1] }
+function versionNumber(id: string) { return /-(\d{3}(?:-[mf])?)(?:-r[0-9a-f]{12})?$/.exec(id)?.[1] }
 
 function versionLabel(id: string, agentId: string | undefined, rows: IdentityRows | null) {
   const version = rows?.experiments.find(item => item.id === id && (!agentId || item.agent_id === agentId))

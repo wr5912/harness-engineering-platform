@@ -28,7 +28,7 @@ function deferred() { let resolve; const promise = new Promise(done => { resolve
 test('新建智能体先预览，冲突保留填写，成功显示独立研究版本且不自动启动', async () => {
   const calls = [], created = [], selected = []
   let conflict = true
-  const receipt = { agent_id: 'daily-assistant', experiment_id: 'EXP-daily-assistant-001-r123456789abc', name: '日常助手', note: '角色已创建，尚未启动。', started: false }
+  const receipt = { agent_id: 'daily-assistant', experiment_id: 'EXP-daily-assistant-001-m-r123456789abc', name: '日常助手', note: '角色已创建，尚未启动。', started: false }
   const ui = await component('CreateAgentDialog', 'create-agent-client.tsx', { active: true, onClose() {}, onCreated: value => created.push(value), onSelect: value => selected.push(value), rpc: { async call(channel, endpoint, payload) { calls.push({ endpoint, payload }); return conflict ? { ok: false, error: { code: 'conflict', message: 'ID 已存在' } } : { ok: true, value: receipt } } } })
   const fill = () => { const inputs = ui.nodes().filter(node => node.type === 'input'), areas = ui.nodes().filter(node => node.type === 'textarea'); inputs[0].props.onChange({ target: { value: 'daily-assistant' } }); inputs[1].props.onChange({ target: { value: '日常助手' } }); areas[0].props.onChange({ target: { value: '基本事项整理' } }); areas[1].props.onChange({ target: { value: '请只根据用户给出的基本事项整理待办。' } }); ui.render() }
   fill()
@@ -44,7 +44,7 @@ test('新建智能体先预览，冲突保留填写，成功显示独立研究�
   ui.nodes().find(node => node.type === 'form').props.onSubmit({ preventDefault() {} }); await ui.settle()
   assert.equal(created.length, 1)
   assert.equal(calls.every(call => call.endpoint === 'agents/new'), true)
-  assert.match(ui.text(), /EXP-daily-assistant-001-r123456789abc/)
+  assert.match(ui.text(), /EXP-daily-assistant-001-m-r123456789abc/)
   ui.button('查看新智能体').props.onClick()
   assert.equal(selected[0].agent_id, 'daily-assistant')
 })

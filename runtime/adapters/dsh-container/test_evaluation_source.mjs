@@ -17,10 +17,11 @@ function command(root, args) {
   const result = spawnSync('git', ['-c', 'core.hooksPath=/dev/null', ...args], { cwd: root, encoding: 'utf8' })
   assert.equal(result.status, 0, result.stderr); return result.stdout.trim()
 }
-function fixture(t) {
+function fixture(t, id = 'EXP-alpha-001-raaaaaaaaaaaa') {
   const root = mkdtempSync(join(tmpdir(), 'eval-source-')), candidate = join(root, `evolution/experiments/${id}/candidate`)
   t.after(() => rmSync(root, { recursive: true, force: true }))
   write(root, 'workspace.json', JSON.stringify({ schemaVersion: 1, id: 'workspace-evaluation-fixture', legacyRoots: [] }))
+  write(root, 'config/business-model-default.json', JSON.stringify({ schema_version: '1.2', default: { provider: 'fixture-provider', model: 'fixture-model' } }))
   write(root, '.gitignore', 'node_modules/\n.local/\n')
   write(root, 'agents/alpha/manifest.yaml', `schema_version: '1.0'\nagent_id: alpha\nactive_experiment: ${id}\n`)
   write(root, 'agents/alpha/evaluation.md', '# 评测\n\n#### U-BASIC-001 固定输入\n\n**用户输入**\n\n> 原始问题\n\n**预期**\n\n原始回答\n')
@@ -36,6 +37,16 @@ function fixture(t) {
   return { root, candidate, ref: 'git:' + command(root, ['rev-parse', 'HEAD']) }
 }
 const mapping = { schema_version: 1, mode: 'mock', connections: [{ server_id: 'readonly', original_url: 'http://old.test/mcp', url: 'http://127.0.0.1:53001/mcp/', enabled: true }] }
+
+test('m/f 固定评测来源分别恢复各自 Candidate，不借用同号另一角色', t => {
+  for (const role of ['m', 'f']) {
+    const identity = `EXP-alpha-027-${role}-raaaaaaaaaaaa`, f = fixture(t, identity)
+    write(f.candidate, 'dsh/workspace/AGENTS.md', '当前未提交角色\n')
+    const fixed = materializeEvaluationSource(f.root, identity, f.ref)
+    assert.equal(readFileSync(join(fixed.root, `evolution/experiments/${identity}/candidate/dsh/workspace/AGENTS.md`), 'utf8'), '原角色\n')
+    assert.equal(fixed.agent_id, 'alpha')
+  }
+})
 
 test('固定来源从同一 Git 提交恢复角色与 Case，当前工作树和分支不改写', t => {
   const f = fixture(t), before = command(f.root, ['rev-parse', 'HEAD'])

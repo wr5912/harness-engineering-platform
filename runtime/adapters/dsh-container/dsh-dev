@@ -504,7 +504,7 @@ def create_harness(agent_id: str, *, repo: Path = REPO, sources: Path | None = N
     sources = sources if sources is not None else source_catalog(repo)
     agent_dir = repo / "agents" / agent_id
     for _ in range(5):
-        experiment_id = f"EXP-{agent_id}-001-r{secrets.token_hex(6)}"
+        experiment_id = f"EXP-{agent_id}-001-m-r{secrets.token_hex(6)}"
         experiment_dir = repo / "evolution/experiments" / experiment_id
         if not experiment_dir.exists():
             break

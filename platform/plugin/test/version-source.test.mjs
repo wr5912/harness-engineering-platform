@@ -6,10 +6,34 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { versionSource, versionSources } from '../src/agents/version-source.ts'
 import { assetText } from '../src/agents/asset-text.ts'
-import { VERSION_ID, isVariantIdentity } from '../src/version-id.ts'
+import { VERSION_ID, isVariantIdentity, validVersionId, versionRole } from '../src/version-id.ts'
 
 const id = 'EXP-test-agent-001'
 const manifest = 'loadable_assets:\n  workspace: dsh/workspace\n  preset_root: dsh/presets\n  managed_root: dsh/managed\n  preset_id: test-agent\n  profile_patch: dsh/managed/test.patch.yml\ncredential_environment_keys: [TEST_TOKEN]\n'
+test('m/f 角色共用当前与固定来源解析，VAR 及旧 Agent 编号合同保持不变', t => {
+  const root = mkdtempSync(join(tmpdir(), 'version-roles-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  for (const role of ['m', 'f']) {
+    const identity = `EXP-test-agent-027-${role}-r0123456789ab`, directory = join(root, 'evolution/experiments', identity)
+    assert.equal(validVersionId(identity), true)
+    assert.equal(versionRole(identity), role)
+    assert.equal(VERSION_ID.exec(identity)[1], 'test-agent')
+    mkdirSync(join(directory, 'candidate'), { recursive: true })
+    writeFileSync(join(directory, 'change.yaml'), `agent_id: test-agent\nexperiment_id: ${identity}\n`)
+    writeFileSync(join(directory, 'candidate/harness.yaml'), manifest)
+    assert.equal(versionSource(root, identity).agent_id, 'test-agent')
+  }
+  for (const identity of ['EXP-test-agent-001', 'EXP-test-agent-002-r0123456789ab', 'VAR-test-agent-003-r0123456789ab', 'VAR-test-027-f-agent-003-r0123456789ab']) assert.equal(validVersionId(identity), true)
+  for (const identity of ['VAR-test-agent-003-m-r0123456789ab', 'VAR-test-agent-003-f-r0123456789ab', 'EXP-test-agent-027-m', 'EXP-test-agent-027-x-r0123456789ab']) assert.equal(validVersionId(identity), false)
+  const git = args => {
+    const value = spawnSync('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgSign=false', ...args], { cwd: root, encoding: 'utf8' })
+    assert.equal(value.status, 0, value.stderr); return value.stdout.trim()
+  }
+  git(['init']); git(['config', 'user.name', 'Fixture']); git(['config', 'user.email', 'fixture@example.invalid'])
+  git(['add', '.']); git(['commit', '-m', 'fixed role sources'])
+  const ref = git(['rev-parse', 'HEAD'])
+  for (const role of ['m', 'f']) assert.equal(versionSource(root, `EXP-test-agent-027-${role}-r0123456789ab`, ref).patch, 'test.patch.yml')
+})
 test('EXP与VAR共享来源读取并保留Agent捕获，VAR必须声明变体计划', t => {
   const root = mkdtempSync(join(tmpdir(), 'variant-source-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))

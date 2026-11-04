@@ -5,6 +5,7 @@ import { load as loadYaml } from 'js-yaml'
 import { RunFileError, readRunEvidenceFile, redactRunText } from '../agents/run-files.ts'
 import { DECISION_TRACE_DECODER_VERSION, buildDecisionSlices, loadRunTrace, listRunTraceSources, type DecisionSlice, type TraceSourceBundle } from './trace.ts'
 import { decisionSourceGroup } from './decision-source-group.ts'
+import { VERSION_ID } from '../version-id.ts'
 import { DECISION_EXTRACTION_CONTRACT, DECISION_SPLITS, decisionText, validateDecisionInputQuestion, validateDecisionInputEvidence, isDecisionTargetReviewed, validateDecisionLabel, validateDecisionQuestions, validateDecisionTargets, validateDecisionTask, type DecisionQuestion, type DecisionReview, type DecisionTarget, type DecisionTask } from './decision-dataset-contract.ts'
 
 type MapValue = Record<string, any>
@@ -52,9 +53,10 @@ async function sourceIdentity(root: string, runId: string, signal?: AbortSignal,
     } catch (error) { if (!(error instanceof RunFileError) || error.code !== 'not_found') throw error }
   }
   if (!manifests.length) fail('缺少 Run 身份文件')
-  const match = /^evolution\/experiments\/((?:EXP|VAR)-([a-z0-9]+(?:-[a-z0-9]+)*)-\d{3}(?:-r[0-9a-f]{12})?)\/runs\/([^/]+)\//.exec(manifests[0]!.path)
-  if (!match || match[3] !== runId) fail('Run 来源目录身份无效')
-  const identity: SourceIdentity = { agent_id: match[2]!, experiment_id: match[1]!, run_id: runId }
+  const match = /^evolution\/experiments\/([^/]+)\/runs\/([^/]+)\//.exec(manifests[0]!.path)
+  const version = match && VERSION_ID.exec(match[1]!)
+  if (!match || !version || match[2] !== runId) fail('Run 来源目录身份无效')
+  const identity: SourceIdentity = { agent_id: version[1]!, experiment_id: match[1]!, run_id: runId }
   for (const manifest of manifests) {
     if (manifest.value.run_id !== runId || manifest.value.agent_id !== undefined && manifest.value.agent_id !== identity.agent_id
       || manifest.value.experiment_id !== undefined && manifest.value.experiment_id !== identity.experiment_id) fail('Run 清单与实际 Agent、版本或 Run 来源身份不一致', 'conflict')

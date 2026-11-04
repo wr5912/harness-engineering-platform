@@ -189,7 +189,7 @@ test('新建向导复用真实 CLI 并保存角色、标准来源与用例，不
   try {
     const business = { id: 'U-CHAT-GREET', title: '整理事项', inputs: '整理用户给定的两件事项', expected_behavior: '只依据给定信息列出两件事项', fast: true }
     const value = success(await createAgent(root, { ...input, evaluation_cases: [business] }))
-    assert.match(value.experiment_id, /^EXP-daily-assistant-001-r[0-9a-f]{12}$/)
+    assert.match(value.experiment_id, /^EXP-daily-assistant-001-m-r[0-9a-f]{12}$/)
     assert.equal(value.started, false)
     const experiment = join(root, 'evolution/experiments', value.experiment_id)
     const role = readFileSync(join(experiment, 'candidate/dsh/workspace/AGENTS.md'), 'utf8')

@@ -27,7 +27,7 @@ export function materializeEvaluationSource(root: string, id: string, ref: strin
   const entries = git(root, ['ls-tree', '-rz', commit]).toString().split('\0').filter(Boolean).flatMap(row => {
     const match = /^(\d+) blob ([a-f0-9]+)\t([\s\S]+)$/.exec(row)
     if (!match || !fixed.has(match[3]) && !prefixes.some(prefix => match[3].startsWith(prefix))
-      && !new RegExp(`^evolution/experiments/(?:EXP|VAR)-${identity.agent_id}-[0-9]{3}(?:-r[0-9a-f]{12})?/change\\.yaml$`).test(match[3])) return []
+      && !new RegExp(`^evolution/experiments/(?:EXP|VAR)-${identity.agent_id}-[0-9]{3}(?:-[mf])?(?:-r[0-9a-f]{12})?/change\\.yaml$`).test(match[3])) return []
     const path = match[3]
     if (path.split('/').some(part => ['runs', '.git', '.local', 'node_modules', 'RuntimeHOME', 'sessions', 'cache', '__pycache__'].includes(part)) || path.endsWith('.llm-api-key')) return []
     if (!['100644', '100755'].includes(match[1])) throw new Error('固定评测来源不能包含链接或特殊文件')

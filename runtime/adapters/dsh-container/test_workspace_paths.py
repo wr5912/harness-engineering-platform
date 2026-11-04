@@ -17,7 +17,7 @@ class WorkspacePathsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / "workspace.json").write_text('{"schemaVersion":1,"id":"workspace-fixture"}')
-            identity = "VAR-example-agent-001-r0123456789ab"
+            identity = "VAR-example-027-f-agent-001-r0123456789ab"
             candidate = root / "evolution/experiments" / identity / "candidate"
             manifest = {"source_id": "experiment:" + identity,
                         "mounts": {"workspace": str(candidate / "dsh/workspace")}}
@@ -46,6 +46,19 @@ class WorkspacePathsTests(unittest.TestCase):
             self.assertTrue((root / "agents/workspace-fixture/manifest.yaml").is_file())
             self.assertFalse((root / "runtime").exists())
             self.assertFalse((root / ".agents").exists())
+
+    def test_role_versions_keep_precise_candidate_ownership(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "workspace.json").write_text('{"schemaVersion":1,"id":"workspace-fixture"}')
+            for role in ("m", "f"):
+                identity = f"EXP-example-agent-027-{role}-r0123456789ab"
+                candidate = root / "evolution/experiments" / identity / "candidate"
+                manifest = {"source_id": "experiment:" + identity,
+                            "mounts": {"workspace": str(candidate / "dsh/workspace")}}
+                self.assertTrue(instance_belongs_to_workspace(root, manifest))
+                manifest["mounts"]["workspace"] = str(root / "evolution/experiments/EXP-example-agent-026/candidate/dsh/workspace")
+                self.assertFalse(instance_belongs_to_workspace(root, manifest))
 
     def test_initialized_workspace_never_falls_back_to_legacy_catalog(self):
         with tempfile.TemporaryDirectory() as temporary:

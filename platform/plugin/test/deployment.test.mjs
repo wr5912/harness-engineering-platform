@@ -14,8 +14,8 @@ function withProgram(t, program) {
 }
 const signal = () => new AbortController().signal
 
-test('独立导出预览、异步打包、状态恢复与流式下载走真实进程，公开回执不包含凭据', async t => {
-  const f = fixture(t)
+for (const id of ['EXP-alpha-001', 'EXP-alpha-027-m-raaaaaaaaaaaa', 'EXP-alpha-027-f-rbbbbbbbbbbbb']) test(`独立导出 ${id} 的预览、异步打包、状态恢复与流式下载，公开回执不包含凭据`, async t => {
+  const f = fixture(t, 'amd64', id)
   withProgram(t, f.program)
   cpSync(f.resources, join(f.program, '.local/deploy-assets/amd64'), { recursive: true })
   const secret = 'private-deployment-fixture'
@@ -31,6 +31,7 @@ test('独立导出预览、异步打包、状态恢复与流式下载走真实�
   const accepted = await manager.handler('export', { ...input, expected_candidate_sha256: preview.value.candidateSha256 }, signal())
   assert.equal(accepted.ok, true, JSON.stringify(accepted.error))
   assert.equal(accepted.value.state, 'running')
+  assert.equal(accepted.value.experiment_id, id)
   let job
   for (let attempt = 0; attempt < 100; attempt++) {
     const status = await manager.handler('status', { job_id: accepted.value.id }, signal())

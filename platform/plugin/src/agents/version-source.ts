@@ -59,6 +59,7 @@ export function inheritedLoadableAssets(source: MapValue, parentId: string): Map
 /** 只读选定版本；固定父版的所有信息均来自同一提交。 */
 export function versionSource(root: string, id: string, commit?: string): MapValue {
   const change = versionIdentity(root, id, commit)
+  if (!commit && (change.current_version_id || change.assets_retired)) throw new Error(`当前资产已迁移或清理，请使用固定来源 ${change.archived_ref}${change.current_version_id ? `；当前资产为 ${change.current_version_id}` : ''}`)
   const base = `evolution/experiments/${id}`
   const read = (path: string, optional = false) => versionFile(root, path, commit, optional)
   const text = read(`${base}/candidate/harness.yaml`, true)
@@ -108,7 +109,11 @@ export function versionSources(root: string) {
   const sources: Record<string, MapValue> = {}, errors: Record<string, string> = {}
   if (existsSync(directory)) for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
     if (!VERSION_ID.test(entry.name)) continue
-    try { sources[entry.name] = versionSource(root, entry.name) }
+    try {
+      const identity = versionIdentity(root, entry.name)
+      if (identity.current_version_id || identity.assets_retired) continue
+      sources[entry.name] = versionSource(root, entry.name)
+    }
     catch (error) { errors[entry.name] = (error as Error).message }
   }
   return { sources, errors }

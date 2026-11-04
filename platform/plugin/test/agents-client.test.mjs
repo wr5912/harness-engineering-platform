@@ -19,7 +19,7 @@ function experiments() {
 }
 
 function detail(agentId = 'first-agent', experimentId = `EXP-${agentId}-002`) {
-  return { agent: { id: agentId, name: `名称 ${agentId}`, manifest: { description: '真实用途' } }, experiment: experiments().find(item => item.id === experimentId),
+  return { agent: { id: agentId, name: `名称 ${agentId}`, manifest: { description: '真实用途', active_experiment: `EXP-${agentId}-001` } }, experiment: experiments().find(item => item.id === experimentId),
     versions: experiments().filter(item => item.agent_id === agentId).reverse().map(item => ({ id: item.id, status: item.status, baseline_ref: item.change.baseline_ref })), baseline: { ref: 'none:first-experiment' }, fusion: {}, related_references: [],
     declared: { source_contract: {}, loadable_source: {} }, loaded_instance: { status: 'not_queried' }, features: [],
     repo_commit: 'c'.repeat(40), derivation: { parent_experiment_id: experimentId, parent_ref: `git:${'d'.repeat(40)}` },
@@ -591,6 +591,69 @@ test('新版本继承盘点仍交由现有 AI 融合流程，保留目标和当�
   assert.equal(ui.calls.some(call => call.endpoint === 'agents/versions/create'), false)
 })
 
+const roleMain = 'EXP-first-agent-027-m-r0123456789ab', roleFeature = 'EXP-first-agent-027-f-r123456789abc'
+function rolePage(id, { completed = false, intercept } = {}) {
+  const versions = [roleMain, roleFeature].map(id => ({ id, agent_id: 'first-agent', status: 'active', change: {} }))
+  return page({ target: { page: 'agents', agent_id: 'first-agent', experiment_id: id }, intercept(endpoint, payload) {
+    const overridden = intercept?.(endpoint, payload)
+    if (overridden !== undefined) return overridden
+    if (endpoint === 'agents/list') return { ok: true, value: { agents: [{ id: 'first-agent', name: '名称 first-agent', version_count: 2, active_experiment: roleFeature }], experiments: versions } }
+    if (endpoint === 'agents/detail') return { ok: true, value: { ...detail('first-agent', 'EXP-first-agent-001'),
+      agent: { id: 'first-agent', name: '名称 first-agent', manifest: { active_experiment: roleFeature } },
+      experiment: versions.find(row => row.id === payload.experiment_id) ?? versions[0], versions,
+      derivation: { parent_ref: `git:${'d'.repeat(40)}`, derivable: true },
+      version_governance: { managed: true, role: id === roleMain ? 'm' : 'f', current_generation: 27, mainline_id: roleMain, editable: true, unresolved_features: [roleFeature], snapshot_sha256: 'e'.repeat(64) },
+      ...(completed ? { creation: { status: 'completed' } } : {}),
+    } }
+  } })
+}
+
+test('明确创建下一代须逐项处置未合并 f，提交主线固定来源与治理摘要', async () => {
+  const ui = rolePage(roleMain, { intercept: endpoint => endpoint === 'agents/create' ? { ok: true, value: { experiment_id: roleMain } } : undefined })
+  await ui.settle(); ui.button('新建研究版本').props.onClick(); ui.render()
+  const operation = () => ui.nodes().find(node => node.type === 'select' && node.props.value === 'copy')
+  assert.ok(operation())
+  operation().props.onChange({ target: { value: 'next' } }); ui.render()
+  ui.nodes().find(node => node.type === 'textarea').props.onChange({ target: { value: '明确开启下一代研究' } }); ui.render()
+  assert.equal(ui.button('明确创建 028-m').props.disabled, true)
+  ui.nodes().find(node => node.type === 'select' && node.props.value === '').props.onChange({ target: { value: 'defer' } }); ui.render()
+  ui.nodes().find(node => node.type === 'fieldset').props.children[2].props.children[1].props.onChange({ target: { value: '保留固定来源，下一代重新比较' } }); ui.render()
+  assert.equal(ui.button('明确创建 028-m').props.disabled, false)
+  ui.button('明确创建 028-m').props.onClick(); await ui.settle()
+  const payload = ui.calls.find(call => call.endpoint === 'agents/create').payload
+  assert.equal(payload.parent_experiment_id, roleMain)
+  assert.equal(payload.create_next_generation, true)
+  assert.equal(payload.version_role, 'm')
+  assert.equal(payload.version_number, 28)
+  assert.equal(payload.expected_governance_sha256, 'e'.repeat(64))
+  assert.equal(payload.feature_dispositions[0].experiment_id, roleFeature)
+  assert.equal(payload.feature_dispositions[0].decision, 'defer')
+})
+
+test('f 合入入口锁定同号现有 m，沿用差异盘点和助手上下文', async () => {
+  const ui = rolePage(roleFeature, { intercept: (endpoint, payload) => endpoint === 'agents/fusion/preview' ? { ok: true, value: { ...payload, inventory: { sources: [] }, preview_id: 'same-generation' } } : undefined })
+  await ui.settle(); ui.button('新建研究版本').props.onClick(); ui.render()
+  ui.nodes().find(node => node.type === 'select' && node.props.value === 'copy').props.onChange({ target: { value: 'merge' } }); ui.render()
+  ui.nodes().find(node => node.type === 'textarea').props.onChange({ target: { value: '将已验证特性实际合入主线' } }); ui.render()
+  ui.button('盘点继承来源').props.onClick(); await ui.settle()
+  const payload = ui.calls.find(call => call.endpoint === 'agents/fusion/preview').payload
+  assert.equal(payload.parent_experiment_id, roleFeature)
+  assert.equal(payload.target_experiment_id, roleMain)
+  await ui.button('请 AI 整理融合方案').props.onClick()
+  assert.match(ui.assistantTasks[0].task, /独立构建、装载和能力验收/)
+  assert.equal(ui.assistantTasks[0].context.fusion_request.target_experiment_id, roleMain)
+  assert.equal(ui.calls.some(call => call.endpoint === 'agents/create'), false)
+})
+
+test('m 验收后的特性清理进入现有助手流程并固定当前主线对象', async () => {
+  const ui = rolePage(roleMain, { completed: true })
+  await ui.settle()
+  await ui.button('清理已合并特性').props.onClick()
+  assert.equal(ui.assistantTasks[0].context.experiment_id, roleMain)
+  assert.match(ui.assistantTasks[0].task, /cleanup_features/)
+  assert.equal(ui.calls.some(call => call.endpoint === 'agents/fusion/finalize'), false)
+})
+
 test('未固定来源时展示后端原因并阻止盘点，不以仓库提交替代所选版本', async () => {
   const ui = page({ target: { page: 'agents', agent_id: 'first-agent', experiment_id: 'EXP-first-agent-001' }, intercept: (endpoint, payload) => endpoint === 'agents/detail' ? { ok: true, value: { ...detail(payload.agent_id, payload.experiment_id), derivation: { parent_ref: null, note: '当前 Candidate 有未提交改动，请先固定来源。' } } } : undefined })
   await ui.settle(); ui.button('新建研究版本').props.onClick(); ui.render()
@@ -606,7 +669,7 @@ test('VAR和历史变体保持查看及评测入口，禁止进入新版本继�
     const ui = page({ target: { page: 'agents', agent_id: 'first-agent', experiment_id: id }, intercept(endpoint) {
       if (endpoint !== 'agents/detail') return undefined
       const value = detail('first-agent', 'EXP-first-agent-002')
-      return { ok: true, value: { ...value, experiment: { ...value.experiment, id }, versions: [...value.versions.filter(row => row.id !== id), { id, is_variant: true, derivable: false }], derivation: { derivable: false, reason: 'variant', parent_ref: null, note: '变体不能作为新版本的继承来源。' } } }
+      return { ok: true, value: { ...value, experiment: { ...value.experiment, id }, versions: [...value.versions.filter(row => row.id !== id), { id, is_variant: true, derivable: false }], derivation: { derivable: false, reason: 'variant', parent_ref: null, note: '变体不能作为新版本、融合或其他变体的继承来源。' } } }
     } })
     await ui.settle()
     assert.equal(ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '版本').props.value, id)

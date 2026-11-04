@@ -408,10 +408,15 @@ def validate_experiments(root: Path, errors: list[dict[str, str]], warnings: lis
             if visible is not None and visible.returncode == 0 and not visible.stdout:
                 continue
         try:
-            resolve_version(experiment.name, repo=root)
+            identity = load_yaml(experiment / "change.yaml")
+            archived_ref = identity.get("archived_ref") if identity.get("current_version_id") or identity.get("assets_retired") else None
+            source = resolve_version(experiment.name, repo=root, source_ref=archived_ref)
         except (OSError, ValueError) as exc:
             errors.append(issue("EXPERIMENT_LOAD", str(exc), relative(experiment / "candidate/harness.yaml", root)))
-        payload, _ = validator.validate(experiment.resolve())
+            source = None
+        # 迁移只保留一份当前 Candidate；旧身份按迁移前固定来源校验，不补造历史资产。
+        validation_path = Path(source["change_path"]).parent if source and archived_ref else experiment.resolve()
+        payload, _ = validator.validate(validation_path)
         for item in payload.get("errors", []):
             copied = dict(item)
             copied["code"] = "EXPERIMENT_" + copied.get("code", "INVALID")

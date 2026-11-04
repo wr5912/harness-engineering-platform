@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
@@ -9,6 +9,7 @@ import { assetText } from './asset-text.ts'
 import { businessCasesSchema, businessCasesMarkdown } from './business-cases.ts'
 import { inheritedLoadableAssets, versionIdentity, versionSource } from './version-source.ts'
 import { VERSION_ID, assertInheritableVersion } from '../version-id.ts'
+import { allocateVersion, governanceSnapshot, withVersionLock } from './version-governance.ts'
 import { candidateDigest, candidateFiles, dataPath, sha256 } from '../tasks/files.ts'
 import { instanceStateRoot, workspaceOwnsInstance } from '../workspace.ts'
 import { inspectAssetBuild } from './asset-build.ts'
@@ -87,13 +88,8 @@ function parentTarget(root: string, target: MigrationMap) {
   if (!existsSync(manifest)) fail('目标 Agent 不存在', 'not_found')
   return { agent, id, ref, source, manifest, manifest_sha256: sha256(readFileSync(manifest)), question: text(target.research_question, 'target.research_question') }
 }
-function freshId(root: string, agent: string, first = false) {
-  const directory = dataPath(root, 'evolution/experiments')
-  const versions = existsSync(directory) ? readdirSync(directory) : []
-  const number = first ? 1 : Math.max(0, ...versions.filter(id => id.startsWith('EXP-') && VERSION_ID.exec(id)?.[1] === agent).map(id => Number(VERSION_ID.exec(id)![2]))) + 1
-  if (number > 999) fail('该 Agent 的版本序号已用完')
-  let id: string; do { id = `EXP-${agent}-${String(number).padStart(3, '0')}-r${randomBytes(6).toString('hex')}` } while (existsSync(join(directory, id)))
-  return id
+function freshId(root: string, agent: string, parent?: string) {
+  return allocateVersion(root, agent, parent)
 }
 function targetAssetPath(path: unknown) {
   const value = safeSourcePath(path)
@@ -207,7 +203,8 @@ export function createMigrationsHandler(rootPath: string) {
       const sourceMode = fromSource ? source.entries.find(item => item.path === edit.source_path)?.mode : undefined
       edits.push({ path, bytes, mode: edit.executable === undefined ? sourceMode ?? 0o644 : edit.executable ? 0o755 : 0o644, ...(fromSource ? { source_path: edit.source_path, source_sha256: sha256(bytes) } : {}) })
     }
-    const operation: Operation = { schema_version: 1, operation_id: `migration-${randomUUID()}`, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), state: 'preparing', agent_id: agent, experiment_id: freshId(root, agent, !parent), target_kind: target.kind, source_id: source.source_id, source_fingerprint: source.fingerprint }
+    const governanceBefore = governanceSnapshot(root, agent)
+    const operation: Operation = { schema_version: 1, operation_id: `migration-${randomUUID()}`, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), state: 'preparing', agent_id: agent, experiment_id: freshId(root, agent, parent?.id), target_kind: target.kind, source_id: source.source_id, source_fingerprint: source.fingerprint }
     // 在生成任何版本之前先保存已分配身份，进程中断后仍可查询本次范围。
     saveOperation(root, operation)
     const directory = operationDirectory(root, operation.operation_id), stage = join(directory, 'stage'), experiment = join(stage, EXP_PATH(operation.experiment_id)), candidate = join(experiment, 'candidate')
@@ -257,7 +254,8 @@ export function createMigrationsHandler(rootPath: string) {
       migrationWrite(join(experiment, EVIDENCE), receipt)
       operation.experiment_tree_sha256 = treeDigest(experiment)
       if (!parent) operation.agent_tree_sha256 = treeDigest(join(stage, 'agents', agent))
-      operation.summary = { agent_id: agent, experiment_id: operation.experiment_id, target_kind: target.kind, source_id: source.source_id, fingerprint: source.fingerprint, selected, mapping: body.mapping, uncovered, scope_limitations: scopeLimitations, evaluation_case_ids: caseIds, candidate_sha256: operation.candidate_sha256, asset_list_sha256: operation.asset_list_sha256, active_version_changed: !parent }
+      if (governanceSnapshot(root, agent) !== governanceBefore) fail('准备期间版本或来源已变化，请重新预览', 'conflict')
+      operation.summary = { agent_id: agent, experiment_id: operation.experiment_id, governance_sha256: governanceBefore, target_kind: target.kind, source_id: source.source_id, fingerprint: source.fingerprint, selected, mapping: body.mapping, uncovered, scope_limitations: scopeLimitations, evaluation_case_ids: caseIds, candidate_sha256: operation.candidate_sha256, asset_list_sha256: operation.asset_list_sha256, active_version_changed: !parent }
       operation.validation = validation
       operation.preview_sha256 = sha256(canonical({ ...operation.summary, experiment_tree_sha256: operation.experiment_tree_sha256, agent_tree_sha256: operation.agent_tree_sha256 ?? null, manifest_sha256: operation.manifest_sha256 ?? null, evaluation_before_sha256: operation.evaluation_before_sha256 ?? null, evaluation_after_sha256: operation.evaluation_after_sha256 ?? null }))
       operation.state = 'prepared'; saveOperation(root, operation)
@@ -265,12 +263,17 @@ export function createMigrationsHandler(rootPath: string) {
     } catch (error) { operation.state = 'failed'; operation.error = safeFailure(error, signal); saveOperation(root, operation); throw new MigrationError(operation.error.code, `${operation.error.message}（操作 ${operation.operation_id} 可查询）`) }
   }
   async function apply(body: MigrationMap, signal?: AbortSignal) {
+    const operation = loadOperation(root, body.operation_id)
+    return withVersionLock(root, operation.agent_id, () => publishMigration(body, signal))
+  }
+  async function publishMigration(body: MigrationMap, signal?: AbortSignal) {
     const operation = loadOperation(root, body.operation_id), directory = operationDirectory(root, operation.operation_id)
     if (body.expected_preview_sha256 !== operation.preview_sha256 || !operation.preview_sha256) fail('请先预览并确认同一份迁移资产', 'conflict')
     if (busy.has(operation.operation_id)) fail('该迁移正在保存，请查询状态', 'conflict')
     busy.add(operation.operation_id)
     try {
       if (operation.state === 'published') return { ...(await status({ operation_id: operation.operation_id })), already_applied: true }
+      if (operation.summary?.governance_sha256 !== governanceSnapshot(root, operation.agent_id, operation.experiment_id)) fail('版本或固定来源已变化，请重新预览', 'conflict')
       if (!['prepared', 'publishing', 'failed'].includes(operation.state)) fail('本次迁移准备未完成，请重新预览', 'conflict')
       if (!operation.experiment_tree_sha256 || !operation.candidate_sha256) fail('本次迁移没有完整暂存资产，请重新预览', 'conflict')
       loadMigrationSource(root, operation.source_id, operation.source_fingerprint)

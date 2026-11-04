@@ -1257,7 +1257,10 @@ test('所有管理业务可以逐动作发现参数；原生下一轮装配使�
   }
   const create = assistantActionContract('agents', 'create')
   assert.deepEqual([create.input_schema.properties.version_number.type, create.input_schema.properties.version_number.minimum, create.input_schema.properties.version_number.maximum], ['integer', 1, 999])
-  assert.match(create.instructions, /保留编号复制/)
+  assert.match(create.instructions, /默认同代 f/)
+  assert.match(create.instructions, /最新代 m\/f 均可编辑/)
+  assert.equal(create.input_schema.properties.create_next_generation.type, 'boolean')
+  assert.equal(create.input_schema.properties.feature_dispositions.type, 'array')
   const nativeCreate = projectAssistantTools([{ name: 'platform_agents' }], { tool_contracts: { agents: 'create' } })[0].parameters
   assert.equal(validateJsonSchemaValue(nativeCreate, { action: 'create', input: { version_number: 27 } }).length, 0)
   assert.ok(validateJsonSchemaValue(nativeCreate, { action: 'create', input: { version_number: '027' } }).length > 0)

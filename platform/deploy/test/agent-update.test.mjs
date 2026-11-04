@@ -8,11 +8,11 @@ import test from 'node:test'
 import { applyAgentUpdate, prepareAgentUpdate } from '../agent-update.mts'
 
 const hash = text => createHash('sha256').update(text).digest('hex')
-function fixture(t) {
+function fixture(t, experimentId = 'EXP-test-agent-027-m-r123456789abc') {
   const base = mkdtempSync(join(tmpdir(), 'hep agent update '))
   t.after(() => rmSync(base, { recursive: true, force: true }))
   const prefix = join(base, 'program'), dataRoot = join(base, 'remote'), local = join(base, 'local')
-  const experimentId = 'EXP-test-agent-027-r123456789abc', instance = 'test-instance', agentId = 'test-agent'
+  const instance = 'test-instance', agentId = 'test-agent'
   const relative = `evolution/experiments/${experimentId}`, path = 'candidate/dsh/workspace/AGENTS.md'
   for (const root of [dataRoot, local]) { mkdirSync(join(root, relative, 'candidate/dsh/workspace'), { recursive: true }); writeFileSync(join(root, relative, path), root === local ? 'new' : 'old') }
   mkdirSync(join(prefix, '.local'), { recursive: true }); writeFileSync(join(prefix, '.local/installation.json'), '{}')
@@ -23,6 +23,16 @@ function fixture(t) {
   writeFileSync(manifest, JSON.stringify(input))
   return { prefix, dataRoot, local, relative, path, identity, manifest, input }
 }
+
+test('m/f 与旧 ID 共用更新入口，拒绝错 Agent、缺随机后缀及 VAR', t => {
+  for (const id of ['EXP-test-agent-027-m-r123456789abc', 'EXP-test-agent-027-f-r123456789abc', 'EXP-test-agent-027-r123456789abc', 'EXP-test-agent-001']) {
+    const f = fixture(t, id), update = prepareAgentUpdate(f.local, f.manifest)
+    assert.equal(applyAgentUpdate({ ...f, dryRun: true }, update).status, 'planned')
+    for (const invalid of ['EXP-other-027-m-r123456789abc', 'EXP-test-agent-027-m', 'VAR-test-agent-027-r123456789abc']) {
+      assert.throws(() => applyAgentUpdate(f, { ...update, experimentId: invalid }), /身份无效/)
+    }
+  }
+})
 
 test('只更新实际差异，保留权限、私有备份与回执；dry-run 和重复执行不写入', t => {
   const f = fixture(t), update = prepareAgentUpdate(f.local, f.manifest), remote = join(f.dataRoot, f.relative, f.path)

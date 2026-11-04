@@ -5,6 +5,7 @@ import { load as yaml } from 'js-yaml'
 import { assertAssetPath, candidateDigest, dataPath, sha256, sourceInfo } from './files.ts'
 import { assertInheritableVersion } from '../version-id.ts'
 import { versionIdentity, versionSource } from '../agents/version-source.ts'
+import { assertVersionEditable } from '../agents/version-governance.ts'
 import { containsLiteralLlmKey } from './llm-key.ts'
 
 export interface TaskAssemblyInput {
@@ -16,6 +17,7 @@ export interface TaskAssemblyInput {
 
 function prepare(root: string, input: TaskAssemblyInput) {
   const identity = sourceInfo(root, input.target_source)
+  assertVersionEditable(root, identity.id)
   const target = { ...identity, entry: versionSource(root, identity.id) }
   if (candidateDigest(target.candidate) !== input.expected_candidate_sha256) throw new Error('目标 Candidate 已变化，请重新预览')
   if (!Array.isArray(input.files) || !input.files.length) throw new Error('请选择需要复用的资产文件')

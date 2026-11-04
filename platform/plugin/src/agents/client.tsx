@@ -16,6 +16,7 @@ import { SearchSelect } from '../components/search-select.tsx'
 import { DetailDrawer } from '../components/detail-drawer.tsx'
 import { AgentEvaluationOverview, type AgentRunOverview } from './overview.tsx'
 import { DeploymentDialog } from '../deployment/client.tsx'
+import { versionRole } from '../version-id.ts'
 
 type RpcResult = { ok: true; value: any } | { ok: false; error: { code: string; message: string; details?: any } }
 type AgentRow = { id: string; name?: string; manifest?: Record<string, any>; active_experiment?: string | null; version_count?: number; latest_experiment_status?: string | null; instance_state?: string }
@@ -60,8 +61,9 @@ function researchStatus(status?: string | null) {
 
 function versionLabel(id?: string | null) {
   if (!id) return '未记录'
-  const number = /-(\d{3}(?:-r[0-9a-f]{12})?)$/.exec(id)?.[1]
-  return number ? `${id.startsWith('VAR-') ? '变体' : '版本'} ${number}` : id
+  const number = /-(\d{3}(?:-[mf])?(?:-r[0-9a-f]{12})?)$/.exec(id)?.[1]
+  const role = versionRole(id)
+  return number ? `${id.startsWith('VAR-') ? '变体' : '版本'} ${number}${role ? role === 'm' ? ' · 主线' : ' · 特性' : ''}` : id
 }
 
 const tabs = [
@@ -106,6 +108,11 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
   const editDialog = useRef<HTMLDialogElement>(null)
   const [versionOpen, setVersionOpen] = useState(false)
   const [versionGoal, setVersionGoal] = useState('')
+  const [versionAction, setVersionAction] = useState<'copy' | 'merge' | 'next'>('copy')
+  const [featureDispositions, setFeatureDispositions] = useState<Record<string, { decision: string; reason: string }>>({})
+  const [versionBusy, setVersionBusy] = useState(false)
+  const governance = detail?.version_governance
+  const mergeTarget = versionAction === 'merge' ? governance?.mainline_id : undefined
   const derivable = detail && canDeriveVersion(detail.experiment) && detail.derivation?.derivable !== false
   const versionParent = derivable ? detail?.derivation?.parent_ref || '' : ''
   const [versionInventory, setVersionInventory] = useState<any>(null)
@@ -499,6 +506,7 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
         parent_ref: versionParent,
         parent_experiment_id: detail.experiment.id,
         research_question: versionGoal,
+        ...(mergeTarget ? { target_experiment_id: mergeTarget } : {}),
       })
       if (selection !== selectionRequest.current || request !== versionPreviewRequest.current) return
       setVersionInventory(value)
@@ -508,20 +516,37 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
 
   async function askVersionPlan() {
     if (!derivable || !versionInventory || !onAssistant) return
-    await onAssistant(`为当前智能体创建新版本。改进目标：${versionGoal.trim()}`, { page: 'agents', agent_id: selected, experiment_id: detail.experiment.id, skill: 'agent-maintenance', workflow: 'research', fusion_request: versionInventory })
+    await onAssistant(`${mergeTarget ? `将当前特性实际合入同号现有主线 ${mergeTarget}，方案须包含目标 Candidate 的 edits、差异与冲突处理，以及该 m 的独立构建、装载和能力验收` : '从固定来源创建副本，已采用 m/f 的智能体默认创建当前代 f'}。改进目标：${versionGoal.trim()}`, { page: 'agents', agent_id: selected, experiment_id: detail.experiment.id, skill: 'agent-maintenance', workflow: 'research', fusion_request: versionInventory })
   }
 
   async function confirmVersion() {
-    if (!derivable || !versionProposal || versionProposal.parent_experiment_id !== detail.experiment.id || versionProposal.parent_ref !== versionParent) return
+    if (!derivable || !versionProposal || versionBusy || versionProposal.parent_experiment_id !== detail.experiment.id || versionProposal.parent_ref !== versionParent || versionProposal.target_experiment_id !== mergeTarget) return
     if (versionProposal.plan.sources.some((source: any) => source.decision === 'inherit' && !canDeriveVersion(experiments.find(item => item.id === source.experiment_id) ?? { ...source, id: source.experiment_id }))) {
       setError('变体不能作为新版本的继承来源。'); return
     }
     const selection = selectionRequest.current
+    setVersionBusy(true)
     try {
       const { value } = await confirmBusinessProposal('fusion/confirm', versionProposal)
       await refreshList()
       if (selection === selectionRequest.current) selectVersion(selected, value.experiment_id)
     } catch (err) { setError((err as Error).message) }
+    finally { setVersionBusy(false) }
+  }
+
+  async function createNextGeneration() {
+    if (!detail || versionBusy || versionAction !== 'next' || !versionParent || governance?.mainline_id !== detail.experiment.id || !governance?.snapshot_sha256) return
+    const selection = selectionRequest.current
+    setVersionBusy(true)
+    try {
+      const value = await call('create', { agent_id: selected, parent_experiment_id: detail.experiment.id, parent_ref: versionParent,
+        create_next_generation: true, version_role: 'm', version_number: governance.current_generation + 1,
+        expected_governance_sha256: governance.snapshot_sha256, research_question: versionGoal,
+        feature_dispositions: (governance.unresolved_features ?? []).map((id: string) => ({ experiment_id: id, ...featureDispositions[id] })) })
+      await refreshList()
+      if (selection === selectionRequest.current) { setVersionOpen(false); selectVersion(selected, value.experiment_id) }
+    } catch (err) { setError((err as Error).message) }
+    finally { setVersionBusy(false) }
   }
 
   async function confirmFeatures() {
@@ -559,7 +584,8 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
 
   function changeLaunch(value: any) { launchRequest.current++; launchBusyRef.current = false; setLaunchBusy(false); setLaunchMessage(''); setLaunch(value) }
   function resetVersionPreview() { versionPreviewRequest.current++; setVersionInventory(null); setVersionProposal(null) }
-  useEffect(() => { resetVersionPreview() }, [versionParent])
+  useEffect(() => { resetVersionPreview() }, [versionParent, versionAction])
+  useEffect(() => { setVersionAction('copy'); setFeatureDispositions({}) }, [detail?.experiment.id])
 
   async function launchVersion() {
     if (!detail || launchBusyRef.current) return
@@ -794,33 +820,46 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
             <button type="button" className="agent-back-to-list" onClick={returnToList}>← 返回{listView === 'variants' ? '变体列表' : '智能体列表'}</button>
             <div className="agent-identity-top">
               {detail.is_current === false && detail.current_variant_id && <p className="agent-notice" role="status">当前查看历史变体记录，资产和 Run 保留原身份。<button type="button" onClick={() => selectVersion(selected, detail.current_variant_id, true, tab)}>查看当前变体</button><code>{detail.current_variant_id}</code></p>}
+              {detail.experiment.change?.current_version_id && <p className="agent-notice" role="status">当前查看迁移前的只读身份，历史证据保留原路径。<button type="button" onClick={() => selectVersion(selected, detail.experiment.change.current_version_id)}>查看当前版本</button></p>}
+              {detail.experiment.change?.assets_retired && <p className="agent-notice" role="status">该特性已完成合并并清理当前资产。历史源码可从固定来源恢复，Run 和工件保留原路径。</p>}
               <div className="agent-identity-title"><span className="agent-identity-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9M8 5.25 16 9.8" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg></span><h2>{detail.agent.name || detail.agent.manifest.name || selectedAgent?.name || selected}</h2><SearchSelect className="agent-version-choice" label="版本" value={selectedExperiment || detail.experiment.id} groups={['迭代版本', '算力变体']} options={versionOptions} onChange={value => selectVersion(selected, value)}/><span className="agent-badge">{isComputeVariant(detail.experiment) ? "算力变体" : "迭代版本"}</span></div>
               <div className="agent-actions agent-main-actions">{sdkProfile ? <><button type="button" className="agent-primary" onClick={() => openSdk()}>SDK 调试</button><button type="button" onClick={() => openSdk('guide')}>接入文档</button></> : <><button type="button" className="agent-primary" disabled={!onNavigate} onClick={startEvaluation}>发起评测</button><button type="button" disabled={launchBusy} onClick={() => void launchVersion()}>进入对话</button><button type="button" onClick={() => setPublishOpen(true)}>发布版本</button></>}<details className="agent-more-actions" open={moreActionsOpen}><summary onClick={event => { event.preventDefault(); setMoreActionsOpen(!moreActionsOpen) }}>更多操作</summary><div><button type="button" onClick={() => { setMoreActionsOpen(false); setDeploymentTarget({ agent_id: selected, experiment_id: detail.experiment.id, label: `${detail.agent.name || selected} · ${versionLabel(detail.experiment.id)}` }); setDeploymentOpen(true) }}>导出独立运行包</button><button type="button" disabled={!onNavigate} onClick={() => { setMoreActionsOpen(false); openEvaluation() }}>查看评测</button><button type="button" disabled={!onNavigate} onClick={() => { setMoreActionsOpen(false); onNavigate?.({ page: 'instances', agent_id: selected, experiment_id: detail.experiment.id }) }}>查看实例</button><button type="button" disabled={!derivable} title={derivable ? undefined : "变体不能作为新版本的继承来源。"} onClick={() => { if (!derivable) return; setMoreActionsOpen(false); setVersionOpen(true); resetVersionPreview() }}>新建研究版本</button><button type="button" disabled={!sdkProfile && !onNavigate} onClick={() => { setMoreActionsOpen(false); if (sdkProfile) openSdk(); else onNavigate?.({ page: 'instances', agent_id: selected, experiment_id: detail.experiment.id, source_id: `experiment:${detail.experiment.id}` }) }}>创建实例</button></div></details></div>
             </div>
             {sdkProfile && <p className="agent-muted">使用方式：官方 TypeScript SDK · 在标准容器内调用</p>}
-            {!derivable && <p className="agent-muted">变体不能作为新版本、融合或其他变体的继承来源。</p>}{isComputeVariant(detail.experiment) && <div className="agent-variant-name"><h3>{variantName(detail.experiment)}</h3><button type="button" disabled={nameBusy || nameOpen} onClick={editVariantName}>修改变体名称</button></div>}
+            {!derivable && <p className="agent-muted">{detail.derivation?.note || '变体不能作为新版本、融合或其他变体的继承来源。'}</p>}{detail.version_governance?.reason && <p role="status" className="agent-muted">{detail.version_governance.reason}</p>}{isComputeVariant(detail.experiment) && <div className="agent-variant-name"><h3>{variantName(detail.experiment)}</h3><button type="button" disabled={nameBusy || nameOpen} onClick={editVariantName}>修改变体名称</button></div>}
             {nameOpen && <form className="agent-name-form" aria-label="修改变体名称" onSubmit={event => { event.preventDefault(); void saveVariantName() }}>
               <label className="agent-field">变体名称<input aria-label="变体名称" value={nameDraft} disabled={nameBusy} onChange={event => setNameDraft(event.target.value)} required /></label>
               <div className="agent-actions"><button type="submit" disabled={nameBusy || !nameDraft.trim() || !nameHash}>保存名称</button><button type="button" disabled={nameBusy} onClick={() => void saveVariantName(true)}>重新核对</button><button type="button" disabled={nameBusy} onClick={closeNameEditor}>取消改名</button></div>
             </form>}
             {nameMessage && <p role="status">{nameMessage}</p>}
-            {detail.creation && <p role="status" className="agent-notice">{detail.creation.status === 'completed' ? '新版本创建成功' : '融合中：等待资产集成与约定验证'}{detail.creation.status !== 'completed' && <button type="button" disabled={!onAssistant} onClick={() => void onAssistant?.('继续完成当前版本的融合。', { page: 'agents', agent_id: selected, experiment_id: detail.experiment.id, skill: 'agent-maintenance', workflow: 'research', session_id: detail.creation.assistant_session_id })}>继续融合</button>}</p>}
+            {detail.creation && <p role="status" className="agent-notice">{detail.creation.status === 'completed' ? '当前版本已完成约定融合验证' : '融合中：等待资产集成与约定验证'}{detail.creation.status !== 'completed' ? <button type="button" disabled={!onAssistant} onClick={() => void onAssistant?.('继续完成当前版本的融合。', { page: 'agents', agent_id: selected, experiment_id: detail.experiment.id, skill: 'agent-maintenance', workflow: 'research', session_id: detail.creation.assistant_session_id })}>继续融合</button> : governance?.role === 'm' && <button type="button" disabled={!onAssistant} onClick={() => void onAssistant?.('核对当前 m 的独立融合验收后，清理对应已合并 f 的当前资产。先解除实例与启用依赖，核对固定源码摘要，保留历史 Run 和工件；使用既有 fusion/finalize 的 cleanup_features 与 confirmed 明确确认。', { page: 'agents', agent_id: selected, experiment_id: detail.experiment.id, skill: 'agent-maintenance', workflow: 'research' })}>清理已合并特性</button>}</p>}
           </section>}
           {versionOpen && detail && derivable && <section className="agent-inline-form" aria-label="新建智能体版本">
-            <h2>新建 {selected} 版本</h2>
+            <h2>{versionAction === 'merge' ? '合入同号主线' : versionAction === 'next' ? '明确创建下一代主线' : `新建 ${selected} 版本`}</h2>
+            {governance?.managed && <label className="agent-field">版本操作<select value={versionAction} disabled={versionBusy} onChange={event => setVersionAction(event.target.value as typeof versionAction)}>
+              <option value="copy">创建当前代特性副本</option>
+              {governance.role === 'f' && !governance.historical && <option value="merge">将当前特性合入同号现有主线</option>}
+              {governance.mainline_id === detail.experiment.id && <option value="next">明确创建下一代主线</option>}
+            </select></label>}
             <label className="agent-field">改进目标<textarea value={versionGoal} onChange={event => { setVersionGoal(event.target.value); resetVersionPreview() }} rows={3} /></label>
             <p className="agent-muted">{versionParent ? '来源已固定，平台将自动继承所选版本。' : detail.derivation?.note || '当前版本尚未固定，请先固定完整来源后再创建研究版本。'}</p>
-            <p>当前主父版：{detail.experiment.id}。先核对未继承的并行能力及取舍，确认后再建立新版本。</p>
-            <div className="agent-actions"><button type="button" disabled={!versionGoal.trim() || !versionParent} onClick={() => void previewVersion()}>盘点继承来源</button><button type="button" onClick={() => { versionPreviewRequest.current++; setVersionOpen(false) }}>关闭</button></div>
+            <p>{mergeTarget ? `将 ${detail.experiment.id} 的资产合入 ${mergeTarget}，随后独立验证该主线。` : `当前父版：${detail.experiment.id}。${governance?.managed ? '副本保留当前代编号；下一代仅由明确创建操作产生。' : '先核对未继承的并行能力及取舍。'}`}</p>
+            {versionAction === 'next' && <>{(governance?.unresolved_features ?? []).map((id: string) => <fieldset key={id}><legend>未合并特性 {id}</legend>
+              <label className="agent-field">处置<select value={featureDispositions[id]?.decision ?? ''} disabled={versionBusy} onChange={event => setFeatureDispositions({ ...featureDispositions, [id]: { reason: featureDispositions[id]?.reason ?? '', decision: event.target.value } })}><option value="">请选择</option><option value="defer">保留历史来源，暂不合并</option><option value="reject">明确放弃</option></select></label>
+              <label className="agent-field">原因<input value={featureDispositions[id]?.reason ?? ''} disabled={versionBusy} onChange={event => setFeatureDispositions({ ...featureDispositions, [id]: { decision: featureDispositions[id]?.decision ?? '', reason: event.target.value } })} /></label>
+            </fieldset>)}<p>创建后当前代成为只读历史；尚未提交的主线改动应先固定为完整来源。</p></>}
+            <div className="agent-actions">{versionAction === 'next' ? <button type="button" disabled={versionBusy || !versionGoal.trim() || !versionParent || !governance?.snapshot_sha256 || (governance?.unresolved_features ?? []).some((id: string) => !featureDispositions[id]?.decision || !featureDispositions[id]?.reason.trim())} onClick={() => void createNextGeneration()}>明确创建 {String((governance?.current_generation ?? 0) + 1).padStart(3, '0')}-m</button> : <button type="button" disabled={versionBusy || !versionGoal.trim() || !versionParent} onClick={() => void previewVersion()}>盘点继承来源</button>}<button type="button" disabled={versionBusy} onClick={() => { versionPreviewRequest.current++; setVersionOpen(false) }}>关闭</button></div>
             {versionInventory && <><h3>主父版尚未覆盖的来源</h3>{versionInventory.inventory.sources.length ? <ul>{versionInventory.inventory.sources.filter((source: any) => canDeriveVersion(experiments.find(item => item.id === source.experiment_id) ?? { ...source, id: source.experiment_id })).map((source: any) => <li key={source.experiment_id}><strong>{source.experiment_id}</strong> · {source.status === 'recommended' ? '建议继承' : source.status === 'excluded' ? '默认排除' : '待判断'}<p>{source.reason}</p></li>)}</ul> : <p>没有发现尚未覆盖的并行来源。</p>}
               <button type="button" disabled={!onAssistant} onClick={() => void askVersionPlan()}>请 AI 整理融合方案</button></>}
-            {versionProposal && versionProposal.parent_experiment_id === detail.experiment.id && versionProposal.parent_ref === versionParent && versionProposal.research_question === versionGoal && <>
+            {versionAction !== 'next' && versionProposal && versionProposal.parent_experiment_id === detail.experiment.id && versionProposal.parent_ref === versionParent && versionProposal.target_experiment_id === mergeTarget && versionProposal.research_question === versionGoal && <>
               <h3>待确认方案</h3><p>{versionProposal.research_question}</p>
               <h4>继承来源与取舍</h4><ul>{versionProposal.plan.sources.map((source: any) => <li key={source.experiment_id}>{source.experiment_id}：{source.decision === 'inherit' ? '继承' : '舍弃'} · {source.reason}<p>{source.ref}</p></li>)}</ul>
               <h4>新版本特性</h4><ul>{versionProposal.plan.features.map((feature: any) => <li key={feature.id}><strong>{feature.title}</strong><p>{feature.description}</p><p>{feature.change || '保留来源能力'} · {feature.source_refs.join('、') || '来源待说明'}</p></li>)}</ul>
               <h4>冲突处理</h4>{versionProposal.plan.conflicts.length ? <ul>{versionProposal.plan.conflicts.map((conflict: any, index: number) => <li key={index}>{conflict.description}：{conflict.resolution}</li>)}</ul> : <p>方案未发现需要业务取舍的冲突。</p>}
               <h4>验证范围</h4><ul>{versionProposal.plan.checks.map((check: any) => <li key={check.id}>{check.id}：{check.kind === 'build' ? `构建 ${check.command.join(' ')}` : check.kind === 'load' ? '实际 DSH Session 装载证据' : `能力评测 ${check.case_ids.join('、')}`}</li>)}</ul>
-              <button type="button" onClick={() => void confirmVersion()}>确认方案并创建版本</button>
+              {versionProposal.merge && <><h4>来源与主线的资产差异</h4><ul>{versionProposal.merge.difference.files.map((file: any) => <li key={file.path}>{file.path} · {({ added: '新增', removed: '删除', modified: '修改' } as Record<string, string>)[file.status]}</li>)}</ul></>}
+              {versionProposal.merge?.edit_preview?.edits.map((edit: any) => <details key={edit.path}><summary>核对主线修改 · {edit.path}</summary><pre className="harness-asset-content">{edit.diff}</pre></details>)}
+              <button type="button" disabled={versionBusy} onClick={() => void confirmVersion()}>{mergeTarget ? '确认差异并合入现有主线' : '确认方案并创建版本'}</button>
             </>}
           </section>}
           {launch && <section className="agent-inline-form" aria-label="启动选中版本"><h2>实例与对话入口 · {launch.experiment_id}</h2>
@@ -855,7 +894,7 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
             onSelectSource={(agentId, experimentId) => selectVersion(agentId, experimentId, true, 'overview', 'identity')}
             onOpenRun={(runId, agentId, experimentId) => onNavigate?.({ page: 'evaluation', agent_id: agentId, experiment_id: experimentId, tab: 'runs', run_id: runId })}
             onOpenCode={openCode} >
-              <Fields items={[['Agent ID', selected], ['查看版本 ID', detail.experiment.id], ['登记版本 ID', selectedAgent?.active_experiment || '未登记'], ['研究状态', researchStatus(detail.experiment.status)], ['相关引用', detail.related_references ?? []]]} />
+              <Fields items={[['Agent ID', selected], ['查看版本 ID', detail.experiment.id], ['最新主线', governance?.mainline_id || '尚未采用 m/f 规则'], ['已启用版本', detail.agent.manifest.active_experiment || '未启用'], ['实例实际加载版本', '请到实例管理核对实际加载记录'], ['研究状态', researchStatus(detail.experiment.status)], ['相关引用', detail.related_references ?? []]]} />
             </VariantSourcePanel>
           </section>}
           {detail && <section role="tabpanel" id="agent-panel-description" aria-labelledby="agent-tab-description" tabIndex={-1} hidden={tab !== 'description'}>{descriptionVisited && <AgentDescriptionPanel key={detail.experiment.id} active={active && tab === 'description'} rpc={rpc} detail={detail} agentId={selected} onSaved={() => { void refreshDetail(); void refreshList() }} onEditAsset={path => { if (discardAssetDraft() && (!descriptionDirty.current || window.confirm('放弃未保存资料并查看原始资产？'))) { descriptionDirty.current = false; selectEditFile(path); selectTab('assets') } }} onDirtyChange={dirty => { descriptionDirty.current = dirty }} onAssistant={onAssistant}/>}</section>}

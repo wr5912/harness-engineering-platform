@@ -10,12 +10,12 @@ const hash = value => createHash('sha256').update(value).digest('hex')
 export function write(path, text, mode) { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, text, mode ? { mode } : {}) }
 export function command(name, args, cwd) { const result = spawnSync(name, args, { cwd, encoding: 'utf8' }); assert.equal(result.status, 0, result.stderr); return result.stdout.trim() }
 export function elf(arch) { const bytes = Buffer.alloc(64); bytes.set([0x7f, 0x45, 0x4c, 0x46, 2, 1]); bytes.writeUInt16LE(arch === 'arm64' ? 183 : 62, 18); return bytes }
-export function fixture(t, arch = 'amd64') {
+export function fixture(t, arch = 'amd64', id = 'EXP-alpha-001') {
   const root = mkdtempSync(join(tmpdir(), 'standalone-pack-')), program = join(root, 'program'), data = join(root, 'data'), resources = join(root, 'resources'), out = join(root, 'out')
   const before = process.env.HARNESS_PYTHON
   process.env.HARNESS_PYTHON = process.execPath
   t.after(() => { if (before === undefined) delete process.env.HARNESS_PYTHON; else process.env.HARNESS_PYTHON = before; rmSync(root, { recursive: true, force: true }) })
-  const id = 'EXP-alpha-001', candidate = join(data, 'evolution/experiments', id, 'candidate'), fingerprint = 'f'.repeat(64), tag = `dsh:fixture-${arch}`
+  const candidate = join(data, 'evolution/experiments', id, 'candidate'), fingerprint = 'f'.repeat(64), tag = `dsh:fixture-${arch}`
   write(join(data, 'evolution/experiments', id, 'change.yaml'), `experiment_id: ${id}\nagent_id: alpha\n`)
   write(join(candidate, 'harness.yaml'), 'loadable_assets:\n  workspace: dsh/workspace\n  preset_root: dsh/presets\n  managed_root: dsh/managed\n  preset_id: alpha-main\n  profile_patch: dsh/managed/alpha.patch.yml\ncredential_environment_keys: [TEST_MODEL_KEY]\n')
   write(join(candidate, 'dsh/workspace/AGENTS.md'), '# 初版\n')

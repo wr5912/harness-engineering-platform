@@ -33,12 +33,12 @@ function traceEvents(user = `查询测试资产的巡检状态。 Authorization:
     envelope('tool/result', { message: { source: { kind: 'tool', callId: 'call-b' }, content: [{ type: 'text', text: 'FUTURE_RESULT_B' }] } }, 7),
   ]
 }
-function fixture() {
+function fixture(experimentId = 'EXP-alpha-001-r0123456789ab') {
   const root = mkdtempSync(join(tmpdir(), 'decision-datasets-'))
   write(join(root, '.agents/skills/decision-sample-extraction/SKILL.md'), '---\nname: decision-sample-extraction\n---\n\n从当前轨迹提取候选，保留人工复核。\n')
   write(join(root, 'AGENTS.md'), '平台管理助手，使用数据侧抽取方法。\n')
   write(join(root, 'docs/harness-research/decision-samples.md'), '保持决策前材料，逐题复核，不能评价不可见答复。\n')
-  const base = id => `evolution/experiments/EXP-alpha-001-r0123456789ab/runs/${id}`
+  const base = id => `evolution/experiments/${experimentId}/runs/${id}`
   const path = `${base(runId)}/evidence/U-BASIC-001/trace.jsonl`
   const raw = traceEvents().map(value => JSON.stringify(value)).join('\n') + '\n'
   function createRun(id, trace = raw) {
@@ -72,6 +72,18 @@ function inputEvidence(saved, sessionId, record = saved.dataset.records[0]) {
 }
 const reviewed = async (fx, value, changes = {}) => fx.handle('datasets/update', updatePayload(value, undefined, changes))
 const exported = (fx, dataset, mode = 'training') => fx.handle('datasets/export', { dataset_id: dataset.id, mode })
+
+for (const role of ['m', 'f']) test(`样本来源与保存保留 ${role} 版本的完整 Run 路径和身份`, async () => {
+  const id = `EXP-alpha-027-${role}-r0123456789ab`, fx = fixture(id)
+  try {
+    const src = await source(fx)
+    assert.equal(src.path, fx.path)
+    const saved = await apply(fx, await preview(fx, src))
+    assert.equal(saved.dataset.path, fx.path)
+    assert.equal(saved.dataset.experiment_id, id)
+    assert.equal(saved.dataset.records[0]._meta.experiment_id, id)
+  } finally { await rm(fx.root, { recursive: true, force: true }) }
+})
 
 test('Skill 注入来源进入样本输入，同源任务分组不随 Skill 目录变化', () => withFixture(async fx => {
   async function extract(task, catalog) {
