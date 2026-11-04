@@ -47,12 +47,14 @@ function validateOptions(command: string, options: Options): void {
     pack: ['out', 'program-root', 'data-root', 'assets-dir', 'image-archive', 'image-tag', 'image-id', 'image-fingerprint', 'arch'],
     install: ['bundle-root', 'prefix', 'data-root', 'host', 'port', 'gateway-port', 'public-url'],
     verify: ['prefix', 'data-root', 'url'],
+    update: ['program-root', 'data-root'],
   }
   const flags: Record<string, string[]> = {
     'agent-preview': [], 'agent-pack': [], 'agent-prepare': [],
     pack: ['no-image', 'no-data', 'allow-dirty', 'allow-fixture-data', 'keep-staging'],
     install: ['dry-run', 'skip-image', 'skip-prepare', 'strict-paths', 'allow-fixture-data', 'start'],
     verify: [],
+    update: ['dry-run'],
   }
   if (!values[command]) throw new Error(`未知命令：${command}`)
   for (const [key, value] of Object.entries(options)) {
@@ -79,6 +81,13 @@ function installPort(value: string | undefined, name: string, fallback: number):
 
 function usage(): string {
   return `用法：
+  dsh-deploy update [选项]
+    --program-root <目录>       当前已准备的本机源码工作区，默认当前仓库
+    --data-root <目录>          当前受管平台的数据根，默认当前关联工作区
+    --dry-run                   只核对身份、运行状态和更新范围，不构建或应用
+    --json                      输出更新回执
+    源码更新保留配置、会话和实例；有在途任务或无法确认空闲时不应用。
+
   dsh-deploy agent-preview|agent-pack|agent-prepare [选项]
     --agent-id <智能体>          明确的业务智能体
     --source experiment:<ID>    已保存的固定版本，包含实际未提交资产
@@ -136,6 +145,12 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     const { command, options } = parse(argv)
     if (!command || command === '--help' || flag(options, 'help')) { console.log(usage()); return 0 }
     validateOptions(command, options)
+    if (command === 'update') {
+      const { updatePlatform } = await import('./update.mts')
+      const report = await updatePlatform({ programRoot: resolve(text(options, 'program-root', REPO)!), dataRoot: resolve(text(options, 'data-root', defaultAssetRoot())!), dryRun: flag(options, 'dry-run') })
+      console.log(JSON.stringify(report, null, 2))
+      return report.status === 'busy' ? 1 : 0
+    }
     if (['agent-preview', 'agent-pack', 'agent-prepare'].includes(command)) {
       const agentId = text(options, 'agent-id'), source = text(options, 'source')
       if (!agentId || !source?.startsWith('experiment:')) throw new Error('独立包需要 --agent-id 和 --source experiment:<ID>')

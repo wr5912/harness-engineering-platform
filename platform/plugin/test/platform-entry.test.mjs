@@ -37,7 +37,7 @@ test('已有配置内容不变时仍修复 Runtime 读取权限且不重写内�
   if (process.geteuid?.() === 0) assert.equal(statSync(file).uid, 1000)
 })
 
-test('默认初始化配置可启动真实业务监听，释放插件时关闭监听', async t => {
+for (const enabled of [true, false]) test(`业务控制${enabled ? '开启' : '关闭'}时可启动真实业务监听，释放插件时关闭监听`, async t => {
   const root = mkdtempSync(join(tmpdir(), 'hep-entry-listener-'))
   const reserved = createServer()
   await new Promise(resolve => reserved.listen(0, '127.0.0.1', resolve))
@@ -49,6 +49,9 @@ test('默认初始化配置可启动真实业务监听，释放插件时关闭�
   await build({ entryPoints: ['src/business-control/index.ts'], outfile: join(root, 'gateway.mjs'), bundle: true, platform: 'node', format: 'esm', packages: 'external' })
   const { applyBusinessGateway } = await import(`file://${join(root, 'gateway.mjs')}`)
   initializeBusinessGateway(root, 'http://127.0.0.1:18120/hep/', '127.0.0.1', port)
+  const file = join(root, 'config/business-access.json'), config = JSON.parse(readFileSync(file, 'utf8'))
+  config.enabled = enabled
+  writeFileSync(file, JSON.stringify(config))
   await applyBusinessGateway(ctx, root)
   const response = await fetch(`http://127.0.0.1:${port}/`)
   assert.equal(response.status, 200)

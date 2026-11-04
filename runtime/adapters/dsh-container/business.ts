@@ -3,9 +3,13 @@ import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSyn
 import { createRequire } from 'node:module'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { isUnrestrictedBusinessAccess } from '../../../platform/plugin/src/business-control/contracts.ts'
 import { createBusinessRuntimePatch } from '../../../platform/plugin/src/business-control/patch.ts'
 import { platformGroupUrl } from '../../../platform/plugin/src/business-control/group-link.ts'
 import { businessGatewayEntry, checkBusinessGatewayEntry } from '../../../platform/plugin/src/business-control/entry.ts'
+import { resolveBusinessInstance } from '../../../platform/plugin/src/business-control/instance.ts'
+import { deleteBusinessInstance, preflightGatewayRegistration, updateGatewayRegistration } from '../../../platform/plugin/src/business-control/registration.ts'
+import { instanceStateRoot } from '../../../platform/plugin/src/workspace.ts'
 import { mcpCredentialPaths } from '../../../platform/plugin/src/mcp/credential-path.ts'
 import { parseLocalCapabilities, type LocalModelRoute } from '../../../platform/plugin/src/business-control/local-capabilities.ts'
 export { parseLocalCapabilities, type LocalModelRoute } from '../../../platform/plugin/src/business-control/local-capabilities.ts'
@@ -78,8 +82,9 @@ export function readBusinessLaunchConfig(file: string, target?: BusinessTarget):
   }
   if (!statSync(config.assetRoot).isDirectory()) throw new Error('业务数据根或共享密钥文件无效')
   const access = JSON.parse(readFileSync(join(config.assetRoot, 'config/business-access.json'), 'utf8'))
-  if (access.schemaVersion !== 1 || access.enabled !== true) throw new Error('业务访问配置尚未启用')
-  if (!isDevelopmentLaunch(access, target)) validateSigningKey(config)
+  if (access.schemaVersion !== 1 || typeof access.enabled !== 'boolean') throw new Error('业务访问配置无效')
+  if (!access.enabled && businessLaunchModes(access, target).accessMode !== 'anonymous') throw new Error('业务访问配置尚未启用')
+  if (!isUnrestrictedLaunch(access, target)) validateSigningKey(config)
   const origin = new URL(config.coordinatorOrigin)
   if (!['http:', 'https:'].includes(origin.protocol) || origin.username || origin.password || origin.pathname !== '/' || origin.search || origin.hash) throw new Error('协调器必须使用不含路径和凭据的 HTTP 来源地址')
   if (['127.0.0.1', 'localhost', '[::1]'].includes(origin.hostname)) throw new Error('bridge 容器不能使用宿主回环地址访问协调器；请配置可达宿主地址')
@@ -107,7 +112,7 @@ function businessLaunchModes(access: any, target?: BusinessTarget) {
     accessMode: previous?.accessMode ?? target?.accessMode ?? 'authenticated' }
 }
 
-function isDevelopmentLaunch(access: any, target?: BusinessTarget): boolean { return businessLaunchModes(access, target).development }
+function isUnrestrictedLaunch(access: any, target?: BusinessTarget): boolean { return isUnrestrictedBusinessAccess(businessLaunchModes(access, target)) }
 
 function validateSigningKey(config: BusinessLaunchConfig): void {
   const path = config.sharedSecretFile
@@ -121,8 +126,9 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
     || !input.sourceDigest || !input.workspaceId
     || !Number.isInteger(input.port) || input.port < 1 || input.port > 65535) throw new Error('业务实例登记参数无效')
   const access = JSON.parse(readFileSync(join(config.assetRoot, 'config/business-access.json'), 'utf8'))
-  const development = isDevelopmentLaunch(access, input)
-  if (!development) validateSigningKey(config)
+  const modes = businessLaunchModes(access, input)
+  const unrestricted = isUnrestrictedBusinessAccess(modes)
+  if (!unrestricted) validateSigningKey(config)
   const compose = yaml.load(input.compose)
   const service = compose?.services?.dsh
   if (!service || service.network_mode !== 'host') throw new Error('业务 Compose 缺少受控 dsh 网络入口')
@@ -146,7 +152,7 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
   const runtimeGeneration = input.runtimeGeneration ?? randomUUID()
   const businessBasePath = `/agents/${input.agentId}/instances/${input.name}/`
   const runtimeConfig = {
-    assetRoot: containerAssets, stateRoot: '/var/lib/dsh/business-control-state', ...(!development ? { sharedSecretFile: containerSecret } : {}),
+    assetRoot: containerAssets, stateRoot: '/var/lib/dsh/business-control-state', ...(!unrestricted ? { sharedSecretFile: containerSecret } : {}),
     coordinatorOrigin: config.coordinatorOrigin, basePath: businessBasePath,
     workspacePath: input.workspacePath ?? '/work/harness/workspace', presetId: input.presetId ?? input.agentId,
     localTools: capabilities.localTools,
@@ -194,7 +200,7 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
   service.environment.push(`HARNESS_BUSINESS_AGENT_ID=${input.agentId}`)
   service.environment.push(`HARNESS_BUSINESS_INSTANCE_ID=${input.name}`)
   const configDirectory = join(config.assetRoot, 'config'), credentials = mcpCredentialPaths(config.assetRoot)
-  const usesMcpCredentials = development || Boolean(manager)
+  const usesMcpCredentials = unrestricted || Boolean(manager)
   const hasMcpCredentials = existsSync(credentials.file)
   if (lstatSync(configDirectory).isSymbolicLink() || !lstatSync(configDirectory).isDirectory()
     || usesMcpCredentials && (hasMcpCredentials
@@ -208,12 +214,12 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
     { type: 'bind', source: configDirectory, target: `${containerAssets}/config`, read_only: true },
     ...(usesMcpCredentials && hasMcpCredentials ? [{ type: 'bind', source: credentials.directory,
       target: mcpCredentialPaths(containerAssets).directory, read_only: true }] : []),
-    ...(!development ? [{ type: 'bind', source: config.sharedSecretFile!, target: containerSecret, read_only: true }] : []),
+    ...(!unrestricted ? [{ type: 'bind', source: config.sharedSecretFile!, target: containerSecret, read_only: true }] : []),
     { type: 'bind', source: '${DSH_BUSINESS_PATCH_HOST:?业务控制 Patch 由启动器注入}', target: containerPatch, read_only: true },
   )
   return { compose: yaml.dump(compose, { lineWidth: -1, noRefs: true }), patch: yaml.dump(patch, { lineWidth: -1, noRefs: true, schema: patchSchema }),
     registration: { runtime_generation: runtimeGeneration, source_digest: input.sourceDigest,
-      access_mode: businessLaunchModes(access, input).accessMode, identity_mode: development ? 'development' : 'published',
+      access_mode: modes.accessMode, identity_mode: modes.identityMode,
       origin: `http://127.0.0.1:${input.port}`, scheduling_supported: true },
     runtimeConfig, localModelRoutes: capabilities.localModelRoutes }
 }
@@ -222,6 +228,30 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   try {
     if (process.argv[2] === '--capabilities') {
       console.log(JSON.stringify(readLocalCapabilities(resolve(process.argv[3]!))))
+      process.exit(0)
+    }
+    if (process.argv[2] === '--preflight-registration') {
+      const input = JSON.parse(readFileSync(0, 'utf8'))
+      await preflightGatewayRegistration(resolve(process.argv[3]!), input.registration, false, input.previousSourceDigest)
+      console.log(JSON.stringify({ valid: true }))
+      process.exit(0)
+    }
+    if (process.argv[2] === '--delete') {
+      const result = await deleteBusinessInstance(resolve(process.argv[3]!), process.argv[4]!)
+      process.stdout.write(result.stdout)
+      process.stderr.write(result.stderr)
+      process.exit(0)
+    }
+    if (process.argv[2] === '--register') {
+      const assetRoot = resolve(process.argv[3]!), instanceId = process.argv[4]!
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(instanceId)) throw new Error('业务实例名称无效')
+      const manifest = JSON.parse(readFileSync(join(instanceStateRoot(assetRoot), instanceId, 'instance.json'), 'utf8'))
+      const registration = { agentId: manifest.agent_id, instanceId, sourceId: manifest.source_id,
+        sourceDigest: manifest.business_control?.source_digest, accessMode: manifest.business_control?.access_mode,
+        identityMode: manifest.business_control?.identity_mode }
+      resolveBusinessInstance(assetRoot, registration)
+      await updateGatewayRegistration(assetRoot, registration, false, process.argv[5])
+      console.log(JSON.stringify({ url: businessGatewayEntry(assetRoot, registration.agentId, instanceId) }))
       process.exit(0)
     }
     if (process.argv[2] === '--entry') {
@@ -262,8 +292,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       '实例未向业务网关开放', '业务网关公开来源无效', '业务实例名称无效', '业务实例归属不匹配',
       '实例没有已核对的业务接入登记', '业务实例来源与网关登记不一致', '业务实例接入地址无效',
       '业务 Runtime 必须使用本机或私网地址', '业务实例 Web 基址与实例入口不一致',
+      '业务网关中同名实例的来源、访问方式或实例阶段不一致，拒绝覆盖',
+      '业务网关尚未配置，无法创建受控实例',
+      '业务网关登记配置无效，拒绝删除受控实例',
+      '受控实例来源登记不完整，拒绝删除；请先核对实例与网关配置',
+      '实例名必须是小写 kebab-case',
+      '业务网关配置持续被占用或保存锁未释放；请稍后重试并核对配置锁',
     ])
-    const reason = error instanceof Error && known.has(error.message) ? error.message
+    const reason = error instanceof Error && (known.has(error.message) || process.argv[2] === '--delete') ? error.message
       : ['--entry', '--check-entry'].includes(process.argv[2]!) ? '业务网页入口配置或实例登记读取失败，请核对当前数据工作区与网关登记'
         : '业务启动配置或来源文件解析失败'
     console.error(`BUSINESS_STARTUP_ERROR:${reason}`)

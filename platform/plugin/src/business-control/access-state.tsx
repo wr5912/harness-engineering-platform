@@ -1,6 +1,6 @@
-import { retiredLocalRiskFact, type ControlScope, type InstanceBinding, type RiskFact } from './contracts.ts'
+import { isUnrestrictedBusinessAccess, retiredLocalRiskFact, type ControlScope, type InstanceBinding, type RiskFact } from './contracts.ts'
 import type { BusinessControlManagementStatus } from './management.ts'
-import { currentRiskFacts, developmentSynchronized } from './overview.tsx'
+import { currentRiskFacts, unrestrictedSynchronized } from './overview.tsx'
 import { LoadingIndicator } from '../components/loading-indicator.tsx'
 
 type ManagedInstance = BusinessControlManagementStatus['instances'][number]
@@ -87,7 +87,7 @@ export function GatewayAccessState({ data, selectedAgentId, selectedServerId, re
   const registered = registration.phase === 'ready' ? registration.rows.filter(item => item.agent_id === selectedAgentId) : []
   const instances = (data?.instances ?? []).filter(instance => instance.agentId === selectedAgentId
     && registered.some(row => row.name === instance.instanceId))
-  const published = instances.filter(instance => instance.identityMode !== 'development')
+  const published = instances.filter(instance => !isUnrestrictedBusinessAccess(instance))
   const inCurrentScope = (scope: ControlScope) => published.filter(instance => matchesGatewayInstanceScope(scope, instance))
   const records = currentRiskFacts(data?.riskFacts ?? [], now).map(item => item.fact).filter(fact => inCurrentScope(fact.scope).length > 0
     && (!selectedServerId || fact.scope.serverId === undefined || fact.scope.serverId === selectedServerId))
@@ -115,13 +115,15 @@ export function GatewayAccessState({ data, selectedAgentId, selectedServerId, re
       : !selectedAgentId ? <p>请选择智能体，核对其运行时限制。</p>
         : registration.phase !== 'ready' ? <p role="status" data-access-notice="unknown">{registration.phase === 'error' ? `实例登记读取失败${registration.error ? `：${registration.error}` : ''}` : '实例登记尚未确认'}，当前作用范围未知，暂不将历史记录列为生效约束。</p>
           : <>
+            {published.length > 0 && <>
             <p data-access-source={externalAuthorization ? 'third-party-first' : 'manual'}><strong>授权方式：{externalAuthorization ? '第三方优先，手动兜底' : '手动配置'}</strong></p>
             <section aria-label="最近访问决定"><h4>最近访问决定</h4>{receipts.length ? <ul>{receipts.map((event, index) => { const receipt = event.authorization!; return <li className="harness-gateway-access-receipt" key={`${event.at}:${event.requestId ?? index}`} data-authorization-source={receipt.source}><strong>{receipt.decision === 'allow' ? '允许' : receipt.decision === 'deny' ? '禁止' : '执行前确认'} · {receipt.source === 'third-party' ? '第三方决定' : receipt.source === 'manual-fallback' ? '手动兜底' : '手动配置'}</strong><span>{event.at} · {event.operationId || event.action}</span>{receipt.reason && <span>{receipt.reason}</span>}{receipt.policyVersion && <small>策略版本 {receipt.policyVersion}{receipt.expiresAt ? ` · 此次决定有效至 ${receipt.expiresAt}${validUntil(receipt.expiresAt, now) ? '' : ' · 回执已过期'}` : ''}</small>}<Scope scope={event.scope!} instances={inCurrentScope(event.scope!)}/></li> })}</ul> : <p>尚无当前实例的访问决定记录。</p>}<p data-access-notice>这里只展示对应请求的已记录决定，不代表智能体永久获准；新请求会重新查询并核对。</p></section>
             <p data-access-automatic={automatic ? 'on' : 'off'}><strong>自动风险评估：{automatic ? '已开启' : '已关闭'}</strong>{automatic && data.configuration.riskAssessment.mode === 'test-mock' ? ' · 测试模拟提供方' : ''}{!automatic && '；旧自动评估只作历史记录，不参与当前许可。'}</p>
-            {!agent || !data.configuration.enabled || !agent.enabled ? <p data-access-notice="unknown">{!agent ? '所选智能体尚未登记业务访问身份，请在智能体身份页完成登记。' : !data.configuration.enabled ? '工作区业务入口已关闭。' : '该智能体的业务访问已关闭。'}身份、归属与手动临时限制仍须满足。</p> : null}
+            </>}
+            {published.length > 0 && (!agent || !data.configuration.enabled || !agent.enabled) ? <p data-access-notice="unknown">{!agent ? '所选智能体尚未登记业务访问身份，请在智能体身份页完成登记。' : !data.configuration.enabled ? '工作区业务入口已关闭。' : '该智能体的业务访问已关闭。'}身份、归属与手动临时限制仍须满足。</p> : null}
             {!registered.length ? <p data-access-notice="unknown">所选智能体没有当前实例登记；历史实例记录不作为当前运行时限制。</p> : null}
             {unobserved > 0 && <p data-access-notice="unknown">{unobserved} 个当前登记实例尚无网关绑定事实，运行状态待确认。</p>}
-            {instances.length > published.length && <p>{instances.length - published.length} 个实例处于开发调试模式，发布阶段的自动评估和人工限制不适用。</p>}
+            {instances.length > published.length && <p>{instances.length - published.length} 个实例无需登录或处于开发调试模式，直接放行；认证、风险评估和访问限制不适用。</p>}
             {published.length > 0 && <>
               {policies.length > 0 && <section aria-label="已保存的手动兜底策略"><h4>已保存的手动兜底策略</h4><ul>{policies.map(policy => {
                 const conditional = policy.rules.filter(rule => Object.keys(rule.when).length > 0).length
@@ -148,10 +150,10 @@ export function GatewayAccessState({ data, selectedAgentId, selectedServerId, re
             </>}
             {instances.length > 0 && <section aria-label="配置应用回执"><h4>配置应用回执{stale ? ' · 上次读取' : ''}</h4><ul>{instances.map(instance => {
               const row = registered.find(item => item.name === instance.instanceId)
-              if (instance.identityMode === 'development') {
+              if (isUnrestrictedBusinessAccess(instance)) {
                 const label = row?.state !== 'running' ? '运行状态待核对' : stale ? '上次读取的同步记录，当前待确认'
-                  : instance.synchronization?.lastError ? '记录同步失败，不阻断开发交互'
-                    : developmentSynchronized(instance) ? '开发记录已同步，无需发布许可回执' : '尚无开发记录同步回执'
+                  : instance.synchronization?.lastError ? '记录同步失败，不阻断交互'
+                    : unrestrictedSynchronized(instance) ? '运行记录已同步，无需发布许可回执' : '尚无运行记录同步回执'
                 return <li key={instance.instanceId} data-access-instance={instance.instanceId}>{instance.instanceId} · {label}
                   {instance.synchronization?.lastSuccessAt && <small>最近成功同步 {instance.synchronization.lastSuccessAt}</small>}
                   {instance.synchronization?.lastError && <small>{instance.synchronization.lastError}</small>}</li>
@@ -163,7 +165,7 @@ export function GatewayAccessState({ data, selectedAgentId, selectedServerId, re
                 : applied ? stale ? '上次读取时已同步，当前待确认' : '当前配置已同步' : '当前配置应用待核对'
               return <li key={instance.instanceId} data-access-instance={instance.instanceId}>{instance.instanceId} · {label}{acknowledgement && <small>回执版本 {acknowledgement.restrictionVersion} / 当前版本 {data.restrictionVersion} · {acknowledgement.at}</small>}</li>
             })}</ul></section>}
-            <p className="harness-gateway-access-note">以上显示匹配范围内的附加约束。每次请求仍核对第三方决定或手动兜底、身份、来源和当前参数；配置已同步也不等于业务请求获准。</p>
+            <p className="harness-gateway-access-note">以上显示匹配范围内的附加约束。只有需要登录的已发布实例在请求时核对第三方决定或手动兜底、身份、来源和当前参数；无需登录的实例直接放行。</p>
           </>}
   </section>
 }

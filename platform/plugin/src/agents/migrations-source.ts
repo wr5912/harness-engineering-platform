@@ -28,7 +28,7 @@ export function safeSourcePath(value: unknown): string {
 export function excludedMigrationPath(path: string): string | undefined {
   const parts = path.split('/'), name = parts.at(-1)!
   if (parts.some(p => SKIP.has(p))) return '运行状态、缓存或依赖目录'
-  if (/^(?:\.env(?:\..*)?|credentials?(?:\..*)?|id_(?:rsa|ed25519)|.*\.llm-api-key)$/i.test(name)) return '凭据文件'
+  if (/^(?:\.env(?:\..*)?|id_(?:rsa|ed25519)|.*\.llm-api-key)$/i.test(name) || /^credentials?(?:\..*)?$/i.test(name) && !/\.(?:[cm]?[jt]s|[jt]sx)$/i.test(name)) return '凭据文件'
   if (/\.(?:safetensors|ckpt|pth|pt|gguf|onnx)$/i.test(name) || /^(?:pytorch_model|model|consolidated|adapter_model).*\.bin$/i.test(name)) return '模型权重；未修改的基础模型不进入 Harness 资产'
   return undefined
 }
@@ -76,7 +76,16 @@ function realSourcePath(value: unknown): string {
   return realpathSync(path)
 }
 async function git(cwd: string, args: string[], signal?: AbortSignal, buffer = MAX_FILE) {
-  return (await execute('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'protocol.ext.allow=never', '-c', 'gc.auto=0', ...args], { cwd, encoding: 'buffer', timeout: 60_000, maxBuffer: buffer, signal, env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_NOSYSTEM: '1' } })).stdout as Buffer
+  try {
+    return (await execute('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'protocol.ext.allow=never', '-c', 'gc.auto=0', ...args], { cwd, encoding: 'buffer', timeout: 60_000, maxBuffer: buffer, signal, env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_NOSYSTEM: '1' } })).stdout as Buffer
+  } catch (error: any) {
+    if (signal?.aborted) throw error
+    const stage = ({ clone: '克隆仓库', 'rev-parse': '解析提交', 'ls-tree': '读取文件清单', show: '读取文件内容' } as Record<string, string>)[args[0]] ?? args[0]
+    if (error.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') migrationFail(`Git ${stage}失败：输出超过读取上限，请缩小来源范围`, 'source_read_failed')
+    if (error.killed) migrationFail(`Git ${stage}超时（60 秒），请核对仓库访问与网络后重试`, 'source_read_timeout')
+    const detail = assetText('git-error.txt', String(error.stderr ?? error.message ?? '')).content.trim().slice(0, 1000)
+    migrationFail(`Git ${stage}失败（退出码 ${error.code ?? 'unknown'}）${detail ? `：${detail}` : ''}`, 'source_read_failed')
+  }
 }
 /** fflate 负责正文解压；中央目录补充它未公开的 Unix 类型和执行位。 */
 function zipMetadata(bytes: Buffer) {
@@ -222,7 +231,8 @@ export async function inspectMigrationSource(root: string, body: MigrationMap, s
       else {
         if (!/^(?:https?:\/\/|ssh:\/\/|git@)/.test(url)) migrationFail('远程 Git 仅接受 HTTPS/SSH 仓库')
         mkdirSync(directory, { recursive: true }); repository = join(directory, 'repository.git')
-        await git(root, ['clone', '--bare', '--filter=blob:none', '--', url, repository], signal, 1024 * 1024)
+        // 清点需要文件大小和正文，完整取回对象，避免逐文件触发联网补取。
+        await git(root, ['clone', '--bare', '--', url, repository], signal, 1024 * 1024)
       }
       const commit = (await git(repository, ['rev-parse', '--verify', `${ref}^{commit}`], signal)).toString().trim()
       if (!/^[0-9a-f]{40}$/.test(commit)) migrationFail('Git 来源无法固定到提交')

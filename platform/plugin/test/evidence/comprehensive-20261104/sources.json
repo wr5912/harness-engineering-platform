@@ -1,0 +1,79 @@
+{
+  "program": {
+    "base": "1a32a74e285a5b8d50678a1d17b2f11b237315e4",
+    "implementation_commit": "1ce1fc5d448769a9229518926fdd7f8a7e6a261d"
+  },
+  "data": {
+    "base": "6a666ba9238dd0d2d35ef25ea549062db3d4e4f0",
+    "implementation_commit": "8fbb06e9387e407db77a081c21d8db9927054bd0"
+  },
+  "source_sha256": {
+    "program": {
+      "README.md": "446bbb86935d4c2b79d75f7a554930974cb43ad7aec383a4e01f72f4e229c33c",
+      "docs/assets/capabilities/overview-4k.png": "5f168cae79f7ada844b2ac8a267ba5ae46af6cf7628e0622dfc413a158520d9f",
+      "docs/assets/capabilities/overview.svg": "aca358504f053f3b797363f30862e98cf00ae2ab8cd08e5be528540074f3009c",
+      "docs/platform-design/02_系统架构与部署设计.md": "22df40b3a977ec925bbd4adb902d8cbe6233950f4a2c4f3bef15f8925ed2fd0f",
+      "docs/platform-design/03_存储架构与数据契约.md": "fa02478f299b167945b11868439bdcf615c3ce36ad8eb57b93a4f48d3d3c3a7d",
+      "docs/platform-design/23_离线一键打包与安装.md": "1a9bba51487f48261e081e569f5e83f4058bbfea98b4dba916c0944810fae7b2",
+      "docs/platform-design/26_前端设计规范与原则.md": "bccda831555ad19fe775495c8d19fdb2db3e371581fa719fb9d494b0d03aa95e",
+      "docs/platform-design/27_跨框架接入使用说明.md": "9c0b09dcafad813e06867ea6d2c1bebdb97573ac6cb29a6c803cba0be93d161c",
+      "docs/platform-design/README.md": "9ebe9594682f6a639a9243ab270ea26556ec40bfd0b53533460e2dc716d48354",
+      "docs/项目术语表.md": "442908ca9a9ded127da6eabaaf7b2faa9fa4b4a16679fa3c2bb23caac95d3d19",
+      "platform/deploy/cli.mts": "f9484ed6bb639342215ca244935dee05e6cc9e4b89bb33af718187e6d4496f75",
+      "platform/deploy/install.mts": "d34404bd402d0664f6df9b021a7cd741562b4f6f250b3893a475fc61f7743848",
+      "platform/deploy/paths.mts": "6668d4512282d4e4674855cb923d451226894844bc81ecbef8a385ef93fddcd2",
+      "platform/deploy/test/deploy.test.mjs": "87f8ad7f0579959293af17a889b2e4dc22c6e0581f5b476f4daf3c7d6ee33842",
+      "platform/deploy/test/update.test.mjs": "ac4d9de6a585b92fd05f2dfc29641f4b22ba58aa713590732a29b51a8679b4b5",
+      "platform/deploy/update.mts": "76d9b4204671ead618674a7dd16eedf4295c3965ccd81ca4e5d7b1ef0f2289dc",
+      "platform/lifecycle.mts": "0eb6831cc3f454a2bfe9890fd7a1f8616f7c71022a00802ece63e41b976ca138",
+      "platform/plugin/build.mjs": "314dfbd23bf89996226d4a47a2697f6179e3ee1462e5d3794e8d94ef3fc8f0c8",
+      "platform/plugin/src/agents/index.ts": "733847f184e3f6571d2e32740b15024cee29433e6efae80aba480d16cdc53300",
+      "platform/plugin/src/evaluation/dataset-view.tsx": "c27aca79bee59732c8729b6e1e09fca7bf3cc82a4f3e95f27e86ec13c2367276",
+      "platform/plugin/src/evaluation/datasets.ts": "b4501e3074d73eebe28e3bc5ebc33115b36c94f2be3bac9fd3b15b4577bd9d17",
+      "platform/plugin/src/home.tsx": "3386959998be6b5b2434fe1622e4953ae4e750e57bc1a5636f5cecdd23af08ee",
+      "platform/plugin/src/instances/external/access.ts": "8f8c428b9b4dbc6afc1548052561e2c33d581e525460039a88d146a61d402f45",
+      "platform/plugin/src/login-showcase.tsx": "cdb03b2f839891876eb7dce4de8608b1e5215b8292f19a0b0aaa128bced847b9",
+      "platform/plugin/src/login.tsx": "c96b8d0764847fa529967a2c2d87036268d612898d8951027da7473f5cd2e1d5",
+      "platform/plugin/src/mcp/client.tsx": "175d754adff441ebbb3a93fa3dc0f2d42282a7d728bad0a1ee43126781d80928",
+      "platform/plugin/src/mcp/execution-receipts.ts": "ecaaa8b33d447a004c288742a3a8301edd5bc5af1e2954111bc1b192bb9e1e63",
+      "platform/plugin/src/mcp/executor.ts": "abd7f2231da1293d42ada5d70257fce7b4118173232033e8718c40c39c16a9b8",
+      "platform/plugin/src/mcp/extension.ts": "7ff8ca2d618ef3f05a07a81ddaf4c3adcd13769273357a8ffa69a29ee16d26b6",
+      "platform/plugin/src/mcp/index.ts": "0456d49c95ad79d52aae7ff0ac9b3b53b871deaafa20eed707bb8eea8890ac1e",
+      "platform/plugin/src/sdk/worker.ts": "7dd678421bb20fd9f48199df0075a6dd39ffa24f65769ebb468fbdd4bc7679c1",
+      "platform/plugin/test/agents.test.mjs": "a96abd6445dce3c9d9ad87a65bd847605fb7e574cd06f55f389860d93d71cc11",
+      "platform/plugin/test/dataset-view.test.mjs": "68dc046051db9c8e98887a737e3fc2e4a2ae693edf5247a1b4db4d251a8a9ccf",
+      "platform/plugin/test/datasets.test.mjs": "6adea79c8d6e1daa717b4ba60344f73a6b4ec8293199bc0a1cc8e511de4ebf4b",
+      "platform/plugin/test/external-instances.test.mjs": "6f730c5a40ddd9c737eb38fdb70dcd5d60196022629d8e9af3be7a8cfdb5c513",
+      "platform/plugin/test/login-page.test.mjs": "f838e68858bfa05a172b864cf452b1d20e790718edbede707400454172d63238",
+      "platform/plugin/test/mcp-composition-client.test.mjs": "febd783c46b1ab4a496bf059042d6b6b4b9047fa6c46f9803cab5da56ea564d4",
+      "platform/plugin/test/mcp.test.mjs": "16216ccbaaf25bf1c035f4620eb32575bee2f98d9a564a9ca9f3ea5169b376c1",
+      "platform/plugin/test/sdk-operations.test.mjs": "2529b7a12577a0e3f3dff741130d85f0449d33e2b02b6bc3540c2f383958ba77",
+      "runtime/research/platform-replay-input.mts": "8405160de869d71e60754c70ed8c684eee22f6432caeacce253882fb9e78a734",
+      "runtime/research/test_platform_asset_edit.mjs": "bed88b8f31c92ad05b9c248453528ddce5d510ccd5a7e302abea728b95e2ac87",
+      "runtime/research/test_platform_replay_input.mjs": "3911d321c70a1afe95162d1f1886c24bad5b81ef20af7a4d2adc9cc8646c0e97"
+    },
+    "data": {
+      ".agents/skills/agent-maintenance/SKILL.md": "d0dd9cc427a9b4bb381cc11a34542252f57f9b22928ee1a824aa41c1d2543513",
+      ".agents/skills/compute-variant-research/SKILL.md": "253aa95f70d883b1e6022b9dc2a129d9dd2c1ccdefe8c2227a48931588065d31",
+      ".agents/skills/kev-trace-pipeline/SKILL.md": "8d5d32b98307332b419ddf645fe1586adca4f87e2ac5dbabe4d5b41fd0efaed1",
+      ".agents/skills/kev-trace-pipeline/references/platform-runtime.md": "9e6746ec5338b3adfc7e463f56bef005d615ce80eb9cc07db7217eaa2cf6bf54",
+      ".agents/skills/kev-training/SKILL.md": "3f0ddb57eee3f3dd7574aeaa018156e0ad0235c26393fe772f0963d35a102fb4",
+      ".agents/skills/kev-training/references/native-execution.md": "90482c7dcb99d2ea93a08e8139efec19aad53d2e02513df7165218db3d1f5468",
+      ".agents/skills/workspace-management/SKILL.md": "b235361eb944e02d8b8cda3ae2bd0c32dfa02f2d6bf9c9802b7f06d9245aaa73",
+      "AGENTS.md": "41f901751f9c7d01dd4ac0e0808a2d54e388730ac9320eb4a7539aa9db1a9cd3",
+      "README.md": "9b06790a25981be707c6818d7eb980a439190e28c20a31d50f5e132d98ec0399",
+      "docs/harness-research/compute-variants.md": "c96ff48ea2964aeb18a0ede0ffbf51762c10153090ce50f352aedbd454ba6f7c",
+      "docs/harness-research/kev-medium-variant-skills.md": "a4aa416425f08930860e671adcae04894f175e59966e0cd202767dd8296143f3",
+      "extensions/security-operations/src/threat/runtime.ts": "c9ad1f1cc232a118975e60575e78a61b028582e9963b8d2c78d9c8c5e6501dfe",
+      "extensions/security-operations/tests/threat-runtime.test.mjs": "e4b0f7ba849d6d45a84afb3c05e56e24e2a48298b85cff491d6ad050bd5a8a5f"
+    }
+  },
+  "loaded_implementation_source_index_matches": true,
+  "source_index_mismatches": [],
+  "live_and_isolated_index_equal": true,
+  "preserved": {
+    "/home/admin/harness-engineering-platform-data/config/business-access.json": true,
+    "/home/admin/harness-engineering-platform-data/evolution/datasets/decision-dataset-b8f473f1-0cd7-42cd-a0a1-b90771f1ebe4.json": true,
+    "/home/admin/harness-engineering-platform-data/evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/evaluation/evidence/dsh-image-build-20261024T023237Z-3.json": true
+  }
+}

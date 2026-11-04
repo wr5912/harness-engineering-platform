@@ -158,3 +158,30 @@ test('超过1MiB的最终响应不会因分块读取丢失完成回执', async t
   const done = await terminal(fx.rpc, 'sdk-large-response')
   assert.equal(done.status, 'completed'); assert.equal(done.final_response.length, 2 * 1024 * 1024)
 })
+
+test('SDK真实Worker跨任意UTF8字节切块保留中文emoji、逐行事件及无末尾换行回执', async t => {
+  for (const newline of [true, false]) {
+    const fx = fixture(t), text = '你好😀，任务结束'
+    const original = "print(json.dumps({'name':'sdk-demo','profile':'sdk','status':'completed','session_id':'session-sdk-test','final_response':'SDK调用完成'}),flush=True)"
+    const replacement = `frames=[{'type':'progress','message':'轨迹中文😀'},{'name':'sdk-demo','profile':'sdk','status':'completed','session_id':'session-sdk-test','final_response':${JSON.stringify(text)}}]\nfor i,frame in enumerate(frames):\n raw=(json.dumps(frame,ensure_ascii=False)+('\\n' if i==0 or ${newline ? 'True' : 'False'} else '')).encode('utf-8')\n for byte in raw:\n  os.write(1,bytes([byte]));time.sleep(0.002)`
+    writeFileSync(fx.cli, readFileSync(fx.cli, 'utf8').replace(original, replacement))
+    const id = newline ? 'sdk-utf8-lines' : 'sdk-utf8-tail'
+    await fx.rpc('start', request(id))
+    const done = await terminal(fx.rpc, id)
+    assert.equal(done.status, 'completed'); assert.equal(done.final_response, text)
+    assert.equal(done.events.find(event => event.type === 'progress').message, '轨迹中文😀')
+  }
+})
+
+test('SDK stderr跨UTF8字节解码并在完整诊断上脱敏，不把未知写成完成', async t => {
+  const secret = 'sdk-stderr-fixture-secret'
+  const fx = fixture(t, { modelPolicy: async () => ({ policy: { default: { provider: 'fixture', model: 'fixture' } }, environment: { SDK_TEST_KEY: secret } }) })
+  const original = "print(json.dumps({'name':'sdk-demo','profile':'sdk','status':'completed','session_id':'session-sdk-test','final_response':'SDK调用完成'}),flush=True)"
+  const replacement = "raw=('中文诊断😀 '+os.environ['SDK_TEST_KEY']).encode('utf-8')\nfor byte in raw:\n os.write(2,bytes([byte]));time.sleep(0.002)\nsys.exit(1)"
+  writeFileSync(fx.cli, readFileSync(fx.cli, 'utf8').replace(original, replacement))
+  await fx.rpc('start', request('sdk-stderr-utf8'))
+  const done = await terminal(fx.rpc, 'sdk-stderr-utf8')
+  assert.equal(done.status, 'unknown'); assert.match(done.error, /中文诊断😀/)
+  assert.equal(done.error.includes(secret), false)
+  assert.equal(readFileSync(join(fx.root, '.local/sdk-operations/sdk-stderr-utf8/operation.json'), 'utf8').includes(secret), false)
+})

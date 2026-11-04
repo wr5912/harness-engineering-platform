@@ -23,7 +23,7 @@ from urllib.parse import urlsplit
 
 ADAPTER = Path(__file__).resolve().parent
 sys.path.insert(0, str(ADAPTER))
-from workspace_paths import PROGRAM_ROOT, asset_root, sites_config
+from workspace_paths import PROGRAM_ROOT, asset_root, instances_root, sites_config
 REPO = asset_root()
 EVALUATION_SCRIPTS = PROGRAM_ROOT / "runtime/research"
 for import_root in (ADAPTER, EVALUATION_SCRIPTS):
@@ -371,6 +371,9 @@ def dsh_dev_command() -> list[str]:
 def start_instance(source: str, name: str, model_policy_path: str | None = None,
                    source_ref: str | None = None, mcp_fixture: str | None = None) -> dict:
     command = [*dsh_dev_command(), "up", "--source", source, "--mode", "eval", "--name", name]
+    if not mcp_fixture:
+        command.extend(("--business-control", str(REPO / "config/business-access.json"),
+                        "--business-identity-mode", "development", "--business-access-mode", "anonymous"))
     if model_policy_path:
         command.extend(("--model-policy", model_policy_path))
     if source_ref:
@@ -403,6 +406,16 @@ def authentication_url(name: str) -> str:
         label="取得 DSH 认证入口", timeout=90, env=os.environ.copy(),
     )
     url = completed.stdout.strip()
+    manifest_path = instances_root(REPO) / name / "instance.json"
+    manifest = strict_json(manifest_path) if manifest_path.is_file() else {}
+    if manifest.get("business_control"):
+        entry = checked_process(
+            ["node", str(ADAPTER / "business.ts"), "--entry", str(REPO), manifest["agent_id"], name],
+            label="核对 DSH 业务网关入口", timeout=30, env=os.environ.copy(),
+        )
+        if url != json.loads(entry.stdout)["url"]:
+            raise EvaluationError("DSH 评测入口与已登记业务网关不一致")
+        return url
     try:
         parsed = urlsplit(url)
         valid = (parsed.scheme == "http" and parsed.hostname == "127.0.0.1"
@@ -424,7 +437,18 @@ def stop_instance(name: str) -> bool:
         )
     except (OSError, subprocess.TimeoutExpired, KeyboardInterrupt):
         return False
-    return completed.returncode == 0
+    if completed.returncode != 0:
+        return False
+    manifest_path = instances_root(REPO) / name / "instance.json"
+    try:
+        if manifest_path.is_file() and strict_json(manifest_path).get("business_control"):
+            completed = run_process(
+                [*dsh_dev_command(), "delete", name], timeout=180, env=os.environ.copy(),
+            )
+            return completed.returncode == 0
+    except (EvaluationError, OSError, subprocess.TimeoutExpired, KeyboardInterrupt):
+        return False
+    return True
 
 
 def driver_command(executor: str, image: str, evidence_root: Path) -> tuple[list[str], str]:
@@ -793,6 +817,10 @@ def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict
                 "image_ref": image_identity["image_ref"],
                 "image_build_fingerprint": image_identity["image_build_fingerprint"],
                 "platform": image_identity["platform"],
+                "instance_name": instance_name,
+                **({"business_control": {key: image_identity["business_control"][key]
+                     for key in ("source_digest", "runtime_generation", "identity_mode", "access_mode")},
+                    "entry_kind": "business-gateway"} if image_identity.get("business_control") else {}),
                 "scope": "actual DSH evaluation runtime image identity; no semantic verdict",
             })
             auth_url = authentication_url(instance_name)

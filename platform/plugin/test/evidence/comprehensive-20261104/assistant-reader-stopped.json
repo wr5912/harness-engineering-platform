@@ -1,0 +1,8 @@
+{
+  "status": "stopped",
+  "checkedAt": "2026-11-04T03:55:19.515Z",
+  "port": 42445,
+  "pid": 3591676,
+  "listening": false,
+  "processExists": false
+}

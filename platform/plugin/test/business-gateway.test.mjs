@@ -74,7 +74,8 @@ class Fixture extends Service {
   async *follow(request, signal) { yield { sessionId: request.address?.sessionId ?? request.sessionId, kind: this.ctx.invocation.peer.principal.kind }; await new Promise(resolve => signal.addEventListener('abort', resolve, { once: true })) }
 }
 mark('create'); mark('list'); mark('updateQueue'); mark('page', { resources: { session: request => request.address?.sessionId ?? request.address?.childSessionId ?? request.sessionId } }); mark('follow', { mode: 'stream', resources: { session: request => request.address?.sessionId ?? request.address?.childSessionId ?? request.sessionId } })
-async function setup(t, { localTools = [], emptyWorkspace = false, registrationFailure = false, sharedDevelopment = false, development = sharedDevelopment, noSecret = false, proxyOrigin, nativeSessions = false, runtimeInputsOnly = false } = {}) {
+async function setup(t, { localTools = [], emptyWorkspace = false, registrationFailure = false, sharedDevelopment = false, sharedPublished = false, development = sharedDevelopment, noSecret = false, disabled = false, proxyOrigin, nativeSessions = false, runtimeInputsOnly = false } = {}) {
+  const sharedAnonymous = sharedDevelopment || sharedPublished
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'business-native-'))
   const assetRoot = runtimeInputsOnly ? join(fixtureRoot, 'runtime-inputs') : fixtureRoot
   mkdirSync(join(assetRoot, 'config'), { recursive: true })
@@ -95,8 +96,9 @@ async function setup(t, { localTools = [], emptyWorkspace = false, registrationF
   const setupConfigPath = join(assetRoot, 'config/business-access.json'), setupConfig = JSON.parse(readFileSync(setupConfigPath, 'utf8'))
   setupConfig.gateway = { host: '127.0.0.1', port: 0, publicOrigin: 'http://business.localhost:0', sharedSecretFile: secretPath, instances: [{ agentId: binding.agentId, instanceId: binding.instanceId }] }
   if (proxyOrigin) setupConfig.gateway.proxyOrigin = proxyOrigin
-  if (sharedDevelopment) Object.assign(setupConfig.gateway.instances[0], { accessMode: 'anonymous', identityMode: 'development', sourceDigest: binding.sourceDigest })
+  if (sharedAnonymous) Object.assign(setupConfig.gateway.instances[0], { accessMode: 'anonymous', identityMode: sharedPublished ? 'published' : 'development', sourceDigest: binding.sourceDigest })
   if (development) Object.assign(setupConfig.gateway.instances[0], { identityMode: 'development', sourceDigest: binding.sourceDigest })
+  if (disabled) setupConfig.enabled = false
   writeFileSync(setupConfigPath, JSON.stringify(setupConfig))
   const ctx = new Context(); t.after(async () => { await ctx.fiber.dispose(); rmSync(fixtureRoot, { recursive: true, force: true }) })
   const basePath = proxyOrigin ? '/agents/soc/instances/soc-business/' : undefined
@@ -138,8 +140,8 @@ async function setup(t, { localTools = [], emptyWorkspace = false, registrationF
   await ctx.get('connection').refresh(); await ctx.get('connection').refresh()
   assert.equal(loaded.state, 2)
   await ctx.plugin(TypertGateway, {}); await ctx.plugin(WorkspaceController); if (!nativeSessions) await ctx.plugin(Fixture); const fixture = ctx.get('sessionFixture'); const control = getBusinessControl(assetRoot)
-  const context = id => { const value = sharedDevelopment ? sharedInstanceIdentity(binding) : identity(id); if (!sharedDevelopment) { value.subject.identitySource = `http://127.0.0.1:${provider.address().port}`; value.evidence.issuer = value.subject.identitySource }; return control.createContext(value, binding) }
-  const headers = (id, path, method = 'POST') => control.isDevelopmentInstance(binding) ? businessAssertionHeaders({ binding, context: context(id) })
+  const context = id => { const value = sharedAnonymous ? sharedInstanceIdentity(binding) : identity(id); if (!sharedAnonymous) { value.subject.identitySource = `http://127.0.0.1:${provider.address().port}`; value.evidence.issuer = value.subject.identitySource }; return control.createContext(value, binding) }
+  const headers = (id, path, method = 'POST') => control.isUnrestrictedInstance(binding) ? businessAssertionHeaders({ binding, context: context(id) })
     : signBusinessAssertion(secret, { binding, context: context(id), snapshot: coordinator.issueSnapshot(binding.instanceId), nonce: randomBytes(24).toString('base64url'), issuedAt: Date.now() }, method, path)
   const rpc = async (id, endpoint, request) => { const path = `/api/${endpoint}`; return fetch(`http://127.0.0.1:${ctx.webServer.port}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers(id, path) }, body: JSON.stringify({ type: 'client-request', rpcId: randomBytes(8).toString('hex'), method: endpoint, payload: { args: { request } } }) }) }
   return { ctx, control, fixture, headers, rpc, context, secret, coordinator, gateway, workspacePath, workspaceRows, workspaceRegistry, registrationConnections, toolGuards, agents, trustCalls, riskCalls: riskProvider.calls, delayTrust: (id, delay) => trustDelays.set(id, delay), revoke: id => revokedSubjects.add(id) }
@@ -273,7 +275,7 @@ test('门户代理保留路径并使用 HTTPS 来源连接原生 API 与 WebSock
   }
   for (const headers of [{ ...portalHeaders, origin: 'https://other.localhost:18060' },
     { ...portalHeaders, 'x-forwarded-proto': 'http' }, { ...portalHeaders, host: 'other.localhost' }]) {
-    assert.equal((await frontFetch(base, { headers })).status, 403)
+    assert.equal((await frontFetch(base + 'api/session/list', { method: 'POST', headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify({ type: 'client-request', rpcId: 'anonymous-origin', method: 'session/list', payload: { args: { request: {} } } }) })).status, 200)
   }
   const ws = new WebSocket(target.replace('http:', 'ws:') + base + 'api/remote.mux', { headers: portalHeaders })
   t.after(() => ws.terminate())
@@ -310,7 +312,7 @@ test('受控本地工具按来源声明和 Session 归属开放，保留原生�
   assert.match(guard({ name: 'skill', agent: { session: { id: 'other-session' } } }), /业务 Session 未登记/)
 })
 
-test('无需认证的开发会话保留 DSH 原生工具，失效归属仍拒绝', async t => {
+test('原则：无需登录的会话保留 DSH 原生工具，只有切换为需要登录才进入 Guard', async t => {
   const { ctx, control, context, toolGuards } = await setup(t, { localTools: ['skill', 'analyze_threat_incident'] })
   const path = join(control.assetRoot, 'config/business-access.json')
   const config = JSON.parse(readFileSync(path, 'utf8'))
@@ -328,7 +330,7 @@ test('无需认证的开发会话保留 DSH 原生工具，失效归属仍拒绝
   assert.equal(guard(request('skill')), undefined)
   assert.equal(guard(request('schedule_create')), undefined)
   assert.equal(guard(request('analyze_pending_threat_incidents')), undefined)
-  assert.match(guard(request('native_read', 'unknown-session')), /业务 Session 未登记/)
+  assert.equal(guard(request('native_read', 'unknown-session')), undefined, '匿名工具 Guard 不叠加会话许可检查')
   const visitorId = 'visitor-' + 'v'.repeat(32), expiresAt = new Date(Date.now() + 60000).toISOString()
   control.bindSession(control.createContext({ subject: { id: visitorId, kind: 'human', identitySource: 'gateway-anonymous' },
     evidence: { issuer: 'gateway-anonymous', externalSubject: visitorId, method: 'anonymous', verifiedAt: new Date().toISOString(), expiresAt }, expiresAt }, binding), 'development-visitor-session')
@@ -336,7 +338,11 @@ test('无需认证的开发会话保留 DSH 原生工具，失效归属仍拒绝
   assert.equal(guard(request('native_read', 'development-visitor-session')), undefined)
   config.gateway.instances[0].identityMode = 'published'
   writeFileSync(path, JSON.stringify(config))
-  assert.match(guard(request('native_read')), /业务任务上下文或许可无效/, '切回发布模式后不能沿用开发许可')
+  assert.equal(guard(request('native_read')), undefined, '发布状态不改变无需登录的放行原则')
+  config.gateway.instances[0].accessMode = 'authenticated'
+  writeFileSync(path, JSON.stringify(config))
+  assert.equal(ctx.get('businessRuntime').requiresAuthentication(), true)
+  assert.match(guard(request('native_read')), /业务任务上下文或许可无效/, '切换为需要登录后才应用访问控制')
 })
 test('原生子 Session 继承已登记父归属，归档后仍按双重归属读取，伪造关系与跨主体拒绝', async t => {
   const { ctx, control, context, rpc, fixture, agents, toolGuards } = await setup(t, { localTools: ['skill', 'analyze_threat_incident', 'delegate_threat_analysis'] })
@@ -398,10 +404,11 @@ test('原生 Connection/Remote/Gateway 非 owner 创建持久归属并隔离列�
   assert.equal((await rpc('A', 'session/page', { address: { kind: 'session', sessionId: b.result.value.sessionId } })).status, 403)
   assert.equal((await rpc('A', 'session/page', { address: { kind: 'subagent', sessionId: a.result.value.sessionId, subagentId: 'unopened' } })).status, 403)
 })
-test('无需认证的开发实例保留完整原生访问能力及共享 Session 上下文', async t => {
-  const { ctx, control, context, rpc, fixture } = await setup(t, { sharedDevelopment: true })
+for (const identityMode of ['development', 'published']) test(`原则：无需登录的 ${identityMode} 实例无签名密钥仍可共享原生会话`, async t => {
+  const { ctx, control, context, rpc, fixture, trustCalls, riskCalls } = await setup(t, { sharedDevelopment: identityMode === 'development', sharedPublished: identityMode === 'published', noSecret: true, disabled: true })
   assert.equal(control.isSharedContext(context('A')), true)
-  assert.equal(control.isDevelopmentContext(context('A')), true)
+  assert.equal(control.isDevelopmentContext(context('A')), identityMode === 'development')
+  assert.equal(ctx.get('businessRuntime').requiresAuthentication(), false)
   control.assert(context('A'), 'agent:access')
   const created = await (await rpc('A', 'session/create', {})).json()
   assert.equal(created.result.ok, true, JSON.stringify(created))
@@ -411,6 +418,8 @@ test('无需认证的开发实例保留完整原生访问能力及共享 Session
   const list = await (await rpc('B', 'session/list', {})).json()
   assert.deepEqual(list.result.value.items.map(item => item.sessionId), [created.result.value.sessionId])
   assert.equal((await rpc('B', 'session/page', { sessionId: created.result.value.sessionId })).status, 200)
+  assert.equal(trustCalls.size, 0)
+  assert.deepEqual(riskCalls, [])
 })
 async function until(read, message) {
   const deadline = Date.now() + 2000
@@ -544,11 +553,9 @@ test('共享 Peer 不共享请求上下文，连接释放保留 Peer，配置撤
   assert.equal(connection.admit({ ...replay }).peer, one.peer, '开发通道不按签名 nonce 拒绝正常重试')
   const file = join(control.assetRoot, 'config/business-access.json'), original = readFileSync(file, 'utf8')
   for (const edit of [
-    config => { config.gateway.instances[0].identityMode = 'published' },
     config => { config.gateway.instances[0].accessMode = 'authenticated' },
     config => { config.gateway.instances[0].sourceDigest = 'sha256:' + 'b'.repeat(64) },
     config => { config.gateway.instances = [] },
-    config => { config.enabled = false },
   ]) {
     writeFileSync(file, original)
     await connection.refresh(); await connection.refresh()
@@ -969,7 +976,7 @@ test('独立业务监听真实认证和代理，清除自报主体及凭据，�
   config.agents[0].enabled = true; config.agents[0].subjects = ['B']; save(); assert.equal((await frontFetch(origin + path, { method: 'POST', headers: { ...headers, authorization: 'Bearer A' } })).status, 403)
 })
 
-test('无需登录的业务实例经统一网关使用稳定共享主体，保留既有动作许可', async t => {
+test('无需登录的业务实例经统一网关使用稳定共享主体，不执行动作许可和访问者校验', async t => {
   const assetRoot = mkdtempSync(join(tmpdir(), 'business-guest-'))
   t.after(() => rmSync(assetRoot, { recursive: true, force: true }))
   mkdirSync(join(assetRoot, 'config'))
@@ -987,7 +994,7 @@ test('无需登录的业务实例经统一网关使用稳定共享主体，保�
   const seen = new Map(), observed = []
   const upstream = createServer((req, res) => {
     try {
-      const assertion = verifyBusinessAssertion(secret, req.headers, req.method, req.url, binding, seen)
+      const assertion = readBusinessAssertion(req.headers, binding)
       observed.push(assertion.context)
       res.setHeader('content-type', req.method === 'GET' ? 'text/html' : 'application/json')
       res.end(req.method === 'GET' ? '<html><body>业务对话</body></html>' : JSON.stringify({ subjectId: assertion.context.subject.id,
@@ -1011,23 +1018,14 @@ test('无需登录的业务实例经统一网关使用稳定共享主体，保�
     })
     request.on('error', reject); request.end()
   })
-  let snapshot
-  for (let round = 0; round < 2; round++) {
-    const path = '/control/soc-business'
-    const response = await fetch(origin + path, { method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(signBusinessAssertion(secret, { binding, ...(snapshot ? { snapshot } : {}),
-        issuedAt: Date.now(), nonce: randomBytes(24).toString('base64url') }, 'POST', path)) })
-    assert.equal(response.status, 200)
-    snapshot = verifyBusinessAssertion(secret, await response.json(), 'RESPONSE', path, binding, new Map()).snapshot
-  }
   const home = await (await frontFetch('/')).text()
   assert.match(home, /无需登录的业务智能体/)
   assert.match(home, /\/agents\/soc\/instances\/soc-business\//)
   assert.equal((await frontFetch(base + 'api/session/list', { method: 'POST' })).status, 200, '无需认证的 API 可直接访问')
   config.agents[0].enabled = false; save()
-  const deniedEntry = await frontFetch(base, { headers: { accept: 'text/html' } })
-  assert.equal(deniedEntry.status, 403)
-  assert.equal(deniedEntry.headers.get('set-cookie'), null, '未通过访问许可时不得签发访客 Cookie')
+  const unrestrictedEntry = await frontFetch(base, { headers: { accept: 'text/html' } })
+  assert.equal(unrestrictedEntry.status, 200)
+  assert.equal(unrestrictedEntry.headers.get('set-cookie'), null, '匿名访问不签发访客 Cookie')
   config.agents[0].enabled = true; save()
   const first = await frontFetch(base, { headers: { accept: 'text/html' } })
   const second = await frontFetch(base, { headers: { accept: 'text/html' } })
@@ -1048,13 +1046,15 @@ test('无需登录的业务实例经统一网关使用稳定共享主体，保�
   assert.equal(getBusinessControl(assetRoot).assert(observed.at(-1), 'session:prompt').kind, 'allow')
   assert.equal(getBusinessControl(assetRoot).assert(observed.at(-1), 'read').kind, 'allow')
   assert.equal((await frontFetch(base + 'api/session/list', { method: 'POST', headers: { cookie: 'harness-guest=forged.value' } })).status, 200)
-  assert.equal((await frontFetch(base + 'api/session/list', { method: 'POST', headers: { cookie: cookieA, host: 'other.localhost' } })).status, 403)
+  assert.equal((await frontFetch(base + 'api/session/list', { method: 'POST', headers: { cookie: cookieA, host: 'other.localhost' } })).status, 200)
+  assert.equal((await frontFetch('/', { headers: { host: 'other.localhost' } })).status, 200)
+  assert.equal((await frontFetch('/agents/soc/', { headers: { host: 'other.localhost' } })).status, 200)
   assert.equal((await fetch(`http://127.0.0.1:${upstream.address().port}${base}api/session/list`, { method: 'POST' })).status, 403, '直连 Runtime 缺少网关签名')
   config.gateway.instances[0].accessMode = 'authenticated'; save()
   assert.equal((await frontFetch(base + 'api/session/list', { method: 'POST', headers: { cookie: cookieA } })).status, 503, '切回个人认证后访客 Cookie 不再可用')
 })
 
-test('开发调试实例无签名密钥仍经网关聊天，切回发布模式立即恢复发布校验', async t => {
+test('匿名实例发布后仍无签名密钥经网关聊天，切回需要登录后恢复校验', async t => {
   const assetRoot = mkdtempSync(join(tmpdir(), 'business-development-'))
   t.after(() => rmSync(assetRoot, { recursive: true, force: true }))
   mkdirSync(join(assetRoot, 'config'))
@@ -1063,7 +1063,7 @@ test('开发调试实例无签名密钥仍经网关聊天，切回发布模式�
   const devBinding = { ...binding, sourceDigest: 'sha256:' + 'd'.repeat(64) }
   mkdirSync(join(assetRoot, '.local/credentials'), { recursive: true })
   writeFileSync(join(assetRoot, '.local/credentials/mcp-manager.json'), JSON.stringify({ sharedToken: 'fixture-token' }))
-  const config = { schemaVersion: 1, enabled: true, agents: [], gateway: { host: '127.0.0.1', port: 0,
+  const config = { schemaVersion: 1, enabled: false, agents: [], gateway: { host: '127.0.0.1', port: 0,
     publicOrigin: 'http://business.localhost:0',
     instances: [{ agentId: 'soc', instanceId: 'soc-business', sourceDigest: devBinding.sourceDigest,
       accessMode: 'anonymous', identityMode: 'development' }] } }
@@ -1137,7 +1137,12 @@ test('开发调试实例无签名密钥仍经网关聊天，切回发布模式�
   config.gateway.instances[0].identityMode = 'unexpected'; save()
   assert.equal((await frontFetch(base + 'api/session/list', { method: 'POST' })).status, 403, '未知身份模式不得降级为开发访问')
   config.gateway.instances[0].identityMode = 'published'; save()
-  assert.equal((await frontFetch(base + 'api/session/list', { method: 'POST' })).status, 403)
+  assert.equal((await frontFetch(base + 'api/session/list', { method: 'POST' })).status, 200)
+  assert.equal(getBusinessControl(assetRoot).agentStatus(devBinding.instanceId).authentication.status, 'not_required')
+  config.gateway.instances[0].accessMode = 'authenticated'; save()
+  assert.equal((await frontFetch(base + 'api/session/list', { method: 'POST' })).status, 503, '关闭业务访问时，需要登录的实例不能进入')
+  config.enabled = true; save()
+  assert.equal((await frontFetch(base + 'api/session/list', { method: 'POST' })).status, 401)
   assert.equal(getBusinessControl(assetRoot).agentStatus(devBinding.instanceId).authentication.status, 'unknown')
   assert.equal((await fetch(`http://127.0.0.1:${upstream.address().port}${base}api/session/list`, { method: 'POST' })).status, 403)
 })
@@ -1281,11 +1286,11 @@ test('已发布网关的有界请求头和版本恢复：累计风险后普通 H
     request.end(JSON.stringify({ type: 'client-request', rpcId: 'large-state', method: 'session/list', payload: { args: { request: {} } } }))
   })
   assert.equal(response.status, 200, response.text)
-  assert.ok(control.hasCurrentSnapshot(binding.instanceId, snapshotVersion), '新版本经控制通道收敛，无需手动刷新重试')
+  assert.equal(control.hasCurrentSnapshot(binding.instanceId, snapshotVersion), false, '匿名交互不等待许可快照同步')
   assert.ok(Buffer.byteLength(JSON.stringify(seenHeaders.at(-1))) < 4096)
   const assertion = JSON.parse(Buffer.from(seenHeaders.at(-1)['x-harness-business-context'], 'base64url').toString())
   assert.equal(assertion.snapshot, undefined)
-  assert.equal(assertion.snapshotVersion, snapshotVersion)
+  assert.equal(assertion.snapshotVersion, undefined)
   const socket = new WebSocket(origin.replace('http:', 'ws:') + base + 'api/remote.mux', { headers: { host: 'business.localhost:0' } })
   await once(socket, 'open'); socket.close(); await once(socket, 'close')
 })

@@ -18,6 +18,7 @@ import { compositionTestInput, isThreatComposition, ThreatConfigurationFields, T
 
 type LivePageProps = { updates?: PlatformUpdates; onContext?(context: Record<string, unknown>): void }
 type NavigationProps = { target?: PlatformNavigation; onNavigate?(target: PlatformNavigation): void; active?: boolean }
+type CompositionAttempt = { execution_id: string; selection_key: string; asset: string; payload: any; state: 'running' | 'unknown' | 'responded'; run_ids?: string[]; message?: string }
 
 const tabs = [
   { id: 'servers', title: '服务列表' },
@@ -163,6 +164,8 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
   const [busy, setBusy] = useState(false)
   const [catalogLoading, setCatalogLoading] = useState(true)
   const [pendingAction, setPendingAction] = useState('')
+  const [attempt, setAttempt] = useState<CompositionAttempt | null>(null)
+  const [recoveredRuns, setRecoveredRuns] = useState<any[]>([])
   const [selectedNode, setSelectedNode] = useState('getAsset')
   const [preview, setPreview] = useState<'config' | 'source' | null>(null)
   const previewRef = useRef<HTMLDivElement>(null)
@@ -226,6 +229,46 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
     return () => { if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame) }
   }, [active, target?.page, target?.tab, target?.composition_id, target?.version, target?.version_id, data, selection, entry])
   const historical = selection?.version === 'published' && Boolean(selection.versionId) && selection.versionId !== entry?.publishedVersionId
+  const selectionKey = selection ? `${selection.id}:${selection.version}:${selection.versionId ?? ''}` : ''
+  const currentSelection = useRef(selectionKey)
+  currentSelection.current = selectionKey
+  const storageKey = `hep:mcp-composition-executions:${document.baseURI}:${data?.workspace_id ?? 'legacy'}`
+  const unresolved = attempt?.selection_key === selectionKey && attempt.state !== 'responded'
+  function remembered() {
+    try { return JSON.parse(sessionStorage.getItem(storageKey) || '{}') as Record<string, CompositionAttempt> } catch { return {} }
+  }
+  function remember(value: CompositionAttempt | null, key = selectionKey) {
+    try {
+      const values = remembered()
+      if (value) values[key] = { execution_id: value.execution_id, selection_key: value.selection_key, asset: value.asset, payload: value.payload, state: 'unknown' }
+      else delete values[key]
+      sessionStorage.setItem(storageKey, JSON.stringify(values))
+      return true
+    } catch { return false }
+  }
+  function acceptReceipt(value: any, original: CompositionAttempt) {
+    const next = { ...original, state: value.state as CompositionAttempt['state'], run_ids: value.run_ids ?? [], message: value.message }
+    setAttempt(next)
+    setResult(value.state === 'responded' ? value.result : null)
+  }
+  async function recover(original = attempt, restoring = false) {
+    if (!original || busy && !restoring) return
+    const id = ++actionId.current
+    setBusy(true); setPendingAction('compositionExecution'); setError('')
+    try {
+      const response = await rpc.call(CHANNEL, 'mcp/compositionExecution', { execution_id: original.execution_id })
+      if (id !== actionId.current || currentSelection.current !== original.selection_key) return
+      if (!response.ok) { setAttempt({ ...original, state: 'unknown', message: response.error.message }); return }
+      acceptReceipt(response.value, original)
+    } catch { if (id === actionId.current) setAttempt({ ...original, state: 'unknown', message: '暂时无法读取原执行回执；输入和执行标识已保留，请稍后继续核对。' }) }
+    finally { if (id === actionId.current) { setBusy(false); setPendingAction('') } }
+  }
+  useEffect(() => {
+    if (!selectionKey || !data) return
+    const saved = remembered()[selectionKey]
+    setAttempt(saved ?? null); setRecoveredRuns([]); setAsset(saved?.asset ?? '')
+    if (saved) { setResult(null); void recover(saved, true) }
+  }, [selectionKey, data?.workspace_id, Boolean(data)])
   const threat = isThreatComposition(config)
   const registeredConnections = data?.connections ?? []
   const connections = data?.connections?.filter((item: any) => item.kind === 'openapi') ?? []
@@ -277,6 +320,10 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
 
   function select(item: CompositionEntry, version: 'draft' | 'published', versionId?: string, focus = true) {
     const next = { id: item.id, version, ...(versionId ? { versionId } : {}) }
+    if (focus && selection?.id === next.id && selection.version === next.version && selection.versionId === next.versionId) {
+      requestAnimationFrame(() => { detailRef.current?.scrollIntoView({ block: 'start' }); detailRef.current?.focus() })
+      return
+    }
     actionId.current++
     setSelection(next); setResult(null); setError(''); setAsset(''); setContinuedRun(null); setBusy(false)
     if (active) onNavigate?.({ page: 'mcp', tab: 'composition', composition_id: item.id, version, ...(versionId ? { version_id: versionId } : {}) })
@@ -327,7 +374,34 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
     } catch { if (id === actionId.current) setError('操作失败，请检查连接并重试。') }
     finally { if (id === actionId.current) { setBusy(false); setPendingAction('') } }
   }
-  const selectedPayload = { compositionId: entry?.id, version: selection?.version, revision: data?.revision, input: compositionTestInput(config || undefined, asset) }
+  const selectedPayload = { compositionId: entry?.id, version: selection?.version, ...(selection?.versionId ? { versionId: selection.versionId } : {}), revision: data?.revision, input: compositionTestInput(config || undefined, asset) }
+  async function execute() {
+    if (busy || unresolved) return
+    const executionId = `graph-${globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`}`
+    const original: CompositionAttempt = { execution_id: executionId, selection_key: selectionKey, asset, payload: { ...selectedPayload, execution: { execution_id: executionId } }, state: 'running' }
+    if (!remember(original)) { setError('无法保存本次执行身份，尚未派发；请允许浏览器会话存储后重试。'); return }
+    const id = ++actionId.current
+    setAttempt(original); setBusy(true); setPendingAction('executeComposition'); setResult(null); setRecoveredRuns([]); setError('')
+    try {
+      const response = await rpc.call(CHANNEL, 'mcp/executeComposition', original.payload)
+      if (id !== actionId.current || currentSelection.current !== original.selection_key) return
+      if (!response.ok) { remember(null, original.selection_key); setAttempt(null); setError(response.error.message); return }
+      const value = response.value as any
+      acceptReceipt(value.execution_receipt ?? { state: 'responded', result: value }, original)
+    } catch { if (id === actionId.current) setAttempt({ ...original, state: 'unknown', message: '未收到执行回执，远端可能已经执行。请核对原请求，平台不会自动再次执行。' }) }
+    finally { if (id === actionId.current) { setBusy(false); setPendingAction('') } }
+  }
+  async function readOriginalRun(runId: string) {
+    const id = ++actionId.current
+    setBusy(true); setError('')
+    try {
+      const response = await rpc.call(CHANNEL, 'mcp/compositionRun', { run_id: runId })
+      if (id !== actionId.current) return
+      if (!response.ok) throw new Error(response.error.message)
+      setRecoveredRuns(previous => [...previous.filter(run => run.run_id !== runId), response.value])
+    } catch (error) { if (id === actionId.current) setError(error instanceof Error ? error.message : '无法读取原运行') }
+    finally { if (id === actionId.current) setBusy(false) }
+  }
   const conflict = Boolean(editor && data && (conflictDetected || editor.revision !== data.revision))
   return <div className="harness-composition-workspace">
     <style>{threatEditorStyle}</style>
@@ -404,7 +478,8 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
           </> : <label>{threat ? '事件 ID' : '查询资产'}<input aria-label={threat ? '组合事件 ID' : '组合查询资产'} disabled={busy} value={asset} onChange={event => { if (busy) return; actionId.current++; setAsset(event.target.value); setResult(null) }} placeholder={threat ? 'INC-20261015-000001' : config?.flow ? '资产 ID，如 9106' : '资产 ID、主机名或 IP'} /></label>}
           <div className="harness-mcp-actions"><button type="button" disabled={busy || !asset.trim()} onClick={() => void action('dryRunComposition', selectedPayload)}>测试（dry）</button>
             {selection?.version === 'draft' && <button type="button" disabled={busy || !asset.trim()} onClick={() => void action('publishComposition', selectedPayload)}>发布工具</button>}
-            <button type="button" disabled={busy || !asset.trim() || !upstream} onClick={() => void action('executeComposition', selectedPayload)}>实际执行组合工具</button></div>
+            <button type="button" disabled={busy || Boolean(unresolved) || !asset.trim() || !upstream} onClick={() => void execute()}>实际执行组合工具</button></div>
+          {attempt?.selection_key === selectionKey && <section className="harness-composition-recovery" aria-label="组合执行回执"><p role="status">{attempt.state === 'responded' ? '已收到原执行回执' : attempt.state === 'running' ? '原请求正在执行，等待回执' : '结果待核对'}</p>{attempt.message && <p>{attempt.message}</p>}<p>执行标识：<code>{attempt.execution_id}</code></p>{attempt.asset !== asset && <p>当前输入已变化，下面核对的仍是原请求：<code>{attempt.asset}</code>。</p>}<button type="button" disabled={busy} onClick={() => void recover()}>核对原请求</button>{attempt.run_ids?.map(runId => <button key={runId} type="button" disabled={busy} onClick={() => void readOriginalRun(runId)}>读取原运行 {runId}</button>)}{recoveredRuns.map(run => <ThreatRunResult key={run.run_id} rpc={rpc} execution={{ result: run }} />)}</section>}
           <p>测试及发布前校验均使用 dry，不请求上游。{threat ? '阶段测试不自动补跑其他阶段；完整流程请执行总组合。' : '实际执行会调用两个只读工具。'}</p>
           {result?.mode === 'dry' && <div role="status"><p>dry 校验通过 · 上游请求 {result.upstreamRequests} 次</p><p>{result.checks.join('、')}。未验证：{result.unverified.join('、')}。</p></div>}
           {result && result.mode !== 'dry' && (threat ? <><ThreatRunResult rpc={rpc} execution={result}/>{continuations.length > 0 && <div className="harness-mcp-actions" aria-label="继续当前运行">{continuations.map(next => <button type="button" key={next.entry.id} disabled={busy} onClick={() => { const runId = run.run_id; select(next.entry, next.version, next.version === 'published' ? next.entry.publishedVersionId : undefined); setAsset(runId); setContinuedRun({ id: next.entry.id, version: next.version, runId }) }}>继续{nextStage === 'infer' ? '模型研判' : nextStage === 'writeback' ? '结果回写' : '报告保存'} · {next.config.title}（{next.version === 'draft' ? '草稿' : '已发布'}）</button>)}</div>}</> : <div><p role="status">{result.ok ? '组合执行成功' : '组合执行失败'}</p>{result.error && <p role="alert">{result.error.message}</p>}

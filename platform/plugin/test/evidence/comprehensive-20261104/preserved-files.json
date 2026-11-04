@@ -1,0 +1,8 @@
+{
+  "preserved": {
+    "/home/admin/harness-engineering-platform-data/config/business-access.json": true,
+    "/home/admin/harness-engineering-platform-data/evolution/datasets/decision-dataset-b8f473f1-0cd7-42cd-a0a1-b90771f1ebe4.json": true,
+    "/home/admin/harness-engineering-platform-data/evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/evaluation/evidence/dsh-image-build-20261024T023237Z-3.json": true
+  },
+  "passed": true
+}

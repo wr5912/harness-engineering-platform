@@ -287,9 +287,13 @@ def read_change_yaml(path: Path) -> dict:
 
 
 def write_flat_yaml(path: Path, values: dict[str, str]) -> None:
-    with path.open("w", encoding="utf-8") as handle:
-        for key, value in values.items():
-            handle.write(f"{key}: {json.dumps(value, ensure_ascii=False)}\n")
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        temporary.write_text("".join(f"{key}: {json.dumps(value, ensure_ascii=False)}\n"
+                                     for key, value in values.items()), encoding="utf-8")
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def append_jsonl(path: Path, value: dict) -> None:
@@ -515,6 +519,15 @@ def case_contracts_for(run_dir: Path) -> dict[str, dict]:
     }
 
 
+def read_run_manifest(path: Path) -> dict[str, str]:
+    manifest = read_flat_yaml(path)
+    if not RUN_ID_RE.fullmatch(path.parent.name) or manifest.get("run_id") != path.parent.name:
+        raise ValueError("run.yaml 的 run_id 缺失或与目录不一致")
+    if manifest.get("status") not in RUN_STATUSES:
+        raise ValueError("run.yaml 的 status 缺失或无效")
+    return manifest
+
+
 def load_run_manifest(repo: Path, run_id: str) -> tuple[Path, dict[str, str]]:
     if not RUN_ID_RE.fullmatch(run_id):
         raise ValueError("run 必须是 run-<UUIDv4>")
@@ -528,7 +541,7 @@ def load_run_manifest(repo: Path, run_id: str) -> tuple[Path, dict[str, str]]:
     if len(matches) != 1:
         raise ValueError(f"unknown or ambiguous run: {run_id}")
     run_dir = matches[0]
-    return run_dir, read_flat_yaml(run_dir / "run.yaml")
+    return run_dir, read_run_manifest(run_dir / "run.yaml")
 
 
 def selected_input_ids(run_dir: Path) -> set[str]:
@@ -589,7 +602,16 @@ def validate_trial_row(
 
 def run_view(repo: Path, run_id: str, case_id: str | None = None) -> dict:
     run_dir, manifest = load_run_manifest(repo, run_id)
-    inputs = json.loads((run_dir / "inputs.lock.json").read_text(encoding="utf-8"))
+    missing = []
+    try:
+        inputs = json.loads((run_dir / "inputs.lock.json").read_text(encoding="utf-8"))
+        if not isinstance(inputs, dict):
+            raise ValueError("inputs.lock.json 必须是对象")
+    except (OSError, ValueError):
+        inputs = {}
+        missing.append("inputs.lock.json 无法读取，冻结来源与用例未知")
+    if manifest.get("recovery_note"):
+        missing.append(manifest["recovery_note"])
     locked_cases = inputs.get("evaluation_cases")
     # 历史 Run 只有选择记录时，保留未知合同，不用当前定义补造冻结事实。
     frozen = {case["case_id"]: case for case in locked_cases} if isinstance(locked_cases, list) else {
@@ -611,7 +633,6 @@ def run_view(repo: Path, run_id: str, case_id: str | None = None) -> dict:
     summary = json.loads(summary_path.read_text(encoding="utf-8")) if summary_path.is_file() else None
     image_path = run_dir / "evidence/dsh-image.json"
     image = json.loads(image_path.read_text(encoding="utf-8")) if image_path.is_file() else None
-    missing = []
     if not isinstance(locked_cases, list):
         missing.append("inputs.lock.json 未冻结 Case 定义，无法判断合同是否变化")
     if summary is None:
@@ -877,7 +898,7 @@ def agent_experiments(repo: Path, agent: str, errors: list[dict] | None = None) 
             if path.is_symlink() or path.parent.is_symlink():
                 continue
             try:
-                manifest = read_flat_yaml(path)
+                manifest = read_run_manifest(path)
                 runs.append({**{key: manifest.get(key) for key in ("run_id", "status", "created_at", "finished_at")},
                              **run_index_facts(path.parent, manifest)})
             except (OSError, ValueError, TypeError, KeyError) as exc:

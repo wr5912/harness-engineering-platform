@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -35,6 +35,12 @@ test('登录页静态输出六项平台能力，无 JavaScript 时首项可读�
   assert.match(html, /data-login-carousel/)
   const slides = tags(html, '[a-z][\\w-]*').filter(tag => /class="[^"]*\blogin-feature-slide\b/.test(tag))
   assert.equal(slides.length, 6)
+  const names = ['智能体构建与迁移', '知识与工具复用', '跨框架智能体接入纳管、安全评估与策略授权', '评测与持续改进', '算力变体与验证', '运行与独立交付']
+  assert.deepEqual([...html.matchAll(/<h3>([^<]+)<\/h3>/g)].map(match => match[1]), names)
+  const readme = readFileSync(new URL('../../../README.md', import.meta.url), 'utf8')
+  const overview = readFileSync(new URL('../../../docs/assets/capabilities/overview.svg', import.meta.url), 'utf8')
+  names.forEach((name, index) => { assert.ok(slides[index].includes(`aria-label="${name}，`)); assert.ok(readme.includes(`| ${name} |`)); assert.ok(overview.includes(`aria-label="${name}"`)) })
+
   assert.equal(slides.filter(tag => /data-active="true"/.test(tag)).length, 1)
   assert.match(slides[0], /data-active="true"/)
   assert.match(slides[0], /aria-hidden="false"/)

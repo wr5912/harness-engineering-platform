@@ -114,7 +114,7 @@ export function install(options: InstallOptions): InstallReport {
       const rewritten = rewriteKnownPaths(dataRoot, mappings)
       report.rewritten = rewritten.changed
       report.oldReferences = rewritten.oldReferences
-      const remaining = scanKnownOldPaths(dataRoot, changedMappings.map(mapping => mapping.from))
+      const remaining = scanKnownOldPaths(dataRoot, changedMappings.map(mapping => mapping.from), mappings.map(mapping => mapping.to))
       if (remaining.length && options.strictPaths) throw new Error(`数据根仍包含旧路径：\n${remaining.map(item => item.file + ':' + item.pattern).join('\n')}`)
       report.oldReferences.push(...remaining)
     }

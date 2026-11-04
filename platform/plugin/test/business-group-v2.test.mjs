@@ -114,7 +114,7 @@ test('v2 分组只接受固定实例签名与当前受信 Session，签名不降
   const business = { ...base, scope: { ...base.scope, sessionId: 'session-A' } }
   // 此处仅借用 groupFetch，模拟真实 Runtime 独立运行的发布心跳。
   const heartbeat = setInterval(() => {
-    if (control.isDevelopmentInstance(binding)) return
+    if (control.isUnrestrictedInstance(binding)) return
     control.recordAgentAuthentication(binding)
     const current = control.issueSnapshot(binding.instanceId)
     control.acknowledge(binding.instanceId, current.restrictionVersion, current.leaseId)
@@ -263,6 +263,20 @@ test('v2 分组只接受固定实例签名与当前受信 Session，签名不降
   assert.deepEqual((await withoutSession.listTools()).tools.map(tool => tool.name), expectedNames)
   await assert.rejects(withoutSession.callTool({ name: 'echo', arguments: args }), /缺少受信 Session/)
   access.gateway.instances[0].identityMode = 'published'
+  access.gateway.instances[0].accessMode = 'anonymous'
+  access.enabled = false
+  writeFileSync(join(root, 'config', 'business-access.json'), JSON.stringify(access))
+  assert.notEqual((await devRequest(unsignedHeaders)).status, 401, '已发布的匿名实例也无需签名')
+  for (const client of [throughRuntime, nativeClient]) {
+    const result = await client.callTool({ name: 'echo', arguments: args,
+      _meta: { 'io.deepseek.dsh/mcp-group-target': { digest: targetDigest } } })
+    assert.notEqual(result.isError, true)
+    assert.equal(result.content[0].text, '{"reached":true}')
+  }
+  access.gateway.instances[0].accessMode = 'authenticated'
+  writeFileSync(join(root, 'config', 'business-access.json'), JSON.stringify(access))
+  assert.equal((await (await devRequest(unsignedHeaders)).json()).stage, 'registration', '关闭接入仍阻止需要登录的实例')
+  access.enabled = true
   writeFileSync(join(root, 'config', 'business-access.json'), JSON.stringify(access))
   assert.equal((await (await devRequest(unsignedHeaders)).json()).stage, 'signature', '发布模式不能沿用开发 Bearer 接入')
 })

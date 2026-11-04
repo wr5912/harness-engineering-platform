@@ -41,7 +41,8 @@ function platformReadBinding(assetRoot: string, value: string) {
   const stateFile = join(root, '.local/platform-service/state.json')
   if (existsSync(stateFile)) {
     const state = json(stateFile)
-    requireValue(typeof state.url === 'string' && baseUrl(state.url).href === url.href && resolve(state.dataRoot) === root, 'PLATFORM_SERVICE_WORKSPACE_MISMATCH')
+    const entry = state.publicUrl ?? state.url
+    requireValue(typeof entry === 'string' && baseUrl(entry).href === url.href && resolve(state.dataRoot) === root, 'PLATFORM_SERVICE_WORKSPACE_MISMATCH')
   }
   return { root, url, identity }
 }
@@ -200,6 +201,7 @@ export async function collectReplayInputs(options: ReplayCollectionOptions) {
     let datasets: string[]
     if (options.runId) {
       const listed = await rpc('agents/datasets/list', { run_id: options.runId, include_eligibility: false })
+      requireValue(listed.catalog_complete !== false, 'DATASET_CATALOG_INCOMPLETE')
       requireValue(Array.isArray(listed.datasets) && listed.datasets.every((item: any) => typeof item.id === 'string' && item.run_id === options.runId), 'DATASET_LIST_IDENTITY_MISMATCH')
       datasets = [...new Set<string>(listed.datasets.map((item: any) => item.id))]
     } else datasets = [options.datasetId!]
@@ -208,6 +210,7 @@ export async function collectReplayInputs(options: ReplayCollectionOptions) {
     let traceCache: { key: string; pages: MapValue[]; covered: number } | undefined
     for (const datasetId of datasets) {
       const readback = await rpc('agents/datasets/read', { dataset_id: datasetId }), dataset = readback.dataset
+      if (options.runId) requireValue(readback.catalog_complete !== false, 'DATASET_CATALOG_INCOMPLETE')
       requireValue(dataset?.schema_version === 2 && dataset.id === datasetId && hashPattern.test(readback.sha256) && Array.isArray(dataset.records)
         && (!options.runId || dataset.run_id === options.runId), 'DATASET_READ_IDENTITY_MISMATCH')
       const records = options.runId ? dataset.records : dataset.records.filter((record: any) => record?._meta?.id === options.recordId)

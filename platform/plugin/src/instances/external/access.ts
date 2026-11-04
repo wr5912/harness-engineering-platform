@@ -259,7 +259,7 @@ export async function readExternalConversation(root: string, caller: ExternalCal
 export async function streamExternal(root: string, caller: ExternalCaller, instanceId: string, sessionId: string, res: ServerResponse, signal: AbortSignal, reauthenticate?: () => Promise<ExternalCaller>): Promise<void> {
   const { instance, policyDigest } = assertExternalAccess(root, instanceId, caller, 'session:events'), session = sessionBinding(root, instance, caller, sessionId)
   const credentials = snapshotExternalCredentials(root, instance)
-  const requestId = randomUUID(); await authorizeExternal(root, instance, caller, 'session:events', null, requestId, signal)
+  const requestId = randomUUID(), assertAuthorized = await authorizeExternal(root, instance, caller, 'session:events', null, requestId, signal)
   const lifetime = new AbortController(), combined = AbortSignal.any([signal, lifetime.signal])
   let dispatched = false
   let lastAuthentication = Date.now(), validating = false
@@ -280,8 +280,9 @@ export async function streamExternal(root: string, caller: ExternalCaller, insta
     appendExternalRecord(root, { instanceId, subjectId: caller.subjectId, requestId, operation: 'session:events', stage: 'dispatching', result: 'allow', sessionId })
     const final = assertExternalAccess(root, instanceId, caller, 'session:events')
     if (final.instance.bindingDigest !== instance.bindingDigest || final.policyDigest !== policyDigest) throw new ExternalAccessError('configuration_changed', '订阅派发前绑定或策略已变化，本次未转发', 409)
-    dispatched = true
-    const response = await adapterFetch(root, instance, eventPath(instance, session.nativeId), { method: 'GET' }, combined, credentials)
+    const response = await adapterFetch(root, instance, eventPath(instance, session.nativeId), { method: 'GET' }, combined, credentials, () => {
+      combined.throwIfAborted(); assertAuthorized(); dispatched = true
+    })
     if (!response.ok || !response.headers.get('content-type')?.includes('text/event-stream')) throw new ExternalAccessError('upstream_error', '上游未提供可用 Session 事件流', 502)
     const opened = assertExternalAccess(root, instanceId, caller, 'session:events')
     if (opened.instance.bindingDigest !== instance.bindingDigest || opened.policyDigest !== policyDigest) throw new ExternalAccessError('configuration_changed', '订阅建立时绑定或策略已变化', 409)

@@ -1,0 +1,1039 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-11-04T02:45:42.713888+00:00",
+  "environment": "current development workspace; remote deployment excluded",
+  "program_head": "31ac8f901380bc88615b15f9d382538c87bda290",
+  "working_tree_dirty": true,
+  "task_source_sha256": {
+    "platform/plugin/src/instances/index.ts": "7b74ef6714eac9211c1a530d599d3dd1878f05ea10ba7b4c1ec5c635c7770f8b",
+    "platform/plugin/test/instances.test.mjs": "e6266ddff59e139b919732621e95d36ad7945e70e78a7c67117949c5c68db33f",
+    "runtime/adapters/dsh-container/run_record.py": "937b13960d2ee2cbb6dedb72b1882032fe677cfc27faf074149f015d4b0645fa",
+    "runtime/adapters/dsh-container/verification.compose.yaml": "90495bc0a275993afc0708228d5cdbfe41b88bc12587268ff5d271c200b75783",
+    "runtime/adapters/dsh-container/README.md": "a20bbdcea0d5843b03ce9cfd78952e25734725a201fe8e5fa85f19f68acac64b",
+    "runtime/adapters/dsh-container/test_dsh_dev.py": "284eb50a22f1b0da3316980c08f06b117001cc9da25a85be330c725e6cb19d9a",
+    "tests/test_run_snapshot.py": "d6e01a9a6c80fbf4fadfceac54bf7c4dfd74e67c6fb664a991a8b1f1c9d319f3"
+  },
+  "validation": {
+    "tests": [
+      {
+        "group": "instances",
+        "passed": 28,
+        "failed": 0,
+        "log_sha256": "cca2c5693306c39fb198cae292dda66fa083f4d74bad448bbfd5763049e96e72"
+      },
+      {
+        "group": "instances-client and business-control-management",
+        "passed": 105,
+        "failed": 0,
+        "log_sha256": "17902f023d0e2eb7daf5779b65ce8ca69ecc339af9acf8daed2894917f6f1256"
+      },
+      {
+        "group": "Run snapshot",
+        "passed": 35,
+        "failed": 0,
+        "log_sha256": "69d62606227cfe7005f28f0ed9976a29c0669ee8e2b4727bc8bd4dbf53356841"
+      },
+      {
+        "group": "dsh-dev",
+        "passed": 152,
+        "failed": 0,
+        "log_sha256": "0ee06f0065a97d9ca22a43f42e9646ef3290e664b86e8f980155b3dc4f18e9b2"
+      },
+      {
+        "group": "evaluation-client",
+        "passed": 80,
+        "failed": 0,
+        "log_sha256": "3f91148f659193e354ddffd79999d81d0b2d576710c0f5f73573af652f73a6de"
+      },
+      {
+        "group": "business runtime",
+        "passed": 19,
+        "failed": 0,
+        "log_sha256": "674e5bf6a24aef133f5acf424f1eba65f128a2792612d84eda3c56563107d336"
+      }
+    ],
+    "passed_total": 419,
+    "typecheck": "passed",
+    "isolated_build": "passed",
+    "live_build": "passed"
+  },
+  "live_loading": {
+    "platform_pid_before": 838769,
+    "platform_pid_after": 838769,
+    "native_plugin_hmr": true,
+    "temporary_hmr_watch_removed": true,
+    "original_running_management_sessions_checked": 2,
+    "original_sessions_still_running_and_agent_available": true,
+    "platform_restart": false,
+    "docker_daemon_restart": false
+  },
+  "deletion": {
+    "rpc": {
+      "observed_at": "2026-11-04T02:37:55.232Z",
+      "instance": "gateway-delete-check-a",
+      "while_locked": {
+        "manifestPresent": true,
+        "request": {
+          "done": false
+        }
+      },
+      "deleted": true,
+      "home_preserved": true,
+      "manifest_after": false,
+      "gateway_registration_after": false
+    },
+    "browser_batch": {
+      "observed_at": "2026-11-04T02:39:23.977Z",
+      "instances": [
+        "gateway-delete-check-b",
+        "gateway-delete-check-c"
+      ],
+      "requests": [
+        {
+          "timestamp": 45953.820257,
+          "payload": {
+            "operation": "delete",
+            "name": "gateway-delete-check-b",
+            "expected_source_id": "experiment:EXP-security-operations-expert-024-rad80a907c628"
+          }
+        },
+        {
+          "timestamp": 45953.820808,
+          "payload": {
+            "operation": "delete",
+            "name": "gateway-delete-check-c",
+            "expected_source_id": "experiment:EXP-security-operations-expert-024-rad80a907c628"
+          }
+        }
+      ],
+      "request_interval_ms": 0.551,
+      "while_locked": {
+        "manifestsPresent": [
+          true,
+          true
+        ],
+        "dialog": "删除业务实例\n\n核对目标和实际影响，再确认执行。\n\n×\n\n正在执行：已收到 0 / 2 项回执\n\n取消"
+      },
+      "receipt": "删除业务实例\n\n核对目标和实际影响，再确认执行。\n\n×\n操作回执：成功 2 项，失败 0 项，结果未知 0 项，未派发 0 项\ngateway-delete-check-b · 删除 · 成功\n当前登记状态（核对于 2026/11/3 18:39:43）：未找到此实例登记\ngateway-delete-check-c · 删除 · 成功\n当前登记状态（核对于 2026/11/3 18:39:43）：未找到此实例登记\n关闭",
+      "home_before": [
+        true,
+        true
+      ],
+      "home_after": [
+        true,
+        true
+      ],
+      "manifests_after": [
+        false,
+        false
+      ],
+      "gateway_registration_after": [],
+      "console_errors": []
+    },
+    "confirmed_residual_cleanup": {
+      "verified": [
+        {
+          "instance": "sec-ops-v024-qwen35-4b",
+          "source_matches": true,
+          "container_absent": true,
+          "home_preserved": true
+        },
+        {
+          "instance": "emergency-action8",
+          "source_matches": true,
+          "container_absent": true,
+          "home_preserved": true
+        },
+        {
+          "instance": "emergency-action2",
+          "source_matches": true,
+          "container_absent": true,
+          "home_preserved": true
+        },
+        {
+          "instance": "sec-ops-v26-kev-decision",
+          "source_matches": true,
+          "container_absent": true,
+          "home_preserved": true
+        },
+        {
+          "instance": "sec-ops-v029-kev-r3",
+          "source_matches": true,
+          "container_absent": true,
+          "home_preserved": true
+        }
+      ],
+      "removed": 5,
+      "gateway_rows_before": 21,
+      "gateway_rows_after": 16,
+      "other_configuration_preserved": true,
+      "backup": ".local/backups/gateway-delete-recovery-20261103/business-access-1793759369981603687.json"
+    },
+    "unresolved_legacy_registrations_preserved": [
+      "security-operations-expert-business-mock",
+      "security-operations-expert-fusion",
+      "security-operations-expert-fusion-v2",
+      "security-operations-expert-mcp-resilience",
+      "tt",
+      "security-operations-expert-fusion-v3",
+      "test-daily-inspection-assistant",
+      "security-operations-expert-2"
+    ]
+  },
+  "run_reading": {
+    "initial_browser_errors": [
+      "TypeError: Cannot read properties of undefined (reading 'slice')",
+      "slot entry crashed in 'shell.overlay'"
+    ],
+    "run_id": "run-052b2fbe-2875-48d6-8b02-942bfe3088d9",
+    "source_id": "experiment:EXP-security-operations-expert-024-rad80a907c628",
+    "original_zero_byte_files": [
+      "run.yaml",
+      "inputs.lock.json",
+      "execution.json",
+      "evidence/analysis/model-policy.json",
+      "evidence/managed/role-tool-matrix.yaml"
+    ],
+    "recovered_manifest_status": "failed",
+    "recovery_basis": "stopped evaluation job e4bb3c59-b5d7-43ca-a5c6-467cf8119905; frozen business evidence remains unknown",
+    "backup": ".local/backups/run-record-recovery-20261103/run-052b2fbe-2875-48d6-8b02-942bfe3088d9/",
+    "overview_count_at_observation": 105,
+    "overview_errors": [],
+    "browser_checks": [
+      {
+        "name": "evaluation-reload",
+        "hash": "/evaluation"
+      },
+      {
+        "name": "cases",
+        "hash": "/evaluation?tab=cases"
+      },
+      {
+        "name": "comparison",
+        "hash": "/evaluation?tab=compare"
+      },
+      {
+        "name": "records-return",
+        "hash": "/evaluation?tab=runs"
+      },
+      {
+        "name": "run-detail",
+        "hash": "/evaluation?run_id=run-35fc537e-774b-42e9-b016-6b3999962f67&tab=runs"
+      },
+      {
+        "name": "instances-existing",
+        "hash": "/instances"
+      },
+      {
+        "name": "instances-failed",
+        "hash": "/instances"
+      },
+      {
+        "name": "instances-all",
+        "hash": "/instances"
+      },
+      {
+        "name": "instances-existing",
+        "hash": "/instances"
+      },
+      {
+        "name": "evaluation-return",
+        "hash": "/evaluation"
+      }
+    ],
+    "browser_errors": []
+  },
+  "initial_instance_recovery": {
+    "observed_at": "2026-11-04T01:49:17.747Z",
+    "before": {
+      "absent": 81,
+      "failed": 13
+    },
+    "after": {
+      "absent": 81,
+      "running": 13
+    },
+    "instances": [
+      {
+        "name": "attachment-reader-test",
+        "port": 18567,
+        "beforeState": "failed",
+        "afterState": "running",
+        "sameContainer": true,
+        "sameHome": true,
+        "samePort": true,
+        "sameImage": true,
+        "policy": "unless-stopped",
+        "policyUpdatePreservedProcess": true
+      },
+      {
+        "name": "emergency-exp027-r058-test",
+        "port": 18564,
+        "beforeState": "failed",
+        "afterState": "running",
+        "sameContainer": true,
+        "sameHome": true,
+        "samePort": true,
+        "sameImage": true,
+        "policy": "unless-stopped",
+        "policyUpdatePreservedProcess": true
+      },
+      {
+        "name": "exp-security-operations-expert-027-cf",
+        "port": 18561,
+        "beforeState": "failed",
+        "afterState": "running",
+        "sameContainer": true,
+        "sameHome": true,
+        "samePort": true,
+        "sameImage": true,
+        "policy": "unless-stopped",
+        "policyUpdatePreservedProcess": true
+      },
+      {
+        "name": "lite-local223-validation",
+        "port": 18513,
+        "beforeState": "failed",
+        "afterState": "running",
+        "sameContainer": true,
+        "sameHome": true,
+        "samePort": true,
+        "sameImage": true,
+        "policy": "unless-stopped",
+        "policyUpdatePreservedProcess": true
+      },
+      {
+        "name": "security-operations-expert-eval-9d574279",
+        "port": 18591,
+        "beforeState": "failed",
+        "afterState": "running",
+        "sameContainer": true,
+        "sameHome": true,
+        "samePort": true,
+        "sameImage": true,
+        "policy": "unless-stopped",
+        "policyUpdatePreservedProcess": true
+      },
+      {
+        "name": "security-operations-expert-eval-c06324b3",
+        "port": 18590,
+        "beforeState": "failed",
+        "afterState": "running",
+        "sameContainer": true,
+        "sameHome": true,
+        "samePort": true,
+        "sameImage": true,
+        "policy": "unless-stopped",
+        "policyUpdatePreservedProcess": true
+      },
+      {
+        "name": "security-operations-expert-eval-d58969f8",
+        "port": 18593,
+        "beforeState": "failed",
+        "afterState": "running",
+        "sameContainer": true,
+        "sameHome": true,
+        "samePort": true,
+        "sameImage": true,
+        "policy": "unless-stopped",
+        "policyUpdatePreservedProcess": true
+      },
+      {
+        "name": "security-operations-expert-eval-f2ddc294",
+        "port": 18592,
+        "beforeState": "failed",
+        "afterState": "running",
+        "sameContainer": true,
+        "sameHome": true,
+        "samePort": true,
+        "sameImage": true,
+        "policy": "unless-stopped",
+        "policyUpdatePreservedProcess": true
+      },
+      {
+        "name": "security-operations-expert-var003-kev-qwen",
+        "port": 18562,
+        "beforeState": "failed",
+        "afterState": "running",
+        "sameContainer": true,
+        "sameHome": true,
+        "samePort": true,
+        "sameImage": true,
+        "policy": "unless-stopped",
+        "policyUpdatePreservedProcess": true
+      },
+      {
+        "name": "security-ops-kev-single-turn-lab",
+        "port": 18556,
+        "beforeState": "failed",
+        "afterState": "running",
+        "sameContainer": true,
+        "sameHome": true,
+        "samePort": true,
+        "sameImage": true,
+        "policy": "unless-stopped",
+        "policyUpdatePreservedProcess": true
+      },
+      {
+        "name": "test-zhouyang-disp14",
+        "port": 18508,
+        "beforeState": "failed",
+        "afterState": "running",
+        "sameContainer": true,
+        "sameHome": true,
+        "samePort": true,
+        "sameImage": true,
+        "policy": "unless-stopped",
+        "policyUpdatePreservedProcess": true
+      },
+      {
+        "name": "test-zhouyang-police-exp027",
+        "port": 18510,
+        "beforeState": "failed",
+        "afterState": "running",
+        "sameContainer": true,
+        "sameHome": true,
+        "samePort": true,
+        "sameImage": true,
+        "policy": "unless-stopped",
+        "policyUpdatePreservedProcess": true
+      },
+      {
+        "name": "threat-analysis-002",
+        "port": 18563,
+        "beforeState": "failed",
+        "afterState": "running",
+        "sameContainer": true,
+        "sameHome": true,
+        "samePort": true,
+        "sameImage": true,
+        "policy": "unless-stopped",
+        "policyUpdatePreservedProcess": true
+      }
+    ],
+    "policy_updates": [
+      {
+        "name": "attachment-reader-test",
+        "running": true,
+        "policy_before": "no",
+        "policy_after": "unless-stopped",
+        "same_container": true,
+        "same_started_at": true,
+        "same_mounts": true
+      },
+      {
+        "name": "emergency-exp027-r058-test",
+        "running": true,
+        "policy_before": "no",
+        "policy_after": "unless-stopped",
+        "same_container": true,
+        "same_started_at": true,
+        "same_mounts": true
+      },
+      {
+        "name": "exp-security-operations-expert-027-cf",
+        "running": true,
+        "policy_before": "no",
+        "policy_after": "unless-stopped",
+        "same_container": true,
+        "same_started_at": true,
+        "same_mounts": true
+      },
+      {
+        "name": "lite-local223-validation",
+        "running": true,
+        "policy_before": "no",
+        "policy_after": "unless-stopped",
+        "same_container": true,
+        "same_started_at": true,
+        "same_mounts": true
+      },
+      {
+        "name": "security-operations-expert-eval-9d574279",
+        "running": true,
+        "policy_before": "no",
+        "policy_after": "unless-stopped",
+        "same_container": true,
+        "same_started_at": true,
+        "same_mounts": true
+      },
+      {
+        "name": "security-operations-expert-eval-c06324b3",
+        "running": true,
+        "policy_before": "no",
+        "policy_after": "unless-stopped",
+        "same_container": true,
+        "same_started_at": true,
+        "same_mounts": true
+      },
+      {
+        "name": "security-operations-expert-eval-d58969f8",
+        "running": true,
+        "policy_before": "no",
+        "policy_after": "unless-stopped",
+        "same_container": true,
+        "same_started_at": true,
+        "same_mounts": true
+      },
+      {
+        "name": "security-operations-expert-eval-f2ddc294",
+        "running": true,
+        "policy_before": "no",
+        "policy_after": "unless-stopped",
+        "same_container": true,
+        "same_started_at": true,
+        "same_mounts": true
+      },
+      {
+        "name": "security-operations-expert-var003-kev-qwen",
+        "running": true,
+        "policy_before": "no",
+        "policy_after": "unless-stopped",
+        "same_container": true,
+        "same_started_at": true,
+        "same_mounts": true
+      },
+      {
+        "name": "security-ops-kev-single-turn-lab",
+        "running": true,
+        "policy_before": "no",
+        "policy_after": "unless-stopped",
+        "same_container": true,
+        "same_started_at": true,
+        "same_mounts": true
+      },
+      {
+        "name": "test-zhouyang-disp14",
+        "running": true,
+        "policy_before": "no",
+        "policy_after": "unless-stopped",
+        "same_container": true,
+        "same_started_at": true,
+        "same_mounts": true
+      },
+      {
+        "name": "test-zhouyang-police-exp027",
+        "running": true,
+        "policy_before": "no",
+        "policy_after": "unless-stopped",
+        "same_container": true,
+        "same_started_at": true,
+        "same_mounts": true
+      },
+      {
+        "name": "threat-analysis-002",
+        "running": true,
+        "policy_before": "no",
+        "policy_after": "unless-stopped",
+        "same_container": true,
+        "same_started_at": true,
+        "same_mounts": true
+      }
+    ]
+  },
+  "target_session": {
+    "name": "exp-security-operations-expert-027-cf",
+    "build": {
+      "experiment_id": "EXP-security-operations-expert-027-reab20c48f610",
+      "schema_version": 1,
+      "entry_path": "dsh/managed/diagnosis-runtime.ts",
+      "output_path": "dsh/managed/diagnosis-runtime.mjs",
+      "compiler": {
+        "typescript": "5.9.3",
+        "esbuild": "0.25.12",
+        "platform_lock_sha256": "61aa7c1b2fe86d51b10607fe37c29d191e9ed00d925f19361a1d72d1bb2e80cd"
+      },
+      "dependencies_sha256": null,
+      "source_files": [
+        {
+          "path": "dsh/managed/diagnosis-runtime.ts",
+          "sha256": "0ad184bba729dc6bfe4a07e916d0398f5cafe16f4f260e24705b9bc2e268758e"
+        }
+      ],
+      "source_sha256": "d90bd984f74ea77ebf1ab0bc933b3030dd39daea20cc52ddfc53d9991308b94c",
+      "platform_sources": [
+        {
+          "path": "runtime/adapters/dsh-web/src/resolve-runtime.ts",
+          "sha256": "69e91bb7ff19f8e6f79694988ccf54d49e1a0a19675c33f59b3f7cc64a55bf1b"
+        }
+      ],
+      "platform_sources_sha256": "af539f1f3eb7a2bc3cfd4456124f15cff8e65abf4333aea55e756823d4b36d3d",
+      "source_inputs_version": 1,
+      "runtime_imports": [
+        "node:crypto",
+        "node:fs/promises",
+        "node:os",
+        "node:path"
+      ],
+      "build_digest": "8871d83ee99ab5daedb06c1f0e2c1734ffe87f4034f55bcdabaac584722e3a5b",
+      "esm_sha256": "f2f4403a3d0f197d0082ded38a9e44c2cd57600da4236df2478ed9c2d59aceb7",
+      "candidate_sha256": "1b1c8f6b880c17c7ae6e9ba951aa1d5ef13ed84474a4fa48912683fa04caf56b"
+    },
+    "presets_observed_at": "2026-11-04T02:10:09.947Z",
+    "preset_checks": [
+      {
+        "name": "attachment-reader-test",
+        "preset_ok": true,
+        "broken": []
+      },
+      {
+        "name": "emergency-exp027-r058-test",
+        "preset_ok": true,
+        "broken": []
+      },
+      {
+        "name": "exp-security-operations-expert-027-cf",
+        "preset_ok": true,
+        "broken": []
+      },
+      {
+        "name": "lite-local223-validation",
+        "preset_ok": true,
+        "broken": []
+      },
+      {
+        "name": "security-operations-expert-eval-9d574279",
+        "preset_ok": true,
+        "broken": []
+      },
+      {
+        "name": "security-operations-expert-eval-c06324b3",
+        "preset_ok": true,
+        "broken": []
+      },
+      {
+        "name": "security-operations-expert-eval-d58969f8",
+        "preset_ok": true,
+        "broken": []
+      },
+      {
+        "name": "security-operations-expert-eval-f2ddc294",
+        "preset_ok": true,
+        "broken": []
+      },
+      {
+        "name": "security-operations-expert-var003-kev-qwen",
+        "preset_ok": true,
+        "broken": []
+      },
+      {
+        "name": "security-ops-kev-single-turn-lab",
+        "preset_ok": true,
+        "broken": []
+      },
+      {
+        "name": "test-zhouyang-disp14",
+        "preset_ok": true,
+        "broken": []
+      },
+      {
+        "name": "test-zhouyang-police-exp027",
+        "preset_ok": true,
+        "broken": [
+          {
+            "id": "security-operations-expert",
+            "broken": "security-operations-diagnosis-runtime (/opt/dsh-managed/diagnosis-runtime.mjs): never started"
+          }
+        ]
+      },
+      {
+        "name": "threat-analysis-002",
+        "preset_ok": true,
+        "broken": []
+      }
+    ],
+    "confirmation_configuration_recovery": {
+      "observedAt": "2026-11-04T02:12:15.782Z",
+      "target": "exp-security-operations-expert-027-cf",
+      "source": "test-zhouyang-police-exp027",
+      "sourceId": "experiment:EXP-security-operations-expert-027-reab20c48f610",
+      "sameAgent": true,
+      "sameCandidate": true,
+      "existingConfigurationReused": true,
+      "newKeyGenerated": false,
+      "contentValidated": true,
+      "mode": "0600"
+    },
+    "new_model_reply": "实例会话恢复正常",
+    "after_refresh": {
+      "observed_at": "2026-11-04T02:13:19.871Z",
+      "reply_visible": true,
+      "confirmation_polls": [
+        {
+          "status": 200,
+          "empty": true
+        },
+        {
+          "status": 200,
+          "empty": true
+        },
+        {
+          "status": 200,
+          "empty": true
+        },
+        {
+          "status": 200,
+          "empty": true
+        },
+        {
+          "status": 200,
+          "empty": true
+        },
+        {
+          "status": 200,
+          "empty": true
+        },
+        {
+          "status": 200,
+          "empty": true
+        },
+        {
+          "status": 200,
+          "empty": true
+        },
+        {
+          "status": 200,
+          "empty": true
+        },
+        {
+          "status": 200,
+          "empty": true
+        },
+        {
+          "status": 200,
+          "empty": true
+        },
+        {
+          "status": 200,
+          "empty": true
+        }
+      ],
+      "console_errors": []
+    },
+    "final_read_only_check": {
+      "observedAt": "2026-11-04T02:43:16.029Z",
+      "state": {
+        "path": "/agents/security-operations-expert/instances/exp-security-operations-expert-027-cf/",
+        "replyVisible": true
+      },
+      "confirmations": [
+        {
+          "status": 200,
+          "empty": true
+        },
+        {
+          "status": 200,
+          "empty": true
+        },
+        {
+          "status": 200,
+          "empty": true
+        }
+      ],
+      "errors": []
+    }
+  },
+  "final_instance_snapshot": {
+    "observed_at_first": "2026-11-04T02:42:12.552789Z",
+    "observed_at_last": "2026-11-04T02:42:12.566063Z",
+    "counts": {
+      "running": 10,
+      "absent": 1
+    },
+    "instances": [
+      {
+        "name": "attachment-reader-test",
+        "port": 18567,
+        "state": "running"
+      },
+      {
+        "name": "emergency-exp027-r058-test",
+        "port": 18564,
+        "state": "running"
+      },
+      {
+        "name": "exp-security-operations-expert-027-cf",
+        "port": 18561,
+        "state": "running"
+      },
+      {
+        "name": "security-operations-expert-eval-836c3c6d",
+        "port": 18502,
+        "state": "running"
+      },
+      {
+        "name": "security-operations-expert-eval-9aebfc46",
+        "port": 18500,
+        "state": "absent"
+      },
+      {
+        "name": "security-operations-expert-eval-b8fc1719",
+        "port": 18501,
+        "state": "running"
+      },
+      {
+        "name": "security-operations-expert-var003-kev-qwen",
+        "port": 18562,
+        "state": "running"
+      },
+      {
+        "name": "security-ops-kev-single-turn-lab",
+        "port": 18556,
+        "state": "running"
+      },
+      {
+        "name": "test-zhouyang-disp14",
+        "port": 18508,
+        "state": "running"
+      },
+      {
+        "name": "test-zhouyang-police-exp027",
+        "port": 18510,
+        "state": "running"
+      },
+      {
+        "name": "threat-analysis-002",
+        "port": 18563,
+        "state": "running"
+      }
+    ],
+    "note": "User deletions and parallel evaluation creation followed the initial recovery. The absent evaluation registration was left to its owning task."
+  },
+  "screenshots": {
+    "delete-batch.png": "6b2e1d8047f6e4bbd47b87ced03fa56591924980f944b99673f85b9f8d2e055d",
+    "recovered-run.png": "568bb814cd9261920e71606b5fb770753e8e5c7cf16095dc5612fd174bafcdb6",
+    "anonymous-gateway.png": "6a438e66f67d09778fc068353b5ea57e848a2b684f67b00efaee3a2b422aa254",
+    "anonymous-manual.png": "5f0801b225146cfb1904d245df545a8ed61a96fe889f83c207dfa46d120d32bd",
+    "instance-final.png": "626b61c0398d500554ff20cd02cad7fb479216cda32dc7e91859f4486a058aa3",
+    "evaluation-final.png": "a25366f309aad1a5a29eaa73e3e74e81c786e5c37f007a98958c505d46cc1f31"
+  },
+  "limits": [
+    "Original zero-byte-file cause unknown; missing frozen evidence was not reconstructed.",
+    "Prior Docker daemon restart cause unknown; no daemon restart was induced to test restart policy.",
+    "Original HTTP 403 causation is unproven; post-recovery confirmation polling was verified.",
+    "Eight legacy registrations outside the initial instance inventory were preserved.",
+    "No full security-operations business evaluation or Research Release was performed."
+  ],
+  "phase_scope": "Existing top-level receipts describe the first recovery phase; anonymous_access_principle describes the subsequent authorized principle correction and reload.",
+  "anonymous_access_principle": {
+    "recorded_at": "2026-11-04T04:59:35.481223+00:00",
+    "rule": "No-login instances bypass authentication, signature, risk, authorization, tool Guard and extra confirmation in both development and published modes; existing functional routing and interface contracts remain applicable.",
+    "scope": [
+      "gateway HTTP/WebSocket",
+      "business core",
+      "runtime native owner Peer",
+      "MCP manager/group overlay",
+      "instance launch/restart/registration",
+      "business Guards",
+      "management UI"
+    ],
+    "development_delivery_check": "pnpm --dir platform/plugin run test:business-access",
+    "validation": {
+      "isolated_program_full_before_final_ui": {
+        "tests": 1600,
+        "passed": 1600
+      },
+      "isolated_instance_python": {
+        "tests": 152,
+        "passed": 152
+      },
+      "mandatory_business_access_after_final_ui": {
+        "platform_tests": 195,
+        "platform_passed": 195,
+        "adapter_tests": 21,
+        "adapter_passed": 21
+      },
+      "isolated_data_guard_and_catalog": {
+        "tests": 12,
+        "passed": 12
+      },
+      "actual_development_inspection_contract": {
+        "tests": 9,
+        "passed": 9
+      },
+      "actual_development_catalog_contract": {
+        "tests": 2,
+        "passed": 2
+      },
+      "final_ui_typecheck": "passed",
+      "live_ui_build": "passed",
+      "diagnosis_compile_managed_asset": "passed; strict TypeScript and existing esbuild entry",
+      "boundary": "Overlapping tests are not summed. Initial full regression preceded the last UI change and upstream rebase. Final merged full regression has 5 failures, all reproduced independently on the unmodified upstream baseline; no claim of a fully passing final suite. Final affected mandatory suite, typecheck and build passed after rebase.",
+      "isolated_program_full_after_rebase": {
+        "tests": 1615,
+        "passed": 1610,
+        "failed": 5,
+        "typecheck": "passed",
+        "build": "passed",
+        "failed_tests": [
+          {
+            "file": "platform/plugin/test/sdk-operations.test.mjs",
+            "line": 109,
+            "test": "旧SDK操作不能停止后来同名的Web实例或另一SDK执行代次"
+          },
+          {
+            "file": "platform/plugin/test/threat-composition-client.test.mjs",
+            "line": 146,
+            "test": "阶段完成不会显示整体成功，运行产物只读获取且HTML按文本呈现"
+          },
+          {
+            "file": "platform/plugin/test/threat-composition-client.test.mjs",
+            "line": 163,
+            "test": "切换运行后旧上下文响应不能覆盖新运行状态"
+          },
+          {
+            "file": "platform/plugin/test/threat-composition-client.test.mjs",
+            "line": 235,
+            "test": "取证结果继续下一阶段只带入同一真实Run，不自动执行或选择另一连接"
+          },
+          {
+            "file": "platform/plugin/test/threat-composition-client.test.mjs",
+            "line": 265,
+            "test": "失败阶段不提示普通续跑，快速完成分支直接准备回写而不补跑模型"
+          }
+        ]
+      },
+      "upstream_baseline_failure_comparison": {
+        "commit": "7cbb73cda4eb82506f4de5291928f1efb82f3abf",
+        "task_changes_included": false,
+        "tests": 24,
+        "passed": 19,
+        "failed": 5,
+        "same_failed_tests": true,
+        "files_changed_by_task": false,
+        "scope": "sdk-operations.test.mjs and threat-composition-client.test.mjs only; not a full baseline rerun"
+      },
+      "mandatory_business_access_after_rebase": {
+        "platform_tests": 195,
+        "platform_passed": 195,
+        "adapter_tests": 21,
+        "adapter_passed": 21,
+        "typecheck": "passed",
+        "build": "passed"
+      },
+      "final_validation_log_sha256": {
+        "final_full": "aaaa2c361964a93640b04b058c4b6f8c6a7cf0e3e28c29c54efa15c27d0f77c1",
+        "upstream_comparison": "9c47c91f27080f29ecb3ab5a943157002c0703b722d869b7042c0100ece7f835",
+        "final_mandatory": "b2b2e0fdbc3c3758c22e5ad8542b6b2c5e97f2edc58ec821a6506333404de8ee"
+      }
+    },
+    "platform_reload": {
+      "authorized_by_user": true,
+      "pid_before": 838769,
+      "pid_after": 1355770,
+      "observed_before": "2026-11-04T04:12:45.897Z",
+      "observed_after_count": "2026-11-04T04:20:23.966Z",
+      "sessions_before": 423,
+      "sessions_after_count": 423,
+      "session_identity_recheck_at": "2026-11-04T04:57:46.387Z",
+      "sessions_at_identity_recheck": 425,
+      "missing_session_ids": [],
+      "running_before": 4,
+      "running_after": 0,
+      "note": "User approved interrupting in-flight management work. Actual pre-restart count was four; earlier question reported two. Immediate after snapshot retained counts; final native list verified all original Session IDs. Two sessions were created in the meantime. No automatic prompt replay.",
+      "home_and_configuration_preserved": true,
+      "business_containers_preserved_by_platform_restart": true
+    },
+    "last_target_reload": {
+      "observedAt": "2026-11-04T04:55:27.141Z",
+      "gatewayStatus": 200,
+      "sessionStatus": 200,
+      "before": 48,
+      "after": 48,
+      "missing": [],
+      "active": [],
+      "originalUserSessionPresent": true,
+      "home_preserved": true,
+      "port": 18561,
+      "image": "ai-agent-harness/dsh:b830ec950-amd64-2ed0d15ad02e",
+      "diagnosis_mjs_sha256": "7d0523c3ccec3f5e0e1a6d8b5ae9e59ad524d33a4eb5e4a04f0c950dae361234",
+      "container_mounted_sha256": "7d0523c3ccec3f5e0e1a6d8b5ae9e59ad524d33a4eb5e4a04f0c950dae361234"
+    },
+    "browser": {
+      "observed_at": "2026-11-04T04:49:04.778Z",
+      "routes_checked": [
+        "unified gateway overview",
+        "manual control empty state",
+        "target instance detail",
+        "evaluation list and page switching"
+      ],
+      "current_instances": 8,
+      "anonymous_development_instances": 8,
+      "controlled_instances": 0,
+      "manual_selectable_instances": 0,
+      "evaluation_rows_including_header": 129,
+      "new_errors": 0,
+      "older_buffered_errors_excluded": 2
+    },
+    "inspection": {
+      "original_session": "session-8427413f-46d7-4ee1-b5db-0b5091b02645",
+      "final_verification_session": "session-6be90bae-7bd7-4a80-b6d2-998eb25b6d08",
+      "old_guard_rejection_removed": true,
+      "catalog_read": "passed after passthrough correction",
+      "first_start": "Model sent string deviceSelector where object required; rejected by local argument validation.",
+      "next_valid_start": {
+        "acceptanceStatus": "BLOCKED",
+        "runId": null,
+        "errorCode": "INSPECTION_SCOPE_UNAVAILABLE",
+        "exceptionType": "StatusException",
+        "httpStatus": 500
+      },
+      "business_acceptance": "not passed; no inspection Run created",
+      "external_service_modified": false
+    },
+    "publication_boundary": {
+      "program_base": "7cbb73cda4eb82506f4de5291928f1efb82f3abf",
+      "data_base": "3a5d1f95d13e9f804e02633f80e5e5157a6ae6c5",
+      "actual_workspace_has_parallel_changes": true,
+      "excluded": "Unrelated pending changes and the parallel inspection Runtime rewrite. Published baseline inspection catalog already preserved original upstream receipt.",
+      "included": "Principle correction, directly affected tests, deletion/Run/instance recovery, missing diagnosis source/artifact, diagnosis catalog passthrough and catalog regression.",
+      "initial_program_base": "1a32a74e285a5b8d50678a1d17b2f11b237315e4"
+    },
+    "isolated_program_source_sha256": {
+      "AGENTS.md": "b041e688858ebd05d9a74aa1caa77cce9b513e9b4248c0e4538b7a6d25c97047",
+      "docs/platform-design/20_业务访问与运行控制插件开发规范.md": "906e0dddd8853ba716d044fe9d72e29343316f121f717a7d1f911976f3d64a8c",
+      "platform/plugin/package.json": "2b66fad9ad4768272befe66d9e6ad5b4dfc11914045361c84d58ac8deacb8495",
+      "platform/plugin/src/business-control/access-state.tsx": "7a78432868fa29caeda6b79408b5a7f1f227d4a51d498e2c9603dd225e660d80",
+      "platform/plugin/src/business-control/contracts.ts": "99fce597ccdbd5bc667fe654147646de45e8496fa2f91effccf27f52c89f218b",
+      "platform/plugin/src/business-control/core.ts": "09341920320dace0d73290e1216a8151fb16c35a76be9796390eef041aafc5c7",
+      "platform/plugin/src/business-control/entry.ts": "f4a21776dc46b86943e3d000f1769eca69668a2146eeb615bc32b3bd252454ff",
+      "platform/plugin/src/business-control/gateway.ts": "89aa0c459a0a0dbf46eaa7772d726fefb6de252e37ac973ae50b0021aef076e1",
+      "platform/plugin/src/business-control/index.ts": "bcee0b6287d5d45ef75923679240d6f035d54457f6dc248dcd9233a615205052",
+      "platform/plugin/src/business-control/management.ts": "89c9c29a52ada1a5d7daf322336fc41e5162190cb6271bd174452123f162dac4",
+      "platform/plugin/src/business-control/overview.tsx": "443ee1d545eab6858d17b6a765fe096f884caf74beb6e10a92add76bcbffa7ea",
+      "platform/plugin/src/business-control/runtime.ts": "fdb5b0f352193d1678bdacce343cb8c8da8bd8d30babb2838f9f2f238b134de9",
+      "platform/plugin/src/business-control/ui.tsx": "3b0351353ebb7d03a78b32db3508f7b215464342dadf8bb40b9cdf6a4f5503ac",
+      "platform/plugin/src/instances/client.tsx": "bc8d20690e44f9cfa97379d78a033e95e245a6fdb4067e2ee45ec48dbbcc9009",
+      "platform/plugin/src/instances/index.ts": "b28e027d15841417409a79f30fed2b74b1b3183f22860d29d9cf2d6963a128c3",
+      "platform/plugin/src/mcp/manager.ts": "4ec3dafc9f0b320d7393b51b057e6ddf214a11504e12d6953f0f2649fa96d568",
+      "platform/plugin/test/business-control-access-state.test.mjs": "88bda1f40837286e84af7dcf090d3aa95b9813368f282f7313fe948df2ed1da0",
+      "platform/plugin/test/business-control-core.test.mjs": "8b36956aa3a300daf583917c7bef972f3888a317b8ba7200713262e06d8b159a",
+      "platform/plugin/test/business-control-management.test.mjs": "8f26837042b45e7ab02493cedbdcb70897c0841afb2bf52194e252a57447cd90",
+      "platform/plugin/test/business-gateway.test.mjs": "5f2a80f035022a13966cd8d17b6cdb595d610950577d0b914d4fe54a8524f269",
+      "platform/plugin/test/business-group-v2.test.mjs": "c1a215d6f10d44002331617818f7aa5debfc506649997ddc7ff89c5d02ef576a",
+      "platform/plugin/test/business-mcp-overlay.test.mjs": "792eb9473e77f1ebf8f54212308ba61cb6674a7dde0a5ef3c6dbb321ec8cebbd",
+      "platform/plugin/test/gateway-overview-client.test.mjs": "2bb719d8481d759d0f7235dd4973a2d66e329df87025a7de20ea2dc29e9846f5",
+      "platform/plugin/test/instances.test.mjs": "85d8d9a5165dc608c3aff3504726c48f6d09d143869515f8dda40c01714d493d",
+      "platform/plugin/test/platform-entry.test.mjs": "34d67e5ae69143f2d24afa46e76ba377fa6e30112181e721fa4f32cff2e8628d",
+      "runtime/adapters/dsh-container/README.md": "a20bbdcea0d5843b03ce9cfd78952e25734725a201fe8e5fa85f19f68acac64b",
+      "runtime/adapters/dsh-container/business.ts": "d32a5aea9896d2eb470ebfc5b6927a2bfdcc7f2045d5cbddf7e139d2947ca798",
+      "runtime/adapters/dsh-container/dsh-dev": "566e42c1dc27e45f396466f597f7f8bebd2f491c6006571269baa06d1da7aa34",
+      "runtime/adapters/dsh-container/run_record.py": "80be93d7d24ceb09806bd57f1418909f9d332df5698d12f29332a8ed36f6954d",
+      "runtime/adapters/dsh-container/test_business.mjs": "9b8601e7753509685c0cdb7d9e9866f0c86da6b69ed003514cd58a493cbd42f5",
+      "runtime/adapters/dsh-container/test_dsh_dev.py": "a4a6afb1298f73b8d7712e959ed76f888b6e044d5cb74605d8faf48f51cc0a32",
+      "runtime/adapters/dsh-container/verification.compose.yaml": "90495bc0a275993afc0708228d5cdbfe41b88bc12587268ff5d271c200b75783",
+      "tests/test_run_snapshot.py": "c55ee679dee4338c6bda23599716cc80d2c07c169e9cc2022b6a9dcb5db2d2ad"
+    },
+    "diagnosis_source_sha256": {
+      "diagnosis-runtime.ts": "95a3920c14b308dd65cfc076ad692840be043d4146b7322015236f0542d12204",
+      "diagnosis-runtime.mjs": "ab0a9ff7bc481a12654ac925679cfda1b5748b1bd5aead14f394125f90e27348"
+    },
+    "limits": [
+      "External inspection scope endpoint returned HTTP 500; full-asset inspection not completed.",
+      "No full business Evaluation or Research Release.",
+      "Anonymous published behavior covered by executable tests; current live inventory has development instances only.",
+      "No remote environment updated.",
+      "Final merged full platform suite has 5 pre-existing upstream failures; the same 5 were reproduced without this task patch and were not remediated in this scope."
+    ]
+  }
+}

@@ -162,7 +162,7 @@ python3 runtime/adapters/dsh-container/dsh-dev down security-operations-expert-e
 
 `up` 会先核对镜像标签对应的构建指纹、平台和 Image ID，再执行停旧实例、写状态和启动；Compose 使用 `tag@image-id` 不可变引用。新建或替换后的主 `dsh` 容器名与实例名完全一致，Compose 项目名固定为 `dsh-dev-<实例名>`；`up --dry-run`、`up` 和 `ps` 都直接输出实例名、实际主容器名和项目名，旧实例由 `ps` 输出其现有主容器名并标记 `needs_migration`。它仍不只看 `docker compose up -d` 的退出码：命令返回 0 之后还要确认 `dsh` 服务真的在运行（`home-init` 是一次性服务，正常结束不算失败），否则报告失败或 `dsh_running: "unknown"` 并以非零退出码结束。成功时 stdout 只输出一个 JSON 结果，其中包含 `image_id`、`image_ref` 和 `image_build_fingerprint`；进度、提示和错误输出到 stderr，失败时 stdout 保持为空。`up --replace` 的成功 JSON 在 `replaced.stop` 中包含完整停止结果。
 
-`ps`、`logs`、`down` 从实例状态文件重建 Compose 所需环境；`ps` 默认只列出运行中的实例，`ps --all` 才包含其他状态并标出 `needs_migration`。历史 `authoring` 实例仍可查询日志和停止，但新建或替换时只接受 `eval`。挂载内容变化不会自动重启进程，使用 `up --replace` 或先 `down` 再同名 `up` 重载。`down` 同时核对 Compose 退出码、实际容器状态和 HOME 卷。
+`ps`、`logs`、`down` 从实例状态文件重建 Compose 所需环境；`ps` 默认只列出运行中的实例，`ps --all` 才包含其他状态并标出 `needs_migration`。主 `dsh` 容器采用 `unless-stopped` 策略，Docker 服务恢复后自动启动此前运行的实例；显式停止的实例保持停止，一次性 `home-init` 不自动重启。历史 `authoring` 实例仍可查询日志和停止，但新建或替换时只接受 `eval`。挂载内容变化不会自动重启进程，使用 `up --replace` 或先 `down` 再同名 `up` 重载。`down` 同时核对 Compose 退出码、实际容器状态和 HOME 卷。
 
 `stopped` 表示仍存在已停止的 DSH 容器；`absent` 表示 Docker 查询成功，但仅有本地登记、没有 DSH 容器。`down` 移除容器后保留登记和 HOME，因此随后通常为 `absent`；Docker 查询失败则为 `unknown`，不能推断为已停止。`delete` 可删除 `stopped` 或 `absent` 实例，执行前重新核对该实例的 Docker 状态，移除容器和登记并保留 HOME 卷及研究记录。
 

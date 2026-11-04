@@ -1283,9 +1283,11 @@ def asset_dependency_mounts(contract: dict) -> list[dict]:
     return mounts
 
 
-def runtime_mounts(contract: dict, analysis_workspace: str | None = None) -> list[dict]:
+def runtime_mounts(contract: dict, analysis_workspace: str | None = None,
+                   private_directory: Path | None = None) -> list[dict]:
     mounts = asset_dependency_mounts(contract)
-    if analysis_workspace or contract.get("business_control") or not contract.get("experiment_id"):
+    if (analysis_workspace or not contract.get("experiment_id")
+            or contract.get("business_control") and private_directory is not None and private_directory.exists()):
         return mounts
     prepared = run([NODE_EXECUTABLE, str(ADAPTER / "harness-runtime.mts"), "--private-files",
                     str(REPO), contract["experiment_id"]])
@@ -1361,7 +1363,7 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
         managed_patch_compat=bool(contract.get("runtime_managed_patch")),
         harness_runtime=bool(contract.get("harness_runtime")) and not analysis_workspace,
         project_workspace=bool(contract.get("project_workspace_host")) and not analysis_workspace,
-        dependency_mounts=runtime_mounts(contract, analysis_workspace),
+        dependency_mounts=runtime_mounts(contract, analysis_workspace, target / "dsh-home/private"),
     )
     business = None
     if contract.get("business_control"):
@@ -1734,15 +1736,15 @@ def prepare_up(args: argparse.Namespace) -> tuple[dict, tuple[Path, dict] | None
             if not access_mode or not identity_mode or home.is_symlink() or home.exists() and (not home.is_dir() or any(not item.is_dir() or item.is_symlink() for item in home.rglob("*"))):
                 fail("此未登记实例缺少原创建模式；保留 HOME，不能按默认访问方式或身份阶段恢复")
         if current is None and (home.is_symlink() or home.exists() and (not home.is_dir()
-                or any(home.iterdir()) and not (development and anonymous))):
-            fail("只有无需认证的开发调试实例可以复用保留的 HOME；认证或发布实例需要新的独立 HOME")
+                or any(home.iterdir()) and not anonymous)):
+            fail("只有无需认证的实例可以复用保留的 HOME；需要认证的实例需要新的独立 HOME")
         contract["business_control"] = {
             "config_file": str(Path(business_file).resolve()), "source_digest": launch["sourceDigest"],
             "runtime_generation": (current[1]["business_control"]["runtime_generation"] if current else secrets.token_hex(16)),
             "identity_mode": "development" if launch.get("development") else "published",
             "access_mode": launch["accessMode"],
         }
-        if current is not None and current[1]["business_control"].get("source_digest") != launch["sourceDigest"] and not launch.get("development"):
+        if current is not None and current[1]["business_control"].get("source_digest") != launch["sourceDigest"] and not (development or anonymous):
             fail("业务来源资产与实例固定摘要不一致；保留旧实例及 Session，请以新实例名创建新版本")
     if args.port is None:
         if current is not None:
@@ -1843,11 +1845,11 @@ def build_plan(args: argparse.Namespace, contract: dict) -> dict:
     return plan
 
 
-def business_command(arguments: list[str], payload: dict | None = None) -> dict:
+def business_command(arguments: list[str], payload: dict | None = None, timeout: float | None = 30) -> dict:
     """仅桥接 TypeScript 实现；输出不包含密钥原值。"""
     completed = subprocess.run([NODE_EXECUTABLE, str(ADAPTER / "business.ts"), *arguments],
                                input=json.dumps(payload) if payload is not None else None,
-                               text=True, capture_output=True, check=False, timeout=30)
+                               text=True, capture_output=True, check=False, timeout=timeout)
     if completed.returncode != 0:
         prefix = "BUSINESS_STARTUP_ERROR:"
         reasons = [line[len(prefix):] for line in completed.stderr.splitlines() if line.startswith(prefix)]
@@ -1948,6 +1950,7 @@ def validate_image_identity(contract: dict, current: tuple[Path, dict] | None = 
 
 
 def command_up(args: argparse.Namespace) -> None:
+    require_up_arguments(args)
     # 必须在选端口前加锁；仅锁写 instance.json 无法避免两个启动同时看到空闲端口。
     dry_run = bool(getattr(args, "dry_run", False))
     lock_business = not dry_run and not getattr(args, "analysis_workspace", None)
@@ -1958,6 +1961,21 @@ def command_up(args: argparse.Namespace) -> None:
             os.environ.update(inherited)
             try:
                 _command_up(args, contract, current)
+            except SystemExit:
+                previous_digest = current[1].get("business_control", {}).get("source_digest") if current else None
+                if not dry_run and contract.get("business_control") and previous_digest:
+                    # 启动可能先保存新来源再失败；登记同步到实际来源，使同名重试仍可通过预检。
+                    try:
+                        manifest = json.loads((instance_dir(args.name) / "instance.json").read_text(encoding="utf-8"))
+                    except (OSError, ValueError):
+                        manifest = {}
+                    if manifest.get("agent_id") == contract["agent_id"] and manifest.get("source_id") == contract["source_id"] \
+                            and manifest.get("business_control", {}).get("source_digest") == contract["business_control"]["source_digest"]:
+                        try:
+                            business_command(["--register", str(REPO), args.name, previous_digest])
+                        except SystemExit:
+                            fail("启动失败后的网关登记未同步，请核对实例与网关配置后重试")
+                raise
             finally:
                 for name in inherited:
                     os.environ.pop(name, None)
@@ -1987,6 +2005,16 @@ def _command_up(args: argparse.Namespace, contract: dict,
         assert_asset_dependencies(contract, identity["image_id"])
     # Compose 插值与模板结构都可以在停旧实例前检查；明显无效的新配置不得先触发停机。
     preflight_new_instance(args, contract)
+    previous_digest = current[1].get("business_control", {}).get("source_digest") if current else None
+    if contract.get("business_control"):
+        business_command(["--preflight-registration", str(REPO)], {
+            "registration": {"agentId": contract["agent_id"], "instanceId": args.name,
+                             "sourceId": contract["source_id"],
+                             "sourceDigest": contract["business_control"]["source_digest"],
+                             "accessMode": contract["business_control"]["access_mode"],
+                             "identityMode": contract["business_control"]["identity_mode"]},
+            "previousSourceDigest": previous_digest,
+        })
     if contract.get("model_policy"):
         assert_model_policy_current(contract["model_policy"], repo=REPO)
     replaced = migrate_existing_instance(args, contract, current)
@@ -2057,6 +2085,14 @@ def _command_up(args: argparse.Namespace, contract: dict,
     if not report["listener_verified"]:
         print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True), file=sys.stderr)
         fail("dsh 容器未确认拥有指定端口的监听；不能交付可能属于其它实例的入口，用 logs 查看失败原因")
+    if contract.get("business_control"):
+        try:
+            report["base_url"] = business_command(["--register", str(REPO), args.name,
+                                                   *([previous_digest] if previous_digest else [])])["url"]
+            report["business_control"] = contract["business_control"]
+        except SystemExit:
+            stop_instance(args.name, load_instance(args.name)[1])
+            fail("业务网关登记失败，已停止本次实例并保留 HOME；修复登记后以同名重试")
     print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
     print(json.dumps({
         "hint": web_cold_start_hint(args.mode, args.analysis_workspace, bool(contract.get("business_control"))),
@@ -2849,7 +2885,9 @@ def delete_instance(name: str, manifest: dict) -> dict:
 def command_delete(args: argparse.Namespace) -> None:
     """删除已停止实例的容器和登记；不删除 HOME、Session、Agent/source 或历史 Run。"""
     _, manifest = load_instance(args.name)
-    print(json.dumps(delete_instance(args.name, manifest), ensure_ascii=False))
+    report = business_command(["--delete", str(REPO), args.name], timeout=None) if manifest.get("business_control") \
+        else delete_instance(args.name, manifest)
+    print(json.dumps(report, ensure_ascii=False))
 
 
 def validate_existing_identity(name: str, manifest: dict, contract: dict, mode: str,
@@ -2931,7 +2969,7 @@ def preflight_new_instance(args: argparse.Namespace, contract: dict) -> None:
             schedule_compat=not analysis_workspace and needs_schedule_compat(contract.get("profile_manifest")),
             harness_runtime=bool(contract.get("harness_runtime")) and not analysis_workspace,
             project_workspace=bool(contract.get("project_workspace_host")) and not analysis_workspace,
-            dependency_mounts=runtime_mounts(contract, analysis_workspace),
+            dependency_mounts=runtime_mounts(contract, analysis_workspace, instance_dir(args.name) / "dsh-home/private"),
         )
         business = None
         if contract.get("business_control"):

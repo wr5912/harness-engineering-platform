@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import fs, { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import fs, { mkdirSync, mkdtempSync, readFileSync, writeFileSync, symlinkSync, unlinkSync } from 'node:fs'
 import { syncBuiltinESMExports } from 'node:module'
 import { rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -710,4 +710,47 @@ test('人工修改拒绝理由仍保留排除状态，不因内容变化回到�
   const result = await fx.handle('datasets/update', input)
   assert.equal(result.dataset.records[0].targets.route.status, 'rejected')
   assert.equal(result.eligibility.counts.candidates, 0)
+}))
+
+test('坏批次不阻断健康Run读取，关系核验不完整仍拒绝写入与全部导出', () => withFixture(async fx => {
+  const saved = await reviewed(fx, await save(fx)), src = await source(fx)
+  const pending = await preview(fx, src, [draft(src, { questions: { route: question({ instructions: '根据相同材料核对另一项查询决策。' }) } })])
+  const badId = 'decision-dataset-33333333-3333-4333-8333-333333333333', badPath = join(fx.root, 'evolution/datasets', `${badId}.json`)
+  const marker = 'SYNTHETIC_BROKEN_BATCH_SECRET'
+  write(badPath, `{"password":"${marker}",`)
+  const list = await fx.handle('datasets/list', { run_id: runId, include_eligibility: false })
+  assert.equal(list.datasets.length, 1); assert.equal(list.datasets[0].id, saved.dataset.id)
+  assert.equal(list.catalog_complete, false); assert.equal(list.batch_errors[0].dataset_id, badId)
+  assert.equal(list.batch_errors[0].code, 'invalid_dataset_json')
+  assert.equal(JSON.stringify(list).includes(marker), false)
+  const healthy = await fx.handle('datasets/read', { dataset_id: saved.dataset.id })
+  assert.equal(healthy.sha256, saved.sha256); assert.equal(healthy.catalog_complete, false)
+  assert.ok(Object.values(healthy.eligibility.counts).every(value => value === 0))
+  assert.match(healthy.eligibility.blocked[0].reasons.join(), /另有不可读取批次/)
+  await assert.rejects(() => fx.handle('datasets/read', { dataset_id: badId }), /JSON 无法解析/)
+  await assert.rejects(() => preview(fx, src), /目录核验不完整/)
+  await assert.rejects(() => apply(fx, pending), /目录核验不完整/)
+  await assert.rejects(() => fx.handle('datasets/update', updatePayload(saved)), /目录核验不完整/)
+  for (const mode of ['candidates', 'training', 'development', 'calibration', 'test']) await assert.rejects(() => exported(fx, saved.dataset, mode), /目录核验不完整/)
+  unlinkSync(badPath)
+  const restored = await fx.handle('datasets/read', { dataset_id: saved.dataset.id })
+  assert.equal(restored.catalog_complete, true); assert.deepEqual(restored.batch_errors, [])
+  assert.equal(restored.eligibility.counts.training, 1)
+}))
+
+test('结构、超大与符号链接坏批次各自可定位，健康批次仍可列出', () => withFixture(async fx => {
+  const saved = await save(fx), badId = 'decision-dataset-44444444-4444-4444-8444-444444444444'
+  const path = join(fx.root, 'evolution/datasets', `${badId}.json`)
+  for (const records of [[null], [{ _meta: null }], {}, [{ ...saved.dataset.records[0], state: { messages: {} } }], [{ ...saved.dataset.records[0], state: { messages: [null] } }]]) {
+    write(path, JSON.stringify({ ...saved.dataset, id: badId, run_id: runId2, records }))
+    const list = await fx.handle('datasets/list', { run_id: runId, include_eligibility: false })
+    assert.equal(list.datasets.length, 1); assert.equal(list.batch_errors[0].code, 'invalid_dataset'); assert.equal(list.catalog_complete, false)
+    assert.equal((await fx.handle('datasets/list', {})).datasets.length, 1)
+    assert.equal((await fx.handle('datasets/read', { dataset_id: saved.dataset.id })).catalog_complete, false)
+  }
+  write(path, ' '.repeat(4 * 1024 * 1024 + 1))
+  assert.equal((await fx.handle('datasets/list', {})).batch_errors[0].code, 'dataset_too_large')
+  unlinkSync(path); symlinkSync(join(fx.root, saved.file), path)
+  assert.equal((await fx.handle('datasets/list', {})).batch_errors[0].code, 'path_rejected')
+  assert.equal((await fx.handle('datasets/read', { dataset_id: saved.dataset.id })).dataset.id, saved.dataset.id)
 }))

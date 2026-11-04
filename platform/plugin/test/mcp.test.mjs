@@ -910,3 +910,82 @@ test('Candidate固定工具复用原生组认证和官方MCP传输，发布后�
     }
   })
 })
+
+test('组合执行按预存身份回读，丢回执、并发和服务重建均不重复派发', async t => {
+  const module = await loadMcpModule()
+  const root = await mkdtemp(join(process.cwd(), '.local', 'composition-receipts-'))
+  const config = { toolName: 'collect_sample', title: '取证', description: '', connectionId: 'platform-compositions', kind: 'threat-stage', stage: 'collect', bindings: { socConnectionId: 'soc', reportConnectionId: 'report' } }
+  const entry = { id: 'collect' }; publishCompositionVersion(entry, config)
+  const compositionsFile = join(root, 'compositions.json')
+  await writeFile(compositionsFile, JSON.stringify({ schema_version: '1.0', compositions: [entry] }))
+  const runId = 'run-11111111-1111-4111-8111-111111111111'
+  let calls = 0, release, started
+  const ready = new Promise(resolve => { started = resolve })
+  const extension = { id: 'receipt-probe', sourceDigest: 'a'.repeat(64), threat: { async execute(stage, bindings, input, signal, execution) {
+    await execution.onRun(runId)
+    calls++; started()
+    await new Promise(resolve => { release = resolve })
+    return { run_id: runId, incident_id: input.incident_id, phase_status: 'completed', status: 'completed' }
+  }, async inspect() { return { run_id: runId, phase_status: 'completed', status: 'completed' } } } }
+  const rpc = module.createMcpHandler(root, { compositionsFile, extension })
+  const listed = (await rpc('list', {})).value
+  const request = { compositionId: 'collect', version: 'published', versionId: entry.publishedVersionId, revision: listed.revision, input: { incident_id: 'INC-20261015-000001' }, execution: { execution_id: 'graph-receipt-probe' } }
+  const pending = rpc('executeComposition', request)
+  await ready
+  const repeated = await rpc('executeComposition', request)
+  assert.equal(repeated.value.execution_receipt.state, 'running')
+  assert.equal(calls, 1)
+  const read = await rpc('compositionExecution', { execution_id: request.execution.execution_id })
+  assert.deepEqual(read.value.run_ids, [runId])
+  const conflict = await rpc('executeComposition', { ...request, input: { incident_id: 'INC-20261015-000002' } })
+  assert.equal(conflict.ok, false); assert.equal(calls, 1)
+  const restarted = (await loadMcpModule()).createMcpHandler(root, { compositionsFile, extension })
+  const unknown = await restarted('compositionExecution', { execution_id: request.execution.execution_id })
+  assert.equal(unknown.value.state, 'unknown')
+  assert.deepEqual(unknown.value.run_ids, [runId])
+  assert.equal((await restarted('executeComposition', request)).value.execution_receipt.state, 'unknown')
+  assert.equal(calls, 1)
+  release(); const completed = await pending
+  assert.equal(completed.value.execution_receipt.state, 'responded')
+  assert.equal(completed.value.result.run_id, runId)
+  assert.equal((await restarted('compositionExecution', { execution_id: request.execution.execution_id })).value.result.result.run_id, runId)
+  assert.equal((await restarted('executeComposition', request)).value.execution_receipt.state, 'responded')
+  assert.equal(calls, 1)
+  const before = (await readdir(join(root, '.local', 'mcp-composition-executions'))).length
+  assert.equal((await rpc('executeComposition', { ...request, execution: { execution_id: 'invalid-input' }, input: {} })).ok, false)
+  assert.equal((await readdir(join(root, '.local', 'mcp-composition-executions'))).length, before)
+  const legacy = rpc('executeComposition', { ...request, execution: undefined })
+  while (calls === 1) await new Promise(resolve => setTimeout(resolve, 5))
+  const files = await readdir(join(root, '.local', 'mcp-composition-executions'))
+  const generated = files.find(name => name !== 'graph-receipt-probe.json').slice(0, -5)
+  assert.equal((await rpc('compositionExecution', { execution_id: generated })).value.state, 'running')
+  release()
+  assert.equal((await legacy).value.execution_receipt.state, 'responded')
+  assert.equal(calls, 2)
+})
+
+test('嵌套组合的原生Run关联追加保存，阶段失败保持未知且不重放', async () => {
+  const module = await loadMcpModule(), root = await mkdtemp(join(process.cwd(), '.local', 'composition-nested-receipts-'))
+  const config = { toolName: 'collect_child', title: '子取证', description: '', connectionId: 'platform-compositions', kind: 'threat-stage', stage: 'collect', bindings: { socConnectionId: 'soc', reportConnectionId: 'report' } }
+  const child = { id: 'child' }; publishCompositionVersion(child, config)
+  const infer = { id: 'infer' }; publishCompositionVersion(infer, { ...config, toolName: 'infer_child', stage: 'infer' })
+  const parent = { id: 'parent' }; publishCompositionVersion(parent, { toolName: 'parent_collect', title: '父组合', description: '', connectionId: 'platform-compositions', kind: 'composite', steps: [
+    { id: 'first', compositionId: child.id, versionId: child.publishedVersionId, inputMap: { incident_id: '$input.incident_id' } },
+    { id: 'second', compositionId: infer.id, versionId: infer.publishedVersionId, inputMap: { run_id: '$steps.first.run_id' } },
+  ] })
+  const compositionsFile = join(root, 'compositions.json'); await writeFile(compositionsFile, JSON.stringify({ schema_version: '1.0', compositions: [child, infer, parent] }))
+  let calls = 0
+  const extension = { id: 'nested-receipts', sourceDigest: 'a'.repeat(64), threat: { async execute(stage, bindings, input, signal, execution) {
+    const id = ['run-11111111-1111-4111-8111-111111111111', 'run-22222222-2222-4222-8222-222222222222'][calls++]; await execution.onRun(id); await execution.onRun(id)
+    if (calls === 2) throw new Error('外部回执不可读')
+    return { run_id: id, incident_id: input.incident_id, phase_status: 'completed', status: 'completed' }
+  } } }
+  const rpc = module.createMcpHandler(root, { compositionsFile, extension }), revision = (await rpc('list', {})).value.revision
+  const request = { compositionId: parent.id, version: 'published', versionId: parent.publishedVersionId, revision, input: { incident_id: 'INC-20261015-000001' }, execution: { execution_id: 'nested-request' } }
+  const result = await rpc('executeComposition', request)
+  assert.equal(result.ok, true)
+  assert.deepEqual(result.value.execution_receipt.run_ids, ['run-11111111-1111-4111-8111-111111111111', 'run-22222222-2222-4222-8222-222222222222'])
+  await rpc('compositionExecution', { execution_id: request.execution.execution_id })
+  await rpc('executeComposition', request)
+  assert.equal(calls, 2)
+})

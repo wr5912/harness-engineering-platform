@@ -8,14 +8,19 @@ const require = createRequire(import.meta.url)
 const source = (await build({ entryPoints: [new URL('../src/business-control/overview.tsx', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime'] })).outputFiles[0].text
 const module = { exports: {} }
 vm.runInNewContext(source, { module, exports: module.exports, require })
-const { currentRiskFacts, identityBucket, riskBucket } = module.exports
+const { currentRiskFacts, identityBucket, riskBucket, unrestrictedSynchronized } = module.exports
 const now = Date.parse('2026-10-28T08:00:00Z')
 const fact = (id, scope, patch = {}) => ({ id, scope, version: 1, status: 'assessed', level: 'low', observedAt: '2026-10-28T07:59:00Z', expiresAt: '2026-10-28T08:01:00Z', ...patch })
 
-test('概览发布身份统计排除开发实例，缺少身份事实保留待核验', () => {
-  assert.equal(identityBucket({ identityMode: 'development' }), 'development')
-  assert.equal(identityBucket({}, { authentication: { status: 'not_required' }, trust: { status: 'trusted' } }), 'development')
-  assert.equal(identityBucket({ identityMode: 'published' }), 'unknown')
+test('概览身份统计排除匿名与开发实例，缺少身份事实保留待核验', () => {
+  assert.equal(identityBucket({ identityMode: 'development' }), 'unrestricted')
+  assert.equal(identityBucket({}, { authentication: { status: 'not_required' }, trust: { status: 'trusted' } }), 'unrestricted')
+  for (const identityMode of ['development', 'published']) {
+    const instance = { identityMode, accessMode: 'anonymous', synchronization: { lastSuccessAt: '2026-10-28T08:00:00Z' } }
+    assert.equal(identityBucket(instance), 'unrestricted')
+    assert.equal(unrestrictedSynchronized(instance), true)
+  }
+  assert.equal(identityBucket({ identityMode: 'published', accessMode: 'authenticated' }), 'unknown')
   assert.equal(identityBucket({}, { authentication: { status: 'verified' }, trust: { status: 'trusted' } }), 'verified')
   assert.equal(identityBucket({}, { authentication: { status: 'verified' }, trust: { status: 'mismatch' } }), 'abnormal')
   assert.equal(identityBucket({}, { authentication: { status: 'expired' }, trust: { status: 'trusted' } }), 'unknown')

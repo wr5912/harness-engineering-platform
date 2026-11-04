@@ -1,7 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { networkInterfaces } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { isIP } from 'node:net'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -135,6 +135,38 @@ async function stop(dataRoot: string) {
     await delay(100)
   }
   throw new Error(`平台 PID ${state.pid} 未在 30 秒内退出；请检查日志 ${state.log}，未强制终止`)
+}
+
+/** 恢复更新前已验证的运行命令；旧制品可能与当前源码的缓存路径不同，不能重新渲染Profile。 */
+export async function restoreManagedProcess(original: State, command: string[], environment: NodeJS.ProcessEnv): Promise<State> {
+  if (!original.detached || !isAbsolute(command[0] ?? '') || command[command.indexOf('--profile') + 1] !== 'harness-platform'
+    || command[command.indexOf('--patch') + 1] !== join(original.dataRoot, '.local/platform-home/profiles/harness-platform/harness-platform.patch.yml')
+    || environment.HARNESS_PROGRAM_ROOT !== original.programRoot || environment.HARNESS_ASSET_ROOT !== original.dataRoot
+    || environment.DSH_HOME !== join(original.dataRoot, '.local/platform-home') || !isAbsolute(environment.HOME ?? '')) throw new Error('原平台启动身份不完整，未执行恢复')
+  const service = join(original.dataRoot, '.local/platform-service'), unlock = await lock(join(service, 'operation.lock'))
+  try {
+    if (managedState(original.dataRoot, original.programRoot)) throw new Error('平台已有受管进程，未覆盖恢复')
+    const fd = openSync(original.log, 'a', 0o600)
+    const child = spawn(command[0], command.slice(1), { cwd: original.dataRoot, env: environment, detached: true, stdio: ['ignore', fd, fd] })
+    closeSync(fd)
+    let failure: Error | undefined
+    child.on('error', error => { failure = error })
+    if (!child.pid) throw new Error('原平台命令无法启动，恢复未确认')
+    const state = { ...original, pid: child.pid, birth: processBirth(child.pid)!, phase: 'starting' }
+    atomic(join(service, 'state.json'), state)
+    try {
+      const deadline = Date.now() + 60_000
+      while (Date.now() < deadline) {
+        if (failure || processBirth(state.pid) !== state.birth) throw new Error(`原平台启动失败；日志：${state.log}`)
+        if (ownsPort(state.pid, state.host, state.port) && await httpPhase(state.url) === 'running') {
+          state.phase = 'running'; atomic(join(service, 'state.json'), state)
+          return state
+        }
+        await delay(100)
+      }
+      throw new Error(`原平台恢复等待超过60秒；日志：${state.log}`)
+    } finally { child.unref() }
+  } finally { unlock() }
 }
 
 export async function main(args = process.argv.slice(2)): Promise<number> {

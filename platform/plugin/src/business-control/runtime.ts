@@ -46,31 +46,31 @@ export class BusinessConnection extends NativeConnection.HostConnectionService {
   private nonces = new Map<string, number>()
   private businessPeers = new Map<PeerScope, BusinessContext>()
   private requestContext = new WeakMap<object, BusinessAdmission>()
-  private sharedDevelopmentPeer?: PeerScope
+  private sharedPeer?: PeerScope
   private disposedBusiness = false
   private businessLifetime = new AbortController()
   private refreshing?: Promise<void>
   private peerTrustChecks = new Map<string, Promise<void>>()
   private latestSnapshot?: RuntimeAssertion['snapshot']
   constructor(ctx: Context, readonly businessConfig: BusinessRuntimeConfig, readonly control: BusinessControl) {
-    // 所有业务 admission 均核对网关上下文，不使用原生免校验 browserPeer。
+    // 保留实例路由上下文；无需登录时共享原生 owner Peer。
     super(ctx, [], { isAuthenticated: () => false, authenticateApi: () => undefined } as never)
     control.registerInstance(businessConfig.binding)
     control.requireSnapshot(businessConfig.binding.instanceId)
-    let nextSync = Date.now() + (control.isDevelopmentInstance(businessConfig.binding) ? 5000 : 500)
+    let nextSync = Date.now() + (control.isUnrestrictedInstance(businessConfig.binding) ? 5000 : 500)
     const timer = setInterval(() => {
       this.refreshPeerTrust()
       try {
-        const development = control.isDevelopmentInstance(businessConfig.binding)
-        if (development && Date.now() < nextSync) return
-        nextSync = Date.now() + (development ? 5000 : 500)
+        const unrestricted = control.isUnrestrictedInstance(businessConfig.binding)
+        if (unrestricted && Date.now() < nextSync) return
+        nextSync = Date.now() + (unrestricted ? 5000 : 500)
       } catch { return }
       void this.refresh().catch(() => { /* 发布租约由授权检查拒绝；开发同步失败不影响交互。 */ })
     }, 500)
     const monitor = setInterval(() => { for (const [peer, context] of this.businessPeers) {
       try {
-        if (!control.enabled()) throw new Error('业务控制已关闭')
-        if (peer === this.sharedDevelopmentPeer && (!control.isDevelopmentContext(context) || !control.isSharedContext(context))) throw new Error('共享开发访问已撤回')
+        if (!control.isAnonymousInstance(businessConfig.binding) && !control.enabled()) throw new Error('业务控制已关闭')
+        if (peer === this.sharedPeer && !control.isSharedContext(context)) throw new Error('无需登录的共享访问已关闭')
         control.assert(context, 'agent:access', [{ kind: 'agent', id: context.scope.agentId }])
       }
       catch { void peer.dispose(); this.businessPeers.delete(peer) }
@@ -88,23 +88,23 @@ export class BusinessConnection extends NativeConnection.HostConnectionService {
       if (sessionId && !context) throw new Error('业务 MCP 请求缺少当前 Session')
       if (context) this.control.assert(context, 'agent:access', [{ kind: 'agent', id: context.scope.agentId }])
       const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase()
-      const development = this.control.isDevelopmentInstance(this.businessConfig.binding)
+      const unrestricted = this.control.isUnrestrictedInstance(this.businessConfig.binding)
       const headers = new Headers(input instanceof Request ? input.headers : undefined)
       new Headers(init?.headers).forEach((value, key) => headers.set(key, value))
       for (const key of [...headers.keys()]) if (key.startsWith('x-harness-')) headers.delete(key)
       headers.delete('authorization')
-      if (development) headers.set('authorization', `Bearer ${readMcpSharedToken(this.businessConfig.assetRoot)}`)
+      if (unrestricted) headers.set('authorization', `Bearer ${readMcpSharedToken(this.businessConfig.assetRoot)}`)
       const outgoing = new Request(input, { ...init, method, headers, redirect: 'error' })
       let requestDigest: string | undefined
       if (method === 'POST') {
         const body = await outgoing.clone().text()
         if (Buffer.byteLength(body) > 64 * 1024) throw new Error('业务 MCP 请求体超过 64 KiB')
-        if (!development) requestDigest = businessRpcDigest(JSON.parse(body))
+        if (!unrestricted) requestDigest = businessRpcDigest(JSON.parse(body))
       }
       const assertion: RuntimeAssertion = { binding: this.businessConfig.binding,
         ...(context ? { context } : {}), ...(requestDigest ? { requestDigest } : {}),
-        ...(!development ? { issuedAt: Date.now(), nonce: randomBytes(24).toString('base64url') } : {}) }
-      for (const [key, value] of Object.entries(development ? businessAssertionHeaders(assertion)
+        ...(!unrestricted ? { issuedAt: Date.now(), nonce: randomBytes(24).toString('base64url') } : {}) }
+      for (const [key, value] of Object.entries(unrestricted ? businessAssertionHeaders(assertion)
         : signBusinessAssertion(readBusinessSecret(this.businessConfig.sharedSecretFile), assertion, method,
           actual.pathname + actual.search))) headers.set(key, value)
       return fetch(outgoing, { headers, redirect: 'error' })
@@ -121,7 +121,7 @@ export class BusinessConnection extends NativeConnection.HostConnectionService {
     const { method, path: logicalPath } = requestAddress(request)
     const prefix = this.businessConfig.basePath?.replace(/\/$/, '') || ''
     const path = prefix && !logicalPath.startsWith(prefix + '/') ? prefix + logicalPath : logicalPath
-    if (this.control.isDevelopmentInstance(this.businessConfig.binding)) return readBusinessAssertion(headersOf(request), this.businessConfig.binding)
+    if (this.control.isUnrestrictedInstance(this.businessConfig.binding)) return readBusinessAssertion(headersOf(request), this.businessConfig.binding)
     const assertion = verifyBusinessAssertion(readBusinessSecret(this.businessConfig.sharedSecretFile), headersOf(request), method, path, this.businessConfig.binding, this.nonces)
     if (assertion.snapshot) {
       if (!this.control.acceptSnapshot(assertion.snapshot)) throw new Error('业务许可快照无效')
@@ -138,19 +138,19 @@ export class BusinessConnection extends NativeConnection.HostConnectionService {
       if (!assertion.context) return { rejection: 401 }
       const context = this.control.acceptContext(assertion.context)
       this.control.assert(context, 'agent:access', [{ kind: 'agent', id: context.scope.agentId }])
-      // 无需认证的开发实例共享整个原生界面；已认证及已发布实例保留各自资源合同。
-      const sharedDevelopment = this.control.isDevelopmentContext(context) && this.control.isSharedContext(context)
+      // 无需登录的实例共享整个原生界面，不以发布状态增加访问限制。
+      const sharedAccess = this.control.isSharedContext(context)
       // 原生问答按 Peer 对象关联事件流与回答，生命周期与实例连接服务一致。
-      const peer = sharedDevelopment && this.sharedDevelopmentPeer || this.createPeer({ principal: sharedDevelopment ? { kind: 'owner' } : { kind: PRINCIPAL, context }, interactions: 'answer' })
+      const peer = sharedAccess && this.sharedPeer || this.createPeer({ principal: sharedAccess ? { kind: 'owner' } : { kind: PRINCIPAL, context }, interactions: 'answer' })
       if (!this.businessPeers.has(peer)) {
-        if (sharedDevelopment) this.sharedDevelopmentPeer = peer
+        if (sharedAccess) this.sharedPeer = peer
         peer.signal.addEventListener('abort', () => {
           this.businessPeers.delete(peer)
-          if (this.sharedDevelopmentPeer === peer) this.sharedDevelopmentPeer = undefined
+          if (this.sharedPeer === peer) this.sharedPeer = undefined
         }, { once: true })
       }
       this.businessPeers.set(peer, context)
-      const admitted = { peer, context, release: sharedDevelopment ? async () => {} : () => peer.dispose() }
+      const admitted = { peer, context, release: sharedAccess ? async () => {} : () => peer.dispose() }
       this.requestContext.set(request, admitted)
       return admitted
     } catch { return { rejection: 403 } }
@@ -182,7 +182,7 @@ export class BusinessConnection extends NativeConnection.HostConnectionService {
   }
   /** 确认前先完成旧心跳，再发送含本次检测事实的新观察；调用取消不打断共享心跳。 */
   async refreshLatest(signal?: AbortSignal): Promise<void> {
-    if (this.control.isDevelopmentInstance(this.businessConfig.binding)) return
+    if (this.control.isUnrestrictedInstance(this.businessConfig.binding)) return
     const wait = async (task: Promise<void>): Promise<void> => {
       if (!signal) return task
       signal.throwIfAborted()
@@ -200,21 +200,21 @@ export class BusinessConnection extends NativeConnection.HostConnectionService {
   private async refreshOnce(): Promise<void> {
     if (this.disposedBusiness) return
     const url = new URL(`/control/${this.businessConfig.binding.instanceId}`, this.businessConfig.coordinatorOrigin)
-    const development = this.control.isDevelopmentInstance(this.businessConfig.binding)
+    const unrestricted = this.control.isUnrestrictedInstance(this.businessConfig.binding)
     const batches = replicaBatches(this.control.exportReplicaState(this.businessConfig.binding))
     for (const batch of batches) {
-      const assertion: RuntimeAssertion = { binding: this.businessConfig.binding, ...(!development ? { ...(this.latestSnapshot ? { acknowledgement: { leaseId: this.latestSnapshot.leaseId, restrictionVersion: this.latestSnapshot.restrictionVersion } } : {}), issuedAt: Date.now(), nonce: randomBytes(24).toString('base64url') } : {}), batch }
-      const response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', ...(development ? { authorization: `Bearer ${readMcpSharedToken(this.businessConfig.assetRoot)}` } : {}) }, body: JSON.stringify(development ? assertion : signBusinessControlAssertion(readBusinessSecret(this.businessConfig.sharedSecretFile), assertion, 'POST', url.pathname)), signal: AbortSignal.any([this.businessLifetime.signal, AbortSignal.timeout(1000)]) })
+      const assertion: RuntimeAssertion = { binding: this.businessConfig.binding, ...(!unrestricted ? { ...(this.latestSnapshot ? { acknowledgement: { leaseId: this.latestSnapshot.leaseId, restrictionVersion: this.latestSnapshot.restrictionVersion } } : {}), issuedAt: Date.now(), nonce: randomBytes(24).toString('base64url') } : {}), batch }
+      const response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', ...(unrestricted ? { authorization: `Bearer ${readMcpSharedToken(this.businessConfig.assetRoot)}` } : {}) }, body: JSON.stringify(unrestricted ? assertion : signBusinessControlAssertion(readBusinessSecret(this.businessConfig.sharedSecretFile), assertion, 'POST', url.pathname)), signal: AbortSignal.any([this.businessLifetime.signal, AbortSignal.timeout(1000)]) })
       if (this.disposedBusiness) return
       if (!response.ok) throw new Error('控制服务未确认同步')
       const signed = await response.json() as Record<string, any>
-      const updated = development ? readBusinessAssertionValue(signed, this.businessConfig.binding)
+      const updated = unrestricted ? readBusinessAssertionValue(signed, this.businessConfig.binding)
         : verifyBusinessControlAssertion(readBusinessSecret(this.businessConfig.sharedSecretFile), signed, 'RESPONSE', url.pathname, this.businessConfig.binding, this.nonces)
       if (updated.synchronization?.id !== batch.id || updated.synchronization.index !== batch.index
         || typeof updated.synchronization.complete !== 'boolean'
         || batch.index === batch.count - 1 && !updated.synchronization.complete) throw new Error('控制同步回执无效')
       if (!updated.synchronization.complete) continue
-      if (development) {
+      if (unrestricted) {
         if (signed.synchronized !== true) throw new Error('控制同步回执无效')
         return
       }
@@ -415,7 +415,7 @@ export async function apply(ctx: Context, config: BusinessRuntimeConfig): Promis
     || new Set(config.localTools).size !== config.localTools.length)) throw new Error('业务本地工具声明无效')
   if (ctx.get('connection')) throw new Error('业务 Profile 必须停用默认 owner Connection')
   const control = configureBusinessControlStateRoot(config.assetRoot, config.stateRoot)
-  if (!control.enabled()) throw new Error('业务 Runtime 控制未启用')
+  if (!control.isAnonymousInstance(config.binding) && !control.enabled()) throw new Error('业务 Runtime 控制未启用')
   try {
     await (ctx.get('workspaceRegistry') as { create(path: string): Promise<unknown> }).create(config.workspacePath)
   } catch (error) {
@@ -426,6 +426,7 @@ export async function apply(ctx: Context, config: BusinessRuntimeConfig): Promis
   const managedTools = new Set<string>(), resourceServers = new Set<string>(), localTools = new Set(config.localTools ?? [])
   const connection = new BusinessConnection(ctx, config, control)
   ctx.provide('businessRuntime', Object.freeze({ binding: Object.freeze({ ...config.binding }),
+    requiresAuthentication: () => !control.isAnonymousInstance(config.binding),
     basePath: config.basePath ?? `/agents/${config.binding.agentId}/instances/${config.binding.instanceId}/`, managedTools, resourceServers,
     isTrustedChildSession: (parentId: string, childId: string) => trustedNativeChild(ctx, control, config.binding, parentId, childId),
     groupUrl: (id: string) => platformGroupUrl(config.assetRoot, id),
@@ -441,13 +442,14 @@ export async function apply(ctx: Context, config: BusinessRuntimeConfig): Promis
   })
   // 所有模型工具先恢复Session真实归属；来源声明仅增加精确本地工具，受管MCP仍走平台授权。
   ;(ctx as any).tools.guard((exec: { agent?: { session: { id: string } }; name: string; arguments?: unknown }) => {
+    if (control.isAnonymousInstance(config.binding)) return
     const context = exec.agent?.session.id ? control.contextForSession(exec.agent.session.id) : undefined
     if (context) {
       try { control.assert(context, 'agent:access', [{ kind: 'agent', id: context.scope.agentId }]) }
       catch { return '业务任务上下文或许可无效' }
     }
     return businessToolDeniedReason(exec, id => control.contextForSession(id), managedTools, localTools, resourceServers,
-      Boolean(context && control.isDevelopmentContext(context)))
+      Boolean(context && control.isUnrestrictedContext(context)))
   })
   const approvals = createBusinessApprovalAdapter(ctx, control)
   const fetchHandler = connection.createSharedFetchHandler('/api')

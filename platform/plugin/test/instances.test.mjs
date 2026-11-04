@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -96,8 +96,10 @@ if (args[0] === 'ps') {
       const identityMode = args.includes('--business-identity-mode') ? args[args.indexOf('--business-identity-mode')+1] : prior.identity_mode || 'published'
       require('node:fs').mkdirSync(require('node:path').dirname(file), {recursive:true})
       require('node:fs').writeFileSync(file, JSON.stringify({name, source_id:source, agent_id:'real-agent', asset_root:process.env.HARNESS_ASSET_ROOT, port:3199, web_base_path:'/agents/real-agent/instances/' + name + '/', business_control:{source_digest:sourceDigest, runtime_generation:'generation-new', origin:'http://127.0.0.1:3199',access_mode:accessMode,identity_mode:identityMode,launch_config_file:args[args.indexOf('--business-control')+1]}}))
+      const register = () => require('node:child_process').execFileSync(process.execPath, ['--experimental-strip-types', ${JSON.stringify(new URL('../../../runtime/adapters/dsh-container/business.ts', import.meta.url).pathname)}, '--register', process.env.HARNESS_ASSET_ROOT, name, prior.source_digest || ''], {stdio:['ignore','pipe','pipe']})
       const failure = require('node:path').join(__dirname,'fail-next-start'), failed = require('node:path').join(__dirname,'startup-failed')
-      if(require('node:fs').existsSync(failure)){require('node:fs').unlinkSync(failure);require('node:fs').writeFileSync(failed,'network unavailable');process.stderr.write('network unavailable');process.exit(1)}
+      if(require('node:fs').existsSync(failure)){require('node:fs').unlinkSync(failure);require('node:fs').writeFileSync(failed,'network unavailable');if(prior.source_digest) register();process.stderr.write('network unavailable');process.exit(1)}
+      register()
       require('node:fs').rmSync(failed,{force:true})
     }
     process.stdout.write(JSON.stringify({warning:'first'}) + '\\n' + JSON.stringify({name, dsh_running:true, token:'receipt-secret'}) + '\\n'); process.stderr.write(JSON.stringify({hint:'not a receipt'}) + '\\n') }
@@ -108,6 +110,14 @@ if (args[0] === 'ps') {
 } else if (args[0] === 'delete') {
   if (['running-one', 'unknown-one', 'batch-083'].includes(args[1])) {
     process.stderr.write('只允许删除已停止实例；目标状态不是 stopped 或查询失败\\n'); process.exit(1)
+  }
+  const fs = require('node:fs'), path = require('node:path')
+  if (fs.existsSync(path.join(__dirname, 'delay-delete'))) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100)
+  const stateRoot = process.env.HARNESS_INSTANCE_STATE_ROOT || (process.env.XDG_STATE_HOME ? path.join(process.env.XDG_STATE_HOME, 'dsh-dev') : path.join(process.env.HARNESS_ASSET_ROOT, '.local/instances'))
+  fs.rmSync(path.join(stateRoot, args[1], 'instance.json'), {force:true})
+  if (fs.existsSync(path.join(__dirname, 'fail-gateway-commit'))) {
+    const access = path.join(process.env.HARNESS_ASSET_ROOT, 'config/business-access.json')
+    fs.renameSync(access, access + '.saved'); fs.mkdirSync(access)
   }
   out({name:args[1], deleted:true, home_preserved:true})
 } else if (args[0] === 'url') {
@@ -122,7 +132,20 @@ if (args[0] === 'ps') {
   process.exit(2)
 }
 `)
-  writeFileSync(join(adapter, 'dsh-dev'), `#!/usr/bin/env python3\nimport os,sys\nos.execv(${JSON.stringify(process.execPath)}, [${JSON.stringify(process.execPath)}, ${JSON.stringify(join(adapter, 'dsh-dev-fixture.cjs'))}, *sys.argv[1:]])\n`)
+  writeFileSync(join(adapter, 'dsh-dev'), `#!/usr/bin/env python3
+import json,os,sys,subprocess
+from pathlib import Path
+node = ${JSON.stringify(process.execPath)}
+script = ${JSON.stringify(join(adapter, 'dsh-dev-fixture.cjs'))}
+def load_instance(name):
+    state = Path(os.environ['HARNESS_INSTANCE_STATE_ROOT']) if os.environ.get('HARNESS_INSTANCE_STATE_ROOT') else Path(os.environ['XDG_STATE_HOME']) / 'dsh-dev' if os.environ.get('XDG_STATE_HOME') else Path(os.environ['HARNESS_ASSET_ROOT']) / '.local/instances'
+    path = state / name / 'instance.json'
+    return path.parent, json.loads(path.read_text())
+def delete_instance(name, manifest):
+    return json.loads(subprocess.check_output([node, script, 'delete', name], text=True))
+if __name__ == '__main__':
+    os.execv(node, [node, script, *sys.argv[1:]])
+`)
   chmodSync(join(adapter, 'dsh-dev'), 0o755)
   return { root, state, cleanup: () => rmSync(root, { recursive: true, force: true }) }
 }
@@ -453,6 +476,109 @@ test('受控实例在网关关闭后仍可删除对应登记，来源冲突则�
   assert.equal(rejected.value.ok, false)
   assert.match(rejected.value.error.message, /业务网关中同名实例的来源、访问方式或实例阶段不一致/)
   assert.equal(readFileSync(callsPath, 'utf8'), callsBeforeConflict)
+})
+
+test('五路删除等待共享网关锁，串行提交并保留其它登记、配置及 HOME', async t => {
+  const { module, cleanup } = await loadModule(), fx = fixture(), previous = process.env.XDG_STATE_HOME
+  process.env.XDG_STATE_HOME = fx.state
+  t.after(() => { fx.cleanup(); cleanup(); previous === undefined ? delete process.env.XDG_STATE_HOME : process.env.XDG_STATE_HOME = previous })
+  const accessPath = join(fx.root, 'config/business-access.json'), callsPath = join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls')
+  const sourceId = 'experiment:EXP-real-agent-001', sourceDigest = 'sha256:' + 'a'.repeat(64)
+  const names = Array.from({ length: 5 }, (_, index) => `delete-${index}`)
+  const config = JSON.parse(readFileSync(accessPath, 'utf8'))
+  const other = { agentId: 'other-agent', instanceId: 'keep-business', sourceId: 'experiment:keep', sourceDigest }
+  config.gateway.instances = [...names.map(instanceId => ({ agentId: 'real-agent', instanceId, sourceId, sourceDigest })), other]
+  config.gateway.externalInstances = [{ instanceId: 'keep-external' }]
+  for (const name of names) {
+    const directory = join(fx.state, 'dsh-dev', name)
+    mkdirSync(directory, { recursive: true })
+    writeFileSync(join(directory, 'instance.json'), JSON.stringify({ name, agent_id: 'real-agent', source_id: sourceId, business_control: { source_digest: sourceDigest } }))
+    writeFileSync(join(directory, 'home-marker'), 'retained')
+  }
+  writeFileSync(accessPath, JSON.stringify(config))
+  writeFileSync(`${accessPath}.lock`, 'another writer')
+  writeFileSync(join(fx.root, 'runtime/adapters/dsh-container/delay-delete'), '')
+  const handler = module.createInstancesHandler(fx.root), signal = new AbortController().signal
+  const pending = Promise.all(names.map(name => handler('run', { operation: 'delete', name, expected_source_id: sourceId }, signal)))
+  await new Promise(resolve => setTimeout(resolve, 100))
+  assert.equal(existsSync(callsPath), false, '拿到配置锁前不得调用 DSH 删除')
+  assert.ok(names.every(name => existsSync(join(fx.state, 'dsh-dev', name, 'instance.json'))))
+  rmSync(`${accessPath}.lock`)
+  const results = await pending
+  assert.ok(results.every(result => result.value.ok), JSON.stringify(results))
+  assert.deepEqual(JSON.parse(readFileSync(accessPath, 'utf8')), { ...config, gateway: { ...config.gateway, instances: [other] } })
+  for (const name of names) {
+    assert.equal(existsSync(join(fx.state, 'dsh-dev', name, 'instance.json')), false)
+    assert.equal(readFileSync(join(fx.state, 'dsh-dev', name, 'home-marker'), 'utf8'), 'retained')
+  }
+  assert.equal(existsSync(`${accessPath}.lock`), false)
+})
+
+test('等待网关锁时可取消，锁内重新读取来源，非锁冲突错误不误报为忙碌', async t => {
+  const { module, cleanup } = await loadModule(), fx = fixture(), previous = process.env.XDG_STATE_HOME
+  process.env.XDG_STATE_HOME = fx.state
+  t.after(() => { fx.cleanup(); cleanup(); previous === undefined ? delete process.env.XDG_STATE_HOME : process.env.XDG_STATE_HOME = previous })
+  const name = 'stopped-business', sourceId = 'experiment:EXP-real-agent-001', sourceDigest = 'sha256:' + 'a'.repeat(64)
+  const directory = join(fx.state, 'dsh-dev', name), accessPath = join(fx.root, 'config/business-access.json')
+  const callsPath = join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls')
+  mkdirSync(directory, { recursive: true })
+  writeFileSync(join(directory, 'instance.json'), JSON.stringify({ name, agent_id: 'real-agent', source_id: sourceId, business_control: { source_digest: sourceDigest } }))
+  const config = JSON.parse(readFileSync(accessPath, 'utf8'))
+  config.gateway.instances = [{ agentId: 'real-agent', instanceId: name, sourceId, sourceDigest }]
+  writeFileSync(accessPath, JSON.stringify(config))
+  writeFileSync(`${accessPath}.lock`, 'another writer')
+  const handler = module.createInstancesHandler(fx.root), controller = new AbortController()
+  const canceled = handler('run', { operation: 'delete', name }, controller.signal)
+  setTimeout(() => controller.abort(), 75)
+  assert.equal((await canceled).value.ok, false)
+  assert.equal(existsSync(`${accessPath}.lock`), true, '不得移除其它写入者的锁')
+  const waiting = handler('run', { operation: 'delete', name }, new AbortController().signal)
+  await new Promise(resolve => setTimeout(resolve, 75))
+  config.gateway.instances[0].sourceDigest = 'sha256:' + 'b'.repeat(64)
+  writeFileSync(accessPath, JSON.stringify(config))
+  rmSync(`${accessPath}.lock`)
+  const conflict = await waiting
+  assert.match(conflict.value.error.message, /同名实例的来源/)
+  rmSync(join(fx.root, 'config'), { recursive: true })
+  const missing = await handler('run', { operation: 'delete', name }, new AbortController().signal)
+  assert.match(missing.value.error.message, /ENOENT/)
+  assert.doesNotMatch(missing.value.error.message, /正在更新|持续被占用/)
+  assert.equal(existsSync(callsPath), false)
+  assert.equal(existsSync(join(directory, 'instance.json')), true)
+})
+
+test('DSH 删除失败不提交网关配置，网关提交失败则保留实例登记供重试', async t => {
+  const { module, cleanup } = await loadModule(), fx = fixture(), previous = process.env.XDG_STATE_HOME
+  process.env.XDG_STATE_HOME = fx.state
+  t.after(() => { fx.cleanup(); cleanup(); previous === undefined ? delete process.env.XDG_STATE_HOME : process.env.XDG_STATE_HOME = previous })
+  const sourceId = 'experiment:EXP-real-agent-001', sourceDigest = 'sha256:' + 'a'.repeat(64)
+  const accessPath = join(fx.root, 'config/business-access.json'), adapter = join(fx.root, 'runtime/adapters/dsh-container')
+  const config = JSON.parse(readFileSync(accessPath, 'utf8'))
+  config.gateway.instances = ['running-one', 'stopped-business'].map(instanceId => ({ agentId: 'real-agent', instanceId, sourceId, sourceDigest }))
+  for (const row of config.gateway.instances) {
+    const directory = join(fx.state, 'dsh-dev', row.instanceId)
+    mkdirSync(directory, { recursive: true })
+    writeFileSync(join(directory, 'instance.json'), JSON.stringify({ name: row.instanceId, agent_id: 'real-agent', source_id: sourceId, business_control: { source_digest: sourceDigest } }))
+  }
+  writeFileSync(accessPath, JSON.stringify(config))
+  const handler = module.createInstancesHandler(fx.root), signal = new AbortController().signal
+  const rejected = await handler('run', { operation: 'delete', name: 'running-one' }, signal)
+  assert.equal(rejected.value.ok, false)
+  assert.deepEqual(JSON.parse(readFileSync(accessPath, 'utf8')), config)
+  const manifestPath = join(fx.state, 'dsh-dev/stopped-business/instance.json'), manifest = readFileSync(manifestPath, 'utf8')
+  writeFileSync(join(adapter, 'fail-gateway-commit'), '')
+  const failed = await handler('run', { operation: 'delete', name: 'stopped-business' }, signal)
+  assert.equal(failed.value.ok, false)
+  assert.match(failed.value.error.message, /实例登记已保留.*重试删除/)
+  assert.deepEqual(JSON.parse(readFileSync(manifestPath, 'utf8')), JSON.parse(manifest))
+  rmSync(accessPath, { recursive: true })
+  renameSync(`${accessPath}.saved`, accessPath)
+  rmSync(join(adapter, 'fail-gateway-commit'))
+  const retried = await handler('run', { operation: 'delete', name: 'stopped-business', expected_source_id: sourceId }, signal)
+  assert.equal(retried.value.ok, true, JSON.stringify(retried))
+  assert.deepEqual(JSON.parse(readFileSync(accessPath, 'utf8')).gateway.instances.map(row => row.instanceId), ['running-one'])
+  assert.equal(existsSync(manifestPath), false)
+  assert.equal(existsSync(`${accessPath}.lock`), false)
 })
 
 test('preview uses real sources and rejects invented sources', async () => {
@@ -797,7 +923,33 @@ test('历史实例未记录默认模型时必须显式选择，不能套用新�
   assert.equal(run.value.ok, true)
 })
 
-test('新建实例拒绝关闭、缺失或不完整的网关，省略参数与批量操作都不能降级直连', async t => {
+for (const identity_mode of ['development', 'published']) test(`原则：业务控制关闭时无需登录的 ${identity_mode} 实例仍可创建并更新来源`, async t => {
+  const { module, cleanup } = await loadModule()
+  const fx = fixture(), previous = process.env.XDG_STATE_HOME
+  process.env.XDG_STATE_HOME = fx.state
+  t.after(() => { fx.cleanup(); cleanup(); if (previous === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = previous })
+  const file = join(fx.root, 'config/business-access.json')
+  const access = JSON.parse(readFileSync(file, 'utf8'))
+  access.enabled = false
+  writeFileSync(file, JSON.stringify(access))
+  const handler = module.createInstancesHandler(fx.root), signal = new AbortController().signal
+  const item = { operation: 'create', name: 'new-business', source: 'experiment:EXP-real-agent-001', access_mode: 'anonymous', identity_mode }
+  const preview = await handler('preview', item, signal)
+  assert.equal(preview.ok, true)
+  const created = await handler('run', { ...item, expected_source_digest: preview.value.plan.business_control.source_digest }, signal)
+  assert.equal(created.value.ok, true, JSON.stringify(created))
+  writeFileSync(join(fx.root, 'runtime/adapters/dsh-container/next-source-digest'), 'changed')
+  const restart = { operation: 'restart', name: item.name }
+  const updated = await handler('preview', restart, signal)
+  const restarted = await handler('run', { ...restart, expected_source_digest: updated.value.plan.business_control.source_digest }, signal)
+  assert.equal(restarted.value.ok, true, JSON.stringify(restarted))
+  const registered = JSON.parse(readFileSync(file, 'utf8')).gateway.instances[0]
+  assert.equal(registered.accessMode, 'anonymous')
+  assert.equal(registered.identityMode, identity_mode)
+  assert.equal(registered.sourceDigest, 'sha256:' + 'c'.repeat(64))
+})
+
+test('新建需要登录的实例拒绝关闭、缺失或不完整的网关，省略参数与批量操作都不能降级直连', async t => {
   const { module, cleanup } = await loadModule()
   const fx = fixture()
   t.after(() => { fx.cleanup(); cleanup() })
@@ -805,7 +957,7 @@ test('新建实例拒绝关闭、缺失或不完整的网关，省略参数与�
   const signal = new AbortController().signal
   const file = join(fx.root, 'config/business-access.json')
   const original = JSON.parse(readFileSync(file, 'utf8'))
-  const item = { operation: 'create', name: 'no-fallback', source: 'experiment:EXP-real-agent-001' }
+  const item = { operation: 'create', name: 'no-fallback', source: 'experiment:EXP-real-agent-001', access_mode: 'authenticated' }
   const falsePreview = await handler('preview', { ...item, business_control: false }, signal)
   assert.equal(falsePreview.ok, false)
   assert.match(falsePreview.error.message, /必须经过统一网关/)

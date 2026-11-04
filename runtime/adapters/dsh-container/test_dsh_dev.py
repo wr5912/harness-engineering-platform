@@ -208,6 +208,9 @@ class RenderComposeTest(unittest.TestCase):
             template, mode="verification", name="probe", project="dsh-dev-probe", port=3081)
         self.assertIn("name: dsh-dev-probe", rendered)
         self.assertIn("  dsh:\n    container_name: probe\n", rendered)
+        initializer, runtime = rendered.split("  dsh:\n", 1)
+        self.assertNotIn("restart:", initializer)
+        self.assertIn("    restart: unless-stopped\n", runtime)
         self.assertIn("    network_mode: host\n", rendered)
         self.assertIn("      - --host\n      - 127.0.0.1\n      - --port\n      - \"3081\"\n", rendered)
         self.assertIn("dsh-dev-probe-home", rendered)
@@ -378,7 +381,7 @@ with dev.model_policy_start_lock(Path(sys.argv[2])):
                 self.assertIn("业务模型设置", error.getvalue())
             self.assertTrue(lock.is_file())
 
-            args = types.SimpleNamespace(source="experiment:EXP-example-agent-001", dry_run=False,
+            args = types.SimpleNamespace(source="experiment:EXP-example-agent-001", mode="eval", dry_run=False,
                                          analysis_workspace=None)
             observed = []
             with mock.patch.object(dev, "REPO", repo), \
@@ -1614,6 +1617,7 @@ class RuntimeEnvironmentRetentionTest(unittest.TestCase):
     @staticmethod
     def args(**values):
         return types.SimpleNamespace(**dict({
+            "source": "experiment:EXP-security-operations-expert-001",
             "name": "environment-probe", "mode": "verification", "analysis_workspace": None,
             "replace": True, "port": 3312, "allow_missing_env": False, "dry_run": False,
             "lan_access": True, "unsafe_no_auth": True, "skip_testing_notice": True,
@@ -1849,6 +1853,63 @@ class UpCommandStateTest(unittest.TestCase):
                 dev.command_up(self.args())
         self.assertEqual(stdout.getvalue(), "")
         self.assertIn('"dsh_running": "unknown"', stderr.getvalue())
+
+
+class BusinessLifecycleEntryTest(unittest.TestCase):
+    def test_private_runtime_files_use_instance_home_or_shared_preparation(self):
+        dependency = {"source": "/dependency", "target": "/opt/dependency", "read_only": True}
+        private = {"source": "/private", "target": "/var/lib/dsh/private", "read_only": True}
+        contract = {"experiment_id": "VAR-example-001", "business_control": {"identity_mode": "development"}}
+        with tempfile.TemporaryDirectory() as directory, \
+                mock.patch.object(dev, "asset_dependency_mounts", return_value=[dependency]), \
+                mock.patch.object(dev, "run", return_value=types.SimpleNamespace(stdout=json.dumps([private]))) as prepare:
+            home_private = Path(directory) / "private"
+            self.assertEqual(dev.runtime_mounts(contract, private_directory=home_private), [dependency, private])
+            prepare.assert_called_once_with([dev.NODE_EXECUTABLE, str(dev.ADAPTER / "harness-runtime.mts"),
+                                             "--private-files", str(dev.REPO), contract["experiment_id"]])
+            home_private.mkdir()
+            prepare.reset_mock()
+            self.assertEqual(dev.runtime_mounts(contract, private_directory=home_private), [dependency])
+            self.assertEqual(dev.runtime_mounts(contract, analysis_workspace="/analysis"), [dependency])
+            prepare.assert_not_called()
+
+    def test_delete_uses_shared_gateway_transaction(self):
+        manifest = {"business_control": {"source_digest": "sha256:current"}}
+        with mock.patch.object(dev, "load_instance", return_value=(Path("/fixture"), manifest)), \
+                mock.patch.object(dev, "business_command", return_value={"deleted": True}) as business, \
+                mock.patch.object(dev, "delete_instance") as direct, \
+                contextlib.redirect_stdout(io.StringIO()):
+            dev.command_delete(types.SimpleNamespace(name="business-probe"))
+        business.assert_called_once_with(["--delete", str(dev.REPO), "business-probe"], timeout=None)
+        direct.assert_not_called()
+
+    def test_failed_restart_registers_only_the_source_actually_written(self):
+        contract = {"agent_id": "agent", "source_id": "experiment:source",
+                    "business_control": {"source_digest": "sha256:new"}}
+        previous = {"business_control": {"source_digest": "sha256:old"}}
+        args = types.SimpleNamespace(name="business-probe", source="experiment:source", mode="eval", dry_run=False, analysis_workspace=None)
+        for current, actual, registered in [
+                ((Path("/fixture"), previous), contract, True),
+                ((Path("/fixture"), previous), {**contract, "source_id": "experiment:other"}, False),
+                ((Path("/fixture"), previous), {**contract, "business_control": previous["business_control"]}, False),
+                (None, contract, False)]:
+            with self.subTest(current=current, actual=actual), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory)
+                (path / "instance.json").write_text(json.dumps(actual), encoding="utf-8")
+                with mock.patch.object(dev, "model_policy_start_lock", return_value=contextlib.nullcontext()), \
+                        mock.patch.object(dev, "instance_startup_lock", return_value=contextlib.nullcontext()), \
+                        mock.patch.object(dev, "prepare_up", return_value=(contract, current)), \
+                        mock.patch.object(dev, "existing_runtime_environment", return_value={}), \
+                        mock.patch.object(dev, "_command_up", side_effect=SystemExit(1)), \
+                        mock.patch.object(dev, "instance_dir", return_value=path), \
+                        mock.patch.object(dev, "business_command") as business:
+                    with self.assertRaises(SystemExit) as failed:
+                        dev.command_up(args)
+                self.assertEqual(failed.exception.code, 1)
+                if registered:
+                    business.assert_called_once_with(["--register", str(dev.REPO), args.name, "sha256:old"])
+                else:
+                    business.assert_not_called()
 
 
 class LegacyInstanceStateTest(unittest.TestCase):
@@ -2107,6 +2168,30 @@ class UpPortOwnershipTest(unittest.TestCase):
                 with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                     dev.prepare_up(self.args(name=name, business_control="/fixture/launch.json", business_access_mode="anonymous", business_identity_mode="development"))
                 self.assertTrue(invalid.is_symlink() if kind == "symlink" else invalid.read_text(encoding="utf-8") == "retained-home-file")
+
+    def test_anonymous_home_and_source_updates_do_not_depend_on_publication(self):
+        for phase in ("development", "published"):
+            with self.subTest(phase=phase):
+                name = "anonymous-" + phase
+                home = dev.STATE_ROOT / name / "dsh-home"
+                home.mkdir(parents=True)
+                session = home / "session.v4.jsonl"
+                session.write_text("retained-session", encoding="utf-8")
+                launch = {"assetRoot": str(dev.REPO), "sourceDigest": "sha256:new", "development": phase == "development",
+                          "accessMode": "anonymous", "registered": True}
+                args = self.args(name=name, business_control="/fixture/launch.json")
+                with mock.patch.object(dev, "resolve", side_effect=lambda *a, **kw: self.contract()), \
+                        mock.patch.object(dev, "business_helper", return_value=launch):
+                    contract, _ = dev.prepare_up(args)
+                    self.assertEqual(contract["business_control"]["identity_mode"], phase)
+                    self.write_existing(name=name, business_control={"source_digest": "sha256:old", "runtime_generation": "generation"})
+                    contract, _ = dev.prepare_up(args)
+                    self.assertEqual(contract["business_control"]["source_digest"], "sha256:new")
+                    self.assertEqual(session.read_text(encoding="utf-8"), "retained-session")
+                    if phase == "published":
+                        launch["accessMode"] = "authenticated"
+                        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                            dev.prepare_up(args)
 
     def test_direct_start_rejects_unprojected_business_default_before_port_selection(self):
         selected = {"provider": "xiaomi-token-plan-cn", "model": "MiMo-V2.6-Flash"}

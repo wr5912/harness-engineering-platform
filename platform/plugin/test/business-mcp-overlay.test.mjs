@@ -5,7 +5,7 @@ import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { configureBusinessControlStateRoot, getBusinessControl } from '../lib/business-control.js'
+import { configureBusinessControlStateRoot, getBusinessControl, sharedInstanceIdentity } from '../lib/business-control.js'
 import { resolveBusinessInstance } from '../lib/business-gateway.js'
 import { McpConfigStore } from '../src/mcp/store.ts'
 import { mcpCredentialPaths } from '../src/mcp/credential-path.ts'
@@ -33,9 +33,18 @@ test('受控业务仅投影 Candidate 重叠连接，平台保存收缩新目录
   const stateRoot = mkdtempSync(join(tmpdir(), 'business-mcp-state-'))
   t.after(() => rmSync(stateRoot, { recursive: true, force: true }))
   configureBusinessControlStateRoot(root, stateRoot)
+  const binding = { workspaceId: 'workspace-fixture', agentId: 'soc', instanceId: 'soc-instance',
+    runtimeGeneration: 'generation-1', sourceDigest: `sha256:${'a'.repeat(64)}` }
   writeFileSync(join(root, 'config', 'sites.json'), JSON.stringify({ platform: '/hep/' }))
   writeFileSync(join(root, 'config', 'business-access.json'), JSON.stringify({ schemaVersion: 1, enabled: false,
-    agents: [], gateway: { managementUrl: 'http://127.0.0.1:18120/hep/' } }))
+    agents: [], gateway: { managementUrl: 'http://127.0.0.1:18120/hep/', instances: [
+      { agentId: binding.agentId, instanceId: binding.instanceId, sourceDigest: binding.sourceDigest,
+        accessMode: 'anonymous', identityMode: 'published' },
+    ] } }))
+  const control = getBusinessControl(root)
+  control.registerInstance(binding)
+  control.bindSession(control.createContext(sharedInstanceIdentity(binding), binding), 'session-fixture')
+  const execution = { agent: { session: { id: 'session-fixture' } }, callId: 'fixture-call' }
   const publicFile = join(root, 'config', 'mcp-manager.json')
   const secretFile = mcpCredentialPaths(root).file
   const sourceA = 'http://127.0.0.1:18101/openapi.json'
@@ -89,14 +98,14 @@ test('受控业务仅投影 Candidate 重叠连接，平台保存收缩新目录
   assert.equal(context.platformMcp.servers.get()[0].specUrl, sourceB, '保存后新目录应使用平台当前目标')
   assert.notEqual(context.mcpSessionManager.currentGroup('candidate-group', 2).targetDigest, oldDigest)
   await assert.rejects(context.mcpSessionManager.callGroupTool('candidate-group', 2, 'source__echo', {},
-    { 'io.deepseek.dsh/mcp-group-target': { version: 2, digest: oldDigest } }), /MCP 分组目标已变化/)
+    { 'io.deepseek.dsh/mcp-group-target': { version: 2, digest: oldDigest } }, execution), /MCP 分组目标已变化/)
   assert.ok(!readFileSync(publicFile, 'utf8').includes(secret))
   assert.ok(!readFileSync(publicFile, 'utf8').includes('fixture-replaced-credential'))
   assert.equal(statSync(secretFile).mode & 0o777, 0o600)
   view = store.mutate([{ op: 'set', path: ['servers', '0', 'enabled'], value: false }], view.revision)
   assert.equal(context.platformMcp.servers.get()[0].enabled, false)
   await assert.rejects(context.mcpSessionManager.callGroupTool('candidate-group', 2, 'source__echo', {},
-    { 'io.deepseek.dsh/mcp-group-target': { version: 2, digest: oldDigest } }), /MCP 分组目标已变化/)
+    { 'io.deepseek.dsh/mcp-group-target': { version: 2, digest: oldDigest } }, execution), /MCP 分组目标已变化/)
   store.mutate([{ op: 'set', path: ['servers'], value: platformServers.slice(1) }], view.revision)
   assert.equal(context.platformMcp.servers.get()[0].enabled, false, '平台服务移除后不能回退 Candidate 旧地址')
   assert.equal(context.platformMcp.servers.get()[0].specUrl, undefined)

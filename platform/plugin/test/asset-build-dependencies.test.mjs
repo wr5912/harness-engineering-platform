@@ -14,8 +14,20 @@ import { inspectAgentSnapshot } from '../../deploy/agent/snapshot.mts'
 process.env.HARNESS_PROGRAM_ROOT = new URL('../../../', import.meta.url).pathname
 const built = mkdtempSync(join(tmpdir(), 'asset-build-module-'))
 await build({ stdin: { contents: "export * from './src/agents/asset-build.ts'; export * from './src/agents/asset-dependencies.ts'; export {candidateDigest} from './src/tasks/files.ts'", resolveDir: new URL('../', import.meta.url).pathname, loader: 'ts' }, outfile: join(built, 'module.mjs'), bundle: true, platform: 'node', format: 'esm' })
-const { createAssetBuildHandler, inspectAssetBuild, assetBuildReviewEvidence, createAssetDependenciesHandler, resolvePreparedAssetDependencies, candidateDigest } = await import(`file://${join(built, 'module.mjs')}`)
+const { createAssetBuildHandler, inspectAssetBuild, assetBuildReviewEvidence, createAssetDependenciesHandler, resolvePreparedAssetDependencies, assetCommand, candidateDigest } = await import(`file://${join(built, 'module.mjs')}`)
 test.after(() => rmSync(built, { recursive: true, force: true }))
+test('依赖命令区分超时、输出超限、终止信号与退出码，不回传安装器原文', async () => {
+  assert.equal(await assetCommand(process.execPath, ['-e', "console.log('ready')"], {}), 'ready')
+  for (const [script, timeout, reason] of [
+    ['setInterval(()=>{},1000)', 100, /超时（0\.1 秒）/],
+    ["process.stdout.write('x'.repeat(5*1024*1024))", 5000, /输出超过 4 MiB 上限/],
+    ["process.kill(process.pid,'SIGTERM')", 5000, /进程被 SIGTERM 终止/],
+    ["console.error('private-installer-output');process.exit(7)", 5000, /退出码 7/],
+  ]) await assert.rejects(assetCommand(process.execPath, ['-e', script], { timeout }), error => {
+    assert.equal(error.code, 'dependency_pending'); assert.match(error.message, reason)
+    assert.doesNotMatch(error.message, /unknown|private-installer-output/); return true
+  })
+})
 const id = 'EXP-alpha-001-r123456abcdef', experiment = `evolution/experiments/${id}`, base = `${experiment}/candidate`, entry = 'dsh/managed/plugin/index.ts'
 const write = (root, path, value) => { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), value) }
 function fixture(t) {

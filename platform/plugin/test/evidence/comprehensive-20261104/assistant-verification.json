@@ -1,0 +1,953 @@
+{
+  "at": "2026-11-04T03:47:30.163Z",
+  "expectedPrinciples": "1b3b925f2ddaba04e125657eac98444f7a3af6d88b74781290f163c1480cb813",
+  "cases": [
+    {
+      "id": "plan-only-precedes-implement",
+      "sessionId": "session-f0372508-bc36-4b50-a070-0e2c7d1cf075",
+      "ended": true,
+      "running": false,
+      "historyComplete": true,
+      "elapsedMs": 42904,
+      "calls": [
+        {
+          "seq": 26,
+          "name": "skill",
+          "skill": "compute-variant-research",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "70d195d1c13d7fa72934115c09533ed711503d81ed83f6ae55d93b30236e0e3d",
+          "hasPlanOnlyPrecedence": true,
+          "hasImplementBranch": true,
+          "pathMention": true
+        },
+        {
+          "seq": 32,
+          "name": "platform_agents",
+          "action": "describe",
+          "describedAction": "compute-variants/context",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "184a6dbaf6a23efd32e6530e5eb7b2751f3f69af8ea7d25c2a9fd3d47b46ceda",
+          "ok": true
+        },
+        {
+          "seq": 35,
+          "name": "platform_agents",
+          "action": "describe",
+          "describedAction": "detail",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "9c4b17d79f3e286744826b3113003e9688c4e28cad9e81847eebb8e2e9ca66d5",
+          "ok": true
+        },
+        {
+          "seq": 38,
+          "name": "platform_agents",
+          "action": "describe",
+          "describedAction": "list",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "44d51339df74e426f72e1d9f921f7ef71ab04fc35092c3f17e748b2903ff6a09",
+          "ok": true
+        },
+        {
+          "seq": 46,
+          "name": "platform_agents",
+          "action": "list",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "ecb22140b7e4d07794f8d14eade885b750cf59ea6b99d783c39f744531410eb4",
+          "operationState": "completed",
+          "ok": true
+        },
+        {
+          "seq": 48,
+          "name": "platform_agents",
+          "action": "detail",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "7ec00d7ab08e56fb0c09530f0b48fc873d66881c15182671cc181380b1bac95b",
+          "operationState": "failed",
+          "ok": false,
+          "error": {
+            "code": "asset_read_failed",
+            "message": "YAML 解析失败",
+            "details": {
+              "path": "agents/assistant-validation-missing/manifest.yaml"
+            }
+          }
+        },
+        {
+          "seq": 50,
+          "name": "platform_agents",
+          "action": "compute-variants/context",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "39bcdb860e73e533543e8478917c8da88aab30cfaec794c8ec085a9f34e392e5",
+          "operationState": "failed",
+          "ok": false,
+          "error": {
+            "code": "ENOENT",
+            "message": "算力变体操作失败，请检查固定来源及 Run 证据",
+            "details": {}
+          }
+        },
+        {
+          "seq": 56,
+          "name": "platform_agents",
+          "action": "describe",
+          "describedAction": "edit/read",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "22ec331253f544b505ad0e1930efe260a5da5dfed93371d6b2affca15a25590b",
+          "ok": true
+        },
+        {
+          "seq": 59,
+          "name": "platform_agents",
+          "action": "describe",
+          "describedAction": "assets/read-fixed",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "b007615ca01580ce28cb8dbc9a71b8e5f00b8ed59fca5e7badff7b896117645c",
+          "ok": true
+        },
+        {
+          "seq": 67,
+          "name": "platform_agents",
+          "action": "edit/read",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "2f0058c6cb08eccfdf9ec7520e0d503e78f3d6e052e680ffac6dc947b9a0131d",
+          "operationState": "failed",
+          "ok": false,
+          "error": {
+            "code": "asset_read_failed",
+            "message": "版本清单不存在",
+            "details": {
+              "path": "evolution/experiments/EXP-assistant-validation-missing-001-r111111111111/change.yaml",
+              "filesystem_code": "ENOENT"
+            }
+          }
+        },
+        {
+          "seq": 69,
+          "name": "platform_agents",
+          "action": "edit/read",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "2f0058c6cb08eccfdf9ec7520e0d503e78f3d6e052e680ffac6dc947b9a0131d",
+          "operationState": "failed",
+          "ok": false,
+          "error": {
+            "code": "asset_read_failed",
+            "message": "版本清单不存在",
+            "details": {
+              "path": "evolution/experiments/EXP-assistant-validation-missing-001-r111111111111/change.yaml",
+              "filesystem_code": "ENOENT"
+            }
+          }
+        },
+        {
+          "seq": 75,
+          "name": "platform_agents",
+          "action": "runs/index",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "6b303350436738d0d147047b91020c512f11b609c625f52cd437a95f1ccf3b6f",
+          "operationState": "failed",
+          "ok": false,
+          "error": {
+            "code": "invalid_request",
+            "message": "缺少 agent_id",
+            "details": {}
+          }
+        },
+        {
+          "seq": 77,
+          "name": "platform_agents",
+          "action": "cases/list",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "c575b1f188b3e0ce48549813ffe38901636e4fa9bfe645036743542ff800753f",
+          "operationState": "failed",
+          "ok": false,
+          "error": {
+            "code": "invalid_request",
+            "message": "缺少 agent_id",
+            "details": {}
+          }
+        },
+        {
+          "seq": 79,
+          "name": "platform_agents",
+          "action": "context",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "870821e30044ed12cfb09553ebc21c6d9e18895b5b0c981135b8d8197a355405",
+          "ok": true,
+          "task_context": {
+            "page": "agents",
+            "skill": "compute-variant-research",
+            "agent_id": "assistant-validation-missing",
+            "experiment_id": "EXP-assistant-validation-missing-001-r111111111111",
+            "run_id": "run-11111111-1111-4111-8111-111111111111",
+            "planning_intent": "plan_only",
+            "generation_intent": "implement"
+          },
+          "available_actions": [
+            "assets/build-preview",
+            "assets/build",
+            "assets/dependencies/prepare",
+            "research/read-reference",
+            "research/validate",
+            "decision/preview",
+            "list",
+            "detail",
+            "edit/read",
+            "edit/preview",
+            "edit/apply",
+            "cases/list",
+            "cases/read",
+            "cases/update",
+            "eval/preview",
+            "eval/start",
+            "eval/status",
+            "eval/cancel",
+            "runs/index",
+            "runs/show",
+            "runs/evidence",
+            "runs/report",
+            "runs/files",
+            "runs/read-file",
+            "runs/compare",
+            "runs/trace",
+            "assets/diff",
+            "assets/read-fixed",
+            "compute-variants/context",
+            "compute-variants/source",
+            "compute-variants/identity-preview",
+            "compute-variants/identity-apply",
+            "compute-variants/preview",
+            "compute-variants/create",
+            "compute-variants/rename",
+            "compute-variants/build-preview",
+            "compute-variants/build",
+            "compute-variants/freeze-preview",
+            "compute-variants/freeze",
+            "compute-variants/compare",
+            "cases/create-context",
+            "cases/from-run",
+            "cases/create-preview",
+            "cases/create",
+            "decision/update",
+            "tasks/capabilities"
+          ]
+        },
+        {
+          "seq": 85,
+          "name": "platform_agents",
+          "action": "runs/index",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "f2ac5f1c4a384dc62488f844f258bb45665f08be024877e6cd6a7813b3bf7c65",
+          "operationState": "completed",
+          "ok": true
+        },
+        {
+          "seq": 87,
+          "name": "platform_agents",
+          "action": "cases/list",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "cfece2fecedff3527135f5bba92c47376d5ab79de9526840f385826b3ed2e82c",
+          "operationState": "failed",
+          "ok": false,
+          "error": {
+            "code": "command_failed",
+            "message": "evaluation.md 合同解析失败",
+            "details": {
+              "reason": "Traceback (most recent call last):\n  File \"<string>\", line 9, in <module>\n  File \"/home/admin/work/harness-engineering-platform/.local/comprehensive-20261104/assistant-program/runtime/research/evaluation_contract.py\", line 83, in load_evaluation\n    raise ValueError(\"evaluation.md 至少需要一个 U-* Case\")\nValueError: evaluation.md 至少需要一个 U-* Case\n"
+            }
+          }
+        },
+        {
+          "seq": 89,
+          "name": "platform_agents",
+          "action": "detail",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "7ec00d7ab08e56fb0c09530f0b48fc873d66881c15182671cc181380b1bac95b",
+          "operationState": "failed",
+          "ok": false,
+          "error": {
+            "code": "asset_read_failed",
+            "message": "YAML 解析失败",
+            "details": {
+              "path": "agents/assistant-validation-missing/manifest.yaml"
+            }
+          }
+        },
+        {
+          "seq": 91,
+          "name": "platform_agents",
+          "action": "compute-variants/source",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "19f500cd849dc27d70ffa29de83b1fc3fd7f2c0f2be0c1f666a9c9f2fb5a426b",
+          "operationState": "failed",
+          "ok": false,
+          "error": {
+            "code": "ENOENT",
+            "message": "算力变体操作失败，请检查固定来源及 Run 证据",
+            "details": {}
+          }
+        },
+        {
+          "seq": 97,
+          "name": "platform_agents",
+          "action": "runs/show",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "a0ecf63dad912ffc07cb784a53b1dfdafa004e37d21f3602c78e10f211bb48d4",
+          "operationState": "failed",
+          "ok": false,
+          "error": {
+            "code": "run_read_failed",
+            "message": "Run 查询失败",
+            "details": {
+              "reason": "run record failed: unknown or ambiguous run: run-11111111-1111-4111-8111-111111111111\n"
+            }
+          }
+        },
+        {
+          "seq": 99,
+          "name": "platform_agents",
+          "action": "research/read-reference",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "955e62bc12138030f303b6ef245ad9523b55fd99bf879867c71b000ef319d532",
+          "operationState": "completed",
+          "ok": true
+        }
+      ],
+      "principlesMatch": true,
+      "usage": [
+        {
+          "seq": 25,
+          "usage": {
+            "inputTokens": 8610,
+            "outputTokens": 263,
+            "cacheReadTokens": 512,
+            "cacheWriteTokens": 0,
+            "totalTokens": 9385
+          }
+        },
+        {
+          "seq": 31,
+          "usage": {
+            "inputTokens": 2905,
+            "outputTokens": 386,
+            "cacheReadTokens": 9344,
+            "cacheWriteTokens": 0,
+            "totalTokens": 12635
+          }
+        },
+        {
+          "seq": 45,
+          "usage": {
+            "inputTokens": 8580,
+            "outputTokens": 230,
+            "cacheReadTokens": 4352,
+            "cacheWriteTokens": 0,
+            "totalTokens": 13162
+          }
+        },
+        {
+          "seq": 55,
+          "usage": {
+            "inputTokens": 382,
+            "outputTokens": 396,
+            "cacheReadTokens": 13056,
+            "cacheWriteTokens": 0,
+            "totalTokens": 13834
+          }
+        },
+        {
+          "seq": 66,
+          "usage": {
+            "inputTokens": 9710,
+            "outputTokens": 520,
+            "cacheReadTokens": 4352,
+            "cacheWriteTokens": 0,
+            "totalTokens": 14582
+          }
+        },
+        {
+          "seq": 74,
+          "usage": {
+            "inputTokens": 290,
+            "outputTokens": 455,
+            "cacheReadTokens": 14464,
+            "cacheWriteTokens": 0,
+            "totalTokens": 15209
+          }
+        },
+        {
+          "seq": 84,
+          "usage": {
+            "inputTokens": 765,
+            "outputTokens": 650,
+            "cacheReadTokens": 15104,
+            "cacheWriteTokens": 0,
+            "totalTokens": 16519
+          }
+        },
+        {
+          "seq": 96,
+          "usage": {
+            "inputTokens": 370,
+            "outputTokens": 1174,
+            "cacheReadTokens": 16512,
+            "cacheWriteTokens": 0,
+            "totalTokens": 18056
+          }
+        },
+        {
+          "seq": 104,
+          "usage": {
+            "inputTokens": 2718,
+            "outputTokens": 2637,
+            "cacheReadTokens": 18048,
+            "cacheWriteTokens": 0,
+            "totalTokens": 23403
+          }
+        }
+      ],
+      "assistant": [
+        "## 本次范围\n\n固定上下文同时给出 `planning_intent=plan_only` 与 `generation_intent=implement`。按 `compute-variant-research` 意图表“两者同时出现时以 `plan_only` 为准”，本次只做第 1 节必要只读取证并交付计划。`implement` 未生效，因此没有创建、编辑、构建、冻结、评测或训练，没有调用原生执行工具，也没有改写或清空 `task_context`。\n\n核对结论：固定目标不存在，无法进入计划填写与派生阶段。\n\n## 依据（只读回执）\n\n| 核对项 | 动作 | 实际回执 |\n|---|---|---|\n| 固定上下文 | `context` | agent_id=`assistant-validation-missing`，experiment_id=`EXP-assistant-validation-missing-001-r111111111111`，run_id=`run-11111111-…`，两个 intent 并存 |\n| 工作区目录 | `list` | `agents: []`、`experiments: []`、`historical_experiments: []`、`releases: []`，来源目录计数 0 |\n| Agent 版本 | `detail` | 失败 `asset_read_failed` / “YAML 解析失败”，路径 `agents/assistant-validation-missing/manifest.yaml`（未返回具体原因，缺失或格式非法均未确认） |\n| 变体上下文 | `compute-variants/context` | 失败 `ENOENT` |\n| 固定变体来源 | `compute-variants/source` | 失败 `ENOENT` |\n| 版本设置 | `edit/read` | 失败 `asset_read_failed`，`evolution/experiments/EXP-assistant-validation-missing-001-r111111111111/change.yaml` 不存在 |\n| 版本与 Run 索引 | `runs/index` | 成功但 `experiments: []`，无任何 Run 线索 |\n| 固定 Run | `runs/show` | 失败 `run_read_failed`：`unknown or ambiguous run` |\n| Case 集合 | `cases/list` | 失败：`evaluation.md` 至少需要一个 `U-*` Case（当前 0 条） |\n| 方法依据 | `research/read-reference {topic:\"compute-variants\"}` | 成功（`docs/harness-research/compute-variants.md`） |\n\n## 缺口\n\n1. **没有可派生父版**：需要同 Agent 的普通 `EXP-` 业务版本、`detail.derivation.derivable=true` 和可恢复的 `git:<40位提交>`；当前一个业务版本都没有。\n2. **目标标识不存在**：固定 Experiment 无 `change.yaml`，固定 Run 无法解析，`VAR-` 变体 ID 也未由平台生成。\n3. **目标材料不可用**：manifest 无法解析，`evaluation.md` 没有任何 `U-*` Case，冻结 Case 与关键任务都无从选择。\n4. **无成本诊断证据**：没有 Run 的实际输出与工具结果，只能提假设，不能据此判断重复请求、检索或长上下文浪费，也不能提供 `generation.source_run_ids`。\n\n## 下一步（本次仅策划，均未执行）\n\n1. 先确认这是“待建 Agent”还是“ID 写错/目标已删”。若是新建，走 Agent 与首个普通 `EXP-` 业务版本的正常入口，并由平台生成 ID、固定 `git:<40位>` 提交，不手写 `EXP-`/`VAR-`。\n2. 修复 `manifest.yaml`，并在 `evaluation.md` 补齐至少一个 `U-*` Case，使其能被 `detail`、`cases/list` 正常读取。\n3. 采集至少一个代表 Run（含实际输出与工具结果）作为策略假设与生成依据；在此之前不填写 `strategy`，也不做成本结论。\n4. 父版满足 `derivable=true` 后再组计划：`parent_experiment_id`/`parent_ref`、`variant_name`、`strategy`、`case_ids`/`critical_case_ids`、`min_runs_per_case`、`max_pass_rate_drop_pp`、`resource_metric`、`min_resource_reduction_pct`；仅在明确改模型时填 `allow_model_change`/`variant_model`/`variant_reasoning_effort`，`generation` 必须引用真实 `source_run_ids`。\n5. 计划确认后按 `compute-variants/preview` → `create`（平台生成 `VAR-…`）→ `edit/*` → `build-preview`/`build` → `freeze-preview`/`freeze` → 两侧 `eval/*` → `compare` 推进，`end` 由人员在变体界面复核。这些写动作需另行明确授权。"
+      ]
+    },
+    {
+      "id": "implement-kev-native-and-missing-stop",
+      "sessionId": "session-2fcb4cf2-3ff6-4db5-b285-15b248918cdf",
+      "ended": true,
+      "running": false,
+      "historyComplete": true,
+      "elapsedMs": 33362,
+      "calls": [
+        {
+          "seq": 26,
+          "name": "skill",
+          "skill": "compute-variant-research",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "70d195d1c13d7fa72934115c09533ed711503d81ed83f6ae55d93b30236e0e3d",
+          "hasPlanOnlyPrecedence": true,
+          "hasImplementBranch": true,
+          "pathMention": true
+        },
+        {
+          "seq": 28,
+          "name": "skill",
+          "skill": "kev-trace-pipeline",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "7571f4c8ada8bffa7bf5d0b338b87b924905f4e1ccd63f7eecc05ec3a4d00721",
+          "hasPlanOnlyPrecedence": false,
+          "hasImplementBranch": true,
+          "pathMention": true
+        },
+        {
+          "seq": 30,
+          "name": "skill",
+          "skill": "kev-training",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "74ca648b0d1a80a996f1a4c36dac594940099e3a53616f5f16a59cd3e08c0fa6",
+          "hasPlanOnlyPrecedence": false,
+          "hasImplementBranch": true,
+          "pathMention": true
+        },
+        {
+          "seq": 32,
+          "name": "platform_agents",
+          "action": "context",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "6875cad164a884bfc35c02bab4fa342c3a543dbf2f000f1ce07ebc80ea3b6056",
+          "ok": true,
+          "task_context": {
+            "page": "agents",
+            "skill": "compute-variant-research",
+            "agent_id": "assistant-validation-missing",
+            "experiment_id": "EXP-assistant-validation-missing-001-r111111111111",
+            "run_id": "run-11111111-1111-4111-8111-111111111111",
+            "generation_intent": "implement"
+          },
+          "available_actions": [
+            "assets/build-preview",
+            "assets/build",
+            "assets/dependencies/prepare",
+            "research/read-reference",
+            "research/validate",
+            "decision/preview",
+            "list",
+            "detail",
+            "edit/read",
+            "edit/preview",
+            "edit/apply",
+            "cases/list",
+            "cases/read",
+            "cases/update",
+            "eval/preview",
+            "eval/start",
+            "eval/status",
+            "eval/cancel",
+            "runs/index",
+            "runs/show",
+            "runs/evidence",
+            "runs/report",
+            "runs/files",
+            "runs/read-file",
+            "runs/compare",
+            "runs/trace",
+            "assets/diff",
+            "assets/read-fixed",
+            "compute-variants/context",
+            "compute-variants/source",
+            "compute-variants/identity-preview",
+            "compute-variants/identity-apply",
+            "compute-variants/preview",
+            "compute-variants/create",
+            "compute-variants/rename",
+            "compute-variants/build-preview",
+            "compute-variants/build",
+            "compute-variants/freeze-preview",
+            "compute-variants/freeze",
+            "compute-variants/compare",
+            "cases/create-context",
+            "cases/from-run",
+            "cases/create-preview",
+            "cases/create",
+            "datasets/source",
+            "datasets/preview",
+            "datasets/apply",
+            "datasets/list",
+            "datasets/read",
+            "datasets/review",
+            "datasets/export",
+            "decision/update",
+            "tasks/capabilities"
+          ]
+        },
+        {
+          "seq": 34,
+          "name": "bash",
+          "command": "pwd",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "306acf69d68b4ceb4bc5c91ae5a35bbb6afcb174ab65c846f0778463e304a10c",
+          "result": "/home/admin/work/harness-engineering-platform/.local/comprehensive-20261104/assistant-data\n"
+        },
+        {
+          "seq": 42,
+          "name": "platform_agents",
+          "action": "describe",
+          "describedAction": "compute-variants/context",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "184a6dbaf6a23efd32e6530e5eb7b2751f3f69af8ea7d25c2a9fd3d47b46ceda",
+          "ok": true
+        },
+        {
+          "seq": 50,
+          "name": "platform_agents",
+          "action": "compute-variants/context",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "39bcdb860e73e533543e8478917c8da88aab30cfaec794c8ec085a9f34e392e5",
+          "operationState": "failed",
+          "ok": false,
+          "error": {
+            "code": "ENOENT",
+            "message": "算力变体操作失败，请检查固定来源及 Run 证据",
+            "details": {}
+          }
+        },
+        {
+          "seq": 56,
+          "name": "platform_agents",
+          "action": "describe",
+          "describedAction": "detail",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "9c4b17d79f3e286744826b3113003e9688c4e28cad9e81847eebb8e2e9ca66d5",
+          "ok": true
+        },
+        {
+          "seq": 64,
+          "name": "platform_agents",
+          "action": "detail",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "7ec00d7ab08e56fb0c09530f0b48fc873d66881c15182671cc181380b1bac95b",
+          "operationState": "failed",
+          "ok": false,
+          "error": {
+            "code": "asset_read_failed",
+            "message": "YAML 解析失败",
+            "details": {
+              "path": "agents/assistant-validation-missing/manifest.yaml"
+            }
+          }
+        }
+      ],
+      "principlesMatch": true,
+      "usage": [
+        {
+          "seq": 25,
+          "usage": {
+            "inputTokens": 13769,
+            "outputTokens": 799,
+            "cacheReadTokens": 2560,
+            "cacheWriteTokens": 0,
+            "totalTokens": 17128
+          }
+        },
+        {
+          "seq": 41,
+          "usage": {
+            "inputTokens": 7080,
+            "outputTokens": 598,
+            "cacheReadTokens": 17024,
+            "cacheWriteTokens": 0,
+            "totalTokens": 24702
+          }
+        },
+        {
+          "seq": 49,
+          "usage": {
+            "inputTokens": 17784,
+            "outputTokens": 93,
+            "cacheReadTokens": 7040,
+            "cacheWriteTokens": 0,
+            "totalTokens": 24917
+          }
+        },
+        {
+          "seq": 55,
+          "usage": {
+            "inputTokens": 156,
+            "outputTokens": 1010,
+            "cacheReadTokens": 24832,
+            "cacheWriteTokens": 0,
+            "totalTokens": 25998
+          }
+        },
+        {
+          "seq": 63,
+          "usage": {
+            "inputTokens": 19088,
+            "outputTokens": 85,
+            "cacheReadTokens": 7040,
+            "cacheWriteTokens": 0,
+            "totalTokens": 26213
+          }
+        },
+        {
+          "seq": 69,
+          "usage": {
+            "inputTokens": 170,
+            "outputTokens": 2330,
+            "cacheReadTokens": 26112,
+            "cacheWriteTokens": 0,
+            "totalTokens": 28612
+          }
+        }
+      ],
+      "assistant": [
+        "**结论：固定目标不可用，实施分支在此停止；没有做任何写操作、训练或资产创建。**\n\n**已实际调用（均为只读）**\n\n| 步骤 | 结果 |\n|---|---|\n| 加载 `compute-variant-research`、`kev-trace-pipeline`、`kev-training` | 成功。实施分支为 `generation_intent=implement` 且非 `plan_only`，应先读 `compute-variants/context` 的 `plan`、`generation_contract`、`workflow_status`，再按 KEV 数据/训练阶段推进 |\n| `platform_agents.context` | 成功。固定目标为 Agent `assistant-validation-missing`、Experiment `EXP-assistant-validation-missing-001-r111111111111`、Run `run-11111111-…`；可用动作含 `compute-variants/*`、`datasets/*`、`eval/*`、`edit/*` 等 |\n| 原生 `bash`：`pwd` | 成功，仅一次，无副作用；工作目录为 `assistant-data` 工作区根 |\n| `describe` `compute-variants/context`、`detail` | 成功，确认参数合同 |\n| `compute-variants/context`（固定 Experiment ID） | **failed，`ENOENT`**：“算力变体操作失败，请检查固定来源及 Run 证据”，无 `details` |\n| 只读交叉核对 `detail`（固定 Agent + Experiment） | **failed，`asset_read_failed`**：“YAML 解析失败”，路径 `agents/assistant-validation-missing/manifest.yaml` |\n\n**真实缺口**\n\n1. 固定 Experiment 查不到算力变体上下文，因此拿不到 `plan`、`generation_contract`、`workflow_status`，也没有可核对的完整父版与 Run 证据。\n2. 同一固定 Agent 的 `manifest.yaml` 无法被 YAML 解析，连基础 `detail` 都读不出来。\n\n**未执行部分**\n\n`compute-variants/preview|create|identity-*|build|freeze|compare`、`edit/*`（含 `edit/apply`）、`assets/*`、`eval/*`、`datasets/*`、`research/read-reference` 均未调用；未训练、未连接训练服务器、未创建业务资产、未修改任何文件、未伪造数据或回执。验证时需要先修复可解析的 manifest 并提供真实存在的固定 Experiment，再重新从 `compute-variants/context` 进入。"
+      ]
+    },
+    {
+      "id": "native-runtime-admission",
+      "sessionId": "session-2833ced1-5582-4e06-8c70-3058e6547fb1",
+      "ended": true,
+      "running": false,
+      "historyComplete": true,
+      "elapsedMs": 46142,
+      "calls": [
+        {
+          "seq": 26,
+          "name": "skill",
+          "skill": "workspace-management",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "5446c3b09ed394d78de705f9e668008378352ac7aa1962b7e6eab29a95b1eb6d",
+          "hasPlanOnlyPrecedence": false,
+          "hasImplementBranch": true,
+          "pathMention": true
+        },
+        {
+          "seq": 28,
+          "name": "platform_instances",
+          "action": "describe",
+          "describedAction": "list",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "7649c7eda401b7873b32607bbd89c65038870e03d8c1f0dc18cdeb228fce8f4b",
+          "ok": true
+        },
+        {
+          "seq": 36,
+          "name": "bash",
+          "command": "ls /home/admin/work/harness-engineering-platform/.local/comprehensive-20261104/assistant-program 2>/dev/null | head -30; echo '---'; ls /home/admin/work/harness-engineering-platform 2>/dev/null | head -30",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "d3202713d2acf3f8df7b588a1721b5d6e93fa553e89e3b06e82a1731e795114f",
+          "result": "AGENTS.md\nREADME.md\ndocs\nplatform\nplugins\nruntime\n---\nAGENTS.md\nAI纠错记录\nCHANGELOG.md\nREADME.md\nVERSION.md\ndocs\nplatform\nplugins\nruntime\ntests\n"
+        },
+        {
+          "seq": 40,
+          "name": "grep",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "e460057624015499b9f2fcb06aa3397473ee2284719840d7d182e1f0727c2c8e"
+        },
+        {
+          "seq": 46,
+          "name": "read",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "fbaeb71ff7219fa410b0fe6479af3b947eb02c297a47ddc6b8075df31dbf769d"
+        },
+        {
+          "seq": 48,
+          "name": "bash",
+          "command": "sed -n '1,60p' /home/admin/work/harness-engineering-platform/docs/platform-design/20_业务访问与运行控制插件开发规范.md",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "acb1197799580d643c338a50069b80ff8bfd67800305e3c81f3793bf0f5a9712",
+          "result": "# 20｜业务访问与运行控制插件开发规范\n\n本规范定义统一网关的智能体身份、实时风险评估与访问控制合同。本规范保留完整安全合同，作为已选设计与后续生产化依据；当前工具阶段按根级 [AGENTS.md](../../AGENTS.md#项目定位与工作方式) 的工具阶段原则运行：网关默认放行已登记业务智能体的全部 HTTP 与 WebSocket 请求，未发布实例不核验发布身份签名、不做风险评估，也不执行网关动作限制。统一网关仅在已发布智能体运行中发现风险时，按配置策略限制高风险 MCP 工具调用。本文中面向生产访问的路径收窄、强制验签和额外审批要求不反向作为当前实现的验收项；需要收紧时按真实暴露、实际滥用或用户明确要求另行确认范围。当前支持即时业务任务，实际装载与验证结果以项目验收矩阵及其证据为准。接入基线为 DSH `v0.2.1-rc.2`；平台和业务 Runtime 的实际升级结果以验收矩阵为准。系统边界见 [02](02_系统架构与部署设计.md#business-access-architecture)，事实写权见 [03](03_存储架构与数据契约.md#business-access-data)，业务过程见 [04](04_核心业务闭环与服务接口.md#business-gateway-flow)，实施顺序见 [05](05_实施路线与迭代计划.md#business-control-route)。本章唯一维护插件接口与一致性要求，不另建策略服务或资产副本。\n\n### 当前访问语义\n\n所有业务实例均经统一网关访问。“无需认证”允许所有访问者直接打开页面、调用 API 和建立 WebSocket，共享该实例的数据与会话；无需先登录、领取访客身份或携带访客 Cookie。现有配置值 `accessMode: anonymous` 表示这一共享访问方式，不表示登录体系内的访客角色。切换访问方式不改写既有会话事件和原始来源，也不将其他实例的数据合并进来。\n\n未发布实例使用开发调试模式，网关全部放行，工具继续采用 DSH 原生权限；不调用风险评估服务，也不受发布规则、操作白名单、风险限制或网关确认约束。开发模式的 HTTP、WebSocket、MCP 和记录同步不使用 HMAC 签名、一次性值或两秒时效窗口；仍核对工作区、Agent、实例、代次、来源摘要及 Session 归属。模式只从本地实例登记读取，不接受请求自报。MCP 是可选外部服务；连接、凭据、初始化或发现失败只影响对应 MCP，不能阻塞智能体启动、聊天或其他可用工具。页面明确报告对应服务状态，并允许恢复后重试。\n\n开发 Runtime 每 5 秒异步回传会话等记录，不依赖许可租约；同步失败保留本地记录并等待下次重试，不关闭 Peer 或阻塞聊天和其他可用工具。Runtime 保持会话绑定的唯一写入方，协调器消费副本。页面分别展示最近记录同步和发布许可应用状态。\n\n控制同步正文按实际 JSON 字节校验，每次请求最多 512 KiB；Runtime 将观察按 128 KiB 分批，以同步 ID、批次序号和内容摘要核对重复请求。协调器验证全部批次后才导入，未完成时保留上次确认状态，末批回执丢失可以重发确认。单条记录过大或整组超过容量时明确报错，不截断记录。\n\n发布请求的签名头只携实例绑定、当前请求上下文和限制版本等必要字段；完整风险与限制快照通过控制正文同步。Runtime 使用最近完整应用的快照核对版本和短租约。网关尚未收到当前版本的应用确认时，最多等待 1.5 秒后台同步，仍未同步则返回可重试的不可用状态；开发模式不等待发布许可。传输版本由 [`BUSINESS_TRANSPORT_VERSION`](../../platform/plugin/src/business-control/contracts.ts) 定义，平台与业务 Runtime 均须实际装载对应制品；标准镜像的只读插件挂载不要求因此重建镜像。\n\n下文涉及个人身份隔离、风险评估和限制的合同仅用于明确启用认证或发布控制的适用场景；强制验签、重放检查和短租约仅适用于发布模式。\n\n## 1. 三类职责与执行责任\n\n统一网关按“智能体身份、风险评估、访问控制”划分。凭据验证与可信来源检查同属智能体身份，不再把含义宽泛的“身份信任”作为一级功能。接入用户的登录与 Session 所属人另列辅助区，不能替代业务智能体身份。\n\n| 分类 | 既有实现入口 | 职责与判断边界 |\n|---|---|---|\n| **智能体身份** | `AgentAuthenticationPlugin`、`AgentIdentityTrustPlugin` | 验证身份凭据、可信来源和实例绑定，管理身份启用与撤销。凭据验证回答身份声明是否成立；来源核验回答当前来源和代次是否符合登记要求。两项分别展示事实，共同构成身份前置条件。 |\n| **风险评估** | `RiskAssessmentPlugin` | 根据当前输入、工具或资源调用、报告发布与下载等业务事件自动评估风险，输出有范围、时间、等级和依据的事实。身份过期、撤销和来源不匹配不折算为业务风险分数。 |\n| **访问控制** | `AccessAuthorizationPlugin` | 维护服务、工具、资源和动作策略，结合身份条件、当前风险、资源归属与必要确认决定允许或拒绝；身份有效或低风险都不会自动增加基础权限。 |\n\n对外服务实例的智能体身份凭据验证通过后，仍须核对固定来源、实例代次和撤销状态。首期使用同一受信部署域内的 HMAC SHA-256 签名通道，来源摘要用于固定装载身份；这些依据不等于硬件远程证明、第三方认证或模型行为保证。开发调试实例也经统一网关访问，但不要求发布阶段的智能体身份验证；网关重建实例上下文；Runtime 调用平台 MCP 分组与记录同步接口复用 MCP 管理已有的私有 Bearer [REDACTED] 在运行时读取，不写入 Candidate。实例登记和会话归属继续核对，不能展示成发布身份已验证。没有实现的认证机制不能显示为可用选项。\n\n身份条件未知、失效或不匹配时直接拒绝对应访问，低风险或人工确认不能放宽。已发布实例启用风险评估后按业务事件自动触发，手动重评仅用于故障恢复和核对。空闲周期巡检和定时任务到期前评估尚未覆盖，不能显示为低风险或已检测；影响见 [05 的首期定时任务边界](05_实施路线与迭代计划.md#首期定时任务边界与影响)。\n\n三类职责不要求三个进程或三套存储。业务网关、DSH Remote、MCP/OpenAPI 与组合叶子在各自真实边界执行控制结果。前端隐藏、目录过滤或模型承诺不能替代服务端检查，确认及输出检查仍按实际阶段声明覆盖。\n\n## 2. 公共合同、界面与唯一事实源\n\n可导出的 TypeScript 合同唯一维护于 [`contracts.ts`](../../platform/plugin/src/business-control/contracts.ts)，管理端、网关和 Runtime 共同引用；执行实现在 [`core.ts`](../../platform/plugin/src/business-control/core.ts)。本文解释语义，不维护第二份字段定义。\n\n### 智能体身份与用户归属\n\n启用个人认证时，一个 Session 的所属人是接入用户，执行它的 Agent 是业务行为主体；两者不能混为一个 `userId`。接入用户认证与信任提供方只解决个人凭据、稳定用户身份和有效状态，在界面单列辅助区域，不替代智能体身份内的凭据验证与可信来源核验。凭据轮换不能改变既有资源归属；多人共享凭据只能形成同一接入用户。\n\n对外服务模式中，Agent 身份与真实实例登记交叉核对，签名绑定实际接收实例、方法、路径、时间和一次性值。只有验签成功才产生发布身份认证证据，不能因配置文件存在或用户传入 `agentId` 就显示认证成功。开发调试模式只核对网关登记、当前装载来源和内部请求通道，不产生发布身份认证证据。删除登记后同名新建必须使用新代次，不能继承旧认证回执；同一持久实例的普通重启保留归属，对外服务仍须重新完成签名握手。\n\n可信来源摘要只保留一个配置位置。来源不匹配、人工撤销、有效证据缺失或过期均参与拒绝；不能用解除某项人工风险限制绕过这些条件。签名证明、策略应用回执与可信判断分别显示，保存策略不等于实例已经应用。\n\n### 风险事实与访问控制策略\n\n每条风险事实保留 Agent 和必要的用户、实例、Session、服务范围，以及级别、信号、来源、观察时间和有效期。同一事实按 ID 和版本更新，不同事实的有效约束可叠加；同范围的新低风险记录不能覆盖另一条仍有效的拒绝信号。按 Agent 汇总时仍保留这些范围：A 用户单会话的风险不能据此撤销 B 的权限，也不能将某次低风险评估写成整个 Agent 永久安全。没有新事实、未知或过期按真实状态呈现。\n\n既有DSH受控运行的风险判断由已保存的 `riskAssessment` 第三方提供方承担，平台不自行判定风险等级、业务场景或操作敏感性。本地检测标记不再参与执行，旧 `detection` 字段和 marker 事实仅保留兼容读取与历史核对。关闭评估时，旧自动风险事实不参与当前许可；身份、基础工具权限、操作目标及手动限制继续生效。开启后，即时输入、实际受管工具或资源调用、报告发布或下载进入适用的第三方评估阶段。评估结果先更新事实，再同步计算许可；异步等待和必要确认结束后，在实际网络派发前重验当前策略、身份条件、风险和目标。风险服务不可用、结果未知或缺少本次需要的条件依据时，不生成低风险事实；将明确状态交给第三方访问服务，进入手动兜底时暂停依赖风险的条件，继续执行基础处理和纯工具规则。已有仍适用且有效的明确拒绝继续约束本次操作。\n\n访问控制优先使用已保存的 `accessAuthorization` 第三方服务，由其对每次真实操作返回允许、禁止或确认。服务未配置或不能提供有效决定时使用手动策略；有效禁止不触发兜底放行。手动工具范围和条件规则只在兜底路径生效，第三方有效决定不再受同一套手动工具策略重复裁决。原生能力、身份与归属、真实目标绑定及人工临时限制继续生效，不能把风险等级直接当作许可。新的有效事实替换同一事实的旧拒绝信号后，后续请求重新计算许可，不自动重放业务。手动限制单独保留，需显式解除；开启评估时先按原范围重评，关闭评估时核对当前基础条件后解除指定限制，其他限制不受影响。\n\n手动兜底复用同一配置中的 Agent 工具服务与动作范围、操作默认处理和条件规则。操作定义同时保留真实目标绑定；人工临时限制独立于策略来源。操作描述必须来自服务端实际解析的工具、目标、方法和参数；不能根据 GET 方法推断安全，不能把同名工具迁往新目标后沿用旧许可。组合固定版本和业务上下文，每个真实叶子独立检查，不为虚拟组合伪造外部目标。\n\n作为手动兜底，Agent 的 `toolPolicies` 按 MCP 服务定义基础处理方式及条件规则：每个服务配置 `serverId`、`defaultEffect` 和 `rules`；规则通过 `operationIds` 或 `kinds` 限定操作，通过 `when.riskLevels`、`when.scenarioIds`、`when.operationTags` 匹配第三方证据，处理方式为 `allow`、`deny` 或 `confirm`。同一字段内多值为或，不同条件字段为且；匹配规则按禁止、确认、允许排序，未命中时执行服务基础处理。允许仍受 Agent 服务与动作范围、手动限制和提供方拒绝信号约束；未配置 `toolPolicies` 时保留原有行为。\n\n第三方请求只在适用规则需要时附 `conditionRequest`；响应通过可选 `conditionEvidence.scenarioIds/operationTags` 返回明确结果，缺字段表示没有所需依据，空数组表示已判定无匹配项。场景名称及敏感、危险标签由提供方识别，网关只做精确条件匹配。条件证据绑定本次服务、工具、方法、操作类型、目标摘要与输入摘要，不能借用其他工具或参数的结果。可确定不匹配的条件不阻塞请求；仍需判定但依据缺失或失效时明确标记缺项，手动兜底暂停依赖该依据的条件，继续执行服务基础处理、纯工具或动作规则及其他既有约束。自动评估关闭时，第三方基础访问授权仍执行；进入手动兜底时同样暂停依赖风险的条件；确认后仍按当前版本重验，不重放业务。\n\n"
+        },
+        {
+          "seq": 56,
+          "name": "grep",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "ae060ccaad9471989f4a3a36182a6d4a9a3cd3ed85f9128851c05378f9b37336"
+        },
+        {
+          "seq": 58,
+          "name": "bash",
+          "command": "grep -n \"cross-framework-access\" -A 40 /home/admin/work/harness-engineering-platform/docs/platform-design/04_核心业务闭环与服务接口.md | head -80",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "4445c2ee6cc45ed68476c3a57e07d26bddb5c8655a806de6c74f87bd4b2a0e9e",
+          "result": "214:<a id=\"cross-framework-access\"></a>\n215-## 跨框架接入与机器资源接口\n216-\n217-接入管理复用已认证 owner RPC：`instances/external/{list,detail,credentials,discover,save,verify,enable,disable,remove,records,request,invoke,conversation/send,conversation/status}`。登记写入携带预期 `revision` 和 `requestId`，响应丢失时通过 `request` 查询实际阶段回执，不重复执行。独立业务请求通过 `/api/external-instances/v1/`，主体由既有身份提供方建立，不信任请求中的实例、用户或目标 URL 声明。调用需满足登记、当前入口授权、风险与真实操作条件。\n218-\n219-`discover` 接收框架、服务地址及必要连接身份，只读取原生可见目标，不创建工作区或智能体。DSH 分别返回工作区与 Preset，AgentScope 返回当前原系统用户可见的 Agent；唯一可用目标自动选中，多项按名称选择。空结果、认证失败、无权列举、不支持与连接失败分别表达。`credentials` 只列出专用目录中已有引用名，不返回凭据。新登记的归属、实例名称和初始 owner 入口范围由服务端补齐；局部编辑省略的已有信息与授权保留，显式修改继续按当前校验执行。\n220-\n221-普通访问调用 `conversation/send`，输入为 `{id, requestId, sessionId?, input}`；没有会话时先创建，再发送一次。`conversation/status` 只接收 `{id, requestId}`，读取原请求，不创建会话或重发消息。两者返回 `running`、`waiting`、`completed`、`failed` 或 `unknown`，以及本次 assistant 消息、工具状态和必要说明。创建、发送复用现有请求回执与会话映射；完成状态从原生事实即时读取，不维护第二份任务状态。\n222-\n223-每次发送使用原生可关联的消息或请求标识，读取只呈现该锚点所属轮次的结果，不把历史 assistant 消息、全局空闲或 HTTP 响应当作本次完成。身份、目标绑定、风险与当前授权在实际派发前核对；只读查询也核对当前归属与访问条件。超时、断线和响应丢失保留原请求标识，恢复仅查询；不能确认的创建或发送不自动重放。既有低层 `invoke` 与独立 HTTP 入口继续服务实际消费者，不在普通界面暴露协议步骤。\n224-\n225-<a id=\"external-access-risk-provider\"></a>\n226-### 外部接入风险提供方配置\n227-\n228-当前事实源仍为数据根 `config/business-access.json`。可选字段结构如下；这是配置片段示例，不是另一份可编辑配置：\n229-\n230-```json\n231-{\n232-  \"externalAccess\": {\n233-    \"riskAssessment\": {\n234-      \"endpoint\": \"https://risk.example/evaluate\",\n235-      \"timeoutMs\": 1500\n236-    }\n237-  }\n238-}\n239-```\n240-\n241-| 字段 | 合同 |\n242-|---|---|\n243-| `externalAccess.riskAssessment.endpoint` | 显式覆盖时必填，HTTP(S)地址，最长500字符；不能包含用户名、密码、查询参数或片段 |\n244-| `externalAccess.riskAssessment.timeoutMs` | 可选，1至60000的整数；省略使用1500毫秒 |\n245-| `externalAccess.riskAssessment.testRunId` | 可选验收标识，1至128个ASCII字母、数字、下划线、点或连字符；不从全局提供方继承 |\n246-\n247-该选择由 `external-controlled` 实例的owner入口、独立HTTP入口及机器资源调用共用。省略 `externalAccess` 或其中的 `riskAssessment` 时沿用全局 `riskAssessment`；显式配置时使用该对象，不与全局字段合并。不改变既有DSH控制提供方，也不替换全局认证、身份信任或第三方访问授权配置。\n248-\n249-显式覆盖必须有效，只接收表列提供方字段；`null`、错误类型、空提供方、无效地址或超时等直接拒绝，不能用来关闭风险检查。显式提供方拒绝、不可达或返回无效事实时，不回退全局提供方，也不映射假主体或伪造DSH来源。恢复全局选用时删除覆盖字段，而不是写入 `null`。\n250-\n251-配置按请求即时读取。异步判断后核对实际所选提供方配置；机器资源还在最后一次异步JWT验证之后、实际网络派发之前，执行同步复核，包含所选控制配置摘要、身份/风险/访问决定的最短有效期及当前实例绑定。任一失效均不派发；显式覆盖存在时，未选中的全局风险配置变化不改变本次所选风险决定。初次判断返回前也执行同一复核。\n252-\n253-此字段当前通过本地配置维护，没有新增UI表单。更新时保留同文件中的既有网关、实例、授权和提供方字段，使用同名排他锁、修订核对与原子写入；既有业务配置保存、网关初始化和机器资源授予操作保留该字段。\n254-\n"
+        },
+        {
+          "seq": 66,
+          "name": "bash",
+          "command": "grep -rn \"实例管理\" /home/admin/work/harness-engineering-platform/platform/plugin/src/instances/client.tsx | head -5; echo ---; grep -rn \"接入实例\\|登记已有智能体\" /home/admin/work/harness-engineering-platform/README.md",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "0ad011738bac7817f25a357a78844131b3c5592ecd18219fe091885fcfa6e20e",
+          "result": "125:  delete: '移除已停止容器与本实例管理登记',\n866:    <main className=\"harness-instances-page\" aria-label=\"实例管理\">\n870:        <div><span className=\"instance-eyebrow\"><svg viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><rect x=\"3\" y=\"2.5\" width=\"14\" height=\"6\" rx=\"2\" stroke=\"currentColor\" strokeWidth=\"1.5\" /><rect x=\"3\" y=\"11.5\" width=\"14\" height=\"6\" rx=\"2\" stroke=\"currentColor\" strokeWidth=\"1.5\" /><path d=\"M6 5.5h.01M6 14.5h.01m4-9h4m-4 9h4\" stroke=\"currentColor\" strokeWidth=\"1.6\" strokeLinecap=\"round\" /></svg>运行 · 交付 · 观察</span><h1>实例管理</h1><p>管理智能体的运行实例，随时核对来源、状态与访问入口。</p></div>\n873:      <div className=\"instance-management-tabs\" role=\"tablist\" aria-label=\"实例管理方式\">\n---\n33:| 已有运行中的智能体，要保留原框架接入 | 实例管理 → 接入实例 → 登记已有智能体，验证并启用平台入口。 |\n"
+        }
+      ],
+      "principlesMatch": true,
+      "usage": [
+        {
+          "seq": 25,
+          "usage": {
+            "inputTokens": 14434,
+            "outputTokens": 861,
+            "cacheReadTokens": 2432,
+            "cacheWriteTokens": 0,
+            "totalTokens": 17727
+          }
+        },
+        {
+          "seq": 35,
+          "usage": {
+            "inputTokens": 12285,
+            "outputTokens": 506,
+            "cacheReadTokens": 7552,
+            "cacheWriteTokens": 0,
+            "totalTokens": 20343
+          }
+        },
+        {
+          "seq": 45,
+          "usage": {
+            "inputTokens": 2625,
+            "outputTokens": 350,
+            "cacheReadTokens": 20224,
+            "cacheWriteTokens": 0,
+            "totalTokens": 23199
+          }
+        },
+        {
+          "seq": 55,
+          "usage": {
+            "inputTokens": 5959,
+            "outputTokens": 812,
+            "cacheReadTokens": 23168,
+            "cacheWriteTokens": 0,
+            "totalTokens": 29939
+          }
+        },
+        {
+          "seq": 65,
+          "usage": {
+            "inputTokens": 2888,
+            "outputTokens": 2963,
+            "cacheReadTokens": 29824,
+            "cacheWriteTokens": 0,
+            "totalTokens": 35675
+          }
+        },
+        {
+          "seq": 73,
+          "usage": {
+            "inputTokens": 401,
+            "outputTokens": 1359,
+            "cacheReadTokens": 35584,
+            "cacheWriteTokens": 0,
+            "totalTokens": 37344
+          }
+        }
+      ],
+      "assistant": [
+        "核对完 `workspace-management` 与程序仓库的跨框架接入文档后，结论如下。\n\n## 结论：走“接入实例（跨框架接入）”路径，不是迁移\n\n现有 AgentScope 保留原 Runtime、原工程和原生命周期，只登记为平台的“接入实例”。这与“把工程迁成 DSH Harness”是两条不同路径：\n\n| 目标 | 路径 |\n|---|---|\n| 原系统继续跑，只加平台访问入口 | 实例管理 → 接入实例 → 登记已有智能体 |\n| 把工程变成可维护、可演进的 DSH Harness | `agent-migration`（本次不需要） |\n\n依据是[跨框架接入使用说明](</home/admin/work/harness-engineering-platform/docs/platform-design/27_跨框架接入使用说明.md>)和 [workspace-management](.agents/skills/workspace-management/SKILL.md) 的路径说明：保留原 Runtime 接入已运行的 DSH、AgentScope 或 OpenCode 时，指向“实例管理 → 接入实例 → 登记已有智能体”，原系统继续负责远端进程。\n\n## 界面入口\n\n平台页面（当前会话即 `http://127.0.0.1:42445/hep/`）→ **实例管理** → 顶部“平台托管 / **接入实例**”切换 → **登记已有智能体**。\n\n登记时按 AgentScope 的要求填：框架、原服务地址、连接身份（原系统用户，凭据中已有 `X-User-ID` 可直接复用）、可选凭据引用。平台会列出原系统当前用户可见的 Agent，按名称选择即可，内部标识由平台保存，不需要你抄 agent_id，也不会在远端创建 Agent 或工作区。\n\n- “保存登记”只保留草稿，不开放访问；“验证并启用”才打开平台入口。\n- 入口默认只允许 `platform-owner`，其他用户访问要在实例详情的“访问授权”里单独放开。\n- 如还需要给该实例的机器调用授予指定资源权限，另走实例 key 与资源授予；不需要就只做入口访问。\n\n## 是否要迁成 DSH\n\n不需要。接入实例不因登记被迁移进平台容器或改造成 DSH，平台也不接管其部署与配置。只有当你希望后续用平台方式构建、评测、演进这套 Harness 时，才需要另走 `agent-migration`，那是独立目标。\n\n## 平台“停用入口”不会停止原服务\n\n不会。文档明确：“停用入口”与“移除登记”不停止远端进程；停用用户入口、撤销实例 key、禁用资源授予都不执行原系统的生命周期操作，部署、升级、启停和恢复仍由原系统负责（[存储/架构合同](</home/admin/work/harness-engineering-platform/docs/platform-design/02_系统架构与部署设计.md>)、[接口合同](</home/admin/work/harness-engineering-platform/docs/platform-design/04_核心业务闭环与服务接口.md>)）。连接验证结果只代表当时的观察时间，不代表持续在线。\n\n## 一个需要知道的边界\n\n管理助手侧**没有**登记工具。`platform_instances` 当前只有 `list`、`detail`、`url`、`logs`、`preview`、`batch-preview`、`run`、`batch`，不包含登记、发现、验证或启停；这些是界面背后的 owner RPC。所以入口登记和授权只能由你在真实界面完成，我不会代做，也没有可调用的登记动作。\n\n另外首期接入访问只提供“发消息并读取本轮结果”的方式，不提供完整的原生 Web/WS 代理、任务取消、远端进程控制或用户委托；本轮完成状态以 AgentScope 原生的执行状态和消息为准。\n\n本次只做了只读核对，未登记实例、未建资产、未迁工程、未调用任何变更动作。"
+      ]
+    },
+    {
+      "id": "project-migration",
+      "sessionId": "session-5d5f19a2-89e4-459c-b724-76a2b7b16d2f",
+      "ended": true,
+      "running": false,
+      "historyComplete": true,
+      "elapsedMs": 23851,
+      "calls": [
+        {
+          "seq": 26,
+          "name": "skill",
+          "skill": "workspace-management",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "5446c3b09ed394d78de705f9e668008378352ac7aa1962b7e6eab29a95b1eb6d",
+          "hasPlanOnlyPrecedence": false,
+          "hasImplementBranch": true,
+          "pathMention": true
+        },
+        {
+          "seq": 28,
+          "name": "skill",
+          "skill": "agent-migration",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "c249da7819503e170c4966f8b24f6b48b5d909861e45f59506e16cd4dbc2b281",
+          "hasPlanOnlyPrecedence": false,
+          "hasImplementBranch": false,
+          "pathMention": true
+        },
+        {
+          "seq": 34,
+          "name": "platform_agents",
+          "action": "describe",
+          "describedAction": "migrations/inspect",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "b6145378851bb13c399c31e20cf633b5d36155ab8a92bded944d7082b3403d09",
+          "ok": true
+        },
+        {
+          "seq": 37,
+          "name": "platform_agents",
+          "action": "describe",
+          "describedAction": "migrations/preview",
+          "resultFound": true,
+          "isError": false,
+          "contentSha256": "533edfbd6acaeef6f23a4f09c252d22657f259de878b6e4d7c53f101e8bc1b92",
+          "ok": true
+        }
+      ],
+      "principlesMatch": true,
+      "usage": [
+        {
+          "seq": 25,
+          "usage": {
+            "inputTokens": 4195,
+            "outputTokens": 333,
+            "cacheReadTokens": 12672,
+            "cacheWriteTokens": 0,
+            "totalTokens": 17200
+          }
+        },
+        {
+          "seq": 33,
+          "usage": {
+            "inputTokens": 4207,
+            "outputTokens": 946,
+            "cacheReadTokens": 17152,
+            "cacheWriteTokens": 0,
+            "totalTokens": 22305
+          }
+        },
+        {
+          "seq": 44,
+          "usage": {
+            "inputTokens": 18143,
+            "outputTokens": 2238,
+            "cacheReadTokens": 6912,
+            "cacheWriteTokens": 0,
+            "totalTokens": 27293
+          }
+        }
+      ],
+      "assistant": [
+        "已核对 `workspace-management` 与迁移技能，并读取了 `migrations/inspect`、`migrations/preview` 的当前合同。本次只做入口分析，未创建任何 Agent、Experiment 或实例，未运行源工程，未连接远端。\n\n## 应走哪个入口\n\n走 **`agent-migration`**（技能正文见 [agent-migration](.agents/skills/agent-migration/SKILL.md)），把外部工程迁成平台内可继承、可构建、可评测的 DSH Harness Candidate。\n\n不走“保留外部 Runtime 的接入实例”这条路：那条路是「实例管理 → 接入实例 → 登记已有智能体」，原系统继续负责远端进程，平台侧只是受控入口，改不了版本也做不了 Harness 级评测——与你说的“持续修改、版本化和评测”正好相反。两条路可以并存，但接入实例不能替代这次迁移。\n\n后续持续演进时，再从迁移产出的业务版本出发走 `harness-evolution` 和 `research-eval`。\n\n## 第一步\n\n平台侧的第一个动作是**只读固定来源**，不是先建 Agent：\n\n1. `platform_agents migrations/inspect`，`source.kind` 取 `local`（本机目录）、`git`（url + ref，服务端固定实际提交）、`archive`（归档路径）或 `text`（材料正文）。返回 `source_id`、`fingerprint`、框架版本、入口和文件目录。\n2. 用 `migrations/read` 按真实路径逐份读取角色指令、技能与引用、工具定义、入口、模型与依赖声明，`offset` 续读。脚本只读不执行，不装 Hook，不跑原 Runtime。\n3. 清点完成后再定目标：新建 Agent，或从**用户指定的普通 `EXP-` 父版**建新版本。不能拿最大编号代替指定版本，不能从 `VAR-` 变体继承，也不能把变体改名绕过。\n\n也就是说：`inspect` → `read` → 目标选择 → 逐项映射表 → `migrations/preview`（出 `operation_id`、`preview_sha256`、`target_source`、`generated_configuration`、`build_contract`）→ `migrations/apply` → `assets/dependencies/prepare` 与 `assets/build` → 业务实例 → 代表 Case 的 `eval/*`。\n\n## 缺少源码时怎么处理\n\n按“缺什么”分档，不要用一种办法套：\n\n| 情况 | 处理 |\n|---|---|\n| 完全没有工程，只有提示词、角色说明、文档或口述行为 | 用 `kind: text` 固定材料（`filename` 省略为 `source.txt`），以内容摘要标识来源。能由材料证明的行为才进映射表，不编造未提供的实现。 |\n| 只有旧目录或归档包 | 先用 `legacy-asset-intake` 只读清点，再以 `local`/`archive` 走 `inspect`。旧资产不激活、不执行。 |\n| 工程在，但缺关键引用、框架版本不明、关键行为缺少定义、模型不可用 | 集中补问**会改变结果**的那几项（目标与预期行为、缺失模块的业务语义、模型替代选择），其余清点和最小草案继续做，不必等齐。 |\n| 确实无法补齐的关键行为 | 列入 `uncovered`，保持待补齐，不用范围说明掩盖；只有本次明确划在范围外的边界（如未做原框架 A/B、固定样例未使用的框架能力）放 `scope_limitations`；被 DSH 原生替代的框架包用 `omitted` + `required:false`。之后在 `migrations/resolve` 里逐项沿 `status.unresolved_items` 的 index 记录依据，未实现的不能标 `converted`/`native`。 |\n| 一句话都没有 | `inspect` 没有可用的 `source`，这是技能层无法补的，需要你提供上述四种之一。 |\n\n两条硬约束：不能把原 Agent 整体黑盒包成一个工具就宣称迁移完成，那只是换了个壳；也不能因为缺源码而把关键行为静默删掉——缺的部分要显式留在 `uncovered`/`pending`，未验证前不报“迁移完成”。默认不做原框架 A/B，迁移后也不声称业务完全等效。\n\n## 开始前需要你给的最小信息\n\n- 来源：本机绝对路径、Git 地址 + ref、归档路径，或材料正文（四选一）\n- 原框架：DSH、OpenCode、AgentScope、LangChain、LangGraph（影响映射口径）\n- 目标：新建 Agent（名称 + 用途），还是既有 Agent 的新版本（给出 Agent ID 与可继承的普通 EXP）\n- 1–2 个代表任务和预期行为（用于定义 Case 与验收，不必是完整用例集）\n- 模型偏好：会先读 `platform_agents context` 的 `model_catalog`，用其中真实的 `provider/model/reasoningEffort`；来源模型不可用时需要你确认替代项\n\n给到来源后，第一步仍是只读 `inspect`，不产生任何写入。"
+      ]
+    }
+  ],
+  "businessAndMethodFilesUnchanged": true,
+  "model": {
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max"
+  },
+  "currencyCost": {
+    "amount": null,
+    "reason": "仅记录原生实际Token用量；未取得计费账单，不估算金额"
+  },
+  "artifacts": [
+    {
+      "path": "index.js",
+      "sourceSha256": "8f519e44d2ef3ceddb294ec9cbf7509bf458ca69e1a0049a6d348b45098842ac",
+      "copiedSha256": "8f519e44d2ef3ceddb294ec9cbf7509bf458ca69e1a0049a6d348b45098842ac"
+    },
+    {
+      "path": "client.js",
+      "sourceSha256": "0bb3fc14efbadde042f361a492b7039590e8541327f7348189ef427d33f428c2",
+      "copiedSha256": "0bb3fc14efbadde042f361a492b7039590e8541327f7348189ef427d33f428c2"
+    },
+    {
+      "path": "sdk-worker.js",
+      "sourceSha256": "1f2245c18bba414288576cf14a0929bfc31dd5f47946e39b8c9af4168eeec5cd",
+      "copiedSha256": "1f2245c18bba414288576cf14a0929bfc31dd5f47946e39b8c9af4168eeec5cd"
+    }
+  ],
+  "programRoot": "/home/admin/work/harness-engineering-platform/.local/comprehensive-20261104/assistant-program",
+  "dataRoot": "/home/admin/work/harness-engineering-platform/.local/comprehensive-20261104/assistant-data",
+  "totalUsage": {
+    "inputTokens": 157514,
+    "outputTokens": 21994,
+    "cacheReadTokens": 335872,
+    "cacheWriteTokens": 0,
+    "totalTokens": 515380
+  }
+}
