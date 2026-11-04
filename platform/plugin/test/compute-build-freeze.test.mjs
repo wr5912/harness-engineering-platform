@@ -38,6 +38,21 @@ const source = `import {defineWorkflow, registerWorkflowTool, runWorkflow} from 
 export const name='compute-workflow'; export const inject=['tools','llm'];
 const workflow=defineWorkflow({id:'asset-alerts',toolName:'query_asset_alerts',description:'查询',inputSchema:{type:'object'},async run(context){return runWorkflow(context,[{id:'asset',run:(_v,c)=>c.callTool('get_asset',c.input)},{id:'alerts',run:(v,c)=>c.callTool('list_alerts',{assetId:v.asset.id})}])}});
 export function apply(ctx:any){registerWorkflowTool(ctx,workflow)}\n`
+test('构建默认复用计划中的模块入口，显式入口与旧回执不得偏离当前计划', async t => {
+  const f = fixture(t), handler = createComputeBuildHandler(f.root), change = f.change()
+  const entry = 'dsh/managed/compact-workflow/index.ts'
+  change.compute_variant.generation = { mode: 'langgraph-aot', entry_path: entry, source_run_ids: ['run-fixed'] }
+  write(f.root, `${exp}/change.yaml`, dump(change)); write(f.root, `${base}/${entry}`, source)
+  const candidate = candidateDigest(join(f.root, base)), preview = await handler('preview', { experiment_id: id })
+  assert.equal(preview.ok, true, JSON.stringify(preview)); assert.equal(preview.value.entry_path, entry)
+  assert.equal((await handler('preview', { experiment_id: id, entry_path: 'dsh/managed/other/index.ts' })).error.code, 'conflict')
+  assert.equal((await handler('preview', { experiment_id: id, entry_path: 'dsh/managed/index.ts' })).error.code, 'invalid_request')
+  const result = await handler('build', { experiment_id: id, expected_candidate_sha256: candidate, expected_preview_sha256: preview.value.preview_sha256 })
+  assert.equal(result.ok, true, JSON.stringify(result)); assert.equal(inspectComputeBuild(f.root, id).verified, true)
+  const next = f.change(); next.compute_variant.generation.entry_path = 'dsh/managed/new-workflow/index.ts'
+  write(f.root, `${exp}/change.yaml`, dump(next))
+  assert.match(inspectComputeBuild(f.root, id).reasons.join(), /入口与生成计划/)
+})
 test('VAR身份可独立构建和冻结，保留计划及原始资产身份', async t => {
   const f = fixture(t), variant = 'VAR-alpha-001-r123456abcdef', variantExp = `evolution/experiments/${variant}`, candidate = `${variantExp}/candidate`
   const change = f.change()

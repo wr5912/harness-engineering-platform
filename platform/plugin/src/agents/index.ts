@@ -1288,6 +1288,8 @@ async function applyEdit(root: string, payload: JsonMap, signal?: AbortSignal) {
   assertUniqueResolved(resolved)
   const dryRun = await validateDraft(root, payload, resolved.filter(item => item.content !== null).map(item => ({ rel: item.rel, content: item.content! })), signal)
   if (signal?.aborted) throw new RpcError('aborted', '草稿保存已取消')
+  if (payload.expected_candidate_sha256 !== undefined && candidateDigest(root, experimentIdField(payload)) !== payload.expected_candidate_sha256) throw new RpcError('conflict', 'Candidate 已变化，请重新预览')
+  if (payload.expected_change_sha256 !== undefined && sha256(readText(changePath(root, experimentIdField(payload)))) !== payload.expected_change_sha256) throw new RpcError('conflict', '研究计划已变化，请重新预览')
   // dry 期间原文件可能变化；校验全部哈希后同步写入，避免异步交错。
   for (const item of resolved) {
     assertNoSymlinkPath(root, item.file)

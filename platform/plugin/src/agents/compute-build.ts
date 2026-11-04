@@ -5,11 +5,11 @@ import { load, dump } from 'js-yaml'
 import { candidateDigest, dataPath, sourceInfo } from '../tasks/files.ts'
 import { programRoot } from '../workspace.ts'
 import { AssetCompileError, compileManagedAsset } from './asset-build-core.ts'
+import { COMPUTE_ENTRY, isComputeEntry } from './compute-generation-contract.ts'
 
 type Body = Record<string, any>
 type Result = { ok: true; value: any } | { ok: false; error: { code: string; message: string } }
 const hash = (value: string | Uint8Array) => createHash('sha256').update(value).digest('hex')
-const ENTRY = 'dsh/managed/compute-workflow/index.ts'
 const RUNTIME_RESOLVER = 'runtime/adapters/dsh-web/src/resolve-runtime.ts'
 class BuildError extends Error { constructor(readonly code: string, message: string) { super(message) } }
 function atomic(file: string, value: string | Uint8Array) {
@@ -33,6 +33,7 @@ export function inspectComputeBuild(assetRoot: string, experimentId: string) {
     const receipt = change.compute_variant_build
     if (!receipt) return { verified: false, reasons: ['尚未构建工作流'], receipt: null }
     const reasons: string[] = [], current = runtimeDigests()
+    if (change.compute_variant?.generation?.entry_path && receipt.entry_path !== change.compute_variant.generation.entry_path) reasons.push('构建入口与生成计划不一致')
     if (receipt.schema_version !== 1 || !/^[0-9a-f]{64}$/.test(receipt.build_digest ?? '')) reasons.push('构建回执格式不完整')
     if (receipt.source_sha256 !== hash(JSON.stringify(receipt.source_files))) reasons.push('源码清单摘要不匹配')
     for (const key of ['runner_sha256', 'deps_sha256'] as const) if (receipt[key] !== current[key]) reasons.push(`${key} 已变化，需要重新构建`)
@@ -52,13 +53,15 @@ export function createComputeBuildHandler(assetRoot: string) {
     const source = sourceInfo(root, body.experiment_id)
     const before = candidateDigest(source.candidate)
     if (body.expected_candidate_sha256 && body.expected_candidate_sha256 !== before) throw new BuildError('conflict', 'Candidate 已变化，请重新预览构建')
-    const entryPath = body.entry_path ?? ENTRY
-    if (typeof entryPath !== 'string' || !entryPath.startsWith('dsh/managed/') || !entryPath.endsWith('.ts')) throw new BuildError('invalid_request', '入口必须是 Candidate Managed 中的 TypeScript 文件')
-    const entry = dataPath(source.candidate, entryPath)
-    const outputPath = entryPath.replace(/\.ts$/, '.mjs'), output = dataPath(source.candidate, outputPath)
     const changeFile = dataPath(root, `evolution/experiments/${source.id}/change.yaml`)
     const changeText = readFileSync(changeFile, 'utf8'), change = load(changeText) as Body
     if (change?.experiment_id !== source.id || change.agent_id !== source.agent_id || !change.compute_variant) throw new BuildError('invalid_request', '仅能构建已建立算力比较计划的目标版本')
+    const plannedEntry = change.compute_variant.generation?.entry_path
+    const entryPath = body.entry_path ?? plannedEntry ?? COMPUTE_ENTRY
+    if (!isComputeEntry(entryPath)) throw new BuildError('invalid_request', '入口必须位于 Candidate Managed 的独立 TypeScript 模块目录中')
+    if (plannedEntry && entryPath !== plannedEntry) throw new BuildError('conflict', '入口与生成计划不一致，请先更新计划再构建')
+    const entry = dataPath(source.candidate, entryPath)
+    const outputPath = entryPath.replace(/\.ts$/, '.mjs'), output = dataPath(source.candidate, outputPath)
     let baseReceipt!: { schema_version: number; entry_path: string; output_path: string; source_sha256: string;
       source_files: { path: string; sha256: string }[]; runner_sha256: string; deps_sha256: string; compiler: { typescript: string; esbuild: string } }
     let buildDigest!: string
@@ -84,7 +87,7 @@ export function createComputeBuildHandler(assetRoot: string) {
     signal?.throwIfAborted()
     const source = sourceInfo(root, body.experiment_id), before = candidateDigest(source.candidate)
     if (body.expected_candidate_sha256 && body.expected_candidate_sha256 !== before) throw new BuildError('conflict', 'Candidate 已变化，请重新预览构建')
-    const key = hash(JSON.stringify({ id: source.id, entry: body.entry_path ?? ENTRY, candidate: before,
+    const key = hash(JSON.stringify({ id: source.id, entry: body.entry_path ?? null, candidate: before,
       change: hash(readFileSync(dataPath(root, `evolution/experiments/${source.id}/change.yaml`))), ...runtimeDigests() }))
     if (cached?.key === key) return cached.prepared
     const prepared = await compile(body, signal)

@@ -12,7 +12,7 @@ import { extractGraphExecutions, measureModelUsage, measureRunModelUsage } from 
 import type { ModelAttempt } from '../evaluation/model-attempts.ts'
 import { inspectComputeBuild } from './compute-build.ts'
 import { computeCodeSource } from './compute-source.ts'
-import { computeGenerationContract } from './compute-generation-contract.ts'
+import { COMPUTE_ENTRY, computeGenerationContract, isComputeEntry } from './compute-generation-contract.ts'
 import { inspectDecisionTraining, type TrainingFile } from './compute-training.ts'
 import { isCodeOnlyModelRoute, isHybridWorkflowRoute } from '../workflows/code-only-route.ts'
 import { matchesWorkflowModelBinding, validateWorkflowModelRoles, type WorkflowModelRoles } from '../workflows/model-roles.ts'
@@ -148,8 +148,8 @@ function makePlan(body: Map, cases: Record<string, any>): ComputePlan {
   if (body.generation !== undefined) {
     const value = body.generation
     if (!value || value.mode !== 'langgraph-aot') fail('生成方式必须为 langgraph-aot')
-    const entry = value.entry_path ?? 'dsh/managed/compute-workflow/index.ts'
-    if (typeof entry !== 'string' || !entry.startsWith('dsh/managed/') || !entry.endsWith('.ts') || entry.includes('\\') || entry.split('/').some(part => !part || part === '.' || part === '..')) fail('生成入口必须位于 Candidate Managed 的 TypeScript 源码中')
+    const entry = value.entry_path ?? COMPUTE_ENTRY
+    if (!isComputeEntry(entry)) fail('生成入口必须位于 Candidate Managed 的独立模块目录中')
     if (value.fixture_sha256 !== undefined && !/^[a-f0-9]{64}$/.test(value.fixture_sha256)) fail('外部输入样本摘要无效')
     generation = { mode: 'langgraph-aot', entry_path: entry, source_run_ids: ids(value.source_run_ids, RUN, 'source_run_ids').sort(),
       ...(value.fixture_sha256 ? { fixture_sha256: value.fixture_sha256 } : {}) }

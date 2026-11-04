@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { createHash } from 'node:crypto'
+import { spawnSync } from 'node:child_process'
 import { build } from 'esbuild'
 import { trainingFixture } from './fixtures/decision-training.mjs'
 import { dump, load } from 'js-yaml'
@@ -139,4 +140,67 @@ test('显式恢复依赖保持源码与资源的相对目录，摘要失效和�
   assert.equal((await archiveDecisionTraining(f.root, id)).reused, true)
   writeFileSync(join(f.root, receipt.supporting_files[0].path), 'changed')
   assert.match((await inspectDecisionTraining(f.root, plan, id)).reasons.join(), /摘要不匹配/)
+})
+
+test('.local恢复先零写入预览，只归档引用闭包，拒绝Session与凭据并保护冲突目标', async t => {
+  const f = fixture(t), id = 'VAR-alpha-001-r123456abcdef', base = `evolution/experiments/${id}`, change = join(f.root, base, 'change.yaml')
+  mkdirSync(join(f.root, base, 'candidate'), { recursive: true })
+  const local = '.local/training-fixture/'
+  cpSync(join(f.root, 'evaluation/training-fixture'), join(f.root, local), { recursive: true })
+  const receipt = JSON.stringify(f.receipt).replaceAll('evaluation/training-fixture/', local)
+  writeFileSync(join(f.root, local, 'receipt.json'), receipt)
+  f.plan.decision_training = { path: local + 'receipt.json', sha256: createHash('sha256').update(receipt).digest('hex') }
+  writeFileSync(change, dump({ experiment_id: id, agent_id: 'alpha', compute_variant: f.plan }))
+  const before = readFileSync(change)
+  const cli = new URL('../../../runtime/research/compute-assets.mts', import.meta.url).pathname
+  const request = join(f.root, 'request.json'); writeFileSync(request, '{"training_files":[]}')
+  const runCli = (method, extra = []) => {
+    const result = spawnSync(process.execPath, ['--experimental-transform-types', cli, method, '--asset-root', f.root, '--experiment-id', id, '--request', request, ...extra], { encoding: 'utf8', timeout: 30000 })
+    assert.equal(result.status, 0, result.stderr); return JSON.parse(result.stdout)
+  }
+  const dry = runCli('training-preview'), preview = dry.archive
+  assert.equal(preview.dry_run, true)
+  assert.deepEqual(readFileSync(change), before)
+  assert.equal(existsSync(join(f.root, base, 'evaluation')), false)
+  assert.equal(existsSync(join(f.root, '.local/training-archive')), false)
+  const privateFile = (path, content = 'not training material') => {
+    mkdirSync(join(f.root, path, '..'), { recursive: true }); writeFileSync(join(f.root, path), content)
+    return { path, sha256: createHash('sha256').update(content).digest('hex') }
+  }
+  for (const path of ['.local/sessions/run/session.jsonl', '.local/credentials.json', '.local/ssh/id_ed25519', '.local/server-api-key.secret']) {
+    const ref = privateFile(path)
+    await assert.rejects(() => archiveDecisionTraining(f.root, id, undefined, [ref], true), /Session、凭据/)
+  }
+  const literal = privateFile('.local/server-settings.json', JSON.stringify({ password: 'synthetic-fixture-only' }))
+  await assert.rejects(() => archiveDecisionTraining(f.root, id, undefined, [literal], true), /凭据常量/)
+  const added = privateFile('.local/training-fixture/recovery-config.json', '{"layers":2}')
+  await assert.rejects(() => archiveDecisionTraining(f.root, id, undefined, [added], false, dry.preview_sha256), /预览已变化/)
+  assert.deepEqual(readFileSync(change), before)
+  assert.equal(existsSync(join(f.root, base, 'evaluation')), false)
+  assert.equal(existsSync(join(f.root, '.local/training-archive')), false)
+  const destination = join(f.root, preview.receipt.path)
+  mkdirSync(join(destination, '..'), { recursive: true }); writeFileSync(destination, 'parallel archive')
+  await assert.rejects(() => archiveDecisionTraining(f.root, id), /冲突/)
+  assert.equal(readFileSync(destination, 'utf8'), 'parallel archive')
+  assert.deepEqual(readFileSync(change), before)
+  rmSync(join(f.root, base, 'evaluation'), { recursive: true })
+  const archived = runCli('training-archive', ['--expected-preview-sha256', dry.preview_sha256])
+  assert.equal(archived.files.some(ref => /sessions|credentials|secret|server-settings/.test(ref.path)), false)
+  rmSync(join(f.root, '.local'), { recursive: true })
+  const plan = load(readFileSync(change, 'utf8')).compute_variant
+  assert.equal((await inspectDecisionTraining(f.root, plan, id)).verified, true)
+  assert.equal((await archiveDecisionTraining(f.root, id)).reused, true)
+  assert.equal(runCli('training-archive', ['--expected-preview-sha256', dry.preview_sha256]).reused, true)
+})
+
+test('原始训练回执含凭据常量时不复制回执或更新计划', async t => {
+  const f = fixture(t), id = 'VAR-alpha-001-r123456abcdef', base = `evolution/experiments/${id}`
+  f.receipt.password = 'synthetic-fixture-only'; f.save()
+  mkdirSync(join(f.root, base, 'candidate'), { recursive: true })
+  const change = join(f.root, base, 'change.yaml')
+  writeFileSync(change, dump({ experiment_id: id, agent_id: 'alpha', compute_variant: f.plan }))
+  const before = readFileSync(change)
+  await assert.rejects(() => archiveDecisionTraining(f.root, id, undefined, [], true), /回执包含凭据常量/)
+  assert.deepEqual(readFileSync(change), before)
+  assert.equal(existsSync(join(f.root, base, 'evaluation')), false)
 })

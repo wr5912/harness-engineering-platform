@@ -1,3 +1,9 @@
+export const COMPUTE_ENTRY = 'dsh/managed/compute-workflow/index.ts'
+export function isComputeEntry(path: unknown): path is string {
+  return typeof path === 'string' && /^dsh\/managed\/[^/]+\/[^/]+\.ts$/.test(path)
+    && !path.includes('\\') && path.split('/').every(part => part && part !== '.' && part !== '..')
+}
+
 /** 程序侧公开 SDK 与接口合同；研究策略和方法仍由数据工作区维护。 */
 export function computeGenerationContract() {
   return {
@@ -10,10 +16,10 @@ export function computeGenerationContract() {
     },
     generation: {
       mode: 'langgraph-aot',
-      default_entry_path: 'dsh/managed/compute-workflow/index.ts',
-      code_directory: '新增算力实现以 entry_path 所在目录为归属目录；保持入口稳定，按实际职责建立必要子目录。经引用核对仍需继承的通用 Managed 插件保留原布局，资产取舍与目录整理方法由 compute-variant-research 维护。',
+      default_entry_path: COMPUTE_ENTRY,
+      code_directory: '新增算力实现集中在 entry_path 所属模块目录，入口保持在模块根，按实际职责组织 routing、models、business 等必要子目录；代码与 Runtime 配置一起维护，不散落 Managed 根。初始父版快照仅作来源材料，完成生成时只保留所需能力及明确依赖闭包。仍被 Profile/Preset、Guard、源码或动态 Skill 调用使用的公共依赖保留原布局；被编译流程替代的父版 Skill 和实现经依赖核对后同批删除并更新引用。取舍依据写入既有研究观察，不新增一套配置来源。训练材料、模型工件与证据沿用 decision_training 和 evaluation/training 合同。',
       fields: {
-        entry_path: 'Candidate 内 dsh/managed/ 下的 .ts 文件；不能含空路径段、.、.. 或反斜线。',
+        entry_path: 'Candidate 内 dsh/managed/<模块>/ 下的 .ts 文件；入口位于模块根，不能直接散落 managed 根，不能含空路径段、.、.. 或反斜线。构建默认读取此计划路径，显式 entry_path 必须与计划一致。',
         source_run_ids: '必填非空 Run ID 数组，引用所选固定父版的真实诊断轨迹；来源证据及摘要由 preview 核对。',
         fixture_sha256: '可选的 64 位小写十六进制固定外部输入摘要；必须与诊断 Run 一致。',
       },
@@ -67,6 +73,7 @@ export function computeGenerationContract() {
       },
     },
     operations: {
+      organize: '程序工具 runtime/research/compute-assets.mts preview/apply：使用现有 edit 的逐文件 path/expected_sha256/content/move_to 合同，预览自动改写同一 Candidate 的路径引用并核对保留依赖；显式选择要移除的父版文件，不依据没有静态引用自动删除 Skill。apply 使用固定预览摘要，经现有 edit 批次保存、失败回滚、成功回读，重复应用同一已完成预览不重写。training-preview/training-archive 复用现有训练引用归档，不构建、不冻结、不启动评测或服务。',
       preview_create: 'compute-variants/preview/create 使用同一 parent_experiment_id、git:<40位提交>、variant_name、strategy、case_ids 和 generation；全链零调用传 execution_mode:code-only，双模型传 execution_mode:hybrid 和 model_roles。create 携带实际 preview_sha256 为 expected_preview_sha256，不能猜摘要。',
       replan: '共享 Case 修订后，已有探索性变体使用 plan-preview/plan-apply，case_ids 保留全部原 Case，可显式增加；apply 携带预览的 change_sha256 和 preview_sha256 作为 expected_change_sha256、expected_preview_sha256。只更新 Case 摘要和计划起始时间，父版、训练、模型、关键 Case 及全部比较阈值保持不变；重新冻结并执行新 Run，历史 Run 保持原样。',
       edit: 'edit/read 后用 edit/preview、edit/apply 保存完整文件正文 edits[].content 及 expected_sha256；新文件须先取得 exists:false、sha256:null，保存传 expected_sha256:null。已有文件归拢使用 edits[].move_to 指向同一 Candidate 内已确认不存在的目标，同时提交完整正文及源摘要，并同批更新导入和配置引用；不留旧源码副本。content:null 按原摘要删除当前 Candidate 内单个文件，同批更新引用；空字符串仍保存空文件。Preset 引用受控构建实际 output_path 对应的 /opt/dsh-managed/ 路径。',

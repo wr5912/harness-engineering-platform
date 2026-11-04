@@ -5,9 +5,14 @@ import { basename, dirname, join } from 'node:path'
 import { load, dump } from 'js-yaml'
 import { dataPath, sourceInfo } from '../tasks/files.ts'
 import { containsLiteralLlmKey } from '../tasks/llm-key.ts'
+import { assetText } from './asset-text.ts'
 import type { WorkflowModelRoles } from '../workflows/model-roles.ts'
 
 export type TrainingFile = { path: string; sha256: string }
+function assertTrainingPath(path: string) {
+  if (path.split('/').some(part => /^(?:sessions?|RuntimeHOME|cache|node_modules|\.git|\.ssh|\.env(?:\..*)?|\.?credentials?(?:\..*)?)$/i.test(part)
+    || /(?:\.llm-api-key|\.secret|\.pem|\.key)$/.test(part) || /^(?:id_rsa|id_ed25519|known_hosts|session\.jsonl)$/i.test(part))) throw new Error('训练归档不能包含 Session、凭据、缓存或服务运行状态')
+}
 
 /** 核对回收的原始材料；不把模型身份、训练计划或命令卡当作执行回执。 */
 export async function inspectDecisionTraining(root: string, plan: {
@@ -22,6 +27,7 @@ export async function inspectDecisionTraining(root: string, plan: {
     async function file(ref: TrainingFile, text = false) {
       require(ref && typeof ref.path === 'string' && /^[a-f0-9]{64}$/.test(ref.sha256), '训练材料必须引用数据根内的文件及其 SHA-256')
       require(!ref.path.startsWith('/') && !ref.path.split('/').includes('..'), '训练材料不能越出数据工作区')
+      assertTrainingPath(ref.path)
       const path = dataPath(root, ref.path)
       if (experimentId) require(['evaluation', 'candidate'].some(part => ref.path.startsWith(`evolution/experiments/${experimentId}/${part}/`)), '训练材料必须归档到所属 Experiment 的 evaluation 或 Candidate，不能依赖 .local 或其他工作区')
       require(lstatSync(path).isFile(), '训练材料必须为文件')
@@ -82,7 +88,7 @@ export async function inspectDecisionTraining(root: string, plan: {
 }
 
 /** prepare 的固定交接步骤：只归档核验过的引用闭包，原始执行回执保持原样。 */
-export async function archiveDecisionTraining(root: string, experimentId: string, signal?: AbortSignal, trainingFiles: TrainingFile[] = []) {
+export async function archiveDecisionTraining(root: string, experimentId: string, signal?: AbortSignal, trainingFiles: TrainingFile[] = [], dryRun = false, expectedPreviewSha256?: string) {
   const source = sourceInfo(root, experimentId), base = `evolution/experiments/${source.id}`
   const changePath = dataPath(root, `${base}/change.yaml`), before = readFileSync(changePath, 'utf8'), change = load(before) as any
   const plan = change.compute_variant
@@ -99,14 +105,17 @@ export async function archiveDecisionTraining(root: string, experimentId: string
   const originalContent = await readFile(dataPath(root, original.path))
   if (createHash('sha256').update(originalContent).digest('hex') !== original.sha256) throw new Error('归档期间训练回执变化，请重新核对')
   if (containsLiteralLlmKey(original.path, originalContent.toString('utf8'))) throw new Error('训练回执包含 LLM API Key，不能归档')
+  if (!assetText(original.path, originalContent.toString('utf8')).editable) throw new Error('训练回执包含凭据常量，不能归档')
   const receipt = JSON.parse(originalContent.toString('utf8'))
   const pending = new Map<string, Buffer>()
   async function collect(ref: TrainingFile, name: string) {
     if (!ref || typeof ref.path !== 'string' || ref.path.startsWith('/') || ref.path.split('/').includes('..') || !/^[a-f0-9]{64}$/.test(ref.sha256)) throw new Error('训练依赖必须引用数据根内文件及其 SHA-256')
+    assertTrainingPath(ref.path)
     if (!lstatSync(dataPath(root, ref.path)).isFile()) throw new Error('训练依赖必须为文件')
     const content = await readFile(dataPath(root, ref.path))
     if (createHash('sha256').update(content).digest('hex') !== ref.sha256) throw new Error('归档期间训练材料变化，请重新核对')
     if (containsLiteralLlmKey(ref.path, content.toString('utf8'))) throw new Error('训练材料包含 LLM API Key，不能归档')
+    if (content.length <= 1024 * 1024 && !content.includes(0) && !assetText(ref.path, content.toString('utf8')).editable) throw new Error('训练材料包含凭据常量，不能归档')
     const path = `${destination}/${name}/${basename(ref.path)}`
     pending.set(path.slice(destination.length + 1), content)
     return { path, sha256: ref.sha256 }
@@ -127,6 +136,15 @@ export async function archiveDecisionTraining(root: string, experimentId: string
   const content = JSON.stringify(receipt, null, 2) + '\n'
   pending.set('receipt.json', Buffer.from(content))
   const next = { path: `${destination}/receipt.json`, sha256: createHash('sha256').update(content).digest('hex') }
+  for (const [path, bytes] of pending) {
+    const target = dataPath(root, `${destination}/${path}`)
+    if (existsSync(target) && !readFileSync(target).equals(bytes)) throw new Error('已有训练归档与当前材料冲突，未修改计划')
+  }
+  const preview = { stage: 'training-archive', reused: false, dry_run: true, receipt: next, source_receipt: original,
+    files: [...pending].map(([path, bytes]) => ({ path: `${destination}/${path}`, sha256: createHash('sha256').update(bytes).digest('hex') })) }
+  if (readFileSync(changePath, 'utf8') !== before) throw new Error('归档预览期间研究计划变化，请重新核对')
+  if (dryRun) return preview
+  if (expectedPreviewSha256 && createHash('sha256').update(JSON.stringify(preview)).digest('hex') !== expectedPreviewSha256) throw new Error('训练归档预览已变化，请重新核对')
   // 暂存仅在 .local；目录完整后一次改名，change.yaml 最后更新。
   const scratch = dataPath(root, '.local/training-archive'); await mkdir(scratch, { recursive: true })
   const temporary = await mkdtemp(join(scratch, 'archive-'))

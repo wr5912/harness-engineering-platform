@@ -526,6 +526,10 @@ test('代码生成预览读取固定父版真实轨迹，拒绝把其他版本Ru
   assert.equal(preview.plan.measurement_schema_version, 2)
   assert.equal(preview.plan.generation.source_evidence.length, 1)
   assert.match(preview.plan.generation.source_evidence[0].sha256, /^[a-f0-9]{64}$/)
+  for (const entry_path of ['dsh/managed/index.ts', 'dsh/managed/compute-workflow/../index.ts', 'dsh/managed/compute-workflow/nested/index.ts']) {
+    const misplaced = await fx.handler('preview', { ...input, generation: { ...input.generation, entry_path } })
+    assert.equal(misplaced.ok, false)
+  }
   const rejected = await fx.handler('preview', { ...input, generation: { ...input.generation, source_run_ids: [variantRun] } })
   assert.equal(rejected.ok, false)
   assert.match(rejected.error.message, /固定父版/)
