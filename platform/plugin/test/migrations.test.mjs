@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import fs, { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, lstatSync } from 'node:fs'
 import { syncBuiltinESMExports } from 'node:module'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
+import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import test from 'node:test'
@@ -31,6 +32,44 @@ function fixture(t) {
   return { root, source, handler: createMigrationsHandler(root) }
 }
 const cases = [{ id: 'U-MIGRATION-001', title: '保留工作职责', inputs: '请说明分析步骤。', expected_behavior: '先读取用户提供的材料，再给出分析步骤。', fast: true }]
+
+test('远程 Git 清点一次取回正文，不逐文件联网补取，失败说明具体阶段', async t => {
+  const fx = fixture(t)
+  git(fx.source, ['init']); git(fx.source, ['config', 'user.name', 'Fixture']); git(fx.source, ['config', 'user.email', 'fixture@example.invalid'])
+  for (let i = 0; i < 4; i++) write(fx.source, `file-${i}.md`, `固定来源 ${i}。`)
+  git(fx.source, ['add', '.']); git(fx.source, ['commit', '-m', '来源'])
+  const commit = git(fx.source, ['rev-parse', 'HEAD']), repository = join(fx.source, 'source.git')
+  git(fx.source, ['clone', '--bare', '.', repository]); git(repository, ['config', 'uploadpack.allowFilter', 'true'])
+  let fetches = 0
+  const server = createServer((request, response) => {
+    const requestChunks = []
+    request.on('data', chunk => requestChunks.push(chunk))
+    request.on('end', () => { if (/(?:command=fetch|want [0-9a-f]{40})/.test(Buffer.concat(requestChunks).toString())) fetches++ })
+    const url = new URL(request.url, 'http://localhost'), chunks = []
+    const child = spawn('git', ['http-backend'], { env: { ...process.env, GIT_PROJECT_ROOT: fx.source, GIT_HTTP_EXPORT_ALL: '1', PATH_INFO: url.pathname, QUERY_STRING: url.search.slice(1), REQUEST_METHOD: request.method, CONTENT_TYPE: request.headers['content-type'] ?? '', HTTP_GIT_PROTOCOL: request.headers['git-protocol'] ?? '' }, stdio: ['pipe', 'pipe', 'ignore'] })
+    request.pipe(child.stdin); child.stdout.on('data', chunk => chunks.push(chunk))
+    child.on('close', () => {
+      const result = Buffer.concat(chunks), split = result.indexOf('\r\n\r\n')
+      if (split < 0) { response.writeHead(500); response.end(); return }
+      for (const line of result.subarray(0, split).toString().split('\r\n')) {
+        const colon = line.indexOf(':'); if (colon < 0) continue
+        const name = line.slice(0, colon), value = line.slice(colon + 1).trim()
+        if (name.toLowerCase() === 'status') response.statusCode = Number(value.split(' ')[0]); else response.setHeader(name, value)
+      }
+      response.end(result.subarray(split + 4))
+    })
+  })
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  t.after(() => new Promise(resolve => server.close(resolve)))
+  const source = { kind: 'git', url: `http://127.0.0.1:${server.address().port}/source.git`, ref: commit }
+  const fixed = success(await fx.handler('inspect', { source }))
+  assert.equal(fixed.provenance.commit, commit)
+  assert.equal(fetches, 1, '文件清单和正文应使用克隆时已取得的对象')
+  for (let i = 0; i < 4; i++) assert.equal(success(await fx.handler('read', { source_id: fixed.source_id, fingerprint: fixed.fingerprint, path: `file-${i}.md` })).content, `固定来源 ${i}。`)
+  const failed = await fx.handler('inspect', { source: { ...source, ref: 'missing-ref' } })
+  assert.equal(failed.error.code, 'source_read_failed')
+  assert.match(failed.error.message, /Git 解析提交失败/)
+})
 
 test('迁移新增多轮 Case 与权威解析器保持独立输入轮次', async t => {
   const fx = fixture(t), turns = ['请记住编号 B-24。', '刚才的编号是什么？']
@@ -112,11 +151,20 @@ test('五类识别器只清点文件和版本，不执行来源脚本；来源�
   write(fx.source, 'package.json', JSON.stringify({ name: 'untrusted-source', version: '1.2.3', scripts: { postinstall: 'touch SHOULD-NOT-EXIST' }, dependencies: { '@langchain/langgraph': '1.5.0' } }))
   write(fx.source, '.env', 'DEEPSEEK_API_KEY=do-not-copy')
   write(fx.source, 'settings.json', '{"apiKey":"sk-0123456789abcdef0123456789"}')
+  const credentialCode = 'export const readCredentials = options => options.token;\n'
+  const clientCode = 'export const labels = {"配置文件的 customApiKey": "config field customApiKey", "环境变量 TYPESAFE_API_KEY": "env var TYPESAFE_API_KEY"};\n'
+  write(fx.source, 'lib/credentials.js', credentialCode)
+  write(fx.source, 'lib/client.js', clientCode)
+  write(fx.source, 'credentials.yaml', 'token: fixture-private-value')
   write(fx.source, 'cache/result.json', '{}')
   write(fx.source, 'model.safetensors', 'unmodified weights')
   const source = success(await fx.handler('inspect', { source: { kind: 'local', path: fx.source } }))
   assert.equal(source.versions['package.json'].version, '1.2.3')
-  for (const path of ['.env', 'settings.json', 'cache', 'model.safetensors']) assert.ok(source.entries.find(entry => entry.path === path)?.excluded, path)
+  for (const path of ['.env', 'settings.json', 'credentials.yaml', 'cache', 'model.safetensors']) assert.ok(source.entries.find(entry => entry.path === path)?.excluded, path)
+  for (const [path, content] of [['lib/credentials.js', credentialCode], ['lib/client.js', clientCode]]) {
+    const read = success(await fx.handler('read', { source_id: source.source_id, fingerprint: source.fingerprint, path }))
+    assert.equal(read.content, content); assert.equal(read.redacted, false)
+  }
   assert.equal(existsSync(join(fx.source, 'SHOULD-NOT-EXIST')), false)
   assert.equal(existsSync(join(fx.root, '.local/migrations/sources', source.source_id, 'files/settings.json')), false)
   write(fx.source, 'package.json', '{}')

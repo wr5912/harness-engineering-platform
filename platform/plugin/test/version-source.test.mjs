@@ -79,6 +79,17 @@ test('源码变量引用原样可编辑，凭据常量只读且正文摘要与�
   assert.equal(masked.content.includes(secret), false)
 })
 
+test('凭据字段匹配完整名称，界面说明保持原文，带前缀的真实常量仍脱敏', () => {
+  const labels = JSON.stringify({ '配置文件 config.yml 的 systemoneApiKey': 'config.yml field systemoneApiKey', '环境变量 TYPESAFE_API_KEY': 'env var TYPESAFE_API_KEY' })
+  assert.equal(assetText('client.js', labels).content, labels)
+  assert.equal(assetText('client.js', labels).redacted, false)
+  for (const code of ['const customApiKey = "fixture-private-value"', '{"apiKey":"fixture-private-value"}', "{'client_secret':'fixture-private-value'}", '{"client-token":"fixture-private-value"}', 'const authToken = "fixture-private-value"']) {
+    const view = assetText('credentials.js', code)
+    assert.equal(view.redacted, true, code)
+    assert.equal(view.content.includes('fixture-private-value'), false)
+  }
+})
+
 test('完整Candidate的约定Profile从同一版本补齐，显式错误不退回，固定提交不借当前文件', t => {
   const root = mkdtempSync(join(tmpdir(), 'version-profile-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))

@@ -20,13 +20,14 @@ class DependencyError extends Error {
 }
 export const assetCommand: AssetCommand = (command, args, options) => new Promise((done, fail) => {
   const child = spawn(command, args, { cwd: options.cwd, signal: options.signal, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1', PIP_DISABLE_PIP_VERSION_CHECK: '1' } })
-  let output = '', size = 0
-  const collect = (chunk: Buffer) => { size += chunk.length; if (size > 4 * 1024 * 1024) child.kill('SIGKILL'); else output += chunk.toString() }
+  let output = '', size = 0, stopped: string | undefined
+  const collect = (chunk: Buffer) => { size += chunk.length; if (size > 4 * 1024 * 1024) { stopped ??= '输出超过 4 MiB 上限'; child.kill('SIGKILL') } else output += chunk.toString() }
   child.stdout.on('data', collect); child.stderr.on('data', collect)
-  const timer = setTimeout(() => child.kill('SIGKILL'), options.timeout ?? 180_000)
+  const timeout = options.timeout ?? 180_000
+  const timer = setTimeout(() => { stopped ??= `超时（${timeout / 1000} 秒）`; child.kill('SIGKILL') }, timeout)
   child.on('error', error => { clearTimeout(timer); fail(error) })
   // 不返回安装器的原始输出，包索引凭据和来源 URL 不进入普通回执。
-  child.on('close', code => { clearTimeout(timer); code === 0 && size <= 4 * 1024 * 1024 ? done(output.trim()) : fail(new DependencyError('dependency_pending', `${command} 依赖准备未完成（退出码 ${code ?? 'unknown'}），请核对目标环境、包版本和网络后重试`)) })
+  child.on('close', (code, signal) => { clearTimeout(timer); code === 0 && !stopped ? done(output.trim()) : fail(new DependencyError('dependency_pending', `${command} 依赖准备未完成（${stopped ?? (signal ? `进程被 ${signal} 终止` : `退出码 ${code}`)}），请核对目标环境、包版本和网络后重试`)) })
 })
 function atomic(file: string, value: string) { mkdirSync(dirname(file), { recursive: true }); const temp = `${file}.${randomUUID()}.tmp`; try { writeFileSync(temp, value); renameSync(temp, file) } finally { rmSync(temp, { force: true }) } }
 function declarations(candidate: string): Declaration[] {
