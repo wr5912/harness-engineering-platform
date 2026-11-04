@@ -119,6 +119,33 @@ class InstanceReloadTest(unittest.TestCase):
         self.assertIn("尚未核验", result["items"][1]["error"])
         self.assertEqual(execute.call_count, 2)
 
+    def test_batch_pauses_after_unknown_without_dispatching_remaining_targets(self):
+        def reload(args):
+            dev.record_reload_attempt(args.name, "unknown", "实际加载尚未核验")
+            dev.fail("装载尚未核验")
+        output = io.StringIO()
+        with mock.patch.object(dev, "reload_one", side_effect=reload) as execute, \
+                contextlib.redirect_stdout(output), contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                dev.command_reload(self.args(name=["exact-one", "not-dispatched"], expected_asset_digest=[ASSET, ASSET],
+                                             expected_generation_digest=[GENERATION, GENERATION]))
+        result = json.loads(output.getvalue())
+        self.assertEqual(execute.call_count, 1)
+        self.assertFalse(result["items"][0]["ok"])
+        self.assertEqual(result["items"][1]["status"], "not_executed")
+
+    def test_list_without_runtime_receipt_does_not_scan_historical_dependencies(self):
+        output = io.StringIO()
+        with mock.patch.object(dev, "run", return_value=subprocess.CompletedProcess([], 0, "{}", "")), \
+                mock.patch.object(dev, "instance_belongs_to_workspace", return_value=True), \
+                mock.patch.object(dev, "instance_entry", return_value={"name": "exact-one", "state": "running"}), \
+                mock.patch.object(dev, "asset_contract") as source, contextlib.redirect_stdout(output):
+            dev.command_ps(types.SimpleNamespace(all=True))
+        source.assert_not_called()
+        item = json.loads(output.getvalue())["instances"][0]
+        self.assertEqual(item["asset_status"]["status"], "unknown")
+        self.assertIsNone(item["asset_status"]["current_digest"])
+
     def test_verified_receipt_requires_matching_bytes_process_source_and_preset(self):
         files = [{"path": "/opt/source.js", "sha256": "e" * 64}]
         expected = {"nonce": "new-nonce", "source_id": self.manifest["source_id"], "digest": ASSET,

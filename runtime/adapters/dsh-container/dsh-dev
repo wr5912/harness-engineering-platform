@@ -2126,11 +2126,26 @@ def command_reload(args: argparse.Namespace) -> None:
         try:
             with redirect_stdout(output), redirect_stderr(errors):
                 reload_one(item)
-            receipts.append({"name": name, "ok": True, "value": json.loads(output.getvalue())})
-        except (SystemExit, OSError, ValueError, subprocess.TimeoutExpired):
+            value = json.loads(output.getvalue())
+            receipts.append({"name": name, "ok": True, "value": value})
+            uncertain = not args.dry_run and value.get("asset_status", {}).get("status") != "current"
+            if uncertain:
+                receipts[-1].update(ok=False, status="unknown", error="实际加载尚未核验，请先查询状态")
+        except (SystemExit, OSError, ValueError, subprocess.TimeoutExpired) as error:
             message = redact_secrets(errors.getvalue().strip()) or "重载未完成；请核对实例状态与最后加载回执后重新预览"
             receipts.append({"name": name, "ok": False, "error": message})
             print(message, file=sys.stderr)
+            try:
+                _, saved = load_instance(name)
+                uncertain = saved.get("asset_reload_attempt", {}).get("status") in ("running", "unknown")
+            except (SystemExit, OSError, ValueError):
+                uncertain = True
+            uncertain = uncertain or isinstance(error, (OSError, ValueError, subprocess.TimeoutExpired))
+        if uncertain:
+            receipts.extend({"name": remaining, "ok": False, "status": "not_executed",
+                             "error": "前一目标重载结果尚未核验，已暂停后续派发；请先查询状态"}
+                            for remaining in names[index + 1:])
+            break
     if len(names) == 1 and receipts[0]["ok"]:
         print(json.dumps(receipts[0]["value"], ensure_ascii=False))
     else:
@@ -2479,6 +2494,9 @@ def command_ps(args: argparse.Namespace) -> None:
                 entry = instance_entry(target, manifest, observation)
                 try:
                     generation = (observation.get("generations") or {}).get(manifest.get("container_name") or target.name)
+                    loaded = manifest.get("asset_load") or {}
+                    if entry["state"] != "running" or loaded.get("verification") != "runtime-observer":
+                        raise ValueError("当前运行代次缺少实际加载回执")
                     entry["asset_status"] = asset_command("status", asset_contract(manifest), manifest,
                                                           generation=generation, state=entry["state"])
                 except (SystemExit, OSError, ValueError, TypeError, KeyError, subprocess.TimeoutExpired):
