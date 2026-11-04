@@ -57,7 +57,7 @@ export function executableCatalog(catalog: Catalog, extension?: CompositionExten
 import type { ModelAttempt, ModelAttemptContext, AttemptRecorder } from '../evaluation/model-attempts.ts'
 export { observeLlm } from '../evaluation/model-attempts.ts'
 export type { ModelAttempt } from '../evaluation/model-attempts.ts'
-export type CompositionExecutionContext = ModelAttemptContext & { recordAttempt?: AttemptRecorder }
+export type CompositionExecutionContext = ModelAttemptContext & { recordAttempt?: AttemptRecorder; onRun?(runId: string): Promise<void> }
 export type GraphExecution = {
   execution_id: string; parent_run_id?: string; case_id?: string; session_id?: string; tool_call_id?: string
   source_digest?: string; build_digest?: string
