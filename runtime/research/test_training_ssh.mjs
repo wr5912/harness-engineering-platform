@@ -185,6 +185,43 @@ test('forward cancel只停止已核验的本地SSH，读取closed回执不再连
   assert.equal(readFileSync(join(f.root, 'wire.jsonl'), 'utf8').trim().split('\n').length, 1)
 })
 
+test('SSH失败按网络、认证、绑定分类；exec/transfer/forward不泄露原始诊断', async t => {
+  const diagnostics = [
+    ['bind: Address already in use', 'SSH_FORWARD_ADDRESS_IN_USE'],
+    ['bind: Cannot assign requested address', 'SSH_FORWARD_BIND_ADDRESS_UNAVAILABLE'],
+    ['Could not request local forwarding.', 'SSH_FORWARD_BIND_FAILED'],
+    ['Permission denied (publickey,password).', 'SSH_AUTHENTICATION_FAILED'],
+    ['Host key verification failed.', 'SSH_HOST_KEY_MISMATCH'],
+    ['connect: Connection timed out', 'SSH_CONNECT_TIMEOUT'],
+    ['connect: Connection refused', 'SSH_CONNECT_REFUSED'],
+    ['Could not resolve hostname fixture.invalid', 'SSH_HOST_RESOLUTION_FAILED'],
+    ['kex_exchange_identification: Connection closed by remote host', 'SSH_HANDSHAKE_FAILED'],
+    ['unclassified failure', 'SSH_FORWARD_EXIT_FAILED'],
+  ]
+  for (const [diagnostic, expected] of diagnostics) await t.test(expected, () => {
+    const f = fixture(t), mappings = join(f.root, 'mappings.json'), receipt = join(f.root, 'forward.json')
+    writeFileSync(mappings, JSON.stringify([{ bind_address: '127.0.0.1', local_port: 18881, remote_port: 18881 }]))
+    const failing = `#!${process.execPath}\nprocess.stderr.write(${JSON.stringify(f.password + '\n' + diagnostic)});process.exit(255)\n`
+    writeFileSync(join(f.root, 'bin/ssh'), failing, { mode: 0o700 })
+    writeFileSync(join(f.root, 'bin/scp'), failing, { mode: 0o700 })
+    const runs = [['forward', '--server-id', f.server.id, '--mappings', mappings, '--receipt', receipt]]
+    if (expected === 'SSH_CONNECT_TIMEOUT') {
+      const card = join(f.root, 'card.json'), local = join(f.root, 'artifact.bin')
+      writeFileSync(card, JSON.stringify({ cwd: f.server.workDir, argv: ['true'], env: {}, unset_env: [] }))
+      writeFileSync(local, 'artifact')
+      runs.push(['exec', '--server-id', f.server.id, '--card', card, '--receipt', join(f.root, 'exec.json')],
+        ['transfer', '--server-id', f.server.id, '--direction', 'upload', '--local', local, '--remote', join(f.server.workDir, 'artifact.bin'), '--receipt', join(f.root, 'transfer.json')])
+    }
+    for (const args of runs) {
+      const result = f.run(...args), saved = readFileSync(args.at(-1), 'utf8')
+      assert.equal(result.status, 1, result.stderr)
+      assert.equal(JSON.parse(saved).error, expected)
+      assert.equal(JSON.parse(result.stderr).error, expected)
+      assert.equal((result.stdout + result.stderr + saved).includes(f.password), false)
+    }
+  })
+})
+
 test('独立PID命名空间通过共享owner socket核状态与取消，不把另一个Job的PID当本地PID', async t => {
   const probe = spawnSync('bwrap', ['--ro-bind', '/', '/', '--dev', '/dev', '--unshare-pid', '--proc', '/proc', '--', 'true'], { encoding: 'utf8' })
   if (probe.status !== 0) { t.skip('当前测试环境未提供可用bwrap；18120原生Job另行实际核验'); return }
