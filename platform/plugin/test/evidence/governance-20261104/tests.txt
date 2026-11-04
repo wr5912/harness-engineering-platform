@@ -1,0 +1,49 @@
+hep-governance-full-tests-20261104.log
+ℹ tests 1682
+ℹ pass 1672
+ℹ fail 10
+ℹ cancelled 0
+ℹ skipped 0
+ℹ duration_ms 288183.080003
+
+hep-governance-auth-idle-20261104.log
+ℹ tests 94
+ℹ pass 94
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ duration_ms 24117.469338
+
+hep-assistant-source-hash-20261104.log
+ℹ tests 90
+ℹ pass 90
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ duration_ms 3001.30096
+
+hep-deploy-tests-20261104.log
+ℹ tests 145
+ℹ pass 145
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ duration_ms 51727.39062
+
+统一创建与资产：
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11667.750989
+
+完整平台隔离安装与实际浏览器（2026-11-04）：
+install: installed; pendingInstances: []; oldReferences: []
+local update: unchanged; activation: none; original PID preserved
+restart: ready; native session preserved
+browser: workspace_root_matches=true; instances_page=true; asset_filter=true
+browser: narrow_no_overflow=true; active_evaluations=0; page_errors=[]
+cleanup: only extracted source removed; isolated platform stopped
