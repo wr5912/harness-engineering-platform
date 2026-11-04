@@ -75,16 +75,34 @@ function transport(assetRoot: string, selected: TrainingServer): Transport {
   }
   return { server: selected, env, options, cleanup() { for (const file of cleanup) rmSync(file, { force: true }) } }
 }
-function command(connection: Transport, script: string, follow = false): Promise<{ code: number; stdout: string }> {
+function sshError(child: ReturnType<typeof spawn>): () => string | undefined {
+  let stderr = ''
+  // 原始认证诊断只保留在有界内存中，回执与日志仅使用固定错误码。
+  child.stderr?.on('data', chunk => { stderr = (stderr + chunk.toString('utf8')).slice(-16384) })
+  return () => {
+    const failures: [RegExp, string][] = [
+      [/Address already in use/i, 'SSH_FORWARD_ADDRESS_IN_USE'],
+      [/Cannot assign requested address/i, 'SSH_FORWARD_BIND_ADDRESS_UNAVAILABLE'],
+      [/Could not request local forwarding/i, 'SSH_FORWARD_BIND_FAILED'],
+      [/Permission denied \((?:publickey|password|keyboard-interactive)[^)]*\)|Too many authentication failures/i, 'SSH_AUTHENTICATION_FAILED'],
+      [/Host key verification failed|REMOTE HOST IDENTIFICATION HAS CHANGED/i, 'SSH_HOST_KEY_MISMATCH'],
+      [/Connection timed out|Operation timed out/i, 'SSH_CONNECT_TIMEOUT'],
+      [/Connection refused/i, 'SSH_CONNECT_REFUSED'],
+      [/Could not resolve hostname/i, 'SSH_HOST_RESOLUTION_FAILED'],
+      [/kex_exchange_identification|Connection (?:closed|reset) by/i, 'SSH_HANDSHAKE_FAILED'],
+    ]
+    return failures.find(([pattern]) => pattern.test(stderr))?.[1]
+  }
+}
+function command(connection: Transport, script: string, follow = false): Promise<{ code: number; stdout: string; error?: string }> {
   return new Promise((resolvePromise, reject) => {
     const child = spawn('ssh', [...connection.options, '-p', String(connection.server.port), '-T', `${connection.server.user}@${connection.server.host}`, 'sh -s'], { env: connection.env, stdio: ['pipe', 'pipe', 'pipe'] })
+    const diagnostic = sshError(child)
     let stdout = ''
     child.on('error', () => reject(new Error('SSH_TRANSPORT_START_FAILED')))
     child.stdout.on('data', chunk => { if (follow) process.stdout.write(chunk); else stdout += chunk.toString('utf8') })
-    // SSH认证错误只报告稳定状态；不把认证会话或AskPass提示写入普通日志。
-    child.stderr.on('data', chunk => { if (follow) process.stderr.write(chunk) })
     child.stdin.on('error', () => {})
-    child.once('close', code => resolvePromise({ code: code ?? 255, stdout }))
+    child.once('close', code => resolvePromise({ code: code ?? 255, stdout, error: code === 255 ? diagnostic() : undefined }))
     child.stdin.end(script)
   })
 }
@@ -156,7 +174,7 @@ function markers(text: string) {
 async function observe(connection: Transport, receipt: Receipt, cancel = false) {
   const identity = `if test -s ${shellQuote(`${receipt.remote}/pid`)} && test -s ${shellQuote(`${receipt.remote}/start-time`)}; then printf 'HSSH_PID='; cat ${shellQuote(`${receipt.remote}/pid`)}; printf 'HSSH_START='; cat ${shellQuote(`${receipt.remote}/start-time`)}; fi\n`
   const response = await command(connection, identity + statusScript(receipt, cancel))
-  requireValue(response.code === 0, 'SSH_STATUS_TRANSPORT_FAILED')
+  requireValue(response.code === 0, response.error ?? 'SSH_STATUS_TRANSPORT_FAILED')
   const found = markers(response.stdout)
   requireValue(found.STATE !== 'identity_mismatch', 'REMOTE_PROCESS_IDENTITY_MISMATCH')
   if (receipt.pid !== undefined && found.PID) requireValue(receipt.pid === Number(found.PID) && receipt.start_time === found.START, 'REMOTE_PROCESS_IDENTITY_MISMATCH')
@@ -178,7 +196,7 @@ export async function executeCard(root: string, serverId: string, cardFile: stri
   process.on('SIGTERM', stop); process.on('SIGINT', stop)
   try {
     const launched = await command(connection, launchScript(card, receipt.remote, receipt.card_sha256!))
-    requireValue(launched.code === 0, 'SSH_LAUNCH_TRANSPORT_FAILED_CHECK_STATUS')
+    requireValue(launched.code === 0, launched.error ?? 'SSH_LAUNCH_TRANSPORT_FAILED_CHECK_STATUS')
     await observe(connection, receipt); save(receiptFile, receipt)
     admitted = true
     process.stdout.write(JSON.stringify({ receipt: resolve(receiptFile), id, status: receipt.status, pid: receipt.pid ?? null }) + '\n')
@@ -186,7 +204,7 @@ export async function executeCard(root: string, serverId: string, cardFile: stri
     if (receipt.status === 'running' && receipt.pid) {
       const dir = shellQuote(receipt.remote)
       const followed = await command(connection, `set -eu\ndir=${dir}\noffset=0\nemit() { size=$(wc -c < "$dir/output.log"); count=$((size-offset)); if test "$count" -gt 0; then dd if="$dir/output.log" iflag=skip_bytes,count_bytes skip="$offset" count="$count" status=none; fi; offset=$size; }\nwhile :; do emit; if test -s "$dir/exit-code"; then emit; break; fi; if ! test -r /proc/${receipt.pid}/stat || test "$(awk '{print $3}' /proc/${receipt.pid}/stat)" = Z; then break; fi; sleep 1; done\n`, true)
-      requireValue(followed.code === 0, 'SSH_LOG_FOLLOW_DISCONNECTED_CHECK_STATUS')
+      requireValue(followed.code === 0, followed.error ?? 'SSH_LOG_FOLLOW_DISCONNECTED_CHECK_STATUS')
     } else await command(connection, `cat ${shellQuote(`${receipt.remote}/output.log`)}\n`, true)
     await cancelling
     await observe(connection, receipt)
@@ -307,7 +325,8 @@ export async function forwardPorts(root: string, serverId: string, mappingsFile:
   process.on('SIGTERM', stop); process.on('SIGINT', stop)
   try {
     save(receiptFile, receipt, true)
-    child = spawn('ssh', args, { env: connection.env, stdio: ['ignore', 'ignore', 'ignore'] })
+    child = spawn('ssh', args, { env: connection.env, stdio: ['ignore', 'ignore', 'pipe'] })
+    const diagnostic = sshError(child)
     const finished = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((done, fail) => {
       child!.once('error', () => fail(new Error('SSH_FORWARD_START_FAILED')))
       child!.once('close', (code, signal) => done({ code, signal }))
@@ -363,7 +382,7 @@ export async function forwardPorts(root: string, serverId: string, mappingsFile:
     if (outcome.signal) receipt.exit_signal = outcome.signal
     receipt.listeners_verified = false
     receipt.status = outcome.code === 0 || outcome.signal === 'SIGTERM' || outcome.signal === 'SIGINT' ? 'closed' : 'failed'
-    requireValue(receipt.status !== 'failed', 'SSH_FORWARD_EXIT_FAILED')
+    requireValue(receipt.status !== 'failed', diagnostic() ?? 'SSH_FORWARD_EXIT_FAILED')
     return receipt
   } catch (error) { receipt.status = 'failed'; receipt.error = error instanceof Error ? error.message : 'SSH_FORWARD_FAILED'; throw error }
   finally { save(receiptFile, receipt); if (control) control.close(() => controlAddress?.close()); rmSync(receipt.control_socket!, { force: true }); connection.cleanup(); process.off('SIGTERM', stop); process.off('SIGINT', stop) }
@@ -382,7 +401,7 @@ export async function inspectExecution(root: string, receiptFile: string, cancel
 async function remoteDigest(connection: Transport, file: string) {
   const response = await command(connection, `set -eu\ntest -f ${shellQuote(file)}\nsha256sum -- ${shellQuote(file)}\n`)
   const digest = /^([a-f0-9]{64})\s/.exec(response.stdout)?.[1]
-  requireValue(response.code === 0 && digest, 'REMOTE_ARTIFACT_DIGEST_UNAVAILABLE')
+  requireValue(response.code === 0 && digest, response.error ?? 'REMOTE_ARTIFACT_DIGEST_UNAVAILABLE')
   return digest
 }
 export async function transferFile(root: string, serverId: string, direction: string, local: string, remote: string, receiptFile: string) {
@@ -397,11 +416,12 @@ export async function transferFile(root: string, serverId: string, direction: st
     const before = direction === 'upload' ? await fileHash(local) : await remoteDigest(connection, destination)
     const remoteArg = `${selected.server.user}@${selected.server.host}:${destination}`
     const args = [...connection.options, '-P', String(selected.server.port), '--', ...(direction === 'upload' ? [resolve(local), remoteArg] : [remoteArg, resolve(local)])]
-    const code = await new Promise<number>((done, fail) => {
-      const child = spawn('scp', args, { env: connection.env, stdio: ['ignore', 'ignore', 'ignore'] })
-      child.on('error', () => fail(new Error('SCP_START_FAILED'))); child.on('close', code => done(code ?? 255))
+    await new Promise<void>((done, fail) => {
+      const child = spawn('scp', args, { env: connection.env, stdio: ['ignore', 'ignore', 'pipe'] })
+      const diagnostic = sshError(child)
+      child.on('error', () => fail(new Error('SCP_START_FAILED')))
+      child.on('close', code => code === 0 ? done() : fail(new Error(diagnostic() ?? 'SCP_TRANSFER_FAILED')))
     })
-    requireValue(code === 0, 'SCP_TRANSFER_FAILED')
     const after = direction === 'upload' ? await remoteDigest(connection, destination) : await fileHash(local)
     requireValue(before === after && await remoteDigest(connection, destination) === before, 'TRANSFER_CONTENT_DIGEST_MISMATCH')
     receipt.status = 'completed'; receipt.sha256 = after; return receipt
