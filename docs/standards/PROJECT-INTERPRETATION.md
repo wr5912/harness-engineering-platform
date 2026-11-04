@@ -27,7 +27,7 @@ Baseline 是比较起点的引用，不是一套必须复制的目录：
 - `release:<agent-id>-v<semver>`：以已有 Research Release 为对照；
 - `none:first-experiment`：首次实验没有既有对照。
 
-每项语义性 Harness 变化建立独立的 `evolution/experiments/<id>/`。业务版本使用 `EXP-<agent-id>-NNN-r<12位随机十六进制>`，变体使用 `VAR-<agent-id>-NNN-r<12位随机十六进制>`；变体不得作为新版本、融合或另一变体的继承来源。既有 ID 与历史引用保留原名。最小内容包括：
+每项语义性 Harness 变化在 `evolution/experiments/<id>/` 中记录。纳入分代治理的业务版本按根级[文件与命名](../../AGENTS.md#文件与命名)使用同代主线与特性身份，修改边界及合并合同见[存储架构与数据契约](../platform-design/03_存储架构与数据契约.md)。变体使用 `VAR-<agent-id>-NNN-r<12位随机十六进制>`，不得作为新版本、融合或另一变体的继承来源。历史 ID 与 Run 保留原文，迁移后的旧身份按固定来源只读解析。最小内容包括：
 
 - `change.yaml`：Experiment 身份、Baseline 引用、状态，以及完成后的结果；
 - `hypothesis.md`：为什么修改、预期观察和停止条件；
