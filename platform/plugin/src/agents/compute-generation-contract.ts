@@ -73,7 +73,7 @@ export function computeGenerationContract() {
       build: '保存后读取当前 candidate_sha256，以 expected_candidate_sha256 调 build-preview；build 保留该摘要和实际预览的 expected_preview_sha256。只做类型检查和固定 ESM 编译，不执行 Candidate，不证明装载。源码、runner、依赖或 ESM 变化后旧构建失效。',
       freeze: 'freeze-preview 返回 Candidate、研究计划、本版本 evaluation 研究资料和选定 Case 的真实差异与 freeze_input={experiment_id,case_ids,evaluation_base_sha256,expected_preview_sha256}；freeze 完整传回 freeze_input。训练监督数据与评估报告保存在本版本 evaluation，不能放入 Runtime 挂载的 Candidate。仅本地冻结约定文件，不推送；两侧 Run 的提交须含同一计划。',
       prepare: 'compute-variants/prepare {experiment_id,entry_path?,training_files?:[{path,sha256}]} 连续归档已有训练引用闭包、核对或构建当前代码、预览并本地冻结，返回 source_ref 和逐阶段复用回执。training_files 仅补充恢复必需的文件，保存到归档回执 supporting_files；工件与依赖保持原相对目录。失败后保留已完成步骤，使用同一目标重试；只有摘要仍匹配的归档、构建与冻结可以复用，不执行 Candidate 或业务评测。',
-      evaluation: 'eval/batch-start {requests:[eval/start参数]} 先整批预检再启动最多8个独立Run；每项必须固定 git:<40位提交> 和不同的 UUIDv4 request_id。中断后原样重发整批参数，只查询或复用已受理任务，不重跑。单Run用 concurrency:1..8 和 parallel_cases 指定可独立执行的Case；未指定的Case独占执行，语义不确定或共享写资源不得并发。',
+      evaluation: '各项先用 eval/preview 取得不同的预留 run_id，再用 eval/batch-start {requests:[eval/start参数]} 整批核对并按序创建最多8个独立Run；每项固定 git:<40位提交>、run_id与原参数。部分创建成功不回滚；回执包含runs、failed、not_started。中断后只逐项查询原run_id，失败或未开始项重新预览，不自动重发整批。单Run用 concurrency:1..8 和 parallel_cases 指定可独立执行的Case；未指定的Case独占执行，语义不确定或共享写资源不得并发。',
       evidence: '分别核对 context.workflow_status 的 generated/built/frozen/loaded/compared。新 Session 的真实图回执须与当前源码、build_digest、esm_sha256 及固定组合身份一致，且 complete=true、status=completed；构建通过或原子回退不等于装载成功。',
       delivery: '通过 compute-variants/compare 核对实际构建、冻结、装载与所选两侧 Run。human_confirmed 只能由用户在变体页面复核，不能由助手提交或改结论字段。',
     },

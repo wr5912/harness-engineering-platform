@@ -1,0 +1,20 @@
+{
+  "scope": "已观察的Python工具回执摘要；首轮没有保存独立stdout日志",
+  "checks": [
+    {
+      "command": "/usr/bin/python3.10 -m unittest runtime/adapters/dsh-container/test_run_record.py runtime/adapters/dsh-container/test_dsh_eval_cancel.py runtime/adapters/dsh-container/test_dsh_eval_cancel_windows.py",
+      "passed": 22,
+      "seconds": 10.014
+    },
+    {
+      "command": "/usr/bin/python3.10 -m unittest runtime/adapters/dsh-container/test_dsh_eval_access.py",
+      "passed": 55,
+      "seconds": 2.2
+    },
+    {
+      "command": "PYTHONPATH=tests /usr/bin/python3.10 -m unittest test_run_snapshot",
+      "passed": 22,
+      "seconds": 14.902
+    }
+  ]
+}

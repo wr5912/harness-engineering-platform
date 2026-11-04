@@ -1,0 +1,4 @@
+
+> @ai-agent-harness/harness-platform@0.1.0 check /home/admin/work/harness-engineering-platform/platform/plugin
+> tsc --noEmit
+

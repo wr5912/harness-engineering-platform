@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -9,315 +9,361 @@ import { build } from 'esbuild'
 
 const plugin = new URL('../', import.meta.url).pathname
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
-
-async function fixture(t, body) {
-  const root = mkdtempSync(join(tmpdir(), 'eval-jobs-'))
+const experiment = 'EXP-test-agent-001'
+const source = `experiment:${experiment}`
+const base = { source, cases: ['U-CASE-001'] }
+const childPrefix = `const fs=require('node:fs'),path=require('node:path');
+const runId=process.env.HARNESS_EVAL_RUN_ID;
+const run=path.join(process.cwd(),'evolution/experiments/${experiment}/runs',runId);
+fs.mkdirSync(run,{recursive:true});
+const manifest={schema_version:'2.0',run_id:runId,experiment_id:'${experiment}',agent_id:'test-agent',status:'running',created_at:new Date().toISOString()};
+fs.writeFileSync(path.join(run,'inputs.lock.json'),JSON.stringify({run_id:runId,source_id:'${source}',evaluation_cases:[{case_id:'U-CASE-001'}]}));
+const finish=status=>{manifest.status=status;fs.writeFileSync(path.join(run,'run.yaml'),JSON.stringify(manifest));};
+finish('running');
+`
+async function fixture(t, body = "finish('completed');console.log(JSON.stringify({run_id:runId}))", raw = false) {
+  const root = mkdtempSync(join(tmpdir(), 'eval-runs-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
   const outfile = join(root, 'jobs.mjs')
   await build({ entryPoints: [join(plugin, 'src/evaluation/jobs.ts')], outfile, bundle: true, platform: 'node', format: 'esm' })
   const { createEvaluationJobs, EvaluationJobError } = await import(`file://${outfile}`)
   const script = join(root, 'dsh-eval')
-  writeFileSync(script, body)
-  const options = { command: () => ({ executable: process.execPath, args: [script] }),
-    environment: () => process.env, redact: text => text.replaceAll('secret-value', '[REDACTED]') }
+  writeFileSync(script, (raw ? '' : childPrefix) + body)
+  const options = { command: () => ({ executable: process.execPath, args: [script] }), environment: () => process.env, redact: text => text.replaceAll('secret-value', '[REDACTED]') }
   return { root, create: (overrides, assetRoot = root) => createEvaluationJobs(assetRoot, { ...options, ...overrides }), EvaluationJobError, script }
 }
-
 async function waitFor(fn, accept) {
   let value
-  for (let count = 0; count < 100; count++) {
-    value = fn()
-    if (accept(value)) return value
-    await delay(20)
-  }
+  for (let count = 0; count < 150; count++) { value = fn(); if (accept(value)) return value; await delay(20) }
   assert.fail(JSON.stringify(value))
 }
-
-test('整批预检后启动，恢复部分批次与终态任务均不重放', async t => {
-  const fx = await fixture(t, 'console.log(JSON.stringify({completed:true}))')
-  let launches = 0, failSecond = true, previews = 0
-  const jobs = fx.create({ command: payload => {
-    if (payload.source === 'experiment:two' && failSecond) throw new Error('训练服务暂不可用')
-    launches++
-    return { executable: process.execPath, args: [fx.script] }
-  } })
-  const requests = ['one', 'two'].map(source => ({ source: `experiment:${source}`, request_id: randomUUID(), source_ref: `git:${'a'.repeat(40)}` }))
-  await assert.rejects(jobs.startBatch(requests, async () => { if (++previews === 2) throw new Error('invalid source') }), /invalid source/)
-  assert.equal(launches, 0)
-  await assert.rejects(jobs.startBatch(requests, async () => {}), /暂不可用/)
-  assert.equal(launches, 1)
-  failSecond = false
-  previews = 0
-  const resumed = await jobs.startBatch(requests, async () => { previews++ })
-  assert.equal(launches, 2)
-  assert.equal(previews, 1)
-  for (const item of resumed) await waitFor(() => jobs.status(item.job_id), job => job.status === 'completed')
-  const restored = fx.create({ command: () => assert.fail('恢复不应启动进程') })
-  assert.deepEqual((await restored.startBatch(requests, async () => assert.fail('终态不应再次预检'))).map(item => item.status), ['completed', 'completed'])
-  await assert.rejects(restored.startBatch([{ ...requests[0], cases: ['U-NEW-001'] }, { ...requests[1], request_id: randomUUID() }], async () => assert.fail('冲突时不能开始新任务')), error => error.code === 'conflict')
-  await assert.rejects(restored.startBatch([requests[0], requests[0]], async () => {}), error => error.code === 'invalid_request')
-})
-
-test('新建管理器从磁盘查询并取消同一评测进程，回执继续保留', async t => {
-  const fx = await fixture(t, [
-    "process.on('SIGTERM',()=>{console.log(JSON.stringify({cancelled:true,instance_stopped:true}));process.exit(2)})",
-    "console.error('ready')", 'setInterval(()=>{},1000)',
-  ].join('\n'))
-  const before = fx.create()
-  const started = await before.start({ source: 'experiment:EXP-test-agent-001', cases: ['U-CASE-001'] })
-  await waitFor(() => before.status(started.job_id), job => job.stderr.includes('ready'))
-  const restored = fx.create()
-  assert.equal(restored.status(started.job_id).status, 'running')
-  assert.deepEqual(restored.list().map(job => job.job_id), [started.job_id])
-  assert.equal(restored.cancel(started.job_id).status, 'cancelling')
-  const final = await waitFor(() => restored.status(started.job_id), job => job.status === 'cancelled')
-  assert.equal(final.result.instance_stopped, true)
-  assert.equal(final.actual_model_calls, null)
-})
-
-test('工作区迁移后读取历史评测及 Run，不改写来源', async t => {
-  const fx = await fixture(t, '')
+const accepted = async (jobs, payload = base) => jobs.start({ ...payload, run_id: jobs.reserve(payload).run_id })
+const statePath = (root, id) => join(root, '.local/evaluation-jobs', `${id}.json`)
+function seedLegacy(fx, extra = {}, id = randomUUID()) {
   const identity = { schemaVersion: 1, id: `workspace-${randomUUID()}`, legacyRoots: [] }
-  writeFileSync(join(fx.root, 'workspace.json'), JSON.stringify(identity))
-  const jobs = fx.create()
-  const payload = { source: 'experiment:EXP-test-agent-001', cases: ['U-CASE-001'] }
-  const started = await jobs.start(payload)
-  await waitFor(() => jobs.status(started.job_id), job => job.status === 'completed')
-  const runId = `run-${randomUUID()}`
-  const run = join(fx.root, 'evolution/experiments/EXP-test-agent-001/runs', runId)
+  if (!existsSync(join(fx.root, 'workspace.json'))) writeFileSync(join(fx.root, 'workspace.json'), JSON.stringify(identity))
+  const workspace = JSON.parse(readFileSync(join(fx.root, 'workspace.json'), 'utf8'))
+  const job = { job_id: id, workspace_id: workspace.id, asset_root: fx.root, source, cases: base.cases,
+    status: 'failed', started_at: '2026-10-30T00:00:00Z', updated_at: '2026-10-30T00:00:00Z', stdout: '', stderr: '', pid: 2147483647, process_start: '1', exit_code: 2, ...extra }
+  mkdirSync(join(fx.root, '.local/evaluation-jobs'), { recursive: true })
+  writeFileSync(statePath(fx.root, id), JSON.stringify(job)); return job
+}
+function seedRun(fx, id, { status = 'completed', jobId, inputs = {} } = {}) {
+  const run = join(fx.root, `evolution/experiments/${experiment}/runs`, id)
   mkdirSync(run, { recursive: true })
-  writeFileSync(join(run, 'execution.json'), JSON.stringify({ job_id: started.job_id }))
-  writeFileSync(join(run, 'run.yaml'), 'status: completed\n')
-  writeFileSync(join(run, 'inputs.lock.json'), JSON.stringify({ source_id: payload.source, evaluation_cases: [{ case_id: 'U-CASE-001' }] }))
-  const moved = `${fx.root}-moved`
-  t.after(() => rmSync(moved, { recursive: true, force: true }))
-  renameSync(fx.root, moved)
-  const descriptor = join(moved, 'workspace.json')
-  const noSpawn = { command: () => assert.fail('历史任务重试不得启动新进程') }
-  assert.throws(() => fx.create(noSpawn, moved).status(started.job_id), error => error.code === 'not_found')
-  writeFileSync(descriptor, JSON.stringify({ ...identity, legacyRoots: [fx.root] }))
-  const restored = fx.create(noSpawn, moved)
-  assert.deepEqual(restored.list().map(job => job.job_id), [started.job_id])
-  const retried = restored.status(started.job_id)
-  assert.equal(retried.run_id, runId)
-  assert.equal(retried.asset_root, fx.root)
-  assert.equal(retried.status, 'completed')
-  assert.deepEqual(retried.cases, payload.cases)
-  const path = join(moved, '.local/evaluation-jobs', `${started.job_id}.json`)
-  const stored = JSON.parse(readFileSync(path, 'utf8'))
-  assert.equal(stored.asset_root, fx.root)
-  for (const foreign of [
-    { ...stored, workspace_id: `workspace-${randomUUID()}` },
-    { ...stored, asset_root: `${fx.root}-other-clone` },
-    { ...stored, job_id: randomUUID() },
-  ]) {
-    writeFileSync(path, JSON.stringify(foreign))
-    assert.throws(() => restored.status(started.job_id), error => error.code === 'not_found')
-    assert.throws(() => restored.cancel(started.job_id), error => error.code === 'not_found')
-  }
+  writeFileSync(join(run, 'run.yaml'), JSON.stringify({ schema_version: '2.0', run_id: id, experiment_id: experiment, agent_id: 'test-agent', status }))
+  writeFileSync(join(run, 'inputs.lock.json'), JSON.stringify({ run_id: id, source_id: source, evaluation_cases: [{ case_id: 'U-CASE-001' }], ...inputs }))
+  writeFileSync(join(run, 'execution.json'), JSON.stringify({ ...(jobId ? { job_id: jobId } : { run_id: id }), instance_stopped: true }))
+  return run
+}
+
+test('预览只预留唯一Run ID，查询可见准备状态，撤销后迟到start不会启动', async t => {
+  const fx = await fixture(t), jobs = fx.create()
+  const preview = jobs.reserve(base)
+  assert.match(preview.run_id, /^run-[0-9a-f-]{36}$/)
+  assert.equal(jobs.status(preview.run_id).status, 'prepared')
+  assert.equal(existsSync(statePath(fx.root, preview.run_id)), false)
+  assert.deepEqual(jobs.list(), { runs: [], pending: [], errors: [] })
+  assert.equal(jobs.cancel(preview.run_id).status, 'cancelled')
+  await assert.rejects(jobs.start({ ...base, run_id: preview.run_id }), error => error.code === 'creation_expired')
+  assert.throws(() => jobs.status(preview.run_id), error => error.code === 'not_found')
 })
 
-test('目录迁移后按当前目录确认并取消评测进程，不使用旧路径中的同名克隆', async t => {
-  const fx = await fixture(t, "process.on('SIGTERM',()=>process.exit(2));console.log('ready');setInterval(()=>{},1000)")
-  const identity = { schemaVersion: 1, id: `workspace-${randomUUID()}`, legacyRoots: [fx.root] }
-  writeFileSync(join(fx.root, 'workspace.json'), JSON.stringify(identity))
+test('同一Run并发与磁盘恢复仅启动一次，参数变化冲突，真正创建后返回成功', async t => {
+  const fx = await fixture(t), jobs = fx.create()
+  let commands = 0, release
+  const gate = new Promise(resolve => { release = resolve })
+  const controlled = fx.create({ command: async () => { commands++; await gate; return { executable: process.execPath, args: [fx.script] } } })
+  const payload = { ...base, run_id: controlled.reserve(base).run_id }
+  const one = controlled.start(payload), two = controlled.start({ ...payload })
+  await assert.rejects(controlled.start({ ...payload, mode: 'fast' }), error => error.code === 'conflict')
+  assert.equal(controlled.status(payload.run_id).run_created, false)
+  assert.equal(controlled.list().pending.length, 1)
+  assert.equal(controlled.list().runs.length, 0)
+  assert.deepEqual(controlled.list().errors, [], '正常准备观察不能被当作读取失败')
+  release()
+  const [a, b] = await Promise.all([one, two])
+  assert.equal(a.run_id, payload.run_id); assert.equal(b.run_id, a.run_id); assert.equal(a.run_created, true)
+  assert.equal(commands, 1); assert.equal('job_id' in a, false)
+  await waitFor(() => controlled.status(a.run_id), value => value.exit_code === 0)
+  const restored = fx.create({ command: () => assert.fail('恢复不得再次启动') })
+  assert.equal((await restored.start(payload)).run_id, payload.run_id)
+  await assert.rejects(restored.start({ ...payload, cases: ['U-OTHER'] }), error => error.code === 'conflict')
+  const second = await accepted(jobs)
+  assert.notEqual(second.run_id, a.run_id)
+})
+
+test('预留在工作区及服务实例之间隔离，重启后未受理ID必须重新预览', async t => {
+  const a = await fixture(t), b = await fixture(t), jobs = a.create()
+  const payload = { ...base, run_id: jobs.reserve(base).run_id }
+  await assert.rejects(a.create().start(payload), error => error.code === 'creation_expired')
+  await assert.rejects(b.create().start(payload), error => error.code === 'creation_expired')
+  assert.equal(jobs.status(payload.run_id).status, 'prepared')
+})
+
+test('命令准备、spawn及创建前失败全部清理，旧ID不能重试启动', async t => {
+  for (const kind of ['command', 'spawn', 'preflight']) await t.test(kind, async t => {
+    const fx = await fixture(t, "console.error('前置校验未通过：来源无效');process.exit(2)", true)
+    let cleanups = 0
+    const jobs = fx.create({ command: () => { if (kind === 'command') throw new Error('来源准备失败'); return { executable: kind === 'spawn' ? '/no-such-evaluator' : process.execPath, args: [fx.script] } }, cleanup: () => { cleanups++ } })
+    const payload = { ...base, run_id: jobs.reserve(base).run_id }
+    await assert.rejects(jobs.start(payload))
+    assert.equal(existsSync(statePath(fx.root, payload.run_id)), false)
+    assert.equal(cleanups, 1)
+    assert.deepEqual(jobs.list().runs, [])
+    await assert.rejects(jobs.start(payload), error => error.code === 'creation_expired')
+    assert.throws(() => jobs.status(payload.run_id), error => error.code === 'not_found')
+  })
+})
+
+test('只删除本请求归属且进程已结束的初始化半成品', async t => {
+  const body = `const fs=require('node:fs'),p=require('node:path');const id=process.env.HARNESS_EVAL_RUN_ID;
+const folder=p.join(process.cwd(),'evolution/experiments/${experiment}/runs',id);fs.mkdirSync(folder,{recursive:true});
+const stat=fs.readFileSync('/proc/'+process.pid+'/stat','utf8');
+fs.writeFileSync(p.join(folder,'.initialization.json'),JSON.stringify({schema_version:'1.0',run_id:id,asset_root:process.cwd(),workspace_id:null,pid:process.pid,process_start:stat.slice(stat.lastIndexOf(')')+2).split(' ')[19],request_sha256:process.env.HARNESS_EVAL_REQUEST_SHA256}));process.exit(2);`
+  const fx = await fixture(t, body, true), jobs = fx.create(), payload = { ...base, run_id: jobs.reserve(base).run_id }
+  await assert.rejects(jobs.start(payload), error => error.code === 'creation_failed')
+  assert.equal(existsSync(join(fx.root, `evolution/experiments/${experiment}/runs`, payload.run_id)), false)
+  assert.equal(existsSync(statePath(fx.root, payload.run_id)), false)
+})
+
+test('无归属的半成品保留并报告未知，不能按创建失败删除', async t => {
+  const fx = await fixture(t, `const fs=require('node:fs'),p=require('node:path');fs.mkdirSync(p.join(process.cwd(),'evolution/experiments/${experiment}/runs',process.env.HARNESS_EVAL_RUN_ID),{recursive:true});process.exit(2);`, true)
+  const jobs = fx.create(), payload = { ...base, run_id: jobs.reserve(base).run_id }
+  await assert.rejects(jobs.start(payload))
+  assert.equal(existsSync(statePath(fx.root, payload.run_id)), true)
+  assert.equal(jobs.status(payload.run_id).status, 'unknown')
+  assert.equal(jobs.list().pending.length, 1)
+})
+
+test('Run已commit而执行交接失败仍保留真实失败Run', async t => {
+  const fx = await fixture(t, "finish('failed');console.error('执行归属写入失败');process.exit(2)")
+  const jobs = fx.create(), result = await accepted(jobs)
+  assert.equal(result.run_created, true)
+  assert.equal(result.status, 'failed')
+  await waitFor(() => jobs.status(result.run_id), value => value.exit_code === 2)
+  assert.equal(existsSync(statePath(fx.root, result.run_id)), true)
+  assert.equal(jobs.list().runs[0].run_id, result.run_id)
+})
+
+test('服务恢复从同一Run查询并取消原进程，Run证据持续保留', async t => {
+  const fx = await fixture(t, "process.on('SIGTERM',()=>{finish('cancelled');console.log(JSON.stringify({run_id:runId,cancelled:true,instance_stopped:true}));process.exit(2)});console.error('ready');setInterval(()=>{},1000)")
+  const original = fx.create(), result = await accepted(original)
+  const restored = fx.create()
+  assert.equal(restored.status(result.run_id).status, 'running')
+  assert.equal(restored.cancel(result.run_id).status, 'cancelling')
+  const end = await waitFor(() => restored.status(result.run_id), value => value.status === 'cancelled')
+  assert.equal(end.run_id, result.run_id)
+  assert.equal(end.run_created, true)
+})
+
+test('准备过程中可撤销，命令返回后不得再spawn', async t => {
+  const fx = await fixture(t); let release
+  const gate = new Promise(resolve => { release = resolve })
+  const jobs = fx.create({ command: async () => { await gate; return { executable: process.execPath, args: [fx.script] } } })
+  const payload = { ...base, run_id: jobs.reserve(base).run_id }, task = jobs.start(payload)
+  assert.equal(jobs.cancel(payload.run_id).status, 'cancelling')
+  assert.equal(jobs.list().pending[0].status, 'cancelling')
+  assert.deepEqual(jobs.list().errors, [], '正常取消观察不能被当作读取失败')
+  release(); await assert.rejects(task, error => error.code === 'creation_cancelled')
+  assert.equal(existsSync(statePath(fx.root, payload.run_id)), false)
+})
+
+test('在途或PID归属不明不会被误判失败或清理，取消不向其他进程发送信号', async t => {
+  const fx = await fixture(t), old = seedLegacy(fx, { status: 'running', pid: process.pid, process_start: 'wrong-start' })
+  const jobs = fx.create()
+  assert.equal(jobs.status(old.job_id).status, 'unknown')
+  assert.throws(() => jobs.cancel(old.job_id), error => error.code === 'process_identity_unknown')
+  assert.equal(existsSync(statePath(fx.root, old.job_id)), true)
+  assert.equal(jobs.list().pending[0].legacy_id, old.job_id)
+})
+
+test('未经迁移的混合旧数据自动清理确定创建前失败，已有失败Run及坏记录互不影响', async t => {
+  const fx = await fixture(t)
+  const failed = seedLegacy(fx, { stderr: '前置校验未通过：来源校验失败' })
+  const unknown = seedLegacy(fx, { stderr: '旧日志片段不足，阶段无法确认' })
+  const completed = seedLegacy(fx, { status: 'completed', exit_code: 0 })
+  const runId = `run-${randomUUID()}`, run = seedRun(fx, runId, { status: 'failed', jobId: completed.job_id })
+  const before = readFileSync(join(run, 'run.yaml'))
+  const badId = randomUUID(); writeFileSync(statePath(fx.root, badId), '{bad json')
+  const future = `run-${randomUUID()}`; writeFileSync(statePath(fx.root, future), JSON.stringify({ schema_version: '3.0' }))
+  const jobs = fx.create(), listed = jobs.list()
+  assert.deepEqual(listed.runs.map(item => item.run_id), [runId])
+  assert.equal(listed.runs[0].status, 'failed')
+  assert.equal(listed.runs[0].agent_id, 'test-agent')
+  assert.equal(existsSync(statePath(fx.root, failed.job_id)), false)
+  assert.equal(existsSync(statePath(fx.root, unknown.job_id)), true)
+  assert.equal(listed.errors.length, 3)
+  assert.deepEqual(readFileSync(join(run, 'run.yaml')), before)
+  assert.equal(jobs.status(runId).run_id, runId)
+  assert.equal((await jobs.start({ ...base, request_id: completed.job_id })).run_id, runId)
+  await assert.rejects(jobs.start({ ...base, request_id: failed.job_id }), error => error.code === 'protocol_changed')
+})
+
+test('旧失败没有Run编号但存在无法关联的已提交Run时不清理', async t => {
+  const fx = await fixture(t), old = seedLegacy(fx, { stderr: '创建 Run 失败：执行关联无法写入' })
+  const id = `run-${randomUUID()}`, run = seedRun(fx, id)
+  rmSync(join(run, 'execution.json'))
+  const jobs = fx.create(), listed = jobs.list()
+  assert.equal(listed.runs.length, 0)
+  assert.equal(listed.errors.length, 1)
+  assert.equal(existsSync(statePath(fx.root, old.job_id)), true)
+  assert.equal(jobs.status(id).run_id, id)
+})
+
+test('旧Run与独立CLI Run直接按真实RunID读取，不要求控制记录或数据升级', async t => {
+  const fx = await fixture(t), id = `run-${randomUUID()}`, run = seedRun(fx, id)
+  const before = readFileSync(join(run, 'run.yaml'))
+  assert.equal(fx.create().status(id).run_id, id)
+  assert.equal(existsSync(join(fx.root, '.local/evaluation-jobs')), false)
+  assert.deepEqual(readFileSync(join(run, 'run.yaml')), before)
+})
+
+test('旧Run缺少冻结输入仍可读取关联，损坏输入则局部报错且不清理', async t => {
+  const fx = await fixture(t), old = seedLegacy(fx, { status: 'completed', exit_code: 0 })
+  const id = `run-${randomUUID()}`, run = seedRun(fx, id, { jobId: old.job_id })
+  rmSync(join(run, 'inputs.lock.json'))
+  const original = readFileSync(join(run, 'run.yaml'))
+  const jobs = fx.create()
+  assert.equal(jobs.status(old.job_id).run_id, id)
+  assert.equal(jobs.status(old.job_id).frozen_inputs_available, false)
+  assert.equal(jobs.status(id).run_id, id)
+  assert.equal(jobs.list().runs[0].run_id, id)
+  writeFileSync(join(run, 'inputs.lock.json'), '{invalid input')
+  assert.throws(() => jobs.status(old.job_id))
+  assert.equal(jobs.list().errors.length, 1)
+  assert.equal(existsSync(statePath(fx.root, old.job_id)), true)
+  assert.deepEqual(readFileSync(join(run, 'run.yaml')), original)
+})
+
+test('工作区迁移沿原声明读取旧关联，不接管同名其他根或改写历史来源', async t => {
+  const fx = await fixture(t), old = seedLegacy(fx, { status: 'completed', exit_code: 0 })
+  const id = `run-${randomUUID()}`; seedRun(fx, id, { jobId: old.job_id })
+  const moved = fx.root + '-moved'; t.after(() => rmSync(moved, { recursive: true, force: true }))
+  const oldBytes = readFileSync(statePath(fx.root, old.job_id))
+  renameSync(fx.root, moved)
+  assert.throws(() => fx.create({}, moved).status(old.job_id), error => error.code === 'not_found')
+  const descriptor = JSON.parse(readFileSync(join(moved, 'workspace.json'), 'utf8'))
+  writeFileSync(join(moved, 'workspace.json'), JSON.stringify({ ...descriptor, legacyRoots: [fx.root] }))
+  const migrated = fx.create({}, moved)
+  assert.equal(migrated.status(old.job_id).run_id, id)
+  assert.deepEqual(readFileSync(statePath(moved, old.job_id)), oldBytes)
+  const foreign = { ...JSON.parse(oldBytes), workspace_id: 'workspace-other' }
+  writeFileSync(statePath(moved, old.job_id), JSON.stringify(foreign))
+  assert.throws(() => migrated.status(old.job_id), error => error.code === 'not_found')
+})
+
+test('批量先核对全批预留，部分失败停止后续且旧编号不能整批重放', async t => {
+  const fx = await fixture(t); let commands = 0
+  const jobs = fx.create({ command: payload => { commands++; if (payload.mode === 'full') throw new Error('准备失败'); return { executable: process.execPath, args: [fx.script] } } })
+  const payloads = ['fast', 'full', 'explicit'].map(mode => ({ ...base, mode, source_ref: `git:${'a'.repeat(40)}` }))
+  const requests = payloads.map(payload => ({ ...payload, run_id: jobs.reserve(payload).run_id }))
+  await assert.rejects(jobs.startBatch([requests[0], { ...requests[1], cases: ['new'] }]), error => error.code === 'conflict')
+  assert.equal(commands, 0)
+  const result = await jobs.startBatch(requests)
+  assert.equal(result.runs.length, 1); assert.equal(result.failed.run_id, requests[1].run_id)
+  assert.deepEqual(result.not_started, [requests[2].run_id]); assert.equal(commands, 2)
+  await assert.rejects(jobs.start(requests[1]), error => error.code === 'creation_expired')
+  await assert.rejects(jobs.start(requests[2]), error => error.code === 'creation_expired')
+  assert.equal((await fx.create().start(requests[0])).run_id, requests[0].run_id)
+})
+
+test('跨handler等待创建撤销后停止等待，不重放已清理请求', async t => {
+  const fx = await fixture(t); let commands = 0, release
+  const gate = new Promise(resolve => { release = resolve })
+  const original = fx.create({ command: async () => { commands++; await gate; return { executable: process.execPath, args: [fx.script] } } })
+  const payload = { ...base, run_id: original.reserve(base).run_id }
+  const first = original.start(payload), second = fx.create({ command: () => assert.fail('接管查询不得启动') }).start(payload)
+  const outcomes = Promise.allSettled([first, second])
+  original.cancel(payload.run_id); release()
+  const values = await outcomes
+  assert.equal(commands, 1)
+  assert.deepEqual(values.map(item => item.status), ['rejected', 'rejected'])
+  assert.equal(values[1].reason.code, 'not_found')
+})
+
+test('已观察终止但清理曾失败的V2启动可在新handler安全收尾', async t => {
+  const fx = await fixture(t, "console.error('前置校验未通过');process.exit(2)", true)
+  const original = fx.create({ cleanup: () => { throw new Error('临时目录暂不可删除') } })
+  const payload = { ...base, run_id: original.reserve(base).run_id }
+  await assert.rejects(original.start(payload), error => error.code === 'cleanup_failed')
+  const before = JSON.parse(readFileSync(statePath(fx.root, payload.run_id), 'utf8'))
+  assert.equal(before.process_finished, true); assert.equal(before.status, 'unknown')
+  const restored = fx.create()
+  assert.throws(() => restored.status(payload.run_id), error => error.code === 'not_found')
+  assert.equal(existsSync(statePath(fx.root, payload.run_id)), false)
+})
+
+test('接管已结束的自有初始化组可清理半成品，无终止依据的前置进程仅待核对', async t => {
+  const fx = await fixture(t), jobs = fx.create(), prepared = jobs.reserve(base)
+  const state = { schema_version: '2.0', run_id: prepared.run_id, source, workspace_id: 'placeholder', asset_root: fx.root,
+    status: 'preparing', started_at: '2026-11-04T00:00:00Z', updated_at: '2026-11-04T00:00:00Z',
+    stdout: '', stderr: '', pid: 2147483647, process_start: '1', request_sha256: 'fixed-request' }
+  writeFileSync(join(fx.root, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: 'workspace-recovery', legacyRoots: [] }))
+  state.workspace_id = 'workspace-recovery'
+  const folder = join(fx.root, `evolution/experiments/${experiment}/runs`, state.run_id)
+  mkdirSync(folder, { recursive: true }); mkdirSync(join(fx.root, '.local/evaluation-jobs'), { recursive: true })
+  writeFileSync(join(folder, '.initialization.json'), JSON.stringify({ schema_version: '1.0', run_id: state.run_id,
+    workspace_id: state.workspace_id, asset_root: fx.root, pid: 2147483647, process_start: '1', request_sha256: state.request_sha256 }))
+  writeFileSync(statePath(fx.root, state.run_id), JSON.stringify(state))
+  const restored = fx.create()
+  assert.throws(() => restored.status(state.run_id), error => error.code === 'not_found')
+  assert.equal(existsSync(folder), false)
+  const unknown = { ...state, run_id: `run-${randomUUID()}` }
+  writeFileSync(statePath(fx.root, unknown.run_id), JSON.stringify(unknown))
+  assert.equal(restored.status(unknown.run_id).status, 'unknown')
+  assert.equal(restored.list().pending[0].run_id, unknown.run_id)
+  assert.equal(existsSync(statePath(fx.root, unknown.run_id)), true)
+})
+
+test('旧failed状态不能掩盖本根仍存活的评测进程，必须保留在途保护', async t => {
+  const fx = await fixture(t, "console.log('ready');setInterval(()=>{},1000)", true)
   const proc = spawn(process.execPath, [fx.script], { cwd: fx.root, stdio: ['ignore', 'pipe', 'pipe'] })
   t.after(() => { if (proc.exitCode === null) proc.kill('SIGKILL') })
   await new Promise((resolve, reject) => { proc.stdout.once('data', resolve); proc.once('error', reject) })
   const stat = readFileSync(`/proc/${proc.pid}/stat`, 'utf8')
-  const id = randomUUID(), now = new Date().toISOString()
-  const directory = join(fx.root, '.local/evaluation-jobs')
-  mkdirSync(directory, { recursive: true })
-  writeFileSync(join(directory, `${id}.json`), JSON.stringify({ job_id: id, workspace_id: identity.id, asset_root: fx.root,
-    source: 'experiment:EXP-test-agent-001', status: 'running', started_at: now, updated_at: now, stdout: '', stderr: '',
-    pid: proc.pid, process_start: stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19] }))
-  const moved = `${fx.root}-moved`
-  t.after(() => rmSync(moved, { recursive: true, force: true }))
-  renameSync(fx.root, moved)
-  mkdirSync(fx.root)
-  writeFileSync(join(fx.root, 'workspace.json'), JSON.stringify(identity))
-  const restored = fx.create({}, moved)
-  assert.equal(restored.status(id).status, 'running')
-  assert.equal(restored.status(id).asset_root, fx.root)
-  const path = join(moved, '.local/evaluation-jobs', `${id}.json`)
-  const stored = readFileSync(path, 'utf8')
-  writeFileSync(fx.script, readFileSync(join(moved, 'dsh-eval')))
-  const other = spawn(process.execPath, [fx.script], { cwd: fx.root, stdio: ['ignore', 'pipe', 'pipe'] })
-  t.after(() => { if (other.exitCode === null) other.kill('SIGKILL') })
-  await new Promise((resolve, reject) => { other.stdout.once('data', resolve); other.once('error', reject) })
-  const otherStat = readFileSync(`/proc/${other.pid}/stat`, 'utf8')
-  writeFileSync(path, JSON.stringify({ ...JSON.parse(stored), pid: other.pid,
-    process_start: otherStat.slice(otherStat.lastIndexOf(')') + 2).split(' ')[19] }))
-  assert.throws(() => restored.cancel(id), error => error.code === 'process_identity_unknown')
-  assert.equal(other.exitCode, null)
-  const otherExited = new Promise(resolve => other.once('exit', resolve))
-  other.kill('SIGTERM')
-  assert.equal(await otherExited, 2)
-  writeFileSync(path, stored)
-  const exited = new Promise(resolve => proc.once('exit', resolve))
-  assert.equal(restored.cancel(id).status, 'cancelling')
-  assert.equal(await exited, 2)
-  assert.equal(JSON.parse(readFileSync(join(moved, '.local/evaluation-jobs', `${id}.json`), 'utf8')).asset_root, fx.root)
+  const old = seedLegacy(fx, { status: 'failed', pid: proc.pid, process_start: stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19], stderr: '前置校验未通过' })
+  const original = readFileSync(statePath(fx.root, old.job_id)), jobs = fx.create()
+  assert.equal(jobs.status(old.job_id).status, 'unknown')
+  assert.equal(jobs.list().pending[0].legacy_id, old.job_id)
+  assert.deepEqual(readFileSync(statePath(fx.root, old.job_id)), original)
 })
 
-test('模型凭据拆成多个输出块时，运行中与完成后的 Job 日志均不保留片段', async t => {
-  const secret = 'credential-fragment-938104'
-  const fx = await fixture(t, [
-    "process.stderr.write('started\\n')",
-    'process.stderr.write(process.env.MODEL_API_KEY.slice(0, 12))',
-    'setTimeout(()=>{process.stderr.write(process.env.MODEL_API_KEY.slice(12));process.stderr.write("\\n");process.stderr.write(process.env.MODEL_API_KEY.slice(0,12)+"\\n");process.stdout.write(process.env.MODEL_API_KEY.slice(0,12)+"\\n");setTimeout(()=>process.exit(0),50)},100)',
-  ].join('\n'))
-  const jobs = fx.create({ command: () => ({ executable: process.execPath, args: [fx.script], environment: { MODEL_API_KEY: secret } }) })
-  const started = await jobs.start({ source: 'experiment:EXP-test-agent-001' })
-  const running = await waitFor(() => jobs.status(started.job_id), job => job.stderr.includes('started'))
-  assert.equal(running.stderr.includes(secret.slice(0, 12)), false)
-  const finished = await waitFor(() => jobs.status(started.job_id), job => job.status === 'completed')
-  assert.equal(finished.stderr.includes(secret), false)
-  assert.equal(finished.stderr.includes(secret.slice(0, 12)), false)
-  assert.equal(finished.stdout.includes(secret.slice(0, 12)), false)
-  assert.match(finished.stderr, /\[REDACTED\]/)
-  const persisted = readFileSync(join(fx.root, '.local/evaluation-jobs', `${started.job_id}.json`), 'utf8')
-  assert.equal(persisted.includes(secret.slice(0, 12)), false)
+test('旧任务取消意图在同handler查询中保持，原状态文件不被改写', async t => {
+  const fx = await fixture(t, "process.on('SIGTERM',()=>setTimeout(()=>{require('node:fs').writeFileSync(process.env.TEST_RUN_MANIFEST,JSON.stringify({run_id:process.env.TEST_RUN_ID,status:'cancelled'}));process.exit(2)},120));console.log('ready');setInterval(()=>{},1000)", true)
+  const id = `run-${randomUUID()}`, path = seedRun(fx, id, { status: 'running' })
+  const proc = spawn(process.execPath, [fx.script], { cwd: fx.root, env: { ...process.env, TEST_RUN_MANIFEST: join(path, 'run.yaml'), TEST_RUN_ID: id }, stdio: ['ignore', 'pipe', 'pipe'] })
+  t.after(() => { if (proc.exitCode === null) proc.kill('SIGKILL') })
+  await new Promise((resolve, reject) => { proc.stdout.once('data', resolve); proc.once('error', reject) })
+  const stat = readFileSync(`/proc/${proc.pid}/stat`, 'utf8')
+  const old = seedLegacy(fx, { status: 'running', pid: proc.pid, process_start: stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19], exit_code: undefined, run_id: id })
+  writeFileSync(join(path, 'execution.json'), JSON.stringify({ job_id: old.job_id }))
+  const original = readFileSync(statePath(fx.root, old.job_id)), jobs = fx.create()
+  assert.equal(jobs.cancel(id).status, 'cancelling')
+  assert.equal(jobs.status(id).status, 'cancelling')
+  assert.equal(jobs.status(old.job_id).status, 'cancelling')
+  await waitFor(() => jobs.status(old.job_id), value => value.status === 'cancelled')
+  assert.deepEqual(readFileSync(statePath(fx.root, old.job_id)), original)
 })
 
-test('短凭据脱敏不破坏机器回执、分块 Run 关联与取消结论', async t => {
-  const runId = 'run-11111111-1111-4111-8111-111111111111'
-  const fx = await fixture(t, [
-    `process.stderr.write('Research Run: ${runId.slice(0, 20)}')`,
-    `setTimeout(() => { process.stderr.write('${runId.slice(20)}\\n'); console.log(JSON.stringify({run_id:'${runId}', cancelled:true, instance_stopped:true, cases:{total:1}, credential:process.env.MODEL_API_KEY, nested:[{detail:'failure '+process.env.MODEL_TOKEN.slice(0,12), API_KEY:'receipt-only-value'}]})); process.exit(2) }, 20)`,
-  ].join('\n'))
-  const jobs = fx.create({ command: () => ({ executable: process.execPath, args: [fx.script], environment: { MODEL_API_KEY: '1', MODEL_TOKEN: '8f327eafc0032b13642dd1ab938104' } }) })
-  const started = await jobs.start({ source: 'experiment:EXP-test-agent-001' })
-  const finished = await waitFor(() => jobs.status(started.job_id), job => job.status === 'cancelled')
-  assert.equal(finished.run_id, runId)
-  assert.equal(finished.result.run_id, runId)
-  assert.equal(JSON.parse(finished.stdout).cases.total, 1)
-  assert.equal(finished.result.credential, '[REDACTED]')
-  assert.equal(finished.result.nested[0].detail, 'failure [REDACTED]')
-  assert.equal(finished.result.nested[0].API_KEY, '[REDACTED]')
-  assert.equal(JSON.parse(finished.stdout).instance_stopped, true)
-  const restored = fx.create().status(started.job_id)
-  assert.equal(restored.status, 'cancelled')
-  assert.equal(restored.run_id, runId)
-  assert.equal(readFileSync(join(fx.root, '.local/evaluation-jobs', `${started.job_id}.json`), 'utf8').includes('"credential": "1"'), false)
+test('清理期间状态发生变化时不删除或覆盖并行更新', async t => {
+  const fx = await fixture(t)
+  const item = seedLegacy(fx, { stderr: '前置校验未通过' }), file = statePath(fx.root, item.job_id)
+  const jobs = fx.create({ cleanup: () => { writeFileSync(file, JSON.stringify({ ...item, stderr: '并行写入新观察' })) } })
+  assert.equal(jobs.list().runs.length, 0)
+  assert.equal(JSON.parse(readFileSync(file, 'utf8')).stderr, '并行写入新观察')
 })
 
-test('业务未通过的已结束 Run 保持 completed 执行状态，列表可从磁盘恢复', async t => {
-  const fx = await fixture(t, 'console.log(JSON.stringify({run_id:process.env.TEST_RUN_ID}));process.exit(1)')
-  const runId = `run-${randomUUID()}`
-  const run = join(fx.root, 'evolution/experiments/EXP-test-agent-001/runs', runId)
-  mkdirSync(run, { recursive: true })
-  writeFileSync(join(run, 'execution.json'), JSON.stringify({ instance_stopped: true }))
-  writeFileSync(join(run, 'run.yaml'), 'status: completed\n')
-  writeFileSync(join(run, 'inputs.lock.json'), JSON.stringify({ source_id: 'experiment:EXP-test-agent-001', evaluation_cases: [] }))
-  writeFileSync(join(run, 'summary.json'), JSON.stringify({ effective_verdict: 'failed' }))
-  const previous = process.env.TEST_RUN_ID
-  process.env.TEST_RUN_ID = runId
-  t.after(() => { if (previous === undefined) delete process.env.TEST_RUN_ID; else process.env.TEST_RUN_ID = previous })
-  const jobs = fx.create()
-  const started = await jobs.start({ source: 'experiment:EXP-test-agent-001' })
-  writeFileSync(join(run, 'execution.json'), JSON.stringify({ job_id: started.job_id, instance_stopped: true }))
-  const finished = await waitFor(() => fx.create().status(started.job_id), job => job.exit_code === 1)
-  assert.equal(finished.status, 'completed')
-  assert.equal(finished.summary.effective_verdict, 'failed')
-  assert.equal(fx.create().list()[0].status, 'completed')
-  assert.equal(fx.create().list()[0].run_id, runId)
-})
-
-test('过时 PID 的取消拒绝向当前进程发信号', async t => {
-  const fx = await fixture(t, '')
-  const jobs = fx.create()
-  const started = await jobs.start({ source: 'experiment:EXP-test-agent-001' })
-  const final = await waitFor(() => jobs.status(started.job_id), job => job.status === 'completed')
-  const path = join(fx.root, '.local/evaluation-jobs', `${started.job_id}.json`)
-  const stored = JSON.parse(readFileSync(path, 'utf8'))
-  Object.assign(stored, { status: 'running', pid: process.pid, process_start: 'not-this-process' })
-  writeFileSync(path, JSON.stringify(stored))
-  const restored = fx.create()
-  assert.throws(() => restored.cancel(started.job_id), error => error.code === 'process_identity_unknown')
-  assert.equal(restored.status(started.job_id).status, 'failed')
-})
-
-test('未捕获 stdout 的 Job 从已有 Run 恢复固定来源、Session 和产物结论', async t => {
-  const fx = await fixture(t, '')
-  const jobs = fx.create()
-  const started = await jobs.start({ source: 'experiment:EXP-test-agent-001' })
-  await waitFor(() => jobs.status(started.job_id), job => job.status === 'completed')
-  const jobPath = join(fx.root, '.local/evaluation-jobs', `${started.job_id}.json`)
-  const stored = JSON.parse(readFileSync(jobPath, 'utf8'))
-  Object.assign(stored, { status: 'running', stdout: '', result: null, run_id: undefined })
-  writeFileSync(jobPath, JSON.stringify(stored))
-  const runId = `run-${randomUUID()}`
-  const run = join(fx.root, 'evolution/experiments/EXP-test-agent-001/runs', runId)
-  const evidence = join(run, 'evidence/U-CASE-001')
-  mkdirSync(evidence, { recursive: true })
-  writeFileSync(join(run, 'execution.json'), JSON.stringify({ job_id: started.job_id, instance_name: 'eval-owned', instance_stopped: true }))
-  writeFileSync(join(run, 'run.yaml'), 'status: completed\n')
-  writeFileSync(join(run, 'inputs.lock.json'), JSON.stringify({ source_id: 'experiment:EXP-test-agent-001', candidate_sha256: 'fixed-candidate',
-    program_origin: { commit: 'fixed-program' }, evaluation_sha256: 'fixed-cases', evaluation_cases: [{ case_id: 'U-CASE-001' }] }))
-  writeFileSync(join(run, 'summary.json'), JSON.stringify({ overall_verdict: 'passed' }))
-  writeFileSync(join(evidence, 'checks.json'), JSON.stringify({ session_id: 'existing-session', trace_available: true }))
-  writeFileSync(join(evidence, 'trace.jsonl'), JSON.stringify({ event: { type: 'request/header' } }) + '\n')
-  const restored = fx.create().status(started.job_id)
-  assert.equal(restored.status, 'completed')
-  assert.equal(restored.run_id, runId)
-  assert.equal(restored.candidate_sha256, 'fixed-candidate')
-  assert.deepEqual(restored.sessions, ['existing-session'])
-  assert.equal(restored.actual_model_calls, null)
-})
-
-test('历史交付截止时间不再取消评测，手动取消仍有效', async t => {
-  const fx = await fixture(t, ["process.on('SIGTERM',()=>{console.log(JSON.stringify({cancelled:true,instance_stopped:true}));process.exit(2)})", "console.error('ready')", 'setInterval(()=>{},1000)'].join('\n'))
-  const jobs = fx.create()
-  const started = await jobs.start({ source: 'experiment:EXP-test-agent-001', cases: ['U-CASE-001'] })
-  await waitFor(() => jobs.status(started.job_id), job => job.stderr.includes('ready'))
-  const file = join(fx.root, '.local/evaluation-jobs', `${started.job_id}.json`)
-  const saved = JSON.parse(readFileSync(file, 'utf8'))
-  writeFileSync(file, JSON.stringify({ ...saved, deadline_at: '2020-01-01T00:00:00Z' }))
-  const restored = fx.create()
-  assert.equal(restored.status(started.job_id).status, 'running')
-  assert.equal(restored.cancel(started.job_id).status, 'cancelling')
-  await waitFor(() => restored.status(started.job_id), job => job.status === 'cancelled')
-})
-
-test('同一请求并发与磁盘恢复只启动一次，改参数被拒绝，明确新请求可独立运行', async t => {
-  const fx = await fixture(t, 'console.log("done")')
-  let commands = 0, ready
-  const gate = new Promise(resolve => { ready = resolve })
-  const jobs = fx.create({ command: async () => { commands++; await gate; return { executable: process.execPath, args: [fx.script] } } })
-  const payload = { request_id: randomUUID(), source: 'experiment:EXP-test-agent-001', cases: ['U-CASE-001'], mode: 'full' }
-  const one = jobs.start(payload), duplicate = jobs.start({ ...payload })
-  await assert.rejects(jobs.start({ ...payload, mode: 'fast' }), error => error.code === 'conflict')
-  ready()
-  const [first, second] = await Promise.all([one, duplicate])
-  assert.equal(first.job_id, payload.request_id)
-  assert.equal(second.job_id, first.job_id)
-  assert.equal(commands, 1)
-  await waitFor(() => jobs.status(first.job_id), job => job.status === 'completed')
-  const recovered = await fx.create().start({ mode: payload.mode, cases: payload.cases, source: payload.source, request_id: payload.request_id })
-  assert.equal(recovered.job_id, first.job_id)
-  assert.equal(recovered.status, 'completed')
-  await assert.rejects(fx.create().start({ ...payload, cases: ['U-CASE-002'] }), error => error.code === 'conflict')
-  const fresh = await jobs.start({ ...payload, request_id: randomUUID() })
-  assert.notEqual(fresh.job_id, first.job_id)
-  assert.equal(commands, 2)
-  await waitFor(() => jobs.status(fresh.job_id), job => job.status === 'completed')
-})
-
-test('受理前准备失败允许同一请求重试且没有残留任务', async t => {
-  const fx = await fixture(t, '')
-  let fail = true
-  const jobs = fx.create({ command: () => {
-    if (fail) throw new Error('来源尚未就绪')
-    return { executable: process.execPath, args: [fx.script] }
-  } })
-  const payload = { request_id: randomUUID(), source: 'experiment:EXP-test-agent-001' }
-  await assert.rejects(jobs.start(payload), /来源尚未就绪/)
-  assert.deepEqual(jobs.list(), [])
-  fail = false
-  const accepted = await jobs.start(payload)
-  assert.equal(accepted.job_id, payload.request_id)
-  await waitFor(() => jobs.status(accepted.job_id), job => job.status === 'completed')
+test('模型凭据拆块或短字符串时不污染运行日志或机器回执', async t => {
+  const secret = '8f327eafc0032b13642dd1ab938104'
+  const fx = await fixture(t, `process.stderr.write(process.env.MODEL_TOKEN.slice(0,12));setTimeout(()=>{process.stderr.write(process.env.MODEL_TOKEN.slice(12)+'\\n');finish('cancelled');console.log(JSON.stringify({run_id:runId,cancelled:true,instance_stopped:true,cases:{total:1},credential:process.env.MODEL_API_KEY,nested:[{API_KEY:'hidden-value'}]}));process.exit(2)},50)`)
+  const jobs = fx.create({ command: () => ({ executable: process.execPath, args: [fx.script], environment: { MODEL_TOKEN: secret, MODEL_API_KEY: '1' } }) })
+  const result = await accepted(jobs)
+  const finished = await waitFor(() => jobs.status(result.run_id), value => value.exit_code === 2)
+  assert.equal(finished.result.run_id, result.run_id); assert.equal(JSON.parse(finished.stdout).cases.total, 1); assert.deepEqual(finished.result.cases, base.cases)
+  assert.equal(finished.result.credential, '[REDACTED]'); assert.equal(finished.result.nested[0].API_KEY, '[REDACTED]')
+  const persisted = readFileSync(statePath(fx.root, result.run_id), 'utf8')
+  assert.equal(persisted.includes(secret), false); assert.equal(persisted.includes(secret.slice(0, 12)), false)
 })
 
 const localRoute = { provider: 'security-operation-delivery', model: 'fixed-operation-result' }
@@ -325,15 +371,13 @@ const remoteRoute = { provider: 'xiaomi-token-plan-cn', model: 'mimo-v2.6-flash'
 const capabilityContent = routes => JSON.stringify({ runtime_capabilities: { local_tools: [], local_model_routes: routes } })
 async function measurementRun(t, { marker = true, legacy = false, declared = true, content = capabilityContent([localRoute]),
   localProof = { usage: { inputTokens: 5, outputTokens: 2, totalTokens: 7 } } } = {}) {
-  const fx = await fixture(t, '')
-  const jobs = fx.create(), started = await jobs.start({ source: 'experiment:EXP-test-agent-001' })
-  await waitFor(() => jobs.status(started.job_id), job => job.status === 'completed')
-  const run = join(fx.root, 'evolution/experiments/EXP-test-agent-001/runs', `run-${randomUUID()}`)
+  const fx = await fixture(t), saved = seedLegacy(fx, { status: 'completed', exit_code: 0 })
+  const run = seedRun(fx, `run-${randomUUID()}`, { jobId: saved.job_id })
   const evidence = join(run, 'evidence/U-CASE-001'), snapshot = join(run, 'evidence/managed/role-tool-matrix.yaml')
   const harness = join(run, 'evidence/analysis/harness.json'), lock = join(run, 'inputs.lock.json')
   mkdirSync(evidence, { recursive: true }); mkdirSync(join(run, 'evidence/managed')); mkdirSync(join(run, 'evidence/analysis'))
   writeFileSync(join(run, 'run.yaml'), 'status: completed\n')
-  writeFileSync(join(run, 'execution.json'), JSON.stringify({ job_id: started.job_id }))
+  writeFileSync(join(run, 'execution.json'), JSON.stringify({ job_id: saved.job_id }))
   const sha256 = createHash('sha256').update(content).digest('hex')
   const inputs = { source_id: 'experiment:EXP-test-agent-001', evaluation_cases: [{ case_id: 'U-CASE-001' }],
     harness_trees: { managed: { files: declared ? [{ path: 'role-tool-matrix.yaml', sha256, size: Buffer.byteLength(content) }] : [] } },
@@ -351,7 +395,7 @@ async function measurementRun(t, { marker = true, legacy = false, declared = tru
       ['step/end', { turn, step: 1 }], ['turn/end', { turn }]]) events.push({ type, seq: seq++, data })
   }
   writeFileSync(join(evidence, 'trace.jsonl'), events.map(event => JSON.stringify({ session_log: 'session.v4.jsonl', event })).join('\n') + '\n')
-  return { ...fx, run, snapshot, harness, lock, content, inputs, status: () => fx.create().status(started.job_id) }
+  return { ...fx, run, snapshot, harness, lock, content, inputs, status: () => fx.create().status(saved.job_id) }
 }
 
 test('新旧Run核对锁定注册声明但仍计代理真实推理，不读取当前Candidate', async t => {

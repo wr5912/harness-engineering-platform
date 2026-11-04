@@ -1,0 +1,182 @@
+{
+  "scope": "实际平台只读首列宽度核验，不执行业务写操作",
+  "checks": [],
+  "failures": [],
+  "errors": [],
+  "blockedWrites": [
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    }
+  ],
+  "layouts": [
+    {
+      "name": "original-1440",
+      "width": 1440,
+      "rows": 88,
+      "first": {
+        "id": "run-23c63f26-12b6-439f-9021-4272852c3b52",
+        "text": "1 项已选用例 · Run ID：run-23c63f26-12b6-439f-9021-4272852c3b52",
+        "start": 10,
+        "lines": 3,
+        "idRects": [
+          {
+            "x": 148.734375,
+            "y": 502.375,
+            "right": 197.421875,
+            "bottom": 519.375,
+            "width": 48.6875,
+            "height": 17
+          },
+          {
+            "x": 197.421875,
+            "y": 502.375,
+            "right": 220.859375,
+            "bottom": 519.375,
+            "width": 23.4375,
+            "height": 17
+          },
+          {
+            "x": 62,
+            "y": 521.5625,
+            "right": 206.34375,
+            "bottom": 538.5625,
+            "width": 144.34375,
+            "height": 17
+          },
+          {
+            "x": 62,
+            "y": 540.75,
+            "right": 142.140625,
+            "bottom": 557.75,
+            "width": 80.140625,
+            "height": 17
+          }
+        ],
+        "priorRects": [
+          {
+            "x": 62,
+            "y": 502.375,
+            "right": 131.359375,
+            "bottom": 519.375,
+            "width": 69.359375,
+            "height": 17
+          },
+          {
+            "x": 131.359375,
+            "y": 502.375,
+            "right": 148.75,
+            "bottom": 519.375,
+            "width": 17.390625,
+            "height": 17
+          }
+        ],
+        "cell": {
+          "left": 50,
+          "right": 264.390625,
+          "width": 214.390625,
+          "paddingLeft": 12,
+          "paddingRight": 12
+        },
+        "timeText": "2026/11/4 19:51:59 结束",
+        "timeHTML": "<time class=\"harness-eval-timestamp\" datetime=\"2026-11-04T11:51:59Z\">2026/11/4 19:51:59 结束</time>"
+      },
+      "allSingleLine": false,
+      "lineCounts": [
+        3
+      ],
+      "scroll": {
+        "clientWidth": 1340,
+        "scrollWidth": 1340,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "original-390",
+      "width": 390,
+      "rows": 88,
+      "first": {
+        "id": "run-23c63f26-12b6-439f-9021-4272852c3b52",
+        "text": "1 项已选用例 · Run ID：run-23c63f26-12b6-439f-9021-4272852c3b52",
+        "start": 10,
+        "lines": 3,
+        "idRects": [
+          {
+            "x": 127.734375,
+            "y": 633.984375,
+            "right": 176.421875,
+            "bottom": 650.984375,
+            "width": 48.6875,
+            "height": 17
+          },
+          {
+            "x": 176.421875,
+            "y": 633.984375,
+            "right": 199.859375,
+            "bottom": 650.984375,
+            "width": 23.4375,
+            "height": 17
+          },
+          {
+            "x": 41,
+            "y": 651.984375,
+            "right": 185.34375,
+            "bottom": 668.984375,
+            "width": 144.34375,
+            "height": 17
+          },
+          {
+            "x": 41,
+            "y": 669.984375,
+            "right": 121.140625,
+            "bottom": 686.984375,
+            "width": 80.140625,
+            "height": 17
+          }
+        ],
+        "priorRects": [
+          {
+            "x": 41,
+            "y": 633.984375,
+            "right": 110.359375,
+            "bottom": 650.984375,
+            "width": 69.359375,
+            "height": 17
+          },
+          {
+            "x": 110.359375,
+            "y": 633.984375,
+            "right": 127.75,
+            "bottom": 650.984375,
+            "width": 17.390625,
+            "height": 17
+          }
+        ],
+        "cell": {
+          "left": 29,
+          "right": 227.390625,
+          "width": 198.390625,
+          "paddingLeft": 12,
+          "paddingRight": 12
+        },
+        "timeText": "2026/11/4 19:51:59 结束",
+        "timeHTML": "<time class=\"harness-eval-timestamp\" datetime=\"2026-11-04T11:51:59Z\">2026/11/4 19:51:59 结束</time>"
+      },
+      "allSingleLine": false,
+      "lineCounts": [
+        3
+      ],
+      "scroll": {
+        "clientWidth": 332,
+        "scrollWidth": 1240,
+        "overflowX": "auto"
+      }
+    }
+  ],
+  "screenshots": [
+    ".local/eval-run-id-width-20261104/baseline-original-1440.png",
+    ".local/eval-run-id-width-20261104/baseline-original-390.png"
+  ],
+  "initialTheme": "light",
+  "finalTheme": "light"
+}

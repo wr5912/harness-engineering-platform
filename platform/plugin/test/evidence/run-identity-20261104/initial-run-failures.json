@@ -1,0 +1,19 @@
+{
+  "scope": "首轮真实失败，保留原Run；未重写instance_stopped",
+  "runs": [
+    {
+      "run_id": "run-465a2d42-791c-4f2d-a5c6-ace56550243e",
+      "status": "failed",
+      "failure_reason": "启动 DSH 评测实例 失败（退出码 1）：dsh-dev failed: 本地镜像不存在：ai-agent-harness/dsh:b830ec950-amd64-2ed0d15ad02e；请先执行 dsh-dev image build --source experiment:VAR-inspection-delivery-demo-001-rfac75f4cb946",
+      "instance_name": "inspection-delivery-demo-eval-e70dfe99",
+      "instance_stopped": false
+    },
+    {
+      "run_id": "run-a82b8c85-d3d2-4d1f-afce-01e47e62ed3d",
+      "status": "failed",
+      "failure_reason": "evaluation-interrupted",
+      "instance_name": "inspection-delivery-demo-eval-ff80a103",
+      "instance_stopped": false
+    }
+  ]
+}

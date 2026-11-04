@@ -1,0 +1,24 @@
+{
+  "status": "applied",
+  "programRoot": "/home/admin/work/harness-engineering-platform",
+  "dataRoot": "/home/admin/harness-engineering-platform-data",
+  "workspaceId": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+  "pid": 3849088,
+  "activation": "managed-restart",
+  "busy": [],
+  "changed": [
+    "platform/plugin/lib/business-control.js",
+    "platform/plugin/lib/business-gateway.js",
+    "platform/plugin/lib/business-runtime.js",
+    "platform/plugin/lib/client.js",
+    "platform/plugin/lib/composition-source-index.json",
+    "platform/plugin/lib/index.js",
+    "platform/plugin/lib/mcp-manager.js",
+    "platform/plugin/lib/model-runtime.js",
+    "platform/plugin/lib/platform-mcp-manager.js",
+    "platform/plugin/lib/standalone-bridge.js",
+    "platform/plugin/lib/standalone-plugin.js"
+  ],
+  "stage": "/home/admin/work/harness-engineering-platform/.local/platform-updates/70991801-95a8-42f3-b6c2-1fcb0e30455b",
+  "receipt": "/home/admin/work/harness-engineering-platform/.local/platform-updates/70991801-95a8-42f3-b6c2-1fcb0e30455b/receipt.json"
+}

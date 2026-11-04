@@ -1,0 +1,23 @@
+{
+  "checkedRunFiles": 402,
+  "changed": [],
+  "missing": [],
+  "removedOldControlRecords": [
+    {
+      "id": "130fde51-ab4a-4506-b290-aff8ff60c815",
+      "run_id": null,
+      "status": "failed"
+    },
+    {
+      "id": "149d807c-9fd6-4779-8298-8a215fc44406",
+      "run_id": null,
+      "status": "failed"
+    },
+    {
+      "id": "dad8b7b2-632b-4058-bfe0-902fc7e61ec8",
+      "run_id": null,
+      "status": "failed"
+    }
+  ],
+  "remainingOldRecords": 57
+}

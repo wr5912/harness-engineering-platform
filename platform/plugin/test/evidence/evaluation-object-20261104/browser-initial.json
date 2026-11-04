@@ -1,0 +1,1473 @@
+{
+  "scope": "实际18120只读页面，主题偏好最终恢复；不写业务资产、不调用模型、不创建评测或启停实例",
+  "checks": [
+    {
+      "name": "真实认证",
+      "ok": true
+    },
+    {
+      "name": "真实首页 精确列顺序",
+      "ok": true
+    },
+    {
+      "name": "真实首页 无变体名称列",
+      "ok": true
+    },
+    {
+      "name": "真实首页 第1行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实首页 第1行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "VAR-security-operations-expert-002-r79757f173c53",
+        "actual": "变体"
+      }
+    },
+    {
+      "name": "真实首页 第2行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实首页 第2行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-security-operations-expert-024-rad80a907c628",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实首页 存在完整随机后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心存在记录",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 精确列顺序",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 无变体名称列",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第1行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第1行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-migration-agentscope-demo-001-rd991aeb01b21",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第2行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第2行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-migration-dsh-demo-001-r20ef75d026f1",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第3行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第3行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-migration-dsh-demo-001-r20ef75d026f1",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第4行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第4行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "VAR-security-operations-expert-002-r79757f173c53",
+        "actual": "变体"
+      }
+    },
+    {
+      "name": "真实评测中心 第5行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第5行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-security-operations-expert-024-rad80a907c628",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第6行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第6行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-security-operations-expert-026-r6aebbb22df61",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第7行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第7行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-security-operations-expert-024-rad80a907c628",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第8行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第8行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "VAR-security-operations-expert-002-r79757f173c53",
+        "actual": "变体"
+      }
+    },
+    {
+      "name": "真实评测中心 第9行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第9行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-security-operations-expert-024-rad80a907c628",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第10行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第10行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-security-operations-expert-026-r6aebbb22df61",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第11行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第11行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-security-operations-expert-024-rad80a907c628",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第12行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第12行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-security-operations-expert-026-r6aebbb22df61",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第13行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第13行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-security-operations-expert-024-rad80a907c628",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第14行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第14行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-audit-e2e-assistant-web-004-r9c5e2e27d234",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第15行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第15行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-audit-e2e-assistant-web-002-ra2a3ad241109",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第16行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第16行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-security-operations-expert-026-r6aebbb22df61",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第17行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第17行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-security-operations-expert-024-rad80a907c628",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第18行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第18行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-audit-e2e-assistant-web-002-ra2a3ad241109",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第19行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第19行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "VAR-security-operations-expert-002-r79757f173c53",
+        "actual": "变体"
+      }
+    },
+    {
+      "name": "真实评测中心 第20行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第20行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-security-operations-expert-024-rad80a907c628",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第21行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第21行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-audit-e2e-assistant-web-002-ra2a3ad241109",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第22行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第22行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "VAR-security-operations-expert-002-r79757f173c53",
+        "actual": "变体"
+      }
+    },
+    {
+      "name": "真实评测中心 第23行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第23行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-audit-e2e-multiturn-001-r6d45ef5006be",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第24行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第24行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-security-operations-expert-024-rad80a907c628",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第25行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第25行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-audit-e2e-multiturn-001-r6d45ef5006be",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第26行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第26行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-audit-e2e-migrate-001-r21862857f1d8",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第27行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第27行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-audit-e2e-assistant-web-001-r57f20304b3c4",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第28行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第28行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-migration-langgraph-demo-001-rac1e3af8bc94",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第29行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第29行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-migration-langgraph-demo-001-rac1e3af8bc94",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第30行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第30行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-migration-langchain-demo-001-rfa4065d93d85",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第31行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第31行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-migration-opencode-demo-001-r2085b6b7a566",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第32行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第32行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-migration-langchain-demo-001-rfa4065d93d85",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第33行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第33行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-migration-opencode-demo-001-r2085b6b7a566",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第34行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第34行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-migration-langgraph-demo-001-rac1e3af8bc94",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第35行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第35行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-migration-langgraph-demo-001-rac1e3af8bc94",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第36行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第36行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-migration-opencode-demo-001-r2085b6b7a566",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第37行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第37行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-migration-dsh-demo-001-r20ef75d026f1",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第38行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第38行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-migration-opencode-demo-001-r2085b6b7a566",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第39行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第39行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-migration-langgraph-demo-001-rac1e3af8bc94",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第40行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第40行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-migration-dsh-demo-001-r20ef75d026f1",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第41行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第41行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-migration-langchain-demo-001-rfa4065d93d85",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第42行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第42行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-migration-agentscope-demo-001-rd991aeb01b21",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第43行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第43行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-migration-dsh-demo-001-r20ef75d026f1",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第44行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第44行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-migration-dsh-demo-001-r20ef75d026f1",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第45行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第45行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "VAR-security-operations-expert-001-r66152e077843",
+        "actual": "变体"
+      }
+    },
+    {
+      "name": "真实评测中心 第46行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第46行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-security-operations-expert-024-rad80a907c628",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第47行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第47行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-security-operations-expert-024-rad80a907c628",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第48行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第48行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-security-operations-expert-025-r36771c9bf2a5",
+        "actual": "变体"
+      }
+    },
+    {
+      "name": "真实评测中心 第49行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第49行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-security-operations-expert-024-rad80a907c628",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第50行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第50行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-security-operations-expert-024-rad80a907c628",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第51行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第51行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-inspection-delivery-demo-003-r1c42f11c4f9a",
+        "actual": "变体"
+      }
+    },
+    {
+      "name": "真实评测中心 第52行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第52行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-inspection-delivery-demo-003-r1c42f11c4f9a",
+        "actual": "变体"
+      }
+    },
+    {
+      "name": "真实评测中心 第53行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第53行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-inspection-delivery-demo-002-r7430faf014e7",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第54行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第54行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-inspection-delivery-demo-003-r1c42f11c4f9a",
+        "actual": "变体"
+      }
+    },
+    {
+      "name": "真实评测中心 第55行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第55行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-inspection-delivery-demo-002-r7430faf014e7",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第56行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第56行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-inspection-delivery-demo-003-r1c42f11c4f9a",
+        "actual": "变体"
+      }
+    },
+    {
+      "name": "真实评测中心 第57行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第57行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-inspection-delivery-demo-003-r1c42f11c4f9a",
+        "actual": "变体"
+      }
+    },
+    {
+      "name": "真实评测中心 第58行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第58行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-inspection-delivery-demo-003-r1c42f11c4f9a",
+        "actual": "变体"
+      }
+    },
+    {
+      "name": "真实评测中心 第59行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第59行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-inspection-delivery-demo-003-r1c42f11c4f9a",
+        "actual": "变体"
+      }
+    },
+    {
+      "name": "真实评测中心 第60行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第60行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-inspection-delivery-demo-002-r7430faf014e7",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第61行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第61行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-security-operations-expert-024-rad80a907c628",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第62行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第62行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-security-operations-expert-024-rad80a907c628",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第63行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第63行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-inspection-delivery-demo-001-rf841e4415364",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第64行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第64行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-daily-inspection-assistant-005-r0dae2ba1ebb1",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第65行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第65行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-daily-inspection-assistant-005-r0dae2ba1ebb1",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第66行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第66行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-daily-inspection-assistant-005-r0dae2ba1ebb1",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第67行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第67行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-daily-inspection-assistant-004-r965bc66e4614",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第68行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第68行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-daily-inspection-assistant-001-r602ec12fd531",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第69行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第69行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-daily-inspection-assistant-001-r602ec12fd531",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第70行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第70行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-autonomous-training-researcher-001-redf6be6240bf",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第71行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第71行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-multi-step-research-analyst-001-r97fa04b7c613",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第72行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第72行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-autonomous-training-researcher-001-redf6be6240bf",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第73行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第73行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-multi-step-research-analyst-001-r97fa04b7c613",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第74行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第74行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-multi-step-research-analyst-001-r97fa04b7c613",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第75行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第75行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-daily-inspection-assistant-003-r6fcb63b26bd9",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第76行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第76行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-autonomous-training-researcher-001-redf6be6240bf",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第77行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第77行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-multi-step-research-analyst-001-r97fa04b7c613",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第78行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第78行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-daily-inspection-assistant-001-r602ec12fd531",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第79行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第79行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-daily-inspection-assistant-001-r602ec12fd531",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第80行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第80行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-daily-inspection-assistant-001-r602ec12fd531",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第81行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第81行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-daily-inspection-assistant-001-r602ec12fd531",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第82行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第82行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-daily-inspection-assistant-001-r602ec12fd531",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第83行完整后缀",
+      "ok": true
+    },
+    {
+      "name": "真实评测中心 第83行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-daily-inspection-assistant-001-r602ec12fd531",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第84行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-test01-002",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 第85行身份与声明一致",
+      "ok": true,
+      "detail": {
+        "id": "EXP-test01-002",
+        "actual": "智能体"
+      }
+    },
+    {
+      "name": "真实评测中心 存在完整随机后缀",
+      "ok": true
+    },
+    {
+      "name": "首页 light-1440 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "评测中心 light-1440 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "首页 light-768 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "评测中心 light-768 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "首页 light-390 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "首页 light-390 保留表头",
+      "ok": true
+    },
+    {
+      "name": "首页 light-390 表区域支持横向滚动",
+      "ok": true
+    },
+    {
+      "name": "首页 light-390 滚动后操作可见",
+      "ok": true
+    },
+    {
+      "name": "首页 light-390 操作可点击",
+      "ok": true
+    },
+    {
+      "name": "评测中心 light-390 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "评测中心 light-390 保留表头",
+      "ok": true
+    },
+    {
+      "name": "评测中心 light-390 表区域支持横向滚动",
+      "ok": true
+    },
+    {
+      "name": "评测中心 light-390 滚动后操作可见",
+      "ok": true
+    },
+    {
+      "name": "评测中心 light-390 操作可点击",
+      "ok": true
+    },
+    {
+      "name": "首页 dark-1440 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "评测中心 dark-1440 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "首页 dark-768 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "评测中心 dark-768 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "首页 dark-390 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "首页 dark-390 保留表头",
+      "ok": true
+    },
+    {
+      "name": "首页 dark-390 表区域支持横向滚动",
+      "ok": true
+    },
+    {
+      "name": "首页 dark-390 滚动后操作可见",
+      "ok": true
+    },
+    {
+      "name": "首页 dark-390 操作可点击",
+      "ok": true
+    },
+    {
+      "name": "评测中心 dark-390 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "评测中心 dark-390 保留表头",
+      "ok": true
+    },
+    {
+      "name": "评测中心 dark-390 表区域支持横向滚动",
+      "ok": true
+    },
+    {
+      "name": "评测中心 dark-390 滚动后操作可见",
+      "ok": true
+    },
+    {
+      "name": "评测中心 dark-390 操作可点击",
+      "ok": true
+    },
+    {
+      "name": "类型筛选 智能体 仅显示对应记录",
+      "ok": true,
+      "detail": {
+        "count": 72
+      }
+    },
+    {
+      "name": "类型筛选 变体 仅显示对应记录",
+      "ok": true,
+      "detail": {
+        "count": 13
+      }
+    },
+    {
+      "name": "恢复全部类型记录数",
+      "ok": true
+    },
+    {
+      "name": "真实Run可定位所属智能体和版本",
+      "ok": true
+    },
+    {
+      "name": "点击结果保持Agent/Experiment/Run身份",
+      "ok": true
+    },
+    {
+      "name": "刷新保持原Run身份",
+      "ok": true
+    },
+    {
+      "name": "返回记录保持原筛选对象",
+      "ok": true
+    },
+    {
+      "name": "实际加载HTTP模块匹配当前客户端制品和URL适配",
+      "ok": true
+    },
+    {
+      "name": "无浏览器脚本异常",
+      "ok": true
+    },
+    {
+      "name": "恢复原主题偏好",
+      "ok": true
+    }
+  ],
+  "failures": [],
+  "pageErrors": [],
+  "blockedWrites": [
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    }
+  ],
+  "limitations": [],
+  "screenshots": [
+    ".local/evaluation-object-20261104/browser-home-light-1440.png",
+    ".local/evaluation-object-20261104/browser-evaluation-light-1440.png",
+    ".local/evaluation-object-20261104/browser-home-light-768.png",
+    ".local/evaluation-object-20261104/browser-evaluation-light-768.png",
+    ".local/evaluation-object-20261104/browser-home-light-390.png",
+    ".local/evaluation-object-20261104/browser-evaluation-light-390.png",
+    ".local/evaluation-object-20261104/browser-home-dark-1440.png",
+    ".local/evaluation-object-20261104/browser-evaluation-dark-1440.png",
+    ".local/evaluation-object-20261104/browser-home-dark-768.png",
+    ".local/evaluation-object-20261104/browser-evaluation-dark-768.png",
+    ".local/evaluation-object-20261104/browser-home-dark-390.png",
+    ".local/evaluation-object-20261104/browser-evaluation-dark-390.png"
+  ],
+  "initialTheme": "light",
+  "homeRealRows": 2,
+  "homeRecentRecords": 8,
+  "evaluationRealRows": 85,
+  "realObjectTypes": [
+    "智能体",
+    "变体"
+  ],
+  "clientSha256": "9813acd18ccc20fa170cc362517594086a79fc73f38aa9bd4e30e1da1ecdf86b",
+  "expectedHttpModuleSha256": "8668dfbdde77b5cb257b34171d867bc69673d3206ab809be0aa3c1716884a767",
+  "finalTheme": "light"
+}

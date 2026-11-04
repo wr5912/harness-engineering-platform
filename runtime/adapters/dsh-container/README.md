@@ -222,6 +222,8 @@ API 与浏览器执行器每次发送输入后，按官方 SDK `session/wait` �
 
 评测可选 `--source-ref git:<40位提交>`，从同一提交读取 Candidate、角色绑定与 Case；固定文件物化到数据根 `.local/evaluation-sources/`，Run 仍写入原 Experiment，不覆盖当前工作树。`--mcp-fixture <JSON文件>` 仅为本次被测 Runtime 提供明确的 Mock 连接映射：`{schema_version:1,mode:"mock",connections:[{server_id,original_url,url,enabled?}]}`。映射必须匹配来源中的原地址，保留工具名称与选择范围，不携带原目标凭据。平台 `eval/preview`、`eval/start` 对应参数为 `source_ref` 和 `mcp_fixture` 对象。Run 保存映射原字节、SHA-256 和源／目标地址；比较必须使用相同映射摘要，报告明确标记 Mock 环境。省略参数时继续使用当前来源和连接。
 
+`dsh-eval --run-id run-<UUIDv4>` 将预分配编号传给 Run 初始化；省略时仍自动生成。平台使用方式及创建失败、旧数据和恢复边界统一见[评测运行合同](../../../docs/platform-design/04_核心业务闭环与服务接口.md#评测运行身份与恢复)。
+
 已声明 `role-tool-matrix.yaml` 的新 Run 将原字节保存在 `evidence/managed/role-tool-matrix.yaml`，由 `inputs.lock.json.managed_role_snapshot` 指向；SHA-256 与大小沿用 `harness_trees.managed.files` 的同一条记录。复核和模型用量核算共用该冻结注册声明；注册位置不能证明没有推理，实际调用标记与供应商用量按执行证据核算，证据不足或相互矛盾时保留未知。历史 Run 只接受与原锁摘要一致的已有审读原文，不从当前 Candidate 回填。
 
 新 Run 的 `harness_review` 锁定源码与生成制品的审读分类。只有受控构建回执完整记录 TypeScript 检查及实际打包输入（`source_inputs_version: 1`），并与当前源码、共享 SDK、编译器、平台依赖锁、已准备业务依赖和实际 ESM 摘要一致时，生成制品才以摘要和构建身份进入材料；对应业务源码与共享 SDK 源码仍完整必读。无法核验、手写或陈旧制品继续全文审读，凭据文件不进入源码投影。旧 Run 沿用其原始锁定合同和既定必读材料，不按当前构建回执重新分类。

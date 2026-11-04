@@ -110,7 +110,7 @@ lines,first=inspect.getsourcelines(owner)
 at=None
 if mode=="handoff":
     initialized=next(index for index,text in enumerate(lines) if text.strip()=="stop_reason = None")
-    at=next(index for index,text in enumerate(lines) if index>initialized and text.strip()=="try:")
+    at=next(index for index,text in enumerate(lines) if index>initialized and text.strip()=="with allow_cancellation():")
 elif mode=="post-cleanup":
     g["run_driver"]=lambda *args: (_ for _ in ()).throw(m.EvaluationError("fixture-failure"))
     at=next(index for index,text in enumerate(lines) if text.strip()=="if fatal_reason:")

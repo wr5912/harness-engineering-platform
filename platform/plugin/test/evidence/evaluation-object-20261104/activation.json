@@ -1,0 +1,19 @@
+{
+  "before": {
+    "pid": 3591404,
+    "cwd": "/home/admin/harness-engineering-platform-data",
+    "serverSha256": "75e179c97892df6c451d7c39a8f6c7699b624022204a0757e05014eeac6acaa0",
+    "profileSha256": "07c929ed9a93efd8dd4a86a7ac0a9f0c77d8ee1f9637602a5f94e098a37234e5",
+    "clientSha256": "0bb3fc14efbadde042f361a492b7039590e8541327f7348189ef427d33f428c2"
+  },
+  "after": {
+    "pid": 3591404,
+    "cwd": "/home/admin/harness-engineering-platform-data",
+    "serverSha256": "75e179c97892df6c451d7c39a8f6c7699b624022204a0757e05014eeac6acaa0",
+    "profileSha256": "07c929ed9a93efd8dd4a86a7ac0a9f0c77d8ee1f9637602a5f94e098a37234e5",
+    "clientSha256": "6204761cd5983893afeceee32f12efcae358822c0db2f3cad8b949a3077b9596"
+  },
+  "candidateSha256": "6204761cd5983893afeceee32f12efcae358822c0db2f3cad8b949a3077b9596",
+  "preserved": true,
+  "scope": "包含完整任务及Run ID、清晰任务文案的最终客户端；仅本地原生HMR"
+}

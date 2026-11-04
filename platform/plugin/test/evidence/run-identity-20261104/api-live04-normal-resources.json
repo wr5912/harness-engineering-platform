@@ -1,0 +1,16 @@
+{
+  "observed_at": "2026-11-04T11:53:02.600654+00:00",
+  "scope": "最终正常Run结束后的只读资源核对，不修改任何Run或HOME",
+  "run_id": "run-23c63f26-12b6-439f-9021-4272852c3b52",
+  "run_status": "completed",
+  "execution_status": "completed",
+  "instance_stopped": true,
+  "case_execution_status": "completed",
+  "case_verdict": "inconclusive",
+  "ui_smoke_passed": true,
+  "instance_name": "inspection-delivery-demo-eval-56f2a56f",
+  "matching_instance_containers": [],
+  "driver_name": "dsh-eval-driver-9164f287e0774363a47462402820b20a",
+  "matching_driver_containers": [],
+  "native_home_preserved": true
+}

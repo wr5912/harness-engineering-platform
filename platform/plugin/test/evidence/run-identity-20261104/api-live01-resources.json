@@ -1,0 +1,19 @@
+{
+  "observed_at": "2026-11-04T09:48:21.095725+00:00",
+  "scope": "只读补充观察，不改写两次失败Run的execution或状态",
+  "platform_pid": 3849088,
+  "instance_state_root": "/home/admin/harness-engineering-platform-data/.local/instances",
+  "process_has_no_state_root_override": true,
+  "instances": [
+    {
+      "name": "inspection-delivery-demo-eval-e70dfe99",
+      "instance_directory_exists": false,
+      "matching_container_names": []
+    },
+    {
+      "name": "inspection-delivery-demo-eval-ff80a103",
+      "instance_directory_exists": false,
+      "matching_container_names": []
+    }
+  ]
+}

@@ -1,0 +1,185 @@
+{
+  "scope": "仅用户授权的未使用、非镜像共享DSH构建缓存；不删除镜像/容器/卷/业务数据",
+  "before_free": 1143230464,
+  "candidates": [
+    {
+      "id": "lqd0vathyx3bwpj8tdnk5b7vj",
+      "bytes": 3122000000,
+      "size": "3.122GB",
+      "last_used": "2 weeks ago"
+    },
+    {
+      "id": "3fi8iuqf1ixyj2appsbjverwk",
+      "bytes": 2709000000,
+      "size": "2.709GB",
+      "last_used": "11 days ago"
+    },
+    {
+      "id": "hpx19wmaupik3rxor0pewzlsk",
+      "bytes": 2588000000,
+      "size": "2.588GB",
+      "last_used": "11 days ago"
+    },
+    {
+      "id": "pxpr36c34a4elsk4lslgje279",
+      "bytes": 2391000000,
+      "size": "2.391GB",
+      "last_used": "6 weeks ago"
+    },
+    {
+      "id": "jqlg22wdos4ua39q407sozeov",
+      "bytes": 2391000000,
+      "size": "2.391GB",
+      "last_used": "6 weeks ago"
+    },
+    {
+      "id": "lupbg08xzg3k3od1m9rfggreh",
+      "bytes": 2391000000,
+      "size": "2.391GB",
+      "last_used": "6 weeks ago"
+    },
+    {
+      "id": "idv9hkagl7h43mk302zg9bzep",
+      "bytes": 2391000000,
+      "size": "2.391GB",
+      "last_used": "7 weeks ago"
+    },
+    {
+      "id": "s21m524dga09rjvk3a8m6oe31",
+      "bytes": 2391000000,
+      "size": "2.391GB",
+      "last_used": "6 weeks ago"
+    },
+    {
+      "id": "3veir85pxcbs0fluc9c4q1q3g",
+      "bytes": 2077999999,
+      "size": "2.078GB",
+      "last_used": "6 weeks ago"
+    },
+    {
+      "id": "3sbkwmczbvbt99k4hzg3qf5jj",
+      "bytes": 1925000000,
+      "size": "1.925GB",
+      "last_used": "7 weeks ago"
+    },
+    {
+      "id": "4dnagsbdrd01ml7xu8o8plgd1",
+      "bytes": 1034999999,
+      "size": "1.035GB",
+      "last_used": "2 weeks ago"
+    },
+    {
+      "id": "rk8clsd3q0in4gkjs5ffs4ljj",
+      "bytes": 350400000,
+      "size": "350.4MB",
+      "last_used": "2 months ago"
+    },
+    {
+      "id": "3tplvghjqb3ol1tjidm7n3wuv",
+      "bytes": 350300000,
+      "size": "350.3MB",
+      "last_used": "2 months ago"
+    },
+    {
+      "id": "j4o6fwcspggy3wf0w0m8pzkhx",
+      "bytes": 350300000,
+      "size": "350.3MB",
+      "last_used": "2 months ago"
+    },
+    {
+      "id": "9q7eb7ogajgj9z3zfibfa8ymw",
+      "bytes": 350200000,
+      "size": "350.2MB",
+      "last_used": "2 months ago"
+    },
+    {
+      "id": "k3npgw8923lje4ml2eavq7hqp",
+      "bytes": 350200000,
+      "size": "350.2MB",
+      "last_used": "2 months ago"
+    }
+  ],
+  "actions": [
+    {
+      "id": "lqd0vathyx3bwpj8tdnk5b7vj",
+      "exit_code": 0,
+      "free_after": 1143226368
+    },
+    {
+      "id": "3fi8iuqf1ixyj2appsbjverwk",
+      "exit_code": 0,
+      "free_after": 1143222272
+    },
+    {
+      "id": "hpx19wmaupik3rxor0pewzlsk",
+      "exit_code": 0,
+      "free_after": 3731697664
+    },
+    {
+      "id": "pxpr36c34a4elsk4lslgje279",
+      "exit_code": 0,
+      "free_after": 3731697664
+    },
+    {
+      "id": "jqlg22wdos4ua39q407sozeov",
+      "exit_code": 0,
+      "free_after": 3731697664
+    },
+    {
+      "id": "lupbg08xzg3k3od1m9rfggreh",
+      "exit_code": 0,
+      "free_after": 3731697664
+    },
+    {
+      "id": "idv9hkagl7h43mk302zg9bzep",
+      "exit_code": 0,
+      "free_after": 3731697664
+    },
+    {
+      "id": "s21m524dga09rjvk3a8m6oe31",
+      "exit_code": 0,
+      "free_after": 3731681280
+    },
+    {
+      "id": "3veir85pxcbs0fluc9c4q1q3g",
+      "exit_code": 0,
+      "free_after": 3731681280
+    },
+    {
+      "id": "3sbkwmczbvbt99k4hzg3qf5jj",
+      "exit_code": 0,
+      "free_after": 3731681280
+    },
+    {
+      "id": "4dnagsbdrd01ml7xu8o8plgd1",
+      "exit_code": 0,
+      "free_after": 3731681280
+    },
+    {
+      "id": "rk8clsd3q0in4gkjs5ffs4ljj",
+      "exit_code": 0,
+      "free_after": 3731681280
+    },
+    {
+      "id": "3tplvghjqb3ol1tjidm7n3wuv",
+      "exit_code": 0,
+      "free_after": 3731681280
+    },
+    {
+      "id": "j4o6fwcspggy3wf0w0m8pzkhx",
+      "exit_code": 0,
+      "free_after": 3731673088
+    },
+    {
+      "id": "9q7eb7ogajgj9z3zfibfa8ymw",
+      "exit_code": 0,
+      "free_after": 3731673088
+    },
+    {
+      "id": "k3npgw8923lje4ml2eavq7hqp",
+      "exit_code": 0,
+      "free_after": 3731673088
+    }
+  ],
+  "after_free": 3731673088
+}

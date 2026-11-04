@@ -1,0 +1,51 @@
+{
+  "scope": "本次已有实例只读DOM就绪探测，阻止会话创建及其他写操作，不新建Run",
+  "instance": "inspection-delivery-demo-eval-88f19bce",
+  "observed_at": "2026-11-04T11:39:28.350Z",
+  "blocked": [
+    {
+      "path": "/agents/inspection-delivery-demo/instances/inspection-delivery-demo-eval-88f19bce/api/session/create",
+      "method": "session/create"
+    }
+  ],
+  "errors": [],
+  "http_status": 200,
+  "dom": {
+    "title": "DSH 本地构建",
+    "frame_count": 1,
+    "body_classes": "",
+    "button_labels": [
+      "DSH 本地构建\n0.2.1-rc.5-b830ec9",
+      "",
+      "新会话",
+      "插件",
+      "自动化任务",
+      "更多",
+      "",
+      "",
+      "",
+      "",
+      "更多",
+      "选择工作区",
+      "",
+      ""
+    ],
+    "fields": [
+      {
+        "tag": "INPUT",
+        "role": null,
+        "label": null,
+        "placeholder": "搜索会话名称",
+        "visible": true
+      },
+      {
+        "tag": "INPUT",
+        "role": null,
+        "label": null,
+        "placeholder": null,
+        "visible": false
+      }
+    ],
+    "dialogs": 0
+  }
+}

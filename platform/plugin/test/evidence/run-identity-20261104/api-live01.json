@@ -1,0 +1,206 @@
+{
+  "scope": "明确授权的两个最小真实browser评测Run：一个完整Mock分页UI冒烟、一个定向取消；只证明工程与浏览器链路，不作业务效果采纳。Case与Harness保持。",
+  "payload": {
+    "source": "experiment:VAR-inspection-delivery-demo-001-rfac75f4cb946",
+    "source_ref": "git:8fbb06e9387e407db77a081c21d8db9927054bd0",
+    "cases": [
+      "U-ASSET-PAGES-001"
+    ],
+    "mode": "full",
+    "executor": "browser",
+    "review": "none"
+  },
+  "checks": [
+    {
+      "name": "未预留RunID不能创建",
+      "ok": true
+    },
+    {
+      "name": "未预留请求没有Run或控制文件",
+      "ok": true
+    },
+    {
+      "name": "真实预览分配唯一RunID",
+      "ok": true
+    },
+    {
+      "name": "预览后仅准备且未创建",
+      "ok": true
+    },
+    {
+      "name": "撤销后的迟到提交不执行",
+      "ok": true
+    },
+    {
+      "name": "撤销预留无Run与控制文件残留",
+      "ok": true
+    },
+    {
+      "name": "新的预览分配新RunID",
+      "ok": true
+    },
+    {
+      "name": "创建成功返回原预览RunID",
+      "ok": true
+    },
+    {
+      "name": "创建成功后实际Run目录存在",
+      "ok": true
+    },
+    {
+      "name": "最小真实Run 目录与清单、冻结输入、执行记录同ID",
+      "ok": true
+    },
+    {
+      "name": "最小真实Run 不生成第二个JobID",
+      "ok": true
+    },
+    {
+      "name": "最小真实Run 固定指定来源与原Case",
+      "ok": true
+    },
+    {
+      "name": "最小真实browser Run执行结束",
+      "ok": false,
+      "detail": {
+        "status": "failed",
+        "run_status": "failed"
+      }
+    },
+    {
+      "name": "最小真实Run的实例已停止",
+      "ok": false
+    },
+    {
+      "name": "终态原ID重发仅返回原Run",
+      "ok": true
+    },
+    {
+      "name": "原ID更换参数被拒绝",
+      "ok": true
+    },
+    {
+      "name": "取消只针对自己本次创建的Run",
+      "ok": true
+    },
+    {
+      "name": "定向取消Run 目录与清单、冻结输入、执行记录同ID",
+      "ok": true
+    },
+    {
+      "name": "定向取消Run 不生成第二个JobID",
+      "ok": true
+    },
+    {
+      "name": "定向取消Run 固定指定来源与原Case",
+      "ok": true
+    },
+    {
+      "name": "取消已结束并确认实例停止",
+      "ok": false,
+      "detail": {
+        "status": "failed",
+        "instance_stopped": false
+      }
+    },
+    {
+      "name": "列表仅发布实际已创建Run",
+      "ok": true
+    },
+    {
+      "name": "两次验收Run列表身份唯一且无预留行",
+      "ok": true
+    }
+  ],
+  "failures": [
+    "最小真实browser Run执行结束",
+    "最小真实Run的实例已停止",
+    "取消已结束并确认实例停止"
+  ],
+  "observations": [
+    {
+      "label": "completed-run",
+      "run_id": "run-465a2d42-791c-4f2d-a5c6-ace56550243e",
+      "run_created": false,
+      "status": "preparing"
+    },
+    {
+      "label": "completed-run",
+      "run_id": "run-465a2d42-791c-4f2d-a5c6-ace56550243e",
+      "run_created": true,
+      "status": "running",
+      "run_status": "planned"
+    },
+    {
+      "label": "completed-run",
+      "run_id": "run-465a2d42-791c-4f2d-a5c6-ace56550243e",
+      "run_created": true,
+      "status": "running",
+      "run_status": "running"
+    },
+    {
+      "label": "completed-run",
+      "run_id": "run-465a2d42-791c-4f2d-a5c6-ace56550243e",
+      "run_created": true,
+      "status": "failed",
+      "exit_code": 2,
+      "run_status": "failed"
+    },
+    {
+      "label": "cancel-run",
+      "run_id": "run-a82b8c85-d3d2-4d1f-afce-01e47e62ed3d",
+      "run_created": false,
+      "status": "preparing"
+    },
+    {
+      "label": "cancel-run",
+      "run_id": "run-a82b8c85-d3d2-4d1f-afce-01e47e62ed3d",
+      "run_created": true,
+      "status": "cancelling"
+    },
+    {
+      "label": "cancel-run",
+      "run_id": "run-a82b8c85-d3d2-4d1f-afce-01e47e62ed3d",
+      "run_created": true,
+      "status": "cancelling",
+      "run_status": "planned"
+    },
+    {
+      "label": "cancel-run",
+      "run_id": "run-a82b8c85-d3d2-4d1f-afce-01e47e62ed3d",
+      "run_created": true,
+      "status": "failed",
+      "exit_code": 2,
+      "run_status": "failed"
+    }
+  ],
+  "created": [
+    {
+      "run_id": "run-465a2d42-791c-4f2d-a5c6-ace56550243e",
+      "directory": "/home/admin/harness-engineering-platform-data/evolution/experiments/VAR-inspection-delivery-demo-001-rfac75f4cb946/runs/run-465a2d42-791c-4f2d-a5c6-ace56550243e",
+      "status": "failed",
+      "source_ref": "git:8fbb06e9387e407db77a081c21d8db9927054bd0",
+      "executor": "browser",
+      "review_mode": "none",
+      "execution_status": "failed",
+      "instance_name": "inspection-delivery-demo-eval-e70dfe99",
+      "instance_stopped": false,
+      "lock_sha256": "2db6531cfdc4b84a0129cb2d3b52c2b6458b2c31871a4cb00b6a0562e65b78d9"
+    },
+    {
+      "run_id": "run-a82b8c85-d3d2-4d1f-afce-01e47e62ed3d",
+      "directory": "/home/admin/harness-engineering-platform-data/evolution/experiments/VAR-inspection-delivery-demo-001-rfac75f4cb946/runs/run-a82b8c85-d3d2-4d1f-afce-01e47e62ed3d",
+      "status": "failed",
+      "source_ref": "git:8fbb06e9387e407db77a081c21d8db9927054bd0",
+      "executor": "browser",
+      "review_mode": "none",
+      "execution_status": "failed",
+      "instance_name": "inspection-delivery-demo-eval-ff80a103",
+      "instance_stopped": false,
+      "lock_sha256": "6efee1ebd151f48e56e0f743f37e2715e2630528c29d4d89fd93f5e8c9128826"
+    }
+  ],
+  "preparedRunId": "run-bd26f05b-4748-4636-8423-15836aef1b11",
+  "completedRunId": "run-465a2d42-791c-4f2d-a5c6-ace56550243e",
+  "cancelledRunId": "run-a82b8c85-d3d2-4d1f-afce-01e47e62ed3d"
+}

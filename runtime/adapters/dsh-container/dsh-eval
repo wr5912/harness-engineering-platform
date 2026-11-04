@@ -23,7 +23,7 @@ from urllib.parse import urlsplit
 
 ADAPTER = Path(__file__).resolve().parent
 sys.path.insert(0, str(ADAPTER))
-from workspace_paths import PROGRAM_ROOT, asset_root, instances_root, sites_config
+from workspace_paths import PROGRAM_ROOT, asset_root, instances_root, sites_config, workspace_id
 REPO = asset_root()
 EVALUATION_SCRIPTS = PROGRAM_ROOT / "runtime/research"
 for import_root in (ADAPTER, EVALUATION_SCRIPTS):
@@ -43,6 +43,7 @@ COMMON_DRIVER = ADAPTER / "dsh-eval-common.mjs"
 VALIDATE_REPOSITORY = PROGRAM_ROOT / "runtime/research/validate_repository.py"
 VALIDATE_EXPERIMENT = PROGRAM_ROOT / "runtime/research/validate_experiment.py"
 RUNTIME_STOP_REASONS = {"identity-drift", "evidence-cross-turn", "case-hard-timeout"}
+RUN_ID = re.compile(r"^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 
 
 class EvaluationError(RuntimeError):
@@ -169,12 +170,17 @@ def initialize_run(source: str, cases: list[dict], executor: str, selection_mode
                    model: str | None = None, compare_to: str | None = None,
                    source_ref: str | None = None, mcp_fixture: str | None = None,
                    model_policy: str | None = None, evaluation_source: str | None = None,
-                   concurrency: int = 1, parallel_cases: list[str] | None = None) -> str:
+                   concurrency: int = 1, parallel_cases: list[str] | None = None,
+                   run_id: str | None = None) -> str:
     command = [
         sys.executable, str(RUN_RECORD), "--repo", str(REPO), "init",
         "--source", source, "--kind", "research", "--executor", executor,
         "--selection-mode", selection_mode, "--review-mode", review_mode,
     ]
+    if run_id:
+        if not RUN_ID.fullmatch(run_id):
+            raise EvaluationError("run_id 必须是小写 run-UUIDv4")
+        command.extend(("--run-id", run_id))
     for case in cases:
         command.extend(("--case", case["case_id"]))
     if concurrency != 1 or parallel_cases:
@@ -194,10 +200,10 @@ def initialize_run(source: str, cases: list[dict], executor: str, selection_mode
     if model_policy:
         command.extend(("--model-policy", model_policy))
     completed = checked_process(command, label="创建 Run", timeout=180)
-    run_id = completed.stdout.strip()
-    if not run_id.startswith("run-"):
+    initialized_id = completed.stdout.strip()
+    if not RUN_ID.fullmatch(initialized_id) or run_id and initialized_id != run_id:
         raise EvaluationError("创建 Run 未返回有效 run_id")
-    return run_id
+    return initialized_id
 
 
 def record_trial(run_id: str, case_id: str, result: dict) -> None:
@@ -767,8 +773,15 @@ def execute(args: argparse.Namespace) -> int:
 def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict],
                       selection_mode: str, review_mode: str) -> int:
     progress("创建并锁定 Research Run")
+    run_id = None
+    run_dir = None
+    allocated_id = getattr(args, "run_id", None) or os.environ.get("HARNESS_EVAL_RUN_ID")
+    allocated_dir = Path(contract["experiment_root"]) / "runs" / allocated_id if isinstance(allocated_id, str) and RUN_ID.fullmatch(allocated_id) else None
+    existed_before = allocated_dir is not None and os.path.lexists(allocated_dir)
     try:
         selected_options = {key: getattr(args, key, None) for key in ("source_ref", "evaluation_source", "mcp_fixture", "model_policy") if getattr(args, key, None)}
+        if allocated_id:
+            selected_options["run_id"] = allocated_id
         if getattr(args, "concurrency", 1) != 1 or getattr(args, "parallel_case", []):
             selected_options.update(concurrency=args.concurrency, parallel_cases=args.parallel_case)
         run_id = initialize_run(args.source, cases, args.executor, selection_mode, review_mode,
@@ -780,22 +793,74 @@ def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict
         if args.executor == "api":
             judge_contract = locked_inputs.get("review_contract") or locked_inputs["judge_contract"]
             contract = {**contract, "judge_model_route": judge_contract["model_route"]}
-        progress(f"Research Run: {run_id}")
         recorded: set[str] = set()
         instance_name = f"{contract['agent_id']}-eval-{uuid.uuid4().hex[:8]}"
-        execution = {"schema_version": "1.0", "job_id": os.environ.get("HARNESS_EVAL_JOB_ID"),
+        try:
+            process_stat = Path(f"/proc/{os.getpid()}/stat").read_text(encoding="utf-8")
+            process_start = process_stat[process_stat.rfind(")") + 2:].split()[19]
+        except (OSError, IndexError):
+            process_start = None
+        execution = {"schema_version": "1.0", "workspace_id": workspace_id(REPO), "asset_root": str(REPO.resolve()),
+                     "process_start": process_start, "request_sha256": os.environ.get("HARNESS_EVAL_REQUEST_SHA256"),
                      "pid": os.getpid(), "run_id": run_id, "instance_name": instance_name,
                      "status": "running", "deadline_at": os.environ.get("HARNESS_EVAL_DEADLINE_AT")}
         write_json(run_dir / "execution.json", execution)
+        progress(f"Research Run: {run_id}")
         up_attempted = False
         fatal_reason = None
         interrupted = False
         cleanup_failed = False
         runtime_rows: dict[str, dict] = {}
         stop_reason = None
-    except EvaluationError as error:
-        progress(f"创建 Run 失败：{error}")
-        emit_result(contract["experiment_id"], len(cases), executor=args.executor)
+    except (EvaluationError, OSError, ValueError, KeyError, TypeError) as error:
+        if run_id is None and allocated_dir is not None and not existed_before:
+            # 子进程可能在提交清单后异常返回；只接回本次调用独占创建的已提交 Run。
+            try:
+                from run_record import read_run_manifest
+                marker_path = allocated_dir / ".initialization.json"
+                files = (marker_path, allocated_dir / "run.yaml", allocated_dir / "inputs.lock.json")
+                if allocated_dir.is_symlink() or any(path.is_symlink() or not path.is_file() for path in files) or os.path.lexists(allocated_dir / "execution.json"):
+                    raise ValueError("Run initialization ownership is unknown")
+                marker = json.loads(marker_path.read_text(encoding="utf-8"))
+                manifest = read_run_manifest(allocated_dir / "run.yaml")
+                locked = json.loads((allocated_dir / "inputs.lock.json").read_text(encoding="utf-8"))
+                if marker.get("schema_version") != "1.0" or marker.get("parent_pid") != os.getpid() or marker.get("run_id") != allocated_id \
+                        or marker.get("asset_root") != str(REPO.resolve()) or marker.get("workspace_id") != workspace_id(REPO) \
+                        or marker.get("request_sha256") != os.environ.get("HARNESS_EVAL_REQUEST_SHA256") \
+                        or manifest.get("run_id") != allocated_id or manifest.get("experiment_id") != contract["experiment_id"] \
+                        or manifest.get("agent_id") != contract["agent_id"] or manifest.get("source_id") != contract["source_id"] \
+                        or locked.get("run_id") != allocated_id or locked.get("source_id") != contract["source_id"] \
+                        or locked.get("source_ref") != contract.get("source_ref"):
+                    raise ValueError("Run initialization identity does not match this request")
+                run_id, run_dir = allocated_id, allocated_dir
+            except (OSError, ValueError, KeyError, TypeError, AttributeError):
+                pass
+        if run_id is None or run_dir is None:
+            progress(f"创建 Run 失败：{error}")
+            emit_result(contract["experiment_id"], len(cases), executor=args.executor)
+            return 2
+        # init 已提交的 Run 不能因执行归属交接失败而被当作未创建删除。
+        reason = process_error_detail(str(error), "run-initialization-handoff-failed")
+        progress(f"Run 已创建，执行准备失败：{reason}")
+        try:
+            write_json(run_dir / "execution.json", {"schema_version": "1.0", "run_id": run_id,
+                       "status": "failed", "instance_stopped": True, "failure_reason": reason})
+        except OSError:
+            progress("执行失败回执暂时无法写入，已保留 Run。")
+        try:
+            finalize_run(run_id, "failed")
+        except (EvaluationError, OSError, ValueError):
+            # 冻结输入损坏时无法生成完整报告，仍标明已提交 Run 的执行失败。
+            from run_record import read_run_manifest, write_flat_yaml, utc_now
+            try:
+                manifest = read_run_manifest(run_dir / "run.yaml")
+                if manifest.get("agent_id") != contract["agent_id"] or manifest.get("experiment_id") != contract["experiment_id"]:
+                    raise ValueError("Run identity mismatch")
+                manifest.update(status="failed", finished_at=utc_now(), recovery_note=reason)
+                write_flat_yaml(run_dir / "run.yaml", manifest)
+            except (OSError, ValueError):
+                progress("Run 封存暂未完成，已保留清单和冻结输入供核对。")
+        emit_result(contract["experiment_id"], len(cases), run_id=run_id, executor=args.executor)
         return 2
     try:
         with allow_cancellation():
@@ -938,6 +1003,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", type=Path, default=REPO, help="用户数据工作区根目录")
     parser.add_argument("--source", required=True, help="experiment:<id> 或已登记 Experiment ID")
+    parser.add_argument("--run-id", help="预分配的 run-UUIDv4；省略时生成新的 Run ID")
     parser.add_argument("--source-ref", help="固定来源 git:<40位提交>，角色、Case 与运行资产读取同一提交")
     parser.add_argument("--evaluation-source", choices=("source", "current"), help="source 沿用所选来源用例（默认）；current 明确使用当前工作区用例并随 Run 冻结")
     parser.add_argument("--mcp-fixture", help="仅本次评测使用的明确 Mock MCP 连接映射 JSON")
@@ -960,6 +1026,12 @@ def main() -> None:
                         help="仅配 --dry-run：校验来源与 Case，不核对业务默认模型连接")
     parser.add_argument("--timeout-seconds", type=int, default=300, help="每轮等待上限（秒）")
     args = parser.parse_args()
+    allocated_id = os.environ.get("HARNESS_EVAL_RUN_ID")
+    if args.run_id and allocated_id and args.run_id != allocated_id:
+        parser.error("--run-id 与 HARNESS_EVAL_RUN_ID 不一致")
+    args.run_id = args.run_id or allocated_id
+    if args.run_id and not RUN_ID.fullmatch(args.run_id):
+        parser.error("run_id 必须是小写 run-UUIDv4")
     REPO = args.repo.expanduser().resolve()
     os.environ["HARNESS_ASSET_ROOT"] = str(REPO)
     if args.timeout_seconds < 10:

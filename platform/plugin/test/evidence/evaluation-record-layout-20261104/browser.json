@@ -1,0 +1,832 @@
+{
+  "scope": "实际平台只读首列宽度核验，不执行业务写操作",
+  "checks": [
+    {
+      "name": "light-1440 完整Run ID单行",
+      "ok": true
+    },
+    {
+      "name": "light-1440 Run ID独占行",
+      "ok": true
+    },
+    {
+      "name": "light-1440 首列容纳完整ID",
+      "ok": true
+    },
+    {
+      "name": "light-1440 无整页横溢出",
+      "ok": true
+    },
+    {
+      "name": "light-1440 其余列可见内容不越界",
+      "ok": true
+    },
+    {
+      "name": "light-1440 开始结束时间分别独占一行",
+      "ok": true
+    },
+    {
+      "name": "light-1440 时间对应真实Run且未虚构结束时间",
+      "ok": true
+    },
+    {
+      "name": "light-1440 列顺序保持",
+      "ok": true
+    },
+    {
+      "name": "light-1440 操作列可命中",
+      "ok": true
+    },
+    {
+      "name": "light-768 完整Run ID单行",
+      "ok": true
+    },
+    {
+      "name": "light-768 Run ID独占行",
+      "ok": true
+    },
+    {
+      "name": "light-768 首列容纳完整ID",
+      "ok": true
+    },
+    {
+      "name": "light-768 无整页横溢出",
+      "ok": true
+    },
+    {
+      "name": "light-768 其余列可见内容不越界",
+      "ok": true
+    },
+    {
+      "name": "light-768 开始结束时间分别独占一行",
+      "ok": true
+    },
+    {
+      "name": "light-768 时间对应真实Run且未虚构结束时间",
+      "ok": true
+    },
+    {
+      "name": "light-768 列顺序保持",
+      "ok": true
+    },
+    {
+      "name": "light-768 保持局部横滚",
+      "ok": true
+    },
+    {
+      "name": "light-768 操作列可命中",
+      "ok": true
+    },
+    {
+      "name": "light-390 完整Run ID单行",
+      "ok": true
+    },
+    {
+      "name": "light-390 Run ID独占行",
+      "ok": true
+    },
+    {
+      "name": "light-390 首列容纳完整ID",
+      "ok": true
+    },
+    {
+      "name": "light-390 无整页横溢出",
+      "ok": true
+    },
+    {
+      "name": "light-390 其余列可见内容不越界",
+      "ok": true
+    },
+    {
+      "name": "light-390 开始结束时间分别独占一行",
+      "ok": true
+    },
+    {
+      "name": "light-390 时间对应真实Run且未虚构结束时间",
+      "ok": true
+    },
+    {
+      "name": "light-390 列顺序保持",
+      "ok": true
+    },
+    {
+      "name": "light-390 保持局部横滚",
+      "ok": true
+    },
+    {
+      "name": "light-390 操作列可命中",
+      "ok": true
+    },
+    {
+      "name": "dark-1440 完整Run ID单行",
+      "ok": true
+    },
+    {
+      "name": "dark-1440 Run ID独占行",
+      "ok": true
+    },
+    {
+      "name": "dark-1440 首列容纳完整ID",
+      "ok": true
+    },
+    {
+      "name": "dark-1440 无整页横溢出",
+      "ok": true
+    },
+    {
+      "name": "dark-1440 其余列可见内容不越界",
+      "ok": true
+    },
+    {
+      "name": "dark-1440 开始结束时间分别独占一行",
+      "ok": true
+    },
+    {
+      "name": "dark-1440 时间对应真实Run且未虚构结束时间",
+      "ok": true
+    },
+    {
+      "name": "dark-1440 列顺序保持",
+      "ok": true
+    },
+    {
+      "name": "dark-1440 操作列可命中",
+      "ok": true
+    },
+    {
+      "name": "dark-768 完整Run ID单行",
+      "ok": true
+    },
+    {
+      "name": "dark-768 Run ID独占行",
+      "ok": true
+    },
+    {
+      "name": "dark-768 首列容纳完整ID",
+      "ok": true
+    },
+    {
+      "name": "dark-768 无整页横溢出",
+      "ok": true
+    },
+    {
+      "name": "dark-768 其余列可见内容不越界",
+      "ok": true
+    },
+    {
+      "name": "dark-768 开始结束时间分别独占一行",
+      "ok": true
+    },
+    {
+      "name": "dark-768 时间对应真实Run且未虚构结束时间",
+      "ok": true
+    },
+    {
+      "name": "dark-768 列顺序保持",
+      "ok": true
+    },
+    {
+      "name": "dark-768 保持局部横滚",
+      "ok": true
+    },
+    {
+      "name": "dark-768 操作列可命中",
+      "ok": true
+    },
+    {
+      "name": "dark-390 完整Run ID单行",
+      "ok": true
+    },
+    {
+      "name": "dark-390 Run ID独占行",
+      "ok": true
+    },
+    {
+      "name": "dark-390 首列容纳完整ID",
+      "ok": true
+    },
+    {
+      "name": "dark-390 无整页横溢出",
+      "ok": true
+    },
+    {
+      "name": "dark-390 其余列可见内容不越界",
+      "ok": true
+    },
+    {
+      "name": "dark-390 开始结束时间分别独占一行",
+      "ok": true
+    },
+    {
+      "name": "dark-390 时间对应真实Run且未虚构结束时间",
+      "ok": true
+    },
+    {
+      "name": "dark-390 列顺序保持",
+      "ok": true
+    },
+    {
+      "name": "dark-390 保持局部横滚",
+      "ok": true
+    },
+    {
+      "name": "dark-390 操作列可命中",
+      "ok": true
+    },
+    {
+      "name": "查看结果保持同Run身份",
+      "ok": true
+    },
+    {
+      "name": "无评测写操作",
+      "ok": true
+    },
+    {
+      "name": "无页面脚本异常",
+      "ok": true
+    },
+    {
+      "name": "恢复主题",
+      "ok": true
+    }
+  ],
+  "failures": [],
+  "errors": [],
+  "blockedWrites": [
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    }
+  ],
+  "layouts": [
+    {
+      "name": "light-1440",
+      "width": 1440,
+      "rows": 88,
+      "first": {
+        "id": "run-23c63f26-12b6-439f-9021-4272852c3b52",
+        "text": "Run ID：run-23c63f26-12b6-439f-9021-4272852c3b52",
+        "start": 0,
+        "lines": 1,
+        "idRects": [
+          {
+            "x": 62,
+            "y": 525.5625,
+            "right": 110.6875,
+            "bottom": 542.5625,
+            "width": 48.6875,
+            "height": 17
+          },
+          {
+            "x": 110.6875,
+            "y": 525.5625,
+            "right": 358.59375,
+            "bottom": 542.5625,
+            "width": 247.90625,
+            "height": 17
+          }
+        ],
+        "priorRects": [],
+        "caseRects": [
+          {
+            "x": 62,
+            "y": 502.375,
+            "right": 131.359375
+          }
+        ],
+        "otherFits": true,
+        "columnWidths": [
+          364.796875,
+          167.1875,
+          212.796875,
+          91.1875,
+          106.390625,
+          152,
+          152,
+          197.59375,
+          76.046875
+        ],
+        "cell": {
+          "left": 50,
+          "right": 414.796875,
+          "width": 364.796875,
+          "paddingLeft": 12,
+          "paddingRight": 12
+        },
+        "status": "completed",
+        "timeRows": [
+          {
+            "text": "开始：2026/11/4 19:51:32",
+            "datetime": "2026-11-04T11:51:32Z",
+            "top": 490.875,
+            "bottom": 510.0625,
+            "lines": 1,
+            "fits": true
+          },
+          {
+            "text": "结束：2026/11/4 19:51:59",
+            "datetime": "2026-11-04T11:51:59Z",
+            "top": 510.0625,
+            "bottom": 529.25,
+            "lines": 1,
+            "fits": true
+          }
+        ],
+        "timeText": "开始：2026/11/4 19:51:32\n结束：2026/11/4 19:51:59",
+        "timeHTML": "<span class=\"harness-eval-timestamp\">开始：<time datetime=\"2026-11-04T11:51:32Z\">2026/11/4 19:51:32</time></span><span class=\"harness-eval-timestamp\">结束：<time datetime=\"2026-11-04T11:51:59Z\">2026/11/4 19:51:59</time></span>"
+      },
+      "allSingleLine": true,
+      "lineCounts": [
+        1
+      ],
+      "withoutEndTime": [
+        {
+          "id": "run-7847167b-0176-4754-ae24-038eeaeee024",
+          "status": "failed",
+          "text": "开始：2026/10/30 23:52:27\n结束：未记录"
+        }
+      ],
+      "scroll": {
+        "clientWidth": 1340,
+        "scrollWidth": 1520,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "light-768",
+      "width": 768,
+      "rows": 88,
+      "first": {
+        "id": "run-23c63f26-12b6-439f-9021-4272852c3b52",
+        "text": "Run ID：run-23c63f26-12b6-439f-9021-4272852c3b52",
+        "start": 0,
+        "lines": 1,
+        "idRects": [
+          {
+            "x": 62,
+            "y": 434.609375,
+            "right": 110.6875,
+            "bottom": 451.609375,
+            "width": 48.6875,
+            "height": 17
+          },
+          {
+            "x": 110.6875,
+            "y": 434.609375,
+            "right": 358.59375,
+            "bottom": 451.609375,
+            "width": 247.90625,
+            "height": 17
+          }
+        ],
+        "priorRects": [],
+        "caseRects": [
+          {
+            "x": 62,
+            "y": 411.421875,
+            "right": 131.359375
+          }
+        ],
+        "otherFits": true,
+        "columnWidths": [
+          364.796875,
+          167.1875,
+          212.796875,
+          91.1875,
+          106.390625,
+          152,
+          152,
+          197.59375,
+          76.046875
+        ],
+        "cell": {
+          "left": 50,
+          "right": 414.796875,
+          "width": 364.796875,
+          "paddingLeft": 12,
+          "paddingRight": 12
+        },
+        "status": "completed",
+        "timeRows": [
+          {
+            "text": "开始：2026/11/4 19:51:32",
+            "datetime": "2026-11-04T11:51:32Z",
+            "top": 399.921875,
+            "bottom": 419.109375,
+            "lines": 1,
+            "fits": true
+          },
+          {
+            "text": "结束：2026/11/4 19:51:59",
+            "datetime": "2026-11-04T11:51:59Z",
+            "top": 419.109375,
+            "bottom": 438.296875,
+            "lines": 1,
+            "fits": true
+          }
+        ],
+        "timeText": "开始：2026/11/4 19:51:32\n结束：2026/11/4 19:51:59",
+        "timeHTML": "<span class=\"harness-eval-timestamp\">开始：<time datetime=\"2026-11-04T11:51:32Z\">2026/11/4 19:51:32</time></span><span class=\"harness-eval-timestamp\">结束：<time datetime=\"2026-11-04T11:51:59Z\">2026/11/4 19:51:59</time></span>"
+      },
+      "allSingleLine": true,
+      "lineCounts": [
+        1
+      ],
+      "withoutEndTime": [
+        {
+          "id": "run-7847167b-0176-4754-ae24-038eeaeee024",
+          "status": "failed",
+          "text": "开始：2026/10/30 23:52:27\n结束：未记录"
+        }
+      ],
+      "scroll": {
+        "clientWidth": 668,
+        "scrollWidth": 1520,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "light-390",
+      "width": 390,
+      "rows": 88,
+      "first": {
+        "id": "run-23c63f26-12b6-439f-9021-4272852c3b52",
+        "text": "Run ID：run-23c63f26-12b6-439f-9021-4272852c3b52",
+        "start": 0,
+        "lines": 1,
+        "idRects": [
+          {
+            "x": 41,
+            "y": 583.171875,
+            "right": 89.6875,
+            "bottom": 600.171875,
+            "width": 48.6875,
+            "height": 17
+          },
+          {
+            "x": 89.6875,
+            "y": 583.171875,
+            "right": 337.59375,
+            "bottom": 600.171875,
+            "width": 247.90625,
+            "height": 17
+          }
+        ],
+        "priorRects": [],
+        "caseRects": [
+          {
+            "x": 41,
+            "y": 562.984375,
+            "right": 110.359375
+          }
+        ],
+        "otherFits": true,
+        "columnWidths": [
+          364.796875,
+          167.1875,
+          212.796875,
+          91.1875,
+          106.390625,
+          152,
+          152,
+          197.59375,
+          76.046875
+        ],
+        "cell": {
+          "left": 29,
+          "right": 393.796875,
+          "width": 364.796875,
+          "paddingLeft": 12,
+          "paddingRight": 12
+        },
+        "status": "completed",
+        "timeRows": [
+          {
+            "text": "开始：2026/11/4 19:51:32",
+            "datetime": "2026-11-04T11:51:32Z",
+            "top": 549.890625,
+            "bottom": 569.078125,
+            "lines": 1,
+            "fits": true
+          },
+          {
+            "text": "结束：2026/11/4 19:51:59",
+            "datetime": "2026-11-04T11:51:59Z",
+            "top": 569.078125,
+            "bottom": 588.265625,
+            "lines": 1,
+            "fits": true
+          }
+        ],
+        "timeText": "开始：2026/11/4 19:51:32\n结束：2026/11/4 19:51:59",
+        "timeHTML": "<span class=\"harness-eval-timestamp\">开始：<time datetime=\"2026-11-04T11:51:32Z\">2026/11/4 19:51:32</time></span><span class=\"harness-eval-timestamp\">结束：<time datetime=\"2026-11-04T11:51:59Z\">2026/11/4 19:51:59</time></span>"
+      },
+      "allSingleLine": true,
+      "lineCounts": [
+        1
+      ],
+      "withoutEndTime": [
+        {
+          "id": "run-7847167b-0176-4754-ae24-038eeaeee024",
+          "status": "failed",
+          "text": "开始：2026/10/30 23:52:27\n结束：未记录"
+        }
+      ],
+      "scroll": {
+        "clientWidth": 332,
+        "scrollWidth": 1520,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "dark-1440",
+      "width": 1440,
+      "rows": 88,
+      "first": {
+        "id": "run-23c63f26-12b6-439f-9021-4272852c3b52",
+        "text": "Run ID：run-23c63f26-12b6-439f-9021-4272852c3b52",
+        "start": 0,
+        "lines": 1,
+        "idRects": [
+          {
+            "x": 62,
+            "y": 361.5625,
+            "right": 110.6875,
+            "bottom": 378.5625,
+            "width": 48.6875,
+            "height": 17
+          },
+          {
+            "x": 110.6875,
+            "y": 361.5625,
+            "right": 358.59375,
+            "bottom": 378.5625,
+            "width": 247.90625,
+            "height": 17
+          }
+        ],
+        "priorRects": [],
+        "caseRects": [
+          {
+            "x": 62,
+            "y": 338.375,
+            "right": 131.359375
+          }
+        ],
+        "otherFits": true,
+        "columnWidths": [
+          364.796875,
+          167.1875,
+          212.796875,
+          91.1875,
+          106.390625,
+          152,
+          152,
+          197.59375,
+          76.046875
+        ],
+        "cell": {
+          "left": 50,
+          "right": 414.796875,
+          "width": 364.796875,
+          "paddingLeft": 12,
+          "paddingRight": 12
+        },
+        "status": "completed",
+        "timeRows": [
+          {
+            "text": "开始：2026/11/4 19:51:32",
+            "datetime": "2026-11-04T11:51:32Z",
+            "top": 326.875,
+            "bottom": 346.0625,
+            "lines": 1,
+            "fits": true
+          },
+          {
+            "text": "结束：2026/11/4 19:51:59",
+            "datetime": "2026-11-04T11:51:59Z",
+            "top": 346.0625,
+            "bottom": 365.25,
+            "lines": 1,
+            "fits": true
+          }
+        ],
+        "timeText": "开始：2026/11/4 19:51:32\n结束：2026/11/4 19:51:59",
+        "timeHTML": "<span class=\"harness-eval-timestamp\">开始：<time datetime=\"2026-11-04T11:51:32Z\">2026/11/4 19:51:32</time></span><span class=\"harness-eval-timestamp\">结束：<time datetime=\"2026-11-04T11:51:59Z\">2026/11/4 19:51:59</time></span>"
+      },
+      "allSingleLine": true,
+      "lineCounts": [
+        1
+      ],
+      "withoutEndTime": [
+        {
+          "id": "run-7847167b-0176-4754-ae24-038eeaeee024",
+          "status": "failed",
+          "text": "开始：2026/10/30 23:52:27\n结束：未记录"
+        }
+      ],
+      "scroll": {
+        "clientWidth": 1340,
+        "scrollWidth": 1520,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "dark-768",
+      "width": 768,
+      "rows": 88,
+      "first": {
+        "id": "run-23c63f26-12b6-439f-9021-4272852c3b52",
+        "text": "Run ID：run-23c63f26-12b6-439f-9021-4272852c3b52",
+        "start": 0,
+        "lines": 1,
+        "idRects": [
+          {
+            "x": 62,
+            "y": 434.609375,
+            "right": 110.6875,
+            "bottom": 451.609375,
+            "width": 48.6875,
+            "height": 17
+          },
+          {
+            "x": 110.6875,
+            "y": 434.609375,
+            "right": 358.59375,
+            "bottom": 451.609375,
+            "width": 247.90625,
+            "height": 17
+          }
+        ],
+        "priorRects": [],
+        "caseRects": [
+          {
+            "x": 62,
+            "y": 411.421875,
+            "right": 131.359375
+          }
+        ],
+        "otherFits": true,
+        "columnWidths": [
+          364.796875,
+          167.1875,
+          212.796875,
+          91.1875,
+          106.390625,
+          152,
+          152,
+          197.59375,
+          76.046875
+        ],
+        "cell": {
+          "left": 50,
+          "right": 414.796875,
+          "width": 364.796875,
+          "paddingLeft": 12,
+          "paddingRight": 12
+        },
+        "status": "completed",
+        "timeRows": [
+          {
+            "text": "开始：2026/11/4 19:51:32",
+            "datetime": "2026-11-04T11:51:32Z",
+            "top": 399.921875,
+            "bottom": 419.109375,
+            "lines": 1,
+            "fits": true
+          },
+          {
+            "text": "结束：2026/11/4 19:51:59",
+            "datetime": "2026-11-04T11:51:59Z",
+            "top": 419.109375,
+            "bottom": 438.296875,
+            "lines": 1,
+            "fits": true
+          }
+        ],
+        "timeText": "开始：2026/11/4 19:51:32\n结束：2026/11/4 19:51:59",
+        "timeHTML": "<span class=\"harness-eval-timestamp\">开始：<time datetime=\"2026-11-04T11:51:32Z\">2026/11/4 19:51:32</time></span><span class=\"harness-eval-timestamp\">结束：<time datetime=\"2026-11-04T11:51:59Z\">2026/11/4 19:51:59</time></span>"
+      },
+      "allSingleLine": true,
+      "lineCounts": [
+        1
+      ],
+      "withoutEndTime": [
+        {
+          "id": "run-7847167b-0176-4754-ae24-038eeaeee024",
+          "status": "failed",
+          "text": "开始：2026/10/30 23:52:27\n结束：未记录"
+        }
+      ],
+      "scroll": {
+        "clientWidth": 668,
+        "scrollWidth": 1520,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "dark-390",
+      "width": 390,
+      "rows": 88,
+      "first": {
+        "id": "run-23c63f26-12b6-439f-9021-4272852c3b52",
+        "text": "Run ID：run-23c63f26-12b6-439f-9021-4272852c3b52",
+        "start": 0,
+        "lines": 1,
+        "idRects": [
+          {
+            "x": 41,
+            "y": 583.171875,
+            "right": 89.6875,
+            "bottom": 600.171875,
+            "width": 48.6875,
+            "height": 17
+          },
+          {
+            "x": 89.6875,
+            "y": 583.171875,
+            "right": 337.59375,
+            "bottom": 600.171875,
+            "width": 247.90625,
+            "height": 17
+          }
+        ],
+        "priorRects": [],
+        "caseRects": [
+          {
+            "x": 41,
+            "y": 562.984375,
+            "right": 110.359375
+          }
+        ],
+        "otherFits": true,
+        "columnWidths": [
+          364.796875,
+          167.1875,
+          212.796875,
+          91.1875,
+          106.390625,
+          152,
+          152,
+          197.59375,
+          76.046875
+        ],
+        "cell": {
+          "left": 29,
+          "right": 393.796875,
+          "width": 364.796875,
+          "paddingLeft": 12,
+          "paddingRight": 12
+        },
+        "status": "completed",
+        "timeRows": [
+          {
+            "text": "开始：2026/11/4 19:51:32",
+            "datetime": "2026-11-04T11:51:32Z",
+            "top": 549.890625,
+            "bottom": 569.078125,
+            "lines": 1,
+            "fits": true
+          },
+          {
+            "text": "结束：2026/11/4 19:51:59",
+            "datetime": "2026-11-04T11:51:59Z",
+            "top": 569.078125,
+            "bottom": 588.265625,
+            "lines": 1,
+            "fits": true
+          }
+        ],
+        "timeText": "开始：2026/11/4 19:51:32\n结束：2026/11/4 19:51:59",
+        "timeHTML": "<span class=\"harness-eval-timestamp\">开始：<time datetime=\"2026-11-04T11:51:32Z\">2026/11/4 19:51:32</time></span><span class=\"harness-eval-timestamp\">结束：<time datetime=\"2026-11-04T11:51:59Z\">2026/11/4 19:51:59</time></span>"
+      },
+      "allSingleLine": true,
+      "lineCounts": [
+        1
+      ],
+      "withoutEndTime": [
+        {
+          "id": "run-7847167b-0176-4754-ae24-038eeaeee024",
+          "status": "failed",
+          "text": "开始：2026/10/30 23:52:27\n结束：未记录"
+        }
+      ],
+      "scroll": {
+        "clientWidth": 332,
+        "scrollWidth": 1520,
+        "overflowX": "auto"
+      }
+    }
+  ],
+  "screenshots": [
+    ".local/eval-run-id-width-20261104/final-visible-light-1440.png",
+    ".local/eval-run-id-width-20261104/final-visible-light-768.png",
+    ".local/eval-run-id-width-20261104/final-visible-light-390.png",
+    ".local/eval-run-id-width-20261104/final-visible-dark-1440.png",
+    ".local/eval-run-id-width-20261104/final-visible-dark-768.png",
+    ".local/eval-run-id-width-20261104/final-visible-dark-390.png"
+  ],
+  "initialTheme": "light",
+  "openedRunId": "run-23c63f26-12b6-439f-9021-4272852c3b52",
+  "finalTheme": "light"
+}

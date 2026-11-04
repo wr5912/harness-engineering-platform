@@ -1,0 +1,79 @@
+{
+  "scope": "原生产函数+真实Playwright HTTP/ZIP边界探针；不发送业务请求或创建Run",
+  "source": "runtime/adapters/dsh-container/dsh-eval-browser.mjs",
+  "source_sha256": "e2a0e7d8dbddb1777918c6a71c2bfaaf9efaad9cb67a17ef2c243b54e188ad86",
+  "checks": [
+    {
+      "name": "短输入：不依赖缺失的turnOutline投影",
+      "ok": true,
+      "exports": [
+        "own"
+      ]
+    },
+    {
+      "name": "长输入：50字符预览截断后仍按全文核对",
+      "ok": true,
+      "exports": [
+        "own"
+      ]
+    },
+    {
+      "name": "短输入：预览空白折叠不影响全文核对",
+      "ok": true,
+      "exports": [
+        "own"
+      ]
+    },
+    {
+      "name": "同预览而全文不同的候选不能认领或触发安全停止",
+      "ok": true,
+      "exports": [
+        "other",
+        "own"
+      ]
+    },
+    {
+      "name": "未更新的已有会话以及子会话不导出或认领",
+      "ok": true,
+      "exports": [
+        "own"
+      ]
+    },
+    {
+      "name": "一个候选暂时无法导出不阻塞其他有效候选",
+      "ok": true,
+      "exports": [
+        "unavailable",
+        "own"
+      ]
+    },
+    {
+      "name": "无完整根输入时不凭预览或子日志认领",
+      "ok": true,
+      "exports": [
+        "empty"
+      ]
+    },
+    {
+      "name": "只核对根会话最后一条完整用户输入",
+      "ok": true,
+      "exports": [
+        "other"
+      ]
+    },
+    {
+      "name": "全文匹配后仍拒绝错误preset",
+      "ok": true,
+      "exports": [
+        "own"
+      ]
+    },
+    {
+      "name": "全文匹配后仍拒绝错误workspace",
+      "ok": true,
+      "exports": [
+        "own"
+      ]
+    }
+  ]
+}

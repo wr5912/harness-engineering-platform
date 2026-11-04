@@ -1,0 +1,43 @@
+{
+  "scope": "原授权DSH缓存lqd同源完整子链，叶到根；只清构建缓存",
+  "before_free": 8323821568,
+  "actions": [
+    {
+      "id": "w97ozp31rdx9sg3cwiff6iolr",
+      "exit_code": 0,
+      "free_after": 8320225280,
+      "summary": "ID\t\t\t\t\t\tRECLAIMABLE\tSIZE\t\tLAST ACCESSED\nw97ozp31rdx9sg3cwiff6iolr               \ttrue \t\t4.128kB   \t2 weeks ago\nTotal:\t4.128kB"
+    },
+    {
+      "id": "rt7rnumhnuz5d3ynw74ydcm03",
+      "exit_code": 0,
+      "free_after": 8319217664,
+      "summary": "ID\t\t\t\t\t\tRECLAIMABLE\tSIZE\t\tLAST ACCESSED\nrt7rnumhnuz5d3ynw74ydcm03               \ttrue \t\t257.1kB   \t2 weeks ago\nTotal:\t257.1kB"
+    },
+    {
+      "id": "4dnagsbdrd01ml7xu8o8plgd1",
+      "exit_code": 0,
+      "free_after": 9073070080,
+      "summary": "ID\t\t\t\t\t\tRECLAIMABLE\tSIZE\t\tLAST ACCESSED\n4dnagsbdrd01ml7xu8o8plgd1               \ttrue \t\t1.035GB   \t2 weeks ago\nTotal:\t1.035GB"
+    },
+    {
+      "id": "o89phbdo0z4yvcqqrbo5b84zc",
+      "exit_code": 0,
+      "free_after": 9072427008,
+      "summary": "ID\t\t\t\t\t\tRECLAIMABLE\tSIZE\t\tLAST ACCESSED\no89phbdo0z4yvcqqrbo5b84zc               \ttrue \t\t17.34kB   \t2 weeks ago\nTotal:\t17.34kB"
+    },
+    {
+      "id": "s398xqskq9swd13v1w31v43sq",
+      "exit_code": 0,
+      "free_after": 9071951872,
+      "summary": "ID\t\t\t\t\t\tRECLAIMABLE\tSIZE\t\tLAST ACCESSED\ns398xqskq9swd13v1w31v43sq               \ttrue \t\t28.91kB   \t2 weeks ago\nTotal:\t28.91kB"
+    },
+    {
+      "id": "lqd0vathyx3bwpj8tdnk5b7vj",
+      "exit_code": 0,
+      "free_after": 11522977792,
+      "summary": "ID\t\t\t\t\t\tRECLAIMABLE\tSIZE\t\tLAST ACCESSED\nlqd0vathyx3bwpj8tdnk5b7vj               \ttrue \t\t3.122GB   \t2 weeks ago\nTotal:\t3.122GB"
+    }
+  ],
+  "after_free": 11522977792
+}

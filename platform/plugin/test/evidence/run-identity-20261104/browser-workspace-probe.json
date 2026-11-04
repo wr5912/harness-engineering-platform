@@ -1,0 +1,127 @@
+{
+  "scope": "真实 Playwright DOM 交互探针；生产函数原文执行，页面为原生工作区边界夹具，不代表真实 DSH 或业务 Run",
+  "source": "runtime/adapters/dsh-container/dsh-eval-browser.mjs",
+  "source_sha256": "654696a8f3dd1ad1d836ed539ae747bf6cfeb04adab1baf2987dfb9bb10ea660",
+  "checks": [
+    {
+      "language": "zh",
+      "kind": "button",
+      "menu": false,
+      "ok": true,
+      "actual": {
+        "path": "/work/harness/workspace",
+        "actions": [
+          "chooser",
+          "edit",
+          "open"
+        ]
+      }
+    },
+    {
+      "language": "zh",
+      "kind": "button",
+      "menu": true,
+      "ok": true,
+      "actual": {
+        "path": "/work/harness/workspace",
+        "actions": [
+          "chooser",
+          "add",
+          "edit",
+          "open"
+        ]
+      }
+    },
+    {
+      "language": "zh",
+      "kind": "legacy",
+      "menu": false,
+      "ok": true,
+      "actual": {
+        "path": "/work/harness/workspace",
+        "actions": [
+          "chooser",
+          "edit",
+          "open"
+        ]
+      }
+    },
+    {
+      "language": "zh",
+      "kind": "legacy",
+      "menu": true,
+      "ok": true,
+      "actual": {
+        "path": "/work/harness/workspace",
+        "actions": [
+          "chooser",
+          "add",
+          "edit",
+          "open"
+        ]
+      }
+    },
+    {
+      "language": "en",
+      "kind": "button",
+      "menu": false,
+      "ok": true,
+      "actual": {
+        "path": "/work/harness/workspace",
+        "actions": [
+          "chooser",
+          "edit",
+          "open"
+        ]
+      }
+    },
+    {
+      "language": "en",
+      "kind": "button",
+      "menu": true,
+      "ok": true,
+      "actual": {
+        "path": "/work/harness/workspace",
+        "actions": [
+          "chooser",
+          "add",
+          "edit",
+          "open"
+        ]
+      }
+    },
+    {
+      "language": "en",
+      "kind": "legacy",
+      "menu": false,
+      "ok": true,
+      "actual": {
+        "path": "/work/harness/workspace",
+        "actions": [
+          "chooser",
+          "edit",
+          "open"
+        ]
+      }
+    },
+    {
+      "language": "en",
+      "kind": "legacy",
+      "menu": true,
+      "ok": true,
+      "actual": {
+        "path": "/work/harness/workspace",
+        "actions": [
+          "chooser",
+          "add",
+          "edit",
+          "open"
+        ]
+      }
+    },
+    {
+      "kind": "already-registered",
+      "ok": true
+    }
+  ]
+}

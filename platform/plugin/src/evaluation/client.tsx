@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { Fragment, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { MarkdownDelegateProvider, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
 import { CaseCreationDialog } from './cases-editor.tsx'
 import { CaseExpected, CaseExpectedPreview } from './case-expected.tsx'
@@ -11,6 +11,7 @@ import { CHANNEL } from '../protocol.ts'
 import { SearchSelect } from '../components/search-select.tsx'
 import { DetailDrawer } from '../components/detail-drawer.tsx'
 import { LoadingIndicator } from '../components/loading-indicator.tsx'
+import { evaluationAgentName, evaluationObjectType, evaluationVersionLabel, type EvaluationExperiment } from './object-identity.ts'
 import { DistributionChart, type ChartSegment } from '../components/overview-charts.tsx'
 import { caseObservation, observationLabel, type CaseObservation } from './case-observation.ts'
 import type { PlatformNavigation, PlatformPageProps } from '../protocol.ts'
@@ -20,31 +21,35 @@ type Tab = 'cases' | 'jobs' | 'runs' | 'compare'
 type RunTab = 'report' | 'results' | 'files' | 'datasets'
 const runTabValue = (value: PlatformNavigation['run_tab']): RunTab => value === 'trace' ? 'files' : value ?? 'report'
 const isTraceFile = (path: string) => /(?:^|\/)(?:trace|judge-trace)\.jsonl$/.test(path)
-const evaluationRequestId = () => globalThis.crypto?.randomUUID?.() ?? 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, marker => {
-  const value = Math.floor(Math.random() * 16)
-  return (marker === 'x' ? value : value & 3 | 8).toString(16)
-})
 type RpcResult = { ok: true; value: any } | { ok: false; error: { code: string; message: string } }
-type Agent = { id: string; name?: string; active_experiment?: string | null }
+type Agent = { id: string; name?: string; manifest?: Record<string, any>; active_experiment?: string | null }
 type CaseCounts = { total: number; passed: number; failed: number; inconclusive: number; mixed: number; pending: number }
 type Run = { stale?: boolean; run_id: string; experiment_id: string; agent_id: string; status?: string; created_at?: string; finished_at?: string; effective_verdict?: string | null; title?: string | null; case_scope?: string | null; case_counts?: CaseCounts | null; review_contract?: ReviewContract; review_status?: string; source_diagnosis?: SourceDiagnosis | null }
-type EvaluationJob = { job_id: string; source: string; agent_id?: string | null; experiment_id?: string | null; status: string; run_id?: string; started_at: string; updated_at?: string; error?: string }
-type EvaluationSubmission = { request_id: string; payload: Record<string, unknown>; agentId: string; experimentId: string; runId: string; tab: string; runSelection: number }
-const submissionKey = () => `harness-evaluation-pending:${new URL('.', document.baseURI).href}`
-function savedSubmission(): EvaluationSubmission | null {
+type EvaluationExecution = { run_id: string | null; run_created: boolean; legacy_id?: string; source?: string; agent_id?: string | null; experiment_id?: string | null; status: string; started_at?: string; updated_at?: string; error?: string; [key: string]: any }
+type EvaluationSubmission = { run_id: string; payload: Record<string, unknown>; agentId: string; experimentId: string; previousRunId: string; tab: string; runSelection: number; scope: string; legacy_id?: string }
+const submissionKey = (scope: string) => `harness-evaluation-pending:v2:${new URL('.', document.baseURI).href}:${scope}`
+const legacySubmissionKey = () => `harness-evaluation-pending:${new URL('.', document.baseURI).href}`
+function savedSubmission(scope: string): EvaluationSubmission | null {
+  if (!scope) return null
   try {
-    const value = JSON.parse(window.sessionStorage.getItem(submissionKey()) ?? 'null')
-    return value && /^[0-9a-f-]{36}$/.test(value.request_id) && typeof value.agentId === 'string' && typeof value.experimentId === 'string'
+    const value = JSON.parse(window.sessionStorage.getItem(submissionKey(scope)) ?? 'null')
+    return value && /^run-[0-9a-f-]{36}$/.test(value.run_id) && value.scope === scope && typeof value.agentId === 'string' && typeof value.experimentId === 'string'
       && value.payload?.source === `experiment:${value.experimentId}` ? value : null
   } catch { return null }
 }
 function saveSubmission(value: EvaluationSubmission): boolean {
-  try { const text = JSON.stringify(value); window.sessionStorage.setItem(submissionKey(), text); return window.sessionStorage.getItem(submissionKey()) === text }
+  try { const text = JSON.stringify(value); window.sessionStorage.setItem(submissionKey(value.scope), text); return window.sessionStorage.getItem(submissionKey(value.scope)) === text }
   catch { return false }
 }
 function clearSubmission(value: EvaluationSubmission) {
-  try { if (savedSubmission()?.request_id === value.request_id) window.sessionStorage.removeItem(submissionKey()) } catch {}
+  try {
+    if (value.legacy_id) window.sessionStorage.removeItem(legacySubmissionKey())
+    else if (savedSubmission(value.scope)?.run_id === value.run_id) window.sessionStorage.removeItem(submissionKey(value.scope))
+  } catch {}
 }
+const legacyRequestId = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const executionKey = (value?: EvaluationExecution | null) => value?.run_id ?? value?.legacy_id ?? ''
+const missingExecution = (error: unknown) => ['not_found', 'creation_expired', 'expired'].includes(String((error as any)?.code ?? ''))
 type CaseDraft = { title: string; inputs: string[]; expected_behavior: string; fast: boolean }
 type CaseDocument = { case: { id: string; title: string; inputs: string[]; expected_behavior: string; scene?: string; tier?: string; fast?: boolean }; sha256: string; path: string }
 type RunFile = { path: string; size: number; kind: 'text' | 'binary' }
@@ -58,7 +63,7 @@ type EvaluationPageProps = PlatformPageProps & {
 }
 const tabs: { id: Tab; label: string }[] = [{ id: 'runs', label: '评测记录' }, { id: 'cases', label: '测试用例' }, { id: 'compare', label: '结果比较' }]
 const markdownLabels = { code: { copyLabel: '复制', copiedLabel: '已复制' }, footnotes: '脚注' }
-const statusLabels: Record<string, string> = { planned: '计划中', running: '运行中', cancelling: '正在取消', completed: '已完成', failed: '失败', cancelled: '已取消', unknown: '状态待核对', passed: '通过', inconclusive: '无法判定', error: '执行错误', skipped: '已跳过', not_requested: '未请求', pending: '等待中' }
+const statusLabels: Record<string, string> = { prepared: '尚未启动', preparing: '正在准备', planned: '计划中', running: '运行中', cancelling: '正在取消', completed: '已完成', failed: '失败', cancelled: '已取消', unknown: '状态待核对', passed: '通过', inconclusive: '无法判定', error: '执行错误', skipped: '已跳过', not_requested: '未请求', pending: '等待中' }
 const label = (value: unknown) => typeof value === 'string' ? statusLabels[value] ?? value : '未记录'
 const executionLabel = (value: unknown) => value === 'completed' ? '已结束' : value === 'failed' ? '执行错误' : label(value)
 const verdictLabel = (value: unknown) => value === 'failed' ? '未通过' : value === 'passed' ? '通过' : value === 'inconclusive' ? '无法判定' : '尚无结论'
@@ -72,10 +77,7 @@ const elapsed = (value: unknown) => {
   const minutes = Math.floor((Date.now() - started) / 60000)
   return minutes < 60 ? `已用 ${minutes} 分钟` : `已用 ${Math.floor(minutes / 60)} 小时 ${minutes % 60} 分钟`
 }
-const versionName = (value: string) => {
-  const match = value.match(/-(\d{3})(?:-r[0-9a-f]{12})?$/)
-  return match ? `v${match[1]}` : value
-}
+const versionName = evaluationVersionLabel
 const tabValue = (value?: string): Tab => value === 'jobs' ? 'jobs' : tabs.some(item => item.id === value) ? value as Tab : 'runs'
 const isFinal = (status?: string) => ['completed', 'failed', 'cancelled'].includes(status ?? '')
 const draftFor = (document: CaseDocument): CaseDraft => ({ title: document.case.title ?? '', inputs: [...(document.case.inputs ?? [])], expected_behavior: document.case.expected_behavior ?? '', fast: document.case.fast ?? document.case.tier === 'fast' })
@@ -128,6 +130,7 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
   const [agentId, setAgentId] = useState(target?.agent_id ?? '')
   const [experimentId, setExperimentId] = useState(target?.experiment_id ?? '')
   const [agents, setAgents] = useState<Agent[]>([])
+  const [experiments, setExperiments] = useState<EvaluationExperiment[]>([])
   const [agentsError, setAgentsError] = useState('')
   const [detail, setDetail] = useState<any>(null)
   const [detailError, setDetailError] = useState('')
@@ -138,6 +141,7 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
   const [runListReady, setRunListReady] = useState(false)
   const [runStatus, setRunStatus] = useState('')
   const [runVerdictFilter, setRunVerdictFilter] = useState('')
+  const [objectTypeFilter, setObjectTypeFilter] = useState('')
   const [runSearch, setRunSearch] = useState('')
   const [recordExpanded, setRecordExpanded] = useState(false)
   const [scopeFiltersOpen, setScopeFiltersOpen] = useState(false)
@@ -193,18 +197,20 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
   const [evalPreview, setEvalPreview] = useState<any>(null)
   const [evalError, setEvalError] = useState('')
   const [evalBusy, setEvalBusy] = useState(false)
-  const [evalPending, setEvalPending] = useState<EvaluationSubmission | null>(savedSubmission)
-  const evalSubmission = useRef(evalPending), evalSending = useRef(false), evalPersisted = useRef(!!evalPending)
-  const [job, setJob] = useState<any>(null)
+  const [assetScope, setAssetScope] = useState('')
+  const [evalPending, setEvalPending] = useState<EvaluationSubmission | null>(null)
+  const [pendingObservation, setPendingObservation] = useState<EvaluationExecution | null>(null)
+  const evalSubmission = useRef<EvaluationSubmission | null>(null), evalSending = useRef(false), evalPersisted = useRef(true)
+  const restoredScope = useRef('')
+  const previewRun = useRef<string | null>(null)
+  const [job, setJob] = useState<EvaluationExecution | null>(null)
   const [jobError, setJobError] = useState('')
   const cancellingJob = useRef('')
   const [cancelJobId, setCancelJobId] = useState('')
-  const [jobs, setJobs] = useState<EvaluationJob[]>([])
+  const [jobs, setJobs] = useState<EvaluationExecution[]>([])
   const [jobsError, setJobsError] = useState('')
   const [jobsLoading, setJobsLoading] = useState(false)
-  const jobNavigation = useRef<{ job_id: string; run_id?: string; agent_id: string; experiment_id: string; initial_run_id: string; run_selection_version: number } | null>(null)
   const runSelectionVersion = useRef(0)
-  const previousTarget = useRef({ run_id: target?.run_id, job_id: target?.job_id })
   const [decisionOpen, setDecisionOpen] = useState(false)
   const [decisionTarget, setDecisionTarget] = useState({ agent: '', experiment: '' })
   const [decision, setDecision] = useState<{ body: string; hash: string | null | undefined; saved: string }>({ body: '', hash: undefined, saved: '' })
@@ -241,11 +247,11 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
 
   async function call(operation: string, payload: Record<string, unknown> = {}) {
     const result = await rpc.call(CHANNEL, `agents/${operation}`, payload) as RpcResult
-    if (!result.ok) throw Object.assign(new Error(`${result.error.code}: ${result.error.message}`), { rejected: true })
+    if (!result.ok) throw Object.assign(new Error(`${result.error.code}: ${result.error.message}`), { rejected: true, code: result.error.code })
     return result.value
   }
   function location(overrides: Partial<PlatformNavigation> = {}): PlatformNavigation {
-    return { page: 'evaluation', tab, agent_id: agentId || undefined, experiment_id: experimentId || undefined, run_id: runId || undefined, run_tab: tab === 'runs' && runTab !== 'report' ? runTab : undefined, case_id: caseId || undefined, job_id: target?.job_id, ...overrides }
+    return { page: 'evaluation', tab, agent_id: agentId || undefined, experiment_id: experimentId || undefined, run_id: runId || undefined, run_tab: tab === 'runs' && runTab !== 'report' ? runTab : undefined, case_id: caseId || undefined, ...overrides }
   }
   function leaveDrafts() {
     if (current.current.caseBusy || current.current.decisionBusy || current.current.datasetBusy || current.current.newCaseBusy) return false
@@ -258,7 +264,7 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
     recordScope.current = null
     detailRequest.current++; caseRequest.current++; evalRequest.current++; compareRequest.current++; decisionRequest.current++
     setNewCase(null); setAgentId(nextAgent); setExperimentId(nextExperiment); setDetail(null); setCaseId(''); setCaseDocument(null); setCaseDraft(null); setCaseLatest(null); setCaseEditing(false); setSelectedCases([]); setCaseMessage(''); setCaseConflict(false)
-    setDecisionOpen(false); setDecision({ body: '', hash: undefined, saved: '' }); setDecisionLatest(null); setConfigOpen(false); setEvalPreview(null); setEvalError(''); setEvalBusy(false)
+    setDecisionOpen(false); setDecision({ body: '', hash: undefined, saved: '' }); setDecisionLatest(null); setConfigOpen(false); releasePreview(); setEvalError(''); setEvalBusy(false)
     setComparison(null); setCompareCaseId(''); setCompareError(''); setCompareBusy(false); setLeftRun(''); setRightRun(''); setSceneFilter(''); setTierFilter(''); setRunId('')
   }
   function changeScope(nextAgent: string, nextExperiment = '') {
@@ -280,19 +286,17 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
     onNavigate?.({ page: 'evaluation', tab: 'runs', agent_id: scope.agent || undefined, experiment_id: scope.experiment || undefined })
     window.setTimeout(() => { const destination = runListTrigger.current?.isConnected ? runListTrigger.current : runListHeading.current; destination?.scrollIntoView({ block: 'center' }); destination?.focus({ preventScroll: true }) }, 0)
   }
-  function chooseRun(id: string, nextTab: Tab = tab, automatic = false, relatedJobId?: string) {
+  function chooseRun(id: string, nextTab: Tab = tab) {
     if (id !== runId && !leaveDrafts()) return
-    if (!automatic) {
-      if (tab === 'runs' && !runId) { recordScope.current = { agent: agentId, experiment: experimentId }; returnToComparison.current = false }
-      runSelectionVersion.current++
-      if (typeof HTMLElement !== 'undefined' && document.activeElement instanceof HTMLElement) runListTrigger.current = document.activeElement
-      focusRunDetail.current = true
-    }
+    if (tab === 'runs' && !runId) { recordScope.current = { agent: agentId, experiment: experimentId }; returnToComparison.current = false }
+    runSelectionVersion.current++
+    if (typeof HTMLElement !== 'undefined' && document.activeElement instanceof HTMLElement) runListTrigger.current = document.activeElement
+    focusRunDetail.current = true
     if (id !== runId) {
       runRequest.current++; fileRequest.current++; setRunId(id); setRunDetail(null); setReport(null); setRunFiles(null); setResultCaseId(''); setFilePath(''); setFilePreview(null)
     }
     setTab(nextTab); setRunTab('report')
-    onNavigate?.(location({ tab: nextTab, run_id: id, run_tab: undefined, case_id: undefined, job_id: automatic ? target?.job_id : relatedJobId, replace: automatic || undefined }))
+    onNavigate?.(location({ tab: nextTab, run_id: id, run_tab: undefined, case_id: undefined, job_id: undefined }))
   }
   function chooseRunTab(next: RunTab) {
     if (next === runTab && target?.run_tab !== 'trace' && (!target?.case_id || next === 'results')) return
@@ -308,33 +312,15 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
   async function loadAgents() {
     const request = ++listRequest.current
     setRunListReady(false)
-    try { const value = await call('list'); if (request === listRequest.current) { setAgents(value.agents ?? []); setAgentsError(''); if (!(value.agents ?? []).length) setRunListReady(true) } }
+    try { const value = await call('list'); if (request === listRequest.current) { setAssetScope(value.root || ''); setAgents(value.agents ?? []); setExperiments([...(value.experiments ?? []), ...(value.historical_experiments ?? [])]); setAgentsError(''); if (!(value.agents ?? []).length) setRunListReady(true) } }
     catch (error) { if (request === listRequest.current) { setAgentsError((error as Error).message); setRunListReady(true) } }
   }
   async function loadJobs() {
     const request = ++jobsRequest.current
     setJobsLoading(true); setJobsError('')
-    try { const value = await call('eval/list'); if (request === jobsRequest.current) setJobs(value.jobs ?? []) }
+    try { const value = await call('eval/list'); if (request === jobsRequest.current) { setJobs((value.runs ?? []).filter((item: EvaluationExecution) => item.run_created && item.run_id)); setJobsError((value.errors ?? []).map((item: any) => `${item.path || '运行观察'}：${item.message || item.error || '暂不可读'}`).join('；')) } }
     catch (error) { if (request === jobsRequest.current) setJobsError((error as Error).message) }
     finally { if (request === jobsRequest.current) setJobsLoading(false) }
-  }
-  function chooseJob(selected: EvaluationJob) {
-    if (!leaveDrafts()) return
-    focusRunDetail.current = false
-    focusJobDetail.current = true
-    if (typeof HTMLElement !== 'undefined' && document.activeElement instanceof HTMLElement && document.activeElement.closest('.harness-eval-record-list, #evaluation-panel-jobs')) runListTrigger.current = document.activeElement
-    const nextAgent = selected.agent_id ?? ''
-    const nextExperiment = selected.experiment_id ?? ''
-    if (nextAgent !== agentId || nextExperiment !== experimentId) resetScope(nextAgent, nextExperiment)
-    current.current = { ...current.current, tab: 'jobs', agentId: nextAgent, experimentId: nextExperiment, runId: '' }
-    jobNavigation.current = { job_id: selected.job_id, agent_id: nextAgent, experiment_id: nextExperiment,
-      initial_run_id: '', run_selection_version: runSelectionVersion.current, run_id: selected.run_id }
-    recordScope.current = { agent: agentId, experiment: experimentId }
-    returnToComparison.current = false
-    setJob(selected); setJobError(''); setTab('jobs')
-    onNavigate?.({ page: 'evaluation', tab: 'jobs', job_id: selected.job_id,
-      agent_id: nextAgent || undefined, experiment_id: nextExperiment || undefined })
-    void statusEvaluation(selected.job_id)
   }
   async function loadRuns() {
     const request = ++runsRequest.current
@@ -369,7 +355,7 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
       if (evalSubmission.current && !evalSending.current) tasks.push(recoverPendingEvaluation())
       if (snapshot.caseId && snapshot.experimentId && !snapshot.caseBusy) tasks.push(loadCase())
       if (snapshot.runId) tasks.push(loadRun())
-      if (snapshot.job?.job_id && !isFinal(snapshot.job.status)) tasks.push(statusEvaluation())
+      if (snapshot.job && executionKey(snapshot.job) && !isFinal(snapshot.job.status)) tasks.push(statusEvaluation(executionKey(snapshot.job)))
       await Promise.allSettled(tasks)
     } finally {
       refreshRunning.current = false
@@ -495,116 +481,139 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
     finally { if (request === compareRequest.current) setCompareBusy(false) }
   }
   function evalPayload() { return { source: `experiment:${experimentId}`, mode: caseScope === 'selected' ? 'full' : caseScope, executor, review: executor === 'browser' ? 'none' : review, ...(caseScope === 'selected' ? { cases: selectedCases } : {}) } }
-  function clearPreview() { evalRequest.current++; setEvalPreview(null); setEvalError('') }
+  function releasePreview() {
+    const id = previewRun.current
+    previewRun.current = null; setEvalPreview(null)
+    if (id && evalSubmission.current?.run_id !== id) void call('eval/cancel', { run_id: id }).catch(() => {})
+  }
+  function clearPreview() { evalRequest.current++; releasePreview(); setEvalError('') }
+  async function readPreview(payload: Record<string, unknown>, request: number) {
+    const value = await call('eval/preview', payload)
+    if (typeof value.run_id !== 'string' || !/^run-[0-9a-f-]{36}$/.test(value.run_id)) throw new Error('评测预览未返回有效 Run ID，请重新预览。')
+    if (request !== evalRequest.current || !current.current.active) { void call('eval/cancel', { run_id: value.run_id }).catch(() => {}); return null }
+    const preview = { ...(value.result ?? value), run_id: value.run_id }
+    previewRun.current = value.run_id; setEvalPreview(preview)
+    return preview
+  }
   async function previewEvaluation() {
-    if (!experimentId) return
+    if (!experimentId || !assetScope || evalSending.current || evalSubmission.current) return
+    releasePreview()
     const request = ++evalRequest.current
-    setEvalBusy(true); setEvalError(''); setEvalPreview(null)
-    try { const value = await call('eval/preview', evalPayload()); if (request === evalRequest.current) setEvalPreview(value.result ?? value) }
+    setEvalBusy(true); setEvalError('')
+    try { await readPreview(evalPayload(), request) }
     catch (error) { if (request === evalRequest.current) setEvalError((error as Error).message) }
     finally { setEvalBusy(false) }
   }
-  async function startEvaluation(resume?: EvaluationSubmission) {
-    // 自动回读可能先于旧按钮的点击回调完成；恢复操作只能指向它显示的原请求。
-    if (resume && evalSubmission.current?.request_id !== resume.request_id) return
-    if ((!experimentId && !evalSubmission.current) || evalSending.current) return
+  function finishSubmission(submission: EvaluationSubmission, message = '') {
+    if (evalSubmission.current !== submission) return
+    clearSubmission(submission); evalSubmission.current = null; setEvalPending(null); setPendingObservation(null); setEvalError(message)
+    if (previewRun.current === submission.run_id) { previewRun.current = null; setEvalPreview(null) }
+  }
+  async function startEvaluation() {
+    if (!experimentId || !assetScope || evalSending.current || evalSubmission.current) return
     evalSending.current = true
-    const request = ++evalRequest.current
-    const submission = evalSubmission.current ?? { request_id: evaluationRequestId(), payload: evalPayload(), agentId, experimentId, runId, tab, runSelection: runSelectionVersion.current }
-    evalSubmission.current = submission
-    evalPersisted.current = saveSubmission(submission)
-    setEvalPending(submission)
-    const initialRunSelection = submission.runSelection
+    const request = ++evalRequest.current, payload = evalPayload()
+    const origin = { agentId, experimentId, previousRunId: runId, tab, runSelection: runSelectionVersion.current, scope: assetScope }
     setEvalBusy(true); setEvalError('')
-    function accepted(value: any) {
-      clearSubmission(submission)
-      evalSubmission.current = null; setEvalPending(null)
-      if (request !== evalRequest.current) { void loadJobs(); return }
-      jobNavigation.current = { job_id: value.job_id, agent_id: submission.agentId, experiment_id: submission.experimentId, initial_run_id: submission.runId, run_selection_version: initialRunSelection }
-      setJob({ ...value, agent_id: submission.agentId, experiment_id: submission.experimentId }); setJobError('')
-      const state = current.current
-      if (state.agentId === submission.agentId && state.experimentId === submission.experimentId) setConfigOpen(false)
-      if (state.active && state.agentId === submission.agentId && state.experimentId === submission.experimentId && state.tab === submission.tab && state.runId === submission.runId && runSelectionVersion.current === initialRunSelection) {
-        chooseTab('runs', { job_id: value.job_id })
-        current.current.targetJobId = value.job_id
-      }
-      void loadJobs()
-      void statusEvaluation(value.job_id)
-    }
+    let submission: EvaluationSubmission | null = null
     try {
-      accepted(await call('eval/start', { ...submission.payload, request_id: submission.request_id }))
-    } catch (error) {
-      if ((error as any).rejected) {
-        clearSubmission(submission)
-        evalSubmission.current = null; setEvalPending(null)
-        if (request === evalRequest.current) setEvalError((error as Error).message)
-      } else {
-        try { accepted(await call('eval/status', { job_id: submission.request_id })) }
-        catch { setEvalError(`此次评测的受理结果未知，可能已经执行。请核对此次请求；继续时沿用同一请求，不会另建任务。目标：${submission.experimentId}。`) }
+      const preview = evalPreview?.run_id && previewRun.current === evalPreview.run_id ? evalPreview : await readPreview(payload, request)
+      if (!preview || request !== evalRequest.current) return
+      submission = { ...origin, run_id: preview.run_id, payload }
+      evalSubmission.current = submission; evalPersisted.current = saveSubmission(submission); setEvalPending(submission)
+      const value = await call('eval/start', { ...payload, run_id: submission.run_id })
+      if (value.run_id !== submission.run_id || value.run_created !== true) throw new Error('尚未核对到完整的 Run 创建回执，请查询原 Run。')
+      finishSubmission(submission)
+      void loadJobs(); void loadRuns()
+      const state = current.current
+      if (request === evalRequest.current && state.active && state.agentId === origin.agentId && state.experimentId === origin.experimentId && state.tab === origin.tab && state.runId === origin.previousRunId && runSelectionVersion.current === origin.runSelection) {
+        setJob({ ...value, agent_id: origin.agentId, experiment_id: origin.experimentId }); setJobError(''); setConfigOpen(false)
+        chooseRun(value.run_id, 'runs')
       }
+    } catch (error) {
+      if (submission && (error as any).rejected && !['observation_unknown', 'cleanup_failed', 'run_read_failed', 'conflict'].includes(String((error as any).code))) {
+        finishSubmission(submission, `${(error as Error).message} 请重新预览后发起新的评测。`)
+      } else if (submission) {
+        setEvalError((error as any).rejected ? `${(error as Error).message} 已保留原 Run，只能查询核对，不会重新启动。` : '此次 Run 的受理结果待核对。恢复时仅查询原 Run，不会重新发起评测。')
+        await recoverPendingEvaluation()
+      } else if (request === evalRequest.current) setEvalError((error as Error).message)
     } finally { evalSending.current = false; setEvalBusy(false) }
   }
   async function recoverPendingEvaluation() {
     const submission = evalSubmission.current
     if (!submission) return
     try {
-      const value = await call('eval/status', { job_id: submission.request_id })
-      if (evalSubmission.current !== submission || evalSending.current) return
-      clearSubmission(submission)
-      evalSubmission.current = null; setEvalPending(null); setEvalError('')
-      const state = current.current
-      if (state.agentId === submission.agentId && state.experimentId === submission.experimentId && runSelectionVersion.current === submission.runSelection) {
-        jobNavigation.current = { job_id: value.job_id, agent_id: submission.agentId, experiment_id: submission.experimentId, initial_run_id: submission.runId, run_selection_version: submission.runSelection }
-        setJob({ ...value, agent_id: submission.agentId, experiment_id: submission.experimentId }); setJobError('')
-      }
-    } catch { /* 回读尚未确认时保留原请求，只允许沿用同一请求继续。 */ }
+      const value = await call('eval/status', submission.legacy_id ? { job_id: submission.legacy_id } : { run_id: submission.run_id }) as EvaluationExecution
+      if (evalSubmission.current !== submission) return
+      setPendingObservation(value)
+      if (value.run_created && value.run_id) {
+        if (value.source && value.source !== submission.payload.source) { finishSubmission(submission, '查询结果不属于原评测目标，未执行任何启动。请重新预览。'); return }
+        finishSubmission(submission)
+        void loadJobs(); void loadRuns()
+        if (current.current.runId === value.run_id) { setJob(value); setJobError('') }
+      } else if (value.status === 'prepared') {
+        setEvalError('该 Run 尚未启动。可撤销预留后重新预览，当前不会重发启动请求。')
+      } else if (isFinal(value.status) && !value.run_created) {
+        finishSubmission(submission, '此次评测未形成可继续的运行记录，请重新预览。')
+      } else setEvalError('原评测仍在准备或状态待核对，当前只查询，不会重新启动。')
+    } catch (error) {
+      if (evalSubmission.current !== submission) return
+      if (missingExecution(error)) finishSubmission(submission, '未找到可继续的运行记录，请重新预览后发起新的评测。')
+      else setEvalError('暂时无法核对原评测状态。已保留原身份，请恢复连接后重新查询。')
+    }
   }
-  async function statusEvaluation(jobId = job?.job_id) {
-    if (!jobId) return
+  async function cancelPendingEvaluation() {
+    const submission = evalSubmission.current
+    if (!submission) return
+    const id = submission.legacy_id || submission.run_id
+    if (!id || cancellingJob.current === id) return
+    cancellingJob.current = id
     try {
-      const value = await call('eval/status', { job_id: jobId })
-      const navigation = jobNavigation.current
-      if (!navigation || navigation.job_id !== jobId) return
-      setJob((previous: any) => previous?.job_id === jobId ? { ...previous, ...value,
-        agent_id: previous.agent_id ?? navigation.agent_id, experiment_id: previous.experiment_id ?? navigation.experiment_id } : previous); setJobError('')
-      const id = value.result?.run_id ?? value.run_id
-      if (id && navigation.run_id !== id) {
-        // 首次观察到 ID 后即记住，离开工作区也不在返回时补跳。
-        navigation.run_id = id
-        const state = current.current
-        if (state.active && state.targetJobId === jobId && state.targetRunId === state.runId
-          && state.agentId === navigation.agent_id && state.experimentId === navigation.experiment_id
-          && state.tab === 'runs' && state.runId === navigation.initial_run_id && runSelectionVersion.current === navigation.run_selection_version) chooseRun(id, 'runs', true)
+      const value = await call('eval/cancel', submission.legacy_id ? { job_id: id } : { run_id: id }) as EvaluationExecution
+      if (evalSubmission.current !== submission) return
+      if (value.status === 'cancelled' && !value.run_created) finishSubmission(submission, '预留或创建已取消，请重新预览。')
+      else { setPendingObservation(value); setEvalError('已请求取消，正在核对收尾状态。'); await recoverPendingEvaluation() }
+    } catch (error) {
+      if (missingExecution(error)) finishSubmission(submission, '未找到可继续的运行记录，请重新预览。')
+      else setEvalError((error as Error).message)
+    } finally { if (cancellingJob.current === id) cancellingJob.current = '' }
+  }
+  async function statusEvaluation(id = executionKey(job), legacy = Boolean(job?.legacy_id && !job?.run_id)) {
+    if (!id) return
+    try {
+      const value = await call('eval/status', legacy ? { job_id: id } : { run_id: id }) as EvaluationExecution
+      const state = current.current
+      if (legacy) {
+        if (state.targetRunId || state.targetJobId !== id) return
+        if (value.run_created && value.run_id) {
+          setJob(value); setJobError(''); setTab('runs'); setRunId(value.run_id)
+          onNavigate?.({ page: 'evaluation', tab: 'runs', run_id: value.run_id, agent_id: value.agent_id || state.agentId || undefined, experiment_id: value.experiment_id || state.experimentId || undefined, replace: true })
+        } else { setJob({ ...value, legacy_id: id }); setJobError('') }
+      } else {
+        if (state.runId !== id) return
+        setJob(previous => executionKey(previous) === id || state.runId === id ? value : previous); setJobError('')
       }
       if (isFinal(value.status)) scheduleRefresh(0)
     } catch (error) {
-      if (jobNavigation.current?.job_id !== jobId) return
-      setJob((previous: any) => previous?.job_id === jobId ? { ...previous, status: 'unknown' } : previous)
-      setJobError((error as Error).message)
+      const state = current.current
+      if (legacy ? state.targetRunId || state.targetJobId !== id : state.runId !== id) return
+      if (legacy && missingExecution(error)) {
+        setJob(null); setJobError('该旧评测未形成可继续的运行记录，可返回评测记录或重新预览。')
+      } else setJobError((error as Error).message)
     }
   }
-  async function cancelEvaluation(jobId: string) {
-    if (job?.job_id !== jobId || job.status !== 'running' || cancellingJob.current === jobId) return
-    cancellingJob.current = jobId
-    setJob((previous: any) => previous?.job_id === jobId ? { ...previous, status: 'cancelling' } : previous)
-    try { await call('eval/cancel', { job_id: jobId }); await statusEvaluation(jobId) }
-    catch (error) {
-      if (jobNavigation.current?.job_id === jobId) {
-        setJob((previous: any) => previous?.job_id === jobId ? { ...previous, status: 'unknown' } : previous)
-        setJobError((error as Error).message)
-      }
-    } finally { if (cancellingJob.current === jobId) cancellingJob.current = '' }
+  async function cancelEvaluation(id: string) {
+    if (!job || executionKey(job) !== id || !['running', 'preparing', 'prepared', 'unknown'].includes(job.status) || cancellingJob.current === id) return
+    cancellingJob.current = id
+    setJob(previous => previous && executionKey(previous) === id ? { ...previous, status: 'cancelling' } : previous)
+    try { await call('eval/cancel', job?.run_id ? { run_id: id } : { job_id: id }); await statusEvaluation(id) }
+    catch (error) { if (executionKey(job) === id) setJobError((error as Error).message) }
+    finally { if (cancellingJob.current === id) cancellingJob.current = '' }
   }
-  function restoreJob(jobId: string) {
-    const listed = jobs.find(item => item.job_id === jobId)
-    const nextAgent = listed?.agent_id ?? target?.agent_id ?? ''
-    const nextExperiment = listed?.experiment_id ?? target?.experiment_id ?? ''
-    jobNavigation.current = { job_id: jobId, agent_id: nextAgent, experiment_id: nextExperiment,
-      initial_run_id: target?.run_id ?? '', run_selection_version: runSelectionVersion.current,
-      run_id: listed?.run_id }
-    setJob(listed ?? { job_id: jobId, status: 'pending', agent_id: nextAgent, experiment_id: nextExperiment })
-    setJobError('')
-    void statusEvaluation(jobId)
+  function restoreLegacy(id: string) {
+    if (current.current.targetRunId) return
+    setJob({ run_id: null, run_created: false, legacy_id: id, status: 'unknown' }); setJobError('')
+    void statusEvaluation(id, true)
   }
   async function openDecision() {
     const experiment = runDetail?.manifest?.experiment_id ?? experimentId
@@ -659,12 +668,12 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
     runDetailHeading.current.focus({ preventScroll: true })
   }, [active, tab, runId, runDetail?.run_id, runListReady, jobsLoading])
   useEffect(() => {
-    if (!active || tab !== 'jobs' || jobsLoading || !focusJobDetail.current || !target?.job_id || job?.job_id !== target.job_id || !jobDetailHeading.current) return
+    if (!active || tab !== 'jobs' || jobsLoading || !focusJobDetail.current || !target?.job_id || job?.legacy_id !== target.job_id || !jobDetailHeading.current) return
     focusJobDetail.current = false
     if (document.querySelector('[role="dialog"][aria-modal="true"], dialog[open]')) return
     jobDetailHeading.current.scrollIntoView({ block: 'start' })
     jobDetailHeading.current.focus({ preventScroll: true })
-  }, [active, tab, jobsLoading, target?.job_id, job?.job_id])
+  }, [active, tab, jobsLoading, target?.job_id, job?.legacy_id])
   useEffect(() => {
     if (pendingEvidence.current?.run !== runId || !runFiles || runDetail?.run_id !== runId) return
     const path = pendingEvidence.current.path
@@ -681,12 +690,10 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
   }, [active, agentId, experimentId, runId, caseId, resultCaseId, tab, onContext])
   useEffect(() => {
     if (target?.page !== 'evaluation') return
-    const previous = previousTarget.current
-    previousTarget.current = { run_id: target.run_id, job_id: target.job_id }
-    if (tabValue(target.tab) === 'runs' && previous.job_id && previous.job_id === target.job_id && previous.run_id !== target.run_id) runSelectionVersion.current++
+    if ((target.run_id ?? '') !== current.current.runId) runSelectionVersion.current++
     const state = current.current
     const nextTab = tabValue(target.tab), nextAgent = target.agent_id ?? '', nextExperiment = target.experiment_id ?? '', nextRun = target.run_id ?? '', nextCase = target.case_id ?? ''
-    if (nextTab === 'jobs' && target.job_id && target.job_id !== job?.job_id) focusJobDetail.current = true
+    if (nextTab === 'jobs' && target.job_id && target.job_id !== job?.legacy_id) focusJobDetail.current = true
     else if (nextTab !== 'jobs') focusJobDetail.current = false
     const scopeChanged = nextAgent !== state.agentId || nextExperiment !== state.experimentId
     const caseChanged = nextTab === 'cases' && nextCase !== state.caseId
@@ -703,14 +710,25 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
     }
   }, [target?.page, target?.agent_id, target?.experiment_id, target?.run_id, target?.run_tab, target?.case_id, target?.job_id, target?.tab])
   useEffect(() => {
-    if (target?.page !== 'evaluation' || !target.job_id || jobNavigation.current?.job_id === target.job_id) return
-    restoreJob(target.job_id)
-  }, [target?.page, target?.job_id])
+    if (target?.page !== 'evaluation') return
+    if (target.run_id) { void statusEvaluation(target.run_id, false); return }
+    if (target.job_id) restoreLegacy(target.job_id)
+  }, [target?.page, target?.run_id, target?.job_id])
   useEffect(() => {
-    if (target?.page !== 'evaluation' || !target.job_id) return
-    const listed = jobs.find(item => item.job_id === target.job_id)
-    if (listed && (jobNavigation.current?.agent_id !== (listed.agent_id ?? '') || jobNavigation.current?.experiment_id !== (listed.experiment_id ?? ''))) restoreJob(target.job_id)
-  }, [jobs, target?.page, target?.job_id])
+    if (!assetScope || restoredScope.current === assetScope) return
+    restoredScope.current = assetScope
+    let saved = savedSubmission(assetScope)
+    if (!saved) try {
+      const previous = JSON.parse(window.sessionStorage.getItem(legacySubmissionKey()) ?? 'null')
+      if (previous && typeof previous.request_id === 'string' && legacyRequestId.test(previous.request_id) && previous.payload?.source === `experiment:${previous.experimentId}`) saved = {
+        run_id: '', legacy_id: previous.request_id, payload: previous.payload, agentId: previous.agentId, experimentId: previous.experimentId,
+        previousRunId: previous.runId ?? '', tab: previous.tab ?? 'runs', runSelection: 0, scope: assetScope,
+      }
+      else if (previous) window.sessionStorage.removeItem(legacySubmissionKey())
+    } catch {}
+    evalSubmission.current = saved; setEvalPending(saved); setPendingObservation(null); evalPersisted.current = true
+    if (saved) void recoverPendingEvaluation()
+  }, [assetScope])
   useEffect(() => {
     if (target?.page !== 'evaluation' || target.intent !== 'start_eval') return
     setConfigOpen(true)
@@ -726,18 +744,19 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
     window.addEventListener('beforeunload', protect)
     return () => window.removeEventListener('beforeunload', protect)
   }, [])
+  useEffect(() => { if (!active && !evalSubmission.current) releasePreview() }, [active])
   useEffect(() => { if (active && configOpen) configDialog.current?.showModal(); else configDialog.current?.close() }, [active, configOpen])
   useEffect(() => { if (active && decisionOpen) decisionDialog.current?.showModal(); else decisionDialog.current?.close() }, [active, decisionOpen])
   useEffect(() => {
     const dialog = cancelDialog.current
     if (!dialog) return
-    if (active && cancelJobId && job?.job_id === cancelJobId && job.status === 'running' && !jobError) {
+    if (active && job && cancelJobId && executionKey(job) === cancelJobId && ['running', 'preparing', 'unknown'].includes(job.status) && !jobError) {
       if (!dialog.open) dialog.showModal()
     } else {
       if (dialog.open) dialog.close()
       if (cancelJobId) setCancelJobId('')
     }
-  }, [active, cancelJobId, job?.job_id, job?.status, jobError])
+  }, [active, cancelJobId, job?.run_id, job?.legacy_id, job?.status, jobError])
   useEffect(() => {
     if (!active) return
     if (refreshOnActive.current) { refreshOnActive.current = false; refreshNow() }
@@ -752,19 +771,27 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
     }).catch(() => undefined)
   }), [updates])
   useEffect(() => {
-    if (!job?.job_id || isFinal(job.status)) return
+    if (!job || !executionKey(job) || isFinal(job.status)) return
     const timer = window.setInterval(() => void statusEvaluation(), 2500)
     return () => window.clearInterval(timer)
-  }, [job?.job_id, job?.status])
+  }, [job?.run_id, job?.legacy_id, job?.status])
 
-  const runExperiments = useMemo(() => [...new Set(runs.filter(run => !agentId || run.agent_id === agentId).map(run => run.experiment_id))], [runs, agentId])
-  const displayedJobStatus = (item: EvaluationJob) => job?.job_id === item.job_id ? job.status : item.status
-  const displayedJobRunId = (item: EvaluationJob) => job?.job_id === item.job_id ? (job.result?.run_id || job.run_id || item.run_id) : item.run_id
-  const filteredJobs = jobs.filter(item => (!displayedJobRunId(item) || !runs.some(run => run.run_id === displayedJobRunId(item)))
-    && (!agentId || item.agent_id === agentId) && (!experimentId || item.experiment_id === experimentId)
-    && (!runStatus || displayedJobStatus(item) === runStatus) && !runVerdictFilter
-    && (!runSearch || `${item.job_id} ${item.agent_id ?? ''} ${agents.find(agent => agent.id === item.agent_id)?.name ?? ''} ${item.experiment_id ?? ''}`.toLowerCase().includes(runSearch.toLowerCase())))
-  const filteredRuns = runs.filter(run => (!agentId || run.agent_id === agentId) && (!experimentId || run.experiment_id === experimentId) && (!runStatus || run.status === runStatus) && (!runVerdictFilter || verdictIfCompleted(run.status, run.effective_verdict) === runVerdictFilter) && (!runSearch || `${run.run_id} ${run.agent_id} ${agents.find(agent => agent.id === run.agent_id)?.name ?? ''} ${run.experiment_id} ${run.title ?? ''}`.toLowerCase().includes(runSearch.toLowerCase())))
+  const controls = [...jobs, ...(job?.run_created && job.run_id ? [job] : [])].sort((a, b) => (a.updated_at ?? '').localeCompare(b.updated_at ?? ''))
+  const byRun = new Map(runs.map(run => [run.run_id, run]))
+  for (const control of controls) {
+    if (!control.run_created || !control.run_id) continue
+    const previous = byRun.get(control.run_id)
+    const experiment = control.experiment_id || (control.source?.startsWith('experiment:') ? control.source.slice(11) : '')
+    const agent = control.agent_id || experiments.find(item => item.id === experiment)?.agent_id || previous?.agent_id || ''
+    byRun.set(control.run_id, { ...previous, run_id: control.run_id, agent_id: agent, experiment_id: experiment || previous?.experiment_id || '',
+      status: previous && isFinal(previous.status) ? previous.status : control.status,
+      created_at: previous?.created_at || control.started_at, finished_at: previous?.finished_at,
+    })
+  }
+  const recordRuns = [...byRun.values()].sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))
+  const runExperiments = [...new Set(recordRuns.filter(run => !agentId || run.agent_id === agentId).map(run => run.experiment_id))]
+  const objectType = (id?: string | null) => evaluationObjectType(id ?? '', experiments)
+  const filteredRuns = recordRuns.filter(run => (!objectTypeFilter || objectType(run.experiment_id) === objectTypeFilter) && (!agentId || run.agent_id === agentId) && (!experimentId || run.experiment_id === experimentId) && (!runStatus || run.status === runStatus) && (!runVerdictFilter || verdictIfCompleted(run.status, run.effective_verdict) === runVerdictFilter) && (!runSearch || `${run.run_id} ${run.agent_id} ${evaluationAgentName(agents, run.agent_id)} ${run.experiment_id} ${run.title ?? ''}`.toLowerCase().includes(runSearch.toLowerCase())))
   const filteredCases = cases.filter(item => (!caseSearch || `${item.id} ${item.title} ${item.input_preview ?? ''}`.toLowerCase().includes(caseSearch.toLowerCase())) && (!sceneFilter || item.scene === sceneFilter) && (!tierFilter || item.tier === tierFilter))
   const sceneOptions = [...new Set(cases.map(item => item.scene).filter(Boolean))]
   const tierOptions = [...new Set(cases.map(item => item.tier).filter(Boolean))]
@@ -776,16 +803,15 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
   const caseCounts: Record<CaseObservation, number> = { passed: 0, failed: 0, inconclusive: 0, mixed: 0, pending: 0 }
   for (const item of observedCases) caseCounts[caseObservation(item).value]++
   const attentionCases = observedCases.filter(item => ['failed', 'inconclusive', 'mixed'].includes(caseObservation(item).value))
-  const selectedRunAgentId = visibleRunDetail?.manifest?.agent_id || runs.find(run => run.run_id === runId)?.agent_id || agentId
-  const selectedRun = runs.find(run => run.run_id === runId)
-  const selectedAgentName = agents.find(agent => agent.id === selectedRunAgentId)?.name || selectedRunAgentId
+  const selectedRunAgentId = visibleRunDetail?.manifest?.agent_id || recordRuns.find(run => run.run_id === runId)?.agent_id || agentId
+  const selectedRun = recordRuns.find(run => run.run_id === runId)
+  const selectedAgentName = evaluationAgentName(agents, selectedRunAgentId)
   const selectedRunVersion = visibleRunDetail?.manifest?.experiment_id || selectedRun?.experiment_id || experimentId
-  const agentName = (id?: string) => agents.find(agent => agent.id === id)?.name || id || '智能体未知'
+  const agentName = (id?: string | null) => evaluationAgentName(agents, id)
   const runName = (run: Run) => run.title?.trim() || `${agentName(run.agent_id)} ${versionName(run.experiment_id)} 评测`
   const runCaseSummary = (run: Run) => caseSummary(visibleRunDetail?.run_id === run.run_id && observedCases.length
     ? { total: observedCases.length, ...caseCounts } : run.case_counts)
-  const jobVerdict = job?.result?.run_status === 'completed' ? verdictIfCompleted(job.status, summaryVerdict(job.summary)) : null
-  const highlightedJob = job ?? jobs.find(item => ['running', 'cancelling'].includes(item.status))
+  const highlightedJob = runId ? [...controls].reverse().find(item => item.run_id === runId) : target?.job_id ? job : null
   const highlightedJobVersion = highlightedJob?.experiment_id ? versionName(highlightedJob.experiment_id) : '版本待读取'
   const selectedComparison = comparison?.cases?.find((item: any) => item.case_id === compareCaseId)
   const comparedCases = comparison ? [comparison.left_view, comparison.right_view].map(view => view.cases.find((item: any) => item.case_id === compareCaseId)) : []
@@ -795,33 +821,35 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
   const versions: string[] = [...new Set([...(detail?.versions ?? []).map((version: any) => version.id), ...runExperiments])]
   const showRecords = tab === 'runs' || tab === 'jobs'
   const scopeControls = <>
-    <button type="button" className="harness-eval-mobile-filter-toggle" aria-expanded={scopeFiltersOpen} aria-controls="evaluation-scope-filters" onClick={() => setScopeFiltersOpen(open => !open)}>筛选：{agents.find(agent => agent.id === agentId)?.name || agentId || '全部智能体'} · {experimentId || '全部版本'}</button>
-    <div id="evaluation-scope-filters" className="harness-eval-filters harness-eval-scope-filters" data-mobile-open={scopeFiltersOpen}><label>智能体<SearchSelect label="评测智能体" value={agentId} onChange={value => changeScope(value)} options={[{ value: '', label: '全部智能体' }, ...agents.map(agent => ({ value: agent.id, label: agent.name || agent.id, description: agent.id }))]} /></label><label>研究版本<SearchSelect label="评测研究版本" value={experimentId} disabled={!agentId} onChange={value => changeScope(agentId, value)} options={[{ value: '', label: '全部版本' }, ...versions.map(id => ({ value: id, label: versionName(id), description: id }))]} /></label><label>评测结论<select aria-label="筛选评测结论" value={runVerdictFilter} onChange={event => setRunVerdictFilter(event.target.value)}><option value="">全部结论</option>{['passed', 'failed', 'inconclusive'].map(verdict => <option key={verdict} value={verdict}>{verdictLabel(verdict)}</option>)}</select></label><button type="button" onClick={refreshNow} aria-busy={runsLoading || jobsLoading || detailLoading}>刷新{(runsLoading || jobsLoading || detailLoading) ? <LoadingIndicator label="读取评测记录与版本" /> : null}</button>{detailError && <p role="alert">{detailError}</p>}</div>
+    <button type="button" className="harness-eval-mobile-filter-toggle" aria-expanded={scopeFiltersOpen} aria-controls="evaluation-scope-filters" onClick={() => setScopeFiltersOpen(open => !open)}>筛选：{agentId ? agentName(agentId) : '全部智能体'} · {experimentId || '全部版本'}</button>
+    <div id="evaluation-scope-filters" className="harness-eval-filters harness-eval-scope-filters" data-mobile-open={scopeFiltersOpen}><label>智能体<SearchSelect label="评测智能体" value={agentId} onChange={value => changeScope(value)} options={[{ value: '', label: '全部智能体' }, ...agents.map(agent => ({ value: agent.id, label: agentName(agent.id), description: agent.id }))]} /></label><label>研究版本<SearchSelect label="评测研究版本" value={experimentId} disabled={!agentId} onChange={value => changeScope(agentId, value)} options={[{ value: '', label: '全部版本' }, ...versions.map(id => ({ value: id, label: versionName(id), description: `${objectType(id)} · ${id}` }))]} /></label>{showRecords && <label>对象类型<select aria-label="筛选对象类型" value={objectTypeFilter} onChange={event => setObjectTypeFilter(event.target.value)}><option value="">全部类型</option><option value="智能体">智能体</option><option value="变体">变体</option></select></label>}<label>评测结论<select aria-label="筛选评测结论" value={runVerdictFilter} onChange={event => setRunVerdictFilter(event.target.value)}><option value="">全部结论</option>{['passed', 'failed', 'inconclusive'].map(verdict => <option key={verdict} value={verdict}>{verdictLabel(verdict)}</option>)}</select></label><button type="button" onClick={refreshNow} aria-busy={runsLoading || jobsLoading || detailLoading}>刷新{(runsLoading || jobsLoading || detailLoading) ? <LoadingIndicator label="读取评测记录与版本" /> : null}</button>{detailError && <p role="alert">{detailError}</p>}</div>
   </>
 
   return <main className="harness-evaluation" aria-label="评测中心">
     <header className="harness-page-heading harness-eval-page-heading">
       <div><span className="harness-eval-eyebrow"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 15V9m6 6V5m6 10V2M2 18h16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>验证 · 比较 · 改进</span><h1>评测中心</h1><p>选择测试用例，运行评测，并比较各版本的结果。</p></div>
     </header>
-    {evalPending && !evalBusy && <section className="harness-eval-limits" role="status" aria-label="待核对的评测请求"><strong>评测受理结果待核对</strong><p>原目标：{agentName(evalPending.agentId)} · {versionName(evalPending.experimentId)}（{evalPending.experimentId}）。请求可能已经执行；核对和继续均沿用原参数与同一请求身份。</p><button type="button" onClick={() => void startEvaluation(evalPending)}>核对原评测请求</button></section>}
+    {evalPending && !evalBusy && <section className="harness-eval-limits" role="status" aria-label="待核对的评测请求"><strong>评测受理结果待核对</strong>{evalPending.run_id && <p>Run ID：{evalPending.run_id}</p>}<p>原目标：{agentName(evalPending.agentId)} · {versionName(evalPending.experimentId)}（{evalPending.experimentId}）。请求可能已经执行；这里只查询原评测状态，不重新发送启动请求。</p><button type="button" onClick={() => void recoverPendingEvaluation()}>核对原评测请求</button><button type="button" disabled={pendingObservation?.status === 'cancelling'} onClick={() => void cancelPendingEvaluation()}>{pendingObservation?.status === 'prepared' ? '撤销预留' : '取消此次评测'}</button>{evalError && <p role="alert">{evalError}</p>}</section>}
+    {!evalPending && !configOpen && evalError && <p role="alert">{evalError}</p>}
     <header className="harness-eval-toolbar"><div role="tablist" aria-label="评测工作区" className="harness-eval-tabs" onKeyDown={event => {
       const index = tabs.findIndex(item => item.id === (tab === 'jobs' ? 'runs' : tab))
       const next = event.key === 'ArrowRight' ? (index + 1) % tabs.length : event.key === 'ArrowLeft' ? (index + tabs.length - 1) % tabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : -1
       if (next < 0) return
       event.preventDefault(); if (tabs[next].id === 'runs') returnToRecords(); else chooseTab(tabs[next].id); document.getElementById(`evaluation-tab-${tabs[next].id}`)?.focus()
-    }}>{tabs.map(item => <button key={item.id} id={`evaluation-tab-${item.id}`} type="button" role="tab" aria-selected={(tab === 'jobs' ? 'runs' : tab) === item.id} aria-controls={item.id === 'runs' ? tab === 'jobs' || target?.job_id && !runId ? 'evaluation-job-detail' : runId ? 'evaluation-panel-runs' : 'evaluation-record-list' : `evaluation-panel-${item.id}`}  tabIndex={(tab === 'jobs' ? 'runs' : tab) === item.id ? 0 : -1} onClick={() => item.id === 'runs' ? returnToRecords() : chooseTab(item.id)}>{item.label}</button>)}</div><button type="button" className="harness-primary" onClick={() => { setConfigOpen(true); clearPreview() }}>新建评测</button></header>
+    }}>{tabs.map(item => <button key={item.id} id={`evaluation-tab-${item.id}`} type="button" role="tab" aria-selected={(tab === 'jobs' ? 'runs' : tab) === item.id} aria-controls={item.id === 'runs' ? runId ? 'evaluation-panel-runs' : 'evaluation-record-list' : `evaluation-panel-${item.id}`}  tabIndex={(tab === 'jobs' ? 'runs' : tab) === item.id ? 0 : -1} onClick={() => item.id === 'runs' ? returnToRecords() : chooseTab(item.id)}>{item.label}</button>)}</div><button type="button" className="harness-primary" onClick={() => { setConfigOpen(true); clearPreview() }}>新建评测</button></header>
 
     {agentsError && <p role="alert">{agentsError}</p>}
-    {highlightedJob && <section id="evaluation-job-detail" role="tabpanel" aria-labelledby="evaluation-tab-runs" hidden={tab !== 'jobs' && !(target?.job_id === highlightedJob.job_id && !runId)} className="harness-eval-job harness-card" aria-label="当前评测任务" data-state={highlightedJob.status}>
-      <div className="harness-eval-job-content"><small>评测任务</small><div className="harness-eval-job-title"><strong ref={job?.job_id === highlightedJob.job_id ? jobDetailHeading : undefined} tabIndex={job?.job_id === highlightedJob.job_id ? -1 : undefined}>{agentName(highlightedJob.agent_id ?? undefined)} {highlightedJobVersion}</strong><span className="harness-eval-badge" data-state={highlightedJob.status}>{executionLabel(highlightedJob.status)}</span></div>
-        <p>{['running', 'cancelling'].includes(highlightedJob.status) ? elapsed(highlightedJob.started_at) || `开始于 ${time(highlightedJob.started_at)}` : `开始于 ${time(highlightedJob.started_at)}`}</p>
-        <p className="harness-eval-job-update">{jobError && job?.job_id === highlightedJob.job_id ? '当前无法获取最新状态；任务身份已保留，请重新查询。' : highlightedJob.status === 'pending' ? '正在连接原评测任务；不会重新发起评测。' : `任务状态已读取${highlightedJob.updated_at ? ` · ${time(highlightedJob.updated_at)} 更新` : ''} · 离开页面后仍可查看`}</p>
-        {jobVerdict && job?.job_id === highlightedJob.job_id && <p>业务结论：{verdictLabel(jobVerdict)}</p>}{highlightedJob.error && <p role="alert">{highlightedJob.error}</p>}{jobError && job?.job_id === highlightedJob.job_id && <p role="alert">未能连接任务 {highlightedJob.job_id}：{jobError}。可重新查询。</p>}
-      </div><div className="harness-eval-actions"><button type="button" onClick={() => chooseJob(highlightedJob)}>查看执行过程</button>{job?.job_id === highlightedJob.job_id && <button type="button" onClick={returnToRecords}>返回评测记录</button>}{job?.job_id === highlightedJob.job_id && <button type="button" onClick={() => void statusEvaluation()}>刷新状态</button>}{job?.job_id === highlightedJob.job_id && <button type="button" disabled={!!jobError || job.status !== 'running'} onClick={() => setCancelJobId(job.job_id)}>取消评测</button>}{job?.job_id === highlightedJob.job_id && (job.result?.run_id || job.run_id) && <button type="button" onClick={() => chooseRun(job.result?.run_id || job.run_id, 'runs', false, job.job_id)}>查看本次报告</button>}</div>
-      <DetailDrawer title="任务 ID 与执行日志" active={active && (tab === 'jobs' || Boolean(target?.job_id === highlightedJob.job_id && !runId))} identity={highlightedJob.job_id}><p>来源版本：{highlightedJob.experiment_id || highlightedJob.source || '待读取'}<br />任务 ID：{highlightedJob.job_id}</p><pre>{job?.job_id === highlightedJob.job_id ? `${job.stdout || '等待输出…'}${job.stderr ? `\n${job.stderr}` : ''}` : '打开任务后读取执行日志。'}</pre></DetailDrawer>
+    {highlightedJob && <section id="evaluation-job-detail" role="region" className="harness-eval-job harness-card" aria-label="评测进度" data-state={highlightedJob.status}>
+      <div className="harness-eval-job-content"><small>{highlightedJob.run_id ? `Run ID：${highlightedJob.run_id}` : '旧评测尚未形成运行记录'}</small><div className="harness-eval-job-title"><strong ref={jobDetailHeading} tabIndex={-1}>{agentName(highlightedJob.agent_id)} {highlightedJobVersion} · {objectType(highlightedJob.experiment_id)}</strong><span className="harness-eval-badge" data-state={highlightedJob.status}>{executionLabel(highlightedJob.status)}</span></div>
+        <p>{['running', 'cancelling', 'preparing'].includes(highlightedJob.status) ? elapsed(highlightedJob.started_at) || `开始于 ${time(highlightedJob.started_at)}` : `开始于 ${time(highlightedJob.started_at)}`}</p>
+        <p className="harness-eval-job-update">{jobError ? '最新进度暂不可读，保留上次观察；请恢复连接后刷新。' : '执行状态来自本次 Run；业务结论以运行证据为准。'}</p>
+        {highlightedJob.error && <p role="alert">{highlightedJob.error}</p>}{jobError && <p role="alert">{jobError}</p>}
+      </div><div className="harness-eval-actions"><button type="button" onClick={() => void statusEvaluation()}>刷新状态</button><button type="button" disabled={!!jobError || !['running', 'preparing', 'unknown'].includes(highlightedJob.status)} onClick={() => { setJob(highlightedJob); setCancelJobId(executionKey(highlightedJob)) }}>取消评测</button>{!highlightedJob.run_id && <button type="button" onClick={returnToRecords}>返回评测记录</button>}</div>
+      <DetailDrawer title="Run 与执行日志" active={active && Boolean(runId || target?.job_id)} identity={executionKey(highlightedJob)}><p>来源版本：{highlightedJob.experiment_id || highlightedJob.source || '待读取'}<br />{highlightedJob.run_id ? `Run ID：${highlightedJob.run_id}` : '该旧评测尚无 Run ID。'}</p><pre>{`${highlightedJob.stdout || '等待输出…'}${highlightedJob.stderr ? `\n${highlightedJob.stderr}` : ''}`}</pre></DetailDrawer>
     </section>}
+    {!runId && target?.job_id && jobError && !highlightedJob && <section className="harness-eval-limits" role="alert"><p>{jobError}</p><button type="button" onClick={() => restoreLegacy(target.job_id!)}>重新查询</button><button type="button" onClick={returnToRecords}>返回评测记录</button></section>}
     {!showRecords && (tab === 'cases' || tab === 'compare') && scopeControls}
-    {showRecords &&     <section ref={runListHeading} tabIndex={-1} id="evaluation-record-list" role="tabpanel" aria-labelledby="evaluation-tab-runs" className="harness-card harness-eval-run-list harness-eval-record-list" hidden={Boolean(runId || tab === 'jobs')} data-expanded={recordExpanded} aria-busy={runsLoading || jobsLoading}>{scopeControls}<div className="harness-eval-record-extra"><div className="harness-eval-filters"><input aria-label="搜索评测记录" placeholder="搜索任务、Run、智能体或版本" value={runSearch} onChange={event => setRunSearch(event.target.value)} /><select aria-label="筛选运行状态" value={runStatus} onChange={event => setRunStatus(event.target.value)}><option value="">全部状态</option>{['planned', 'running', 'cancelling', 'completed', 'failed', 'cancelled', 'unknown'].map(status => <option key={status} value={status}>{executionLabel(status)}</option>)}</select></div></div>{runsError && <p role="alert">Run 列表读取失败：{runsError}。可刷新重试。</p>}{jobsError && <p role="alert">任务列表读取失败：{jobsError}。可刷新重试。</p>}<div className="harness-table-scroll" role="region" aria-label="评测记录，可横向滚动查看完整列" tabIndex={0}><table className="harness-eval-run-table" aria-label="评测记录列表"><thead><tr><th>评测名称</th><th>版本</th><th>执行状态</th><th>评测结论</th><th>用例结果</th><th>时间</th><th>操作</th></tr></thead><tbody>{filteredJobs.map(item => <tr key={`job-${item.job_id}`} data-selected={job?.job_id === item.job_id} onClick={() => chooseJob(item)}><td data-label="评测名称"><button type="button" className="harness-eval-row-link" title={item.job_id} aria-label={`查看 ${agentName(item.agent_id ?? undefined)} 的评测任务 ${item.job_id}`} aria-pressed={job?.job_id === item.job_id} onClick={event => { event.stopPropagation(); chooseJob(item) }}><strong className="harness-eval-object-name">{agentName(item.agent_id ?? undefined)} {item.experiment_id ? versionName(item.experiment_id) : '版本待读取'} 评测任务</strong><small className="harness-eval-run-id">{isFinal(displayedJobStatus(item)) ? '历史任务' : '当前任务'} · …{item.job_id.slice(-8)}</small></button></td><td data-label="版本"><strong className="harness-eval-version-name" title={item.experiment_id || item.source}>{item.experiment_id ? versionName(item.experiment_id) : '版本待读取'}</strong></td><td data-label="执行状态"><span className="harness-eval-badge" data-state={displayedJobStatus(item)}>{executionLabel(displayedJobStatus(item))}</span></td><td data-label="评测结论"><span className="harness-eval-muted">{displayedJobStatus(item) === 'unknown' ? '状态待核对' : '尚无可核对结论'}</span></td><td data-label="用例结果"><span className="harness-eval-muted">{displayedJobRunId(item) ? '已有 Run，打开任务核对' : isFinal(displayedJobStatus(item)) ? '未生成可核对的 Run' : '等待评测完成'}</span></td><td data-label="时间"><time className="harness-eval-timestamp" dateTime={item.started_at}>{time(item.started_at)} 开始</time></td><td data-label="操作"><button type="button" className="harness-eval-open-result" onClick={event => { event.stopPropagation(); chooseJob(item) }}>{job?.job_id === item.job_id ? '已选中' : '查看任务'}</button></td></tr>)}{filteredRuns.map(run => <tr key={run.run_id} data-selected={runId === run.run_id} onClick={() => chooseRun(run.run_id, 'runs')}><td data-label="评测名称"><button type="button" className="harness-eval-row-link" title={run.run_id} aria-label={`查看 ${runName(run)}，Run ${run.run_id}`} aria-pressed={runId === run.run_id} onClick={event => { event.stopPropagation(); chooseRun(run.run_id, 'runs') }}><strong className="harness-eval-object-name">{runName(run)}</strong><small className="harness-eval-run-id">{agentName(run.agent_id)} · {run.case_scope || '用例范围未知'} · Run · …{run.run_id.slice(-8)}</small></button></td><td data-label="版本"><strong className="harness-eval-version-name" title={run.experiment_id}>{versionName(run.experiment_id)}</strong></td><td data-label="执行状态"><span className="harness-eval-badge" data-state={run.status}>{executionLabel(run.status)}</span></td><td data-label="评测结论">{run.stale && <small role="status">上次读取结果，当前记录暂不可读</small>}<span className="harness-eval-badge" data-state={verdictIfCompleted(run.status, run.effective_verdict) || 'unknown'}>{verdictLabel(verdictIfCompleted(run.status, run.effective_verdict))}</span>{separatedReview(run.review_contract) && <small className="harness-eval-review-status">业务效果复核：{effectReviewLabel(run.review_status)}<br />源码诊断：{sourceDiagnosisLabel(run.source_diagnosis)}</small>}</td><td data-label="用例结果">{runCaseSummary(run) ? <>{runCaseSummary(run)}{run.status !== 'completed' && <small>部分记录，非最终结论</small>}</> : <span className="harness-eval-muted">结果未知 · 逐例记录待核对</span>}</td><td data-label="时间"><time className="harness-eval-timestamp" dateTime={run.finished_at || run.created_at}>{time(run.finished_at || run.created_at)}{run.finished_at ? ' 结束' : ' 开始'}</time></td><td data-label="操作"><button type="button" className="harness-eval-open-result" onClick={event => { event.stopPropagation(); chooseRun(run.run_id, 'runs') }}>{runId === run.run_id ? '已选中' : '查看结果'}</button></td></tr>)}</tbody></table></div>{!runsLoading && !jobsLoading && !filteredRuns.length && !filteredJobs.length && !runsError && !jobsError && !agentsError && <Empty>当前筛选范围暂无评测记录。可新建评测，或选择其他智能体与版本。</Empty>}<div className="harness-eval-list-footer"><span>{(runsLoading || jobsLoading) && !runs.length && !jobs.length ? '—' : `共 ${filteredJobs.length + filteredRuns.length} 条评测记录`}</span><span>结论仅适用于对应评测范围；逐例摘要来自本次 Run 的冻结用例与记录，缺失时标为未知。</span><button type="button" aria-expanded={recordExpanded} onClick={() => setRecordExpanded(value => !value)}>{recordExpanded ? '收起列表' : '展开列表'}</button></div></section>}
+    {showRecords &&     <section ref={runListHeading} tabIndex={-1} id="evaluation-record-list" role="tabpanel" aria-labelledby="evaluation-tab-runs" className="harness-card harness-eval-run-list harness-eval-record-list" hidden={Boolean(runId || tab === 'jobs')} data-expanded={recordExpanded} aria-busy={runsLoading || jobsLoading}>{scopeControls}<div className="harness-eval-record-extra"><div className="harness-eval-filters"><input aria-label="搜索评测记录" placeholder="搜索任务、Run、智能体或版本" value={runSearch} onChange={event => setRunSearch(event.target.value)} /><select aria-label="筛选运行状态" value={runStatus} onChange={event => setRunStatus(event.target.value)}><option value="">全部状态</option>{['planned', 'running', 'cancelling', 'completed', 'failed', 'cancelled', 'unknown'].map(status => <option key={status} value={status}>{executionLabel(status)}</option>)}</select></div></div>{runsError && <p role="alert">Run 列表读取失败：{runsError}。可刷新重试。</p>}{jobsError && <p role="alert">Run 状态读取失败：{jobsError}。可刷新重试。</p>}<div className="harness-table-scroll" role="region" aria-label="评测记录，可横向滚动查看完整列" tabIndex={0}><table className="harness-eval-run-table" aria-label="评测记录列表"><thead><tr><th>评测名称</th><th>所属智能体</th><th>被测版本</th><th>对象类型</th><th>执行状态</th><th>评测结论</th><th>用例结果</th><th>时间</th><th>操作</th></tr></thead><tbody>{filteredRuns.map(run => <tr key={run.run_id} data-selected={runId === run.run_id} onClick={() => chooseRun(run.run_id, 'runs')}><td data-label="评测名称"><button type="button" className="harness-eval-row-link" title={run.run_id} aria-label={`查看 ${runName(run)}，Run ${run.run_id}`} aria-pressed={runId === run.run_id} onClick={event => { event.stopPropagation(); chooseRun(run.run_id, 'runs') }}><strong className="harness-eval-object-name">{runName(run)}</strong><small className="harness-eval-case-meta">{run.case_scope || '用例范围未知'}</small><small className="harness-eval-run-id">Run ID：{run.run_id}</small></button></td><td data-label="所属智能体">{agentName(run.agent_id)}</td><td data-label="被测版本"><strong className="harness-eval-version-name" title={run.experiment_id}>{versionName(run.experiment_id)}</strong></td><td data-label="对象类型"><span className="harness-eval-badge">{objectType(run.experiment_id)}</span></td><td data-label="执行状态"><span className="harness-eval-badge" data-state={run.status}>{executionLabel(run.status)}</span></td><td data-label="评测结论">{run.stale && <small role="status">上次读取结果，当前记录暂不可读</small>}<span className="harness-eval-badge" data-state={verdictIfCompleted(run.status, run.effective_verdict) || 'unknown'}>{verdictLabel(verdictIfCompleted(run.status, run.effective_verdict))}</span>{separatedReview(run.review_contract) && <small className="harness-eval-review-status">业务效果复核：{effectReviewLabel(run.review_status)}<br />源码诊断：{sourceDiagnosisLabel(run.source_diagnosis)}</small>}</td><td data-label="用例结果">{runCaseSummary(run) ? <>{runCaseSummary(run)}{run.status !== 'completed' && <small>部分记录，非最终结论</small>}</> : <span className="harness-eval-muted">结果未知 · 逐例记录待核对</span>}</td><td data-label="时间"><span className="harness-eval-timestamp">开始：<time dateTime={run.created_at}>{time(run.created_at)}</time></span><span className="harness-eval-timestamp">结束：{run.finished_at ? <time dateTime={run.finished_at}>{time(run.finished_at)}</time> : ['planned', 'preparing', 'running', 'cancelling'].includes(run.status ?? '') ? '尚未结束' : '未记录'}</span></td><td data-label="操作"><button type="button" className="harness-eval-open-result" onClick={event => { event.stopPropagation(); chooseRun(run.run_id, 'runs') }}>{runId === run.run_id ? '已选中' : '查看结果'}</button></td></tr>)}</tbody></table></div>{!runsLoading && !jobsLoading && !filteredRuns.length && !runsError && !jobsError && !agentsError && <Empty>当前筛选范围暂无评测记录。可新建评测，或选择其他智能体与版本。</Empty>}<div className="harness-eval-list-footer"><span>{(runsLoading || jobsLoading) && !runs.length && !jobs.length ? '—' : `共 ${filteredRuns.length} 条评测记录`}</span><span>结论仅适用于对应评测范围；逐例摘要来自本次 Run 的冻结用例与记录，缺失时标为未知。</span><button type="button" aria-expanded={recordExpanded} onClick={() => setRecordExpanded(value => !value)}>{recordExpanded ? '收起列表' : '展开列表'}</button></div></section>}
     <section role="tabpanel" id="evaluation-panel-cases" aria-labelledby="evaluation-tab-cases" hidden={tab !== 'cases'}>
       {!agentId || !experimentId ? <Empty>选择智能体和具体研究版本后维护用例或运行评测。</Empty> : <>
         <p className="harness-eval-note">用例由 <strong>{agentId}</strong> 的所有研究版本共用。保存后对后续评测立即生效；正在执行和历史 Run 保留各自冻结的用例定义。</p>
@@ -837,7 +865,7 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
     </section>
     <section role="tabpanel" id="evaluation-panel-runs" aria-labelledby="evaluation-tab-runs" hidden={tab !== 'runs' || !runId}>
       <section className="harness-card harness-eval-run-detail" aria-label="Run 详情">{!runId ? <Empty>{runsLoading || !runListReady ? <LoadingIndicator label="读取评测结果" block /> : runsError && !runs.length ? '暂时无法读取已保存的评测结果；请刷新重试。' : !runs.length ? '当前没有已保存的 Run。可打开上方评测任务核对进展，或新建评测。' : '从运行列表选择一项，查看结论与需要核对的证据。'}</Empty> : <>
-        <div className="harness-eval-section-heading"><div><div className="harness-eval-detail-title"><h2 ref={runDetailHeading} tabIndex={-1}>{selectedRunVersion ? versionName(selectedRunVersion) : '版本待读取'} · {selectedRun?.title?.trim() || `${selectedAgentName || '智能体'}评测`}</h2><span className="harness-eval-badge" data-state={verdictIfCompleted(visibleRunDetail?.manifest?.status ?? selectedRun?.status, summaryVerdict(visibleRunDetail?.summary) ?? selectedRun?.effective_verdict) || 'unknown'}>{verdictLabel(verdictIfCompleted(visibleRunDetail?.manifest?.status ?? selectedRun?.status, summaryVerdict(visibleRunDetail?.summary) ?? selectedRun?.effective_verdict))}</span>{runLoading && visibleRunDetail ? <LoadingIndicator label="刷新评测结果" /> : null}</div><small className="harness-eval-muted">{executionLabel(visibleRunDetail?.manifest?.status ?? selectedRun?.status)} · {time(visibleRunDetail?.manifest?.finished_at ?? selectedRun?.finished_at ?? visibleRunDetail?.manifest?.created_at ?? selectedRun?.created_at)} {visibleRunDetail?.manifest?.finished_at || selectedRun?.finished_at ? '结束' : '开始'}</small><DetailDrawer title="技术来源与 Run 信息" active={active && tab === 'runs'} identity={`${runId}:${runTab}`}><Facts items={[["来源版本", selectedRunVersion], ["Run ID", runId], ["智能体", selectedRunAgentId]]} />{visibleRunDetail && <><Facts items={[["机器结论", label(verdictIfCompleted(visibleRunDetail.manifest.status, visibleRunDetail.summary?.machine_overall_verdict ?? visibleRunDetail.summary?.overall_verdict))], ["开始时间", time(visibleRunDetail.manifest.created_at)], ["执行器", visibleRunDetail.source?.executor], [separatedReview(visibleRunDetail.source?.review_contract) ? "业务效果复核" : "复核", label(visibleRunDetail.summary?.review_status)]]} />{visibleRunDetail.missing?.length > 0 && <><h3>记录与采集缺口（{visibleRunDetail.missing.length}）</h3><ul>{visibleRunDetail.missing.map((value: string) => <li key={value}>{value}</li>)}</ul></>}<h3>Run 原始结构化记录</h3><pre>{json(visibleRunDetail)}</pre></>}{sealed ? <a className="harness-eval-download" href={download('archive')} download>下载完整 Run ZIP</a> : <p>完整包在 Run 封存后提供</p>}</DetailDrawer></div><div className="harness-eval-actions">{onAssistant && <button type="button" className="harness-primary" disabled={!visibleRunDetail} onClick={() => void onAssistant('请分析当前评测的业务结论、未通过或无法判定的用例与证据，提出可验证的改进建议；不要把执行结束当作业务通过。', { page: 'evaluation', agent_id: selectedRunAgentId, experiment_id: selectedRunVersion, run_id: runId })}>AI 分析并改进</button>}{report?.present && <a className="harness-eval-download" href={download('report')} download>下载报告</a>}<button type="button" onClick={() => { if (returnToComparison.current) { returnToComparison.current = false; setRunId(''); chooseTab('compare', { run_id: undefined, run_tab: undefined, case_id: undefined, job_id: undefined }) } else returnToRecords() }}>{returnToComparison.current ? '返回结果比较' : '返回评测记录'}</button></div></div>
+        <div className="harness-eval-section-heading"><div><div className="harness-eval-detail-title"><h2 ref={runDetailHeading} tabIndex={-1}>{selectedRunVersion ? versionName(selectedRunVersion) : '版本待读取'} · {objectType(selectedRunVersion)} · {selectedRun?.title?.trim() || `${selectedAgentName || '智能体'}评测`}</h2><span className="harness-eval-badge" data-state={verdictIfCompleted(visibleRunDetail?.manifest?.status ?? selectedRun?.status, summaryVerdict(visibleRunDetail?.summary) ?? selectedRun?.effective_verdict) || 'unknown'}>{verdictLabel(verdictIfCompleted(visibleRunDetail?.manifest?.status ?? selectedRun?.status, summaryVerdict(visibleRunDetail?.summary) ?? selectedRun?.effective_verdict))}</span>{runLoading && visibleRunDetail ? <LoadingIndicator label="刷新评测结果" /> : null}</div><small className="harness-eval-muted">{executionLabel(visibleRunDetail?.manifest?.status ?? selectedRun?.status)} · {time(visibleRunDetail?.manifest?.finished_at ?? selectedRun?.finished_at ?? visibleRunDetail?.manifest?.created_at ?? selectedRun?.created_at)} {visibleRunDetail?.manifest?.finished_at || selectedRun?.finished_at ? '结束' : '开始'}</small><DetailDrawer title="技术来源与 Run 信息" active={active && tab === 'runs'} identity={`${runId}:${runTab}`}><Facts items={[["来源版本", selectedRunVersion], ["Run ID", runId], ["智能体", selectedRunAgentId]]} />{visibleRunDetail && <><Facts items={[["机器结论", label(verdictIfCompleted(visibleRunDetail.manifest.status, visibleRunDetail.summary?.machine_overall_verdict ?? visibleRunDetail.summary?.overall_verdict))], ["开始时间", time(visibleRunDetail.manifest.created_at)], ["执行器", visibleRunDetail.source?.executor], [separatedReview(visibleRunDetail.source?.review_contract) ? "业务效果复核" : "复核", label(visibleRunDetail.summary?.review_status)]]} />{visibleRunDetail.missing?.length > 0 && <><h3>记录与采集缺口（{visibleRunDetail.missing.length}）</h3><ul>{visibleRunDetail.missing.map((value: string) => <li key={value}>{value}</li>)}</ul></>}<h3>Run 原始结构化记录</h3><pre>{json(visibleRunDetail)}</pre></>}{sealed ? <a className="harness-eval-download" href={download('archive')} download>下载完整 Run ZIP</a> : <p>完整包在 Run 封存后提供</p>}</DetailDrawer></div><div className="harness-eval-actions">{onAssistant && <button type="button" className="harness-primary" disabled={!visibleRunDetail} onClick={() => void onAssistant('请分析当前评测的业务结论、未通过或无法判定的用例与证据，提出可验证的改进建议；不要把执行结束当作业务通过。', { page: 'evaluation', agent_id: selectedRunAgentId, experiment_id: selectedRunVersion, run_id: runId })}>AI 分析并改进</button>}{report?.present && <a className="harness-eval-download" href={download('report')} download>下载报告</a>}<button type="button" onClick={() => { if (returnToComparison.current) { returnToComparison.current = false; setRunId(''); chooseTab('compare', { run_id: undefined, run_tab: undefined, case_id: undefined, job_id: undefined }) } else returnToRecords() }}>{returnToComparison.current ? '返回结果比较' : '返回评测记录'}</button></div></div>
         {extractError && <p role="alert">{extractError}</p>}{runLoading && !visibleRunDetail && <LoadingIndicator label="读取评测结果" block />}{runError && <p role="alert">结果读取失败：{runError}。{visibleRunDetail ? '以下为上次读取内容，可能已过期。' : '当前没有可显示的结果。'}可用页面顶部的“刷新”重试。</p>}
         {datasetSource && runTab === 'files' && <button type="button" onClick={() => chooseRunTab('datasets')}>返回样本复核（保留草稿）</button>}
         <div role="tablist" aria-label="Run 内容" className="harness-eval-subtabs" onKeyDown={event => { const ids: RunTab[] = ['report', 'results', 'files', 'datasets']; const index = ids.indexOf(runTab); const next = event.key === 'ArrowRight' ? (index + 1) % ids.length : event.key === 'ArrowLeft' ? (index + ids.length - 1) % ids.length : -1; if (next < 0) return; event.preventDefault(); chooseRunTab(ids[next]); document.getElementById(`evaluation-run-tab-${ids[next]}`)?.focus() }}>{([{ id: 'report', title: '结果概览' }, { id: 'results', title: '逐例结果' }, { id: 'files', title: '产物文件' }, { id: 'datasets', title: '决策样本' }] as const).map(item => <button type="button" key={item.id} role="tab" id={`evaluation-run-tab-${item.id}`} aria-selected={runTab === item.id} aria-controls={`evaluation-run-panel-${item.id}`} tabIndex={runTab === item.id ? 0 : -1} onClick={() => chooseRunTab(item.id)}>{item.title}</button>)}</div>
@@ -869,8 +897,8 @@ export function EvaluationPage({ rpc, updates, onAssistant, onContext, target, o
       onNavigate?.({ page: 'evaluation', tab: 'cases', agent_id: newCase.agent, experiment_id: newCase.experiment, case_id: document.case.id })
       updates?.invalidate(['agents', 'catalog'])
     }}/>}
-    <dialog ref={configDialog} className="harness-eval-drawer" aria-labelledby="evaluation-config-title" onCancel={event => { if (evalBusy) event.preventDefault(); else setConfigOpen(false) }}><div className="harness-eval-section-heading"><h2 id="evaluation-config-title">{evalPending ? `核对评测 ${agentName(evalPending.agentId)} ${versionName(evalPending.experimentId)}` : agentId && experimentId ? `评测 ${agentName(agentId)} ${versionName(experimentId)}` : '新建评测'}</h2><button type="button" disabled={evalBusy} onClick={() => setConfigOpen(false)}>关闭</button></div><div className="harness-eval-dialog-body"><p className="harness-eval-muted">选择研究版本、验证目标和用例范围，再启动独立 Run。</p><div className="harness-eval-editor"><label>智能体<SearchSelect label="新建评测智能体" disabled={evalBusy || !!evalPending} value={agentId} onChange={value => { changeScope(value); setConfigOpen(true) }} options={agents.map(agent => ({ value: agent.id, label: agent.name || agent.id, description: agent.id }))} /></label><label>研究版本<SearchSelect label="新建评测版本" disabled={!agentId || detailLoading || evalBusy || !!evalPending} value={experimentId} onChange={value => { changeScope(agentId, value); setConfigOpen(true) }} options={versions.map(id => ({ value: id, label: versionName(id), description: id }))} /></label></div><section className="harness-eval-advanced"><h3>验证目标与复核</h3><div className="harness-eval-editor"><label>验证目标<select aria-label="验证目标" value={executor} disabled={evalBusy || !!evalPending} onChange={event => { setExecutor(event.target.value); clearPreview() }}><option value="api">业务能力评测</option><option value="browser">界面冒烟</option></select></label><label>证据复核<select aria-label="证据复核" value={executor === 'browser' ? 'none' : review} disabled={evalBusy || !!evalPending || executor === 'browser'} onChange={event => { if (executor === 'browser') return; setReview(event.target.value); clearPreview() }}><option value="none">不请求 AI 复核</option><option value="ai">AI 业务效果与源码评估</option></select></label></div><p className="harness-eval-muted">{executor === 'browser' ? '检查界面能否打开和完成基础交互，不生成业务能力通过结论，也不进行 AI 证据复核。' : '按用例验证业务行为。AI 评估分别审读业务运行证据与冻结源码，源码诊断不改变业务效果结论。'}</p></section><section className="harness-eval-range"><h3>评测范围</h3><div className="harness-eval-scope-choice" role="group" aria-label="评测范围">{([{ id: 'fast', title: '快速评测' }, { id: 'full', title: '全部用例' }, { id: 'selected', title: '自选用例' }] as const).map(item => <button key={item.id} type="button" aria-pressed={caseScope === item.id} disabled={evalBusy || !!evalPending} onClick={() => { setCaseScope(item.id); clearPreview() }}>{item.title}</button>)}</div>{caseScope === 'selected' ? <><input aria-label="搜索待评测用例" placeholder="搜索用例名称或 ID" value={newCaseSearch} onChange={event => setNewCaseSearch(event.target.value)} /><div className="harness-eval-new-case-list">{cases.filter(item => `${item.id} ${item.title}`.toLowerCase().includes(newCaseSearch.trim().toLowerCase())).map(item => <label key={item.id}><input type="checkbox" aria-label={`执行 ${item.id}`} disabled={evalBusy || !!evalPending} checked={selectedCases.includes(item.id)} onChange={event => { setSelectedCases(current => event.target.checked ? [...current, item.id] : current.filter(id => id !== item.id)); clearPreview() }} /><span><strong>{item.title || item.id}</strong><small>{item.id}</small></span></label>)}</div><p>已选择 {selectedCases.length} 个用例。</p>{!selectedCases.length && <p className="harness-eval-muted">请至少选择一个用例。</p>}</> : <p>{caseScope === 'fast' ? '按已保存的快速评测标记选择用例。' : '评测此智能体的全部已保存用例。'}实际范围以执行预览为准。</p>}<p className="harness-eval-muted">结论只适用于本次用例和执行环境；历史 Run 保留冻结定义。</p></section>{caseDirty && <p role="alert">用例草稿尚未保存，本次评测将使用已保存的定义。</p>}{detailError && <p role="alert">{detailError}</p>}{evalError && <p role="alert">{evalError}</p>}{evalPreview && <section className="harness-eval-preview"><h3>执行预览</h3><Facts items={[["用例数量", evalPreview.case_ids?.length], ["验证目标", evalPreview.executor === 'browser' ? '界面冒烟' : '业务能力评测']]} />{evalPreview.case_ids?.length > 0 && <p>{evalPreview.case_ids.join('、')}</p>}{evalPreview.missing_env_names?.length > 0 && <p role="alert">缺少环境变量：{evalPreview.missing_env_names.join('、')}</p>}<Raw value={evalPreview} title="预览完整配置" inline /></section>}</div><div className="harness-eval-actions harness-eval-dialog-footer"><button type="button" disabled={!!evalPending || !experimentId || evalBusy || detailLoading || caseScope === 'selected' && !selectedCases.length} onClick={() => void previewEvaluation()}>执行预览</button><button type="button" className="harness-primary" disabled={evalBusy || !evalPending && (!experimentId || detailLoading || caseScope === 'selected' && !selectedCases.length)} onClick={() => void startEvaluation(evalPending ?? undefined)}>{evalBusy ? '处理中…' : evalPending ? '核对并继续此次请求' : '启动评测'}</button></div></dialog>
+    <dialog ref={configDialog} className="harness-eval-drawer" aria-labelledby="evaluation-config-title" onCancel={event => { if (evalBusy) event.preventDefault(); else { setConfigOpen(false); releasePreview() } }}><div className="harness-eval-section-heading"><h2 id="evaluation-config-title">{evalPending ? `核对评测 ${agentName(evalPending.agentId)} ${versionName(evalPending.experimentId)}` : agentId && experimentId ? `评测 ${agentName(agentId)} ${versionName(experimentId)}` : '新建评测'}</h2><button type="button" disabled={evalBusy} onClick={() => { setConfigOpen(false); releasePreview() }}>关闭</button></div><div className="harness-eval-dialog-body"><p className="harness-eval-muted">选择研究版本、验证目标和用例范围，再启动独立 Run。</p>{evalPending && <p role="status">{evalPending.run_id ? `Run ID：${evalPending.run_id}` : '旧评测受理状态待核对'} · {evalBusy ? '正在准备运行记录' : '受理结果待核对'}</p>}<div className="harness-eval-editor"><label>智能体<SearchSelect label="新建评测智能体" disabled={evalBusy || !!evalPending} value={agentId} onChange={value => { changeScope(value); setConfigOpen(true) }} options={agents.map(agent => ({ value: agent.id, label: agentName(agent.id), description: agent.id }))} /></label><label>研究版本<SearchSelect label="新建评测版本" disabled={!agentId || detailLoading || evalBusy || !!evalPending} value={experimentId} onChange={value => { changeScope(agentId, value); setConfigOpen(true) }} options={versions.map(id => ({ value: id, label: versionName(id), description: `${objectType(id)} · ${id}` }))} /></label></div><section className="harness-eval-advanced"><h3>验证目标与复核</h3><div className="harness-eval-editor"><label>验证目标<select aria-label="验证目标" value={executor} disabled={evalBusy || !!evalPending} onChange={event => { setExecutor(event.target.value); clearPreview() }}><option value="api">业务能力评测</option><option value="browser">界面冒烟</option></select></label><label>证据复核<select aria-label="证据复核" value={executor === 'browser' ? 'none' : review} disabled={evalBusy || !!evalPending || executor === 'browser'} onChange={event => { if (executor === 'browser') return; setReview(event.target.value); clearPreview() }}><option value="none">不请求 AI 复核</option><option value="ai">AI 业务效果与源码评估</option></select></label></div><p className="harness-eval-muted">{executor === 'browser' ? '检查界面能否打开和完成基础交互，不生成业务能力通过结论，也不进行 AI 证据复核。' : '按用例验证业务行为。AI 评估分别审读业务运行证据与冻结源码，源码诊断不改变业务效果结论。'}</p></section><section className="harness-eval-range"><h3>评测范围</h3><div className="harness-eval-scope-choice" role="group" aria-label="评测范围">{([{ id: 'fast', title: '快速评测' }, { id: 'full', title: '全部用例' }, { id: 'selected', title: '自选用例' }] as const).map(item => <button key={item.id} type="button" aria-pressed={caseScope === item.id} disabled={evalBusy || !!evalPending} onClick={() => { setCaseScope(item.id); clearPreview() }}>{item.title}</button>)}</div>{caseScope === 'selected' ? <><input aria-label="搜索待评测用例" placeholder="搜索用例名称或 ID" value={newCaseSearch} onChange={event => setNewCaseSearch(event.target.value)} /><div className="harness-eval-new-case-list">{cases.filter(item => `${item.id} ${item.title}`.toLowerCase().includes(newCaseSearch.trim().toLowerCase())).map(item => <label key={item.id}><input type="checkbox" aria-label={`执行 ${item.id}`} disabled={evalBusy || !!evalPending} checked={selectedCases.includes(item.id)} onChange={event => { setSelectedCases(current => event.target.checked ? [...current, item.id] : current.filter(id => id !== item.id)); clearPreview() }} /><span><strong>{item.title || item.id}</strong><small>{item.id}</small></span></label>)}</div><p>已选择 {selectedCases.length} 个用例。</p>{!selectedCases.length && <p className="harness-eval-muted">请至少选择一个用例。</p>}</> : <p>{caseScope === 'fast' ? '按已保存的快速评测标记选择用例。' : '评测此智能体的全部已保存用例。'}实际范围以执行预览为准。</p>}<p className="harness-eval-muted">结论只适用于本次用例和执行环境；历史 Run 保留冻结定义。</p></section>{caseDirty && <p role="alert">用例草稿尚未保存，本次评测将使用已保存的定义。</p>}{detailError && <p role="alert">{detailError}</p>}{evalError && <p role="alert">{evalError}</p>}{evalPreview && <section className="harness-eval-preview"><h3>执行预览</h3><Facts items={[["用例数量", evalPreview.case_ids?.length], ["验证目标", evalPreview.executor === 'browser' ? '界面冒烟' : '业务能力评测']]} />{evalPreview.case_ids?.length > 0 && <p>{evalPreview.case_ids.join('、')}</p>}{evalPreview.missing_env_names?.length > 0 && <p role="alert">缺少环境变量：{evalPreview.missing_env_names.join('、')}</p>}<Raw value={evalPreview} title="预览完整配置" inline /></section>}</div><div className="harness-eval-actions harness-eval-dialog-footer">{evalPending && <button type="button" disabled={pendingObservation?.status === 'cancelling'} onClick={() => void cancelPendingEvaluation()}>取消此次评测</button>}<button type="button" disabled={!!evalPending || !experimentId || evalBusy || detailLoading || caseScope === 'selected' && !selectedCases.length} onClick={() => void previewEvaluation()}>执行预览</button><button type="button" className="harness-primary" disabled={evalBusy || !evalPending && (!experimentId || detailLoading || caseScope === 'selected' && !selectedCases.length)} onClick={() => { if (evalPending) void recoverPendingEvaluation(); else void startEvaluation() }}>{evalBusy ? '处理中…' : evalPending ? '核对此次 Run' : '启动评测'}</button></div></dialog>
     <dialog ref={decisionDialog} className="harness-eval-decision-dialog" aria-labelledby="evaluation-decision-title" onCancel={event => { event.preventDefault(); closeDecision() }}><div className="harness-eval-section-heading"><h2 id="evaluation-decision-title">记录研究决策{['正在读取研究决策…', '正在读取最新 Decision…'].includes(decisionMessage) ? <LoadingIndicator label="读取研究决策" /> : null}</h2><button type="button" disabled={decisionBusy} onClick={closeDecision}>关闭</button></div><div className="harness-eval-dialog-body"><p>绑定研究版本：<strong>{decisionTarget.experiment}</strong></p><label className="harness-eval-field">Decision 正文<textarea aria-label="Decision 正文" rows={16} disabled={decisionBusy || decision.hash === undefined} value={decision.body} onChange={event => setDecision({ ...decision, body: event.target.value })} /></label>{decisionConflict && <div className="harness-eval-conflict" role="alert"><p>Decision 已被其他任务修改。你的草稿保留在编辑框中；关闭窗口后重新打开仍可继续。</p><div className="harness-eval-actions"><a className="harness-eval-download" href={`data:text/markdown;charset=utf-8,${encodeURIComponent(decision.body)}`} download={`${decisionTarget.experiment}-decision-draft.md`}>下载 Decision 草稿</a><button type="button" onClick={() => void readLatestDecision()}>读取最新 Decision</button>{decisionLatest && <button type="button" onClick={() => { setDecision(previous => ({ ...previous, hash: decisionLatest.hash, saved: decisionLatest.body })); setDecisionConflict(false); setDecisionMessage('已使用最新 Decision 作为保存基准；草稿未改变，请核对合并后保存。') }}>使用最新版本作为保存基准</button>}</div>{decisionLatest && <details><summary>查看最新 Decision（不覆盖草稿）</summary><pre>{decisionLatest.body}</pre></details>}</div>}{decisionMessage && !['正在读取研究决策…', '正在读取最新 Decision…'].includes(decisionMessage) && <p role="status">{decisionMessage}</p>}</div><div className="harness-eval-actions harness-eval-dialog-footer"><button type="button" className="harness-primary" disabled={decisionBusy || decision.hash === undefined || !decisionDirty} onClick={() => void saveDecision()}>{decisionBusy ? '保存中…' : '保存研究决策'}</button></div></dialog>
-    <dialog ref={cancelDialog} className="harness-eval-confirm-dialog" aria-labelledby="evaluation-cancel-title" onCancel={() => setCancelJobId('')}><div className="harness-eval-section-heading"><h2 id="evaluation-cancel-title">取消当前评测？</h2><button type="button" onClick={() => setCancelJobId('')}>关闭</button></div><div className="harness-eval-dialog-body"><p>目标评测：<strong>{agentName(job?.agent_id)} {job?.experiment_id ? versionName(job.experiment_id) : '版本待读取'}</strong></p><p>当前状态：{job?.status === 'running' ? `运行中${elapsed(job.started_at) ? ` · ${elapsed(job.started_at)}` : ''}` : executionLabel(job?.status)}</p><p>取消会请求结束这项独立评测任务。已保存的历史 Run 和用例不会因此删除；取消完成前，最终执行状态与业务结论仍需重新查询。</p><p className="harness-eval-muted">任务 ID：<code>{cancelJobId}</code></p></div><div className="harness-eval-actions harness-eval-dialog-footer"><button type="button" onClick={() => setCancelJobId('')}>继续评测</button><button type="button" className="harness-primary" disabled={!cancelJobId || job?.job_id !== cancelJobId || job?.status !== 'running' || !!jobError} onClick={() => { const confirmedJobId = cancelJobId; setCancelJobId(''); void cancelEvaluation(confirmedJobId) }}>确认取消</button></div></dialog>
+    <dialog ref={cancelDialog} className="harness-eval-confirm-dialog" aria-labelledby="evaluation-cancel-title" onCancel={() => setCancelJobId('')}><div className="harness-eval-section-heading"><h2 id="evaluation-cancel-title">取消当前评测？</h2><button type="button" onClick={() => setCancelJobId('')}>关闭</button></div><div className="harness-eval-dialog-body"><p>目标评测：<strong>{agentName(job?.agent_id)} {job?.experiment_id ? versionName(job.experiment_id) : '版本待读取'}</strong></p><p>当前状态：{job?.status === 'running' ? `运行中${elapsed(job.started_at) ? ` · ${elapsed(job.started_at)}` : ''}` : executionLabel(job?.status)}</p><p>取消会请求结束这项独立评测任务。已保存的历史 Run 和用例不会因此删除；取消完成前，最终执行状态与业务结论仍需重新查询。</p><p className="harness-eval-muted">{job?.run_id ? 'Run ID：' : '旧评测标识：'}<code>{cancelJobId}</code></p></div><div className="harness-eval-actions harness-eval-dialog-footer"><button type="button" onClick={() => setCancelJobId('')}>继续评测</button><button type="button" className="harness-primary" disabled={!cancelJobId || executionKey(job) !== cancelJobId || !['running', 'preparing', 'unknown'].includes(job?.status ?? '') || !!jobError} onClick={() => { const confirmedJobId = cancelJobId; setCancelJobId(''); void cancelEvaluation(confirmedJobId) }}>确认取消</button></div></dialog>
   </main>
 }

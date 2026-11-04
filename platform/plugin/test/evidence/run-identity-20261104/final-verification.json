@@ -1,0 +1,73 @@
+{
+  "observed_at": "2026-11-04T11:54:09.859917+00:00",
+  "scope": "当前开发环境的程序装载、旧数据保留及最终工程验收；无远端部署或业务语义采纳",
+  "platform": {
+    "status": "running",
+    "pid": 4033125,
+    "birth": "99571682",
+    "programRoot": "/home/admin/work/harness-engineering-platform",
+    "dataRoot": "/home/admin/harness-engineering-platform-data",
+    "host": "10.0.160.32",
+    "port": 18120,
+    "url": "http://10.0.160.32:18120/hep/",
+    "publicUrl": "http://10.0.160.32:18120/hep/",
+    "log": "/home/admin/harness-engineering-platform-data/.local/platform-service/platform.log",
+    "phase": "running",
+    "detached": true
+  },
+  "runtime": {
+    "HARNESS_PROGRAM_ROOT": "/home/admin/work/harness-engineering-platform",
+    "HARNESS_ASSET_ROOT": "/home/admin/harness-engineering-platform-data",
+    "HARNESS_DSH_ENTRY": "/home/admin/work/cross-framework-sources/dsh/apps/cli/lib/bin.js",
+    "HARNESS_PYTHON": "/usr/bin/python3.10",
+    "DSH_HOME": "/home/admin/harness-engineering-platform-data/.local/platform-home"
+  },
+  "profile_sha256": "07c929ed9a93efd8dd4a86a7ac0a9f0c77d8ee1f9637602a5f94e098a37234e5",
+  "profile_preserved": true,
+  "server_artifact_sha256": "d31d1fe8de12138da2d31673788a3ec5f4e927cb61541a936add2c429bcfc084",
+  "server_equals_deploy_stage": true,
+  "legacy_data": {
+    "checked_run_files": 402,
+    "changed": [],
+    "missing": [],
+    "removed_old_no_run_failures": [
+      {
+        "file": "130fde51-ab4a-4506-b290-aff8ff60c815.json",
+        "id": "130fde51-ab4a-4506-b290-aff8ff60c815",
+        "status": "failed",
+        "run_id": null,
+        "pid": 3437956,
+        "exit_code": 2
+      },
+      {
+        "file": "149d807c-9fd6-4779-8298-8a215fc44406.json",
+        "id": "149d807c-9fd6-4779-8298-8a215fc44406",
+        "status": "failed",
+        "run_id": null,
+        "pid": 3428134,
+        "exit_code": 2
+      },
+      {
+        "file": "dad8b7b2-632b-4058-bfe0-902fc7e61ec8.json",
+        "id": "dad8b7b2-632b-4058-bfe0-902fc7e61ec8",
+        "status": "failed",
+        "run_id": null,
+        "pid": 3439821,
+        "exit_code": 2
+      }
+    ],
+    "remaining_original_controls": 57
+  },
+  "browser": {
+    "checks": 56,
+    "failures": [],
+    "errors": []
+  },
+  "final_normal_run": {
+    "checks": 17,
+    "failures": [],
+    "run_id": "run-23c63f26-12b6-439f-9021-4272852c3b52"
+  },
+  "program_commit": "dacedd94a51f0181a17bda3d253d7950c2a82a67",
+  "submitted_or_pushed": false
+}

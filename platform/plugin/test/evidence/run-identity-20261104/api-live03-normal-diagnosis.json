@@ -1,0 +1,41 @@
+{
+  "scope": "Run自然停止后只读原有持久HOME及Case证据，不重启/不新建Run；不能补称为live RPC或历史driver容器内hash",
+  "run_id": "run-de9f0702-893b-4ce4-9245-fbccbb5fe462",
+  "case_checks": {
+    "schema_version": "1.0",
+    "case_id": "U-ASSET-PAGES-001",
+    "transport": "browser",
+    "completed": false,
+    "failure_reason": "browser-case-error",
+    "failure_detail": "Error:poll-timeout",
+    "trace_available": false
+  },
+  "workspace_recorded": true,
+  "sessions": [
+    {
+      "session_id": "session-7aef7ee2-b3ac-449a-bf3c-097d44ac9080",
+      "records": 27,
+      "preset": "inspection-delivery-demo",
+      "workspace": "/work/harness/workspace",
+      "case_input_present": true,
+      "completed_turns": 1,
+      "assistant_message_records": 2,
+      "tool_result_records": 1
+    },
+    {
+      "session_id": "session-ba634eb3-7546-46b9-bf15-141af3ec916f",
+      "records": 4,
+      "preset": "inspection-delivery-demo",
+      "workspace": "/work/harness/workspace",
+      "case_input_present": false,
+      "completed_turns": 0,
+      "assistant_message_records": 0,
+      "tool_result_records": 0
+    }
+  ],
+  "limits": [
+    "请求live RPC与容器内sha时本Run已经自然停止且容器删除，未伪造为已核对",
+    "截图与持久记录表明Harness有已完成响应，但不足以把browser Case判为通过"
+  ],
+  "inference": "driver在runCase进入之后发生poll-timeout；没有导出trace且正确preset/workspace的原Case输入和completed Turn已持久化，优先核对resolveNewSession对session/list投影的适配"
+}

@@ -162,7 +162,30 @@ test('读取失败或状态缺失不被当作空闲', async t => {
   const f = await activityFixture(t, { 'session/list': { items: [] }, 'agents/eval/list': { jobs: [] } })
   await assert.rejects(readUpdateActivity(f.options, f.state, 'workspace-update-test'), /只读核对失败/)
   const malformed = await activityFixture(t, { 'session/list': { items: [] }, 'agents/eval/list': { jobs: [{ job_id: 'broken' }] }, 'agents/sdk/list': [] })
-  await assert.rejects(readUpdateActivity(malformed.options, malformed.state, 'workspace-update-test'), /评测任务状态不完整/)
+  await assert.rejects(readUpdateActivity(malformed.options, malformed.state, 'workspace-update-test'), /评测运行状态不完整/)
+})
+
+test('Run准备中与未知观察均阻止更新，兼容旧评测响应', async t => {
+  const f = await activityFixture(t, {
+    'session/list': { items: [] },
+    'agents/eval/list': { runs: [{ run_id: 'run-created', status: 'completed' }], pending: [{ run_id: 'run-preparing', status: 'preparing' }, { legacy_id: 'old-unknown', status: 'unknown' }], errors: [] },
+    'agents/sdk/list': [],
+  })
+  const busy = await readUpdateActivity(f.options, f.state, 'workspace-update-test')
+  assert.deepEqual(busy.map(item => [item.id, item.state]), [['run-preparing', 'preparing'], ['old-unknown', 'unknown']])
+})
+
+test('局部损坏的评测控制记录不能被更新器当作空闲', async t => {
+  const f = await activityFixture(t, {
+    'session/list': { items: [] }, 'agents/sdk/list': [],
+    'agents/eval/list': { runs: [], pending: [], errors: [{ path: 'evaluation-jobs/broken.json', message: '无法核对' }] },
+  })
+  await assert.rejects(readUpdateActivity(f.options, f.state, 'workspace-update-test'), /评测状态存在未核对项/)
+  const malformed = await activityFixture(t, {
+    'session/list': { items: [] }, 'agents/sdk/list': [],
+    'agents/eval/list': { runs: [], pending: [], errors: {} },
+  })
+  await assert.rejects(readUpdateActivity(malformed.options, malformed.state, 'workspace-update-test'), /在途状态响应不完整/)
 })
 
 test('已受理组合阻止更新，完成后可继续；只读核对不重新执行上游', async t => {

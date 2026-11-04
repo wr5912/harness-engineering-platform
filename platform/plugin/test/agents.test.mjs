@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
@@ -139,10 +139,60 @@ async function rpc(handler, endpoint, payload = {}) {
   return result.value
 }
 
-async function waitForJob(handler, jobId) {
+// 隔离模型与CLI执行结果，真实写入本次控制器需要核对的Run提交文件。
+function evaluationScript(body) {
+  return [
+    'import json,os,sys,pathlib',
+    '_fixture_run=None',
+    '_fixture_state="planned"',
+    'def _fixture_commit(state,instance_stopped=True):',
+    ' global _fixture_state',
+    ' _fixture_state=state',
+    ' if _fixture_run:',
+    '  manifest={"schema_version":"2.0","run_id":_fixture_id,"experiment_id":_fixture_experiment,"agent_id":"test-agent","source_id":_fixture_source,"kind":"research","baseline_ref":"none:first-experiment","evaluation_ref":"agents/test-agent/evaluation.md","status":state,"created_at":"2026-11-04T00:00:00Z"}',
+    '  temporary=_fixture_run/".run.yaml.tmp"',
+    '  temporary.write_text("".join(key+": "+json.dumps(value)+"\\n" for key,value in manifest.items()))',
+    '  temporary.replace(_fixture_run/"run.yaml")',
+    '  execution=_fixture_run/"execution.json"',
+    '  if execution.exists():',
+    '   value=json.loads(execution.read_text());value.update(status=state,instance_stopped=instance_stopped)',
+    '   temporary=_fixture_run/".execution.json.tmp";temporary.write_text(json.dumps(value));temporary.replace(execution)',
+    'if "--dry-run" not in sys.argv:',
+    ' _fixture_id=sys.argv[sys.argv.index("--run-id")+1]',
+    ' _fixture_source=sys.argv[sys.argv.index("--source")+1]',
+    ' _fixture_experiment=_fixture_source.removeprefix("experiment:")',
+    ' _fixture_run=pathlib.Path.cwd()/"evolution/experiments"/_fixture_experiment/"runs"/_fixture_id',
+    ' _fixture_run.mkdir(parents=True,exist_ok=False)',
+    ' _fixture_cases=[sys.argv[index+1] for index,argument in enumerate(sys.argv) if argument=="--case"] or ["U-CASE-001"]',
+    ' _fixture_inputs={"schema_version":"2.0","run_id":_fixture_id,"source_id":_fixture_source,"evaluation_cases":[{"case_id":case,"inputs":["ping"],"expected_behavior":"返回 pong。"} for case in _fixture_cases]}',
+    ' for key,flag in [("source_ref","--source-ref"),("evaluation_source","--evaluation-source")]:',
+    '  if flag in sys.argv: _fixture_inputs[key]=sys.argv[sys.argv.index(flag)+1]',
+    ' (_fixture_run/"inputs.lock.json").write_text(json.dumps(_fixture_inputs))',
+    ' _fixture_commit("planned")',
+    ' (_fixture_run/"execution.json").write_text(json.dumps({"run_id":_fixture_id,"pid":os.getpid(),"status":"running"}))',
+    ' print("Research Run: "+_fixture_id,file=sys.stderr,flush=True)',
+    'try:',
+    ` exec(${JSON.stringify(body)},globals())`,
+    'except SystemExit as error:',
+    ' if _fixture_run and _fixture_state=="planned": _fixture_commit("failed" if error.code else "completed")',
+    ' raise',
+    'except BaseException:',
+    ' if _fixture_run: _fixture_commit("failed")',
+    ' raise',
+    'else:',
+    ' if _fixture_run: _fixture_commit("completed")',
+  ].join('\n')
+}
+
+async function startEvaluation(handler, payload) {
+  const preview = await rpc(handler, 'eval/preview', payload)
+  return rpc(handler, 'eval/start', { ...payload, run_id: preview.run_id })
+}
+
+async function waitForJob(handler, runId) {
   for (let index = 0; index < 20; index += 1) {
-    const status = await rpc(handler, 'eval/status', { job_id: jobId })
-    if (status.status !== 'running') return status
+    const status = await rpc(handler, 'eval/status', { run_id: runId })
+    if (['completed', 'failed', 'cancelled'].includes(status.status) && status.exit_code !== undefined && status.exit_code !== null) return status
     await new Promise(resolve => setTimeout(resolve, 25))
   }
   throw new Error('job did not finish')
@@ -1334,19 +1384,19 @@ test('隔离程序评测的预览与任务共用来源、模型投影和凭据�
   const fx = fixture()
   const isolated = mkdtempSync(join(tmpdir(), 'isolated-evaluation-'))
   try {
-    write(join(isolated, 'runtime/adapters/dsh-container/dsh-eval'), [
+    write(join(isolated, 'runtime/adapters/dsh-container/dsh-eval'), evaluationScript([
       'import json,os,sys',
       'policy=json.load(open(sys.argv[sys.argv.index("--model-policy")+1]))',
       'print(json.dumps({"program_root":os.environ["HARNESS_PROGRAM_ROOT"],"script":sys.argv[0],"key_present":bool(os.environ.get("MODEL_API_KEY")),"model":policy["default"]["model"]}))',
-    ].join('\n'))
+    ].join('\n')))
     const handler = createAgentsHandler(fx.root, undefined, {}, async () => ({
       policy: { default: { model: 'actual-model' } }, environment: { MODEL_API_KEY: 'private-fixture-key' },
     }))
     const payload = { source: 'experiment:EXP-test-agent-001', program_root: isolated }
     const preview = await rpc(handler, 'eval/preview', payload)
     assert.equal(preview.command[1], join(isolated, 'runtime/adapters/dsh-container/dsh-eval'))
-    const started = await rpc(handler, 'eval/start', payload)
-    const finished = await waitForJob(handler, started.job_id)
+    const started = await rpc(handler, 'eval/start', { ...payload, run_id: preview.run_id })
+    const finished = await waitForJob(handler, started.run_id)
     assert.equal(finished.status, 'completed')
     for (const result of [preview.result, finished.result]) {
       assert.equal(result.program_root, isolated)
@@ -1369,7 +1419,7 @@ test('平台评测预览和 Job 共用当前模型投影，策略文件随任务
   const secret = 'fixture-model-secret-938104'
   const policyRoot = join(fx.root, '.local/evaluation-jobs/model-policies')
   try {
-    write(join(fx.root, 'runtime/adapters/dsh-container/dsh-eval'), [
+    write(join(fx.root, 'runtime/adapters/dsh-container/dsh-eval'), evaluationScript([
       'import json,os,sys,time',
       'path=sys.argv[sys.argv.index("--model-policy")+1]',
       'policy=json.load(open(path))',
@@ -1381,7 +1431,7 @@ test('平台评测预览和 Job 共用当前模型投影，策略文件随任务
       'print(os.environ.get("MODEL_API_KEY"),file=sys.stderr,flush=True)',
       'time.sleep(.35)',
       'print(json.dumps({"policy_exists_at_exit":os.path.exists(path),"agent_id":policy["agent_id"]}))',
-    ].join('\n'))
+    ].join('\n')))
     const projected = []
     const handler = createAgentsHandler(fx.root, undefined, {}, async agentId => {
       projected.push(agentId)
@@ -1396,10 +1446,10 @@ test('平台评测预览和 Job 共用当前模型投影，策略文件随任务
     assert.equal(preview.command.includes(secret), false)
     assert.equal(preview.command.some(part => part.includes(policyRoot)), false)
     assert.deepEqual(readdirSync(policyRoot), [])
-    const started = await rpc(handler, 'eval/start', payload)
+    const started = await rpc(handler, 'eval/start', { ...payload, run_id: preview.run_id })
     let running
     for (let attempt = 0; attempt < 30; attempt++) {
-      running = await rpc(handler, 'eval/status', { job_id: started.job_id })
+      running = await rpc(handler, 'eval/status', { run_id: started.run_id })
       if (running.stderr.includes('started') && running.stderr.includes('[REDACTED]')) break
       await new Promise(resolve => setTimeout(resolve, 20))
     }
@@ -1409,12 +1459,12 @@ test('平台评测预览和 Job 共用当前模型投影，策略文件随任务
     const directories = readdirSync(policyRoot)
     assert.equal(directories.length, 1)
     assert.equal(statSync(join(policyRoot, directories[0], 'policy.json')).mode & 0o777, 0o600)
-    const finished = await waitForJob(handler, started.job_id)
+    const finished = await waitForJob(handler, started.run_id)
     assert.equal(finished.status, 'completed')
     assert.equal(finished.result.policy_exists_at_exit, true)
     assert.deepEqual(readdirSync(policyRoot), [])
-    const failed = await rpc(handler, 'eval/start', { ...payload, cases: ['U-CASE-FAIL'] })
-    assert.equal((await waitForJob(handler, failed.job_id)).status, 'failed')
+    const failed = await startEvaluation(handler, { ...payload, cases: ['U-CASE-FAIL'] })
+    assert.equal((await waitForJob(handler, failed.run_id)).status, 'failed')
     assert.deepEqual(readdirSync(policyRoot), [])
     write(join(fx.root, 'runtime/adapters/dsh-container/dsh-eval'), [
       'import os,sys',
@@ -1426,7 +1476,7 @@ test('平台评测预览和 Job 共用当前模型投影，策略文件随任务
     assert.equal(JSON.stringify(rejected).includes(secret.slice(0, 12)), false)
     assert.match(JSON.stringify(rejected), /\[REDACTED\]/)
     assert.deepEqual(readdirSync(policyRoot), [])
-    assert.deepEqual(projected, ['test-agent', 'test-agent', 'test-agent', 'test-agent'])
+    assert.deepEqual(projected, ['test-agent', 'test-agent', 'test-agent', 'test-agent', 'test-agent'])
   } finally { await rm(fx.root, { recursive: true, force: true }) }
 })
 
@@ -1435,14 +1485,14 @@ test('公开评测固定历史来源并给预览和Job传递同字节Mock映射�
   const fx = fixture(), policyRoot = join(fx.root, '.local/evaluation-jobs/model-policies')
   try {
     write(join(fx.root, 'evolution/experiments/EXP-test-agent-001/candidate/roles/analyst/AGENTS.md'), '当前工作树的新角色\n')
-    write(join(fx.root, 'runtime/adapters/dsh-container/dsh-eval'), [
+    write(join(fx.root, 'runtime/adapters/dsh-container/dsh-eval'), evaluationScript([
       'import hashlib,json,sys',
       'ref=sys.argv[sys.argv.index("--source-ref")+1]',
       'evaluation_source=sys.argv[sys.argv.index("--evaluation-source")+1]',
       'path=sys.argv[sys.argv.index("--mcp-fixture")+1]',
       'raw=open(path,"rb").read()',
       'print(json.dumps({"source_ref":ref,"evaluation_source":evaluation_source,"fixture":json.loads(raw),"fixture_sha256":hashlib.sha256(raw).hexdigest()}))',
-    ].join('\n'))
+    ].join('\n')))
     const selected = []
     const handler = createAgentsHandler(fx.root, undefined, {}, async (agentId, _model, candidate) => {
       selected.push({ agentId, candidate, role: readFileSync(join(candidate, 'roles/analyst/AGENTS.md'), 'utf8') })
@@ -1451,7 +1501,7 @@ test('公开评测固定历史来源并给预览和Job传递同字节Mock映射�
     const mcp_fixture = { schema_version: 1, mode: 'mock', connections: [{ server_id: 'readonly', original_url: 'http://original.test/mcp', url: 'http://mock.test/mcp' }] }
     const payload = { source: 'experiment:EXP-test-agent-001', source_ref: 'git:' + fx.commit, evaluation_source: 'current', mcp_fixture, cases: ['U-CASE-001'] }
     const preview = await rpc(handler, 'eval/preview', payload)
-    const started = await rpc(handler, 'eval/start', payload), final = await waitForJob(handler, started.job_id)
+    const started = await rpc(handler, 'eval/start', { ...payload, run_id: preview.run_id }), final = await waitForJob(handler, started.run_id)
     assert.equal(final.status, 'completed')
     assert.deepEqual(final.result.fixture, mcp_fixture)
     assert.equal(final.result.fixture_sha256, preview.result.fixture_sha256)
@@ -1499,56 +1549,121 @@ test('eval job status parses redacted stdout result', async () => {
   const { createAgentsHandler } = await loadServer()
   const fx = fixture()
   try {
-    write(join(fx.root, 'runtime/adapters/dsh-container/dsh-eval'), 'import json\nprint(json.dumps({"status":"ok","token":"secret-value","api_key":"key-value"}))\n')
+    write(join(fx.root, 'runtime/adapters/dsh-container/dsh-eval'), evaluationScript('import json\nprint(json.dumps({"status":"ok","token":"secret-value","api_key":"key-value"}))\n'))
     const handler = createAgentsHandler(fx.root)
-    const started = await rpc(handler, 'eval/start', { source: 'experiment:EXP-test-agent-001', mode: 'fast', executor: 'api', review: 'none' })
-    const status = await waitForJob(handler, started.job_id)
+    const started = await startEvaluation(handler, { source: 'experiment:EXP-test-agent-001', mode: 'fast', executor: 'api', review: 'none' })
+    const status = await waitForJob(handler, started.run_id)
     assert.equal(status.status, 'completed')
+    assert.match(started.run_id, /^run-[0-9a-f-]{36}$/)
+    assert.equal(started.job_id, undefined)
+    assert.equal(status.job_id, undefined)
     assert.equal(status.result.token, '[REDACTED]')
     assert.equal(status.stdout.includes('secret-value'), false)
     assert.equal(status.result.api_key, '[REDACTED]')
     assert.equal(status.stdout.includes('key-value'), false)
     assert.match(status.log_note, /截断显示/)
     const listed = await rpc(createAgentsHandler(fx.root), 'eval/list')
-    assert.equal(listed.jobs[0].job_id, started.job_id)
-    assert.equal(listed.jobs[0].agent_id, 'test-agent')
-    assert.equal(listed.jobs[0].experiment_id, 'EXP-test-agent-001')
-    assert.equal(listed.jobs[0].status, 'completed')
+    assert.equal(listed.runs[0].run_id, started.run_id)
+    assert.equal(listed.runs[0].agent_id, 'test-agent')
+    assert.equal(listed.runs[0].experiment_id, 'EXP-test-agent-001')
+    assert.equal(listed.runs[0].status, 'completed')
+    assert.equal(listed.jobs, undefined)
+    assert.deepEqual(listed.errors, [])
+    const alias = await rpc(handler, 'eval/status', { job_id: started.run_id })
+    assert.equal(alias.run_id, started.run_id, '原查询参数只作为同一个 Run 的兼容入口')
   } finally {
     await rm(fx.root, { recursive: true, force: true })
   }
+})
+
+test('评测预览预留统一 Run ID，未预览和参数漂移不能启动，创建失败清除且旧提交不重放', async () => {
+  const { createAgentsHandler } = await loadServer()
+  const fx = fixture()
+  try {
+    const script = join(fx.root, 'runtime/adapters/dsh-container/dsh-eval')
+    write(script, [
+      'import json,sys,pathlib',
+      'if "--dry-run" in sys.argv: print(json.dumps({"case_ids":["U-CASE-001"]}));sys.exit(0)',
+      '(pathlib.Path.cwd()/"attempts.log").open("a").write("attempt\\n")',
+      'print("fixture-initialization-failed",file=sys.stderr)',
+      'sys.exit(2)',
+    ].join('\n'))
+    const handler = createAgentsHandler(fx.root)
+    const payload = { source: 'experiment:EXP-test-agent-001', mode: 'fast', executor: 'api', review: 'none' }
+    const absent = await handler('eval/start', { ...payload, run_id: `run-${randomUUID()}` }, new AbortController().signal)
+    assert.equal(absent.ok, false)
+    assert.equal(absent.error.code, 'creation_expired')
+    assert.equal(existsSync(join(fx.root, 'attempts.log')), false)
+    const preview = await rpc(handler, 'eval/preview', payload)
+    assert.match(preview.run_id, /^run-[0-9a-f-]{36}$/)
+    const prepared = await rpc(handler, 'eval/status', { run_id: preview.run_id })
+    assert.equal(prepared.status, 'prepared')
+    assert.equal(prepared.run_created, false)
+    assert.equal((await rpc(handler, 'eval/list')).runs.length, 0)
+    const conflict = await handler('eval/start', { ...payload, run_id: preview.run_id, mode: 'full' }, new AbortController().signal)
+    assert.equal(conflict.ok, false)
+    assert.equal(conflict.error.code, 'conflict')
+    assert.equal(existsSync(join(fx.root, 'attempts.log')), false)
+    const failed = await handler('eval/start', { ...payload, run_id: preview.run_id }, new AbortController().signal)
+    assert.equal(failed.ok, false)
+    assert.equal(failed.error.code, 'creation_failed')
+    assert.match(failed.error.message, /fixture-initialization-failed/)
+    assert.equal(existsSync(join(fx.root, '.local/evaluation-jobs', `${preview.run_id}.json`)), false)
+    assert.equal(existsSync(join(fx.root, 'evolution/experiments/EXP-test-agent-001/runs', preview.run_id)), false)
+    const listed = await rpc(handler, 'eval/list')
+    assert.deepEqual(listed.runs, [])
+    assert.deepEqual(listed.errors, [])
+    const missing = await handler('eval/status', { run_id: preview.run_id }, new AbortController().signal)
+    assert.equal(missing.ok, false)
+    assert.equal(missing.error.code, 'not_found')
+    const repeated = await handler('eval/start', { ...payload, run_id: preview.run_id }, new AbortController().signal)
+    assert.equal(repeated.ok, false)
+    assert.equal(repeated.error.code, 'creation_expired')
+    assert.equal(readFileSync(join(fx.root, 'attempts.log'), 'utf8'), 'attempt\n')
+    const next = await rpc(handler, 'eval/preview', payload)
+    assert.notEqual(next.run_id, preview.run_id)
+    const cancelled = await rpc(handler, 'eval/cancel', { run_id: next.run_id })
+    assert.equal(cancelled.status, 'cancelled')
+    const late = await handler('eval/start', { ...payload, run_id: next.run_id }, new AbortController().signal)
+    assert.equal(late.ok, false)
+    assert.equal(late.error.code, 'creation_expired')
+    assert.equal(readFileSync(join(fx.root, 'attempts.log'), 'utf8'), 'attempt\n')
+  } finally { await rm(fx.root, { recursive: true, force: true }) }
 })
 
 for (const stopped of [true, false]) test(`取消评测等待 CLI 收尾；实例停止${stopped ? '已确认才显示 cancelled' : '未确认显示 failed'}`, async () => {
   const { createAgentsHandler } = await loadServer()
   const fx = fixture()
   try {
-    write(join(fx.root, 'runtime/adapters/dsh-container/dsh-eval'), [
+    write(join(fx.root, 'runtime/adapters/dsh-container/dsh-eval'), evaluationScript([
       'import signal,time,json,sys',
+      'if "--dry-run" in sys.argv: print(json.dumps({"case_ids":["U-CASE-001"]}));sys.exit(0)',
       'def cancelled(*_args):',
       '    time.sleep(.15)',
-      `    print(json.dumps({"cancelled":True,"instance_stopped":${stopped ? 'True' : 'False'},"run_id":"run-11111111-1111-4111-8111-111111111111"}),flush=True)`,
+      `    _fixture_commit(${stopped ? '"cancelled",True' : '"failed",False'})`,
+      `    print(json.dumps({"cancelled":True,"instance_stopped":${stopped ? 'True' : 'False'},"run_id":_fixture_id}),flush=True)`,
       '    raise SystemExit(2)',
       'signal.signal(signal.SIGTERM,cancelled)',
       'print("cancellation-ready",file=sys.stderr,flush=True)',
       'time.sleep(30)',
-    ].join('\n'))
+    ].join('\n')))
     const handler = createAgentsHandler(fx.root)
-    const started = await rpc(handler, 'eval/start', { source: 'experiment:EXP-test-agent-001' })
+    const started = await startEvaluation(handler, { source: 'experiment:EXP-test-agent-001' })
     for (let attempt = 0; attempt < 40; attempt++) {
-      if ((await rpc(handler, 'eval/status', { job_id: started.job_id })).stderr.includes('cancellation-ready')) break
+      if ((await rpc(handler, 'eval/status', { run_id: started.run_id })).stderr.includes('cancellation-ready')) break
       await new Promise(resolve => setTimeout(resolve, 25))
     }
-    const cancelling = await rpc(handler, 'eval/cancel', { job_id: started.job_id })
+    const cancelling = await rpc(handler, 'eval/cancel', { run_id: started.run_id })
     assert.equal(cancelling.status, 'cancelling')
-    assert.equal((await rpc(handler, 'eval/status', { job_id: started.job_id })).status, 'cancelling')
-    assert.equal((await rpc(handler, 'eval/cancel', { job_id: started.job_id })).status, 'cancelling')
+    assert.equal((await rpc(handler, 'eval/status', { run_id: started.run_id })).status, 'cancelling')
+    assert.equal((await rpc(handler, 'eval/cancel', { run_id: started.run_id })).status, 'cancelling')
     let status
     for (let attempt = 0; attempt < 40; attempt++) {
-      status = await rpc(handler, 'eval/status', { job_id: started.job_id })
+      status = await rpc(handler, 'eval/status', { run_id: started.run_id })
       if (!['running', 'cancelling'].includes(status.status)) break
       await new Promise(resolve => setTimeout(resolve, 25))
     }
+    status = await waitForJob(handler, started.run_id)
     assert.equal(status.status, stopped ? 'cancelled' : 'failed')
     assert.equal(status.result.instance_stopped, stopped)
     if (!stopped) assert.match(status.error, /停止尚未确认/)
@@ -1741,31 +1856,33 @@ test('用例保存保留预期中的普通四级小节，其他 Case 原文不�
   assert.ok(current.endsWith(following))
 })
 
-test('运行中 Job 即时返回 stderr 跨数据块输出的 Run ID', async t => {
+test('预分配 Run ID 不被 stderr 跨数据块输出的另一编号改写', async t => {
   const { createAgentsHandler } = await loadServer()
   const { root } = fixture()
   t.after(() => rm(root, { recursive: true, force: true }))
-  const runId = 'run-11111111-1111-4111-8111-111111111111'
-  write(join(root, 'runtime/adapters/dsh-container/dsh-eval'), [
+  const otherRunId = 'run-11111111-1111-4111-8111-111111111111'
+  write(join(root, 'runtime/adapters/dsh-container/dsh-eval'), evaluationScript([
     'import sys,time,json',
+    'if "--dry-run" in sys.argv: print(json.dumps({"case_ids":["U-CASE-001"]}));sys.exit(0)',
     'sys.stderr.write("Research Run: run-11111111-1111-");sys.stderr.flush()',
     'time.sleep(0.08)',
     'sys.stderr.write("4111-8111-111111111111\\n");sys.stderr.flush()',
     'time.sleep(0.25)',
-    `print(json.dumps({"run_id":"${runId}"}))`,
+    'print(json.dumps({"run_id":_fixture_id}))',
     '',
-  ].join('\n'))
+  ].join('\n')))
   const handler = createAgentsHandler(root)
-  const started = await rpc(handler, 'eval/start', { source: 'experiment:EXP-test-agent-001', mode: 'fast', executor: 'api', review: 'none' })
+  const started = await startEvaluation(handler, { source: 'experiment:EXP-test-agent-001', mode: 'fast', executor: 'api', review: 'none' })
   let observed
   for (let attempt = 0; attempt < 30; attempt++) {
-    observed = await rpc(handler, 'eval/status', { job_id: started.job_id })
+    observed = await rpc(handler, 'eval/status', { run_id: started.run_id })
     if (observed.run_id) break
     await new Promise(resolve => setTimeout(resolve, 20))
   }
-  assert.equal(observed.run_id, runId)
+  assert.equal(observed.run_id, started.run_id)
+  assert.notEqual(observed.run_id, otherRunId)
   assert.equal(observed.status, 'running')
-  assert.equal((await waitForJob(handler, started.job_id)).result.run_id, runId)
+  assert.equal((await waitForJob(handler, started.run_id)).result.run_id, started.run_id)
 })
 
 test('特性历史观察引用按所属 Experiment 解析，新保存归一并可通过专用工具读取', async () => {

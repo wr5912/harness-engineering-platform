@@ -13,6 +13,7 @@ export interface PlatformNavigation {
   run_id?: string
   run_tab?: 'report' | 'results' | 'trace' | 'files' | 'datasets'
   case_id?: string
+  /** 只解析既有评测深链；新导航只写入 run_id。 */
   job_id?: string
   instance_name?: string
   source_id?: string

@@ -1,0 +1,193 @@
+{
+  "scope": "driver修复后仅一个全新正常Run：固定来源与原Case的Mock browser工程冒烟，不作业务效果主张；不重放旧Run",
+  "payload": {
+    "source": "experiment:VAR-inspection-delivery-demo-001-rfac75f4cb946",
+    "source_ref": "git:8fbb06e9387e407db77a081c21d8db9927054bd0",
+    "cases": [
+      "U-ASSET-PAGES-001"
+    ],
+    "mode": "full",
+    "executor": "browser",
+    "review": "none"
+  },
+  "expectedDriver": "654696a8f3dd1ad1d836ed539ae747bf6cfeb04adab1baf2987dfb9bb10ea660",
+  "checks": [
+    {
+      "name": "启动前driver为已冻结修复版本",
+      "ok": true
+    },
+    {
+      "name": "全新预览分配Run ID",
+      "ok": true
+    },
+    {
+      "name": "仅一次启动返回相同已创建Run",
+      "ok": true
+    },
+    {
+      "name": "正常Run执行完成并按原ID封存",
+      "ok": true
+    },
+    {
+      "name": "正常Run实例停止已确认",
+      "ok": true
+    },
+    {
+      "name": "目录清单冻结输入执行记录使用同一Run ID",
+      "ok": true
+    },
+    {
+      "name": "执行记录不生成Job ID",
+      "ok": true
+    },
+    {
+      "name": "固定原来源提交和Case",
+      "ok": true
+    },
+    {
+      "name": "Run冻结实际加载的修复driver",
+      "ok": true
+    },
+    {
+      "name": "Run实际标准镜像身份一致",
+      "ok": true
+    },
+    {
+      "name": "本次实例无遗留运行容器",
+      "ok": true
+    },
+    {
+      "name": "正常Run真实行完整编号与已结束状态",
+      "ok": true
+    },
+    {
+      "name": "正常Run详情保持同一完整Run ID和完成状态",
+      "ok": true
+    },
+    {
+      "name": "补验页面无脚本异常及自动评测写入",
+      "ok": true
+    }
+  ],
+  "failures": [],
+  "observations": [
+    {
+      "run_id": "run-de9f0702-893b-4ce4-9245-fbccbb5fe462",
+      "status": "running",
+      "run_status": "planned",
+      "run_created": true
+    },
+    {
+      "run_id": "run-de9f0702-893b-4ce4-9245-fbccbb5fe462",
+      "status": "running",
+      "run_status": "running",
+      "run_created": true
+    },
+    {
+      "run_id": "run-de9f0702-893b-4ce4-9245-fbccbb5fe462",
+      "status": "completed",
+      "run_status": "completed",
+      "run_created": true,
+      "exit_code": 1
+    }
+  ],
+  "blockedWrites": [],
+  "pageErrors": [],
+  "run_id": "run-de9f0702-893b-4ce4-9245-fbccbb5fe462",
+  "created": {
+    "run_id": "run-de9f0702-893b-4ce4-9245-fbccbb5fe462",
+    "directory": "/home/admin/harness-engineering-platform-data/evolution/experiments/VAR-inspection-delivery-demo-001-rfac75f4cb946/runs/run-de9f0702-893b-4ce4-9245-fbccbb5fe462",
+    "status": "completed",
+    "run_status": "completed",
+    "execution_status": "completed",
+    "instance_name": "inspection-delivery-demo-eval-88f19bce",
+    "instance_stopped": true,
+    "source_ref": "git:8fbb06e9387e407db77a081c21d8db9927054bd0",
+    "driver_sha256": "654696a8f3dd1ad1d836ed539ae747bf6cfeb04adab1baf2987dfb9bb10ea660",
+    "image": {
+      "schema_version": "1.0",
+      "source_id": "experiment:VAR-inspection-delivery-demo-001-rfac75f4cb946",
+      "local_image_tag": "ai-agent-harness/dsh:b830ec950-amd64-2ed0d15ad02e",
+      "local_image_id": "sha256:6a975adf96634fd8e20552f4e8ca075625d01bcd8636cda9d4db5af2d5d8fcaf",
+      "image_ref": "ai-agent-harness/dsh:b830ec950-amd64-2ed0d15ad02e@sha256:6a975adf96634fd8e20552f4e8ca075625d01bcd8636cda9d4db5af2d5d8fcaf",
+      "image_build_fingerprint": "sha256:2ed0d15ad02e05605d5ffb34986f149efb399d1a9331d21eceae9735b4ebfaca",
+      "platform": "linux/amd64",
+      "instance_name": "inspection-delivery-demo-eval-88f19bce",
+      "business_control": {
+        "source_digest": "sha256:4f522dc16838e6412556e45183e6f326a921715b2aaef71ec3ea76147b4242c6",
+        "runtime_generation": "63241e379167c40ad7d81c1e8dd424dc",
+        "identity_mode": "development",
+        "access_mode": "anonymous"
+      },
+      "entry_kind": "business-gateway",
+      "scope": "actual DSH evaluation runtime image identity; no semantic verdict"
+    }
+  },
+  "matchingContainers": [],
+  "summary": {
+    "schema_version": "3.0",
+    "run_id": "run-de9f0702-893b-4ce4-9245-fbccbb5fe462",
+    "trial_count": 1,
+    "execution_status_counts": {
+      "completed": 0,
+      "error": 1,
+      "skipped": 0
+    },
+    "machine_trial_verdict_counts": {
+      "passed": 0,
+      "failed": 0,
+      "inconclusive": 1
+    },
+    "machine_overall_verdict": "inconclusive",
+    "review_status": "not_requested",
+    "reviewed_case_count": 0,
+    "reviewed_case_verdict_counts": null,
+    "reviewed_overall_verdict": null,
+    "effective_verdict": "inconclusive",
+    "source_verification": {
+      "status": "matched",
+      "reason": null,
+      "checks": [
+        {
+          "component": "candidate",
+          "status": "matched",
+          "expected_sha256": "9cceec4f6ed93d626059777a43ba8cac38882febe7cca71587edcff0d9f1a5a4",
+          "actual_sha256": "9cceec4f6ed93d626059777a43ba8cac38882febe7cca71587edcff0d9f1a5a4"
+        },
+        {
+          "component": "workspace",
+          "status": "matched",
+          "expected_sha256": "d27277dc23adb6205d2cbbe4ed3fa790dc697db4952d45030c831655563fdcf4",
+          "actual_sha256": "d27277dc23adb6205d2cbbe4ed3fa790dc697db4952d45030c831655563fdcf4"
+        },
+        {
+          "component": "presets",
+          "status": "matched",
+          "expected_sha256": "b7bcf92109fd8f8c941ee11a36f5ea9b264c4c4843b230b73f3d287a7f3b1b90",
+          "actual_sha256": "b7bcf92109fd8f8c941ee11a36f5ea9b264c4c4843b230b73f3d287a7f3b1b90"
+        },
+        {
+          "component": "managed",
+          "status": "matched",
+          "expected_sha256": "3a29fc58efa5bbf2ad42fe917706f212a7c7a0a222a2685e376928a0b021fcc4",
+          "actual_sha256": "3a29fc58efa5bbf2ad42fe917706f212a7c7a0a222a2685e376928a0b021fcc4"
+        },
+        {
+          "component": "evaluation_implementation",
+          "status": "matched",
+          "expected_sha256": "e5e7bacf57021817d1e0580b611873c17e823fe6d6fd42486dfda66ae97cd162",
+          "actual_sha256": "e5e7bacf57021817d1e0580b611873c17e823fe6d6fd42486dfda66ae97cd162"
+        }
+      ]
+    }
+  },
+  "uiRow": {
+    "id": "用例范围未知 · Run ID：run-de9f0702-893b-4ce4-9245-fbccbb5fe462",
+    "execution": "已结束"
+  },
+  "uiDetail": {
+    "run_id": "run-de9f0702-893b-4ce4-9245-fbccbb5fe462",
+    "state": "completed",
+    "id": "Run ID：run-de9f0702-893b-4ce4-9245-fbccbb5fe462"
+  }
+}
