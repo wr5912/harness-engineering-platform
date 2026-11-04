@@ -28,7 +28,7 @@ test('API 评测执行器支持免认证入口并保留历史 Token 握手校验
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
   try {
     const origin = `http://127.0.0.1:${server.address().port}`
-    for (basePath of ['/', '/assistant/']) {
+    for (basePath of ['/', '/assistant/', '/agents/test/instances/test-eval/']) {
       for (mode of ['plain', 'token', 'missing-cookie', 'denied', 'token-without-redirect']) {
         rpcCalls = 0
         const child = spawn(process.execPath, [new URL('./dsh-eval-api.mjs', import.meta.url).pathname], { stdio: ['pipe', 'pipe', 'pipe'] })

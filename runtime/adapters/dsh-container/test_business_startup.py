@@ -71,7 +71,7 @@ class BusinessStartupTest(unittest.TestCase):
         with self.helper(), mock.patch.object(dev, "read_model_policy", return_value={"source": "platform", "default": None}), \
              contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
             dev.prepare_up(self.args())
-        self.assertIn("只有无需认证的开发调试实例可以复用保留的 HOME", error.getvalue())
+        self.assertIn("只有无需认证的实例可以复用保留的 HOME", error.getvalue())
         self.assertEqual((home / "old-session").read_text(), "preserve")
 
     def test_existing_registration_cannot_switch_business_boundary(self):
@@ -81,7 +81,7 @@ class BusinessStartupTest(unittest.TestCase):
                  mock.patch.object(dev, "validate_existing_identity"), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 dev.prepare_up(self.args(business_control=new_file))
 
-    def test_retained_home_only_reused_for_anonymous_development_without_writes(self):
+    def test_retained_home_only_reused_for_anonymous_access_without_writes(self):
         home = self.state / "business-test/dsh-home"
         home.mkdir(parents=True)
         session = home / "old-session"
@@ -92,14 +92,14 @@ class BusinessStartupTest(unittest.TestCase):
             with self.subTest(development=development, access_mode=access_mode), \
                  mock.patch.object(dev, "business_helper", return_value=launch), \
                  mock.patch.object(dev, "read_model_policy", return_value={"source": "platform", "default": None}):
-                if development and access_mode == "anonymous":
+                if access_mode == "anonymous":
                     contract, current = dev.prepare_up(self.args())
                     self.assertIsNone(current)
                     self.assertTrue(contract["business_control"]["runtime_generation"])
                 else:
                     with contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
                         dev.prepare_up(self.args())
-                    self.assertIn("只有无需认证的开发调试实例可以复用保留的 HOME", error.getvalue())
+                    self.assertIn("只有无需认证的实例可以复用保留的 HOME", error.getvalue())
             self.assertEqual(session.read_text(), "preserve")
             self.assertEqual(list(home.parent.iterdir()), [home])
         home.rename(self.root / "original-home")
@@ -108,7 +108,7 @@ class BusinessStartupTest(unittest.TestCase):
              mock.patch.object(dev, "read_model_policy", return_value={"source": "platform", "default": None}), \
              contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
             dev.prepare_up(self.args())
-        self.assertIn("只有无需认证的开发调试实例可以复用保留的 HOME", error.getvalue())
+        self.assertIn("只有无需认证的实例可以复用保留的 HOME", error.getvalue())
 
     def test_creation_policy_validates_retained_home_before_gateway_registration(self):
         home = self.state / "business-test/dsh-home"
@@ -118,7 +118,7 @@ class BusinessStartupTest(unittest.TestCase):
             with self.subTest(identity=identity, access=access), self.helper(), \
                  mock.patch.object(dev, "read_model_policy", return_value={"source": "platform", "default": None}):
                 args = self.args(business_access_mode=access, business_identity_mode=identity)
-                if identity == "development" and access == "anonymous":
+                if access == "anonymous":
                     dev.prepare_up(args)
                 else:
                     with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):

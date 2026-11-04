@@ -7,6 +7,9 @@ import { isUnrestrictedBusinessAccess } from '../../../platform/plugin/src/busin
 import { createBusinessRuntimePatch } from '../../../platform/plugin/src/business-control/patch.ts'
 import { platformGroupUrl } from '../../../platform/plugin/src/business-control/group-link.ts'
 import { businessGatewayEntry, checkBusinessGatewayEntry } from '../../../platform/plugin/src/business-control/entry.ts'
+import { resolveBusinessInstance } from '../../../platform/plugin/src/business-control/instance.ts'
+import { deleteBusinessInstance, preflightGatewayRegistration, updateGatewayRegistration } from '../../../platform/plugin/src/business-control/registration.ts'
+import { instanceStateRoot } from '../../../platform/plugin/src/workspace.ts'
 import { mcpCredentialPaths } from '../../../platform/plugin/src/mcp/credential-path.ts'
 import { parseLocalCapabilities, type LocalModelRoute } from '../../../platform/plugin/src/business-control/local-capabilities.ts'
 export { parseLocalCapabilities, type LocalModelRoute } from '../../../platform/plugin/src/business-control/local-capabilities.ts'
@@ -227,6 +230,30 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       console.log(JSON.stringify(readLocalCapabilities(resolve(process.argv[3]!))))
       process.exit(0)
     }
+    if (process.argv[2] === '--preflight-registration') {
+      const input = JSON.parse(readFileSync(0, 'utf8'))
+      await preflightGatewayRegistration(resolve(process.argv[3]!), input.registration, false, input.previousSourceDigest)
+      console.log(JSON.stringify({ valid: true }))
+      process.exit(0)
+    }
+    if (process.argv[2] === '--delete') {
+      const result = await deleteBusinessInstance(resolve(process.argv[3]!), process.argv[4]!)
+      process.stdout.write(result.stdout)
+      process.stderr.write(result.stderr)
+      process.exit(0)
+    }
+    if (process.argv[2] === '--register') {
+      const assetRoot = resolve(process.argv[3]!), instanceId = process.argv[4]!
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(instanceId)) throw new Error('业务实例名称无效')
+      const manifest = JSON.parse(readFileSync(join(instanceStateRoot(assetRoot), instanceId, 'instance.json'), 'utf8'))
+      const registration = { agentId: manifest.agent_id, instanceId, sourceId: manifest.source_id,
+        sourceDigest: manifest.business_control?.source_digest, accessMode: manifest.business_control?.access_mode,
+        identityMode: manifest.business_control?.identity_mode }
+      resolveBusinessInstance(assetRoot, registration)
+      await updateGatewayRegistration(assetRoot, registration, false, process.argv[5])
+      console.log(JSON.stringify({ url: businessGatewayEntry(assetRoot, registration.agentId, instanceId) }))
+      process.exit(0)
+    }
     if (process.argv[2] === '--entry') {
       const assetRoot = resolve(process.argv[3]!), agentId = process.argv[4]!, instanceId = process.argv[5]!
       const url = businessGatewayEntry(assetRoot, agentId, instanceId)
@@ -265,8 +292,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       '实例未向业务网关开放', '业务网关公开来源无效', '业务实例名称无效', '业务实例归属不匹配',
       '实例没有已核对的业务接入登记', '业务实例来源与网关登记不一致', '业务实例接入地址无效',
       '业务 Runtime 必须使用本机或私网地址', '业务实例 Web 基址与实例入口不一致',
+      '业务网关中同名实例的来源、访问方式或实例阶段不一致，拒绝覆盖',
+      '业务网关尚未配置，无法创建受控实例',
+      '业务网关登记配置无效，拒绝删除受控实例',
+      '受控实例来源登记不完整，拒绝删除；请先核对实例与网关配置',
+      '实例名必须是小写 kebab-case',
+      '业务网关配置持续被占用或保存锁未释放；请稍后重试并核对配置锁',
     ])
-    const reason = error instanceof Error && known.has(error.message) ? error.message
+    const reason = error instanceof Error && (known.has(error.message) || process.argv[2] === '--delete') ? error.message
       : ['--entry', '--check-entry'].includes(process.argv[2]!) ? '业务网页入口配置或实例登记读取失败，请核对当前数据工作区与网关登记'
         : '业务启动配置或来源文件解析失败'
     console.error(`BUSINESS_STARTUP_ERROR:${reason}`)

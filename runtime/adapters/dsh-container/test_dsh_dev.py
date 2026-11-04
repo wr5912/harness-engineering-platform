@@ -1855,6 +1855,63 @@ class UpCommandStateTest(unittest.TestCase):
         self.assertIn('"dsh_running": "unknown"', stderr.getvalue())
 
 
+class BusinessLifecycleEntryTest(unittest.TestCase):
+    def test_private_runtime_files_use_instance_home_or_shared_preparation(self):
+        dependency = {"source": "/dependency", "target": "/opt/dependency", "read_only": True}
+        private = {"source": "/private", "target": "/var/lib/dsh/private", "read_only": True}
+        contract = {"experiment_id": "VAR-example-001", "business_control": {"identity_mode": "development"}}
+        with tempfile.TemporaryDirectory() as directory, \
+                mock.patch.object(dev, "asset_dependency_mounts", return_value=[dependency]), \
+                mock.patch.object(dev, "run", return_value=types.SimpleNamespace(stdout=json.dumps([private]))) as prepare:
+            home_private = Path(directory) / "private"
+            self.assertEqual(dev.runtime_mounts(contract, private_directory=home_private), [dependency, private])
+            prepare.assert_called_once_with([dev.NODE_EXECUTABLE, str(dev.ADAPTER / "harness-runtime.mts"),
+                                             "--private-files", str(dev.REPO), contract["experiment_id"]])
+            home_private.mkdir()
+            prepare.reset_mock()
+            self.assertEqual(dev.runtime_mounts(contract, private_directory=home_private), [dependency])
+            self.assertEqual(dev.runtime_mounts(contract, analysis_workspace="/analysis"), [dependency])
+            prepare.assert_not_called()
+
+    def test_delete_uses_shared_gateway_transaction(self):
+        manifest = {"business_control": {"source_digest": "sha256:current"}}
+        with mock.patch.object(dev, "load_instance", return_value=(Path("/fixture"), manifest)), \
+                mock.patch.object(dev, "business_command", return_value={"deleted": True}) as business, \
+                mock.patch.object(dev, "delete_instance") as direct, \
+                contextlib.redirect_stdout(io.StringIO()):
+            dev.command_delete(types.SimpleNamespace(name="business-probe"))
+        business.assert_called_once_with(["--delete", str(dev.REPO), "business-probe"], timeout=None)
+        direct.assert_not_called()
+
+    def test_failed_restart_registers_only_the_source_actually_written(self):
+        contract = {"agent_id": "agent", "source_id": "experiment:source",
+                    "business_control": {"source_digest": "sha256:new"}}
+        previous = {"business_control": {"source_digest": "sha256:old"}}
+        args = types.SimpleNamespace(name="business-probe", source="experiment:source", mode="eval", dry_run=False, analysis_workspace=None)
+        for current, actual, registered in [
+                ((Path("/fixture"), previous), contract, True),
+                ((Path("/fixture"), previous), {**contract, "source_id": "experiment:other"}, False),
+                ((Path("/fixture"), previous), {**contract, "business_control": previous["business_control"]}, False),
+                (None, contract, False)]:
+            with self.subTest(current=current, actual=actual), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory)
+                (path / "instance.json").write_text(json.dumps(actual), encoding="utf-8")
+                with mock.patch.object(dev, "model_policy_start_lock", return_value=contextlib.nullcontext()), \
+                        mock.patch.object(dev, "instance_startup_lock", return_value=contextlib.nullcontext()), \
+                        mock.patch.object(dev, "prepare_up", return_value=(contract, current)), \
+                        mock.patch.object(dev, "existing_runtime_environment", return_value={}), \
+                        mock.patch.object(dev, "_command_up", side_effect=SystemExit(1)), \
+                        mock.patch.object(dev, "instance_dir", return_value=path), \
+                        mock.patch.object(dev, "business_command") as business:
+                    with self.assertRaises(SystemExit) as failed:
+                        dev.command_up(args)
+                self.assertEqual(failed.exception.code, 1)
+                if registered:
+                    business.assert_called_once_with(["--register", str(dev.REPO), args.name, "sha256:old"])
+                else:
+                    business.assert_not_called()
+
+
 class LegacyInstanceStateTest(unittest.TestCase):
     """旧版状态文件必须仍能停止、查询与迁移，不能把新版升级变成死循环。"""
 

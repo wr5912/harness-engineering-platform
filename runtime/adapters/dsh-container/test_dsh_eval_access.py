@@ -132,6 +132,51 @@ class EvaluationAccessTest(unittest.TestCase):
                 with self.assertRaises(evaluation.EvaluationError):
                     evaluation.authentication_url("probe")
 
+    def test_business_evaluation_starts_through_gateway_but_fixture_remains_isolated(self):
+        image = "sha256:" + "1" * 64
+        report = {"image_tag": "fixture", "image_id": image, "image_ref": "fixture@" + image,
+                  "image_build_fingerprint": image, "platform": "fixture"}
+        for fixture in (None, "/fixture.json"):
+            with self.subTest(fixture=fixture), mock.patch.object(evaluation, "checked_process", return_value=subprocess.CompletedProcess([], 0, json.dumps(report), "")) as run:
+                evaluation.start_instance("experiment:fixture", "probe", mcp_fixture=fixture)
+                command = run.call_args.args[0]
+                self.assertEqual("--business-control" in command, fixture is None)
+                if fixture is None:
+                    self.assertEqual(command[command.index("--business-control") + 1], str(self.root / "config/business-access.json"))
+                    self.assertEqual(command[command.index("--business-identity-mode") + 1], "development")
+                    self.assertEqual(command[command.index("--business-access-mode") + 1], "anonymous")
+
+    def test_business_url_must_equal_validated_registered_gateway(self):
+        directory = self.root / "custom-state/probe"
+        directory.mkdir(parents=True)
+        (directory / "instance.json").write_text(json.dumps({"agent_id": "fixture", "business_control": {"runtime_generation": "test"}}))
+        gateway = "http://business.example:53105/agents/fixture/instances/probe/"
+        for actual in (gateway, "http://127.0.0.1:18500/", gateway.replace("probe/", "other/")):
+            replies = [subprocess.CompletedProcess([], 0, actual, ""),
+                       subprocess.CompletedProcess([], 0, json.dumps({"url": gateway}), "")]
+            with self.subTest(url=actual), mock.patch.dict(os.environ, {"HARNESS_INSTANCE_STATE_ROOT": str(directory.parent)}), \
+                    mock.patch.object(evaluation, "checked_process", side_effect=replies):
+                if actual == gateway:
+                    self.assertEqual(evaluation.authentication_url("probe"), gateway)
+                else:
+                    with self.assertRaisesRegex(evaluation.EvaluationError, "已登记业务网关不一致"):
+                        evaluation.authentication_url("probe")
+
+    def test_owned_managed_evaluation_cleanup_unregisters_only_after_stop(self):
+        directory = self.root / "custom-state/probe"
+        directory.mkdir(parents=True)
+        manifest = directory / "instance.json"
+        for managed, stop_code, delete_code in ((True, 0, 0), (True, 1, 0), (True, 0, 1), (False, 0, 0)):
+            manifest.write_text(json.dumps({"business_control": {"source_digest": "fixture"}} if managed else {}))
+            replies = [subprocess.CompletedProcess([], stop_code, "", ""),
+                       subprocess.CompletedProcess([], delete_code, "", "")]
+            with self.subTest(managed=managed, stop=stop_code, delete=delete_code), \
+                    mock.patch.dict(os.environ, {"HARNESS_INSTANCE_STATE_ROOT": str(directory.parent)}), \
+                    mock.patch.object(evaluation, "run_process", side_effect=replies) as run:
+                self.assertEqual(evaluation.stop_instance("probe"), stop_code == 0 and (not managed or delete_code == 0))
+                operations = [call.args[0][-2:] for call in run.call_args_list]
+                self.assertEqual(operations, [["down", "probe"], ["delete", "probe"]] if managed and stop_code == 0 else [["down", "probe"]])
+
 
 class ReviewTargetRouteTest(unittest.TestCase):
     MIMO = {"provider": "xiaomi-token-plan-cn", "model": "mimo-v2.6-flash", "reasoningEffort": "off"}

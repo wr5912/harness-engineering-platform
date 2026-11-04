@@ -96,8 +96,10 @@ if (args[0] === 'ps') {
       const identityMode = args.includes('--business-identity-mode') ? args[args.indexOf('--business-identity-mode')+1] : prior.identity_mode || 'published'
       require('node:fs').mkdirSync(require('node:path').dirname(file), {recursive:true})
       require('node:fs').writeFileSync(file, JSON.stringify({name, source_id:source, agent_id:'real-agent', asset_root:process.env.HARNESS_ASSET_ROOT, port:3199, web_base_path:'/agents/real-agent/instances/' + name + '/', business_control:{source_digest:sourceDigest, runtime_generation:'generation-new', origin:'http://127.0.0.1:3199',access_mode:accessMode,identity_mode:identityMode,launch_config_file:args[args.indexOf('--business-control')+1]}}))
+      const register = () => require('node:child_process').execFileSync(process.execPath, ['--experimental-strip-types', ${JSON.stringify(new URL('../../../runtime/adapters/dsh-container/business.ts', import.meta.url).pathname)}, '--register', process.env.HARNESS_ASSET_ROOT, name, prior.source_digest || ''], {stdio:['ignore','pipe','pipe']})
       const failure = require('node:path').join(__dirname,'fail-next-start'), failed = require('node:path').join(__dirname,'startup-failed')
-      if(require('node:fs').existsSync(failure)){require('node:fs').unlinkSync(failure);require('node:fs').writeFileSync(failed,'network unavailable');process.stderr.write('network unavailable');process.exit(1)}
+      if(require('node:fs').existsSync(failure)){require('node:fs').unlinkSync(failure);require('node:fs').writeFileSync(failed,'network unavailable');if(prior.source_digest) register();process.stderr.write('network unavailable');process.exit(1)}
+      register()
       require('node:fs').rmSync(failed,{force:true})
     }
     process.stdout.write(JSON.stringify({warning:'first'}) + '\\n' + JSON.stringify({name, dsh_running:true, token:'receipt-secret'}) + '\\n'); process.stderr.write(JSON.stringify({hint:'not a receipt'}) + '\\n') }
@@ -130,7 +132,20 @@ if (args[0] === 'ps') {
   process.exit(2)
 }
 `)
-  writeFileSync(join(adapter, 'dsh-dev'), `#!/usr/bin/env python3\nimport os,sys\nos.execv(${JSON.stringify(process.execPath)}, [${JSON.stringify(process.execPath)}, ${JSON.stringify(join(adapter, 'dsh-dev-fixture.cjs'))}, *sys.argv[1:]])\n`)
+  writeFileSync(join(adapter, 'dsh-dev'), `#!/usr/bin/env python3
+import json,os,sys,subprocess
+from pathlib import Path
+node = ${JSON.stringify(process.execPath)}
+script = ${JSON.stringify(join(adapter, 'dsh-dev-fixture.cjs'))}
+def load_instance(name):
+    state = Path(os.environ['HARNESS_INSTANCE_STATE_ROOT']) if os.environ.get('HARNESS_INSTANCE_STATE_ROOT') else Path(os.environ['XDG_STATE_HOME']) / 'dsh-dev' if os.environ.get('XDG_STATE_HOME') else Path(os.environ['HARNESS_ASSET_ROOT']) / '.local/instances'
+    path = state / name / 'instance.json'
+    return path.parent, json.loads(path.read_text())
+def delete_instance(name, manifest):
+    return json.loads(subprocess.check_output([node, script, 'delete', name], text=True))
+if __name__ == '__main__':
+    os.execv(node, [node, script, *sys.argv[1:]])
+`)
   chmodSync(join(adapter, 'dsh-dev'), 0o755)
   return { root, state, cleanup: () => rmSync(root, { recursive: true, force: true }) }
 }
