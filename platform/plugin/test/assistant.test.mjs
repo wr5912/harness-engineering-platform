@@ -451,6 +451,13 @@ if (args[0] === 'up') {
     const directory = require('node:path').join(process.env.HARNESS_INSTANCE_STATE_ROOT, plan.name)
     fs.mkdirSync(directory, { recursive: true })
     fs.writeFileSync(require('node:path').join(directory, 'instance.json'), JSON.stringify(plan))
+    if (plan.business_control) {
+      const accessPath = require('node:path').join(plan.asset_root, 'config/business-access.json')
+      const access = JSON.parse(fs.readFileSync(accessPath, 'utf8'))
+      access.gateway.instances = [...access.gateway.instances.filter(row => row.instanceId !== plan.name),
+        { agentId: plan.agent_id, instanceId: plan.name, sourceId: plan.source_id, sourceDigest: plan.business_control.source_digest, accessMode: 'anonymous', identityMode: 'development' }]
+      fs.writeFileSync(accessPath, JSON.stringify(access))
+    }
   }
   console.log(JSON.stringify(args.includes('--dry-run') ? plan : { name: plan.name, dsh_running: true }))
 }
@@ -490,7 +497,8 @@ else throw new Error('unexpected command')
     assert.equal(proposed.input.port, 3198)
     assert.match(proposed.input.expected_model_policy_hash, /^[0-9a-f]{64}$/)
     await f.rpc('confirm', { session_id: id, proposal_id: proposed.id })
-    assert.equal((await pending).state, 'completed')
+    const settled = await pending
+    assert.equal(settled.state, 'completed', JSON.stringify(settled))
   }
   const stalePreview = await handler('preview', { operation: 'create', name: 'stale-one', source }, new AbortController().signal)
   const staleInput = { operation: 'create', name: 'stale-one', source, business_control: true, access_mode: 'anonymous', identity_mode: 'development', expected_source_id: source, expected_source_digest: stalePreview.value.plan.business_control.source_digest, port: stalePreview.value.plan.port, model_selection: stalePreview.value.model_selection, expected_model_policy_hash: stalePreview.value.model_policy_hash }
@@ -1141,6 +1149,11 @@ test('专项研究文档按任务主题放行，拒绝借资料读取扩展动�
   const implement = (await f.rpc('session', { task: '生成并训练', context: { skill: 'compute-variant-research', generation_intent: 'implement' } })).value.session_id
   assert.equal((await f.execute(implement, 'agents', 'datasets/list', {})).state, 'completed')
   assert.equal(f.calls.some(call => call.endpoint === 'agents/datasets/list'), true)
+  for (const domain of ['instances', 'mcp']) {
+    assert.equal((await f.execute(implement, domain, 'list', {})).state, 'completed', '执行任务能够核对真实实例和工具，不受仅策划的范围限制')
+    await assert.rejects(() => f.execute(plan, domain, 'list', {}), /不允许此操作/)
+  }
+  assert.equal(assistantActionContract('agents', 'compute-variants/prepare').input_schema.properties.training_files.items.properties.sha256.type, 'string')
   const general = (await f.rpc('session', { task: '检查' })).value.session_id
   assert.equal((await f.execute(general, 'agents', 'research/validate', { experiment_id: 'EXP-selected-001' })).state, 'completed')
   assert.equal((await f.status(general)).proposals.length, 0)
@@ -1219,6 +1232,7 @@ test('所有管理业务可以逐动作发现参数；原生下一轮装配使�
     const nativeEdit = projectAssistantTools([{ name: 'platform_agents' }], { tool_contracts: { agents: action } })[0].parameters
     const input = { experiment_id: 'EXP-alpha-001', edits: [{ path: 'candidate/dsh/managed/adapter.ts', move_to: 'candidate/dsh/managed/compute-workflow/models/adapter.ts', content: 'export {}', expected_sha256: 'source-sha' }] }
     assert.equal(validateJsonSchemaValue(nativeEdit, { action, input }).length, 0)
+    assert.equal(validateJsonSchemaValue(nativeEdit, { action, input: { ...input, edits: [{ path: input.edits[0].path, content: null, expected_sha256: 'source-sha' }] } }).length, 0)
     assert.ok(validateJsonSchemaValue(nativeEdit, { action, input: { ...input, edits: [{ ...input.edits[0], move_to: 42 }] } }).length > 0)
   }
   const caseEdit = projectAssistantTools([{ name: 'platform_agents' }], { tool_contracts: { agents: 'cases/update' } })[0].parameters

@@ -18,12 +18,13 @@ export function allowedAssistantActions(domain: AssistantDomain, state: any): re
   if (context.skill === 'decision-sample-extraction') return domain === 'agents' ? ['research/read-reference', 'datasets/source', 'datasets/preview', 'datasets/list'] : []
   if (context.skill === 'agent-maintenance' && context.workflow === 'features') return domain === 'agents' ? featureActions : []
   if (context.skill === 'compute-variant-research') return domain === 'agents'
-    ? assistantActions.agents.filter(action => /^(compute-variants\/|research\/|assets\/|edit\/|eval\/|runs\/|decision\/|cases\/)/.test(action) || isComputeVariantExecution(state) && action.startsWith('datasets/') || ['list', 'detail', 'tasks/capabilities'].includes(action)) : []
+    ? assistantActions.agents.filter(action => /^(compute-variants\/|research\/|assets\/|edit\/|eval\/|runs\/|decision\/|cases\/)/.test(action) || isComputeVariantExecution(state) && action.startsWith('datasets/') || ['list', 'detail', 'tasks/capabilities'].includes(action)) : isComputeVariantExecution(state) ? assistantActions[domain] : []
   return assistantActions[domain]
 }
 
 const string = { type: 'string' }, strings = { type: 'array', items: string }, object = { type: 'object', additionalProperties: true }
 const fields: MapValue = {
+  training_files: { type: 'array', items: { type: 'object', required: ['path', 'sha256'], additionalProperties: false, properties: { path: string, sha256: { type: 'string', pattern: '^[a-f0-9]{64}$' } } }, description: 'prepare 归档的补充训练依赖，如模型配置、tokenizer 和状态构造器资源；逐文件核对摘要并保持原相对目录，不复制缓存或整个目录。已归档依赖随后从回执复用。' },
   version_number: { type: 'integer', minimum: 1, maximum: 999, description: '可选版本编号，如 27 表示 027；保留父版编号创建副本时传入该编号。省略时递增；完整 ID 的随机后缀始终由平台生成，同编号可存在多个不同后缀的版本。' },
   source_ref: { type: 'string', pattern: '^git:[a-f0-9]{40}$', description: '可选固定来源；Candidate、Case、角色绑定均读取同一 Git 提交，Run 仍保存到原版本。' },
   evaluation_source: { type: 'string', enum: ['source', 'current'], description: '默认 source 沿用所选来源的 Case；current 明确用当前工作区 Case 评测固定 Candidate，所选口径随 Run 冻结。' },
@@ -57,7 +58,7 @@ const fields: MapValue = {
   split: { type: 'string', enum: ['unassigned', 'train', 'development', 'calibration', 'test'] },
   evaluation_cases: z.toJSONSchema(businessCasesSchema, { io: 'input' }),
   edits: { type: 'array', items: { type: 'object', required: ['path', 'content', 'expected_sha256'], additionalProperties: false,
-    properties: { path: string, move_to: { ...string, description: '可选：将 path 移动到同一 Candidate 内尚不存在的文件路径，同时保存 content；摘要仍取源文件，目标须先读取为不存在。' }, content: { ...string, description: '修改后完整文件正文，不能省略或只提供补丁。' }, expected_sha256: { type: ['string', 'null'], description: 'edit/read 返回的原始摘要；新文件为 null。' } } } },
+    properties: { path: string, move_to: { ...string, description: '可选：将 path 移动到同一 Candidate 内尚不存在的文件路径，同时保存 content；摘要仍取源文件，目标须先读取为不存在。' }, content: { type: ['string', 'null'], description: '修改后完整文件正文，不能省略或只提供补丁；null 表示删除当前 Candidate 内单个文件，须有原摘要，不能同时 move_to。空字符串仍表示保存空文件。' }, expected_sha256: { type: ['string', 'null'], description: 'edit/read 返回的原始摘要；新文件为 null，删除必须是现有文件的摘要。' } } } },
   features: { type: 'array', items: { type: 'object', required: ['id', 'title', 'description'], additionalProperties: false,
     properties: { id: string, title: string, description: string, source_refs: strings, evidence_refs: strings, change: string } } },
   ops: { type: 'array', items: { type: 'object', properties: { op: { type: 'string', enum: ['set', 'unset'] }, path: strings, value: {} }, required: ['op', 'path'] } },
@@ -112,7 +113,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['sdk/status sdk/stop', 'operation_id', '停止会关闭本次 Runtime，保留 HOME；结果未知时核对原实例，不自动重跑。'],
     ['sdk/list sdk/guide', 'source', 'source 必须指向 SDK 型版本，返回该版本的调试记录或业务集成用 TypeScript 调用示例与接入说明。开发 DSH 插件和工具时，读取锁定 Runtime 的插件与工具公开合同。'],
     ['create', 'agent_id parent_experiment_id parent_ref research_question version_number', 'parent_ref 使用固定 git:<40位commit>；保留编号复制时传 version_number（如 27），平台生成不同的随机后缀，不需改为新编号；创建版本不表示已融合验证。'],
-    ['edit/read', 'experiment_id path'], ['edit/preview edit/apply', 'experiment_id edits', '先 edit/read，每次提交实际文件正文和原摘要；可用 edits[].move_to 在同一 Candidate 内移动文件到已读取确认不存在的路径，同批更新引用，目标已存在时拒绝覆盖。写入遵循 DSH 原生权限与当前任务范围。'],
+    ['edit/read', 'experiment_id path'], ['edit/preview edit/apply', 'experiment_id edits', '先 edit/read，每次提交实际文件正文和原摘要；可用 edits[].move_to 在同一 Candidate 内移动文件到已读取确认不存在的路径，同批更新引用，目标已存在时拒绝覆盖。content:null 按原摘要删除当前 Candidate 内单个文件，不递归删除目录；空字符串保存空文件。写入遵循 DSH 原生权限与当前任务范围。'],
     ['assets/diff', 'experiment_id path against baseline_experiment_id', '先省略 path 列差异，再用返回的 path 读完整差异；against=baseline 或指定比较方式。'], ['assets/read-fixed', 'agent_id experiment_id ref path', 'ref 必须为固定 git:<40位commit>；省略 path 可先列目录。'],
     ['cases/list cases/create-context', 'agent_id experiment_id'], ['cases/read', 'agent_id experiment_id case_id'],
     ['cases/from-run', 'agent_id experiment_id run_id case_id'],
@@ -142,7 +143,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['compute-variants/preview compute-variants/create', 'agent_id parent_experiment_id parent_ref variant_name strategy case_ids critical_case_ids min_runs_per_case max_pass_rate_drop_pp resource_metric min_resource_reduction_pct allow_model_change variant_model variant_reasoning_effort execution_mode model_roles decision_training generation', '使用 context 返回的生成合同；名称与策略分别提供。hybrid 双模型身份与单模型变更互斥。'],
     ['compute-variants/rename', 'experiment_id variant_name expected_change_sha256'],
     ['compute-variants/plan-preview compute-variants/plan-apply', 'experiment_id case_ids expected_change_sha256 expected_preview_sha256', '共享用例修订后重新确认已有探索性变体计划；保留全部原 Case，可明确新增 Case，不改变父版、训练、模型及质量和资源阈值。apply 传真实预览的两个摘要，随后重新冻结并执行新 Run；保留历史 Run。'],
-    ['compute-variants/prepare', 'experiment_id entry_path case_ids', '连续核对构建摘要，必要时构建，再本地冻结；返回固定source_ref和各步复用情况。源码审阅及研究计划确定后使用；不训练、不启动业务或评测。中断后重试核对当前摘要，不重复有效构建。'],
+    ['compute-variants/prepare', 'experiment_id entry_path case_ids training_files', '先核验并归档已完成的混合变体训练引用闭包到所属 Experiment/evaluation，更新计划引用，再核对或构建代码并本地冻结；返回固定source_ref和各步复用情况。training_files 补充模型配置与源码资源等恢复依赖，归档后从回执复用。保留原始执行回执，不回收凭据、缓存或整个工作目录。源码审阅及研究计划确定后使用；不训练、不启动业务或评测。中断后重试核对当前摘要，不重复有效步骤。'],
     ['compute-variants/build-preview compute-variants/build', 'experiment_id entry_path expected_candidate_sha256 expected_preview_sha256', '先读取源码后构建；执行时服务器生成并校验真实构建预览。'],
     ['compute-variants/freeze-preview compute-variants/freeze', 'experiment_id case_ids evaluation_base_sha256 expected_preview_sha256', '使用 freeze-preview 返回的 freeze_input，核对真实差异与摘要；冻结遵循 DSH 原生权限；不得用 human_confirmed 代替人员复核。'],
     ['compute-variants/compare', 'experiment_id parent_run_ids variant_run_ids', '比较固定父版与变体的真实 Run；助手不能确认 end。'],

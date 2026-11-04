@@ -51,7 +51,8 @@ function redactReceipt(value: any, secrets: readonly string[], redact: (text: st
   if (typeof value === 'string') return text(value)
   if (Array.isArray(value)) return value.map(item => redactReceipt(item, secrets, redact))
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value)
-    .map(([key, item]) => [text(key), redactReceipt(item, secrets, redact)]))
+    .map(([key, item]) => [text(key), /^(?:api[_-]?key|token|password|secret)$/i.test(key)
+      ? '[REDACTED]' : redactReceipt(item, secrets, redact)]))
   return value
 }
 

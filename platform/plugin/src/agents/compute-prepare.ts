@@ -1,4 +1,5 @@
 import { inspectComputeBuild } from './compute-build.ts'
+import { archiveDecisionTraining } from './compute-training.ts'
 
 type Body = Record<string, any>
 type Result = { ok: true; value: any } | { ok: false; error: { code: string; message: string; details?: Body } }
@@ -7,11 +8,14 @@ type Handler = (method: string, body: Body, signal?: AbortSignal) => Promise<Res
 /** 固定本地步骤连续执行；业务判断、训练与外部写入不在此流程中。 */
 export async function prepareComputeVariant(root: string, body: Body, build: Handler, freeze: Handler, signal?: AbortSignal): Promise<Result> {
   const steps: Body[] = []
-  let stage = 'build'
+  let stage = 'training-archive'
   const failed = (result: Extract<Result, { ok: false }>): Result => ({ ok: false,
     error: { ...result.error, details: { ...result.error.details, stage, completed_steps: steps } } })
   try {
     signal?.throwIfAborted()
+    const archived = await archiveDecisionTraining(root, body.experiment_id, signal, body.training_files)
+    if (archived) steps.push(archived)
+    stage = 'build'
     const existing = inspectComputeBuild(root, body.experiment_id)
     if (existing.verified && (!body.entry_path || body.entry_path === existing.receipt.entry_path)) {
       steps.push({ stage, reused: true, build_digest: existing.receipt.build_digest })
@@ -34,6 +38,6 @@ export async function prepareComputeVariant(root: string, body: Body, build: Han
       notes: ['构建与本地冻结已完成；尚未启动评测或证明业务通过。'] } }
   } catch (error) {
     return failed({ ok: false, error: { code: signal?.aborted ? 'aborted' : 'prepare_failed',
-      message: `${stage === 'build' ? '构建' : '冻结'}未完成；已完成步骤保留，重试时按当前摘要核对。${signal?.aborted ? '操作已取消。' : ''}` } })
+      message: `${stage === 'training-archive' ? '训练归档' : stage === 'build' ? '构建' : '冻结'}未完成；已完成步骤保留，重试时按当前摘要核对。${signal?.aborted ? '操作已取消。' : error instanceof Error ? error.message : ''}` } })
   }
 }

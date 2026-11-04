@@ -221,7 +221,7 @@ function catalog(root: string) {
   return { parsed: { schema_version: '2.0', sources } as SourceCatalog, errors }
 }
 
-function atomicWrite(file: string, body: string) {
+function atomicWrite(file: string, body: string | Buffer) {
   mkdirSync(dirname(file), { recursive: true })
   const tmp = `${file}.${process.pid}.${Date.now()}.${randomBytes(3).toString('hex')}.tmp`
   const mode = existsSync(file) ? lstatSync(file).mode & 0o777 : undefined
@@ -1121,7 +1121,7 @@ function edits(payload: JsonMap) {
     if (row.expected_sha256 !== undefined && row.expected_sha256 !== null && typeof row.expected_sha256 !== 'string') {
       throw new RpcError('invalid_request', 'expected_sha256 必须是文件摘要或新文件的 null')
     }
-    return { path, content: textField(row, 'content'), expected: row.expected_sha256 as string | null | undefined, moveTo: optionalString(row, 'move_to') }
+    return { path, content: row.content === null ? null : textField(row, 'content'), expected: row.expected_sha256 as string | null | undefined, moveTo: optionalString(row, 'move_to') }
   })
 }
 
@@ -1129,6 +1129,13 @@ function editLocations(root: string, payload: JsonMap) {
   const locations = edits(payload).map(edit => {
     const source = editablePath(root, payload, edit.path)
     const target = edit.moveTo ? editablePath(root, payload, edit.moveTo) : source
+    if (edit.content === null) {
+      const candidate = `evolution/experiments/${experimentIdField(payload)}/candidate/`
+      if (!source.rel.startsWith(candidate) || edit.moveTo) throw new RpcError('path_rejected', '删除仅限当前 Candidate 内的单个文件，不能同时移动')
+      if (typeof edit.expected !== 'string') throw new RpcError('invalid_request', '删除必须提供 edit/read 返回的原文件摘要')
+      if (!existsSync(source.file)) throw new RpcError('conflict', '待删除文件不存在，请重新读取', { path: source.rel })
+      if (!lstatSync(source.file).isFile()) throw new RpcError('path_rejected', '只能删除单个文件，不能递归删除目录')
+    }
     if (edit.moveTo) {
       const candidate = `evolution/experiments/${experimentIdField(payload)}/candidate/`
       if (!source.rel.startsWith(candidate) || !target.rel.startsWith(candidate) || source.file === target.file) {
@@ -1155,8 +1162,8 @@ function readEditable(root: string, payload: JsonMap) {
   const stat = lstatSync(target.file)
   if (stat.isDirectory()) return ok({ path: target.rel, kind: 'directory', editable: false })
   const value = readAssetText(target.file)
-  return ok({ path: target.rel, exists: true, kind: value === null ? 'binary' : 'text', editable: value !== null, size: stat.size,
-    ...(value === null ? {} : assetText(target.rel, value)) })
+  return ok({ path: target.rel, exists: true, kind: value === null ? 'binary' : 'text', size: stat.size,
+    ...(value === null ? { editable: false, sha256: sha256(readFileSync(target.file)) } : assetText(target.rel, value)) })
 }
 
 function readAssetText(file: string): string | null {
@@ -1220,15 +1227,18 @@ async function validateDraft(root: string, payload: JsonMap, drafts: { rel: stri
 async function previewEdit(root: string, payload: JsonMap, signal?: AbortSignal) {
   const targets = editLocations(root, payload)
   const result = targets.map(({ edit, source, target }) => {
-    const before = editableText(source.file)
-    if (assetText(source.rel, before).redacted) throw new RpcError('path_rejected', '含凭据常量的资产仅提供只读预览，请在本地维护后重新读取')
+    const before = edit.content === null ? readFileSync(source.file) : editableText(source.file)
+    const beforeText = typeof before === 'string' ? before : readAssetText(source.file)
+    if (beforeText !== null && assetText(source.rel, beforeText).redacted) throw new RpcError('path_rejected', '含凭据常量的资产仅提供只读预览，请在本地维护后重新读取')
     const beforeHash = existsSync(source.file) ? sha256(before) : null
     if (edit.expected !== undefined && beforeHash !== edit.expected) throw new RpcError('conflict', '文件或存在状态已被修改', { path: target.rel, expected_sha256: edit.expected, actual_sha256: beforeHash })
+    if (edit.content === null) return { path: source.rel, deleted: true, exists: true, before_sha256: beforeHash, after_sha256: null, changed: true,
+      diff: beforeText === null ? '' : simpleDiff(source.rel, beforeText, ''), redacted: false }
     if (rejectsLlmApiKey(target.rel, edit.content)) throw new RpcError('secret_rejected', '拒绝写入 LLM API Key')
     if (target.rel.endsWith('/evaluation.md')) loadEvaluationPreview(root, edit.content)
-    return { path: target.rel, ...(edit.moveTo ? { previous_path: source.rel } : {}), exists: beforeHash !== null, before_sha256: beforeHash, after_sha256: sha256(edit.content), changed: !!edit.moveTo || beforeHash === null || before !== edit.content, diff: simpleDiff(target.rel, assetText(source.rel, before).content, assetText(target.rel, edit.content).content), redacted: assetText(source.rel, before).redacted || assetText(target.rel, edit.content).redacted }
+    return { path: target.rel, ...(edit.moveTo ? { previous_path: source.rel } : {}), exists: beforeHash !== null, before_sha256: beforeHash, after_sha256: sha256(edit.content), changed: !!edit.moveTo || beforeHash === null || before !== edit.content, diff: simpleDiff(target.rel, assetText(source.rel, beforeText!).content, assetText(target.rel, edit.content).content), redacted: assetText(source.rel, beforeText!).redacted || assetText(target.rel, edit.content).redacted }
   })
-  const dryRun = await validateDraft(root, payload, targets.map(({ edit, target }) => ({ rel: target.rel, content: edit.content })), signal)
+  const dryRun = await validateDraft(root, payload, targets.filter(({ edit }) => edit.content !== null).map(({ edit, target }) => ({ rel: target.rel, content: edit.content! })), signal)
   return ok({ edits: result, dry_run: dryRun })
 }
 
@@ -1256,34 +1266,40 @@ function loadEvaluationPreview(root: string, content: string) {
 
 async function applyEdit(root: string, payload: JsonMap, signal?: AbortSignal) {
   const resolved = editLocations(root, payload).map(({ edit, source, target }) => {
-    const before = editableText(source.file)
-    if (assetText(source.rel, before).redacted) throw new RpcError('path_rejected', '含凭据常量的资产仅提供只读预览，请在本地维护后重新读取')
+    const before = edit.content === null ? readFileSync(source.file) : editableText(source.file)
+    const beforeText = typeof before === 'string' ? before : readAssetText(source.file)
+    if (beforeText !== null && assetText(source.rel, beforeText).redacted) throw new RpcError('path_rejected', '含凭据常量的资产仅提供只读预览，请在本地维护后重新读取')
     if (edit.expected === undefined) throw new RpcError('invalid_request', '写入必须提供 expected_sha256，新文件使用 null', { path: target.rel })
     const beforeHash = existsSync(source.file) ? sha256(before) : null
     if (beforeHash !== edit.expected) throw new RpcError('conflict', '文件或存在状态已被修改', { path: target.rel, expected_sha256: edit.expected, actual_sha256: beforeHash })
-    if (rejectsLlmApiKey(target.rel, edit.content)) throw new RpcError('secret_rejected', '拒绝写入 LLM API Key')
-    if (target.rel.endsWith('/evaluation.md')) loadEvaluationPreview(root, edit.content)
+    if (edit.content !== null && rejectsLlmApiKey(target.rel, edit.content)) throw new RpcError('secret_rejected', '拒绝写入 LLM API Key')
+    if (edit.content !== null && target.rel.endsWith('/evaluation.md')) loadEvaluationPreview(root, edit.content)
     return { ...target, source, moved: !!edit.moveTo, mode: beforeHash === null ? undefined : lstatSync(source.file).mode & 0o777,
       content: edit.content, expected: edit.expected, before: beforeHash === null ? null : before }
   })
   assertUniqueResolved(resolved)
-  const dryRun = await validateDraft(root, payload, resolved, signal)
+  const dryRun = await validateDraft(root, payload, resolved.filter(item => item.content !== null).map(item => ({ rel: item.rel, content: item.content! })), signal)
   if (signal?.aborted) throw new RpcError('aborted', '草稿保存已取消')
   // dry 期间原文件可能变化；校验全部哈希后同步写入，避免异步交错。
   for (const item of resolved) {
     assertNoSymlinkPath(root, item.file)
     assertNoSymlinkPath(root, item.source.file)
-    if ((existsSync(item.source.file) ? sha256(editableText(item.source.file)) : null) !== item.expected || (item.moved && existsSync(item.file))) throw new RpcError('conflict', '文件或存在状态已被修改', { path: item.rel })
+    if ((existsSync(item.source.file) ? sha256(readFileSync(item.source.file)) : null) !== item.expected || (item.moved && existsSync(item.file))) throw new RpcError('conflict', '文件或存在状态已被修改', { path: item.rel })
   }
   const written: typeof resolved = []
   try {
     for (const item of resolved) {
+      if (item.content === null) { rmSync(item.file); written.push(item); continue }
       atomicWrite(item.file, item.content); written.push(item)
       if (item.moved) { chmodSync(item.file, item.mode!); rmSync(item.source.file) }
     }
   } catch (error) {
     for (const item of written.reverse()) {
       // 仅恢复本次实际写入且未被并行修改的内容。
+      if (item.content === null) {
+        if (!existsSync(item.file)) { atomicWrite(item.file, item.before!); chmodSync(item.file, item.mode!) }
+        continue
+      }
       if (!existsSync(item.file) || sha256(editableText(item.file)) !== sha256(item.content)) continue
       if (item.moved) {
         if (existsSync(item.source.file)) {
@@ -1295,7 +1311,7 @@ async function applyEdit(root: string, payload: JsonMap, signal?: AbortSignal) {
     }
     throw error
   }
-  return ok({ written: resolved.map(item => ({ path: item.rel, ...(item.moved ? { previous_path: item.source.rel } : {}), sha256: sha256(item.content) })), dry_run: dryRun })
+  return ok({ written: resolved.map(item => ({ path: item.rel, ...(item.moved ? { previous_path: item.source.rel } : {}), ...(item.content === null ? { deleted: true, sha256: null } : { sha256: sha256(item.content) }) })), dry_run: dryRun })
 }
 
 async function cases(root: string, payload: JsonMap, signal?: AbortSignal) {

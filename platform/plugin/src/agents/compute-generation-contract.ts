@@ -11,7 +11,7 @@ export function computeGenerationContract() {
     generation: {
       mode: 'langgraph-aot',
       default_entry_path: 'dsh/managed/compute-workflow/index.ts',
-      code_directory: '新增算力实现以 entry_path 所在目录为归属目录；保持入口稳定，按实际职责建立必要子目录。继承的通用 Managed 插件保留原布局，目录整理方法由 compute-variant-research 维护。',
+      code_directory: '新增算力实现以 entry_path 所在目录为归属目录；保持入口稳定，按实际职责建立必要子目录。经引用核对仍需继承的通用 Managed 插件保留原布局，资产取舍与目录整理方法由 compute-variant-research 维护。',
       fields: {
         entry_path: 'Candidate 内 dsh/managed/ 下的 .ts 文件；不能含空路径段、.、.. 或反斜线。',
         source_run_ids: '必填非空 Run ID 数组，引用所选固定父版的真实诊断轨迹；来源证据及摘要由 preview 核对。',
@@ -27,7 +27,7 @@ export function computeGenerationContract() {
     available_tools: ['skill', 'platform_agents'],
     execution_tools: 'generation_intent=implement 且非 plan_only 时复用 DSH 原生执行工具与 KEV 技能；仅策划保留 available_tools。平台不新增训练调度器，SSH banner 可达不表示认证、GPU 或训练成功。',
     decision_training: {
-      binding: 'hybrid 默认实际训练 KEV；preview/create 传 decision_training={path,sha256}，引用数据根内回收的原始执行回执。可先保留未训练计划，但训练核验缺失不能成为 end。监督材料保存到 evaluation，Runtime 工件保存到 Candidate，冻结时一并保留。',
+      binding: 'hybrid 默认实际训练 KEV；preview/create 传 decision_training={path,sha256}，引用数据根内回收的原始执行回执。prepare 自动将已核验的数据、日志、报告和工件归档到所属 Experiment/evaluation/training，保留原执行回执并更新计划引用；按摘要复用，不回收缓存、凭据和整个工作目录。冻结校验完整引用闭包，不接受 .local 或其他版本的工作目录引用。训练复现工件保存在 evaluation，Runtime 实际装载的代码与配置保存在 Candidate。可先保留未训练计划，但训练核验缺失不能成为 end。',
       receipt: {
         schema_version: 1, source_run_ids: ['与 generation.source_run_ids 相同的真实 Run'],
         datasets: { train: '{path,sha256}', development: '{path,sha256}', calibration: '{path,sha256}', test: '{path,sha256}' },
@@ -35,6 +35,7 @@ export function computeGenerationContract() {
         calibration: { status: 'completed', exit_code: 0, report: '{path,sha256}' },
         test: { status: 'completed', exit_code: 0, report: '{path,sha256}' },
         artifacts: { checkpoint: '{path,sha256}', state_constructor: '{path,sha256}', calibration: '{path,sha256}' },
+        supporting_files: ['可选 {path,sha256}：adapter/training 配置、tokenizer、状态构造器资源及其他实际恢复依赖；不包含基础权重缓存、凭据或服务运行状态'],
       },
       validation: '路径相对数据根，不接受符号链接；核对所有文件字节摘要、原生 KEV _meta.split/id/group_id（平台桥接使用 bridge_group_id）、四分区非空与隔离、训练成功退出和优化步骤、校准/测试完成及三个工件与 model_roles.decision 的摘要一致。复用 KEV 数据审计和编码检查，文件核验不代替实际执行、人员标签复核、业务效果或服务部署验证。',
     },
@@ -68,10 +69,10 @@ export function computeGenerationContract() {
     operations: {
       preview_create: 'compute-variants/preview/create 使用同一 parent_experiment_id、git:<40位提交>、variant_name、strategy、case_ids 和 generation；全链零调用传 execution_mode:code-only，双模型传 execution_mode:hybrid 和 model_roles。create 携带实际 preview_sha256 为 expected_preview_sha256，不能猜摘要。',
       replan: '共享 Case 修订后，已有探索性变体使用 plan-preview/plan-apply，case_ids 保留全部原 Case，可显式增加；apply 携带预览的 change_sha256 和 preview_sha256 作为 expected_change_sha256、expected_preview_sha256。只更新 Case 摘要和计划起始时间，父版、训练、模型、关键 Case 及全部比较阈值保持不变；重新冻结并执行新 Run，历史 Run 保持原样。',
-      edit: 'edit/read 后用 edit/preview、edit/apply 保存完整文件正文 edits[].content 及 expected_sha256；新文件须先取得 exists:false、sha256:null，保存传 expected_sha256:null。已有文件归拢使用 edits[].move_to 指向同一 Candidate 内已确认不存在的目标，同时提交完整正文及源摘要，并同批更新导入和配置引用；不留旧源码副本。Preset 引用受控构建实际 output_path 对应的 /opt/dsh-managed/ 路径。',
+      edit: 'edit/read 后用 edit/preview、edit/apply 保存完整文件正文 edits[].content 及 expected_sha256；新文件须先取得 exists:false、sha256:null，保存传 expected_sha256:null。已有文件归拢使用 edits[].move_to 指向同一 Candidate 内已确认不存在的目标，同时提交完整正文及源摘要，并同批更新导入和配置引用；不留旧源码副本。content:null 按原摘要删除当前 Candidate 内单个文件，同批更新引用；空字符串仍保存空文件。Preset 引用受控构建实际 output_path 对应的 /opt/dsh-managed/ 路径。',
       build: '保存后读取当前 candidate_sha256，以 expected_candidate_sha256 调 build-preview；build 保留该摘要和实际预览的 expected_preview_sha256。只做类型检查和固定 ESM 编译，不执行 Candidate，不证明装载。源码、runner、依赖或 ESM 变化后旧构建失效。',
       freeze: 'freeze-preview 返回 Candidate、研究计划、本版本 evaluation 研究资料和选定 Case 的真实差异与 freeze_input={experiment_id,case_ids,evaluation_base_sha256,expected_preview_sha256}；freeze 完整传回 freeze_input。训练监督数据与评估报告保存在本版本 evaluation，不能放入 Runtime 挂载的 Candidate。仅本地冻结约定文件，不推送；两侧 Run 的提交须含同一计划。',
-      prepare: 'compute-variants/prepare {experiment_id,entry_path?} 连续核对或构建当前代码、预览并本地冻结，返回 source_ref 和逐阶段复用回执。失败后保留已完成步骤，使用同一目标重试；只有摘要仍匹配的构建与冻结可以复用，不执行 Candidate 或业务评测。',
+      prepare: 'compute-variants/prepare {experiment_id,entry_path?,training_files?:[{path,sha256}]} 连续归档已有训练引用闭包、核对或构建当前代码、预览并本地冻结，返回 source_ref 和逐阶段复用回执。training_files 仅补充恢复必需的文件，保存到归档回执 supporting_files；工件与依赖保持原相对目录。失败后保留已完成步骤，使用同一目标重试；只有摘要仍匹配的归档、构建与冻结可以复用，不执行 Candidate 或业务评测。',
       evaluation: 'eval/batch-start {requests:[eval/start参数]} 先整批预检再启动最多8个独立Run；每项必须固定 git:<40位提交> 和不同的 UUIDv4 request_id。中断后原样重发整批参数，只查询或复用已受理任务，不重跑。单Run用 concurrency:1..8 和 parallel_cases 指定可独立执行的Case；未指定的Case独占执行，语义不确定或共享写资源不得并发。',
       evidence: '分别核对 context.workflow_status 的 generated/built/frozen/loaded/compared。新 Session 的真实图回执须与当前源码、build_digest、esm_sha256 及固定组合身份一致，且 complete=true、status=completed；构建通过或原子回退不等于装载成功。',
       delivery: '通过 compute-variants/compare 核对实际构建、冻结、装载与所选两侧 Run。human_confirmed 只能由用户在变体页面复核，不能由助手提交或改结论字段。',

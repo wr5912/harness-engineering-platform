@@ -8,6 +8,7 @@ import { candidateFiles, dataPath, sourceInfo } from '../tasks/files.ts'
 import { workspaceConfigPath } from '../workspace.ts'
 import { parseEvaluationDocument } from '../evaluation/cases.ts'
 import { containsLiteralLlmKey } from '../tasks/llm-key.ts'
+import { inspectDecisionTraining } from './compute-training.ts'
 
 type Body = Record<string, any>
 type Result = { ok: true; value: any } | { ok: false; error: { code: string; message: string } }
@@ -94,6 +95,13 @@ export function createComputeFreezeHandler(assetRoot: string) {
       if (containsLiteralLlmKey(path, content.toString('utf8'))) throw new FreezeError('secret_rejected', '冻结对象包含 LLM API Key 常量')
       entries.set(path, { content, mode: lstatSync(file).mode & 0o111 ? '100755' : '100644' })
     }
+    if (change.compute_variant?.execution_mode === 'hybrid' && change.compute_variant.decision_training) {
+      const training = await inspectDecisionTraining(root, change.compute_variant, source.id)
+      if (!training.verified) throw new FreezeError('invalid_request', training.reasons.join('；') + '；请通过 prepare 归档后冻结')
+      for (const ref of training.files ?? []) if (!entries.has(ref.path) || hash(entries.get(ref.path)!.content) !== ref.sha256) {
+        throw new FreezeError('invalid_request', `冻结未包含完整训练材料：${ref.path}`)
+      }
+    }
     const evaluationPath = `agents/${source.agent_id}/evaluation.md`, originalEvaluation = headFile(root, head, evaluationPath)
     if (!originalEvaluation) throw new FreezeError('invalid_request', '评测定义缺少 Git 基准，不能局部冻结')
     const evaluationBase = hash(originalEvaluation)
@@ -106,9 +114,9 @@ export function createComputeFreezeHandler(assetRoot: string) {
       || canonical(currentCases.cases[id]) !== canonical(projectedCases.cases[id])
       || canonical(currentCases.catalog.find(item => item.case_id === id)) !== canonical(projectedCases.catalog.find(item => item.case_id === id))) throw new FreezeError('conflict', '所选 Case 与冻结计划或章节口径不同，请重新确认计划')
     entries.set(evaluationPath, { content: Buffer.from(projectedEvaluation), mode: '100644' })
-    // 删除只属于当前 Candidate 的旧文件；运行记录与其他 Experiment 均不进入提交。
+    // 删除仅限当前 Candidate 和研究资料；运行记录与其他 Experiment 均不进入提交。
     const trackedPaths = new Set(git(root, ['ls-tree', '-r', '-z', '--name-only', head]).toString().split('\0').filter(Boolean))
-    const trackedOwned = [...trackedPaths].filter(path => path.startsWith(`${base}/candidate/`) || researchDocuments.includes(path))
+    const trackedOwned = [...trackedPaths].filter(path => path.startsWith(`${base}/candidate/`) || path.startsWith(`${base}/evaluation/`) || researchDocuments.includes(path))
     const deleted = trackedOwned.filter(path => !entries.has(path) && !existsSync(dataPath(root, path)))
     const paths = [...entries.keys(), ...deleted].sort()
     const staged = git(root, ['diff', '--cached', '--name-only', '-z', '--', ...paths]).toString().split('\0').filter(Boolean)

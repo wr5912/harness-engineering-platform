@@ -184,7 +184,7 @@ test('短凭据脱敏不破坏机器回执、分块 Run 关联与取消结论', 
   const runId = 'run-11111111-1111-4111-8111-111111111111'
   const fx = await fixture(t, [
     `process.stderr.write('Research Run: ${runId.slice(0, 20)}')`,
-    `setTimeout(() => { process.stderr.write('${runId.slice(20)}\\n'); console.log(JSON.stringify({run_id:'${runId}', cancelled:true, instance_stopped:true, cases:{total:1}, credential:process.env.MODEL_API_KEY, nested:[{detail:'failure '+process.env.MODEL_TOKEN.slice(0,12)}]})); process.exit(2) }, 20)`,
+    `setTimeout(() => { process.stderr.write('${runId.slice(20)}\\n'); console.log(JSON.stringify({run_id:'${runId}', cancelled:true, instance_stopped:true, cases:{total:1}, credential:process.env.MODEL_API_KEY, nested:[{detail:'failure '+process.env.MODEL_TOKEN.slice(0,12), API_KEY:'receipt-only-value'}]})); process.exit(2) }, 20)`,
   ].join('\n'))
   const jobs = fx.create({ command: () => ({ executable: process.execPath, args: [fx.script], environment: { MODEL_API_KEY: '1', MODEL_TOKEN: '8f327eafc0032b13642dd1ab938104' } }) })
   const started = await jobs.start({ source: 'experiment:EXP-test-agent-001' })
@@ -194,6 +194,7 @@ test('短凭据脱敏不破坏机器回执、分块 Run 关联与取消结论', 
   assert.equal(JSON.parse(finished.stdout).cases.total, 1)
   assert.equal(finished.result.credential, '[REDACTED]')
   assert.equal(finished.result.nested[0].detail, 'failure [REDACTED]')
+  assert.equal(finished.result.nested[0].API_KEY, '[REDACTED]')
   assert.equal(JSON.parse(finished.stdout).instance_stopped, true)
   const restored = fx.create().status(started.job_id)
   assert.equal(restored.status, 'cancelled')

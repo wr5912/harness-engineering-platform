@@ -885,6 +885,66 @@ test('移动源码和更新引用同批完成，保留权限并拒绝摘要冲�
   } finally { await rm(fx.root, { recursive: true, force: true }) }
 })
 
+test('删除资产按原摘要预览并与引用同批保存，空正文保持写入语义', async () => {
+  const { createAgentsHandler } = await loadServer()
+  const fx = fixture(), experiment_id = 'EXP-test-agent-001'
+  const root = join(fx.root, `evolution/experiments/${experiment_id}`)
+  try {
+    const handler = createAgentsHandler(fx.root)
+    const path = 'candidate/dsh/workspace/.agents/skills/unused/SKILL.md', entry = 'candidate/dsh/managed/skills.json'
+    const binary = 'candidate/dsh/managed/unused.bin', empty = 'candidate/dsh/managed/notes.txt', bytes = Buffer.alloc(1024 * 1024 + 1, 0xff)
+    write(join(root, path), '# unused\n'); write(join(root, entry), '["unused"]\n'); write(join(root, binary), bytes); write(join(root, empty), 'notes\n')
+    const source = await rpc(handler, 'edit/read', { experiment_id, path })
+    const metadata = await rpc(handler, 'edit/read', { experiment_id, path: binary })
+    assert.equal(metadata.editable, false)
+    assert.equal(metadata.sha256, createHash('sha256').update(bytes).digest('hex'))
+    const edits = [{ path, content: null, expected_sha256: source.sha256 }, { path: binary, content: null, expected_sha256: metadata.sha256 },
+      { path: entry, content: '[]\n', expected_sha256: (await rpc(handler, 'edit/read', { experiment_id, path: entry })).sha256 },
+      { path: empty, content: '', expected_sha256: (await rpc(handler, 'edit/read', { experiment_id, path: empty })).sha256 }]
+    const preview = await rpc(handler, 'edit/preview', { experiment_id, edits })
+    assert.equal(preview.edits[0].deleted, true)
+    assert.equal(preview.edits[0].after_sha256, null)
+    assert.match(preview.edits[0].diff, /-# unused/)
+    assert.equal(existsSync(join(root, path)), true, '预览不能删除文件')
+    await assert.rejects(() => rpc(handler, 'edit/apply', { experiment_id, edits: [{ ...edits[0], expected_sha256: 'stale' }] }), /conflict:/)
+    for (const invalid of [
+      { ...edits[0], expected_sha256: null }, { path, content: null },
+      { ...edits[0], move_to: 'candidate/moved.md' }, { ...edits[0], path: 'candidate/dsh/workspace/.agents/skills/unused' },
+      { ...edits[0], path: 'agents/test-agent/evaluation.md' }, { ...edits[0], path: 'decision.md' },
+    ]) await assert.rejects(() => rpc(handler, 'edit/preview', { experiment_id, edits: [invalid] }), /invalid_request:|path_rejected:/)
+    const saved = await rpc(handler, 'edit/apply', { experiment_id, edits })
+    assert.equal(saved.written[0].deleted, true)
+    assert.equal(saved.written[1].sha256, null)
+    assert.equal(existsSync(join(root, path)), false)
+    assert.equal(existsSync(join(root, binary)), false)
+    assert.equal(readFileSync(join(root, entry), 'utf8'), '[]\n')
+    assert.equal(readFileSync(join(root, empty), 'utf8'), '')
+    await assert.rejects(() => rpc(handler, 'edit/apply', { experiment_id, edits }), /conflict:/)
+  } finally { await rm(fx.root, { recursive: true, force: true }) }
+})
+
+test('删除后同批写入失败恢复二进制原文、文件权限与引用', async () => {
+  if (process.getuid?.() === 0) return
+  const { createAgentsHandler } = await loadServer()
+  const fx = fixture(), experiment_id = 'EXP-test-agent-001'
+  const root = join(fx.root, `evolution/experiments/${experiment_id}`)
+  const path = 'candidate/dsh/managed/obsolete.bin', second = 'candidate/dsh/managed/readonly/entry.ts', bytes = Buffer.from([0, 255, 1, 128])
+  const locked = dirname(join(root, second))
+  try {
+    const handler = createAgentsHandler(fx.root)
+    write(join(root, path), bytes); chmodSync(join(root, path), 0o755)
+    write(join(root, second), "export const path = '../obsolete.bin'\n"); chmodSync(locked, 0o555)
+    const edits = []
+    for (const item of [{ path, content: null }, { path: second, content: 'export const path = null\n' }]) {
+      edits.push({ ...item, expected_sha256: (await rpc(handler, 'edit/read', { experiment_id, path: item.path })).sha256 })
+    }
+    await assert.rejects(() => rpc(handler, 'edit/apply', { experiment_id, edits }))
+    assert.deepEqual(readFileSync(join(root, path)), bytes)
+    assert.equal(statSync(join(root, path)).mode & 0o777, 0o755)
+    assert.equal(readFileSync(join(root, second), 'utf8'), "export const path = '../obsolete.bin'\n")
+  } finally { chmodSync(locked, 0o755); await rm(fx.root, { recursive: true, force: true }) }
+})
+
 test('移动后同批写入失败恢复源文件、执行位与旧引用', async () => {
   if (process.getuid?.() === 0) return
   const { createAgentsHandler } = await loadServer()

@@ -1,14 +1,16 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, symlinkSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
+import { createHash } from 'node:crypto'
 import { build } from 'esbuild'
 import { trainingFixture } from './fixtures/decision-training.mjs'
+import { dump, load } from 'js-yaml'
 
 const compiled = mkdtempSync(join(tmpdir(), 'compute-training-test-'))
 await build({ entryPoints: [new URL('../src/agents/compute-training.ts', import.meta.url).pathname], outfile: join(compiled, 'training.mjs'), bundle: true, platform: 'node', format: 'esm' })
-const { inspectDecisionTraining } = await import(`file://${join(compiled, 'training.mjs')}`)
+const { inspectDecisionTraining, archiveDecisionTraining } = await import(`file://${join(compiled, 'training.mjs')}`)
 test.after(() => rmSync(compiled, { recursive: true, force: true }))
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'training-receipt-'))
@@ -77,4 +79,64 @@ test('训练材料不得越界或通过符号链接引用，摘要变化失效',
   assert.match((await inspectDecisionTraining(f.root, f.plan)).reasons.join(), /符号链接/)
   f.save(); f.file('train.log', 'changed log')
   assert.match((await inspectDecisionTraining(f.root, f.plan)).reasons.join(), /摘要不匹配/)
+})
+
+test('归档只回收引用闭包，清除工作目录后可独立恢复并复用，不重训或修改原回执', async t => {
+  const f = fixture(t), id = 'VAR-alpha-001-r123456abcdef', base = `evolution/experiments/${id}`
+  const changePath = join(f.root, base, 'change.yaml')
+  mkdirSync(join(f.root, base, 'candidate'), { recursive: true })
+  writeFileSync(changePath, dump({ experiment_id: id, agent_id: 'alpha', compute_variant: f.plan }))
+  const original = readFileSync(join(f.root, f.plan.decision_training.path))
+  writeFileSync(join(f.root, 'evaluation/training-fixture/private-do-not-copy.txt'), 'unreferenced runtime state')
+  assert.equal((await inspectDecisionTraining(f.root, f.plan, id)).verified, false)
+  const archived = await archiveDecisionTraining(f.root, id)
+  assert.equal(archived.reused, false)
+  assert.deepEqual(readFileSync(join(f.root, f.plan.decision_training.path)), original)
+  const plan = load(readFileSync(changePath, 'utf8')).compute_variant
+  assert.equal((await inspectDecisionTraining(f.root, plan, id)).verified, true)
+  assert.equal(existsSync(join(f.root, archived.receipt.path, '../private-do-not-copy.txt')), false)
+  const restored = mkdtempSync(join(tmpdir(), 'training-restored-'))
+  t.after(() => rmSync(restored, { recursive: true, force: true }))
+  mkdirSync(join(restored, 'evolution/experiments'), { recursive: true })
+  cpSync(join(f.root, base), join(restored, base), { recursive: true })
+  rmSync(join(f.root, 'evaluation'), { recursive: true, force: true })
+  rmSync(join(f.root, '.local'), { recursive: true, force: true })
+  assert.equal((await inspectDecisionTraining(restored, plan, id)).verified, true)
+  const before = readFileSync(changePath)
+  assert.equal((await archiveDecisionTraining(f.root, id)).reused, true)
+  assert.deepEqual(readFileSync(changePath), before)
+  writeFileSync(join(f.root, plan.decision_training.path), '{}')
+  await assert.rejects(() => archiveDecisionTraining(f.root, id), /摘要不匹配/)
+  assert.deepEqual(readFileSync(changePath), before)
+})
+
+test('显式恢复依赖保持源码与资源的相对目录，摘要失效和非法补充不得更新计划', async t => {
+  const f = fixture(t), id = 'VAR-alpha-001-r123456abcdef', base = `evolution/experiments/${id}`
+  const changePath = join(f.root, base, 'change.yaml')
+  mkdirSync(join(f.root, base, 'candidate'), { recursive: true })
+  const put = (path, content) => {
+    mkdirSync(join(f.root, path, '..'), { recursive: true }); writeFileSync(join(f.root, path), content)
+    return { path, sha256: createHash('sha256').update(content).digest('hex') }
+  }
+  const resource = put('.local/source/assets/contract.json', '{"version":1}')
+  f.receipt.artifacts.state_constructor = put('.local/source/scripts/build.py', 'resource = "../assets/contract.json"')
+  f.plan.model_roles.decision.state_constructor_sha256 = f.receipt.artifacts.state_constructor.sha256
+  f.save()
+  writeFileSync(changePath, dump({ experiment_id: id, agent_id: 'alpha', compute_variant: f.plan }))
+  const before = readFileSync(changePath)
+  await assert.rejects(() => archiveDecisionTraining(f.root, id, undefined, [{ ...resource, sha256: '0'.repeat(64) }]), /材料变化/)
+  await assert.rejects(() => archiveDecisionTraining(f.root, id, undefined, [{ path: '../secret', sha256: resource.sha256 }]), /数据根内/)
+  assert.deepEqual(readFileSync(changePath), before)
+  await archiveDecisionTraining(f.root, id, undefined, [resource])
+  const plan = load(readFileSync(changePath, 'utf8')).compute_variant
+  const receipt = JSON.parse(readFileSync(join(f.root, plan.decision_training.path), 'utf8'))
+  assert.equal(receipt.supporting_files[0].path, join(receipt.artifacts.state_constructor.path, '../../assets/contract.json'))
+  rmSync(join(f.root, '.local'), { recursive: true, force: true })
+  assert.equal((await inspectDecisionTraining(f.root, plan, id)).verified, true)
+  const archivedPlan = readFileSync(changePath)
+  assert.equal((await archiveDecisionTraining(f.root, id, undefined, [resource])).reused, true)
+  assert.deepEqual(readFileSync(changePath), archivedPlan)
+  assert.equal((await archiveDecisionTraining(f.root, id)).reused, true)
+  writeFileSync(join(f.root, receipt.supporting_files[0].path), 'changed')
+  assert.match((await inspectDecisionTraining(f.root, plan, id)).reasons.join(), /摘要不匹配/)
 })

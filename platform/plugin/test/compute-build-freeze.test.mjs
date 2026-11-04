@@ -7,12 +7,13 @@ import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { build } from 'esbuild'
 import { dump, load } from 'js-yaml'
+import { trainingFixture } from './fixtures/decision-training.mjs'
 
 process.env.HARNESS_PROGRAM_ROOT = new URL('../../../', import.meta.url).pathname
 process.env.HARNESS_PYTHON ||= '/usr/bin/python3'
 const built = mkdtempSync(join(tmpdir(), 'compute-build-freeze-module-'))
-await build({ stdin: { contents: "export * from './src/agents/compute-build.ts'; export * from './src/agents/compute-freeze.ts'; export * from './src/tasks/files.ts'; export * from './src/tasks/llm-key.ts'", resolveDir: new URL('../', import.meta.url).pathname, loader: 'ts' }, outfile: join(built, 'module.mjs'), bundle: true, platform: 'node', format: 'esm' })
-const { createComputeBuildHandler, inspectComputeBuild, createComputeFreezeHandler, candidateDigest, containsLiteralLlmKey } = await import(`file://${join(built, 'module.mjs')}`)
+await build({ stdin: { contents: "export * from './src/agents/compute-build.ts'; export * from './src/agents/compute-freeze.ts'; export * from './src/agents/compute-training.ts'; export * from './src/tasks/files.ts'; export * from './src/tasks/llm-key.ts'", resolveDir: new URL('../', import.meta.url).pathname, loader: 'ts' }, outfile: join(built, 'module.mjs'), bundle: true, platform: 'node', format: 'esm' })
+const { createComputeBuildHandler, inspectComputeBuild, createComputeFreezeHandler, archiveDecisionTraining, inspectDecisionTraining, candidateDigest, containsLiteralLlmKey } = await import(`file://${join(built, 'module.mjs')}`)
 test.after(() => rmSync(built, { recursive: true, force: true }))
 const id = 'EXP-alpha-002-r222222222222', exp = `evolution/experiments/${id}`, base = `${exp}/candidate`
 const hash = value => createHash('sha256').update(value).digest('hex')
@@ -208,6 +209,35 @@ test('评估归档变化会使旧冻结预览失效，不移动HEAD或污染索�
   assert.equal(git(f.root, ['rev-parse', 'HEAD']), head)
   assert.equal(git(f.root, ['diff', '--cached', '--name-only']), '')
   assert.equal(readFileSync(join(f.root, archive), 'utf8'), '{"accuracy":0.25}\n')
+})
+
+test('混合变体冻结包含完整训练闭包，独立克隆可核验，移除研究材料不会残留旧Git文件', async t => {
+  const f = fixture(t), freeze = createComputeFreezeHandler(f.root), training = trainingFixture(f.root, ['run-fixed'])
+  const change = f.change()
+  Object.assign(change.compute_variant, training.plan)
+  write(f.root, `${exp}/change.yaml`, dump(change))
+  const rejected = await freeze('preview', { experiment_id: id })
+  assert.equal(rejected.ok, false)
+  assert.match(rejected.error.message, /归档到所属 Experiment/)
+  await archiveDecisionTraining(f.root, id)
+  const obsolete = `${exp}/evaluation/obsolete.json`
+  write(f.root, obsolete, '{"obsolete":true}')
+  const preview = await freeze('preview', { experiment_id: id })
+  assert.equal(preview.ok, true, JSON.stringify(preview))
+  assert.equal((await freeze('freeze', preview.value.freeze_input)).ok, true)
+  const restored = mkdtempSync(join(tmpdir(), 'compute-training-clone-'))
+  t.after(() => rmSync(restored, { recursive: true, force: true }))
+  git(f.root, ['clone', '--quiet', '--no-hardlinks', f.root, restored])
+  const plan = load(readFileSync(join(restored, exp, 'change.yaml'), 'utf8')).compute_variant
+  assert.equal(existsSync(join(restored, '.local')), false)
+  assert.equal((await inspectDecisionTraining(restored, plan, id)).verified, true)
+  rmSync(join(f.root, obsolete))
+  const deleted = await freeze('preview', { experiment_id: id })
+  assert.ok(deleted.value.files.some(item => item.path === obsolete && item.operation === 'delete'))
+  assert.equal((await freeze('freeze', deleted.value.freeze_input)).ok, true)
+  assert.equal(spawnSync('git', ['cat-file', '-e', `HEAD:${obsolete}`], { cwd: f.root }).status, 128)
+  rmSync(join(f.root, f.change().compute_variant.decision_training.path))
+  assert.equal((await freeze('preview', { experiment_id: id })).ok, false)
 })
 test('共同基准可显式选真实Case批量冻结240个文件，无须伪造算力计划', { timeout: 45_000 }, async t => {
   const f = fixture(t), freeze = createComputeFreezeHandler(f.root), change = f.change()
