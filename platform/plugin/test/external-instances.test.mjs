@@ -3,6 +3,8 @@ import { once } from 'node:events'
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { createRequire } from 'node:module'
+import fs from 'node:fs'
+import { syncBuiltinESMExports } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -371,4 +373,35 @@ test('业务总开关关闭时新入口拒绝且已开放SSE结束，列表明�
   await assert.rejects(access.invokeExternal(f.root, caller(), { id: 'remote-one', operation: 'session:create', requestId: 'global-deny' }, signal()), error => error.code === 'entry_disabled')
   assert.equal(registry.externalInstances(f.root).instances[0].entryState, 'disabled'); assert.equal(f.calls.length, before)
   const ended = await Promise.race([reader.read(), new Promise((_, reject) => setTimeout(() => reject(new Error('总开关关闭后原流未结束')), 1500))]); assert.equal(ended.done, true)
+})
+
+test('事件订阅首次派发复核风险有效期与配置，并准确记录未派发', async t => {
+  const f = await fixture(t); await f.enable()
+  const created = await access.invokeExternal(f.root, caller(), { id: 'remote-one', operation: 'session:create', requestId: 'stream-dispatch-session' }, signal())
+  const provider = await riskProvider(t, async () => ({ body: { expiresAt: new Date(Date.now() + 250).toISOString() } }))
+  const file = join(f.root, 'config/business-access.json'), config = JSON.parse(readFileSync(file))
+  config.externalAccess = { riskAssessment: { endpoint: provider.endpoint + '/external' } }
+  writeFileSync(file, JSON.stringify(config))
+  const realAppend = fs.appendFileSync, realNow = Date.now
+  for (const mode of ['expired', 'changed']) {
+    let injected = false
+    fs.appendFileSync = (path, data, ...args) => {
+      const row = String(data)
+      if (String(path).startsWith(f.root) && row.includes('"operation":"session:events"') && row.includes('"stage":"dispatching"')) {
+        injected = true
+        if (mode === 'expired') Date.now = () => realNow() + 1000
+        else { config.externalAccess.riskAssessment.endpoint = provider.endpoint + '/replacement'; writeFileSync(file, JSON.stringify(config)) }
+      }
+      return realAppend(path, data, ...args)
+    }
+    syncBuiltinESMExports()
+    try {
+      const before = f.calls.filter(call => call.path === '/api/event').length
+      await assert.rejects(access.streamExternal(f.root, caller(), 'remote-one', created.sessionId, { headersSent: false, writableEnded: false, end() {} }, signal()), error => error.code === (mode === 'expired' ? 'authorization_expired' : 'configuration_changed'))
+      assert.equal(injected, true)
+      assert.equal(f.calls.filter(call => call.path === '/api/event').length, before)
+      const record = registry.readExternalRecords(f.root, 'remote-one')[0]
+      assert.equal(record.stage, 'not_dispatched'); assert.equal(record.result, 'deny')
+    } finally { fs.appendFileSync = realAppend; Date.now = realNow; syncBuiltinESMExports() }
+  }
 })

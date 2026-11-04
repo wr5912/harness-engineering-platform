@@ -194,8 +194,16 @@ async function parseJsonCommandAsync(root: string, args: string[], message = '�
 }
 
 function readYamlMap(root: string, file: string, content?: string): JsonMap {
+  if (content === undefined) {
+    try { content = readFileSync(file, 'utf8') }
+    catch (error) {
+      const filesystemCode = (error as NodeJS.ErrnoException).code ?? 'unknown'
+      throw new RpcError('asset_read_failed', filesystemCode === 'ENOENT' ? 'YAML 文件不存在' : 'YAML 文件读取失败',
+        { path: repoRelative(root, file), filesystem_code: filesystemCode })
+    }
+  }
   try {
-    const value = loadYaml(content ?? readFileSync(file, 'utf8')) ?? {}
+    const value = loadYaml(content) ?? {}
     if (typeof value !== 'object' || Array.isArray(value)) throw new Error('YAML 顶层必须是 object')
     return value as JsonMap
   } catch {

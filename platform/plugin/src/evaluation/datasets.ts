@@ -12,6 +12,8 @@ type Sample = { state: unknown; workflow: string; task: DecisionTask; questions:
 type SourceIdentity = { agent_id: string; experiment_id: string; run_id: string }
 type Dataset = { schema_version?: number; id: string; run_id: string; agent_id?: string; experiment_id?: string; source_version?: MapValue; path: string; source_sha256: string; source_bundle?: TraceSourceBundle; created_at: string; extractor: MapValue; records: Sample[]; skipped: string[] }
 type RecordEligibility = { record_id: string; legacy: boolean; eligible_questions: string[]; reasons: string[]; question_reasons: Record<string, string[]>; export_modes: string[] }
+type BatchError = { dataset_id: string; path: string; code: string; message: string }
+type DatasetCatalog = { datasets: Dataset[]; batch_errors: BatchError[]; catalog_complete: boolean }
 const ID = /^decision-dataset-[0-9a-f-]{36}$/
 const HASH = /^[0-9a-f]{64}$/
 const RECORD_ID = /^decision-[0-9a-f]{32}$/
@@ -20,6 +22,7 @@ const MODES = ['candidates', 'training', 'development', 'calibration', 'test']
 // 给原生工具的外层回执及专项合同投影留出空间。
 const SOURCE_PAGE_CHARACTERS = 12000
 const DECISION_STATE_BYTES = 96 * 1024
+const DATASET_MAX_BYTES = 4 * 1024 * 1024
 const digest = (value: unknown) => createHash('sha256').update(typeof value === 'string' ? value : JSON.stringify(value)).digest('hex')
 function canonical(value: any): any {
   if (Array.isArray(value)) return value.map(canonical)
@@ -121,21 +124,39 @@ function fileFor(root: string, id: unknown) {
 function read(root: string, id: unknown) {
   const path = fileFor(root, id)
   if (!existsSync(path)) fail('数据集不存在', 'not_found')
+  const stat = lstatSync(path)
+  if (!stat.isFile()) fail('数据集必须是普通文件', 'path_rejected')
+  if (stat.size > DATASET_MAX_BYTES) fail('数据集超过 4 MiB', 'dataset_too_large')
   const content = readFileSync(path, 'utf8')
-  if (content.length > 4 * 1024 * 1024) fail('数据集过大')
-  const dataset = JSON.parse(content) as Dataset
-  if (dataset.id !== id || !Array.isArray(dataset.records)) fail('数据集结构无效')
+  let dataset: Dataset
+  try { dataset = JSON.parse(content) } catch { fail('数据集 JSON 无法解析', 'invalid_dataset_json') }
+  const map = (value: unknown) => Boolean(value && typeof value === 'object' && !Array.isArray(value))
+  const readableRecord = (record: any) => map(record) && map(record._meta) && typeof record._meta.id === 'string'
+    && (record.state?.messages == null || Array.isArray(record.state.messages) && record.state.messages.every(map))
+  if (!map(dataset) || dataset.id !== id || typeof dataset.run_id !== 'string' || !Array.isArray(dataset.records)
+    || !dataset.records.every(readableRecord)) fail('数据集结构无效')
   return { dataset, sha256: digest(content) }
 }
-function all(root: string): Dataset[] {
+function scan(root: string): DatasetCatalog {
   const base = storage(root)
-  return existsSync(base) ? readdirSync(base).filter(name => name.endsWith('.json') && ID.test(name.slice(0, -5))).map(name => read(root, name.slice(0, -5)).dataset) : []
+  const datasets: Dataset[] = [], batch_errors: BatchError[] = []
+  for (const name of existsSync(base) ? readdirSync(base).sort().filter(name => name.endsWith('.json') && ID.test(name.slice(0, -5))) : []) {
+    const dataset_id = name.slice(0, -5)
+    try { datasets.push(read(root, dataset_id).dataset) }
+    catch (error) { batch_errors.push({ dataset_id, path: `evolution/datasets/${name}`, code: error instanceof RunFileError ? error.code : 'dataset_unreadable', message: error instanceof RunFileError ? error.message : '数据集文件无法读取' }) }
+  }
+  return { datasets, batch_errors, catalog_complete: batch_errors.length === 0 }
+}
+function all(root: string): Dataset[] {
+  const catalog = scan(root)
+  if (!catalog.catalog_complete) fail(`数据集目录核验不完整，请先修复不可读取的批次：${catalog.batch_errors.map(error => error.path).join('；')}`, 'dataset_catalog_incomplete')
+  return catalog.datasets
 }
 function write(root: string, dataset: Dataset, create = false) {
   const path = fileFor(root, dataset.id)
   mkdirSync(storage(root), { recursive: true })
   const content = JSON.stringify(clean(dataset), null, 2) + '\n'
-  if (content.length > 4 * 1024 * 1024) fail('样本批次超过 4 MiB，请分批保存')
+  if (Buffer.byteLength(content) > DATASET_MAX_BYTES) fail('样本批次超过 4 MiB，请分批保存')
   if (create) writeFileSync(path, content, { flag: 'wx' })
   else { const temp = `${path}.${randomUUID()}.tmp`; writeFileSync(temp, content, { flag: 'wx' }); renameSync(temp, path) }
   return { dataset: clean(dataset), sha256: digest(content), file: `evolution/datasets/${dataset.id}.json` }
@@ -294,10 +315,21 @@ async function eligibility(root: string, dataset: Dataset, datasets: Dataset[], 
   if (dataset.schema_version === 2) { try { checked = await verifySource(root, dataset, signal) } catch (reason) { signal?.throwIfAborted(); error = sourceError(reason) } }
   return eligibilityFromSource(dataset, datasets, checked, error)
 }
+async function catalogEligibility(root: string, dataset: Dataset, catalog: DatasetCatalog, signal?: AbortSignal) {
+  const qualified = await eligibility(root, dataset, catalog.datasets, signal)
+  if (catalog.catalog_complete) return qualified
+  const reason = '另有不可读取批次，无法完整核对同源、重复和用途关系；请修复批次后重新核验，当前不能导出。'
+  return { counts: Object.fromEntries(MODES.map(mode => [mode, 0])),
+    records: qualified.records.map(record => ({ ...record, eligible_questions: [], export_modes: [], reasons: [...record.reasons, reason] })),
+    blocked: qualified.records.map(record => ({ record_id: record.record_id, reasons: [...record.reasons, reason] })) }
+}
 
 export function createDecisionDatasetHandler(root: string) {
   const previews = new Map<string, { dataset: Dataset; owner: string; created: number }>()
-  async function response(saved: ReturnType<typeof read> & { file?: string }, signal?: AbortSignal) { return { ...saved, eligibility: await eligibility(root, saved.dataset, all(root), signal) } }
+  async function response(saved: ReturnType<typeof read> & { file?: string }, signal?: AbortSignal) {
+    const catalog = scan(root)
+    return { ...saved, batch_errors: catalog.batch_errors, catalog_complete: catalog.catalog_complete, eligibility: await catalogEligibility(root, saved.dataset, catalog, signal) }
+  }
   return async function handle(endpoint: string, body: MapValue, signal?: AbortSignal): Promise<any> {
     signal?.throwIfAborted()
     try {
@@ -433,9 +465,9 @@ export function createDecisionDatasetHandler(root: string) {
       }
       if (endpoint === 'datasets/list') {
         if (body.include_eligibility !== undefined && typeof body.include_eligibility !== 'boolean') fail('include_eligibility 必须是布尔值')
-        const datasets = all(root)
-        return { datasets: await Promise.all(datasets.filter(dataset => !body.run_id || dataset.run_id === body.run_id).map(async dataset => {
-          const qualified = body.include_eligibility === false ? null : await eligibility(root, dataset, datasets, signal)
+        const catalog = scan(root)
+        return { batch_errors: catalog.batch_errors, catalog_complete: catalog.catalog_complete, datasets: await Promise.all(catalog.datasets.filter(dataset => !body.run_id || dataset.run_id === body.run_id).map(async dataset => {
+          const qualified = body.include_eligibility === false ? null : await catalogEligibility(root, dataset, catalog, signal)
           return { id: dataset.id, schema_version: dataset.schema_version ?? 1, run_id: dataset.run_id, path: dataset.path,
             ...(dataset.agent_id ? { agent_id: dataset.agent_id, experiment_id: dataset.experiment_id } : {}), created_at: dataset.created_at,
             count: dataset.records.length, reviewed: dataset.schema_version === 2 ? dataset.records.filter(record => Object.values(record.targets ?? {}).some(isDecisionTargetReviewed)).length : dataset.records.filter(record => record._meta?.label_status === 'reviewed').length,

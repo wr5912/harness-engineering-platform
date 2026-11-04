@@ -398,3 +398,57 @@ test('样本隐藏通知只记脏，恢复与首次慢读取通知单飞合并�
     fail = false; ui.notify(); await ui.settle(); assert.doesNotMatch(ui.text(), /样本列表暂不可读/)
   } finally { ui.cleanup() }
 })
+
+test('其他坏批次可见且阻止导出，刷新核验不会覆盖健康样本草稿', async () => {
+  let broken = false
+  const ui = workbench({ handler: async (action, input, original) => {
+    const result = await original(action, input)
+    return ['list', 'read'].includes(action) ? { ...result, catalog_complete: !broken, batch_errors: broken ? [{ dataset_id: 'broken-batch', path: 'evolution/datasets/broken-batch.json', code: 'invalid_dataset_json', message: '数据集 JSON 无法解析' }] : [] } : result
+  } })
+  try {
+    await open(ui)
+    ui.change('第 1 题问题', '尚未保存的题目草稿')
+    broken = true; ui.notify(); await ui.settle()
+    assert.match(ui.text(), /另有 1 个批次无法读取/)
+    assert.match(ui.text(), /evolution\/datasets\/broken-batch.json/)
+    assert.equal(ui.byLabel('第 1 题问题').props.value, '尚未保存的题目草稿')
+    assert.equal(ui.download('候选').props.disabled, true)
+    assert.equal(ui.button('保存本条修改与复核').props.disabled, true)
+    assert.equal(ui.calls.some(call => ['update', 'export'].includes(call.action)), false)
+    broken = false; ui.notify(); await ui.settle()
+    assert.doesNotMatch(ui.text(), /另有 1 个批次无法读取/)
+    assert.equal(ui.byLabel('第 1 题问题').props.value, '尚未保存的题目草稿')
+    assert.equal(ui.download('候选').props.disabled, false)
+    assert.equal(ui.button('保存本条修改与复核').props.disabled, false)
+  } finally { ui.cleanup() }
+})
+
+test('当前批次损坏后保留原对象和草稿，选择器与错误明确标记旧读取', async () => {
+  let broken = false
+  const ui = workbench({ handler: async (action, input, original) => {
+    if (broken && action === 'read' && input.dataset_id === 'dataset-a') throw new Error('invalid_dataset_json: 数据集 JSON 无法解析')
+    const value = await original(action, input)
+    return action === 'list' && broken ? { ...value, datasets: value.datasets.filter(item => item.id !== 'dataset-a'), catalog_complete: false, batch_errors: [{ dataset_id: 'dataset-a', path: 'evolution/datasets/dataset-a.json', message: '数据集 JSON 无法解析' }] } : value
+  } })
+  try {
+    await open(ui)
+    ui.change('第 1 题问题', '损坏文件前的未保存草稿')
+    broken = true; ui.notify(); await ui.settle()
+    assert.equal(ui.byLabel('样本批次').props.value, 'dataset-a')
+    assert.match(ui.text(), /当前批次无法读取 · dataset-a/)
+    assert.match(ui.text(), /保留上次读取的内容和草稿/)
+    assert.equal(ui.byLabel('第 1 题问题').props.value, '损坏文件前的未保存草稿')
+    assert.equal(ui.download('候选').props.disabled, true)
+  } finally { ui.cleanup() }
+})
+
+test('目录不完整且健康列表为空时，不把未知归属写成当前Run没有样本', async () => {
+  const ui = workbench({ handler: async (action, input, original) => action === 'list'
+    ? { datasets: [], catalog_complete: false, batch_errors: [{ dataset_id: 'unknown-batch', path: 'evolution/datasets/unknown-batch.json', message: '数据集 JSON 无法解析' }] }
+    : original(action, input) })
+  try {
+    await ui.settle()
+    assert.match(ui.text(), /不可读取批次的归属尚未核对/)
+    assert.doesNotMatch(ui.text(), /此 Run 尚无样本/)
+  } finally { ui.cleanup() }
+})

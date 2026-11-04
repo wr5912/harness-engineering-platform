@@ -63,6 +63,7 @@ export function DecisionDatasetView({ rpc, runId, active, updates, onDirty, onBu
   const [list, setList] = useState<any[]>([]), [id, setId] = useState(''), [document, setDocument] = useState<any>(null), [recordId, setRecordId] = useState('')
   const [draft, setDraft] = useState<Draft | null>(null), [error, setError] = useState(''), [message, setMessage] = useState(''), [busy, setBusy] = useState(false)
   const [listPhase, setListPhase] = useState<'loading' | 'ready' | 'error'>('loading'), [listError, setListError] = useState('')
+  const [batchErrors, setBatchErrors] = useState<any[]>([]), [catalogComplete, setCatalogComplete] = useState(true)
   const generation = useRef(0), refreshSequence = useRef(0), current = useRef({ runId, id, recordId, dirty: false, busy: false, sha256: '' })
   const invalidField = useRef('')
   const record = document?.dataset?.records?.find((entry: any) => entry._meta.id === recordId)
@@ -96,22 +97,26 @@ export function DecisionDatasetView({ rpc, runId, active, updates, onDirty, onBu
     try {
       const value = await call('list', { run_id: target, include_eligibility: false })
       if (current.current.runId !== target || request !== generation.current || refreshId !== refreshSequence.current) return
-      setList(value.datasets); setListPhase('ready'); listRead = true
+      setList(value.datasets); setBatchErrors(value.batch_errors ?? []); setCatalogComplete(value.catalog_complete !== false); setListPhase('ready'); listRead = true
       if (selectedId && !current.current.busy) {
         const latest = await call('read', { dataset_id: selectedId })
         if (current.current.runId !== target || request !== generation.current || refreshId !== refreshSequence.current || current.current.id !== selectedId || current.current.busy) return
-        if (current.current.dirty) { if (latest.sha256 !== current.current.sha256) setError('样本已在其他窗口修改；当前草稿保留。请核对后重新读取本批次。'); return }
+        if (current.current.dirty) {
+          if (latest.sha256 !== current.current.sha256) setError('样本已在其他窗口修改；当前草稿保留。请核对后重新读取本批次。')
+          else setDocument((previous: any) => ({ ...previous, eligibility: latest.eligibility, batch_errors: latest.batch_errors, catalog_complete: latest.catalog_complete }))
+          return
+        }
         const selected = latest.dataset.records.find((entry: any) => entry._meta.id === current.current.recordId) ?? latest.dataset.records[0]
         setDocument(latest); setRecordId(selected?._meta.id ?? ''); setDraft(selected ? draftOf(selected) : null); setError('')
       }
     }
     catch (e) { if (current.current.runId === target && request === generation.current && refreshId === refreshSequence.current) {
-      if (listRead) setError((e as Error).message)
+      if (listRead) setError(`当前批次读取失败：${(e as Error).message}。保留上次读取的内容和草稿，请修复后重新读取。`)
       else { setListPhase('error'); setListError((e as Error).message) }
     } }
   }
   const refresh = useQueuedRefresh(active && Boolean(runId), readBatch, runId)
-  useEffect(() => { generation.current++; setId(''); setDocument(null); setRecordId(''); setDraft(null); setList([]); setListPhase('loading'); setListError(''); setError(''); setMessage(''); return () => { generation.current++ } }, [runId])
+  useEffect(() => { generation.current++; setId(''); setDocument(null); setRecordId(''); setDraft(null); setList([]); setBatchErrors([]); setCatalogComplete(true); setListPhase('loading'); setListError(''); setError(''); setMessage(''); return () => { generation.current++ } }, [runId])
   useEffect(() => { if (runId) void refresh() }, [runId])
   useEffect(() => updates?.subscribe(() => { if (updates.getSnapshot().domains.includes('agents')) void refresh() }), [updates])
   async function open(next: string) {
@@ -119,7 +124,7 @@ export function DecisionDatasetView({ rpc, runId, active, updates, onDirty, onBu
     const request = ++generation.current
     setId(next); setDocument(null); setDraft(null); setError(''); setMessage('')
     if (!next) return
-    try { const value = await call('read', { dataset_id: next }); if (request !== generation.current) return; setDocument(value); const first = value.dataset.records[0]; setRecordId(first?._meta.id ?? ''); setDraft(first ? draftOf(first) : null) }
+    try { const value = await call('read', { dataset_id: next }); if (request !== generation.current) return; setDocument(value); if (typeof value.catalog_complete === 'boolean') { setBatchErrors(value.batch_errors ?? []); setCatalogComplete(value.catalog_complete) }; const first = value.dataset.records[0]; setRecordId(first?._meta.id ?? ''); setDraft(first ? draftOf(first) : null) }
     catch (e) { if (request === generation.current) setError((e as Error).message) }
   }
   function changeQuestion(index: number, patch: Partial<QuestionDraft>, reset = true) {
@@ -141,6 +146,7 @@ export function DecisionDatasetView({ rpc, runId, active, updates, onDirty, onBu
   }
   async function save(nextRecordId?: string) {
     if (!draft || !record || busy || legacy) return
+    if (!catalogComplete || document.catalog_complete === false) { setError('数据集目录核验不完整，请先修复不可读取的批次并刷新；当前草稿保留。'); return }
     setError(''); setBusy(true); setMessage(''); invalidField.current = ''
     const request = ++generation.current
     try {
@@ -185,17 +191,19 @@ export function DecisionDatasetView({ rpc, runId, active, updates, onDirty, onBu
   const renderMessage = (entry: any, index: number, open = false) => <details key={`${recordId}:${index}`} className="harness-dataset-message" open={open}><summary><span>{messageName(entry)}</span>{!open && <small>第 {index + 1} 条{entry.name ? ` · ${entry.name}` : ''}</small>}</summary><div className="harness-dataset-message-content">{messageText(entry.content) || '本条含结构化内容，请展开原始输入核对。'}</div>{entry.tool_calls?.length > 0 && <p className="harness-eval-muted">包含 {entry.tool_calls.length} 个工具请求；参数见原始输入。</p>}</details>
   return <section className="harness-eval-dataset" aria-label="决策样本工作区">
     <div className="harness-dataset-toolbar">
-      <label className="harness-eval-field harness-dataset-picker">样本批次<select aria-label="样本批次" value={id} disabled={busy} onChange={event => void open(event.target.value)}><option value="">选择已保存的批次</option>{list.map(item => <option key={item.id} value={item.id}>{time(item.created_at)} · {item.count} 条 · 有已复核题 {item.reviewed}</option>)}</select></label>
+      <label className="harness-eval-field harness-dataset-picker">样本批次<select aria-label="样本批次" value={id} disabled={busy} onChange={event => void open(event.target.value)}><option value="">选择已保存的批次</option>{id && !list.some(item => item.id === id) && batchErrors.some(item => item.dataset_id === id) && <option value={id} disabled>当前批次无法读取 · {id}</option>}{list.map(item => <option key={item.id} value={item.id}>{time(item.created_at)} · {item.count} 条 · 有已复核题 {item.reviewed}</option>)}</select></label>
       <div className="harness-dataset-toolbar-actions"><button onClick={() => void refresh()}>刷新样本</button>{document && <DetailDrawer title="批次操作与导出" trigger="批次操作" active={active} identity={`${runId}:${id}:batch`}>
-        <div className="harness-eval-actions"><button disabled={busy} onClick={() => void open(id)}>重新读取本批次</button>{downloads.map(([kind, title]) => <button key={kind} disabled={busy || !eligibility?.counts?.[kind]} onClick={() => void download(kind)}>下载{title} JSONL{eligibility?.counts?.[kind] === undefined ? '' : `（${eligibility.counts[kind]}）`}</button>)}</div>
+        <div className="harness-eval-actions"><button disabled={busy} onClick={() => void open(id)}>重新读取本批次</button>{downloads.map(([kind, title]) => <button key={kind} disabled={busy || !catalogComplete || document.catalog_complete === false || !eligibility?.counts?.[kind]} onClick={() => void download(kind)}>下载{title} JSONL{eligibility?.counts?.[kind] === undefined ? '' : `（${eligibility.counts[kind]}）`}</button>)}</div>
+        {(!catalogComplete || document.catalog_complete === false) && <p className="harness-eval-note">数据集目录尚未完整核验，暂不能导出。请修复下方不可读取的批次，再刷新核验。</p>}
         <p className="harness-eval-note">下载仅包含已保存且符合该用途的题目。未分配用途不进入训练；来源组与关联组共同约束训练、开发、校准和测试隔离。复核记录保留实际方式，AI 委托复核仅用于功能验证。</p>
         {eligibility?.blocked?.length > 0 && <div className="harness-eval-limits"><strong>批次中 {eligibility.blocked.length} 条样本存在导出限制</strong><ul>{eligibility.blocked.map((item: any) => <li key={item.record_id}>{item.record_id}：{item.reasons.join('；')}</li>)}</ul></div>}
         <details><summary>抽取来源与跳过原因</summary><pre>{json({ extractor: document.dataset.extractor, path: document.dataset.path, source_sha256: document.dataset.source_sha256, skipped: document.dataset.skipped })}</pre></details>
       </DetailDrawer>}</div>
     </div>
     {listPhase === 'loading' && <p role="status">正在读取样本批次…</p>}{listError && <p role="alert">样本批次读取失败：{listError}。请重新读取。{list.length > 0 && '当前显示上次读取的批次。'}</p>}
+    {batchErrors.length > 0 && <div className="harness-eval-limits" role="alert"><strong>另有 {batchErrors.length} 个批次无法读取</strong><p>下列文件尚不能核对所属 Run 和关联关系。可继续阅读健康样本；修复并刷新前，导出及依赖完整目录的保存操作不可用。</p><ul>{batchErrors.map(item => <li key={item.dataset_id}><code>{item.path}</code>：{item.message}</li>)}</ul></div>}
     {error && (!document || !draft || readIssue) && <p role="alert">{error}</p>}{message && <p role="status">{message}</p>}
-    {listPhase === 'ready' && !list.length && <p className="harness-eval-empty">此 Run 尚无样本。点击上方“请 AI 抽取决策样本”，平台会自动保存候选并回读；训练前仍需逐题复核。</p>}
+    {listPhase === 'ready' && !list.length && <p className="harness-eval-empty">{catalogComplete ? '此 Run 尚无样本。点击上方“请 AI 抽取决策样本”，平台会自动保存候选并回读；训练前仍需逐题复核。' : '尚未读到此 Run 可用的样本批次；不可读取批次的归属尚未核对，请修复后刷新。'}</p>}
     {id && !document && !error && <p role="status">正在读取本批次样本…</p>}
     {document && <>
       {legacy && <div className="harness-eval-limits" role="status"><strong>旧格式样本，仅供阅读和候选下载。</strong><p>原有标签和复核记录保持原样；需要按当前决策合同重新抽取，不能直接作为新版合格训练或评测样本。</p>{onReextract && <button disabled={busy} onClick={onReextract}>按当前合同重新抽取</button>}</div>}
@@ -235,7 +243,7 @@ export function DecisionDatasetView({ rpc, runId, active, updates, onDirty, onBu
               <button disabled={busy} onClick={() => setDraft({ ...draft, questions: [...draft.questions, { originalName: '', name: `decision_${draft.questions.length + 1}`, type: 'choice', instructions: '', criteria: '{}', label: '""', probabilities: '', provenance: '{"kind":"human_annotation"}', basis: '', status: 'suggested', decisionTimeReviewed: false, originalQuestion: {}, originalTarget: {} }] })}>添加命名决策题</button>
             </section>
             <section className="harness-dataset-section"><div className="harness-dataset-section-title"><h4>保存与后续用途</h4></div>{recordEligibility?.reasons?.length > 0 && <details className="harness-dataset-export-limits" aria-label="本条导出限制"><summary>本条导出限制（{recordEligibility.reasons.length}）</summary><ul>{recordEligibility.reasons.map((reason: string) => <li key={reason}>{reason}</li>)}</ul></details>}<details className="harness-dataset-advanced"><summary>数据用途与关联分组 <span>{purposes.find(([value]) => value === draft.split)?.[1] ?? '未分配'}</span></summary><p className="harness-eval-note">固定来源任务组：{record._meta.source_group_id ?? '未记录'}。关联分组只能增加同源联系，不能解除已有隔离。</p><label className="harness-eval-field">关联任务分组<input aria-label="决策任务分组" disabled={busy} value={draft.group} onChange={event => setDraft({ ...draft, group: event.target.value })}/></label><label className="harness-eval-field">数据用途<select aria-label="决策数据用途" disabled={busy} value={draft.split} onChange={event => setDraft({ ...draft, split: event.target.value })}>{purposes.map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select></label></details></section>
-            <div className="harness-dataset-savebar">{error && <p id={`harness-dataset-save-error-${recordId}`} tabIndex={-1} className="harness-dataset-save-error" role="alert">{error}</p>}<div className="harness-dataset-savebar-main"><div><strong>{busy ? '正在保存…' : dirty ? '本条有未保存修改' : '暂无待保存修改'}</strong></div><div className="harness-eval-actions"><button className="harness-primary" disabled={busy || !dirty} onClick={() => void save()}>{busy ? '正在保存…' : '保存本条修改与复核'}</button>{nextRecord && <button disabled={busy} onClick={() => dirty ? void save(nextRecord._meta.id) : selectRecord(nextRecord._meta.id)}>{dirty ? '保存并查看下一条' : '查看下一条样本'}</button>}</div></div></div>
+            <div className="harness-dataset-savebar">{error && <p id={`harness-dataset-save-error-${recordId}`} tabIndex={-1} className="harness-dataset-save-error" role="alert">{error}</p>}<div className="harness-dataset-savebar-main"><div><strong>{busy ? '正在保存…' : dirty ? '本条有未保存修改' : '暂无待保存修改'}</strong></div><div className="harness-eval-actions"><button className="harness-primary" disabled={busy || !dirty || !catalogComplete || document.catalog_complete === false} onClick={() => void save()}>{busy ? '正在保存…' : '保存本条修改与复核'}</button>{nextRecord && <button disabled={busy || dirty && (!catalogComplete || document.catalog_complete === false)} onClick={() => dirty ? void save(nextRecord._meta.id) : selectRecord(nextRecord._meta.id)}>{dirty ? '保存并查看下一条' : '查看下一条样本'}</button>}</div></div></div>
           </>}
           <DetailDrawer title="实际动作与证据定位" active={active} identity={`${runId}:${id}:${recordId}`}><pre>{json(record._meta)}</pre></DetailDrawer>
         </article>}

@@ -96,11 +96,13 @@ async function fixture(t, mode = {}) {
     requests.push({ method, payload: structuredClone(payload) }); active++; maxActive = Math.max(maxActive, active)
     const value = (() => {
       if (method === 'inventory') return { root, workspace: { ...workspace, ...(mode.wrongWorkspace ? { id: 'workspace-other' } : {}) }, runs: [] }
-      if (method === 'agents/datasets/list') return { datasets: [datasetId, secondDatasetId].map(id => ({ id, schema_version: 2, run_id: runId, path, count: 1 })) }
+      if (method === 'agents/datasets/list') return { datasets: (mode.emptyList ? [] : [datasetId, secondDatasetId]).map(id => ({ id, schema_version: 2, run_id: runId, path, count: 1 })),
+        ...(mode.catalogIncomplete ? { catalog_complete: false, batch_errors: [{ dataset_id: 'unreadable', path: 'evolution/datasets/unreadable.json', code: 'invalid_dataset_json', message: '数据集 JSON 无法解析' }] } : {}) }
       if (method === 'agents/datasets/read') {
         const dataset = { ...docs.dataset, id: payload.dataset_id }
         if (mode.unsafeBody) dataset.records = [{ ...dataset.records[0], unit_password: 'UNIT_REAL_LOOKING_SECRET_MUST_NOT_BE_SAVED' }]
-        return { dataset, sha256: sha(`unit original platform file ${payload.dataset_id}`), eligibility: { status: 'ready' } }
+        return { dataset, sha256: sha(`unit original platform file ${payload.dataset_id}`), eligibility: { status: 'ready' },
+          ...(mode.readCatalogIncomplete ? { catalog_complete: false, batch_errors: [{ dataset_id: 'unreadable', path: 'evolution/datasets/unreadable.json', code: 'invalid_dataset_json', message: '数据集 JSON 无法解析' }] } : {}) }
       }
       if (method === 'agents/datasets/source') {
         if (!payload.decision_id && (payload.cursor ?? 0) === 0) sourceHomeReads++
@@ -189,6 +191,27 @@ test('batch按Run读取真实批次，include_eligibility:false且复用一个�
   assert.equal(outputs.length, 2)
   assert.deepEqual(outputs.map(file => JSON.parse(readFileSync(file)).input.readback.dataset.id).sort(), [datasetId, secondDatasetId].sort())
   assert.equal(f.stats().logins, 1); assert.equal(f.stats().maxActive, 1)
+})
+
+test('batch目录不完整或中途出现坏批次保留partial，空健康列表也不能写成收集完成', async t => {
+  for (const mode of [{ catalogIncomplete: true }, { catalogIncomplete: true, emptyList: true }, { readCatalogIncomplete: true }]) {
+    const f = await fixture(t, mode), options = { ...f.options, runId, datasetId: undefined, recordId: undefined }
+    await assert.rejects(collectReplayInputs(options), /DATASET_CATALOG_INCOMPLETE/)
+    assertPartial(options.out)
+    const manifest = JSON.parse(readFileSync(join(options.out, 'manifest.json')))
+    assert.equal(manifest.error_code, 'DATASET_CATALOG_INCOMPLETE')
+    assert.equal(f.requests.some(request => request.method === 'agents/datasets/source'), false)
+  }
+})
+
+test('单条collect允许读取健康样本并保留目录不完整事实，不推定整批已收集', async t => {
+  const f = await fixture(t, { readCatalogIncomplete: true })
+  await collectReplayInputs(f.options)
+  const saved = JSON.parse(readFileSync(join(f.options.out, 'input.json')))
+  assert.equal(saved.input.readback.catalog_complete, false)
+  assert.equal(saved.input.readback.batch_errors[0].code, 'invalid_dataset_json')
+  const manifest = JSON.parse(readFileSync(join(f.options.out, 'manifest.json')))
+  assert.equal(manifest.mode, 'collect'); assert.equal(manifest.complete, true); assert.equal(manifest.records.length, 1)
 })
 
 test('URL登记错配先拒绝登录，在线workspace错配不继续读样本', async t => {

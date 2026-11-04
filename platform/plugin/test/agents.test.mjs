@@ -1455,6 +1455,31 @@ test('智能体详情解析不阻塞服务，YAML 顶层校验保留', async t =
   assert.equal(missing.error.code, 'asset_read_failed')
 })
 
+test('YAML 资产读取区分清单缺失、文件读取失败和真实语法错误', async t => {
+  const { root } = fixture()
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const { createAgentsHandler } = await loadServer(), handler = createAgentsHandler(root)
+  const manifest = join(root, 'agents/test-agent/manifest.yaml')
+  await rm(manifest)
+  for (const endpoint of ['detail', 'description', 'list']) {
+    const result = await handler(endpoint, endpoint === 'list' ? {} : { agent_id: 'test-agent' }, new AbortController().signal)
+    assert.equal(result.ok, false); assert.equal(result.error.code, 'asset_read_failed')
+    assert.equal(result.error.message, 'YAML 文件不存在')
+    assert.deepEqual(result.error.details, { path: 'agents/test-agent/manifest.yaml', filesystem_code: 'ENOENT' })
+  }
+  mkdirSync(manifest)
+  const unreadable = await handler('detail', { agent_id: 'test-agent' }, new AbortController().signal)
+  assert.equal(unreadable.ok, false); assert.equal(unreadable.error.code, 'asset_read_failed')
+  assert.equal(unreadable.error.message, 'YAML 文件读取失败')
+  assert.deepEqual(unreadable.error.details, { path: 'agents/test-agent/manifest.yaml', filesystem_code: 'EISDIR' })
+  await rm(manifest, { recursive: true })
+  write(manifest, 'agent: [\n')
+  const invalid = await handler('detail', { agent_id: 'test-agent' }, new AbortController().signal)
+  assert.equal(invalid.ok, false); assert.equal(invalid.error.code, 'asset_read_failed')
+  assert.equal(invalid.error.message, 'YAML 解析失败')
+  assert.deepEqual(invalid.error.details, { path: 'agents/test-agent/manifest.yaml' })
+})
+
 test('用例按选中区块保存，多轮与档位回读一致，冲突和无效内容不改源文件', async t => {
   const { createAgentsHandler } = await loadServer()
   const { root } = fixture()
