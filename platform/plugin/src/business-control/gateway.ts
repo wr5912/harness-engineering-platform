@@ -53,7 +53,7 @@ export function requireBusinessToken(authorization: unknown, assetRoot: string):
 }
 
 export function readBusinessSecret(path?: string): Buffer {
-  if (!path) throw new Error('已发布实例缺少业务接入共享密钥')
+  if (!path) throw new Error('需要登录的发布实例缺少业务接入共享密钥')
   const value = readFileSync(path)
   if (value.length < 32) throw new Error('业务接入共享密钥必须至少为 32 字节')
   return value
@@ -110,7 +110,7 @@ export function businessRequestHeaders(req: IncomingMessage): Record<string, str
   return { authorization: typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined }
 }
 function rejectSocket(socket: Duplex, status = 401): void { socket.end(`HTTP/1.1 ${status} Rejected\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`) }
-/** 业务智能体请求默认全部转发；实例内的业务 Runtime 继续做身份、来源与动作校验。 */
+/** 业务智能体请求默认全部转发；需要登录的实例才进入业务访问控制。 */
 export function allowedBusinessPath(path: string, method: string, transport: 'http' | 'websocket'): boolean {
   void path; void method; void transport
   return true
@@ -172,13 +172,11 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
   if (config.instances.some(item => !/^[a-z][a-z0-9-]*$/.test(item.agentId) || !/^[a-z][a-z0-9-]*$/.test(item.instanceId)
     || item.accessMode !== undefined && !['authenticated', 'anonymous'].includes(item.accessMode))) throw new Error('业务 Agent、实例名称或访问方式无效')
   const control = getBusinessControl(assetRoot)
-  if (!control.enabled()) throw new Error('业务控制尚未启用')
   const origin = new URL(config.publicOrigin)
   const proxyOrigin = config.proxyOrigin ? new URL(config.proxyOrigin) : undefined
   for (const value of [origin, proxyOrigin]) if (value && (!['http:', 'https:'].includes(value.protocol) || value.pathname !== '/' || value.search || value.hash || value.username || value.password)) throw new Error('业务公开来源必须是独立 origin')
   const currentInstances = (): BusinessGatewayInstance[] => {
     const access = control.config(), current = access.gateway as Partial<BusinessGatewayConfig> | undefined
-    if (!access.enabled) throw new Error('业务网关已关闭')
     if (!current) throw new Error('业务网关登记已移除')
     if (current.publicOrigin !== config.publicOrigin || current.proxyOrigin !== config.proxyOrigin || current.sharedSecretFile !== config.sharedSecretFile
       || current.host !== config.host || current.port !== config.port || !Array.isArray(current.instances)) {
@@ -233,16 +231,16 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
     const identity = await control.authenticate({ transport, method: req.method || 'GET', path: req.url || '/', headers: headerForIdentity(req) }, lifetime.signal)
     return identity
   }
-  const assertionFor = (instance: RegisteredBusinessInstance, context?: BusinessContext): RuntimeAssertion => control.isDevelopmentInstance(instance.binding)
+  const assertionFor = (instance: RegisteredBusinessInstance, context?: BusinessContext): RuntimeAssertion => control.isUnrestrictedInstance(instance.binding)
     ? { binding: instance.binding, context }
     : { binding: instance.binding, context, snapshotVersion: control.currentRestrictionVersion(), issuedAt: Date.now(), nonce: randomBytes(24).toString('base64url') }
   const prepare = async (req: IncomingMessage, transport: 'http' | 'websocket', res?: ServerResponse) => {
-    const externalOrigin = assertOrigin(req)
     const url = new URL(req.url || '/', origin)
     const match = /^\/agents\/([a-z0-9-]+)\/instances\/([a-z0-9-]+)(\/.*)?$/.exec(url.pathname)
     if (!match) throw new Error('请选择已开放业务实例')
     const selected = currentInstances().find(instance => instance.agentId === match[1] && instance.instanceId === match[2])
     if (!selected) throw new Error('业务实例未开放')
+    const externalOrigin = selected.accessMode === 'anonymous' ? requestOrigin(req) ?? origin : assertOrigin(req)
     const instance = resolveBusinessInstance(assetRoot, selected)
     const route = match[3] || '/'
     if (!allowedBusinessPath(route, req.method || 'GET', transport)) throw new Error('业务路径未开放')
@@ -250,7 +248,7 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
     control.registerInstance(instance.binding)
     const context = control.createContext(identity, instance.binding)
     control.assert(context, 'agent:access', [{ kind: 'agent', id: selected.agentId }])
-    if (selected.identityMode !== 'development' && !control.hasAcknowledgedSnapshot(instance.binding.instanceId)) {
+    if (!control.isUnrestrictedInstance(instance.binding) && !control.hasAcknowledgedSnapshot(instance.binding.instanceId)) {
       // Native Connection 的接入方法是同步的；转发前等待后台控制回读当前版本。
       const deadline = Date.now() + 1500
       while (!control.hasAcknowledgedSnapshot(instance.binding.instanceId) && Date.now() < deadline && !lifetime.signal.aborted) {
@@ -265,7 +263,7 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
     req.headers['x-forwarded-host'] = externalOrigin.host
     req.headers['x-forwarded-proto'] = externalOrigin.protocol.replace(':', '')
     req.url = path
-    Object.assign(req.headers, selected.identityMode === 'development' ? businessAssertionHeaders(assertionFor(instance, context))
+    Object.assign(req.headers, control.isUnrestrictedInstance(instance.binding) ? businessAssertionHeaders(assertionFor(instance, context))
       : signBusinessAssertion(readBusinessSecret(config.sharedSecretFile), assertionFor(instance, context), req.method || 'GET', path))
     req.headers.host = new URL(instance.origin).host
     return instance
@@ -277,8 +275,8 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
       // 专用接入入口自行认证；任何错误都不能进入既有 DSH 或管理身份回退。
       if (await machineAccess(req, res) || await externalAccess(req, res)) return
       if (req.url === '/' && req.method === 'GET') {
-        assertOrigin(req)
         const instances = currentInstances()
+        if (!instances.some(item => item.accessMode === 'anonymous')) assertOrigin(req)
         let availableAgents: { agentId: string; instanceId: string }[] = []
         const anonymousInstances: BusinessGatewayInstance[] = []
         const resolvedInstances: BusinessGatewayInstance[] = []
@@ -292,9 +290,7 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
             try {
               const instance = resolveBusinessInstance(assetRoot, selected)
               control.registerInstance(instance.binding)
-              const rule = control.config().agents.find(item => item.agentId === selected.agentId)
-              if ((selected.identityMode === 'development' || rule?.enabled && (rule.actions.includes('*') || rule.actions.includes('agent:access')))
-                && control.agentStatus(instance.binding.instanceId).trust.status === 'trusted') anonymousInstances.push(selected)
+              anonymousInstances.push(selected)
             } catch { unavailableCount++ }
             continue
           }
@@ -345,8 +341,8 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
       }
       const legacy = /^\/agents\/([a-z0-9-]+)\/$/.exec(req.url || '')
       if (legacy && req.method === 'GET') {
-        assertOrigin(req)
         const candidates = currentInstances().filter(item => item.agentId === legacy[1])
+        if (!candidates.some(item => item.accessMode === 'anonymous')) assertOrigin(req)
         let identity: AuthenticatedIdentity | undefined
         if (req.headers.authorization || browserSessionId(req)) {
           try { identity = await admit(req, 'http') }
@@ -360,9 +356,7 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
             try {
               const instance = resolveBusinessInstance(assetRoot, selected)
               control.registerInstance(instance.binding)
-              const rule = control.config().agents.find(item => item.agentId === selected.agentId)
-              if ((selected.identityMode === 'development' || rule?.enabled && (rule.actions.includes('*') || rule.actions.includes('agent:access')))
-                && control.agentStatus(instance.binding.instanceId).trust.status === 'trusted') available.push(selected)
+              available.push(selected)
             } catch { unavailableCount++ }
             continue
           }
@@ -389,20 +383,20 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
         const selected = currentInstances().find(item => item.instanceId === instanceId)
         if (!selected) throw new Error('业务实例未登记')
         const instance = resolveBusinessInstance(assetRoot, selected); control.registerInstance(instance.binding)
-        const development = selected.identityMode === 'development'
-        if (development) requireBusinessToken(req.headers.authorization, assetRoot)
+        const unrestricted = control.isUnrestrictedInstance(instance.binding)
+        if (unrestricted) requireBusinessToken(req.headers.authorization, assetRoot)
         const body = await readControlRequest(req)
-        const assertion = development ? readBusinessAssertionValue(body, instance.binding)
+        const assertion = unrestricted ? readBusinessAssertionValue(body, instance.binding)
           : verifyBusinessControlAssertion(readBusinessSecret(config.sharedSecretFile), body, 'POST', req.url, instance.binding, controlNonces)
         control.recordAgentAuthentication(instance.binding)
         const acknowledgement = assertion.acknowledgement ?? assertion.snapshot
-        if (!development && acknowledgement) control.acknowledge(instanceId, acknowledgement.restrictionVersion, acknowledgement.leaseId)
+        if (!unrestricted && acknowledgement) control.acknowledge(instanceId, acknowledgement.restrictionVersion, acknowledgement.leaseId)
         const complete = assertion.batch ? control.importReplicaBatch(instance.binding, assertion.batch) : true
         if (assertion.observation) control.importReplicaState(instance.binding, assertion.observation)
         if (complete) control.recordSynchronization(instance.binding)
         const reply = { ...assertionFor(instance), ...(assertion.batch ? { synchronization: { id: assertion.batch.id, index: assertion.batch.index, complete } } : {}),
-          ...(complete && !development ? { snapshot: control.issueSnapshot(instanceId) } : {}) }
-        return json(res, 200, development ? { ...reply, synchronized: complete }
+          ...(complete && !unrestricted ? { snapshot: control.issueSnapshot(instanceId) } : {}) }
+        return json(res, 200, unrestricted ? { ...reply, synchronized: complete }
           : body.assertion ? signBusinessControlAssertion(readBusinessSecret(config.sharedSecretFile), reply, 'RESPONSE', req.url)
             : signBusinessAssertion(readBusinessSecret(config.sharedSecretFile), reply, 'RESPONSE', req.url))
       }

@@ -40,6 +40,7 @@ services:
   dsh:
     image: ${DSH_IMAGE_TAG:?镜像标签由 source.lock.json 解析结果注入}
     pull_policy: never
+    restart: unless-stopped
     init: true
     entrypoint: [node, --expose-internals, /opt/dsh/apps/cli/lib/bin.js]
     depends_on:

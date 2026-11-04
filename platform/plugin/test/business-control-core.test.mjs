@@ -34,12 +34,13 @@ function authenticatedSnapshot(control, instance = binding) {
 async function fixture(t, { remote = true, confirmation = false } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'business-control-test-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
-  const upstream = { denied: {}, version: 1, level: 'low', riskCalls: [], revoked: new Set(), trustGate: undefined, unavailable: false, requests: 0, assessInput: undefined }
+  const upstream = { denied: {}, version: 1, level: 'low', riskCalls: [], revoked: new Set(), trustGate: undefined, unavailable: false, requests: 0, securityCalls: [], assessInput: undefined }
   let origin
   {
     const server = createServer(async (request, response) => {
       const chunks = []; for await (const chunk of request) chunks.push(chunk)
       const body = JSON.parse(Buffer.concat(chunks).toString())
+      upstream.securityCalls.push(request.url)
       if (upstream.unavailable) { response.writeHead(503).end(); return }
       let result
       if (request.url === '/authenticate') {
@@ -145,24 +146,29 @@ test('开发调试实例核对固定来源，无控制租约或发布规则仍�
   assert.throws(() => control.assert(f.a, 'session:prompt'), { code: 'agent_closed' })
 })
 
-test('未发布实例全部放行，不访问认证与风险服务，也不受发布动作和确认策略限制', async t => {
+for (const identityMode of ['development', 'published']) test(`原则：无需登录的 ${identityMode} 实例全部放行，控制服务故障与拒绝策略均不生效`, async t => {
   const f = await fixture(t, { confirmation: true })
-  f.config.gateway.instances[0].identityMode = 'development'
-  f.config.gateway.instances[0].accessMode = 'anonymous'
+  Object.assign(f.config.gateway.instances[0], { identityMode, accessMode: 'anonymous' })
   Object.assign(f.config.agents[0], { enabled: false, subjects: [], actions: [], serverIds: [], agentTrust: { enabled: false } })
+  f.config.accessAuthorization = { endpoint: `${f.origin}/authorize` }
   writeFileSync(join(f.root, 'config/business-access.json'), JSON.stringify(f.config))
   const control = f.control
-  const snapshot = control.issueSnapshot(binding.instanceId)
-  control.acknowledge(binding.instanceId, snapshot.restrictionVersion, snapshot.leaseId)
-  const context = control.bindSession(control.createContext(sharedInstanceIdentity(binding), binding), 'shared-development')
+  const context = control.bindSession(control.createContext(sharedInstanceIdentity(binding), binding), `shared-${identityMode}`)
+  control.updateRestriction({ scope: context.scope, deniedActions: ['*'], active: true, reason: 'must-not-affect-anonymous' })
+  control.setAvailable(false)
+  control.setConfirmationHandler(() => assert.fail('无需登录的实例不应弹出确认'))
   f.upstream.unavailable = true
-  for (const action of ['agent:access', 'session:prompt', 'read', 'write', 'publish']) assert.equal(control.assert(context, action).kind, 'allow')
-  await control.inspect(context, 'input', 'TEST-INJECT')
+  context.identity.expiresAt = context.identity.evidence.expiresAt = '2000-01-01T00:00:00Z'
+  for (const action of ['agent:access', 'session:create', 'session:prompt', 'read', 'write', 'publish']) assert.equal(control.assert(context, action).kind, 'allow')
+  for (const stage of ['input', 'operation', 'report']) await control.inspect(context, stage, 'TEST-INJECT TEST-PARAM TEST-SENSITIVE')
+  await control.revalidateIdentity(context)
   assert.equal(await f.run(context, { ...operation('writeback'), operationId: 'unregistered', args: { value: 'TEST-PARAM' } }), 'ok')
   assert.equal(await f.run(context, { ...operation('publish'), args: { fileContentBase64: 'invalid' } }), 'ok')
+  assert.deepEqual(f.upstream.securityCalls, [], '不请求认证、身份核验、风险评估或访问控制服务')
   assert.deepEqual(f.upstream.riskCalls, [])
+  assert.deepEqual(control.agentStatus(binding.instanceId).authentication, { method: 'none', status: 'not_required' })
   assert.equal(control.agentStatus(binding.instanceId).trust.status, 'trusted')
-  assert.throws(() => control.acceptContext({ ...context, sourceDigest: 'different' }), { code: 'instance_binding_mismatch' })
+  assert.throws(() => control.acceptContext({ ...context, sourceDigest: 'different' }), { code: 'instance_binding_mismatch' }, '仍须把请求送到正确实例')
 })
 
 test('开发实例更新来源保留同代次会话，发布实例和其他代次不迁移', async t => {
@@ -347,10 +353,12 @@ test('必要确认等待同一个调用；撤权、变参使确认失效，成�
   f.control.setConfirmationHandler(async () => { confirmations++ })
   assert.equal(await f.run(f.a, operation('writeback')), 'ok')
   assert.equal(confirmations, 1); assert.equal(f.upstream.requests, 1)
+  authenticatedSnapshot(f.control)
   f.control.setConfirmationHandler(async () => {
     f.control.update({ scope: f.a.scope, deniedActions: ['write'], active: true, reason: 'revoked-during-confirmation' })
   })
   await assert.rejects(f.run(f.a, operation('writeback')), { code: 'confirmation_invalid' })
+  authenticatedSnapshot(f.control)
   const changed = operation('writeback')
   f.control.setConfirmationHandler(async () => { changed.args = { value: 'changed' } })
   await assert.rejects(f.run(f.b, changed), { code: 'confirmation_invalid' })

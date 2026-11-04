@@ -10,7 +10,7 @@ export function businessGatewayEntry(assetRoot: string, agentId: string, instanc
   const access = JSON.parse(readFileSync(join(assetRoot, 'config/business-access.json'), 'utf8'))
   const gateway = access.gateway
   const selected = gateway?.instances?.find((value: { agentId: string; instanceId: string }) => value.agentId === agentId && value.instanceId === instanceId)
-  if (access.enabled !== true || !selected) throw new Error('实例未向业务网关开放')
+  if (!selected || access.enabled !== true && selected.accessMode !== 'anonymous') throw new Error('实例未向业务网关开放')
   resolveBusinessInstance(assetRoot, selected)
   const origin = new URL(gateway.publicOrigin)
   if (!['http:', 'https:'].includes(origin.protocol) || origin.username || origin.password || origin.pathname !== '/' || origin.search || origin.hash) throw new Error('业务网关公开来源无效')
