@@ -76,8 +76,10 @@ if (!shared.length) limit('没有共同 Case');
 if (leftOnly.length || rightOnly.length) limit('选择的 Case 集合不同');
 const cases = shared.map(case_id => {
   const a = leftCases.get(case_id)!, b = rightCases.get(case_id)!;
-  const frozen_contract_same = isDeepStrictEqual(a.frozen, b.frozen);
-  if (!frozen_contract_same) limit(`${case_id}: 冻结 Case 口径不同`);
+  const frozen_contract_known = a.frozen != null && b.frozen != null;
+  const frozen_contract_same = frozen_contract_known && isDeepStrictEqual(a.frozen, b.frozen);
+  if (!frozen_contract_known) limit(`${case_id}: 缺少冻结 Case 口径`);
+  else if (!frozen_contract_same) limit(`${case_id}: 冻结 Case 口径不同`);
   for (const [side, item] of [['left', a], ['right', b]] as const) {
     if (!item.load_observation?.preset_matches || !item.load_observation?.workspace_matches)
       limit(`${case_id}: ${side} 缺少正确装载观察`);
@@ -97,9 +99,6 @@ const cases = shared.map(case_id => {
   if (!a.trials.length || !b.trials.length) limit(`${case_id}: 缺少 Trial 结果`);
   for (const [side, item] of [['left', a], ['right', b]] as const) {
     if (item.tool_calls?.some(call => call.status !== 'ok')) limit(`${case_id}: ${side} 工具调用失败或结果未知`);
-    if (case_id.startsWith('U-INS-') && !item.tool_calls?.some(call =>
-      call.name?.startsWith('mcp__inspection__') && call.status === 'ok'))
-      limit(`${case_id}: ${side} 巡检服务依赖未确认可用`);
   }
   return {
     case_id, frozen_contract_same,

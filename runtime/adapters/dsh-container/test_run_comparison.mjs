@@ -73,6 +73,34 @@ test('完整相同路由保留观察性对照且显示实际provider、model和o
   assert.match(result.markdown, /仍需结合实验设计判断/)
 })
 
+test('评测口径变化和双方缺少快照均不能作为同口径比较', () => {
+  const left = view('old'), right = view('new')
+  right.cases[0].frozen.inputs = ['查询当前状态并说明范围']
+  const changed = compare(left, right)
+  assert.equal(changed.comparable, true)
+  assert.equal(changed.causal_comparable, false)
+  assert.equal(changed.cases[0].frozen_contract_same, false)
+  assert.ok(changed.limits.includes('U-BASIC-001: 冻结 Case 口径不同'))
+  left.cases[0].frozen = right.cases[0].frozen = null
+  const unknown = compare(left, right)
+  assert.equal(unknown.causal_comparable, false)
+  assert.equal(unknown.cases[0].frozen_contract_same, false)
+  assert.ok(unknown.limits.includes('U-BASIC-001: 缺少冻结 Case 口径'))
+})
+
+test('比较不按用例编号或MCP连接名称猜测业务依赖，实际工具错误仍限制归因', () => {
+  const left = view('old'), right = view('new')
+  for (const run of [left, right]) {
+    run.cases[0].case_id = 'U-INS-001'
+    run.cases[0].tool_calls = [{ name: 'mcp__inspection-group-v2__list_inspections', status: 'ok' }]
+  }
+  assert.equal(compare(left, right).causal_comparable, true)
+  right.cases[0].tool_calls[0].status = 'error'
+  const failed = compare(left, right)
+  assert.equal(failed.causal_comparable, false)
+  assert.ok(failed.limits.includes('U-INS-001: right 工具调用失败或结果未知'))
+})
+
 for (const field of ['provider', 'model', 'reasoningEffort']) {
   test(`记录中的${field}差异不能归因于Harness`, () => {
     const result = compare(view('old'), view('new', [{ ...route, [field]: 'different' }]))
