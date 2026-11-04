@@ -9,7 +9,7 @@ interface ModelRuntimeConfig { agentId: string; allowed: ModelIdentity[]; localR
 
 export function assertModelAllowed(config: ModelRuntimeConfig, request: ModelIdentity): void {
   if (![...config.allowed, ...(config.localRoutes ?? [])].some(item => item.provider === request.provider && item.model === request.model)) {
-    throw new Error(`业务智能体 ${config.agentId} 当前不可使用模型 ${request.provider}/${request.model}；请核对平台“设置 → 模型”的目录与实例模型设置。`)
+    throw Object.assign(new Error(`业务智能体 ${config.agentId} 当前不可使用模型 ${request.provider}/${request.model}；请核对平台“设置 → 模型”的目录与实例模型设置。`), { code: 'MODEL_ROUTE_NOT_ALLOWED' })
   }
 }
 
@@ -23,12 +23,12 @@ export function apply(ctx: { on: (event: string, listener: (...args: any[]) => a
   ctx.on('llm/stream', (async function* (request: ModelRequest, next: () => AsyncIterable<unknown>) {
     assertModelAllowed(config, request)
     if (config.assetRoot && config.localRoutes?.some(item => item.provider === request.provider && item.model === request.model)) {
-      if (!request.sessionId) throw new Error('业务本地模型路由缺少当前 Session')
+      if (!request.sessionId) throw Object.assign(new Error('业务本地模型路由缺少当前 Session'), { code: 'MODEL_SESSION_MISSING' })
       const control = getBusinessControl(config.assetRoot)
       const context = control.contextForSession(request.sessionId)
-      if (!context) throw new Error('业务本地模型路由缺少受信 Session 归属')
+      if (!context) throw Object.assign(new Error('业务本地模型路由缺少受信 Session 归属'), { code: 'MODEL_SESSION_UNTRUSTED' })
       control.assert(context, 'agent:access')
-      if (context.identity?.evidence.method === 'anonymous') throw new Error('访客尚未获准使用业务本地模型路由')
+      if (context.identity?.evidence.method === 'anonymous') throw Object.assign(new Error('访客尚未获准使用业务本地模型路由'), { code: 'MODEL_VISITOR_NOT_AUTHORIZED' })
     }
     yield* next()
   }) as any)

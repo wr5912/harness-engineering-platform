@@ -378,6 +378,94 @@ function codeOnlyFixture(t, run, renderResult, hybrid) {
   return { ...f, agent, hooks, hook, events, titles, adapters, selectedPresets, enter, enterMessages, commitReply, stream, execute }
 }
 
+test('混合工作流分别呈现模型配置失败与服务响应失败，落盘和恢复后保留同一原因', async t => {
+  for (const providerFailure of [false, true]) {
+    let tools = 0
+    const f = codeOnlyFixture(t, async context => {
+      await context.infer({ ...modelRoles.language, reasoningEffort: 'off' }, { messages: [] })
+      tools++; await context.callTool('start_inspection', {})
+      return { reply: '不得声称巡检已执行' }
+    }, undefined, { async prepareCall(config) {
+      if (!providerFailure) throw Object.assign(new Error('private-token-must-not-leak'), { code: 'MODEL_ROUTE_NOT_ALLOWED' })
+      return { config, async *stream() {
+        yield { type: 'finish', reason: { kind: 'error', failure: { message: 'private-provider-url-must-not-leak', code: 'QWEN_HTTP_503', status: 503 } } }
+      } }
+    } })
+    const entered = await f.enter(1, '执行一次常规巡检'), first = await f.stream(1); entered.commit()
+    const result = await f.execute(1, first)
+    const cause = result.value.graph_execution.failure_context
+    assert.equal(cause.kind, 'model')
+    assert.equal(cause.phase, providerFailure ? 'response' : 'prepare')
+    assert.equal(cause.tool_calls_started, 0)
+    assert.equal(tools, 0)
+    const reply = (await f.stream(1)).text
+    assert.match(reply, /模型调用失败（qwen\/qwen3.5-2b）/)
+    assert.match(reply, providerFailure ? /QWEN_HTTP_503，HTTP 503/ : /实例未启用该模型路由，MODEL_ROUTE_NOT_ALLOWED/)
+    assert.match(reply, /尚未调用业务工具/)
+    assert.doesNotMatch(reply, /private-|证据不符合|巡检已执行/)
+    // 与原生 spill 相同：正文只剩预览，完整图身份由同一工具回执的 meta 保留。
+    f.events.at(-1).data.message.content = [{ type: 'text', text: '[结果已落盘]' }]
+    f.hook('agent/disposed', { agent: f.agent })
+    assert.equal((await f.stream(1)).text, reply)
+    f.hook('agent/disposed', { agent: f.agent })
+    f.events.at(-1).data.meta = { ...f.events.at(-1).data.meta,
+      graph_execution: { ...f.events.at(-1).data.meta.graph_execution, session_id: 'wrong-session' } }
+    const mismatched = (await f.stream(1)).text
+    assert.match(mismatched, /执行证据/)
+    assert.doesNotMatch(mismatched, /模型调用失败|尚未调用/)
+  }
+})
+
+test('工具返回错误和派发异常均标明具体工具；流程错误不误归因于先前已恢复的模型失败', async t => {
+  for (const throws of [false, true]) {
+    let calls = 0
+    const f = codeOnlyFixture(t, async context => {
+      await context.callTool('inspection_service', {})
+      await context.callTool('must_not_run', {})
+      return { reply: '不得伪报成功' }
+    })
+    if (throws) f.ctx.tools.guard(exec => {
+      if (exec.name === 'inspection_service') throw Object.assign(new Error('private-endpoint'), { code: 'TOOL_TRANSPORT_FAILED' })
+    })
+    f.register('inspection_service', () => { calls++; return { isError: true, error: { code: 'INSPECTION_UNAVAILABLE' } } })
+    f.register('must_not_run', () => assert.fail('失败后不得继续'))
+    const entered = await f.enter(1, '巡检'), first = await f.stream(1); entered.commit()
+    const result = await f.execute(1, first)
+    assert.equal(result.value.graph_execution.failure_context.kind, 'tool')
+    const reply = (await f.stream(1)).text
+    assert.match(reply, /工具调用失败（inspection_service）/)
+    if (!throws) assert.match(reply, /INSPECTION_UNAVAILABLE/)
+    assert.match(reply, /先核对回执/)
+    assert.doesNotMatch(reply, /尚未调用|模型调用失败|private-/)
+    assert.equal(calls, throws ? 0 : 1)
+  }
+  const f = codeOnlyFixture(t, async context => {
+    try { await context.infer({ ...modelRoles.language, reasoningEffort: 'off' }, { messages: [] }) } catch { /* 业务显式恢复。 */ }
+    return runWorkflow(context, [{ id: 'assemble_report', run() { throw new Error('private-input') } }])
+  }, undefined, { prepareCall() { throw new Error('temporary-model-error') } })
+  const entered = await f.enter(1, '报告'), first = await f.stream(1); entered.commit()
+  await f.execute(1, first)
+  const reply = (await f.stream(1)).text
+  assert.match(reply, /工作流执行错误（assemble_report）/)
+  assert.doesNotMatch(reply, /模型调用失败|private-/)
+})
+
+test('取消、未知结果及无效返回分别说明，不与模型或业务工具失败混淆', async t => {
+  const f = codeOnlyFixture(t, async () => undefined)
+  const entered = await f.enter(1, '执行'), first = await f.stream(1); entered.commit()
+  await f.execute(1, first)
+  assert.match((await f.stream(1)).text, /工作流执行错误：流程返回的数据格式无效，WORKFLOW_INVALID_RESULT/)
+  const graph = structuredClone(f.events.at(-1).data.meta.graph_execution)
+  f.events.at(-1).data.meta = { ...f.events.at(-1).data.meta, graph_execution: graph }
+  for (const [patch, expected] of [[{ status: 'cancelled' }, /工作流已取消/], [{ complete: false }, /执行结果未知/], [{ status: 'unexpected' }, /执行结果未知/]]) {
+    f.hook('agent/disposed', { agent: f.agent })
+    const previous = { status: graph.status, complete: graph.complete }
+    Object.assign(graph, patch)
+    assert.match((await f.stream(1)).text, expected)
+    Object.assign(graph, previous)
+  }
+})
+
 // 与真实原生完成通知保持相同source与三段文本结构；正文保留证据不足的终态限定。
 const nativeSettlement = () => ({ role: 'user', id: '3fc55a52-9bd7-408a-beb3-88ab496a017a', source: {
   kind: 'subagent-settled', form: 'notice',

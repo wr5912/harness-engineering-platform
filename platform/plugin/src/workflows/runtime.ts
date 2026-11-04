@@ -92,6 +92,8 @@ export function registerWorkflowTool(ctx: any, definition: WorkflowDefinition, o
       const identity = { execution_id: executionId, role: 'target' as const,
         ...(exec.agent?.session?.id ? { session_id: exec.agent.session.id } : {}), ...(exec.callId ? { tool_call_id: exec.callId } : {}),
         ...(exec.parent_run_id ? { parent_run_id: exec.parent_run_id } : {}), ...(exec.case_id ? { case_id: exec.case_id } : {}) }
+      const failures = new Map<unknown, { kind: 'model' | 'tool'; operation: string; phase: string }>()
+      let toolCallsStarted = 0
       let observed: ReturnType<typeof observeLlm> | undefined
       function modelObserver() {
         if (observed) return observed
@@ -127,34 +129,52 @@ export function registerWorkflowTool(ctx: any, definition: WorkflowDefinition, o
       const context: WorkflowContext = {
         input, signal: exec.signal, executionId, trace,
         async callTool(name, args) {
-          const result = await invokeTool(name, args)
-          if (result.failed) throw new Error(`工作流工具失败：${name}`)
-          return result.value
+          toolCallsStarted++
+          let phase = 'dispatch'
+          try {
+            const result = await invokeTool(name, args)
+            phase = 'response'
+            if (result.failed) {
+              const receipt = trace.at(-1)?.result
+              throw Object.assign(new Error(`工作流工具失败：${name}`), { code: receipt?.error?.code ?? receipt?.code })
+            }
+            return result.value
+          } catch (error) {
+            failures.set(error, { kind: 'tool', operation: name, phase })
+            throw error
+          }
         },
         async infer(config, payload) {
           if (options.executionMode === 'code-only') throw new Error('纯代码工作流禁止模型调用')
           if (options.executionMode === 'hybrid' && !matchesWorkflowModelBinding({ ...config, reasoning_effort: config.reasoningEffort }, modelRoles!.language)) throw new Error('语言推理路由不符合混合工作流角色绑定')
-          const observed = modelObserver()
-          const prepared = await observed.prepareCall(config, exec.signal)
-          let content = '', completed = false, failure: Error | undefined
-          for await (const chunk of prepared.stream({ ...prepared.config, ...(payload.system === undefined ? {} : { system: payload.system }), messages: payload.messages,
-            sessionId: identity.session_id, signal: exec.signal })) {
-            if (chunk.type === 'text-delta') content += chunk.text
-            if (chunk.type === 'finish') {
-              if (chunk.reason?.kind === 'stop') completed = true
-              else {
-                const detail = chunk.reason?.failure
-                const error = detail ? new LlmError(detail.message, detail.code, { status: detail.status, requestId: detail.requestId })
-                  : new Error('工作流模型响应未完成')
-                if (chunk.reason?.kind !== 'error' || !detail) throw error
-                // 先让观察器结算原生失败终态及用量，再将同一失败交给业务调用方。
-                failure = error
+          let phase = 'prepare'
+          try {
+            const observed = modelObserver()
+            const prepared = await observed.prepareCall(config, exec.signal)
+            phase = 'response'
+            let content = '', completed = false, failure: Error | undefined
+            for await (const chunk of prepared.stream({ ...prepared.config, ...(payload.system === undefined ? {} : { system: payload.system }), messages: payload.messages,
+              sessionId: identity.session_id, signal: exec.signal })) {
+              if (chunk.type === 'text-delta') content += chunk.text
+              if (chunk.type === 'finish') {
+                if (chunk.reason?.kind === 'stop') completed = true
+                else {
+                  const detail = chunk.reason?.failure
+                  const error = detail ? new LlmError(detail.message, detail.code, { status: detail.status, requestId: detail.requestId })
+                    : new Error('工作流模型响应未完成')
+                  if (chunk.reason?.kind !== 'error' || !detail) throw error
+                  // 先让观察器结算原生失败终态及用量，再将同一失败交给业务调用方。
+                  failure = error
+                }
               }
             }
+            if (failure) throw failure
+            if (!completed) throw new Error('工作流模型响应未完成')
+            return { content }
+          } catch (error) {
+            failures.set(error, { kind: 'model', operation: `${config.provider}/${config.model}`, phase })
+            throw error
           }
-          if (failure) throw failure
-          if (!completed) throw new Error('工作流模型响应未完成')
-          return { content }
         },
         async decide(name, args) {
           if (options.executionMode !== 'hybrid') throw new Error('类型化决策仅适用于混合工作流')
@@ -194,6 +214,7 @@ export function registerWorkflowTool(ctx: any, definition: WorkflowDefinition, o
               || !Object.keys(value.typed_decision).length || snapshotJsonValue(value.typed_decision) === undefined) throw new Error('类型化决策未完成')
             return value.typed_decision
           } catch (error) {
+            failures.set(error, { kind: 'model', operation: `${binding.provider}/${binding.model}`, phase: 'decision' })
             trace.push({ node: `${name}:typed_decision`, status: exec.signal.aborted ? 'cancelled' : 'failed', error_code: 'DECISION_NOT_COMPLETED' })
             if (attempts.some(attempt => attempt.attempt_id === decisionCallId)) attempts.push({ ...fallback, status: exec.signal.aborted ? 'cancelled' : 'failed', time: Date.now(), error_type: 'DecisionReceiptUnavailable' })
             throw error
@@ -201,16 +222,24 @@ export function registerWorkflowTool(ctx: any, definition: WorkflowDefinition, o
         },
       }
       let result: any, failure: string | undefined, errorCode: string | undefined, modelFailure: Record<string, unknown> | undefined
+      let failureContext: { kind: string; operation?: string; phase?: string; code?: string; status?: number } | undefined
       try {
         result = snapshotJsonValue(await definition.run(context))
         if (result === undefined) {
           failure = '工作流返回值不是无损 JSON；请修复业务源码中的 undefined 或其他非 JSON 值'
           errorCode = 'WORKFLOW_INVALID_RESULT'
+          failureContext = { kind: 'workflow', code: errorCode }
         }
       } catch (error) {
         failure = exec.signal.aborted ? '工作流已取消' : '工作流执行失败，请查看节点回执'
+        const detail = error instanceof LlmError ? error.failure : error && typeof error === 'object' ? error as Record<string, unknown> : undefined
+        const step = trace.filter(item => item.status === 'failed').at(-1)?.node
+        failureContext = { ...(failures.get(error) ?? { kind: 'workflow', ...(typeof step === 'string' ? { operation: step } : {}) }),
+          ...(typeof detail?.code === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(detail.code) ? { code: detail.code } : {}),
+          ...(typeof detail?.status === 'number' ? { status: detail.status } : {}) }
         if (!exec.signal.aborted && error instanceof WorkflowModelUnavailableError) {
           failure = error.message; errorCode = 'WORKFLOW_MODEL_UNAVAILABLE'
+          failureContext.code = errorCode
         }
         if (!exec.signal.aborted && error instanceof LlmError) {
           const detail = error.failure
@@ -222,7 +251,8 @@ export function registerWorkflowTool(ctx: any, definition: WorkflowDefinition, o
         ...(options.executionMode ? { execution_mode: options.executionMode } : {}),
         ...(typeof __WORKFLOW_BUILD_DIGEST__ === 'string' ? { build_digest: __WORKFLOW_BUILD_DIGEST__, source_digest: __WORKFLOW_SOURCE_DIGEST__ } : {}),
         esm_sha256: loadedEsmSha256,
-        status: failure ? exec.signal.aborted ? 'cancelled' : 'failed' : 'completed', ...(modelFailure ? { failure: modelFailure } : {}), trace, model_attempts: attempts }
+        status: failure ? exec.signal.aborted ? 'cancelled' : 'failed' : 'completed', ...(modelFailure ? { failure: modelFailure } : {}),
+        ...(failureContext ? { failure_context: { ...failureContext, tool_calls_started: toolCallsStarted } } : {}), trace, model_attempts: attempts }
       // 失败也返回完整结构化证据；上层必须检查 ok，不能用工具文字流畅代替成功。
       return { ok: !failure, ...(failure ? { error: failure, ...(errorCode ? { error_code: errorCode } : {}) } : { result }), graph_execution }
     },
@@ -375,9 +405,25 @@ function registerWorkflowAgent(ctx: any, options: CodeOnlyWorkflowAgent | Hybrid
       const value = projected ? { ...projected, graph_execution: receipt.data.meta.graph_execution } : JSON.parse(textContent(receipt.data.message))
       const graph = value.graph_execution
       if (graph?.session_id !== sessionId(agent) || graph?.tool_call_id !== state.callId || graph.execution_mode !== mode
-        || graph.complete !== true || graph.status !== 'completed' || !Array.isArray(graph.model_attempts)
-        || codeOnly && graph.model_attempts.length) return `工作流未完成或执行证据不符合${label}要求，已停止；请查看本轮图回执。`
-      if (value.ok !== true) return '工作流执行失败，已停止；请查看本轮图回执。'
+        || !Array.isArray(graph.model_attempts) || codeOnly && graph.model_attempts.length) return `工作流执行证据不符合${label}要求，无法确认本轮结果；请核对图回执，勿直接重试写操作。`
+      if (graph.complete !== true) return unknown
+      if (graph.status === 'cancelled') return '工作流已取消，后续步骤未继续；已发出的操作请先核对工具回执，再决定是否重试。'
+      if (graph.status === 'failed' && value.ok === false) {
+        const cause = graph.failure_context
+        const category = cause?.kind === 'model' ? '模型调用失败' : cause?.kind === 'tool' ? '工具调用失败' : '工作流执行错误'
+        const reason = cause?.code === 'MODEL_ROUTE_NOT_ALLOWED' ? '实例未启用该模型路由'
+          : cause?.code === 'WORKFLOW_MODEL_UNAVAILABLE' ? '实例未装载模型服务'
+          : cause?.code === 'MODEL_SESSION_MISSING' || cause?.code === 'MODEL_SESSION_UNTRUSTED' ? '模型调用缺少有效会话归属'
+          : cause?.code === 'MODEL_VISITOR_NOT_AUTHORIZED' ? '当前访问者尚未获准使用该模型'
+          : cause?.code === 'WORKFLOW_INVALID_RESULT' ? '流程返回的数据格式无效' : ''
+        const detail = [reason, cause?.code, cause?.status ? `HTTP ${cause.status}` : ''].filter(Boolean).join('，')
+        const scope = cause?.tool_calls_started === 0 ? '本轮尚未调用业务工具。'
+          : '已发出的工具调用请先核对回执，确认结果后再重试，避免重复执行。'
+        const next = cause?.kind === 'model' ? '请核对模型配置或服务状态后继续。'
+          : cause?.kind === 'tool' ? '请核对该工具的错误回执及服务状态。' : '请查看本轮图回执定位失败步骤。'
+        return `${category}${cause?.operation ? `（${cause.operation}）` : ''}${detail ? `：${detail}` : ''}，已停止后续步骤。${scope}${next}`
+      }
+      if (graph.status !== 'completed' || value.ok !== true) return unknown
       const text = projected ? value.reply : options.renderResult ? options.renderResult(value.result) : value.result?.reply
       return typeof text === 'string' && text.trim() ? text : '工作流未提供有效回复，已停止；请查看本轮图回执。'
     } catch { return '工作流回执无法解析，已停止；请查看本轮工具回执。' }

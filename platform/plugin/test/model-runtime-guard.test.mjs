@@ -28,7 +28,7 @@ test('同一业务实例的目标与评测 Session 均只可调用启动时业�
   for (const sessionId of ['target-session', 'evaluation-judge-session']) {
     await assert.rejects(async () => {
       for await (const _chunk of stream({ provider: 'provider-a', model: 'model-two', sessionId }, next)) {}
-    }, /当前不可使用模型 provider-a\/model-two/)
+    }, error => error.code === 'MODEL_ROUTE_NOT_ALLOWED' && /当前不可使用模型 provider-a\/model-two/.test(error.message))
   }
   assert.deepEqual(emitted, [])
   const received = []
@@ -90,7 +90,7 @@ test('无需认证的共享 Session 可用主模型和固定本地路由，未�
   for (const sessionId of ['unknown-session', undefined]) {
     await assert.rejects(async () => {
       for await (const _ of stream({ provider: 'threat-analysis-delivery', model: 'fixed-summary', sessionId }, next)) {}
-    }, /缺少受信 Session 归属|缺少当前 Session/)
+    }, error => error.code === (sessionId ? 'MODEL_SESSION_UNTRUSTED' : 'MODEL_SESSION_MISSING'))
   }
 })
 
