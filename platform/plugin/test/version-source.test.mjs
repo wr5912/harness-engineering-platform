@@ -90,6 +90,16 @@ test('凭据字段匹配完整名称，界面说明保持原文，带前缀的�
   }
 })
 
+test('模型标准词元保留原文，认证 token 和词元中的真实密钥仍脱敏', () => {
+  const config = JSON.stringify({ bos_token: '<s>', eos_token: '<|endoftext|>', pad_token: '[PAD]', unk_token: '<unk>', mask_token: '[MASK]', sep_token: '[SEP]', cls_token: '[CLS]', decoder_start_token: '</s>', image_token: '<|image_pad|>', model_specific_special_tokens: { audio_bos_token: '<|audio_start|>', vision_eos_token: '<|vision_end|>' } })
+  assert.equal(assetText('tokenizer_config.json', config).content, config)
+  assert.equal(assetText('tokenizer_config.json', config).editable, true)
+  for (const code of ['{"access_token":"fixture-private-value"}', '{"hf_token":"fixture-private-value"}', '{"eos_token":"sk-fixture-private-value"}']) {
+    assert.equal(assetText('tokenizer_config.json', code).editable, false)
+  }
+  assert.equal(assetText('credentials.json', '{"eos_token":"<|endoftext|>"}').editable, false)
+})
+
 test('完整Candidate的约定Profile从同一版本补齐，显式错误不退回，固定提交不借当前文件', t => {
   const root = mkdtempSync(join(tmpdir(), 'version-profile-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))

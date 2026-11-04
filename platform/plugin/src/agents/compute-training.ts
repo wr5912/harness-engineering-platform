@@ -115,7 +115,7 @@ export async function archiveDecisionTraining(root: string, experimentId: string
     const content = await readFile(dataPath(root, ref.path))
     if (createHash('sha256').update(content).digest('hex') !== ref.sha256) throw new Error('归档期间训练材料变化，请重新核对')
     if (containsLiteralLlmKey(ref.path, content.toString('utf8'))) throw new Error('训练材料包含 LLM API Key，不能归档')
-    if (content.length <= 1024 * 1024 && !content.includes(0) && !assetText(ref.path, content.toString('utf8')).editable) throw new Error('训练材料包含凭据常量，不能归档')
+    if (content.length <= 1024 * 1024 && !content.includes(0) && !assetText(ref.path, content.toString('utf8')).editable) throw new Error(`训练材料包含凭据常量，不能归档：${ref.path}`)
     const path = `${destination}/${name}/${basename(ref.path)}`
     pending.set(path.slice(destination.length + 1), content)
     return { path, sha256: ref.sha256 }
@@ -141,7 +141,7 @@ export async function archiveDecisionTraining(root: string, experimentId: string
     if (existsSync(target) && !readFileSync(target).equals(bytes)) throw new Error('已有训练归档与当前材料冲突，未修改计划')
   }
   const preview = { stage: 'training-archive', reused: false, dry_run: true, receipt: next, source_receipt: original,
-    files: [...pending].map(([path, bytes]) => ({ path: `${destination}/${path}`, sha256: createHash('sha256').update(bytes).digest('hex') })) }
+    files: [...pending].sort(([left], [right]) => left.localeCompare(right)).map(([path, bytes]) => ({ path: `${destination}/${path}`, sha256: createHash('sha256').update(bytes).digest('hex') })) }
   if (readFileSync(changePath, 'utf8') !== before) throw new Error('归档预览期间研究计划变化，请重新核对')
   if (dryRun) return preview
   if (expectedPreviewSha256 && createHash('sha256').update(JSON.stringify(preview)).digest('hex') !== expectedPreviewSha256) throw new Error('训练归档预览已变化，请重新核对')

@@ -120,6 +120,7 @@ test('显式恢复依赖保持源码与资源的相对目录，摘要失效和�
     return { path, sha256: createHash('sha256').update(content).digest('hex') }
   }
   const resource = put('.local/source/assets/contract.json', '{"version":1}')
+  const tokenizer = put('.local/source/assets/tokenizer_config.json', '{"eos_token":"<|endoftext|>","pad_token":"[PAD]"}')
   f.receipt.artifacts.state_constructor = put('.local/source/scripts/build.py', 'resource = "../assets/contract.json"')
   f.plan.model_roles.decision.state_constructor_sha256 = f.receipt.artifacts.state_constructor.sha256
   f.save()
@@ -128,10 +129,11 @@ test('显式恢复依赖保持源码与资源的相对目录，摘要失效和�
   await assert.rejects(() => archiveDecisionTraining(f.root, id, undefined, [{ ...resource, sha256: '0'.repeat(64) }]), /材料变化/)
   await assert.rejects(() => archiveDecisionTraining(f.root, id, undefined, [{ path: '../secret', sha256: resource.sha256 }]), /数据根内/)
   assert.deepEqual(readFileSync(changePath), before)
-  await archiveDecisionTraining(f.root, id, undefined, [resource])
+  await archiveDecisionTraining(f.root, id, undefined, [resource, tokenizer])
   const plan = load(readFileSync(changePath, 'utf8')).compute_variant
   const receipt = JSON.parse(readFileSync(join(f.root, plan.decision_training.path), 'utf8'))
   assert.equal(receipt.supporting_files[0].path, join(receipt.artifacts.state_constructor.path, '../../assets/contract.json'))
+  assert.equal(readFileSync(join(f.root, receipt.supporting_files[1].path), 'utf8'), '{"eos_token":"<|endoftext|>","pad_token":"[PAD]"}')
   rmSync(join(f.root, '.local'), { recursive: true, force: true })
   assert.equal((await inspectDecisionTraining(f.root, plan, id)).verified, true)
   const archivedPlan = readFileSync(changePath)
@@ -160,6 +162,8 @@ test('.local恢复先零写入预览，只归档引用闭包，拒绝Session与�
   }
   const dry = runCli('training-preview'), preview = dry.archive
   assert.equal(preview.dry_run, true)
+  assert.deepEqual(preview.files.map(file => file.path), preview.files.map(file => file.path).sort((left, right) => left.localeCompare(right)))
+  assert.equal(runCli('training-preview').preview_sha256, dry.preview_sha256)
   assert.deepEqual(readFileSync(change), before)
   assert.equal(existsSync(join(f.root, base, 'evaluation')), false)
   assert.equal(existsSync(join(f.root, '.local/training-archive')), false)

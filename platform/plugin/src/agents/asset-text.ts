@@ -6,7 +6,12 @@ export function assetText(path: string, text: string) {
   let content = text.replace(/\bsk-[A-Za-z0-9_-]{12,}\b/g, '[已隐藏]')
     .replace(/\bBearer[ \t]+([A-Za-z0-9._~+/-]{12,}=*)(?=["'`\s]|$)/gi, 'Bearer [已隐藏]')
     // 匹配完整字段名，避免把说明文案末尾的 API Key 名称当作凭据字段。
-    .replace(/((?:(["'])[\w$.-]*(?:password|token|api[_-]?key|secret)\2|\b[\w$]*(?:password|token|api[_-]?key|secret))\s*[:=]\s*)(["'])([^"'\r\n]*)\3/gi, (raw, prefix, _keyQuote, quote, value) => !value || value.includes('${') ? raw : `${prefix}${quote}[已隐藏]${quote}`)
+    .replace(/((?:(["'])[\w$.-]*(?:password|token|api[_-]?key|secret)\2|\b[\w$]*(?:password|token|api[_-]?key|secret))\s*[:=]\s*)(["'])([^"'\r\n]*)\3/gi, (raw, prefix, _keyQuote, quote, value) => {
+      // tokenizer 的标准词元字段描述模型字典，不是认证凭据。
+      const modelToken = /(?:^|\/)tokenizer_config\.json$/i.test(path)
+        && /^["']?[\w.-]+_token["']?\s*[:=]/i.test(prefix) && /^(?:<[^<>\r\n]+>|\[[A-Z_]+\])$/.test(value)
+      return !value || value.includes('${') || modelToken ? raw : `${prefix}${quote}[已隐藏]${quote}`
+    })
   const redacted = content !== text || containsLiteralLlmKey(path, text)
   if (redacted && content === text) content = '[此文件包含 LLM 凭据常量，请从本地专用凭据文件维护]'
   return { content, redacted, editable: !redacted, sha256: createHash('sha256').update(text).digest('hex'),

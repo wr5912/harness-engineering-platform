@@ -123,8 +123,8 @@ function decode(buffer: Buffer): string | null {
   if (buffer.includes(0)) return null
   try { return new TextDecoder('utf-8', { fatal: true }).decode(buffer) } catch { return null }
 }
-function textPreview(text: string) {
-  const view = assetText('source', text), clean = view.content, data = Buffer.from(clean, 'utf8')
+function textPreview(path: string, text: string) {
+  const view = assetText(path, text), clean = view.content, data = Buffer.from(clean, 'utf8')
   if (data.length <= PREVIEW_BYTES) return { ...view, truncated: false }
   // 流式解码保留末尾未完成字节，截断预览不会引入半个 UTF-8 字符。
   const content = new TextDecoder('utf-8', { fatal: true }).decode(data.subarray(0, PREVIEW_BYTES), { stream: true })
@@ -160,7 +160,7 @@ export async function readFixedAsset(rootPath: string, payload: JsonMap, signal?
         const data = await git(root, ['cat-file', 'blob', entry.object], signal), text = decode(data)
         value.selected = text === null
           ? { ...selected, kind: 'binary', content: null, truncated: false, sha256: hash(data) }
-          : { ...selected, kind: 'text', ...textPreview(text), sha256: hash(data) }
+          : { ...selected, kind: 'text', ...textPreview(entry.path, text), sha256: hash(data) }
       }
     }
     cancelled(signal)
@@ -251,7 +251,7 @@ export async function readAssetDiff(rootPath: string, payload: JsonMap, signal?:
       const beforeText = decode(beforeData), afterText = decode(afterData)
       if (beforeText === null || afterText === null) value.selected = { path, kind: 'binary', before: null, after: null, diff: '二进制文件仅比较内容摘要和大小。', truncated: false }
       else {
-        const beforePreview = textPreview(beforeText), afterPreview = textPreview(afterText)
+        const beforePreview = textPreview(path, beforeText), afterPreview = textPreview(path, afterText)
         value.selected = { path, kind: 'text', before: beforePreview.content, after: afterPreview.content,
           diff: await previewDiff(beforePreview.content, afterPreview.content, path, signal), truncated: beforePreview.truncated || afterPreview.truncated, redacted: beforePreview.redacted || afterPreview.redacted }
       }
