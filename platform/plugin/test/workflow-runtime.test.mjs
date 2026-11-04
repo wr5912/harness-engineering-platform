@@ -401,6 +401,7 @@ test('混合工作流分别呈现模型配置失败与服务响应失败，落�
     const reply = (await f.stream(1)).text
     assert.match(reply, /模型调用失败（qwen\/qwen3.5-2b）/)
     assert.match(reply, providerFailure ? /QWEN_HTTP_503，HTTP 503/ : /实例未启用该模型路由，MODEL_ROUTE_NOT_ALLOWED/)
+    assert.match(reply, providerFailure ? /失败阶段：接收模型响应/ : /失败阶段：准备模型调用/)
     assert.match(reply, /尚未调用业务工具/)
     assert.doesNotMatch(reply, /private-|证据不符合|巡检已执行/)
     // 与原生 spill 相同：正文只剩预览，完整图身份由同一工具回执的 meta 保留。
@@ -424,9 +425,13 @@ test('工具返回错误和派发异常均标明具体工具；流程错误不�
       await context.callTool('must_not_run', {})
       return { reply: '不得伪报成功' }
     })
-    if (throws) f.ctx.tools.guard(exec => {
-      if (exec.name === 'inspection_service') throw Object.assign(new Error('private-endpoint'), { code: 'TOOL_TRANSPORT_FAILED' })
-    })
+    if (throws) {
+      const execute = f.ctx.tools.execute.bind(f.ctx.tools)
+      f.ctx.tools.execute = input => {
+        if (input.name === 'inspection_service') throw Object.assign(new Error('private-endpoint'), { code: 'TOOL_TRANSPORT_FAILED' })
+        return execute(input)
+      }
+    }
     f.register('inspection_service', () => { calls++; return { isError: true, error: { code: 'INSPECTION_UNAVAILABLE' } } })
     f.register('must_not_run', () => assert.fail('失败后不得继续'))
     const entered = await f.enter(1, '巡检'), first = await f.stream(1); entered.commit()
@@ -434,6 +439,7 @@ test('工具返回错误和派发异常均标明具体工具；流程错误不�
     assert.equal(result.value.graph_execution.failure_context.kind, 'tool')
     const reply = (await f.stream(1)).text
     assert.match(reply, /工具调用失败（inspection_service）/)
+    assert.match(reply, throws ? /失败阶段：派发工具调用/ : /失败阶段：处理工具返回结果/)
     if (!throws) assert.match(reply, /INSPECTION_UNAVAILABLE/)
     assert.match(reply, /先核对回执/)
     assert.doesNotMatch(reply, /尚未调用|模型调用失败|private-/)
