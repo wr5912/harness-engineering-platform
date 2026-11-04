@@ -1,0 +1,243 @@
+import assert from 'node:assert/strict'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
+import { createServer } from 'node:http'
+import { spawn } from 'node:child_process'
+import { once } from 'node:events'
+import { setTimeout as delay } from 'node:timers/promises'
+import test from 'node:test'
+import { readUpdateActivity, updatePlatform } from '../update.mts'
+import { managedState, processBirth, restoreManagedProcess } from '../../lifecycle.mts'
+import { createCompositionExecutionStore } from '../../plugin/src/mcp/execution-receipts.ts'
+
+function fixture(t, { target = 'index.js', initialBusy = [], afterBuildBusy = [], failBuild = false, conflict = false, failVerify = false } = {}) {
+  const base = resolve('.local/deploy-update-tests'); mkdirSync(base, { recursive: true })
+  const programRoot = mkdtempSync(join(base, 'case-')), dataRoot = join(programRoot, 'data')
+  t.after(() => rmSync(programRoot, { recursive: true, force: true }))
+  const write = (path, value) => { mkdirSync(join(path, '..'), { recursive: true }); writeFileSync(path, value) }
+  write(join(dataRoot, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: 'workspace-update-test', legacyRoots: [] }))
+  write(join(programRoot, 'platform/plugin/src/index.ts'), 'source')
+  const live = join(programRoot, 'platform/plugin/lib', target); write(live, 'old-code')
+  const state = { pid: 123, birth: 'birth', programRoot, dataRoot, url: 'http://127.0.0.1:18120/hep/', host: '127.0.0.1', port: 18120, log: 'log', phase: 'running', detached: true }
+  const events = []; let inspections = 0, verifications = 0
+  const observation = busy => ({ state, workspaceId: 'workspace-update-test', environment: {}, busy })
+  const services = {
+    async inspect() { inspections++; return observation(inspections > 1 ? afterBuildBusy : initialBusy) },
+    async build(_options, stage) {
+      events.push('build')
+      if (failBuild) throw Error('fixture build failed')
+      const source = join(stage, 'new.js'); write(source, 'new-code')
+      if (conflict) write(live, 'parallel-code')
+      return [{ source, target: live }]
+    },
+    async lifecycle(action) { events.push(action) },
+    async verify() { verifications++; events.push('verify'); if (failVerify && verifications === 1) throw Error('fixture verification failed'); return observation([]) },
+  }
+  return { options: { programRoot, dataRoot }, services, events, live, programRoot, get inspections() { return inspections } }
+}
+
+test('更新预览只核对，不创建stage、构建、启停或改制品', async t => {
+  const f = fixture(t)
+  const report = await updatePlatform({ ...f.options, dryRun: true }, f.services)
+  assert.equal(report.status, 'planned'); assert.deepEqual(f.events, []); assert.equal(f.inspections, 1)
+  assert.equal(existsSync(join(f.programRoot, '.local/platform-updates')), false)
+  assert.equal(readFileSync(f.live, 'utf8'), 'old-code')
+})
+
+test('已有在途对象时直接拒绝应用，不取消任务', async t => {
+  const busy = [{ kind: 'session', id: 'session-running', state: 'running' }]
+  const f = fixture(t, { initialBusy: busy })
+  const report = await updatePlatform(f.options, f.services)
+  assert.equal(report.status, 'busy'); assert.deepEqual(report.busy, busy); assert.deepEqual(f.events, [])
+})
+
+test('构建后再次发现任务时保留stage和live，不执行停止', async t => {
+  const f = fixture(t, { afterBuildBusy: [{ kind: 'sdk', id: 'sdk-1', state: 'starting' }] })
+  const report = await updatePlatform(f.options, f.services)
+  assert.equal(report.status, 'busy'); assert.ok(existsSync(report.stage)); assert.deepEqual(f.events, ['build'])
+  assert.equal(readFileSync(f.live, 'utf8'), 'old-code'); assert.equal(JSON.parse(readFileSync(report.receipt)).status, 'busy')
+})
+
+test('隔离构建失败不影响运行制品，失败回执和目录保留', async t => {
+  const f = fixture(t, { failBuild: true })
+  await assert.rejects(updatePlatform(f.options, f.services), /fixture build failed/)
+  assert.equal(readFileSync(f.live, 'utf8'), 'old-code'); assert.deepEqual(f.events, ['build'])
+  const directory = join(f.programRoot, '.local/platform-updates')
+  const stage = readdirSync(directory).find(name => name !== 'update.lock')
+  assert.equal(JSON.parse(readFileSync(join(directory, stage, 'receipt.json'))).status, 'failed')
+})
+
+test('构建期间并行制品修改保留原样，不被更新覆盖', async t => {
+  const f = fixture(t, { conflict: true })
+  await assert.rejects(updatePlatform(f.options, f.services), /构建期间变化/)
+  assert.equal(readFileSync(f.live, 'utf8'), 'parallel-code'); assert.deepEqual(f.events, ['build'])
+})
+
+test('源码或stage在准备期间变化时拒绝应用，不停止平台', async t => {
+  const f = fixture(t), build = f.services.build
+  f.services.build = async (...args) => { const entries = await build(...args); writeFileSync(join(f.programRoot, 'platform/plugin/src/index.ts'), 'parallel-source'); return entries }
+  await assert.rejects(updatePlatform(f.options, f.services), /构建期间变化/)
+  assert.equal(readFileSync(f.live, 'utf8'), 'old-code'); assert.deepEqual(f.events, ['build'])
+  const stageCase = fixture(t), stageBuild = stageCase.services.build, inspect = stageCase.services.inspect
+  let stageSource
+  stageCase.services.build = async (...args) => { const entries = await stageBuild(...args); stageSource = entries[0].source; return entries }
+  stageCase.services.inspect = async (...args) => { if (stageSource) writeFileSync(stageSource, 'parallel-stage'); return inspect(...args) }
+  await assert.rejects(updatePlatform(stageCase.options, stageCase.services), /应用前来源或制品摘要变化/)
+  assert.equal(readFileSync(stageCase.live, 'utf8'), 'old-code'); assert.deepEqual(stageCase.events, ['build'])
+})
+
+test('仅客户端变化原子应用并核验，保持原PID且不启停', async t => {
+  const f = fixture(t, { target: 'client.js' })
+  const report = await updatePlatform(f.options, f.services)
+  assert.equal(report.status, 'applied'); assert.equal(report.activation, 'native-hmr')
+  assert.deepEqual(f.events, ['build', 'verify']); assert.equal(readFileSync(f.live, 'utf8'), 'new-code')
+  assert.equal(readFileSync(join(report.stage, 'backup/0'), 'utf8'), 'old-code')
+})
+
+test('独立SDK worker变化作用于下一次操作，不停止平台', async t => {
+  const f = fixture(t, { target: 'sdk-worker.js' })
+  const report = await updatePlatform(f.options, f.services)
+  assert.equal(report.activation, 'next-sdk-operation'); assert.deepEqual(f.events, ['build', 'verify'])
+})
+
+test('服务端变化使用原管理器定向停止启动，再核对在线身份', async t => {
+  const f = fixture(t)
+  const report = await updatePlatform(f.options, f.services)
+  assert.equal(report.activation, 'managed-restart'); assert.deepEqual(f.events, ['build', 'stop', 'start', 'verify'])
+  assert.equal(readFileSync(f.live, 'utf8'), 'new-code')
+})
+
+test('应用后核验失败恢复旧制品和原启动参数，不改源码或数据', async t => {
+  const f = fixture(t, { failVerify: true })
+  await assert.rejects(updatePlatform(f.options, f.services), /旧制品已恢复并核验/)
+  assert.equal(readFileSync(f.live, 'utf8'), 'old-code')
+  assert.equal(readFileSync(join(f.programRoot, 'platform/plugin/src/index.ts'), 'utf8'), 'source')
+  assert.deepEqual(f.events, ['build', 'stop', 'start', 'verify', 'stop', 'restore', 'verify'])
+})
+
+test('停止命令失败但原进程仍可核验时保持旧制品，不重复启动', async t => {
+  const f = fixture(t)
+  f.services.lifecycle = async action => { f.events.push(action); throw Error('fixture stop failed') }
+  await assert.rejects(updatePlatform(f.options, f.services), /旧制品已恢复并核验/)
+  assert.equal(readFileSync(f.live, 'utf8'), 'old-code'); assert.deepEqual(f.events, ['build', 'stop', 'verify'])
+})
+
+async function activityFixture(t, responses) {
+  const f = fixture(t)
+  mkdirSync(join(f.options.dataRoot, '.local/credentials'), { recursive: true })
+  writeFileSync(join(f.options.dataRoot, '.local/credentials/admin.json'), JSON.stringify({ username: 'fixture', password: 'fixture' }))
+  const requested = []
+  const server = createServer(async (request, response) => {
+    if (request.url === '/hep/login') { response.writeHead(303, { 'set-cookie': 'harness_platform_session=fixture; Path=/hep/' }); response.end(); return }
+    const endpoint = request.url.replace(/^\/hep\/(api|harness-platform)\//, '')
+    requested.push(endpoint)
+    let value = endpoint === 'inventory' ? { root: f.options.dataRoot, workspace: { id: 'workspace-update-test', root: f.options.dataRoot } } : responses[endpoint]
+    if (typeof value === 'function') {
+      let body = ''; for await (const chunk of request) body += chunk
+      value = await value(JSON.parse(body).payload)
+    }
+    response.writeHead(value === undefined ? 503 : 200, { 'content-type': 'application/json' })
+    response.end(JSON.stringify(value === undefined ? {} : { result: { ok: true, value } }))
+  })
+  server.listen(0, '127.0.0.1'); await once(server, 'listening')
+  t.after(() => new Promise(resolve => server.close(resolve)))
+  const state = { url: `http://127.0.0.1:${server.address().port}/hep/` }
+  return { ...f, state, requested }
+}
+
+test('在线只读核对覆盖原生会话、管理提案和评测、SDK任务，不从摘要推断空闲', async t => {
+  const f = await activityFixture(t, {
+    'session/list': { items: [{ sessionId: 'session-active', running: true }, { sessionId: 'assistant-active', running: false, projections: { values: { harnessPlatformAssistant: { workspace_id: 'workspace-update-test' } } } }] },
+    'assistant/status': { running: false, proposals: [{ state: 'running' }], submissions: {} },
+    'agents/eval/list': { jobs: [{ job_id: 'eval-active', status: 'cancelling' }] },
+    'agents/sdk/list': [{ id: 'sdk-active', status: 'starting' }],
+  })
+  const busy = await readUpdateActivity(f.options, f.state, 'workspace-update-test')
+  assert.deepEqual(busy.map(item => [item.kind, item.id]), [['session', 'session-active'], ['assistant', 'assistant-active'], ['evaluation', 'eval-active'], ['sdk', 'sdk-active']])
+  assert.ok(f.requested.includes('assistant/status'))
+  assert.ok(f.requested.every(endpoint => ['inventory', 'session/list', 'assistant/status', 'agents/eval/list', 'agents/sdk/list'].includes(endpoint)))
+})
+
+test('读取失败或状态缺失不被当作空闲', async t => {
+  const f = await activityFixture(t, { 'session/list': { items: [] }, 'agents/eval/list': { jobs: [] } })
+  await assert.rejects(readUpdateActivity(f.options, f.state, 'workspace-update-test'), /只读核对失败/)
+  const malformed = await activityFixture(t, { 'session/list': { items: [] }, 'agents/eval/list': { jobs: [{ job_id: 'broken' }] }, 'agents/sdk/list': [] })
+  await assert.rejects(readUpdateActivity(malformed.options, malformed.state, 'workspace-update-test'), /评测任务状态不完整/)
+})
+
+test('已受理组合阻止更新，完成后可继续；只读核对不重新执行上游', async t => {
+  const responses = { 'session/list': { items: [] }, 'agents/eval/list': { jobs: [] }, 'agents/sdk/list': [] }
+  const f = await activityFixture(t, responses), store = createCompositionExecutionStore(f.options.dataRoot)
+  let release, calls = 0, queries = 0
+  const pending = store.execute('composition-pending', { composition_id: 'fixture', version: 'published', revision: 'fixture', input_sha256: 'fixture', config_sha256: 'fixture', implementation_sha256: 'fixture' }, async () => {
+    calls++; await new Promise(resolve => { release = resolve }); return { completed: true }
+  })
+  t.after(() => release())
+  responses['mcp/compositionExecution'] = payload => { queries++; return store.read(payload.execution_id) }
+  const inspect = f.services.inspect
+  f.services.inspect = async options => ({ ...await inspect(options), busy: await readUpdateActivity(options, f.state, 'workspace-update-test') })
+  const busy = await updatePlatform(f.options, f.services)
+  assert.equal(busy.status, 'busy'); assert.deepEqual(busy.busy, [{ kind: 'composition', id: 'composition-pending', state: 'running' }]); assert.deepEqual(f.events, [])
+  assert.equal(calls, 1); assert.equal(queries, 1)
+  release(); await pending
+  const applied = await updatePlatform(f.options, f.services)
+  assert.equal(applied.status, 'applied'); assert.equal(calls, 1); assert.ok(queries >= 3)
+  assert.ok(!f.requested.includes('mcp/executeComposition'))
+})
+
+test('旧磁盘running以服务器unknown为准，无回执时兼容没有新端点的版本', async t => {
+  const responses = { 'session/list': { items: [] }, 'agents/eval/list': { jobs: [] }, 'agents/sdk/list': [] }
+  const f = await activityFixture(t, responses)
+  assert.deepEqual(await readUpdateActivity(f.options, f.state, 'workspace-update-test'), [])
+  const directory = join(f.options.dataRoot, '.local/mcp-composition-executions'); mkdirSync(directory, { recursive: true })
+  assert.deepEqual(await readUpdateActivity(f.options, f.state, 'workspace-update-test'), [])
+  assert.ok(!f.requested.includes('mcp/compositionExecution'))
+  const receipt = { execution_id: 'old-composition', workspace_id: 'workspace-update-test', state: 'running' }
+  writeFileSync(join(directory, 'old-composition.json'), JSON.stringify(receipt))
+  responses['mcp/compositionExecution'] = payload => ({ ...receipt, execution_id: payload.execution_id, state: 'unknown' })
+  assert.deepEqual(await readUpdateActivity(f.options, f.state, 'workspace-update-test'), [])
+  assert.equal(JSON.parse(readFileSync(join(directory, 'old-composition.json'), 'utf8')).state, 'running')
+})
+
+test('组合回执或只读查询失败时拒绝空闲判断', async t => {
+  const responses = { 'session/list': { items: [] }, 'agents/eval/list': { jobs: [] }, 'agents/sdk/list': [] }
+  const f = await activityFixture(t, responses), directory = join(f.options.dataRoot, '.local/mcp-composition-executions')
+  mkdirSync(directory, { recursive: true }); const file = join(directory, 'composition-broken.json')
+  writeFileSync(file, '{')
+  await assert.rejects(readUpdateActivity(f.options, f.state, 'workspace-update-test'), /回执无法读取/)
+  writeFileSync(file, JSON.stringify({ execution_id: 'composition-broken', workspace_id: 'workspace-update-test', state: 'running' }))
+  await assert.rejects(readUpdateActivity(f.options, f.state, 'workspace-update-test'), /只读核对失败：mcp\/compositionExecution/)
+  responses['mcp/compositionExecution'] = { execution_id: 'different', workspace_id: 'workspace-update-test', state: 'responded' }
+  await assert.rejects(readUpdateActivity(f.options, f.state, 'workspace-update-test'), /组合执行状态不完整/)
+})
+
+test('SDK未知状态仍有属于该操作的worker时保留在途状态', async t => {
+  const responses = { 'session/list': { items: [] }, 'agents/eval/list': { jobs: [] }, 'agents/sdk/list': [] }
+  const f = await activityFixture(t, responses)
+  const directory = join(f.options.dataRoot, '.local/sdk-operations/sdk-unknown')
+  const worker = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)', directory], { stdio: 'ignore' })
+  await once(worker, 'spawn'); t.after(() => worker.kill())
+  responses['agents/sdk/list'] = [{ id: 'sdk-unknown', instance_id: 'sdk-fixture', status: 'unknown', worker_pid: worker.pid }]
+  const busy = await readUpdateActivity(f.options, f.state, 'workspace-update-test')
+  assert.deepEqual(busy, [{ kind: 'sdk', id: 'sdk-unknown', state: 'unknown-live' }])
+})
+
+test('受管恢复直接复用原命令、HOME与地址，不依赖当前源码重新渲染Profile', async t => {
+  const f = fixture(t), probe = createServer()
+  probe.listen(0, '127.0.0.1'); await once(probe, 'listening')
+  const port = probe.address().port; await new Promise(resolve => probe.close(resolve))
+  const script = join(f.programRoot, 'previous-runtime.mjs'), service = join(f.options.dataRoot, '.local/platform-service')
+  mkdirSync(service, { recursive: true })
+  writeFileSync(script, `import {createServer} from 'node:http'; createServer((_q,r)=>{r.end(JSON.stringify({cwd:process.cwd(),home:process.env.HOME,dshHome:process.env.DSH_HOME,args:process.argv.slice(2)}))}).listen(Number(process.env.UPDATE_TEST_PORT),'127.0.0.1')`)
+  const patch = join(f.options.dataRoot, '.local/platform-home/profiles/harness-platform/harness-platform.patch.yml')
+  const environment = { ...process.env, HARNESS_PROGRAM_ROOT: f.programRoot, HARNESS_ASSET_ROOT: f.options.dataRoot, HOME: join(f.programRoot, 'original-home'), DSH_HOME: join(f.options.dataRoot, '.local/platform-home'), UPDATE_TEST_PORT: String(port) }
+  const state = { pid: 123, birth: 'previous-process', programRoot: f.programRoot, dataRoot: f.options.dataRoot, host: '127.0.0.1', port, url: `http://127.0.0.1:${port}/hep/`, log: join(service, 'platform.log'), phase: 'running', detached: true }
+  const command = [process.execPath, script, '--profile', 'harness-platform', '--patch', patch]
+  const restored = await restoreManagedProcess(state, command, environment)
+  t.after(async () => { try { process.kill(-restored.pid, 'SIGTERM') } catch {} for (let i = 0; i < 100 && processBirth(restored.pid) === restored.birth; i++) await delay(20) })
+  const response = await fetch(restored.url), runtime = await response.json()
+  assert.equal(runtime.cwd, f.options.dataRoot); assert.equal(runtime.home, environment.HOME); assert.equal(runtime.dshHome, environment.DSH_HOME)
+  assert.deepEqual(runtime.args, command.slice(2)); assert.equal(managedState(f.options.dataRoot, f.programRoot).pid, restored.pid)
+  assert.equal(existsSync(join(service, 'operation.lock')), false)
+  await assert.rejects(restoreManagedProcess(state, command, environment), /已有受管进程/)
+})

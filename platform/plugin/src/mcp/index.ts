@@ -6,9 +6,10 @@ import { randomUUID } from 'node:crypto'
 import { compositionCodeSource } from './source.ts'
 import { compositionInputSchema, compositionReadonly } from './definition.ts'
 import { compositionConfig, publishCompositionVersion, publishedCompositionService, readCompositions, selectedComposition, versionConfig, writeCompositions } from './compositions.ts'
-import { workspaceConfigPath } from '../workspace.ts'
+import { workspaceConfigPath, workspaceIdentity } from '../workspace.ts'
+import { compositionExecutionDigest, createCompositionExecutionStore } from './execution-receipts.ts'
 import { executableCatalog, type CompositionExecutionContext } from './extension.ts'
-import { createRegistry, executeComposition, dryRunComposition, compositionStructure, compositionVersion, compositionImplementationDigest, saveRegistry, type McpRegistry } from './executor.ts'
+import { createRegistry, compositionInput, executeComposition, dryRunComposition, compositionStructure, compositionVersion, compositionImplementationDigest, saveRegistry, type McpRegistry } from './executor.ts'
 import { callOpenApiOperation, limitedText, loadOpenApi, normalizeConnection, publicConnection, validateSpecUrl, type CredentialRef } from './openapi.ts'
 import { managedDispatch, managementDispatch, type ManagedDispatch } from './control.ts'
 import { currentBusinessContext, getBusinessControl } from '../business-control/core.ts'
@@ -28,6 +29,7 @@ function success<T>(value: T): ConnectionRpcResult<T> {
 async function listState(registry: McpRegistry, assetRoot: string, compositionsFile: string) {
   const { catalog, revision } = readCompositions(compositionsFile)
   return {
+    workspace_id: workspaceIdentity(assetRoot).id,
     connections: [
       ...[...registry.openapi.values()].map(connection => ({
         ...publicConnection(connection),
@@ -200,6 +202,7 @@ export function createMcpHandler(assetRoot: string, options: { stateFile?: strin
   }
   registry.extension = options.extension
   const controlHandler = createBusinessControlHandler(assetRoot)
+  const executions = createCompositionExecutionStore(assetRoot)
   return async (endpoint, payload, signal, peer) => {
     try {
       if (endpoint.startsWith('control/')) return controlHandler(endpoint.slice('control/'.length), payload, signal, peer)
@@ -216,6 +219,12 @@ export function createMcpHandler(assetRoot: string, options: { stateFile?: strin
         }
       }
       if (endpoint === 'list') return success(await listState(registry, assetRoot, compositionsFile))
+      if (endpoint === 'compositionExecution') {
+        if (currentBusinessContext()) return failure('forbidden', '组合执行回执仅供平台管理页面核对')
+        const receipt = executions.read((payload as any)?.execution_id)
+        if (!receipt) return failure('not_found', '未找到原执行回执；尚不能确认原请求是否执行，请核对远端结果。')
+        return success(receipt)
+      }
       if (endpoint === 'compositionSource') return success(compositionCodeSource(assetRoot, readCompositions(compositionsFile).catalog, registry.extension, payload, undefined, (await compositionVersion(assetRoot, undefined, registry.extension)).sourceDigest))
       if (endpoint === 'compositionRun' || endpoint === 'compositionArtifact') {
         if (!registry.threat) throw new Error('威胁分析运行器尚未装载')
@@ -248,6 +257,15 @@ export function createMcpHandler(assetRoot: string, options: { stateFile?: strin
       if (['saveCompositionDraft', 'publishComposition', 'executeComposition', 'dryRunComposition', 'callPublishedComposition'].includes(endpoint)) {
         const { catalog, revision } = readCompositions(compositionsFile)
         const request = (payload as any) ?? {}
+        const execution = endpoint === 'executeComposition' && !currentBusinessContext() ? executionContext(request.execution ?? {}) : undefined
+        if (execution) {
+          const previous = executions.read(execution.execution_id)
+          if (previous) {
+            executions.assertRequest(previous, { composition_id: request.compositionId, version: request.version, version_id: request.versionId,
+              revision: request.revision, input_sha256: compositionExecutionDigest(request.input ?? {}) })
+            return success({ ...(previous.result ?? {}), execution_receipt: previous })
+          }
+        }
         if (endpoint !== 'callPublishedComposition' && request.revision !== revision) throw new Error('编排目录已变化，请刷新后重试；当前草稿未覆盖')
         if (endpoint === 'saveCompositionDraft') {
           const draft = compositionConfig(request.draft)
@@ -284,9 +302,21 @@ export function createMcpHandler(assetRoot: string, options: { stateFile?: strin
           writeCompositions(compositionsFile, catalog, revision)
           return success({ ...await listState(registry, assetRoot, compositionsFile), dry })
         }
-        return success(endpoint === 'dryRunComposition'
-          ? { ...await dryRunComposition(registry, config, request.input ?? {}, catalog), version: await compositionVersion(assetRoot, config, registry.extension, catalog, registry) }
-          : await executeComposition(registry, assetRoot, config, request.input ?? {}, signal, catalog))
+        if (endpoint === 'dryRunComposition') return success({ ...await dryRunComposition(registry, config, request.input ?? {}, catalog), version: await compositionVersion(assetRoot, config, registry.extension, catalog, registry) })
+        if (!execution) return success(await executeComposition(registry, assetRoot, config, request.input ?? {}, signal, catalog))
+        compositionInput(request.input ?? {}, config)
+        const actual = await compositionVersion(assetRoot, config, registry.extension, catalog, registry)
+        let executionFailure: unknown
+        const receipt = await executions.execute(execution.execution_id, {
+          composition_id: request.compositionId, version: request.version, ...(request.versionId ? { version_id: request.versionId } : {}), revision,
+          input_sha256: compositionExecutionDigest(request.input ?? {}), config_sha256: compositionExecutionDigest(config), implementation_sha256: actual.implementationDigest,
+        }, async onRun => {
+          try { return await executeComposition(registry, assetRoot, config, request.input ?? {}, signal, catalog, false, { ...execution, onRun }, actual) }
+          catch (error) { executionFailure = error; throw error }
+        })
+        // 旧调用方不提供执行标识，继续接收原有错误；其在途执行仍纳入更新检查。
+        if (request.execution === undefined && executionFailure) throw executionFailure
+        return success({ ...(receipt.result ?? {}), execution_receipt: receipt })
       }
       if (endpoint === 'registerOpenApi') {
         const connection = normalizeConnection(payload)

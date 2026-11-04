@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3840" height="2160" viewBox="0 0 3840 2160" role="img" aria-labelledby="title description">
+<title id="title">Harness 工程平台六项能力全景</title><desc id="description">面向个人开发者和内部团队，说明构建迁移、知识工具、跨框架访问、评测改进、算力变体和独立交付。箭头表示各任务内部的数据或访问方向。</desc>
+<defs><linearGradient id="page" x2="0" y2="1"><stop stop-color="#f5f9ff"/><stop offset="1" stop-color="#eef4fc"/></linearGradient><filter id="shadow" x="-8%" y="-8%" width="116%" height="124%"><feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#182235" flood-opacity=".05"/></filter></defs>
+<rect width="3840" height="2160" fill="url(#page)"/>
+<g font-family="Noto Sans CJK SC,Microsoft YaHei,sans-serif" fill="#182235">
+<rect x="130" y="100" width="16" height="112" rx="8" fill="#2459cf"/>
+<text x="180" y="179" font-size="82" font-weight="600">Harness 工程平台</text>
+<text x="180" y="250" font-size="40" fill="#66758b">让智能体真正可用，持续变好。</text>
+<text x="130" y="347" font-size="36" fill="#2459cf">从需求与已有工程出发，复用资产，以真实任务和证据持续改进，再运行与交付。</text>
+<g transform="translate(130 420)" aria-label="智能体构建与迁移"><rect width="1060" height="710" rx="32" fill="#fff" stroke="#e3e9f2" stroke-width="2" filter="url(#shadow)"/><rect x="40" y="40" width="94" height="74" rx="18" fill="#edf4ff"/><text x="87" y="92" text-anchor="middle" font-size="40" fill="#2459cf" font-weight="600">01</text>
+<text x="164" y="90" font-size="44" font-weight="600">智能体构建与迁移</text>
+<text x="42" y="230" font-size="34" fill="#66758b">从需求新建，或迁入已有智能体工程</text>
+<text x="42" y="298" font-size="34" fill="#66758b">角色 · 提示词 · 技能 · 工具 · 模型</text>
+<rect x="40" y="358" width="980" height="188" rx="20" fill="#f8faff" stroke="#e3e9f2"/>
+<text x="68" y="427" font-size="34" fill="#2459cf">需求 / 工程 → 可维护的 Harness 资产</text>
+<text x="68" y="499" font-size="34" fill="#2459cf">关键任务验证 → 版本与运行记录</text>
+<path d="M42 594H1018" stroke="#e3e9f2" stroke-width="2"/><text x="42" y="652" font-size="32" fill="#66758b">继续维护资产与行为</text></g>
+<g transform="translate(1390 420)" aria-label="知识与工具复用"><rect width="1060" height="710" rx="32" fill="#fff" stroke="#e3e9f2" stroke-width="2" filter="url(#shadow)"/><rect x="40" y="40" width="94" height="74" rx="18" fill="#edf4ff"/><text x="87" y="92" text-anchor="middle" font-size="40" fill="#2459cf" font-weight="600">02</text>
+<text x="164" y="90" font-size="44" font-weight="600">知识与工具复用</text>
+<text x="42" y="230" font-size="34" fill="#66758b">业务知识保留来源与版本</text>
+<text x="42" y="298" font-size="34" fill="#66758b">MCP / OpenAPI 接入、分组、编排与调试</text>
+<rect x="40" y="358" width="980" height="188" rx="20" fill="#f8faff" stroke="#e3e9f2"/>
+<text x="68" y="427" font-size="34" fill="#2459cf">知识与能力 → 继承 / 融合 / 比较</text>
+<text x="68" y="499" font-size="34" fill="#2459cf">工具与资源 → 按真实接口调用</text>
+<path d="M42 594H1018" stroke="#e3e9f2" stroke-width="2"/><text x="42" y="652" font-size="32" fill="#66758b">复用已有成果，核对实际消费</text></g>
+<g transform="translate(2650 420)" aria-label="跨框架智能体接入纳管、安全评估与策略授权"><rect width="1060" height="710" rx="32" fill="#fff" stroke="#e3e9f2" stroke-width="2" filter="url(#shadow)"/><rect x="40" y="40" width="94" height="74" rx="18" fill="#edf4ff"/><text x="87" y="92" text-anchor="middle" font-size="40" fill="#2459cf" font-weight="600">03</text>
+<text x="164" y="90" font-size="44" font-weight="600">跨框架智能体接入纳管、</text>
+<text x="164" y="150" font-size="44" font-weight="600">安全评估与策略授权</text>
+<text x="42" y="230" font-size="34" fill="#66758b">DSH · AgentScope · OpenCode 保留原框架</text>
+<text x="42" y="298" font-size="34" fill="#66758b">原系统负责远端进程的部署与生命周期</text>
+<rect x="40" y="358" width="980" height="188" rx="20" fill="#f8faff" stroke="#e3e9f2"/>
+<text x="68" y="427" font-size="34" fill="#2459cf">用户 → 平台入口 → 原生智能体</text>
+<text x="68" y="499" font-size="34" fill="#2459cf">实例 key → 资源授予 → 指定资源</text>
+<path d="M42 594H1018" stroke="#e3e9f2" stroke-width="2"/><text x="42" y="652" font-size="32" fill="#66758b">其他服务沿用原有认证</text></g>
+<g transform="translate(130 1210)" aria-label="评测与持续改进"><rect width="1060" height="710" rx="32" fill="#fff" stroke="#e3e9f2" stroke-width="2" filter="url(#shadow)"/><rect x="40" y="40" width="94" height="74" rx="18" fill="#edf4ff"/><text x="87" y="92" text-anchor="middle" font-size="40" fill="#2459cf" font-weight="600">04</text>
+<text x="164" y="90" font-size="44" font-weight="600">评测与持续改进</text>
+<text x="42" y="230" font-size="34" fill="#66758b">固定版本、用例与比较条件</text>
+<text x="42" y="298" font-size="34" fill="#66758b">执行轨迹和业务产物保存真实来源</text>
+<rect x="40" y="358" width="980" height="188" rx="20" fill="#f8faff" stroke="#e3e9f2"/>
+<text x="68" y="427" font-size="34" fill="#2459cf">同一用例 → 修改前 / 修改后 → 逐例核对</text>
+<text x="68" y="499" font-size="34" fill="#2459cf">任务结果 → 问题定位 → 必要修改</text>
+<path d="M42 594H1018" stroke="#e3e9f2" stroke-width="2"/><text x="42" y="652" font-size="32" fill="#66758b">业务效果与源码诊断分别判断</text></g>
+<g transform="translate(1390 1210)" aria-label="算力变体与验证"><rect width="1060" height="710" rx="32" fill="#fff" stroke="#e3e9f2" stroke-width="2" filter="url(#shadow)"/><rect x="40" y="40" width="94" height="74" rx="18" fill="#edf4ff"/><text x="87" y="92" text-anchor="middle" font-size="40" fill="#2459cf" font-weight="600">05</text>
+<text x="164" y="90" font-size="44" font-weight="600">算力变体与验证</text>
+<text x="42" y="230" font-size="34" fill="#66758b">固定完整父版，保留比较口径</text>
+<text x="42" y="298" font-size="34" fill="#66758b">中算力决策模型与低算力代码分别验证</text>
+<rect x="40" y="358" width="980" height="188" rx="20" fill="#f8faff" stroke="#e3e9f2"/>
+<text x="68" y="427" font-size="34" fill="#2459cf">数据 → 训练 / 代码 → 固定输入比较</text>
+<text x="68" y="499" font-size="34" fill="#2459cf">任务质量 + 资源证据 → 研究结论</text>
+<path d="M42 594H1018" stroke="#e3e9f2" stroke-width="2"/><text x="42" y="652" font-size="32" fill="#66758b">不预设等效或成本节省</text></g>
+<g transform="translate(2650 1210)" aria-label="运行与独立交付"><rect width="1060" height="710" rx="32" fill="#fff" stroke="#e3e9f2" stroke-width="2" filter="url(#shadow)"/><rect x="40" y="40" width="94" height="74" rx="18" fill="#edf4ff"/><text x="87" y="92" text-anchor="middle" font-size="40" fill="#2459cf" font-weight="600">06</text>
+<text x="164" y="90" font-size="44" font-weight="600">运行与独立交付</text>
+<text x="42" y="230" font-size="34" fill="#66758b">使用：Web 交互 / 官方 TypeScript SDK</text>
+<text x="42" y="298" font-size="34" fill="#66758b">交付：平台托管实例 / 适用版本独立包</text>
+<rect x="40" y="358" width="980" height="188" rx="20" fill="#f8faff" stroke="#e3e9f2"/>
+<text x="68" y="427" font-size="34" fill="#2459cf">Web → HTTP 业务入口</text>
+<text x="68" y="499" font-size="34" fill="#2459cf">SDK 应用 ↔ stdio ↔ 同容器 DSH Runtime</text>
+<path d="M42 594H1018" stroke="#e3e9f2" stroke-width="2"/><text x="42" y="652" font-size="32" fill="#66758b">安装、实际装载与业务通过分别核验</text></g>
+<text x="130" y="2070" font-size="32" fill="#66758b">能力边界与实际验证见项目文档；本图不将连接、训练完成或一次成功视为业务效果证明。</text></g></svg>

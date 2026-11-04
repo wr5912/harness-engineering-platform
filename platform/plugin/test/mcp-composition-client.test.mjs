@@ -11,7 +11,7 @@ const oldId = 'a'.repeat(64), currentId = 'b'.repeat(64)
 const oldConfig = { toolName: 'find_asset', title: '旧发布标题', description: '旧版说明', connectionId: 'source-one' }
 const currentConfig = { ...oldConfig, title: '当前发布标题', description: '当前说明' }
 
-function workbench(initialTarget = { page: 'mcp', tab: 'composition', composition_id: 'composition-one', version: 'published', version_id: oldId }, { execute, action, readCatalog, source, extraCompositions = [] } = {}) {
+function workbench(initialTarget = { page: 'mcp', tab: 'composition', composition_id: 'composition-one', version: 'published', version_id: oldId }, { execute, action, readCatalog, source, queryExecution, readRun, storage = new Map(), extraCompositions = [] } = {}) {
   const states = [], dependencies = [], cleanups = [], calls = [], navigations = [], copied = []
   let cursor, effects, changed, tree, listener
   let catalog = { revision: 'r1', connections: [{ kind: 'openapi', id: 'source-one' }], extension: null,
@@ -33,6 +33,7 @@ function workbench(initialTarget = { page: 'mcp', tab: 'composition', compositio
     window: { addEventListener() {}, removeEventListener() {} },
     navigator: { clipboard: { async writeText(value) { copied.push(value) } } },
     document: { baseURI: 'http://localhost:3090/hep/' },
+    sessionStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) },
   })
   const props = { target: initialTarget, active: true, configuration: { status: 'ready' }, onCatalogChange() {}, onContext() {},
     onNavigate(value) { navigations.push(value); props.target = value; changed = true },
@@ -41,6 +42,8 @@ function workbench(initialTarget = { page: 'mcp', tab: 'composition', compositio
       calls.push({ endpoint, payload })
       if (endpoint === 'mcp/list') return readCatalog ? readCatalog(catalog) : { ok: true, value: structuredClone(catalog) }
       if (endpoint === 'mcp/compositionSource' && source) return source(payload)
+      if (endpoint === 'mcp/compositionExecution') return queryExecution ? queryExecution(payload) : { ok: false, error: { code: 'not_found', message: '未找到原执行回执' } }
+      if (endpoint === 'mcp/compositionRun' && readRun) return readRun(payload)
       if (action && ['mcp/dryRunComposition', 'mcp/publishComposition', 'mcp/executeComposition'].includes(endpoint)) return action(endpoint, payload)
       if (endpoint === 'mcp/saveCompositionDraft') {
         if (payload.revision !== catalog.revision) return { ok: false, error: { message: '编排目录已变化，请刷新后重试' } }
@@ -241,4 +244,73 @@ test('查看实现源码复用多文件浏览器，并将固定历史版本和�
   assert.equal(ui.calls.some(call => /save|publish|execute/i.test(call.endpoint)), false)
   ui.setTarget({ page: 'mcp', tab: 'composition', composition_id: 'composition-one', version: 'published', version_id: currentId }); await ui.settle()
   assert.equal(ui.nodes().some(node => typeof node.type === 'function' && node.type.name === 'GeneratedCodeBrowser'), false)
+})
+
+test('组合回执丢失后保留原执行身份，刷新只读恢复且不再次派发', async () => {
+  const target = { page: 'mcp', tab: 'composition', composition_id: 'composition-one', version: 'published', version_id: currentId }
+  const storage = new Map()
+  let captured, executes = 0, queries = 0
+  const execute = payload => { captured = payload; executes++; throw new Error('受理后的RPC回执丢失') }
+  const ui = workbench(target, { storage, execute })
+  await ui.settle()
+  ui.nodes().find(node => node.props?.['aria-label'] === '组合查询资产').props.onChange({ target: { value: 'original-host' } }); ui.render()
+  ui.button('实际执行组合工具').props.onClick(); await ui.settle()
+  assert.equal(executes, 1)
+  assert.match(captured.execution.execution_id, /^graph-/)
+  assert.match(ui.text(), /结果待核对/)
+  assert.equal(ui.button('实际执行组合工具').props.disabled, true)
+  assert.equal(ui.nodes().find(node => node.props?.['aria-label'] === '组合查询资产').props.value, 'original-host')
+  const restored = workbench(target, { storage, execute, queryExecution(payload) {
+    queries++; assert.equal(payload.execution_id, captured.execution.execution_id)
+    return { ok: true, value: { state: 'responded', run_ids: [], result: { ok: true, result: { asset: 'original-host', alerts: [] } } } }
+  } })
+  await restored.settle()
+  assert.equal(executes, 1)
+  assert.equal(queries, 1)
+  assert.match(restored.text(), /已收到原执行回执/)
+  assert.equal(restored.nodes().find(node => node.props?.['aria-label'] === '组合查询资产').props.value, 'original-host')
+})
+
+test('服务端保留未知执行时可读取关联原运行，明确拒绝可修改输入', async () => {
+  const target = { page: 'mcp', tab: 'composition', composition_id: 'composition-one', version: 'published', version_id: currentId }
+  const runId = 'run-11111111-1111-4111-8111-111111111111'
+  let executes = 0, reads = 0
+  const ui = workbench(target, { execute: async () => { executes++; return { ok: true, value: { execution_receipt: { state: 'unknown', run_ids: [runId], message: '原请求回执待核对' } } } }, readRun(payload) {
+    reads++; assert.equal(payload.run_id, runId); return { ok: true, value: { run_id: runId, phase_status: 'completed', status: 'completed' } }
+  } })
+  await ui.settle()
+  ui.nodes().find(node => node.props?.['aria-label'] === '组合查询资产').props.onChange({ target: { value: 'host' } }); ui.render()
+  ui.button('实际执行组合工具').props.onClick(); await ui.settle()
+  ui.button(`读取原运行 ${runId}`).props.onClick(); await ui.settle()
+  assert.equal(reads, 1); assert.equal(executes, 1)
+  assert.equal(ui.nodes().find(node => node.type?.name === 'ThreatRunResult').props.execution.result.run_id, runId)
+  const denied = workbench(target, { execute: async () => ({ ok: false, error: { message: '编排目录已变化，尚未派发' } }) })
+  await denied.settle()
+  denied.nodes().find(node => node.props?.['aria-label'] === '组合查询资产').props.onChange({ target: { value: 'host' } }); denied.render()
+  denied.button('实际执行组合工具').props.onClick(); await denied.settle()
+  assert.match(denied.text(), /编排目录已变化/)
+  assert.equal(denied.button('实际执行组合工具').props.disabled, false)
+})
+
+test('无法保存执行身份时不派发，重选当前组合不丢在途回执', async () => {
+  const target = { page: 'mcp', tab: 'composition', composition_id: 'composition-one', version: 'published', version_id: currentId }
+  let calls = 0
+  const broken = { get() { return null }, set() { throw new Error('storage unavailable') } }
+  const unavailable = workbench(target, { storage: broken, execute() { calls++; return { ok: true, value: {} } } })
+  await unavailable.settle()
+  unavailable.nodes().find(node => node.props?.['aria-label'] === '组合查询资产').props.onChange({ target: { value: 'host' } }); unavailable.render()
+  unavailable.button('实际执行组合工具').props.onClick(); await unavailable.settle()
+  assert.equal(calls, 0)
+  assert.match(unavailable.text(), /无法保存本次执行身份，尚未派发/)
+  let finish
+  const ui = workbench(target, { execute: () => { calls++; return new Promise(resolve => { finish = resolve }) } })
+  await ui.settle()
+  ui.nodes().find(node => node.props?.['aria-label'] === '组合查询资产').props.onChange({ target: { value: 'host' } }); ui.render()
+  ui.button('实际执行组合工具').props.onClick(); await ui.settle()
+  const current = ui.nodes().find(node => node.type === 'button' && node.props?.['aria-current'] === 'true')
+  assert.ok(current)
+  current.props.onClick(); ui.render()
+  finish({ ok: true, value: { ok: true, result: { asset: 'same-target-receipt' } } }); await ui.settle()
+  assert.match(ui.text(), /已收到原执行回执/)
+  assert.equal(calls, 1)
 })

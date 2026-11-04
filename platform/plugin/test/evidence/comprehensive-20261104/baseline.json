@@ -1,0 +1,32 @@
+{
+  "programHead": "1a32a74e285a5b8d50678a1d17b2f11b237315e4",
+  "dataHead": "6a666ba9238dd0d2d35ef25ea549062db3d4e4f0",
+  "dataStatus": " M config/business-access.json\n?? evolution/datasets/decision-dataset-b8f473f1-0cd7-42cd-a0a1-b90771f1ebe4.json\n?? evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/evaluation/evidence/dsh-image-build-20261024T023237Z-3.json\n",
+  "preserved": {
+    "/home/admin/harness-engineering-platform-data/config/business-access.json": "870b8d91034b1eee9ff706d05e6346c38fea43204d88550a72701d4c953acd3e",
+    "/home/admin/harness-engineering-platform-data/evolution/datasets/decision-dataset-b8f473f1-0cd7-42cd-a0a1-b90771f1ebe4.json": "6abad71a779253cb9dc7e518919ab3043061762a835a1a6910280ac7da3dccab",
+    "/home/admin/harness-engineering-platform-data/evolution/experiments/EXP-security-operations-expert-024-rad80a907c628/evaluation/evidence/dsh-image-build-20261024T023237Z-3.json": "eda22672b360ad06d0152bd08242d1d3faeb1120a4e699d014f887cd2cfc1da0"
+  },
+  "runtime": {
+    "pid": 2500377,
+    "birth": "95375843",
+    "programRoot": "/home/admin/work/harness-engineering-platform",
+    "dataRoot": "/home/admin/harness-engineering-platform-data",
+    "host": "10.0.160.32",
+    "port": 18120,
+    "url": "http://10.0.160.32:18120/hep/",
+    "publicUrl": "http://10.0.160.32:18120/hep/",
+    "log": "/home/admin/harness-engineering-platform-data/.local/platform-service/platform.log",
+    "phase": "running",
+    "detached": true
+  },
+  "artifacts": {
+    "platform/plugin/lib/client.js": "4b7f1e663884d4ca9e50da14afa8058456884749343d7d8d4872c71d03e875e5",
+    "platform/plugin/lib/index.js": "3495a57f227a5aaab5c47db52f500ea891d6c5a977638a2d8ce36656cab67596",
+    "platform/profile/cordis.patch.yml": "e1d441988108a4184cae19d2de63ff0a27d302b7a8744272db0a745d206a7f0b"
+  },
+  "input": {
+    "file": "Harness工程平台_完整整改方案_V0.1_20261104.docx",
+    "sha256": "22b63a31c8d9bb80e68e19a9f1cd36d0a2ce9188887166461cbe4bfb9bb8376d"
+  }
+}

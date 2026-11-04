@@ -1,0 +1,30 @@
+{
+  "files": [
+    "/home/admin/work/harness-engineering-platform/README.md",
+    "/home/admin/work/harness-engineering-platform/docs/ai-agent-harness项目验收矩阵.md",
+    "/home/admin/work/harness-engineering-platform/docs/platform-design/02_系统架构与部署设计.md",
+    "/home/admin/work/harness-engineering-platform/docs/platform-design/03_存储架构与数据契约.md",
+    "/home/admin/work/harness-engineering-platform/docs/platform-design/23_离线一键打包与安装.md",
+    "/home/admin/work/harness-engineering-platform/docs/platform-design/26_前端设计规范与原则.md",
+    "/home/admin/work/harness-engineering-platform/docs/platform-design/27_跨框架接入使用说明.md",
+    "/home/admin/work/harness-engineering-platform/docs/platform-design/README.md",
+    "/home/admin/work/harness-engineering-platform/docs/项目对抗性审查_2026-11-03.md",
+    "/home/admin/work/harness-engineering-platform/docs/项目术语表.md",
+    "/home/admin/work/harness-engineering-platform/platform/plugin/test/evidence/comprehensive-20261104/README.md",
+    "/home/admin/work/harness-engineering-platform/platform/plugin/test/evidence/comprehensive-20261104/review-integrated.md",
+    "/home/admin/harness-engineering-platform-data/.agents/skills/agent-maintenance/SKILL.md",
+    "/home/admin/harness-engineering-platform-data/.agents/skills/compute-variant-research/SKILL.md",
+    "/home/admin/harness-engineering-platform-data/.agents/skills/kev-trace-pipeline/SKILL.md",
+    "/home/admin/harness-engineering-platform-data/.agents/skills/kev-trace-pipeline/references/platform-runtime.md",
+    "/home/admin/harness-engineering-platform-data/.agents/skills/kev-training/SKILL.md",
+    "/home/admin/harness-engineering-platform-data/.agents/skills/kev-training/references/native-execution.md",
+    "/home/admin/harness-engineering-platform-data/.agents/skills/workspace-management/SKILL.md",
+    "/home/admin/harness-engineering-platform-data/AGENTS.md",
+    "/home/admin/harness-engineering-platform-data/README.md",
+    "/home/admin/harness-engineering-platform-data/docs/harness-research/compute-variants.md",
+    "/home/admin/harness-engineering-platform-data/docs/harness-research/kev-medium-variant-skills.md"
+  ],
+  "linksChecked": 507,
+  "errors": [],
+  "passed": true
+}

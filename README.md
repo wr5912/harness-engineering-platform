@@ -2,21 +2,46 @@
 
 让智能体真正可用，持续变好。
 
-Harness 工程平台（Harness Engineering Platform，简称 HEP）基于 DSH，提供智能体资产、评测、实例和工具管理能力，并将经过验证的技术研究成果持续融入平台。
+Harness 工程平台（Harness Engineering Platform，简称 HEP）面向个人开发者和内部使用：通过管理助手构建或迁入智能体，复用知识和工具，用固定业务用例检验修改，再运行或独立交付适用版本。已有 DSH、AgentScope、OpenCode 实例也可保留原框架，接入平台并按资源授权访问。
 
 项目面向个人开发者，以平台建设和实际使用需求为主线。平台通过系统全局 DSH 装载 Cordis 插件，复用已有 CLI；程序保存在本仓库，用户资产和运行状态保存在独立数据工作区（默认 `~/harness-engineering-platform-data`）；业务智能体由独立的 DSH 容器实例执行。项目定位、开发边界和协作原则以 [`AGENTS.md`](./AGENTS.md) 为准。
 
-程序仓库为 [wr5912/harness-engineering-platform](https://github.com/wr5912/harness-engineering-platform)，数据仓库为 [wr5912/harness-engineering-platform-data](https://github.com/wr5912/harness-engineering-platform-data)。已有部署可以继续使用原本地程序目录，数据根、插件包名和标准镜像名不随仓库更名而改变。
+程序仓库为 [wr5912/harness-engineering-platform](https://github.com/wr5912/harness-engineering-platform)，配套数据仓库为 [wr5912/harness-engineering-platform-data](https://github.com/wr5912/harness-engineering-platform-data)。已有部署可以继续使用原本地程序目录，数据根、插件包名和标准镜像名不随仓库更名而改变。
+
+[快速开始](#快速启动) · [接入已有智能体](docs/platform-design/27_跨框架接入使用说明.md#登记与访问) · [独立部署智能体](docs/platform-design/23_离线一键打包与安装.md#单智能体独立运行包) · [查看验证结果](./docs/ai-agent-harness项目验收矩阵.md)
 
 ## 当前能力
+
+| 能力 | 用途与边界 |
+|---|---|
+| 智能体构建与迁移 | 从需求新建，或将已有工程迁入为可维护的 Harness 资产，用关键任务验证行为。 |
+| 知识与工具复用 | 知识保留来源，能力按版本继承或融合；通过 MCP 与 OpenAPI 接入、组合和调试工具。 |
+| 跨框架智能体接入纳管、安全评估与策略授权 | 已有实例保留原 Runtime；平台管理访问入口和指定资源权限，原系统负责远端进程。 |
+| 评测与持续改进 | 固定版本和用例逐例比较，区分业务效果与源码诊断，历史运行保留当时口径。 |
+| 算力变体与验证 | 中算力可训练决策模型，低算力尝试代码执行；比较任务质量与资源证据，不预设等效或节省成本。 |
+| 运行与独立交付 | 通过 Web 或官方 TypeScript SDK 使用；按需运行平台托管实例，或导出符合打包条件的独立运行包。 |
+
+![平台六项能力全景](docs/assets/capabilities/overview-4k.png)
+
+[查看4K全景图](docs/assets/capabilities/overview-4k.png) · [可编辑 SVG](docs/assets/capabilities/overview.svg)。PNG由SVG导出；能力名称与展示规格由[前端设计规范](docs/platform-design/26_前端设计规范与原则.md#56-登录页特性轮播)维护。
+
+### 按任务选择入口
+
+| 我的起点 | 首选路径 |
+|---|---|
+| 已有工程，要继续维护角色、工具或代码 | 智能体管理 → 导入／迁移，生成并验证 DSH Harness。 |
+| 已有运行中的智能体，要保留原框架接入 | 实例管理 → 接入实例 → 登记已有智能体，验证并启用平台入口。 |
+| 只需要交付一个业务智能体 | 选定版本 → 更多操作 → 导出独立运行包。 |
+
+### 页面入口
 
 | 页面 | 可以完成的操作 |
 |---|---|
 | 首页 | 描述业务需求发起构建、评测或改进优化；提供明确标注模拟数据的巡检体验示例，以及真实资产和运行概览 |
-| 管理对话 | 由平台管理助手复用能力、装配资产、执行评测，在确认的范围和额度内修复并核验实例与业务产物；使用原生 DSH 会话，保留任务状态、草稿与模型设置入口 |
+| 管理对话 | 由平台管理助手复用能力、装配资产、执行评测，在明确的任务与授权范围内持续修复并核验实例与业务产物；使用原生 DSH 会话，保留任务状态、草稿与模型设置入口 |
 | 智能体管理 | 新建智能体和首次研究版本；搜索并查看所选版本的概览、资产、能力和运行状态，比较固定 Baseline/指定版本差异；支持融合创建、AI 特性确认、资产校验编辑、实例启动，以及固定父版派生与评测比较的算力变体 |
 | 评测中心 | 新增、编辑共享用例，从 Run 冻结输入整理新用例；运行评测，阅读结构化轨迹、比较真实来源与逐例结果，记录研究决策；通过 AI Skill 抽取、复核和导出决策样本，下载完整 Run 证据 |
-| 实例管理 | 创建、启停、重启、删除及批量操作 DSH 容器实例，查看逐项回执；获取 Web 访问入口和 iframe 嵌入说明 |
+| 实例管理 | 管理平台托管的 DSH 容器实例，查看逐项回执；登记并访问已有原生实例，区分入口启用、资源授权及原系统生命周期 |
 | 统一网关 | 按智能体身份、风险评估、访问控制三类配置；身份内包含认证方式、可信来源与撤销，查看即时任务的风险、执行限制和实例回执 |
 | MCP 管理 | 管理 OpenAPI/MCP 服务、工具与资源分组及调试；维护资产告警只读查询、威胁分析阶段及父子组合的草稿与固定发布版，查看流程、执行 dry 或实际测试，将已发布组合服务加入分组 |
 
@@ -33,29 +58,34 @@ Harness 工程平台（Harness Engineering Platform，简称 HEP）基于 DSH，
 准备系统全局 DSH、Node.js、pnpm，以及安装了 PyYAML 的 Python；PyYAML 用于读取原生 YAML 配置和 Run 记录。DSH 版本须匹配平台插件的兼容声明；工具链已使用 Node.js 24 和 Python 3.10 验证，环境若默认使用旧版，应先调整 PATH 选择兼容解释器。PyYAML 缺失不阻止打开初始化页，准备平台时会提示为启动器所用 Python 安装该依赖。
 
 ```bash
-# 首次获取程序
-git clone git@github.com:wr5912/harness-engineering-platform.git
+git clone https://github.com/wr5912/harness-engineering-platform.git
 cd harness-engineering-platform
-
-# 首次使用：缺数据工作区时自动进入 /hep/ 初始化引导
 ./platform/dsh-platform start
+```
 
-# 已有完整工作区，平台插件源码修改后重新准备
-./platform/dsh-platform prepare
+打开终端给出的地址。首次使用按引导连接、克隆配套数据仓库或创建空白工作区；已有账号与配置保持。
 
-# 只预览来源、HOME、插件路径和监听参数
+### 第一个可观察结果
+
+使用配套数据时，在评测中心选择安全运营专家的 `U-INS-001`，再查看历史 Run 的冻结预期：当前用例和当时执行口径可能不同，页面会分别展示，无需发起模型请求。空白工作区不附历史样例，可先连接配套数据；缺失样例时按页面提示办理。
+
+### 常用管理命令
+
+```bash
+# 状态与只读启动预览
+./platform/dsh-platform status
 ./platform/dsh-platform start --dry-run
 
-# 后台启动；优先使用数据工作区已保存的管理地址，缺省端口 18120
-./platform/dsh-platform start
-./platform/dsh-platform status
-./platform/dsh-platform restart
-./platform/dsh-platform stop
+# 本机源码更新：先核对身份、制品和在途任务，再更新
+./platform/dsh-deploy update --dry-run
+./platform/dsh-deploy update
 
-# 开发调试时前台运行
+# 按需停止或重启；前台运行用于调试
+./platform/dsh-platform stop
+./platform/dsh-platform restart
 ./platform/dsh-platform start --foreground
 
-# 指定地址或端口；仅本机使用可设置 --host 127.0.0.1
+# 指定监听地址或端口
 ./platform/dsh-platform start --host 192.168.1.10 --port 3091
 ```
 
@@ -65,7 +95,7 @@ cd harness-engineering-platform
 
 打开终端显示的 `/hep/` URL，使用数据根 `.local/credentials/admin.json` 中配置的账号登录。账号在该文件维护，修改后重启生效，旧登录会话失效。查询与编辑不需要 LLM API Key；使用管理对话前，在“设置 → 模型”配置所选模型。
 
-首页的构建、评测和改进优化都直接描述任务，无需预先选择智能体、版本或运行记录。助手先查询已有资产和证据，必要时集中澄清，再确认执行范围。“体验示例”会核对当前工作区已有的巡检工具与业务测试，使用基础 Mock 台账；缺少样例或服务时说明具体条件。任务执行、验证范围和外部预算限制见[任务交付与验收](./docs/platform-design/17_任务型智能体交付与验收.md)。
+首页的构建、评测和改进优化都直接描述任务，无需预先选择智能体、版本或运行记录。助手先查询已有资产和证据，必要时集中澄清，再确认执行范围。“体验示例”会核对当前工作区已有的巡检工具与业务测试，使用基础 Mock 台账；缺少样例或服务时说明具体条件。当前会话与执行边界及历史交付记录见[任务交付与验收](./docs/platform-design/17_任务型智能体交付与验收.md)。
 
 平台使用数据根 `.local/platform-home/` 保存 Session、设置及凭据（`.local/` 不提交 Git，克隆后需从本地备份恢复或按部署说明准备），再次 `prepare` 和重启会保留用户设置。使用 `stop` 停止，`restart` 重启；前台模式也可用 `Ctrl+C` 停止，再次 `start` 复用同一 HOME；“退出登录”撤销当前会话。版本兼容、认证和装载的完整合同见[当前平台接入合同](./docs/platform-design/02_系统架构与部署设计.md#当前最小平台接入合同)。
 
@@ -95,7 +125,7 @@ docker version --format '{{.Server.Os}}/{{.Server.Arch}}'
 docker buildx version && docker compose version
 ```
 
-在目标主机完整克隆本程序仓库和私有[数据仓库](https://github.com/wr5912/harness-engineering-platform-data)。本程序仓库的命令见上文；数据仓库可克隆到默认数据根：
+在目标主机完整克隆本程序仓库和配套[数据仓库](https://github.com/wr5912/harness-engineering-platform-data)。本程序仓库的命令见上文；数据仓库可克隆到默认数据根：
 
 ```bash
 git clone git@github.com:wr5912/harness-engineering-platform-data.git \
@@ -178,7 +208,7 @@ tests/                                   # 可重复的合同测试
 AI纠错记录/                               # 按天追加的开发纠错记录
 ```
 
-数据工作区保存管理助手的 `AGENTS.md`、`.agents/skills/`、研究方法文档，以及 `agents/`、`evolution/`、`config/`、业务 `extensions/` 和被 Git 忽略的 `.local/`。13 项管理、研究、审查和表达 Skill 均由数据仓库维护；程序只提供加载和工具实现。目录归属和备份边界见[独立工作区合同](docs/platform-design/02_系统架构与部署设计.md#独立数据工作区)。平台从自身位置解析脚本，从 `HARNESS_ASSET_ROOT` 解析业务规则和资产，不能通过启动目录切换数据源。
+数据工作区保存管理助手的 `AGENTS.md`、`.agents/skills/`、研究方法文档，以及 `agents/`、`evolution/`、`config/`、业务 `extensions/` 和被 Git 忽略的 `.local/`。管理、研究、审查和表达 Skill 均由配套数据仓库维护；程序只提供加载和工具实现。目录归属和备份边界见[独立工作区合同](docs/platform-design/02_系统架构与部署设计.md#独立数据工作区)。平台从自身位置解析脚本，从 `HARNESS_ASSET_ROOT` 解析业务规则和资产，不能通过启动目录切换数据源。
 
 每个 Agent 的业务 Case 只在数据根的 `agents/<agent-id>/evaluation.md` 维护；Run 中的冻结输入是历史事实，不是第二份可编辑 Case。Git 和 Research Release 保存可恢复版本，不维护 `evolution/baselines/` 或 `agents/<agent-id>/current/`。Session、缓存、附件和整个 Runtime HOME 不作为 Harness 资产回流。
 

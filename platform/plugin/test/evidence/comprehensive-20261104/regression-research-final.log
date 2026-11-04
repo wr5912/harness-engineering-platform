@@ -1,0 +1,33 @@
+✔ 锁定manifest后经真实HTTP read/preview/CAS/apply/readback逐字导入，保留BOM/Unicode/大源码且不执行 (225.722606ms)
+✔ 已同字节只读核对，不重复保存；显式target_path仍限定指定Candidate (104.562432ms)
+✔ VAR Candidate 使用相同来源SHA、CAS和写后回读链导入源码 (129.677535ms)
+✔ 写后网络中断先回读，不重发apply；同字节核对不能冒称收到成功写回执 (100.741154ms)
+✔ preview冲突不派发apply；apply冲突或回读不同字节保留partial且不自动重试 (149.488026ms)
+✔ 源字节/manifest SHA/目标身份错配先拒绝网络，不写Candidate (5.975495ms)
+✔ 已有文件保留生成正文时的expected_sha256，A变成B后拒写而不采用新读SHA (89.127479ms)
+✔ 未指定expected仅创建新文件，已有不同文件与非法expected均拒绝 (70.174537ms)
+✔ 原只读client仍拒绝edit端点，不能因writer复用共同工厂扩大collector能力 (44.601701ms)
+✔ 源文件含凭据常量时不发preview/apply，partial收据不保存源码或凭据 (21.724113ms)
+✔ 资产源码中的apiKey变量和Bearer模板保持原字节，不按Run日志规则误判为凭据常量 (67.058387ms)
+✔ 实际管理凭据即使藏在普通源码字段中也不能作为资产导入，收据仅保存摘要 (54.436798ms)
+✔ 研究RPC优先核对公开HTTPS入口，仍保留旧直连及工作区绑定 (50.044085ms)
+✔ 真实HTTP认证与完整来源分页保留原生引用、完整分片SHA和平台fileSha，Cookie不落证据 (553.653725ms)
+✔ batch按Run读取真实批次，include_eligibility:false且复用一个客户端顺序取证 (480.582805ms)
+✔ batch目录不完整或中途出现坏批次保留partial，空健康列表也不能写成收集完成 (168.997744ms)
+✔ 单条collect允许读取健康样本并保留目录不完整事实，不推定整批已收集 (213.393417ms)
+✔ URL登记错配先拒绝登录，在线workspace错配不继续读样本 (17.653613ms)
+✔ 完整分片正文篡改不能通过descriptor摘要，partial保留且不生成可用input (126.259503ms)
+✔ 分片来源身份漂移或无进展cursor拒绝，不能缓存伪装完整来源 (125.530959ms)
+✔ 公开回执含未脱敏secret时阻断，不把真实秘密或修改后的投影作为原HTTP证据保存 (41.824586ms)
+✔ 真实RPC信封rpcId错配不能作为成功回执使用 (26.27234ms)
+✔ 跨分片才可识别的秘密在完整检查失败后，全部fragment正文与秘密片段均不落证据 (58.714066ms)
+✔ 最终native prefix读取后来源身份变化仍拒绝，不把先前缓存当作当前稳定来源 (131.973856ms)
+✔ 同名out不能覆盖先前取证，Run与dataset身份不能同时选择 (175.044686ms)
+ℹ tests 25
+ℹ suites 0
+ℹ pass 25
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2606.297781

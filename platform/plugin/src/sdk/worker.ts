@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { StringDecoder } from 'node:string_decoder'
 import { redactRunText } from '../agents/run-files.ts'
 import { readSdkOperation, saveSdkOperation, sdkInstance, stopSdkInstance } from './operations.ts'
 
@@ -15,6 +16,7 @@ const cli = config.cli ?? join(config.program, 'runtime/adapters/dsh-container/d
 const environment = { ...process.env, HARNESS_ASSET_ROOT: config.root, HARNESS_PROGRAM_ROOT: config.program,
   HARNESS_SDK_OPERATION_ID: operation.id, HARNESS_SDK_STOP_FILE: join(directory, 'stop-requested') }
 let stopping = false, stderr = '', pending = '', result: Record<string, any> | undefined
+const stdoutDecoder = new StringDecoder('utf8'), stderrDecoder = new StringDecoder('utf8')
 let stopPromise: Promise<boolean> | undefined
 const save = () => saveSdkOperation(directory, operation)
 const stop = async () => {
@@ -55,16 +57,24 @@ const line = (raw: string) => {
   } catch { operation.events = [...operation.events, { message: clean.slice(-4000) }].slice(-200) }
   save()
 }
-child.stdout.on('data', (chunk: Buffer) => {
-  pending += chunk.toString()
+const consumeStdout = (text: string) => {
+  pending += text
   let index: number
   while ((index = pending.indexOf('\n')) >= 0) { line(pending.slice(0, index)); pending = pending.slice(index + 1) }
   // 最终文本可大于单个事件；轨迹逐条流式传递，超大单行明确保留未知结果。
   if (pending.length > 16 * 1024 * 1024) { line(pending.slice(0, 4000) + '…'); pending = '' }
-})
-child.stderr.on('data', (chunk: Buffer) => { stderr = (stderr + redact(chunk.toString())).slice(-8000) })
+}
+const consumeStderr = (text: string) => {
+  const combined = stderr + text
+  // 先清理完整诊断再截断，避免把已出现的凭据裁成无法匹配的尾片段。
+  stderr = combined.length > 8000 ? redact(combined).slice(-8000) : combined
+}
+child.stdout.on('data', (chunk: Buffer) => consumeStdout(stdoutDecoder.write(chunk)))
+child.stderr.on('data', (chunk: Buffer) => consumeStderr(stderrDecoder.write(chunk)))
 child.once('error', error => { operation.error = redact(error.message) })
 child.once('close', async code => {
+  consumeStdout(stdoutDecoder.end())
+  consumeStderr(stderrDecoder.end())
   line(pending)
   const stopped = stopPromise ? await stopPromise : false
   let beforeLaunch = false

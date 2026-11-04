@@ -41,7 +41,7 @@ async function fixture(t, mode = {}) {
     const envelope = JSON.parse(raw), { method, payload } = envelope
     requests.push({ method, payload }); assert.equal(request.url, '/hep/harness-platform/' + method)
     let value, error
-    if (method === 'inventory') value = { root, workspace }
+    if (method === 'inventory') value = { root, workspace: mode.wrongWorkspace ? { ...workspace, id: 'workspace-other' } : workspace }
     else {
       assert.equal(payload.experiment_id, experiment)
       if (method === 'agents/edit/read') {
@@ -71,10 +71,11 @@ async function fixture(t, mode = {}) {
     response.end(JSON.stringify({ type: 'server-response', rpcId: envelope.rpcId, result: error ? { ok: false, error } : { ok: true, value } }))
   })
   await new Promise(done => server.listen(0, '127.0.0.1', done))
-  const url = `http://127.0.0.1:${server.address().port}/hep/`
+  const serverUrl = `http://127.0.0.1:${server.address().port}/hep/`
+  const url = mode.publicUrl ?? serverUrl
   writeFileSync(join(root, 'config/business-access.json'), JSON.stringify({ gateway: { managementUrl: url } }))
   t.after(async () => { server.closeAllConnections(); await new Promise(done => server.close(done)); rmSync(root, { recursive: true, force: true }) })
-  return { root, path, sourceFile, targets, requests, password, cookie, stats: () => ({ logins, applies }), options: { url, assetRoot: root, agentId: agent, experimentId: experiment, sourceManifest, expectedManifestSha256: sha(rawManifest), out: join(root, 'result') } }
+  return { root, path, sourceFile, targets, requests, password, cookie, serverUrl, stats: () => ({ logins, applies }), options: { url, assetRoot: root, agentId: agent, experimentId: experiment, sourceManifest, expectedManifestSha256: sha(rawManifest), out: join(root, 'result') } }
 }
 
 test('锁定manifest后经真实HTTP read/preview/CAS/apply/readback逐字导入，保留BOM/Unicode/大源码且不执行', async t => {
@@ -192,4 +193,34 @@ test('实际管理凭据即使藏在普通源码字段中也不能作为资产�
   await assert.rejects(importCandidateSources({ ...f.options, expectedManifestSha256: sha(raw) }), /ASSET_SOURCE_UNSAFE/)
   assert.equal(f.stats().applies, 0)
   assert.equal(files(f.options.out).map(file => readFileSync(file, 'utf8')).join('\n').includes(f.password), false)
+})
+
+test('研究RPC优先核对公开HTTPS入口，仍保留旧直连及工作区绑定', async t => {
+  const publicUrl = 'https://platform.example.invalid/hep/'
+  const proxied = await fixture(t, { publicUrl })
+  mkdirSync(join(proxied.root, '.local/platform-service'), { recursive: true })
+  writeFileSync(join(proxied.root, '.local/platform-service/state.json'), JSON.stringify({ url: proxied.serverUrl, publicUrl: publicUrl.slice(0, -1), dataRoot: proxied.root }))
+  const originalFetch = globalThis.fetch
+  // 仅替换HTTPS反代的网络边界；地址、来源、账号与在线inventory校验仍执行真实客户端。
+  globalThis.fetch = (input, init) => {
+    const target = new URL(input instanceof Request ? input.url : String(input))
+    if (target.origin === new URL(publicUrl).origin) { target.protocol = 'http:'; target.host = new URL(proxied.serverUrl).host }
+    return originalFetch(target, init)
+  }
+  try {
+    const client = await createPlatformReadClient(proxied.options)
+    try { assert.equal(client.workspace.id, 'workspace-synthetic-asset-edit') } finally { await client.close() }
+  } finally { globalThis.fetch = originalFetch }
+  assert.deepEqual(proxied.requests.map(request => request.method), ['inventory'])
+  const direct = await fixture(t)
+  mkdirSync(join(direct.root, '.local/platform-service'), { recursive: true })
+  writeFileSync(join(direct.root, '.local/platform-service/state.json'), JSON.stringify({ url: direct.options.url.slice(0, -1), dataRoot: direct.root }))
+  const client = await createPlatformReadClient(direct.options); await client.close()
+  for (const state of [{ url: direct.options.url, publicUrl: 'https://wrong.example.invalid/hep/', dataRoot: direct.root }, { url: direct.options.url, dataRoot: '/different-workspace' }]) {
+    writeFileSync(join(direct.root, '.local/platform-service/state.json'), JSON.stringify(state))
+    await assert.rejects(createPlatformReadClient(direct.options), /PLATFORM_SERVICE_WORKSPACE_MISMATCH/)
+  }
+  await assert.rejects(createPlatformReadClient({ ...direct.options, url: 'https://wrong.example.invalid/hep/' }), /PLATFORM_MANAGEMENT_URL_MISMATCH/)
+  const mismatched = await fixture(t, { wrongWorkspace: true })
+  await assert.rejects(createPlatformReadClient(mismatched.options), /ONLINE_WORKSPACE_MISMATCH/)
 })

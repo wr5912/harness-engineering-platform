@@ -187,7 +187,7 @@ function inputLimit(value: unknown): number {
   return value
 }
 
-function compositionInput(input: Record<string, any>, config?: CompositionConfig): Record<string, any> {
+export function compositionInput(input: Record<string, any>, config?: CompositionConfig): Record<string, any> {
   if (config?.kind) {
     const key = config.kind === 'composite' || config.stage === 'collect' ? 'incident_id' : 'run_id'
     if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).some(name => name !== key) || typeof input[key] !== 'string' || !new RegExp(key === 'incident_id' ? INCIDENT_ID_PATTERN : RUN_ID_PATTERN).test(input[key])) throw new Error(`${key} 格式无效，且不能传入其他字段`)
@@ -324,7 +324,7 @@ export async function executeComposition(registry: McpRegistry, assetRoot: strin
   const runContext: CompositionExecutionContext = { execution_id: execution?.execution_id ?? `graph-${randomUUID()}`, role: execution?.role ?? 'target',
     ...(execution ?? {}), recordAttempt: async attempt => { attempts.push(structuredClone(attempt)); await inheritedRecorder?.(attempt) } }
   const graphExecution = (complete = true): GraphExecution => {
-    const { recordAttempt: _record, role: _role, model_invocation: _invocation, ...identity } = runContext
+    const { recordAttempt: _record, onRun: _onRun, role: _role, model_invocation: _invocation, ...identity } = runContext
     return { ...identity, source_digest: version.sourceDigest, build_digest: version.implementationDigest,
       model_attempts: attempts, complete, ...(!complete ? { unknown_reasons: ['graph-model-attempts-unobserved'] } : {}) }
   }
