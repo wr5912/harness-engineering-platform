@@ -63,7 +63,7 @@ function mount({ failApply = false, delay, readOnly = () => false } = {}) {
   return { settle, render, button, fields, calls, dirty, listeners, files, modal, modalEvents, text: () => text(tree), nodes: () => nodes(tree), setConfirm(value) { confirm = value }, cleanup() { cleanups.forEach(fn => fn?.()) }, props, base }
 }
 
-test('描述读取选中版本自定义资产路径，已有字段经预览保存回同一文件', async () => {
+test('描述读取选中版本自定义资产路径，已有字段直接保存回同一文件', async () => {
   const ui = mount()
   try {
     await ui.settle()
@@ -75,8 +75,7 @@ test('描述读取选中版本自定义资产路径，已有字段经预览保�
     ui.fields()[1].props.onChange({ target: { value: '表单新简介' } }); ui.render()
     assert.equal(ui.dirty.at(-1), true)
     assert.ok(ui.listeners.has('beforeunload'))
-    assert.equal(ui.button('保存修改').props.disabled, true)
-    ui.button('校验与预览').props.onClick(); await ui.settle()
+    assert.equal(ui.button('校验与预览'), undefined)
     assert.equal(ui.button('保存修改').props.disabled, false)
     ui.button('保存修改').props.onClick(); await ui.settle()
     const saved = ui.calls.find(call => call.endpoint === 'agents/edit/apply').body
@@ -84,8 +83,62 @@ test('描述读取选中版本自定义资产路径，已有字段经预览保�
     assert.equal(saved.edits.length, 2)
     assert.ok(saved.edits.every(edit => edit.expected_sha256 === 'original-digest'))
     assert.match(ui.files.get(ui.base + '/harness.yaml'), /# 保留\nagent:\n  id: inspection\n  name: "表单新名称"/)
+    assert.doesNotMatch(ui.files.get(ui.base + '/harness.yaml'), /notes:/)
     assert.match(ui.files.get(ui.base + '/custom/presets/inspection-v2/preset.yml'), /description: "表单新简介"\nmodel: original/)
     assert.equal(ui.dirty.at(-1), false)
+    assert.equal(ui.calls.some(call => call.endpoint === 'agents/edit/preview'), false)
+  } finally { ui.cleanup() }
+})
+
+test('可选备注兼容旧版本，可多行保存、回读、导出并清空，仅更新当前版本原文件', async () => {
+  const ui = mount()
+  const notes = '现场补充：第一行\n第二行 <script>仅文本</script>'
+  const path = ui.base + '/harness.yaml'
+  try {
+    await ui.settle()
+    assert.match(ui.text(), /此版本尚未填写备注/)
+    ui.button('编辑资料').props.onClick(); ui.render()
+    assert.equal(ui.fields()[2].props.value, '')
+    ui.fields()[0].props.onChange({ target: { value: '连同备注修改的名称' } }); ui.render()
+    ui.fields()[2].props.onChange({ target: { value: notes } }); ui.render()
+    ui.button('保存修改').props.onClick(); await ui.settle()
+    const edits = ui.calls.find(call => call.endpoint === 'agents/edit/apply').body.edits
+    assert.equal(edits.length, 1)
+    assert.equal(edits[0].path, path)
+    assert.equal(edits[0].expected_sha256, 'original-digest')
+    assert.match(edits[0].content, /name: "连同备注修改的名称"/)
+    assert.match(edits[0].content, /notes: "现场补充：第一行\\n第二行 <script>仅文本<\/script>"/)
+    assert.ok(ui.text().includes(notes))
+    assert.match(ui.files.get(path), /# 保留\nagent:/)
+    assert.match(ui.files.get(path), /loadable_assets:\n  preset_root: custom\/presets/)
+    ui.button('预览与导出').props.onClick(); await ui.settle()
+    const exported = ui.nodes().find(node => node.type === 'pre' && String(node.props.children).includes('"agent_id"'))
+    assert.equal(JSON.parse(exported.props.children).notes, notes)
+    ui.button('关闭').props.onClick(); ui.render()
+    ui.button('编辑资料').props.onClick(); ui.render()
+    assert.equal(ui.fields()[2].props.value, notes)
+    ui.fields()[2].props.onChange({ target: { value: '' } }); ui.render()
+    ui.button('保存修改').props.onClick(); await ui.settle()
+    assert.match(ui.files.get(path), /notes: ""/)
+    assert.match(ui.text(), /此版本尚未填写备注/)
+    assert.equal(ui.dirty.at(-1), false)
+  } finally { ui.cleanup() }
+})
+
+test('备注保存冲突保留草稿，取消编辑不会写入旧版本', async () => {
+  const ui = mount({ failApply: true })
+  try {
+    await ui.settle()
+    ui.button('编辑资料').props.onClick(); ui.render()
+    ui.fields()[2].props.onChange({ target: { value: '尚未保存的备注' } }); ui.render()
+    assert.equal(ui.dirty.at(-1), true)
+    ui.button('保存修改').props.onClick(); await ui.settle()
+    assert.equal(ui.fields()[2].props.value, '尚未保存的备注')
+    assert.match(ui.text(), /文件摘要发生冲突.*草稿已保留/)
+    assert.doesNotMatch(ui.files.get(ui.base + '/harness.yaml'), /notes:/)
+    ui.setConfirm(true); ui.button('取消').props.onClick(); ui.render()
+    assert.equal(ui.dirty.at(-1), false)
+    assert.doesNotMatch(ui.files.get(ui.base + '/harness.yaml'), /notes:/)
   } finally { ui.cleanup() }
 })
 
@@ -101,8 +154,8 @@ test('描述和技能表单沿用资产只读决定，可编辑字段仍能单�
     ui.button('编辑资料').props.onClick(); ui.render()
     assert.equal(ui.fields()[0].props.disabled, true)
     assert.equal(ui.fields()[1].props.disabled, false)
+    assert.equal(ui.fields()[2].props.disabled, true)
     ui.fields()[1].props.onChange({ target: { value: '可独立更新的简介' } }); ui.render()
-    ui.button('校验与预览').props.onClick(); await ui.settle()
     ui.button('保存修改').props.onClick(); await ui.settle()
     const saved = ui.calls.find(call => call.endpoint === 'agents/edit/apply').body.edits
     assert.equal(saved.length, 1)
@@ -124,10 +177,9 @@ test('技能表单保存保留无关元数据与正文，冲突后保留输入�
     await ui.settle()
     ui.button('编辑').props.onClick(); ui.render()
     ui.fields()[1].props.onChange({ target: { value: '更新技能说明' } }); ui.render()
-    ui.button('校验与预览').props.onClick(); await ui.settle()
-    const preview = ui.calls.find(call => call.endpoint === 'agents/edit/preview').body.edits[0]
-    assert.match(preview.content, /description: "更新技能说明"\nowner: 保留\n---\n# 技能正文\n保持原文。\n$/)
     ui.button('保存修改').props.onClick(); await ui.settle()
+    const saved = ui.calls.find(call => call.endpoint === 'agents/edit/apply').body.edits[0]
+    assert.match(saved.content, /description: "更新技能说明"\nowner: 保留\n---\n# 技能正文\n保持原文。\n$/)
     assert.match(ui.text(), /文件摘要发生冲突.*草稿已保留/)
     assert.equal(ui.fields()[1].props.value, '更新技能说明')
     ui.button('取消').props.onClick(); ui.render()
@@ -140,13 +192,12 @@ test('技能表单保存保留无关元数据与正文，冲突后保留输入�
   } finally { ui.cleanup() }
 })
 
-test('编辑期间资产摘要变化保留草稿并阻止旧预览保存', async () => {
+test('编辑期间资产摘要变化保留草稿并阻止旧资料保存', async () => {
   const ui = mount()
   try {
     await ui.settle()
     ui.button('编辑资料').props.onClick(); ui.render()
     ui.fields()[0].props.onChange({ target: { value: '本地草稿' } }); ui.render()
-    ui.button('校验与预览').props.onClick(); await ui.settle()
     const reads = ui.calls.filter(call => call.endpoint === 'agents/edit/read').length
     ui.props.detail = { ...ui.props.detail, candidate_sha256: 'other-writer-digest' }
     ui.render(); await ui.settle()
@@ -161,7 +212,7 @@ test('编辑期间资产摘要变化保留草稿并阻止旧预览保存', async
 })
 
 
-test('新增技能只创建选中工作区的新文件，预览和保存携带不存在校验', async () => {
+test('新增技能只创建选中工作区的新文件，直接保存携带不存在校验', async () => {
   const ui = mount()
   try {
     await ui.settle()
@@ -169,16 +220,15 @@ test('新增技能只创建选中工作区的新文件，预览和保存携带�
     ui.fields()[0].props.onChange({ target: { value: '../outside' } }); ui.render()
     ui.fields()[2].props.onChange({ target: { value: '新技能说明' } }); ui.render()
     ui.fields()[3].props.onChange({ target: { value: '# 新技能\n读取真实输入。\n' } }); ui.render()
-    ui.button('校验与预览').props.onClick(); await ui.settle()
+    ui.button('保存修改').props.onClick(); await ui.settle()
     assert.match(ui.text(), /小写 kebab-case/)
     assert.equal(ui.calls.some(call => call.endpoint === 'agents/edit/preview'), false)
     ui.fields()[0].props.onChange({ target: { value: 'new-inspection' } }); ui.render()
-    ui.button('校验与预览').props.onClick(); await ui.settle()
-    const edit = ui.calls.find(call => call.endpoint === 'agents/edit/preview').body.edits[0]
+    ui.button('保存修改').props.onClick(); await ui.settle()
+    const edit = ui.calls.find(call => call.endpoint === 'agents/edit/apply').body.edits[0]
     assert.equal(edit.path, ui.base + '/custom/workspace/.agents/skills/new-inspection/SKILL.md')
     assert.equal(edit.expected_sha256, null)
     assert.match(edit.content, /name: "new-inspection"\ndescription: "新技能说明"\n---\n# 新技能/)
-    ui.button('保存修改').props.onClick(); await ui.settle()
     assert.equal(ui.files.get(edit.path), edit.content)
   } finally { ui.cleanup() }
 })
