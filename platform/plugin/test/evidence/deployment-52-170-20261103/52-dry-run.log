@@ -1,0 +1,1 @@
+dsh-deploy: git 执行失败：spawnSync git ENOBUFS

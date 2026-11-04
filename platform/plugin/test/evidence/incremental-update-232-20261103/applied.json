@@ -1,0 +1,18 @@
+{
+  "status": "updated",
+  "activation": "pending",
+  "files": 286,
+  "bytes": 48826956,
+  "commits": [
+    {
+      "before": "6771136d8f0f83a6ade48f3a33772278d0006e11",
+      "commit": "ea509f21c10472ea819d55a51b08adacc266fe00"
+    },
+    {
+      "before": "81e2d43650b54d78fc6a9d5175a3b8ad9fa55400",
+      "commit": "2c2786edd4eefae434249482cedd4c39b9ff1ea4"
+    }
+  ],
+  "backup": "/srv/storage/hep-rc5-20261102/program/.local/deploy-updates/3979f0c0-01da-4cf0-8ecd-25fab65b2b80",
+  "transferBytes": 55594898
+}

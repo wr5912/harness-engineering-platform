@@ -1,0 +1,77 @@
+{
+  "scope": "232 实际平台只读选择版本、按名称搜索与刷新；不保存资产、不调用模型、不启停实例",
+  "checks": [
+    {
+      "name": "EXP027 完整版本标签",
+      "ok": true
+    },
+    {
+      "name": "变体主行使用完整版本号",
+      "ok": true
+    },
+    {
+      "name": "变体辅助行保留名称与来源",
+      "ok": true
+    },
+    {
+      "name": "变体名称可搜索",
+      "ok": true
+    },
+    {
+      "name": "1440 变体完整标签可见",
+      "ok": true
+    },
+    {
+      "name": "1440 无横向溢出",
+      "ok": true
+    },
+    {
+      "name": "768 变体完整标签可见",
+      "ok": true
+    },
+    {
+      "name": "768 无横向溢出",
+      "ok": true
+    },
+    {
+      "name": "390 变体完整标签可见",
+      "ok": true
+    },
+    {
+      "name": "390 无横向溢出",
+      "ok": true
+    },
+    {
+      "name": "变体身份切换正确",
+      "ok": true
+    },
+    {
+      "name": "刷新保留所选完整版本",
+      "ok": true
+    },
+    {
+      "name": "可返回指定 EXP027",
+      "ok": true
+    },
+    {
+      "name": "无页面脚本异常",
+      "ok": true
+    }
+  ],
+  "errors": [],
+  "blockedWrites": [
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    }
+  ],
+  "variant": {
+    "label": "v003-r6fcbc8e8f093",
+    "description": "KEV 实训与 Qwen 小模型业务验证 · 基于 v024-rad80a907c628 · LangGraph 代码"
+  },
+  "selectedUrl": "http://172.16.138.232:18120/hep/#/agents?agent_id=security-operations-expert&experiment_id=VAR-security-operations-expert-003-r6fcbc8e8f093&tab=overview"
+}

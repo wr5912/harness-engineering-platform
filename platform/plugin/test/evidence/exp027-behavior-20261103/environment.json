@@ -1,0 +1,47 @@
+{
+  "observed_at": "2026-11-03T09:10:01.646462+00:00",
+  "instances": [
+    {
+      "name": "security-operations-expert-exp027",
+      "source_id": "experiment:EXP-security-operations-expert-027-reab20c48f610",
+      "container_id": "14ac909dd092969fe7f5740084b8e77e262d53b47e37ec2d3138798f5b1558de",
+      "image": "sha256:c06d4e1fecc66f175a2fbeaa51e96ea0b2af8f58be22f89edac73df3c779bece",
+      "started_at": "2026-11-03T09:06:22.708452109Z",
+      "running": true,
+      "model": null
+    },
+    {
+      "name": "hep-deploy-accept-amd64-final",
+      "source_id": "experiment:EXP-security-operations-expert-024-rad80a907c628",
+      "container_id": "e343f21ecf5517c3db03e409cdb2db7f825f145837c0f156db5a7989bf8e447d",
+      "image": "sha256:c06d4e1fecc66f175a2fbeaa51e96ea0b2af8f58be22f89edac73df3c779bece",
+      "started_at": "2026-11-03T06:08:10.924680452Z",
+      "running": true,
+      "model": null
+    }
+  ],
+  "original_ledger_sha256": "a69ffa45f986f19009d3314f170e7b8f59fd2f03223ae422ee19f7032db84475",
+  "files": {
+    "candidate/dsh/presets/security-operations-expert/agent.cordis.yml": "fdc8742eaeaa2b532c26fd6e31530b68af6013e05f3b7181f0ad476e4f409953",
+    "candidate/dsh/presets/security-operations-expert/preset.yml": "129215f47b4ebad9d9e00dec9ff6f4b6a9e6f9671d09e283c4fcb22a315367c6",
+    "candidate/dsh/workspace/AGENTS.md": "dc2433294f15b3d8b14afe5f36d2d015630911d4d8077fb3531521ca08a16a2b",
+    "candidate/dsh/workspace/.agents/skills/security-inspection/SKILL.md": "4228563e287b6fcd406c3a31adc81345e3cf614f37997c7578aaedec71380d6f",
+    "candidate/dsh/managed/inspection-preparation-runtime.ts": "0dda91f3d20fc8976caf1bfbdfd3a90773f9f5a293710174bf72cae66516b0fd",
+    "candidate/dsh/managed/inspection-preparation-runtime.mjs": "e311be6fcf55893f69bd7d54465851a0437ca35a6bda9b7f5d032f7425a200d6",
+    "change.yaml": "c38649b26c9c57065b2931f8a68bb2a0c1bf27f1f6255ddd5f80d38d91ad3e41"
+  },
+  "http": [
+    {
+      "url": "http://172.16.138.232:18120/hep/login",
+      "status": 200
+    },
+    {
+      "url": "http://172.16.138.232:53106/agents/security-operations-expert/instances/hep-deploy-accept-amd64-final/",
+      "status": 200
+    },
+    {
+      "url": "http://172.16.138.232:53106/agents/security-operations-expert/instances/security-operations-expert-exp027/",
+      "status": 200
+    }
+  ]
+}

@@ -47,14 +47,18 @@ function validateOptions(command: string, options: Options): void {
     pack: ['out', 'program-root', 'data-root', 'assets-dir', 'image-archive', 'image-tag', 'image-id', 'image-fingerprint', 'arch'],
     install: ['bundle-root', 'prefix', 'data-root', 'host', 'port', 'gateway-port', 'public-url'],
     verify: ['prefix', 'data-root', 'url'],
-    update: ['program-root', 'data-root'],
+    relocate: ['prefix', 'from-data-root', 'data-root', 'ssh'],
+    'agent-update': ['prefix', 'data-root', 'remote-data-root', 'ssh', 'manifest'],
+    update: ['prefix', 'data-root', 'remote-data-root', 'ssh', 'program-root', 'cancel-prepare'],
   }
   const flags: Record<string, string[]> = {
     'agent-preview': [], 'agent-pack': [], 'agent-prepare': [],
     pack: ['no-image', 'no-data', 'allow-dirty', 'allow-fixture-data', 'keep-staging'],
     install: ['dry-run', 'skip-image', 'skip-prepare', 'strict-paths', 'allow-fixture-data', 'start'],
     verify: [],
-    update: ['dry-run'],
+    relocate: ['dry-run', 'resume'],
+    'agent-update': ['dry-run'],
+    update: ['dry-run', 'minimal-data', 'install-deps', 'start'],
   }
   if (!values[command]) throw new Error(`未知命令：${command}`)
   for (const [key, value] of Object.entries(options)) {
@@ -88,6 +92,29 @@ function usage(): string {
     --json                      输出更新回执
     源码更新保留配置、会话和实例；有在途任务或无法确认空闲时不应用。
 
+  dsh-deploy update --ssh <user@host> [选项]
+    --program-root <目录>       本地程序仓库，默认当前仓库
+    --data-root <目录>          本地数据仓库，默认当前关联工作区
+    --prefix <目录>             远端已安装程序根（必填）
+    --remote-data-root <目录>   远端数据根（必填）
+    --ssh <user@host>           SSH 目标（必填）
+    --dry-run                   构建 HEAD 快照并核对增量，不更改远端安装文件
+    --minimal-data              仅刷新管理身份、技能和参考资料，保留现场业务资产
+    --install-deps              依赖变化时，在隔离目录补齐已准备的离线依赖增量
+    --cancel-prepare <PID>      恢复时取消本工具卡住的离线准备进程，再继续更新
+    --start                     核对空闲会话后重载管理平台并验证，保留业务容器
+    仅传两仓已提交增量和变化制品；保留现场配置、会话和无关改动，冲突停止，失败回滚。
+    不传镜像；默认不安装依赖、不重启，按实际变化显式启用。
+
+  dsh-deploy agent-update [选项]
+    --manifest <JSON>           智能体、Experiment、实例及文件路径/预期远端 SHA256 清单
+    --data-root <目录>          本地数据根，包含实际未提交的待更新资产
+    --prefix <目录>             远端已安装的程序根
+    --remote-data-root <目录>   远端数据根
+    --ssh <user@host>           SSH 目标
+    --dry-run                   仅核对身份、摘要与差异；不写入
+    仅更新指定版本资产，保留私有备份和回执；失败回滚，不重启或宣称运行中已生效。
+
   dsh-deploy agent-preview|agent-pack|agent-prepare [选项]
     --agent-id <智能体>          明确的业务智能体
     --source experiment:<ID>    已保存的固定版本，包含实际未提交资产
@@ -116,6 +143,15 @@ function usage(): string {
     --allow-dirty                工作树有改动时仍打包 HEAD 快照（不包含未提交改动）
     --allow-fixture-data         允许夹具数据根（仅测试；真实部署默认拒绝）
     --keep-staging               保留暂存目录
+
+  dsh-deploy relocate [选项]
+    --prefix <目录>              已安装的程序根（必填）
+    --from-data-root <目录>      当前数据根（必填）
+    --data-root <目录>           目标数据根，默认 ~/harness-engineering-platform-data
+    --ssh <user@host>            通过 SSH 在目标机执行本工具；远端路径须为绝对路径
+    --dry-run                    只核对和展示迁移计划
+    --resume                     目标和定位已就位时，按匹配回执恢复平台并核对
+    保留原数据、会话和业务实例挂载；跨文件系统使用持久 bind 挂载，不复制全量数据。
 
   dsh-deploy verify [选项]
     --prefix <目录>              程序安装目录，默认 ~/work/harness-engineering-platform-data
@@ -146,10 +182,34 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     if (!command || command === '--help' || flag(options, 'help')) { console.log(usage()); return 0 }
     validateOptions(command, options)
     if (command === 'update') {
+      if (['ssh', 'prefix', 'remote-data-root', 'minimal-data', 'install-deps', 'start', 'cancel-prepare'].some(key => options[key] !== undefined)) {
+        const prefix = text(options, 'prefix'), dataRoot = text(options, 'remote-data-root'), ssh = text(options, 'ssh')
+        if (!prefix || !dataRoot || !ssh) throw new Error('update 需要 --prefix、--remote-data-root 和 --ssh')
+        const { updateRemote } = await import('./remote-update.mts')
+        return updateRemote(ssh, { prefix, dataRoot, dryRun: flag(options, 'dry-run'), minimalData: flag(options, 'minimal-data'), installDeps: flag(options, 'install-deps'), start: flag(options, 'start'), cancelPrepare: text(options, 'cancel-prepare') === undefined ? undefined : Number(text(options, 'cancel-prepare')) }, resolve(text(options, 'program-root', REPO)!), resolve(text(options, 'data-root', defaultAssetRoot())!))
+      }
       const { updatePlatform } = await import('./update.mts')
       const report = await updatePlatform({ programRoot: resolve(text(options, 'program-root', REPO)!), dataRoot: resolve(text(options, 'data-root', defaultAssetRoot())!), dryRun: flag(options, 'dry-run') })
       console.log(JSON.stringify(report, null, 2))
       return report.status === 'busy' ? 1 : 0
+    }
+    if (command === 'agent-update') {
+      const prefix = text(options, 'prefix'), dataRoot = text(options, 'remote-data-root'), ssh = text(options, 'ssh'), manifest = text(options, 'manifest')
+      if (!prefix || !dataRoot || !ssh || !manifest) throw new Error('agent-update 需要 --prefix、--remote-data-root、--ssh 和 --manifest')
+      const { prepareAgentUpdate, updateAgentRemote } = await import('./agent-update.mts')
+      const update = prepareAgentUpdate(resolve(text(options, 'data-root', defaultAssetRoot())!), resolve(manifest))
+      return updateAgentRemote(ssh, { prefix, dataRoot, dryRun: flag(options, 'dry-run') }, update)
+    }
+    if (command === 'relocate') {
+      const prefix = text(options, 'prefix'), fromDataRoot = text(options, 'from-data-root'), ssh = text(options, 'ssh')
+      if (!prefix || !fromDataRoot) throw new Error('relocate 需要 --prefix 和 --from-data-root')
+      const dataRoot = text(options, 'data-root', ssh ? undefined : join(homedir(), 'harness-engineering-platform-data'))
+      if (!dataRoot || ![prefix, fromDataRoot, dataRoot].every(path => path.startsWith('/'))) throw new Error('迁移路径须为绝对路径；SSH 执行须显式指定远端 --data-root')
+      const input = { prefix, fromDataRoot, dataRoot, dryRun: flag(options, 'dry-run'), resume: flag(options, 'resume') }
+      const { relocate, relocateRemote } = await import('./relocate.mts')
+      if (ssh) return relocateRemote(ssh, input)
+      console.log(JSON.stringify(await relocate(input), null, 2))
+      return 0
     }
     if (['agent-preview', 'agent-pack', 'agent-prepare'].includes(command)) {
       const agentId = text(options, 'agent-id'), source = text(options, 'source')

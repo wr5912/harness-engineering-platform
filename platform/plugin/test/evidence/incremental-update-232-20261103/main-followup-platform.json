@@ -1,0 +1,14 @@
+{
+  "status": "running",
+  "pid": 909528,
+  "birth": "43953920",
+  "programRoot": "/srv/storage/hep-rc5-20261102/program",
+  "dataRoot": "/root/harness-engineering-platform-data",
+  "host": "172.16.138.232",
+  "port": 18120,
+  "url": "http://172.16.138.232:18120/hep/",
+  "publicUrl": "http://172.16.138.232:18120/hep/",
+  "log": "/root/harness-engineering-platform-data/.local/platform-service/platform.log",
+  "phase": "running",
+  "detached": true
+}

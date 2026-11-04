@@ -1,0 +1,45 @@
+{
+  "program": "1a32a74e285a5b8d50678a1d17b2f11b237315e4",
+  "data": "03e32ea23a026ce63550c7a68e3482dff9427ee0",
+  "manifest": {
+    "program": "1a32a74e285a5b8d50678a1d17b2f11b237315e4",
+    "data": {
+      "commit": "03e32ea23a026ce63550c7a68e3482dff9427ee0",
+      "dirty": true,
+      "sensitive": true,
+      "kind": "workspace",
+      "workspaceId": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+      "skills": 19,
+      "sourceCommit": "03e32ea23a026ce63550c7a68e3482dff9427ee0",
+      "minimal": false
+    }
+  },
+  "agents": [
+    "asset-discovery-assistant",
+    "autonomous-training-researcher",
+    "daily-inspection-assistant",
+    "inspection-delivery-demo",
+    "multi-step-research-analyst",
+    "rc5-ui-acceptance-20261102",
+    "security-operations-expert",
+    "test01"
+  ],
+  "skills": 21,
+  "modelRuntimeInode": 33891943,
+  "containers": [
+    {
+      "name": "security-operations-expert",
+      "id": "5546ba91acfe57c74bea1fa03dc0e127462b159c1c429fcf823c9cf9d01594c7",
+      "status": "running",
+      "startedAt": "2026-11-02T10:14:36.26247684Z",
+      "image": "ai-agent-harness/dsh:b830ec950-arm64-fdc3f44c9900@sha256:2764e787d4f12770d24bedefe788a9679c7336a9685c21a3e8e82908fe88c1d9"
+    },
+    {
+      "name": "hep-agent-security-operations-expert-1793614616-24935-dsh-1",
+      "id": "35bf553853bdb2a486e7e8fcf899657682a703d02f6dd8944f894d15b4a6c3eb",
+      "status": "running",
+      "startedAt": "2026-11-02T10:21:20.35204246Z",
+      "image": "ai-agent-harness/dsh:b830ec950-arm64-fdc3f44c9900"
+    }
+  ]
+}

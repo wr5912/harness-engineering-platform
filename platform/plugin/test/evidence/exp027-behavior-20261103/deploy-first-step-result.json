@@ -1,0 +1,28 @@
+{
+  "instance": "security-operations-expert-exp027",
+  "experimentId": "EXP-security-operations-expert-027-reab20c48f610",
+  "status": "updated",
+  "activation": "pending",
+  "files": [
+    {
+      "path": "candidate/dsh/managed/inspection-preparation-runtime.ts",
+      "beforeSha256": "f9c082e1d12a4c62859b88d723c8239f078f2da44d015ff2650c6ba9094758bb",
+      "sha256": "0dda91f3d20fc8976caf1bfbdfd3a90773f9f5a293710174bf72cae66516b0fd",
+      "changed": true
+    },
+    {
+      "path": "candidate/dsh/managed/inspection-preparation-runtime.mjs",
+      "beforeSha256": "0747c102880dfb20b4e9c8e1d95463e1cc16702f07afb69a110d8e3de6a3ac19",
+      "sha256": "e311be6fcf55893f69bd7d54465851a0437ca35a6bda9b7f5d032f7425a200d6",
+      "changed": true
+    },
+    {
+      "path": "change.yaml",
+      "beforeSha256": "adc387473965b0e1f57ae10d8827db6288dd5b84c03a0f829efa69fab7ccb2ac",
+      "sha256": "c38649b26c9c57065b2931f8a68bb2a0c1bf27f1f6255ddd5f80d38d91ad3e41",
+      "changed": true
+    }
+  ],
+  "bytes": 38095,
+  "backup": "/srv/storage/hep-rc5-20261102/program/.local/deploy-agent-updates/80233172-83b1-462f-b2db-45cecf84d06d"
+}

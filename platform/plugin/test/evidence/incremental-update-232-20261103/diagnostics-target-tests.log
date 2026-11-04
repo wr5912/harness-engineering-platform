@@ -1,0 +1,27 @@
+✔ 指定 EXP027：首次提示词组装前安装巡检工具适配，恢复会话与子 Agent 作用域不串用 (10.428892ms)
+✔ 指定 EXP027：任务默认范围由服务解析，错误回执保留且不重复提交或虚构恢复 (162.225864ms)
+✔ 指定 EXP027：DSH 抛出的底层异常只保存在私有账本，恢复后不重复启动 (127.337123ms)
+✔ EXP-security-operations-expert-024-rad80a907c628：范围、过期刷新、同轮幂等与未知回执 (292.873221ms)
+✔ EXP-security-operations-expert-024-rad80a907c628：澄清、取消、损坏状态和真实消息归属 (33.564526ms)
+✔ EXP-security-operations-expert-024-rad80a907c628：原生 Schedule 同次到期请求标识稳定 (19.485324ms)
+✔ EXP-security-operations-expert-024-rad80a907c628：全文预算溢出只补读一次同次摘要并由既有交付器输出 (10.59115ms)
+✔ EXP-security-operations-expert-025-r3f8a8b3da3f1：范围、过期刷新、同轮幂等与未知回执 (105.805015ms)
+✔ EXP-security-operations-expert-025-r3f8a8b3da3f1：澄清、取消、损坏状态和真实消息归属 (9.947347ms)
+✔ EXP-security-operations-expert-025-r3f8a8b3da3f1：原生 Schedule 同次到期请求标识稳定 (11.316807ms)
+✔ EXP-security-operations-expert-025-r3f8a8b3da3f1：全文预算溢出只补读一次同次摘要并由既有交付器输出 (11.873516ms)
+✔ EXP-security-operations-expert-026-ra06021c8deaf：范围、过期刷新、同轮幂等与未知回执 (49.530635ms)
+✔ EXP-security-operations-expert-026-ra06021c8deaf：澄清、取消、损坏状态和真实消息归属 (6.353716ms)
+✔ EXP-security-operations-expert-026-ra06021c8deaf：原生 Schedule 同次到期请求标识稳定 (13.205202ms)
+✔ EXP-security-operations-expert-026-ra06021c8deaf：全文预算溢出只补读一次同次摘要并由既有交付器输出 (7.656573ms)
+✔ EXP-security-operations-expert-027-reab20c48f610：范围、过期刷新、同轮幂等与未知回执 (56.224174ms)
+✔ EXP-security-operations-expert-027-reab20c48f610：澄清、取消、损坏状态和真实消息归属 (7.234651ms)
+✔ EXP-security-operations-expert-027-reab20c48f610：原生 Schedule 同次到期请求标识稳定 (11.572887ms)
+✔ EXP-security-operations-expert-027-reab20c48f610：全文预算溢出只补读一次同次摘要并由既有交付器输出 (11.842961ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1148.825384

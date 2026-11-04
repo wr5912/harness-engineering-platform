@@ -7,8 +7,8 @@ import { instanceWebUrl } from '../instances/url.ts'
 
 type Asset = { path: string; content: string; sha256: string; editable?: boolean; reason?: string }
 type Skill = Asset & { name: string; description: string; body: string }
-type Description = { harness: Asset; preset: Asset | null; name: string; description: string; skills: Skill[]; skillPrefix: string }
-type Editor = { kind: 'profile' | 'skill' | 'new-skill'; skill?: Skill; skillId?: string; name: string; description: string; body: string }
+type Description = { harness: Asset; preset: Asset | null; name: string; description: string; notes: string; skills: Skill[]; skillPrefix: string }
+type Editor = { kind: 'profile' | 'skill' | 'new-skill'; skill?: Skill; skillId?: string; name: string; description: string; notes?: string; body: string }
 const object = (text: string): Record<string, any> => {
   const value = load(text)
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('当前文件不是可编辑的 YAML 对象，请使用资产编辑器核对。')
@@ -71,7 +71,6 @@ export function AgentDescriptionPanel({ rpc, detail, agentId, onSaved, onEditAss
   const [instanceMessage, setInstanceMessage] = useState('')
   const [instancesLoading, setInstancesLoading] = useState(false), [instanceUrlLoading, setInstanceUrlLoading] = useState(false)
   const instanceRequest = useRef(0)
-  const [preview, setPreview] = useState<any>(null)
   const [busy, setBusy] = useState(false)
   const [retry, setRetry] = useState(0)
   const [failedPaths, setFailedPaths] = useState<string[]>([])
@@ -109,13 +108,13 @@ export function AgentDescriptionPanel({ rpc, detail, agentId, onSaved, onEditAss
         return { ...asset, name: typeof fields.name === 'string' ? fields.name : path.slice(prefix.length, -9), description: typeof fields.description === 'string' ? fields.description : '', body: parts.body }
       }))
       if (request !== sequence.current) return
-      setValue({ harness, preset, name: typeof data.agent?.name === 'string' ? data.agent.name : agentId, description: preset && typeof object(preset.content).description === 'string' ? object(preset.content).description : '', skillPrefix: prefix, skills: results.flatMap(result => result.status === 'fulfilled' ? [result.value] : []) })
+      setValue({ harness, preset, name: typeof data.agent?.name === 'string' ? data.agent.name : agentId, description: preset && typeof object(preset.content).description === 'string' ? object(preset.content).description : '', notes: typeof data.agent?.notes === 'string' ? data.agent.notes : '', skillPrefix: prefix, skills: results.flatMap(result => result.status === 'fulfilled' ? [result.value] : []) })
       setFailedPaths(results.flatMap(result => result.status === 'rejected' ? [String(result.reason?.message ?? result.reason)] : []))
     })().catch(error => { if (request === sequence.current) setError(error instanceof Error ? error.message : '读取失败') })
     return () => { sequence.current++ }
   }, [rpc, experimentId, detail.candidate_sha256, retry])
   const initial = editor?.kind === 'skill' ? editor.skill : value
-  const dirty = Boolean(editor && (editor.kind === 'new-skill' ? editor.skillId || editor.name || editor.description || editor.body : editor.name !== initial?.name || editor.description !== initial?.description || editor.kind === 'skill' && editor.body !== editor.skill?.body))
+  const dirty = Boolean(editor && (editor.kind === 'new-skill' ? editor.skillId || editor.name || editor.description || editor.body : editor.name !== initial?.name || editor.description !== initial?.description || editor.kind === 'profile' && editor.notes !== value?.notes || editor.kind === 'skill' && editor.body !== editor.skill?.body))
   useEffect(() => { onDirtyChange(dirty); return () => onDirtyChange(false) }, [dirty, onDirtyChange])
   useEffect(() => {
     if (!dirty) return
@@ -156,20 +155,23 @@ export function AgentDescriptionPanel({ rpc, detail, agentId, onSaved, onEditAss
   }, [exportOpen, instanceName, rpc])
   function close() {
     if (busy || dirty && !window.confirm('当前资料有未保存修改。确认放弃草稿？')) return
-    setEditor(null); setViewSkill(null); setExportOpen(false); setPreview(null); setMessage('')
+    setEditor(null); setViewSkill(null); setExportOpen(false); setMessage('')
     if (sourceChanged) { editorRef.current = null; setRetry(value => value + 1) }
   }
   function openSource(path: string) {
     if (busy || dirty && !window.confirm('放弃未保存资料并查看原始资产？')) return
-    setEditor(null); setViewSkill(null); setExportOpen(false); setPreview(null); onDirtyChange(false); onEditAsset(path)
+    setEditor(null); setViewSkill(null); setExportOpen(false); onDirtyChange(false); onEditAsset(path)
   }
   function edits() {
     if (!editor || !value) return []
     if (editor.kind === 'profile') {
       const rows = []
-      if (editor.name !== value.name) {
+      if (editor.name !== value.name || editor.notes !== value.notes) {
         if (value.harness.editable === false) throw new Error(value.harness.reason || '版本声明仅提供只读预览。')
-        rows.push({ path: value.harness.path, content: replaceDescriptionField(value.harness.content, 'name', editor.name.trim(), 'agent'), expected_sha256: value.harness.sha256 })
+        let content = value.harness.content
+        if (editor.name !== value.name) content = replaceDescriptionField(content, 'name', editor.name.trim(), 'agent')
+        if (editor.notes !== value.notes) content = replaceDescriptionField(content, 'notes', editor.notes ?? '', 'agent')
+        rows.push({ path: value.harness.path, content, expected_sha256: value.harness.sha256 })
       }
       if (value.preset && editor.description !== value.description) {
         if (value.preset.editable === false) throw new Error(value.preset.reason || '版本简介仅提供只读预览。')
@@ -193,23 +195,22 @@ export function AgentDescriptionPanel({ rpc, detail, agentId, onSaved, onEditAss
     metadata = replaceDescriptionField(metadata, 'description', editor.description)
     return [{ path: skill.path, content: parts.header + metadata + parts.separator + editor.body, expected_sha256: skill.sha256 }]
   }
-  async function save(apply: boolean) {
+  async function save() {
     if (busy || !editor || !dirty) return
-    if (sourceChanged) { setMessage('保存依据已变化，请保留草稿并核对最新资产，不能沿用旧预览保存。'); return }
+    if (sourceChanged) { setMessage('保存依据已变化，请保留草稿并核对最新资产后再保存。'); return }
     const request = sequence.current
     setBusy(true); setMessage('')
     try {
       const rows = edits()
       if (!rows.length) { setMessage('没有需要保存的修改。'); return }
-      const result = await call(apply ? 'edit/apply' : 'edit/preview', { experiment_id: experimentId, edits: rows })
+      await call('edit/apply', { experiment_id: experimentId, edits: rows })
       if (request !== sequence.current) return
-      if (apply) { setEditor(null); setPreview(null); setRetry(value => value + 1); setMessage('版本资料已保存；运行实例的装载状态请到实例管理核对。'); onSaved() }
-      else { setPreview(result); setMessage('校验通过，尚未保存。请核对变更内容。') }
+      setEditor(null); setRetry(value => value + 1); setMessage('版本资料已保存；运行实例的装载状态请到实例管理核对。'); onSaved()
     } catch (error) { if (request === sequence.current) setMessage(`${error instanceof Error ? error.message : '请求失败'}；草稿已保留，请核对最新文件后重试。`) }
     finally { setBusy(false) }
   }
   const selectedInstance = instances.find(item => item.name === instanceName)
-  const exported = value ? { agent_id: agentId, experiment_id: experimentId, name: value.name, description: value.description, skills: value.skills.map(skill => ({ name: skill.name, description: skill.description, asset: skill.path })), ...(selectedInstance ? { instance: { name: selectedInstance.name, state: selectedInstance.state, url: instanceUrl || null } } : {}) } : null
+  const exported = value ? { agent_id: agentId, experiment_id: experimentId, name: value.name, description: value.description, notes: value.notes, skills: value.skills.map(skill => ({ name: skill.name, description: skill.description, asset: skill.path })), ...(selectedInstance ? { instance: { name: selectedInstance.name, state: selectedInstance.state, url: instanceUrl || null } } : {}) } : null
   function downloadProfile() {
     if (!exported) return
     const url = URL.createObjectURL(new Blob([JSON.stringify(exported, null, 2) + '\n'], { type: 'application/json' }))
@@ -221,12 +222,12 @@ export function AgentDescriptionPanel({ rpc, detail, agentId, onSaved, onEditAss
     {error && <p role="alert">资料读取失败：{error} <button type="button" onClick={() => setRetry(value => value + 1)}>重试</button><button type="button" onClick={() => onEditAsset(base + '/harness.yaml')}>查看资产来源</button></p>}
     {!value && !error && <LoadingIndicator label="读取版本资料与技能" block />}
     {message && !open && <p role="status">{message}</p>}
-    {value && <><section className="agent-description-card"><div className="agent-section-heading"><h3>基本资料</h3><button type="button" disabled={value.harness.editable === false && (!value.preset || value.preset.editable === false)} onClick={() => { setEditor({ kind: 'profile', name: value.name, description: value.description, body: '' }); setMessage(''); setPreview(null) }}>编辑资料</button></div><p className="agent-description-text">{value.description || '此版本尚未填写简介。'}</p>{value.harness.reason && <p role="status">{value.harness.reason}</p>}{value.preset?.reason && <p role="status">{value.preset.reason}</p>}</section>
-    <section className="agent-description-card"><div className="agent-section-heading"><h3>技能</h3><div className="agent-actions"><span className="agent-muted">{value.skills.length} 项已发现资产</span><button type="button" onClick={() => { setEditor({ kind: 'new-skill', skillId: '', name: '', description: '', body: '' }); setMessage(''); setPreview(null) }}>新增技能</button></div></div><div className="harness-table-scroll"><table><thead><tr><th>技能</th><th>说明</th><th>操作</th></tr></thead><tbody>{value.skills.map(skill => <tr key={skill.path}><td><strong>{skill.name}</strong></td><td>{skill.description || '未填写说明'}{skill.reason && <p role="status">{skill.reason}</p>}</td><td><div className="agent-actions"><button type="button" onClick={() => setViewSkill(skill)}>查看</button><button type="button" disabled={skill.editable === false} onClick={() => { setEditor({ kind: 'skill', skill, name: skill.name, description: skill.description, body: skill.body }); setMessage(''); setPreview(null) }}>编辑</button></div></td></tr>)}</tbody></table></div>{!value.skills.length && <p className="agent-muted">此版本尚未发现 Skill 资产。</p>}{failedPaths.length > 0 && <details><summary>有 {failedPaths.length} 项技能资料读取失败</summary>{failedPaths.map((text, index) => <p key={index} role="alert">{text}</p>)}</details>}</section></>}
+    {value && <><section className="agent-description-card"><div className="agent-section-heading"><h3>基本资料</h3><button type="button" disabled={value.harness.editable === false && (!value.preset || value.preset.editable === false)} onClick={() => { setEditor({ kind: 'profile', name: value.name, description: value.description, notes: value.notes, body: '' }); setMessage('') }}>编辑资料</button></div><p className="agent-description-text">{value.description || '此版本尚未填写简介。'}</p><h4>备注</h4><p className="agent-description-text">{value.notes || '此版本尚未填写备注。'}</p>{value.harness.reason && <p role="status">{value.harness.reason}</p>}{value.preset?.reason && <p role="status">{value.preset.reason}</p>}</section>
+    <section className="agent-description-card"><div className="agent-section-heading"><h3>技能</h3><div className="agent-actions"><span className="agent-muted">{value.skills.length} 项已发现资产</span><button type="button" onClick={() => { setEditor({ kind: 'new-skill', skillId: '', name: '', description: '', body: '' }); setMessage('') }}>新增技能</button></div></div><div className="harness-table-scroll"><table><thead><tr><th>技能</th><th>说明</th><th>操作</th></tr></thead><tbody>{value.skills.map(skill => <tr key={skill.path}><td><strong>{skill.name}</strong></td><td>{skill.description || '未填写说明'}{skill.reason && <p role="status">{skill.reason}</p>}</td><td><div className="agent-actions"><button type="button" onClick={() => setViewSkill(skill)}>查看</button><button type="button" disabled={skill.editable === false} onClick={() => { setEditor({ kind: 'skill', skill, name: skill.name, description: skill.description, body: skill.body }); setMessage('') }}>编辑</button></div></td></tr>)}</tbody></table></div>{!value.skills.length && <p className="agent-muted">此版本尚未发现 Skill 资产。</p>}{failedPaths.length > 0 && <details><summary>有 {failedPaths.length} 项技能资料读取失败</summary>{failedPaths.map((text, index) => <p key={index} role="alert">{text}</p>)}</details>}</section></>}
     <dialog ref={dialog} className="harness-asset-dialog agent-description-dialog" aria-labelledby="agent-description-dialog-title" onCancel={event => { event.preventDefault(); close() }}><header className="agent-section-heading"><h2 id="agent-description-dialog-title">{editor ? editor.kind === 'profile' ? '编辑版本资料' : editor.kind === 'new-skill' ? '新增技能' : '编辑技能' : viewSkill ? viewSkill.name : '预览与导出'}</h2><button type="button" disabled={busy} onClick={close}>关闭</button></header><div className="agent-dialog-body">
-      {editor && <>{editor.kind === 'new-skill' && <label className="agent-field">技能 ID<input aria-label="新技能 ID" maxLength={64} placeholder="小写 kebab-case，作为技能目录" value={editor.skillId} disabled={busy} onChange={event => { setEditor({ ...editor, skillId: event.target.value, name: editor.name === editor.skillId ? event.target.value : editor.name }); setPreview(null) }}/></label>}<label className="agent-field">名称<input value={editor.name} maxLength={160} disabled={busy || editor.kind === 'profile' && value?.harness.editable === false || editor.kind === 'skill' && editor.skill?.editable === false} onChange={event => { setEditor({ ...editor, name: event.target.value }); setPreview(null) }}/></label><label className="agent-field">{editor.kind === 'profile' ? '简介' : '技能说明'}<textarea value={editor.description} rows={4} disabled={busy || editor.kind === 'profile' && (!value?.preset || value.preset.editable === false) || editor.kind === 'skill' && editor.skill?.editable === false} onChange={event => { setEditor({ ...editor, description: event.target.value }); setPreview(null) }}/></label>{editor.kind === 'profile' && !value?.preset && <p className="agent-muted">未找到此版本的 Preset 文件，简介保存暂不可用。</p>}{editor.kind !== 'profile' && <label className="agent-field">技能正文<textarea className="agent-editor" value={editor.body} rows={12} disabled={busy || editor.kind === 'skill' && editor.skill?.editable === false} onChange={event => { setEditor({ ...editor, body: event.target.value }); setPreview(null) }}/></label>}{preview && <pre>{preview.edits?.map((edit: any) => edit.diff || '无差异').join('\n')}</pre>}</>}
+      {editor && <>{editor.kind === 'new-skill' && <label className="agent-field">技能 ID<input aria-label="新技能 ID" maxLength={64} placeholder="小写 kebab-case，作为技能目录" value={editor.skillId} disabled={busy} onChange={event => { setEditor({ ...editor, skillId: event.target.value, name: editor.name === editor.skillId ? event.target.value : editor.name }) }}/></label>}<label className="agent-field">名称<input value={editor.name} maxLength={160} disabled={busy || editor.kind === 'profile' && value?.harness.editable === false || editor.kind === 'skill' && editor.skill?.editable === false} onChange={event => { setEditor({ ...editor, name: event.target.value }) }}/></label><label className="agent-field">{editor.kind === 'profile' ? '简介' : '技能说明'}<textarea value={editor.description} rows={4} disabled={busy || editor.kind === 'profile' && (!value?.preset || value.preset.editable === false) || editor.kind === 'skill' && editor.skill?.editable === false} onChange={event => { setEditor({ ...editor, description: event.target.value }) }}/></label>{editor.kind === 'profile' && <label className="agent-field">备注<textarea value={editor.notes ?? ''} rows={4} disabled={busy || value?.harness.editable === false} onChange={event => { setEditor({ ...editor, notes: event.target.value }) }}/><span className="agent-muted">记录当前版本的补充信息，可留空。</span></label>}{editor.kind === 'profile' && !value?.preset && <p className="agent-muted">未找到此版本的 Preset 文件，简介保存暂不可用。</p>}{editor.kind !== 'profile' && <label className="agent-field">技能正文<textarea className="agent-editor" value={editor.body} rows={12} disabled={busy || editor.kind === 'skill' && editor.skill?.editable === false} onChange={event => { setEditor({ ...editor, body: event.target.value }) }}/></label>}</>}
       {viewSkill && <><p>{viewSkill.description || '未填写说明'}</p><pre>{viewSkill.body}</pre><p className="agent-muted">资产来源：<code>{viewSkill.path}</code></p></>}
-      {exportOpen && <>{instances.length > 0 && <label className="agent-field">接入实例<SearchSelect label="预览接入实例" value={instanceName} options={[{ value: '', label: '仅预览版本资料' }, ...instances.map(item => ({ value: item.name, label: item.name, description: item.state }))]} onChange={setInstanceName}/></label>}{instancesLoading || instanceUrlLoading ? <LoadingIndicator label={instancesLoading ? "读取版本关联实例" : "读取所选实例接入信息"} block /> : instanceMessage && <p role="status">{instanceMessage}</p>}{instanceUrl && <p><a href={instanceUrl} target="_blank" rel="noreferrer">打开所选实例</a></p>}<p>当前预览读取此版本已保存的名称、简介及技能。标准描述缺少提供方与输入输出类型等必需字段，暂未接入；可下载已有版本资料 JSON。</p><pre>{JSON.stringify(exported, null, 2)}</pre><div className="agent-actions"><button type="button" onClick={downloadProfile}>下载版本资料 JSON</button><button type="button" disabled>下载标准描述（未接入）</button></div></>}
-      {sourceChanged && <p role="alert">保存依据已变化，草稿仍保留。请复制需要的内容，取消后重新读取资料再编辑。</p>}{message && <p role="status">{message}</p>}</div>{editor && <footer className="agent-actions agent-dialog-actions"><button type="button" disabled={busy || sourceChanged || !dirty || !editor.name.trim()} onClick={() => void save(false)}>校验与预览</button><button type="button" className="agent-primary" disabled={busy || sourceChanged || !preview || !dirty || !editor.name.trim()} onClick={() => void save(true)}>{busy ? '正在核对…' : '保存修改'}</button>{editor.kind !== 'new-skill' && <button type="button" disabled={busy} onClick={() => openSource(editor.kind === 'skill' ? editor.skill!.path : value!.harness.path)}>查看原始资产</button>}<button type="button" disabled={busy} onClick={close}>取消</button></footer>}</dialog>
+      {exportOpen && <>{instances.length > 0 && <label className="agent-field">接入实例<SearchSelect label="预览接入实例" value={instanceName} options={[{ value: '', label: '仅预览版本资料' }, ...instances.map(item => ({ value: item.name, label: item.name, description: item.state }))]} onChange={setInstanceName}/></label>}{instancesLoading || instanceUrlLoading ? <LoadingIndicator label={instancesLoading ? "读取版本关联实例" : "读取所选实例接入信息"} block /> : instanceMessage && <p role="status">{instanceMessage}</p>}{instanceUrl && <p><a href={instanceUrl} target="_blank" rel="noreferrer">打开所选实例</a></p>}<p>当前预览读取此版本已保存的名称、简介、备注及技能。标准描述缺少提供方与输入输出类型等必需字段，暂未接入；可下载已有版本资料 JSON。</p><pre>{JSON.stringify(exported, null, 2)}</pre><div className="agent-actions"><button type="button" onClick={downloadProfile}>下载版本资料 JSON</button><button type="button" disabled>下载标准描述（未接入）</button></div></>}
+      {sourceChanged && <p role="alert">保存依据已变化，草稿仍保留。请复制需要的内容，取消后重新读取资料再编辑。</p>}{message && <p role="status">{message}</p>}</div>{editor && <footer className="agent-actions agent-dialog-actions"><button type="button" className="agent-primary" disabled={busy || sourceChanged || !dirty || !editor.name.trim()} onClick={() => void save()}>{busy ? '正在保存…' : '保存修改'}</button>{editor.kind !== 'new-skill' && <button type="button" disabled={busy} onClick={() => openSource(editor.kind === 'skill' ? editor.skill!.path : value!.harness.path)}>查看原始资产</button>}<button type="button" disabled={busy} onClick={close}>取消</button></footer>}</dialog>
   </div>
 }

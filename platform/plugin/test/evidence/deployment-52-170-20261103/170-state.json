@@ -1,0 +1,31 @@
+{
+  "program": "1a32a74e285a5b8d50678a1d17b2f11b237315e4",
+  "data": "57b797ba23013431be8068214a8c06d0163997ed",
+  "manifest": {
+    "program": "1a32a74e285a5b8d50678a1d17b2f11b237315e4",
+    "data": {
+      "commit": "57b797ba23013431be8068214a8c06d0163997ed",
+      "dirty": false,
+      "sensitive": true,
+      "kind": "workspace",
+      "workspaceId": "workspace-7a6c3d58-09e9-4882-b589-02f6a0dad8df",
+      "skills": 19,
+      "sourceCommit": "03e32ea23a026ce63550c7a68e3482dff9427ee0",
+      "minimal": true
+    }
+  },
+  "agents": [
+    "daily-chat"
+  ],
+  "skills": 21,
+  "modelRuntimeInode": 3196840,
+  "containers": [
+    {
+      "name": "daily-chat",
+      "id": "eeecd984ba8079cf02767d1d730cb79ae79a8da33987c86d82f634138e87fb87",
+      "status": "running",
+      "startedAt": "2026-11-02T09:50:39.607380278Z",
+      "image": "ai-agent-harness/dsh:b830ec950-arm64-fdc3f44c9900@sha256:2764e787d4f12770d24bedefe788a9679c7336a9685c21a3e8e82908fe88c1d9"
+    }
+  ]
+}

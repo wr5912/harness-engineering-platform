@@ -1,0 +1,87 @@
+{
+  "status": "updated",
+  "activation": {
+    "status": "active",
+    "sessionsPreserved": 8,
+    "pid": 1705840,
+    "verification": {
+      "checks": [
+        {
+          "id": "program-integrity",
+          "status": "ok",
+          "detail": "安装来源 1a32a74e285a5b8d50678a1d17b2f11b237315e4"
+        },
+        {
+          "id": "business-gateway",
+          "status": "ok",
+          "detail": "网关配置完整，已核对发布签名密钥，入口 http://172.16.138.52:53105；监听状态需启动后核对"
+        },
+        {
+          "id": "workspace-assets",
+          "status": "ok",
+          "detail": "21 skills, workspace-95db14d2-d53d-4015-8256-ade8612b1b77"
+        },
+        {
+          "id": "profile-skills",
+          "status": "ok",
+          "detail": "/root/hep-rc5-20261102/data/.agents/skills"
+        },
+        {
+          "id": "default-workspace",
+          "status": "ok",
+          "detail": "/root/hep-rc5-20261102/data"
+        },
+        {
+          "id": "runtime",
+          "status": "ok",
+          "detail": "DSH 0.2.1-rc.5，只读启动预检通过"
+        },
+        {
+          "id": "online-workspace",
+          "status": "ok",
+          "detail": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77，PID 1705840，密码登录及 inventory RPC 通过"
+        },
+        {
+          "id": "online-business-gateway",
+          "status": "ok",
+          "detail": "PID 1705840 已监听业务网关 172.16.138.52:53105"
+        },
+        {
+          "id": "online-business-instances",
+          "status": "ok",
+          "detail": "已核对 1 个运行中业务实例的网页入口与接入版本"
+        }
+      ],
+      "onlineVerified": true,
+      "ok": true
+    }
+  },
+  "files": 9,
+  "bytes": 7601177,
+  "commits": [
+    {
+      "before": "1a32a74e285a5b8d50678a1d17b2f11b237315e4",
+      "commit": "1a32a74e285a5b8d50678a1d17b2f11b237315e4"
+    },
+    {
+      "before": "03e32ea23a026ce63550c7a68e3482dff9427ee0",
+      "commit": "03e32ea23a026ce63550c7a68e3482dff9427ee0"
+    }
+  ],
+  "sourceDataCommit": "03e32ea23a026ce63550c7a68e3482dff9427ee0",
+  "minimalData": false,
+  "dependencies": [],
+  "revalidatedArtifacts": [
+    "platform/plugin/lib/client.js",
+    "platform/plugin/lib/standalone-bootstrap.js",
+    "platform/plugin/lib/standalone-bridge.js",
+    "platform/plugin/lib/standalone-plugin.js",
+    "runtime/adapters/dsh-web/lib/client-urls-worker.mjs",
+    "runtime/adapters/dsh-web/lib/container-webserver.mjs",
+    "runtime/adapters/dsh-web/lib/index.mjs",
+    "runtime/adapters/dsh-web/lib/platform-webserver.mjs"
+  ],
+  "revalidatedSources": [],
+  "backup": "/root/hep-rc5-20261102/program/.local/deploy-updates/ddd4271b-6d56-4386-b2b2-9cfb0a5e17cd",
+  "transferBytes": 2531104
+}

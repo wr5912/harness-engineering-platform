@@ -417,11 +417,13 @@ function registerWorkflowAgent(ctx: any, options: CodeOnlyWorkflowAgent | Hybrid
           : cause?.code === 'MODEL_VISITOR_NOT_AUTHORIZED' ? '当前访问者尚未获准使用该模型'
           : cause?.code === 'WORKFLOW_INVALID_RESULT' ? '流程返回的数据格式无效' : ''
         const detail = [reason, cause?.code, cause?.status ? `HTTP ${cause.status}` : ''].filter(Boolean).join('，')
+        const phase = cause?.kind === 'model' ? cause.phase === 'prepare' ? '准备模型调用' : cause.phase === 'decision' ? '模型决策' : '接收模型响应'
+          : cause?.kind === 'tool' ? cause.phase === 'dispatch' ? '派发工具调用' : '处理工具返回结果' : undefined
         const scope = cause?.tool_calls_started === 0 ? '本轮尚未调用业务工具。'
           : '已发出的工具调用请先核对回执，确认结果后再重试，避免重复执行。'
         const next = cause?.kind === 'model' ? '请核对模型配置或服务状态后继续。'
           : cause?.kind === 'tool' ? '请核对该工具的错误回执及服务状态。' : '请查看本轮图回执定位失败步骤。'
-        return `${category}${cause?.operation ? `（${cause.operation}）` : ''}${detail ? `：${detail}` : ''}，已停止后续步骤。${scope}${next}`
+        return `${category}${cause?.operation ? `（${cause.operation}）` : ''}${detail ? `：${detail}` : ''}，已停止后续步骤。${phase ? `失败阶段：${phase}。` : ''}${scope}${next}`
       }
       if (graph.status !== 'completed' || value.ok !== true) return unknown
       const text = projected ? value.reply : options.renderResult ? options.renderResult(value.result) : value.result?.reply

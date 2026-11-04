@@ -1,0 +1,9 @@
+OK program-integrity: 安装来源 1a32a74e285a5b8d50678a1d17b2f11b237315e4
+OK business-gateway: 网关配置完整，已核对发布签名密钥，入口 http://172.16.138.232:53106；监听状态需启动后核对
+OK workspace-assets: 21 skills, workspace-95db14d2-d53d-4015-8256-ade8612b1b77
+OK profile-skills: /root/harness-engineering-platform-data/.agents/skills
+OK default-workspace: /root/harness-engineering-platform-data
+OK runtime: DSH 0.2.1-rc.5，只读启动预检通过
+OK online-workspace: workspace-95db14d2-d53d-4015-8256-ade8612b1b77，PID 909528，密码登录及 inventory RPC 通过
+OK online-business-gateway: PID 909528 已监听业务网关 172.16.138.232:53106
+OK online-business-instances: 已核对 2 个运行中业务实例的网页入口与接入版本

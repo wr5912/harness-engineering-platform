@@ -1,0 +1,24 @@
+增量包 3521276 字节；两仓 Git 差异 17/0 个文件；变化制品 6 个；未包含镜像、依赖和运行状态
+{
+  "status": "planned",
+  "activation": "pending",
+  "files": 23,
+  "bytes": 3992376,
+  "commits": [
+    {
+      "before": "ea509f21c10472ea819d55a51b08adacc266fe00",
+      "commit": "1a32a74e285a5b8d50678a1d17b2f11b237315e4"
+    },
+    {
+      "before": "2c2786edd4eefae434249482cedd4c39b9ff1ea4",
+      "commit": "2c2786edd4eefae434249482cedd4c39b9ff1ea4"
+    }
+  ],
+  "revalidatedArtifacts": [
+    "runtime/adapters/dsh-web/lib/client-urls-worker.mjs",
+    "runtime/adapters/dsh-web/lib/container-webserver.mjs",
+    "runtime/adapters/dsh-web/lib/index.mjs",
+    "runtime/adapters/dsh-web/lib/platform-webserver.mjs"
+  ],
+  "transferBytes": 3521276
+}

@@ -1,0 +1,2 @@
+dsh-deploy: ssh 执行失败：更新路径包含符号链接：evolution/experiments/EXP-security-operations-expert-028-rb0f7bd202dc1/candidate/dsh/managed/dsh-decision-engine/node_modules/@deepseek-ai/schemastery/LICENSE
+

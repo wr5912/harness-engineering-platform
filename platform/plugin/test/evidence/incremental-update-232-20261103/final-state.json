@@ -1,0 +1,96 @@
+{
+  "beforeTime": "2026-11-03T10:36:47.648Z",
+  "afterUpdateTime": "2026-11-03T10:42:09.957Z",
+  "finalTime": "2026-11-03T11:00:23.032Z",
+  "program": "ea509f21c10472ea819d55a51b08adacc266fe00",
+  "data": "2c2786edd4eefae434249482cedd4c39b9ff1ea4",
+  "containerCounts": {
+    "before": 68,
+    "final": 68
+  },
+  "changedContainers": [
+    {
+      "before": {
+        "id": "14ac909dd092969fe7f5740084b8e77e262d53b47e37ec2d3138798f5b1558de",
+        "name": "/security-operations-expert-exp027",
+        "started": "2026-11-03T09:06:22.708452109Z",
+        "running": true,
+        "image": "sha256:c06d4e1fecc66f175a2fbeaa51e96ea0b2af8f58be22f89edac73df3c779bece"
+      },
+      "after": {
+        "id": "39c320861b9669c2d8f9076a62ecbb09f836e8ac3f4827730dbae6e24040ce77",
+        "name": "/security-operations-expert-exp027",
+        "started": "2026-11-03T10:56:53.612581774Z",
+        "running": true,
+        "image": "sha256:c06d4e1fecc66f175a2fbeaa51e96ea0b2af8f58be22f89edac73df3c779bece"
+      }
+    },
+    {
+      "before": {
+        "id": "690325c32778bfd6ead0cd42a686668f79dcac24898d342ed50e65cc6f202e06",
+        "name": "/dsh-dev-security-operations-expert-exp027-home-init-1",
+        "started": "2026-11-03T09:06:21.213428724Z",
+        "running": false,
+        "image": "sha256:c06d4e1fecc66f175a2fbeaa51e96ea0b2af8f58be22f89edac73df3c779bece"
+      },
+      "after": {
+        "id": "68a78c02aacfc636ea6699186c32cd722a2c12a4739400c353719b9acd28a0c2",
+        "name": "/dsh-dev-security-operations-expert-exp027-home-init-1",
+        "started": "2026-11-03T10:56:52.394305889Z",
+        "running": false,
+        "image": "sha256:c06d4e1fecc66f175a2fbeaa51e96ea0b2af8f58be22f89edac73df3c779bece"
+      }
+    },
+    {
+      "before": {
+        "id": "056ffdef8b4d2bf1c717890c718130d68c652b55015ed77b51ad299d6b388779",
+        "name": "/kb-access-helper",
+        "started": "2026-11-03T10:36:06.120181694Z",
+        "running": true,
+        "image": "sha256:c3374c30c48d9468551d92dcc7d44f560c707d7763b7daf862211e5192f30019"
+      },
+      "after": {
+        "id": "056ffdef8b4d2bf1c717890c718130d68c652b55015ed77b51ad299d6b388779",
+        "name": "/kb-access-helper",
+        "started": "2026-11-03T11:00:11.49057726Z",
+        "running": true,
+        "image": "sha256:c3374c30c48d9468551d92dcc7d44f560c707d7763b7daf862211e5192f30019"
+      }
+    }
+  ],
+  "protectedInstance": {
+    "before": {
+      "id": "e343f21ecf5517c3db03e409cdb2db7f825f145837c0f156db5a7989bf8e447d",
+      "name": "/hep-deploy-accept-amd64-final",
+      "started": "2026-11-03T06:08:10.924680452Z",
+      "running": true,
+      "image": "sha256:c06d4e1fecc66f175a2fbeaa51e96ea0b2af8f58be22f89edac73df3c779bece"
+    },
+    "after": {
+      "id": "e343f21ecf5517c3db03e409cdb2db7f825f145837c0f156db5a7989bf8e447d",
+      "name": "/hep-deploy-accept-amd64-final",
+      "started": "2026-11-03T06:08:10.924680452Z",
+      "running": true,
+      "image": "sha256:c06d4e1fecc66f175a2fbeaa51e96ea0b2af8f58be22f89edac73df3c779bece"
+    }
+  },
+  "originalManagementSessionCount": 9,
+  "originalManagementSessionsPreserved": true,
+  "configHashes": {
+    "before": {
+      "workspace.json": "f1693af492eef088a6da04efe8587a15a9a11e16c9aa4e6988e719614957da0d",
+      "config/business-access.json": "3f123cc1cfb60a795628cd74acf59c908dc002fb2f30b636250232d2055a0d2b",
+      "config/business-model-default.json": "5c4c465a7b1fee3c69d306da06195927bc0df3dab2d763f28ed932d96d58b49e"
+    },
+    "afterUpdate": {
+      "workspace.json": "f1693af492eef088a6da04efe8587a15a9a11e16c9aa4e6988e719614957da0d",
+      "config/business-access.json": "3f123cc1cfb60a795628cd74acf59c908dc002fb2f30b636250232d2055a0d2b",
+      "config/business-model-default.json": "5c4c465a7b1fee3c69d306da06195927bc0df3dab2d763f28ed932d96d58b49e"
+    },
+    "final": {
+      "workspace.json": "f1693af492eef088a6da04efe8587a15a9a11e16c9aa4e6988e719614957da0d",
+      "config/business-access.json": "338dc8feaab66aff2c94f1c978c657a16651f5f28f374dc2578b216ce1b5dbd7",
+      "config/business-model-default.json": "5c4c465a7b1fee3c69d306da06195927bc0df3dab2d763f28ed932d96d58b49e"
+    }
+  }
+}

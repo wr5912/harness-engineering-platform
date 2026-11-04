@@ -1,0 +1,10 @@
+✔ 无关 HTTP 200 不通过在线工作区核验，也不向它发送登录凭据 (13.770371ms)
+✔ 离线核验检查网关配置与本地密钥，关闭或配置不全不得通过 (8.515186ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 254.21423

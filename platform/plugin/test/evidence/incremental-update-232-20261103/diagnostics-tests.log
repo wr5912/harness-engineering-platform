@@ -1,0 +1,66 @@
+✔ 指定 EXP027：首次提示词组装前安装巡检工具适配，恢复会话与子 Agent 作用域不串用 (10.206234ms)
+✔ 指定 EXP027：任务默认范围由服务解析，错误回执保留且不重复提交或虚构恢复 (71.577967ms)
+✔ 指定 EXP027：DSH 抛出的底层异常只保存在私有账本，恢复后不重复启动 (48.878377ms)
+✔ EXP-security-operations-expert-024-rad80a907c628：范围、过期刷新、同轮幂等与未知回执 (68.364087ms)
+✔ EXP-security-operations-expert-024-rad80a907c628：澄清、取消、损坏状态和真实消息归属 (11.246759ms)
+✔ EXP-security-operations-expert-024-rad80a907c628：原生 Schedule 同次到期请求标识稳定 (23.144805ms)
+✔ EXP-security-operations-expert-024-rad80a907c628：全文预算溢出只补读一次同次摘要并由既有交付器输出 (9.733055ms)
+✔ EXP-security-operations-expert-025-r3f8a8b3da3f1：范围、过期刷新、同轮幂等与未知回执 (105.815245ms)
+✔ EXP-security-operations-expert-025-r3f8a8b3da3f1：澄清、取消、损坏状态和真实消息归属 (9.350277ms)
+✔ EXP-security-operations-expert-025-r3f8a8b3da3f1：原生 Schedule 同次到期请求标识稳定 (21.600037ms)
+✔ EXP-security-operations-expert-025-r3f8a8b3da3f1：全文预算溢出只补读一次同次摘要并由既有交付器输出 (12.441332ms)
+✔ EXP-security-operations-expert-026-ra06021c8deaf：范围、过期刷新、同轮幂等与未知回执 (60.727834ms)
+✔ EXP-security-operations-expert-026-ra06021c8deaf：澄清、取消、损坏状态和真实消息归属 (6.716823ms)
+✔ EXP-security-operations-expert-026-ra06021c8deaf：原生 Schedule 同次到期请求标识稳定 (23.44398ms)
+✔ EXP-security-operations-expert-026-ra06021c8deaf：全文预算溢出只补读一次同次摘要并由既有交付器输出 (9.817486ms)
+✔ EXP-security-operations-expert-027-reab20c48f610：范围、过期刷新、同轮幂等与未知回执 (166.252406ms)
+✔ EXP-security-operations-expert-027-reab20c48f610：澄清、取消、损坏状态和真实消息归属 (6.246683ms)
+✔ EXP-security-operations-expert-027-reab20c48f610：原生 Schedule 同次到期请求标识稳定 (69.860377ms)
+✔ EXP-security-operations-expert-027-reab20c48f610：全文预算溢出只补读一次同次摘要并由既有交付器输出 (14.513911ms)
+✔ VAR-security-operations-expert-001-rd4c625231cdb：范围、过期刷新、同轮幂等与未知回执 (32.691034ms)
+✔ VAR-security-operations-expert-001-rd4c625231cdb：澄清、取消、损坏状态和真实消息归属 (5.515881ms)
+✔ VAR-security-operations-expert-001-rd4c625231cdb：原生 Schedule 同次到期请求标识稳定 (18.555833ms)
+✔ VAR-security-operations-expert-001-rd4c625231cdb：全文预算溢出只补读一次同次摘要并由既有交付器输出 (8.443211ms)
+✔ VAR-security-operations-expert-002-r5a8db4982991：范围、过期刷新、同轮幂等与未知回执 (256.65659ms)
+✔ VAR-security-operations-expert-002-r5a8db4982991：澄清、取消、损坏状态和真实消息归属 (26.957293ms)
+✔ VAR-security-operations-expert-002-r5a8db4982991：原生 Schedule 同次到期请求标识稳定 (22.514815ms)
+✔ VAR-security-operations-expert-002-r5a8db4982991：全文预算溢出只补读一次同次摘要并由既有交付器输出 (9.941666ms)
+✔ VAR-security-operations-expert-001-r144fbb173cad：范围、过期刷新、同轮幂等与未知回执 (71.901782ms)
+✔ VAR-security-operations-expert-001-r144fbb173cad：澄清、取消、损坏状态和真实消息归属 (31.004665ms)
+✔ VAR-security-operations-expert-001-r144fbb173cad：原生 Schedule 同次到期请求标识稳定 (9.449372ms)
+✔ VAR-security-operations-expert-001-r144fbb173cad：全文预算溢出只补读一次同次摘要并由既有交付器输出 (10.237836ms)
+✔ VAR-security-operations-expert-002-r727f8750a82f：范围、过期刷新、同轮幂等与未知回执 (50.695048ms)
+✔ VAR-security-operations-expert-002-r727f8750a82f：澄清、取消、损坏状态和真实消息归属 (6.218425ms)
+✔ VAR-security-operations-expert-002-r727f8750a82f：原生 Schedule 同次到期请求标识稳定 (9.530245ms)
+✔ VAR-security-operations-expert-002-r727f8750a82f：全文预算溢出只补读一次同次摘要并由既有交付器输出 (7.974511ms)
+✖ VAR-security-operations-expert-001-rd4c625231cdb：真实 LangGraph 准备、启动和原运行查询，不调用 KEV (171.438059ms)
+✔ VAR-security-operations-expert-002-r5a8db4982991：真实 LangGraph 准备、启动和原运行查询，不调用 KEV (149.293107ms)
+✔ 纯代码整体 Variant：原目录、明确范围与同轮执行；咨询和周期请求不写入 (214.447521ms)
+✔ 混合整体 Variant：巡检跳过 KEV，保留真实语言模型角色和原生工具调用 (151.580565ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 38
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2242.321739
+
+✖ failing tests:
+
+test at agents/security-operations-expert/tests/inspection-runtime.test.mts:215:3
+✖ VAR-security-operations-expert-001-rd4c625231cdb：真实 LangGraph 准备、启动和原运行查询，不调用 KEV (171.438059ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"error":"工作流执行失败，请查看节点回执","graph_execution":{"execution_id":"workflow-a8464605-52d0-40c3-b226-f76ab0638998","role":"target","session_id":"session-real","tool_call_id":"call-real","workflow_id":"security-inspection-kev-route","complete":true,"execution_mode":"code-only","build_digest":"aa8c264788326d9a6e6392fef09846ab29c5e4f91041029d2339751376364bc5","source_digest":"10a297b9102fe53c73206bda210c01954068d7f5d2e32c3e7b1b8db347f7f4f0","esm_sha256":"c294f2326c02fd96f58d2a9e8cd42e0e7f80f030407e621bbf8f681f274f6a25","status":"failed","trace":[{"node":"request","status":"failed","elapsed_ms":0}],"model_attempts":[]}}
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/cmp/harness-engineering-platform-data/agents/security-operations-expert/tests/inspection-runtime.test.mts:227:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
