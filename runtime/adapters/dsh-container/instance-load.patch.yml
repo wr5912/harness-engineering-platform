@@ -1,0 +1,3 @@
+- insert:
+    - id: harness-instance-load-observer
+      name: /opt/dsh-adapter/instance-load-observer.ts

@@ -1187,14 +1187,16 @@ class InstanceStateTest(unittest.TestCase):
 
 
 class ImageIdentityAndPsStateTest(unittest.TestCase):
-    def test_batch_observation_groups_containers_and_volumes_with_two_queries(self):
+    def test_batch_observation_groups_containers_and_volumes_with_generation_query(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             docker = root / "docker"
             docker.write_text('#!/usr/bin/env python3\nimport json, sys\nfrom pathlib import Path\n'
                 'with Path(__file__).with_name("calls").open("a") as out: out.write(sys.argv[1] + "\\n")\n'
                 'if sys.argv[1] == "ps":\n'
-                ' for i in range(100): print(json.dumps({"Project": "project-" + str(i), "State": "running"}))\n'
+                ' for i in range(100): print(json.dumps({"ID": "id-" + str(i), "Name": "instance-" + str(i), "Project": "project-" + str(i), "State": "running"}))\n'
+                'elif sys.argv[1] == "inspect":\n'
+                ' for i in range(100): print(json.dumps({"name": "/instance-" + str(i), "id": "id-" + str(i), "started_at": "now", "running": True}))\n'
                 'else:\n'
                 ' print(json.dumps({"name": "real-home", "project": "project-1", "volume": "project-1-home"}))\n'
                 ' print(json.dumps({"name": "other", "project": "project-1", "volume": "data"}))\n', encoding="utf-8")
@@ -1204,7 +1206,8 @@ class ImageIdentityAndPsStateTest(unittest.TestCase):
             observed = json.loads(result.stdout)
             self.assertEqual(len(observed["projects"]), 100)
             self.assertEqual(observed["homes"], {"project-1": "real-home"})
-            self.assertEqual(sorted((root / "calls").read_text().splitlines()), ["ps", "volume"])
+            self.assertEqual(sorted((root / "calls").read_text().splitlines()), ["inspect", "ps", "volume"])
+            self.assertEqual(observed["generations"]["instance-1"]["id"], "id-1")
 
     def test_failed_batch_observation_reports_unknown_without_per_instance_retry(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -1613,6 +1616,9 @@ class RuntimeEnvironmentRetentionTest(unittest.TestCase):
 
     def setUp(self):
         isolate_registration_guard(self)
+        observer = mock.patch.object(dev, "prepare_load_expectation", return_value=None)
+        observer.start()
+        self.addCleanup(observer.stop)
 
     @staticmethod
     def args(**values):
@@ -1757,6 +1763,9 @@ class UpCommandStateTest(unittest.TestCase):
 
     def setUp(self):
         isolate_registration_guard(self)
+        observer = mock.patch.object(dev, "prepare_load_expectation", return_value=None)
+        observer.start()
+        self.addCleanup(observer.stop)
         self._temp = tempfile.TemporaryDirectory()
         dev.STATE_ROOT = Path(self._temp.name)
         selected = {"provider": "deepseek-official", "model": "deepseek-flash"}
@@ -2012,6 +2021,9 @@ class UpPortOwnershipTest(unittest.TestCase):
 
     def setUp(self):
         isolate_registration_guard(self)
+        observer = mock.patch.object(dev, "prepare_load_expectation", return_value=None)
+        observer.start()
+        self.addCleanup(observer.stop)
         self._temp = tempfile.TemporaryDirectory()
         dev.STATE_ROOT = Path(self._temp.name)
         self._managed = Path(self._temp.name) / "managed"
@@ -2615,6 +2627,7 @@ with mock.patch.object(dev, 'resolve', return_value=contract), \
  mock.patch.object(dev, 'compose_env', return_value={}), mock.patch.object(dev, 'write_instance', side_effect=write_instance), \
  mock.patch.object(dev, 'run', side_effect=docker), mock.patch.object(dev, 'wait_for_service', return_value=container), \
  mock.patch.object(dev, 'load_instance', return_value=(dev.STATE_ROOT / name, {})), \
+ mock.patch.object(dev, 'prepare_load_expectation', return_value=None), \
  mock.patch.object(dev, 'project_containers', return_value=container), \
  mock.patch.object(dev, 'container_owns_listener', side_effect=lambda *_: listener is not None), \
  contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):

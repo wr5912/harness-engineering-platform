@@ -790,7 +790,7 @@ def compose_env(contract: dict, mode: str, port: int, name: str,
     environment.update({
         "DSH_IMAGE_TAG": image_reference(contract["image"]["local_image_tag"], image_id),
         "DSH_ADAPTER_HOST": str(ADAPTER),
-        "DSH_HOME_HOST": str(instance_dir(name) / "dsh-home"),
+        "DSH_HOME_HOST": contract.get("reload_manifest", {}).get("home_directory") or str(instance_dir(name) / "dsh-home"),
         "DSH_SITES_CONFIG_HOST": str(sites_config(REPO)),
         "DSH_WEB_ADAPTER_HOST": str(WEB_ADAPTER),
         "DSH_MODEL_RUNTIME_HOST": str(MODEL_RUNTIME_HOST),
@@ -922,7 +922,8 @@ def render_compose(template: str, *, mode: str, name: str, project: str, port: i
                    plugin_node_modules: bool = False, bind_home: bool = False,
                    image_fingerprint: str | None = None, schedule_compat: bool = False,
                    managed_patch_compat: bool = False, harness_runtime: bool = False,
-                   project_workspace: bool = False, dependency_mounts: list[dict] = ()) -> str:
+                   project_workspace: bool = False, dependency_mounts: list[dict] = (),
+                   asset_load_directory: str | None = None) -> str:
     """把受控 Compose 模板渲染为隔离的业务或归因实例配置。"""
     if mode not in MODES:
         fail("mode 只能是 verification")
@@ -967,6 +968,12 @@ def render_compose(template: str, *, mode: str, name: str, project: str, port: i
         fail("Compose 模板缺少唯一的 dsh 服务锚点")
     text = text.replace(dsh_service, dsh_service + f"    container_name: {name}\n")
     web_mount = "        target: /opt/dsh-web\n        read_only: true\n"
+    if asset_load_directory:
+        text = text.replace(web_mount, web_mount + "      - type: bind\n"
+                            f"        source: {json.dumps(asset_load_directory).replace('$', '$$')}\n"
+                            "        target: /opt/harness-asset-load\n        read_only: true\n")
+        text = text.replace("      - --no-open\n", "      - --patch\n"
+                            "      - /opt/dsh-adapter/instance-load.patch.yml\n      - --no-open\n")
     text = text.replace(web_mount, web_mount + "      - type: bind\n"
                         "        source: ${DSH_SITES_CONFIG_HOST:?站点路径由工作区配置注入}\n"
                         "        target: /opt/harness-config/sites.json\n        read_only: true\n")
@@ -1364,6 +1371,7 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
         harness_runtime=bool(contract.get("harness_runtime")) and not analysis_workspace,
         project_workspace=bool(contract.get("project_workspace_host")) and not analysis_workspace,
         dependency_mounts=runtime_mounts(contract, analysis_workspace, target / "dsh-home/private"),
+        asset_load_directory=str(target / "asset-load") if not analysis_workspace else None,
     )
     business = None
     if contract.get("business_control"):
@@ -1448,6 +1456,7 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
                                if name not in required_env_names(contract, analysis_workspace)],
         **({"business_control": {**business["registration"],
                                   "launch_config_file": contract["business_control"]["config_file"]}} if business else {}),
+        **({key: current[1][key] for key in ("asset_load", "asset_reload_attempt") if key in current[1]} if current else {}),
     }
     (target / "instance.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -1949,6 +1958,187 @@ def validate_image_identity(contract: dict, current: tuple[Path, dict] | None = 
     }
 
 
+def asset_command(operation: str, contract: dict, manifest: dict, **extra):
+    result = subprocess.run([NODE_EXECUTABLE, str(ADAPTER / "instance-assets.mts"), operation],
+                            input=json.dumps({"contract": contract, "manifest": manifest,
+                                              "directory": str(instance_dir(manifest["name"])), **extra}),
+                            text=True, capture_output=True, timeout=60)
+    if result.returncode:
+        fail("无法核对实例装载闭包；请检查来源和只读挂载，未认定资产已生效")
+    return json.loads(result.stdout)
+
+
+def asset_contract(manifest: dict) -> dict:
+    contract = resolve(manifest["source_id"], repo=REPO,
+                       **({"source_ref": manifest["source_ref"]} if manifest.get("source_ref") else {}))
+    assert_asset_dependencies(contract)
+    return contract
+
+
+def observe_generation(name: str, manifest: dict) -> dict:
+    require_docker_registration(name, manifest)
+    result = run(["docker", "inspect", "--format",
+                  '{"id":{{json .Id}},"started_at":{{json .State.StartedAt}},"running":{{json .State.Running}}}',
+                  manifest.get("container_name") or name], check=False)
+    if result.returncode:
+        fail("无法确认目标实例的运行代次；未执行重载")
+    try:
+        value = json.loads(result.stdout)
+        if not value.get("id") or not value.get("started_at") or not isinstance(value.get("running"), bool):
+            raise ValueError()
+        return value
+    except (ValueError, TypeError):
+        fail("目标实例的运行代次未知；未执行重载")
+
+
+def reload_snapshot(name: str) -> tuple[dict, dict, dict]:
+    _, manifest = load_instance(name)
+    generation = observe_generation(name, manifest)
+    if not generation["running"]:
+        fail("已停止的实例不能重载；请按需使用启动操作")
+    contract = asset_contract(manifest)
+    status = asset_command("status", contract, manifest, generation=generation, state="running", cache=False)
+    return contract, manifest, status
+
+
+def assert_reload_cas(args: argparse.Namespace) -> None:
+    _, manifest, status = reload_snapshot(args.name)
+    if status["current_digest"] != args.expected_asset_digest or status["generation_digest"] != args.expected_generation_digest:
+        fail("资产来源或运行代次已变化，请重新预览重载；本次未执行")
+    if manifest != args.reload_manifest:
+        fail("实例登记已变化，请重新预览重载；本次未执行")
+
+
+def record_reload_attempt(name: str, status: str, message: str) -> None:
+    target, manifest = load_instance(name)
+    manifest["asset_reload_attempt"] = {"status": status, "at": datetime.now(timezone.utc).isoformat(), "message": message}
+    (target / "instance.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def prepare_load_expectation(name: str, contract: dict) -> dict:
+    target, manifest = load_instance(name)
+    assert_reload_source(contract)
+    assets = asset_command("source", contract, manifest)
+    files = asset_command("applied", contract, manifest, directory=str(target))
+    expected = {"nonce": secrets.token_hex(16), "source_id": manifest["source_id"], "digest": assets["digest"],
+                "preset_id": manifest["session_preset"], "files": files,
+                "source_files": assets["files"], "configuration_digest": assets["configuration_digest"]}
+    directory = target / "asset-load"
+    directory.mkdir(exist_ok=True)
+    (directory / "expected.json").write_text(json.dumps(expected, ensure_ascii=False), encoding="utf-8")
+    return expected
+
+
+def assert_reload_source(contract: dict) -> None:
+    previous = contract.get("reload_manifest")
+    if previous and asset_command("source", asset_contract(previous), previous, directory=None)["digest"] != contract["reload_source_digest"]:
+        fail("重载期间来源已变化，加载结果尚未核验；请重新预览")
+
+
+def verify_load_receipt(name: str, contract: dict, expected: dict) -> dict:
+    target, manifest = load_instance(name)
+    generation = observe_generation(name, manifest)
+    if not generation["running"]:
+        fail("目标实例未运行，未记录加载成功")
+    for _ in range(40):
+        result = run(["docker", "exec", generation["id"], "cat", "/tmp/hep-asset-load.json"], check=False)
+        try:
+            receipt = json.loads(result.stdout) if result.returncode == 0 else {}
+        except ValueError:
+            receipt = {}
+        if receipt.get("ok") is True and all(receipt.get(key) == expected[key] for key in ("nonce", "source_id", "digest", "preset_id")):
+            assert_reload_source(contract)
+            # 运行中观察器核对字节；宿主再次核对来源及代次，避免把启动间的改写记成已加载。
+            import hashlib
+            files_digest = "sha256:" + hashlib.sha256(json.dumps(expected["files"], ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
+            if receipt.get("files_digest") != files_digest or not receipt.get("loaded_at") or not receipt.get("pid"):
+                fail("目标实例加载回执不完整，尚未核验")
+            if observe_generation(name, manifest) != generation or asset_command("source", asset_contract(manifest), manifest)["digest"] != expected["digest"]:
+                fail("装载期间来源或运行代次变化，尚未核验；请重新预览")
+            if asset_command("applied", contract, manifest, directory=str(target)) != expected["files"]:
+                fail("装载期间构建投影变化，尚未核验；请重新预览")
+            receipt = {**receipt, **{key: expected[key] for key in ("source_files", "configuration_digest") if key in expected},
+                       "verification": "runtime-observer", "container_id": generation["id"], "started_at": generation["started_at"]}
+            manifest["asset_load"] = receipt
+            manifest["asset_reload_attempt"] = {"status": "verified", "at": receipt["loaded_at"], "message": "实际加载已核验"}
+            (target / "instance.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            return {"status": "current", "current_digest": receipt["digest"], "loaded": receipt}
+        time.sleep(0.25)
+    fail("目标实例尚未返回本次进程的加载回执；结果未知，请查看日志并重新预览，不自动重试")
+
+
+def reload_one(args: argparse.Namespace) -> None:
+    _, manifest, status = reload_snapshot(args.name)
+    plan = {"name": args.name, "source_id": manifest["source_id"], "port": manifest.get("port"),
+            "current_asset_digest": status["current_digest"], "generation_digest": status["generation_digest"],
+            "asset_status": status, "model_policy": manifest.get("model_policy"),
+            "retention": {"home": "保留", "sessions": "保留", "port": "保留", "model": "保留", "gateway_identity": "保留"}}
+    if args.dry_run:
+        print(json.dumps(plan, ensure_ascii=False))
+        return
+    if not args.expected_asset_digest or not args.expected_generation_digest:
+        fail("重载必须提供预览的 --expected-asset-digest 与 --expected-generation-digest")
+    for value in (args.expected_asset_digest, args.expected_generation_digest):
+        if not re.fullmatch(r"sha256:[a-f0-9]{64}", value):
+            fail("重载预览摘要无效")
+    launch = argparse.Namespace(**{key: manifest.get(key) for key in
+        ("trusted_host", "lan_access", "unsafe_no_auth", "skip_testing_notice", "source_ref")},
+        source=manifest["source_id"], mode=manifest["mode"], name=args.name, port=instance_recorded_port(manifest),
+        analysis_workspace=manifest.get("mounts", {}).get("analysis_workspace"),
+        plugin_node_modules=manifest.get("mounts", {}).get("plugin_node_modules"),
+        business_control=manifest.get("business_control", {}).get("launch_config_file") or manifest.get("business_control", {}).get("config_file"),
+        business_access_mode=None, business_identity_mode=None, dry_run=False, replace=True, migrate_home=False,
+        allow_missing_env=False, model_policy=args.model_policy, mcp_fixture=None,
+        reload_manifest=manifest, expected_asset_digest=args.expected_asset_digest,
+        expected_generation_digest=args.expected_generation_digest)
+    if launch.port is None:
+        fail("实例缺少原端口，不能精确重载")
+    # fixture 原始路径不属于实例登记；只重建已登记的显式映射，不回退到真实 MCP。
+    with tempfile.TemporaryDirectory(prefix="dsh-reload-") as temporary:
+        if manifest.get("mcp_fixture"):
+            fixture = manifest["mcp_fixture"]
+            mapping = {"schema_version": 1, "mode": "mock", "connections": [
+                {key: value for key, value in connection.items() if key != "field"} for connection in fixture["connections"]]}
+            fixture_path = Path(temporary) / "fixture.json"
+            fixture_path.write_text(json.dumps(mapping), encoding="utf-8")
+            launch.mcp_fixture = str(fixture_path)
+        command_up(launch)
+
+
+def command_reload(args: argparse.Namespace) -> None:
+    # 每个目标均进入现有 up/replace 的锁、预检和保留 HOME 路径；批次不重放失败项。
+    import io
+    from contextlib import redirect_stdout, redirect_stderr
+    receipts = []
+    names = args.name
+    if len(names) != len(set(names)):
+        fail("批量重载不能包含重复目标")
+    for key in ("expected_asset_digest", "expected_generation_digest"):
+        values = getattr(args, key) or []
+        if values and len(values) != len(names):
+            fail("批量重载的预览摘要数量必须与目标数量相同")
+    for index, name in enumerate(names):
+        item = argparse.Namespace(**{**vars(args), "name": name,
+            "expected_asset_digest": (args.expected_asset_digest or [None] * len(names))[index],
+            "expected_generation_digest": (args.expected_generation_digest or [None] * len(names))[index]})
+        output = io.StringIO()
+        errors = io.StringIO()
+        try:
+            with redirect_stdout(output), redirect_stderr(errors):
+                reload_one(item)
+            receipts.append({"name": name, "ok": True, "value": json.loads(output.getvalue())})
+        except (SystemExit, OSError, ValueError, subprocess.TimeoutExpired):
+            message = redact_secrets(errors.getvalue().strip()) or "重载未完成；请核对实例状态与最后加载回执后重新预览"
+            receipts.append({"name": name, "ok": False, "error": message})
+            print(message, file=sys.stderr)
+    if len(names) == 1 and receipts[0]["ok"]:
+        print(json.dumps(receipts[0]["value"], ensure_ascii=False))
+    else:
+        print(json.dumps({"items": receipts, "partial_success": any(item["ok"] for item in receipts) and not all(item["ok"] for item in receipts)}, ensure_ascii=False))
+    if not all(item["ok"] for item in receipts):
+        raise SystemExit(1)
+
+
 def command_up(args: argparse.Namespace) -> None:
     require_up_arguments(args)
     # 必须在选端口前加锁；仅锁写 instance.json 无法避免两个启动同时看到空闲端口。
@@ -1956,12 +2146,24 @@ def command_up(args: argparse.Namespace) -> None:
     lock_business = not dry_run and not getattr(args, "analysis_workspace", None)
     with model_policy_start_lock(REPO) if lock_business else nullcontext():
         with nullcontext() if dry_run else instance_startup_lock():
+            if hasattr(args, "reload_manifest"):
+                assert_reload_cas(args)
             contract, current = prepare_up(args)
+            if hasattr(args, "reload_manifest"):
+                for key in ("lan_access", "unsafe_no_auth", "skip_testing_notice", "trusted_host"):
+                    setattr(args, key, args.reload_manifest.get(key))
+                contract["reload_manifest"] = args.reload_manifest
+                if args.reload_manifest.get("mcp_fixture"):
+                    contract["mcp_fixture"] = args.reload_manifest["mcp_fixture"]
             inherited = existing_runtime_environment(args, contract, current)
             os.environ.update(inherited)
             try:
                 _command_up(args, contract, current)
-            except SystemExit:
+            except (SystemExit, OSError, subprocess.TimeoutExpired):
+                if hasattr(args, "reload_manifest"):
+                    target_manifest = existing_instance(args.name)
+                    if target_manifest and target_manifest[1].get("asset_reload_attempt", {}).get("status") == "running":
+                        record_reload_attempt(args.name, "unknown", "重载未完成或加载结果尚未核验；保留 HOME 与最后回执，请检查日志后重新预览")
                 previous_digest = current[1].get("business_control", {}).get("source_digest") if current else None
                 if not dry_run and contract.get("business_control") and previous_digest:
                     # 启动可能先保存新来源再失败；登记同步到实际来源，使同名重试仍可通过预检。
@@ -2017,6 +2219,10 @@ def _command_up(args: argparse.Namespace, contract: dict,
         })
     if contract.get("model_policy"):
         assert_model_policy_current(contract["model_policy"], repo=REPO)
+    if hasattr(args, "reload_manifest"):
+        assert_reload_cas(args)
+        contract["reload_source_digest"] = asset_command("source", asset_contract(args.reload_manifest), args.reload_manifest, directory=None)["digest"]
+        record_reload_attempt(args.name, "running", "正在重载；连接中断后请核对实际回执，不自动重试")
     replaced = migrate_existing_instance(args, contract, current)
     if port_in_use(args.port):
         holder = running_instance_service(args.name)
@@ -2043,6 +2249,7 @@ def _command_up(args: argparse.Namespace, contract: dict,
         image_id=identity["image_id"], analysis_workspace=args.analysis_workspace,
         plugin_node_modules=getattr(args, "plugin_node_modules", None),
     )
+    expectation = prepare_load_expectation(args.name, contract) if args.analysis_workspace is None else None
     run(compose_command(target, args.name, "config", "--quiet"), env=environment)
     run(compose_command(target, args.name, "up", "-d", "--no-build"), env=environment)
     # `docker compose up -d` 返回 0 只说明命令成功，不说明容器在运行：容器可能立刻退出。
@@ -2093,6 +2300,13 @@ def _command_up(args: argparse.Namespace, contract: dict,
         except SystemExit:
             stop_instance(args.name, load_instance(args.name)[1])
             fail("业务网关登记失败，已停止本次实例并保留 HOME；修复登记后以同名重试")
+    if expectation:
+        try:
+            report["asset_status"] = verify_load_receipt(args.name, contract, expectation)
+        except SystemExit:
+            if hasattr(args, "reload_manifest"):
+                raise
+            report["asset_status"] = {"status": "unknown", "message": "实例已启动，但本次实际装载尚未核验"}
     print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
     print(json.dumps({
         "hint": web_cold_start_hint(args.mode, args.analysis_workspace, bool(contract.get("business_control"))),
@@ -2242,7 +2456,7 @@ def command_ps(args: argparse.Namespace) -> None:
     entries = []
     unowned_record_count = 0
     try:
-        observed = run(["node", str(ADAPTER / "instance-observation.ts")], check=False, timeout=12)
+        observed = run(["node", str(ADAPTER / "instance-observation.ts")], check=False, timeout=20)
         observation = json.loads(observed.stdout) if observed.returncode == 0 else {}
         if not isinstance(observation, dict):
             observation = {}
@@ -2263,6 +2477,16 @@ def command_ps(args: argparse.Namespace) -> None:
                     continue
                 owned = True
                 entry = instance_entry(target, manifest, observation)
+                try:
+                    generation = (observation.get("generations") or {}).get(manifest.get("container_name") or target.name)
+                    entry["asset_status"] = asset_command("status", asset_contract(manifest), manifest,
+                                                          generation=generation, state=entry["state"])
+                except (SystemExit, OSError, ValueError, TypeError, KeyError, subprocess.TimeoutExpired):
+                    entry["asset_status"] = {"status": "unknown", "current_digest": None,
+                                            "checked_at": datetime.now(timezone.utc).isoformat(), "changed_files": [],
+                                            "loaded": manifest.get("asset_load"),
+                                            "last_attempt": manifest.get("asset_reload_attempt"),
+                                            "reason": "来源或运行代次无法核对，尚未核验"}
             except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError) as error:
                 if not owned:
                     unowned_record_count += 1
@@ -3168,6 +3392,14 @@ def main() -> None:
     up.add_argument("--business-identity-mode", choices=("development", "published"),
                     help="新建网关实例的身份阶段；已有实例沿用网关登记")
     up.set_defaults(handler=command_up)
+
+    reload_parser = commands.add_parser("reload", help="按预览摘要重载运行中的实例；支持逐项目标摘要的批量重载")
+    reload_parser.add_argument("name", nargs="+")
+    reload_parser.add_argument("--dry-run", action="store_true", help="只读观察来源和运行代次，不停止实例")
+    reload_parser.add_argument("--expected-asset-digest", action="append")
+    reload_parser.add_argument("--expected-generation-digest", action="append")
+    reload_parser.add_argument("--model-policy", help="既有平台实例的当前模型策略，保留登记的模型选择")
+    reload_parser.set_defaults(handler=command_reload)
 
     sdk = commands.add_parser("sdk-run", help="在标准容器中通过官方 TypeScript SDK 执行输入")
     sdk.add_argument("--source", required=True)

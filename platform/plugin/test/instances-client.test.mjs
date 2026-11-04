@@ -10,9 +10,10 @@ const source = (await build({ entryPoints: [new URL('../src/instances/client.tsx
 const defaultModel = { provider: 'provider-a', model: 'base-model' }
 const alternateModel = { provider: 'provider-a', model: 'variant-model' }
 const previewHash = 'a'.repeat(64)
+const assetDigest = 'sha256:' + 'b'.repeat(64), generationDigest = 'sha256:' + 'c'.repeat(64)
 const modelList = { catalog: { groups: [{ id: 'provider-a', name: '模型服务 A', models: [{ id: 'base-model', name: '基础模型' }, { id: 'variant-model', name: '变体模型' }] }, { id: 'provider-b', name: '模型服务 B', models: [{ id: 'other-model', name: '其他模型' }] }] }, business_allowed: [defaultModel, alternateModel, { provider: 'provider-b', model: 'other-model' }], business_default: defaultModel }
 
-function page({ instances = [{ name: 'basic-instance', agent_id: 'basic-agent', state: 'running', source_id: 'experiment:EXP-basic-001', port: 3084, model_policy: { default: defaultModel } }], respond, target } = {}) {
+function page({ instances = [{ name: 'basic-instance', agent_id: 'basic-agent', state: 'running', source_id: 'experiment:EXP-basic-001', port: 3084, model_policy: { default: defaultModel } }], respond, target, browser } = {}) {
   const states = [], dependencies = [], cleanups = [], calls = [], copied = [], navigations = []
   let cursor = 0, effects = [], changed = false, tree, listener
   const react = { ...require('react'),
@@ -22,7 +23,7 @@ function page({ instances = [{ name: 'basic-instance', agent_id: 'basic-agent', 
     useEffect(effect, deps) { const at = cursor++; if (!dependencies[at] || deps.some((value, index) => !Object.is(value, dependencies[at][index]))) { dependencies[at] = deps; effects.push(() => { cleanups[at]?.(); cleanups[at] = effect() }) } },
   }
   const module = { exports: {} }
-  vm.runInNewContext(source, { module, exports: module.exports, URL, require: name => name === 'react' ? react : name === '@deepseek-ai/dsh-client-ui-primitives' ? { Modal: () => null } : require(name), window: { location: { hostname: '127.0.0.1' } }, navigator: { clipboard: { async writeText(value) { copied.push(value) } } } })
+  vm.runInNewContext(source, { module, exports: module.exports, URL, require: name => name === 'react' ? react : name === '@deepseek-ai/dsh-client-ui-primitives' ? { Modal: () => null } : require(name), window: { location: { hostname: '127.0.0.1' }, ...browser?.window }, ...(browser ? { document: browser.document, HTMLElement: class {} } : {}), navigator: { clipboard: { async writeText(value) { copied.push(value) } } } })
   const props = {
     target,
     onNavigate(target) { navigations.push(target) },
@@ -42,6 +43,8 @@ function page({ instances = [{ name: 'basic-instance', agent_id: 'basic-agent', 
       if (endpoint === 'instances/detail') return { ok: true, value: { instance: instances.find(item => item.name === payload.name), runs: [{ id: `run-${payload.name}`, path: `runs/run-${payload.name}` }], session_scope: { home_volume: `${payload.name}-home`, preserved: true, note: '会话保存在独立 HOME 中。' } } }
       if (endpoint === 'instances/logs') return { ok: true, value: { logs: `${payload.name}: runtime ready` } }
       if (endpoint === 'instances/url') return { ok: true, value: { url: `http://127.0.0.1:${instances.find(item => item.name === payload.name).port}/assistant/`, lan_access: false } }
+      if (endpoint === 'instances/preview' && payload.operation === 'reload') return { ok: true, value: { operation: payload.operation, name: payload.name,
+        plan: { source_id: instances.find(item => item.name === payload.name)?.source_id, current_asset_digest: assetDigest, generation_digest: generationDigest }, model_policy_hash: previewHash } }
       if (endpoint === 'instances/preview') return { ok: true, value: { operation: payload.operation, name: payload.name, plan: { source_id: 'experiment:EXP-basic-001', port: payload.port ?? instances.find(item => item.name === payload.name)?.port ?? 3199, ...(payload.operation === 'create' ? { business_control: { source_digest: 'sha256:' + 'a'.repeat(64) } } : {}) }, ...(payload.operation === 'create' ? { access_mode: payload.access_mode, identity_mode: payload.identity_mode } : {}), ...(['create', 'start', 'restart'].includes(payload.operation) ? { model_selection: payload.model_selection ?? instances.find(item => item.name === payload.name)?.model_policy?.default ?? defaultModel, model_policy_hash: previewHash } : {}), ...(payload.operation === 'stop' ? { observed_state: instances.find(item => item.name === payload.name)?.state ?? 'running', observed_at: '2026-10-21T01:00:00.000Z' } : {}) } }
       if (endpoint === 'instances/run') return { ok: true, value: { ...payload, ok: true } }
       throw new Error('unexpected operation')
@@ -73,6 +76,112 @@ function chooseAgent(ui, value) {
     .props.onChange({ target: { value } })
   ui.render()
 }
+
+test('资产状态筛选区分待重载、当前和无回执旧实例，详情显示来源摘要与历史回执', async () => {
+  const instances = ['pending_reload', 'current', 'legacy'].map((status, index) => ({ name: status, agent_id: 'basic-agent', source_id: 'experiment:EXP-basic-001', state: 'running', port: 18500 + index,
+    ...(status !== 'legacy' ? { asset_status: { status, current_digest: assetDigest, reason: '资产已变化需重载，变化项相对最后实际加载回执', checked_at: '2026-11-04T00:01:00Z', changed_files: [{ path: '/opt/dsh-managed/plugin/new.js', change: 'added' }], loaded: { digest: generationDigest, loaded_at: '2026-11-04T00:00:00Z', container_id: 'container-previous', started_at: '2026-11-04T00:00:00Z' } } } : {}) }))
+  const ui = page({ instances })
+  await ui.settle()
+  const filter = () => ui.nodes().find(node => node.props?.['aria-label'] === '资产生效筛选')
+  const listed = () => ui.nodes().filter(node => node.props?.className === 'instance-list-td instance-name').map(node => ui.text(node).split('基础助手')[0])
+  assert.match(ui.text(), /资产已变化需重载.*资产已生效.*未知 \/ 未核验/)
+  filter().props.onChange({ target: { value: 'pending_reload' } }); ui.render()
+  assert.deepEqual(listed(), ['pending_reload'])
+  ui.button('查看详情').props.onClick({ currentTarget: { focus() {} } }); await ui.settle()
+  assert.match(ui.text(), /当前来源资产摘要/)
+  assert.match(ui.text(), new RegExp(assetDigest))
+  assert.match(ui.text(), /最后实际加载回执/)
+  assert.match(ui.text(), /检查于/)
+  assert.match(ui.text(), /新增：\/opt\/dsh-managed\/plugin\/new.js/)
+  assert.match(ui.text(), /历史回执仅适用于对应运行代次/)
+  ui.setTarget({ page: 'instances', instance_name: 'legacy' }); await ui.settle()
+  assert.match(ui.text(), /没有实际加载回执，尚未核验/)
+  assert.match(ui.text(), /未记录；不能据此判定资产已生效/)
+})
+
+test('单项重载只发送预览冻结的摘要并回读实际加载回执，刷新不重放写请求', async () => {
+  const instance = { name: 'basic-instance', state: 'running', source_id: 'experiment:EXP-basic-001', port: 3084,
+    asset_status: { status: 'pending_reload', current_digest: assetDigest } }
+  const loaded = { digest: assetDigest, container_id: 'new-container', started_at: '2026-11-04T00:00:00Z', loaded_at: '2026-11-04T00:00:01Z' }
+  const ui = page({ instances: [instance], respond(endpoint, payload) {
+    if (endpoint === 'instances/run') {
+      instance.asset_status = { status: 'current', current_digest: assetDigest, loaded }
+      return { ok: true, value: { ...payload, ok: true, requested_source_id: instance.source_id, value: { value: { asset_status: instance.asset_status } } } }
+    }
+  } })
+  await ui.settle()
+  await ui.button('重载').props.onClick(); await ui.settle()
+  assert.match(ui.text(), /本次来源摘要.*本次运行代次摘要/)
+  assert.match(ui.text(), /不会自动重试写请求/)
+  await ui.button('确认重载 1 项').props.onClick(); await ui.settle()
+  const writes = () => ui.calls.filter(call => call.endpoint === 'instances/run')
+  assert.deepEqual(JSON.parse(JSON.stringify(writes()[0].payload)), { operation: 'reload', name: instance.name,
+    expected_source_id: instance.source_id, expected_asset_digest: assetDigest, expected_generation_digest: generationDigest, expected_model_policy_hash: previewHash })
+  assert.match(ui.text(), /成功 1 项/)
+  assert.doesNotMatch(ui.text(), /当前登记与本次操作预期不一致/)
+  ui.invalidate(); await ui.settle()
+  assert.equal(writes().length, 1)
+})
+
+test('批量重载保留预览失败和执行失败，停止实例不派发，后续可执行目标仍处理一次', async () => {
+  const instances = ['stopped', 'failed', 'good'].map(name => ({ name, source_id: 'experiment:EXP-basic-001', state: name === 'stopped' ? 'stopped' : 'running' }))
+  const ui = page({ instances, respond(endpoint, payload) {
+    if (endpoint === 'instances/batch-preview') return { ok: true, value: { previews: payload.items.map(item => item.name === 'stopped'
+      ? { ...item, ok: false, error: { message: '已停止的实例不能重载' } }
+      : { ...item, ok: true, value: { ...item, plan: { source_id: instances[0].source_id, current_asset_digest: assetDigest, generation_digest: generationDigest }, model_policy_hash: previewHash } }) } }
+    if (endpoint === 'instances/run') {
+      if (payload.name === 'failed') return { ok: true, value: { ...payload, ok: false, error: { message: '来源已变化，请重新预览' } } }
+      const instance = instances.find(item => item.name === payload.name)
+      instance.asset_status = { status: 'current', loaded: { digest: assetDigest, container_id: 'new', started_at: 'now' } }
+      return { ok: true, value: { ...payload, ok: true, value: { value: { asset_status: instance.asset_status } } } }
+    }
+  } })
+  await ui.settle()
+  ui.nodes().find(node => node.props?.['aria-label'] === '全选当前列表实例').props.onChange({ target: { checked: true } }); ui.render()
+  await ui.button('重载').props.onClick(); await ui.settle()
+  await ui.button('确认重载 2 项').props.onClick(); await ui.settle()
+  assert.deepEqual(ui.calls.filter(call => call.endpoint === 'instances/run').map(call => call.payload.name), ['failed', 'good'])
+  assert.match(ui.text(), /成功 1 项.*失败 1 项.*未派发 1 项/)
+})
+
+test('批量重载加载结果未核验时暂停后续目标，刷新不会重试', async () => {
+  const instances = ['unknown', 'later'].map(name => ({ name, source_id: 'experiment:EXP-basic-001', state: 'running' }))
+  const ui = page({ instances, respond(endpoint, payload) {
+    if (endpoint === 'instances/batch-preview') return { ok: true, value: { previews: payload.items.map(item => ({ ...item, ok: true,
+      value: { ...item, plan: { source_id: instances[0].source_id, current_asset_digest: assetDigest, generation_digest: generationDigest }, model_policy_hash: previewHash } })) } }
+    if (endpoint === 'instances/run') return { ok: true, value: { ...payload, ok: false, error: { message: '实际加载结果尚未核验，请刷新实例回执' } } }
+  } })
+  await ui.settle()
+  ui.nodes().find(node => node.props?.['aria-label'] === '全选当前列表实例').props.onChange({ target: { checked: true } }); ui.render()
+  await ui.button('重载').props.onClick(); await ui.settle()
+  await ui.button('确认重载 2 项').props.onClick(); await ui.settle()
+  assert.deepEqual(ui.calls.filter(call => call.endpoint === 'instances/run').map(call => call.payload.name), ['unknown'])
+  assert.match(ui.text(), /结果未知 1 项.*未派发 1 项/)
+  ui.invalidate(); await ui.settle()
+  assert.equal(ui.calls.filter(call => call.endpoint === 'instances/run').length, 1)
+})
+
+test('重载预览目标不符或代次缺失不能确认，切换目标后迟到预览不会重开操作', async () => {
+  for (const wrong of ['name', 'generation']) {
+    const ui = page({ respond(endpoint, payload) {
+      if (endpoint === 'instances/preview') return { ok: true, value: { ...payload, ...(wrong === 'name' ? { name: 'other' } : {}),
+        plan: { source_id: 'experiment:EXP-basic-001', current_asset_digest: assetDigest, ...(wrong === 'generation' ? {} : { generation_digest: generationDigest }) }, model_policy_hash: previewHash } }
+    } })
+    await ui.settle(); await ui.button('重载').props.onClick(); await ui.settle()
+    assert.match(ui.text(), /预览未核实目标、资产或运行代次/)
+    assert.equal(ui.button('确认重载 1 项'), undefined)
+    assert.equal(ui.calls.some(call => call.endpoint === 'instances/run'), false)
+  }
+  const late = deferred()
+  const ui = page({ respond(endpoint) { if (endpoint === 'instances/preview') return late.promise } })
+  await ui.settle()
+  const preview = ui.button('重载').props.onClick(); ui.render()
+  ui.setTarget({ page: 'agents' })
+  late.resolve({ ok: true, value: { name: 'basic-instance', operation: 'reload', plan: { source_id: 'experiment:EXP-basic-001', current_asset_digest: assetDigest, generation_digest: generationDigest }, model_policy_hash: previewHash } })
+  await preview; await ui.settle()
+  assert.equal(ui.button('确认重载 1 项'), undefined)
+  assert.equal(ui.calls.some(call => call.endpoint === 'instances/run'), false)
+})
 
 test('SDK实例完成为正常状态，列表和详情提供SDK入口并省略Web与网站嵌入', async () => {
   const ui = page({ instances: [{ name: 'sdk-demo', agent_id: 'basic-agent', profile: 'sdk', state: 'completed', source_id: 'experiment:EXP-basic-001' }] })
@@ -145,7 +254,7 @@ test('非空实例列表保留原型的搜索、状态筛选与表格层级，�
   await ui.settle()
   const filter = ui.nodes().find(node => node.props?.className === 'instance-filter-row')
   const labels = ui.nodes(filter).filter(node => node.type === 'label')
-  assert.deepEqual(labels.map(node => ui.text(node).slice(0, 2)), ['搜索', '状态', '登记'])
+  assert.deepEqual(labels.map(node => ui.text(node).slice(0, 2)), ['搜索', '状态', '登记', '资产'])
   assert.ok(ui.nodes().some(node => node.type === 'table' && node.props.className === 'instance-table'))
   assert.match(ui.text(), /basic-instance.*共 1 条记录/)
   ui.nodes().find(node => node.type === 'input' && node.props['aria-label'] === '搜索实例').props.onChange({ target: { value: 'basic-agent' } })
@@ -171,10 +280,10 @@ test('实例状态分布按搜索与来源统计，状态筛选不改变分母�
   const listed = () => ui.nodes().filter(node => node.props?.className === 'instance-list-td instance-name').map(node => ui.text(node))
   await ui.settle()
   assert.deepEqual(counts(), ['1', '1', '1', '1', '3'])
-  assert.match(ui.text(chart()), /当前搜索与来源下共 7 项登记；状态仅筛选下方列表/)
+  assert.match(ui.text(chart()), /当前搜索、来源与资产筛选下共 7 项登记；状态仅筛选下方列表/)
   ui.nodes().find(node => node.props?.['aria-label'] === '搜索实例').props.onChange({ target: { value: 'basic-agent' } }); ui.render()
   assert.deepEqual(counts(), ['1', '1', '0', '1', '3'])
-  assert.match(ui.text(chart()), /当前搜索与来源下共 6 项登记/)
+  assert.match(ui.text(chart()), /当前搜索、来源与资产筛选下共 6 项登记/)
   legendButton('状态未知').props.onClick(); ui.render()
   assert.deepEqual(counts(), ['1', '1', '0', '1', '3'])
   assert.deepEqual(listed().map(value => value.split('基础助手')[0]), ['unknown-instance', 'missing-state', 'unrecognized-state'])
@@ -183,7 +292,7 @@ test('实例状态分布按搜索与来源统计，状态筛选不改变分母�
   assert.equal(ui.nodes().filter(node => node.props?.className === 'instance-state-badge' && ui.text(node) === '状态未知').length, 3)
   ui.nodes().find(node => node.props?.['aria-label'] === '实例登记来源筛选').props.onChange('experiment:EXP-other-002'); ui.render()
   assert.deepEqual(counts(), ['0', '0', '0', '0', '0'])
-  assert.match(ui.text(chart()), /当前搜索与来源范围没有实例登记/)
+  assert.match(ui.text(chart()), /当前搜索、来源与资产筛选范围没有实例登记/)
   ui.nodes().find(node => node.props?.['aria-label'] === '搜索实例').props.onChange({ target: { value: '' } }); ui.render()
   assert.deepEqual(counts(), ['0', '0', '1', '0', '0'])
   legendButton('异常').props.onClick(); ui.render()
@@ -203,7 +312,7 @@ test('实例分布首次读取未成功前不展示零结果，成功读取空�
   first.resolve({ ok: false, error: { message: '暂时无法读取登记' } }); await ui.settle()
   assert.equal(chart(), undefined)
   fail = false; ui.button('重新读取').props.onClick(); await ui.settle()
-  assert.match(ui.text(chart()), /当前搜索与来源范围没有实例登记/)
+  assert.match(ui.text(chart()), /当前搜索、来源与资产筛选范围没有实例登记/)
 })
 
 test('实例刷新失败仍保留已知分布并标记上次观察，不把未知读取画为零', async () => {
@@ -1050,4 +1159,28 @@ test('Instances 首次列表慢读取与领域通知共用队列', async () => {
   assert.equal(reads, 1)
   block = false; release(); await ui.settle()
   assert.equal(reads, 2)
+})
+
+
+test('可见托管实例页每30秒只读检查、focus与恢复可见立即检查，隐藏和离开页面停查并清理监听', async () => {
+  const events = new Map(), timers = new Map()
+  const target = scope => ({ addEventListener(type, fn) { events.set(`${scope}:${type}`, fn) }, removeEventListener(type) { events.delete(`${scope}:${type}`) } })
+  const document = { visibilityState: 'visible', ...target('document') }
+  const window = { ...target('window'), setInterval(fn, interval) { assert.equal(interval, 30_000); timers.set(1, fn); return 1 }, clearInterval(id) { timers.delete(id) } }
+  const ui = page({ browser: { document, window } })
+  await ui.settle()
+  const count = () => ui.calls.filter(call => call.endpoint === 'instances/list').length
+  let before = count()
+  timers.get(1)(); await ui.settle(); assert.equal(count(), before + 1)
+  before = count(); events.get('window:focus')(); await ui.settle(); assert.equal(count(), before + 1)
+  document.visibilityState = 'hidden'; before = count()
+  timers.get(1)(); events.get('window:focus')(); events.get('document:visibilitychange')()
+  await ui.settle(); assert.equal(count(), before)
+  document.visibilityState = 'visible'; events.get('document:visibilitychange')()
+  await ui.settle(); assert.equal(count(), before + 1)
+  ui.setActive(false); before = count(); await ui.settle()
+  assert.equal(timers.size, 0); assert.equal(events.size, 0); assert.equal(count(), before)
+  ui.setActive(true); await ui.settle(); assert.equal(count(), before + 1)
+  before = count(); ui.invalidate(); await ui.settle(); assert.equal(count(), before + 1, '保留事件刷新')
+  assert.equal(ui.calls.filter(call => call.endpoint === 'instances/run').length, 0)
 })

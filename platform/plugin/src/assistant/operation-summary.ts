@@ -50,7 +50,7 @@ export function operationSummary(meta: OperationMeta, phase = 'result') {
   const action = meta.action
   const instanceReceipt = meta.domain === 'instances' ? receipts.find(item => typeof item.operation === 'string' && typeof item.name === 'string') : undefined
   const instanceOperation = instanceReceipt?.operation ?? input.operation
-  let title = action === 'list' ? ({ agents: '查询智能体', instances: '查询实例', mcp: '查询 MCP 工具与组合' } as Record<string, string>)[meta.domain] : meta.domain === 'instances' && action === 'run' ? ({ create: '创建实例', start: '启动实例', stop: '停止实例', restart: '重启实例', delete: '删除实例' } as Record<string, string>)[instanceOperation] : meta.domain === 'instances' && action === 'preview' ? '核对实例操作范围' : titles[action]
+  let title = action === 'list' ? ({ agents: '查询智能体', instances: '查询实例', mcp: '查询 MCP 工具与组合' } as Record<string, string>)[meta.domain] : meta.domain === 'instances' && action === 'run' ? ({ create: '创建实例', start: '启动实例', stop: '停止实例', restart: '重启实例', reload: '重载实例资产', delete: '删除实例' } as Record<string, string>)[instanceOperation] : meta.domain === 'instances' && action === 'preview' ? '核对实例操作范围' : titles[action]
   title ??= action || `平台${meta.domain}操作`
   if (action === 'describe' && typeof value?.action === 'string') title += `：${titles[value.action] ?? value.action}`
   const file = input.path ?? value?.selected?.path

@@ -367,6 +367,39 @@ test('实例创建、启动和重启由助手内部预览冻结来源、端口�
   }
 })
 
+test('助手重载冻结实际来源与代次，批量部分失败和旧确认均不重放', async t => {
+  const asset = 'sha256:' + 'b'.repeat(64), generation = 'sha256:' + 'c'.repeat(64)
+  const preview = input => ({ ...input, plan: { source_id: 'experiment:EXP-test-agent-001', current_asset_digest: asset,
+    ...(input.name === 'missing-generation' ? {} : { generation_digest: generation }) }, model_policy_hash: 'a'.repeat(64) })
+  const f = fixture(t, (endpoint, input) => {
+    if (endpoint === 'instances/preview') return { ok: true, value: preview(input) }
+    if (endpoint === 'instances/batch-preview') return { ok: true, value: { previews: input.items.map(item => ({ ...item, ok: true, value: preview(item) })) } }
+    if (endpoint === 'instances/batch') return { ok: true, value: { receipts: input.items.map(item => ({ ...item, ok: item.name === 'good',
+      ...(item.name === 'good' ? {} : { error: { message: '来源发生变化，请重新预览' } }) })) } }
+  })
+  const id = (await f.rpc('session', { task: '按当前资产重载实例' })).value.session_id
+  const request = { name: 'single', operation: 'reload', expected_asset_digest: 'old', expected_generation_digest: 'old' }
+  assert.equal((await f.execute(id, 'instances', 'run', request)).state, 'completed')
+  const card = await f.operation(id)
+  const run = f.calls.find(call => call.endpoint === 'instances/run')
+  assert.equal(run.input.expected_source_id, 'experiment:EXP-test-agent-001')
+  assert.equal(run.input.expected_asset_digest, asset)
+  assert.equal(run.input.expected_generation_digest, generation)
+  assert.equal(run.input.expected_model_policy_hash, 'a'.repeat(64))
+  assert.equal(run.input.port, undefined)
+  assert.equal(run.input.model_selection, undefined)
+  await f.rpc('confirm', { session_id: id, proposal_id: card.id })
+  assert.equal(f.calls.filter(call => call.endpoint === 'instances/run').length, 1)
+  const result = await f.execute(id, 'instances', 'batch', { items: ['good', 'failed'].map(name => ({ name, operation: 'reload' })) })
+  assert.equal(result.state, 'failed')
+  const batch = await f.operation(id)
+  assert.equal(batch.input.items[1].expected_generation_digest, generation)
+  await f.rpc('confirm', { session_id: id, proposal_id: batch.id })
+  assert.equal(f.calls.filter(call => call.endpoint === 'instances/batch').length, 1)
+  await assert.rejects(() => f.execute(id, 'instances', 'run', { name: 'missing-generation', operation: 'reload' }), /资产|代次/)
+  assert.equal(f.calls.filter(call => call.endpoint === 'instances/run').length, 1)
+})
+
 test('业务实例创建冻结来源摘要、访问方式并使用统一网关入口', async t => {
   const contract = assistantActionContract('instances', 'run')
   for (const key of ['business_control', 'access_mode', 'identity_mode']) assert.ok(contract.input_schema.properties[key], `${key} 应出现在实例合同`)

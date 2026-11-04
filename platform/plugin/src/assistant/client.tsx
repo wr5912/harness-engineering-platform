@@ -335,7 +335,7 @@ function targetVersionLabel(value: unknown, data: any, input: Record<string, any
 function confirmationAction(meta: OperationMeta) {
   const value = unwrap(meta.preview) as any
   if (meta.action === 'datasets/apply') return `保存 ${value?.count ?? value?.records?.length ?? ''} 条样本`
-  if (meta.domain === 'instances' && meta.action === 'run') return ({ create: '创建实例', start: '启动实例', stop: '停止实例', restart: '重启实例', delete: '删除实例' } as Record<string, string>)[meta.input?.operation ?? value?.operation ?? value?.input?.operation] ?? '执行实例操作'
+  if (meta.domain === 'instances' && meta.action === 'run') return ({ create: '创建实例', start: '启动实例', stop: '停止实例', restart: '重启实例', reload: '重载实例资产', delete: '删除实例' } as Record<string, string>)[meta.input?.operation ?? value?.operation ?? value?.input?.operation] ?? '执行实例操作'
   return ({ 'features/apply': '保存特性', 'decision/update': '保存研究结论', saveConfiguration: '保存 MCP 配置', 'fusion/confirm': '创建融合版本', create: '创建研究版本', new: '创建智能体', 'edit/apply': '保存修改', 'eval/start': '开始评测', callPublishedComposition: '执行工具组合', callTool: '调用工具', publishComposition: '发布工具组合', saveCompositionDraft: '保存组合草稿', 'cases/update': '保存测试用例', 'cases/create': '保存测试用例', 'compute-variants/create': '创建算力变体', 'compute-variants/build': '构建代码变体', 'compute-variants/freeze': '确认冻结本次数据差异' } as Record<string, string>)[meta.action] ?? actionLabels[meta.action] ?? '执行此操作'
 }
 

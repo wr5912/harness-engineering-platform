@@ -15,7 +15,7 @@ import { SdkDebugDialog } from '../agents/sdk-client.tsx'
 import { ExternalInstancesPage } from './external-client.tsx'
 import { externalInstanceTheme } from './external-style.ts'
 
-type Operation = 'create' | 'start' | 'stop' | 'restart' | 'delete'
+type Operation = 'create' | 'start' | 'stop' | 'restart' | 'reload' | 'delete'
 
 interface InstanceRow {
   name: string
@@ -40,6 +40,16 @@ interface InstanceRow {
   mount_modes?: Record<string, string>
   ps?: string
   model_policy?: { default?: ModelSelection | null }
+  asset_status?: {
+    status: 'current' | 'pending_reload' | 'unknown'
+    current_digest?: string | null
+    generation_digest?: string | null
+    reason?: string
+    checked_at?: string
+    changed_files?: { path: string; change: 'added' | 'modified' | 'removed' }[]
+    loaded?: { digest: string; loaded_at: string; container_id: string; started_at: string; verification: string } | null
+    last_attempt?: { status: string; at: string; message?: string } | null
+  }
 }
 
 type ModelRef = Pick<ModelSelection, 'provider' | 'model'>
@@ -51,6 +61,8 @@ interface ActionRequest {
   source?: string
   expected_source_id?: string
   expected_source_digest?: string
+  expected_asset_digest?: string
+  expected_generation_digest?: string
   expected_state?: string
   port?: number
   business_control?: boolean
@@ -74,7 +86,7 @@ interface Receipt {
   status?: 'success' | 'failed' | 'unknown' | 'not_dispatched'
   requested_source_id?: string
   model_selection?: ModelSelection
-  registration?: { status: 'checking' | 'verified' | 'unknown'; observed?: Pick<InstanceRow, 'source_id' | 'state' | 'business_gateway' | 'access_mode' | 'identity_mode' | 'access_url'> | null; checked_at?: string }
+  registration?: { status: 'checking' | 'verified' | 'unknown'; observed?: Pick<InstanceRow, 'source_id' | 'state' | 'business_gateway' | 'access_mode' | 'identity_mode' | 'access_url' | 'asset_status'> | null; checked_at?: string }
   value?: unknown
   error?: { message: string }
 }
@@ -115,6 +127,7 @@ const labels: Record<Operation, string> = {
   start: '启动',
   stop: '停止',
   restart: '重启',
+  reload: '重载',
   delete: '删除',
 }
 const impacts: Record<Operation, string> = {
@@ -122,11 +135,14 @@ const impacts: Record<Operation, string> = {
   start: '启动此实例容器',
   stop: '停止并移除此实例容器',
   restart: '停止旧容器并以同一来源重建',
+  reload: '按当前资产重建目标容器，核验实际加载；保留 HOME、会话、端口、模型与网关身份。进行中的请求可能中断，不会自动重放。',
   delete: '移除已停止容器与本实例管理登记',
 }
 
 const detailTabs = [{ id: 'overview', label: '概览' }, { id: 'embed', label: '网站嵌入' }, { id: 'logs', label: '运行日志' }, { id: 'receipts', label: '操作回执' }] as const
 const stateLabels: Record<string, string> = { running: '运行中', stopped: '已停止', completed: '执行完成', absent: '无容器', failed: '异常', unknown: '状态未知' }
+const assetLabels = { current: '资产已生效', pending_reload: '资产已变化需重载', unknown: '未知 / 未核验' }
+const assetState = (item: InstanceRow) => item.asset_status?.status || 'unknown'
 const modelKey = (value: ModelRef) => JSON.stringify([value.provider, value.model])
 const sameModel = (left?: ModelSelection | null, right?: ModelSelection | null) =>
   left === right || Boolean(left && right && left.provider === right.provider && left.model === right.model && left.reasoningEffort === right.reasoningEffort)
@@ -184,6 +200,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
   const [lastListAt, setLastListAt] = useState('')
   const [query, setQuery] = useState('')
   const [sourceFilter, setSourceFilter] = useState('')
+  const [assetFilter, setAssetFilter] = useState('all')
   useEffect(() => {
     if (target?.page === 'instances') setSourceFilter(target.experiment_id ? `experiment:${target.experiment_id}` : '')
   }, [target?.page, target?.experiment_id])
@@ -232,6 +249,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
   const listRequest = useRef(0)
   const currentListRead = useRef<{ request: number; promise: Promise<InstanceRow[]> } | null>(null)
   const detailRequest = useRef(0)
+  const actionPreviewRequest = useRef(0)
   const detailName = useRef<string | undefined>(undefined)
   const sourceRequest = useRef(0)
   const sourceRunRequest = useRef(0)
@@ -247,7 +265,8 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
   const embedCode = embedUrl ? `<iframe\n  src="${embedUrl.replaceAll('&', '&amp;').replaceAll('"', '&quot;')}"\n  title="DSH 智能体"\n  style="width: 100%; height: 700px; border: 0;"\n  allow="clipboard-write"\n></iframe>` : ''
 
   const scopedInstances = useMemo(() => instances.filter(item => (!sourceFilter || item.source_id === sourceFilter)
-    && `${item.name} ${item.agent_id ?? ''} ${item.source_id ?? ''}`.toLowerCase().includes(query.toLowerCase())), [instances, query, sourceFilter])
+    && (assetFilter === 'all' || assetState(item) === assetFilter)
+    && `${item.name} ${item.agent_id ?? ''} ${item.source_id ?? ''}`.toLowerCase().includes(query.toLowerCase())), [instances, query, sourceFilter, assetFilter])
   const stateSegments = useMemo(() => instanceStateSegments(scopedInstances), [scopedInstances])
   const visible = useMemo(() => scopedInstances.filter(item => matchesInstanceState(item.state, filter)), [scopedInstances, filter])
   const visibleSelected = visible.filter(item => selected.has(item.name)).length
@@ -435,6 +454,25 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
     }
     await Promise.allSettled(reads)
   })
+  const refreshChangedRef = useRef(refreshChanged)
+  refreshChangedRef.current = refreshChanged
+  useEffect(() => {
+    if (!active || instanceView !== 'managed' || typeof document === 'undefined') return
+    const check = () => {
+      if (document.visibilityState !== 'visible') return
+      changedDomains.current.add('instances')
+      void refreshChangedRef.current()
+    }
+    const timer = window.setInterval(check, 30_000)
+    window.addEventListener('focus', check)
+    document.addEventListener('visibilitychange', check)
+    check()
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', check)
+      document.removeEventListener('visibilitychange', check)
+    }
+  }, [active, instanceView])
   useEffect(() => updates?.subscribe(() => {
     const domains = updates.getSnapshot().domains.filter(domain => ['instances', 'agents', 'catalog'].includes(domain))
     if (!domains.length) return
@@ -507,11 +545,17 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
   }, [creating, actionDialog, active, instanceView])
 
   function closeAction() {
+    actionPreviewRequest.current++
+    setActionPhase(null)
     setActionDialog(null)
     setPreviews([])
     setPreviewRun(null)
     setPending(null)
   }
+
+  useEffect(() => {
+    if (actionPhase !== 'execute' && actionPhase !== 'readback') closeAction()
+  }, [target?.page, target?.instance_name, active, instanceView])
 
   function updateForm(next: typeof form) {
     if (next.source !== form.source) setCreateModelDraft(undefined)
@@ -535,11 +579,12 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
 
   async function prepare(operation: Operation, names: string[], modelSelection?: ModelSelection) {
     const sdkInstances = instances.filter(item => names.includes(item.name) && isSdk(item))
-    if ((operation === 'start' || operation === 'restart') && sdkInstances.length) {
+    if ((operation === 'start' || operation === 'restart' || operation === 'reload') && sdkInstances.length) {
       if (names.length === 1) openSdk(sdkInstances[0])
       else setError('SDK 实例需要逐个提交调试输入，请在对应实例中打开 SDK 调试。')
       return
     }
+    const request = ++actionPreviewRequest.current
     if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) actionOpener.current = document.activeElement
     setActionDialog(operation)
     setReceipts([])
@@ -555,6 +600,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
       const results: OperationPreview[] = items.length === 1
         ? [{ name: items[0].name, operation, ok: true, value: await call<OperationPreview['value']>('preview', items[0]) }]
         : (await call<{ previews: OperationPreview[] }>('batch-preview', { items })).previews
+      if (request !== actionPreviewRequest.current) return
       const frozen: ActionRequest[] = []
       const skipped: Receipt[] = []
       const shown = results.map((result, index) => {
@@ -592,6 +638,19 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
           }
           frozen.push({ ...item, model_selection: selected, expected_model_policy_hash: hash, expected_source_id: source,
             ...(typeof sourceDigest === 'string' ? { expected_source_digest: sourceDigest } : {}), port: plannedPort as number })
+        } else if (operation === 'reload') {
+          const asset = result.value.plan?.current_asset_digest
+          const generation = result.value.plan?.generation_digest
+          const hash = result.value.model_policy_hash
+          if (result.name !== item.name || result.value.name !== item.name || result.value.operation !== operation
+            || typeof asset !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(asset)
+            || typeof generation !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(generation)
+            || typeof hash !== 'string' || !/^[a-f0-9]{64}$/.test(hash)) {
+            const message = '预览未核实目标、资产或运行代次，请刷新后重新预览；本项不会执行。'
+            skipped.push({ ...item, ok: false, status: 'not_dispatched', error: { message } })
+            return { ...result, ok: false, error: { message } }
+          }
+          frozen.push({ ...item, expected_source_id: source, expected_asset_digest: asset, expected_generation_digest: generation, expected_model_policy_hash: hash })
         } else if (operation === 'stop') {
           const state = instanceState(result.value.observed_state)
           if (state === 'unknown' || !result.value.observed_at) {
@@ -606,9 +665,9 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
       setPreviews(shown)
       if (frozen.length) setPending({ operation, items: frozen, selectedCount: items.length, skipped, modelChange: Boolean(modelSelection) })
     } catch (err) {
-      setError((err as Error).message)
+      if (request === actionPreviewRequest.current) setError((err as Error).message)
     } finally {
-      setActionPhase(null)
+      if (request === actionPreviewRequest.current) setActionPhase(null)
     }
   }
 
@@ -630,7 +689,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
             if (receipt.name !== item.name || receipt.operation !== item.operation) {
               return { ...item, ok: false, status: 'unknown' as const, error: { message: '操作回执目标与提交目标不一致，执行结果待核对。' } }
             }
-            return { ...receipt, port: item.port, model_selection: item.model_selection, status: receipt.ok ? 'success' as const : /未知|未确认|无法确认|查询失败|无法复查/.test(receipt.error?.message || '') ? 'unknown' as const : 'failed' as const }
+            return { ...receipt, port: item.port, model_selection: item.model_selection, status: receipt.ok ? 'success' as const : /未知|未确认|未核验|无法确认|查询失败|无法复查/.test(receipt.error?.message || '') ? 'unknown' as const : 'failed' as const }
           } catch (err) {
             return { ...item, ok: false, status: 'unknown' as const, error: { message: `回执未收到，执行结果未知；请刷新核对。${(err as Error).message}` } }
           }
@@ -839,6 +898,12 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
     if (item.operation === 'delete') return !observed
     if (!observed) return false
     if (item.requested_source_id && observed.source_id !== item.requested_source_id) return false
+    if (item.operation === 'reload') {
+      const loaded = (item.value as { value?: { asset_status?: InstanceRow['asset_status'] } })?.value?.asset_status?.loaded
+      return observed.state === 'running' && observed.asset_status?.status === 'current' && Boolean(loaded)
+        && loaded!.digest === observed.asset_status.loaded?.digest && loaded!.container_id === observed.asset_status.loaded?.container_id
+        && loaded!.started_at === observed.asset_status.loaded?.started_at
+    }
     return item.operation === 'stop' ? observed.state === 'absent' : observed.state === 'running'
   }
 
@@ -925,11 +990,12 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
             <option value="absent">无容器（仅登记）</option><option value="failed">异常</option><option value="unknown">状态未知</option>
           </select></label>
           <label className="instance-filter-field">登记来源<SearchSelect label="实例登记来源筛选" value={sourceFilter} onChange={value => { setSourceFilter(value); if (!value) onNavigate?.({ page: 'instances' }) }} options={[{ value: '', label: '全部来源' }, ...sources.map(source => ({ value: source.source_id, label: source.experiment_id, description: agentName(source.agent_id) }))]} /></label>
-          <button type="button" className="instance-clear-filter" onClick={() => { setQuery(''); setFilter('existing'); setSourceFilter(''); onNavigate?.({ page: 'instances' }) }}>清除筛选</button>
+          <label className="instance-filter-field">资产生效<select aria-label="资产生效筛选" value={assetFilter} onChange={event => setAssetFilter(event.target.value)} className="instance-field-input"><option value="all">全部资产状态</option>{Object.entries(assetLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <button type="button" className="instance-clear-filter" onClick={() => { setQuery(''); setFilter('existing'); setSourceFilter(''); setAssetFilter('all'); onNavigate?.({ page: 'instances' }) }}>清除筛选</button>
           <div className="instance-toolbar-actions"><button type="button" onClick={() => void refreshChanged()} disabled={loading} className="instance-button">刷新列表{loading && listLoaded ? <LoadingIndicator label="读取实例列表" /> : null}</button>
         <button type="button" className="harness-primary" aria-haspopup="dialog" aria-expanded={creating} aria-controls="instance-create" disabled={busy} onClick={event => { createOpener.current = event.currentTarget; void loadModels(); void loadSources(); setCreating(true) }}>新建实例</button></div>
         </div>
-        {listLoaded && <div className="instance-state-overview" aria-busy={loading}><DistributionChart title="实例状态分布" description={`${refreshError ? '上次观察；当前状态待核对。' : ''}当前搜索与来源下共 ${scopedInstances.length} 项登记；状态仅筛选下方列表。`} variant="bars" totalLabel="项登记" emptyText="当前搜索与来源范围没有实例登记。"
+        {listLoaded && <div className="instance-state-overview" aria-busy={loading}><DistributionChart title="实例状态分布" description={`${refreshError ? '上次观察；当前状态待核对。' : ''}当前搜索、来源与资产筛选下共 ${scopedInstances.length} 项登记；状态仅筛选下方列表。`} variant="bars" totalLabel="项登记" emptyText="当前搜索、来源与资产筛选范围没有实例登记。"
           segments={stateSegments} selectedKey={filter} onSelect={key => setFilter(current => current === key ? 'all' : key)} /></div>}
         <div className="instance-filter-summary"><span>{lastListAt ? `${refreshError ? '上次成功观察' : '观察于'} ${lastListAt}${refreshError ? ' · 当前状态待核对' : ''}` : loading ? '' : '实例状态尚未读取'}</span></div>
       </section>
@@ -937,7 +1003,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
         {selectedNames.length ? <>
           <strong>已选择 {selected.size} 个</strong>
           {selected.size > visibleSelected && <span className="instance-muted">其中 {selected.size - visibleSelected} 个不在当前列表</span>}
-          {(['start', 'stop', 'restart', 'delete'] as Operation[]).map(operation => <button key={operation} type="button" disabled={busy || missingSelections.length > 0}
+          {(['start', 'stop', 'restart', 'reload', 'delete'] as Operation[]).map(operation => <button key={operation} type="button" disabled={busy || missingSelections.length > 0}
             onClick={() => prepare(operation, selectedNames)} className="instance-button">{labels[operation]}</button>)}
           <button type="button" disabled={busy} onClick={() => setSelected(new Set())} className="instance-button">取消选择</button>
           {missingSelections.length > 0 && <span role="status" className="instance-selection-notice">{missingSelections.length} 个所选登记已不存在。<button type="button" onClick={() => setSelected(current => new Set([...current].filter(name => !missingSelections.includes(name))))}>清除失效选择</button></span>}
@@ -981,7 +1047,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
                     })} />
                 </td>
                 <td className="instance-list-td instance-name" data-label="实例 / 智能体"><strong>{item.name}</strong><small>{agentName(item.agent_id)}{agentName(item.agent_id) !== item.agent_id ? ` · ${item.agent_id}` : ''}</small></td>
-                <td className="instance-list-td instance-source" data-label="登记来源版本"><strong>{versionLabel(item.source_id)}</strong><small>{sourceById.get(item.source_id || '')?.experiment_id || item.source_id}</small></td>
+                <td className="instance-list-td instance-source" data-label="登记来源版本"><strong>{versionLabel(item.source_id)}</strong><small>{sourceById.get(item.source_id || '')?.experiment_id || item.source_id}</small>{!isSdk(item) && <span className="instance-state-badge" data-state={assetState(item) === 'current' ? 'running' : 'unknown'}>{assetLabels[assetState(item)]}</span>}</td>
                 <td className="instance-list-td" data-label="运行状态"><span className="instance-state-badge" data-state={instanceState(item.state)}>{stateLabels[instanceState(item.state)]}</span></td>
                 <td className="instance-list-td" data-label="访问入口">
                   {isSdk(item) ? <><button type="button" onClick={() => openSdk(item)} className="instance-button">SDK 调试</button><div className="instance-muted instance-access-note">官方 TypeScript SDK · 同容器调用</div></> : <><button type="button" disabled={item.state !== 'running' || !item.port || opening.has(item.name)}
@@ -994,7 +1060,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
                 </td>
                 <td className="instance-list-td" data-label="操作"><div className="instance-actions">
                   <button type="button" onClick={event => openDetail(item.name, false, false, event?.currentTarget)} disabled={detailLoading} className="instance-button">查看详情</button>
-                  {(isSdk(item) ? item.state === 'running' ? ['stop'] : ['delete'] : item.state === 'running' ? ['stop', 'restart'] : item.state === 'stopped' || item.state === 'absent' ? ['start', 'delete'] : item.state === 'failed' ? ['start', 'stop'] : []).map(operation =>
+                  {(isSdk(item) ? item.state === 'running' ? ['stop'] : ['delete'] : item.state === 'running' ? ['stop', 'restart', 'reload'] : item.state === 'stopped' || item.state === 'absent' ? ['start', 'delete'] : item.state === 'failed' ? ['start', 'stop'] : []).map(operation =>
                     <button type="button" key={operation} disabled={busy} onClick={() => prepare(operation as Operation, [item.name])} className="instance-button">{labels[operation as Operation]}</button>)}
                   {item.state === 'unknown' && <span>观察失败，请刷新</span>}
                 </div></td>
@@ -1018,6 +1084,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
             <div className="instance-actions">
               {isSdk(detail.instance) ? <><button type="button" className="harness-primary" onClick={() => openSdk(detail.instance)}>SDK 调试</button><button type="button" className="instance-button" onClick={() => openSdk(detail.instance, 'guide')}>接入文档</button></> : <button type="button" className="harness-primary" disabled={detail.instance.state !== 'running' || !detail.instance.port || opening.has(detail.instance.name)} onClick={() => void openWeb(detail.instance.name)}>{opening.has(detail.instance.name) ? '正在打开…' : '访问 DSH Web'}</button>}
               <button type="button" className="instance-button" disabled={detailLoading} onClick={() => void openDetail(detail.instance.name, true)}>刷新详情{detailLoading ? <LoadingIndicator label="刷新实例详情" /> : null}</button>
+              {!isSdk(detail.instance) && <button type="button" className="instance-button" disabled={busy || detail.instance.state !== 'running'} onClick={() => void prepare('reload', [detail.instance.name])}>重载</button>}
               <button type="button" className="instance-button" onClick={() => closeDetail()}>返回实例列表</button>
             </div>
           </header>
@@ -1036,6 +1103,11 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
             <dl className="instance-detail-grid">
               <div className="instance-fact"><dt className="instance-muted">实例登记来源</dt><dd className="instance-fact-value"><strong>{sourceLabel(detail.instance.source_id)}</strong><br/><code>{detail.instance.source_id || '未记录来源 ID'}</code>{detail.instance.source_id && <button type="button" className="instance-button instance-copy-id" onClick={() => void copySourceId(detail.instance.source_id!)}>复制来源 ID</button>}{sourceCopyNotice && <small role="status">{sourceCopyNotice}</small>}</dd></div>
               <div className="instance-fact"><dt className="instance-muted">登记默认模型</dt><dd className="instance-fact-value"><strong>{modelLabel(models?.catalog, instanceCurrentModel)}</strong>{instanceCurrentModel?.reasoningEffort && <small>推理档位：{instanceCurrentModel.reasoningEffort}</small>}<small>来自本实例登记，当前 Session 的实际模型需单独核对。</small></dd></div>
+              {!isSdk(detail.instance) && <>
+                <div className="instance-fact"><dt className="instance-muted">资产生效状态</dt><dd className="instance-fact-value"><strong>{assetLabels[assetState(detail.instance)]}</strong><small>{detail.instance.asset_status?.reason || '没有实际加载回执，尚未核验。'}</small>{detail.instance.asset_status?.checked_at && <small>检查于 {new Date(detail.instance.asset_status.checked_at).toLocaleString('zh-CN')}</small>}{detail.instance.asset_status?.changed_files?.length ? <ul aria-label="资产变化项">{detail.instance.asset_status.changed_files.map(file => <li key={file.path}>{{ added: '新增', modified: '修改', removed: '删除' }[file.change]}：{file.path}</li>)}</ul> : null}{detail.instance.asset_status?.last_attempt && <small>最近重载尝试：{{ running: '正在执行', unknown: '结果未核验', verified: '已核验' }[detail.instance.asset_status.last_attempt.status] || '结果未核验'} · {new Date(detail.instance.asset_status.last_attempt.at).toLocaleString('zh-CN')} {detail.instance.asset_status.last_attempt.message}</small>}</dd></div>
+                <div className="instance-fact"><dt className="instance-muted">当前来源资产摘要</dt><dd className="instance-fact-value"><code>{detail.instance.asset_status?.current_digest || '读取失败或尚未核验'}</code></dd></div>
+                <div className="instance-fact"><dt className="instance-muted">最后实际加载回执</dt><dd className="instance-fact-value">{detail.instance.asset_status?.loaded ? <><code>{detail.instance.asset_status.loaded.digest}</code><small>加载于 {new Date(detail.instance.asset_status.loaded.loaded_at).toLocaleString('zh-CN')}</small><small>容器 {detail.instance.asset_status.loaded.container_id?.slice(0, 12) || '未记录'} · 代次 {detail.instance.asset_status.loaded.started_at}</small><small>历史回执仅适用于对应运行代次。</small></> : '未记录；不能据此判定资产已生效。'}</dd></div>
+              </>}
               {[
                 ['智能体', detail.instance.agent_id || '未记录'],
                 ...(isSdk(detail.instance) ? [['使用方式', '官方 TypeScript SDK · 同容器调用']] : [[detail.instance.business_gateway ? '内部 Web 端口' : '访问端口', detail.instance.port || '未记录']]),
@@ -1152,6 +1224,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
                 <div><dt>目标</dt><dd>{item.name}</dd></div>
                 <div><dt>登记来源</dt><dd>{typeof source === 'string' ? <>{sourceLabel(source)}<br/><code>{source}</code></> : '未确认'}</dd></div>
                 <div><dt>本次变化</dt><dd>{impacts[item.operation]}</dd></div>
+                {item.operation === 'reload' && <><div><dt>本次来源摘要</dt><dd><code>{String(plan?.current_asset_digest || '未确认')}</code></dd></div><div><dt>本次运行代次摘要</dt><dd><code>{String(plan?.generation_digest || '未确认')}</code></dd></div><div><dt>冲突与恢复</dt><dd>执行前再次核对来源和代次；变化时拒绝执行，请重新预览。失败或结果未知时先刷新回执，不会自动重试写请求。</dd></div></>}
                 {['create', 'start', 'restart'].includes(item.operation) && <div><dt>默认模型</dt><dd>{modelLabel(models?.catalog, value?.model_selection)}{value?.model_selection?.reasoningEffort ? ` · 推理档位 ${value.model_selection.reasoningEffort}` : ''}<small className="instance-muted">应用到本次实例启动配置；已有 Session 需另行核对。</small></dd></div>}
                 <div><dt>{observed?.business_gateway ? '内部 Runtime 端口' : '访问端口'}</dt><dd>{typeof port === 'number' ? port : '未确认或不适用'}</dd></div>
                 {observed?.business_gateway && <div><dt>网关入口</dt><dd>{observed.access_url || '网关深链尚未核对'}；{observed.access_mode === 'anonymous' ? '无需登录' : '需要个人登录'}</dd></div>}

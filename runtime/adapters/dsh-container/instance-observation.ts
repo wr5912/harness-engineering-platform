@@ -23,4 +23,9 @@ const homes: Record<string, string> = {}
 for (const volume of volumes ?? []) {
   if (volume.project && volume.volume === `${volume.project}-home`) homes[volume.project] ??= volume.name
 }
-process.stdout.write(JSON.stringify({ projects: containers === null ? null : projects, homes: volumes === null ? null : homes }))
+const inspected = containers?.length ? await listing(['inspect', '--format',
+  '{"name":{{json .Name}},"id":{{json .Id}},"started_at":{{json .State.StartedAt}},"running":{{json .State.Running}}}',
+  ...containers.map(item => item.ID)]) : []
+const generations = Object.fromEntries((inspected ?? []).map(({ name, ...generation }) => [name.replace(/^\//, ''), generation]))
+process.stdout.write(JSON.stringify({ projects: containers === null ? null : projects, homes: volumes === null ? null : homes,
+  generations: inspected === null ? null : generations }))

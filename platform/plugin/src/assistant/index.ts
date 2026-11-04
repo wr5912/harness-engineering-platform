@@ -257,6 +257,13 @@ function freezeInstanceOperation(input: MapValue, preview: any): MapValue {
     if (!['running', 'stopped', 'absent', 'failed'].includes(value.observed_state) || !value.observed_at) throw new Error('实例预览缺少当前状态，请重新提交操作')
     return { ...input, expected_source_id: source, expected_state: value.observed_state }
   }
+  if (input.operation === 'reload') {
+    const asset = value.plan?.current_asset_digest, generation = value.plan?.generation_digest, hash = value.model_policy_hash
+    if (typeof asset !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(asset)
+      || typeof generation !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(generation)
+      || typeof hash !== 'string' || !/^[a-f0-9]{64}$/.test(hash)) throw new Error('重载预览缺少来源、运行代次或模型摘要，请重新核对')
+    return { ...input, expected_source_id: source, expected_asset_digest: asset, expected_generation_digest: generation, expected_model_policy_hash: hash }
+  }
   if (input.operation === 'delete') return { ...input, expected_source_id: source }
   throw new Error('未知实例操作')
 }
@@ -557,7 +564,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
       && (!proposal.input.compositionId || !proposal.input.versionId)) throw new Error('旧提案缺少固定组合版本，请重新生成预览')
     if (proposal.domain === 'instances' && ['run', 'batch'].includes(proposal.action)) {
       const items = proposal.action === 'batch' ? proposal.input.items : [proposal.input]
-      if (!Array.isArray(items) || items.some((item: any) => ['create', 'start', 'restart'].includes(item?.operation) && !item.expected_model_policy_hash)) {
+      if (!Array.isArray(items) || items.some((item: any) => ['create', 'start', 'restart', 'reload'].includes(item?.operation) && !item.expected_model_policy_hash)) {
         throw new Error('旧实例提案缺少模型设置核对结果，请重新生成提案')
       }
     }
@@ -578,7 +585,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
       const operationInput = proposal.domain === 'agents' && proposal.action === 'compute-variants/identity-apply'
         ? proposal.input : { ...proposal.input, confirmed: true }
       let receipt = await dispatch(proposal.domain, proposal.action, operationInput, operationSignal)
-      if (proposal.domain === 'instances' && ['create', 'start', 'restart'].includes(proposal.input.operation)
+      if (proposal.domain === 'instances' && ['create', 'start', 'restart', 'reload'].includes(proposal.input.operation)
         && receipt.ok && proposal.input.business_control === true) {
         const entry = await dispatch('instances', 'url', { name: proposal.input.name }, operationSignal)
         receipt = entry.ok && typeof entry.value?.url === 'string'

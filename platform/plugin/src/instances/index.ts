@@ -20,7 +20,7 @@ const SECRET_RE = /(Bearer\s+)[^\s,)"']+|(token=)[^\s&)"']+|("(?:api[_-]?key|tok
 const LOG_LIMIT = 20000
 const MODEL_PREVIEW_KEY = randomBytes(32)
 
-export type InstanceOperation = 'create' | 'start' | 'stop' | 'restart' | 'delete'
+export type InstanceOperation = 'create' | 'start' | 'stop' | 'restart' | 'reload' | 'delete'
 
 export interface ModelSelection {
   provider: string
@@ -34,6 +34,8 @@ export interface InstanceActionRequest {
   source?: string
   expected_source_id?: string
   expected_source_digest?: string
+  expected_asset_digest?: string
+  expected_generation_digest?: string
   expected_state?: string
   mode?: 'eval'
   business_control?: boolean
@@ -400,8 +402,26 @@ function parseCommandOutput(stdout: string, stderr: string) {
   }
 }
 
+function reloadArgs(request: InstanceActionRequest, dryRun = false): string[] {
+  return ['reload', request.name, ...(dryRun ? ['--dry-run'] : [
+    '--expected-asset-digest', request.expected_asset_digest!, '--expected-generation-digest', request.expected_generation_digest!,
+  ])]
+}
+
+async function reloadWithPolicy(assetRoot: string, request: InstanceActionRequest, dryRun: boolean, modelPolicy?: ModelPolicyProvider, signal?: AbortSignal) {
+  const prepared = await requestForUp(assetRoot, request, Boolean(modelPolicy))
+  const agentId = await ensureRealSource(assetRoot, prepared.source!)
+  return runUpWithModelPolicy(assetRoot, reloadArgs(request, dryRun), agentId, modelPolicy,
+    prepared.model_selection, dryRun ? undefined : request.expected_model_policy_hash, registeredModelSnapshot(prepared.manifest), signal)
+}
+
 async function previewOne(assetRoot: string, request: InstanceActionRequest, signal?: AbortSignal, modelPolicy?: ModelPolicyProvider) {
   const name = assertName(request.name)
+  if (request.operation === 'reload') {
+    const projected = await reloadWithPolicy(assetRoot, request, true, modelPolicy, signal)
+    return { operation: request.operation, name, plan: JSON.parse(projected.result.stdout), retention: retention(request.operation),
+      model_selection: projected.model_selection, model_policy_hash: projected.model_policy_hash }
+  }
   if (request.operation === 'create' || request.operation === 'start' || request.operation === 'restart') {
     const prepared = await requestForUp(assetRoot, request, Boolean(modelPolicy))
     const source = prepared.source
@@ -473,8 +493,23 @@ async function runOne(assetRoot: string, request: InstanceActionRequest, signal?
           if (current?.source_id !== request.expected_source_id) throw new Error('实例来源已变化，请刷新后重新预览；本次未执行。')
         }
       }
-      if (modelPolicy && ['create', 'start', 'restart'].includes(request.operation) && !request.expected_model_policy_hash) {
+      if (modelPolicy && ['create', 'start', 'restart', 'reload'].includes(request.operation) && !request.expected_model_policy_hash) {
         throw new Error('请先预览当前模型设置，再确认实例操作；本次未执行。')
+      }
+      if (request.operation === 'reload') {
+        if (!request.expected_asset_digest || !request.expected_generation_digest) throw new Error('请先预览资产与运行代次，再执行重载；本次未执行')
+        signal?.throwIfAborted()
+        // 写入开始后继续取得实际回执；断线不得自动重放。
+        const projected = await reloadWithPolicy(assetRoot, request, false, modelPolicy)
+        const parsed = parseCommandOutput(projected.result.stdout, projected.result.stderr)
+        const result = parsed.value as { name?: string; asset_status?: { status?: string; current_digest?: string; loaded?: { digest?: string; verification?: string } } }
+        if (result.name !== name || result.asset_status?.status !== 'current'
+          || result.asset_status.loaded?.verification !== 'runtime-observer'
+          || !result.asset_status.loaded.digest || result.asset_status.current_digest !== result.asset_status.loaded.digest) {
+          throw new Error('重载命令已返回，但实际加载结果尚未核验；请刷新实例回执，不要自动重试')
+        }
+        const manifest = await manifestFor(assetRoot, name)
+        return { name, operation: request.operation, ok: true, requested_source_id: String(manifest?.source_id ?? ''), value: parsed }
       }
       // delete 在 CLI 内按目标实例核验容器状态，避免逐项扫描整个实例列表。
       if (request.operation !== 'create' && request.operation !== 'delete') {
@@ -575,7 +610,7 @@ async function listRuns(assetRoot: string, experiment: string) {
 function actionRequest(payload: unknown): InstanceActionRequest {
   const object = payloadObject(payload)
   const operation = object.operation
-  if (!['create', 'start', 'stop', 'restart', 'delete'].includes(String(operation))) {
+  if (!['create', 'start', 'stop', 'restart', 'reload', 'delete'].includes(String(operation))) {
     throw new Error('未知实例操作')
   }
   const request: InstanceActionRequest = {
@@ -599,6 +634,15 @@ function actionRequest(payload: unknown): InstanceActionRequest {
     if (typeof object.expected_source_digest !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(object.expected_source_digest)) throw new Error('来源摘要无效，请重新预览')
     request.expected_source_digest = object.expected_source_digest
   }
+  for (const field of ['expected_asset_digest', 'expected_generation_digest'] as const) {
+    if (object[field] !== undefined) {
+      if (operation !== 'reload' || typeof object[field] !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(object[field] as string)) throw new Error('重载预览摘要无效，请重新预览')
+      request[field] = object[field] as string
+    }
+  }
+  if (operation === 'reload' && ['source', 'port', 'model_selection', 'business_control', 'access_mode', 'identity_mode', 'allow_missing_env'].some(field => object[field] !== undefined)) {
+    throw new Error('重载保留已登记的来源、端口、模型与业务身份，不接受覆盖参数')
+  }
   if (object.expected_state !== undefined) {
     const state = normalizeInstanceState(object.expected_state)
     if (request.operation !== 'stop' || state === 'unknown') {
@@ -613,7 +657,7 @@ function actionRequest(payload: unknown): InstanceActionRequest {
     }
     request.expected_model_policy_hash = object.expected_model_policy_hash
   }
-  if (!['create', 'start', 'restart'].includes(request.operation) && (request.model_selection || request.expected_model_policy_hash)) {
+  if (!['create', 'start', 'restart', 'reload'].includes(request.operation) && (request.model_selection || request.expected_model_policy_hash)) {
     throw new Error('只有创建、启动或重启可以选择模型')
   }
   if (object.mode !== undefined) {

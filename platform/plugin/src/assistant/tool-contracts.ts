@@ -73,7 +73,7 @@ type Hint = [actions: string, input: string, note?: string]
 const hints: Record<AssistantDomain, Hint[]> = {
   instances: [
     ['list', ''], ['detail url', 'name'], ['logs', 'name tail'],
-    ['preview run', 'name operation source port allow_missing_env business_control access_mode identity_mode model_selection', 'operation=create/start/stop/restart/delete；创建必须传明确的 experiment:<ID> 来源。创建业务实例默认且必须经过统一网关，默认 access_mode=anonymous、identity_mode=development；可明确选择 authenticated 或 published。网关不可用时说明原因并修复配置，禁止省略参数或传 false 改为直连。独立研究评测使用 agents/eval 入口，不用业务实例创建接口绕过网关。用户要求最新版本时，先用 agents/detail 的 versions[0].id 确定版本，再作为 source 传入；默认 detail.experiment 可能是已启用版本，不等于最新版本。直接调用 run 即可由平台内部预览并核对模型、业务来源摘要与访问设置，按 DSH 原生权限执行；无需另调 preview 或额外索取确认。业务实例创建后用 instances/url 取统一网关入口，不要把容器直连端口当作业务链接。'],
+    ['preview run', 'name operation source port allow_missing_env business_control access_mode identity_mode model_selection', 'operation=create/start/stop/restart/reload/delete；reload 只重载运行中实例，内部先预览并绑定资产和运行代次摘要，保留 HOME、会话、端口、模型和网关身份，核验实际加载回执；批量逐项返回结果，不自动重放失败或未知写请求；创建必须传明确的 experiment:<ID> 来源。创建业务实例默认且必须经过统一网关，默认 access_mode=anonymous、identity_mode=development；可明确选择 authenticated 或 published。网关不可用时说明原因并修复配置，禁止省略参数或传 false 改为直连。独立研究评测使用 agents/eval 入口，不用业务实例创建接口绕过网关。用户要求最新版本时，先用 agents/detail 的 versions[0].id 确定版本，再作为 source 传入；默认 detail.experiment 可能是已启用版本，不等于最新版本。直接调用 run 即可由平台内部预览并核对模型、业务来源摘要与访问设置，按 DSH 原生权限执行；无需另调 preview 或额外索取确认。业务实例创建后用 instances/url 取统一网关入口，不要把容器直连端口当作业务链接。'],
     ['batch-preview batch', 'items', 'items 为多个与 run 相同的操作对象；逐项核对结果，部分失败不能称为全部完成。'],
   ],
   mcp: [

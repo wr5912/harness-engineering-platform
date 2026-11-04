@@ -75,6 +75,24 @@ if (args[0] === 'ps') {
     {name:'absent-one', state:'absent', source_id:'experiment:EXP-real-agent-001', home_volume:'home-absent', home_preserved:true},
     ...newBusiness
   ]})
+} else if (args[0] === 'reload') {
+  const fs = require('node:fs'), path = require('node:path'), name = args[1]
+  const states = path.join(__dirname, 'observed-states.json')
+  if (fs.existsSync(states) && JSON.parse(fs.readFileSync(states))[name] === 'stopped') {
+    process.stderr.write('已停止的实例不能重载'); process.exit(1)
+  }
+  const source_id = 'experiment:EXP-real-agent-001'
+  const asset = 'sha256:' + (fs.existsSync(path.join(__dirname, 'next-source-digest')) ? 'c' : 'a').repeat(64)
+  const generation = 'sha256:' + (fs.existsSync(path.join(__dirname, 'next-generation')) ? 'd' : 'b').repeat(64)
+  if (args.includes('--dry-run')) out({name, source_id, current_asset_digest:asset, generation_digest:generation, port:3181})
+  else {
+    if (args[args.indexOf('--expected-asset-digest')+1] !== asset || args[args.indexOf('--expected-generation-digest')+1] !== generation) {
+      process.stderr.write('资产来源或运行代次已变化，请重新预览'); process.exit(1)
+    }
+    if (name === 'fail-one') { process.stderr.write('实际加载尚未核验'); process.exit(1) }
+    out({name, asset_status:{status:fs.existsSync(path.join(__dirname, 'bad-load-receipt'))?'unknown':'current', current_digest:asset,
+      loaded:{digest:asset, verification:'runtime-observer', container_id:'container-current', started_at:'new-process', loaded_at:'2026-11-04T00:00:00Z'}}})
+  }
 } else if (args[0] === 'up') {
   const dry = args.includes('--dry-run')
   const sourceDigest = require('node:fs').existsSync(require('node:path').join(__dirname, 'next-source-digest')) ? 'sha256:' + 'c'.repeat(64) : 'sha256:' + 'a'.repeat(64)
@@ -149,6 +167,52 @@ if __name__ == '__main__':
   chmodSync(join(adapter, 'dsh-dev'), 0o755)
   return { root, state, cleanup: () => rmSync(root, { recursive: true, force: true }) }
 }
+
+test('重载由同一 CLI 执行并冻结来源与代次；停止、冲突、未知回执和批量失败如实返回', async t => {
+  const { module, cleanup } = await loadModule(), fx = fixture(), previous = process.env.XDG_STATE_HOME
+  process.env.XDG_STATE_HOME = fx.state
+  t.after(() => { fx.cleanup(); cleanup(); previous === undefined ? delete process.env.XDG_STATE_HOME : process.env.XDG_STATE_HOME = previous })
+  const handler = module.createInstancesHandler(fx.root), signal = new AbortController().signal
+  const adapter = join(fx.root, 'runtime/adapters/dsh-container')
+  const preview = await handler('preview', { operation: 'reload', name: 'running-one' }, signal)
+  assert.equal(preview.ok, true, JSON.stringify(preview))
+  const request = { operation: 'reload', name: 'running-one', expected_source_id: preview.value.plan.source_id,
+    expected_asset_digest: preview.value.plan.current_asset_digest, expected_generation_digest: preview.value.plan.generation_digest }
+  const missing = await handler('run', { operation: 'reload', name: 'running-one' }, signal)
+  assert.equal(missing.value.ok, false)
+  for (const field of ['port', 'model_selection', 'source', 'business_control', 'access_mode', 'identity_mode']) {
+    const override = await handler('run', { ...request, [field]: { port: 33000, model_selection: { provider: 'p', model: 'm' }, source: 'experiment:EXP-real-agent-001', business_control: false, access_mode: 'anonymous', identity_mode: 'development' }[field] }, signal)
+    assert.equal(override.ok, false, field)
+  }
+  for (const marker of ['next-source-digest', 'next-generation']) {
+    writeFileSync(join(adapter, marker), 'changed')
+    const result = await handler('run', request, signal)
+    assert.equal(result.value.ok, false)
+    assert.match(result.value.error.message, /变化/)
+    rmSync(join(adapter, marker))
+  }
+  writeFileSync(join(adapter, 'observed-states.json'), JSON.stringify({ 'running-one': 'stopped' }))
+  const stopped = await handler('run', request, signal)
+  assert.equal(stopped.value.ok, false)
+  assert.match(stopped.value.error.message, /已停止/)
+  rmSync(join(adapter, 'observed-states.json'))
+  writeFileSync(join(adapter, 'bad-load-receipt'), 'unknown')
+  assert.equal((await handler('run', request, signal)).value.ok, false)
+  rmSync(join(adapter, 'bad-load-receipt'))
+  const succeeded = await handler('run', request, signal)
+  assert.equal(succeeded.value.ok, true, JSON.stringify(succeeded))
+  assert.equal(succeeded.value.value.value.asset_status.loaded.verification, 'runtime-observer')
+  mkdirSync(join(fx.state, 'dsh-dev/fail-one'))
+  writeFileSync(join(fx.state, 'dsh-dev/fail-one/instance.json'), readFileSync(join(fx.state, 'dsh-dev/running-one/instance.json')))
+  const batch = await handler('batch', { items: [request, { ...request, name: 'fail-one' }] }, signal)
+  assert.equal(batch.value.partial_success, true)
+  assert.deepEqual(batch.value.receipts.map(item => item.ok), [true, false])
+  const calls = readFileSync(join(adapter, 'dsh-dev.calls'), 'utf8').trim().split('\n').map(line => JSON.parse(line))
+  const writes = calls.filter(args => args[0] === 'reload' && !args.includes('--dry-run'))
+  assert.equal(writes.length, 7)
+  assert.ok(writes.every(args => !args.includes('--port') && !args.includes('--source') && args.includes('--expected-generation-digest')))
+  assert.equal(calls.some(args => args[0] === 'up' || args[0] === 'down'), false)
+})
 
 test('instances list keeps real observed state and detail run/session links', async () => {
   const { module, cleanup: cleanupModule } = await loadModule()
