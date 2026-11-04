@@ -1,6 +1,6 @@
-# 算力变体资产工具验证与真实资产只读清点
+# 算力变体资产工具验证与训练材料归档
 
-2026-11-04，在 `/tmp/hep-compute-assets` 完成平台工具与临时夹具验证。涉及 PA-03、PA-04、PA-07、PA-10、PA-12 的资产、来源及构建合同；本记录不更新项目总验收结论。没有启动业务评测、GPU 训练、模型服务或真实实例，没有推送、部署或迁移真实数据。
+2026-11-04，完成平台工具、临时夹具和真实变体训练材料归档验证。涉及 PA-03、PA-04、PA-07、PA-10、PA-12 的资产、来源及构建合同；本记录不更新项目总验收结论。没有启动业务评测、GPU 训练、模型服务或真实实例，也没有部署远端。
 
 ## 工具变化与验证范围
 
@@ -45,15 +45,15 @@
 
 动态固定依赖摘要为 `AGENTS.md` 的 `ab10b7e8b163f86087fb772842fb97b1f0c3c32111ceae77692ac55f9af6a8ae`，以及巡检 Skill 的 `2b80e668bd033d05b2549ff9120dc1dc9d21c0f3198e4db9f410fbe5f28eabcc`。`.local/adapter-prep` 的 `business-continuation`、`business-contract`、`business-context-projection`、`inspection-triage` 与当前模块字节不同，只能作历史来源，不能覆盖当前 Candidate。
 
-## 已持久保存的训练成果
+## 训练成果及补充归档
 
-当前 `decision_training` 指向 `E/evaluation/training/8f815723e2c63e4eec96c17a9e5641442a23e8268519b5037480f9f63ea17c9a/receipt.json`，SHA-256 为 `9c22fa889c0db929888845dcb36c773021c7902a390b7a8da551d252d9fc70b3`。其 19 个文件引用均存在且字节摘要匹配，包括回执、四分区数据、日志、两份报告、三个工件和八个补充依赖。原始回执 `source-receipt.json` 也存在，摘要为 `8f815723e2c63e4eec96c17a9e5641442a23e8268519b5037480f9f63ea17c9a`。
+清点时 `decision_training` 指向 `E/evaluation/training/8f815723e2c63e4eec96c17a9e5641442a23e8268519b5037480f9f63ea17c9a/receipt.json`，SHA-256 为 `9c22fa889c0db929888845dcb36c773021c7902a390b7a8da551d252d9fc70b3`。其 19 个文件引用均存在且字节摘要匹配，包括回执、四分区数据、日志、两份报告、三个工件和八个补充依赖。原始回执 `source-receipt.json` 的摘要为 `8f815723e2c63e4eec96c17a9e5641442a23e8268519b5037480f9f63ea17c9a`。
 
-已归档内容包括完整 checkpoint 目录中的 adapter、配置、tokenizer、训练配置与指标，校准 `head.pt`，状态构造器源码及路由合同。`adapter_model.safetensors` 为 43,338,624 字节，摘要 `c7d94cb9794ed10d2e60b5866bf6974c4796fc6e52275a342dc67e0ddf2bf9e3`；校准 `head.pt` 为 2,105,023 字节，摘要 `1c288d83be995fde06ed52d435ecd4d1af9db9b8c1bf371611f85a7233f9b56c`。这些成果并非仅存在于 `.local`。持久归档 `materials/.local/...` 中的 `.local` 是保留的来源路径，不是运行暂存目录。
+已归档内容包括完整 checkpoint 目录中的 adapter、配置、tokenizer、训练配置与指标，校准 `head.pt`，状态构造器源码及路由合同。`adapter_model.safetensors` 为 43,338,624 字节，摘要 `c7d94cb9794ed10d2e60b5866bf6974c4796fc6e52275a342dc67e0ddf2bf9e3`；校准 `head.pt` 为 2,105,023 字节，摘要 `1c288d83be995fde06ed52d435ecd4d1af9db9b8c1bf371611f85a7233f9b56c`。当前归档使用 `materials/local-source/` 保留相对目录关系；来源原路径留在原始回执中，持久材料不受 `.local/` 忽略规则影响。
 
-## 建议补齐的具体训练溯源材料
+## 本次补齐的训练溯源材料
 
-下列文件在清点时尚未列入 `supporting_files`，是恢复说明的候选补充项。路径均以 `L/` 为前缀；清点只读取文件字节核对摘要，未将其当作业务验收。执行归档前审阅用途与内容，将所需项填入 `training_files`，通过 `training-preview` 核对目标，再在本次已授权的资产整理范围内执行 `training-archive`。不手工改回执或复制整个目录。
+下列文件在清点时尚未列入 `supporting_files`，路径均以 `L/` 为前缀。本次审阅用途与内容后，通过公共 CLI 的 `training-preview` 和对应摘要的 `training-archive` 归档，没有手工修改回执或复制整个目录。
 
 | `L/` 下相对路径 | 字节数 | SHA-256 |
 | --- | ---: | --- |
@@ -71,6 +71,8 @@
 | `gpu-validation-01/validation-receipt.json` | 20742 | `b534451a31ae56e2e0373c61c5d0b79d9a312e884225772526527a8daa0613f2` |
 | `gpu-validation-01/validation-report.md` | 6302 | `a70198b9e74bcc6612d89d3dd9b1c07465f19e37db3f54d3f99c7533cbec76b0` |
 
-基础模型下载缓存、远程运维/监督脚本、`.local/verification-private-files/`、SSH 状态和原始 `session.jsonl` 均不属于以上归档集合。未读取凭据文件，不复制 HOME 或 Session。当前计划无需改动核心工件引用；补充材料后由工具产生新的归档引用，目标路径以 dry 输出为准。
+当前回执为 `E/evaluation/training/cc11e6157c2c3064742cedbb84a51567c04f0e27ea9b388109d381118351ac57/receipt.json`，SHA-256 为 `3742ac796492fe73d4e9712872fec5b86fa089566c942394b92880b34036aea1`。32 个引用全部存在、摘要匹配，并逐一通过 `git check-ignore` 核对为可收录；四分区记录数为 train 17、development 5、calibration 7、test 5。补充请求重复执行返回 `reused: true`，没有重训或改写原始回执。
 
-以上证明文件、引用及工具合同，不证明模型恢复、推理效果、中算力业务验收或 Research Release。真实迁移、动态依赖的完整运行验证及进程硬中断恢复均未执行。
+归档路径与恢复定向回归 21 项通过，含补充归档不嵌套旧目录、相对资源加载布局、原生模型词元、删除临时来源后核对和 Git 收录；TypeScript 检查通过。基础模型下载缓存、远程运维/监督脚本、`.local/verification-private-files/`、SSH 状态和原始 `session.jsonl` 均未进入归档集合，没有复制 HOME 或 Session。
+
+以上证明文件、引用及工具合同，不证明真实模型恢复、推理效果、中算力业务验收或 Research Release。中算力业务验收按用户要求暂停；动态依赖的完整运行验证及进程硬中断恢复未执行。

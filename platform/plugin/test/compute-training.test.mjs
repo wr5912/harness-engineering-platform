@@ -132,6 +132,7 @@ test('显式恢复依赖保持源码与资源的相对目录，摘要失效和�
   await archiveDecisionTraining(f.root, id, undefined, [resource, tokenizer])
   const plan = load(readFileSync(changePath, 'utf8')).compute_variant
   const receipt = JSON.parse(readFileSync(join(f.root, plan.decision_training.path), 'utf8'))
+  assert.equal(receipt.artifacts.state_constructor.path.includes('/.local/'), false)
   assert.equal(receipt.supporting_files[0].path, join(receipt.artifacts.state_constructor.path, '../../assets/contract.json'))
   assert.equal(readFileSync(join(f.root, receipt.supporting_files[1].path), 'utf8'), '{"eos_token":"<|endoftext|>","pad_token":"[PAD]"}')
   rmSync(join(f.root, '.local'), { recursive: true, force: true })
@@ -142,6 +143,35 @@ test('显式恢复依赖保持源码与资源的相对目录，摘要失效和�
   assert.equal((await archiveDecisionTraining(f.root, id)).reused, true)
   writeFileSync(join(f.root, receipt.supporting_files[0].path), 'changed')
   assert.match((await inspectDecisionTraining(f.root, plan, id)).reasons.join(), /摘要不匹配/)
+})
+
+test('补充归档保持持久目录布局，不嵌套旧归档或重复原始依赖，Git 可收录完整闭包', async t => {
+  const f = fixture(t), id = 'VAR-alpha-001-r123456abcdef', base = `evolution/experiments/${id}`, change = join(f.root, base, 'change.yaml')
+  mkdirSync(join(f.root, base, 'candidate'), { recursive: true })
+  const put = (name, content) => {
+    const path = `.local/source/${name}`
+    mkdirSync(join(f.root, path, '..'), { recursive: true }); writeFileSync(join(f.root, path), content)
+    return { path, sha256: createHash('sha256').update(content).digest('hex') }
+  }
+  const first = put('assets/first.json', '{}'), second = put('assets/second.json', '{"round":2}')
+  f.receipt.artifacts.state_constructor = put('scripts/build.py', 'resource = "../assets/first.json"')
+  f.plan.model_roles.decision.state_constructor_sha256 = f.receipt.artifacts.state_constructor.sha256
+  f.save(); writeFileSync(change, dump({ experiment_id: id, agent_id: 'alpha', compute_variant: f.plan }))
+  await archiveDecisionTraining(f.root, id, undefined, [first])
+  const archived = await archiveDecisionTraining(f.root, id, undefined, [first, second])
+  const receipt = JSON.parse(readFileSync(join(f.root, archived.receipt.path), 'utf8'))
+  assert.equal(receipt.supporting_files.length, 2)
+  const materials = join(archived.receipt.path, '../materials')
+  assert.equal(receipt.artifacts.state_constructor.path, `${materials}/local-source/source/scripts/build.py`)
+  assert.equal(receipt.supporting_files[0].path, `${materials}/local-source/source/assets/first.json`)
+  assert.equal(receipt.supporting_files[1].path, `${materials}/local-source/source/assets/second.json`)
+  assert.equal(spawnSync('git', ['init', '-q'], { cwd: f.root }).status, 0)
+  writeFileSync(join(f.root, '.gitignore'), '.local/\n')
+  for (const ref of archived.files) assert.equal(spawnSync('git', ['check-ignore', ref.path], { cwd: f.root }).status, 1, ref.path)
+  rmSync(join(f.root, '.local'), { recursive: true, force: true })
+  rmSync(join(f.root, 'evaluation'), { recursive: true, force: true })
+  assert.equal((await inspectDecisionTraining(f.root, load(readFileSync(change, 'utf8')).compute_variant, id)).verified, true)
+  assert.equal((await archiveDecisionTraining(f.root, id, undefined, [first, second])).reused, true)
 })
 
 test('.local恢复先零写入预览，只归档引用闭包，拒绝Session与凭据并保护冲突目标', async t => {

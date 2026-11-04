@@ -29,7 +29,7 @@ export async function inspectDecisionTraining(root: string, plan: {
       require(!ref.path.startsWith('/') && !ref.path.split('/').includes('..'), '训练材料不能越出数据工作区')
       assertTrainingPath(ref.path)
       const path = dataPath(root, ref.path)
-      if (experimentId) require(['evaluation', 'candidate'].some(part => ref.path.startsWith(`evolution/experiments/${experimentId}/${part}/`)), '训练材料必须归档到所属 Experiment 的 evaluation 或 Candidate，不能依赖 .local 或其他工作区')
+      if (experimentId) require(!ref.path.split('/').includes('.local') && ['evaluation', 'candidate'].some(part => ref.path.startsWith(`evolution/experiments/${experimentId}/${part}/`)), '训练材料必须归档到所属 Experiment 的 evaluation 或 Candidate，不能依赖 .local 或其他工作区')
       require(lstatSync(path).isFile(), '训练材料必须为文件')
       require(lstatSync(path).size > 0, `训练材料为空：${ref.path}`)
       const hash = createHash('sha256')
@@ -94,9 +94,17 @@ export async function archiveDecisionTraining(root: string, experimentId: string
   const plan = change.compute_variant
   if (plan?.execution_mode !== 'hybrid' || !plan.decision_training) return null
   if (!Array.isArray(trainingFiles)) throw new Error('training_files 必须为文件及 SHA-256 引用数组')
+  function materialPath(path: string) {
+    if (typeof path !== 'string') throw new Error('训练依赖必须引用数据根内文件及其 SHA-256')
+    const prefix = `${base}/evaluation/training/`
+    // 补充归档复用原相对布局；来源路径留在原回执中，持久材料不使用被 Git 忽略的 .local 名称。
+    while (path.startsWith(prefix) && /^[a-f0-9]{64}\/materials\//.test(path.slice(prefix.length))) path = path.slice(prefix.length).replace(/^[a-f0-9]{64}\/materials\//, '')
+    return path.split('/').map(part => part === '.local' ? 'local-source' : part).join('/')
+  }
   const owned = await inspectDecisionTraining(root, plan, source.id)
   const ownedMaterials = `${dirname(plan.decision_training.path)}/materials/`
-  if (owned.verified && trainingFiles.every(ref => owned.files?.some(file => (file.path === ref?.path || file.path === ownedMaterials + ref?.path) && file.sha256 === ref.sha256))) return { stage: 'training-archive', reused: true, receipt: plan.decision_training, files: owned.files }
+  if (owned.verified && !owned.files?.some(file => file.path.startsWith(ownedMaterials + base + '/evaluation/training/'))
+    && trainingFiles.every(ref => owned.files?.some(file => (file.path === ref?.path || file.path === ownedMaterials + materialPath(ref?.path)) && file.sha256 === ref.sha256))) return { stage: 'training-archive', reused: true, receipt: plan.decision_training, files: owned.files }
   const verified = await inspectDecisionTraining(root, plan)
   if (!verified.verified) throw new Error(verified.reasons.join('；'))
   signal?.throwIfAborted()
@@ -117,6 +125,8 @@ export async function archiveDecisionTraining(root: string, experimentId: string
     if (containsLiteralLlmKey(ref.path, content.toString('utf8'))) throw new Error('训练材料包含 LLM API Key，不能归档')
     if (content.length <= 1024 * 1024 && !content.includes(0) && !assetText(ref.path, content.toString('utf8')).editable) throw new Error(`训练材料包含凭据常量，不能归档：${ref.path}`)
     const path = `${destination}/${name}/${basename(ref.path)}`
+    const previous = pending.get(path.slice(destination.length + 1))
+    if (previous && !previous.equals(content)) throw new Error('训练材料归档路径冲突')
     pending.set(path.slice(destination.length + 1), content)
     return { path, sha256: ref.sha256 }
   }
@@ -124,14 +134,15 @@ export async function archiveDecisionTraining(root: string, experimentId: string
   receipt.training.log = await collect(receipt.training.log, 'execution')
   for (const stage of ['calibration', 'test']) receipt[stage].report = await collect(receipt[stage].report, `reports/${stage}`)
   // 工件与显式依赖保持原目录关系，状态构造器和模型配置的相对加载才能恢复。
-  for (const name of ['checkpoint', 'state_constructor', 'calibration']) receipt.artifacts[name] = await collect(receipt.artifacts[name], `materials/${dirname(receipt.artifacts[name].path)}`)
+  for (const name of ['checkpoint', 'state_constructor', 'calibration']) receipt.artifacts[name] = await collect(receipt.artifacts[name], `materials/${dirname(materialPath(receipt.artifacts[name].path))}`)
   const supporting = new Map<string, TrainingFile>()
   for (const ref of [...receipt.supporting_files ?? [], ...trainingFiles]) {
-    const previous = supporting.get(ref?.path)
+    const path = materialPath(ref?.path)
+    const previous = supporting.get(path)
     if (previous && previous.sha256 !== ref.sha256) throw new Error('训练依赖文件清单摘要冲突')
-    supporting.set(ref?.path, ref)
+    supporting.set(path, ref)
   }
-  if (supporting.size) receipt.supporting_files = await Promise.all([...supporting.values()].map(ref => collect(ref, `materials/${dirname(ref.path)}`)))
+  if (supporting.size) receipt.supporting_files = await Promise.all([...supporting.values()].map(ref => collect(ref, `materials/${dirname(materialPath(ref.path))}`)))
   pending.set('source-receipt.json', originalContent)
   const content = JSON.stringify(receipt, null, 2) + '\n'
   pending.set('receipt.json', Buffer.from(content))
