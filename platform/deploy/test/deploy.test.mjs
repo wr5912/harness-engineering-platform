@@ -12,6 +12,7 @@ import { ensureDshScopeLink } from '../runtime.mts'
 import { assertRealWorkspace, inspectDataRoot } from '../data.mts'
 import { pack } from '../pack.mts'
 import { verifyDeployment } from '../verify.mts'
+import { install } from '../install.mts'
 
 function workspace() {
   const root = mkdtempSync(join(tmpdir(), 'hep-deploy-test-'))
@@ -372,5 +373,44 @@ test('安装到新数据根自动初始化启用的网关，重装保留主动�
     assert.equal(next.enabled, false)
     assert.deepEqual(next.gateway.instances, access.gateway.instances)
     assert.deepEqual(readFileSync(join(root, next.gateway.sharedSecretFile)), secret)
+  } finally { close() }
+})
+
+test('重叠路径只替换原文一次，合法目标和同值映射不被旧HOME扫描误拒绝', () => {
+  const { root, close } = workspace()
+  try {
+    const file = join(root, 'workspace.json')
+    writeFileSync(file, JSON.stringify({ data: '/home/old/data/agents', unchanged: '/home/old/kept/file', home: '/home/old/other', boundary: '/home/old/data-extra' }))
+    const mappings = [{ from: '/home/old', to: '/home/new' }, { from: '/home/old/data', to: '/home/old/restored-$&' }, { from: '/home/old/kept', to: '/home/old/kept' }]
+    const report = rewriteKnownPaths(root, mappings)
+    const value = JSON.parse(readFileSync(file, 'utf8'))
+    assert.deepEqual(value, { data: '/home/old/restored-$&/agents', unchanged: '/home/old/kept/file', home: '/home/new/other', boundary: '/home/new/data-extra' })
+    assert.deepEqual(report.oldReferences, [])
+    assert.deepEqual(scanKnownOldPaths(root, ['/home/old', '/home/old/data'], mappings.map(item => item.to)), [])
+    value.leftover = '/home/old/forgotten'
+    writeFileSync(file, JSON.stringify(value))
+    assert.deepEqual(scanKnownOldPaths(root, ['/home/old'], mappings.map(item => item.to)), [{ file, pattern: '/home/old' }])
+    assert.throws(() => rewriteKnownPaths(root, [{ from: '/same', to: '/a' }, { from: '/same', to: '/b' }]), /不同目标/)
+  } finally { close() }
+})
+
+test('strict-paths安装接受仍位于旧HOME中的完整目标路径，保留字面特殊字符', () => {
+  const { root, close } = workspace()
+  try {
+    const bundle = join(root, 'bundle'), prefix = join(root, 'program-$&'), dataRoot = join(root, 'data-$&')
+    const write = (path, content, mode = 0o600) => { mkdirSync(join(path, '..'), { recursive: true }); writeFileSync(path, content, { mode }) }
+    write(join(bundle, 'program/platform/plugin/package.json'), JSON.stringify({ peerDependencies: { '@deepseek-ai/dsh-client-connection': 'fixture-runtime' } }))
+    const oldHome = tmpdir(), oldProgram = join(oldHome, 'source-program'), oldData = join(oldHome, 'source-data')
+    write(join(bundle, 'data/workspace.json'), JSON.stringify({ id: 'workspace-path-test', program: oldProgram, data: join(oldData, 'agents/item'), home: join(oldHome, 'other') }))
+    for (const path of ['node/bin/node', 'pnpm/bin/pnpm', 'git/git', 'python/bin/python3']) write(join(bundle, 'offline', path), '#!/bin/sh\nprintf "%s\\n" fixture-runtime\n', 0o755)
+    write(join(bundle, 'offline/dsh/apps/cli/lib/bin.js'), '')
+    write(join(bundle, 'manifest.json'), JSON.stringify({ schemaVersion: 1,
+      package: { name: 'fixture', version: '1', commit: 'fixture', dirty: false, arch: process.arch === 'arm64' ? 'arm64' : 'amd64', createdAt: 'fixture' },
+      source: { home: oldHome, programRoot: oldProgram, dataRoot: oldData }, runtime: {}, data: { sensitive: false }, files: collectEntries(bundle) }))
+    const report = install({ bundleRoot: bundle, prefix, dataRoot, port: 18120, skipImage: true, skipPrepare: true, allowFixtureData: true, strictPaths: true, start: false, dryRun: false, json: true })
+    assert.equal(report.status, 'installed'); assert.deepEqual(report.oldReferences, [])
+    const actual = JSON.parse(readFileSync(join(dataRoot, 'workspace.json'), 'utf8'))
+    assert.equal(actual.program, prefix); assert.equal(actual.data, join(dataRoot, 'agents/item'))
+    assert.ok(!actual.home.startsWith(oldHome + '/'))
   } finally { close() }
 })

@@ -9,11 +9,6 @@ export interface PathMapping {
   to: string
 }
 
-function pathPattern(value: string): RegExp {
-  const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  return new RegExp(escaped + '(?![A-Za-z0-9_.-])', 'g')
-}
-
 export interface RewriteReport {
   changed: string[]
   oldReferences: Array<{ file: string; pattern: string }>
@@ -48,13 +43,21 @@ function normalizeMapping(mapping: PathMapping): PathMapping {
   return { from, to }
 }
 
+function longestPattern(values: string[]): RegExp {
+  return new RegExp('(?:' + values.sort((a, b) => b.length - a.length).map(value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')(?![A-Za-z0-9_.-])', 'g')
+}
+
 export function rewriteKnownPaths(dataRoot: string, mappings: PathMapping[]): RewriteReport {
-  const normalized = mappings.map(normalizeMapping).filter(mapping => mapping.from !== mapping.to).sort((a, b) => b.from.length - a.from.length)
+  const normalized = mappings.map(normalizeMapping).sort((a, b) => b.from.length - a.from.length)
+  const replacements = new Map<string, string>()
+  for (const mapping of normalized) {
+    if (replacements.has(mapping.from) && replacements.get(mapping.from) !== mapping.to) throw new Error('同一路径不能映射到不同目标')
+    replacements.set(mapping.from, mapping.to)
+  }
   const report: RewriteReport = { changed: [], oldReferences: [] }
   for (const file of knownPathFiles(dataRoot)) {
     const original = readFileSync(file, 'utf8')
-    let updated = original
-    for (const mapping of normalized) updated = updated.replace(pathPattern(mapping.from), mapping.to)
+    const updated = replacements.size ? original.replace(longestPattern([...replacements.keys()]), from => replacements.get(from)!) : original
     if (updated !== original) {
       if (file.endsWith('.json')) {
         try { JSON.parse(updated) } catch { throw new Error(`路径映射后 JSON 无效：${file}`) }
@@ -62,18 +65,21 @@ export function rewriteKnownPaths(dataRoot: string, mappings: PathMapping[]): Re
       writeFileSync(file, updated, { encoding: 'utf8', mode: 0o600 })
       report.changed.push(file)
     }
-    for (const mapping of normalized) {
-      if (pathPattern(mapping.from).test(updated)) report.oldReferences.push({ file, pattern: mapping.from })
-    }
   }
+  report.oldReferences = scanKnownOldPaths(dataRoot, normalized.filter(mapping => mapping.from !== mapping.to).map(mapping => mapping.from), normalized.map(mapping => mapping.to))
   return report
 }
 
-export function scanKnownOldPaths(dataRoot: string, patterns: string[]): Array<{ file: string; pattern: string }> {
+export function scanKnownOldPaths(dataRoot: string, patterns: string[], allowedTargets: string[] = []): Array<{ file: string; pattern: string }> {
   const found: Array<{ file: string; pattern: string }> = []
+  const allowed = new Set(allowedTargets.filter(Boolean)), old = new Set(patterns.filter(Boolean))
+  const values = [...new Set([...allowed, ...old])]
+  if (!values.length) return found
   for (const file of knownPathFiles(dataRoot)) {
     const text = readFileSync(file, 'utf8')
-    for (const pattern of patterns) if (pattern && pathPattern(pattern).test(text)) found.push({ file, pattern })
+    const matches = new Set<string>()
+    for (const match of text.matchAll(longestPattern(values))) if (!allowed.has(match[0]) && old.has(match[0])) matches.add(match[0])
+    for (const pattern of matches) found.push({ file, pattern })
   }
   return found
 }
