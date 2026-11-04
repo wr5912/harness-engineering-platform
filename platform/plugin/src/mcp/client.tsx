@@ -158,7 +158,7 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
   const [mappingValid, setMappingValid] = useState(true)
   useEffect(() => { setMappingValid(true) }, [editor?.id, editor?.value.kind])
   const [asset, setAsset] = useState('')
-  const [continuedRun, setContinuedRun] = useState<{ id: string; version: string; runId: string } | null>(null)
+  const [continuedRun, setContinuedRun] = useState<{ selectionKey: string; runId: string } | null>(null)
   const [rawResult, setResult] = useState<any>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -266,7 +266,7 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
   useEffect(() => {
     if (!selectionKey || !data) return
     const saved = remembered()[selectionKey]
-    setAttempt(saved ?? null); setRecoveredRuns([]); setAsset(saved?.asset ?? '')
+    setAttempt(saved ?? null); setRecoveredRuns([]); setAsset(continuedRun?.selectionKey === selectionKey ? continuedRun.runId : saved?.asset ?? '')
     if (saved) { setResult(null); void recover(saved, true) }
   }, [selectionKey, data?.workspace_id, Boolean(data)])
   const threat = isThreatComposition(config)
@@ -293,7 +293,7 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
     return next?.kind === 'threat-stage' && next.stage === nextStage && next.bindings?.socConnectionId === config?.bindings?.socConnectionId && next.bindings?.reportConnectionId === config?.bindings?.reportConnectionId
       ? [{ entry: item, version, config: next }] : []
   }) : []
-  const carriedRun = continuedRun && continuedRun.id === selection?.id && continuedRun.version === selection?.version && continuedRun.runId === asset ? continuedRun.runId : null
+  const carriedRun = continuedRun?.selectionKey === selectionKey && continuedRun.runId === asset ? continuedRun.runId : null
 
   function accept(value: any) {
     setCatalogLoading(false)
@@ -482,7 +482,7 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
           {attempt?.selection_key === selectionKey && <section className="harness-composition-recovery" aria-label="组合执行回执"><p role="status">{attempt.state === 'responded' ? '已收到原执行回执' : attempt.state === 'running' ? '原请求正在执行，等待回执' : '结果待核对'}</p>{attempt.message && <p>{attempt.message}</p>}<p>执行标识：<code>{attempt.execution_id}</code></p>{attempt.asset !== asset && <p>当前输入已变化，下面核对的仍是原请求：<code>{attempt.asset}</code>。</p>}<button type="button" disabled={busy} onClick={() => void recover()}>核对原请求</button>{attempt.run_ids?.map(runId => <button key={runId} type="button" disabled={busy} onClick={() => void readOriginalRun(runId)}>读取原运行 {runId}</button>)}{recoveredRuns.map(run => <ThreatRunResult key={run.run_id} rpc={rpc} execution={{ result: run }} />)}</section>}
           <p>测试及发布前校验均使用 dry，不请求上游。{threat ? '阶段测试不自动补跑其他阶段；完整流程请执行总组合。' : '实际执行会调用两个只读工具。'}</p>
           {result?.mode === 'dry' && <div role="status"><p>dry 校验通过 · 上游请求 {result.upstreamRequests} 次</p><p>{result.checks.join('、')}。未验证：{result.unverified.join('、')}。</p></div>}
-          {result && result.mode !== 'dry' && (threat ? <><ThreatRunResult rpc={rpc} execution={result}/>{continuations.length > 0 && <div className="harness-mcp-actions" aria-label="继续当前运行">{continuations.map(next => <button type="button" key={next.entry.id} disabled={busy} onClick={() => { const runId = run.run_id; select(next.entry, next.version, next.version === 'published' ? next.entry.publishedVersionId : undefined); setAsset(runId); setContinuedRun({ id: next.entry.id, version: next.version, runId }) }}>继续{nextStage === 'infer' ? '模型研判' : nextStage === 'writeback' ? '结果回写' : '报告保存'} · {next.config.title}（{next.version === 'draft' ? '草稿' : '已发布'}）</button>)}</div>}</> : <div><p role="status">{result.ok ? '组合执行成功' : '组合执行失败'}</p>{result.error && <p role="alert">{result.error.message}</p>}
+          {result && result.mode !== 'dry' && (threat ? <><ThreatRunResult rpc={rpc} execution={result}/>{continuations.length > 0 && <div className="harness-mcp-actions" aria-label="继续当前运行">{continuations.map(next => <button type="button" key={next.entry.id} disabled={busy} onClick={() => { const runId = run.run_id; const versionId = next.version === 'published' ? next.entry.publishedVersionId : undefined; select(next.entry, next.version, versionId); setAsset(runId); setContinuedRun({ selectionKey: `${next.entry.id}:${next.version}:${versionId ?? ''}`, runId }) }}>继续{nextStage === 'infer' ? '模型研判' : nextStage === 'writeback' ? '结果回写' : '报告保存'} · {next.config.title}（{next.version === 'draft' ? '草稿' : '已发布'}）</button>)}</div>}</> : <div><p role="status">{result.ok ? '组合执行成功' : '组合执行失败'}</p>{result.error && <p role="alert">{result.error.message}</p>}
             {result.result?.alertSummary && <p>近 30 天：{result.result.alertSummary.totalGroups} 个告警分组 · {result.result.alertSummary.totalAlerts} 条告警 · 当前展示 {result.result.alerts.length} 个分组。{result.result.alertSummary.truncated && '上游结果已截断。'}<br/>查询范围：{result.result.alertSummary.from} ～ {result.result.alertSummary.to}</p>}
             <div className="harness-table-scroll"><table className="harness-composition-trace"><thead><tr><th>步骤</th><th>状态</th><th>HTTP</th><th>耗时</th></tr></thead><tbody>{(result.result?.trace ?? []).map((step: any) => <tr key={step.step}><td data-label="步骤">{step.operationId}</td><td data-label="状态">{step.status}</td><td data-label="HTTP">{step.httpStatus ?? '未调用'}</td><td data-label="耗时">{step.durationMs === undefined ? '—' : `${step.durationMs} ms`}</td></tr>)}</tbody></table></div>
             <details><summary>业务结果</summary><pre>{JSON.stringify({ asset: result.result?.asset, alerts: result.result?.alerts, alertSummary: result.result?.alertSummary }, null, 2)}</pre></details><details><summary>执行回执与来源版本</summary><pre>{JSON.stringify({ receipts: result.receipts, version: result.version }, null, 2)}</pre></details></div>)}

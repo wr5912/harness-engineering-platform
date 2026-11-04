@@ -15,8 +15,10 @@ const compiled = await build({
   } }],
 })
 const require = createRequire(import.meta.url)
-function client() {
+function client(storage) {
   const states = [], deps = [], cleanups = []
+  const values = new Map()
+  const sessionStorage = storage ?? { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, String(value)) }
   let cursor = 0, changed = false, effects = [], tree, Component, props
   const react = { ...require('react'),
     useState(initial) {
@@ -29,7 +31,7 @@ function client() {
   }
   const module = { exports: {} }
   vm.runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, require: name => name === 'react' ? react : name === '@deepseek-ai/dsh-client-ui-primitives' ? { Tooltip: props => props.children, Modal: props => props.open ? props.children : null } : require(name), URL, Blob,
-    window: { addEventListener() {}, removeEventListener() {} }, requestAnimationFrame: callback => callback(),
+    window: { addEventListener() {}, removeEventListener() {} }, sessionStorage, requestAnimationFrame: callback => callback(),
     document: { baseURI: 'http://127.0.0.1:3090/hep/' } })
   // 子组件通过实际页面元素传出，保持与生产引用相同的函数。
   function mount(component, value) { cleanups.forEach(cleanup => cleanup?.()); states.length = deps.length = cleanups.length = 0; Component = component; props = value; return render() }
@@ -45,12 +47,24 @@ const stage = (id, phase) => ({ id, draft: { kind: 'threat-stage', stage: phase,
 const parent = { id: 'threat-analysis', draft: { kind: 'composite', toolName: 'threat-analysis', title: '总组合', description: '', connectionId: 'platform-compositions', steps: [{ id: 'collect', compositionId: 'threat-collect', versionId: '', inputMap: { incident_id: '$input.incident_id' } }] }, graphs: { draft: graph } }
 const state = { extension: { id: 'fixture-security', seed: true, flow: true, stages: true }, revision: 'r1', connections: [{ id: 'soc', kind: 'openapi' }, { id: 'report', kind: 'mcp-http' }], compositions: [parent, ...['collect', 'infer', 'writeback', 'report'].map(phase => stage(`threat-${phase}`, phase))] }
 
-async function page(rpc) {
-  const ui = client()
+async function page(rpc, storage) {
+  const ui = client(storage)
   ui.mount(ui.exports.CompositionPage, { rpc, configuration: {}, active: true, onCatalogChange() {} })
   await tick(); ui.render()
   return ui
 }
+
+test('浏览器不能保存执行身份时明确阻止派发，避免丢失未知写入的恢复入口', async t => {
+  const calls = []
+  const ui = await page({ call: async (_channel, endpoint) => { calls.push(endpoint); return { ok: true, value: state } } },
+    { getItem: () => null, setItem() { throw Error('storage unavailable') } })
+  t.after(ui.dispose)
+  ui.nodes().find(node => node.type === 'button' && ui.text(node).startsWith('threat-collectthreat-collect')).props.onClick(); ui.render()
+  ui.nodes().find(node => node.props?.['aria-label'] === '组合事件 ID').props.onChange({ target: { value: 'INC-20261015-000001' } }); ui.render()
+  ui.button('实际执行组合工具').props.onClick(); await tick(); ui.render()
+  assert.match(ui.text(), /无法保存本次执行身份，尚未派发/)
+  assert.equal(calls.includes('mcp/executeComposition'), false)
+})
 
 test('页面读取已有编排，阶段测试使用run_id并显示服务端编译节点', async t => {
   const calls = []
@@ -280,6 +294,28 @@ test('失败阶段不提示普通续跑，快速完成分支直接准备回写�
   assert.match(ui.text(next), /继续结果回写/)
   assert.doesNotMatch(ui.text(next), /继续模型研判/)
   assert.equal(calls.filter(endpoint => endpoint === 'mcp/executeComposition').length, 3)
+})
+
+test('阶段续接保留原未知执行身份，恢复核对不会覆盖新带入的Run或再次派发', async t => {
+  const calls = []
+  const saved = { execution_id: 'graph-original', selection_key: 'threat-infer:draft:', asset: 'run-original', payload: {}, state: 'unknown' }
+  let stored = JSON.stringify({ [saved.selection_key]: saved })
+  const ui = await page({ call: async (_channel, endpoint, payload) => {
+    calls.push({ endpoint, payload })
+    if (endpoint === 'mcp/executeComposition') return { ok: true, value: { ok: true, result: { run_id: 'run-new', phase_status: 'completed', status: 'evidence_ready', route: 'five_source' } } }
+    if (endpoint === 'mcp/compositionExecution') return { ok: true, value: { state: 'unknown', message: '原执行结果待核对' } }
+    return { ok: true, value: state }
+  } }, { getItem: () => stored, setItem: (_key, value) => { stored = value } }); t.after(ui.dispose)
+  ui.nodes().find(node => node.type === 'button' && ui.text(node).startsWith('threat-collectthreat-collect')).props.onClick(); ui.render()
+  ui.nodes().find(node => node.props?.['aria-label'] === '组合事件 ID').props.onChange({ target: { value: 'INC-20261015-000001' } }); ui.render()
+  ui.button('实际执行组合工具').props.onClick(); await tick(); ui.render()
+  ui.nodes(ui.nodes().find(node => node.props?.['aria-label'] === '继续当前运行')).find(node => node.type === 'button').props.onClick(); ui.render(); await tick(); ui.render()
+  assert.equal(ui.nodes().find(node => node.props?.['aria-label'] === '组合运行 ID').props.value, 'run-new')
+  assert.match(ui.text(), /已带入上一阶段返回的运行/)
+  assert.match(ui.text(), /当前输入已变化，下面核对的仍是原请求：run-original/)
+  assert.equal(ui.button('实际执行组合工具').props.disabled, true)
+  assert.deepEqual(JSON.parse(JSON.stringify(calls.find(call => call.endpoint === 'mcp/compositionExecution').payload)), { execution_id: 'graph-original' })
+  assert.equal(calls.filter(call => call.endpoint === 'mcp/executeComposition').length, 1)
 })
 
 async function stepEditor(config, entries) {
