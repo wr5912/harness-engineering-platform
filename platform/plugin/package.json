@@ -34,7 +34,7 @@
   "scripts": {
     "check": "tsc --noEmit",
     "build": "pnpm run check && node build.mjs",
-    "test": "pnpm run build && node --test test/*.test.mjs",
+    "test": "export HARNESS_DSH_ENTRY=\"${HARNESS_DSH_ENTRY:-$(readlink -f \"$(command -v dsh)\")}\" && pnpm run build && node --test test/*.test.mjs",
     "test:business-access": "export HARNESS_DSH_ENTRY=\"${HARNESS_DSH_ENTRY:-$(readlink -f \"$(command -v dsh)\")}\" && pnpm run build && node --test test/business-control-core.test.mjs test/business-control-management.test.mjs test/business-gateway.test.mjs test/business-group-v2.test.mjs test/business-mcp-overlay.test.mjs test/business-control-access-state.test.mjs test/gateway-overview-client.test.mjs test/platform-entry.test.mjs test/instances.test.mjs && node --experimental-strip-types --test ../../runtime/adapters/dsh-container/test_business.mjs"
   },
   "peerDependencies": {
