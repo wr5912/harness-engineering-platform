@@ -39,42 +39,25 @@ function BuildScene() {
 
 function KnowledgeScene() {
   return <>
-    <path className="login-scene-link" d="M186 154h64M456 154h42q22 0 22-22v-22m-22 44q22 0 22 22v24" />
-    <g transform="rotate(-7 130 160)"><rect className="login-scene-paper" x="66" y="83" width="124" height="156" rx="12" /></g>
-    <Surface x={76} y={74} width={112} height={156}>
-      <Icon kind="document" x={96} y={94} size={30} /><path className="login-scene-rule" d="M98 145h66m-66 18h50m-50 18h60" /><text x="132" y="211" textAnchor="middle">业务文档</text>
-    </Surface>
-    <g className="login-scene-stack" transform="translate(353 160) rotate(-6)">
-      <rect className="login-scene-paper" x="-93" y="-101" width="186" height="214" rx="14" transform="rotate(-8)" />
-      <rect className="login-scene-paper" x="-93" y="-101" width="186" height="214" rx="14" transform="rotate(5)" />
-      <Surface x={-93} y={-101} width={186} height={214} main>
-        <path className="login-scene-rule" d="M-66-77H16m-82 11h55" />
-        <Icon kind="layers" x={-24} y={-35} size={48} />
-        <text className="login-scene-title" x="0" y="46" textAnchor="middle">知识资产</text>
-        <text className="login-scene-caption" x="0" y="79" textAnchor="middle">来源可追溯</text>
-      </Surface>
-    </g>
-    <circle className="login-scene-orbit" cx="530" cy="81" r="31" /><Icon kind="branch" x={518} y={69} /><text x="530" y="132" textAnchor="middle">继承</text>
-    <circle className="login-scene-orbit" cx="530" cy="221" r="31" /><Icon kind="layers" x={518} y={209} /><text x="530" y="273" textAnchor="middle">融合</text>
+    <path className="login-scene-link" d="M196 96h64M196 228h36q28 0 28-28v-40M438 160h54M492 160v-64m0 64v68" />
+    <Surface x={54} y={54} width={142} height={86}><Icon kind="document" x={74} y={70}/><text x="74" y="122">业务知识</text></Surface>
+    <Surface x={54} y={184} width={142} height={86}><Icon kind="tools" x={74} y={200}/><text x="74" y="252">MCP / OpenAPI</text></Surface>
+    <Surface x={260} y={76} width={178} height={168} main><Icon kind="layers" x={324} y={100} size={44}/><text x="349" y="180" textAnchor="middle">知识与工具资产</text><text className="login-scene-caption" x="349" y="214" textAnchor="middle">来源 · 版本 · 配置</text></Surface>
+    <circle className="login-scene-orbit" cx="530" cy="96" r="37"/><Icon kind="branch" x={518} y={84}/><text x="530" y="155" textAnchor="middle">继承</text>
+    <circle className="login-scene-orbit" cx="530" cy="228" r="37"/><Icon kind="layers" x={518} y={216}/><text x="530" y="287" textAnchor="middle">融合与复用</text>
   </>
 }
 
 function ConnectionScene() {
   return <>
-    <circle className="login-scene-ring" cx="325" cy="160" r="116" />
-    <path className="login-scene-link" d="M186 92h28q27 0 43 27m-71 109h28q27 0 43-27M401 160h75" />
-    <rect className="login-scene-pill" x="68" y="66" width="118" height="52" rx="26" /><text className="login-scene-blue" x="127" y="98" textAnchor="middle">MCP</text>
-    <rect className="login-scene-pill" x="68" y="202" width="118" height="52" rx="26" /><text className="login-scene-blue" x="127" y="234" textAnchor="middle">OpenAPI</text>
-    <circle className="login-scene-hub" cx="325" cy="160" r="76" />
-    <Icon kind="agent" x={300} y={114} size={50} /><text className="login-scene-title" x="325" y="197" textAnchor="middle">智能体</text>
-    <g transform="translate(325 44)"><rect className="login-scene-pill" x="-22" y="-22" width="44" height="44" rx="12" /><Icon kind="tools" x={-12} y={-12} /></g>
-    <g transform="translate(325 276)"><rect className="login-scene-pill" x="-22" y="-22" width="44" height="44" rx="12" /><Icon kind="branch" x={-12} y={-12} /></g>
-    <g transform="translate(487 106)">
-      <rect className="login-scene-paper" width="96" height="104" rx="16" />
-      {[0, 1, 2, 3].map(i => <rect key={i} className="login-scene-tile" x={14 + i % 2 * 38} y={16 + Math.floor(i / 2) * 38} width="30" height="30" rx="8" />)}
-    </g>
-    <text x="535" y="242" textAnchor="middle">业务系统</text>
-    <circle className="login-scene-node" cx="441" cy="160" r="5" />
+    <path className="login-scene-link" d="M180 86h70M400 86h70M544 156v68H400M250 224h-70"/>
+    <path className="login-scene-arrow" d="m242 80 8 6-8 6m220-12 8 6-8 6m-62 132-8 6 8 6m-220-12-8 6 8 6"/>
+    <Surface x={45} y={50} width={135} height={72}><Icon kind="chat" x={61} y={65}/><text x="96" y="96">使用者</text></Surface>
+    <Surface x={250} y={50} width={150} height={72} main><text x="325" y="80" textAnchor="middle">平台入口</text><text className="login-scene-caption" x="325" y="105" textAnchor="middle">身份 · 风险 · 授权</text></Surface>
+    <Surface x={470} y={30} width={148} height={126}><text x="544" y="60" textAnchor="middle">原生实例</text><text className="login-scene-blue" x="544" y="87" textAnchor="middle">DSH · AgentScope</text><text className="login-scene-blue" x="544" y="113" textAnchor="middle">OpenCode</text><text className="login-scene-caption" x="544" y="140" textAnchor="middle">原系统负责生命周期</text></Surface>
+    <Surface x={250} y={188} width={150} height={72} main><text x="325" y="220" textAnchor="middle">指定资源授权</text><text className="login-scene-caption" x="325" y="244" textAnchor="middle">实例 key · 资源范围</text></Surface>
+    <Surface x={45} y={188} width={135} height={72}><Icon kind="folder" x={61} y={202}/><text x="96" y="235">资源</text></Surface>
+    <text className="login-scene-caption" x="325" y="305" textAnchor="middle">用户访问远端 · 远端访问指定资源</text>
   </>
 }
 
@@ -107,14 +90,14 @@ function DeliveryScene() {
     <path className="login-scene-link" d="M246 118v24q0 16 16 16h128q16 0 16 16v24M456 118v24q0 16-16 16H262q-16 0-16 16v24" />
     <text className="login-scene-caption" x="60" y="85">使用</text><text className="login-scene-caption" x="60" y="242">交付</text>
     <Surface x={156} y={26} width={180} height={92} main><Icon kind="window" x={176} y={48} size={30} /><text className="login-scene-title" x="228" y="77">Web</text></Surface>
-    <Surface x={366} y={26} width={180} height={92} main><Icon kind="code" x={386} y={48} size={30} /><text className="login-scene-title" x="438" y="77">SDK</text></Surface>
+    <Surface x={366} y={26} width={180} height={92} main><Icon kind="code" x={386} y={48} size={30} /><text className="login-scene-title" x="438" y="77">SDK</text><text className="login-scene-caption" x="456" y="104" textAnchor="middle">stdio 本地调用</text></Surface>
     <g transform="translate(175 193)">
       <rect className="login-scene-paper" x="0" y="22" width="140" height="50" rx="12" />
       <rect className="login-scene-paper" x="0" y="11" width="140" height="50" rx="12" />
       <rect className="login-scene-hub" width="140" height="50" rx="12" />
       <circle className="login-scene-node" cx="22" cy="25" r="5" /><path className="login-scene-rule" d="M42 25h76" />
     </g>
-    <text x="245" y="296" textAnchor="middle">平台运行</text>
+    <text x="245" y="296" textAnchor="middle">平台托管实例</text>
     <g transform="translate(455 229)">
       <path className="login-scene-package-top" d="m0-48 62 29-62 30-62-30Z" />
       <path className="login-scene-package-left" d="m-62-19 62 30v45l-62-30Z" />
