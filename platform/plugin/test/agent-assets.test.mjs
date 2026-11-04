@@ -184,6 +184,23 @@ function createFixture() {
 }
 const input = { agent_id: 'daily-assistant', name: '日常工作助手', description: '帮助整理日常工作事项。', role: '请根据用户提供的基本事项，整理简明的待办清单；缺少时间时先补问。' }
 
+test('本地 CLI 新建与页面和助手共用完整角色及业务用例创建', () => {
+  const root = createFixture()
+  try {
+    const business = { id: 'U-CLI-001', title: '整理事项', inputs: '整理两件事项', expected_behavior: '依据输入整理两件事项' }
+    const result = spawnSync(process.execPath, ['--experimental-transform-types', join(plugin, 'src/agents/cli.ts'), 'new', '--asset-root', root, '--input', '-'], {
+      cwd: repo, input: JSON.stringify({ ...input, evaluation_cases: [business] }), encoding: 'utf8', env: { ...process.env, HARNESS_PROGRAM_ROOT: root, HARNESS_ASSET_ROOT: root },
+    })
+    assert.equal(result.status, 0, result.stderr)
+    const value = success(JSON.parse(result.stdout))
+    assert.match(value.experiment_id, /^EXP-daily-assistant-001-m-r[0-9a-f]{12}$/)
+    assert.equal(value.started, false)
+    assert.ok(readFileSync(join(root, 'evolution/experiments', value.experiment_id, 'candidate/dsh/workspace/AGENTS.md'), 'utf8').includes(input.role))
+    assert.ok(readFileSync(join(root, 'agents/daily-assistant/evaluation.md'), 'utf8').includes(business.expected_behavior))
+    assert.equal(existsSync(join(root, '.local/instances')), false)
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
 test('新建向导复用真实 CLI 并保存角色、标准来源与用例，不启动实例', async () => {
   const root = createFixture()
   try {
