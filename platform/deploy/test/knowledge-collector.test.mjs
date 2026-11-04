@@ -164,6 +164,19 @@ test('完整平台同步打包接入使用冻结管理快照，并清理暂存�
   assert.equal(existsSync(join(f.root, '.knowledge-result.json')), false)
 })
 
+test('程序 main 文档引用使用本包冻结源码', t => {
+  const f = fixture(t)
+  const url = 'https://github.com/wr5912/harness-engineering-platform/blob/main/runtime/research/compute-assets.md'
+  f.write('data/AGENTS.md', `[资产归拢](${url})`)
+  f.write('program/runtime/research/compute-assets.md', '# 本次冻结版本的实际用法\n')
+  const metadata = collectPlatformKnowledge(f.root)
+  const index = JSON.parse(readFileSync(join(f.root, metadata.path), 'utf8'))
+  assert.equal(index.missing.length, 0)
+  assert.equal(index.sources[0].url, url)
+  assert.equal(index.sources[0].providedFrom, 'program/runtime/research/compute-assets.md')
+  assert.equal(readFileSync(join(f.root, 'data/knowledge/offline', index.sources[0].path), 'utf8'), '# 本次冻结版本的实际用法\n')
+})
+
 test('完整平台复用资源目录中按摘要核对的知识；缓存正文不扩充依赖，损坏仍拒绝出包', async t => {
   const f = fixture(t), s = await server(t), data = join(f.root, 'data'), cache = join(f.root, 'prepared/knowledge')
   f.write('data/AGENTS.md', `[参考](${s.base}/guide.md)`)

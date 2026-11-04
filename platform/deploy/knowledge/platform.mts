@@ -3,7 +3,7 @@ import { join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { run } from '../fsutil.mts'
 import type { RuntimeEntry } from '../manifest.mts'
-import type { KnowledgeRoot } from './index.mts'
+import { inspectKnowledge, type KnowledgeRoot } from './index.mts'
 
 /** 完整平台只收集冻结快照中的管理身份与已声明扩展，不另扫业务 Candidate。 */
 export function managementKnowledgeRoots(dataRoot: string): KnowledgeRoot[] {
@@ -24,9 +24,18 @@ export function collectPlatformKnowledge(staging: string, cacheDir?: string): Ru
   const data = join(staging, 'data')
   const roots = managementKnowledgeRoots(data)
   if (!roots.length) return undefined
+  const program = join(staging, 'program')
+  const localSources = inspectKnowledge({ roots, mode: 'offline' }).references.flatMap(reference => {
+    const url = new URL(reference.url)
+    const prefix = '/wr5912/harness-engineering-platform/blob/main/'
+    if (url.hostname !== 'github.com' || !url.pathname.startsWith(prefix)) return []
+    const path = resolve(program, decodeURIComponent(url.pathname.slice(prefix.length)))
+    return path.startsWith(program + sep) && existsSync(path) ? [{ url: reference.url, path }] : []
+  })
+  if (localSources.length) roots.push({ root: program, label: 'program', include: [] })
   if (cacheDir && existsSync(cacheDir)) roots.push({ root: resolve(cacheDir), label: 'prepared-knowledge', include: [] })
   const input = join(staging, '.knowledge-input.json'), output = join(staging, '.knowledge-result.json')
-  writeFileSync(input, JSON.stringify({ roots, mode: 'offline', outDir: join(data, 'knowledge/offline') }))
+  writeFileSync(input, JSON.stringify({ roots, localSources, mode: 'offline', outDir: join(data, 'knowledge/offline') }))
   try {
     run(process.execPath, [fileURLToPath(new URL('./cli.mts', import.meta.url)), input, output], { timeout: 0 })
     return { path: 'data/knowledge/offline/index.json', version: '1', source: 'management-skills' }

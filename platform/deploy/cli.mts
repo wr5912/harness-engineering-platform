@@ -44,7 +44,7 @@ function validateOptions(command: string, options: Options): void {
     'agent-preview': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir'],
     'agent-pack': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir', 'out', 'seed-file', 'expected-candidate-sha256'],
     'agent-prepare': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir', 'image-archive', 'docker-assets'],
-    pack: ['out', 'program-root', 'data-root', 'assets-dir', 'image-archive', 'image-tag', 'image-id', 'image-fingerprint', 'arch'],
+    pack: ['out', 'program-root', 'data-root', 'assets-dir', 'knowledge-dir', 'image-archive', 'image-tag', 'image-id', 'image-fingerprint', 'arch'],
     install: ['bundle-root', 'prefix', 'data-root', 'host', 'port', 'gateway-port', 'public-url'],
     verify: ['prefix', 'data-root', 'url'],
     relocate: ['prefix', 'from-data-root', 'data-root', 'ssh'],
@@ -134,6 +134,7 @@ function usage(): string {
     --program-root <目录>        程序仓库根，默认当前仓库
     --data-root <目录>           完整数据根，默认当前关联工作区
     --assets-dir <目录>          离线资源目录（node/pnpm/git/dsh/program 依赖）
+    --knowledge-dir <目录>       已归档知识目录，按原始索引和摘要核对后复用
     --image-archive <tar>        预构建镜像归档；与 --image-tag 二选一
     --image-tag <tag>            从本机 Docker 导出镜像
     --image-id <sha256:...>      期望镜像 ID
@@ -268,6 +269,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
         out: resolve(text(options, 'out', join(REPO, 'dist')) as string),
         dataRoot: text(options, 'data-root', defaultAssetRoot()),
         assetsDir: text(options, 'assets-dir'),
+        knowledgeDir: text(options, 'knowledge-dir'),
         imageArchive: text(options, 'image-archive'),
         imageTag: text(options, 'image-tag'),
         imageId: text(options, 'image-id'),

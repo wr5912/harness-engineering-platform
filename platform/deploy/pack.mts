@@ -14,6 +14,7 @@ export interface PackOptions {
   out: string
   dataRoot?: string
   assetsDir?: string
+  knowledgeDir?: string
   imageArchive?: string
   imageTag?: string
   imageId?: string
@@ -93,7 +94,7 @@ function copyData(dataRoot: string, staging: string, assets: string): ReturnType
           throw new Error(`离线资源缺少管理助手插件依赖：${dependency}`)
         }
       }
-      copyTree(join(prepared, 'node_modules'), join(target, profile, 'node_modules'))
+      copyAsset(join(prepared, 'node_modules'), join(target, profile, 'node_modules'))
       // prepare 在目标机重建平台链接，不能携带准备机的绝对源码路径。
       removeTree(join(target, profile, 'node_modules/@ai-agent-harness/harness-platform'))
     }
@@ -205,7 +206,7 @@ export function pack(options: PackOptions): { archive: string; size: number } {
     dataCheck = assertRealWorkspace(dataRoot, options.allowFixtureData)
     dataRepository = copyData(dataRoot, staging, options.assetsDir!)
     copyDataDependencies(join(staging, 'data'), options.assetsDir!)
-    const knowledge = collectPlatformKnowledge(staging, join(options.assetsDir!, 'knowledge'))
+    const knowledge = collectPlatformKnowledge(staging, options.knowledgeDir ?? join(options.assetsDir!, 'knowledge'))
     if (knowledge) runtime.knowledge = knowledge
   }
   console.error('pack: 正在核对并收集标准 Runtime 镜像')
