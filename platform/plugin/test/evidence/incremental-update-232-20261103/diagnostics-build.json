@@ -1,0 +1,88 @@
+{
+  "result": {
+    "ok": true,
+    "value": {
+      "experiment_id": "EXP-security-operations-expert-027-reab20c48f610",
+      "schema_version": 1,
+      "entry_path": "dsh/managed/inspection-preparation-runtime.ts",
+      "output_path": "dsh/managed/inspection-preparation-runtime.mjs",
+      "compiler": {
+        "typescript": "5.9.3",
+        "esbuild": "0.25.12",
+        "platform_lock_sha256": "61aa7c1b2fe86d51b10607fe37c29d191e9ed00d925f19361a1d72d1bb2e80cd"
+      },
+      "dependencies_sha256": null,
+      "source_files": [
+        {
+          "path": "dsh/managed/inspection-preparation-runtime.ts",
+          "sha256": "e347c8b91a821c2967fc6ea5147512f1bf65cef912109f879dd393b8ed443e36"
+        }
+      ],
+      "source_sha256": "5a65fd967144fc3636e804702fdd892527152cda19916d7702426bd020b8a82b",
+      "platform_sources": [
+        {
+          "path": "runtime/adapters/dsh-web/src/resolve-runtime.ts",
+          "sha256": "69e91bb7ff19f8e6f79694988ccf54d49e1a0a19675c33f59b3f7cc64a55bf1b"
+        }
+      ],
+      "platform_sources_sha256": "af539f1f3eb7a2bc3cfd4456124f15cff8e65abf4333aea55e756823d4b36d3d",
+      "source_inputs_version": 1,
+      "runtime_imports": [
+        "node:crypto",
+        "node:fs/promises",
+        "node:os",
+        "node:path",
+        "node:fs",
+        "node:module",
+        "node:url"
+      ],
+      "build_digest": "34b3f635a97fc27bfc1974542c3927d6578aa57ae538ff8ba6c29e6294c09029",
+      "esm_sha256": "b8ddec9a61b53fead991df895944f991710f5f1d3e375d4b4f7855237affa598",
+      "candidate_sha256": "9381c565c79b4db361ed9b34fec32fdea6e1792f90d21d87cf62f68f49ed7a82"
+    }
+  },
+  "verified": {
+    "verified": true,
+    "reasons": [],
+    "receipts": [
+      {
+        "schema_version": 1,
+        "entry_path": "dsh/managed/inspection-preparation-runtime.ts",
+        "output_path": "dsh/managed/inspection-preparation-runtime.mjs",
+        "compiler": {
+          "typescript": "5.9.3",
+          "esbuild": "0.25.12",
+          "platform_lock_sha256": "61aa7c1b2fe86d51b10607fe37c29d191e9ed00d925f19361a1d72d1bb2e80cd"
+        },
+        "dependencies_sha256": null,
+        "source_files": [
+          {
+            "path": "dsh/managed/inspection-preparation-runtime.ts",
+            "sha256": "e347c8b91a821c2967fc6ea5147512f1bf65cef912109f879dd393b8ed443e36"
+          }
+        ],
+        "source_sha256": "5a65fd967144fc3636e804702fdd892527152cda19916d7702426bd020b8a82b",
+        "platform_sources": [
+          {
+            "path": "runtime/adapters/dsh-web/src/resolve-runtime.ts",
+            "sha256": "69e91bb7ff19f8e6f79694988ccf54d49e1a0a19675c33f59b3f7cc64a55bf1b"
+          }
+        ],
+        "platform_sources_sha256": "af539f1f3eb7a2bc3cfd4456124f15cff8e65abf4333aea55e756823d4b36d3d",
+        "source_inputs_version": 1,
+        "runtime_imports": [
+          "node:crypto",
+          "node:fs/promises",
+          "node:os",
+          "node:path",
+          "node:fs",
+          "node:module",
+          "node:url"
+        ],
+        "build_digest": "34b3f635a97fc27bfc1974542c3927d6578aa57ae538ff8ba6c29e6294c09029",
+        "esm_sha256": "b8ddec9a61b53fead991df895944f991710f5f1d3e375d4b4f7855237affa598",
+        "candidate_sha256": "9381c565c79b4db361ed9b34fec32fdea6e1792f90d21d87cf62f68f49ed7a82"
+      }
+    ]
+  }
+}

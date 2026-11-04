@@ -1,0 +1,173 @@
+{
+  "checked_at": "2026-11-03T07:07:38.533108+00:00",
+  "scope": "PA-13 / PA-05 / PA-08 / PA-12：部署工具强制使用原则与 232 默认数据根迁移",
+  "rules": {
+    "authority": "AGENTS.md：打包部署更新必须经过工具",
+    "references": [
+      ".agents/skills/dsh-platform-development/SKILL.md",
+      "docs/platform-design/23_离线一键打包与安装.md"
+    ]
+  },
+  "deployment": {
+    "host": "172.16.138.232",
+    "tool": "platform/dsh-deploy relocate --ssh root@172.16.138.232",
+    "receipt": {
+      "prefix": "/srv/storage/hep-rc5-20261102/program",
+      "fromDataRoot": "/srv/storage/hep-rc5-20261102/data",
+      "dataRoot": "/root/harness-engineering-platform-data",
+      "workspaceId": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+      "mode": "bind",
+      "status": "relocated",
+      "sessionsPreserved": 7,
+      "restarted": true,
+      "backup": "/srv/storage/hep-rc5-20261102/program/.local/deploy-relocations/2026-11-03T06-41-41.690Z-3857976",
+      "resumed": true
+    },
+    "canonical_data_root": "/root/harness-engineering-platform-data",
+    "physical_storage_root": "/srv/storage/hep-rc5-20261102/data",
+    "persistence": "fstab bind,x-systemd.requires-mounts-for；原路径与目标目录 inode 相同",
+    "program_root_migrated": false,
+    "full_data_copied": false,
+    "images_rebuilt_or_imported": false,
+    "business_containers_restarted": false,
+    "latest_tool_dry_run": {
+      "mode": "existing",
+      "status": "unchanged",
+      "restarted": false,
+      "management_sessions": 8
+    }
+  },
+  "validation": {
+    "deployment_verify": {
+      "checks": [
+        {
+          "id": "program-integrity",
+          "status": "ok",
+          "detail": "安装来源 6771136d8f0f83a6ade48f3a33772278d0006e11"
+        },
+        {
+          "id": "business-gateway",
+          "status": "ok",
+          "detail": "网关配置完整，已核对发布签名密钥，入口 http://172.16.138.232:53106；监听状态需启动后核对"
+        },
+        {
+          "id": "workspace-assets",
+          "status": "ok",
+          "detail": "20 skills, workspace-95db14d2-d53d-4015-8256-ade8612b1b77"
+        },
+        {
+          "id": "profile-skills",
+          "status": "ok",
+          "detail": "/root/harness-engineering-platform-data/.agents/skills"
+        },
+        {
+          "id": "default-workspace",
+          "status": "ok",
+          "detail": "/root/harness-engineering-platform-data"
+        },
+        {
+          "id": "runtime",
+          "status": "ok",
+          "detail": "DSH 0.2.1-rc.5，只读启动预检通过"
+        },
+        {
+          "id": "online-workspace",
+          "status": "ok",
+          "detail": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77，PID 3882363，密码登录及 inventory RPC 通过"
+        },
+        {
+          "id": "online-business-gateway",
+          "status": "ok",
+          "detail": "PID 3882363 已监听业务网关 172.16.138.232:53106"
+        },
+        {
+          "id": "online-business-instances",
+          "status": "ok",
+          "detail": "已核对 1 个运行中业务实例的网页入口与接入版本"
+        }
+      ],
+      "onlineVerified": true,
+      "ok": true
+    },
+    "deployment_tests": {
+      "passed": 35,
+      "failed": 0,
+      "command": "node --test platform/deploy/test/deploy.test.mjs platform/deploy/test/install.test.mjs platform/deploy/test/verify.test.mjs platform/deploy/test/relocate.test.mjs"
+    },
+    "final_relocation_tests": {
+      "passed": 7,
+      "failed": 0,
+      "reason": "补充恢复原地址、逐项会话核对和不完整备份目录处理后复验"
+    },
+    "preservation": {
+      "originalSessionFiles": 134,
+      "unchangedCompressedSessionHashes": 133,
+      "changedCompressedSessionFiles": 1,
+      "changedFileDecompressedContentMatchesEarlierBackup": true,
+      "earlierBackupUtc": "2026-11-03T05:59Z",
+      "workspaceIdPreserved": true,
+      "protectedConfigurationHashesUnchanged": true,
+      "containersWithUnchangedIdStartTimeAndState": 65,
+      "excludedPreexistingRestartLoop": [
+        "kb-access-helper"
+      ],
+      "targetContainer": {
+        "id": "e343f21ecf5517c3db03e409cdb2db7f825f145837c0f156db5a7989bf8e447d",
+        "name": "hep-deploy-accept-amd64-final",
+        "startedAt": "2026-11-03T06:08:10.924680452Z",
+        "running": true,
+        "restarting": false
+      }
+    },
+    "browser": {
+      "checkedAt": "2026-11-03T07:05:47.802Z",
+      "nativeNewSessionCwd": "/root/harness-engineering-platform-data",
+      "newBlankSessionId": "session-846168f5-a2b7-44b0-90b0-336bc01de053",
+      "managementSessionCount": 8,
+      "runningManagementSessionCount": 0,
+      "sidebarWorkspaceVisible": true,
+      "composerReady": true,
+      "modelMessageSent": false
+    },
+    "portal": {
+      "ssoclientUnchanged": true,
+      "menuUnchanged": true,
+      "sessionCount": 104,
+      "testSession": [],
+      "directHttpStatus": 200,
+      "platformHttpStatus": 200,
+      "menuEntryPassed": true
+    }
+  },
+  "failures_and_repairs": [
+    {
+      "failure": "findmnt 校验候选 fstab 时目标目录不存在",
+      "result": "未停止平台，迁移回执 rolled-back",
+      "repair": "工具先创建空目标目录再校验，提前创建私有日志，失败仍清理本次目标"
+    },
+    {
+      "failure": "平台首次启动后的在线核对连接失败，回滚时挂载点被占用",
+      "result": "回执 recovery-required，未强制卸载或终止业务容器",
+      "repair": "通过工具 --resume 按匹配回执恢复并验证；已启动后的网络错误保留新数据和运行平台"
+    },
+    {
+      "failure": "首次恢复的登录核对超过原 15 秒限制；独立诊断观察登录链路约 88 秒",
+      "result": "保留运行平台，工具返回核对未完成",
+      "repair": "每次请求独立等待最多 120 秒并关闭连接复用；工具重试恢复及 verify 9/9 通过"
+    }
+  ],
+  "tool_sources_sha256": {
+    "platform/deploy/cli.mts": "89e24b3dfc8042e29ca6d2bab13c13038349e31190ad28f2316041363dda80df",
+    "platform/deploy/relocate.mts": "663f792cad5d64fa9664d1d135377afd534ff105b598ea7a96d9a3204cb7be94",
+    "platform/deploy/test/relocate.test.mjs": "50b75f7fb70d54f7cf9c040ab180ef754a2086bfe54c750b917d73314da76aaa"
+  },
+  "boundaries": [
+    "工具新增功能和修复位于本地工作树，通过 SSH stdin 执行当前工具源码；未提交或推送，不声称远端 main 已包含修复。",
+    "实际验证 Linux AMD64：跨文件系统 bind 挂载；同文件系统迁移、恢复原地址和失败回滚由隔离测试验证。",
+    "未执行物理主机重启验证；fstab 已声明源挂载依赖，原磁盘存储目录仍是挂载源，不能删除。",
+    "历史 Session 的创建目录和事件不改写，其执行目录仍按原生历史记录处理；新会话使用新根。本轮浏览器产生一个空白管理会话，未发送模型消息。",
+    "134 份原会话文件仍在；133 份压缩摘要与迁移前相同，另 1 份与更早的增量更新前备份解压字节相同。未保留该文件的迁移前原字节，不声称其压缩摘要相同。",
+    "kb-access-helper 为迁移前已有重启循环，未处理；挂载点被占用的具体进程未归因。",
+    "未验证新安装、ARM64、镜像导入或完整 SOC 业务；本轮不提升 Experiment Evaluation 或 Research Release 结论。"
+  ]
+}

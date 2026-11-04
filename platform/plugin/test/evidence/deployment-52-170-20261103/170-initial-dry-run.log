@@ -1,0 +1,4 @@
+dsh-deploy: ssh 执行失败：
+Authorized users only. All activities may be monitored and reported.
+git 执行失败：spawnSync git ENOENT
+

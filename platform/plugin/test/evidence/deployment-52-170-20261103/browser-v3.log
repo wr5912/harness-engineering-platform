@@ -1,0 +1,2 @@
+{"host":"170","checks":[{"name":"默认账户密码登录","ok":true},{"name":"管理对话入口可用","ok":true},{"name":"管理页面没有登录回跳","ok":true},{"name":"原有智能体可见","ok":true},{"name":"最小库没有导入安全运营智能体","ok":true},{"name":"原有业务实例可见","ok":true},{"name":"窄屏管理入口可用","ok":true},{"name":"无页面脚本异常","ok":true}],"errors":[]}
+{"host":"52","checks":[{"name":"默认账户密码登录","ok":true},{"name":"管理对话入口可用","ok":true},{"name":"管理页面没有登录回跳","ok":true},{"name":"原有智能体可见","ok":true},{"name":"原有业务实例可见","ok":true},{"name":"窄屏管理入口可用","ok":true},{"name":"无页面脚本异常","ok":true}],"errors":[]}

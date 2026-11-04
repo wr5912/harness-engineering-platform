@@ -1,0 +1,83 @@
+{
+  "checked_at": "2026-11-03T01:38:14.882Z",
+  "scope": "PA-08 / PA-12 门户 AI助手接入当前 53106 网关实例",
+  "deployment": {
+    "program_root": "/srv/storage/hep-rc5-20261102/program",
+    "data_root": "/srv/storage/hep-rc5-20261102/data",
+    "program_commit": "b26b7f206773ebb0b1290531802ca022b5967ed6",
+    "data_commit": "49c0bfdf623700fe80f1ba4b410018bae7ead30d",
+    "source_id": "experiment:EXP-security-operations-expert-024-rad80a907c628",
+    "changed_configuration": {
+      "gateway.proxyOrigin": "https://172.16.138.232:18060"
+    },
+    "other_business_configuration_unchanged": true,
+    "program_source_changed": false,
+    "config_owner": "1000:1000",
+    "config_mode": "0600",
+    "backup": "/root/hep-portal-integration-20261102/business-access-before-092527.json",
+    "platform_restarted": true,
+    "target_container_restarted": true,
+    "target_container_status": "running",
+    "target_container_started_at": "2026-11-03T01:27:46.193336519Z"
+  },
+  "portal": {
+    "routePrefix": "/agents/",
+    "upstream": "http://172.16.138.232:53106",
+    "stripPrefix": "0",
+    "longConn": "1",
+    "menuId": 95224,
+    "path": "${origin}/agents/security-operations-expert/instances/hep-deploy-accept-amd64-final/",
+    "configuration_already_correct": true
+  },
+  "browser": {
+    "checkedAt": "2026-11-03T01:38:14.882Z",
+    "pageErrors": [],
+    "httpErrors": [],
+    "websockets": [
+      {
+        "path": "/agents/security-operations-expert/instances/hep-deploy-accept-amd64-final/api/remote.mux",
+        "received": 89,
+        "sent": 10
+      },
+      {
+        "path": "/agents/security-operations-expert/instances/hep-deploy-accept-amd64-final/api/remote.mux",
+        "received": 9,
+        "sent": 8
+      },
+      {
+        "path": "/agents/security-operations-expert/instances/hep-deploy-accept-amd64-final/api/remote.mux",
+        "received": 9,
+        "sent": 8
+      }
+    ],
+    "portalUrl": "https://172.16.138.232:18060/iframe/1",
+    "iframeUrl": "https://172.16.138.232:18060/agents/security-operations-expert/instances/hep-deploy-accept-amd64-final/",
+    "reply": "门户接入验证成功。",
+    "sessionUrl": "https://172.16.138.232:18060/agents/security-operations-expert/instances/hep-deploy-accept-amd64-final/",
+    "iframeRefreshPreserved": true,
+    "portalRefreshPreserved": true
+  },
+  "checks": {
+    "ssoclientUnchanged": true,
+    "menuUnchanged": true,
+    "sessionCount": 91,
+    "directHttpStatus": 200,
+    "platformHttpStatus": 200,
+    "menuEntryPassed": true,
+    "management_sessions": 7,
+    "management_running_sessions": 0,
+    "visual_inspection": "passed"
+  },
+  "observations": [
+    "门户路由已指向 53106；新部署数据配置缺少 proxyOrigin，导致门户请求 403。补齐后复用现有网关来源校验与来源头重建。",
+    "首次原子替换配置未保留属主，短暂导致容器读取失败并退出；已恢复 1000:1000、0600 并启动原容器，未删除其 HOME 或会话。后续配置原子替换必须在替换前保留 uid/gid 和 mode。",
+    "平台启动等待超过启动器 60 秒限时，后台进程存活，后续恢复；观察到 PTR DNS 查询，但没有据此认定全部延迟的根因。未修改系统 DNS 或 hosts。",
+    "使用新会话发送普通问候，助手回复门户接入验证成功；iframe 和门户刷新后均保留。完整截图仅存现场临时目录，避免将其他会话标题纳入仓库。"
+  ],
+  "limits": [
+    "保持现有 anonymous/development 共享实例，未接入或验证 SSO 票据核销。",
+    "浏览器使用 ignoreHTTPSErrors，未验证证书信任链。",
+    "未重新运行业务 MCP、语音、全量业务 Case 或长期重启稳定性测试。",
+    "本次没有修改程序源码，未重复构建或执行源码回归测试；未提交推送。"
+  ]
+}

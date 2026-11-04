@@ -250,7 +250,7 @@ API 通道退出码 `0` 表示锁定 Case 均得到 `passed`；`1` 表示运行�
 
 #### 既有研究模式
 
-未使用 `--business-control` 的既有研究实例继续由 `dsh-dev up` 的共用预检入口采用以下设置：Web 监听 `0.0.0.0`，允许局域网远程访问；关闭 Web/API 的 Token 与 Host/Origin 校验；跳过 Web 内测声明弹窗。命令行、平台创建/启动/重启、研究工具重启及评测创建实例均使用这个入口。`up --dry-run` 的计划与实际写入的配置使用同一规则；`--lan-access`、`--unsafe-no-auth`、`--skip-testing-notice` 保留为显式标记，不再是研究实例的可选访问模式。
+未使用 `--business-control` 的既有研究实例继续由 `dsh-dev up` 的共用预检入口采用以下设置：Web 监听 `0.0.0.0`，允许局域网远程访问；关闭 Web/API 的 Token 与 Host/Origin 校验；跳过 Web 内测声明弹窗。该入口供独立研究和 MCP fixture 使用；平台业务实例及真实业务评测启用业务控制并经统一网关。受控实例的网关登记、删除事务和失败恢复共用平台实现，CLI 不另行维护一套。`up --dry-run` 的计划与实际写入的配置使用同一规则；`--lan-access`、`--unsafe-no-auth`、`--skip-testing-notice` 保留为显式标记，不再是研究实例的可选访问模式。
 
 已有实例再次启动时自动应用新规则，不继承旧访问设置；运行中的实例需执行重启或 `up --replace` 才会重新加载，HOME 卷及记录端口保持不变。专用归因工作进程不装载业务智能体，它读取只读 Run 进行内部评审，继续使用回环监听和 Token 认证。
 

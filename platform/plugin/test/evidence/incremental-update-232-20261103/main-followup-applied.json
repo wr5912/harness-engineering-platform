@@ -1,0 +1,24 @@
+{
+  "status": "updated",
+  "activation": "pending",
+  "files": 23,
+  "bytes": 3992376,
+  "commits": [
+    {
+      "before": "ea509f21c10472ea819d55a51b08adacc266fe00",
+      "commit": "1a32a74e285a5b8d50678a1d17b2f11b237315e4"
+    },
+    {
+      "before": "2c2786edd4eefae434249482cedd4c39b9ff1ea4",
+      "commit": "2c2786edd4eefae434249482cedd4c39b9ff1ea4"
+    }
+  ],
+  "revalidatedArtifacts": [
+    "runtime/adapters/dsh-web/lib/client-urls-worker.mjs",
+    "runtime/adapters/dsh-web/lib/container-webserver.mjs",
+    "runtime/adapters/dsh-web/lib/index.mjs",
+    "runtime/adapters/dsh-web/lib/platform-webserver.mjs"
+  ],
+  "backup": "/srv/storage/hep-rc5-20261102/program/.local/deploy-updates/d7d32cd5-b2b5-4fbf-99c0-e9480ae9b666",
+  "transferBytes": 3521276
+}

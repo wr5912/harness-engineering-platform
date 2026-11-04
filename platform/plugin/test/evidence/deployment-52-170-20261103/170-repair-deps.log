@@ -1,0 +1,24 @@
+增量包 81317 字节；两仓 Git 差异 0/0 个文件；变化制品 0 个；不传镜像和运行状态，离线依赖增量 1 组
+dsh-deploy: ssh 执行失败：7
+  let error = new Error(text);
+              ^
+
+Error: Build failed with 1 error:
+error: The entry point "src/index.ts" cannot be marked as external
+    at failureErrorWithLog (/root/hep-rc5-20261102/program/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+    at /root/hep-rc5-20261102/program/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:926:25
+    at runOnEndCallbacks (/root/hep-rc5-20261102/program/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1307:45)
+    at buildResponseToResult (/root/hep-rc5-20261102/program/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:924:7)
+    at /root/hep-rc5-20261102/program/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:951:16
+    at responseCallbacks.<computed> (/root/hep-rc5-20261102/program/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+    at handleIncomingPacket (/root/hep-rc5-20261102/program/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+    at Socket.readFromStdout (/root/hep-rc5-20261102/program/platform/plugin/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+    at Socket.emit (node:events:514:28)
+    at addChunk (node:internal/streams/readable:568:12) {
+  errors: [Getter/Setter],
+  warnings: [Getter/Setter]
+}
+
+Node.js v24.21.0
+
+

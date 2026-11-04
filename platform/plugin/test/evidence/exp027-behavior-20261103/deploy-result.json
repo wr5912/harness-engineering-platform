@@ -1,0 +1,52 @@
+{
+  "instance": "security-operations-expert-exp027",
+  "experimentId": "EXP-security-operations-expert-027-reab20c48f610",
+  "status": "updated",
+  "activation": "pending",
+  "files": [
+    {
+      "path": "candidate/dsh/presets/security-operations-expert/agent.cordis.yml",
+      "beforeSha256": "f7b8e6772c5f1261b891f456b4f47bcb0ae4a5e3851f148aca0bcadf8d7c6e15",
+      "sha256": "fdc8742eaeaa2b532c26fd6e31530b68af6013e05f3b7181f0ad476e4f409953",
+      "changed": true
+    },
+    {
+      "path": "candidate/dsh/presets/security-operations-expert/preset.yml",
+      "beforeSha256": "e2edf722ed79cc54419a5ac4efcc13693856945347715562f8940c706faf8742",
+      "sha256": "129215f47b4ebad9d9e00dec9ff6f4b6a9e6f9671d09e283c4fcb22a315367c6",
+      "changed": true
+    },
+    {
+      "path": "candidate/dsh/workspace/AGENTS.md",
+      "beforeSha256": "1694572fdb12ffbc8cbfc9f8fafe488ac3f99a76598fdb9ffdf5dcff8a39f573",
+      "sha256": "dc2433294f15b3d8b14afe5f36d2d015630911d4d8077fb3531521ca08a16a2b",
+      "changed": true
+    },
+    {
+      "path": "candidate/dsh/workspace/.agents/skills/security-inspection/SKILL.md",
+      "beforeSha256": "f459d52f113f74c229210f1b3ec4b581c05355fbee7abe21c5d517989d8cfbd3",
+      "sha256": "4228563e287b6fcd406c3a31adc81345e3cf614f37997c7578aaedec71380d6f",
+      "changed": true
+    },
+    {
+      "path": "candidate/dsh/managed/inspection-preparation-runtime.ts",
+      "beforeSha256": "933857e4f577d298b3502b0ae8765acb8a3dd1733b83f0dbd20d6d929e8c2d51",
+      "sha256": "f9c082e1d12a4c62859b88d723c8239f078f2da44d015ff2650c6ba9094758bb",
+      "changed": true
+    },
+    {
+      "path": "candidate/dsh/managed/inspection-preparation-runtime.mjs",
+      "beforeSha256": "6bb645490e482ed6bbc3d8dc8a2fda58111c097d85772b63adca97300dbd3e00",
+      "sha256": "0747c102880dfb20b4e9c8e1d95463e1cc16702f07afb69a110d8e3de6a3ac19",
+      "changed": true
+    },
+    {
+      "path": "change.yaml",
+      "beforeSha256": "79a001aeb8417561928605e7502ba842c30ca7d53b6f4a0f211c1c493355ee0f",
+      "sha256": "adc387473965b0e1f57ae10d8827db6288dd5b84c03a0f829efa69fab7ccb2ac",
+      "changed": true
+    }
+  ],
+  "bytes": 69318,
+  "backup": "/srv/storage/hep-rc5-20261102/program/.local/deploy-agent-updates/29bd4c53-280f-4836-9c78-5bd7c6ce1776"
+}

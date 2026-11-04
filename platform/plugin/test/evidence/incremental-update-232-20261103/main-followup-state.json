@@ -1,0 +1,39 @@
+{
+  "program": "1a32a74e285a5b8d50678a1d17b2f11b237315e4",
+  "data": "2c2786edd4eefae434249482cedd4c39b9ff1ea4",
+  "managementSessionIdsPreserved": true,
+  "managementSessionCount": 9,
+  "configurationHashesUnchanged": true,
+  "targetAndProtectedContainers": {
+    "/security-operations-expert-exp027": {
+      "unchanged": true,
+      "current": {
+        "id": "39c320861b9669c2d8f9076a62ecbb09f836e8ac3f4827730dbae6e24040ce77",
+        "name": "/security-operations-expert-exp027",
+        "started": "2026-11-03T10:56:53.612581774Z",
+        "running": true,
+        "image": "sha256:c06d4e1fecc66f175a2fbeaa51e96ea0b2af8f58be22f89edac73df3c779bece"
+      }
+    },
+    "/hep-deploy-accept-amd64-final": {
+      "unchanged": true,
+      "current": {
+        "id": "e343f21ecf5517c3db03e409cdb2db7f825f145837c0f156db5a7989bf8e447d",
+        "name": "/hep-deploy-accept-amd64-final",
+        "started": "2026-11-03T06:08:10.924680452Z",
+        "running": true,
+        "image": "sha256:c06d4e1fecc66f175a2fbeaa51e96ea0b2af8f58be22f89edac73df3c779bece"
+      }
+    }
+  },
+  "otherContainerChanges": [
+    "/kb-access-helper"
+  ],
+  "sessionSequenceChanges": [
+    {
+      "sessionId": "session-846168f5-a2b7-44b0-90b0-336bc01de053",
+      "before": 163,
+      "after": 164
+    }
+  ]
+}

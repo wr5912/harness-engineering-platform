@@ -1,0 +1,23 @@
+{
+  "host": "52",
+  "checks": [
+    {
+      "name": "默认账户密码登录",
+      "ok": true
+    },
+    {
+      "name": "管理对话入口可用",
+      "ok": true
+    },
+    {
+      "name": "管理页面没有登录回跳",
+      "ok": true
+    },
+    {
+      "name": "原有智能体可见",
+      "ok": true
+    }
+  ],
+  "errors": [],
+  "failure": "locator.waitFor: Timeout 45000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByText('security-operations-expert').first() to be visible\u001b[22m\n\u001b[2m    92 × locator resolved to hidden <span class=\"agent-id\">security-operations-expert</span>\u001b[22m\n"
+}

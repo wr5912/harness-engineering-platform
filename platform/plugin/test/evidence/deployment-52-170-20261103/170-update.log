@@ -1,0 +1,5 @@
+增量包 106777677 字节；两仓 Git 差异 664/60 个文件；变化制品 20 个；不传镜像和运行状态，离线依赖增量 1 组
+dsh-deploy: ssh 执行失败：
+Authorized users only. All activities may be monitored and reported.
+/root/hep-rc5-20261102/program/platform/dsh-platform 执行失败：
+

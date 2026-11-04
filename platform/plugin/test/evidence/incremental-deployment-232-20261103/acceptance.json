@@ -1,0 +1,238 @@
+{
+  "checked_at": "2026-11-03T06:16:13.836207+00:00",
+  "scope": "PA-13 / PA-05 / PA-08 / PA-12：232 已有安装的双仓增量更新",
+  "deployment": {
+    "host": "172.16.138.232",
+    "program_root": "/srv/storage/hep-rc5-20261102/program",
+    "data_root": "/srv/storage/hep-rc5-20261102/data",
+    "versions": {
+      "program": {
+        "before": "da8ea79ceab272276140c345d990c3e992040dea",
+        "after": "6771136d8f0f83a6ade48f3a33772278d0006e11",
+        "changed_paths": 321
+      },
+      "data": {
+        "before": "e9b9419011cef28779093855b72305fbd3cf7bc5",
+        "after": "81e2d43650b54d78fc6a9d5175a3b8ad9fa55400",
+        "changed_paths": 1410
+      }
+    },
+    "source_selection": "两仓 main 的已提交快照；开始与收尾 HEAD 一致，未提交并行草稿未部署，未执行提交或推送。",
+    "method": "Git 增量 bundle 导入并仅更新变更路径，rsync 传输插件构建制品，仅写入 9 个摘要变化制品；保留挂载文件 inode 和现场配置。原生平台 restart 含启动预检，原容器 docker restart 装载业务 Runtime。",
+    "target_instance": "hep-deploy-accept-amd64-final",
+    "source_id": "experiment:EXP-security-operations-expert-024-rad80a907c628",
+    "platform_port": 18120,
+    "gateway_port": 53106,
+    "instance_port": 28622,
+    "platform_pid": 3646025,
+    "backups_and_scripts": "/srv/storage/incremental-232-20261103T055857Z",
+    "full_package_rebuilt": false,
+    "dependencies_reinstalled": false,
+    "runtime_image_built_or_imported": false
+  },
+  "transfer": {
+    "program_bundle_bytes": 20609792,
+    "data_bundle_bytes": 2437751,
+    "rsync_sent_bytes": 26257396,
+    "changed_artifacts": 9,
+    "written_artifact_bytes": 9945568,
+    "previous_full_package_bytes": 2529544521
+  },
+  "validation": {
+    "typecheck": "passed",
+    "targeted_tests": {
+      "lifecycle_and_evaluation_source": 10,
+      "gateway_compute_and_external_paths": 84,
+      "failed": 0
+    },
+    "native_deployment_verify": {
+      "checks": [
+        {
+          "id": "program-integrity",
+          "status": "ok",
+          "detail": "安装来源 6771136d8f0f83a6ade48f3a33772278d0006e11"
+        },
+        {
+          "id": "business-gateway",
+          "status": "ok",
+          "detail": "网关配置完整，已核对发布签名密钥，入口 http://172.16.138.232:53106；监听状态需启动后核对"
+        },
+        {
+          "id": "workspace-assets",
+          "status": "ok",
+          "detail": "20 skills, workspace-95db14d2-d53d-4015-8256-ade8612b1b77"
+        },
+        {
+          "id": "profile-skills",
+          "status": "ok",
+          "detail": "/srv/storage/hep-rc5-20261102/data/.agents/skills"
+        },
+        {
+          "id": "default-workspace",
+          "status": "ok",
+          "detail": "/srv/storage/hep-rc5-20261102/data"
+        },
+        {
+          "id": "runtime",
+          "status": "ok",
+          "detail": "DSH 0.2.1-rc.5，只读启动预检通过"
+        },
+        {
+          "id": "online-workspace",
+          "status": "ok",
+          "detail": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77，PID 3646025，密码登录及 inventory RPC 通过"
+        },
+        {
+          "id": "online-business-gateway",
+          "status": "ok",
+          "detail": "PID 3646025 已监听业务网关 172.16.138.232:53106"
+        },
+        {
+          "id": "online-business-instances",
+          "status": "ok",
+          "detail": "已核对 1 个运行中业务实例的网页入口与接入版本"
+        }
+      ],
+      "onlineVerified": true,
+      "ok": true
+    },
+    "preservation": {
+      "heads": {
+        "program": "6771136d8f0f83a6ade48f3a33772278d0006e11",
+        "data": "81e2d43650b54d78fc6a9d5175a3b8ad9fa55400"
+      },
+      "artifactsVerified": 31,
+      "protectedConfigurationsUnchanged": true,
+      "protectedConfigurationInodesPreserved": true,
+      "targetContainerIdPreserved": true,
+      "targetImageSourcePortHomeAndPoliciesPreserved": true,
+      "targetMountedRuntimeHashVerified": true,
+      "otherStableContainersUnchanged": 34,
+      "preexistingRestartLoops": [
+        {
+          "name": "kb-access-helper",
+          "restartsBefore": 6807,
+          "restartsAfter": 6818,
+          "status": "restarting"
+        }
+      ],
+      "originalSessionFiles": 107,
+      "compressedSessionFilesUnchanged": 103,
+      "sessionContentComparison": [
+        {
+          "path": ".local/platform-home/sessions/--srv-storage-hep-acceptance-20261026-data--/session-58678484-9c3c-4598-9154-116af13653e4/session.v4.jsonl.zstd",
+          "recompressed": true,
+          "appendedBytes": 0
+        },
+        {
+          "path": ".local/platform-home/sessions/--srv-storage-hep-acceptance-20261026-data--/session-e75d5c28-5da4-4881-9153-792fb063e2ea/session.v4.jsonl.zstd",
+          "recompressed": true,
+          "appendedBytes": 0
+        },
+        {
+          "path": ".local/platform-home/sessions/--srv-storage-hep-rc5-20261102-data--/session-9dccd305-668d-4867-b085-c41d42e50982/session.v4.jsonl.zstd",
+          "recompressed": true,
+          "appendedBytes": 0
+        },
+        {
+          "path": ".local/instances/hep-deploy-accept-amd64-final/dsh-home/sessions/--work-harness-workspace--/session-aab4688d-9d3b-43a0-9036-8c796e8f6086/session.v4.jsonl.zstd",
+          "recompressed": true,
+          "appendedBytes": 0
+        }
+      ],
+      "allOriginalSessionContentsPreserved": true,
+      "platformPid": 3646025,
+      "portalOrigin": "https://172.16.138.232:18060"
+    },
+    "session_inventory": {
+      "checkedAt": "2026-11-03T06:12:50.409Z",
+      "management": {
+        "count": 7,
+        "running": [],
+        "originalSessionsPreserved": true
+      },
+      "business": {
+        "count": 103,
+        "running": [],
+        "originalSessionsPreserved": true
+      }
+    },
+    "portal_browser": {
+      "checkedAt": "2026-11-03T06:11:28.706Z",
+      "pageErrors": [],
+      "httpErrors": [],
+      "websockets": [
+        {
+          "path": "/agents/security-operations-expert/instances/hep-deploy-accept-amd64-final/api/remote.mux",
+          "received": 88,
+          "sent": 10
+        },
+        {
+          "path": "/agents/security-operations-expert/instances/hep-deploy-accept-amd64-final/api/remote.mux",
+          "received": 9,
+          "sent": 8
+        },
+        {
+          "path": "/agents/security-operations-expert/instances/hep-deploy-accept-amd64-final/api/remote.mux",
+          "received": 9,
+          "sent": 8
+        }
+      ],
+      "portalUrl": "https://172.16.138.232:18060/iframe/1",
+      "iframeUrl": "https://172.16.138.232:18060/agents/security-operations-expert/instances/hep-deploy-accept-amd64-final/",
+      "reply": "门户接入验证成功。",
+      "sessionUrl": "https://172.16.138.232:18060/agents/security-operations-expert/instances/hep-deploy-accept-amd64-final/",
+      "iframeRefreshPreserved": true,
+      "portalRefreshPreserved": true
+    },
+    "portal_configuration_and_entry": {
+      "ssoclientUnchanged": true,
+      "menuUnchanged": true,
+      "sessionCount": 102,
+      "testSession": [],
+      "directHttpStatus": 200,
+      "platformHttpStatus": 200,
+      "menuEntryPassed": true
+    },
+    "platform_browser": {
+      "checkedAt": "2026-11-03T06:14:00.760Z",
+      "pageErrors": [],
+      "httpErrors": [
+        {
+          "status": 403,
+          "path": "/hep/openai-codex/update"
+        }
+      ],
+      "instancePageReadySeconds": 3.176,
+      "targetInstanceVisible": true,
+      "navigationItems": [
+        "首页",
+        "管理对话",
+        "智能体管理",
+        "评测中心",
+        "实例管理",
+        "统一网关",
+        "MCP 管理"
+      ]
+    },
+    "platform_browser_script": "实例页面、导航和目标实例加载通过；严格要求所有 HTTP 均无错误的脚本两次因 /hep/openai-codex/update 403 失败，不能声称浏览器所有请求通过。",
+    "visual_inspection": [
+      "portal.png",
+      "platform.png"
+    ]
+  },
+  "observations": [
+    "平台第一次就绪约 45 秒，随后曾发生管理与网关 HTTP 超时；进程短时处于同步子进程等待，稍后自行恢复。未据此认定 DNS、磁盘或程序根因，也未修改系统或 DSH。恢复后会话清单、门户真实聊天、页面和 9 项核对均通过；最终管理入口与网关响应分别约 3ms、16ms。",
+    "门户首次浏览器检查未找到 iframe，刷新过期的门户登录状态后重新进入，通过实际聊天与两种刷新。",
+    "初次定向测试缺少锁定 DSH 入口或工作目录不正确，错误日志保留；指定 HARNESS_DSH_ENTRY 并在 platform/plugin 下执行后 84 项通过，另 10 项启动与来源测试通过。",
+    "31 个预期制品摘要全部一致；107 份原有会话中 103 份压缩字节未变，4 份重新压缩但解压内容逐字节不变。目标容器 ID、镜像、EXP024、端口、HOME、模型与接入策略保持；34 个其他稳定容器未重启。",
+    "kb-access-helper 更新前已自动重启 6807 次，收尾为 6818 次，容器 ID、镜像未变；本次未对其启停或整改。",
+    "原生 Codex 账户刷新请求返回 403，实例页约 3.2 秒可操作且无脚本异常；平台认证源码和锁定 DSH 未变化，未对该辅助接口做原因归属或整改。"
+  ],
+  "limits": [
+    "未执行全新安装、ARM64、镜像导入、长期稳定性测试或全量平台回归。",
+    "真实模型只验证普通问候；未执行 SOC 工具、业务全部 Case、Experiment Evaluation 或 Research Release 复现。",
+    "未验证门户 SSO 票据核销和证书信任链；复用现有匿名共享实例，浏览器忽略自签证书错误。",
+    "启动后短暂超时、原生 Codex 账户刷新 403 以及 kb-access-helper 既有重启问题不作为已整改事项。"
+  ]
+}

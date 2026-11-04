@@ -1,0 +1,14 @@
+{
+  "old": "ea509f21c10472ea819d55a51b08adacc266fe00",
+  "new": "1a32a74e285a5b8d50678a1d17b2f11b237315e4",
+  "branch": "main",
+  "indexClean": true,
+  "preservedWithoutChanges": 92,
+  "mergedOverlappingFiles": [
+    "docs/ai-agent-harness项目验收矩阵.md",
+    "docs/platform-design/06_界面与前后端渐进建设.md"
+  ],
+  "otherChangedSinceSnapshot": [],
+  "freeBytes": 878682112,
+  "recoveredPartialCheckoutAfterDiskFull": true
+}

@@ -1,0 +1,41 @@
+增量包 106777711 字节；两仓 Git 差异 664/60 个文件；变化制品 20 个；不传镜像和运行状态，离线依赖增量 1 组
+{
+  "status": "planned",
+  "activation": "pending",
+  "files": 736,
+  "bytes": 77598676,
+  "commits": [
+    {
+      "before": "b26b7f206773ebb0b1290531802ca022b5967ed6",
+      "commit": "1a32a74e285a5b8d50678a1d17b2f11b237315e4"
+    },
+    {
+      "before": "fb27abc1c4544ee120c6d04f8ed010df184e69dc",
+      "commit": "7d6a2d0b7cb4b060b870e7e8b6a4053371c5ff09"
+    }
+  ],
+  "sourceDataCommit": "32b9cbbcb5b5972b029e46493d6ae4e01b50691e",
+  "minimalData": true,
+  "dependencies": [
+    "platform/plugin"
+  ],
+  "revalidatedArtifacts": [],
+  "revalidatedSources": [
+    "docs/ai-agent-harness项目验收矩阵.md",
+    "docs/platform-design/06_界面与前后端渐进建设.md",
+    "platform/deploy/data.mts",
+    "platform/deploy/test/data-dependencies.test.mjs",
+    "platform/plugin/src/evaluation/cases-editor.tsx",
+    "platform/plugin/src/evaluation/client.tsx",
+    "platform/plugin/src/evaluation/style.ts",
+    "platform/plugin/test/business-group-v2.test.mjs",
+    "platform/plugin/test/evaluation-cases-client.test.mjs",
+    "platform/plugin/test/evaluation-client.test.mjs",
+    "platform/plugin/test/evidence/dsh-rc5-20261102/README.md",
+    "runtime/adapters/dsh-container/dsh-dev",
+    "runtime/adapters/dsh-container/dsh-eval",
+    "runtime/adapters/dsh-container/test_dsh_dev.py",
+    "runtime/adapters/dsh-container/test_dsh_eval_access.py"
+  ],
+  "transferBytes": 106777711
+}

@@ -1,0 +1,33 @@
+{
+  "time": "2026-11-03T11:01:24.511Z",
+  "files": {
+    "candidate/dsh/managed/inspection-preparation-runtime.ts": "e347c8b91a821c2967fc6ea5147512f1bf65cef912109f879dd393b8ed443e36",
+    "candidate/dsh/managed/inspection-preparation-runtime.mjs": "b8ddec9a61b53fead991df895944f991710f5f1d3e375d4b4f7855237affa598",
+    "change.yaml": "911acbdd4d33fbb5e1949a9193f9e574d010d8e10f28dab296b7b9b1b91e2636"
+  },
+  "mounted": "b8ddec9a61b53fead991df895944f991710f5f1d3e375d4b4f7855237affa598",
+  "ledgers": [
+    {
+      "session": "session-b6fc8379-5817-44cf-8301-c2a87105c20b",
+      "sha256": "a69ffa45f986f19009d3314f170e7b8f59fd2f03223ae422ee19f7032db84475"
+    },
+    {
+      "session": "session-9672a86a-3377-4ac0-bfd9-e98d81c3fa72",
+      "sha256": "b8f7c027db246941037cbad3c90de920d046c38300df585f50637cf1cde06f7a"
+    }
+  ],
+  "entries": {
+    "platform": {
+      "status": 200,
+      "html": true
+    },
+    "target": {
+      "status": 200,
+      "html": true
+    },
+    "protected": {
+      "status": 200,
+      "html": true
+    }
+  }
+}
