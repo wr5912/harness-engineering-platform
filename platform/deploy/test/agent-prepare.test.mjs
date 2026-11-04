@@ -36,6 +36,29 @@ test('准备中止保持既有运行资源，临时结果不替换当前缓存',
   assert.equal(readFileSync(join(f.resources, 'resources.json'), 'utf8'), previous)
 })
 
+test('发行版构建后缀使用上游版本下载，无法识别的版本在导出镜像前失败', async t => {
+  const f = fixture(t), bin = join(f.root, 'bin'), calls = join(f.root, 'downloads.txt')
+  const previousPath = process.env.PATH
+  process.env.PATH = `${bin}:${previousPath}`
+  t.after(() => { process.env.PATH = previousPath })
+  write(join(bin, 'docker'), '#!/bin/sh\ncase "$1" in version) echo 29.1.3;; compose) echo 2.40.3+ds1-0ubuntu1~22.04.1;; *) exit 90;; esac\n', 0o755)
+  write(join(bin, 'curl'), `#!/bin/sh
+while [ "$1" != "--output" ]; do shift; done
+target="$2"
+url="$3"
+printf '%s\\n' "$url" >> '${calls}'
+case "$url" in *.tgz) cp '${join(f.resources, 'docker/docker-fixture.tgz')}' "$target";; *) cp '${join(f.resources, 'docker/docker-compose')}' "$target";; esac
+`, 0o755)
+  const result = await prepareAgentResources({ ...f.input, resourcesDir: join(f.root, 'normalized'), imageArchive: join(f.resources, 'images/dsh-runtime.tar') })
+  assert.equal(result.manifest.docker.version, '29.1.3')
+  assert.equal(result.manifest.docker.composeVersion, '2.40.3')
+  assert.match(readFileSync(calls, 'utf8'), /releases\/download\/v2\.40\.3\/docker-compose-linux-x86_64/)
+  write(join(bin, 'docker'), '#!/bin/sh\necho 2.40.3-rc.1\n', 0o755)
+  const stages = []
+  await assert.rejects(prepareAgentResources({ ...f.input, resourcesDir: join(f.root, 'invalid') }, { onProgress: item => stages.push(item.stage) }), /无法解析/)
+  assert.deepEqual(stages, [])
+})
+
 test('另一 Agent 同路径但不同锁文件的缓存不被预览当成当前版本依赖', t => {
   const f = fixture(t)
   write(join(f.candidate, 'dsh/managed/local-provider/package.json'), JSON.stringify({ name: 'local-provider', dependencies: { fixture: '1.0.0' } }))

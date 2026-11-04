@@ -58,6 +58,14 @@ export async function prepareAgentResources(input: PrepareAgentInput, hooks: Age
   mkdirSync(dirname(target), { recursive: true })
   const staging = mkdtempSync(join(dirname(target), '.prepare-'))
   try {
+    let dockerVersion: string | undefined, composeVersion: string | undefined
+    if (!input.dockerAssetsDir) {
+      // 发行版的 +ds 等构建标记不属于上游下载版本；预发布版本仍须显式导入。
+      const upstream = (value: string) => /^v?(\d+\.\d+\.\d+)(?:\+[0-9A-Za-z.~+-]+)?$/.exec(value.trim())?.[1]
+      dockerVersion = upstream(await agentCommand('docker', ['version', '--format', '{{.Client.Version}}'], { signal: hooks.signal }))
+      composeVersion = upstream(await agentCommand('docker', ['compose', 'version', '--short'], { signal: hooks.signal }))
+      if (!dockerVersion || !composeVersion) throw new Error('无法解析当前 Docker／Compose 官方版本，请指定 --docker-assets')
+    }
     const expected = expectedImage(input.programRoot, input.arch)
     hooks.onProgress?.({ stage: 'resources', message: '正在准备锁定的标准 DSH 镜像' })
     const imageArchive = 'images/dsh-runtime.tar'
@@ -80,12 +88,8 @@ export async function prepareAgentResources(input: PrepareAgentInput, hooks: Age
     hooks.onProgress?.({ stage: 'resources', message: '正在准备 Docker 和 Compose 离线资源' })
     const docker = join(staging, 'docker')
     mkdirSync(docker)
-    let dockerVersion: string | undefined, composeVersion: string | undefined
     if (input.dockerAssetsDir) copyTree(resolve(input.dockerAssetsDir), docker)
     else {
-      dockerVersion = (await agentCommand('docker', ['version', '--format', '{{.Client.Version}}'], { signal: hooks.signal })).trim()
-      composeVersion = (await agentCommand('docker', ['compose', 'version', '--short'], { signal: hooks.signal })).trim().replace(/^v/, '')
-      if (!/^\d+\.\d+\.\d+$/.test(dockerVersion) || !/^\d+\.\d+\.\d+$/.test(composeVersion)) throw new Error('无法解析当前 Docker／Compose 官方版本，请指定 --docker-assets')
       const machine = input.arch === 'arm64' ? 'aarch64' : 'x86_64'
       await download(`https://download.docker.com/linux/static/stable/${machine}/docker-${dockerVersion}.tgz`, join(docker, `docker-${dockerVersion}.tgz`), hooks)
       await download(`https://github.com/docker/compose/releases/download/v${composeVersion}/docker-compose-linux-${machine}`, join(docker, 'docker-compose'), hooks)
