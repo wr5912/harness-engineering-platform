@@ -174,6 +174,24 @@ class HarnessInitTest(unittest.TestCase):
         self.assertFalse((self.repo / "agents/test01").exists())
         self.assertFalse((self.repo / "evolution/experiments/EXP-test01-001-m-r0123456789ab").exists())
 
+    def test_existing_version_without_agent_manifest_cannot_create_second_main(self):
+        original = self.create()
+        import shutil
+        shutil.rmtree(self.repo / "agents/test01")
+        with mock.patch.object(dev.secrets, "token_hex", return_value="abcdef123456"), \
+             self.assertRaisesRegex(ValueError, "拒绝重复创建 001-m"):
+            dev.create_harness("test01", repo=self.repo, sources=self.sources, lock_path=self.lock)
+        self.assertEqual([p.name for p in (self.repo / "evolution/experiments").iterdir()], [original["experiment_id"]])
+
+    def test_platform_version_lock_also_blocks_direct_cli_creation(self):
+        lock = self.repo / ".local/version-governance/test01.lock"
+        lock.parent.mkdir(parents=True)
+        lock.write_text(str(os.getpid()))
+        with self.assertRaisesRegex(ValueError, "正在创建或采纳版本"):
+            self.create()
+        self.assertTrue(lock.exists())
+        self.assertFalse((self.repo / "agents/test01").exists())
+
     def test_random_suffix_retries_occupied_id(self):
         (self.repo / "evolution/experiments/EXP-test01-001-m-r0123456789ab").mkdir()
         with mock.patch.object(dev.secrets, "token_hex", side_effect=["0123456789ab", "abcdef123456"]):

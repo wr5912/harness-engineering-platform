@@ -498,11 +498,34 @@ def create_harness(agent_id: str, *, repo: Path = REPO, sources: Path | None = N
     """创建最小 Agent、首次 Experiment 与自包含的 DSH 装载声明。"""
     if not NAME_RE.fullmatch(agent_id):
         raise ValueError("agent-id 必须是小写 kebab-case")
+    # 与平台创建、迁移和融合共用同一个排他锁文件。
+    lock = repo / ".local/version-governance" / f"{agent_id}.lock"
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError:
+        raise ValueError("该 Agent 正在创建或采纳版本，请稍后重试；异常退出留下的锁须先核对进程再清理") from None
+    try:
+        os.write(fd, str(os.getpid()).encode())
+        return _create_harness(agent_id, repo=repo, sources=sources, lock_path=lock_path, profile=profile)
+    finally:
+        os.close(fd)
+        lock.unlink()
+
+
+def _create_harness(agent_id: str, *, repo: Path, sources: Path | None,
+                    lock_path: Path, profile: str) -> dict:
     if profile not in {"web", "sdk"}:
         raise ValueError("profile 只能是 web 或 sdk")
 
     sources = sources if sources is not None else source_catalog(repo)
     agent_dir = repo / "agents" / agent_id
+    experiments = repo / "evolution/experiments"
+    existing = [path.name for path in experiments.iterdir() if path.name.startswith("EXP-")
+                and (match := EXPERIMENT.fullmatch(path.name)) and match[1] == agent_id
+                and (path / "change.yaml").is_file()] if experiments.exists() else []
+    if existing:
+        raise ValueError("Agent 已有版本，拒绝重复创建 001-m：" + "、".join(sorted(existing)))
     for _ in range(5):
         experiment_id = f"EXP-{agent_id}-001-m-r{secrets.token_hex(6)}"
         experiment_dir = repo / "evolution/experiments" / experiment_id

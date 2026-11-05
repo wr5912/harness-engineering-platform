@@ -389,6 +389,7 @@ test('m/f 治理允许最新代两种角色编辑、历史只读派生，同号�
   assert.equal(readFileSync(join(fx.root, `evolution/experiments/${copy.experiment_id}/candidate/dsh/workspace/input.txt`), 'utf8'), 'feature\n', '派生固定父版，不借用当前修改')
   const fromHistory = await rpc(handler, 'create', versionRequest(fx.commit))
   assert.match(fromHistory.experiment_id, /^EXP-test-agent-027-f-r[0-9a-f]{12}$/)
+  await assert.rejects(() => rpc(handler, 'create', versionRequest(fx.commit, { parent_experiment_id: managedMain, version_number: 27, version_role: 'm' })), /角色为 f/)
   const next = versionRequest(fx.commit, { parent_experiment_id: managedMain, create_next_generation: true, version_role: 'm', version_number: 28 })
   await assert.rejects(() => rpc(handler, 'create', next), /明确处置未合并特性/)
   await assert.rejects(() => rpc(handler, 'create', versionRequest(fx.commit, { parent_experiment_id: managedMain, version_number: 28 })), /不能跳代/)
@@ -396,8 +397,12 @@ test('m/f 治理允许最新代两种角色编辑、历史只读派生，同号�
   assert.equal(current.version_governance.mainline_id, managedMain)
   const dispositions = current.version_governance.unresolved_features.map(experiment_id => ({ experiment_id, decision: 'defer', reason: '本次明确保留在历史代，后续按固定来源重做' }))
   await assert.rejects(() => rpc(handler, 'create', { ...next, feature_dispositions: dispositions, expected_governance_sha256: 'stale' }), /conflict/)
-  const created = await rpc(handler, 'create', { ...next, feature_dispositions: dispositions, expected_governance_sha256: current.version_governance.snapshot_sha256 })
+  const attempts = await Promise.allSettled([1, 2].map(() => rpc(handler, 'create', { ...next, feature_dispositions: dispositions, expected_governance_sha256: current.version_governance.snapshot_sha256 })))
+  assert.equal(attempts.filter(row => row.status === 'fulfilled').length, 1)
+  assert.equal(attempts.filter(row => row.status === 'rejected').length, 1)
+  const created = attempts.find(row => row.status === 'fulfilled').value
   assert.match(created.experiment_id, /^EXP-test-agent-028-m-r[0-9a-f]{12}$/)
+  assert.deepEqual(readdirSync(join(fx.root, 'evolution/experiments')).filter(id => /^EXP-test-agent-028-m-/.test(id)), [created.experiment_id])
   assert.equal((await rpc(handler, 'detail', { agent_id: 'test-agent', experiment_id: managedMain })).version_governance.editable, false)
   const change = loadYaml(readFileSync(join(fx.root, created.path, 'change.yaml'), 'utf8'))
   assert.equal(change.feature_dispositions.length, 3)
@@ -406,6 +411,32 @@ test('m/f 治理允许最新代两种角色编辑、历史只读派生，同号�
   const evaluation = await rpc(handler, 'edit/read', { experiment_id: managedMain, path: 'evaluation.md' })
   assert.equal(evaluation.editable, true, 'Agent 共享评测文件不属于历史 Candidate')
   await rpc(handler, 'edit/apply', { experiment_id: managedMain, edits: [{ path: evaluation.path, content: evaluation.content + '\n', expected_sha256: evaluation.sha256 }] })
+})
+
+test('当前代及历史代的重复 m 均明确报冲突，阻止创建、编辑和融合；其他 Agent 的同号 m 不冲突', async t => {
+  const { createAgentsHandler } = await loadServer()
+  for (const historical of [false, true]) {
+    const fx = managedFixture()
+    t.after(() => rm(fx.root, { recursive: true, force: true }))
+    const handler = createAgentsHandler(fx.root)
+    if (historical) addVersion(fx.root, 'EXP-test-agent-028-m-raaaaaaaaaaaa', 'status: active\n')
+    const duplicate = 'EXP-test-agent-027-m-rbbbbbbbbbbbb'
+    addVersion(fx.root, duplicate, `status: active\n${historical ? 'compute_variant: {}\n' : ''}`)
+    const detail = await rpc(handler, 'detail', { agent_id: 'test-agent', experiment_id: managedFeature })
+    assert.equal(detail.version_governance.mainline_id, null)
+    assert.equal(detail.version_governance.editable, false)
+    assert.equal(detail.derivation.derivable, false)
+    assert.match(detail.version_governance.reason, /同一智能体、同一版本号只允许一个 m/)
+    assert.ok(detail.version_governance.reason.includes(duplicate))
+    assert.ok(detail.version_governance.reason.includes(managedMain))
+    await assert.rejects(() => rpc(handler, 'create', versionRequest(fx.commit, { parent_experiment_id: managedMain })), /只允许一个 m/)
+    await assert.rejects(() => rpc(handler, 'edit/apply', { experiment_id: managedFeature, edits: [{ path: 'candidate/dsh/workspace/input.txt', content: 'bad', expected_sha256: 'a'.repeat(64) }] }), /只允许一个 m/)
+    await assert.rejects(() => rpc(handler, 'fusion/preview', versionRequest(fx.commit, { parent_experiment_id: managedFeature, target_experiment_id: managedMain })), /当前主线|主线|只允许一个 m/)
+  }
+  const fx = managedFixture()
+  t.after(() => rm(fx.root, { recursive: true, force: true }))
+  write(join(fx.root, 'evolution/experiments/EXP-other-agent-027-m-rbbbbbbbbbbbb/change.yaml'), 'agent_id: other-agent\n')
+  assert.equal((await rpc(createAgentsHandler(fx.root), 'detail', { agent_id: 'test-agent', experiment_id: managedMain })).version_governance.editable, true)
 })
 
 test('m/f 融合实际写入同号现有 m、拒绝空采纳及过期 CAS，并以 m 自身 Run 独立完成', async t => {

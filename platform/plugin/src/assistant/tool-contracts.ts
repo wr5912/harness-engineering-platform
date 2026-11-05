@@ -26,7 +26,7 @@ const string = { type: 'string' }, strings = { type: 'array', items: string }, o
 const fields: MapValue = {
   training_files: { type: 'array', items: { type: 'object', required: ['path', 'sha256'], additionalProperties: false, properties: { path: string, sha256: { type: 'string', pattern: '^[a-f0-9]{64}$' } } }, description: 'prepare 归档的补充训练依赖，如模型配置、tokenizer 和状态构造器资源；逐文件核对摘要并保持原相对目录，不复制缓存或整个目录。已归档依赖随后从回执复用。' },
   version_number: { type: 'integer', minimum: 1, maximum: 999, description: '可选编号；启用 m/f 后只能等于当前代，创建同代 f 特性副本。省略时仍保留当前代；下一代 m 只能由用户明确 create_next_generation 创建，先处置未合并特性。随机后缀由平台生成。' },
-  version_role: { type: 'string', enum: ['m', 'f'], description: '明确角色；同号副本为 f，明确创建下一代为 m。' },
+  version_role: { type: 'string', enum: ['m', 'f'], description: '同一 Agent、同一版本号只允许一个 m，可有多个 f；同号副本为 f，明确创建下一代为 m。不同后缀不能用于额外创建 m。' },
   create_next_generation: { type: 'boolean', description: '仅用户明确要求创建下一代时为 true，不因融合或采纳自动设置。' },
   feature_dispositions: { type: 'array', items: { type: 'object', required: ['experiment_id', 'decision', 'reason'], properties: { experiment_id: string, decision: { type: 'string', enum: ['defer', 'reject'] }, reason: string } } },
   source_ref: { type: 'string', pattern: '^git:[a-f0-9]{40}$', description: '可选固定来源；Candidate、Case、角色绑定均读取同一 Git 提交，Run 仍保存到原版本。' },

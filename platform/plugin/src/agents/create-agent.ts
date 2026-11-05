@@ -8,6 +8,7 @@ import { dump as dumpYaml, load as loadYaml } from 'js-yaml'
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 import { redactRunText } from './run-files.ts'
 import { businessCasesSchema, businessCasesMarkdown } from './business-cases.ts'
+import { VersionGovernanceError, versionGovernance, withVersionLock } from './version-governance.ts'
 
 const execute = promisify(execFile)
 const CLI = 'runtime/adapters/dsh-container/dsh-dev'
@@ -47,7 +48,7 @@ export async function createAgent(rootPath: string, payload: JsonMap, signal?: A
       if (!stat.isDirectory() || stat.isSymbolicLink()) throw new CreationError('path_rejected', '资产目录必须是仓库内的实体目录')
     }
     if (/[\r\n]/.test(name)) throw new CreationError('invalid_request', '名称必须为单行')
-    if (pathExists(join(root, 'agents', agentId)) || Object.values(versionSources(root).sources).some(item => item.agent_id === agentId)) throw new CreationError('conflict', 'Agent ID 已存在，未覆盖已有资产')
+    if (pathExists(join(root, 'agents', agentId)) || versionGovernance(root, agentId).versions.length || Object.values(versionSources(root).sources).some(item => item.agent_id === agentId)) throw new CreationError('conflict', 'Agent ID 已存在，未覆盖已有资产')
     cancelled(signal)
     temporary = mkdtempSync(join(root, '.platform-agent-create-'))
     for (const path of ['agents', 'evolution/experiments']) mkdirSync(join(temporary, path), { recursive: true })
@@ -109,27 +110,29 @@ export async function createAgent(rootPath: string, payload: JsonMap, signal?: A
     phase = 'publish'
     const source = versionSource(temporary, created.experiment_id)
     if (source?.agent_id !== agentId) throw new CreationError('creation_failed', '创建工具没有返回一致的版本身份')
-    const targetAgent = join(root, 'agents', agentId), targetExperiment = join(root, 'evolution/experiments', created.experiment_id)
-    if (pathExists(targetAgent) || pathExists(targetExperiment) || Object.values(versionSources(root).sources).some(item => item.agent_id === agentId)) throw new CreationError('conflict', '创建期间 Agent ID 被占用，未覆盖已有资产')
-    // 新工作区在真实资产准备完成后才建立父目录；并行创建也重新核对实体目录。
-    for (const path of ['agents', 'evolution', 'evolution/experiments']) {
-      const directory = join(root, path)
-      if (!pathExists(directory)) {
-        try { mkdirSync(directory); createdDirectories.push(directory) }
-        catch (error) { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error }
+    return await withVersionLock(root, agentId, async () => {
+      const targetAgent = join(root, 'agents', agentId), targetExperiment = join(root, 'evolution/experiments', created.experiment_id)
+      if (pathExists(targetAgent) || pathExists(targetExperiment) || versionGovernance(root, agentId).versions.length || Object.values(versionSources(root).sources).some(item => item.agent_id === agentId)) throw new CreationError('conflict', '创建期间 Agent ID 被占用，未覆盖已有资产')
+      // 新工作区在真实资产准备完成后才建立父目录；并行创建也重新核对实体目录。
+      for (const path of ['agents', 'evolution', 'evolution/experiments']) {
+        const directory = join(root, path)
+        if (!pathExists(directory)) {
+          try { mkdirSync(directory); createdDirectories.push(directory) }
+          catch (error) { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error }
+        }
+        const stat = lstatSync(directory)
+        if (!stat.isDirectory() || stat.isSymbolicLink()) throw new CreationError('path_rejected', '资产目录必须是仓库内的实体目录')
       }
-      const stat = lstatSync(directory)
-      if (!stat.isDirectory() || stat.isSymbolicLink()) throw new CreationError('path_rejected', '资产目录必须是仓库内的实体目录')
-    }
-    // 同步发布已校验的两棵目录；不改写其他版本。
-    renameSync(agent, targetAgent); moved.push(targetAgent)
-    renameSync(experiment, targetExperiment); moved.push(targetExperiment)
-    moved.length = 0
-    return { ok: true, value: { agent_id: agentId, experiment_id: created.experiment_id, source_id: created.source_id, name, profile, status: 'created', started: false, note: `角色和首次研究版本已创建，使用方式为${profile === 'sdk' ? '官方 TypeScript SDK' : 'Web 交互'}；尚未启动实例或完成业务评测。` } }
+      // 同步发布已校验的两棵目录；不改写其他版本。
+      renameSync(agent, targetAgent); moved.push(targetAgent)
+      renameSync(experiment, targetExperiment); moved.push(targetExperiment)
+      moved.length = 0
+      return { ok: true, value: { agent_id: agentId, experiment_id: created.experiment_id, source_id: created.source_id, name, profile, status: 'created', started: false, note: `角色和首次研究版本已创建，使用方式为${profile === 'sdk' ? '官方 TypeScript SDK' : 'Web 交互'}；尚未启动实例或完成业务评测。` } }
+    })
   } catch (error) {
     for (const path of moved.reverse()) rmSync(path, { recursive: true, force: true })
     for (const path of createdDirectories.reverse()) { try { rmdirSync(path) } catch {} }
-    if (error instanceof CreationError) return { ok: false, error: { code: error.code, message: error.message, details: {} } }
+    if (error instanceof CreationError || error instanceof VersionGovernanceError) return { ok: false, error: { code: error.code, message: error.message, details: {} } }
     if (signal?.aborted) return { ok: false, error: { code: 'aborted', message: '新建智能体已取消，未保存资产', details: {} } }
     const failure = error as Error & { stderr?: string }
     const message = phase === 'validation' ? '智能体资产合同校验失败，本次新增资产已回滚；请根据具体用例或来源错误修正后重试' : '智能体创建失败，本次新增资产已回滚；请根据失败阶段和具体原因排查'

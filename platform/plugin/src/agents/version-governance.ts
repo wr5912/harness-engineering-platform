@@ -16,30 +16,38 @@ export function versionGovernance(root: string, agent: string) {
   const versions = (existsSync(directory) ? readdirSync(directory).sort() : []).filter(id => {
     if (!validVersionId(id) || !id.startsWith('EXP-') || VERSION_ID.exec(id)![1] !== agent) return false
     const file = join(directory, id, 'change.yaml')
-    return existsSync(file) && !isVariantIdentity(id, load(readFileSync(file, 'utf8')) as Record<string, unknown>)
+    return existsSync(file) && (!!versionRole(id) || !isVariantIdentity(id, load(readFileSync(file, 'utf8')) as Record<string, unknown>))
   })
   const generation = Math.max(0, ...versions.map(id => Number(VERSION_ID.exec(id)![2])))
   const managed = versions.some(id => versionRole(id))
   const mainlines = versions.filter(id => versionRole(id) === 'm' && Number(VERSION_ID.exec(id)![2]) === generation)
-  return { agent_id: agent, generation, managed, versions, mainline_id: mainlines.length === 1 ? mainlines[0]! : null,
-    conflict: managed && mainlines.length !== 1 }
+  const byGeneration = new Map<number, string[]>()
+  for (const id of versions.filter(id => versionRole(id) === 'm')) {
+    const number = Number(VERSION_ID.exec(id)![2])
+    byGeneration.set(number, [...(byGeneration.get(number) ?? []), id])
+  }
+  const duplicate_mainlines = [...byGeneration.values()].filter(ids => ids.length > 1)
+  const conflict_reason = duplicate_mainlines.length ? `同一智能体、同一版本号只允许一个 m：${duplicate_mainlines.map(ids => ids.join('、')).join('；')}`
+    : managed && mainlines.length !== 1 ? '当前代主线缺失，请先核对版本身份' : ''
+  return { agent_id: agent, generation, managed, versions, mainline_id: !conflict_reason && mainlines.length === 1 ? mainlines[0]! : null,
+    duplicate_mainlines, conflict: !!conflict_reason, conflict_reason }
 }
 
 export function versionAccess(root: string, id: string) {
   const match = VERSION_ID.exec(id)
   if (!match || !validVersionId(id)) throw new VersionGovernanceError('版本 ID 无效')
   const change = join(root, 'evolution/experiments', id, 'change.yaml')
-  if (isVariantIdentity(id, existsSync(change) ? load(readFileSync(change, 'utf8')) as Record<string, unknown> : {})) {
+  if (!versionRole(id) && isVariantIdentity(id, existsSync(change) ? load(readFileSync(change, 'utf8')) as Record<string, unknown> : {})) {
     return { role: null, generation: Number(match[2]), historical: false, editable: true, reason: '', mainline_id: null }
   }
   const state = versionGovernance(root, match[1]!)
   const historical = (state.managed || match[1] === 'security-operations-expert') && Number(match[2]) < state.generation || match[1] === 'security-operations-expert' && Number(match[2]) < 27
   const role = versionRole(id)
   const identity = existsSync(change) ? load(readFileSync(change, 'utf8')) as Record<string, unknown> : {}
-  const reason = identity.assets_retired ? '特性当前资产已清理，只读历史；按 archived_ref 派生或复现。'
+  const reason = state.conflict_reason || (identity.assets_retired ? '特性当前资产已清理，只读历史；按 archived_ref 派生或复现。'
     : identity.current_version_id ? '旧身份只读；当前资产见迁移后的版本，历史来源按 archived_ref 读取。'
     : historical ? '历史代资产只读，仍可从固定来源派生或复现。'
-    : state.managed && !role ? '旧身份只读，请先完成当前版本身份迁移。' : ''
+    : state.managed && !role ? '旧身份只读，请先完成当前版本身份迁移。' : '')
   return { role, generation: Number(match[2]), historical, editable: !reason, reason, mainline_id: state.mainline_id }
 }
 
@@ -93,7 +101,7 @@ export function featureDispositions(root: string, agent: string, input: unknown)
 export function allocateVersion(root: string, agent: string, parent?: string, requested?: unknown, options: { version_role?: unknown; create_next_generation?: unknown; feature_dispositions?: unknown } = {}) {
   if (requested !== undefined && (typeof requested !== 'number' || !Number.isInteger(requested) || requested < 1 || requested > 999)) throw new VersionGovernanceError('version_number 必须是 1–999 的整数', 'invalid_request')
   const state = versionGovernance(root, agent)
-  if (state.conflict) throw new VersionGovernanceError('当前代主线不唯一或缺失，请先核对版本身份')
+  if (state.conflict) throw new VersionGovernanceError(state.conflict_reason)
   if (parent && isVariantIdentity(parent, existsSync(join(root, 'evolution/experiments', parent, 'change.yaml')) ? load(readFileSync(join(root, 'evolution/experiments', parent, 'change.yaml'), 'utf8')) as Record<string, unknown> : {})) throw new VersionGovernanceError('变体不能作为新版本的继承来源', 'invalid_request')
   if (parent && (VERSION_ID.exec(parent)?.[1] !== agent || !state.versions.includes(parent))) throw new VersionGovernanceError('父版必须是本 Agent 的非变体版本')
   if (options.create_next_generation !== undefined && typeof options.create_next_generation !== 'boolean') throw new VersionGovernanceError('create_next_generation 必须为布尔值', 'invalid_request')

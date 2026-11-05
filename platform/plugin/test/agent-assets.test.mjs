@@ -227,6 +227,21 @@ test('新建向导复用真实 CLI 并保存角色、标准来源与用例，不
   } finally { rmSync(root, { recursive: true, force: true }) }
 })
 
+test('已有版本身份但缺少 Agent 清单与 Candidate 时，新建仍拒绝生成另一个 001-m', async () => {
+  const root = createFixture()
+  try {
+    const id = `EXP-${input.agent_id}-001-m-raaaaaaaaaaaa`
+    const directory = join(root, 'evolution/experiments', id)
+    mkdirSync(directory, { recursive: true })
+    writeFileSync(join(directory, 'change.yaml'), `agent_id: ${input.agent_id}\nexperiment_id: ${id}\n`)
+    const result = await createAgent(root, input)
+    assert.equal(result.ok, false)
+    assert.equal(result.error.code, 'conflict')
+    assert.deepEqual(readdirSync(join(root, 'evolution/experiments')), [id])
+    assert.equal(existsSync(join(root, 'agents', input.agent_id)), false)
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
 test('实际创建入口与工具参数共用 Case 合同，非法业务 Case 不落盘', async () => {
   const root = createFixture()
   try {

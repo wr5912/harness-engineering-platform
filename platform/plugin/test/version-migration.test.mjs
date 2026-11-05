@@ -106,3 +106,17 @@ test('预览后引用变化拒绝执行，不移动 Candidate', async t => {
   await assert.rejects(applyVersion027Migration(root, { confirmed: true, expected_plan_sha256: plan.plan_sha256 }), /重新预览/)
   assert.ok(existsSync(join(root, source, 'candidate')))
 })
+
+test('迁移拒绝同号不同后缀的已有 m，预览后的主线占用也不能产生第二个 m', async t => {
+  const { root, write, source } = fixture(t)
+  const preview = version027MigrationPreview(root)
+  const duplicate = 'EXP-security-operations-expert-027-m-raaaaaaaaaaaa'
+  write(`evolution/experiments/${duplicate}/change.yaml`, `agent_id: security-operations-expert\nexperiment_id: ${duplicate}\n`)
+  const blocked = version027MigrationPreview(root)
+  assert.equal(blocked.ready, false)
+  assert.match(blocked.inventory[0].reason, /不能迁移出第二个 m/)
+  assert.ok(blocked.inventory[0].reason.includes(duplicate))
+  await assert.rejects(applyVersion027Migration(root, { confirmed: true, expected_plan_sha256: preview.plan_sha256 }), /重新预览/)
+  await assert.rejects(applyVersion027Migration(root, { confirmed: true, expected_plan_sha256: blocked.plan_sha256 }), /预检未通过/)
+  assert.ok(existsSync(join(root, source, 'candidate')))
+})

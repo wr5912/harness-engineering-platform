@@ -5,7 +5,8 @@ import { dump, load } from 'js-yaml'
 import { atomicWrite, candidateDigest, dataPath, gitCandidateDigest, sha256 } from '../tasks/files.ts'
 import { workspaceConfigPath } from '../workspace.ts'
 import { versionIdentity, versionSource } from './version-source.ts'
-import { VersionGovernanceError, versionInstanceDependencies, withVersionLock } from './version-governance.ts'
+import { VersionGovernanceError, versionGovernance, versionInstanceDependencies, withVersionLock } from './version-governance.ts'
+import { VERSION_ID, versionRole } from '../version-id.ts'
 
 const AGENT = 'security-operations-expert'
 export const VERSION_027_MAPPING = [
@@ -53,6 +54,7 @@ export function planVersion027Migration(root: string) {
   const references: { path: string; fields: string[] }[] = []
   const inventory: { from: string; to: string; status: 'ready' | 'migrated' | 'absent' | 'partial' | 'blocked'; reason?: string }[] = []
   const mapping: Mapping = []
+  const governance = versionGovernance(root, AGENT)
   for (const { from, to } of VERSION_027_MAPPING) {
     const source = `evolution/experiments/${from}`, target = `evolution/experiments/${to}`
     if (!existsSync(dataPath(root, source))) {
@@ -64,6 +66,9 @@ export function planVersion027Migration(root: string) {
     let change: MapValue, digest: string, archivedDigest: string
     const candidate = dataPath(root, `${source}/candidate`)
     try {
+      if (governance.duplicate_mainlines.length) throw new VersionGovernanceError(governance.conflict_reason)
+      const existingMain = governance.versions.filter(id => versionRole(id) === 'm' && VERSION_ID.exec(id)![2] === '027' && id !== VERSION_027_MAPPING[0]!.to)
+      if (existingMain.length) throw new VersionGovernanceError(`027 已有主线，不能迁移出第二个 m：${existingMain.join('、')}`)
       change = versionIdentity(root, from)
       if (change.current_version_id) {
         if (change.current_version_id !== to || existsSync(candidate)) throw new VersionGovernanceError('旧身份的迁移指向或当前资产不一致')
