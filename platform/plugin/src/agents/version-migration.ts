@@ -49,7 +49,7 @@ export function planVersion027Migration(root: string) {
   const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' })
   const commit = head.stdout.trim()
   if (head.status !== 0 || !/^[a-f0-9]{40}$/.test(commit)) throw new VersionGovernanceError('迁移前须固定完整来源到 Git')
-  const writes: Write[] = [], moves: { from: string; to: string; candidate_sha256: string }[] = []
+  const writes: Write[] = [], moves: { from: string; to: string; candidate_sha256: string; archived_candidate_sha256: string; candidate_dirty: boolean }[] = []
   const references: { path: string; fields: string[] }[] = []
   const inventory: { from: string; to: string; status: 'ready' | 'migrated' | 'absent' | 'partial' | 'blocked'; reason?: string }[] = []
   const mapping: Mapping = []
@@ -61,7 +61,7 @@ export function planVersion027Migration(root: string) {
     if (!existsSync(dataPath(root, `${source}/change.yaml`))) {
       inventory.push({ from, to, status: 'partial', reason: '目录缺少版本身份，不迁移、不补造资产或改写引用。' }); continue
     }
-    let change: MapValue, digest: string
+    let change: MapValue, digest: string, archivedDigest: string
     const candidate = dataPath(root, `${source}/candidate`)
     try {
       change = versionIdentity(root, from)
@@ -77,16 +77,19 @@ export function planVersion027Migration(root: string) {
       versionSource(root, from)
       versionSource(root, from, commit)
       const dirty = spawnSync('git', ['status', '--porcelain', '--untracked-files=all', '--',
-        `${source}/candidate`, `${source}/change.yaml`, `${source}/hypothesis.md`, `${source}/decision.md`], { cwd: root, encoding: 'utf8' })
-      if (dirty.status !== 0 || dirty.stdout.trim()) throw new VersionGovernanceError('先固定完整版本到 Git 再迁移，保留未提交的并行修改')
+        `${source}/change.yaml`, `${source}/hypothesis.md`, `${source}/decision.md`], { cwd: root, encoding: 'utf8' })
+      if (dirty.status !== 0 || dirty.stdout.trim()) throw new VersionGovernanceError('先固定版本身份和研究说明到 Git 再迁移')
       digest = candidateDigest(candidate)
-      if (gitCandidateDigest(root, from, `git:${commit}`) !== digest) throw new VersionGovernanceError('当前 Candidate 与固定来源不一致')
+      const fixedDigest = gitCandidateDigest(root, from, `git:${commit}`)
+      if (!fixedDigest) throw new VersionGovernanceError('固定来源缺少完整 Candidate')
+      archivedDigest = fixedDigest
     } catch (error) {
       inventory.push({ from, to, status: 'blocked', reason: error instanceof Error ? error.message : String(error) }); continue
     }
     mapping.push({ from, to })
     inventory.push({ from, to, status: 'ready' })
-    moves.push({ from: `${source}/candidate`, to: `${target}/candidate`, candidate_sha256: digest })
+    moves.push({ from: `${source}/candidate`, to: `${target}/candidate`, candidate_sha256: digest,
+      archived_candidate_sha256: archivedDigest, candidate_dirty: digest !== archivedDigest })
     const changeFile = `${source}/change.yaml`, before = readFileSync(dataPath(root, changeFile), 'utf8')
     writes.push({ path: changeFile, before, after: yaml({ ...change, current_version_id: to, archived_ref: `git:${commit}` }) })
     // 新身份不能继承旧身份的验收结论或回执；历史原件继续留在旧目录。

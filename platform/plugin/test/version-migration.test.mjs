@@ -61,18 +61,42 @@ test('迁移只包含完整固定资产，残片和缺失版本不阻塞或被�
   assert.equal((await applyVersion027Migration(root, { confirmed: true, expected_plan_sha256: repeated.plan_sha256 })).migrated, false)
 })
 
-test('未提交资产和目标冲突在预检中明确阻塞，不能执行或重写来源', async t => {
+test('迁移保留工作稿及未跟踪源码，固定历史不受影响，也不继承验收结论', async t => {
   const { root, write, main, source } = fixture(t)
   write(`${source}/candidate/dsh/workspace/AGENTS.md`, 'parallel draft\n')
+  write(`${source}/candidate/dsh/managed/new.ts`, 'export const draft = true\n')
+  const plan = version027MigrationPreview(root)
+  assert.equal(plan.ready, true)
+  assert.equal(plan.moves[0].candidate_dirty, true)
+  assert.notEqual(plan.moves[0].candidate_sha256, plan.moves[0].archived_candidate_sha256)
+  await applyVersion027Migration(root, { confirmed: true, expected_plan_sha256: plan.plan_sha256 })
+  const target = `evolution/experiments/${main.to}`
+  assert.equal(readFileSync(join(root, target, 'candidate/dsh/workspace/AGENTS.md'), 'utf8'), 'parallel draft\n')
+  assert.equal(readFileSync(join(root, target, 'candidate/dsh/managed/new.ts'), 'utf8'), 'export const draft = true\n')
+  assert.match(readFileSync(join(root, target, 'change.yaml'), 'utf8'), /outcome: inconclusive/)
+  assert.equal(spawnSync('git', ['show', `${plan.source_ref.slice(4)}:${source}/candidate/dsh/workspace/AGENTS.md`], { cwd: root, encoding: 'utf8' }).stdout, 'fixture rules\n')
+})
+
+test('未提交的身份说明和目标冲突阻止迁移，不能重写来源', async t => {
+  const { root, write, main, source } = fixture(t)
+  write(`${source}/change.yaml`, `agent_id: security-operations-expert\nexperiment_id: ${main.from}\nstatus: draft\n`)
   let plan = version027MigrationPreview(root)
   assert.equal(plan.ready, false)
   assert.equal(plan.inventory[0].status, 'blocked')
-  assert.match(plan.inventory[0].reason, /并行修改/)
+  assert.match(plan.inventory[0].reason, /版本身份和研究说明/)
   await assert.rejects(applyVersion027Migration(root, { confirmed: true, expected_plan_sha256: plan.plan_sha256 }), /预检未通过/)
-  assert.equal(readFileSync(join(root, source, 'candidate/dsh/workspace/AGENTS.md'), 'utf8'), 'parallel draft\n')
+  assert.ok(existsSync(join(root, source, 'candidate/dsh/workspace/AGENTS.md')))
   write(`evolution/experiments/${main.to}/existing.txt`, 'existing target\n')
   plan = version027MigrationPreview(root)
   assert.match(plan.inventory[0].reason, /目标已存在/)
+})
+
+test('预览后工作稿变化拒绝迁移，保留新修改', async t => {
+  const { root, write, source } = fixture(t)
+  const plan = version027MigrationPreview(root)
+  write(`${source}/candidate/dsh/workspace/AGENTS.md`, 'later draft\n')
+  await assert.rejects(applyVersion027Migration(root, { confirmed: true, expected_plan_sha256: plan.plan_sha256 }), /重新预览/)
+  assert.equal(readFileSync(join(root, source, 'candidate/dsh/workspace/AGENTS.md'), 'utf8'), 'later draft\n')
 })
 
 test('预览后引用变化拒绝执行，不移动 Candidate', async t => {
