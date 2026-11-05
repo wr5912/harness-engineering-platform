@@ -28,7 +28,7 @@ import { RunFileError, readRunReport, listRunFiles, previewRunFile, redactRunTex
 import { readRunTrace } from '../evaluation/trace.ts'
 import { createDecisionDatasetHandler } from '../evaluation/datasets.ts'
 import { createEvaluationJobs, EvaluationJobError, redactKnownValues } from '../evaluation/jobs.ts'
-import { caseSourceReferences, createCaseManagementHandler, type RunCaseSource } from '../evaluation/cases.ts'
+import { caseBlockRange, caseSourceReferences, createCaseManagementHandler, type RunCaseSource } from '../evaluation/cases.ts'
 import { caseObservation } from '../evaluation/case-observation.ts'
 import { readAssetDiff, readFixedAsset } from './asset-diff.ts'
 import { createAgent } from './create-agent.ts'
@@ -1461,15 +1461,7 @@ async function updateCase(root: string, payload: JsonMap, signal?: AbortSignal) 
   const inputs = (payload.inputs as string[]).map(value => value.replace(/\r\n?/g, '\n').trim())
   const expectedBehavior = stringField(payload, 'expected_behavior').replace(/\r\n?/g, '\n')
   if (typeof payload.fast !== 'boolean') throw new RpcError('invalid_request', 'fast 必须是布尔值')
-  // 与 evaluation_contract 一致：普通四级标题属于预期正文，只有下一业务 Case 或一至三级章节结束该区块。
-  const headings = [...evaluation.content.matchAll(/^#### (U-[A-Z0-9-]+)\s+([^\r\n]+)\r?$/gm)]
-  const index = headings.findIndex(match => match[1] === caseId)
-  if (index < 0) throw new RpcError('invalid_request', '无法定位用例正文')
-  const start = headings[index].index!
-  let end = headings[index + 1]?.index ?? evaluation.content.length
-  const bodyStart = start + headings[index][0].length
-  const nextSection = /^#{1,3} /m.exec(evaluation.content.slice(bodyStart, end))
-  if (nextSection) end = bodyStart + nextSection.index
+  const { start, end } = caseBlockRange(evaluation.content, caseId)
   const oldBlock = evaluation.content.slice(start, end)
   const newline = oldBlock.includes('\r\n') ? '\r\n' : '\n'
   const tail = oldBlock.match(/(?:\r?\n)*$/)?.[0] || newline
@@ -1853,6 +1845,7 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
         case 'cases/list': return await cases(root, body, signal)
         case 'cases/read': return await readCase(root, body, signal)
         case 'cases/update': return await updateCase(root, body, signal)
+        case 'cases/delete':
         case 'cases/create-context':
         case 'cases/from-run':
         case 'cases/create-preview':
@@ -1877,6 +1870,7 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
         }
         case 'eval/status': return ok(jobs.status(stringField(body, body.run_id !== undefined ? 'run_id' : 'job_id')))
         case 'eval/cancel': return ok(jobs.cancel(stringField(body, body.run_id !== undefined ? 'run_id' : 'job_id')))
+        case 'runs/delete': return ok(jobs.remove(body.run_ids))
         case 'runs/index': return await runRecord(root, 'index', body, signal)
         case 'runs/overview': return await runRecord(root, 'overview', body, signal)
         case 'runs/show': return await runRecord(root, 'show', body, signal)

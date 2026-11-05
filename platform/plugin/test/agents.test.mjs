@@ -2114,6 +2114,30 @@ test('用例按选中区块保存，多轮与档位回读一致，冲突和无�
   assert.deepEqual((await rpc(handler, 'cases/list', { agent_id: 'test-agent' })).cases.map(row => row.id), ['U-CASE-001', 'U-CASE-002'])
 })
 
+test('删除用例沿用 dry 保存和摘要校验，Run 删除只移除选中证据', async t => {
+  const { createAgentsHandler } = await loadServer()
+  const { root } = fixture()
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const file = join(root, 'agents/test-agent/evaluation.md'), first = readFileSync(file, 'utf8')
+  write(file, first + '\n#### U-CASE-002 待删除\n\n**用户输入**\n> second\n\n**预期**\n保留第一条。\n')
+  const runId = 'run-22222222-2222-4222-8222-222222222222'
+  const runPath = join(root, 'evolution/experiments/EXP-test-agent-001/runs', runId)
+  const frozen = JSON.stringify({ run_id: runId, evaluation_cases: [{ case_id: 'U-CASE-002', inputs: ['second'], expected_behavior: '保留第一条。' }] })
+  write(join(runPath, 'run.yaml'), `run_id: ${runId}\nstatus: completed\n`)
+  write(join(runPath, 'inputs.lock.json'), frozen)
+  const handler = createAgentsHandler(root), target = { experiment_id: 'EXP-test-agent-001', case_id: 'U-CASE-002' }
+  const before = await rpc(handler, 'cases/read', target)
+  await assert.rejects(() => rpc(handler, 'cases/delete', { ...target, expected_sha256: 'a'.repeat(64) }), /conflict:/)
+  await rpc(handler, 'cases/delete', { ...target, expected_sha256: before.sha256 })
+  assert.equal(readFileSync(file, 'utf8').trim(), first.trim())
+  assert.equal(readFileSync(join(runPath, 'inputs.lock.json'), 'utf8'), frozen)
+  const last = await rpc(handler, 'cases/read', { ...target, case_id: 'U-CASE-001' })
+  await assert.rejects(() => rpc(handler, 'cases/delete', { ...target, case_id: 'U-CASE-001', expected_sha256: last.sha256 }), /至少保留一个/)
+  assert.deepEqual(await rpc(handler, 'runs/delete', { run_ids: [runId] }), { deleted: [runId], failed: [] })
+  assert.equal(existsSync(runPath), false)
+  assert.equal(readFileSync(file, 'utf8').trim(), first.trim())
+})
+
 test('用例解析与摘要来自同一次读取，解析期间的外部修改不会混入口径', async t => {
   const { createAgentsHandler } = await loadServer()
   const { root } = fixture()

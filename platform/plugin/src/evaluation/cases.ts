@@ -24,6 +24,19 @@ export function caseSourceReferences(block: string): string[] {
     .map(match => match[0].trim())
 }
 
+/** 与评测合同保持一致：普通四级标题仍属于用例正文。 */
+export function caseBlockRange(content: string, caseId: string) {
+  const headings = [...content.matchAll(/^#### (U-[A-Z0-9-]+)\s+([^\r\n]+)\r?$/gm)]
+  const index = headings.findIndex(match => match[1] === caseId)
+  if (index < 0) throw new CaseError('not_found', '未找到测试用例正文')
+  const start = headings[index].index!
+  let end = headings[index + 1]?.index ?? content.length
+  const bodyStart = start + headings[index][0].length
+  const nextSection = /^#{1,3} /m.exec(content.slice(bodyStart, end))
+  if (nextSection) end = bodyStart + nextSection.index
+  return { start, end }
+}
+
 interface ParsedEvaluation {
   case_ids: string[]
   cases: Record<string, { case_id: string; title: string; inputs: string[]; expected_behavior: string }>
@@ -163,6 +176,24 @@ export function createCaseManagementHandler(assetRoot: string, services: CaseMan
     try {
       if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new CaseError('invalid_request', '用例请求必须为对象')
       const body = payload as JsonMap
+      if (endpoint === 'cases/delete') {
+        const document = await documentFor(root, body, signal)
+        const caseId = field(body, 'case_id')
+        if (!document.parsed.cases[caseId]) throw new CaseError('not_found', '测试用例已不存在，请刷新列表')
+        if (field(body, 'expected_sha256') !== document.sha256) throw new CaseError('conflict', '用例集已被修改，请重新读取后再删除')
+        if (document.parsed.case_ids.length === 1) throw new CaseError('last_case', '评测合同要求至少保留一个测试用例')
+        const { start, end } = caseBlockRange(document.content, caseId)
+        const content = document.content.slice(0, start) + document.content.slice(end)
+        const parsed = await parseEvaluationDocument(root, content, signal)
+        const remaining = document.parsed.case_ids.filter(id => id !== caseId)
+        if (JSON.stringify(parsed.case_ids) !== JSON.stringify(remaining) || remaining.some(id =>
+          JSON.stringify(parsed.cases[id]) !== JSON.stringify(document.parsed.cases[id]) ||
+          JSON.stringify(parsed.catalog.find(item => item.case_id === id)) !== JSON.stringify(document.parsed.catalog.find(item => item.case_id === id))))
+          throw new CaseError('invalid_request', '删除会改变其他用例，已拒绝写入')
+        cancelled(signal)
+        await services.applyEvaluation(document.experimentId, content, document.sha256, signal)
+        return { ok: true, value: { case_id: caseId, path: document.path, sha256: digest(content) } }
+      }
       if (endpoint === 'cases/create-context' || endpoint === 'cases/from-run') {
         const document = await documentFor(root, body, signal)
         const result = context(document)

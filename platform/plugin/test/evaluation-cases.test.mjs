@@ -106,3 +106,16 @@ test('来源路径中的符号链接不读取，取消操作不写文件', () =>
   await rm(fx.evaluation); symlinkSync(outside, fx.evaluation)
   assert.equal((await call(fx, 'cases/create-context')).error.code, 'path_rejected'); assert.equal(fx.writes.length, 0)
 }))
+
+test('删除当前用例保留相邻场景及其他用例，摘要冲突和最后一个用例不写入', () => withFixture(async fx => {
+  const stale = await call(fx, 'cases/delete', { case_id: 'U-CASE-001', expected_sha256: 'old' })
+  assert.equal(stale.error.code, 'conflict'); assert.equal(fx.writes.length, 0)
+  const result = await call(fx, 'cases/delete', { case_id: 'U-CASE-001', expected_sha256: hash(fx.initial) })
+  assert.equal(result.ok, true)
+  const content = readFileSync(fx.evaluation, 'utf8'), parsed = await parseEvaluationDocument(fx.root, content)
+  assert.deepEqual(parsed.case_ids, ['U-CASE-002']); assert.equal(parsed.catalog[0].scene, '其他')
+  assert.equal(parsed.cases['U-CASE-002'].expected_behavior, '返回目录。')
+  assert.equal((await call(fx, 'cases/delete', { case_id: 'U-CASE-001', expected_sha256: hash(content) })).error.code, 'not_found')
+  assert.equal((await call(fx, 'cases/delete', { case_id: 'U-CASE-002', expected_sha256: hash(content) })).error.code, 'last_case')
+  assert.equal(fx.writes.length, 1)
+}))

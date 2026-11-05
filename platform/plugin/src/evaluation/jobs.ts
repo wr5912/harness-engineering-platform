@@ -341,6 +341,41 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
     }
     return { runs: [...runs.values()].sort((a, b) => (b.started_at ?? '').localeCompare(a.started_at ?? '')), pending, errors }
   }
+  function remove(ids: unknown) {
+    if (!Array.isArray(ids) || !ids.length || ids.some(id => typeof id !== 'string' || !RUN.test(id)) || new Set(ids).size !== ids.length)
+      throw new EvaluationJobError('invalid_request', '请选择不重复的有效评测记录')
+    const deleted: string[] = [], failed: { run_id: string; code: string; message: string }[] = []
+    for (const id of ids as string[]) {
+      try {
+        const matches = experiments().map(experiment => join(root, 'evolution/experiments', experiment, 'runs', id)).filter(path => existsSync(path))
+        if (!matches.length) throw new EvaluationJobError('not_found', '评测记录已不存在，请刷新列表核对')
+        if (matches.length !== 1) throw new EvaluationJobError('conflict', '存在重复的评测编号，无法确定删除目标')
+        if (realpathSync(matches[0]) !== join(realRoot, matches[0].slice(root.length + 1))) throw new EvaluationJobError('run_read_failed', '评测目录包含符号链接，无法核对删除目标')
+        const run = inspectRun(matches[0], id)
+        if (!run || !FINAL.has(run.manifest.status)) throw new EvaluationJobError('run_active', '评测尚未结束或状态未知，请先取消并刷新状态')
+        const job = control(id)
+        let execution: MapValue = {}
+        const executionPath = join(run.path, 'execution.json')
+        if (existsSync(executionPath)) {
+          if (!ordinary(executionPath)) throw new EvaluationJobError('run_read_failed', '执行记录不是普通文件')
+          try { execution = JSON.parse(readFileSync(executionPath, 'utf8')) }
+          catch { throw new EvaluationJobError('run_read_failed', '执行记录无法解析，无法核对进程状态') }
+        }
+        const key = job ? keyFor(job) : id
+        if (live.has(key) || starting.has(key) || prepared.has(id) || (job?.pid && !processGone(job.pid, job.process_start))
+          || (execution.pid && !processGone(execution.pid, execution.process_start)))
+          throw new EvaluationJobError('run_active', '评测进程仍在运行，请稍后刷新再删除')
+        if (job && runDirectory(job)?.path !== run.path) throw new EvaluationJobError('conflict', '运行控制与评测记录不一致，已保留原记录')
+        if (job && existsSync(pathFor(key))) unlinkSync(pathFor(key))
+        rmSync(run.path, { recursive: true })
+        deleted.push(id)
+      } catch (error) {
+        failed.push({ run_id: id, code: (error as EvaluationJobError).code ?? 'delete_failed', message: options.redact((error as Error).message) })
+      }
+    }
+    if (deleted.length) options.onChange?.()
+    return { deleted, failed }
+  }
   function cancel(id: string) {
     pathFor(id)
     if (prepared.delete(id)) return { run_id: id, run_created: false, status: 'cancelled' }
@@ -491,5 +526,5 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
     }
     return { runs, failed: null, not_started: [] }
   }
-  return { reserve, start, status, cancel, list, lookup, startBatch }
+  return { reserve, start, status, cancel, list, lookup, startBatch, remove }
 }

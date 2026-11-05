@@ -1918,3 +1918,71 @@ test('等待Run初始化提交时可取消同一Run，创建取消不进入记�
     assert.match(ui.text(), /创建已取消.*重新预览/s)
   } finally { rejectStart?.(new Error('creation_cancelled: 测试收尾')); ui.cleanup() }
 })
+
+test('单条删除先确认，取消不请求，确认后移除对应记录', async () => {
+  const deleted = new Set()
+  const ui = workbench({ handler: async (action, payload, original) => {
+    if (action === 'runs/delete') { payload.run_ids.forEach(id => deleted.add(id)); return { deleted: payload.run_ids, failed: [] } }
+    if (action === 'runs/overview') { const value = await original(action, payload); for (const agent of value.agents) for (const exp of agent.experiments) exp.runs = exp.runs.filter(run => !deleted.has(run.run_id)); return value }
+    return original(action, payload)
+  } })
+  try {
+    await ui.settle(); ui.byLabel(`删除评测 ${runA}`).props.onClick({ stopPropagation() {} }); await ui.settle()
+    assert.equal(ui.calls.filter(call => call.action === 'runs/delete').length, 0)
+    ui.button('取消').props.onClick(); await ui.settle()
+    ui.byLabel(`删除评测 ${runA}`).props.onClick({ stopPropagation() {} }); await ui.settle()
+    ui.button('确认删除').props.onClick(); await ui.settle()
+    assert.deepEqual([...ui.calls.find(call => call.action === 'runs/delete').payload.run_ids], [runA])
+    assert.equal(ui.byLabel(`删除评测 ${runA}`), undefined)
+    assert.ok(ui.byLabel(`删除评测 ${runB}`)); assert.match(ui.text(), /已删除 1 条评测记录/)
+  } finally { ui.cleanup() }
+})
+
+test('批量只提交当前筛选可删除项，部分失败仅重试失败项', async () => {
+  let attempt = 0
+  const ui = workbench({ handler: async (action, payload, original) => {
+    if (action === 'runs/delete') return ++attempt === 1 ? { deleted: [runA], failed: [{ run_id: runB, message: '文件暂不可写' }] } : { deleted: [runB], failed: [] }
+    if (action === 'runs/overview' && attempt) return overview([['beta', [{ ...betaRun, runs: attempt === 1 ? betaRun.runs : [] }]]])
+    return original(action, payload)
+  } })
+  try {
+    await ui.settle(); ui.change('选择当前筛选下所有可删除评测', true)
+    ui.button('批量删除').props.onClick(); await ui.settle(); ui.button('确认删除').props.onClick(); await ui.settle()
+    assert.match(ui.text(), /文件暂不可写/); assert.match(ui.text(), /1 条未删除/)
+    ui.button('重试删除').props.onClick(); await ui.settle()
+    const requests = ui.calls.filter(call => call.action === 'runs/delete')
+    assert.deepEqual([...requests[0].payload.run_ids].sort(), [runA, runB]); assert.deepEqual([...requests[1].payload.run_ids], [runB])
+  } finally { ui.cleanup() }
+})
+
+test('运行中评测不可选择，筛选变化清空批量选择', async () => {
+  const ui = workbench({ handler: async (action, payload, original) => {
+    if (action === 'runs/overview') return overview([['alpha', [{ experiment_id: expA, runs: [{ run_id: runA, status: 'running' }, { run_id: runB, status: 'completed' }] }]]])
+    return original(action, payload)
+  } })
+  try {
+    await ui.settle(); assert.equal(ui.byLabel(`删除评测 ${runA}`).props.disabled, true)
+    assert.equal(ui.byLabel(`选择评测 ${runA}`).props.disabled, true)
+    ui.change('选择当前筛选下所有可删除评测', true); assert.equal(ui.button('批量删除').props.disabled, false)
+    ui.change('搜索评测记录', 'nothing'); assert.equal(ui.button('批量删除').props.disabled, true)
+    ui.change('搜索评测记录', ''); assert.equal(ui.byLabel(`选择评测 ${runB}`).props.checked, false)
+  } finally { ui.cleanup() }
+})
+
+test('删除用例提交冻结身份和摘要，失败保留用例并可重试，成功清理选择', async () => {
+  let attempts = 0
+  const ui = workbench({ target: { page: 'evaluation', tab: 'cases', agent_id: 'alpha', experiment_id: expA, case_id: 'C-1' }, handler: async (action, payload, original) => {
+    if (action === 'cases/delete') { if (++attempts === 1) throw new Error('conflict: 用例集已被修改'); return { case_id: payload.case_id } }
+    if (action === 'detail' && attempts > 1) return { ...detail, evaluation: { ...detail.evaluation, cases: detail.evaluation.cases.slice(1) } }
+    return original(action, payload)
+  } })
+  try {
+    await ui.settle(); ui.button('删除用例').props.onClick(); await ui.settle()
+    assert.match(ui.text(), /各版本共用当前用例集/)
+    ui.button('确认删除').props.onClick(); await ui.settle(); assert.match(ui.text(), /用例集已被修改/)
+    assert.equal(ui.getTarget().case_id, 'C-1')
+    ui.button('重试删除').props.onClick(); await ui.settle()
+    assert.deepEqual(JSON.parse(JSON.stringify(ui.calls.find(call => call.action === 'cases/delete').payload)), { experiment_id: expA, case_id: 'C-1', expected_sha256: doc.sha256 })
+    assert.equal(ui.getTarget().case_id, undefined); assert.match(ui.text(), /已删除测试用例/)
+  } finally { ui.cleanup() }
+})

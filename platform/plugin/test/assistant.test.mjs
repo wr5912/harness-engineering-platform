@@ -1271,6 +1271,8 @@ test('所有管理业务可以逐动作发现参数；原生下一轮装配使�
     const native = projectAssistantTools([{ name: 'platform_agents' }], { tool_contracts: { agents: action } })[0].parameters
     assert.equal(validateJsonSchemaValue(native, { action, input: { experiment_id: 'EXP-alpha-001', content: '首次研究决策', expected_sha256: null } }).length, 0)
   }
+  assert.equal(assistantActionContract('agents', 'runs/delete').input_schema.properties.run_ids.type, 'array')
+  assert.equal(assistantActionContract('agents', 'cases/delete').input_schema.properties.expected_sha256.type, 'string')
   const create = assistantActionContract('agents', 'create')
   assert.deepEqual([create.input_schema.properties.version_number.type, create.input_schema.properties.version_number.minimum, create.input_schema.properties.version_number.maximum], ['integer', 1, 999])
   assert.match(create.instructions, /默认同代 f/)

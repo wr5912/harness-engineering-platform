@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { build } from 'esbuild'
 
@@ -487,4 +487,31 @@ test('新快照缺损不降级legacy，旧声明无可信原文时调用与用�
     assert.ok(status.model_calls_unknown_reasons.some(reason => reason.startsWith('local-model-routes-')))
     assert.match(status.model_calls_basis, /声明尚未核对/)
   })
+})
+
+test('批量删除仅移除终态 Run 及其控制，活动项逐条保留', async t => {
+  const fx = await fixture(t)
+  const done = `run-${randomUUID()}`, active = `run-${randomUUID()}`, legacyId = randomUUID()
+  const donePath = seedRun(fx, done, { jobId: legacyId }), activePath = seedRun(fx, active, { status: 'running' })
+  seedLegacy(fx, { run_id: done }, legacyId)
+  const jobs = fx.create()
+  const result = jobs.remove([done, active])
+  assert.deepEqual(result.deleted, [done]); assert.equal(result.failed[0].run_id, active); assert.equal(result.failed[0].code, 'run_active')
+  assert.equal(existsSync(donePath), false); assert.equal(existsSync(statePath(fx.root, legacyId)), false)
+  assert.equal(existsSync(activePath), true); assert.deepEqual(jobs.list().errors, [])
+  assert.equal(jobs.remove([done]).failed[0].code, 'not_found')
+})
+
+test('无效批量、重复身份和目录链接不能误删，终态清单仍有活进程也拒绝', async t => {
+  const fx = await fixture(t), jobs = fx.create(), id = `run-${randomUUID()}`
+  const path = seedRun(fx, id)
+  for (const ids of [[], [id, id], [id, '../invalid']]) assert.throws(() => jobs.remove(ids), error => error.code === 'invalid_request')
+  assert.equal(existsSync(path), true)
+  const second = join(fx.root, 'evolution/experiments/EXP-other-001/runs', id)
+  mkdirSync(dirname(second), { recursive: true }); symlinkSync(path, second)
+  assert.equal(jobs.remove([id]).failed[0].code, 'conflict'); unlinkSync(second)
+  const stat = readFileSync(`/proc/${process.pid}/stat`, 'utf8')
+  const start = stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19]
+  writeFileSync(join(path, 'execution.json'), JSON.stringify({ pid: process.pid, process_start: start }))
+  assert.equal(jobs.remove([id]).failed[0].code, 'run_active'); assert.equal(existsSync(path), true)
 })

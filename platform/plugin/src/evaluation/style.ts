@@ -97,4 +97,9 @@ export const evaluationPageTheme = `
 @media(max-width:760px){.harness-eval-toolbar{flex-wrap:wrap;gap:8px}.harness-eval-toolbar>.harness-eval-tabs{flex-basis:100%;order:1}.harness-eval-toolbar>.harness-primary{margin-left:auto}.harness-eval-tabs{padding:0 12px;gap:22px}.harness-eval-result-workspace{grid-template-columns:minmax(0,1fr)}.harness-eval-result-cases{max-height:240px}.harness-eval-result-workspace>article{padding:16px}.harness-eval-drawer{max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);height:fit-content;border-radius:10px}.harness-eval-drawer .harness-eval-editor,.harness-eval-new-case-list{grid-template-columns:minmax(0,1fr)}.harness-eval-record-list .harness-eval-scope-filters[data-mobile-open=false]{display:flex}.harness-eval-record-list .harness-eval-mobile-filter-toggle{display:none}}
 @media(max-width:760px){.harness-evaluation .harness-eval-record-list{padding:16px}.harness-eval-record-list .harness-table-scroll{border:0;border-radius:0}.harness-eval-record-list .harness-eval-run-table tbody tr+tr{border-top:1px solid var(--hep-border)}.harness-evaluation .harness-eval-page-heading h1{font-size:23px}.harness-platform .harness-eval-toolbar>.harness-eval-tabs>button{flex:1;padding-inline:12px}}
 
+
+.harness-evaluation .harness-eval-delete{color:var(--hep-danger);border-color:var(--hep-danger)}
+.harness-evaluation .harness-eval-delete:hover{color:var(--hep-danger);background:color-mix(in srgb,var(--hep-danger) 8%,var(--hep-surface))}
+.harness-eval-delete-toolbar{margin-block:16px;flex-wrap:wrap}.harness-eval-record-name{display:flex;align-items:flex-start;gap:8px}.harness-eval-record-name>input{flex:none;margin-top:5px}.harness-eval-record-actions{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.harness-eval-confirm-dialog ul{padding-left:20px}.harness-eval-confirm-dialog li+li{margin-top:12px}.harness-eval-confirm-dialog code,.harness-eval-confirm-dialog [role=alert]{overflow-wrap:anywhere}
 `
