@@ -1,0 +1,80 @@
+{
+  "status": "updated",
+  "activation": {
+    "status": "active",
+    "sessionsPreserved": 3,
+    "pid": 445086,
+    "verification": {
+      "checks": [
+        {
+          "id": "program-integrity",
+          "status": "ok",
+          "detail": "安装来源 a55e99631555a91917c444737635711df60b310d"
+        },
+        {
+          "id": "business-gateway",
+          "status": "ok",
+          "detail": "网关配置完整，已核对发布签名密钥，入口 http://127.0.0.1:53108；监听状态需启动后核对"
+        },
+        {
+          "id": "workspace-assets",
+          "status": "ok",
+          "detail": "22 skills, workspace-95db14d2-d53d-4015-8256-ade8612b1b77"
+        },
+        {
+          "id": "profile-skills",
+          "status": "ok",
+          "detail": "/home/cmp/work/harness-engineering-platform/.local/operations/plan-closure-20261105/platform-installed-data/.agents/skills"
+        },
+        {
+          "id": "default-workspace",
+          "status": "ok",
+          "detail": "/home/cmp/work/harness-engineering-platform/.local/operations/plan-closure-20261105/platform-installed-data"
+        },
+        {
+          "id": "runtime",
+          "status": "ok",
+          "detail": "DSH 0.2.1-rc.5，只读启动预检通过"
+        },
+        {
+          "id": "online-workspace",
+          "status": "ok",
+          "detail": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77，PID 445086，密码登录及 inventory RPC 通过"
+        },
+        {
+          "id": "online-business-gateway",
+          "status": "ok",
+          "detail": "PID 445086 已监听业务网关 127.0.0.1:53108"
+        },
+        {
+          "id": "online-business-instances",
+          "status": "ok",
+          "detail": "已核对 0 个运行中业务实例的网页入口与接入版本"
+        }
+      ],
+      "onlineVerified": true,
+      "ok": true
+    }
+  },
+  "files": 13,
+  "bytes": 7814156,
+  "commits": [
+    {
+      "before": "854a1aa57be80189f558c0f1237c6fde2a7125df",
+      "commit": "a55e99631555a91917c444737635711df60b310d"
+    },
+    {
+      "before": "f42ee0c5df473e141ed357f9f0918a132f1e0c37",
+      "commit": "f42ee0c5df473e141ed357f9f0918a132f1e0c37"
+    }
+  ],
+  "sourceDataCommit": "f42ee0c5df473e141ed357f9f0918a132f1e0c37",
+  "minimalData": false,
+  "dependencies": [
+    "platform/plugin"
+  ],
+  "revalidatedArtifacts": [],
+  "revalidatedSources": [],
+  "backup": "/home/cmp/work/harness-engineering-platform/.local/operations/plan-closure-20261105/platform-installed/.local/deploy-updates/7cffa724-9a2d-4e74-8339-65e18514c625",
+  "transferBytes": 3205813
+}

@@ -1,0 +1,223 @@
+{
+  "scope": {
+    "agentId": "security-operations-expert",
+    "experimentId": "EXP-security-operations-expert-027-reab20c48f610",
+    "instance": "security-operations-expert-exp027",
+    "targetHost": "172.16.138.232"
+  },
+  "program": {
+    "status": "updated",
+    "files": 16,
+    "bytes": 10019989,
+    "commits": [
+      {
+        "before": "2819adfd1f98af2b52fa277fbd232a43b3442b7a",
+        "commit": "013b79ed0096b4f6d404dcea35ab55e290e7cb2a"
+      },
+      {
+        "before": "2c2786edd4eefae434249482cedd4c39b9ff1ea4",
+        "commit": "2c2786edd4eefae434249482cedd4c39b9ff1ea4"
+      }
+    ],
+    "transferBytes": 3463203,
+    "activation": {
+      "status": "active",
+      "sessionsPreserved": 10,
+      "pid": 3353898
+    }
+  },
+  "agent": {
+    "files": [
+      {
+        "path": "candidate/dsh/managed/emergency-action-guard.mjs",
+        "beforeSha256": "c0d5d072f135664fbf413438c9c86fef7d795dc733ae84369d3c67e355979ce5",
+        "sha256": "ccd6ba0a6ab876e68b4499358255dd108abfd8052aebe9864c872c40c4989b46",
+        "changed": true
+      },
+      {
+        "path": "candidate/dsh/managed/policy-configuration-guard.mjs",
+        "beforeSha256": "f1d3e32754edc4e9e1c2372a8ff11e33899c9693f3829192a1657faab86fa842",
+        "sha256": "b082992dcf0a356c81b10e5cb3729f1f0ccff9131c23cc0435750db7ae71356a",
+        "changed": true
+      },
+      {
+        "path": "candidate/dsh/managed/rule-review-request.mjs",
+        "beforeSha256": "cc2b2079e7aff425ec06aafc5df74b892caecdf8649c7a0fb1f2b4b6e02f99fb",
+        "sha256": "8d7d41c51d8eeca43ccf4cfd7625d63bcfcad952574f05b2fd7e82a248c14ded",
+        "changed": true
+      },
+      {
+        "path": "candidate/dsh/managed/security-operations-child-guard.mjs",
+        "beforeSha256": "1bb1233945f0479407327b1497cb7745b7024d0b85024045e9f04ef5019573a4",
+        "sha256": "03ae9192d873b7b523a16265938f966d0808a341802e48f633ae9c4686bd2acb",
+        "changed": true
+      },
+      {
+        "path": "candidate/dsh/managed/security-operations-guard.mjs",
+        "beforeSha256": "664465c609774ffed19440a7dd19b63817805c4167442d8d19b9565c51b007b2",
+        "sha256": "10a4071a3b0d1b5ad2cbb2804db303be7414d62bd721e9df5fd3752d9784a272",
+        "changed": true
+      },
+      {
+        "path": "candidate/dsh/managed/threat-analysis.mjs",
+        "beforeSha256": "eef5b62bd15b997974fd3e47c9747c14571efe393eb990a0792fee3c6f010f2a",
+        "sha256": "b720edf1489aa0c660843c084453ab4ba25914fee89ced8dcb171c497ace069e",
+        "changed": true
+      },
+      {
+        "path": "candidate/dsh/managed/threat-analysis/dsh_runner.py",
+        "beforeSha256": "bb48daf1cb1ef4334436814fba53fdab0d34c8ae1c550beeebf093ea6f8dd805",
+        "sha256": "743000bd4043f3a4cfc4200d7fa8548634ab4320acd26911f52e426b779e4605",
+        "changed": true
+      },
+      {
+        "path": "candidate/dsh/managed/threat-analysis/mcp-group-bridge.mjs",
+        "beforeSha256": "b582d63688a8af9b40046189fb0f0680c8357e46a2ea6cfd00bb455cd4b02fcf",
+        "sha256": "3eae3be807d160f57ba363160baad0d7aec5c76cbff381e620a69617dd381538",
+        "changed": true
+      },
+      {
+        "path": "candidate/dsh/managed/threat-analysis/mcp-group-bridge.ts",
+        "beforeSha256": "18d3c669422fa2fd6c897e6eaf1d403ba3e644ffe0a379e4fe1bbcbd665f8881",
+        "sha256": "d36fe4092dfc298001dc1990b7c43f9c87cd19f9f9574a330d64b0e52de5ae54",
+        "changed": true
+      },
+      {
+        "path": "candidate/dsh/managed/threat-analysis/mcp_gateway.py",
+        "beforeSha256": "65260fab722c65eba10d3b3f6738c802d54697326d5d52213e677ea271cd6ac1",
+        "sha256": "ab6ae2ee137e2b32128935912c5d7cb0914019eb729356227deaaa209448ab1e",
+        "changed": true
+      },
+      {
+        "path": "candidate/dsh/managed/threat-analysis/result_storage.py",
+        "beforeSha256": "d1188d158b3e998f83a0969b9d458ab7f06e874e2c0d696c1fdac1d7c8c7962b",
+        "sha256": "4dff0a24ff7ee8dcc2d976f87c5e12d4fe978dd95ec9b0197d2f7adce7c5ec12",
+        "changed": true
+      },
+      {
+        "path": "candidate/dsh/managed/threat-analysis/rule_candidates.py",
+        "beforeSha256": "6c0aad964ee119b74a49f3736ec991ffde1b7caa8ddd3e2cf316379c4fc75437",
+        "sha256": "1173bf47526bf8fd124cc3adb5a703da09f70c858703310b413ca437c28de496",
+        "changed": true
+      },
+      {
+        "path": "candidate/dsh/managed/threat-analysis/rule_context.py",
+        "beforeSha256": "a724e54bdb9568b553ff6a033d8c6aef2264afc5cfce92ab6e7f96ba242bf5f7",
+        "sha256": "a9abf5aa04ab49e90f964d5237714989665e62bcff676d931d4d6185fc861e94",
+        "changed": true
+      },
+      {
+        "path": "candidate/dsh/managed/threat-analysis/rule_evidence.py",
+        "beforeSha256": "9fbbfc5598b2075b61edc7033cecdbe9405db6a6dfdd00892ca3779f6c972d80",
+        "sha256": "70c9d6ad76f776d22853bdb3187a55f5ca1d54fec009ef237d46ea9d8538f7c1",
+        "changed": true
+      },
+      {
+        "path": "candidate/dsh/managed/threat-analysis/rule_optimization.py",
+        "beforeSha256": "bbcf55daf0a45e01d1fa385ccfd7d1ddae3c753d514a2b33b8b95b7d7887a057",
+        "sha256": "16e2d4aa7978e38e46391a5c1ff0db514ee44a7e84d88380749284c126424863",
+        "changed": true
+      },
+      {
+        "path": "candidate/dsh/managed/threat-analysis/rule_report.py",
+        "beforeSha256": "2adb49fdbff8a6e8be33a1771e72ad9b48a846d422928d6c598a2a832fc41bbc",
+        "sha256": "2dc4685a72851bc612a7fc0ea30462d859c4b3bfa6da0ecc6c7ef222ed56c200",
+        "changed": true
+      },
+      {
+        "path": "candidate/dsh/managed/threat-analysis/rule_validation.py",
+        "beforeSha256": "ea2cf57b1def5095d1ee756248e28a390ad42a8fc58a283adf2e5ed49bff9059",
+        "sha256": "045f236f7761078101f46465dfe3d30bfc63d29a9c4db500154c46c59deb6504",
+        "changed": true
+      },
+      {
+        "path": "candidate/dsh/workspace/.agents/skills/threat-analysis/SKILL.md",
+        "beforeSha256": "94904f9e254451630f9761033bc7ee0708b0e9f9a0b2f3ff1e7644a1b82d5e53",
+        "sha256": "792e09a2b6e9569a7065740022f73c6c4811951d4a0a60736900ab00d39e1693",
+        "changed": true
+      },
+      {
+        "path": "candidate/dsh/managed/threat-analysis/rule_references.py",
+        "beforeSha256": null,
+        "sha256": "ad958c73111145036b00d745b6920a57b61e8889a51311efdc15cd25e2f3bf26",
+        "changed": true
+      },
+      {
+        "path": "candidate/dsh/managed/threat-analysis/rule_body_validation.py",
+        "beforeSha256": null,
+        "sha256": "21d17e21b093298e4e4d03dfcca4138f74126ebb17dd6a510dd769d0152acbbb",
+        "changed": true
+      }
+    ],
+    "bytes": 382318
+  },
+  "preservation": {
+    "updatedFilesVerified": 20,
+    "unselectedFilesUnchanged": 218,
+    "modelConfigurationUnchanged": true,
+    "sourceAndPortUnchanged": true,
+    "sameRuntimeImage": true,
+    "persistentHomePreserved": true,
+    "targetRestarted": true,
+    "otherInstancesNotRestarted": 3,
+    "originalSessionsPreserved": 74,
+    "anonymousBrowserVerified": true
+  },
+  "anonymousBrowser": {
+    "loginRequired": false,
+    "nativeApiStatus": 200,
+    "unrelatedOriginAllowed": true
+  },
+  "mcp": {
+    "group": "threat-analysis-runtime",
+    "mappingsChecked": 29,
+    "changedSelections": 18,
+    "otherGroupsUnchanged": true,
+    "preflight": {
+      "manual": true,
+      "pending": true,
+      "resolved": 28,
+      "tools": 30,
+      "resources": 2,
+      "templates": 15,
+      "digest": "5f708e1a17d5ab54c0e87708dceb707b6763b98b9200cb1788df09e9427811b1",
+      "unavailable": [
+        "save_persistence_result"
+      ]
+    }
+  },
+  "incidentRead": {
+    "incidentId": "INC-20261105-000006",
+    "transportStatusCode": 200,
+    "businessCode": 200,
+    "dataPresent": true
+  },
+  "reportServiceContract": {
+    "source": "report-write",
+    "operation": "save_persistence_result",
+    "inputProperties": [
+      "businessId",
+      "contentType",
+      "fileContentBase64",
+      "fileName",
+      "payloadJson",
+      "resultType",
+      "revision",
+      "sourceModule"
+    ],
+    "required": [],
+    "hasContentObject": false
+  },
+  "tests": {
+    "platform": {
+      "passed": 186,
+      "failed": 0
+    },
+    "deploymentRecovery": {
+      "passed": 11,
+      "failed": 0
+    },
+    "fullBusinessAcceptance": false,
+    "mediumVariantAcceptance": "paused"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "status": 200,
+  "content_type": "text/html;charset=UTF-8",
+  "bytes": 12053,
+  "sha256": "639b8d10e7819812cf5a1d6efdd7361ce5cb0bd184769b48f658014c3b6a5be1",
+  "business_id": "run-9f5b176c-68e8-4c30-bdc9-43ff7870d877",
+  "source_module": "threat-analysis",
+  "revision": 1,
+  "result_type": "report",
+  "matches_stored_bytes": true,
+  "report_id": "file-6f0caee5-5107-493b-b7b1-52e8a95f1e1f"
+}

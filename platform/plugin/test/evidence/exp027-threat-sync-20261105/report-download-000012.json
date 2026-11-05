@@ -1,0 +1,12 @@
+{
+  "status": 200,
+  "content_type": "text/html;charset=UTF-8",
+  "bytes": 11031,
+  "sha256": "3a00c3edfb5516040404ee4a10709612a967bc7bd8c99f9c695942cbc7df6d30",
+  "get_sha256": "3a00c3edfb5516040404ee4a10709612a967bc7bd8c99f9c695942cbc7df6d30",
+  "matches_stored_bytes": true,
+  "business_id": "run-26e0e434-19b0-4a15-ba21-78aa13bda923",
+  "source_module": "threat-analysis",
+  "revision": 1,
+  "result_type": "report"
+}

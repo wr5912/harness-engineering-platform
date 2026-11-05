@@ -1,0 +1,20 @@
+{
+  "at": "2026-11-05T05:05:52.916Z",
+  "workspace_id": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+  "workspace_root_matches": true,
+  "assistant_principles_sha256": "3204283950678e57623322d215ad7be703912701e0aae5bf5cc7091fbe4cdf0b",
+  "session_id": "session-07611912-042d-4fb6-ac4d-15ac6c89c22e",
+  "session_preserved": true,
+  "instances_page": true,
+  "asset_filter": true,
+  "narrow_no_overflow": true,
+  "active_evaluations": 0,
+  "page_errors": [],
+  "model": {
+    "completed": true,
+    "reply": "模型连接验证完成",
+    "tool_calls": 0,
+    "persisted": 21
+  },
+  "scope": "完整安装实际认证、工作区身份、助手原则、真实模型回复、原生会话、实例页面；不代表业务效果验收"
+}

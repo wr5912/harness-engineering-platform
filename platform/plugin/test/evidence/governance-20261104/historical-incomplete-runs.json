@@ -1,0 +1,27 @@
+{
+  "scope": "固定历史中未完成的 Run，不补造结果，不作本轮验收",
+  "runs": [
+    {
+      "run_id": "run-8180a3a4-c21f-4c51-bb16-35463ce9a036",
+      "execution_state": "running",
+      "run_status": "running",
+      "results_bytes": 4096,
+      "results_sha256": "d065acdc26ead679c69f2daa019a7918a1de3a11ec2a6e3e013659257f291f64",
+      "null_bytes": 3326,
+      "source_commit": "8d92b794",
+      "current_matches_committed_history": true,
+      "reusable_as_completed_run": false
+    },
+    {
+      "run_id": "run-c25b777e-3857-4215-b2eb-0c7caed75e8a",
+      "execution_state": "running",
+      "run_status": "running",
+      "results_bytes": 4096,
+      "results_sha256": "59fdeacaf110a57d89fdb40335fbc4421487be66508d6ebae4fbee917ee62767",
+      "null_bytes": 2393,
+      "source_commit": "8d92b794",
+      "current_matches_committed_history": true,
+      "reusable_as_completed_run": false
+    }
+  ]
+}

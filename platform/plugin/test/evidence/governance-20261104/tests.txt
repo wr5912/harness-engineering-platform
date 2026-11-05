@@ -47,3 +47,65 @@ restart: ready; native session preserved
 browser: workspace_root_matches=true; instances_page=true; asset_filter=true
 browser: narrow_no_overflow=true; active_evaluations=0; page_errors=[]
 cleanup: only extracted source removed; isolated platform stopped
+
+2026-11-05 UTC 最终复验（分组重叠，不累加为独立总数）：
+
+plugin-final-all.log
+ℹ tests 1718
+ℹ pass 1718
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ duration_ms 193187.932992
+
+sdk-conversation-final.log
+ℹ tests 22
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ duration_ms 3822.937606
+
+gateway-diagnostic-file-native.log
+ℹ tests 47
+ℹ pass 47
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ duration_ms 16956.038979
+
+dependency-repair-final.log
+ℹ tests 13
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ duration_ms 34251.560407
+
+local-install-update-tests-final.log
+ℹ tests 12
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ duration_ms 38738.841011
+
+agent-pack-regression.log
+ℹ tests 14
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ duration_ms 22490.649114
+
+migration-affected-final.log
+ℹ tests 85
+ℹ pass 85
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ duration_ms 172073.704248
+
+offline-prepare-system-final.log
+Ran 45 tests in 45.850s
+OK

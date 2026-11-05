@@ -1,0 +1,87 @@
+{
+  "at": "2026-11-05T05:02:53.801Z",
+  "current": "EXP-security-operations-expert-027-m-reab20c48f610",
+  "old": "EXP-security-operations-expert-027-reab20c48f610",
+  "current_editable": true,
+  "history_readonly": true,
+  "history_ref": "git:f42ee0c5df473e141ed357f9f0918a132f1e0c37",
+  "migration_idempotent": true,
+  "version_label": "v027-m-reab20c48f610 · 主线\n⌄",
+  "page_errors": [],
+  "instances": [
+    {
+      "name": "exp-security-operations-expert-027-cf",
+      "state": "running",
+      "asset_status": {
+        "changed_files": [],
+        "checked_at": "2026-11-05T05:02:46.798271+00:00",
+        "current_digest": null,
+        "last_attempt": null,
+        "loaded": null,
+        "reason": "来源或运行代次无法核对，尚未核验",
+        "status": "unknown"
+      }
+    },
+    {
+      "name": "test-zhouyang-police-exp027",
+      "state": "running",
+      "asset_status": {
+        "changed_files": [
+          {
+            "change": "modified",
+            "path": "/opt/dsh-managed/threat-analysis/dsh_runner.py"
+          },
+          {
+            "change": "modified",
+            "path": "/opt/dsh-managed/threat-analysis/incident_scope.py"
+          },
+          {
+            "change": "modified",
+            "path": "/opt/dsh-managed/threat-analysis/result_delivery.py"
+          },
+          {
+            "change": "modified",
+            "path": "/opt/dsh-managed/threat-analysis/result_storage.py"
+          },
+          {
+            "change": "modified",
+            "path": "/opt/harness-platform/lib/business-runtime.js"
+          },
+          {
+            "change": "modified",
+            "path": "/opt/harness-platform/lib/mcp-manager.js"
+          },
+          {
+            "change": "modified",
+            "path": "运行配置"
+          }
+        ],
+        "checked_at": "2026-11-05T05:02:47.548Z",
+        "current_digest": "sha256:bade83dc3dea3023acaf1a0e4777033772a32d3feb73bdd12c4b65f909cc874b",
+        "generation_digest": "sha256:36a21058bbfee6bea3e8bfa791b118a5d891d53ccbafac860807d0d7ff485370",
+        "last_attempt": {
+          "at": "2026-11-05T01:52:44.013Z",
+          "message": "实际加载已核验",
+          "status": "verified"
+        },
+        "loaded": {
+          "configuration_digest": "sha256:8529208bf285122be6949b5dbc0753e78a207ee9d7934e4c03bfcdfc4fe7741c",
+          "container_id": "6d1edc5466f1d759d50a8d3bb105a2ceb20bbe8b0bbb9fa7ed2b72216ff40507",
+          "digest": "sha256:0f798de8929ec6ebe38eb2cddd335a26c91e38eb099085b14d5e7420c0b6c5b2",
+          "files_digest": "sha256:b90fda735e0c419e024191724443d3b73e4cad9c779ef35dd5dcba309f1fbe71",
+          "loaded_at": "2026-11-05T01:52:44.013Z",
+          "nonce": "1e8266c42cb19799771bf438e7b8d95c",
+          "ok": true,
+          "pid": 7,
+          "preset_id": "security-operations-expert",
+          "source_id": "experiment:EXP-security-operations-expert-027-reab20c48f610",
+          "started_at": "2026-11-05T01:52:36.727506576Z",
+          "verification": "runtime-observer",
+          "source_file_count": 3935
+        },
+        "reason": "资产已变化需重载，变化项相对最后实际加载回执",
+        "status": "pending_reload"
+      }
+    }
+  ]
+}

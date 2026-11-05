@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-05T04:29:51.794Z",
+  "session_id": "session-eddc3ee6-44ba-497b-8dbb-e7358b64a95e",
+  "session_preserved": true,
+  "web": true,
+  "narrow_no_overflow": true,
+  "page_errors": [],
+  "model": {
+    "completed": true,
+    "reply": "模型连接验证完成",
+    "tool_calls": 0,
+    "persisted": 16
+  },
+  "scope": "实际离线安装、真实模型回复和原生会话；不代表业务效果验收"
+}

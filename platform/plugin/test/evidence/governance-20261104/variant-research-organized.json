@@ -1,0 +1,28 @@
+{
+  "stage": "research-materials-organized",
+  "experiment_id": "VAR-security-operations-expert-003-r6fcbc8e8f093",
+  "archive_receipt": {
+    "path": "evolution/experiments/VAR-security-operations-expert-003-r6fcbc8e8f093/evaluation/training/3742ac796492fe73d4e9712872fec5b86fa089566c942394b92880b34036aea1/receipt.json",
+    "sha256": "0c543def1b53bb85b6080e4bc701fc8c433423cbd5183dcaff65f647cba9afe5"
+  },
+  "archived_files_verified": 33,
+  "removed_candidate_paths": [
+    "dsh/managed/compute-workflow/state-constructor.manifest.json",
+    "dsh/managed/compute-workflow/training/security-routing-training.py"
+  ],
+  "runtime_source_files_changed": 0,
+  "preserved_business_skills": [
+    "emergency-action",
+    "fault-analysis",
+    "playbook-impact-assessment",
+    "policy-configuration",
+    "response-planning",
+    "security-inspection",
+    "security-investigation",
+    "threat-analysis"
+  ],
+  "training_started": false,
+  "business_run_started": false,
+  "instance_reloaded": false,
+  "build_and_effect_acceptance": "暂停；后续按整理后的 Candidate 重新构建核验，不沿用旧冻结摘要"
+}

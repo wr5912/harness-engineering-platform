@@ -1,0 +1,23 @@
+{
+  "data_commit": "5df6a48c",
+  "instance": "security-operations-expert-exp027",
+  "files": [
+    {
+      "path": "candidate/dsh/managed/threat-analysis/dsh_runner.py",
+      "sha256": "0a512f3d887ca170d00cd662ee09d977acf462371883c30b33fb7035de40c184",
+      "changed": true
+    },
+    {
+      "path": "candidate/dsh/managed/threat-analysis/result_delivery.py",
+      "sha256": "b411ac77cd83a4827b18d5fe40c584e73aeb1392b987b00fc601e8079d0ca7f8",
+      "changed": true
+    }
+  ],
+  "bytes": 58918,
+  "fresh_process_validation": {
+    "formal_report_rejected": true,
+    "reason": "formal delivery requires completed and validated analysis"
+  },
+  "full_business_acceptance": "pending_new_unclaimed_incident",
+  "medium_variant_acceptance": "paused"
+}

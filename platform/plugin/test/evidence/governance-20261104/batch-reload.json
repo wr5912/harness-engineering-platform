@@ -1,0 +1,23 @@
+{
+  "source": "experiment:EXP-rc5-ui-acceptance-20261102-001-rbf6b3633f11e",
+  "stopped_rejected": {
+    "code": "invalid_request",
+    "message": "dsh-dev failed: 无法确认目标实例的运行代次；未执行重载\n"
+  },
+  "receipts": [
+    {
+      "name": "closure-reload-running-03",
+      "ok": true
+    }
+  ],
+  "skipped": [
+    {
+      "name": "closure-reload-stopped-03",
+      "reason": "停止实例不能重载，已跳过"
+    }
+  ],
+  "running_loaded": true,
+  "stopped_not_started": true,
+  "gateway": true,
+  "cleaned": true
+}
