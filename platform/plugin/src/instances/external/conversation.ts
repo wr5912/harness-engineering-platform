@@ -54,7 +54,7 @@ function dshReply(requestId: string, snapshot: ConversationSnapshot, accepted: b
   const index = events.findIndex(event => event.type === 'user/message' && event.data?.source?.kind === 'user' && event.data.source.rpcId === requestId)
   if (index < 0) return unresolved(accepted, '尚未读到本次输入事件，可继续读取；不会自动重发。')
   const turn = events.slice(0, index).reverse().find(event => event.type === 'turn/start')?.data?.turn
-  const next = events.slice(index + 1), boundary = next.findIndex(event => event.type === 'user/message')
+  const next = events.slice(index + 1), boundary = next.findIndex(event => event.type === 'user/message' && event.data?.source?.kind === 'user')
   const current = boundary < 0 ? next : next.slice(0, boundary)
   const messages: ExternalConversationResult['messages'] = current.filter(event => event.type === 'assistant/message').flatMap(event => {
     const text = textContent(event.data?.message?.content)

@@ -196,4 +196,10 @@ test('规范化严格截至下条user，失败与等待按三框架原生事实�
   assert.equal(dsh(events).status, 'completed'); assert.equal(dsh(events).messages[0].text, 'DSH真实回复')
   assert.equal(dsh([...events.slice(0, 3), { ...events[3], data: { turn: 99, reason: { kind: 'completed' } } }]).status, 'running')
   assert.equal(dsh([...events.slice(0, 3), { ...events[3], data: { turn: 1, reason: { kind: 'blocked' } } }]).status, 'waiting')
+  const injected = ['agent-instructions', 'runtime-context', 'skill-catalog', 'time-context'].map((kind, index) => ({ type: 'user/message', seq: 2.1 + index / 10, data: { source: { kind } } }))
+  assert.equal(dsh([...events, ...injected]).status, 'completed')
+  assert.equal(dsh([...events.slice(0, 3), ...injected, { ...events[3], data: { turn: 1, reason: { kind: 'error' } } }]).status, 'failed')
+  const nextInput = { type: 'user/message', seq: 2.9, data: { source: { kind: 'user', rpcId: 'later' } } }
+  const boundedDsh = dsh([...events, ...injected, nextInput])
+  assert.equal(boundedDsh.status, 'unknown'); assert.deepEqual(boundedDsh.messages, [])
 })

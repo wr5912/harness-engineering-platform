@@ -14,7 +14,7 @@ const { createSdkHandler } = await import(`file://${join(compiled, 'operations.m
 process.env.HARNESS_PROGRAM_ROOT = program
 process.env.HARNESS_PYTHON ??= 'python3'
 const source = 'experiment:EXP-sdk-test-001-r123456abcdef'
-function fixture(t, { slow = false, fail = false, modelPolicy } = {}) {
+function fixture(t, { slow = false, fail = false, linger = false, modelPolicy } = {}) {
   const root = mkdtempSync(join(base, 'workspace-'))
   const candidate = join(root, 'evolution/experiments', source.slice(11), 'candidate')
   mkdirSync(join(candidate, 'sdk'), { recursive: true })
@@ -24,7 +24,13 @@ function fixture(t, { slow = false, fail = false, modelPolicy } = {}) {
   writeFileSync(join(candidate, 'sdk/example.ts'), "import { DeepSeekHarness } from '@deepseek-ai/dsh-sdk-client'\n")
   const cli = join(root, 'fake-cli.py')
   writeFileSync(cli, `import json,sys,time,signal,os\nfrom pathlib import Path\na=sys.argv\nif 'down' in a: sys.exit(0)\np=Path(${JSON.stringify(root)})/'calls'\np.write_text(p.read_text()+'1' if p.exists() else '1')\nreg=Path(os.environ['HARNESS_ASSET_ROOT'])/'.local/instances/sdk-demo'\nreg.mkdir(parents=True,exist_ok=True)\n(reg/'instance.json').write_text(json.dumps({'profile':'sdk','source_id':'experiment:EXP-sdk-test-001-r123456abcdef','sdk_operation_id':os.environ.get('HARNESS_SDK_OPERATION_ID'),'asset_root':os.environ['HARNESS_ASSET_ROOT']}))\nprint(json.dumps({'event':'started'}),flush=True)\nsignal.signal(signal.SIGTERM,lambda *_:sys.exit(0))\ntime.sleep(${slow ? '20' : '0.1'})\n${fail ? "print(json.dumps({'profile':'sdk','name':'sdk-demo','status':'failed','message':os.environ.get('SDK_TEST_KEY','failure')}),flush=True);sys.exit(1)" : "print(json.dumps({'name':'sdk-demo','profile':'sdk','status':'completed','session_id':'session-sdk-test','final_response':'SDK调用完成'}),flush=True)"}\n`)
-  const handler = createSdkHandler(root, { worker: join(compiled, 'worker.mjs'), cli, modelPolicy })
+  let worker = join(compiled, 'worker.mjs')
+  if (linger) {
+    const entry = join(root, 'worker.mjs')
+    writeFileSync(entry, `await import(${JSON.stringify(`file://${worker}`)});setTimeout(() => {}, 3000)\n`)
+    worker = entry
+  }
+  const handler = createSdkHandler(root, { worker, cli, modelPolicy })
   const rpc = (method, body) => handler(method, body, new AbortController().signal, undefined)
   t.after(async () => {
     const listed = await rpc('list', {})
@@ -107,7 +113,7 @@ test('Web版本拒绝SDK调用，持久运行记录丢进程后标记未知且�
 })
 
 test('旧SDK操作不能停止后来同名的Web实例或另一SDK执行代次', async t => {
-  const fx = fixture(t)
+  const fx = fixture(t, { linger: true })
   await fx.rpc('start', request('sdk-old-operation'))
   await terminal(fx.rpc, 'sdk-old-operation')
   const directory = join(fx.root, '.local/sdk-operations/sdk-old-operation')
@@ -118,6 +124,7 @@ test('旧SDK操作不能停止后来同名的Web实例或另一SDK执行代次',
     writeFileSync(manifestFile, JSON.stringify({ ...replacement, source_id: source, asset_root: fx.root }))
     const stopped = await fx.rpc('stop', { operation_id: 'sdk-old-operation' })
     assert.equal(stopped.ok, false); assert.match(stopped.error.message, /已被替换|不属于/)
+    assert.equal(existsSync(join(directory, 'stop-requested')), false)
     assert.equal((await fx.rpc('status', { operation_id: 'sdk-old-operation' })).value.status, 'unknown')
   }
   // 测试清理只结束旧操作记录，不对替换后的实例执行停止。

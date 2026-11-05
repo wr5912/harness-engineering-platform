@@ -34,11 +34,14 @@ export function sdkInstance(root: string, operation: SdkOperation): Record<strin
   return JSON.parse(readFileSync(file, 'utf8'))
 }
 /** 停止前核对本次运行身份，旧操作不能停止后来同名的实例。 */
+function assertSdkInstance(root: string, operation: SdkOperation, current: Record<string, any>) {
+  if (!workspaceOwnsInstance(root, current) || current.profile !== 'sdk' || current.source_id !== operation.source
+    || current.sdk_operation_id !== operation.id) throw new Error('实例已被替换或不属于本次 SDK 执行，未停止当前实例；请核对原操作结果')
+}
 export async function stopSdkInstance(root: string, operation: SdkOperation, cli: string, environment: NodeJS.ProcessEnv) {
   const current = sdkInstance(root, operation)
   if (current) {
-    if (!workspaceOwnsInstance(root, current) || current.profile !== 'sdk' || current.source_id !== operation.source
-      || current.sdk_operation_id !== operation.id) throw new Error('实例已被替换或不属于本次 SDK 执行，未停止当前实例；请核对原操作结果')
+    assertSdkInstance(root, operation, current)
     await promisify(execFile)(process.env.HARNESS_PYTHON || 'python3', [cli, '--repo', root, 'down', operation.instance_id], { env: environment, timeout: 30_000 })
   } else {
     const result = await promisify(execFile)('docker', ['ps', '-a', '--format', '{{.Names}}'], { timeout: 10_000 })
@@ -141,6 +144,10 @@ export function createSdkHandler(root: string, options: { modelPolicy?: SdkModel
       if (endpoint === 'stop') {
         const id = operationId(body.operation_id), directory = join(base, id), operation = read(id)
         if (!ACTIVE.has(operation.status)) return { ok: true, value: operation }
+        if (operation.status === 'unknown') {
+          const current = sdkInstance(root, operation)
+          if (current) assertSdkInstance(root, operation, current)
+        }
         writeFileSync(join(directory, 'stop-requested'), '', { mode: 0o600 })
         if (workerAlive(operation, directory)) process.kill(operation.worker_pid!, 'SIGTERM')
         else if (operation.status === 'starting') {
