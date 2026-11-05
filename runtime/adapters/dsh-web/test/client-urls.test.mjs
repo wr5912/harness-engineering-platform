@@ -10,6 +10,36 @@ import { transformClientUrls } from '../lib/index.mjs'
 const require = createRequire(new URL('../../../../platform/plugin/package.json', import.meta.url))
 const yaml = require('js-yaml')
 
+test('仅适配原生中文运行文案，保留耗时占位、英文和业务正文', () => {
+  const source = `globalThis.copy = {
+    'chat.deepDiving': '深度求索中',
+    'chat.deepDivingFor': '深度求索中，用时 {duration} ···',
+    message: '深度求索中，用时...',
+    other: { 'chat.deepDiving': 'Deep diving', 'chat.deepDivingFor': 'Deep diving for {duration} ···' }
+  }`
+  const context = { URL, Request, document: { baseURI: 'http://fixture.local/hep/' } }
+  const transformed = transformClientUrls(source)
+  vm.runInNewContext(transformed, context)
+  assert.equal(context.copy['chat.deepDiving'], '思考中')
+  assert.equal(context.copy['chat.deepDivingFor'].replace('{duration}', '2秒'), '思考中，用时 2秒 ···')
+  assert.equal(context.copy.message, '深度求索中，用时...')
+  assert.equal(context.copy.other['chat.deepDiving'], 'Deep diving')
+  assert.equal(context.copy.other['chat.deepDivingFor'], 'Deep diving for {duration} ···')
+  assert.equal(transformClientUrls(transformed), transformed)
+})
+
+test('锁定版原生聊天制品的状态与无障碍提示共用适配后的字典', () => {
+  const webRequire = createRequire(require.resolve('@deepseek-ai/dsh-web-app/package.json'))
+  const source = readFileSync(webRequire.resolve('@deepseek-ai/dsh-client-ui-chat/client'), 'utf8')
+  const transformed = transformClientUrls(source)
+  assert.equal((source.match(/"chat.deepDiving": "深度求索中"/g) ?? []).length, 1)
+  assert.equal((source.match(/"chat.deepDivingFor": "深度求索中，用时 \{duration\} ···"/g) ?? []).length, 1)
+  assert.ok(transformed.includes('"chat.deepDiving": "思考中"'))
+  assert.ok(transformed.includes('"chat.deepDivingFor": "思考中，用时 {duration} ···"'))
+  assert.ok(!transformed.includes('深度求索中'))
+  new vm.Script(transformed)
+})
+
 function execute(source, basePath = '/assistant/') {
   const calls = []
   const context = {

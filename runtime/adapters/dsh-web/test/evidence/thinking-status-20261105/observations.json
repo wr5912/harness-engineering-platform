@@ -1,0 +1,197 @@
+{
+  "observedAt": "2026-11-05T08:29:08Z",
+  "runtime": "0.2.1-rc.5",
+  "instances": [
+    {
+      "instance": "threat-analysis-003",
+      "status": 200,
+      "runningLabel": true,
+      "accessibleLabel": true,
+      "oldLabel": false
+    },
+    {
+      "instance": "exp-security-operations-expert-027-cf",
+      "status": 200,
+      "runningLabel": true,
+      "accessibleLabel": true,
+      "oldLabel": false
+    },
+    {
+      "instance": "test-zhouyang-police-exp027",
+      "status": 200,
+      "runningLabel": true,
+      "accessibleLabel": true,
+      "oldLabel": false
+    },
+    {
+      "instance": "test-zhouyang-disp14",
+      "status": 200,
+      "runningLabel": true,
+      "accessibleLabel": true,
+      "oldLabel": false
+    }
+  ],
+  "activation": {
+    "observedAt": "2026-11-05T08:28:11Z",
+    "instances": [
+      {
+        "instance": "threat-analysis-003",
+        "http": 200,
+        "thinking": true,
+        "oldLabel": false,
+        "retention": {
+          "container": true,
+          "image": true,
+          "ports": true,
+          "mounts": true,
+          "originalSessions": true
+        },
+        "sessionCount": 3,
+        "missingOriginalSessions": [],
+        "newSessionCount": 0,
+        "startedAt": "2026-11-05T08:25:52.65232893Z"
+      },
+      {
+        "instance": "exp-security-operations-expert-027-cf",
+        "http": 200,
+        "thinking": true,
+        "oldLabel": false,
+        "retention": {
+          "container": true,
+          "image": true,
+          "ports": true,
+          "mounts": true,
+          "originalSessions": true
+        },
+        "sessionCount": 132,
+        "missingOriginalSessions": [],
+        "newSessionCount": 0,
+        "startedAt": "2026-11-05T08:25:54.092466539Z"
+      }
+    ]
+  },
+  "manager": {
+    "observedAt": "2026-11-05T08:20:30.052Z",
+    "observations": [
+      {
+        "running": [
+          {
+            "text": "思考中\n思考中，用时 1秒 ···",
+            "status": "思考中"
+          }
+        ],
+        "stop": true,
+        "path": "/hep/"
+      },
+      {
+        "width": 1440,
+        "running": [
+          {
+            "text": "思考中\n思考中，用时 1秒 ···",
+            "status": "思考中"
+          }
+        ],
+        "overflow": false
+      },
+      {
+        "width": 768,
+        "running": [
+          {
+            "text": "思考中\n思考中，用时 2秒 ···",
+            "status": "思考中"
+          }
+        ],
+        "overflow": false
+      },
+      {
+        "width": 390,
+        "running": [
+          {
+            "text": "思考中\n思考中，用时 3秒 ···",
+            "status": "思考中"
+          }
+        ],
+        "overflow": false
+      }
+    ],
+    "errors": [],
+    "final": {
+      "running": false,
+      "text": "验证界面状态提示文案\n对话\n请仅回复“收到”，不要调用工具，不执行任何操作。本消息仅用于验证界面状态文案。\n00:20\n已完成\n已完成，用时 4秒\n\n收到\n\n00:20\n发消息或创建任务, / 调用指令, @ 文件或对话\n当前：标准速度。点击选择速度。\n7d\n1 轮 1 步·2077 tok/s\n17K tok·缓存命中 0%\n3%\nHarness工程平台\nHarness Engineering Platform\n管理对话\n☰"
+    }
+  },
+  "business": {
+    "observedAt": "2026-11-05T08:26:46.511Z",
+    "observations": [
+      {
+        "running": [
+          {
+            "text": "思考中\n思考中，用时 1秒 ···",
+            "status": "思考中"
+          }
+        ],
+        "stop": true,
+        "path": "/agents/security-operations-expert/instances/test-zhouyang-disp14/"
+      },
+      {
+        "width": 1440,
+        "running": [
+          {
+            "text": "思考中\n思考中，用时 1秒 ···",
+            "status": "思考中"
+          }
+        ],
+        "overflow": false,
+        "rects": [
+          {
+            "x": 341.5,
+            "y": 441,
+            "width": 680,
+            "height": 22
+          }
+        ]
+      },
+      {
+        "width": 768,
+        "running": [
+          {
+            "text": "思考中\n思考中，用时 2秒 ···",
+            "status": "思考中"
+          }
+        ],
+        "overflow": false,
+        "rects": [
+          {
+            "x": 88,
+            "y": 441,
+            "width": 641,
+            "height": 22
+          }
+        ]
+      },
+      {
+        "width": 390,
+        "running": [
+          {
+            "text": "思考中\n思考中，用时 3秒 ···",
+            "status": "思考中"
+          }
+        ],
+        "overflow": false,
+        "rects": [
+          {
+            "x": 88,
+            "y": 485,
+            "width": 263,
+            "height": 22
+          }
+        ]
+      }
+    ],
+    "errors": [],
+    "final": {
+      "running": false,
+      "text": "界面状态文案验证\n对话\n请仅回复“收到”，不要调用工具，不执行任何操作。本消息仅用于验证界面状态文案。\n00:24\n已完成\n已完成，用时 5秒\n\n收到\n\n00:24\n请仅回复“收到”，不要调用工具，不执行任何操作。本消息仅用于验证界面状态文案。\n00:26\n已完成\n已完成，用时 4秒\n\n收到\n\n00:26\n语音连接已断开，在途播报已取消。\n发消息或创建任务, / 调用指令, @ 文件或对话\nQwen3.8-27B\n2 轮 2 步·400 tok/s\n63.8K tok·缓存命中 0%\n12%\n系统消息\n系统消息\n当前会话\n1\n当前\n0\n待处理\n0\n执行中\n1\n已完成\n\n当前会话最近一次执行已完成。"
+    }
+  }
+}

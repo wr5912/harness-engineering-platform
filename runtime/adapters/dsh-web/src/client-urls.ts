@@ -2,7 +2,7 @@ import ts from 'typescript'
 
 interface Scope { names: Set<string>; parent?: Scope; functionScope: boolean }
 
-/** 只转换最终网络目标；不触及 OpenAPI 参数、文件路径或浏览器 Origin 的语义。 */
+/** 适配最终网络目标和原生运行文案；不触及业务内容、文件路径或浏览器 Origin 的语义。 */
 export function transformClientUrls(source: string): string {
   const file = ts.createSourceFile('client.js', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS)
   const scopes = new WeakMap<ts.Node, Scope>()
@@ -46,8 +46,15 @@ export function transformClientUrls(source: string): string {
   }
   let helper = '__harnessSiteUrl'
   while (source.includes(helper)) helper += '_'
-  const edits: { position: number; text: string }[] = []
+  const edits: { position: number; end?: number; text: string }[] = []
   function targets(node: ts.Node): void {
+    // 锁定版 locale 不允许覆盖已有字典，沿共享 Web 出口适配这两个原生键，保留计时和无障碍提示。
+    if (ts.isPropertyAssignment(node) && ts.isStringLiteral(node.name) && ts.isStringLiteral(node.initializer)
+      && ['chat.deepDiving', 'chat.deepDivingFor'].includes(node.name.text)
+      && node.initializer.text.startsWith('深度求索中')) {
+      edits.push({ position: node.initializer.getStart(file), end: node.initializer.end,
+        text: JSON.stringify(node.initializer.text.replace(/^深度求索中/, '思考中')) })
+    }
     let argument: ts.Expression | undefined
     if (ts.isCallExpression(node) && (globalMember(node.expression, 'fetch')
       || (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'addModule'
@@ -60,7 +67,7 @@ export function transformClientUrls(source: string): string {
   }
   targets(file)
   if (!edits.length) return source
-  for (const edit of edits.sort((a, b) => b.position - a.position)) source = source.slice(0, edit.position) + edit.text + source.slice(edit.position)
+  for (const edit of edits.sort((a, b) => b.position - a.position)) source = source.slice(0, edit.position) + edit.text + source.slice(edit.end ?? edit.position)
   source = source.replace(/^\s*\/\/[#@] sourceMappingURL=[^\r\n]*$/gm, '')
   // 私有闭包避免组合资源和 HMR 再次装载时产生顶层声明冲突。
   return `((browser)=>{function ${helper}(input){
