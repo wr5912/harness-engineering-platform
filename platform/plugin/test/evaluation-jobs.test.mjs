@@ -18,7 +18,7 @@ const run=path.join(process.cwd(),'evolution/experiments/${experiment}/runs',run
 fs.mkdirSync(run,{recursive:true});
 const manifest={schema_version:'2.0',run_id:runId,experiment_id:'${experiment}',agent_id:'test-agent',status:'running',created_at:new Date().toISOString()};
 fs.writeFileSync(path.join(run,'inputs.lock.json'),JSON.stringify({run_id:runId,source_id:'${source}',evaluation_cases:[{case_id:'U-CASE-001'}]}));
-const finish=status=>{manifest.status=status;fs.writeFileSync(path.join(run,'run.yaml'),JSON.stringify(manifest));};
+const finish=status=>{manifest.status=status;const temporary=path.join(run,'run.yaml.tmp');fs.writeFileSync(temporary,JSON.stringify(manifest));fs.renameSync(temporary,path.join(run,'run.yaml'));};
 finish('running');
 `
 async function fixture(t, body = "finish('completed');console.log(JSON.stringify({run_id:runId}))", raw = false) {

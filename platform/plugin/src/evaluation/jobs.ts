@@ -399,11 +399,14 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
       const settle = (error?: Error) => {
         if (settled) return
         let run: Run | undefined
-        try { run = runDirectory(job) } catch (observed) { if (!error) error = observed as Error }
-        if (run) {
-          job.status = FINAL.has(run.manifest.status) ? run.manifest.status : job.status === 'cancelling' ? 'cancelling' : 'running'; save(job)
-          settled = true; clearInterval(timer); resolveCreated(snapshot(job)); return
-        }
+        try {
+          run = runDirectory(job)
+          if (run) {
+            job.status = FINAL.has(run.manifest.status) ? run.manifest.status : job.status === 'cancelling' ? 'cancelling' : 'running'; save(job)
+            const value = snapshot(job)
+            settled = true; clearInterval(timer); resolveCreated(value); return
+          }
+        } catch (observed) { if (!error) error = observed as Error }
         if (error) { settled = true; clearInterval(timer); rejectCreated(error) }
       }
       let proc: ReturnType<typeof spawn>

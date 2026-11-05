@@ -149,7 +149,7 @@ test('批量重载加载结果未核验时暂停后续目标，刷新不会重�
   const ui = page({ instances, respond(endpoint, payload) {
     if (endpoint === 'instances/batch-preview') return { ok: true, value: { previews: payload.items.map(item => ({ ...item, ok: true,
       value: { ...item, plan: { source_id: instances[0].source_id, current_asset_digest: assetDigest, generation_digest: generationDigest }, model_policy_hash: previewHash } })) } }
-    if (endpoint === 'instances/run') return { ok: true, value: { ...payload, ok: false, error: { message: '实际加载结果尚未核验，请刷新实例回执' } } }
+    if (endpoint === 'instances/run') return { ok: true, value: { ...payload, ok: false, status: 'unknown', error: { message: '执行状态需核对，请刷新实例回执' } } }
   } })
   await ui.settle()
   ui.nodes().find(node => node.props?.['aria-label'] === '全选当前列表实例').props.onChange({ target: { checked: true } }); ui.render()
