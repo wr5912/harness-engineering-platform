@@ -149,6 +149,26 @@ test('迭代版本始终显示完整随机后缀，同号且末六位相同的�
   assert.equal(ui.calls.some(call => /apply|activate|create/.test(call.endpoint)), false)
 })
 
+test('版本选择展示各自的备注，切换与资料刷新不串用其他版本备注', async () => {
+  const rows = experiments().filter(item => item.agent_id === 'first-agent')
+  let notes = ['首版说明', '当前变体说明']
+  const ui = page({ intercept(endpoint, payload) {
+    if (endpoint !== 'agents/detail') return
+    return { ok: true, value: { ...detail('first-agent', payload.experiment_id), versions: rows.map((row, i) => ({ id: row.id, notes: notes[i] })) } }
+  } })
+  await ui.settle()
+  const selector = () => ui.nodes().find(node => node.type === 'select' && node.props['aria-label'] === '版本')
+  const labels = () => ui.nodes(selector()).filter(node => node.type === 'option').map(node => ui.text(node))
+  assert.match(labels().find(text => text.includes('v001')), /v001 · 首版说明/)
+  assert.match(labels().find(text => text.includes('v002')), /v002 · 当前变体说明/)
+  notes = ['已更新的首版备注', '  ']
+  selector().props.onChange({ target: { value: rows[0].id } }); await ui.settle()
+  assert.equal(selector().props.value, rows[0].id)
+  assert.match(labels().find(text => text.includes('v001')), /v001 · 已更新的首版备注/)
+  assert.match(labels().find(text => text.includes('v002')), /^v002 资产告警轻量版/)
+  assert.equal(ui.calls.some(call => /apply|activate|create/.test(call.endpoint)), false)
+})
+
 test('变体候选使用版本号与完整后缀，保留名称和来源信息', async () => {
   const base = experiments().filter(item => item.agent_id === 'first-agent')
   const rows = [...base,

@@ -22,7 +22,7 @@ type RpcResult = { ok: true; value: any } | { ok: false; error: { code: string; 
 type AgentRow = { id: string; name?: string; manifest?: Record<string, any>; active_experiment?: string | null; version_count?: number; latest_experiment_status?: string | null; instance_state?: string }
 type PreviewState = { path: string; body: string; before: string; diff: string; dry: any }
 type AssetNode = { name: string; path: string; kind: string; children?: AssetNode[] }
-type ExperimentRow = { id: string; agent_id: string; status?: string; is_variant?: boolean; derivable?: boolean; is_current?: boolean; change: Record<string, any> }
+type ExperimentRow = { id: string; agent_id: string; notes?: string; status?: string; is_variant?: boolean; derivable?: boolean; is_current?: boolean; change: Record<string, any> }
 type ListView = NonNullable<PlatformNavigation['list_view']>
 type RunOverview = AgentRunOverview
 
@@ -681,7 +681,7 @@ export function AgentsPage({ rpc, updates, onContext, onAssistant, target, onNav
       ? [variantName(version), source.parent.experimentId ? `基于 ${versionLabel(source.parent.experimentId).replace(/^版本 /, 'v')}` : '来源版本未记录', source.generationMode && generationLabel(version)]
       : [researchStatus(version.status)]
     if (version.is_current === false) description.push('历史记录')
-    return { value: version.id, label: name, group: variant ? '算力变体' : '迭代版本', description: description.filter(Boolean).join(' · ') }
+    return { value: version.id, label: [name, version.notes?.trim()].filter(Boolean).join(' · '), group: variant ? '算力变体' : '迭代版本', description: description.filter(Boolean).join(' · ') }
   })
   const visibleVariants = variants.filter(variant => {
     const agent = agents.find(item => item.id === variant.agent_id)

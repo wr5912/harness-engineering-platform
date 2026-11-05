@@ -1,0 +1,103 @@
+{
+  "scope": "228 已加载页面的浏览器响应夹具，核对长备注和空备注边界",
+  "checks": [
+    {
+      "name": "长备注夹具-1440 选择器完整可见",
+      "pass": true
+    },
+    {
+      "name": "长备注夹具-1440 页面无横向溢出",
+      "pass": true
+    },
+    {
+      "name": "长备注夹具-1440 宽度400px",
+      "pass": true
+    },
+    {
+      "name": "长备注夹具-1440 下拉完整内容",
+      "pass": true
+    },
+    {
+      "name": "长备注夹具-1440 空备注不留分隔符",
+      "pass": true
+    },
+    {
+      "name": "长备注夹具-768 选择器完整可见",
+      "pass": true
+    },
+    {
+      "name": "长备注夹具-768 页面无横向溢出",
+      "pass": true
+    },
+    {
+      "name": "长备注夹具-768 下拉完整内容",
+      "pass": true
+    },
+    {
+      "name": "长备注夹具-768 空备注不留分隔符",
+      "pass": true
+    },
+    {
+      "name": "长备注夹具-390 选择器完整可见",
+      "pass": true
+    },
+    {
+      "name": "长备注夹具-390 页面无横向溢出",
+      "pass": true
+    },
+    {
+      "name": "长备注夹具-390 下拉完整内容",
+      "pass": true
+    },
+    {
+      "name": "长备注夹具-390 空备注不留分隔符",
+      "pass": true
+    },
+    {
+      "name": "夹具未改写真实资产",
+      "pass": true
+    },
+    {
+      "name": "无页面脚本异常",
+      "pass": true
+    }
+  ],
+  "errors": [],
+  "sizes": [
+    {
+      "name": "长备注夹具-1440",
+      "width": 400,
+      "left": 540.484375,
+      "right": 940.484375,
+      "viewport": 1440,
+      "overflow": false,
+      "clipped": false
+    },
+    {
+      "name": "长备注夹具-768",
+      "width": 400,
+      "left": 258.734375,
+      "right": 658.734375,
+      "viewport": 768,
+      "overflow": false,
+      "clipped": false
+    },
+    {
+      "name": "长备注夹具-390",
+      "width": 332,
+      "left": 29,
+      "right": 361,
+      "viewport": 390,
+      "overflow": false,
+      "clipped": false
+    }
+  ],
+  "originalTheme": "dark",
+  "responseKeys": [
+    "type",
+    "rpcId",
+    "result"
+  ],
+  "fixtureIntercepts": 2,
+  "finalTheme": "dark"
+}

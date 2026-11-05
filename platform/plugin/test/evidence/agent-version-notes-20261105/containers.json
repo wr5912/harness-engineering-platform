@@ -1,0 +1,4 @@
+{
+  "beforeAfterIdentical": true,
+  "snapshot": "004026c6f3e1\tthreat-analysis-003\t127.0.0.1:18500->18500/tcp\n65cc478d6ff1\texp-security-operations-expert-027-cf\t127.0.0.1:18561->18561/tcp\ndb7374bc7e70\ttest-zhouyang-police-exp027\t127.0.0.1:18510->18510/tcp\n88fb7a584606\tai-lite-local223-web-000691\t\n331520aed894\ttest-zhouyang-disp14\t127.0.0.1:18508->18508/tcp\n3b1f15eb0f43\tai-knowledge-local-frontend\t\n4d44438b5653\tai-knowledge-local-app\t\n1a0913a6a291\tai-knowledge-local-docreader\t\n5a573720a5e6\tnwj-mcp-platform\t0.0.0.0:50500->8001/tcp\n4d87c071b008\txsoc-dameng\t0.0.0.0:26040->5236/tcp, [::]:26040->5236/tcp\nf0818eeb7e81\tPostgreSQL18\t0.0.0.0:26011->5432/tcp, [::]:26011->5432/tcp\n1edf6a00d334\tbuildx_buildkit_soe-exp014-recovery0\t\n"
+}

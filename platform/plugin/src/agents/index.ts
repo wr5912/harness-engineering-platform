@@ -243,13 +243,16 @@ function listDirs(file: string): string[] {
   }
 }
 
-function agentDisplayName(root: string, experimentId?: string): string | undefined {
-  if (!experimentId) return undefined
+function agentProfile(root: string, experimentId?: string): { name?: string; notes?: string } {
+  if (!experimentId) return {}
   const file = join(root, 'evolution/experiments', experimentId, 'candidate/harness.yaml')
-  if (!existsSync(file)) return undefined
+  if (!existsSync(file)) return {}
   assertNoSymlinkPath(root, file)
   const agent = readYamlMap(root, file).agent as JsonMap | undefined
-  return typeof agent?.name === 'string' && agent.name.trim() ? agent.name.trim() : undefined
+  return {
+    name: typeof agent?.name === 'string' && agent.name.trim() ? agent.name.trim() : undefined,
+    notes: typeof agent?.notes === 'string' ? agent.notes : undefined,
+  }
 }
 
 function listAgents(root: string, experiments = listExperiments(root)) {
@@ -257,7 +260,7 @@ function listAgents(root: string, experiments = listExperiments(root)) {
     const manifest = readYamlMap(root, join(root, 'agents', id, 'manifest.yaml'))
     const versions = experiments.filter(item => item.agent_id === id).sort((a, b) => b.id.localeCompare(a.id, 'en', { numeric: true }))
     const active = typeof manifest.active_experiment === 'string' && versions.some(value => value.id === manifest.active_experiment) ? manifest.active_experiment : undefined
-    return { id, name: agentDisplayName(root, active ?? versions[0]?.id) ?? id, version_count: versions.length, latest_experiment_status: versions[0]?.status ?? null,
+    return { id, name: agentProfile(root, active ?? versions[0]?.id).name ?? id, version_count: versions.length, latest_experiment_status: versions[0]?.status ?? null,
       path: `agents/${id}`, manifest, active_experiment: manifest.active_experiment ?? null }
   })
 }
@@ -1032,9 +1035,10 @@ async function detail(root: string, payload: JsonMap, signal?: AbortSignal) {
   catch (error) { if (!(error instanceof RpcError && error.code === 'path_rejected')) throw error }
   let governanceDigest: string | null = null
   try { governanceDigest = governanceSnapshot(root, agentId) } catch { /* 无法固定的资产仍允许只读清点；创建和合并继续严格核对。 */ }
+  const profile = agentProfile(root, experimentId)
   return ok({
-    agent: { id: agentId, name: agentDisplayName(root, experimentId) ?? agentId, manifest, path: `agents/${agentId}` },
-    experiment: exp,
+    agent: { id: agentId, name: profile.name ?? agentId, manifest, path: `agents/${agentId}` },
+    experiment: { ...exp, notes: profile.notes },
     version_governance: { ...versionAccess(root, experimentId), managed: governance.managed, current_generation: governance.generation, snapshot_sha256: governanceDigest,
       unresolved_features: governance.managed ? featureDispositionsPending(root, agentId) : [] },
     current_variant_id: exp.current_variant_id,
@@ -1043,7 +1047,12 @@ async function detail(root: string, payload: JsonMap, signal?: AbortSignal) {
     change_sha256: exp.change_sha256,
     candidate_sha256: readableCandidateDigest,
     selection: { basis: explicitExperiment ? 'explicit' : governance.mainline_id ? 'current_mainline' : activeExperiment ? 'active_experiment' : 'latest_experiment', experiment_id: experimentId },
-    versions: versions.map(item => ({ id: item.id, governance: versionAccess(root, item.id), is_current: item.is_current, current_variant_id: item.current_variant_id, is_variant: isVariantIdentity(item.id, item.change), derivable: !isVariantIdentity(item.id, item.change), status: item.status, baseline_ref: item.baseline_ref, ...(item.error ? { error: item.error } : {}) })),
+    versions: versions.map(item => {
+      let notes: string | undefined
+      try { notes = item.id === experimentId ? profile.notes : agentProfile(root, item.id).notes }
+      catch { /* 其他版本的资料不可读时，仍允许查看和切换当前版本。 */ }
+      return { id: item.id, notes, governance: versionAccess(root, item.id), is_current: item.is_current, current_variant_id: item.current_variant_id, is_variant: isVariantIdentity(item.id, item.change), derivable: !isVariantIdentity(item.id, item.change), status: item.status, baseline_ref: item.baseline_ref, ...(item.error ? { error: item.error } : {}) }
+    }),
     baseline: { ref: exp.baseline_ref, parent_experiment_id: exp.change.parent_experiment_id ?? null, source: exp.baseline_ref ? 'change.yaml' : 'unknown' },
     fusion: declaredFusion(exp.change),
     related_references: relatedRefs(root, experimentId),
