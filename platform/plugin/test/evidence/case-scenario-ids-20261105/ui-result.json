@@ -1,0 +1,40 @@
+{
+  "experiment_id": "EXP-security-operations-expert-027-m-reab20c48f610",
+  "failures": [
+    "invalid_request: U-NEW-999 使用了占位缩写；请使用所属场景的英文缩写；当前草稿已保留。",
+    "invalid_request: 安全巡检 的用例编号必须以 U-INS- 开头；当前草稿已保留。"
+  ],
+  "layouts": [
+    {
+      "width": 1440,
+      "box": {
+        "x": 340,
+        "y": 20,
+        "width": 760,
+        "height": 960
+      },
+      "overflow": false
+    },
+    {
+      "width": 768,
+      "box": {
+        "x": 16,
+        "y": 20,
+        "width": 736,
+        "height": 960
+      },
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "box": {
+        "x": 12,
+        "y": 12,
+        "width": 366,
+        "height": 976
+      },
+      "overflow": false
+    }
+  ],
+  "saved": false
+}

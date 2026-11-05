@@ -1,0 +1,230 @@
+{
+  "date": "2026-11-05",
+  "assistant": {
+    "session_id": "session-55933e17-91e0-4fb6-903a-7df25160b443",
+    "running": false,
+    "actions": [
+      {
+        "seq": 114,
+        "action": "describe",
+        "input": {
+          "action": "cases/renumber-preview"
+        }
+      },
+      {
+        "seq": 121,
+        "action": "describe",
+        "input": {
+          "action": "cases/renumber"
+        }
+      },
+      {
+        "seq": 131,
+        "action": "describe",
+        "input": {
+          "action": "cases/create-context"
+        }
+      },
+      {
+        "seq": 138,
+        "action": "cases/create-context",
+        "input": {
+          "agent_id": "security-operations-expert",
+          "experiment_id": "EXP-security-operations-expert-027-m-reab20c48f610"
+        }
+      },
+      {
+        "seq": 143,
+        "action": "describe",
+        "input": {
+          "action": "cases/list"
+        }
+      },
+      {
+        "seq": 150,
+        "action": "cases/list",
+        "input": {
+          "agent_id": "security-operations-expert",
+          "experiment_id": "EXP-security-operations-expert-027-m-reab20c48f610"
+        }
+      },
+      {
+        "seq": 155,
+        "action": "describe",
+        "input": {
+          "action": "cases/renumber-preview"
+        }
+      },
+      {
+        "seq": 162,
+        "action": "cases/renumber-preview",
+        "input": {
+          "experiment_id": "EXP-security-operations-expert-027-m-reab20c48f610",
+          "expected_sha256": "28dc1a02ab65ac77ba3100ce5b7e7aa59c7ab35e01856ee8e26a218afd22cada",
+          "renames": [
+            {
+              "from": "U-NEW-008",
+              "to": "U-INS-012"
+            },
+            {
+              "from": "U-NEW-009",
+              "to": "U-INS-013"
+            },
+            {
+              "from": "U-NEW-001",
+              "to": "U-EMG-004"
+            },
+            {
+              "from": "U-NEW-003",
+              "to": "U-POL-014"
+            },
+            {
+              "from": "U-NEW-005",
+              "to": "U-POL-015"
+            },
+            {
+              "from": "U-NEW-006",
+              "to": "U-POL-016"
+            },
+            {
+              "from": "U-NEW-002",
+              "to": "U-THREAT-001"
+            },
+            {
+              "from": "U-NEW-004",
+              "to": "U-THREAT-002"
+            },
+            {
+              "from": "U-NEW-007",
+              "to": "U-THREAT-003"
+            },
+            {
+              "from": "U-NEW-010",
+              "to": "U-THREAT-004"
+            },
+            {
+              "from": "U-NEW-011",
+              "to": "U-THREAT-005"
+            },
+            {
+              "from": "U-NEW-012",
+              "to": "U-THREAT-006"
+            }
+          ]
+        }
+      },
+      {
+        "seq": 167,
+        "action": "describe",
+        "input": {
+          "action": "cases/renumber"
+        }
+      },
+      {
+        "seq": 177,
+        "action": "cases/renumber",
+        "input": {
+          "experiment_id": "EXP-security-operations-expert-027-m-reab20c48f610",
+          "expected_sha256": "28dc1a02ab65ac77ba3100ce5b7e7aa59c7ab35e01856ee8e26a218afd22cada",
+          "renames": [
+            {
+              "from": "U-NEW-008",
+              "to": "U-INS-012"
+            },
+            {
+              "from": "U-NEW-009",
+              "to": "U-INS-013"
+            },
+            {
+              "from": "U-NEW-001",
+              "to": "U-EMG-004"
+            },
+            {
+              "from": "U-NEW-003",
+              "to": "U-POL-014"
+            },
+            {
+              "from": "U-NEW-005",
+              "to": "U-POL-015"
+            },
+            {
+              "from": "U-NEW-006",
+              "to": "U-POL-016"
+            },
+            {
+              "from": "U-NEW-002",
+              "to": "U-THREAT-001"
+            },
+            {
+              "from": "U-NEW-004",
+              "to": "U-THREAT-002"
+            },
+            {
+              "from": "U-NEW-007",
+              "to": "U-THREAT-003"
+            },
+            {
+              "from": "U-NEW-010",
+              "to": "U-THREAT-004"
+            },
+            {
+              "from": "U-NEW-011",
+              "to": "U-THREAT-005"
+            },
+            {
+              "from": "U-NEW-012",
+              "to": "U-THREAT-006"
+            }
+          ]
+        }
+      },
+      {
+        "seq": 184,
+        "action": "describe",
+        "input": {
+          "action": "cases/list"
+        }
+      },
+      {
+        "seq": 199,
+        "action": "cases/list",
+        "input": {
+          "agent_id": "security-operations-expert",
+          "experiment_id": "EXP-security-operations-expert-027-m-reab20c48f610"
+        }
+      }
+    ],
+    "final_reply": "已保存并回读：**12 项改号完成，5 个文件变更**。输入、预期、fast、顺序及其他业务正文未改，旧编号无残留。\n\n变更文件：\n- [evaluation.md](<agents/security-operations-expert/evaluation.md>)：通过定向改号入口完成全部映射。\n- [platform-adapter.md](<.agents/skills/evaluation-review/references/platform-adapter.md#L16-L25>)：集中维护编号、授权改号及失败处理规则。\n- [evaluation-review/SKILL.md](<.agents/skills/evaluation-review/SKILL.md#L28>)：加入授权改号例外与规则引用。\n- [case-template.md](<.agents/skills/evaluation-review/assets/case-template.md>)：示例改为 `U-INS-001`，注明不能盲抄；实际位置为 `assets/`。\n- [agent-maintenance/SKILL.md](<.agents/skills/agent-maintenance/SKILL.md#L23-L39>)：补充新增、改号入口及禁止绕过校验的要求。\n\n历史 Run 与出处保持不变；未修改其他 Skill 或管理原则，未执行 Git、评测、版本创建或实例操作。"
+  },
+  "evaluation": {
+    "before_sha256": "28dc1a02ab65ac77ba3100ce5b7e7aa59c7ab35e01856ee8e26a218afd22cada",
+    "after_sha256": "d3f98171f60d464e273fc888170dcc3b0e0a2f486052f1e86228cdc12db3eb06",
+    "renamed_count": 12,
+    "only_heading_ids_changed": true
+  },
+  "skills_sha256": {
+    ".agents/skills/evaluation-review/SKILL.md": "bdbf996ac4aae563401f9cd4645fc631c6ab81dae8fbaeb68fa0577bb62a0856",
+    ".agents/skills/evaluation-review/references/platform-adapter.md": "d6a5154ddda59779398fa118f14fad7b2ae339885f4a097313d9b0cee3d5e708",
+    ".agents/skills/evaluation-review/assets/case-template.md": "f3b7ece5cd9af314317411634c49e7332af78162b64203f4257d4e33e7e82a1b",
+    ".agents/skills/agent-maintenance/SKILL.md": "d72bbbfe47f8718d0ffdb17f9a248f7c98de9bbcb4610050d70eba4168621840",
+    ".agents/skills/harness-experiment-fusion/SKILL.md": "3b2a271a7774bb4452be3351a29ea5d0a6bbc7c91e8426b4b7ce35cb4d32a71e"
+  },
+  "fusion_assistant": {
+    "session_id": "session-c7da046e-da4d-4e5b-bab7-c55ae1dd4c91",
+    "completed": true,
+    "scope": "Skill editing and readback; no fusion write or business Run"
+  },
+  "runtime": {
+    "status": "applied",
+    "activation": "managed-restart",
+    "pid": 1657769,
+    "workspace_id": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+    "busy_before_update": []
+  },
+  "limits": [
+    "No business Run",
+    "No ARM64 physical validation",
+    "No new comparison dependency",
+    "Concurrent Case semantic changes excluded from task commit"
+  ]
+}
