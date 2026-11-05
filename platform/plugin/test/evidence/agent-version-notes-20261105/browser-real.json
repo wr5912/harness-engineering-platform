@@ -1,0 +1,234 @@
+{
+  "scope": "228 实际平台，只读版本选择及浏览器响应边界长备注夹具",
+  "checks": [
+    {
+      "name": "真实后端返回当前版本备注",
+      "pass": true
+    },
+    {
+      "name": "真实后端返回各版本独立备注",
+      "pass": true
+    },
+    {
+      "name": "light-1440 选择器完整可见",
+      "pass": true
+    },
+    {
+      "name": "light-1440 页面无横向溢出",
+      "pass": true
+    },
+    {
+      "name": "light-1440 宽度400px",
+      "pass": true
+    },
+    {
+      "name": "light-1440 完整版本和备注",
+      "pass": true
+    },
+    {
+      "name": "light-1440 下拉展示各自备注",
+      "pass": true
+    },
+    {
+      "name": "light-1440 按备注搜索",
+      "pass": true
+    },
+    {
+      "name": "light-1440 Esc恢复焦点",
+      "pass": true
+    },
+    {
+      "name": "light-768 选择器完整可见",
+      "pass": true
+    },
+    {
+      "name": "light-768 页面无横向溢出",
+      "pass": true
+    },
+    {
+      "name": "light-768 完整版本和备注",
+      "pass": true
+    },
+    {
+      "name": "light-768 下拉展示各自备注",
+      "pass": true
+    },
+    {
+      "name": "light-768 按备注搜索",
+      "pass": true
+    },
+    {
+      "name": "light-768 Esc恢复焦点",
+      "pass": true
+    },
+    {
+      "name": "light-390 选择器完整可见",
+      "pass": true
+    },
+    {
+      "name": "light-390 页面无横向溢出",
+      "pass": true
+    },
+    {
+      "name": "light-390 完整版本和备注",
+      "pass": true
+    },
+    {
+      "name": "light-390 下拉展示各自备注",
+      "pass": true
+    },
+    {
+      "name": "light-390 按备注搜索",
+      "pass": true
+    },
+    {
+      "name": "light-390 Esc恢复焦点",
+      "pass": true
+    },
+    {
+      "name": "dark-1440 选择器完整可见",
+      "pass": true
+    },
+    {
+      "name": "dark-1440 页面无横向溢出",
+      "pass": true
+    },
+    {
+      "name": "dark-1440 宽度400px",
+      "pass": true
+    },
+    {
+      "name": "dark-1440 完整版本和备注",
+      "pass": true
+    },
+    {
+      "name": "dark-1440 下拉展示各自备注",
+      "pass": true
+    },
+    {
+      "name": "dark-1440 按备注搜索",
+      "pass": true
+    },
+    {
+      "name": "dark-1440 Esc恢复焦点",
+      "pass": true
+    },
+    {
+      "name": "dark-768 选择器完整可见",
+      "pass": true
+    },
+    {
+      "name": "dark-768 页面无横向溢出",
+      "pass": true
+    },
+    {
+      "name": "dark-768 完整版本和备注",
+      "pass": true
+    },
+    {
+      "name": "dark-768 下拉展示各自备注",
+      "pass": true
+    },
+    {
+      "name": "dark-768 按备注搜索",
+      "pass": true
+    },
+    {
+      "name": "dark-768 Esc恢复焦点",
+      "pass": true
+    },
+    {
+      "name": "dark-390 选择器完整可见",
+      "pass": true
+    },
+    {
+      "name": "dark-390 页面无横向溢出",
+      "pass": true
+    },
+    {
+      "name": "dark-390 完整版本和备注",
+      "pass": true
+    },
+    {
+      "name": "dark-390 下拉展示各自备注",
+      "pass": true
+    },
+    {
+      "name": "dark-390 按备注搜索",
+      "pass": true
+    },
+    {
+      "name": "dark-390 Esc恢复焦点",
+      "pass": true
+    },
+    {
+      "name": "键盘切换精确版本",
+      "pass": true
+    },
+    {
+      "name": "刷新保持版本与备注",
+      "pass": true
+    }
+  ],
+  "errors": [],
+  "sizes": [
+    {
+      "name": "light-1440",
+      "width": 400,
+      "left": 540.484375,
+      "right": 940.484375,
+      "viewport": 1440,
+      "overflow": false,
+      "clipped": false
+    },
+    {
+      "name": "light-768",
+      "width": 400,
+      "left": 258.734375,
+      "right": 658.734375,
+      "viewport": 768,
+      "overflow": false,
+      "clipped": false
+    },
+    {
+      "name": "light-390",
+      "width": 332,
+      "left": 29,
+      "right": 361,
+      "viewport": 390,
+      "overflow": false,
+      "clipped": false
+    },
+    {
+      "name": "dark-1440",
+      "width": 400,
+      "left": 540.484375,
+      "right": 940.484375,
+      "viewport": 1440,
+      "overflow": false,
+      "clipped": false
+    },
+    {
+      "name": "dark-768",
+      "width": 400,
+      "left": 258.734375,
+      "right": 658.734375,
+      "viewport": 768,
+      "overflow": false,
+      "clipped": false
+    },
+    {
+      "name": "dark-390",
+      "width": 332,
+      "left": 29,
+      "right": 361,
+      "viewport": 390,
+      "overflow": false,
+      "clipped": false
+    }
+  ],
+  "originalTheme": "dark",
+  "fixtureIntercepts": 2,
+  "failure": "TimeoutError: locator.waitFor: Timeout 90000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('combobox', { name: '版本', exact: true }) to be visible\u001b[22m\n",
+  "finalTheme": "dark"
+}

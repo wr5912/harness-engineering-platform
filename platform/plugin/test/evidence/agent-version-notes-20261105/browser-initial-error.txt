@@ -1,0 +1,1 @@
+长备注边界夹具在 route.fetch 后 route.fulfill 报 Route is already handled，Node 异步异常导致最终回执未写入。真实数据已完成六张截图；本轮不据此报告断言总数，修正为预读真实详情并只替换浏览器响应后重新核验。
