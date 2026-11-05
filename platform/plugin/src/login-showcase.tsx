@@ -134,8 +134,8 @@ export const loginShowcaseStyle = `
 .login-scene-orbit,.login-scene-pill{fill:var(--hep-primary-soft);stroke:color-mix(in srgb,var(--hep-primary) 18%,var(--hep-border));stroke-width:1}
 .login-scene-paper{fill:var(--hep-primary-soft);stroke:var(--hep-border)}
 .login-scene-agent-tile{fill:var(--hep-primary);stroke:var(--hep-primary-hover);filter:drop-shadow(0 12px 20px color-mix(in srgb,var(--hep-primary) 16%,transparent))}
-.login-scene-inverse .login-scene-icon{stroke:var(--hep-surface);stroke-width:1.2}
-.login-scene .login-scene-inverse-label{fill:var(--hep-surface);font-size:12px;font-weight:400}
+.login-scene-inverse .login-scene-icon{stroke:var(--hep-on-primary);stroke-width:1.2}
+.login-scene .login-scene-inverse-label{fill:var(--hep-on-primary);font-size:12px;font-weight:400}
 .login-scene-hub{fill:var(--hep-surface);stroke:color-mix(in srgb,var(--hep-primary) 26%,var(--hep-border));stroke-width:1.2;filter:drop-shadow(0 8px 16px color-mix(in srgb,var(--hep-primary) 8%,transparent))}
 .login-scene-ring{fill:none;stroke:color-mix(in srgb,var(--hep-primary) 18%,var(--hep-border));stroke-width:1;stroke-dasharray:3 6}
 .login-scene-tile{fill:var(--hep-surface);stroke:color-mix(in srgb,var(--hep-primary) 20%,var(--hep-border));stroke-width:1}

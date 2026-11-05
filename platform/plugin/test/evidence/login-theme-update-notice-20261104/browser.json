@@ -1,0 +1,179 @@
+{
+  "initialPreference": "dark",
+  "checks": [
+    {
+      "width": 1440,
+      "scheme": "light",
+      "dark": false,
+      "label": "切换到深色主题",
+      "button": {
+        "x": 836,
+        "y": 150.015625,
+        "width": 44,
+        "height": 44
+      },
+      "overflow": false,
+      "formInViewport": true,
+      "background": "rgb(245, 248, 252)",
+      "input": {
+        "background": "rgb(255, 255, 255)",
+        "color": "rgb(24, 34, 53)",
+        "inputInViewport": true
+      }
+    },
+    {
+      "width": 1440,
+      "scheme": "dark",
+      "dark": true,
+      "label": "切换到浅色主题",
+      "button": {
+        "x": 836,
+        "y": 150.015625,
+        "width": 44,
+        "height": 44
+      },
+      "overflow": false,
+      "formInViewport": true,
+      "background": "rgb(2, 7, 19)",
+      "input": {
+        "background": "rgb(6, 22, 41)",
+        "color": "rgb(215, 229, 250)",
+        "inputInViewport": true
+      }
+    },
+    {
+      "width": 768,
+      "scheme": "light",
+      "dark": false,
+      "label": "切换到深色主题",
+      "button": {
+        "x": 552.5,
+        "y": 24,
+        "width": 44,
+        "height": 44
+      },
+      "overflow": false,
+      "formInViewport": true,
+      "background": "rgb(245, 248, 252)",
+      "input": {
+        "background": "rgb(255, 255, 255)",
+        "color": "rgb(24, 34, 53)",
+        "inputInViewport": true
+      }
+    },
+    {
+      "width": 768,
+      "scheme": "dark",
+      "dark": true,
+      "label": "切换到浅色主题",
+      "button": {
+        "x": 552.5,
+        "y": 24,
+        "width": 44,
+        "height": 44
+      },
+      "overflow": false,
+      "formInViewport": true,
+      "background": "rgb(2, 7, 19)",
+      "input": {
+        "background": "rgb(6, 22, 41)",
+        "color": "rgb(215, 229, 250)",
+        "inputInViewport": true
+      }
+    },
+    {
+      "width": 390,
+      "scheme": "light",
+      "dark": false,
+      "label": "切换到深色主题",
+      "button": {
+        "x": 315,
+        "y": 24,
+        "width": 44,
+        "height": 44
+      },
+      "overflow": false,
+      "formInViewport": true,
+      "background": "rgb(245, 248, 252)",
+      "input": {
+        "background": "rgb(255, 255, 255)",
+        "color": "rgb(24, 34, 53)",
+        "inputInViewport": true
+      }
+    },
+    {
+      "width": 390,
+      "scheme": "dark",
+      "dark": true,
+      "label": "切换到浅色主题",
+      "button": {
+        "x": 315,
+        "y": 24,
+        "width": 44,
+        "height": 44
+      },
+      "overflow": false,
+      "formInViewport": true,
+      "background": "rgb(2, 7, 19)",
+      "input": {
+        "background": "rgb(6, 22, 41)",
+        "color": "rgb(215, 229, 250)",
+        "inputInViewport": true
+      }
+    },
+    {
+      "step": "invalid-login-and-reload",
+      "dark": true,
+      "message": "用户名或密码错误。",
+      "draft": "dark"
+    },
+    {
+      "step": "toggle-preserves-form",
+      "passed": true
+    },
+    {
+      "step": "authenticated-theme-handoff",
+      "dark": true,
+      "draftCleared": true
+    },
+    {
+      "step": "native-theme-persistence",
+      "scheme": "light",
+      "serverSaved": true
+    },
+    {
+      "step": "native-theme-persistence",
+      "scheme": "dark",
+      "serverSaved": true
+    },
+    {
+      "step": "global-update-overlay",
+      "stage": "reload",
+      "absent": true
+    },
+    {
+      "step": "logout-inherits-native-theme",
+      "preference": "dark",
+      "dark": true,
+      "draft": null
+    },
+    {
+      "step": "global-update-overlay",
+      "stage": "fresh-browser-context",
+      "emptyDismissal": true,
+      "absent": true
+    },
+    {
+      "step": "manual-update-preserved",
+      "available": true,
+      "checkButton": true,
+      "runtimeSection": true,
+      "modelSection": true
+    },
+    {
+      "step": "global-update-overlay",
+      "stage": "after-closing-settings",
+      "absent": true
+    }
+  ]
+}

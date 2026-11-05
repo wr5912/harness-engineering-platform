@@ -1,0 +1,12 @@
+{
+  "status": "unchanged",
+  "programRoot": "/home/cmp/work/harness-engineering-platform",
+  "dataRoot": "/home/cmp/harness-engineering-platform-data",
+  "workspaceId": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+  "pid": 768323,
+  "activation": "none",
+  "busy": [],
+  "changed": [],
+  "stage": "/home/cmp/work/harness-engineering-platform/.local/platform-updates/e3e66a5f-b790-4414-94da-0e95ead36d13",
+  "receipt": "/home/cmp/work/harness-engineering-platform/.local/platform-updates/e3e66a5f-b790-4414-94da-0e95ead36d13/receipt.json"
+}

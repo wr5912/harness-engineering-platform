@@ -5,7 +5,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { credentialKey, type CredentialRecord } from '@deepseek-ai/dsh-credentials'
 import type { ConnectionTrustRequest } from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-host-webserver'
-import { loginCarouselScriptHash, loginPage } from './login.tsx'
+import { loginCarouselScriptHash, loginThemeScriptHash, loginPage } from './login.tsx'
 import { workspaceLocalPath } from './workspace.ts'
 
 declare module '@deepseek-ai/dsh-host-webserver' {
@@ -134,11 +134,17 @@ export async function applyAuthentication(ctx: Context, assetRoot: string) {
   const cookieHeader = (value: string, age: number) =>
     `${COOKIE}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${ctx.webServer.protocol === 'https:' ? '; Secure' : ''}`
   const html = (res: ServerResponse, status = 200, error = '') => {
+    let preference: 'light' | 'dark' | 'system' = 'system'
+    try {
+      const value = ctx.settingsController.describe().namespaces.find(item => item.ns === 'ui-theme')?.value
+      const selected = value && typeof value === 'object' && !Array.isArray(value) ? value.preference : undefined
+      if (selected === 'light' || selected === 'dark') preference = selected
+    } catch {} // 配置暂不可读时仍保留登录入口，按系统主题显示。
     res.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store',
       // no-referrer 会使浏览器表单的 Origin 变成 null，导致同源登录被拒绝。
       'referrer-policy': 'same-origin', 'x-content-type-options': 'nosniff',
-      'content-security-policy': `default-src 'none'; script-src 'sha256-${loginCarouselScriptHash}'; style-src 'unsafe-inline'; img-src data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'` })
-    res.end(loginPage(ctx.webServer.publicPath('/login'), error))
+      'content-security-policy': `default-src 'none'; script-src 'sha256-${loginThemeScriptHash}' 'sha256-${loginCarouselScriptHash}'; style-src 'unsafe-inline'; img-src data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'` })
+    res.end(loginPage(ctx.webServer.publicPath('/login'), error, preference))
   }
   for (const path of ['/login', '/logout']) {
     ctx.effect(() => ctx.webServer.register({ kind: 'exact', path, async handler(req, res) {
@@ -167,9 +173,17 @@ export async function applyAuthentication(ctx: Context, assetRoot: string) {
       try { body = await formBody(req) }
       catch { html(res, 413, '登录信息过长或请求未完成。'); return }
       const fields = new URLSearchParams(body)
+      const theme = fields.get('theme')
+      if (fields.getAll('theme').length > 1 || theme && theme !== 'light' && theme !== 'dark') {
+        html(res, 400, '主题选择无效，请刷新后重试。'); return
+      }
       const matches = fields.getAll('username').length === 1 && fields.getAll('password').length === 1
         && timingSafeEqual(Buffer.from(hash(JSON.stringify([fields.get('username'), fields.get('password')]))), Buffer.from(accountDigest))
       if (!matches) { html(res, 401, '用户名或密码错误。'); return }
+      if (theme) {
+        try { await ctx.settingsController.update('ui-theme', { preference: theme }, undefined) }
+        catch { html(res, 503, '暂时无法保存主题设置，请重试。'); return }
+      }
       const value = randomBytes(32).toString('base64url')
       const session = { digest: hash(value), authority: authority(req), expires: Date.now() + MAX_AGE * 1000 }
       try { await update(items => [...items, session]) }

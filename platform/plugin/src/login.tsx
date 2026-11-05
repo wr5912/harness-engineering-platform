@@ -3,11 +3,15 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { PlatformLogo } from './logo.tsx'
 import logo from '../assets/harness-logo.svg'
 import { initializeLoginCarousel } from './login-carousel.ts'
+import { initializeLoginTheme } from './login-theme.ts'
+import { LOGIN_THEME_DRAFT, ThemeIcon } from './theme-toggle.tsx'
 import { LoginShowcase, loginShowcaseStyle } from './login-showcase.tsx'
 import { visualTokens, workbenchTokens } from './styles/tokens.ts'
 
 export const loginCarouselScript = `(${initializeLoginCarousel.toString()})();`
 export const loginCarouselScriptHash = createHash('sha256').update(loginCarouselScript).digest('base64')
+export const loginThemeScript = `(${initializeLoginTheme.toString()})(${JSON.stringify(LOGIN_THEME_DRAFT)});`
+export const loginThemeScriptHash = createHash('sha256').update(loginThemeScript).digest('base64')
 
 const features = [
   { label: '智能体构建与迁移', title: '智能体构建与迁移', description: '从业务需求新建智能体，或将已有工程迁入为可维护的 Harness 资产。通过管理助手组织角色、技能、工具和模型，用关键任务核对行为。', tags: ['对话式构建', '已有工程迁入', '行为映射与验证'] },
@@ -34,14 +38,15 @@ function FeatureCarousel() {
   </section>
 }
 
-export function loginPage(action: string, error = ''): string {
+export function loginPage(action: string, error = '', preference: 'light' | 'dark' | 'system' = 'system'): string {
   return '<!doctype html>' + renderToStaticMarkup(<html lang="zh-CN">
     <head><meta charSet="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
       <title>登录 · Harness工程平台</title><link rel="icon" type="image/svg+xml" href={logo} /><style dangerouslySetInnerHTML={{ __html: `
       ${visualTokens}
       ${workbenchTokens}
       ${loginShowcaseStyle}
-      *{box-sizing:border-box}body{margin:0;min-height:100dvh;display:grid;place-items:center;color-scheme:light;padding:32px;background:radial-gradient(ellipse at 20% 25%,color-mix(in srgb,var(--hep-primary) 9%,transparent),transparent 50%),var(--hep-bg);color:var(--hep-text);font:14px/1.7 system-ui,"Microsoft YaHei",sans-serif}
+      *{box-sizing:border-box}body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:32px;background:radial-gradient(ellipse at 20% 25%,color-mix(in srgb,var(--hep-primary) 9%,transparent),transparent 50%),var(--hep-bg);color:var(--hep-text);font:14px/1.7 system-ui,"Microsoft YaHei",sans-serif}
+      .login-theme-toggle{display:grid;place-items:center;flex-shrink:0;margin-left:auto;width:44px;height:44px;padding:0;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--hep-text);cursor:pointer}.login-theme-toggle:hover{background:var(--hep-surface-hover)}.login-theme-toggle[hidden],.login-theme-sun,body[data-ds-dark-theme] .login-theme-moon{display:none}body[data-ds-dark-theme] .login-theme-sun{display:contents}
       .login-shell{width:min(100%,1240px);display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,380px);grid-template-areas:"brand form" "story form";column-gap:80px;row-gap:32px;align-items:center}.login-wordmark{grid-area:brand;display:flex;align-items:center;gap:12px;font-size:17px;font-weight:600}.login-story{grid-area:story;min-width:0}.login-story h2{margin:0 0 24px;font-size:40px;line-height:1.4;letter-spacing:-.04em;font-weight:600}
       .login-panel{grid-area:form;width:100%;max-width:340px;justify-self:center}.login-panel>header{text-align:left;margin-bottom:32px}.login-panel h1{font-size:24px;line-height:1.4;font-weight:600;margin:0;letter-spacing:-.025em}.login-panel>header p{font-size:14px;line-height:1.7;color:var(--hep-muted);margin:8px 0 0}
       .login-field+.login-field{margin-top:20px}.login-panel label{display:block;margin:0 0 8px;font-weight:500}.login-panel form :is(input,button){width:100%;min-height:48px;padding:12px;border-radius:var(--hep-control-radius);font:inherit;line-height:1.55;transition:border-color var(--hep-motion-fast),box-shadow var(--hep-motion-fast),background-color var(--hep-motion-fast)}
@@ -55,10 +60,12 @@ export function loginPage(action: string, error = ''): string {
       @media(max-width:900px){body{padding:24px}.login-shell{max-width:440px;grid-template-columns:minmax(0,1fr);grid-template-areas:"brand" "form" "story";gap:36px}.login-story h2{display:none}.login-panel{max-width:none}.login-panel h1{font-size:22px}.login-story{padding-top:28px;border-top:1px solid var(--hep-border)}}
       @media(max-width:680px){body{padding:24px 16px}.login-feature-copy{padding-top:18px}.login-feature-copy h3{font-size:22px}.login-feature-copy>p{font-size:13px}.login-feature-tags{margin-top:18px;font-size:11px}.login-feature-tags li+li::before{margin:0 8px}.login-carousel-arrow{top:115px}}
       ` }} /></head>
-    <body className="harness-login"><div className="login-shell">
-      <div className="login-wordmark"><PlatformLogo size={40} /><span>Harness 工程平台</span></div>
+    <body className="harness-login" data-theme-preference={preference} data-ds-dark-theme={preference === 'dark' ? '' : undefined}>
+      <script dangerouslySetInnerHTML={{ __html: loginThemeScript }} /><div className="login-shell">
+      <div className="login-wordmark"><PlatformLogo size={40} /><span>Harness 工程平台</span><button type="button" className="login-theme-toggle" data-login-theme hidden aria-label="切换到深色主题" title="切换到深色主题"><span className="login-theme-moon"><ThemeIcon scheme="light" /></span><span className="login-theme-sun"><ThemeIcon scheme="dark" /></span></button></div>
       <main className="login-panel"><header><h1>登录工作台</h1><p>使用平台账号，继续你的工作。</p></header>
         <form method="post" action={action}>
+          <input type="hidden" name="theme" value="" />
           <div className="login-field"><label htmlFor="username">用户名</label><input id="username" name="username" autoComplete="username" required autoFocus maxLength={256} /></div>
           <div className="login-field"><label htmlFor="password">密码</label><input id="password" name="password" type="password" autoComplete="current-password" required maxLength={1024} /></div>
           {error && <p role="alert">{error}</p>}<button type="submit">登录</button>

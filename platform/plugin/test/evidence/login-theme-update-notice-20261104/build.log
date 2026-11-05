@@ -1,0 +1,3 @@
+$ node build.mjs
+隔离候选目录：/tmp/hep-login-theme-candidate-20261104/platform/plugin
+PASS (exit 0)

@@ -5,6 +5,7 @@ import test from 'node:test'
 import vm from 'node:vm'
 import { build } from 'esbuild'
 import { navigationHash, readNavigation } from '../src/navigation.ts'
+import { SlotCore } from '@deepseek-ai/dsh-client-ui-slots'
 
 test('页面定位保留精确 Agent、版本、Run 与用例，未知地址回首页', () => {
   const target = { page: 'evaluation', agent_id: 'test01', experiment_id: 'EXP-test01-002', run_id: 'run-11111111-1111-4111-8111-111111111111', case_id: 'U-IDENTITY-001', tab: 'runs' }
@@ -90,6 +91,28 @@ async function clientModule(path, exports, stubs) {
       builder.onLoad({ filter: /.*/, namespace: 'child-view' }, args => ({ contents: stubs[args.path], loader: 'js' }))
     } }] })).outputFiles[0].text
 }
+
+test('平台通过原生插槽只替换 Codex 更新弹窗，加载顺序、刷新与卸载均保持正确', async () => {
+  const source = await clientModule('../src/client.tsx', '', shellViews)
+  const module = { exports: {} }
+  vm.runInNewContext(source, { module, exports: module.exports, require })
+  for (const pluginFirst of [false, true]) {
+    const slots = new SlotCore(), disposers = []
+    slots.register({ name: 'root', children: { 'shell.overlay': { kind: 'list', scope: 'root' } } }, () => null)
+    const pluginOverlay = () => '发现新版本', otherOverlay = () => '其他弹窗'
+    const mountPlugin = () => slots.register({ name: 'shell.overlay', id: 'dsh-codex-connect-update', order: 40 }, pluginOverlay)
+    slots.register({ name: 'shell.overlay', id: 'other-plugin' }, otherOverlay)
+    if (pluginFirst) mountPlugin()
+    module.exports.apply({ effect() {}, on() {}, connection: { rpc: {} },
+      slots: { inject(name, callback) { if (name === 'shell.overlay') disposers.push(callback()) }, register: slots.register.bind(slots) } })
+    if (!pluginFirst) mountPlugin()
+    const overlay = () => slots.entriesOfSlot('shell.overlay').find(entry => entry.options.id === 'dsh-codex-connect-update')
+    assert.equal(overlay().component(), null)
+    assert.equal(slots.entriesOfSlot('shell.overlay').find(entry => entry.options.id === 'other-plugin').component, otherOverlay)
+    disposers.forEach(dispose => dispose())
+    assert.equal(overlay().component, pluginOverlay, '平台卸载后原生贡献仍完整保留')
+  }
+})
 
 function renderPage(source, component, props, initialHash = '#/mcp') {
   const states = [], dependencies = [], listeners = new Map()

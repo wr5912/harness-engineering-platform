@@ -25,6 +25,7 @@ import { bindNewConversation, prepareConversation } from './conversation.ts'
 import { AssistantConversation, AssistantOperations, PlatformOperationCard, createAssistant, type Assistant, type AssistantContext } from './assistant/client.tsx'
 import { createPlatformUpdates, type PlatformUpdates } from './realtime/client.ts'
 import { ModelsSettingsFooter } from './models/client.tsx'
+import { LOGIN_THEME_DRAFT, ThemeIcon } from './theme-toggle.tsx'
 
 export const name = 'harness-platform-client'
 export const inject = ['connection', 'remote', 'slots', 'layout', 'workspaces', 'uiWorkspace', 'uiSession', 'sessions', 'conversation', 'theme']
@@ -332,7 +333,7 @@ function PlatformPage({ catalog, rpc, assistant, updates, theme, enterConversati
     <header className="harness-topbar"><a className="harness-brand" href={navigationHash({ page: 'home' })} aria-label="返回 Harness 工程平台首页" onClick={event => { event.preventDefault(); navigate('home') }}><PlatformLogo size={38}/><span><strong>{full ? 'Harness工程平台' : 'Harness 工程平台'}</strong><small>{full ? 'Harness Engineering Platform' : 'ENGINEERING WORKSPACE'}</small></span></a>
       {navigation}
       <span className="harness-current-module" aria-label={`当前模块：${pages.find(item => item.id === page)?.label}`}>{pages.find(item => item.id === page)?.label}</span>
-      <button type="button" className="harness-theme-toggle" aria-label={themeScheme === 'dark' ? '切换到浅色主题' : '切换到深色主题'} title={themeScheme === 'dark' ? '切换到浅色主题' : '切换到深色主题'} onClick={() => theme.setScheme(themeScheme === 'dark' ? 'light' : 'dark')}><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{themeScheme === 'dark' ? <><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></> : <path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"/>}</svg></button>
+      <button type="button" className="harness-theme-toggle" aria-label={themeScheme === 'dark' ? '切换到浅色主题' : '切换到深色主题'} title={themeScheme === 'dark' ? '切换到浅色主题' : '切换到深色主题'} onClick={() => theme.setScheme(themeScheme === 'dark' ? 'light' : 'dark')}><ThemeIcon scheme={themeScheme}/></button>
       {page !== 'home' && <button ref={toggleAssistant} type="button" className="harness-assistant-toggle" aria-expanded={visible} aria-label={visible ? '收起 AI 助手' : `打开 AI 助手${statusLabel === 'AI 助手' ? '' : `，${statusLabel}`}`} title={statusLabel === 'AI 助手' ? '平台 AI 助手' : `AI 助手 · ${statusLabel}`} data-status={waiting || status?.pendingInteraction ? 'waiting' : status?.running ? 'running' : unread || status?.completionUnread ? 'unread' : undefined} onClick={toggleAssistantOpen}><AssistantIcon/></button>}
       <div ref={accountMenu} className="harness-account" title={account.error ?? account.username ?? undefined} onKeyDown={event => { if (event.key === 'Escape') { setAccountMenuOpen(false); accountMenu.current?.querySelector<HTMLButtonElement>('.harness-account-toggle')?.focus() } }}>
         <button type="button" className="harness-account-toggle" aria-label="平台菜单" aria-expanded={accountMenuOpen} aria-controls="harness-account-actions" onClick={() => setAccountMenuOpen(value => !value)}><span className="harness-avatar">{account.username ? Array.from(account.username)[0].toLocaleUpperCase() : '…'}</span><span className="harness-account-menu-label">{full ? '账号' : account.username || '账号'}</span><span className="harness-menu-icon" aria-hidden="true">☰</span></button>
@@ -411,6 +412,7 @@ function PlatformSettings({ openSettings, settingsOpen, settingsShortcut }: Sett
 }
 
 export function apply(ctx: ClientContext) {
+  try { sessionStorage.removeItem(LOGIN_THEME_DRAFT) } catch {}
   ctx.effect(() => ctx.theme.overrideTokens('harness-platform-dark', nativeThemeOverrides))
   ctx.effect(() => bindNewConversation(ctx))
   let modelRevision = 0
@@ -435,6 +437,10 @@ export function apply(ctx: ClientContext) {
     useEffect(() => { complete() }, [complete])
     return null
   })))
+  // 同一插槽 ID 的低优先级贡献替换更新弹窗，插件设置和其他浮层继续使用原生实现。
+  ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+    name: 'shell.overlay', id: 'dsh-codex-connect-update', priority: -100,
+  }, () => null))
   const updates = createPlatformUpdates(ctx.connection)
   ctx.effect(() => updates.start())
   const catalog = createCatalog(ctx.connection.rpc, updates)

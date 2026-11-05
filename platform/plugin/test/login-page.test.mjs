@@ -16,7 +16,7 @@ async function load(entry) {
   vm.runInNewContext(result.outputFiles[0].text, { module, exports: module.exports, require, Buffer, Headers, URL, URLSearchParams })
   return module.exports
 }
-const { loginPage, loginCarouselScript, loginCarouselScriptHash } = await load('../src/login.tsx')
+const { loginPage, loginCarouselScript, loginCarouselScriptHash, loginThemeScript, loginThemeScriptHash } = await load('../src/login.tsx')
 
 const tags = (html, tag) => Array.from(html.matchAll(new RegExp(`<${tag}\\b[^>]*>`, 'gi')), match => match[0])
 const hasHidden = tag => /\shidden(?:\s|=|>)/i.test(tag)
@@ -81,16 +81,53 @@ test('登录跳转地址及服务端错误按 HTML 转义，不产生额外脚�
   assert.match(html, /role="alert"[^>]*>&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;&amp;无法登录/)
   assert.equal(html.includes(action), false)
   assert.equal(html.includes(error), false)
-  assert.equal(tags(html, 'script').length, 1)
+  assert.equal(tags(html, 'script').length, 2)
 })
 
-test('页面只内嵌唯一轮播脚本，其实际字节与 CSP 使用的 SHA256 摘要一致', () => {
+test('页面内嵌主题与轮播脚本，其实际字节与 CSP 使用的 SHA256 摘要一致', () => {
   const html = loginPage('/hep/login')
   const scripts = Array.from(html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi))
-  assert.equal(scripts.length, 1)
-  assert.doesNotMatch(scripts[0][1], /\bsrc\s*=/i)
-  assert.equal(scripts[0][2], loginCarouselScript)
-  assert.equal(createHash('sha256').update(scripts[0][2]).digest('base64'), loginCarouselScriptHash)
+  assert.equal(scripts.length, 2)
+  for (const [index, [script, digest]] of [[loginThemeScript, loginThemeScriptHash], [loginCarouselScript, loginCarouselScriptHash]].entries()) {
+    assert.doesNotMatch(scripts[index][1], /\bsrc\s*=/i)
+    assert.equal(scripts[index][2], script)
+    assert.equal(createHash('sha256').update(script).digest('base64'), digest)
+  }
+})
+
+test('登录主题继承宿主或系统、切换保留表单和草稿，存储被禁用时仍可切换', () => {
+  for (const blocked of [false, true]) {
+    const body = eventTarget(), button = eventTarget(), field = { value: '' }
+    body.dataset.themePreference = 'system'; body.style = {}
+    body.hasAttribute = name => body.getAttribute(name) !== null
+    body.toggleAttribute = (name, active) => active ? body.setAttribute(name, '') : body.removeAttribute(name)
+    const media = eventTarget(); media.matches = true
+    const values = new Map(), document = eventTarget()
+    document.body = body
+    let ready = false
+    document.querySelector = selector => ready ? selector === '[data-login-theme]' ? button : field : null
+    const sessionStorage = { getItem: key => { if (blocked) throw new Error('blocked'); return values.get(key) ?? null },
+      setItem: (key, value) => { if (blocked) throw new Error('blocked'); values.set(key, value) } }
+    const initialize = () => vm.runInNewContext(loginThemeScript, { document, window: { matchMedia: () => media }, sessionStorage })
+    initialize()
+    assert.equal(body.style.colorScheme, 'dark', '正文绘制前按系统应用深色')
+    ready = true; document.emit('DOMContentLoaded')
+    assert.equal(button.hidden, false)
+    assert.equal(button.getAttribute('aria-label'), '切换到浅色主题')
+    assert.equal(field.value, '', '未操作时不覆盖宿主的 system 偏好')
+    button.emit('click')
+    assert.equal(body.style.colorScheme, 'light')
+    assert.equal(field.value, 'light')
+    assert.equal(button.getAttribute('aria-label'), '切换到深色主题')
+    media.emit('change')
+    assert.equal(body.style.colorScheme, 'light', '手动选择不被系统变化覆盖')
+    if (!blocked) {
+      initialize()
+      assert.equal(body.style.colorScheme, 'light', '登录前刷新保留待保存选择')
+      assert.equal(values.get('harness-platform:login-theme-draft'), 'light')
+    }
+  }
+  assert.match(loginPage('/hep/login', '', 'dark'), /data-theme-preference="dark" data-ds-dark-theme=""/)
 })
 
 // 仅替换 DOM、媒体查询和时钟边界；执行页面真实输出的脚本，不重写轮播状态迁移。
@@ -146,7 +183,7 @@ function carousel({ reducedMotion = false, missingRoot = false } = {}) {
     }
     now = until
   }
-  const script = html.match(/<script\b[^>]*>([\s\S]*?)<\/script>/i)[1]
+  const script = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].at(-1)[1]
   vm.runInNewContext(script, { document, window })
   return { root, slides, content, previous, next, form, document, window, motion, advance,
     pointer(type, values = {}) {
@@ -341,28 +378,44 @@ test('真实登录 HTTP 的 CSP 允许且仅允许当前脚本，错误登录、
   await root.plugin({ name: 'login-test-credentials', apply(ctx) { new Credentials(ctx) } })
   await root.plugin(WebServer, { host: '127.0.0.1', port: 0 })
   await root.plugin(Connection)
-  await root.plugin({ name: 'login-test-auth', inject: ['connection', 'credentials', 'webServer'], apply(ctx) { return applyAuthentication(ctx, assetRoot) } })
+  let preference = 'system', writes = 0, refuseTheme = false
+  await root.plugin({ name: 'login-test-theme', apply(ctx) { ctx.provide('settingsController', {
+    describe: () => ({ namespaces: [{ ns: 'ui-theme', value: { preference } }] }),
+    async update(ns, patch) { assert.equal(ns, 'ui-theme'); if (refuseTheme) throw new Error('fixture unavailable'); preference = patch.preference; writes++ },
+  }) } })
+  await root.plugin({ name: 'login-test-auth', inject: ['connection', 'credentials', 'webServer', 'settingsController'], apply(ctx) { return applyAuthentication(ctx, assetRoot) } })
   const origin = `http://127.0.0.1:${root.webServer.port}`
   const base = origin + root.webServer.publicPath('/')
   const loginUrl = origin + root.webServer.publicPath('/login')
-  const login = password => fetch(loginUrl, { method: 'POST', redirect: 'manual',
+  const login = (password, theme = '') => fetch(loginUrl, { method: 'POST', redirect: 'manual',
     headers: { 'content-type': 'application/x-www-form-urlencoded', origin },
-    body: new URLSearchParams({ username: 'login-test', password }) })
+    body: new URLSearchParams({ username: 'login-test', password, theme }) })
   const page = await fetch(loginUrl)
   assert.equal(page.status, 200)
   assert.equal(page.headers.get('referrer-policy'), 'same-origin')
   const html = await page.text()
   const scripts = Array.from(html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))
-  assert.equal(scripts.length, 1)
-  const digest = createHash('sha256').update(scripts[0][1]).digest('base64')
+  assert.equal(scripts.length, 2)
+  const digests = scripts.map(script => createHash('sha256').update(script[1]).digest('base64'))
   const policy = page.headers.get('content-security-policy')
   const scriptSources = policy.match(/(?:^|;)\s*script-src\s+([^;]+)/)?.[1].trim().split(/\s+/)
-  assert.deepEqual(scriptSources, [`'sha256-${digest}'`])
-  const wrong = await login('incorrect-fixture-password')
+  assert.deepEqual(scriptSources, digests.map(digest => `'sha256-${digest}'`))
+  const wrong = await login('incorrect-fixture-password', 'dark')
   assert.equal(wrong.status, 401)
   assert.equal(wrong.headers.get('set-cookie'), null)
   assert.match(await wrong.text(), /用户名或密码错误/)
-  const success = await login('fixture-password')
+  assert.equal(writes, 0)
+  assert.equal((await login('fixture-password', 'invalid')).status, 400)
+  assert.equal(writes, 0)
+  refuseTheme = true
+  const failedTheme = await login('fixture-password', 'dark')
+  assert.equal(failedTheme.status, 503)
+  assert.equal(failedTheme.headers.get('set-cookie'), null)
+  assert.match(await failedTheme.text(), /暂时无法保存主题设置/)
+  refuseTheme = false
+  const success = await login('fixture-password', 'dark')
+  assert.equal(writes, 1)
+  assert.match(await (await fetch(loginUrl)).text(), /data-theme-preference="dark" data-ds-dark-theme=""/)
   assert.equal(success.status, 303)
   assert.equal(success.headers.get('location'), root.webServer.publicPath('/'))
   const cookieHeader = success.headers.get('set-cookie')
