@@ -57,6 +57,7 @@ export interface InstanceActionReceipt {
   name: string
   operation: InstanceOperation | string
   ok: boolean
+  status?: 'success' | 'failed' | 'unknown' | 'not_dispatched'
   value?: unknown
   error?: { code: string, message: string, details?: unknown }
   requested_source_id?: string
@@ -575,11 +576,13 @@ async function runOne(assetRoot: string, request: InstanceActionRequest, signal?
       return { name, operation: request.operation, ok: true, value: parseCommandOutput(result.stdout, result.stderr) }
     })
   } catch (error) {
+    const message = (error as Error).message
     return {
       name,
       operation: request.operation,
       ok: false,
-      error: { code: 'operation_failed', message: (error as Error).message },
+      status: /未知|未确认|未核验|无法确认|无法复查/.test(message) ? 'unknown' : 'failed',
+      error: { code: 'operation_failed', message },
     }
   }
 }
@@ -756,6 +759,10 @@ export function createInstancesHandler(assetRoot: string, modelPolicy?: ModelPol
         if (!Array.isArray(object.items)) throw new Error('批量操作需要 items')
         const receipts: InstanceActionReceipt[] = []
         for (const item of object.items) {
+          if (receipts.at(-1)?.status === 'unknown' || receipts.at(-1)?.status === 'not_dispatched') {
+            receipts.push({ ...invalidItem(item, new Error('前项结果未知，本项未派发；请刷新核对后继续。')), status: 'not_dispatched' })
+            continue
+          }
           try {
             receipts.push(await runOne(assetRoot, actionRequest(item), signal, modelPolicy))
           } catch (error) {

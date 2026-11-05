@@ -299,6 +299,8 @@ export function applyTools(ctx: Context) {
 
 
 export async function apply(ctx: Context, config: Config) {
+  // 原生文件锁会读取诊断报告；离线环境不得因此同步等待反向 DNS。
+  Object.assign(process.report, { excludeNetwork: true })
   const assetRoot = process.env.HARNESS_ASSET_ROOT
   if (!assetRoot) throw new Error('未设置 HARNESS_ASSET_ROOT')
   await bindConversationWorkspace(ctx, assetRoot)

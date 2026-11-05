@@ -281,6 +281,10 @@ export function applyUpdate(target: Target, update: Update) {
   if (update.repositories.length !== 2 || update.repositories[0].root !== target.prefix || update.repositories[1].root !== target.dataRoot) throw new Error('双仓身份不符')
   const manifestPath = join(target.prefix, '.local/installation.json'), originalManifest = readFileSync(manifestPath)
   const manifest = JSON.parse(originalManifest.toString())
+  const activationPath = join(target.prefix, '.local/deploy-activation.json')
+  const activationBefore = existsSync(activationPath) ? readFileSync(activationPath) : undefined
+  const activation = activationBefore ? JSON.parse(activationBefore.toString()) : undefined
+  let activationWritten = false
   const dependencyDirectories = [...new Set([...update.repositories[0].files.filter(file => /(?:^|\/)(package.json|pnpm-lock.yaml)$/.test(file.path)).map(file => dirname(file.path)), ...state.repairDependencies])]
   for (const directory of dependencyDirectories) {
     if (!['platform/plugin', 'runtime/adapters/dsh-web'].includes(directory)) throw new Error(`尚不支持此依赖目录的增量准备：${directory}`)
@@ -368,6 +372,11 @@ export function applyUpdate(target: Target, update: Update) {
     if (update.sourceDataCommit) { manifest.data.sourceCommit = update.sourceDataCommit; manifest.data.minimal = !!target.minimalData }
     writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
     for (const entry of changed) if (digest(entry.path) !== (entry.file.content === null ? null : hash(content(entry.file)!))) throw new Error('更新后文件摘要不符')
+    // 修复后继续激活时，保留原会话快照并跟随本次已核对的提交。
+    if (activation?.prefix === target.prefix && activation.dataRoot === target.dataRoot && activation.commit === update.repositories[0].before) {
+      activationWritten = true
+      writeFileSync(activationPath, JSON.stringify({ ...activation, commit: update.repositories[0].commit }), { mode: 0o600 })
+    }
     report.status = 'updated'
   } catch (error) {
     let restored = true
@@ -380,6 +389,7 @@ export function applyUpdate(target: Target, update: Update) {
       else { writeFileSync(entry.path, entry.before); chmodSync(entry.path, entry.mode) }
     } catch { restored = false }
     writeFileSync(manifestPath, originalManifest)
+    if (activationWritten) writeFileSync(activationPath, activationBefore!)
     report.status = restored ? 'rolled-back' : 'recovery-required'
     throw new Error(`更新失败，${restored ? '已回滚' : '需根据备份恢复'}：${error instanceof Error ? error.message : error}；${backup}`)
   } finally {

@@ -410,6 +410,8 @@ export function businessToolDeniedReason(exec: { agent?: { session: { id: string
 }
 
 export async function apply(ctx: Context, config: BusinessRuntimeConfig): Promise<void> {
+  // 原生文件锁会读取诊断报告；离线环境不得因此同步等待反向 DNS。
+  Object.assign(process.report, { excludeNetwork: true })
   if (!config?.binding || !config.assetRoot || !config.stateRoot || !config.coordinatorOrigin || !config.workspacePath) throw new Error('业务 Runtime 配置缺失')
   if (config.localTools !== undefined && (!Array.isArray(config.localTools) || config.localTools.some(name => typeof name !== 'string' || !name)
     || new Set(config.localTools).size !== config.localTools.length)) throw new Error('业务本地工具声明无效')

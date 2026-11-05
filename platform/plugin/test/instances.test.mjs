@@ -802,6 +802,16 @@ test('batch returns per-item partial success and unknown mutation fails closed',
     assert.equal(batch.value.ok, false)
     assert.equal(batch.value.partial_success, true)
     assert.deepEqual(batch.value.receipts.map(item => item.ok), [true, false])
+    const callsFile = join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls')
+    const before = readFileSync(callsFile, 'utf8')
+    const paused = await handler('batch', { items: [
+      { operation: 'stop', name: 'unknown-one' },
+      { operation: 'stop', name: 'running-one' },
+      { operation: 'stop', name: 'fail-one' },
+    ] }, new AbortController().signal)
+    assert.deepEqual(paused.value.receipts.map(item => item.status), ['unknown', 'not_dispatched', 'not_dispatched'])
+    const dispatched = readFileSync(callsFile, 'utf8').slice(before.length).trim().split('\n').map(line => JSON.parse(line))
+    assert.ok(dispatched.every(args => !['down', 'up', 'delete', 'reload'].includes(args[0])))
   } finally {
     if (previous === undefined) delete process.env.XDG_STATE_HOME
     else process.env.XDG_STATE_HOME = previous

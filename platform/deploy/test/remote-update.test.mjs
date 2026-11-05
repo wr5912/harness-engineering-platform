@@ -68,6 +68,9 @@ test('Git 推进失败恢复已写文件和安装清单，留下回执并释放�
 
 test('Git 增量包推进两仓 HEAD 并保留现场脏改动', t => {
   const { target, update } = fixture(t)
+  const pending = join(target.prefix, '.local/deploy-activation.json')
+  const snapshot = { state: { pid: 123 }, sessions: ['kept-session'] }
+  writeFileSync(pending, JSON.stringify({ ...target, commit: update.repositories[0].before, snapshot }))
   for (const [index, repo] of update.repositories.entries()) {
     const source = `${repo.root}-source`
     execFileSync('git', ['clone', '-q', repo.root, source])
@@ -81,6 +84,7 @@ test('Git 增量包推进两仓 HEAD 并保留现场脏改动', t => {
     writeFileSync(join(repo.root, 'untracked'), `keep-${index}`)
   }
   assert.equal(applyUpdate(target, update).status, 'updated')
+  assert.deepEqual(JSON.parse(readFileSync(pending)), { ...target, commit: update.repositories[0].commit, snapshot })
   for (const [index, repo] of update.repositories.entries()) {
     assert.equal(execFileSync('git', ['-C', repo.root, 'rev-parse', 'HEAD']).toString().trim(), repo.commit)
     assert.equal(readFileSync(join(repo.root, 'untracked'), 'utf8'), `keep-${index}`)

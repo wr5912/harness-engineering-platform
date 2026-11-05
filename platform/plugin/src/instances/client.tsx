@@ -689,7 +689,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
             if (receipt.name !== item.name || receipt.operation !== item.operation) {
               return { ...item, ok: false, status: 'unknown' as const, error: { message: '操作回执目标与提交目标不一致，执行结果待核对。' } }
             }
-            return { ...receipt, port: item.port, model_selection: item.model_selection, status: receipt.ok ? 'success' as const : /未知|未确认|未核验|无法确认|查询失败|无法复查/.test(receipt.error?.message || '') ? 'unknown' as const : 'failed' as const }
+            return { ...receipt, port: item.port, model_selection: item.model_selection, status: receipt.status ?? (receipt.ok ? 'success' as const : 'failed' as const) }
           } catch (err) {
             return { ...item, ok: false, status: 'unknown' as const, error: { message: `回执未收到，执行结果未知；请刷新核对。${(err as Error).message}` } }
           }

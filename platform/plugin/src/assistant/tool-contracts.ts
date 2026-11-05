@@ -130,7 +130,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['features/read-source', 'experiment_id ref', '先省略 ref 获取来源文件，再逐个读取。'],
     ['features/preview', 'experiment_id features', '固定目标特性整理任务自动保存并回读；保留证据和未验证边界，不需人工确认。'],
     ['features/proposal', 'experiment_id'], ['features/apply fusion/confirm datasets/apply', 'preview_id', '此操作由既有确认或固定目标专项保存流程办理；不要绕过原预览身份。'],
-    ['versions/migration-plan', '', '只预览 security-operations-expert 的三条 027 精确身份迁移，返回引用字段、实例依赖和 plan_sha256，不改真实数据。'],
+    ['versions/migration-plan', '', '盘点 security-operations-expert 的 027 身份，仅迁移当前完整且已固定的资产；返回缺失、残片、已迁移及阻塞项、引用字段、实例依赖和 plan_sha256，不改真实数据。'],
     ['versions/migration-apply', 'expected_plan_sha256 confirmed', '仅明确授权迁移时执行，使用最新 plan_sha256；依赖须先解除，历史 Run 和归档原文不改写。'],
     ['fusion/preview', 'agent_id parent_experiment_id parent_ref target_experiment_id research_question plan', '合并特性时 target_experiment_id 必须为同号现有 m，parent 为 f。先省略 plan 读取 inventory 和实际差异；plan.edits 必须包含实际 Candidate 修改和原文件 expected_sha256，不能只标采纳。合并 m 需要 build/load/capability 三类独立验证。融合 plan={sources:[{experiment_id,ref,decision:inherit/omit,reason}],features,conflicts:[{description,resolution}],checks:[{id,kind:build/load/capability,command?,cwd?,case_ids?}],evaluation_case_ids,evaluation_sha256}；command 是 argv 数组，如 ["node","--check","candidate/plugin.mjs"]，不经过 shell，不能把整行命令作为一个数组元素；来源和评测摘要使用实际读取值。'],
     ['fusion/proposal', 'agent_id parent_experiment_id'], ['fusion/status', 'experiment_id'],
