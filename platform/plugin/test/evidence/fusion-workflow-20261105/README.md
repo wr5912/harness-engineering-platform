@@ -19,7 +19,7 @@
 | CLI 与 RPC 续办 | 1/1；同一 operation 跨进程及新 handler 续办、评测口径漂移拒绝写入、重复确认返回原回执；仍拒绝缺少目标 m 自身验收的 finalize |
 | 管理助手与装配 | 96/96；原生会话身份注入、草稿状态续接、工具内部失败上报、确认及动作 schema。此处助手工具测试使用隔离 handler，不代表真实模型业务完成 |
 | 原版本管理路径 | 修改期间既有 74/74 通过，保持旧 `preview + plan.edits` 调用与未分代融合语义 |
-| 类型与构建 | `pnpm run build` 包含 TypeScript 检查；结果见下方实际装载记录 |
+| 类型与构建 | `pnpm run build` 包含 TypeScript 检查；隔离工作树及合入并行版本展示提交后均通过，本地维护更新再次构建成功 |
 
 270 文件夹具执行五轮准备与确认，最终并行回归环境的机械阶段耗时约 1448、1962、1990、2505、5451 毫秒，中位数 1990 毫秒；未调用模型，不含业务语义判断、装载或评测，不能作为整轮提速比例。装配错误现在提供实际阶段、路径、摘要及下一步，配置解析错误不回传配置正文。
 
@@ -27,6 +27,10 @@
 
 ## 实际装载与限制
 
-代码在隔离开发工作树验证。完成本地维护更新后在此补充实际回执；当前不以源码、构建或模拟助手结果代替运行中生效。
+程序提交 `578deddd` 与并行版本展示改动合为 `8c3deeb1`，已推送程序仓库 `main`。本地使用 `platform/dsh-deploy update` 更新原程序与数据工作区；回执为 `applied`、`managed-restart`，工作区仍为 `workspace-95db14d2-d53d-4015-8256-ade8612b1b77`，进程为 `1559458`。更新前无在途任务，工具保持原 HOME、工作区和监听配置；更新前的 467 份原生会话文件全部保留。本地回执定位为 `.local/platform-updates/1904b2a9-f085-4453-89f1-b5c97d608ea6/receipt.json`，不纳入 Git。
+
+真实管理会话 `session-c29c262b-2381-47da-bb80-78dbc037a9ac` 已结束，加载了当前数据根中的 `harness-experiment-fusion` 技能，配置回读的技能摘要与磁盘一致。模型实际调用 `platform_agents.describe` 读取 `fusion/prepare`、`fusion/resolve`、`fusion/recover`，三项内部回执均成功；随后正确说明固定来源、真实目标、操作身份与摘要续办、Beyond Compare 映射输出导入、旧 `plan.edits` 兼容及目标 m 自身验收。会话仅包含加载技能和三次只读合同读取，没有调用业务写操作；这证明实际工具入口与助手理解，不代表真实业务融合通过。
+
+数据提交 `c5dabf05`（包含前序文档归属整改 `294a0604`）已推送 `fix/PLATFORM-fusion-workflow`，形成[合并请求 !6](http://172.16.138.233/ai-soc/harness-engineering-platform-data/-/merge_requests/6)。GitLab 拒绝直接推送受保护的 `main`，当前账号也没有该分支合并权限；远端 `main` 仍为 `5b1ade86`，待 Maintainer 合并。未修改分支保护，不能将两仓 main 交付整体标为完成。
 
 未执行真实业务版本融合、SOC 写入、目标 m 的新 Run 或 Research Release；未部署远端、安装或验证 Beyond Compare。精确重命名识别只覆盖唯一的内容与执行位完全匹配，其他重命名仍需人工取舍。相关一级验收状态不因此整体提升。
