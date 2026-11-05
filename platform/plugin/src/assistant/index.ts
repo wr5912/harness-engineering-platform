@@ -783,7 +783,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
             input.assistant_input_evidence = evidence
           }
         }
-        if (domain === 'agents' && ['features/preview', 'fusion/preview'].includes(args.action)) input.assistant_session_id = id
+        if (domain === 'agents' && ['features/preview', 'fusion/preview', 'fusion/prepare'].includes(args.action)) input.assistant_session_id = id
         if (!readActions.has(args.action) && !(domain === 'agents' && await confirmedFusion(id, args.action, input, exec.signal))) {
           return executeOperation(id, domain, args.action, input, exec.signal)
         }

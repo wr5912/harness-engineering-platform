@@ -1900,3 +1900,27 @@ test('原生受理后写回执失败可由实际user/message恢复；未知身�
   const missing = await f.rpc('status', { session_id, request_id: 'not-sent' })
   assert.equal(missing.value.submission.state, 'not_received')
 })
+
+test('持久融合工具合同、真实 Session 续办与内层失败反馈', async t => {
+  const f = fixture(t, (endpoint, input) => endpoint === 'agents/fusion/resolve'
+    ? { ok: false, error: { code: 'fusion_conflict', message: '来源已变化', details: { next_action: 'fusion/prepare' } } }
+    : endpoint.startsWith('agents/fusion/') ? { ok: true, value: { operation_id: input.operation_id ?? 'fixed-operation', state: endpoint.endsWith('/confirm') ? 'applied' : 'prepared', plan_sha256: 'a'.repeat(64) } } : undefined)
+  const id = (await f.rpc('session', {})).value.session_id
+  const prepare = await f.execute(id, 'agents', 'fusion/prepare', { agent_id: 'test-agent', plan: {} })
+  assert.equal(prepare.state, 'completed')
+  assert.equal(f.calls.find(row => row.endpoint === 'agents/fusion/prepare').input.assistant_session_id, id)
+  await f.reload()
+  const input = { operation_id: 'fixed-operation', expected_plan_sha256: 'a'.repeat(64) }
+  const status = await f.execute(id, 'agents', 'fusion/status', { operation_id: input.operation_id })
+  assert.equal(status.result.value.operation_id, input.operation_id)
+  const rejected = await f.execute(id, 'agents', 'fusion/resolve', { ...input, resolutions: [] })
+  assert.equal(rejected.state, 'failed')
+  assert.equal(rejected.result.error.code, 'fusion_conflict')
+  const applied = await f.execute(id, 'agents', 'fusion/confirm', input)
+  assert.equal(applied.state, 'completed')
+  assert.equal(f.calls.filter(row => row.endpoint === 'agents/fusion/confirm').length, 1)
+  assert.equal(f.calls.find(row => row.endpoint === 'agents/fusion/confirm').input.confirmed, true)
+  for (const action of ['fusion/prepare', 'fusion/resolve', 'fusion/recover']) assert.ok(assistantActions.agents.includes(action))
+  assert.equal(assistantActionContract('agents', 'fusion/resolve').input_schema.properties.resolutions.items.properties.decision.enum.includes('result'), true)
+  assert.deepEqual(assistantActionContract('agents', 'fusion/recover').input_schema.properties.recovery.enum, ['rollback', 'complete'])
+})

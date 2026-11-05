@@ -5,8 +5,9 @@ import { load as yaml } from 'js-yaml'
 import { assertAssetPath, candidateDigest, dataPath, sha256, sourceInfo } from './files.ts'
 import { assertInheritableVersion } from '../version-id.ts'
 import { versionIdentity, versionSource } from '../agents/version-source.ts'
-import { assertVersionEditable } from '../agents/version-governance.ts'
+import { assertVersionEditable, VersionGovernanceError } from '../agents/version-governance.ts'
 import { containsLiteralLlmKey } from './llm-key.ts'
+import { AssetOperationError } from './asset-error.ts'
 
 export interface TaskAssemblyInput {
   target_source: string
@@ -16,39 +17,58 @@ export interface TaskAssemblyInput {
 }
 
 function prepare(root: string, input: TaskAssemblyInput) {
+  const context = { stage: 'target', path: '' }
+  try { return prepareAssets(root, input, context) }
+  catch (error) {
+    if (error instanceof AssetOperationError || error instanceof VersionGovernanceError) throw error
+    const message = (error as Error).message
+    const pathError = ['路径必须是工作区内的 POSIX 相对路径', '不允许符号链接路径', 'Candidate 不能包含符号链接', '运行状态、依赖、环境凭据和 LLM API Key 不能作为装配资产'].includes(message)
+    throw new AssetOperationError('assembly_validation_failed', pathError ? message : '装配预检失败，请核对该阶段的来源、路径和配置格式', { ...context, filesystem_code: (error as NodeJS.ErrnoException).code ?? null, next_action: 'tasks/assembly-preview' })
+  }
+}
+
+function prepareAssets(root: string, input: TaskAssemblyInput, context: { stage: string; path: string }) {
+  const reject = (message: string, details: Record<string, any> = {}): never => { throw new AssetOperationError('assembly_validation_failed', message, { ...context, ...details, next_action: 'tasks/assembly-preview' }) }
   const identity = sourceInfo(root, input.target_source)
   assertVersionEditable(root, identity.id)
   const target = { ...identity, entry: versionSource(root, identity.id) }
-  if (candidateDigest(target.candidate) !== input.expected_candidate_sha256) throw new Error('目标 Candidate 已变化，请重新预览')
-  if (!Array.isArray(input.files) || !input.files.length) throw new Error('请选择需要复用的资产文件')
+  const actual = candidateDigest(target.candidate)
+  if (actual !== input.expected_candidate_sha256) reject('目标 Candidate 已变化，请重新预览', { expected_sha256: input.expected_candidate_sha256, actual_sha256: actual })
+  if (!Array.isArray(input.files) || !input.files.length) reject('请选择需要复用的资产文件')
   const seen = new Set<string>()
   const files = input.files.map(item => {
+    context.stage = 'source'; context.path = item.path
     const source = sourceInfo(root, item.source)
-    if (source.id !== target.id) assertInheritableVersion(source.id, versionIdentity(root, source.id))
+    if (source.id !== target.id) {
+      try { assertInheritableVersion(source.id, versionIdentity(root, source.id)) }
+      catch (error) { reject((error as Error).message) }
+    }
     const targetPath = item.target_path ?? item.path
     assertAssetPath(item.path); assertAssetPath(targetPath)
     const from = dataPath(source.candidate, item.path), to = dataPath(target.candidate, targetPath)
-    if (seen.has(to)) throw new Error('装配目标路径重复')
+    if (seen.has(to)) reject('装配目标路径重复')
     seen.add(to)
-    if (!lstatSync(from).isFile() || lstatSync(from).size > 1024 * 1024) throw new Error('仅支持不超过 1 MiB 的普通资产文件')
+    if (!lstatSync(from).isFile() || lstatSync(from).size > 1024 * 1024) reject('仅支持不超过 1 MiB 的普通资产文件')
     const content = readFileSync(from)
-    if (sha256(content) !== item.expected_source_sha256) throw new Error('复用来源已变化，请重新选择')
-    if (containsLiteralLlmKey(item.path, content.toString('utf8'))) throw new Error('资产包含 LLM API Key 常量，不能装配')
+    if (sha256(content) !== item.expected_source_sha256) reject('复用来源已变化，请重新选择', { expected_sha256: item.expected_source_sha256, actual_sha256: sha256(content) })
+    if (containsLiteralLlmKey(item.path, content.toString('utf8'))) reject('资产包含 LLM API Key 常量，不能装配')
+    context.stage = 'target-file'; context.path = targetPath
     const before = existsSync(to) ? readFileSync(to) : null
-    if ((before === null ? null : sha256(before)) !== item.expected_target_sha256) throw new Error('装配目标已变化，请重新预览')
+    if ((before === null ? null : sha256(before)) !== item.expected_target_sha256) reject('装配目标已变化，请重新预览', { expected_sha256: item.expected_target_sha256, actual_sha256: before === null ? null : sha256(before) })
     return { from, to, path: targetPath, content, before, mode: lstatSync(from).mode & 0o111 ? 0o755 : 0o644,
       previousMode: before ? lstatSync(to).mode & 0o777 : null, source: source.source, source_path: item.path,
       sha256: sha256(content), operation: before === null ? 'create' : 'replace' }
   })
   for (const edit of input.configuration_edits ?? []) {
+    context.stage = 'configuration'; context.path = edit.path
     assertAssetPath(edit.path)
     const to = dataPath(target.candidate, edit.path)
-    if (seen.has(to)) throw new Error('装配目标路径重复')
+    if (seen.has(to)) reject('装配目标路径重复')
     seen.add(to)
-    if (typeof edit.content !== 'string' || Buffer.byteLength(edit.content) > 1024 * 1024) throw new Error('配置编辑内容无效或过大')
-    if (containsLiteralLlmKey(edit.path, edit.content)) throw new Error('配置不能包含 LLM API Key 常量')
+    if (typeof edit.content !== 'string' || Buffer.byteLength(edit.content) > 1024 * 1024) reject('配置编辑内容无效或过大')
+    if (containsLiteralLlmKey(edit.path, edit.content)) reject('配置不能包含 LLM API Key 常量')
     const before = existsSync(to) ? readFileSync(to) : null
-    if ((before === null ? null : sha256(before)) !== edit.expected_target_sha256) throw new Error('装配配置已变化，请重新预览')
+    if ((before === null ? null : sha256(before)) !== edit.expected_target_sha256) reject('装配配置已变化，请重新预览', { expected_sha256: edit.expected_target_sha256, actual_sha256: before === null ? null : sha256(before) })
     if (/\.ya?ml$/.test(edit.path)) yaml(edit.content)
     if (/\.json$/.test(edit.path)) JSON.parse(edit.content)
     files.push({ from: '', to, path: edit.path, content: Buffer.from(edit.content), before,
@@ -57,8 +77,10 @@ function prepare(root: string, input: TaskAssemblyInput) {
       sha256: sha256(edit.content), operation: before === null ? 'create' : 'replace' })
   }
   // 用整批草稿检查目标配置的实际文件引用；只声明目录存在不算运行验证。
-  const read = (path: string) => files.find(file => file.path === path)?.content.toString('utf8')
-    ?? readFileSync(dataPath(target.candidate, path), 'utf8')
+  const read = (path: string) => {
+    context.stage = 'configuration-references'; context.path = path
+    return files.find(file => file.path === path)?.content.toString('utf8') ?? readFileSync(dataPath(target.candidate, path), 'utf8')
+  }
   const references = new Set<string>()
   function inspect(value: unknown): void {
     if (typeof value === 'string') {
@@ -66,7 +88,7 @@ function prepare(root: string, input: TaskAssemblyInput) {
         if (!value.startsWith(container) || value.includes('${')) continue
         const path = relative + value.slice(container.length)
         const file = dataPath(target.candidate, path)
-        if (!files.some(item => item.path === path) && !existsSync(file)) throw new Error('目标配置引用了不存在的资产：' + path)
+        if (!files.some(item => item.path === path) && !existsSync(file)) reject('目标配置引用了不存在的资产', { path })
         references.add(path)
       }
     } else if (Array.isArray(value)) value.forEach(inspect)
@@ -104,10 +126,11 @@ export async function applyTaskAssembly(root: string, input: TaskAssemblyInput) 
     }
   } catch (error) {
     for (const file of written.reverse()) {
+      if (!existsSync(file.to) || sha256(readFileSync(file.to)) !== file.sha256 || (lstatSync(file.to).mode & 0o111 ? 0o755 : 0o644) !== file.mode) continue
       if (file.before === null) rmSync(file.to)
       else { writeFileSync(file.to, file.before); chmodSync(file.to, file.previousMode!) }
     }
-    throw error
+    throw new AssetOperationError('assembly_apply_failed', '装配写入失败；已恢复未被并行修改的本次写入，请核对实际状态后继续', { stage: 'write', filesystem_code: (error as NodeJS.ErrnoException).code ?? null, next_action: 'tasks/assembly-preview' })
   }
   return { experiment_id: target.id, source: target.source, candidate_sha256: candidateDigest(target.candidate),
     files: files.map(({ path, source, source_path, sha256 }) => ({ path, source, source_path, sha256 })),

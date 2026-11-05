@@ -23,6 +23,7 @@ const titles: Record<string, string> = {
   'edit/read': '读取资产文件', 'edit/preview': '核对资产修改', 'edit/apply': '保存资产修改',
   'eval/preview': '核对评测范围', 'eval/start': '启动评测', 'eval/status': '查询评测进度', 'eval/cancel': '取消评测',
   'runs/index': '查询运行记录', 'runs/delete': '删除评测记录', 'runs/show': '读取运行详情', 'runs/report': '读取评测报告', 'runs/read-file': '读取运行文件', 'runs/trace': '读取执行轨迹',
+  'fusion/preview': '核对融合差异', 'fusion/prepare': '准备融合草稿', 'fusion/resolve': '解决融合冲突', 'fusion/confirm': '保存融合资产', 'fusion/status': '查询融合进度', 'fusion/recover': '恢复融合写入', 'fusion/verify': '验证融合目标', 'fusion/finalize': '完成融合验收',
   'tasks/assembly-preview': '核对能力装配', 'tasks/assembly-apply': '装配复用能力',
   'compute-variants/context': '读取算力变体进度', 'compute-variants/preview': '核对算力变体计划', 'compute-variants/create': '创建探索性算力变体', 'compute-variants/rename': '修改变体名称',
   'compute-variants/plan-preview': '核对更新后的评测口径', 'compute-variants/plan-apply': '重新确认算力比较口径',

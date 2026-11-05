@@ -2456,3 +2456,33 @@ test('缺Decision的结构化保存失败恢复为缺文件，不生成空Decisi
     assert.equal(existsSync(decision), false);assert.deepEqual(readFileSync(change), before)
   } finally { await rm(fx.root, { recursive: true, force: true }) }
 })
+
+test('持久融合跨 CLI、RPC 续办；评测漂移拒绝写入，确认幂等且继续要求 m 自身验收', async t => {
+  const { createAgentsHandler } = await loadServer(), fx = managedFixture()
+  t.after(() => rm(fx.root, { recursive: true, force: true }))
+  const handler = createAgentsHandler(fx.root)
+  const request = versionRequest(fx.commit, { parent_experiment_id: managedFeature, target_experiment_id: managedMain })
+  const inventory = (await rpc(handler, 'fusion/preview', request)).inventory
+  const plan = fusionPlan([...inventory.sources.map(row => ({ experiment_id: row.experiment_id, decision: 'omit', reason: '保留既有目标' })), { experiment_id: managedFeature, ref: `git:${fx.commit}`, decision: 'inherit', reason: '采纳特性' }])
+  plan.checks.unshift({ id: 'build', kind: 'build', command: [process.execPath, '--version'] })
+  let op = versionCli(fx.root, 'fusion/prepare', { ...request, plan })
+  assert.equal(op.state, 'prepared')
+  assert.equal(op.base.verified, false)
+  const file = join(fx.root, `evolution/experiments/${managedMain}/candidate/dsh/workspace/input.txt`)
+  assert.equal(readFileSync(file, 'utf8'), 'workspace\n')
+  const resolve = () => ({ operation_id: op.operation_id, expected_plan_sha256: op.plan_sha256, resolutions: op.conflicts.map(row => ({ path: row.path, decision: 'source', reason: '采用指定特性' })) })
+  const evaluation = join(fx.root, 'agents/test-agent/evaluation.md'), original = readFileSync(evaluation, 'utf8')
+  write(evaluation, original.replace('返回 pong。', '口径改变。'))
+  await assert.rejects(() => rpc(handler, 'fusion/resolve', resolve()), /conflict/)
+  write(evaluation, original)
+  op = versionCli(fx.root, 'fusion/resolve', resolve())
+  const input = { operation_id: op.operation_id, expected_plan_sha256: op.plan_sha256, confirmed: true }
+  const confirmed = await rpc(handler, 'fusion/confirm', input)
+  assert.equal(readFileSync(file, 'utf8'), 'feature\n')
+  assert.deepEqual(versionCli(fx.root, 'fusion/confirm', input), confirmed)
+  const fresh = createAgentsHandler(fx.root)
+  assert.equal((await rpc(fresh, 'fusion/status', { operation_id: op.operation_id })).state, 'applied')
+  await assert.rejects(() => rpc(fresh, 'fusion/finalize', { experiment_id: managedMain, expected_candidate_sha256: confirmed.candidate_sha256 }), /verification_incomplete/)
+  versionCli(fx.root, 'fusion/recover', { ...input, recovery: 'rollback' })
+  assert.equal(readFileSync(file, 'utf8'), 'workspace\n')
+})

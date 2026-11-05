@@ -31,6 +31,8 @@ import { createEvaluationJobs, EvaluationJobError, redactKnownValues } from '../
 import { caseBlockRange, caseSourceReferences, createCaseManagementHandler, type RunCaseSource } from '../evaluation/cases.ts'
 import { caseObservation } from '../evaluation/case-observation.ts'
 import { readAssetDiff, readFixedAsset } from './asset-diff.ts'
+import { AssetOperationError } from '../tasks/asset-error.ts'
+import { fusionDifference, prepareFusion, readFusionOperation, resolveFusion, confirmFusion, recoverFusion, fusionOperationStatus } from './fusion-operations.ts'
 import { createAgent } from './create-agent.ts'
 import { createSdkHandler } from '../sdk/operations.ts'
 import { VERSION_ID, isVariantIdentity, assertInheritableVersion, versionRole } from '../version-id.ts'
@@ -85,7 +87,7 @@ function ok<T extends RpcValue>(value: T): ConnectionRpcResult<T> {
 function failure(error: unknown): ConnectionRpcResult<never> {
   if (error instanceof VersionGovernanceError) return { ok: false, error: { code: error.code, message: error.message, details: {} } }
   if (error instanceof EvaluationJobError) return { ok: false, error: { code: error.code, message: error.message, details: {} } }
-  if (error instanceof RpcError || error instanceof RunFileError) return { ok: false, error: { code: error.code, message: error.message, details: error.details } }
+  if (error instanceof RpcError || error instanceof RunFileError || error instanceof AssetOperationError) return { ok: false, error: { code: error.code, message: error.message, details: error.details } }
   const code = (error as NodeJS.ErrnoException).code ?? 'unknown'
   return { ok: false, error: { code: 'asset_operation_failed', message: '智能体资产操作失败', details: { filesystem_code: code } } }
 }
@@ -734,7 +736,7 @@ function fusionSourcesCurrent(root: string, plan: FusionPlan) {
   })
 }
 
-async function fusionPreview(root: string, body: JsonMap, previews: Map<string, VersionPreview>) {
+async function fusionPreview(root: string, body: JsonMap, previews: Map<string, VersionPreview>, native = false) {
   const agentId = agentIdField(body)
   const snapshot = fusionSnapshot(root, agentId)
   const parentId = experimentIdField(body, 'parent_experiment_id')
@@ -746,32 +748,64 @@ async function fusionPreview(root: string, body: JsonMap, previews: Map<string, 
   const target = fusionTarget(root, body)
   let merge: JsonMap | null = null
   if (target) {
-    const difference = await readAssetDiff(root, { experiment_id: parentId, against: target })
-    if (!difference.ok) return difference
-    merge = { target_experiment_id: target, expected_candidate_sha256: candidateDigest(root, target), difference: difference.value }
+    const difference = native ? null : await readAssetDiff(root, { experiment_id: parentId, against: target })
+    if (difference && !difference.ok) return difference
+    merge = { target_experiment_id: target, expected_candidate_sha256: candidateDigest(root, target), ...(difference?.ok ? { difference: difference.value } : {}), ...(!native ? { three_way: fusionDifference(root, body as any) } : {}) }
     if (plan) {
       if (!plan.sources.some(source => source.experiment_id === parentId && source.ref === parentRef && source.decision === 'inherit')) throw new RpcError('invalid_request', '合并方案必须采用当前特性的固定来源')
       if (!plan.checks.some(check => check.kind === 'build')) throw new RpcError('invalid_request', '合并后的 m 必须独立构建、装载和验收')
-      const edits = requireObject(body.plan).edits
-      if (!Array.isArray(edits) || !edits.length) throw new RpcError('invalid_request', '合并方案需要实际资产 edits，不能只登记采纳')
-      plan.edits = edits.map(item => requireObject(item))
-      for (const edit of plan.edits) {
-        const path = stringField(edit, 'path')
-        if (path.startsWith('evolution/') || path.startsWith('agents/') || ['change.yaml', 'decision.md', 'hypothesis.md'].includes(path) || path.startsWith('evaluation/')) throw new RpcError('path_rejected', '融合 edits 仅可修改目标 Candidate 资产')
+      if (native) merge = { ...merge, sources: fusionSourcesCurrent(root, plan) }
+      else {
+        const edits = requireObject(body.plan).edits
+        if (!Array.isArray(edits) || !edits.length) throw new RpcError('invalid_request', '合并方案需要实际资产 edits，不能只登记采纳')
+        plan.edits = edits.map(item => requireObject(item))
+        for (const edit of plan.edits) {
+          const path = stringField(edit, 'path')
+          if (path.startsWith('evolution/') || path.startsWith('agents/') || ['change.yaml', 'decision.md', 'hypothesis.md'].includes(path) || path.startsWith('evaluation/')) throw new RpcError('path_rejected', '融合 edits 仅可修改目标 Candidate 资产')
+        }
+        const edited = await previewEdit(root, { experiment_id: target, edits: plan.edits })
+        if (!edited.ok) return edited
+        if (!edited.value.edits.some((edit: JsonMap) => edit.changed)) throw new RpcError('invalid_request', '融合必须实际改变目标资产')
+        merge = { ...merge, sources: fusionSourcesCurrent(root, plan), edit_preview: edited.value }
       }
-      const edited = await previewEdit(root, { experiment_id: target, edits: plan.edits })
-      if (!edited.ok) return edited
-      if (!edited.value.edits.some((edit: JsonMap) => edit.changed)) throw new RpcError('invalid_request', '融合必须实际改变目标资产')
-      merge = { ...merge, sources: fusionSourcesCurrent(root, plan), edit_preview: edited.value }
     }
   }
   const value = { preview_id: plan ? randomUUID() : null, plan_sha256: sha256(JSON.stringify({ body, snapshot, plan })), agent_id: agentId, parent_experiment_id: parentId, parent_ref: parentRef, ...(target ? { target_experiment_id: target, merge } : {}), research_question: question, inventory, plan, plan_ready: Boolean(plan), requires_confirmation: true, assistant_session_id: optionalString(body, 'assistant_session_id') ?? null }
   if (fusionSnapshot(root, agentId) !== snapshot) throw new RpcError('conflict', '预览期间来源已变化，请重新读取差异')
-  if (plan) previews.set(value.preview_id!, { kind: 'fusion', payload: body, snapshot, value })
+  if (plan && !native) previews.set(value.preview_id!, { kind: 'fusion', payload: body, snapshot, value })
   return ok(value)
 }
 
+async function fusionPrepare(root: string, body: JsonMap, previews: Map<string, VersionPreview>) {
+  const snapshot = fusionSnapshot(root, agentIdField(body))
+  const preview = await fusionPreview(root, body, previews, true)
+  if (!preview.ok) return preview
+  if (!preview.value.plan || !preview.value.target_experiment_id) throw new RpcError('invalid_request', '原生融合草稿需要同号现有 m 和完整 plan')
+  if (fusionSnapshot(root, agentIdField(body)) !== snapshot) throw new RpcError('conflict', '准备期间资产已变化，请重新 prepare')
+  const request = { agent_id: agentIdField(body), parent_experiment_id: stringField(body, 'parent_experiment_id'), parent_ref: stringField(body, 'parent_ref'), target_experiment_id: stringField(body, 'target_experiment_id'), research_question: stringField(body, 'research_question'), assistant_session_id: optionalString(body, 'assistant_session_id') ?? null }
+  const operation = prepareFusion(root, request, preview.value.plan, snapshot)
+  if (fusionSnapshot(root, request.agent_id) !== snapshot) throw new RpcError('conflict', '准备期间资产已变化，请重新 prepare')
+  return ok(operation)
+}
+
+async function fusionOperationConfirm(root: string, body: JsonMap) {
+  const operation = readFusionOperation(root, stringField(body, 'operation_id'))
+  return withVersionLock(root, operation.request.agent_id, async () => ok(await confirmFusion(root, body, async (op, drafts) => {
+    const target = fusionTarget(root, op.request), plan = op.plan as FusionPlan
+    if (fusionSnapshot(root, op.request.agent_id) !== op.snapshot || evaluationDigest(root, op.request.agent_id, plan.evaluation_case_ids) !== plan.evaluation_sha256) throw new RpcError('conflict', '版本、来源或评测口径已变化，请保留草稿并重新 prepare')
+    const sources = fusionSourcesCurrent(root, plan)
+    await validateDraft(root, { experiment_id: target }, drafts)
+    if (fusionSnapshot(root, op.request.agent_id) !== op.snapshot || evaluationDigest(root, op.request.agent_id, plan.evaluation_case_ids) !== plan.evaluation_sha256) throw new RpcError('conflict', '草稿校验期间版本或评测口径变化')
+    const change = readYamlMap(root, changePath(root, target!))
+    const existing = Array.isArray(change.fusion_sources) ? change.fusion_sources as JsonMap[] : []
+    return dumpYaml({ ...change, features: plan.features,
+      fusion_sources: [...existing.filter(source => !sources.some(item => item.experiment_id === source.experiment_id)), ...sources],
+      creation: { status: 'integrating', operation_id: op.operation_id, plan_sha256: op.plan_sha256, target_experiment_id: target, confirmed_at: new Date().toISOString(), research_question: op.request.research_question, assistant_session_id: op.request.assistant_session_id ?? null, plan, receipts: [] } })
+  })))
+}
+
 async function fusionConfirm(root: string, body: JsonMap, previews: Map<string, VersionPreview>) {
+  if (body.operation_id !== undefined) return fusionOperationConfirm(root, body)
   if (body.preview_id === undefined && body.plan && body.expected_plan_sha256) {
     const { confirmed, expected_plan_sha256, ...request } = body
     const current = await fusionPreview(root, request, previews)
@@ -814,6 +848,7 @@ async function fusionConfirm(root: string, body: JsonMap, previews: Map<string, 
 }
 
 function fusionStatus(root: string, body: JsonMap) {
+  if (body.operation_id !== undefined) return ok(fusionOperationStatus(root, stringField(body, 'operation_id')))
   const id = experimentIdField(body)
   const exp = experimentInfo(root, id)
   return ok({ experiment_id: id, candidate_sha256: candidateDigest(root, id), creation: creationView(root, id, exp.change), features: featureView(root, exp.id, exp.change) })
@@ -1834,6 +1869,21 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
         case 'features/proposal': return latestProposal(body, previews, 'features')
         case 'features/apply': return featureApply(root, body, previews)
         case 'fusion/preview': return await fusionPreview(root, body, previews)
+        case 'fusion/prepare': return await fusionPrepare(root, body, previews)
+        case 'fusion/resolve': {
+          const operation = readFusionOperation(root, stringField(body, 'operation_id'))
+          return await withVersionLock(root, operation.request.agent_id, async () => {
+            if (fusionSnapshot(root, operation.request.agent_id) !== operation.snapshot || evaluationDigest(root, operation.request.agent_id, operation.plan.evaluation_case_ids) !== operation.plan.evaluation_sha256) throw new RpcError('conflict', '来源或目标已变化，请保留草稿并重新 prepare')
+            return ok(resolveFusion(root, body))
+          })
+        }
+        case 'fusion/recover': {
+          const operation = readFusionOperation(root, stringField(body, 'operation_id'))
+          return await withVersionLock(root, operation.request.agent_id, async () => {
+            assertVersionEditable(root, operation.request.target_experiment_id)
+            return ok(recoverFusion(root, body))
+          })
+        }
         case 'fusion/proposal': return latestProposal(body, previews, 'fusion')
         case 'fusion/confirm': return await fusionConfirm(root, body, previews)
         case 'fusion/status': return fusionStatus(root, body)

@@ -128,3 +128,15 @@ test('整批装配先检查配置绑定，缺失依赖或越界路径不得部�
   input.files[0].target_path = 'dsh/workspace/link/report.md'; symlinkSync(tmpdir(), join(root, `evolution/experiments/${targetId}/candidate/dsh/workspace/link`))
   await assert.rejects(applyTaskAssembly(root, input), /符号链接/)
 })
+
+test('装配错误携带实际阶段、路径和摘要，配置解析失败不泄露正文', async t => {
+  const root = fixture(t), input = assemblyInput(root)
+  const missing = { ...input, files: [{ ...input.files[0], path: 'dsh/workspace/missing.md' }] }
+  await assert.rejects(previewTaskAssembly(root, missing), e => e.code === 'assembly_validation_failed' && e.details.stage === 'source' && e.details.path === 'dsh/workspace/missing.md' && e.details.filesystem_code === 'ENOENT')
+  const drift = { ...input, files: [{ ...input.files[0], expected_source_sha256: '0'.repeat(64) }] }
+  await assert.rejects(previewTaskAssembly(root, drift), e => e.code === 'assembly_validation_failed' && e.details.expected_sha256 === '0'.repeat(64) && e.details.actual_sha256 === input.files[0].expected_source_sha256)
+  const path = 'dsh/presets/inspection-task/agent.cordis.yml'
+  const malformed = { ...input, configuration_edits: [{ path, content: 'values: [\nprivate_value: fixture-private-value\n', expected_target_sha256: sha256(readFileSync(join(root, `evolution/experiments/${targetId}/candidate/${path}`))) }] }
+  await assert.rejects(previewTaskAssembly(root, malformed), e => e.code === 'assembly_validation_failed' && e.details.stage === 'configuration' && e.details.path === path && !JSON.stringify(e).includes('fixture-private-value'))
+  assert.equal(existsSync(join(root, `evolution/experiments/${targetId}/candidate/${input.files[0].path}`)), false)
+})

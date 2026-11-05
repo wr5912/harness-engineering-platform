@@ -10,10 +10,10 @@ export const RUN = /^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-
 const EXCLUDED = new Set(['runs', 'history', 'RuntimeHOME', 'sessions', 'cache', '.git', 'node_modules', '__pycache__'])
 export const sha256 = (value: string | Buffer) => createHash('sha256').update(value).digest('hex')
 
-export function atomicWrite(file: string, body: string | Buffer) {
+export function atomicWrite(file: string, body: string | Buffer, desiredMode?: number) {
   mkdirSync(dirname(file), { recursive: true })
   const tmp = `${file}.${process.pid}.${Date.now()}.${randomBytes(3).toString('hex')}.tmp`
-  const mode = existsSync(file) ? lstatSync(file).mode & 0o777 : undefined
+  const mode = desiredMode ?? (existsSync(file) ? lstatSync(file).mode & 0o777 : undefined)
   try {
     writeFileSync(tmp, body, { flag: 'wx', mode })
     if (mode !== undefined) chmodSync(tmp, mode)
@@ -54,36 +54,48 @@ export function candidateDigest(candidate: string): string {
   return hash.digest('hex')
 }
 
-export function gitCandidateDigest(root: string, id: string, ref: string): string | null {
+/** 一次读取固定树与全部 blob；不检出、不执行来源内容。 */
+export function readGitCandidate(root: string, id: string, ref: string): Map<string, { content: Buffer; mode: number }> | null {
+  if (!EXPERIMENT.test(id) || !/^git:[0-9a-f]{40}$/.test(ref)) return null
   const base = `evolution/experiments/${id}/candidate/`
   const listed = spawnSync('git', ['ls-tree', '-rz', '--full-tree', ref.slice(4), '--', base.slice(0, -1)], { cwd: root, encoding: 'buffer', maxBuffer: 10 * 1024 * 1024 })
   if (listed.status !== 0) return null
   const records = listed.stdout.toString('utf8').split('\0').filter(Boolean).map(row => {
     const match = /^(\d+) blob ([0-9a-f]+)\t(.+)$/.exec(row)
     return match ? { mode: Number.parseInt(match[1]!, 8) & 0o777, object: match[2]!, path: match[3]!.slice(base.length), symlink: match[1] === '120000' } : null
-  }).filter((row): row is NonNullable<typeof row> => row !== null)
+  })
+  if (records.some(row => row === null)) return null
+  const assets = records.filter((row): row is NonNullable<typeof row> => row !== null)
     .filter(row => !row.path.split('/').some(part => EXCLUDED.has(part) || part.endsWith('.llm-api-key')))
-  if (!records.length || records.some(row => row.symlink)) return null
+  if (!assets.length || assets.some(row => row.symlink) || assets.length > 10_000) return null
   // 与工作树扫描一致：按目录项排序后深度遍历，而非整条路径的字符串顺序。
-  records.sort((left, right) => {
+  assets.sort((left, right) => {
     const a = left.path.split('/'), b = right.path.split('/')
     for (let index = 0; index < Math.min(a.length, b.length); index++) if (a[index] !== b[index]) return a[index]! < b[index]! ? -1 : 1
     return a.length - b.length
   })
-  const blobs = spawnSync('git', ['cat-file', '--batch'], { cwd: root, input: records.map(row => row.object).join('\n') + '\n', maxBuffer: 100 * 1024 * 1024 })
+  const blobs = spawnSync('git', ['cat-file', '--batch'], { cwd: root, input: assets.map(row => row.object).join('\n') + '\n', maxBuffer: 100 * 1024 * 1024 })
   if (blobs.status !== 0) return null
-  const hash = createHash('sha256')
+  const result = new Map<string, { content: Buffer; mode: number }>()
   let offset = 0
-  for (const row of records) {
+  for (const row of assets) {
     const end = blobs.stdout.indexOf(10, offset)
     const header = blobs.stdout.subarray(offset, end).toString('ascii').split(' ')
     const size = Number(header[2])
     if (end < 0 || header[1] !== 'blob' || !Number.isSafeInteger(size) || size < 0) return null
     const data = blobs.stdout.subarray(end + 1, end + 1 + size)
     if (data.length !== size) return null
-    hash.update(JSON.stringify([row.path, row.mode, sha256(data)]))
+    result.set(row.path, { content: data, mode: row.mode })
     offset = end + size + 2
   }
+  return result
+}
+
+export function gitCandidateDigest(root: string, id: string, ref: string): string | null {
+  const files = readGitCandidate(root, id, ref)
+  if (!files) return null
+  const hash = createHash('sha256')
+  for (const [path, file] of files) hash.update(JSON.stringify([path, file.mode, sha256(file.content)]))
   return hash.digest('hex')
 }
 
