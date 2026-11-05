@@ -145,13 +145,19 @@ export function inspectUpdate(target: Target) {
   }
   // 历史安装可能在 prepare 时生成清单外制品；仍按当前摘要核对并保留备份。
   for (const directory of ['platform/plugin/lib', 'platform/plugin/business', 'runtime/adapters/dsh-web/lib']) collect(directory)
-  const dependencyBases: Record<string, string> = {}, repairDependencies: string[] = []
+  const dependencyBases: Record<string, string> = {}, repairDependencies: string[] = [], dependencyDamage: Record<string, string[]> = {}
   const dependencies = Object.fromEntries(['platform/plugin', 'runtime/adapters/dsh-web'].map(directory => {
     let modules = join(target.prefix, directory, 'node_modules')
     if (existsSync(join(target.prefix, directory, 'package.json'))) {
       const pkg = JSON.parse(readFileSync(join(target.prefix, directory, 'package.json'), 'utf8'))
       const complete = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).every(name => existsSync(join(modules, name)))
-      if (!complete) {
+      const prefix = `program/${directory}/node_modules/`
+      const damaged = manifest.files.filter((entry: any) => entry.path.startsWith(prefix)).filter((entry: any) => {
+        const path = join(modules, entry.path.slice(prefix.length)), stat = lstatSync(path, { throwIfNoEntry: false })
+        return !stat || (entry.type === 'symlink' ? !stat.isSymbolicLink() || readlinkSync(path) !== entry.target : !stat.isFile() || digest(path) !== entry.sha256 || entry.mode !== undefined && (stat.mode & 0o777) !== entry.mode)
+      }).map((entry: any) => entry.path.slice(prefix.length)) as string[]
+      dependencyDamage[directory] = damaged
+      if (!complete || damaged.length) {
         repairDependencies.push(directory)
         const backups = join(target.prefix, '.local/deploy-updates')
         for (const name of existsSync(backups) ? readdirSync(backups).sort((a,b) => statSync(join(backups,b)).mtimeMs - statSync(join(backups,a)).mtimeMs) : []) {
@@ -168,12 +174,13 @@ export function inspectUpdate(target: Target) {
             const path = join(candidate, entry.path.slice(prefix.length)), stat = lstatSync(path, { throwIfNoEntry: false })
             return stat && (entry.type === 'symlink' ? stat.isSymbolicLink() && readlinkSync(path) === entry.target : stat.isFile() && digest(path) === entry.sha256)
           })
-          if (valid) { modules = candidate; break }
+          if (valid) { modules = candidate; dependencyDamage[directory] = []; break }
         }
       }
     }
     dependencyBases[directory] = modules
-    return [directory, existsSync(join(modules, '.pnpm')) ? readdirSync(join(modules, '.pnpm')) : []]
+    const damagedFolders = new Set((dependencyDamage[directory] ?? []).filter(path => path.startsWith('.pnpm/')).map(path => path.split('/')[1]))
+    return [directory, existsSync(join(modules, '.pnpm')) ? readdirSync(join(modules, '.pnpm')).filter(name => !damagedFolders.has(name)) : []]
   }))
   const sources: Record<string, {sha256: string; mode: number} | null> = {}
   if (manifest.package.commit && manifest.package.commit !== head(target.prefix)) {
@@ -202,7 +209,7 @@ export function inspectUpdate(target: Target) {
     }
     return { path, sha256: digest(absolute), blob: existsSync(absolute) ? git(target.dataRoot, 'hash-object', '--', path).toString().trim() : null }
   })
-  return { program: head(target.prefix), data: head(target.dataRoot), dataHistory: git(target.dataRoot, 'rev-list', '--max-count=100', 'HEAD').toString().trim().split('\n'), architecture: process.arch, dependencies, dependencyBases, repairDependencies, artifacts, revalidated, sources, dirtyData }
+  return { program: head(target.prefix), data: head(target.dataRoot), dataHistory: git(target.dataRoot, 'rev-list', '--max-count=100', 'HEAD').toString().trim().split('\n'), architecture: process.arch, dependencies, dependencyBases, repairDependencies, dependencyDamage, artifacts, revalidated, sources, dirtyData }
 }
 
 export function exportHistory(root: string, common?: string) {
@@ -333,6 +340,7 @@ export function applyUpdate(target: Target, update: Update) {
       mkdirSync(prepared, { recursive: true })
       const live = join(target.prefix, directory, 'node_modules')
       run('cp', ['-a', state.dependencyBases[directory], join(prepared, 'node_modules')])
+      for (const path of state.dependencyDamage[directory] ?? []) rmSync(safe(join(prepared, 'node_modules'), path), { force: true })
       const delta = update.dependencies!.find(item => item.directory === directory)!
       for (const path of delta.remove) {
         if (!/^(?:@[a-zA-Z0-9_.-]+\/)?[a-zA-Z0-9_.-]+$/.test(path) || path.split('/').some(part => part === '.' || part === '..')) throw new Error(`依赖包名无效：${path}`)

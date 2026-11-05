@@ -807,7 +807,11 @@ def prepare(home, offline=False):
         print("安装插件依赖…", flush=True)
         build_command("插件依赖安装", [pnpm, "install", "--frozen-lockfile"], cwd=PLUGIN)
     print("构建平台插件与 Web 基址适配…", flush=True)
-    build_command("插件构建", [pnpm, "run", "build"], cwd=PLUGIN, env=runtime_environment(home))
+    build_environment = runtime_environment(home)
+    if offline:
+        # pnpm run 默认可能隐式安装；离线准备不能改写已校验的依赖。
+        build_environment["pnpm_config_verify_deps_before_run"] = "false"
+    build_command("插件构建", [pnpm, "run", "build"], cwd=PLUGIN, env=build_environment)
     for extension in workspace_extensions():
         extension_output(extension)
     check_artifacts()

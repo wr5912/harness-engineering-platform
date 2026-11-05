@@ -88,7 +88,8 @@ else:
         self.write_executable("pnpm", r'''
 import json, os, pathlib, sys
 with open(os.environ["FAKE_PNPM_TRACE"], "a") as handle:
-    handle.write(json.dumps({"args": sys.argv[1:], "cwd": os.getcwd()}) + "\n")
+    handle.write(json.dumps({"args": sys.argv[1:], "cwd": os.getcwd(),
+                            "verify_deps": os.environ.get("pnpm_config_verify_deps_before_run")}) + "\n")
 if os.environ.get("FAKE_PNPM_FAIL") == "build" and sys.argv[1:] == ["run", "build"]:
     print("[ERR_PNPM_TEST_BUILD] fixture build failed", file=sys.stderr)
     sys.exit(1)
@@ -261,6 +262,7 @@ if sys.argv[1:] == ["run", "build"]:
         self.assertEqual(result.returncode, 0, result.stderr)
         calls = [json.loads(line) for line in self.pnpm_trace.read_text().splitlines()]
         self.assertEqual([call["args"] for call in calls], [["run", "build"]])
+        self.assertEqual(calls[0]["verify_deps"], "false")
         self.assertTrue((self.plugin / "lib/index.js").is_file())
         self.assertTrue((self.web / "lib/platform-webserver.mjs").is_file())
 

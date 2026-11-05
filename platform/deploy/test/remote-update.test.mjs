@@ -239,6 +239,33 @@ test('离线准备损坏依赖后，从工具备份验证恢复并重建可执�
   assert.deepEqual(inspectUpdate(target).repairDependencies, [])
 })
 
+test('依赖仍可解析但内容被改写时，只复用完整分组并通过离线增量修复', t => {
+  const { target, update } = fixture(t), directory = 'platform/plugin'
+  const modules = join(target.prefix, directory, 'node_modules'), packagePath = '.pnpm/native/node_modules/native'
+  mkdirSync(join(modules, packagePath), { recursive: true })
+  mkdirSync(join(modules, '.pnpm/unchanged'))
+  writeFileSync(join(target.prefix, directory, 'package.json'), '{"dependencies":{"native":"1"}}')
+  symlinkSync(packagePath, join(modules, 'native'))
+  writeFileSync(join(modules, packagePath, 'cli.js'), 'original executable')
+  const archive = execFileSync('tar', ['-czf', '-', '-C', modules, 'native', packagePath])
+  writeFileSync(join(target.prefix, '.local/installation.json'), JSON.stringify({ schemaVersion: 1, files: [
+    { path: `program/${directory}/node_modules/${packagePath}/cli.js`, type: 'file', sha256: hash('original executable') },
+    { path: `program/${directory}/node_modules/.pnpm-workspace-state-v1.json`, type: 'file', sha256: hash('original state') },
+  ], package: {}, data: {} }))
+  writeFileSync(join(modules, packagePath, 'cli.js'), 'changed by implicit install')
+  writeFileSync(join(modules, '.pnpm-workspace-state-v1.json'), 'changed state')
+  const state = inspectUpdate(target)
+  assert.deepEqual(state.repairDependencies, [directory])
+  assert.deepEqual(state.dependencies[directory], ['unchanged'])
+  update.repositories.forEach(repo => repo.files = [])
+  update.dependencies = [{ directory, archive: archive.toString('base64'), remove: ['native'], bins: { native: '../native/cli.js' } }]
+  assert.throws(() => applyUpdate(target, update), /install-deps/)
+  assert.equal(applyUpdate({ ...target, installDeps: true }, update).status, 'updated')
+  assert.equal(readFileSync(join(modules, '.bin/native'), 'utf8'), 'original executable')
+  assert.equal(existsSync(join(modules, '.pnpm-workspace-state-v1.json')), false)
+  assert.deepEqual(inspectUpdate(target).repairDependencies, [])
+})
+
 test('分条压缩包完整还原 Git 包和去重文件，缺失内容不会写入', t => {
   const { target, update } = fixture(t)
   const content = update.repositories[0].files[0].content, id = hash(Buffer.from(content, 'base64'))
