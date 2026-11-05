@@ -235,8 +235,7 @@ export async function updatePlatform(input: UpdateOptions, services: UpdateServi
   const options = { ...input, programRoot: realpathSync(input.programRoot), dataRoot: realpathSync(input.dataRoot) }
   const observed = await services.inspect(options)
   const report: UpdateReport = { status: options.dryRun ? 'planned' : 'unchanged', programRoot: options.programRoot, dataRoot: options.dataRoot, workspaceId: observed.workspaceId, pid: observed.state.pid, activation: 'none', busy: observed.busy, changed: [] }
-  if (observed.busy.length) { report.status = 'busy'; return report }
-  if (options.dryRun) return report
+  if (options.dryRun) { if (observed.busy.length) report.status = 'busy'; return report }
   const base = join(options.programRoot, '.local/platform-updates'), lock = join(base, 'update.lock')
   mkdirSync(base, { recursive: true, mode: 0o700 })
   try { mkdirSync(lock); writeFileSync(join(lock, 'owner.json'), JSON.stringify({ pid: process.pid, birth: processBirth(process.pid) })) }
@@ -257,7 +256,7 @@ export async function updatePlatform(input: UpdateOptions, services: UpdateServi
     if (sourceSnapshot(options) !== source || !sameSnapshot(liveSnapshot(options), live)) throw new Error('源码、Profile或运行制品在构建期间变化；保留构建结果，未应用')
     const current = await services.inspect(options)
     if (current.state.pid !== observed.state.pid || current.state.birth !== observed.state.birth || current.workspaceId !== observed.workspaceId) throw new Error('受管进程在构建期间变化，未应用')
-    if (current.busy.length) { report.status = 'busy'; report.busy = current.busy; return report }
+    report.busy = current.busy
     if (JSON.stringify(current.overlay) !== JSON.stringify(observed.overlay) || JSON.stringify(current.extensions) !== JSON.stringify(observed.extensions)) throw new Error('生成Profile来源在更新准备期间变化；保留构建结果，未应用')
     if (sourceSnapshot(options) !== source || !sameSnapshot(liveSnapshot(options), live) || !sameSnapshot(extensionSnapshot(observed), extensions) || entries.some((entry, index) => sha(entry.source) !== staged[index])) throw new Error('应用前来源或制品摘要变化；保留构建结果，未应用')
     const changed = entries.filter(entry => sha(entry.source) !== sha(entry.target))
@@ -265,6 +264,7 @@ export async function updatePlatform(input: UpdateOptions, services: UpdateServi
     if (!changed.length) return report
     const clientOnly = changed.every(entry => entry.target === join(options.programRoot, 'platform/plugin/lib/client.js'))
     const workerOnly = changed.every(entry => entry.target === join(options.programRoot, 'platform/plugin/lib/sdk-worker.js'))
+    if (!clientOnly && !workerOnly && current.busy.length) { report.status = 'busy'; return report }
     report.activation = clientOnly ? 'native-hmr' : workerOnly ? 'next-sdk-operation' : 'managed-restart'
     for (const [index, entry] of changed.entries()) {
       const existed = existsSync(entry.target), path = join(stage, 'backup', String(index)), mode = existed ? statSync(entry.target).mode & 0o777 : 0o644

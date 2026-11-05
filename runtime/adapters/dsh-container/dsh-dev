@@ -3080,7 +3080,7 @@ def command_down(args: argparse.Namespace) -> None:
 
 
 def delete_instance(name: str, manifest: dict) -> dict:
-    """删除已停止实例的容器与本地登记，保留 HOME 卷和研究资产。"""
+    """先停止实例，再删除容器与本地登记，保留 HOME 卷和研究资产。"""
     require_docker_registration(name, manifest)
     target = instance_dir(name)
     containers = project_containers(name)
@@ -3097,13 +3097,16 @@ def delete_instance(name: str, manifest: dict) -> dict:
     state = normalized_instance_state(containers)
     report["state"] = state
     report["containers_before"] = containers
-    if state not in {"stopped", "absent"}:
+    if state == "unknown":
         report["deleted"] = False
         print(json.dumps(report, ensure_ascii=False), file=sys.stderr)
-        fail(f"实例 {name} 当前状态为 {state}，只允许删除已停止实例")
+        fail(f"实例 {name} 当前状态无法确认，拒绝停止和删除；请刷新状态后重试")
     before_volume, before_preserved = home_volume(manifest)
     report["home_volume_before"] = before_volume
     report["home_preserved_before"] = before_preserved
+    if state in {"running", "failed"}:
+        report["stop"] = stop_instance(name, manifest)
+        containers = report["stop"]["containers"]
     if containers:
         completed = run(compose_command(target, name, "rm", "-f", "-s"),
                         check=False, env=instance_compose_env(manifest))
@@ -3148,7 +3151,7 @@ def delete_instance(name: str, manifest: dict) -> dict:
 
 
 def command_delete(args: argparse.Namespace) -> None:
-    """删除已停止实例的容器和登记；不删除 HOME、Session、Agent/source 或历史 Run。"""
+    """先停止再删除实例容器和登记；不删除 HOME、Session、Agent/source 或历史 Run。"""
     _, manifest = load_instance(args.name)
     report = business_command(["--delete", str(REPO), args.name], timeout=None) if manifest.get("business_control") \
         else delete_instance(args.name, manifest)
@@ -3469,7 +3472,7 @@ def main() -> None:
     down_parser.add_argument("name")
     down_parser.set_defaults(handler=command_down)
 
-    delete_parser = commands.add_parser("delete", help="删除已停止实例的容器和登记；保留 HOME")
+    delete_parser = commands.add_parser("delete", help="先停止再删除实例容器和登记；保留 HOME")
     delete_parser.add_argument("name")
     delete_parser.set_defaults(handler=command_delete)
 

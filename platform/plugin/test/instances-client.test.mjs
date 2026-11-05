@@ -77,6 +77,26 @@ function chooseAgent(ui, value) {
   ui.render()
 }
 
+test('运行中 Web 与 SDK 实例均可一次确认删除，只派发删除而不额外派发停止', async () => {
+  for (const profile of ['web', 'sdk']) {
+    const instances = [{ name: 'running-delete', state: 'running', profile, source_id: 'experiment:EXP-basic-001' }]
+    const ui = page({ instances, respond(endpoint) {
+      if (endpoint === 'instances/run') instances.splice(0)
+    } })
+    await ui.settle()
+    await ui.button('删除').props.onClick(); await ui.settle()
+    assert.match(ui.text(), /先停止实例，再移除容器与本实例管理登记/)
+    assert.match(ui.text(), /进行中的业务请求可能终止/)
+    assert.equal(ui.calls.filter(call => call.endpoint === 'instances/run').length, 0)
+    await ui.button('确认删除 1 项').props.onClick(); await ui.settle()
+    const writes = ui.calls.filter(call => call.endpoint === 'instances/run')
+    assert.equal(writes.length, 1)
+    assert.equal(writes[0].payload.operation, 'delete')
+    assert.equal(writes[0].payload.name, 'running-delete')
+    assert.match(ui.text(), /操作回执：成功 1 项/)
+  }
+})
+
 test('资产状态筛选区分待重载、当前和无回执旧实例，详情显示来源摘要与历史回执', async () => {
   const instances = ['pending_reload', 'current', 'legacy'].map((status, index) => ({ name: status, agent_id: 'basic-agent', source_id: 'experiment:EXP-basic-001', state: 'running', port: 18500 + index,
     ...(status !== 'legacy' ? { asset_status: { status, current_digest: assetDigest, reason: '资产已变化需重载，变化项相对最后实际加载回执', checked_at: '2026-11-04T00:01:00Z', changed_files: [{ path: '/opt/dsh-managed/plugin/new.js', change: 'added' }], loaded: { digest: generationDigest, loaded_at: '2026-11-04T00:00:00Z', container_id: 'container-previous', started_at: '2026-11-04T00:00:00Z' } } } : {}) }))
@@ -87,7 +107,7 @@ test('资产状态筛选区分待重载、当前和无回执旧实例，详情�
   assert.match(ui.text(), /资产已变化需重载.*资产已生效.*未知 \/ 未核验/)
   filter().props.onChange({ target: { value: 'pending_reload' } }); ui.render()
   assert.deepEqual(listed(), ['pending_reload'])
-  ui.button('查看详情').props.onClick({ currentTarget: { focus() {} } }); await ui.settle()
+  ui.button('详情').props.onClick({ currentTarget: { focus() {} } }); await ui.settle()
   assert.match(ui.text(), /当前来源资产摘要/)
   assert.match(ui.text(), new RegExp(assetDigest))
   assert.match(ui.text(), /最后实际加载回执/)
@@ -189,7 +209,7 @@ test('SDK实例完成为正常状态，列表和详情提供SDK入口并省略We
   assert.ok(ui.button('SDK 调试'))
   assert.match(ui.text(), /执行完成/)
   assert.equal(ui.button('打开 Web'), undefined)
-  ui.button('查看详情').props.onClick({ currentTarget: { focus() {} } }); ui.render(); await ui.settle()
+  ui.button('详情').props.onClick({ currentTarget: { focus() {} } }); ui.render(); await ui.settle()
   assert.ok(ui.button('接入文档'))
   assert.equal(ui.button('访问 DSH Web'), undefined)
   assert.equal(ui.tab('网站嵌入'), undefined)
@@ -536,7 +556,7 @@ test('受控实例创建预览、列表、详情和回执显示网关深链与�
   } })
   await ui.settle()
   assert.match(ui.text(), /经统一网关 · 无需登录.*http:\/\/business\.example:53105\/agents\/basic-agent\/instances\/existing-guest\//)
-  ui.button('查看详情').props.onClick(); await ui.settle()
+  ui.button('详情').props.onClick(); await ui.settle()
   assert.match(ui.text(), /内部 Web 端口.*访问方式.*经过网关，无需认证\（共享数据和会话\）.*已登记网关入口.*http:\/\/business\.example:53105\/agents\/basic-agent\/instances\/existing-guest\//)
   ui.button('返回实例列表').props.onClick(); ui.render()
   openCreate(ui); await ui.settle()
@@ -732,7 +752,7 @@ test('版本绑定模型不可用时保留该模型并说明原因，不能回�
 test('实例详情更改默认模型需预览重启或启动，回执冻结所选模型和配置摘要', async () => {
   const ui = page()
   await ui.settle()
-  await ui.button('查看详情').props.onClick(); await ui.settle()
+  await ui.button('详情').props.onClick(); await ui.settle()
   assert.match(ui.text(), /登记默认模型.*模型服务 A · 基础模型/)
   const beforeReads = ui.calls.filter(call => call.endpoint === 'models/list').length
   ui.button('更改默认模型').props.onClick(); await ui.settle()
@@ -750,7 +770,7 @@ test('实例详情更改默认模型需预览重启或启动，回执冻结所�
 
   const stopped = page({ instances: [{ name: 'stopped-instance', agent_id: 'basic-agent', state: 'stopped', source_id: 'experiment:EXP-basic-001', port: 3086, model_policy: { default: defaultModel } }] })
   await stopped.settle()
-  await stopped.button('查看详情').props.onClick(); await stopped.settle()
+  await stopped.button('详情').props.onClick(); await stopped.settle()
   stopped.button('更改默认模型').props.onClick(); await stopped.settle()
   stopped.nodes().find(node => (node.type === 'select' || node.props.role === 'combobox') && node.props['aria-label'] === '实例默认模型').props.onChange({ target: { value: JSON.stringify(['provider-a', 'variant-model']) } }); stopped.render()
   await stopped.button('预览并启动').props.onClick(); await stopped.settle()
@@ -763,7 +783,7 @@ test('实例重启后回读到新登记默认模型才结束模型编辑', async
     if (endpoint === 'instances/run') instances[0] = { ...instances[0], model_policy: { default: payload.model_selection } }
   } })
   await ui.settle()
-  await ui.button('查看详情').props.onClick(); await ui.settle()
+  await ui.button('详情').props.onClick(); await ui.settle()
   ui.button('更改默认模型').props.onClick(); await ui.settle()
   ui.nodes().find(node => (node.type === 'select' || node.props.role === 'combobox') && node.props['aria-label'] === '实例默认模型').props.onChange({ target: { value: JSON.stringify(['provider-a', 'variant-model']) } }); ui.render()
   await ui.button('预览并重启').props.onClick(); await ui.settle()
@@ -827,7 +847,7 @@ test('批量预览失败不阻止其它目标；执行回执区分成功、失�
   ui.button('关闭').props.onClick(); ui.render()
   for (const [index, name, outcome] of [[0, 'one', '成功'], [1, 'two', '未派发'], [2, 'three', '失败'], [3, 'four', '结果未知'], [4, 'five', '未派发']]) {
     if (index > 0) { ui.button('返回实例列表').props.onClick(); ui.render() }
-    await ui.buttons('查看详情')[index].props.onClick(); await ui.settle()
+    await ui.buttons('详情')[index].props.onClick(); await ui.settle()
     ui.tab('操作回执').props.onClick(); ui.render()
     const panel = ui.nodes().find(node => node.props?.id === 'instance-panel-receipts')
     assert.match(ui.text(panel), new RegExp(`${name} · 停止 · ${outcome}`))
@@ -846,7 +866,7 @@ test('操作回执仅在本页会话可回看，目标不符的成功响应按�
   assert.match(ui.text(), /结果未知 1 项/)
   assert.match(ui.text(), /操作回执目标与提交目标不一致/)
   ui.button('关闭').props.onClick(); ui.render()
-  await ui.button('查看详情').props.onClick(); await ui.settle()
+  await ui.button('详情').props.onClick(); await ui.settle()
   ui.tab('操作回执').props.onClick(); ui.render()
   const panel = ui.nodes().find(node => node.props?.id === 'instance-panel-receipts')
   assert.match(ui.text(panel), /basic-instance · 重启 · 结果未知/)
@@ -883,7 +903,7 @@ test('无效实例深链提供返回列表入口并清除错误', async () => {
 test('实例详情按任务切换页签，嵌入地址取自接口且刷新后保留代码与当前页签', async () => {
   const ui = page()
   await ui.settle()
-  await ui.button('查看详情').props.onClick(); await ui.settle()
+  await ui.button('详情').props.onClick(); await ui.settle()
   assert.ok(ui.nodes().some(node => node.props?.role === 'tablist' && node.props['aria-label'] === '实例详情'))
   assert.equal(ui.tab('概览').props['aria-selected'], true)
   assert.equal(ui.text().includes('basic-instance: runtime ready'), false, '默认概览不铺开运行日志')
@@ -909,13 +929,13 @@ test('切换实例重置为概览，不沿用前一个实例的嵌入代码或�
     { name: 'other-instance', state: 'running', source_id: 'experiment:EXP-other-002', port: 3085 },
   ] })
   await ui.settle()
-  await ui.buttons('查看详情')[0].props.onClick(); await ui.settle()
+  await ui.buttons('详情')[0].props.onClick(); await ui.settle()
   ui.tab('网站嵌入').props.onClick(); ui.render()
   await ui.button('生成 iframe 代码').props.onClick(); await ui.settle()
   ui.tab('运行日志').props.onClick(); ui.render()
   assert.match(ui.text(), /basic-instance: runtime ready/)
   ui.button('返回实例列表').props.onClick(); ui.render()
-  await ui.buttons('查看详情')[1].props.onClick(); await ui.settle()
+  await ui.buttons('详情')[1].props.onClick(); await ui.settle()
   assert.equal(ui.tab('概览').props['aria-selected'], true)
   assert.equal(ui.text().includes('basic-instance: runtime ready'), false)
   ui.tab('网站嵌入').props.onClick(); ui.render()
@@ -933,7 +953,7 @@ test('关闭详情后忽略迟到的后台详情与嵌入地址回执', async ()
     if (endpoint === 'instances/url') return pendingUrl.promise
   } })
   await ui.settle()
-  await ui.button('查看详情').props.onClick(); await ui.settle()
+  await ui.button('详情').props.onClick(); await ui.settle()
   ui.tab('网站嵌入').props.onClick(); ui.render()
   ui.button('生成 iframe 代码').props.onClick(); await ui.settle()
   ui.invalidate(); await ui.settle()
@@ -955,7 +975,7 @@ test('实例登记消失时清理已生成的嵌入代码，也忽略进行中�
     if (endpoint === 'instances/url' && delayUrl) return pendingUrl.promise
   } })
   await ui.settle()
-  await ui.button('查看详情').props.onClick(); await ui.settle()
+  await ui.button('详情').props.onClick(); await ui.settle()
   ui.tab('网站嵌入').props.onClick(); ui.render()
   await ui.button('生成 iframe 代码').props.onClick(); await ui.settle()
   assert.ok(ui.button('复制嵌入代码'))
@@ -991,7 +1011,7 @@ test('日志失败保留详情概览，错误仅在运行日志中显示；未�
   await ui.settle()
   for (let index = 0; index < 2; index++) {
     if (index > 0) { ui.button('返回实例列表').props.onClick(); ui.render() }
-    await ui.buttons('查看详情')[index].props.onClick(); await ui.settle()
+    await ui.buttons('详情')[index].props.onClick(); await ui.settle()
     assert.equal(ui.tab('概览').props['aria-selected'], true)
     assert.equal(ui.text().includes('container logs unavailable'), false)
     ui.tab('运行日志').props.onClick(); ui.render()
@@ -1070,7 +1090,7 @@ test('缺失实例深链不请求日志，提供保留对象的只读重试与�
 
 test('实例来源运行历史在评测中心维护，实例页仅保留固定来源跳转', async () => {
   const ui = page()
-  await ui.settle(); ui.button('查看详情').props.onClick(); await ui.settle()
+  await ui.settle(); ui.button('详情').props.onClick(); await ui.settle()
   assert.equal(ui.text().includes('来源版本的运行记录'), false)
   assert.equal(ui.nodes().some(node => node.props?.className === 'instance-run-list'), false)
   ui.button('查看来源版本评测').props.onClick()

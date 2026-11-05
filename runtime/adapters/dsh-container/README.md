@@ -164,7 +164,7 @@ python3 runtime/adapters/dsh-container/dsh-dev down security-operations-expert-e
 
 `ps`、`logs`、`down` 从实例状态文件重建 Compose 所需环境；`ps` 默认只列出运行中的实例，`ps --all` 才包含其他状态并标出 `needs_migration`。主 `dsh` 容器采用 `unless-stopped` 策略，Docker 服务恢复后自动启动此前运行的实例；显式停止的实例保持停止，一次性 `home-init` 不自动重启。历史 `authoring` 实例仍可查询日志和停止，但新建或替换时只接受 `eval`。挂载内容变化不会自动重启进程，使用 `up --replace` 或先 `down` 再同名 `up` 重载。`down` 同时核对 Compose 退出码、实际容器状态和 HOME 卷。
 
-`stopped` 表示仍存在已停止的 DSH 容器；`absent` 表示 Docker 查询成功，但仅有本地登记、没有 DSH 容器。`down` 移除容器后保留登记和 HOME，因此随后通常为 `absent`；Docker 查询失败则为 `unknown`，不能推断为已停止。`delete` 可删除 `stopped` 或 `absent` 实例，执行前重新核对该实例的 Docker 状态，移除容器和登记并保留 HOME 卷及研究记录。
+`stopped` 表示仍存在已停止的 DSH 容器；`absent` 表示 Docker 查询成功，但仅有本地登记、没有 DSH 容器。`down` 移除容器后保留登记和 HOME，因此随后通常为 `absent`；Docker 查询失败则为 `unknown`，不能推断为已停止。`delete` 执行前重新核对该实例的 Docker 状态，按[实例删除合同](../../../docs/platform-design/02_系统架构与部署设计.md#33-实例编排契约)先停止再移除容器和登记，并保留 HOME 卷及研究记录；无需另行执行 `down`。
 
 新实例的 HOME 使用上述目录的 bind 挂载；原生 Session、附件和 Web MCP 设置都保留在该 HOME。历史登记仍使用原 named volume，普通 `up --replace` 不会将其换成空 HOME。迁移时先停止实例并备份，再完整复制旧 HOME 到目标登记目录的 `dsh-home/`，校验文件与权限后执行：
 
@@ -173,7 +173,7 @@ python3 runtime/adapters/dsh-container/dsh-dev down security-operations-expert-e
   --source <原来源> --mode eval --name <原实例名> --replace --migrate-home
 ```
 
-`--migrate-home` 拒绝缺失或空目录，只由 `dsh-dev` 更新 `instance.json` 和 Compose；旧数据卷保留以便回退。`delete` 仅删除已停止实例的容器与登记文件，保留同目录下的 `dsh-home/` 和其中的原生 MCP 配置。HOME 数据属于需要备份的持久化数据，不能当作构建缓存清理。
+`--migrate-home` 拒绝缺失或空目录，只由 `dsh-dev` 更新 `instance.json` 和 Compose；旧数据卷保留以便回退。`delete` 保留同目录下的 `dsh-home/` 和其中的原生 MCP 配置。HOME 数据属于需要备份的持久化数据，不能当作构建缓存清理。
 
 两份启动器设计方案保留为历史设计记录；当前行为以本页、CLI `--help` 和测试为准。
 

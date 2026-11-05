@@ -1506,7 +1506,7 @@ class DownCommandTest(unittest.TestCase):
 
 
 class DeleteCommandTest(unittest.TestCase):
-    """`delete` 只能删除已停止实例登记，不能把失败或未知状态当作可清理。"""
+    """`delete` 先核验停止结果再删除登记，失败或未知时保留恢复入口。"""
 
     def setUp(self):
         isolate_registration_guard(self)
@@ -1537,8 +1537,9 @@ class DeleteCommandTest(unittest.TestCase):
 
     def call(self, effects):
         stdout, stderr = io.StringIO(), io.StringIO()
-        with mock.patch.object(dev, "run", side_effect=effects), \
+        with mock.patch.object(dev, "run", side_effect=effects) as runner, \
                 contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            self.runner = runner
             try:
                 dev.command_delete(types.SimpleNamespace(name="delete-probe"))
             except SystemExit as stop:
@@ -1600,12 +1601,56 @@ class DeleteCommandTest(unittest.TestCase):
         self.assertIn('"deleted": false', errors)
         self.assertTrue((dev.STATE_ROOT / "delete-probe" / "instance.json").is_file())
 
-    def test_running_failed_and_unknown_states_keep_registration(self):
+    def test_delete_stops_running_instance_before_removing_registration(self):
+        running = subprocess.CompletedProcess([], 0, stdout=(
+            "abc\trunning\tUp\tdelete-probe\tdsh\n"
+            "init\texited\tExited (0)\tdelete-probe-home-init-1\thome-init\n"), stderr="")
+        volume = subprocess.CompletedProcess([], 0, stdout="dsh-dev-delete-probe-home\n", stderr="")
+        empty = subprocess.CompletedProcess([], 0, stdout="", stderr="")
+        code, printed, errors = self.call([running, volume, empty, empty, volume, volume])
+        self.assertEqual(code, 0, errors)
+        report = json.loads(printed)
+        self.assertEqual(report["state"], "running")
+        self.assertTrue(report["stop"]["stopped"])
+        self.assertTrue(report["deleted"])
+        self.assertTrue(report["home_preserved"])
+        commands = [call.args[0] for call in self.runner.call_args_list]
+        self.assertTrue(any("down" in command for command in commands))
+        self.assertFalse(any("rm" in command for command in commands))
+        self.assertFalse((dev.STATE_ROOT / "delete-probe").exists())
+
+    def test_delete_keeps_registration_if_stopping_fails_or_cannot_be_verified(self):
+        running = subprocess.CompletedProcess([], 0, stdout="abc\trunning\tUp\tdelete-probe\tdsh\n", stderr="")
+        volume = subprocess.CompletedProcess([], 0, stdout="dsh-dev-delete-probe-home\n", stderr="")
+        empty = subprocess.CompletedProcess([], 0, stdout="", stderr="")
+        failed = subprocess.CompletedProcess([], 1, stdout="", stderr="daemon down")
+        for effects in ([running, volume, failed], [running, volume, empty, failed, volume],
+                        [running, volume, empty, running, volume]):
+            with self.subTest(effects=effects):
+                code, printed, errors = self.call(effects)
+                self.assertNotEqual(code, 0)
+                self.assertEqual(printed, "")
+                self.assertTrue(errors)
+                self.assertTrue((dev.STATE_ROOT / "delete-probe" / "instance.json").is_file())
+                self.assertFalse(any("rm" in call.args[0] for call in self.runner.call_args_list))
+
+    def test_delete_cleans_failed_instance_through_the_same_stop_path(self):
+        failed = subprocess.CompletedProcess([], 0, stdout="abc\tdead\tDead\tdelete-probe\tdsh\n", stderr="")
+        volume = subprocess.CompletedProcess([], 0, stdout="dsh-dev-delete-probe-home\n", stderr="")
+        empty = subprocess.CompletedProcess([], 0, stdout="", stderr="")
+        code, printed, errors = self.call([failed, volume, empty, empty, volume, volume])
+        self.assertEqual(code, 0, errors)
+        report = json.loads(printed)
+        self.assertEqual(report["state"], "failed")
+        self.assertTrue(report["stop"]["stopped"])
+        self.assertTrue(report["deleted"])
+
+    def test_unknown_states_keep_registration_without_stopping(self):
         cases = [
             subprocess.CompletedProcess(
-                [], 0, stdout="abc\trunning\tUp\tdsh-dev-delete-probe-dsh-1\tdsh\n", stderr=""),
+                [], 0, stdout="abc\tpaused\tPaused\tdsh-dev-delete-probe-dsh-1\tdsh\n", stderr=""),
             subprocess.CompletedProcess(
-                [], 0, stdout="abc\texited\tExited (17)\tdsh-dev-delete-probe-dsh-1\tdsh\n", stderr=""),
+                [], 0, stdout="abc\trestarting\tRestarting\tdsh-dev-delete-probe-dsh-1\tdsh\n", stderr=""),
             subprocess.CompletedProcess([], 1, stdout="", stderr="daemon down"),
         ]
         for completed in cases:
@@ -1627,6 +1672,7 @@ class DeleteCommandTest(unittest.TestCase):
                 self.assertEqual(printed, "")
                 self.assertTrue((dev.STATE_ROOT / "delete-probe" / "instance.json").is_file())
                 self.assertTrue("unknown" in errors or '"deleted": false' in errors)
+                self.assertEqual(self.runner.call_count, 1)
 
 
 class RuntimeEnvironmentRetentionTest(unittest.TestCase):

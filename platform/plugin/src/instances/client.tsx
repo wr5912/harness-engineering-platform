@@ -136,7 +136,7 @@ const impacts: Record<Operation, string> = {
   stop: '停止并移除此实例容器',
   restart: '停止旧容器并以同一来源重建',
   reload: '按当前资产重建目标容器，核验实际加载；保留 HOME、会话、端口、模型与网关身份。进行中的请求可能中断，不会自动重放。',
-  delete: '移除已停止容器与本实例管理登记',
+  delete: '先停止实例，再移除容器与本实例管理登记；进行中的业务请求可能终止。',
 }
 
 const detailTabs = [{ id: 'overview', label: '概览' }, { id: 'embed', label: '网站嵌入' }, { id: 'logs', label: '运行日志' }, { id: 'receipts', label: '操作回执' }] as const
@@ -1059,8 +1059,8 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
                   {item.business_gateway && (item.access_url ? <button type="button" className="instance-access-address" title={item.access_url} aria-label={`查看 ${item.name} 的完整访问地址`} onClick={event => void openDetail(item.name, false, false, event.currentTarget)}>{item.access_url}</button> : <div className="instance-muted instance-access-note">网关深链尚未核对</div>)}</>}
                 </td>
                 <td className="instance-list-td" data-label="操作"><div className="instance-actions">
-                  <button type="button" onClick={event => openDetail(item.name, false, false, event?.currentTarget)} disabled={detailLoading} className="instance-button">查看详情</button>
-                  {(isSdk(item) ? item.state === 'running' ? ['stop'] : ['delete'] : item.state === 'running' ? ['stop', 'restart', 'reload'] : item.state === 'stopped' || item.state === 'absent' ? ['start', 'delete'] : item.state === 'failed' ? ['start', 'stop'] : []).map(operation =>
+                  <button type="button" onClick={event => openDetail(item.name, false, false, event?.currentTarget)} disabled={detailLoading} className="instance-button">详情</button>
+                  {(isSdk(item) ? item.state === 'running' ? ['stop', 'delete'] : ['delete'] : item.state === 'running' ? ['stop', 'restart', 'reload', 'delete'] : item.state === 'stopped' || item.state === 'absent' ? ['start', 'delete'] : item.state === 'failed' ? ['start', 'stop', 'delete'] : []).map(operation =>
                     <button type="button" key={operation} disabled={busy} onClick={() => prepare(operation as Operation, [item.name])} className="instance-button">{labels[operation as Operation]}</button>)}
                   {item.state === 'unknown' && <span>观察失败，请刷新</span>}
                 </div></td>

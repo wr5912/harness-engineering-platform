@@ -1,0 +1,152 @@
+{
+  "date": "2026-11-05",
+  "create_browser": {
+    "mode": "create",
+    "name": "delete-lifecycle-probe-20261105-final",
+    "events": [],
+    "previews": [],
+    "created": true,
+    "running": true
+  },
+  "delete_browser": {
+    "mode": "delete",
+    "name": "delete-lifecycle-probe-20261105-final",
+    "events": [],
+    "previews": [
+      {
+        "scheme": "light",
+        "width": 1440,
+        "geometry": {
+          "left": 400,
+          "right": 1040,
+          "width": 1440
+        },
+        "file": "delete-preview-light-1440.png"
+      },
+      {
+        "scheme": "light",
+        "width": 768,
+        "geometry": {
+          "left": 64,
+          "right": 704,
+          "width": 768
+        },
+        "file": "delete-preview-light-768.png"
+      },
+      {
+        "scheme": "light",
+        "width": 390,
+        "geometry": {
+          "left": 17,
+          "right": 373,
+          "width": 390
+        },
+        "file": "delete-preview-light-390.png"
+      },
+      {
+        "scheme": "dark",
+        "width": 1440,
+        "geometry": {
+          "left": 400,
+          "right": 1040,
+          "width": 1440
+        },
+        "file": "delete-preview-dark-1440.png"
+      },
+      {
+        "scheme": "dark",
+        "width": 768,
+        "geometry": {
+          "left": 64,
+          "right": 704,
+          "width": 768
+        },
+        "file": "delete-preview-dark-768.png"
+      },
+      {
+        "scheme": "dark",
+        "width": 390,
+        "geometry": {
+          "left": 17,
+          "right": 373,
+          "width": 390
+        },
+        "file": "delete-preview-dark-390.png"
+      }
+    ],
+    "detailButtonCount": 5,
+    "detailsOpenedAndReturned": true,
+    "registrationReadbackVerified": true,
+    "deleted": true,
+    "absentFromList": true
+  },
+  "before": {
+    "name": "delete-lifecycle-probe-20261105-final",
+    "home_marker_sha256": "0580f108649c89b3f1a964a654af624e83517108c656e0c3d7c9169fd79485c9",
+    "gateway_registered": true,
+    "targets": [
+      {
+        "Id": "e683c5f35d21bd53043343b43b39868c238c47c88b9c9edac8463d06e7ecbd27",
+        "Name": "/delete-lifecycle-probe-20261105-final",
+        "state": "running",
+        "started_at": "2026-11-05T09:22:37.46900607Z"
+      },
+      {
+        "Id": "331520aed8949f7a4f572aad72c26b5552bbaa3e337162597d1b877e31fc85e3",
+        "Name": "/test-zhouyang-disp14",
+        "state": "running",
+        "started_at": "2026-11-05T00:41:54.329305611Z"
+      }
+    ]
+  },
+  "after": {
+    "registration_removed": true,
+    "containers_removed": true,
+    "gateway_registration_removed": true,
+    "home_marker_preserved": true,
+    "original_instance_unchanged": true
+  },
+  "activation": {
+    "status": "applied",
+    "pid": 1067167,
+    "activation": "native-hmr",
+    "changed": [
+      "platform/plugin/lib/client.js"
+    ]
+  },
+  "activity_at_update": {
+    "session": 3,
+    "assistant": 2
+  },
+  "prior_attempts": {
+    "first_create": {
+      "name": "delete-lifecycle-probe-20261105",
+      "created": true,
+      "running": true,
+      "events": [
+        {
+          "type": "console",
+          "message": "Failed to load resource: net::ERR_NETWORK_CHANGED"
+        }
+      ],
+      "error": "Expected values to be strictly equal:\n\n1 !== 0\n"
+    },
+    "first_delete": {
+      "name": "delete-lifecycle-probe-20261105",
+      "deleted": true,
+      "events": [],
+      "error": "Expected values to be strictly equal:\n\n1 !== 0\n"
+    },
+    "first_after": {
+      "registration_removed": true,
+      "containers_removed": true,
+      "gateway_registration_removed": true,
+      "home_marker_preserved": true,
+      "original_instance_unchanged": true
+    },
+    "same_name_recreate": {
+      "created": false,
+      "reason": "实例目录已存在但缺少 instance.json；保留 HOME 的目录未被覆盖"
+    }
+  }
+}

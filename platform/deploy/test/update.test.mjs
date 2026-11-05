@@ -45,11 +45,16 @@ test('更新预览只核对，不创建stage、构建、启停或改制品', asy
   assert.equal(readFileSync(f.live, 'utf8'), 'old-code')
 })
 
-test('已有在途对象时直接拒绝应用，不取消任务', async t => {
+test('已有在途对象时构建核对差异，需要重启则拒绝应用，不取消任务', async t => {
   const busy = [{ kind: 'session', id: 'session-running', state: 'running' }]
-  const f = fixture(t, { initialBusy: busy })
+  const f = fixture(t, { initialBusy: busy, afterBuildBusy: busy })
   const report = await updatePlatform(f.options, f.services)
-  assert.equal(report.status, 'busy'); assert.deepEqual(report.busy, busy); assert.deepEqual(f.events, [])
+  assert.equal(report.status, 'busy'); assert.deepEqual(report.busy, busy); assert.deepEqual(f.events, ['build'])
+  assert.equal(readFileSync(f.live, 'utf8'), 'old-code')
+  assert.equal(report.activation, 'none')
+  const preview = fixture(t, { initialBusy: busy })
+  assert.equal((await updatePlatform({ ...preview.options, dryRun: true }, preview.services)).status, 'busy')
+  assert.deepEqual(preview.events, [])
 })
 
 test('构建后再次发现任务时保留stage和live，不执行停止', async t => {
@@ -93,6 +98,18 @@ test('仅客户端变化原子应用并核验，保持原PID且不启停', async
   assert.equal(report.status, 'applied'); assert.equal(report.activation, 'native-hmr')
   assert.deepEqual(f.events, ['build', 'verify']); assert.equal(readFileSync(f.live, 'utf8'), 'new-code')
   assert.equal(readFileSync(join(report.stage, 'backup/0'), 'utf8'), 'old-code')
+})
+
+test('在途会话和任务不阻止无需启停的客户端与SDK worker更新', async t => {
+  const busy = [{ kind: 'session', id: 'session-running', state: 'running' }, { kind: 'sdk', id: 'sdk-running', state: 'running' }]
+  for (const target of ['client.js', 'sdk-worker.js']) {
+    const f = fixture(t, { target, initialBusy: busy, afterBuildBusy: busy })
+    const report = await updatePlatform(f.options, f.services)
+    assert.equal(report.status, 'applied'); assert.equal(report.pid, 123)
+    assert.equal(report.activation, target === 'client.js' ? 'native-hmr' : 'next-sdk-operation')
+    assert.deepEqual(report.busy, busy); assert.deepEqual(f.events, ['build', 'verify'])
+    assert.equal(readFileSync(f.live, 'utf8'), 'new-code')
+  }
 })
 
 test('独立SDK worker变化作用于下一次操作，不停止平台', async t => {
@@ -234,8 +251,8 @@ test('已受理组合阻止更新，完成后可继续；只读核对不重新�
   const inspect = f.services.inspect
   f.services.inspect = async options => ({ ...await inspect(options), busy: await readUpdateActivity(options, f.state, 'workspace-update-test') })
   const busy = await updatePlatform(f.options, f.services)
-  assert.equal(busy.status, 'busy'); assert.deepEqual(busy.busy, [{ kind: 'composition', id: 'composition-pending', state: 'running' }]); assert.deepEqual(f.events, [])
-  assert.equal(calls, 1); assert.equal(queries, 1)
+  assert.equal(busy.status, 'busy'); assert.deepEqual(busy.busy, [{ kind: 'composition', id: 'composition-pending', state: 'running' }]); assert.deepEqual(f.events, ['build'])
+  assert.equal(calls, 1); assert.equal(queries, 2)
   release(); await pending
   const applied = await updatePlatform(f.options, f.services)
   assert.equal(applied.status, 'applied'); assert.equal(calls, 1); assert.ok(queries >= 3)

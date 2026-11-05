@@ -127,8 +127,9 @@ if (args[0] === 'ps') {
   if (name === 'fail-one') { process.stderr.write('stop failed token=secret-token\\n'); process.exit(1) }
   out({name, stopped:true, home_preserved:true})
 } else if (args[0] === 'delete') {
-  if (['running-one', 'unknown-one', 'batch-083'].includes(args[1])) {
-    process.stderr.write('只允许删除已停止实例；目标状态不是 stopped 或查询失败\\n'); process.exit(1)
+  if (['fail-one', 'batch-083'].includes(args[1])) { process.stderr.write('停止实例失败，未执行删除\\n'); process.exit(1) }
+  if (args[1] === 'unknown-one') {
+    process.stderr.write('实例当前状态无法确认，拒绝停止和删除\\n'); process.exit(1)
   }
   const fs = require('node:fs'), path = require('node:path')
   if (fs.existsSync(path.join(__dirname, 'delay-delete'))) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100)
@@ -634,7 +635,7 @@ test('DSH 删除失败不提交网关配置，网关提交失败则保留实例�
   const sourceId = 'experiment:EXP-real-agent-001', sourceDigest = 'sha256:' + 'a'.repeat(64)
   const accessPath = join(fx.root, 'config/business-access.json'), adapter = join(fx.root, 'runtime/adapters/dsh-container')
   const config = JSON.parse(readFileSync(accessPath, 'utf8'))
-  config.gateway.instances = ['running-one', 'stopped-business'].map(instanceId => ({ agentId: 'real-agent', instanceId, sourceId, sourceDigest }))
+  config.gateway.instances = ['fail-one', 'stopped-business'].map(instanceId => ({ agentId: 'real-agent', instanceId, sourceId, sourceDigest }))
   for (const row of config.gateway.instances) {
     const directory = join(fx.state, 'dsh-dev', row.instanceId)
     mkdirSync(directory, { recursive: true })
@@ -642,7 +643,7 @@ test('DSH 删除失败不提交网关配置，网关提交失败则保留实例�
   }
   writeFileSync(accessPath, JSON.stringify(config))
   const handler = module.createInstancesHandler(fx.root), signal = new AbortController().signal
-  const rejected = await handler('run', { operation: 'delete', name: 'running-one' }, signal)
+  const rejected = await handler('run', { operation: 'delete', name: 'fail-one' }, signal)
   assert.equal(rejected.value.ok, false)
   assert.deepEqual(JSON.parse(readFileSync(accessPath, 'utf8')), config)
   const manifestPath = join(fx.state, 'dsh-dev/stopped-business/instance.json'), manifest = readFileSync(manifestPath, 'utf8')
@@ -656,7 +657,7 @@ test('DSH 删除失败不提交网关配置，网关提交失败则保留实例�
   rmSync(join(adapter, 'fail-gateway-commit'))
   const retried = await handler('run', { operation: 'delete', name: 'stopped-business', expected_source_id: sourceId }, signal)
   assert.equal(retried.value.ok, true, JSON.stringify(retried))
-  assert.deepEqual(JSON.parse(readFileSync(accessPath, 'utf8')).gateway.instances.map(row => row.instanceId), ['running-one'])
+  assert.deepEqual(JSON.parse(readFileSync(accessPath, 'utf8')).gateway.instances.map(row => row.instanceId), ['fail-one'])
   assert.equal(existsSync(manifestPath), false)
   assert.equal(existsSync(`${accessPath}.lock`), false)
 })
@@ -857,11 +858,11 @@ test('165 项删除委托 CLI 逐项核验，保留失败回执且不扫描全�
   assert.equal(result.value.receipts.filter(item => item.ok).length, 164)
   assert.equal(result.value.receipts[83].ok, false)
   assert.equal(result.value.receipts[164].value.value.home_preserved, true)
-  for (const name of ['running-one', 'unknown-one']) {
-    const rejected = await handler('run', { operation: 'delete', name }, new AbortController().signal)
-    assert.equal(rejected.value.ok, false)
-    assert.match(rejected.value.error.message, /只允许删除已停止实例/)
-  }
+  const running = await handler('run', { operation: 'delete', name: 'running-one' }, new AbortController().signal)
+  assert.equal(running.value.ok, true)
+  const rejected = await handler('run', { operation: 'delete', name: 'unknown-one' }, new AbortController().signal)
+  assert.equal(rejected.value.status, 'unknown')
+  assert.match(rejected.value.error.message, /状态无法确认/)
   const calls = readFileSync(join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls'), 'utf8').trim().split('\n').map(line => JSON.parse(line))
   assert.equal(calls.length, 167)
   assert.ok(calls.every(args => args[0] === 'delete'))
