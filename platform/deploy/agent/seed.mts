@@ -14,5 +14,5 @@ export function agentSeed(snapshot: AgentSourceSnapshot, supplied: AgentSeed = {
   const declared = Object.fromEntries((snapshot.source.optional_env_names ?? []).filter((name: string) => process.env[name] !== undefined).map((name: string) => [name, process.env[name]!]))
   const environment = { ...declared, ...local, ...(supplied.environment ?? {}) }
   if (Object.keys(environment).some(name => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) || Object.values(environment).some(value => typeof value !== 'string' || value.includes('\0'))) throw new Error('业务环境配置包含无效名称或值')
-  return { ...supplied, environment }
+  return { ...supplied, mcp: { ...supplied.mcp, servers: supplied.mcp?.servers ?? [], groups: supplied.mcp?.groups ?? [] }, environment }
 }

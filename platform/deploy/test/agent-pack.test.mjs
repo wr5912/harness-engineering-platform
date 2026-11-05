@@ -9,6 +9,7 @@ import { previewAgentPackage, packAgent } from '../agent/pack.mts'
 import { agentCandidateDigest, assertDependencyArchitecture, copyAgentSnapshot, inspectAgentSnapshot } from '../agent/snapshot.mts'
 import { agentSeed } from '../agent/seed.mts'
 import { readBusinessDefault, BusinessDefaultError } from '../../plugin/src/models/business-default.ts'
+import { validateStandaloneConfig } from '../../plugin/src/standalone/config.ts'
 import { agentCommand } from '../agent/process.mts'
 import { candidateDigest, candidateFiles } from '../../plugin/src/tasks/files.ts'
 
@@ -35,7 +36,23 @@ test('单 Agent 快照读取实际未提交字节、保留来源身份，排除�
   assert.equal(readFileSync(join(staging, 'assets/workspace/AGENTS.md'), 'utf8'), '# 当前已保存且未提交的业务规则\n')
   const seed = agentSeed(source, { environment: { TEST_MODEL_KEY: 'replacement-fixture-value' } })
   assert.equal(seed.environment.TEST_MODEL_KEY, 'replacement-fixture-value')
+  assert.deepEqual(seed.mcp, { servers: [], groups: [] })
+  assert.deepEqual(agentSeed(source, { mcp: { servers: [{ id: 'fixture' }], sharedToken: 'fixture-token' } }).mcp,
+    { servers: [{ id: 'fixture' }], groups: [], sharedToken: 'fixture-token' })
   assert.equal(existsSync(join(staging, 'assets/workspace/.env')), false)
+})
+
+test('仅配置模型的独立包生成可初始化的空 MCP 配置，不要求调用方补齐可选字段', async t => {
+  const f = fixture(t)
+  const modelPatch = [{ name: 'fixture-model' }]
+  const result = await packAgent({ ...f.input, seed: { modelPatch } })
+  const extracted = join(f.root, 'model-only')
+  tarExtract(result.archive, extracted)
+  const seed = JSON.parse(readFileSync(join(extracted, 'config-seed/standalone.json'), 'utf8'))
+  const config = validateStandaloneConfig(seed)
+  assert.deepEqual(config.modelPatch, modelPatch)
+  assert.deepEqual(config.mcp.servers, [])
+  assert.deepEqual(config.mcp.groups, [])
 })
 
 test('未承接的迁移运行声明在独立包预览和打包前明确拒绝，不能静默改变行为', async t => {
