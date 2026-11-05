@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, sym
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { applyUpdate, decodeUpdate, encodeUpdate, inspectUpdate, prepareDependencyDelta, refreshMinimalData } from '../remote-update.mts'
+import { applyUpdate, decodeUpdate, encodeUpdate, inspectUpdate, prepareDependencyDelta, refreshMinimalData, updateRemote } from '../remote-update.mts'
 
 const hash = value => createHash('sha256').update(value).digest('hex')
 function fixture(t) {
@@ -38,6 +38,40 @@ test('增量更新保留 inode、现场配置及无关改动；dry-run 和重试
   assert.equal(statSync(report.backup).mode & 0o777, 0o700)
   assert.equal(applyUpdate(target, update).status, 'unchanged')
   assert.equal(inspectUpdate(target).program, update.repositories[0].before)
+})
+
+test('本机安装目录复用增量工具，冻结提交、预演、应用和重试均保留现场数据', t => {
+  const { target } = fixture(t)
+  const sources = [target.prefix, target.dataRoot].map(root => {
+    const source = `${root}-source`
+    execFileSync('git', ['clone', '-q', root, source])
+    writeFileSync(join(source, 'asset'), 'new')
+    return source
+  })
+  const program = sources[0]
+  for (const directory of ['platform/plugin', 'runtime/adapters/dsh-web']) {
+    mkdirSync(join(program, directory, 'node_modules'), { recursive: true })
+    writeFileSync(join(program, directory, '.gitignore'), 'node_modules/\nlib/\nbusiness/\n')
+  }
+  writeFileSync(join(program, 'platform/plugin/build.mjs'), `import {mkdirSync,writeFileSync} from 'node:fs';
+for (const directory of ['lib','business','../../runtime/adapters/dsh-web/lib']) {mkdirSync(directory,{recursive:true});writeFileSync(directory+'/index.js','built')}\n`)
+  for (const source of sources) {
+    execFileSync('git', ['-C', source, 'add', '.'])
+    execFileSync('git', ['-C', source, '-c', 'user.name=Test', '-c', 'user.email=test@example.test', 'commit', '-qm', 'update'])
+  }
+  mkdirSync(join(target.prefix, 'bin')); writeFileSync(join(target.prefix, 'bin/hep-env.sh'), 'export HEP_OFFLINE=1\n')
+  mkdirSync(join(target.prefix, 'runtime/node/bin'), { recursive: true })
+  symlinkSync(process.execPath, join(target.prefix, 'runtime/node/bin/node'))
+  mkdirSync(join(target.dataRoot, 'config')); writeFileSync(join(target.dataRoot, 'config/local.json'), 'private-local')
+  // 来源工作树的未提交内容不得混入冻结的安装更新。
+  writeFileSync(join(program, 'asset'), 'uncommitted')
+  assert.equal(updateRemote(undefined, { ...target, dryRun: true }, ...sources), 0)
+  assert.equal(readFileSync(join(target.prefix, 'asset'), 'utf8'), 'old')
+  assert.equal(updateRemote(undefined, target, ...sources), 0)
+  for (const root of [target.prefix, target.dataRoot]) assert.equal(readFileSync(join(root, 'asset'), 'utf8'), 'new')
+  assert.equal(readFileSync(join(target.prefix, 'platform/plugin/lib/index.js'), 'utf8'), 'built')
+  assert.equal(readFileSync(join(target.dataRoot, 'config/local.json'), 'utf8'), 'private-local')
+  assert.equal(updateRemote(undefined, target, ...sources), 0)
 })
 
 test('冲突、现场配置、目录越界和符号链接在写入前拒绝', t => {
@@ -218,10 +252,10 @@ test('分条压缩包完整还原 Git 包和去重文件，缺失内容不会写
   assert.equal(applyUpdate(target, decodeUpdate(encodeUpdate(update))).status, 'updated')
 })
 
-test('本机与 SSH 更新保留各自入口，缺少远端目标时不触发更新', () => {
+test('工作区与安装目录更新保留各自入口，目标不完整时不触发更新', () => {
   const cli = new URL('../cli.mts', import.meta.url).pathname
   const invoke = args => execFileSync(process.execPath, [cli, 'update', ...args], { encoding: 'utf8', stdio: 'pipe' })
   assert.throws(() => invoke(['--program-root', '/tmp/hep-pull-no-such-program-jy45a6e', '--data-root', '/tmp/hep-pull-no-such-data-jy45a6e', '--dry-run']), error => /ENOENT/.test(error.stderr))
-  assert.throws(() => invoke(['--prefix', '/tmp/unused']), error => /update 需要 --prefix、--remote-data-root 和 --ssh/.test(error.stderr))
+  assert.throws(() => invoke(['--prefix', '/tmp/unused']), error => /update 需要 --prefix 和 --remote-data-root/.test(error.stderr))
   assert.throws(() => invoke(['--ssh', 'invalid target', '--prefix', '/tmp/unused', '--remote-data-root', '/tmp/unused']), error => /SSH 目标无效/.test(error.stderr))
 })

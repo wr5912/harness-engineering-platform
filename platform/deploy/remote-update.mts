@@ -399,12 +399,14 @@ export function applyUpdate(target: Target, update: Update) {
   return report
 }
 
-export function updateRemote(ssh: string, target: Target, programRoot: string, dataRoot: string) {
-  if (!/^(?:[a-zA-Z0-9._-]+@)?[a-zA-Z0-9][a-zA-Z0-9.-]*$/.test(ssh)) throw new Error('SSH 目标无效')
+export function updateRemote(ssh: string | undefined, target: Target, programRoot: string, dataRoot: string) {
+  if (ssh !== undefined && !/^(?:[a-zA-Z0-9._-]+@)?[a-zA-Z0-9][a-zA-Z0-9.-]*$/.test(ssh)) throw new Error('SSH 目标无效')
   const source = readFileSync(new URL('./remote-update.mts', import.meta.url), 'utf8')
-  const remote = (expression: string) => JSON.parse(run('ssh', ['-T', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', ssh,
-    `HEP_ROOT=${quote(target.prefix)} . ${quote(join(target.prefix, 'bin/hep-env.sh'))} && ${quote(join(target.prefix, 'runtime/node/bin/node'))} --input-type=module-typescript -`], undefined,
-    source + `\ntry { console.log(JSON.stringify(await (${expression}))) } catch(e) { console.error(e.message); process.exitCode=1 }`).toString())
+  const remote = (expression: string) => {
+    const command = `HEP_ROOT=${quote(target.prefix)} . ${quote(join(target.prefix, 'bin/hep-env.sh'))} && ${quote(join(target.prefix, 'runtime/node/bin/node'))} --input-type=module-typescript -`
+    return JSON.parse(run(ssh === undefined ? 'sh' : 'ssh', ssh === undefined ? ['-c', command] : ['-T', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', ssh, command], undefined,
+      source + `\ntry { console.log(JSON.stringify(await (${expression}))) } catch(e) { console.error(e.message); process.exitCode=1 }`).toString())
+  }
   if (target.cancelPrepare !== undefined) console.error(JSON.stringify(remote(`cancelPreparation(${JSON.stringify(target)}, ${JSON.stringify(target.cancelPrepare)})`)))
   const state = remote(`inspectUpdate(${JSON.stringify(target)})`)
   const temporary = mkdtempSync(join(tmpdir(), 'hep-update-'))
@@ -490,7 +492,8 @@ export function updateRemote(ssh: string, target: Target, programRoot: string, d
     let result: any
     try {
       const path = join(wire, 'update.gz')
-      run('ssh', ['-T', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', ssh, `umask 077; cat > ${quote(path)}`], undefined, compressed)
+      if (ssh === undefined) writeFileSync(path, compressed, { mode: 0o600 })
+      else run('ssh', ['-T', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', ssh, `umask 077; cat > ${quote(path)}`], undefined, compressed)
       result = remote(`applyUpdate(${JSON.stringify(target)}, decodeUpdate(readFileSync(${JSON.stringify(path)})))`)
     } finally { remote(`(rmSync(${JSON.stringify(wire)}, {recursive:true, force:true}), true)`) }
     if (target.start && !target.dryRun) result.activation = remote(`activateUpdate(${JSON.stringify(target)})`)

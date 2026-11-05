@@ -92,13 +92,13 @@ function usage(): string {
     --json                      输出更新回执
     源码更新保留配置、会话和实例；有在途任务或无法确认空闲时不应用。
 
-  dsh-deploy update --ssh <user@host> [选项]
+  dsh-deploy update --prefix <目录> --remote-data-root <目录> [选项]
     --program-root <目录>       本地程序仓库，默认当前仓库
     --data-root <目录>          本地数据仓库，默认当前关联工作区
-    --prefix <目录>             远端已安装程序根（必填）
-    --remote-data-root <目录>   远端数据根（必填）
-    --ssh <user@host>           SSH 目标（必填）
-    --dry-run                   构建 HEAD 快照并核对增量，不更改远端安装文件
+    --prefix <目录>             目标已安装程序根（必填）
+    --remote-data-root <目录>   目标数据根（必填）
+    --ssh <user@host>           SSH 目标；省略时更新本机安装目录
+    --dry-run                   构建 HEAD 快照并核对增量，不更改目标安装文件
     --minimal-data              仅刷新管理身份、技能和参考资料，保留现场业务资产
     --install-deps              依赖变化时，在隔离目录补齐已准备的离线依赖增量
     --cancel-prepare <PID>      恢复时取消本工具卡住的离线准备进程，再继续更新
@@ -185,7 +185,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     if (command === 'update') {
       if (['ssh', 'prefix', 'remote-data-root', 'minimal-data', 'install-deps', 'start', 'cancel-prepare'].some(key => options[key] !== undefined)) {
         const prefix = text(options, 'prefix'), dataRoot = text(options, 'remote-data-root'), ssh = text(options, 'ssh')
-        if (!prefix || !dataRoot || !ssh) throw new Error('update 需要 --prefix、--remote-data-root 和 --ssh')
+        if (!prefix || !dataRoot) throw new Error('update 需要 --prefix 和 --remote-data-root')
         const { updateRemote } = await import('./remote-update.mts')
         return updateRemote(ssh, { prefix, dataRoot, dryRun: flag(options, 'dry-run'), minimalData: flag(options, 'minimal-data'), installDeps: flag(options, 'install-deps'), start: flag(options, 'start'), cancelPrepare: text(options, 'cancel-prepare') === undefined ? undefined : Number(text(options, 'cancel-prepare')) }, resolve(text(options, 'program-root', REPO)!), resolve(text(options, 'data-root', defaultAssetRoot())!))
       }
