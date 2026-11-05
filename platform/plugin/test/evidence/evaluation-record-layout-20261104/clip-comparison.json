@@ -1,0 +1,1902 @@
+{
+  "scope": "仅临时DOM旧列宽对照，不代表旧源码完整页面；reload恢复真实制品",
+  "current": [
+    {
+      "id": "run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+      "label": "评测结论",
+      "rawBad": 1,
+      "visibleBad": [],
+      "clip": [
+        {
+          "className": "harness-eval-review-status",
+          "left": 1004.359375,
+          "right": 1132.359375,
+          "textOverflow": "ellipsis"
+        }
+      ]
+    },
+    {
+      "id": "run-403db09b-c724-4514-96f0-c95a59f1fdd1",
+      "label": "评测结论",
+      "rawBad": 1,
+      "visibleBad": [],
+      "clip": [
+        {
+          "className": "harness-eval-review-status",
+          "left": 1004.359375,
+          "right": 1132.359375,
+          "textOverflow": "ellipsis"
+        }
+      ]
+    },
+    {
+      "id": "run-61f812e3-90ab-40fa-89a1-f1bb97a9008b",
+      "label": "评测结论",
+      "rawBad": 1,
+      "visibleBad": [],
+      "clip": [
+        {
+          "className": "harness-eval-review-status",
+          "left": 1004.359375,
+          "right": 1132.359375,
+          "textOverflow": "ellipsis"
+        }
+      ]
+    },
+    {
+      "id": "run-e94134da-05cd-40e8-8642-b2cd4163c37a",
+      "label": "评测结论",
+      "rawBad": 1,
+      "visibleBad": [],
+      "clip": [
+        {
+          "className": "harness-eval-review-status",
+          "left": 1004.359375,
+          "right": 1132.359375,
+          "textOverflow": "ellipsis"
+        }
+      ]
+    }
+  ],
+  "legacyWidths": [
+    {
+      "id": "run-23c63f26-12b6-439f-9021-4272852c3b52",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1328.921875
+        },
+        {
+          "left": 1223.5625,
+          "right": 1328.921875
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-de9f0702-893b-4ce4-9245-fbccbb5fe462",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1328.921875
+        },
+        {
+          "left": 1223.5625,
+          "right": 1328.921875
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-9f341352-fc1a-47b4-b64e-c31c9b56c2ea",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1328.921875
+        },
+        {
+          "left": 1223.5625,
+          "right": 1328.921875
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-68d23096-e504-4571-b7e6-ed9460f49b8e",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1328.921875
+        },
+        {
+          "left": 1223.5625,
+          "right": 1328.921875
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-a82b8c85-d3d2-4d1f-afce-01e47e62ed3d",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1328.921875
+        },
+        {
+          "left": 1223.5625,
+          "right": 1328.921875
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-465a2d42-791c-4f2d-a5c6-ace56550243e",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1328.921875
+        },
+        {
+          "left": 1223.5625,
+          "right": 1328.921875
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+      "label": "评测结论",
+      "rawBad": 1,
+      "visibleBad": [],
+      "clip": [
+        {
+          "className": "harness-eval-review-status",
+          "left": 879.359375,
+          "right": 1002.75,
+          "textOverflow": "ellipsis"
+        }
+      ]
+    },
+    {
+      "id": "run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-403db09b-c724-4514-96f0-c95a59f1fdd1",
+      "label": "评测结论",
+      "rawBad": 1,
+      "visibleBad": [],
+      "clip": [
+        {
+          "className": "harness-eval-review-status",
+          "left": 879.359375,
+          "right": 1002.75,
+          "textOverflow": "ellipsis"
+        }
+      ]
+    },
+    {
+      "id": "run-403db09b-c724-4514-96f0-c95a59f1fdd1",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-61f812e3-90ab-40fa-89a1-f1bb97a9008b",
+      "label": "评测结论",
+      "rawBad": 1,
+      "visibleBad": [],
+      "clip": [
+        {
+          "className": "harness-eval-review-status",
+          "left": 879.359375,
+          "right": 1002.75,
+          "textOverflow": "ellipsis"
+        }
+      ]
+    },
+    {
+      "id": "run-61f812e3-90ab-40fa-89a1-f1bb97a9008b",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-e94134da-05cd-40e8-8642-b2cd4163c37a",
+      "label": "评测结论",
+      "rawBad": 1,
+      "visibleBad": [],
+      "clip": [
+        {
+          "className": "harness-eval-review-status",
+          "left": 879.359375,
+          "right": 1002.75,
+          "textOverflow": "ellipsis"
+        }
+      ]
+    },
+    {
+      "id": "run-e94134da-05cd-40e8-8642-b2cd4163c37a",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-50416fc7-d53d-4877-ac45-7b88b9098c27",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-fda3aa24-5a81-4319-b7eb-d3977dd9f873",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-028a9199-2c68-45be-b0e8-26b83852283f",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-e2fcc6f8-5a91-4ed1-aaad-b21bad701b65",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-92c6bb6a-f9dc-4536-895e-33f28e570dee",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-2dfa0a95-a136-474c-a94d-8ffbd49dcea5",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-83b2f055-b298-47ff-ad1b-5699842b3696",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-be40346f-4eb4-468f-983f-52498ee3699a",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-336d94c7-a463-423e-80d2-891fb03ba574",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-ade00ca7-8b91-41b6-a835-f7ec65fdd603",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-d202b15b-58bc-4f21-bf17-8da76597584d",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-8a1aa32c-7177-4fb1-bea2-ec975478df08",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-71851ee6-512c-420a-9b33-ede51556e3b2",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-155f12ad-8c0f-4877-aa6e-e8a04232ca70",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-3c1aebe1-ad0d-4869-80e6-9a52213e4421",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-55901154-c14c-41b6-a32f-22310fcff526",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-29c51dee-fadf-47e2-a4c3-d0fc6747a04e",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-7847167b-0176-4754-ae24-038eeaeee024",
+      "label": "时间",
+      "rawBad": 1,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-9c86ea55-1217-466c-823d-2a139162b75b",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-6c8e03aa-bf4b-4c90-815c-5135693635d9",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-7e794337-04a5-4170-a0f1-4d34b0008fb2",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-2519628c-9852-41c2-91c2-91a9072c32ca",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-a6623acc-e17a-4ecd-a771-80e817de2a62",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-f43f08c4-de15-4709-87d4-596c0055de71",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-3ce29909-55b1-480b-86c4-0d64fc86fac0",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-595f93db-4eac-4b30-aefc-c406da87bbaf",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-f5c823e7-fa97-43ab-8431-81552f18ef9e",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-a7ea372c-ec13-4659-a651-cbcb70189343",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-3a989157-7d93-42a4-b74d-8e6d265dfbff",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-554679fe-7c11-4393-bea0-477a81ab3f66",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-b770117b-41c0-452d-a438-3c19481f5906",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-7ed22769-5691-4f11-a581-5b0015b78645",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-049b7160-f967-4acf-8728-c2c21869fb9e",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-2e105c05-0bf6-4d43-ac5c-92caeb41287a",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-9a8559ea-d654-4439-b5f2-c25dd0b94a55",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-14b9ccca-8da4-494d-82b5-5685265b3f4f",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-2bf41af5-1912-4a8d-8137-1e642435b2a5",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-91b77922-a32e-4dcd-9de6-e62dcfb1beff",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-b4846065-1e39-4bd6-9894-4ba27ded6e04",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-86063dd0-6bfe-45ed-bc7f-ffaf9b9ec0d8",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-f2221194-2bfd-4d3e-bd86-d83948a0b2cd",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-f62533d0-87fe-4258-8ca2-cb76adbecbb5",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-6e58ccba-22f1-4756-b746-b0946d24609b",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-1a666623-a876-4138-8910-03a58836301a",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-6e8b2d9b-6e46-45a3-9f28-c34275f8b97c",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-bb12b61b-dc48-4f4c-9619-01998df63cda",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-c2d1720d-2c56-4fd5-be91-018c48918643",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-3cb5d380-b314-4cb8-8887-287bb095fadf",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-6400d097-407d-4339-b8e7-b0d53d5beccc",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-a20ca3b3-f75b-4166-ba2a-f8fbc00a4352",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-54788818-d712-4862-a32c-416407c24724",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-16b16116-3654-4300-a862-a4b293266c2e",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-424f67b4-bb0c-4ebb-bd92-38a267ca6e48",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-e6ffe4c8-932b-4b6a-b9fb-1f802f536408",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-6544173e-0670-4cfd-af86-f0d27cad77d2",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-05973a80-6b91-40e7-a0da-acca3a4ea696",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-9521d681-a5c0-4d62-a620-ef1b3f0280f1",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-80b598ef-5546-45a2-a950-e413f781a402",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-1822acd1-3780-4554-8ae2-17d910aa5ee8",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-325d6b40-9324-4dee-8b8f-b82e969e69b9",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-b0ccfe4c-eab4-465a-b34a-9dc5bfa16ca6",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-f1d08497-4457-450c-ab50-7ce87af4c564",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-59e5fb6b-b867-42cb-a675-d7d952387cfa",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-66de2525-68db-4066-8d29-749bd950b19e",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-0e64207b-4fa6-443b-824b-4277842deb5f",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-c3b32564-7be2-4ce5-b8e6-72d07531a274",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-3df5f417-c35e-491b-a917-5fb20a2c662c",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-9c6726bf-4d37-45cd-9932-6757238250e6",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-288f1d03-4997-4bc0-9fe8-1ffc78ade264",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-5f178a71-522f-4e5f-af14-3d240cced704",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-930dde7e-f7ae-4264-b5ad-29fe1288f2e9",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-a994263a-68a8-458b-a619-09f3d2304c0a",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-531b95b3-e6ee-4d4f-a117-5ac3e9d372f8",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-12bb21a4-8451-4a20-a86e-a06876519865",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-c067d20b-0a4c-48cb-a78d-5a6e03e6172a",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-d8867c0c-4717-4f65-b61a-f88976cbab31",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-35fc537e-774b-42e9-b016-6b3999962f67",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        },
+        {
+          "left": 1223.5625,
+          "right": 1335.578125
+        }
+      ],
+      "clip": []
+    },
+    {
+      "id": "run-a4abf894-4750-4113-8497-7fc08a3a36b5",
+      "label": "时间",
+      "rawBad": 2,
+      "visibleBad": [
+        {
+          "left": 1223.5625,
+          "right": 1328.921875
+        },
+        {
+          "left": 1223.5625,
+          "right": 1328.921875
+        }
+      ],
+      "clip": []
+    }
+  ],
+  "restored": {
+    "inlineStyle": null,
+    "minWidth": "1520px",
+    "firstWidth": 364.796875
+  },
+  "missingEndSamples": [
+    {
+      "id": "run-23c63f26-12b6-439f-9021-4272852c3b52",
+      "time": "开始：2026/11/4 19:51:29\n结束：未记录"
+    },
+    {
+      "id": "run-de9f0702-893b-4ce4-9245-fbccbb5fe462",
+      "time": "开始：2026/11/4 19:36:29\n结束：未记录"
+    },
+    {
+      "id": "run-9f341352-fc1a-47b4-b64e-c31c9b56c2ea",
+      "time": "开始：2026/11/4 19:30:50\n结束：未记录"
+    },
+    {
+      "id": "run-68d23096-e504-4571-b7e6-ed9460f49b8e",
+      "time": "开始：2026/11/4 19:24:56\n结束：未记录"
+    },
+    {
+      "id": "run-a82b8c85-d3d2-4d1f-afce-01e47e62ed3d",
+      "time": "开始：2026/11/4 17:34:19\n结束：未记录"
+    },
+    {
+      "id": "run-465a2d42-791c-4f2d-a5c6-ace56550243e",
+      "time": "开始：2026/11/4 17:34:08\n结束：未记录"
+    },
+    {
+      "id": "run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+      "time": "开始：2026/10/31 08:00:42\n结束：未记录"
+    },
+    {
+      "id": "run-403db09b-c724-4514-96f0-c95a59f1fdd1",
+      "time": "开始：2026/10/31 07:05:39\n结束：未记录"
+    },
+    {
+      "id": "run-61f812e3-90ab-40fa-89a1-f1bb97a9008b",
+      "time": "开始：2026/10/31 06:35:29\n结束：未记录"
+    },
+    {
+      "id": "run-e94134da-05cd-40e8-8642-b2cd4163c37a",
+      "time": "开始：2026/10/31 06:23:27\n结束：未记录"
+    },
+    {
+      "id": "run-50416fc7-d53d-4877-ac45-7b88b9098c27",
+      "time": "开始：2026/10/31 04:20:44\n结束：未记录"
+    },
+    {
+      "id": "run-fda3aa24-5a81-4319-b7eb-d3977dd9f873",
+      "time": "开始：2026/10/31 04:20:32\n结束：未记录"
+    },
+    {
+      "id": "run-028a9199-2c68-45be-b0e8-26b83852283f",
+      "time": "开始：2026/10/31 04:20:24\n结束：未记录"
+    },
+    {
+      "id": "run-e2fcc6f8-5a91-4ed1-aaad-b21bad701b65",
+      "time": "开始：2026/10/31 04:20:18\n结束：未记录"
+    },
+    {
+      "id": "run-92c6bb6a-f9dc-4536-895e-33f28e570dee",
+      "time": "开始：2026/10/31 02:35:51\n结束：未记录"
+    },
+    {
+      "id": "run-2dfa0a95-a136-474c-a94d-8ffbd49dcea5",
+      "time": "开始：2026/10/31 02:35:45\n结束：未记录"
+    },
+    {
+      "id": "run-83b2f055-b298-47ff-ad1b-5699842b3696",
+      "time": "开始：2026/10/31 02:09:21\n结束：未记录"
+    },
+    {
+      "id": "run-be40346f-4eb4-468f-983f-52498ee3699a",
+      "time": "开始：2026/10/31 01:37:42\n结束：未记录"
+    },
+    {
+      "id": "run-336d94c7-a463-423e-80d2-891fb03ba574",
+      "time": "开始：2026/10/31 01:28:17\n结束：未记录"
+    },
+    {
+      "id": "run-ade00ca7-8b91-41b6-a835-f7ec65fdd603",
+      "time": "开始：2026/10/31 01:28:14\n结束：未记录"
+    },
+    {
+      "id": "run-d202b15b-58bc-4f21-bf17-8da76597584d",
+      "time": "开始：2026/10/31 01:27:33\n结束：未记录"
+    },
+    {
+      "id": "run-8a1aa32c-7177-4fb1-bea2-ec975478df08",
+      "time": "开始：2026/10/31 01:22:50\n结束：未记录"
+    },
+    {
+      "id": "run-71851ee6-512c-420a-9b33-ede51556e3b2",
+      "time": "开始：2026/10/31 01:22:43\n结束：未记录"
+    },
+    {
+      "id": "run-155f12ad-8c0f-4877-aa6e-e8a04232ca70",
+      "time": "开始：2026/10/31 00:26:53\n结束：未记录"
+    },
+    {
+      "id": "run-3c1aebe1-ad0d-4869-80e6-9a52213e4421",
+      "time": "开始：2026/10/31 00:16:07\n结束：未记录"
+    },
+    {
+      "id": "run-55901154-c14c-41b6-a32f-22310fcff526",
+      "time": "开始：2026/10/31 00:16:04\n结束：未记录"
+    },
+    {
+      "id": "run-29c51dee-fadf-47e2-a4c3-d0fc6747a04e",
+      "time": "开始：2026/10/31 00:15:50\n结束：未记录"
+    },
+    {
+      "id": "run-7847167b-0176-4754-ae24-038eeaeee024",
+      "time": "开始：2026/10/30 23:52:26\n结束：未记录"
+    },
+    {
+      "id": "run-9c86ea55-1217-466c-823d-2a139162b75b",
+      "time": "开始：2026/10/30 23:38:40\n结束：未记录"
+    },
+    {
+      "id": "run-6c8e03aa-bf4b-4c90-815c-5135693635d9",
+      "time": "开始：2026/10/30 23:26:00\n结束：未记录"
+    },
+    {
+      "id": "run-7e794337-04a5-4170-a0f1-4d34b0008fb2",
+      "time": "开始：2026/10/30 16:16:55\n结束：未记录"
+    },
+    {
+      "id": "run-2519628c-9852-41c2-91c2-91a9072c32ca",
+      "time": "开始：2026/10/30 16:07:13\n结束：未记录"
+    },
+    {
+      "id": "run-a6623acc-e17a-4ecd-a771-80e817de2a62",
+      "time": "开始：2026/10/30 16:03:59\n结束：未记录"
+    },
+    {
+      "id": "run-f43f08c4-de15-4709-87d4-596c0055de71",
+      "time": "开始：2026/10/30 16:03:33\n结束：未记录"
+    },
+    {
+      "id": "run-3ce29909-55b1-480b-86c4-0d64fc86fac0",
+      "time": "开始：2026/10/30 15:52:03\n结束：未记录"
+    },
+    {
+      "id": "run-595f93db-4eac-4b30-aefc-c406da87bbaf",
+      "time": "开始：2026/10/30 15:46:58\n结束：未记录"
+    },
+    {
+      "id": "run-f5c823e7-fa97-43ab-8431-81552f18ef9e",
+      "time": "开始：2026/10/30 15:46:19\n结束：未记录"
+    },
+    {
+      "id": "run-a7ea372c-ec13-4659-a651-cbcb70189343",
+      "time": "开始：2026/10/30 15:30:25\n结束：未记录"
+    },
+    {
+      "id": "run-3a989157-7d93-42a4-b74d-8e6d265dfbff",
+      "time": "开始：2026/10/30 15:27:11\n结束：未记录"
+    },
+    {
+      "id": "run-554679fe-7c11-4393-bea0-477a81ab3f66",
+      "time": "开始：2026/10/30 15:23:59\n结束：未记录"
+    },
+    {
+      "id": "run-b770117b-41c0-452d-a438-3c19481f5906",
+      "time": "开始：2026/10/30 15:21:21\n结束：未记录"
+    },
+    {
+      "id": "run-7ed22769-5691-4f11-a581-5b0015b78645",
+      "time": "开始：2026/10/30 15:18:10\n结束：未记录"
+    },
+    {
+      "id": "run-049b7160-f967-4acf-8728-c2c21869fb9e",
+      "time": "开始：2026/10/30 15:17:11\n结束：未记录"
+    },
+    {
+      "id": "run-2e105c05-0bf6-4d43-ac5c-92caeb41287a",
+      "time": "开始：2026/10/30 15:09:35\n结束：未记录"
+    },
+    {
+      "id": "run-9a8559ea-d654-4439-b5f2-c25dd0b94a55",
+      "time": "开始：2026/10/30 15:06:31\n结束：未记录"
+    },
+    {
+      "id": "run-14b9ccca-8da4-494d-82b5-5685265b3f4f",
+      "time": "开始：2026/10/30 15:06:08\n结束：未记录"
+    },
+    {
+      "id": "run-2bf41af5-1912-4a8d-8137-1e642435b2a5",
+      "time": "开始：2026/10/30 14:38:11\n结束：未记录"
+    },
+    {
+      "id": "run-91b77922-a32e-4dcd-9de6-e62dcfb1beff",
+      "time": "开始：2026/10/30 10:29:57\n结束：未记录"
+    },
+    {
+      "id": "run-b4846065-1e39-4bd6-9894-4ba27ded6e04",
+      "time": "开始：2026/10/30 10:29:56\n结束：未记录"
+    },
+    {
+      "id": "run-86063dd0-6bfe-45ed-bc7f-ffaf9b9ec0d8",
+      "time": "开始：2026/10/30 03:53:15\n结束：未记录"
+    },
+    {
+      "id": "run-f2221194-2bfd-4d3e-bd86-d83948a0b2cd",
+      "time": "开始：2026/10/30 03:53:11\n结束：未记录"
+    },
+    {
+      "id": "run-f62533d0-87fe-4258-8ca2-cb76adbecbb5",
+      "time": "开始：2026/10/29 23:44:03\n结束：未记录"
+    },
+    {
+      "id": "run-6e58ccba-22f1-4756-b746-b0946d24609b",
+      "time": "开始：2026/10/29 23:18:09\n结束：未记录"
+    },
+    {
+      "id": "run-1a666623-a876-4138-8910-03a58836301a",
+      "time": "开始：2026/10/26 20:16:28\n结束：未记录"
+    },
+    {
+      "id": "run-6e8b2d9b-6e46-45a3-9f28-c34275f8b97c",
+      "time": "开始：2026/10/26 20:16:17\n结束：未记录"
+    },
+    {
+      "id": "run-bb12b61b-dc48-4f4c-9619-01998df63cda",
+      "time": "开始：2026/10/26 20:00:23\n结束：未记录"
+    },
+    {
+      "id": "run-c2d1720d-2c56-4fd5-be91-018c48918643",
+      "time": "开始：2026/10/26 20:00:13\n结束：未记录"
+    },
+    {
+      "id": "run-3cb5d380-b314-4cb8-8887-287bb095fadf",
+      "time": "开始：2026/10/26 20:00:02\n结束：未记录"
+    },
+    {
+      "id": "run-6400d097-407d-4339-b8e7-b0d53d5beccc",
+      "time": "开始：2026/10/26 19:59:04\n结束：未记录"
+    },
+    {
+      "id": "run-a20ca3b3-f75b-4166-ba2a-f8fbc00a4352",
+      "time": "开始：2026/10/26 19:52:30\n结束：未记录"
+    },
+    {
+      "id": "run-54788818-d712-4862-a32c-416407c24724",
+      "time": "开始：2026/10/26 19:30:55\n结束：未记录"
+    },
+    {
+      "id": "run-16b16116-3654-4300-a862-a4b293266c2e",
+      "time": "开始：2026/10/26 19:16:45\n结束：未记录"
+    },
+    {
+      "id": "run-424f67b4-bb0c-4ebb-bd92-38a267ca6e48",
+      "time": "开始：2026/10/26 19:04:19\n结束：未记录"
+    }
+  ],
+  "screenshot": ".local/eval-run-id-width-20261104/final-1920-all.png",
+  "assessmentComparisonOnly": {
+    "current": [
+      {
+        "id": "run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+        "label": "评测结论",
+        "rawBad": 1,
+        "visibleBad": [],
+        "clip": [
+          {
+            "className": "harness-eval-review-status",
+            "left": 1004.359375,
+            "right": 1132.359375,
+            "textOverflow": "ellipsis"
+          }
+        ]
+      },
+      {
+        "id": "run-403db09b-c724-4514-96f0-c95a59f1fdd1",
+        "label": "评测结论",
+        "rawBad": 1,
+        "visibleBad": [],
+        "clip": [
+          {
+            "className": "harness-eval-review-status",
+            "left": 1004.359375,
+            "right": 1132.359375,
+            "textOverflow": "ellipsis"
+          }
+        ]
+      },
+      {
+        "id": "run-61f812e3-90ab-40fa-89a1-f1bb97a9008b",
+        "label": "评测结论",
+        "rawBad": 1,
+        "visibleBad": [],
+        "clip": [
+          {
+            "className": "harness-eval-review-status",
+            "left": 1004.359375,
+            "right": 1132.359375,
+            "textOverflow": "ellipsis"
+          }
+        ]
+      },
+      {
+        "id": "run-e94134da-05cd-40e8-8642-b2cd4163c37a",
+        "label": "评测结论",
+        "rawBad": 1,
+        "visibleBad": [],
+        "clip": [
+          {
+            "className": "harness-eval-review-status",
+            "left": 1004.359375,
+            "right": 1132.359375,
+            "textOverflow": "ellipsis"
+          }
+        ]
+      }
+    ],
+    "legacyWidths": [
+      {
+        "id": "run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+        "label": "评测结论",
+        "rawBad": 1,
+        "visibleBad": [],
+        "clip": [
+          {
+            "className": "harness-eval-review-status",
+            "left": 879.359375,
+            "right": 1002.75,
+            "textOverflow": "ellipsis"
+          }
+        ]
+      },
+      {
+        "id": "run-403db09b-c724-4514-96f0-c95a59f1fdd1",
+        "label": "评测结论",
+        "rawBad": 1,
+        "visibleBad": [],
+        "clip": [
+          {
+            "className": "harness-eval-review-status",
+            "left": 879.359375,
+            "right": 1002.75,
+            "textOverflow": "ellipsis"
+          }
+        ]
+      },
+      {
+        "id": "run-61f812e3-90ab-40fa-89a1-f1bb97a9008b",
+        "label": "评测结论",
+        "rawBad": 1,
+        "visibleBad": [],
+        "clip": [
+          {
+            "className": "harness-eval-review-status",
+            "left": 879.359375,
+            "right": 1002.75,
+            "textOverflow": "ellipsis"
+          }
+        ]
+      },
+      {
+        "id": "run-e94134da-05cd-40e8-8642-b2cd4163c37a",
+        "label": "评测结论",
+        "rawBad": 1,
+        "visibleBad": [],
+        "clip": [
+          {
+            "className": "harness-eval-review-status",
+            "left": 879.359375,
+            "right": 1002.75,
+            "textOverflow": "ellipsis"
+          }
+        ]
+      }
+    ]
+  },
+  "comparisonLimit": "旧列宽注入只比较既有评测结论摘要裁剪，不代表旧源码完整页面；新时间nowrap配旧宽度的其他列结果不作旧页面结论。"
+}

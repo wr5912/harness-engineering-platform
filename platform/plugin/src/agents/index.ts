@@ -1519,6 +1519,10 @@ function evalArgs(payload: JsonMap, dryRun: boolean, modelPolicyPath?: string, m
     args.push('--evaluation-source', payload.evaluation_source)
   }
   if (mcpFixturePath) args.push('--mcp-fixture', mcpFixturePath)
+  if (!dryRun && payload.run_id !== undefined) {
+    if (typeof payload.run_id !== 'string' || !RUN_ID.test(payload.run_id)) throw new RpcError('invalid_request', 'run_id 必须是预览返回的 run-<UUIDv4>')
+    args.push('--run-id', payload.run_id)
+  }
   if (compareTo) args.push('--compare-to', compareTo)
   if (payload.artifact_export !== undefined) {
     const artifact = requireObject(payload.artifact_export)
@@ -1536,14 +1540,14 @@ function commandJson(root: string, args: string[]) {
   return parseJsonCommand(root, args)
 }
 
-function cleanupEvalPolicies(root: string, jobId: string) {
+function cleanupEvalPolicies(root: string, runId: string) {
   const directory = workspaceLocalPath(root, 'evaluation-jobs', 'model-policies')
   if (!existsSync(directory)) return
-  for (const name of readdirSync(directory)) if (name.startsWith(`${jobId}-`)) rmSync(join(directory, name), { recursive: true, force: true })
+  for (const name of readdirSync(directory)) if (name.startsWith(`${runId}-`)) rmSync(join(directory, name), { recursive: true, force: true })
 }
 
 async function evalCommand(root: string, payload: JsonMap, dryRun: boolean, modelPolicy?: EvalModelPolicyProvider,
-  jobId = 'preview'): Promise<{ executable: string; args: string[]; environment?: NodeJS.ProcessEnv; dispose?: () => void }> {
+  runId = 'preview'): Promise<{ executable: string; args: string[]; environment?: NodeJS.ProcessEnv; dispose?: () => void }> {
   const executionRoot = optionalString(payload, 'program_root') ?? programRoot()
   if (!isAbsolute(executionRoot) || !existsSync(join(executionRoot, DSH_EVAL))) throw new RpcError('invalid_request', 'program_root 必须是包含 dsh-eval 的程序根绝对路径')
   const args = (policy?: string, fixture?: string) => [join(executionRoot, DSH_EVAL), ...evalArgs(payload, dryRun, policy, fixture).slice(1)]
@@ -1577,7 +1581,7 @@ async function evalCommand(root: string, payload: JsonMap, dryRun: boolean, mode
   if (!projected && !fixture) return { executable: process.env.HARNESS_PYTHON || 'python3', args: args(), environment }
   const directory = workspaceLocalPath(root, 'evaluation-jobs', 'model-policies')
   mkdirSync(directory, { recursive: true, mode: 0o700 })
-  const temporary = mkdtempSync(join(directory, `${jobId}-`))
+  const temporary = mkdtempSync(join(directory, `${runId}-`))
   try {
     const file = join(temporary, 'policy.json')
     if (projected) writeFileSync(file, JSON.stringify(projected.policy), { mode: 0o600, flag: 'wx' })
@@ -1747,9 +1751,9 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
   const root = rootOf(assetRoot)
   const sdk = createSdkHandler(root, { modelPolicy, onChange })
   const jobs = createEvaluationJobs(root, {
-    command: (payload, jobId) => evalCommand(root, payload, false, modelPolicy, jobId),
+    command: (payload, runId) => evalCommand(root, { ...payload, run_id: runId }, false, modelPolicy, runId),
     environment: () => programEnvironment(root), redact: text => redact(text, 16 * 1024), onChange,
-    cleanup: jobId => cleanupEvalPolicies(root, jobId),
+    cleanup: runId => cleanupEvalPolicies(root, runId),
   })
   const previews = new Map<string, VersionPreview>()
   const datasets = createDecisionDatasetHandler(root)
@@ -1853,19 +1857,26 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
         case 'cases/from-run':
         case 'cases/create-preview':
         case 'cases/create': return await caseManagement(endpoint, body, signal, peer)
-        case 'eval/preview': return await evalPreview(root, body, signal, modelPolicy)
+        case 'eval/preview': {
+          const preview = await evalPreview(root, body, signal, modelPolicy)
+          if (!preview.ok) return preview
+          return ok({ ...preview.value, ...jobs.reserve(body) })
+        }
         case 'eval/start': return ok(await jobs.start(body))
-        case 'eval/batch-start': return ok({ jobs: await jobs.startBatch(body.requests, async request => { await evalPreview(root, request, signal, modelPolicy) }, signal) })
-        case 'eval/list': return ok({ jobs: jobs.list().map(job => {
-          const experimentId = job.source.startsWith('experiment:') ? job.source.slice('experiment:'.length) : null
-          let agentId: string | null = null
-          if (experimentId && EXP_ID.test(experimentId)) {
-            try { agentId = experimentInfo(root, experimentId).agent_id } catch { /* 来源可能已移除，原 Job 仍可查询。 */ }
-          }
-          return { ...job, experiment_id: experimentId, agent_id: agentId }
-        }) })
-        case 'eval/status': return ok(jobs.status(stringField(body, 'job_id')))
-        case 'eval/cancel': return ok(jobs.cancel(stringField(body, 'job_id')))
+        case 'eval/batch-start': return ok(await jobs.startBatch(body.requests, undefined, signal))
+        case 'eval/list': {
+          const observed = jobs.list()
+          return ok({ ...observed, runs: observed.runs.map(run => {
+            const experimentId = run.experiment_id ?? (run.source.startsWith('experiment:') ? run.source.slice('experiment:'.length) : null)
+            let agentId: string | null = run.agent_id ?? null
+            if (!agentId && experimentId && EXP_ID.test(experimentId)) {
+              try { agentId = experimentInfo(root, experimentId).agent_id } catch { /* 来源可能已移除，原 Run 仍可查询。 */ }
+            }
+            return { ...run, experiment_id: experimentId, agent_id: agentId }
+          }) })
+        }
+        case 'eval/status': return ok(jobs.status(stringField(body, body.run_id !== undefined ? 'run_id' : 'job_id')))
+        case 'eval/cancel': return ok(jobs.cancel(stringField(body, body.run_id !== undefined ? 'run_id' : 'job_id')))
         case 'runs/index': return await runRecord(root, 'index', body, signal)
         case 'runs/overview': return await runRecord(root, 'overview', body, signal)
         case 'runs/show': return await runRecord(root, 'show', body, signal)

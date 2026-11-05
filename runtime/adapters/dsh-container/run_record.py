@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import importlib.util
 from importlib.machinery import SourceFileLoader
@@ -948,6 +949,13 @@ def command_compare(repo: Path, args: argparse.Namespace) -> None:
 
 
 def command_init(repo: Path, args: argparse.Namespace) -> None:
+    allocated_id = os.environ.get("HARNESS_EVAL_RUN_ID")
+    supplied_id = getattr(args, "run_id", None)
+    if supplied_id and allocated_id and supplied_id != allocated_id:
+        raise ValueError("--run-id 与 HARNESS_EVAL_RUN_ID 不一致")
+    run_id = supplied_id or allocated_id or "run-" + str(uuid.uuid4())
+    if not isinstance(run_id, str) or not RUN_ID_RE.fullmatch(run_id) or run_id != run_id.lower():
+        raise ValueError("run_id 必须是小写 run-UUIDv4")
     contract = resolve(args.source, repo=repo, source_ref=getattr(args, "source_ref", None),
                        **({"evaluation_source": args.evaluation_source} if getattr(args, "evaluation_source", None) else {}))
     experiment_id = contract.get("experiment_id")
@@ -977,10 +985,31 @@ def command_init(repo: Path, args: argparse.Namespace) -> None:
     comparison_ref = getattr(args, "compare_to", None)
     if comparison_ref:
         comparison_run_view(repo, comparison_ref, agent_id)
-    run_id = "run-" + str(uuid.uuid4())
     run_dir = experiment / "runs" / run_id
-    run_dir.mkdir(parents=True, exist_ok=False)
+    # Run 查询在数据根内按编号唯一定位；指定编号也不能在另一 Experiment 重用。
+    experiments = repo / "evolution/experiments"
+    descriptor = os.open(experiments, os.O_RDONLY | os.O_DIRECTORY)
     try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        for existing in experiments.iterdir():
+            if os.path.lexists(existing / "runs" / run_id):
+                raise FileExistsError(f"Run ID 已占用：{run_id}")
+        run_dir.mkdir(parents=True, exist_ok=False)
+    finally:
+        os.close(descriptor)
+    committed = False
+    try:
+        try:
+            process_stat = Path(f"/proc/{os.getpid()}/stat").read_text(encoding="utf-8")
+            process_start = process_stat[process_stat.rfind(")") + 2:].split()[19]
+        except (OSError, IndexError):
+            process_start = None
+        marker = run_dir / ".initialization.json"
+        marker.write_text(json.dumps({
+            "schema_version": "1.0", "run_id": run_id, "workspace_id": workspace_id(repo),
+            "asset_root": str(repo.resolve()), "pid": os.getpid(), "parent_pid": os.getppid(), "process_start": process_start,
+            "request_sha256": os.environ.get("HARNESS_EVAL_REQUEST_SHA256"),
+        }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         candidate = Path(contract["candidate_root"]).parent
         source_digest = candidate_digest(candidate)
         inputs = {
@@ -1096,8 +1125,25 @@ def command_init(repo: Path, args: argparse.Namespace) -> None:
             "evaluation_ref": evaluation_ref,
         }
         write_flat_yaml(run_dir / "run.yaml", manifest)
+        committed = True
+        try:
+            marker.unlink()
+        except OSError:
+            # 清单已提交；残留标记不能使成功的 Run 被当作未创建而删除。
+            pass
     except BaseException:
-        shutil.rmtree(run_dir)
+        if not committed:
+            # 清单可能已经原子提交，而写入函数尚未正常返回；不能据内存标志回滚。
+            try:
+                observed = read_run_manifest(run_dir / "run.yaml")
+                locked = json.loads((run_dir / "inputs.lock.json").read_text(encoding="utf-8"))
+                committed = observed.get("run_id") == run_id and locked.get("run_id") == run_id
+            except FileNotFoundError:
+                if not os.path.lexists(run_dir / "run.yaml"):
+                    shutil.rmtree(run_dir)
+            except (OSError, ValueError, TypeError, KeyError):
+                # 无法确认提交情况时保留现场，交由按归属核对的恢复路径处理。
+                pass
         raise
     print(run_id)
 
@@ -1284,6 +1330,7 @@ def main() -> None:
     parser.add_argument("--repo", type=Path, default=REPO, help="仓库根目录")
     commands = parser.add_subparsers(dest="command", required=True)
     init_parser = commands.add_parser("init", help="创建 Run 并记录输入身份")
+    init_parser.add_argument("--run-id", help="预分配的 run-UUIDv4；省略时生成新的 Run ID")
     init_parser.add_argument("--source", required=True, help="当前支持 experiment:<id>")
     init_parser.add_argument("--source-ref", help="固定来源 git:<40位提交>")
     init_parser.add_argument("--evaluation-source", choices=("source", "current"), help="明确选择来源用例或当前用例，所选合同封存到 Run")

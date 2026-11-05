@@ -1,0 +1,481 @@
+{
+  "scope": "实际平台只读UI验收：完整RunID、仅真实Run、旧链接恢复及无Run提示、明暗与三种屏宽。自动管理session/create在浏览器边界阻止，不写业务资产或自动发起评测。",
+  "apiReportPath": ".local/run-identity-20261104/api-live02.json",
+  "checks": [
+    {
+      "name": "新的真实运行列表合同已装载",
+      "ok": true
+    },
+    {
+      "name": "首页light-1440列顺序",
+      "ok": true
+    },
+    {
+      "name": "首页light-1440无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "light-1440 评测中心列顺序",
+      "ok": true
+    },
+    {
+      "name": "light-1440 仅展示真实RPC Run且完整ID直接可见",
+      "ok": true
+    },
+    {
+      "name": "light-1440 完整ID和版本不裁切且首列不越界",
+      "ok": true
+    },
+    {
+      "name": "light-1440 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "首页light-768列顺序",
+      "ok": true
+    },
+    {
+      "name": "首页light-768无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "light-768 评测中心列顺序",
+      "ok": true
+    },
+    {
+      "name": "light-768 仅展示真实RPC Run且完整ID直接可见",
+      "ok": true
+    },
+    {
+      "name": "light-768 完整ID和版本不裁切且首列不越界",
+      "ok": true
+    },
+    {
+      "name": "light-768 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "首页light-390列顺序",
+      "ok": true
+    },
+    {
+      "name": "首页light-390无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "light-390 评测中心列顺序",
+      "ok": true
+    },
+    {
+      "name": "light-390 仅展示真实RPC Run且完整ID直接可见",
+      "ok": true
+    },
+    {
+      "name": "light-390 完整ID和版本不裁切且首列不越界",
+      "ok": true
+    },
+    {
+      "name": "light-390 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "light-390 表格局部滚动",
+      "ok": true
+    },
+    {
+      "name": "light-390 操作按钮命中",
+      "ok": true
+    },
+    {
+      "name": "首页dark-1440列顺序",
+      "ok": true
+    },
+    {
+      "name": "首页dark-1440无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "dark-1440 评测中心列顺序",
+      "ok": true
+    },
+    {
+      "name": "dark-1440 仅展示真实RPC Run且完整ID直接可见",
+      "ok": true
+    },
+    {
+      "name": "dark-1440 完整ID和版本不裁切且首列不越界",
+      "ok": true
+    },
+    {
+      "name": "dark-1440 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "首页dark-768列顺序",
+      "ok": true
+    },
+    {
+      "name": "首页dark-768无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "dark-768 评测中心列顺序",
+      "ok": true
+    },
+    {
+      "name": "dark-768 仅展示真实RPC Run且完整ID直接可见",
+      "ok": true
+    },
+    {
+      "name": "dark-768 完整ID和版本不裁切且首列不越界",
+      "ok": true
+    },
+    {
+      "name": "dark-768 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "首页dark-390列顺序",
+      "ok": true
+    },
+    {
+      "name": "首页dark-390无整页溢出",
+      "ok": true
+    },
+    {
+      "name": "dark-390 评测中心列顺序",
+      "ok": true
+    },
+    {
+      "name": "dark-390 仅展示真实RPC Run且完整ID直接可见",
+      "ok": true
+    },
+    {
+      "name": "dark-390 完整ID和版本不裁切且首列不越界",
+      "ok": true
+    },
+    {
+      "name": "dark-390 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "dark-390 表格局部滚动",
+      "ok": true
+    },
+    {
+      "name": "dark-390 操作按钮命中",
+      "ok": true
+    },
+    {
+      "name": "真实对象类型筛选智能体",
+      "ok": true
+    },
+    {
+      "name": "真实对象类型筛选变体",
+      "ok": true
+    },
+    {
+      "name": "本次真实Run出现在正确对象下",
+      "ok": true
+    },
+    {
+      "name": "本次Run详情深链身份正确",
+      "ok": true
+    },
+    {
+      "name": "刷新保持本次真实Run",
+      "ok": true
+    },
+    {
+      "name": "返回原对象记录",
+      "ok": true
+    },
+    {
+      "name": "用户原始指定Run完整编号直接展示",
+      "ok": true
+    },
+    {
+      "name": "用户原始指定Run按真实Run ID打开",
+      "ok": true
+    },
+    {
+      "name": "仍有可复核的旧链接样本",
+      "ok": true
+    },
+    {
+      "name": "旧Job链接转向原Run且不新建",
+      "ok": true
+    },
+    {
+      "name": "无Run旧链接准确提示不可继续",
+      "ok": true
+    },
+    {
+      "name": "实际HTTP客户端与当前磁盘制品及URL适配一致",
+      "ok": true
+    },
+    {
+      "name": "页面恢复没有自动preview/start/cancel",
+      "ok": true
+    },
+    {
+      "name": "无脚本异常",
+      "ok": true
+    },
+    {
+      "name": "恢复原主题",
+      "ok": true
+    }
+  ],
+  "failures": [],
+  "errors": [],
+  "blockedWrites": [
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    }
+  ],
+  "screenshots": [
+    ".local/run-identity-20261104/browser-live02-light-1440-left.png",
+    ".local/run-identity-20261104/browser-live02-light-768-left.png",
+    ".local/run-identity-20261104/browser-live02-light-390-left.png",
+    ".local/run-identity-20261104/browser-live02-dark-1440-left.png",
+    ".local/run-identity-20261104/browser-live02-dark-768-left.png",
+    ".local/run-identity-20261104/browser-live02-dark-390-left.png",
+    ".local/run-identity-20261104/browser-live02-original-run.png"
+  ],
+  "layouts": [
+    {
+      "name": "light-1440",
+      "count": 86,
+      "types": [
+        "变体",
+        "智能体"
+      ]
+    },
+    {
+      "name": "light-768",
+      "count": 86,
+      "types": [
+        "变体",
+        "智能体"
+      ]
+    },
+    {
+      "name": "light-390",
+      "count": 86,
+      "types": [
+        "变体",
+        "智能体"
+      ]
+    },
+    {
+      "name": "dark-1440",
+      "count": 86,
+      "types": [
+        "变体",
+        "智能体"
+      ]
+    },
+    {
+      "name": "dark-768",
+      "count": 86,
+      "types": [
+        "变体",
+        "智能体"
+      ]
+    },
+    {
+      "name": "dark-390",
+      "count": 86,
+      "types": [
+        "变体",
+        "智能体"
+      ]
+    }
+  ],
+  "initialTheme": "light",
+  "originalRun": {
+    "run_id": "run-2dfa0a95-a136-474c-a94d-8ffbd49dcea5",
+    "experiment_id": "EXP-security-operations-expert-024-rad80a907c628"
+  },
+  "legacySample": {
+    "id": "05e11ad6-f824-4e2b-808f-fae75eac21d1",
+    "runId": "run-9c86ea55-1217-466c-823d-2a139162b75b"
+  },
+  "clientSha256": "08bb34d2d345e3556fcb21f33e89111b5d4303feb82b0ee4ec72dff2f9abc621",
+  "httpModuleSha256": "faaad3919a4516568ee1096c96eb56f5e0fc566a1e96429bb3442eee4ff713e2",
+  "finalTheme": "light"
+}

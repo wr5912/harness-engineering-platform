@@ -1,0 +1,55 @@
+test_committed_manifest_survives_marker_removal_failure (test_run_record.RunInitializationTest) ... ok
+test_committed_manifest_survives_write_return_failure (test_run_record.RunInitializationTest) ... ok
+test_committed_run_is_preserved_and_failed_when_execution_handoff_cannot_write (test_run_record.RunInitializationTest) ... ok
+test_committed_subprocess_error_is_recovered_as_failed_run (test_run_record.RunInitializationTest) ... ok
+test_concurrent_other_parent_commit_is_not_adopted (test_run_record.RunInitializationTest) ... ok
+test_corrupt_committed_inputs_keep_identity_and_failed_manifest (test_run_record.RunInitializationTest) ... ok
+test_creation_progress_follows_persisted_run_only_execution_identity (test_run_record.RunInitializationTest) ... ok
+test_default_and_explicit_identity_are_frozen_without_initialization_marker (test_run_record.RunInitializationTest) ... ok
+test_environment_identity_must_match_explicit_id (test_run_record.RunInitializationTest) ... ok
+test_existing_committed_run_is_not_adopted_or_rewritten_after_conflict (test_run_record.RunInitializationTest) ... ok
+test_initialization_failure_cleans_only_owned_directory (test_run_record.RunInitializationTest) ... ok
+test_occupied_directory_and_invalid_id_never_change_existing_data (test_run_record.RunInitializationTest) ... ok
+test_other_experiment_occupied_identity_including_partial_path_is_rejected (test_run_record.RunInitializationTest) ... ok
+test_sigkill_keeps_owned_initialization_marker_for_safe_recovery (test_run_record.RunInitializationTest) ... ok
+test_two_cli_processes_cannot_create_same_identity_in_different_experiments (test_run_record.RunInitializationTest) ... ok
+test_cancel_during_run_initialization_preserves_id_and_never_starts_instance (test_dsh_eval_cancel.EvaluationCancellationTest) ... ok
+test_invalid_and_expired_deadlines_stop_before_source_or_runtime_access (test_dsh_eval_cancel.EvaluationCancellationTest) ... ok
+test_sigterm_stops_driver_then_seals_cancelled_run (test_dsh_eval_cancel.EvaluationCancellationTest) ... ok
+test_unconfirmed_instance_stop_is_failed_not_successful_cancel (test_dsh_eval_cancel.EvaluationCancellationTest) ... ok
+test_analysis_down_failure_takes_priority_over_pending_cancel (test_dsh_eval_cancel_windows.EvaluationCancellationWindowTest) ... ok
+test_cancel_after_record_append_does_not_record_same_case_again (test_dsh_eval_cancel_windows.EvaluationCancellationWindowTest) ... ok
+test_driver_cleanup_failure_remains_failed_when_target_stop_succeeds (test_dsh_eval_cancel_windows.EvaluationCancellationWindowTest) ... ok
+test_driver_removal_failure_takes_priority_over_pending_cancel (test_dsh_eval_cancel_windows.EvaluationCancellationWindowTest) ... ok
+test_first_sigterm_after_cleanup_cannot_leave_failed_run_running (test_dsh_eval_cancel_windows.EvaluationCancellationWindowTest) ... ok
+test_first_sigterm_during_analysis_down_waits_for_cleanup (test_dsh_eval_cancel_windows.EvaluationCancellationWindowTest) ... ok
+test_first_sigterm_during_driver_removal_waits_for_cleanup (test_dsh_eval_cancel_windows.EvaluationCancellationWindowTest) ... ok
+test_sigterm_after_real_spawn_before_process_assignment_reaps_child (test_dsh_eval_cancel_windows.EvaluationCancellationWindowTest) ... ok
+test_sigterm_at_initialization_handoff_preserves_run_and_seals_cancelled (test_dsh_eval_cancel_windows.EvaluationCancellationWindowTest) ... ok
+test_build_review_bridge_failure_or_candidate_mismatch_keeps_full_text_contract (test_run_snapshot.FrozenRunSnapshotTests) ... ok
+test_cancelled_run_keeps_cancelled_status_when_source_has_changed (test_run_snapshot.FrozenRunSnapshotTests) ... ok
+test_experiment_index_skips_ignored_residue_but_reports_missing_visible_manifest (test_run_snapshot.FrozenRunSnapshotTests) ... ok
+test_external_inputs_freeze_original_bytes_and_explicit_mode (test_run_snapshot.FrozenRunSnapshotTests) ... ok
+test_external_inputs_reject_missing_or_invalid_mode_without_partial_run (test_run_snapshot.FrozenRunSnapshotTests) ... ok
+test_finalize_verifies_frozen_source_and_preserves_real_case_results (test_run_snapshot.FrozenRunSnapshotTests) ... ok
+test_incomplete_run_manifest_is_reported_without_hiding_valid_runs (test_run_snapshot.FrozenRunSnapshotTests) ... ok
+test_init_uses_one_authoritative_read_when_evaluation_changes_during_initialization (test_run_snapshot.FrozenRunSnapshotTests) ... ok
+test_managed_role_snapshot_freezes_original_bytes_and_reuses_harness_digest (test_run_snapshot.FrozenRunSnapshotTests) ... ok
+test_managed_role_snapshot_rejects_changes_after_tree_lock_without_partial_run (test_run_snapshot.FrozenRunSnapshotTests) ... ok
+test_manifest_replace_failure_preserves_previous_file (test_run_snapshot.FrozenRunSnapshotTests) ... ok
+test_overview_isolates_invalid_run_and_experiment (test_run_snapshot.FrozenRunSnapshotTests) ... ok
+test_run_records_program_and_asset_versions_separately (test_run_snapshot.FrozenRunSnapshotTests) ... ok
+test_run_without_external_fixture_does_not_claim_frozen_external_inputs (test_run_snapshot.FrozenRunSnapshotTests) ... ok
+test_runtime_driver_executes_init_snapshot_instead_of_earlier_plan_or_later_definition (test_run_snapshot.FrozenRunSnapshotTests) ... ok
+test_unreadable_inputs_remain_unknown_in_read_only_run_view (test_run_snapshot.FrozenRunSnapshotTests) ... ok
+test_existing_configured_default_is_preserved_without_new_required_cli_flag (test_run_snapshot.ReviewContractSnapshotTests) ... ok
+test_explicit_policy_freezes_independent_review_model_without_business_assets (test_run_snapshot.ReviewContractSnapshotTests) ... ok
+test_missing_actual_default_does_not_invent_a_review_model (test_run_snapshot.ReviewContractSnapshotTests) ... ok
+test_policy_change_during_freeze_is_rejected (test_run_snapshot.ReviewContractSnapshotTests) ... ok
+test_run_index_keeps_effect_and_source_status_separate_and_unknown_on_bad_summary (test_run_snapshot.ReviewContractSnapshotTests) ... ok
+test_workflow_target_keeps_its_binding_while_judge_uses_frozen_business_default (test_run_snapshot.ReviewContractSnapshotTests) ... ok
+
+----------------------------------------------------------------------
+Ran 50 tests in 49.938s
+
+OK

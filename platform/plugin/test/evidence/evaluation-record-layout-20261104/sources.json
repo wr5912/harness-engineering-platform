@@ -1,0 +1,17 @@
+{
+  "observed_at": "2026-11-04T12:30:36.406103+00:00",
+  "sources": [
+    {
+      "path": "platform/plugin/src/evaluation/client.tsx",
+      "sha256": "65583bc77c62c3e9390c8765fc522d00ffb9e41ac98af6ac92eae69b6477b30b"
+    },
+    {
+      "path": "platform/plugin/src/evaluation/style.ts",
+      "sha256": "44e4b75ff98610427c2681a583b1454f12fc3e63fc4ddb5cfbac1934dd903a81"
+    },
+    {
+      "path": "platform/plugin/test/evaluation-client.test.mjs",
+      "sha256": "64b81ef16914ec53026a066752d5fd03c9c2e69f13218d45336d00a236d7c57b"
+    }
+  ]
+}

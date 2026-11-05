@@ -54,9 +54,9 @@ test('统一网关有独立稳定路由，旧 MCP 地址保持原样', () => {
   assert.deepEqual(readNavigation('#/mcp'), { page: 'mcp' })
 })
 
-test('评测 Job、实例来源与 MCP 组合版本可精确往返，非法动作意图被忽略', () => {
+test('评测Run、实例来源与MCP组合版本可精确往返，非法动作意图被忽略', () => {
   for (const target of [
-    { page: 'evaluation', agent_id: 'demo', experiment_id: 'EXP-demo-001', job_id: '550e8400-e29b-41d4-a716-446655440000', tab: 'jobs' },
+    { page: 'evaluation', agent_id: 'demo', experiment_id: 'EXP-demo-001', run_id: 'run-550e8400-e29b-41d4-a716-446655440000', tab: 'runs' },
     { page: 'evaluation', agent_id: 'demo', experiment_id: 'EXP-demo-001', intent: 'start_eval' },
     { page: 'instances', instance_name: 'demo-001', source_id: 'experiment:EXP-demo-001', tab: 'logs' },
     { page: 'mcp', server_id: 'my-server', tab: 'servers' },
@@ -247,4 +247,13 @@ test('智能体资产深链保留完整相对路径，仅资产页接收且拒�
   }
   assert.equal(readNavigation('#/agents?tab=overview&asset_path=candidate%2Findex.ts').asset_path, undefined)
   assert.equal(navigationHash({ ...target, tab: 'overview' }).includes('asset_path'), false)
+})
+
+
+test('旧评测Job深链仅保留读取入口，新序列化只输出Run身份且显式Run优先', () => {
+  const legacy = '#/evaluation?tab=jobs&job_id=550e8400-e29b-41d4-a716-446655440000'
+  assert.deepEqual(readNavigation(legacy), { page: 'evaluation', tab: 'jobs', job_id: '550e8400-e29b-41d4-a716-446655440000' })
+  assert.equal(navigationHash(readNavigation(legacy)), '#/evaluation?tab=runs')
+  const run = 'run-11111111-1111-4111-8111-111111111111'
+  assert.deepEqual(readNavigation(legacy + '&run_id=' + run), { page: 'evaluation', tab: 'runs', run_id: run })
 })

@@ -1,0 +1,6 @@
+dsh-platform: 平台启动失败；日志：/home/admin/harness-engineering-platform-data/.local/platform-service/platform.log
+dsh-platform: 平台启动失败；日志：/home/admin/harness-engineering-platform-data/.local/platform-service/platform.log
+平台已启动：http://10.0.160.32:18120/hep/
+PID：4033125
+日志：/home/admin/harness-engineering-platform-data/.local/platform-service/platform.log
+已核对 3 个运行中业务实例的网页入口与接入版本

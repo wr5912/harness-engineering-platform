@@ -1,0 +1,24 @@
+{
+  "sources": [
+    {
+      "path": "platform/plugin/src/home.tsx",
+      "sha256": "9ab17b22b7788d1b2a252e383089fd0fcc9ecc53c5b7fcf9641d28a027dc8d6b"
+    },
+    {
+      "path": "platform/plugin/src/home/style.ts",
+      "sha256": "10906701f5a9bd0f292607fa5e5a02038a75d9d20ebaf503464d15742248757e"
+    },
+    {
+      "path": "platform/plugin/src/evaluation/client.tsx",
+      "sha256": "c218b9a3692fcd9092b089e7d5210011a07541556d3014d25ee97e2ea837d30f"
+    },
+    {
+      "path": "platform/plugin/src/evaluation/style.ts",
+      "sha256": "bad6755a0cd9e936ae86a22ed66039b0a8305e5593a33fe84a330239cab3fc35"
+    },
+    {
+      "path": "platform/plugin/src/evaluation/object-identity.ts",
+      "sha256": "9e22c8de47b53df5ab59b24598bb2e9f8383ca6d7f74cb3cb847465aa42ca895"
+    }
+  ]
+}

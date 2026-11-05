@@ -1,0 +1,1218 @@
+{
+  "scope": "初轮后仅补验最终客户端的表格视觉、核心列、结果跳转与HTTP装载；DOM长名称/时间仅作为临时布局探针，刷新恢复，不写业务资产。原生自动session/create由浏览器边界拦截，未检验会话创建功能。",
+  "checks": [
+    {
+      "name": "真实认证",
+      "ok": true
+    },
+    {
+      "name": "首页 light-1440 核心列顺序",
+      "ok": true
+    },
+    {
+      "name": "首页 light-1440 时间和名称不越过单元格且不压操作列",
+      "ok": true,
+      "detail": {
+        "minimumGap": 60.67,
+        "overflows": []
+      }
+    },
+    {
+      "name": "首页 light-1440 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "首页 light-1440 保留表头",
+      "ok": true
+    },
+    {
+      "name": "首页 light-1440 最近评测自然高度",
+      "ok": true
+    },
+    {
+      "name": "评测中心 light-1440 核心列顺序",
+      "ok": true
+    },
+    {
+      "name": "评测中心 light-1440 时间和名称不越过单元格且不压操作列",
+      "ok": true,
+      "detail": {
+        "minimumGap": 28.64,
+        "overflows": []
+      }
+    },
+    {
+      "name": "评测中心 light-1440 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "评测中心 light-1440 保留表头",
+      "ok": true
+    },
+    {
+      "name": "评测中心长文字探针 light-1440 核心列顺序",
+      "ok": true
+    },
+    {
+      "name": "评测中心长文字探针 light-1440 时间和名称不越过单元格且不压操作列",
+      "ok": true,
+      "detail": {
+        "minimumGap": 28.64,
+        "overflows": []
+      }
+    },
+    {
+      "name": "评测中心长文字探针 light-1440 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "评测中心长文字探针 light-1440 保留表头",
+      "ok": true
+    },
+    {
+      "name": "刷新恢复临时布局探针 light-1440",
+      "ok": true
+    },
+    {
+      "name": "首页 light-768 核心列顺序",
+      "ok": true
+    },
+    {
+      "name": "首页 light-768 时间和名称不越过单元格且不压操作列",
+      "ok": true,
+      "detail": {
+        "minimumGap": 29.36,
+        "overflows": []
+      }
+    },
+    {
+      "name": "首页 light-768 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "首页 light-768 保留表头",
+      "ok": true
+    },
+    {
+      "name": "首页 light-768 最近评测自然高度",
+      "ok": true
+    },
+    {
+      "name": "评测中心 light-768 核心列顺序",
+      "ok": true
+    },
+    {
+      "name": "评测中心 light-768 时间和名称不越过单元格且不压操作列",
+      "ok": true,
+      "detail": {
+        "minimumGap": 50.66,
+        "overflows": []
+      }
+    },
+    {
+      "name": "评测中心 light-768 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "评测中心 light-768 保留表头",
+      "ok": true
+    },
+    {
+      "name": "评测中心长文字探针 light-768 核心列顺序",
+      "ok": true
+    },
+    {
+      "name": "评测中心长文字探针 light-768 时间和名称不越过单元格且不压操作列",
+      "ok": true,
+      "detail": {
+        "minimumGap": 24.11,
+        "overflows": []
+      }
+    },
+    {
+      "name": "评测中心长文字探针 light-768 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "评测中心长文字探针 light-768 保留表头",
+      "ok": true
+    },
+    {
+      "name": "刷新恢复临时布局探针 light-768",
+      "ok": true
+    },
+    {
+      "name": "首页 light-390 核心列顺序",
+      "ok": true
+    },
+    {
+      "name": "首页 light-390 时间和名称不越过单元格且不压操作列",
+      "ok": true,
+      "detail": {
+        "minimumGap": 29.36,
+        "overflows": []
+      }
+    },
+    {
+      "name": "首页 light-390 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "首页 light-390 保留表头",
+      "ok": true
+    },
+    {
+      "name": "首页 light-390 表格局部滚动",
+      "ok": true
+    },
+    {
+      "name": "首页 light-390 操作按钮真实可命中",
+      "ok": true
+    },
+    {
+      "name": "首页 light-390 最近评测自然高度",
+      "ok": true
+    },
+    {
+      "name": "评测中心 light-390 核心列顺序",
+      "ok": true
+    },
+    {
+      "name": "评测中心 light-390 时间和名称不越过单元格且不压操作列",
+      "ok": true,
+      "detail": {
+        "minimumGap": 50.66,
+        "overflows": []
+      }
+    },
+    {
+      "name": "评测中心 light-390 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "评测中心 light-390 保留表头",
+      "ok": true
+    },
+    {
+      "name": "评测中心 light-390 表格局部滚动",
+      "ok": true
+    },
+    {
+      "name": "评测中心 light-390 操作按钮真实可命中",
+      "ok": true
+    },
+    {
+      "name": "评测中心长文字探针 light-390 核心列顺序",
+      "ok": true
+    },
+    {
+      "name": "评测中心长文字探针 light-390 时间和名称不越过单元格且不压操作列",
+      "ok": true,
+      "detail": {
+        "minimumGap": 24.11,
+        "overflows": []
+      }
+    },
+    {
+      "name": "评测中心长文字探针 light-390 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "评测中心长文字探针 light-390 保留表头",
+      "ok": true
+    },
+    {
+      "name": "评测中心长文字探针 light-390 表格局部滚动",
+      "ok": true
+    },
+    {
+      "name": "评测中心长文字探针 light-390 操作按钮真实可命中",
+      "ok": true
+    },
+    {
+      "name": "刷新恢复临时布局探针 light-390",
+      "ok": true
+    },
+    {
+      "name": "首页 dark-1440 核心列顺序",
+      "ok": true
+    },
+    {
+      "name": "首页 dark-1440 时间和名称不越过单元格且不压操作列",
+      "ok": true,
+      "detail": {
+        "minimumGap": 60.67,
+        "overflows": []
+      }
+    },
+    {
+      "name": "首页 dark-1440 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "首页 dark-1440 保留表头",
+      "ok": true
+    },
+    {
+      "name": "首页 dark-1440 最近评测自然高度",
+      "ok": true
+    },
+    {
+      "name": "评测中心 dark-1440 核心列顺序",
+      "ok": true
+    },
+    {
+      "name": "评测中心 dark-1440 时间和名称不越过单元格且不压操作列",
+      "ok": true,
+      "detail": {
+        "minimumGap": 28.64,
+        "overflows": []
+      }
+    },
+    {
+      "name": "评测中心 dark-1440 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "评测中心 dark-1440 保留表头",
+      "ok": true
+    },
+    {
+      "name": "评测中心长文字探针 dark-1440 核心列顺序",
+      "ok": true
+    },
+    {
+      "name": "评测中心长文字探针 dark-1440 时间和名称不越过单元格且不压操作列",
+      "ok": true,
+      "detail": {
+        "minimumGap": 28.64,
+        "overflows": []
+      }
+    },
+    {
+      "name": "评测中心长文字探针 dark-1440 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "评测中心长文字探针 dark-1440 保留表头",
+      "ok": true
+    },
+    {
+      "name": "刷新恢复临时布局探针 dark-1440",
+      "ok": true
+    },
+    {
+      "name": "首页 dark-768 核心列顺序",
+      "ok": true
+    },
+    {
+      "name": "首页 dark-768 时间和名称不越过单元格且不压操作列",
+      "ok": true,
+      "detail": {
+        "minimumGap": 29.36,
+        "overflows": []
+      }
+    },
+    {
+      "name": "首页 dark-768 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "首页 dark-768 保留表头",
+      "ok": true
+    },
+    {
+      "name": "首页 dark-768 最近评测自然高度",
+      "ok": true
+    },
+    {
+      "name": "评测中心 dark-768 核心列顺序",
+      "ok": true
+    },
+    {
+      "name": "评测中心 dark-768 时间和名称不越过单元格且不压操作列",
+      "ok": true,
+      "detail": {
+        "minimumGap": 50.66,
+        "overflows": []
+      }
+    },
+    {
+      "name": "评测中心 dark-768 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "评测中心 dark-768 保留表头",
+      "ok": true
+    },
+    {
+      "name": "评测中心长文字探针 dark-768 核心列顺序",
+      "ok": true
+    },
+    {
+      "name": "评测中心长文字探针 dark-768 时间和名称不越过单元格且不压操作列",
+      "ok": true,
+      "detail": {
+        "minimumGap": 24.11,
+        "overflows": []
+      }
+    },
+    {
+      "name": "评测中心长文字探针 dark-768 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "评测中心长文字探针 dark-768 保留表头",
+      "ok": true
+    },
+    {
+      "name": "刷新恢复临时布局探针 dark-768",
+      "ok": true
+    },
+    {
+      "name": "首页 dark-390 核心列顺序",
+      "ok": true
+    },
+    {
+      "name": "首页 dark-390 时间和名称不越过单元格且不压操作列",
+      "ok": true,
+      "detail": {
+        "minimumGap": 29.36,
+        "overflows": []
+      }
+    },
+    {
+      "name": "首页 dark-390 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "首页 dark-390 保留表头",
+      "ok": true
+    },
+    {
+      "name": "首页 dark-390 表格局部滚动",
+      "ok": true
+    },
+    {
+      "name": "首页 dark-390 操作按钮真实可命中",
+      "ok": true
+    },
+    {
+      "name": "首页 dark-390 最近评测自然高度",
+      "ok": true
+    },
+    {
+      "name": "评测中心 dark-390 核心列顺序",
+      "ok": true
+    },
+    {
+      "name": "评测中心 dark-390 时间和名称不越过单元格且不压操作列",
+      "ok": true,
+      "detail": {
+        "minimumGap": 50.66,
+        "overflows": []
+      }
+    },
+    {
+      "name": "评测中心 dark-390 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "评测中心 dark-390 保留表头",
+      "ok": true
+    },
+    {
+      "name": "评测中心 dark-390 表格局部滚动",
+      "ok": true
+    },
+    {
+      "name": "评测中心 dark-390 操作按钮真实可命中",
+      "ok": true
+    },
+    {
+      "name": "评测中心长文字探针 dark-390 核心列顺序",
+      "ok": true
+    },
+    {
+      "name": "评测中心长文字探针 dark-390 时间和名称不越过单元格且不压操作列",
+      "ok": true,
+      "detail": {
+        "minimumGap": 24.11,
+        "overflows": []
+      }
+    },
+    {
+      "name": "评测中心长文字探针 dark-390 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "评测中心长文字探针 dark-390 保留表头",
+      "ok": true
+    },
+    {
+      "name": "评测中心长文字探针 dark-390 表格局部滚动",
+      "ok": true
+    },
+    {
+      "name": "评测中心长文字探针 dark-390 操作按钮真实可命中",
+      "ok": true
+    },
+    {
+      "name": "刷新恢复临时布局探针 dark-390",
+      "ok": true
+    },
+    {
+      "name": "首页窄屏结果跳转保留对象与Run",
+      "ok": true
+    },
+    {
+      "name": "最终客户端刷新保持Run身份",
+      "ok": true
+    },
+    {
+      "name": "最终客户端返回记录入口可用",
+      "ok": true
+    },
+    {
+      "name": "最终HTTP模块匹配当前磁盘客户端及URL适配",
+      "ok": true
+    },
+    {
+      "name": "无脚本异常",
+      "ok": true
+    },
+    {
+      "name": "恢复原主题偏好",
+      "ok": true
+    }
+  ],
+  "failures": [],
+  "errors": [],
+  "blockedWrites": [
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    }
+  ],
+  "screenshots": [
+    ".local/evaluation-object-20261104/browser-final-home-light-1440.png",
+    ".local/evaluation-object-20261104/browser-final-evaluation-light-1440.png",
+    ".local/evaluation-object-20261104/browser-final-home-light-768.png",
+    ".local/evaluation-object-20261104/browser-final-evaluation-light-768.png",
+    ".local/evaluation-object-20261104/browser-final-home-light-390.png",
+    ".local/evaluation-object-20261104/browser-final-evaluation-light-390.png",
+    ".local/evaluation-object-20261104/browser-final-home-dark-1440.png",
+    ".local/evaluation-object-20261104/browser-final-evaluation-dark-1440.png",
+    ".local/evaluation-object-20261104/browser-final-home-dark-768.png",
+    ".local/evaluation-object-20261104/browser-final-evaluation-dark-768.png",
+    ".local/evaluation-object-20261104/browser-final-home-dark-390.png",
+    ".local/evaluation-object-20261104/browser-final-evaluation-dark-390.png"
+  ],
+  "layout": [
+    {
+      "name": "首页 light-1440",
+      "probe": false,
+      "rows": 2,
+      "overflows": [],
+      "minimumGap": 60.67,
+      "tableHead": "table-header-group",
+      "localOverflow": false,
+      "overflowX": "auto",
+      "pageOverflow": false,
+      "maxHeight": "none"
+    },
+    {
+      "name": "评测中心 light-1440",
+      "probe": false,
+      "rows": 85,
+      "overflows": [],
+      "minimumGap": 28.64,
+      "tableHead": "table-header-group",
+      "localOverflow": false,
+      "overflowX": "auto",
+      "pageOverflow": false,
+      "maxHeight": "640px"
+    },
+    {
+      "name": "评测中心长文字探针 light-1440",
+      "probe": true,
+      "rows": 85,
+      "overflows": [],
+      "minimumGap": 28.64,
+      "tableHead": "table-header-group",
+      "localOverflow": false,
+      "overflowX": "auto",
+      "pageOverflow": false,
+      "maxHeight": "640px"
+    },
+    {
+      "name": "首页 light-768",
+      "probe": false,
+      "rows": 2,
+      "overflows": [],
+      "minimumGap": 29.36,
+      "tableHead": "table-header-group",
+      "localOverflow": true,
+      "overflowX": "auto",
+      "pageOverflow": false,
+      "maxHeight": "none"
+    },
+    {
+      "name": "评测中心 light-768",
+      "probe": false,
+      "rows": 85,
+      "overflows": [],
+      "minimumGap": 50.66,
+      "tableHead": "table-header-group",
+      "localOverflow": true,
+      "overflowX": "auto",
+      "pageOverflow": false,
+      "maxHeight": "640px"
+    },
+    {
+      "name": "评测中心长文字探针 light-768",
+      "probe": true,
+      "rows": 85,
+      "overflows": [],
+      "minimumGap": 24.11,
+      "tableHead": "table-header-group",
+      "localOverflow": true,
+      "overflowX": "auto",
+      "pageOverflow": false,
+      "maxHeight": "640px"
+    },
+    {
+      "name": "首页 light-390",
+      "probe": false,
+      "rows": 2,
+      "overflows": [],
+      "minimumGap": 29.36,
+      "tableHead": "table-header-group",
+      "localOverflow": true,
+      "overflowX": "auto",
+      "pageOverflow": false,
+      "maxHeight": "none"
+    },
+    {
+      "name": "评测中心 light-390",
+      "probe": false,
+      "rows": 85,
+      "overflows": [],
+      "minimumGap": 50.66,
+      "tableHead": "table-header-group",
+      "localOverflow": true,
+      "overflowX": "auto",
+      "pageOverflow": false,
+      "maxHeight": "640px"
+    },
+    {
+      "name": "评测中心长文字探针 light-390",
+      "probe": true,
+      "rows": 85,
+      "overflows": [],
+      "minimumGap": 24.11,
+      "tableHead": "table-header-group",
+      "localOverflow": true,
+      "overflowX": "auto",
+      "pageOverflow": false,
+      "maxHeight": "640px"
+    },
+    {
+      "name": "首页 dark-1440",
+      "probe": false,
+      "rows": 2,
+      "overflows": [],
+      "minimumGap": 60.67,
+      "tableHead": "table-header-group",
+      "localOverflow": false,
+      "overflowX": "auto",
+      "pageOverflow": false,
+      "maxHeight": "none"
+    },
+    {
+      "name": "评测中心 dark-1440",
+      "probe": false,
+      "rows": 85,
+      "overflows": [],
+      "minimumGap": 28.64,
+      "tableHead": "table-header-group",
+      "localOverflow": false,
+      "overflowX": "auto",
+      "pageOverflow": false,
+      "maxHeight": "640px"
+    },
+    {
+      "name": "评测中心长文字探针 dark-1440",
+      "probe": true,
+      "rows": 85,
+      "overflows": [],
+      "minimumGap": 28.64,
+      "tableHead": "table-header-group",
+      "localOverflow": false,
+      "overflowX": "auto",
+      "pageOverflow": false,
+      "maxHeight": "640px"
+    },
+    {
+      "name": "首页 dark-768",
+      "probe": false,
+      "rows": 2,
+      "overflows": [],
+      "minimumGap": 29.36,
+      "tableHead": "table-header-group",
+      "localOverflow": true,
+      "overflowX": "auto",
+      "pageOverflow": false,
+      "maxHeight": "none"
+    },
+    {
+      "name": "评测中心 dark-768",
+      "probe": false,
+      "rows": 85,
+      "overflows": [],
+      "minimumGap": 50.66,
+      "tableHead": "table-header-group",
+      "localOverflow": true,
+      "overflowX": "auto",
+      "pageOverflow": false,
+      "maxHeight": "640px"
+    },
+    {
+      "name": "评测中心长文字探针 dark-768",
+      "probe": true,
+      "rows": 85,
+      "overflows": [],
+      "minimumGap": 24.11,
+      "tableHead": "table-header-group",
+      "localOverflow": true,
+      "overflowX": "auto",
+      "pageOverflow": false,
+      "maxHeight": "640px"
+    },
+    {
+      "name": "首页 dark-390",
+      "probe": false,
+      "rows": 2,
+      "overflows": [],
+      "minimumGap": 29.36,
+      "tableHead": "table-header-group",
+      "localOverflow": true,
+      "overflowX": "auto",
+      "pageOverflow": false,
+      "maxHeight": "none"
+    },
+    {
+      "name": "评测中心 dark-390",
+      "probe": false,
+      "rows": 85,
+      "overflows": [],
+      "minimumGap": 50.66,
+      "tableHead": "table-header-group",
+      "localOverflow": true,
+      "overflowX": "auto",
+      "pageOverflow": false,
+      "maxHeight": "640px"
+    },
+    {
+      "name": "评测中心长文字探针 dark-390",
+      "probe": true,
+      "rows": 85,
+      "overflows": [],
+      "minimumGap": 24.11,
+      "tableHead": "table-header-group",
+      "localOverflow": true,
+      "overflowX": "auto",
+      "pageOverflow": false,
+      "maxHeight": "640px"
+    }
+  ],
+  "initialTheme": "dark",
+  "selectedIdentity": {
+    "agent": "security-operations-expert",
+    "experiment": "VAR-security-operations-expert-002-r79757f173c53",
+    "run": "run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c"
+  },
+  "clientSha256": "fda2707ab34ebfa12c774d83b0d1af8da3733266214f29039b1454e13b73d2c8",
+  "expectedHttpModuleSha256": "0163dccd16cebadb75abe008b8c3ee1d18034a866301f45d80273824797b694f",
+  "finalTheme": "dark"
+}

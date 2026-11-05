@@ -80,8 +80,8 @@ export function operationSummary(meta: OperationMeta, phase = 'result') {
   }
   else if (action === 'tasks/capabilities' && Array.isArray(value?.sources)) outcome = `找到 ${value.sources.length} 个资产来源${Array.isArray(value.mcp) ? `、${value.mcp.length} 个 MCP 连接` : ''}；尚未验证运行效果`
   else if (action === 'detail' && value?.experiment) outcome = `已读取版本${version ? ` ${version}` : ''}${Array.isArray(value.evaluation?.cases) ? `、${value.evaluation.cases.length} 个测试用例` : ''}`
-  else if (action === 'eval/status') outcome = ({ running: '评测运行中', queued: '评测等待执行', completed: '评测已结束，结果以运行报告为准', failed: '评测执行失败', cancelled: '评测已取消', interrupted: '评测已中断，已保留现有证据' } as Record<string, string>)[value?.status] ?? '评测状态尚未明确'
-  else if (action === 'eval/start' && value?.job_id) outcome = '评测已启动'
+  else if (action === 'eval/status') outcome = ({ prepared: '已核对评测范围，尚未启动', preparing: '正在创建评测记录', running: '评测运行中', cancelling: '正在取消评测', unknown: '评测状态待核对', completed: '评测已结束，结果以运行报告为准', failed: '评测执行失败', cancelled: '评测已取消', interrupted: '评测已中断，已保留现有证据' } as Record<string, string>)[value?.status] ?? '评测状态尚未明确'
+  else if (action === 'eval/start' && value?.run_id && value.run_created === true) outcome = value.status === 'failed' ? '评测记录已创建，执行失败，请核对报告' : '评测记录已创建'
   else if (action === 'eval/preview') outcome = '已核对评测范围，尚未启动运行'
   else if (action === 'new' || action === 'create') outcome = value?.experiment_id ? '已创建研究版本，业务效果仍需评测' : outcome
   else if (action === 'edit/preview' && Array.isArray(value?.edits)) outcome = `已核对 ${value.edits.length} 份文件修改；尚未写入`

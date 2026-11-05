@@ -1,0 +1,16 @@
+{
+  "scope": "实际活动Run行和详情只读核对，不点取消或启动",
+  "run_id": "run-68d23096-e504-4571-b7e6-ed9460f49b8e",
+  "observed_at": "2026-11-04T11:30:29.967Z",
+  "blocked": [],
+  "errors": [],
+  "row": {
+    "id_text": "用例范围未知 · Run ID：run-68d23096-e504-4571-b7e6-ed9460f49b8e",
+    "execution": "运行中"
+  },
+  "detail": {
+    "run_id": "run-68d23096-e504-4571-b7e6-ed9460f49b8e",
+    "state": "running",
+    "id_text": "Run ID：run-68d23096-e504-4571-b7e6-ed9460f49b8e"
+  }
+}

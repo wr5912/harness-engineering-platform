@@ -1,0 +1,32 @@
+{"session_resolution_probes":10,"passed":10}
+✔ API 评测执行器支持免认证入口并保留历史 Token 握手校验 (4132.179984ms)
+✔ 研究入口的上下文、运行、比较与实例子进程沿用 HARNESS_PYTHON (1559.62239ms)
+{"status":"dsh-eval-common-tests-passed","cases":42}
+✔ runtime/adapters/dsh-container/test_dsh_eval_common.mjs (257.216194ms)
+✔ 真实HTTP驱动并发Case分别保存Session及评审证据，结果保持输入顺序 (966.850101ms)
+✔ 真实 session/create 失败保留原生错误码与插件定位，不把配置正文写入证据 (455.858068ms)
+✔ 原生Preset roster保留多插件missing service诊断，Session失败仍保存真实阶段与error_code (379.235738ms)
+✔ 任意broken正文与配置不进入证据，readiness接口失败保持unknown而不假报ready (716.79778ms)
+✔ 真实 review 驱动保存根与子 Session 轨迹，同 Session repair 使用独立 attempt 且保留首次证据 (831.332144ms)
+✔ 证据复核沿用实际非DeepSeek路由与推理档位，仍核对原生选择和请求轨迹 (431.927835ms)
+✔ 归因 route 或工具校验失败仍保存已经取得的原始轨迹及工具事件 (410.385398ms)
+✔ DSH v4 原生工具回执保留调用关联及 read 行覆盖，支持 read、grep 和 glob (381.044209ms)
+✔ 原生read参数错误必须由同文件的后续成功读取恢复，失败尝试保留且不计覆盖 (3153.665455ms)
+✔ DSH v4 回执异常关联、错误、歧义嵌套或缺少读取元数据不能成为有效证据 (771.45311ms)
+✔ 归因等待超时保存最后一个完整取得的 archive 快照 (1223.718851ms)
+✔ 始终无法取得 archive 时保留失败检查并明确 trace_available=false (971.138596ms)
+✔ 真实业务多轮 Case 次轮超时保留首轮与最后取得的部分轨迹 (1304.073547ms)
+✔ 业务 Case 次轮一直无法导出时仍保留首轮成功取得的归档 (977.067205ms)
+✔ 业务Judge显式选择冻结普通模型，目标会话保留自身绑定，实际错路由不得判通过 (765.66491ms)
+✔ 业务语义评审超时独立保存 judge 的部分轨迹，不覆盖目标 Session (1301.98286ms)
+✔ 根首轮结束后仍等待委派及根后续回合，封存最终回复和子任务用量 (1052.968402ms)
+✔ 委派回报后的根回合失败保留失败，不由首个completed覆盖 (1226.30085ms)
+✔ judge 的跨轮安全错误保留原始归属，目标 trace 与 judge-trace 各自指向正确 Session (372.098037ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 17891.178854

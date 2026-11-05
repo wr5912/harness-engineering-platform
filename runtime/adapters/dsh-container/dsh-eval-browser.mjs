@@ -95,10 +95,20 @@ async function exportSession(page, sessionId) {
 
 async function resolveNewSession(page, existingSessions, input, presetId, workspace, timeoutMs, signal) {
   const session = await poll(
-    async () => (await listSessions(page)).find(item =>
-      (!existingSessions.has(item.sessionId) || item.updatedAt > existingSessions.get(item.sessionId))
-      && item.projections?.values?.turnOutline?.at(-1)?.prompt === input
-      && item.origin !== 'subagent' && item.parentSessionId === undefined),
+    async () => {
+      for (const item of await listSessions(page)) {
+        if (existingSessions.has(item.sessionId) && !(item.updatedAt > existingSessions.get(item.sessionId))
+          || item.origin === 'subagent' || item.parentSessionId !== undefined) continue
+        let archive
+        try { archive = await exportSession(page, item.sessionId) }
+        catch { continue }
+        // turnOutline.prompt 是有长度和空白限制的预览；身份只能核对根日志中的完整输入。
+        const message = archive.root.findLast(event => event.type === 'user/message' && event.data?.source?.kind === 'user')
+        const content = message?.data?.content
+        if (Array.isArray(content) && content.filter(block => block?.type === 'text' && typeof block.text === 'string')
+          .map(block => block.text).join('') === input) return item
+      }
+    },
     item => item !== undefined,
     timeoutMs,
     signal,
@@ -134,17 +144,21 @@ async function clickAfterNotice(page, locator, timeoutMs) {
 }
 
 async function connectWorkspace(page, workspace, timeoutMs) {
-  const chooser = page.getByRole('textbox', { name: /^(Choose workspace|选择工作区)$/ })
+  const chooserName = /^(Choose workspace|选择工作区)$/
+  const buttonChooser = page.getByRole('button', { name: chooserName })
+  const legacyChooser = page.getByRole('textbox', { name: chooserName })
   const composer = page.locator(COMPOSER).last()
   let noticeDismissed = false
   const state = await poll(async () => {
     noticeDismissed = await dismissTestingNotice(page, 500) || noticeDismissed
     return {
       ready: await composer.isVisible().catch(() => false),
-      chooser: await chooser.isVisible().catch(() => false),
+      chooser: await buttonChooser.isVisible().catch(() => false) || await legacyChooser.isVisible().catch(() => false),
     }
   }, value => value.ready || value.chooser, timeoutMs)
   if (state.ready) return { testing_notice_dismissed: noticeDismissed, workspace_action: 'already-registered' }
+  // 新版同时有同名的不可编辑输入框；优先点击实际工作区按钮，旧版才回退输入框。
+  const chooser = await buttonChooser.isVisible().catch(() => false) ? buttonChooser : legacyChooser
   noticeDismissed = await clickAfterNotice(page, chooser, timeoutMs) || noticeDismissed
   const dialog = page.getByRole('dialog').last()
   const addWorkspace = page.getByRole('menuitem', { name: /^(Add workspace|添加工作区)/ })

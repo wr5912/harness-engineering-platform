@@ -1,0 +1,28 @@
+{
+  "scope": "1920px实际完整Run事实加载后的全列表宽截图；非控制中间态，未执行业务写",
+  "rows": 88,
+  "firstId": "run-23c63f26-12b6-439f-9021-4272852c3b52",
+  "firstCase": "1 项已选用例",
+  "firstTime": "开始：2026/11/4 19:51:32\n结束：2026/11/4 19:51:59",
+  "tableWidth": 1620,
+  "containerWidth": 1620,
+  "scrollWidth": 1620,
+  "inlineStyle": null,
+  "firstColumnWidth": 388.796875,
+  "timeColumnRight": 1688.953125,
+  "pageWidth": 1920,
+  "pageScrollWidth": 1920,
+  "missingEndSamples": [
+    {
+      "id": "run-7847167b-0176-4754-ae24-038eeaeee024",
+      "time": "开始：2026/10/30 23:52:27\n结束：未记录"
+    }
+  ],
+  "blockedWrites": [
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    }
+  ],
+  "screenshot": ".local/eval-run-id-width-20261104/final-1920-all.png"
+}

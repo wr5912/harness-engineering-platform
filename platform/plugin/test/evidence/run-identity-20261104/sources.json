@@ -1,0 +1,123 @@
+{
+  "observed_at": "2026-11-04T11:54:09.853108+00:00",
+  "commit": "dacedd94a51f0181a17bda3d253d7950c2a82a67",
+  "working_tree": "本轮程序未提交，以下为已验证源码摘要",
+  "sources": [
+    {
+      "path": "platform/deploy/test/update.test.mjs",
+      "sha256": "8dd6389014f1b99473738de2949ed7c082648400310615e97465baf7c2854b70"
+    },
+    {
+      "path": "platform/deploy/update.mts",
+      "sha256": "ab57298ee3762cfbadbf6b718b8eb76dbb7d55c9c3b74a8186cd9a42d14891c2"
+    },
+    {
+      "path": "platform/plugin/src/agents/compute-generation-contract.ts",
+      "sha256": "2922007ebe6b2c0a4302634955fd5e8ca263ae49fc1b14d79d1b0ddf9f7cf480"
+    },
+    {
+      "path": "platform/plugin/src/agents/index.ts",
+      "sha256": "78823320ced29663c544aecdc86952dc320e04c78a916cb9605957482eb483f9"
+    },
+    {
+      "path": "platform/plugin/src/assistant/index.ts",
+      "sha256": "cd82817c0255b04001428ceb610de35694e031c10a8b826728c83531566b328a"
+    },
+    {
+      "path": "platform/plugin/src/assistant/operation-summary.ts",
+      "sha256": "c82ef7f58af117e74d588d6ca9d0e1ec205f718112f68215c58250dfdcd7e61d"
+    },
+    {
+      "path": "platform/plugin/src/assistant/tool-contracts.ts",
+      "sha256": "2006f9a7994ea739c6454a793024029f362ceaa854d66c1559f1fff36bf129db"
+    },
+    {
+      "path": "platform/plugin/src/client.tsx",
+      "sha256": "79ff61798a778ca1950f022dfd689edcdc54f6bfeced71e278d72164c9379ee5"
+    },
+    {
+      "path": "platform/plugin/src/evaluation/client.tsx",
+      "sha256": "493ea8e01c209b8b65e57360963104f91ce41ea0e97b2ab106f8db95cc55e23f"
+    },
+    {
+      "path": "platform/plugin/src/evaluation/jobs.ts",
+      "sha256": "5c8f17721f9df03f65509f8288e9946459d0bd32aac58873efb780eef833311b"
+    },
+    {
+      "path": "platform/plugin/src/evaluation/object-identity.ts",
+      "sha256": "9e22c8de47b53df5ab59b24598bb2e9f8383ca6d7f74cb3cb847465aa42ca895"
+    },
+    {
+      "path": "platform/plugin/src/evaluation/style.ts",
+      "sha256": "bad6755a0cd9e936ae86a22ed66039b0a8305e5593a33fe84a330239cab3fc35"
+    },
+    {
+      "path": "platform/plugin/src/home.tsx",
+      "sha256": "7e365f0c90ceb5e678dbc9970a4fc9b618aa21f7104df07eda16e5e6a5ca761b"
+    },
+    {
+      "path": "platform/plugin/src/home/style.ts",
+      "sha256": "10906701f5a9bd0f292607fa5e5a02038a75d9d20ebaf503464d15742248757e"
+    },
+    {
+      "path": "platform/plugin/src/navigation.ts",
+      "sha256": "5e7990ea1c0e64a7b0ff509c2a0a39f5b6f52d12ff8d5bef17b54e7a92ab86b4"
+    },
+    {
+      "path": "platform/plugin/src/protocol.ts",
+      "sha256": "d6ac0d426aa405cc203dbf01036527a32a81dac344830121af3425ccda6b4915"
+    },
+    {
+      "path": "platform/plugin/test/agents.test.mjs",
+      "sha256": "76e164e72e1daa201673548dd64673bae36d85e44fd485173966f71df50e5add"
+    },
+    {
+      "path": "platform/plugin/test/assistant.test.mjs",
+      "sha256": "e517b6966b62df5e2c77b774befd1be2ee97f97a981307486573c573d0347f8f"
+    },
+    {
+      "path": "platform/plugin/test/evaluation-client.test.mjs",
+      "sha256": "8a69997b2533bdf35c1200d87552c51928ca5403f42c4f815d3aa081cce29731"
+    },
+    {
+      "path": "platform/plugin/test/evaluation-jobs.test.mjs",
+      "sha256": "1ff7d6b77e9c434bd2cde29f4ccc175391426985440599cc5c7415a42401e6a9"
+    },
+    {
+      "path": "platform/plugin/test/evaluation-object-identity.test.mjs",
+      "sha256": "983b1b29308a4075d6fe12b6f52803c8c9f39231bc01e59e55c0a15ccbdca3b0"
+    },
+    {
+      "path": "platform/plugin/test/home-entry.test.mjs",
+      "sha256": "4d4df262480de1e3538b82f549becf2006135ac19d71f5dc05d019b52321583d"
+    },
+    {
+      "path": "platform/plugin/test/navigation.test.mjs",
+      "sha256": "f105a489eaefe2e8440dcb6d4eada5f7a4cfe8213d76f2f7afd9016914d6c5da"
+    },
+    {
+      "path": "runtime/adapters/dsh-container/README.md",
+      "sha256": "d82dc2d0237a79ad2322331a07fb305ed3a2e1f058cb930b0ee049d594f32b94"
+    },
+    {
+      "path": "runtime/adapters/dsh-container/dsh-eval",
+      "sha256": "aa21f73dc6be654198d6a8c04541bbf54de252b9a6777f55cafdaa308c5b13d9"
+    },
+    {
+      "path": "runtime/adapters/dsh-container/dsh-eval-browser.mjs",
+      "sha256": "e2a0e7d8dbddb1777918c6a71c2bfaaf9efaad9cb67a17ef2c243b54e188ad86"
+    },
+    {
+      "path": "runtime/adapters/dsh-container/run_record.py",
+      "sha256": "30073d87251d70a6c110bd63712f0aaa5436e55eddbf6d6e3f738d6ffc61082e"
+    },
+    {
+      "path": "runtime/adapters/dsh-container/test_dsh_eval_cancel_windows.py",
+      "sha256": "ddcc722715c5803230cde8213d476acbb227ffc7383b38f28f8c4020734a8ad7"
+    },
+    {
+      "path": "runtime/adapters/dsh-container/test_run_record.py",
+      "sha256": "0d183f98f6235ea9b2e1f04be9570a8fb6c09d353fd905f1198b4e97ea42014e"
+    }
+  ]
+}

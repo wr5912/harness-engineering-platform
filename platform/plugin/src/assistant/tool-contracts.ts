@@ -121,9 +121,9 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['cases/list cases/create-context', 'agent_id experiment_id'], ['cases/read', 'agent_id experiment_id case_id'],
     ['cases/from-run', 'agent_id experiment_id run_id case_id'],
     ['cases/update cases/create-preview cases/create', 'agent_id experiment_id case_id title scene inputs expected_behavior fast expected_sha256 source_run_id source_case_id', '先读用例或 create-context，并按 evaluation-review 核对共用业务口径；预期写业务过程与结果模式，使用已核验 API 名称、operationId 或中文能力名，不绑定 MCP 运行时 ID、KEV 等实现路线或特定环境。inputs 为非空字符串数组，expected_sha256 取原文件摘要。新建先 create-preview。'],
-    ['eval/preview eval/start', 'source source_ref evaluation_source mcp_fixture cases mode executor review model model_selection compare_to artifact_export concurrency parallel_cases request_id program_root', 'source=experiment:<ID>；cases 为固定 Case ID 数组。source_ref 可固定历史来源；evaluation_source=current 明确改用当前 Case，不改变固定 Candidate。program_root 可指定已构建的隔离程序根，沿用平台模型投影和凭据注入；程序来源由 Run 如实封存。mcp_fixture 明确 Mock 边界并随 Run 封存，不修改原连接或 Candidate，不代表真实业务系统验收。model 是原有断言，model_selection 是本次主角色原生模型选择；省略时读取所选来源的版本绑定。preview 不执行评测，start 返回 job_id。'],
-    ['eval/batch-start', 'requests', '连续预检并启动1–8个固定来源评测；requests内每项使用eval/start参数并必须提供不同的request_id和固定source_ref。恢复时原样重传整批，已结束或运行中的任务均不重放；来源、用例或模型变化另建请求。'],
-    ['eval/status eval/cancel', 'job_id'], ['runs/index', 'agent_id experiment_id'],
+    ['eval/preview eval/start', 'source source_ref evaluation_source mcp_fixture cases mode executor review model model_selection compare_to artifact_export concurrency parallel_cases program_root', 'source=experiment:<ID>；cases 为固定 Case ID 数组。source_ref 可固定历史来源；evaluation_source=current 明确改用当前 Case，不改变固定 Candidate。program_root 可指定已构建的隔离程序根，沿用平台模型投影和凭据注入；程序来源由 Run 如实封存。mcp_fixture 明确 Mock 边界并随 Run 封存，不修改原连接或 Candidate，不代表真实业务系统验收。model 是原有断言，model_selection 是本次主角色原生模型选择；省略时读取所选来源的版本绑定。preview 不执行评测，返回唯一预留 run_id。start 必须携带该 run_id 与相同参数，真实 Run 创建后返回同一编号。刷新、断线和旧请求恢复只能 status 查询；不存在或过期时重新 preview，不能重发原启动。旧 Skill 的 job_id 为旧输入名，以当前合同及真实回执为准。'],
+    ['eval/batch-start', 'requests', '先逐项preview取得不同的run_id，每项固定source_ref和原参数，再启动1–8个独立Run；整批核对预留，按序创建，失败即停止未开始项。返回runs、failed和not_started；已创建Run不回滚。断线只逐项status查询，不自动重发整批；失败或未开始项须重新preview。'],
+    ['eval/status eval/cancel', 'run_id', '使用预览及启动返回的同一Run ID。status也查询尚未启动或正在创建的预留；cancel可撤销未消费预留。旧job_id输入仅兼容查询原运行或取消原对象，不创建新评测。'], ['runs/index', 'agent_id experiment_id'],
     ['runs/show', 'run_id case_id'], ['runs/report runs/files', 'run_id'], ['runs/read-file', 'run_id path'],
     ['runs/evidence', 'run_id case_id filename'], ['runs/compare', 'left right case_id'], ['runs/trace', 'run_id path source_sha256 cursor limit session_log'],
     ['decision/preview decision/update', 'experiment_id content expected_sha256 status outcome expected_change_sha256', 'expected_sha256 原样使用 detail.decision.sha256；缺文件为 null，已有空文件仍为实际摘要。修改 status/outcome 时还须 detail 返回的 change 摘要；status=active/completed，outcome=adopt/continue/reject/inconclusive。'],
@@ -165,9 +165,9 @@ export function assistantActionContract(domain: AssistantDomain, action: string)
     properties.program_root = { ...string, description: '可选的已构建程序根绝对路径；省略时使用当前平台程序。评测保留原生模型策略和凭据注入。' }
     properties.concurrency = { type: 'integer', minimum: 1, maximum: 8, description: '独立 Case 并发上限，默认1；只并行 parallel_cases，其他用例独占执行。' }
     properties.parallel_cases = { ...strings, description: '已确认互不影响的所选 Case ID；同一业务资源的写操作不得并行。' }
-    properties.request_id = { ...string, description: 'UUID v4；重试同一请求保留此值，参数变化另建请求；不会重放原任务。' }
+    if (action === 'eval/start') properties.run_id = { ...string, pattern: '^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$', description: '原样使用eval/preview返回的预留Run ID；无预留、已清理或过期时不得重发启动。' }
   }
-  if (action === 'eval/batch-start') properties.requests = { type: 'array', minItems: 1, maxItems: 8, items: { ...assistantActionContract('agents', 'eval/start').input_schema, required: ['source', 'source_ref', 'request_id'] } }
+  if (action === 'eval/batch-start') properties.requests = { type: 'array', minItems: 1, maxItems: 8, items: { ...assistantActionContract('agents', 'eval/start').input_schema, required: ['source', 'source_ref', 'run_id'] } }
   if (action === 'sdk/start') properties.input = { type: 'string', description: '本次真实调试输入。' }
   if (action === 'documents/read') {
     properties.cursor = { type: 'string', description: '上一次回执的 next_cursor，绑定原文件摘要与位置。' }
@@ -202,7 +202,7 @@ export function assistantActionContract(domain: AssistantDomain, action: string)
     mapping_index: { type: 'integer', description: 'status.unresolved_items返回的原mapping索引，与uncovered_index二选一。' }, uncovered_index: { type: 'integer', description: 'status.unresolved_items返回的原uncovered索引，与mapping_index二选一。' },
     disposition: { type: 'string', enum: ['converted', 'native', 'outside-scope'], description: '省略为converted；outside-scope只说明当前明确范围，不表示实现，不允许提供target，仍须保留真实Case依据。' }, target: string, notes: string, case_ids: strings,
   } } }
-  return { domain, action, input_schema: { type: 'object', properties, additionalProperties: true },
+  return { domain, action, input_schema: { type: 'object', properties, ...(action === 'eval/start' ? { required: ['source', 'run_id'] } : ['eval/status', 'eval/cancel'].includes(action) ? { required: ['run_id'] } : {}), additionalProperties: true },
     instructions: hint[2] ?? '使用先前实际返回的对象标识；缺少目标先查询目录。输入由原业务接口校验，错误时核对具体字段，不重放结果未知的写操作。' }
 }
 

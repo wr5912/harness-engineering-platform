@@ -14,6 +14,7 @@ import { PlatformLogo } from './logo.tsx'
 import { LoadingIndicator } from './components/loading-indicator.tsx'
 import { DistributionChart } from './components/overview-charts.tsx'
 import { runOutcomeSegments } from './components/run-overview.ts'
+import { evaluationAgentName, evaluationObjectType, evaluationVersionLabel, type EvaluationExperiment } from './evaluation/object-identity.ts'
 import { GENERAL_PLACEHOLDER, DEMO_AGENT, DEMO_BUILD_PROMPT, DEMO_CASE, HOME_MODES, HOME_SUBTITLE, homeTaskRequest, type HomeMode } from './home-entry.ts'
 export { PlatformLogo } from './logo.tsx'
 
@@ -24,19 +25,18 @@ interface Dashboard {
   instances: Observation<{ instances: { state: string }[] }>
   mcp: Observation<{ connections: unknown[] }>
 }
-interface EvaluationJob {
-  job_id: string
+interface EvaluationExecution {
+  run_id: string
+  run_created: boolean
   source: string
   experiment_id: string | null
   agent_id: string | null
   status: string
-  run_id?: string
   started_at?: string
   updated_at?: string
   error?: string
 }
 
-const jobStates: Record<string, string> = { queued: '排队中', running: '运行中', recovering: '正在恢复', completed: '已完成，查看结论', failed: '执行失败', cancelled: '已取消', unknown: '状态待核对' }
 function riskOverview(phase: 'pending' | 'ready' | 'error', facts: RiskFact[], enabled?: boolean) {
   if (phase === 'pending') return { value: '—', note: '' }
   if (phase === 'error') return { value: '读取失败', note: '进入统一网关重新核对' }
@@ -86,9 +86,11 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
   const observedSessions = useRef(new Set<string>())
   const [sessionError, setSessionError] = useState('')
   const [continueError, setContinueError] = useState('')
-  const [jobs, setJobs] = useState<EvaluationJob[]>([])
+  const [jobs, setJobs] = useState<EvaluationExecution[]>([])
   const [jobsLoaded, setJobsLoaded] = useState(false)
   const [jobsObserved, setJobsObserved] = useState(false)
+  const [objects, setObjects] = useState<{ scope: string; agents: { id: string; name?: string; manifest?: Record<string, any> }[]; experiments: EvaluationExperiment[] }>()
+  const [objectsError, setObjectsError] = useState('')
   const changedDomains = useRef(new Set(['agents']))
   const homeRequest = useRef(0), currentScope = useRef(workspaceScope)
   currentScope.current = workspaceScope
@@ -192,15 +194,27 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
   const refreshHome = useQueuedRefresh(active, async () => {
     const request = ++homeRequest.current, scope = workspaceScope
     const readJobs = changedDomains.current.has('agents')
+    const readObjects = readJobs || changedDomains.current.has('catalog')
     changedDomains.current.clear()
     const current = () => request === homeRequest.current && currentScope.current === scope
     if (readJobs) { setContinueError(''); setJobsLoaded(false) }
     setRunError(''); setRunPhase('pending')
     setRiskState(previous => ({ ...previous, phase: 'pending' }))
     await Promise.allSettled([
+      ...(readObjects ? [rpc.call(CHANNEL, 'agents/list', {}).then(result => {
+        if (!current()) return
+        if (result.ok) {
+          const value = result.value as { agents?: NonNullable<typeof objects>['agents']; experiments?: EvaluationExperiment[]; historical_experiments?: EvaluationExperiment[] }
+          setObjects({ scope, agents: value.agents ?? [], experiments: [...(value.experiments ?? []), ...(value.historical_experiments ?? [])] }); setObjectsError('')
+        } else { setObjects(undefined); setObjectsError(result.error.message) }
+      }).catch(() => { if (current()) { setObjects(undefined); setObjectsError('无法读取评测对象信息，请刷新重试。') } })] : []),
       ...(readJobs ? [rpc.call(CHANNEL, 'agents/eval/list', {}).then(result => {
         if (!current()) return
-        if (result.ok) { setJobs((result.value as { jobs: EvaluationJob[] }).jobs ?? []); setJobsObserved(true) }
+        if (result.ok) {
+          const value = result.value as { runs?: EvaluationExecution[]; errors?: { message?: string; path?: string }[] }
+          setJobs((value.runs ?? []).filter(run => run.run_created && run.run_id)); setJobsObserved(true)
+          if (value.errors?.length) setContinueError(value.errors.map(item => item.message || `${item.path || '运行状态'}暂不可读`).join('；'))
+        }
         else setContinueError(result.error.message)
         setJobsLoaded(true)
       }).catch(() => { if (current()) { setContinueError('评测任务暂不可读，请重试。'); setJobsLoaded(true) } })] : []),
@@ -250,19 +264,27 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
   }).sort((a, b) => a.priority - b.priority || b.row.updatedAt - a.row.updatedAt) : []
   const runStatusLabel = (run: RecentRun) => ({ completed: '执行结束', failed: '执行失败', cancelled: '已取消', running: '运行中', planned: '计划中' } as Record<string, string>)[run.status ?? ''] ?? '执行状态未知'
   const verdictLabel = (run: RecentRun) => run.status !== 'completed' ? '尚无业务结论' : ({ passed: '业务通过', failed: '业务未通过', inconclusive: '结论待核实' } as Record<string, string>)[run.effective_verdict ?? ''] ?? '业务结论未知'
-  const versionName = (id: string) => '版本 ' + (/-([0-9]{3})(?:-r[0-9a-f]{12})?$/.exec(id)?.[1] ?? id)
+  const objectAgents = objects?.scope === workspaceScope ? objects.agents : []
+  const objectExperiments = objects?.scope === workspaceScope ? objects.experiments : []
+  const agentName = (id: string) => evaluationAgentName(objectAgents, id)
+  const objectType = (id: string) => evaluationObjectType(id, objectExperiments)
+  const versionName = evaluationVersionLabel
   const uniqueRuns = (runs ?? []).filter((run, index, rows) => rows.findIndex(item => item.id === run.id) === index)
   const attentionRuns = runPhase !== 'error' ? uniqueRuns.filter(run => run.status === 'failed' || run.status === 'completed' && run.effective_verdict !== 'passed') : []
   const attentionRunIds = new Set(attentionRuns.map(run => run.id))
   const terminalRunIds = new Set(runPhase !== 'error' ? uniqueRuns.filter(run => ['completed', 'failed', 'cancelled'].includes(run.status ?? '')).map(run => run.id) : [])
-  const visibleJobs = jobs.filter(job => ['queued', 'running', 'recovering', 'unknown', 'failed', 'completed'].includes(job.status) && (!job.run_id || !terminalRunIds.has(job.run_id)))
-  const linkedJobRunIds = new Set(visibleJobs.map(job => job.run_id).filter((id): id is string => Boolean(id)))
-  const recentWorkRuns = runPhase !== 'error' ? uniqueRuns.filter(run => !attentionRunIds.has(run.id) && !linkedJobRunIds.has(run.id)).slice(0, 2) : []
+  // 活动 Run 读取完整控制清单，不受最近八条摘要范围限制。
+  const activeRuns: RecentRun[] = jobs.filter(run => !['completed', 'failed', 'cancelled'].includes(run.status) && !terminalRunIds.has(run.run_id) && !attentionRunIds.has(run.run_id)).map(run => {
+    const recent = uniqueRuns.find(item => item.id === run.run_id)
+    return { ...recent, id: run.run_id, agent_id: run.agent_id || recent?.agent_id || '', experiment_id: run.experiment_id || recent?.experiment_id || '',
+      status: run.status, created_at: recent?.created_at || run.started_at || null, finished_at: null }
+  })
+  const activeRunIds = new Set(activeRuns.map(run => run.id))
+  const recentWorkRuns = runPhase !== 'error' ? uniqueRuns.filter(run => !attentionRunIds.has(run.id) && !activeRunIds.has(run.id)).slice(0, 2) : []
   const continuations = [
     ...sessionTasks.map(item => ({ kind: 'session' as const, priority: item.priority, updatedAt: item.row.updatedAt, item })),
-    ...visibleJobs.map(item => ({ kind: 'job' as const,
-      priority: item.status === 'unknown' ? 1 : ['queued', 'running', 'recovering'].includes(item.status) ? 2 : item.status === 'failed' ? 3 : 4,
-      updatedAt: Date.parse(item.updated_at ?? item.started_at ?? '') || 0, item })),
+    ...activeRuns.map(item => ({ kind: 'run' as const, priority: item.status === 'unknown' ? 1 : 2,
+      updatedAt: Date.parse(item.created_at ?? '') || 0, item })),
     ...attentionRuns.map(item => ({ kind: 'run' as const, priority: 1,
       updatedAt: Date.parse(item.finished_at ?? item.created_at ?? '') || 0, item })),
   ].sort((a, b) => a.priority - b.priority || b.updatedAt - a.updatedAt)
@@ -325,7 +347,7 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
     finally { setSending(false) }
   }
   const running = dashboard?.instances.ok ? dashboard.instances.value.instances.filter(item => item.state === 'running').length : undefined
-  const runningJobs = jobsObserved && !continueError ? jobs.filter(job => ['queued', 'running', 'recovering'].includes(job.status)).length : undefined
+  const runningJobs = jobsObserved && !continueError ? jobs.filter(job => ['queued', 'running', 'recovering', 'cancelling'].includes(job.status)).length : undefined
   const totalInstances = dashboard?.instances.ok ? dashboard.instances.value.instances.length : undefined
   const mcpConnections = dashboard?.mcp.ok ? dashboard.mcp.value.connections.length : undefined
   const risk = riskOverview(riskState.phase === 'pending' && riskState.observed ? 'ready' : riskState.phase, riskState.facts, riskState.enabled)
@@ -379,32 +401,29 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
           if (entry.kind === 'run') {
             const run = entry.item
             const failed = run.status === 'failed' || run.effective_verdict === 'failed'
+            const running = !['completed', 'failed', 'cancelled'].includes(run.status ?? '')
             return <article className="harness-continue-item" key={`run/${run.id}`}>
-              <ContinueIcon kind="run" tone={failed ? 'danger' : 'warning'}/>
-              <div className="harness-continue-content"><div className="harness-continue-title"><strong>{run.agent_name || run.agent_id} · {versionName(run.experiment_id)} 评测</strong><span className="harness-run-state" data-status={failed ? 'failed' : 'unknown'}>{run.status === 'failed' ? '执行失败' : run.effective_verdict === 'failed' ? '结果待处理' : run.effective_verdict === 'inconclusive' ? '结论待核实' : '结论待核对'}</span></div><small>最近 Run · {runStatusLabel(run)} · {verdictLabel(run)} · {run.finished_at || run.created_at ? new Date(run.finished_at || run.created_at || '').toLocaleString() : '时间未记录'}</small></div>
-              <button type="button" onClick={() => navigate({ page: 'evaluation', tab: 'runs', agent_id: run.agent_id, experiment_id: run.experiment_id, run_id: run.id })}>查看结果</button>
+              <ContinueIcon kind="run" tone={failed ? 'danger' : running ? 'blue' : 'warning'}/>
+              <div className="harness-continue-content"><div className="harness-continue-title"><strong>{agentName(run.agent_id)} · {versionName(run.experiment_id)} · {objectType(run.experiment_id)}评测</strong><span className="harness-run-state" data-status={running ? run.status ?? 'unknown' : failed ? 'failed' : 'unknown'}>{running ? runStatusLabel(run) : run.status === 'failed' ? '执行失败' : run.effective_verdict === 'failed' ? '结果待处理' : run.effective_verdict === 'inconclusive' ? '结论待核实' : '结论待核对'}</span></div><small>最近 Run · {runStatusLabel(run)} · {verdictLabel(run)} · {run.finished_at || run.created_at ? new Date(run.finished_at || run.created_at || '').toLocaleString() : '时间未记录'}</small></div>
+              <button type="button" onClick={() => navigate({ page: 'evaluation', tab: 'runs', agent_id: run.agent_id, experiment_id: run.experiment_id, run_id: run.id })}>{running ? '查看进度' : '查看结果'}</button>
             </article>
           }
-          const job = entry.item
-          return <article className="harness-continue-item" key={job.job_id}>
-          <ContinueIcon kind="job" tone={job.status === 'failed' ? 'danger' : job.status === 'unknown' ? 'warning' : 'blue'}/>
-          <div className="harness-continue-content"><div className="harness-continue-title"><strong>{job.agent_id ? `智能体 ${job.agent_id}` : '来源待核对'} · {job.experiment_id ? versionName(job.experiment_id) : job.source}</strong><span className="harness-run-state" data-status={job.status}>{jobStates[job.status] ?? '状态待核对'}</span></div><small>评测任务 · {job.updated_at ? new Date(job.updated_at).toLocaleString() : '时间未记录'}</small></div>
-          <button type="button" onClick={() => navigate({ page: 'evaluation', tab: 'jobs', job_id: job.job_id, ...(job.agent_id ? { agent_id: job.agent_id } : {}), ...(job.experiment_id ? { experiment_id: job.experiment_id } : {}) })}>查看任务</button>
-          </article>
+
         })}
       </div>
     </section>
       <section className="harness-card harness-recent-work" aria-label="最近评测" aria-busy={runPhase === 'pending'}><div className="harness-section-heading"><h2>最近评测{runPhase === 'pending' && uniqueRuns.length > 0 && <LoadingIndicator label="更新最近评测" />}</h2><button type="button" className="harness-home-view-all" onClick={() => navigate({ page: 'evaluation', tab: 'runs' })}>查看全部 →</button></div>
         {runPhase === 'error' && <p role="alert">{runError}</p>}{runPhase === 'pending' && !uniqueRuns.length && <LoadingIndicator label="读取最近评测" block />}
+        {objectsError && <p role="alert">对象信息读取失败：{objectsError} 未确认的对象类型显示为待核对。</p>}
         {runPhase === 'ready' && uniqueRuns.length === 0 && <p>尚无 Run。进入评测中心选择用例并运行评测。</p>}
         {uniqueRuns.length > 0 && <div className="harness-home-run-overview">
           <DistributionChart title="近期评测分布" description={`${runPhase === 'ready' ? '本次读取' : runPhase === 'pending' ? '保留上次读取，更新中' : '上次读取，当前更新失败'} · 当前工作区最近 ${uniqueRuns.length} 条记录，最多 8 条；不代表累计通过率。`} segments={runOutcomeSegments(uniqueRuns)} totalLabel="条记录" />
         </div>}
         {runPhase === 'ready' && uniqueRuns.length > 0 && recentWorkRuns.length === 0 && <p>需处理的最近 Run 已列在上方；暂无其他 Run 记录。</p>}
-        {recentWorkRuns.length > 0 && <div><table className="harness-home-run-table"><thead><tr><th>任务与版本</th><th>执行</th><th>有效结论</th><th>操作</th></tr></thead><tbody>{recentWorkRuns.map(run => <tr className="harness-run-row" key={`${run.experiment_id}/${run.id}`}><td data-label="任务与版本"><strong>{run.agent_name || run.agent_id} · {versionName(run.experiment_id)}</strong><small>{run.created_at ? new Date(run.created_at).toLocaleString() : '创建时间未记录'}</small></td><td data-label="执行"><span className="harness-run-state" data-status={run.status ?? 'unknown'}>{runStatusLabel(run)}</span></td><td data-label="有效结论"><span className="harness-run-state" data-status={run.effective_verdict ?? 'unknown'}>{verdictLabel(run)}</span></td><td data-label="操作"><button className="harness-run-action" type="button" onClick={() => navigate({ page: 'evaluation', tab: 'runs', agent_id: run.agent_id, experiment_id: run.experiment_id, run_id: run.id })}>查看结果</button></td></tr>)}</tbody></table></div>}
+        {recentWorkRuns.length > 0 && <div className="harness-table-scroll harness-home-run-scroll" role="region" aria-label="最近评测记录" tabIndex={0}><table className="harness-home-run-table"><thead><tr><th>所属智能体</th><th>被测版本</th><th>对象类型</th><th>执行状态</th><th>评测结论</th><th>时间</th><th>操作</th></tr></thead><tbody>{recentWorkRuns.map(run => <tr className="harness-run-row" key={`${run.experiment_id}/${run.id}`}><td data-label="所属智能体"><strong>{agentName(run.agent_id)}</strong></td><td data-label="被测版本" title={run.experiment_id}>{versionName(run.experiment_id)}</td><td data-label="对象类型">{objectType(run.experiment_id)}</td><td data-label="执行状态"><span className="harness-run-state" data-status={run.status ?? 'unknown'}>{runStatusLabel(run)}</span></td><td data-label="评测结论"><span className="harness-run-state" data-status={run.effective_verdict ?? 'unknown'}>{verdictLabel(run)}</span></td><td data-label="时间">{run.finished_at || run.created_at ? new Date(run.finished_at || run.created_at || '').toLocaleString() : '时间未记录'}</td><td data-label="操作"><button className="harness-run-action" type="button" onClick={() => navigate({ page: 'evaluation', tab: 'runs', agent_id: run.agent_id, experiment_id: run.experiment_id, run_id: run.id })}>查看结果</button></td></tr>)}</tbody></table></div>}
     </section></div>
     <aside className="harness-home-secondary"><section className="harness-card harness-workspace-summary" aria-label="工作区概况"><div className="harness-section-heading"><div><h2>工作区概况</h2><p>{dashboard && runPhase !== 'ready' ? runPhase === 'pending' ? '上次观察' : '读取失败，显示上次观察' : '来自当前工作区的实际观察'}</p></div><button type="button" aria-busy={runPhase === 'pending'} onClick={() => setRefresh(value => value + 1)}>{runPhase === 'pending' && <LoadingIndicator label="更新工作区概况" />}刷新</button></div><div className="harness-stats">
-      {([{ kind: 'number', label: '正在运行的评测', pending: !jobsLoaded && runningJobs === undefined, value: runningJobs, page: { page: 'evaluation', tab: 'jobs' }, note: runningJobs === undefined ? continueError ? '评测任务读取失败' : '' : '查看运行任务' },
+      {([{ kind: 'number', label: '正在运行的评测', pending: !jobsLoaded && runningJobs === undefined, value: runningJobs, page: { page: 'evaluation', tab: 'runs' }, note: runningJobs === undefined ? continueError ? '评测任务读取失败' : '' : '查看运行任务' },
         { kind: 'number', label: '平台托管实例运行中', pending: !dashboard && runPhase === 'pending', value: running === undefined ? undefined : `${running} / ${totalInstances}`, page: { page: 'instances' }, note: running === undefined ? '实例状态暂不可读' : '按最近一次实例观察' },
         { kind: 'number', label: 'MCP 已登记连接', pending: !dashboard && runPhase === 'pending', value: mcpConnections, page: { page: 'mcp' }, note: mcpConnections === undefined ? '连接清单暂不可读' : '调用结果需在 MCP 页核对' },
         { kind: 'status', label: '网关风险评估', pending: riskState.phase === 'pending' && !riskState.observed, value: risk.value, page: { page: 'gateway', tab: 'risk' }, note: riskState.phase === 'pending' && riskState.observed ? `${risk.note} · 上次读取` : risk.note }] as const)

@@ -1,0 +1,428 @@
+{
+  "scope": "最终完整Job/Run ID定向补验：真实RPC与表内可见文字逐条核对、六种视口主题布局、原Run跳转与HTTP字节。只读业务；拦截自动session/create，不验证会话创建。",
+  "checks": [
+    {
+      "name": "真实认证",
+      "ok": true
+    },
+    {
+      "name": "取得真实Job及Run RPC记录",
+      "ok": true
+    },
+    {
+      "name": "light-1440 全部行完整ID与真实RPC相符并直接可读",
+      "ok": true,
+      "detail": {
+        "rows": 85,
+        "bad": []
+      }
+    },
+    {
+      "name": "light-1440 不含历史任务或当前任务及ID省略号",
+      "ok": true
+    },
+    {
+      "name": "light-1440 首列文字不越cell且无CSS裁切",
+      "ok": true
+    },
+    {
+      "name": "light-1440 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "light-1440 列顺序保持",
+      "ok": true
+    },
+    {
+      "name": "light-768 全部行完整ID与真实RPC相符并直接可读",
+      "ok": true,
+      "detail": {
+        "rows": 85,
+        "bad": []
+      }
+    },
+    {
+      "name": "light-768 不含历史任务或当前任务及ID省略号",
+      "ok": true
+    },
+    {
+      "name": "light-768 首列文字不越cell且无CSS裁切",
+      "ok": true
+    },
+    {
+      "name": "light-768 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "light-768 列顺序保持",
+      "ok": true
+    },
+    {
+      "name": "light-390 全部行完整ID与真实RPC相符并直接可读",
+      "ok": true,
+      "detail": {
+        "rows": 85,
+        "bad": []
+      }
+    },
+    {
+      "name": "light-390 不含历史任务或当前任务及ID省略号",
+      "ok": true
+    },
+    {
+      "name": "light-390 首列文字不越cell且无CSS裁切",
+      "ok": true
+    },
+    {
+      "name": "light-390 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "light-390 列顺序保持",
+      "ok": true
+    },
+    {
+      "name": "light-390 表格局部横向滚动",
+      "ok": true
+    },
+    {
+      "name": "light-390 操作按钮命中",
+      "ok": true
+    },
+    {
+      "name": "dark-1440 全部行完整ID与真实RPC相符并直接可读",
+      "ok": true,
+      "detail": {
+        "rows": 85,
+        "bad": []
+      }
+    },
+    {
+      "name": "dark-1440 不含历史任务或当前任务及ID省略号",
+      "ok": true
+    },
+    {
+      "name": "dark-1440 首列文字不越cell且无CSS裁切",
+      "ok": true
+    },
+    {
+      "name": "dark-1440 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "dark-1440 列顺序保持",
+      "ok": true
+    },
+    {
+      "name": "dark-768 全部行完整ID与真实RPC相符并直接可读",
+      "ok": true,
+      "detail": {
+        "rows": 85,
+        "bad": []
+      }
+    },
+    {
+      "name": "dark-768 不含历史任务或当前任务及ID省略号",
+      "ok": true
+    },
+    {
+      "name": "dark-768 首列文字不越cell且无CSS裁切",
+      "ok": true
+    },
+    {
+      "name": "dark-768 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "dark-768 列顺序保持",
+      "ok": true
+    },
+    {
+      "name": "dark-390 全部行完整ID与真实RPC相符并直接可读",
+      "ok": true,
+      "detail": {
+        "rows": 85,
+        "bad": []
+      }
+    },
+    {
+      "name": "dark-390 不含历史任务或当前任务及ID省略号",
+      "ok": true
+    },
+    {
+      "name": "dark-390 首列文字不越cell且无CSS裁切",
+      "ok": true
+    },
+    {
+      "name": "dark-390 无整页横向溢出",
+      "ok": true
+    },
+    {
+      "name": "dark-390 列顺序保持",
+      "ok": true
+    },
+    {
+      "name": "dark-390 表格局部横向滚动",
+      "ok": true
+    },
+    {
+      "name": "dark-390 操作按钮命中",
+      "ok": true
+    },
+    {
+      "name": "原Run所属版本和智能体可定位",
+      "ok": true
+    },
+    {
+      "name": "完整ID行结果跳转保持原Agent/Experiment/Run身份",
+      "ok": true
+    },
+    {
+      "name": "完整ID版刷新保持原Run",
+      "ok": true
+    },
+    {
+      "name": "完整ID版返回记录可用",
+      "ok": true
+    },
+    {
+      "name": "最终完整ID客户端HTTP模块匹配磁盘及既有URL适配",
+      "ok": true
+    },
+    {
+      "name": "无脚本异常",
+      "ok": true
+    },
+    {
+      "name": "恢复原主题偏好",
+      "ok": true
+    }
+  ],
+  "failures": [],
+  "errors": [],
+  "blockedWrites": [
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    },
+    {
+      "path": "/hep/api/session/create",
+      "method": "session/create"
+    }
+  ],
+  "screenshots": [
+    ".local/evaluation-object-20261104/browser-id-light-1440-left.png",
+    ".local/evaluation-object-20261104/browser-id-light-768-left.png",
+    ".local/evaluation-object-20261104/browser-id-light-390-left.png",
+    ".local/evaluation-object-20261104/browser-id-dark-1440-left.png",
+    ".local/evaluation-object-20261104/browser-id-dark-768-left.png",
+    ".local/evaluation-object-20261104/browser-id-dark-390-left.png"
+  ],
+  "layout": [
+    {
+      "name": "light-1440",
+      "rows": 85,
+      "jobs": 3,
+      "runs": 82,
+      "bad": [],
+      "samples": [
+        {
+          "id": "dad8b7b2-632b-4058-bfe0-902fc7e61ec8",
+          "text": "任务 ID：dad8b7b2-632b-4058-bfe0-902fc7e61ec8",
+          "cellText": "AgentScope Python工具迁移样例 v001-rd991aeb01b21 评测任务\n任务 ID：dad8b7b2-632b-4058-bfe0-902fc7e61ec8",
+          "fits": true,
+          "noClip": true,
+          "style": {
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "textOverflow": "clip"
+          }
+        },
+        {
+          "id": "run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+          "text": "1 项已选用例 · Run ID：run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+          "cellText": "SOAR 剧本定义\n1 项已选用例 · Run ID：run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+          "fits": true,
+          "noClip": true,
+          "style": {
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "textOverflow": "clip"
+          }
+        }
+      ]
+    },
+    {
+      "name": "light-768",
+      "rows": 85,
+      "jobs": 3,
+      "runs": 82,
+      "bad": [],
+      "samples": [
+        {
+          "id": "dad8b7b2-632b-4058-bfe0-902fc7e61ec8",
+          "text": "任务 ID：dad8b7b2-632b-4058-bfe0-902fc7e61ec8",
+          "cellText": "AgentScope Python工具迁移样例 v001-rd991aeb01b21 评测任务\n任务 ID：dad8b7b2-632b-4058-bfe0-902fc7e61ec8",
+          "fits": true,
+          "noClip": true,
+          "style": {
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "textOverflow": "clip"
+          }
+        },
+        {
+          "id": "run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+          "text": "1 项已选用例 · Run ID：run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+          "cellText": "SOAR 剧本定义\n1 项已选用例 · Run ID：run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+          "fits": true,
+          "noClip": true,
+          "style": {
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "textOverflow": "clip"
+          }
+        }
+      ]
+    },
+    {
+      "name": "light-390",
+      "rows": 85,
+      "jobs": 3,
+      "runs": 82,
+      "bad": [],
+      "samples": [
+        {
+          "id": "dad8b7b2-632b-4058-bfe0-902fc7e61ec8",
+          "text": "任务 ID：dad8b7b2-632b-4058-bfe0-902fc7e61ec8",
+          "cellText": "AgentScope Python工具迁移样例 v001-rd991aeb01b21 评测任务\n任务 ID：dad8b7b2-632b-4058-bfe0-902fc7e61ec8",
+          "fits": true,
+          "noClip": true,
+          "style": {
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "textOverflow": "clip"
+          }
+        },
+        {
+          "id": "run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+          "text": "1 项已选用例 · Run ID：run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+          "cellText": "SOAR 剧本定义\n1 项已选用例 · Run ID：run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+          "fits": true,
+          "noClip": true,
+          "style": {
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "textOverflow": "clip"
+          }
+        }
+      ]
+    },
+    {
+      "name": "dark-1440",
+      "rows": 85,
+      "jobs": 3,
+      "runs": 82,
+      "bad": [],
+      "samples": [
+        {
+          "id": "dad8b7b2-632b-4058-bfe0-902fc7e61ec8",
+          "text": "任务 ID：dad8b7b2-632b-4058-bfe0-902fc7e61ec8",
+          "cellText": "AgentScope Python工具迁移样例 v001-rd991aeb01b21 评测任务\n任务 ID：dad8b7b2-632b-4058-bfe0-902fc7e61ec8",
+          "fits": true,
+          "noClip": true,
+          "style": {
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "textOverflow": "clip"
+          }
+        },
+        {
+          "id": "run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+          "text": "1 项已选用例 · Run ID：run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+          "cellText": "SOAR 剧本定义\n1 项已选用例 · Run ID：run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+          "fits": true,
+          "noClip": true,
+          "style": {
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "textOverflow": "clip"
+          }
+        }
+      ]
+    },
+    {
+      "name": "dark-768",
+      "rows": 85,
+      "jobs": 3,
+      "runs": 82,
+      "bad": [],
+      "samples": [
+        {
+          "id": "dad8b7b2-632b-4058-bfe0-902fc7e61ec8",
+          "text": "任务 ID：dad8b7b2-632b-4058-bfe0-902fc7e61ec8",
+          "cellText": "AgentScope Python工具迁移样例 v001-rd991aeb01b21 评测任务\n任务 ID：dad8b7b2-632b-4058-bfe0-902fc7e61ec8",
+          "fits": true,
+          "noClip": true,
+          "style": {
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "textOverflow": "clip"
+          }
+        },
+        {
+          "id": "run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+          "text": "1 项已选用例 · Run ID：run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+          "cellText": "SOAR 剧本定义\n1 项已选用例 · Run ID：run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+          "fits": true,
+          "noClip": true,
+          "style": {
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "textOverflow": "clip"
+          }
+        }
+      ]
+    },
+    {
+      "name": "dark-390",
+      "rows": 85,
+      "jobs": 3,
+      "runs": 82,
+      "bad": [],
+      "samples": [
+        {
+          "id": "dad8b7b2-632b-4058-bfe0-902fc7e61ec8",
+          "text": "任务 ID：dad8b7b2-632b-4058-bfe0-902fc7e61ec8",
+          "cellText": "AgentScope Python工具迁移样例 v001-rd991aeb01b21 评测任务\n任务 ID：dad8b7b2-632b-4058-bfe0-902fc7e61ec8",
+          "fits": true,
+          "noClip": true,
+          "style": {
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "textOverflow": "clip"
+          }
+        },
+        {
+          "id": "run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+          "text": "1 项已选用例 · Run ID：run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+          "cellText": "SOAR 剧本定义\n1 项已选用例 · Run ID：run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+          "fits": true,
+          "noClip": true,
+          "style": {
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "textOverflow": "clip"
+          }
+        }
+      ]
+    }
+  ],
+  "initialTheme": "dark",
+  "totalRows": 85,
+  "totalJobs": 3,
+  "totalRuns": 82,
+  "clientSha256": "6204761cd5983893afeceee32f12efcae358822c0db2f3cad8b949a3077b9596",
+  "expectedHttpModuleSha256": "9e7d4820bb130427393f8b97c8a9d55aa5c432f969e5407ec3d26de64fa4ad1d",
+  "finalTheme": "dark"
+}

@@ -369,8 +369,8 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
       input = { toolName: entry.published.toolName, compositionId: entry.id, versionId: entry.publishedVersionId, input: businessInput }
       preview = { action, title: entry.published.title, description: entry.published.description, ...input }
     }
-    if (domain === 'agents' && ['edit/apply', 'eval/start', 'decision/update'].includes(action)) {
-      preview = await dispatch(domain, action === 'eval/start' ? 'eval/preview' : action === 'decision/update' ? 'decision/preview' : 'edit/preview', input, signal)
+    if (domain === 'agents' && ['edit/apply', 'decision/update'].includes(action)) {
+      preview = await dispatch(domain, action === 'decision/update' ? 'decision/preview' : 'edit/preview', input, signal)
       if (!preview.ok) return wireValue(preview)
     }
     if (domain === 'agents' && action === 'compute-variants/create') {
@@ -548,7 +548,11 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
     if (action === 'eval/start') {
       const cases = status.value.creation.plan?.evaluation_case_ids
       if (!Array.isArray(cases) || !cases.length) return false
-      if (input.cases === undefined) input.cases = [...cases]
+      if (input.cases === undefined) {
+        // 新评测的预留已绑定参数，不能在启动前隐式改变用例范围。
+        if (input.run_id) return false
+        input.cases = [...cases]
+      }
       if (!Array.isArray(input.cases) || !input.cases.length || input.cases.some((value: unknown) => !cases.includes(value))) return false
     }
     return true

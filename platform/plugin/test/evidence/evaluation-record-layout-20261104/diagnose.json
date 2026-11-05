@@ -1,0 +1,184 @@
+{
+  "bad": [
+    {
+      "id": "run-971516bf-fc6c-4f3b-b62a-c3cf400a3a5c",
+      "label": "评测结论",
+      "cell": {
+        "left": 992.359375,
+        "right": 1144.359375
+      },
+      "rects": [
+        {
+          "left": 1064.375,
+          "right": 1201.765625,
+          "width": 137.390625,
+          "height": 17
+        }
+      ],
+      "children": [
+        {
+          "text": "通过",
+          "className": "harness-eval-badge",
+          "overflow": "visible",
+          "textOverflow": "clip",
+          "whiteSpace": "nowrap",
+          "left": 1004.359375,
+          "right": 1046.375
+        },
+        {
+          "text": "业务效果复核：已完成源码诊断：未完成 · 源码未核实完整",
+          "className": "harness-eval-review-status",
+          "overflow": "hidden",
+          "textOverflow": "ellipsis",
+          "whiteSpace": "nowrap",
+          "left": 1004.359375,
+          "right": 1132.359375
+        },
+        {
+          "text": "",
+          "className": "",
+          "overflow": "visible",
+          "textOverflow": "clip",
+          "whiteSpace": "nowrap",
+          "left": 1124.390625,
+          "right": 1124.390625
+        }
+      ]
+    },
+    {
+      "id": "run-403db09b-c724-4514-96f0-c95a59f1fdd1",
+      "label": "评测结论",
+      "cell": {
+        "left": 992.359375,
+        "right": 1144.359375
+      },
+      "rects": [
+        {
+          "left": 1064.375,
+          "right": 1201.765625,
+          "width": 137.390625,
+          "height": 17
+        }
+      ],
+      "children": [
+        {
+          "text": "通过",
+          "className": "harness-eval-badge",
+          "overflow": "visible",
+          "textOverflow": "clip",
+          "whiteSpace": "nowrap",
+          "left": 1004.359375,
+          "right": 1046.375
+        },
+        {
+          "text": "业务效果复核：已完成源码诊断：未完成 · 源码未核实完整",
+          "className": "harness-eval-review-status",
+          "overflow": "hidden",
+          "textOverflow": "ellipsis",
+          "whiteSpace": "nowrap",
+          "left": 1004.359375,
+          "right": 1132.359375
+        },
+        {
+          "text": "",
+          "className": "",
+          "overflow": "visible",
+          "textOverflow": "clip",
+          "whiteSpace": "nowrap",
+          "left": 1124.390625,
+          "right": 1124.390625
+        }
+      ]
+    },
+    {
+      "id": "run-61f812e3-90ab-40fa-89a1-f1bb97a9008b",
+      "label": "评测结论",
+      "cell": {
+        "left": 992.359375,
+        "right": 1144.359375
+      },
+      "rects": [
+        {
+          "left": 1064.375,
+          "right": 1201.765625,
+          "width": 137.390625,
+          "height": 17
+        }
+      ],
+      "children": [
+        {
+          "text": "通过",
+          "className": "harness-eval-badge",
+          "overflow": "visible",
+          "textOverflow": "clip",
+          "whiteSpace": "nowrap",
+          "left": 1004.359375,
+          "right": 1046.375
+        },
+        {
+          "text": "业务效果复核：已完成源码诊断：未完成 · 源码未核实完整",
+          "className": "harness-eval-review-status",
+          "overflow": "hidden",
+          "textOverflow": "ellipsis",
+          "whiteSpace": "nowrap",
+          "left": 1004.359375,
+          "right": 1132.359375
+        },
+        {
+          "text": "",
+          "className": "",
+          "overflow": "visible",
+          "textOverflow": "clip",
+          "whiteSpace": "nowrap",
+          "left": 1124.390625,
+          "right": 1124.390625
+        }
+      ]
+    },
+    {
+      "id": "run-e94134da-05cd-40e8-8642-b2cd4163c37a",
+      "label": "评测结论",
+      "cell": {
+        "left": 992.359375,
+        "right": 1144.359375
+      },
+      "rects": [
+        {
+          "left": 1064.375,
+          "right": 1201.765625,
+          "width": 137.390625,
+          "height": 17
+        }
+      ],
+      "children": [
+        {
+          "text": "未通过",
+          "className": "harness-eval-badge",
+          "overflow": "visible",
+          "textOverflow": "clip",
+          "whiteSpace": "nowrap",
+          "left": 1004.359375,
+          "right": 1058.375
+        },
+        {
+          "text": "业务效果复核：已完成源码诊断：未完成 · 源码未核实完整",
+          "className": "harness-eval-review-status",
+          "overflow": "hidden",
+          "textOverflow": "ellipsis",
+          "whiteSpace": "nowrap",
+          "left": 1004.359375,
+          "right": 1132.359375
+        },
+        {
+          "text": "",
+          "className": "",
+          "overflow": "visible",
+          "textOverflow": "clip",
+          "whiteSpace": "nowrap",
+          "left": 1124.390625,
+          "right": 1124.390625
+        }
+      ]
+    }
+  ]
+}

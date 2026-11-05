@@ -933,12 +933,13 @@ test('整理特性锁定任务版本，页面导航不改变预览目标', async
   assert.ok(settled.result.ok)
 })
 
-test('融合继续评测只使用实际目标source和确认Case，其他范围走独立预览', async t => {
+test('融合继续评测保留已预留的目标与Case，不隐式重新预览或替换Run身份', async t => {
   const f = fixture(t, (endpoint, input) => endpoint === 'agents/fusion/status'
     ? { ok: true, value: { creation: { status: 'integrating', assistant_session_id: input.experiment_id === 'EXP-basic-002' ? 'session-1' : 'another-session', plan: { evaluation_case_ids: ['U-BASIC-001'] } } } }
     : undefined)
   const id = (await f.rpc('session', {})).value.session_id
-  const allowed = await f.execute(id, 'agents', 'eval/start', { source: 'experiment:EXP-basic-002' })
+  const runId = 'run-11111111-1111-4111-8111-111111111111'
+  const allowed = await f.execute(id, 'agents', 'eval/start', { source: 'experiment:EXP-basic-002', cases: ['U-BASIC-001'], run_id: runId })
   assert.equal(allowed.state, 'completed')
   assert.deepEqual(f.calls.find(call => call.endpoint === 'agents/eval/start').input.cases, ['U-BASIC-001'])
   for (const input of [
@@ -949,21 +950,36 @@ test('融合继续评测只使用实际目标source和确认Case，其他范围�
     const proposed = await f.operation(id)
     assert.equal(proposed.action, 'eval/start')
     assert.equal(f.calls.filter(call => call.endpoint === 'agents/eval/start').length, input.source.includes('other') ? 2 : 3)
-    assert.ok(f.calls.some(call => call.endpoint === 'agents/eval/preview'))
+    assert.equal(f.calls.some(call => call.endpoint === 'agents/eval/preview'), false, '启动不隐式分配第二个预留编号')
     await f.rpc('cancel', { session_id: id })
     await operation
   }
 })
 
-test('普通资产写入与评测先使用真实preview失败时不生成确认或执行', async t => {
-  const f = fixture(t, endpoint => ['agents/edit/preview', 'agents/eval/preview'].includes(endpoint) ? { ok: false, error: { code: 'conflict', message: '固定来源已变化', details: {} } } : undefined)
+test('资产写入保留预览，评测直接由启动接口核对原Run预留而不自动补号', async t => {
+  const f = fixture(t, endpoint => ['agents/edit/preview', 'agents/eval/start'].includes(endpoint) ? { ok: false, error: { code: 'creation_expired', message: '原预留已过期，请重新预览', details: {} } } : undefined)
   const id = (await f.rpc('session', {})).value.session_id
   for (const [action, input] of [['edit/apply', { experiment_id: 'EXP-basic-001', edits: [] }], ['eval/start', { source: 'experiment:EXP-basic-001' }]]) {
     const response = await f.execute(id, 'agents', action, input)
-    assert.equal(response.ok, false)
-    assert.equal(f.calls.some(call => call.endpoint === `agents/${action}`), false)
+    assert.equal(response.result?.ok ?? response.ok, false)
+    assert.equal(f.calls.some(call => call.endpoint === `agents/${action}`), action === 'eval/start')
   }
-  assert.deepEqual((await f.status(id)).proposals, [])
+  const settled = (await f.status(id)).proposals
+  assert.equal(settled.length, 1)
+  assert.equal(settled[0].state, 'failed')
+  assert.equal(settled[0].result.error.code, 'creation_expired')
+  assert.equal(f.calls.some(call => call.endpoint === 'agents/eval/preview'), false)
+})
+
+test('评测工具只声明唯一Run身份，旧Skill得到当前合同且SDK请求身份保持原用途', () => {
+  const start = assistantActionContract('agents', 'eval/start')
+  assert.deepEqual(start.input_schema.required, ['source', 'run_id'])
+  assert.ok(start.input_schema.properties.run_id)
+  assert.equal(start.input_schema.properties.request_id, undefined)
+  assert.match(start.instructions, /旧 Skill.*当前合同/)
+  for (const action of ['eval/status', 'eval/cancel']) assert.deepEqual(assistantActionContract('agents', action).input_schema.required, ['run_id'])
+  assert.ok(assistantActionContract('agents', 'sdk/start').input_schema.properties.request_id)
+  assert.ok(assistantActionContract('agents', 'eval/batch-start').input_schema.properties.requests.items.required.includes('run_id'))
 })
 
 test('算力变体先预览真实计划再创建，摘要与方案固定', async t => {

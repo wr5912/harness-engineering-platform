@@ -28,7 +28,7 @@ function localClock(initial = Date.parse('2026-10-29T08:00:00Z')) {
     advance(duration) { now += duration; for (const [id, timer] of timers) if (timer.at <= now) { timers.delete(id); timer.callback() } },
   }
 }
-function home({ example = false, exampleCase = true, exampleExtra = false, exampleActive = 'EXP-daily-inspection-assistant-002-r222222222222', noRuns = false, runVerdict = 'passed', runStatus = 'completed', runsFixture, failStart = false, sessionFixture, jobsFixture = [], active = true, intercept, storage = memoryStorage(), username = 'admin', workspaceRoot = '/test-assets', workspaceId = 'workspace-test', accountError = false, clock, beforeStart } = {}) {
+function home({ example = false, exampleCase = true, exampleExtra = false, exampleActive = 'EXP-daily-inspection-assistant-002-r222222222222', noRuns = false, runVerdict = 'passed', runStatus = 'completed', runsFixture, agentsFixture = [{ id: 'alpha', name: '行业简报助手' }], experimentsFixture = [{ id: experiment, agent_id: 'alpha', change: {} }], historicalExperimentsFixture = [], failStart = false, sessionFixture, controlsFixture = [], active = true, intercept, storage = memoryStorage(), username = 'admin', workspaceRoot = '/test-assets', workspaceId = 'workspace-test', accountError = false, clock, beforeStart } = {}) {
   const states = [], dependencies = [], cleanups = [], calls = [], tasks = [], navigations = [], assistantSelections = [], projectionRefreshes = []
   let cursor = 0, effects = [], changed = false, tree
   const react = { ...require('react'),
@@ -59,8 +59,8 @@ function home({ example = false, exampleCase = true, exampleExtra = false, examp
       if (method === 'auth/current') return accountError ? { ok: false, error: { message: '账号暂不可读' } } : { ok: true, value: { username } }
       if (method === 'home') return { ok: true, value: { recent_runs: runsFixture ?? (noRuns ? [] : [{ id: runId, agent_id: 'alpha', experiment_id: experiment, status: runStatus, effective_verdict: runVerdict, created_at: '2026-10-16T00:00:00Z' }]), instances: { ok: true, value: { instances: [] } }, mcp: { ok: true, value: { connections: [] } } } }
       if (method === 'mcp/control/status') return { ok: true, value: { configuration: { riskAssessment: { configured: true } }, riskFacts: [] } }
-      if (method === 'agents/eval/list') return { ok: true, value: { jobs: jobsFixture } }
-      if (method === 'agents/list') return { ok: true, value: { agents: [{ id: 'alpha', name: '行业简报助手' }] } }
+      if (method === 'agents/eval/list') return { ok: true, value: { runs: controlsFixture, errors: [] } }
+      if (method === 'agents/list') return { ok: true, value: { agents: agentsFixture, experiments: experimentsFixture, historical_experiments: historicalExperimentsFixture } }
       if (method === 'agents/detail') return { ok: true, value: { agent: { id: body.agent_id, manifest: { active_experiment: body.agent_id === 'daily-inspection-assistant' ? exampleActive : body.experiment_id || experiment } }, experiment: { id: body.experiment_id || experiment }, selection: { basis: body.experiment_id ? 'explicit' : 'active_experiment' }, versions: [{ id: body.experiment_id || experiment }], evaluation: { cases: body.agent_id === 'daily-inspection-assistant' ? exampleCase ? [{ id: 'U-ASSET-PAGES-001' }] : [] : [{ id: 'U-BUSINESS-001' }] } } }
       if (method === 'agents/tasks/capabilities') return { ok: true, value: { sources: [{ source: 'experiment:EXP-daily-inspection-assistant-001-r111111111111', experiment_id: 'EXP-daily-inspection-assistant-001-r111111111111', plugins: [] }, { source: 'experiment:EXP-daily-inspection-assistant-002-r222222222222', experiment_id: 'EXP-daily-inspection-assistant-002-r222222222222', plugins: [{ plugin_names: ['/opt/dsh-managed/task-example-tools.mjs'] }] }, ...(exampleExtra ? [{ source: 'experiment:EXP-daily-inspection-assistant-003-r333333333333', experiment_id: 'EXP-daily-inspection-assistant-003-r333333333333', plugins: [{ plugin_names: ['/opt/dsh-managed/task-example-tools.mjs'] }] }] : [])] } }
       throw new Error(`unexpected RPC ${method}`)
@@ -81,12 +81,12 @@ function home({ example = false, exampleCase = true, exampleExtra = false, examp
     cleanup: () => cleanups.forEach(cleanup => cleanup?.()) }
 }
 
-test('继续工作回到原 Session 和原 Job，不创建第二个任务', async () => {
+test('继续工作回到原 Session 和原 Run，不创建第二个任务', async () => {
   const sessionId = 'session-original'
-  const jobId = '550e8400-e29b-41d4-a716-446655440000'
+  const jobId = 'run-550e8400-e29b-41d4-a716-446655440000'
   const ui = home({ sessionFixture: { ids: [sessionId], byId: { [sessionId]: { cwd: '/test-assets', updatedAt: Date.now(), displayTitle: '完成原评测',
     projectionValues: { harnessPlatformAssistant: { session_id: sessionId, workspace_id: 'workspace-test', pending_proposals: 1 } } } }, projectionsBySession: {}, phase: 'ready' },
-    jobsFixture: [{ job_id: jobId, source: `experiment:${experiment}`, agent_id: 'alpha', experiment_id: experiment, status: 'running' }] })
+    controlsFixture: [{ run_id: jobId, run_created: true, source: `experiment:${experiment}`, agent_id: 'alpha', experiment_id: experiment, status: 'running' }] })
   try {
     await ui.settle()
     assert.match(ui.text(), /完成原评测/)
@@ -94,9 +94,9 @@ test('继续工作回到原 Session 和原 Job，不创建第二个任务', asyn
     await ui.click('继续原会话')
     assert.deepEqual(ui.assistantSelections, [sessionId])
     assert.equal(ui.navigations.at(-1), 'conversations')
-    await ui.click('查看任务')
-    assert.equal(ui.navigations.at(-1).job_id, jobId)
-    assert.equal(ui.navigations.at(-1).tab, 'jobs')
+    await ui.click('查看进度')
+    assert.equal(ui.navigations.at(-1).run_id, jobId)
+    assert.equal(ui.navigations.at(-1).tab, 'runs')
     assert.equal(ui.tasks.length, 0)
   } finally { ui.cleanup() }
 })
@@ -249,31 +249,31 @@ test('首页风险回执缺少明确开关时保留待核对，不能据旧事�
   }
 })
 
-test('继续工作读取较早待确认会话，跨会话与 Job 按待处理优先级排列', async () => {
+test('继续工作读取较早待确认会话，跨会话与活动 Run 按待处理优先级排列', async () => {
   const ids = Array.from({ length: 13 }, (_, index) => `session-${index}`)
   const byId = Object.fromEntries(ids.map((id, index) => [id, { cwd: '/test-assets', updatedAt: Date.now() - index * 1000,
     displayTitle: `会话 ${index}`, projectionValues: { harnessPlatformAssistant: { session_id: id, workspace_id: 'workspace-test',
       ...(index === 12 ? { pending_proposals: 1 } : {}) } } }]))
-  const jobId = '550e8400-e29b-41d4-a716-446655440001'
-  const ui = home({ sessionFixture: { ids, byId, projectionsBySession: {}, phase: 'ready' }, jobsFixture: [
-    { job_id: jobId, source: `experiment:${experiment}`, agent_id: 'alpha', experiment_id: experiment, status: 'running' },
+  const jobId = 'run-550e8400-e29b-41d4-a716-446655440001'
+  const ui = home({ sessionFixture: { ids, byId, projectionsBySession: {}, phase: 'ready' }, controlsFixture: [
+    { run_id: jobId, run_created: true, source: `experiment:${experiment}`, agent_id: 'alpha', experiment_id: experiment, status: 'running' },
   ] })
   try {
     await ui.settle()
     assert.equal(ui.projectionRefreshes.length, 13)
     const rows = ui.nodes().filter(node => node.type === 'article' && node.props.className === 'harness-continue-item')
     assert.match(ui.text(rows[0]), /会话 12.*待确认/s)
-    assert.match(ui.text(rows[1]), /智能体 alpha.*运行中/s)
+    assert.match(ui.text(rows[1]), /行业简报助手.*智能体评测.*运行中/s)
     assert.equal(rows.length, 2)
     assert.ok(rows.every(row => !/会话 [0-9](?:\D|$)/.test(ui.text(row))), '已结束且没有待处理操作的原生会话不进入继续处理')
     assert.doesNotMatch(ui.text(), /已显示.*项/)
     assert.ok(ui.menu())
-    await ui.click('查看任务')
-    assert.equal(ui.navigations.at(-1).job_id, jobId)
+    await ui.click('查看进度')
+    assert.equal(ui.navigations.at(-1).run_id, jobId)
   } finally { ui.cleanup() }
 })
 
-test('业务未通过、无法判定与执行失败的 Run 进入继续处理，同 Run 不重复列为 Job 或最近工作', async () => {
+test('业务未通过、无法判定与执行失败的 Run 进入继续处理，同 Run 不重复列为控制记录或最近工作', async () => {
   const inconclusiveId = 'run-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
   const executionFailedId = 'run-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
   const unknownId = 'run-dddddddd-dddd-4ddd-8ddd-dddddddddddd'
@@ -284,16 +284,16 @@ test('业务未通过、无法判定与执行失败的 Run 进入继续处理，
     { ...failed, id: executionFailedId, status: 'failed', effective_verdict: null, created_at: '2026-10-16T06:00:00Z' },
     { ...failed, id: unknownId, effective_verdict: null, created_at: '2026-10-16T05:30:00Z' },
     { ...failed, id: passedId, effective_verdict: 'passed', created_at: '2026-10-16T05:00:00Z' },
-  ], jobsFixture: [
-    { job_id: 'job-for-failed-run', source: `experiment:${experiment}`, agent_id: 'alpha', experiment_id: experiment, run_id: runId, status: 'completed' },
-    { job_id: 'job-for-passed-run', source: `experiment:${experiment}`, agent_id: 'alpha', experiment_id: experiment, run_id: passedId, status: 'completed' },
+  ], controlsFixture: [
+    { run_created: true, source: `experiment:${experiment}`, agent_id: 'alpha', experiment_id: experiment, run_id: runId, status: 'completed' },
+    { run_created: true, source: `experiment:${experiment}`, agent_id: 'alpha', experiment_id: experiment, run_id: passedId, status: 'completed' },
   ] })
   try {
     await ui.settle()
     const rows = ui.nodes().filter(node => node.type === 'article' && node.props.className === 'harness-continue-item')
     assert.equal(rows.length, 4, '摘要只展示前四项，同一 Run 合并对应 Job')
     const title = row => ui.nodes(row).find(node => node.props?.className === 'harness-continue-title')
-    assert.match(ui.text(title(rows[0])), /行业简报助手.*版本 001 评测.*结果待处理/s)
+    assert.match(ui.text(title(rows[0])), /行业简报助手.*v001-r123456abcdef.*智能体评测.*结果待处理/s)
     assert.match(ui.text(rows[0]), /执行结束.*业务未通过/s)
     assert.match(ui.text(rows[1]), /结论待核实/)
     assert.match(ui.text(rows[2]), /执行失败.*尚无业务结论/s)
@@ -308,6 +308,44 @@ test('业务未通过、无法判定与执行失败的 Run 进入继续处理，
     await ui.click('查看结果')
     assert.deepEqual({ ...ui.navigations.at(-1) }, { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: experiment, run_id: runId })
   } finally { ui.cleanup() }
+})
+
+test('最近评测按确认顺序拆分对象列，完整版本与原始跳转保持，不展示变体名称', async () => {
+  const variant = 'VAR-alpha-001-rabcdef123456'
+  const base = { agent_id: 'alpha', agent_name: '不应作为所属智能体的Candidate名称', status: 'completed', effective_verdict: 'passed', created_at: '2026-11-04T08:00:00Z' }
+  const ui = home({ runsFixture: [{ ...base, id: runId, experiment_id: experiment }, { ...base, id: 'variant-run', experiment_id: variant }],
+    agentsFixture: [{ id: 'alpha', name: 'Candidate名称', manifest: { name: '所属智能体' } }],
+    experimentsFixture: [{ id: experiment, change: {} }, { id: variant, change: { variant_name: '不应展示的变体名称' } }] })
+  try {
+    await ui.settle()
+    const table = ui.nodes().find(node => node.props?.className === 'harness-home-run-table')
+    assert.deepEqual(ui.nodes(table).filter(node => node.type === 'th').map(node => ui.text(node)), ['所属智能体', '被测版本', '对象类型', '执行状态', '评测结论', '时间', '操作'])
+    const rows = ui.nodes(table).filter(node => node.type === 'tr' && node.props?.className === 'harness-run-row')
+    const cells = row => ui.nodes(row).filter(node => node.type === 'td').map(node => ui.text(node))
+    assert.deepEqual(cells(rows[0]).slice(0, 3), ['所属智能体', 'v001-r123456abcdef', '智能体'])
+    assert.deepEqual(cells(rows[1]).slice(0, 3), ['所属智能体', 'v001-rabcdef123456', '变体'])
+    assert.doesNotMatch(ui.text(table), /Candidate名称|不应展示的变体名称/)
+    await ui.nodes(rows[1]).find(node => node.type === 'button').props.onClick()
+    assert.deepEqual({ ...ui.navigations.at(-1) }, { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: variant, run_id: 'variant-run' })
+    assert.equal(ui.calls.filter(call => call.method === 'agents/list').length, 1)
+  } finally { ui.cleanup() }
+})
+
+test('首页识别历史EXP变体，元数据失败时保留Run并明确类型待核对', async () => {
+  const legacy = 'EXP-alpha-002'
+  for (const unavailable of [false, true]) {
+    const ui = home({ runsFixture: [{ id: runId, agent_id: 'alpha', experiment_id: legacy, status: 'completed', effective_verdict: 'passed' }],
+      historicalExperimentsFixture: [{ id: legacy, change: { variant_kind: 'end' } }],
+      intercept(method) { if (unavailable && method === 'agents/list') return { ok: false, error: { message: '对象声明不可读' } } } })
+    try {
+      await ui.settle()
+      const row = ui.nodes().find(node => node.props?.className === 'harness-run-row')
+      const type = ui.nodes(row).find(node => node.props?.['data-label'] === '对象类型')
+      assert.equal(ui.text(type), unavailable ? '待核对' : '变体')
+      assert.match(ui.text(row), /业务通过/)
+      if (unavailable) assert.match(ui.text(), /对象信息读取失败.*对象声明不可读/)
+    } finally { ui.cleanup() }
+  }
 })
 
 test('Run 索引读取失败时不把继续处理误判为空', async () => {
@@ -370,7 +408,7 @@ test('四类快捷任务仅凭描述进入对应意图，不预选智能体、�
   ]
   for (const entry of cases) {
     const ui = home({ intercept(method) {
-      if (method === 'agents/list' || method === 'agents/detail') throw new Error('首页无需预读选择器数据')
+      if (method === 'agents/detail') throw new Error('快捷任务无需预读对象详情')
     } })
     try {
       await ui.settle()
@@ -384,7 +422,8 @@ test('四类快捷任务仅凭描述进入对应意图，不预选智能体、�
       assert.equal(ui.tasks[0].root, '/test-assets'); assert.equal(ui.tasks[0].context.page, 'home')
       assert.equal(ui.tasks[0].context.skill, entry.skill); assert.equal(ui.tasks[0].context.workflow, entry.workflow); assert.equal(ui.tasks[0].context.entry_intent, entry.mode)
       for (const key of ['agent_id', 'experiment_id', 'source', 'run_id', 'evaluation_case_ids']) assert.equal(ui.tasks[0].context[key], undefined)
-      assert.equal(ui.calls.some(call => call.method === 'agents/list' || call.method === 'agents/detail'), false)
+      assert.equal(ui.calls.filter(call => call.method === 'agents/list').length, 1, '仅摘要读取一次对象元数据，快捷任务不追加选择器请求')
+      assert.equal(ui.calls.some(call => call.method === 'agents/detail'), false)
     } finally { ui.cleanup() }
   }
 })
@@ -427,7 +466,8 @@ test('首页按实际业务域刷新摘要，助手事件及模式切换不触�
     for (const domain of ['instances', 'mcp', 'agents', 'catalog']) { ui.invalidate([domain]); await ui.settle() }
     assert.equal(count('home'), initial + 4)
     assert.equal(count('agents/eval/list'), initialJobs + 1)
-    assert.equal(count('agents/list'), 0); assert.equal(count('agents/detail'), 0)
+    assert.equal(count('agents/list'), 3, '首次、agents及catalog变化更新对象身份；模式和助手事件不触发读取')
+    assert.equal(count('agents/detail'), 0)
   } finally { ui.cleanup() }
 })
 
@@ -472,7 +512,7 @@ test('多版本示例默认使用具工具和Case的启用来源，版本切换�
       assert.equal(ui.label('巡检示例版本').props.value, `experiment:${expected}`)
       assert.equal(ui.button('开始体验').props.disabled, false)
       assert.equal(ui.label('可选示例版本').type, 'details'); assert.equal(ui.label('可选示例版本').props.open, undefined)
-      if (selectedActive === active) assert.match(ui.text(), /版本 003（当前启用）/)
+      if (selectedActive === active) assert.match(ui.text(), /v003-r333333333333（当前启用）/)
       const before = ui.calls.filter(call => call.method === 'agents/detail' && call.body.experiment_id === expected).length
       await ui.click('开始体验')
       assert.equal(ui.tasks[0].context.source, `experiment:${expected}`)
@@ -613,7 +653,7 @@ test('首页摘要只显示前四项，单一类型的顶栏查看全部直接�
     const ui = home({ noRuns: kind !== 'run',
       ...(kind === 'session' ? { sessionFixture: { ids, phase: 'ready', projectionsBySession: {}, byId: Object.fromEntries(ids.map((id, index) => [id, { cwd: '/test-assets', updatedAt: now - index * 1000, displayTitle: `原管理会话 ${index}`, projectionValues: { harnessPlatformAssistant: { session_id: id, workspace_id: 'workspace-test', pending_proposals: 1 } } }])) } } : {}),
       ...(kind === 'run' ? { runsFixture: ids.map((id, index) => ({ id, agent_id: 'alpha', experiment_id: experiment, status: 'completed', effective_verdict: 'failed', created_at: new Date(now - index * 1000).toISOString() })) } : {}),
-      ...(kind === 'job' ? { jobsFixture: ids.map((job_id, index) => ({ job_id, source: `experiment:${experiment}`, agent_id: 'alpha', experiment_id: experiment, status: 'running', updated_at: new Date(now - index * 1000).toISOString() })) } : {}),
+      ...(kind === 'job' ? { controlsFixture: ids.map((run_id, index) => ({ run_id, run_created: true, source: `experiment:${experiment}`, agent_id: 'alpha', experiment_id: experiment, status: 'running', updated_at: new Date(now - index * 1000).toISOString() })) } : {}),
     })
     try {
       await ui.settle()
@@ -638,7 +678,7 @@ test('首页摘要只显示前四项，单一类型的顶栏查看全部直接�
 test('混合摘要的顶栏原生菜单区分管理与评测，关闭和导航保留首页输入', async () => {
   const ids = ['pending-0', 'pending-1', 'pending-2', 'completed-session']
   const ui = home({ runVerdict: 'failed', sessionFixture: { ids, phase: 'ready', projectionsBySession: {}, byId: Object.fromEntries(ids.map((id, index) => [id, { cwd: '/test-assets', updatedAt: Date.now() - index * 1000, displayTitle: `管理任务 ${index}`, projectionValues: { harnessPlatformAssistant: { session_id: id, workspace_id: 'workspace-test', ...(index < 3 ? { pending_proposals: 1 } : {}) } } }])) },
-    jobsFixture: [{ job_id: 'hidden-running-job', source: `experiment:${experiment}`, agent_id: 'alpha', experiment_id: experiment, status: 'running', updated_at: new Date().toISOString() }] })
+    controlsFixture: [{ run_id: 'run-99999999-9999-4999-8999-999999999999', run_created: true, source: `experiment:${experiment}`, agent_id: 'alpha', experiment_id: experiment, status: 'running', updated_at: new Date().toISOString() }] })
   try {
     await ui.settle()
     const rows = ui.nodes().filter(node => node.props?.className === 'harness-continue-item')
@@ -693,13 +733,13 @@ test('摘要不显示计数尾栏，未知 Run 仍保留原结果说明', async 
   } finally { empty.cleanup() }
 })
 
-test('最近评测摘要仍限两条，查看全部直达混合评测记录且不用内部滚动容器', async () => {
+test('最近评测摘要仍限两条，查看全部直达混合评测记录且表格支持区域滚动', async () => {
   const ui = home({ runsFixture: Array.from({ length: 5 }, (_, index) => ({ id: `passed-run-${index}`, agent_id: 'alpha', experiment_id: experiment, status: 'completed', effective_verdict: 'passed', created_at: new Date(Date.now() - index * 1000).toISOString() })) })
   try {
     await ui.settle()
     const recent = ui.label('最近评测')
     assert.equal(ui.nodes(recent).filter(node => node.props?.className === 'harness-run-row').length, 2)
-    assert.equal(ui.nodes(recent).some(node => node.props?.className === 'harness-table-scroll'), false)
+    assert.equal(ui.nodes(recent).some(node => node.props?.className?.includes('harness-home-run-scroll')), true)
     const recordAction = ui.nodes(recent).find(node => node.props?.className === 'harness-run-action')
     assert.equal(ui.text(recordAction), '查看结果')
     recordAction.props.onClick(); await ui.settle()
@@ -713,7 +753,7 @@ test('最近评测摘要仍限两条，查看全部直达混合评测记录且�
 test('摘要刷新保留条目和已知数字，加载状态不插入正文且失败后可见', async () => {
   let hold = false
   const pending = new Map()
-  const ui = home({ runVerdict: 'failed', jobsFixture: [{ job_id: 'job-active', status: 'running', agent_id: 'alpha', experiment_id: experiment }],
+  const ui = home({ runVerdict: 'failed', controlsFixture: [{ run_id: 'run-88888888-8888-4888-8888-888888888888', run_created: true, status: 'running', agent_id: 'alpha', experiment_id: experiment }],
     intercept(method) { if (hold && ['home', 'agents/eval/list', 'mcp/control/status'].includes(method)) return new Promise(resolve => pending.set(method, resolve)) } })
   try {
     await ui.settle()
@@ -747,27 +787,27 @@ test('摘要刷新保留条目和已知数字，加载状态不插入正文且�
 })
 
 test('首页隐藏只记脏，首次慢请求及在途通知共用单批刷新，恢复补一次', async () => {
-  const waiting = [], endpoints = new Set(['home', 'agents/eval/list', 'mcp/control/status'])
+  const waiting = [], endpoints = new Set(['home', 'agents/list', 'agents/eval/list', 'mcp/control/status'])
   let slow = true, activeReads = 0, maximum = 0
   const ui = home({ active: false, intercept(method) {
     if (!slow || !endpoints.has(method)) return
     activeReads++; maximum = Math.max(maximum, activeReads)
-    return new Promise(resolve => waiting.push(() => { activeReads--; resolve(method === 'home' ? { ok: true, value: { recent_runs: [], instances: { ok: true, value: { instances: [] } }, mcp: { ok: true, value: { connections: [] } } } } : method === 'agents/eval/list' ? { ok: true, value: { jobs: [] } } : { ok: true, value: { riskFacts: [] } }) }))
+    return new Promise(resolve => waiting.push(() => { activeReads--; resolve(method === 'home' ? { ok: true, value: { recent_runs: [], instances: { ok: true, value: { instances: [] } }, mcp: { ok: true, value: { connections: [] } } } } : method === 'agents/list' ? { ok: true, value: { agents: [], experiments: [] } } : method === 'agents/eval/list' ? { ok: true, value: { jobs: [] } } : { ok: true, value: { riskFacts: [] } }) }))
   } })
   try {
     await ui.settle(); const before = ui.calls.length
     for (let n = 0; n < 3; n++) { ui.invalidate(['agents']); await ui.settle() }
     assert.equal(ui.calls.length, before)
-    ui.setActive(true); await ui.settle(); assert.equal(activeReads, 3)
+    ui.setActive(true); await ui.settle(); assert.equal(activeReads, 4)
     const started = ui.calls.length
     for (let n = 0; n < 3; n++) { ui.invalidate(['agents']); await ui.settle() }
     assert.equal(ui.calls.length, started)
     slow = false; waiting.splice(0).forEach(release => release()); await ui.settle()
-    assert.equal(ui.calls.length, started + 3)
-    assert.equal(maximum, 3, '同一批三个不同端点并行，不启动第二批')
+    assert.equal(ui.calls.length, started + 4)
+    assert.equal(maximum, 4, '同一批四个不同端点并行，不启动第二批')
     ui.setActive(false); await ui.settle(); const hidden = ui.calls.length
     ui.invalidate(['agents']); ui.invalidate(['instances']); await ui.settle(); assert.equal(ui.calls.length, hidden)
-    ui.setActive(true); await ui.settle(); assert.equal(ui.calls.length, hidden + 3)
+    ui.setActive(true); await ui.settle(); assert.equal(ui.calls.length, hidden + 4)
   } finally { ui.cleanup() }
 })
 

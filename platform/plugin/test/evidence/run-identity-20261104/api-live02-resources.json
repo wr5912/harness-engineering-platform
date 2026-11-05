@@ -1,0 +1,138 @@
+{
+  "observed_at": "2026-11-04T11:33:18.199100+00:00",
+  "scope": "本轮两个已提交Run只读收尾观察；不改写历史或执行文件",
+  "runs": [
+    {
+      "run_id": "run-68d23096-e504-4571-b7e6-ed9460f49b8e",
+      "status": "failed",
+      "failure_reason": "browser 评测失败（退出码 2）：dsh-eval-browser failed: workspace-connect: TimeoutError:locator.click: Timeout 300000ms exceeded.",
+      "instance_name": "inspection-delivery-demo-eval-5ec6a30f",
+      "instance_stopped": true,
+      "matching_containers": [],
+      "instance_directory_exists": true,
+      "summary": {
+        "schema_version": "3.0",
+        "run_id": "run-68d23096-e504-4571-b7e6-ed9460f49b8e",
+        "trial_count": 1,
+        "execution_status_counts": {
+          "completed": 0,
+          "error": 1,
+          "skipped": 0
+        },
+        "machine_trial_verdict_counts": {
+          "passed": 0,
+          "failed": 0,
+          "inconclusive": 1
+        },
+        "machine_overall_verdict": "inconclusive",
+        "review_status": "not_requested",
+        "reviewed_case_count": 0,
+        "reviewed_case_verdict_counts": null,
+        "reviewed_overall_verdict": null,
+        "effective_verdict": "inconclusive",
+        "source_verification": {
+          "status": "matched",
+          "reason": null,
+          "checks": [
+            {
+              "component": "candidate",
+              "status": "matched",
+              "expected_sha256": "9cceec4f6ed93d626059777a43ba8cac38882febe7cca71587edcff0d9f1a5a4",
+              "actual_sha256": "9cceec4f6ed93d626059777a43ba8cac38882febe7cca71587edcff0d9f1a5a4"
+            },
+            {
+              "component": "workspace",
+              "status": "matched",
+              "expected_sha256": "d27277dc23adb6205d2cbbe4ed3fa790dc697db4952d45030c831655563fdcf4",
+              "actual_sha256": "d27277dc23adb6205d2cbbe4ed3fa790dc697db4952d45030c831655563fdcf4"
+            },
+            {
+              "component": "presets",
+              "status": "matched",
+              "expected_sha256": "b7bcf92109fd8f8c941ee11a36f5ea9b264c4c4843b230b73f3d287a7f3b1b90",
+              "actual_sha256": "b7bcf92109fd8f8c941ee11a36f5ea9b264c4c4843b230b73f3d287a7f3b1b90"
+            },
+            {
+              "component": "managed",
+              "status": "matched",
+              "expected_sha256": "3a29fc58efa5bbf2ad42fe917706f212a7c7a0a222a2685e376928a0b021fcc4",
+              "actual_sha256": "3a29fc58efa5bbf2ad42fe917706f212a7c7a0a222a2685e376928a0b021fcc4"
+            },
+            {
+              "component": "evaluation_implementation",
+              "status": "matched",
+              "expected_sha256": "fe60ebbdc7657a348380aa39a154ce6186bc5849f6074d23b3ead7f1d4d13c62",
+              "actual_sha256": "fe60ebbdc7657a348380aa39a154ce6186bc5849f6074d23b3ead7f1d4d13c62"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "run_id": "run-9f341352-fc1a-47b4-b64e-c31c9b56c2ea",
+      "status": "cancelled",
+      "failure_reason": "evaluation-interrupted",
+      "instance_name": "inspection-delivery-demo-eval-d9c6ba66",
+      "instance_stopped": true,
+      "matching_containers": [],
+      "instance_directory_exists": true,
+      "summary": {
+        "schema_version": "3.0",
+        "run_id": "run-9f341352-fc1a-47b4-b64e-c31c9b56c2ea",
+        "trial_count": 1,
+        "execution_status_counts": {
+          "completed": 0,
+          "error": 0,
+          "skipped": 1
+        },
+        "machine_trial_verdict_counts": {
+          "passed": 0,
+          "failed": 0,
+          "inconclusive": 1
+        },
+        "machine_overall_verdict": "inconclusive",
+        "review_status": "not_requested",
+        "reviewed_case_count": 0,
+        "reviewed_case_verdict_counts": null,
+        "reviewed_overall_verdict": null,
+        "effective_verdict": "inconclusive",
+        "source_verification": {
+          "status": "matched",
+          "reason": null,
+          "checks": [
+            {
+              "component": "candidate",
+              "status": "matched",
+              "expected_sha256": "9cceec4f6ed93d626059777a43ba8cac38882febe7cca71587edcff0d9f1a5a4",
+              "actual_sha256": "9cceec4f6ed93d626059777a43ba8cac38882febe7cca71587edcff0d9f1a5a4"
+            },
+            {
+              "component": "workspace",
+              "status": "matched",
+              "expected_sha256": "d27277dc23adb6205d2cbbe4ed3fa790dc697db4952d45030c831655563fdcf4",
+              "actual_sha256": "d27277dc23adb6205d2cbbe4ed3fa790dc697db4952d45030c831655563fdcf4"
+            },
+            {
+              "component": "presets",
+              "status": "matched",
+              "expected_sha256": "b7bcf92109fd8f8c941ee11a36f5ea9b264c4c4843b230b73f3d287a7f3b1b90",
+              "actual_sha256": "b7bcf92109fd8f8c941ee11a36f5ea9b264c4c4843b230b73f3d287a7f3b1b90"
+            },
+            {
+              "component": "managed",
+              "status": "matched",
+              "expected_sha256": "3a29fc58efa5bbf2ad42fe917706f212a7c7a0a222a2685e376928a0b021fcc4",
+              "actual_sha256": "3a29fc58efa5bbf2ad42fe917706f212a7c7a0a222a2685e376928a0b021fcc4"
+            },
+            {
+              "component": "evaluation_implementation",
+              "status": "matched",
+              "expected_sha256": "fe60ebbdc7657a348380aa39a154ce6186bc5849f6074d23b3ead7f1d4d13c62",
+              "actual_sha256": "fe60ebbdc7657a348380aa39a154ce6186bc5849f6074d23b3ead7f1d4d13c62"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

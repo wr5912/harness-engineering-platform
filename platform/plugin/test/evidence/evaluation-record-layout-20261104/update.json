@@ -1,0 +1,14 @@
+{
+  "status": "applied",
+  "programRoot": "/home/admin/work/harness-engineering-platform",
+  "dataRoot": "/home/admin/harness-engineering-platform-data",
+  "workspaceId": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+  "pid": 4033125,
+  "activation": "native-hmr",
+  "busy": [],
+  "changed": [
+    "platform/plugin/lib/client.js"
+  ],
+  "stage": "/home/admin/work/harness-engineering-platform/.local/platform-updates/1c749d21-2d14-46da-8264-55472a61b304",
+  "receipt": "/home/admin/work/harness-engineering-platform/.local/platform-updates/1c749d21-2d14-46da-8264-55472a61b304/receipt.json"
+}

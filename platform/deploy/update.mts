@@ -114,7 +114,11 @@ export async function readUpdateActivity(options: UpdateOptions, state: ServiceS
   const inventory = await rpc('inventory', {})
   if (inventory?.root !== options.dataRoot || inventory.workspace?.id !== workspaceId || inventory.workspace?.root !== options.dataRoot) throw new Error('在线工作区身份不符，未应用')
   const [sessions, evaluations, operations] = await Promise.all([rpc('session/list', { args: { _request: {} } }, true), rpc('agents/eval/list', {}), rpc('agents/sdk/list', {})])
-  if (!Array.isArray(sessions?.items) || !Array.isArray(evaluations?.jobs) || !Array.isArray(operations)) throw new Error('在途状态响应不完整，不能判断为空闲')
+  const evaluationRuns = Array.isArray(evaluations?.runs) ? [...evaluations.runs, ...(Array.isArray(evaluations.pending) ? evaluations.pending : [])] : evaluations?.jobs
+  if (!Array.isArray(sessions?.items) || !Array.isArray(evaluationRuns) || !Array.isArray(operations)
+    || evaluations?.pending !== undefined && !Array.isArray(evaluations.pending)
+    || evaluations?.errors !== undefined && !Array.isArray(evaluations.errors)) throw new Error('在途状态响应不完整，不能判断为空闲')
+  if (evaluations.errors?.length) throw new Error('评测状态存在未核对项，不能判断为空闲')
   const busy: BusyItem[] = []
   for (const session of sessions.items) {
     if (typeof session.sessionId !== 'string' || typeof session.running !== 'boolean') throw new Error('会话运行状态缺失，不能判断为空闲')
@@ -126,9 +130,10 @@ export async function readUpdateActivity(options: UpdateOptions, state: ServiceS
       if (current.running || current.proposals?.some((item: any) => item.state === 'running') || Object.values(current.submissions ?? {}).some((item: any) => ['pending', 'unknown'].includes(item.state))) busy.push({ kind: 'assistant', id: session.sessionId, state: 'pending' })
     }
   }
-  for (const job of evaluations.jobs) {
-    if (typeof job.job_id !== 'string' || !['running', 'cancelling', 'completed', 'failed', 'cancelled'].includes(job.status)) throw new Error('评测任务状态不完整，不能判断为空闲')
-    if (['running', 'cancelling'].includes(job.status)) busy.push({ kind: 'evaluation', id: job.job_id, state: job.status })
+  for (const run of evaluationRuns) {
+    const id = run.run_id ?? run.legacy_id ?? run.job_id
+    if (typeof id !== 'string' || !['preparing', 'running', 'cancelling', 'unknown', 'completed', 'failed', 'cancelled'].includes(run.status)) throw new Error('评测运行状态不完整，不能判断为空闲')
+    if (['preparing', 'running', 'cancelling', 'unknown'].includes(run.status)) busy.push({ kind: 'evaluation', id, state: run.status })
   }
   for (const operation of operations) {
     if (typeof operation.id !== 'string' || !['starting', 'running', 'stopping', 'completed', 'failed', 'stopped', 'unknown'].includes(operation.status)) throw new Error('SDK任务状态不完整，不能判断为空闲')

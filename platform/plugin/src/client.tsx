@@ -305,7 +305,7 @@ function PlatformPage({ catalog, rpc, assistant, updates, theme, enterConversati
     target.instance_name && `实例 ${target.instance_name}`,
     target.source_id && target.source_id !== `experiment:${target.experiment_id}` && `来源 ${sourceLabel(target.source_id, target.agent_id, identityRows)}`,
     target.server_id && `服务 ${target.server_id}`, target.composition_id && `组合 ${target.composition_id}`,
-    target.version_id && `组合版本 ${target.version_id}`, target.job_id && `评测任务 ${target.job_id}`,
+    target.version_id && `组合版本 ${target.version_id}`,
     target.run_id && `Run ${target.run_id}`, target.case_id && `用例 ${target.case_id}`].filter(Boolean).join(' · ')
   const fixedObject = fixed ? [agentLabel(fixed.agent_id, identityRows),
     fixed.source && sourceLabel(fixed.source, fixed.agent_id, identityRows),
@@ -323,7 +323,7 @@ function PlatformPage({ catalog, rpc, assistant, updates, theme, enterConversati
   const viewedIds = [
     ['Agent ID', target.agent_id], ['版本 ID', target.experiment_id], ['实例名', target.instance_name], ['来源 ID', target.source_id],
     ['服务 ID', target.server_id], ['组合 ID', target.composition_id], ['组合版本 ID', target.version_id],
-    ['Job ID', target.job_id], ['Run ID', target.run_id], ['用例 ID', target.case_id],
+    ['Run ID', target.run_id], ['用例 ID', target.case_id],
   ].filter((item): item is [string, string] => Boolean(item[1]))
   const fixedIds = fixed ? [['Agent ID', fixed.agent_id], ['来源 ID', fixed.source], ['实例名', fixed.instance_name]]
     .filter((item): item is [string, string] => Boolean(item[1])) : []

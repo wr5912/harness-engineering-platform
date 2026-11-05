@@ -1,0 +1,242 @@
+{
+  "scope": "driver修复后仅一个全新正常Run：固定来源与原Case的Mock browser工程冒烟，不作业务效果主张；不重放旧Run",
+  "payload": {
+    "source": "experiment:VAR-inspection-delivery-demo-001-rfac75f4cb946",
+    "source_ref": "git:8fbb06e9387e407db77a081c21d8db9927054bd0",
+    "cases": [
+      "U-ASSET-PAGES-001"
+    ],
+    "mode": "full",
+    "executor": "browser",
+    "review": "none"
+  },
+  "expectedDriver": "e2a0e7d8dbddb1777918c6a71c2bfaaf9efaad9cb67a17ef2c243b54e188ad86",
+  "checks": [
+    {
+      "name": "启动前driver为已冻结修复版本",
+      "ok": true
+    },
+    {
+      "name": "全新预览分配Run ID",
+      "ok": true
+    },
+    {
+      "name": "仅一次启动返回相同已创建Run",
+      "ok": true
+    },
+    {
+      "name": "正常Run执行完成并按原ID封存",
+      "ok": true
+    },
+    {
+      "name": "正常Run实例停止已确认",
+      "ok": true
+    },
+    {
+      "name": "目录清单冻结输入执行记录使用同一Run ID",
+      "ok": true
+    },
+    {
+      "name": "执行记录不生成Job ID",
+      "ok": true
+    },
+    {
+      "name": "固定原来源提交和Case",
+      "ok": true
+    },
+    {
+      "name": "Run冻结实际加载的修复driver",
+      "ok": true
+    },
+    {
+      "name": "Run实际标准镜像身份一致",
+      "ok": true
+    },
+    {
+      "name": "本次实例无遗留运行容器",
+      "ok": true
+    },
+    {
+      "name": "真实browser Case执行完成且保留语义未知",
+      "ok": true
+    },
+    {
+      "name": "真实browser UI冒烟完成并显示回答",
+      "ok": true
+    },
+    {
+      "name": "实际driver容器只读挂载脚本与冻结摘要一致",
+      "ok": true
+    },
+    {
+      "name": "正常Run真实行完整编号与已结束状态",
+      "ok": true
+    },
+    {
+      "name": "正常Run详情保持同一完整Run ID和完成状态",
+      "ok": true
+    },
+    {
+      "name": "补验页面无脚本异常及自动评测写入",
+      "ok": true
+    }
+  ],
+  "failures": [],
+  "observations": [
+    {
+      "run_id": "run-23c63f26-12b6-439f-9021-4272852c3b52",
+      "status": "running",
+      "run_status": "planned",
+      "run_created": true
+    },
+    {
+      "run_id": "run-23c63f26-12b6-439f-9021-4272852c3b52",
+      "status": "running",
+      "run_status": "running",
+      "run_created": true
+    },
+    {
+      "run_id": "run-23c63f26-12b6-439f-9021-4272852c3b52",
+      "status": "completed",
+      "run_status": "completed",
+      "run_created": true,
+      "exit_code": 0
+    }
+  ],
+  "blockedWrites": [],
+  "pageErrors": [],
+  "run_id": "run-23c63f26-12b6-439f-9021-4272852c3b52",
+  "runningDriver": {
+    "captured_at": "2026-11-04T11:51:44.732Z",
+    "container": "dsh-eval-driver-9164f287e0774363a47462402820b20a",
+    "source": "/home/admin/work/harness-engineering-platform/runtime/adapters/dsh-container/dsh-eval-browser.mjs",
+    "destination": "/opt/dsh/apps/web/dsh-eval-browser.mjs",
+    "readonly": true,
+    "container_sha256": "e2a0e7d8dbddb1777918c6a71c2bfaaf9efaad9cb67a17ef2c243b54e188ad86",
+    "host_sha256": "e2a0e7d8dbddb1777918c6a71c2bfaaf9efaad9cb67a17ef2c243b54e188ad86",
+    "image": "ai-agent-harness/dsh:b830ec950-amd64-2ed0d15ad02e@sha256:6a975adf96634fd8e20552f4e8ca075625d01bcd8636cda9d4db5af2d5d8fcaf"
+  },
+  "created": {
+    "run_id": "run-23c63f26-12b6-439f-9021-4272852c3b52",
+    "directory": "/home/admin/harness-engineering-platform-data/evolution/experiments/VAR-inspection-delivery-demo-001-rfac75f4cb946/runs/run-23c63f26-12b6-439f-9021-4272852c3b52",
+    "status": "completed",
+    "run_status": "completed",
+    "execution_status": "completed",
+    "instance_name": "inspection-delivery-demo-eval-56f2a56f",
+    "instance_stopped": true,
+    "source_ref": "git:8fbb06e9387e407db77a081c21d8db9927054bd0",
+    "driver_sha256": "e2a0e7d8dbddb1777918c6a71c2bfaaf9efaad9cb67a17ef2c243b54e188ad86",
+    "image": {
+      "schema_version": "1.0",
+      "source_id": "experiment:VAR-inspection-delivery-demo-001-rfac75f4cb946",
+      "local_image_tag": "ai-agent-harness/dsh:b830ec950-amd64-2ed0d15ad02e",
+      "local_image_id": "sha256:6a975adf96634fd8e20552f4e8ca075625d01bcd8636cda9d4db5af2d5d8fcaf",
+      "image_ref": "ai-agent-harness/dsh:b830ec950-amd64-2ed0d15ad02e@sha256:6a975adf96634fd8e20552f4e8ca075625d01bcd8636cda9d4db5af2d5d8fcaf",
+      "image_build_fingerprint": "sha256:2ed0d15ad02e05605d5ffb34986f149efb399d1a9331d21eceae9735b4ebfaca",
+      "platform": "linux/amd64",
+      "instance_name": "inspection-delivery-demo-eval-56f2a56f",
+      "business_control": {
+        "source_digest": "sha256:4f522dc16838e6412556e45183e6f326a921715b2aaef71ec3ea76147b4242c6",
+        "runtime_generation": "b26daece3d85eec5c1c5587653a87b68",
+        "identity_mode": "development",
+        "access_mode": "anonymous"
+      },
+      "entry_kind": "business-gateway",
+      "scope": "actual DSH evaluation runtime image identity; no semantic verdict"
+    }
+  },
+  "matchingContainers": [],
+  "summary": {
+    "schema_version": "3.0",
+    "run_id": "run-23c63f26-12b6-439f-9021-4272852c3b52",
+    "trial_count": 1,
+    "execution_status_counts": {
+      "completed": 1,
+      "error": 0,
+      "skipped": 0
+    },
+    "machine_trial_verdict_counts": {
+      "passed": 0,
+      "failed": 0,
+      "inconclusive": 1
+    },
+    "machine_overall_verdict": "inconclusive",
+    "review_status": "not_requested",
+    "reviewed_case_count": 0,
+    "reviewed_case_verdict_counts": null,
+    "reviewed_overall_verdict": null,
+    "effective_verdict": "inconclusive",
+    "source_verification": {
+      "status": "matched",
+      "reason": null,
+      "checks": [
+        {
+          "component": "candidate",
+          "status": "matched",
+          "expected_sha256": "9cceec4f6ed93d626059777a43ba8cac38882febe7cca71587edcff0d9f1a5a4",
+          "actual_sha256": "9cceec4f6ed93d626059777a43ba8cac38882febe7cca71587edcff0d9f1a5a4"
+        },
+        {
+          "component": "workspace",
+          "status": "matched",
+          "expected_sha256": "d27277dc23adb6205d2cbbe4ed3fa790dc697db4952d45030c831655563fdcf4",
+          "actual_sha256": "d27277dc23adb6205d2cbbe4ed3fa790dc697db4952d45030c831655563fdcf4"
+        },
+        {
+          "component": "presets",
+          "status": "matched",
+          "expected_sha256": "b7bcf92109fd8f8c941ee11a36f5ea9b264c4c4843b230b73f3d287a7f3b1b90",
+          "actual_sha256": "b7bcf92109fd8f8c941ee11a36f5ea9b264c4c4843b230b73f3d287a7f3b1b90"
+        },
+        {
+          "component": "managed",
+          "status": "matched",
+          "expected_sha256": "3a29fc58efa5bbf2ad42fe917706f212a7c7a0a222a2685e376928a0b021fcc4",
+          "actual_sha256": "3a29fc58efa5bbf2ad42fe917706f212a7c7a0a222a2685e376928a0b021fcc4"
+        },
+        {
+          "component": "evaluation_implementation",
+          "status": "matched",
+          "expected_sha256": "b2ffaec5cad9e9cbfd7ffc5af9414b2fe3696a6c0fd7dc23529bb0920862db93",
+          "actual_sha256": "b2ffaec5cad9e9cbfd7ffc5af9414b2fe3696a6c0fd7dc23529bb0920862db93"
+        }
+      ]
+    }
+  },
+  "caseResults": [
+    {
+      "case_id": "U-ASSET-PAGES-001",
+      "execution_status": "completed",
+      "verdict": "inconclusive"
+    }
+  ],
+  "caseChecks": {
+    "schema_version": "1.0",
+    "case_id": "U-ASSET-PAGES-001",
+    "transport": "browser",
+    "expected_behavior": "实际调用task_inspection的start、page和report；使用同一个run_id，分页从0按返回cursor到null，共读取asset-0001至asset-0005五台，报告数量为5，包含实际可下载Markdown和CSV。明确基础模拟台账、未检测真实设备。不能只给职责或用户提供数据摘要。",
+    "session_id": "session-b329110d-f923-4ece-8b5b-8263df6ccc03",
+    "session_preset": "inspection-delivery-demo",
+    "session_workspace": "/work/harness/workspace",
+    "preset_matches": true,
+    "workspace_matches": true,
+    "ui_startup": {
+      "testing_notice_dismissed": false,
+      "workspace_action": "already-registered"
+    },
+    "trace_format": "dsh-session-export-envelope-v1",
+    "root_session_log": "session.v4.jsonl",
+    "completed": true,
+    "ui_smoke_passed": true,
+    "trace_available": true
+  },
+  "uiRow": {
+    "id": "用例范围未知 · Run ID：run-23c63f26-12b6-439f-9021-4272852c3b52",
+    "execution": "已结束"
+  },
+  "uiDetail": {
+    "run_id": "run-23c63f26-12b6-439f-9021-4272852c3b52",
+    "state": "completed",
+    "id": "Run ID：run-23c63f26-12b6-439f-9021-4272852c3b52"
+  }
+}

@@ -1,0 +1,219 @@
+{
+  "scope": "明确授权的两个最小真实browser评测Run：一个完整Mock分页UI冒烟、一个定向取消；只证明工程与浏览器链路，不作业务效果采纳。Case与Harness保持。",
+  "payload": {
+    "source": "experiment:VAR-inspection-delivery-demo-001-rfac75f4cb946",
+    "source_ref": "git:8fbb06e9387e407db77a081c21d8db9927054bd0",
+    "cases": [
+      "U-ASSET-PAGES-001"
+    ],
+    "mode": "full",
+    "executor": "browser",
+    "review": "none"
+  },
+  "checks": [
+    {
+      "name": "未预留RunID不能创建",
+      "ok": true
+    },
+    {
+      "name": "未预留请求没有Run或控制文件",
+      "ok": true
+    },
+    {
+      "name": "真实预览分配唯一RunID",
+      "ok": true
+    },
+    {
+      "name": "预览后仅准备且未创建",
+      "ok": true
+    },
+    {
+      "name": "撤销后的迟到提交不执行",
+      "ok": true
+    },
+    {
+      "name": "撤销预留无Run与控制文件残留",
+      "ok": true
+    },
+    {
+      "name": "新的预览分配新RunID",
+      "ok": true
+    },
+    {
+      "name": "创建成功返回原预览RunID",
+      "ok": true
+    },
+    {
+      "name": "创建成功后实际Run目录存在",
+      "ok": true
+    },
+    {
+      "name": "最小真实Run 目录与清单、冻结输入、执行记录同ID",
+      "ok": true
+    },
+    {
+      "name": "最小真实Run 不生成第二个JobID",
+      "ok": true
+    },
+    {
+      "name": "最小真实Run 固定指定来源与原Case",
+      "ok": true
+    },
+    {
+      "name": "最小真实browser Run执行结束",
+      "ok": false,
+      "detail": {
+        "status": "failed",
+        "run_status": "failed"
+      }
+    },
+    {
+      "name": "最小真实Run的实例已停止",
+      "ok": true
+    },
+    {
+      "name": "终态原ID重发仅返回原Run",
+      "ok": true
+    },
+    {
+      "name": "原ID更换参数被拒绝",
+      "ok": true
+    },
+    {
+      "name": "取消只针对自己本次创建的Run",
+      "ok": true
+    },
+    {
+      "name": "定向取消Run 目录与清单、冻结输入、执行记录同ID",
+      "ok": true
+    },
+    {
+      "name": "定向取消Run 不生成第二个JobID",
+      "ok": true
+    },
+    {
+      "name": "定向取消Run 固定指定来源与原Case",
+      "ok": true
+    },
+    {
+      "name": "取消已结束并确认实例停止",
+      "ok": true,
+      "detail": {
+        "status": "cancelled",
+        "instance_stopped": true
+      }
+    },
+    {
+      "name": "列表仅发布实际已创建Run",
+      "ok": true
+    },
+    {
+      "name": "两次验收Run列表身份唯一且无预留行",
+      "ok": true
+    }
+  ],
+  "failures": [
+    "最小真实browser Run执行结束"
+  ],
+  "observations": [
+    {
+      "label": "completed-run",
+      "run_id": "run-68d23096-e504-4571-b7e6-ed9460f49b8e",
+      "run_created": false,
+      "status": "preparing"
+    },
+    {
+      "label": "completed-run",
+      "run_id": "run-68d23096-e504-4571-b7e6-ed9460f49b8e",
+      "run_created": true,
+      "status": "running",
+      "run_status": "planned"
+    },
+    {
+      "label": "completed-run",
+      "run_id": "run-68d23096-e504-4571-b7e6-ed9460f49b8e",
+      "run_created": true,
+      "status": "failed",
+      "run_status": "failed"
+    },
+    {
+      "label": "completed-run",
+      "run_id": "run-68d23096-e504-4571-b7e6-ed9460f49b8e",
+      "run_created": true,
+      "status": "failed",
+      "exit_code": 2,
+      "run_status": "failed"
+    },
+    {
+      "label": "cancel-run",
+      "run_id": "run-9f341352-fc1a-47b4-b64e-c31c9b56c2ea",
+      "run_created": false,
+      "status": "preparing"
+    },
+    {
+      "label": "cancel-run",
+      "run_id": "run-9f341352-fc1a-47b4-b64e-c31c9b56c2ea",
+      "run_created": true,
+      "status": "running",
+      "run_status": "planned"
+    },
+    {
+      "label": "cancel-run",
+      "run_id": "run-9f341352-fc1a-47b4-b64e-c31c9b56c2ea",
+      "run_created": true,
+      "status": "cancelling"
+    },
+    {
+      "label": "cancel-run",
+      "run_id": "run-9f341352-fc1a-47b4-b64e-c31c9b56c2ea",
+      "run_created": true,
+      "status": "cancelling",
+      "run_status": "planned"
+    },
+    {
+      "label": "cancel-run",
+      "run_id": "run-9f341352-fc1a-47b4-b64e-c31c9b56c2ea",
+      "run_created": true,
+      "status": "cancelling",
+      "run_status": "running"
+    },
+    {
+      "label": "cancel-run",
+      "run_id": "run-9f341352-fc1a-47b4-b64e-c31c9b56c2ea",
+      "run_created": true,
+      "status": "cancelled",
+      "exit_code": 2,
+      "run_status": "cancelled"
+    }
+  ],
+  "created": [
+    {
+      "run_id": "run-68d23096-e504-4571-b7e6-ed9460f49b8e",
+      "directory": "/home/admin/harness-engineering-platform-data/evolution/experiments/VAR-inspection-delivery-demo-001-rfac75f4cb946/runs/run-68d23096-e504-4571-b7e6-ed9460f49b8e",
+      "status": "failed",
+      "source_ref": "git:8fbb06e9387e407db77a081c21d8db9927054bd0",
+      "executor": "browser",
+      "review_mode": "none",
+      "execution_status": "failed",
+      "instance_name": "inspection-delivery-demo-eval-5ec6a30f",
+      "instance_stopped": true,
+      "lock_sha256": "23ba22f0c642103596bbea64813af9598191c09206223af19d30f8b3b46b2ba3"
+    },
+    {
+      "run_id": "run-9f341352-fc1a-47b4-b64e-c31c9b56c2ea",
+      "directory": "/home/admin/harness-engineering-platform-data/evolution/experiments/VAR-inspection-delivery-demo-001-rfac75f4cb946/runs/run-9f341352-fc1a-47b4-b64e-c31c9b56c2ea",
+      "status": "cancelled",
+      "source_ref": "git:8fbb06e9387e407db77a081c21d8db9927054bd0",
+      "executor": "browser",
+      "review_mode": "none",
+      "execution_status": "cancelled",
+      "instance_name": "inspection-delivery-demo-eval-d9c6ba66",
+      "instance_stopped": true,
+      "lock_sha256": "7f0480a71bd8402dbd24087eb2a1c7c14ca14978f3ce7d51ad4001de9173b643"
+    }
+  ],
+  "preparedRunId": "run-f78a73be-999d-4f11-a255-7818d01437ea",
+  "completedRunId": "run-68d23096-e504-4571-b7e6-ed9460f49b8e",
+  "cancelledRunId": "run-9f341352-fc1a-47b4-b64e-c31c9b56c2ea",
+  "cancellationPoint": "本次Run已写入真实dsh-image.json、独立实例启动返回后立即定向取消"
+}

@@ -18,7 +18,7 @@ const betaRun = { experiment_id: 'EXP-beta-001', runs: [{ run_id: runB, status: 
 const alphaOverview = experiments => overview([['alpha', experiments], ['beta', [betaRun]]])
 function workbench({ target, handler, onAssistant, storage = new Map() } = {}) {
   const states = [], dependencies = [], cleanups = []
-  let cursor, effects, changed, tree, modalOpen = false, failSave = false, loadedDoc = structuredClone(doc), decisionContent = detail.decision.content
+  let cursor, effects, changed, tree, previewSerial = 0, modalOpen = false, failSave = false, loadedDoc = structuredClone(doc), decisionContent = detail.decision.content
   const calls = [], navigations = [], contexts = [], confirmations = [], assistants = []
   const updateListeners = new Set()
   let updateSnapshot = { domains: [], revision: 0 }
@@ -48,7 +48,7 @@ function workbench({ target, handler, onAssistant, storage = new Map() } = {}) {
   vm.runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, require: name => name === 'react' ? react : name === '@deepseek-ai/dsh-client-ui-primitives' ? { MarkdownText, MarkdownDelegateProvider } : require(name), window, crypto: webcrypto, document: { baseURI: 'http://localhost:3090/hep/', getElementById: () => ({ focus() {} }), querySelector: () => modalOpen ? { role: 'dialog' } : null }, URL })
   const { EvaluationPage } = module.exports
   const defaultHandler = async (action, payload) => {
-    if (action === 'list') return { agents: [{ id: 'alpha' }, { id: 'beta' }] }
+    if (action === 'list') return { root: '/test-assets', agents: [{ id: 'alpha' }, { id: 'beta' }], experiments: [{ id: expA, agent_id: 'alpha', change: {} }] }
     if (action === 'detail') return { ...detail, decision: { ...detail.decision, content: decisionContent } }
     if (action === 'runs/overview') return overview([['alpha', [{ experiment_id: expA, runs: [{ run_id: runA, status: 'completed', created_at: '2026-10-15T08:00:00Z' }] }]], ['beta', [betaRun]]])
     if (action === 'runs/show') return { run_id: payload.run_id, run_path: `evolution/experiments/${expA}/runs/${payload.run_id}`, manifest: { agent_id: 'alpha', experiment_id: expA, status: 'completed' }, summary: { effective_verdict: 'passed' }, source: { executor: 'api' }, cases: [{ case_id: 'C-1', frozen: { inputs: ['原始输入'], expected_behavior: '原始标准' }, trials: [], evidence: [] }], missing: [] }
@@ -61,10 +61,10 @@ function workbench({ target, handler, onAssistant, storage = new Map() } = {}) {
       loadedDoc = { ...loadedDoc, sha256: 'case-v2', case: { ...loadedDoc.case, title: payload.title, inputs: [...payload.inputs], expected_behavior: payload.expected_behavior, fast: payload.fast } }
       return structuredClone(loadedDoc)
     }
-    if (action === 'eval/preview') return { result: { mode: payload.mode, case_ids: payload.cases ?? ['C-1'], executor: payload.executor } }
-    if (action === 'eval/list') return { jobs: [] }
-    if (action === 'eval/start') return { job_id: 'job-1', status: 'running' }
-    if (action === 'eval/status') return { job_id: 'job-1', status: 'completed', result: { run_id: runA } }
+    if (action === 'eval/preview') return { run_id: ++previewSerial === 1 ? runA : `run-aaaaaaaa-aaaa-4aaa-8aaa-${String(previewSerial).padStart(12, '0')}`, result: { mode: payload.mode, case_ids: payload.cases ?? ['C-1'], executor: payload.executor } }
+    if (action === 'eval/list') return { runs: [], errors: [] }
+    if (action === 'eval/start') return { run_id: payload.run_id, run_created: true, status: 'running' }
+    if (action === 'eval/status') return { run_id: payload.run_id || runA, run_created: true, status: 'completed', result: { run_id: payload.run_id || runA } }
     if (action === 'eval/cancel') return { status: 'cancelled' }
     if (action === 'decision/update') { decisionContent = payload.content; return { sha256: 'decision-v2' } }
     throw new Error(`未处理的 RPC ${action}`)
@@ -173,19 +173,20 @@ test('无深链时先显示统一记录，用户选择后才读取结果', async
   } finally { ui.cleanup() }
 })
 
-test('只有 Job 或 Run 索引读取失败时不伪造默认 Run', async () => {
-  for (const failed of [false, true]) {
-    const ui = workbench({ target: { page: 'evaluation' }, handler: async (action, payload, original) => {
-      if (action === 'eval/list') return { jobs: [{ job_id: 'job-1', source: `experiment:${expA}`, agent_id: 'alpha', experiment_id: expA, status: 'running', started_at: '2026-10-15T08:00:00Z' }] }
-      if (action === 'runs/overview') { if (failed) throw new Error('network: 暂时不可达'); return { agents: [] } }
-      return original(action, payload)
+test('控制清单或运行索引不可读时只保留真实Run，不伪造启动记录', async () => {
+  for (const failure of ['eval/list', 'runs/overview']) {
+    const ui = workbench({ handler(action, payload, fallback) {
+      if (action === failure) throw new Error('read_failed: 运行观察不可读')
+      if (action === 'eval/list') return { runs: [], errors: [] }
+      return fallback(action, payload)
     } })
     try {
       await ui.settle()
-      assert.equal(ui.getTarget()?.run_id, undefined)
-      assert.equal(ui.calls.some(call => call.action === 'runs/show'), false)
-      assert.match(ui.text(), failed ? /暂时无法读取已保存的评测结果/ : /当前没有已保存的 Run。可打开上方评测任务核对进展/)
-      assert.match(ui.text(), /查看任务/)
+      assert.match(ui.text(), /运行观察不可读/)
+      assert.equal(ui.calls.some(call => call.action === 'eval/start'), false)
+      const rows = ui.nodes(ui.byLabel('评测记录列表')).filter(node => node.type === 'tr').slice(1)
+      assert.equal(rows.length, failure === 'eval/list' ? 2 : 0)
+      assert.doesNotMatch(ui.text(ui.byLabel('评测记录列表')), /任务 ID：/)
     } finally { ui.cleanup() }
   }
 })
@@ -259,68 +260,49 @@ test('Job 选择与深链聚焦同一任务，返回记录恢复列表入口', a
   } finally { ui.cleanup() }
 })
 
-test('刷新与新标签页按 job_id 恢复原任务，不调用 eval/start，用户主动查看才跳到 Run', async () => {
-  const target = { page: 'evaluation', tab: 'jobs', job_id: 'job-1', agent_id: 'alpha', experiment_id: expA }
-  const handler = async (action, payload, original) => {
-    if (action === 'eval/list') return { jobs: [{ job_id: 'job-1', source: `experiment:${expA}`, agent_id: 'alpha', experiment_id: expA, status: 'running', started_at: '2026-10-15T08:00:00Z' }] }
-    if (action === 'eval/status') return { job_id: payload.job_id, source: `experiment:${expA}`, status: 'completed', result: { run_id: runA } }
-    return original(action, payload)
-  }
-  for (let reopen = 0; reopen < 2; reopen++) {
-    const ui = workbench({ target, handler })
+test('旧job_id深链只读取实际关联并replace为原Run，不启动评测', async () => {
+  for (let index = 0; index < 2; index++) {
+    const ui = workbench({ target: { page: 'evaluation', tab: 'jobs', job_id: 'legacy-job', agent_id: 'alpha', experiment_id: expA }, handler(action, payload, fallback) {
+      if (action === 'eval/status' && payload.job_id) return { run_id: runA, run_created: true, status: 'running', source: `experiment:${expA}` }
+      return fallback(action, payload)
+    } })
     try {
       await ui.settle()
-      assert.equal(ui.calls.filter(call => call.action === 'eval/start').length, 0)
-      assert.ok(ui.calls.some(call => call.action === 'eval/status' && call.payload.job_id === 'job-1'))
-      assert.equal(ui.jobStatus(), '已结束')
-      assert.equal(ui.getTarget().run_id, undefined)
-      ui.button('查看本次报告').props.onClick()
-      await ui.settle()
-      assert.equal(ui.getTarget().run_id, runA)
-      assert.equal(ui.getTarget().job_id, 'job-1')
+      assert.equal(ui.getTarget().run_id, runA); assert.equal(ui.getTarget().job_id, undefined)
+      assert.equal(ui.getTarget().tab, 'runs')
+      assert.ok(ui.navigations.some(item => item.run_id === runA && item.replace === true))
+      assert.ok(ui.calls.some(call => call.action === 'eval/status' && call.payload.job_id === 'legacy-job'))
+      assert.equal(ui.calls.some(call => ['eval/start', 'eval/preview'].includes(call.action)), false)
     } finally { ui.cleanup() }
   }
 })
 
-test('从 Run 页主动选择无 Run ID 的 Job 时，立即返回的状态不抢走任务标签', async () => {
-  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA }, handler: async (action, payload, original) => {
-    if (action === 'eval/list') return { jobs: [{ job_id: 'job-1', source: `experiment:${expA}`, agent_id: 'alpha', experiment_id: expA, status: 'running', started_at: '2026-10-15T08:00:00Z' }] }
-    if (action === 'eval/status') return { job_id: payload.job_id, source: `experiment:${expA}`, status: 'completed', result: { run_id: runA } }
-    return original(action, payload)
-  } })
+test('明确Run深链优先于同时残留的旧Job参数，不查询或跳到另一个Run', async () => {
+  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', run_id: runB, job_id: 'legacy-job' } })
   try {
     await ui.settle()
-    const records = ui.nodes().find(node => node.type === 'table' && node.props['aria-label'] === '评测记录列表')
-    assert.ok(records)
-    assert.ok(ui.nodes().indexOf(records) > ui.nodes().indexOf(ui.byLabel('评测工作区')), '三个工作面标签置于记录前')
-    assert.match(ui.text(records), /当前任务.*运行中.*尚无可核对结论.*查看任务/)
-    assert.match(ui.text(records), /Run · .*查看结果/)
-    ui.idButton('job-1').props.onClick({ stopPropagation() {} })
-    await new Promise(resolve => setImmediate(resolve))
-    assert.equal(ui.navigations.at(-1).tab, 'jobs')
-    assert.equal(ui.navigations.at(-1).run_id, undefined)
-    await ui.settle()
-    assert.equal(ui.getTarget().tab, 'jobs')
+    assert.equal(ui.getTarget().run_id, runB)
+    assert.equal(ui.calls.some(call => call.action === 'eval/status' && call.payload.job_id), false)
     assert.equal(ui.calls.some(call => call.action === 'eval/start'), false)
+    assert.ok(ui.calls.some(call => call.action === 'runs/show' && call.payload.run_id === runB))
   } finally { ui.cleanup() }
 })
 
-test('统一记录对已有 Run 的任务去重，未形成 Run 的最终任务仍可核对', async () => {
-  const ui = workbench({ handler: async (action, payload, original) => {
-    if (action === 'eval/list') return { jobs: [
-      { job_id: 'job-with-run', source: `experiment:${expA}`, agent_id: 'alpha', experiment_id: expA, status: 'completed', run_id: runA, started_at: '2026-10-15T08:00:00Z' },
-      { job_id: 'job-without-run', source: `experiment:${expA}`, agent_id: 'alpha', experiment_id: expA, status: 'failed', started_at: '2026-10-15T09:00:00Z' },
-    ] }
-    return original(action, payload)
+test('控制快照与评测事实按Run ID合并，未创建Run的预留或失败不进入表格', async () => {
+  const ui = workbench({ handler(action, payload, fallback) {
+    if (action === 'eval/list') return { runs: [
+      { run_id: runA, run_created: true, source: `experiment:${expA}`, agent_id: 'alpha', experiment_id: expA, status: 'running' },
+      { run_id: 'run-prepared', run_created: false, status: 'prepared' },
+      { run_id: null, legacy_id: 'failed-without-run', run_created: false, status: 'failed' },
+    ], errors: [] }
+    return fallback(action, payload)
   } })
   try {
     await ui.settle()
-    const records = ui.nodes().find(node => node.type === 'table' && node.props['aria-label'] === '评测记录列表')
-    assert.ok(records)
-    assert.equal(ui.nodes(records).some(node => node.type === 'button' && node.props.title === 'job-with-run'), false)
-    assert.equal(ui.nodes(records).some(node => node.type === 'button' && node.props.title === 'job-without-run'), true)
-    assert.match(ui.text(records), /历史任务.*执行错误.*尚无可核对结论.*未生成可核对的 Run/)
-    assert.match(ui.text(records), /Run · .*查看结果/)
+    const rows = ui.nodes(ui.byLabel('评测记录列表')).filter(node => node.type === 'tr').slice(1)
+    assert.equal(rows.length, 2)
+    assert.equal(ui.nodes(ui.byLabel('评测记录列表')).filter(node => node.type === 'button' && node.props.title === runA).length, 1)
+    assert.doesNotMatch(ui.text(ui.byLabel('评测记录列表')), /failed-without-run|run-prepared|任务 ID：/)
   } finally { ui.cleanup() }
 })
 
@@ -446,35 +428,35 @@ test('深链接切换 Run 后只定位最终读取的目标', async () => {
   } finally { ui.cleanup() }
 })
 
-test('Job 失效保留原 ID 和重试入口，不静默选到其他任务', async () => {
-  const ui = workbench({ target: { page: 'evaluation', tab: 'jobs', job_id: 'job-missing' }, handler: async (action, payload, original) => {
-    if (action === 'eval/list') return { jobs: [{ job_id: 'job-other', source: `experiment:${expA}`, status: 'running', started_at: '2026-10-15T08:00:00Z' }] }
-    if (action === 'eval/status') throw new Error('not_found: 评测任务不存在')
-    return original(action, payload)
+test('无Run的旧深链失效时只显示说明和重新查询，不静默选中其他记录', async () => {
+  const ui = workbench({ target: { page: 'evaluation', tab: 'jobs', job_id: 'legacy-missing' }, handler(action, payload, fallback) {
+    if (action === 'eval/status') throw new Error('not_found: 旧评测不存在')
+    return fallback(action, payload)
   } })
   try {
-    await ui.settle()
-    assert.match(ui.text(), /未能连接任务 job-missing/)
-    assert.equal(ui.getTarget().job_id, 'job-missing')
-    assert.equal(ui.button('刷新状态').props.disabled, undefined)
-    assert.equal(ui.calls.some(call => call.action === 'eval/start'), false)
+    await ui.settle(); assert.match(ui.text(), /旧评测未形成可继续的运行记录/)
+    assert.equal(ui.getTarget().run_id, undefined)
+    ui.button('重新查询').props.onClick(); await ui.settle()
+    assert.equal(ui.calls.filter(call => call.action === 'eval/status' && call.payload.job_id === 'legacy-missing').length, 2)
+    assert.equal(ui.calls.some(call => ['eval/start', 'eval/preview'].includes(call.action)), false)
   } finally { ui.cleanup() }
 })
 
-test('未主动选择任务时仍显示真实运行中 Job，并从同一任务进入执行过程', async () => {
-  const ui = workbench({ handler: async (action, payload, original) => action === 'eval/list'
-    ? { jobs: [{ job_id: 'job-active', agent_id: 'alpha', experiment_id: expA, source: `experiment:${expA}`, status: 'running', started_at: '2026-10-20T08:00:00Z' }] }
-    : action === 'eval/status' ? { job_id: payload.job_id, status: 'running', agent_id: 'alpha', experiment_id: expA }
-      : original(action, payload) })
+test('活动控制记录以同一Run进入结果详情，列表不额外显示任务身份', async () => {
+  const activeRun = 'run-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+  const control = { run_id: activeRun, run_created: true, source: `experiment:${expA}`, agent_id: 'alpha', experiment_id: expA, status: 'running', started_at: '2026-11-04T08:00:00Z' }
+  const ui = workbench({ handler(action, payload, fallback) {
+    if (action === 'eval/list') return { runs: [control], errors: [] }
+    if (action === 'eval/status' && payload.run_id === activeRun) return control
+    return fallback(action, payload)
+  } })
   try {
-    await ui.settle()
-    const banner = ui.byLabel('当前评测任务')
-    assert.match(ui.text(banner), /alpha v001.*运行中/)
+    await ui.settle(); assert.ok(ui.idButton(activeRun))
+    assert.equal(ui.byLabel('评测进度'), undefined, '未选择时没有另一个任务工作面')
+    ui.idButton(activeRun).props.onClick({ stopPropagation() {} }); await ui.settle()
+    assert.equal(ui.getTarget().run_id, activeRun); assert.equal(ui.getTarget().job_id, undefined)
+    assert.match(ui.text(ui.byLabel('评测进度')), /Run ID：run-aaaaaaaa.*运行中/s)
     assert.equal(ui.calls.some(call => call.action === 'eval/start'), false)
-    ui.button('查看执行过程').props.onClick()
-    await ui.settle()
-    assert.equal(ui.getTarget().job_id, 'job-active')
-    assert.ok(ui.calls.some(call => call.action === 'eval/status' && call.payload.job_id === 'job-active'))
   } finally { ui.cleanup() }
 })
 
@@ -656,73 +638,52 @@ test('未完成 Run 的部分通过摘要不成为列表、详情或对照的整
   } finally { ui.cleanup() }
 })
 
-test('Job 的部分通过摘要仅在 Job 与 Run 都完成后展示整体结论', async () => {
-  for (const status of ['running', 'failed', 'cancelled', 'completed']) {
-    const ui = workbench({ target: { page: 'evaluation', tab: 'jobs', job_id: 'job-1', agent_id: 'alpha', experiment_id: expA }, handler: async (action, payload, original) => {
-      if (action === 'eval/list') return { jobs: [{ job_id: 'job-1', source: `experiment:${expA}`, agent_id: 'alpha', experiment_id: expA, status, started_at: '2026-10-15T08:00:00Z' }] }
-      if (action === 'eval/status') return { job_id: 'job-1', source: `experiment:${expA}`, status, result: { run_id: runA, run_status: status }, summary: { effective_verdict: 'passed' } }
-      return original(action, payload)
-    } })
-    try {
-      await ui.settle()
-      assert.equal(ui.text().includes('业务结论：通过'), status === 'completed', status)
-      assert.ok(ui.button('查看本次报告'), '部分 Run 仍可打开查证据')
-    } finally { ui.cleanup() }
-  }
-})
-
-test('取消评测先核对任务身份，确认后进入取消中且快速双击只发送一次请求', async () => {
-  let finishCancel
-  const pendingCancel = new Promise(resolve => { finishCancel = resolve })
-  let cancelled = false
-  const ui = workbench({ target: { page: 'evaluation', tab: 'jobs', job_id: 'job-1', agent_id: 'alpha', experiment_id: expA }, handler: async (action, payload, original) => {
-    if (action === 'eval/list') return { jobs: [{ job_id: 'job-1', source: `experiment:${expA}`, agent_id: 'alpha', experiment_id: expA, status: 'running', started_at: '2026-10-15T08:00:00Z' }] }
-    if (action === 'eval/status') return { job_id: 'job-1', status: cancelled ? 'cancelled' : 'running' }
-    if (action === 'eval/cancel') return pendingCancel
-    return original(action, payload)
+test('运行控制快照中的部分通过不能替代Run的有效业务结论', async () => {
+  const ui = workbench({ handler(action, payload, fallback) {
+    if (action === 'eval/list') return { runs: [{ run_id: runA, run_created: true, agent_id: 'alpha', experiment_id: expA, status: 'running', summary: { effective_verdict: 'passed' } }], errors: [] }
+    if (action === 'runs/overview') return overview([['alpha', [{ experiment_id: expA, runs: [{ run_id: runA, status: 'running', effective_verdict: 'passed' }] }]]])
+    return fallback(action, payload)
   } })
   try {
     await ui.settle()
-    const cancel = ui.button('取消评测')
-    cancel.props.onClick(); cancel.props.onClick()
-    ui.render()
-    assert.equal(ui.calls.filter(call => call.action === 'eval/cancel').length, 0)
-    assert.equal(ui.nodes().find(node => node.type === 'dialog' && node.props.className === 'harness-eval-confirm-dialog')?.props['aria-labelledby'], 'evaluation-cancel-title')
-    assert.match(ui.text(), /目标评测：alpha v001.*任务 ID：job-1/)
-    const confirm = ui.button('确认取消')
-    confirm.props.onClick(); confirm.props.onClick()
-    ui.render()
-    assert.equal(ui.calls.filter(call => call.action === 'eval/cancel').length, 1)
-    assert.equal(ui.calls.find(call => call.action === 'eval/cancel')?.payload.job_id, 'job-1')
-    assert.equal(ui.jobStatus(), '正在取消')
-    assert.equal(ui.button('取消评测').props.disabled, true)
-    cancelled = true; finishCancel({ status: 'cancelling' }); await ui.settle()
-    assert.equal(ui.jobStatus(), '已取消')
-    assert.equal(ui.calls.filter(call => call.action === 'eval/cancel').length, 1)
+    const row = ui.nodes(ui.byLabel('评测记录列表')).find(node => node.type === 'tr' && node.props.onClick)
+    const verdict = ui.nodes(row).find(node => node.type === 'td' && node.props['data-label'] === '评测结论')
+    assert.match(ui.text(verdict), /尚无结论/); assert.doesNotMatch(ui.text(verdict), /^通过/)
   } finally { ui.cleanup() }
 })
 
-test('评测状态读取失败时标明待核对并保留 Job 身份，重试后恢复实际状态', async () => {
-  let disconnected = true
-  const ui = workbench({ target: { page: 'evaluation', tab: 'jobs', job_id: 'job-1', agent_id: 'alpha', experiment_id: expA }, handler: async (action, payload, original) => {
-    if (action === 'eval/list') return { jobs: [{ job_id: 'job-1', source: `experiment:${expA}`, agent_id: 'alpha', experiment_id: expA, status: 'running', started_at: '2026-10-15T08:00:00Z' }] }
-    if (action === 'eval/status') {
-      if (disconnected) throw new Error('network: 状态查询暂不可用')
-      return { job_id: 'job-1', status: 'running' }
-    }
-    return original(action, payload)
+test('取消评测确认同一Run ID，快速双击只发送一次取消请求', async () => {
+  let resolveCancel, status = 'running'
+  const pendingCancel = new Promise(resolve => { resolveCancel = resolve })
+  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', run_id: runA, agent_id: 'alpha', experiment_id: expA }, handler(action, payload, fallback) {
+    if (action === 'eval/status') return { run_id: runA, run_created: true, status }
+    if (action === 'eval/cancel') return pendingCancel
+    return fallback(action, payload)
   } })
   try {
-    await ui.settle()
-    assert.equal(ui.jobStatus(), '状态待核对')
-    assert.match(ui.text(), /未能连接任务 job-1/)
-    const records = ui.nodes().find(node => node.type === 'table' && node.props['aria-label'] === '评测记录列表')
-    assert.match(ui.text(records), /当前任务.*状态待核对.*状态待核对/)
+    await ui.settle(); ui.button('取消评测').props.onClick(); ui.render()
+    assert.match(ui.text(), new RegExp(`Run ID：${runA}`))
+    const confirm = ui.button('确认取消'); confirm.props.onClick(); confirm.props.onClick(); await ui.settle()
+    assert.equal(ui.calls.filter(call => call.action === 'eval/cancel').length, 1)
+    assert.deepEqual({ ...ui.calls.find(call => call.action === 'eval/cancel').payload }, { run_id: runA })
+    status = 'cancelling'; resolveCancel({ run_id: runA, status }); await ui.settle()
     assert.equal(ui.button('取消评测').props.disabled, true)
-    disconnected = false
-    ui.button('刷新状态').props.onClick(); await ui.settle()
-    assert.equal(ui.jobStatus(), '运行中')
-    assert.equal(ui.button('取消评测').props.disabled, false)
+  } finally { resolveCancel?.({}); ui.cleanup() }
+})
+
+test('进度读取失败保留原Run和上次观察，刷新只查询不重启', async () => {
+  let offline = false
+  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', run_id: runA }, handler(action, payload, fallback) {
+    if (action === 'eval/status') { if (offline) throw new Error('unavailable: 状态不可读'); return { run_id: runA, run_created: true, status: 'running' } }
+    return fallback(action, payload)
+  } })
+  try {
+    await ui.settle(); offline = true; ui.button('刷新状态').props.onClick(); await ui.settle()
+    assert.match(ui.text(ui.byLabel('评测进度')), /上次观察.*状态不可读/s)
+    assert.equal(ui.getTarget().run_id, runA); assert.equal(ui.button('取消评测').props.disabled, true)
+    offline = false; ui.button('刷新状态').props.onClick(); await ui.settle()
+    assert.doesNotMatch(ui.text(ui.byLabel('评测进度')), /状态不可读/)
+    assert.equal(ui.calls.some(call => call.action === 'eval/start'), false)
   } finally { ui.cleanup() }
 })
 
@@ -966,24 +927,18 @@ test('浏览器导航从具体研究版本返回全部版本时清除旧版本�
   ui.cleanup()
 })
 
-test('已有旧报告时启动新评测会定位新 Run，任务报告按钮合并标签与 Run 导航', async () => {
-  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA, run_id: runB } })
-  await ui.settle()
-  ui.button('新建评测').props.onClick()
-  ui.render()
-  ui.button('启动评测').props.onClick()
-  await ui.settle()
-  assert.equal(ui.navigations.at(-1).run_id, runA)
-  assert.equal(ui.navigations.at(-1).tab, 'runs')
-  assert.equal(ui.contexts.at(-1).run_id, runA)
-  ui.nodes().find(node => node.props?.id === 'evaluation-tab-cases').props.onClick()
-  await ui.settle()
-  ui.button('查看本次报告').props.onClick()
-  await ui.settle()
-  assert.equal(ui.navigations.at(-1).run_id, runA)
-  assert.equal(ui.navigations.at(-1).tab, 'runs')
-  assert.equal(ui.nodes().find(node => node.props?.id === 'evaluation-tab-runs').props['aria-selected'], true)
-  ui.cleanup()
+test('在旧报告发起评测时预览分配新Run，创建成功后定位同一新Run', async () => {
+  const created = 'run-cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA, run_id: runA }, handler(action, payload, fallback) {
+    if (action === 'eval/preview') return { run_id: created, result: { case_ids: ['C-1'] } }
+    return fallback(action, payload)
+  } })
+  try {
+    await ui.settle(); ui.button('新建评测').props.onClick(); ui.render(); ui.button('启动评测').props.onClick(); await ui.settle()
+    assert.equal(ui.calls.find(call => call.action === 'eval/start').payload.run_id, created)
+    assert.equal(ui.getTarget().run_id, created); assert.equal(ui.getTarget().job_id, undefined)
+    assert.ok(ui.calls.some(call => call.action === 'runs/show' && call.payload.run_id === created))
+  } finally { ui.cleanup() }
 })
 
 test('比较证据入口一次导航到运行标签和对应 Run，并打开实际轨迹文件', async () => {
@@ -1092,26 +1047,21 @@ test('状态响应迟到时已离开评测页只更新任务，返回后不补�
   ui.cleanup()
 })
 
-test('等待状态时切换智能体范围，旧任务完成不覆盖新范围或导航', async () => {
-  let release
-  const pending = new Promise(resolve => { release = resolve })
-  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA }, handler: async (action, payload, original) => { if (action === 'eval/status') await pending; return original(action, payload) } })
-  await ui.settle()
-  ui.button('新建评测').props.onClick()
-  ui.render()
-  ui.button('启动评测').props.onClick()
-  await ui.settle()
-  ui.setTarget({ page: 'evaluation', tab: 'runs', agent_id: 'beta' })
-  await ui.settle()
-  const navigationCount = ui.navigations.length
-  release()
-  await ui.settle()
-  assert.equal(ui.navigations.length, navigationCount)
-  assert.equal(ui.byLabel('评测智能体').props.value, 'beta')
-  assert.equal(ui.byLabel('评测研究版本').props.value, '')
-  assert.equal(ui.contexts.at(-1).run_id, undefined)
-  assert.equal(ui.jobStatus(), '已结束')
-  ui.cleanup()
+test('创建回执迟到时已切换智能体范围，不覆盖新范围或导航', async () => {
+  let resolveStart
+  const pending = new Promise(resolve => { resolveStart = resolve })
+  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA }, handler(action, payload, fallback) {
+    if (action === 'eval/start') return pending
+    return fallback(action, payload)
+  } })
+  try {
+    await ui.settle(); ui.button('新建评测').props.onClick(); ui.render(); ui.button('启动评测').props.onClick(); await ui.settle()
+    ui.change('评测智能体', ''); await ui.settle()
+    resolveStart({ run_id: runA, run_created: true, status: 'running' }); await ui.settle()
+    assert.equal(ui.byLabel('评测智能体').props.value, '')
+    assert.equal(ui.getTarget().run_id, undefined)
+    assert.equal(ui.calls.filter(call => call.action === 'eval/start').length, 1)
+  } finally { resolveStart?.({ run_id: runA, run_created: true, status: 'running' }); ui.cleanup() }
 })
 
 test('等待任务时手动选择其他 Run，首个任务 run_id 不抢占当前报告', async () => {
@@ -1138,32 +1088,17 @@ test('等待任务时手动选择其他 Run，首个任务 run_id 不抢占当�
   ui.cleanup()
 })
 
-test('从任务手动查看历史 Run 后清除任务绑定，子页签与刷新不切回任务结果', async () => {
-  const target = { page: 'evaluation', tab: 'jobs', job_id: 'job-1', agent_id: 'alpha', experiment_id: expA }
-  const handler = async (action, payload, original) => {
-    if (action === 'eval/list') return { jobs: [{ job_id: 'job-1', agent_id: 'alpha', experiment_id: expA, status: 'running', started_at: '2026-10-15T08:00:00Z' }] }
-    if (action === 'eval/status') return { job_id: 'job-1', status: 'completed', result: { run_id: runA } }
-    if (action === 'runs/overview') return alphaOverview([{ experiment_id: expA, runs: [{ run_id: runB, status: 'completed', created_at: '2026-10-15T09:00:00Z' }, { run_id: runA, status: 'completed', created_at: '2026-10-15T08:00:00Z' }] }])
-    return original(action, payload)
-  }
-  const ui = workbench({ target, handler })
+test('从旧链接解析的Run切到其他Run后，子页签与刷新不再携带旧Job', async () => {
+  const ui = workbench({ target: { page: 'evaluation', tab: 'jobs', job_id: 'legacy-job' } })
   try {
-    await ui.settle()
-    ui.idButton(runB).props.onClick({ stopPropagation() {} })
-    await ui.settle()
+    await ui.settle(); assert.equal(ui.getTarget().run_id, runA)
+    ui.idButton(runB).props.onClick({ stopPropagation() {} }); await ui.settle()
+    assert.equal(ui.getTarget().run_id, runB); assert.equal(ui.getTarget().job_id, undefined)
+    ui.button('产物文件').props.onClick(); await ui.settle()
+    assert.equal(ui.getTarget().run_id, runB); assert.equal(ui.getTarget().job_id, undefined)
+    ui.invalidate(['agents']); await ui.settle()
     assert.equal(ui.getTarget().run_id, runB)
-    assert.equal(ui.getTarget().job_id, undefined)
-    ui.nodes().find(node => node.props?.id === 'evaluation-run-tab-files').props.onClick()
-    await ui.settle()
-    assert.equal(ui.getTarget().run_tab, 'files')
-    assert.equal(ui.getTarget().job_id, undefined)
-    const refreshed = workbench({ target: ui.getTarget(), handler })
-    try {
-      await refreshed.settle()
-      assert.equal(refreshed.getTarget().run_id, runB)
-      assert.equal(refreshed.getTarget().job_id, undefined)
-      assert.equal(refreshed.calls.some(call => call.action === 'eval/status'), false)
-    } finally { refreshed.cleanup() }
+    assert.equal(ui.calls.filter(call => call.action === 'eval/status' && call.payload.job_id).length, 1)
   } finally { ui.cleanup() }
 })
 
@@ -1326,26 +1261,23 @@ test('新增用例草稿允许离开评测页后卸载模态层，拒绝时恢�
   } finally { ui.cleanup() }
 })
 
-test('取消评测保持正在取消状态，禁止重复取消并在 CLI 收尾后读取封存报告', async () => {
+test('Run取消中不重复发取消，收尾后仍读取原Run的封存结果', async () => {
   let state = 'running'
-  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA }, handler: async (action, payload, original) => {
-    if (action === 'eval/status') return { job_id: 'job-1', status: state, result: state === 'cancelled' ? { run_id: runA, cancelled: true, instance_stopped: true } : undefined }
-    if (action === 'eval/cancel') { state = 'cancelling'; return { status: state } }
-    return original(action, payload)
+  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', run_id: runA }, handler(action, payload, fallback) {
+    if (action === 'eval/status') return { run_id: runA, run_created: true, status: state }
+    if (action === 'eval/cancel') { state = 'cancelling'; return { run_id: runA, run_created: true, status: state } }
+    return fallback(action, payload)
   } })
   try {
-    await ui.settle(); ui.button('新建评测').props.onClick(); ui.render(); ui.button('启动评测').props.onClick(); await ui.settle()
-    ui.button('取消评测').props.onClick(); ui.render()
-    assert.equal(ui.calls.filter(item => item.action === 'eval/cancel').length, 0)
-    ui.button('确认取消').props.onClick(); await ui.settle()
-    assert.equal(ui.jobStatus(), '正在取消'); assert.equal(ui.button('取消评测').props.disabled, true)
-    ui.button('取消评测').props.onClick(); await ui.settle()
-    assert.equal(ui.calls.filter(item => item.action === 'eval/cancel').length, 1)
+    await ui.settle(); ui.button('取消评测').props.onClick(); ui.render(); ui.button('确认取消').props.onClick(); await ui.settle()
+    assert.match(ui.text(ui.byLabel('评测进度')), /正在取消/)
+    assert.equal(ui.button('取消评测').props.disabled, true)
     state = 'cancelled'; ui.button('刷新状态').props.onClick(); await ui.settle()
-    assert.equal(ui.jobStatus(), '已取消'); assert.ok(ui.calls.some(item => item.action === 'runs/show' && item.payload.run_id === runA))
+    assert.equal(ui.getTarget().run_id, runA)
+    assert.equal(ui.calls.filter(call => call.action === 'eval/cancel').length, 1)
+    assert.ok(ui.calls.some(call => call.action === 'runs/show' && call.payload.run_id === runA))
   } finally { ui.cleanup() }
 })
-
 
 test('从样本跳到固定轨迹并返回保留组件身份和草稿保护，重新抽取使用同一Run', async () => {
   const ui = workbench({ target: { page: 'evaluation', tab: 'runs', run_id: runA } })
@@ -1642,114 +1574,84 @@ test('评测记录后台刷新保留已有列表，读取反馈位于刷新入�
   } finally { release(); ui.cleanup() }
 })
 
-test('丢失受理回执进入未知，沿用同一请求继续，明确新建才使用新身份', async () => {
-  const accepted = new Map()
-  let starts = 0, offline = true
-  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA }, handler: async (action, payload, original) => {
-    if (action === 'eval/start') {
-      if (!accepted.has(payload.request_id)) { starts++; accepted.set(payload.request_id, { job_id: payload.request_id, status: 'running' }) }
-      return accepted.get(payload.request_id)
-    }
-    if (action === 'eval/status' && accepted.has(payload.job_id)) return accepted.get(payload.job_id)
-    return original(action, payload)
+test('创建回执丢失后只查询原Run，明确新建才获得新的预留ID', async () => {
+  let offline = true, starts = 0, accepted
+  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA }, handler(action, payload, fallback) {
+    if (action === 'eval/start') { starts++; accepted = { run_id: payload.run_id, run_created: true, status: 'running' }; return accepted }
+    if (action === 'eval/status' && accepted) return accepted
+    return fallback(action, payload)
   } })
   const delegate = ui.rpc.call
-  ui.rpc.call = async (...args) => {
-    const endpoint = args[1]
-    if (offline && endpoint === 'agents/eval/status') throw new Error('连接中断')
-    const response = await delegate(...args)
-    if (offline && endpoint === 'agents/eval/start') throw new Error('回执丢失')
-    return response
-  }
-  try {
-    await ui.settle(); ui.button('新建评测').props.onClick(); ui.render()
-    ui.button('启动评测').props.onClick(); await ui.settle()
-    assert.match(ui.text(), /受理结果未知.*可能已经执行/)
-    assert.equal(ui.button('启动评测'), undefined)
-    assert.equal(ui.byLabel('验证目标').props.disabled, true)
-    assert.ok(ui.calls.some(call => call.action === 'eval/start' && /^[0-9a-f-]{36}$/.test(call.payload.request_id)))
-    const request = ui.calls.find(call => call.action === 'eval/start').payload.request_id
-    offline = false
-    ui.button('核对并继续此次请求').props.onClick(); await ui.settle()
-    assert.equal(starts, 1)
-    assert.equal(ui.calls.filter(call => call.action === 'eval/start').at(-1).payload.request_id, request)
-    ui.button('新建评测').props.onClick(); ui.render(); ui.button('启动评测').props.onClick(); await ui.settle()
-    assert.equal(starts, 2)
-    assert.notEqual(ui.calls.filter(call => call.action === 'eval/start').at(-1).payload.request_id, request)
-  } finally { ui.cleanup() }
-})
-
-test('重连只回读并恢复未知请求的原任务，不重发启动', async () => {
-  let job, offline = true
-  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA } })
-  const delegate = ui.rpc.call
-  ui.rpc.call = async (...args) => {
-    if (args[1] === 'agents/eval/start') { job = { job_id: args[2].request_id, status: 'running' }; throw new Error('回执丢失') }
-    if (args[1] === 'agents/eval/status' && job) { if (offline) throw new Error('连接中断'); return { ok: true, value: job } }
-    return delegate(...args)
-  }
+  ui.rpc.call = async (...args) => { if (offline && args[1] === 'agents/eval/status') throw new Error('连接中断'); const value = await delegate(...args); if (offline && args[1] === 'agents/eval/start') throw new Error('回执丢失'); return value }
   try {
     await ui.settle(); ui.button('新建评测').props.onClick(); ui.render(); ui.button('启动评测').props.onClick(); await ui.settle()
-    assert.ok(ui.button('核对并继续此次请求'))
-    offline = false; ui.invalidate(['agents']); await ui.settle()
-    assert.equal(ui.button('核对并继续此次请求'), undefined)
-    assert.equal(ui.getTarget().job_id, undefined, '重连不切换用户当前工作对象')
-    assert.equal(ui.calls.filter(call => call.action === 'eval/start').length, 0, '传输夹具已拦截唯一启动，恢复只查询原任务')
-  } finally { ui.cleanup() }
-})
-
-test('受理前断连后切到全部智能体，仍能核对并续发固定原目标且不改变当前配置', async () => {
-  let offline = true, received = 0
-  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA } })
-  const delegate = ui.rpc.call
-  ui.rpc.call = async (...args) => {
-    if (offline && ['agents/eval/start', 'agents/eval/status'].includes(args[1])) throw new Error('尚未送达')
-    if (args[1] === 'agents/eval/start') received++
-    return delegate(...args)
-  }
-  try {
-    await ui.settle(); ui.button('新建评测').props.onClick(); ui.render(); ui.button('启动评测').props.onClick(); await ui.settle()
-    const dialog = ui.nodes().find(node => node.type === 'dialog' && node.props['aria-labelledby'] === 'evaluation-config-title')
-    dialog.props.onCancel({ preventDefault() {} }); ui.render()
-    ui.change('评测智能体', ''); await ui.settle()
-    assert.match(ui.text(ui.byLabel('待核对的评测请求')), /EXP-alpha-001/)
-    assert.equal(ui.getTarget().agent_id, undefined)
+    assert.match(ui.text(), /受理结果待核对/)
+    const first = ui.calls.find(call => call.action === 'eval/start').payload.run_id
+    assert.match(first, /^run-[0-9a-f-]{36}$/)
     offline = false; ui.button('核对原评测请求').props.onClick(); await ui.settle()
-    assert.equal(received, 1)
-    assert.equal(ui.calls.find(call => call.action === 'eval/start').payload.source, `experiment:${expA}`)
-    assert.equal(ui.getTarget().agent_id, undefined, '核对旧请求不把当前全部智能体切回旧对象')
+    assert.equal(starts, 1); assert.equal(ui.button('核对原评测请求'), undefined)
+    ui.button('启动评测').props.onClick(); await ui.settle()
+    assert.equal(starts, 2)
+    assert.notEqual(ui.calls.filter(call => call.action === 'eval/start').at(-1).payload.run_id, first)
   } finally { ui.cleanup() }
 })
 
-test('未知评测在发出前保存身份，整页刷新重挂后仍沿用原请求', async () => {
-  const storage = new Map(), savedKey = 'harness-evaluation-pending:http://localhost:3090/hep/'
+test('重连只回读已创建Run，恢复时不抢占用户工作对象或重发start', async () => {
+  let offline = true, accepted
+  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA } })
+  const delegate = ui.rpc.call
+  ui.rpc.call = async (...args) => {
+    if (args[1] === 'agents/eval/start') { accepted = { run_id: args[2].run_id, run_created: true, status: 'running' }; throw new Error('回执丢失') }
+    if (args[1] === 'agents/eval/status' && accepted) { if (offline) throw new Error('断连'); return { ok: true, value: accepted } }
+    return delegate(...args)
+  }
+  try {
+    await ui.settle(); ui.button('新建评测').props.onClick(); ui.render(); ui.button('启动评测').props.onClick(); await ui.settle()
+    ui.change('评测智能体', ''); await ui.settle(); offline = false; ui.invalidate(['agents']); await ui.settle()
+    assert.equal(ui.button('核对原评测请求'), undefined)
+    assert.equal(ui.getTarget().run_id, undefined)
+    assert.equal(ui.calls.filter(call => call.action === 'eval/start').length, 0, '唯一启动由传输夹具捕获，恢复没有发送第二次')
+  } finally { ui.cleanup() }
+})
+
+test('未受理请求查询not_found后清pending，旧恢复按钮绝不重发start', async () => {
+  let connected = false, starts = 0
+  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA } })
+  const delegate = ui.rpc.call
+  ui.rpc.call = async (...args) => {
+    if (args[1] === 'agents/eval/start') { starts++; throw new Error('请求未送达') }
+    if (args[1] === 'agents/eval/status') { if (!connected) throw new Error('断连'); return { ok: false, error: { code: 'not_found', message: '没有该Run' } } }
+    return delegate(...args)
+  }
+  try {
+    await ui.settle(); ui.button('新建评测').props.onClick(); ui.render(); ui.button('启动评测').props.onClick(); await ui.settle()
+    const old = ui.button('核对原评测请求'); assert.ok(old)
+    ui.change('评测智能体', ''); await ui.settle(); connected = true
+    old.props.onClick(); await ui.settle()
+    assert.match(ui.text(), /未找到可继续的运行记录.*重新预览/s)
+    assert.equal(ui.button('核对原评测请求'), undefined)
+    old.props.onClick(); await ui.settle(); assert.equal(starts, 1)
+    assert.equal(ui.byLabel('评测智能体').props.value, '')
+  } finally { ui.cleanup() }
+})
+
+test('待核对Run发送前按工作区保存，刷新只恢复原Run且其他数据根不消费暂存', async () => {
+  const storage = new Map(); let id
   const first = workbench({ storage, target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA } })
   const delegate = first.rpc.call
-  let requestId
   first.rpc.call = async (...args) => {
-    if (args[1] === 'agents/eval/start') {
-      requestId = args[2].request_id
-      assert.equal(JSON.parse(storage.get(savedKey)).request_id, requestId, '发送前已保存稳定身份')
-      throw new Error('回执未到达')
-    }
+    if (args[1] === 'agents/eval/start') { id = args[2].run_id; const saved = [...storage.entries()].find(([key]) => key.startsWith('harness-evaluation-pending:v2:')); assert.equal(JSON.parse(saved[1]).run_id, id); assert.equal(JSON.parse(saved[1]).previousRunId, ''); throw new Error('回执丢失') }
     if (args[1] === 'agents/eval/status') throw new Error('断连')
     return delegate(...args)
   }
   await first.settle(); first.button('新建评测').props.onClick(); first.render(); first.button('启动评测').props.onClick(); await first.settle(); first.cleanup()
-  const second = workbench({ storage, target: { page: 'evaluation' }, handler: async (action, payload, original) => {
-    if (action === 'eval/status' && payload.job_id === requestId) throw new Error('not_found: 尚未受理')
-    if (action === 'eval/start') return { job_id: payload.request_id, status: 'running' }
-    return original(action, payload)
-  } })
+  const other = workbench({ storage, handler(action, payload, fallback) { if (action === 'list') return { root: '/other-assets', agents: [{ id: 'alpha' }] }; return fallback(action, payload) } })
+  try { await other.settle(); assert.equal(other.button('核对原评测请求'), undefined); assert.equal(other.calls.some(call => call.action === 'eval/start'), false); assert.ok(storage.size) } finally { other.cleanup() }
+  const second = workbench({ storage, handler(action, payload, fallback) { if (action === 'eval/status') return { run_id: id, run_created: true, status: 'running', source: `experiment:${expA}` }; return fallback(action, payload) } })
   try {
-    await second.settle()
-    assert.match(second.text(second.byLabel('待核对的评测请求')), /EXP-alpha-001/)
-    assert.ok(second.button('核对原评测请求'))
-    second.button('核对原评测请求').props.onClick(); await second.settle()
-    const submitted = second.calls.find(call => call.action === 'eval/start')
-    assert.equal(submitted.payload.request_id, requestId)
-    assert.equal(submitted.payload.source, `experiment:${expA}`)
-    assert.equal(storage.has(savedKey), false, '确认受理才清除对应暂存')
+    await second.settle(); assert.ok(second.calls.some(call => call.action === 'eval/status' && call.payload.run_id === id))
+    assert.equal(second.calls.some(call => ['eval/start', 'eval/preview'].includes(call.action)), false)
+    assert.equal(second.button('核对原评测请求'), undefined); assert.equal(storage.size, 0)
   } finally { second.cleanup() }
 })
 
@@ -1770,26 +1672,15 @@ test('浏览器暂存不可用时未知请求仍保留内存身份并阻止无�
   } finally { ui.cleanup() }
 })
 
-test('自动回读先确认受理后，旧恢复按钮的迟到点击不得创建新的请求', async () => {
-  let offline = true, accepted = 0, job
-  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA } })
-  const delegate = ui.rpc.call
-  ui.rpc.call = async (...args) => {
-    if (args[1] === 'agents/eval/start') { accepted++; job = { job_id: args[2].request_id, status: 'running' }; throw new Error('回执丢失') }
-    if (args[1] === 'agents/eval/status' && job) { if (offline) throw new Error('尚未重连'); return { ok: true, value: job } }
-    return delegate(...args)
-  }
+test('旧版pending只按旧Job身份查询，清理后的not_found不重新预览或启动', async () => {
+  const key = 'harness-evaluation-pending:http://localhost:3090/hep/'
+  const storage = new Map([[key, JSON.stringify({ request_id: '550e8400-e29b-41d4-a716-446655440000', payload: { source: `experiment:${expA}` }, agentId: 'alpha', experimentId: expA, runId: '', tab: 'runs' })]])
+  const ui = workbench({ storage, handler(action, payload, fallback) { if (action === 'eval/status') throw new Error('not_found: 旧创建记录已清理'); return fallback(action, payload) } })
   try {
-    await ui.settle(); ui.button('新建评测').props.onClick(); ui.render(); ui.button('启动评测').props.onClick(); await ui.settle()
-    const oldContinue = ui.button('核对并继续此次请求'), oldRecover = ui.button('核对原评测请求')
-    assert.ok(oldContinue); assert.ok(oldRecover)
-    offline = false; ui.invalidate(['agents']); await ui.settle()
-    assert.equal(ui.button('核对原评测请求'), undefined)
-    oldContinue.props.onClick(); oldRecover.props.onClick(); await ui.settle()
-    assert.equal(accepted, 1)
-    ui.button('关闭').props.onClick(); ui.render()
-    ui.button('新建评测').props.onClick(); ui.render(); ui.button('启动评测').props.onClick(); await ui.settle()
-    assert.equal(accepted, 2, '只有明确新建评测才产生第二个请求')
+    await ui.settle(); assert.ok(ui.calls.some(call => call.action === 'eval/status' && call.payload.job_id === '550e8400-e29b-41d4-a716-446655440000'))
+    assert.equal(ui.calls.some(call => ['eval/start', 'eval/preview'].includes(call.action)), false)
+    assert.equal(storage.has(key), false)
+    assert.match(ui.text(), /未找到可继续的运行记录.*重新预览/s)
   } finally { ui.cleanup() }
 })
 
@@ -1809,4 +1700,221 @@ test('首次Decision不存在时正文可编辑并以null创建，读到空文�
       assert.match(ui.text(), /研究决策已保存/)
     } finally { ui.cleanup() }
   }
+})
+
+test('评测记录按确认顺序拆列，完整版本和历史变体身份来自同一次资产读取', async () => {
+  const normal = 'EXP-alpha-027-r123456abcdef'
+  const variant = 'VAR-alpha-003-rabcdef123456'
+  const legacy = 'EXP-alpha-019-r789abc123456'
+  const unknown = 'EXP-alpha-005-r999999999999'
+  const runIds = [runA, runB, 'run-33333333-3333-4333-8333-333333333333', 'run-44444444-4444-4444-8444-444444444444']
+  const ui = workbench({ handler(action, payload, fallback) {
+    if (action === 'list') return { agents: [{ id: 'alpha', name: '候选名称', manifest: { name: '安全运营专家' } }],
+      experiments: [{ id: normal, agent_id: 'alpha', is_variant: false, change: {} }, { id: variant, agent_id: 'alpha', change: { variant_name: '不应显示的变体名称' } }],
+      historical_experiments: [{ id: legacy, agent_id: 'alpha', change: { kind: 'end' } }] }
+    if (action === 'runs/overview') return overview([['alpha', [normal, variant, legacy, unknown].map((id, index) => ({ experiment_id: id,
+      runs: [{ run_id: runIds[index], title: '日常巡检', status: 'completed', effective_verdict: 'passed', created_at: `2026-11-04T0${9 - index}:00:00Z` }] }))]])
+    return fallback(action, payload)
+  } })
+  try {
+    await ui.settle()
+    const table = ui.byLabel('评测记录列表')
+    assert.deepEqual(ui.nodes(table).filter(node => node.type === 'th').map(node => ui.text(node)), ['评测名称', '所属智能体', '被测版本', '对象类型', '执行状态', '评测结论', '用例结果', '时间', '操作'])
+    const rows = ui.nodes(table).filter(node => node.type === 'tr').slice(1)
+    const cell = (row, name) => ui.nodes(row).find(node => node.type === 'td' && node.props['data-label'] === name)
+    assert.deepEqual(rows.map(row => ui.text(cell(row, '对象类型'))), ['智能体', '变体', '变体', '待核对'])
+    assert.deepEqual(rows.map(row => ui.text(cell(row, '被测版本'))), ['v027-r123456abcdef', 'v003-rabcdef123456', 'v019-r789abc123456', 'v005-r999999999999'])
+    assert.ok(rows.every(row => ui.text(cell(row, '所属智能体')) === '安全运营专家'))
+    assert.doesNotMatch(ui.text(table), /候选名称|不应显示的变体名称/)
+    assert.equal(ui.calls.filter(call => call.action === 'list').length, 1)
+    assert.equal(ui.calls.filter(call => call.action === 'detail').length, 0, '不逐行读取详情')
+    ui.idButton(runB).props.onClick({ stopPropagation() {} }); await ui.settle()
+    assert.equal(ui.getTarget().run_id, runB, '拆列不改变原始 Run 跳转')
+  } finally { ui.cleanup() }
+})
+
+test('对象类型筛选一致作用于事实与控制合并后的真实Run，不改变对象或请求', async () => {
+  const normal = 'EXP-alpha-027-r123456abcdef', variant = 'VAR-alpha-003-rabcdef123456', legacy = 'EXP-alpha-019-r789abc123456'
+  const extra = 'run-55555555-5555-4555-8555-555555555555'
+  const ui = workbench({ handler(action, payload, fallback) {
+    if (action === 'list') return { root: '/test-assets', agents: [{ id: 'alpha' }], experiments: [{ id: normal, change: {} }, { id: variant, change: {} }], historical_experiments: [{ id: legacy, change: { compute_variant: {} } }] }
+    if (action === 'runs/overview') return overview([['alpha', [normal, variant, legacy].map((id, index) => ({ experiment_id: id, runs: [{ run_id: index ? `run-${index}` : runA, title: `记录${index}`, status: 'completed', effective_verdict: 'passed' }] }))]])
+    if (action === 'eval/list') return { runs: [{ run_id: extra, run_created: true, source: `experiment:${variant}`, agent_id: 'alpha', experiment_id: variant, status: 'running' }], errors: [] }
+    return fallback(action, payload)
+  } })
+  try {
+    await ui.settle(); const rows = () => ui.nodes(ui.byLabel('评测记录列表')).filter(node => node.type === 'tr').slice(1)
+    const beforeCalls = ui.calls.length, beforeNavigation = ui.navigations.length
+    assert.equal(rows().length, 4)
+    ui.change('筛选对象类型', '智能体'); await ui.settle(); assert.equal(rows().length, 1); assert.ok(ui.idButton(runA))
+    ui.change('筛选对象类型', '变体'); await ui.settle(); assert.equal(rows().length, 3); assert.ok(ui.idButton(extra))
+    ui.change('筛选对象类型', ''); await ui.settle(); assert.equal(rows().length, 4)
+    assert.equal(ui.calls.length, beforeCalls); assert.equal(ui.navigations.length, beforeNavigation)
+  } finally { ui.cleanup() }
+})
+
+test('记录表首列完整展示唯一Run ID，不再出现第二个任务ID且保持原始导航', async () => {
+  const ui = workbench()
+  try {
+    await ui.settle()
+    const table = ui.byLabel('评测记录列表')
+    const firstCell = ui.nodes(table).find(node => node.type === 'td' && node.props['data-label'] === '评测名称' && ui.nodes(node).some(child => child.props?.title === runA))
+    const id = ui.nodes(firstCell).find(node => node.props?.className === 'harness-eval-run-id')
+    assert.equal(ui.text(id), `Run ID：${runA}`)
+    assert.equal(ui.text(ui.nodes(firstCell).find(node => node.props?.className === 'harness-eval-case-meta')), '用例范围未知')
+    assert.doesNotMatch(ui.text(table), /任务 ID：|历史任务|当前任务|进行中任务|…|\.\.\./)
+    ui.idButton(runA).props.onClick({ stopPropagation() {} }); await ui.settle()
+    assert.equal(ui.getTarget().run_id, runA); assert.equal(ui.getTarget().job_id, undefined)
+    assert.equal(ui.calls.find(call => call.action === 'runs/show').payload.run_id, runA)
+  } finally { ui.cleanup() }
+})
+
+test('记录时间分开始与结束两行，未结束和旧记录缺失时间分别说明', async () => {
+  for (const entry of [
+    { status: 'completed', created_at: '2026-11-04T08:00:00Z', finished_at: '2026-11-04T08:01:00Z' },
+    { status: 'running', created_at: '2026-11-04T08:00:00Z', endLabel: '结束：尚未结束' },
+    { status: 'failed', created_at: '2026-11-04T08:00:00Z', endLabel: '结束：未记录' },
+    { status: 'unknown', endLabel: '结束：未记录' },
+  ]) {
+    const ui = workbench({ handler: async (action, payload, original) => action === 'runs/overview'
+      ? overview([['alpha', [{ experiment_id: expA, runs: [{ run_id: runA, ...entry }] }]]]) : original(action, payload) })
+    try {
+      await ui.settle()
+      const row = ui.nodes(ui.byLabel('评测记录列表')).find(node => node.type === 'tr' && ui.nodes(node).some(child => child.props?.title === runA))
+      const cell = ui.nodes(row).find(node => node.type === 'td' && node.props['data-label'] === '时间')
+      const lines = ui.nodes(cell).filter(node => node.props?.className === 'harness-eval-timestamp')
+      assert.equal(lines.length, 2)
+      assert.equal(ui.nodes(lines[0]).find(node => node.type === 'time').props.dateTime, entry.created_at)
+      assert.match(ui.text(lines[0]), entry.created_at ? /^开始：/ : /^开始：未记录$/)
+      if (entry.finished_at) {
+        assert.equal(ui.nodes(lines[1]).find(node => node.type === 'time').props.dateTime, entry.finished_at)
+        assert.match(ui.text(lines[1]), /^结束：/)
+      } else {
+        assert.equal(ui.text(lines[1]), entry.endLabel)
+        assert.equal(ui.nodes(lines[1]).some(node => node.type === 'time'), false)
+      }
+    } finally { ui.cleanup() }
+  }
+})
+
+test('预览只预留Run，关闭或修改参数撤销预留，再启动使用新ID', async () => {
+  for (const operation of ['close', 'change']) {
+    const ui = workbench({ target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA } })
+    try {
+      await ui.settle(); ui.button('新建评测').props.onClick(); ui.render(); ui.button('执行预览').props.onClick(); await ui.settle()
+      assert.equal(ui.calls.some(call => call.action === 'eval/start'), false)
+      if (operation === 'close') { ui.button('关闭').props.onClick(); await ui.settle(); ui.button('新建评测').props.onClick(); ui.render() }
+      else { ui.change('验证目标', 'browser'); await ui.settle() }
+      assert.equal(ui.calls.find(call => call.action === 'eval/cancel').payload.run_id, runA)
+      ui.button('启动评测').props.onClick(); await ui.settle()
+      assert.notEqual(ui.calls.find(call => call.action === 'eval/start').payload.run_id, runA)
+    } finally { ui.cleanup() }
+  }
+})
+
+test('准备前断线恢复到prepared时只读取，用户明确撤销后才能重新预览', async () => {
+  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA } })
+  const delegate = ui.rpc.call
+  ui.rpc.call = async (...args) => {
+    if (args[1] === 'agents/eval/start') throw new Error('未送达')
+    if (args[1] === 'agents/eval/status') return { ok: true, value: { run_id: runA, run_created: false, status: 'prepared' } }
+    return delegate(...args)
+  }
+  try {
+    await ui.settle(); ui.button('新建评测').props.onClick(); ui.render(); ui.button('启动评测').props.onClick(); await ui.settle()
+    assert.match(ui.text(), /尚未启动/)
+    assert.equal(ui.calls.some(call => call.action === 'eval/cancel'), false, '只读恢复不能自动撤销或重发')
+    assert.ok(ui.button('撤销预留')); ui.button('撤销预留').props.onClick(); await ui.settle()
+    assert.equal(ui.calls.filter(call => call.action === 'eval/cancel').length, 1)
+    assert.equal(ui.button('核对原评测请求'), undefined)
+    assert.match(ui.text(), /预留或创建已取消.*重新预览/)
+  } finally { ui.cleanup() }
+})
+
+test('Run创建失败直接在发起处显示原因并清暂存，不把预留ID放进表格', async () => {
+  const storage = new Map(), created = 'run-cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+  const ui = workbench({ storage, target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA }, handler(action, payload, fallback) {
+    if (action === 'eval/preview') return { run_id: created, result: { case_ids: ['C-1'] } }
+    if (action === 'eval/start') throw new Error('creation_failed: 冻结输入失败，创建数据已清理')
+    return fallback(action, payload)
+  } })
+  try {
+    await ui.settle(); ui.button('新建评测').props.onClick(); ui.render(); ui.button('启动评测').props.onClick(); await ui.settle()
+    assert.match(ui.text(), /冻结输入失败.*重新预览/s)
+    assert.equal(ui.idButton(created), undefined); assert.equal(storage.size, 0)
+    assert.equal(ui.button('核对原评测请求'), undefined)
+    assert.equal(ui.getTarget().run_id, undefined)
+  } finally { ui.cleanup() }
+})
+
+test('预览回执迟到时页面已隐藏，撤销该预留且不启动Run', async () => {
+  let resolvePreview
+  const preview = new Promise(resolve => { resolvePreview = resolve })
+  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA }, handler(action, payload, fallback) {
+    if (action === 'eval/preview') return preview
+    return fallback(action, payload)
+  } })
+  try {
+    await ui.settle(); ui.button('新建评测').props.onClick(); ui.render(); ui.button('执行预览').props.onClick(); await ui.settle()
+    ui.setActive(false); resolvePreview({ run_id: runA, result: { case_ids: ['C-1'] } }); await ui.settle()
+    assert.equal(ui.calls.find(call => call.action === 'eval/cancel').payload.run_id, runA)
+    assert.equal(ui.calls.some(call => call.action === 'eval/start'), false)
+  } finally { resolvePreview?.({ run_id: runA }); ui.cleanup() }
+})
+
+test('旧在途无Run只在原入口观察取消，出现真实关联后才转换为Run导航', async () => {
+  let state = 'running', committed = false
+  const id = '550e8400-e29b-41d4-a716-446655440000'
+  const ui = workbench({ target: { page: 'evaluation', tab: 'jobs', job_id: id }, handler(action, payload, fallback) {
+    if (action === 'eval/status' && payload.job_id) return { run_id: committed ? runA : null, legacy_id: id, run_created: committed, status: state }
+    if (action === 'eval/cancel') { state = 'cancelling'; return { run_id: null, legacy_id: id, run_created: false, status: state } }
+    return fallback(action, payload)
+  } })
+  try {
+    await ui.settle(); assert.match(ui.text(ui.byLabel('评测进度')), /旧评测尚未形成运行记录/)
+    assert.doesNotMatch(ui.text(ui.byLabel('评测记录列表')), new RegExp(id))
+    ui.button('取消评测').props.onClick(); ui.render(); ui.button('确认取消').props.onClick(); await ui.settle()
+    assert.deepEqual({ ...ui.calls.find(call => call.action === 'eval/cancel').payload }, { job_id: id })
+    committed = true; state = 'cancelled'; ui.button('刷新状态').props.onClick(); await ui.settle()
+    assert.equal(ui.getTarget().run_id, runA); assert.equal(ui.getTarget().job_id, undefined)
+    assert.equal(ui.calls.some(call => call.action === 'eval/start'), false)
+    assert.equal(ui.calls.some(call => call.payload.run_id === `run-${id}`), false)
+  } finally { ui.cleanup() }
+})
+
+test('清理或观察未确认的明确回执仍保留pending，只查询原Run不重新启动', async () => {
+  for (const code of ['observation_unknown', 'cleanup_failed', 'run_read_failed', 'conflict']) {
+    const ui = workbench({ target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA }, handler(action, payload, fallback) {
+      if (action === 'eval/start') throw new Error(`${code}: 原运行现场待核对`)
+      if (action === 'eval/status') return { run_id: runA, run_created: false, status: 'unknown' }
+      return fallback(action, payload)
+    } })
+    try {
+      await ui.settle(); ui.button('新建评测').props.onClick(); ui.render(); ui.button('启动评测').props.onClick(); await ui.settle()
+      assert.ok(ui.button('核对原评测请求'))
+      ui.button('核对原评测请求').props.onClick(); await ui.settle()
+      assert.equal(ui.calls.filter(call => call.action === 'eval/start').length, 1)
+      assert.ok(ui.calls.filter(call => call.action === 'eval/status').every(call => call.payload.run_id === runA))
+    } finally { ui.cleanup() }
+  }
+})
+
+test('等待Run初始化提交时可取消同一Run，创建取消不进入记录表', async () => {
+  let rejectStart, submitted
+  const waiting = new Promise((_resolve, reject) => { rejectStart = reject })
+  const created = 'run-dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+  const ui = workbench({ target: { page: 'evaluation', tab: 'runs', agent_id: 'alpha', experiment_id: expA }, handler(action, payload, fallback) {
+    if (action === 'eval/preview') return { run_id: created, result: { case_ids: ['C-1'] } }
+    if (action === 'eval/start') { submitted = payload.run_id; return waiting }
+    if (action === 'eval/cancel') { rejectStart(new Error('creation_cancelled: Run创建已取消并清理')); return { run_id: created, run_created: false, status: 'cancelled' } }
+    return fallback(action, payload)
+  } })
+  try {
+    await ui.settle(); ui.button('新建评测').props.onClick(); ui.render(); ui.button('启动评测').props.onClick(); await ui.settle()
+    assert.equal(submitted, created); assert.match(ui.text(), /正在准备运行记录/)
+    ui.button('取消此次评测').props.onClick(); await ui.settle()
+    assert.equal(ui.calls.find(call => call.action === 'eval/cancel').payload.run_id, created)
+    assert.equal(ui.idButton(created), undefined)
+    assert.match(ui.text(), /创建已取消.*重新预览/s)
+  } finally { rejectStart?.(new Error('creation_cancelled: 测试收尾')); ui.cleanup() }
 })
