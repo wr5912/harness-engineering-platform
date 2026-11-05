@@ -1,3 +1,4 @@
+import { suggestCaseId, validateCaseIds } from './case-ids.ts'
 import { VERSION_ID } from '../version-id.ts'
 import { programRoot } from '../workspace.ts'
 import { assertVersionIdentity } from '../agents/version-source.ts'
@@ -120,15 +121,12 @@ async function sourceCase(services: CaseManagementServices, agentId: string, run
   return selected
 }
 
-function nextCaseId(parsed: ParsedEvaluation) {
-  let index = 1
-  while (parsed.case_ids.includes(`U-NEW-${String(index).padStart(3, '0')}`)) index++
-  return `U-NEW-${String(index).padStart(3, '0')}`
-}
 function context(document: Awaited<ReturnType<typeof documentFor>>) {
+  const scenes = [...new Set(document.parsed.catalog.map(item => item.scene))]
+  const scene = scenes[0] ?? '新增测试用例'
   return { agent_id: document.agentId, experiment_id: document.experimentId, path: document.path, sha256: document.sha256,
-    scenes: [...new Set(document.parsed.catalog.map(item => item.scene))],
-    draft: { case_id: nextCaseId(document.parsed), title: '', scene: document.parsed.catalog[0]?.scene ?? '新增测试用例', inputs: [''], expected_behavior: '', fast: false } }
+    scenes, case_id_suggestions: Object.fromEntries(scenes.map(scene => [scene, suggestCaseId(document.parsed.catalog, scene)])),
+    draft: { case_id: suggestCaseId(document.parsed.catalog, scene), title: '', scene, inputs: [''], expected_behavior: '', fast: false } }
 }
 
 async function prepare(root: string, body: JsonMap, services: CaseManagementServices, signal?: AbortSignal) {
@@ -140,6 +138,8 @@ async function prepare(root: string, body: JsonMap, services: CaseManagementServ
   if (document.parsed.case_ids.includes(caseId)) throw new CaseError('conflict', 'Case ID 已存在，新增不会覆盖已有用例')
   const title = singleLine(field(body, 'title'), '用例名称')
   const scene = singleLine(field(body, 'scene'), '场景')
+  try { validateCaseIds(document.parsed.catalog, [...document.parsed.catalog, { case_id: caseId, scene }]) }
+  catch (error) { throw new CaseError('invalid_request', (error as Error).message) }
   if (!Array.isArray(body.inputs) || !body.inputs.length || body.inputs.some(value => typeof value !== 'string' || !value.trim())) throw new CaseError('invalid_request', '至少需要一条非空用户输入')
   const inputs = (body.inputs as string[]).map(value => value.replace(/\r\n?/g, '\n').trim())
   const expectedBehavior = field(body, 'expected_behavior').replace(/\r\n?/g, '\n')
@@ -176,6 +176,32 @@ export function createCaseManagementHandler(assetRoot: string, services: CaseMan
     try {
       if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new CaseError('invalid_request', '用例请求必须为对象')
       const body = payload as JsonMap
+      if (endpoint === 'cases/renumber-preview' || endpoint === 'cases/renumber') {
+        const document = await documentFor(root, body, signal)
+        if (field(body, 'expected_sha256') !== document.sha256) throw new CaseError('conflict', '用例集已被修改，请重新读取后核对改号映射')
+        if (!Array.isArray(body.renames) || !body.renames.length) throw new CaseError('invalid_request', 'renames 必须是非空改号映射数组')
+        const mapping = new Map<string, string>(), targets = new Set<string>()
+        for (const item of body.renames) {
+          if (!item || typeof item !== 'object' || Array.isArray(item)) throw new CaseError('invalid_request', '改号映射必须包含 from 和 to')
+          const from = field(item, 'from'), to = field(item, 'to')
+          if (!CASE_ID.test(from) || !CASE_ID.test(to) || from === to) throw new CaseError('invalid_request', '原编号和新编号必须有效且不同')
+          if (!document.parsed.case_ids.includes(from)) throw new CaseError('not_found', `原用例 ${from} 不存在`)
+          if (mapping.has(from) || targets.has(to) || document.parsed.case_ids.includes(to)) throw new CaseError('conflict', '改号映射重复或目标编号已被占用')
+          mapping.set(from, to); targets.add(to)
+        }
+        // 只改用例标题，历史运行出处中的原编号保持冻结。
+        const content = document.content.replace(/^#### (U-[A-Z0-9-]+)(?=\s)/gm, (heading, id) => mapping.has(id) ? `#### ${mapping.get(id)}` : heading)
+        const parsed = await parseEvaluationDocument(root, content, signal)
+        try { validateCaseIds(document.parsed.catalog, parsed.catalog) }
+        catch (error) { throw new CaseError('invalid_request', (error as Error).message) }
+        const result = { path: document.path, before_sha256: document.sha256, sha256: digest(content),
+          renames: [...mapping].map(([from, to]) => ({ from, to, scene: document.parsed.catalog.find(row => row.case_id === from)!.scene })),
+          note: '仅替换当前用例标题编号；正文及历史 Run、历史出处不变。当前正文内的直接引用需另行核对。' }
+        if (endpoint === 'cases/renumber-preview') return { ok: true, value: { ...result, written: false } }
+        cancelled(signal)
+        await services.applyEvaluation(document.experimentId, content, document.sha256, signal)
+        return { ok: true, value: { ...result, written: true } }
+      }
       if (endpoint === 'cases/delete') {
         const document = await documentFor(root, body, signal)
         const caseId = field(body, 'case_id')
@@ -200,9 +226,10 @@ export function createCaseManagementHandler(assetRoot: string, services: CaseMan
         if (endpoint === 'cases/from-run') {
           const runId = field(body, 'run_id'), caseId = field(body, 'case_id')
           const source = await sourceCase(services, document.agentId, runId, caseId, signal)
+          const scene = document.parsed.catalog.find(row => row.case_id === caseId)?.scene ?? result.draft.scene
           return { ok: true, value: { ...result, source_run_id: runId, source_case_id: caseId,
             note: '草稿仅复制运行时的冻结输入。请人工重写输入并填写预期行为；实际回答和失败结果不会作为参考答案。',
-            draft: { ...result.draft, title: `复现：${source.frozen?.title ?? caseId}`, inputs: [...source.frozen!.inputs!], expected_behavior: '' } } }
+            draft: { ...result.draft, scene, case_id: suggestCaseId(document.parsed.catalog, scene), title: `复现：${source.frozen?.title ?? caseId}`, inputs: [...source.frozen!.inputs!], expected_behavior: '' } } }
         }
         return { ok: true, value: result }
       }

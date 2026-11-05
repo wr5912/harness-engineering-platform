@@ -2497,3 +2497,18 @@ test('持久融合跨 CLI、RPC 续办；评测漂移拒绝写入，确认幂等
   versionCli(fx.root, 'fusion/recover', { ...input, recovery: 'rollback' })
   assert.equal(readFileSync(file, 'utf8'), 'workspace\n')
 })
+
+test('完整 evaluation.md 的预览和保存共用编号校验，不能绕过新增用例入口', async () => {
+  const { createAgentsHandler } = await loadServer()
+  const fx = fixture(), experiment_id = 'EXP-test-agent-001'
+  try {
+    const handler = createAgentsHandler(fx.root)
+    const current = await rpc(handler, 'edit/read', { experiment_id, path: 'evaluation.md' })
+    for (const id of ['U-NEW-001', 'U-XXX-001', 'U-POL-002']) {
+      const block = `\n#### ${id} 新增用例\n\n**用户输入**\n\n> 新的输入\n\n**预期**\n\n说明结果。\n`
+      const input = { experiment_id, edits: [{ path: current.path, content: current.content + block, expected_sha256: current.sha256 }] }
+      for (const action of ['edit/preview', 'edit/apply']) await assert.rejects(() => rpc(handler, action, input), /占位缩写|U-CASE-/)
+    }
+    assert.equal((await rpc(handler, 'edit/read', { experiment_id, path: 'evaluation.md' })).sha256, current.sha256)
+  } finally { await rm(fx.root, { recursive: true, force: true }) }
+})

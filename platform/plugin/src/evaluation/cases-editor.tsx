@@ -53,8 +53,8 @@ export function CaseCreationDialog({ rpc, agentId, experimentId, sourceRun, acti
       setDocument(value); setConflict(false)
       if (!keepDraft) { setDraft(value.draft); setLoadedDraft(JSON.stringify(value.draft)) }
       else {
-        setDraft(current => current ? { ...current, case_id: value.draft.case_id } : value.draft)
-        setMessage('已读取最新用例文件并自动分配可用编号，当前草稿已保留。请重新预览，核对新增内容后保存。')
+        setDraft(current => current ? { ...current, case_id: value.case_id_suggestions?.[current.scene] ?? current.case_id } : value.draft)
+        setMessage('已读取最新用例文件，草稿正文已保留。请核对场景和编号，重新预览后保存。')
       }
     } catch (cause) { if (id === request.current) setError((cause as Error).message) }
     finally { if (id === request.current) setLoading(false) }
@@ -104,8 +104,8 @@ export function CaseCreationDialog({ rpc, agentId, experimentId, sourceRun, acti
     {error && <p role="alert">{error}</p>}
     {conflict && <p role="alert">用例文件已变化，请重新读取后核对。<button type="button" disabled={busy || loading} onClick={() => void load(true)}>保留草稿并重读最新版本</button></p>}
     {draft && <div className="harness-eval-editor">
-      <p className="harness-eval-muted">用例编号：<code aria-label="新增用例编号">{draft.case_id}</code>（自动分配）</p>
-      <label className="harness-eval-field">场景<input aria-label="新增用例场景" list="evaluation-case-scenes" disabled={busy || loading} value={draft.scene} onChange={event => update({ ...draft, scene: event.target.value })} /><datalist id="evaluation-case-scenes">{document?.scenes?.map((scene: string) => <option key={scene} value={scene} />)}</datalist></label>
+      <label className="harness-eval-field">用例编号<input aria-label="新增用例编号" disabled={busy || loading} value={draft.case_id} placeholder="U-场景英文缩写-序号" onChange={event => update({ ...draft, case_id: event.target.value })} /><small>沿用场景已有英文缩写；新场景请填写有业务含义的缩写，不能使用 NEW 或 XXX。</small></label>
+      <label className="harness-eval-field">场景<input aria-label="新增用例场景" list="evaluation-case-scenes" disabled={busy || loading} value={draft.scene} onChange={event => update({ ...draft, scene: event.target.value, case_id: document?.case_id_suggestions?.[event.target.value] ?? '' })} /><datalist id="evaluation-case-scenes">{document?.scenes?.map((scene: string) => <option key={scene} value={scene} />)}</datalist></label>
       <label className="harness-eval-field">名称<input aria-label="新增用例名称" disabled={busy || loading} value={draft.title} onChange={event => update({ ...draft, title: event.target.value })} /></label>
       <h3>多轮输入</h3>{draft.inputs.map((value, index) => <div className="harness-eval-input-turn" key={index}><label className="harness-eval-field">第 {index + 1} 轮<textarea aria-label={`新增用例第 ${index + 1} 轮输入`} rows={3} disabled={busy || loading} value={value} onChange={event => update({ ...draft, inputs: draft.inputs.map((item, at) => at === index ? event.target.value : item) })} /></label><button type="button" disabled={busy || loading || draft.inputs.length === 1} onClick={() => update({ ...draft, inputs: draft.inputs.filter((_, at) => at !== index) })}>移除第 {index + 1} 轮</button></div>)}
       <button type="button" disabled={busy || loading} onClick={() => update({ ...draft, inputs: [...draft.inputs, ''] })}>＋ 添加一轮输入</button>

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -22,6 +23,18 @@ test('系统 Git 收集使用宿主 glibc，完整执行初始化、归档与离
     run(git, ['clone', archive, restored])
     assert.equal(run(git, ['-C', restored, 'show', 'HEAD:asset']), 'offline asset\n')
     assert.equal(run(git, ['-C', restored, 'status', '--porcelain']), '')
+    const base = join(root, 'base'), source = join(root, 'source'), target = join(root, 'target')
+    writeFileSync(base, 'first\nsecond\nthird\n')
+    writeFileSync(source, 'first\nsecond\nsource\n')
+    writeFileSync(target, 'target\nsecond\nthird\n')
+    assert.equal(run(git, ['merge-file', '-p', '--diff3', target, base, source]), 'target\nsecond\nsource\n')
+    writeFileSync(source, 'source\nsecond\nthird\n')
+    const conflict = spawnSync(git, ['merge-file', '-p', '--diff3', target, base, source], { encoding: 'utf8' })
+    assert.equal(conflict.status, 1, conflict.stderr)
+    assert.match(conflict.stdout, /^<<<<<<< /m)
+    assert.match(conflict.stdout, /^\|{7} /m)
+    assert.equal(readFileSync(target, 'utf8'), 'target\nsecond\nthird\n', '-p 不应覆盖目标文件')
+
   } finally { rmSync(root, { recursive: true, force: true }) }
 })
 

@@ -1,3 +1,4 @@
+import { validateCaseIds, type CaseCatalog } from '../evaluation/case-ids.ts'
 import { reuseParentDependencies } from './plugin-dependency-reuse.ts'
 import { assetText } from './asset-text.ts'
 import { createRequire } from 'node:module'
@@ -1386,7 +1387,7 @@ async function previewEdit(root: string, payload: JsonMap, signal?: AbortSignal)
     if (edit.content === null) return { path: source.rel, deleted: true, exists: true, before_sha256: beforeHash, after_sha256: null, changed: true,
       diff: beforeText === null ? '' : simpleDiff(source.rel, beforeText, ''), redacted: false }
     if (rejectsLlmApiKey(target.rel, edit.content)) throw new RpcError('secret_rejected', '拒绝写入 LLM API Key')
-    if (target.rel.endsWith('/evaluation.md')) loadEvaluationPreview(root, edit.content)
+    if (target.rel.endsWith('/evaluation.md')) validateEvaluationEdit(root, beforeText, edit.content)
     return { path: target.rel, ...(edit.moveTo ? { previous_path: source.rel } : {}), exists: beforeHash !== null, before_sha256: beforeHash, after_sha256: sha256(edit.content), changed: !!edit.moveTo || beforeHash === null || before !== edit.content, diff: simpleDiff(target.rel, assetText(source.rel, beforeText!).content, assetText(target.rel, edit.content).content), redacted: assetText(source.rel, beforeText!).redacted || assetText(target.rel, edit.content).redacted }
   })
   const dryRun = await validateDraft(root, payload, targets.filter(({ edit }) => edit.content !== null).map(({ edit, target }) => ({ rel: target.rel, content: edit.content! })), signal)
@@ -1415,6 +1416,12 @@ function loadEvaluationPreview(root: string, content: string) {
   return JSON.parse(run.stdout) as JsonMap
 }
 
+function validateEvaluationEdit(root: string, before: string | null, after: string) {
+  const parsed = loadEvaluationPreview(root, after)
+  try { validateCaseIds(before ? loadEvaluationPreview(root, before).catalog as CaseCatalog : [], parsed.catalog as CaseCatalog) }
+  catch (error) { throw new RpcError('invalid_request', (error as Error).message) }
+}
+
 async function applyEdit(root: string, payload: JsonMap, signal?: AbortSignal, beforeWrite?: () => void) {
   const resolved = editLocations(root, payload).map(({ edit, source, target }) => {
     const before = edit.content === null ? readFileSync(source.file) : editableText(source.file)
@@ -1424,7 +1431,7 @@ async function applyEdit(root: string, payload: JsonMap, signal?: AbortSignal, b
     const beforeHash = existsSync(source.file) ? sha256(before) : null
     if (beforeHash !== edit.expected) throw new RpcError('conflict', '文件或存在状态已被修改', { path: target.rel, expected_sha256: edit.expected, actual_sha256: beforeHash })
     if (edit.content !== null && rejectsLlmApiKey(target.rel, edit.content)) throw new RpcError('secret_rejected', '拒绝写入 LLM API Key')
-    if (edit.content !== null && target.rel.endsWith('/evaluation.md')) loadEvaluationPreview(root, edit.content)
+    if (edit.content !== null && target.rel.endsWith('/evaluation.md')) validateEvaluationEdit(root, beforeText, edit.content)
     return { ...target, source, moved: !!edit.moveTo, mode: beforeHash === null ? undefined : lstatSync(source.file).mode & 0o777,
       content: edit.content, expected: edit.expected, before: beforeHash === null ? null : before }
   })
@@ -1905,6 +1912,8 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
         case 'cases/read': return await readCase(root, body, signal)
         case 'cases/update': return await updateCase(root, body, signal)
         case 'cases/delete':
+        case 'cases/renumber-preview':
+        case 'cases/renumber':
         case 'cases/create-context':
         case 'cases/from-run':
         case 'cases/create-preview':
