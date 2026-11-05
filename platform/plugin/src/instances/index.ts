@@ -212,14 +212,16 @@ async function runDsh(assetRoot: string, args: string[], signal?: AbortSignal, m
       cwd: assetRoot,
       env: { ...process.env, ...modelEnvironment, HARNESS_ASSET_ROOT: resolve(assetRoot), HARNESS_PROGRAM_ROOT: programRoot() },
       encoding: 'utf8',
-      maxBuffer: 1024 * 1024,
+      maxBuffer: 32 * 1024 * 1024,
       signal,
     })
   } catch (error) {
     const failed = error as NodeJS.ErrnoException & { stdout?: string, stderr?: string }
     const removeValues = (text: string) => Object.values(modelEnvironment).filter(value => value.length >= 4)
       .reduce((value, secret) => value.replaceAll(secret, '<redacted>'), text)
-    throw Object.assign(new Error(bounded(removeValues(failed.stderr || failed.stdout || failed.message))), {
+    const message = failed.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' ? '实例命令输出超过读取上限，请检查实例响应规模。'
+      : failed.stderr || failed.message
+    throw Object.assign(new Error(bounded(removeValues(message))), {
       code: failed.code,
       stdout: bounded(removeValues(failed.stdout || '')),
       stderr: bounded(removeValues(failed.stderr || '')),

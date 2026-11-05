@@ -130,6 +130,8 @@ test('状态列出相对加载回执的增删、修改、配置变化和检查�
   rmSync(join(root, 'managed/plugin/lib/index.js')); manifest.port++
   const status = assetStatus(contract, manifest, generation, 'running', root)
   assert.equal(status.status, 'pending_reload')
+  assert.equal(status.loaded.source_files, undefined)
+  assert.deepEqual(manifest.asset_load.source_files, initial.files, '状态摘要不能修改持久回执或差异依据')
   assert.ok(Number.isFinite(Date.parse(status.checked_at)))
   assert.deepEqual(status.changed_files, [
     { path: '/opt/dsh-managed/plugin/new.js', change: 'added' },
@@ -139,6 +141,17 @@ test('状态列出相对加载回执的增删、修改、配置变化和检查�
   ])
   delete manifest.asset_load.source_files
   assert.match(assetStatus(contract, manifest, generation, 'running', root).reason, /旧回执未记录逐项清单/)
+})
+
+test('大型依赖清单只参与差异核对，不放大实例状态响应', t => {
+  const { root, manifest, contract, source } = fixture(t), initial = source()
+  const files = Array(20000).fill(initial.files[0])
+  manifest.asset_load = { source_files: files, digest: initial.digest }
+  assert.ok(JSON.stringify(manifest.asset_load).length > 1024 * 1024)
+  const status = assetStatus(contract, manifest, null, 'running', root)
+  assert.ok(JSON.stringify(status).length < 20000)
+  assert.equal(status.loaded.digest, initial.digest)
+  assert.equal(manifest.asset_load.source_files, files)
 })
 
 test('跨进程状态检查复用派生缓存，CAS 与 source 绕过缓存，缓存损坏可重建', t => {

@@ -421,6 +421,16 @@ test('真实登录 HTTP 的 CSP 允许且仅允许当前脚本，错误登录、
   const cookieHeader = success.headers.get('set-cookie')
   assert.match(cookieHeader, /HttpOnly; SameSite=Strict/)
   const cookie = cookieHeader.split(';')[0]
+  const nativeName = `dsh-auth-${createHash('sha256').update(new URL(origin).host).digest('base64url')}`
+  assert.equal(cookie.split('=')[0], nativeName, '插件任务身份使用 DSH 原生的 authority Cookie 名称')
+  const legacyCookie = cookie.replace(nativeName, 'harness_platform_session')
+  const migrated = await fetch(loginUrl, { redirect: 'manual', headers: { cookie: legacyCookie } })
+  assert.equal(migrated.status, 303)
+  assert.ok(migrated.headers.getSetCookie().some(value => value.startsWith(cookie + ';')))
+  assert.ok(migrated.headers.getSetCookie().some(value => value.startsWith('harness_platform_session=;') && value.includes('Max-Age=0')))
+  for (const invalid of [`${nativeName}=${'x'.repeat(43)}`, `${cookie}; ${cookie}`, `${nativeName}=${'x'.repeat(43)}; ${legacyCookie}`]) {
+    assert.equal((await fetch(loginUrl, { redirect: 'manual', headers: { cookie: invalid } })).status, 200)
+  }
   const signedIn = await fetch(loginUrl, { redirect: 'manual', headers: { cookie } })
   assert.equal(signedIn.status, 303)
   assert.equal(new URL(signedIn.headers.get('location'), origin).href, base)
@@ -431,4 +441,5 @@ test('真实登录 HTTP 的 CSP 允许且仅允许当前脚本，错误登录、
   const signedOut = await fetch(loginUrl, { redirect: 'manual', headers: { cookie } })
   assert.equal(signedOut.status, 200)
   assert.match(await signedOut.text(), /action="\/hep\/login"/)
+  assert.equal((await fetch(loginUrl, { redirect: 'manual', headers: { cookie: legacyCookie } })).status, 200)
 })

@@ -148,7 +148,9 @@ export function assetStatus(contract: RecordValue, manifest: RecordValue, genera
     for (const path of previous.keys()) changed_files.push({ path, change: 'removed' })
     if (loaded.configuration_digest !== current.configuration_digest) changed_files.push({ path: '运行配置', change: 'modified' })
   }
-  return { status, checked_at: new Date().toISOString(), changed_files, current_digest: current.digest, loaded, last_attempt: manifest.asset_reload_attempt ?? null,
+  // 逐文件清单留在实例登记中用于差异核对，状态查询只传回执摘要。
+  const { source_files: _sourceFiles, ...receipt } = loaded ?? {}
+  return { status, checked_at: new Date().toISOString(), changed_files, current_digest: current.digest, loaded: loaded ? receipt : null, last_attempt: manifest.asset_reload_attempt ?? null,
     generation_digest: generation ? generationDigest(manifest, generation) : null,
     reason: verifiedGeneration ? status === 'current' ? '运行代次与加载回执一致' : loaded.source_files ? '资产已变化需重载，变化项相对最后实际加载回执' : '资产已变化需重载；旧回执未记录逐项清单' : '当前运行代次缺少实际加载回执，尚未核验' }
 }

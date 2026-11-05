@@ -129,13 +129,17 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
     const manifestPath = join(path, 'run.yaml'), inputPath = join(path, 'inputs.lock.json')
     if (!existsSync(manifestPath)) return undefined
     if (lstatSync(path).isSymbolicLink() || !ordinary(manifestPath) || (existsSync(inputPath) && !ordinary(inputPath))) throw new EvaluationJobError('run_read_failed', 'Run 清单或冻结输入无法核对，已保留现场')
-    let manifest: MapValue, inputs: MapValue
-    try { manifest = loadYaml(readFileSync(manifestPath, 'utf8')) as MapValue; inputs = existsSync(inputPath) ? JSON.parse(readFileSync(inputPath, 'utf8')) as MapValue : {} }
+    let manifest: MapValue, inputs: MapValue, frozenInputsAvailable = existsSync(inputPath)
+    try {
+      manifest = loadYaml(readFileSync(manifestPath, 'utf8')) as MapValue
+      if (manifest?.recovery_note && frozenInputsAvailable && statSync(inputPath).size === 0) frozenInputsAvailable = false
+      inputs = frozenInputsAvailable ? JSON.parse(readFileSync(inputPath, 'utf8')) as MapValue : {}
+    }
     catch { throw new EvaluationJobError('run_read_failed', 'Run 清单或冻结输入无法解析，原文件已保留') }
     // 旧 Run 可以缺少冻结输入中的 run_id，但已有身份声明不能与目录不一致。
     if (!manifest || (manifest.run_id != null && manifest.run_id !== id) || (inputs.run_id != null && inputs.run_id !== id)
       || !['planned', 'running', 'completed', 'failed', 'cancelled'].includes(manifest.status)) throw new EvaluationJobError('run_read_failed', 'Run 身份或状态与目录不一致')
-    return { path, id, manifest, inputs, frozen_inputs_available: existsSync(inputPath) }
+    return { path, id, manifest, inputs, frozen_inputs_available: frozenInputsAvailable }
   }
   function runDirectory(job: RunControl): Run | undefined {
     const id = job.schema_version === '2.0' ? job.run_id : job.run_id ?? job.result?.run_id
@@ -145,9 +149,9 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
       if (existsSync(path)) { const run = inspectRun(path, id); if (run) { if (job.schema_version === '2.0' && (run.manifest.run_id !== id || run.inputs.run_id !== id)) throw new EvaluationJobError('run_read_failed', '新 Run 缺少一致的清单与输入身份'); return run } }
     }
     if (job.schema_version === '2.0') return undefined
-    // 旧请求可能没有捕获 Run 输出；仅在本根原 execution 关联中查找。
+    // 旧请求可能没有捕获 Run 输出；只查所属版本的原 execution 或已核验恢复关联。
     let uncertainty = ''
-    for (const experiment of experiments()) {
+    for (const experiment of selected) {
       const folder = join(root, 'evolution/experiments', experiment, 'runs')
       if (!existsSync(folder)) continue
       for (const name of readdirSync(folder)) {
@@ -157,7 +161,16 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
         if (existsSync(execution)) {
           if (!ordinary(execution)) { uncertainty = '旧执行关联无法核对'; continue }
           let record: MapValue
-          try { record = JSON.parse(readFileSync(execution, 'utf8')) } catch { uncertainty = '旧执行关联无法解析，原文件已保留'; continue }
+          try { record = JSON.parse(readFileSync(execution, 'utf8')) } catch {
+            const run = inspectRun(path, name), recovered = run?.manifest
+            const recoveredId = /^\.local\/evaluation-jobs\/([0-9a-f-]+)\.json$/.exec(recovered?.recovery_source ?? '')?.[1]
+            if (recoveredId && UUID.test(recoveredId) && existsSync(pathFor(recoveredId)) && ordinary(pathFor(recoveredId))
+              && createHash('sha256').update(readFileSync(pathFor(recoveredId))).digest('hex') === recovered?.recovery_source_sha256) {
+              if (recoveredId === job.job_id) return run
+              continue
+            }
+            uncertainty = '旧执行关联无法解析，原文件已保留'; continue
+          }
           if (record.job_id === job.job_id) return inspectRun(path, name)
         } else if (!job.source.startsWith('experiment:') || experiment === job.source.slice(11)) {
           uncertainty = '存在缺少执行关联的 Run 或初始化目录，未清理旧请求'
@@ -174,8 +187,8 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
       model_calls_basis: '轨迹请求头仅在配置变化时产生，不能据此推算实际模型调用或内部重试次数。' }
     if (!run) return result
     const { inputs, manifest } = run
-    Object.assign(result, { run_status: manifest.status, frozen_inputs_available: run.frozen_inputs_available, experiment_id: manifest.experiment_id ?? run.path.split('/').at(-3), agent_id: manifest.agent_id,
-      source: inputs.source_id ?? job.source, cases: inputs.evaluation_cases?.map((item: MapValue) => item.case_id) ?? job.cases ?? [],
+    Object.assign(result, { run_status: manifest.status, frozen_inputs_available: run.frozen_inputs_available, recovery_note: manifest.recovery_note, experiment_id: manifest.experiment_id ?? run.path.split('/').at(-3), agent_id: manifest.agent_id,
+      source: inputs.source_id ?? job.source, cases: inputs.evaluation_cases?.map((item: MapValue) => item.case_id) ?? (manifest.recovery_note ? [] : job.cases ?? []),
       candidate_sha256: inputs.candidate_sha256, evaluation_sha256: inputs.evaluation_sha256,
       program_origin: inputs.program_origin, evaluation_implementation: inputs.evaluation_implementation,
       source_ref: inputs.source_ref, evaluation_source: inputs.evaluation_source, mcp_fixture: inputs.mcp_fixture, sessions: [], instance_name: null })
@@ -298,7 +311,10 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
     const run = committedById(id)
     if (run) {
       const source = run.inputs.source_id ?? run.manifest.source_id ?? `experiment:${run.manifest.experiment_id}`
-      const execution = existsSync(join(run.path, 'execution.json')) ? JSON.parse(readFileSync(join(run.path, 'execution.json'), 'utf8')) : {}
+      let execution: MapValue = {}
+      try { execution = JSON.parse(readFileSync(join(run.path, 'execution.json'), 'utf8')) } catch {
+        if (!FINAL.has(run.manifest.status)) throw new EvaluationJobError('run_read_failed', '运行中的执行记录无法读取，进程状态未知')
+      }
       const known = FINAL.has(run.manifest.status) ? run.manifest.status : ownsProcess(execution as RunControl, root) ? 'running' : 'unknown'
       const observed = { source, status: known, started_at: run.manifest.created_at, updated_at: run.manifest.finished_at ?? run.manifest.created_at, stdout: '', stderr: '' } as RunControl
       const actual = receipt(observed, run)
@@ -311,7 +327,16 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
     if (!existsSync(directory)) return { runs: [], pending, errors }
     for (const name of readdirSync(directory)) {
       if (!name.endsWith('.json') || (!UUID.test(name.slice(0, -5)) && !RUN.test(name.slice(0, -5)))) continue
-      try { const value = snapshot(read(name.slice(0, -5)), false); if (value.run_created && value.run_id) runs.set(value.run_id, value); else { if (!FINAL.has(value.status)) pending.push(value); if (value.status !== 'preparing' && value.status !== 'cancelling' && value.status !== 'running') errors.push({ path: `evaluation-jobs/${name}`, message: '旧启动状态待核对，未重放或清理。', code: 'observation_unknown' }) } }
+      try {
+        const job = read(name.slice(0, -5))
+        const value = snapshot(job, false)
+        // 已删除版本的终态旧启动回执保留原文件，不再作为当前 Run 的读取故障。
+        if (job.schema_version === undefined && job.source.startsWith('experiment:') && VERSION_ID.test(job.source.slice(11))
+          && !existsSync(join(root, 'evolution/experiments', job.source.slice(11))) && FINAL.has(job.status)
+          && processGone(job.pid, job.process_start) && !live.has(keyFor(job)) && !starting.has(keyFor(job))) continue
+        if (value.run_created && value.run_id) runs.set(value.run_id, value)
+        else { if (!FINAL.has(value.status)) pending.push(value); if (value.status !== 'preparing' && value.status !== 'cancelling' && value.status !== 'running') errors.push({ path: `evaluation-jobs/${name}`, message: '旧启动状态待核对，未重放或清理。', code: 'observation_unknown' }) }
+      }
       catch (error) { if ((error as EvaluationJobError).code !== 'not_found') errors.push({ path: `evaluation-jobs/${name}`, message: options.redact((error as Error).message), code: (error as EvaluationJobError).code }) }
     }
     return { runs: [...runs.values()].sort((a, b) => (b.started_at ?? '').localeCompare(a.started_at ?? '')), pending, errors }

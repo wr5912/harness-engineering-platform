@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, renameSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import assert from 'node:assert/strict'
@@ -168,6 +168,32 @@ test('持续通知按最小间隔合并，不把每次写入放大成一帧', as
   const merged = decode(await reader.read())
   assert.ok(Date.now() - startedAt >= 300, '最小间隔内不得发送第二帧')
   assert.deepEqual(new Set(merged.domains), new Set(['mcp', 'instances']))
+})
+
+test('实例状态派生缓存不触发重读循环，实际登记变更仍通知', async t => {
+  const root = mkdtempSync(join(tmpdir(), 'platform instance cache events '))
+  const stateRoot = join(root, '.local/instances')
+  const instance = join(stateRoot, 'fixture')
+  mkdirSync(instance, { recursive: true })
+  const manifest = join(instance, 'instance.json')
+  const cache = join(instance, 'asset-file-cache.json')
+  writeFileSync(manifest, '{}')
+  writeFileSync(cache, '{}')
+  const events = createPlatformEvents(root, { docker: false, stateRoot, minIntervalMs: 100 })
+  const seen = []
+  events.subscribe(event => seen.push(event))
+  events.start()
+  t.after(() => { events.dispose(); rmSync(root, { recursive: true, force: true }) })
+  for (let index = 0; index < 3; index++) {
+    const temporary = `${cache}.${index}.tmp`
+    writeFileSync(temporary, JSON.stringify({ checked: index }))
+    renameSync(temporary, cache)
+  }
+  await delay(1300)
+  assert.equal(seen.length, 0, '状态读取生成的缓存不能使实例和目录失效')
+  writeFileSync(manifest, '{"changed":true}')
+  for (let attempt = 0; attempt < 30 && !seen.length; attempt++) await delay(100)
+  assert.ok(seen.some(event => event.domains.includes('instances') && event.domains.includes('agents')))
 })
 
 test('Run 延迟清单和完成摘要通知列表，高频轨迹不触发刷新', async t => {

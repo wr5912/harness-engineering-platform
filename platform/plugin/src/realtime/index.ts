@@ -8,7 +8,7 @@ import { PLATFORM_DOMAINS, type PlatformDomain } from './client.ts'
 
 export type PlatformInvalidation = { revision: number; domains: PlatformDomain[]; ids: string[] }
 type Options = { docker?: boolean; stateRoot?: string; minIntervalMs?: number }
-const IGNORED = new Set(['node_modules', '.git', '.venv', '__pycache__', 'lib', 'dist', '.cache', 'cache', 'history', 'RuntimeHOME', 'dsh-home', 'sessions', 'attachments'])
+const IGNORED = new Set(['node_modules', '.git', '.venv', '__pycache__', 'lib', 'dist', '.cache', 'cache', 'asset-file-cache.json', 'history', 'RuntimeHOME', 'dsh-home', 'sessions', 'attachments'])
 const RUN_DIRECTORY = /^run-/
 
 /** 观察已有事实源；通知只含稳定标识，不携带文件内容、配置或运行日志。 */

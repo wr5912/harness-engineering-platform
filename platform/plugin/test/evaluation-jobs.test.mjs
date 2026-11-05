@@ -236,6 +236,46 @@ test('旧Run缺少冻结输入仍可读取关联，损坏输入则局部报错�
   assert.deepEqual(readFileSync(join(run, 'run.yaml')), original)
 })
 
+test('历史恢复Run按已校验原任务关联读取，空证据保持未知且不影响其他版本', async t => {
+  const fx = await fixture(t), old = seedLegacy(fx)
+  const id = `run-${randomUUID()}`, run = seedRun(fx, id, { status: 'failed' })
+  const manifest = JSON.parse(readFileSync(join(run, 'run.yaml'), 'utf8'))
+  Object.assign(manifest, { recovery_note: '原冻结输入和执行记录为空，仅恢复身份与失败状态。',
+    recovery_source: `.local/evaluation-jobs/${old.job_id}.json`,
+    recovery_source_sha256: createHash('sha256').update(readFileSync(statePath(fx.root, old.job_id))).digest('hex') })
+  writeFileSync(join(run, 'run.yaml'), JSON.stringify(manifest))
+  for (const name of ['inputs.lock.json', 'execution.json']) writeFileSync(join(run, name), '')
+  const other = seedLegacy(fx, { source: 'experiment:EXP-other-agent-001', stderr: '旧日志不足，阶段未知' })
+  mkdirSync(join(fx.root, 'evolution/experiments/EXP-other-agent-001'), { recursive: true })
+  const jobs = fx.create(), listed = jobs.list()
+  assert.deepEqual(listed.runs.map(item => item.run_id), [id])
+  assert.equal(listed.runs[0].status, 'failed')
+  assert.equal(listed.runs[0].frozen_inputs_available, false)
+  assert.equal(listed.runs[0].recovery_note, manifest.recovery_note)
+  assert.equal(listed.errors.length, 1)
+  assert.match(listed.errors[0].path, new RegExp(other.job_id))
+  assert.equal(jobs.status(old.job_id).run_id, id)
+  assert.equal(jobs.status(id).run_id, id)
+  assert.deepEqual(jobs.status(id).result.cases, [])
+  assert.deepEqual(jobs.status(old.job_id).result.cases, [])
+  for (const name of ['inputs.lock.json', 'execution.json']) assert.equal(readFileSync(join(run, name), 'utf8'), '')
+  writeFileSync(statePath(fx.root, old.job_id), readFileSync(statePath(fx.root, old.job_id), 'utf8') + '\n')
+  assert.throws(() => jobs.status(old.job_id), error => error.code === 'run_read_failed', '恢复关联摘要变化不能继续认领Run')
+})
+
+test('已删除版本的终态旧回执退出当前列表，原记录保留；在途与未知进程仍报告', async t => {
+  const fx = await fixture(t), old = seedLegacy(fx, { status: 'completed', exit_code: 1, stderr: 'Research Run: run-旧日志已脱敏' })
+  const path = statePath(fx.root, old.job_id), before = readFileSync(path), jobs = fx.create()
+  assert.deepEqual(jobs.list(), { runs: [], pending: [], errors: [] })
+  assert.deepEqual(readFileSync(path), before)
+  assert.equal(jobs.status(old.job_id).status, 'completed')
+  const stat = readFileSync(`/proc/${process.pid}/stat`, 'utf8')
+  for (const change of [{ status: 'running' }, { pid: undefined }, { pid: process.pid, process_start: stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19] }]) {
+    writeFileSync(path, JSON.stringify({ ...old, ...change }))
+    assert.equal(jobs.list().errors.length, 1)
+  }
+})
+
 test('工作区迁移沿原声明读取旧关联，不接管同名其他根或改写历史来源', async t => {
   const fx = await fixture(t), old = seedLegacy(fx, { status: 'completed', exit_code: 0 })
   const id = `run-${randomUUID()}`; seedRun(fx, id, { jobId: old.job_id })

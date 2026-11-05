@@ -2525,7 +2525,7 @@ def command_ps(args: argparse.Namespace) -> None:
                 except (SystemExit, OSError, ValueError, TypeError, KeyError, subprocess.TimeoutExpired):
                     entry["asset_status"] = {"status": "unknown", "current_digest": None,
                                             "checked_at": datetime.now(timezone.utc).isoformat(), "changed_files": [],
-                                            "loaded": manifest.get("asset_load"),
+                                            "loaded": {key: value for key, value in loaded.items() if key != "source_files"} if loaded else None,
                                             "last_attempt": manifest.get("asset_reload_attempt"),
                                             "reason": "来源或运行代次无法核对，尚未核验"}
             except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError) as error:

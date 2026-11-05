@@ -169,6 +169,21 @@ if __name__ == '__main__':
   return { root, state, cleanup: () => rmSync(root, { recursive: true, force: true }) }
 }
 
+test('实例查询接受已有大型装载回执，进程失败不把 stdout 文件清单当错误说明', async t => {
+  const { module, cleanup } = await loadModule(), fx = fixture()
+  t.after(() => { fx.cleanup(); cleanup() })
+  const script = join(fx.root, 'runtime/adapters/dsh-container/dsh-dev-fixture.cjs')
+  writeFileSync(script, `process.stdout.write(JSON.stringify({instances:[{name:'large-instance',state:'running',asset_status:{loaded:{source_files:Array(20000).fill({path:'dependency.js',sha256:'a'.repeat(64)})}}}]}))`)
+  const handler = module.createInstancesHandler(fx.root), signal = new AbortController().signal
+  const listed = await handler('list', {}, signal)
+  assert.equal(listed.ok, true, JSON.stringify(listed.error))
+  assert.equal(listed.value.instances[0].asset_status.loaded.source_files.length, 20000)
+  writeFileSync(script, `process.stdout.write('FILE_LIST_SHOULD_NOT_BE_AN_ERROR'.repeat(50000));process.exitCode=2`)
+  const failed = await handler('list', {}, signal)
+  assert.equal(failed.ok, false)
+  assert.doesNotMatch(failed.error.message, /FILE_LIST_SHOULD_NOT_BE_AN_ERROR/)
+})
+
 test('重载由同一 CLI 执行并冻结来源与代次；停止、冲突、未知回执和批量失败如实返回', async t => {
   const { module, cleanup } = await loadModule(), fx = fixture(), previous = process.env.XDG_STATE_HOME
   process.env.XDG_STATE_HOME = fx.state

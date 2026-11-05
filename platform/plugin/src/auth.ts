@@ -16,7 +16,7 @@ declare module '@deepseek-ai/dsh-host-webserver' {
 }
 
 const KEY = credentialKey('harness-platform', 'browser-sessions')
-const COOKIE = 'harness_platform_session'
+const LEGACY_COOKIE = 'harness_platform_session'
 const MAX_AGE = 30 * 24 * 60 * 60
 const hash = (value: string) => createHash('sha256').update(value).digest('hex')
 interface Session { digest: string; authority: string; expires: number }
@@ -75,11 +75,17 @@ export async function applyAuthentication(ctx: Context, assetRoot: string) {
     return typeof value === 'string' ? value : undefined
   }
   const authority = (req: ConnectionTrustRequest) => `${ctx.webServer.protocol}//${header(req, 'host')?.toLowerCase()}`
-  const sessionOf = (req: ConnectionTrustRequest) => {
-    const values = (header(req, 'cookie') ?? '').split(';').map(value => value.trim())
-      .filter(value => value.startsWith(`${COOKIE}=`)).map(value => value.slice(COOKIE.length + 1))
+  // 使用 DSH 原生名称，让依赖 Connection 认证的插件取得同一浏览器身份。
+  const cookieName = (req: ConnectionTrustRequest) => `dsh-auth-${createHash('sha256').update(new URL(authority(req)).host).digest('base64url')}`
+  const sessionValue = (req: ConnectionTrustRequest) => {
+    const cookies = (header(req, 'cookie') ?? '').split(';').map(value => value.trim())
+    const name = cookies.some(value => value.startsWith(`${cookieName(req)}=`)) ? cookieName(req) : LEGACY_COOKIE
+    const values = cookies.filter(value => value.startsWith(`${name}=`)).map(value => value.slice(name.length + 1))
     if (values.length !== 1 || !/^[A-Za-z0-9_-]{43}$/.test(values[0])) return undefined
-    const session = sessions.get(hash(values[0]))
+    return values[0]
+  }
+  const sessionOf = (req: ConnectionTrustRequest) => {
+    const value = sessionValue(req), session = value ? sessions.get(hash(value)) : undefined
     return session && session.expires > Date.now() && session.authority === authority(req) ? session : undefined
   }
   const fence = (req: ConnectionTrustRequest) => {
@@ -87,7 +93,7 @@ export async function applyAuthentication(ctx: Context, assetRoot: string) {
     return 'rejection' in admission && admission.rejection === 403
   }
   const rejection = (req: ConnectionTrustRequest) => fence(req) ? 403 : active && sessionOf(req) ? undefined : 401
-  const redirect = (res: ServerResponse, location: string, cookie?: string) => {
+  const redirect = (res: ServerResponse, location: string, cookie?: string | string[]) => {
     res.writeHead(303, { 'cache-control': 'no-store', 'referrer-policy': 'same-origin', location,
       ...(cookie ? { 'set-cookie': cookie } : {}) })
     res.end()
@@ -110,6 +116,7 @@ export async function applyAuthentication(ctx: Context, assetRoot: string) {
       if (new URL(req.url ?? '/', 'http://platform.invalid').searchParams.has('token')) {
         redirect(res, ctx.webServer.publicPath('/')); return false
       }
+      migrateCookie(req, res)
       res.setHeader('cache-control', 'no-store')
       return true
     } },
@@ -131,8 +138,14 @@ export async function applyAuthentication(ctx: Context, assetRoot: string) {
     sessions = new Map(stored(record, accountDigest).sessions.map(session => [session.digest, session]))
   }
   await update(value => value)
-  const cookieHeader = (value: string, age: number) =>
-    `${COOKIE}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${ctx.webServer.protocol === 'https:' ? '; Secure' : ''}`
+  const cookieHeader = (req: ConnectionTrustRequest, value: string, age: number, name = cookieName(req)) =>
+    `${name}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${ctx.webServer.protocol === 'https:' ? '; Secure' : ''}`
+  const migrateCookie = (req: ConnectionTrustRequest, res: ServerResponse) => {
+    const session = sessionOf(req)
+    if (session && !(header(req, 'cookie') ?? '').split(';').some(value => value.trim().startsWith(`${cookieName(req)}=`))) {
+      res.setHeader('set-cookie', [cookieHeader(req, sessionValue(req)!, Math.max(0, Math.floor((session.expires - Date.now()) / 1000))), cookieHeader(req, '', 0, LEGACY_COOKIE)])
+    }
+  }
   const html = (res: ServerResponse, status = 200, error = '') => {
     let preference: 'light' | 'dark' | 'system' = 'system'
     try {
@@ -151,7 +164,7 @@ export async function applyAuthentication(ctx: Context, assetRoot: string) {
       if (!active) { res.writeHead(503); res.end(); return }
       if (fence(req)) { res.writeHead(403); res.end(); return }
       if (path === '/login' && req.method === 'GET') {
-        if (sessionOf(req)) redirect(res, ctx.webServer.publicPath('/'))
+        if (sessionOf(req)) { migrateCookie(req, res); redirect(res, ctx.webServer.publicPath('/')) }
         else html(res)
         return
       }
@@ -163,7 +176,7 @@ export async function applyAuthentication(ctx: Context, assetRoot: string) {
         sessions.delete(session.digest)
         try { await update(value => value.filter(item => item.digest !== session.digest)) }
         catch { res.writeHead(503); res.end(); return }
-        redirect(res, ctx.webServer.publicPath('/login'), cookieHeader('', 0))
+        redirect(res, ctx.webServer.publicPath('/login'), [cookieHeader(req, '', 0), cookieHeader(req, '', 0, LEGACY_COOKIE)])
         return
       }
       if (req.headers['content-type']?.split(';')[0] !== 'application/x-www-form-urlencoded') {
@@ -188,7 +201,7 @@ export async function applyAuthentication(ctx: Context, assetRoot: string) {
       const session = { digest: hash(value), authority: authority(req), expires: Date.now() + MAX_AGE * 1000 }
       try { await update(items => [...items, session]) }
       catch { html(res, 503, '暂时无法保存登录状态，请重试。'); return }
-      redirect(res, ctx.webServer.publicPath('/'), cookieHeader(value, MAX_AGE))
+      redirect(res, ctx.webServer.publicPath('/'), [cookieHeader(req, value, MAX_AGE), cookieHeader(req, '', 0, LEGACY_COOKIE)])
     } }))
   }
   ctx.on('webserver/index-inject', table => {

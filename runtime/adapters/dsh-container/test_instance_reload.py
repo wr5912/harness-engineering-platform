@@ -163,6 +163,8 @@ class InstanceReloadTest(unittest.TestCase):
         self.assertEqual(result["items"][1]["status"], "not_executed")
 
     def test_list_without_runtime_receipt_does_not_scan_historical_dependencies(self):
+        self.manifest["asset_load"] = {"digest": ASSET, "source_files": [{"path": "dependency.js", "sha256": "e" * 64}]}
+        (self.target / "instance.json").write_text(json.dumps(self.manifest), encoding="utf-8")
         output = io.StringIO()
         with mock.patch.object(dev, "run", return_value=subprocess.CompletedProcess([], 0, "{}", "")), \
                 mock.patch.object(dev, "instance_belongs_to_workspace", return_value=True), \
@@ -173,6 +175,8 @@ class InstanceReloadTest(unittest.TestCase):
         item = json.loads(output.getvalue())["instances"][0]
         self.assertEqual(item["asset_status"]["status"], "unknown")
         self.assertIsNone(item["asset_status"]["current_digest"])
+        self.assertEqual(item["asset_status"]["loaded"], {"digest": ASSET})
+        self.assertIn("source_files", json.loads((self.target / "instance.json").read_text())["asset_load"])
 
     def test_verified_receipt_requires_matching_bytes_process_source_and_preset(self):
         files = [{"path": "/opt/source.js", "sha256": "e" * 64}]

@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { managedState, ownsPort, processBirth, restoreManagedProcess } from '../lifecycle.mts'
-import { workspaceIdentity, instanceStateRoot, workspaceLocalPath } from '../plugin/src/workspace.ts'
+import { workspaceIdentity, instanceStateRoot, workspaceLocalPath, workspaceOwnsCwd } from '../plugin/src/workspace.ts'
 
 export type UpdateOptions = { programRoot: string; dataRoot: string; dryRun?: boolean }
 type ServiceState = NonNullable<ReturnType<typeof managedState>>
@@ -101,11 +101,15 @@ function preparedProfile(options: UpdateOptions, environment: NodeJS.ProcessEnv)
 export async function readUpdateActivity(options: UpdateOptions, state: ServiceState, workspaceId: string): Promise<BusyItem[]> {
   const url = new URL(state.publicUrl ?? state.url), account = json(join(options.dataRoot, '.local/credentials/admin.json'))
   const request = { redirect: 'error' as const, signal: AbortSignal.timeout(30_000) }
-  const login = await fetch(new URL('login', url), { ...request, redirect: 'manual', method: 'POST', headers: { origin: url.origin, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ username: account.username, password: account.password }) })
-  const cookie = login.headers.getSetCookie().filter(value => value.startsWith('harness_platform_session=')).map(value => value.split(';')[0]).join('; ')
+  // 启停通过同步子进程执行，旧连接的关闭事件可能尚未处理；核验不得复用上一进程的连接。
+  const headers = { origin: url.origin, connection: 'close' }
+  const login = await fetch(new URL('login', url), { ...request, redirect: 'manual', method: 'POST', headers: { ...headers, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ username: account.username, password: account.password }) })
+  const cookieName = `dsh-auth-${createHash('sha256').update(url.host).digest('base64url')}`
+  const cookie = login.headers.getSetCookie().filter(value => value.startsWith(`${cookieName}=`) || value.startsWith('harness_platform_session=') && !/Max-Age=0(?:;|$)/i.test(value)).map(value => value.split(';')[0]).join('; ')
   if (login.status !== 303 || !cookie) throw new Error('更新前平台认证失败，未应用')
   async function rpc(endpoint: string, payload: object, native = false) {
-    const response = await fetch(new URL(`${native ? 'api' : 'harness-platform'}/${endpoint}`, url), { ...request, signal: AbortSignal.timeout(30_000), method: 'POST', headers: { origin: url.origin, cookie, 'content-type': 'application/json' }, body: JSON.stringify({ type: 'client-request', rpcId: `platform-update-${randomUUID()}`, method: endpoint, payload }) })
+    const response = await fetch(new URL(`${native ? 'api' : 'harness-platform'}/${endpoint}`, url), { ...request, signal: AbortSignal.timeout(native ? 120_000 : 30_000), method: 'POST', headers: { ...headers, cookie, 'content-type': 'application/json' }, body: JSON.stringify({ type: 'client-request', rpcId: `platform-update-${randomUUID()}`, method: endpoint, payload }) })
+      .catch(error => { throw new Error(`更新前只读核对失败：${endpoint}（${error.cause?.code ?? error.name}）`) })
     if (!response.ok) throw new Error(`更新前只读核对失败：${endpoint} HTTP ${response.status}`)
     const value = await response.json() as any
     if (value?.result?.ok !== true) throw new Error(`更新前只读核对失败：${endpoint}`)
@@ -118,13 +122,29 @@ export async function readUpdateActivity(options: UpdateOptions, state: ServiceS
   if (!Array.isArray(sessions?.items) || !Array.isArray(evaluationRuns) || !Array.isArray(operations)
     || evaluations?.pending !== undefined && !Array.isArray(evaluations.pending)
     || evaluations?.errors !== undefined && !Array.isArray(evaluations.errors)) throw new Error('在途状态响应不完整，不能判断为空闲')
-  if (evaluations.errors?.length) throw new Error('评测状态存在未核对项，不能判断为空闲')
+  for (const error of evaluations.errors ?? []) {
+    // 历史 Run 的证据读取失败与进程在途分开核对，避免阻塞修复读取器本身。
+    const id = /^evaluation-jobs\/([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.json$/.exec(error.path ?? '')?.[1]
+    let finished = false
+    try {
+      const path = join(workspaceLocalPath(options.dataRoot, 'evaluation-jobs'), `${id}.json`)
+      const job = json(path)
+      const birth = Number.isInteger(job.pid) && job.pid > 1 ? processBirth(job.pid) : undefined
+      finished = !!id && error.code === 'run_read_failed' && lstatSync(path).isFile() && !lstatSync(path).isSymbolicLink()
+        && job.schema_version === undefined && job.job_id === id && job.workspace_id === workspaceId && workspaceOwnsCwd(options.dataRoot, job.asset_root)
+        && ['completed', 'failed', 'cancelled'].includes(job.status) && Number.isInteger(job.pid) && job.pid > 1
+        && typeof job.process_start === 'string' && /^\d+$/.test(job.process_start)
+        && (!existsSync(`/proc/${job.pid}`) || !!birth && birth !== job.process_start)
+    } catch {}
+    if (!finished) throw new Error('评测状态存在未核对项，不能判断为空闲')
+  }
   const busy: BusyItem[] = []
   for (const session of sessions.items) {
     if (typeof session.sessionId !== 'string' || typeof session.running !== 'boolean') throw new Error('会话运行状态缺失，不能判断为空闲')
     if (session.running) busy.push({ kind: 'session', id: session.sessionId, state: 'running' })
     const hint = session.projections?.values?.harnessPlatformAssistant
-    if (hint?.workspace_id === workspaceId) {
+    // 子会话由 DSH 子代理路由持有，继承的助手投影不是独立管理会话；运行状态仍在上方核对。
+    if (hint?.workspace_id === workspaceId && session.origin !== 'subagent') {
       const current = await rpc('assistant/status', { session_id: session.sessionId })
       if (typeof current?.running !== 'boolean' || !Array.isArray(current.proposals) || !current.submissions || typeof current.submissions !== 'object') throw new Error('管理会话状态不完整，不能判断为空闲')
       if (current.running || current.proposals?.some((item: any) => item.state === 'running') || Object.values(current.submissions ?? {}).some((item: any) => ['pending', 'unknown'].includes(item.state))) busy.push({ kind: 'assistant', id: session.sessionId, state: 'pending' })

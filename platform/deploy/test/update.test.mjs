@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { createServer } from 'node:http'
@@ -128,7 +129,12 @@ async function activityFixture(t, responses) {
   writeFileSync(join(f.options.dataRoot, '.local/credentials/admin.json'), JSON.stringify({ username: 'fixture', password: 'fixture' }))
   const requested = []
   const server = createServer(async (request, response) => {
-    if (request.url === '/hep/login') { response.writeHead(303, { 'set-cookie': 'harness_platform_session=fixture; Path=/hep/' }); response.end(); return }
+    assert.equal(request.headers.connection, 'close', '启停前后的核验必须使用新连接')
+    if (request.url === '/hep/login') {
+      const name = `dsh-auth-${createHash('sha256').update(request.headers.host).digest('base64url')}`
+      response.writeHead(303, { 'set-cookie': [`${name}=fixture; Path=/hep/`, 'harness_platform_session=; Max-Age=0; Path=/'] }); response.end(); return
+    }
+    assert.match(request.headers.cookie, /^dsh-auth-[A-Za-z0-9_-]+=fixture$/)
     const endpoint = request.url.replace(/^\/hep\/(api|harness-platform)\//, '')
     requested.push(endpoint)
     let value = endpoint === 'inventory' ? { root: f.options.dataRoot, workspace: { id: 'workspace-update-test', root: f.options.dataRoot } } : responses[endpoint]
@@ -165,6 +171,16 @@ test('读取失败或状态缺失不被当作空闲', async t => {
   await assert.rejects(readUpdateActivity(malformed.options, malformed.state, 'workspace-update-test'), /评测运行状态不完整/)
 })
 
+test('继承助手投影的子会话只核对原生运行状态，不走普通管理会话路由', async t => {
+  const sessions = { items: [{ sessionId: 'child', origin: 'subagent', running: false,
+    projections: { values: { harnessPlatformAssistant: { workspace_id: 'workspace-update-test' } } } }] }
+  const f = await activityFixture(t, { 'session/list': sessions, 'agents/eval/list': { jobs: [] }, 'agents/sdk/list': [] })
+  assert.deepEqual(await readUpdateActivity(f.options, f.state, 'workspace-update-test'), [])
+  assert.equal(f.requested.includes('assistant/status'), false)
+  sessions.items[0].running = true
+  assert.deepEqual(await readUpdateActivity(f.options, f.state, 'workspace-update-test'), [{ kind: 'session', id: 'child', state: 'running' }])
+})
+
 test('Run准备中与未知观察均阻止更新，兼容旧评测响应', async t => {
   const f = await activityFixture(t, {
     'session/list': { items: [] },
@@ -186,6 +202,24 @@ test('局部损坏的评测控制记录不能被更新器当作空闲', async t 
     'agents/eval/list': { runs: [], pending: [], errors: {} },
   })
   await assert.rejects(readUpdateActivity(malformed.options, malformed.state, 'workspace-update-test'), /在途状态响应不完整/)
+})
+
+test('历史证据读取错误只在原任务终态且进程已消失时允许更新，不改写记录', async t => {
+  const id = 'f10d4400-ab8b-4cf1-8f27-93660869caf3'
+  const f = await activityFixture(t, {
+    'session/list': { items: [] }, 'agents/sdk/list': [],
+    'agents/eval/list': { runs: [], pending: [], errors: [{ path: `evaluation-jobs/${id}.json`, code: 'run_read_failed' }] },
+  })
+  const folder = join(f.options.dataRoot, '.local/evaluation-jobs'); mkdirSync(folder, { recursive: true })
+  const path = join(folder, `${id}.json`), job = { job_id: id, workspace_id: 'workspace-update-test', asset_root: f.options.dataRoot,
+    status: 'failed', pid: 2147483647, process_start: '123' }
+  const before = JSON.stringify(job); writeFileSync(path, before)
+  assert.deepEqual(await readUpdateActivity(f.options, f.state, 'workspace-update-test'), [])
+  assert.equal(readFileSync(path, 'utf8'), before)
+  for (const change of [{ status: 'running' }, { workspace_id: 'other' }, { pid: undefined }, { pid: process.pid, process_start: processBirth(process.pid) }]) {
+    writeFileSync(path, JSON.stringify({ ...job, ...change }))
+    await assert.rejects(readUpdateActivity(f.options, f.state, 'workspace-update-test'), /评测状态存在未核对项/)
+  }
 })
 
 test('已受理组合阻止更新，完成后可继续；只读核对不重新执行上游', async t => {
