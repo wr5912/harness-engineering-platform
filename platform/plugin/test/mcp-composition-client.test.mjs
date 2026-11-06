@@ -29,10 +29,10 @@ function workbench(initialTarget = { page: 'mcp', tab: 'composition', compositio
   vm.runInNewContext(`${compiled}\nmodule.exports.CompositionPage = CompositionPage;`, {
     module, exports: module.exports, URL, structuredClone, requestAnimationFrame: callback => callback(),
     require: name => name === 'react' ? react : name === 'react-dom' ? { createPortal: element => element }
-      : name === '@deepseek-ai/dsh-client-ui-primitives' ? { Tooltip: props => props.children } : name === 'harness-mcp-manager-client' ? { Manager: () => null } : require(name),
-    window: { addEventListener() {}, removeEventListener() {} },
+      : name === '@deepseek-ai/dsh-client-ui-primitives' ? { useModalLayer() {}, Menu: props => props.children, MenuItemButton: props => props.children } : name === 'harness-mcp-manager-client' ? { Manager: () => null } : require(name),
+    window: { matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }), addEventListener() {}, removeEventListener() {}, scrollX: 0, scrollY: 0, scrollTo() {} },
     navigator: { clipboard: { async writeText(value) { copied.push(value) } } },
-    document: { baseURI: 'http://localhost:3090/hep/' },
+    document: { baseURI: 'http://localhost:3090/hep/', body: { style: {} } },
     sessionStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) },
   })
   const props = { target: initialTarget, active: true, configuration: { status: 'ready' }, onCatalogChange() {}, onContext() {},
@@ -60,8 +60,9 @@ function workbench(initialTarget = { page: 'mcp', tab: 'composition', compositio
     return [value, ...(value.props?.children === undefined ? [] : nodes(value.props.children))] }
   function text(value) { if (!arguments.length) value = tree; if (Array.isArray(value)) return value.map(item => text(item)).join(''); return value && typeof value === 'object' ? text(value.props?.children) : String(value ?? '') }
   const button = label => nodes().find(node => node.type === 'button' && text(node) === label)
+  const menuItem = label => nodes().find(node => node.props?.onSelect && text(node) === label)
   render()
-  return { render, settle, nodes, text, button, calls, navigations, copied,
+  return { render, settle, nodes, text, button, menuItem, calls, navigations, copied,
     setActive(value) { props.active = value; render() }, setTarget(value) { props.target = value; render() }, externalUpdate(value) { catalog = value; listener?.(); render() } }
 }
 
@@ -71,7 +72,7 @@ test('组合深链恢复冻结发布版本，失效版本不回退到当前发�
   assert.match(ui.text(), /旧发布标题/)
   assert.match(ui.text(), /历史发布版本，只读查看/)
   assert.equal(ui.button('测试（dry）'), undefined)
-  assert.ok(ui.button('查看配置'))
+  assert.ok(ui.menuItem('查看配置'))
   assert.equal(ui.nodes().some(node => node.type === 'summary' && ui.text(node) === '冻结版本配置'), false)
   ui.setTarget({ page: 'mcp', tab: 'composition', composition_id: 'composition-one', version: 'published', version_id: currentId })
   await ui.settle()
@@ -87,7 +88,7 @@ test('组合深链恢复冻结发布版本，失效版本不回退到当前发�
 test('组合目录冲突后保留草稿，读取最新并手工重应用再保存', async () => {
   const ui = workbench({ page: 'mcp', tab: 'composition', composition_id: 'composition-one', version: 'published', version_id: currentId })
   await ui.settle()
-  ui.button('解锁编辑').props.onClick(); ui.render()
+  ui.button('编辑').props.onClick(); ui.render()
   const title = () => ui.nodes().find(node => node.type === 'input' && node.props.value?.includes('标题'))
   title().props.onChange({ target: { value: '我的草稿标题' } }); ui.render()
   const latest = { revision: 'r2', connections: [{ kind: 'openapi', id: 'source-one' }], extension: null,
@@ -137,14 +138,56 @@ test('执行 A 时路由切换到 B，旧回执不会显示在 B 或解除 B 的
   assert.doesNotMatch(ui.text(), /A-marker/)
 })
 
-test('发布说明使用可聚焦图标，移除常驻面板并保留测试操作', async () => {
+test('紧凑头部使用版本选择器和资料抽屉，完整发布信息仍可查阅', async () => {
   const ui = workbench({ page: 'mcp', tab: 'composition', composition_id: 'composition-one', version: 'published', version_id: currentId }); await ui.settle()
-  const icon = ui.nodes().find(node => node.type === 'button' && node.props?.['aria-label'] === '调用与发布说明')
-  assert.equal(icon.props.type, 'button')
-  const tooltip = ui.nodes().find(node => node.props?.openOnClick && node.props?.label?.includes('仅列出并执行已发布版本'))
-  assert.ok(tooltip.props.portal)
-  assert.equal(ui.nodes().some(node => node.props?.className === 'harness-composition-publish'), false)
+  const versions = ui.nodes().find(node => node.props?.label === '编排版本')
+  assert.equal(versions.props.value, currentId)
+  assert.equal(versions.props.options.length, 2)
+  assert.equal(versions.props.options[1].value, oldId)
+  const drawer = ui.nodes().find(node => node.props?.title === '编排资料')
+  assert.equal(drawer.props.trigger, '资料')
+  assert.match(ui.text(drawer), /仅列出并执行已发布版本/)
+  assert.match(ui.text(drawer), new RegExp(currentId))
   assert.ok(ui.button('测试（dry）'))
+})
+
+test('节点与测试面板默认收起，布局及全屏切换保留选择和输入，离开后退出全屏', async () => {
+  const ui = workbench({ page: 'mcp', tab: 'composition', composition_id: 'composition-one', version: 'published', version_id: currentId }); await ui.settle()
+  const panel = title => ui.nodes().find(node => node.props?.title === title && node.props?.onClose)
+  const workspace = () => ui.nodes().find(node => node.props?.className === 'harness-composition-workspace')
+  const input = () => ui.nodes().find(node => node.props?.['aria-label'] === '组合查询资产')
+  assert.equal(panel('编排节点详情').props.open, false)
+  assert.equal(panel('测试与运行').props.open, false)
+  assert.equal(panel('编排节点详情').props.drawer, false)
+  assert.equal(panel('测试与运行').props.drawer, true)
+  input().props.onChange({ target: { value: 'retained-host' } }); ui.render()
+  ui.nodes().find(node => node.type?.name === 'CompositionCanvas').props.onSelect('node-a'); ui.render()
+  assert.equal(panel('编排节点详情').props.open, true)
+  ui.nodes().find(node => node.props?.className === 'harness-composition-test-toggle').props.onClick(); ui.render()
+  ui.button('收起列表').props.onClick(); ui.render()
+  ui.button('全屏').props.onClick(); ui.render()
+  assert.equal(workspace().props['data-fullscreen'], true)
+  assert.equal(workspace().props['data-list-open'], false)
+  assert.equal(panel('测试与运行').props.open, true)
+  assert.equal(input().props.value, 'retained-host')
+  panel('测试与运行').props.onClose(); ui.render()
+  assert.equal(panel('测试与运行').props.open, false)
+  assert.equal(input().props.value, 'retained-host')
+  assert.equal(workspace().props['data-fullscreen'], true)
+  assert.equal(ui.nodes().find(node => node.props?.label === '编排版本').props.value, currentId)
+  ui.button('退出全屏').props.onClick(); ui.render()
+  ui.button('全屏').props.onClick(); ui.render()
+  ui.setActive(false)
+  assert.equal(workspace().props['data-fullscreen'], false)
+  assert.equal(panel('编排节点详情').props.open, false)
+  ui.setActive(true)
+  assert.equal(input().props.value, 'retained-host')
+  ui.button('编辑').props.onClick(); ui.render()
+  const title = () => ui.nodes().find(node => node.type === 'input' && node.props.value?.includes('标题'))
+  title().props.onChange({ target: { value: '保留的草稿标题' } }); ui.render()
+  ui.button('全屏').props.onClick(); ui.render()
+  ui.button('退出全屏').props.onClick(); ui.render()
+  assert.equal(title().props.value, '保留的草稿标题')
 })
 
 test('编排首次读取不冒充空目录，刷新已有内容只在标题显示轻量状态', async () => {
@@ -230,7 +273,7 @@ test('阶段组合按已有运行恢复时，在途运行ID同样不可更换', 
 test('查看实现源码复用多文件浏览器，并将固定历史版本和文件SHA交给只读接口', async () => {
   const ui = workbench(undefined, { source: payload => ({ ok: true, value: payload.path ? { identity: 'fixed', path: payload.path, sha256: payload.expected_sha256, content: 'actual source' } : { identity: 'fixed', files: [], notes: [] } }) })
   await ui.settle()
-  ui.button('查看生成代码').props.onClick(); await ui.settle()
+  ui.menuItem('查看生成代码').props.onSelect(); await ui.settle()
   assert.match(ui.text(), /编排使用的实现源码/)
   assert.doesNotMatch(ui.text(), /尚未接入生成源码|生成并保存源码/)
   const browser = ui.nodes().find(node => typeof node.type === 'function' && node.type.name === 'GeneratedCodeBrowser')

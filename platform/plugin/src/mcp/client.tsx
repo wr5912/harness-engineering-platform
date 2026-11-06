@@ -2,13 +2,14 @@ import { GeneratedCodeBrowser } from '../components/generated-code-browser.tsx'
 import { useEffect, useRef, useState } from 'react'
 import { useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Menu, MenuItemButton } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Manager } from 'harness-mcp-manager-client'
 import { copyText } from '../../../../plugins/mcp-manager/clipboard.ts'
 import { SearchSelect } from '../components/search-select.tsx'
 import { DetailDrawer } from '../components/detail-drawer.tsx'
 import { LoadingIndicator } from '../components/loading-indicator.tsx'
 import { CompositionCanvas } from './graph-canvas.tsx'
+import { CompositionPanel, useCompositionFullscreen, useCompositionNarrow } from './composition-workbench.tsx'
 import { PasswordInput } from './components.tsx'
 import { CHANNEL, type PlatformNavigation, type PlatformPageProps } from '../protocol.ts'
 import type { CompositionConfig, CompositionEntry } from './compositions.ts'
@@ -174,9 +175,13 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
   const requestId = useRef(0)
   const actionId = useRef(0)
   const detailRef = useRef<HTMLElement>(null)
+  const { fullscreen, setFullscreen } = useCompositionFullscreen(detailRef, active)
+  const narrow = useCompositionNarrow()
+  const [listOpen, setListOpen] = useState(true)
+  const [nodeOpen, setNodeOpen] = useState(false)
+  const [testOpen, setTestOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
   const locatedComposition = useRef('')
-  const listRef = useRef<HTMLElement>(null)
-  const listButtons = useRef(new Map<string, HTMLButtonElement>())
   const routeMatchesSelection = !target?.composition_id || target.composition_id === selection?.id
     && (!target.version || target.version === selection?.version) && target.version_id === selection?.versionId
   const result = routeMatchesSelection ? rawResult : null
@@ -230,6 +235,8 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
   }, [active, target?.page, target?.tab, target?.composition_id, target?.version, target?.version_id, data, selection, entry])
   const historical = selection?.version === 'published' && Boolean(selection.versionId) && selection.versionId !== entry?.publishedVersionId
   const selectionKey = selection ? `${selection.id}:${selection.version}:${selection.versionId ?? ''}` : ''
+  useEffect(() => { setSelectedNode(''); setNodeOpen(false); setMoreOpen(false) }, [selectionKey])
+  useEffect(() => { if (!active || editor) { setNodeOpen(false); setTestOpen(false); setMoreOpen(false) } }, [active, Boolean(editor)])
   const currentSelection = useRef(selectionKey)
   currentSelection.current = selectionKey
   const storageKey = `hep:mcp-composition-executions:${document.baseURI}:${data?.workspace_id ?? 'legacy'}`
@@ -403,24 +410,48 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
     finally { if (id === actionId.current) setBusy(false) }
   }
   const conflict = Boolean(editor && data && (conflictDetected || editor.revision !== data.revision))
-  return <div className="harness-composition-workspace">
+  const versionOptions = entry ? [
+    ...(entry.draft ? [{ value: 'draft', label: '编辑草稿', group: '草稿' }] : []),
+    ...(entry.published ? [{ value: entry.publishedVersionId ?? 'published', label: '当前发布版本', description: entry.publishedVersionId, group: '已发布' }] : []),
+    ...(entry.versions ?? []).filter(version => version.versionId !== entry.publishedVersionId).map(version => ({ value: version.versionId, label: `历史版本 ${version.versionId.slice(0, 12)}`, description: `${version.versionId} · ${version.publishedAt ?? '发布时间未记录'}`, group: '历史版本' })),
+  ] : []
+  const testStatus = busy && pendingAction !== 'list' ? '正在处理…'
+    : unresolved ? attempt?.state === 'running' ? '原请求正在执行，等待回执' : '结果待核对'
+      : result?.mode === 'dry' ? 'dry 校验通过，未请求上游'
+        : result ? result.ok === false ? '最近执行失败' : threat ? '已收到执行回执，详情中核对运行状态' : '最近执行成功' : '尚无测试结果'
+  return <div className="harness-composition-workspace" data-list-open={listOpen} data-fullscreen={fullscreen}>
     <style>{threatEditorStyle}</style>
-    <nav ref={listRef} className="harness-card harness-composition-sidebar" aria-label="工具编排列表">
+    <nav className="harness-card harness-composition-sidebar" aria-label="工具编排列表">
       <h2>工具组合编排{data && (catalogLoading || busy && pendingAction === 'list') && <LoadingIndicator label="刷新编排目录" />}</h2><div className="harness-mcp-actions"><button className="harness-primary" type="button" disabled={busy || !!editor || !data} onClick={() => setEditor({ revision: data.revision, value: { toolName: '', title: '资产相关告警查询', description: '查询资产后查询相关告警的两步只读组合', connectionId: connections[0]?.id ?? '' } })}>新建编排</button>
         <button type="button" disabled={busy || !!editor} onClick={() => void refreshCatalog()}>刷新</button></div>
       <section aria-label="全部编排"><h3>全部编排（{entries.length}）</h3>
         {!data ? null : entries.length ? <ul>{entries.map(item => {
           const version = item.draft ? 'draft' : 'published'
           const value = item[version]!
-          return <li key={item.id}><button ref={element => { if (element) listButtons.current.set(item.id, element); else listButtons.current.delete(item.id) }} type="button" disabled={busy || !!editor} aria-current={selection?.id === item.id ? 'true' : undefined} onClick={() => select(item, version, version === 'published' ? item.publishedVersionId : undefined)}>
+          return <li key={item.id}><button type="button" disabled={busy || !!editor} aria-current={selection?.id === item.id ? 'true' : undefined} onClick={() => select(item, version, version === 'published' ? item.publishedVersionId : undefined)}>
             <span>{value.title}</span><small>{value.toolName}</small>
             <span className="harness-composition-status">{item.published && <span data-state="published">已发布</span>}{item.draft && <span data-state="draft">正在编辑</span>}</span>
           </button></li>
         })}</ul> : <p>暂无编排</p>}
       </section>
     </nav>
-    <section ref={detailRef} tabIndex={-1} className="harness-card harness-composition-detail" aria-label="组合编排详情">
-      <button type="button" className="harness-composition-return" onClick={() => { listRef.current?.scrollIntoView({ block: 'start' }); if (selection) listButtons.current.get(selection.id)?.focus() }}>返回编排列表</button>
+    <section ref={detailRef} tabIndex={-1} className="harness-card harness-composition-detail" aria-label="组合编排详情" role={fullscreen ? 'dialog' : undefined} aria-modal={fullscreen ? true : undefined}>
+      {narrow && <div className="harness-composition-mobile-picker"><SearchSelect label="选择编排" value={selection?.id ?? ''} disabled={busy || !!editor} options={entries.map(item => ({ value: item.id, label: (item.draft ?? item.published)!.title, description: (item.draft ?? item.published)!.toolName }))} onChange={id => { const item = entries.find(item => item.id === id); if (item) select(item, item.draft ? 'draft' : 'published', item.draft ? undefined : item.publishedVersionId, false) }}/><button type="button" disabled={busy || !!editor || !data} onClick={() => setEditor({ revision: data.revision, value: { toolName: '', title: '资产相关告警查询', description: '查询资产后查询相关告警的两步只读组合', connectionId: connections[0]?.id ?? '' } })}>新建编排</button><button type="button" disabled={busy || !!editor} onClick={() => void refreshCatalog()}>刷新</button></div>}
+      <div className="harness-composition-topbar">
+        <button type="button" className="harness-composition-list-toggle" aria-expanded={listOpen && !fullscreen} disabled={fullscreen} onClick={() => setListOpen(!listOpen)}>{listOpen ? '收起列表' : '展开列表'}</button>
+        <h2>{editor ? (editor.id ? '编辑草稿' : '新建编排') : config?.title ?? '工具组合编排'}</h2>
+        {!editor && config && <>
+          <SearchSelect className="harness-composition-version" label="编排版本" value={selection?.version === 'draft' ? 'draft' : selection?.versionId ?? entry?.publishedVersionId ?? 'published'} options={versionOptions} disabled={busy} onChange={value => select(entry!, value === 'draft' ? 'draft' : 'published', value === 'draft' || value === 'published' ? undefined : value, false)}/>
+          <button type="button" disabled={busy} onClick={() => { setEditor({ id: entry!.id, revision: data.revision, value: { ...(entry!.draft ?? config!) } }); setResult(null); setError('') }}>{entry?.draft ? '继续编辑草稿' : '编辑'}</button>
+          <Menu open={moreOpen} onClose={() => setMoreOpen(false)} portal align="end" anchor={<button type="button" aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(!moreOpen)}>更多</button>}>
+            <MenuItemButton onSelect={() => { setMoreOpen(false); setPreview('config') }}>查看配置</MenuItemButton>
+            <MenuItemButton onSelect={() => { setMoreOpen(false); setPreview('source') }}>查看生成代码</MenuItemButton>
+            {entry?.published && <MenuItemButton disabled={busy} separatorBefore onSelect={() => { setMoreOpen(false); void action('withdrawComposition', { compositionId: entry.id, revision: data.revision }) }}>下架工具</MenuItemButton>}
+            <MenuItemButton disabled={busy} danger onSelect={() => { setMoreOpen(false); void action('deleteComposition', { compositionId: entry?.id, revision: data.revision }) }}>删除编排</MenuItemButton>
+          </Menu>
+        </>}
+        <button type="button" className="harness-composition-fullscreen-toggle" aria-pressed={fullscreen} onClick={() => setFullscreen(!fullscreen)}>{fullscreen ? '退出全屏' : '全屏'}</button>
+      </div>
       {error && <p role="alert">{error}</p>}
       {busy && pendingAction !== 'list' && <p role="status">正在处理…</p>}
       {config && !extensionReady && <p role="alert">此编排依赖的业务扩展尚未装载。已有目录保持可读，请先启用工作区的 DSH 扩展。</p>}
@@ -433,7 +464,6 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
       </section>}
       {recoveryDraft && <section className="harness-composition-conflict" role="status"><h3>保留的本地草稿</h3><p>原草稿基于版本 <code>{recoveryDraft.revision.slice(0, 12)}</code>；重新读取目录后请逐项核对并手工重应用。刷新页面前请复制或下载。</p><div className="harness-mcp-actions"><button type="button" onClick={() => exportDraft(recoveryDraft.value, false)}>复制保留草稿</button><button type="button" onClick={() => exportDraft(recoveryDraft.value, true)}>下载保留草稿</button><button type="button" onClick={() => setRecoveryDraft(null)}>放弃保留草稿</button></div></section>}
       {!config && !editor ? !data ? !error && <LoadingIndicator label="读取编排目录" block /> : <div className="harness-composition-empty"><svg width="36" height="36" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="3" y="12" width="8" height="8" rx="2"/><rect x="21" y="3" width="8" height="8" rx="2"/><rect x="21" y="21" width="8" height="8" rx="2"/><path d="M11 16h5V7h5m-5 9v9h5"/></svg><h3>{selection ? '重新选择工具组合' : '从一组工具开始编排'}</h3><p>{selection ? `所选编排 ${selection.id} 的${selection.version === 'draft' ? '草稿' : selection.versionId ? `发布版本 ${selection.versionId}` : '当前发布版本'}已不存在，请重新选择。` : '在左侧选择一个工具组合，或点击“新建编排”开始。'}</p></div> : <>
-        <div className="harness-composition-heading"><h2>{editor ? (editor.id ? '编辑草稿' : '新建编排') : config?.title}</h2>{!editor && <Tooltip disabled={!active} label={`MCP 入口：${new URL('api/harness-platform/mcp', document.baseURI).href}。入口受平台登录认证保护，仅列出并执行已发布版本。草稿供查看与测试，发布后调用方需重新发现工具。`} side="bottom" align="end" portal maxWidth={400} openOnClick><button type="button" className="harness-composition-help" aria-label="调用与发布说明"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M10 9v5M10 5.5v1"/></svg></button></Tooltip>}</div>
         {editor ? <form onSubmit={event => { event.preventDefault(); if (!mappingValid) return; void action('saveCompositionDraft', { compositionId: editor.id, revision: editor.revision, draft: editor.value }) }} className="harness-composition-editor">
           <p>{isThreatComposition(editor.value) ? '编辑阶段连接或固定子版本，保存草稿后进行 dry 校验和发布。' : '复用当前 LangGraph 两步只读流程：查询资产 → 查询相关告警。保存草稿后进行 dry 测试和发布。'}</p>
           <label>编排标题<input required maxLength={80} value={editor.value.title} onChange={event => setEditor({ ...editor, value: { ...editor.value, title: event.target.value } })} /></label>
@@ -452,25 +482,29 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
           </select></label>}</>}
           <div className="harness-mcp-actions"><button className="harness-primary" disabled={busy || conflict || !mappingValid} type="submit">保存草稿</button><button disabled={busy || !mappingValid} type="button" onClick={() => { setRecoveryDraft(editor); setEditor(null); setError('草稿已暂存于当前页面。刷新或关闭前请复制或下载，继续编辑时请手工核对最新目录。') }}>暂存并返回详情</button></div>
           <p>草稿保存到仓库编排目录；已发布版本继续供 MCP 调用。</p>
-        </form> : <>
-          <div className="harness-mcp-actions" aria-label="编排版本">{(['draft', 'published'] as const).filter(version => entry?.[version]).map(version => <button key={version} disabled={busy} aria-pressed={selection?.version === version && (version === 'draft' || !selection.versionId || selection.versionId === entry?.publishedVersionId)} onClick={() => select(entry!, version, version === 'published' ? entry?.publishedVersionId : undefined, false)}>{version === 'draft' ? '编辑草稿' : '当前发布版本'}</button>)}
-            {entry?.versions?.filter(version => version.versionId !== entry.publishedVersionId).map(version => <button key={version.versionId} type="button" disabled={busy} aria-pressed={selection?.versionId === version.versionId} onClick={() => select(entry, 'published', version.versionId, false)}>历史版本 {version.versionId.slice(0, 12)}</button>)}</div>
-          <p>{selection?.version === 'draft' ? '草稿尚未发布' : historical ? '历史发布版本，只读查看' : '当前版本已发布'} · {upstream ? '依赖已登记，等待实际调用验证' : threat ? '请编辑连接或选择已发布的固定子版本' : '请先接入所需的 OpenAPI 服务器'}</p>
-          {selection?.version === 'published' && <p>版本 ID：<code>{selection.versionId ?? entry?.publishedVersionId ?? '未提供'}</code>{historical && <> · 发布时间：{frozenVersion?.publishedAt ?? '未记录'}</>}</p>}
-          {config?.description?.trim() && config.description.trim() !== config.title.trim() && <p>{config.description}</p>}<p>工具：<code>{config?.toolName}</code> · {config?.kind === 'threat-stage' ? <>SOC：<code>{config.bindings?.socConnectionId}</code> · 报告：<code>{config.bindings?.reportConnectionId}</code></> : config?.kind === 'composite' ? '调用下列固定子组合版本' : <>上游：<code>{config?.connectionId}</code>{config?.flow && <> → <code>{config.alertsConnectionId}</code></>}</>}</p>
-          {selection?.version === 'published' && !historical && entry?.published?.publishedAt && <p>发布时间：{entry.published.publishedAt}</p>}
-          <button type="button" disabled={busy} onClick={() => { setEditor({ id: entry!.id, revision: data.revision, value: { ...(entry!.draft ?? config!) } }); setResult(null); setError('') }}>{entry?.draft ? '继续编辑草稿' : '解锁编辑'}</button>
-          <button type="button" onClick={() => setPreview('config')}>查看配置</button> <button type="button" onClick={() => setPreview('source')}>查看生成代码</button>
-        </>}
-        {!editor && <div className="harness-composition-layout"><div>
+        </form> : <div className="harness-composition-summary">
+          <span>{selection?.version === 'draft' ? '草稿尚未发布' : historical ? '历史发布版本，只读查看' : '当前版本已发布'} · {upstream ? '依赖已登记，等待实际调用验证' : threat ? '请编辑连接或选择已发布的固定子版本' : '请先接入所需的服务器'}</span>
+          <DetailDrawer title="编排资料" trigger="资料" active={active} identity={selectionKey}>
+            <h3>{config?.title}</h3><p>{config?.description}</p>
+            <dl className="harness-fields"><div><dt>版本状态</dt><dd>{selection?.version === 'draft' ? '草稿尚未发布' : historical ? '历史发布版本' : '当前发布版本'}</dd></div>
+              <div><dt>版本 ID</dt><dd><code>{selection?.version === 'draft' ? '未发布' : selection?.versionId ?? entry?.publishedVersionId ?? '未提供'}</code>{selection?.version === 'published' && <button type="button" onClick={() => void copyText(selection.versionId ?? entry?.publishedVersionId ?? '').then(() => setError('版本 ID 已复制。')).catch(() => setError('无法自动复制，请从资料中手动复制版本 ID。'))}>复制版本 ID</button>}</dd></div>
+              <div><dt>发布时间</dt><dd>{historical ? frozenVersion?.publishedAt ?? '未记录' : entry?.published?.publishedAt ?? '未发布'}</dd></div>
+              <div><dt>工具</dt><dd><code>{config?.toolName}</code></dd></div>
+              <div><dt>工作流与连接</dt><dd>{config?.kind === 'threat-stage' ? <>SOC：<code>{config.bindings?.socConnectionId}</code> · 报告：<code>{config.bindings?.reportConnectionId}</code></> : config?.kind === 'composite' ? '调用画布中的固定子组合版本' : <><code>{config?.connectionId}</code>{config?.flow && <> → <code>{config.alertsConnectionId}</code></>}</>}</dd></div>
+            </dl><h3>调用与发布说明</h3><p>MCP 入口：<code>{new URL('api/harness-platform/mcp', document.baseURI).href}</code>。入口受平台登录认证保护，仅列出并执行已发布版本。草稿供查看与测试，发布后调用方需重新发现工具。</p>
+          </DetailDrawer>
+        </div>}
+        {!editor && <div className="harness-composition-layout" data-node-open={nodeOpen}><div className="harness-composition-graph">
           {historical && <p>此历史版本仅提供冻结配置查看；执行请通过固定版本的调用入口验证。</p>}
-          <CompositionCanvas graph={graph} selected={node?.id} onSelect={setSelectedNode} identity={`${selection?.id}:${selection?.version}:${selection?.versionId ?? ''}`}/>
-        </div><aside className="harness-card" aria-label="编排节点详情">{node && <><h3>{node.id === '__start__' ? '开始' : node.id === '__end__' ? '结束' : node.title}</h3><p>{node.operationId ? <>工具：<code>{node.operationId}</code></> : node.id === '__start__' ? '流程开始' : node.id === '__end__' ? '流程结束' : '流程节点'}</p><p>状态：{result?.mode === 'dry' ? 'dry 未执行节点' : trace?.status ?? '尚未执行'}</p>
+          <CompositionCanvas graph={graph} selected={node?.id} onSelect={id => { setSelectedNode(id); setNodeOpen(true) }} identity={selectionKey}/>
+        </div><CompositionPanel drawer={narrow} title="编排节点详情" open={nodeOpen && active} onClose={() => setNodeOpen(false)} className="harness-composition-node-panel"><div className="harness-composition-panel-body">{node && <><h3>{node.id === '__start__' ? '开始' : node.id === '__end__' ? '结束' : node.title}</h3><p>{node.operationId ? <>工具：<code>{node.operationId}</code></> : node.id === '__start__' ? '流程开始' : node.id === '__end__' ? '流程结束' : '流程节点'}</p><p>状态：{result?.mode === 'dry' ? 'dry 未执行节点' : trace?.status ?? '尚未执行'}</p>
           {node.operationId && <><h4>输入映射</h4><dl className="harness-fields">{Object.entries(node.input ?? {}).map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{typeof value === 'object' ? JSON.stringify(value) : String(value)}</dd></div>)}</dl>
           {trace?.mappedArguments && <pre className="harness-asset-content">{JSON.stringify(trace.mappedArguments, null, 2)}</pre>}
           <h4>输出：{node.output}</h4><pre className="harness-asset-content">{result?.result ? JSON.stringify(config?.kind === 'threat-stage' ? result.result : result.result.stepValues?.[node.output] ?? result.result[node.output], null, 2) : '尚无执行结果'}</pre>{trace?.reason && <p>{trace.reason}</p>}</>}
-        </>}</aside></div>}
-        {!editor && !historical && <><section className="harness-composition-test"><p>{threat ? '实际执行将按已编译流程调用取证、模型或模拟存储；请使用基本运维测试事件。' : '第一步失败或缺少资产 ID 时，第二步停止执行。'}</p>
+        </>}</div></CompositionPanel></div>}
+        {!editor && !historical && <div className="harness-composition-test-dock">
+          <button type="button" className="harness-composition-test-toggle" aria-expanded={testOpen} onClick={() => setTestOpen(!testOpen)}><strong>测试与运行</strong><span role="status">{testStatus}</span><span>{testOpen ? '收起' : '展开'}</span></button>
+          <CompositionPanel drawer title="测试与运行" open={testOpen && active} onClose={() => setTestOpen(false)} className="harness-composition-test-panel"><section className="harness-composition-test"><p>{threat ? '实际执行将按已编译流程调用取证、模型或模拟存储；请使用基本运维测试事件。' : '第一步失败或缺少资产 ID 时，第二步停止执行。'}</p>
           {config?.kind === 'threat-stage' && config.stage !== 'collect' ? <>
             {carriedRun && <p role="status">已带入上一阶段返回的运行：<code>{carriedRun}</code>。核对本阶段后再执行。</p>}
             <DetailDrawer title="按已知运行恢复" trigger={carriedRun ? '更换运行（高级恢复）' : '按已知运行恢复（高级）'} active={active} identity={`${selection?.id}:${selection?.version}:${selection?.versionId ?? ''}`}><div className="harness-threat-editor"><p>填写已有阶段返回的运行 ID。关闭窗口后输入仍保留，实际执行仍需在本阶段点击“实际执行组合工具”。</p><label>运行 ID<input aria-label="组合运行 ID" disabled={busy} value={asset} onChange={event => { if (busy) return; actionId.current++; setAsset(event.target.value); setContinuedRun(null); setResult(null) }} placeholder="填写已有阶段返回的 run_id" /></label></div></DetailDrawer>
@@ -486,10 +520,10 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
             {result.result?.alertSummary && <p>近 30 天：{result.result.alertSummary.totalGroups} 个告警分组 · {result.result.alertSummary.totalAlerts} 条告警 · 当前展示 {result.result.alerts.length} 个分组。{result.result.alertSummary.truncated && '上游结果已截断。'}<br/>查询范围：{result.result.alertSummary.from} ～ {result.result.alertSummary.to}</p>}
             <div className="harness-table-scroll"><table className="harness-composition-trace"><thead><tr><th>步骤</th><th>状态</th><th>HTTP</th><th>耗时</th></tr></thead><tbody>{(result.result?.trace ?? []).map((step: any) => <tr key={step.step}><td data-label="步骤">{step.operationId}</td><td data-label="状态">{step.status}</td><td data-label="HTTP">{step.httpStatus ?? '未调用'}</td><td data-label="耗时">{step.durationMs === undefined ? '—' : `${step.durationMs} ms`}</td></tr>)}</tbody></table></div>
             <details><summary>业务结果</summary><pre>{JSON.stringify({ asset: result.result?.asset, alerts: result.result?.alerts, alertSummary: result.result?.alertSummary }, null, 2)}</pre></details><details><summary>执行回执与来源版本</summary><pre>{JSON.stringify({ receipts: result.receipts, version: result.version }, null, 2)}</pre></details></div>)}
-          </section>
-        </>}
+          </section></CompositionPanel>
+        </div>}
       </>}
-      {preview && <div className="harness-composition-modal-backdrop" onClick={event => { if (event.target === event.currentTarget) setPreview(null) }}><div ref={previewRef} tabIndex={-1} className="harness-composition-modal" role="dialog" aria-modal="true" aria-label={preview === 'config' ? '查看编排配置' : '查看生成代码'} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); setPreview(null) }; if (event.key === 'Tab') { const elements = previewRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled),select:not(:disabled),summary,pre[tabindex],a[href]'); if (!elements?.length) return; const first = elements[0], last = elements[elements.length - 1]; if (event.shiftKey && (document.activeElement === first || document.activeElement === previewRef.current)) { event.preventDefault(); last.focus() } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() } } }}>
+      {preview && <div className="harness-composition-modal-backdrop" onClick={event => { if (event.target === event.currentTarget) setPreview(null) }}><div ref={previewRef} tabIndex={-1} className="harness-composition-modal" role="dialog" aria-modal="true" aria-label={preview === 'config' ? '查看编排配置' : '查看生成代码'} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setPreview(null) }; if (event.key === 'Tab') { const elements = previewRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled),select:not(:disabled),summary,pre[tabindex],a[href]'); if (!elements?.length) return; const first = elements[0], last = elements[elements.length - 1]; if (event.shiftKey && (document.activeElement === first || document.activeElement === previewRef.current)) { event.preventDefault(); last.focus() } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() } } }}>
         <header><h2>{preview === 'config' ? '编排配置' : '编排使用的实现源码'}</h2><button type="button" onClick={() => setPreview(null)} aria-label="关闭编排预览">×</button></header>
         <div><p>{config?.title} · {historical ? '历史发布版本' : selection?.version === 'published' ? '当前发布版本' : '已保存草稿'}</p>{preview === 'config' ? <pre tabIndex={0}>{JSON.stringify(config, null, 2)}</pre> : <GeneratedCodeBrowser identity={`composition:${selection?.id}:${selection?.version}:${selection?.versionId ?? ''}:${data?.revision ?? ''}`} loadCatalog={async () => {
           const result = await rpc.call(CHANNEL, 'mcp/compositionSource', { selection })

@@ -1,0 +1,56 @@
+{
+  "status": "busy",
+  "programRoot": "/home/cmp/work/harness-engineering-platform",
+  "dataRoot": "/home/cmp/harness-engineering-platform-data",
+  "workspaceId": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+  "pid": 3099790,
+  "activation": "none",
+  "busy": [
+    {
+      "kind": "session",
+      "id": "3b3fd448-cfea-4892-b450-a96ffc2e15f6",
+      "state": "running"
+    },
+    {
+      "kind": "session",
+      "id": "session-6ea22501-7c81-4b5c-b024-07939e827c55",
+      "state": "running"
+    },
+    {
+      "kind": "assistant",
+      "id": "session-6ea22501-7c81-4b5c-b024-07939e827c55",
+      "state": "pending"
+    },
+    {
+      "kind": "session",
+      "id": "session-c1f027cc-3639-485a-8c6f-b7429c296fa1",
+      "state": "running"
+    },
+    {
+      "kind": "assistant",
+      "id": "session-c1f027cc-3639-485a-8c6f-b7429c296fa1",
+      "state": "pending"
+    },
+    {
+      "kind": "evaluation",
+      "id": "run-32d64186-73e1-4686-b6a5-4a055faea53f",
+      "state": "running"
+    },
+    {
+      "kind": "workflow",
+      "id": "run-55f58e73-def9-41dc-a097-54d83795b7a9",
+      "state": "running"
+    }
+  ],
+  "changed": [
+    "platform/plugin/lib/client.js",
+    "platform/plugin/lib/composition-source-index.json",
+    "platform/plugin/lib/index.js",
+    "platform/plugin/lib/mcp-manager.js",
+    "platform/plugin/lib/platform-mcp-manager.js",
+    "platform/plugin/lib/standalone-bridge.js",
+    "platform/plugin/lib/standalone-plugin.js"
+  ],
+  "stage": "/home/cmp/work/harness-engineering-platform/.local/platform-updates/351a057a-c19f-4d3a-9c49-d95d281b6c57",
+  "receipt": "/home/cmp/work/harness-engineering-platform/.local/platform-updates/351a057a-c19f-4d3a-9c49-d95d281b6c57/receipt.json"
+}

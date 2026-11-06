@@ -1,0 +1,283 @@
+{
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "checks": [
+    {
+      "name": "desktop-layout",
+      "value": {
+        "detail": {
+          "x": 284,
+          "y": 247.578125,
+          "width": 1128,
+          "height": 724.421875,
+          "top": 247.578125,
+          "right": 1412,
+          "bottom": 972,
+          "left": 284
+        },
+        "parent": {
+          "x": 28,
+          "y": 247.578125,
+          "width": 1384,
+          "height": 724.421875,
+          "top": 247.578125,
+          "right": 1412,
+          "bottom": 972,
+          "left": 28
+        },
+        "canvas": {
+          "x": 306,
+          "y": 428.96875,
+          "width": 1084,
+          "height": 424.453125,
+          "top": 428.96875,
+          "right": 1390,
+          "bottom": 853.421875,
+          "left": 306
+        },
+        "heading": {
+          "x": 305,
+          "y": 268.578125,
+          "width": 1086,
+          "height": 38.390625,
+          "top": 268.578125,
+          "right": 1391,
+          "bottom": 306.96875,
+          "left": 305
+        },
+        "summary": {
+          "x": 305,
+          "y": 318.96875,
+          "width": 1086,
+          "height": 36,
+          "top": 318.96875,
+          "right": 1391,
+          "bottom": 354.96875,
+          "left": 305
+        },
+        "scrollWidth": 1440,
+        "innerWidth": 1440,
+        "style": {
+          "alignSelf": "auto",
+          "height": "724.422px",
+          "grid": "240px 1128px"
+        }
+      }
+    },
+    {
+      "name": "metadata-drawer",
+      "value": true
+    },
+    {
+      "name": "list-collapse",
+      "value": true
+    },
+    {
+      "name": "test-drawer-preserves-canvas",
+      "value": {
+        "before": {
+          "x": 306,
+          "y": 428.96875,
+          "width": 1084,
+          "height": 424.453125,
+          "top": 428.96875,
+          "right": 1390,
+          "bottom": 853.421875,
+          "left": 306
+        },
+        "after": {
+          "x": 306,
+          "y": 428.96875,
+          "width": 1084,
+          "height": 424.453125,
+          "top": 428.96875,
+          "right": 1390,
+          "bottom": 853.421875,
+          "left": 306
+        }
+      }
+    },
+    {
+      "name": "fullscreen-layout",
+      "value": {
+        "detail": {
+          "x": 0,
+          "y": 0,
+          "width": 1440,
+          "height": 1000,
+          "top": 0,
+          "right": 1440,
+          "bottom": 1000,
+          "left": 0
+        },
+        "parent": {
+          "x": 28,
+          "y": 247.578125,
+          "width": 1384,
+          "height": 724.421875,
+          "top": 247.578125,
+          "right": 1412,
+          "bottom": 972,
+          "left": 28
+        },
+        "canvas": {
+          "x": 22,
+          "y": 181.390625,
+          "width": 1396,
+          "height": 700.03125,
+          "top": 181.390625,
+          "right": 1418,
+          "bottom": 881.421875,
+          "left": 22
+        },
+        "heading": {
+          "x": 21,
+          "y": 21,
+          "width": 1398,
+          "height": 38.390625,
+          "top": 21,
+          "right": 1419,
+          "bottom": 59.390625,
+          "left": 21
+        },
+        "summary": {
+          "x": 21,
+          "y": 71.390625,
+          "width": 1398,
+          "height": 36,
+          "top": 71.390625,
+          "right": 1419,
+          "bottom": 107.390625,
+          "left": 21
+        },
+        "scrollWidth": 1440,
+        "innerWidth": 1440,
+        "style": {
+          "alignSelf": "auto",
+          "height": "1000px",
+          "grid": "1384px"
+        }
+      }
+    },
+    {
+      "name": "state-and-nested-escape",
+      "value": true
+    },
+    {
+      "name": "narrow-node-drawer",
+      "value": true
+    },
+    {
+      "name": "mobile-layout",
+      "value": {
+        "detail": {
+          "x": 12,
+          "y": 255.46875,
+          "width": 366,
+          "height": 564.53125,
+          "top": 255.46875,
+          "right": 378,
+          "bottom": 820,
+          "left": 12
+        },
+        "parent": {
+          "x": 12,
+          "y": 255.46875,
+          "width": 366,
+          "height": 564.53125,
+          "top": 255.46875,
+          "right": 378,
+          "bottom": 820,
+          "left": 12
+        },
+        "canvas": {
+          "x": 30,
+          "y": 546.4375,
+          "width": 330,
+          "height": 129.390625,
+          "top": 546.4375,
+          "right": 360,
+          "bottom": 675.828125,
+          "left": 30
+        },
+        "heading": {
+          "x": 29,
+          "y": 318.859375,
+          "width": 332,
+          "height": 84.78125,
+          "top": 318.859375,
+          "right": 361,
+          "bottom": 403.640625,
+          "left": 29
+        },
+        "summary": {
+          "x": 29,
+          "y": 411.640625,
+          "width": 332,
+          "height": 36,
+          "top": 411.640625,
+          "right": 361,
+          "bottom": 447.640625,
+          "left": 29
+        },
+        "scrollWidth": 390,
+        "innerWidth": 390,
+        "style": {
+          "alignSelf": "auto",
+          "height": "564.531px",
+          "grid": "366px"
+        }
+      }
+    },
+    {
+      "name": "mobile-fullscreen-escape",
+      "value": true
+    },
+    {
+      "name": "short-screen-test-drawer-false",
+      "value": {
+        "canvas": {
+          "x": 306,
+          "y": 428.96875,
+          "width": 1084,
+          "height": 260.03125,
+          "top": 428.96875,
+          "right": 1390,
+          "bottom": 689,
+          "left": 306
+        },
+        "scroll": {
+          "top": 0,
+          "client": 346,
+          "total": 346
+        }
+      }
+    },
+    {
+      "name": "short-screen-test-drawer-true",
+      "value": {
+        "canvas": {
+          "x": 22,
+          "y": 181.390625,
+          "width": 1396,
+          "height": 500.03125,
+          "top": 181.390625,
+          "right": 1418,
+          "bottom": 681.421875,
+          "left": 22
+        },
+        "scroll": {
+          "top": 0,
+          "client": 346,
+          "total": 346
+        }
+      }
+    }
+  ],
+  "clientFixture": "/home/cmp/work/harness-engineering-platform/.local/composition-workbench-20261106/artifacts/client.js",
+  "catalogRevision": "ab2f559de9ec2b8cf6f166ebabce9f31d8d569722b4aa16d22a586fca3d0af52",
+  "version": "6ad792b7d915133949574bff56eff865b582eb4ec15c2ecf85172bc8f2100b67",
+  "pageErrors": []
+}

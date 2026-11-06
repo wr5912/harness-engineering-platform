@@ -1,0 +1,39 @@
+{
+  "checks": [
+    {
+      "size": {
+        "width": 1440,
+        "height": 800
+      },
+      "scroll": {
+        "top": 2092,
+        "client": 719,
+        "total": 2811
+      },
+      "canvas": {
+        "x": 306,
+        "y": 428.96875,
+        "width": 1084,
+        "height": 260.03125
+      }
+    },
+    {
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "scroll": {
+        "top": 2063,
+        "client": 763,
+        "total": 2826
+      },
+      "canvas": {
+        "x": 30,
+        "y": 546.4375,
+        "width": 330,
+        "height": 129.390625
+      }
+    }
+  ],
+  "clientFixture": "/home/cmp/work/harness-engineering-platform/.local/composition-workbench-20261106/artifacts/client.js"
+}

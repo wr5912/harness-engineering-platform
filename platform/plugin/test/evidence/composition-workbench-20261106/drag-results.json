@@ -1,0 +1,73 @@
+{
+  "checks": [
+    {
+      "name": "mouse-drag-100",
+      "value": {
+        "dx": 79.7816162109375,
+        "dy": 31.78167724609375
+      }
+    },
+    {
+      "name": "mouse-drag-150",
+      "value": {
+        "dx": 64.6724853515625,
+        "dy": 24.6724853515625
+      }
+    },
+    {
+      "name": "fullscreen-drag",
+      "value": {
+        "dx": 54.45985412597656,
+        "dy": 29.459869384765625
+      }
+    },
+    {
+      "name": "mouse-drag-40",
+      "value": {
+        "dx": 44.911865234375,
+        "dy": 19.911865234375
+      }
+    },
+    {
+      "name": "pan-tracks-screen",
+      "value": true
+    },
+    {
+      "name": "keyboard-move",
+      "value": "translate(34 178)"
+    },
+    {
+      "name": "click-and-keyboard-selection",
+      "value": true
+    },
+    {
+      "name": "move-before-refresh",
+      "value": {
+        "dx": 35,
+        "dy": 15
+      }
+    },
+    {
+      "name": "refresh-restores-source-layout",
+      "value": true
+    },
+    {
+      "name": "mobile-touch-drag",
+      "value": {
+        "dx": 28,
+        "dy": 20
+      }
+    },
+    {
+      "name": "mobile-fullscreen-touch",
+      "value": {
+        "dx": 28.00000762939453,
+        "dy": 20
+      }
+    }
+  ],
+  "clientFixture": "/home/cmp/work/harness-engineering-platform/.local/composition-workbench-20261106/artifacts/client.js",
+  "pageErrors": [],
+  "catalogRevision": "ab2f559de9ec2b8cf6f166ebabce9f31d8d569722b4aa16d22a586fca3d0af52",
+  "version": "6ad792b7d915133949574bff56eff865b582eb4ec15c2ecf85172bc8f2100b67"
+}

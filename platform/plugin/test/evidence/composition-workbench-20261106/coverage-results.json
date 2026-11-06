@@ -1,0 +1,68 @@
+{
+  "checks": [
+    {
+      "name": "published-inspection-status",
+      "value": {
+        "kind": "workflow",
+        "nodes": 4,
+        "height": 424.453125
+      }
+    },
+    {
+      "name": "published-inspection-baseline",
+      "value": {
+        "kind": "workflow",
+        "nodes": 4,
+        "height": 424.453125
+      }
+    },
+    {
+      "name": "published-inspection-vulnerabilities",
+      "value": {
+        "kind": "workflow",
+        "nodes": 4,
+        "height": 424.453125
+      }
+    },
+    {
+      "name": "published-inspection-reachability",
+      "value": {
+        "kind": "workflow",
+        "nodes": 11,
+        "height": 424.453125
+      }
+    },
+    {
+      "name": "published-inspection-routine",
+      "value": {
+        "kind": "workflow",
+        "nodes": 5,
+        "height": 424.453125
+      }
+    },
+    {
+      "name": "published-inspection-deep",
+      "value": {
+        "kind": "workflow",
+        "nodes": 4,
+        "height": 424.453125
+      }
+    },
+    {
+      "name": "historical-version",
+      "value": "7706ef8d3c5af97d0386b26d0cc7ea0866f3142d99ad066ee913596ece2fc006"
+    },
+    {
+      "name": "themes-mobile-version",
+      "value": {
+        "width": 208
+      }
+    },
+    {
+      "name": "error-remains-visible-after-panel-collapse",
+      "value": true
+    }
+  ],
+  "clientFixture": "/home/cmp/work/harness-engineering-platform/.local/composition-workbench-20261106/artifacts/client.js",
+  "catalogRevision": "ab2f559de9ec2b8cf6f166ebabce9f31d8d569722b4aa16d22a586fca3d0af52"
+}
