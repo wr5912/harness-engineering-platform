@@ -1,0 +1,47 @@
+{
+  "observed_at": "2026-11-06T05:17:21.933Z",
+  "retired": [
+    {
+      "name": "exp-security-operations-expert-027-cf",
+      "standardDeleteCompleted": true,
+      "registrationAbsent": true,
+      "homePreserved": true,
+      "containersAbsent": true
+    },
+    {
+      "name": "test-zhouyang-disp14",
+      "standardDeleteCompleted": true,
+      "registrationAbsent": true,
+      "homePreserved": true,
+      "containersAbsent": true
+    },
+    {
+      "name": "test-zhouyang-police-exp027",
+      "standardDeleteCompleted": true,
+      "registrationAbsent": true,
+      "homePreserved": true,
+      "containersAbsent": true
+    },
+    {
+      "name": "threat-analysis-003",
+      "standardDeleteCompleted": true,
+      "registrationAbsent": true,
+      "homePreserved": true,
+      "containersAbsent": true
+    }
+  ],
+  "oldGroupAbsent": true,
+  "oldServerAbsent": true,
+  "exclusiveCredentialAbsent": true,
+  "oldAccessOperationsAbsent": true,
+  "oldAgentServerRefAbsent": true,
+  "oldGatewayRegistrationsAbsent": true,
+  "preserved": {
+    "name": "inspection-027-schedule-acceptance",
+    "source_id": "experiment:EXP-security-operations-expert-027-f-r3ba4799b0cb7",
+    "port": 18502,
+    "containerRunning": true,
+    "homePresent": true
+  },
+  "history": "Candidate, Run, HOME and sessions were retained; historical references were not rewritten"
+}

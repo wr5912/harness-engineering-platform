@@ -9,8 +9,8 @@ function FileTree({ files, selected, onSelect, depth = 0 }: { files: GeneratedCo
     groups.set(name, [...(groups.get(name) ?? []), file])
   }
   return <ul>{[...groups].map(([name, entries]) => <li key={name}>{entries[0].path.split('/').length > depth + 1
-    ? <details open><summary>{name}/</summary><FileTree files={entries} selected={selected} onSelect={onSelect} depth={depth + 1} /></details>
-    : <button type="button" title={entries[0].path} aria-current={selected === entries[0].path} onClick={() => onSelect(entries[0].path)}>{entries[0].entry && '入口 · '}{name}{entries[0].missing && '（缺失）'}</button>}</li>)}</ul>
+    ? <details open={entries.some(file => file.path === selected)}><summary title={name}>{name}/</summary><FileTree files={entries} selected={selected} onSelect={onSelect} depth={depth + 1} /></details>
+    : <button type="button" title={entries[0].path} aria-current={selected === entries[0].path} onClick={() => onSelect(entries[0].path)}>{entries[0].entry && '入口 · '}{entries[0].label ?? name}{entries[0].missing && '（缺失）'}</button>}</li>)}</ul>
 }
 export function GeneratedCodeBrowser({ identity, loadCatalog, loadFile, onOpenAsset }: {
   identity: string
@@ -61,20 +61,23 @@ export function GeneratedCodeBrowser({ identity, loadCatalog, loadFile, onOpenAs
     {visible?.notes.map((note, index) => <p key={index}>{note}</p>)}
     {visible && !visible.files.length && <p role="status">当前没有可读取的实现文件。</p>}
     {visible && visible.files.length > 0 && <>
-      <label>选择代码文件<select aria-label="选择代码文件" value={selected} onChange={event => setSelected(event.target.value)}>{visible.files.map(file => <option key={file.path} value={file.path}>{file.entry ? '入口 · ' : ''}{kindName[file.kind]} · {file.path}</option>)}</select></label>
+      <label>选择代码文件<select aria-label="选择代码文件" value={selected} onChange={event => setSelected(event.target.value)}>{visible.files.map(file => <option key={file.path} value={file.path}>{file.entry ? '入口 · ' : ''}{file.label ? `${file.label} · ` : ''}{file.path}</option>)}</select></label>
       <div className="code-browser-layout"><nav aria-label="相关代码目录">{(['source', 'artifact', 'support', 'binary'] as const).map(kind => {
         const files = visible.files.filter(file => file.kind === kind)
         return files.length ? <details open key={kind}><summary>{kindName[kind]}（{files.length}）</summary><FileTree files={files} selected={selected} onSelect={setSelected} /></details> : null
       })}</nav><article aria-label="当前代码文件">
-        {file && <><p><strong>{file.path}</strong> · {kindName[file.kind]} · {file.language}{file.entry && ' · 入口'} · {file.bytes === null ? '大小未知' : `${file.bytes} 字节`}</p><p>文件 SHA-256：<code>{file.sha256 ?? '未读取'}</code></p>
+        {file && <><p><strong>{file.label ?? file.path}</strong> · {kindName[file.kind]} · {file.language}{file.entry && ' · 入口'} · {file.bytes === null ? '大小未知' : `${file.bytes} 字节`}</p>
+          {file.built_sha256 && !file.matches_build && <p role="alert">当前文件与构建不一致，以下内容不代表已装载源码。</p>}
+          <details><summary>文件校验信息</summary><p>路径：<code>{file.path}</code></p><p>文件 SHA-256：<code>{file.sha256 ?? '未读取'}</code></p>
+            {file.built_sha256 && <p>构建时 SHA-256：<code>{file.built_sha256}</code> · {file.matches_build ? '当前文件与构建一致' : '当前文件与构建不一致，以下内容不代表已装载源码'}</p>}
+          </details>
           {onOpenAsset && file.asset_path && <p><button type="button" onClick={() => onOpenAsset(file.asset_path!)}>到资产查看或编辑此文件</button></p>}
-          {file.built_sha256 && <p>构建时 SHA-256：<code>{file.built_sha256}</code> · {file.matches_build ? '当前文件与构建一致' : '当前文件与构建不一致，以下内容不代表已装载源码'}</p>}
           {file.missing && <p role="alert">此文件已列入构建清单，但当前不存在。请刷新目录或到资产恢复。</p>}
           {file.kind === 'binary' && <p>此文件仅显示资产信息，不作为代码预览。</p>}
         </>}
         {loading && <p role="status">正在读取所选文件…</p>}
         {error && <p role="alert">{error} <button type="button" onClick={() => setRetry(value => value + 1)}>重试读取文件</button></p>}
-        {readable && <><p role="status">{readable.redacted ? '内容已脱敏，不能以此预览替换原文件。' : readable.truncated ? '当前为截断预览；文件摘要覆盖完整原文件。' : '完整文件内容。'}</p><pre tabIndex={0} aria-label="代码内容"><code>{readable.content || '（空文件）'}</code></pre></>}
+        {readable && <><p role="status">{readable.redacted && '内容已脱敏，不能以此预览替换原文件。'}{readable.truncated && '当前为截断预览；文件摘要覆盖完整原文件。'}{readable.complete && '完整文件内容。'}</p><pre tabIndex={0} aria-label="代码内容"><code>{readable.content || '（空文件）'}</code></pre></>}
       </article></div>
     </>}
   </section>

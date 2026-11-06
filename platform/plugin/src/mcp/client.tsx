@@ -173,7 +173,8 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
   const [parents, setParents] = useState<NonNullable<typeof selection>[]>([])
   const [preview, setPreview] = useState<'config' | 'source' | null>(null)
   const previewRef = useRef<HTMLDivElement>(null)
-  useEffect(() => { if (!preview) return; const previous = document.activeElement as HTMLElement | null; previewRef.current?.focus(); return () => previous?.focus?.() }, [preview])
+  const moreRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => { if (!preview) return; previewRef.current?.focus(); return () => moreRef.current?.focus() }, [preview])
   useEffect(() => { setPreview(null) }, [target?.composition_id, target?.version, target?.version_id])
   const requestId = useRef(0)
   const actionId = useRef(0)
@@ -460,9 +461,9 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
         {!editor && config && <>
           <SearchSelect className="harness-composition-version" label="编排版本" value={selection?.version === 'draft' ? 'draft' : selection?.versionId ?? entry?.publishedVersionId ?? 'published'} options={versionOptions} disabled={busy} onChange={value => select(entry!, value === 'draft' ? 'draft' : 'published', value === 'draft' || value === 'published' ? undefined : value, false)}/>
           <button type="button" disabled={busy} onClick={() => { setEditor({ id: entry!.id, revision: data.revision, value: { ...(entry!.draft ?? config!) } }); setResult(null); setError('') }}>{entry?.draft ? '继续编辑草稿' : '编辑'}</button>
-          <Menu open={moreOpen} onClose={() => setMoreOpen(false)} portal align="end" anchor={<button type="button" aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(!moreOpen)}>更多</button>}>
+          <Menu open={moreOpen} onClose={() => setMoreOpen(false)} portal align="end" anchor={<button ref={moreRef} type="button" aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(!moreOpen)}>更多</button>}>
             <MenuItemButton onSelect={() => { setMoreOpen(false); setPreview('config') }}>查看配置</MenuItemButton>
-            <MenuItemButton onSelect={() => { setMoreOpen(false); setPreview('source') }}>查看生成代码</MenuItemButton>
+            <MenuItemButton onSelect={() => { setMoreOpen(false); setPreview('source') }}>查看编排代码</MenuItemButton>
             {entry?.published && <MenuItemButton disabled={busy} separatorBefore onSelect={() => { setMoreOpen(false); void action('withdrawComposition', { compositionId: entry.id, revision: data.revision }) }}>下架工具</MenuItemButton>}
             <MenuItemButton disabled={busy} danger onSelect={() => { setMoreOpen(false); if (window.confirm(`删除编排“${config.title}”（${entry?.id}）及其源码、文档和发布包？历史运行记录保留。`)) void action('deleteComposition', { compositionId: entry?.id, revision: data.revision }) }}>删除编排</MenuItemButton>
           </Menu>
@@ -545,9 +546,9 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
           </section></CompositionPanel>
         </div>}
       </>}
-      {preview && <div className="harness-composition-modal-backdrop" onClick={event => { if (event.target === event.currentTarget) setPreview(null) }}><div ref={previewRef} tabIndex={-1} className="harness-composition-modal" role="dialog" aria-modal="true" aria-label={preview === 'config' ? '查看编排配置' : '查看生成代码'} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setPreview(null) }; if (event.key === 'Tab') { const elements = previewRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled),select:not(:disabled),summary,pre[tabindex],a[href]'); if (!elements?.length) return; const first = elements[0], last = elements[elements.length - 1]; if (event.shiftKey && (document.activeElement === first || document.activeElement === previewRef.current)) { event.preventDefault(); last.focus() } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() } } }}>
-        <header><h2>{preview === 'config' ? '编排配置' : '编排使用的实现源码'}</h2><button type="button" onClick={() => setPreview(null)} aria-label="关闭编排预览">×</button></header>
-        <div><p>{config?.title} · {historical ? '历史发布版本' : selection?.version === 'published' ? '当前发布版本' : '已保存草稿'}</p>{preview === 'config' ? <pre tabIndex={0}>{JSON.stringify(config, null, 2)}</pre> : <GeneratedCodeBrowser identity={`composition:${selection?.id}:${selection?.version}:${selection?.versionId ?? ''}:${data?.revision ?? ''}`} loadCatalog={async () => {
+      {preview && <div className="harness-composition-modal-backdrop" onClick={event => { if (event.target === event.currentTarget) setPreview(null) }}><div ref={previewRef} tabIndex={-1} className="harness-composition-modal" role="dialog" aria-modal="true" aria-label={preview === 'config' ? '查看编排配置' : '查看编排代码'} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setPreview(null) }; if (event.key === 'Tab') { const elements = previewRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled),select:not(:disabled),summary,pre[tabindex],a[href]'); if (!elements?.length) return; const first = elements[0], last = elements[elements.length - 1]; if (event.shiftKey && (document.activeElement === first || document.activeElement === previewRef.current)) { event.preventDefault(); last.focus() } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() } } }}>
+        <header><h2>{preview === 'config' ? '编排配置' : '编排代码'}</h2><button type="button" onClick={() => setPreview(null)} aria-label="关闭编排预览">×</button></header>
+        <div><p>{config?.title} · {historical ? '历史发布版本' : selection?.version === 'published' ? '当前发布版本' : '已保存草稿'}{selection?.version === 'published' && <> · <code>{selection.versionId ?? entry?.publishedVersionId}</code></>}</p>{preview === 'config' ? <pre tabIndex={0}>{JSON.stringify(config, null, 2)}</pre> : <GeneratedCodeBrowser identity={`composition:${selection?.id}:${selection?.version}:${selection?.versionId ?? ''}:${data?.revision ?? ''}`} loadCatalog={async () => {
           const result = await rpc.call(CHANNEL, 'mcp/compositionSource', { selection })
           if (!result.ok) throw new Error(result.error.message)
           return result.value as any

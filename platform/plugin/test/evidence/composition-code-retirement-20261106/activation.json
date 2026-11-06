@@ -1,0 +1,9 @@
+{
+  "checked_at": "2026-11-06T05:21:00.228775+00:00",
+  "command": "platform/dsh-deploy update --dry-run --json",
+  "status": "busy",
+  "activation": "none",
+  "in_flight_items": 15,
+  "forced_restart": false,
+  "runtime_files_copied": false
+}

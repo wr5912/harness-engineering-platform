@@ -228,7 +228,7 @@ export function createMcpHandler(assetRoot: string, options: { stateFile?: strin
         if (!receipt) return failure('not_found', '未找到原执行回执；尚不能确认原请求是否执行，请核对远端结果。')
         return success(receipt)
       }
-      if (endpoint === 'compositionSource') return success(compositionCodeSource(assetRoot, readCompositions(compositionsFile).catalog, registry.extension, payload, undefined, (await compositionVersion(assetRoot, undefined, registry.extension)).sourceDigest))
+      if (endpoint === 'compositionSource') return success(compositionCodeSource(assetRoot, readCompositions(compositionsFile).catalog, payload))
       if (endpoint === 'compositionGraph') {
         const catalog = readCompositions(compositionsFile).catalog, request = payload as any
         const config = request.versionId ? versionConfig(catalog, request.compositionId, request.versionId) : selectedComposition(catalog, request)

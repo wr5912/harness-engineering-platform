@@ -299,16 +299,16 @@ test('阶段组合按已有运行恢复时，在途运行ID同样不可更换', 
   assert.equal(input().props.disabled, false)
 })
 
-test('查看实现源码复用多文件浏览器，并将固定历史版本和文件SHA交给只读接口', async () => {
+test('查看编排代码复用多文件浏览器，并将固定历史版本和文件SHA交给只读接口', async () => {
   const ui = workbench(undefined, { source: payload => ({ ok: true, value: payload.path ? { identity: 'fixed', path: payload.path, sha256: payload.expected_sha256, content: 'actual source' } : { identity: 'fixed', files: [], notes: [] } }) })
   await ui.settle()
-  ui.menuItem('查看生成代码').props.onSelect(); await ui.settle()
-  assert.match(ui.text(), /编排使用的实现源码/)
+  ui.menuItem('查看编排代码').props.onSelect(); await ui.settle()
+  assert.match(ui.text(), /编排代码/); assert.ok(ui.text().includes(oldId))
   assert.doesNotMatch(ui.text(), /尚未接入生成源码|生成并保存源码/)
   const browser = ui.nodes().find(node => typeof node.type === 'function' && node.type.name === 'GeneratedCodeBrowser')
   assert.ok(browser)
   await browser.props.loadCatalog()
-  await browser.props.loadFile({ path: 'platform/plugin/src/mcp/executor.ts', sha256: 'c'.repeat(64) })
+  await browser.props.loadFile({ path: 'components/source.py', sha256: 'c'.repeat(64) })
   const calls = ui.calls.filter(call => call.endpoint === 'mcp/compositionSource')
   assert.equal(calls.length, 2)
   assert.equal(calls[0].payload.selection.versionId, oldId)

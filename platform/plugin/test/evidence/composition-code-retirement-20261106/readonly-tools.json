@@ -1,0 +1,41 @@
+{
+  "tools": [
+    "inspection_status",
+    "inspection_baseline",
+    "inspection_vulnerabilities",
+    "inspection_reachability",
+    "inspection_routine",
+    "inspection_deep",
+    "get_composition_run",
+    "get_composition_artifact",
+    "get_composition_details"
+  ],
+  "run_id": "run-6df38d76-9baf-47ff-b478-5199642bed6c",
+  "status": "completed",
+  "queries": [
+    {
+      "name": "get_composition_details",
+      "ok": true,
+      "keys": [
+        "run_id",
+        "node_id",
+        "offset",
+        "limit",
+        "total",
+        "items"
+      ],
+      "bytes": 1800
+    },
+    {
+      "name": "get_composition_artifact",
+      "ok": true,
+      "keys": [
+        "filename",
+        "contentType",
+        "body"
+      ],
+      "bytes": 5299
+    }
+  ],
+  "runUnchanged": true
+}

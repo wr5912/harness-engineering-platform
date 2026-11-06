@@ -1,0 +1,44 @@
+[
+  {
+    "id": "inspection-status",
+    "version": "6ad792b7d915133949574bff56eff865b582eb4ec15c2ecf85172bc8f2100b67",
+    "files": 10,
+    "nodes": 6,
+    "childFiles": 0
+  },
+  {
+    "id": "inspection-baseline",
+    "version": "7d13efbb796459bb3c7f0bd434fdb81cf92d99f90ef51877cad160fb5cbc1d59",
+    "files": 12,
+    "nodes": 8,
+    "childFiles": 0
+  },
+  {
+    "id": "inspection-vulnerabilities",
+    "version": "843a3da357574cb5ddf572bb7ffa889b1a65ce13dcc83bbd8b4a8e7157004a6b",
+    "files": 15,
+    "nodes": 10,
+    "childFiles": 0
+  },
+  {
+    "id": "inspection-reachability",
+    "version": "9feacdb49aa330c57db87dac7444f18b7bc6fd79558e3a35dc06f47e061d2573",
+    "files": 32,
+    "nodes": 27,
+    "childFiles": 0
+  },
+  {
+    "id": "inspection-routine",
+    "version": "1bf774cbd79a8db4c956319e89e4340f21bd3f5c8f3d601943acbbed0fcc86cc",
+    "files": 61,
+    "nodes": 5,
+    "childFiles": 54
+  },
+  {
+    "id": "inspection-deep",
+    "version": "fcfe4f5af18889eac699e1e44cb7802ad47e7917ca77e86f4e737385e45d9be9",
+    "files": 82,
+    "nodes": 4,
+    "childFiles": 76
+  }
+]

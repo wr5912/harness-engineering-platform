@@ -1,54 +1,46 @@
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { programRoot } from '../workspace.ts'
-import { codeCatalog, codeDirectory, readCode, type CodeLocation } from '../components/generated-code-files.ts'
+import { codeCatalog, readCode, type CodeLocation } from '../components/generated-code-files.ts'
 import { selectedComposition, versionConfig, type Catalog } from './compositions.ts'
-import type { CompositionExtension } from './extension.ts'
+import { lfxDigest, loadLfxBundle, type LfxBundle } from './lfx-assets.ts'
 
-export function compositionCodeSource(assetRoot: string, catalog: Catalog, extension: CompositionExtension | undefined, request: any, sourceRoot = programRoot(), loadedSourceDigest?: string) {
+export function compositionCodeSource(assetRoot: string, catalog: Catalog, request: any) {
   const selection = request?.selection
   if (!selection || typeof selection.id !== 'string' || !['draft', 'published'].includes(selection.version)) throw new Error('请选择已保存的编排版本')
   if (selection.versionId !== undefined && (selection.version !== 'published' || typeof selection.versionId !== 'string')) throw new Error('固定编排版本参数无效')
   const config = selection.versionId ? versionConfig(catalog, selection.id, selection.versionId) : selectedComposition(catalog, { compositionId: selection.id, version: selection.version })
-  const identity = `composition:${selection.id}:${createHash('sha256').update(JSON.stringify(config)).digest('hex')}`
-  const prefix = 'platform/plugin/'
-  const locations: CodeLocation[] = []
-  const sourceIndex = join(sourceRoot, `${prefix}lib/composition-source-index.json`)
-  let indexed = false
-  if (existsSync(sourceIndex)) {
-    const index = JSON.parse(readFileSync(sourceIndex, 'utf8'))
-    if (index.schema_version === 1 && /^[0-9a-f]{64}$/.test(index.source_digest ?? '') && index.source_digest === loadedSourceDigest && Array.isArray(index.files)) {
-      for (const file of [...index.files, ...(Array.isArray(index.artifacts) ? index.artifacts : [])]) {
-        if (typeof file.path !== 'string' || !/^[0-9a-f]{64}$/.test(file.sha256)) throw new Error('组合实现构建清单无效')
-        locations.push({ root: sourceRoot, file: file.path, path: file.path, entry: file.path === `${prefix}src/mcp/executor.ts`, built_sha256: file.sha256,
-          kind: file.path.includes('/lib/') ? 'artifact' : /\.[cm]?js$/.test(file.path) ? 'support' : undefined })
+  const locations: CodeLocation[] = [], notes: string[] = []
+  const bundle = config.engine === 'lfx' ? loadLfxBundle(assetRoot, config.workflow!, config, catalog) : undefined
+  const identity = `composition:${selection.id}:${createHash('sha256').update(JSON.stringify([config, bundle ? lfxDigest(bundle) : null])).digest('hex')}`
+  const add = (path: string, content: string, label: string, kind: CodeLocation['kind'] = 'source', entry = false) => {
+    locations.push({ root: assetRoot, file: `mcp/compositions/${selection.id}/${path}`, path, content, label, kind, entry })
+  }
+  const json = (value: unknown) => JSON.stringify(value, null, 2) + '\n'
+  function flowCode(flow: any, prefix: string) {
+    for (const node of flow.data.nodes) {
+      const template = node.data.node.template, id = encodeURIComponent(node.id)
+      add(`${prefix}components/${id}.py`, template.code.value, `${node.data.node.display_name ?? node.id} · ${node.id}`)
+      if (node.data.type === 'HepBatch') {
+        add(`${prefix}components/${id}/flow.json`, json(template.body.value), `批量内部流程 · ${node.id}`, 'support')
+        flowCode(template.body.value, `${prefix}components/${id}/`)
       }
-      indexed = true
     }
   }
-  const notes = [config.engine === 'lfx' ? '原生 flow.json 同时定义执行与画布。发布包冻结流程、组件模块和固定子编排；平台适配器按已装载实现摘要核对。' : '此编排按已保存配置构建 LangGraph，以下是当前平台实现文件；历史发布配置不表示当前源码就是当时装载的实现。运行采用的实现摘要以执行回执为准。']
-  notes.push(indexed ? `平台文件清单对应已装载的组合实现摘要：${loadedSourceDigest}。逐文件显示当前内容与构建时是否一致。` : '尚无与已装载组合实现摘要匹配的构建文件清单；请重新构建并装载平台后查看平台实现源码。')
-  if (extension?.id) {
-    let registrations: any[] = []
-    const workspace = join(assetRoot, 'workspace.json')
-    if (existsSync(workspace)) registrations = JSON.parse(readFileSync(workspace, 'utf8')).extensions ?? []
-    const matches = registrations.filter(item => item?.id === extension.id)
-    if (matches.length > 1) throw new Error('业务扩展登记重复，无法确定源码来源')
-    const registration = matches[0]
-    if (registration && typeof registration.path === 'string') {
-      const directory = registration.path.replace(/\/$/, '')
-      const own = `${directory}/compositions/${selection.id}`
-      const files = config.engine === 'lfx'
-        ? config.flowDigest ? [`${own}/versions/${config.flowDigest}/bundle.json`]
-          : [`${own}/flow.json`, ...codeDirectory(assetRoot, `${own}/src`), ...codeDirectory(assetRoot, `${directory}/src/lfx`)]
-        : directory === 'mcp'
-        ? [...codeDirectory(assetRoot, own), ...(config.workflow ? [...codeDirectory(assetRoot, `${directory}/src/inspection`), `${directory}/src/soc.ts`] : config.flow ? [] : [...codeDirectory(assetRoot, `${directory}/src/threat`), `${directory}/src/threat-services.ts`])].filter(file => existsSync(join(assetRoot, file)))
-        : codeDirectory(assetRoot, `${directory}/src`)
-      for (const name of ['build.mjs', 'package.json']) if (existsSync(join(assetRoot, directory, name))) files.push(`${directory}/${name}`)
-      locations.push(...files.map(file => ({ root: assetRoot, file, path: `workspace/${file}`, entry: file === `${directory}/src/index.ts`, ...(file === `${directory}/build.mjs` ? { kind: 'support' as const } : {}) })))
-      notes.push(`业务扩展 ${extension.id} 的源码目录来自当前工作区登记；运行中扩展摘要：${extension.sourceDigest ?? '未知'}。当前文件与该摘要的一致性尚未核对。`)
-    } else notes.push(`业务扩展 ${extension.id} 未登记可读取的源码目录。`)
+  function bundleCode(value: LfxBundle, prefix = '') {
+    add(`${prefix}flow.json`, json(value.flow), prefix ? '固定子编排流程' : '编排流程', 'support', !prefix)
+    flowCode(value.flow, prefix)
+    for (const [name, content] of Object.entries(value.modules)) {
+      add(`${prefix}modules/${encodeURIComponent(name)}.py`, content, `业务模块 · ${name}`)
+    }
+    if ('typescript' in value && typeof value.typescript === 'string') add(`${prefix}execution.js`, value.typescript, '业务执行模块 · JavaScript', 'artifact')
+    for (const [key, child] of Object.entries(value.children)) bundleCode(child, `${prefix}children/${encodeURIComponent(key)}/`)
+  }
+  if (bundle) {
+    bundleCode(bundle)
+    notes.push(config.flowDigest ? '所选固定发布包的只读视图；包含原生流程、节点组件、业务模块及固定子编排。' : '已保存草稿的只读视图；流程、节点组件和已声明业务依赖来自同一份 LFX 资产。')
+    notes.push('节点名称和 ID 对应画布；children 目录标明固定子编排及版本。组件仍依赖平台提供的连接与运行环境。')
+  } else {
+    add('composition.json', json(config), '编排定义', 'support', true)
+    notes.push('此版本不是原生 LFX 编排。仅展示已保存定义；未保存可核实的业务源码快照，不以当前平台源码替代。')
   }
   return request.path === undefined ? codeCatalog(identity, locations, notes) : readCode(identity, locations, request.path, request.expected_sha256)
 }

@@ -112,6 +112,18 @@ test('管理助手工具以 owner 身份访问平台管理接口', async t => {
   assert.equal(call.peer?.principal?.kind, 'owner')
 })
 
+test('业务访问配置保存保留严格输入，不附加 confirmed 字段', async t => {
+  const input = { revision: 'r1', enabled: true, agents: [], operations: [] }
+  const f = fixture(t, (endpoint, request) => {
+    if (endpoint !== 'mcp/control/saveConfiguration') return
+    assert.deepEqual(request, input)
+    return { ok: true, value: { revision: 'r2' } }
+  })
+  const id = (await f.rpc('session', { task: '清理退役服务的业务访问配置' })).value.session_id
+  await f.execute(id, 'mcp', 'control/saveConfiguration', input)
+  assert.equal((await f.operation(id)).state, 'completed')
+})
+
 
 test('真实 Session 投影隔离上下文、冷恢复固定任务，用户 prompt 保持原文', async t => {
   const f = fixture(t)

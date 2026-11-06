@@ -4,7 +4,7 @@ import { relative, resolve, sep } from 'node:path'
 import { assetText } from '../agents/asset-text.ts'
 import type { GeneratedCodeCatalog, GeneratedCodeFile, GeneratedCodeKind, GeneratedCodeRead } from './generated-code.ts'
 
-export interface CodeLocation { root: string; file: string; path: string; kind?: GeneratedCodeKind; entry?: boolean; asset_path?: string; built_sha256?: string }
+export interface CodeLocation { root: string; file: string; path: string; content?: string; label?: string; kind?: GeneratedCodeKind; entry?: boolean; asset_path?: string; built_sha256?: string }
 const hash = (data: Buffer) => createHash('sha256').update(data).digest('hex')
 const TEXT = /\.(?:[cm]?[jt]sx?|py|txt|json|ya?ml|md|css|html|map)$/i
 const MAX_FILE_BYTES = 16 * 1024 * 1024
@@ -40,7 +40,11 @@ export function codeDirectory(root: string, directory: string): string[] {
 
 function descriptor(location: CodeLocation): GeneratedCodeFile {
   const absolute = checked(location.root, location.file)
-  const base = { path: location.path, kind: location.kind ?? (/[cm]?jsx?$/.test(location.file) ? 'artifact' : /tsx?$/.test(location.file) ? 'source' : 'support'), language: location.file.split('.').pop() ?? 'text', entry: Boolean(location.entry), ...(location.asset_path ? { asset_path: location.asset_path } : {}) }
+  const base = { path: location.path, ...(location.label ? { label: location.label } : {}), kind: location.kind ?? (/[cm]?jsx?$/.test(location.file) ? 'artifact' : /tsx?$/.test(location.file) ? 'source' : 'support'), language: location.file.split('.').pop() ?? 'text', entry: Boolean(location.entry), ...(location.asset_path ? { asset_path: location.asset_path } : {}) }
+  if (location.content !== undefined) {
+    const bytes = Buffer.from(location.content)
+    return bytes.length > MAX_FILE_BYTES ? { ...base, kind: 'binary', bytes: bytes.length, sha256: null } : { ...base, bytes: bytes.length, sha256: hash(bytes) }
+  }
   if (!existsSync(absolute)) return { ...base, bytes: null, sha256: null, missing: true }
   const stat = lstatSync(absolute)
   if (!stat.isFile()) throw new Error('请选择源码文件')
@@ -65,7 +69,7 @@ export function readCode(identity: string, locations: CodeLocation[], path: unkn
   const info = descriptor(location)
   if (info.missing) throw new Error('源码文件不存在，请刷新文件目录后重试')
   if (info.kind === 'binary') throw new Error('此文件不提供代码预览，请到资产查看')
-  const bytes = readFileSync(checked(location.root, location.file))
+  const bytes = location.content === undefined ? readFileSync(checked(location.root, location.file)) : Buffer.from(location.content)
   if (hash(bytes) !== expected) throw new Error('源码文件已变化，请刷新文件目录后重试')
   const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
   const preview = assetText(location.file, text)

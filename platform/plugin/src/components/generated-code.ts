@@ -1,6 +1,7 @@
 export type GeneratedCodeKind = 'source' | 'artifact' | 'support' | 'binary'
 export interface GeneratedCodeFile {
   path: string
+  label?: string
   kind: GeneratedCodeKind
   language: string
   entry: boolean

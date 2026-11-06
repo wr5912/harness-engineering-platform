@@ -589,6 +589,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
       started = true
       // 浏览器请求断连不取消仍在运行的原工具；用户停止会话时由工具信号取消。
       const operationInput = proposal.domain === 'agents' && proposal.action === 'compute-variants/identity-apply'
+        || proposal.domain === 'mcp' && proposal.action === 'control/saveConfiguration'
         ? proposal.input : { ...proposal.input, confirmed: true }
       let receipt = await dispatch(proposal.domain, proposal.action, operationInput, operationSignal)
       if (proposal.domain === 'instances' && ['create', 'start', 'restart', 'reload'].includes(proposal.input.operation)

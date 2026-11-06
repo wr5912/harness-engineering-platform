@@ -34,10 +34,14 @@ test('共享浏览器列出多文件树、入口、类型、完整SHA并切换�
   try {
     await ui.settle(); assert.match(ui.text(), /3 个相关文件/); assert.match(ui.text(), /SOURCE:src\/index.ts/)
     assert.equal(ui.nodes().filter(node => node.type === 'option').length, 3)
+    const folder = name => ui.nodes().find(node => node.type === 'details' && ui.text(node).startsWith(`${name}/`))
+    assert.equal(folder('src').props.open, true); assert.equal(folder('dist').props.open, false)
     assert.match(ui.text(), /入口/); assert.match(ui.text(), /源码（2）/); assert.match(ui.text(), /构建产物（1）/)
     ui.select('src/context.ts'); await ui.settle(); assert.match(ui.text(), /SOURCE:src\/context.ts/); assert.doesNotMatch(ui.text(), /SOURCE:src\/index.ts/)
     ui.button('到资产查看或编辑此文件').props.onClick(); assert.deepEqual(opened, ['candidate/src/context.ts'])
     assert.equal(ui.nodes().find(node => node.type === 'pre').props.tabIndex, 0)
+    ui.select('dist/index.js'); await ui.settle()
+    assert.equal(folder('src').props.open, false); assert.equal(folder('dist').props.open, true)
     const css = ui.nodes().find(node => node.type === 'style').props.children
     assert.match(css, /max-width:600px/); assert.match(css, /minmax\(0,1fr\)/); assert.match(css, /overflow:auto;white-space:pre/)
   } finally { ui.close() }
@@ -47,7 +51,7 @@ test('失败可重试，截断脱敏不能被称为完整文件，目录失败�
   const ui = browser({ loadCatalog: async () => { if (catalogs++) throw new Error('目录读取失败'); return catalog() }, loadFile: async file => { if (!attempts++) throw new Error('暂时无法读取'); return { ...read(file), complete: false, truncated: true, redacted: true } } })
   try {
     await ui.settle(); assert.match(ui.text(), /暂时无法读取/)
-    ui.button('重试读取文件').props.onClick(); await ui.settle(); assert.match(ui.text(), /内容已脱敏/); assert.doesNotMatch(ui.text(), /完整文件内容/)
+    ui.button('重试读取文件').props.onClick(); await ui.settle(); assert.match(ui.text(), /内容已脱敏/); assert.match(ui.text(), /截断预览/); assert.doesNotMatch(ui.text(), /完整文件内容/)
     ui.button('刷新文件目录').props.onClick(); await ui.settle(); assert.match(ui.text(), /以下保留上次文件清单/)
   } finally { ui.close() }
 })
@@ -79,5 +83,17 @@ test('文件读取在途刷新目录失败时结束loading并可重试，旧文�
     release(); await ui.settle(); assert.doesNotMatch(ui.text(), /SOURCE:src\/index.ts/)
     ui.button('重试读取文件').props.onClick(); await ui.settle()
     assert.match(ui.text(), /SOURCE:src\/index.ts/); assert.doesNotMatch(ui.text(), /正在读取所选文件/)
+  } finally { ui.close() }
+})
+
+test('业务节点标签可定位，摘要默认折叠而构建不一致保持可见', async () => {
+  const value = catalog(); Object.assign(value.files[0], { label: '资产查询 · asset-query', built_sha256: 'b'.repeat(64), matches_build: false })
+  const ui = browser({ loadCatalog: async () => value })
+  try {
+    await ui.settle()
+    assert.match(ui.text(), /资产查询 · asset-query/)
+    const details = ui.nodes().find(node => node.type === 'details' && ui.text(node).startsWith('文件校验信息'))
+    assert.ok(details); assert.equal(details.props.open, undefined)
+    assert.ok(ui.nodes().some(node => node.props?.role === 'alert' && ui.text(node).includes('不代表已装载源码')))
   } finally { ui.close() }
 })
