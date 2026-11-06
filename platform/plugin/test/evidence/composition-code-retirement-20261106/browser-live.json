@@ -1,0 +1,30 @@
+{
+  "observed_at": "2026-11-06T05:55:47.551Z",
+  "mode": "live platform after managed update; actual client and API without routes or overlays",
+  "desktop": {
+    "width": 1440,
+    "dialogWidth": 820,
+    "defaultFile": "flow.json",
+    "defaultChildFolderCollapsed": true,
+    "selectedFiles": [
+      {
+        "path": "components/input.py",
+        "label": "运行输入 · input",
+        "sha256": "de06e2f7ce643d753d2c1a66da9c6256b66e34d0dd407ceae1ddc83639430b46"
+      },
+      {
+        "path": "children/inspection-routine%3A1bf774cbd79a8db4c956319e89e4340f21bd3f5c8f3d601943acbbed0fcc86cc/children/inspection-baseline%3A7d13efbb796459bb3c7f0bd434fdb81cf92d99f90ef51877cad160fb5cbc1d59/components/assets.py",
+        "label": "逐资产核对基线 · assets",
+        "sha256": "c0fd912e98ffa8c4a3c6ab5e1ed5e29122c3031efd6535c0c7bb9d06e1d25fcb"
+      }
+    ],
+    "metadataCollapsed": true
+  },
+  "mobile": {
+    "width": 390,
+    "documentWidth": 390,
+    "dialogWidth": 358
+  },
+  "escapeClosesAndRestoresFocus": true,
+  "pageErrors": []
+}

@@ -6,7 +6,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { managedState, ownsPort, processBirth, restoreManagedProcess } from '../lifecycle.mts'
 import { workspaceIdentity, instanceStateRoot, workspaceLocalPath, workspaceOwnsCwd, mcpLocalPath } from '../plugin/src/workspace.ts'
 
-export type UpdateOptions = { programRoot: string; dataRoot: string; dryRun?: boolean }
+export type UpdateOptions = { programRoot: string; dataRoot: string; dryRun?: boolean; interruptSessions?: boolean }
 type ServiceState = NonNullable<ReturnType<typeof managedState>>
 export type BusyItem = { kind: string; id: string; state: string }
 export type UpdateInspection = {
@@ -297,7 +297,8 @@ export async function updatePlatform(input: UpdateOptions, services: UpdateServi
     if (!changed.length && !current.pendingActivation) return report
     const clientOnly = !current.pendingActivation && changed.every(entry => entry.target === join(options.programRoot, 'platform/plugin/lib/client.js'))
     const workerOnly = !current.pendingActivation && changed.every(entry => entry.target === join(options.programRoot, 'platform/plugin/lib/sdk-worker.js'))
-    if (!clientOnly && !workerOnly && current.busy.length) { report.status = 'busy'; return report }
+    const blocking = current.busy.filter(item => !options.interruptSessions || !['session', 'assistant'].includes(item.kind))
+    if (!clientOnly && !workerOnly && blocking.length) { report.status = 'busy'; return report }
     report.activation = clientOnly ? 'native-hmr' : workerOnly ? 'next-sdk-operation' : 'managed-restart'
     for (const [index, entry] of changed.entries()) {
       const existed = existsSync(entry.target), path = join(stage, 'backup', String(index)), mode = existed ? statSync(entry.target).mode & 0o777 : 0o644

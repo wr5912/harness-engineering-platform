@@ -1,0 +1,88 @@
+{
+  "observed_at": "2026-11-06T05:55:34.090Z",
+  "workspace_id": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+  "composition_count": 14,
+  "compositions": [
+    {
+      "id": "inspection-status",
+      "published": true
+    },
+    {
+      "id": "inspection-baseline",
+      "published": true
+    },
+    {
+      "id": "inspection-vulnerabilities",
+      "published": true
+    },
+    {
+      "id": "inspection-reachability",
+      "published": true
+    },
+    {
+      "id": "inspection-routine",
+      "published": true
+    },
+    {
+      "id": "inspection-deep",
+      "published": true
+    },
+    {
+      "id": "soc-workflow-approval",
+      "published": false
+    },
+    {
+      "id": "policy-single",
+      "published": false
+    },
+    {
+      "id": "policy-department",
+      "published": false
+    },
+    {
+      "id": "emergency-single",
+      "published": false
+    },
+    {
+      "id": "disposition-preview",
+      "published": false
+    },
+    {
+      "id": "soc-target-resolution",
+      "published": false
+    },
+    {
+      "id": "policy-dispatch-draft",
+      "published": false
+    },
+    {
+      "id": "policy-response-observe",
+      "published": false
+    }
+  ],
+  "builtin_queries": [
+    "get_composition_run",
+    "get_composition_artifact",
+    "get_composition_details"
+  ],
+  "old_inspection_connection_absent": true,
+  "old_group_absent": true,
+  "session_count": 504,
+  "interrupted_session_records_preserved": [
+    "session-0ef54382-2252-472c-b934-4f93ee93668e",
+    "05d1105d-4c93-4007-802d-ced269abaee9",
+    "session-21bb13b9-e407-436b-8986-8472a5f19234",
+    "bef15db4-a25b-4171-a89d-a7f16d4775eb",
+    "03fedff7-f962-4157-849a-9cb738348bd0",
+    "session-e1fb0e7a-eb30-4e3b-8eed-fd5af035077e"
+  ],
+  "original_session_records_still_running": [],
+  "preserved_business_instance": {
+    "name": "inspection-027-schedule-acceptance",
+    "running": true,
+    "started_at": "2026-11-06T02:46:33.648057478Z"
+  },
+  "program_commit": "0840cf08a6a5a953d37fc14486b3f3e08099c476",
+  "data_commit": "48588022d26bba9616ef665b46bed8220d179c21",
+  "source_worktrees_dirty": true
+}

@@ -1,0 +1,41 @@
+{
+  "status": "applied",
+  "programRoot": "/home/cmp/work/harness-engineering-platform",
+  "dataRoot": "/home/cmp/harness-engineering-platform-data",
+  "workspaceId": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+  "pid": 3761078,
+  "activation": "managed-restart",
+  "busy": [
+    {
+      "kind": "session",
+      "id": "session-6a79ab7e-f558-4cc5-b45d-7cc2e4c52975",
+      "state": "running"
+    },
+    {
+      "kind": "assistant",
+      "id": "session-6a79ab7e-f558-4cc5-b45d-7cc2e4c52975",
+      "state": "pending"
+    },
+    {
+      "kind": "session",
+      "id": "session-0ef54382-2252-472c-b934-4f93ee93668e",
+      "state": "running"
+    },
+    {
+      "kind": "assistant",
+      "id": "session-0ef54382-2252-472c-b934-4f93ee93668e",
+      "state": "pending"
+    }
+  ],
+  "changed": [
+    "platform/plugin/lib/composition-source-index.json",
+    "platform/plugin/lib/index.js",
+    "platform/plugin/lib/mcp-manager.js",
+    "platform/plugin/lib/platform-mcp-manager.js",
+    "platform/plugin/lib/standalone-bridge.js",
+    "platform/plugin/lib/standalone-plugin.js",
+    "../../harness-engineering-platform-data/.local/platform-home/profiles/harness-platform/harness-platform.patch.yml"
+  ],
+  "stage": "/home/cmp/work/harness-engineering-platform/.local/platform-updates/866b1e16-c796-4fc0-a8ab-54038ecb9559",
+  "receipt": "/home/cmp/work/harness-engineering-platform/.local/platform-updates/866b1e16-c796-4fc0-a8ab-54038ecb9559/receipt.json"
+}

@@ -59,7 +59,7 @@ function validateOptions(command: string, options: Options): void {
     verify: [],
     relocate: ['dry-run', 'resume'],
     'agent-update': ['dry-run'],
-    update: ['dry-run', 'minimal-data', 'install-deps', 'start'],
+    update: ['dry-run', 'minimal-data', 'install-deps', 'start', 'interrupt-sessions'],
     'mcp-migrate': ['dry-run'],
   }
   if (!values[command]) throw new Error(`未知命令：${command}`)
@@ -94,8 +94,9 @@ function usage(): string {
     --program-root <目录>       当前已准备的本机源码工作区，默认当前仓库
     --data-root <目录>          当前受管平台的数据根，默认当前关联工作区
     --dry-run                   只核对身份、运行状态和更新范围，不构建或应用
+    --interrupt-sessions        明确允许重载中断本机管理会话的在途执行，保留会话记录
     --json                      输出更新回执
-    源码更新保留配置、会话和实例；有在途任务或无法确认空闲时不应用。
+    源码更新保留配置、会话和实例；默认有在途任务或无法确认空闲时不应用。
 
   dsh-deploy update --prefix <目录> --remote-data-root <目录> [选项]
     --program-root <目录>       本地程序仓库，默认当前仓库
@@ -195,13 +196,14 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     }
     if (command === 'update') {
       if (['ssh', 'prefix', 'remote-data-root', 'minimal-data', 'install-deps', 'start', 'cancel-prepare'].some(key => options[key] !== undefined)) {
+        if (flag(options, 'interrupt-sessions')) throw new Error('--interrupt-sessions 仅适用于当前本机源码平台')
         const prefix = text(options, 'prefix'), dataRoot = text(options, 'remote-data-root'), ssh = text(options, 'ssh')
         if (!prefix || !dataRoot) throw new Error('update 需要 --prefix 和 --remote-data-root')
         const { updateRemote } = await import('./remote-update.mts')
         return updateRemote(ssh, { prefix, dataRoot, dryRun: flag(options, 'dry-run'), minimalData: flag(options, 'minimal-data'), installDeps: flag(options, 'install-deps'), start: flag(options, 'start'), cancelPrepare: text(options, 'cancel-prepare') === undefined ? undefined : Number(text(options, 'cancel-prepare')) }, resolve(text(options, 'program-root', REPO)!), resolve(text(options, 'data-root', defaultAssetRoot())!))
       }
       const { updatePlatform } = await import('./update.mts')
-      const report = await updatePlatform({ programRoot: resolve(text(options, 'program-root', REPO)!), dataRoot: resolve(text(options, 'data-root', defaultAssetRoot())!), dryRun: flag(options, 'dry-run') })
+      const report = await updatePlatform({ programRoot: resolve(text(options, 'program-root', REPO)!), dataRoot: resolve(text(options, 'data-root', defaultAssetRoot())!), dryRun: flag(options, 'dry-run'), interruptSessions: flag(options, 'interrupt-sessions') })
       console.log(JSON.stringify(report, null, 2))
       return report.status === 'busy' ? 1 : 0
     }

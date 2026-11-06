@@ -64,6 +64,20 @@ test('构建后再次发现任务时保留stage和live，不执行停止', async
   assert.equal(readFileSync(f.live, 'utf8'), 'old-code'); assert.equal(JSON.parse(readFileSync(report.receipt)).status, 'busy')
 })
 
+test('明确允许中断会话时重载并保留在途清单，业务任务仍阻止重载', async t => {
+  const sessions = [{ kind: 'session', id: 'active', state: 'running' }, { kind: 'assistant', id: 'active', state: 'pending' }]
+  const f = fixture(t, { initialBusy: sessions, afterBuildBusy: sessions })
+  const report = await updatePlatform({ ...f.options, interruptSessions: true }, f.services)
+  assert.equal(report.status, 'applied'); assert.equal(report.activation, 'managed-restart')
+  assert.deepEqual(report.busy, sessions); assert.deepEqual(f.events, ['build', 'stop', 'start', 'verify'])
+  for (const kind of ['sdk', 'evaluation', 'workflow', 'composition']) {
+    const busy = [...sessions, { kind, id: 'business', state: 'running' }]
+    const blocked = fixture(t, { initialBusy: busy, afterBuildBusy: busy })
+    assert.equal((await updatePlatform({ ...blocked.options, interruptSessions: true }, blocked.services)).status, 'busy')
+    assert.deepEqual(blocked.events, ['build']); assert.equal(readFileSync(blocked.live, 'utf8'), 'old-code')
+  }
+})
+
 test('隔离构建失败不影响运行制品，失败回执和目录保留', async t => {
   const f = fixture(t, { failBuild: true })
   await assert.rejects(updatePlatform(f.options, f.services), /fixture build failed/)

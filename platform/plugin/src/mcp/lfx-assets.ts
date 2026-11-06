@@ -16,7 +16,7 @@ export function validateLfxFlow(flow: any) {
     ids.add(node.id)
     if (node.data.type === 'HepBatch') validateLfxFlow(node.data.node.template.body.value)
   }
-  if (flow.data.nodes.filter((node: any) => node.data.node.is_output).length !== 1) throw new Error('LFX 流程需要唯一的结果节点')
+  if (!flow.data.nodes.some((node: any) => node.data.node.is_output)) throw new Error('LFX 流程需要至少一个结果节点')
   for (const edge of flow.data.edges) {
     const source = flow.data.nodes.find((node: any) => node.id === edge.source), target = flow.data.nodes.find((node: any) => node.id === edge.target)
     const from = edge.data?.sourceHandle, to = edge.data?.targetHandle

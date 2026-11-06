@@ -29,7 +29,9 @@ test('静态读取与画布直接使用原生节点、端口和位置，不执�
   const bad = structuredClone(native); bad.data.edges[0].data.sourceHandle.name = 'missing'
   assert.throws(() => validateLfxFlow(bad), /端口/)
   bad.data.edges = []; bad.data.nodes[1].data.node.is_output = false
-  assert.throws(() => validateLfxFlow(bad), /唯一/)
+  assert.throws(() => validateLfxFlow(bad), /至少一个结果节点/)
+  native.data.nodes.push(node('branch-result', true))
+  assert.doesNotThrow(() => validateLfxFlow(native))
 })
 
 test('发布快照冻结源码；修改草稿不会改变旧版本，重新冻结采用当前草稿', t => {
