@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { graphLayout, type CompositionGraph as Graph } from './graph-layout.ts'
 
 /** 仅呈现服务端返回的图；配置编辑和执行继续使用现有入口。 */
 export function CompositionCanvas({ graph, selected, onSelect, identity }: { graph?: Graph; selected?: string; onSelect(id: string): void; identity: string }) {
   const [view, setView] = useState({ scale: 1, x: 0, y: 0 })
   const [movedNodes, setMovedNodes] = useState<Record<string, { x: number; y: number }>>({})
+  const viewport = useRef<HTMLDivElement>(null)
   const plane = useRef<SVGGElement>(null)
   const suppressClick = useRef(false)
   const drag = useRef<{ pointer: number; clientX: number; clientY: number; start: DOMPoint; origin: { x: number; y: number }; matrix: DOMMatrix; node?: string } | null>(null)
@@ -14,10 +15,23 @@ export function CompositionCanvas({ graph, selected, onSelect, identity }: { gra
   const kinds: Record<string, string> = { composition: '子编排', batch: '批量检查', condition: '条件判断', call: '接口调用', aggregate: '结果汇总', scope: '范围核对' }
   const { width, height, positions } = graphLayout(graph ?? { nodes: [], edges: [] })
   for (const [id, point] of Object.entries(movedNodes)) if (positions.has(id)) positions.set(id, point)
-  const zoom = (amount: number) => setView(value => ({ ...value, scale: Math.max(.4, Math.min(2, Math.round((value.scale + amount) * 10) / 10)) }))
+  const zoom = useCallback((amount: number) => setView(value => ({ ...value, scale: Math.max(.4, Math.min(2, Math.round((value.scale + amount) * 10) / 10)) })), [])
+  const hasNodes = nodes.length > 0
+  useEffect(() => {
+    const element = viewport.current
+    if (!element) return
+    const wheel = (event: WheelEvent) => {
+      if (!event.ctrlKey || !event.deltaY) return
+      event.preventDefault()
+      zoom(event.deltaY < 0 ? .1 : -.1)
+    }
+    // 使用非被动监听，阻止 Ctrl＋滚轮同时触发浏览器整页缩放。
+    element.addEventListener('wheel', wheel, { passive: false })
+    return () => element.removeEventListener('wheel', wheel)
+  }, [hasNodes, zoom])
   return <section className="harness-flow-canvas" aria-label="编排画布">
     <header><span>控制流程 <small>{graph?.native ? 'LFX 原生流程' : '按执行步骤展示'}</small></span><div><button type="button" aria-label="缩小画布" disabled={view.scale <= .4} onClick={() => zoom(-.1)}>−</button><span aria-live="polite">{Math.round(view.scale * 100)}%</span><button type="button" aria-label="放大画布" disabled={view.scale >= 2} onClick={() => zoom(.1)}>＋</button><button type="button" onClick={() => setView({ scale: 1, x: 0, y: 0 })}>适应画布</button><button type="button" disabled={!Object.keys(movedNodes).length} onClick={() => { setMovedNodes({}); setView({ scale: 1, x: 0, y: 0 }) }}>重置布局</button></div></header>
-    {!nodes.length ? <p className="harness-flow-empty">此版本未提供图结构。可查看版本配置，当前画布不推断执行路径。</p> : <div className="harness-flow-viewport" onPointerDown={event => {
+    {!nodes.length ? <p className="harness-flow-empty">此版本未提供图结构。可查看版本配置，当前画布不推断执行路径。</p> : <div ref={viewport} className="harness-flow-viewport" onPointerDown={event => {
       if (event.button !== 0 || drag.current) return
       const node = (event.target as Element).closest<SVGGElement>('.harness-flow-node')
       // 节点用流程坐标，平移用 SVG 坐标，缩放及响应式尺寸均由浏览器矩阵换算。
@@ -60,6 +74,6 @@ export function CompositionCanvas({ graph, selected, onSelect, identity }: { gra
         </g>
       </svg>
     </div>}
-    <footer>拖动节点调整位置，拖动空白处平移；聚焦节点后可用方向键移动。布局仅用于当前查看，点击节点查看详情；箭头表示执行方向，虚线表示条件。</footer>
+    <footer>按住 Ctrl 并滚动鼠标滚轮缩放；拖动节点调整位置，拖动空白处平移；聚焦节点后可用方向键移动。布局仅用于当前查看，点击节点查看详情；箭头表示执行方向，虚线表示条件。</footer>
   </section>
 }

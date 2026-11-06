@@ -9,13 +9,15 @@ const compiled = (await build({ entryPoints: [new URL('../src/mcp/graph-canvas.t
   write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime'] })).outputFiles[0].text
 
 function canvas() {
-  const states = [], dependencies = [], selected = [], captured = []
-  let cursor, effects, changed, tree
+  const states = [], dependencies = [], cleanups = [], selected = [], captured = []
+  const surface = new EventTarget()
+  let cursor, effects, changed, tree, viewportRef
   const react = { ...require('react'),
     useState(initial) { const at = cursor++; if (!(at in states)) states[at] = initial
       return [states[at], value => { const next = typeof value === 'function' ? value(states[at]) : value; if (!Object.is(next, states[at])) { states[at] = next; changed = true } }] },
     useRef(initial) { const at = cursor++; return states[at] ??= { current: initial } },
-    useEffect(effect, deps) { const at = cursor++; if (!dependencies[at] || deps.some((value, index) => !Object.is(value, dependencies[at][index]))) { dependencies[at] = deps; effects.push(effect) } },
+    useCallback(callback) { const at = cursor++; return states[at] ??= callback },
+    useEffect(effect, deps) { const at = cursor++; if (!dependencies[at] || deps.some((value, index) => !Object.is(value, dependencies[at][index]))) { dependencies[at] = deps; effects.push(() => { cleanups[at]?.(); cleanups[at] = effect() }) } },
   }
   const module = { exports: {} }
   class Point {
@@ -30,8 +32,15 @@ function canvas() {
     return Array.isArray(value) ? value.flatMap(item => items(item)) : !value || typeof value !== 'object' ? [] : [value, ...items(value.props?.children ?? [])]
   }
   function render() {
-    do { cursor = 0; effects = []; changed = false; tree = module.exports.CompositionCanvas(props); effects.forEach(effect => effect()) } while (changed)
-    items().find(item => item.type === 'g' && item.ref).ref.current = { getScreenCTM: () => ({ inverse: () => ({ scale: .5 }) }), ownerSVGElement: { getScreenCTM: () => ({ inverse: () => ({ scale: 2 }) }) } }
+    do {
+      cursor = 0; effects = []; changed = false; tree = module.exports.CompositionCanvas(props)
+      const viewport = items().find(item => item.props?.className === 'harness-flow-viewport')
+      if (viewport) viewportRef = viewport.ref
+      if (viewportRef) viewportRef.current = viewport ? surface : null
+      const plane = items().find(item => item.type === 'g' && item.ref)
+      if (plane) plane.ref.current = { getScreenCTM: () => ({ inverse: () => ({ scale: .5 }) }), ownerSVGElement: { getScreenCTM: () => ({ inverse: () => ({ scale: 2 }) }) } }
+      effects.forEach(effect => effect())
+    } while (changed)
   }
   render()
   const viewport = () => items().find(item => item.props?.className === 'harness-flow-viewport')
@@ -41,7 +50,13 @@ function canvas() {
   const pointer = (handler, e) => { viewport().props[handler](e); render() }
   const start = node().props.transform.match(/-?\d+(?:\.\d+)?/g).map(Number)
   const position = (x = 0, y = 0) => `translate(${start[0] + x} ${start[1] + y})`
-  return { props, graph, render, items, node, viewport, event, pointer, selected, captured, position }
+  const wheel = (ctrlKey, deltaY) => {
+    const event = new Event('wheel', { cancelable: true })
+    Object.assign(event, { ctrlKey, deltaY })
+    surface.dispatchEvent(event); render()
+    return event.defaultPrevented
+  }
+  return { props, graph, render, items, node, viewport, event, pointer, selected, captured, position, wheel }
 }
 
 test('拖动节点按实际矩阵移动并更新连线，小幅点击仍选择，切换版本重置且不改写来源', () => {
@@ -73,4 +88,26 @@ test('平移与节点拖动分离，取消及丢失捕获后停止，方向键�
   ui.pointer('onPointerDown', ui.event(10, 10)); ui.pointer('onLostPointerCapture', ui.event(10, 10)); ui.pointer('onPointerMove', ui.event(100, 100)); assert.equal(ui.node().props.transform, ui.position(10, 30))
   ui.items().find(item => item.type === 'button' && item.props.children === '重置布局').props.onClick(); ui.render()
   assert.equal(ui.node().props.transform, ui.position()); assert.match(plane(), /^translate\(0 0\)/)
+})
+
+test('Ctrl＋滚轮复用缩放范围，普通滚轮放行，切换空图移除监听后可重新挂载', () => {
+  const ui = canvas()
+  const scale = () => Number(ui.items().find(item => item.type === 'g' && item.ref).props.transform.match(/scale\(([^)]+)\)/)[1])
+  assert.equal(ui.wheel(false, -120), false); assert.equal(scale(), 1)
+  assert.equal(ui.wheel(true, 0), false); assert.equal(scale(), 1)
+  assert.equal(ui.wheel(true, -120), true); assert.equal(scale(), 1.1)
+  assert.equal(ui.wheel(true, 120), true); assert.equal(scale(), 1)
+  for (let index = 0; index < 30; index++) assert.equal(ui.wheel(true, -1), true)
+  assert.equal(scale(), 2)
+  assert.equal(ui.items().find(item => item.props?.['aria-label'] === '放大画布').props.disabled, true)
+  for (let index = 0; index < 30; index++) assert.equal(ui.wheel(true, 1), true)
+  assert.equal(scale(), .4)
+  assert.equal(ui.items().find(item => item.props?.['aria-label'] === '缩小画布').props.disabled, true)
+  ui.items().find(item => item.type === 'button' && item.props.children === '适应画布').props.onClick(); ui.render()
+  assert.equal(scale(), 1)
+  ui.props.graph = { nodes: [], edges: [] }; ui.render()
+  assert.equal(ui.wheel(true, -120), false)
+  ui.props.graph = ui.graph; ui.render()
+  assert.equal(ui.wheel(true, -120), true); assert.equal(scale(), 1.1)
+  ui.props.identity = 'version-two'; ui.render(); assert.equal(scale(), 1)
 })

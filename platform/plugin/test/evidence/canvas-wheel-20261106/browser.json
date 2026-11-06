@@ -1,0 +1,230 @@
+{
+  "observedAt": "2026-11-06T06:54:10.132Z",
+  "mode": "actual native platform/API with isolated client fixture",
+  "fixture": "/tmp/hep-canvas-wheel/platform/plugin/lib/client.js",
+  "loadedClientRequests": 1,
+  "checks": {
+    "ctrlWheelUpDown": true,
+    "ordinaryWheelPreserved": true,
+    "range40To200": true,
+    "browserZoomUnchanged": true,
+    "panPreservedWhileZooming": true,
+    "nodeDragAndReset": true,
+    "nodeSelection": true,
+    "fullscreen": true
+  },
+  "wheelEvents": [
+    {
+      "ctrl": true,
+      "delta": -120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": 120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": false,
+      "delta": -120,
+      "canceled": false,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": -120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": -120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": -120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": -120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": -120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": -120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": -120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": -120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": -120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": -120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": -120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": -120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": 120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": 120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": 120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": 120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": 120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": 120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": 120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": 120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": 120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": 120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": 120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": 120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": 120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": 120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": 120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": 120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": 120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": 120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": 120,
+      "canceled": true,
+      "canvas": true
+    },
+    {
+      "ctrl": true,
+      "delta": 120,
+      "canceled": true,
+      "canvas": true
+    }
+  ],
+  "pageErrors": [],
+  "businessWrites": []
+}

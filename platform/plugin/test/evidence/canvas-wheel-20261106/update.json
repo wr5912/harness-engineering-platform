@@ -1,0 +1,32 @@
+{
+  "status": "busy",
+  "programRoot": "/home/cmp/work/harness-engineering-platform",
+  "dataRoot": "/home/cmp/harness-engineering-platform-data",
+  "workspaceId": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+  "pid": 3761078,
+  "activation": "none",
+  "busy": [
+    {
+      "kind": "session",
+      "id": "session-e1fb0e7a-eb30-4e3b-8eed-fd5af035077e",
+      "state": "running"
+    },
+    {
+      "kind": "assistant",
+      "id": "session-e1fb0e7a-eb30-4e3b-8eed-fd5af035077e",
+      "state": "pending"
+    },
+    {
+      "kind": "session",
+      "id": "0e3d04a7-85c9-4c70-97e2-5bc2cf7e589b",
+      "state": "running"
+    }
+  ],
+  "changed": [
+    "platform/plugin/lib/client.js",
+    "platform/plugin/lib/composition-source-index.json",
+    "platform/plugin/lib/index.js"
+  ],
+  "stage": "/home/cmp/work/harness-engineering-platform/.local/platform-updates/a877f25a-dee9-43b1-a6f8-5a1ff5353c80",
+  "receipt": "/home/cmp/work/harness-engineering-platform/.local/platform-updates/a877f25a-dee9-43b1-a6f8-5a1ff5353c80/receipt.json"
+}
