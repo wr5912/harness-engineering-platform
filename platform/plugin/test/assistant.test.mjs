@@ -13,8 +13,8 @@ import { createAssistant, redactAssistant } from '../src/assistant/index.ts'
 import { managementSkills } from '../src/assistant/business-assets.ts'
 import { assistantMcp } from '../src/assistant/mcp.ts'
 import { sha256 } from '../src/tasks/files.ts'
-import { assistantActions, assistantActionContract, projectAssistantTools } from '../src/assistant/tool-contracts.ts'
-import { DECISION_EXTRACTION_CONTRACT, decisionExtractionToolParameters } from '../src/evaluation/decision-dataset-contract.ts'
+import { assistantActions, assistantActionContract } from '../src/assistant/tool-contracts.ts'
+import { DECISION_EXTRACTION_CONTRACT } from '../src/evaluation/decision-dataset-contract.ts'
 import { businessCasesSchema } from '../src/agents/business-cases.ts'
 import { workspaceIdentity } from '../src/workspace.ts'
 import { initializeBusinessGateway } from '../src/business-control/configuration.ts'
@@ -51,7 +51,7 @@ function fixture(t, responder, root) {
   function addSession(id, cwd = root, seed = [], parentSession) {
     const row = { events: [...seed], input: {}, session: undefined }
     sessions.set(id, row)
-    row.session = ctx.sessions.create(id, { ...(seed.length ? { seed } : {}), ...(parentSession ? { inheritedEventCount: seed.length } : {}), meta: { cwd, ...(parentSession ? { parentSession, isSeeded: true } : {}) } })
+    row.session = ctx.sessions.create(id, { ...(seed.length ? { seed } : {}), ...(parentSession ? { inheritedEventCount: seed.length } : {}), meta: { cwd, ...(parentSession ? { parentSession, isSeeded: seed.length > 0 } : {}) } })
     return row.session
   }
   const controller = {
@@ -80,7 +80,6 @@ function fixture(t, responder, root) {
   }
   const create = () => { const assistant = createAssistant(root, platform, services); assistant.registerTools({ register: tool => tools.set(tool.name, tool) }); return assistant }
   let assistant = create()
-  ctx.on('system-prompt/assemble', async (_assembly, context, next) => assistant.assemblePrompt(await next(), context))
   t.after(async () => { await assistant.dispose(); await ctx.fiber.dispose() })
   const signal = new AbortController().signal
   const rpc = (action, input, requestSignal = signal) => assistant.handler(action, input, requestSignal)
@@ -99,7 +98,6 @@ function fixture(t, responder, root) {
   const assembly = id => ctx.systemPrompt.assemble({ agent: { session: sessions.get(id).session } })
   const assemble = async id => (await assembly(id)).sections.filter(item => ['harness-platform/assistant', 'harness-platform/assistant-output'].includes(item.name)).map(item => item.text).filter(Boolean).join('\n')
   return { root, ctx, sessions, services, tools, calls, peers, prompts, rpc, status, execute, operation, assemble, assembly, addSession,
-    beforeModelCall: id => assistant.beforeModelCall(id),
     async reload() { await assistant.dispose(); assistant = create() } }
 }
 
@@ -134,21 +132,21 @@ test('真实 Session 投影隔离上下文、冷恢复固定任务，用户 prom
   assert.notEqual(first, second)
   assert.equal(f.sessions.get(first).input.workspaceId, undefined)
   assert.equal(f.sessions.get(first).input.cwd, f.root)
-  assert.deepEqual(f.prompts[0].content, [{ type: 'text', text: task }])
+  assert.deepEqual(f.prompts[0].content[0], { type: 'text', text: task })
+  assert.match(f.prompts[0].content[1].text, /EXP-a-001/)
   await f.rpc('context', { session_id: first, context: { experiment_id: 'EXP-a-002' } })
   await f.reload()
   const status = await f.status(first)
   assert.equal(status.context.experiment_id, 'EXP-a-002')
   assert.equal(status.task_context.experiment_id, 'EXP-a-001')
   const a = await f.assemble(first), b = await f.assemble(second)
-  assert.ok(a.includes('EXP-a-001') && a.includes('EXP-a-002') && a.includes('{{secret}}'))
-  assert.ok(!a.includes('EXP-b-001') && !a.includes(task))
-  assert.ok(b.includes('EXP-b-001') && !b.includes('EXP-a-'))
+  assert.equal(a, '')
+  assert.equal(b, '')
   assert.equal(f.prompts.length, 1, '页面变化和冷恢复不得触发用户消息')
   f.addSession('ordinary')
   assert.equal(await f.assemble('ordinary'), '', '普通原生会话不自动注入平台策略')
   f.addSession('foreign', '/another-project')
-  assert.equal((await f.rpc('status', { session_id: 'foreign' })).ok, false)
+  assert.equal((await f.rpc('status', { session_id: 'foreign' })).ok, true)
 })
 
 test('旧引导名创建会话后写入规范上下文，配置、describe和模型装配使用工作区入口', async t => {
@@ -164,15 +162,14 @@ test('旧引导名创建会话后写入规范上下文，配置、describe和模
   assert.deepEqual((await f.status(id)).task_context, canonical)
   assert.deepEqual((await f.status(id)).context, canonical)
   assert.equal(context.skill, 'harness-guided-workflow', '新建不改写调用方输入')
-  assert.deepEqual(f.prompts[0].content, [{ type: 'text', text: '澄清已有智能体的修改目标' }])
+  assert.deepEqual(f.prompts[0].content[0], { type: 'text', text: '澄清已有智能体的修改目标' })
   await f.rpc('context', { session_id: id, context: { skill: 'harness-guided-workflow', page: 'instances' } })
   const toolContext = (await f.execute(id, 'agents', 'context')).value
   assert.deepEqual(toolContext.task_context, canonical)
   assert.deepEqual(toolContext.context, { skill: 'workspace-management', page: 'instances' })
   assert.equal((await f.execute(id, 'agents', 'describe', { action: 'list' })).value.action, 'list')
   assert.doesNotMatch(await f.assemble(id), /harness-guided-workflow/)
-  assert.match(await f.assemble(id), /"skill":"workspace-management"/)
-  await f.beforeModelCall(id)
+  assert.equal(await f.assemble(id), '')
   assert.doesNotMatch(JSON.stringify(f.sessions.get(id).events), /harness-guided-workflow/, '新事件只保存当前入口')
   await f.reload()
   assert.deepEqual((await f.status(id)).task_context, canonical)
@@ -201,7 +198,6 @@ test('旧引导会话从原生事件冷恢复并续接，当前投影规范化�
   assert.deepEqual((await restored.execute(id, 'agents', 'context')).value.task_context, canonical)
   assert.equal((await restored.execute(id, 'agents', 'describe', { action: 'list' })).value.action, 'list')
   assert.doesNotMatch(await restored.assemble(id), /harness-guided-workflow/)
-  await restored.beforeModelCall(id)
   assert.equal(restored.prompts.length, 0, '恢复和模型装配不得伪造用户消息')
   assert.equal((await restored.rpc('session', { session_id: id, task: '保留固定目标并继续澄清' })).ok, true)
   assert.deepEqual((await restored.status(id)).task_context, canonical)
@@ -231,77 +227,43 @@ test('向已有专用会话追加无context指导保留固定skill与目标，�
   assert.deepEqual((await f.status(id)).task_context, {})
 })
 
-test('各类平台任务只装载一份共用表达正文，不写入用户消息或会话事实', async t => {
-  const principles = expressionFixture
-  assert.ok(principles, '共用表达来源必须有正文')
+test('各类任务沿用原生提示词与工具声明，不重复注入管理原则和 Skill 正文', async t => {
   const f = fixture(t)
-  const suffixOrder = f.services.systemPrompt.getSectionOrder('DEPLOYMENT_PERSONA_SUFFIX')
-  const before = f.services.systemPrompt.section({ name: 'test/before-persona-suffix', order: suffixOrder - 0.5, text: '部署角色收尾之前' })
-  const after = f.services.systemPrompt.section({ name: 'test/after-persona-suffix', order: suffixOrder + 0.5, text: '部署角色收尾之后' })
-  t.after(() => { before(); after() })
-  const contexts = [
-    { page: 'home' },
-    { page: 'agents', skill: 'agent-maintenance', workflow: 'features', agent_id: 'basic', experiment_id: 'EXP-basic-001' },
-    { page: 'agents', skill: 'agent-maintenance', workflow: 'research', experiment_id: 'EXP-basic-001' },
-    { page: 'agents', skill: 'compute-variant-research', workflow: 'compute-variants', experiment_id: 'EXP-basic-001' },
-    { page: 'mcp', skill: 'mcp-composition' },
-    { page: 'evaluation', skill: 'decision-sample-extraction', run_id: 'run-fixed' },
-    { page: 'instances' },
-  ]
-  for (const context of contexts) {
-    const task = `请处理 ${context.workflow ?? context.page}`
-    const id = (await f.rpc('session', { task, context })).value.session_id
-    const assembled = await f.assemble(id)
-    assert.equal(assembled.split(principles).length - 1, 1, `${context.workflow ?? context.page} 应装载唯一正文`)
-    const { sections } = await f.assembly(id)
-    const names = sections.map(item => item.name)
-    const outputIndex = names.indexOf('harness-platform/assistant-output')
-    assert.equal(sections[outputIndex]?.text, principles)
-    assert.ok(names.indexOf('harness-platform/assistant') < names.indexOf('test/before-persona-suffix'))
-    assert.ok(names.indexOf('test/before-persona-suffix') < outputIndex && outputIndex < names.indexOf('test/after-persona-suffix'), '表达正文使用 Runtime 官方部署角色收尾位置')
-    assert.equal(sections.map(item => item.text).join('\n').split(principles).length - 1, 1, '整组系统提示不得重复装载原则')
-    assert.deepEqual(f.prompts.at(-1).content, [{ type: 'text', text: task }])
-    assert.ok(!JSON.stringify(f.sessions.get(id).events).includes(JSON.stringify(principles).slice(1, -1)), '运行记录不复制共用可编辑原则')
+  const unregister = f.ctx.systemPrompt.section({ name: 'test/native', order: 640, text: '原生内容' })
+  t.after(unregister)
+  f.services.skills.get = async () => assert.fail('原生装配不通过平台重复读取 Skill')
+  for (const context of [{ page: 'home' }, { skill: 'agent-maintenance', workflow: 'features' }, { skill: 'compute-variant-research', planning_intent: 'plan_only' }, { skill: 'decision-sample-extraction', run_id: 'run-fixed' }]) {
+    const id = (await f.rpc('session', { task: '请处理当前任务', context })).value.session_id
+    assert.equal(await f.assemble(id), '')
+    assert.equal((await f.assembly(id)).sections.find(item => item.name === 'test/native').text, '原生内容')
+    assert.doesNotMatch(JSON.stringify(f.sessions.get(id).events), new RegExp(expressionFixture))
   }
-  assert.equal(f.calls.length, 0, '装载表达原则不发起业务操作')
+  assert.equal(f.calls.length, 0)
 })
 
-test('原生 Session 事件冷恢复后仍装载表达正文，普通会话与其他工作区保持隔离', async t => {
-  const principles = expressionFixture
+test('原生 Session 事件冷恢复保留上下文，不新增提示词段落或用户消息', async t => {
   const original = fixture(t)
-  const id = (await original.rpc('session', { task: '抽取决策样本', context: { skill: 'decision-sample-extraction', run_id: 'run-fixed' } })).value.session_id
+  const id = (await original.rpc('session', { task: '抽取', context: { skill: 'decision-sample-extraction', run_id: 'run-fixed' } })).value.session_id
   const events = [...original.sessions.get(id).events]
   const restored = fixture(t, undefined, original.root)
   restored.addSession(id, original.root, events)
-  assert.equal((await restored.assemble(id)).split(principles).length - 1, 1)
   assert.equal((await restored.status(id)).task_context.run_id, 'run-fixed')
   await restored.reload()
-  assert.equal((await restored.assemble(id)).split(principles).length - 1, 1, '重新注册不能重复注入')
-  restored.addSession('ordinary')
-  restored.addSession('foreign', '/another-project', events)
-  assert.equal(await restored.assemble('ordinary'), '')
-  assert.equal(await restored.assemble('foreign'), '')
-  assert.equal(restored.prompts.length, 0, '恢复和系统提示装载不得伪造用户消息')
+  assert.equal(await restored.assemble(id), '')
+  assert.equal(restored.prompts.length, 0)
+  assert.deepEqual(restored.sessions.get(id).events, events)
 })
 
-test('表达 Skill 与管理规则从当前数据读取，编辑后及冷恢复立即生效，程序副本不替代来源', async t => {
+test('管理资产诊断只报告缺失，不阻断原生装配、续接或工具执行', async t => {
   const f = fixture(t)
-  const id = (await f.rpc('session', { context: { page: 'home' } })).value.session_id
-  const path = join(f.root, '.agents/skills/user-facing-output/SKILL.md')
-  writeFileSync(path, '---\nname: user-facing-output\ndescription: 表达\n---\n当前数据中的新表达原则')
-  writeFileSync(join(f.root, 'AGENTS.md'), '当前数据中的新管理原则')
-  assert.match(await f.assemble(id), /当前数据中的新表达原则/)
-  assert.match(await f.assemble(id), /当前数据中的新管理原则/)
-  await f.reload()
-  assert.match(await f.assemble(id), /当前数据中的新表达原则/)
-  const before = f.sessions.get(id).events.length
-  rmSync(path)
+  const id = (await f.rpc('session', {})).value.session_id
+  rmSync(join(f.root, '.agents/skills/user-facing-output/SKILL.md'))
+  rmSync(join(f.root, 'AGENTS.md'))
   assert.equal((await f.rpc('configuration', {})).value.core_ready, false)
-  assert.equal((await f.rpc('session', { task: '新任务' })).ok, false)
-  await assert.rejects(() => f.beforeModelCall(id), /未配置平台管理助手/)
-  assert.equal((await f.rpc('status', { session_id: id })).ok, true)
-  assert.equal(f.sessions.get(id).events.length, before)
-  assert.equal(f.prompts.length, 0)
+  assert.equal((await f.rpc('session', { task: '新任务' })).ok, true)
+  assert.equal((await f.rpc('session', { session_id: id, task: '继续' })).ok, true)
+  assert.equal(await f.assemble(id), '')
+  assert.equal((await f.execute(id, 'instances', 'list')).state, 'completed')
 })
 
 test('配置检查区分核心和专项缺失，并拒绝原生注册表同名的程序来源', async t => {
@@ -316,8 +278,8 @@ test('配置检查区分核心和专项缺失，并拒绝原生注册表同名�
   const original = f.services.skills.get
   f.services.skills.get = async (name, options) => name === 'user-facing-output' ? { name, path: '/old-program/platform/skills/user-facing-output/SKILL.md', content: '旧规则' } : original(name, options)
   assert.equal((await f.rpc('configuration', {})).value.core_ready, false)
-  assert.equal((await f.rpc('session', { task: '新任务' })).ok, false)
-  assert.equal(f.sessions.size, 0)
+  assert.equal((await f.rpc('session', { task: '新任务' })).ok, true)
+  assert.equal(f.sessions.size, 1)
 })
 
 test('原生权限后的工具直接返回真实回执，不生成额外待确认且旧确认不重复写入', async t => {
@@ -568,7 +530,7 @@ test('原生记录冷恢复后可确认一次，但不会通过伪用户消息�
   assert.equal(f.prompts.length, 0)
 })
 
-test('fork 可继承上下文，不能继承父会话提案或确认权', async t => {
+test('fork 不注入平台上下文，也不继承父会话提案或确认权', async t => {
   const f = fixture(t)
   const parent = (await f.rpc('session', { context: { experiment_id: 'EXP-parent' } })).value.session_id
   appendPluginRecord(f.sessions.get(parent).session, 'plugin:harness-platform/assistant', {
@@ -576,7 +538,8 @@ test('fork 可继承上下文，不能继承父会话提案或确认权', async 
   })
   const second = (await f.rpc('session', {})).value.session_id
   f.addSession('forked', f.root, f.sessions.get(parent).events, parent)
-  assert.ok((await f.assemble('forked')).includes('EXP-parent'))
+  assert.equal(await f.assemble('forked'), '')
+  assert.equal((await f.status(parent)).context.experiment_id, 'EXP-parent')
   assert.deepEqual((await f.status('forked')).proposals, [])
   for (const session_id of ['forked', second]) assert.equal((await f.rpc('confirm', { session_id, proposal_id: 'legacy-parent-proposal' })).ok, false)
   assert.equal(f.calls.length, 0)
@@ -819,8 +782,9 @@ test('决策抽取预览使用当前真实请求模型和固定 Run，AI 不能�
   assert.equal(f.tools.get('platform_agents').parameters.properties.action.enum.includes('datasets/update'), false)
   await assert.rejects(f.execute(id, 'agents', 'datasets/update', { label_status: 'reviewed' }), /未知的领域操作/)
   await f.rpc('context', { session_id: id, context: { run_id: 'run-22222222-2222-4222-8222-222222222222' } })
-  await assert.rejects(f.execute(id, 'agents', 'datasets/preview', { ...input, run_id: 'run-22222222-2222-4222-8222-222222222222' }), /固定任务上下文/)
-  assert.equal(f.calls.filter(item => item.endpoint === 'agents/datasets/preview').length, 1)
+  await f.execute(id, 'agents', 'datasets/preview', { ...input, run_id: 'run-22222222-2222-4222-8222-222222222222' })
+  assert.equal(f.calls.filter(item => item.endpoint === 'agents/datasets/preview').length, 2)
+  assert.equal(f.calls.at(-1).input.run_id, 'run-22222222-2222-4222-8222-222222222222')
 })
 
 test('AI 决策样本预览后仅携原 owner 保存一次，旧提案取消不写数据集', async t => {
@@ -868,30 +832,31 @@ test('独立工作区固化助手身份、迁移旧 Session 归属且不改写�
   assert.equal(f.sessions.get('legacy').session.header.cwd, '/old-platform')
   assert.deepEqual(f.sessions.get('legacy').events, before)
   const prompt = await f.assemble('legacy')
-  assert.ok(prompt.includes('workspace-fixture') && prompt.includes(root))
-  assert.ok(prompt.includes('business-agent') && prompt.includes('业务工作由数据工作区原则和技能指导'))
+  assert.equal(prompt, '')
   const created = await f.rpc('session', { task: '读取业务数据', context: { agent_id: 'business-agent' } })
   assert.equal(f.sessions.get(created.value.session_id).input.cwd, root)
   f.addSession('other', '/old-platform/unrelated')
-  assert.equal((await f.rpc('status', { session_id: 'other' })).ok, false)
+  assert.equal((await f.rpc('status', { session_id: 'other' })).ok, true)
   assert.equal(await f.assemble('other'), '')
 })
 
 
-test('已绑定的管理 Session 不随路径复用而跨工作区身份接受工具调用', async t => {
-  const root = mkdtempSync(join(tmpdir(), 'assistant bound workspace '))
-  t.after(() => rmSync(root, { recursive: true, force: true }))
-  const descriptor = join(root, 'workspace.json')
-  writeFileSync(descriptor, JSON.stringify({ schemaVersion: 1, id: 'workspace-first', legacyRoots: [] }))
-  const f = fixture(t, undefined, root)
-  const created = await f.rpc('session', { task: '读取任务' })
-  const id = created.value.session_id
-  assert.equal((await f.status(id)).workspace_id, 'workspace-first')
-  writeFileSync(descriptor, JSON.stringify({ schemaVersion: 1, id: 'workspace-second', legacyRoots: [] }))
-  assert.equal((await f.rpc('status', { session_id: id })).ok, false)
-  assert.equal(await f.assemble(id), '')
-  await assert.rejects(() => f.execute(id, 'agents', 'list'), /当前 Session 不是平台管理会话/)
-  assert.equal(f.calls.length, 0)
+test('全新原生子会话、fork 和普通会话不需要平台激活记录即可使用业务工具', async t => {
+  const f = fixture(t)
+  const parent = (await f.rpc('session', { task: '父任务' })).value.session_id
+  for (const [id, seed] of [['fresh-child', []], ['fork', f.sessions.get(parent).events]]) {
+    const child = f.addSession(id, f.root, seed, parent)
+    assert.equal(child.header.parentSession, parent)
+    if (!seed.length) assert.equal(child.inheritedEventCount, 0)
+    const history = JSON.stringify(f.sessions.get(id).events)
+    assert.equal((await f.execute(id, 'instances', 'list')).state, 'completed')
+    assert.equal((await f.execute(id, 'agents', 'describe', { action: 'cases/reorder' })).value.action, 'cases/reorder')
+    await f.reload()
+    assert.equal((await f.execute(id, 'mcp', 'list')).state, 'completed')
+    assert.equal(JSON.stringify(f.sessions.get(id).events), history)
+  }
+  f.addSession('ordinary')
+  assert.equal((await f.execute('ordinary', 'mcp', 'list')).state, 'completed')
 })
 
 test('普通派生、用例更新与业务样例创建可达，写操作经原生许可后只执行一次', async t => {
@@ -918,24 +883,16 @@ test('普通派生、用例更新与业务样例创建可达，写操作经原�
   }
 })
 
-test('整理特性锁定任务版本，页面导航不改变预览目标', async t => {
-  const f = fixture(t, endpoint => endpoint === 'agents/features/preview' ? { ok: true, value: { preview_id: 'features-fixed', experiment_id: 'EXP-basic-001', features: [], requires_confirmation: true } } : endpoint === 'agents/detail' ? { ok: true, value: { features: [] } } : undefined)
-  const id = (await f.rpc('session', { task: '整理当前版本特性', context: { skill: 'agent-maintenance', workflow: 'features', agent_id: 'basic', experiment_id: 'EXP-basic-001' } })).value.session_id
+test('任务目标只补齐缺省参数，显式目标和其他领域动作不被平台限制', async t => {
+  const f = fixture(t)
+  const id = (await f.rpc('session', { task: '整理特性', context: { skill: 'agent-maintenance', workflow: 'features', agent_id: 'basic', experiment_id: 'EXP-basic-001' } })).value.session_id
   await f.rpc('context', { session_id: id, context: { experiment_id: 'EXP-basic-002' } })
-  await assert.rejects(() => f.execute(id, 'agents', 'features/preview', { experiment_id: 'EXP-basic-002', features: [] }), /固定任务上下文/)
-  assert.equal((await f.execute(id, 'agents', 'features/read-source', { experiment_id: 'EXP-basic-001', ref: 'evaluation/observations.md' })).state, 'completed')
   await f.execute(id, 'agents', 'features/read-source', {})
-  assert.equal(f.calls.at(-1).input.experiment_id, 'EXP-basic-001', '缺省目标也绑定原任务，不能漂移到最新编号')
-  await assert.rejects(() => f.execute(id, 'agents', 'edit/preview', { experiment_id: 'EXP-basic-001', edits: [] }), /仅允许读取业务来源/)
-  await assert.rejects(() => f.execute(id, 'instances', 'list'), /仅允许读取业务来源/)
-  const settled = await f.execute(id, 'agents', 'features/preview', { experiment_id: 'EXP-basic-001', features: [] })
-  assert.deepEqual((await f.status(id)).proposals, [])
-  assert.equal(f.calls.filter(call => call.endpoint === 'agents/features/apply').length, 1)
-  assert.equal(settled.state, 'completed')
-  assert.equal(settled.preview, undefined)
-  assert.equal(settled.action, 'features/apply')
-  assert.deepEqual(f.calls.find(call => call.endpoint === 'agents/detail').input, { agent_id: 'basic', experiment_id: 'EXP-basic-001' }, 'detail 必须使用固定 Agent 与版本，不随页面改变')
-  assert.ok(settled.result.ok)
+  assert.equal(f.calls.at(-1).input.experiment_id, 'EXP-basic-001')
+  await f.execute(id, 'agents', 'features/read-source', { experiment_id: 'EXP-basic-002' })
+  assert.equal(f.calls.at(-1).input.experiment_id, 'EXP-basic-002')
+  assert.equal((await f.execute(id, 'instances', 'list')).state, 'completed')
+  assert.equal((await f.execute(id, 'agents', 'edit/preview', { experiment_id: 'EXP-basic-002', edits: [] })).state, 'completed')
 })
 
 test('融合继续评测保留已预留的目标与Case，不隐式重新预览或替换Run身份', async t => {
@@ -1083,14 +1040,14 @@ test('算力变体预览失败或确认时配置已变，助手不宣称创建�
   assert.equal(receipt.state, 'failed'); assert.equal(receipt.result.error.code, 'conflict')
 })
 
-test('助手不伪造变体人员复核，决策抽取会话也不能借新动作扩权', async t => {
+test('变体业务复核约束保留，决策抽取上下文不限制其他业务工具', async t => {
   const f = fixture(t)
   const id = (await f.rpc('session', { task: '讨论变体' })).value.session_id
   await assert.rejects(() => f.execute(id, 'agents', 'compute-variants/confirm', { human_confirmed: true }), /未知的领域操作/)
   await assert.rejects(() => f.execute(id, 'agents', 'compute-variants/create', { human_confirmed: true }), /人员复核/)
   const extraction = (await f.rpc('session', { task: '抽取决策', context: { skill: 'decision-sample-extraction', run_id: 'run-fixed' } })).value.session_id
-  for (const action of ['context', 'preview', 'compare', 'create', 'rename']) await assert.rejects(() => f.execute(extraction, 'agents', `compute-variants/${action}`, { run_id: 'run-fixed' }), /决策样本任务仅允许/)
-  assert.equal(f.calls.length, 0)
+  for (const action of ['context', 'preview', 'compare', 'create', 'rename']) assert.equal((await f.execute(extraction, 'agents', 'describe', { action: `compute-variants/${action}` })).ok, true)
+  assert.equal((await f.execute(extraction, 'mcp', 'list')).state, 'completed')
 })
 
 test('MCP 草稿复用真实结构校验，无效包装在提案前拒绝', async t => {
@@ -1186,31 +1143,18 @@ test('用户可仅拒绝当前旧待确认操作，另一个操作可确认一�
   assert.equal((await f.rpc('reject', { session_id: id, proposal_id: 'second' })).ok, false)
 })
 
-test('专项研究文档按任务主题放行，拒绝借资料读取扩展动作范围', async t => {
+test('Skill 和仅策划上下文不增加原生工具或研究资料白名单', async t => {
   const f = fixture(t)
-  const extraction = (await f.rpc('session', { task: '抽取', context: { skill: 'decision-sample-extraction', run_id: 'run-fixed' } })).value.session_id
-  assert.equal((await f.execute(extraction, 'agents', 'research/read-reference', { topic: 'decision-samples' })).state, 'completed')
-  await assert.rejects(() => f.execute(extraction, 'agents', 'research/read-reference', { topic: 'compute-variants' }), /主题不属于/)
-  await assert.rejects(() => f.execute(extraction, 'agents', 'research/validate', { experiment_id: 'EXP-other-001' }), /仅允许/)
-  const compute = (await f.rpc('session', { task: '算力', context: { skill: 'compute-variant-research' } })).value.session_id
-  assert.equal((await f.execute(compute, 'agents', 'research/read-reference', { topic: 'evaluation-and-evidence' })).state, 'completed')
-  await assert.rejects(() => f.execute(compute, 'agents', 'research/read-reference', { topic: 'decision-samples' }), /主题不属于/)
-  const plan = (await f.rpc('session', { task: '仅策划', context: { skill: 'compute-variant-research', planning_intent: 'plan_only' } })).value.session_id
-  for (const action of ['compute-variants/create', 'compute-variants/compare', 'edit/apply', 'eval/start', 'eval/cancel']) {
-    await assert.rejects(() => f.execute(plan, 'agents', action, {}), /仅策划请求不执行/)
+  for (const context of [{ skill: 'decision-sample-extraction', run_id: 'run-fixed' }, { skill: 'compute-variant-research', planning_intent: 'plan_only' }]) {
+    const id = (await f.rpc('session', { task: '仅讨论方案', context })).value.session_id
+    for (const topic of ['decision-samples', 'compute-variants', 'evaluation-and-evidence']) {
+      assert.equal((await f.execute(id, 'agents', 'research/read-reference', { topic })).state, 'completed')
+    }
+    for (const domain of ['agents', 'instances', 'mcp']) {
+      assert.equal((await f.execute(id, domain, 'list')).state, 'completed')
+      assert.equal((await f.execute(id, domain, 'describe', { action: 'list' })).value.action, 'list')
+    }
   }
-  await assert.rejects(() => f.execute(plan, 'agents', 'datasets/export', {}), /不允许此操作/)
-  const implement = (await f.rpc('session', { task: '生成并训练', context: { skill: 'compute-variant-research', generation_intent: 'implement' } })).value.session_id
-  assert.equal((await f.execute(implement, 'agents', 'datasets/list', {})).state, 'completed')
-  assert.equal(f.calls.some(call => call.endpoint === 'agents/datasets/list'), true)
-  for (const domain of ['instances', 'mcp']) {
-    assert.equal((await f.execute(implement, domain, 'list', {})).state, 'completed', '执行任务能够核对真实实例和工具，不受仅策划的范围限制')
-    await assert.rejects(() => f.execute(plan, domain, 'list', {}), /不允许此操作/)
-  }
-  assert.equal(assistantActionContract('agents', 'compute-variants/prepare').input_schema.properties.training_files.items.properties.sha256.type, 'string')
-  const general = (await f.rpc('session', { task: '检查' })).value.session_id
-  assert.equal((await f.execute(general, 'agents', 'research/validate', { experiment_id: 'EXP-selected-001' })).state, 'completed')
-  assert.equal((await f.status(general)).proposals.length, 0)
 })
 
 test('研究结论确认展示结构化变更，并保留双摘要直到实际保存', async t => {
@@ -1227,96 +1171,44 @@ test('研究结论确认展示结构化变更，并保留双摘要直到实际�
   assert.deepEqual(f.calls.at(-1).input, { ...input, confirmed: true })
 })
 
-test('真实原生 assemble 先运行同步 section 再进入异步 waterfall，首次管理请求仍得到完整业务正文', async t => {
+test('真实原生 assemble 保留同步 section，不触发平台资产预检或异步提示词钩子', async t => {
   const f = fixture(t)
-  const id = (await f.rpc('session', { task: '第一次管理任务' })).value.session_id
-  const order = []
-  const unregister = f.services.systemPrompt.section({
-    name: 'test/native-synchronous-provider', order: 640,
-    text: () => { order.push('section'); return '原生同步内容' },
-  })
+  const id = (await f.rpc('session', { task: '第一次任务' })).value.session_id
+  const unregister = f.ctx.systemPrompt.section({ name: 'test/native', order: 640, text: () => '原生同步内容' })
   t.after(unregister)
-  const get = f.services.skills.get
-  f.services.skills.get = async (...args) => { order.push('skill'); await setImmediate(); return get(...args) }
+  f.services.skills.get = async () => assert.fail('不应触发平台预检')
   const assembled = await f.assembly(id)
-  assert.equal(order[0], 'section', '测试必须走原生真实装配顺序，不提前调用业务加载函数')
-  assert.ok(order.includes('skill'))
-  assert.match(assembled.sections.find(item => item.name === 'harness-platform/assistant').text,
-    /业务工作由数据工作区原则和技能指导/)
-  assert.equal(assembled.sections.find(item => item.name === 'harness-platform/assistant-output').text, expressionFixture)
-  assert.equal(assembled.sections.find(item => item.name === 'test/native-synchronous-provider').text, '原生同步内容')
-  rmSync(join(f.root, '.agents/skills/user-facing-output/SKILL.md'))
-  await assert.rejects(() => f.assembly(id), /未配置平台管理助手/)
+  assert.equal(assembled.sections.find(item => item.name === 'test/native').text, '原生同步内容')
+  assert.equal(assembled.sections.some(item => item.name.startsWith('harness-platform/assistant')), false)
 })
 
-test('所有管理业务可以逐动作发现参数；原生下一轮装配使用所选合同且可切换和恢复', async t => {
+test('动作合同可按需查询，describe 不改变原生工具 Schema 或解锁动作', async t => {
   const f = fixture(t)
   const { createRequire } = await import('node:module')
   const { pathToFileURL } = await import('node:url')
   const require = createRequire(import.meta.url)
   const sdk = createRequire(require.resolve('@deepseek-ai/dsh-api-session-controller'))
-  const { ToolRuntime, assertSupportedJsonSchema, validateJsonSchemaValue } = await import(pathToFileURL(sdk.resolve('@deepseek-ai/dsh-tools')).href)
+  const { ToolRuntime, assertSupportedJsonSchema } = await import(pathToFileURL(sdk.resolve('@deepseek-ai/dsh-tools')).href)
   new ToolRuntime(f.ctx, { mode: 'native' })
   for (const tool of f.tools.values()) f.ctx.tools.register(tool)
-  const id = (await f.rpc('session', { task: '构建、评测和交付智能体' })).value.session_id
-  const initial = (await f.assembly(id)).tools.filter(tool => tool.name.startsWith('platform_'))
-  for (const tool of initial) {
-    assert.deepEqual(tool.parameters.properties.action.enum, ['context', 'describe'], '未读取操作合同前不让模型盲猜参数')
-    assert.equal(validateJsonSchemaValue(tool.parameters, { action: 'describe', input: { action: assistantActions[tool.name.slice(9)][0] } }).length, 0)
+  const id = (await f.rpc('session', { context: { skill: 'compute-variant-research', planning_intent: 'plan_only' } })).value.session_id
+  const schema = async () => (await f.assembly(id)).tools.filter(tool => tool.name.startsWith('platform_'))
+  const original = await schema()
+  for (const [domain, actions] of Object.entries(assistantActions)) {
+    assert.deepEqual(original.find(tool => tool.name === `platform_${domain}`).parameters.properties.action.enum, ['context', 'describe', ...actions])
+    for (const action of actions) assert.equal((await f.execute(id, domain, 'describe', { action })).value.action, action)
   }
-  for (const [domain, names] of Object.entries(assistantActions)) {
-    for (const action of names) {
-      assert.equal(assistantActionContract(domain, action).action, action)
-      assert.doesNotThrow(() => assertSupportedJsonSchema(projectAssistantTools([{ name: `platform_${domain}` }], { tool_contracts: { [domain]: action } })[0].parameters))
-    }
-  }
-  for (const action of ['decision/preview', 'decision/update']) {
-    const described = assistantActionContract('agents', action)
-    assert.deepEqual(described.input_schema.properties.expected_sha256.type, ['string', 'null'])
-    const native = projectAssistantTools([{ name: 'platform_agents' }], { tool_contracts: { agents: action } })[0].parameters
-    assert.equal(validateJsonSchemaValue(native, { action, input: { experiment_id: 'EXP-alpha-001', content: '首次研究决策', expected_sha256: null } }).length, 0)
-  }
-  assert.equal(assistantActionContract('agents', 'runs/delete').input_schema.properties.run_ids.type, 'array')
-  assert.equal(assistantActionContract('agents', 'cases/delete').input_schema.properties.expected_sha256.type, 'string')
-  const graph = assistantActionContract('mcp', 'compositionGraph')
-  assert.ok(graph.input_schema.properties.version, '当前草稿或发布选择必须能通过合同传入')
-  assert.ok(graph.input_schema.properties.versionId, '历史发布版本保留固定版本身份')
-  assert.match(graph.instructions, /version=draft\/published/)
-  assert.match(graph.instructions, /versionId 不是 draft\/published/)
-  const source = projectAssistantTools([{ name: 'platform_mcp' }], { tool_contracts: { mcp: 'compositionSource' } })[0].parameters
-  const fixedSource = { action: 'compositionSource', input: { selection: { id: 'inspection-routine', version: 'published', versionId: 'fixed-version' } } }
-  assert.equal(validateJsonSchemaValue(source, fixedSource).length, 0)
-  assert.ok(validateJsonSchemaValue(source, { ...fixedSource, input: { selection: { ...fixedSource.input.selection, version: 'version' } } }).length > 0)
-  assert.match(assistantActionContract('mcp', 'compositionSource').instructions, /version=published/)
-  const create = assistantActionContract('agents', 'create')
-  assert.deepEqual([create.input_schema.properties.version_number.type, create.input_schema.properties.version_number.minimum, create.input_schema.properties.version_number.maximum], ['integer', 1, 999])
-  assert.match(create.instructions, /默认同代 f/)
-  assert.match(create.instructions, /最新代 m\/f 均可编辑/)
-  assert.equal(create.input_schema.properties.create_next_generation.type, 'boolean')
-  assert.equal(create.input_schema.properties.feature_dispositions.type, 'array')
-  const nativeCreate = projectAssistantTools([{ name: 'platform_agents' }], { tool_contracts: { agents: 'create' } })[0].parameters
-  assert.equal(validateJsonSchemaValue(nativeCreate, { action: 'create', input: { version_number: 27 } }).length, 0)
-  assert.ok(validateJsonSchemaValue(nativeCreate, { action: 'create', input: { version_number: '027' } }).length > 0)
-  for (const action of ['edit/preview', 'edit/apply']) {
-    const nativeEdit = projectAssistantTools([{ name: 'platform_agents' }], { tool_contracts: { agents: action } })[0].parameters
-    const input = { experiment_id: 'EXP-alpha-001', edits: [{ path: 'candidate/dsh/managed/adapter.ts', move_to: 'candidate/dsh/managed/compute-workflow/models/adapter.ts', content: 'export {}', expected_sha256: 'source-sha' }] }
-    assert.equal(validateJsonSchemaValue(nativeEdit, { action, input }).length, 0)
-    assert.equal(validateJsonSchemaValue(nativeEdit, { action, input: { ...input, edits: [{ path: input.edits[0].path, content: null, expected_sha256: 'source-sha' }] } }).length, 0)
-    assert.ok(validateJsonSchemaValue(nativeEdit, { action, input: { ...input, edits: [{ ...input.edits[0], move_to: 42 }] } }).length > 0)
-  }
-  const caseEdit = projectAssistantTools([{ name: 'platform_agents' }], { tool_contracts: { agents: 'cases/update' } })[0].parameters
-  assert.ok(validateJsonSchemaValue(caseEdit, { action: 'cases/update', input: { expected_sha256: null } }).length > 0)
-  assert.equal(f.tools.has('platform_task'), false)
-  assert.equal(f.calls.length, 0, 'describe 不伪装公共业务 RPC，也不执行业务')
-  await f.execute(id, 'agents', 'describe', { action: 'edit/apply' })
+  for (const tool of original) assert.doesNotThrow(() => assertSupportedJsonSchema(tool.parameters))
+  assert.deepEqual(await schema(), original)
   await f.reload()
-  assert.deepEqual((await f.assembly(id)).tools.find(tool => tool.name === 'platform_agents').parameters.properties.action.enum, ['context', 'describe', 'edit/apply'])
-  await f.execute(id, 'agents', 'describe', { action: 'eval/status' })
-  assert.deepEqual((await f.assembly(id)).tools.find(tool => tool.name === 'platform_agents').parameters.properties.action.enum, ['context', 'describe', 'eval/status'])
-  const scoped = (await f.rpc('session', { task: '整理特性', context: { skill: 'agent-maintenance', workflow: 'features', agent_id: 'basic', experiment_id: 'EXP-basic-001' } })).value.session_id
-  await assert.rejects(() => f.execute(scoped, 'agents', 'describe', { action: 'edit/apply' }), /不允许/)
-  const feature = (await f.assembly(scoped)).tools.find(tool => tool.name === 'platform_agents')
-  assert.equal(feature.parameters.properties.action.enum.includes('edit/apply'), false)
+  assert.deepEqual(await schema(), original)
+  assert.equal(f.calls.length, 0)
+  assert.equal(assistantActionContract('agents', 'cases/reorder').input_schema.properties.expected_sha256.type, 'string')
+  assert.equal(assistantActionContract('agents', 'cases/reorder').input_schema.properties.case_ids.items.type, 'string')
+  assert.deepEqual(assistantActionContract('agents', 'decision/update').input_schema.properties.expected_sha256.type, ['string', 'null'])
+  assert.equal(assistantActionContract('agents', 'runs/delete').input_schema.properties.run_ids.type, 'array')
+  assert.ok(assistantActionContract('mcp', 'compositionGraph').input_schema.properties.versionId)
+  assert.equal(f.tools.has('platform_task'), false)
 })
 
 test('固定 Run 抽样自动保存并回读，省略 Run 由服务器绑定且不会生成确认提案', async t => {
@@ -1335,13 +1227,14 @@ test('固定 Run 抽样自动保存并回读，省略 Run 由服务器绑定且�
   assert.equal(saved.state, 'completed')
   assert.equal(saved.action, 'datasets/apply')
   assert.equal(saved.result.value.dataset.records[0].targets.sufficient.status, 'suggested')
-  assert.equal(f.calls[0].input.run_id, run_id)
+  assert.equal(f.calls.find(call => call.endpoint === 'agents/datasets/preview').input.run_id, run_id)
   assert.equal(f.calls.find(call => call.endpoint === 'agents/datasets/apply').input.assistant_session_id, id)
   assert.deepEqual((await f.status(id)).proposals, [])
   assert.equal((await f.status(id)).automatic_save.expected, undefined, '恢复检查仅保存目标和摘要，不复制另一份样本正文')
   await f.execute(id, 'agents', 'datasets/preview', { samples: [] })
   assert.equal(f.calls.filter(call => call.endpoint === 'agents/datasets/apply').length, 1)
-  await assert.rejects(() => f.execute(id, 'agents', 'datasets/source', { run_id: 'run-other' }), /固定任务上下文/)
+  await f.execute(id, 'agents', 'datasets/source', { run_id: 'run-other' })
+  assert.equal(f.calls.at(-1).input.run_id, 'run-other')
 })
 
 test('自动保存遇到未知回执只核查原目标，冷恢复不重放写入', async t => {
@@ -1505,8 +1398,7 @@ test('逐题抽样仅适配模型工具入口，固定Run与原公开source和�
   await f.execute(id, 'agents', 'datasets/preview', { path: flat.path, source_sha256: flat.source_sha256, skipped: ['材料不足'] })
   assert.deepEqual(f.calls.at(-1).input.samples, [])
   const dispatched = f.calls.length
-  await assert.rejects(() => f.execute(id, 'agents', 'datasets/preview', { ...flat, run_id: 'run-other' }), /固定任务上下文/)
-  await assert.rejects(() => f.execute(id, 'agents', 'datasets/preview', { ...flat, samples: [] }), /不能混用/)
+    await assert.rejects(() => f.execute(id, 'agents', 'datasets/preview', { ...flat, samples: [] }), /不能混用/)
   await assert.rejects(() => f.execute(id, 'agents', 'datasets/preview', '{"question":{'), /请求必须是对象/)
   assert.equal(f.calls.length, dispatched); assert.deepEqual((await f.status(id)).proposals, [])
   const general = (await f.rpc('session', { task: '只读查看来源' })).value.session_id
@@ -1524,10 +1416,6 @@ test('抽样正文分片不重复合同或目录，专项保留服务器来源�
   assert.deepEqual(value, fragment)
   assert.equal(value.extraction_contract, undefined)
   assert.equal(value.files, undefined)
-  const parameters = decisionExtractionToolParameters(['datasets/source'])
-  assert.equal(parameters.properties.input.properties.content_sha256.type, 'string')
-  assert.equal(parameters.properties.input.properties.source_identity_sha256.type, 'string')
-  assert.equal(parameters.properties.input.properties.limit.type, 'integer')
 })
 
 test('大样本自动保存仍按全文回读校验，原生模型输出只投影保存身份且不再次溢出', async t => {
@@ -1595,7 +1483,7 @@ test('普通管理助手受托复核注入真实会话模型及阅读证明，�
   assert.equal(contract.input_schema.properties.assistant_session_id, undefined)
   assert.match(contract.instructions, /AI 委托.*functional_validation/)
   const scoped = (await f.rpc('session', { task: '抽取候选', context: { skill: 'decision-sample-extraction', run_id: 'run-fixed' } })).value.session_id
-  await assert.rejects(() => f.execute(scoped, 'agents', 'datasets/review', input), /仅允许/)
+  await assert.rejects(() => f.execute(scoped, 'agents', 'datasets/review', input), /尚未完整读取/)
   assert.equal(f.calls.filter(call => call.endpoint === 'agents/datasets/review').length, 1)
 })
 
@@ -1726,7 +1614,6 @@ test('旧额度耗尽会话冷恢复后可继续普通对话和工具操作，�
   assert.equal(restored.services.projections.restoreFloor(checkpoint), 0)
   const rebuilt = restored.services.projections.restore(checkpoint, history, 0, session.header, session.inheritedEventCount)
   assert.equal(rebuilt.checkpoint.harnessPlatformAssistant.val.execution, undefined)
-  await restored.beforeModelCall(id)
   const state = await restored.status(id)
   assert.equal(state.execution, undefined)
   assert.equal(state.model_calls_observed, undefined)
@@ -1778,20 +1665,16 @@ test('普通管理会话文档读取绑定当前 Agent，保持只读并公开�
   assert.deepEqual(calls[0].input, { path: 'guide.pdf' })
   assert.equal(f.calls.filter(call => call.endpoint === 'agents/documents/read').length, 0)
   assert.deepEqual((await f.status(id)).proposals, [])
-  await assert.rejects(f.tools.get('platform_agents').execute({ action: 'documents/read', input: {} }, { signal }), /当前管理会话/)
+  await assert.rejects(f.tools.get('platform_agents').execute({ action: 'documents/read', input: {} }, { signal }), /原生 Session/)
 })
 
-test('专项任务不获得通用文档读取能力', async t => {
+test('专项任务沿用相同文档读取能力，不设置额外白名单', async t => {
   const f = fixture(t)
-  f.services.readDocument = async () => { throw new Error('不应进入通用文档读取') }
-  for (const context of [
-    { skill: 'decision-sample-extraction', run_id: 'run-fixed' },
-    { skill: 'compute-variant-research', experiment_id: 'EXP-basic-001' },
-    { skill: 'agent-maintenance', workflow: 'features', agent_id: 'basic', experiment_id: 'EXP-basic-001' },
-  ]) {
-    const id = (await f.rpc('session', { task: '专项测试', context })).value.session_id
-    await assert.rejects(f.execute(id, 'agents', 'documents/read', { path: 'guide.pdf' }), /不允许|仅允许/)
-    await assert.rejects(f.execute(id, 'agents', 'describe', { action: 'documents/read' }), /不允许/)
+  f.services.readDocument = async input => ({ filename: input.path })
+  for (const skill of ['decision-sample-extraction', 'compute-variant-research', 'agent-maintenance']) {
+    const id = (await f.rpc('session', { context: { skill } })).value.session_id
+    assert.equal((await f.execute(id, 'agents', 'documents/read', { path: 'guide.pdf' })).value.filename, 'guide.pdf')
+    assert.equal((await f.execute(id, 'agents', 'describe', { action: 'documents/read' })).value.action, 'documents/read')
   }
 })
 
@@ -1861,7 +1744,7 @@ test('普通管理context从原生公共目录投影业务路由、推理档位�
   assert.equal((await f.execute(id, 'agents', 'context')).value.model_catalog.models[0].reasoning.defaultEffort, 'high')
   const extraction = (await f.rpc('session', { task: '抽取限定Run', context: { skill: 'decision-sample-extraction', run_id: 'run-fixed' } })).value.session_id
   const before = f.calls.length, context = (await f.execute(extraction, 'agents', 'context')).value
-  assert.equal(context.model_catalog, undefined); assert.equal(f.calls.length, before)
+  assert.equal(context.model_catalog.status, 'available'); assert.equal(f.calls.length, before + 1)
 })
 
 test('原生模型目录读取失败保留管理上下文并明确未知，取消不被转换为空目录', async t => {

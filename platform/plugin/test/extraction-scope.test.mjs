@@ -1,26 +1,17 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync } from 'node:fs'
-import { rm } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import test from 'node:test'
-import { build } from 'esbuild'
 import { createAssistant } from '../src/assistant/index.ts'
-import { DECISION_EXTRACTION_CONTRACT, decisionExtractionModelContract, normalizeDecisionModelSubmission, validateDecisionQuestions, validateDecisionLabel } from '../src/evaluation/decision-dataset-contract.ts'
+import { normalizeDecisionModelSubmission, validateDecisionQuestions, validateDecisionLabel } from '../src/evaluation/decision-dataset-contract.ts'
 
 const require = createRequire(import.meta.url)
 // 使用平台已锁定 Controller 依赖树中的真实 SDK，不依赖机器的全局安装位置。
 const sdkRequire = createRequire(require.resolve('@deepseek-ai/dsh-api-session-controller'))
 const sdk = async name => import(pathToFileURL(sdkRequire.resolve(name)).href)
-const [{ Context }, { SystemPrompt }, { ToolRuntime, assertSupportedJsonSchema, validateJsonSchemaValue }, { createScope }] = await Promise.all([
+const [{ Context }, { SystemPrompt }, { ToolRuntime }, { createScope }] = await Promise.all([
   sdk('@deepseek-ai/cordis'), sdk('@deepseek-ai/dsh-system-prompt'), sdk('@deepseek-ai/dsh-tools'), sdk('@deepseek-ai/dsh-scope'),
 ])
-const built = mkdtempSync(join(tmpdir(), 'extraction-scope-build-'))
-await build({ entryPoints: [new URL('../src/assistant/extraction-scope.ts', import.meta.url).pathname], outfile: join(built, 'scope.mjs'), bundle: true, platform: 'node', format: 'esm' })
-const { DECISION_EXTRACTION_ACTIONS, projectDecisionExtractionTools } = await import(pathToFileURL(join(built, 'scope.mjs')).href)
-test.after(() => rm(built, { recursive: true, force: true }))
 
 function fixture(t, { parentPtc = false, actualPlatformTools = false } = {}) {
   const ctx = new Context()
@@ -37,7 +28,7 @@ function fixture(t, { parentPtc = false, actualPlatformTools = false } = {}) {
   }
   // 仅装载真实平台工具声明；此夹具不执行平台业务，也不访问模型或实际数据。
   const assistant = actualPlatformTools ? createAssistant('/schema-fixture', async () => assert.fail('声明测试不能调用平台业务'), {
-    projections: { register: () => () => {} }, systemPrompt: ctx.systemPrompt,
+    projections: { register: () => () => {} },
   }) : null
   assistant?.registerTools(ctx.tools)
   const parentKey = { id: 'preset' }
@@ -56,24 +47,11 @@ function fixture(t, { parentPtc = false, actualPlatformTools = false } = {}) {
   return { ctx, agent, agentScope, calls, definition, execute, schemas, toolSchemas, other }
 }
 
-test('抽取投影使用真实平台工具，SDK校验逐题字段及三题型而不公开动态样本映射', async t => {
+test('决策抽样传输沿用业务校验，不投影原生工具Schema', async t => {
   const f = fixture(t, { actualPlatformTools: true })
-  const original = (await f.toolSchemas(f.agent)).find(tool => tool.name === 'platform_agents')
-  assert.ok(original.parameters.properties.action.enum.includes('compute-variants/create'))
-  const assembled = await f.toolSchemas(f.agent), snapshot = structuredClone(assembled)
-  const projected = projectDecisionExtractionTools(assembled), tool = projected.find(tool => tool.name === 'platform_agents')
-  assert.deepEqual(assembled, snapshot, '不得修改 SDK 返回的原始声明')
-  assert.equal(projected.find(tool => tool.name === 'skill'), assembled.find(tool => tool.name === 'skill'))
-  assert.deepEqual(tool.parameters.properties.action.enum, DECISION_EXTRACTION_ACTIONS)
-  assert.deepEqual(DECISION_EXTRACTION_ACTIONS, ['context', 'research/read-reference', 'datasets/source', 'datasets/preview', 'datasets/list'])
-  assert.doesNotThrow(() => assertSupportedJsonSchema(tool.parameters))
-  const input = tool.parameters.properties.input, contract = decisionExtractionModelContract()
-  assert.equal(contract.model_submission.transport, 'single-question-v1')
-  assert.deepEqual(input.properties.task.properties.semantics.enum, DECISION_EXTRACTION_CONTRACT.task.semantics)
-  assert.equal(input.properties.workflow.description, DECISION_EXTRACTION_CONTRACT.workflow)
-  assert.ok(input.description.includes(contract.model_submission.required_fields.join('、')))
-  for (const field of ['samples', 'questions', 'targets', 'state', '_meta', 'assistant_session_id']) assert.equal(input.properties[field], undefined)
-  assert.equal(input.properties.skipped.items.type, 'string')
+  const tool = (await f.toolSchemas(f.agent)).find(tool => tool.name === 'platform_agents')
+  assert.ok(tool.parameters.properties.action.enum.includes('eval/start'))
+  assert.ok(tool.parameters.properties.action.enum.includes('compute-variants/create'))
   const common = { path: 'trace.jsonl', source_sha256: 'a'.repeat(64), decision_id: 'decision-fixed', action_name: 'respond', workflow: '材料核对', task: { id: 'check-input', semantics: 'recommended_decision' }, question_name: 'input_ready' }
   const variants = [
     { question: { type: 'choice', instructions: '当前应采取哪种动作？', criteria: { respond: '依据现有材料答复', query: '继续查询缺少的材料' } }, target: { label: 'respond', basis: '当前用户输入已包含必要材料。', probabilities: { respond: 0.7, query: 0.3 } } },
@@ -82,39 +60,21 @@ test('抽取投影使用真实平台工具，SDK校验逐题字段及三题型�
   ]
   for (const variant of [...variants, { ...variants[0], task: { id: 'actual-action', semantics: 'observed_action' }, target: { label: 'respond', basis: '来源记录的实际动作是 respond。' } }]) {
     const submission = { ...common, ...variant }
-    assert.deepEqual(validateJsonSchemaValue(tool.parameters, { action: 'datasets/preview', input: submission }), [])
     const sample = normalizeDecisionModelSubmission(submission).samples[0]
     const questions = validateDecisionQuestions(sample.questions)
     assert.doesNotThrow(() => validateDecisionLabel(questions.input_ready, sample.targets.input_ready))
   }
-  for (const args of [
-    { action: 'context', input: {} },
-    { action: 'research/read-reference', input: { topic: 'decision-samples' } },
-    { action: 'datasets/source', input: { run_id: 'run-fixed', path: 'trace.jsonl', cursor: 3 } },
-    { action: 'datasets/list', input: { run_id: 'run-fixed' } },
-    { action: 'datasets/preview', input: { path: 'trace.jsonl', source_sha256: 'a'.repeat(64), skipped: ['输入不足'] } },
-  ]) assert.deepEqual(validateJsonSchemaValue(tool.parameters, args), [])
-  for (const args of [
-    { action: 'eval/start', input: {} },
-    { action: 'datasets/preview', input: '{"question":{}}' },
-    ...[
-      { ...common, ...variants[0], samples: [] },
-      { ...common, ...variants[1], skipped: [{ reason: '输入不足' }] },
-      { ...common, ...variants[1], question: { type: 'noul' } },
-      { ...common, ...variants[2], question: { ...variants[2].question, criteria: { a: '低', b: '高' } } },
-      { ...common, ...variants[0], target: { ...variants[0].target, status: 'reviewed' } },
-      { ...common, ...variants[0], target: { ...variants[0].target, label: 0.5 } },
-    ].map(value => ({ action: 'datasets/preview', input: value })),
-  ]) assert.ok(validateJsonSchemaValue(tool.parameters, args).length)
+  assert.throws(() => normalizeDecisionModelSubmission({ ...common, ...variants[0], samples: [] }), /不能混用/)
+  assert.throws(() => validateDecisionQuestions({ invalid: { type: 'noul' } }))
   assert.equal(f.calls.length, 0)
 })
 
-test('抽取Schema投影保留原生工具、其他会话和原始注册', async t => {
+test('平台上下文保留完整原生工具、其他会话和原始注册', async t => {
   const f = fixture(t, { actualPlatformTools: true })
   const before = await f.toolSchemas(f.agent), otherBefore = await f.toolSchemas(f.other)
-  const projected = projectDecisionExtractionTools(await f.toolSchemas(f.agent))
+  const assembled = await f.toolSchemas(f.agent)
   for (const name of ['bash', 'read', 'write', 'spawn_agent', 'run_in_background']) {
-    assert.ok(projected.some(tool => tool.name === name), `${name} 必须沿用原生声明`)
+    assert.ok(assembled.some(tool => tool.name === name), `${name} 必须沿用原生声明`)
     assert.equal((await f.execute(name)).isError, false)
   }
   assert.deepEqual(await f.toolSchemas(f.other), otherBefore)

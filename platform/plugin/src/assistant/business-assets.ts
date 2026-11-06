@@ -64,8 +64,3 @@ export async function assistantConfiguration(root: string, skills: NativeSkills,
   return { ready, core_ready: coreMissing.length === 0, missing, requested_skill: requested, message, assets,
     tasks: Object.fromEntries(managementSkills.map(name => [name, coreMissing.length === 0 && !missing.includes(name)])) }
 }
-export async function assertAssistantConfigured(root: string, skills: NativeSkills, context: Record<string, any> = {}, scope?: any, signal?: AbortSignal) {
-  const state = await assistantConfiguration(root, skills, context, scope, signal)
-  if (!state.ready) throw new Error(state.message)
-  return state
-}

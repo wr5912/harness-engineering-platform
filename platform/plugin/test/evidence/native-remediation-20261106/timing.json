@@ -1,0 +1,300 @@
+{
+  "sessions": [
+    {
+      "session_id": "session-6a79ab7e-f558-4cc5-b45d-7cc2e4c52975",
+      "parent_session": null,
+      "is_seeded": false
+    }
+  ],
+  "turns": [
+    {
+      "session_id": "session-6a79ab7e-f558-4cc5-b45d-7cc2e4c52975",
+      "turn": 12,
+      "user_event_seqs": [
+        856
+      ],
+      "reason": {
+        "kind": "completed"
+      },
+      "missing_timestamps": 0,
+      "model_steps": [
+        {
+          "step": 1,
+          "duration_ms": 66296,
+          "output_chars": 253
+        },
+        {
+          "step": 2,
+          "duration_ms": 6703,
+          "output_chars": 182
+        },
+        {
+          "step": 3,
+          "duration_ms": 8085,
+          "output_chars": 158
+        },
+        {
+          "step": 4,
+          "duration_ms": 14996,
+          "output_chars": 70
+        },
+        {
+          "step": 5,
+          "duration_ms": 29899,
+          "output_chars": 64
+        },
+        {
+          "step": 6,
+          "duration_ms": 81010,
+          "output_chars": 1747
+        },
+        {
+          "step": 7,
+          "duration_ms": 41291,
+          "output_chars": 310
+        },
+        {
+          "step": 8,
+          "duration_ms": 87308,
+          "output_chars": 378
+        },
+        {
+          "step": 9,
+          "duration_ms": 34943,
+          "output_chars": 382
+        },
+        {
+          "step": 10,
+          "duration_ms": 31129,
+          "output_chars": 77
+        },
+        {
+          "step": 11,
+          "duration_ms": 11568,
+          "output_chars": 186
+        },
+        {
+          "step": 12,
+          "duration_ms": 484595,
+          "output_chars": 36374
+        },
+        {
+          "step": 13,
+          "duration_ms": 71172,
+          "output_chars": 580
+        },
+        {
+          "step": 14,
+          "duration_ms": 28770,
+          "output_chars": 124
+        },
+        {
+          "step": 15,
+          "duration_ms": 38057,
+          "output_chars": 208
+        },
+        {
+          "step": 16,
+          "duration_ms": 50250,
+          "output_chars": 158
+        },
+        {
+          "step": 17,
+          "duration_ms": 487773,
+          "output_chars": 36371
+        },
+        {
+          "step": 18,
+          "duration_ms": 120698,
+          "output_chars": 379
+        },
+        {
+          "step": 19,
+          "duration_ms": 26669,
+          "output_chars": 67
+        },
+        {
+          "step": 20,
+          "duration_ms": 881723,
+          "output_chars": 36378
+        },
+        {
+          "step": 21,
+          "duration_ms": 133506,
+          "output_chars": 186
+        },
+        {
+          "step": 22,
+          "duration_ms": 12944,
+          "output_chars": 284
+        },
+        {
+          "step": 23,
+          "duration_ms": 59366,
+          "output_chars": 201
+        },
+        {
+          "step": 24,
+          "duration_ms": 8652,
+          "output_chars": 221
+        }
+      ],
+      "tool_calls": 25,
+      "retry_count": 1,
+      "incomplete_intervals": 0,
+      "wall_ms": 2827872,
+      "completed": true,
+      "interval_union_ms": {
+        "model_step": 2817403,
+        "tool": 4620,
+        "compaction": 0,
+        "retry_wait": 771
+      }
+    },
+    {
+      "session_id": "session-6a79ab7e-f558-4cc5-b45d-7cc2e4c52975",
+      "turn": 14,
+      "user_event_seqs": [
+        1076
+      ],
+      "reason": {
+        "kind": "completed"
+      },
+      "missing_timestamps": 0,
+      "model_steps": [
+        {
+          "step": 1,
+          "duration_ms": 96064,
+          "output_chars": 94
+        },
+        {
+          "step": 2,
+          "duration_ms": 121828,
+          "output_chars": 81
+        },
+        {
+          "step": 3,
+          "duration_ms": 7934,
+          "output_chars": 158
+        },
+        {
+          "step": 4,
+          "duration_ms": 31233,
+          "output_chars": 428
+        },
+        {
+          "step": 5,
+          "duration_ms": 31186,
+          "output_chars": 201
+        },
+        {
+          "step": 6,
+          "duration_ms": 128150,
+          "output_chars": 178
+        },
+        {
+          "step": 7,
+          "duration_ms": 62200,
+          "output_chars": 441
+        },
+        {
+          "step": 8,
+          "duration_ms": 21014,
+          "output_chars": 131
+        },
+        {
+          "step": 9,
+          "duration_ms": 29693,
+          "output_chars": 69
+        },
+        {
+          "step": 10,
+          "duration_ms": 660175,
+          "output_chars": 33267
+        },
+        {
+          "step": 11,
+          "duration_ms": 58460,
+          "output_chars": 125
+        },
+        {
+          "step": 12,
+          "duration_ms": 441143,
+          "output_chars": 33265
+        },
+        {
+          "step": 13,
+          "duration_ms": 79932,
+          "output_chars": 524
+        },
+        {
+          "step": 14,
+          "duration_ms": 4025,
+          "output_chars": 53
+        },
+        {
+          "step": 15,
+          "duration_ms": 10378,
+          "output_chars": 463
+        },
+        {
+          "step": 16,
+          "duration_ms": 32989,
+          "output_chars": 81
+        },
+        {
+          "step": 17,
+          "duration_ms": 10821,
+          "output_chars": 497
+        },
+        {
+          "step": 18,
+          "duration_ms": 30727,
+          "output_chars": 334
+        },
+        {
+          "step": 19,
+          "duration_ms": 5337,
+          "output_chars": 53
+        },
+        {
+          "step": 20,
+          "duration_ms": 9347,
+          "output_chars": 507
+        },
+        {
+          "step": 21,
+          "duration_ms": 31405,
+          "output_chars": 253
+        },
+        {
+          "step": 22,
+          "duration_ms": 36398,
+          "output_chars": 32
+        },
+        {
+          "step": 23,
+          "duration_ms": 6484,
+          "output_chars": 223
+        }
+      ],
+      "tool_calls": 30,
+      "retry_count": 1,
+      "incomplete_intervals": 0,
+      "wall_ms": 2055146,
+      "completed": true,
+      "interval_union_ms": {
+        "model_step": 1946923,
+        "tool": 5969,
+        "compaction": 93488,
+        "retry_wait": 534
+      }
+    }
+  ],
+  "limitations": [
+    "Wall time starts at the actual user event and ends at native turn/end; missing boundaries remain unknown.",
+    "Model step spans include provider latency, streaming and native retries; they do not measure pure thinking.",
+    "Each category uses interval union; categories may overlap and must not be added. Child sessions remain separate.",
+    "Timing does not imply successful request reconstruction or business acceptance."
+  ]
+}

@@ -208,24 +208,9 @@ export function createAssistant(ctx: Pick<Context, 'sessions' | 'uiSession' | 'u
           if (submission.task !== task || JSON.stringify(submission.context) !== JSON.stringify(taskContext)) throw new Error('上一项任务的受理结果待核对，请先恢复原提交。')
           if (await acceptedSubmission(submission)) { await finishSubmission(submission, current, view, true); return }
         }
-        const configuration = await rpc.call(CHANNEL, 'assistant/configuration', { context: taskContext })
-        if (!configuration.ok) throw new Error(configuration.error.message)
-        const availability = configuration.value as { ready: boolean; message: string }
-        if (!availability.ready) throw new Error(availability.message || '当前工作区未配置平台管理助手，请连接或克隆已有数据仓库。')
         const sessionIdToResume = submission?.sessionId ?? (typeof taskContext.session_id === 'string' ? taskContext.session_id : undefined)
         const root = getRoot()
         if (!root) throw new Error('项目工作区尚未就绪，请稍后重试。')
-        let resumeCwd: string | undefined
-        if (sessionIdToResume) {
-          if (!ctx.sessions.list.getSnapshot().byId[sessionIdToResume as SessionId]) await ctx.sessions.refresh()
-          resumeCwd = ctx.sessions.list.getSnapshot().byId[sessionIdToResume as SessionId]?.cwd
-          if (!resumeCwd) {
-            const status = await rpc.call(CHANNEL, 'assistant/status', { session_id: sessionIdToResume })
-            if (!status.ok) throw new Error(status.error.message)
-            resumeCwd = (status.value as { workspace?: { session_cwd?: string } }).workspace?.session_cwd
-          }
-          if (!resumeCwd || ![root, ...getLegacyRoots()].includes(resumeCwd)) throw new Error('助手会话不属于当前工作区')
-        }
         const workspace = sessionIdToResume ? undefined : await ctx.workspaces.create({ path: root })
         // 续接保留原会话身份；原生 create 只用于新任务，避免历史任务被另建会话。
         const preparedSessionId = sessionIdToResume as SessionId | undefined

@@ -1914,6 +1914,8 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
         case 'cases/delete':
         case 'cases/renumber-preview':
         case 'cases/renumber':
+        case 'cases/reorder-preview':
+        case 'cases/reorder':
         case 'cases/create-context':
         case 'cases/from-run':
         case 'cases/create-preview':

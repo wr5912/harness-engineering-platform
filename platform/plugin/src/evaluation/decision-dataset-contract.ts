@@ -75,58 +75,6 @@ export function normalizeDecisionModelSubmission(input: Record<string, any>): Re
   return { ...source, samples: [{ decision_id, action_name, workflow, task, questions: { [question_name]: question }, targets: { [question_name]: target } }] }
 }
 
-/** 抽取工具只描述模型需提供的字段；业务校验与服务器生成字段继续由当前合同负责。 */
-export function decisionExtractionToolParameters(actions: readonly string[]) {
-  const contract = DECISION_EXTRACTION_CONTRACT
-  const text = { type: 'string' }
-  // 原生 SDK 的 additionalProperties 仅支持布尔值；动态键的值类型仍由现有业务校验器核对。
-  const choiceCriteria = { type: 'object', additionalProperties: true, description: '候选键到非空说明字符串的映射。' }
-  const question = {
-    oneOf: Object.entries(contract.types).map(([type, description]) => ({
-      type: 'object', additionalProperties: false, required: ['type', 'instructions', ...(type === 'noul' ? [] : ['criteria'])],
-      description, properties: {
-        type: { type: 'string', enum: [type] }, instructions: { ...text, description: '依据当前决策前可见材料提出的问题，优先中文。' },
-        criteria: type === 'score' ? { type: 'array', items: text }
-          : type === 'noul' ? { type: 'object', additionalProperties: false, required: ['false', 'true'], properties: { false: text, true: text } } : choiceCriteria,
-      },
-    })),
-  }
-  return {
-    type: 'object',
-    properties: {
-      action: { type: 'string', enum: [...actions] },
-      input: {
-        type: 'object', additionalProperties: false,
-        description: `context 使用空对象；research/read-reference 使用 topic；datasets/source、datasets/list 使用固定 run_id。datasets/preview 每次一题，提供 ${MODEL_SUBMISSION.required_fields.join('、')}。${MODEL_SUBMISSION.instructions} ${contract.language}`,
-        properties: {
-          run_id: { ...text, description: MODEL_SUBMISSION.run_id },
-          topic: { type: 'string', enum: ['decision-samples'] },
-          path: { ...text, description: MODEL_SUBMISSION.source_path },
-          source_sha256: { ...text, description: '逐字使用 datasets/source 返回的来源摘要。' },
-          source_identity_sha256: { ...text, description: '完整来源身份摘要，绑定Run清单、inputs.lock及所选文件依赖；所有续读必填，preview亦可原样传回防止来源改绑。' },
-          cursor: { type: 'integer', description: 'datasets/source 返回的 next_cursor；首次读取可省略。' },
-          limit: { type: 'integer', description: '目录1–20条，决策页1–3条，decision_id分片1–6000字符；通常使用read_input。' },
-          content_sha256: { ...text, description: '决策分片正文摘要；按read_input或上一片回执原样续读，不能猜测。' },
-          decision_id: { ...text, description: '所选来源分页返回的 decision_id。' },
-          action_name: { ...text, description: '同一决策 observed_action.name 的原值。' },
-          workflow: { ...text, description: contract.workflow },
-          task: { type: 'object', additionalProperties: false, required: Object.keys(contract.task), properties: {
-            id: { ...text, description: contract.task.id }, semantics: { type: 'string', enum: [...contract.task.semantics] },
-          } },
-          question_name: { ...text, description: MODEL_SUBMISSION.question_name },
-          question,
-          target: { type: 'object', additionalProperties: false, required: ['label', 'basis'], description: `${contract.probabilities}。${contract.provenance}`, properties: {
-            label: { oneOf: [{ type: 'string' }, { type: 'boolean' }, { type: 'integer' }] },
-            basis: { ...text, description: '分清决策前证据、推断与不确定性，优先中文。' },
-            probabilities: { type: 'object', additionalProperties: true, description: contract.probabilities },
-          } },
-          skipped: { type: 'array', items: text, description: `${contract.preview.skipped.instructions} 最多 ${contract.preview.skipped.max_items} 项，每项最多 ${contract.preview.skipped.max_item_length} 字符。` },
-        },
-      },
-    },
-    required: ['action', 'input'], additionalProperties: false,
-  }
-}
 
 function error(message: string): never { throw new Error(message) }
 function map(value: unknown): Record<string, any> { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : error('需要 JSON 对象') }

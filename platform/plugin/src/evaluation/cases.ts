@@ -176,6 +176,43 @@ export function createCaseManagementHandler(assetRoot: string, services: CaseMan
     try {
       if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new CaseError('invalid_request', '用例请求必须为对象')
       const body = payload as JsonMap
+      if (endpoint === 'cases/reorder-preview' || endpoint === 'cases/reorder') {
+        const document = await documentFor(root, body, signal)
+        if (field(body, 'expected_sha256') !== document.sha256) throw new CaseError('conflict', '用例集已被修改，请重新读取后核对排序')
+        const scene = field(body, 'scene')
+        const before = document.parsed.catalog.filter(row => row.scene === scene).map(row => row.case_id)
+        if (!before.length) throw new CaseError('not_found', '场景不存在或没有用例')
+        const order = body.case_ids
+        if (!Array.isArray(order) || order.length !== before.length || new Set(order).size !== before.length || order.some(id => typeof id !== 'string' || !before.includes(id)))
+          throw new CaseError('invalid_request', 'case_ids 必须是该场景全部用例 ID 的完整排列，不能重复、遗漏或跨场景')
+        const ranges = before.map(id => {
+          const range = caseBlockRange(document.content, id)
+          // 分隔换行留在原位置，末尾无换行的用例也能移动而不粘连标题。
+          const text = document.content.slice(range.start, range.end).replace(/(?:\r?\n)+$/, '')
+          return { ...range, end: range.start + text.length, text }
+        })
+        const blocks = new Map(before.map((id, index) => [id, ranges[index].text]))
+        let content = '', cursor = 0
+        for (const [index, range] of ranges.entries()) {
+          content += document.content.slice(cursor, range.start) + blocks.get(order[index])!
+          cursor = range.end
+        }
+        content += document.content.slice(cursor)
+        const changed = content !== document.content
+        if (changed) {
+          const parsed = await parseEvaluationDocument(root, content, signal)
+          if (JSON.stringify(parsed.catalog.filter(row => row.scene === scene).map(row => row.case_id)) !== JSON.stringify(order)
+            || parsed.case_ids.length !== document.parsed.case_ids.length || document.parsed.case_ids.some(id =>
+              JSON.stringify(parsed.cases[id]) !== JSON.stringify(document.parsed.cases[id])
+              || JSON.stringify(parsed.catalog.find(row => row.case_id === id)) !== JSON.stringify(document.parsed.catalog.find(row => row.case_id === id))))
+            throw new CaseError('invalid_request', '排序会改变用例内容或场景，已拒绝写入')
+        }
+        cancelled(signal)
+        const written = endpoint === 'cases/reorder' && changed
+        if (written) await services.applyEvaluation(document.experimentId, content, document.sha256, signal)
+        return { ok: true, value: { path: document.path, scene, before_order: before, after_order: order,
+          before_sha256: document.sha256, sha256: digest(content), written } }
+      }
       if (endpoint === 'cases/renumber-preview' || endpoint === 'cases/renumber') {
         const document = await documentFor(root, body, signal)
         if (field(body, 'expected_sha256') !== document.sha256) throw new CaseError('conflict', '用例集已被修改，请重新读取后核对改号映射')

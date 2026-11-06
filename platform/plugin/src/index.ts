@@ -177,7 +177,7 @@ export function applyTools(ctx: Context) {
     if (getBusinessControl(assetRoot).enabled() && !currentBusinessContext() && peer?.principal.kind !== 'owner') return failure('forbidden', '平台管理操作要求管理身份')
     try { return await managementDispatch(assetRoot, () => handler(endpoint, payload, signal, peer)) }
     finally {
-      if (!['external/list', 'external/detail', 'external/records', 'external/request', 'agentAccess/status', 'sdk/status', 'sdk/list', 'sdk/guide', 'deployment/preview', 'deployment/status', 'control/status', 'control/probeProvider', 'control/providerProtocol', 'description', 'research/read-reference', 'research/validate', 'legacy/inspect', 'migrations/inspect', 'migrations/read', 'migrations/preview', 'migrations/status', 'assets/build-preview', 'decision/preview', 'list', 'detail', 'sources', 'url', 'logs', 'edit/read', 'cases/list', 'cases/read', 'eval/list', 'eval/status', 'runs/index', 'runs/overview', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/preview', 'compute-variants/compare', 'compute-variants/build-preview', 'compute-variants/freeze-preview', 'training-servers/list', 'training-servers/probe', 'tasks/capabilities', 'datasets/source', 'datasets/list', 'datasets/read', 'datasets/export', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'fusion/status', 'fusion/proposal', 'features/proposal', 'features/read-source', 'configuration'].includes(endpoint)) notify([domain, 'catalog'])
+      if (!['external/list', 'external/detail', 'external/records', 'external/request', 'agentAccess/status', 'sdk/status', 'sdk/list', 'sdk/guide', 'deployment/preview', 'deployment/status', 'control/status', 'control/probeProvider', 'control/providerProtocol', 'description', 'research/read-reference', 'research/validate', 'legacy/inspect', 'migrations/inspect', 'migrations/read', 'migrations/preview', 'migrations/status', 'assets/build-preview', 'decision/preview', 'list', 'detail', 'sources', 'url', 'logs', 'edit/read', 'cases/list', 'cases/read', 'cases/reorder-preview', 'eval/list', 'eval/status', 'runs/index', 'runs/overview', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/preview', 'compute-variants/compare', 'compute-variants/build-preview', 'compute-variants/freeze-preview', 'training-servers/list', 'training-servers/probe', 'tasks/capabilities', 'datasets/source', 'datasets/list', 'datasets/read', 'datasets/export', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'fusion/status', 'fusion/proposal', 'features/proposal', 'features/read-source', 'configuration'].includes(endpoint)) notify([domain, 'catalog'])
     }
   }
   const modelProjection = (agentId: string, selected?: { provider: string; model: string; reasoningEffort?: string }, candidatePath?: string) => projectModelPolicy(assetRoot, agentId, {
@@ -243,16 +243,12 @@ export function applyTools(ctx: Context) {
       return snapshot.events
     },
     running: id => services.agents.get(id)?.status === 'running',
-    liveAgent: id => services.agents.get(id),
     record: async (session, type, value) => { const records = await runtimeModule('@deepseek-ai/dsh-session'); records.appendPluginRecord(session, type, value) },
-    projections: services.sessionProjections, systemPrompt: services.systemPrompt, skills: services.skills,
+    projections: services.sessionProjections, skills: services.skills,
     notify, mcp: manager ? assistantMcp(manager) : undefined,
   })
   domains.assistant = assistant.handler
   assistant.registerTools(services.tools)
-  // 只注入管理规则和平台工具说明；模型流、重试及工具作用域由 DSH 原生维护。
-  ctx.on('system-prompt/assemble' as any, (async (_assembly: any, context: any, next: any) =>
-    assistant.assemblePrompt(await next(), context)) as any)
   ctx.effect(() => () => assistant.dispose())
   ctx.on('session/event' as any, ((session: any) => notify(['assistant'], [session.id])) as any)
   ctx.on('agent/status' as any, ((event: any) => notify(['assistant'], [event.agent.id])) as any)

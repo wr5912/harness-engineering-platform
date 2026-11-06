@@ -1,0 +1,56 @@
+{
+  "status": "busy",
+  "programRoot": "/home/cmp/work/harness-engineering-platform",
+  "dataRoot": "/home/cmp/harness-engineering-platform-data",
+  "workspaceId": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+  "pid": 4130730,
+  "activation": "none",
+  "busy": [
+    {
+      "kind": "session",
+      "id": "session-e1fb0e7a-eb30-4e3b-8eed-fd5af035077e",
+      "state": "running"
+    },
+    {
+      "kind": "assistant",
+      "id": "session-e1fb0e7a-eb30-4e3b-8eed-fd5af035077e",
+      "state": "pending"
+    },
+    {
+      "kind": "session",
+      "id": "session-6a79ab7e-f558-4cc5-b45d-7cc2e4c52975",
+      "state": "running"
+    },
+    {
+      "kind": "assistant",
+      "id": "session-6a79ab7e-f558-4cc5-b45d-7cc2e4c52975",
+      "state": "pending"
+    },
+    {
+      "kind": "session",
+      "id": "session-76d25dcd-3069-4a0c-9ad0-66c9118f3245",
+      "state": "running"
+    },
+    {
+      "kind": "assistant",
+      "id": "session-76d25dcd-3069-4a0c-9ad0-66c9118f3245",
+      "state": "pending"
+    },
+    {
+      "kind": "session",
+      "id": "session-f04ebb49-61c6-4786-8a5e-755625b06793",
+      "state": "running"
+    },
+    {
+      "kind": "assistant",
+      "id": "session-f04ebb49-61c6-4786-8a5e-755625b06793",
+      "state": "pending"
+    },
+    {
+      "kind": "evaluation",
+      "id": "run-8cebf3b2-f68b-476b-a670-28b882fecfe1",
+      "state": "running"
+    }
+  ],
+  "changed": []
+}

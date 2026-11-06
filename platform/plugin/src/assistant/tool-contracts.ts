@@ -1,25 +1,14 @@
 import { z } from 'zod'
 import { businessCasesSchema } from '../agents/business-cases.ts'
 import { DECISION_EXTRACTION_CONTRACT } from '../evaluation/decision-dataset-contract.ts'
-import { isComputeVariantExecution } from './extraction-scope.ts'
 
 export type AssistantDomain = 'agents' | 'instances' | 'mcp'
 type MapValue = Record<string, any>
 const migrationActions = ['migrations/inspect', 'migrations/read', 'migrations/preview', 'migrations/apply', 'migrations/status', 'migrations/resolve', 'assets/build-preview', 'assets/build', 'assets/dependencies/prepare']
 export const assistantActions: Record<AssistantDomain, readonly string[]> = {
-  agents: ['sdk/start', 'sdk/status', 'sdk/stop', 'sdk/list', 'sdk/guide', ...migrationActions, 'versions/migration-plan', 'versions/migration-apply', 'documents/read', 'research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'list', 'detail', 'edit/read', 'edit/preview', 'edit/apply', 'cases/list', 'cases/read', 'cases/update', 'cases/delete', 'cases/renumber-preview', 'cases/renumber', 'eval/preview', 'eval/start', 'eval/batch-start', 'eval/status', 'eval/cancel', 'runs/index', 'runs/delete', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/source', 'compute-variants/identity-preview', 'compute-variants/identity-apply', 'compute-variants/preview', 'compute-variants/create', 'compute-variants/rename', 'compute-variants/plan-preview', 'compute-variants/plan-apply', 'compute-variants/prepare', 'compute-variants/build-preview', 'compute-variants/build', 'compute-variants/freeze-preview', 'compute-variants/freeze', 'compute-variants/compare', 'new', 'create', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'cases/create', 'datasets/source', 'datasets/preview', 'datasets/apply', 'datasets/list', 'datasets/read', 'datasets/review', 'datasets/export', 'decision/update', 'features/read-source', 'features/preview', 'features/proposal', 'features/apply', 'fusion/preview', 'fusion/prepare', 'fusion/resolve', 'fusion/recover', 'fusion/proposal', 'fusion/confirm', 'fusion/status', 'fusion/verify', 'fusion/finalize', 'tasks/capabilities', 'tasks/assembly-preview', 'tasks/assembly-apply'],
+  agents: ['sdk/start', 'sdk/status', 'sdk/stop', 'sdk/list', 'sdk/guide', ...migrationActions, 'versions/migration-plan', 'versions/migration-apply', 'documents/read', 'research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'list', 'detail', 'edit/read', 'edit/preview', 'edit/apply', 'cases/list', 'cases/read', 'cases/update', 'cases/delete', 'cases/renumber-preview', 'cases/renumber', 'cases/reorder-preview', 'cases/reorder', 'eval/preview', 'eval/start', 'eval/batch-start', 'eval/status', 'eval/cancel', 'runs/index', 'runs/delete', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/source', 'compute-variants/identity-preview', 'compute-variants/identity-apply', 'compute-variants/preview', 'compute-variants/create', 'compute-variants/rename', 'compute-variants/plan-preview', 'compute-variants/plan-apply', 'compute-variants/prepare', 'compute-variants/build-preview', 'compute-variants/build', 'compute-variants/freeze-preview', 'compute-variants/freeze', 'compute-variants/compare', 'new', 'create', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'cases/create', 'datasets/source', 'datasets/preview', 'datasets/apply', 'datasets/list', 'datasets/read', 'datasets/review', 'datasets/export', 'decision/update', 'features/read-source', 'features/preview', 'features/proposal', 'features/apply', 'fusion/preview', 'fusion/prepare', 'fusion/resolve', 'fusion/recover', 'fusion/proposal', 'fusion/confirm', 'fusion/status', 'fusion/verify', 'fusion/finalize', 'tasks/capabilities', 'tasks/assembly-preview', 'tasks/assembly-apply'],
   instances: ['list', 'detail', 'url', 'logs', 'preview', 'batch-preview', 'run', 'batch'],
   mcp: ['list', 'configuration', 'saveConfiguration', 'test', 'resources', 'resourceTemplates', 'readResource', 'callTool', 'sources/list', 'sources/create', 'sources/refresh', 'sources/toggle', 'sources/components', 'sources/logs', 'sources/preview', 'sources/invoke', 'saveCompositionDraft', 'publishComposition', 'withdrawComposition', 'deleteComposition', 'executeComposition', 'dryRunComposition', 'callPublishedComposition', 'compositionRun', 'compositionArtifact', 'compositionDetails', 'compositionSource', 'compositionGraph', 'seedThreatCompositions', 'control/status', 'control/saveConfiguration', 'control/restrict', 'control/reassess', 'control/release'],
-}
-
-export const featureActions = ['research/read-reference', 'detail', 'edit/read', 'assets/diff', 'assets/read-fixed', 'features/read-source', 'features/preview', 'features/proposal', 'runs/index', 'runs/show', 'runs/report', 'runs/files', 'runs/read-file', 'runs/trace']
-export function allowedAssistantActions(domain: AssistantDomain, state: any): readonly string[] {
-  const context = state?.task_context ?? {}
-  if (context.skill === 'decision-sample-extraction') return domain === 'agents' ? ['research/read-reference', 'datasets/source', 'datasets/preview', 'datasets/list'] : []
-  if (context.skill === 'agent-maintenance' && context.workflow === 'features') return domain === 'agents' ? featureActions : []
-  if (context.skill === 'compute-variant-research') return domain === 'agents'
-    ? assistantActions.agents.filter(action => /^(compute-variants\/|research\/|assets\/|edit\/|eval\/|runs\/|decision\/|cases\/)/.test(action) || isComputeVariantExecution(state) && action.startsWith('datasets/') || ['list', 'detail', 'tasks/capabilities'].includes(action)) : isComputeVariantExecution(state) ? assistantActions[domain] : []
-  return assistantActions[domain]
 }
 
 const string = { type: 'string' }, strings = { type: 'array', items: string }, object = { type: 'object', additionalProperties: true }
@@ -82,7 +71,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
   ],
   mcp: [
     ['list configuration', '', '先读取当前目录、公开配置及字符串 revision；凭据仅返回已配置状态，通过 MCP 管理页面维护。'],
-    ['saveConfiguration', 'ops revision', 'revision 使用 configuration 返回的字符串；修改路径使用字符串数组，只修改单个服务的公开字段。新增服务可写入 servers 的末尾索引；凭据和 Header 值通过页面维护。'],
+    ['saveConfiguration', 'ops revision', 'revision 使用 configuration 返回的字符串；ops 为 {op:"set"|"unset",path:string[],value?:any}。只修改所需服务或分组：新增服务用 ["servers",String(value.servers.length)]，新增分组用 ["groups",String(value.groups.length)]；更新用当前索引，删除用 unset。分组值为 {id,members:[{serverId,names,resourceUris,resourceTemplates}]}，成员身份与选择来自真实目录；不替换整个配置，不改其他分组。保存自动校验并重载，随后回读配置和分组实际目录；冲突先重新读取 revision，不盲重试。凭据和 Header 值通过页面维护。'],
     ['test resources resourceTemplates sources/list', 'serverId', 'serverId 来自当前配置。test 和 sources/components 提供真实可用工具及其输入合同。'],
     ['sources/components sources/logs sources/refresh', 'serverId sourceId'],
     ['readResource', 'serverId uri'], ['callTool', 'serverId toolName arguments', '先读取实际工具 inputSchema，再传 arguments；执行遵循 DSH 原生权限。'],
@@ -123,6 +112,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['edit/read', 'experiment_id path'], ['edit/preview edit/apply', 'experiment_id edits', '先 edit/read，每次提交实际文件正文和原摘要；可用 edits[].move_to 在同一 Candidate 内移动文件到已读取确认不存在的路径，同批更新引用，目标已存在时拒绝覆盖。content:null 按原摘要删除当前 Candidate 内单个文件，不递归删除目录；空字符串保存空文件。写入遵循 DSH 原生权限与当前任务范围。'],
     ['assets/diff', 'experiment_id path against baseline_experiment_id', '先省略 path 列差异，再用返回的 path 读完整差异；against=baseline 或指定比较方式。'], ['assets/read-fixed', 'agent_id experiment_id ref path', 'ref 必须为固定 git:<40位commit>；省略 path 可先列目录。'],
     ['cases/list cases/create-context', 'agent_id experiment_id', '新增时从 create-context 返回的 case_id_suggestions 选择所属场景编号；无法推导时明确有业务含义的英文缩写，不使用 NEW/XXX。切换场景后重新选择对应建议。'], ['cases/read', 'agent_id experiment_id case_id'],
+    ['cases/reorder-preview cases/reorder', 'experiment_id scene case_ids expected_sha256', '仅调整单一场景中现有用例的顺序。case_ids 必须为该场景全部 ID 的完整排列，摘要来自 cases/list。按原文块移动，保留编号、正文、注释、fast 标记及其他场景；已是目标顺序时不写入。返回顺序和摘要，不返回整份正文。'],
     ['cases/renumber-preview cases/renumber', 'experiment_id renames expected_sha256', '仅用户明确授权改号时使用。renames 为 {from,to} 数组；先预览映射再保存，不传整份文件。只改当前用例标题编号，正文及历史 Run、历史出处不变；当前正文直接引用另行核对，目标编号不得已占用。'],
     ['cases/delete', 'experiment_id case_id expected_sha256', '先 cases/read 核对用例及原摘要。删除当前共用用例，至少保留一个；历史 Run 冻结口径与结果不变。写入沿用版本治理及摘要校验。'],
     ['cases/from-run', 'agent_id experiment_id run_id case_id'],
@@ -219,42 +209,4 @@ export function assistantActionContract(domain: AssistantDomain, action: string)
   } } }
   return { domain, action, input_schema: { type: 'object', properties, ...(action === 'eval/start' ? { required: ['source', 'run_id'] } : ['eval/status', 'eval/cancel'].includes(action) ? { required: ['run_id'] } : {}), additionalProperties: true },
     instructions: hint[2] ?? '使用先前实际返回的对象标识；缺少目标先查询目录。输入由原业务接口校验，错误时核对具体字段，不重放结果未知的写操作。' }
-}
-
-/** DSH 只接收有限 JSON Schema；数值和长度约束保留为说明，实际 Zod 解析不变。 */
-function nativeSchema(schema: MapValue): MapValue {
-  const result: MapValue = {}
-  const constraints: string[] = []
-  for (const [key, value] of Object.entries(schema)) {
-    if (key === 'properties') result.properties = Object.fromEntries(Object.entries(value).map(([name, child]) => [name, nativeSchema(child as MapValue)]))
-    else if (key === 'additionalProperties' && typeof value === 'object') { result.additionalProperties = true; constraints.push(`动态属性的值合同=${JSON.stringify(value)}`) }
-    else if (key === 'items' && typeof value === 'object') result[key] = nativeSchema(value)
-    else if (key === 'type' && Array.isArray(value)) result.oneOf = value.map(type => ({ type }))
-    else if (['oneOf', 'anyOf'].includes(key)) result.oneOf = value.map(nativeSchema)
-    else if (['type', 'required', 'additionalProperties', 'enum', 'const', 'description', 'title', 'default', 'examples'].includes(key)) result[key] = value
-    else if (key !== '$schema') constraints.push(`${key}=${JSON.stringify(value)}`)
-  }
-  if (constraints.length) result.description = [result.description, `接口校验：${constraints.join('；')}`].filter(Boolean).join('。')
-  return result
-}
-
-/** describe 是模型适配层的只读动作，不注册为公共业务 RPC。 */
-export function projectAssistantTools<T extends { name: string }>(tools: readonly T[], state: any): T[] {
-  return tools.flatMap(tool => {
-    const domain = tool.name.replace(/^platform_/, '') as AssistantDomain
-    if (!Object.hasOwn(assistantActions, domain) || !tool.name.startsWith('platform_')) return [tool]
-    const allowed = allowedAssistantActions(domain, state)
-    if (!allowed.length) return []
-    const selected = state?.tool_contracts?.[domain]
-    const contract = allowed.includes(selected) ? assistantActionContract(domain, selected) : undefined
-    return [{ ...tool,
-      description: `平台${domain}工具。先用 describe(input.action=操作名)查看单个操作合同，再执行该动作；context读取固定目标。可随时describe切换其他合法动作。${contract ? `当前操作 ${selected}：${contract.instructions}` : '先查已有对象和能力，再构建、评测、改进或交付。'}确认和实际执行结果以平台回执为准。`,
-      parameters: { type: 'object', properties: {
-        action: { type: 'string', enum: ['context', 'describe', ...(contract ? [selected] : [])] },
-        input: { type: 'object', properties: { ...contract && nativeSchema(contract.input_schema).properties,
-          action: { type: 'string', enum: [...allowed], description: '仅 describe 使用：需要查看的操作名。' } }, additionalProperties: true,
-          description: contract ? '执行当前操作时使用所示字段；context 使用空对象，describe 使用 action。完整业务语义由原接口校验。' : '不确定参数时先 describe；input={action:"操作名"}。' },
-      }, required: ['action', 'input'], additionalProperties: false },
-    }]
-  })
 }

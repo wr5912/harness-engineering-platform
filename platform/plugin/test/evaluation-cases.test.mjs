@@ -151,3 +151,46 @@ test('改号拒绝陈旧摘要、重复映射、占用目标和无效场景缩�
   ]) assert.equal((await call(fx, 'cases/renumber', { expected_sha256: hash(initial), ...body })).ok, false)
   assert.equal(fx.writes.length, 0); assert.equal(readFileSync(fx.evaluation, 'utf8'), initial)
 }))
+
+for (const newline of ['\n', '\r\n']) for (const trailing of [true, false]) test(`场景排序只移动原文块，保留其他场景、fast、出处及换行 ${JSON.stringify(newline)} EOF=${trailing}`, () => withFixture(async fx => {
+  const first = fx.initial.slice(fx.initial.indexOf('#### U-CASE-001'), fx.initial.indexOf('## 其他')).trimEnd()
+    .replace('**用户输入**', `**评估档位：** \`fast\`\n\n<!-- source_run_id: ${runId}; source_case_id: U-OLD-001 -->\n\n**用户输入**`)
+    .replace('返回 pong。', '返回 pong。\n\n#### 补充说明\n\n正文中的普通四级标题。')
+  const second = first.replaceAll('U-CASE-001', 'U-CASE-003').replaceAll('ping', 'second').replaceAll('pong', 'second-result')
+  const other = fx.initial.slice(fx.initial.indexOf('## 其他')).trimEnd()
+  // 非目标场景位于中间，同名场景的两个区段不交换位置。
+  const initial = ['# 业务评测', '', '## 基础', '', first, '', other, '', '## 基础', '', second].join('\n').replaceAll('\n', newline) + (trailing ? newline : '')
+  writeFileSync(fx.evaluation, initial)
+  const before = await parseEvaluationDocument(fx.root, initial)
+  const input = { scene: '基础', case_ids: ['U-CASE-003', 'U-CASE-001'], expected_sha256: hash(initial) }
+  const preview = await call(fx, 'cases/reorder-preview', input)
+  assert.equal(preview.ok, true, JSON.stringify(preview)); assert.equal(preview.value.written, false)
+  assert.equal(readFileSync(fx.evaluation, 'utf8'), initial); assert.equal(fx.writes.length, 0)
+  const result = await call(fx, 'cases/reorder', input)
+  assert.equal(result.ok, true, JSON.stringify(result)); assert.equal(result.value.written, true)
+  const actual = readFileSync(fx.evaluation, 'utf8')
+  const expected = ['# 业务评测', '', '## 基础', '', second, '', other, '', '## 基础', '', first].join('\n').replaceAll('\n', newline) + (trailing ? newline : '')
+  assert.equal(actual, expected)
+  const after = await parseEvaluationDocument(fx.root, actual)
+  for (const id of before.case_ids) {
+    assert.deepEqual(after.cases[id], before.cases[id])
+    assert.deepEqual(after.catalog.find(row => row.case_id === id), before.catalog.find(row => row.case_id === id))
+  }
+  assert.deepEqual(result.value.before_order, ['U-CASE-001', 'U-CASE-003'])
+  assert.deepEqual(result.value.after_order, input.case_ids)
+  assert.equal(result.value.sha256, hash(actual))
+  const noop = await call(fx, 'cases/reorder', { ...input, expected_sha256: hash(actual) })
+  assert.equal(noop.value.written, false); assert.equal(fx.writes.length, 1)
+  assert.equal((await call(fx, 'cases/reorder', input)).error.code, 'conflict')
+}))
+
+test('排序拒绝重复、遗漏、额外或跨场景 ID、缺失摘要及取消，不写入', () => withFixture(async fx => {
+  for (const body of [
+    { case_ids: [] }, { case_ids: ['U-CASE-001', 'U-CASE-001'] }, { case_ids: ['U-CASE-002'] },
+    { case_ids: ['U-CASE-404'] }, { case_ids: [null] }, { scene: '不存在', case_ids: ['U-CASE-001'] },
+    { case_ids: ['U-CASE-001'], expected_sha256: '' }, { case_ids: ['U-CASE-001'], expected_sha256: 'old' },
+  ]) assert.equal((await call(fx, 'cases/reorder', { scene: '基础', expected_sha256: hash(fx.initial), ...body })).ok, false)
+  const controller = new AbortController(); controller.abort()
+  assert.equal((await fx.handler('cases/reorder', { experiment_id: experiment, scene: '基础', case_ids: ['U-CASE-001'], expected_sha256: hash(fx.initial) }, controller.signal)).error.code, 'aborted')
+  assert.equal(fx.writes.length, 0); assert.equal(readFileSync(fx.evaluation, 'utf8'), fx.initial)
+}))

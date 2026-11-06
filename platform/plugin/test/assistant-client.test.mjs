@@ -33,6 +33,7 @@ function fixture(call, selection, rows = {}, config = {}) {
       references.push(reference)
       return reference
     }, async using(id, options, operation) {
+      if (!rows[id] && config.refreshedRows?.[id]) rows[id] = config.refreshedRows[id]
       const reference = this.retain(id, options)
       try { await reference.ready; return await operation(reference) }
       finally { reference.release() }
@@ -272,17 +273,18 @@ test('迁移前原生会话按服务端提供的旧根恢复平台上下文', as
 })
 
 
-test('续接迁移旧会话时保留原 cwd，拒绝把外部会话收编为管理任务', async () => {
+test('原生续接保留历史 cwd，不增加管理会话资格检查', async () => {
   const f = fixture(async (_channel, endpoint, body) => ({ ok: true, value: endpoint === 'assistant/session' ? { session_id: body.session_id } : { proposals: [] } }), undefined, { legacy: { cwd: '/old-repo' }, foreign: { cwd: '/another-project' } }, { legacyRoots: ['/old-repo'] })
   await f.assistant.create('继续任务', { session_id: 'legacy' })
   assert.equal(f.assistant.getSnapshot().sessionId, 'legacy')
   assert.equal(f.nativeCreates.length, 0)
-  await assert.rejects(() => f.assistant.create('继续任务', { session_id: 'foreign' }), /不属于当前工作区/)
+  await f.assistant.create('继续任务', { session_id: 'foreign' })
+  assert.equal(f.assistant.getSnapshot().sessionId, 'foreign')
   assert.equal(f.nativeCreates.length, 0)
   f.assistant.dispose()
 })
 
-test('续接前刷新未到达的历史会话目录，不通过新建接口收编', async () => {
+test('通过原生 using 装载尚未出现在目录的历史会话', async () => {
   const f = fixture(async (_channel, endpoint, body) => ({ ok: true, value: endpoint === 'assistant/session' ? { session_id: body.session_id } : { proposals: [] } }), undefined, {}, { legacyRoots: ['/old-repo'], refreshedRows: { legacy: { cwd: '/old-repo' } } })
   await f.assistant.create('继续任务', { session_id: 'legacy' })
   assert.equal(f.assistant.getSnapshot().sessionId, 'legacy')
@@ -291,13 +293,13 @@ test('续接前刷新未到达的历史会话目录，不通过新建接口收�
 })
 
 
-test('配置缺失在创建原生工作区和会话之前提示，既有会话仍可查看', async () => {
-  const f = fixture(async () => ({ ok: true, value: { proposals: [] } }), 'existing', { existing: { cwd: '/repo' } }, { configuration: { ok: true, value: { ready: false, message: '当前工作区未配置平台管理助手，请连接或克隆已有数据仓库。' } } })
+test('可选业务配置缺失不阻断原生新建和既有会话', async () => {
+  const f = fixture(async (_channel, endpoint, body) => ({ ok: true, value: endpoint === 'assistant/session' ? { session_id: body.session_id } : { proposals: [] } }), 'existing', { existing: { cwd: '/repo' } }, { configuration: { ok: true, value: { ready: false, message: '当前工作区未配置平台管理助手，请连接或克隆已有数据仓库。' } } })
   await f.assistant.select('existing', false)
-  await assert.rejects(f.assistant.create('新任务'), /未配置平台管理助手/)
-  assert.equal(f.nativeCreates.length, 0)
-  assert.equal(f.assistant.getSnapshot().sessionId, 'existing')
-  assert.match(f.assistant.getSnapshot().error, /连接或克隆/)
+  await f.assistant.create('新任务')
+  assert.equal(f.nativeCreates.length, 1)
+  assert.equal(f.assistant.getSnapshot().sessionId, 'session-1')
+  assert.equal(f.assistant.getSnapshot().error, '')
   f.assistant.dispose()
 })
 
