@@ -115,6 +115,7 @@ test('平台通过原生插槽只替换 Codex 更新弹窗，加载顺序、刷�
 })
 
 function renderPage(source, component, props, initialHash = '#/mcp') {
+  props = { brandingForm: { subscribe() {}, getSnapshot: () => ({ value: { branding: { name: '测试平台', subtitle: '' } } }) }, ...props }
   const states = [], dependencies = [], listeners = new Map()
   let cursor = 0, effects = [], changed = false, tree
   const react = { ...require('react'),

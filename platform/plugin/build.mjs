@@ -121,6 +121,8 @@ await build({
 // 构建投影仅记录实际参与实现摘要的文件，不作为可编辑来源。
 await writeFile(outputPath('lib/composition-source-index.json'), JSON.stringify({ schema_version: 1, source_digest: implementationDigest, files: implementationSources,
   artifacts: [{ path: relative(resolve('../..'), resolve(outputPath('lib/index.js'))), sha256: createHash('sha256').update(await readFile(outputPath('lib/index.js'))).digest('hex') }] }, null, 2) + '\n')
+await build({ entryPoints: ['src/branding-config.ts'], outfile: 'lib/branding-config.js', bundle: true,
+  platform: 'node', target: 'node20', format: 'esm', packages: 'external', legalComments: 'none' })
 await build({ entryPoints: ['src/mcp/manager.ts'], outfile: 'lib/mcp-manager.js', bundle: true,
   platform: 'node', target: 'node24', format: 'esm', packages: 'external', plugins: [managerSources], legalComments: 'none', define: implementationDefine })
 await build({ entryPoints: ['src/mcp/platform-manager.ts'], outfile: 'lib/platform-mcp-manager.js', bundle: true,

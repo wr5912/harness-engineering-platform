@@ -1,0 +1,13 @@
+{
+  "title": "Harness 工程平台",
+  "brand": "Harness 工程平台\nHarness Engineering Platform",
+  "brandLabel": "返回 Harness 工程平台首页",
+  "settings": "平台名称\n\n用于顶栏、登录页和浏览器标题，保存后自动生效。\n\n名称\n副标题（可留空）\n保存平台名称",
+  "inputs": [
+    "Harness 工程平台",
+    "Harness Engineering Platform"
+  ],
+  "buttonDisabled": true,
+  "width": 1440,
+  "scrollWidth": 1440
+}

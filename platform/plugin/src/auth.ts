@@ -5,8 +5,9 @@ import type { Context } from '@deepseek-ai/cordis'
 import { credentialKey, type CredentialRecord } from '@deepseek-ai/dsh-credentials'
 import type { ConnectionTrustRequest } from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-host-webserver'
-import { loginCarouselScriptHash, loginThemeScriptHash, loginPage } from './login.tsx'
+import { loginBrandingScriptHash, loginCarouselScriptHash, loginThemeScriptHash, loginPage } from './login.tsx'
 import { workspaceLocalPath } from './workspace.ts'
+import { DEFAULT_BRANDING, type Branding } from './branding-defaults.ts'
 
 declare module '@deepseek-ai/dsh-host-webserver' {
   interface WebServer {
@@ -65,7 +66,7 @@ function formBody(req: IncomingMessage): Promise<string> {
   })
 }
 
-export async function applyAuthentication(ctx: Context, assetRoot: string) {
+export async function applyAuthentication(ctx: Context, assetRoot: string, branding: () => Branding = () => DEFAULT_BRANDING) {
   const connection = ctx.connection
   const nativeAdmission = connection.admit.bind(connection)
   let active = false
@@ -156,9 +157,17 @@ export async function applyAuthentication(ctx: Context, assetRoot: string) {
     res.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store',
       // no-referrer 会使浏览器表单的 Origin 变成 null，导致同源登录被拒绝。
       'referrer-policy': 'same-origin', 'x-content-type-options': 'nosniff',
-      'content-security-policy': `default-src 'none'; script-src 'sha256-${loginThemeScriptHash}' 'sha256-${loginCarouselScriptHash}'; style-src 'unsafe-inline'; img-src data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'` })
-    res.end(loginPage(ctx.webServer.publicPath('/login'), error, preference))
+      'content-security-policy': `default-src 'none'; script-src 'sha256-${loginThemeScriptHash}' 'sha256-${loginCarouselScriptHash}' 'sha256-${loginBrandingScriptHash}'; connect-src 'self'; style-src 'unsafe-inline'; img-src data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'` })
+    res.end(loginPage(ctx.webServer.publicPath('/login'), error, preference, branding(), ctx.webServer.publicPath('/api/harness-platform/branding')))
   }
+  ctx.effect(() => ctx.webServer.register({ kind: 'exact', path: '/api/harness-platform/branding', handler(req, res) {
+    if (!active) { res.writeHead(503); res.end(); return }
+    if (fence(req)) { res.writeHead(403); res.end(); return }
+    if (req.method !== 'GET') { res.writeHead(405, { allow: 'GET' }); res.end(); return }
+    const { name, subtitle } = branding()
+    res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+    res.end(JSON.stringify({ name, subtitle }))
+  } }))
   for (const path of ['/login', '/logout']) {
     ctx.effect(() => ctx.webServer.register({ kind: 'exact', path, async handler(req, res) {
       if (!active) { res.writeHead(503); res.end(); return }

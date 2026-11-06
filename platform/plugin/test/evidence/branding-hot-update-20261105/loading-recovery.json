@@ -1,0 +1,33 @@
+{
+  "checks": [
+    "first describe failure exits indefinite loading, shows failure and disables editing",
+    "native shared mirror retry recovers actual settings without browser reload",
+    "recovered input and title agree with persisted native configuration"
+  ],
+  "failed": {
+    "title": "Harness 工程平台",
+    "brand": "Harness 工程平台\nHarness Engineering Platform",
+    "brandLabel": "返回 Harness 工程平台首页",
+    "settings": "平台名称\n\n用于顶栏、登录页和浏览器标题，保存后自动生效。\n\n读取配置失败：client api: settings/describe failed: Failed to fetch。请检查连接，然后重新读取。\n\n重新读取配置\n名称\n副标题（可留空）\n保存平台名称",
+    "inputs": [
+      "Harness 工程平台",
+      "Harness Engineering Platform"
+    ],
+    "buttonDisabled": false,
+    "width": 1440,
+    "scrollWidth": 1440
+  },
+  "recovered": {
+    "title": "断网后保留的草稿",
+    "brand": "断网后保留的草稿",
+    "brandLabel": "返回 断网后保留的草稿首页",
+    "settings": "平台名称\n\n用于顶栏、登录页和浏览器标题，保存后自动生效。\n\n名称\n副标题（可留空）\n保存平台名称",
+    "inputs": [
+      "断网后保留的草稿",
+      ""
+    ],
+    "buttonDisabled": true,
+    "width": 1440,
+    "scrollWidth": 1440
+  }
+}

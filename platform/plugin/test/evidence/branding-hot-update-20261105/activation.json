@@ -1,0 +1,41 @@
+{
+  "status": "busy",
+  "activation": "none",
+  "pid": 3099790,
+  "busy": [
+    {
+      "kind": "session",
+      "id": "session-e3c748eb-15f5-4388-877d-91e0251e7702",
+      "state": "running"
+    },
+    {
+      "kind": "assistant",
+      "id": "session-e3c748eb-15f5-4388-877d-91e0251e7702",
+      "state": "pending"
+    },
+    {
+      "kind": "session",
+      "id": "session-c1f027cc-3639-485a-8c6f-b7429c296fa1",
+      "state": "running"
+    },
+    {
+      "kind": "assistant",
+      "id": "session-c1f027cc-3639-485a-8c6f-b7429c296fa1",
+      "state": "pending"
+    },
+    {
+      "kind": "evaluation",
+      "id": "run-32d64186-73e1-4686-b6a5-4a055faea53f",
+      "state": "running"
+    }
+  ],
+  "changed": [
+    "platform/plugin/lib/client.js",
+    "platform/plugin/lib/composition-source-index.json",
+    "platform/plugin/lib/index.js",
+    "platform/plugin/lib/mcp-manager.js",
+    "platform/plugin/lib/platform-mcp-manager.js",
+    "platform/plugin/lib/standalone-bridge.js",
+    "platform/plugin/lib/standalone-plugin.js"
+  ]
+}

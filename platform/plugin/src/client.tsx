@@ -26,9 +26,11 @@ import { AssistantConversation, AssistantOperations, PlatformOperationCard, crea
 import { createPlatformUpdates, type PlatformUpdates } from './realtime/client.ts'
 import { ModelsSettingsFooter } from './models/client.tsx'
 import { LOGIN_THEME_DRAFT, ThemeIcon } from './theme-toggle.tsx'
+import { BrandingSettingsRow, useBranding, type BrandingForm } from './branding.tsx'
+import { BRANDING_NAMESPACE, DEFAULT_BRANDING, type BrandingSettings } from './branding-defaults.ts'
 
 export const name = 'harness-platform-client'
-export const inject = ['connection', 'remote', 'slots', 'layout', 'workspaces', 'uiWorkspace', 'uiSession', 'sessions', 'conversation', 'theme']
+export const inject = ['connection', 'remote', 'slots', 'layout', 'workspaces', 'uiWorkspace', 'uiSession', 'sessions', 'conversation', 'theme', 'configForms']
 type ThemeScheme = 'light' | 'dark'
 type ThemeControls = { getScheme: () => ThemeScheme; setScheme: (scheme: ThemeScheme) => void; subscribe: (listener: () => void) => () => void }
 type ThemeChangeSource = { on(event: 'theme/change', listener: () => void): void }
@@ -126,11 +128,14 @@ type PlatformProps = PlatformPageProps & PropsRuntime<'shell.overlay'> & PropsRe
   sessions: Context['sessions']
   updates: PlatformUpdates
   theme: ThemeControls
+  brandingForm: BrandingForm
   enterConversation: (sidebarCollapsed?: boolean) => void
   showNativeConversation: (visible: boolean, afterHidden?: () => void) => void
 }
 
-function PlatformPage({ catalog, rpc, assistant, updates, theme, enterConversation, showNativeConversation, SessionProvider, renderSlot, useSessionStatus, sessions }: PlatformProps) {
+function PlatformPage({ catalog, rpc, assistant, updates, theme, brandingForm, enterConversation, showNativeConversation, SessionProvider, renderSlot, useSessionStatus, sessions }: PlatformProps) {
+  const branding = useBranding(brandingForm).value?.branding ?? DEFAULT_BRANDING
+  useEffect(() => { document.title = branding.name }, [branding.name])
   const [target, setTarget] = useState<PlatformNavigation>(() => readNavigation(window.location.hash))
   const page = target.page
   const mountedPages = useRef(new Set<PageId>([page]))
@@ -330,7 +335,7 @@ function PlatformPage({ catalog, rpc, assistant, updates, theme, enterConversati
     .filter((item): item is [string, string] => Boolean(item[1])) : []
   return <div ref={frame} className="harness-platform" data-page={page} data-assistant-open={floating || undefined}>
     <style>{platformTheme}</style>
-    <header className="harness-topbar"><a className="harness-brand" href={navigationHash({ page: 'home' })} aria-label="返回 Harness 工程平台首页" onClick={event => { event.preventDefault(); navigate('home') }}><PlatformLogo size={38}/><span><strong>{full ? 'Harness工程平台' : 'Harness 工程平台'}</strong><small>{full ? 'Harness Engineering Platform' : 'ENGINEERING WORKSPACE'}</small></span></a>
+    <header className="harness-topbar"><a className="harness-brand" href={navigationHash({ page: 'home' })} aria-label={`返回 ${branding.name}首页`} onClick={event => { event.preventDefault(); navigate('home') }}><PlatformLogo size={38}/><span><strong title={branding.name}>{branding.name}</strong>{branding.subtitle && <small title={branding.subtitle}>{branding.subtitle}</small>}</span></a>
       {navigation}
       <span className="harness-current-module" aria-label={`当前模块：${pages.find(item => item.id === page)?.label}`}>{pages.find(item => item.id === page)?.label}</span>
       <button type="button" className="harness-theme-toggle" aria-label={themeScheme === 'dark' ? '切换到浅色主题' : '切换到深色主题'} title={themeScheme === 'dark' ? '切换到浅色主题' : '切换到深色主题'} onClick={() => theme.setScheme(themeScheme === 'dark' ? 'light' : 'dark')}><ThemeIcon scheme={themeScheme}/></button>
@@ -473,12 +478,14 @@ export function apply(ctx: ClientContext) {
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay', id: 'harness-platform', order: -100,
     children: { 'harness.assistant.conversation': { kind: 'single', scope: 'session-maybe' } },
-    inject: () => ({ catalog, assistant, sessions: ctx.sessions, updates, theme, rpc: ctx.connection.rpc, enterConversation: (sidebarCollapsed?: boolean) => prepareConversation(ctx.layout, sidebarCollapsed), showNativeConversation }),
+    inject: () => ({ catalog, assistant, sessions: ctx.sessions, updates, theme, brandingForm: ctx.configForms.get<BrandingSettings>(BRANDING_NAMESPACE), rpc: ctx.connection.rpc, enterConversation: (sidebarCollapsed?: boolean) => prepareConversation(ctx.layout, sidebarCollapsed), showNativeConversation }),
   }, PlatformPage))
   ctx.slots.inject('harness.assistant.conversation', () => ctx.slots.register({ name: 'harness.assistant.conversation' }, AssistantConversation))
   ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({ name: 'conversation.input.dock', id: 'harness-operation-confirmation', inject: () => ({ rpc: ctx.connection.rpc, assistant }) }, AssistantOperations))
   for (const key of ['platform_agents', 'platform_instances', 'platform_mcp']) ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({ name: 'tool.call.toolview', key, inject: () => ({ rpc: ctx.connection.rpc, assistant }) }, PlatformOperationCard))
   ctx.slots.inject('settings.launcher', () => ctx.slots.register({ name: 'settings.launcher', priority: -1 }, PlatformSettings))
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({ name: 'settings.general.item', id: 'platform-branding', order: 20,
+    inject: () => ({ form: ctx.configForms.get<BrandingSettings>(BRANDING_NAMESPACE), describe: ctx.configForms.describe() }) }, BrandingSettingsRow))
   ctx.slots.inject('settings.models.footer', () => ctx.slots.register({ name: 'settings.models.footer', id: 'harness-model-sharing', order: 20,
     inject: () => ({ rpc: ctx.connection.rpc, changes: modelChanges }) }, ModelsSettingsFooter))
   ctx.slots.inject('sidebar.brand.mark', () => ctx.slots.register({ name: 'sidebar.brand.mark', priority: -1 }, ({ size }: SidebarBrandMarkOwnerProps) => <PlatformLogo size={size}/>))

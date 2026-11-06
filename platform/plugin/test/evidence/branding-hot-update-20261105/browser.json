@@ -1,0 +1,55 @@
+{
+  "results": [
+    "save synchronizes both authenticated pages and login",
+    "all pages retain original document",
+    "login input draft retained",
+    "header accessible name synchronized",
+    "blank name rejected in browser",
+    "blank name rejected by native settings boundary",
+    "empty subtitle hidden on login",
+    "HTML treated as text",
+    "long header uses full title tooltip",
+    "external change leaves draft intact",
+    "stale revision rejected without losing draft",
+    "explicit retry saves preserved draft",
+    "network failure retains draft",
+    "explicit retry after network recovery succeeds",
+    "configuration persists across browser refresh"
+  ],
+  "snapshots": [
+    {
+      "title": "断网后保留的草稿",
+      "brand": "断网后保留的草稿",
+      "brandLabel": "返回 断网后保留的草稿首页",
+      "settings": "平台名称\n\n用于顶栏、登录页和浏览器标题，保存后自动生效。\n\n名称\n副标题（可留空）\n保存平台名称",
+      "inputs": [
+        "断网后保留的草稿",
+        ""
+      ],
+      "buttonDisabled": true,
+      "width": 1440,
+      "scrollWidth": 1440
+    },
+    {
+      "title": "断网后保留的草稿",
+      "brand": "断网后保留的草稿",
+      "brandLabel": "返回 断网后保留的草稿首页",
+      "settings": "平台名称\n\n用于顶栏、登录页和浏览器标题，保存后自动生效。\n\n名称\n副标题（可留空）\n保存平台名称\n已保存，已打开的页面会自动更新。",
+      "inputs": [
+        "断网后保留的草稿",
+        ""
+      ],
+      "buttonDisabled": true,
+      "width": 1440,
+      "scrollWidth": 1440
+    },
+    {
+      "title": "登录 · 断网后保留的草稿",
+      "inputs": null,
+      "loginName": "断网后保留的草稿",
+      "loginSubtitleHidden": true,
+      "width": 1440,
+      "scrollWidth": 1440
+    }
+  ]
+}

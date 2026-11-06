@@ -48,6 +48,7 @@ test('平台登录保护原生 API、三个写入域与 MCP，旧 Token/Cookie �
   await root.plugin({ name: 'test-credentials', apply(ctx) { new Credentials(ctx) } })
   await root.plugin(WebServer, { host: '127.0.0.1', port: 0 })
   await root.plugin(Connection)
+  await root.plugin({ name: 'test-branding', apply(ctx) { ctx.provide('platformBranding', () => ({ name: 'Harness 工程平台', subtitle: '' })) } })
   await root.plugin({ name: 'test-platform-mcp', apply(ctx) { ctx.provide('platformMcp', { servers: { get: () => [] }, groups: { get: () => [] } }) } })
   // 不执行 Session/模型；支撑新依赖，认证与原生投影注册仍运行真实实现。
   await root.plugin({ name: 'test-assistant-services', apply(ctx) {

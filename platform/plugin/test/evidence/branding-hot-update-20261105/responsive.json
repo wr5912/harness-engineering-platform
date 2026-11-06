@@ -1,0 +1,29 @@
+[
+  {
+    "width": 1440,
+    "scrollWidth": 1440,
+    "left": 493,
+    "right": 1130,
+    "inputFocused": true,
+    "saveVisible": true,
+    "settings": "平台名称\n\n用于顶栏、登录页和浏览器标题，保存后自动生效。\n\n名称\n副标题（可留空）\n保存平台名称\n已保存，已打开的页面会自动更新。"
+  },
+  {
+    "width": 768,
+    "scrollWidth": 768,
+    "left": 237,
+    "right": 714,
+    "inputFocused": true,
+    "saveVisible": true,
+    "settings": "平台名称\n\n用于顶栏、登录页和浏览器标题，保存后自动生效。\n\n名称\n副标题（可留空）\n保存平台名称\n已保存，已打开的页面会自动更新。"
+  },
+  {
+    "width": 390,
+    "scrollWidth": 390,
+    "left": 29,
+    "right": 356,
+    "inputFocused": true,
+    "saveVisible": true,
+    "settings": "平台名称\n\n用于顶栏、登录页和浏览器标题，保存后自动生效。\n\n名称\n副标题（可留空）\n保存平台名称\n已保存，已打开的页面会自动更新。"
+  }
+]

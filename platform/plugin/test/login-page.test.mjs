@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { request as httpRequest } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import vm from 'node:vm'
@@ -16,7 +17,7 @@ async function load(entry) {
   vm.runInNewContext(result.outputFiles[0].text, { module, exports: module.exports, require, Buffer, Headers, URL, URLSearchParams })
   return module.exports
 }
-const { loginPage, loginCarouselScript, loginCarouselScriptHash, loginThemeScript, loginThemeScriptHash } = await load('../src/login.tsx')
+const { loginPage, loginBrandingScript, loginBrandingScriptHash, loginCarouselScript, loginCarouselScriptHash, loginThemeScript, loginThemeScriptHash } = await load('../src/login.tsx')
 
 const tags = (html, tag) => Array.from(html.matchAll(new RegExp(`<${tag}\\b[^>]*>`, 'gi')), match => match[0])
 const hasHidden = tag => /\shidden(?:\s|=|>)/i.test(tag)
@@ -81,14 +82,14 @@ test('登录跳转地址及服务端错误按 HTML 转义，不产生额外脚�
   assert.match(html, /role="alert"[^>]*>&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;&amp;无法登录/)
   assert.equal(html.includes(action), false)
   assert.equal(html.includes(error), false)
-  assert.equal(tags(html, 'script').length, 2)
+  assert.equal(tags(html, 'script').length, 3)
 })
 
 test('页面内嵌主题与轮播脚本，其实际字节与 CSP 使用的 SHA256 摘要一致', () => {
   const html = loginPage('/hep/login')
   const scripts = Array.from(html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi))
-  assert.equal(scripts.length, 2)
-  for (const [index, [script, digest]] of [[loginThemeScript, loginThemeScriptHash], [loginCarouselScript, loginCarouselScriptHash]].entries()) {
+  assert.equal(scripts.length, 3)
+  for (const [index, [script, digest]] of [[loginThemeScript, loginThemeScriptHash], [loginCarouselScript, loginCarouselScriptHash], [loginBrandingScript, loginBrandingScriptHash]].entries()) {
     assert.doesNotMatch(scripts[index][1], /\bsrc\s*=/i)
     assert.equal(scripts[index][2], script)
     assert.equal(createHash('sha256').update(script).digest('base64'), digest)
@@ -183,7 +184,7 @@ function carousel({ reducedMotion = false, missingRoot = false } = {}) {
     }
     now = until
   }
-  const script = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].at(-1)[1]
+  const script = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)][1][1]
   vm.runInNewContext(script, { document, window })
   return { root, slides, content, previous, next, form, document, window, motion, advance,
     pointer(type, values = {}) {
@@ -379,11 +380,12 @@ test('真实登录 HTTP 的 CSP 允许且仅允许当前脚本，错误登录、
   await root.plugin(WebServer, { host: '127.0.0.1', port: 0 })
   await root.plugin(Connection)
   let preference = 'system', writes = 0, refuseTheme = false
+  let branding = { name: '配置平台', subtitle: 'Configurable Platform' }
   await root.plugin({ name: 'login-test-theme', apply(ctx) { ctx.provide('settingsController', {
     describe: () => ({ namespaces: [{ ns: 'ui-theme', value: { preference } }] }),
     async update(ns, patch) { assert.equal(ns, 'ui-theme'); if (refuseTheme) throw new Error('fixture unavailable'); preference = patch.preference; writes++ },
   }) } })
-  await root.plugin({ name: 'login-test-auth', inject: ['connection', 'credentials', 'webServer', 'settingsController'], apply(ctx) { return applyAuthentication(ctx, assetRoot) } })
+  await root.plugin({ name: 'login-test-auth', inject: ['connection', 'credentials', 'webServer', 'settingsController'], apply(ctx) { return applyAuthentication(ctx, assetRoot, () => branding) } })
   const origin = `http://127.0.0.1:${root.webServer.port}`
   const base = origin + root.webServer.publicPath('/')
   const loginUrl = origin + root.webServer.publicPath('/login')
@@ -395,11 +397,29 @@ test('真实登录 HTTP 的 CSP 允许且仅允许当前脚本，错误登录、
   assert.equal(page.headers.get('referrer-policy'), 'same-origin')
   const html = await page.text()
   const scripts = Array.from(html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))
-  assert.equal(scripts.length, 2)
+  assert.equal(scripts.length, 3)
   const digests = scripts.map(script => createHash('sha256').update(script[1]).digest('base64'))
   const policy = page.headers.get('content-security-policy')
   const scriptSources = policy.match(/(?:^|;)\s*script-src\s+([^;]+)/)?.[1].trim().split(/\s+/)
   assert.deepEqual(scriptSources, digests.map(digest => `'sha256-${digest}'`))
+  assert.match(html, /登录 · 配置平台/)
+  const brandingUrl = origin + root.webServer.publicPath('/api/harness-platform/branding')
+  const publicBranding = await fetch(brandingUrl)
+  assert.equal(publicBranding.status, 200)
+  assert.equal(publicBranding.headers.get('cache-control'), 'no-store')
+  assert.deepEqual(await publicBranding.json(), branding)
+  assert.equal((await fetch(brandingUrl, { method: 'POST' })).status, 405)
+  assert.equal((await fetch(brandingUrl, { headers: { origin: 'http://other.invalid' } })).status, 403)
+  const untrustedHost = await new Promise((resolve, reject) => {
+    const request = httpRequest(brandingUrl, { headers: { host: 'other.invalid' } }, response => {
+      response.resume(); response.on('end', () => resolve(response.statusCode))
+    })
+    request.on('error', reject); request.end()
+  })
+  assert.equal(untrustedHost, 403)
+  branding = { name: '已热更新', subtitle: '' }
+  assert.deepEqual(await (await fetch(brandingUrl)).json(), branding)
+  assert.match(await (await fetch(loginUrl)).text(), /登录 · 已热更新/)
   const wrong = await login('incorrect-fixture-password', 'dark')
   assert.equal(wrong.status, 401)
   assert.equal(wrong.headers.get('set-cookie'), null)
@@ -442,4 +462,36 @@ test('真实登录 HTTP 的 CSP 允许且仅允许当前脚本，错误登录、
   assert.equal(signedOut.status, 200)
   assert.match(await signedOut.text(), /action="\/hep\/login"/)
   assert.equal((await fetch(loginUrl, { redirect: 'manual', headers: { cookie: legacyCookie } })).status, 200)
+})
+
+
+test('自定义名称经过转义，空副标题不显示', () => {
+  const html = loginPage('/hep/login', '', 'system', { name: '<自定义 & 平台>', subtitle: '' })
+  assert.match(html, /登录 · &lt;自定义 &amp; 平台&gt;/)
+  assert.match(html, /data-platform-subtitle[^>]*hidden/)
+  assert.doesNotMatch(html, /Harness.?工程平台/)
+})
+
+test('登录页热更新在隐藏时不查询，失败后继续同步', async () => {
+  const document = eventTarget(), name = {}, subtitle = {}, story = eventTarget()
+  document.body = { dataset: { brandingUrl: '/hep/api/harness-platform/branding' } }
+  document.querySelector = selector => ({ '[data-platform-name]': name, '[data-platform-subtitle]': subtitle, '[data-platform-story]': story })[selector]
+  let poll, count = 0, broken = false, value = { name: '<新平台>', subtitle: '' }
+  vm.runInNewContext(loginBrandingScript, { document, window: { setInterval(callback, delay) { assert.equal(delay, 3000); poll = callback } },
+    async fetch(url, options) {
+      count++; assert.equal(url, document.body.dataset.brandingUrl); assert.equal(options.cache, 'no-store')
+      if (broken) throw new Error('offline')
+      return { ok: true, json: async () => value }
+    } })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(document.title, '登录 · <新平台>')
+  assert.equal(name.textContent, '<新平台>')
+  assert.equal(story.getAttribute('aria-label'), '了解 <新平台>')
+  assert.equal(subtitle.hidden, true)
+  document.hidden = true; await poll(); assert.equal(count, 1)
+  broken = true; document.hidden = false; await poll(); assert.equal(document.title, '登录 · <新平台>')
+  broken = false; value = { name: '恢复后的平台', subtitle: '副标题' }
+  document.emit('visibilitychange'); await new Promise(resolve => setImmediate(resolve))
+  assert.equal(document.title, '登录 · 恢复后的平台')
+  assert.equal(subtitle.textContent, '副标题'); assert.equal(subtitle.hidden, false)
 })

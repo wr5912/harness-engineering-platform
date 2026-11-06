@@ -25,11 +25,11 @@ export const baseTheme = `${visualTokens}
 .harness-table-scroll{max-height:480px;overflow:auto;scrollbar-width:thin}
 .harness-platform [role=alert]{color:var(--dsw-alias-state-error-primary,#b93838)}
 .harness-topbar{min-height:76px;flex-shrink:0;display:flex;align-items:center;gap:24px;padding:0 var(--hep-page-padding);background:var(--hep-surface);border-bottom:1px solid var(--hep-border)}
-.harness-brand{display:flex;gap:10px;align-items:center;flex-shrink:0}
+.harness-brand{display:flex;gap:10px;align-items:center;min-width:0;max-width:min(35vw,420px)}.harness-brand>img{flex-shrink:0}.harness-brand>span{min-width:0}
 .harness-platform .harness-brand{color:var(--hep-text);text-decoration:none}
 .harness-platform .harness-brand:hover{color:var(--hep-text);text-decoration:none}
-.harness-brand strong{display:block;font-size:17px;font-weight:700;line-height:1.3;white-space:nowrap}
-.harness-brand small{display:block;font-size:9px;line-height:1.6;color:var(--hep-muted);letter-spacing:.09em}
+.harness-brand strong{display:block;font-size:17px;font-weight:700;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.harness-brand small{display:block;font-size:9px;line-height:1.6;color:var(--hep-muted);letter-spacing:.09em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .harness-nav{display:flex;align-items:stretch;gap:4px;min-width:0;align-self:stretch;overflow-x:auto;scrollbar-width:thin}
 .harness-topbar>.harness-nav{flex:1}
 .harness-platform .harness-nav button{position:relative;flex-shrink:0;white-space:nowrap;border:0;border-radius:0;background:transparent;padding:0 12px;color:var(--hep-muted);font-size:13px}

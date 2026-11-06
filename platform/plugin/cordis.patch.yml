@@ -12,6 +12,9 @@
 - id: directory-picker
   disabled: true
 - insert:
+    - id: platform-branding
+      name: ./lib/branding-config.js
+      disabled: false
     - id: mcp-session-manager
       name: ./lib/platform-mcp-manager.js
       disabled: false
