@@ -311,7 +311,6 @@ export async function dryRunComposition(registry: McpRegistry, config: Compositi
       if (child.workflow) {
         const workflow = registry.extension?.workflows?.[child.workflow]
         if (!workflow) throw new Error(`工作流尚未装载：${child.workflow}`)
-        if (child.implementation && child.implementation !== compositionImplementationDigest(child, registry.extension, resolved, registry)) throw new Error('固定子组合实现与当前装载不一致，请恢复实现或重新发布')
         for (const id of workflow.connections(child)) if (!registry.openapi.has(id) && !registry.mcp.has(id)) throw new Error(`未注册组合依赖连接：${id}`)
       }
       if (child.kind === 'composite') {
@@ -351,8 +350,6 @@ export async function executeComposition(registry: McpRegistry, assetRoot: strin
   if (context && typeof input.run_id === 'string') registry.access!.assertRunRead(context, input.run_id)
   const resolvedCatalog = catalog ?? readCompositions(workspaceConfigPath(assetRoot, 'mcp-compositions.json')).catalog
   const version = checkedVersion ?? await compositionVersion(assetRoot, config, registry.extension, resolvedCatalog, registry)
-  const assertImplementation = () => { if (config.implementation && config.implementation !== version.implementationDigest) throw new Error('已发布实现与当前装载代码或连接不一致；请恢复实现或重新发布草稿') }
-  if (!config.workflow || execution?.workflowContext) assertImplementation()
   const attempts: ModelAttempt[] = []
   const inheritedRecorder = execution?.recordAttempt
   const runContext: CompositionExecutionContext = { execution_id: execution?.execution_id ?? (() => { const context = currentBusinessContext(); return context?.scope.sessionId && context.invocationId ? `call-${compositionExecutionDigest([context.scope.sessionId, context.invocationId])}` : `graph-${randomUUID()}` })(), role: execution?.role ?? 'target',
@@ -373,10 +370,9 @@ export async function executeComposition(registry: McpRegistry, assetRoot: strin
       const frozenCatalog = structuredClone({ ...resolvedCatalog, compositions: resolvedCatalog.compositions.filter(entry => required.has(entry.id) || [entry.draft, entry.published, ...(entry.versions ?? []).map(item => item.config)].some(item => item && compositionVersionId(item) === compositionVersionId(config))) }), frozenConfig = structuredClone(config)
       const frozenRegistry = { ...registry, extension: { ...registry.extension, workflows: { ...registry.extension?.workflows } }, openapi: new Map(registry.openapi), mcp: new Map(registry.mcp) }
       const compositionId = resolvedCatalog.compositions.find(entry => [entry.draft, entry.published, ...(entry.versions ?? []).map(item => item.config)].some(item => item && compositionVersionId(item) === compositionVersionId(config)))?.id ?? config.workflow
-      const accepted = await workflowRuns(assetRoot).start({ config: frozenConfig, input: validated, catalog: frozenCatalog, version: { ...version, implementationDigest: config.implementation ?? version.implementationDigest }, executionId: runContext.execution_id, compositionId }, workflow,
+      const accepted = await workflowRuns(assetRoot).start({ config: frozenConfig, input: validated, catalog: frozenCatalog, version, executionId: runContext.execution_id, compositionId }, workflow,
         context => executeComposition(frozenRegistry, assetRoot, frozenConfig, validated, undefined, frozenCatalog, true, { ...runContext, workflowContext: context }, version),
         async () => {
-          assertImplementation()
           await dryRunComposition(registry, config, validated, resolvedCatalog)
           return workflow.prepare?.(validated, config, signal ? AbortSignal.any([signal, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000))
         })

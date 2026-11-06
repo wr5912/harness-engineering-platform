@@ -49,7 +49,8 @@ export function workflowRuns(root: string) {
     mkdirSync(directory, { recursive: true, mode: 0o700 })
     const identity = compositionExecutionDigest({ execution: request.executionId })
     const identityFile = join(directory, `execution-${identity}.json`)
-    const binding = compositionExecutionDigest({ compositionId: request.compositionId, input: request.input, version: request.version.implementationDigest })
+    // 发布身份用于请求去重；当前装载摘要只记入运行，不让配置更新重放旧请求。
+    const binding = compositionExecutionDigest({ compositionId: request.compositionId, input: request.input, version: request.config.implementation ?? request.version.implementationDigest })
     if (existsSync(identityFile)) {
       const previous = JSON.parse(readFileSync(identityFile, 'utf8'))
       if (previous.binding !== binding) throw new Error('执行标识已用于不同的编排、实现或输入')

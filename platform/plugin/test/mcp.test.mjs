@@ -1026,16 +1026,72 @@ test('管理调用返回已接受回执，发布父依赖阻止下架，删除�
   const published = await rpc('publishComposition', { compositionId: 'stable-id', version: 'draft', revision: state.revision, input: {} })
   assert.equal(published.ok, true, JSON.stringify(published))
   state = published.value
+  const beforeBinding = state.compositions.find(entry => entry.id === 'stable-id').binding
+  const nestedDraft = await rpc('saveCompositionDraft', { revision: state.revision, newId: 'nested-live', draft: { kind: 'composite', workflow: 'parent', toolName: 'nested_live', title: '复用已发布子检查', description: '', steps: [{ id: 'child', compositionId: 'stable-id', versionId: beforeBinding.versionId, inputMap: {} }] } })
+  const nested = await rpc('publishComposition', { compositionId: 'nested-live', version: 'draft', revision: nestedDraft.value.revision, input: {} })
+  assert.equal(nested.ok, true, JSON.stringify(nested))
+  state = nested.value
   const beforeUpdate = await rpc('callPublishedComposition', { toolName: 'stable_tool', input: {}, execution: { execution_id: 'before-update' } })
   workflow.sourceDigest = 'b'.repeat(64)
   const recovered = await rpc('callPublishedComposition', { toolName: 'stable_tool', input: {}, execution: { execution_id: 'before-update' } })
   assert.equal(recovered.value.result.run_id, beforeUpdate.value.result.run_id)
-  assert.equal((await rpc('callPublishedComposition', { toolName: 'stable_tool', input: {}, execution: { execution_id: 'after-update' } })).ok, false)
+  const afterUpdate = await rpc('callPublishedComposition', { toolName: 'stable_tool', input: {}, execution: { execution_id: 'after-update' } })
+  assert.equal(afterUpdate.ok, true, JSON.stringify(afterUpdate))
+  assert.notEqual(afterUpdate.value.version.implementationDigest, beforeUpdate.value.version.implementationDigest)
+  assert.equal((await rpc('callPublishedComposition', { toolName: 'stable_tool', ...beforeBinding, input: {} })).error.code, 'conflict')
+  assert.equal((await rpc('dryRunComposition', { compositionId: 'stable-id', version: 'published', revision: state.revision, input: {} })).ok, true)
+  assert.equal((await rpc('dryRunComposition', { compositionId: 'nested-live', version: 'published', revision: state.revision, input: {} })).ok, true)
+  assert.equal((await rpc('callPublishedComposition', { toolName: 'nested_live', input: {} })).ok, true)
   assert.equal((await rpc('deleteComposition', { compositionId: 'child', revision: state.revision })).error.code, 'composition_published')
   assert.equal((await rpc('withdrawComposition', { compositionId: 'child', revision: state.revision })).error.code, 'composition_referenced')
   const withdrawn = await rpc('withdrawComposition', { compositionId: 'parent', revision: state.revision })
   assert.equal(withdrawn.ok, true)
   assert.equal((await rpc('withdrawComposition', { compositionId: 'child', revision: withdrawn.value.revision })).ok, true)
+})
+
+test('发布后连接更新立即用于新调用，外部失败仅影响相关调用，旧请求不重放', async () => {
+  const module = await loadMcpModule()
+  await withFixture(async ({ baseUrl, calls }) => {
+    const root = await mkdtemp(join(tmpdir(), 'mcp-live-configuration-')), file = join(root, 'compositions.json')
+    await writeFile(file, JSON.stringify({ schema_version: '1.0', compositions: [] }))
+    const credentialPath = join(root, 'token.txt')
+    await writeFile(credentialPath, 'secret-token')
+    const workflow = { inputSchema: { type: 'object', properties: {} }, sourceDigest: 'a'.repeat(64), connections: () => ['soc'],
+      execute: async () => ({ status: 'completed' }) }
+    const handler = module.createMcpHandler(root, { compositionsFile: file, extension: { id: 'live', workflows: { check: workflow } } })
+    const rpc = (method, args) => module.managementDispatch(root, () => handler(method, args))
+    workflow.prepare = async () => {
+      const result = await rpc('callTool', { connectionId: 'soc', toolName: 'get_asset', arguments: { asset: 'host-a' } })
+      if (!result.ok) throw new Error(result.error.message)
+      return result.value.json
+    }
+    const register = specUrl => rpc('registerOpenApi', { id: 'soc', specUrl, credentialRef: { kind: 'file', path: credentialPath } })
+    await register(`${baseUrl}/openapi.json`)
+    const saved = await rpc('saveCompositionDraft', { revision: (await rpc('list', {})).value.revision, newId: 'live', draft: { kind: 'workflow', workflow: 'check', toolName: 'live', title: '检查', description: '' } })
+    const published = await rpc('publishComposition', { compositionId: 'live', version: 'draft', revision: saved.value.revision, input: {} })
+    assert.equal(published.ok, true, JSON.stringify(published))
+    const execute = id => rpc('callPublishedComposition', { toolName: 'live', input: {}, execution: { execution_id: id } })
+    const first = await execute('first')
+    assert.equal(first.ok, true, JSON.stringify(first))
+    const count = () => calls.filter(call => call.path === '/assets/host-a').length
+    assert.equal(count(), 1)
+    await register(`${baseUrl}/openapi.json?revision=2`)
+    const repeated = await execute('first')
+    assert.equal(repeated.value.result.run_id, first.value.result.run_id)
+    assert.equal(count(), 1)
+    const updated = await execute('updated')
+    assert.equal(updated.ok, true, JSON.stringify(updated))
+    assert.ok(calls.some(call => call.path === '/openapi.json' && call.search === '?revision=2'))
+    assert.notEqual(updated.value.version.implementationDigest, first.value.version.implementationDigest)
+    await register(`${baseUrl}/missing-spec`)
+    assert.equal((await execute('unavailable')).ok, false)
+    assert.equal((await rpc('list', {})).ok, true)
+    await rpc('registerMcp', { id: 'unrelated', endpointUrl: `${baseUrl}/missing-mcp` })
+    assert.equal((await rpc('callTool', { connectionId: 'unrelated', toolName: 'missing' })).ok, false)
+    await register(`${baseUrl}/openapi.json?revision=3`)
+    assert.equal((await execute('recovered')).ok, true)
+    assert.equal(count(), 3)
+  })
 })
 
 test('删除清理整个组合包，兼容旧目录与已删登记残留，保留邻居和历史运行', async () => {

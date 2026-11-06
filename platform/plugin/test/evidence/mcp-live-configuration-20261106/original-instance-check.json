@@ -1,0 +1,46 @@
+{
+  "own_instance_read": {
+    "instance": "inspection-027-schedule-acceptance",
+    "session_id": "session-24025291-c470-49a4-a528-f8199577456b",
+    "queried_run_id": "run-041f8b67-c776-4b46-bf1d-03228388a031",
+    "running": false,
+    "as_of_seq": 74,
+    "calls": [
+      {
+        "seq": 67,
+        "name": "mcp__inspection-compositions__get_composition_run",
+        "arguments": {
+          "run_id": "run-041f8b67-c776-4b46-bf1d-03228388a031"
+        }
+      }
+    ],
+    "responses": [
+      {
+        "seq": 69,
+        "ok": true,
+        "run_id": "run-041f8b67-c776-4b46-bf1d-03228388a031",
+        "composition_id": "inspection-status",
+        "status": "completed",
+        "business_result": "incomplete",
+        "scope_count": 105,
+        "artifact_names": [
+          "inspection-report.html",
+          "inspection-details.json"
+        ]
+      }
+    ],
+    "assistant_text": [
+      {
+        "seq": 72,
+        "text": "续查同一运行 `run-041f8b67-c776-4b46-bf1d-03228388a031`（只读，未新建/重启任何巡检）：\n\n- **执行状态 `completed`**：运行已于 2026-11-06T09:07:55Z 结束，各节点执行完毕（耗时约 8.5 秒）——这只表示执行流程跑完。\n- **业务结果 `incomplete`**：结果不完整，因存在未知项，不代表全部正常。计数：正常 83、异常 18、未知 4、不适用 0、失败 0。\n- **范围**：`scope.all=true` 冻结资产 **105** 台（冻结于 09:07:48Z）。\n- **报告产物**：`inspection-report.html`（395,225 字节）、`inspection-details.json`（279,406 字节）。"
+      }
+    ]
+  },
+  "cross_instance_probe": {
+    "session_id": "session-010e54cf-00ad-4292-bbb6-1795a839a1ba",
+    "queried_run_id": "run-c17d5c47-e10c-495f-a774-0b8399f8ab31",
+    "result": "当前请求未获业务许可",
+    "interpretation": "运行属于独立评测实例；会话与资源归属规则继续生效，未放宽权限。",
+    "new_inspection_started": false
+  }
+}

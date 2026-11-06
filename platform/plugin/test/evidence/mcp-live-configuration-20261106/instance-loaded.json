@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "operation": "reload",
+  "name": "inspection-027-schedule-acceptance",
+  "source_id": "experiment:EXP-security-operations-expert-027-f-r3ba4799b0cb7",
+  "agent_id": "security-operations-expert",
+  "current_digest": "sha256:b52ca6a2355722c33508f8a43214c55f9662348a958482508a946ac6a077dacb",
+  "loaded_digest": "sha256:b52ca6a2355722c33508f8a43214c55f9662348a958482508a946ac6a077dacb",
+  "loaded_ok": true,
+  "loaded_at": "2026-11-06T09:49:42.275Z",
+  "matched": true
+}

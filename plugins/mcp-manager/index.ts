@@ -882,7 +882,7 @@ export function apply(ctx: any, config: any): void {
   } }), 'mcp-manager.admin')
 
   const loadServers = async (selected: any[], preset: object, scopes: any[], unavailable: Set<string>) => {
-    if (config.isolateDiscovery && selected.length > 1) {
+    if (selected.length > 1) {
       // 每个连接独立完成发现与注册；慢或失效来源不延迟健康工具的可见性。
       const results = await Promise.allSettled(selected.map(async server => {
         const owned: any[] = []
@@ -922,17 +922,22 @@ export function apply(ctx: any, config: any): void {
         agents.set(id, { kind: 'agent', server })
         scope.ctx.effect(() => () => { agents.delete(id) }, 'mcp-manager.agent-endpoint')
         if (config.withToolContext) {
+          const currentServer = () => {
+            const latest = snapshot(config).servers.find(item => item.id === server.id && item.enabled !== false)
+            if (!latest) throw new Error('MCP 服务器已停用或移除')
+            return latest
+          }
           if (server.platformGroup) scope.ctx.inject(['mcpResources'], (inner: any) => {
             inner.mcpResources.register(server.id, { request: (request: any, execution: any) => config.withToolContext(execution, async () => {
-              server.platformAssertCurrent?.()
-              const active = { ...server, platformSignal: execution.signal }
+              const active = { ...currentServer(), platformSignal: execution.signal }
+              active.platformAssertCurrent?.()
               const result = await withClient(active, client => {
                 if (request.method === 'resources/list') return client.listResources(request.cursor ? { cursor: request.cursor } : undefined, { signal: execution.signal })
                 if (request.method === 'resources/templates/list') return client.listResourceTemplates(request.cursor ? { cursor: request.cursor } : undefined, { signal: execution.signal })
                 if (request.method === 'resources/read' && typeof request.uri === 'string') return client.readResource({ uri: request.uri }, { signal: execution.signal })
                 throw new Error('不支持的 MCP Resource 操作')
               })
-              server.platformAssertCurrent?.()
+              active.platformAssertCurrent?.()
               return result
             }) })
             inner.effect(() => {
@@ -954,9 +959,7 @@ export function apply(ctx: any, config: any): void {
               name: publicName, rawName: tool.name,
               description: tool.description ?? '', inputSchema: tool.inputSchema, outputSchema: tool.outputSchema,
               call: (args: any, execution: any) => config.withToolContext(execution, async () => {
-                const latest = snapshot(config).servers.find(item => item.id === server.id && item.enabled !== false)
-                if (!latest || JSON.stringify([latest.specUrl, latest.url]) !== JSON.stringify([server.specUrl, server.url])) throw new Error('MCP 服务器目标已变化或已停用')
-                return callManagedTool({ ...latest, platformSignal: execution.signal }, tool.name, args)
+                return callManagedTool({ ...currentServer(), platformSignal: execution.signal }, tool.name, args)
               }),
               }))
               const registration = `${server.id}\0${publicName}`
@@ -1032,6 +1035,8 @@ export function apply(ctx: any, config: any): void {
         await active.ready
         if (active.users === 0) return
         if (reused && active.unavailable.size) {
+          // 新 Session 到达时已有重试可能仍使用恢复前的结果；结束后再核对一次。
+          await active.retry
           active.retry ??= (async () => {
             const scopes = await active.ready
             const added: any[] = []

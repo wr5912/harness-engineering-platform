@@ -1,0 +1,129 @@
+{
+  "evaluation_run_id": "run-1b5c49a9-510b-42b6-ab0e-804e1b4ee698",
+  "evaluation_status": "completed",
+  "evaluation_verdict": "inconclusive",
+  "evaluation_observation": "语义判定：评审未为全部冻结要求提供可定位的结果证据。 同一路由自评，仅作研究辅助。",
+  "session_id": "session-1260efb5-0a3b-46ce-8836-a401137d4c2c",
+  "business_run_id": "run-c17d5c47-e10c-495f-a774-0b8399f8ab31",
+  "execution_status": "completed",
+  "business_result": "incomplete",
+  "scope_all": true,
+  "scope_count": 105,
+  "created_at": "2026-11-06T09:53:45.919Z",
+  "finished_at": "2026-11-06T09:55:02.521Z",
+  "metrics": {
+    "requests": 336,
+    "peak_concurrency": 8,
+    "preparation_ms": 748,
+    "elapsed_ms": 77350
+  },
+  "calls": [
+    {
+      "seq": 24,
+      "name": "mcp__inspection-compositions__inspection_routine",
+      "arguments": {
+        "scope": {
+          "all": true
+        }
+      }
+    },
+    {
+      "seq": 29,
+      "name": "mcp__inspection-compositions__get_composition_run",
+      "arguments": {
+        "run_id": "run-c17d5c47-e10c-495f-a774-0b8399f8ab31"
+      }
+    },
+    {
+      "seq": 34,
+      "name": "mcp__inspection-compositions__get_composition_run",
+      "arguments": {
+        "run_id": "run-c17d5c47-e10c-495f-a774-0b8399f8ab31"
+      }
+    },
+    {
+      "seq": 39,
+      "name": "mcp__inspection-compositions__get_composition_run",
+      "arguments": {
+        "run_id": "run-c17d5c47-e10c-495f-a774-0b8399f8ab31"
+      }
+    },
+    {
+      "seq": 52,
+      "name": "mcp__inspection-compositions__get_composition_run",
+      "arguments": {
+        "run_id": "run-c17d5c47-e10c-495f-a774-0b8399f8ab31"
+      }
+    },
+    {
+      "seq": 57,
+      "name": "mcp__inspection-compositions__get_composition_run",
+      "arguments": {
+        "run_id": "run-c17d5c47-e10c-495f-a774-0b8399f8ab31"
+      }
+    },
+    {
+      "seq": 62,
+      "name": "mcp__inspection-compositions__get_composition_run",
+      "arguments": {
+        "run_id": "run-c17d5c47-e10c-495f-a774-0b8399f8ab31"
+      }
+    },
+    {
+      "seq": 70,
+      "name": "mcp__inspection-compositions__get_composition_artifact",
+      "arguments": {
+        "run_id": "run-c17d5c47-e10c-495f-a774-0b8399f8ab31",
+        "artifactId": "report"
+      }
+    }
+  ],
+  "checks": {
+    "status": {
+      "status": "incomplete",
+      "counts": {
+        "normal": 82,
+        "abnormal": 19,
+        "unknown": 4,
+        "not_applicable": 0,
+        "failed": 0
+      }
+    },
+    "baseline": {
+      "status": "incomplete",
+      "counts": {
+        "normal": 9,
+        "abnormal": 0,
+        "unknown": 96,
+        "not_applicable": 0,
+        "failed": 0
+      }
+    },
+    "reachability": {
+      "status": "incomplete",
+      "counts": {
+        "normal": 0,
+        "abnormal": 0,
+        "unknown": 131,
+        "not_applicable": 0,
+        "failed": 0
+      }
+    }
+  },
+  "artifacts": [
+    {
+      "id": "report",
+      "filename": "inspection-report.html",
+      "content_type": "text/html; charset=utf-8",
+      "bytes": 2520844,
+      "sha256": "d531d8d82ef26c9d309443745a9e3fcad9e9bf13c40bf4f963d80930cfc9e1ad"
+    },
+    {
+      "id": "details",
+      "filename": "inspection-details.json",
+      "content_type": "application/json",
+      "bytes": 1886018,
+      "sha256": "5bd407835a77b6f5d36acdef33ed743db2665e7cf75055be6c3b7e2007b991ad"
+    }
+  ]
+}

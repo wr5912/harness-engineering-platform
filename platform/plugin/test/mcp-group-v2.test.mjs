@@ -260,7 +260,8 @@ test('业务 Session 跳过连接、鉴权和规范发现失败的 MCP 来源，
       '/echo': { get: { operationId: 'echo', responses: { 200: { description: 'ok' } } } },
     },
   })))
-  const hanging = await serve(t, () => {})
+  let hangingClosed = false
+  const hanging = await serve(t, (_req, res) => res.on('close', () => { hangingClosed = true }))
   const reserved = createServer()
   await new Promise(resolve => reserved.listen(0, '127.0.0.1', resolve))
   const port = reserved.address().port
@@ -314,6 +315,10 @@ test('业务 Session 跳过连接、鉴权和规范发现失败的 MCP 来源，
   const started = Date.now()
   const first = await session('offline', parent)
   assert.ok(Date.now() - started < 100, 'Session 创建不能等待外部 MCP 发现')
+  await waitFor(() => ctx.tools.get('mcp__Healthy__echo', first.agent))
+  assert.equal(hangingClosed, false, '健康工具不等待慢来源超时')
+  assert.equal(ctx.tools.get('mcp__Hanging__echo', first.agent), undefined,
+    '健康工具应在慢来源超时前独立完成注册')
   await waitFor(() => transitions.some(([name, active]) => name === 'mcp__Duplicate__echo' && !active))
   assert.ok(ctx.tools.get('mcp__Healthy__echo', first.agent), '可达来源照常注册')
   assert.equal(ctx.tools.get('mcp__Recovering__echo', first.agent), undefined, '不可达来源不得注册工具')
@@ -322,6 +327,19 @@ test('业务 Session 跳过连接、鉴权和规范发现失败的 MCP 来源，
   assert.equal(ctx.tools.get('mcp__Duplicate__echo', first.agent), undefined, '部分注册成功的坏来源必须回滚')
   assert.equal(ctx.mcpSessionManager.resolveTool('recovering', 'echo'), undefined)
   assert.equal(ctx.mcpSessionManager.resolveTool('duplicate', 'echo'), undefined)
+  const original = { ...servers[0] }
+  const updated = await fixtureMcp(t, 'updated', [])
+  delete servers[0].specUrl
+  servers[0].url = updated
+  const existingTool = ctx.tools.get('mcp__Healthy__echo', first.agent)
+  assert.equal((await existingTool.execute({ value: 'current' }, {})).content[0].text, 'updated:current',
+    '现有 Session 的已注册工具使用当前连接，不因地址变更被旧快照拒绝')
+  servers[0].enabled = false
+  await assert.rejects(existingTool.execute({}, {}), /已停用/)
+  servers[0].enabled = true
+  servers[0].tools = { mode: 'selected', names: [] }
+  await assert.rejects(existingTool.execute({}, {}), /不属于当前 MCP 范围/)
+  servers[0] = original
   const [stillOffline, concurrentOffline] = await Promise.all([
     session('still-offline', parent), session('concurrent-offline', parent),
   ])
