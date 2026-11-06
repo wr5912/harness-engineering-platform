@@ -278,21 +278,22 @@ export function createMcpHandler(assetRoot: string, options: { stateFile?: strin
         }
         if (endpoint !== 'callPublishedComposition' && request.revision !== revision) throw new Error('编排目录已变化，请刷新后重试；当前草稿未覆盖')
         if (endpoint === 'withdrawComposition' || endpoint === 'deleteComposition') {
+          if (typeof request.compositionId !== 'string' || !/^[a-z0-9-]{1,80}$/.test(request.compositionId)) throw new Error('编排 ID 无效')
           const entry = catalog.compositions.find(item => item.id === request.compositionId)
-          if (!entry) throw new Error('所选编排不存在')
           if (endpoint === 'deleteComposition') {
-            if (entry.published) return failure('composition_published', '请先下架组合，再删除')
-            const references = compositionReferences(catalog, entry.id, false, config => lfxDependencies(assetRoot, config))
+            if (entry?.published) return failure('composition_published', '请先下架组合，再删除')
+            const references = compositionReferences(catalog, request.compositionId, false, config => lfxDependencies(assetRoot, config))
             if (references.length) return failure('composition_referenced', '仍有组合引用，请先调整依赖', { references })
             const active = workflowRuns(assetRoot).active().map(id => workflowRuns(assetRoot).read(id))
-            if (active.some(run => run.plan?.compositions.some((item: any) => item.id === entry.id)) || executions.active().some(receipt => receipt.binding.composition_id === entry.id)) return failure('composition_running', '仍有已接受运行使用该组合，完成后可删除')
-            catalog.compositions = catalog.compositions.filter(item => item.id !== entry.id)
+            if (active.some(run => run.plan?.compositions.some((item: any) => item.id === request.compositionId)) || executions.active().some(receipt => receipt.binding.composition_id === request.compositionId)) return failure('composition_running', '仍有已接受运行使用该组合，完成后可删除')
+            catalog.compositions = catalog.compositions.filter(item => item.id !== request.compositionId)
           } else {
+            if (!entry) throw new Error('所选编排不存在')
             const references = compositionReferences(catalog, entry.id, true, config => lfxDependencies(assetRoot, config))
             if (references.length) return failure('composition_referenced', '仍有已发布组合引用，请先调整依赖或下架父组合', { references })
             entry.draft ??= entry.published ? compositionConfig(entry.published) : undefined; delete entry.published; delete entry.publishedVersionId
           }
-          writeCompositions(compositionsFile, catalog, revision, endpoint === 'deleteComposition' ? entry.id : undefined)
+          writeCompositions(compositionsFile, catalog, revision, endpoint === 'deleteComposition' ? request.compositionId : undefined)
           return success(await listState(registry, assetRoot, compositionsFile))
         }
         if (endpoint === 'saveCompositionDraft') {

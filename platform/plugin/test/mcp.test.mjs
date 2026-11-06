@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, readdir, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, symlink, writeFile } from 'node:fs/promises'
+import fs from 'node:fs'
+import { syncBuiltinESMExports } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createServer } from 'node:http'
@@ -9,7 +11,7 @@ import { build } from 'esbuild'
 import { execFileSync } from 'node:child_process'
 import { compositionQueries } from '../src/mcp/definition.ts'
 const queryNames = compositionQueries.map(item => item.toolName)
-import { publishCompositionVersion } from '../src/mcp/compositions.ts'
+import { publishCompositionVersion, readCompositions, writeCompositions } from '../src/mcp/compositions.ts'
 import { mappedInput } from '../src/mcp/nested.ts'
 import { registerFixedCompositionTools, withFixedCompositionExecution } from '../src/workflows/fixed-composition.ts'
 
@@ -1034,4 +1036,111 @@ test('管理调用返回已接受回执，发布父依赖阻止下架，删除�
   const withdrawn = await rpc('withdrawComposition', { compositionId: 'parent', revision: state.revision })
   assert.equal(withdrawn.ok, true)
   assert.equal((await rpc('withdrawComposition', { compositionId: 'child', revision: withdrawn.value.revision })).ok, true)
+})
+
+test('删除清理整个组合包，兼容旧目录与已删登记残留，保留邻居和历史运行', async () => {
+  const module = await loadMcpModule()
+  for (const schema_version of ['1.0', '2.0']) {
+    const root = await mkdtemp(join(tmpdir(), 'mcp-delete-')), file = join(root, 'mcp/compositions.json')
+    const draft = { kind: 'workflow', workflow: 'probe', toolName: 'probe', title: '待删除', description: '' }
+    const target = join(root, 'mcp/compositions/probe'), neighbor = join(root, 'mcp/compositions/neighbor')
+    await mkdir(join(target, 'src'), { recursive: true })
+    await mkdir(join(target, 'docs'), { recursive: true })
+    await mkdir(join(target, 'versions/frozen'), { recursive: true })
+    await mkdir(neighbor, { recursive: true })
+    await mkdir(join(root, 'mcp/.local/runs'), { recursive: true })
+    await writeFile(join(target, 'src/index.ts'), 'source')
+    await writeFile(join(target, 'docs/README.md'), 'docs')
+    await writeFile(join(target, 'versions/frozen/bundle.json'), 'bundle')
+    await writeFile(join(neighbor, 'marker'), 'neighbor')
+    const history = join(root, 'mcp/.local/runs/historical.json')
+    await writeFile(history, 'historical run')
+    const entry = { id: 'probe', draft }
+    await writeFile(join(target, 'composition.json'), JSON.stringify(entry))
+    await writeFile(file, JSON.stringify({ schema_version, compositions: schema_version === '2.0' ? [{ id: 'probe', path: 'compositions/probe/composition.json' }] : [entry] }))
+    const handler = module.createMcpHandler(root, { compositionsFile: file, servers: () => [] })
+    const rpc = (method, args) => module.managementDispatch(root, () => handler(method, args))
+    const state = readCompositions(file)
+    assert.equal((await rpc('deleteComposition', { compositionId: 'probe', revision: 'stale' })).ok, false)
+    assert.equal((await rpc('deleteComposition', { compositionId: '../neighbor', revision: state.revision })).ok, false)
+    assert.equal(fs.existsSync(target), true)
+    const deleted = await rpc('deleteComposition', { compositionId: 'probe', revision: state.revision })
+    assert.equal(deleted.ok, true, JSON.stringify(deleted))
+    assert.equal(fs.existsSync(target), false)
+    assert.deepEqual(readCompositions(file).catalog.compositions, [])
+    assert.equal(await readFile(history, 'utf8'), 'historical run')
+    assert.equal(await readFile(join(neighbor, 'marker'), 'utf8'), 'neighbor')
+    await mkdir(join(target, 'src'), { recursive: true })
+    await writeFile(join(target, 'src/index.ts'), 'old deletion residue')
+    assert.equal((await rpc('deleteComposition', { compositionId: 'probe', revision: deleted.value.revision })).ok, true)
+    assert.equal(fs.existsSync(target), false)
+  }
+})
+
+test('目录清理失败不报成功，释放锁后可使用原 ID 继续清理', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'mcp-delete-failure-')), file = join(root, 'compositions.json')
+  const target = join(root, 'compositions/probe')
+  await mkdir(target, { recursive: true })
+  await writeFile(join(target, 'source.ts'), 'source')
+  await writeFile(file, JSON.stringify({ schema_version: '2.0', compositions: [] }))
+  const state = readCompositions(file)
+  const remove = t.mock.method(fs, 'rmSync', () => { throw Object.assign(new Error('fixture'), { code: 'EACCES' }) })
+  syncBuiltinESMExports()
+  try { assert.throws(() => writeCompositions(file, state.catalog, state.revision, 'probe'), /登记已移除.*清理失败.*EACCES/) }
+  finally { remove.mock.restore(); syncBuiltinESMExports() }
+  assert.equal(fs.existsSync(`${file}.lock`), false)
+  assert.equal(fs.existsSync(target), true)
+  const current = readCompositions(file)
+  writeCompositions(file, current.catalog, current.revision, 'probe')
+  assert.equal(fs.existsSync(target), false)
+})
+
+test('登记保存失败保留完整资产目录，且释放写锁', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'mcp-delete-index-failure-')), file = join(root, 'compositions.json')
+  const target = join(root, 'compositions/probe')
+  await mkdir(target, { recursive: true })
+  await writeFile(join(target, 'source.ts'), 'source')
+  await writeFile(file, JSON.stringify({ schema_version: '2.0', compositions: [] }))
+  const state = readCompositions(file)
+  const rename = t.mock.method(fs, 'renameSync', () => { throw new Error('index save failed') })
+  syncBuiltinESMExports()
+  try { assert.throws(() => writeCompositions(file, state.catalog, state.revision, 'probe'), /index save failed/) }
+  finally { rename.mock.restore(); syncBuiltinESMExports() }
+  assert.equal(fs.existsSync(`${file}.lock`), false)
+  assert.equal(await readFile(join(target, 'source.ts'), 'utf8'), 'source')
+  assert.equal(readCompositions(file).revision, state.revision)
+})
+
+test('已接受运行阻止删除，下架后继续完成且删除后仍可查询历史', async t => {
+  const module = await loadMcpModule(), root = await mkdtemp(join(tmpdir(), 'mcp-delete-running-'))
+  const file = join(root, 'compositions.json'), entry = { id: 'probe' }
+  publishCompositionVersion(entry, { kind:'workflow',workflow:'probe',toolName:'probe',title:'检查',description:'' })
+  await writeFile(file, JSON.stringify({schema_version:'1.0',compositions:[entry]}))
+  let release, entered
+  const started = new Promise(resolve => { entered = resolve }), pending = new Promise(resolve => { release = resolve })
+  t.after(() => release())
+  const workflow = {inputSchema:{type:'object',properties:{}},sourceDigest:'a'.repeat(64),connections:()=>[],
+    async execute() {entered();await pending;return {status:'completed'}}}
+  const handler = module.createMcpHandler(root,{compositionsFile:file,servers:()=>[],extension:{id:'probe',workflows:{probe:workflow}}})
+  const rpc = (method,args) => module.managementDispatch(root,()=>handler(method,args))
+  const accepted = await rpc('callPublishedComposition',{toolName:'probe',input:{},execution:{execution_id:'running-delete'}})
+  assert.equal(accepted.ok,true,JSON.stringify(accepted))
+  await started
+  const run_id = accepted.value.result.run_id
+  const withdrawn = await rpc('withdrawComposition',{compositionId:'probe',revision:readCompositions(file).revision})
+  assert.equal(withdrawn.ok,true)
+  assert.equal((await rpc('deleteComposition',{compositionId:'probe',revision:withdrawn.value.revision})).error.code,'composition_running')
+  release()
+  let run
+  for(let i=0;i<100;i++) {
+    run = await rpc('compositionRun',{run_id})
+    if(run.value?.status==='completed')break
+    await new Promise(resolve=>setTimeout(resolve,10))
+  }
+  assert.equal(run.value.status,'completed',JSON.stringify(run))
+  const deleted = await rpc('deleteComposition',{compositionId:'probe',revision:readCompositions(file).revision})
+  assert.equal(deleted.ok,true,JSON.stringify(deleted))
+  const historical = await rpc('compositionRun',{run_id})
+  assert.equal(historical.ok,true)
+  assert.equal(historical.value.status,'completed')
 })

@@ -393,7 +393,7 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
         accept(value)
         const saved = value.compositions.find((item: CompositionEntry) => item.id === payload.compositionId)
         select(saved, 'published', saved.publishedVersionId, false); setResult(value.dry)
-      } else if (['withdrawComposition', 'deleteComposition'].includes(endpoint)) { accept(value); setSelection(null); setError(endpoint === 'withdrawComposition' ? '已下架，新调用已停止；已有记录保留。' : '已删除编排登记，源码、文档和历史记录保留。') } else setResult(value)
+      } else if (['withdrawComposition', 'deleteComposition'].includes(endpoint)) { accept(value); setSelection(null); setError(endpoint === 'withdrawComposition' ? '已下架，新调用已停止；已有记录保留。' : '已删除编排及其源码、文档和发布包；历史运行记录保留。') } else setResult(value)
       if (['saveCompositionDraft', 'publishComposition', 'withdrawComposition', 'deleteComposition'].includes(endpoint)) updates?.invalidate(['mcp'])
     } catch { if (id === actionId.current) setError('操作失败，请检查连接并重试。') }
     finally { if (id === actionId.current) { setBusy(false); setPendingAction('') } }
@@ -464,7 +464,7 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
             <MenuItemButton onSelect={() => { setMoreOpen(false); setPreview('config') }}>查看配置</MenuItemButton>
             <MenuItemButton onSelect={() => { setMoreOpen(false); setPreview('source') }}>查看生成代码</MenuItemButton>
             {entry?.published && <MenuItemButton disabled={busy} separatorBefore onSelect={() => { setMoreOpen(false); void action('withdrawComposition', { compositionId: entry.id, revision: data.revision }) }}>下架工具</MenuItemButton>}
-            <MenuItemButton disabled={busy} danger onSelect={() => { setMoreOpen(false); void action('deleteComposition', { compositionId: entry?.id, revision: data.revision }) }}>删除编排</MenuItemButton>
+            <MenuItemButton disabled={busy} danger onSelect={() => { setMoreOpen(false); if (window.confirm(`删除编排“${config.title}”（${entry?.id}）及其源码、文档和发布包？历史运行记录保留。`)) void action('deleteComposition', { compositionId: entry?.id, revision: data.revision }) }}>删除编排</MenuItemButton>
           </Menu>
         </>}
         <button type="button" className="harness-composition-fullscreen-toggle" aria-pressed={fullscreen} onClick={() => setFullscreen(!fullscreen)}>{fullscreen ? '退出全屏' : '全屏'}</button>

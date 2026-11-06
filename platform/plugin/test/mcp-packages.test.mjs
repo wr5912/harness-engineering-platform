@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { readCompositions, writeCompositions, compositionConfig, publishCompositionVersion, compositionReferences, assertPublishedDependencies } from '../src/mcp/compositions.ts'
 
-test('包定义独立保存，撤下保留固定历史，引用阻止删除，删除保留代码文档', t => {
+test('包定义独立保存，撤下保留固定历史，引用阻止删除，删除清理整个资产包', t => {
   const root = mkdtempSync(join(tmpdir(), 'mcp-packages-'))
   t.after(() => rmSync(root, {recursive:true,force:true}))
   const file = join(root, 'compositions.json')
@@ -27,6 +27,14 @@ test('包定义独立保存，撤下保留固定历史，引用阻止删除，�
   assert.throws(()=>writeCompositions(file,before.catalog,before.revision),/已变化/)
   ;({catalog,revision}=readCompositions(file));catalog.compositions=catalog.compositions.filter(item=>item.id!=='parent');writeCompositions(file,catalog,revision,'parent')
   ;({catalog,revision}=readCompositions(file));catalog.compositions=[];writeCompositions(file,catalog,revision,'child')
-  assert.equal(existsSync(join(root,'compositions/child/composition.json')),false)
-  assert.equal(readFileSync(join(root,'compositions/child/docs/README.md'),'utf8'),'入口')
+  assert.equal(existsSync(join(root,'compositions/child')),false)
+})
+
+test('其他编排复用包内工作流源码时计为直接引用', () => {
+  for (const kind of ['workflow','composite']) {
+    const draft = compositionConfig({kind,workflow:'child',toolName:'alias',title:'复用子检查',description:'',steps:[{id:'step',compositionId:'other',versionId:'v1',inputMap:{}}]})
+    const catalog = {schema_version:'1.0',compositions:[{id:'child',draft},{id:'alias',draft,published:draft}]}
+    assert.deepEqual(compositionReferences(catalog,'child'),[{id:'alias',title:'复用子检查'}])
+    assert.deepEqual(compositionReferences(catalog,'child',true),[])
+  }
 })

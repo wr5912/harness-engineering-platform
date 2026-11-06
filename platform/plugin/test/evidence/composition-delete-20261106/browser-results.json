@@ -1,0 +1,17 @@
+{
+  "environment": "isolated-native-DSH",
+  "fixture": "delete-fixture",
+  "confirmation": "删除编排“删除核验夹具”（delete-fixture）及其源码、文档和发布包？历史运行记录保留。",
+  "cancelPreservesAsset": true,
+  "mobile": {
+    "width": 390,
+    "scrollWidth": 390,
+    "moreVisible": true
+  },
+  "confirmRemovesFullAsset": true,
+  "historyRetained": true,
+  "after": {
+    "text": "收起列表\n工具组合编排\n全屏\n\n已删除编排及其源码、文档和发布包；历史运行记录保留。\n\n重新选择工具组合\n\n所选编排 delete-fixture 的草稿已不存在，请重新选择。",
+    "hash": "#/mcp?tab=composition&composition_id=delete-fixture&version=draft"
+  }
+}

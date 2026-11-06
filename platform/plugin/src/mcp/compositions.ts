@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { ThreatBindings, ThreatStage } from './extension.ts'
 import { compositionQueries } from './definition.ts'
@@ -144,6 +144,7 @@ export function readCompositions(file: string, ownsLock = false) {
 }
 
 export function writeCompositions(file: string, catalog: Catalog, expectedRevision: unknown, deletedId?: string) {
+  if (deletedId !== undefined && (!/^[a-z0-9-]{1,80}$/.test(deletedId) || catalog.compositions.some(entry => entry.id === deletedId))) throw new Error('待删除编排身份无效或仍在目录中')
   const previous = readCompositions(file)
   if (previous.revision !== expectedRevision) throw new Error('编排目录已变化，请刷新后重试；当前草稿未覆盖')
   validateCatalog(catalog)
@@ -153,35 +154,37 @@ export function writeCompositions(file: string, catalog: Catalog, expectedRevisi
     if (!retained || JSON.stringify(retained.config) !== JSON.stringify(version.config)) throw new Error('已发布组合版本不可修改或移除')
   }
   mkdirSync(dirname(file), { recursive: true })
-  if (existsSync(file) && JSON.parse(readFileSync(file, 'utf8')).schema_version === '2.0') {
-    const lock = `${file}.lock`, descriptor = openSync(lock, 'wx')
-    const backups = new Map<string, string | undefined>()
-    try {
-      if (readCompositions(file, true).revision !== expectedRevision) throw new Error('编排目录已变化，请刷新后重试')
-      for (const entry of catalog.compositions) {
-        const target = join(dirname(file), 'compositions', entry.id, 'composition.json')
-        const value = JSON.stringify(entry, null, 2) + '\n'
-        const old = existsSync(target) ? readFileSync(target, 'utf8') : undefined
-        if (value === old) continue
-        backups.set(target, old)
-        mkdirSync(dirname(target), { recursive: true })
-        writeFileSync(`${target}.tmp`, value); renameSync(`${target}.tmp`, target)
+  const lock = `${file}.lock`, descriptor = openSync(lock, 'wx')
+  try {
+    if (readCompositions(file, true).revision !== expectedRevision) throw new Error('编排目录已变化，请刷新后重试')
+    if (existsSync(file) && JSON.parse(readFileSync(file, 'utf8')).schema_version === '2.0') {
+      const backups = new Map<string, string | undefined>()
+      try {
+        for (const entry of catalog.compositions) {
+          const target = join(dirname(file), 'compositions', entry.id, 'composition.json')
+          const value = JSON.stringify(entry, null, 2) + '\n'
+          const old = existsSync(target) ? readFileSync(target, 'utf8') : undefined
+          if (value === old) continue
+          backups.set(target, old)
+          mkdirSync(dirname(target), { recursive: true })
+          writeFileSync(`${target}.tmp`, value); renameSync(`${target}.tmp`, target)
+        }
+        const index = { schema_version: '2.0', compositions: catalog.compositions.map(entry => ({ id: entry.id, path: `compositions/${entry.id}/composition.json` })) }
+        writeFileSync(`${file}.tmp`, JSON.stringify(index, null, 2) + '\n'); renameSync(`${file}.tmp`, file)
+      } catch (error) {
+        for (const [target, value] of backups) { if (value === undefined) unlinkSync(target); else writeFileSync(target, value) }
+        throw error
       }
-      const index = { schema_version: '2.0', compositions: catalog.compositions.map(entry => ({ id: entry.id, path: `compositions/${entry.id}/composition.json` })) }
-      if (deletedId) {
-        const target = join(dirname(file), 'compositions', deletedId, 'composition.json')
-        if (existsSync(target)) { backups.set(target, readFileSync(target, 'utf8')); unlinkSync(target) }
-      }
-      writeFileSync(`${file}.tmp`, JSON.stringify(index, null, 2) + '\n'); renameSync(`${file}.tmp`, file)
-    } catch (error) {
-      for (const [target, value] of backups) { if (value === undefined) unlinkSync(target); else writeFileSync(target, value) }
-      throw error
-    } finally { closeSync(descriptor); unlinkSync(lock) }
-    return
-  }
-  const temp = `${file}.${process.pid}.tmp`
-  writeFileSync(temp, JSON.stringify(catalog, null, 2) + '\n')
-  renameSync(temp, file)
+    } else {
+      const temp = `${file}.${process.pid}.tmp`
+      writeFileSync(temp, JSON.stringify(catalog, null, 2) + '\n')
+      renameSync(temp, file)
+    }
+    if (deletedId) {
+      try { rmSync(join(dirname(file), 'compositions', deletedId), { recursive: true, force: true }) }
+      catch (error) { throw new Error(`编排登记已移除，但资产目录清理失败（${(error as NodeJS.ErrnoException).code ?? '未知原因'}）；请核对目录后使用同一编排 ID 继续删除`) }
+    }
+  } finally { closeSync(descriptor); unlinkSync(lock) }
 }
 
 export function selectedComposition(catalog: Catalog, selection: any): CompositionConfig {
@@ -203,5 +206,5 @@ export function assertPublishedDependencies(catalog: Catalog, config: Compositio
 }
 
 export function compositionReferences(catalog: Catalog, id: string, publishedOnly = false, dependencies: Dependencies = config => config.steps ?? []) {
-  return catalog.compositions.filter(entry => entry.id !== id && [...(publishedOnly ? [] : [entry.draft]), entry.published, ...(entry.published ? (entry.versions ?? []).map(version => version.config) : [])].some(config => config && dependencies(config).some(step => step.compositionId === id))).map(entry => ({ id: entry.id, title: entry.published?.title ?? entry.draft?.title ?? entry.id }))
+  return catalog.compositions.filter(entry => entry.id !== id && [...(publishedOnly ? [] : [entry.draft]), entry.published, ...(entry.published ? (entry.versions ?? []).map(version => version.config) : [])].some(config => config && ((!publishedOnly && config.workflow === id) || dependencies(config).some(step => step.compositionId === id)))).map(entry => ({ id: entry.id, title: entry.published?.title ?? entry.draft?.title ?? entry.id }))
 }

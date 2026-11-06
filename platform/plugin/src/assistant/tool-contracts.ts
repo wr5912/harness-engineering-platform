@@ -90,7 +90,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['sources/toggle', 'serverId sourceId enabled'], ['sources/preview sources/invoke', 'serverId sourceId toolName arguments', '按 sources/components 返回的组件合同提供参数。'],
     ['saveCompositionDraft', 'compositionId newId revision draft', 'revision 来自 list；新编排省略 compositionId，可用 newId 指定稳定 ID；更新时必须指定已有 compositionId。'],
     ['publishComposition executeComposition dryRunComposition', 'compositionId version revision input', '先保存草稿；version=draft/published，发布只接受 draft；使用当前 revision。'],
-    ['withdrawComposition deleteComposition', 'compositionId revision', '使用 list 返回的身份与 revision。下架停止新调用，已受理运行继续；删除须先下架且解除引用，保留源码、文档与历史运行。结果未知先回读，不重复写入。'],
+    ['withdrawComposition deleteComposition', 'compositionId revision', '使用 list 返回的身份与 revision。下架停止新调用，已受理运行继续；删除须先下架、解除引用且无在途运行，清理该编排完整资产目录（源码、文档及发布包），历史运行记录保留。旧删除残留或清理失败时，先核对登记与资产目录，再使用原 compositionId 和最新 revision 显式继续清理。结果未知先回读，不自动重复写入。'],
     ['callPublishedComposition', 'toolName input', '服务器从当前目录固定实际已发布版本，按 DSH 原生权限执行。'],
     ['compositionSource', 'selection path expected_sha256', '省略 path 列实际源码目录；selection.version 只取 draft/published，固定历史版本同时传 version=published 和实际 versionId；path 和 expected_sha256 使用目录回执。仅读实际文件，不执行。'],
     ['compositionGraph', 'compositionId version versionId', '读取实际控制流程图；当前选择传 version=draft/published，固定历史版本传实际 versionId，二者择一；versionId 不是 draft/published。查询不执行节点。'],

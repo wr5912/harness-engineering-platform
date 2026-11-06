@@ -1,0 +1,39 @@
+{
+  "operation": "shared-deleteComposition-handler",
+  "result": [
+    {
+      "id": "security-asset-related-alerts-readonly",
+      "removed": true,
+      "verifiedAfterPreviousRequest": true
+    },
+    {
+      "id": "threat-analysis",
+      "removed": true
+    },
+    {
+      "id": "threat-collect",
+      "removed": true
+    },
+    {
+      "id": "threat-infer",
+      "removed": true
+    },
+    {
+      "id": "threat-report",
+      "removed": true
+    },
+    {
+      "id": "threat-writeback",
+      "removed": true
+    }
+  ],
+  "retainedIds": [
+    "inspection-status",
+    "inspection-baseline",
+    "inspection-vulnerabilities",
+    "inspection-reachability",
+    "inspection-routine",
+    "inspection-deep"
+  ],
+  "catalogAndDefinitionsUnchanged": true
+}

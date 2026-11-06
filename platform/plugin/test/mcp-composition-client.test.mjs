@@ -11,7 +11,7 @@ const oldId = 'a'.repeat(64), currentId = 'b'.repeat(64)
 const oldConfig = { toolName: 'find_asset', title: '旧发布标题', description: '旧版说明', connectionId: 'source-one' }
 const currentConfig = { ...oldConfig, title: '当前发布标题', description: '当前说明' }
 
-function workbench(initialTarget = { page: 'mcp', tab: 'composition', composition_id: 'composition-one', version: 'published', version_id: oldId }, { execute, action, readCatalog, source, queryExecution, readRun, storage = new Map(), extraCompositions = [] } = {}) {
+function workbench(initialTarget = { page: 'mcp', tab: 'composition', composition_id: 'composition-one', version: 'published', version_id: oldId }, { execute, action, readCatalog, source, queryExecution, readRun, confirm = () => true, storage = new Map(), extraCompositions = [] } = {}) {
   const states = [], dependencies = [], cleanups = [], calls = [], navigations = [], copied = []
   let cursor, effects, changed, tree, listener
   let catalog = { revision: 'r1', connections: [{ kind: 'openapi', id: 'source-one' }], extension: null,
@@ -30,7 +30,7 @@ function workbench(initialTarget = { page: 'mcp', tab: 'composition', compositio
     module, exports: module.exports, URL, structuredClone, requestAnimationFrame: callback => callback(),
     require: name => name === 'react' ? react : name === 'react-dom' ? { createPortal: element => element }
       : name === '@deepseek-ai/dsh-client-ui-primitives' ? { useModalLayer() {}, Menu: props => props.children, MenuItemButton: props => props.children } : name === 'harness-mcp-manager-client' ? { Manager: () => null } : require(name),
-    window: { matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }), addEventListener() {}, removeEventListener() {}, scrollX: 0, scrollY: 0, scrollTo() {} },
+    window: { confirm, matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }), addEventListener() {}, removeEventListener() {}, scrollX: 0, scrollY: 0, scrollTo() {} },
     navigator: { clipboard: { async writeText(value) { copied.push(value) } } },
     document: { baseURI: 'http://localhost:3090/hep/', body: { style: {} } },
     sessionStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) },
@@ -45,7 +45,7 @@ function workbench(initialTarget = { page: 'mcp', tab: 'composition', compositio
       if (endpoint === 'mcp/compositionSource' && source) return source(payload)
       if (endpoint === 'mcp/compositionExecution') return queryExecution ? queryExecution(payload) : { ok: false, error: { code: 'not_found', message: '未找到原执行回执' } }
       if (endpoint === 'mcp/compositionRun' && readRun) return readRun(payload)
-      if (action && ['mcp/dryRunComposition', 'mcp/publishComposition', 'mcp/executeComposition'].includes(endpoint)) return action(endpoint, payload)
+      if (action && ['mcp/dryRunComposition', 'mcp/publishComposition', 'mcp/executeComposition', 'mcp/deleteComposition'].includes(endpoint)) return action(endpoint, payload)
       if (endpoint === 'mcp/saveCompositionDraft') {
         if (payload.revision !== catalog.revision) return { ok: false, error: { message: '编排目录已变化，请刷新后重试' } }
         catalog = { ...catalog, revision: 'r3', compositions: catalog.compositions.map(entry => entry.id === payload.compositionId ? { ...entry, draft: payload.draft } : entry) }
@@ -66,6 +66,33 @@ function workbench(initialTarget = { page: 'mcp', tab: 'composition', compositio
   return { render, settle, nodes, text, button, menuItem, calls, navigations, copied,
     setActive(value) { props.active = value; render() }, setTarget(value) { props.target = value; render() }, externalUpdate(value) { catalog = value; listener?.(); render() } }
 }
+
+test('删除确认说明完整范围，取消不发送请求；清理失败保留对象并显示原因，成功清空选择', async () => {
+  let confirmed = false, failed = true
+  const prompts = []
+  const ui = workbench({page:'mcp',tab:'composition',composition_id:'composition-one',version:'published',version_id:currentId}, {
+    confirm: message => { prompts.push(message); return confirmed },
+    action: (endpoint, payload) => {
+      assert.equal(endpoint, 'mcp/deleteComposition')
+      assert.equal(payload.compositionId, 'composition-one')
+      assert.equal(payload.revision, 'r1')
+      return failed ? {ok:false,error:{message:'编排登记已移除，但资产目录清理失败（EACCES）；请核对目录后使用同一编排 ID 继续删除'}}
+        : {ok:true,value:{revision:'r2',compositions:[],connections:[],extension:null}}
+    },
+  })
+  await ui.settle()
+  ui.menuItem('删除编排').props.onSelect(); await ui.settle()
+  assert.match(prompts[0], /当前发布标题.*composition-one.*源码、文档和发布包.*历史运行记录保留/)
+  assert.equal(ui.calls.some(call => call.endpoint === 'mcp/deleteComposition'), false)
+  confirmed = true
+  ui.menuItem('删除编排').props.onSelect(); await ui.settle()
+  assert.match(ui.text(), /清理失败（EACCES）/)
+  assert.ok(ui.menuItem('删除编排'))
+  failed = false
+  ui.menuItem('删除编排').props.onSelect(); await ui.settle()
+  assert.match(ui.text(), /已删除编排及其源码、文档和发布包；历史运行记录保留/)
+  assert.equal(ui.menuItem('删除编排'), undefined)
+})
 
 test('组合深链恢复冻结发布版本，失效版本不回退到当前发布', async () => {
   const ui = workbench()
