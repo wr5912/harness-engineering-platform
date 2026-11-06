@@ -33,7 +33,7 @@ class ScopeSessionQuery extends SessionQueryEngine {
   async searchEvents() { assert.fail('作用域切换测试不搜索事件') }
 }
 
-test('真实HTTP管理会话使用原生工具，专用切换与可信Skill可用，普通DSH会话不受影响', async t => {
+test('真实HTTP管理任务切换保留全部原生工具、Skill和权限决定', async t => {
   const ctx = new Context()
   const assetRoot = mkdtempSync(join(tmpdir(), 'assistant-scope-switch-'))
   symlinkSync(new URL('../node_modules', import.meta.url).pathname, join(assetRoot, 'node_modules'), 'dir')
@@ -97,6 +97,7 @@ test('真实HTTP管理会话使用原生工具，专用切换与可信Skill可�
       },
     })
     inner.provide('workspaceRegistry', {})
+    inner.provide('platformBranding', () => ({ name: 'Harness 工程平台', subtitle: '' }))
     inner.provide('workspaceController', {})
     inner.provide('settingsController', {})
     inner.provide('agentDefaultModel', {})
@@ -151,10 +152,11 @@ test('真实HTTP管理会话使用原生工具，专用切换与可信Skill可�
     for (const name of ['platform_agents', 'platform_instances', 'platform_mcp', 'skill', 'bash', 'read', 'write']) assert.ok(names.includes(name), `${name} 应可用`)
   }
   const assertCompute = async () => {
-    assert.deepEqual(await schemas(), ['platform_agents', 'skill'])
+    const names = await schemas()
+    for (const name of ['platform_agents', 'skill', 'bash', 'read', 'write', 'spawn_agent']) assert.ok(names.includes(name), `${name} 在专用任务中仍可用`)
     assert.equal((await execute('skill', { name: 'compute-variant-research' })).isError, false)
-    assert.equal((await execute('skill', { name: 'task-builder' })).isError, true)
-    for (const tool of ['platform_instances', 'platform_mcp', 'bash', 'read', 'write', 'spawn_agent']) assert.equal((await execute(tool)).isError, true)
+    assert.equal((await execute('skill', { name: 'task-builder' })).isError, false)
+    for (const tool of ['bash', 'read', 'write', 'spawn_agent']) assert.equal((await execute(tool)).isError, false)
   }
   await assertCompute()
   await rpc('status', { session_id: id })
@@ -215,11 +217,11 @@ test('真实HTTP管理会话使用原生工具，专用切换与可信Skill可�
   await assertManagement()
   await rpc('session', { session_id: id, task: '重新选择算力任务', context: { skill: 'compute-variant-research' } })
   await assertCompute()
-  assert.equal(calls.some(call => call.agentId === id && ['bash', 'read', 'write', 'spawn_agent'].includes(call.name)), false)
+  assert.equal(calls.some(call => call.agentId === id && ['bash', 'read', 'write', 'spawn_agent'].includes(call.name)), true)
   assert.equal(prompts.length, 7)
   await rpc('session', { session_id: id, task: '执行中算力训练', context: { skill: 'compute-variant-research', generation_intent: 'implement' } })
   for (const name of ['platform_agents', 'skill', 'bash', 'read', 'write']) assert.ok((await schemas()).includes(name), `${name} 执行阶段应可用`)
-  assert.equal((await execute('bash', { command: 'fixture training command' })).isError, false, '明确执行恢复原生执行工具')
+  assert.equal((await execute('bash', { command: 'fixture training command' })).isError, false, '明确执行继续使用原生工具')
   assert.equal((await execute('skill', { name: 'kev-training' })).isError, false, '明确执行可加载训练技能')
   const contract = await execute('platform_agents', { action: 'describe', input: { action: 'datasets/export' } })
   assert.equal(contract.isError, false, '明确执行可发现真实数据导出合同')
@@ -229,13 +231,13 @@ test('真实HTTP管理会话使用原生工具，专用切换与可信Skill可�
   assert.equal((await execute('platform_agents', { action: 'compute-variants/create', input: {} })).isError, true)
   assert.equal((await execute('platform_agents', { action: 'eval/start', input: {} })).isError, true)
   ctx.emit('agent/disposed', { agent })
-  assert.ok(ctx.tools.get('bash', agent), 'agent disposed释放所有平台限制')
+  assert.ok(ctx.tools.get('bash', agent), 'agent disposed不改写原生工具')
   const stop = agent.ctx.tools.presentAs('native')
   stop()
   await rpc('status', { session_id: id })
   await assertCompute()
   await loaded.dispose()
-  assert.ok(ctx.tools.get('bash', agent), '插件卸载释放重新安装的scope')
+  assert.ok(ctx.tools.get('bash', agent), '插件卸载保持原生工具可用')
   const stopAfterUnload = agent.ctx.tools.presentAs('native')
   stopAfterUnload()
 })

@@ -1,0 +1,51 @@
+{
+  "status": "busy",
+  "activation": "none",
+  "busy": [
+    {
+      "kind": "session",
+      "id": "session-583075bf-2d09-4651-aec7-a4d9cfa89503",
+      "state": "running"
+    },
+    {
+      "kind": "assistant",
+      "id": "session-583075bf-2d09-4651-aec7-a4d9cfa89503",
+      "state": "pending"
+    },
+    {
+      "kind": "session",
+      "id": "session-6a79ab7e-f558-4cc5-b45d-7cc2e4c52975",
+      "state": "running"
+    },
+    {
+      "kind": "assistant",
+      "id": "session-6a79ab7e-f558-4cc5-b45d-7cc2e4c52975",
+      "state": "pending"
+    },
+    {
+      "kind": "session",
+      "id": "session-f04ebb49-61c6-4786-8a5e-755625b06793",
+      "state": "running"
+    },
+    {
+      "kind": "assistant",
+      "id": "session-f04ebb49-61c6-4786-8a5e-755625b06793",
+      "state": "pending"
+    },
+    {
+      "kind": "session",
+      "id": "session-e1fb0e7a-eb30-4e3b-8eed-fd5af035077e",
+      "state": "running"
+    },
+    {
+      "kind": "assistant",
+      "id": "session-e1fb0e7a-eb30-4e3b-8eed-fd5af035077e",
+      "state": "pending"
+    },
+    {
+      "kind": "evaluation",
+      "id": "run-bd92197e-dbc0-4e09-91f0-1f773e864672",
+      "state": "running"
+    }
+  ]
+}

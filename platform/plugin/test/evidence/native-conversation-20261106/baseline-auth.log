@@ -1,0 +1,29 @@
+✖ 平台登录保护原生 API、三个写入域与 MCP，旧 Token/Cookie 被拒绝且退出可撤销会话 (418.625204ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2157.085027
+
+✖ failing tests:
+
+test at test/native-auth.test.mjs:16:1
+✖ 平台登录保护原生 API、三个写入域与 MCP，旧 Token/Cookie 被拒绝且退出可撤销会话 (418.625204ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  4 !== 1
+
+      at TestContext.<anonymous> (file:///tmp/hep-native-conversation-isolated-gg5b40oa/platform/plugin/test/native-auth.test.mjs:197:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 4,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

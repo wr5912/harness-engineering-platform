@@ -40,6 +40,7 @@ test('真实 Cordis 提供方 Fiber 无 webServer 注入时，插件仍经原生
     new SessionProjectionRegistry(ctx)
     new SystemPrompt(ctx, {})
     ctx.provide('workspaceRegistry', {})
+    ctx.provide('platformBranding', () => ({ name: 'Harness 工程平台', subtitle: '' }))
     ctx.provide('workspaceController', {})
     ctx.provide('sessionController', {})
     ctx.provide('sessionQuery', { async readSession() { assert.fail('注册测试不读取 Session 历史') } })

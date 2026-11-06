@@ -79,7 +79,7 @@ const shellViews = {
   './business-control/ui.tsx': 'export const BusinessControlPage = () => null',
   './theme.ts': 'export const platformTheme = ""',
   './conversation.ts': 'export const prepareConversation = () => {}; export const bindNewConversation = () => {}',
-  './assistant/client.tsx': 'export const AssistantConversation = () => null; export const AssistantOperations = () => null; export const PlatformOperationCard = () => null; export const createAssistant = () => {}',
+  './assistant/client.tsx': 'export const AssistantConversation = () => null; export const createAssistant = () => {}',
   './realtime/client.ts': 'export const createPlatformUpdates = () => {}',
 }
 async function clientModule(path, exports, stubs) {
@@ -97,14 +97,16 @@ test('平台通过原生插槽只替换 Codex 更新弹窗，加载顺序、刷�
   const module = { exports: {} }
   vm.runInNewContext(source, { module, exports: module.exports, require })
   for (const pluginFirst of [false, true]) {
-    const slots = new SlotCore(), disposers = []
+    const slots = new SlotCore(), disposers = [], injections = []
     slots.register({ name: 'root', children: { 'shell.overlay': { kind: 'list', scope: 'root' } } }, () => null)
     const pluginOverlay = () => '发现新版本', otherOverlay = () => '其他弹窗'
     const mountPlugin = () => slots.register({ name: 'shell.overlay', id: 'dsh-codex-connect-update', order: 40 }, pluginOverlay)
     slots.register({ name: 'shell.overlay', id: 'other-plugin' }, otherOverlay)
     if (pluginFirst) mountPlugin()
     module.exports.apply({ effect() {}, on() {}, connection: { rpc: {} },
-      slots: { inject(name, callback) { if (name === 'shell.overlay') disposers.push(callback()) }, register: slots.register.bind(slots) } })
+      slots: { inject(name, callback) { injections.push(name); if (name === 'shell.overlay') disposers.push(callback()) }, register: slots.register.bind(slots) } })
+    assert.ok(!injections.includes('conversation.input.dock'), '保留原生对话输入区')
+    assert.ok(!injections.includes('tool.call.toolview'), '保留原生工具回执')
     if (!pluginFirst) mountPlugin()
     const overlay = () => slots.entriesOfSlot('shell.overlay').find(entry => entry.options.id === 'dsh-codex-connect-update')
     assert.equal(overlay().component(), null)

@@ -217,9 +217,6 @@ test('旧引导会话从原生事件冷恢复并续接，当前投影规范化�
 
 test('向已有专用会话追加无context指导保留固定skill与目标，不跟随最新页面', async t => {
   const f = fixture(t), fixed = { skill: 'compute-variant-research', workflow: 'compute-variants', agent_id: 'alpha', experiment_id: 'EXP-alpha-002' }
-  let scoped = 0, managed = 0, released = 0
-  f.services.scopeComputeVariants = () => { scoped++ }
-  f.services.releaseTaskScope = () => { released++ }
   const id = (await f.rpc('session', { task: '生成代码变体', context: fixed })).value.session_id
   await f.rpc('context', { session_id: id, context: { page: 'instances', instance_name: 'latest-page-only' } })
   assert.equal((await f.rpc('session', { session_id: id, task: '补充真实Guard探针事实' })).ok, true)
@@ -228,14 +225,10 @@ test('向已有专用会话追加无context指导保留固定skill与目标，�
   assert.equal(status.context.instance_name, 'latest-page-only')
   assert.equal(f.prompts.at(-1).sessionId, id)
   assert.deepEqual(f.prompts.at(-1).content, [{ type: 'text', text: '补充真实Guard探针事实' }])
-  assert.ok(scoped > 0)
   await f.reload()
   assert.deepEqual((await f.status(id)).task_context, fixed, '保留的固定上下文必须可冷恢复')
-  const beforeManagement = managed, beforeRelease = released
   assert.equal((await f.rpc('session', { session_id: id, task: '显式切换普通讨论', context: {} })).ok, true)
   assert.deepEqual((await f.status(id)).task_context, {})
-  assert.equal(managed, beforeManagement, '通用管理不额外应用平台任务作用域')
-  assert.ok(released > beforeRelease, '退出专用任务后释放专用 Scope，使用原生 DSH 工具')
 })
 
 test('各类平台任务只装载一份共用表达正文，不写入用户消息或会话事实', async t => {

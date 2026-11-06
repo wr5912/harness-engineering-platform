@@ -38,7 +38,7 @@ body:has(.harness-platform) [data-shortcut-modal="settings"] button:is([class*="
   --dsw-alias-label-primary-foreground:#fff;
 }
 /* 蓝底主按钮及选中反馈标签配白字；完成状态、勾选与附件亮底保留原生反色。 */
-body[data-ds-dark-theme]:has(.harness-platform) button:is([class$="_primary"],[class*="_primary "],[class$="_primaryButton"],[class*="_primaryButton "],[class$="_chipActive"],[class*="_chipActive "]){
+body[data-ds-dark-theme]:has(.harness-platform) [data-shortcut-modal="settings"] button:is([class$="_primary"],[class*="_primary "],[class$="_primaryButton"],[class*="_primaryButton "],[class$="_chipActive"],[class*="_chipActive "]){
   --dsw-alias-label-primary-foreground:var(--hep-on-primary);
 }
 body:has(.harness-platform) [data-shortcut-modal="settings"] [class$="_close"]{width:44px;flex:none}

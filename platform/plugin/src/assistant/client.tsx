@@ -1,12 +1,8 @@
-import { useState, useSyncExternalStore } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
-import type { ConversationViewsProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
 import type { PropsRenderFactories, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { CHANNEL } from '../protocol.ts'
-import { operationSummary, type OperationMeta } from './operation-summary.ts'
 
 type SessionId = Parameters<Context['sessions']['binding']>[0]
 type SessionReference = ReturnType<Context['sessions']['retain']>
@@ -34,7 +30,7 @@ interface AssistantSnapshot {
   error: string
   pendingSubmission?: { sessionId: SessionId; requestId: string }
   statusError?: string
-  status?: { task_context?: Record<string, any>; running?: boolean; proposals?: { id: string; state: OperationMeta['state']; domain: string; action: string; input?: Record<string, any>; preview?: unknown; result?: unknown; error?: string; continuation?: string }[] }
+  status?: { task_context?: Record<string, any>; running?: boolean; proposals?: { id: string; state: 'awaiting_confirmation' | 'running' | 'completed' | 'failed' | 'cancelled' | 'unknown'; domain: string; action: string; input?: Record<string, any>; preview?: unknown; result?: unknown; error?: string; continuation?: string }[] }
 }
 
 /** 浏览器只保留当前会话引用，任务与业务结果由原生 Session 和后端维护。 */
@@ -277,208 +273,11 @@ export function createAssistant(ctx: Pick<Context, 'sessions' | 'uiSession' | 'u
 }
 export type Assistant = ReturnType<typeof createAssistant>
 
-function ChatView({ renderSlot }: ConversationViewsProps) {
-  return <>{renderSlot('conversation.session', { view: 'chat' })}</>
-}
-
-/** Factory 复用原生消息、附件、问答、权限确认及 Composer。 */
+/** 仅提供嵌入容器，正文、视图与输入区均交给原生 Factory。 */
 export function AssistantConversation({ useSession, useConversation, renderFactorySlot }: PropsRuntime<'harness.assistant.conversation'> & PropsRenderFactories) {
   const session = useSession(value => value)
   const conversation = useConversation(value => value)
   const active = Boolean(session && (session.running || !session.blank || session.promptAttempted)) || Boolean(conversation?.activeTargets.size)
   const hero = !active
-  return renderFactorySlot('conversation.content', { variant: 'embedded', phase: hero ? 'hero' : 'active', hero }, { slots: { views: ChatView } })
-}
-
-const domainLabels: Record<string, string> = { agents: '智能体与评测', instances: '实例', mcp: 'MCP' }
-const labels: Record<string, string> = {
-  agent_id: '智能体', experiment_id: '版本', baseline: '主父版', sources: '关联来源', features: '特性',
-  action: '操作', operation: '操作', name: '名称', instance: '实例', instance_name: '实例', source: '来源',
-  title: '说明', goal: '目标', validation: '验证', warnings: '提示', summary: '摘要', status: '状态',
-  success: '成功', failed: '失败', ok: '成功', message: '说明', result: '回执', receipts: '逐项回执',
-  description: '说明', input: '修改内容', ops: '配置修改', op: '修改方式', path: '配置位置', value: '内容',
-  revision: '配置版本', before: '原有特性', source_refs: '特性来源', evidence_refs: '验证依据', change: '本版变化',
-  compositionId: '工具组合', versionId: '固定发布版本', toolName: '工具名称',
-}
-const internalFields = new Set(['preview_id', 'proposal_id', 'assistant_session_id', 'catalog_hash', 'plan_ready', 'requires_confirmation', 'evaluation_sha256', 'candidate_sha256', 'source_sha256'])
-const technicalFields = new Set(['command', 'argv', 'cwd', 'stdout', 'stderr', 'logs', 'trace'])
-const actionLabels: Record<string, string> = { create: '从固定父版派生', 'tasks/assembly-apply': '装配复用能力', saveConfiguration: '保存 MCP 配置', callPublishedComposition: '执行固定版本工具组合', 'fusion/confirm': '应用融合方案', 'features/apply': '保存版本特性', 'datasets/apply': '保存待复核决策样本', 'cases/create': '新增测试用例', new: '新建智能体', 'edit/apply': '保存资产修改', 'eval/start': '执行评测', 'eval/cancel': '取消评测', run: '实例操作', batch: '批量实例操作' }
-
-function unwrap(value: unknown): unknown {
-  if (value && typeof value === 'object' && 'ok' in value && 'value' in value && value.ok === true) return value.value
-  return value
-}
-
-function Details({ value, includeIdentifiers = false }: { value: unknown; includeIdentifiers?: boolean }) {
-  if (value === null || value === undefined) return <span>未提供</span>
-  if (typeof value === 'boolean') return <span>{value ? '是' : '否'}</span>
-  if (Array.isArray(value)) return value.length ? <ul>{value.map((item, index) => <li key={index}><Details value={item} includeIdentifiers={includeIdentifiers}/></li>)}</ul> : <span>无</span>
-  if (typeof value === 'object') return <dl>{Object.entries(value).filter(([key]) => includeIdentifiers || !internalFields.has(key)).map(([key, item]) => <div key={key}><dt>{labels[key] ?? key}</dt><dd>{technicalFields.has(key) ? <details><summary>查看技术详情</summary><Details value={item} includeIdentifiers={includeIdentifiers}/></details> : <Details value={item} includeIdentifiers={includeIdentifiers}/>}</dd></div>)}</dl>
-  return <span>{String(value)}</span>
-}
-
-function BusinessPreviewDetails({ value }: { value: unknown }) {
-  return <Details value={unwrap(value)} includeIdentifiers/>
-}
-
-function versionLabel(value: unknown) {
-  const text = String(value ?? '')
-  const number = /-(\d{3}(?:-[mf])?)(?:-r[0-9a-f]{12})?$/.exec(text)?.[1]
-  return number ? `${/^(?:experiment:)?VAR-/.test(text) ? '变体' : '版本'} ${number}` : text
-}
-function targetVersionLabel(value: unknown, data: any, input: Record<string, any>) {
-  const match = /^(?:experiment:)?(?:EXP|VAR)-([a-z0-9]+(?:-[a-z0-9]+)*)-\d{3}(?:-[mf])?(?:-r[0-9a-f]{12})?$/.exec(String(value ?? ''))
-  const agent = data?.agent_name ?? data?.agent_id ?? input.agent_name ?? input.agent_id ?? match?.[1]
-  const version = versionLabel(value) || '所选版本'
-  return agent ? `智能体“${agent}”的${version}` : version
-}
-function confirmationAction(meta: OperationMeta) {
-  const value = unwrap(meta.preview) as any
-  if (meta.action === 'datasets/apply') return `保存 ${value?.count ?? value?.records?.length ?? ''} 条样本`
-  if (meta.domain === 'instances' && meta.action === 'run') return ({ create: '创建实例', start: '启动实例', stop: '停止实例', restart: '重启实例', reload: '重载实例资产', delete: '删除实例' } as Record<string, string>)[meta.input?.operation ?? value?.operation ?? value?.input?.operation] ?? '执行实例操作'
-  return ({ 'features/apply': '保存特性', 'decision/update': '保存研究结论', saveConfiguration: '保存 MCP 配置', 'fusion/confirm': '确认融合方案', create: '创建研究版本', new: '创建智能体', 'edit/apply': '保存修改', 'eval/start': '开始评测', callPublishedComposition: '执行工具组合', callTool: '调用工具', publishComposition: '发布工具组合', saveCompositionDraft: '保存组合草稿', 'cases/update': '保存测试用例', 'cases/create': '保存测试用例', 'compute-variants/create': '创建算力变体', 'compute-variants/build': '构建代码变体', 'compute-variants/freeze': '确认冻结本次数据差异' } as Record<string, string>)[meta.action] ?? actionLabels[meta.action] ?? '执行此操作'
-}
-
-/** 确认的是动作、对象及后果；完整证据与字段保留在可展开详情中。 */
-function BusinessPreview({ value, meta }: { value: unknown; meta: OperationMeta }) {
-  const data = unwrap(value) as any
-  const input = meta.input ?? data?.input ?? {}
-  const plan = data?.plan
-  let summary: any
-  if (data?.status === 'suggested' && Array.isArray(data.records)) summary = <>
-    <p>将 <strong>{data.count ?? data.records.length} 条决策样本</strong>保存到本次运行的“决策样本”。</p>
-    <p>业务范围：{[...new Set(data.records.map((record: any) => record.workflow).filter(Boolean))].join('、') || '当前固定运行中的业务决策'}；共 {data.records.reduce((count: number, record: any) => count + Object.keys(record.questions ?? {}).length, 0)} 道命名决策题。</p>
-    <p>标签仍是 AI 建议，保存后待人员逐题复核，再明确训练或评测用途。</p>
-  </>
-  else if (meta.action === 'features/apply') {
-    const features = data?.features ?? data?.after?.features ?? []
-    const removed = (data?.before?.features ?? []).filter((feature: any) => !features.some((next: any) => next.id === feature.id)).length
-    summary = <><p>把 <strong>{features.length} 项特性说明</strong>保存到{targetVersionLabel(data?.experiment_id ?? input.experiment_id, data, input)}。</p>{removed > 0 && <p><strong>将移除原有的 {removed} 项特性说明。</strong></p>}<p>保存说明不会自动将能力标记为已验证；来源与证据会一并保留。</p></>
-  } else if (meta.action === 'saveConfiguration') {
-    const ops = data?.input?.ops ?? input.ops ?? []
-    const disabled = ops.filter((op: any) => op.path?.at(-1) === 'enabled' && op.value === false).length
-    const removed = ops.filter((op: any) => op.op === 'unset' && op.path?.[0] === 'servers' && op.path.length === 2).length
-    summary = <><p>将 <strong>{ops.length} 项连接设置修改</strong>保存到数据仓库 MCP 配置。</p>{disabled > 0 && <p><strong>其中 {disabled} 项会停用连接，相关工具将不可调用。</strong></p>}{removed > 0 && <p><strong>将移除 {removed} 个连接及其工具入口。</strong></p>}<p>现有凭据沿用本地受控凭据文件；此操作不验证上游业务效果。</p></>
-  } else if (data?.parent_experiment_id && plan) summary = <>
-    <p>从{versionLabel(data.parent_experiment_id)}为 <strong>{data.agent_id}</strong>创建独立融合版本。</p>
-    <p>采用 {plan.sources?.filter((source: any) => source.decision === 'inherit').length ?? 0} 个来源，纳入 {plan.features?.length ?? 0} 项特性，约定 {plan.checks?.length ?? 0} 项验证。当前版本保留，新版本须完成验证后才可交付。</p>
-  </>
-  else if (meta.action === 'compute-variants/freeze') summary = <><p>将预览列出的生成源码、构建产物和比较计划固定到<strong>本地数据 Git</strong>。</p><p>仅提交本次明确列出的文件；实际差异和固定来源见下方。保存提交不代表业务效果通过。</p>{typeof data?.diff === 'string' && <details open><summary>本次冻结差异</summary><pre>{data.diff}</pre></details>}</>
-  else if (meta.action === 'compute-variants/build') summary = <><p>构建当前目标的 TypeScript 工作流，并核对实际产物摘要。</p><p>构建通过后仍需在新 Session 核对装载和业务效果。</p></>
-  else if (meta.action === 'new') summary = <><p>创建智能体 <strong>{data?.name ?? input.name ?? data?.agent_id ?? input.agent_id}</strong>及其首个研究版本。</p><p>先保存角色和资产；可用的业务能力仍需装配与评测。</p></>
-  else if (meta.action === 'edit/apply') summary = <p>向{targetVersionLabel(input.experiment_id ?? data?.experiment_id, data, input)}保存 <strong>{input.edits?.length ?? data?.files?.length ?? data?.edits?.length ?? '约定'} 份文件修改</strong>。具体内容和差异见下方。</p>
-  else if (meta.action === 'decision/update') {
-    const states: Record<string, string> = { active: '进行中', completed: '已完成', adopt: '采纳', continue: '继续研究', reject: '不采纳', inconclusive: '证据不足' }
-    const change = data?.change
-    summary = <><p>保存{targetVersionLabel(input.experiment_id, data, input)}的研究结论与依据。</p>{change && <p>状态：{states[change.before.status] ?? change.before.status} → <strong>{states[change.after.status] ?? change.after.status}</strong>；结论：{states[change.before.outcome] ?? change.before.outcome ?? '未记录'} → <strong>{states[change.after.outcome] ?? change.after.outcome ?? '未记录'}</strong>。</p>}</>
-  }
-  else if (meta.action === 'eval/start') summary = <><p>对{targetVersionLabel(input.source ?? data?.source, data, input)}执行 <strong>{input.cases?.length ?? data?.cases?.length ?? '约定'} 项测试</strong>，创建新的评测运行记录。</p><p>将调用已配置的模型；结果按实际执行保存。</p></>
-  else if (meta.domain === 'instances' && meta.action === 'run' && ['create', 'start'].includes(input.operation ?? data?.operation)) {
-    const operation = input.operation ?? data?.operation
-    const source = plan?.source_id ?? data?.source_id
-    const port = plan?.port ?? data?.port
-    const model = data?.model_selection
-    summary = <>
-      <p>{operation === 'create' ? '创建并启动' : '启动'}实例 <strong>{data?.name ?? input.name ?? '未确认名称'}</strong>，来源为{source ? targetVersionLabel(source, data, input) : '未确认版本'}。</p>
-      {source && <small className="harness-instance-source">固定来源：<code>{source}</code></small>}
-      <p>访问端口：<strong>{typeof port === 'number' ? port : '未确认'}</strong>；本次默认模型：<strong>{model?.provider && model?.model ? `${model.provider} · ${model.model}` : '未确认'}</strong>{model?.reasoningEffort ? `（推理档位 ${model.reasoningEffort}）` : ''}。</p>
-      {input.business_control === true && <p>业务受控实例：通过统一网关访问，固定工作区与业务预设由业务 Runtime 装载。</p>}
-      <small>确认后直接{operation === 'create' ? '创建并启动' : '启动'}；运行状态与业务效果以实际回执核对。</small>
-    </>
-  }
-  else if (meta.action === 'callPublishedComposition' || meta.action === 'callTool') summary = <><p>执行 <strong>{data?.title ?? data?.toolName ?? input.toolName ?? data?.compositionId ?? input.compositionId ?? '所选工具'}</strong>，请求已配置的上游接口。</p><p>使用本提案固定的工具、参数及版本；实际业务结果在执行后核对。</p></>
-  else summary = <p>{operationSummary({ ...meta, state: 'awaiting_confirmation' }).title}。执行范围与实际修改保留在下方详情。</p>
-  const warnings = data?.warnings ?? data?.validation?.warnings ?? []
-  return <div className="harness-confirmation-summary">{summary}{Array.isArray(warnings) && warnings.map((warning: any, index: number) => <p key={index} role="note">{typeof warning === 'string' ? warning : warning.message ?? JSON.stringify(warning)}</p>)}<details><summary>查看完整方案与实际修改</summary><BusinessPreviewDetails value={value}/></details></div>
-}
-
-interface OperationProps {
-  meta?: OperationMeta
-  phase: string
-  toolName: string
-  sessionId: SessionId
-  rpc: ClientConnectionRpc
-  assistant: Assistant
-  origin?: 'dock' | 'tool'
-}
-function OperationCard(props: OperationProps) {
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const assistantState = useSyncExternalStore(props.assistant.subscribe, props.assistant.getSnapshot)
-  const meta = props.meta
-  const proposal = assistantState.sessionId === props.sessionId ? assistantState.status?.proposals?.find(item => item.id === meta?.proposal_id) : undefined
-  const state = proposal?.state ?? meta?.state
-  const result = proposal?.result ?? meta?.result
-  const summary = operationSummary({ kind: 'platform-operation', domain: meta?.domain ?? '', action: meta?.action ?? props.toolName,
-    ...meta, state: state ?? 'unknown', input: proposal?.input ?? meta?.input, result, error: proposal?.error ?? meta?.error }, props.phase)
-  if (props.origin !== 'dock') return <div className="harness-operation-inline" aria-label="平台操作回执">
-    {props.phase !== 'result' ? <p role="status">{summary.title}：{summary.outcome}</p> : <details className="harness-operation-result">
-      <summary><strong>{summary.title}</strong><span role={summary.failed ? 'alert' : undefined}> · {summary.outcome}</span></summary>
-      {result !== undefined && <Details value={unwrap(result)}/>}
-      {proposal?.error && <p role="alert">{proposal.error}</p>}
-      {proposal?.continuation === 'requires_user_message' && <p>原会话运行已结束，请发送后续消息继续。</p>}
-    </details>}
-  </div>
-  return <section className="harness-operation-card" aria-label="平台操作回执">
-    <header><strong>{summary.title}</strong><span>{domainLabels[meta?.domain ?? ''] ?? '平台操作'}</span></header>
-    {!meta || meta.kind !== 'platform-operation' ? <p role="status">{props.phase === 'result' ? '操作已返回，请查看会话说明。' : '正在读取与处理…'}</p> : <>
-      {state !== 'awaiting_confirmation' && <p className="harness-operation-state" role={summary.failed ? 'alert' : 'status'}>{summary.outcome}</p>}
-      {state === 'awaiting_confirmation' && meta.preview !== undefined && <BusinessPreview value={meta.preview} meta={{ ...meta, input: proposal?.input ?? meta.input }}/>}
-      {result !== undefined && <details className="harness-operation-result"><summary>查看实际操作回执</summary><Details value={unwrap(result)}/></details>}
-      {proposal?.error && <p role="alert">{proposal.error}</p>}
-      {state === 'awaiting_confirmation' && meta.proposal_id && <div className="harness-confirmation-actions"><button className="harness-primary" disabled={busy} onClick={async () => {
-        setBusy(true); setError('')
-        try {
-          const response = await props.rpc.call(CHANNEL, 'assistant/confirm', { session_id: props.sessionId, proposal_id: meta.proposal_id })
-          if (!response.ok) throw new Error(response.error.message)
-          props.assistant.applySettlement(props.sessionId, response.value)
-          await props.assistant.refresh()
-        } catch (failure) { setError(failure instanceof Error ? failure.message : '确认失败，请重试。') }
-        finally { setBusy(false) }
-      }}>{busy ? '正在提交…' : confirmationAction({ ...meta, input: proposal?.input ?? meta.input })}</button>
-      <button type="button" disabled={busy} onClick={async () => {
-        setBusy(true); setError('')
-        try {
-          const response = await props.rpc.call(CHANNEL, 'assistant/reject', { session_id: props.sessionId, proposal_id: meta.proposal_id })
-          if (!response.ok) throw new Error(response.error.message)
-          props.assistant.applySettlement(props.sessionId, response.value)
-          await props.assistant.refresh()
-        } catch (failure) { setError(failure instanceof Error ? failure.message : '暂缓失败，请重试。') }
-        finally { setBusy(false) }
-      }}>暂不执行</button></div>}
-    </>}
-    {error && <p role="alert">{error}</p>}
-  </section>
-}
-
-/** 原生工具结果携带的真实提案可以在原会话内确认。 */
-export function PlatformOperationCard(props: ToolCallViewProps & { rpc: ClientConnectionRpc; assistant: Assistant }) {
-  const block = props.block
-  let args: any = { action: block.args?.text?.('action'), input: block.args?.value?.('input') }
-  if (!args.action) try { args = JSON.parse(props.phase === 'result' ? props.block.call?.argsRaw ?? '{}' : props.phase === 'start' ? props.block.argsRaw : '{}') } catch { /* 流式参数尚不完整，继续展示已知工具身份。 */ }
-  let payload: any, text = ''
-  if (props.phase === 'result') {
-    text = props.block.content.filter(item => item.type === 'text').map(item => item.text).join('\n')
-    try { payload = JSON.parse(text) } catch { /* 普通错误回执保留原文，不编造成功。 */ }
-  }
-  const wire = props.phase === 'result' ? props.block.meta as any : undefined
-  const meta: OperationMeta = { kind: 'platform-operation', domain: props.toolName.replace(/^platform_/, ''), action: args.action ?? props.toolName,
-    state: props.phase === 'result' ? props.block.isError ? 'failed' : text ? 'completed' : 'unknown' : 'running', result: payload ?? (text || undefined),
-    ...(wire?.kind === 'platform-operation' ? wire : payload?.kind === 'platform-operation' ? payload : {}), input: wire?.input ?? payload?.input ?? args.input,
-    ...(props.phase === 'result' && props.block.isError ? { state: 'failed', error: text || '工具执行失败，未收到完整回执' } : {}) }
-  return <OperationCard {...props} meta={meta} origin="tool"/>
-}
-
-/** 原生轨迹默认折叠；待确认操作直接出现在 Composer 上方。 */
-export function AssistantOperations({ assistant, rpc, sessionId }: PropsRuntime<'conversation.input.dock'> & { rpc: ClientConnectionRpc; assistant: Assistant }) {
-  const state = useSyncExternalStore(assistant.subscribe, assistant.getSnapshot)
-  if (state.sessionId !== sessionId) return null
-  const proposals = state.status?.proposals ?? []
-  const pending = proposals.filter(item => ['awaiting_confirmation', 'running'].includes(item.state))
-  if (!pending.length && !state.statusError) return null
-  return <div className="harness-assistant-proposals-dock">{state.statusError && <p role="alert">{state.statusError} <button type="button" onClick={() => void assistant.refresh()}>重试读取</button></p>}{pending.length > 0 && <details className="harness-assistant-proposals" open>
-    <summary>{pending.some(item => item.state === 'awaiting_confirmation') ? '待处理的历史操作' : '平台操作进度'}</summary>
-    <div>{pending.map(proposal => <OperationCard key={proposal.id} assistant={assistant} rpc={rpc} sessionId={sessionId}
-      origin="dock" phase="result" toolName={`platform_${proposal.domain}`} meta={{ ...proposal, kind: 'platform-operation', proposal_id: proposal.id }}/>)}</div>
-  </details>}</div>
+  return renderFactorySlot('conversation.content', { variant: 'embedded', phase: hero ? 'hero' : 'active', hero })
 }

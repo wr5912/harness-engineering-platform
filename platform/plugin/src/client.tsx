@@ -22,7 +22,7 @@ import { BusinessControlPage } from './business-control/ui.tsx'
 import type { GatewayAssistantBridge } from './business-control/window.tsx'
 import { platformTheme } from './theme.ts'
 import { bindNewConversation, prepareConversation } from './conversation.ts'
-import { AssistantConversation, AssistantOperations, PlatformOperationCard, createAssistant, type Assistant, type AssistantContext } from './assistant/client.tsx'
+import { AssistantConversation, createAssistant, type Assistant, type AssistantContext } from './assistant/client.tsx'
 import { createPlatformUpdates, type PlatformUpdates } from './realtime/client.ts'
 import { ModelsSettingsFooter } from './models/client.tsx'
 import { LOGIN_THEME_DRAFT, ThemeIcon } from './theme-toggle.tsx'
@@ -481,8 +481,6 @@ export function apply(ctx: ClientContext) {
     inject: () => ({ catalog, assistant, sessions: ctx.sessions, updates, theme, brandingForm: ctx.configForms.get<BrandingSettings>(BRANDING_NAMESPACE), rpc: ctx.connection.rpc, enterConversation: (sidebarCollapsed?: boolean) => prepareConversation(ctx.layout, sidebarCollapsed), showNativeConversation }),
   }, PlatformPage))
   ctx.slots.inject('harness.assistant.conversation', () => ctx.slots.register({ name: 'harness.assistant.conversation' }, AssistantConversation))
-  ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({ name: 'conversation.input.dock', id: 'harness-operation-confirmation', inject: () => ({ rpc: ctx.connection.rpc, assistant }) }, AssistantOperations))
-  for (const key of ['platform_agents', 'platform_instances', 'platform_mcp']) ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({ name: 'tool.call.toolview', key, inject: () => ({ rpc: ctx.connection.rpc, assistant }) }, PlatformOperationCard))
   ctx.slots.inject('settings.launcher', () => ctx.slots.register({ name: 'settings.launcher', priority: -1 }, PlatformSettings))
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({ name: 'settings.general.item', id: 'platform-branding', order: 20,
     inject: () => ({ form: ctx.configForms.get<BrandingSettings>(BRANDING_NAMESPACE), describe: ctx.configForms.describe() }) }, BrandingSettingsRow))

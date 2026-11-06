@@ -19,10 +19,10 @@ const [{ Context }, { SystemPrompt }, { ToolRuntime, assertSupportedJsonSchema, 
 ])
 const built = mkdtempSync(join(tmpdir(), 'extraction-scope-build-'))
 await build({ entryPoints: [new URL('../src/assistant/extraction-scope.ts', import.meta.url).pathname], outfile: join(built, 'scope.mjs'), bundle: true, platform: 'node', format: 'esm' })
-const { createExtractionScope, createComputeVariantScope, isDecisionExtraction, isComputeVariantResearch, createFeatureScope, isFeatureOrganization, DECISION_EXTRACTION_ACTIONS, projectDecisionExtractionTools } = await import(pathToFileURL(join(built, 'scope.mjs')).href)
+const { DECISION_EXTRACTION_ACTIONS, projectDecisionExtractionTools } = await import(pathToFileURL(join(built, 'scope.mjs')).href)
 test.after(() => rm(built, { recursive: true, force: true }))
 
-function fixture(t, { parentPtc = false, computeResearch = false, featureOrganization = false, actualPlatformTools = false } = {}) {
+function fixture(t, { parentPtc = false, actualPlatformTools = false } = {}) {
   const ctx = new Context()
   new SystemPrompt(ctx, {})
   new ToolRuntime(ctx, { mode: 'native' })
@@ -46,22 +46,20 @@ function fixture(t, { parentPtc = false, computeResearch = false, featureOrganiz
   const agent = { id: 'extraction-agent', session: {} }
   const agentScope = createScope(ctx, agent, parent ? { parent: parentKey } : undefined)
   agent.ctx = agentScope.ctx
-  const scope = featureOrganization ? createFeatureScope() : computeResearch ? createComputeVariantScope() : createExtractionScope()
   const other = { id: 'other-agent', session: {} }
   const otherScope = createScope(ctx, other)
   other.ctx = otherScope.ctx
   const execute = (name, arguments_ = {}, target = agent) => ctx.tools.execute({ name, arguments: arguments_, callId: `call-${name}-${calls.length}`, agent: target, signal: new AbortController().signal })
   const toolSchemas = async target => (await ctx.systemPrompt.assemble({ scope: target, agent: target })).tools
   const schemas = async target => (await toolSchemas(target)).map(tool => tool.name).sort()
-  t.after(async () => { scope.dispose(); await assistant?.dispose(); await agentScope.dispose(); await otherScope.dispose(); if (parent) await parent.dispose(); await ctx.fiber.dispose() })
-  return { ctx, agent, agentScope, scope, calls, definition, execute, schemas, toolSchemas, other }
+  t.after(async () => { await assistant?.dispose(); await agentScope.dispose(); await otherScope.dispose(); if (parent) await parent.dispose(); await ctx.fiber.dispose() })
+  return { ctx, agent, agentScope, calls, definition, execute, schemas, toolSchemas, other }
 }
 
 test('抽取投影使用真实平台工具，SDK校验逐题字段及三题型而不公开动态样本映射', async t => {
   const f = fixture(t, { actualPlatformTools: true })
   const original = (await f.toolSchemas(f.agent)).find(tool => tool.name === 'platform_agents')
   assert.ok(original.parameters.properties.action.enum.includes('compute-variants/create'))
-  f.scope.apply(f.agent)
   const assembled = await f.toolSchemas(f.agent), snapshot = structuredClone(assembled)
   const projected = projectDecisionExtractionTools(assembled), tool = projected.find(tool => tool.name === 'platform_agents')
   assert.deepEqual(assembled, snapshot, '不得修改 SDK 返回的原始声明')
@@ -111,133 +109,16 @@ test('抽取投影使用真实平台工具，SDK校验逐题字段及三题型�
   assert.equal(f.calls.length, 0)
 })
 
-test('抽取Schema投影不改变原生注册、其他会话或解除后的管理工具', async t => {
+test('抽取Schema投影保留原生工具、其他会话和原始注册', async t => {
   const f = fixture(t, { actualPlatformTools: true })
   const before = await f.toolSchemas(f.agent), otherBefore = await f.toolSchemas(f.other)
-  f.scope.apply(f.agent)
-  projectDecisionExtractionTools(await f.toolSchemas(f.agent))
+  const projected = projectDecisionExtractionTools(await f.toolSchemas(f.agent))
+  for (const name of ['bash', 'read', 'write', 'spawn_agent', 'run_in_background']) {
+    assert.ok(projected.some(tool => tool.name === name), `${name} 必须沿用原生声明`)
+    assert.equal((await f.execute(name)).isError, false)
+  }
   assert.deepEqual(await f.toolSchemas(f.other), otherBefore)
   const registered = f.ctx.tools.get('platform_agents', f.agent)
   assert.ok(registered.parameters.properties.action.enum.includes('compute-variants/create'))
-  f.scope.release(f.agent)
   assert.deepEqual(await f.toolSchemas(f.agent), before)
-})
-
-test('真实 SDK 的 schema 与执行共同过滤，重复应用不叠加，其他 Session 不受影响', async t => {
-  const f = fixture(t)
-  assert.ok((await f.schemas(f.agent)).includes('bash'))
-  f.scope.apply(f.agent)
-  assert.doesNotThrow(() => f.scope.apply(f.agent), '重复注册 presentAs 会被 Runtime 拒绝，因此这里直接验证幂等性')
-  assert.deepEqual(await f.schemas(f.agent), ['platform_agents', 'skill'])
-  assert.ok((await f.schemas(f.other)).includes('bash'))
-  assert.equal((await f.execute('bash', { command: '本测试不执行 shell' })).isError, true)
-  assert.equal((await f.execute('spawn_agent')).isError, true)
-  assert.equal(f.calls.length, 0)
-  assert.equal((await f.execute('platform_agents', { action: 'datasets/source' })).isError, false)
-  assert.deepEqual(f.calls.map(call => call.name), ['platform_agents'])
-  f.scope.release(f.agent)
-  assert.ok((await f.schemas(f.agent)).includes('bash'))
-  assert.equal((await f.execute('bash')).isError, false)
-})
-
-test('guard 使用原生 execution.arguments，指定技能通过，其他技能与自己 scope 的工具均拒绝', async t => {
-  const f = fixture(t)
-  f.scope.apply(f.agent)
-  assert.equal((await f.execute('skill', { name: 'decision-sample-extraction' })).isError, false)
-  assert.equal((await f.execute('skill', { name: 'other-skill' })).isError, true)
-  assert.equal((await f.execute('skill')).isError, true)
-  f.agent.ctx.tools.register(f.definition('own_local'))
-  assert.ok(f.ctx.tools.get('own_local', f.agent), 'Runtime 自身 scope 工具不受 restrict 隐藏，必须用 guard 拒绝')
-  const rejected = await f.execute('own_local')
-  assert.equal(rejected.isError, true)
-  assert.match(JSON.stringify(rejected.content), /决策样本任务/)
-  assert.deepEqual(f.calls.map(call => call.name), ['skill'])
-})
-
-test('强制 native 表达移除祖先的 run_code 传输，解除后恢复祖先表达', async t => {
-  const f = fixture(t, { parentPtc: true })
-  assert.ok(f.ctx.tools.get('run_code', f.agent))
-  f.scope.apply(f.agent)
-  assert.deepEqual(await f.schemas(f.agent), ['platform_agents', 'skill'])
-  assert.equal(f.ctx.tools.get('run_code', f.agent), undefined)
-  assert.equal((await f.execute('run_code', { description: '基础测试', code: 'return {}' })).isError, true)
-  assert.equal(f.calls.length, 0)
-  f.scope.release(f.agent)
-  assert.ok(f.ctx.tools.get('run_code', f.agent))
-})
-
-test('release 和 dispose 复原能力，作用域销毁后再次清理安全', async t => {
-  const f = fixture(t)
-  f.scope.apply(f.agent)
-  f.scope.apply(f.other)
-  f.scope.release(f.agent)
-  f.scope.release(f.agent)
-  assert.ok((await f.schemas(f.agent)).includes('bash'))
-  assert.deepEqual(await f.schemas(f.other), ['platform_agents', 'skill'])
-  f.scope.apply(f.agent)
-  f.scope.dispose()
-  f.scope.dispose()
-  assert.ok((await f.schemas(f.agent)).includes('bash'))
-  assert.ok((await f.schemas(f.other)).includes('bash'))
-  f.scope.apply(f.agent)
-  await f.agentScope.dispose()
-  assert.doesNotThrow(() => f.scope.release(f.agent))
-})
-
-test('初始化中途失败会撤销已经安装的限制，不遗留不可恢复的半个 scope', async t => {
-  const f = fixture(t)
-  f.agent.ctx.tools.presentAs('native')
-  assert.throws(() => f.scope.apply(f.agent), /conflicts/)
-  assert.ok(f.ctx.tools.get('bash', f.agent), 'presentAs 冲突前创建的 restrict 必须回滚')
-  assert.equal((await f.execute('bash')).isError, false)
-})
-
-test('继承抽取上下文到其他工作区不限制工具，当前项目的普通会话保持原能力', async t => {
-  const f = fixture(t)
-  const state = { task_context: { skill: 'decision-sample-extraction' } }
-  f.agent.session.header = { cwd: '/another-project' }
-  if (isDecisionExtraction('/project', f.agent, state)) f.scope.apply(f.agent)
-  assert.ok((await f.schemas(f.agent)).includes('bash'))
-  assert.equal((await f.execute('bash')).isError, false)
-  f.agent.session.header.cwd = '/project'
-  assert.equal(isDecisionExtraction('/project', f.agent, { task_context: {} }), false)
-  if (isDecisionExtraction('/project', f.agent, state)) f.scope.apply(f.agent)
-  assert.deepEqual(await f.schemas(f.agent), ['platform_agents', 'skill'])
-})
-
-test('算力研究真实原生作用域阻止 shell、读写及其他技能，保留平台动作与普通会话', async t => {
-  const f = fixture(t, { computeResearch: true })
-  f.agent.session.header = { cwd: '/project' }
-  const state = { task_context: { skill: 'compute-variant-research' } }
-  assert.equal(isComputeVariantResearch('/other', f.agent, state), false)
-  assert.equal(isComputeVariantResearch('/project', f.agent, { task_context: {} }), false)
-  assert.equal(isComputeVariantResearch('/project', f.agent, state), true)
-  assert.equal(isComputeVariantResearch('/project', f.agent, { task_context: { ...state.task_context, generation_intent: 'implement' } }), false)
-  assert.equal(isComputeVariantResearch('/project', f.agent, { task_context: { ...state.task_context, generation_intent: 'implement', planning_intent: 'plan_only' } }), true)
-  f.scope.apply(f.agent)
-  assert.deepEqual(await f.schemas(f.agent), ['platform_agents', 'skill'])
-  for (const name of ['bash', 'read', 'write', 'spawn_agent']) assert.equal((await f.execute(name, { command: '此测试命令不得执行' })).isError, true)
-  assert.equal((await f.execute('skill', { name: 'workspace-management' })).isError, true)
-  assert.equal((await f.execute('skill', { name: 'compute-variant-research' })).isError, false)
-  assert.equal((await f.execute('platform_agents', { action: 'compute-variants/preview' })).isError, false)
-  assert.deepEqual(f.calls.map(call => call.name), ['skill', 'platform_agents'])
-  assert.ok((await f.schemas(f.other)).includes('bash'))
-  assert.equal((await f.execute('bash', {}, f.other)).isError, false)
-})
-
-
-test('特性整理工具范围精确绑定 workflow，普通维护会话保持原能力', async t => {
-  const f = fixture(t, { featureOrganization: true })
-  f.agent.session.header = { cwd: '/project' }
-  const state = { task_context: { skill: 'agent-maintenance', workflow: 'features' } }
-  assert.equal(isFeatureOrganization('/project', f.agent, state), true)
-  assert.equal(isFeatureOrganization('/elsewhere', f.agent, state), false)
-  assert.equal(isFeatureOrganization('/project', f.agent, { task_context: { skill: 'agent-maintenance', workflow: 'research' } }), false)
-  f.scope.apply(f.agent)
-  assert.deepEqual(await f.schemas(f.agent), ['platform_agents', 'skill'])
-  for (const name of ['bash', 'read', 'write']) assert.equal((await f.execute(name, { command: '不得执行的测试命令' })).isError, true)
-  assert.equal((await f.execute('skill', { name: 'agent-maintenance' })).isError, false)
-  assert.equal((await f.execute('platform_agents', { action: 'features/read-source' })).isError, false)
-  assert.equal((await f.execute('skill', { name: 'compute-variant-research' })).isError, true)
-  assert.ok((await f.schemas(f.other)).includes('bash'))
 })

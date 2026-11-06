@@ -4,12 +4,11 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { build } from 'esbuild'
-import { runInNewContext } from 'node:vm'
 
 const output = await mkdtemp(join(tmpdir(), 'harness-assistant-client-'))
 const file = join(output, 'assistant.mjs')
 await build({ entryPoints: [new URL('../src/assistant/client.tsx', import.meta.url).pathname], outfile: file, bundle: true, platform: 'node', format: 'esm' })
-const { createAssistant } = await import(`file://${file}`)
+const { createAssistant, AssistantConversation } = await import(`file://${file}`)
 after(() => rm(output, { recursive: true, force: true }))
 
 function fixture(call, selection, rows = {}, config = {}) {
@@ -243,129 +242,24 @@ test('retain同步失败后解除选择锁，原生恢复错误可见且后续�
   f.assistant.dispose()
 })
 
-test('组合确认卡片显示实际冻结版本与工具身份', async () => {
-  const compiled = await build({ entryPoints: ['src/assistant/client.tsx'], write: false, bundle: true, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime'] })
-  const versionId = '1'.repeat(64)
-  const proposal = { id: 'proposal-fixed', state: 'awaiting_confirmation', domain: 'mcp', action: 'callPublishedComposition',
-    preview: { action: 'callPublishedComposition', compositionId: 'composition-fixed', versionId, toolName: 'basic_status', title: '基础状态' } }
-  const assistant = { subscribe: () => () => {}, getSnapshot: () => ({ sessionId: 'session-fixed', status: { proposals: [proposal] } }) }
-  const jsx = (type, props) => ({ type, props })
-  const module = { exports: {} }
-  runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, require(name) {
-    if (name === 'react') return { createContext: value => ({ value }), useContext: context => context.value, useState: initial => [initial, () => {}], useSyncExternalStore: (_subscribe, snapshot) => snapshot() }
-    if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx }
-    throw new Error(`unexpected import: ${name}`)
-  } })
-  const render = node => {
-    if (node == null || typeof node === 'boolean') return ''
-    if (typeof node !== 'object') return String(node)
-    if (Array.isArray(node)) return node.map(render).join(' ')
-    if (typeof node.type === 'function') return render(node.type(node.props))
-    return render(node.props?.children)
+test('嵌入会话只交给原生 Factory，不替换视图、工具回执或输入区', () => {
+  for (const [session, conversation, phase] of [
+    [undefined, undefined, 'hero'],
+    [{ blank: true }, { activeTargets: new Set() }, 'hero'],
+    [{ running: true, blank: true }, undefined, 'active'],
+    [{ blank: false }, undefined, 'active'],
+    [{ blank: true, promptAttempted: true }, undefined, 'active'],
+    [undefined, { activeTargets: new Set(['target']) }, 'active'],
+  ]) {
+    const calls = [], native = Symbol('native conversation')
+    const result = AssistantConversation({
+      useSession: select => select(session), useConversation: select => select(conversation),
+      renderFactorySlot: (...args) => { calls.push(args); return native },
+    })
+    assert.equal(result, native)
+    assert.deepEqual(calls, [['conversation.content', { variant: 'embedded', phase, hero: phase === 'hero' }]])
   }
-  const text = render(module.exports.AssistantOperations({ assistant, rpc: { call() { assert.fail('渲染不能执行操作') } }, sessionId: 'session-fixed' }))
-  assert.match(text, /固定发布版本/)
-  assert.ok(text.includes(versionId))
-  assert.ok(text.includes('composition-fixed') && text.includes('basic_status'))
-  assert.match(text, /执行工具组合/)
-  assert.match(text, /暂不执行/)
 })
-
-test('原生回执消费真实参数与结果，完成提案不重复进dock，只有dock保留确认入口', async () => {
-  const compiled = await build({ entryPoints: ['src/assistant/client.tsx'], write: false, bundle: true, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime'] })
-  let proposals = []
-  const assistant = { subscribe: () => () => {}, getSnapshot: () => ({ sessionId: 's', status: { proposals } }) }
-  const jsx = (type, props) => ({ type, props }), module = { exports: {} }
-  runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, require(name) {
-    if (name === 'react') return { createContext: value => ({ value }), useContext: context => context.value, useState: initial => [initial, () => {}], useSyncExternalStore: (_subscribe, snapshot) => snapshot() }
-    if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx }
-    throw new Error(`unexpected import: ${name}`)
-  } })
-  const nodes = []
-  const render = node => {
-    if (node == null || typeof node === 'boolean') return ''
-    if (typeof node !== 'object') return String(node)
-    if (Array.isArray(node)) return node.map(render).join(' ')
-    if (typeof node.type === 'function') return render(node.type(node.props))
-    nodes.push(node); return render(node.props?.children)
-  }
-  const props = { phase: 'result', toolName: 'platform_agents', callId: 'read-1', sessionId: 's', assistant, rpc: { call() { assert.fail('渲染不得执行操作') } } }
-  const block = { args: { text: () => 'detail', value: () => ({ agent_id: 'daily-inspection-assistant' }) }, call: null, isError: false,
-    content: [{ type: 'text', text: JSON.stringify({ kind: 'platform-operation', domain: 'agents', action: 'detail', state: 'completed', result: { ok: true, value: { agent: { name: '巡检助手' }, experiment: { id: 'EXP-a-003' }, evaluation: { cases: [{}] } } } }) }] }
-  const text = render(module.exports.PlatformOperationCard({ ...props, block }))
-  assert.match(text, /读取智能体详情.*巡检助手/); assert.match(text, /1 个测试用例/)
-  assert.equal(nodes.some(node => node.type === 'section'), false, '只读回执为可展开单行，不再绘制大卡片')
-  assert.doesNotMatch(text, /已返回操作结果/)
-  proposals = [{ id: 'p', domain: 'agents', action: 'create', state: 'completed', result: { ok: true } }]
-  assert.equal(module.exports.AssistantOperations({ assistant, rpc: props.rpc, sessionId: 's' }), null)
-  proposals = [{ ...proposals[0], state: 'awaiting_confirmation', preview: { parent_experiment_id: 'EXP-a-001' } }]
-  const dockText = render(module.exports.AssistantOperations({ assistant, rpc: props.rpc, sessionId: 's' }))
-  assert.equal((dockText.match(/创建研究版本/g) ?? []).length, 1)
-  const toolText = render(module.exports.PlatformOperationCard({ ...props, block: { ...block, meta: { ...proposals[0], kind: 'platform-operation', proposal_id: 'p' } } }))
-  assert.doesNotMatch(toolText, /暂不执行/, '同一提案原生轨迹不重复绘制确认按钮')
-  const errorText = render(module.exports.PlatformOperationCard({ ...props, toolName: 'platform_agents', block: { ...block, args: { text: () => 'new', value: () => ({}) }, isError: true, content: [{ type: 'text', text: '创建失败' }] } }))
-  assert.match(errorText, /创建智能体资产.*创建失败/)
-})
-
-test('普通操作确认显示业务摘要和完整事实，旧任务状态不再绘制任务卡', async () => {
-  const compiled = await build({ entryPoints: ['src/assistant/client.tsx'], write: false, bundle: true, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime'] })
-  let proposal = { id: 'p', domain: 'agents', action: 'datasets/apply', state: 'awaiting_confirmation', preview: { count: 1, records: [] } }
-  let execution, refreshes = 0
-  const assistant = { subscribe: () => () => {}, getSnapshot: () => ({ sessionId: 's', status: { proposals: proposal ? [proposal] : [], execution } }), refresh: async () => { refreshes++ }, applySettlement: (_id, receipt) => { proposal = { ...proposal, ...receipt } } }
-  const requests = [], rpc = { async call(_channel, method, body) { requests.push({ method, body }); return { ok: true, value: { state: 'cancelled' } } } }
-  const jsx = (type, props) => ({ type, props }), module = { exports: {} }
-  runInNewContext(compiled.outputFiles[0].text, { module, exports: module.exports, require(name) {
-    if (name === 'react') return { createContext: value => ({ value }), useContext: context => context.value, useState: initial => [initial, () => {}], useSyncExternalStore: (_subscribe, snapshot) => snapshot() }
-    if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx }
-    throw new Error(`unexpected import: ${name}`)
-  } })
-  let nodes = []
-  const render = (node, all = false) => {
-    if (node == null || typeof node === 'boolean') return ''
-    if (typeof node !== 'object') return String(node)
-    if (Array.isArray(node)) return node.map(child => render(child, all)).join(' ')
-    if (typeof node.type === 'function') return render(node.type(node.props), all)
-    nodes.push(node)
-    if (node.type === 'details' && !node.props.open && !all) return render([node.props.children].flat().find(child => child?.type === 'summary'), all)
-    return render(node.props.children, all)
-  }
-  const view = () => module.exports.AssistantOperations({ assistant, rpc, sessionId: 's' })
-  const visible = render(view())
-  assert.match(visible, /保存 1 条样本/)
-  await nodes.find(node => node.type === 'button' && node.props.children === '暂不执行').props.onClick()
-  assert.equal(requests[0].method, 'assistant/reject'); assert.equal(requests[0].body.proposal_id, 'p')
-  assert.equal(view(), null, '取消回执立即移出输入区')
-  proposal = { ...proposal, state: 'awaiting_confirmation' }
-  let finishRefresh
-  assistant.refresh = () => new Promise(resolve => { finishRefresh = resolve })
-  rpc.call = async () => ({ ok: true, value: { id: 'p', state: 'completed', continuation: 'requires_user_message' } })
-  nodes = []; render(view())
-  const confirming = nodes.find(node => node.type === 'button' && node.props.children === '保存 1 条样本').props.onClick()
-  await new Promise(resolve => setImmediate(resolve))
-  assert.equal(view(), null, '确认成功后无需等待状态刷新即可收起')
-  finishRefresh(); await confirming
-  assistant.refresh = async () => { refreshes++ }
-  proposal = { id: 'dataset', domain: 'agents', action: 'datasets/apply', state: 'awaiting_confirmation', preview: { status: 'suggested', count: 1, records: [{ workflow: '安全事件处置', questions: { action: {}, needs_review: {} }, targets: { action: { basis: '只在完整详情展示的标签依据' } } }] } }
-  nodes = []
-  const sample = render(view())
-  assert.match(sample, /保存 1 条样本/); assert.match(sample, /人员逐题复核/); assert.match(sample, /安全事件处置/); assert.match(sample, /2.*道命名决策题/); assert.doesNotMatch(sample, /只在完整详情/)
-  proposal = { id: 'mcp', domain: 'mcp', action: 'saveConfiguration', state: 'awaiting_confirmation', preview: { action: 'saveConfiguration', input: { ops: [{ op: 'set', path: ['servers', 'test', 'enabled'], value: false }] } } }
-  assert.match(render(view()), /停用连接.*不可调用/)
-  const fullFreezeDiff = '冻结差异开始\n' + '+ compiled-esm-confirmation '.repeat(100000) + '\n冻结差异结束'
-  proposal = { id: 'freeze', domain: 'agents', action: 'compute-variants/freeze', state: 'awaiting_confirmation', input: { experiment_id: 'EXP-alpha-002' },
-    preview: { ok: true, value: { experiment_id: 'EXP-alpha-002', files: [{ path: 'candidate/dsh/managed/compute-workflow/index.mjs', sha256: 'd'.repeat(64) }], diff: fullFreezeDiff, preview_sha256: 'f'.repeat(64) } } }
-  const freezeDetails = render(view(), true)
-  assert.ok(freezeDetails.includes(fullFreezeDiff), '原生确认界面使用持久完整差异，不使用模型投影或截断版本')
-  assert.match(freezeDetails, /确认冻结本次数据差异/)
-  proposal = { id: 'variant-eval', domain: 'agents', action: 'eval/start', state: 'awaiting_confirmation', input: { source: 'experiment:VAR-alpha-001-rabcdef123456' }, preview: { source: 'experiment:VAR-alpha-001-rabcdef123456', cases: ['U-ONE-001'] } }
-  const variant = render(view())
-  assert.match(variant, /智能体“alpha”的变体 001/)
-  assert.doesNotMatch(variant, /版本 001/)
-  proposal = undefined
-  execution = { state: 'budget_exhausted', reason: '任务总时限已耗尽', plan: { budget: { max_model_calls: 60 } } }
-  assert.equal(view(), null, '历史任务额度不再绘制卡片或恢复按钮')
-})
-
 
 test('迁移前原生会话按服务端提供的旧根恢复平台上下文', async () => {
   const calls = []
