@@ -53,3 +53,11 @@ PYTHONPATH=.agents/skills/kev-trace-pipeline/scripts python3 -m unittest discove
 ```
 
 当前实际服务端尚未装载本次整改。待在途工作结束，通过维护工具 `platform/dsh-deploy update` 更新，保留 HOME、会话、端口及业务实例；再由管理助手完成排序、继续、原生子会话和思考/工具流复验。三轮同类真实模型任务的中位数不超过 5 分钟仍是待验证目标，不能由脚本耗时或静态回归推定。未修改或重跑业务评测、Research Release、外部服务或远端部署，不提升相关路径的整体完成状态。
+
+## 本机装载补验（2026-11-06 UTC）
+
+用户明确要求重启后，通过 `platform/dsh-deploy update --interrupt-sessions --json` 更新本机 `18120`，回执为 `applied`、`managed-restart`，PID 从 `4130730` 变为 `204164`。应用前只有管理会话在途，本次允许中断其执行并保留记录；没有独立评测或业务操作阻塞。装载范围包括当前工作树中的并行修改，不仅是上文两个任务提交。维护工具核对并保留监听地址、工作区与 HOME；后台制品摘要与本次暂存构建一致。
+
+实际浏览器完成登录及桌面、窄屏原生会话页核对，无脚本异常或横向溢出；在线 inventory 的数据根及工作区身份正确，新增排序预览入口对缺失参数返回 `invalid_request`，证明当前请求已到达新处理器。515 份原生会话轨迹均保留，11 个既有容器的启动时间和重启次数未变化。未发送新的模型任务或执行业务写入，真实模型提速、排序和续办效果仍待复验。
+
+本机维护回执位于 `.local/platform-updates/3dc663ed-6118-4670-a2f7-f44f68ba445f/receipt.json`；浏览器和会话、容器保留核对位于 `/tmp/hep-platform-restart-20261106/`。临时浏览器脚本首次使用了非安全 HTTP 上不可用的 `crypto.randomUUID()`，改用本地时间生成核验请求 ID 后通过；未修改平台代码。
