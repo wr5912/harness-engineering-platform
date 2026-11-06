@@ -1,0 +1,37 @@
+{
+  "status": "applied",
+  "programRoot": "/home/cmp/work/harness-engineering-platform",
+  "dataRoot": "/home/cmp/harness-engineering-platform-data",
+  "workspaceId": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+  "pid": 3923503,
+  "activation": "managed-restart",
+  "busy": [
+    {
+      "kind": "session",
+      "id": "session-6a79ab7e-f558-4cc5-b45d-7cc2e4c52975",
+      "state": "running"
+    },
+    {
+      "kind": "assistant",
+      "id": "session-6a79ab7e-f558-4cc5-b45d-7cc2e4c52975",
+      "state": "pending"
+    },
+    {
+      "kind": "session",
+      "id": "session-e1fb0e7a-eb30-4e3b-8eed-fd5af035077e",
+      "state": "running"
+    },
+    {
+      "kind": "assistant",
+      "id": "session-e1fb0e7a-eb30-4e3b-8eed-fd5af035077e",
+      "state": "pending"
+    }
+  ],
+  "changed": [
+    "platform/plugin/lib/client.js",
+    "platform/plugin/lib/composition-source-index.json",
+    "platform/plugin/lib/index.js"
+  ],
+  "stage": "/home/cmp/work/harness-engineering-platform/.local/platform-updates/9c16460a-ca68-46ec-aa93-e27b7dd5e300",
+  "receipt": "/home/cmp/work/harness-engineering-platform/.local/platform-updates/9c16460a-ca68-46ec-aa93-e27b7dd5e300/receipt.json"
+}

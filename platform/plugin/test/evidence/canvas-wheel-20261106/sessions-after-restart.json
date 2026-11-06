@@ -1,0 +1,71 @@
+{
+  "observedAt": "2026-11-06T07:01:51.058Z",
+  "sessions": [
+    {
+      "sessionId": "session-6a79ab7e-f558-4cc5-b45d-7cc2e4c52975",
+      "sessionRetained": true,
+      "running": true,
+      "assistantRunning": true,
+      "proposals": [
+        {
+          "state": "completed"
+        },
+        {
+          "state": "completed"
+        },
+        {
+          "state": "completed"
+        },
+        {
+          "state": "completed"
+        },
+        {
+          "state": "completed"
+        },
+        {
+          "state": "completed"
+        },
+        {
+          "state": "completed"
+        }
+      ],
+      "submissionStates": []
+    },
+    {
+      "sessionId": "session-e1fb0e7a-eb30-4e3b-8eed-fd5af035077e",
+      "sessionRetained": true,
+      "running": true,
+      "assistantRunning": true,
+      "proposals": [
+        {
+          "state": "completed"
+        },
+        {
+          "state": "completed"
+        },
+        {
+          "state": "completed"
+        },
+        {
+          "state": "completed"
+        },
+        {
+          "state": "completed"
+        },
+        {
+          "state": "completed"
+        },
+        {
+          "state": "completed"
+        },
+        {
+          "state": "completed"
+        },
+        {
+          "state": "completed"
+        }
+      ],
+      "submissionStates": []
+    }
+  ]
+}
