@@ -128,13 +128,15 @@ function inputChoices(field: string, previous: CompositionStep[], entries: Compo
 }
 function defaultInputMap(config: CompositionConfig | undefined, previous: CompositionStep[], entries: CompositionEntry[]) {
   if (!config) return {}
-  const field = compositionInputSchema(config).required[0]
+  if (config.workflow) return { scope: '$input.scope' }
+  const field = compositionInputSchema(config).required?.[0]
+  if (!field) return {}
   const choices = inputChoices(field, previous, entries)
   return { [field]: choices.at(-1)?.value ?? '' }
 }
 function StepInputFields({ step, previous, entries, change, active, identity, onValidityChange }: { step: CompositionStep; previous: CompositionStep[]; entries: CompositionEntry[]; change(value: Record<string, unknown>): void; active?: boolean; identity?: string; onValidityChange?(error: string): void }) {
   const config = childConfig(step, entries)
-  const field = config ? compositionInputSchema(config).required[0] : undefined
+  const field = config && !config.workflow ? compositionInputSchema(config).required?.[0] : undefined
   const choices = field ? inputChoices(field, previous, entries) : []
   const current = field ? step.inputMap[field] : undefined
   const recognized = choices.some(choice => choice.value === current)
@@ -187,9 +189,10 @@ export function ThreatRunResult({ rpc, execution }: { rpc: ClientConnectionRpc; 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [artifact, setArtifact] = useState<{ filename: string; contentType: string; body: string } | null>(null)
+  const [details, setDetails] = useState<any>(null)
   const [download, setDownload] = useState('')
   const request = useRef(0)
-  useEffect(() => { request.current++; setRun(initial); setArtifact(null); setError(''); setBusy(false); return () => { request.current++ } }, [initial])
+  useEffect(() => { request.current++; setRun(initial); setArtifact(null); setDetails(null); setError(''); setBusy(false); return () => { request.current++ } }, [initial])
   useEffect(() => {
     if (!artifact) { setDownload(''); return }
     const url = URL.createObjectURL(new Blob([artifact.body], { type: artifact.contentType }))
@@ -204,24 +207,26 @@ export function ThreatRunResult({ rpc, execution }: { rpc: ClientConnectionRpc; 
       if (id !== request.current) return
       if (!response.ok) throw new Error(response.error.message)
       if (endpoint === 'compositionRun') setRun(response.value)
+      else if (endpoint === 'compositionDetails') setDetails(response.value)
       else setArtifact(response.value as any)
     } catch (failure) { if (id === request.current) setError(failure instanceof Error ? failure.message : '无法读取运行产物') }
     finally { if (id === request.current) setBusy(false) }
   }
+  const workflow = run?.engine === 'workflow'
   const storage = run?.delivery?.storage ?? run?.storage
   const link = reportLink(storage?.report?.download_url)
   const traces = run?.trace ?? []
-  return <section className="harness-threat-run" aria-label="威胁分析运行结果">
-    <p role="status">阶段状态：{run?.phase_status ?? '未提供'} · 研判状态：{run?.status ?? '未提供'}</p>
-    <p>阶段返回不代表整体研判、SOC 回写和报告保存均成功，请分别核对下列实际状态。</p>
+  return <section className="harness-threat-run" aria-label={workflow ? "巡检组合运行结果" : "威胁分析运行结果"}>
+    <p role="status">{workflow ? '执行状态' : '研判状态'}：{run?.status ?? '未提供'}{!workflow && <> · 阶段状态：{run?.phase_status ?? '未提供'}</>}</p>
+    {workflow ? <><p>执行状态与业务结论分别核对；unknown 或 incomplete 表示仍有未覆盖项。</p><pre>{JSON.stringify({ scope: run.scope, summary: run.result, metrics: run.metrics }, null, 2)}</pre>{run.error && <p role="alert">{run.error}</p>}<ul>{Object.entries(run.nodes ?? {}).map(([id, node]: [string, any]) => <li key={id}>{node.title ?? id} · {node.status ?? '执行中'}{node.result?.summary && <pre>{JSON.stringify(node.result.summary, null, 2)}</pre>}<button type="button" disabled={busy} onClick={() => void read('compositionDetails', { run_id: run.run_id, node_id: id, offset: 0, limit: 50 })}>查看明细</button></li>)}</ul>{details && <section aria-label="检查明细"><p>共 {details.total} 项，当前从第 {details.offset + 1} 项显示。</p><pre>{JSON.stringify(details.items, null, 2)}</pre><button type="button" disabled={busy || details.offset === 0} onClick={() => void read('compositionDetails', { run_id: run.run_id, node_id: details.node_id, offset: Math.max(0, details.offset - details.limit), limit: details.limit })}>上一页</button><button type="button" disabled={busy || details.offset + details.limit >= details.total} onClick={() => void read('compositionDetails', { run_id: run.run_id, node_id: details.node_id, offset: details.offset + details.limit, limit: details.limit })}>下一页</button></section>}</> : <p>阶段返回不代表整体研判、SOC 回写和报告保存均成功，请分别核对下列实际状态。</p>}
     {run?.validation?.status === 'failed' && <p role="alert"><strong>输出校验未通过，以下模型内容需要人工复核，不能视为已核实结论。</strong></p>}
     {execution?.error && <p role="alert">{execution.error.message}</p>}
     {error && <p role="alert">{error}</p>}
-    <dl>{[['事件 ID', run?.incident_id], ['运行 ID', run?.run_id], ['路由', run?.route], ['内层模型已调用', run?.llm_invoked === undefined ? undefined : String(run.llm_invoked)], ['模型', run?.model], ['输出校验', run?.validation?.status], ['SOC 摘要存储', storage?.summary?.status], ['报告存储', storage?.report?.status]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value ?? '未提供'}</dd></div>)}</dl>
+    <dl>{(workflow ? [['运行 ID', run?.run_id]] : [['事件 ID', run?.incident_id], ['运行 ID', run?.run_id], ['路由', run?.route], ['内层模型已调用', run?.llm_invoked === undefined ? undefined : String(run.llm_invoked)], ['模型', run?.model], ['输出校验', run?.validation?.status], ['SOC 摘要存储', storage?.summary?.status], ['报告存储', storage?.report?.status]]).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value ?? '未提供'}</dd></div>)}</dl>
     {run?.run_id && <button type="button" disabled={busy} onClick={() => void read('compositionRun', { run_id: run.run_id })}>刷新运行上下文</button>}
     {run?.delivery?.markdown && <details open><summary>本次程序摘要</summary><pre>{run.delivery.markdown}</pre></details>}
     {link && <a href={link} target="_blank" rel="noreferrer">下载已保存报告</a>}
-    <h4>实际父子调用轨迹</h4>{traces.length ? <ol>{traces.map((trace: any, index: number) => <li key={index}><strong>{trace.title ?? trace.stage ?? trace.step ?? trace.compositionId ?? `节点 ${index + 1}`}</strong> · {trace.status ?? trace.phase_status ?? '未提供'}<details><summary>节点回执与参数</summary><pre>{JSON.stringify(trace, null, 2)}</pre></details></li>)}</ol> : <p>尚无节点执行轨迹。</p>}
+    {!workflow && <><h4>实际父子调用轨迹</h4>{traces.length ? <ol>{traces.map((trace: any, index: number) => <li key={index}><strong>{trace.title ?? trace.stage ?? trace.step ?? trace.compositionId ?? `节点 ${index + 1}`}</strong> · {trace.status ?? trace.phase_status ?? '未提供'}<details><summary>节点回执与参数</summary><pre>{JSON.stringify(trace, null, 2)}</pre></details></li>)}</ol> : <p>尚无节点执行轨迹。</p>}</>}
     {initial?.stepValues && <details><summary>父组合调用与各子组合原始结果</summary><pre>{JSON.stringify({ trace: initial.trace, stepValues: initial.stepValues }, null, 2)}</pre></details>}
     {run?.artifacts?.length > 0 && <><h4>冻结输入与运行产物</h4><ul>{run.artifacts.map((item: any) => <li key={item.id}><button type="button" disabled={busy} onClick={() => void read('compositionArtifact', { run_id: run.run_id, artifactId: item.id })}>{item.name ?? item.id}</button> · {item.content_type ?? ''} · {item.bytes ?? '未知'} 字节</li>)}</ul></>}
     {artifact && <details open><summary>{artifact.filename}</summary>{download && <a href={download} download={artifact.filename}>下载此产物</a>}<pre>{artifact.body}</pre></details>}

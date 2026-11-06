@@ -487,9 +487,10 @@ export async function apply(ctx: Context, config: BusinessRuntimeConfig): Promis
       if (endpoint === 'session/create') {
         const request = envelope?.payload?.args?.request
         if (!request || typeof request !== 'object' || Array.isArray(request) || Object.keys(request).some(key => !['sessionId', 'workspaceId', 'cwd', 'agentPreset'].includes(key))) throw new Error('业务 Session 使用固定工作区与Preset，不接受初始消息')
-        // 原生UI的临时ID、工作区与Preset选择均不决定业务来源。
+        // 开发与匿名实例保留原生 Preset 选择；工作区及实例来源仍由服务端固定。
         const workspace = nativeFixedWorkspace(ctx, config.workspacePath)
-        envelope.payload.args.request = { ...(workspace ? { workspaceId: workspace.id } : config.workspacePath ? { cwd: config.workspacePath } : {}), ...(config.presetId ? { agentPreset: config.presetId } : {}) }
+        const preset = control.isUnrestrictedContext(context) ? request.agentPreset ?? config.presetId : config.presetId
+        envelope.payload.args.request = { ...(workspace ? { workspaceId: workspace.id } : config.workspacePath ? { cwd: config.workspacePath } : {}), ...(preset === undefined ? {} : { agentPreset: preset }) }
         body = Buffer.from(JSON.stringify(envelope))
       }
       const content = businessInboxContent(endpoint, envelope?.payload?.args)

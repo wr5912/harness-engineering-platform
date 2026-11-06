@@ -164,7 +164,7 @@ test('阶段完成不会显示整体成功，运行产物只读获取且HTML按�
   const view = await runView(execution, { call: async (_channel, endpoint, payload) => { calls.push({ endpoint, payload }); return { ok: true, value: { filename: 'report.html', contentType: 'text/html', body: '<h1>基础报告</h1>' } } } })
   t.after(view.dispose)
   const { ui } = view
-  assert.match(ui.text(), /阶段状态：completed · 研判状态：model_failed/)
+  assert.match(ui.text(), /研判状态：model_failed · 阶段状态：completed/)
   assert.doesNotMatch(ui.text(), /组合执行成功/)
   assert.ok(ui.nodes().some(node => node.props?.role === 'alert' && ui.text(node) === '输出校验未通过，以下模型内容需要人工复核，不能视为已核实结论。'))
   assert.ok(ui.nodes().some(node => node.type === 'pre' && node.props.children === execution.result.delivery.markdown))

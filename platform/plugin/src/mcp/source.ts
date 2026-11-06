@@ -27,7 +27,7 @@ export function compositionCodeSource(assetRoot: string, catalog: Catalog, exten
       indexed = true
     }
   }
-  const notes = ['此编排按已保存配置构建 LangGraph，以下是当前平台实现文件；历史发布配置不表示当前源码就是当时装载的实现。运行采用的实现摘要以执行回执为准。']
+  const notes = [config.engine === 'lfx' ? '原生 flow.json 同时定义执行与画布。发布包冻结流程、组件模块和固定子编排；平台适配器按已装载实现摘要核对。' : '此编排按已保存配置构建 LangGraph，以下是当前平台实现文件；历史发布配置不表示当前源码就是当时装载的实现。运行采用的实现摘要以执行回执为准。']
   notes.push(indexed ? `平台文件清单对应已装载的组合实现摘要：${loadedSourceDigest}。逐文件显示当前内容与构建时是否一致。` : '尚无与已装载组合实现摘要匹配的构建文件清单；请重新构建并装载平台后查看平台实现源码。')
   if (extension?.id) {
     let registrations: any[] = []
@@ -38,7 +38,13 @@ export function compositionCodeSource(assetRoot: string, catalog: Catalog, exten
     const registration = matches[0]
     if (registration && typeof registration.path === 'string') {
       const directory = registration.path.replace(/\/$/, '')
-      const files = codeDirectory(assetRoot, `${directory}/src`)
+      const own = `${directory}/compositions/${selection.id}`
+      const files = config.engine === 'lfx'
+        ? config.flowDigest ? [`${own}/versions/${config.flowDigest}/bundle.json`]
+          : [`${own}/flow.json`, ...codeDirectory(assetRoot, `${own}/src`), ...codeDirectory(assetRoot, `${directory}/src/lfx`)]
+        : directory === 'mcp'
+        ? [...codeDirectory(assetRoot, own), ...(config.workflow ? [...codeDirectory(assetRoot, `${directory}/src/inspection`), `${directory}/src/soc.ts`] : config.flow ? [] : [...codeDirectory(assetRoot, `${directory}/src/threat`), `${directory}/src/threat-services.ts`])].filter(file => existsSync(join(assetRoot, file)))
+        : codeDirectory(assetRoot, `${directory}/src`)
       for (const name of ['build.mjs', 'package.json']) if (existsSync(join(assetRoot, directory, name))) files.push(`${directory}/${name}`)
       locations.push(...files.map(file => ({ root: assetRoot, file, path: `workspace/${file}`, entry: file === `${directory}/src/index.ts`, ...(file === `${directory}/build.mjs` ? { kind: 'support' as const } : {}) })))
       notes.push(`业务扩展 ${extension.id} 的源码目录来自当前工作区登记；运行中扩展摘要：${extension.sourceDigest ?? '未知'}。当前文件与该摘要的一致性尚未核对。`)

@@ -74,7 +74,7 @@ class Fixture extends Service {
   async *follow(request, signal) { yield { sessionId: request.address?.sessionId ?? request.sessionId, kind: this.ctx.invocation.peer.principal.kind }; await new Promise(resolve => signal.addEventListener('abort', resolve, { once: true })) }
 }
 mark('create'); mark('list'); mark('updateQueue'); mark('page', { resources: { session: request => request.address?.sessionId ?? request.address?.childSessionId ?? request.sessionId } }); mark('follow', { mode: 'stream', resources: { session: request => request.address?.sessionId ?? request.address?.childSessionId ?? request.sessionId } })
-async function setup(t, { localTools = [], emptyWorkspace = false, registrationFailure = false, sharedDevelopment = false, sharedPublished = false, development = sharedDevelopment, noSecret = false, disabled = false, proxyOrigin, nativeSessions = false, runtimeInputsOnly = false } = {}) {
+async function setup(t, { localTools = [], emptyWorkspace = false, registrationFailure = false, sharedDevelopment = false, sharedPublished = false, development = sharedDevelopment, noSecret = false, disabled = false, proxyOrigin, nativeSessions = false, runtimeInputsOnly = false, presetId } = {}) {
   const sharedAnonymous = sharedDevelopment || sharedPublished
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'business-native-'))
   const assetRoot = runtimeInputsOnly ? join(fixtureRoot, 'runtime-inputs') : fixtureRoot
@@ -131,7 +131,7 @@ async function setup(t, { localTools = [], emptyWorkspace = false, registrationF
   if (NativeSessionController) await ctx.plugin(NativeSessionController, { nativeOpen: false })
   const centerRoot = join(fixtureRoot, 'center-assets'); mkdirSync(join(centerRoot, 'config'), { recursive: true }); mkdirSync(join(centerRoot, '.local/instances/soc-business'), { recursive: true }); symlinkSync(join(assetRoot, 'config/business-access.json'), join(centerRoot, 'config/business-access.json')); writeFileSync(join(centerRoot, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: binding.workspaceId })); writeFileSync(join(centerRoot, '.local/instances/soc-business/instance.json'), JSON.stringify({ workspace_id: binding.workspaceId, asset_root: centerRoot, agent_id: binding.agentId, web_base_path: '/agents/soc/instances/soc-business/', business_control: { runtime_generation: binding.runtimeGeneration, source_digest: binding.sourceDigest, origin: `http://127.0.0.1:${ctx.webServer.port}` } })); const coordinator = getBusinessControl(centerRoot); coordinator.registerInstance(binding); const gateway = await startBusinessGateway(centerRoot, { ...setupConfig.gateway, sharedSecretFile: secretPath }); t.after(() => gateway.close())
   mkdirSync(join(centerRoot, '.local/credentials'), { recursive: true }); writeFileSync(join(centerRoot, '.local/credentials/mcp-manager.json'), readFileSync(mcpFile))
-  const loaded = ctx.plugin(Runtime, { assetRoot, stateRoot: join(fixtureRoot, 'runtime-state'), ...(!noSecret ? { sharedSecretFile: secretPath } : {}), coordinatorOrigin: `http://127.0.0.1:${gateway.server.address().port}`, basePath, workspacePath, binding, localTools })
+  const loaded = ctx.plugin(Runtime, { assetRoot, stateRoot: join(fixtureRoot, 'runtime-state'), ...(!noSecret ? { sharedSecretFile: secretPath } : {}), coordinatorOrigin: `http://127.0.0.1:${gateway.server.address().port}`, basePath, workspacePath, binding, localTools, presetId })
   if (registrationFailure) {
     await assert.rejects(async () => { await loaded }, /业务固定工作区登记失败.*EACCES/)
     return { ctx, workspaceRows, registrationConnections }
@@ -502,6 +502,15 @@ async function nativeQuestions(t, fixture) {
     },
   }
 }
+test('开发与匿名实例保留原生 Preset 选择，认证发布实例仍固定业务 Preset', async t => {
+  for (const mode of [{ development: true }, { sharedPublished: true }, {}]) await t.test(JSON.stringify(mode), async t => {
+    const { rpc, fixture } = await setup(t, { ...mode, presetId: 'soc' })
+    assert.equal((await rpc('A', 'session/create', { agentPreset: 'evaluation-judge', cwd: '/etc' })).status, 200)
+    assert.deepEqual(fixture.createdRequests[0], { workspaceId: 'native-fixed-workspace', agentPreset: Object.keys(mode).length ? 'evaluation-judge' : 'soc' })
+    assert.equal((await rpc('A', 'session/create', {})).status, 200)
+    assert.deepEqual(fixture.createdRequests[1], { workspaceId: 'native-fixed-workspace', agentPreset: 'soc' })
+  })
+})
 test('原生问答跨 HTTP、页面完成和多标签保持同一 Peer，重复回答只完成一次', async t => {
   const fixture = await setup(t, { sharedDevelopment: true }), { ctx, headers, rpc } = fixture
   const questions = await nativeQuestions(t, fixture), first = await questions.connect(), second = await questions.connect()

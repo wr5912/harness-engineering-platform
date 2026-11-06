@@ -84,7 +84,7 @@ export { Manager };`
 
 const { name } = JSON.parse(await readFile(new URL('./package.json', import.meta.url), 'utf8'))
 // 固定已打包执行代码的身份，不能用运行时工作树替代实际装载制品。
-const implementationFiles = ['definition.ts', 'compositions.ts', 'executor.ts', 'execution-receipts.ts', 'index.ts', 'openapi.ts', 'native.ts', 'nested.ts', 'extension.ts', 'control.ts', 'manager.ts', 'platform-manager.ts']
+const implementationFiles = ['definition.ts', 'compositions.ts', 'executor.ts', 'source-digest.ts', 'workflow-graph.ts', 'workflow-runs.ts', 'execution-receipts.ts', 'index.ts', 'openapi.ts', 'native.ts', 'nested.ts', 'extension.ts', 'control.ts', 'manager.ts', 'platform-manager.ts']
   .map(file => `platform/plugin/src/mcp/${file}`)
   .concat(['runtime/adapters/dsh-web/src/resolve-runtime.ts', 'platform/plugin/build.mjs', 'platform/plugin/package.json', 'platform/plugin/pnpm-lock.yaml', 'platform/plugin/src/index.ts',
     'platform/plugin/src/evaluation/model-attempts.ts', 'platform/plugin/src/workflows/graph.ts',
@@ -97,6 +97,7 @@ for (const directory of ['agent-access', 'instances/external']) {
   for (const file of (await readdir(new URL('../../' + base + '/', import.meta.url))).filter(file => file.endsWith('.ts')).sort()) implementationFiles.push(`${base}/${file}`)
 }
 const implementationHash = createHash('sha256')
+implementationFiles.push('platform/plugin/src/mcp/lfx-runtime.ts', 'platform/plugin/src/mcp/lfx-assets.ts', ...['hep_lfx.py', 'server.py', 'requirements.txt'].map(file => `platform/mcp/lfx/${file}`))
 const implementationSources = []
 for (const file of implementationFiles) {
   const bytes = await readFile(new URL('../../' + file, import.meta.url))

@@ -94,6 +94,16 @@ test('独立 bundle 共用 singleton 与 ALS；未启用旧研究模式保留，
   assert.equal(await getBusinessControl(legacyRoot).execute(operation(), () => 'legacy'), 'legacy')
 })
 
+test('管理助手的输入、操作和报告不进入业务风险评估；复制上下文不能冒充管理身份', async t => {
+  const f = await fixture(t)
+  const context = f.control.managementContext()
+  for (const stage of ['input', 'operation', 'report']) {
+    assert.equal(await f.control.inspect(context, stage, '管理助手巡检产物'), undefined)
+  }
+  assert.equal(f.upstream.riskCalls.length, 0)
+  await assert.rejects(f.control.inspect(structuredClone(context), 'report', '产物'), { code: 'context_invalid' })
+})
+
 test('无需认证共享实例允许读取，不运行本地内容判定，切换认证方式仍撤回旧主体', async t => {
   const f = await fixture(t)
   f.config.gateway.instances[0].accessMode = 'anonymous'

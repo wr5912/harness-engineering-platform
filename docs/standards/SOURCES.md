@@ -4,6 +4,10 @@
 
 本地术语修订核对日期：2026-10-13。外部研发规范条目保留 2026-09-23 的锁定信息，本次未重新访问外部仓库。
 
+## 数据仓库索引参考
+
+[Karpathy 的 LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) 于 2026-11-05 查阅，作为数据仓库知识整理与导航的思想来源。项目采用范围及强制约定只在数据仓库的[层级索引与按需阅读](https://github.com/wr5912/harness-engineering-platform-data/blob/main/AGENTS.md#层级索引与按需阅读)维护，不依赖远程原文运行。
+
 ## 目录与资产模型参考
 
 | 规范 | 受控副本 | 输入原版 SHA-256 | 当前副本身份 |

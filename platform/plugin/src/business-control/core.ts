@@ -765,6 +765,7 @@ export class BusinessControl {
     return fact
   }
   async inspect(context: BusinessContext, stage: 'input' | 'operation' | 'report', input: unknown, signal = noSignal(), action: string = 'write', operationBinding?: AccessRequest['operationBinding']): Promise<RiskFact | undefined> {
+    if (this.isManagement(context)) return
     this.acceptContext(context)
     if (this.isUnrestrictedContext(context)) return
     if (['anonymous', 'none'].includes(context.identity?.evidence.method ?? '') && !this.isSharedContext(context)) return error('identity_source_changed', 401)

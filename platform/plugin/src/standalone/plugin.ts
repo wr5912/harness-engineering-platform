@@ -68,7 +68,7 @@ export async function apply(ctx: any, options: { home?: string; root?: string } 
     async readResource() { throw new Error('组合工具不提供资源') },
     async listTools() {
       return { tools: catalog().compositions.filter(entry => entry.published).map(entry => ({ name: entry.published!.toolName, title: entry.published!.title,
-        description: entry.published!.description, inputSchema: compositionInputSchema(entry.published) })) }
+        description: entry.published!.description, inputSchema: compositionInputSchema(entry.published, extension) })) }
     },
     async callTool(request: any, options?: { signal?: AbortSignal }) {
       refreshRegistry()

@@ -1,6 +1,10 @@
 import { Annotation } from '@langchain/langgraph'
 import { versionConfig, type Catalog, type CompositionConfig, type CompositionStep } from './compositions.ts'
 import { compileSequence } from '../workflows/graph.ts'
+import { compositionInputSchema } from './definition.ts'
+import type { CompositionExtension } from './extension.ts'
+import { compileWorkflow, END, START } from './workflow-graph.ts'
+import type { WorkflowContext } from './extension.ts'
 
 const safePart = (part: string) => /^[A-Za-z_][A-Za-z0-9_-]*$/.test(part) && !['__proto__', 'prototype', 'constructor'].includes(part)
 
@@ -14,7 +18,27 @@ function mappingPaths(value: unknown): string[] {
   return []
 }
 
-export function validateNested(config: CompositionConfig, catalog: Catalog, ancestors = new Set<string>()) {
+export function nestedWorkflowGraph(config: CompositionConfig, catalog: Catalog, call: (child: CompositionConfig, input: Record<string, any>, step: CompositionStep) => Promise<any>, aggregate: (values: Record<string, any>, input: Record<string, any>) => Promise<Record<string, any>>, context?: WorkflowContext) {
+  const steps = config.steps ?? []
+  if (steps.some(step => step.when && step.when !== 'always')) throw new Error('工作流子组合仅支持明确的输入依赖；不支持威胁分析的阶段条件')
+  const nodes = steps.map(step => {
+    const child = versionConfig(catalog, step.compositionId, step.versionId)
+    return { id: step.id, title: child.title, kind: 'composition', compositionId: step.compositionId, versionId: step.versionId, input: step.inputMap, output: step.id,
+      run: async (state: any) => {
+        try { return { values: { [step.id]: await call(child, mappedInput(step.inputMap, state.input, state.values), step) } } }
+        catch (error) { return { values: { [step.id]: { status: 'failed', error: error instanceof Error ? error.message : '子组合执行失败' } } } }
+      } }
+  })
+  const dependencies = new Map(steps.map(step => [step.id, [...new Set(mappingPaths(step.inputMap).filter(path => path.startsWith('$steps.')).map(path => path.split('.')[1]))]]))
+  for (const [id, sources] of dependencies) if (sources.some(source => !dependencies.has(source) || steps.findIndex(step => step.id === source) >= steps.findIndex(step => step.id === id))) throw new Error('参数映射只能引用前序步骤输出')
+  const terminals = steps.filter(step => ![...dependencies.values()].some(sources => sources.includes(step.id))).map(step => step.id)
+  return compileWorkflow([...nodes, { id: 'aggregate', title: '汇总检查结果', kind: 'aggregate', run: async state => ({ result: await aggregate(state.values, state.input) }) }], [
+    ...steps.map(step => ({ source: dependencies.get(step.id)!.length ? dependencies.get(step.id)! : START, target: step.id })),
+    { source: terminals.length ? terminals : START, target: 'aggregate' }, { source: 'aggregate', target: END },
+  ], context)
+}
+
+export function validateNested(config: CompositionConfig, catalog: Catalog, ancestors = new Set<string>(), extension?: CompositionExtension) {
   if (config.kind !== 'composite') return
   const previous = new Set<string>()
   for (const step of config.steps ?? []) {
@@ -25,11 +49,10 @@ export function validateNested(config: CompositionConfig, catalog: Catalog, ance
       const parts = path.slice(1).split('.')
       if (!parts.every(safePart) || !(parts[0] === 'input' && parts.length >= 2 || parts[0] === 'steps' && parts.length >= 3 && previous.has(parts[1]))) throw new Error('参数映射只能引用输入或前序步骤输出')
     }
-    const required = child.kind === 'threat-stage' && child.stage !== 'collect' ? 'run_id' : child.kind ? 'incident_id' : 'asset'
-    if (!(required in step.inputMap)) throw new Error(`子组合参数映射缺少 ${required}`)
-    const allowed = child.kind ? [required] : ['asset', 'limit']
-    if (Object.keys(step.inputMap).some(key => !allowed.includes(key))) throw new Error('子组合参数映射包含未声明字段')
-    validateNested(child, catalog, new Set([...ancestors, key]))
+    const schema = compositionInputSchema(child, extension)
+    for (const required of schema.required ?? []) if (!(required in step.inputMap)) throw new Error(`子组合参数映射缺少 ${required}`)
+    if (schema.additionalProperties === false && Object.keys(step.inputMap).some(key => !Object.hasOwn(schema.properties ?? {}, key))) throw new Error('子组合参数映射包含未声明字段')
+    validateNested(child, catalog, new Set([...ancestors, key]), extension)
     previous.add(step.id)
   }
   if (!ancestors.size) {
@@ -50,13 +73,17 @@ export function mappedInput(map: Record<string, unknown>, input: Record<string, 
       if (!parts.every(safePart)) throw new Error('参数映射路径无效')
       let resolved: any = { input, steps }
       for (const part of parts) {
-        if (!resolved || typeof resolved !== 'object' || !Object.hasOwn(resolved, part)) throw new Error('参数映射来源字段不存在')
+        if (!resolved || typeof resolved !== 'object' || !Object.hasOwn(resolved, part)) {
+          // 可选输入未提供时由子组合的 Schema 判断必填性；步骤输出缺失仍是执行错误。
+          if (parts[0] === 'input') return undefined
+          throw new Error('参数映射来源字段不存在')
+        }
         resolved = resolved[part]
       }
       return resolved
     }
     if (Array.isArray(value)) return value.map(resolve)
-    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, resolve(item)]))
+    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, resolve(item)]).filter(([, item]) => item !== undefined))
     return value
   }
   return resolve(map)
@@ -101,8 +128,8 @@ export async function nestedStructure(config: CompositionConfig, catalog: Catalo
   return { nodes: Object.values(compiled.nodes).map((node: any) => ({ id: node.id, ...node.metadata })), edges: compiled.edges }
 }
 
-export async function executeNested(config: CompositionConfig, catalog: Catalog, input: Record<string, any>, call: Parameters<typeof graph>[2]) {
-  validateNested(config, catalog)
+export async function executeNested(config: CompositionConfig, catalog: Catalog, input: Record<string, any>, call: Parameters<typeof graph>[2], extension?: CompositionExtension) {
+  validateNested(config, catalog, new Set(), extension)
   const state = await graph(config, catalog, call).invoke({ input, stepValues: {}, latest: {}, trace: [], receipts: [], errors: [], graphComplete: true })
   const error = state.errors[0] ?? (!Object.keys(state.stepValues).length ? { code: 'composition_not_executed', message: '所有子步骤均被跳过，未产生运行结果' } : undefined)
   return { ok: !error, receipts: state.receipts, graph_complete: state.graphComplete, result: { ...state.latest, stepValues: state.stepValues, trace: state.trace }, ...(error ? { error } : {}) }

@@ -22,6 +22,24 @@ export interface ThreatRuntime {
 }
 
 import type { Catalog, CompositionConfig } from './compositions.ts'
+export type WorkflowContext = {
+  runId: string; nodeId: string; signal: AbortSignal; shared: any
+  progress(value: Record<string, any>): void
+  call<T>(call: () => Promise<T>): Promise<T>
+  map<T, R>(items: T[], call: (item: T, index: number) => Promise<R>): Promise<R[]>
+}
+export type CompositionWorkflow = {
+  native?: { digest(config: CompositionConfig): string; freeze(config: CompositionConfig): string }
+  inputSchema: Record<string, any>
+  outputSchema?: Record<string, any>
+  sourceDigest: string
+  connections(config: CompositionConfig): string[]
+  structure?(config: CompositionConfig): Promise<{ nodes: any[]; edges: any[] }>
+  prepare?(input: Record<string, any>, config: CompositionConfig, signal: AbortSignal): Promise<any>
+  execute?(input: Record<string, any>, config: CompositionConfig, context: WorkflowContext): Promise<Record<string, any>>
+  aggregate?(steps: Record<string, any>, input: Record<string, any>, context: WorkflowContext): Promise<Record<string, any>>
+  artifacts?(result: Record<string, any>): { id: string; filename: string; contentType: string; body: string }[]
+}
 export type CompositionCall = { ok: boolean; status: number; json: any; receipt: any }
 export type CompositionFlow = {
   steps(config: CompositionConfig): { step: string; title: string; connectionId?: string; operationId: string; input: Record<string, unknown>; output: string }[]
@@ -37,12 +55,15 @@ export type CompositionExtension = {
   sourceDigest?: string
   threat?: ThreatRuntime
   flow?: CompositionFlow
+  workflows?: Record<string, CompositionWorkflow>
   seed?(catalog: Catalog, bindings: ThreatBindings): void
 }
 
 /** 目录仍可编辑；工具发现只暴露当前已装载实现能够执行的发布项。 */
 export function executableCatalog(catalog: Catalog, extension?: CompositionExtension): Catalog {
   const available = (config: CompositionConfig, path = new Set<string>()): boolean => {
+    if (config.workflow && !extension?.workflows?.[config.workflow]) return false
+    if (config.kind === 'workflow') return Boolean(extension?.workflows?.[config.workflow!]?.execute)
     if (config.kind === 'threat-stage') return Boolean(extension?.threat)
     if (config.kind === 'composite') return (config.steps ?? []).every(step => {
       const key = `${step.compositionId}:${step.versionId}`
@@ -57,7 +78,7 @@ export function executableCatalog(catalog: Catalog, extension?: CompositionExten
 import type { ModelAttempt, ModelAttemptContext, AttemptRecorder } from '../evaluation/model-attempts.ts'
 export { observeLlm } from '../evaluation/model-attempts.ts'
 export type { ModelAttempt } from '../evaluation/model-attempts.ts'
-export type CompositionExecutionContext = ModelAttemptContext & { recordAttempt?: AttemptRecorder; onRun?(runId: string): Promise<void> }
+export type CompositionExecutionContext = ModelAttemptContext & { recordAttempt?: AttemptRecorder; onRun?(runId: string): Promise<void>; workflowContext?: WorkflowContext }
 export type GraphExecution = {
   execution_id: string; parent_run_id?: string; case_id?: string; session_id?: string; tool_call_id?: string
   source_digest?: string; build_digest?: string

@@ -54,6 +54,8 @@ export function workspaceOwnsInstance(assetRoot: string, manifest: Record<string
 
 export function workspaceConfigPath(assetRoot: string, name: string): string {
   if (!/^[a-z][a-z0-9-]*\.json$/.test(name)) throw new Error('配置文件名无效')
+  const mcp = { 'mcp-manager.json': 'manager.json', 'mcp-compositions.json': 'compositions.json' }[name]
+  if (mcp && existsSync(join(assetRoot, 'mcp', 'manager.json'))) return join(resolve(assetRoot), 'mcp', mcp)
   const current = join(resolve(assetRoot), 'config', name)
   if (existsSync(join(assetRoot, 'workspace.json')) || existsSync(current)) return current
   const legacy: Record<string, string> = {
@@ -66,6 +68,11 @@ export function workspaceConfigPath(assetRoot: string, name: string): string {
 
 export function workspaceLocalPath(assetRoot: string, ...parts: string[]): string {
   return join(resolve(assetRoot), '.local', ...parts)
+}
+
+export function mcpLocalPath(assetRoot: string, area: string, ...parts: string[]): string {
+  if (existsSync(join(assetRoot, 'mcp/manager.json'))) return join(resolve(assetRoot), 'mcp/.local', area, ...parts)
+  return area === 'executions' ? workspaceLocalPath(assetRoot, 'mcp-composition-executions', ...parts) : workspaceLocalPath(assetRoot, area, ...parts)
 }
 
 /** CLI、实例详情与目录监听共用同一状态位置，不随进程 cwd 改变。 */

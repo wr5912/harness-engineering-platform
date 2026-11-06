@@ -215,7 +215,7 @@ export function applyTools(ctx: Context) {
               group_id: actual.id, group_link_version: 2, group_target_digest: actual.targetDigest,
               tool_name: entry.published.toolName,
               compositionId: entry.binding.compositionId, versionId: entry.binding.versionId,
-              expectedImplementationDigest: entry.binding.expectedImplementationDigest, input_schema: compositionInputSchema(entry.published),
+              expectedImplementationDigest: entry.binding.expectedImplementationDigest, input_schema: entry.inputSchema,
             } }] : []
           })
           return bindings.length ? bindings : [{ ...base, fixed_binding_unavailable: '尚无已登记且可核验目标身份的原生 MCP 分组包含该工具' }]

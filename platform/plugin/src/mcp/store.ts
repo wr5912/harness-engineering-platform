@@ -3,6 +3,7 @@ import { closeSync, existsSync, fchmodSync, fsyncSync, mkdirSync, openSync, read
 import { dirname, join } from 'node:path'
 import { prepareBusinessRuntimeFile } from '../business-control/secret-file.ts'
 import { mcpCredentialFile, mcpCredentialPaths } from './credential-path.ts'
+import { workspaceConfigPath } from '../workspace.ts'
 
 type Document = { schemaVersion: 1; servers: any[]; groups: any[] }
 type Secrets = { schemaVersion: 1; sharedToken: string; servers: Record<string, {
@@ -143,7 +144,7 @@ export class McpConfigStore {
   private readonly validate: (value: McpConfiguration) => void
   constructor(assetRoot: string, validate: (value: McpConfiguration) => void) {
     this.assetRoot = assetRoot
-    this.publicFile = join(assetRoot, 'config', 'mcp-manager.json')
+    this.publicFile = workspaceConfigPath(assetRoot, 'mcp-manager.json')
     this.validate = validate
   }
   private get secretFile(): string { return mcpCredentialFile(this.assetRoot) }

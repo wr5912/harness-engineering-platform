@@ -6,7 +6,7 @@ import type { GeneratedCodeCatalog, GeneratedCodeFile, GeneratedCodeKind, Genera
 
 export interface CodeLocation { root: string; file: string; path: string; kind?: GeneratedCodeKind; entry?: boolean; asset_path?: string; built_sha256?: string }
 const hash = (data: Buffer) => createHash('sha256').update(data).digest('hex')
-const TEXT = /\.(?:[cm]?[jt]sx?|json|ya?ml|md|css|html|map)$/i
+const TEXT = /\.(?:[cm]?[jt]sx?|py|txt|json|ya?ml|md|css|html|map)$/i
 const MAX_FILE_BYTES = 16 * 1024 * 1024
 export const CODE_PREVIEW_CHARACTERS = 128 * 1024
 

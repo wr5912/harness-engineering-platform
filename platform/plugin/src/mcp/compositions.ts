@@ -1,23 +1,26 @@
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import type { ThreatBindings, ThreatStage } from './extension.ts'
+import { compositionQueries } from './definition.ts'
 export type { ThreatBindings, ThreatStage } from './extension.ts'
 
 export type CompositionStep = { id: string; compositionId: string; versionId: string; inputMap: Record<string, unknown>; when?: 'always' | 'five_source' | 'claimed' | 'completed' }
 export type CompositionConfig = {
   toolName: string; title: string; description: string; connectionId: string; flow?: 'soc-asset-alerts'; alertsConnectionId?: string
-  kind?: 'threat-stage' | 'composite'; stage?: ThreatStage; bindings?: ThreatBindings; steps?: CompositionStep[]
+  kind?: 'threat-stage' | 'composite' | 'workflow'; stage?: ThreatStage; bindings?: ThreatBindings; steps?: CompositionStep[]
+  workflow?: string; connections?: Record<string, string>; options?: Record<string, any>
+  implementation?: string
+  engine?: 'lfx'; flowDigest?: string
 }
-export type CompositionVersion = { versionId: string; publishedAt?: string; config: CompositionConfig }
+export type CompositionVersion = { versionId: string; publishedAt?: string; implementationDigest?: string; config: CompositionConfig }
 export type CompositionEntry = { id: string; draft?: CompositionConfig; published?: CompositionConfig & { publishedAt?: string }; versions?: CompositionVersion[]; publishedVersionId?: string }
 export type Catalog = { schema_version: '1.0'; compositions: CompositionEntry[] }
 
 export const COMPOSITION_SERVICE_ID = 'platform-compositions'
 export function publishedCompositionService(catalog: Catalog, available: Catalog = catalog) {
   // 已保存分组引用服务身份；扩展装载前可暂时没有可调用工具，不能让服务 ID 消失。
-  if (!catalog.compositions.some(entry => entry.published)) return undefined
-  const publishedTools = available.compositions.flatMap(entry => entry.published ? [entry.published] : [])
+  const publishedTools = [...available.compositions.flatMap(entry => entry.published ? [entry.published] : []), ...compositionQueries]
   return { id: COMPOSITION_SERVICE_ID, serverName: 'compositions', description: '工具组合编排（已发布）',
     enabled: true, platformComposition: true, publishedTools,
     tools: { mode: 'all', names: publishedTools.map(tool => tool.toolName) } }
@@ -31,8 +34,17 @@ export function compositionConfig(value: any): CompositionConfig {
   if (typeof title !== 'string' || !title.trim() || title.length > 80) throw new Error('编排标题须为 1–80 个字符')
   if (typeof description !== 'string' || description.length > 500) throw new Error('工具说明须不超过 500 个字符')
   if (typeof connectionId !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(connectionId)) throw new Error('请选择 OpenAPI 服务器')
-  if (kind !== undefined && kind !== 'threat-stage' && kind !== 'composite') throw new Error('组合类型无效')
-  const base = { toolName, title: title.trim(), description, connectionId }
+  if (kind !== undefined && !['threat-stage', 'composite', 'workflow'].includes(kind)) throw new Error('组合类型无效')
+  const workflow = value.workflow
+  if (workflow !== undefined && (typeof workflow !== 'string' || !/^[a-z][a-z0-9-]{0,79}$/.test(workflow) || !['workflow', 'composite'].includes(kind))) throw new Error('工作流标识无效')
+  if (kind === 'workflow' && !workflow) throw new Error('请选择已登记工作流')
+  if (value.connections !== undefined && (!value.connections || typeof value.connections !== 'object' || Array.isArray(value.connections) || Object.values(value.connections).some(id => typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(id)))) throw new Error('工作流连接绑定无效')
+  if (value.options !== undefined && (!value.options || typeof value.options !== 'object' || Array.isArray(value.options))) throw new Error('工作流选项无效')
+  if (value.implementation !== undefined && !/^[0-9a-f]{64}$/.test(value.implementation)) throw new Error('组合实现摘要无效')
+  if (value.engine !== undefined && (value.engine !== 'lfx' || kind !== 'workflow' || !workflow)) throw new Error('LFX 需要代码工作流身份')
+  if (value.flowDigest !== undefined && (value.engine !== 'lfx' || !/^[0-9a-f]{64}$/.test(value.flowDigest))) throw new Error('LFX 发布摘要无效')
+  const base = { toolName, title: title.trim(), description, connectionId, ...(value.implementation ? { implementation: value.implementation } : {}), ...(workflow ? { workflow, ...(value.connections ? { connections: value.connections } : {}), ...(value.options ? { options: value.options } : {}) } : {}) }
+  if (kind === 'workflow') return { ...base, kind, ...(value.engine ? { engine: value.engine, ...(value.flowDigest ? { flowDigest: value.flowDigest } : {}) } : {}) }
   if (kind === 'threat-stage') {
     if (!['collect', 'infer', 'writeback', 'report'].includes(stage)) throw new Error('威胁分析阶段无效')
     const binding = value.bindings
@@ -74,11 +86,14 @@ export function versionConfig(catalog: Catalog, compositionId: string, versionId
   return version.config
 }
 
-export function publishCompositionVersion(entry: CompositionEntry, config: CompositionConfig) {
+export function publishCompositionVersion(entry: CompositionEntry, config: CompositionConfig, implementationDigest?: string) {
   const versionId = compositionVersionId(config)
   const publishedAt = new Date().toISOString()
   entry.versions ??= []
   if (!entry.versions.some(version => version.versionId === versionId)) entry.versions.push({ versionId, publishedAt, config: compositionConfig(config) })
+  const version = entry.versions.find(version => version.versionId === versionId)!
+  if (version.implementationDigest && implementationDigest && version.implementationDigest !== implementationDigest) throw new Error('固定版本实现不可替换，请重新发布新版本')
+  if (implementationDigest) version.implementationDigest = implementationDigest
   entry.published = { ...compositionConfig(config), publishedAt }
   entry.publishedVersionId = versionId
   delete entry.draft
@@ -89,7 +104,7 @@ function validateCatalog(catalog: Catalog) {
   const ids = new Set<string>()
   const names = new Map<string, string>()
   for (const entry of catalog.compositions) {
-    if (!entry || typeof entry.id !== 'string' || !/^[a-z0-9-]{1,80}$/.test(entry.id) || ids.has(entry.id) || (!entry.draft && !entry.published)) throw new Error('编排 ID 无效、重复或没有版本')
+    if (!entry || typeof entry.id !== 'string' || !/^[a-z0-9-]{1,80}$/.test(entry.id) || ids.has(entry.id) || (!entry.draft && !entry.published && !entry.versions?.length)) throw new Error('编排 ID 无效、重复或没有版本')
     ids.add(entry.id)
     for (const config of [entry.draft, entry.published].filter(Boolean)) {
       const valid = compositionConfig(config)
@@ -105,9 +120,19 @@ function validateCatalog(catalog: Catalog) {
   }
 }
 
-export function readCompositions(file: string) {
+export function readCompositions(file: string, ownsLock = false) {
+  if (!ownsLock && existsSync(`${file}.lock`)) throw new Error('组合目录正在保存，请稍后重试')
   const text = existsSync(file) ? readFileSync(file, 'utf8') : JSON.stringify({ schema_version: '1.0', compositions: [] })
-  const catalog = JSON.parse(text) as Catalog
+  const document = JSON.parse(text)
+  const contents: string[] = []
+  const catalog: Catalog = document.schema_version === '2.0' ? { schema_version: '1.0', compositions: document.compositions.map((item: any) => {
+    if (!item || typeof item.id !== 'string' || !/^[a-z0-9-]{1,80}$/.test(item.id) || item.path !== `compositions/${item.id}/composition.json`) throw new Error('组合包索引无效')
+    const content = readFileSync(join(dirname(file), item.path), 'utf8')
+    contents.push(item.path, content)
+    const entry = JSON.parse(content)
+    if (entry.id !== item.id) throw new Error('组合包与索引身份不一致')
+    return entry
+  }) } : document
   validateCatalog(catalog)
   // 旧目录只有 published；派生一个初始版本，保存时再物化，不改变旧 published 内容。
   for (const entry of catalog.compositions) if (entry.published && !entry.publishedVersionId) {
@@ -115,18 +140,45 @@ export function readCompositions(file: string) {
     entry.versions ??= []
     if (!entry.versions.some(version => version.versionId === entry.publishedVersionId)) entry.versions.push({ versionId: entry.publishedVersionId, publishedAt: entry.published.publishedAt, config: compositionConfig(entry.published) })
   }
-  return { catalog, revision: createHash('sha256').update(text).digest('hex') }
+  return { catalog, revision: createHash('sha256').update([text, ...contents].join('\0')).digest('hex') }
 }
 
-export function writeCompositions(file: string, catalog: Catalog, expectedRevision: unknown) {
+export function writeCompositions(file: string, catalog: Catalog, expectedRevision: unknown, deletedId?: string) {
   const previous = readCompositions(file)
   if (previous.revision !== expectedRevision) throw new Error('编排目录已变化，请刷新后重试；当前草稿未覆盖')
   validateCatalog(catalog)
   for (const entry of previous.catalog.compositions) for (const version of entry.versions ?? []) {
+    if (entry.id === deletedId && !catalog.compositions.some(item => item.id === deletedId)) continue
     const retained = catalog.compositions.find(item => item.id === entry.id)?.versions?.find(item => item.versionId === version.versionId)
     if (!retained || JSON.stringify(retained.config) !== JSON.stringify(version.config)) throw new Error('已发布组合版本不可修改或移除')
   }
   mkdirSync(dirname(file), { recursive: true })
+  if (existsSync(file) && JSON.parse(readFileSync(file, 'utf8')).schema_version === '2.0') {
+    const lock = `${file}.lock`, descriptor = openSync(lock, 'wx')
+    const backups = new Map<string, string | undefined>()
+    try {
+      if (readCompositions(file, true).revision !== expectedRevision) throw new Error('编排目录已变化，请刷新后重试')
+      for (const entry of catalog.compositions) {
+        const target = join(dirname(file), 'compositions', entry.id, 'composition.json')
+        const value = JSON.stringify(entry, null, 2) + '\n'
+        const old = existsSync(target) ? readFileSync(target, 'utf8') : undefined
+        if (value === old) continue
+        backups.set(target, old)
+        mkdirSync(dirname(target), { recursive: true })
+        writeFileSync(`${target}.tmp`, value); renameSync(`${target}.tmp`, target)
+      }
+      const index = { schema_version: '2.0', compositions: catalog.compositions.map(entry => ({ id: entry.id, path: `compositions/${entry.id}/composition.json` })) }
+      if (deletedId) {
+        const target = join(dirname(file), 'compositions', deletedId, 'composition.json')
+        if (existsSync(target)) { backups.set(target, readFileSync(target, 'utf8')); unlinkSync(target) }
+      }
+      writeFileSync(`${file}.tmp`, JSON.stringify(index, null, 2) + '\n'); renameSync(`${file}.tmp`, file)
+    } catch (error) {
+      for (const [target, value] of backups) { if (value === undefined) unlinkSync(target); else writeFileSync(target, value) }
+      throw error
+    } finally { closeSync(descriptor); unlinkSync(lock) }
+    return
+  }
   const temp = `${file}.${process.pid}.tmp`
   writeFileSync(temp, JSON.stringify(catalog, null, 2) + '\n')
   renameSync(temp, file)
@@ -137,4 +189,19 @@ export function selectedComposition(catalog: Catalog, selection: any): Compositi
   const config = catalog.compositions.find(entry => entry.id === selection.compositionId)?.[selection.version as 'draft' | 'published']
   if (!config) throw new Error('所选编排版本不存在')
   return config
+}
+
+/** 下架阻止新的固定版本和父子调用；已接受运行使用自己的冻结目录。 */
+type Dependencies = (config: CompositionConfig) => { compositionId: string; versionId: string }[]
+export function assertPublishedDependencies(catalog: Catalog, config: CompositionConfig, path = new Set<string>(), dependencies: Dependencies = config => config.steps ?? []) {
+  for (const step of dependencies(config)) {
+    const key = `${step.compositionId}:${step.versionId}`
+    if (path.has(key)) throw new Error('组合版本存在循环引用')
+    if (!catalog.compositions.find(entry => entry.id === step.compositionId)?.published) throw new Error(`子组合已下架或删除：${step.compositionId}`)
+    assertPublishedDependencies(catalog, versionConfig(catalog, step.compositionId, step.versionId), new Set([...path, key]), dependencies)
+  }
+}
+
+export function compositionReferences(catalog: Catalog, id: string, publishedOnly = false, dependencies: Dependencies = config => config.steps ?? []) {
+  return catalog.compositions.filter(entry => entry.id !== id && [...(publishedOnly ? [] : [entry.draft]), entry.published, ...(entry.published ? (entry.versions ?? []).map(version => version.config) : [])].some(config => config && dependencies(config).some(step => step.compositionId === id))).map(entry => ({ id: entry.id, title: entry.published?.title ?? entry.draft?.title ?? entry.id }))
 }

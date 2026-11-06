@@ -7,7 +7,10 @@ import { createHash } from 'node:crypto'
 import test from 'node:test'
 import { build } from 'esbuild'
 import { execFileSync } from 'node:child_process'
+import { compositionQueries } from '../src/mcp/definition.ts'
+const queryNames = compositionQueries.map(item => item.toolName)
 import { publishCompositionVersion } from '../src/mcp/compositions.ts'
+import { mappedInput } from '../src/mcp/nested.ts'
 import { registerFixedCompositionTools, withFixedCompositionExecution } from '../src/workflows/fixed-composition.ts'
 
 async function loadMcpModule(native = false) {
@@ -16,7 +19,7 @@ async function loadMcpModule(native = false) {
   const outfile = join(outdir, 'index.mjs')
   await symlink(join(process.cwd(), 'node_modules'), join(outdir, 'node_modules'), 'dir')
   await build({
-    entryPoints: [native ? 'src/mcp/native.ts' : 'src/mcp/index.ts'],
+    stdin: { contents: `export * from './src/mcp/${native ? 'native' : 'index'}.ts'; export { managementDispatch } from './src/mcp/control.ts'`, resolveDir: process.cwd(), loader: 'ts' },
     outfile,
     bundle: true,
     platform: 'node',
@@ -589,7 +592,7 @@ test('编排草稿持久化，旧发布版保持可调用，dry 发布后 Gatewa
     assert.deepEqual((await reload('list', {})).value.compositions, saved.value.compositions)
     const gateway = module.createMcpGatewayFetchHandler(process.cwd(), handler)
     const request = async (method, params) => (await gateway(new Request('http://fixture.local', { method: 'POST', body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) }))).json()
-    assert.deepEqual((await request('tools/list')).result.tools.map(item => item.name), ['query_asset_related_alerts'])
+    assert.deepEqual((await request('tools/list')).result.tools.map(item => item.name), ['query_asset_related_alerts', ...queryNames])
     assert.equal((await request('tools/call', { name: draft.toolName, arguments: { asset: 'host-a' } })).error.code, -32602)
     const dry = await compositionRequest(rpc, 'dryRunComposition', { asset: 'host-a' }, { compositionId: entry.id, version: 'draft' })
     assert.equal(dry.value.version.definition.toolName, draft.toolName)
@@ -605,7 +608,7 @@ test('编排草稿持久化，旧发布版保持可调用，dry 发布后 Gatewa
     assert.equal(published.value.compositions[0].draft, undefined)
     assert.equal(published.value.compositions[0].published.toolName, draft.toolName)
     assert.ok(published.value.compositions[0].published.publishedAt)
-    assert.deepEqual((await request('tools/list')).result.tools.map(item => item.name), [draft.toolName])
+    assert.deepEqual((await request('tools/list')).result.tools.map(item => item.name), [draft.toolName, ...queryNames])
     assert.equal((await request('tools/call', { name: entry.published.toolName, arguments: { asset: 'host-a' } })).error.code, -32602)
     const current = await request('tools/call', { name: draft.toolName, arguments: { asset: 'host-a' } })
     assert.equal(JSON.parse(current.result.content[0].text).version.definition.toolName, draft.toolName)
@@ -620,13 +623,13 @@ test('已发布编排服务与 Gateway 共用工具和执行路径，草稿发�
     const client = module.createPublishedCompositionClient(join(process.cwd(), '../..'), handler)
     const original = (await rpc('list', {})).value
     assert.equal(original.publishedService.id, 'platform-compositions')
-    assert.deepEqual(original.publishedService.tools.names, ['query_asset_related_alerts'])
+    assert.deepEqual(original.publishedService.tools.names, ['query_asset_related_alerts', ...queryNames])
     assert.deepEqual((await client.listTools()).tools.map(tool => tool.name), original.publishedService.tools.names)
     assert.deepEqual(await client.listResources(), { resources: [] })
     const entry = original.compositions[0]
     const draft = { ...entry.published, toolName: 'published_service_v2' }
     const saved = await rpc('saveCompositionDraft', { compositionId: entry.id, revision: original.revision, draft })
-    assert.deepEqual(saved.value.publishedService.tools.names, ['query_asset_related_alerts'])
+    assert.deepEqual(saved.value.publishedService.tools.names, ['query_asset_related_alerts', ...queryNames])
     await assert.rejects(client.callTool({ name: draft.toolName, arguments: { asset: 'host-a' } }), /Unknown tool/)
     const result = await client.callTool({ name: entry.published.toolName, arguments: { asset: 'host-a', limit: 2 } })
     assert.equal(result.isError, false)
@@ -636,8 +639,8 @@ test('已发布编排服务与 Gateway 共用工具和执行路径，草稿发�
     calls.length = 0
     const published = await rpc('publishComposition', { compositionId: entry.id, version: 'draft', revision: saved.value.revision, input: { asset: 'host-a' } })
     assert.equal(published.ok, true)
-    assert.deepEqual(published.value.publishedService.tools.names, [draft.toolName])
-    assert.deepEqual((await client.listTools()).tools.map(tool => tool.name), [draft.toolName])
+    assert.deepEqual(published.value.publishedService.tools.names, [draft.toolName, ...queryNames])
+    assert.deepEqual((await client.listTools()).tools.map(tool => tool.name), [draft.toolName, ...queryNames])
     await assert.rejects(client.callTool({ name: entry.published.toolName, arguments: { asset: 'host-a' } }), /Unknown tool/)
     assert.deepEqual(calls, [])
   })
@@ -661,7 +664,7 @@ test('多个编排独立选择，未发布草稿不进入发现列表且使用�
     assert.deepEqual(calls, [])
     const gateway = module.createMcpGatewayFetchHandler(process.cwd(), handler)
     const discovered = async () => (await (await gateway(new Request('http://fixture.local', { method: 'POST', body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) }))).json()).result.tools.map(item => item.name)
-    assert.deepEqual(await discovered(), ['query_asset_related_alerts'])
+    assert.deepEqual(await discovered(), ['query_asset_related_alerts', ...queryNames])
     await rpc('registerOpenApi', { id: 'another-api', specUrl: `${baseUrl}/openapi.json`, credentialRef: { kind: 'file', path: join(temp, 'token.txt') } })
     assert.equal((await compositionRequest(rpc, 'dryRunComposition', { asset: 'host-a' }, selection)).ok, true)
     const executed = await compositionRequest(rpc, 'executeComposition', { asset: 'host-a' }, selection)
@@ -673,7 +676,7 @@ test('多个编排独立选择，未发布草稿不进入发现列表且使用�
     const published = await rpc('publishComposition', { ...selection, revision: created.value.revision, input: { asset: 'host-a' } })
     assert.equal(published.ok, true)
     assert.equal(calls.length, callCount)
-    assert.deepEqual(await discovered(), ['query_asset_related_alerts', 'another_query'])
+    assert.deepEqual(await discovered(), ['query_asset_related_alerts', 'another_query', ...queryNames])
   })
 })
 
@@ -742,18 +745,18 @@ test('未装载业务扩展时目录可读、业务工具不暴露且种子不�
   assert.equal(listed.value.compositions.length, 1)
   assert.equal(listed.value.extension, null)
   assert.equal(listed.value.publishedService.id, 'platform-compositions')
-  assert.deepEqual(listed.value.publishedService.tools.names, [])
+  assert.deepEqual(listed.value.publishedService.tools.names, queryNames)
   assert.equal((await rpc('seedThreatCompositions', { revision: listed.value.revision, bindings: config.bindings })).ok, false)
   assert.equal(await readFile(compositionsFile, 'utf8'), original)
   const gateway = module.createMcpGatewayFetchHandler(root, rpc)
   const discover = async () => (await (await gateway(new Request('http://fixture.local', { method: 'POST', body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) }))).json()).result.tools
-  assert.deepEqual(await discover(), [])
+  assert.deepEqual((await discover()).map(tool => tool.name), queryNames)
   extension.id = 'fixture-extension'
   extension.threat = { execute() { throw new Error('仅验证发现，不得执行') }, inspect() {}, artifact() {} }
-  assert.deepEqual((await discover()).map(tool => tool.name), ['collect_sample'])
+  assert.deepEqual((await discover()).map(tool => tool.name), ['collect_sample', ...queryNames])
   delete extension.id
   delete extension.threat
-  assert.deepEqual(await discover(), [])
+  assert.deepEqual((await discover()).map(tool => tool.name), queryNames)
   assert.equal(await readFile(compositionsFile, 'utf8'), original)
 })
 
@@ -988,4 +991,47 @@ test('嵌套组合的原生Run关联追加保存，阶段失败保持未知且�
   await rpc('compositionExecution', { execution_id: request.execution.execution_id })
   await rpc('executeComposition', request)
   assert.equal(calls, 2)
+})
+
+test('可选输入映射省略未提供字段，步骤输出缺失报错', () => {
+  assert.deepEqual(mappedInput({ scope: '$input.scope', reachability: '$input.reachability' }, { scope: { all: true } }, {}), { scope: { all: true } })
+  assert.throws(() => mappedInput({ value: '$steps.previous.value' }, {}, {}), /来源字段不存在/)
+})
+
+test('管理调用返回已接受回执，发布父依赖阻止下架，删除前须下架', async t => {
+  const module = await loadMcpModule()
+  const root = await mkdtemp(join(tmpdir(), 'mcp-management-workflow-'))
+  const file = join(root, 'compositions.json')
+  const child = { id: 'child' }, parent = { id: 'parent' }
+  const config = { kind: 'workflow', workflow: 'child', toolName: 'child', title: '子检查', description: '' }
+  publishCompositionVersion(child, config)
+  publishCompositionVersion(parent, { kind: 'composite', workflow: 'parent', toolName: 'parent', title: '父检查', description: '', steps: [{ id: 'child', compositionId: child.id, versionId: child.publishedVersionId, inputMap: {} }] })
+  await writeFile(file, JSON.stringify({ schema_version: '1.0', compositions: [child, parent] }))
+  const workflow = { inputSchema: { type: 'object', properties: {} }, sourceDigest: 'a'.repeat(64), connections: () => [], execute: async () => ({ status: 'completed' }), aggregate: async steps => steps }
+  const handler = module.createMcpHandler(root, { compositionsFile: file, servers: () => [], extension: { id: 'probe', sourceDigest: 'a'.repeat(64), workflows: { child: workflow, parent: workflow } } })
+  const rpc = (method, args) => module.managementDispatch(root, () => handler(method, args))
+  let state = (await rpc('list', {})).value
+  const saved = await rpc('saveCompositionDraft', { revision: state.revision, newId: 'stable-id', draft: { ...config, toolName: 'stable_tool' } })
+  assert.equal(saved.ok, true)
+  assert.ok(saved.value.compositions.some(entry => entry.id === 'stable-id'))
+  state = saved.value
+  assert.equal((await rpc('saveCompositionDraft', { revision: state.revision, newId: 'stable-id', draft: { ...config, toolName: 'stable_tool' } })).ok, false)
+  const accepted = await rpc('callPublishedComposition', { toolName: 'child', input: {}, execution: { execution_id: 'same' } })
+  assert.equal(accepted.ok, true, JSON.stringify(accepted))
+  assert.match(accepted.value.result.run_id, /^run-/)
+  const repeated = await rpc('callPublishedComposition', { toolName: 'child', input: {}, execution: { execution_id: 'same' } })
+  assert.equal(repeated.value.result.run_id, accepted.value.result.run_id)
+  const published = await rpc('publishComposition', { compositionId: 'stable-id', version: 'draft', revision: state.revision, input: {} })
+  assert.equal(published.ok, true, JSON.stringify(published))
+  state = published.value
+  const beforeUpdate = await rpc('callPublishedComposition', { toolName: 'stable_tool', input: {}, execution: { execution_id: 'before-update' } })
+  workflow.sourceDigest = 'b'.repeat(64)
+  const recovered = await rpc('callPublishedComposition', { toolName: 'stable_tool', input: {}, execution: { execution_id: 'before-update' } })
+  assert.equal(recovered.value.result.run_id, beforeUpdate.value.result.run_id)
+  assert.equal((await rpc('callPublishedComposition', { toolName: 'stable_tool', input: {}, execution: { execution_id: 'after-update' } })).ok, false)
+  assert.equal((await rpc('deleteComposition', { compositionId: 'child', revision: state.revision })).error.code, 'composition_published')
+  assert.equal((await rpc('withdrawComposition', { compositionId: 'child', revision: state.revision })).error.code, 'composition_referenced')
+  const withdrawn = await rpc('withdrawComposition', { compositionId: 'parent', revision: state.revision })
+  assert.equal(withdrawn.ok, true)
+  assert.equal((await rpc('withdrawComposition', { compositionId: 'child', revision: withdrawn.value.revision })).ok, true)
 })

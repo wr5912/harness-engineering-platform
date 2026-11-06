@@ -1,0 +1,148 @@
+{
+  "flow": {
+    "width": 1440,
+    "overflow": false,
+    "nodes": [
+      {
+        "id": "input",
+        "title": "运行输入"
+      },
+      {
+        "id": "scope",
+        "title": "核对冻结范围与规则"
+      },
+      {
+        "id": "mode",
+        "title": "选择检查目标来源"
+      },
+      {
+        "id": "explicit",
+        "title": "生成明确检查对"
+      },
+      {
+        "id": "pairs-explicit",
+        "title": "逐检查对核查路径与策略"
+      },
+      {
+        "id": "rules",
+        "title": "按规则生成检查对"
+      },
+      {
+        "id": "pairs-rules",
+        "title": "逐检查对核查路径与策略"
+      },
+      {
+        "id": "rulesError",
+        "title": "保留规则读取失败"
+      },
+      {
+        "id": "noRules",
+        "title": "记录缺少检查规则"
+      },
+      {
+        "id": "selected-result",
+        "title": "汇合选中的核查结果"
+      },
+      {
+        "id": "summary",
+        "title": "汇总可达性检查"
+      }
+    ]
+  },
+  "batch": {
+    "width": 1440,
+    "overflow": false,
+    "nodes": [
+      {
+        "id": "input",
+        "title": "运行输入"
+      },
+      {
+        "id": "path",
+        "title": "读取计算路径"
+      },
+      {
+        "id": "evidence",
+        "title": "核对路径与必经节点证据"
+      },
+      {
+        "id": "need-acl",
+        "title": "是否需要逐跳策略"
+      },
+      {
+        "id": "direct",
+        "title": "保留无需逐跳策略的结论"
+      },
+      {
+        "id": "acl",
+        "title": "读取并核对逐跳 ACL"
+      },
+      {
+        "id": "selected-path",
+        "title": "汇合选中的路径"
+      },
+      {
+        "id": "conclusion",
+        "title": "形成检查对结论"
+      }
+    ]
+  },
+  "mobile": {
+    "width": 390,
+    "overflow": false,
+    "nodes": [
+      {
+        "id": "input",
+        "title": "运行输入"
+      },
+      {
+        "id": "path",
+        "title": "读取计算路径"
+      },
+      {
+        "id": "evidence",
+        "title": "核对路径与必经节点证据"
+      },
+      {
+        "id": "need-acl",
+        "title": "是否需要逐跳策略"
+      },
+      {
+        "id": "direct",
+        "title": "保留无需逐跳策略的结论"
+      },
+      {
+        "id": "acl",
+        "title": "读取并核对逐跳 ACL"
+      },
+      {
+        "id": "selected-path",
+        "title": "汇合选中的路径"
+      },
+      {
+        "id": "conclusion",
+        "title": "形成检查对结论"
+      }
+    ]
+  },
+  "fixedChild": {
+    "width": 1440,
+    "overflow": false,
+    "nodes": [
+      "input",
+      "scope",
+      "mode",
+      "explicit",
+      "pairs-explicit",
+      "rules",
+      "pairs-rules",
+      "rulesError",
+      "noRules",
+      "selected-result",
+      "summary"
+    ],
+    "hasBack": true,
+    "compositionId": "inspection-reachability",
+    "versionId": "9feacdb49aa330c57db87dac7444f18b7bc6fd79558e3a35dc06f47e061d2573"
+  }
+}

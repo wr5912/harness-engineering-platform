@@ -9,7 +9,7 @@ const migrationActions = ['migrations/inspect', 'migrations/read', 'migrations/p
 export const assistantActions: Record<AssistantDomain, readonly string[]> = {
   agents: ['sdk/start', 'sdk/status', 'sdk/stop', 'sdk/list', 'sdk/guide', ...migrationActions, 'versions/migration-plan', 'versions/migration-apply', 'documents/read', 'research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'list', 'detail', 'edit/read', 'edit/preview', 'edit/apply', 'cases/list', 'cases/read', 'cases/update', 'cases/delete', 'cases/renumber-preview', 'cases/renumber', 'eval/preview', 'eval/start', 'eval/batch-start', 'eval/status', 'eval/cancel', 'runs/index', 'runs/delete', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/source', 'compute-variants/identity-preview', 'compute-variants/identity-apply', 'compute-variants/preview', 'compute-variants/create', 'compute-variants/rename', 'compute-variants/plan-preview', 'compute-variants/plan-apply', 'compute-variants/prepare', 'compute-variants/build-preview', 'compute-variants/build', 'compute-variants/freeze-preview', 'compute-variants/freeze', 'compute-variants/compare', 'new', 'create', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'cases/create', 'datasets/source', 'datasets/preview', 'datasets/apply', 'datasets/list', 'datasets/read', 'datasets/review', 'datasets/export', 'decision/update', 'features/read-source', 'features/preview', 'features/proposal', 'features/apply', 'fusion/preview', 'fusion/prepare', 'fusion/resolve', 'fusion/recover', 'fusion/proposal', 'fusion/confirm', 'fusion/status', 'fusion/verify', 'fusion/finalize', 'tasks/capabilities', 'tasks/assembly-preview', 'tasks/assembly-apply'],
   instances: ['list', 'detail', 'url', 'logs', 'preview', 'batch-preview', 'run', 'batch'],
-  mcp: ['list', 'configuration', 'saveConfiguration', 'test', 'resources', 'resourceTemplates', 'readResource', 'callTool', 'sources/list', 'sources/create', 'sources/refresh', 'sources/toggle', 'sources/components', 'sources/logs', 'sources/preview', 'sources/invoke', 'saveCompositionDraft', 'publishComposition', 'executeComposition', 'dryRunComposition', 'callPublishedComposition', 'compositionRun', 'compositionArtifact', 'compositionSource', 'seedThreatCompositions', 'control/status', 'control/saveConfiguration', 'control/restrict', 'control/reassess', 'control/release'],
+  mcp: ['list', 'configuration', 'saveConfiguration', 'test', 'resources', 'resourceTemplates', 'readResource', 'callTool', 'sources/list', 'sources/create', 'sources/refresh', 'sources/toggle', 'sources/components', 'sources/logs', 'sources/preview', 'sources/invoke', 'saveCompositionDraft', 'publishComposition', 'withdrawComposition', 'deleteComposition', 'executeComposition', 'dryRunComposition', 'callPublishedComposition', 'compositionRun', 'compositionArtifact', 'compositionDetails', 'compositionSource', 'compositionGraph', 'seedThreatCompositions', 'control/status', 'control/saveConfiguration', 'control/restrict', 'control/reassess', 'control/release'],
 }
 
 export const featureActions = ['research/read-reference', 'detail', 'edit/read', 'assets/diff', 'assets/read-fixed', 'features/read-source', 'features/preview', 'features/proposal', 'runs/index', 'runs/show', 'runs/report', 'runs/files', 'runs/read-file', 'runs/trace']
@@ -55,7 +55,7 @@ const fields: MapValue = {
   port: { type: 'integer' }, tail: { type: 'integer' }, cursor: { type: 'integer' }, limit: { type: 'integer' },
   arguments: { ...object, description: '使用 test 或 sources/components 返回的真实工具 inputSchema，不猜测参数。' },
   input: { ...object, description: '业务工具输入，使用当前工具目录返回的 inputSchema。' },
-  plan: object, selection: { ...object, description: '固定编排来源 {id,version:draft/published/version,versionId?}，使用实际目录返回的身份。' },
+  plan: object, selection: { type: 'object', required: ['id', 'version'], properties: { id: string, version: { type: 'string', enum: ['draft', 'published'] }, versionId: string }, description: '编排来源 {id,version:draft/published}；固定历史版本使用 {id,version:published,versionId:实际版本ID}，身份来自当前目录。' },
   workflow: string, task: { ...object, description: '沿用 datasets/read 的 {id,semantics}；semantics=recommended_decision 或 observed_action。' },
   questions: { ...object, description: '沿用公开决策合同的命名问题映射，每题含 type/instructions/criteria?。' },
   targets: { ...object, description: '与 questions 名称精确对应；每题只含 label、basis、probabilities?、status(reviewed/rejected)、decision_time_reviewed。' },
@@ -88,11 +88,14 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['readResource', 'serverId uri'], ['callTool', 'serverId toolName arguments', '先读取实际工具 inputSchema，再传 arguments；执行遵循 DSH 原生权限。'],
     ['sources/create', 'serverId name specUrl', '向当前配置的管理服务创建 OpenAPI 来源。'],
     ['sources/toggle', 'serverId sourceId enabled'], ['sources/preview sources/invoke', 'serverId sourceId toolName arguments', '按 sources/components 返回的组件合同提供参数。'],
-    ['saveCompositionDraft', 'compositionId revision draft', 'revision 来自 list；新编排省略 compositionId，更新时必须指定已有 ID。'],
+    ['saveCompositionDraft', 'compositionId newId revision draft', 'revision 来自 list；新编排省略 compositionId，可用 newId 指定稳定 ID；更新时必须指定已有 compositionId。'],
     ['publishComposition executeComposition dryRunComposition', 'compositionId version revision input', '先保存草稿；version=draft/published，发布只接受 draft；使用当前 revision。'],
+    ['withdrawComposition deleteComposition', 'compositionId revision', '使用 list 返回的身份与 revision。下架停止新调用，已受理运行继续；删除须先下架且解除引用，保留源码、文档与历史运行。结果未知先回读，不重复写入。'],
     ['callPublishedComposition', 'toolName input', '服务器从当前目录固定实际已发布版本，按 DSH 原生权限执行。'],
-    ['compositionSource', 'selection path expected_sha256', '省略 path 列实际源码目录；selection 固定编排与 draft/published/version 身份，path 和 expected_sha256 使用目录回执。仅读实际文件，不执行。'],
+    ['compositionSource', 'selection path expected_sha256', '省略 path 列实际源码目录；selection.version 只取 draft/published，固定历史版本同时传 version=published 和实际 versionId；path 和 expected_sha256 使用目录回执。仅读实际文件，不执行。'],
+    ['compositionGraph', 'compositionId version versionId', '读取实际控制流程图；当前选择传 version=draft/published，固定历史版本传实际 versionId，二者择一；versionId 不是 draft/published。查询不执行节点。'],
     ['compositionRun', 'run_id'], ['compositionArtifact', 'run_id artifactId'], ['seedThreatCompositions', 'revision bindings', '仅在业务扩展实际装载且用户要求时使用。'],
+    ['compositionDetails', 'run_id node_id offset limit', '按运行回执中的节点 ID 分页读取原始明细，以 offset 加已返回条数续读至 total，不把摘要当完整明细。'],
     ['control/status', '', '读取基础许可、风险事实、限制与真实实例回执；定时任务不在首期覆盖范围。'],
     ['control/saveConfiguration', 'revision enabled agents', '使用 control/status 的字符串 revision 和当前 agents 规则；只修改开放与基础授权，不发送凭据。'],
     ['control/restrict', 'scope deniedActions reason', 'scope 至少指定 workspaceId、agentId、subjectId；使用已登记实例及主体，动作 read/write/publish。'],

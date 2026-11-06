@@ -2,8 +2,9 @@ import { createHash, randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import { managedState, ownsPort, processBirth, restoreManagedProcess } from '../lifecycle.mts'
-import { workspaceIdentity, instanceStateRoot, workspaceLocalPath, workspaceOwnsCwd } from '../plugin/src/workspace.ts'
+import { workspaceIdentity, instanceStateRoot, workspaceLocalPath, workspaceOwnsCwd, mcpLocalPath } from '../plugin/src/workspace.ts'
 
 export type UpdateOptions = { programRoot: string; dataRoot: string; dryRun?: boolean }
 type ServiceState = NonNullable<ReturnType<typeof managedState>>
@@ -11,6 +12,7 @@ export type BusyItem = { kind: string; id: string; state: string }
 export type UpdateInspection = {
   state: ServiceState; workspaceId: string; environment: NodeJS.ProcessEnv; busy: BusyItem[]
   command?: string[]
+  pendingActivation?: boolean
   overlay?: { path: string; text: string }; extensions?: Array<{ entry: string; output: string }>
 }
 export type UpdateEntry = { source: string; target: string }
@@ -38,18 +40,22 @@ function files(path: string): string[] {
   if (!existsSync(path)) return []
   const stat = lstatSync(path)
   if (stat.isSymbolicLink()) throw new Error(`更新来源不能是符号链接：${path}`)
-  return stat.isDirectory() ? readdirSync(path).sort().filter(name => !['node_modules', '.git'].includes(name)).flatMap(name => files(join(path, name))) : stat.isFile() ? [path] : []
+  return stat.isDirectory() ? readdirSync(path).sort().filter(name => !['node_modules', '.git', '__pycache__'].includes(name)).flatMap(name => files(join(path, name))) : stat.isFile() ? [path] : []
 }
 function sourceSnapshot(options: UpdateOptions) {
-  const roots = ['platform/plugin/src', 'platform/plugin/assets', 'platform/plugin/business', 'plugins/mcp-manager', 'runtime/adapters/dsh-web/src', 'platform/profile']
+  const roots = ['platform/plugin/src', 'platform/plugin/assets', 'platform/plugin/business', 'platform/mcp/lfx', 'plugins/mcp-manager', 'runtime/adapters/dsh-web/src', 'platform/profile']
   const selected = roots.flatMap(path => files(join(options.programRoot, path)))
   for (const folder of ['platform/plugin', 'runtime/adapters/dsh-web']) for (const name of ['package.json', 'pnpm-lock.yaml', 'build.mjs']) selected.push(join(options.programRoot, folder, name))
   for (const name of ['platform/dsh-platform-internal.py', 'platform/dsh-platform', 'platform/lifecycle.mts', 'platform/deploy/update.mts']) selected.push(join(options.programRoot, name))
   for (const name of ['workspace.json', 'AGENTS.md']) if (existsSync(join(options.dataRoot, name))) selected.push(join(options.dataRoot, name))
   for (const extension of json(join(options.dataRoot, 'workspace.json')).extensions ?? []) {
     const directory = resolve(options.dataRoot, extension.path)
-    if (!directory.startsWith(options.dataRoot + '/') || !extension.path.startsWith('extensions/')) throw new Error('扩展路径不属于当前数据根')
+    if (!directory.startsWith(options.dataRoot + '/') || !(extension.path === 'mcp' || extension.path.startsWith('extensions/'))) throw new Error('扩展路径不属于当前数据根')
     selected.push(...files(join(directory, 'src')), join(directory, 'build.mjs'), join(directory, 'package.json'))
+    if (extension.path === 'mcp') for (const entry of readdirSync(join(directory, 'compositions'))) {
+      selected.push(...files(join(directory, 'compositions', entry, 'src')))
+      const flow = join(directory, 'compositions', entry, 'flow.json'); if (existsSync(flow)) selected.push(flow)
+    }
   }
   return hash([...new Set(selected)].sort().map(path => `${path}\0${sha(path)}`).join('\n'))
 }
@@ -59,7 +65,7 @@ function liveSnapshot(options: UpdateOptions) {
     const value = line.match(/^\s+name: (.+)$/)?.[1]
     if (!value?.includes('/.local/build-cache/')) return []
     const path = JSON.parse(value)
-    if (typeof path !== 'string' || !path.startsWith(join(options.dataRoot, '.local/build-cache') + '/')) throw new Error('已加载扩展缓存不属于当前数据根')
+    if (typeof path !== 'string' || ![join(options.dataRoot, '.local/build-cache'), join(options.dataRoot, 'mcp/.local/build-cache')].some(root => path.startsWith(root + '/'))) throw new Error('已加载扩展缓存不属于当前数据根')
     return files(dirname(path))
   }) : []
   return Object.fromEntries([
@@ -92,8 +98,7 @@ function preparedProfile(options: UpdateOptions, environment: NodeJS.ProcessEnv)
   const script = `import importlib.util,json,sys\nfrom pathlib import Path\nspec=importlib.util.spec_from_file_location('platform_update_source',sys.argv[1])\nm=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)\nhome=m.platform_home();m.global_dsh(home);r=m.rendered_profile();p=home/'profiles'/m.PROFILE_NAME\na=(p/'package.json').read_text();r['package.json']=m.merged_profile_manifest(a,r['package.json'])\nassert json.loads(a)==json.loads(r['package.json']), 'Profile依赖合同变化，需要prepare'\nassert (p/'pnpm-workspace.yaml').read_text()==r['pnpm-workspace.yaml'], 'Profile模板变化，需要prepare'\nassert (p/'node_modules/@ai-agent-harness/harness-platform').resolve()==m.PLUGIN, 'Profile程序链接不符'\nassert m.normalized_mcp_patch(p)==(p/'cordis.patch.yml').read_text(), '用户Patch需要prepare'\nprint(json.dumps({'overlay':r[m.PLATFORM_PATCH],'extensions':[{'entry':str(m.asset_root()/e['path']/'build.mjs'),'output':str(m.extension_output(e,path_only=True))} for e in m.workspace_extensions()]}))\n`
   const value = JSON.parse(command(environment.HARNESS_PYTHON || '/usr/bin/python3.10', ['-c', script, join(options.programRoot, 'platform/dsh-platform-internal.py')], { cwd: options.programRoot, env: environment }))
   const path = join(options.dataRoot, '.local/platform-home/profiles/harness-platform/harness-platform.patch.yml')
-  const normalize = (text: string) => text.replace(/\/\.local\/build-cache\/[^"\r\n]+\/plugin\.js/g, '/.local/build-cache/<current-source>/plugin.js')
-  if (normalize(readFileSync(path, 'utf8')) !== normalize(value.overlay)) throw new Error('Profile模板或Runtime合同变化；请先完成平台 prepare，当前更新未应用')
+  // 依赖与 Runtime 合同已在上方核对；渲染后的模板与程序制品一起暂存、应用和回滚。
   return { overlay: { path, text: value.overlay as string }, extensions: value.extensions as Array<{ entry: string; output: string }> }
 }
 
@@ -103,10 +108,15 @@ export async function readUpdateActivity(options: UpdateOptions, state: ServiceS
   const request = { redirect: 'error' as const, signal: AbortSignal.timeout(30_000) }
   // 启停通过同步子进程执行，旧连接的关闭事件可能尚未处理；核验不得复用上一进程的连接。
   const headers = { origin: url.origin, connection: 'close' }
-  const login = await fetch(new URL('login', url), { ...request, redirect: 'manual', method: 'POST', headers: { ...headers, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ username: account.username, password: account.password }) })
+  const authenticate = () => fetch(new URL('login', url), { ...request, signal: AbortSignal.timeout(30_000), redirect: 'manual', method: 'POST', headers: { ...headers, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ username: account.username, password: account.password }) })
+  let login = await authenticate()
+  // 启动器可先返回 bootstrap；认证路由尚未装载时等待，不把错误凭据当成启动延迟。
+  for (let attempt = 0; attempt < 60 && [404, 503].includes(login.status); attempt++) {
+    await login.body?.cancel(); await delay(500); login = await authenticate()
+  }
   const cookieName = `dsh-auth-${createHash('sha256').update(url.host).digest('base64url')}`
   const cookie = login.headers.getSetCookie().filter(value => value.startsWith(`${cookieName}=`) || value.startsWith('harness_platform_session=') && !/Max-Age=0(?:;|$)/i.test(value)).map(value => value.split(';')[0]).join('; ')
-  if (login.status !== 303 || !cookie) throw new Error('更新前平台认证失败，未应用')
+  if (login.status !== 303 || !cookie) throw new Error(`更新前平台认证失败（HTTP ${login.status}），未应用`)
   async function rpc(endpoint: string, payload: object, native = false) {
     const response = await fetch(new URL(`${native ? 'api' : 'harness-platform'}/${endpoint}`, url), { ...request, signal: AbortSignal.timeout(native ? 120_000 : 30_000), method: 'POST', headers: { ...headers, cookie, 'content-type': 'application/json' }, body: JSON.stringify({ type: 'client-request', rpcId: `platform-update-${randomUUID()}`, method: endpoint, payload }) })
       .catch(error => { throw new Error(`更新前只读核对失败：${endpoint}（${error.cause?.code ?? error.name}）`) })
@@ -174,7 +184,7 @@ export async function readUpdateActivity(options: UpdateOptions, state: ServiceS
       if (alive) busy.push({ kind: 'sdk', id: operation.id, state: 'unknown-live' })
     }
   }
-  const directory = workspaceLocalPath(options.dataRoot, 'mcp-composition-executions')
+  const directory = mcpLocalPath(options.dataRoot, 'executions')
   let receipts: string[]
   try { receipts = readdirSync(directory).filter(name => name.endsWith('.json')).sort() }
   catch (error) {
@@ -191,6 +201,14 @@ export async function readUpdateActivity(options: UpdateOptions, state: ServiceS
     if (current?.execution_id !== saved.execution_id || current.workspace_id !== workspaceId || !['running', 'responded', 'unknown'].includes(current.state)) throw new Error('组合执行状态不完整，不能判断为空闲')
     if (current.state === 'running') busy.push({ kind: 'composition', id: saved.execution_id, state: 'running' })
   }
+  const runs = join(options.dataRoot, 'mcp/.local/runs')
+  if (existsSync(runs)) for (const name of readdirSync(runs).filter(name => /^run-[0-9a-f-]{36}\.json$/.test(name))) {
+    const saved = json(join(runs, name))
+    if (saved.engine !== 'workflow' || !['accepted', 'running'].includes(saved.status)) continue
+    const current = await rpc('mcp/compositionRun', { run_id: saved.run_id })
+    if (!current || current.run_id !== saved.run_id) throw new Error('工作流运行状态无法核对，未应用')
+    if (['accepted', 'running'].includes(current.status)) busy.push({ kind: 'workflow', id: saved.run_id, state: current.status })
+  }
   return busy
 }
 async function inspect(options: UpdateOptions): Promise<UpdateInspection> {
@@ -201,10 +219,25 @@ async function inspect(options: UpdateOptions): Promise<UpdateInspection> {
   const workspaceId = workspaceIdentity(options.dataRoot).id
   const prepared = preparedProfile(options, environment)
   const command = [readlinkSync(`/proc/${state.pid}/exe`), ...readFileSync(`/proc/${state.pid}/cmdline`, 'utf8').split('\0').filter(Boolean).slice(1)]
-  return { state, workspaceId, environment, command, ...prepared, busy: await readUpdateActivity(options, state, workspaceId) }
+  // 原地构建可能先于 update；启动记录之后写入的服务端制品不能视为已装载。
+  const started = statSync(join(options.dataRoot, '.local/platform-service/state.json')).mtimeMs
+  const pendingActivation = Object.keys(liveSnapshot(options)).some(path => path.endsWith('.js')
+    && !['client.js', 'sdk-worker.js'].includes(path.split('/').at(-1)!) && statSync(path).mtimeMs > started)
+  return { state, workspaceId, environment, command, pendingActivation, ...prepared, busy: await readUpdateActivity(options, state, workspaceId) }
 }
 async function build(options: UpdateOptions, stage: string, inspection: UpdateInspection): Promise<UpdateEntry[]> {
   const output = join(stage, 'artifacts'), environment = { ...inspection.environment, HEP_OFFLINE: '1' }
+  const requirements = join(options.programRoot, 'platform/mcp/lfx/requirements.txt')
+  if (existsSync(requirements)) {
+    const directory = join(options.programRoot, '.local/lfx', sha(requirements)!)
+    const python = join(directory, 'bin/python'), ready = join(directory, '.ready')
+    if (!existsSync(ready)) {
+      command('uv', ['venv', '--python', '3.12', directory], { cwd: options.programRoot, env: inspection.environment, log: join(stage, 'lfx-venv.log'), timeout: 300_000 })
+      command('uv', ['pip', 'sync', '--python', python, requirements], { cwd: options.programRoot, env: inspection.environment, log: join(stage, 'lfx-dependencies.log'), timeout: 300_000 })
+      command(python, ['-c', 'from importlib.metadata import version; assert version("lfx") == "1.13.1"; import hep_lfx'], { cwd: join(options.programRoot, 'platform/mcp/lfx'), env: inspection.environment, log: join(stage, 'lfx-check.log') })
+      writeFileSync(ready, sha(requirements)!)
+    }
+  }
   command(process.execPath, ['build.mjs', '--out-dir', output], { cwd: join(options.programRoot, 'platform/plugin'), env: environment, log: join(stage, 'build.log'), timeout: 300_000 })
   for (const extension of inspection.extensions ?? []) if (!existsSync(join(extension.output, 'plugin.js'))) command(process.execPath, [extension.entry], { cwd: options.programRoot, env: environment, log: join(stage, `extension-${hash(extension.entry).slice(0, 10)}.log`) })
   const entries: UpdateEntry[] = []
@@ -261,9 +294,9 @@ export async function updatePlatform(input: UpdateOptions, services: UpdateServi
     if (sourceSnapshot(options) !== source || !sameSnapshot(liveSnapshot(options), live) || !sameSnapshot(extensionSnapshot(observed), extensions) || entries.some((entry, index) => sha(entry.source) !== staged[index])) throw new Error('应用前来源或制品摘要变化；保留构建结果，未应用')
     const changed = entries.filter(entry => sha(entry.source) !== sha(entry.target))
     report.changed = changed.map(entry => relative(options.programRoot, entry.target))
-    if (!changed.length) return report
-    const clientOnly = changed.every(entry => entry.target === join(options.programRoot, 'platform/plugin/lib/client.js'))
-    const workerOnly = changed.every(entry => entry.target === join(options.programRoot, 'platform/plugin/lib/sdk-worker.js'))
+    if (!changed.length && !current.pendingActivation) return report
+    const clientOnly = !current.pendingActivation && changed.every(entry => entry.target === join(options.programRoot, 'platform/plugin/lib/client.js'))
+    const workerOnly = !current.pendingActivation && changed.every(entry => entry.target === join(options.programRoot, 'platform/plugin/lib/sdk-worker.js'))
     if (!clientOnly && !workerOnly && current.busy.length) { report.status = 'busy'; return report }
     report.activation = clientOnly ? 'native-hmr' : workerOnly ? 'next-sdk-operation' : 'managed-restart'
     for (const [index, entry] of changed.entries()) {

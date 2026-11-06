@@ -41,6 +41,7 @@ function workbench(initialTarget = { page: 'mcp', tab: 'composition', compositio
     rpc: { async call(_channel, endpoint, payload) {
       calls.push({ endpoint, payload })
       if (endpoint === 'mcp/list') return readCatalog ? readCatalog(catalog) : { ok: true, value: structuredClone(catalog) }
+      if (endpoint === 'mcp/compositionGraph') return { ok: true, value: { nodes: [], edges: [] } }
       if (endpoint === 'mcp/compositionSource' && source) return source(payload)
       if (endpoint === 'mcp/compositionExecution') return queryExecution ? queryExecution(payload) : { ok: false, error: { code: 'not_found', message: '未找到原执行回执' } }
       if (endpoint === 'mcp/compositionRun' && readRun) return readRun(payload)
@@ -82,7 +83,8 @@ test('组合深链恢复冻结发布版本，失效版本不回退到当前发�
   await ui.settle()
   assert.match(ui.text(), /已不存在，请重新选择/)
   assert.equal(ui.button('测试（dry）'), undefined)
-  assert.equal(ui.calls.some(call => call.endpoint !== 'mcp/list'), false)
+  assert.equal(ui.calls.filter(call => call.endpoint !== 'mcp/list').every(call => call.endpoint === 'mcp/compositionGraph' && call.payload.compositionId === 'composition-one' && [oldId, 'c'.repeat(64)].includes(call.payload.versionId)), true)
+  assert.equal(ui.calls.at(-1).payload.versionId, 'c'.repeat(64))
 })
 
 test('组合目录冲突后保留草稿，读取最新并手工重应用再保存', async () => {

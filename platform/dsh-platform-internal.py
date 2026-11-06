@@ -162,8 +162,8 @@ def workspace_extensions():
             raise PlatformError("工作区扩展 ID 无效或重复。")
         found.add(item["id"])
         relative = item.get("path")
-        if not isinstance(relative, str) or not relative.startswith("extensions/") or ".." in Path(relative).parts:
-            raise PlatformError("工作区扩展必须位于数据根 extensions/。")
+        if not isinstance(relative, str) or not (relative == "mcp" or relative.startswith("extensions/")) or ".." in Path(relative).parts:
+            raise PlatformError("工作区扩展必须位于数据根 mcp/ 或 extensions/。")
         directory = (asset_root() / relative).resolve()
         if not directory.is_relative_to(asset_root()) or not (directory / "build.mjs").is_file():
             raise PlatformError("工作区扩展构建入口不存在或超出数据根。")
@@ -178,7 +178,7 @@ def extension_output(extension, path_only=False):
         result = subprocess.run(command, env=runtime_environment(platform_home()),
                                 capture_output=True, text=True, check=True, timeout=120)
         output = Path(result.stdout.strip()).resolve()
-        if not output.is_relative_to(asset_root() / ".local/build-cache"):
+        if not (output.is_relative_to(asset_root() / ".local/build-cache") or output.is_relative_to(asset_root() / "mcp/.local/build-cache")):
             raise ValueError()
         return output
     except (OSError, ValueError, subprocess.SubprocessError):
@@ -320,13 +320,14 @@ def normalized_mcp_patch(profile, source=None):
 def mcp_credential_paths():
     layout = json.loads((PLUGIN / "assets/mcp-credential-layout.json").read_text(encoding="utf-8"))
     root = asset_root()
-    directory = root / layout["directory"]
+    directory = root / ("mcp/.local/credentials" if (root / "mcp/manager.json").is_file() else layout["directory"])
     return {"directory": directory, "file": directory / layout["file"], "lock": directory / layout["lock"],
             "legacyFile": root / layout["legacyFile"], "legacyLock": root / layout["legacyLock"]}
 
 
 def mcp_store_paths():
-    return asset_root() / "config/mcp-manager.json", mcp_credential_paths()["file"]
+    root = asset_root()
+    return root / ("mcp/manager.json" if (root / "mcp/manager.json").is_file() else "config/mcp-manager.json"), mcp_credential_paths()["file"]
 
 
 def mcp_legacy_alias(path, target):

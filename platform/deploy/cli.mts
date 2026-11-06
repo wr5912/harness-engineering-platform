@@ -50,6 +50,7 @@ function validateOptions(command: string, options: Options): void {
     relocate: ['prefix', 'from-data-root', 'data-root', 'ssh'],
     'agent-update': ['prefix', 'data-root', 'remote-data-root', 'ssh', 'manifest'],
     update: ['prefix', 'data-root', 'remote-data-root', 'ssh', 'program-root', 'cancel-prepare'],
+    'mcp-migrate': ['program-root', 'data-root'],
   }
   const flags: Record<string, string[]> = {
     'agent-preview': [], 'agent-pack': [], 'agent-prepare': [],
@@ -59,6 +60,7 @@ function validateOptions(command: string, options: Options): void {
     relocate: ['dry-run', 'resume'],
     'agent-update': ['dry-run'],
     update: ['dry-run', 'minimal-data', 'install-deps', 'start'],
+    'mcp-migrate': ['dry-run'],
   }
   if (!values[command]) throw new Error(`未知命令：${command}`)
   for (const [key, value] of Object.entries(options)) {
@@ -85,6 +87,9 @@ function installPort(value: string | undefined, name: string, fallback: number):
 
 function usage(): string {
   return `用法：
+  dsh-deploy mcp-migrate [--program-root <目录>] [--data-root <目录>] [--dry-run] [--json]
+    将当前 MCP 配置、组合与运行数据归拢到数据根 mcp；核对空闲后激活，失败恢复。
+
   dsh-deploy update [选项]
     --program-root <目录>       当前已准备的本机源码工作区，默认当前仓库
     --data-root <目录>          当前受管平台的数据根，默认当前关联工作区
@@ -182,6 +187,12 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     const { command, options } = parse(argv)
     if (!command || command === '--help' || flag(options, 'help')) { console.log(usage()); return 0 }
     validateOptions(command, options)
+    if (command === 'mcp-migrate') {
+      const { migrateMcp } = await import('./mcp-migrate.mts')
+      const report = await migrateMcp({ programRoot: resolve(text(options, 'program-root', REPO)!), dataRoot: resolve(text(options, 'data-root', defaultAssetRoot())!), dryRun: flag(options, 'dry-run') })
+      console.log(JSON.stringify(report, null, 2))
+      return report.status === 'busy' ? 1 : 0
+    }
     if (command === 'update') {
       if (['ssh', 'prefix', 'remote-data-root', 'minimal-data', 'install-deps', 'start', 'cancel-prepare'].some(key => options[key] !== undefined)) {
         const prefix = text(options, 'prefix'), dataRoot = text(options, 'remote-data-root'), ssh = text(options, 'ssh')

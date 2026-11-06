@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { workspaceIdentity, workspaceLocalPath } from '../workspace.ts'
+import { workspaceIdentity, mcpLocalPath } from '../workspace.ts'
 
 export type CompositionExecutionBinding = {
   composition_id: string
@@ -32,7 +32,7 @@ export const compositionExecutionDigest = (value: unknown) => createHash('sha256
 /** 仅保存组合调用的回执和原生运行关联，不调度或重放业务。 */
 export function createCompositionExecutionStore(root: string) {
   const workspace = workspaceIdentity(root).id
-  const directory = workspaceLocalPath(root, 'mcp-composition-executions')
+  const directory = mcpLocalPath(root, 'executions')
   function file(id: string) {
     if (!/^[A-Za-z0-9_.:-]{1,160}$/.test(id)) throw new Error('组合执行标识无效')
     return join(directory, `${id}.json`)
@@ -78,5 +78,5 @@ export function createCompositionExecutionStore(root: string) {
     } finally { active.delete(path) }
     return receipt
   }
-  return { read, assertRequest, execute }
+  return { read, assertRequest, execute, active: () => [...active].filter(path => path.startsWith(directory + '/')).map(path => JSON.parse(readFileSync(path, 'utf8')) as CompositionExecutionReceipt) }
 }

@@ -10,11 +10,11 @@ export const defaultRepository = 'git@github.com:wr5912/harness-engineering-plat
 export const defaultAccount = { username: 'admin', password: 'admin123' }
 export type Check = { id: string; label: string; status: 'ok' | 'missing' | 'invalid'; detail: string }
 export type SetupRequest = { action: 'existing' | 'clone' | 'new'; root: string; repositoryUrl?: string; previewRevision?: string; account?: { username: string; password: string } }
-const configurations: Record<string, { label: string; value: () => unknown; valid: (value: any) => boolean }> = {
+function configurations(root: string): Record<string, { label: string; value: () => unknown; valid: (value: any) => boolean }> { return {
   'workspace.json': { label: '工作区身份', value: () => ({ schemaVersion: 1, id: `workspace-${randomUUID()}`, legacyRoots: [], extensions: [] }), valid: v => v?.schemaVersion === 1 && typeof v.id === 'string' && /^workspace-[a-zA-Z0-9-]+$/.test(v.id) && Array.isArray(v.legacyRoots ?? []) && (v.legacyRoots ?? []).every((p: unknown) => typeof p === 'string' && isAbsolute(p)) },
   'config/sites.json': { label: '站点配置', value: () => ({ assistant: '/assistant/', platform: '/hep/' }), valid: v => ['assistant', 'platform'].every(k => typeof v?.[k] === 'string' && /^\/[a-z][a-z0-9-]*\/$/.test(v[k])) },
-  'config/mcp-compositions.json': { label: '组合目录', value: () => ({ schema_version: '1.0', compositions: [] }), valid: v => v?.schema_version === '1.0' && Array.isArray(v.compositions) },
-}
+  [existsSync(join(root, 'config/mcp-compositions.json')) && !existsSync(join(root, 'mcp/compositions.json')) ? 'config/mcp-compositions.json' : 'mcp/compositions.json']: { label: '组合目录', value: () => ({ schema_version: '2.0', compositions: [] }), valid: v => ['1.0', '2.0'].includes(v?.schema_version) && Array.isArray(v.compositions) },
+} }
 const accountFile = '.local/credentials/admin.json'
 const accountValid = (v: any) => typeof v?.username === 'string' && Boolean(v.username.trim()) && v.username.length <= 256 && typeof v.password === 'string' && Boolean(v.password) && v.password.length <= 1024
 export function selectedRoot(value: string) {
@@ -50,7 +50,7 @@ export async function inspectWorkspace(rootValue: string) {
     try { repository = resolve((await git(['rev-parse', '--show-toplevel'], root)).stdout.trim()) === root } catch { /* 非 Git 目录可在明确初始化操作中创建。 */ }
   }
   checks.push({ id: 'repository', label: '独立 Git 工作区', status: repository ? 'ok' : 'missing', detail: repository ? root : '目录尚未建立独立 Git 仓库' })
-  for (const [relative, spec] of Object.entries(configurations)) {
+  for (const [relative, spec] of Object.entries(configurations(root))) {
     const path = join(root, relative)
     let status: Check['status'] = 'missing'
     if (existsSync(path)) {
@@ -66,7 +66,7 @@ export async function inspectWorkspace(rootValue: string) {
   let extensions: { id: string; path: string }[] = []
   if (checks.find(c => c.id === 'workspace.json')?.status === 'ok') {
     const declared = JSON.parse(readFileSync(join(root, 'workspace.json'), 'utf8')).extensions ?? []
-    const valid = Array.isArray(declared) && new Set(declared.map(e => e?.id)).size === declared.length && declared.every(e => e && typeof e.id === 'string' && /^[a-z][a-z0-9-]*$/.test(e.id) && typeof e.path === 'string' && e.path.startsWith('extensions/') && !e.path.split('/').includes('..') && existsSync(join(root, e.path, 'build.mjs')))
+    const valid = Array.isArray(declared) && new Set(declared.map(e => e?.id)).size === declared.length && declared.every(e => e && typeof e.id === 'string' && /^[a-z][a-z0-9-]*$/.test(e.id) && typeof e.path === 'string' && (e.path === 'mcp' || e.path.startsWith('extensions/')) && !e.path.split('/').includes('..') && existsSync(join(root, e.path, 'build.mjs')))
     checks.push({ id: 'extensions', label: '声明的工作区扩展', status: valid ? 'ok' : 'invalid', detail: valid ? '仅在明确执行初始化后构建装载已声明扩展' : '扩展声明或构建入口无效；请先修复' })
     if (valid) extensions = declared.map(e => ({ id: e.id, path: e.path }))
   }
@@ -122,7 +122,7 @@ export async function previewWorkspace(input: SetupRequest) {
   if (input.action === 'clone') repositoryUrl(input.repositoryUrl)
   const plannedChanges = input.action === 'clone' ? ['克隆完整 Git 历史到临时目录，检查结构后移动到目标位置'] : []
   if (state.checks.find(c => c.id === 'repository')?.status !== 'ok' && input.action !== 'clone') plannedChanges.push('在目标数据目录执行 git init，不添加或提交已有文件')
-  for (const c of state.checks) if (c.status === 'missing' && c.id in configurations) plannedChanges.push(`仅在不存在时创建 ${c.id}`)
+  for (const c of state.checks) if (c.status === 'missing' && c.id in configurations(root)) plannedChanges.push(`仅在不存在时创建 ${c.id}`)
   const ignore = missingIgnoreRules(root)
   if (ignore.missing.length) plannedChanges.push(`保留已有 .gitignore，追加必要忽略规则：${ignore.missing.join('、')}`)
   if (state.needsAccount) plannedChanges.push('仅在不存在时创建本地账号文件 .local/credentials/admin.json（权限 0600）')
@@ -159,7 +159,7 @@ export async function initializeWorkspace(input: SetupRequest) {
       mkdirSync(root, { recursive: true })
       if (plan.checks.find(c => c.id === 'repository')?.status !== 'ok') await git(['init', '--', root])
     }
-    for (const [relative, spec] of Object.entries(configurations)) writeMissing(working, relative, spec.value())
+    for (const [relative, spec] of Object.entries(configurations(working))) writeMissing(working, relative, spec.value())
     const ignore = missingIgnoreRules(working)
     if (ignore.missing.length) appendFileSync(join(working, '.gitignore'), `${ignore.content && !ignore.content.endsWith('\n') ? '\n' : ''}${ignore.missing.join('\n')}\n`)
     if (!existsSync(join(working, accountFile))) writeMissing(working, accountFile, { username: account.username, password: account.password })

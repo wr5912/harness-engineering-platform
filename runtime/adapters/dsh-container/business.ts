@@ -213,7 +213,8 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
     { type: 'bind', source: pluginRoot, target: containerPlugin, read_only: true },
     { type: 'bind', source: configDirectory, target: `${containerAssets}/config`, read_only: true },
     ...(usesMcpCredentials && hasMcpCredentials ? [{ type: 'bind', source: credentials.directory,
-      target: mcpCredentialPaths(containerAssets).directory, read_only: true }] : []),
+      target: mcpCredentialPaths(containerAssets, existsSync(join(config.assetRoot, 'mcp/manager.json'))).directory, read_only: true }] : []),
+    ...(existsSync(join(config.assetRoot, 'mcp/manager.json')) ? [{ type: 'bind', source: join(config.assetRoot, 'mcp/manager.json'), target: `${containerAssets}/mcp/manager.json`, read_only: true }] : []),
     ...(!unrestricted ? [{ type: 'bind', source: config.sharedSecretFile!, target: containerSecret, read_only: true }] : []),
     { type: 'bind', source: '${DSH_BUSINESS_PATCH_HOST:?业务控制 Patch 由启动器注入}', target: containerPatch, read_only: true },
   )

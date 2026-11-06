@@ -125,6 +125,35 @@ test('服务端变化使用原管理器定向停止启动，再核对在线身�
   assert.equal(readFileSync(f.live, 'utf8'), 'new-code')
 })
 
+test('渲染后的 Profile 模板随程序更新，核验失败一并恢复', async t => {
+  for (const failVerify of [false, true]) {
+    const f = fixture(t, { failVerify }), build = f.services.build
+    const target = join(f.options.dataRoot, '.local/platform-home/profiles/harness-platform/harness-platform.patch.yml')
+    mkdirSync(join(target, '..'), { recursive: true }); writeFileSync(target, 'old-profile')
+    f.services.build = async (...args) => {
+      const entries = await build(...args), source = join(args[1], 'profile.yml')
+      writeFileSync(source, 'new-profile'); return [...entries, { source, target }]
+    }
+    if (failVerify) await assert.rejects(updatePlatform(f.options, f.services), /旧制品已恢复并核验/)
+    else assert.equal((await updatePlatform(f.options, f.services)).activation, 'managed-restart')
+    assert.equal(readFileSync(target, 'utf8'), failVerify ? 'old-profile' : 'new-profile')
+  }
+})
+
+test('原地构建与stage相同但尚未激活时仍定向重载；在途任务阻止重载', async t => {
+  for (const busy of [[], [{ kind: 'session', id: 'inflight', state: 'running' }]]) {
+    const f = fixture(t, { initialBusy: busy, afterBuildBusy: busy })
+    writeFileSync(f.live, 'new-code')
+    const inspect = f.services.inspect
+    f.services.inspect = async (...args) => ({ ...await inspect(...args), pendingActivation: true })
+    const report = await updatePlatform(f.options, f.services)
+    assert.deepEqual(report.changed, [])
+    assert.equal(report.status, busy.length ? 'busy' : 'applied')
+    assert.equal(report.activation, busy.length ? 'none' : 'managed-restart')
+    assert.deepEqual(f.events, busy.length ? ['build'] : ['build', 'stop', 'start', 'verify'])
+  }
+})
+
 test('应用后核验失败恢复旧制品和原启动参数，不改源码或数据', async t => {
   const f = fixture(t, { failVerify: true })
   await assert.rejects(updatePlatform(f.options, f.services), /旧制品已恢复并核验/)
@@ -148,6 +177,8 @@ async function activityFixture(t, responses) {
   const server = createServer(async (request, response) => {
     assert.equal(request.headers.connection, 'close', '启停前后的核验必须使用新连接')
     if (request.url === '/hep/login') {
+      const pending = responses.login?.()
+      if (pending) { response.writeHead(pending); response.end(); return }
       const name = `dsh-auth-${createHash('sha256').update(request.headers.host).digest('base64url')}`
       response.writeHead(303, { 'set-cookie': [`${name}=fixture; Path=/hep/`, 'harness_platform_session=; Max-Age=0; Path=/'] }); response.end(); return
     }
@@ -167,6 +198,16 @@ async function activityFixture(t, responses) {
   const state = { url: `http://127.0.0.1:${server.address().port}/hep/` }
   return { ...f, state, requested }
 }
+
+test('启动 bootstrap 尚未装载登录路由时等待装载，错误凭据立即失败', async t => {
+  let attempts = 0
+  const f = await activityFixture(t, { login: () => ++attempts < 2 ? 404 : undefined,
+    'session/list': { items: [] }, 'agents/eval/list': { jobs: [] }, 'agents/sdk/list': [] })
+  assert.deepEqual(await readUpdateActivity(f.options, f.state, 'workspace-update-test'), [])
+  assert.equal(attempts, 2)
+  const denied = await activityFixture(t, { login: () => 401 })
+  await assert.rejects(readUpdateActivity(denied.options, denied.state, 'workspace-update-test'), /HTTP 401/)
+})
 
 test('在线只读核对覆盖原生会话、管理提案和评测、SDK任务，不从摘要推断空闲', async t => {
   const f = await activityFixture(t, {

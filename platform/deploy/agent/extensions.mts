@@ -5,6 +5,7 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { sha256File } from '../manifest.mts'
 import type { StandaloneExtension } from '../../plugin/src/standalone-extensions/index.ts'
+import { sourceTreeDigest } from '../../plugin/src/mcp/source-digest.ts'
 
 const id = 'security-operations-compositions'
 const hash = (value: string | Uint8Array) => createHash('sha256').update(value).digest('hex')
@@ -13,10 +14,14 @@ interface Options { programRoot: string; assetRoot: string; staging: string; com
 interface SourceFile { path: string; sha256: string }
 
 /** 只遍历已选目录的发布项与其明确引用的固定子版本。 */
-function requiredBusiness(catalog: any): { threat: boolean; flow: boolean } {
-  const result = { threat: false, flow: false }
+function requiredBusiness(catalog: any) {
+  const result = { threat: false, flow: false, workflows: new Set<string>() }
   function visit(config: any, path = new Set<string>()) {
     if (!config) return
+    if (config.workflow) {
+      if (!/^inspection-(?:status|baseline|vulnerabilities|reachability|routine|deep)$/.test(config.workflow)) throw new Error('此工作流尚未提供独立运行扩展')
+      result.workflows.add(config.workflow)
+    }
     if (config.kind === 'threat-stage') result.threat = true
     else if (config.kind === 'composite') for (const step of config.steps ?? []) {
       const key = `${step.compositionId}:${step.versionId}`
@@ -48,13 +53,13 @@ function git(root: string, args: string[]) {
 /** 仅静态构建平台明确装载的安全运营扩展；不执行数据工作区的 build 或安装脚本。 */
 export async function stageSelectedExtensions(options: Options) {
   const needed = requiredBusiness(options.compositions)
-  if (!needed.threat && !needed.flow) return { extensions: [] as StandaloneExtension[], sources: [] as SourceFile[] }
+  if (!needed.threat && !needed.flow && !needed.workflows.size) return { extensions: [] as StandaloneExtension[], sources: [] as SourceFile[] }
   options.signal?.throwIfAborted()
   options.onProgress?.({ stage: 'extensions', message: '正在冻结所用业务编排实现与固定算法' })
   const assetRoot = realpathSync(options.assetRoot), programRoot = realpathSync(options.programRoot)
   let declared: any
   try { declared = JSON.parse(readFileSync(join(assetRoot, 'workspace.json'), 'utf8')).extensions?.find((item: any) => item.id === id) } catch { /* 缺口用统一业务说明。 */ }
-  if (declared?.path !== 'extensions/security-operations') throw new Error('所选组合需要工作区声明的 security-operations 业务扩展')
+  if (!['extensions/security-operations', 'mcp'].includes(declared?.path)) throw new Error('所选组合需要工作区声明的 security-operations 业务扩展')
   const business = realpathSync(join(assetRoot, declared.path))
   if (!business.startsWith(assetRoot + sep)) throw new Error('业务扩展不在当前数据工作区内')
   const sources: SourceFile[] = []
@@ -65,17 +70,28 @@ export async function stageSelectedExtensions(options: Options) {
       else { plainFile(business, file); sources.push({ path: relative(assetRoot, file).split(sep).join('/'), sha256: sha256File(file) }) }
     }
   }
-  collect(join(business, 'src'))
+  const modern = declared.path === 'mcp'
+  if (!modern) collect(join(business, 'src'))
+  else {
+    if (needed.threat) { collect(join(business, 'src/threat')); sources.push({ path: 'mcp/src/threat-services.ts', sha256: sha256File(join(business, 'src/threat-services.ts')) }) }
+    if (needed.flow) collect(join(business, 'compositions/security-asset-related-alerts-readonly/src'))
+    if (needed.workflows.size) {
+      collect(join(business, 'src/inspection'))
+      sources.push({ path: 'mcp/src/soc.ts', sha256: sha256File(join(business, 'src/soc.ts')) })
+      for (const workflow of needed.workflows) collect(join(business, 'compositions', workflow, 'src'))
+      sources.push({ path: 'mcp/build.mjs', sha256: sha256File(join(business, 'build.mjs')) })
+    }
+  }
   if (existsSync(join(business, 'package.json'))) {
     const manifest = plainFile(business, join(business, 'package.json')), pkg = JSON.parse(readFileSync(manifest, 'utf8'))
     if (Object.keys(pkg.dependencies ?? {}).length || Object.keys(pkg.peerDependencies ?? {}).length) throw new Error('业务扩展声明了额外 Node 环境，尚未准备独立部署依赖')
     sources.push({ path: relative(assetRoot, manifest).split(sep).join('/'), sha256: sha256File(manifest) })
   }
   for (const entry of readdirSync(business)) if (/^(?:requirements[^/]*\.txt|pyproject\.toml)$/.test(entry)) throw new Error('业务扩展声明了额外 Python 环境，尚未准备独立部署依赖')
-  const sourceText = readFileSync(plainFile(business, join(business, 'src/threat/source.ts')), 'utf8')
-  const commit = /export const THREAT_SOURCE_COMMIT = ['"]([0-9a-f]{40})['"]/.exec(sourceText)?.[1]
-  const sourceDirectory = /export const THREAT_SOURCE_DIRECTORY = ['"]([^'"\r\n]+)['"]/.exec(sourceText)?.[1]
-  if (!commit || !sourceDirectory || sourceDirectory.startsWith('/') || sourceDirectory.split('/').some(part => !part || ['.', '..'].includes(part))) throw new Error('业务扩展的固定算法来源声明无效')
+  const sourceText = needed.threat ? readFileSync(plainFile(business, join(business, 'src/threat/source.ts')), 'utf8') : ''
+  const commit = /export const THREAT_SOURCE_COMMIT = ['"]([0-9a-f]{40})['"]/.exec(sourceText)?.[1] ?? ''
+  const sourceDirectory = /export const THREAT_SOURCE_DIRECTORY = ['"]([^'"\r\n]+)['"]/.exec(sourceText)?.[1] ?? ''
+  if (needed.threat && (!commit || !sourceDirectory || sourceDirectory.startsWith('/') || sourceDirectory.split('/').some(part => !part || ['.', '..'].includes(part)))) throw new Error('业务扩展的固定算法来源声明无效')
   const destination = join(options.staging, 'runtime/extensions', id)
   mkdirSync(destination, { recursive: true })
   let fixed: { commit: string; directory: string; digest: string; files: SourceFile[] } | undefined
@@ -114,16 +130,22 @@ export async function stageSelectedExtensions(options: Options) {
   const compiledInputs: Array<{ path: string; sha256: string; absolute: string }> = []
   const require = createRequire(join(programRoot, 'platform/plugin/package.json'))
   const { build } = require('esbuild')
-  const runtime = join(business, 'src/threat/runtime.ts'), services = join(business, 'src/threat-services.ts'), flow = join(business, 'src/asset-alerts.ts')
+  const runtime = join(business, 'src/threat/runtime.ts'), services = join(business, 'src/threat-services.ts'), flow = join(business, modern ? 'compositions/security-asset-related-alerts-readonly/src/index.ts' : 'src/asset-alerts.ts')
+  const includeThreat = needed.threat || !modern, includeFlow = needed.flow || !modern
+  const workflowDigests = Object.fromEntries([...needed.workflows].map(workflow => [workflow, sourceTreeDigest(business, [join(business, 'compositions', workflow, 'src'), join(business, 'src/inspection'), join(business, 'src/soc.ts'), join(business, 'build.mjs')])]))
   const entry = `import { populateSecurityOperations } from ${JSON.stringify(join(adapter, 'security-operations.ts'))};\n`
-    + `import { createThreatRuntime } from ${JSON.stringify(runtime)};\nimport { createNativeThreatServices } from ${JSON.stringify(services)};\nimport { assetAlertsFlow } from ${JSON.stringify(flow)};\n`
-    + 'export const populate=(ctx,options)=>populateSecurityOperations(ctx,options,{createThreatRuntime,createNativeThreatServices,assetAlertsFlow});\n'
+    + (includeThreat ? `import { createThreatRuntime } from ${JSON.stringify(runtime)};\nimport { createNativeThreatServices } from ${JSON.stringify(services)};\n` : '')
+    + (includeFlow ? `import { assetAlertsFlow } from ${JSON.stringify(flow)};\n` : '')
+    + (needed.workflows.size ? `import { createSoc } from ${JSON.stringify(join(business, 'src/soc.ts'))};\n` : '')
+    + [...needed.workflows].map((workflow, index) => `import { create as workflow${index} } from ${JSON.stringify(join(business, 'compositions', workflow, 'src/index.ts'))};\n`).join('')
+    + `export const populate=(ctx,options)=>populateSecurityOperations(ctx,options,{${includeThreat ? 'createThreatRuntime,createNativeThreatServices,' : ''}${includeFlow ? 'assetAlertsFlow,' : ''}${needed.workflows.size ? 'createSoc,' : ''}workflows:{${[...needed.workflows].map((workflow, index) => `${JSON.stringify(workflow)}:soc=>({...workflow${index}(soc),sourceDigest:${JSON.stringify(workflowDigests[workflow])}})`).join(',')}}});\n`
   options.signal?.throwIfAborted()
   const output = await build({ stdin: { contents: entry, resolveDir: business, sourcefile: 'standalone-security-operations.ts', loader: 'ts' }, bundle: true, write: false,
     platform: 'node', target: 'node24', format: 'esm', packages: 'external', metafile: true, logLevel: 'silent',
-    define: { __STANDALONE_THREAT_SOURCE_COMMIT__: JSON.stringify(commit), __STANDALONE_THREAT_SOURCE_DIRECTORY__: JSON.stringify(sourceDirectory), __STANDALONE_THREAT_SOURCE_DIGEST__: JSON.stringify(fixed?.digest ?? '') },
+    define: { __STANDALONE_THREAT_SOURCE_COMMIT__: JSON.stringify(commit ?? ''), __STANDALONE_THREAT_SOURCE_DIRECTORY__: JSON.stringify(sourceDirectory ?? ''), __STANDALONE_THREAT_SOURCE_DIGEST__: JSON.stringify(fixed?.digest ?? '') },
     plugins: [{ name: 'standalone-business-boundaries', setup(builder: any) {
-      builder.onResolve({ filter: /^@harness-platform\/mcp\/extension$/ }, () => ({ path: join(programRoot, 'platform/plugin/src/mcp/extension.ts') }))
+      builder.onResolve({ filter: /^@harness-platform\/mcp\// }, (args: any) => ({ path: join(programRoot, 'platform/plugin/src/mcp', args.path.split('/').at(-1) + '.ts') }))
+      builder.onResolve({ filter: /^@mcp\/inspection$/ }, () => ({ path: join(business, 'src/inspection/index.ts') }))
       builder.onResolve({ filter: /(?:^|\/)source\.ts$/ }, (args: any) => resolve(args.resolveDir, args.path) === join(business, 'src/threat/source.ts') ? { path: join(adapter, 'source.ts') } : undefined)
       builder.onLoad({ filter: /\.ts$/ }, (args: any) => {
         const absolute = realpathSync(args.path), contents = readFileSync(absolute, 'utf8')

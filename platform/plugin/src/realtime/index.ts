@@ -158,7 +158,8 @@ export function createPlatformEvents(assetRoot: string, options: Options = {}) {
     const compositionRoot = dirname(workspaceConfigPath(root, 'mcp-compositions.json'))
     if (compositionRoot === configRoot) observe(configRoot, ['mcp', 'instances'], false, ['mcp-compositions.json', 'external-instances.json', 'business-access.json'])
     else {
-      observe(compositionRoot, ['mcp'], false, 'mcp-compositions.json')
+      observe(compositionRoot, ['mcp'], false, ['compositions.json', 'manager.json'])
+      observe(join(compositionRoot, 'compositions'), ['mcp'], true)
       observe(configRoot, ['instances'], false, ['external-instances.json', 'business-access.json'])
     }
     if (!existsSync(configRoot)) observe(root, ['instances'], false, basename(configRoot))

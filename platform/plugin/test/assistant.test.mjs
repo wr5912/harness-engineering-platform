@@ -907,7 +907,7 @@ test('普通派生、用例更新与业务样例创建可达，写操作经原�
     assert.equal(f.calls.filter(call => call.endpoint === `${domain}/${action}`).length, 1)
   }
   assert.equal((await f.execute(id, 'agents', 'assets/read-fixed', { agent_id: 'basic', experiment_id: 'EXP-basic-001', ref: `git:${'a'.repeat(40)}` })).state, 'completed')
-  for (const action of ['compositionRun', 'compositionArtifact']) {
+  for (const action of ['compositionRun', 'compositionArtifact', 'compositionDetails', 'withdrawComposition', 'deleteComposition']) {
     const response = await f.execute(id, 'mcp', action, { run_id: 'basic-run', artifactId: 'summary' })
     assert.equal(response.state, 'completed')
   }
@@ -1273,6 +1273,16 @@ test('所有管理业务可以逐动作发现参数；原生下一轮装配使�
   }
   assert.equal(assistantActionContract('agents', 'runs/delete').input_schema.properties.run_ids.type, 'array')
   assert.equal(assistantActionContract('agents', 'cases/delete').input_schema.properties.expected_sha256.type, 'string')
+  const graph = assistantActionContract('mcp', 'compositionGraph')
+  assert.ok(graph.input_schema.properties.version, '当前草稿或发布选择必须能通过合同传入')
+  assert.ok(graph.input_schema.properties.versionId, '历史发布版本保留固定版本身份')
+  assert.match(graph.instructions, /version=draft\/published/)
+  assert.match(graph.instructions, /versionId 不是 draft\/published/)
+  const source = projectAssistantTools([{ name: 'platform_mcp' }], { tool_contracts: { mcp: 'compositionSource' } })[0].parameters
+  const fixedSource = { action: 'compositionSource', input: { selection: { id: 'inspection-routine', version: 'published', versionId: 'fixed-version' } } }
+  assert.equal(validateJsonSchemaValue(source, fixedSource).length, 0)
+  assert.ok(validateJsonSchemaValue(source, { ...fixedSource, input: { selection: { ...fixedSource.input.selection, version: 'version' } } }).length > 0)
+  assert.match(assistantActionContract('mcp', 'compositionSource').instructions, /version=published/)
   const create = assistantActionContract('agents', 'create')
   assert.deepEqual([create.input_schema.properties.version_number.type, create.input_schema.properties.version_number.minimum, create.input_schema.properties.version_number.maximum], ['integer', 1, 999])
   assert.match(create.instructions, /默认同代 f/)

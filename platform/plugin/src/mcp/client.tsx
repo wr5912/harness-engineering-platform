@@ -168,6 +168,9 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
   const [attempt, setAttempt] = useState<CompositionAttempt | null>(null)
   const [recoveredRuns, setRecoveredRuns] = useState<any[]>([])
   const [selectedNode, setSelectedNode] = useState('getAsset')
+  const [frozenGraph, setFrozenGraph] = useState<{ key: string; graph?: any; error?: string } | null>(null)
+  const [subflows, setSubflows] = useState<{ title: string; graph: any }[]>([])
+  const [parents, setParents] = useState<NonNullable<typeof selection>[]>([])
   const [preview, setPreview] = useState<'config' | 'source' | null>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   useEffect(() => { if (!preview) return; const previous = document.activeElement as HTMLElement | null; previewRef.current?.focus(); return () => previous?.focus?.() }, [preview])
@@ -235,8 +238,17 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
   }, [active, target?.page, target?.tab, target?.composition_id, target?.version, target?.version_id, data, selection, entry])
   const historical = selection?.version === 'published' && Boolean(selection.versionId) && selection.versionId !== entry?.publishedVersionId
   const selectionKey = selection ? `${selection.id}:${selection.version}:${selection.versionId ?? ''}` : ''
-  useEffect(() => { setSelectedNode(''); setNodeOpen(false); setMoreOpen(false) }, [selectionKey])
+  useEffect(() => { setSubflows([]); setSelectedNode(''); setNodeOpen(false); setMoreOpen(false) }, [selectionKey])
   useEffect(() => { if (!active || editor) { setNodeOpen(false); setTestOpen(false); setMoreOpen(false) } }, [active, Boolean(editor)])
+  useEffect(() => {
+    if (!historical || !selection) { setFrozenGraph(null); return }
+    let cancelled = false
+    setFrozenGraph({ key: selectionKey })
+    void rpc.call(CHANNEL, 'mcp/compositionGraph', { compositionId: selection.id, versionId: selection.versionId }).then(response => {
+      if (!cancelled) setFrozenGraph(response.ok ? { key: selectionKey, graph: response.value } : { key: selectionKey, error: response.error.message })
+    }).catch(() => { if (!cancelled) setFrozenGraph({ key: selectionKey, error: '无法读取此固定版本的流程图，请刷新重试。' }) })
+    return () => { cancelled = true }
+  }, [historical, selectionKey, data?.revision])
   const currentSelection = useRef(selectionKey)
   currentSelection.current = selectionKey
   const storageKey = `hep:mcp-composition-executions:${document.baseURI}:${data?.workspace_id ?? 'legacy'}`
@@ -277,14 +289,18 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
     if (saved) { setResult(null); void recover(saved, true) }
   }, [selectionKey, data?.workspace_id, Boolean(data)])
   const threat = isThreatComposition(config)
+  const workflow = Boolean(config?.workflow)
+  let testInput: Record<string, unknown> = {}, inputError = ''
+  try { testInput = workflow ? JSON.parse(asset || '{}') : compositionTestInput(config || undefined, asset); if (!testInput || typeof testInput !== 'object' || Array.isArray(testInput)) throw new Error() } catch { inputError = '请输入有效的 JSON 对象' }
   const registeredConnections = data?.connections ?? []
   const connections = data?.connections?.filter((item: any) => item.kind === 'openapi') ?? []
-  const extensionReady = config?.flow ? Boolean(data?.extension?.flow) : config?.kind ? Boolean(data?.extension?.stages) : true
+  const extensionReady = config?.flow ? Boolean(data?.extension?.flow) : workflow ? Boolean(data?.extension?.workflows?.some((item: any) => item.id === config?.workflow)) : config?.kind ? Boolean(data?.extension?.stages) : true
   const upstream = extensionReady && config && (config.kind === 'threat-stage'
     ? [config.bindings?.socConnectionId, config.bindings?.reportConnectionId].every(id => registeredConnections.some((item: any) => item.id === id))
-    : config.kind === 'composite' ? config.steps?.every(step => entries.find(item => item.id === step.compositionId)?.versions?.some(version => version.versionId === step.versionId))
+    : workflow ? Object.values(config.connections ?? {}).every(id => registeredConnections.some((item: any) => item.id === id)) : config.kind === 'composite' ? config.steps?.every(step => entries.find(item => item.id === step.compositionId)?.versions?.some(version => version.versionId === step.versionId))
       : [config.connectionId, ...(config.flow ? [config.alertsConnectionId] : [])].every(id => connections.some((item: any) => item.id === id)))
-  const graph = result?.graph ?? (historical ? undefined : selection && data?.compositions.find((item: any) => item.id === selection.id)?.graphs?.[selection.version])
+  const rootGraph = result?.graph ?? (historical ? frozenGraph?.key === selectionKey ? frozenGraph.graph : undefined : selection && data?.compositions.find((item: any) => item.id === selection.id)?.graphs?.[selection.version])
+  const graph = subflows.at(-1)?.graph ?? rootGraph
   const nodes = graph?.nodes ?? []
   const node = nodes.find((item: any) => item.id === selectedNode) ?? nodes[0]
   const trace = result?.result?.trace?.find((item: any) => node && ((node.step && item.step === node.step) || item.step === node.id || item.stage === node.operationId))
@@ -325,7 +341,8 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
   })
   useEffect(() => { void refreshCatalog(); return () => { requestId.current++ } }, [configuration])
 
-  function select(item: CompositionEntry, version: 'draft' | 'published', versionId?: string, focus = true) {
+  function select(item: CompositionEntry, version: 'draft' | 'published', versionId?: string, focus = true, preserveParents = false) {
+    if (!preserveParents) setParents([])
     const next = { id: item.id, version, ...(versionId ? { versionId } : {}) }
     if (focus && selection?.id === next.id && selection.version === next.version && selection.versionId === next.versionId) {
       requestAnimationFrame(() => { detailRef.current?.scrollIntoView({ block: 'start' }); detailRef.current?.focus() })
@@ -376,12 +393,12 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
         accept(value)
         const saved = value.compositions.find((item: CompositionEntry) => item.id === payload.compositionId)
         select(saved, 'published', saved.publishedVersionId, false); setResult(value.dry)
-      } else setResult(value)
-      if (['saveCompositionDraft', 'publishComposition'].includes(endpoint)) updates?.invalidate(['mcp'])
+      } else if (['withdrawComposition', 'deleteComposition'].includes(endpoint)) { accept(value); setSelection(null); setError(endpoint === 'withdrawComposition' ? '已下架，新调用已停止；已有记录保留。' : '已删除编排登记，源码、文档和历史记录保留。') } else setResult(value)
+      if (['saveCompositionDraft', 'publishComposition', 'withdrawComposition', 'deleteComposition'].includes(endpoint)) updates?.invalidate(['mcp'])
     } catch { if (id === actionId.current) setError('操作失败，请检查连接并重试。') }
     finally { if (id === actionId.current) { setBusy(false); setPendingAction('') } }
   }
-  const selectedPayload = { compositionId: entry?.id, version: selection?.version, ...(selection?.versionId ? { versionId: selection.versionId } : {}), revision: data?.revision, input: compositionTestInput(config || undefined, asset) }
+  const selectedPayload = { compositionId: entry?.id, version: selection?.version, ...(selection?.versionId ? { versionId: selection.versionId } : {}), revision: data?.revision, input: testInput }
   async function execute() {
     if (busy || unresolved) return
     const executionId = `graph-${globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`}`
@@ -418,7 +435,7 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
   const testStatus = busy && pendingAction !== 'list' ? '正在处理…'
     : unresolved ? attempt?.state === 'running' ? '原请求正在执行，等待回执' : '结果待核对'
       : result?.mode === 'dry' ? 'dry 校验通过，未请求上游'
-        : result ? result.ok === false ? '最近执行失败' : threat ? '已收到执行回执，详情中核对运行状态' : '最近执行成功' : '尚无测试结果'
+        : result ? result.ok === false ? '最近执行失败' : workflow || threat ? '已收到执行回执，详情中核对运行状态' : '最近执行成功' : '尚无测试结果'
   return <div className="harness-composition-workspace" data-list-open={listOpen} data-fullscreen={fullscreen}>
     <style>{threatEditorStyle}</style>
     <nav className="harness-card harness-composition-sidebar" aria-label="工具编排列表">
@@ -465,11 +482,11 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
       {recoveryDraft && <section className="harness-composition-conflict" role="status"><h3>保留的本地草稿</h3><p>原草稿基于版本 <code>{recoveryDraft.revision.slice(0, 12)}</code>；重新读取目录后请逐项核对并手工重应用。刷新页面前请复制或下载。</p><div className="harness-mcp-actions"><button type="button" onClick={() => exportDraft(recoveryDraft.value, false)}>复制保留草稿</button><button type="button" onClick={() => exportDraft(recoveryDraft.value, true)}>下载保留草稿</button><button type="button" onClick={() => setRecoveryDraft(null)}>放弃保留草稿</button></div></section>}
       {!config && !editor ? !data ? !error && <LoadingIndicator label="读取编排目录" block /> : <div className="harness-composition-empty"><svg width="36" height="36" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="3" y="12" width="8" height="8" rx="2"/><rect x="21" y="3" width="8" height="8" rx="2"/><rect x="21" y="21" width="8" height="8" rx="2"/><path d="M11 16h5V7h5m-5 9v9h5"/></svg><h3>{selection ? '重新选择工具组合' : '从一组工具开始编排'}</h3><p>{selection ? `所选编排 ${selection.id} 的${selection.version === 'draft' ? '草稿' : selection.versionId ? `发布版本 ${selection.versionId}` : '当前发布版本'}已不存在，请重新选择。` : '在左侧选择一个工具组合，或点击“新建编排”开始。'}</p></div> : <>
         {editor ? <form onSubmit={event => { event.preventDefault(); if (!mappingValid) return; void action('saveCompositionDraft', { compositionId: editor.id, revision: editor.revision, draft: editor.value }) }} className="harness-composition-editor">
-          <p>{isThreatComposition(editor.value) ? '编辑阶段连接或固定子版本，保存草稿后进行 dry 校验和发布。' : '复用当前 LangGraph 两步只读流程：查询资产 → 查询相关告警。保存草稿后进行 dry 测试和发布。'}</p>
+          <p>{editor.value.kind === 'workflow' ? '编辑代码工作流的连接，保存后进行 dry 校验和发布。' : isThreatComposition(editor.value) ? '编辑阶段连接或固定子版本，保存草稿后进行 dry 校验和发布。' : '复用当前 LangGraph 两步只读流程：查询资产 → 查询相关告警。保存草稿后进行 dry 测试和发布。'}</p>
           <label>编排标题<input required maxLength={80} value={editor.value.title} onChange={event => setEditor({ ...editor, value: { ...editor.value, title: event.target.value } })} /></label>
           <label>工具名称<input required maxLength={64} pattern="[A-Za-z0-9_.\-]+" value={editor.value.toolName} onChange={event => setEditor({ ...editor, value: { ...editor.value, toolName: event.target.value } })} /></label>
           <label className="harness-mcp-wide">工具说明<textarea maxLength={500} value={editor.value.description} onChange={event => setEditor({ ...editor, value: { ...editor.value, description: event.target.value } })} /></label>
-          {isThreatComposition(editor.value) ? <ThreatConfigurationFields rpc={rpc} active={active} identity={`${editor.id ?? 'new'}:${editor.revision}`} onValidityChange={setMappingValid} value={editor.value} change={value => setEditor({ ...editor, value })} compositionId={editor.id} connections={registeredConnections} entries={entries}/> : <><label>接口流程<select value={editor.value.flow ?? ''} onChange={event => setEditor({ ...editor, value: { ...editor.value, flow: event.target.value === 'soc-asset-alerts' ? 'soc-asset-alerts' : undefined, alertsConnectionId: event.target.value ? editor.value.alertsConnectionId ?? connections[0]?.id ?? '' : undefined } })}>
+          {editor.value.kind === 'workflow' ? <fieldset><legend>代码工作流连接</legend><p>工作流：<code>{editor.value.workflow}</code>。输入及输出以实际 Schema 为准。</p>{Object.entries(editor.value.connections ?? {}).map(([key, connection]) => <label key={key}>{key}<select required value={connection} onChange={event => setEditor({ ...editor, value: { ...editor.value, connections: { ...editor.value.connections, [key]: event.target.value } } })}><option value="">请选择连接</option>{registeredConnections.map((item: any) => <option key={item.id} value={item.id}>{item.name || item.id}</option>)}</select></label>)}</fieldset> : isThreatComposition(editor.value) ? <ThreatConfigurationFields rpc={rpc} active={active} identity={`${editor.id ?? 'new'}:${editor.revision}`} onValidityChange={setMappingValid} value={editor.value} change={value => setEditor({ ...editor, value })} compositionId={editor.id} connections={registeredConnections} entries={entries}/> : <><label>接口流程<select value={editor.value.flow ?? ''} onChange={event => setEditor({ ...editor, value: { ...editor.value, flow: event.target.value === 'soc-asset-alerts' ? 'soc-asset-alerts' : undefined, alertsConnectionId: event.target.value ? editor.value.alertsConnectionId ?? connections[0]?.id ?? '' : undefined } })}>
             <option value="">get_asset → list_alerts</option>{(data?.extension?.flow || editor.value.flow) && <option value="soc-asset-alerts">SOC 资产详情 → 近 30 天告警分组</option>}
           </select></label>
           <label>{editor.value.flow ? '资产 OpenAPI 服务器' : 'OpenAPI 服务器'}<select required value={editor.value.connectionId} onChange={event => setEditor({ ...editor, value: { ...editor.value, connectionId: event.target.value } })}>
@@ -490,33 +507,38 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
               <div><dt>版本 ID</dt><dd><code>{selection?.version === 'draft' ? '未发布' : selection?.versionId ?? entry?.publishedVersionId ?? '未提供'}</code>{selection?.version === 'published' && <button type="button" onClick={() => void copyText(selection.versionId ?? entry?.publishedVersionId ?? '').then(() => setError('版本 ID 已复制。')).catch(() => setError('无法自动复制，请从资料中手动复制版本 ID。'))}>复制版本 ID</button>}</dd></div>
               <div><dt>发布时间</dt><dd>{historical ? frozenVersion?.publishedAt ?? '未记录' : entry?.published?.publishedAt ?? '未发布'}</dd></div>
               <div><dt>工具</dt><dd><code>{config?.toolName}</code></dd></div>
-              <div><dt>工作流与连接</dt><dd>{config?.kind === 'threat-stage' ? <>SOC：<code>{config.bindings?.socConnectionId}</code> · 报告：<code>{config.bindings?.reportConnectionId}</code></> : config?.kind === 'composite' ? '调用画布中的固定子组合版本' : <><code>{config?.connectionId}</code>{config?.flow && <> → <code>{config.alertsConnectionId}</code></>}</>}</dd></div>
+              <div><dt>工作流与连接</dt><dd>{config?.kind === 'threat-stage' ? <>SOC：<code>{config.bindings?.socConnectionId}</code> · 报告：<code>{config.bindings?.reportConnectionId}</code></> : workflow ? <><code>{config?.workflow}</code><pre>{JSON.stringify(config?.connections, null, 2)}</pre></> : config?.kind === 'composite' ? '调用画布中的固定子组合版本' : <><code>{config?.connectionId}</code>{config?.flow && <> → <code>{config.alertsConnectionId}</code></>}</>}</dd></div>
             </dl><h3>调用与发布说明</h3><p>MCP 入口：<code>{new URL('api/harness-platform/mcp', document.baseURI).href}</code>。入口受平台登录认证保护，仅列出并执行已发布版本。草稿供查看与测试，发布后调用方需重新发现工具。</p>
           </DetailDrawer>
         </div>}
         {!editor && <div className="harness-composition-layout" data-node-open={nodeOpen}><div className="harness-composition-graph">
-          {historical && <p>此历史版本仅提供冻结配置查看；执行请通过固定版本的调用入口验证。</p>}
-          <CompositionCanvas graph={graph} selected={node?.id} onSelect={id => { setSelectedNode(id); setNodeOpen(true) }} identity={selectionKey}/>
-        </div><CompositionPanel drawer={narrow} title="编排节点详情" open={nodeOpen && active} onClose={() => setNodeOpen(false)} className="harness-composition-node-panel"><div className="harness-composition-panel-body">{node && <><h3>{node.id === '__start__' ? '开始' : node.id === '__end__' ? '结束' : node.title}</h3><p>{node.operationId ? <>工具：<code>{node.operationId}</code></> : node.id === '__start__' ? '流程开始' : node.id === '__end__' ? '流程结束' : '流程节点'}</p><p>状态：{result?.mode === 'dry' ? 'dry 未执行节点' : trace?.status ?? '尚未执行'}</p>
-          {node.operationId && <><h4>输入映射</h4><dl className="harness-fields">{Object.entries(node.input ?? {}).map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{typeof value === 'object' ? JSON.stringify(value) : String(value)}</dd></div>)}</dl>
+          {parents.length > 0 && <button type="button" disabled={busy} onClick={() => { const parent = parents.at(-1)!, owner = entries.find(item => item.id === parent.id); if (owner) { setParents(parents.slice(0, -1)); select(owner, parent.version, parent.versionId, false, true) } }}>返回上级编排</button>}
+          {subflows.length > 0 && <p><button type="button" onClick={() => { setSubflows(subflows.slice(0, -1)); setSelectedNode(''); setNodeOpen(false) }}>返回上层流程</button> · {subflows.map(item => item.title).join(' / ')}</p>}
+          {historical && frozenGraph?.key === selectionKey && frozenGraph.error && <p role="alert">{frozenGraph.error}</p>}
+          <CompositionCanvas graph={graph} selected={node?.id} onSelect={id => { setSelectedNode(id); setNodeOpen(true) }} identity={`${selectionKey}:${subflows.map(item => item.title).join('/')}`}/>
+        </div><CompositionPanel drawer={narrow} title="编排节点详情" open={nodeOpen && active} onClose={() => setNodeOpen(false)} className="harness-composition-node-panel"><div className="harness-composition-panel-body">{node && <><h3>{node.id === '__start__' ? '开始' : node.id === '__end__' ? '结束' : node.title}</h3><p>{node.operationId ? <>工具：<code>{node.operationId}</code></> : node.id === '__start__' ? '流程开始' : node.id === '__end__' ? '流程结束' : '流程节点'}</p><p>状态：{result?.mode === 'dry' ? 'dry 未执行节点' : trace?.status ?? (workflow && result?.result?.run_id ? '请在运行记录中查看步骤结果' : '尚未执行')}</p>
+          {node.description && <p>{node.description}</p>}
+          {node.subgraph && <button type="button" onClick={() => { setSubflows([...subflows, { title: node.title, graph: node.subgraph }]); setSelectedNode(''); setNodeOpen(false) }}>展开批量步骤</button>}
+          {node.compositionId && node.versionId && <><p>子编排：<code>{node.compositionId}</code><br/>固定版本：<code>{node.versionId}</code></p><button type="button" disabled={busy || !entries.some(item => item.id === node.compositionId && item.versions?.some(version => version.versionId === node.versionId))} onClick={() => { const child = entries.find(item => item.id === node.compositionId); if (child && selection) { setParents([...parents, selection]); select(child, 'published', node.versionId, false, true) } }}>进入子编排</button></>}
+          {(node.operationId || node.input) && <><h4>输入映射</h4><dl className="harness-fields">{Object.entries(node.input ?? {}).map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{typeof value === 'object' ? JSON.stringify(value) : String(value)}</dd></div>)}</dl>
           {trace?.mappedArguments && <pre className="harness-asset-content">{JSON.stringify(trace.mappedArguments, null, 2)}</pre>}
           <h4>输出：{node.output}</h4><pre className="harness-asset-content">{result?.result ? JSON.stringify(config?.kind === 'threat-stage' ? result.result : result.result.stepValues?.[node.output] ?? result.result[node.output], null, 2) : '尚无执行结果'}</pre>{trace?.reason && <p>{trace.reason}</p>}</>}
         </>}</div></CompositionPanel></div>}
         {!editor && !historical && <div className="harness-composition-test-dock">
           <button type="button" className="harness-composition-test-toggle" aria-expanded={testOpen} onClick={() => setTestOpen(!testOpen)}><strong>测试与运行</strong><span role="status">{testStatus}</span><span>{testOpen ? '收起' : '展开'}</span></button>
-          <CompositionPanel drawer title="测试与运行" open={testOpen && active} onClose={() => setTestOpen(false)} className="harness-composition-test-panel"><section className="harness-composition-test"><p>{threat ? '实际执行将按已编译流程调用取证、模型或模拟存储；请使用基本运维测试事件。' : '第一步失败或缺少资产 ID 时，第二步停止执行。'}</p>
-          {config?.kind === 'threat-stage' && config.stage !== 'collect' ? <>
+          <CompositionPanel drawer title="测试与运行" open={testOpen && active} onClose={() => setTestOpen(false)} className="harness-composition-test-panel"><section className="harness-composition-test"><p>{workflow ? '按明确范围读取事实并生成报告；缺失或失败不代表正常。' : threat ? '实际执行将按已编译流程调用取证、模型或模拟存储；请使用基本运维测试事件。' : '第一步失败或缺少资产 ID 时，第二步停止执行。'}</p>
+          {workflow ? <label>执行输入 JSON<textarea aria-label="组合执行输入 JSON" disabled={busy} value={asset} onChange={event => { actionId.current++; setAsset(event.target.value); setResult(null) }} placeholder={'{"scope":{"assetIds":[123]}}'} />{inputError && <small role="alert">{inputError}</small>}<details><summary>输入 Schema</summary><pre>{JSON.stringify(data?.extension?.workflows?.find((item: any) => item.id === config?.workflow)?.inputSchema, null, 2)}</pre></details></label> : config?.kind === 'threat-stage' && config.stage !== 'collect' ? <>
             {carriedRun && <p role="status">已带入上一阶段返回的运行：<code>{carriedRun}</code>。核对本阶段后再执行。</p>}
-            <DetailDrawer title="按已知运行恢复" trigger={carriedRun ? '更换运行（高级恢复）' : '按已知运行恢复（高级）'} active={active} identity={`${selection?.id}:${selection?.version}:${selection?.versionId ?? ''}`}><div className="harness-threat-editor"><p>填写已有阶段返回的运行 ID。关闭窗口后输入仍保留，实际执行仍需在本阶段点击“实际执行组合工具”。</p><label>运行 ID<input aria-label="组合运行 ID" disabled={busy} value={asset} onChange={event => { if (busy) return; actionId.current++; setAsset(event.target.value); setContinuedRun(null); setResult(null) }} placeholder="填写已有阶段返回的 run_id" /></label></div></DetailDrawer>
+            <DetailDrawer title="按已知运行恢复" trigger={carriedRun ? '更换运行（高级恢复）' : '按已知运行恢复（高级）'} active={active} identity={`${selectionKey}:${subflows.map(item => item.title).join('/')}`}><div className="harness-threat-editor"><p>填写已有阶段返回的运行 ID。关闭窗口后输入仍保留，实际执行仍需在本阶段点击“实际执行组合工具”。</p><label>运行 ID<input aria-label="组合运行 ID" disabled={busy} value={asset} onChange={event => { if (busy) return; actionId.current++; setAsset(event.target.value); setContinuedRun(null); setResult(null) }} placeholder="填写已有阶段返回的 run_id" /></label></div></DetailDrawer>
             {!asset && <p>从上一阶段的实际结果选择“继续”，即可自动带入同一运行；也可按已知运行恢复。</p>}
           </> : <label>{threat ? '事件 ID' : '查询资产'}<input aria-label={threat ? '组合事件 ID' : '组合查询资产'} disabled={busy} value={asset} onChange={event => { if (busy) return; actionId.current++; setAsset(event.target.value); setResult(null) }} placeholder={threat ? 'INC-20261015-000001' : config?.flow ? '资产 ID，如 9106' : '资产 ID、主机名或 IP'} /></label>}
-          <div className="harness-mcp-actions"><button type="button" disabled={busy || !asset.trim()} onClick={() => void action('dryRunComposition', selectedPayload)}>测试（dry）</button>
-            {selection?.version === 'draft' && <button type="button" disabled={busy || !asset.trim()} onClick={() => void action('publishComposition', selectedPayload)}>发布工具</button>}
-            <button type="button" disabled={busy || Boolean(unresolved) || !asset.trim() || !upstream} onClick={() => void execute()}>实际执行组合工具</button></div>
+          <div className="harness-mcp-actions"><button type="button" disabled={busy || !asset.trim() || Boolean(inputError)} onClick={() => void action('dryRunComposition', selectedPayload)}>测试（dry）</button>
+            {selection?.version === 'draft' && <button type="button" disabled={busy || !asset.trim() || Boolean(inputError)} onClick={() => void action('publishComposition', selectedPayload)}>发布工具</button>}
+            <button type="button" disabled={busy || Boolean(unresolved) || !asset.trim() || Boolean(inputError) || !upstream || !entry?.published && selection?.version === 'published'} onClick={() => void execute()}>实际执行组合工具</button></div>
           {attempt?.selection_key === selectionKey && <section className="harness-composition-recovery" aria-label="组合执行回执"><p role="status">{attempt.state === 'responded' ? '已收到原执行回执' : attempt.state === 'running' ? '原请求正在执行，等待回执' : '结果待核对'}</p>{attempt.message && <p>{attempt.message}</p>}<p>执行标识：<code>{attempt.execution_id}</code></p>{attempt.asset !== asset && <p>当前输入已变化，下面核对的仍是原请求：<code>{attempt.asset}</code>。</p>}<button type="button" disabled={busy} onClick={() => void recover()}>核对原请求</button>{attempt.run_ids?.map(runId => <button key={runId} type="button" disabled={busy} onClick={() => void readOriginalRun(runId)}>读取原运行 {runId}</button>)}{recoveredRuns.map(run => <ThreatRunResult key={run.run_id} rpc={rpc} execution={{ result: run }} />)}</section>}
-          <p>测试及发布前校验均使用 dry，不请求上游。{threat ? '阶段测试不自动补跑其他阶段；完整流程请执行总组合。' : '实际执行会调用两个只读工具。'}</p>
+          <p>测试及发布前校验均使用 dry，不请求上游。{workflow ? '运行接受后可刷新进度、读取明细和下载报告。' : threat ? '阶段测试不自动补跑其他阶段；完整流程请执行总组合。' : '实际执行会调用两个只读工具。'}</p>
           {result?.mode === 'dry' && <div role="status"><p>dry 校验通过 · 上游请求 {result.upstreamRequests} 次</p><p>{result.checks.join('、')}。未验证：{result.unverified.join('、')}。</p></div>}
-          {result && result.mode !== 'dry' && (threat ? <><ThreatRunResult rpc={rpc} execution={result}/>{continuations.length > 0 && <div className="harness-mcp-actions" aria-label="继续当前运行">{continuations.map(next => <button type="button" key={next.entry.id} disabled={busy} onClick={() => { const runId = run.run_id; const versionId = next.version === 'published' ? next.entry.publishedVersionId : undefined; select(next.entry, next.version, versionId); setAsset(runId); setContinuedRun({ selectionKey: `${next.entry.id}:${next.version}:${versionId ?? ''}`, runId }) }}>继续{nextStage === 'infer' ? '模型研判' : nextStage === 'writeback' ? '结果回写' : '报告保存'} · {next.config.title}（{next.version === 'draft' ? '草稿' : '已发布'}）</button>)}</div>}</> : <div><p role="status">{result.ok ? '组合执行成功' : '组合执行失败'}</p>{result.error && <p role="alert">{result.error.message}</p>}
+          {result && result.mode !== 'dry' && (workflow ? <ThreatRunResult rpc={rpc} execution={result}/> : threat ? <><ThreatRunResult rpc={rpc} execution={result}/>{continuations.length > 0 && <div className="harness-mcp-actions" aria-label="继续当前运行">{continuations.map(next => <button type="button" key={next.entry.id} disabled={busy} onClick={() => { const runId = run.run_id; const versionId = next.version === 'published' ? next.entry.publishedVersionId : undefined; select(next.entry, next.version, versionId); setAsset(runId); setContinuedRun({ selectionKey: `${next.entry.id}:${next.version}:${versionId ?? ''}`, runId }) }}>继续{nextStage === 'infer' ? '模型研判' : nextStage === 'writeback' ? '结果回写' : '报告保存'} · {next.config.title}（{next.version === 'draft' ? '草稿' : '已发布'}）</button>)}</div>}</> : <div><p role="status">{result.ok ? '组合执行成功' : '组合执行失败'}</p>{result.error && <p role="alert">{result.error.message}</p>}
             {result.result?.alertSummary && <p>近 30 天：{result.result.alertSummary.totalGroups} 个告警分组 · {result.result.alertSummary.totalAlerts} 条告警 · 当前展示 {result.result.alerts.length} 个分组。{result.result.alertSummary.truncated && '上游结果已截断。'}<br/>查询范围：{result.result.alertSummary.from} ～ {result.result.alertSummary.to}</p>}
             <div className="harness-table-scroll"><table className="harness-composition-trace"><thead><tr><th>步骤</th><th>状态</th><th>HTTP</th><th>耗时</th></tr></thead><tbody>{(result.result?.trace ?? []).map((step: any) => <tr key={step.step}><td data-label="步骤">{step.operationId}</td><td data-label="状态">{step.status}</td><td data-label="HTTP">{step.httpStatus ?? '未调用'}</td><td data-label="耗时">{step.durationMs === undefined ? '—' : `${step.durationMs} ms`}</td></tr>)}</tbody></table></div>
             <details><summary>业务结果</summary><pre>{JSON.stringify({ asset: result.result?.asset, alerts: result.result?.alerts, alertSummary: result.result?.alertSummary }, null, 2)}</pre></details><details><summary>执行回执与来源版本</summary><pre>{JSON.stringify({ receipts: result.receipts, version: result.version }, null, 2)}</pre></details></div>)}

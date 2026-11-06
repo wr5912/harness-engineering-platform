@@ -71,8 +71,9 @@ test('Wiki 经真实资产接口形成可读独立副本，并按来源合同挂
   const originalSha = hash(original)
   write(join(management, 'raw/guide.txt'), original)
   const documents = {
-    'index.md': `# 检修知识\n\n[操作规程](wiki/guide.md)\n\n## sources\n\n原件：guide.txt；SHA-256：${originalSha}。原件由管理库保存，未随业务副本部署。\n`,
-    'wiki/guide.md': '# 检修规则\n\n检修前确认设备停机，等待 30 分钟。\n\n[资料段落](../readable/guide.md#paragraph-1)；[来源登记](../index.md#sources)。\n',
+    'index.md': '# 检修知识\n\n[操作规程](wiki/guide.md)；[来源登记](sources.md)。\n',
+    'sources.md': `# 来源登记\n\n原件：guide.txt；SHA-256：${originalSha}。原件由管理库保存，未随业务副本部署。\n`,
+    'wiki/guide.md': '# 检修规则\n\n检修前确认设备停机，等待 30 分钟。\n\n[资料段落](../readable/guide.md#paragraph-1)；[来源登记](../sources.md)。\n',
     'readable/guide.md': `# 文本阅读副本\n\n## paragraph-1\n\n${original}`,
   }
   for (const [path, content] of Object.entries(documents)) write(join(management, path), content)
@@ -124,7 +125,7 @@ test('Wiki 经真实资产接口形成可读独立副本，并按来源合同挂
 
   const revised = original.replace('30 分钟', '60 分钟')
   write(join(management, 'raw/guide-v2.txt'), revised)
-  write(join(management, 'index.md'), documents['index.md'] + `\n新版原件：guide-v2.txt；SHA-256：${hash(revised)}。\n`)
+  write(join(management, 'sources.md'), documents['sources.md'] + `\n新版原件：guide-v2.txt；SHA-256：${hash(revised)}。\n`)
   write(join(management, 'wiki/guide.md'), documents['wiki/guide.md'].replace('30 分钟', '60 分钟'))
   write(join(management, 'readable/guide.md'), documents['readable/guide.md'].replace('30 分钟', '60 分钟'))
   assert.equal(hash(readFileSync(join(management, 'raw/guide.txt'))), originalSha)

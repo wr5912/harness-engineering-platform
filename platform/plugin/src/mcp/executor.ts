@@ -4,14 +4,19 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph'
-import { compositionDefinition, compositionInputSchema, compositionOutputSchema, INCIDENT_ID_PATTERN, RUN_ID_PATTERN } from './definition.ts'
+import { compositionDefinition, compositionInputSchema, compositionOutputSchema, compositionReadonly, INCIDENT_ID_PATTERN, RUN_ID_PATTERN } from './definition.ts'
 import { compositionConfig, compositionVersionId, readCompositions, versionConfig, type Catalog, type CompositionConfig } from './compositions.ts'
 import type { ThreatRuntime, CompositionExtension, CompositionExecutionContext, GraphExecution } from './extension.ts'
 import type { ModelAttempt } from '../evaluation/model-attempts.ts'
-import { executeNested, nestedStructure, validateNested } from './nested.ts'
-import { programRoot, workspaceConfigPath, workspaceLocalPath } from '../workspace.ts'
+import { executeNested, nestedStructure, nestedWorkflowGraph, validateNested } from './nested.ts'
+import { programRoot, workspaceConfigPath, mcpLocalPath } from '../workspace.ts'
 import { callOpenApiOperation, loadOpenApi, type OpenApiConnection } from './openapi.ts'
 import type { ManagedDispatch } from './control.ts'
+import { fromJSONSchema } from 'zod'
+import { workflowRuns } from './workflow-runs.ts'
+import { lfxDependencies } from './lfx-assets.ts'
+import { compositionExecutionDigest } from './execution-receipts.ts'
+import { currentBusinessContext } from '../business-control/core.ts'
 
 export type ConnectionStatus = {
   registered: boolean
@@ -38,7 +43,7 @@ export type McpRegistry = {
 type PersistedState = { openapi?: OpenApiConnection[]; mcp?: any[] }
 
 function defaultStateFile(assetRoot: string): string {
-  return workspaceLocalPath(assetRoot, 'state', 'mcp-connections.json')
+  return mcpLocalPath(assetRoot, 'state', 'mcp-connections.json')
 }
 
 export function createRegistry(assetRoot?: string, stateFile = assetRoot ? defaultStateFile(assetRoot) : undefined): McpRegistry {
@@ -89,12 +94,12 @@ let developmentSourceDigest: string | undefined
 function sourceDigestOf(): string {
   if (typeof __PLATFORM_MCP_IMPLEMENTATION_DIGEST__ !== 'undefined') return __PLATFORM_MCP_IMPLEMENTATION_DIGEST__
   if (developmentSourceDigest !== undefined) return developmentSourceDigest
-  const files = ['definition.ts', 'compositions.ts', 'executor.ts', 'index.ts', 'openapi.ts', 'native.ts', 'nested.ts', 'extension.ts', 'control.ts', 'manager.ts']
+  const files = ['definition.ts', 'compositions.ts', 'executor.ts', 'source-digest.ts', 'workflow-graph.ts', 'workflow-runs.ts', 'index.ts', 'openapi.ts', 'native.ts', 'nested.ts', 'extension.ts', 'control.ts', 'manager.ts', 'lfx-runtime.ts', 'lfx-assets.ts']
     .map(file => `platform/plugin/src/mcp/${file}`)
     .concat(['platform/plugin/build.mjs', 'platform/plugin/package.json', 'platform/plugin/pnpm-lock.yaml', 'platform/plugin/src/index.ts',
       'platform/plugin/src/evaluation/model-attempts.ts', 'platform/plugin/src/workflows/graph.ts',
       ...['contracts.ts', 'core.ts', 'providers.ts', 'reports.ts'].map(file => `platform/plugin/src/business-control/${file}`),
-      ...['index.ts', 'openapi.ts'].map(file => `plugins/mcp-manager/${file}`)])
+      ...['index.ts', 'openapi.ts'].map(file => `plugins/mcp-manager/${file}`), ...['hep_lfx.py', 'server.py', 'requirements.txt'].map(file => `platform/mcp/lfx/${file}`)])
   try {
     const hash = createHash('sha256')
     for (const file of files) hash.update(file).update('\0').update(readFileSync(join(programRoot(), file)))
@@ -111,6 +116,7 @@ function canonical(value: any): string {
 function dependencyDefinitions(config: CompositionConfig | undefined, catalog?: Catalog, path = new Set<string>()): any {
   if (!config) return null
   const normalized = compositionConfig(config)
+  delete normalized.implementation
   if (normalized.kind !== 'composite') return normalized
   return { ...normalized, dependencies: normalized.steps!.map(step => {
     const key = `${step.compositionId}:${step.versionId}`
@@ -125,7 +131,9 @@ function connectionIdentities(definition: any, registry?: McpRegistry): any[] {
   const ids = new Set<string>()
   function visit(config: any) {
     if (!config) return
+    if (config.workflow) for (const id of registry?.extension?.workflows?.[config.workflow]?.connections(config) ?? []) ids.add(id)
     if (config.kind === 'composite') for (const child of config.dependencies) visit(child.definition)
+    else if (config.kind === 'workflow') return
     else if (config.kind === 'threat-stage') { ids.add(config.bindings.socConnectionId); ids.add(config.bindings.reportConnectionId) }
     else { ids.add(config.connectionId); if (config.alertsConnectionId) ids.add(config.alertsConnectionId) }
   }
@@ -143,10 +151,12 @@ function connectionIdentities(definition: any, registry?: McpRegistry): any[] {
 function compositionImplementation(config?: CompositionConfig, extension?: CompositionExtension, catalog?: Catalog, registry?: McpRegistry) {
   const sourceDigest = sourceDigestOf()
   const normalized = config ? compositionConfig(config) : undefined
-  const definition = { ...compositionDefinition, ...normalized, readonly: !config?.kind, inputSchema: compositionInputSchema(config), outputSchema: compositionOutputSchema(config),
+  if (normalized) delete normalized.implementation
+  const definition = { ...compositionDefinition, ...normalized, readonly: compositionReadonly(config), inputSchema: compositionInputSchema(config, extension), outputSchema: compositionOutputSchema(config, extension),
     upstream: config?.kind ? { kind: config.kind, ...(config.kind === 'composite' ? { steps: config.steps } : { stage: config.stage, bindings: config.bindings }) } : { kind: 'openapi', steps: config?.flow ? [] : compositionSteps(config) } }
-  const businessExtension = extension?.id ? { id: extension.id, sourceDigest: extension.sourceDigest ?? 'unknown' } : undefined
   const dependencies = dependencyDefinitions(config, catalog)
+  const workflowSources = (value: any): any => value && ({ workflow: value.workflow, sourceDigest: value.engine === 'lfx' ? extension?.workflows?.[value.workflow]?.native?.digest(value) : extension?.workflows?.[value.workflow]?.sourceDigest, children: value.dependencies?.map((child: any) => workflowSources(child.definition)) })
+  const businessExtension = extension?.id ? { id: extension.id, sourceDigest: config?.workflow ? workflowSources(dependencies) : extension.sourceDigest ?? 'unknown' } : undefined
   const implementationDigest = createHash('sha256').update(canonical({ sourceDigest, businessExtension, definition, dependencies, connections: connectionIdentities(dependencies, registry) })).digest('hex')
   return { sourceDigest, businessExtension, digest: implementationDigest, implementationDigest, definition,
     ...(config ? { versionId: compositionVersionId(config) } : {}) }
@@ -187,7 +197,12 @@ function inputLimit(value: unknown): number {
   return value
 }
 
-export function compositionInput(input: Record<string, any>, config?: CompositionConfig): Record<string, any> {
+export function compositionInput(input: Record<string, any>, config?: CompositionConfig, extension?: CompositionExtension): Record<string, any> {
+  if (config?.workflow) {
+    const parsed = fromJSONSchema(compositionInputSchema(config, extension)).safeParse(input)
+    if (!parsed.success) throw new Error(`组合输入无效：${parsed.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('；')}`)
+    return parsed.data as Record<string, any>
+  }
   if (config?.kind) {
     const key = config.kind === 'composite' || config.stage === 'collect' ? 'incident_id' : 'run_id'
     if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).some(name => name !== key) || typeof input[key] !== 'string' || !new RegExp(key === 'incident_id' ? INCIDENT_ID_PATTERN : RUN_ID_PATTERN).test(input[key])) throw new Error(`${key} 格式无效，且不能传入其他字段`)
@@ -260,6 +275,15 @@ function compositionGraph(config: CompositionConfig | undefined, call: (step: Re
 }
 
 export async function compositionStructure(config?: CompositionConfig, catalog?: Catalog, extension?: CompositionExtension, allowUnavailable = false) {
+  if (config?.workflow) {
+    if (config.kind === 'composite') {
+      const graph = await nestedWorkflowGraph(config, catalog ?? { schema_version: '1.0', compositions: [] }, async () => { throw new Error('结构查询不可执行节点') }, async () => ({})).getGraphAsync()
+      return { nodes: Object.values(graph.nodes).map((node: any) => ({ id: node.id, ...node.metadata })), edges: graph.edges }
+    }
+    const workflow = extension?.workflows?.[config.workflow]
+    if (workflow?.structure) return workflow.structure(config)
+  }
+  if (config?.kind === 'workflow') return { nodes: [{ id: '__start__' }, { id: config.workflow, title: config.title, workflow: config.workflow, connections: config.connections }, { id: '__end__' }], edges: [{ source: '__start__', target: config.workflow }, { source: config.workflow, target: '__end__' }] }
   if (config?.flow && !extension?.flow && allowUnavailable) return { nodes: [], edges: [], unavailable: '业务组合扩展尚未装载' }
   if (config?.kind === 'composite') return nestedStructure(config, catalog ?? { schema_version: '1.0', compositions: [] })
   if (config?.kind === 'threat-stage') {
@@ -279,21 +303,29 @@ function threatStageGraph(config: CompositionConfig, call: (input: Record<string
 }
 
 export async function dryRunComposition(registry: McpRegistry, config: CompositionConfig, input: Record<string, any>, catalog?: Catalog) {
-  const validated = compositionInput(input, config)
+  const validated = compositionInput(input, config, registry.extension)
   if (config.kind) {
     const resolved = catalog ?? { schema_version: '1.0' as const, compositions: [] }
-    validateNested(config, resolved)
+    validateNested(config, resolved, new Set(), registry.extension)
     const check = (child: CompositionConfig) => {
+      if (child.workflow) {
+        const workflow = registry.extension?.workflows?.[child.workflow]
+        if (!workflow) throw new Error(`工作流尚未装载：${child.workflow}`)
+        if (child.implementation && child.implementation !== compositionImplementationDigest(child, registry.extension, resolved, registry)) throw new Error('固定子组合实现与当前装载不一致，请恢复实现或重新发布')
+        for (const id of workflow.connections(child)) if (!registry.openapi.has(id) && !registry.mcp.has(id)) throw new Error(`未注册组合依赖连接：${id}`)
+      }
       if (child.kind === 'composite') {
+        if (child.workflow && child.steps?.some(step => step.when && step.when !== 'always')) throw new Error('工作流子组合仅支持明确的输入依赖；不支持威胁分析的阶段条件')
         for (const step of child.steps ?? []) check(resolved.compositions.find(entry => entry.id === step.compositionId)!.versions!.find(version => version.versionId === step.versionId)!.config)
-      } else if (child.kind === 'threat-stage') {
+      } else if (child.kind === 'workflow') return
+      else if (child.kind === 'threat-stage') {
         if (!registry.threat) throw new Error('业务组合扩展尚未装载')
         for (const id of [child.bindings!.socConnectionId, child.bindings!.reportConnectionId]) if (!registry.openapi.has(id) && !registry.mcp.has(id)) throw new Error(`未注册组合依赖连接：${id}`)
       } else for (const step of compositionSteps(child, registry.extension)) if (!registry.openapi.has(step.connectionId!)) throw new Error(`未注册组合依赖连接：${step.connectionId}`)
     }
     check(config)
     return { ok: true, mode: 'dry', input: validated, graph: await compositionStructure(config, resolved, registry.extension), upstreamRequests: 0,
-      checks: ['输入有效', '子组合版本与参数映射有效', '依赖连接已登记', 'LangGraph 图已编译'], unverified: ['SOC 认领与业务接口', '模型实际调用', '回写与报告保存'] }
+      checks: ['输入有效', '子组合版本与参数映射有效', '依赖连接已登记', '执行结构有效'], unverified: config.workflow ? ['真实范围与上游数据', '实际检查及报告产物'] : ['SOC 认领与业务接口', '模型实际调用', '回写与报告保存'] }
   }
   for (const step of compositionSteps(config, registry.extension)) {
     if (!step.connectionId || !registry.openapi.has(step.connectionId)) throw new Error(`未注册组合依赖连接：${step.connectionId ?? '未选择'}`)
@@ -319,16 +351,65 @@ export async function executeComposition(registry: McpRegistry, assetRoot: strin
   if (context && typeof input.run_id === 'string') registry.access!.assertRunRead(context, input.run_id)
   const resolvedCatalog = catalog ?? readCompositions(workspaceConfigPath(assetRoot, 'mcp-compositions.json')).catalog
   const version = checkedVersion ?? await compositionVersion(assetRoot, config, registry.extension, resolvedCatalog, registry)
+  const assertImplementation = () => { if (config.implementation && config.implementation !== version.implementationDigest) throw new Error('已发布实现与当前装载代码或连接不一致；请恢复实现或重新发布草稿') }
+  if (!config.workflow || execution?.workflowContext) assertImplementation()
   const attempts: ModelAttempt[] = []
   const inheritedRecorder = execution?.recordAttempt
-  const runContext: CompositionExecutionContext = { execution_id: execution?.execution_id ?? `graph-${randomUUID()}`, role: execution?.role ?? 'target',
+  const runContext: CompositionExecutionContext = { execution_id: execution?.execution_id ?? (() => { const context = currentBusinessContext(); return context?.scope.sessionId && context.invocationId ? `call-${compositionExecutionDigest([context.scope.sessionId, context.invocationId])}` : `graph-${randomUUID()}` })(), role: execution?.role ?? 'target',
     ...(execution ?? {}), recordAttempt: async attempt => { attempts.push(structuredClone(attempt)); await inheritedRecorder?.(attempt) } }
   const graphExecution = (complete = true): GraphExecution => {
-    const { recordAttempt: _record, onRun: _onRun, role: _role, model_invocation: _invocation, ...identity } = runContext
+    const { recordAttempt: _record, onRun: _onRun, role: _role, model_invocation: _invocation, workflowContext: _workflow, ...identity } = runContext
     return { ...identity, source_digest: version.sourceDigest, build_digest: version.implementationDigest,
       model_attempts: attempts, complete, ...(!complete ? { unknown_reasons: ['graph-model-attempts-unobserved'] } : {}) }
   }
-  const validated = compositionInput(input, config)
+  const validated = compositionInput(input, config, registry.extension)
+  if (config.workflow) {
+    const workflow = registry.extension?.workflows?.[config.workflow]
+    if (!workflow) throw new Error(`工作流尚未装载：${config.workflow}`)
+    if (!runContext.workflowContext) {
+      const required = new Set<string>()
+      const visit = (value: CompositionConfig) => { for (const step of lfxDependencies(assetRoot, value)) { required.add(step.compositionId); visit(versionConfig(resolvedCatalog, step.compositionId, step.versionId)) } }
+      visit(config)
+      const frozenCatalog = structuredClone({ ...resolvedCatalog, compositions: resolvedCatalog.compositions.filter(entry => required.has(entry.id) || [entry.draft, entry.published, ...(entry.versions ?? []).map(item => item.config)].some(item => item && compositionVersionId(item) === compositionVersionId(config))) }), frozenConfig = structuredClone(config)
+      const frozenRegistry = { ...registry, extension: { ...registry.extension, workflows: { ...registry.extension?.workflows } }, openapi: new Map(registry.openapi), mcp: new Map(registry.mcp) }
+      const compositionId = resolvedCatalog.compositions.find(entry => [entry.draft, entry.published, ...(entry.versions ?? []).map(item => item.config)].some(item => item && compositionVersionId(item) === compositionVersionId(config)))?.id ?? config.workflow
+      const accepted = await workflowRuns(assetRoot).start({ config: frozenConfig, input: validated, catalog: frozenCatalog, version: { ...version, implementationDigest: config.implementation ?? version.implementationDigest }, executionId: runContext.execution_id, compositionId }, workflow,
+        context => executeComposition(frozenRegistry, assetRoot, frozenConfig, validated, undefined, frozenCatalog, true, { ...runContext, workflowContext: context }, version),
+        async () => {
+          assertImplementation()
+          await dryRunComposition(registry, config, validated, resolvedCatalog)
+          return workflow.prepare?.(validated, config, signal ? AbortSignal.any([signal, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000))
+        })
+      if (context) registry.access!.bindRun(context, accepted.run_id)
+      await execution?.onRun?.(accepted.run_id)
+      return { ok: true, version: accepted.version, result: accepted, receipts: [], graph_execution: graphExecution() }
+    }
+    const workflowContext = runContext.workflowContext
+    workflowContext.signal.throwIfAborted()
+    workflowContext.progress({ status: 'running', title: config.title, version_id: version.versionId, input_digest: compositionExecutionDigest(validated), implementation_digest: version.implementationDigest })
+    try {
+      let result: Record<string, any>
+      if (config.kind === 'workflow') {
+        if (!workflow.execute) throw new Error('工作流没有执行实现')
+        result = await workflow.execute(validated, config, workflowContext)
+      } else {
+        validateNested(config, resolvedCatalog, new Set(), registry.extension)
+        if (!workflow.aggregate) throw new Error('父工作流没有汇总实现')
+        const state = await nestedWorkflowGraph(config, resolvedCatalog, async (child, args, step) => {
+            const nodeId = `${workflowContext.nodeId}/${step.id}`
+              const value = await executeComposition(registry, assetRoot, child, args, workflowContext.signal, resolvedCatalog, true,
+                { ...runContext, workflowContext: { ...workflowContext, nodeId } }, { ...version, ...compositionImplementation(child, registry.extension, resolvedCatalog, registry) })
+              return value.result
+        }, (values, input) => workflow.aggregate!(values, input, workflowContext), workflowContext).invoke({ input: validated, values: {} }, { signal: workflowContext.signal })
+        result = state.result
+      }
+      workflowContext.progress({ status: 'completed', result })
+      return { ok: true, result: { ...result, run_id: workflowContext.runId }, version, receipts: [], graph_execution: graphExecution() }
+    } catch (error) {
+      workflowContext.progress({ status: 'failed', error: error instanceof Error ? error.message : '工作流失败' })
+      throw error
+    }
+  }
   if (config.kind) {
     const runSignal = nested && signal ? signal : signal ? AbortSignal.any([signal, AbortSignal.timeout(36 * 60_000)]) : AbortSignal.timeout(36 * 60_000)
     if (config.kind === 'threat-stage') {
@@ -351,7 +432,7 @@ export async function executeComposition(registry: McpRegistry, assetRoot: strin
           message: state.result.status === 'claim_failed' ? 'SOC 事件认领失败' : state.result.phase_status === 'unknown' ? '威胁分析阶段状态尚未确认' : '威胁分析阶段执行失败' } } : {}) }
     }
     runSignal.throwIfAborted()
-    const result = await executeNested(config, resolvedCatalog, validated, (child, args) => executeComposition(registry, assetRoot, child, args, runSignal, resolvedCatalog, true, runContext))
+    const result = await executeNested(config, resolvedCatalog, validated, (child, args) => executeComposition(registry, assetRoot, child, args, runSignal, resolvedCatalog, true, runContext), registry.extension)
     return { ...result, version, graph_execution: graphExecution((result as any).graph_complete !== false) }
   }
   const runSignal = totalSignal(signal)

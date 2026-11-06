@@ -1,0 +1,108 @@
+{
+  "verification_date": "2026-11-05 America/Los_Angeles",
+  "scope": "PA-12 原生组合迁移及管理助手开发方法分项；不是完整业务验收",
+  "assistant": {
+    "session_id": "session-6ea22501-7c81-4b5c-b024-07939e827c55",
+    "requests": [
+      "composition-development-capability-20261106",
+      "composition-development-details-readback-20261106",
+      "composition-development-source-readback-20261106"
+    ],
+    "readback_final_seq": 321,
+    "new_execution_during_readback": false,
+    "run_id": "run-fcaa78bb-c227-4bf2-aad3-7997327b6443",
+    "execution_status": "completed",
+    "business_status": "incomplete",
+    "details": {
+      "root": {
+        "total": 8,
+        "returned": 8,
+        "statuses": {
+          "normal": 1,
+          "unknown": 7
+        }
+      },
+      "root/status": {
+        "total": 1,
+        "returned": 1,
+        "statuses": {
+          "normal": 1
+        }
+      },
+      "root/baseline": {
+        "total": 1,
+        "returned": 1,
+        "statuses": {
+          "unknown": 1
+        }
+      },
+      "root/reachability": {
+        "total": 6,
+        "returned": 6,
+        "statuses": {
+          "unknown": 6
+        }
+      }
+    },
+    "assistant_page_size": 2
+  },
+  "runtime": {
+    "official_lfx_flows": 6,
+    "official_flow_regression": "passed",
+    "workflow_run_tests": 3,
+    "assistant_contract_tests": 1,
+    "typecheck": "passed"
+  },
+  "source_readback": {
+    "selection": {
+      "id": "inspection-routine",
+      "version": "published",
+      "versionId": "1bf774cbd79a8db4c956319e89e4340f21bd3f5c8f3d601943acbbed0fcc86cc"
+    },
+    "files": [
+      {
+        "path": "platform/mcp/lfx/server.py",
+        "kind": "support",
+        "language": "py",
+        "entry": false,
+        "bytes": 2140,
+        "sha256": "901efdb8d5048f14074d25394391f9bb80aeda86e9d911bf080d9febc80226da",
+        "built_sha256": "901efdb8d5048f14074d25394391f9bb80aeda86e9d911bf080d9febc80226da",
+        "matches_build": true
+      },
+      {
+        "path": "workspace/mcp/compositions/inspection-routine/versions/b23e1b6a2026d6af553be3d12bf2edb7cec277546563a47f397f1d7ab774ad61/bundle.json",
+        "kind": "support",
+        "language": "json",
+        "entry": false,
+        "bytes": 129769,
+        "sha256": "11b01c152cff136d15e8a73bda45a94e540d8eec8d4d82893a99932dd92d8a61"
+      }
+    ],
+    "assistant_final_seq": 388,
+    "readonly": true,
+    "server_file_matches_build": true,
+    "lfx_process_loaded_file_bytes": "not_verified",
+    "extension_loaded_source_consistency": "not_verified",
+    "activation_receipt_id": "a87dfdce-6fa6-4441-a8db-c09f9d410e3c",
+    "activation_status": "applied"
+  },
+  "evaluation": {
+    "experiment_id": "EXP-security-operations-expert-027-f-r3ba4799b0cb7",
+    "run_id": "run-32d64186-73e1-4686-b6a5-4a055faea53f",
+    "cases": 14,
+    "passed": 11,
+    "inconclusive": [
+      "U-INS-001",
+      "U-INS-002",
+      "U-INS-012"
+    ],
+    "decision": "continue"
+  },
+  "limits": [
+    "未验证管理助手独立完成全新工作流登记；该环节仍由平台研发补齐。",
+    "未建立性能对照，不声称耗时、Token或成功率收益。",
+    "周期实例缺少实际装载回执，定期触发仍未验收。",
+    "旧 inspection 连接和专用分组尚未清理；等待使用方完整验收。"
+  ]
+}

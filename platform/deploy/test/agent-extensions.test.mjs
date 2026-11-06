@@ -103,3 +103,20 @@ test('仅SOC查询流程不携带威胁分析固定算法', async t => {
   assert.equal(info.fixedSource, undefined)
   assert.equal(existsSync(join(x.staging, 'runtime/extensions/security-operations-compositions/fixed-source')), false)
 })
+
+test('巡检独立包只带选中代码和公共依赖，不要求威胁算法或模型服务', async t => {
+  const x = fixture(t), business = join(x.assetRoot, 'mcp')
+  write(join(x.assetRoot, 'workspace.json'), JSON.stringify({ extensions: [{ id: 'security-operations-compositions', path: 'mcp' }] }))
+  write(join(business, 'src/inspection/index.ts'), 'export const marker="public";\n')
+  write(join(business, 'src/soc.ts'), 'export const createSoc=()=>async()=>({ok:true});\n')
+  write(join(business, 'compositions/inspection-status/src/index.ts'), "import {marker} from '@mcp/inspection';export const create=soc=>({inputSchema:{type:'object'},marker,execute:()=>soc()});\n")
+  write(join(business, 'compositions/inspection-deep/src/private.ts'), 'throw new Error("不应入包")\n')
+  write(join(business, 'build.mjs'), 'throw new Error("不执行数据构建脚本")\n')
+  const info = await stageSelectedExtensions({ ...x.input, compositions: { compositions: [{ published: { kind: 'workflow', workflow: 'inspection-status' } }] } })
+  assert.equal(info.fixedSource, undefined)
+  assert.ok(info.sources.every(file => !/threat|inspection-deep/.test(file.path)))
+  const {ctx} = context(); delete ctx.llm; delete ctx.settingsController
+  await populateStandaloneExtensions(ctx, info, x.staging)
+  assert.deepEqual(await ctx.standaloneCompositionExtension.workflows['inspection-status'].execute(), {ok:true})
+  assert.match(ctx.standaloneCompositionExtension.workflows['inspection-status'].sourceDigest, /^[a-f0-9]{64}$/)
+})

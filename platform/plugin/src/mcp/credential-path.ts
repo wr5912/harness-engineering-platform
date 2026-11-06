@@ -2,8 +2,8 @@ import { existsSync, lstatSync, readlinkSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import layout from '../../assets/mcp-credential-layout.json' with { type: 'json' }
 
-export function mcpCredentialPaths(root: string) {
-  const directory = join(root, layout.directory)
+export function mcpCredentialPaths(root: string, migrated = existsSync(join(root, 'mcp/manager.json'))) {
+  const directory = join(root, migrated ? 'mcp/.local/credentials' : layout.directory)
   return { directory, file: join(directory, layout.file), lock: join(directory, layout.lock),
     legacyFile: join(root, layout.legacyFile), legacyLock: join(root, layout.legacyLock) }
 }

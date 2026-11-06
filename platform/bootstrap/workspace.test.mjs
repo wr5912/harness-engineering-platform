@@ -36,6 +36,8 @@ test('新工作区预览无写入，初始化保持空业务并可复用账号�
   assert.equal(existsSync(f.root), false)
   await initializeWorkspace(request)
   assert.equal((await inspectWorkspace(f.root)).ready, true)
+  assert.equal(JSON.parse(readFileSync(join(f.root, 'mcp/compositions.json'))).schema_version, '2.0')
+  assert.equal(existsSync(join(f.root, 'config/mcp-compositions.json')), false)
   assert.equal(existsSync(join(f.root, 'agents')), false)
   assert.equal(existsSync(join(f.root, 'evolution')), false)
   assert.equal(statSync(join(f.root, '.local/credentials/admin.json')).mode & 0o777, 0o600)
@@ -43,6 +45,21 @@ test('新工作区预览无写入，初始化保持空业务并可复用账号�
   const original = readFileSync(join(f.root, '.local/credentials/admin.json'), 'utf8')
   await initializeWorkspace({ action: 'existing', root: f.root, account: { username: 'different', password: 'discard' } })
   assert.equal(readFileSync(join(f.root, '.local/credentials/admin.json'), 'utf8'), original)
+})
+
+test('迁移后的 MCP 根扩展可直接启动，旧组合目录仍能读取且不生成第二份', async t => {
+  const f = fixture(t)
+  await initializeWorkspace({ action: 'new', root: f.root })
+  writeFileSync(join(f.root, 'mcp/build.mjs'), 'export {}')
+  const workspace = JSON.parse(readFileSync(join(f.root, 'workspace.json')))
+  workspace.extensions = [{ id: 'security-operations-compositions', path: 'mcp' }]
+  writeFileSync(join(f.root, 'workspace.json'), JSON.stringify(workspace))
+  assert.equal((await inspectWorkspace(f.root)).ready, true)
+  rmSync(join(f.root, 'mcp/compositions.json'))
+  writeFileSync(join(f.root, 'config/mcp-compositions.json'), JSON.stringify({ schema_version: '1.0', compositions: [] }))
+  assert.equal((await inspectWorkspace(f.root)).ready, true)
+  await initializeWorkspace({ action: 'existing', root: f.root })
+  assert.equal(existsSync(join(f.root, 'mcp/compositions.json')), false)
 })
 
 test('已有非Git数据预览git init且保留文件，损坏身份不得静默覆盖', async t => {

@@ -1,9 +1,20 @@
 import type { CompositionConfig } from './compositions.ts'
+import type { CompositionExtension } from './extension.ts'
 
 export const INCIDENT_ID_PATTERN = '^INC-\\d{8}-\\d{6}$'
 export const RUN_ID_PATTERN = '^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+export const compositionQueries = [
+  { toolName: 'get_composition_run', title: '查询组合运行', description: '按原运行 ID 查询进度、已完成检查、明细和报告清单；不会重新执行。', inputSchema: { type: 'object', properties: { run_id: { type: 'string', pattern: RUN_ID_PATTERN } }, required: ['run_id'], additionalProperties: false } },
+  { toolName: 'get_composition_artifact', title: '读取组合报告', description: '读取原运行已生成的 HTML 或 JSON 报告。', inputSchema: { type: 'object', properties: { run_id: { type: 'string', pattern: RUN_ID_PATTERN }, artifactId: { type: 'string', minLength: 1 } }, required: ['run_id', 'artifactId'], additionalProperties: false } },
+  { toolName: 'get_composition_details', title: '分页查询检查明细', description: '按原运行和节点 ID 分页读取已完成的检查事实，不重新执行。节点 ID 从运行查询取得。', inputSchema: { type: 'object', properties: { run_id: { type: 'string', pattern: RUN_ID_PATTERN }, node_id: { type: 'string', minLength: 1 }, offset: { type: 'integer', minimum: 0, default: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200, default: 50 } }, required: ['run_id', 'node_id'], additionalProperties: false } },
+] as const
 
-export function compositionInputSchema(config?: CompositionConfig) {
+export function compositionInputSchema(config?: CompositionConfig, extension?: CompositionExtension): Record<string, any> {
+  if (config?.workflow) {
+    const workflow = extension?.workflows?.[config.workflow]
+    if (!workflow) throw new Error(`工作流尚未装载：${config.workflow}`)
+    return workflow.inputSchema
+  }
   if (config?.kind) {
     const collect = config.kind === 'composite' || config.stage === 'collect'
     const key = collect ? 'incident_id' : 'run_id'
@@ -15,9 +26,10 @@ export function compositionInputSchema(config?: CompositionConfig) {
   } } : schema
 }
 
-export function compositionReadonly(config?: CompositionConfig) { return !config?.kind }
+export function compositionReadonly(config?: CompositionConfig) { return !config?.kind || Boolean(config.workflow) }
 
-export function compositionOutputSchema(config?: CompositionConfig) {
+export function compositionOutputSchema(config?: CompositionConfig, extension?: CompositionExtension): Record<string, any> {
+  if (config?.workflow) return extension?.workflows?.[config.workflow]?.outputSchema ?? { type: 'object' }
   if (!config?.kind) return compositionDefinition.outputSchema
   return { type: 'object', properties: {
     run_id: { type: 'string' }, incident_id: { type: 'string' }, status: { type: 'string' }, phase_status: { type: 'string' },
