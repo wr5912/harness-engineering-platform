@@ -85,9 +85,13 @@ export function lfxCanvas(flow: any): any {
   return { native: flow, nodes: flow.data.nodes.map((node: any) => {
     const template = node.data.node.template
     return { id: node.id, title: node.data.node.display_name, description: node.data.node.description,
-      kind: node.data.node.metadata?.kind, position: node.position,
+      kind: node.data.node.metadata?.kind, role: node.data.type === 'HepInput' ? 'input' : node.data.node.is_output === true ? 'output' : undefined, position: node.position,
       ...(node.data.type === 'HepChild' ? { compositionId: template.composition_id.value, versionId: template.version_id.value } : {}),
       ...(node.data.type === 'HepBatch' ? { subgraph: lfxCanvas(template.body.value) } : {}) }
-  }), edges: flow.data.edges.map((edge: any) => ({ ...edge, conditional: edge.data.sourceHandle.name !== 'result',
-    label: flow.data.nodes.find((node: any) => node.id === edge.source)?.data.node.outputs.find((output: any) => output.name === edge.data.sourceHandle.name)?.display_name })) }
+  }), edges: flow.data.edges.map((edge: any) => {
+    const node = flow.data.nodes.find((node: any) => node.id === edge.source)?.data.node
+    const port = edge.data.sourceHandle.name, label = node?.outputs.find((output: any) => output.name === port)?.display_name
+    const fallback = node?.metadata?.kind === 'condition' && (!label || node.outputs.filter((output: any) => output.display_name === label).length > 1)
+    return { ...edge, conditional: port !== 'result', label: fallback && (port === 'go' || port === 'stop') ? port === 'go' ? '继续' : '返回' : label }
+  }) }
 }

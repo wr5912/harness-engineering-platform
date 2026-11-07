@@ -1,0 +1,193 @@
+{
+  "observedAt": "2026-11-07T02:25:30.532Z",
+  "mode": "真实本地平台页面、导航与只读接口；客户端使用隔离构建，收到的原生图通过本次 lfxCanvas 投影；正式服务尚未装载",
+  "checks": [
+    "15 nodes / 14 edges / 3 diamonds / 4 outputs",
+    "all 14 edges have arrows",
+    "condition labels use continue / return",
+    "input starts at top and main result ends at bottom",
+    "main spine is vertical",
+    "every title fits within its actual flowchart shape",
+    "100 percent uses actual 14px text",
+    "Ctrl wheel zooms in",
+    "Ctrl wheel zooms out",
+    "ordinary wheel preserves zoom",
+    "zoom upper bound 200",
+    "zoom lower bound 40",
+    "browser zoom preserved",
+    "Ctrl wheel prevents browser zoom only",
+    "blank canvas pans",
+    "node drag updates geometry",
+    "reset restores automatic layout",
+    "keyboard moves node",
+    "Enter opens node details",
+    "selection preserves type fill",
+    "test panel preserves layout and zoom",
+    "fullscreen preserves zoom and node positions",
+    "1440 light: four distinct type fills",
+    "1440 light: no page horizontal overflow",
+    "1440 light: usable canvas viewport",
+    "1440 dark: four distinct type fills",
+    "1440 dark: no page horizontal overflow",
+    "1440 dark: usable canvas viewport",
+    "768 light: four distinct type fills",
+    "768 light: no page horizontal overflow",
+    "768 light: usable canvas viewport",
+    "768 dark: four distinct type fills",
+    "768 dark: no page horizontal overflow",
+    "768 dark: usable canvas viewport",
+    "390 light: four distinct type fills",
+    "390 light: no page horizontal overflow",
+    "390 light: usable canvas viewport",
+    "390 dark: four distinct type fills",
+    "390 dark: no page horizontal overflow",
+    "390 dark: usable canvas viewport",
+    "source flow unchanged",
+    "no browser page errors",
+    "no business execution or asset writes requested",
+    "isolated build and actual native graph projection loaded"
+  ],
+  "geometry": [
+    {
+      "id": "input",
+      "kind": "input",
+      "x": 52,
+      "y": 24,
+      "w": 240,
+      "h": 56
+    },
+    {
+      "id": "resolve",
+      "kind": "process",
+      "x": 52,
+      "y": 104,
+      "w": 240,
+      "h": 56
+    },
+    {
+      "id": "preview",
+      "kind": "process",
+      "x": 52,
+      "y": 184,
+      "w": 240,
+      "h": 56
+    },
+    {
+      "id": "preview-stop",
+      "kind": "condition",
+      "x": 52,
+      "y": 264,
+      "w": 240,
+      "h": 96
+    },
+    {
+      "id": "draft",
+      "kind": "process",
+      "x": 52,
+      "y": 392,
+      "w": 240,
+      "h": 56
+    },
+    {
+      "id": "draft-stop",
+      "kind": "condition",
+      "x": 52,
+      "y": 472,
+      "w": 240,
+      "h": 96
+    },
+    {
+      "id": "submit",
+      "kind": "process",
+      "x": 52,
+      "y": 600,
+      "w": 240,
+      "h": 56
+    },
+    {
+      "id": "approval",
+      "kind": "process",
+      "x": 52,
+      "y": 680,
+      "w": 240,
+      "h": 56
+    },
+    {
+      "id": "execute-stop",
+      "kind": "condition",
+      "x": 52,
+      "y": 760,
+      "w": 240,
+      "h": 96
+    },
+    {
+      "id": "execute",
+      "kind": "process",
+      "x": 52,
+      "y": 888,
+      "w": 240,
+      "h": 56
+    },
+    {
+      "id": "observe",
+      "kind": "process",
+      "x": 52,
+      "y": 968,
+      "w": 240,
+      "h": 56
+    },
+    {
+      "id": "result",
+      "kind": "output",
+      "x": 52,
+      "y": 1048,
+      "w": 240,
+      "h": 56
+    },
+    {
+      "id": "preview-result",
+      "kind": "output",
+      "x": 348,
+      "y": 392,
+      "w": 240,
+      "h": 56
+    },
+    {
+      "id": "draft-result",
+      "kind": "output",
+      "x": 348,
+      "y": 600,
+      "w": 240,
+      "h": 56
+    },
+    {
+      "id": "waiting-result",
+      "kind": "output",
+      "x": 348,
+      "y": 888,
+      "w": 240,
+      "h": 56
+    }
+  ],
+  "sourceDigest": "674d7894316c7824f2e69f4305e4bf8d274c962cb1ac77cf8e5ea88ef20308c6",
+  "layout": {
+    "width": 640,
+    "height": 1128,
+    "previousPreviewHeight": 1480,
+    "reductionPercent": 23.8
+  },
+  "screenshots": [
+    "flow-light",
+    "1440-light",
+    "1440-dark",
+    "768-light",
+    "768-dark",
+    "390-light",
+    "390-dark",
+    "flow-dark"
+  ],
+  "clientLoads": 1,
+  "projectedGraphs": 56,
+  "pageErrors": [],
+  "businessWrites": []
+}

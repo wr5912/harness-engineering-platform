@@ -1,0 +1,11 @@
+{
+  "mode": "浏览器响应夹具：只替换三个视图标题，核对长文本在实际 SVG 形状内的排版",
+  "checks": [
+    "long input / condition / output titles stay inside actual shapes",
+    "long condition displays complete title across multiple lines",
+    "source graph remains unchanged",
+    "no page errors or business writes"
+  ],
+  "pageErrors": [],
+  "businessWrites": []
+}

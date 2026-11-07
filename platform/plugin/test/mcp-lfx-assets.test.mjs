@@ -20,11 +20,14 @@ function save(root, id, native) {
 }
 const config = id => compositionConfig({ kind: 'workflow', workflow: id, engine: 'lfx', toolName: id, title: id, description: '', connections: { master: 'master' } })
 
-test('静态读取与画布直接使用原生节点、端口和位置，不执行组件代码', t => {
-  const root = workspace(t), native = flow(); save(root, 'leaf', native)
+test('静态读取保留原生节点、端口和位置，画布仅按连接关系布局，不执行组件代码', t => {
+  const root = workspace(t), native = flow(); native.data.nodes[0].data.type = 'HepInput'; save(root, 'leaf', native)
   const bundle = loadLfxBundle(root, 'leaf', config('leaf')), canvas = lfxCanvas(bundle.flow)
   assert.deepEqual(canvas.native, native)
-  assert.deepEqual(graphLayout(canvas).positions.get('result'), native.data.nodes[1].position)
+  assert.deepEqual(canvas.nodes[1].position, native.data.nodes[1].position)
+  assert.equal(canvas.nodes[0].role, 'input'); assert.equal(canvas.nodes[1].role, 'output')
+  const layout = graphLayout(canvas)
+  assert(layout.positions.get('result').y > layout.positions.get('input').y)
   assert.deepEqual(canvas.edges[0].data, native.data.edges[0].data)
   const bad = structuredClone(native); bad.data.edges[0].data.sourceHandle.name = 'missing'
   assert.throws(() => validateLfxFlow(bad), /端口/)
@@ -32,6 +35,21 @@ test('静态读取与画布直接使用原生节点、端口和位置，不执�
   assert.throws(() => validateLfxFlow(bad), /至少一个结果节点/)
   native.data.nodes.push(node('branch-result', true))
   assert.doesNotThrow(() => validateLfxFlow(native))
+})
+
+test('条件重复或缺失的 go/stop 标签采用继续/返回，保留明确标签与原生端口', () => {
+  const native = flow(), source = native.data.nodes[0].data.node
+  source.metadata = { kind: 'condition' }
+  source.outputs = [{ name: 'go', display_name: '是否继续？' }, { name: 'stop', display_name: '是否继续？' }]
+  native.data.edges = ['go', 'stop'].map(name => ({ ...native.data.edges[0], data: { sourceHandle: { id: 'input', name }, targetHandle: { id: 'result', fieldName: 'value' } } }))
+  const before = structuredClone(native), canvas = lfxCanvas(native)
+  assert.deepEqual(canvas.edges.map(edge => edge.label), ['继续', '返回'])
+  assert.deepEqual(canvas.edges.map(edge => edge.data), native.data.edges.map(edge => edge.data))
+  assert.deepEqual(native, before)
+  source.outputs[0].display_name = '已批准'; source.outputs[1].display_name = '等待审批'
+  assert.deepEqual(lfxCanvas(native).edges.map(edge => edge.label), ['已批准', '等待审批'])
+  source.outputs.forEach(output => { delete output.display_name })
+  assert.deepEqual(lfxCanvas(native).edges.map(edge => edge.label), ['继续', '返回'])
 })
 
 test('发布快照冻结源码；修改草稿不会改变旧版本，重新冻结采用当前草稿', t => {

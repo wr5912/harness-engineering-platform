@@ -111,3 +111,20 @@ test('Ctrl＋滚轮复用缩放范围，普通滚轮放行，切换空图移除�
   assert.equal(ui.wheel(true, -120), true); assert.equal(scale(), 1.1)
   ui.props.identity = 'version-two'; ui.render(); assert.equal(scale(), 1)
 })
+
+test('画布显示分类形状、完整标题、条件标签和每条边的箭头，汇合及回边仍可呈现', () => {
+  const ui = canvas(), title = '核对审批状态后是否继续执行并返回最终结果？'
+  ui.props.graph = { nodes: [{ id: 'a', role: 'input' }, { id: 'choose', title, kind: 'condition' }, { id: 'work' }, { id: 'out', role: 'output' }],
+    edges: [{ source: 'a', target: 'choose' }, { source: 'choose', target: 'work', conditional: true, label: '继续' }, { source: 'choose', target: 'out', conditional: true, label: '返回' }, { source: 'work', target: 'out' }, { source: 'out', target: 'choose' }] }
+  const before = structuredClone(ui.props.graph); ui.render()
+  const nodes = ui.items().filter(item => item.props?.className === 'harness-flow-node')
+  assert.deepEqual(nodes.map(item => item.props['data-kind']), ['input', 'condition', 'process', 'output'])
+  assert.equal(ui.items().filter(item => item.type === 'polygon').length, 3)
+  const lines = nodes[1].props.children[1].props.children.map(item => item.props.children)
+  assert.equal(lines.join(''), title)
+  const edges = ui.items().filter(item => item.props?.className === 'harness-flow-edge')
+  assert.equal(edges.length, 5)
+  for (const edge of edges) assert.equal(edge.props.children.filter(item => item?.type === 'path').length, 2)
+  assert.equal(ui.items().filter(item => item.props?.className === 'harness-flow-edge-label').length, 2)
+  assert.deepEqual(ui.props.graph, before)
+})

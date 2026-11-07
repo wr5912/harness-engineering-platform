@@ -1,0 +1,26 @@
+{
+  "observedAt": "2026-11-07T02:25:16.458060+00:00",
+  "revision": "63ab5063c98d166fcc480a613765424ec8b7f888",
+  "dirty": true,
+  "scope": "当前开发工作树；含其他任务的既有修改，不声称隔离主线全量验证",
+  "typecheck": "passed",
+  "build": "passed; isolated output /tmp/hep-flow-layout-build",
+  "tests": {
+    "passed": 36,
+    "failed": 0,
+    "files": [
+      "mcp-workflow-graph.test.mjs",
+      "mcp-graph-canvas.test.mjs",
+      "mcp-lfx-assets.test.mjs",
+      "mcp-composition-client.test.mjs"
+    ]
+  },
+  "sourceSha256": {
+    "platform/plugin/src/mcp/graph-layout.ts": "39bd360115fd4cbeaf9a844472293bf27df36f938c9b894247802e7a1b6e411e",
+    "platform/plugin/src/mcp/graph-canvas.tsx": "85f3536f2b051e36a4944915106befe7cee3d754f228bd258b42a62f1688992d",
+    "platform/plugin/src/mcp/lfx-assets.ts": "5caaebcc4c22cd31e9433fa000e8535ea99567e39751c7041a1f7650c6356c35",
+    "platform/plugin/src/mcp/style.ts": "fded1d6002fc8725d2932148f3ccec328c3d1f014ed41308cdedb05d4d4bf9a9",
+    "platform/plugin/src/styles/tokens.ts": "f7c600939a79e0830c29320bc6ee8606457140db838a1116fe189d75314b43bd"
+  },
+  "clientSha256": "5e75fcd55e90ab77f9a047f08f2037240b9d75e338214b7d76a7d55d13f7f832"
+}

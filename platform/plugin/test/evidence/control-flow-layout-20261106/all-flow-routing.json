@@ -1,0 +1,62 @@
+{
+  "mode": "现有八项流程的只读静态几何检查，每段连线采样100点；不执行组件",
+  "observedAt": "2026-11-07T02:24:00.966Z",
+  "flows": [
+    {
+      "id": "emergency-action",
+      "nodes": 13,
+      "edges": 12,
+      "sourceSha256": "7adfd9550143ff0fd8f79988b96900889d592182bbbab9d2242e42b46965758b",
+      "crossedNodes": []
+    },
+    {
+      "id": "inspection-baseline",
+      "nodes": 4,
+      "edges": 3,
+      "sourceSha256": "c10cdb8beb343189889ba3611f1282611af8fd71281c7f85ac36604e8448cdea",
+      "crossedNodes": []
+    },
+    {
+      "id": "inspection-deep",
+      "nodes": 4,
+      "edges": 4,
+      "sourceSha256": "dad7f950307ffea3e971359fc2eccf315ff4734916760dbdc7926ccf2723b4d1",
+      "crossedNodes": []
+    },
+    {
+      "id": "inspection-reachability",
+      "nodes": 11,
+      "edges": 13,
+      "sourceSha256": "b0b7e92a4d82d69d1959979f73ce708e9bd3e2bd632e00ae7e6d8987e4dda1cc",
+      "crossedNodes": []
+    },
+    {
+      "id": "inspection-routine",
+      "nodes": 5,
+      "edges": 6,
+      "sourceSha256": "49768f5a78b7182ac12ed99de5cd6d7885b356801bddf871aaa7dfc6c0d2a480",
+      "crossedNodes": []
+    },
+    {
+      "id": "inspection-status",
+      "nodes": 3,
+      "edges": 2,
+      "sourceSha256": "d57de741e9efa73f2890544120c1908c35bfbae2013f1466d5c5d64e6eca0cbc",
+      "crossedNodes": []
+    },
+    {
+      "id": "inspection-vulnerabilities",
+      "nodes": 4,
+      "edges": 3,
+      "sourceSha256": "e3fc0caca5ed7aa7dc946d51253aaddf98bf5422a2f3ec40608f2c79268a96cb",
+      "crossedNodes": []
+    },
+    {
+      "id": "policy-change",
+      "nodes": 15,
+      "edges": 14,
+      "sourceSha256": "674d7894316c7824f2e69f4305e4bf8d274c962cb1ac77cf8e5ea88ef20308c6",
+      "crossedNodes": []
+    }
+  ]
+}

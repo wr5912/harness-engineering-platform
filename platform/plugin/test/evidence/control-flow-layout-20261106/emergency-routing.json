@@ -1,0 +1,220 @@
+{
+  "observedAt": "2026-11-07T02:25:20.464Z",
+  "mode": "真实应急处置页面与只读接口，临时装载隔离客户端及当前视图投影",
+  "checks": [
+    "actual emergency graph has 13 nodes and 12 edges",
+    "native condition labels preserved",
+    "every forward edge descends without upward detours",
+    "no connector crosses unrelated nodes",
+    "blocked condition fan leaves from bottom in row gap",
+    "all arrows end just above their own target",
+    "all connectors keep their own arrows",
+    "emergency 390 light has no horizontal overflow",
+    "emergency 390 dark has no horizontal overflow",
+    "native flow unchanged",
+    "no page errors or business writes",
+    "isolated client and current view projection loaded"
+  ],
+  "routing": [
+    {
+      "source": "input",
+      "target": "discover",
+      "path": "M160 80 L160 101",
+      "end": {
+        "x": 160,
+        "y": 101
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 160,
+      "sourceX": 160,
+      "sourceBottom": 80,
+      "targetY": 104
+    },
+    {
+      "source": "discover",
+      "target": "parameters",
+      "path": "M160 160 L160 181",
+      "end": {
+        "x": 160,
+        "y": 181
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 160,
+      "sourceX": 160,
+      "sourceBottom": 160,
+      "targetY": 184
+    },
+    {
+      "source": "parameters",
+      "target": "prepare-stop",
+      "path": "M160 240 L160 261",
+      "end": {
+        "x": 160,
+        "y": 261
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 160,
+      "sourceX": 160,
+      "sourceBottom": 240,
+      "targetY": 264
+    },
+    {
+      "source": "prepare-stop",
+      "target": "prepared-result",
+      "path": "M280 312 C502 312 724 312 724 389",
+      "end": {
+        "x": 724,
+        "y": 389
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 724,
+      "sourceX": 160,
+      "sourceBottom": 360,
+      "targetY": 392
+    },
+    {
+      "source": "prepare-stop",
+      "target": "createTask",
+      "path": "M280 312 C354 312 428 312 428 389",
+      "end": {
+        "x": 428,
+        "y": 389
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 428,
+      "sourceX": 160,
+      "sourceBottom": 360,
+      "targetY": 392
+    },
+    {
+      "source": "prepare-stop",
+      "target": "preview",
+      "path": "M160 360 L160 389",
+      "end": {
+        "x": 160,
+        "y": 389
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 160,
+      "sourceX": 160,
+      "sourceBottom": 360,
+      "targetY": 392
+    },
+    {
+      "source": "createTask",
+      "target": "creation-result",
+      "path": "M456 448 L456 469",
+      "end": {
+        "x": 456,
+        "y": 469
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 456,
+      "sourceX": 456,
+      "sourceBottom": 448,
+      "targetY": 472
+    },
+    {
+      "source": "preview",
+      "target": "execute-stop",
+      "path": "M160 448 L160 469",
+      "end": {
+        "x": 160,
+        "y": 469
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 160,
+      "sourceX": 160,
+      "sourceBottom": 448,
+      "targetY": 472
+    },
+    {
+      "source": "execute-stop",
+      "target": "execute",
+      "path": "M160 568 L160 597",
+      "end": {
+        "x": 160,
+        "y": 597
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 160,
+      "sourceX": 160,
+      "sourceBottom": 568,
+      "targetY": 600
+    },
+    {
+      "source": "execute-stop",
+      "target": "preview-result",
+      "path": "M160 568 L160 576 C160 586.5 428 586.5 428 597",
+      "end": {
+        "x": 428,
+        "y": 597
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 428,
+      "sourceX": 160,
+      "sourceBottom": 568,
+      "targetY": 600
+    },
+    {
+      "source": "execute",
+      "target": "observe",
+      "path": "M160 656 L160 677",
+      "end": {
+        "x": 160,
+        "y": 677
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 160,
+      "sourceX": 160,
+      "sourceBottom": 656,
+      "targetY": 680
+    },
+    {
+      "source": "observe",
+      "target": "result",
+      "path": "M160 736 L160 757",
+      "end": {
+        "x": 160,
+        "y": 757
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 160,
+      "sourceX": 160,
+      "sourceBottom": 736,
+      "targetY": 760
+    }
+  ],
+  "screenshots": [
+    "emergency-light",
+    "emergency-390-light",
+    "emergency-dark",
+    "emergency-390-dark"
+  ],
+  "pageErrors": [],
+  "businessWrites": []
+}

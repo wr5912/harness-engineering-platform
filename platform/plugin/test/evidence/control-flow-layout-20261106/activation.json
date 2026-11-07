@@ -1,0 +1,14 @@
+{
+  "status": "busy",
+  "activation": "none",
+  "changed": [
+    "platform/plugin/lib/client.js"
+  ],
+  "observedAt": "2026-11-07T02:26:41.218474+00:00",
+  "busyCounts": {
+    "session": 6,
+    "assistant": 5
+  },
+  "receipt": ".local/platform-updates/13bffa80-5742-4d5f-8256-9f23344405fe/receipt.json",
+  "liveVerification": "routing-live.json 直接读取运行页面，前向汇合已可见；服务端节点类型投影及末版条件侧面避让尚未由维护工具完整装载"
+}

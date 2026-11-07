@@ -1,0 +1,290 @@
+{
+  "observedAt": "2026-11-07T02:23:07.387Z",
+  "mode": "真实运行页面，无客户端和接口替换",
+  "loadedClientHashes": [
+    {
+      "sha256": "329ec899fe6c3bcb3495d511da3d8fcfc98d9681e99d189448ae9e8161049a0f",
+      "bytes": 6574880,
+      "routing": true
+    }
+  ],
+  "expectedClientHash": "c021fb7bea87ba935ef205a4453e64633d1085d886fadf7d675436190e18ca61",
+  "nodeCategories": [
+    {
+      "id": "input",
+      "kind": "process"
+    },
+    {
+      "id": "scope",
+      "kind": "process"
+    },
+    {
+      "id": "mode",
+      "kind": "condition"
+    },
+    {
+      "id": "explicit",
+      "kind": "process"
+    },
+    {
+      "id": "pairs-explicit",
+      "kind": "process"
+    },
+    {
+      "id": "rules",
+      "kind": "process"
+    },
+    {
+      "id": "pairs-rules",
+      "kind": "process"
+    },
+    {
+      "id": "rulesError",
+      "kind": "process"
+    },
+    {
+      "id": "noRules",
+      "kind": "process"
+    },
+    {
+      "id": "selected-result",
+      "kind": "process"
+    },
+    {
+      "id": "summary",
+      "kind": "process"
+    }
+  ],
+  "checks": [
+    "actual reachability graph has 11 nodes and 13 edges",
+    "four branch labels preserved",
+    "every forward edge descends without upward detours",
+    "no connector crosses unrelated nodes",
+    "short branches stay inside their source columns before merging",
+    "four incoming edges use separate ordered target ports",
+    "all connectors keep their own arrows",
+    "reachability 390 light has no horizontal overflow",
+    "reachability 390 dark has no horizontal overflow",
+    "native flow unchanged",
+    "no page errors or business writes",
+    "actual served client contains shared routing implementation"
+  ],
+  "routing": [
+    {
+      "source": "input",
+      "target": "scope",
+      "path": "M160 80 L160 101",
+      "end": {
+        "x": 160,
+        "y": 101
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 160,
+      "sourceX": 160,
+      "sourceBottom": 80,
+      "targetY": 104
+    },
+    {
+      "source": "scope",
+      "target": "mode",
+      "path": "M160 160 L160 181",
+      "end": {
+        "x": 160,
+        "y": 181
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 160,
+      "sourceX": 160,
+      "sourceBottom": 160,
+      "targetY": 184
+    },
+    {
+      "source": "mode",
+      "target": "explicit",
+      "path": "M160 280 L160 309",
+      "end": {
+        "x": 160,
+        "y": 309
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 160,
+      "sourceX": 160,
+      "sourceBottom": 280,
+      "targetY": 312
+    },
+    {
+      "source": "explicit",
+      "target": "pairs-explicit",
+      "path": "M160 368 L160 389",
+      "end": {
+        "x": 160,
+        "y": 389
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 160,
+      "sourceX": 160,
+      "sourceBottom": 368,
+      "targetY": 392
+    },
+    {
+      "source": "pairs-explicit",
+      "target": "selected-result",
+      "path": "M160 448 L160 469",
+      "end": {
+        "x": 160,
+        "y": 469
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 160,
+      "sourceX": 160,
+      "sourceBottom": 448,
+      "targetY": 472
+    },
+    {
+      "source": "mode",
+      "target": "rules",
+      "path": "M280 232 C354 232 428 232 428 309",
+      "end": {
+        "x": 428,
+        "y": 309
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 428,
+      "sourceX": 160,
+      "sourceBottom": 280,
+      "targetY": 312
+    },
+    {
+      "source": "rules",
+      "target": "pairs-rules",
+      "path": "M456 368 L456 389",
+      "end": {
+        "x": 456,
+        "y": 389
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 456,
+      "sourceX": 456,
+      "sourceBottom": 368,
+      "targetY": 392
+    },
+    {
+      "source": "pairs-rules",
+      "target": "selected-result",
+      "path": "M456 448 L456 448 C456 458.5 188 458.5 188 469",
+      "end": {
+        "x": 188,
+        "y": 469
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 456,
+      "sourceX": 456,
+      "sourceBottom": 448,
+      "targetY": 472
+    },
+    {
+      "source": "mode",
+      "target": "rulesError",
+      "path": "M280 232 C502 232 724 232 724 309",
+      "end": {
+        "x": 724,
+        "y": 309
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 724,
+      "sourceX": 160,
+      "sourceBottom": 280,
+      "targetY": 312
+    },
+    {
+      "source": "rulesError",
+      "target": "selected-result",
+      "path": "M752 368 L752 448 C752 458.5 216 458.5 216 469",
+      "end": {
+        "x": 216,
+        "y": 469
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 752,
+      "sourceX": 752,
+      "sourceBottom": 368,
+      "targetY": 472
+    },
+    {
+      "source": "mode",
+      "target": "noRules",
+      "path": "M280 232 C650 232 1020 232 1020 309",
+      "end": {
+        "x": 1020,
+        "y": 309
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 1020,
+      "sourceX": 160,
+      "sourceBottom": 280,
+      "targetY": 312
+    },
+    {
+      "source": "noRules",
+      "target": "selected-result",
+      "path": "M1048 368 L1048 448 C1048 458.5 244 458.5 244 469",
+      "end": {
+        "x": 244,
+        "y": 469
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 1048,
+      "sourceX": 1048,
+      "sourceBottom": 368,
+      "targetY": 472
+    },
+    {
+      "source": "selected-result",
+      "target": "summary",
+      "path": "M160 528 L160 549",
+      "end": {
+        "x": 160,
+        "y": 549
+      },
+      "forward": true,
+      "monotonic": true,
+      "hits": [],
+      "maxX": 160,
+      "sourceX": 160,
+      "sourceBottom": 528,
+      "targetY": 552
+    }
+  ],
+  "screenshots": [
+    "live-reachability-light",
+    "live-reachability-390-light",
+    "live-reachability-dark",
+    "live-reachability-390-dark"
+  ],
+  "pageErrors": [],
+  "businessWrites": []
+}
