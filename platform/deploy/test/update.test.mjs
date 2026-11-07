@@ -114,6 +114,41 @@ test('仅客户端变化原子应用并核验，保持原PID且不启停', async
   assert.equal(readFileSync(join(report.stage, 'backup/0'), 'utf8'), 'old-code')
 })
 
+test('显式客户端更新保留并行数据扩展与服务端制品，不激活待重载服务端', async t => {
+  const busy = [{ kind: 'session', id: 'active', state: 'running' }]
+  const f = fixture(t, { target: 'client.js', initialBusy: busy, afterBuildBusy: busy }), build = f.services.build, inspect = f.services.inspect
+  const preview = await updatePlatform({ ...f.options, clientOnly: true, dryRun: true }, f.services)
+  assert.equal(preview.status, 'planned'); assert.deepEqual(preview.busy, busy); assert.deepEqual(f.events, [])
+  const source = join(f.options.dataRoot, 'mcp/src/index.ts'), server = join(f.programRoot, 'platform/plugin/lib/index.js')
+  mkdirSync(join(source, '..'), { recursive: true }); writeFileSync(source, 'old-extension'); writeFileSync(server, 'old-server')
+  writeFileSync(join(f.options.dataRoot, 'workspace.json'), JSON.stringify({ extensions: [{ path: 'mcp' }] }))
+  f.services.inspect = async (...args) => ({ ...await inspect(...args), pendingActivation: true })
+  f.services.build = async (...args) => {
+    const entries = await build(...args)
+    writeFileSync(source, 'parallel-extension'); writeFileSync(server, 'parallel-server')
+    return entries
+  }
+  const report = await updatePlatform({ ...f.options, clientOnly: true }, f.services)
+  assert.equal(report.activation, 'native-hmr'); assert.equal(report.pid, 123)
+  assert.deepEqual(report.changed, ['platform/plugin/lib/client.js']); assert.deepEqual(f.events, ['build', 'verify'])
+  assert.equal(readFileSync(source, 'utf8'), 'parallel-extension'); assert.equal(readFileSync(server, 'utf8'), 'parallel-server')
+})
+
+test('显式客户端更新拒绝其他目标，客户端并行冲突仍拒绝应用', async t => {
+  const server = fixture(t)
+  await assert.rejects(updatePlatform({ ...server.options, clientOnly: true }, server.services), /仅客户端更新包含其他目标/)
+  assert.equal(readFileSync(server.live, 'utf8'), 'old-code'); assert.deepEqual(server.events, ['build'])
+  const client = fixture(t, { target: 'client.js', conflict: true })
+  await assert.rejects(updatePlatform({ ...client.options, clientOnly: true }, client.services), /构建期间变化/)
+  assert.equal(readFileSync(client.live, 'utf8'), 'parallel-code'); assert.deepEqual(client.events, ['build'])
+})
+
+test('显式客户端更新验证失败时原子回滚，不启停平台', async t => {
+  const f = fixture(t, { target: 'client.js', failVerify: true })
+  await assert.rejects(updatePlatform({ ...f.options, clientOnly: true }, f.services), /旧制品已恢复并核验/)
+  assert.equal(readFileSync(f.live, 'utf8'), 'old-code'); assert.deepEqual(f.events, ['build', 'verify', 'verify'])
+})
+
 test('在途会话和任务不阻止无需启停的客户端与SDK worker更新', async t => {
   const busy = [{ kind: 'session', id: 'session-running', state: 'running' }, { kind: 'sdk', id: 'sdk-running', state: 'running' }]
   for (const target of ['client.js', 'sdk-worker.js']) {

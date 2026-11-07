@@ -1,0 +1,128 @@
+{
+  "url": "http://172.16.138.228:18120/hep/#/conversations",
+  "time": "2026-11-07T04:38:40.594Z",
+  "checks": [
+    "欢迎区标题组隐藏，原生输入可用",
+    "递归命中未展开目录并进入该目录",
+    "检索结果打开原生 Markdown 文件预览，原生草稿保留",
+    "1440/900/390px 深浅主题：面板在视口内、无横向溢出",
+    "末版热更新后，键盘打开自动聚焦，大小写不敏感检索",
+    "Escape 关闭并恢复触发按钮焦点",
+    "真实空结果提示与清空恢复入口",
+    "真实检索数量为 20；点外部关闭，原生输入保留",
+    "刷新后重新打开：标题隐藏、键盘聚焦、目录逐级浏览及真实原生预览通过",
+    "末版客户端三种屏宽及深浅主题复验：自动聚焦、面板边界和无横向溢出通过"
+  ],
+  "visuals": [
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "light",
+      "left": 1008,
+      "top": 191.6875,
+      "right": 1428,
+      "bottom": 751.6875,
+      "width": 420,
+      "height": 560,
+      "scrollWidth": 420,
+      "clientWidth": 420,
+      "color": "rgb(15, 17, 21)",
+      "autofocus": true,
+      "overflow": false
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "dark",
+      "left": 1008,
+      "top": 191.6875,
+      "right": 1428,
+      "bottom": 751.6875,
+      "width": 420,
+      "height": 560,
+      "scrollWidth": 420,
+      "clientWidth": 420,
+      "color": "rgb(215, 229, 250)",
+      "autofocus": true,
+      "overflow": false
+    },
+    {
+      "viewport": {
+        "width": 900,
+        "height": 900
+      },
+      "theme": "light",
+      "left": 468,
+      "top": 181.6875,
+      "right": 888,
+      "bottom": 741.6875,
+      "width": 420,
+      "height": 560,
+      "scrollWidth": 420,
+      "clientWidth": 420,
+      "color": "rgb(15, 17, 21)",
+      "autofocus": true,
+      "overflow": false
+    },
+    {
+      "viewport": {
+        "width": 900,
+        "height": 900
+      },
+      "theme": "dark",
+      "left": 468,
+      "top": 181.6875,
+      "right": 888,
+      "bottom": 741.6875,
+      "width": 420,
+      "height": 560,
+      "scrollWidth": 420,
+      "clientWidth": 420,
+      "color": "rgb(215, 229, 250)",
+      "autofocus": true,
+      "overflow": false
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "left": 12,
+      "top": 140.5,
+      "right": 378,
+      "bottom": 700.5,
+      "width": 366,
+      "height": 560,
+      "scrollWidth": 366,
+      "clientWidth": 366,
+      "color": "rgb(15, 17, 21)",
+      "autofocus": true,
+      "overflow": false
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "left": 12,
+      "top": 140.5,
+      "right": 378,
+      "bottom": 700.5,
+      "width": 366,
+      "height": 560,
+      "scrollWidth": 366,
+      "clientWidth": 366,
+      "color": "rgb(215, 229, 250)",
+      "autofocus": true,
+      "overflow": false
+    }
+  ],
+  "pageErrors": [],
+  "draftCleared": true
+}

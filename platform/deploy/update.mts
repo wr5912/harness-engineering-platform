@@ -6,7 +6,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { managedState, ownsPort, processBirth, restoreManagedProcess } from '../lifecycle.mts'
 import { workspaceIdentity, instanceStateRoot, workspaceLocalPath, workspaceOwnsCwd, mcpLocalPath } from '../plugin/src/workspace.ts'
 
-export type UpdateOptions = { programRoot: string; dataRoot: string; dryRun?: boolean; interruptSessions?: boolean }
+export type UpdateOptions = { programRoot: string; dataRoot: string; dryRun?: boolean; interruptSessions?: boolean; clientOnly?: boolean }
 type ServiceState = NonNullable<ReturnType<typeof managedState>>
 export type BusyItem = { kind: string; id: string; state: string }
 export type UpdateInspection = {
@@ -48,7 +48,7 @@ function sourceSnapshot(options: UpdateOptions) {
   for (const folder of ['platform/plugin', 'runtime/adapters/dsh-web']) for (const name of ['package.json', 'pnpm-lock.yaml', 'build.mjs']) selected.push(join(options.programRoot, folder, name))
   for (const name of ['platform/dsh-platform-internal.py', 'platform/dsh-platform', 'platform/lifecycle.mts', 'platform/deploy/update.mts']) selected.push(join(options.programRoot, name))
   for (const name of ['workspace.json', 'AGENTS.md']) if (existsSync(join(options.dataRoot, name))) selected.push(join(options.dataRoot, name))
-  for (const extension of json(join(options.dataRoot, 'workspace.json')).extensions ?? []) {
+  for (const extension of options.clientOnly ? [] : json(join(options.dataRoot, 'workspace.json')).extensions ?? []) {
     const directory = resolve(options.dataRoot, extension.path)
     if (!directory.startsWith(options.dataRoot + '/') || !(extension.path === 'mcp' || extension.path.startsWith('extensions/'))) throw new Error('扩展路径不属于当前数据根')
     selected.push(...files(join(directory, 'src')), join(directory, 'build.mjs'), join(directory, 'package.json'))
@@ -60,6 +60,10 @@ function sourceSnapshot(options: UpdateOptions) {
   return hash([...new Set(selected)].sort().map(path => `${path}\0${sha(path)}`).join('\n'))
 }
 function liveSnapshot(options: UpdateOptions) {
+  if (options.clientOnly) {
+    const path = join(options.programRoot, 'platform/plugin/lib/client.js')
+    return Object.fromEntries(files(path).map(file => [file, sha(file)]))
+  }
   const overlay = join(options.dataRoot, '.local/platform-home/profiles/harness-platform/harness-platform.patch.yml')
   const activeExtensions = existsSync(overlay) ? readFileSync(overlay, 'utf8').split('\n').flatMap(line => {
     const value = line.match(/^\s+name: (.+)$/)?.[1]
@@ -94,6 +98,7 @@ function preparedProfile(options: UpdateOptions, environment: NodeJS.ProcessEnv)
     const root = join(options.programRoot, directory)
     if (sha(join(root, 'pnpm-lock.yaml')) !== sha(join(root, 'node_modules/.pnpm/lock.yaml')) || !sha(join(root, 'pnpm-lock.yaml'))) throw new Error('已装依赖与锁文件不符；请先完成平台 prepare，当前更新未应用')
   }
+  if (options.clientOnly) return {}
   // 只调用现有渲染与兼容检查，不调用会修改运行目录的 prepare。
   const script = `import importlib.util,json,sys\nfrom pathlib import Path\nspec=importlib.util.spec_from_file_location('platform_update_source',sys.argv[1])\nm=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)\nhome=m.platform_home();m.global_dsh(home);r=m.rendered_profile();p=home/'profiles'/m.PROFILE_NAME\na=(p/'package.json').read_text();r['package.json']=m.merged_profile_manifest(a,r['package.json'])\nassert json.loads(a)==json.loads(r['package.json']), 'Profile依赖合同变化，需要prepare'\nassert (p/'pnpm-workspace.yaml').read_text()==r['pnpm-workspace.yaml'], 'Profile模板变化，需要prepare'\nassert (p/'node_modules/@ai-agent-harness/harness-platform').resolve()==m.PLUGIN, 'Profile程序链接不符'\nassert m.normalized_mcp_patch(p)==(p/'cordis.patch.yml').read_text(), '用户Patch需要prepare'\nprint(json.dumps({'overlay':r[m.PLATFORM_PATCH],'extensions':[{'entry':str(m.asset_root()/e['path']/'build.mjs'),'output':str(m.extension_output(e,path_only=True))} for e in m.workspace_extensions()]}))\n`
   const value = JSON.parse(command(environment.HARNESS_PYTHON || '/usr/bin/python3.10', ['-c', script, join(options.programRoot, 'platform/dsh-platform-internal.py')], { cwd: options.programRoot, env: environment }))
@@ -221,14 +226,14 @@ async function inspect(options: UpdateOptions): Promise<UpdateInspection> {
   const command = [readlinkSync(`/proc/${state.pid}/exe`), ...readFileSync(`/proc/${state.pid}/cmdline`, 'utf8').split('\0').filter(Boolean).slice(1)]
   // 原地构建可能先于 update；启动记录之后写入的服务端制品不能视为已装载。
   const started = statSync(join(options.dataRoot, '.local/platform-service/state.json')).mtimeMs
-  const pendingActivation = Object.keys(liveSnapshot(options)).some(path => path.endsWith('.js')
+  const pendingActivation = !options.clientOnly && Object.keys(liveSnapshot(options)).some(path => path.endsWith('.js')
     && !['client.js', 'sdk-worker.js'].includes(path.split('/').at(-1)!) && statSync(path).mtimeMs > started)
   return { state, workspaceId, environment, command, pendingActivation, ...prepared, busy: await readUpdateActivity(options, state, workspaceId) }
 }
 async function build(options: UpdateOptions, stage: string, inspection: UpdateInspection): Promise<UpdateEntry[]> {
   const output = join(stage, 'artifacts'), environment = { ...inspection.environment, HEP_OFFLINE: '1' }
   const requirements = join(options.programRoot, 'platform/mcp/lfx/requirements.txt')
-  if (existsSync(requirements)) {
+  if (!options.clientOnly && existsSync(requirements)) {
     const directory = join(options.programRoot, '.local/lfx', sha(requirements)!)
     const python = join(directory, 'bin/python'), ready = join(directory, '.ready')
     if (!existsSync(ready)) {
@@ -245,6 +250,7 @@ async function build(options: UpdateOptions, stage: string, inspection: UpdateIn
     const path = relative(output, file)
     const target = path.startsWith('dsh-web/') ? join(options.programRoot, 'runtime/adapters/dsh-web/lib', path.slice(8))
       : path.startsWith('business/') ? join(options.programRoot, 'platform/plugin/business', path.slice(9)) : join(options.programRoot, 'platform/plugin/lib', path)
+    if (options.clientOnly && target !== join(options.programRoot, 'platform/plugin/lib/client.js')) continue
     if (path.startsWith('business/')) writeFileSync(file, readFileSync(file, 'utf8').replaceAll("'../", "'../lib/").replaceAll('"../', '"../lib/'))
     if (path === 'composition-source-index.json') {
       const value = json(file)
@@ -268,7 +274,7 @@ export async function updatePlatform(input: UpdateOptions, services: UpdateServi
   const options = { ...input, programRoot: realpathSync(input.programRoot), dataRoot: realpathSync(input.dataRoot) }
   const observed = await services.inspect(options)
   const report: UpdateReport = { status: options.dryRun ? 'planned' : 'unchanged', programRoot: options.programRoot, dataRoot: options.dataRoot, workspaceId: observed.workspaceId, pid: observed.state.pid, activation: 'none', busy: observed.busy, changed: [] }
-  if (options.dryRun) { if (observed.busy.length) report.status = 'busy'; return report }
+  if (options.dryRun) { if (observed.busy.length && !options.clientOnly) report.status = 'busy'; return report }
   const base = join(options.programRoot, '.local/platform-updates'), lock = join(base, 'update.lock')
   mkdirSync(base, { recursive: true, mode: 0o700 })
   try { mkdirSync(lock); writeFileSync(join(lock, 'owner.json'), JSON.stringify({ pid: process.pid, birth: processBirth(process.pid) })) }
@@ -285,6 +291,7 @@ export async function updatePlatform(input: UpdateOptions, services: UpdateServi
   try {
     const source = sourceSnapshot(options), live = liveSnapshot(options)
     const entries = await services.build(options, stage, observed)
+    if (options.clientOnly && entries.some(entry => entry.target !== join(options.programRoot, 'platform/plugin/lib/client.js'))) throw new Error('仅客户端更新包含其他目标，未应用')
     const staged = entries.map(entry => sha(entry.source)), extensions = extensionSnapshot(observed)
     if (sourceSnapshot(options) !== source || !sameSnapshot(liveSnapshot(options), live)) throw new Error('源码、Profile或运行制品在构建期间变化；保留构建结果，未应用')
     const current = await services.inspect(options)
@@ -294,9 +301,10 @@ export async function updatePlatform(input: UpdateOptions, services: UpdateServi
     if (sourceSnapshot(options) !== source || !sameSnapshot(liveSnapshot(options), live) || !sameSnapshot(extensionSnapshot(observed), extensions) || entries.some((entry, index) => sha(entry.source) !== staged[index])) throw new Error('应用前来源或制品摘要变化；保留构建结果，未应用')
     const changed = entries.filter(entry => sha(entry.source) !== sha(entry.target))
     report.changed = changed.map(entry => relative(options.programRoot, entry.target))
-    if (!changed.length && !current.pendingActivation) return report
-    const clientOnly = !current.pendingActivation && changed.every(entry => entry.target === join(options.programRoot, 'platform/plugin/lib/client.js'))
-    const workerOnly = !current.pendingActivation && changed.every(entry => entry.target === join(options.programRoot, 'platform/plugin/lib/sdk-worker.js'))
+    const pendingActivation = !options.clientOnly && current.pendingActivation
+    if (!changed.length && !pendingActivation) return report
+    const clientOnly = !pendingActivation && changed.every(entry => entry.target === join(options.programRoot, 'platform/plugin/lib/client.js'))
+    const workerOnly = !pendingActivation && changed.every(entry => entry.target === join(options.programRoot, 'platform/plugin/lib/sdk-worker.js'))
     const blocking = current.busy.filter(item => !options.interruptSessions || !['session', 'assistant'].includes(item.kind))
     if (!clientOnly && !workerOnly && blocking.length) { report.status = 'busy'; return report }
     report.activation = clientOnly ? 'native-hmr' : workerOnly ? 'next-sdk-operation' : 'managed-restart'

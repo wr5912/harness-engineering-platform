@@ -28,9 +28,10 @@ import { ModelsSettingsFooter } from './models/client.tsx'
 import { LOGIN_THEME_DRAFT, ThemeIcon } from './theme-toggle.tsx'
 import { BrandingSettingsRow, useBranding, type BrandingForm } from './branding.tsx'
 import { BRANDING_NAMESPACE, DEFAULT_BRANDING, type BrandingSettings } from './branding-defaults.ts'
+import { WorkspaceFileSearch } from './assistant/workspace-file-search.tsx'
 
 export const name = 'harness-platform-client'
-export const inject = ['connection', 'remote', 'slots', 'layout', 'workspaces', 'uiWorkspace', 'uiSession', 'sessions', 'conversation', 'theme', 'configForms']
+export const inject = ['connection', 'remote', 'remote.fileReferences', 'slots', 'layout', 'workspaces', 'uiWorkspace', 'uiSession', 'sessions', 'conversation', 'sidebarRight', 'theme', 'configForms']
 type ThemeScheme = 'light' | 'dark'
 type ThemeControls = { getScheme: () => ThemeScheme; setScheme: (scheme: ThemeScheme) => void; subscribe: (listener: () => void) => () => void }
 type ThemeChangeSource = { on(event: 'theme/change', listener: () => void): void }
@@ -489,4 +490,8 @@ export function apply(ctx: ClientContext) {
   ctx.slots.inject('sidebar.brand.mark', () => ctx.slots.register({ name: 'sidebar.brand.mark', priority: -1 }, ({ size }: SidebarBrandMarkOwnerProps) => <PlatformLogo size={size}/>))
   ctx.slots.inject('sidebar.brand.name', () => ctx.slots.register({ name: 'sidebar.brand.name', priority: -1 }, () => <span>管理对话</span>))
   ctx.slots.inject('conversation.hero.brand.mark', () => ctx.slots.register({ name: 'conversation.hero.brand.mark', priority: -1 }, ConversationWelcome))
+  const listFiles: Context['remote']['fileReferences']['list'] = (sessionId, query, signal) => ctx.remote.fileReferences.list(sessionId, query, signal)
+  ctx.slots.inject('sidebar.right.tab.files.actions', () => ctx.slots.register({ name: 'sidebar.right.tab.files.actions', id: 'harness-file-search',
+    inject: () => ({ listFiles, sidebar: ctx.sidebarRight }),
+  }, props => <WorkspaceFileSearch key={`${props.sessionId}:${props.absolutePath}`} {...props}/>))
 }

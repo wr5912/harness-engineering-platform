@@ -66,4 +66,6 @@ body[data-ds-dark-theme] .harness-conversation-welcome{color:var(--hep-text)}
 @media(max-width:1100px){.harness-assistant-floating{inset:0;right:0;bottom:0;max-width:none;width:100vw;height:100dvh;border:0;border-radius:0}.harness-platform button.harness-assistant-launch{display:none}.harness-platform button.harness-assistant-toggle{grid-column:3;grid-row:1;width:44px;height:44px;min-height:44px}.harness-assistant-toggle .harness-assistant-icon{width:34px;height:34px}.harness-platform button.harness-assistant-toggle[aria-expanded=true]{display:none}}
 @media(max-width:580px){.harness-assistant-heading{padding:10px}.harness-assistant-heading strong{font-size:13px}.harness-assistant-context{padding:6px 10px}}
 .harness-conversation-welcome{display:inline-flex;align-items:center;gap:12px;color:#223550;font-size:24px}
+/* 仅移除平台欢迎区装饰标题，保留原生输入区及全部对话控件。 */
+[class$="_headline"]:has(.harness-conversation-welcome)>[class$="_titleGroup"]{display:none}
 `

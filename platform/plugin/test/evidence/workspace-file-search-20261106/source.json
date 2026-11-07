@@ -1,0 +1,14 @@
+{
+  "commit": "76342d7478508ae8fcf26edfe41fdaa5439bb10c",
+  "dirty": true,
+  "files": {
+    "platform/plugin/src/assistant/workspace-file-search.tsx": "0fdff8620b114af87c8884c175952d72fdf00fc6fd30ff9834961cc0f947ce2e",
+    "platform/plugin/src/assistant/style.ts": "715dacd72865fd5d8bdf250b36f3b41db3baef85ccf49443bddae2b5271d6b91",
+    "platform/plugin/src/client.tsx": "692a9995f33a1ec2aa77c024f67386bf2b816c3db38c298b1dfa7037d1c3842a",
+    "platform/plugin/package.json": "838c3539deb7c6deab9c40c9ce5f56fd4e4b39b4517cc2e5586375ceecb33b21",
+    "platform/plugin/pnpm-lock.yaml": "bc5f36eb3e9ab14dd711dec75e1d5a4a92d6dd278ad4652baaaaaff090b9183b",
+    "platform/deploy/update.mts": "5040e61c8107f3b65cc26ca35efc0874cf43a34962d6498ad429f5e742243626",
+    "platform/deploy/cli.mts": "458cd885d1cc22bae230b8877afc9e5cf22648f23f6fbf14e0f17bda2489c00e",
+    "platform/plugin/lib/client.js": "403019e1c4cbb0a11fe21b7881dce9f40231e0c0f394d80290e6143a8e926a7c"
+  }
+}

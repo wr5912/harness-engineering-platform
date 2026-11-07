@@ -1,0 +1,55 @@
+{
+  "status": "applied",
+  "programRoot": "/home/cmp/work/harness-engineering-platform",
+  "dataRoot": "/home/cmp/harness-engineering-platform-data",
+  "workspaceId": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+  "pid": 2764397,
+  "activation": "native-hmr",
+  "busy": [
+    {
+      "kind": "session",
+      "id": "session-e1fb0e7a-eb30-4e3b-8eed-fd5af035077e",
+      "state": "running"
+    },
+    {
+      "kind": "assistant",
+      "id": "session-e1fb0e7a-eb30-4e3b-8eed-fd5af035077e",
+      "state": "pending"
+    },
+    {
+      "kind": "session",
+      "id": "25ef7822-a18b-46bf-adfa-67cf056b0071",
+      "state": "running"
+    },
+    {
+      "kind": "session",
+      "id": "25f30438-5f04-4d6d-9770-34d9a98ddc18",
+      "state": "running"
+    },
+    {
+      "kind": "session",
+      "id": "session-917d55d5-4f2c-4fbd-8442-7d88549ab2f3",
+      "state": "running"
+    },
+    {
+      "kind": "assistant",
+      "id": "session-917d55d5-4f2c-4fbd-8442-7d88549ab2f3",
+      "state": "pending"
+    },
+    {
+      "kind": "session",
+      "id": "session-cba7af08-2562-4c31-87cf-3970310b625e",
+      "state": "running"
+    },
+    {
+      "kind": "assistant",
+      "id": "session-cba7af08-2562-4c31-87cf-3970310b625e",
+      "state": "pending"
+    }
+  ],
+  "changed": [
+    "platform/plugin/lib/client.js"
+  ],
+  "stage": "/home/cmp/work/harness-engineering-platform/.local/platform-updates/488889c6-f7f2-4e83-a59c-9317a296b90f",
+  "receipt": "/home/cmp/work/harness-engineering-platform/.local/platform-updates/488889c6-f7f2-4e83-a59c-9317a296b90f/receipt.json"
+}

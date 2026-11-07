@@ -1,0 +1,26 @@
+[
+  {
+    "status": "failed",
+    "pid": 2764397,
+    "activation": "none",
+    "changed": [],
+    "error": "生成Profile来源在更新准备期间变化；保留构建结果，未应用",
+    "stage": "/home/cmp/work/harness-engineering-platform/.local/platform-updates/652d6e79-90ef-4f8f-a8b2-ed2b68d615fd"
+  },
+  {
+    "status": "failed",
+    "pid": 2764397,
+    "activation": "none",
+    "changed": [],
+    "error": "生成Profile来源在更新准备期间变化；保留构建结果，未应用",
+    "stage": "/home/cmp/work/harness-engineering-platform/.local/platform-updates/4d1a126f-239e-448c-9cf2-15bd710208c8"
+  },
+  {
+    "status": "failed",
+    "pid": 2764397,
+    "activation": "none",
+    "changed": [],
+    "error": "源码、Profile或运行制品在构建期间变化；保留构建结果，未应用",
+    "stage": "/home/cmp/work/harness-engineering-platform/.local/platform-updates/94b16e18-91dc-449c-a022-86fe377dc5fc"
+  }
+]
