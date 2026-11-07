@@ -1,0 +1,20 @@
+✓ Lockfile passes supply-chain policies (verified 16d ago)
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +5
++++++
+Packages are hard linked from the content-addressable store to the virtual store.
+  Content-addressable store is at: /home/cmp/.local/share/pnpm/store/v11
+  Virtual store is at:             node_modules/.pnpm
+Progress: resolved 5, reused 5, downloaded 0, added 1
+Progress: resolved 5, reused 5, downloaded 0, added 3
+Progress: resolved 5, reused 5, downloaded 0, added 4
+Progress: resolved 5, reused 5, downloaded 0, added 5
+Progress: resolved 5, reused 5, downloaded 0, added 5, done
+
+devDependencies:
++ @types/node 24.19.2
++ esbuild 0.25.12
++ typescript 5.9.3
+
+Done in 8.8s using pnpm v11.28.5

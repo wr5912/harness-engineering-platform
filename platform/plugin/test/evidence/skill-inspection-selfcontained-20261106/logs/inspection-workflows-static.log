@@ -1,0 +1,29 @@
+Skill: /home/cmp/harness-engineering-platform-data/evolution/experiments/EXP-security-operations-expert-027-f-r3ba4799b0cb7/candidate/dsh/workspace/.agents/skills/security-inspection
+Files read: 2
+No static findings. This does NOT prove execution quality.
+Note: 只读、无外部依赖；不是完整 YAML 解析器、恶意代码扫描器或真实运行评估。REVIEW 不代表确认缺陷。
+
+Skill: /home/cmp/harness-engineering-platform-data/.agents/skills/mcp-composition
+Files read: 2
+No static findings. This does NOT prove execution quality.
+Note: 只读、无外部依赖；不是完整 YAML 解析器、恶意代码扫描器或真实运行评估。REVIEW 不代表确认缺陷。
+
+Skill: /home/cmp/work/harness-engineering-platform/.agents/skills/reviewing-agent-skills
+Files read: 7
+[REVIEW] MCP-001 references/mcp-boundaries.md:22 - 出现具体 MCP 工具标识：mcp__old_server__get_agent
+  -> 确认它是稳定契约/说明示例还是易变实现名；仅凭出现名称不能判错。
+[REVIEW] MCP-001 references/mcp-boundaries.md:23 - 出现具体 MCP 工具标识：mcp__old_server__get_config
+  -> 确认它是稳定契约/说明示例还是易变实现名；仅凭出现名称不能判错。
+[REVIEW] MCP-001 references/mcp-boundaries.md:24 - 出现具体 MCP 工具标识：mcp__old_server__do_test
+  -> 确认它是稳定契约/说明示例还是易变实现名；仅凭出现名称不能判错。
+Note: 只读、无外部依赖；不是完整 YAML 解析器、恶意代码扫描器或真实运行评估。REVIEW 不代表确认缺陷。
+
+Skill: /home/cmp/harness-engineering-platform-data/.agents/skills/reviewing-agent-skills
+Files read: 10
+[REVIEW] MCP-001 references/mcp-boundaries.md:28 - 出现具体 MCP 工具标识：mcp__old_group_id__get_agent
+  -> 确认它是稳定契约/说明示例还是易变实现名；仅凭出现名称不能判错。
+[REVIEW] MCP-001 references/mcp-boundaries.md:29 - 出现具体 MCP 工具标识：mcp__old_group_id__get_config
+  -> 确认它是稳定契约/说明示例还是易变实现名；仅凭出现名称不能判错。
+[REVIEW] MCP-001 references/mcp-boundaries.md:30 - 出现具体 MCP 工具标识：mcp__old_group_id__do_test
+  -> 确认它是稳定契约/说明示例还是易变实现名；仅凭出现名称不能判错。
+Note: 只读、无外部依赖；不是完整 YAML 解析器、恶意代码扫描器或真实运行评估。REVIEW 不代表确认缺陷。

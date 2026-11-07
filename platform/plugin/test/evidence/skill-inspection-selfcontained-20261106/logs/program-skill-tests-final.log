@@ -1,0 +1,15 @@
+test_bad_name (test_inspect_skill.InspectorTests) ... ok
+test_does_not_run_script (test_inspect_skill.InspectorTests) ... ok
+test_mcp_name_is_only_review_signal (test_inspect_skill.InspectorTests) ... ok
+test_missing_metadata (test_inspect_skill.InspectorTests) ... ok
+test_missing_resource (test_inspect_skill.InspectorTests) ... ok
+test_own_skill_does_not_have_structural_errors (test_inspect_skill.InspectorTests) ... ok
+test_valid_skill (test_inspect_skill.InspectorTests) ... ok
+test_bare_sibling_private_path (test_inspect_skill.PackageClosureTests) ... ok
+test_nested_missing_and_private_dependency (test_inspect_skill.PackageClosureTests) ... ok
+test_symlink_escape (test_inspect_skill.PackageClosureTests) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.012s
+
+OK

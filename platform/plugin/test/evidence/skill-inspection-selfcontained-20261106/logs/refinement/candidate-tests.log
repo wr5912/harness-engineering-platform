@@ -1,0 +1,35 @@
+✔ 同一真实消息和工具的执行身份跨调用稳定；换参数不能偷偷换身份 (3.300801ms)
+✔ 真实主会话绑定不依赖关键词，缺少真实来源或子会话不能伪造身份 (1.133014ms)
+✔ 原生定时每次到期有独立身份，同一次投递重试保持不变 (0.503537ms)
+✔ 业务别名和预览后的确认交给原生助手理解，不额外用正则拦截 (0.43938ms)
+✔ 原生定时批次按真实消息绑定，不重新解析或改写原生信封 (0.30952ms)
+✔ 装载保留真实 Schema 和回执，丢回执重试传递原身份；查询不改请求 (2.084588ms)
+✔ 业务 Guard 在实际pre-step按 Agent 作用域识别 Web MCP 工具，且按当前目录刷新 (7.272786ms)
+✔ 故障子 Agent 按实际注册名授权，能力缺失和旧名均拒绝 (0.785754ms)
+✔ 资源工具可调用，业务工具限制继续生效 (2.931837ms)
+✔ 主 Agent 直接读取已发现事实，不委派；故障子角色和写入边界保持原有约束 (1.438648ms)
+✔ 原生作用域restrict不可用时保留逐调用Guard边界 (1.469042ms)
+✔ 首次挂载推迟restrict仍冻结本轮DENY；挂载完成和后续ALLOW轮次不丢失或沿用旧约束 (3.573035ms)
+✔ security-operations-guard 在访问配置同步为匿名后解除已有限制 (1.352781ms)
+✔ security-operations-child-guard 在访问配置同步为匿名后解除已有限制 (0.361024ms)
+✔ policy-configuration-guard 在访问配置同步为匿名后解除已有限制 (0.823223ms)
+✔ emergency-action-guard 在访问配置同步为匿名后解除已有限制 (0.809788ms)
+✔ 迟到的 MCP 巡检工具可见且旧限制被替换，不累积限制 (1.226291ms)
+✔ 巡检 Skill 锁定本轮能力，策略和应急工具不能越界 (12.12297ms)
+✔ 应急确认轮次仍能查询当前操作结果 (1.013442ms)
+✔ 无需登录的development实例不安装security-operations-guard工具限制和 Guard (0.78998ms)
+✔ 无需登录的development实例不安装security-operations-child-guard工具限制和 Guard (1.26178ms)
+✔ 无需登录的development实例不安装policy-configuration-guard工具限制和 Guard (0.613891ms)
+✔ 无需登录的development实例不安装emergency-action-guard工具限制和 Guard (0.462011ms)
+✔ 无需登录的published实例不安装security-operations-guard工具限制和 Guard (0.446959ms)
+✔ 无需登录的published实例不安装security-operations-child-guard工具限制和 Guard (0.224079ms)
+✔ 无需登录的published实例不安装policy-configuration-guard工具限制和 Guard (0.3748ms)
+✔ 无需登录的published实例不安装emergency-action-guard工具限制和 Guard (0.659155ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 27
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 147.881867

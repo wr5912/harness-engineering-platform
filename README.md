@@ -201,6 +201,7 @@ AGENTS.md                                # 项目定位、协作规则与修改�
 .codex/                                  # Codex 开发配置，不是业务 Harness
 platform/                                # 平台启动入口、Profile、插件和管理工具实现
 runtime/research/                        # 研究校验、继承检查和旧资产清点工具
+runtime/research/kev-data/               # KEV 离线轨迹、数据复核及训练输入共同实现
 runtime/adapters/dsh-container/           # DSH 容器装载、评测与来源解析
 plugins/                                 # 通用资产查询与 MCP 管理源码
 docs/                                    # 设计、规范适用解释和验收证据入口

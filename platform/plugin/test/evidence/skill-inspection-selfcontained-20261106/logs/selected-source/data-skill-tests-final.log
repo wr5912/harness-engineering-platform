@@ -1,0 +1,52 @@
+test_allowed_tools_must_be_a_string_not_a_list (test_inspect_skill.InspectorTests) ... ok
+test_bad_name (test_inspect_skill.InspectorTests) ... ok
+test_code_example_and_placeholder_do_not_become_missing_files (test_inspect_skill.InspectorTests) ... ok
+test_document_length_is_a_recommendation_not_a_hard_format_error (test_inspect_skill.InspectorTests) ... ok
+test_does_not_run_script (test_inspect_skill.InspectorTests) ... ok
+test_dsh_accepts_lf_and_crlf_delimiters (test_inspect_skill.InspectorTests) ... ok
+test_dsh_extensions_are_explicit_and_do_not_claim_runtime_validation (test_inspect_skill.InspectorTests) ... ok
+test_dsh_numeric_switch_notation_is_not_conclusively_rejected (test_inspect_skill.InspectorTests) ... ok
+test_dsh_raw_read_does_not_normalize_bare_cr_into_lf (test_inspect_skill.InspectorTests) ... ok
+test_dsh_rejects_legacy_invocation_fields (test_inspect_skill.InspectorTests) ... ok
+test_dsh_rejects_unrecognized_invocation_values (test_inspect_skill.InspectorTests) ... ok
+test_dsh_strict_delimiters_preserve_bom_and_trailing_space_evidence (test_inspect_skill.InspectorTests) ... ok
+test_dsh_string_fields_with_implicit_type_candidates_require_native_check (test_inspect_skill.InspectorTests) ... ok
+test_dsh_switch_array_remains_a_confirmed_invalid_value (test_inspect_skill.InspectorTests) ... ok
+test_duplicate_keys_are_rejected (test_inspect_skill.InspectorTests) ... ok
+test_each_finding_has_rule_origin (test_inspect_skill.InspectorTests) ... ok
+test_empty_body_is_a_confirmed_content_failure (test_inspect_skill.InspectorTests) ... ok
+test_empty_compatibility_is_not_accepted (test_inspect_skill.InspectorTests) ... ok
+test_exact_scan_limit_does_not_count_unrelated_files_or_directories (test_inspect_skill.InspectorTests) ... ok
+test_explicit_markdown_resource_without_suffix_is_still_checked (test_inspect_skill.InspectorTests) ... ok
+test_invalid_yaml_does_not_pass (test_inspect_skill.InspectorTests) ... ok
+test_malformed_url_is_a_review_signal_not_a_crash (test_inspect_skill.InspectorTests) ... ok
+test_mcp_name_is_only_review_signal (test_inspect_skill.InspectorTests) ... ok
+test_metadata_nested_map_is_not_coerced_to_string (test_inspect_skill.InspectorTests) ... ok
+test_missing_metadata (test_inspect_skill.InspectorTests) ... ok
+test_missing_parser_blocks_strict_checks_and_nonzero_gate (test_inspect_skill.InspectorTests) ... ok
+test_missing_resource (test_inspect_skill.InspectorTests) ... ok
+test_name_on_is_not_misparsed_using_yaml_1_1_boolean_rules (test_inspect_skill.InspectorTests) ... ok
+test_no_fixed_heading_template_is_required (test_inspect_skill.InspectorTests) ... ok
+test_official_field_length_boundaries (test_inspect_skill.InspectorTests) ... ok
+test_official_metadata_numeric_scalar_remains_a_string (test_inspect_skill.InspectorTests) ... ok
+test_one_line_body_cannot_claim_complete_audit_pass (test_inspect_skill.InspectorTests) ... ok
+test_own_skill_does_not_have_structural_errors (test_inspect_skill.InspectorTests) ... ok
+test_presentation_findings_are_not_official_format_failures (test_inspect_skill.InspectorTests) ... ok
+test_quoted_name_whitespace_is_not_silently_trimmed (test_inspect_skill.InspectorTests) ... ok
+test_reference_parser_limit_does_not_prove_dsh_load_failure (test_inspect_skill.InspectorTests) ... ok
+test_reference_with_an_explicit_other_base_is_not_assumed_local (test_inspect_skill.InspectorTests) ... ok
+test_required_field_cannot_be_a_sequence (test_inspect_skill.InspectorTests) ... ok
+test_scan_limits_are_reported_as_blocked (test_inspect_skill.InspectorTests) ... ok
+test_tool_action_names_are_not_invented_resource_paths (test_inspect_skill.InspectorTests) ... ok
+test_unicode_name_valid_for_standard_but_not_pinned_dsh (test_inspect_skill.InspectorTests) ... ok
+test_unknown_fields_are_sourced_to_reference_implementation (test_inspect_skill.InspectorTests) ... ok
+test_valid_scalar_with_delimiter_text_is_not_split (test_inspect_skill.InspectorTests) ... ok
+test_valid_skill (test_inspect_skill.InspectorTests) ... ok
+test_bare_sibling_private_path (test_inspect_skill.PackageClosureTests) ... ok
+test_nested_missing_and_private_dependency (test_inspect_skill.PackageClosureTests) ... ok
+test_symlink_escape (test_inspect_skill.PackageClosureTests) ... ok
+
+----------------------------------------------------------------------
+Ran 47 tests in 2.599s
+
+OK

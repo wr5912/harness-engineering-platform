@@ -78,6 +78,62 @@ def read_text(path: Path) -> Optional[str]:
         return None
 
 
+
+def check_package(root, findings):
+    """Inspect actual package paths without importing or executing their code."""
+    from urllib.parse import unquote, urlsplit
+    links = re.compile(r"!?\[[^\]\n]*\]\(\s*(<[^>\n]+>|[^\s)]+)(?:\s+[^)\n]+)?\)")
+    siblings = [re.escape(p.name) for p in root.parent.iterdir()
+                if p != root and (p / "SKILL.md").is_file()]
+    private = re.compile(r"(?<![A-Za-z0-9_.-])(?:" + "|".join(siblings)
+                         + r")/(?:references|scripts|assets)/[^\s`<>\])]+") if siblings else None
+    count = 0
+    for path in sorted(root.rglob("*")):
+        label = str(path.relative_to(root))
+        if not path.resolve().is_relative_to(root):
+            findings.append(finding("PKG-001", "ERROR", label, 1,
+                "资源或符号链接逃逸 Skill 包。", "将本技能私有资源纳入包内；公共依赖使用显式引用。", "certain"))
+            continue
+        if not path.is_file() or path.suffix.lower() != ".md":
+            continue
+        count += 1
+        content = read_text(path)
+        if count > MAX_DEEP_FILES + 1 or content is None:
+            findings.append(finding("PKG-002", "BLOCKED", label, 1,
+                "包资源未完整扫描。", "补查未读资源，不得据此宣称闭合。", "certain"))
+            break
+        for match in private.finditer(content) if private else []:
+            findings.append(finding("PKG-004", "ERROR", label, line_number(content, match.start()),
+                "引用兄弟技能私有资源：" + match.group(),
+                "独立任务交接公开 SKILL.md；本技能自有方法纳入本包。", "certain"))
+        for match in links.finditer(content):
+            target = match[1].strip("<>")
+            try:
+                parsed = urlsplit(target)
+            except ValueError:
+                continue
+            if parsed.scheme or parsed.netloc or not parsed.path:
+                continue
+            relative = unquote(parsed.path)
+            if any(token in relative for token in ("<", ">", "{", "}", "*", "...")):
+                continue
+            ref = path.parent / relative
+            resolved = ref.resolve()
+            line = content.count("\n", 0, match.start()) + 1
+            if resolved.is_relative_to(root):
+                if not resolved.exists():
+                    findings.append(finding("PKG-003", "ERROR", label, line,
+                        "包内链接资源缺失：" + relative, "修正相对路径或提供资源。", "certain"))
+            elif ref.is_absolute() and (relative.startswith("/") or any(part in Path(relative).parts for part in ("references", "scripts", "assets"))):
+                findings.append(finding("PKG-004", "ERROR", label, line,
+                    "依赖包外私有资源或开发机绝对路径：" + relative,
+                    "将自有方法迁入包内；独立任务只交接兄弟技能公开 SKILL.md 入口。", "certain"))
+            elif not resolved.exists():
+                findings.append(finding("PKG-005", "REVIEW", label, line,
+                    "公共外部引用未在本机解析：" + relative,
+                    "核对所属工作区、公开入口和交接合同；不复制公共事实。"))
+
+
 def inspect(root: Path, include_references: bool = False) -> Dict[str, object]:
     findings: List[Dict[str, object]] = []
     scanned = 0
@@ -161,6 +217,9 @@ def inspect(root: Path, include_references: bool = False) -> Dict[str, object]:
                 scanned += 1
                 targets.append((str(path.relative_to(root)), content))
 
+    if include_references:
+        check_package(root, findings)
+
     observed_tools = {}
     for label, content in targets:
         for match in MCP_RE.finditer(content):
@@ -188,7 +247,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Read-only static hints for an Agent Skill")
     parser.add_argument("skill_dir", type=Path, help="Directory containing SKILL.md")
     parser.add_argument("--format", choices=("text", "json"), default="text")
-    parser.add_argument("--include-references", action="store_true", help="Also scan references/ and scripts/ (examples may cause false positives)")
+    parser.add_argument("--include-references", action="store_true", help="Recursively inspect package links and scan references/scripts (examples may cause false positives)")
     parser.add_argument("--fail-on-error", action="store_true", help="Exit 2 on certain structural ERROR findings")
     args = parser.parse_args(argv)
     report = inspect(args.skill_dir, include_references=args.include_references)

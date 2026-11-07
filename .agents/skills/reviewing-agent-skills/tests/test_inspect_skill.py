@@ -62,5 +62,41 @@ class InspectorTests(unittest.TestCase):
         self.assertEqual([], [x for x in result["findings"] if x["level"] == "ERROR"])
 
 
+
+class PackageClosureTests(unittest.TestCase):
+    def test_bare_sibling_private_path(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "example"
+            other = Path(temporary) / "other"
+            root.mkdir()
+            other.mkdir()
+            (other / "SKILL.md").write_text("# Public entry")
+            (root / "SKILL.md").write_text("---\nname: example\ndescription: Reviews package closure when an existing skill needs auditing.\n---\nRead `other/references/private.md`.\n[Handoff](../other/SKILL.md)\n")
+            results = inspector.inspect(root, include_references=True)["findings"]
+            private = [f for f in results if f["id"] == "PKG-004"]
+            self.assertEqual(len(private), 1)
+            self.assertIn("other/references/private.md", private[0]["message"])
+
+    def test_nested_missing_and_private_dependency(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "example"
+            (root / "references").mkdir(parents=True)
+            (root / "SKILL.md").write_text("---\nname: example\ndescription: Reviews package closure when an existing skill needs auditing.\n---\n[Method](references/method.md)\n")
+            (root / "references/method.md").write_text("[Missing](missing.md)\n[Private](../../other/references/method.md)\n[Handoff](../../other/SKILL.md)\n")
+            results = inspector.inspect(root, include_references=True)["findings"]
+            self.assertTrue(any(f["id"] == "PKG-003" and f["file"] == "references/method.md" for f in results))
+            self.assertTrue(any(f["id"] == "PKG-004" for f in results))
+            self.assertFalse(any(f["level"] == "ERROR" and "Handoff" in f["message"] for f in results))
+
+    def test_symlink_escape(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "example"
+            root.mkdir()
+            (root / "SKILL.md").write_text("---\nname: example\ndescription: Reviews package closure when an existing skill needs auditing.\n---\nReview.\n")
+            (root / "outside").symlink_to(Path(temporary))
+            results = inspector.inspect(root, include_references=True)["findings"]
+            self.assertTrue(any(f["id"] == "PKG-001" for f in results))
+
+
 if __name__ == "__main__":
     unittest.main()
