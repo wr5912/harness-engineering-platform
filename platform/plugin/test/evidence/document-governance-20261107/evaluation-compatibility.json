@@ -1,0 +1,130 @@
+{
+  "check": "同一输入分别由基线与候选解析器读取，逐字段比较全部返回值；工作区未修改。",
+  "program_base": "9ace9eeb",
+  "reports": [
+    {
+      "workspace": "paired_task",
+      "cases": 175,
+      "files": [
+        {
+          "path": "agents/asset-discovery-assistant/evaluation.md",
+          "source_sha256": "17fb8199a6fe3ede58610571016e15b66d319621538546f68da79d92e68075db",
+          "cases": 10,
+          "parsed_sha256": "cc6a4c2400fc5d0225c1672ffa2c4f19369f0e946af9be7802bc36f9fad5f7d6",
+          "full_fields_changed": []
+        },
+        {
+          "path": "agents/autonomous-training-researcher/evaluation.md",
+          "source_sha256": "2856da7ac06aa5aaa1b2fe64c459d9f3dd6ea4ccda6fd0cc919fa1fdac7c629d",
+          "cases": 3,
+          "parsed_sha256": "7abf28e68629a776a9e560a04197abe5d7e98c1a600cfefbcce4e45485149033",
+          "full_fields_changed": []
+        },
+        {
+          "path": "agents/daily-inspection-assistant/evaluation.md",
+          "source_sha256": "44e3f44388a5c6b28ff78655ca82727c7b96208d5a82cc1d9bf681edf6eaac26",
+          "cases": 6,
+          "parsed_sha256": "42f7ceb1972a36e80464c2ab04f928e9b91652cfbe1adcfcbb6964fbf05bac27",
+          "full_fields_changed": []
+        },
+        {
+          "path": "agents/inspection-delivery-demo/evaluation.md",
+          "source_sha256": "71723c99626c1dbc4f943a8dafddcc5d1b16dd9ba81e88c42ebd7031c2058b9a",
+          "cases": 4,
+          "parsed_sha256": "fbbb880cc81a7b7003a1c06824b68be8ce6c3d0f3a6537c2d8d076c131f1d342",
+          "full_fields_changed": []
+        },
+        {
+          "path": "agents/multi-step-research-analyst/evaluation.md",
+          "source_sha256": "bddd77a806dab38ea4fe76eebd707497932e0e027a94580677794c6394b84c98",
+          "cases": 4,
+          "parsed_sha256": "935d218f308502751c47f25b5ab5da8824e2089b27c610eb67aacd16e4e88395",
+          "full_fields_changed": []
+        },
+        {
+          "path": "agents/rc5-ui-acceptance-20261102/evaluation.md",
+          "source_sha256": "d83bd8cb7094cf3b281488ac4da494857d0fffa39ec928a963ed75b481dcb8bc",
+          "cases": 3,
+          "parsed_sha256": "a6eba7a76469820e2c3b9aad9d7ae5b3e58f7cde1cf248e17f9e8f1d09676896",
+          "full_fields_changed": []
+        },
+        {
+          "path": "agents/security-operations-expert/evaluation.md",
+          "source_sha256": "14661100837768b7bba05d85f7bdbafb12ed0f57b07ce127556443cdbb88b6d3",
+          "cases": 144,
+          "parsed_sha256": "80dcbf3d1046f0433c32970031e2f6da4d3cadb35804ac846652358648f3093b",
+          "full_fields_changed": []
+        },
+        {
+          "path": "agents/test01/evaluation.md",
+          "source_sha256": "311bd13106b2db23dfac244b53038906e569e31717e1722b549eb0c03a47ec2b",
+          "cases": 1,
+          "parsed_sha256": "9b9c833560c07b0aa204a97eddad560104868e56604d925c4cb7a36d3bb6fbe9",
+          "full_fields_changed": []
+        }
+      ]
+    },
+    {
+      "workspace": "parallel_workspace",
+      "cases": 59,
+      "files": [
+        {
+          "path": "agents/asset-discovery-assistant/evaluation.md",
+          "source_sha256": "17fb8199a6fe3ede58610571016e15b66d319621538546f68da79d92e68075db",
+          "cases": 10,
+          "parsed_sha256": "cc6a4c2400fc5d0225c1672ffa2c4f19369f0e946af9be7802bc36f9fad5f7d6",
+          "full_fields_changed": []
+        },
+        {
+          "path": "agents/autonomous-training-researcher/evaluation.md",
+          "source_sha256": "2856da7ac06aa5aaa1b2fe64c459d9f3dd6ea4ccda6fd0cc919fa1fdac7c629d",
+          "cases": 3,
+          "parsed_sha256": "7abf28e68629a776a9e560a04197abe5d7e98c1a600cfefbcce4e45485149033",
+          "full_fields_changed": []
+        },
+        {
+          "path": "agents/daily-inspection-assistant/evaluation.md",
+          "source_sha256": "44e3f44388a5c6b28ff78655ca82727c7b96208d5a82cc1d9bf681edf6eaac26",
+          "cases": 6,
+          "parsed_sha256": "42f7ceb1972a36e80464c2ab04f928e9b91652cfbe1adcfcbb6964fbf05bac27",
+          "full_fields_changed": []
+        },
+        {
+          "path": "agents/inspection-delivery-demo/evaluation.md",
+          "source_sha256": "71723c99626c1dbc4f943a8dafddcc5d1b16dd9ba81e88c42ebd7031c2058b9a",
+          "cases": 4,
+          "parsed_sha256": "fbbb880cc81a7b7003a1c06824b68be8ce6c3d0f3a6537c2d8d076c131f1d342",
+          "full_fields_changed": []
+        },
+        {
+          "path": "agents/multi-step-research-analyst/evaluation.md",
+          "source_sha256": "bddd77a806dab38ea4fe76eebd707497932e0e027a94580677794c6394b84c98",
+          "cases": 4,
+          "parsed_sha256": "935d218f308502751c47f25b5ab5da8824e2089b27c610eb67aacd16e4e88395",
+          "full_fields_changed": []
+        },
+        {
+          "path": "agents/rc5-ui-acceptance-20261102/evaluation.md",
+          "source_sha256": "d83bd8cb7094cf3b281488ac4da494857d0fffa39ec928a963ed75b481dcb8bc",
+          "cases": 3,
+          "parsed_sha256": "a6eba7a76469820e2c3b9aad9d7ae5b3e58f7cde1cf248e17f9e8f1d09676896",
+          "full_fields_changed": []
+        },
+        {
+          "path": "agents/security-operations-expert/evaluation.md",
+          "source_sha256": "8daf5e7c756845e8aa6103cd9ea858b4e7c5a3373adc04b49566a80a0ef0a952",
+          "cases": 28,
+          "parsed_sha256": "116bd342521cce247ad0b9f8a7a0efc9b9724aa7736e21558b62851ede322e0a",
+          "full_fields_changed": []
+        },
+        {
+          "path": "agents/test01/evaluation.md",
+          "source_sha256": "311bd13106b2db23dfac244b53038906e569e31717e1722b549eb0c03a47ec2b",
+          "cases": 1,
+          "parsed_sha256": "9b9c833560c07b0aa204a97eddad560104868e56604d925c4cb7a36d3bb6fbe9",
+          "full_fields_changed": []
+        }
+      ]
+    }
+  ]
+}
