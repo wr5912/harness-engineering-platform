@@ -25,20 +25,18 @@ export function caseSourceReferences(block: string): string[] {
     .map(match => match[0].trim())
 }
 
-/** 与评测合同保持一致：普通四级标题仍属于用例正文。 */
-export function caseBlockRange(content: string, caseId: string) {
-  const headings = [...content.matchAll(/^#### (U-[A-Z0-9-]+)\s+([^\r\n]+)\r?$/gm)]
-  const index = headings.findIndex(match => match[1] === caseId)
-  if (index < 0) throw new CaseError('not_found', '未找到测试用例正文')
-  const start = headings[index].index!
-  let end = headings[index + 1]?.index ?? content.length
-  const bodyStart = start + headings[index][0].length
-  const nextSection = /^#{1,3} /m.exec(content.slice(bodyStart, end))
-  if (nextSection) end = bodyStart + nextSection.index
-  return { start, end }
+/** 边界由研究合同给出；行偏移兼容 CRLF 和 UTF-16 字符。 */
+export function caseBlockRange(content: string, caseId: string, parsed: { ranges: Record<string, { start_line: number; end_line: number }> }) {
+  const range = parsed.ranges[caseId]
+  if (!range) throw new CaseError('not_found', '未找到测试用例正文')
+  const offsets = [0]
+  for (const match of content.matchAll(/\n/g)) offsets.push(match.index! + 1)
+  return { start: offsets[range.start_line] ?? content.length, end: offsets[range.end_line] ?? content.length }
 }
 
 interface ParsedEvaluation {
+  scene_ranges: { scene: string; end_line: number }[]
+  ranges: Record<string, { start_line: number; end_line: number }>
   case_ids: string[]
   cases: Record<string, { case_id: string; title: string; inputs: string[]; expected_behavior: string }>
   catalog: { case_id: string; scene: string; fast: boolean }[]
@@ -82,7 +80,7 @@ export async function parseEvaluationDocument(root: string, content: string, sig
   const file = join(temp, 'evaluation.md')
   try {
     await writeFile(file, content)
-    const code = 'import json,sys\nfrom pathlib import Path\nsys.path.insert(0,sys.argv[1])\nfrom evaluation_contract import load_evaluation\nprint(json.dumps(load_evaluation(Path(sys.argv[2])),ensure_ascii=False))'
+    const code = 'import json,sys\nfrom pathlib import Path\nsys.path.insert(0,sys.argv[1])\nfrom evaluation_contract import load_evaluation\nprint(json.dumps(load_evaluation(Path(sys.argv[2]), include_ranges=True),ensure_ascii=False))'
     const { stdout } = await execute(process.env.HARNESS_PYTHON || 'python3', ['-c', code, join(programRoot(), CONTRACT, '..'), file], { cwd: root, signal, timeout: 15000, maxBuffer: 10 * 1024 * 1024 })
     return JSON.parse(stdout)
   } catch (error) {
@@ -153,10 +151,9 @@ async function prepare(root: string, body: JsonMap, services: CaseManagementServ
     ...(sourceRun ? [`<!-- source_run_id: ${sourceRun}; source_case_id: ${sourceCaseId} -->`, ''] : []),
     ...inputs.flatMap((value, index) => [`**用户输入${inputs.length > 1 ? ` ${index + 1}` : ''}**`, '', ...value.split('\n').map(line => `> ${line}`), '']),
     '**预期**', '', ...expectedBehavior.split('\n'), '', ''].join(newline)
-  const headings = [...document.content.matchAll(/^## ([^\r\n]+)\r?$/gm)]
-  const section = headings.find(item => item[1] === scene)
-  const index = section ? headings.indexOf(section) : -1
-  const position = section ? headings[index + 1]?.index ?? document.content.length : document.content.length
+  const section = document.parsed.scene_ranges.find(item => item.scene === scene)
+  const offsets = [0, ...[...document.content.matchAll(/\n/g)].map(match => match.index! + 1)]
+  const position = section ? offsets[section.end_line] ?? document.content.length : document.content.length
   const addition = `${section ? '' : `## ${scene}${newline}${newline}`}${block}`
   const prefix = document.content.slice(0, position)
   const content = prefix + (prefix.endsWith(`${newline}${newline}`) ? '' : prefix.endsWith(newline) ? newline : `${newline}${newline}`) + addition + document.content.slice(position)
@@ -186,7 +183,7 @@ export function createCaseManagementHandler(assetRoot: string, services: CaseMan
         if (!Array.isArray(order) || order.length !== before.length || new Set(order).size !== before.length || order.some(id => typeof id !== 'string' || !before.includes(id)))
           throw new CaseError('invalid_request', 'case_ids 必须是该场景全部用例 ID 的完整排列，不能重复、遗漏或跨场景')
         const ranges = before.map(id => {
-          const range = caseBlockRange(document.content, id)
+          const range = caseBlockRange(document.content, id, document.parsed)
           // 分隔换行留在原位置，末尾无换行的用例也能移动而不粘连标题。
           const text = document.content.slice(range.start, range.end).replace(/(?:\r?\n)+$/, '')
           return { ...range, end: range.start + text.length, text }
@@ -227,7 +224,11 @@ export function createCaseManagementHandler(assetRoot: string, services: CaseMan
           mapping.set(from, to); targets.add(to)
         }
         // 只改用例标题，历史运行出处中的原编号保持冻结。
-        const content = document.content.replace(/^#### (U-[A-Z0-9-]+)(?=\s)/gm, (heading, id) => mapping.has(id) ? `#### ${mapping.get(id)}` : heading)
+        let content = document.content
+        for (const [from, to] of [...mapping].sort((a, b) => document.parsed.ranges[b[0]].start_line - document.parsed.ranges[a[0]].start_line)) {
+          const { start } = caseBlockRange(document.content, from, document.parsed)
+          content = content.slice(0, start) + content.slice(start).replace(`#### ${from}`, `#### ${to}`)
+        }
         const parsed = await parseEvaluationDocument(root, content, signal)
         try { validateCaseIds(document.parsed.catalog, parsed.catalog) }
         catch (error) { throw new CaseError('invalid_request', (error as Error).message) }
@@ -245,7 +246,7 @@ export function createCaseManagementHandler(assetRoot: string, services: CaseMan
         if (!document.parsed.cases[caseId]) throw new CaseError('not_found', '测试用例已不存在，请刷新列表')
         if (field(body, 'expected_sha256') !== document.sha256) throw new CaseError('conflict', '用例集已被修改，请重新读取后再删除')
         if (document.parsed.case_ids.length === 1) throw new CaseError('last_case', '评测合同要求至少保留一个测试用例')
-        const { start, end } = caseBlockRange(document.content, caseId)
+        const { start, end } = caseBlockRange(document.content, caseId, document.parsed)
         const content = document.content.slice(0, start) + document.content.slice(end)
         const parsed = await parseEvaluationDocument(root, content, signal)
         const remaining = document.parsed.case_ids.filter(id => id !== caseId)

@@ -29,4 +29,4 @@
 
 容器和平台的页面及新 Session 验证不等于模型回复或各 Agent 的业务任务通过。当前数据克隆没有可完成模型请求的余额；训练任务的远端算力及真实外部 SOC/语音服务也未在本轮验证。`PA-05/06/12` 继续为部分验证。
 
-ARM64 主机尚未取得实机运行证据。需要在所述 Ubuntu 24.04.4 `aarch64` 主机按[部署说明](../../../../../README.md#amd64-与-arm64-主机部署)原生安装平台与依赖、完整克隆数据仓库、重新安装 Candidate 原生依赖并构建 ARM64 标准镜像；确认 `uname -m` 与 Docker server 架构一致，再复验平台登录、新 Session、六个 active Agent、Chromium 和安全运营语音插件。只有这些检查完成才能记录 ARM64 实机通过。
+ARM64 主机尚未取得实机运行证据。需要在所述 Ubuntu 24.04.4 `aarch64` 主机按[部署说明](../../../../../docs/platform-design/23_离线一键打包与安装.md#源码主机部署)原生安装平台与依赖、完整克隆数据仓库、重新安装 Candidate 原生依赖并构建 ARM64 标准镜像；确认 `uname -m` 与 Docker server 架构一致，再复验平台登录、新 Session、六个 active Agent、Chromium 和安全运营语音插件。只有这些检查完成才能记录 ARM64 实机通过。

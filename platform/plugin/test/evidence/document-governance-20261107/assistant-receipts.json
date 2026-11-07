@@ -1,0 +1,1018 @@
+{
+  "environment": {
+    "port": 18121,
+    "program_base": "9ace9eeb",
+    "data_base": "ac0b4c24",
+    "shared_18120_restarted": false
+  },
+  "selection": "仅保留工具调用、所述动作的选定回执和回合结束；省略推理、上下文、凭据及完整会话。",
+  "sessions": [
+    {
+      "session_id": "session-b912c2dd-0169-45aa-a813-29dfabc4edf8",
+      "events": [
+        {
+          "seq": 23,
+          "type": "call",
+          "name": "skill",
+          "arguments": {
+            "name": "workspace-management"
+          }
+        },
+        {
+          "seq": 28,
+          "type": "call",
+          "name": "read",
+          "arguments": {
+            "file_path": "$DATA_ROOT/.agents/skills/workspace-management/references/document-maintenance.md"
+          }
+        },
+        {
+          "seq": 30,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "context",
+            "input": {}
+          }
+        },
+        {
+          "seq": 35,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "describe",
+            "input": {
+              "action": "documents/inspect"
+            }
+          }
+        },
+        {
+          "seq": 40,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "documents/inspect",
+            "input": {
+              "path": "docs/harness-research"
+            }
+          }
+        },
+        {
+          "seq": 41,
+          "type": "receipt",
+          "action": "documents/inspect",
+          "result": {
+            "ok": true,
+            "value": {
+              "scope": "docs/harness-research",
+              "findings": [],
+              "complete": true,
+              "unscanned": [],
+              "limitations": [
+                "为检查入站引用，会读取所选范围外的当前文本；跳过凭据、运行状态和专用资产，不保证动态消费者完整。",
+                "仅核对普通 Markdown 链接和配置中的字面 Markdown 路径；锚点、代码消费者、插值和语义重复需进一步阅读。",
+                "无入站引用、同名或时间久均不构成删除依据；受保护路径不作为通用整理目标。"
+              ],
+              "scanned_files_count": 8
+            }
+          }
+        },
+        {
+          "seq": 45,
+          "type": "call",
+          "name": "read",
+          "arguments": {
+            "file_path": "$DATA_ROOT/docs/harness-research/README.md"
+          }
+        },
+        {
+          "seq": 46,
+          "type": "call",
+          "name": "read",
+          "arguments": {
+            "file_path": "$DATA_ROOT/docs/harness-research/compute-variants.md"
+          }
+        },
+        {
+          "seq": 52,
+          "type": "call",
+          "name": "read",
+          "arguments": {
+            "file_path": "$DATA_ROOT/docs/harness-research/controlled-improvement.md"
+          }
+        },
+        {
+          "seq": 53,
+          "type": "call",
+          "name": "read",
+          "arguments": {
+            "file_path": "$DATA_ROOT/docs/harness-research/kev-medium-variant-skills.md"
+          }
+        },
+        {
+          "seq": 59,
+          "type": "call",
+          "name": "read",
+          "arguments": {
+            "file_path": "$DATA_ROOT/docs/harness-research/evaluation-and-evidence.md"
+          }
+        },
+        {
+          "seq": 60,
+          "type": "call",
+          "name": "read",
+          "arguments": {
+            "file_path": "$DATA_ROOT/docs/harness-research/inheritance-and-fusion.md"
+          }
+        },
+        {
+          "seq": 66,
+          "type": "call",
+          "name": "read",
+          "arguments": {
+            "file_path": "$DATA_ROOT/docs/harness-research/decision-samples.md"
+          }
+        },
+        {
+          "seq": 67,
+          "type": "call",
+          "name": "read",
+          "arguments": {
+            "file_path": "$DATA_ROOT/docs/harness-research/kev-data-format-and-output-plan.md"
+          }
+        },
+        {
+          "seq": 73,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "describe",
+            "input": {
+              "action": "research/read-reference"
+            }
+          }
+        },
+        {
+          "seq": 75,
+          "type": "call",
+          "name": "glob",
+          "arguments": {
+            "pattern": ".agents/skills/{harness-evolution/references/repository-invariants.md,research-eval/references/experiment-contract.md,research-eval/SKILL.md,decision-sample-extraction/SKILL.md,kev-trace-pipeline/SKILL.md,kev-trace-pipeline/references/stages/*.md,kev-trace-pipeline/references/dataset-formats.md,kev-trace-pipeline/references/legacy-native.md,kev-trace-pipeline/references/security-routing.md,kev-training/SKILL.md,kev-training/references/native-execution.md,kev-training/references/modal-workload.md,kev-deploy/SKILL.md,user-facing-output/SKILL.md,kev-trace-pipeline/assets/validation-summary.json}"
+          }
+        },
+        {
+          "seq": 80,
+          "type": "call",
+          "name": "glob",
+          "arguments": {
+            "pattern": "docs/harness-research/**"
+          }
+        },
+        {
+          "seq": 82,
+          "type": "call",
+          "name": "glob",
+          "arguments": {
+            "pattern": "agents/openai.yaml"
+          }
+        },
+        {
+          "seq": 87,
+          "type": "call",
+          "name": "glob",
+          "arguments": {
+            "pattern": "agents/**/openai.yaml"
+          }
+        },
+        {
+          "seq": 89,
+          "type": "call",
+          "name": "glob",
+          "arguments": {
+            "pattern": "**/openai.yaml"
+          }
+        },
+        {
+          "seq": 94,
+          "type": "call",
+          "name": "skill",
+          "arguments": {
+            "name": "user-facing-output"
+          }
+        },
+        {
+          "seq": 101,
+          "type": "turn/end",
+          "reason": {
+            "kind": "completed"
+          }
+        }
+      ]
+    },
+    {
+      "session_id": "session-25ea5d8a-a2b9-44ba-b426-1e8929cc4212",
+      "events": [
+        {
+          "seq": 23,
+          "type": "call",
+          "name": "skill",
+          "arguments": {
+            "name": "workspace-management"
+          }
+        },
+        {
+          "seq": 25,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "context",
+            "input": {}
+          }
+        },
+        {
+          "seq": 30,
+          "type": "call",
+          "name": "read",
+          "arguments": {
+            "file_path": "$DATA_ROOT/.agents/skills/workspace-management/references/document-maintenance.md"
+          }
+        },
+        {
+          "seq": 32,
+          "type": "call",
+          "name": "glob",
+          "arguments": {
+            "pattern": "docs/document-maintenance-probe/**"
+          }
+        },
+        {
+          "seq": 37,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "documents/inspect",
+            "input": {
+              "path": "docs/document-maintenance-probe"
+            }
+          }
+        },
+        {
+          "seq": 38,
+          "type": "receipt",
+          "action": "documents/inspect",
+          "result": {
+            "ok": true,
+            "value": {
+              "scope": "docs/document-maintenance-probe",
+              "findings": [
+                {
+                  "path": "docs/document-maintenance-probe/current.md",
+                  "group": "需判断",
+                  "reason": "未发现静态入站引用；用途仍需判断",
+                  "source_sha256": "5c46b0571c91858801a041e4287b363286af1d4e3d1cf1b18757c6a7d7c3179f",
+                  "evidence": [],
+                  "references": [],
+                  "suggested_action": "核对真实消费者与用途",
+                  "recovery_basis": "整理预览保存本次涉及文件的原文与摘要"
+                }
+              ],
+              "complete": true,
+              "unscanned": [],
+              "limitations": [
+                "为检查入站引用，会读取所选范围外的当前文本；跳过凭据、运行状态和专用资产，不保证动态消费者完整。",
+                "仅核对普通 Markdown 链接和配置中的字面 Markdown 路径；锚点、代码消费者、插值和语义重复需进一步阅读。",
+                "无入站引用、同名或时间久均不构成删除依据；受保护路径不作为通用整理目标。"
+              ],
+              "scanned_files_count": 3
+            }
+          }
+        },
+        {
+          "seq": 39,
+          "type": "call",
+          "name": "read",
+          "arguments": {
+            "file_path": "$DATA_ROOT/docs/document-maintenance-probe/README.md"
+          }
+        },
+        {
+          "seq": 40,
+          "type": "call",
+          "name": "read",
+          "arguments": {
+            "file_path": "$DATA_ROOT/docs/document-maintenance-probe/current.md"
+          }
+        },
+        {
+          "seq": 41,
+          "type": "call",
+          "name": "read",
+          "arguments": {
+            "file_path": "$DATA_ROOT/docs/document-maintenance-probe/obsolete.md"
+          }
+        },
+        {
+          "seq": 48,
+          "type": "call",
+          "name": "grep",
+          "arguments": {
+            "pattern": "obsolete\\.md|document-maintenance-probe",
+            "path": "$DATA_ROOT"
+          }
+        },
+        {
+          "seq": 50,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "describe",
+            "input": {
+              "action": "documents/prepare"
+            }
+          }
+        },
+        {
+          "seq": 55,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "documents/read",
+            "input": {
+              "path": "docs/document-maintenance-probe/README.md"
+            }
+          }
+        },
+        {
+          "seq": 56,
+          "type": "receipt",
+          "action": "documents/read",
+          "result": {
+            "ok": true,
+            "value": {
+              "path": "docs/document-maintenance-probe/README.md",
+              "source_sha256": "a71aa59c6d28aa0649d611f23969374ebcabbd1074b5e9af4dc7a635cb907acc",
+              "format": "markdown",
+              "blocks_total": 2
+            }
+          }
+        },
+        {
+          "seq": 57,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "documents/read",
+            "input": {
+              "path": "docs/document-maintenance-probe/obsolete.md"
+            }
+          }
+        },
+        {
+          "seq": 58,
+          "type": "receipt",
+          "action": "documents/read",
+          "result": {
+            "ok": true,
+            "value": {
+              "path": "docs/document-maintenance-probe/obsolete.md",
+              "source_sha256": "9da2c555504ae358b8517b0bf449f8bebee1c7e0562a48dde75ab7b2b46a790d",
+              "format": "markdown",
+              "blocks_total": 2
+            }
+          }
+        },
+        {
+          "seq": 62,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "documents/prepare",
+            "input": {
+              "changes": [
+                {
+                  "kind": "update",
+                  "path": "docs/document-maintenance-probe/README.md",
+                  "expected_sha256": "a71aa59c6d28aa0649d611f23969374ebcabbd1074b5e9af4dc7a635cb907acc",
+                  "content": "# 资料整理试点\n\n[当前说明](current.md)\n"
+                },
+                {
+                  "kind": "delete",
+                  "path": "docs/document-maintenance-probe/obsolete.md",
+                  "expected_sha256": "9da2c555504ae358b8517b0bf449f8bebee1c7e0562a48dde75ab7b2b46a790d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "seq": 65,
+          "type": "receipt",
+          "action": "documents/prepare",
+          "result": {
+            "ok": true,
+            "value": {
+              "operation_id": "c06550a7-9c4e-406c-b5bf-f189d7e9cc9e",
+              "state": "prepared",
+              "plan_sha256": "eddd60d35c4a506fc06986df276e949a14908ad5c5d5312f2ce5c42e48dd0650",
+              "files": [
+                {
+                  "path": "docs/document-maintenance-probe/README.md",
+                  "before_sha256": "a71aa59c6d28aa0649d611f23969374ebcabbd1074b5e9af4dc7a635cb907acc",
+                  "after_sha256": "fda90d766e16d4aeb1ae610a415541180d2c3951359542588cdd58e20d68ee27",
+                  "current_sha256": "a71aa59c6d28aa0649d611f23969374ebcabbd1074b5e9af4dc7a635cb907acc"
+                },
+                {
+                  "path": "docs/document-maintenance-probe/obsolete.md",
+                  "before_sha256": "9da2c555504ae358b8517b0bf449f8bebee1c7e0562a48dde75ab7b2b46a790d",
+                  "after_sha256": null,
+                  "current_sha256": "9da2c555504ae358b8517b0bf449f8bebee1c7e0562a48dde75ab7b2b46a790d"
+                }
+              ],
+              "next_action": "documents/apply",
+              "preview": [
+                {
+                  "path": "docs/document-maintenance-probe/README.md",
+                  "before_sha256": "a71aa59c6d28aa0649d611f23969374ebcabbd1074b5e9af4dc7a635cb907acc",
+                  "content": "# 资料整理试点\n\n[当前说明](current.md)\n"
+                },
+                {
+                  "path": "docs/document-maintenance-probe/obsolete.md",
+                  "before_sha256": "9da2c555504ae358b8517b0bf449f8bebee1c7e0562a48dde75ab7b2b46a790d",
+                  "content": null
+                }
+              ],
+              "apply_input": {
+                "operation_id": "c06550a7-9c4e-406c-b5bf-f189d7e9cc9e",
+                "expected_plan_sha256": "eddd60d35c4a506fc06986df276e949a14908ad5c5d5312f2ce5c42e48dd0650"
+              },
+              "limitations": [
+                "预览不修改文档；动态消费者须先由助手核对。执行后可按原 operation_id 查询或恢复。"
+              ]
+            }
+          }
+        },
+        {
+          "seq": 70,
+          "type": "turn/end",
+          "reason": {
+            "kind": "completed"
+          }
+        },
+        {
+          "seq": 80,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "documents/apply",
+            "input": {
+              "operation_id": "c06550a7-9c4e-406c-b5bf-f189d7e9cc9e",
+              "expected_plan_sha256": "eddd60d35c4a506fc06986df276e949a14908ad5c5d5312f2ce5c42e48dd0650"
+            }
+          }
+        },
+        {
+          "seq": 83,
+          "type": "receipt",
+          "action": "documents/apply",
+          "result": {
+            "ok": true,
+            "value": {
+              "operation_id": "c06550a7-9c4e-406c-b5bf-f189d7e9cc9e",
+              "state": "applied",
+              "plan_sha256": "eddd60d35c4a506fc06986df276e949a14908ad5c5d5312f2ce5c42e48dd0650",
+              "files": [
+                {
+                  "path": "docs/document-maintenance-probe/README.md",
+                  "before_sha256": "a71aa59c6d28aa0649d611f23969374ebcabbd1074b5e9af4dc7a635cb907acc",
+                  "after_sha256": "fda90d766e16d4aeb1ae610a415541180d2c3951359542588cdd58e20d68ee27",
+                  "current_sha256": "fda90d766e16d4aeb1ae610a415541180d2c3951359542588cdd58e20d68ee27"
+                },
+                {
+                  "path": "docs/document-maintenance-probe/obsolete.md",
+                  "before_sha256": "9da2c555504ae358b8517b0bf449f8bebee1c7e0562a48dde75ab7b2b46a790d",
+                  "after_sha256": null,
+                  "current_sha256": null
+                }
+              ],
+              "next_action": "documents/status"
+            }
+          }
+        },
+        {
+          "seq": 87,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "documents/status",
+            "input": {
+              "operation_id": "c06550a7-9c4e-406c-b5bf-f189d7e9cc9e"
+            }
+          }
+        },
+        {
+          "seq": 88,
+          "type": "receipt",
+          "action": "documents/status",
+          "result": {
+            "ok": true,
+            "value": {
+              "operation_id": "c06550a7-9c4e-406c-b5bf-f189d7e9cc9e",
+              "state": "applied",
+              "plan_sha256": "eddd60d35c4a506fc06986df276e949a14908ad5c5d5312f2ce5c42e48dd0650",
+              "files": [
+                {
+                  "path": "docs/document-maintenance-probe/README.md",
+                  "before_sha256": "a71aa59c6d28aa0649d611f23969374ebcabbd1074b5e9af4dc7a635cb907acc",
+                  "after_sha256": "fda90d766e16d4aeb1ae610a415541180d2c3951359542588cdd58e20d68ee27",
+                  "current_sha256": "fda90d766e16d4aeb1ae610a415541180d2c3951359542588cdd58e20d68ee27"
+                },
+                {
+                  "path": "docs/document-maintenance-probe/obsolete.md",
+                  "before_sha256": "9da2c555504ae358b8517b0bf449f8bebee1c7e0562a48dde75ab7b2b46a790d",
+                  "after_sha256": null,
+                  "current_sha256": null
+                }
+              ],
+              "next_action": "documents/status"
+            }
+          }
+        },
+        {
+          "seq": 89,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "documents/read",
+            "input": {
+              "path": "docs/document-maintenance-probe/README.md"
+            }
+          }
+        },
+        {
+          "seq": 90,
+          "type": "receipt",
+          "action": "documents/read",
+          "result": {
+            "ok": true,
+            "value": {
+              "path": "docs/document-maintenance-probe/README.md",
+              "source_sha256": "fda90d766e16d4aeb1ae610a415541180d2c3951359542588cdd58e20d68ee27",
+              "format": "markdown",
+              "blocks_total": 2
+            }
+          }
+        },
+        {
+          "seq": 91,
+          "type": "call",
+          "name": "glob",
+          "arguments": {
+            "pattern": "docs/document-maintenance-probe/**"
+          }
+        },
+        {
+          "seq": 98,
+          "type": "turn/end",
+          "reason": {
+            "kind": "completed"
+          }
+        },
+        {
+          "seq": 108,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "documents/recover",
+            "input": {
+              "operation_id": "c06550a7-9c4e-406c-b5bf-f189d7e9cc9e",
+              "expected_plan_sha256": "eddd60d35c4a506fc06986df276e949a14908ad5c5d5312f2ce5c42e48dd0650"
+            }
+          }
+        },
+        {
+          "seq": 111,
+          "type": "receipt",
+          "action": "documents/recover",
+          "result": {
+            "ok": true,
+            "value": {
+              "operation_id": "c06550a7-9c4e-406c-b5bf-f189d7e9cc9e",
+              "state": "recovered",
+              "plan_sha256": "eddd60d35c4a506fc06986df276e949a14908ad5c5d5312f2ce5c42e48dd0650",
+              "files": [
+                {
+                  "path": "docs/document-maintenance-probe/README.md",
+                  "before_sha256": "a71aa59c6d28aa0649d611f23969374ebcabbd1074b5e9af4dc7a635cb907acc",
+                  "after_sha256": "fda90d766e16d4aeb1ae610a415541180d2c3951359542588cdd58e20d68ee27",
+                  "current_sha256": "a71aa59c6d28aa0649d611f23969374ebcabbd1074b5e9af4dc7a635cb907acc"
+                },
+                {
+                  "path": "docs/document-maintenance-probe/obsolete.md",
+                  "before_sha256": "9da2c555504ae358b8517b0bf449f8bebee1c7e0562a48dde75ab7b2b46a790d",
+                  "after_sha256": null,
+                  "current_sha256": "9da2c555504ae358b8517b0bf449f8bebee1c7e0562a48dde75ab7b2b46a790d"
+                }
+              ],
+              "next_action": "documents/recover"
+            }
+          }
+        },
+        {
+          "seq": 115,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "documents/read",
+            "input": {
+              "path": "docs/document-maintenance-probe/README.md"
+            }
+          }
+        },
+        {
+          "seq": 116,
+          "type": "receipt",
+          "action": "documents/read",
+          "result": {
+            "ok": true,
+            "value": {
+              "path": "docs/document-maintenance-probe/README.md",
+              "source_sha256": "a71aa59c6d28aa0649d611f23969374ebcabbd1074b5e9af4dc7a635cb907acc",
+              "format": "markdown",
+              "blocks_total": 2
+            }
+          }
+        },
+        {
+          "seq": 117,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "documents/read",
+            "input": {
+              "path": "docs/document-maintenance-probe/obsolete.md"
+            }
+          }
+        },
+        {
+          "seq": 118,
+          "type": "receipt",
+          "action": "documents/read",
+          "result": {
+            "ok": true,
+            "value": {
+              "path": "docs/document-maintenance-probe/obsolete.md",
+              "source_sha256": "9da2c555504ae358b8517b0bf449f8bebee1c7e0562a48dde75ab7b2b46a790d",
+              "format": "markdown",
+              "blocks_total": 2
+            }
+          }
+        },
+        {
+          "seq": 124,
+          "type": "turn/end",
+          "reason": {
+            "kind": "completed"
+          }
+        }
+      ]
+    },
+    {
+      "session_id": "session-b28a8d65-120c-4a6a-a1e0-64de2e80a1a7",
+      "events": [
+        {
+          "seq": 23,
+          "type": "call",
+          "name": "skill",
+          "arguments": {
+            "name": "research-eval"
+          }
+        },
+        {
+          "seq": 25,
+          "type": "call",
+          "name": "read",
+          "arguments": {
+            "file_path": "$DATA_ROOT/README.md"
+          }
+        },
+        {
+          "seq": 30,
+          "type": "call",
+          "name": "glob",
+          "arguments": {
+            "pattern": "evolution/*"
+          }
+        },
+        {
+          "seq": 32,
+          "type": "call",
+          "name": "read",
+          "arguments": {
+            "file_path": "$DATA_ROOT/docs/harness-research/README.md"
+          }
+        },
+        {
+          "seq": 37,
+          "type": "call",
+          "name": "glob",
+          "arguments": {
+            "pattern": "evolution/**"
+          }
+        },
+        {
+          "seq": 39,
+          "type": "call",
+          "name": "glob",
+          "arguments": {
+            "pattern": "agents/*"
+          }
+        },
+        {
+          "seq": 44,
+          "type": "call",
+          "name": "glob",
+          "arguments": {
+            "pattern": "agents/*/*"
+          }
+        },
+        {
+          "seq": 46,
+          "type": "call",
+          "name": "grep",
+          "arguments": {
+            "pattern": "U-INS-001"
+          }
+        },
+        {
+          "seq": 51,
+          "type": "call",
+          "name": "read",
+          "arguments": {
+            "file_path": "$DATA_ROOT/agents/security-operations-expert/evaluation.md"
+          }
+        },
+        {
+          "seq": 53,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "context",
+            "input": {}
+          }
+        },
+        {
+          "seq": 58,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "describe",
+            "input": {
+              "action": "cases/list"
+            }
+          }
+        },
+        {
+          "seq": 60,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "describe",
+            "input": {
+              "action": "runs/index"
+            }
+          }
+        },
+        {
+          "seq": 62,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "describe",
+            "input": {
+              "action": "runs/show"
+            }
+          }
+        },
+        {
+          "seq": 64,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "describe",
+            "input": {
+              "action": "runs/read-file"
+            }
+          }
+        },
+        {
+          "seq": 69,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "cases/list",
+            "input": {
+              "agent_id": "security-operations-expert"
+            }
+          }
+        },
+        {
+          "seq": 71,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "runs/index",
+            "input": {
+              "agent_id": "security-operations-expert"
+            }
+          }
+        },
+        {
+          "seq": 76,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "describe",
+            "input": {
+              "action": "cases/read"
+            }
+          }
+        },
+        {
+          "seq": 78,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "describe",
+            "input": {
+              "action": "runs/evidence"
+            }
+          }
+        },
+        {
+          "seq": 83,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "cases/read",
+            "input": {
+              "agent_id": "security-operations-expert",
+              "case_id": "U-INS-001"
+            }
+          }
+        },
+        {
+          "seq": 84,
+          "type": "receipt",
+          "action": "cases/read",
+          "result": {
+            "ok": false,
+            "error": {
+              "code": "invalid_request",
+              "message": "缺少 experiment_id",
+              "details": {}
+            }
+          }
+        },
+        {
+          "seq": 85,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "runs/show",
+            "input": {
+              "run_id": "run-a331f9ed-8dce-4b18-82a5-12ca948ab2c6",
+              "case_id": "U-INS-001"
+            }
+          }
+        },
+        {
+          "seq": 86,
+          "type": "receipt",
+          "action": "runs/show",
+          "result": {
+            "ok": true,
+            "value": {
+              "run_id": "run-a331f9ed-8dce-4b18-82a5-12ca948ab2c6",
+              "case": {
+                "case_id": "U-INS-001",
+                "frozen": {
+                  "case_id": "U-INS-001",
+                  "title": "常规巡检",
+                  "inputs": [
+                    "执行一次常规巡检。"
+                  ],
+                  "expected_behavior": "先调用 `list_executable_inspections`，从本轮目录选出唯一匹配的已发布常规巡检任务，使用返回的 `taskId`、`definitionVersion` 和本次请求稳定的 `requestId` 调用一次 `start_inspection`，全量巡检不传 `scope`。之后只以同一 `runId` 调用 `get_inspection_result` 直到报告就绪，不重复发起。回复依据服务的 `conclusionStatus`、`businessSummary` 和完整 `reportMarkdown`，准确给出设备数量，不改写结论；设备数量缺失时说明缺口，该项不得判通过。仅当 `reportDownloadUrl` 非空时原样提供下载地址。运行中、工具失败或报告未就绪时不得声称完成；结果为 `PARTIAL` 时须说明证据缺口。"
+                },
+                "current": {
+                  "case_id": "U-INS-001",
+                  "title": "常规巡检：完整请求同轮准备并执行",
+                  "inputs": [
+                    "执行一次常规巡检，覆盖当前巡检服务的全部资产。"
+                  ],
+                  "expected_behavior": "1. 根据真实可用能力选择常规巡检，使用显式全量范围；同轮发起一次，不另等确认、不伪造上下文。\n2. 同一请求的重试不得创建重复运行；执行回执未知时先核对原请求，取得真实运行标识后只续查该运行。\n3. 运行中报告状态和标识，不冒充完成。完成后依据同次回执说明范围、资产数量、各项结论及证据缺口，仅提供真实存在的报告入口。\n4. 常规巡检覆盖在线状态、基线和可达性，不暗中扩成新漏洞扫描。数据缺失、未核查与异常分别表达，不能将执行完成或未知项当作全部正常。\n5. 外部依赖失败时保留失败证据和已完成部分，说明实际覆盖范围；没有真实执行回执不能判业务通过。"
+                },
+                "contract_changed": true
+              },
+              "missing": [],
+              "source_verification": null
+            }
+          }
+        },
+        {
+          "seq": 90,
+          "type": "call",
+          "name": "grep",
+          "arguments": {
+            "pattern": "口径与输入|冻结",
+            "path": "$DATA_ROOT/docs/harness-research/evaluation-and-evidence.md"
+          }
+        },
+        {
+          "seq": 95,
+          "type": "call",
+          "name": "read",
+          "arguments": {
+            "file_path": "$DATA_ROOT/docs/harness-research/evaluation-and-evidence.md",
+            "limit": 20
+          }
+        },
+        {
+          "seq": 101,
+          "type": "turn/end",
+          "reason": {
+            "kind": "completed"
+          }
+        },
+        {
+          "seq": 114,
+          "type": "call",
+          "name": "platform_agents",
+          "arguments": {
+            "action": "cases/read",
+            "input": {
+              "agent_id": "security-operations-expert",
+              "case_id": "U-INS-001"
+            }
+          }
+        },
+        {
+          "seq": 115,
+          "type": "receipt",
+          "action": "cases/read",
+          "result": {
+            "ok": true,
+            "value": {
+              "case": {
+                "id": "U-INS-001",
+                "title": "常规巡检：完整请求同轮准备并执行",
+                "inputs": [
+                  "执行一次常规巡检，覆盖当前巡检服务的全部资产。"
+                ],
+                "expected_behavior": "1. 根据真实可用能力选择常规巡检，使用显式全量范围；同轮发起一次，不另等确认、不伪造上下文。\n2. 同一请求的重试不得创建重复运行；执行回执未知时先核对原请求，取得真实运行标识后只续查该运行。\n3. 运行中报告状态和标识，不冒充完成。完成后依据同次回执说明范围、资产数量、各项结论及证据缺口，仅提供真实存在的报告入口。\n4. 常规巡检覆盖在线状态、基线和可达性，不暗中扩成新漏洞扫描。数据缺失、未核查与异常分别表达，不能将执行完成或未知项当作全部正常。\n5. 外部依赖失败时保留失败证据和已完成部分，说明实际覆盖范围；没有真实执行回执不能判业务通过。",
+                "scene": "安全巡检",
+                "tier": "fast"
+              },
+              "sha256": "14661100837768b7bba05d85f7bdbafb12ed0f57b07ce127556443cdbb88b6d3",
+              "path": "agents/security-operations-expert/evaluation.md"
+            }
+          }
+        },
+        {
+          "seq": 120,
+          "type": "turn/end",
+          "reason": {
+            "kind": "completed"
+          }
+        }
+      ]
+    },
+    {
+      "session_id": "session-f7e1a1b4-450f-430f-b753-fe2592dce167",
+      "events": [
+        {
+          "seq": 22,
+          "type": "call",
+          "name": "read",
+          "arguments": {
+            "file_path": "$DATA_ROOT/docs/document-maintenance-probe/README.md"
+          }
+        },
+        {
+          "seq": 28,
+          "type": "call",
+          "name": "read",
+          "arguments": {
+            "file_path": "$DATA_ROOT/docs/document-maintenance-probe/current.md"
+          }
+        },
+        {
+          "seq": 34,
+          "type": "turn/end",
+          "reason": {
+            "kind": "completed"
+          }
+        }
+      ]
+    }
+  ]
+}

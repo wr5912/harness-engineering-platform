@@ -29,7 +29,7 @@ def load_module(path: Path, prefix: str):
 def evaluation_text(case_id: str, stage: str) -> str:
     return f"""# 测试用例
 
-### {stage}场景
+## {stage}场景
 
 #### {case_id} {stage}用例
 
@@ -364,6 +364,21 @@ class FrozenRunSnapshotTests(unittest.TestCase):
                     self.assertEqual(inputs.read_bytes() if inputs.exists() else None, content)
                     with self.assertRaisesRegex(ValueError, "对照 Run 缺少有效"):
                         module.comparison_run_view(repo, run_dir.name)
+
+    def test_invalid_current_evaluation_preserves_frozen_run_and_unknown_comparison(self):
+        module = load_module(fixtures.RUN_RECORD, "invalid_current_evaluation")
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            run_dir, _ = recorded_run(module, repo)
+            before = (run_dir / "inputs.lock.json").read_bytes()
+            frozen = json.loads(before)["evaluation_cases"]
+            evaluation = repo / "agents/example-agent/evaluation.md"
+            evaluation.write_text(evaluation.read_text() + "\n### 不支持的分组\n重要条件。\n")
+            view = module.run_view(repo, run_dir.name)
+            self.assertEqual(view["cases"][0]["frozen"], frozen[0])
+            self.assertIsNone(view["cases"][0]["contract_changed"])
+            self.assertTrue(any("当前评测无法解析" in item for item in view["missing"]))
+            self.assertEqual((run_dir / "inputs.lock.json").read_bytes(), before)
 
     def test_manifest_replace_failure_preserves_previous_file(self) -> None:
         module = load_module(fixtures.RUN_RECORD, "atomic_run_manifest")

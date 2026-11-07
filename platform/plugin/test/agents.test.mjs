@@ -2108,6 +2108,7 @@ test('用例按选中区块保存，多轮与档位回读一致，冲突和无�
   const handler = createAgentsHandler(root)
   const base = { experiment_id: 'EXP-test-agent-001', case_id: 'U-CASE-001' }
   const before = await rpc(handler, 'cases/read', base)
+  assert.deepEqual(await rpc(handler, 'cases/read', { agent_id: 'test-agent', case_id: base.case_id }), before)
   assert.deepEqual(before.case.inputs, ['ping'])
   const update = { ...base, title: '多轮保存', inputs: ['first\n\ncontinued', 'second'], expected_behavior: '返回两轮的真实结果。', fast: false, expected_sha256: before.sha256 }
   const saved = await rpc(handler, 'cases/update', update)

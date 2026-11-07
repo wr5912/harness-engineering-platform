@@ -194,3 +194,21 @@ test('排序拒绝重复、遗漏、额外或跨场景 ID、缺失摘要及取�
   assert.equal((await fx.handler('cases/reorder', { experiment_id: experiment, scene: '基础', case_ids: ['U-CASE-001'], expected_sha256: hash(fx.initial) }, controller.signal)).error.code, 'aborted')
   assert.equal(fx.writes.length, 0); assert.equal(readFileSync(fx.evaluation, 'utf8'), fx.initial)
 }))
+
+test('创建、改号与删除共用合同边界，围栏中的场景和用例示例逐字保留', () => withFixture(async fx => {
+  const example = '\n```md\n## 基础\n#### U-CASE-001 字面示例\n**预期**\n示例\n```\n';
+  write(fx.evaluation, fx.initial.replace('返回目录。', '返回目录。' + example));
+  const created = await call(fx, 'cases/create', await payload(fx));
+  assert.equal(created.ok, true, JSON.stringify(created));
+  let content = readFileSync(fx.evaluation, 'utf8');
+  assert.ok(content.indexOf('#### U-CASE-003') < content.indexOf('## 其他'));
+  const renamed = await call(fx, 'cases/renumber', { expected_sha256: hash(content), renames: [{ from: 'U-CASE-001', to: 'U-CASE-004' }] });
+  assert.equal(renamed.ok, true, JSON.stringify(renamed));
+  content = readFileSync(fx.evaluation, 'utf8');
+  assert.ok(content.includes(example));
+  const removed = await call(fx, 'cases/delete', { expected_sha256: hash(content), case_id: 'U-CASE-004' });
+  assert.equal(removed.ok, true, JSON.stringify(removed));
+  content = readFileSync(fx.evaluation, 'utf8');
+  assert.ok(content.includes(example));
+  assert.deepEqual((await parseEvaluationDocument(fx.root, content)).case_ids, ['U-CASE-003', 'U-CASE-002']);
+}));

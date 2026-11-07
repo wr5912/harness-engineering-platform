@@ -1,5 +1,6 @@
 import { validateCaseIds, type CaseCatalog } from '../evaluation/case-ids.ts'
 import { reuseParentDependencies } from './plugin-dependency-reuse.ts'
+import { documentOperation } from './document-operations.ts'
 import { assetText } from './asset-text.ts'
 import { createRequire } from 'node:module'
 import { execFile, spawnSync } from 'node:child_process'
@@ -1404,7 +1405,7 @@ function evaluationPreviewCode(root: string) {
     '    handle.write(sys.stdin.read())',
     '    name = handle.name',
     'try:',
-    '    print(json.dumps(load_evaluation(Path(name)), ensure_ascii=False))',
+    '    print(json.dumps(load_evaluation(Path(name), include_ranges=True), ensure_ascii=False))',
     'finally:',
     '    Path(name).unlink(missing_ok=True)',
   ].join('\n')
@@ -1491,8 +1492,8 @@ function caseFromEvaluation(evaluation: Awaited<ReturnType<typeof loadEvaluation
 }
 
 async function readCase(root: string, payload: JsonMap, signal?: AbortSignal) {
-  const exp = experimentInfo(root, experimentIdField(payload))
-  const evaluation = await loadEvaluation(root, exp.agent_id, signal)
+  const agentId = payload.experiment_id === undefined ? agentIdField(payload) : experimentInfo(root, experimentIdField(payload)).agent_id
+  const evaluation = await loadEvaluation(root, agentId, signal)
   return ok({ case: caseFromEvaluation(evaluation, stringField(payload, 'case_id')), sha256: evaluation.sha256, path: evaluation.path })
 }
 
@@ -1512,7 +1513,7 @@ async function updateCase(root: string, payload: JsonMap, signal?: AbortSignal) 
   const inputs = (payload.inputs as string[]).map(value => value.replace(/\r\n?/g, '\n').trim())
   const expectedBehavior = stringField(payload, 'expected_behavior').replace(/\r\n?/g, '\n')
   if (typeof payload.fast !== 'boolean') throw new RpcError('invalid_request', 'fast 必须是布尔值')
-  const { start, end } = caseBlockRange(evaluation.content, caseId)
+  const { start, end } = caseBlockRange(evaluation.content, caseId, evaluation.parsed as { ranges: Record<string, { start_line: number; end_line: number }> })
   const oldBlock = evaluation.content.slice(start, end)
   const newline = oldBlock.includes('\r\n') ? '\r\n' : '\n'
   const tail = oldBlock.match(/(?:\r?\n)*$/)?.[0] || newline
@@ -1835,6 +1836,7 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
     try {
       const body = payload === undefined ? {} : requireObject(payload)
       if (['assets/build', 'assets/dependencies/prepare'].includes(endpoint)) assertVersionEditable(root, experimentIdField(body))
+      if (endpoint.startsWith('documents/') && endpoint !== 'documents/read') return ok(documentOperation(root, endpoint.slice('documents/'.length), body))
       if (endpoint.startsWith('migrations/')) return await migrations(endpoint.slice('migrations/'.length) as any, body, signal)
       if (endpoint === 'assets/build-preview' || endpoint === 'assets/build') {
         const result = await assetBuild(endpoint === 'assets/build-preview' ? 'preview' : 'build', body, signal)

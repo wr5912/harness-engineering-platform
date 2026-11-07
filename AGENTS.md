@@ -164,7 +164,7 @@ Memory 位于仓库外的 `$CODEX_HOME/memories`，不得复制进仓库、Resea
 2. 按本次任务检索[AI 纠错经验总结](docs/AI纠错经验总结.md)的相关条目，涉及歧义时查[项目术语表](docs/项目术语表.md)；不要求每次通读全部历史记录。
 3. 阅读 `docs/standards/SOURCES.md` 与 `docs/standards/PROJECT-INTERPRETATION.md`，确认来源对平台开发及 Harness 研究的适用范围。
 4. 阅读项目验收矩阵，确定涉及的 `PA-xx`、已有证据和缺口。
-5. 按[分支与开发工作流](#分支与开发工作流)判断任务对象并选择技能；平台及通用工具开发使用本仓库 `dsh-platform-development`。新建、迁移、修改或优化业务 Harness 时，读取已选数据工作区的 `AGENTS.md` 和 `.agents/skills/workspace-management/SKILL.md`，按数据侧原则开展任务。
+5. 按[分支与开发工作流](#分支与开发工作流)判断任务对象并选择技能；平台及通用工具开发使用本仓库 `dsh-platform-development`。编写项目说明使用 [writing-project-docs](.agents/skills/writing-project-docs/SKILL.md)，审查项目文档使用 [reviewing-project-docs](.agents/skills/reviewing-project-docs/SKILL.md)；业务用例和 Skill 审查使用各自技能。新建、迁移、修改或优化业务 Harness 时，读取已选数据工作区的 `AGENTS.md` 和 `.agents/skills/workspace-management/SKILL.md`，按数据侧原则开展任务。
 6. 检查 Git 工作树和现有资产；不得覆盖、回退或混入他人的改动。涉及运行或环境操作时，先核对工作树、目标主机、实例、进程／端口及实际来源，按本次目标区分本地、部署测试与其他环境。
 
 ## 分支与开发工作流

@@ -621,7 +621,11 @@ def run_view(repo: Path, run_id: str, case_id: str | None = None) -> dict:
     if case_id and case_id not in frozen:
         raise ValueError(f"Run 未选择 Case：{case_id}")
     evaluation_path = repo / manifest["evaluation_ref"]
-    current = load_evaluation(evaluation_path)["cases"] if evaluation_path.is_file() else {}
+    try:
+        current = load_evaluation(evaluation_path)["cases"]
+    except (OSError, ValueError) as error:
+        current = None
+        missing.append(f"当前评测无法解析，合同比较未知：{error}")
     rows_path = run_dir / "results.jsonl"
     rows = [json.loads(line) for line in rows_path.read_text(encoding="utf-8").splitlines() if line.strip()] if rows_path.is_file() else []
     analysis_path = run_dir / "analysis.json"
@@ -694,8 +698,8 @@ def run_view(repo: Path, run_id: str, case_id: str | None = None) -> dict:
         cases.append({
             "case_id": selected_id,
             "frozen": contract,
-            "current": current.get(selected_id),
-            "contract_changed": current.get(selected_id) != contract if contract is not None else None,
+            "current": current.get(selected_id) if current is not None else None,
+            "contract_changed": current.get(selected_id) != contract if contract is not None and current is not None else None,
             "trials": selected_rows,
             "output": response.get("assistant_texts") if response else None,
             "actual_routes": [turn.get("route") for turn in response.get("turns", [])] if response else None,

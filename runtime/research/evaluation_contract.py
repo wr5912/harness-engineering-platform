@@ -9,12 +9,28 @@ import re
 from pathlib import Path
 
 
-CASE_RE = re.compile(r"^#### (U-[A-Z0-9-]+)\s+([^\n]+)$", re.MULTILINE)
+CASE_RE = re.compile(r"^#### (U-[A-Z0-9-]+)[ \t]+([^\n]+)$", re.MULTILINE)
 CASE_LIKE_RE = re.compile(r"^#### ([A-Z]-[A-Z0-9-]+)\s+", re.MULTILINE)
-LABEL_RE = re.compile(r"^\*\*(用户输入(?: ([1-9][0-9]*))?|预期)\*\*\s*$", re.MULTILINE)
-BOLD_LABEL_RE = re.compile(r"^\*\*[^*\n]+\*\*\s*$", re.MULTILINE)
+LABEL_RE = re.compile(r"^\*\*(用户输入(?: ([1-9][0-9]*))?|预期)\*\*[ \t]*$", re.MULTILINE)
+BOLD_LABEL_RE = re.compile(r"^\*\*[^*\n]+\*\*[ \t]*$", re.MULTILINE)
 SCENE_RE = re.compile(r"^## ([^\n]+)$", re.MULTILINE)
 FAST_MARKER = "**评估档位：** `fast`"
+
+
+def _structure(text: str) -> str:
+    """遮蔽围栏代码，保持原偏移；示例中的标题和字段不是合同结构。"""
+    lines = []
+    fence = None
+    for line in text.splitlines(keepends=True):
+        marker = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line.rstrip("\n"))
+        hidden = fence is not None or marker is not None
+        if fence:
+            if marker and marker[1][0] == fence[0] and len(marker[1]) >= len(fence) and not marker[2].strip():
+                fence = None
+        elif marker:
+            fence = marker[1]
+        lines.append(re.sub(r"[^\n]", " ", line) if hidden else line)
+    return "".join(lines)
 
 
 def _input(block: str, case_id: str, label: str) -> str:
@@ -32,8 +48,9 @@ def _input(block: str, case_id: str, label: str) -> str:
 
 
 def _case(case_id: str, title: str, body: str) -> dict[str, object]:
-    labels = list(LABEL_RE.finditer(body))
-    all_labels = list(BOLD_LABEL_RE.finditer(body))
+    structure = _structure(body)
+    labels = list(LABEL_RE.finditer(structure))
+    all_labels = list(BOLD_LABEL_RE.finditer(structure))
     if len(labels) != len(all_labels):
         raise ValueError(f"{case_id} 只允许用户输入和预期两个字段")
     if not labels:
@@ -70,15 +87,21 @@ def _case(case_id: str, title: str, body: str) -> dict[str, object]:
     }
 
 
-def load_evaluation(path: Path) -> dict[str, object]:
+def load_evaluation(path: Path, *, include_ranges: bool = False) -> dict[str, object]:
     if not path.is_file() or path.is_symlink():
         raise ValueError(f"缺少实体评测文件：{path}")
     text = path.read_text(encoding="utf-8")
-    unsupported = [match.group(1) for match in CASE_LIKE_RE.finditer(text)
+    structure = _structure(text)
+    for heading in re.finditer(r"^(#{1,6})[ \t]+([^\n]+)$", structure, re.MULTILINE):
+        level, title = len(heading[1]), heading[2]
+        if level == 3 or (level != 4 and re.match(r"[A-Z]-[A-Z0-9-]+(?:\s|$)", title)) or (level == 4 and title.startswith("U-") and not CASE_RE.fullmatch(heading[0])) or (level == 1 and CASE_RE.search(structure[:heading.start()])):
+            line = text.count("\n", 0, heading.start()) + 1
+            raise ValueError(f"evaluation.md 第 {line} 行标题层级不支持：使用二级场景标题和四级 U-* 用例标题")
+    unsupported = [match.group(1) for match in CASE_LIKE_RE.finditer(structure)
                    if not match.group(1).startswith("U-")]
     if unsupported:
         raise ValueError("evaluation.md 只允许业务 U-* Case：" + "、".join(unsupported))
-    matches = list(CASE_RE.finditer(text))
+    matches = list(CASE_RE.finditer(structure))
     if not matches:
         raise ValueError("evaluation.md 至少需要一个 U-* Case")
 
@@ -90,15 +113,18 @@ def load_evaluation(path: Path) -> dict[str, object]:
     cases = {}
     catalog = []
     signatures = {}
+    ranges = {}
     for index, match in enumerate(matches):
         end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
-        body = text[match.end():end]
-        next_section = re.search(r"^#{1,3} ", body, re.MULTILINE)
+        next_section = re.search(r"^## ", structure[match.end():end], re.MULTILINE)
         if next_section:
-            body = body[:next_section.start()]
+            end = match.end() + next_section.start()
+        ranges[match[1]] = {"start_line": text.count("\n", 0, match.start()),
+                            "end_line": text.count("\n", 0, end) + (1 if end == len(text) and text and not text.endswith("\n") else 0)}
+        body = text[match.end():end]
         lines = body.splitlines()
         first = next((index for index, line in enumerate(lines) if line.strip()), None)
-        marker_lines = [index for index, line in enumerate(lines) if line.startswith("**评估档位：**")]
+        marker_lines = [index for index, line in enumerate(_structure(body).splitlines()) if line.startswith("**评估档位：**")]
         if marker_lines and (marker_lines != [first] or lines[first] != FAST_MARKER):
             raise ValueError(f"{match.group(1)} 评估档位只能在标题下首行标记为 fast")
         fast = bool(marker_lines)
@@ -111,13 +137,20 @@ def load_evaluation(path: Path) -> dict[str, object]:
             raise ValueError(f"业务测试输入重复：{signatures[signature]}、{value['case_id']}")
         signatures[signature] = value["case_id"]
         cases[value["case_id"]] = value
-        headings = list(SCENE_RE.finditer(text[:match.start()]))
+        headings = list(SCENE_RE.finditer(structure[:match.start()]))
         catalog.append({
             "case_id": value["case_id"],
             "scene": headings[-1].group(1).strip() if headings else "未分组",
             "fast": fast,
         })
-    return {"case_ids": case_ids, "cases": cases, "catalog": catalog}
+    result = {"case_ids": case_ids, "cases": cases, "catalog": catalog}
+    if include_ranges:
+        result["ranges"] = ranges
+        sections = list(SCENE_RE.finditer(structure))
+        result["scene_ranges"] = [{"scene": section[1].strip(),
+                                   "end_line": text.count("\n", 0, sections[i + 1].start()) if i + 1 < len(sections) else len(text.splitlines())}
+                                  for i, section in enumerate(sections)]
+    return result
 
 
 def execution_for(path: Path, selected_case_ids: list[str]) -> list[dict[str, object]]:

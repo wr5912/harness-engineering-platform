@@ -1,0 +1,29 @@
+{
+  "input": "# 评测\n\n## 巡检\n\n#### U-INS-001 常规巡检\n\n**评估档位：** `fast`\n\n**用户输入**\n\n> 执行一次常规巡检。\n\n**预期**\n\n仅完整报告就绪时才能报完成。\n### 下载\n仅 reportDownloadUrl 非空时原样提供。PARTIAL 说明缺失；未完成不得报完成。\n",
+  "old_case_count": 1,
+  "old_expected": "仅完整报告就绪时才能报完成。",
+  "new_error": "evaluation.md 第 16 行标题层级不支持：使用二级场景标题和四级 U-* 用例标题",
+  "fixed_input": "# 评测\n\n## 巡检\n\n#### U-INS-001 常规巡检\n\n**评估档位：** `fast`\n\n**用户输入**\n\n> 执行一次常规巡检。\n\n**预期**\n\n仅完整报告就绪时才能报完成。\n下载：\n仅 reportDownloadUrl 非空时原样提供。PARTIAL 说明缺失；未完成不得报完成。\n",
+  "new_parsed": {
+    "case_ids": [
+      "U-INS-001"
+    ],
+    "cases": {
+      "U-INS-001": {
+        "case_id": "U-INS-001",
+        "title": "常规巡检",
+        "inputs": [
+          "执行一次常规巡检。"
+        ],
+        "expected_behavior": "仅完整报告就绪时才能报完成。\n下载：\n仅 reportDownloadUrl 非空时原样提供。PARTIAL 说明缺失；未完成不得报完成。"
+      }
+    },
+    "catalog": [
+      {
+        "case_id": "U-INS-001",
+        "scene": "巡检",
+        "fast": true
+      }
+    ]
+  }
+}
