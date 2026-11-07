@@ -11,7 +11,7 @@ import { build } from 'esbuild'
 import { execFileSync } from 'node:child_process'
 import { compositionQueries } from '../src/mcp/definition.ts'
 const queryNames = compositionQueries.map(item => item.toolName)
-import { publishCompositionVersion, readCompositions, writeCompositions } from '../src/mcp/compositions.ts'
+import { compositionConfig, publishCompositionVersion, readCompositions, writeCompositions } from '../src/mcp/compositions.ts'
 import { mappedInput } from '../src/mcp/nested.ts'
 import { registerFixedCompositionTools, withFixedCompositionExecution } from '../src/workflows/fixed-composition.ts'
 
@@ -31,6 +31,34 @@ async function loadMcpModule(native = false) {
   })
   return import(outfile)
 }
+
+test('删除未被当前入口引用的子组合后，列表仍保留历史版本且不生成无效执行绑定', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'mcp-history-list-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const file = join(root, 'compositions.json')
+  const leaf = { id: 'leaf' }, parent = { id: 'parent' }
+  const single = id => compositionConfig({ toolName: id, title: id, description: '', connectionId: 'soc' })
+  publishCompositionVersion(leaf, single('leaf'))
+  publishCompositionVersion(parent, compositionConfig({ kind: 'composite', toolName: 'parent', title: 'parent', description: '',
+    steps: [{ id: 'child', compositionId: 'leaf', versionId: leaf.publishedVersionId, inputMap: {} }] }))
+  const oldVersionId = parent.publishedVersionId
+  publishCompositionVersion(parent, single('parent'))
+  const catalog = { schema_version: '1.0', compositions: [parent] }
+  writeCompositions(file, catalog, readCompositions(file).revision)
+  const module = await loadMcpModule()
+  const handler = module.createMcpHandler(root, { compositionsFile: file })
+  const result = await handler('list', {})
+  assert.equal(result.ok, true, JSON.stringify(result.error))
+  const entry = result.value.compositions[0]
+  assert.equal(entry.binding.versionId, parent.publishedVersionId)
+  assert.match(entry.binding.expectedImplementationDigest, /^[a-f0-9]{64}$/)
+  const historical = entry.versions.find(version => version.versionId === oldVersionId)
+  assert.equal(historical.binding, undefined)
+  assert.match(historical.bindingError, /子组合已发布版本不存在/)
+  const executed = await handler('callPublishedComposition', { compositionId: 'parent', toolName: 'parent', versionId: oldVersionId, input: { asset: 'host' } })
+  assert.equal(executed.ok, false)
+  assert.match(executed.error.message, /删除|不存在/)
+})
 
 function listen(server) {
   return new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server.address().port)))

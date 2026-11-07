@@ -1,0 +1,24 @@
+✔ 同一真实消息和工具的执行身份跨调用稳定；换参数不能偷偷换身份 (3.032232ms)
+✔ 真实主会话绑定不依赖关键词，缺少真实来源或子会话不能伪造身份 (1.553101ms)
+✔ 原生定时每次到期有独立身份，同一次投递重试保持不变 (0.411941ms)
+✔ 业务别名和预览后的确认交给原生助手理解，不额外用正则拦截 (0.441765ms)
+✔ 原生定时批次按真实消息绑定，不重新解析或改写原生信封 (0.38128ms)
+✔ 装载保留真实 Schema 和回执，丢回执重试传递原身份；查询不改请求 (2.648432ms)
+✔ 巡检 Skill 锁定本轮能力，策略和应急工具不能越界 (14.017125ms)
+✔ 应急确认轮次仍能查询当前操作结果 (1.025008ms)
+✔ 无需登录的development实例不安装security-operations-guard工具限制和 Guard (1.001637ms)
+✔ 无需登录的development实例不安装security-operations-child-guard工具限制和 Guard (1.650773ms)
+✔ 无需登录的development实例不安装policy-configuration-guard工具限制和 Guard (0.544949ms)
+✔ 无需登录的development实例不安装emergency-action-guard工具限制和 Guard (0.364613ms)
+✔ 无需登录的published实例不安装security-operations-guard工具限制和 Guard (0.309632ms)
+✔ 无需登录的published实例不安装security-operations-child-guard工具限制和 Guard (0.295955ms)
+✔ 无需登录的published实例不安装policy-configuration-guard工具限制和 Guard (0.370002ms)
+✔ 无需登录的published实例不安装emergency-action-guard工具限制和 Guard (0.514708ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 167.066323

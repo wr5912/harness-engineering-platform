@@ -208,5 +208,16 @@ export function assertPublishedDependencies(catalog: Catalog, config: Compositio
 }
 
 export function compositionReferences(catalog: Catalog, id: string, publishedOnly = false, dependencies: Dependencies = config => config.steps ?? []) {
-  return catalog.compositions.filter(entry => entry.id !== id && [...(publishedOnly ? [] : [entry.draft]), entry.published, ...(entry.published ? (entry.versions ?? []).map(version => version.config) : [])].some(config => config && ((!publishedOnly && config.workflow === id) || dependencies(config).some(step => step.compositionId === id)))).map(entry => ({ id: entry.id, title: entry.published?.title ?? entry.draft?.title ?? entry.id }))
+  const references = (config: CompositionConfig, path = new Set<string>()): boolean => {
+    if (!publishedOnly && config.workflow === id) return true
+    return dependencies(config).some(step => {
+      if (step.compositionId === id) return true
+      const key = `${step.compositionId}:${step.versionId}`
+      if (path.has(key)) return false
+      const fixed = catalog.compositions.find(entry => entry.id === step.compositionId)?.versions?.find(version => version.versionId === step.versionId)
+      return fixed ? references(fixed.config, new Set([...path, key])) : false
+    })
+  }
+  // 只从当前草稿和发布入口追踪实际固定依赖；未被引用的历史版本不阻止下架。
+  return catalog.compositions.filter(entry => entry.id !== id && [...(publishedOnly ? [] : [entry.draft]), entry.published].some(config => config && references(config))).map(entry => ({ id: entry.id, title: entry.published?.title ?? entry.draft?.title ?? entry.id }))
 }

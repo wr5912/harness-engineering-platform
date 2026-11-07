@@ -1,0 +1,25 @@
+{
+  "ok": true,
+  "inspectionIds": [
+    "inspection-baseline",
+    "inspection-deep",
+    "inspection-reachability",
+    "inspection-routine",
+    "inspection-vulnerabilities"
+  ],
+  "unavailableHistoricalBindings": 6,
+  "publishedToolNames": [
+    "inspection_baseline",
+    "inspection_vulnerabilities",
+    "inspection_reachability",
+    "inspection_routine",
+    "inspection_deep",
+    "policy_change",
+    "emergency_action"
+  ],
+  "queryToolNames": [
+    "get_composition_run",
+    "get_composition_artifact",
+    "get_composition_details"
+  ]
+}

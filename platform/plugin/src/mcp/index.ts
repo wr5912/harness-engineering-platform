@@ -52,8 +52,14 @@ async function listState(registry: McpRegistry, assetRoot: string, compositionsF
       inputSchema: entry.published?.workflow && registry.extension?.workflows?.[entry.published.workflow] ? compositionInputSchema(entry.published, registry.extension) : undefined,
       ...(entry.published ? { binding: { compositionId: entry.id, versionId: entry.publishedVersionId,
         expectedImplementationDigest: compositionImplementationDigest(entry.published, registry.extension, catalog, registry) } } : {}),
-      versions: entry.versions?.map(version => ({ ...version, binding: { compositionId: entry.id, versionId: version.versionId,
-        expectedImplementationDigest: compositionImplementationDigest(version.config, registry.extension, catalog, registry) } })),
+      versions: entry.versions?.map(version => {
+        try {
+          return { ...version, binding: { compositionId: entry.id, versionId: version.versionId,
+            expectedImplementationDigest: compositionImplementationDigest(version.config, registry.extension, catalog, registry) } }
+        } catch (error) {
+          return { ...version, bindingError: error instanceof Error ? error.message : String(error) }
+        }
+      }),
       graphs: Object.fromEntries(await Promise.all((['draft', 'published'] as const).filter(key => entry[key]).map(async key => [key, await compositionStructure(entry[key], catalog, registry.extension, true)]))),
     }))),
     draftTools: boundDrafts(assetRoot).map(item => ({ ...item.config, inputSchema: compositionInputSchema(item.config, registry.extension) })),

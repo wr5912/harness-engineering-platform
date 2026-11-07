@@ -38,3 +38,23 @@ test('其他编排复用包内工作流源码时计为直接引用', () => {
     assert.deepEqual(compositionReferences(catalog,'child',true),[])
   }
 })
+
+test('未引用的历史父版本不阻止下架，当前入口固定的旧版本仍检查传递依赖', () => {
+  const leaf = { id: 'leaf' }, parent = { id: 'parent' }, root = { id: 'root' }
+  const single = id => compositionConfig({kind:'workflow',workflow:id,toolName:id,title:id,description:''})
+  const childOf = (id, entry) => compositionConfig({kind:'composite',workflow:id,toolName:id,title:id,description:'',steps:[{id:'child',compositionId:entry.id,versionId:entry.publishedVersionId,inputMap:{}}]})
+  publishCompositionVersion(leaf, single('leaf'))
+  publishCompositionVersion(parent, childOf('parent', leaf))
+  const old = parent.published
+  const oldVersionId = parent.publishedVersionId
+  publishCompositionVersion(root, childOf('root', parent))
+  publishCompositionVersion(parent, single('parent'))
+  const catalog = {schema_version:'1.0',compositions:[leaf,parent,root]}
+  assert.deepEqual(compositionReferences(catalog,'leaf',true),[{id:'root',title:'root'}])
+  publishCompositionVersion(root, childOf('root', parent))
+  assert.deepEqual(compositionReferences(catalog,'leaf'),[])
+  delete leaf.published
+  assert.throws(() => assertPublishedDependencies(catalog,old),/下架|删除/)
+  assert.doesNotThrow(() => assertPublishedDependencies(catalog,root.published))
+  assert.ok(parent.versions.some(version => version.versionId === oldVersionId))
+})
