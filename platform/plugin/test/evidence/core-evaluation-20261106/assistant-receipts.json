@@ -1,0 +1,186 @@
+{
+  "session_id": "session-e85ff680-3426-4c6f-9a66-bab434129584",
+  "evidence_scope": "管理助手保存回执摘录及研发工具独立字节核对；不是业务 Run",
+  "skill_reads": [
+    {
+      "seq": 36,
+      "path": "/home/cmp/harness-engineering-platform-data/.agents/skills/evaluation-review/references/platform-adapter.md"
+    },
+    {
+      "seq": 37,
+      "path": "/home/cmp/harness-engineering-platform-data/.agents/skills/evaluation-review/references/sources-and-methods.md"
+    },
+    {
+      "seq": 63,
+      "path": "/home/cmp/harness-engineering-platform-data/.agents/skills/evaluation-review/assets/case-template.md"
+    },
+    {
+      "seq": 64,
+      "path": "/home/cmp/harness-engineering-platform-data/.agents/skills/evaluation-review/assets/u-ins-001.platform.md"
+    },
+    {
+      "seq": 65,
+      "path": "/home/cmp/harness-engineering-platform-data/.agents/skills/evaluation-review/agents/openai.yaml"
+    }
+  ],
+  "receipts": [
+    {
+      "call_seq": 55,
+      "result_seq": 56,
+      "action": "cases/list",
+      "state": "completed",
+      "ok": true,
+      "path": "agents/security-operations-expert/evaluation.md",
+      "sha256": "1055d09a4dec9489862ac3b9126ef8203895aeed337cb9e46dd520bbf592d16e"
+    },
+    {
+      "call_seq": 122,
+      "result_seq": 123,
+      "action": "cases/list",
+      "state": "completed",
+      "ok": true,
+      "path": "agents/security-operations-expert/evaluation.md",
+      "sha256": "8bd5937c72b085b0f75d107f8eebfe5573f68264deb74f8157a35784300f9cb8"
+    },
+    {
+      "call_seq": 196,
+      "result_seq": 197,
+      "action": "cases/list",
+      "state": "completed",
+      "ok": true,
+      "path": "agents/security-operations-expert/evaluation.md",
+      "sha256": "8bd5937c72b085b0f75d107f8eebfe5573f68264deb74f8157a35784300f9cb8"
+    },
+    {
+      "call_seq": 226,
+      "result_seq": 227,
+      "action": "edit/preview",
+      "state": "completed",
+      "ok": true,
+      "dry_run": {
+        "mode": "dry",
+        "preflight_scope": "changed-files",
+        "checks": [
+          "草稿格式"
+        ],
+        "note": "仅检查本次文件；未执行源码、评测、模型或业务工具，未启动实例或创建 Run。"
+      },
+      "edits": [
+        {
+          "path": "agents/security-operations-expert/evaluation.md",
+          "before_sha256": "8bd5937c72b085b0f75d107f8eebfe5573f68264deb74f8157a35784300f9cb8",
+          "after_sha256": "764bf7e4a8d1cb96b4dc07b18bfc962036e059d293333018b284418596d09e3c"
+        }
+      ]
+    },
+    {
+      "call_seq": 243,
+      "result_seq": 246,
+      "action": "edit/apply",
+      "state": "completed",
+      "ok": true,
+      "written": [
+        {
+          "path": "agents/security-operations-expert/evaluation.md",
+          "sha256": "764bf7e4a8d1cb96b4dc07b18bfc962036e059d293333018b284418596d09e3c"
+        }
+      ],
+      "dry_run": {
+        "mode": "dry",
+        "preflight_scope": "changed-files",
+        "checks": [
+          "草稿格式"
+        ],
+        "note": "仅检查本次文件；未执行源码、评测、模型或业务工具，未启动实例或创建 Run。"
+      }
+    },
+    {
+      "call_seq": 251,
+      "result_seq": 252,
+      "action": "cases/list",
+      "state": "completed",
+      "ok": true,
+      "path": "agents/security-operations-expert/evaluation.md",
+      "sha256": "764bf7e4a8d1cb96b4dc07b18bfc962036e059d293333018b284418596d09e3c"
+    },
+    {
+      "call_seq": 253,
+      "result_seq": 254,
+      "action": "edit/read",
+      "state": "completed",
+      "ok": true,
+      "path": "agents/security-operations-expert/evaluation.md",
+      "sha256": "764bf7e4a8d1cb96b4dc07b18bfc962036e059d293333018b284418596d09e3c",
+      "content_sha256": "764bf7e4a8d1cb96b4dc07b18bfc962036e059d293333018b284418596d09e3c"
+    },
+    {
+      "call_seq": 306,
+      "result_seq": 309,
+      "action": "cases/update",
+      "state": "completed",
+      "ok": true,
+      "path": "agents/security-operations-expert/evaluation.md",
+      "sha256": "8daf5e7c756845e8aa6103cd9ea858b4e7c5a3373adc04b49566a80a0ef0a952",
+      "case": {
+        "id": "U-FLT-012",
+        "title": "从业务症状发现对象并定位故障",
+        "scene": "故障排查",
+        "tier": "fast"
+      },
+      "input_count": 4
+    },
+    {
+      "call_seq": 313,
+      "result_seq": 314,
+      "action": "cases/read",
+      "state": "completed",
+      "ok": true,
+      "path": "agents/security-operations-expert/evaluation.md",
+      "sha256": "8daf5e7c756845e8aa6103cd9ea858b4e7c5a3373adc04b49566a80a0ef0a952",
+      "case": {
+        "id": "U-FLT-012",
+        "title": "从业务症状发现对象并定位故障",
+        "scene": "故障排查",
+        "tier": "fast"
+      },
+      "input_count": 4
+    },
+    {
+      "call_seq": 315,
+      "result_seq": 316,
+      "action": "cases/list",
+      "state": "completed",
+      "ok": true,
+      "path": "agents/security-operations-expert/evaluation.md",
+      "sha256": "8daf5e7c756845e8aa6103cd9ea858b4e7c5a3373adc04b49566a80a0ef0a952",
+      "case_count": 28,
+      "scene_count": 9,
+      "fast_count": 8
+    }
+  ],
+  "independent_readback": {
+    "sha256": "8daf5e7c756845e8aa6103cd9ea858b4e7c5a3373adc04b49566a80a0ef0a952",
+    "matches_reviewed_draft_bytes": true,
+    "case_count": 28,
+    "scene_count": 9,
+    "fast_count": 8,
+    "scenes": {
+      "安全巡检": 4,
+      "独立应急指令": 3,
+      "策略配置": 4,
+      "故障排查": 4,
+      "智能问答": 2,
+      "威胁事件研判": 4,
+      "原生定时研判": 2,
+      "语音交互": 1,
+      "资产纳管": 4
+    },
+    "last_updated_case": "U-FLT-012",
+    "input_count": 4
+  },
+  "limitations": [
+    "原生 bash 未能访问宿主机隔离草案路径；后续平台编辑工具保存与回读成功，独立字节核对一致",
+    "未执行 28 条业务 Run、统一网关定时研判到期、语音或耗时对照",
+    "首次审查遇到来源摘要冲突后未保存；承接并行编号后重新预览保存"
+  ]
+}

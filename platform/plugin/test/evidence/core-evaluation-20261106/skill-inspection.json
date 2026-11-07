@@ -1,0 +1,6 @@
+{
+  "target": "/tmp/hep-core-evaluation-ad81zh3s/data/.agents/skills/evaluation-review",
+  "files_read": 1,
+  "findings": [],
+  "note": "只读、无外部依赖；不是完整 YAML 解析器、恶意代码扫描器或真实运行评估。REVIEW 不代表确认缺陷。"
+}
