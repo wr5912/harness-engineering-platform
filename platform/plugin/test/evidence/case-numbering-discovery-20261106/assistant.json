@@ -1,0 +1,59 @@
+{
+  "session_id": "session-63d57d87-74a0-462a-b24f-d7166144fa47",
+  "completed": true,
+  "tool_calls": [
+    "skill",
+    "read",
+    "read",
+    "read",
+    "read",
+    "grep",
+    "read",
+    "read",
+    "read",
+    "read",
+    "read",
+    "read",
+    "read"
+  ],
+  "read_paths": [
+    "/home/cmp/harness-engineering-platform-data/.agents/skills/evaluation-review/references/platform-adapter.md",
+    "/home/cmp/harness-engineering-platform-data/docs/harness-research/evaluation-and-evidence.md",
+    "/home/cmp/harness-engineering-platform-data/agents/security-operations-expert/evaluation.md",
+    "/home/cmp/harness-engineering-platform-data/mcp/docs/policy-response-interaction-design.md",
+    "/home/cmp/harness-engineering-platform-data/mcp/docs/policy-response-interaction-design.md",
+    "/home/cmp/harness-engineering-platform-data/agents/security-operations-expert/evaluation.md",
+    "/home/cmp/harness-engineering-platform-data/agents/security-operations-expert/evaluation.md",
+    "/home/cmp/harness-engineering-platform-data/agents/security-operations-expert/evaluation.md",
+    "/home/cmp/harness-engineering-platform-data/agents/security-operations-expert/evaluation.md",
+    "/home/cmp/harness-engineering-platform-data/agents/security-operations-expert/evaluation.md",
+    "/home/cmp/harness-engineering-platform-data/agents/security-operations-expert/evaluation.md"
+  ],
+  "final": "**结论：当前文档覆盖了“先咨询、发现对象，再进入任务”的多轮场景，也保留了输入齐全直接办理的路径。这里只确认文档覆盖，不代表能力已实现或评测通过。**\n\n### 实际阅读\n- 已先调用 [evaluation-review 技能](</home/cmp/harness-engineering-platform-data/.agents/skills/evaluation-review/SKILL.md>)。\n- 已读 [平台适配与编号规则](</home/cmp/harness-engineering-platform-data/.agents/skills/evaluation-review/references/platform-adapter.md#L16-L27>)、[共用评测口径](</home/cmp/harness-engineering-platform-data/docs/harness-research/evaluation-and-evidence.md#L5-L17>)。\n- 已读 [业务评测总则及相关用例](</home/cmp/harness-engineering-platform-data/agents/security-operations-expert/evaluation.md>)、[策略与应急交互设计](</home/cmp/harness-engineering-platform-data/mcp/docs/policy-response-interaction-design.md>)。\n\n### 1. 现行编号格式\n唯一合法形式为 **`U-场景英文缩写-三位数字`**：缩写只能是单段大写英文字母，序号为 `001`～`999`。标题格式为 `#### 合法编号 业务名称`，全文件编号唯一，标题不得夹带第二套编号或别名。\n\n本次读取时仍见 `U-ASSET-ALERTS-001` 等旧格式，见[相关标题](</home/cmp/harness-engineering-platform-data/agents/security-operations-expert/evaluation.md#L1499-L1551>)；**未改号，也不认定整改已完成。**\n\n### 2. 场景覆盖\n| 方向 | 已有多轮覆盖 |\n|---|---|\n| 巡检 | `U-INS-024/025`：发现设备→选定巡检→分析异常，以及已有结果缺失时不自动补跑 |\n| 策略 | `U-POL-017～019`：发现防火墙→草稿；异常设备→诊断→策略预览；候选变化与取消 |\n| 应急 | `U-EMG-005/006`：发现异常或主机→方案→取消，或明确执行→续查原动作 |\n| 研判 | `U-THREAT-019/020`：事件发现→选定研判→只读处置方案，以及候选不完整时不默选 |\n\n另有 `U-QA-016` 覆盖新用户能力咨询→只读发现，`U-FLT-012` 覆盖业务名称→正式诊断。\n\n**直接办理也已保留**：例如巡检 `U-INS-001`、策略 `U-POL-002`、研判 `U-THREAT-008`。[交互设计第 2.3 节](</home/cmp/harness-engineering-platform-data/mcp/docs/policy-response-interaction-design.md#L49-L65>)明确不强制补走咨询流程。细分来看，应急直接执行在[第 7.3 节](</home/cmp/harness-engineering-platform-data/mcp/docs/policy-response-interaction-design.md#L275-L284>)已有设计，但独立应急用例目前以单轮方案准备、多轮执行为主，未见单独的单轮直接执行用例。\n\n本轮仅只读核验：未修改文件、未改号，未创建、发布或执行组合编排，未调用 AISOC，未启动业务评测。",
+  "current_assets": [
+    {
+      "path": ".agents/skills/evaluation-review/SKILL.md",
+      "sha256": "c8b21e89b9e7172638275271b07e2936b5f1e8d37b0fcb6722420d3dbd66d979"
+    },
+    {
+      "path": ".agents/skills/evaluation-review/references/platform-adapter.md",
+      "sha256": "7958e81fed31f30b2d256d6b552186530e821cdb853a7b5c6f49f878b9af059e"
+    },
+    {
+      "path": ".agents/skills/agent-maintenance/SKILL.md",
+      "sha256": "5f33440ff3c48fd1cff934a68d880dc3b94c39e424ed75dd3ef2415f99248c5c"
+    },
+    {
+      "path": ".agents/skills/mcp-composition/SKILL.md",
+      "sha256": "53246109efc995dcb6b884436192fa24b7b93b88e6c1a71e61254ba5eff5fd24"
+    },
+    {
+      "path": ".agents/skills/reviewing-agent-skills/SKILL.md",
+      "sha256": "32f3d862f0a1e9c222faa1809ff993877d171287dc47a0c1aef739a92cb90404"
+    },
+    {
+      "path": "mcp/docs/policy-response-interaction-design.md",
+      "sha256": "7322d55c55f512f1adc273ee7f30c286d94805a8aa67551fcdf7117f1a94d87d"
+    }
+  ]
+}

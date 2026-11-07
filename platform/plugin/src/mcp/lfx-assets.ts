@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
+import { buildSync } from 'esbuild'
 import { readCompositions, versionConfig, type Catalog, type CompositionConfig } from './compositions.ts'
 
-export type LfxBundle = { engine: 'lfx==1.13.1'; flow: any; modules: Record<string, string>; children: Record<string, LfxBundle> }
+export type LfxBundle = { engine: 'lfx==1.13.1'; flow: any; modules: Record<string, string>; children: Record<string, LfxBundle>; typescript?: string }
 export const lfxDigest = (bundle: LfxBundle) => createHash('sha256').update(JSON.stringify(bundle)).digest('hex')
 
 /** 只验证序列化结构，不导入组件、不构造 Graph、不访问上游。 */
@@ -48,11 +49,27 @@ export function loadLfxBundle(root: string, id: string, config: CompositionConfi
     return bundle
   }
   const flow = validateLfxFlow(JSON.parse(readFileSync(join(base, 'flow.json'), 'utf8')))
+  const own = realpathSync(base), shared = existsSync(join(root, 'mcp/src')) ? realpathSync(join(root, 'mcp/src')) : join(root, 'mcp/src')
+  const within = (directory: string, path: string) => { const name = relative(directory, path); return name !== '..' && !name.startsWith('../') && !name.startsWith('..\\') }
+  let typescript: string | undefined
+  if (flow.metadata?.hep?.typescript !== undefined) {
+    const entry = flow.metadata.hep.typescript
+    if (typeof entry !== 'string' || !entry.endsWith('.ts')) throw new Error('LFX TypeScript 入口无效')
+    const source = realpathSync(resolve(base, entry))
+    if (!within(own, source)) throw new Error('LFX TypeScript 入口必须属于本编排')
+    // 只静态编译，不导入业务模块；发布包保存实际执行的完整依赖字节。
+    const compiled = buildSync({ absWorkingDir: join(root, 'mcp'), entryPoints: [source], bundle: true, write: false, format: 'esm', platform: 'node', target: 'node24', metafile: true, logLevel: 'silent' })
+    for (const path of Object.keys(compiled.metafile!.inputs)) {
+      const actual = realpathSync(resolve(root, 'mcp', path))
+      if (!within(own, actual) && !within(shared, actual)) throw new Error('LFX TypeScript 依赖只能来自本编排或 MCP 共用源码')
+    }
+    typescript = compiled.outputFiles![0].text
+  }
   const modules: Record<string, string> = {}
   for (const [name, path] of Object.entries(flow.metadata?.hep?.modules ?? {})) {
     if (!/^[a-z][a-z0-9_]*$/.test(name) || typeof path !== 'string') throw new Error('LFX 模块引用无效')
     const source = realpathSync(resolve(root, 'mcp', path))
-    if (relative(realpathSync(join(root, 'mcp')), source).startsWith('..')) throw new Error('LFX 模块必须属于 MCP 资产')
+    if (!within(own, source) && !within(shared, source)) throw new Error('LFX 模块只能来自本编排或 MCP 共用源码')
     modules[name] = readFileSync(source, 'utf8')
   }
   const children: Record<string, LfxBundle> = {}
@@ -65,7 +82,7 @@ export function loadLfxBundle(root: string, id: string, config: CompositionConfi
     if (Object.entries(definition.connections ?? {}).some(([alias, connection]) => config.connections?.[alias] !== connection)) throw new Error('父 LFX 编排必须包含子编排的相同连接绑定')
     children[key] = loadLfxBundle(root, child.compositionId, definition, versions, new Set([...ancestors, key]))
   }
-  return { engine: 'lfx==1.13.1', flow, modules, children }
+  return { engine: 'lfx==1.13.1', flow, modules, children, ...(typescript === undefined ? {} : { typescript }) }
 }
 
 export function freezeLfxBundle(root: string, id: string, config: CompositionConfig) {

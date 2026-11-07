@@ -9,6 +9,34 @@ import type { CompositionWorkflow, WorkflowContext } from './extension.ts'
 import { freezeLfxBundle, lfxCanvas, lfxDigest, loadLfxBundle, type LfxBundle } from './lfx-assets.ts'
 
 type Invoke = (connection: string, operation: string, args: Record<string, any>, signal: AbortSignal, fingerprint?: string) => Promise<any>
+const moduleDigest = (source: string) => createHash('sha256').update(source).digest('hex')
+async function typedWorkflow(bundle: LfxBundle, invoke: Invoke): Promise<CompositionWorkflow | undefined> {
+  if (!bundle.typescript) return undefined
+  const module = await import('data:text/javascript;base64,' + Buffer.from(bundle.typescript).toString('base64'))
+  return module.create(invoke)
+}
+
+/** 每个节点独立派发；缓存与重试必须由了解业务语义的组件决定。 */
+export function lfxCallbacks(config: any, context: WorkflowContext, invoke: Invoke, components: Record<string, CompositionWorkflow['components']> = {}) {
+  return async (value: any) => {
+    if (value.action === 'invoke') {
+      if (!Object.values(config.connections ?? {}).includes(value.connection)) throw new Error('LFX 使用了未绑定的连接')
+      return context.call(() => invoke(value.connection, value.operation, value.arguments, context.signal, context.shared?.connection_fingerprints?.[value.connection]))
+    }
+    if (value.action === 'component') {
+      const module = Object.hasOwn(components, value.module_digest ?? '') && components[value.module_digest]
+      const component = module && Object.hasOwn(module, value.name ?? '') && module[value.name]
+      if (typeof component !== 'function' || typeof value.node_id !== 'string') throw new Error('LFX TypeScript 组件未登记在当前冻结包中')
+      return component(value.input, config, { ...context, nodeId: value.node_id })
+    }
+    if (value.action === 'progress') {
+      const { node_id, action: _action, ...progress } = value
+      context.progress.call({ ...context, nodeId: node_id }, progress)
+      return
+    }
+    throw new Error('未知 LFX 回调')
+  }
+}
 let processState: { process: ChildProcess; url: string; key: string } | undefined
 let starting: Promise<NonNullable<typeof processState>> | undefined
 
@@ -35,7 +63,9 @@ async function runtime() {
           if (attempt === 99) throw new Error('LFX 尚未就绪')
         }
         clearTimeout(timer)
-        processState = { process: child, url, key }; resolve(processState)
+        processState = { process: child, url, key }
+        child.unref(); (child.stdout as any)?.unref?.(); (child.stderr as any)?.unref?.()
+        resolve(processState)
       } catch { /* 仅识别启动回执。 */ }
     })
     child.once('error', error => { clearTimeout(timer); reject(error) })
@@ -47,30 +77,26 @@ async function runtime() {
 
 async function execute(bundle: LfxBundle, input: any, config: any, context: WorkflowContext, invoke: Invoke) {
   const host = await runtime(), token = randomUUID(), runKey = randomUUID(), flowId = randomUUID()
-  const cache = new Map<string, Promise<any>>()
+  const components: Record<string, CompositionWorkflow['components']> = {}
+  async function register(current: LfxBundle) {
+    if (current.typescript) components[moduleDigest(current.typescript)] = (await typedWorkflow(current, invoke))?.components
+    for (const child of Object.values(current.children)) await register(child)
+  }
+  await register(bundle)
+  const callback = lfxCallbacks(config, context, invoke, components)
+  let callbackError: string | undefined
   const server = createServer(async (request, response) => {
     if (request.headers.authorization !== `Bearer ${token}`) { response.writeHead(401).end(); return }
     try {
       let text = ''; for await (const chunk of request) { text += chunk; if (text.length > 16 * 1024 * 1024) throw new Error('LFX 回调过大') }
       const value = JSON.parse(text)
-      let result: any
-      if (value.action === 'invoke') {
-        if (!Object.values(config.connections ?? {}).includes(value.connection)) throw new Error('LFX 使用了未绑定的连接')
-        const key = JSON.stringify([value.connection, value.operation, value.arguments])
-        if (!cache.has(key)) cache.set(key, context.call(async () => {
-          const call = () => invoke(value.connection, value.operation, value.arguments, context.signal, context.shared?.connection_fingerprints?.[value.connection])
-          try { return await call() } catch (error: any) {
-            if (!context.signal.aborted && /ECONNRESET|ETIMEDOUT|fetch failed/.test(error.message)) return call()
-            throw error
-          }
-        }))
-        result = await cache.get(key)
-      } else if (value.action === 'progress') {
-        const { node_id, action: _action, ...progress } = value
-        context.progress.call({ ...context, nodeId: node_id }, progress)
-      } else throw new Error('未知 LFX 回调')
+      const result = await callback(value)
       response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ value: result ?? null }))
-    } catch (error) { response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ error: error instanceof Error ? error.message : 'LFX 回调失败' })) }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'LFX 回调失败'
+      callbackError ??= message
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ error: message }))
+    }
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const port = (server.address() as any).port
@@ -96,10 +122,10 @@ async function execute(bundle: LfxBundle, input: any, config: any, context: Work
         const raw = frame.split('\n').find(line => line.startsWith('data: '))?.slice(6)
         if (!raw) continue
         const event = JSON.parse(raw)
-        if (event.event === 'error') throw new Error('LFX 流程执行失败，请查看节点进度')
+        if (event.event === 'error') throw new Error(callbackError ?? 'LFX 流程执行失败，请查看节点进度')
         if (event.event === 'end_vertex') {
           const built = event.data?.build_data
-          if (built?.valid === false) throw new Error('LFX 节点执行失败，请查看节点进度')
+          if (built?.valid === false) throw new Error(callbackError ?? 'LFX 节点执行失败，请查看节点进度')
           if (outputIds.has(built?.id)) {
             const values = Object.values(built.data?.artifacts ?? {}) as any[]
             result = values.find(value => value && Object.hasOwn(value, 'raw'))?.raw
@@ -120,10 +146,11 @@ export function lfxWorkflow(root: string, id: string, previous: CompositionWorkf
   return { ...previous,
     native: { digest: config => lfxDigest(loadLfxBundle(root, id, config)), freeze: config => freezeLfxBundle(root, id, config) },
     structure: config => config.engine === 'lfx' ? Promise.resolve(lfxCanvas(loadLfxBundle(root, id, config).flow)) : previous.structure?.(config) ?? Promise.resolve({ nodes: [], edges: [] }),
-    prepare: async (input, config, signal) => {
+    prepare: async (input, config, signal, context) => {
       const bundle = config.engine === 'lfx' ? loadLfxBundle(root, id, config) : undefined
-      const snapshot = await previous.prepare?.(input, config, signal)
-      return bundle ? { ...snapshot, lfxBundle: bundle } : snapshot
+      const workflow = bundle && await typedWorkflow(bundle, invoke) || previous
+      const snapshot = await workflow.prepare?.(input, config, signal, context)
+      return bundle ? { ...snapshot, asset_root: root, lfxBundle: bundle } : snapshot
     },
     execute: (input, config, context) => config.engine === 'lfx' ? execute(context.shared.lfxBundle, input, config, context, invoke) : previous.execute!(input, config, context),
   }

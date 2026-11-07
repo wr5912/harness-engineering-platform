@@ -1,0 +1,53 @@
+{
+  "observed_at": "2026-11-06T08:22:51.333920+00:00",
+  "case_count": 117,
+  "scene_count": 10,
+  "prefixes_by_scene": {
+    "安全巡检": "INS",
+    "独立应急指令": "EMG",
+    "策略配置": "POL",
+    "故障排查": "FLT",
+    "智能问答": "QA",
+    "威胁事件研判": "THREAT",
+    "原生定时研判": "SCHED",
+    "语音交互": "VOICE",
+    "资产关联告警代码变体研究": "ASSET",
+    "资产纳管": "ONBOARD"
+  },
+  "heading_aliases": [],
+  "only_four_current_heading_ids_changed": true,
+  "case_numbering_tests": {
+    "command": "node --test test/case-ids.test.mjs test/evaluation-cases.test.mjs test/agent-assets.test.mjs test/evaluation-cases-client.test.mjs",
+    "passed": 31,
+    "failed": 0
+  },
+  "migration_tests": {
+    "command": "node --test test/migrations.test.mjs",
+    "passed": 29,
+    "failed": 0
+  },
+  "agent_regression_tests": {
+    "command": "node --test test/agents.test.mjs",
+    "passed": 76,
+    "failed": 0
+  },
+  "typecheck": {
+    "command": "pnpm exec tsc --noEmit",
+    "passed": true
+  },
+  "build": {
+    "entry": "platform/dsh-deploy update",
+    "passed": true
+  },
+  "current_review_asset_hashes_unchanged": true,
+  "business_evaluation_rerun": false,
+  "external_business_writes": false,
+  "compositions_published": false,
+  "program_scoped_diff_check": true,
+  "data_diff_check": {
+    "passed": false,
+    "reason": "preexisting blank line at EOF from parallel changes",
+    "present_in_before_snapshot": true,
+    "preserved": true
+  }
+}

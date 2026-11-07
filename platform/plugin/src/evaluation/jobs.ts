@@ -29,7 +29,8 @@ const LOG_LIMIT = 16 * 1024
 function requestDigest(payload: MapValue): string {
   const normalize = (value: any): any => Array.isArray(value) ? value.map(normalize)
     : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, normalize(value[key])])) : value
-  const { request_id: _requestId, run_id: _runId, job_id: _jobId, ...input } = payload
+  // 管理助手执行时附加的确认标记不属于预览冻结的评测参数。
+  const { request_id: _requestId, run_id: _runId, job_id: _jobId, confirmed: _confirmed, ...input } = payload
   return createHash('sha256').update(JSON.stringify(normalize(input))).digest('hex')
 }
 

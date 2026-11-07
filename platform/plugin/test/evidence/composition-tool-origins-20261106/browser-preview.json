@@ -1,0 +1,139 @@
+{
+  "mode": "实际平台客户端与实际目录；本浏览器临时替换服务元数据为整改函数计算值，非服务端装载证据",
+  "checks": [
+    {
+      "width": 1440,
+      "overflow": false,
+      "sidebar": "工具组合编排\n6 个已发布编排 · 3 个内置查询工具\n平台服务",
+      "sections": [
+        {
+          "title": "已发布编排 · 6",
+          "tools": [
+            "inspection_status",
+            "inspection_baseline",
+            "inspection_vulnerabilities",
+            "inspection_reachability",
+            "inspection_routine",
+            "inspection_deep"
+          ]
+        },
+        {
+          "title": "平台内置 · 运行查询 · 3",
+          "tools": [
+            "get_composition_run",
+            "get_composition_artifact",
+            "get_composition_details"
+          ]
+        }
+      ],
+      "text": "工具组合编排\n\n提供已发布编排和平台内置运行查询。在「工具组合编排」工作区管理编排版本与发布。\n\n配置：平台工具目录\n连接与工具调用：待验证\n已发布编排 · 6\ninspection_status\n状态检查：按明确资产范围读取 SOC 事实并生成报告；未知和缺失不代表正常。\ninspection_baseline\n基线检查：按明确资产范围读取 SOC 事实并生成报告；未知和缺失不代表正常。\ninspection_vulnerabilities\n漏洞检查：按明确资产范围读取 SOC 事实并生成报告；未知和缺失不代表正常。\ninspection_reachability\n可达性检查：按明确资产范围读取 SOC 事实并生成报告；未知和缺失不代表正常。\ninspection_routine\n常规巡检：按明确资产范围复用固定子组合，共享资产快照与请求额度，缺失和未知不代表正常。\ninspection_deep\n全面巡检：按明确资产范围复用固定子组合，共享资产快照与请求额度，缺失和未知不代表正常。\n平台内置 · 运行查询 · 3\n\n用于读取已有运行、检查明细和报告，由平台提供。\n\nget_composition_run\n按原运行 ID 查询进度、已完成检查、明细和报告清单；不会重新执行。\nget_composition_artifact\n读取原运行已生成的 HTML 或 JSON 报告。\nget_composition_details\n按原运行和节点 ID 分页读取已完成的检查事实，不重新执行。节点 ID 从运行查询取得。"
+    },
+    {
+      "width": 768,
+      "overflow": false,
+      "sidebar": "工具组合编排\n6 个已发布编排 · 3 个内置查询工具\n平台服务",
+      "sections": [
+        {
+          "title": "已发布编排 · 6",
+          "tools": [
+            "inspection_status",
+            "inspection_baseline",
+            "inspection_vulnerabilities",
+            "inspection_reachability",
+            "inspection_routine",
+            "inspection_deep"
+          ]
+        },
+        {
+          "title": "平台内置 · 运行查询 · 3",
+          "tools": [
+            "get_composition_run",
+            "get_composition_artifact",
+            "get_composition_details"
+          ]
+        }
+      ],
+      "text": "工具组合编排\n\n提供已发布编排和平台内置运行查询。在「工具组合编排」工作区管理编排版本与发布。\n\n配置：平台工具目录\n连接与工具调用：待验证\n已发布编排 · 6\ninspection_status\n状态检查：按明确资产范围读取 SOC 事实并生成报告；未知和缺失不代表正常。\ninspection_baseline\n基线检查：按明确资产范围读取 SOC 事实并生成报告；未知和缺失不代表正常。\ninspection_vulnerabilities\n漏洞检查：按明确资产范围读取 SOC 事实并生成报告；未知和缺失不代表正常。\ninspection_reachability\n可达性检查：按明确资产范围读取 SOC 事实并生成报告；未知和缺失不代表正常。\ninspection_routine\n常规巡检：按明确资产范围复用固定子组合，共享资产快照与请求额度，缺失和未知不代表正常。\ninspection_deep\n全面巡检：按明确资产范围复用固定子组合，共享资产快照与请求额度，缺失和未知不代表正常。\n平台内置 · 运行查询 · 3\n\n用于读取已有运行、检查明细和报告，由平台提供。\n\nget_composition_run\n按原运行 ID 查询进度、已完成检查、明细和报告清单；不会重新执行。\nget_composition_artifact\n读取原运行已生成的 HTML 或 JSON 报告。\nget_composition_details\n按原运行和节点 ID 分页读取已完成的检查事实，不重新执行。节点 ID 从运行查询取得。"
+    },
+    {
+      "width": 390,
+      "overflow": false,
+      "sidebar": "工具组合编排6 个已发布编排 · 3 个内置查询工具平台服务",
+      "sections": [
+        {
+          "title": "已发布编排 · 6",
+          "tools": [
+            "inspection_status",
+            "inspection_baseline",
+            "inspection_vulnerabilities",
+            "inspection_reachability",
+            "inspection_routine",
+            "inspection_deep"
+          ]
+        },
+        {
+          "title": "平台内置 · 运行查询 · 3",
+          "tools": [
+            "get_composition_run",
+            "get_composition_artifact",
+            "get_composition_details"
+          ]
+        }
+      ],
+      "text": "工具组合编排\n\n提供已发布编排和平台内置运行查询。在「工具组合编排」工作区管理编排版本与发布。\n\n配置：平台工具目录\n连接与工具调用：待验证\n已发布编排 · 6\ninspection_status\n状态检查：按明确资产范围读取 SOC 事实并生成报告；未知和缺失不代表正常。\ninspection_baseline\n基线检查：按明确资产范围读取 SOC 事实并生成报告；未知和缺失不代表正常。\ninspection_vulnerabilities\n漏洞检查：按明确资产范围读取 SOC 事实并生成报告；未知和缺失不代表正常。\ninspection_reachability\n可达性检查：按明确资产范围读取 SOC 事实并生成报告；未知和缺失不代表正常。\ninspection_routine\n常规巡检：按明确资产范围复用固定子组合，共享资产快照与请求额度，缺失和未知不代表正常。\ninspection_deep\n全面巡检：按明确资产范围复用固定子组合，共享资产快照与请求额度，缺失和未知不代表正常。\n平台内置 · 运行查询 · 3\n\n用于读取已有运行、检查明细和报告，由平台提供。\n\nget_composition_run\n按原运行 ID 查询进度、已完成检查、明细和报告清单；不会重新执行。\nget_composition_artifact\n读取原运行已生成的 HTML 或 JSON 报告。\nget_composition_details\n按原运行和节点 ID 分页读取已完成的检查事实，不重新执行。节点 ID 从运行查询取得。"
+    }
+  ],
+  "group": [
+    {
+      "text": "状态检查已发布编排inspection_status",
+      "checked": true
+    },
+    {
+      "text": "基线检查已发布编排inspection_baseline",
+      "checked": true
+    },
+    {
+      "text": "漏洞检查已发布编排inspection_vulnerabilities",
+      "checked": true
+    },
+    {
+      "text": "可达性检查已发布编排inspection_reachability",
+      "checked": true
+    },
+    {
+      "text": "常规巡检已发布编排inspection_routine",
+      "checked": true
+    },
+    {
+      "text": "全面巡检已发布编排inspection_deep",
+      "checked": true
+    },
+    {
+      "text": "查询组合运行平台内置 · 运行查询get_composition_run",
+      "checked": true
+    },
+    {
+      "text": "读取组合报告平台内置 · 运行查询get_composition_artifact",
+      "checked": true
+    },
+    {
+      "text": "分页查询检查明细平台内置 · 运行查询get_composition_details",
+      "checked": true
+    }
+  ],
+  "light": {
+    "scheme": "切换到深色主题",
+    "sections": [
+      {
+        "title": "已发布编排 · 6",
+        "count": 6
+      },
+      {
+        "title": "平台内置 · 运行查询 · 3",
+        "count": 3
+      }
+    ],
+    "overflow": false
+  },
+  "scriptErrors": []
+}

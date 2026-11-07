@@ -69,6 +69,16 @@ test('预览只预留唯一Run ID，查询可见准备状态，撤销后迟到st
   assert.throws(() => jobs.status(preview.run_id), error => error.code === 'not_found')
 })
 
+test('管理助手附加确认标记可以启动原预留，实际评测参数变化仍冲突', async t => {
+  const fx = await fixture(t), jobs = fx.create()
+  const preview = jobs.reserve(base)
+  await assert.rejects(jobs.start({ ...base, run_id: preview.run_id, confirmed: true, mode: 'full' }), error => error.code === 'conflict')
+  const started = await jobs.start({ ...base, run_id: preview.run_id, confirmed: true })
+  assert.equal(started.run_id, preview.run_id)
+  assert.equal(started.run_created, true)
+  await waitFor(() => jobs.status(preview.run_id), value => value.status === 'completed')
+})
+
 test('同一Run并发与磁盘恢复仅启动一次，参数变化冲突，真正创建后返回成功', async t => {
   const fx = await fixture(t), jobs = fx.create()
   let commands = 0, release

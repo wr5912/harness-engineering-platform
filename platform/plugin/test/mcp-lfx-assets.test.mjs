@@ -1,11 +1,19 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { freezeLfxBundle, lfxCanvas, lfxDependencies, loadLfxBundle, validateLfxFlow } from '../src/mcp/lfx-assets.ts'
 import { assertPublishedDependencies, compositionConfig, compositionReferences, publishCompositionVersion } from '../src/mcp/compositions.ts'
 import { graphLayout } from '../src/mcp/graph-layout.ts'
+import { lfxWorkflow } from '../src/mcp/lfx-runtime.ts'
+import { createHash } from 'node:crypto'
+import { existsSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
+
+const program = fileURLToPath(new URL('../../../', import.meta.url))
+const python = join(program, '.local/lfx', createHash('sha256').update(readFileSync(join(program, 'platform/mcp/lfx/requirements.txt'))).digest('hex'), 'bin/python')
 
 const node = (id, output = false) => ({ id, position: { x: 30, y: 100 }, data: { id, type: 'TestComponent', node: { display_name: id, is_output: output, outputs: [{ name: 'result', display_name: '结果' }], template: { code: { value: 'raise RuntimeError("静态读取禁止执行")' }, value: {} } } } })
 const flow = () => ({ data: { nodes: [node('input'), node('result', true)], edges: [{ source: 'input', target: 'result', data: { sourceHandle: { id: 'input', name: 'result' }, targetHandle: { id: 'result', fieldName: 'value' } } }] } })
@@ -82,4 +90,83 @@ test('原生固定子编排参与发布、下架和删除依赖检查，父绑�
   delete child.published
   assert.throws(() => assertPublishedDependencies(catalog, parent, new Set(), dependencies), /下架/)
   assert.throws(() => loadLfxBundle(root, 'parent', { ...parent, connections: { master: 'wrong' } }, catalog), /连接绑定/)
+})
+
+test('Python 模块仅允许本编排和 MCP 共用源码，禁止跨包及符号链接逃逸', t => {
+  const root = workspace(t), native = flow()
+  save(root, 'leaf', native)
+  for (const name of ['compositions/leaf/src', 'compositions/sibling/src', 'src']) mkdirSync(join(root, 'mcp', name), { recursive: true })
+  const own = join(root, 'mcp/compositions/leaf/src/own.py'), shared = join(root, 'mcp/src/shared.py'), other = join(root, 'mcp/compositions/sibling/src/private.py')
+  for (const file of [own, shared, other]) writeFileSync(file, 'value = 1')
+  const check = path => { native.metadata = { hep: { modules: { code: path } } }; save(root, 'leaf', native); return loadLfxBundle(root, 'leaf', config('leaf')) }
+  assert.equal(check('compositions/leaf/src/own.py').modules.code, 'value = 1')
+  assert.equal(check('src/shared.py').modules.code, 'value = 1')
+  assert.throws(() => check('compositions/sibling/src/private.py'), /本编排或 MCP 共用源码/)
+  symlinkSync(other, join(root, 'mcp/compositions/leaf/src/link.py'))
+  assert.throws(() => check('compositions/leaf/src/link.py'), /本编排或 MCP 共用源码/)
+})
+
+test('TypeScript 静态打包不执行；固定发布后组件及其共用依赖保持原字节', async t => {
+  const root = workspace(t), native = flow(), own = join(root, 'mcp/compositions/typed/src')
+  native.metadata = { hep: { typescript: 'src/index.ts' } }; save(root, 'typed', native)
+  mkdirSync(own, { recursive: true }); mkdirSync(join(root, 'mcp/src'), { recursive: true })
+  const shared = join(root, 'mcp/src/value.ts')
+  writeFileSync(shared, 'export const value = 1')
+  writeFileSync(join(own, 'index.ts'), 'import { value } from "../../../src/value.ts"; export function create() { return { prepare: async () => ({ value }), components: { echo: () => ({ value }) } } }')
+  const first = freezeLfxBundle(root, 'typed', config('typed')), fixed = { ...config('typed'), flowDigest: first }
+  writeFileSync(shared, 'export const value = 2')
+  assert.notEqual(freezeLfxBundle(root, 'typed', config('typed')), first)
+  const workflow = lfxWorkflow(root, 'typed', { inputSchema: {}, sourceDigest: 'current', connections: () => [] }, async () => undefined)
+  assert.equal((await workflow.prepare({}, fixed, new AbortController().signal)).value, 1)
+  assert.equal((await workflow.prepare({}, config('typed'), new AbortController().signal)).value, 2)
+  writeFileSync(join(own, 'index.ts'), 'throw new Error("静态阶段禁止导入"); export function create() {}')
+  assert.doesNotThrow(() => freezeLfxBundle(root, 'typed', config('typed')))
+  save(root, 'sibling', flow()); mkdirSync(join(root, 'mcp/compositions/sibling/src'), { recursive: true })
+  writeFileSync(join(root, 'mcp/compositions/sibling/src/private.ts'), 'export const value = 3')
+  writeFileSync(join(own, 'index.ts'), 'import { value } from "../../sibling/src/private.ts"; export { value }')
+  assert.throws(() => freezeLfxBundle(root, 'typed', config('typed')), /本编排或 MCP 共用源码/)
+})
+
+test('官方 HTTP 嵌套流程执行冻结 TS 组件，状态轮询不复用旧回执', { skip: !existsSync(python) }, t => {
+  const root = workspace(t)
+  const native = JSON.parse(execFileSync(python, ['-c', `
+import json
+from test_runtime import node, custom, flow, edge
+from hep_lfx import HepInput
+body=' async def build(self)->Data:\\n  from hep_lfx import component\\n  return Data(data=await component("read",payload(self.value),self._id))\\n'
+print(json.dumps(flow([node(HepInput,'input'),custom('first',body),custom('second',body,output=True)],[edge('input','first'),edge('first','second')])))
+`], { cwd: join(program, 'platform/mcp/lfx'), encoding: 'utf8' }))
+  native.metadata = { hep: { typescript: 'src/index.ts' } }; save(root, 'typed', native)
+  const source = join(root, 'mcp/compositions/typed/src')
+  mkdirSync(source)
+  writeFileSync(join(source, 'index.ts'), `export function create(invoke) { return { components: { read: async (input, config, context) => {
+    const state = await context.call(() => invoke('master', 'status', {id:1}, context.signal));
+    return { values: [...(input.values ?? []), state.value], frozen: 1 };
+  } } } }`)
+  const fixed = { ...config('typed'), flowDigest: freezeLfxBundle(root, 'typed', config('typed')) }
+  const child = { id: 'typed' }; publishCompositionVersion(child, fixed)
+  writeFileSync(join(root, 'mcp/compositions.json'), JSON.stringify({ schema_version: '1.0', compositions: [child] }))
+  const parent = JSON.parse(execFileSync(python, ['-c', `
+import json
+from test_runtime import node, flow, edge
+from hep_lfx import HepInput, HepChild
+print(json.dumps(flow([node(HepInput,'input'),node(HepChild,'child',output=True,composition_id='typed',version_id=${JSON.stringify(child.publishedVersionId)})],[edge('input','child')])))
+`], { cwd: join(program, 'platform/mcp/lfx'), encoding: 'utf8' }))
+  save(root, 'parent', parent)
+  const parentFixed = { ...config('parent'), flowDigest: freezeLfxBundle(root, 'parent', config('parent')) }
+  writeFileSync(join(source, 'index.ts'), 'throw new Error("不得加载已修改的草稿")')
+  const script = `
+import assert from 'node:assert/strict';
+import { lfxWorkflow } from ${JSON.stringify(new URL('../src/mcp/lfx-runtime.ts', import.meta.url).href)};
+try {
+  const config = ${JSON.stringify(parentFixed)}, nodes = []; let calls = 0;
+  const workflow = lfxWorkflow(${JSON.stringify(root)},'parent', {inputSchema:{},sourceDigest:'test',connections:()=>[]},async()=>({value:++calls}));
+  const signal = AbortSignal.timeout(30000), shared = await workflow.prepare({}, config, signal);
+  const result = await workflow.execute({}, config, {runId:'test',nodeId:'root',signal,shared,call:fn=>fn(),progress(value){nodes.push({id:this.nodeId,...value})}});
+  assert.deepEqual(result,{values:[1,2],frozen:1}); assert.equal(calls,2);
+  assert.ok(nodes.some(node=>node.id==='root/child/second' && node.status==='completed'));
+  process.exit(0);
+} catch(error) { console.error(error); process.exit(1); }
+`
+  execFileSync(process.execPath, ['--input-type=module', '-'], { input: script, timeout: 40_000, env: { ...process.env, HARNESS_PROGRAM_ROOT: program } })
 })

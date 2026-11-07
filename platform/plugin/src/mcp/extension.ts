@@ -29,13 +29,15 @@ export type WorkflowContext = {
   map<T, R>(items: T[], call: (item: T, index: number) => Promise<R>): Promise<R[]>
 }
 export type CompositionWorkflow = {
+  responseMode?: 'complete'
   native?: { digest(config: CompositionConfig): string; freeze(config: CompositionConfig): string }
   inputSchema: Record<string, any>
   outputSchema?: Record<string, any>
   sourceDigest: string
   connections(config: CompositionConfig): string[]
   structure?(config: CompositionConfig): Promise<{ nodes: any[]; edges: any[] }>
-  prepare?(input: Record<string, any>, config: CompositionConfig, signal: AbortSignal): Promise<any>
+  prepare?(input: Record<string, any>, config: CompositionConfig, signal: AbortSignal, context?: Pick<WorkflowContext, 'call'>): Promise<any>
+  components?: Record<string, (input: Record<string, any>, config: CompositionConfig, context: WorkflowContext) => Promise<Record<string, any>> | Record<string, any>>
   execute?(input: Record<string, any>, config: CompositionConfig, context: WorkflowContext): Promise<Record<string, any>>
   aggregate?(steps: Record<string, any>, input: Record<string, any>, context: WorkflowContext): Promise<Record<string, any>>
   artifacts?(result: Record<string, any>): { id: string; filename: string; contentType: string; body: string }[]

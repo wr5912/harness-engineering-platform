@@ -1,0 +1,22 @@
+{
+  "observed_at": "2026-11-06T08:20:57.990Z",
+  "actual_platform": true,
+  "response_overlays": false,
+  "current_asset_ids": [
+    "U-ASSET-001",
+    "U-ASSET-002",
+    "U-ASSET-003",
+    "U-ASSET-004"
+  ],
+  "discovery_case_visible": "U-POL-017",
+  "suggestion": "U-ASSET-005",
+  "rejected": [
+    "U-ASSET-ALERTS-005",
+    "U-ASSET-000",
+    "U-ASSET-1000"
+  ],
+  "draft_retained": true,
+  "valid_preview": true,
+  "saved": false,
+  "page_errors": []
+}

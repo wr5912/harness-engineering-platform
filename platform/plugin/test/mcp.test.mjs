@@ -21,7 +21,7 @@ async function loadMcpModule(native = false) {
   const outfile = join(outdir, 'index.mjs')
   await symlink(join(process.cwd(), 'node_modules'), join(outdir, 'node_modules'), 'dir')
   await build({
-    stdin: { contents: `export * from './src/mcp/${native ? 'native' : 'index'}.ts'; export { managementDispatch } from './src/mcp/control.ts'`, resolveDir: process.cwd(), loader: 'ts' },
+    stdin: { contents: `export * from './src/mcp/${native ? 'native' : 'index'}.ts'; export { managementDispatch } from './src/mcp/control.ts'; export { withBusinessContext } from './src/business-control/core.ts'`, resolveDir: process.cwd(), loader: 'ts' },
     outfile,
     bundle: true,
     platform: 'node',
@@ -35,6 +35,24 @@ async function loadMcpModule(native = false) {
 function listen(server) {
   return new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server.address().port)))
 }
+
+test('草稿绑定和执行回执允许真实管理上下文，业务上下文不能冒用管理身份', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'mcp-management-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const module = await loadMcpModule()
+  const handler = module.createMcpHandler(root)
+  const request = { revision: 'stale', instanceName: 'acceptance', compositionIds: [] }
+  const manager = (endpoint, payload) => module.managementDispatch(root, () => handler(endpoint, payload))
+  const invalid = await manager('bindCompositionDrafts', request)
+  assert.notEqual(invalid.error.code, 'forbidden')
+  assert.match(invalid.error.message, /目录已变化/)
+  assert.equal((await manager('compositionExecution', { execution_id: 'missing' })).error.code, 'not_found')
+  const business = { subject: { id: 'platform-management' }, scope: {}, sourceDigest: 'platform-management' }
+  for (const endpoint of ['bindCompositionDrafts', 'compositionExecution']) {
+    const result = await module.withBusinessContext(business, () => handler(endpoint, request))
+    assert.equal(result.error.code, 'forbidden')
+  }
+})
 
 async function jsonRpc(url, body) {
   const response = await fetch(url, {
@@ -625,6 +643,8 @@ test('已发布编排服务与 Gateway 共用工具和执行路径，草稿发�
     const client = module.createPublishedCompositionClient(join(process.cwd(), '../..'), handler)
     const original = (await rpc('list', {})).value
     assert.equal(original.publishedService.id, 'platform-compositions')
+    assert.deepEqual(original.publishedService.publishedTools.map(tool => tool.toolName), ['query_asset_related_alerts'])
+    assert.deepEqual(original.publishedService.builtinTools.map(tool => tool.toolName), queryNames)
     assert.deepEqual(original.publishedService.tools.names, ['query_asset_related_alerts', ...queryNames])
     assert.deepEqual((await client.listTools()).tools.map(tool => tool.name), original.publishedService.tools.names)
     assert.deepEqual(await client.listResources(), { resources: [] })
@@ -747,6 +767,8 @@ test('未装载业务扩展时目录可读、业务工具不暴露且种子不�
   assert.equal(listed.value.compositions.length, 1)
   assert.equal(listed.value.extension, null)
   assert.equal(listed.value.publishedService.id, 'platform-compositions')
+  assert.deepEqual(listed.value.publishedService.publishedTools, [])
+  assert.deepEqual(listed.value.publishedService.builtinTools.map(tool => tool.toolName), queryNames)
   assert.deepEqual(listed.value.publishedService.tools.names, queryNames)
   assert.equal((await rpc('seedThreatCompositions', { revision: listed.value.revision, bindings: config.bindings })).ok, false)
   assert.equal(await readFile(compositionsFile, 'utf8'), original)
@@ -998,6 +1020,43 @@ test('嵌套组合的原生Run关联追加保存，阶段失败保持未知且�
 test('可选输入映射省略未提供字段，步骤输出缺失报错', () => {
   assert.deepEqual(mappedInput({ scope: '$input.scope', reachability: '$input.reachability' }, { scope: { all: true } }, {}), { scope: { all: true } })
   assert.throws(() => mappedInput({ value: '$steps.previous.value' }, {}, {}), /来源字段不存在/)
+})
+
+test('短流程调用直接返回最终结果和错误，同一在途请求不重放；长流程仍返回受理', async t => {
+  const module = await loadMcpModule(), root = await mkdtemp(join(tmpdir(), 'mcp-complete-workflow-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const file = join(root, 'compositions.json'), entry = { id: 'short' }
+  publishCompositionVersion(entry, { kind: 'workflow', workflow: 'short', toolName: 'short', title: '短流程', description: '' })
+  await writeFile(file, JSON.stringify({ schema_version: '1.0', compositions: [entry] }))
+  let calls = 0, release
+  const gate = new Promise(resolve => { release = resolve })
+  const workflow = { responseMode: 'complete', inputSchema: { type: 'object', properties: { fail: { type: 'boolean' } } }, sourceDigest: 'a'.repeat(64), connections: () => [],
+    async execute(input) { calls++; await gate; if (input.fail) throw new Error('缺少真实动作参数 sourceIp'); return { stage: 'prepared', deviceId: 'actual-device', items: [{ error: '真实预览阻塞' }] } } }
+  const handler = module.createMcpHandler(root, { compositionsFile: file, servers: () => [], extension: { workflows: { short: workflow } } })
+  const rpc = (method, args) => module.managementDispatch(root, () => handler(method, args))
+  const request = { toolName: 'short', input: {}, execution: { execution_id: 'same-short' } }
+  const first = rpc('callPublishedComposition', request)
+  while (!calls) await new Promise(resolve => setTimeout(resolve, 5))
+  const duplicate = rpc('callPublishedComposition', request)
+  release()
+  const [result, repeated] = await Promise.all([first, duplicate])
+  assert.equal(result.ok, true, JSON.stringify(result))
+  assert.equal(result.value.result.stage, 'prepared')
+  assert.equal(result.value.result.deviceId, 'actual-device')
+  assert.deepEqual(result.value.result.items, [{ error: '真实预览阻塞' }])
+  assert.deepEqual(repeated.value.result, result.value.result)
+  assert.equal(calls, 1)
+  const replayed = await rpc('callPublishedComposition', request)
+  assert.deepEqual(replayed.value.result, result.value.result)
+  assert.equal(calls, 1)
+  const failed = await rpc('callPublishedComposition', { toolName: 'short', input: { fail: true }, execution: { execution_id: 'failed-short' } })
+  assert.equal(failed.value.ok, false, JSON.stringify(failed))
+  assert.equal(failed.value.result.status, 'failed')
+  assert.match(failed.value.error.message, /sourceIp/)
+  delete workflow.responseMode
+  const accepted = await rpc('callPublishedComposition', { toolName: 'short', input: {}, execution: { execution_id: 'long' } })
+  assert.equal(accepted.value.result.status, 'accepted')
+  while ((await rpc('compositionRun', { run_id: accepted.value.result.run_id })).value.status === 'accepted') await new Promise(resolve => setTimeout(resolve, 5))
 })
 
 test('管理调用返回已接受回执，发布父依赖阻止下架，删除前须下架', async t => {

@@ -1,0 +1,142 @@
+{
+  "observed_at": "2026-11-06T08:21:10.520015+00:00",
+  "update": {
+    "status": "applied",
+    "programRoot": "/home/cmp/work/harness-engineering-platform",
+    "dataRoot": "/home/cmp/harness-engineering-platform-data",
+    "workspaceId": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+    "pid": 4130730,
+    "activation": "managed-restart",
+    "busy": [
+      {
+        "kind": "session",
+        "id": "session-6a79ab7e-f558-4cc5-b45d-7cc2e4c52975",
+        "state": "running"
+      },
+      {
+        "kind": "assistant",
+        "id": "session-6a79ab7e-f558-4cc5-b45d-7cc2e4c52975",
+        "state": "pending"
+      },
+      {
+        "kind": "session",
+        "id": "session-f04ebb49-61c6-4786-8a5e-755625b06793",
+        "state": "running"
+      },
+      {
+        "kind": "assistant",
+        "id": "session-f04ebb49-61c6-4786-8a5e-755625b06793",
+        "state": "pending"
+      },
+      {
+        "kind": "session",
+        "id": "session-e1fb0e7a-eb30-4e3b-8eed-fd5af035077e",
+        "state": "running"
+      },
+      {
+        "kind": "assistant",
+        "id": "session-e1fb0e7a-eb30-4e3b-8eed-fd5af035077e",
+        "state": "pending"
+      }
+    ],
+    "changed": [
+      "platform/plugin/lib/composition-source-index.json",
+      "platform/plugin/lib/index.js",
+      "platform/plugin/lib/mcp-manager.js",
+      "platform/plugin/lib/platform-mcp-manager.js",
+      "platform/plugin/lib/standalone-bridge.js",
+      "platform/plugin/lib/standalone-plugin.js"
+    ],
+    "stage": "/home/cmp/work/harness-engineering-platform/.local/platform-updates/7d5f0642-9398-46a6-9220-289f6b67682f",
+    "receipt": "/home/cmp/work/harness-engineering-platform/.local/platform-updates/7d5f0642-9398-46a6-9220-289f6b67682f/receipt.json"
+  },
+  "session_count_before": 510,
+  "session_count_after": 511,
+  "preexisting_sessions_missing": [],
+  "completed_review_session_preserved": true,
+  "home": "/home/cmp/harness-engineering-platform-data/.local/platform-home",
+  "working_directory": "/home/cmp/harness-engineering-platform-data",
+  "configuration_ready": true,
+  "configuration_missing": [],
+  "current_asset_hashes_verified": [
+    {
+      "name": "AGENTS.md",
+      "path": "AGENTS.md",
+      "sha256": "4cfcac34d1902f9da50fd6431cdff7b2e36a3e2017eb1dc3408f03588d8e3628"
+    },
+    {
+      "name": "workspace-management",
+      "path": ".agents/skills/workspace-management/SKILL.md",
+      "sha256": "0e77fee94e3467848ca3a1d5d552d53d3e6f1990569a9577ecbe98f5317b1da6"
+    },
+    {
+      "name": "task-builder",
+      "path": ".agents/skills/task-builder/SKILL.md",
+      "sha256": "3639cb342de797b82e59a098f0d6865726baf7b02a873cd97d2d329c2a83cefb"
+    },
+    {
+      "name": "agent-maintenance",
+      "path": ".agents/skills/agent-maintenance/SKILL.md",
+      "sha256": "5f33440ff3c48fd1cff934a68d880dc3b94c39e424ed75dd3ef2415f99248c5c"
+    },
+    {
+      "name": "agent-migration",
+      "path": ".agents/skills/agent-migration/SKILL.md",
+      "sha256": "b12664f76c039646e7cbc8792600ed926aedf8b9a8a451199a52f95d8534fac4"
+    },
+    {
+      "name": "mcp-composition",
+      "path": ".agents/skills/mcp-composition/SKILL.md",
+      "sha256": "53246109efc995dcb6b884436192fa24b7b93b88e6c1a71e61254ba5eff5fd24"
+    },
+    {
+      "name": "compute-variant-research",
+      "path": ".agents/skills/compute-variant-research/SKILL.md",
+      "sha256": "a7ca447406d1de8d5120cdbf91537a77ebe756636eb5f3f4b65fba9d042a1e63"
+    },
+    {
+      "name": "decision-sample-extraction",
+      "path": ".agents/skills/decision-sample-extraction/SKILL.md",
+      "sha256": "ab8abbd70986a75eaec1844a5c1ed20ea9ae6e1687aec6c471b4253f9106bc2c"
+    },
+    {
+      "name": "harness-evolution",
+      "path": ".agents/skills/harness-evolution/SKILL.md",
+      "sha256": "7a3a240d03daffe11773012e8c4053fc2d1059a04ef3e548033d63e466b60cd5"
+    },
+    {
+      "name": "harness-experiment-fusion",
+      "path": ".agents/skills/harness-experiment-fusion/SKILL.md",
+      "sha256": "3b2a271a7774bb4452be3351a29ea5d0a6bbc7c91e8426b4b7ce35cb4d32a71e"
+    },
+    {
+      "name": "research-eval",
+      "path": ".agents/skills/research-eval/SKILL.md",
+      "sha256": "7621e2429a131cb50d681a6525bc5d8b04aaaf5d508615e865431b3a634a22d8"
+    },
+    {
+      "name": "legacy-asset-intake",
+      "path": ".agents/skills/legacy-asset-intake/SKILL.md",
+      "sha256": "7573f142ea1540a24f1b8718963261d31019157cc4139f2038e4ad2091df9737"
+    },
+    {
+      "name": "reviewing-agent-skills",
+      "path": ".agents/skills/reviewing-agent-skills/SKILL.md",
+      "sha256": "32f3d862f0a1e9c222faa1809ff993877d171287dc47a0c1aef739a92cb90404"
+    },
+    {
+      "name": "user-facing-output",
+      "path": ".agents/skills/user-facing-output/SKILL.md",
+      "sha256": "ccf7c1dd08b1958d5136e66f4e204b91301b60a0b838fb38fed95de314fc1aa5"
+    }
+  ],
+  "inventory_keys": [
+    "schema_version",
+    "root",
+    "workspace",
+    "observed_at",
+    "agents",
+    "experiments",
+    "runs"
+  ]
+}

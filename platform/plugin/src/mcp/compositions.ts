@@ -12,6 +12,7 @@ export type CompositionConfig = {
   workflow?: string; connections?: Record<string, string>; options?: Record<string, any>
   implementation?: string
   engine?: 'lfx'; flowDigest?: string
+  readonly?: boolean
 }
 export type CompositionVersion = { versionId: string; publishedAt?: string; implementationDigest?: string; config: CompositionConfig }
 export type CompositionEntry = { id: string; draft?: CompositionConfig; published?: CompositionConfig & { publishedAt?: string }; versions?: CompositionVersion[]; publishedVersionId?: string }
@@ -20,10 +21,10 @@ export type Catalog = { schema_version: '1.0'; compositions: CompositionEntry[] 
 export const COMPOSITION_SERVICE_ID = 'platform-compositions'
 export function publishedCompositionService(catalog: Catalog, available: Catalog = catalog) {
   // 已保存分组引用服务身份；扩展装载前可暂时没有可调用工具，不能让服务 ID 消失。
-  const publishedTools = [...available.compositions.flatMap(entry => entry.published ? [entry.published] : []), ...compositionQueries]
-  return { id: COMPOSITION_SERVICE_ID, serverName: 'compositions', description: '工具组合编排（已发布）',
-    enabled: true, platformComposition: true, publishedTools,
-    tools: { mode: 'all', names: publishedTools.map(tool => tool.toolName) } }
+  const publishedTools = available.compositions.flatMap(entry => entry.published ? [entry.published] : [])
+  return { id: COMPOSITION_SERVICE_ID, serverName: 'compositions', description: '工具组合编排',
+    enabled: true, platformComposition: true, publishedTools, builtinTools: compositionQueries,
+    tools: { mode: 'all', names: [...publishedTools, ...compositionQueries].map(tool => tool.toolName) } }
 }
 
 export function compositionConfig(value: any): CompositionConfig {
@@ -43,7 +44,8 @@ export function compositionConfig(value: any): CompositionConfig {
   if (value.implementation !== undefined && !/^[0-9a-f]{64}$/.test(value.implementation)) throw new Error('组合实现摘要无效')
   if (value.engine !== undefined && (value.engine !== 'lfx' || kind !== 'workflow' || !workflow)) throw new Error('LFX 需要代码工作流身份')
   if (value.flowDigest !== undefined && (value.engine !== 'lfx' || !/^[0-9a-f]{64}$/.test(value.flowDigest))) throw new Error('LFX 发布摘要无效')
-  const base = { toolName, title: title.trim(), description, connectionId, ...(value.implementation ? { implementation: value.implementation } : {}), ...(workflow ? { workflow, ...(value.connections ? { connections: value.connections } : {}), ...(value.options ? { options: value.options } : {}) } : {}) }
+  if (value.readonly !== undefined && (!workflow || typeof value.readonly !== 'boolean')) throw new Error('工作流只读声明无效')
+  const base = { toolName, title: title.trim(), description, connectionId, ...(value.readonly === undefined ? {} : { readonly: value.readonly }), ...(value.implementation ? { implementation: value.implementation } : {}), ...(workflow ? { workflow, ...(value.connections ? { connections: value.connections } : {}), ...(value.options ? { options: value.options } : {}) } : {}) }
   if (kind === 'workflow') return { ...base, kind, ...(value.engine ? { engine: value.engine, ...(value.flowDigest ? { flowDigest: value.flowDigest } : {}) } : {}) }
   if (kind === 'threat-stage') {
     if (!['collect', 'infer', 'writeback', 'report'].includes(stage)) throw new Error('威胁分析阶段无效')

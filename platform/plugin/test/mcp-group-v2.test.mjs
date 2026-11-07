@@ -10,6 +10,7 @@ import { Client, StreamableHTTPClientTransport, UriTemplate } from '@modelcontex
 import { McpServer, createMcpHandler } from '@modelcontextprotocol/server'
 import { toNodeHandler } from '@modelcontextprotocol/node'
 import { runtimeModule } from '../../../runtime/adapters/dsh-web/src/resolve-runtime.ts'
+import { boundDrafts, saveDraftBinding, withDraftInstance } from '../src/mcp/draft-bindings.ts'
 
 async function waitFor(check) {
   for (let i = 0; i < 300 && !check(); i++) await new Promise(resolve => setTimeout(resolve, 10))
@@ -108,7 +109,7 @@ test('v2 调用按来源路由，健康工具与资源工具不等待无关挂�
   await assert.rejects(call('slow', {}), /timeout|aborted/i, '只取消真正挂起的目标调用')
 })
 
-async function groupServer(t, manager, servers, groups, methods = [], rpcRequests = []) {
+async function groupServer(t, manager, servers, groups, methods = [], rpcRequests = [], overrides = {}) {
   const routes = []
   const origin = await serve(t, (request, response) => {
     const path = new URL(request.url, 'http://localhost').pathname
@@ -125,7 +126,7 @@ async function groupServer(t, manager, servers, groups, methods = [], rpcRequest
     withGroupRequest: (req, method, run, rpcRequest) => {
       if (req.url.endsWith('/v2')) { methods.push(method); rpcRequests.push(rpcRequest) }
       return run()
-    } })
+    }, ...overrides })
   const client = async version => {
     const value = new Client({ name: 'group-v2-test', version: '1' }, { versionNegotiation: { mode: 'auto' } })
     const path = `/mcp/groups/${groups[0].id}${version === 2 ? '/v2' : ''}`
@@ -135,6 +136,36 @@ async function groupServer(t, manager, servers, groups, methods = [], rpcRequest
   }
   return { origin, context, token, client, rpcRequests }
 }
+
+test('分组 HTTP 路由在实例上下文内生成快照，草稿发现和调用同源且不泄露给其他实例', async t => {
+  const manager = await managerModule(t)
+  const root = await mkdtemp(join(tmpdir(), 'group-drafts-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const binding = { instanceId: 'acceptance', sourceDigest: 'source-a' }
+  saveDraftBinding(root, { ...binding, compositions: [{ id: 'policy-change', config: { toolName: 'policy_change' } }] })
+  const tools = () => boundDrafts(root).map(item => ({ name: item.config.toolName, inputSchema: { type: 'object' } }))
+  const groups = [{ id: 'drafts', members: [{ serverId: 'platform-compositions', names: ['policy_change'] }] }]
+  const { origin, token } = await groupServer(t, manager, [], groups, [], [], {
+    servers: { get: () => [{ id: 'platform-compositions', serverName: 'compositions', enabled: true,
+      platformComposition: true, publishedTools: tools(), tools: { mode: 'selected', names: tools().map(item => item.name) } }] },
+    platformClient: { listTools: async () => ({ tools: tools() }),
+      callTool: async request => { assert.ok(tools().some(item => item.name === request.name)); return { content: [{ type: 'text', text: 'draft-ok' }] } } },
+    withGroupTransport: (req, run) => withDraftInstance({ ...binding, instanceId: req.headers['x-test-instance'] || 'other' }, run),
+  })
+  const open = async instance => {
+    const value = new Client({ name: 'draft-test', version: '1' }, { versionNegotiation: { mode: 'auto' } })
+    await value.connect(new StreamableHTTPClientTransport(new URL('/mcp/groups/drafts/v2', origin), {
+      requestInit: { headers: { Authorization: `Bearer ${token}`, 'X-Test-Instance': instance } },
+    }))
+    t.after(() => value.close())
+    return value
+  }
+  const [selected, other] = await Promise.all([open('acceptance'), open('other')])
+  assert.deepEqual((await selected.listTools()).tools.map(item => item.name), ['policy_change'])
+  assert.deepEqual((await other.listTools()).tools, [])
+  assert.equal((await selected.callTool({ name: 'policy_change', arguments: {} })).content[0].text, 'draft-ok')
+  await assert.rejects(other.callTool({ name: 'policy_change', arguments: {} }), /不属于当前 MCP 范围/)
+})
 
 test('v2 分组名称与显示名解耦，资源代理隔离同 URI 来源并拒绝失效选择', async t => {
   const manager = await managerModule(t), reads = [], methods = []

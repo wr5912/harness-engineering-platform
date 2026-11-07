@@ -1,5 +1,6 @@
 """使用官方 Graph 验证分支、固定子流程、批次与取消，不替换调度器。"""
 import asyncio
+import hashlib
 import json
 import os
 import unittest
@@ -54,12 +55,13 @@ class Client:
                 await asyncio.sleep(json.get("delay", 0.01))
             finally:
                 self.active -= 1
+        value = json["input"] if json["action"] == "component" else None
         class Reply:
             def raise_for_status(self):
                 pass
 
             def json(self):
-                return {"value": None}
+                return {"value": value}
         return Reply()
 
 
@@ -92,6 +94,28 @@ class RuntimeTest(unittest.IsolatedAsyncioTestCase):
             built = {event["node_id"].split('/')[-1] for event in self.client.events if event.get("status") == 'completed'}
             self.assertEqual(built.intersection({'a', 'b', 'c'}), {selected})
 
+    async def test_early_exit_and_deep_paths_have_independent_outputs(self):
+        def router(identity, field):
+            methods = ''.join(f' def route_{key}(self)->Data:\n'
+                              f'  excluded=[key for key in ("early","deep") if key!=payload(self.value)["{field}"]]\n'
+                              '  for key in excluded:self.stop(key)\n'
+                              '  self.graph.exclude_branches_conditionally(self._id,excluded)\n'
+                              '  return self.value\n' for key in ('early', 'deep'))
+            return custom(identity, methods, outputs='[Output(name="early",method="route_early",group_outputs=True),Output(name="deep",method="route_deep",group_outputs=True)]')
+        finish = ' def build(self)->Data:\n  return self.value\n'
+        native = flow([node(HepInput, 'input'), router('outer', 'outer'), router('inner', 'inner'),
+                       *[custom(name, finish, output=True) for name in ('early_end', 'inner_end', 'deep_end')]],
+                      [edge('input', 'outer'), edge('outer', 'early_end', 'early'), edge('outer', 'inner', 'deep'),
+                       edge('inner', 'inner_end', 'early'), edge('inner', 'deep_end', 'deep')])
+        for outer, inner, expected in [('early', 'deep', 'early_end'), ('deep', 'early', 'inner_end'), ('deep', 'deep', 'deep_end')]:
+            self.client.events.clear()
+            value = {'outer': outer, 'inner': inner}
+            self.assertEqual(await self.execute(native, value), value)
+            built = {event['node_id'].split('/')[-1] for event in self.client.events if event.get('status') == 'completed'}
+            self.assertEqual(built.intersection({'early_end', 'inner_end', 'deep_end'}), {expected})
+            if outer == 'early':
+                self.assertNotIn('inner', built)
+
     def batch(self, delay=0.01):
         body = flow([node(HepInput, 'input'), custom('check', f' async def build(self)->Data:\n  await callback("work",delay={delay})\n  return Data(data={{"index":payload(self.value)["item"],"snapshot":current_run.get()["shared"]["snapshot"]}})\n', output=True)], [edge('input', 'check')])
         return flow([node(HepInput, 'input'), node(HepBatch, 'batch', output=True, concurrency=3, body=body)], [edge('input', 'batch')])
@@ -118,14 +142,25 @@ class RuntimeTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.client.active, 0)
         self.assertEqual(sum(event['action'] == 'work' for event in self.client.events), 3)
 
-    async def test_identical_children_share_one_execution_within_root(self):
+    async def test_distinct_child_nodes_do_not_collapse_identical_inputs(self):
         self.run['bundle']['children']['check:fixed'] = {'flow': self.batch(), 'children': {}, 'modules': {}}
         join = custom('join', ' def build(self)->Data:\n  assert len(self.value)==2\n  return self.value[0]\n', is_list=True, output=True)
         native = flow([node(HepInput, 'input'), *[node(HepChild, name, composition_id='check', version_id='fixed') for name in ('first', 'second')], join],
                       [edge('input', 'first'), edge('input', 'second'), edge('first', 'join'), edge('second', 'join')])
         result = await self.execute(native, {'items': [1, 2, 3]})
         self.assertEqual(len(result['items']), 3)
-        self.assertEqual(sum(event['action'] == 'work' for event in self.client.events), 3)
+        self.assertEqual(sum(event['action'] == 'work' for event in self.client.events), 6)
+
+    async def test_typescript_callback_binds_the_current_frozen_child_and_node(self):
+        self.run['bundle']['typescript'] = 'frozen typescript'
+        body = (' async def build(self)->Data:\n'
+                '  from hep_lfx import component\n'
+                '  return Data(data=await component("echo",payload(self.value),self._id))\n')
+        native = flow([node(HepInput, 'input'), custom('typed', body, output=True)], [edge('input', 'typed')])
+        self.assertEqual(await self.execute(native, {'target': 'test'}), {'target': 'test'})
+        event = next(value for value in self.client.events if value['action'] == 'component')
+        self.assertEqual(event['module_digest'], hashlib.sha256(b'frozen typescript').hexdigest())
+        self.assertEqual(event['node_id'], 'root/typed')
 
     async def test_official_http_stream_ignores_external_proxy_for_local_callbacks(self):
         import httpx

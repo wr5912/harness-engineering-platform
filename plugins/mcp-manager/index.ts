@@ -803,12 +803,16 @@ export function apply(ctx: any, config: any): void {
         return send(res, 401, { error: `business_${stage}_invalid`, stage })
       }
     } else if (!bearerAccepted(req, config.sharedToken.get())) return send(res, 401, { error: 'Bearer token required' })
-    try {
+    const serveGroup = async () => {
       const current = snapshot(config)
       const group = current.groups.find(item => item.id === id)
       if (!group) return send(res, 404, { error: 'group not found' })
       await serveMcp(req, res, { kind: 'group', group, servers: current.servers }, () => currentGroup(id), version,
         config.withGroupRequest)
+    }
+    try {
+      if (config.withGroupTransport) await config.withGroupTransport(req, serveGroup)
+      else await serveGroup()
     } catch (error) { if (!res.headersSent) send(res, 502, { error: String(error) }); else res.destroy() }
   } }), 'mcp-manager.groups')
 

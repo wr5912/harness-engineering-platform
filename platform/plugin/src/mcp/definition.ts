@@ -26,7 +26,7 @@ export function compositionInputSchema(config?: CompositionConfig, extension?: C
   } } : schema
 }
 
-export function compositionReadonly(config?: CompositionConfig) { return !config?.kind || Boolean(config.workflow) }
+export function compositionReadonly(config?: CompositionConfig) { return config?.readonly ?? (!config?.kind || Boolean(config.workflow)) }
 
 export function compositionOutputSchema(config?: CompositionConfig, extension?: CompositionExtension): Record<string, any> {
   if (config?.workflow) return extension?.workflows?.[config.workflow]?.outputSchema ?? { type: 'object' }

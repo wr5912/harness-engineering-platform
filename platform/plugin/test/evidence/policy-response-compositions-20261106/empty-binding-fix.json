@@ -1,0 +1,44 @@
+{
+  "status": "applied",
+  "pid": 2430355,
+  "activation": "managed-restart",
+  "changed": [
+    "platform/plugin/lib/client.js",
+    "platform/plugin/lib/composition-source-index.json",
+    "platform/plugin/lib/index.js",
+    "platform/plugin/lib/mcp-manager.js",
+    "platform/plugin/lib/platform-mcp-manager.js",
+    "platform/plugin/lib/standalone-bridge.js",
+    "platform/plugin/lib/standalone-plugin.js"
+  ],
+  "stage": "/home/cmp/work/harness-engineering-platform/.local/platform-updates/2705763b-22fa-4443-9fb7-a5ba91a7d688",
+  "receipt": "/home/cmp/work/harness-engineering-platform/.local/platform-updates/2705763b-22fa-4443-9fb7-a5ba91a7d688/receipt.json",
+  "issue": "解除草稿绑定后的空集合不应因实例来源变化阻断已发布分组",
+  "regression": {
+    "before": "空集合且来源变化时抛错，可复现",
+    "after": "19/19，包括非空来源不一致仍拒绝"
+  },
+  "typecheck": "passed: pnpm run check",
+  "manager_session": "session-7749b3ce-f58d-45be-93e5-4fac8b41f6a9",
+  "reload": {
+    "seq": 581,
+    "proposal_id": "1ba7d868-8e37-40bc-81a5-540957639338",
+    "state": "completed",
+    "ok": true,
+    "sessions_before": 44,
+    "sessions_after": 44,
+    "all_previous_session_ids_preserved": true
+  },
+  "run": "run-d0b97ad9-9b5a-4642-8228-ffda70712586",
+  "native_verification": {
+    "case_count": 3,
+    "tools_per_session": 147,
+    "both_composition_tools_present": true,
+    "actual_published_composition_calls": 3,
+    "trial_passed": 2,
+    "trial_failed": 1,
+    "run_status": "failed",
+    "source_audit": "matched",
+    "end_asset_status": "current"
+  }
+}

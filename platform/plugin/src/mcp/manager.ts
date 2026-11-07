@@ -16,6 +16,7 @@ import { createBusinessControlHandler } from '../business-control/management.ts'
 import { loadOpenApi } from 'harness-mcp-manager-openapi'
 import { McpConfigStore, type McpConfigurationView } from './store.ts'
 import type { BusinessContext } from '../business-control/contracts.ts'
+import { boundDrafts, withDraftInstance } from './draft-bindings.ts'
 
 export const { name, Config, validateConfiguration } = manager
 export const inject = manager.inject
@@ -65,7 +66,9 @@ export function apply(ctx: Context, suppliedConfig: ManagerConfig) {
   const compositionExtension: CompositionExtension = {}
   const publishedService = () => {
     const catalog = readCompositions(workspaceConfigPath(assetRoot, 'mcp-compositions.json')).catalog
-    return publishedCompositionService(catalog, executableCatalog(catalog, compositionExtension))
+    const drafts = boundDrafts(assetRoot)
+    const available = executableCatalog(catalog, compositionExtension)
+    return publishedCompositionService({ ...available, compositions: [...available.compositions.filter(item => !drafts.some(draft => draft.config.toolName === item.published?.toolName)), ...drafts.map(item => ({ id: item.id, published: item.config }))] })
   }
   const store = new McpConfigStore(assetRoot, value => {
     if (value.servers.some(server => server.id === COMPOSITION_SERVICE_ID || server.platformComposition)) {
@@ -144,11 +147,16 @@ export function apply(ctx: Context, suppliedConfig: ManagerConfig) {
       businessGroupRequests.set(req, assertion)
       return true
     },
+    withGroupTransport: <T>(req: any, run: () => Promise<T>) => {
+      const assertion = businessGroupRequests.get(req)
+      return assertion ? withDraftInstance(assertion.binding, run) : run()
+    },
     withGroupRequest: <T>(req: any, method: string, run: () => Promise<T>, rpcRequest: any) => {
       const assertion = businessGroupRequests.get(req)
       if (!assertion) return managementDispatch(assetRoot, run)
       if (!control.enabled() && !control.isAnonymousInstance(assertion.binding)) throw new BusinessTransportError('registration', '业务接入已关闭')
-      if (method === 'tools/list') return run()
+      const scopedRun = () => withDraftInstance(assertion.binding, run)
+      if (method === 'tools/list') return scopedRun()
       if (!assertion?.context?.scope.sessionId) throw new BusinessTransportError('context', '业务 MCP 请求缺少受信 Session')
       if (!control.isUnrestrictedInstance(assertion.binding) && assertion.requestDigest !== businessRpcDigest(rpcRequest)) throw new BusinessTransportError('signature', '业务 MCP 请求内容与签名不一致')
       return withSignedRuntimeSession(() => {
@@ -157,7 +165,7 @@ export function apply(ctx: Context, suppliedConfig: ManagerConfig) {
           context = control.acceptContext(assertion.context!)
           control.assert(context, 'agent:access', [{ kind: 'agent', id: context.scope.agentId }])
         } catch { throw new BusinessTransportError('context', '业务 Session、身份或实例许可已失效') }
-        return withBusinessContext(context, run)
+        return withBusinessContext(context, scopedRun)
       })
     },
     platformTransportForServer: (server: { id: string; url?: string }) => {

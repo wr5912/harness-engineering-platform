@@ -45,6 +45,15 @@ async def invoke(connection, operation, arguments):
     return await callback("invoke", connection=connection, operation=operation, arguments=arguments)
 
 
+async def component(name, input_value, node_id):
+    source = current_run.get()["bundle"].get("typescript")
+    if not source:
+        raise ValueError("当前原生流程未冻结 TypeScript 组件")
+    return await callback("component", name=name, input=input_value,
+                          node_id=current_path.get() + "/" + node_id,
+                          module_digest=hashlib.sha256(source.encode()).hexdigest())
+
+
 async def progress(node, **values):
     await callback("progress", node_id=current_path.get() + "/" + node, **values)
 
@@ -141,7 +150,7 @@ class HepChild(HepComponent):
             raise ValueError("固定子编排未冻结：" + key)
         run = current_run.get()
         cache = run.setdefault("child_tasks", {})
-        cache_key = key + ":" + json.dumps(payload(self.value), sort_keys=True)
+        cache_key = current_path.get() + "/" + self._id + ":" + key + ":" + json.dumps(payload(self.value), sort_keys=True)
         if cache_key in cache:
             return Data(data=await cache[cache_key])
         token = current_run.set({**run, "bundle": bundle})

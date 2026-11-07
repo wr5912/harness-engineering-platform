@@ -1,0 +1,89 @@
+{
+  "observed_at": "2026-11-06T08:20:17.456911+00:00",
+  "actual_platform": "http://172.16.138.228:18120/hep/",
+  "experiment_id": "EXP-security-operations-expert-027-f-r5efdc136f237",
+  "path": "agents/security-operations-expert/evaluation.md",
+  "before_sha256": "e469143993a19b17f453f7078720129d4184d8dec5068d6e6d052e3be03d8d22",
+  "after_sha256": "b97ba8cd0e29795edec5d02053681cae7b7821deb579a59ea1bf3f7252636d82",
+  "case_count": 117,
+  "renames": [
+    {
+      "from": "U-ASSET-ALERTS-001",
+      "to": "U-ASSET-001"
+    },
+    {
+      "from": "U-ASSET-ALERTS-MISSING",
+      "to": "U-ASSET-002"
+    },
+    {
+      "from": "U-ASSET-ALERTS-EMPTY",
+      "to": "U-ASSET-003"
+    },
+    {
+      "from": "U-ASSET-ALERTS-FAIL",
+      "to": "U-ASSET-004"
+    }
+  ],
+  "preview": {
+    "path": "agents/security-operations-expert/evaluation.md",
+    "before_sha256": "e469143993a19b17f453f7078720129d4184d8dec5068d6e6d052e3be03d8d22",
+    "sha256": "b97ba8cd0e29795edec5d02053681cae7b7821deb579a59ea1bf3f7252636d82",
+    "renames": [
+      {
+        "from": "U-ASSET-ALERTS-001",
+        "to": "U-ASSET-001",
+        "scene": "资产关联告警代码变体研究"
+      },
+      {
+        "from": "U-ASSET-ALERTS-MISSING",
+        "to": "U-ASSET-002",
+        "scene": "资产关联告警代码变体研究"
+      },
+      {
+        "from": "U-ASSET-ALERTS-EMPTY",
+        "to": "U-ASSET-003",
+        "scene": "资产关联告警代码变体研究"
+      },
+      {
+        "from": "U-ASSET-ALERTS-FAIL",
+        "to": "U-ASSET-004",
+        "scene": "资产关联告警代码变体研究"
+      }
+    ],
+    "note": "仅替换当前用例标题编号；正文及历史 Run、历史出处不变。当前正文内的直接引用需另行核对。",
+    "written": false
+  },
+  "save": {
+    "path": "agents/security-operations-expert/evaluation.md",
+    "before_sha256": "e469143993a19b17f453f7078720129d4184d8dec5068d6e6d052e3be03d8d22",
+    "sha256": "b97ba8cd0e29795edec5d02053681cae7b7821deb579a59ea1bf3f7252636d82",
+    "renames": [
+      {
+        "from": "U-ASSET-ALERTS-001",
+        "to": "U-ASSET-001",
+        "scene": "资产关联告警代码变体研究"
+      },
+      {
+        "from": "U-ASSET-ALERTS-MISSING",
+        "to": "U-ASSET-002",
+        "scene": "资产关联告警代码变体研究"
+      },
+      {
+        "from": "U-ASSET-ALERTS-EMPTY",
+        "to": "U-ASSET-003",
+        "scene": "资产关联告警代码变体研究"
+      },
+      {
+        "from": "U-ASSET-ALERTS-FAIL",
+        "to": "U-ASSET-004",
+        "scene": "资产关联告警代码变体研究"
+      }
+    ],
+    "note": "仅替换当前用例标题编号；正文及历史 Run、历史出处不变。当前正文内的直接引用需另行核对。",
+    "written": true
+  },
+  "only_current_heading_ids_changed": true,
+  "all_current_ids_unique_and_valid": true,
+  "historical_runs_rewritten": false,
+  "assistant_configuration_ready": true
+}

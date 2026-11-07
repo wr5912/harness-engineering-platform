@@ -1,0 +1,11 @@
+{
+  "at": "2026-11-06T06:18:23.811Z",
+  "url": "http://172.16.138.228:18120/hep/#/mcp?tab=composition&composition_id=policy-single&version=draft",
+  "title": "Harness 工程平台",
+  "errors": [],
+  "alerts": [],
+  "nodeCount": 135,
+  "edgeCount": 143,
+  "text": "控制流程 LFX 原生流程\n−\n100%\n＋\n适应画布\n重置布局\nanalyze\nresume\nobserve\ndecision\nstop\nanalyze\nobserve\nstop\npath\ndirect\nstop\npath\ndirect\nstop\npreview\nstop\non\noff\nstop\nhits\nstop\nfreeze\nstop\ncreate\nbind\nrevalidate\napproval\nobserve\nstop\nnext\nstop\nnext\nstop\nrevalidate\nstop\nnext\nstop\nnext\nstop\nmatch\nexecute\nstop\nnext\nstop\napprove\nstop\nnext\nstop\nnext\nstop\nnext\nstop\n单点策略输入\ninput\n请求与只读/命令入口\n条件判断\n恢复原host操作与未知停止\n条件判断\n分析入口互斥汇合\nanalysisInput\n只读解析源端点\nsource\n只读解析目的端点\ndestination\n源目并行结果完整汇合\nendpoints\n端点消歧/网段直接/主机路径\n条件判断\n读取原源目权威路径\npath\n路径优先与合格direct兜底\n条件判断\ndirect兜底入口互斥汇合\ndirectInput\n只读发现纳管防火墙目录\ndirect\n路径/直接执行点互斥汇合\ncandidateInput\n逐设备资格核对（并发4）\n批量检查\n汇合合格执行点并保留排除原因\ncandidates\n核对指定设备与真实替代候选\nspecified\n多执行点/显式替代设备选择\n条件判断\n只读配置与回滚预览资格\npreview\n覆盖默认关闭/明确开启\n条件判断\nNOT_ASSESSED：无覆盖\ncoverageOff\n读取完整规则与时间批次\nrules\n规则边界分区与64上限\n条件判断\n逐分区只读ACL命中（并发8）\n批量检查\n完整汇合覆盖判定\ncoverage\n覆盖分支互斥汇合\ncoverageInput\n只预览停止/仅NEEDS_CHA\n条件判断\n宿主保存冻结快照与阶段制品\nfreeze\n原号检查点/未知等待停止\n条件判断\n一次SOC create DRA\ncreateDraft\n创建回执/未知停止\n条件判断\n原SOC任务绑定入口\nbindInput\n原taskId只读detail与\nbind\n绑定成功/未知停止\n条件判断\nDRAFT业务停止/明确exec\n条件判断\n写前重验证入口互斥汇合\nrevalidateInput\n重验证冻结预览与原DRAFT\nrevalidate\n重验证通过/变化停止\n条件判断\n独立SOC submit命令\nsubmit\n提交回执/未知停止\n条件判断\n审批恢复入口互斥汇合\napprovalInput\n读取原taskId的权威审批状态\napprovalState\n公开审批依赖/等待/已批准\n条件判断\n读取审批第一页与完整总数\napprovalIndex\n审批依赖可用/不可用停止\n条件判断\n完整审批分页（并发4）\n批量检查\n完整待办唯一关联原流程实例\n条件判断\n独立SOC approve命令\napprove\n批准回执/未知停止\n条件判断\n只读核对SOC实际APPROVE\napprovedState\n真实批准生效/等待停止\n条件判断\n执行入口互斥汇合\nexecuteInput\n独立SOC execute命令\nexecute\n执行受理/未知停止\n条件判断\n本地拒绝/请求修改CAS（不撤销\ndecision\n互斥分支：analyze\nstart_analyze_branch\n互斥分支：resume\nstart_resume_branch\n互斥分支：observe\nstart_observe_branch\n互斥分支：decision\nstart_decision_branch\n互斥分支：stop\nstart_stop_branch\n互斥分支：analyze\nresume_analyze_branch\n互斥分支：observe\nresume_observe_branch\n互斥分支：stop\nresume_stop_branch\n互斥分支：path\nendpointGate_path_branch\n互斥分支：direct\nendpointGate_d",
+  "scope": "readonly draft canvas, no execution or publishing"
+}

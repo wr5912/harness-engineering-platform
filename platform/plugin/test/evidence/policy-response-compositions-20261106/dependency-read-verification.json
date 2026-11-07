@@ -1,0 +1,51 @@
+{
+  "captured_at": "2026-11-07T02:16:15.757Z",
+  "management_session": "session-c6b22f3c-a791-48c4-b90d-977c73b57539",
+  "server": "ai-soc-ingest",
+  "host": "172.16.138.223",
+  "receipts": [
+    {
+      "seq": 1869,
+      "time": 1794017421070,
+      "entry": "devices-resource",
+      "action": "readResource",
+      "state": "completed",
+      "ok": true,
+      "business_code": 200,
+      "data_count": 4
+    },
+    {
+      "seq": 1871,
+      "time": 1794017421408,
+      "entry": "scan-templates-resource",
+      "action": "readResource",
+      "state": "completed",
+      "ok": true,
+      "business_code": 200,
+      "data_count": 18
+    },
+    {
+      "seq": 1875,
+      "time": 1794017421745,
+      "entry": "devices-tool",
+      "action": "callTool",
+      "state": "completed",
+      "proposal_id": "d6ac0d9a-f9b9-4005-a821-98cc4984e516",
+      "ok": true,
+      "business_code": 200,
+      "data_count": 4
+    },
+    {
+      "seq": 1879,
+      "time": 1794017422224,
+      "entry": "scan-templates-tool",
+      "action": "callTool",
+      "state": "completed",
+      "proposal_id": "d577bc8f-de92-4c70-81ad-20e855ba9ec2",
+      "ok": true,
+      "business_code": 200,
+      "data_count": 18
+    }
+  ],
+  "scope": "设备目录及扫描模板资源和同源工具各一次；历史401根因未知，不代表其他接口全部正常。"
+}

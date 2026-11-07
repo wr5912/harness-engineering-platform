@@ -130,6 +130,12 @@ test('迁移用例输入错误指出具体字段，未创建目标资产', async
     target: { kind: 'new-agent', agent_id: 'migrated-agent', name: '材料分析助手', description: '读取材料。', role: '读取材料。' },
     files: [{ path: 'dsh/workspace/AGENTS.md', content: '读取材料。' }], mapping: [{ source: 'role.md', target: 'dsh/workspace/AGENTS.md', status: 'converted' }], evaluation_cases: [missingInputs] })
   assert.equal(result.ok, false); assert.match(result.error.message, /evaluation_cases\.0\.inputs/)
+  for (const id of ['U-ASSET-PAGES-001', 'U-ASSET-EMPTY', 'U-ASSET-000', 'U-ASSET-1000']) {
+    const rejected = await fx.handler('preview', { source_id: source.source_id, fingerprint: source.fingerprint,
+      target: { kind: 'new-agent', agent_id: 'migrated-agent', name: '材料分析助手', description: '读取材料。', role: '读取材料。' },
+      files: [{ path: 'dsh/workspace/AGENTS.md', content: '读取材料。' }], mapping: [{ source: 'role.md', target: 'dsh/workspace/AGENTS.md', status: 'converted' }], evaluation_cases: [{ ...cases[0], id }] })
+    assert.equal(rejected.ok, false); assert.match(rejected.error.message, /evaluation_cases\.0\.id.*三位数字/)
+  }
   assert.equal(existsSync(join(fx.root, 'agents/migrated-agent')), false)
 })
 

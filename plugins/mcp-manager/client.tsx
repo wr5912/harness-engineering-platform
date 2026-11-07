@@ -9,6 +9,10 @@ window.__ModuleLoader__.load({
     const { useEffect, useState } = React
     const ParameterEditor = createParameterEditor(React)
     const formName = 'mcp-session-manager'
+    const compositionTools = server => [
+      ...(server.publishedTools ?? []).map(tool => ({ ...tool, originLabel: '已发布编排' })),
+      ...(server.builtinTools ?? []).map(tool => ({ ...tool, originLabel: '平台内置 · 运行查询' })),
+    ].map(tool => ({ ...tool, name: tool.toolName || tool.name }))
     const defaultSpec = 'http://172.16.138.232:18087/v3/api-docs/mcp'
     const emptyServer = () => ({ id: '', description: '', specUrl: '', authType: 'credential',
       apiKey: '', authHeader: 'Authorization', loginUrl: '', loginUsername: '', loginPassword: '', loginTokenPath: 'data.token',
@@ -486,7 +490,7 @@ window.__ModuleLoader__.load({
         const server = visibleServers.find(item => item.id === member.serverId && item.enabled !== false)
         if (!server) continue
         const catalogs = [
-          ['names', 'name', server.platformComposition ? (server.publishedTools ?? []).map(tool => ({ ...tool, name: tool.toolName || tool.name })) : discovered[server.id]],
+          ['names', 'name', server.platformComposition ? compositionTools(server) : discovered[server.id]],
           ['resourceUris', 'uri', discoveredResources[server.id]?.resourceUris],
           ['resourceTemplates', 'uriTemplate', discoveredResources[server.id]?.resourceTemplates],
         ]
@@ -543,7 +547,7 @@ window.__ModuleLoader__.load({
                   <span className="mcp-service-count">服务 · {visibleServers.length}</span>
                   {filteredServers.map(({ server, index }) => {
                     const check = checkOf(server)
-                    const badge = server.platformComposition ? ['目录已发布', 'neutral']
+                    const badge = server.platformComposition ? ['平台服务', 'neutral']
                       : serverDraftChanged(server) ? ['修改未保存', 'changed']
                       : server.enabled === false ? ['已停用', 'neutral']
                       : connectionIssue(server) ? [connectionIssue(server), 'changed']
@@ -551,8 +555,8 @@ window.__ModuleLoader__.load({
                       : check ? [check.kind === 'openapi' ? '规范已读取' : '连接已验证', 'verified']
                       : ['连接待检查', 'neutral']
                     return <button key={index} className="mcp-list-item" data-server-id={server.id} type="button" aria-current={currentServerIndex === index ? 'true' : undefined} onClick={() => { setActiveServer(index); setServicePane('tools'); onSelectServerId?.(server.id) }}>
-                      <span className="mcp-service-title">{server.platformComposition ? server.description || '工具组合编排（已发布）' : server.serverName || server.id || '新服务器'}</span>
-                      {server.platformComposition ? <span className="mcp-service-desc">由已发布组合生成</span> : server.description?.trim() && server.description.trim() !== (server.serverName || server.id || '').trim() && <span className="mcp-service-desc">{server.description}</span>}
+                      <span className="mcp-service-title">{server.platformComposition ? server.description || '工具组合编排' : server.serverName || server.id || '新服务器'}</span>
+                      {server.platformComposition ? <span className="mcp-service-desc">{server.publishedTools?.length ?? 0} 个已发布编排 · {server.builtinTools?.length ?? 0} 个内置查询工具</span> : server.description?.trim() && server.description.trim() !== (server.serverName || server.id || '').trim() && <span className="mcp-service-desc">{server.description}</span>}
                       <span className="mcp-service-badge" data-state={badge[1]}>{badge[0]}</span>
                     </button>
                   })}
@@ -563,9 +567,10 @@ window.__ModuleLoader__.load({
                   <option value={-1}>请选择服务</option>{visibleServers.map((server, index) => <option key={index} value={index}>{server.platformComposition ? server.description || server.id : server.serverName || server.id || '新服务器'}</option>)}
                 </select></label><button type="button" onClick={addServer}>接入服务</button></div>
                 {editingServer?.platformComposition ? <div className="mcp-card">
-                  <div className="mcp-card-head"><div><h3>{editingServer.description || '工具组合编排（已发布）'}</h3><p className="mcp-muted">已发布组合生成的服务，在「工具组合编排」工作区管理版本与发布。</p></div></div>
-                  <div className="mcp-service-facts" aria-label="当前服务检查范围"><span>配置：已发布工具目录</span><span>连接与工具调用：待验证</span></div>
-                  <section className="mcp-section"><h3>已发布工具</h3>{editingServer.publishedTools?.length ? <ul className="mcp-catalog">{editingServer.publishedTools.map(tool => <li key={tool.toolName || tool.name}><strong>{tool.toolName || tool.name}</strong>{tool.description && <small>{tool.description}</small>}</li>)}</ul> : <p className="mcp-muted">当前目录没有可列出的工具。</p>}</section>
+                  <div className="mcp-card-head"><div><h3>{editingServer.description || '工具组合编排'}</h3><p className="mcp-muted">提供已发布编排和平台内置运行查询。在「工具组合编排」工作区管理编排版本与发布。</p></div></div>
+                  <div className="mcp-service-facts" aria-label="当前服务检查范围"><span>配置：平台工具目录</span><span>连接与工具调用：待验证</span></div>
+                  <section className="mcp-section"><h3>已发布编排 · {editingServer.publishedTools?.length ?? 0}</h3>{editingServer.publishedTools?.length ? <ul className="mcp-catalog">{editingServer.publishedTools.map(tool => <li key={tool.toolName || tool.name}><strong>{tool.toolName || tool.name}</strong>{tool.description && <small>{tool.description}</small>}</li>)}</ul> : <p className="mcp-muted">当前没有已发布编排。</p>}</section>
+                  {!!editingServer.builtinTools?.length && <section className="mcp-section"><h3>平台内置 · 运行查询 · {editingServer.builtinTools.length}</h3><p className="mcp-muted">用于读取已有运行、检查明细和报告，由平台提供。</p><ul className="mcp-catalog">{editingServer.builtinTools.map(tool => <li key={tool.toolName || tool.name}><strong>{tool.toolName || tool.name}</strong>{tool.description && <small>{tool.description}</small>}</li>)}</ul></section>}
                 </div> : editingServer ? <div className="mcp-card">
                   <div className="mcp-card-head"><div><h3>{editingServer.serverName || editingServer.id || '新服务器'}</h3>{editingServer.description?.trim() && editingServer.description.trim() !== (editingServer.serverName || editingServer.id || '').trim() && <p className="mcp-muted">{editingServer.description}</p>}</div>
                     <div className="mcp-actions"><button type="button" disabled={busy || !editingServer.id || serverDraftChanged(editingServer) || editingServer.enabled === false} onClick={() => void callTest(editingServer.id)}>连接测试</button><button className="mcp-primary" type="button" disabled={!editingServer.id} onClick={() => openDiagnostic(editingServer.id)}>调试工具</button><label className="mcp-switch"><input type="checkbox" checked={editingServer.enabled !== false} onChange={event => editServer(currentServerIndex, 'enabled', event.target.checked)} />启用</label></div>
@@ -699,7 +704,7 @@ window.__ModuleLoader__.load({
                         [field, [...new Set(members.flatMap(member => member[field] ?? []))]]))
                       const needsMerge = members.length > 1
                       const resources = discoveredResources[server.id]
-                      const discoveredTools = server.platformComposition ? (server.publishedTools ?? []).map(tool => ({ ...tool, name: tool.toolName || tool.name })).filter(tool => tool.name) : discovered[server.id]
+                      const discoveredTools = server.platformComposition ? compositionTools(server).filter(tool => tool.name) : discovered[server.id]
                       const query = selectionQueries.get(server.id) ?? ''
                       const keyword = query.trim().toLowerCase()
                       const catalogs = [
@@ -722,7 +727,7 @@ window.__ModuleLoader__.load({
                           return { value, item, label: item?.title || item?.name || value,
                             operation, choices: [{ field: section.field, value, title: section.field === 'names' ? '工具调用' : section.field === 'resourceUris' ? '资源读取' : '资源模板读取' }],
                             searchNames: [item?.groupToolName],
-                            details: [...new Set([item?.name, value, publishedName,
+                            details: [...new Set([item?.originLabel, item?.name, value, publishedName,
                               fullName && (shortened && !publicName
                                 ? `DSH 展开名：${fullName}（${fullName.length} 字符，保存并重新发现后显示最终名称）`
                                 : `DSH：${publicName || fullName}（展开前 ${fullName.length} 字符${shortened ? '，由 DSH 缩短' : ''}）`)].filter(Boolean))] }

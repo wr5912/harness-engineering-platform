@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import vm from 'node:vm'
 import test from 'node:test'
+import { compositionQueries } from '../src/mcp/definition.ts'
 
 // 运行实际客户端产物，只替换 React 的状态调度和 Portal 容器。
 function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理请求') }, clipboardFailure = false } = {}) {
@@ -55,7 +56,7 @@ function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理
     onSelectGroupId: id => { props.selectedServerId = undefined; props.selectedGroupId = id },
     form: { state: { status: 'ready', writable: true, revision: 'r1', value: { servers: [server], groups, sharedToken: '' } } },
     publishedService: { id: 'platform-compositions', platformComposition: true, enabled: true,
-      description: '工具组合编排（已发布）', publishedTools: [{ name: 'query_asset_related_alerts' }],
+      description: '工具组合编排', publishedTools: [{ name: 'query_asset_related_alerts' }],
       tools: { mode: 'all', names: ['query_asset_related_alerts'] } },
     write: async (ops, revision) => {
       writes.push({ ops, revision })
@@ -113,6 +114,7 @@ function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理
         publishedTools: names.map(name => ({ toolName: name })) }
       render()
     },
+    setBuiltinTools: tools => { props.publishedService.builtinTools = tools; render() },
     setView: value => { props.view = value; render() }, getView: () => props.view,
     setServerId: value => { props.selectedGroupId = undefined; props.selectedServerId = value; render() },
     setGroupId: value => { props.selectedServerId = undefined; props.selectedGroupId = value; render() },
@@ -139,13 +141,13 @@ function serviceSelection(ui, serverId) {
 
 test('自动生成的已发布组合服务不参与原生服务保存校验或持久化', async () => {
   const ui = editor()
-  assert.match(ui.text(ui.serviceButton('工具组合编排')), /由已发布组合生成.*目录已发布/)
+  assert.match(ui.text(ui.serviceButton('工具组合编排')), /1 个已发布编排.*平台服务/)
   assert.doesNotMatch(ui.text(ui.serviceButton('工具组合编排')), /连接已验证/)
   ui.input('描述（可选）').props.onChange({ target: { value: '18080' } })
   ui.render()
   ui.serviceButton('工具组合编排').props.onClick()
   ui.render()
-  assert.match(ui.text(ui.render()), /已发布组合生成的服务.*已发布工具.*query_asset_related_alerts/)
+  assert.match(ui.text(ui.render()), /提供已发布编排和平台内置运行查询.*已发布编排 · 1.*query_asset_related_alerts/)
   assert.equal(ui.input('ID'), undefined)
   assert.equal(ui.button('保存更改').props.disabled, false)
   await ui.button('保存更改').props.onClick()
@@ -156,6 +158,43 @@ test('自动生成的已发布组合服务不参与原生服务保存校验或�
   assert.deepEqual(ops.find(op => op.path[0] === 'servers').value, [{ ...ui.server, description: '18080' }])
   assert.deepEqual(ops.find(op => op.path[0] === 'groups').value, ui.groups)
   assert.match(ui.text(ui.render()), /配置已保存/)
+})
+
+test('内置运行查询与已发布编排分开展示，零发布时也不虚增编排数量', () => {
+  const ui = editor()
+  ui.setBuiltinTools(compositionQueries)
+  ui.setServerId('platform-compositions')
+  const sections = () => ui.nodes().filter(node => node.type === 'section' && node.props?.className === 'mcp-section')
+  const published = () => sections().find(node => ui.text(node).startsWith('已发布编排'))
+  const builtin = () => sections().find(node => ui.text(node).startsWith('平台内置 · 运行查询'))
+  assert.match(ui.text(published()), /已发布编排 · 1.*query_asset_related_alerts/)
+  assert.doesNotMatch(ui.text(published()), /get_composition_/)
+  assert.match(ui.text(builtin()), /平台内置 · 运行查询 · 3/)
+  for (const tool of compositionQueries) assert.ok(ui.text(builtin()).includes(tool.toolName))
+  ui.setPublishedTools([])
+  assert.match(ui.text(ui.serviceButton('工具组合编排')), /0 个已发布编排 · 3 个内置查询工具/)
+  assert.match(ui.text(published()), /已发布编排 · 0当前没有已发布编排。/)
+  assert.match(ui.text(builtin()), /get_composition_run/)
+})
+
+test('分组仍可选择全部内置查询，并保留已保存的原工具名称', async () => {
+  const ui = editor()
+  ui.setBuiltinTools(compositionQueries)
+  ui.refreshValue({ servers: [ui.server], groups: [{ id: 'research', members: [
+    { serverId: 'platform-compositions', names: ['query_asset_related_alerts', 'get_composition_run'] },
+  ] }], sharedToken: 'fixture-token' })
+  ui.setView('groups')
+  const selection = serviceSelection(ui, 'platform-compositions')
+  assert.equal(selection.choices().length, 4)
+  for (const tool of compositionQueries) {
+    const choice = selection.choices().find(node => ui.text(node).includes(tool.toolName))
+    assert.match(ui.text(choice), /平台内置 · 运行查询/)
+    assert.equal(ui.nodes(choice).find(node => node.type === 'input').props.checked, tool.toolName === 'get_composition_run')
+  }
+  assert.doesNotMatch(ui.text(selection.root()), /当前未发现/)
+  await ui.button('保存更改').props.onClick()
+  assert.deepEqual(ui.writes[0].ops.find(op => op.path[0] === 'groups').value[0].members[0].names,
+    ['query_asset_related_alerts', 'get_composition_run'])
 })
 
 test('非空服务详情按原型层级呈现服务选择、状态摘要和真实发现结果', async () => {
@@ -593,7 +632,7 @@ test('筛选无匹配不混淆未发现或已知空列表，已保存的失效�
 test('深链按服务 ID 恢复，失效 ID 不静默选中其他服务', () => {
   const ui = editor()
   ui.setServerId('platform-compositions')
-  assert.match(ui.text(ui.render()), /已发布组合生成的服务.*已发布工具.*query_asset_related_alerts/)
+  assert.match(ui.text(ui.render()), /提供已发布编排和平台内置运行查询.*已发布编排 · 1.*query_asset_related_alerts/)
   assert.equal(ui.input('ID'), undefined)
   ui.setServerId('missing-server')
   assert.equal(ui.input('ID'), undefined)
@@ -647,7 +686,7 @@ test('主动删除深链服务后改选下一可用服务', () => {
   ui.button('连接配置').props.onClick(); ui.render()
   ui.button('删除服务器').props.onClick(); ui.render()
   assert.equal(ui.selections.at(-1), 'platform-compositions')
-  assert.match(ui.text(ui.render()), /已发布组合生成的服务/)
+  assert.match(ui.text(ui.render()), /提供已发布编排和平台内置运行查询/)
   assert.equal(ui.serviceButton('工具组合编排').props['aria-current'], 'true')
 })
 

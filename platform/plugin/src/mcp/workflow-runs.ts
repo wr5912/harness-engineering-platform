@@ -45,21 +45,21 @@ export function workflowRuns(root: string) {
     }
   }
   async function start(request: { config: CompositionConfig; input: Record<string, any>; catalog: Catalog; version: any; executionId: string; compositionId: string }, workflow: CompositionWorkflow,
-    execute: (context: WorkflowContext) => Promise<any>, prepare: () => Promise<any> = async () => undefined) {
+    execute: (context: WorkflowContext) => Promise<any>, prepare: (context: Pick<WorkflowContext, 'call'>) => Promise<any> = async () => undefined) {
     mkdirSync(directory, { recursive: true, mode: 0o700 })
     const identity = compositionExecutionDigest({ execution: request.executionId })
     const identityFile = join(directory, `execution-${identity}.json`)
     // 发布身份用于请求去重；当前装载摘要只记入运行，不让配置更新重放旧请求。
     const binding = compositionExecutionDigest({ compositionId: request.compositionId, input: request.input, version: request.config.implementation ?? request.version.implementationDigest })
-    if (existsSync(identityFile)) {
-      const previous = JSON.parse(readFileSync(identityFile, 'utf8'))
-      if (previous.binding !== binding) throw new Error('执行标识已用于不同的编排、实现或输入')
-      return inspect(previous.run_id)
-    }
     const pending = admissions.get(identityFile)
     if (pending) {
       if (pending.binding !== binding) throw new Error('执行标识已用于不同的编排、实现或输入')
       return pending.promise
+    }
+    if (existsSync(identityFile)) {
+      const previous = JSON.parse(readFileSync(identityFile, 'utf8'))
+      if (previous.binding !== binding) throw new Error('执行标识已用于不同的编排、实现或输入')
+      return inspect(previous.run_id, workflow.responseMode === 'complete')
     }
     const restoreContext = AsyncLocalStorage.snapshot()
     const submittedAt = Date.now()
@@ -68,12 +68,23 @@ export function workflowRuns(root: string) {
     try { return await promise } finally { admissions.delete(identityFile) }
     async function admit() {
     if (state.queue.length >= 256) throw new Error('当前待运行组合过多，请稍后提交；本次未创建运行')
-    const prepared = await prepare()
+    const metrics = { requests: 0, peak_concurrency: 0, preparation_ms: 0 }
+    let requests = 0
+    const waiting: (() => void)[] = []
+    const limited = async <T>(call: () => Promise<T>): Promise<T> => {
+      if (requests >= 8) await new Promise<void>(resolve => waiting.push(resolve))
+      else requests++
+      metrics.requests++
+      metrics.peak_concurrency = Math.max(metrics.peak_concurrency, requests)
+      try { return await call() } finally { const next = waiting.shift(); if (next) next(); else requests-- }
+    }
+    const prepared = await prepare({ call: limited })
     const preparationMs = Date.now() - submittedAt
+    metrics.preparation_ms = preparationMs
     const runId = `run-${randomUUID()}`, path = file(runId)
     const record: any = { engine: 'workflow', run_id: runId, composition_id: request.compositionId, workflow: request.config.workflow,
       status: 'accepted', created_at: now(), input: request.input, version: request.version, plan: request.catalog,
-      scope: prepared?.scope, snapshot: prepared, progress: {}, nodes: {}, artifacts: [], metrics: { requests: 0, peak_concurrency: 0, preparation_ms: preparationMs } }
+      scope: prepared?.scope, snapshot: prepared, progress: {}, nodes: {}, artifacts: [], metrics }
     // 同一请求先落运行，再以排他文件登记身份；失败时不会启动上游调用。
     atomic(path, record)
     try { writeFileSync(identityFile, JSON.stringify({ binding, run_id: runId }), { flag: 'wx', mode: 0o600 }) }
@@ -82,33 +93,24 @@ export function workflowRuns(root: string) {
       const previous = JSON.parse(readFileSync(identityFile, 'utf8'))
       if (previous.binding !== binding) throw new Error('执行标识已用于不同输入')
       record.status = 'interrupted'; record.error = '并发重复请求未执行'; atomic(path, record)
-      return inspect(previous.run_id)
+      return inspect(previous.run_id, workflow.responseMode === 'complete')
     }
     state.active.add(runId)
     const persist = () => { record.updated_at = now(); atomic(path, record) }
     let progressTimer: ReturnType<typeof setTimeout> | undefined
     const persistProgress = () => { progressTimer ??= setTimeout(() => { progressTimer = undefined; persist() }, 250) }
-    let requests = 0
-    const waiting: (() => void)[] = []
-    const limited = async <T>(call: () => Promise<T>): Promise<T> => {
-      if (requests >= 8) await new Promise<void>(resolve => waiting.push(resolve))
-      else requests++
-      record.metrics.requests++
-      record.metrics.peak_concurrency = Math.max(record.metrics.peak_concurrency, requests)
-      try { return await call() } finally { const next = waiting.shift(); if (next) next(); else requests-- }
-    }
     const context: WorkflowContext = { runId, nodeId: 'root', signal: AbortSignal.timeout(36 * 60_000), shared: prepared,
       progress(value) { record.nodes[this.nodeId] = { ...record.nodes[this.nodeId], ...value, updated_at: now() }; persistProgress() },
       call: limited,
       async map(items, call) { return Promise.all(items.map(call)) } }
-    state.queue.push(() => restoreContext(async () => {
+    const run = () => restoreContext(async () => {
       try {
         record.status = 'running'; record.started_at = now(); persist()
         const value = await execute(context)
         record.result = value.result ?? value
         record.status = value.ok === false ? 'failed' : 'completed'
         if (value.error) record.error = value.error
-        record.artifacts = workflow.artifacts?.(record.result) ?? []
+        record.artifacts.push(...(workflow.artifacts?.(record.result) ?? []))
       } catch (error) {
         record.status = 'failed'; record.error = error instanceof Error ? error.message : '工作流执行失败'
       } finally {
@@ -117,23 +119,28 @@ export function workflowRuns(root: string) {
         record.metrics.elapsed_ms = Date.parse(record.finished_at) - submittedAt
         try { persist() } finally { state.active.delete(runId) }
       }
-    }))
+    })
+    if (workflow.responseMode === 'complete') {
+      await run()
+      return publicRun(record, true)
+    }
+    state.queue.push(run)
     // 先返回已持久化的 accepted 回执；请求断开不取消已接受的运行。
     setImmediate(pump)
     return publicRun(record)
     }
   }
-  function publicRun(value: any) {
+  function publicRun(value: any, fullResult = false) {
     const { plan: _plan, snapshot: _snapshot, ...view } = value
     const compact = (result: any): any => {
       if (!result || typeof result !== 'object') return result
       const { items, facts, ...summary } = result
       return { ...summary, ...(items ? { item_count: items.length } : {}), ...(result.checks ? { checks: Object.fromEntries(Object.entries(result.checks).map(([key, check]) => [key, compact(check)])) } : {}) }
     }
-    return { ...view, result: compact(value.result), nodes: Object.fromEntries(Object.entries(value.nodes).map(([key, node]: [string, any]) => [key, { ...compact(node), ...(node.result ? { result: compact(node.result) } : {}) }])),
-      artifacts: value.artifacts.map(({ body: _body, ...artifact }: any) => ({ ...artifact, bytes: Buffer.byteLength(_body ?? '') })) }
+    return { ...view, result: fullResult ? value.result : compact(value.result), nodes: Object.fromEntries(Object.entries(value.nodes).map(([key, node]: [string, any]) => [key, { ...compact(node), ...(node.result ? { result: compact(node.result) } : {}) }])),
+      artifacts: value.artifacts.map(({ body: _body, ...artifact }: any) => ({ ...artifact, bytes: artifact.bytes ?? Buffer.byteLength(_body ?? '') })) }
   }
-  function inspect(id: string) { const value = read(id); return value ? publicRun(value) : undefined }
+  function inspect(id: string, fullResult = false) { const value = read(id); return value ? publicRun(value, fullResult) : undefined }
   function details(id: string, nodeId: string, offset = 0, limit = 50) {
     if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 200) throw new Error('明细分页参数无效')
     const record = read(id), node = record?.nodes[nodeId]

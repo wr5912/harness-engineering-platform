@@ -94,7 +94,7 @@ let developmentSourceDigest: string | undefined
 function sourceDigestOf(): string {
   if (typeof __PLATFORM_MCP_IMPLEMENTATION_DIGEST__ !== 'undefined') return __PLATFORM_MCP_IMPLEMENTATION_DIGEST__
   if (developmentSourceDigest !== undefined) return developmentSourceDigest
-  const files = ['definition.ts', 'compositions.ts', 'executor.ts', 'source-digest.ts', 'workflow-graph.ts', 'workflow-runs.ts', 'index.ts', 'openapi.ts', 'native.ts', 'nested.ts', 'extension.ts', 'control.ts', 'manager.ts', 'lfx-runtime.ts', 'lfx-assets.ts']
+  const files = ['definition.ts', 'compositions.ts', 'executor.ts', 'source-digest.ts', 'workflow-graph.ts', 'workflow-runs.ts', 'execution-receipts.ts', 'index.ts', 'openapi.ts', 'native.ts', 'nested.ts', 'extension.ts', 'control.ts', 'manager.ts', 'lfx-runtime.ts', 'lfx-assets.ts']
     .map(file => `platform/plugin/src/mcp/${file}`)
     .concat(['platform/plugin/build.mjs', 'platform/plugin/package.json', 'platform/plugin/pnpm-lock.yaml', 'platform/plugin/src/index.ts',
       'platform/plugin/src/evaluation/model-attempts.ts', 'platform/plugin/src/workflows/graph.ts',
@@ -372,12 +372,17 @@ export async function executeComposition(registry: McpRegistry, assetRoot: strin
       const compositionId = resolvedCatalog.compositions.find(entry => [entry.draft, entry.published, ...(entry.versions ?? []).map(item => item.config)].some(item => item && compositionVersionId(item) === compositionVersionId(config)))?.id ?? config.workflow
       const accepted = await workflowRuns(assetRoot).start({ config: frozenConfig, input: validated, catalog: frozenCatalog, version, executionId: runContext.execution_id, compositionId }, workflow,
         context => executeComposition(frozenRegistry, assetRoot, frozenConfig, validated, undefined, frozenCatalog, true, { ...runContext, workflowContext: context }, version),
-        async () => {
+        async preparation => {
           await dryRunComposition(registry, config, validated, resolvedCatalog)
-          return workflow.prepare?.(validated, config, signal ? AbortSignal.any([signal, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000))
+          return workflow.prepare?.(validated, config, signal ? AbortSignal.any([signal, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000), preparation)
         })
       if (context) registry.access!.bindRun(context, accepted.run_id)
       await execution?.onRun?.(accepted.run_id)
+      if (workflow.responseMode === 'complete') return {
+        ok: accepted.status === 'completed', version: accepted.version,
+        result: accepted.result ?? accepted, receipts: [], graph_execution: graphExecution(),
+        ...(accepted.error ? { error: { code: 'workflow_failed', message: typeof accepted.error === 'string' ? accepted.error : accepted.error.message } } : {}),
+      }
       return { ok: true, version: accepted.version, result: accepted, receipts: [], graph_execution: graphExecution() }
     }
     const workflowContext = runContext.workflowContext

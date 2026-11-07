@@ -1,0 +1,13 @@
+{
+  "sessionId": "session-5ed9146a-0869-4744-b1bc-b5bfdc758632",
+  "scope": "实际管理助手只读核验工具归属、资产数量及运行服务装载；未执行巡检或写入业务资产",
+  "toolCounts": {
+    "skill": 2,
+    "platform_mcp": 3,
+    "read": 14,
+    "todo_write": 3,
+    "grep": 4,
+    "glob": 2
+  },
+  "finalText": "**核验结论：实际已发布编排为 6 个；本次读取的运行服务仍是旧分类，尚未装载该整改，并非新增了三个编排。**\n\n### 实际编排资产\n已对照[资产登记](</home/cmp/harness-engineering-platform-data/mcp/compositions.json#L3-L27>)及六个组合的发布记录，均有 `published` 和 `publishedVersionId`：\n状态检查、基线检查、漏洞检查、可达性检查、常规巡检、全面巡检。\n\n### 三个工具的正确归属\n\n以下均属于平台内置查询 `builtinTools`，不计入已发布编排：\n\n| 工具 | 用途 |\n|---|---|\n| `get_composition_run` | 查询既有运行进度与结果 |\n| `get_composition_artifact` | 读取既有运行报告 |\n| `get_composition_details` | 分页读取既有检查明细 |\n\n依据：[组合编排服务合同](</home/cmp/work/harness-engineering-platform/docs/platform-design/04_核心业务闭环与服务接口.md#L155>)及[查询定义](</home/cmp/work/harness-engineering-platform/platform/plugin/src/mcp/definition.ts#L6-L10>)。\n\n### 运行服务是否生效\n通过 `platform_mcp list` 读取的 `platform-compositions` 目录中：\n- `publishedService.publishedTools` 仍包含 **9 项**，混入上述三个查询工具。\n- 未返回独立的 `builtinTools`。\n- 当前[源码](</home/cmp/work/harness-engineering-platform/platform/plugin/src/mcp/compositions.ts#L20-L26>)已拆分两类，但本次运行目录尚未反映。\n\n正确分类应为 **6 个已发布编排＋3 个内置查询工具**；工具总数仍可为 9，问题在分类，不是资产新增。\n\n本次仅做只读核验，未创建或发布资产、未执行巡检、未修改文件或重启服务。"
+}

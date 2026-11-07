@@ -93,3 +93,47 @@ test('原生嵌套组合的明细从已保存结果分页读取，保留未知�
   assert.throws(() => store.details(id, 'root/absent'), /节点不存在/)
   assert.equal(readFileSync(path, 'utf8'), original)
 })
+
+test('准备与执行共用请求计数和并发额度，重复请求不重新准备', async t => {
+  const root = mkdtempSync(join(tmpdir(), 'workflow-preparation-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const runs = workflowRuns(root), workflow = {}
+  const request = { config: { workflow: 'test' }, compositionId: 'test', input: {}, catalog: {}, version: {}, executionId: 'same-request' }
+  let active = 0, peak = 0, preparations = 0, preparationCall
+  const call = async () => {
+    active++; peak = Math.max(peak, active)
+    await new Promise(resolve => setImmediate(resolve))
+    active--
+  }
+  const prepare = async context => {
+    preparations++; preparationCall = context.call
+    await Promise.all(Array.from({ length: 12 }, () => context.call(call)))
+    return { scope: { count: 1 } }
+  }
+  const execute = async context => {
+    assert.equal(context.call, preparationCall)
+    await context.call(call)
+    return { status: 'completed' }
+  }
+  const first = await runs.start(request, workflow, execute, prepare)
+  assert.equal(first.status, 'accepted')
+  for (let i = 0; i < 100 && runs.active().length; i++) await delay(5)
+  const completed = runs.inspect(first.run_id)
+  assert.equal(completed.status, 'completed')
+  assert.equal(completed.metrics.requests, 13)
+  assert.equal(completed.metrics.peak_concurrency, 8)
+  assert.equal(peak, 8)
+  assert.equal((await runs.start(request, workflow, execute, prepare)).run_id, first.run_id)
+  assert.equal(preparations, 1)
+})
+
+test('准备失败不创建已接受运行，原请求可在修复后重试', async t => {
+  const root = mkdtempSync(join(tmpdir(), 'workflow-preparation-failure-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const runs = workflowRuns(root), workflow = {}
+  const request = { config: {}, compositionId: 'test', input: {}, catalog: {}, version: {}, executionId: 'retry-request' }
+  await assert.rejects(runs.start(request, workflow, async () => ({}), async context => context.call(async () => { throw new Error('范围缺失') })), /范围缺失/)
+  assert.deepEqual(runs.active(), [])
+  assert.equal((await runs.start(request, workflow, async () => ({}))).status, 'accepted')
+  for (let i = 0; i < 100 && runs.active().length; i++) await delay(5)
+})

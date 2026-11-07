@@ -1,0 +1,22 @@
+[
+  {
+    "id": "policy-change",
+    "published": true,
+    "versionId": "d1e7e76495b0633a899cbf30d413ba6099ee27d98dbc55c4ea7e1d5abbf4b300",
+    "nodes": 15,
+    "edges": 14,
+    "conditional": 6,
+    "graphNodes": 15,
+    "graphEdges": 14
+  },
+  {
+    "id": "emergency-action",
+    "published": true,
+    "versionId": "43a03bc99cd871342d1d377c4ea1c38684e2851bb8d7b21d6129f881b98f8ef0",
+    "nodes": 13,
+    "edges": 12,
+    "conditional": 5,
+    "graphNodes": 13,
+    "graphEdges": 12
+  }
+]

@@ -8,7 +8,7 @@ const migrationActions = ['migrations/inspect', 'migrations/read', 'migrations/p
 export const assistantActions: Record<AssistantDomain, readonly string[]> = {
   agents: ['sdk/start', 'sdk/status', 'sdk/stop', 'sdk/list', 'sdk/guide', ...migrationActions, 'versions/migration-plan', 'versions/migration-apply', 'documents/read', 'research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'list', 'detail', 'edit/read', 'edit/preview', 'edit/apply', 'cases/list', 'cases/read', 'cases/update', 'cases/delete', 'cases/renumber-preview', 'cases/renumber', 'cases/reorder-preview', 'cases/reorder', 'eval/preview', 'eval/start', 'eval/batch-start', 'eval/status', 'eval/cancel', 'runs/index', 'runs/delete', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/source', 'compute-variants/identity-preview', 'compute-variants/identity-apply', 'compute-variants/preview', 'compute-variants/create', 'compute-variants/rename', 'compute-variants/plan-preview', 'compute-variants/plan-apply', 'compute-variants/prepare', 'compute-variants/build-preview', 'compute-variants/build', 'compute-variants/freeze-preview', 'compute-variants/freeze', 'compute-variants/compare', 'new', 'create', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'cases/create', 'datasets/source', 'datasets/preview', 'datasets/apply', 'datasets/list', 'datasets/read', 'datasets/review', 'datasets/export', 'decision/update', 'features/read-source', 'features/preview', 'features/proposal', 'features/apply', 'fusion/preview', 'fusion/prepare', 'fusion/resolve', 'fusion/recover', 'fusion/proposal', 'fusion/confirm', 'fusion/status', 'fusion/verify', 'fusion/finalize', 'tasks/capabilities', 'tasks/assembly-preview', 'tasks/assembly-apply'],
   instances: ['list', 'detail', 'url', 'logs', 'preview', 'batch-preview', 'run', 'batch'],
-  mcp: ['list', 'configuration', 'saveConfiguration', 'test', 'resources', 'resourceTemplates', 'readResource', 'callTool', 'sources/list', 'sources/create', 'sources/refresh', 'sources/toggle', 'sources/components', 'sources/logs', 'sources/preview', 'sources/invoke', 'saveCompositionDraft', 'publishComposition', 'withdrawComposition', 'deleteComposition', 'executeComposition', 'dryRunComposition', 'callPublishedComposition', 'compositionRun', 'compositionArtifact', 'compositionDetails', 'compositionSource', 'compositionGraph', 'seedThreatCompositions', 'control/status', 'control/saveConfiguration', 'control/restrict', 'control/reassess', 'control/release'],
+  mcp: ['list', 'configuration', 'saveConfiguration', 'test', 'resources', 'resourceTemplates', 'readResource', 'callTool', 'sources/list', 'sources/create', 'sources/refresh', 'sources/toggle', 'sources/components', 'sources/logs', 'sources/preview', 'sources/invoke', 'saveCompositionDraft', 'bindCompositionDrafts', 'publishComposition', 'withdrawComposition', 'deleteComposition', 'executeComposition', 'dryRunComposition', 'callPublishedComposition', 'compositionRun', 'compositionArtifact', 'compositionDetails', 'compositionSource', 'compositionGraph', 'seedThreatCompositions', 'control/status', 'control/saveConfiguration', 'control/restrict', 'control/reassess', 'control/release'],
 }
 
 const string = { type: 'string' }, strings = { type: 'array', items: string }, object = { type: 'object', additionalProperties: true }
@@ -59,7 +59,7 @@ const fields: MapValue = {
   bindings: object, artifact_export: object, files: { type: 'array', items: object }, configuration_edits: { type: 'array', items: object },
   items: { type: 'array', items: object }, expected_device_ids: strings, required_case_ids: strings, required_tool_names: strings,
   agents: { type: 'array', items: object }, scope: object, deniedActions: strings,
-  sessionId: string, restrictionId: string, reason: string, action: string,
+  sessionId: string, restrictionId: string, reason: string, action: string, instanceName: string, compositionIds: strings,
 }
 type Hint = [actions: string, input: string, note?: string]
 // 这里是模型的逐操作用法索引，不是第二套业务校验器；完整语义仍由原接口处理。
@@ -78,6 +78,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['sources/create', 'serverId name specUrl', '向当前配置的管理服务创建 OpenAPI 来源。'],
     ['sources/toggle', 'serverId sourceId enabled'], ['sources/preview sources/invoke', 'serverId sourceId toolName arguments', '按 sources/components 返回的组件合同提供参数。'],
     ['saveCompositionDraft', 'compositionId newId revision draft', 'revision 来自 list；新编排省略 compositionId，可用 newId 指定稳定 ID；更新时必须指定已有 compositionId。'],
+    ['bindCompositionDrafts', 'instanceName compositionIds revision', '对实际实例固定 LFX 草稿用于端到端联调，不发布。仅该实例的实际来源可发现和执行这些固定草稿；分组仍需选择对应工具名。实现或来源变化后重新绑定；compositionIds=[] 解除绑定。'],
     ['publishComposition executeComposition dryRunComposition', 'compositionId version revision input', '先保存草稿；version=draft/published，发布只接受 draft；使用当前 revision。'],
     ['withdrawComposition deleteComposition', 'compositionId revision', '使用 list 返回的身份与 revision。下架停止新调用，已受理运行继续；删除须先下架、解除引用且无在途运行，清理该编排完整资产目录（源码、文档及发布包），历史运行记录保留。旧删除残留或清理失败时，先核对登记与资产目录，再使用原 compositionId 和最新 revision 显式继续清理。结果未知先回读，不自动重复写入。'],
     ['callPublishedComposition', 'toolName input', '服务器从当前目录固定实际已发布版本，按 DSH 原生权限执行。'],
@@ -104,7 +105,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['documents/read', 'path cursor limit source_sha256', '只读当前数据工作区文档或当前会话附件。path 使用工作区相对路径或模型输入中原生附件 read_path；不传 Session ID。支持 Markdown/TXT、文本 PDF、DOCX。按 blocks 的页/段号及片段偏移引用来源；has_more=true 时用 next_cursor 与 source_sha256 连续读取，不能将首段当作全文。扫描件、图片及复杂排版以 warnings 为准；不执行文件，也不创建知识资产。'],
     ['research/read-reference', 'topic', 'topic=controlled-improvement/evaluation-and-evidence/inheritance-and-fusion/compute-variants/decision-samples。'],
     ['research/validate', 'experiment_id'], ['legacy/inspect', 'path', '仅检查 data evolution/history/imports 内的既有材料，不执行旧代码。'],
-    ['new', 'agent_id name description role evaluation_cases profile', '先查 tasks/capabilities 复用已有能力；evaluation_cases 使用实际业务测试，ID 以 U- 开头（如 U-CHAT-GREET），身份测试由平台创建；inputs 为单轮字符串或按轮次排列的字符串数组，多行文字不等于多轮。'],
+    ['new', 'agent_id name description role evaluation_cases profile', '先查 tasks/capabilities 复用已有能力；evaluation_cases 使用实际业务测试，ID 使用单段大写场景缩写和 001～999 三位序号（如 U-CHAT-001），身份测试由平台创建；inputs 为单轮字符串或按轮次排列的字符串数组，多行文字不等于多轮。'],
     ['sdk/start', 'source instance_id input session_id request_id', '启动同容器官方 TypeScript SDK 调试。request_id 固定，重试必须保持同一请求；刷新只用 sdk/status 查询，不重放输入。'],
     ['sdk/status sdk/stop', 'operation_id', '停止会关闭本次 Runtime，保留 HOME；结果未知时核对原实例，不自动重跑。'],
     ['sdk/list sdk/guide', 'source', 'source 必须指向 SDK 型版本，返回该版本的调试记录或业务集成用 TypeScript 调用示例与接入说明。开发 DSH 插件和工具时，读取锁定 Runtime 的插件与工具公开合同。'],

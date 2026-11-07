@@ -204,7 +204,7 @@ test('本地 CLI 新建与页面和助手共用完整角色及业务用例创建
 test('新建向导复用真实 CLI 并保存角色、标准来源与用例，不启动实例', async () => {
   const root = createFixture()
   try {
-    const business = { id: 'U-CHAT-GREET', title: '整理事项', inputs: '整理用户给定的两件事项', expected_behavior: '只依据给定信息列出两件事项', fast: true }
+    const business = { id: 'U-CHAT-001', title: '整理事项', inputs: '整理用户给定的两件事项', expected_behavior: '只依据给定信息列出两件事项', fast: true }
     const value = success(await createAgent(root, { ...input, evaluation_cases: [business] }))
     assert.match(value.experiment_id, /^EXP-daily-assistant-001-m-r[0-9a-f]{12}$/)
     assert.equal(value.started, false)
@@ -246,19 +246,20 @@ test('实际创建入口与工具参数共用 Case 合同，非法业务 Case �
   const root = createFixture()
   try {
     const original = readFileSync(join(root, 'runtime/adapters/dsh-container/sources.json'), 'utf8')
-    const business = { id: 'U-ASSET-PAGES-001', title: '完整分页', inputs: '读取全部分页', expected_behavior: '覆盖五台模拟设备' }
+    const business = { id: 'U-ASSET-001', title: '完整分页', inputs: '读取全部分页', expected_behavior: '覆盖五台模拟设备' }
     const invalidCases = [
       [{ ...business, id: 'U-IDENTITY-001' }], [{ ...business, id: 'U-ROLE-001' }], [business, business],
       [{ ...business, title: '完整分页\n额外标题' }], [{ ...business, expected_behavior: '完整结果\n# 额外标题' }],
-      Array.from({ length: 31 }, (_, i) => ({ ...business, id: `U-BUSINESS-${i}` })),
+      Array.from({ length: 31 }, (_, i) => ({ ...business, id: `U-BUSINESS-${String(i + 1).padStart(3, '0')}` })),
       [{ ...business, inputs: '设备'.repeat(5000) }],
       [{ ...business, id: 'CHAT-GREET', fast: true }],
       [{ ...business, id: 'CHAT-GREET', fast: false }],
+      ...['U-ASSET-PAGES-001', 'U-CHAT-GREET', 'U-ASSET-000', 'U-ASSET-1', 'U-ASSET-1000', 'U-ASSET2-001', 'U-NEW-001', 'U-XXX-001'].map(id => [{ ...business, id }]),
     ]
     for (const evaluation_cases of invalidCases) {
       const result = await createAgent(root, { ...input, evaluation_cases })
       assert.equal(result.error.code, 'invalid_request')
-      if (evaluation_cases[0].id === 'CHAT-GREET') assert.match(result.error.message, /必须以 U- 开头/)
+      if (evaluation_cases[0].id === 'CHAT-GREET') assert.match(result.error.message, /三位数字/)
     }
     assert.equal(existsSync(join(root, 'agents', input.agent_id)), false)
     assert.deepEqual(readdirSync(join(root, 'evolution/experiments')), [])
@@ -271,8 +272,8 @@ test('实际创建的多轮 Case 保留每轮边界，单轮内换行不变成�
   const root = createFixture()
   try {
     const turns = ['请记住订单编号 A-17。\n本轮不结算。', '刚才的订单编号是什么？']
-    success(await createAgent(root, { ...input, evaluation_cases: [{ id: 'U-CHAT-MEMORY', title: '跨轮记忆', inputs: turns, expected_behavior: '第二轮准确回答 A-17。' }] }))
-    const result = spawnSync(process.env.HARNESS_PYTHON ?? 'python3', ['-c', 'import sys,json;from pathlib import Path;sys.path.insert(0,sys.argv[1]);from evaluation_contract import load_evaluation;print(json.dumps(load_evaluation(Path(sys.argv[2]))["cases"]["U-CHAT-MEMORY"]["inputs"]))', join(root, 'runtime/research'), join(root, 'agents/daily-assistant/evaluation.md')], { encoding: 'utf8' })
+    success(await createAgent(root, { ...input, evaluation_cases: [{ id: 'U-CHAT-001', title: '跨轮记忆', inputs: turns, expected_behavior: '第二轮准确回答 A-17。' }] }))
+    const result = spawnSync(process.env.HARNESS_PYTHON ?? 'python3', ['-c', 'import sys,json;from pathlib import Path;sys.path.insert(0,sys.argv[1]);from evaluation_contract import load_evaluation;print(json.dumps(load_evaluation(Path(sys.argv[2]))["cases"]["U-CHAT-001"]["inputs"]))', join(root, 'runtime/research'), join(root, 'agents/daily-assistant/evaluation.md')], { encoding: 'utf8' })
     assert.equal(result.status, 0, result.stderr)
     assert.deepEqual(JSON.parse(result.stdout), turns)
   } finally { rmSync(root, { recursive: true, force: true }) }

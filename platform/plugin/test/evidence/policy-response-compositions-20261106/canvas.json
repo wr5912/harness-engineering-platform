@@ -1,0 +1,20 @@
+[
+  {
+    "id": "policy-change",
+    "published": false,
+    "nodes": 15,
+    "edges": 14,
+    "conditional": 6,
+    "graphNodes": 15,
+    "graphEdges": 14
+  },
+  {
+    "id": "emergency-action",
+    "published": false,
+    "nodes": 13,
+    "edges": 12,
+    "conditional": 5,
+    "graphNodes": 13,
+    "graphEdges": 12
+  }
+]
