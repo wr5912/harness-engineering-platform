@@ -1,0 +1,104 @@
+{
+  "checkedAt": "2026-11-07T04:26:19.509Z",
+  "programSource": {
+    "commit": "72438ecf64277229caae372dccf7cda1f65f1df5",
+    "dirty": true
+  },
+  "dataSource": {
+    "commit": "bd3004f1d1736a45f95471a033fd3e3fab5f68d7",
+    "dirty": true
+  },
+  "activation": {
+    "status": "applied",
+    "activation": "managed-restart",
+    "pid": 2764397,
+    "stageId": "5e041057-49b1-4d34-bc0f-5c12c795d264"
+  },
+  "catalogRevision": "2ad094b15b4862ef0dda4c6dd343e5757fcb7988623638af283b5e3f9d63523b",
+  "inspection": [
+    {
+      "id": "inspection-baseline",
+      "version": "cbab7937cc6318726309c47821ecd8616dafe5e1634bbe75af55754add01f9dc",
+      "bindingValid": true
+    },
+    {
+      "id": "inspection-vulnerabilities",
+      "version": "475681fc4867f7f4db38ede402caa66441e78a3c1bf986753d334ed656c1e4e2",
+      "bindingValid": true
+    },
+    {
+      "id": "inspection-reachability",
+      "version": "03a782d9f932e08d41ab1c30cfa85b7784f10d3775cecf859a92b6c6b87c426b",
+      "bindingValid": true
+    },
+    {
+      "id": "inspection-routine",
+      "version": "06bf7342d95b21c1986c08a64c3baaa3f30bbc9cff91726b74aaf4ba6a6c58c4",
+      "bindingValid": true
+    },
+    {
+      "id": "inspection-deep",
+      "version": "9c4007b5c98793c841a86f768bdf45d2184b712d7235f9631c18e18dcab484b6",
+      "bindingValid": true
+    }
+  ],
+  "inspectionPackages": [
+    "inspection-baseline",
+    "inspection-deep",
+    "inspection-reachability",
+    "inspection-routine",
+    "inspection-vulnerabilities"
+  ],
+  "statusPackageRemoved": true,
+  "tools": [
+    {
+      "name": "inspection_baseline",
+      "registered": true
+    },
+    {
+      "name": "inspection_vulnerabilities",
+      "registered": true
+    },
+    {
+      "name": "inspection_reachability",
+      "registered": true
+    },
+    {
+      "name": "inspection_routine",
+      "registered": true
+    },
+    {
+      "name": "inspection_deep",
+      "registered": true
+    },
+    {
+      "name": "get_composition_run",
+      "registered": true
+    },
+    {
+      "name": "get_composition_artifact",
+      "registered": true
+    },
+    {
+      "name": "get_composition_details",
+      "registered": true
+    }
+  ],
+  "httpCheck": {
+    "checkedAt": "2026-11-07T04:30:18.223048+00:00",
+    "method": "GET",
+    "responses": [
+      {
+        "url": "http://172.16.138.228:18120/hep/",
+        "status": 200,
+        "bytes": 44144
+      },
+      {
+        "url": "http://172.16.138.228:53105/agents/security-operations-expert/instances/inspection-027-schedule-acceptance/",
+        "status": 200,
+        "bytes": 39920
+      }
+    ],
+    "scope": "页面响应检查；未补做浏览器交互验收"
+  }
+}
