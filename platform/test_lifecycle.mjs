@@ -5,9 +5,18 @@ import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
-import { launchAddress, managedState, processBirth } from './lifecycle.mts'
+import { launchAddress, managedState, processBirth, renderAutostartUnit } from './lifecycle.mts'
 import { handoffService } from './bootstrap/server.ts'
 import { platformGroupUrl } from './plugin/src/business-control/group-link.ts'
+
+test('自启动单元固定程序根、数据根和用户服务入口', () => {
+  const unit = renderAutostartUnit('/opt/hep root', '/srv/hep data', '/opt/node/bin:/usr/bin')
+  assert.match(unit, /WorkingDirectory=\/opt\/hep\\x20root/)
+  assert.match(unit, /HARNESS_ASSET_ROOT=\/srv\/hep data/)
+  assert.match(unit, /ExecStart="\/opt\/hep root\/platform\/dsh-platform" start --foreground/)
+  assert.match(unit, /WantedBy=default\.target/)
+  assert.match(unit, /TimeoutStartSec=10min/)
+})
 
 test('地址配置只读校验，允许已有多级站点基址', () => {
   const root = mkdtempSync(join(tmpdir(), 'hep-address-'))

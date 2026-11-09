@@ -49,6 +49,16 @@ cd harness-engineering-platform
 ./platform/dsh-platform stop
 ```
 
+Linux 主机可用同一个入口设置用户级自启动，AMD64 与 ARM64 使用相同的 systemd 文本单元：
+
+```bash
+HARNESS_ASSET_ROOT=~/harness-engineering-platform-data ./platform/dsh-platform autostart enable
+HARNESS_ASSET_ROOT=~/harness-engineering-platform-data ./platform/dsh-platform autostart status
+HARNESS_ASSET_ROOT=~/harness-engineering-platform-data ./platform/dsh-platform autostart disable
+```
+
+启用会固定当前程序根和 `HARNESS_ASSET_ROOT`，并启用用户驻留；不会重启当前平台。使用离线安装包的一键运行命令 `./install.sh --start` 时，安装器会在平台启动成功后自动执行同一自启动配置。主机仍需具备对应架构的 Node.js、Python、DSH 和其他运行依赖。自启动单元由 `~/.config/systemd/user/harness-engineering-platform.service` 管理。
+
 源码更新使用 `./platform/dsh-deploy update --dry-run` 核对来源、制品与在途任务，再执行 `update`。生命周期、监听地址、打包安装和恢复见[部署说明](docs/platform-design/23_离线一键打包与安装.md)。
 
 ## 按任务查找

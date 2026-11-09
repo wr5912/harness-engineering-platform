@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { networkInterfaces } from 'node:os'
+import { homedir, networkInterfaces } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { isIP } from 'node:net'
@@ -12,6 +12,8 @@ import { prepareBusinessRuntimeFile } from './plugin/src/business-control/secret
 import { reportBusinessReadiness } from './business-readiness.mts'
 
 const programRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const autostartService = 'harness-engineering-platform.service'
+const autostartMarker = '# Managed by harness-engineering-platform dsh-platform autostart.'
 type State = { pid: number; birth: string; programRoot: string; dataRoot: string; url: string; publicUrl?: string; host: string; port: number; log: string; phase: string; detached: boolean }
 const json = (path: string) => JSON.parse(readFileSync(path, 'utf8'))
 function atomic(path: string, value: unknown, business = false) {
@@ -102,6 +104,77 @@ export function launchAddress(dataRoot: string, host?: string, port?: string, pu
 
 function privateArgs(args: string[]) { return [join(programRoot, 'platform/dsh-platform-internal.py'), ...args] }
 function python() { return process.env.HARNESS_PYTHON || 'python3' }
+function systemdQuote(value: string) {
+  return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('%', '%%').replaceAll('\n', '\\n')}"`
+}
+function systemdPath(value: string) {
+  return value.replaceAll('\\', '\\\\').replaceAll('%', '%%').replaceAll(/\s/g, character => `\\x${character.charCodeAt(0).toString(16).padStart(2, '0')}`)
+}
+export function renderAutostartUnit(root = programRoot, dataRoot = defaultAssetRoot(), runtimePath = [dirname(process.execPath), process.env.PATH].filter(Boolean).join(':')) {
+  return [autostartMarker, '[Unit]', 'Description=Harness Engineering Platform', '', '[Service]', 'Type=simple',
+    `WorkingDirectory=${systemdPath(root)}`, `Environment=${systemdQuote(`HARNESS_PROGRAM_ROOT=${root}`)}`,
+    `Environment=${systemdQuote(`HARNESS_ASSET_ROOT=${dataRoot}`)}`, `Environment=${systemdQuote(`PATH=${runtimePath}`)}`,
+    `ExecStart=${systemdQuote(join(root, 'platform/dsh-platform'))} start --foreground`, 'Restart=on-failure', 'RestartSec=5s',
+    'TimeoutStartSec=10min', 'TimeoutStopSec=45s', 'KillMode=control-group', '', '[Install]', 'WantedBy=default.target', ''].join('\n')
+}
+function commandResult(command: string, args: string[]) {
+  const result = spawnSync(command, args, { encoding: 'utf8' })
+  if (result.error) throw new Error(`无法执行 ${command}：${result.error.message}`)
+  const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim()
+  if (result.status !== 0) throw new Error(output || `${command} 退出码 ${result.status ?? '未知'}`)
+  return output
+}
+function systemctl(args: string[]) { return commandResult('systemctl', ['--user', ...args]) }
+function probe(command: string, args: string[]) {
+  const result = spawnSync(command, args, { encoding: 'utf8' })
+  if (result.error) return { available: false, status: undefined, output: result.error.message }
+  return { available: true, status: result.status, output: `${result.stdout ?? ''}${result.stderr ?? ''}`.trim() }
+}
+function autostartUnitPath() { return join(homedir(), '.config/systemd/user', autostartService) }
+function ensureLinger() {
+  if (typeof process.getuid !== 'function') throw new Error('当前系统不支持 Linux 用户自启动')
+  const uid = String(process.getuid())
+  const state = probe('loginctl', ['show-user', uid, '-p', 'Linger'])
+  if (state.available && state.status === 0 && state.output === 'Linger=yes') return
+  commandResult('loginctl', ['enable-linger', uid])
+}
+function autostartStatus(dataRoot: string, asJson: boolean) {
+  const unitPath = autostartUnitPath()
+  const unit = existsSync(unitPath) ? readFileSync(unitPath, 'utf8') : undefined
+  const enabled = probe('systemctl', ['--user', 'is-enabled', autostartService])
+  const active = probe('systemctl', ['--user', 'is-active', autostartService])
+  const linger = typeof process.getuid === 'function' ? probe('loginctl', ['show-user', String(process.getuid()), '-p', 'Linger']) : undefined
+  const result = { service: autostartService, unitPath, unitOwned: unit?.includes(autostartMarker) ?? false,
+    enabled: enabled.status === 0 ? enabled.output.split('\n')[0] || 'enabled' : unit ? 'disabled' : 'not-installed',
+    active: active.status === 0 ? active.output.split('\n')[0] || 'active' : 'inactive',
+    linger: linger?.status === 0 ? linger.output : 'unknown', programRoot, dataRoot: resolve(dataRoot) }
+  console.log(asJson ? JSON.stringify(result, null, 2) : `自启动：${result.enabled}\n服务：${result.active}\n用户驻留：${result.linger}\n单元：${result.unitPath}`)
+  return 0
+}
+function manageAutostart(subcommand: string, dataRoot: string, asJson: boolean) {
+  if (process.platform !== 'linux') throw new Error('自启动当前只支持 Linux systemd；AMD64 与 ARM64 使用同一套入口')
+  const unitPath = autostartUnitPath(), directory = dirname(unitPath)
+  const existing = existsSync(unitPath) ? readFileSync(unitPath, 'utf8') : undefined
+  if (subcommand === 'status') return autostartStatus(dataRoot, asJson)
+  if (subcommand !== 'enable' && subcommand !== 'disable') throw new Error(`未知自启动操作：${subcommand}`)
+  if (existing && !existing.includes(autostartMarker)) throw new Error(`已有非平台管理的 systemd 单元：${unitPath}；未覆盖`)
+  if (subcommand === 'disable') {
+    if (!existing) return 0
+    systemctl(['disable', autostartService]); rmSync(unitPath); systemctl(['daemon-reload'])
+    console.log('平台自启动已停用（未停止当前平台进程）'); return 0
+  }
+  systemctl(['show-environment']); ensureLinger(); mkdirSync(directory, { recursive: true, mode: 0o700 })
+  const temporary = `${unitPath}.${process.pid}.tmp`
+  writeFileSync(temporary, renderAutostartUnit(programRoot, dataRoot), { mode: 0o600 })
+  try { renameSync(temporary, unitPath); systemctl(['daemon-reload']); systemctl(['enable', autostartService]) }
+  catch (error) {
+    rmSync(temporary, { force: true });
+    if (existing === undefined) rmSync(unitPath, { force: true }); else writeFileSync(unitPath, existing, { mode: 0o600 })
+    try { systemctl(['daemon-reload']) } catch { /* 保留原始失败。 */ }
+    throw error
+  }
+  console.log(`平台自启动已启用：${unitPath}\n数据根：${resolve(dataRoot)}\n当前进程不会被重启`); return 0
+}
 async function lock(directory: string): Promise<() => void> {
   mkdirSync(dirname(directory), { recursive: true })
   for (let attempt = 0; attempt < 600; attempt++) {
@@ -172,8 +245,16 @@ export async function restoreManagedProcess(original: State, command: string[], 
 export async function main(args = process.argv.slice(2)): Promise<number> {
   const [command, ...rest] = args
   if (!command || command === '--help') {
-    console.log('用法：dsh-platform prepare [--offline] | start [--foreground] [--host IPv4] [--port 18120] [--public-url URL] [--dry-run] | stop | restart [--host IPv4] [--port 18120] [--public-url URL] | status [--json]')
+    console.log('用法：dsh-platform prepare [--offline] | start [--foreground] [--host IPv4] [--port 18120] [--public-url URL] [--dry-run] | stop | restart [--host IPv4] [--port 18120] [--public-url URL] | status [--json] | autostart enable|disable|status [--json]')
     return 0
+  }
+  const dataRoot = defaultAssetRoot()
+  process.env.HARNESS_PROGRAM_ROOT = programRoot
+  process.env.HARNESS_ASSET_ROOT = dataRoot
+  if (command === 'autostart') {
+    const [subcommand = 'status', ...autostartArgs] = rest
+    if (autostartArgs.some(arg => arg !== '--json') || autostartArgs.filter(arg => arg === '--json').length > 1) throw new Error('自启动仅支持一次 --json')
+    return manageAutostart(subcommand, dataRoot, autostartArgs.includes('--json'))
   }
   const flags = new Set<string>(), values: Record<string, string> = {}
   const allowed: Record<string, string[]> = { prepare: ['--offline'], start: ['--foreground', '--dry-run', '--host', '--port', '--public-url'], restart: ['--foreground', '--host', '--port', '--public-url'], stop: [], status: ['--json'] }
@@ -187,9 +268,6 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
       values[key] = rest[++n]
     }
   }
-  const dataRoot = defaultAssetRoot()
-  process.env.HARNESS_PROGRAM_ROOT = programRoot
-  process.env.HARNESS_ASSET_ROOT = dataRoot
   if (command === 'prepare') {
     const result = spawnSync(python(), privateArgs(['prepare', ...(flags.has('--offline') || process.env.HEP_OFFLINE === '1' ? ['--offline'] : [])]), { stdio: 'inherit' })
     if (result.error) throw new Error('无法执行 Python 3.10+；请检查 HARNESS_PYTHON')
@@ -253,7 +331,8 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
     const sigint = () => forward('SIGINT'), sigterm = () => forward('SIGTERM')
     process.on('SIGINT', sigint); process.on('SIGTERM', sigterm)
     try {
-      const deadline = Date.now() + 60_000
+      const timeout = foreground ? 10 * 60_000 : 60_000
+      const deadline = Date.now() + timeout
       while (Date.now() < deadline) {
         if (failure || processBirth(state.pid) !== state.birth) throw new Error(`平台启动失败；日志：${log}`)
         if (ownsPort(state.pid, state.host, state.port)) {
@@ -271,7 +350,7 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
         }
         await delay(100)
       }
-      throw new Error(`平台启动等待超过 60 秒；请用 status 和日志检查：${log}`)
+      throw new Error(`平台启动等待超过 ${foreground ? '10 分钟' : '60 秒'}；请用 status 和日志检查：${log}`)
     } catch (error) {
       child.unref()
       if (saved && readFileSync(accessPath, 'utf8') === saved && processBirth(state.pid) !== state.birth) {

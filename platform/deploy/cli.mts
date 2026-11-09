@@ -179,7 +179,7 @@ function usage(): string {
     --skip-prepare               不执行 prepare（仅用于诊断/分步安装）
     --strict-paths               路径映射后仍有旧路径时失败
     --allow-fixture-data         允许夹具数据根（仅测试；真实部署默认拒绝）
-    --start                      安装完成后后台启动平台，等待就绪后返回
+    --start                      安装完成后后台启动平台并启用用户级自启动，等待就绪后返回
 
 可导入已准备的目标架构资源生成安装包；安装和运行须使用匹配架构的主机，AMD64 与 ARM64 不混用。`
 }
@@ -341,6 +341,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
         console.log(`数据根：${report.dataRoot}`)
         console.log(`架构：${report.arch}`)
         if (Object.keys(report.runtime).length) console.log(`运行时：${JSON.stringify(report.runtime)}`)
+        console.log(`自启动：${report.autostart}`)
         if (report.image) console.log(`镜像：${report.image.tag ?? report.image.id ?? ''} loaded=${report.image.loaded}`)
         if (report.rewritten.length) console.log(`路径已重写：${report.rewritten.length} 个文件`)
         if (report.oldReferences.length) console.warn(`仍存在旧路径引用：${report.oldReferences.length} 处`)

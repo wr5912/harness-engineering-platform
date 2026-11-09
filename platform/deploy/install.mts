@@ -40,6 +40,7 @@ export interface InstallReport {
   oldReferences: Array<{ file: string; pattern: string }>
   image?: { tag?: string; id?: string; loaded: boolean }
   prepare: 'skipped' | 'ok'
+  autostart: 'skipped' | 'enabled'
   pendingInstances: string[]
   sensitive: boolean
 }
@@ -84,6 +85,7 @@ export function install(options: InstallOptions): InstallReport {
     oldReferences: [],
     image: manifest.image ? { tag: manifest.image.tag, id: manifest.image.id, loaded: false } : undefined,
     prepare: 'skipped',
+    autostart: 'skipped',
     pendingInstances: [],
     sensitive: Boolean(manifest.data?.sensitive || manifest.sensitivePaths?.length),
   }
@@ -192,6 +194,9 @@ export function install(options: InstallOptions): InstallReport {
     const args = options.host ? ['--host', options.host, '--port', String(options.port), ...(options.publicUrl ? ['--public-url', options.publicUrl] : [])] : []
     const started = spawnSync(join(prefix, 'platform', 'dsh-platform'), ['start', ...args], { cwd: prefix, env, stdio: 'inherit' })
     if (started.status !== 0) throw new Error(`平台启动失败（退出码 ${started.status}）；安装目录已保留，可重试 ${prefix}/platform/dsh-platform start`)
+    const autostart = spawnSync(join(prefix, 'platform', 'dsh-platform'), ['autostart', 'enable'], { cwd: prefix, env, stdio: 'inherit' })
+    if (autostart.status !== 0) throw new Error(`平台已启动，但自启动配置失败（退出码 ${autostart.status}）；安装目录已保留，可重试 ${prefix}/platform/dsh-platform autostart enable`)
+    report.autostart = 'enabled'
   }
   return report
 }
