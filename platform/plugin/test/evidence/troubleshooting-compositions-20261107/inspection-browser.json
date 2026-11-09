@@ -1,0 +1,27 @@
+{
+  "at": "2026-11-07T08:24:35.987Z",
+  "base": "http://172.16.138.228:53105/agents/security-operations-expert/instances/inspection-027-schedule-acceptance/",
+  "session": "session-28abf8fb-0585-4985-aee2-7f10b0b894a4",
+  "kind": "inspection",
+  "cards": 1,
+  "preview_rendered": true,
+  "expected_sha256": "6a792d4de846cdf9dea9b240c4848a8887236e1b86f8925152b1a928171ad58b",
+  "contains": [
+    "巡检"
+  ],
+  "downloads": [
+    {
+      "card": 0,
+      "filename": "inspection-report-run-38097788-f7f9-4eb7-b459-4f8c45fd8f12.html",
+      "bytes": 2565668,
+      "sha256": "6a792d4de846cdf9dea9b240c4848a8887236e1b86f8925152b1a928171ad58b"
+    },
+    {
+      "card": 0,
+      "filename": "inspection-report-run-38097788-f7f9-4eb7-b459-4f8c45fd8f12.html",
+      "bytes": 2565668,
+      "sha256": "6a792d4de846cdf9dea9b240c4848a8887236e1b86f8925152b1a928171ad58b"
+    }
+  ],
+  "page_errors": []
+}

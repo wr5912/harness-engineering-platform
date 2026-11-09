@@ -1,0 +1,29 @@
+{
+  "at": "2026-11-07T05:36:40.204Z",
+  "base": "http://172.16.138.228:53105/agents/security-operations-expert/instances/inspection-027-schedule-acceptance/",
+  "session": "session-df3ad729-267a-42ba-9755-ea475244c9a4",
+  "kind": "fault",
+  "cards": 2,
+  "preview_rendered": true,
+  "expected_sha256": "18d17217b995d15c939b34ddd91b72688c33b5780fdf3eeaddde0e0b2c3b5c01",
+  "contains": [
+    "172.16.200.11",
+    "故障排查报告"
+  ],
+  "downloads": [
+    {
+      "card": 0,
+      "filename": "fault-report-58a5e26e9f52b540.html",
+      "bytes": 14282,
+      "sha256": "18d17217b995d15c939b34ddd91b72688c33b5780fdf3eeaddde0e0b2c3b5c01"
+    },
+    {
+      "card": 1,
+      "filename": "fault-report-58a5e26e9f52b540.html",
+      "bytes": 14282,
+      "sha256": "18d17217b995d15c939b34ddd91b72688c33b5780fdf3eeaddde0e0b2c3b5c01"
+    }
+  ],
+  "page_errors": [],
+  "scope": "迁移前基线；首次和重复导出均在真实原生页面下载，非新编排业务验收。"
+}

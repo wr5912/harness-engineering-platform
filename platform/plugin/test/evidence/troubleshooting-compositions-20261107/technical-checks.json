@@ -1,0 +1,88 @@
+{
+  "at": "2026-11-07T06:21:59.789Z",
+  "report_tests": {
+    "total": 300,
+    "passed": 300,
+    "failed": 0,
+    "scope": "Native-shaped Session/SDK/attachment mocks; no real SOC or browser proof"
+  },
+  "guard_tests": {
+    "total": 29,
+    "passed": 28,
+    "failed": 1,
+    "failure": "Existing threat-child single-analysis assertion at candidate/tests/security-operations-child-guard.test.mjs:21; fault-composition checks pass",
+    "scope": "Technical role/tool routing regression only"
+  },
+  "formal_package_contracts": {
+    "total": 44,
+    "passed": 44,
+    "failed": 0,
+    "scope": "Final source after all 26 condition port display labels"
+  },
+  "concurrent_reload_observation": {
+    "reload_attempt_at": "2026-11-07T06:30:49.156148+00:00",
+    "verification": "Read-only comparison of actual container bytes against its own expected load manifest",
+    "expected_files": 3952,
+    "mismatches": [
+      {
+        "path": "/opt/dsh-managed/asset-onboarding-runtime.ts",
+        "expected": "886277d3fbbc084bceeb816dc2957307e8c02610fea685994232cee0025be8b7",
+        "actual": "fdb2c5c91222d2d502e86712c76a8a6f4987cd5198b0f97c7a07961d7e4a6dc5"
+      }
+    ],
+    "outcome": "Runtime observer rejected the changed mount; loaded state remains unknown. Freeze the writers and rebuild before a fresh preview and reload."
+  },
+  "final_checks": {
+    "at": "2026-11-07T10:11:26.665042+00:00",
+    "report_tests": {
+      "total": 400,
+      "passed": 400,
+      "failed": 0,
+      "includes": "Exact Run UUID download intent and 不要重建/重绘; async polls before initial export do not invalidate original attachment; later unknown reads and new diagnoses still invalidate reuse"
+    },
+    "formal_package_contracts": {
+      "total": 56,
+      "passed": 56,
+      "failed": 0
+    },
+    "business_access_platform": {
+      "total": 204,
+      "passed": 204,
+      "failed": 0
+    },
+    "business_access_container": {
+      "total": 23,
+      "passed": 23,
+      "failed": 0
+    },
+    "old_session_source_target": {
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "scope": "Old sessions reject changed/disabled destinations before dispatch; a new session calls the current destination."
+    },
+    "scope": "Technical regressions; live SOC, native attachment and Evaluation evidence are separate.",
+    "evaluation_session_cleanup": {
+      "total": 20,
+      "passed": 20,
+      "failed": 0,
+      "scope": "真实API驱动及HTTP边界夹具；业务、评分、复核超时分别取消自身会话，保留部分轨迹、原始错误及取消接受状态，正常完成不取消。"
+    }
+  },
+  "final_evaluation": {
+    "at": "2026-11-09T01:48:29.732608Z",
+    "runs": 5,
+    "passed": 3,
+    "inconclusive": 2,
+    "source_verification": "matched for all five Runs",
+    "evidence": "final-evaluation-20261109.json",
+    "scope": "Management-assistant controlled final Evaluation; business results remain incomplete where the Run records them, and no external SOC capability is inferred.",
+    "source_digests": {
+      "candidate": "66d23b0416df30e24a83826ab95488ef240b55bf0903987fab303a40bab57381",
+      "workspace": "4268a3caa3c641ce3c144db464ee1b9640dff1e0a43cb0722d711fc8702d576c",
+      "presets": "7c0ed20cbd40da461df7a0ad50a47d338bac976d8bc3ef36726854a11cd245f2",
+      "managed": "f4d4a5f6372388181c417469a02e557377838f53e107f5d9433a5aa391957c75",
+      "evaluation": "7af331738921c0f94b935e679c6a6b853404cf671c79fca6ac8e945dc2c0747e"
+    }
+  }
+}

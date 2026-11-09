@@ -37,6 +37,7 @@ export interface InstanceActionRequest {
   expected_source_digest?: string
   expected_asset_digest?: string
   expected_generation_digest?: string
+  apply_source_mcp?: boolean
   expected_state?: string
   mode?: 'eval'
   business_control?: boolean
@@ -339,7 +340,7 @@ async function assertKnownForMutation(assetRoot: string, name: string, signal?: 
   return state
 }
 
-async function requestForUp(assetRoot: string, request: InstanceActionRequest, requireRecordedModel: boolean): Promise<InstanceActionRequest & { manifest?: any }> {
+async function requestForUp(assetRoot: string, request: InstanceActionRequest, requireRecordedModel: boolean): Promise<InstanceActionRequest & { manifest?: any; registered_source_digest?: string }> {
   const manifest = request.operation === 'create' ? undefined : await manifestFor(assetRoot, request.name)
   if (request.operation !== 'create' && !manifest) throw new Error(`未找到实例 ${request.name}`)
   const requestedSource = request.source || (manifest ? instanceDesiredSource(assetRoot, manifest) : undefined)
@@ -370,12 +371,15 @@ async function requestForUp(assetRoot: string, request: InstanceActionRequest, r
   }
   const accessMode = request.access_mode ?? (manifest ? (registered?.accessMode ?? recordedBusiness?.access_mode) === 'anonymous' ? 'anonymous' : 'authenticated' : 'anonymous')
   if (businessControl && access?.enabled !== true && accessMode !== 'anonymous') throw new Error('需要登录的实例尚未启用业务访问')
+  const reloadStatus = (manifest?.asset_reload_attempt as { status?: string } | undefined)?.status
+  const interruptedReload = reloadStatus === 'running' || reloadStatus === 'unknown'
   return {
     ...request, manifest,
     business_control: businessControl,
     ...(businessControl ? {
       access_mode: accessMode,
       identity_mode: request.identity_mode ?? (manifest ? (registered?.identityMode ?? recordedBusiness?.identity_mode) === 'development' ? 'development' : 'published' : 'development'),
+      ...(interruptedReload && typeof registered?.sourceDigest === 'string' ? { registered_source_digest: registered.sourceDigest } : {}),
     } : {}),
     source: requestedSource ? assertSource(requestedSource) : undefined,
     port: request.port ?? optionalPort(manifest?.port),
@@ -415,7 +419,7 @@ function parseCommandOutput(stdout: string, stderr: string) {
 }
 
 function reloadArgs(request: InstanceActionRequest, dryRun = false): string[] {
-  return ['reload', request.name, ...(dryRun ? ['--dry-run'] : [
+  return ['reload', request.name, ...(request.apply_source_mcp ? ['--apply-source-mcp'] : []), ...(dryRun ? ['--dry-run'] : [
     '--expected-asset-digest', request.expected_asset_digest!, '--expected-generation-digest', request.expected_generation_digest!,
   ])]
 }
@@ -535,7 +539,8 @@ async function runOne(assetRoot: string, request: InstanceActionRequest, signal?
         const source = prepared.source
         if (!source) throw new Error('创建、启动或重启需要来源')
         const agentId = await ensureRealSource(assetRoot, source, instanceSourceRef(prepared.manifest))
-        const previousSourceDigest = (prepared.manifest?.business_control as { source_digest?: string } | undefined)?.source_digest
+        const previousSourceDigest = prepared.registered_source_digest
+          ?? (prepared.manifest?.business_control as { source_digest?: string } | undefined)?.source_digest
         if (prepared.business_control) {
           const preview = await runUpWithModelPolicy(assetRoot, upArgs(assetRoot, { ...prepared, name, source }, true), prepared, agentId,
             modelPolicy, prepared.model_selection, request.expected_model_policy_hash, registeredModelSnapshot(prepared.manifest), signal)
@@ -643,6 +648,10 @@ function actionRequest(payload: unknown): InstanceActionRequest {
     request.identity_mode = object.identity_mode as 'development' | 'published'
   }
   if (object.source !== undefined) request.source = assertSource(object.source)
+  if (object.apply_source_mcp !== undefined) {
+    if (operation !== 'reload') throw new Error('只有重载可以同步来源 MCP 连接')
+    request.apply_source_mcp = optionalBoolean(object.apply_source_mcp, 'apply_source_mcp')
+  }
   if (object.expected_source_id !== undefined) request.expected_source_id = assertSource(object.expected_source_id)
   if (object.expected_source_digest !== undefined) {
     if (typeof object.expected_source_digest !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(object.expected_source_digest)) throw new Error('来源摘要无效，请重新预览')

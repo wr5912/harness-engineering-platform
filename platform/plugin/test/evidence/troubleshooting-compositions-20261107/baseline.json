@@ -1,0 +1,121 @@
+{
+  "run_id": "run-baad80f3-fc6d-4e4a-ab92-428a1f1f34d9",
+  "source": "experiment:EXP-security-operations-expert-027-f-r3ba4799b0cb7",
+  "cases": [
+    "U-FLT-013",
+    "U-FLT-014"
+  ],
+  "status": "completed",
+  "started_at": "2026-11-07T04:44:51.291Z",
+  "updated_at": "2026-11-07T04:52:58.373Z",
+  "actual_model_calls": 15,
+  "token_usage": {
+    "input_tokens": 599775,
+    "output_tokens": 9910,
+    "total_tokens": 609685
+  },
+  "run_status": "completed",
+  "candidate_sha256": "916dc2c32d68ea1f5298cd78266606e60094796dfd5e6ccfdb5a0c1de9985df9",
+  "evaluation_sha256": "9cdfa1fcd08933e66106b5ffccd4badeba6537ecf33ba4c675d544e43a3afd91",
+  "program_origin": {
+    "commit": "76342d7478508ae8fcf26edfe41fdaa5439bb10c",
+    "dirty": true,
+    "changed_path_count": 40,
+    "root": "/home/cmp/work/harness-engineering-platform"
+  },
+  "evaluation_implementation": {
+    "dsh-eval": "e34e401631e869f4271e9a0861474cff9e74ca20f195497539ebc5439bcf94e5",
+    "dsh-dev": "e074dcef0bf758c88afd8c06ef0d11ac4231ff0cbef02fe4ebfcb27ec145a8a5",
+    "source_contract.py": "0b90ec37c00439cb7691bb01d185955e8eb69f09fb8a200460bae598c5f5e9fe",
+    "version-source.mts": "0f2364e0fb3f748a4d0abc99a3a2983dc5cf9b43d4db7238a8dcc75d489b2ba4",
+    "evaluation-source.mts": "e48349fbc9c28f14988161d6ba3d63907685edc4225d2a21d601c65854aa2c5f",
+    "dsh-eval-api.mjs": "498d1a20436dd4e31de65458382042c470c951e2ce47e26451feccd06039d5a8",
+    "dsh-eval-browser.mjs": "e2a0e7d8dbddb1777918c6a71c2bfaaf9efaad9cb67a17ef2c243b54e188ad86",
+    "dsh-eval-common.mjs": "708bb9ce1b82c006a9921075016c0c0774d1222b29b5bdcb0bf90eeb6f1889b6",
+    "harness-runtime.mts": "7a568ac06d6af98623bc40d129e4916b609c7c922d2b2431144550b1154d1356",
+    "run_record.py": "30073d87251d70a6c110bd63712f0aaa5436e55eddbf6d6e3f738d6ffc61082e",
+    "scenario_analysis.py": "03e35781236ee381f3035cd256a78590c757eaf80d591f509a87a3eb06112fed",
+    "business.ts": "e0dd7f3d38d8bdbd41a25b251b9f78e158a233b37be2034440cb2adec94b24f1",
+    "evaluation-registry.patch.yml": "454e645362c2a746345c8ded4edee9317379d080382fe66d80e9d50b54591908",
+    "evaluation-wait.mts": "305b6724e4376721857c2128a77d8826428a3b2cd362e6fbc1ea17d87d2e0992",
+    "evaluation-judge-guard.mjs": "ad46cdd4c8264d3023bf0ea33327fdb60869209a3463f32f6cf30a347483219d",
+    "scenario-analysis-guard.mjs": "21c9b85f5400fefadbb39145d97409bd158a050941e076da249a504c8f24d541",
+    "evaluation-case-scheduler.mts": "5cc7a04bf72fc242e245841b2cf132ced45dba386c03ec99892710dfeb54abe4",
+    "evaluation-presets/evaluation-judge/agent.cordis.yml": "6c0c0c93018b318942d7334026e43b12124fa0fcabe166076d6e3d49f9e24f59",
+    "evaluation-presets/evaluation-judge/preset.yml": "df22cd2de4f05a31a21a2f041f44b2de57a48140797602ed4bf068e216a62a5e",
+    "evaluation-presets/scenario-analysis/agent.cordis.yml": "2dd97c8dd481ed744387c85c22cbd2c8883faec3c5ca405b8d6f1e516d5ee73f",
+    "evaluation-presets/scenario-analysis/preset.yml": "b9ca918a58de3bb8b043ec0847937950e06bc27c1cc7b155dd0823ee1076be03",
+    "platform/plugin/src/agents/asset-build.ts": "6650057aa4702867d9e06683424f011a7819a943220b717a80db47fed70e7409",
+    "platform/plugin/src/agents/asset-build-core.ts": "6bc13d704244fe9079e20e7dafdbfaa2d9bface27636edebc94099c63b8ca07d",
+    "platform/plugin/src/agents/asset-dependencies.ts": "9aa99714fb7641fcb3e42608707f5354af8ae4d48b3a42a9e18e0ac6e4a19e00",
+    "platform/plugin/src/agents/plugin-dependency-reuse.ts": "a9917afb926b3164fbf721cb1783e470ebc88d7d32e593e042b3105c19c4f94d",
+    "platform/plugin/src/agents/version-source.ts": "49151b216294b4175f10306ad5b3a29b0100588d3a36030d5dc371f245a118e1",
+    "platform/plugin/src/agents/compute-variants.ts": "cc186bf22e52c0270c6ace799e68e33c4364bc19c4ea58b22f043812b00b2a42",
+    "platform/plugin/src/models/harness-runtime.ts": "5a7c98db9b279268452c9683950470c4816fe357c1db2cb75d06d4fd51308793",
+    "platform/plugin/src/evaluation/jobs.ts": "ebf1cc2a0d882331d4e8d27cef091207414a92bf925acf178a214fdd64b33497",
+    "platform/plugin/src/evaluation/model-usage.ts": "fad7ab45e7a127aa373ecd45fc46445e848bbff85c433bb8373c85f2988448de",
+    "platform/plugin/src/evaluation/model-attempts.ts": "3f0a2d93c95a8396966a279bd07162f907eca7c725b62f004ac3aa3af564abe5",
+    "platform/plugin/src/business-control/local-capabilities.ts": "89214f8031c724f5e2682388c525cc44ec53e18695c50ecd00831956205b309d"
+  },
+  "instance_name": "inspection-027-schedule-acceptance",
+  "instance_owned": false,
+  "instance_stopped": false,
+  "cleanup_complete": true,
+  "summary": {
+    "schema_version": "3.0",
+    "run_id": "run-baad80f3-fc6d-4e4a-ab92-428a1f1f34d9",
+    "trial_count": 2,
+    "execution_status_counts": {
+      "completed": 2,
+      "error": 0,
+      "skipped": 0
+    },
+    "machine_trial_verdict_counts": {
+      "passed": 2,
+      "failed": 0,
+      "inconclusive": 0
+    },
+    "machine_overall_verdict": "passed",
+    "review_status": "not_requested",
+    "reviewed_case_count": 0,
+    "reviewed_case_verdict_counts": null,
+    "reviewed_overall_verdict": null,
+    "effective_verdict": "passed",
+    "source_verification": {
+      "status": "matched",
+      "reason": null,
+      "checks": [
+        {
+          "component": "candidate",
+          "status": "matched",
+          "expected_sha256": "916dc2c32d68ea1f5298cd78266606e60094796dfd5e6ccfdb5a0c1de9985df9",
+          "actual_sha256": "916dc2c32d68ea1f5298cd78266606e60094796dfd5e6ccfdb5a0c1de9985df9"
+        },
+        {
+          "component": "workspace",
+          "status": "matched",
+          "expected_sha256": "83e5432a25d1b4d7701a13dd3d59b695c03659aa3227d6ee3cbd29cef925e1ef",
+          "actual_sha256": "83e5432a25d1b4d7701a13dd3d59b695c03659aa3227d6ee3cbd29cef925e1ef"
+        },
+        {
+          "component": "presets",
+          "status": "matched",
+          "expected_sha256": "2f66d5532c931dfadc249854e68382cf5eac12c61eef45d304fc9ea60718a1a0",
+          "actual_sha256": "2f66d5532c931dfadc249854e68382cf5eac12c61eef45d304fc9ea60718a1a0"
+        },
+        {
+          "component": "managed",
+          "status": "matched",
+          "expected_sha256": "ad3d56c62226a0328b880aae256b4c83cd320c83878baa82acb569c74200688b",
+          "actual_sha256": "ad3d56c62226a0328b880aae256b4c83cd320c83878baa82acb569c74200688b"
+        },
+        {
+          "component": "evaluation_implementation",
+          "status": "matched",
+          "expected_sha256": "db96bbedc6b623e075216245d991ef139dbbf4bc7f3dd826da1e0b4943a5876a",
+          "actual_sha256": "db96bbedc6b623e075216245d991ef139dbbf4bc7f3dd826da1e0b4943a5876a"
+        }
+      ]
+    }
+  }
+}

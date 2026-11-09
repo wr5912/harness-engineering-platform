@@ -164,6 +164,8 @@ python3 runtime/adapters/dsh-container/dsh-dev down security-operations-expert-e
 
 `ps`、`logs`、`down` 从实例状态文件重建 Compose 所需环境；`ps` 默认只列出运行中的实例，`ps --all` 才包含其他状态并标出 `needs_migration`。主 `dsh` 容器采用 `unless-stopped` 策略，Docker 服务恢复后自动启动此前运行的实例；显式停止的实例保持停止，一次性 `home-init` 不自动重启。历史 `authoring` 实例仍可查询日志和停止，但新建或替换时只接受 `eval`。挂载内容变化不会自动重启进程，使用 `up --replace` 或先 `down` 再同名 `up` 重载。`down` 同时核对 Compose 退出码、实际容器状态和 HOME 卷。
 
+需要将来源声明的新 MCP 连接应用到保留 HOME 的业务实例时，使用 `reload <name> --apply-source-mcp`，预览、摘要与保留边界遵循[实例资产状态与重载合同](../../../docs/platform-design/04_核心业务闭环与服务接口.md#当前实例资产状态与重载合同)。
+
 `stopped` 表示仍存在已停止的 DSH 容器；`absent` 表示 Docker 查询成功，但仅有本地登记、没有 DSH 容器。`down` 移除容器后保留登记和 HOME，因此随后通常为 `absent`；Docker 查询失败则为 `unknown`，不能推断为已停止。`delete` 执行前重新核对该实例的 Docker 状态，按[实例删除合同](../../../docs/platform-design/02_系统架构与部署设计.md#33-实例编排契约)先停止再移除容器和登记，并保留 HOME 卷及研究记录；无需另行执行 `down`。
 
 新实例的 HOME 使用上述目录的 bind 挂载；原生 Session、附件和 Web MCP 设置都保留在该 HOME。历史登记仍使用原 named volume，普通 `up --replace` 不会将其换成空 HOME。迁移时先停止实例并备份，再完整复制旧 HOME 到目标登记目录的 `dsh-home/`，校验文件与权限后执行：
@@ -210,15 +212,17 @@ python3 runtime/adapters/dsh-container/dsh-eval \
   --compare-to <baseline-run-id>
 ```
 
-默认 `--mode fast` 执行标记了 `**评估档位：** \`fast\`` 的业务 Case；`--mode full` 执行全部 Case。没有 fast 标记时默认档位明确报错。`--case` 可重复并支持大小写敏感的 shell 风格通配符，一旦出现就覆盖 `--mode`；结果按 `evaluation.md` 顺序去重，为避免 shell 提前展开应给通配符加引号。`--dry-run` 输出请求档位、实际选择方式和 Case 列表。这里的 `--mode` 是评测范围，和 `dsh-dev --mode eval` 的容器运行模式不同。非 `--dry-run` 执行会先校验仓库和 Experiment，再创建独立评测实例。每个 Case 使用新的目标 Session，多轮输入在该 Session 内依次发送；API 和浏览器执行器都导出回答及同一 Session 的工具事件。API 通道用独立的无工具评审 Session 对照输入、预期、回答和工具证据给出语义结论；浏览器通道只检查页面、会话身份、消息发送及回答显示，业务结论保持 `inconclusive`。
+默认 `--mode fast` 执行标记了 `**评估档位：** \`fast\`` 的业务 Case；`--mode full` 执行全部 Case。没有 fast 标记时默认档位明确报错。`--case` 可重复并支持大小写敏感的 shell 风格通配符，一旦出现就覆盖 `--mode`；结果按 `evaluation.md` 顺序去重，为避免 shell 提前展开应给通配符加引号。`--dry-run` 输出请求档位、实际选择方式和 Case 列表。这里的 `--mode` 是评测范围，和 `dsh-dev --mode eval` 的容器运行模式不同。非 `--dry-run` 执行会先校验仓库和 Experiment，默认创建独立评测实例。指定 `--instance-name <实例名>` 时复用来源与实际装载一致的既有实例，核对及恢复边界见[评测运行合同](../../../docs/platform-design/04_核心业务闭环与服务接口.md#评测运行身份与恢复)。每个 Case 使用新的目标 Session，多轮输入在该 Session 内依次发送；API 和浏览器执行器都导出回答及同一 Session 的工具事件。API 通道用独立的无工具评审 Session 对照输入、预期、回答和工具证据给出语义结论；浏览器通道只检查页面、会话身份、消息发送及回答显示，业务结论保持 `inconclusive`。
 
 API 与浏览器执行器每次发送输入后，按官方 SDK `session/wait` 的相同原生语义等待根 Agent、正在推进的后代任务及回报唤起的根回合稳定，再导出最终快照。同一输入的回答取其最终根回合；等待受 Case 时限和取消信号约束，未完成时保留已取得的部分轨迹。
+
+API 等待或导出失败后，通过原生 `session/cancel` 取消该次提示对应的业务、评分或复核 Session，保留原始失败及取消接受回执；取消未获确认时明确记录，不停止共享实例或其他会话。
 
 启用 AI 复核后，适配层在逐 Case 评审后，再启动使用 `scenario-analysis` Preset 的独立 DSH 实例，只把当前 Run 以只读方式挂载到 `/work/evaluation-run`；被测 Candidate 的 workspace、Preset、managed patch、MCP、Skill 和 delegate 均不进入评审实例。新 Run 的 `review_contract` 冻结既有评测模型策略及明确路由，评审不依赖被测智能体是否调用模型；平台只同步非秘密模型连接和凭据引用，不装载业务 Harness 的运行投影。路由缺失、不可连接或实际请求不匹配时，按对应复核任务报告失败。
 
 新合同将业务效果与源码诊断分开执行。每个已选场景使用独立效果 Session，完整读取冻结 Case、输入、预期、回答、工具和运行证据。效果输入投影保留来源身份、摘要和运行边界，绑定原始锁文件，源码正文不进入该投影。另用一个全 Run 的源码诊断 Session 审读锁定 Harness；完整原锁和资产 SHA-256 清单保留。两项复核分别记录状态、原因、Session 和阅读范围：源码未读齐为未完成，不能给出全源码通过，也不覆盖已完成的效果结论。无 `review_contract` 的历史 Run 保持原复核口径。
 
-为避开 `read` 的行数、单行和字节上限，适配层在 Run 内生成带原文件路径、字节数和 SHA-256 的 JSON/JSONL 语义无损材料分片，并对重复的大型工具结果按内容摘要引用；效果输入投影另行注明省略源码的范围，不冒称完整锁文件副本。原文件仍是事实源，报告也只引用原文件。执行器核对每次工具调用与原生回执的关联，对两项任务分别验证必读分片的逐行覆盖。read 的原生参数错误只有在同一文件后续成功重读时才允许恢复；失败尝试保留在轨迹与阅读记录中，不计覆盖。其他工具错误、未恢复的读取、漏读或路由漂移使对应任务未完成。缺口可以同时引用支持 Case 与反例 Case 的原始证据；空 `tools.jsonl` 是“未调用工具”的有效证据，其他材料证据必须非空。`evaluation-judge` 与 `scenario-analysis` 都是评测适配层 Harness，不属于被测 Candidate；`.agents/skills/research-eval` 只指导仓库研发流程，不会被 DSH 评审实例装载。技术装载、合同和工具链检查由运行前的项目与 Experiment 校验承担，不是业务 Case。认证 URL 只经进程标准输入交给执行器，不写入 Run 或普通输出；无论成功、失败或中断都尝试停止实例。
+为避开 `read` 的行数、单行和字节上限，适配层在 Run 内生成带原文件路径、字节数和 SHA-256 的 JSON/JSONL 语义无损材料分片，并对重复的大型工具结果按内容摘要引用；效果输入投影另行注明省略源码的范围，不冒称完整锁文件副本。原文件仍是事实源，报告也只引用原文件。执行器核对每次工具调用与原生回执的关联，对两项任务分别验证必读分片的逐行覆盖。read 的原生参数错误只有在同一文件后续成功重读时才允许恢复；失败尝试保留在轨迹与阅读记录中，不计覆盖。其他工具错误、未恢复的读取、漏读或路由漂移使对应任务未完成。缺口可以同时引用支持 Case 与反例 Case 的原始证据；空 `tools.jsonl` 是“未调用工具”的有效证据，其他材料证据必须非空。`evaluation-judge` 与 `scenario-analysis` 都是评测适配层 Harness，不属于被测 Candidate；`.agents/skills/research-eval` 只指导仓库研发流程，不会被 DSH 评审实例装载。技术装载、合同和工具链检查由运行前的项目与 Experiment 校验承担，不是业务 Case。认证 URL 只经进程标准输入交给执行器，不写入 Run 或普通输出；无论成功、失败或中断都清理本次执行；独立评测实例尝试停止，指定的既有实例保持运行，仅清理本次 Case 的会话。
 
 评测可选 `--source-ref git:<40位提交>`，从同一提交读取 Candidate、角色绑定与 Case；固定文件物化到数据根 `.local/evaluation-sources/`，Run 仍写入原 Experiment，不覆盖当前工作树。`--mcp-fixture <JSON文件>` 仅为本次被测 Runtime 提供明确的 Mock 连接映射：`{schema_version:1,mode:"mock",connections:[{server_id,original_url,url,enabled?}]}`。映射必须匹配来源中的原地址，保留工具名称与选择范围，不携带原目标凭据。平台 `eval/preview`、`eval/start` 对应参数为 `source_ref` 和 `mcp_fixture` 对象。Run 保存映射原字节、SHA-256 和源／目标地址；比较必须使用相同映射摘要，报告明确标记 Mock 环境。省略参数时继续使用当前来源和连接。
 
@@ -228,7 +232,7 @@ API 与浏览器执行器每次发送输入后，按官方 SDK `session/wait` �
 
 新 Run 的 `harness_review` 锁定源码与生成制品的审读分类。只有受控构建回执完整记录 TypeScript 检查及实际打包输入（`source_inputs_version: 1`），并与当前源码、共享 SDK、编译器、平台依赖锁、已准备业务依赖和实际 ESM 摘要一致时，生成制品才以摘要和构建身份进入材料；对应业务源码与共享 SDK 源码仍完整必读。无法核验、手写或陈旧制品继续全文审读，凭据文件不进入源码投影。旧 Run 沿用其原始锁定合同和既定必读材料，不按当前构建回执重新分类。
 
-API 通道退出码 `0` 表示锁定 Case 均得到 `passed`；`1` 表示运行已完整封存但至少一个语义结论为 `failed` 或 `inconclusive`。浏览器通道在所选 Case 均完成 UI 冒烟时返回 `0`，业务 `verdict` 仍为 `inconclusive`。退出码 `2` 表示参数、环境或执行基础设施失败。基础设施失败导致未执行的 Case 记为 `execution_status=error`；中断后未开始的 Case 记为 `execution_status=skipped`，两者的 `verdict` 均为 `inconclusive`。每次封存保留 `summary.json`、逐项事实 `results.jsonl`、完整场景目录与选择方式，以及只读的 `analysis.json` 和 `report.md`。报告按场景展示去重 Case 的覆盖、失败、无法判定和未执行数；源码诊断只给出可证伪假设，不改变 Case 原判定。新合同启用 AI 复核时，业务证据复核不完整会使 `review_status` 为 `failed`，Run 失败封存；源码诊断未完成单独记录，不触发业务复核失败。未启用时只生成确定性场景覆盖，不启动额外复核 Session。非 `--dry-run` 的 stdout 只输出一个不含凭据的 JSON，字段为 `run_id`、`experiment_id`、`executor`、`verdict`、`cases`、`review_status`、`reviewed_cases`、`summary`、`report` 和 `instance_stopped`。
+API 通道退出码 `0` 表示锁定 Case 均得到 `passed`；`1` 表示运行已完整封存但至少一个语义结论为 `failed` 或 `inconclusive`。浏览器通道在所选 Case 均完成 UI 冒烟时返回 `0`，业务 `verdict` 仍为 `inconclusive`。退出码 `2` 表示参数、环境或执行基础设施失败。基础设施失败导致未执行的 Case 记为 `execution_status=error`；中断后未开始的 Case 记为 `execution_status=skipped`，两者的 `verdict` 均为 `inconclusive`。每次封存保留 `summary.json`、逐项事实 `results.jsonl`、完整场景目录与选择方式，以及只读的 `analysis.json` 和 `report.md`。报告按场景展示去重 Case 的覆盖、失败、无法判定和未执行数；源码诊断只给出可证伪假设，不改变 Case 原判定。新合同启用 AI 复核时，业务证据复核不完整会使 `review_status` 为 `failed`，Run 失败封存；源码诊断未完成单独记录，不触发业务复核失败。未启用时只生成确定性场景覆盖，不启动额外复核 Session。非 `--dry-run` 的 stdout 只输出一个不含凭据的 JSON，字段为 `run_id`、`experiment_id`、`executor`、`verdict`、`cases`、`review_status`、`reviewed_cases`、`summary`、`report`、`instance_owned`、`instance_stopped`、`cleanup_complete` 和 `cancelled`。
 
 **普通研究实例手工打开 Web 时，先选定 Candidate 工作区。** 容器的 `working_dir` 只是进程工作目录，不等于 DSH 已登记的工作区。API 执行器使用 DSH 原生 `workspace/create` 登记；普通实例在浏览器中选择 `/work/harness/workspace` 的步骤如下：
 

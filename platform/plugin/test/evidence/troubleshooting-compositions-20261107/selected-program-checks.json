@@ -1,0 +1,16 @@
+{
+  "scope": "HEAD plus only this task selected changes in an isolated tree; other tasks excluded",
+  "build": {
+    "exit_code": 0
+  },
+  "business": {
+    "passed": 22,
+    "failed": 0
+  },
+  "mcp_overlay": {
+    "passed": 2,
+    "failed": 0,
+    "runtime": "locked DSH 0.2.1-rc.5",
+    "setup_observation": "Initial isolated test had no resolvable runtime package. Rerun with actual HARNESS_DSH_ENTRY passed; no source change."
+  }
+}

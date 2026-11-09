@@ -60,6 +60,29 @@ test('条件重复或缺失的 go/stop 标签采用继续/返回，保留明确�
   assert.deepEqual(lfxCanvas(native).edges.map(edge => edge.label), ['继续', '返回'])
 })
 
+test('静态校验拒绝根及嵌套批次被官方参数装载器忽略的常量', () => {
+  const batch = id => {
+    const value = node(id, true)
+    value.data.type = 'HepBatch'
+    Object.assign(value.data.node.template, { body: { show: true, value: flow() }, items_key: { show: true, value: 'items' }, concurrency: { show: true, value: 4 } })
+    return value
+  }
+  const native = { data: { nodes: [batch('outer')], edges: [] } }
+  native.data.nodes[0].data.node.template.body.value.data.nodes.push(batch('inner'))
+  assert.doesNotThrow(() => validateLfxFlow(native))
+  const defaults = structuredClone(native)
+  delete defaults.data.nodes[0].data.node.template.items_key
+  delete defaults.data.nodes[0].data.node.template.concurrency
+  assert.doesNotThrow(() => validateLfxFlow(defaults))
+  for (const id of ['outer', 'inner']) for (const name of ['body', 'items_key', 'concurrency']) for (const invalid of ['hidden', 'missing']) {
+    const bad = structuredClone(native)
+    const outer = bad.data.nodes[0], target = id === 'outer' ? outer : outer.data.node.template.body.value.data.nodes.at(-1)
+    if (invalid === 'hidden') delete target.data.node.template[name].show
+    else delete target.data.node.template[name].value
+    assert.throws(() => validateLfxFlow(bad), new RegExp(`${id}.*${name}.*show:true`))
+  }
+})
+
 test('发布快照冻结源码；修改草稿不会改变旧版本，重新冻结采用当前草稿', t => {
   const root = workspace(t), native = flow(), module = join(root, 'mcp/compositions/leaf/src/own.py')
   save(root, 'leaf', native); mkdirSync(join(module, '..'), { recursive: true }); writeFileSync(module, 'value = 1')

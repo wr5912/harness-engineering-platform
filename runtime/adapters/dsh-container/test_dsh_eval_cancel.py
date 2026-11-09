@@ -46,8 +46,9 @@ def stop(*args):
 def record(run_id,case_id,result): (run/"recorded.json").write_text(json.dumps(result))
 def finalize(run_id,status): (run/"run.yaml").write_text("status: "+status+"\n")
 g=m.execute.__globals__
-g.update(REPO=base,resolve=lambda *a,**kw:contract,load_evaluation=lambda p:{},select_case_ids=lambda *a:["U-BASIC-001"],execution_for=lambda *a:cases,dry_run_payload=lambda *a,**kw:{"missing_env_names":[]},validate_before_run=lambda *a:{"repository":{"valid":True}},initialize_run=initialize,authentication_url=lambda *a:"http://127.0.0.1:1/",start_instance=start,run_driver=driver,stop_instance=stop,record_trial=record,finalize_run=finalize,validate_after_run=lambda *a:None)
-raise SystemExit(m.execute(types.SimpleNamespace(source="experiment:EXP-basic-001",case=[],mode="fast",executor="api",review="none",compare_to=None,dry_run=False,model=None,timeout_seconds=30)))
+g.update(REPO=base,resolve=lambda *a,**kw:contract,load_evaluation=lambda p:{},select_case_ids=lambda *a:["U-BASIC-001"],execution_for=lambda *a:cases,dry_run_payload=lambda *a,**kw:{"missing_env_names":[]},validate_before_run=lambda *a:{"repository":{"valid":True}},initialize_run=initialize,authentication_url=lambda *a:"http://127.0.0.1:1/",start_instance=start,run_driver=driver,stop_instance=stop,record_trial=record,finalize_run=finalize,validate_after_run=lambda *a:None,
+existing_instance_identity=lambda *a:{"instance_name":"existing","instance_owned":False,"asset_status":{"current_digest":"fixture"},"generation":{"id":"fixed"},"image_build_fingerprint":"fixture","image_tag":"fixture","image_id":"fixture","image_ref":"fixture","platform":"fixture"})
+raise SystemExit(m.execute(types.SimpleNamespace(source="experiment:EXP-basic-001",case=[],mode="fast",executor="api",review="none",compare_to=None,dry_run=False,model=None,timeout_seconds=30,instance_name="existing" if mode=="existing" else None)))
 '''
 
 
@@ -74,6 +75,17 @@ class EvaluationCancellationTest(unittest.TestCase):
                     self.assertEqual(json.loads(completed.stdout).get("cancelled", False), cancelled)
                     self.assertFalse((root / "evolution").exists())
 
+    def test_preflight_failure_never_claims_existing_instance_stopped(self):
+        completed = subprocess.run([
+            sys.executable, str(ADAPTER / "dsh-eval"), "--source", "experiment:EXP-basic-001",
+            "--instance-name", "existing",
+        ], env={**os.environ, "HARNESS_EVAL_DEADLINE_AT": "invalid"}, capture_output=True, text=True, timeout=10)
+        self.assertEqual(completed.returncode, 2, completed.stderr)
+        result = json.loads(completed.stdout)
+        self.assertFalse(result["instance_stopped"])
+        self.assertFalse(result["instance_owned"])
+        self.assertTrue(result["cleanup_complete"])
+
     def probe(self, mode):
         temporary = tempfile.TemporaryDirectory(prefix="dsh-eval-cancel-test-")
         self.addCleanup(temporary.cleanup)
@@ -94,7 +106,7 @@ class EvaluationCancellationTest(unittest.TestCase):
                 self.assertLess(time.monotonic(), deadline)
                 time.sleep(.01)
         process.send_signal(signal.SIGTERM)
-        if mode != "initialize":
+        if mode not in ("initialize", "existing"):
             while not (base / "cleanup-started").exists():
                 self.assertLess(time.monotonic(), deadline)
                 time.sleep(.01)
@@ -112,6 +124,21 @@ class EvaluationCancellationTest(unittest.TestCase):
         self.assertTrue(result["cancelled"])
         self.assertTrue(result["instance_stopped"])
 
+    def test_cancel_existing_instance_cleans_driver_without_stopping_instance(self):
+        base, result = self.probe("existing")
+        self.assertFalse((base / "instance-started").exists())
+        self.assertFalse((base / "stopped").exists())
+        self.assertFalse(alive(int((base / "driver.pid").read_text())))
+        self.assertFalse(alive(int((base / "descendant.pid").read_text())))
+        self.assertTrue(result["cancelled"])
+        self.assertFalse(result["instance_stopped"])
+        self.assertFalse(result["instance_owned"])
+        self.assertTrue(result["cleanup_complete"])
+        execution = json.loads((base / "experiment/runs/run-11111111-1111-4111-8111-111111111111/execution.json").read_text())
+        self.assertEqual(execution["status"], "cancelled")
+        self.assertFalse(execution["instance_owned"])
+        self.assertTrue(execution["cleanup_complete"])
+
     def test_cancel_during_run_initialization_preserves_id_and_never_starts_instance(self):
         base, result = self.probe("initialize")
         self.assertFalse((base / "instance-started").exists())
@@ -122,6 +149,7 @@ class EvaluationCancellationTest(unittest.TestCase):
     def test_unconfirmed_instance_stop_is_failed_not_successful_cancel(self):
         base, result = self.probe("stop-failed")
         self.assertFalse(result["instance_stopped"])
+        self.assertFalse(result["cleanup_complete"])
         self.assertEqual((base / "experiment/runs/run-11111111-1111-4111-8111-111111111111/run.yaml").read_text(), "status: failed\n")
 
 

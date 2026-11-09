@@ -1,0 +1,61 @@
+{
+  "session_id": "session-9ab6a38a-24e2-4d2a-a86d-3d10dbd019f6",
+  "seq": 468,
+  "receipt": {
+    "kind": "platform-operation",
+    "domain": "mcp",
+    "action": "bindCompositionDrafts",
+    "proposal_id": "8404bfcc-886e-48ee-92c6-e61b98509f20",
+    "state": "completed",
+    "result": {
+      "ok": true,
+      "value": {
+        "instanceId": "inspection-027-schedule-acceptance",
+        "sourceDigest": "sha256:bc96cf04686f70b73cd6dfa3b5ca14d47856a482d9304dd871fb89f206d5413a",
+        "compositions": [
+          {
+            "id": "troubleshooting-business-access",
+            "config": {
+              "toolName": "diagnose_business_access",
+              "title": "业务访问故障排查",
+              "description": "按唯一源、目标、精确协议端口及绝对时间窗口读取SOC状态、固定快照告警与配置路径，保留来源和未知缺口；报告按同次Run读取原HTML。不主动探测、配置写入或修复，不以未知判断正常。",
+              "connectionId": "platform-compositions",
+              "readonly": true,
+              "workflow": "troubleshooting-business-access",
+              "connections": {
+                "master": "ai-soc-master",
+                "detect": "ai-soc-detect",
+                "graph": "ai-soc-graph"
+              },
+              "kind": "workflow",
+              "engine": "lfx",
+              "flowDigest": "c86ac107c620ced14d431a8440176af45faa489acd45e35195199e66846c04ad"
+            },
+            "implementationDigest": "4bae33c08fee8c2fdcfcda9f92016811476fd43016bb5c30af7839d690ee36af"
+          },
+          {
+            "id": "troubleshooting-device-offline",
+            "config": {
+              "toolName": "diagnose_device_offline",
+              "title": "设备不在线排查",
+              "description": "唯一定位并冻结设备与绝对时间窗口后读取SOC状态、固定快照告警及管理观察；仅本次真实管理响应后核采集适用性、绑定及采集证据。报告按同次Run读取原HTML；分页不完整和缺原子保持未知，不主动探测、配置写入或修复。",
+              "connectionId": "platform-compositions",
+              "readonly": true,
+              "workflow": "troubleshooting-device-offline",
+              "connections": {
+                "master": "ai-soc-master",
+                "ingest": "ai-soc-ingest",
+                "detect": "ai-soc-detect",
+                "graph": "ai-soc-graph"
+              },
+              "kind": "workflow",
+              "engine": "lfx",
+              "flowDigest": "d8bc65b7a5145fea4aa0b4c5fd2f9b046d8155822c10e0d2d17acc86bd4dadc5"
+            },
+            "implementationDigest": "f6e23faef0d0813d8684af6e060e55a0646b3cc94152a4c03df025d29f90a180"
+          }
+        ]
+      }
+    }
+  }
+}

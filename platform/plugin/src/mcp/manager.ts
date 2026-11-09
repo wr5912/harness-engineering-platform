@@ -23,6 +23,7 @@ export const inject = manager.inject
 export interface ManagerConfig {
   servers: { get(): any[] }
   groups: { get(): any[] }
+  mountServers?: (servers: any[]) => any[]
   dispatch?: (request: any, signal?: AbortSignal) => Promise<{ status: number; value: any }>
   compositionHandler?: ConnectionRpcHandler
   compositionExtension?: CompositionExtension
@@ -34,6 +35,27 @@ export interface ManagerConfig {
 
 const connectionFields = ['specUrl', 'url', 'managementUrl', 'authType', 'authHeader', 'loginUrl',
   'loginTokenPath', 'apiKey', 'loginUsername', 'loginPassword', 'headers'] as const
+
+/** 仅补充来源已声明、但没有本地客户端的组成员引用；不发布平台全部目录。 */
+function businessGroups(candidateServers: any[], candidateGroups: any[], platform: { servers: any[]; groups: any[] }): any[] {
+  const direct = new Set(candidateServers.map(server => server.id))
+  return candidateGroups.flatMap(group => {
+    if (group.members.every((member: any) => direct.has(member.serverId))) return [group]
+    const saved = platform.groups.find(value => value.id === group.id)
+    if (!saved) return []
+    const members = group.members.flatMap((member: any) => {
+      if (direct.has(member.serverId)) return [member]
+      const selected = saved.members.find((value: any) => value.serverId === member.serverId)
+      if (!selected || !platform.servers.some(server => server.id === member.serverId && server.enabled !== false)) return []
+      const names = member.names.filter((name: string) => selected.names.includes(name))
+      const resourceUris = (member.resourceUris ?? []).filter((uri: string) => (selected.resourceUris ?? []).includes(uri))
+      const resourceTemplates = (member.resourceTemplates ?? []).filter((uri: string) => (selected.resourceTemplates ?? []).includes(uri))
+      return names.length || resourceUris.length || resourceTemplates.length
+        ? [{ ...member, names, resourceUris, resourceTemplates }] : []
+    })
+    return members.length ? [{ ...group, members }] : []
+  })
+}
 
 function businessServers(assetRoot: string, candidateServers: any[], platformServers: any[]): any[] {
   const platformById = new Map(platformServers.map(server => [server.id, server]))
@@ -79,7 +101,18 @@ export function apply(ctx: Context, suppliedConfig: ManagerConfig) {
   })
   store.view()
   const config = businessRuntime ? { ...suppliedConfig,
-    servers: { get: () => businessServers(assetRoot, suppliedConfig.servers.get(), store.view().value.servers) },
+    groups: { get: () => businessGroups(suppliedConfig.servers.get(), suppliedConfig.groups.get(), store.view().value) },
+    servers: { get: () => {
+      const platform = store.view().value, declared = suppliedConfig.servers.get()
+      const referenced = businessGroups(declared, suppliedConfig.groups.get(), platform).flatMap(group => group.members)
+      const servers = [...declared]
+      for (const member of referenced) if (!declared.some((server: any) => server.id === member.serverId)) {
+        const existing = servers.find(server => server.id === member.serverId)
+        if (existing) existing.tools.names = [...new Set([...existing.tools.names, ...member.names])]
+        else servers.push({ id: member.serverId, enabled: true, tools: { mode: 'selected', names: [...member.names] } })
+      }
+      return businessServers(assetRoot, servers, platform.servers)
+    } },
   } : { ...suppliedConfig,
     servers: { get: () => store.view().value.servers },
     groups: { get: () => store.view().value.groups },
@@ -113,6 +146,12 @@ export function apply(ctx: Context, suppliedConfig: ManagerConfig) {
   manager.apply(ctx, { ...config, platformClient, autoMountServers: Boolean(businessRuntime),
     platformExecute: execute,
     ...(businessRuntime ? {
+      // 引用成员仅供组服务内部调用，不自动变成主/子角色的新底层MCP客户端。
+      mountServers: (servers: any[]) => {
+        const declared = suppliedConfig.servers.get()
+        const direct = servers.filter(server => declared.some((value: any) => value.id === server.id))
+        return suppliedConfig.mountServers ? suppliedConfig.mountServers(direct) : direct
+      },
       businessGroupUrl: (id: string) => businessRuntime.groupUrl(id),
       businessGroupFetch: (id: string, sessionId?: string) => businessRuntime.groupFetch(id, sessionId),
     } : {}),
@@ -185,6 +224,7 @@ export function apply(ctx: Context, suppliedConfig: ManagerConfig) {
       return managementDispatch(assetRoot, run)
     },
     withToolContext: async (execution: any, run: () => Promise<any>) => {
+      execution.signal?.throwIfAborted()
       const runtime = (ctx as any).get('businessRuntime')
       const sessionId = execution.agent?.session?.id ?? (runtime ? undefined : execution.agent?.id)
       const context = typeof sessionId === 'string' ? control.contextForSession(sessionId) : undefined

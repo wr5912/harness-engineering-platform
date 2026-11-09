@@ -260,19 +260,30 @@ async function promptSession(connection, sessionId, input, inputs, timeoutMs, si
   if (accepted?.accepted !== true) throw new Error('prompt-not-accepted')
   onStep?.('trace-export', { last_successful_step: 'prompt-accepted' })
   let archive
-  await waitForSessionTree(connection, sessionId, timeoutMs, signal, async () => {
-    try {
+  try {
+    await waitForSessionTree(connection, sessionId, timeoutMs, signal, async () => {
+      try {
+        archive = await exportSession(connection, sessionId, signal)
+        await onArchive?.(archive)
+      } catch (error) { if (SAFETY_STOP_REASONS.has(error?.message) || signal?.aborted) throw error }
+    })
+    // 原生等待完成后重新导出；export 自身刷新根及后代 Session 的持久化屏障。
+    const turns = await poll(async () => {
       archive = await exportSession(connection, sessionId, signal)
       await onArchive?.(archive)
-    } catch (error) { if (SAFETY_STOP_REASONS.has(error?.message) || signal?.aborted) throw error }
-  })
-  // 原生等待完成后重新导出；export 自身刷新根及后代 Session 的持久化屏障。
-  const turns = await poll(async () => {
-    archive = await exportSession(connection, sessionId, signal)
-    await onArchive?.(archive)
-    return turnsFromTrace(archive, inputs)
-  }, value => value !== null, timeoutMs, signal)
-  return { archive, turns }
+      return turnsFromTrace(archive, inputs)
+    }, value => value !== null, timeoutMs, signal)
+    return { archive, turns }
+  } catch (error) {
+    // 结束本次提示对应的任务；超时 signal 已取消，收尾请求使用独立的有限等待。
+    const cancellation = { session_id: sessionId, accepted: false }
+    try {
+      const receipt = await rpc(connection, 'session/cancel', { request: { sessionId } }, AbortSignal.timeout(5000))
+      cancellation.accepted = receipt?.accepted === true
+    } catch { /* 保留原始失败，取消未获确认由回执明确表示。 */ }
+    onStep?.('trace-export', { session_cancellation: cancellation })
+    throw error
+  }
 }
 
 export function analysisToolAccesses(archive, toolNames, { partial = false, issues = [] } = {}) {
@@ -500,6 +511,7 @@ async function runCase(connection, payload, item, workspace, signal, traceState)
         failure_stage: traceState.stage, last_successful_step: traceState.last_successful_step ?? null,
         rpc_method: error?.rpc_method ?? null, http_status: error?.http_status ?? null,
         error_code: error?.error_code ?? null, runtime_diagnostic: error?.runtime_diagnostic, preset_readiness: error?.preset_readiness,
+        session_cancellation: traceState.session_cancellation,
         request_id: traceState.request_id ?? null,
       }
       throw error
@@ -528,6 +540,7 @@ async function main() {
       let latestArchive = null
       let sessionId = scene.session_id ?? null
       let failure = null
+      let sessionCancellation
       const attempt = (scene.prior_prompts?.length ?? 0) + 1
       try {
         const session = scene.session_id === undefined
@@ -548,6 +561,7 @@ async function main() {
           signal => promptSession(
             connection, session.session_id, scene.prompt, inputs, payload.timeout_ms, signal,
             archive => { latestArchive = archive },
+            (_step, metadata) => { if (metadata.session_cancellation) sessionCancellation = metadata.session_cancellation },
           ),
           payload.timeout_ms,
           true,
@@ -598,6 +612,7 @@ async function main() {
           operation: 'review', session_id: sessionId, attempt,
           status: failure ? 'error' : 'completed', failure_reason: failure,
           trace_available: Boolean(latestArchive),
+          session_cancellation: sessionCancellation,
         })
       }
       return { row }
@@ -628,6 +643,7 @@ async function main() {
           rpc_method: error?.rpc_method ?? null, http_status: error?.http_status ?? null,
           error_code: error?.error_code ?? (/^[a-z0-9-]+$/.test(error?.message ?? '') ? error.message : error?.name ?? 'Error'),
           runtime_diagnostic: error?.runtime_diagnostic,
+          session_cancellation: traceState.session_cancellation,
           preset_readiness: error?.preset_readiness ?? traceState.session?.preset_readiness,
           trace_available: Boolean(targetArchive) },
         traceState.judgeSession ? { response: null, archive: traceState.judgeArchive, checks: { ...traceState.judgeSession, unavailable_reason: reason, trace_available: Boolean(traceState.judgeArchive) } } : null)

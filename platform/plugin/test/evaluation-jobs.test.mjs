@@ -179,6 +179,17 @@ test('准备过程中可撤销，命令返回后不得再spawn', async t => {
   assert.equal(existsSync(statePath(fx.root, payload.run_id)), false)
 })
 
+test('复用实例取消仅在本次评测清理完成时成功，不要求停止共享实例', async t => {
+  for (const cleanup_complete of [true, false, undefined]) {
+    const receipt = { cancelled: true, instance_owned: false, instance_stopped: false, cleanup_complete }
+    const fx = await fixture(t, `finish('${cleanup_complete === true ? 'cancelled' : 'failed'}');console.log(JSON.stringify({run_id:runId,...${JSON.stringify(receipt)}}));process.exit(2)`)
+    const jobs = fx.create(), started = await accepted(jobs)
+    const end = await waitFor(() => jobs.status(started.run_id), value => value.exit_code === 2)
+    assert.equal(end.status, cleanup_complete === true ? 'cancelled' : 'failed')
+    if (cleanup_complete !== true) assert.match(end.error, /评测清理尚未确认/)
+  }
+})
+
 test('在途或PID归属不明不会被误判失败或清理，取消不向其他进程发送信号', async t => {
   const fx = await fixture(t), old = seedLegacy(fx, { status: 'running', pid: process.pid, process_start: 'wrong-start' })
   const jobs = fx.create()

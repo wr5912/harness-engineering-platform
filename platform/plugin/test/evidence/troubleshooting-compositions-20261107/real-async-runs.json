@@ -1,0 +1,218 @@
+{
+  "at": "2026-11-07T09:49:25Z",
+  "runs": [
+    {
+      "run_id": "run-a30def71-e3fa-4d23-bcf2-d9295ed738c0",
+      "composition_id": "troubleshooting-business-access",
+      "status": "completed",
+      "created_at": "2026-11-07T09:28:16.730Z",
+      "finished_at": "2026-11-07T09:28:24.078Z",
+      "input": {
+        "source": {
+          "ip": "172.16.100.226",
+          "assetId": 3617426
+        },
+        "target": {
+          "ip": "172.16.200.11",
+          "assetId": 3617609
+        },
+        "protocol": "tcp",
+        "port": 443,
+        "from": "2026-11-07T05:00:00Z",
+        "to": "2026-11-07T08:00:00Z"
+      },
+      "artifact": {
+        "filename": "business-access-report.html",
+        "content_type": "text/html; charset=utf-8",
+        "bytes": 67570,
+        "sha256": "3e39be2368be3641be8bd7e29fd8d6752b5fbb3e17c8b2f076f18378f81e57d5"
+      },
+      "version": {
+        "gitCommit": "240a196bd28b91203add24bcdf730f04fe5ba500",
+        "gitDirty": true,
+        "programCommit": "d18d03cc57b9d307bba90216709b45c2797e43ae",
+        "programDirty": true,
+        "sourceDigest": "69fe1bc21cdf1e0eaddeabdd60e60ae4b367049df6761b8c1e4103436e343bbb",
+        "digest": "4bae33c08fee8c2fdcfcda9f92016811476fd43016bb5c30af7839d690ee36af",
+        "implementationDigest": "4bae33c08fee8c2fdcfcda9f92016811476fd43016bb5c30af7839d690ee36af",
+        "versionId": "eee58596c50941a4340dc5b8c0febc28cdca0ffdd410ffba1c0b2d36cb1c9fb0"
+      },
+      "business_status": "incomplete",
+      "terminal": "identity-blocked",
+      "item_count": 1,
+      "active_checks_executed": false,
+      "gaps": [
+        {
+          "check": "unique-endpoints",
+          "status": "unknown",
+          "reason": "资产不能唯一精确匹配已确认IP/ID：172.16.100.226"
+        }
+      ],
+      "next_check": null,
+      "raw_receipt_count": 1
+    },
+    {
+      "run_id": "run-0573b05e-1730-4d7a-924c-29f09891a57f",
+      "composition_id": "troubleshooting-device-offline",
+      "status": "completed",
+      "created_at": "2026-11-07T09:25:58.453Z",
+      "finished_at": "2026-11-07T09:26:04.000Z",
+      "input": {
+        "asset": {
+          "ip": "172.16.200.11",
+          "assetId": 3617609
+        },
+        "observer": {
+          "ip": "172.16.100.226",
+          "assetId": 3617426
+        },
+        "from": "2026-11-07T05:00:00Z",
+        "to": "2026-11-07T08:00:00Z"
+      },
+      "artifact": {
+        "filename": "device-offline-report.html",
+        "content_type": "text/html; charset=utf-8",
+        "bytes": 68919,
+        "sha256": "c54a54dc2307c01c3840c3c2c5cce88bddaef421a52c3edfab939c682f7c76b9"
+      },
+      "version": {
+        "gitCommit": "240a196bd28b91203add24bcdf730f04fe5ba500",
+        "gitDirty": true,
+        "programCommit": "d18d03cc57b9d307bba90216709b45c2797e43ae",
+        "programDirty": true,
+        "sourceDigest": "69fe1bc21cdf1e0eaddeabdd60e60ae4b367049df6761b8c1e4103436e343bbb",
+        "digest": "f6e23faef0d0813d8684af6e060e55a0646b3cc94152a4c03df025d29f90a180",
+        "implementationDigest": "f6e23faef0d0813d8684af6e060e55a0646b3cc94152a4c03df025d29f90a180",
+        "versionId": "479d282b0eddcc6f2d25484c9e91700b9cc95afbfb66613c0771fc3e85098199"
+      },
+      "business_status": "incomplete",
+      "terminal": "root/blocked-result",
+      "item_count": 1,
+      "active_checks_executed": false,
+      "gaps": [
+        "对象不唯一，未执行依赖检查"
+      ],
+      "next_check": "按已核对象补足真实管理/网络响应与来源时区；没有原子则保留未执行，不以其他执行点代替。",
+      "raw_receipt_count": 2
+    },
+    {
+      "run_id": "run-abe4d181-ed02-4f97-ae2f-660d84eea02b",
+      "composition_id": "troubleshooting-business-access",
+      "status": "completed",
+      "created_at": "2026-11-07T09:31:41.149Z",
+      "finished_at": "2026-11-07T09:32:19.960Z",
+      "input": {
+        "source": {
+          "ip": "172.16.138.226",
+          "assetId": 3617426
+        },
+        "target": {
+          "ip": "172.16.200.11",
+          "assetId": 3617609
+        },
+        "protocol": "tcp",
+        "port": 443,
+        "from": "2026-11-07T05:00:00Z",
+        "to": "2026-11-07T08:00:00Z"
+      },
+      "artifact": {
+        "filename": "business-access-report.html",
+        "content_type": "text/html; charset=utf-8",
+        "bytes": 205376,
+        "sha256": "bb16c2205d15fda6d0ed52d1070675d074bb763352ec8073a582b50312babed4"
+      },
+      "version": {
+        "gitCommit": "240a196bd28b91203add24bcdf730f04fe5ba500",
+        "gitDirty": true,
+        "programCommit": "d18d03cc57b9d307bba90216709b45c2797e43ae",
+        "programDirty": true,
+        "sourceDigest": "69fe1bc21cdf1e0eaddeabdd60e60ae4b367049df6761b8c1e4103436e343bbb",
+        "digest": "4bae33c08fee8c2fdcfcda9f92016811476fd43016bb5c30af7839d690ee36af",
+        "implementationDigest": "4bae33c08fee8c2fdcfcda9f92016811476fd43016bb5c30af7839d690ee36af",
+        "versionId": "eee58596c50941a4340dc5b8c0febc28cdca0ffdd410ffba1c0b2d36cb1c9fb0"
+      },
+      "business_status": "incomplete",
+      "terminal": "batch-summary",
+      "item_count": 8,
+      "active_checks_executed": false,
+      "gaps": [
+        {
+          "check": "source-soc-state",
+          "status": "unknown",
+          "reason": "保留SOC状态来源；不以在线标签或历史探测代替本次响应。DATABASE_LOCAL未核时区或心跳/同步缺口均不判正常。"
+        },
+        {
+          "check": "target-soc-state",
+          "status": "unknown",
+          "reason": "保留SOC状态来源；不以在线标签或历史探测代替本次响应。DATABASE_LOCAL未核时区或心跳/同步缺口均不判正常。"
+        },
+        {
+          "check": "configuration-path",
+          "status": "unknown",
+          "reason": "仅保留配置路径模型、原始判据和缺口；不是当前源端连接，不以reachable=false覆盖UNKNOWN，不从NAT候选扩张对象。"
+        },
+        {
+          "check": "current-source-tcp",
+          "status": "unavailable",
+          "reason": "本草稿仅只读；未执行主动TCP，也没有本Run核验过的当前源端结果。动作目录启用标志不代表真机可用，不能用历史SOC探测代替。"
+        },
+        {
+          "check": "tcp-followup-not-executed",
+          "status": "unavailable",
+          "reason": "当前TCP结果不可用，未假定成功、拒绝或超时；三类后继均不冒充已执行。其他已保存检查事实另列，不以TCP未知替代其结果。"
+        }
+      ],
+      "next_check": null,
+      "raw_receipt_count": 8
+    },
+    {
+      "run_id": "run-d92c830e-ea24-4f46-bc0b-717b0c3bf494",
+      "composition_id": "troubleshooting-device-offline",
+      "status": "completed",
+      "created_at": "2026-11-07T09:29:19.820Z",
+      "finished_at": "2026-11-07T09:29:38.884Z",
+      "input": {
+        "asset": {
+          "ip": "172.16.200.11",
+          "assetId": 3617609
+        },
+        "observer": {
+          "ip": "172.16.138.226",
+          "assetId": 3617426
+        },
+        "from": "2026-11-07T05:00:00Z",
+        "to": "2026-11-07T08:00:00Z"
+      },
+      "artifact": {
+        "filename": "device-offline-report.html",
+        "content_type": "text/html; charset=utf-8",
+        "bytes": 160817,
+        "sha256": "f9dfd12961430dcfd149b0d9791e2763cea775d64e426417af4422908a8f7c82"
+      },
+      "version": {
+        "gitCommit": "240a196bd28b91203add24bcdf730f04fe5ba500",
+        "gitDirty": true,
+        "programCommit": "d18d03cc57b9d307bba90216709b45c2797e43ae",
+        "programDirty": true,
+        "sourceDigest": "69fe1bc21cdf1e0eaddeabdd60e60ae4b367049df6761b8c1e4103436e343bbb",
+        "digest": "f6e23faef0d0813d8684af6e060e55a0646b3cc94152a4c03df025d29f90a180",
+        "implementationDigest": "f6e23faef0d0813d8684af6e060e55a0646b3cc94152a4c03df025d29f90a180",
+        "versionId": "479d282b0eddcc6f2d25484c9e91700b9cc95afbfb66613c0771fc3e85098199"
+      },
+      "business_status": "incomplete",
+      "terminal": "root/summary",
+      "item_count": 6,
+      "active_checks_executed": false,
+      "gaps": [
+        "SOC在线不代表本次真实响应或业务正常；源时区未核不得以评估时间代替观测时间",
+        "告警未命中只描述固定窗口，不能排除故障",
+        "未核得当前管理侧电源/系统/网卡观察原子；SOC标签和历史探测不能替代本次真实响应",
+        "没有本次管理/网络响应，不能判断电、物理离线或设备正常；未释放响应后的采集检查",
+        "仅为已有配置IP对模型，不是本次响应，不证明实际路径、端口、断电或设备正常"
+      ],
+      "next_check": "按已核对象补足真实管理/网络响应与来源时区；没有原子则保留未执行，不以其他执行点代替。",
+      "raw_receipt_count": 5
+    }
+  ],
+  "boundary": "No raw upstream bodies, credentials, native headers or generated HTML included. Invalid original IP is retained separately from the corrected input."
+}

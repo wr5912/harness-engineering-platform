@@ -15,7 +15,15 @@ export function validateLfxFlow(flow: any) {
     if (!node?.id || ids.has(node.id) || node.data?.id !== node.id || typeof node.data?.node?.template?.code?.value !== 'string') throw new Error('LFX 节点身份或组件代码无效')
     if (!Number.isFinite(node.position?.x) || !Number.isFinite(node.position?.y)) throw new Error('LFX 节点缺少画布位置')
     ids.add(node.id)
-    if (node.data.type === 'HepBatch') validateLfxFlow(node.data.node.template.body.value)
+    if (node.data.type === 'HepBatch') {
+      const template = node.data.node.template
+      // 官方 ParameterHandler 跳过不可见常量，缺失时不能把静态结构当作可装载流程。
+      for (const name of ['body', 'items_key', 'concurrency']) {
+        if (name !== 'body' && template[name] === undefined) continue
+        if (template[name]?.show !== true || template[name].value == null) throw new Error(`LFX 批量节点 ${node.id} 的 ${name} 需要 show:true 和实际值`)
+      }
+      validateLfxFlow(template.body.value)
+    }
   }
   if (!flow.data.nodes.some((node: any) => node.data.node.is_output)) throw new Error('LFX 流程需要至少一个结果节点')
   for (const edge of flow.data.edges) {

@@ -142,6 +142,26 @@ class RuntimeTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.client.active, 0)
         self.assertEqual(sum(event['action'] == 'work' for event in self.client.events), 3)
 
+    async def test_native_batch_releases_fast_branch_successor_before_unrelated_slow_branch(self):
+        methods = ''.join(f' def route_{key}(self)->Data:\n'
+                          '  selected=payload(self.value)["item"]\n'
+                          '  excluded=[key for key in ("fast","slow") if key!=selected]\n'
+                          '  for key in excluded:self.stop(key)\n'
+                          '  self.graph.exclude_branches_conditionally(self._id,excluded)\n'
+                          '  return self.value\n' for key in ('fast', 'slow'))
+        router = custom('route', methods, outputs='[Output(name="fast",method="route_fast",group_outputs=True),Output(name="slow",method="route_slow",group_outputs=True)]')
+        branches = [custom(key, f' async def build(self)->Data:\n  await callback("work",delay={delay})\n  return self.value\n')
+                    for key, delay in [('fast', 0.01), ('slow', 0.2)]]
+        ends = [custom(key + '_next', ' def build(self)->Data:\n  return self.value\n', output=True) for key in ('fast', 'slow')]
+        body = flow([node(HepInput, 'input'), router, *branches, *ends],
+                    [edge('input', 'route'), *[item for key in ('fast', 'slow') for item in (edge('route', key, key), edge(key, key + '_next'))]])
+        native = flow([node(HepInput, 'input'), node(HepBatch, 'batch', output=True, concurrency=2, body=body)], [edge('input', 'batch')])
+        result = await self.execute(native, {'items': ['fast', 'slow']})
+        self.assertEqual([item['item'] for item in result['items']], ['fast', 'slow'])
+        completed = [event['node_id'] for event in self.client.events if event.get('status') == 'completed']
+        self.assertLess(completed.index('root/batch[0]/fast_next'), completed.index('root/batch[1]/slow'))
+        self.assertEqual(self.client.peak, 2)
+
     async def test_distinct_child_nodes_do_not_collapse_identical_inputs(self):
         self.run['bundle']['children']['check:fixed'] = {'flow': self.batch(), 'children': {}, 'modules': {}}
         join = custom('join', ' def build(self)->Data:\n  assert len(self.value)==2\n  return self.value[0]\n', is_list=True, output=True)

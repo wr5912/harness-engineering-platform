@@ -629,6 +629,30 @@ def effective_required_env_names(contract: dict, model_policy_path: str | None,
     return dsh_dev.required_env_names({**contract, "model_policy": policy})
 
 
+def existing_instance_identity(args: argparse.Namespace, contract: dict) -> dict:
+    if getattr(args, "mcp_fixture", None) or getattr(args, "source_check", False):
+        raise EvaluationError("指定既有实例不能使用 Mock MCP 或纯来源校验")
+    loader = SourceFileLoader("dsh_eval_existing_instance", str(DSH_DEV))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    dsh_dev = importlib.util.module_from_spec(spec)
+    loader.exec_module(dsh_dev)
+    dsh_dev.REPO = REPO
+    try:
+        target, manifest = dsh_dev.load_instance(args.instance_name)
+        generation = dsh_dev.observe_generation(args.instance_name, manifest)
+        policy = dsh_dev.read_model_policy(getattr(args, "model_policy", None), contract["agent_id"], repo=REPO)
+        checked = checked_process(["node", str(ADAPTER / "instance-assets.mts"), "evaluation"],
+                                  input_text=json.dumps({"contract": contract, "manifest": manifest,
+                                                         "generation": generation, "directory": str(target),
+                                                         "model": policy["default"]}),
+                                  label="核对指定评测实例", timeout=60)
+        identity = dsh_dev.validate_image_identity(contract, (target, manifest))
+        return {**identity, **json.loads(checked.stdout), "generation": generation,
+                "business_control": manifest["business_control"]}
+    except SystemExit as error:
+        raise EvaluationError("指定实例的工作区、运行状态、模型或镜像核对失败；未修改实例") from error
+
+
 def dry_run_payload(contract: dict, cases: list[dict], executor: str, requested_mode: str,
                     selection_mode: str, review_mode: str, model_policy_path: str | None = None,
                     expected_model: str | None = None, *, source_only: bool = False) -> dict:
@@ -658,6 +682,8 @@ def result_payload(
     run_id: str | None = None,
     summary_path: Path | None = None,
     instance_stopped: bool = True,
+    instance_owned: bool = True,
+    cleanup_complete: bool | None = None,
     verdict: str | None = None,
     executor: str | None = None,
     cancelled: bool = False,
@@ -696,6 +722,8 @@ def result_payload(
         "summary": summary_ref,
         "report": report_ref,
         "instance_stopped": instance_stopped,
+        "instance_owned": instance_owned,
+        "cleanup_complete": instance_stopped if cleanup_complete is None else cleanup_complete,
         "cancelled": cancelled,
     }
 
@@ -705,6 +733,8 @@ def emit_result(*args, **kwargs) -> None:
 
 
 def execute(args: argparse.Namespace) -> int:
+    untouched = {"instance_owned": not bool(getattr(args, "instance_name", None)),
+                 "instance_stopped": not bool(getattr(args, "instance_name", None)), "cleanup_complete": True}
     if getattr(args, "mcp_fixture", None):
         args.mcp_fixture = str(Path(args.mcp_fixture).expanduser().resolve())
     source_only = bool(getattr(args, "source_check", False))
@@ -733,6 +763,9 @@ def execute(args: argparse.Namespace) -> int:
                            model_policy_path, expected_model,
                            source_only=source_only)
     plan["case_schedule"] = {"concurrency": concurrency, "parallel_cases": parallel_cases}
+    if getattr(args, "instance_name", None):
+        identity = existing_instance_identity(args, contract)
+        plan["instance"] = {key: identity[key] for key in ("instance_name", "instance_owned", "asset_status", "generation", "image_ref")}
     if args.compare_to:
         plan["compare_to_run_id"] = args.compare_to
     if source_ref:
@@ -750,7 +783,7 @@ def execute(args: argparse.Namespace) -> int:
         return 0
     if plan["missing_env_names"]:
         progress("缺少运行时环境变量：" + "、".join(plan["missing_env_names"]))
-        emit_result(contract["experiment_id"], len(cases), executor=args.executor)
+        emit_result(contract["experiment_id"], len(cases), executor=args.executor, **untouched)
         return 2
 
     progress("执行仓库与 Experiment 前置校验")
@@ -762,7 +795,7 @@ def execute(args: argparse.Namespace) -> int:
             check = checks[name]
             detail = check.get("error") or ", ".join(str(code) for code in check.get("error_codes", []))
             progress(f"{name}（退出码 {check.get('exit_code')}）：{detail}")
-        emit_result(contract["experiment_id"], len(cases), executor=args.executor)
+        emit_result(contract["experiment_id"], len(cases), executor=args.executor, **untouched)
         return 2
 
     # 从创建 Run 到收尾返回始终持有取消所有权，只有实际执行阶段允许中断。
@@ -772,6 +805,7 @@ def execute(args: argparse.Namespace) -> int:
 
 def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict],
                       selection_mode: str, review_mode: str) -> int:
+    instance_owned = not bool(getattr(args, "instance_name", None))
     progress("创建并锁定 Research Run")
     run_id = None
     run_dir = None
@@ -794,7 +828,7 @@ def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict
             judge_contract = locked_inputs.get("review_contract") or locked_inputs["judge_contract"]
             contract = {**contract, "judge_model_route": judge_contract["model_route"]}
         recorded: set[str] = set()
-        instance_name = f"{contract['agent_id']}-eval-{uuid.uuid4().hex[:8]}"
+        instance_name = getattr(args, "instance_name", None) or f"{contract['agent_id']}-eval-{uuid.uuid4().hex[:8]}"
         try:
             process_stat = Path(f"/proc/{os.getpid()}/stat").read_text(encoding="utf-8")
             process_start = process_stat[process_stat.rfind(")") + 2:].split()[19]
@@ -802,7 +836,7 @@ def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict
             process_start = None
         execution = {"schema_version": "1.0", "workspace_id": workspace_id(REPO), "asset_root": str(REPO.resolve()),
                      "process_start": process_start, "request_sha256": os.environ.get("HARNESS_EVAL_REQUEST_SHA256"),
-                     "pid": os.getpid(), "run_id": run_id, "instance_name": instance_name,
+                     "pid": os.getpid(), "run_id": run_id, "instance_name": instance_name, "instance_owned": instance_owned,
                      "status": "running", "deadline_at": os.environ.get("HARNESS_EVAL_DEADLINE_AT")}
         write_json(run_dir / "execution.json", execution)
         progress(f"Research Run: {run_id}")
@@ -837,14 +871,16 @@ def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict
                 pass
         if run_id is None or run_dir is None:
             progress(f"创建 Run 失败：{error}")
-            emit_result(contract["experiment_id"], len(cases), executor=args.executor)
+            emit_result(contract["experiment_id"], len(cases), executor=args.executor,
+                        instance_owned=instance_owned, instance_stopped=instance_owned, cleanup_complete=True)
             return 2
         # init 已提交的 Run 不能因执行归属交接失败而被当作未创建删除。
         reason = process_error_detail(str(error), "run-initialization-handoff-failed")
         progress(f"Run 已创建，执行准备失败：{reason}")
         try:
             write_json(run_dir / "execution.json", {"schema_version": "1.0", "run_id": run_id,
-                       "status": "failed", "instance_stopped": True, "failure_reason": reason})
+                       "status": "failed", "instance_owned": instance_owned,
+                       "instance_stopped": instance_owned, "cleanup_complete": True, "failure_reason": reason})
         except OSError:
             progress("执行失败回执暂时无法写入，已保留 Run。")
         try:
@@ -860,16 +896,21 @@ def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict
                 write_flat_yaml(run_dir / "run.yaml", manifest)
             except (OSError, ValueError):
                 progress("Run 封存暂未完成，已保留清单和冻结输入供核对。")
-        emit_result(contract["experiment_id"], len(cases), run_id=run_id, executor=args.executor)
+        emit_result(contract["experiment_id"], len(cases), run_id=run_id, executor=args.executor,
+                    instance_owned=instance_owned, instance_stopped=instance_owned, cleanup_complete=True)
         return 2
     try:
         with allow_cancellation():
-            progress("启动独立 DSH 评测实例")
-            up_attempted = True
-            runtime_options = {"source_ref": args.source_ref} if getattr(args, "source_ref", None) else {}
-            if locked_inputs.get("mcp_fixture"):
-                runtime_options["mcp_fixture"] = str(run_dir / "evidence/mcp-fixture.json")
-            image_identity = start_instance(args.source, instance_name, getattr(args, "model_policy", None), **runtime_options)
+            if instance_owned:
+                progress("启动独立 DSH 评测实例")
+                up_attempted = True
+                runtime_options = {"source_ref": args.source_ref} if getattr(args, "source_ref", None) else {}
+                if locked_inputs.get("mcp_fixture"):
+                    runtime_options["mcp_fixture"] = str(run_dir / "evidence/mcp-fixture.json")
+                image_identity = start_instance(args.source, instance_name, getattr(args, "model_policy", None), **runtime_options)
+            else:
+                progress("核对并复用指定 DSH 评测实例；仅创建本次 Case 的会话")
+                image_identity = existing_instance_identity(args, contract)
             if locked_inputs.get("mcp_fixture") and image_identity.get("mcp_fixture") != locked_inputs["mcp_fixture"]:
                 raise EvaluationError("实际 MCP Mock 投影与冻结 Run 输入不一致")
             if image_identity["image_build_fingerprint"] != contract["image"]["build_fingerprint"]:
@@ -883,6 +924,8 @@ def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict
                 "image_build_fingerprint": image_identity["image_build_fingerprint"],
                 "platform": image_identity["platform"],
                 "instance_name": instance_name,
+                "instance_owned": instance_owned,
+                **({key: image_identity[key] for key in ("asset_status", "generation")} if not instance_owned else {}),
                 **({"business_control": {key: image_identity["business_control"][key]
                      for key in ("source_digest", "runtime_generation", "identity_mode", "access_mode")},
                     "entry_kind": "business-gateway"} if image_identity.get("business_control") else {}),
@@ -927,6 +970,10 @@ def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict
             write_json(run_dir / "analysis.json", analysis)
             if review_mode == "ai" and analysis["review_status"] != "completed":
                 raise EvaluationError(analysis["review_reason"])
+            if not instance_owned:
+                current = existing_instance_identity(args, contract)
+                if current["generation"] != image_identity["generation"] or current["asset_status"]["current_digest"] != image_identity["asset_status"]["current_digest"]:
+                    raise EvaluationError("评测期间指定实例或来源资产发生变化，不能确认同一装载的结果")
     except KeyboardInterrupt:
         interrupted = True
         fatal_reason = _cancel_reason
@@ -939,8 +986,9 @@ def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict
     except Exception as error:
         fatal_reason = f"evaluation-runtime-{type(error).__name__}"
     finally:
-        stopped = (stop_instance(instance_name) if up_attempted else True) and not cleanup_failed
-        if not stopped and fatal_reason is None:
+        cleanup_complete = (stop_instance(instance_name) if up_attempted else True) and not cleanup_failed
+        stopped = instance_owned and cleanup_complete
+        if not cleanup_complete and fatal_reason is None:
             fatal_reason = "instance-stop-unconfirmed"
 
     if _cancel_requested and fatal_reason is None:
@@ -958,9 +1006,9 @@ def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict
                 else:
                     value = write_unfinished_evidence(run_dir, case, fatal_reason, unfinished_status)
                 record_trial(run_id, case["case_id"], value)
-        write_json(run_dir / "execution.json", {**execution, "status": "cancelled" if interrupted and stopped else "failed",
-                   "instance_stopped": stopped, "failure_reason": fatal_reason})
-        finalize_run(run_id, "cancelled" if interrupted and stopped else "failed")
+        write_json(run_dir / "execution.json", {**execution, "status": "cancelled" if interrupted and cleanup_complete else "failed",
+                   "instance_stopped": stopped, "cleanup_complete": cleanup_complete, "failure_reason": fatal_reason})
+        finalize_run(run_id, "cancelled" if interrupted and cleanup_complete else "failed")
         summary_path = run_dir / "summary.json"
         try:
             validate_after_run(contract)
@@ -969,12 +1017,13 @@ def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict
         emit_result(
             contract["experiment_id"], len(cases), run_id=run_id,
             summary_path=summary_path, instance_stopped=stopped, verdict="inconclusive",
+            instance_owned=instance_owned, cleanup_complete=cleanup_complete,
             executor=args.executor,
             cancelled=interrupted,
         )
         return 2
 
-    write_json(run_dir / "execution.json", {**execution, "status": "completed", "instance_stopped": stopped})
+    write_json(run_dir / "execution.json", {**execution, "status": "completed", "instance_stopped": stopped, "cleanup_complete": cleanup_complete})
     finalize_run(run_id, "completed")
     summary_path = run_dir / "summary.json"
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
@@ -986,12 +1035,14 @@ def execute_owned_run(args: argparse.Namespace, contract: dict, cases: list[dict
         emit_result(
             contract["experiment_id"], len(cases), run_id=run_id,
             summary_path=summary_path, instance_stopped=stopped, verdict="inconclusive",
+            instance_owned=instance_owned, cleanup_complete=cleanup_complete,
             executor=args.executor,
         )
         return 2
     emit_result(
         contract["experiment_id"], len(cases), run_id=run_id,
         summary_path=summary_path, instance_stopped=stopped, executor=args.executor,
+        instance_owned=instance_owned, cleanup_complete=cleanup_complete,
     )
     if args.executor == "browser":
         return 0 if all(row["execution_status"] == "completed" for row in runtime_rows.values()) else 1
@@ -1004,6 +1055,7 @@ def main() -> None:
     parser.add_argument("--repo", type=Path, default=REPO, help="用户数据工作区根目录")
     parser.add_argument("--source", required=True, help="experiment:<id> 或已登记 Experiment ID")
     parser.add_argument("--run-id", help="预分配的 run-UUIDv4；省略时生成新的 Run ID")
+    parser.add_argument("--instance-name", help="复用来源及实际装载一致的既有实例；完成或取消均不停止该实例")
     parser.add_argument("--source-ref", help="固定来源 git:<40位提交>，角色、Case 与运行资产读取同一提交")
     parser.add_argument("--evaluation-source", choices=("source", "current"), help="source 沿用所选来源用例（默认）；current 明确使用当前工作区用例并随 Run 冻结")
     parser.add_argument("--mcp-fixture", help="仅本次评测使用的明确 Mock MCP 连接映射 JSON")
@@ -1058,13 +1110,15 @@ def main() -> None:
         raise SystemExit(execute(args))
     except KeyboardInterrupt:
         # 尚未进入拥有 Run/实例的执行区块，此时没有待清理的业务实例。
-        emit_result(args.source.removeprefix("experiment:"), 0, executor=args.executor, cancelled=True)
+        emit_result(args.source.removeprefix("experiment:"), 0, executor=args.executor, cancelled=True,
+                    instance_owned=not bool(args.instance_name), instance_stopped=not bool(args.instance_name), cleanup_complete=True)
         raise SystemExit(2)
     except (EvaluationError, ValueError) as error:
         progress(f"dsh-eval failed: {error}")
         source = args.source.removeprefix("experiment:")
         experiment_id = source if EXPERIMENT.fullmatch(source) else None
-        emit_result(experiment_id, 0, executor=args.executor)
+        emit_result(experiment_id, 0, executor=args.executor,
+                    instance_owned=not bool(args.instance_name), instance_stopped=not bool(args.instance_name), cleanup_complete=True)
         raise SystemExit(2)
     finally:
         if previous_timer is not None:

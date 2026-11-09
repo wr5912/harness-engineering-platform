@@ -1,6 +1,6 @@
 import { readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { appliedFiles, assetStatus, sourceAssets, type AssetFileCache } from './instance-assets.ts'
+import { appliedFiles, assetStatus, evaluationInstance, sourceAssets, type AssetFileCache } from './instance-assets.ts'
 
 try {
   const input = JSON.parse(readFileSync(0, 'utf8'))
@@ -9,7 +9,8 @@ try {
   if (process.argv[2] === 'status' && cachePath) {
     try { Object.assign(cache, JSON.parse(readFileSync(cachePath, 'utf8'))) } catch {}
   }
-  const value = process.argv[2] === 'applied' ? appliedFiles(input.contract, input.manifest, input.directory)
+  const value = process.argv[2] === 'evaluation' ? evaluationInstance(input.contract, input.manifest, input.generation, input.directory, input.model)
+    : process.argv[2] === 'applied' ? appliedFiles(input.contract, input.manifest, input.directory)
     : process.argv[2] === 'source' ? sourceAssets(input.contract, input.manifest, input.directory)
     : assetStatus(input.contract, input.manifest, input.generation, input.state, input.directory, cachePath ? cache : undefined)
   if (process.argv[2] === 'status' && cachePath) {

@@ -1,0 +1,28 @@
+{
+  "at": "2026-11-07T10:33:30.988Z",
+  "base": "http://172.16.138.228:53105/agents/security-operations-expert/instances/inspection-027-schedule-acceptance/",
+  "session": "session-30a1879b-7506-434b-9743-8b6e0bfbc9a9",
+  "kind": "fault",
+  "cards": 3,
+  "preview_rendered": true,
+  "expected_sha256": "f9dfd12961430dcfd149b0d9791e2763cea775d64e426417af4422908a8f7c82",
+  "contains": [
+    "172.16.200.11",
+    "run-d92c830e-ea24-4f46-bc0b-717b0c3bf494"
+  ],
+  "downloads": [
+    {
+      "card": 2,
+      "filename": "device-offline-report.html",
+      "bytes": 160817,
+      "sha256": "f9dfd12961430dcfd149b0d9791e2763cea775d64e426417af4422908a8f7c82"
+    },
+    {
+      "card": 2,
+      "filename": "device-offline-report.html",
+      "bytes": 160817,
+      "sha256": "f9dfd12961430dcfd149b0d9791e2763cea775d64e426417af4422908a8f7c82"
+    }
+  ],
+  "page_errors": []
+}

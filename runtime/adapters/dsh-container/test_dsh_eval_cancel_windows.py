@@ -11,7 +11,7 @@ import unittest
 
 ADAPTER = Path(__file__).resolve().parent
 PROBE = runpy.run_path(str(ADAPTER / "test_dsh_eval_cancel.py"))["PROBE"]
-EXECUTE = 'raise SystemExit(m.execute(types.SimpleNamespace(source="experiment:EXP-basic-001",case=[],mode="fast",executor="api",review="none",compare_to=None,dry_run=False,model=None,timeout_seconds=30)))'
+EXECUTE = 'raise SystemExit(m.execute(types.SimpleNamespace(source="experiment:EXP-basic-001",case=[],mode="fast",executor="api",review="none",compare_to=None,dry_run=False,model=None,timeout_seconds=30,instance_name="existing" if mode=="existing" else None)))'
 
 SPAWN_PROBE = r'''
 import json,os,signal,sys,time

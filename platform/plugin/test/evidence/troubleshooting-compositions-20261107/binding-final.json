@@ -1,0 +1,19 @@
+{
+  "at": "2026-11-07T10:32:05.310Z",
+  "source_digest": "sha256:bc96cf04686f70b73cd6dfa3b5ca14d47856a482d9304dd871fb89f206d5413a",
+  "binding_source_digest": "sha256:bc96cf04686f70b73cd6dfa3b5ca14d47856a482d9304dd871fb89f206d5413a",
+  "binding_matches": true,
+  "asset_status": "current",
+  "compositions": [
+    {
+      "id": "troubleshooting-business-access",
+      "toolName": "diagnose_business_access",
+      "implementationDigest": "4bae33c08fee8c2fdcfcda9f92016811476fd43016bb5c30af7839d690ee36af"
+    },
+    {
+      "id": "troubleshooting-device-offline",
+      "toolName": "diagnose_device_offline",
+      "implementationDigest": "f6e23faef0d0813d8684af6e060e55a0646b3cc94152a4c03df025d29f90a180"
+    }
+  ]
+}

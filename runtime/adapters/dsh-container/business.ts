@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs'
+import { chownSync, existsSync, lstatSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -26,6 +26,45 @@ const containerAssets = '/opt/harness-business-assets'
 const containerPlugin = '/opt/harness-platform'
 const containerSecret = '/opt/harness-business/shared-secret'
 const containerPatch = '/opt/harness-business/business.patch.yml'
+
+/** 显式重载时只同步来源的连接列表，不覆盖其他原生运行设置。 */
+export function syncSourceMcp(settings: string, seed: string, apply = false, expectedDigest?: string) {
+  for (const file of [settings, seed]) {
+    const state = lstatSync(file)
+    if (!state.isFile() || state.isSymbolicLink()) throw new Error('MCP 设置必须是普通文件')
+  }
+  const original = readFileSync(settings, 'utf8')
+  const digest = (text: string) => `sha256:${createHash('sha256').update(text).digest('hex')}`
+  const beforeDigest = digest(original)
+  if (expectedDigest && expectedDigest !== beforeDigest) throw new Error('MCP 运行设置已变化，请重新预览重载')
+  const readManager = (text: string) => {
+    const rows = yaml.load(text, { schema: patchSchema })
+    if (!Array.isArray(rows)) throw new Error('MCP 配置种子无效')
+    const managers = rows.flatMap(item => [item, ...(item?.insert ?? [])])
+      .filter(item => item?.id === 'mcp-session-manager' || typeof item?.name === 'string' && /(?:^|\/)mcp-manager\/index\.(?:mjs|js|ts)$/.test(item.name))
+    if (managers.length !== 1 || !Array.isArray(managers[0]?.config?.servers)) throw new Error('MCP manager 声明冲突或缺少连接列表')
+    const servers = managers[0].config.servers
+    if (servers.some((server: any) => typeof server?.id !== 'string' || !server.id) || new Set(servers.map((server: any) => server.id)).size !== servers.length) throw new Error('MCP 连接身份无效或重复')
+    return { rows, manager: managers[0] }
+  }
+  const current = readManager(original), desired = readManager(readFileSync(seed, 'utf8'))
+  const previousIds = current.manager.config.servers.map((server: any) => server.id)
+  const changed = JSON.stringify(current.manager.config.servers) !== JSON.stringify(desired.manager.config.servers)
+  current.manager.config.servers = desired.manager.config.servers
+  const content = changed ? yaml.dump(current.rows, { schema: patchSchema, lineWidth: -1 }) : original
+  if (apply && changed) {
+    if (readFileSync(settings, 'utf8') !== original) throw new Error('MCP 运行设置已变化，请重新预览重载')
+    const temporary = `${settings}.${randomUUID()}.tmp`
+    try {
+      const state = statSync(settings)
+      writeFileSync(temporary, content, { flag: 'wx', mode: state.mode & 0o777 })
+      if (process.getuid?.() === 0) chownSync(temporary, state.uid, state.gid)
+      renameSync(temporary, settings)
+    } finally { if (existsSync(temporary)) unlinkSync(temporary) }
+  }
+  return { changed, applied: apply, before_digest: beforeDigest, after_digest: digest(content), previous_server_ids: previousIds,
+    server_ids: desired.manager.config.servers.map((server: any) => server.id) }
+}
 
 export interface BusinessLaunchConfig {
   assetRoot: string; sharedSecretFile?: string; coordinatorOrigin: string; pluginRoot?: string
@@ -144,6 +183,16 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
     throw new Error('业务来源 MCP manager 声明冲突或配置无效')
   }
   const manager = managers[0]
+  // 保留HOME里的其它设置；来源中明确新增的组依赖不能因旧运行设置而丢失。
+  const sourceSeed = join(dirname(input.profileManifest), 'web-profile.seed.patch.yml')
+  const sourceEntries = seed !== sourceSeed && existsSync(sourceSeed) ? yaml.load(readFileSync(sourceSeed, 'utf8')) ?? [] : entries
+  if (!Array.isArray(sourceEntries)) throw new Error('业务来源 MCP 配置种子无效')
+  const sourceManager = sourceEntries.flatMap(item => [item, ...(item?.insert ?? [])]).find(item => item?.id === manager?.id)
+  const retainedGroups = manager?.config.groups ?? []
+  const declaredGroups = sourceManager?.config?.groups ?? []
+  if (!Array.isArray(retainedGroups) || !Array.isArray(declaredGroups)) throw new Error('业务来源 MCP 配置种子无效')
+  const managerConfig = manager && { ...manager.config, groups: [...retainedGroups,
+    ...declaredGroups.filter((group: any) => !retainedGroups.some((current: any) => current.id === group.id))] }
   const pluginRoot = config.pluginRoot ?? join(programRoot, 'platform/plugin')
   if (manager) for (const file of ['lib/mcp-manager.js', 'business/mcp-manager.js']) {
     if (!existsSync(join(pluginRoot, file)) || !statSync(join(pluginRoot, file)).isFile()) throw new Error('业务 MCP manager 插件尚未构建')
@@ -183,7 +232,7 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
     { id: 'web-runtime', config: { publicUrl: new URL(businessBasePath, config.coordinatorOrigin).href } },
     ...(manager ? [{ id: manager.id, disabled: true }] : []),
     ...createBusinessRuntimePatch(runtimeConfig, `${containerPlugin}/business/runtime.js`,
-      manager ? `${containerPlugin}/business/mcp-manager.js` : undefined, manager?.config),
+      manager ? `${containerPlugin}/business/mcp-manager.js` : undefined, managerConfig),
   ]
   delete service.network_mode
   service.networks = ['business']
@@ -227,6 +276,11 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
+    if (process.argv[2] === '--sync-source-mcp') {
+      const input = JSON.parse(readFileSync(0, 'utf8'))
+      console.log(JSON.stringify(syncSourceMcp(input.settings, input.seed, input.apply === true, input.expected_digest)))
+      process.exit(0)
+    }
     if (process.argv[2] === '--capabilities') {
       console.log(JSON.stringify(readLocalCapabilities(resolve(process.argv[3]!))))
       process.exit(0)
@@ -278,6 +332,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     }))
   } catch (error) {
     const known = new Set([
+      'MCP 设置必须是普通文件', 'MCP 运行设置已变化，请重新预览重载', 'MCP 配置种子无效',
+      'MCP manager 声明冲突或缺少连接列表', 'MCP 连接身份无效或重复',
       '业务数据根或共享密钥文件无效', '业务访问配置尚未启用', '协调器必须使用不含路径和凭据的 HTTP 来源地址',
       '业务实例身份模式无效',
       '业务实例访问方式无效',

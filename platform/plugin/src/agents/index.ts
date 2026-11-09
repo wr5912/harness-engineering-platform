@@ -1551,6 +1551,11 @@ function evalArgs(payload: JsonMap, dryRun: boolean, modelPolicyPath?: string, m
     for (const id of payload.parallel_cases) args.push('--parallel-case', id)
   }
   const model = optionalString(payload, 'model')
+  const instanceName = optionalString(payload, 'instance_name')
+  if (instanceName) {
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/.test(instanceName)) throw new RpcError('invalid_request', 'instance_name 格式无效')
+    args.push('--instance-name', instanceName)
+  }
   const compareTo = optionalString(payload, 'compare_to')
   if (model) args.push('--model', model)
   if (modelPolicyPath) args.push('--model-policy', modelPolicyPath)

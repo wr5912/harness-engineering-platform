@@ -155,6 +155,23 @@ export function assetStatus(contract: RecordValue, manifest: RecordValue, genera
     reason: verifiedGeneration ? status === 'current' ? '运行代次与加载回执一致' : loaded.source_files ? '资产已变化需重载，变化项相对最后实际加载回执' : '资产已变化需重载；旧回执未记录逐项清单' : '当前运行代次缺少实际加载回执，尚未核验' }
 }
 
+export function evaluationInstance(contract: RecordValue, manifest: RecordValue, generation: RecordValue, directory: string, model?: RecordValue) {
+  if (manifest.source_id !== contract.source_id || manifest.agent_id !== contract.agent_id
+    || (manifest.source_ref ?? null) !== (contract.source_ref ?? null)
+    || manifest.session_preset !== contract.preset_id || manifest.target_preset !== contract.preset_id) {
+    throw new Error('指定实例的来源或角色与评测不一致')
+  }
+  if (manifest.profile !== 'web' || !manifest.evaluation_patch || !manifest.business_control) {
+    throw new Error('指定实例需要 Web 评测支持及已登记的业务网关')
+  }
+  if (model && JSON.stringify(Object.entries(manifest.model_policy?.default ?? {}).sort()) !== JSON.stringify(Object.entries(model).sort())) {
+    throw new Error('指定实例的模型与本次评测选择不一致，请先更新实例模型')
+  }
+  const status = assetStatus(contract, manifest, generation, generation.running ? 'running' : 'stopped', directory)
+  if (status.status !== 'current') throw new Error(`指定实例实际装载尚未匹配来源：${status.status}；请先核对并重载`)
+  return { instance_name: manifest.name, instance_owned: false, asset_status: status }
+}
+
 export function verifyFiles(files: AssetFile[]): void {
   for (const file of files) {
     if (!file.path.startsWith('/') || createHash('sha256').update(readFileSync(file.path)).digest('hex') !== file.sha256) {

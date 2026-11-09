@@ -6,6 +6,26 @@ import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { workflowRuns } from '../src/mcp/workflow-runs.ts'
 
+test('节点完成或失败在返回前落盘，后继不依赖延迟进度定时器', async t => {
+  const root = mkdtempSync(join(tmpdir(), 'mcp-workflow-persist-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const store = workflowRuns(root)
+  const request = { config: {}, input: {}, catalog: {}, version: {}, executionId: 'persist', compositionId: 'check' }
+  const completed = await store.start(request, { responseMode: 'complete' }, async context => {
+    const path = join(root, 'mcp/.local/runs', context.runId + '.json')
+    for (const status of ['completed', 'failed']) {
+      context.progress.call({ ...context, nodeId: status }, { status: 'running' })
+      context.progress.call({ ...context, nodeId: status }, { status, result: { items: [{ fact: status }] } })
+      const saved = JSON.parse(readFileSync(path, 'utf8')).nodes[status]
+      assert.equal(saved.status, status)
+      assert.deepEqual(saved.result.items, [{ fact: status }])
+    }
+    return { checked: true }
+  })
+  assert.equal(completed.status, 'completed')
+  assert.equal(completed.result.checked, true)
+})
+
 test('重复请求共用准备和运行，独立请求共享有界并发，报告与失败记录可恢复', async t => {
   const root = mkdtempSync(join(tmpdir(), 'mcp-workflow-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
@@ -92,6 +112,22 @@ test('原生嵌套组合的明细从已保存结果分页读取，保留未知�
   assert.deepEqual(store.details(id, 'root/routine/baseline').items, result.checks.routine.checks.baseline.items)
   assert.throws(() => store.details(id, 'root/absent'), /节点不存在/)
   assert.equal(readFileSync(path, 'utf8'), original)
+})
+
+test('直接checks结果兼容routine包装及批次节点路径，读取已保存明细不重跑', async t => {
+  const root = mkdtempSync(join(tmpdir(), 'mcp-workflow-direct-details-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const store = workflowRuns(root), id = 'run-00000000-0000-4000-8000-000000000002'
+  const result = { checks: { status: { items: [{ id: 'online' }] }, baseline: { items: [{ id: 'baseline-unknown' }] }, vulnerabilities: { items: [{ id: 'asset-1' }] } } }
+  mkdirSync(join(root, 'mcp/.local/runs'), { recursive: true })
+  writeFileSync(join(root, 'mcp/.local/runs', id + '.json'), JSON.stringify({ engine: 'workflow', status: 'completed', result, artifacts: [], nodes: {
+    root: {}, 'root/routine': {}, 'root/routine/baseline/summary': {}, 'root/routine/status': {}, 'root/summary': {}, 'root/vulnerabilities/assets': {}, 'root/vulnerabilities/assets[0]/assess': {},
+  }}))
+  assert.deepEqual(store.details(id, 'root/routine/baseline/summary').items, result.checks.baseline.items)
+  assert.deepEqual(store.details(id, 'root/routine/status').items, result.checks.status.items)
+  assert.equal(store.details(id, 'root/summary').total, 3)
+  assert.deepEqual(store.details(id, 'root/vulnerabilities/assets').items, result.checks.vulnerabilities.items)
+  assert.deepEqual(store.details(id, 'root/vulnerabilities/assets[0]/assess').items, result.checks.vulnerabilities.items)
 })
 
 test('准备与执行共用请求计数和并发额度，重复请求不重新准备', async t => {

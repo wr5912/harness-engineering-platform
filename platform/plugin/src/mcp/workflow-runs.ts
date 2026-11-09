@@ -100,7 +100,12 @@ export function workflowRuns(root: string) {
     let progressTimer: ReturnType<typeof setTimeout> | undefined
     const persistProgress = () => { progressTimer ??= setTimeout(() => { progressTimer = undefined; persist() }, 250) }
     const context: WorkflowContext = { runId, nodeId: 'root', signal: AbortSignal.timeout(36 * 60_000), shared: prepared,
-      progress(value) { record.nodes[this.nodeId] = { ...record.nodes[this.nodeId], ...value, updated_at: now() }; persistProgress() },
+      progress(value) {
+        record.nodes[this.nodeId] = { ...record.nodes[this.nodeId], ...value, updated_at: now() }
+        // 完成事实必须先落盘，调用方随后才能释放依赖该事实的后继。
+        if (terminal.has(value.status)) { clearTimeout(progressTimer); progressTimer = undefined; persist() }
+        else persistProgress()
+      },
       call: limited,
       async map(items, call) { return Promise.all(items.map(call)) } }
     const run = () => restoreContext(async () => {
@@ -141,13 +146,39 @@ export function workflowRuns(root: string) {
       artifacts: value.artifacts.map(({ body: _body, ...artifact }: any) => ({ ...artifact, bytes: artifact.bytes ?? Buffer.byteLength(_body ?? '') })) }
   }
   function inspect(id: string, fullResult = false) { const value = read(id); return value ? publicRun(value, fullResult) : undefined }
+  function resultForNode(result: any, nodeId: string): any {
+    let current = result, matched = false
+    for (const raw of nodeId.split('/').slice(1)) {
+      if (current?.checks && Object.hasOwn(current.checks, raw)) { current = current.checks[raw]; matched = true; continue }
+      if (raw === 'routine' && current?.checks) { current = current.checks; matched = true; continue }
+      if (raw === 'summary' || ['assess', 'children', 'observations', 'input', 'scope', 'selected-result'].includes(raw)) { matched = true; continue }
+      const indexed = /^(.+)\[(\d+)\]$/.exec(raw)
+      if (indexed) {
+        const key = indexed[1], index = Number(indexed[2])
+        if (key === 'assets' && Array.isArray(current)) { current = current[index]; matched = true; continue }
+        if (key === 'assets' && Array.isArray(current?.items)) { current = current.items[index]; matched = true; continue }
+        if (Array.isArray(current?.[key])) { current = current[key][index]; matched = true; continue }
+        return undefined
+      }
+      if (raw === 'assets' && Array.isArray(current?.items)) { current = current.items; matched = true; continue }
+      if (current && Object.hasOwn(current, raw)) { current = current[raw]; matched = true; continue }
+      return undefined
+    }
+    return matched ? current : result
+  }
   function details(id: string, nodeId: string, offset = 0, limit = 50) {
     if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 200) throw new Error('明细分页参数无效')
     const record = read(id), node = record?.nodes[nodeId]
     if (!node) throw new Error('运行节点不存在，请先查询运行中的节点 ID')
-    const result = node.result ?? nodeId.split('/').slice(1).reduce((value: any, key: string) => value?.checks?.[key], record.result)
-    const collect = (value: any): any[] => value?.items ?? Object.values(value?.checks ?? {}).flatMap(collect)
-    const items = node.items ?? collect(result)
+    const result = node.result ?? resultForNode(record.result, nodeId)
+    if (result === undefined) throw new Error('运行节点没有可读取的已保存结果')
+    const collect = (value: any): any[] => {
+      if (Array.isArray(value)) return value
+      if (Array.isArray(value?.items)) return value.items
+      if (value?.checks && typeof value.checks === 'object') return Object.values(value.checks).flatMap(collect)
+      return value && typeof value === 'object' ? [value] : []
+    }
+    const items = Array.isArray(node.items) ? node.items : collect(result)
     return { run_id: id, node_id: nodeId, offset, limit, total: items.length, items: items.slice(offset, offset + limit) }
   }
   function artifact(id: string, artifactId: string) {

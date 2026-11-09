@@ -1,0 +1,82 @@
+{
+  "checked_at": "2026-11-09T01:48:29.732608Z",
+  "experiment_id": "EXP-security-operations-expert-027-f-r3ba4799b0cb7",
+  "candidate_digest": "66d23b0416df30e24a83826ab95488ef240b55bf0903987fab303a40bab57381",
+  "workspace_digest": "4268a3caa3c641ce3c144db464ee1b9640dff1e0a43cb0722d711fc8702d576c",
+  "presets_digest": "7c0ed20cbd40da461df7a0ad50a47d338bac976d8bc3ef36726854a11cd245f2",
+  "managed_digest": "f4d4a5f6372388181c417469a02e557377838f53e107f5d9433a5aa391957c75",
+  "evaluation_digest": "7af331738921c0f94b935e679c6a6b853404cf671c79fca6ac8e945dc2c0747e",
+  "source_verification": "matched for all five Runs",
+  "summary": {
+    "runs": 5,
+    "passed": 3,
+    "inconclusive": 2,
+    "failed_business_acceptance": 0
+  },
+  "runs": [
+    {
+      "run_id": "run-f074c620-03fc-493f-839f-71613498cd72",
+      "case_id": "U-FLT-012",
+      "status": "cancelled",
+      "execution_status_counts": {
+        "completed": 0,
+        "error": 0,
+        "skipped": 1
+      },
+      "machine_verdict": "inconclusive",
+      "effective_verdict": "inconclusive",
+      "reason": "evaluation-interrupted"
+    },
+    {
+      "run_id": "run-0602631c-d836-43fe-9549-4ca5cd9a5928",
+      "case_id": "U-FLT-016",
+      "status": "failed",
+      "execution_status_counts": {
+        "completed": 0,
+        "error": 1,
+        "skipped": 0
+      },
+      "machine_verdict": "inconclusive",
+      "effective_verdict": "inconclusive",
+      "reason": "execution-error"
+    },
+    {
+      "run_id": "run-3b429607-ccad-42e7-b8ac-fa99f4e78996",
+      "case_id": "U-FLT-017",
+      "status": "completed",
+      "execution_status_counts": {
+        "completed": 1,
+        "error": 0,
+        "skipped": 0
+      },
+      "machine_verdict": "passed",
+      "effective_verdict": "passed"
+    },
+    {
+      "run_id": "run-0199035d-4293-4a8b-9e02-58b26c45aedd",
+      "case_id": "U-INS-024",
+      "status": "completed",
+      "execution_status_counts": {
+        "completed": 1,
+        "error": 0,
+        "skipped": 0
+      },
+      "machine_verdict": "passed",
+      "effective_verdict": "passed"
+    },
+    {
+      "run_id": "run-b6b4d547-bede-423c-a9dc-ed79aa593634",
+      "case_id": "U-QA-016",
+      "status": "completed",
+      "execution_status_counts": {
+        "completed": 1,
+        "error": 0,
+        "skipped": 0
+      },
+      "machine_verdict": "passed",
+      "effective_verdict": "passed"
+    }
+  ],
+  "decision": "continue",
+  "limitation": "The two inconclusive Runs are retained as real failures; this is not a full business acceptance pass. External SOC evidence gaps and incomplete business results remain bounded by each Run."
+}

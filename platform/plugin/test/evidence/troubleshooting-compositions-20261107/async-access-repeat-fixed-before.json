@@ -1,0 +1,23 @@
+{
+  "at": "2026-11-07T10:06:12.578Z",
+  "label": "async-access-repeat-fixed",
+  "session_id": "session-93f12fa5-c917-417d-9c27-8c59e9c42361",
+  "before_seq": 106,
+  "as_of_seq": 132,
+  "finished": true,
+  "calls": [
+    {
+      "seq": 118,
+      "name": "export_security_report",
+      "call_id": "call_c33a0cd29ef641cd8017047c"
+    },
+    {
+      "seq": 126,
+      "name": "export_security_report",
+      "call_id": "call_16c9c395d5ae428a9238eb31"
+    }
+  ],
+  "reports": [],
+  "new_diagnosis_or_soc_calls": 0,
+  "outcome": "failed: report-source rejected historical pre-export polls as new source; retained before shared fix"
+}

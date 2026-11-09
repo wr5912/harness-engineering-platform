@@ -147,6 +147,10 @@ async function fixture(t, scenario = () => ({}), selectedRoute = route) {
         assert.ok(session)
         session.prompts.push(args.request.content[0].text)
         value = { accepted: true }
+      } else if (method === 'session/cancel') {
+        const session = sessions.get(args.request.sessionId)
+        assert.ok(session)
+        value = { accepted: !scenario(session.prompts.at(-1), session).cancelRejected }
       } else throw new Error(`未实现的外部 RPC: ${method}`)
       response.writeHead(200, { 'content-type': 'application/json' })
       response.end(JSON.stringify({ result: { ok: true, value } }))
@@ -398,6 +402,8 @@ test('归因等待超时保存最后一个完整取得的 archive 快照', async
   assert.equal(saved.checks.trace_available, true)
   assert.ok(saved.tools.length > 0)
   assert.equal(saved.trace.some(row => row.event.type === 'turn/end'), false)
+  assert.deepEqual(runtime.requests.filter(row => row.method === 'session/cancel').map(row => row.args.request.sessionId), ['review-1'])
+  assert.deepEqual(saved.checks.session_cancellation, { session_id: 'review-1', accepted: true })
 })
 
 test('始终无法取得 archive 时保留失败检查并明确 trace_available=false', async t => {
@@ -429,6 +435,8 @@ test('真实业务多轮 Case 次轮超时保留首轮与最后取得的部分�
   assert.equal(saved.trace.find(row => row.event.type === 'fixture/snapshot').event.data.snapshot, runtime.exportCounts.get('review-1'))
   assert.equal(saved.tools.length, 6)
   assert.equal(runtime.sessions.size, 1, '目标失败后不应启动评审 Session')
+  assert.deepEqual(runtime.requests.filter(row => row.method === 'session/cancel').map(row => row.args.request.sessionId), ['review-1'])
+  assert.deepEqual(saved.checks.session_cancellation, { session_id: 'review-1', accepted: true })
 })
 
 test('业务 Case 次轮一直无法导出时仍保留首轮成功取得的归档', async t => {
@@ -448,6 +456,7 @@ test('业务Judge显式选择冻结普通模型，目标会话保留自身绑定
     const runtime = await fixture(t, (_prompt, session) => ({ judge: session.preset === 'reviewer',
       routeMismatch: mismatch && session.preset === 'reviewer' }))
     const response = await runtime.runTarget([{ case_id: 'U-JUDGE-001', inputs: [firstPrompt], expected_behavior: '完成目标任务。' }])
+    assert.equal(runtime.requests.filter(row => row.method === 'session/cancel').length, 0)
     const selection = runtime.requests.filter(row => row.method === 'session/selectModel')
     assert.equal(selection.length, 1)
     assert.equal(selection[0].args.request.sessionId, 'review-2')
@@ -475,7 +484,17 @@ test('业务语义评审超时独立保存 judge 的部分轨迹，不覆盖目�
   assert.equal(judge.trace.some(row => row.event.type === 'turn/end'), false)
   assert.equal(judge.checks.session_id, 'review-2')
   assert.equal(judge.checks.unavailable_reason, 'task-tree-wait-timeout')
+  assert.deepEqual(runtime.requests.filter(row => row.method === 'session/cancel').map(row => row.args.request.sessionId), ['review-2'])
+  assert.deepEqual(judge.checks.session_cancellation, { session_id: 'review-2', accepted: true })
   assert.equal(judge.trace.find(row => row.event.type === 'fixture/snapshot').event.data.snapshot, runtime.exportCounts.get('review-2'))
+})
+
+test('超时取消未被接受时保留原始失败并明确未确认取消', async t => {
+  const runtime = await fixture(t, () => ({ incomplete: true, cancelRejected: true }))
+  const response = await runtime.run([{ scene_id: 'scene-1', prompt: firstPrompt }], 400)
+  assert.equal(response.results[0].error, 'case-hard-timeout')
+  const saved = await runtime.evidence('scene-1')
+  assert.deepEqual(saved.checks.session_cancellation, { session_id: 'review-1', accepted: false })
 })
 
 test('根首轮结束后仍等待委派及根后续回合，封存最终回复和子任务用量', async t => {

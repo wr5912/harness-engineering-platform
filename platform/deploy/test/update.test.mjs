@@ -278,6 +278,22 @@ test('读取失败或状态缺失不被当作空闲', async t => {
   await assert.rejects(readUpdateActivity(malformed.options, malformed.state, 'workspace-update-test'), /评测运行状态不完整/)
 })
 
+test('明确允许中断会话时不枚举历史，仍核对评测和 SDK 任务并标明未枚举', async t => {
+  const f = await activityFixture(t, {
+    'agents/eval/list': { jobs: [{ job_id: 'eval-active', status: 'running' }] },
+    'agents/sdk/list': [{ id: 'sdk-active', status: 'starting' }],
+  })
+  assert.deepEqual(await readUpdateActivity({ ...f.options, interruptSessions: true }, f.state, 'workspace-update-test'), [
+    { kind: 'session', id: '*', state: 'interruption-authorized-not-enumerated' },
+    { kind: 'evaluation', id: 'eval-active', state: 'running' },
+    { kind: 'sdk', id: 'sdk-active', state: 'starting' },
+  ])
+  assert.ok(!f.requested.includes('session/list'))
+  assert.ok(!f.requested.includes('assistant/status'))
+  const failed = await activityFixture(t, { 'agents/eval/list': { jobs: [] } })
+  await assert.rejects(readUpdateActivity({ ...failed.options, interruptSessions: true }, failed.state, 'workspace-update-test'), /只读核对失败/)
+})
+
 test('继承助手投影的子会话只核对原生运行状态，不走普通管理会话路由', async t => {
   const sessions = { items: [{ sessionId: 'child', origin: 'subagent', running: false,
     projections: { values: { harnessPlatformAssistant: { workspace_id: 'workspace-update-test' } } } }] }

@@ -1,0 +1,42 @@
+{
+  "experiment_id": "EXP-security-operations-expert-027-f-r3ba4799b0cb7",
+  "schema_version": 1,
+  "entry_path": "dsh/managed/mcp-manager/index.ts",
+  "output_path": "dsh/managed/mcp-manager/index.mjs",
+  "compiler": {
+    "typescript": "5.9.3",
+    "esbuild": "0.25.12",
+    "platform_lock_sha256": "bc5f36eb3e9ab14dd711dec75e1d5a4a92d6dd278ad4652baaaaaff090b9183b"
+  },
+  "dependencies_sha256": null,
+  "source_files": [
+    {
+      "path": "dsh/managed/mcp-manager/connection.ts",
+      "sha256": "09d66d933a12a12d500c606ce9744e10348a48eb732cf77ae56a68012098adf3"
+    },
+    {
+      "path": "dsh/managed/mcp-manager/index.ts",
+      "sha256": "e05ce72e8addc48ed7e92fe0adb96a46e9713f7447dd5c8fdf54991abb9f5462"
+    },
+    {
+      "path": "dsh/managed/mcp-manager/openapi.ts",
+      "sha256": "7af7dab8d039fb2d536e359130dd8f46191a2424a04a3e89fe88baf177b91c31"
+    }
+  ],
+  "source_sha256": "8edcc40372d8c022e52f21be1328de95be265bab65647f511f49fdf67901acd6",
+  "platform_sources": [
+    {
+      "path": "runtime/adapters/dsh-web/src/resolve-runtime.ts",
+      "sha256": "69e91bb7ff19f8e6f79694988ccf54d49e1a0a19675c33f59b3f7cc64a55bf1b"
+    }
+  ],
+  "platform_sources_sha256": "af539f1f3eb7a2bc3cfd4456124f15cff8e65abf4333aea55e756823d4b36d3d",
+  "source_inputs_version": 1,
+  "runtime_imports": [
+    "node:crypto",
+    "node:module"
+  ],
+  "build_digest": "2c24f227bf9601fb45394576535a20491e622483114816187a64209b99abb668",
+  "esm_sha256": "9fc04c6d961e23cb12ca5521e6e2bdd94aad183ac431df4a6dfbea81d580481a",
+  "candidate_sha256": "66a4697cf1ac2116f2e57d846b0ab2d42ceda62d9ced960ab772acb6386dd5bf"
+}

@@ -1,0 +1,631 @@
+{
+  "run_id": "run-ea5f30b0-19ac-408e-b72d-4beabb28d4c1",
+  "summary": {
+    "schema_version": "3.0",
+    "run_id": "run-ea5f30b0-19ac-408e-b72d-4beabb28d4c1",
+    "trial_count": 5,
+    "execution_status_counts": {
+      "completed": 4,
+      "error": 1,
+      "skipped": 0
+    },
+    "machine_trial_verdict_counts": {
+      "passed": 2,
+      "failed": 1,
+      "inconclusive": 2
+    },
+    "machine_overall_verdict": "failed",
+    "review_status": "not_requested",
+    "reviewed_case_count": 0,
+    "reviewed_case_verdict_counts": null,
+    "reviewed_overall_verdict": null,
+    "effective_verdict": "failed",
+    "source_verification": {
+      "status": "matched",
+      "reason": null,
+      "checks": [
+        {
+          "component": "candidate",
+          "status": "matched",
+          "expected_sha256": "aaba454eb0e84f835177082b174964c4d5d59f0ba75ab212512565ed4c209bbb",
+          "actual_sha256": "aaba454eb0e84f835177082b174964c4d5d59f0ba75ab212512565ed4c209bbb"
+        },
+        {
+          "component": "workspace",
+          "status": "matched",
+          "expected_sha256": "8491fe763cda2f751a409241311562f31f10a90e2d327cf118c54c0798197494",
+          "actual_sha256": "8491fe763cda2f751a409241311562f31f10a90e2d327cf118c54c0798197494"
+        },
+        {
+          "component": "presets",
+          "status": "matched",
+          "expected_sha256": "7c0ed20cbd40da461df7a0ad50a47d338bac976d8bc3ef36726854a11cd245f2",
+          "actual_sha256": "7c0ed20cbd40da461df7a0ad50a47d338bac976d8bc3ef36726854a11cd245f2"
+        },
+        {
+          "component": "managed",
+          "status": "matched",
+          "expected_sha256": "0648f6a1fdaa1e589791ca9ad3ec316aef3497c712ac1a957271bc99875a00ca",
+          "actual_sha256": "0648f6a1fdaa1e589791ca9ad3ec316aef3497c712ac1a957271bc99875a00ca"
+        },
+        {
+          "component": "evaluation_implementation",
+          "status": "matched",
+          "expected_sha256": "89ac878a141e1341286a269d6053a0318249496164adbf64789c16f50af9d874",
+          "actual_sha256": "89ac878a141e1341286a269d6053a0318249496164adbf64789c16f50af9d874"
+        }
+      ]
+    }
+  },
+  "evidence": [
+    {
+      "case_id": "U-FLT-012",
+      "repeat_turn": 4,
+      "session_id": "session-7158ea16-08fc-487b-ba35-4aa3277eb16f",
+      "verdict": {
+        "case_id": "U-FLT-012",
+        "execution_status": "completed",
+        "verdict": "inconclusive",
+        "observation": "评审未产生有效结论，需人工判定。",
+        "evidence_ref": "evidence/U-FLT-012"
+      },
+      "tool_calls": [
+        {
+          "seq": 17,
+          "turn": 1,
+          "name": "skill",
+          "callId": "call_5ac136a8bee649948cecd64e"
+        },
+        {
+          "seq": 22,
+          "turn": 1,
+          "name": "mcp__soc-readonly__search_graph_assets",
+          "callId": "call_9b87062d7cbf4c0aaf954610"
+        },
+        {
+          "seq": 24,
+          "turn": 1,
+          "name": "mcp__sec-ops__search_graph_assets",
+          "callId": "call_ae14525f93d54ec4b8dc0071"
+        },
+        {
+          "seq": 26,
+          "turn": 1,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_6786f897a8e0458ba48b83f2"
+        },
+        {
+          "seq": 31,
+          "turn": 1,
+          "name": "mcp__sec-ops__get_soc_asset_by_asset_id",
+          "callId": "call_04c83946ef6245749ba249bd"
+        },
+        {
+          "seq": 33,
+          "turn": 1,
+          "name": "mcp__sec-ops__get_soc_asset_biz_systems",
+          "callId": "call_19189d7471d4470da6f6d370"
+        },
+        {
+          "seq": 38,
+          "turn": 1,
+          "name": "mcp__sec-ops__search_graph_assets",
+          "callId": "call_5b73a9019ec6410aa7a2350f"
+        },
+        {
+          "seq": 40,
+          "turn": 1,
+          "name": "mcp__sec-ops__get_graph_resolve_ip_host",
+          "callId": "call_ca2098bd12c740358ce452ff"
+        },
+        {
+          "seq": 42,
+          "turn": 1,
+          "name": "mcp__sec-ops__get_graph_resolve_ip_host",
+          "callId": "call_fa837f897bea457aa90b6319"
+        },
+        {
+          "seq": 47,
+          "turn": 1,
+          "name": "mcp__sec-ops__search_graph_assets",
+          "callId": "call_c8308a0197d94ccb8f97e44a"
+        },
+        {
+          "seq": 49,
+          "turn": 1,
+          "name": "mcp__sec-ops__get_graph_node_detail",
+          "callId": "call_eeb6d06760bb41a986f4ecf1"
+        },
+        {
+          "seq": 54,
+          "turn": 1,
+          "name": "mcp__sec-ops__get_graph_coverage",
+          "callId": "call_0bc0a3f8da6647689ba06d90"
+        },
+        {
+          "seq": 56,
+          "turn": 1,
+          "name": "mcp__sec-ops__get_ingest_devices_by_asset_by_asset_id",
+          "callId": "call_bc5ef8ba9b724432b063d1d8"
+        },
+        {
+          "seq": 69,
+          "turn": 2,
+          "name": "mcp__troubleshooting-compositions__diagnose_device_offline",
+          "callId": "call_6f4804bc3aff4493895b71c4"
+        },
+        {
+          "seq": 74,
+          "turn": 2,
+          "name": "mcp__troubleshooting-compositions__get_composition_run",
+          "callId": "call_4fb95fb869dd40af8841d9dc"
+        },
+        {
+          "seq": 79,
+          "turn": 2,
+          "name": "mcp__troubleshooting-compositions__get_composition_run",
+          "callId": "call_76c3b9b726b74d17bc8990c8"
+        },
+        {
+          "seq": 84,
+          "turn": 2,
+          "name": "mcp__troubleshooting-compositions__get_composition_artifact",
+          "callId": "call_fc14a1bcf8a1440aa5c5c378"
+        },
+        {
+          "seq": 97,
+          "turn": 3,
+          "name": "export_security_report",
+          "callId": "call_4543882581d54f5d871327dc"
+        },
+        {
+          "seq": 110,
+          "turn": 4,
+          "name": "export_security_report",
+          "callId": "call_0797b9661acd4ec29fe564f9"
+        }
+      ],
+      "native_runs": [
+        {
+          "seq": 69,
+          "turn": 2,
+          "name": "mcp__troubleshooting-compositions__diagnose_device_offline",
+          "input": {
+            "asset": {
+              "ip": "172.16.2.100",
+              "assetId": 3617448
+            },
+            "from": "2026-11-07T07:35:12Z",
+            "to": "2026-11-07T10:35:12Z"
+          },
+          "result_status": "accepted"
+        }
+      ],
+      "reports": [
+        {
+          "seq": 98,
+          "turn": 3,
+          "isError": false,
+          "kind": "fault",
+          "session_id": "session-7158ea16-08fc-487b-ba35-4aa3277eb16f",
+          "filename": "device-offline-report.html",
+          "content_type": "text/html; charset=utf-8",
+          "bytes": 66442,
+          "sha256": "5e12b3097f08fa929df4591b7470d3101358c256388ef3341598c828af8d48ba",
+          "attachment_id": "sha256:5e12b3097f08fa929df4591b7470d3101358c256388ef3341598c828af8d48ba",
+          "source": {
+            "kind": "fault-troubleshooting",
+            "parent_session_id": "session-7158ea16-08fc-487b-ba35-4aa3277eb16f",
+            "run_id": "run-644bf785-cc33-4400-bf6d-72b412fb22eb",
+            "composition_id": "troubleshooting-device-offline",
+            "workflow": "troubleshooting-device-offline",
+            "start_tool_name": "mcp__troubleshooting-compositions__diagnose_device_offline",
+            "start_registered_tool_name": "mcp__troubleshooting-compositions__diagnose_device_offline",
+            "start_call_id": "call_6f4804bc3aff4493895b71c4",
+            "start_turn": 2,
+            "start_step": 1,
+            "start_seq": 69,
+            "start_result_seq": 70,
+            "user_message_id": "907ebce1-4d48-4e54-970a-a4c6f598523e",
+            "request_seq": 67,
+            "request_sha256": "3be48fb89952e88e2c70cd8a947563223afda16ec226719cbbfb3754f461a91a",
+            "start_receipt_hash_scope": "native-tool-result.visible-text/v1",
+            "start_receipt_sha256": "c2b36994dbcf2b3216aabbf3f6f85c3eb64b61cb788f836eb81e0e50f9a0d04c",
+            "artifact_id": "report",
+            "original_filename": "device-offline-report.html",
+            "original_content_type": "text/html; charset=utf-8",
+            "original_sha256": "5e12b3097f08fa929df4591b7470d3101358c256388ef3341598c828af8d48ba",
+            "original_sha256_scope": "sha256-of-original-utf8-body",
+            "original_bytes": 66442,
+            "artifact_metadata": {
+              "id": "report",
+              "filename": "device-offline-report.html",
+              "contentType": "text/html; charset=utf-8",
+              "bytes": 66442
+            },
+            "artifact_response_metadata": {
+              "filename": "device-offline-report.html",
+              "contentType": "text/html; charset=utf-8"
+            },
+            "source_sha256": "18489bf38016cde257158b8d08af35e2d0400e476a47f94abb397edd7fa7a562"
+          }
+        },
+        {
+          "seq": 111,
+          "turn": 4,
+          "isError": false,
+          "kind": "fault",
+          "session_id": "session-7158ea16-08fc-487b-ba35-4aa3277eb16f",
+          "filename": "device-offline-report.html",
+          "content_type": "text/html; charset=utf-8",
+          "bytes": 66442,
+          "sha256": "5e12b3097f08fa929df4591b7470d3101358c256388ef3341598c828af8d48ba",
+          "attachment_id": "sha256:5e12b3097f08fa929df4591b7470d3101358c256388ef3341598c828af8d48ba",
+          "source": {
+            "kind": "fault-troubleshooting",
+            "parent_session_id": "session-7158ea16-08fc-487b-ba35-4aa3277eb16f",
+            "run_id": "run-644bf785-cc33-4400-bf6d-72b412fb22eb",
+            "composition_id": "troubleshooting-device-offline",
+            "workflow": "troubleshooting-device-offline",
+            "start_tool_name": "mcp__troubleshooting-compositions__diagnose_device_offline",
+            "start_registered_tool_name": "mcp__troubleshooting-compositions__diagnose_device_offline",
+            "start_call_id": "call_6f4804bc3aff4493895b71c4",
+            "start_turn": 2,
+            "start_step": 1,
+            "start_seq": 69,
+            "start_result_seq": 70,
+            "user_message_id": "907ebce1-4d48-4e54-970a-a4c6f598523e",
+            "request_seq": 67,
+            "request_sha256": "3be48fb89952e88e2c70cd8a947563223afda16ec226719cbbfb3754f461a91a",
+            "start_receipt_hash_scope": "native-tool-result.visible-text/v1",
+            "start_receipt_sha256": "c2b36994dbcf2b3216aabbf3f6f85c3eb64b61cb788f836eb81e0e50f9a0d04c",
+            "artifact_id": "report",
+            "original_filename": "device-offline-report.html",
+            "original_content_type": "text/html; charset=utf-8",
+            "original_sha256": "5e12b3097f08fa929df4591b7470d3101358c256388ef3341598c828af8d48ba",
+            "original_sha256_scope": "sha256-of-original-utf8-body",
+            "original_bytes": 66442,
+            "artifact_metadata": {
+              "id": "report",
+              "filename": "device-offline-report.html",
+              "contentType": "text/html; charset=utf-8",
+              "bytes": 66442
+            },
+            "artifact_response_metadata": {
+              "filename": "device-offline-report.html",
+              "contentType": "text/html; charset=utf-8"
+            },
+            "source_sha256": "18489bf38016cde257158b8d08af35e2d0400e476a47f94abb397edd7fa7a562"
+          }
+        }
+      ],
+      "repeat_other_calls": [],
+      "active_calls": []
+    },
+    {
+      "case_id": "U-FLT-016",
+      "repeat_turn": 3,
+      "session_id": "session-6a4ec97d-33ad-4f52-9f01-23d9cdd34cd5",
+      "verdict": {
+        "case_id": "U-FLT-016",
+        "execution_status": "error",
+        "verdict": "inconclusive",
+        "observation": "Runtime API 在 target-trace-export 阶段未完成，未产生语义结论。",
+        "evidence_ref": "evidence/U-FLT-016",
+        "failure_reason": "api-target-trace-export-failed"
+      },
+      "tool_calls": [
+        {
+          "seq": 17,
+          "turn": 1,
+          "name": "skill",
+          "callId": "call_d6024d4d5df14362892e72b9"
+        },
+        {
+          "seq": 22,
+          "turn": 1,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_56f00bc005504163a39edf0e"
+        },
+        {
+          "seq": 27,
+          "turn": 1,
+          "name": "read",
+          "callId": "call_a3704199263d4ecda6489f45"
+        },
+        {
+          "seq": 32,
+          "turn": 1,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_c1e97ad8935244bfbdf98d0a"
+        },
+        {
+          "seq": 34,
+          "turn": 1,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_52c2dda7b63540c2bbe5275f"
+        },
+        {
+          "seq": 39,
+          "turn": 1,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_ddb15281da7f4077968a42ec"
+        },
+        {
+          "seq": 41,
+          "turn": 1,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_a9ccb4018226440098d2e73d"
+        },
+        {
+          "seq": 43,
+          "turn": 1,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_b9c94206f8824fb28b380b5d"
+        },
+        {
+          "seq": 48,
+          "turn": 1,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_943589edf8534f189008c96f"
+        },
+        {
+          "seq": 50,
+          "turn": 1,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_30987e6369e24ce38818a53a"
+        },
+        {
+          "seq": 52,
+          "turn": 1,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_6fa8a6934f2f4e59b9a3271e"
+        }
+      ],
+      "native_runs": [],
+      "reports": [],
+      "repeat_other_calls": [],
+      "active_calls": []
+    },
+    {
+      "case_id": "U-FLT-017",
+      "repeat_turn": null,
+      "session_id": "session-cc38bff3-ef1b-4524-b5f5-51ab71771494",
+      "verdict": {
+        "case_id": "U-FLT-017",
+        "execution_status": "completed",
+        "verdict": "passed",
+        "observation": "语义判定：六项要求逐条核对均满足：工具轨迹中先以只读 SOC 资产列表真实读取候选（一次超时报错后重试成功，返回两台真实设备 172.16.138.240 与 172.16.138.210 及其在线证据），符合前置可取得两台真实设备且本会话未提供服务与时间窗口；第二轮仅冻结源目的方向并只澄清协议、单端口与带时区绝对时间三项影响诊断的参数，未擅设端口、未默认 24 小时、未启动条件不完整的诊断；取消回复明确说明尚未启动、未创建任何 Run，未声称取消不存在的运行；完整可见轨迹仅有 skill 读取与 SOC 只读查询，无诊断启动、探测或配置写入；同时未把候选列表当作澄清后的目标绑定已验证。 同一路由自评，仅作研究辅助。",
+        "evidence_ref": "evidence/U-FLT-017"
+      },
+      "tool_calls": [
+        {
+          "seq": 17,
+          "turn": 1,
+          "name": "skill",
+          "callId": "call_04a170a87123423394a5ca80"
+        },
+        {
+          "seq": 22,
+          "turn": 1,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_afa2cbc3228c459c9bde5230"
+        },
+        {
+          "seq": 27,
+          "turn": 1,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_1484caaf93fb42dc91d89582"
+        }
+      ],
+      "native_runs": [],
+      "reports": [],
+      "repeat_other_calls": [],
+      "active_calls": []
+    },
+    {
+      "case_id": "U-INS-024",
+      "repeat_turn": null,
+      "session_id": "session-fc6a736e-fc90-4acb-ab11-f08e1a22e5b0",
+      "verdict": {
+        "case_id": "U-INS-024",
+        "execution_status": "completed",
+        "verdict": "passed",
+        "observation": "语义判定：第一轮基于真实工具目录与 SOC 资产只读查询交付了巡检项说明和设备列表（94 台、第 1–2 页共 20 台、状态评估时间与 DATABASE_LOCAL 时区标注），全程未编造设备、未启动任何巡检；正向前置满足（存在真实候选 assetId 3617612 等）。第二轮沿同一列表绑定第一台，直接复用已取得的 assetId 3617612 发起一次常规巡检，未要求用户重填 ID，范围冻结为 1 台而非全部资产，也未扩展为漏洞扫描；同次回执与明细分别核对了状态（1 正常）、基线（1 未知，NO_TEMPLATE）与可达性（6 条规则均 unknown，并区分选择器故障与未匹配检查对）。启动回执为 accepted 后仅以原 run_id 续查，未重复创建运行，后续明细查询均沿用同一次运行标识；交付了实际冻结范围、各项结论、证据缺口与真实报告入口（同次 artifacts 中的 inspection-report.html/inspection-details.json），未把 completed 执行状态等同于全部正常。第三轮仅沿同次结果解释 P1–P3 优先级，明确区分异常（0 项）、数据缺失（无模板、无层级）与尚未核实（选择器是否全网受影响、离线信号过期），未重新巡检、未做任何修复，结论均有同次工具回执支撑。 同一路由自评，仅作研究辅助。",
+        "evidence_ref": "evidence/U-INS-024"
+      },
+      "tool_calls": [
+        {
+          "seq": 17,
+          "turn": 1,
+          "name": "skill",
+          "callId": "call_a2b3ed47c22f465eb39c6cc6"
+        },
+        {
+          "seq": 22,
+          "turn": 1,
+          "name": "read",
+          "callId": "call_8cfecaaa8ff34d4599818f42"
+        },
+        {
+          "seq": 24,
+          "turn": 1,
+          "name": "list_mcp_resources",
+          "callId": "call_6b2803a216044979a5bc299f"
+        },
+        {
+          "seq": 26,
+          "turn": 1,
+          "name": "list_mcp_resource_templates",
+          "callId": "call_f18ba428fd9a480684acc225"
+        },
+        {
+          "seq": 31,
+          "turn": 1,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_5e23c6a391394864a1ea2ca0"
+        },
+        {
+          "seq": 36,
+          "turn": 1,
+          "name": "grep",
+          "callId": "call_8f71b53e3b444334b11e51e9"
+        },
+        {
+          "seq": 41,
+          "turn": 1,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_d389cdb895904b53b526d24c"
+        },
+        {
+          "seq": 43,
+          "turn": 1,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_ddd72fedd1744218bc0595b1"
+        },
+        {
+          "seq": 56,
+          "turn": 2,
+          "name": "mcp__inspection-compositions__inspection_routine",
+          "callId": "call_87d5f0f985504d82ba21e4a6"
+        },
+        {
+          "seq": 61,
+          "turn": 2,
+          "name": "mcp__inspection-compositions__get_composition_run",
+          "callId": "call_664a3ddf44b74b51a363f720"
+        },
+        {
+          "seq": 66,
+          "turn": 2,
+          "name": "mcp__inspection-compositions__get_composition_details",
+          "callId": "call_1c2f06afab9841fd8fc79810"
+        },
+        {
+          "seq": 68,
+          "turn": 2,
+          "name": "mcp__inspection-compositions__get_composition_details",
+          "callId": "call_7f676946cf2840fcb3c672f7"
+        },
+        {
+          "seq": 73,
+          "turn": 2,
+          "name": "export_security_report",
+          "callId": "call_ef34e1989f3e4ba7880d0ce5"
+        }
+      ],
+      "native_runs": [],
+      "reports": [],
+      "repeat_other_calls": [],
+      "active_calls": []
+    },
+    {
+      "case_id": "U-QA-016",
+      "repeat_turn": null,
+      "session_id": "session-da42bf92-1747-4d27-b631-a93fe67f6260",
+      "verdict": {
+        "case_id": "U-QA-016",
+        "execution_status": "completed",
+        "verdict": "failed",
+        "observation": "语义判定：第一轮（index 0）按实际能力与限制介绍，起步建议以建议口吻呈现，未把计划写成既有功能，满足第1项；第二轮确实转为真实只读查询（list_soc_asset、合规违规查询等回执），列出94台设备构成、可辨认的离线设备IP/主机名、合规违规与采集异常查询结果，并注明来源、原始观测时间（2026-11-07 18:42–18:44 数据库本地时间、未擅自补时区）与范围，但回答正文自始至终未披露分页（页码、每页条数或分页边界），工具回执虽显示分页调用，回答层面缺少该项，第2项明确不满足；第3项真实查询数据非能力复述，0 条结论均来自成功回执，未知项（漏洞/基线 NO_DATA、本轮未查）如实保留为缺口，满足；第4项全程仅只读查询、读取 skill 与 grep，未启动巡检、扫描、处置或配置修改，满足。因第2项要求的分页披露缺失，整体判 failed。 同一路由自评，仅作研究辅助。",
+        "evidence_ref": "evidence/U-QA-016"
+      },
+      "tool_calls": [
+        {
+          "seq": 25,
+          "turn": 2,
+          "name": "skill",
+          "callId": "call_1d4c32a530bd4edf9f80ab62"
+        },
+        {
+          "seq": 30,
+          "turn": 2,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_5a72b353e2f340d894aea22c"
+        },
+        {
+          "seq": 32,
+          "turn": 2,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_4d2be496ce1f4dc2b363172a"
+        },
+        {
+          "seq": 37,
+          "turn": 2,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_f487c8a975ec4b17b284a586"
+        },
+        {
+          "seq": 39,
+          "turn": 2,
+          "name": "mcp__sec-ops__get_graph_compliance_violations",
+          "callId": "call_9b16897f46ed4ef980c6b3c4"
+        },
+        {
+          "seq": 44,
+          "turn": 2,
+          "name": "grep",
+          "callId": "call_e4579edf8101495997ccc31a"
+        },
+        {
+          "seq": 46,
+          "turn": 2,
+          "name": "grep",
+          "callId": "call_0a920a603da94372b1bf3888"
+        },
+        {
+          "seq": 51,
+          "turn": 2,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_c0f47a695a39413da2d311c9"
+        },
+        {
+          "seq": 53,
+          "turn": 2,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_561bdd6fd9d24e199af9468e"
+        },
+        {
+          "seq": 55,
+          "turn": 2,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_8c5e3aea3a9241daa0281020"
+        },
+        {
+          "seq": 57,
+          "turn": 2,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_6f8d2e9ebe7d4cbd9130050e"
+        },
+        {
+          "seq": 59,
+          "turn": 2,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_696a5dfb9c074adaadd67cb8"
+        },
+        {
+          "seq": 61,
+          "turn": 2,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_197c93897d9b40ef8241811b"
+        },
+        {
+          "seq": 63,
+          "turn": 2,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_36bb9da8cbd94dd182908529"
+        },
+        {
+          "seq": 65,
+          "turn": 2,
+          "name": "mcp__soc-readonly__list_soc_asset",
+          "callId": "call_6a30ef8d20fe4e56a89ed164"
+        }
+      ],
+      "native_runs": [],
+      "reports": [],
+      "repeat_other_calls": [],
+      "active_calls": []
+    }
+  ]
+}

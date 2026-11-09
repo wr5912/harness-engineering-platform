@@ -193,7 +193,7 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
       candidate_sha256: inputs.candidate_sha256, evaluation_sha256: inputs.evaluation_sha256,
       program_origin: inputs.program_origin, evaluation_implementation: inputs.evaluation_implementation,
       source_ref: inputs.source_ref, evaluation_source: inputs.evaluation_source, mcp_fixture: inputs.mcp_fixture, sessions: [], instance_name: null })
-    try { const execution = JSON.parse(readFileSync(join(run.path, 'execution.json'), 'utf8')); for (const name of ['instance_name', 'instance_stopped', 'failure_reason', 'deadline_at']) result[name] = execution[name] } catch {}
+    try { const execution = JSON.parse(readFileSync(join(run.path, 'execution.json'), 'utf8')); for (const name of ['instance_name', 'instance_owned', 'instance_stopped', 'cleanup_complete', 'failure_reason', 'deadline_at']) result[name] = execution[name] } catch {}
     if (!full) return result
     const sessions = new Set<string>(), traces: UsageTrace[] = []
     const walk = (folder: string) => {
@@ -504,9 +504,10 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
           catch (error) { settle(error as Error) }
           return
         }
-        job.status = job.result?.cancelled === true ? job.result.instance_stopped === true ? 'cancelled' : 'failed'
+        const cleaned = job.result?.instance_stopped === true || (job.result?.instance_owned === false && job.result?.cleanup_complete === true)
+        job.status = job.result?.cancelled === true ? cleaned ? 'cancelled' : 'failed'
           : FINAL.has(run.manifest.status) ? run.manifest.status : code === 0 ? 'completed' : 'failed'
-        if (job.result?.cancelled === true && job.result.instance_stopped !== true) job.error = '取消后的实例停止尚未确认，请核对 Run 与实例状态。'
+        if (job.result?.cancelled === true && !cleaned) job.error = '取消后的评测清理尚未确认，请核对 Run、会话与实例状态。'
         save(job); settle()
       })
     })

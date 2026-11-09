@@ -1,0 +1,47 @@
+{
+  "at": "2026-11-07T06:21:44.540Z",
+  "base": "http://172.16.138.228:18120/hep/",
+  "mode": "actual browser, no overlays or mocked platform responses",
+  "graphs": [
+    {
+      "id": "troubleshooting-business-access",
+      "root_nodes": 6,
+      "branch_nodes": 26,
+      "condition_nodes": 2,
+      "condition_labels": [
+        "源SOC状态",
+        "目标SOC状态",
+        "源关联告警",
+        "目标关联告警",
+        "配置路径",
+        "TCP结果",
+        "TCP已连接",
+        "连接被拒绝",
+        "连接被拒绝",
+        "连接超时",
+        "连接超时",
+        "连接结果未知"
+      ],
+      "expanded_and_returned": true
+    },
+    {
+      "id": "troubleshooting-device-offline",
+      "root_nodes": 6,
+      "branch_nodes": 20,
+      "condition_nodes": 3,
+      "condition_labels": [
+        "状态证据",
+        "关联告警",
+        "管理观察",
+        "本次已响应",
+        "唯一绑定",
+        "绑定缺口",
+        "响应未核实",
+        "无回复"
+      ],
+      "nested_nodes": 10,
+      "expanded_and_returned": true
+    }
+  ],
+  "page_errors": []
+}

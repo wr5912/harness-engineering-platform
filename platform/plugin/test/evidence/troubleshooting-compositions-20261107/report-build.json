@@ -1,0 +1,41 @@
+{
+  "experiment_id": "EXP-security-operations-expert-027-f-r3ba4799b0cb7",
+  "schema_version": 1,
+  "entry_path": "dsh/managed/security-report-runtime.ts",
+  "output_path": "dsh/managed/security-report-runtime.mjs",
+  "compiler": {
+    "typescript": "5.9.3",
+    "esbuild": "0.25.12",
+    "platform_lock_sha256": "bc5f36eb3e9ab14dd711dec75e1d5a4a92d6dd278ad4652baaaaaff090b9183b"
+  },
+  "dependencies_sha256": null,
+  "source_files": [
+    {
+      "path": "dsh/managed/security-report-runtime.ts",
+      "sha256": "731b5bb13679a42b3fd09ca78a1a0693a6e66946686c1cb7d0ad691fcd9239f6"
+    },
+    {
+      "path": "dsh/managed/security-report-source.d.mts",
+      "sha256": "e0e7c831647c9d3dcc050d52ff7cac8ea66d02d09d507a95f04e65321105a86c"
+    },
+    {
+      "path": "dsh/managed/security-report-source.mjs",
+      "sha256": "40daacb1af53693a15bb36e7b07d5d86838966bc0d7380de4026b0161190f288"
+    }
+  ],
+  "source_sha256": "376631f18a610eeafee69785e0911d1414fbaf33678105341c54bb7daecc1e9e",
+  "platform_sources": [
+    {
+      "path": "runtime/adapters/dsh-web/src/resolve-runtime.ts",
+      "sha256": "69e91bb7ff19f8e6f79694988ccf54d49e1a0a19675c33f59b3f7cc64a55bf1b"
+    }
+  ],
+  "platform_sources_sha256": "af539f1f3eb7a2bc3cfd4456124f15cff8e65abf4333aea55e756823d4b36d3d",
+  "source_inputs_version": 1,
+  "runtime_imports": [
+    "node:crypto"
+  ],
+  "build_digest": "2157aa0462aea6f5da13c4c2fdd10b86549b7b46fb2ab590768aeb7ff60e3131",
+  "esm_sha256": "c358d85820ee8f2df7a80d39c871c2096a35ddb6b847d585aa2e5ebef2086161",
+  "candidate_sha256": "f40f562fb50f442da822e02ca74d05f094f99c7a4be87248a58c241c968a0008"
+}

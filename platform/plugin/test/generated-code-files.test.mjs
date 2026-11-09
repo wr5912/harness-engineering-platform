@@ -70,7 +70,7 @@ test('编排源码仅展开同源LFX包、批量内部流程和固定子编排�
     const childEntry = { id: 'leaf' }; publishCompositionVersion(childEntry, child)
     const native = nativeFlow('batch')
     native.data.nodes[0].data.type = 'HepBatch'
-    native.data.nodes[0].data.node.template.body = { value: nativeFlow('nested') }
+    native.data.nodes[0].data.node.template.body = { show: true, value: nativeFlow('nested') }
     const childNode = nativeFlow('child').data.nodes[0]; childNode.data.type = 'HepChild'; childNode.data.node.is_output = false
     Object.assign(childNode.data.node.template, { composition_id: { value: 'leaf' }, version_id: { value: childEntry.publishedVersionId } })
     native.data.nodes.push(childNode)

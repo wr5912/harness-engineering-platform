@@ -1,0 +1,12 @@
+{
+  "scope": "HEAD plus only this task selected changes in an isolated data tree; other tasks excluded",
+  "report_regressions": {
+    "passed": 400,
+    "failed": 0
+  },
+  "composition_contracts": {
+    "passed": 56,
+    "failed": 0
+  },
+  "external_soc": "Contract tests replace only the external SOC boundary; real receipts and browser evidence are recorded separately."
+}

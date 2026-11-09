@@ -5,7 +5,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
-import { businessSourceDigest, readBusinessLaunchConfig, renderBusinessInstance } from './business.ts'
+import { businessSourceDigest, readBusinessLaunchConfig, renderBusinessInstance, syncSourceMcp } from './business.ts'
 import { mcpCredentialPaths } from '../../../platform/plugin/src/mcp/credential-path.ts'
 const require = createRequire(new URL('../../../platform/plugin/package.json', import.meta.url))
 const yaml = require('js-yaml')
@@ -33,6 +33,30 @@ function fixture(t) {
       command: ['--patch', 'managed.patch.yml', '--no-open', '--host', '127.0.0.1', '--port', '53191'], environment: [], volumes: [] } } }) }
   return { root, config, file, input, managed }
 }
+
+test('显式同步来源 MCP 只替换服务连接，预览不写入，过期设置拒绝覆盖', t => {
+  const f = fixture(t), seed = join(f.managed, 'web-profile.seed.patch.yml'), settings = join(f.root, 'settings.yml')
+  const rows = [{ id: 'native-model', config: { model: 'retained' } }, { insert: [{ id: 'mcp-session-manager',
+    name: 'file:///opt/dsh-managed/mcp-manager/index.mjs', config: { servers: [{ id: 'old', url: 'http://old.invalid' }], groups: ['retained'], timeout: 321 } }] }]
+  writeFileSync(settings, yaml.dump(rows))
+  const original = readFileSync(settings, 'utf8'), preview = syncSourceMcp(settings, seed)
+  assert.deepEqual(preview.previous_server_ids, ['old'])
+  assert.deepEqual(preview.server_ids, ['soc'])
+  assert.equal(readFileSync(settings, 'utf8'), original)
+  writeFileSync(settings, original + '\n')
+  assert.throws(() => syncSourceMcp(settings, seed, true, preview.before_digest), /已变化/)
+  assert.equal(readFileSync(settings, 'utf8'), original + '\n')
+  const applied = syncSourceMcp(settings, seed, true)
+  assert.equal(applied.applied, true)
+  const saved = yaml.load(readFileSync(settings, 'utf8'))
+  rows[1].insert[0].config.servers = [{ id: 'soc', url: 'http://host.docker.internal:53101/mcp' }]
+  assert.deepEqual(saved, rows)
+  assert.equal(syncSourceMcp(settings, seed).changed, false)
+  writeFileSync(seed, yaml.dump([{ insert: [{ ...rows[1].insert[0], config: { servers: [{ id: 'soc' }, { id: 'soc' }] } }] }]))
+  const beforeFailure = readFileSync(settings, 'utf8')
+  assert.throws(() => syncSourceMcp(settings, seed, true), /重复/)
+  assert.equal(readFileSync(settings, 'utf8'), beforeFailure)
+})
 
 test('启动配置只读核验，拒绝容器不可达协调器、未构建插件及短密钥', t => {
   const f = fixture(t)
@@ -383,4 +407,28 @@ test('固定来源中的平台分组连接随部署入口装配，不改写资�
   assert.equal(patch.config.watch, "process.env.DSH_HARNESS_MODE === 'authoring'")
   assert.match(result.patch, /!!js/)
   assert.equal(readFileSync(file, 'utf8'), original)
+})
+
+// 只装配声明引用；没有业务组硬编码，也不连接fixture以外来源。
+test('旧运行设置保留其它组，来源新增的显式组引用仍传给实际provider', t => {
+  const f = fixture(t), source = join(f.managed, 'web-profile.seed.patch.yml')
+  const rows = yaml.load(readFileSync(source, 'utf8'))
+  const dependency = { id: 'declared-group', members: [{ serverId: 'referenced-source', names: ['allowed-operation'], resourceUris: [], resourceTemplates: ['fixture://task/{taskId}'] }] }
+  rows[0].insert[0].config.groups = [dependency]
+  writeFileSync(source, yaml.dump(rows))
+  const settings = join(f.root, 'settings.yml'), retained = { id: 'retained-group', members: [{ serverId: 'soc', names: ['old-operation'] }] }
+  const old = structuredClone(rows); old[0].insert[0].config.groups = [retained]
+  writeFileSync(settings, yaml.dump(old))
+  const sourceBefore = readFileSync(source), settingsBefore = readFileSync(settings)
+  const rendered = renderBusinessInstance(f.config, { ...f.input, runtimeSettings: settings })
+  const manager = yaml.load(rendered.patch).flatMap(item => item.insert ?? []).find(item => item.id === 'business-mcp-manager')
+  assert.deepEqual(manager.config.groups, [retained, dependency])
+  assert.deepEqual(manager.config.servers, rows[0].insert[0].config.servers, '成员引用不被转为所有角色的底层客户端')
+  assert.deepEqual(readFileSync(source), sourceBefore)
+  assert.deepEqual(readFileSync(settings), settingsBefore)
+  assert.equal(JSON.stringify(manager.config).includes('fixture-token'), false)
+  old[0].insert[0].config.groups.push({ ...dependency, members: [{ serverId: 'soc', names: ['retained-operation'] }] })
+  writeFileSync(settings, yaml.dump(old))
+  const sameId = yaml.load(renderBusinessInstance(f.config, { ...f.input, runtimeSettings: settings }).patch).flatMap(item => item.insert ?? []).find(item => item.id === 'business-mcp-manager')
+  assert.deepEqual(sameId.config.groups, old[0].insert[0].config.groups, '不静默覆盖运行设置中已有同ID选择')
 })

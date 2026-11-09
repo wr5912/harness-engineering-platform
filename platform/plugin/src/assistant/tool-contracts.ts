@@ -13,6 +13,7 @@ export const assistantActions: Record<AssistantDomain, readonly string[]> = {
 
 const string = { type: 'string' }, strings = { type: 'array', items: string }, object = { type: 'object', additionalProperties: true }
 const fields: MapValue = {
+  apply_source_mcp: { type: 'boolean', description: '仅 reload：显式将当前来源的 MCP 服务连接同步到实例，保留其他 HOME 设置；默认保留实例原连接。先核对预览中的连接身份和实际装载。' },
   training_files: { type: 'array', items: { type: 'object', required: ['path', 'sha256'], additionalProperties: false, properties: { path: string, sha256: { type: 'string', pattern: '^[a-f0-9]{64}$' } } }, description: 'prepare 归档的补充训练依赖，如模型配置、tokenizer 和状态构造器资源；逐文件核对摘要并保持原相对目录，不复制缓存或整个目录。已归档依赖随后从回执复用。' },
   version_number: { type: 'integer', minimum: 1, maximum: 999, description: '可选编号；启用 m/f 后只能等于当前代，创建同代 f 特性副本。省略时仍保留当前代；下一代 m 只能由用户明确 create_next_generation 创建，先处置未合并特性。随机后缀由平台生成。' },
   version_role: { type: 'string', enum: ['m', 'f'], description: '同一 Agent、同一版本号只允许一个 m，可有多个 f；同号副本为 f，明确创建下一代为 m。不同后缀不能用于额外创建 m。' },
@@ -59,14 +60,14 @@ const fields: MapValue = {
   bindings: object, artifact_export: object, files: { type: 'array', items: object }, configuration_edits: { type: 'array', items: object },
   items: { type: 'array', items: object }, expected_device_ids: strings, required_case_ids: strings, required_tool_names: strings,
   agents: { type: 'array', items: object }, scope: object, deniedActions: strings,
-  sessionId: string, restrictionId: string, reason: string, action: string, instanceName: string, compositionIds: strings,
+  sessionId: string, restrictionId: string, reason: string, action: string, instanceName: string, instance_name: string, compositionIds: strings,
 }
 type Hint = [actions: string, input: string, note?: string]
 // 这里是模型的逐操作用法索引，不是第二套业务校验器；完整语义仍由原接口处理。
 const hints: Record<AssistantDomain, Hint[]> = {
   instances: [
     ['list', ''], ['detail url', 'name'], ['logs', 'name tail'],
-    ['preview run', 'name operation source port allow_missing_env business_control access_mode identity_mode model_selection', 'operation=create/start/stop/restart/reload/delete；reload 只重载运行中实例，内部先预览并绑定资产和运行代次摘要，保留 HOME、会话、端口、模型和网关身份，核验实际加载回执；批量逐项返回结果，不自动重放失败或未知写请求；创建必须传明确的 experiment:<ID> 来源。创建业务实例默认且必须经过统一网关，默认 access_mode=anonymous、identity_mode=development；可明确选择 authenticated 或 published。网关不可用时说明原因并修复配置，禁止省略参数或传 false 改为直连。独立研究评测使用 agents/eval 入口，不用业务实例创建接口绕过网关。用户要求最新版本时，先用 agents/detail 的 versions[0].id 确定版本，再作为 source 传入；默认 detail.experiment 可能是已启用版本，不等于最新版本。直接调用 run 即可由平台内部预览并核对模型、业务来源摘要与访问设置，按 DSH 原生权限执行；无需另调 preview 或额外索取确认。业务实例创建后用 instances/url 取统一网关入口，不要把容器直连端口当作业务链接。'],
+    ['preview run', 'name operation source port allow_missing_env business_control access_mode identity_mode model_selection apply_source_mcp', 'operation=create/start/stop/restart/reload/delete；reload 只重载运行中实例，内部先预览并绑定资产和运行代次摘要，保留 HOME、会话、端口、模型和网关身份，核验实际加载回执；批量逐项返回结果，不自动重放失败或未知写请求；创建必须传明确的 experiment:<ID> 来源。创建业务实例默认且必须经过统一网关，默认 access_mode=anonymous、identity_mode=development；可明确选择 authenticated 或 published。网关不可用时说明原因并修复配置，禁止省略参数或传 false 改为直连。独立研究评测使用 agents/eval 入口，不用业务实例创建接口绕过网关。用户要求最新版本时，先用 agents/detail 的 versions[0].id 确定版本，再作为 source 传入；默认 detail.experiment 可能是已启用版本，不等于最新版本。直接调用 run 即可由平台内部预览并核对模型、业务来源摘要与访问设置，按 DSH 原生权限执行；无需另调 preview 或额外索取确认。业务实例创建后用 instances/url 取统一网关入口，不要把容器直连端口当作业务链接。'],
     ['batch-preview batch', 'items', 'items 为多个与 run 相同的操作对象；逐项核对结果，部分失败不能称为全部完成。'],
   ],
   mcp: [
@@ -123,7 +124,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
     ['cases/delete', 'experiment_id case_id expected_sha256', '先 cases/read 核对用例及原摘要。删除当前共用用例，至少保留一个；历史 Run 冻结口径与结果不变。写入沿用版本治理及摘要校验。'],
     ['cases/from-run', 'agent_id experiment_id run_id case_id'],
     ['cases/update cases/create-preview cases/create', 'agent_id experiment_id case_id title scene inputs expected_behavior fast expected_sha256 source_run_id source_case_id', '先读用例或 create-context，并按 evaluation-review 核对共用业务口径；预期写业务过程与结果模式，使用已核验 API 名称、operationId 或中文能力名，不绑定 MCP 运行时 ID、KEV 等实现路线或特定环境。inputs 为非空字符串数组，expected_sha256 取原文件摘要。新建先 create-preview。'],
-    ['eval/preview eval/start', 'source source_ref evaluation_source mcp_fixture cases mode executor review model model_selection compare_to artifact_export concurrency parallel_cases program_root', 'source=experiment:<ID>；cases 为固定 Case ID 数组。source_ref 可固定历史来源；evaluation_source=current 明确改用当前 Case，不改变固定 Candidate。program_root 可指定已构建的隔离程序根，沿用平台模型投影和凭据注入；程序来源由 Run 如实封存。mcp_fixture 明确 Mock 边界并随 Run 封存，不修改原连接或 Candidate，不代表真实业务系统验收。model 是原有断言，model_selection 是本次主角色原生模型选择；省略时读取所选来源的版本绑定。preview 不执行评测，返回唯一预留 run_id。start 必须携带该 run_id 与相同参数，真实 Run 创建后返回同一编号。刷新、断线和旧请求恢复只能 status 查询；不存在或过期时重新 preview，不能重发原启动。旧 Skill 的 job_id 为旧输入名，以当前合同及真实回执为准。'],
+    ['eval/preview eval/start', 'source source_ref evaluation_source mcp_fixture cases mode executor review model model_selection compare_to artifact_export concurrency parallel_cases program_root instance_name', 'source=experiment:<ID>；cases 为固定 Case ID 数组。source_ref 可固定历史来源；evaluation_source=current 明确改用当前 Case，不改变固定 Candidate。instance_name 可复用来源、模型、镜像及实际装载一致的既有实例，完成或取消均不停止该实例；不兼容 mcp_fixture。program_root 可指定已构建的隔离程序根，沿用平台模型投影和凭据注入；程序来源由 Run 如实封存。mcp_fixture 明确 Mock 边界并随 Run 封存，不修改原连接或 Candidate，不代表真实业务系统验收。model 是原有断言，model_selection 是本次主角色原生模型选择；省略时读取所选来源的版本绑定。preview 不执行评测，返回唯一预留 run_id。start 必须携带该 run_id 与相同参数，真实 Run 创建后返回同一编号。刷新、断线和旧请求恢复只能 status 查询；不存在或过期时重新 preview，不能重发原启动。旧 Skill 的 job_id 为旧输入名，以当前合同及真实回执为准。'],
     ['eval/batch-start', 'requests', '先逐项preview取得不同的run_id，每项固定source_ref和原参数，再启动1–8个独立Run；整批核对预留，按序创建，失败即停止未开始项。返回runs、failed和not_started；已创建Run不回滚。断线只逐项status查询，不自动重发整批；失败或未开始项须重新preview。'],
     ['eval/status eval/cancel', 'run_id', '使用预览及启动返回的同一Run ID。status也查询尚未启动或正在创建的预留；cancel可撤销未消费预留。旧job_id输入仅兼容查询原运行或取消原对象，不创建新评测。'], ['runs/index', 'agent_id experiment_id'],
     ['runs/delete', 'run_ids', '永久删除指定评测的结果、报告和证据，仅允许已结束且进程已退出的 Run；逐条返回 deleted 与 failed，部分失败只重试失败项。删除前核对用户指定的记录及范围。结果未知时先 runs/index 查询，不自动重放。'],

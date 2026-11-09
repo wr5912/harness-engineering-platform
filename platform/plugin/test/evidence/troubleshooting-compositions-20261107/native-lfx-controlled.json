@@ -1,0 +1,41 @@
+{
+  "at": "2026-11-07T06:21:59.719Z",
+  "results": [
+    {
+      "id": "troubleshooting-business-access",
+      "ok": true,
+      "external_boundary": "Only external SOC boundary mocked; actual official LFX and formal flow/TypeScript components",
+      "flow_sha256": "f3943ec9db5777a401fa540bac64b4603a9b25ccf82d68b431e37ad0d883cdb7",
+      "component_sha256": "f990159ab2cb2a49be5adebdd5574e2fbf85267008e68d16877c3e1561c828ea",
+      "calls": 7,
+      "result_status": "incomplete",
+      "active_checks_executed": false,
+      "facts": 8,
+      "independent_successor": {
+        "node": "root/checks[5]/tcp-unknown",
+        "at": 8194.131819,
+        "slow_alert_node": "root/checks[2]/source-alerts",
+        "slow_alert_at": 9141.223422
+      },
+      "advance_ms": 947.0916029999989
+    },
+    {
+      "id": "troubleshooting-device-offline",
+      "ok": true,
+      "external_boundary": "Only external SOC boundary mocked; actual official LFX and formal flow/TypeScript components",
+      "flow_sha256": "0dd21435788c498762f91005adcddc653233f0dcaf1c221b90a16691e5a98547",
+      "component_sha256": "d74bc9710988c40501a277508336364aeba720f3235bc9ed22ca7d6058002a71",
+      "calls": 5,
+      "result_status": "incomplete",
+      "active_checks_executed": false,
+      "facts": 6,
+      "independent_successor": {
+        "node": "root/offline-batch[2]/unknown-gap",
+        "at": 11552.826101,
+        "slow_alert_node": "root/offline-batch[1]/alerts",
+        "slow_alert_at": 12530.847895
+      },
+      "advance_ms": 978.0217940000002
+    }
+  ]
+}

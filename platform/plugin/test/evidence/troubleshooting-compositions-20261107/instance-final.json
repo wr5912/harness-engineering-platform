@@ -1,0 +1,39 @@
+{
+  "at": "2026-11-07T10:29:45.048Z",
+  "name": "inspection-027-schedule-acceptance",
+  "source_id": "experiment:EXP-security-operations-expert-027-f-r3ba4799b0cb7",
+  "state": "running",
+  "port": 18502,
+  "image_id": "sha256:c06d4e1fecc66f175a2fbeaa51e96ea0b2af8f58be22f89edac73df3c779bece",
+  "image_build_fingerprint": "sha256:2ed0d15ad02e05605d5ffb34986f149efb399d1a9331d21eceae9735b4ebfaca",
+  "session_preset": "security-operations-expert",
+  "home_directory": "/home/cmp/harness-engineering-platform-data/.local/instances/inspection-027-schedule-acceptance/dsh-home",
+  "home_preserved": true,
+  "asset_status": {
+    "changed_files": [],
+    "checked_at": "2026-11-07T10:29:39.900Z",
+    "current_digest": "sha256:11945c0ebb824528732190185efdaf4ae10b069bf86cf737c101eeb0cb361633",
+    "generation_digest": "sha256:d5879c313319897da11897fecafe53b6086e250756813ef704cc6baaa38a4469",
+    "last_attempt": {
+      "at": "2026-11-07T10:26:42.924Z",
+      "message": "实际加载已核验",
+      "status": "verified"
+    },
+    "loaded": {
+      "configuration_digest": "sha256:97c0be729d267a4a020afc2168941cc0b6b5fc40c4e6cb99d44cf04f7b8d8709",
+      "container_id": "ce1e49cb07465da159483bd60102b8d99a6aee1c4e424b7ce03900a8f2b7e2b8",
+      "digest": "sha256:11945c0ebb824528732190185efdaf4ae10b069bf86cf737c101eeb0cb361633",
+      "files_digest": "sha256:9f74c59a5e9ef2892dedc3e54a362f26699acb93bc464eeee76f5c3d9cf61a4c",
+      "loaded_at": "2026-11-07T10:26:42.924Z",
+      "nonce": "83d66ccc0da7e35df20b675eece332c4",
+      "ok": true,
+      "pid": 7,
+      "preset_id": "security-operations-expert",
+      "source_id": "experiment:EXP-security-operations-expert-027-f-r3ba4799b0cb7",
+      "started_at": "2026-11-07T10:26:32.995347927Z",
+      "verification": "runtime-observer"
+    },
+    "reason": "运行代次与加载回执一致",
+    "status": "current"
+  }
+}

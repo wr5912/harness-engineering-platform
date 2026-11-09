@@ -115,7 +115,9 @@ if (args[0] === 'ps') {
       const identityMode = args.includes('--business-identity-mode') ? args[args.indexOf('--business-identity-mode')+1] : prior.identity_mode || 'published'
       require('node:fs').mkdirSync(require('node:path').dirname(file), {recursive:true})
       require('node:fs').writeFileSync(file, JSON.stringify({name, source_id:source, agent_id:'real-agent', asset_root:process.env.HARNESS_ASSET_ROOT, port:3199, web_base_path:'/agents/real-agent/instances/' + name + '/', business_control:{source_digest:sourceDigest, runtime_generation:'generation-new', origin:'http://127.0.0.1:3199',access_mode:accessMode,identity_mode:identityMode,launch_config_file:args[args.indexOf('--business-control')+1]}}))
-      const register = () => require('node:child_process').execFileSync(process.execPath, ['--experimental-strip-types', ${JSON.stringify(new URL('../../../runtime/adapters/dsh-container/business.ts', import.meta.url).pathname)}, '--register', process.env.HARNESS_ASSET_ROOT, name, prior.source_digest || ''], {stdio:['ignore','pipe','pipe']})
+      const accessFile = require('node:path').join(process.env.HARNESS_ASSET_ROOT, 'config/business-access.json')
+      const registered = JSON.parse(require('node:fs').readFileSync(accessFile)).gateway.instances.find(item => item.instanceId === name)
+      const register = () => require('node:child_process').execFileSync(process.execPath, ['--experimental-strip-types', ${JSON.stringify(new URL('../../../runtime/adapters/dsh-container/business.ts', import.meta.url).pathname)}, '--register', process.env.HARNESS_ASSET_ROOT, name, registered?.sourceDigest || prior.source_digest || ''], {stdio:['ignore','pipe','pipe']})
       const failure = require('node:path').join(__dirname,'fail-next-start'), failed = require('node:path').join(__dirname,'startup-failed')
       if(require('node:fs').existsSync(failure)){require('node:fs').unlinkSync(failure);require('node:fs').writeFileSync(failed,'network unavailable');if(prior.source_digest) register();process.stderr.write('network unavailable');process.exit(1)}
       register()
@@ -216,7 +218,7 @@ test('重载由同一 CLI 执行并冻结来源与代次；停止、冲突、未
   writeFileSync(join(adapter, 'bad-load-receipt'), 'unknown')
   assert.equal((await handler('run', request, signal)).value.ok, false)
   rmSync(join(adapter, 'bad-load-receipt'))
-  const succeeded = await handler('run', request, signal)
+  const succeeded = await handler('run', { ...request, apply_source_mcp: true }, signal)
   assert.equal(succeeded.value.ok, true, JSON.stringify(succeeded))
   assert.equal(succeeded.value.value.value.asset_status.loaded.verification, 'runtime-observer')
   mkdirSync(join(fx.state, 'dsh-dev/fail-one'))
@@ -227,6 +229,9 @@ test('重载由同一 CLI 执行并冻结来源与代次；停止、冲突、未
   const calls = readFileSync(join(adapter, 'dsh-dev.calls'), 'utf8').trim().split('\n').map(line => JSON.parse(line))
   const writes = calls.filter(args => args[0] === 'reload' && !args.includes('--dry-run'))
   assert.equal(writes.length, 7)
+  assert.ok(writes.some(args => args.includes('--apply-source-mcp')))
+  const invalidSync = await handler('preview', { operation: 'start', name: 'running-one', apply_source_mcp: true }, signal)
+  assert.equal(invalidSync.ok, false)
   assert.ok(writes.every(args => !args.includes('--port') && !args.includes('--source') && args.includes('--expected-generation-digest')))
   assert.equal(calls.some(args => args[0] === 'up' || args[0] === 'down'), false)
 })
@@ -498,9 +503,25 @@ test('平台省略网关参数仍创建匿名开发网关实例，原子登记�
   assert.equal(JSON.parse(readFileSync(accessPath, 'utf8')).gateway.instances.length, 1)
   assert.equal(JSON.parse(readFileSync(accessPath, 'utf8')).gateway.instances[0].accessMode, 'anonymous', '同名实例重启保留无需认证方式')
   assert.equal(JSON.parse(readFileSync(accessPath, 'utf8')).gateway.instances[0].identityMode, 'development', '同名实例重启保留开发阶段')
+  const staleAccess = JSON.parse(readFileSync(accessPath, 'utf8'))
+  staleAccess.gateway.instances[0].sourceDigest = 'sha256:' + 'a'.repeat(64)
+  writeFileSync(accessPath, JSON.stringify(staleAccess))
   writeFileSync(join(fx.root, 'runtime/adapters/dsh-container/next-source-digest'), 'changed')
   const refreshed = await handler('preview', restart, signal)
   assert.equal(refreshed.value.plan.business_control.source_digest, 'sha256:' + 'c'.repeat(64))
+  const manifestPath = join(fx.state, 'dsh-dev', name, 'instance.json')
+  const interrupted = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  interrupted.business_control.source_digest = refreshed.value.plan.business_control.source_digest
+  interrupted.asset_reload_attempt = { status: 'unknown' }
+  writeFileSync(manifestPath, JSON.stringify(interrupted))
+  const recovered = await handler('run', { operation: 'start', name, expected_source_id: source,
+    expected_source_digest: refreshed.value.plan.business_control.source_digest }, signal)
+  assert.equal(recovered.value.ok, true, JSON.stringify(recovered))
+  assert.equal(JSON.parse(readFileSync(accessPath, 'utf8')).gateway.instances[0].sourceDigest,
+    refreshed.value.plan.business_control.source_digest, '中断重载后的实例清单摘要变化可沿网关旧登记恢复')
+  const settled = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  settled.asset_reload_attempt = { status: 'verified' }
+  writeFileSync(manifestPath, JSON.stringify(settled))
   writeFileSync(join(fx.root, 'runtime/adapters/dsh-container/fail-next-start'), 'network unavailable')
   const failedRestart = await handler('run', { ...restart, expected_source_digest: refreshed.value.plan.business_control.source_digest }, signal)
   assert.equal(failedRestart.value.ok, false)
@@ -522,7 +543,7 @@ test('平台省略网关参数仍创建匿名开发网关实例，原子登记�
   assert.equal(JSON.parse(readFileSync(accessPath, 'utf8')).gateway.instances[0].sourceDigest, 'sha256:' + 'b'.repeat(64))
   const calls = readFileSync(join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls'), 'utf8').trim().split('\n').map(line => JSON.parse(line))
   assert.ok(calls.filter(args => args[0] === 'up').every(args => args[args.indexOf('--business-control') + 1] === accessPath))
-  assert.ok(calls.filter(args => args[0] === 'up' && !args.includes('--replace')).every(args =>
+  assert.ok(calls.filter(args => args[0] === 'up' && args.includes('--business-access-mode')).every(args =>
     args[args.indexOf('--business-access-mode') + 1] === 'anonymous' && args[args.indexOf('--business-identity-mode') + 1] === 'development'))
   assert.ok(calls.filter(args => args.includes('--replace')).every(args => !args.includes('--business-access-mode') && !args.includes('--business-identity-mode')))
   assert.ok(calls.some(args => args[0] === 'up' && args.includes('--replace') && args.includes('--port') && args[args.indexOf('--port') + 1] === '3199'))

@@ -1692,12 +1692,12 @@ test('隔离程序评测的预览与任务共用来源、模型投影和凭据�
     write(join(isolated, 'runtime/adapters/dsh-container/dsh-eval'), evaluationScript([
       'import json,os,sys',
       'policy=json.load(open(sys.argv[sys.argv.index("--model-policy")+1]))',
-      'print(json.dumps({"program_root":os.environ["HARNESS_PROGRAM_ROOT"],"script":sys.argv[0],"key_present":bool(os.environ.get("MODEL_API_KEY")),"model":policy["default"]["model"]}))',
+      'print(json.dumps({"program_root":os.environ["HARNESS_PROGRAM_ROOT"],"script":sys.argv[0],"key_present":bool(os.environ.get("MODEL_API_KEY")),"model":policy["default"]["model"],"selected_instance":sys.argv[sys.argv.index("--instance-name")+1]}))',
     ].join('\n')))
     const handler = createAgentsHandler(fx.root, undefined, {}, async () => ({
       policy: { default: { model: 'actual-model' } }, environment: { MODEL_API_KEY: 'private-fixture-key' },
     }))
-    const payload = { source: 'experiment:EXP-test-agent-001', program_root: isolated }
+    const payload = { source: 'experiment:EXP-test-agent-001', program_root: isolated, instance_name: 'selected-instance' }
     const preview = await rpc(handler, 'eval/preview', payload)
     assert.equal(preview.command[1], join(isolated, 'runtime/adapters/dsh-container/dsh-eval'))
     const started = await rpc(handler, 'eval/start', { ...payload, run_id: preview.run_id })
@@ -1708,8 +1708,14 @@ test('隔离程序评测的预览与任务共用来源、模型投影和凭据�
       assert.equal(result.script, preview.command[1])
       assert.equal(result.key_present, true)
       assert.equal(result.model, 'actual-model')
+      assert.equal(result.selected_instance, 'selected-instance')
     }
     assert.equal(process.env.HARNESS_PROGRAM_ROOT, fx.root)
+    for (const instance_name of ['../other', 'with spaces']) {
+      const rejected = await handler('eval/preview', { ...payload, instance_name }, new AbortController().signal)
+      assert.equal(rejected.ok, false)
+      assert.match(rejected.error.message, /instance_name 格式无效/)
+    }
     for (const program_root of ['relative/path', join(isolated, 'missing')]) {
       const rejected = await handler('eval/preview', { ...payload, program_root }, new AbortController().signal)
       assert.equal(rejected.ok, false)
@@ -1971,7 +1977,7 @@ for (const stopped of [true, false]) test(`取消评测等待 CLI 收尾；实�
     status = await waitForJob(handler, started.run_id)
     assert.equal(status.status, stopped ? 'cancelled' : 'failed')
     assert.equal(status.result.instance_stopped, stopped)
-    if (!stopped) assert.match(status.error, /停止尚未确认/)
+    if (!stopped) assert.match(status.error, /清理尚未确认/)
   } finally { await rm(fx.root, { recursive: true, force: true }) }
 })
 

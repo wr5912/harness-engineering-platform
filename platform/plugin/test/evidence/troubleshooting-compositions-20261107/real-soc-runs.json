@@ -1,0 +1,128 @@
+[
+  {
+    "at": "2026-11-07T08:19:52.190Z",
+    "run_id": "run-aaec53f2-fba3-41d6-b3d8-e796ca9083a1",
+    "composition_id": "troubleshooting-business-access",
+    "status": "completed",
+    "business_status": "incomplete",
+    "input": {
+      "source": {
+        "ip": "172.16.138.226",
+        "assetId": 3617426
+      },
+      "target": {
+        "ip": "172.16.200.11",
+        "assetId": 3617609
+      },
+      "protocol": "tcp",
+      "port": 443,
+      "from": "2026-11-07T00:00:00Z",
+      "to": "2026-11-07T03:00:00Z"
+    },
+    "version": {
+      "gitCommit": "240a196bd28b91203add24bcdf730f04fe5ba500",
+      "gitDirty": true,
+      "programCommit": "d18d03cc57b9d307bba90216709b45c2797e43ae",
+      "programDirty": true,
+      "sourceDigest": "8733df85f0cfbeaf01b2f77ab6733dd959e1a1887bc5b5c37aac403b577025bf",
+      "businessExtension": {
+        "id": "security-operations-compositions",
+        "sourceDigest": {
+          "workflow": "troubleshooting-business-access",
+          "sourceDigest": "885e124b228d14e4c3c4afc6ba63e5822a90c8499f0a252bfb408bd7f04fe575"
+        }
+      },
+      "implementationDigest": "d6ac1b1fba43974460c3c6c43e140587af08aa1ba3a64ab688546536900888a6",
+      "versionId": "21f85f57ec18d67aba749750a89e3befbccc66f835a7ae3cf55242c6529852e0"
+    },
+    "metrics": {
+      "requests": 7,
+      "peak_concurrency": 5,
+      "preparation_ms": 51,
+      "elapsed_ms": 26321
+    },
+    "artifact": {
+      "id": "report",
+      "filename": "business-access-report.html",
+      "contentType": "text/html; charset=utf-8",
+      "bytes": 86834,
+      "sha256": "5c2e2ca8f6e3ad894cf61c70c581cf008b9f4aeaab315654054bc8a4644ec4cd",
+      "digest_source": "UTF-8 original body, not server-provided",
+      "repeat_identical": true
+    },
+    "persistence": {
+      "last_digest": "236a784cf21aacfdb58655b821440cb1ff7dd227f2eb65f220cabc9547f37e57",
+      "public_readback": {
+        "requested_at": "2026-11-07T08:08:21.182Z",
+        "received_at": "2026-11-07T08:08:23.105Z",
+        "node_id": "root/resolve",
+        "total": 1,
+        "items_sha256": "47eb38796fe871faa788f0b28c2e0461ed1ce833040c6fdad0e380cf1717a86c",
+        "matches_saved_fact": true,
+        "run_status_after_read": "running"
+      }
+    }
+  },
+  {
+    "at": "2026-11-07T08:19:52.225Z",
+    "run_id": "run-4c3db93a-98bf-40a8-8677-6d6aebf988be",
+    "composition_id": "troubleshooting-device-offline",
+    "status": "completed",
+    "business_status": "incomplete",
+    "input": {
+      "asset": {
+        "ip": "172.16.200.11",
+        "assetId": 3617609
+      },
+      "observer": {
+        "ip": "172.16.138.226",
+        "assetId": 3617426
+      },
+      "from": "2026-11-07T00:00:00Z",
+      "to": "2026-11-07T03:00:00Z"
+    },
+    "version": {
+      "gitCommit": "240a196bd28b91203add24bcdf730f04fe5ba500",
+      "gitDirty": true,
+      "programCommit": "d18d03cc57b9d307bba90216709b45c2797e43ae",
+      "programDirty": true,
+      "sourceDigest": "8733df85f0cfbeaf01b2f77ab6733dd959e1a1887bc5b5c37aac403b577025bf",
+      "businessExtension": {
+        "id": "security-operations-compositions",
+        "sourceDigest": {
+          "workflow": "troubleshooting-device-offline",
+          "sourceDigest": "07544bcc1fe384bb43460f791621cdced8c11c3088c6bfcc809bbd1dcbfbcb31"
+        }
+      },
+      "implementationDigest": "629dddef8677d7e1638b2432db85fbc48d8523bcf6aa5d8bcd554a5464d6e9d8",
+      "versionId": "79c81ccbec7ad0a9490722d403c380750f2f9135d4f3ac0757fde1a745ac227f"
+    },
+    "metrics": {
+      "requests": 5,
+      "peak_concurrency": 2,
+      "preparation_ms": 55,
+      "elapsed_ms": 14693
+    },
+    "artifact": {
+      "id": "report",
+      "filename": "device-offline-report.html",
+      "contentType": "text/html; charset=utf-8",
+      "bytes": 60707,
+      "sha256": "497793b6b5c88715f84ea3af97fe8bc54c004ede0c121baa6c5177e05e3aff7a",
+      "digest_source": "UTF-8 original body, not server-provided",
+      "repeat_identical": true
+    },
+    "persistence": {
+      "last_digest": "6422ca34eaa50fa92941ba583a295b94bd3f8e061d49dc9c17bdf403f6046a8b",
+      "public_readback": {
+        "requested_at": "2026-11-07T08:08:44.719Z",
+        "received_at": "2026-11-07T08:08:45.136Z",
+        "node_id": "root/resolve",
+        "total": 1,
+        "items_sha256": "d46964f859d3ff9f1b2dc8dc4a3bcc14d6564783d6d038e1fe22314cc7ef1a4e",
+        "matches_saved_fact": true,
+        "run_status_after_read": "running"
+      }
+    }
+  }
+]

@@ -1,0 +1,7 @@
+{
+  "experiment_id": "EXP-security-operations-expert-027-f-r3ba4799b0cb7",
+  "entry_path": "dsh/managed/security-report-runtime.ts",
+  "output_path": "dsh/managed/security-report-runtime.mjs",
+  "source_sha256": "94a474d04261ab17b95359ec2bfb0c11e45618c35a211b3a06ce30ae9e3c922e",
+  "candidate_sha256": "2a9df148f7774e187d46ca4cb0eab29c5930311593ee855e08427aa42728d90d"
+}

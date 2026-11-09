@@ -1,0 +1,64 @@
+{
+  "at": "2026-11-07T10:17:12.425Z",
+  "label": "async-access-repeat-source-fixed",
+  "session_id": "session-93f12fa5-c917-417d-9c27-8c59e9c42361",
+  "before_seq": 132,
+  "as_of_seq": 150,
+  "finished": true,
+  "calls": [
+    {
+      "seq": 144,
+      "name": "export_security_report",
+      "call_id": "call_43b75c54c129497b9e664294"
+    }
+  ],
+  "reports": [
+    {
+      "seq": 145,
+      "call_id": "call_43b75c54c129497b9e664294",
+      "is_error": false,
+      "kind": "fault",
+      "filename": "business-access-report.html",
+      "bytes": 205376,
+      "sha256": "bb16c2205d15fda6d0ed52d1070675d074bb763352ec8073a582b50312babed4",
+      "attachment_id": "sha256:bb16c2205d15fda6d0ed52d1070675d074bb763352ec8073a582b50312babed4",
+      "source": {
+        "kind": "fault-troubleshooting",
+        "parent_session_id": "session-93f12fa5-c917-417d-9c27-8c59e9c42361",
+        "run_id": "run-abe4d181-ed02-4f97-ae2f-660d84eea02b",
+        "composition_id": "troubleshooting-business-access",
+        "workflow": "troubleshooting-business-access",
+        "start_tool_name": "mcp__troubleshooting-compositions__diagnose_business_access",
+        "start_registered_tool_name": "mcp__troubleshooting-compositions__diagnose_business_access",
+        "start_call_id": "call_f6d830a2d3244b0da0f25dfd",
+        "start_turn": 3,
+        "start_step": 1,
+        "start_seq": 63,
+        "start_result_seq": 64,
+        "user_message_id": "764bc1d2-976a-49fd-b3ee-b5c779c176ad",
+        "request_seq": 61,
+        "request_sha256": "9a53d0607906f739ae420a6db7b9c7a2ab0b4ba3684b5cf64fc11ba2b2831618",
+        "start_receipt_hash_scope": "native-tool-result.visible-text/v1",
+        "start_receipt_sha256": "f195d6fe916b774dc22b02963fd0e22c2687aed61019ac8b85abbccfd9c51f62",
+        "artifact_id": "report",
+        "original_filename": "business-access-report.html",
+        "original_content_type": "text/html; charset=utf-8",
+        "original_sha256": "bb16c2205d15fda6d0ed52d1070675d074bb763352ec8073a582b50312babed4",
+        "original_sha256_scope": "sha256-of-original-utf8-body",
+        "original_bytes": 205376,
+        "artifact_metadata": {
+          "id": "report",
+          "filename": "business-access-report.html",
+          "contentType": "text/html; charset=utf-8",
+          "bytes": 205376
+        },
+        "artifact_response_metadata": {
+          "filename": "business-access-report.html",
+          "contentType": "text/html; charset=utf-8"
+        },
+        "source_sha256": "11ce98882145f208d27ef9c4ff7dc7be08d8f46283a2faef8649750ba745ca3f"
+      }
+    }
+  ],
+  "new_diagnosis_or_soc_calls": 0
+}

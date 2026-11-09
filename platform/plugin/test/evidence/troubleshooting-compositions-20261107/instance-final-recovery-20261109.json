@@ -1,0 +1,48 @@
+{
+  "checked_at": "2026-11-09T01:15:31.489Z",
+  "instance": {
+    "name": "inspection-027-schedule-acceptance",
+    "state": "running",
+    "source_id": "experiment:EXP-security-operations-expert-027-f-r3ba4799b0cb7",
+    "agent_id": "security-operations-expert",
+    "port": 18502,
+    "asset_status": {
+      "changed_files": [],
+      "checked_at": "2026-11-09T01:15:29.426Z",
+      "current_digest": "sha256:c0502577020ef35a334218351b7481803f23a8d6d96529a10bd406abf65761fd",
+      "generation_digest": "sha256:ec0162a713be3afe8f1a97aaa3a22b6afffd60c7f356843a632d7dc87db0f0f9",
+      "last_attempt": {
+        "at": "2026-11-09T01:10:40.870Z",
+        "message": "实际加载已核验",
+        "status": "verified"
+      },
+      "loaded": {
+        "configuration_digest": "sha256:97c0be729d267a4a020afc2168941cc0b6b5fc40c4e6cb99d44cf04f7b8d8709",
+        "container_id": "47fa3af2fcbfb238508d0667f370c49774be4038ec7cdc7b477bce7b1b6a6836",
+        "digest": "sha256:c0502577020ef35a334218351b7481803f23a8d6d96529a10bd406abf65761fd",
+        "files_digest": "sha256:f94da27d68bcc2b527982cb4da55fa3598afdbe8e1fd14e5efdfbf3fa5178afd",
+        "loaded_at": "2026-11-09T01:10:40.870Z",
+        "ok": true,
+        "pid": 7,
+        "preset_id": "security-operations-expert",
+        "source_id": "experiment:EXP-security-operations-expert-027-f-r3ba4799b0cb7",
+        "started_at": "2026-11-09T01:10:34.257062649Z",
+        "verification": "runtime-observer"
+      },
+      "reason": "运行代次与加载回执一致",
+      "status": "current"
+    },
+    "business_gateway": true,
+    "access_mode": "anonymous",
+    "identity_mode": "development",
+    "home_preserved": true,
+    "access_url": "http://172.16.138.228:53105/agents/security-operations-expert/instances/inspection-027-schedule-acceptance/"
+  },
+  "gateway": {
+    "instanceId": "inspection-027-schedule-acceptance",
+    "agentId": "security-operations-expert",
+    "sourceDigest": "sha256:a367cd92a31de0bcec1c6dea06b975659084e911317674d5f0acd3ec407d6570",
+    "accessMode": "anonymous",
+    "identityMode": "development"
+  }
+}

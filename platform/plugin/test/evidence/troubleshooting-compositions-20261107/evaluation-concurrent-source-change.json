@@ -1,0 +1,82 @@
+{
+  "run_id": "run-99282789-7ff3-435e-b6dd-403eb12b9caf",
+  "execution": {
+    "schema_version": "1.0",
+    "workspace_id": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+    "asset_root": "/home/cmp/harness-engineering-platform-data",
+    "process_start": "33278169",
+    "request_sha256": "0e97384d65c1f0a8fe77b80a9214ca4a883fff659348f7c94c4b2570f72b0364",
+    "pid": 3763311,
+    "run_id": "run-99282789-7ff3-435e-b6dd-403eb12b9caf",
+    "instance_name": "inspection-027-schedule-acceptance",
+    "instance_owned": false,
+    "status": "failed",
+    "deadline_at": null,
+    "instance_stopped": false,
+    "cleanup_complete": true,
+    "failure_reason": "核对指定评测实例 失败（退出码 1）：资产装载核对失败：指定实例实际装载尚未匹配来源：unknown；请先核对并重载"
+  },
+  "summary": {
+    "schema_version": "3.0",
+    "run_id": "run-99282789-7ff3-435e-b6dd-403eb12b9caf",
+    "trial_count": 5,
+    "execution_status_counts": {
+      "completed": 0,
+      "error": 5,
+      "skipped": 0
+    },
+    "machine_trial_verdict_counts": {
+      "passed": 0,
+      "failed": 0,
+      "inconclusive": 5
+    },
+    "machine_overall_verdict": "inconclusive",
+    "review_status": "not_requested",
+    "reviewed_case_count": 0,
+    "reviewed_case_verdict_counts": null,
+    "reviewed_overall_verdict": null,
+    "effective_verdict": "inconclusive",
+    "source_verification": {
+      "status": "changed",
+      "reason": "source-changed",
+      "checks": [
+        {
+          "component": "candidate",
+          "status": "changed",
+          "expected_sha256": "2a9df148f7774e187d46ca4cb0eab29c5930311593ee855e08427aa42728d90d",
+          "actual_sha256": "aaba454eb0e84f835177082b174964c4d5d59f0ba75ab212512565ed4c209bbb"
+        },
+        {
+          "component": "workspace",
+          "status": "matched",
+          "expected_sha256": "8491fe763cda2f751a409241311562f31f10a90e2d327cf118c54c0798197494",
+          "actual_sha256": "8491fe763cda2f751a409241311562f31f10a90e2d327cf118c54c0798197494"
+        },
+        {
+          "component": "presets",
+          "status": "matched",
+          "expected_sha256": "7c0ed20cbd40da461df7a0ad50a47d338bac976d8bc3ef36726854a11cd245f2",
+          "actual_sha256": "7c0ed20cbd40da461df7a0ad50a47d338bac976d8bc3ef36726854a11cd245f2"
+        },
+        {
+          "component": "managed",
+          "status": "changed",
+          "expected_sha256": "4595cf4651b5939b143ebe11e7a0f29b29a95864f9acfa67eb9d2086f2ed3641",
+          "actual_sha256": "0648f6a1fdaa1e589791ca9ad3ec316aef3497c712ac1a957271bc99875a00ca"
+        },
+        {
+          "component": "evaluation_implementation",
+          "status": "matched",
+          "expected_sha256": "89ac878a141e1341286a269d6053a0318249496164adbf64789c16f50af9d874",
+          "actual_sha256": "89ac878a141e1341286a269d6053a0318249496164adbf64789c16f50af9d874"
+        }
+      ]
+    }
+  },
+  "cause_observation": {
+    "changed_file": "candidate/dsh/managed/web-profile.seed.patch.yml",
+    "changed_at": "2026-11-07T10:22:35Z",
+    "concurrent_reload_started_at": "2026-11-07T10:24:20.427223Z",
+    "scope": "Concurrent asset task added asset-management group and reloaded the shared instance during evaluation. This run is not valid business acceptance."
+  }
+}

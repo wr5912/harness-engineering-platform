@@ -927,6 +927,7 @@ export function apply(ctx: any, config: any): void {
         scope.ctx.effect(() => () => { agents.delete(id) }, 'mcp-manager.agent-endpoint')
         if (config.withToolContext) {
           const currentServer = () => {
+            server.platformAssertCurrent?.()
             const latest = snapshot(config).servers.find(item => item.id === server.id && item.enabled !== false)
             if (!latest) throw new Error('MCP 服务器已停用或移除')
             return latest

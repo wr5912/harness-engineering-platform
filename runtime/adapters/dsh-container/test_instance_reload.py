@@ -63,6 +63,18 @@ class InstanceReloadTest(unittest.TestCase):
             source.assert_not_called()
             up.assert_not_called()
 
+    def test_explicit_mcp_sync_is_previewed_and_forwarded_to_existing_lifecycle(self):
+        receipt = {"before_digest": ASSET, "server_ids": ["current"]}
+        with mock.patch.object(dev, "reload_snapshot", return_value=({}, self.manifest, self.status)), \
+                mock.patch.object(dev, "sync_source_mcp", return_value=receipt) as sync, \
+                mock.patch.object(dev, "command_up") as up, contextlib.redirect_stdout(io.StringIO()) as output:
+            dev.reload_one(self.args(dry_run=True, apply_source_mcp=True))
+            self.assertEqual(json.loads(output.getvalue())["mcp_connection_sync"], receipt)
+            sync.assert_called_once_with({}, self.manifest)
+            up.assert_not_called()
+            dev.reload_one(self.args(apply_source_mcp=True))
+            self.assertTrue(up.call_args.args[0].apply_source_mcp)
+
     def test_reload_reuses_exact_registered_parameters_and_lifecycle(self):
         with mock.patch.object(dev, "reload_snapshot", return_value=({}, self.manifest, self.status)), \
                 mock.patch.object(dev, "command_up") as up:

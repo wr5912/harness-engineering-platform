@@ -1,0 +1,21 @@
+{
+  "checked_at": "2026-11-09T01:15:15.737Z",
+  "url": "http://172.16.138.228:53105/agents/security-operations-expert/instances/inspection-027-schedule-acceptance/",
+  "status": 200,
+  "title": "DSH 本地构建",
+  "page_errors": [],
+  "body_excerpt": "AI 安全运营\n新会话\n插件\n自动化任务\n更多\n会话\n暂无会话\n更多\nAI-SOC\n选择一个工作区开始",
+  "visible_buttons": [
+    "AI 安全运营",
+    "",
+    "新会话",
+    "插件",
+    "自动化任务",
+    "更多",
+    "",
+    "",
+    "更多",
+    "",
+    ""
+  ]
+}

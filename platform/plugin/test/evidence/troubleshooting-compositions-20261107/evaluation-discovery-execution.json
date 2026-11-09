@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "workspace_id": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+  "asset_root": "/home/cmp/harness-engineering-platform-data",
+  "process_start": "33364615",
+  "request_sha256": "0e97384d65c1f0a8fe77b80a9214ca4a883fff659348f7c94c4b2570f72b0364",
+  "pid": 3806337,
+  "run_id": "run-ea5f30b0-19ac-408e-b72d-4beabb28d4c1",
+  "instance_name": "inspection-027-schedule-acceptance",
+  "instance_owned": false,
+  "status": "completed",
+  "deadline_at": null,
+  "instance_stopped": false,
+  "cleanup_complete": true
+}

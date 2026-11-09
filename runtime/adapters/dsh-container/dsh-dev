@@ -1889,6 +1889,17 @@ def business_command(arguments: list[str], payload: dict | None = None, timeout:
     return json.loads(completed.stdout)
 
 
+def registered_business_source_digest(instance_id: str) -> str | None:
+    try:
+        access = json.loads((REPO / "config/business-access.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    for item in access.get("gateway", {}).get("instances", []):
+        if item.get("instanceId") == instance_id and isinstance(item.get("sourceDigest"), str):
+            return item["sourceDigest"]
+    return None
+
+
 def business_helper(config_file: str, payload: dict) -> dict:
     return business_command([str(Path(config_file).resolve())], payload)
 
@@ -2024,6 +2035,17 @@ def reload_snapshot(name: str) -> tuple[dict, dict, dict]:
     return contract, manifest, status
 
 
+def sync_source_mcp(contract: dict, manifest: dict, apply: bool = False, expected_digest: str | None = None) -> dict:
+    if not manifest.get("business_control"):
+        fail("同步来源 MCP 连接仅适用于业务实例")
+    home = Path(manifest.get("home_directory") or instance_dir(manifest["name"]) / "dsh-home")
+    return business_command(["--sync-source-mcp"], {
+        "settings": str(home / "profiles/web/cordis.patch.yml"),
+        "seed": str(Path(contract["managed"]) / "web-profile.seed.patch.yml"),
+        "apply": apply, "expected_digest": expected_digest,
+    })
+
+
 def assert_reload_cas(args: argparse.Namespace) -> None:
     _, manifest, status = reload_snapshot(args.name)
     if status["current_digest"] != args.expected_asset_digest or status["generation_digest"] != args.expected_generation_digest:
@@ -2096,6 +2118,8 @@ def reload_one(args: argparse.Namespace) -> None:
             "current_asset_digest": status["current_digest"], "generation_digest": status["generation_digest"],
             "asset_status": status, "model_policy": manifest.get("model_policy"),
             "retention": {"home": "保留", "sessions": "保留", "port": "保留", "model": "保留", "gateway_identity": "保留"}}
+    if getattr(args, "apply_source_mcp", False):
+        plan["mcp_connection_sync"] = sync_source_mcp(contract, manifest)
     if args.dry_run:
         print(json.dumps(plan, ensure_ascii=False))
         return
@@ -2113,6 +2137,7 @@ def reload_one(args: argparse.Namespace) -> None:
         business_access_mode=None, business_identity_mode=None, dry_run=False, replace=True, migrate_home=False,
         allow_missing_env=False, model_policy=args.model_policy, mcp_fixture=None,
         reload_manifest=manifest, expected_asset_digest=args.expected_asset_digest,
+        apply_source_mcp=getattr(args, "apply_source_mcp", False),
         expected_generation_digest=args.expected_generation_digest)
     if launch.port is None:
         fail("实例缺少原端口，不能精确重载")
@@ -2202,7 +2227,9 @@ def command_up(args: argparse.Namespace) -> None:
                     target_manifest = existing_instance(args.name)
                     if target_manifest and target_manifest[1].get("asset_reload_attempt", {}).get("status") == "running":
                         record_reload_attempt(args.name, "unknown", "重载未完成或加载结果尚未核验；保留 HOME 与最后回执，请检查日志后重新预览")
-                previous_digest = current[1].get("business_control", {}).get("source_digest") if current else None
+                interrupted_reload = current and current[1].get("asset_reload_attempt", {}).get("status") in ("running", "unknown")
+                previous_digest = (registered_business_source_digest(args.name) if interrupted_reload else None) \
+                    or (current[1].get("business_control", {}).get("source_digest") if current else None)
                 if not dry_run and contract.get("business_control") and previous_digest:
                     # 启动可能先保存新来源再失败；登记同步到实际来源，使同名重试仍可通过预检。
                     try:
@@ -2240,12 +2267,15 @@ def _command_up(args: argparse.Namespace, contract: dict,
                               "missing_env_names": missing}, ensure_ascii=False), file=sys.stderr)
     else:
         check_environment(contract, args.analysis_workspace)
+    mcp_sync = sync_source_mcp(contract, current[1]) if getattr(args, "apply_source_mcp", False) else None
     identity = validate_image_identity(contract, current=current, replace=getattr(args, "replace", False))
     if args.analysis_workspace is None:
         assert_asset_dependencies(contract, identity["image_id"])
     # Compose 插值与模板结构都可以在停旧实例前检查；明显无效的新配置不得先触发停机。
     preflight_new_instance(args, contract)
-    previous_digest = current[1].get("business_control", {}).get("source_digest") if current else None
+    interrupted_reload = current and current[1].get("asset_reload_attempt", {}).get("status") in ("running", "unknown")
+    previous_digest = (registered_business_source_digest(args.name) if interrupted_reload else None) \
+        or (current[1].get("business_control", {}).get("source_digest") if current else None)
     if contract.get("business_control"):
         business_command(["--preflight-registration", str(REPO)], {
             "registration": {"agentId": contract["agent_id"], "instanceId": args.name,
@@ -2262,6 +2292,8 @@ def _command_up(args: argparse.Namespace, contract: dict,
         contract["reload_source_digest"] = asset_command("source", asset_contract(args.reload_manifest), args.reload_manifest, directory=None)["digest"]
         record_reload_attempt(args.name, "running", "正在重载；连接中断后请核对实际回执，不自动重试")
     replaced = migrate_existing_instance(args, contract, current)
+    if mcp_sync is not None:
+        sync_source_mcp(contract, current[1], apply=True, expected_digest=mcp_sync["before_digest"])
     if port_in_use(args.port):
         holder = running_instance_service(args.name)
         if holder == "dsh":
@@ -3443,6 +3475,7 @@ def main() -> None:
     reload_parser.add_argument("--dry-run", action="store_true", help="只读观察来源和运行代次，不停止实例")
     reload_parser.add_argument("--expected-asset-digest", action="append")
     reload_parser.add_argument("--expected-generation-digest", action="append")
+    reload_parser.add_argument("--apply-source-mcp", action="store_true", help="显式同步来源 MCP 服务连接，保留其他 HOME 设置")
     reload_parser.add_argument("--model-policy", help="既有平台实例的当前模型策略，保留登记的模型选择")
     reload_parser.set_defaults(handler=command_reload)
 

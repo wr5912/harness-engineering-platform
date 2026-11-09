@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { appliedFiles, assetStatus, digest, generationDigest, sourceAssets, verifyFiles } from './instance-assets.ts'
+import { appliedFiles, assetStatus, digest, evaluationInstance, generationDigest, sourceAssets, verifyFiles } from './instance-assets.ts'
 
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'hep-instance-assets-'))
@@ -20,6 +20,29 @@ function fixture(t) {
   const source = () => sourceAssets(contract, manifest, root)
   return { root, put, contract, manifest, source }
 }
+
+test('复用评测实例要求来源、角色、模型和真实装载一致', t => {
+  const { root, put, contract, manifest, source } = fixture(t)
+  Object.assign(contract, { source_id: manifest.source_id, agent_id: 'demo', preset_id: 'demo' })
+  Object.assign(manifest, { agent_id: 'demo', profile: 'web', evaluation_patch: '/evaluation.patch.yml', business_control: {} })
+  const generation = { id: 'current', started_at: '2026-11-04T00:00:00Z', running: true }
+  const initial = source()
+  manifest.asset_load = { verification: 'runtime-observer', ok: true, source_id: manifest.source_id, preset_id: 'demo',
+    digest: initial.digest, files_digest: digest([]), loaded_at: generation.started_at, pid: 10, container_id: generation.id, started_at: generation.started_at }
+  const check = () => evaluationInstance(contract, manifest, generation, root, { model: 'm', provider: 'p' })
+  assert.equal(check().instance_owned, false)
+  assert.equal(check().asset_status.status, 'current')
+  manifest.source_id = 'experiment:other'
+  assert.throws(check, /来源或角色/)
+  manifest.source_id = contract.source_id
+  manifest.model_policy.default.model = 'different'
+  assert.throws(check, /模型/)
+  manifest.model_policy.default.model = 'm'
+  assert.throws(() => evaluationInstance(contract, manifest, { ...generation, id: 'replaced' }, root), /实际装载/)
+  assert.throws(() => evaluationInstance(contract, manifest, { ...generation, running: false }, root), /实际装载/)
+  put('managed/plugin/src/index.ts', 'pending reload')
+  assert.throws(check, /实际装载/)
+})
 
 test('装载闭包覆盖提示词、Skill、插件源码、制品、依赖和运行配置', t => {
   const { root, put, contract, manifest, source } = fixture(t)

@@ -1,0 +1,24 @@
+{
+  "status": "applied",
+  "programRoot": "/home/cmp/work/harness-engineering-platform",
+  "dataRoot": "/home/cmp/harness-engineering-platform-data",
+  "workspaceId": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+  "pid": 3600763,
+  "activation": "managed-restart",
+  "busy": [
+    {
+      "kind": "session",
+      "id": "*",
+      "state": "interruption-authorized-not-enumerated"
+    }
+  ],
+  "changed": [
+    "platform/plugin/lib/composition-source-index.json",
+    "platform/plugin/lib/index.js",
+    "platform/plugin/lib/mcp-manager.js",
+    "platform/plugin/lib/platform-mcp-manager.js",
+    "platform/plugin/lib/standalone-bridge.js",
+    "platform/plugin/lib/standalone-plugin.js",
+    "../../harness-engineering-platform-data/.local/platform-home/profiles/harness-platform/harness-platform.patch.yml"
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "kind": "platform-operation",
+  "domain": "agents",
+  "action": "edit/apply",
+  "proposal_id": "39be0aa8-b4d3-4daf-8214-645a85429407",
+  "state": "completed",
+  "result": {
+    "ok": true,
+    "value": {
+      "written": [
+        {
+          "path": "evolution/experiments/EXP-security-operations-expert-027-f-r3ba4799b0cb7/candidate/dsh/workspace/AGENTS.md",
+          "sha256": "52ae63ca44a25192a17afd2b21204729921ebfe697036fa1443c1a8c3187bec9"
+        },
+        {
+          "path": "evolution/experiments/EXP-security-operations-expert-027-f-r3ba4799b0cb7/candidate/dsh/workspace/.agents/skills/fault-analysis/SKILL.md",
+          "sha256": "6f653ecd6d8d5f9594770e55847a9c4e90efeab42831ee1d7d505608d2b22a43"
+        }
+      ],
+      "dry_run": {
+        "mode": "dry",
+        "preflight_scope": "changed-files",
+        "checks": [
+          "草稿格式"
+        ],
+        "note": "仅检查本次文件；未执行源码、评测、模型或业务工具，未启动实例或创建 Run。"
+      }
+    }
+  },
+  "session_id": "session-b5446b43-d3dc-4959-b7a7-225b455b609c",
+  "event_seq": 87
+}
