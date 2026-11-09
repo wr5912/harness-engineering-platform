@@ -84,13 +84,15 @@ test('统一入口后台启停、重复启动、重启、只读预检与端口�
   writeFileSync(join(data, 'workspace.json'), '{}')
   writeFileSync(join(data, 'config/sites.json'), '{"platform":"/hep/"}')
   const health = join(data, 'fixture-health.txt')
-  writeFileSync(join(repo, 'platform/dsh-platform-internal.py'), `import http.server, json, pathlib, sys, time
+  writeFileSync(join(repo, 'platform/dsh-platform-internal.py'), `import http.server, json, os, pathlib, sys, time
 host = sys.argv[sys.argv.index('--host')+1]
 port = int(sys.argv[sys.argv.index('--port')+1])
 if '--dry-run' in sys.argv:
     if pathlib.Path(${JSON.stringify(join(data, 'fixture-invalid.txt'))}).exists():
         print('扩展尚未按当前来源构建', file=sys.stderr); sys.exit(1)
     print(json.dumps({'dry': True})); sys.exit(0)
+if os.environ.get('HEP_FIXTURE_FAIL_START'):
+    print('fixture startup failure Authorization: Bearer fixture-secret https://example.invalid/?token=fixture-query', file=sys.stderr); sys.exit(7)
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         path = pathlib.Path(${JSON.stringify(health)})
@@ -111,6 +113,7 @@ http.server.ThreadingHTTPServer((host, port), Handler).serve_forever()
   writeFileSync(file, JSON.stringify({ schemaVersion: 1, enabled: true, agents: [], gateway: { managementUrl: `http://127.0.0.1:${port}/hep/` } }))
   const env = { ...process.env, HARNESS_ASSET_ROOT: data, HARNESS_PYTHON: process.env.HARNESS_PYTHON ?? 'python3' }
   const cli = (...args) => spawnSync(join(repo, 'platform/dsh-platform'), args, { env, encoding: 'utf8', timeout: 15_000 })
+  const cliWithEnv = (overrides, ...args) => spawnSync(join(repo, 'platform/dsh-platform'), args, { env: { ...env, ...overrides }, encoding: 'utf8', timeout: 15_000 })
   const state = () => JSON.parse(cli('status', '--json').stdout)
   try {
     const dry = cli('start', '--dry-run')
@@ -118,6 +121,8 @@ http.server.ThreadingHTTPServer((host, port), Handler).serve_forever()
     assert.equal(managedState(data, repo), undefined)
     const first = cli('start')
     assert.equal(first.status, 0, first.stderr || first.stdout)
+    assert.match(first.stdout, /启动预检通过/)
+    assert.match(first.stdout, /平台启动中/)
     const pid = state().pid
     assert.equal(state().status, 'running')
     assert.equal(cli('start').status, 0)
@@ -159,6 +164,20 @@ http.server.ThreadingHTTPServer((host, port), Handler).serve_forever()
     assert.equal(cli('stop').status, 0)
     assert.equal(state().status, 'stopped')
     assert.equal(cli('stop').status, 0)
+    writeFileSync(invalid, 'stale')
+    const blockedStart = cli('start')
+    assert.notEqual(blockedStart.status, 0)
+    assert.match(blockedStart.stderr, /扩展尚未按当前来源构建/)
+    assert.equal(state().status, 'stopped', '普通启动预检失败不能拉起子进程')
+    rmSync(invalid)
+    const log = join(data, '.local/platform-service/platform.log')
+    writeFileSync(log, 'old failure token=old-secret\n')
+    const failedStart = cliWithEnv({ HEP_FIXTURE_FAIL_START: '1' }, 'start')
+    assert.notEqual(failedStart.status, 0)
+    assert.match(failedStart.stderr, /fixture startup failure/)
+    assert.match(failedStart.stderr, /\[REDACTED\]/)
+    assert.doesNotMatch(failedStart.stderr, /fixture-secret|fixture-query|old-secret/)
+    assert.match(failedStart.stderr, /日志：/)
     assert.equal(cli('start').status, 0)
     assert.equal(state().publicUrl, publicUrl, '停止后启动仍保留公开入口')
     assert.equal(state().port, port, '停止后启动复用此前本机监听端口')

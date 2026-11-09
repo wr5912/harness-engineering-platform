@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process'
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, readlinkSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, networkInterfaces } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -125,6 +125,55 @@ function commandResult(command: string, args: string[]) {
   return output
 }
 function systemctl(args: string[]) { return commandResult('systemctl', ['--user', ...args]) }
+function stripLauncherPrefix(value: string): string {
+  return value.replace(/^dsh-platform:\s*/gm, '')
+}
+function runStartPreflight(args: string[]): string {
+  const result = spawnSync(python(), privateArgs([...args, '--dry-run']), { encoding: 'utf8' })
+  if (result.error) throw new Error(`无法执行启动预检：${result.error.message}`)
+  const output = stripLauncherPrefix(`${result.stderr ?? ''}${result.stdout ?? ''}`).trim()
+  if (result.status !== 0) throw new Error(output || '启动预检未通过')
+  return `${result.stdout ?? ''}`.trim()
+}
+function preflightSummary(output: string, dataRoot: string): string {
+  try {
+    const value = JSON.parse(output) as Record<string, unknown>
+    if (value.mode === 'initialization') return `启动预检通过：数据根尚未初始化，将进入浏览器引导（${dataRoot}）`
+    const dsh = typeof value.dsh_version === 'string' ? `DSH ${value.dsh_version}` : `Python ${python()}`
+    const profile = typeof value.profile === 'string' ? `Profile ${value.profile}` : 'Profile 待读取'
+    const home = typeof value.home === 'string' ? `HOME ${value.home}` : `数据根 ${dataRoot}`
+    const repository = typeof value.repository === 'string' ? `程序根 ${value.repository}` : `程序根 ${programRoot}`
+    const assets = typeof value.asset_root === 'string' ? `数据根 ${value.asset_root}` : `数据根 ${dataRoot}`
+    return `启动预检通过：${repository}；${assets}；Python ${python()}；${dsh}；${profile}；${home}`
+  } catch {
+    return `启动预检通过：程序根 ${programRoot}；数据根 ${dataRoot}；Python ${python()}`
+  }
+}
+function redactDiagnostic(value: string): string {
+  return value
+    .replace(/((?:password|token|secret|api[-_ ]?key)\s*[:=]\s*)("[^"]*"|'[^']*'|[^,\s]+)/gi, '$1[REDACTED]')
+    .replace(/(authorization\s*:\s*bearer\s+|\bbearer\s+)[^\s,]+/gi, '$1[REDACTED]')
+    .replace(/([?&](?:token|secret|password|api[-_]?key)=)[^&\s]+/gi, '$1[REDACTED]')
+    .replace(/\bsk-[A-Za-z0-9_-]+\b/g, '[REDACTED]')
+}
+function startupDiagnostic(log: string, offset = 0): string {
+  let descriptor: number | undefined
+  try {
+    const size = statSync(log).size
+    const lower = Math.max(0, Math.min(offset, size))
+    const start = Math.max(lower, size - 64 * 1024)
+    const buffer = Buffer.alloc(size - start)
+    descriptor = openSync(log, 'r')
+    readSync(descriptor, buffer, 0, buffer.length, start)
+    const lines = buffer.toString('utf8').split(/\r?\n/).filter(Boolean)
+    const matches = lines.filter(line => /dsh-platform:|error|fail|failure|incompatible|invalid|cannot|无法|失败|不兼容|错误|异常/i.test(line))
+    return matches.slice(-3).map(line => redactDiagnostic(stripLauncherPrefix(line))).join('\n')
+  } catch {
+    return ''
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor)
+  }
+}
 function probe(command: string, args: string[]) {
   const result = spawnSync(command, args, { encoding: 'utf8' })
   if (result.error) return { available: false, status: undefined, output: result.error.message }
@@ -287,8 +336,12 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
   const unlock = await lock(join(service, 'operation.lock'))
   try {
     if (command === 'restart') {
-      const checked = spawnSync(python(), privateArgs([...startArgs, '--dry-run']), { encoding: 'utf8' })
-      if (checked.error || checked.status !== 0) throw new Error(checked.stderr?.trim() || '启动检查未通过；原平台进程已保留')
+      try {
+        const checked = runStartPreflight(startArgs)
+        console.log(preflightSummary(checked, dataRoot))
+      } catch (error) {
+        throw new Error(`${error instanceof Error ? error.message : String(error)}；原平台进程已保留`)
+      }
     }
     if (command === 'stop' || command === 'restart') await stop(dataRoot)
     if (command === 'stop') { console.log('平台已停止'); return 0 }
@@ -303,6 +356,8 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
       if (phase === 'running') await reportBusinessReadiness(programRoot, dataRoot)
       return 0
     }
+    const checked = runStartPreflight(startArgs)
+    console.log(preflightSummary(checked, dataRoot))
     const accessPath = join(dataRoot, 'config/business-access.json')
     const before = existsSync(accessPath) ? readFileSync(accessPath, 'utf8') : undefined
     let saved: string | undefined
@@ -312,6 +367,7 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
       saved = readFileSync(accessPath, 'utf8')
     }
     const log = join(service, 'platform.log')
+    const logOffset = existsSync(log) ? statSync(log).size : 0
     const foreground = flags.has('--foreground')
     const fd = foreground ? undefined : openSync(log, 'a', 0o600)
     const child = spawn(python(), privateArgs(startArgs), { detached: true, stdio: foreground ? 'inherit' : ['ignore', fd!, fd!], env: process.env })
@@ -332,9 +388,15 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
     process.on('SIGINT', sigint); process.on('SIGTERM', sigterm)
     try {
       const timeout = foreground ? 10 * 60_000 : 60_000
-      const deadline = Date.now() + timeout
+      const startedAt = Date.now()
+      const deadline = startedAt + timeout
+      let nextProgressAt = startedAt + 5_000
+      console.log(`平台启动中：${address!.publicUrl ?? address!.url}\nPID：${state.pid}\n日志：${log}`)
       while (Date.now() < deadline) {
-        if (failure || processBirth(state.pid) !== state.birth) throw new Error(`平台启动失败；日志：${log}`)
+        if (failure || processBirth(state.pid) !== state.birth) {
+          const detail = failure?.message || startupDiagnostic(log, logOffset)
+          throw new Error(`平台启动失败${detail ? `：\n${detail}` : ''}\n日志：${log}`)
+        }
         if (ownsPort(state.pid, state.host, state.port)) {
           const phase = await httpPhase(state.url)
           if (phase !== 'unavailable') {
@@ -348,9 +410,15 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
             return 0
           }
         }
+        if (!foreground && Date.now() >= nextProgressAt) {
+          const elapsed = Math.floor((Date.now() - startedAt) / 1000)
+          console.log(`平台仍在启动（已等待 ${elapsed} 秒）；日志：${log}`)
+          nextProgressAt += 5_000
+        }
         await delay(100)
       }
-      throw new Error(`平台启动等待超过 ${foreground ? '10 分钟' : '60 秒'}；请用 status 和日志检查：${log}`)
+      const detail = startupDiagnostic(log, logOffset)
+      throw new Error(`平台启动等待超过 ${foreground ? '10 分钟' : '60 秒'}${detail ? `；最近诊断：\n${detail}` : ''}\n日志：${log}`)
     } catch (error) {
       child.unref()
       if (saved && readFileSync(accessPath, 'utf8') === saved && processBirth(state.pid) !== state.birth) {
