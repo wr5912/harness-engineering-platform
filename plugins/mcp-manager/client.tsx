@@ -125,7 +125,7 @@ window.__ModuleLoader__.load({
       @media(prefers-reduced-motion:reduce){.mcp-manager button,.mcp-manager input,.mcp-manager select,.mcp-manager summary::before{transition:none}.mcp-manager button:active:not(:disabled){transform:none}}
     `
 
-    function Manager({ view, form, write, publishedService, selectedServerId, selectedGroupId, onSelectServerId, onSelectGroupId, onOpenView, onValidationError, toolbarTarget, renderToolbar, PasswordInput, SearchSelect }) {
+    function Manager({ view, form, write, publishedService, selectedServerId, selectedGroupId, onSelectServerId, onSelectGroupId, onOpenView, onValidationError, toolbarTarget, connectionTestTarget, active = true, renderToolbar, PasswordInput, SearchSelect }) {
       const state = form?.state
       const input = (value, change, props = {}) => props.type === 'password' && !props.readOnly && PasswordInput
         ? <PasswordInput value={value ?? ''} onChange={event => change(event.target.value)} {...props} />
@@ -150,6 +150,8 @@ window.__ModuleLoader__.load({
       const [status, setStatus] = useState('')
       const [copyNotice, setCopyNotice] = useState(null)
       const [checks, setChecks] = useState({})
+      const [batch, setBatch] = useState(null)
+      const batchRequest = React.useRef(null)
       const [recoveryDraft, setRecoveryDraft] = useState(null)
       const [copiedDraft, setCopiedDraft] = useState('')
       const [busy, setBusy] = useState(false)
@@ -225,7 +227,80 @@ window.__ModuleLoader__.load({
           return latest
         })
       }, [state?.value, state?.revision, state?.status])
-      useEffect(() => { setChecks({}) }, [state?.revision])
+      useEffect(() => {
+        setChecks({})
+        setBatch(null)
+        return () => cancelConnectionTests()
+      }, [state?.revision])
+      useEffect(() => {
+        if (active && connectionTestTarget) void testConnections()
+        return () => cancelConnectionTests()
+      }, [active, !!connectionTestTarget])
+
+      function cancelConnectionTests() {
+        batchRequest.current?.abort()
+        batchRequest.current = null
+        setBatch(previous => previous?.running ? { ...previous, running: false, cancelled: true } : previous)
+        setChecks(previous => Object.fromEntries(Object.entries(previous).filter(([, check]) => !check.pending)))
+      }
+      async function readService(serverId, signal) {
+        const response = await fetch(new URL('api/mcp-manager', document.baseURI), { method: 'POST', credentials: 'same-origin', signal,
+          headers: { 'content-type': 'application/json' }, body: JSON.stringify({ serverId, action: 'test' }) })
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`)
+        return data
+      }
+      function recordDiscovery(server, data) {
+        setDiscovered(previous => ({ ...previous, [server.id]: data.toolsUnavailable ? undefined : data.tools ?? [] }))
+        setDiscoveredResources(previous => ({ ...previous, [server.id]: {
+          resourceUris: data.resources?.unavailable ? undefined : data.resources?.resources,
+          resourceTemplates: data.resourceTemplates?.unavailable ? undefined : data.resourceTemplates?.resourceTemplates,
+        } }))
+        const unavailable = [data.toolsUnavailable && '工具', data.resources?.unavailable && '资源', data.resourceTemplates?.unavailable && '模板'].filter(Boolean)
+        setChecks(previous => ({ ...previous, [server.id]: { at: new Date().toLocaleString(), revision: state.revision,
+          tools: data.toolsUnavailable ? undefined : data.tools?.length ?? 0,
+          resources: data.resources?.unavailable ? undefined : data.resources?.resources?.length,
+          templates: data.resourceTemplates?.unavailable ? undefined : data.resourceTemplates?.resourceTemplates?.length,
+          partial: unavailable.length > 0, reason: unavailable.length ? `${unavailable.join('、')}目录读取失败，可重试连接测试。` : '',
+          kind: server.platformComposition ? 'platform' : server.specUrl ? 'openapi' : 'mcp' } }))
+        return unavailable.length > 0
+      }
+      async function testConnections() {
+        if (batchRequest.current || busy || !active || state?.status !== 'ready') return
+        const servers = [...(state.value.servers ?? []), ...(publishedService ? [publishedService] : [])]
+        const enabled = servers.filter(server => server.enabled !== false)
+        const run = new AbortController()
+        batchRequest.current = run
+        const current = () => batchRequest.current === run && !run.signal.aborted
+        setBatch({ running: true, total: enabled.length, completed: 0, succeeded: 0, failed: 0, partial: 0, skipped: servers.length - enabled.length })
+        setChecks(previous => ({ ...previous, ...Object.fromEntries(enabled.map(server => [server.id, { revision: state.revision, pending: true }])) }))
+        let next = 0
+        await Promise.all(Array.from({ length: Math.min(4, enabled.length) }, async () => {
+          while (current() && next < enabled.length) {
+            const server = enabled[next++]
+            const request = new AbortController()
+            const abort = () => request.abort()
+            run.signal.addEventListener('abort', abort, { once: true })
+            let timedOut = false
+            const timeout = setTimeout(() => { timedOut = true; request.abort() }, 20_000)
+            let outcome = 'failed'
+            try {
+              const data = await readService(server.id, request.signal)
+              if (!current()) return
+              outcome = recordDiscovery(server, data) ? 'partial' : 'succeeded'
+            } catch (error) {
+              if (!current()) return
+              setChecks(previous => ({ ...previous, [server.id]: { at: new Date().toLocaleString(), revision: state.revision, failed: true,
+                reason: timedOut ? '连接测试超过 20 秒，请检查服务后重试。' : `${error instanceof Error ? error.message : String(error)}。请检查服务地址、网络与凭据后重试。` } }))
+            } finally {
+              clearTimeout(timeout)
+              run.signal.removeEventListener('abort', abort)
+            }
+            if (current()) setBatch(previous => ({ ...previous, completed: previous.completed + 1, [outcome]: previous[outcome] + 1 }))
+          }
+        }))
+        if (current()) { batchRequest.current = null; setBatch(previous => ({ ...previous, running: false })) }
+      }
       useEffect(() => {
         if (!draft || state?.status !== 'ready') return
         const dirty = JSON.stringify({ servers: draft.servers, groups: draft.groups, sharedToken: draft.sharedToken })
@@ -511,7 +586,7 @@ window.__ModuleLoader__.load({
       const currentServerIndex = selectedServerId ? visibleServers.findIndex(server => server.id === selectedServerId) : activeServer
       const editingServer = visibleServers[currentServerIndex]
       const currentCheck = checkOf(editingServer)
-      const currentTools = currentCheck && !currentCheck.failed ? (catalog?.serverId === editingServer?.id ? catalog.data.tools ?? [] : discovered[editingServer?.id] ?? []) : []
+      const currentTools = currentCheck && !currentCheck.pending && !currentCheck.failed ? discovered[editingServer?.id] ?? [] : []
       // 工具范围草稿不改变连接目录；连接资料变化后仍需保存并重新发现。
       const savedEditingServer = (state.value.servers ?? []).find(server => server.id === editingServer?.id)
       const scopeCheck = checks[editingServer?.id]
@@ -559,6 +634,12 @@ window.__ModuleLoader__.load({
 
       return <section className="mcp-manager">
         <style>{styles}</style>
+        {connectionTestTarget && renderToolbar?.(<>
+          <button type="button" disabled={!active || busy || batch?.running} onClick={() => void testConnections()} title="按已保存配置测试所有已启用服务，停用服务跳过">{batch?.running ? `连接测试中 ${batch.completed}/${batch.total}` : '连接测试'}</button>
+          <span className="harness-mcp-test-summary" role="status">{batch
+            ? `${batch.running ? '正在检查' : batch.cancelled ? '检查已取消' : '检查完成'} ${batch.completed}/${batch.total} · 成功 ${batch.succeeded} · 部分可用 ${batch.partial} · 失败 ${batch.failed} · 停用跳过 ${batch.skipped}`
+            : '按已保存配置检查已启用服务'}</span>
+        </>, connectionTestTarget)}
         {toolbarTarget && renderToolbar ? renderToolbar(isDirty ? <button className="harness-primary" type="button" onClick={() => save()} disabled={busy || !state.writable}>保存更改</button> : null, toolbarTarget) : <div className="mcp-toolbar">
           <div><strong>MCP 服务与分组配置</strong><p>保存后新建会话验证连接和工具发现。</p></div>
           <button className="mcp-primary" type="button" onClick={() => save()} disabled={busy || !state.writable || !isDirty}>保存更改</button>
@@ -585,12 +666,14 @@ window.__ModuleLoader__.load({
                   <span className="mcp-service-count">服务 · {visibleServers.length}</span>
                   {filteredServers.map(({ server, index }) => {
                     const check = checkOf(server)
-                    const badge = server.platformComposition ? ['平台服务', 'neutral']
-                      : serverDraftChanged(server) ? ['修改未保存', 'changed']
+                    const badge = serverDraftChanged(server) ? ['修改未保存', 'changed']
                       : server.enabled === false ? ['已停用', 'neutral']
+                      : check?.pending ? ['检查中', 'neutral']
                       : connectionIssue(server) ? [connectionIssue(server), 'changed']
                       : check?.failed ? ['检查失败', 'failed']
-                      : check ? [check.kind === 'openapi' ? '规范已读取' : '连接已验证', 'verified']
+                      : check?.partial ? ['部分可用', 'changed']
+                      : check ? [check.kind === 'platform' ? '平台目录已读取' : check.kind === 'openapi' ? '规范已读取' : '连接已验证', 'verified']
+                      : server.platformComposition ? ['平台服务', 'neutral']
                       : ['连接待检查', 'neutral']
                     return <button key={index} className="mcp-list-item" data-server-id={server.id} type="button" aria-current={currentServerIndex === index ? 'true' : undefined} onClick={() => { setActiveServer(index); setServicePane('tools'); onSelectServerId?.(server.id) }}>
                       <span className="mcp-service-title">{server.platformComposition ? server.description || '工具组合编排' : server.serverName || server.id || '新服务器'}</span>
@@ -606,18 +689,19 @@ window.__ModuleLoader__.load({
                 </select></label><button type="button" onClick={addServer}>接入服务</button></div>
                 {editingServer?.platformComposition ? <div className="mcp-card">
                   <div className="mcp-card-head"><div><h3>{editingServer.description || '工具组合编排'}</h3><p className="mcp-muted">提供已发布编排和平台内置运行查询。在「工具组合编排」工作区管理编排版本与发布。</p></div></div>
-                  <div className="mcp-service-facts" aria-label="当前服务检查范围"><span>配置：平台工具目录</span><span>连接与工具调用：待验证</span></div>
+                  <div className="mcp-service-facts" aria-label="当前服务检查范围"><span>配置：平台工具目录</span><span>{currentCheck?.pending ? '目录检查中' : currentCheck?.failed ? '目录检查失败' : currentCheck?.partial ? '目录部分可用' : currentCheck ? '平台目录已读取' : '目录待检查'} · 工具调用待验证</span>{currentCheck?.at && <span>最近检查 {currentCheck.at}</span>}{currentCheck?.reason && <span role="alert">{currentCheck.reason}</span>}</div>
                   <section className="mcp-section"><h3>已发布编排 · {editingServer.publishedTools?.length ?? 0}</h3>{editingServer.publishedTools?.length ? <ul className="mcp-catalog">{editingServer.publishedTools.map(tool => <li key={tool.toolName || tool.name}><strong>{tool.toolName || tool.name}</strong>{tool.description && <small>{tool.description}</small>}</li>)}</ul> : <p className="mcp-muted">当前没有已发布编排。</p>}</section>
                   {!!editingServer.builtinTools?.length && <section className="mcp-section"><h3>平台内置 · 运行查询 · {editingServer.builtinTools.length}</h3><p className="mcp-muted">用于读取已有运行、检查明细和报告，由平台提供。</p><ul className="mcp-catalog">{editingServer.builtinTools.map(tool => <li key={tool.toolName || tool.name}><strong>{tool.toolName || tool.name}</strong>{tool.description && <small>{tool.description}</small>}</li>)}</ul></section>}
                 </div> : editingServer ? <div className="mcp-card">
                   <div className="mcp-card-head"><div><h3>{editingServer.serverName || editingServer.id || '新服务器'}</h3>{editingServer.description?.trim() && editingServer.description.trim() !== (editingServer.serverName || editingServer.id || '').trim() && <p className="mcp-muted">{editingServer.description}</p>}</div>
-                    <div className="mcp-actions"><button type="button" disabled={busy || !editingServer.id || serverDraftChanged(editingServer) || editingServer.enabled === false} onClick={() => void callTest(editingServer.id)}>连接测试</button><button className="mcp-primary" type="button" disabled={!editingServer.id} onClick={() => openDiagnostic(editingServer.id)}>调试工具</button><label className="mcp-switch"><input type="checkbox" checked={editingServer.enabled !== false} onChange={event => editServer(currentServerIndex, 'enabled', event.target.checked)} />启用</label></div>
+                    <div className="mcp-actions">{!connectionTestTarget && <button type="button" disabled={busy || !editingServer.id || serverDraftChanged(editingServer) || editingServer.enabled === false} onClick={() => void callTest(editingServer.id)}>连接测试</button>}<button className="mcp-primary" type="button" disabled={!editingServer.id} onClick={() => openDiagnostic(editingServer.id)}>调试工具</button><label className="mcp-switch"><input type="checkbox" checked={editingServer.enabled !== false} onChange={event => editServer(currentServerIndex, 'enabled', event.target.checked)} />启用</label></div>
                   </div>
                   <div className="mcp-service-summary" aria-label="当前服务状态">
-                    <article><small>连接状态</small><strong>{serverDraftChanged(editingServer) ? '配置未保存' : currentCheck?.failed ? '检查失败' : currentCheck ? currentCheck.kind === 'openapi' ? '规范已读取' : '连接成功' : '待检查'}</strong></article>
-                    <article><small>工具发现</small><strong>{currentCheck && !currentCheck.failed ? `${currentCheck.tools} 个工具` : '待核对'}</strong><small>{currentCheck && !currentCheck.failed ? '已枚举工具定义' : '尚无可用的发现结果'}</small></article>
+                    <article><small>连接状态</small><strong>{serverDraftChanged(editingServer) ? '配置未保存' : currentCheck?.pending ? '检查中' : currentCheck?.failed ? '检查失败' : currentCheck?.partial ? '部分可用' : currentCheck ? currentCheck.kind === 'openapi' ? '规范已读取' : '连接成功' : '待检查'}</strong></article>
+                    <article><small>工具发现</small><strong>{currentCheck?.tools !== undefined ? `${currentCheck.tools} 个工具` : '待核对'}</strong><small>{currentCheck?.tools !== undefined ? '已枚举工具定义' : '尚无可用的发现结果'}</small></article>
+                    {currentCheck && !currentCheck.pending && !currentCheck.failed && <article><small>资源与模板</small><strong>{currentCheck.resources ?? '未知'} 个资源 · {currentCheck.templates ?? '未知'} 个模板</strong></article>}
                   </div>
-                  <p className="mcp-service-scope">{currentCheck ? `最近检查 ${currentCheck.at}。` : ''}{serverDraftChanged(editingServer) ? '当前配置未保存，保存后可重新检查连接与工具。' : '连接检查只确认接口读取与工具枚举；实际调用和业务结果待验证。'}</p>
+                  <p className="mcp-service-scope">{currentCheck?.at ? `最近检查 ${currentCheck.at}。` : ''}{serverDraftChanged(editingServer) ? '当前配置未保存，连接测试使用已保存配置；保存后可检查新配置。' : '连接检查只确认接口读取与工具枚举；实际调用和业务结果待验证。'}{currentCheck?.reason && <span role="alert">{currentCheck.reason}</span>}</p>
                   <nav className="mcp-service-tabs" aria-label="服务详情"><button type="button" aria-current={servicePane === 'tools' ? 'page' : undefined} onClick={() => setServicePane('tools')}>工具与调试</button><button type="button" aria-current={servicePane === 'connection' ? 'page' : undefined} onClick={() => setServicePane('connection')}>连接配置</button></nav>
                   {servicePane === 'tools' && <section className="mcp-section"><h3>已发现的工具</h3>{currentTools.length ? <ul className="mcp-discovered-list">{currentTools.map(tool => <li key={tool.name}><div><strong>{tool.name}</strong>{tool.description && <p className="mcp-muted">{tool.description}</p>}</div><button type="button" onClick={() => openDiagnostic(editingServer.id, tool.name)}>调试</button></li>)}</ul> : <p className="mcp-muted">{currentCheck?.failed ? '最近一次检查失败，暂不能列出当前配置的工具。' : '当前配置尚无已验证的工具目录。保存配置后运行连接测试，才能显示实际发现的工具。'}</p>}</section>}
                   {servicePane === 'connection' && <>
@@ -802,7 +886,7 @@ window.__ModuleLoader__.load({
                           </div>
                           {server.enabled === false && <p className="mcp-muted">此来源已停用，所选能力不会通过分组开放。</p>}
                           {needsMerge && <p className="mcp-muted">此来源有重复成员，请先合并再编辑选择。</p>}
-                          {!server.platformComposition && <button className="mcp-quiet" type="button" onClick={() => void callTest(server.id)} disabled={busy || !server.id || server.enabled === false}>发现工具与资源</button>}
+                          {!server.platformComposition && <button className="mcp-quiet" type="button" onClick={() => void callTest(server.id)} disabled={busy || batch?.running || !server.id || server.enabled === false}>发现工具与资源</button>}
                           {sections.filter(section => section.items.length || !section.merged.length).map(section => <section key={section.field}><h4>{section.title}</h4>
                             {section.visibleItems.length ? <div className="mcp-tools">{section.visibleItems.map(({ value, item, label, details, operation, choices }) => {
                               const info = <span className="mcp-check-info"><span>{label}{selected[section.field].includes(value) && Array.isArray(section.discovered) && !item && <span className="mcp-muted">（当前未发现）</span>}</span>
@@ -836,7 +920,7 @@ window.__ModuleLoader__.load({
               <div className="mcp-card mcp-debug-target">
                 {objectSelect({ label: '调试对象', value: isGroup ? `group:${diagnosticId}` : `server:${diagnosticId}`, options: [...savedServers.map(server => ({ value: `server:${server.id}`, label: server.serverName || server.id, description: server.specUrl ? `${server.id} · OpenAPI 规范地址：${server.specUrl}` : server.id, group: '服务' })), ...(state.value.groups ?? []).map(group => ({ value: `group:${group.id}`, label: group.id, group: '已保存分组' }))], onChange: value => { if (value.startsWith('group:')) { setSelected(value); onSelectGroupId?.(value.slice(6)) } else { setSelected(value.slice(7)); onSelectServerId?.(value.slice(7)) } } })}
                 <div><span className="mcp-muted">使用已保存配置{isDirty ? ' · 当前有未保存草稿' : ''}</span>{diagnosticServer?.specUrl && <small className="mcp-muted">OpenAPI 规范地址：{diagnosticServer.specUrl}</small>}{diagnosticGroup && <small className="mcp-muted">分组端点：{new URL(`mcp/groups/${diagnosticGroup.id}/v2`, state.publicUrl ?? document.baseURI).href}</small>}</div>
-                {button('发现工具与资源', () => call('test'), busy || !diagnosticId)}
+                {button('发现工具与资源', () => call('test'), busy || batch?.running || !diagnosticId)}
                 {!diagnosticId && <p role="alert">调试目标不存在或尚未保存，请重新选择。</p>}
               </div>
               <section className="mcp-card mcp-debug-selection" aria-label="选择调试能力">
@@ -897,28 +981,20 @@ window.__ModuleLoader__.load({
       </section>
 
       async function callTest(serverId) {
+        if (batchRequest.current) return
         const requestId = ++diagnosticRequest.current
         const current = () => diagnosticRequest.current === requestId && diagnosticTarget.current === targetKey
         setBusy(true)
         setStatus('')
         setCatalog(null)
         try {
-          const response = await fetch(new URL('api/mcp-manager', document.baseURI), { method: 'POST', credentials: 'same-origin',
-            headers: { 'content-type': 'application/json' }, body: JSON.stringify({ serverId, action: 'test' }) })
-          const data = await response.json()
+          const data = await readService(serverId)
           if (!current()) return
-          if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`)
           const reconciliation = reconcileGroupSelections(serverId, data)
           const changed = reconciliation.removed.length || reconciliation.migrated.length
           if (changed) setDraft(reconciliation.draft)
           setCatalog({ serverId, data })
-          setDiscovered(previous => ({ ...previous, [serverId]: data.toolsUnavailable ? undefined : data.tools ?? [] }))
-          setDiscoveredResources(previous => ({ ...previous, [serverId]: {
-            resourceUris: data.resources?.unavailable ? undefined : data.resources?.resources,
-            resourceTemplates: data.resourceTemplates?.unavailable ? undefined : data.resourceTemplates?.resourceTemplates,
-          } }))
-          setChecks(previous => ({ ...previous, [serverId]: { at: new Date().toLocaleString(), revision: state.revision, tools: data.tools?.length ?? 0,
-            kind: (state.value.servers ?? []).find(server => server.id === serverId)?.specUrl ? 'openapi' : 'mcp' } }))
+          recordDiscovery(savedServers.find(server => server.id === serverId) ?? { id: serverId }, data)
           const counts = [
             Array.isArray(data.tools) ? `${data.tools.length} 个工具` : '工具列表未返回',
             Array.isArray(data.resources?.resources) ? `${data.resources.resources.length} 个资源` : '资源列表未返回',

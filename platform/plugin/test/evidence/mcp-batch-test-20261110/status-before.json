@@ -1,0 +1,22 @@
+{
+  "width": 1440,
+  "theme": "light",
+  "titleFont": "18px",
+  "values": [
+    {
+      "text": "规范已读取",
+      "font": "24px",
+      "weight": "600"
+    },
+    {
+      "text": "72 个工具",
+      "font": "24px",
+      "weight": "600"
+    },
+    {
+      "text": "11 个资源 · 41 个模板",
+      "font": "24px",
+      "weight": "600"
+    }
+  ]
+}

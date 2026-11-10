@@ -132,8 +132,8 @@ export async function readUpdateActivity(options: UpdateOptions, state: ServiceS
   }
   const inventory = await rpc('inventory', {})
   if (inventory?.root !== options.dataRoot || inventory.workspace?.id !== workspaceId || inventory.workspace?.root !== options.dataRoot) throw new Error('在线工作区身份不符，未应用')
-  // 已明确允许中断全部管理会话时，无需为不再阻塞更新的会话扫描全部历史记录。
-  const [sessions, evaluations, operations] = await Promise.all([options.interruptSessions ? Promise.resolve({ items: [] }) : rpc('session/list', { args: { _request: {} } }, true), rpc('agents/eval/list', {}), rpc('agents/sdk/list', {})])
+  // 仅客户端更新保留所有会话；无需扫描不会阻塞这次更新的历史记录。
+  const [sessions, evaluations, operations] = await Promise.all([options.clientOnly || options.interruptSessions ? Promise.resolve({ items: [] }) : rpc('session/list', { args: { _request: {} } }, true), rpc('agents/eval/list', {}), rpc('agents/sdk/list', {})])
   const evaluationRuns = Array.isArray(evaluations?.runs) ? [...evaluations.runs, ...(Array.isArray(evaluations.pending) ? evaluations.pending : [])] : evaluations?.jobs
   if (!Array.isArray(sessions?.items) || !Array.isArray(evaluationRuns) || !Array.isArray(operations)
     || evaluations?.pending !== undefined && !Array.isArray(evaluations.pending)
@@ -154,7 +154,8 @@ export async function readUpdateActivity(options: UpdateOptions, state: ServiceS
     } catch {}
     if (!finished) throw new Error('评测状态存在未核对项，不能判断为空闲')
   }
-  const busy: BusyItem[] = options.interruptSessions ? [{ kind: 'session', id: '*', state: 'interruption-authorized-not-enumerated' }] : []
+  const busy: BusyItem[] = options.clientOnly ? [{ kind: 'session', id: '*', state: 'client-update-preserved-not-enumerated' }]
+    : options.interruptSessions ? [{ kind: 'session', id: '*', state: 'interruption-authorized-not-enumerated' }] : []
   for (const session of sessions.items) {
     if (typeof session.sessionId !== 'string' || typeof session.running !== 'boolean') throw new Error('会话运行状态缺失，不能判断为空闲')
     if (session.running) busy.push({ kind: 'session', id: session.sessionId, state: 'running' })

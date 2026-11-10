@@ -1,0 +1,442 @@
+{
+  "checks": [
+    {
+      "name": "进入页面自动检查9项服务",
+      "passed": true
+    },
+    {
+      "name": "切换四个工作区不重复测试",
+      "passed": true
+    },
+    {
+      "name": "选择及筛选服务不重复测试",
+      "passed": true
+    },
+    {
+      "name": "草稿明确提示使用已保存配置",
+      "passed": true
+    },
+    {
+      "name": "检查中禁用批量按钮",
+      "passed": true
+    },
+    {
+      "name": "筛选和草稿不缩小测试范围，完整读取9项",
+      "passed": true
+    },
+    {
+      "name": "检查不改变未保存描述",
+      "passed": true
+    },
+    {
+      "name": "离开后再次进入仅新增一轮9项检查",
+      "passed": true
+    },
+    {
+      "name": "真实请求最大并发为4",
+      "passed": true
+    },
+    {
+      "name": "两项超时逐项展示时间和原因，其余7项完成且可重试",
+      "passed": true
+    },
+    {
+      "name": "实际MCP配置字节未改变",
+      "passed": true
+    }
+  ],
+  "summary": "检查完成 9/9 · 成功 7 · 部分可用 0 · 失败 2 · 停用跳过 0",
+  "requests": [
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-correlate",
+      "http": 200,
+      "catalog": {
+        "tools": 72,
+        "resources": 11,
+        "templates": 41,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-detect",
+      "http": 200,
+      "catalog": {
+        "tools": 24,
+        "resources": 5,
+        "templates": 17,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-event",
+      "http": 200,
+      "catalog": {
+        "tools": 7,
+        "resources": 1,
+        "templates": 1,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-graph",
+      "http": 200,
+      "catalog": {
+        "tools": 110,
+        "resources": 23,
+        "templates": 57,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-ingest",
+      "http": 200,
+      "catalog": {
+        "tools": 163,
+        "resources": 18,
+        "templates": 87,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-master",
+      "http": 200,
+      "catalog": {
+        "tools": 109,
+        "resources": 13,
+        "templates": 50,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-response",
+      "http": 200,
+      "catalog": {
+        "tools": 31,
+        "resources": 6,
+        "templates": 27,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-framework",
+      "http": 200,
+      "catalog": {
+        "tools": 30,
+        "resources": 3,
+        "templates": 19,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "platform-compositions",
+      "http": 200,
+      "catalog": {
+        "tools": 12,
+        "resources": 0,
+        "templates": 0,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-correlate",
+      "http": 200,
+      "catalog": {
+        "tools": 72,
+        "resources": 11,
+        "templates": 41,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-detect",
+      "http": 200,
+      "catalog": {
+        "tools": 24,
+        "resources": 5,
+        "templates": 17,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-event",
+      "http": 200,
+      "catalog": {
+        "tools": 7,
+        "resources": 1,
+        "templates": 1,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-graph",
+      "http": 200,
+      "catalog": {
+        "tools": 110,
+        "resources": 23,
+        "templates": 57,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-ingest",
+      "http": 200,
+      "catalog": {
+        "tools": 163,
+        "resources": 18,
+        "templates": 87,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-master",
+      "http": 200,
+      "catalog": {
+        "tools": 109,
+        "resources": 13,
+        "templates": 50,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-response",
+      "http": 200,
+      "catalog": {
+        "tools": 31,
+        "resources": 6,
+        "templates": 27,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-framework",
+      "http": 200,
+      "catalog": {
+        "tools": 30,
+        "resources": 3,
+        "templates": 19,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "platform-compositions",
+      "http": 200,
+      "catalog": {
+        "tools": 12,
+        "resources": 0,
+        "templates": 0,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-correlate",
+      "http": 200,
+      "catalog": {
+        "tools": 72,
+        "resources": 11,
+        "templates": 41,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-detect",
+      "http": 200,
+      "catalog": {
+        "tools": 24,
+        "resources": 5,
+        "templates": 17,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-event",
+      "http": 200,
+      "catalog": {
+        "tools": 7,
+        "resources": 1,
+        "templates": 1,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-graph",
+      "http": 200,
+      "catalog": {
+        "tools": 110,
+        "resources": 23,
+        "templates": 57,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-ingest",
+      "http": 200,
+      "catalog": {
+        "tools": 163,
+        "resources": 18,
+        "templates": 87,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-master",
+      "error": "AbortError"
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-response",
+      "http": 200,
+      "catalog": {
+        "tools": 31,
+        "resources": 6,
+        "templates": 27,
+        "partial": false
+      }
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "ai-soc-framework",
+      "error": "AbortError"
+    },
+    {
+      "path": "/hep/api/mcp-manager",
+      "method": "POST",
+      "action": "test",
+      "serverId": "platform-compositions",
+      "http": 200,
+      "catalog": {
+        "tools": 12,
+        "resources": 0,
+        "templates": 0,
+        "partial": false
+      }
+    }
+  ],
+  "maxConcurrency": 4,
+  "errors": [],
+  "badges": [
+    {
+      "id": "ai-soc-correlate",
+      "state": "规范已读取"
+    },
+    {
+      "id": "ai-soc-detect",
+      "state": "规范已读取"
+    },
+    {
+      "id": "ai-soc-event",
+      "state": "规范已读取"
+    },
+    {
+      "id": "ai-soc-graph",
+      "state": "规范已读取"
+    },
+    {
+      "id": "ai-soc-ingest",
+      "state": "规范已读取"
+    },
+    {
+      "id": "ai-soc-master",
+      "state": "检查失败"
+    },
+    {
+      "id": "ai-soc-response",
+      "state": "规范已读取"
+    },
+    {
+      "id": "ai-soc-framework",
+      "state": "检查失败"
+    },
+    {
+      "id": "platform-compositions",
+      "state": "平台目录已读取"
+    }
+  ],
+  "failures": [
+    {
+      "id": "ai-soc-master",
+      "scope": "最近检查 2026/11/10 01:29:34。连接检查只确认接口读取与工具枚举；实际调用和业务结果待验证。连接测试超过 20 秒，请检查服务后重试。"
+    },
+    {
+      "id": "ai-soc-framework",
+      "scope": "最近检查 2026/11/10 01:29:42。连接检查只确认接口读取与工具枚举；实际调用和业务结果待验证。连接测试超过 20 秒，请检查服务后重试。"
+    }
+  ],
+  "configUnchanged": true,
+  "observation": "自动及手动前两轮均9/9成功，再次进入7成功、2超时。最初脚本误要求每轮全部在线，断言失败；请求数及逐项失败反馈独立复验通过。"
+}

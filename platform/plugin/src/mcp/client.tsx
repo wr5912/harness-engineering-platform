@@ -38,6 +38,7 @@ export function McpPage({ rpc, updates, onContext, target, onNavigate, active = 
   const [state, setState] = useState<any>({ status: 'loading' })
   const [page, setPage] = useState<string>(tabs.some(tab => tab.id === target?.tab) ? target!.tab! : 'servers')
   const [toolbarTarget, setToolbarTarget] = useState<HTMLDivElement | null>(null)
+  const [connectionTestTarget, setConnectionTestTarget] = useState<HTMLDivElement | null>(null)
   const [publishedService, setPublishedService] = useState<any>(null)
   const [serviceError, setServiceError] = useState('')
   const managerRoot = useRef<HTMLDivElement>(null)
@@ -67,9 +68,9 @@ export function McpPage({ rpc, updates, onContext, target, onNavigate, active = 
         ? { ...previous, error: `读取 MCP 数据配置失败：${transportDetail(error)}` }
         : { status: 'unavailable', error: `读取 MCP 数据配置失败：${transportDetail(error)}` })),
       page === 'composition' ? Promise.resolve() : rpc.call(CHANNEL, 'mcp/list', {}).then(response => {
-        if (response.ok) { setPublishedService((response.value as any).publishedService ?? null); setServiceError(''); setServiceLoaded(true) }
+        if (response.ok) { setPublishedService((response.value as any).publishedService ?? null); setServiceError('') }
         else setServiceError(response.error.message)
-      }).catch(error => setServiceError(`读取已发布组合服务失败：${transportDetail(error)}`)),
+      }).catch(error => setServiceError(`读取已发布组合服务失败：${transportDetail(error)}`)).finally(() => setServiceLoaded(true)),
     ])
   })
   useEffect(() => { void refreshConfiguration() }, [rpc])
@@ -110,7 +111,9 @@ export function McpPage({ rpc, updates, onContext, target, onNavigate, active = 
   return <main className="harness-mcp-page" aria-label="MCP 管理">
     <header className="harness-page-heading harness-mcp-page-heading">
       <div><span className="harness-mcp-kicker">工具与连接</span><h1>MCP 管理</h1><p>接入服务、组织工具与资源，在同一工作区完成调试和组合编排。</p></div>
-      <button type="button" className="harness-primary" disabled={state.status !== 'ready'} onClick={() => { selectTab('servers'); requestAnimationFrame(() => managerRoot.current?.querySelector<HTMLButtonElement>('.mcp-service-layout .mcp-add')?.click()) }}>＋ 接入服务</button>
+      <div className="harness-mcp-heading-actions" ref={setConnectionTestTarget}>
+        <button type="button" className="harness-primary" disabled={state.status !== 'ready'} onClick={() => { selectTab('servers'); requestAnimationFrame(() => managerRoot.current?.querySelector<HTMLButtonElement>('.mcp-service-layout .mcp-add')?.click()) }}>＋ 接入服务</button>
+      </div>
     </header>
     <div className="harness-mcp-module-toolbar">
       <nav className="harness-mcp-toolbar harness-mcp-tabs" aria-label="MCP 工作区">{tabs.map(tab => <button key={tab.id} type="button" aria-current={page === tab.id ? 'page' : undefined} onClick={() => selectTab(tab.id)}>{tab.title}</button>)}</nav>
@@ -125,7 +128,7 @@ export function McpPage({ rpc, updates, onContext, target, onNavigate, active = 
         const item = managerRoot.current?.querySelector<HTMLElement>('.mcp-sidebar [aria-current="true"]')
         item?.scrollIntoView({ block: 'nearest' }); item?.focus()
       }}>返回服务列表</button>}
-      {state.status === 'ready' && <Manager view={page} onValidationError={() => selectTab('servers')} publishedService={publishedService} selectedServerId={target?.server_id} selectedGroupId={target?.group_id} PasswordInput={PasswordInput} SearchSelect={SearchSelect} renderToolbar={(control, container) => createPortal(control, container)} onOpenView={(view, serverId, groupId) => {
+      {state.status === 'ready' && <Manager view={page} active={active && serviceLoaded} connectionTestTarget={connectionTestTarget} onValidationError={() => selectTab('servers')} publishedService={publishedService} selectedServerId={target?.server_id} selectedGroupId={target?.group_id} PasswordInput={PasswordInput} SearchSelect={SearchSelect} renderToolbar={(control, container) => createPortal(control, container)} onOpenView={(view, serverId, groupId) => {
       lastServer.current = serverId
       lastGroup.current = groupId
       setPage(view)

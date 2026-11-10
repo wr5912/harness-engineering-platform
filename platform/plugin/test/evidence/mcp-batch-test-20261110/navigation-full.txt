@@ -1,0 +1,43 @@
+✔ 页面定位保留精确 Agent、版本、Run 与用例，未知地址回首页 (3.543411ms)
+✔ 评测 Run 子视图可随 URL 往返，用例深链优先定位逐例结果 (0.95236ms)
+✔ 智能体列表视图独立于右侧详情页签并随地址往返恢复 (0.316986ms)
+✔ 旧链接保留原样，非法列表视图在读取和写入时均忽略 (0.466533ms)
+✔ 统一网关有独立稳定路由，旧 MCP 地址保持原样 (0.441597ms)
+✔ 评测Run、实例来源与MCP组合版本可精确往返，非法动作意图被忽略 (0.575617ms)
+✖ 平台通过原生插槽只替换 Codex 更新弹窗，加载顺序、刷新与卸载均保持正确 (114.030705ms)
+✔ 一级导航可直接进入统一网关，单一管理页面保持挂载并随路由启停 (52.301544ms)
+✔ 浮窗分别显示当前 A 与固定任务 B 的名称、重复版本和精确对象入口 (41.153035ms)
+✔ MCP 工作区仅保留四个工具页签，统一网关使用顶部一级入口 (36.43348ms)
+✔ MCP 页头连接测试排在接入服务之后，配置及组合目录就绪后才启用，跨页签保持启用 (42.165047ms)
+✔ 智能体资产深链保留完整相对路径，仅资产页接收且拒绝越界段 (0.980261ms)
+✔ 旧评测Job深链仅保留读取入口，新序列化只输出Run身份且显式Run优先 (0.287514ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 12
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 485.839202
+
+✖ failing tests:
+
+test at platform/plugin/test/navigation.test.mjs:95:1
+✖ 平台通过原生插槽只替换 Codex 更新弹窗，加载顺序、刷新与卸载均保持正确 (114.030705ms)
+  node:internal/modules/esm/resolve:1022
+      throw error;
+      ^
+  
+  Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'clsx' imported from /home/cmp/work/harness-engineering-platform/platform/plugin/node_modules/.pnpm/@deepseek-ai+dsh-client-ui-primitives@0.2.1-rc.5_@deepseek-ai+cordis@4.0.5/node_modules/@deepseek-ai/dsh-client-ui-primitives/lib/index.js
+      at Object.getPackageJSONURL (node:internal/modules/package_json_reader:331:9)
+      at packageResolve (node:internal/modules/esm/resolve:784:25)
+      at moduleResolve (node:internal/modules/esm/resolve:873:18)
+      at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+      at #cachedDefaultResolve (node:internal/modules/esm/loader:705:20)
+      at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:725:38)
+      at ModuleLoader.resolveSync (node:internal/modules/esm/loader:763:56)
+      at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:604:27)
+      at ModuleJobSync.syncLink (node:internal/modules/esm/module_job:276:33)
+      at ModuleJobSync.link (node:internal/modules/esm/module_job:611:17) {
+    code: 'ERR_MODULE_NOT_FOUND'
+  }

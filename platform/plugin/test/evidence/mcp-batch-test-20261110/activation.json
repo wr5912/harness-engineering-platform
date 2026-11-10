@@ -1,0 +1,35 @@
+{
+  "status": "applied",
+  "programRoot": "/home/cmp/work/harness-engineering-platform",
+  "dataRoot": "/home/cmp/harness-engineering-platform-data",
+  "workspaceId": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+  "pid": 2369310,
+  "activation": "native-hmr",
+  "busy": [
+    {
+      "kind": "session",
+      "id": "*",
+      "state": "client-update-preserved-not-enumerated"
+    }
+  ],
+  "changed": [
+    "platform/plugin/lib/client.js"
+  ],
+  "stage": "/home/cmp/work/harness-engineering-platform/.local/platform-updates/a3e2bb1d-ad00-4630-a48e-93c81edc6a7b",
+  "receipt": "/home/cmp/work/harness-engineering-platform/.local/platform-updates/a3e2bb1d-ad00-4630-a48e-93c81edc6a7b/receipt.json",
+  "sourceHead": "05bf509aa374e86c0b60f62b182be1a384e97ec7",
+  "sourceDirty": true,
+  "clientSha256": "60d0de61bc20fecd6679696f220939eef106f64ba91db8ce0c97730bacbefb0d",
+  "processAfter": "2369310 Tue Nov 10 01:05:19 2026",
+  "savedConfiguration": {
+    "before": {
+      "sha256": "d80602107d407abcf3890f052b7164cdc11c5780237933093cbbc631884cb4cc",
+      "mtime": 1794302218252155364
+    },
+    "after": {
+      "sha256": "d80602107d407abcf3890f052b7164cdc11c5780237933093cbbc631884cb4cc",
+      "mtime": 1794302218252155364
+    },
+    "unchanged": true
+  }
+}

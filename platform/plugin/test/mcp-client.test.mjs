@@ -6,9 +6,9 @@ import test from 'node:test'
 import { compositionQueries } from '../src/mcp/definition.ts'
 
 // 运行实际客户端产物，只替换 React 的状态调度和 Portal 容器。
-function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理请求') }, clipboardFailure = false, SearchSelect, writeResult } = {}) {
+function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理请求') }, clipboardFailure = false, SearchSelect, writeResult, timers = { setTimeout, clearTimeout } } = {}) {
   const require = createRequire(import.meta.url)
-  const states = [], dependencies = []
+  const states = [], dependencies = [], cleanups = []
   const clipboard = []
   let registration, cursor, effects, changed
   const react = {
@@ -30,7 +30,7 @@ function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理
       const index = cursor++
       if (!dependencies[index] || deps.some((value, at) => value !== dependencies[index][at])) {
         dependencies[index] = deps
-        effects.push(effect)
+        effects.push(() => { cleanups[index]?.(); cleanups[index] = effect() })
       }
     },
   }
@@ -41,7 +41,7 @@ function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理
     structuredClone, URL, location: { origin: 'http://127.0.0.1:3090' },
     document: { baseURI: 'http://127.0.0.1:3090/hep/' },
     navigator: { clipboard: { writeText: async value => { if (clipboardFailure) throw new Error('denied'); clipboard.push(value) } } },
-    fetch,
+    fetch, AbortController, ...timers,
   })
   const { Manager } = registration.factory(name => name === '@deepseek-ai/dsh-client-ui-primitives' ? {} : name === 'react' ? react
     : name === 'react-dom' ? { ...require(name), createPortal: element => element } : require(name))
@@ -118,10 +118,116 @@ function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理
     },
     setBuiltinTools: tools => { props.publishedService.builtinTools = tools; render() },
     setView: value => { props.view = value; render() }, getView: () => props.view,
+    enableBatch: () => { props.connectionTestTarget = {}; props.renderToolbar = control => control; props.active = true; render() },
+    setActive: value => { props.active = value; render() },
+    unmount: () => cleanups.forEach(cleanup => cleanup?.()),
     setServerId: value => { props.selectedGroupId = undefined; props.selectedServerId = value; render() },
     setGroupId: value => { props.selectedServerId = undefined; props.selectedGroupId = value; render() },
     replaceDraftServersBeforeEffects: servers => { states[0] = { ...states[0], servers: structuredClone(servers) }; return renderBeforeEffects() } }
 }
+
+const discoveryReply = (tools = []) => ({ ok: true, json: async () => ({ tools, resources: { resources: [] }, resourceTemplates: { resourceTemplates: [] } }) })
+const flushBatch = async ui => { await new Promise(setImmediate); ui.render() }
+
+test('全局连接测试按保存配置检查全部启用服务，忽略筛选并保留分组和未保存输入', async () => {
+  const requests = []
+  const ui = editor({ fetch: async (_url, options) => {
+    const request = JSON.parse(options.body); requests.push(request)
+    return request.serverId === 'broken' ? { ok: false, json: async () => ({ error: '无法连接测试服务' }) }
+      : request.serverId === 'partial' ? { ok: true, json: async () => ({ toolsUnavailable: true, resources: { resources: [] }, resourceTemplates: { unavailable: true } }) }
+        : discoveryReply([{ name: 'saved_tool' }])
+  } })
+  const groups = [{ id: 'keep', members: [{ serverId: ui.server.id, names: ['old_selection'] }] }]
+  ui.refreshValue({ servers: [ui.server, { id: 'broken', url: 'https://broken.test', enabled: true },
+    { id: 'partial', url: 'https://partial.test', enabled: true }, { id: 'disabled', url: 'https://disabled.test', enabled: false }], groups })
+  ui.input('描述（可选）').props.onChange({ target: { value: '未保存输入' } }); ui.render()
+  ui.nodes().find(node => node.type === 'input' && node.props.type === 'search').props.onChange({ target: { value: '不存在的服务' } }); ui.render()
+  ui.enableBatch()
+  assert.equal(ui.button('连接测试中 0/4').props.disabled, true)
+  assert.equal(ui.nodes().filter(node => node.type === 'button' && ui.text(node) === '连接测试').length, 0, '服务卡片不再显示单项按钮')
+  await flushBatch(ui)
+  assert.deepEqual(requests.map(item => item.serverId).sort(), ['biz-soc-framework', 'broken', 'partial', 'platform-compositions'])
+  assert.ok(requests.every(item => item.action === 'test'))
+  assert.match(ui.text(ui.render()), /检查完成 4\/4 · 成功 2 · 部分可用 1 · 失败 1 · 停用跳过 1/)
+  ui.nodes().find(node => node.type === 'input' && node.props.type === 'search').props.onChange({ target: { value: '' } }); ui.render()
+  assert.match(ui.text(ui.serviceButton('biz-soc-framework')), /修改未保存/)
+  ui.setServerId('broken'); assert.match(ui.text(ui.render()), /无法连接测试服务.*请检查服务地址、网络与凭据/)
+  ui.setServerId('partial'); assert.match(ui.text(ui.render()), /部分可用.*工具目录|工具、模板目录读取失败/)
+  assert.doesNotMatch(ui.text(ui.render()), /0 个工具/)
+  ui.setServerId('platform-compositions'); assert.match(ui.text(ui.render()), /平台目录已读取.*工具调用待验证/)
+  ui.setServerId(ui.server.id)
+  assert.equal(ui.input('描述（可选）').props.value, '未保存输入')
+  assert.equal(ui.writes.length, 0)
+  await ui.button('保存更改').props.onClick(); ui.render()
+  assert.deepEqual(ui.writes[0].ops.find(op => op.path[0] === 'groups').value, groups)
+})
+
+test('自动检查每次进入执行一次，页签和选择不重复触发，手动检查可再次运行', async () => {
+  let requests = 0
+  const ui = editor({ fetch: async () => { requests++; return discoveryReply() } })
+  ui.enableBatch(); await flushBatch(ui)
+  assert.equal(requests, 2)
+  ui.setView('groups'); ui.setServerId('platform-compositions'); ui.setView('connection'); ui.render()
+  assert.equal(requests, 2)
+  ui.setView('servers')
+  await ui.button('连接测试').props.onClick(); await flushBatch(ui)
+  assert.equal(requests, 4)
+  ui.setActive(false); ui.setActive(true); await flushBatch(ui)
+  assert.equal(requests, 6)
+})
+
+test('批量检查最多四个并发，失败后继续，单项20秒超时不会阻塞剩余服务', async () => {
+  let inflight = 0, peak = 0
+  const pending = [], timeouts = new Map()
+  const ui = editor({ timers: { setTimeout: (fn, delay) => { const id = {}; timeouts.set(id, { fn, delay }); return id }, clearTimeout: id => timeouts.delete(id) },
+    fetch: (_url, options) => new Promise((resolve, reject) => {
+      inflight++; peak = Math.max(peak, inflight)
+      const finish = value => { inflight--; resolve(value) }
+      options.signal.addEventListener('abort', () => { inflight--; reject(new Error('aborted')) }, { once: true })
+      pending.push({ id: JSON.parse(options.body).serverId, finish })
+    }) })
+  ui.refreshValue({ servers: Array.from({ length: 6 }, (_, i) => ({ id: `service-${i}`, url: `https://service-${i}.test` })), groups: [] })
+  ui.enableBatch()
+  assert.equal(inflight, 4)
+  ui.setView('groups')
+  assert.ok(ui.nodes().filter(node => node.type === 'button' && ui.text(node) === '发现工具与资源').every(node => node.props.disabled))
+  const firstTimeout = [...timeouts.values()][0]; assert.equal(firstTimeout.delay, 20_000); firstTimeout.fn()
+  pending[1].finish({ ok: false, json: async () => ({ error: 'HTTP 503' }) })
+  pending[2].finish(discoveryReply()); pending[3].finish(discoveryReply())
+  await flushBatch(ui)
+  assert.equal(pending.length, 7, '超时与失败后继续剩余服务和平台组合目录')
+  pending.slice(4).forEach(request => request.finish(discoveryReply()))
+  await flushBatch(ui)
+  assert.equal(peak, 4)
+  assert.equal(timeouts.size, 0)
+  assert.match(ui.text(ui.render()), /检查完成 7\/7 · 成功 5 · 部分可用 0 · 失败 2/)
+  ui.setView('servers'); ui.setServerId('service-0')
+  assert.match(ui.text(ui.render()), /超过 20 秒/)
+})
+
+test('离开、版本更新和卸载取消请求，迟到响应不能覆盖新状态', async () => {
+  const pending = []
+  const ui = editor({ fetch: (_url, options) => new Promise(resolve => pending.push({ options, resolve })) })
+  ui.enableBatch(); ui.setActive(false)
+  assert.ok(pending.every(item => item.options.signal.aborted))
+  pending.forEach(item => item.resolve(discoveryReply([{ name: 'stale_tool' }])))
+  await flushBatch(ui)
+  assert.match(ui.text(ui.render()), /检查已取消 0\/2/)
+  assert.doesNotMatch(ui.text(ui.render()), /stale_tool|规范已读取/)
+  ui.setActive(true)
+  assert.equal(pending.length, 4)
+  ui.refreshValue(undefined, 'r2')
+  assert.ok(pending.slice(2).every(item => item.options.signal.aborted))
+  pending.slice(2).forEach(item => item.resolve(discoveryReply([{ name: 'old_revision_tool' }])))
+  await flushBatch(ui)
+  assert.equal(pending.length, 4, '版本更新不会额外自动启动一轮')
+  assert.doesNotMatch(ui.text(ui.render()), /old_revision_tool/)
+  assert.doesNotMatch(ui.text(ui.render()), /检查已取消|检查完成/)
+  void ui.button('连接测试').props.onClick(); ui.render(); ui.unmount()
+  assert.ok(pending.slice(4).every(item => item.options.signal.aborted))
+  pending.slice(4).forEach(item => item.resolve(discoveryReply()))
+  await new Promise(setImmediate)
+})
 
 function serviceSelection(ui, serverId) {
   const root = () => ui.nodes().find(node => node.type === 'details' && node.props['data-server-id'] === serverId)

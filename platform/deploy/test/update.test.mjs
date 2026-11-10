@@ -294,6 +294,27 @@ test('明确允许中断会话时不枚举历史，仍核对评测和 SDK 任务
   await assert.rejects(readUpdateActivity({ ...failed.options, interruptSessions: true }, failed.state, 'workspace-update-test'), /只读核对失败/)
 })
 
+test('仅客户端更新保留会话且不枚举历史，仍核对工作区和业务任务', async t => {
+  const f = await activityFixture(t, {
+    'agents/eval/list': { jobs: [{ job_id: 'eval-active', status: 'running' }] },
+    'agents/sdk/list': [],
+  })
+  const busy = await readUpdateActivity({ ...f.options, clientOnly: true }, f.state, 'workspace-update-test')
+  assert.deepEqual(busy, [
+    { kind: 'session', id: '*', state: 'client-update-preserved-not-enumerated' },
+    { kind: 'evaluation', id: 'eval-active', state: 'running' },
+  ])
+  assert.deepEqual(f.requested, ['inventory', 'agents/eval/list', 'agents/sdk/list'])
+  await assert.rejects(readUpdateActivity({ ...f.options, clientOnly: true }, f.state, 'wrong-workspace'), /在线工作区身份不符/)
+  const failed = await activityFixture(t, { 'agents/eval/list': { jobs: [] } })
+  await assert.rejects(readUpdateActivity({ ...failed.options, clientOnly: true }, failed.state, 'workspace-update-test'), /只读核对失败/)
+  const update = fixture(t, { target: 'client.js', afterBuildBusy: busy })
+  const report = await updatePlatform({ ...update.options, clientOnly: true }, update.services)
+  assert.equal(report.status, 'applied')
+  assert.equal(report.activation, 'native-hmr')
+  assert.deepEqual(update.events, ['build', 'verify'])
+})
+
 test('继承助手投影的子会话只核对原生运行状态，不走普通管理会话路由', async t => {
   const sessions = { items: [{ sessionId: 'child', origin: 'subagent', running: false,
     projections: { values: { harnessPlatformAssistant: { workspace_id: 'workspace-update-test' } } } }] }

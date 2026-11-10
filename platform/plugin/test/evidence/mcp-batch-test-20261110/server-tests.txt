@@ -1,0 +1,61 @@
+(node:2408933) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/cmp/work/harness-engineering-platform/plugins/mcp-manager/resource-address.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /home/cmp/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ v2 调用按来源路由，健康工具与资源工具不等待无关挂起成员 (2314.610784ms)
+✔ 分组 HTTP 路由在实例上下文内生成快照，草稿发现和调用同源且不泄露给其他实例 (211.478426ms)
+✔ v2 分组名称与显示名解耦，资源代理隔离同 URI 来源并拒绝失效选择 (470.486009ms)
+✔ v2 分组保留可达来源，标出不可达来源；平台可关闭管理 Agent 自动装载 (75.419089ms)
+✔ v2 拒绝跨来源、上游重复和旧名冲突，离线来源不让出名称且不影响其他工具 (360.454961ms)
+✖ 业务 Session 跳过连接、鉴权和规范发现失败的 MCP 来源，仍校验本地配置 (114.722332ms)
+✔ 原始 OpenAPI 发现尊重调用方取消信号，包括登录授权过程 (259.748697ms)
+✔ 原生 MCP 桥沿用 DSH 的非致命启动与无工具注册状态 (149.460222ms)
+✔ 原生 MCP 的同名工具与资源不合并，冲突项不发布也不能通过旧名调用 (137.725994ms)
+✔ OpenAPI 地址模板与实际请求共用服务器基址及路径解析，重新发现跟随基址变化 (21.435012ms)
+✔ 服务基址迁移后分组工具、资源和模板实际访问新地址，不依赖旧服务在线 (112.388555ms)
+✔ OpenAPI 同一操作只发布一个工具，保留资源读取与已选包装工具调用 (177.369107ms)
+✔ v2 分组可列出并读取包含多个普通变量的来源资源模板 (97.787304ms)
+✔ 旧分组可继续读取同一服务重复成员，v2 拒绝歧义来源 (79.885136ms)
+✔ 分组允许只有 Resource 能力的服务，工具发现不要求上游 tools 能力 (120.809742ms)
+✔ v2 工具代理将 SDK 取消传到实际来源 (118.584084ms)
+✔ 资源工具复用真实读取、参数约束和同进程分派，正文可供 DSH 模型读取 (404.455654ms)
+✔ OpenAPI 资源工具保留参数类型、必填查询参数与说明，并隔离未选操作 (112.290214ms)
+✔ 三类发现遍历全部分页，模板不支持与坏来源不阻塞其他资源工具，二进制保留原文 (469.01649ms)
+✔ 分组调试通过实际已发布 v2 端点发现、调用、读 URI 与模板，拒绝混淆目标 (528.585353ms)
+(node:2408934) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/cmp/work/harness-engineering-platform/plugins/mcp-manager/resource-address.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /home/cmp/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ 仅更改 HTTP(S) 协议、主机或端口时保存即迁移全部分组，保留路径、模板和工具选择 (47.890313ms)
+✔ MCP 保存共用数据仓库版本，凭据只进本地文件，旧版本拒绝覆盖 (11.760477ms)
+✔ Runtime Store 构造和读取不修改目录权限、凭据归属或其他本地文件 (2.760215ms)
+✔ prepare 迁移后已构造的 Store 使用同一 canonical 凭据和锁，旧读取入口保留 (66.086648ms)
+✔ 凭据读取拒绝未受信旧引用、并存文件和悬空 canonical 引用，不执行迁移 (2.428315ms)
+✔ MCP 保存锁阻止并行写；未知字段与地址凭据不能进入公开配置 (4.831931ms)
+✔ 本地凭据为空时可装载，并在界面保存时补充到本地文件 (9.992132ms)
+✔ 真实配置校验允许待补充登录和无授权来源，仍拒绝非法结构 (0.962763ms)
+✔ 平台 MCP 入口不暴露原生 Settings 配置，业务入口保留自身配置合同 (30.564307ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 28
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6795.00389
+
+✖ failing tests:
+
+test at test/mcp-group-v2.test.mjs:284:1
+✖ 业务 Session 跳过连接、鉴权和规范发现失败的 MCP 来源，仍校验本地配置 (114.722332ms)
+  Error: MCP 当前连接或工具范围已变化
+      at Object.assertCurrent [as platformAssertCurrent] (file:///tmp/mcp-group-v2-HXI8QW/manager.mjs:508:99)
+      at currentServer (file:///tmp/mcp-group-v2-HXI8QW/manager.mjs:1406:43)
+      at file:///tmp/mcp-group-v2-HXI8QW/manager.mjs:1448:47
+      at Object.withToolContext (file:///home/cmp/work/harness-engineering-platform/platform/plugin/test/mcp-group-v2.test.mjs:328:77)
+      at Object.call (file:///tmp/mcp-group-v2-HXI8QW/manager.mjs:1447:51)
+      at Object.execute (file:///home/cmp/.local/share/hep-runtimes/dsh-0.2.1-rc.5/node_modules/@deepseek-ai/dsh-mcp-client/lib/index.js:231:85)
+      at TestContext.<anonymous> (file:///home/cmp/work/harness-engineering-platform/platform/plugin/test/mcp-group-v2.test.mjs:367:36)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)

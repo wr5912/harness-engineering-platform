@@ -1,0 +1,10 @@
+✔ MCP 工作区仅保留四个工具页签，统一网关使用顶部一级入口 (75.219402ms)
+✔ MCP 页头连接测试排在接入服务之后，配置及组合目录就绪后才启用，跨页签保持启用 (46.112592ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 311.014827

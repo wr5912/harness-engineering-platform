@@ -1,0 +1,573 @@
+{
+  "measurements": [
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 1000,
+      "buttons": [
+        {
+          "text": "＋ 接入服务",
+          "x": 1212.859375,
+          "y": 93.796875,
+          "right": 1312,
+          "bottom": 132.1875,
+          "disabled": false
+        },
+        {
+          "text": "连接测试",
+          "x": 1320,
+          "y": 93.796875,
+          "right": 1402,
+          "bottom": 132.1875,
+          "disabled": false
+        }
+      ],
+      "scroll": [
+        {
+          "className": "harness-mcp-page harness-gateway-page",
+          "scrollWidth": 0,
+          "clientWidth": 0
+        },
+        {
+          "className": "harness-mcp-page",
+          "scrollWidth": 1430,
+          "clientWidth": 1430
+        },
+        {
+          "className": "harness-page-heading harness-mcp-page-heading",
+          "scrollWidth": 1374,
+          "clientWidth": 1374
+        },
+        {
+          "className": "harness-mcp-heading-actions",
+          "scrollWidth": 420,
+          "clientWidth": 420
+        }
+      ],
+      "values": [
+        {
+          "text": "规范已读取",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "72 个工具",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "11 个资源 · 41 个模板",
+          "font": "14px",
+          "weight": "400"
+        }
+      ],
+      "documentOverflow": false,
+      "summary": "检查完成 9/9 · 成功 9 · 部分可用 0 · 失败 0 · 停用跳过 0",
+      "summaryTop": 140.1875,
+      "screenshot": "desktop-light.png"
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 1000,
+      "buttons": [
+        {
+          "text": "＋ 接入服务",
+          "x": 1212.859375,
+          "y": 93.796875,
+          "right": 1312,
+          "bottom": 132.1875,
+          "disabled": false
+        },
+        {
+          "text": "连接测试",
+          "x": 1320,
+          "y": 93.796875,
+          "right": 1402,
+          "bottom": 132.1875,
+          "disabled": false
+        }
+      ],
+      "scroll": [
+        {
+          "className": "harness-mcp-page harness-gateway-page",
+          "scrollWidth": 0,
+          "clientWidth": 0
+        },
+        {
+          "className": "harness-mcp-page",
+          "scrollWidth": 1430,
+          "clientWidth": 1430
+        },
+        {
+          "className": "harness-page-heading harness-mcp-page-heading",
+          "scrollWidth": 1374,
+          "clientWidth": 1374
+        },
+        {
+          "className": "harness-mcp-heading-actions",
+          "scrollWidth": 420,
+          "clientWidth": 420
+        }
+      ],
+      "values": [
+        {
+          "text": "规范已读取",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "72 个工具",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "11 个资源 · 41 个模板",
+          "font": "14px",
+          "weight": "400"
+        }
+      ],
+      "documentOverflow": false,
+      "summary": "检查完成 9/9 · 成功 9 · 部分可用 0 · 失败 0 · 停用跳过 0",
+      "summaryTop": 140.1875,
+      "screenshot": "desktop-dark.png"
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "height": 1024,
+      "buttons": [
+        {
+          "text": "＋ 接入服务",
+          "x": 540.859375,
+          "y": 102.84375,
+          "right": 640,
+          "bottom": 141.234375,
+          "disabled": false
+        },
+        {
+          "text": "连接测试",
+          "x": 648,
+          "y": 102.84375,
+          "right": 730,
+          "bottom": 141.234375,
+          "disabled": false
+        }
+      ],
+      "scroll": [
+        {
+          "className": "harness-mcp-page harness-gateway-page",
+          "scrollWidth": 0,
+          "clientWidth": 0
+        },
+        {
+          "className": "harness-mcp-page",
+          "scrollWidth": 758,
+          "clientWidth": 758
+        },
+        {
+          "className": "harness-page-heading harness-mcp-page-heading",
+          "scrollWidth": 702,
+          "clientWidth": 702
+        },
+        {
+          "className": "harness-mcp-heading-actions",
+          "scrollWidth": 420,
+          "clientWidth": 420
+        }
+      ],
+      "values": [
+        {
+          "text": "规范已读取",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "72 个工具",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "11 个资源 · 41 个模板",
+          "font": "14px",
+          "weight": "400"
+        }
+      ],
+      "documentOverflow": false,
+      "summary": "检查完成 9/9 · 成功 9 · 部分可用 0 · 失败 0 · 停用跳过 0",
+      "summaryTop": 149.234375,
+      "screenshot": "tablet-light.png"
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "height": 1024,
+      "buttons": [
+        {
+          "text": "＋ 接入服务",
+          "x": 540.859375,
+          "y": 102.84375,
+          "right": 640,
+          "bottom": 141.234375,
+          "disabled": false
+        },
+        {
+          "text": "连接测试",
+          "x": 648,
+          "y": 102.84375,
+          "right": 730,
+          "bottom": 141.234375,
+          "disabled": false
+        }
+      ],
+      "scroll": [
+        {
+          "className": "harness-mcp-page harness-gateway-page",
+          "scrollWidth": 0,
+          "clientWidth": 0
+        },
+        {
+          "className": "harness-mcp-page",
+          "scrollWidth": 758,
+          "clientWidth": 758
+        },
+        {
+          "className": "harness-page-heading harness-mcp-page-heading",
+          "scrollWidth": 702,
+          "clientWidth": 702
+        },
+        {
+          "className": "harness-mcp-heading-actions",
+          "scrollWidth": 420,
+          "clientWidth": 420
+        }
+      ],
+      "values": [
+        {
+          "text": "规范已读取",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "72 个工具",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "11 个资源 · 41 个模板",
+          "font": "14px",
+          "weight": "400"
+        }
+      ],
+      "documentOverflow": false,
+      "summary": "检查完成 9/9 · 成功 9 · 部分可用 0 · 失败 0 · 停用跳过 0",
+      "summaryTop": 149.234375,
+      "screenshot": "tablet-dark.png"
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "height": 844,
+      "buttons": [
+        {
+          "text": "＋ 接入服务",
+          "x": 12,
+          "y": 166.6875,
+          "right": 111.140625,
+          "bottom": 205.078125,
+          "disabled": false
+        },
+        {
+          "text": "连接测试",
+          "x": 119.140625,
+          "y": 166.6875,
+          "right": 201.140625,
+          "bottom": 205.078125,
+          "disabled": false
+        }
+      ],
+      "scroll": [
+        {
+          "className": "harness-mcp-page harness-gateway-page",
+          "scrollWidth": 0,
+          "clientWidth": 0
+        },
+        {
+          "className": "harness-mcp-page",
+          "scrollWidth": 380,
+          "clientWidth": 380
+        },
+        {
+          "className": "harness-page-heading harness-mcp-page-heading",
+          "scrollWidth": 356,
+          "clientWidth": 356
+        },
+        {
+          "className": "harness-mcp-heading-actions",
+          "scrollWidth": 356,
+          "clientWidth": 356
+        }
+      ],
+      "values": [
+        {
+          "text": "规范已读取",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "72 个工具",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "11 个资源 · 41 个模板",
+          "font": "14px",
+          "weight": "400"
+        }
+      ],
+      "documentOverflow": false,
+      "summary": "检查完成 9/9 · 成功 9 · 部分可用 0 · 失败 0 · 停用跳过 0",
+      "summaryTop": 213.078125,
+      "screenshot": "mobile-light.png"
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "height": 844,
+      "buttons": [
+        {
+          "text": "＋ 接入服务",
+          "x": 12,
+          "y": 166.6875,
+          "right": 111.140625,
+          "bottom": 205.078125,
+          "disabled": false
+        },
+        {
+          "text": "连接测试",
+          "x": 119.140625,
+          "y": 166.6875,
+          "right": 201.140625,
+          "bottom": 205.078125,
+          "disabled": false
+        }
+      ],
+      "scroll": [
+        {
+          "className": "harness-mcp-page harness-gateway-page",
+          "scrollWidth": 0,
+          "clientWidth": 0
+        },
+        {
+          "className": "harness-mcp-page",
+          "scrollWidth": 380,
+          "clientWidth": 380
+        },
+        {
+          "className": "harness-page-heading harness-mcp-page-heading",
+          "scrollWidth": 356,
+          "clientWidth": 356
+        },
+        {
+          "className": "harness-mcp-heading-actions",
+          "scrollWidth": 356,
+          "clientWidth": 356
+        }
+      ],
+      "values": [
+        {
+          "text": "规范已读取",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "72 个工具",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "11 个资源 · 41 个模板",
+          "font": "14px",
+          "weight": "400"
+        }
+      ],
+      "documentOverflow": false,
+      "summary": "检查完成 9/9 · 成功 9 · 部分可用 0 · 失败 0 · 停用跳过 0",
+      "summaryTop": 213.078125,
+      "screenshot": "mobile-dark.png"
+    }
+  ],
+  "services": [
+    {
+      "id": "ai-soc-correlate",
+      "values": [
+        {
+          "text": "规范已读取",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "72 个工具",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "11 个资源 · 41 个模板",
+          "font": "14px",
+          "weight": "400"
+        }
+      ]
+    },
+    {
+      "id": "ai-soc-detect",
+      "values": [
+        {
+          "text": "规范已读取",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "24 个工具",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "5 个资源 · 17 个模板",
+          "font": "14px",
+          "weight": "400"
+        }
+      ]
+    },
+    {
+      "id": "ai-soc-event",
+      "values": [
+        {
+          "text": "规范已读取",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "7 个工具",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "1 个资源 · 1 个模板",
+          "font": "14px",
+          "weight": "400"
+        }
+      ]
+    },
+    {
+      "id": "ai-soc-graph",
+      "values": [
+        {
+          "text": "规范已读取",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "110 个工具",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "23 个资源 · 57 个模板",
+          "font": "14px",
+          "weight": "400"
+        }
+      ]
+    },
+    {
+      "id": "ai-soc-ingest",
+      "values": [
+        {
+          "text": "规范已读取",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "163 个工具",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "18 个资源 · 87 个模板",
+          "font": "14px",
+          "weight": "400"
+        }
+      ]
+    },
+    {
+      "id": "ai-soc-master",
+      "values": [
+        {
+          "text": "规范已读取",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "109 个工具",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "13 个资源 · 50 个模板",
+          "font": "14px",
+          "weight": "400"
+        }
+      ]
+    },
+    {
+      "id": "ai-soc-response",
+      "values": [
+        {
+          "text": "规范已读取",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "31 个工具",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "6 个资源 · 27 个模板",
+          "font": "14px",
+          "weight": "400"
+        }
+      ]
+    },
+    {
+      "id": "ai-soc-framework",
+      "values": [
+        {
+          "text": "规范已读取",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "30 个工具",
+          "font": "14px",
+          "weight": "400"
+        },
+        {
+          "text": "3 个资源 · 19 个模板",
+          "font": "14px",
+          "weight": "400"
+        }
+      ]
+    },
+    {
+      "id": "platform-compositions",
+      "values": []
+    }
+  ],
+  "keyboard": {
+    "text": "连接测试",
+    "focusVisible": true,
+    "outline": "solid"
+  },
+  "extraConnectionTests": 0,
+  "originalThemeRestored": true
+}

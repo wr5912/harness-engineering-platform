@@ -135,7 +135,7 @@ function renderPage(source, component, props, initialHash = '#/mcp') {
   function nodes(value) { if (!arguments.length) value = tree; return Array.isArray(value) ? value.flatMap(item => nodes(item)) : value && typeof value === 'object' ? [value, ...nodes(value.props?.children)] : [] }
   const text = value => Array.isArray(value) ? value.map(text).join('') : value && typeof value === 'object' ? text(value.props?.children) : String(value ?? '')
   render()
-  return { render, nodes, text, location, listeners, button: title => nodes().find(node => node.type === 'button' && text(node) === title) }
+  return { render, nodes, text, location, listeners, updateProps: value => { Object.assign(props, value); render() }, button: title => nodes().find(node => node.type === 'button' && text(node) === title) }
 }
 function themeStore(initial = 'light') {
   let scheme = initial
@@ -263,6 +263,37 @@ test('MCP 工作区仅保留四个工具页签，统一网关使用顶部一级�
   ui.button('工具组合编排').props.onClick(); ui.render()
   assert.equal(ui.button('工具组合编排').props['aria-current'], 'page')
   assert.equal(ui.nodes().some(node => node.type?.name === 'BusinessControlPage'), false)
+})
+
+test('MCP 页头连接测试排在接入服务之后，配置及组合目录就绪后才启用，跨页签保持启用', async () => {
+  const source = await clientModule('../src/mcp/client.tsx', '', {
+    'harness-mcp-manager-client': 'export function Manager() { return null }',
+    './threat-editor.tsx': 'export const compositionTestInput = () => {}; export const isThreatComposition = () => false; export const ThreatConfigurationFields = () => null; export const ThreatRunResult = () => null; export const threatEditorStyle = ""',
+  })
+  let completeCatalog
+  const ui = renderPage(source, 'McpPage', { active: true, rpc: { call: async (_channel, method) => method === 'mcp/list'
+    ? new Promise(resolve => { completeCatalog = resolve }) : { ok: true, value: { revision: 'r1', value: { servers: [], groups: [] } } } } })
+  await new Promise(setImmediate); ui.render()
+  const manager = () => ui.nodes().find(node => node.type?.name === 'Manager')
+  const actions = ui.nodes().find(node => node.props?.className === 'harness-mcp-heading-actions')
+  assert.equal(ui.text(actions), '＋ 接入服务')
+  const container = {}
+  actions.ref(container); ui.render()
+  assert.equal(manager().props.connectionTestTarget, container, 'Portal 在接入按钮之后追加全局连接测试')
+  assert.equal(manager().props.active, false, '组合目录尚未返回，不启动批量测试')
+  completeCatalog({ ok: true, value: { publishedService: { id: 'platform-compositions' } } })
+  await new Promise(setImmediate); ui.render()
+  assert.equal(manager().props.active, true)
+  ui.button('工具组合编排').props.onClick(); ui.render()
+  assert.equal(manager().props.active, true, '组合编排页也保留全局检查')
+  assert.equal(manager().props.connectionTestTarget, container)
+  ui.updateProps({ active: false }); assert.equal(manager().props.active, false)
+  ui.updateProps({ active: true }); assert.equal(manager().props.active, true)
+  const unavailable = renderPage(source, 'McpPage', { active: true, rpc: { call: async (_channel, method) => method === 'mcp/list'
+    ? { ok: false, error: { message: '组合目录暂不可用' } } : { ok: true, value: { revision: 'r1', value: { servers: [], groups: [] } } } } })
+  await new Promise(setImmediate); unavailable.render()
+  assert.equal(unavailable.nodes().find(node => node.type?.name === 'Manager').props.active, true, '组合目录失败不阻断已保存服务的连接测试')
+  assert.match(unavailable.text(unavailable.render()), /组合目录暂不可用/)
 })
 
 test('智能体资产深链保留完整相对路径，仅资产页接收且拒绝越界段', () => {
