@@ -83,6 +83,35 @@ test('MCP 可扩展下拉宽度并限制描述行数，搜索仍匹配完整描�
   assert.equal(ui.node('option').props['aria-selected'], true)
 })
 
+test('服务候选的 OpenAPI 规范地址可搜索并完整显示', () => {
+  const specUrl = 'http://172.16.138.223:18087/v3/api-docs/mcp'
+  const ui = selector({ value: 'soc', options: [{ value: 'soc', label: 'ai-soc-correlate', group: '服务', description: `OpenAPI 规范地址：${specUrl}` }] })
+  ui.open()
+  assert.equal(ui.nodes().find(node => node.type === 'small').props.children, `服务 · OpenAPI 规范地址：${specUrl}`)
+  ui.nodes().find(node => node.props?.['aria-label'] === '搜索工具').props.onChange({ target: { value: '18087/v3/api-docs/mcp' } }); ui.render()
+  assert.equal(ui.nodes().filter(node => node.props?.role === 'option').length, 1)
+  assert.equal(ui.node('option').props['aria-selected'], true)
+})
+
+test('工具接口地址独立完整展示，方法、路径及完整 URL 均可搜索', () => {
+  const detail = 'POST https://business.example/api/v2/items/{id}/lookup'
+  const ui = selector({ descriptionLines: 2, options: [
+    { value: 'first', label: '查询条目', detail, description: '很长的说明。'.repeat(80) },
+    { value: 'other', label: '其他工具' },
+  ] })
+  assert.ok(ui.node('combobox').props.title.startsWith(detail + '\n'))
+  ui.open()
+  const lines = ui.nodes().filter(node => node.type === 'small')
+  assert.equal(lines[0].props.children, detail)
+  assert.equal(lines[0].props.style, undefined)
+  assert.equal(lines[1].props.style.WebkitLineClamp, 2)
+  for (const query of ['post', '/v2/items/{id}', detail.slice(5)]) {
+    ui.nodes().find(node => node.props?.['aria-label'] === '搜索工具').props.onChange({ target: { value: query } }); ui.render()
+    assert.equal(ui.nodes().filter(node => node.props?.role === 'option').length, 1)
+    assert.equal(ui.node('option').props['aria-selected'], true)
+  }
+})
+
 test('默认选择器保持既有宽度及完整描述，扩展菜单在窄屏保持12px边界', () => {
   const regular = selector(); regular.open()
   assert.equal(regular.nodes().find(node => node.props?.className === 'hep-search-popup').props.style.width, 240)

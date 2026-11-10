@@ -1,8 +1,10 @@
 # Harness 工程平台项目验收矩阵
 
-更新日期：2026-11-06
+更新日期：2026-11-09
 
 本文是 **Harness 工程平台项目与工具链**验证路径、当前证据和缺口的唯一维护位置。它直接回答三个问题：总共有多少条路径、每条做到什么程度、哪些检查应该进入自动化测试。
+
+2026-11-09 的 MCP 调试地址检索补充 `PA-08/12`：OpenAPI [服务候选](../platform/plugin/test/evidence/mcp-debug-openapi-url-20261109/desktop-light.png)显示服务 ID 与已保存的规范地址，支持 URL 搜索；[工具候选](../platform/plugin/test/evidence/mcp-debug-openapi-url-20261109/tool-url-desktop-light.png)与[选中说明](../platform/plugin/test/evidence/mcp-debug-openapi-url-20261109/tool-url-selected-desktop-light.png)显示 HTTP 方法和完整接口地址模板，保留路径占位符并支持复制。接口地址复用实际调用的基址和路径解析；原生 MCP、分组只展示工具与描述。类型检查、构建及前端 52/52 项通过；[扩展检查记录](../platform/plugin/test/evidence/mcp-debug-openapi-url-20261109/tool-url-validation.txt)为 70/71，1 项既有 Session 连接变更用例失败，替换回原版 OpenAPI 解析器仍复现。本机 18120 实际核对完整 URL 搜索、键盘选择、复制成功、对象切换与旧反馈清除，原生组合服务发现 12 个工具，inspection-compositions 分组发现 8 个工具；[900px 平板](../platform/plugin/test/evidence/mcp-debug-openapi-url-20261109/tool-url-tablet-light.png)与 [390px 深色页面](../platform/plugin/test/evidence/mcp-debug-openapi-url-20261109/tool-url-narrow-dark.png)地址换行、弹层边界与横向溢出检查通过。更新工具首次读取会话状态超时，获得允许中断管理会话的明确授权后，通过 `dsh-deploy update --interrupt-sessions` 重载并核对实际装载，保留数据根、地址、端口与业务实例。未修改服务配置、部署远端或执行业务工具调用，不提升业务 Evaluation、Research Release 或一级路径整体状态。
 
 2026-11-07 UTC 的[核心用例精简与 evaluation-review 核验](../platform/plugin/test/evidence/core-evaluation-20261106/README.md)补充 `PA-01/03/12`：当前安全运营评测由 152 条精简为 28 条、9 类场景、8 条 fast，审查技能及写入、执行和直接引用同步；管理助手完成摘要保护的预览、保存、回读，独立字节核对一致。定向工程检查 11/11、冻结来源合同 7/7 通过；首次缺失源码与隔离依赖失败证据保留。未执行 28 条真实业务 Run 或同口径耗时对照，附件、到期、写入效果、语音及移出分支的工程覆盖仍按证据核实，不提升业务、Research Release 或路径整体状态。
 

@@ -498,6 +498,32 @@ test('原生 MCP 的同名工具与资源不合并，冲突项不发布也不能
   await assert.rejects(v2.callTool({ name: 'native__echo', arguments: {} }), /冲突/)
 })
 
+test('OpenAPI 地址模板与实际请求共用服务器基址及路径解析，重新发现跟随基址变化', async t => {
+  const { loadOpenApi, callOpenApiTool } = await rawOpenApiModule(t)
+  let endpoint = '', serverBase = '/api/v2'
+  const calls = []
+  endpoint = await serve(t, (req, res) => {
+    if (req.url === '/specs/openapi.json') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({
+      openapi: '3.0.0', servers: serverBase === undefined ? undefined : [{ url: serverBase }], paths: {
+        '/items/{id}/lookup': { post: { operationId: 'lookup', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }] } },
+        '/status': { get: { operationId: 'status' } },
+      },
+    }))
+    calls.push({ method: req.method, url: new URL(req.url, endpoint).href })
+    res.writeHead(200, { 'content-type': 'application/json' }).end('{}')
+  })
+  for (serverBase of ['/api/v2', '../runtime', `${endpoint}/new-base/`, undefined]) {
+    const source = await loadOpenApi({ id: 'api', specUrl: `${endpoint}/specs/openapi.json` })
+    const prefix = new URL(serverBase ?? '/', `${endpoint}/specs/openapi.json`).href.replace(/\/$/, '')
+    const operation = source.tools[0].httpOperation
+    assert.deepEqual(operation, { method: 'POST', path: '/items/{id}/lookup', urlTemplate: `${prefix}/items/{id}/lookup` })
+    assert.equal(source.businessTools.find(tool => tool.name === 'status').httpOperation.urlTemplate, `${prefix}/status`)
+    assert.equal(source.resources[0].httpOperation.urlTemplate, source.resources[0].uri)
+    await callOpenApiTool(source, 'lookup', { id: 'A B' })
+    assert.deepEqual(calls.at(-1), { method: operation.method, url: operation.urlTemplate.replace('{id}', 'A%20B') })
+  }
+})
+
 test('OpenAPI 同一操作只发布一个工具，保留资源读取与已选包装工具调用', async t => {
   const manager = await managerModule(t), calls = []
   let endpoint = ''
@@ -521,7 +547,7 @@ test('OpenAPI 同一操作只发布一个工具，保留资源读取与已选包
   assert.deepEqual((await v1.listTools()).tools.map(item => item.name), ['mcp__Display__get_item'])
   const discover = await (await fetch(`${origin}/api/mcp-manager`, { method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ action: 'test', serverId: 'api' }) })).json()
-  assert.deepEqual(discover.tools[0].httpOperation, { method: 'GET', path: '/item/{id}' })
+  assert.deepEqual(discover.tools[0].httpOperation, { method: 'GET', path: '/item/{id}', urlTemplate: `${endpoint}/item/{id}` })
   assert.deepEqual(discover.resourceTemplates.resourceTemplates[0].httpOperation, discover.tools[0].httpOperation)
   assert.equal(discover.resourceTemplates.resourceTemplates[0].groupToolName, 'get_item')
   assert.equal(discover.tools[0].groupPublicNames['api-group'], 'mcp__api-group__get_item')

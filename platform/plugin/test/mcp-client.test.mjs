@@ -6,7 +6,7 @@ import test from 'node:test'
 import { compositionQueries } from '../src/mcp/definition.ts'
 
 // 运行实际客户端产物，只替换 React 的状态调度和 Portal 容器。
-function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理请求') }, clipboardFailure = false } = {}) {
+function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理请求') }, clipboardFailure = false, SearchSelect } = {}) {
   const require = createRequire(import.meta.url)
   const states = [], dependencies = []
   const clipboard = []
@@ -54,6 +54,7 @@ function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理
     onOpenView: (view, serverId, groupId) => { props.view = view; props.selectedServerId = serverId; props.selectedGroupId = groupId },
     onSelectServerId: id => { selections.push(id); props.selectedServerId = id },
     onSelectGroupId: id => { props.selectedServerId = undefined; props.selectedGroupId = id },
+    SearchSelect,
     form: { state: { status: 'ready', writable: true, revision: 'r1', value: { servers: [server], groups, sharedToken: '' } } },
     publishedService: { id: 'platform-compositions', platformComposition: true, enabled: true,
       description: '工具组合编排', publishedTools: [{ name: 'query_asset_related_alerts' }],
@@ -341,6 +342,105 @@ test('MCP 分组入口使用当前站点基址与 v2 路径', async () => {
   await ui.button('复制分组链接').props.onClick()
   assert.deepEqual(ui.copied, ['http://127.0.0.1:3090/hep/mcp/groups/research/v2'])
   assert.ok(ui.nodes(ui.render()).some(node => node.props?.className === 'mcp-copy-feedback' && ui.text(node) === '已复制。'))
+})
+
+test('调试对象按服务类型显示地址，原生 MCP 不展示连接 URL', () => {
+  const SearchSelect = () => null
+  const ui = editor({ SearchSelect })
+  const nativeUrl = 'http://127.0.0.1:53001/mcp'
+  ui.refreshValue({ servers: [{ ...ui.server, serverName: 'SOC 服务' }, { id: 'native-service', url: nativeUrl, enabled: true }], groups: ui.groups, sharedToken: '' })
+  ui.setView('connection')
+  const target = () => ui.nodes().find(node => node.type === SearchSelect && node.props.label === '调试对象')
+  const openapi = target().props.options.find(option => option.value === `server:${ui.server.id}`)
+  assert.equal(openapi.label, 'SOC 服务')
+  assert.equal(openapi.description, `${ui.server.id} · OpenAPI 规范地址：${ui.server.specUrl}`)
+  assert.ok(ui.text(ui.render()).includes(`OpenAPI 规范地址：${ui.server.specUrl}`))
+
+  target().props.onChange('server:native-service')
+  ui.render()
+  const native = target().props.options.find(option => option.value === 'server:native-service')
+  assert.equal(native.description, 'native-service')
+  assert.doesNotMatch(ui.text(ui.render()), /53001\/mcp|OpenAPI 规范地址/)
+
+  target().props.onChange('group:research')
+  ui.render()
+  assert.match(ui.text(ui.render()), /分组端点：http:\/\/127\.0\.0\.1:3090\/hep\/mcp\/groups\/research\/v2/)
+  assert.doesNotMatch(ui.text(ui.render()), /OpenAPI 规范地址/)
+})
+
+test('原生 MCP 选择后不自动请求，仍通过手动发现展示工具', async () => {
+  const actions = []
+  const ui = editor({ fetch: async (url, init) => {
+    actions.push(JSON.parse(init.body))
+    return { ok: true, json: async () => ({ tools: [{ name: 'native_lookup' }], resources: { resources: [] }, resourceTemplates: { resourceTemplates: [] } }) }
+  } })
+  ui.refreshValue({ servers: [{ id: 'native-service', url: 'http://127.0.0.1:53001/mcp', enabled: true }], groups: [], sharedToken: '' })
+  ui.setView('connection')
+  assert.deepEqual(actions, [])
+  assert.match(ui.text(ui.render()), /先发现当前对象的工具与资源/)
+  await ui.button('发现工具与资源').props.onClick()
+  await new Promise(resolve => setImmediate(resolve))
+  ui.render()
+  assert.deepEqual(actions.map(action => action.action), ['test'])
+  assert.match(ui.text(ui.render()), /native_lookup/)
+})
+
+test('OpenAPI 工具使用发现的实际接口地址，切换工具、服务及分组保持准确', async () => {
+  const SearchSelect = () => null
+  const urlTemplate = 'https://business.example/api/v2/items/{id}/lookup'
+  const secondUrl = 'https://business.example/api/v2/batch'
+  const tools = [
+    { name: 'lookup', title: '查询条目', description: '查询说明。'.repeat(100), httpOperation: { method: 'POST', path: '/items/{id}/lookup', urlTemplate } },
+    { name: 'batch', description: '批量说明', httpOperation: { method: 'PUT', path: '/batch', urlTemplate: secondUrl } },
+  ]
+  const ui = editor({ SearchSelect, fetch: async () => ({ ok: true, json: async () => ({ tools }) }) })
+  ui.refreshValue({ servers: [ui.server, { id: 'native', url: 'http://127.0.0.1:53001/mcp', enabled: true }], groups: ui.groups, sharedToken: '' })
+  ui.setView('connection')
+  const discover = async () => { await ui.button('发现工具与资源').props.onClick(); ui.render() }
+  const picker = label => ui.nodes().find(node => node.type === SearchSelect && node.props.label === label)
+  await discover()
+  assert.equal(picker('工具').props.options[0].detail, `POST ${urlTemplate}`)
+  assert.match(ui.text(ui.render()), /接口地址模板：POST https:\/\/business\.example\/api\/v2\/items\/\{id\}\/lookup/)
+  await ui.button('复制接口地址').props.onClick(); ui.render()
+  assert.deepEqual(ui.copied, [urlTemplate])
+  assert.match(ui.text(ui.render()), /已复制。/)
+  picker('工具').props.onChange('batch'); ui.render()
+  assert.match(ui.text(ui.render()), /接口地址模板：PUT https:\/\/business\.example\/api\/v2\/batch/)
+  assert.doesNotMatch(ui.text(ui.render()), /已复制。|items\/\{id\}/)
+  await ui.button('复制接口地址').props.onClick(); ui.render()
+  assert.deepEqual(ui.copied, [urlTemplate, secondUrl])
+
+  for (const target of ['server:native', 'group:research']) {
+    picker('调试对象').props.onChange(target); ui.render()
+    assert.equal(ui.button('复制接口地址'), undefined)
+    await discover()
+    assert.equal(picker('工具').props.options[0].detail, undefined)
+    assert.doesNotMatch(ui.text(ui.render()), /接口地址模板|business\.example|已复制。/)
+    assert.match(ui.text(ui.render()), /查询说明/)
+  }
+})
+
+test('接口地址复制失败提供手动复制；保存新配置后清除旧地址', async () => {
+  const urlTemplate = 'http://127.0.0.1:18087/api/items/{id}'
+  const ui = editor({ clipboardFailure: true, fetch: async () => ({ ok: true, json: async () => ({
+    tools: [{ name: 'lookup', httpOperation: { method: 'POST', path: '/items/{id}', urlTemplate } }],
+  }) }) })
+  ui.setView('connection')
+  await ui.button('发现工具与资源').props.onClick(); ui.render()
+  await ui.button('复制接口地址').props.onClick(); ui.render()
+  assert.match(ui.text(ui.render()), /无法自动复制，请选中下方内容手动复制/)
+  assert.equal(ui.nodes().find(node => node.type === 'textarea' && node.props.readOnly)?.props.value, urlTemplate)
+  ui.refreshValue({ servers: [{ ...ui.server, specUrl: 'http://127.0.0.1:18088/openapi.json' }], groups: ui.groups, sharedToken: '' }, 'r2')
+  assert.equal(ui.button('复制接口地址'), undefined)
+  assert.doesNotMatch(ui.text(ui.render()), /18087\/api\/items|无法自动复制/)
+})
+
+test('OpenAPI 工具缺少地址元数据时说明重新发现，不从规范地址猜测', async () => {
+  const ui = editor({ fetch: async () => ({ ok: true, json: async () => ({ tools: [{ name: 'lookup', description: '查询说明' }] }) }) })
+  ui.setView('connection')
+  await ui.button('发现工具与资源').props.onClick(); ui.render()
+  assert.match(ui.text(ui.render()), /未获取到接口地址，请重新发现工具与资源/)
+  assert.equal(ui.button('复制接口地址'), undefined)
 })
 
 test('分组复制失败在按钮旁提供可选取的原链接，切换对象不显示旧反馈', async () => {

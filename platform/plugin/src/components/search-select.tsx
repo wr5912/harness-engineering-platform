@@ -1,7 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
-export type SearchSelectOption = { value: string; label: string; description?: string; group?: string; disabled?: boolean }
+export type SearchSelectOption = { value: string; label: string; detail?: string; description?: string; group?: string; disabled?: boolean }
 export type SearchSelectProps = {
   value: string
   options: readonly SearchSelectOption[]
@@ -34,7 +34,7 @@ export function SearchSelect({ value, options, groups, onChange, label, placehol
   const availableGroups = groups?.filter(group => options.some(item => item.group === group)) ?? []
   const currentGroup = availableGroups.includes(browseGroup) ? browseGroup : selected?.group ?? availableGroups[0]
   const needle = query.trim().toLocaleLowerCase()
-  const visible = options.filter(item => (!availableGroups.length || item.group === currentGroup) && (!needle || [item.label, item.value, item.description, item.group].some(text => text?.toLocaleLowerCase().includes(needle))))
+  const visible = options.filter(item => (!availableGroups.length || item.group === currentGroup) && (!needle || [item.label, item.value, item.detail, item.description, item.group].some(text => text?.toLocaleLowerCase().includes(needle))))
   const close = (restore = false) => { setOpen(false); if (restore) trigger.current?.focus() }
   useLayoutEffect(() => {
     if (open && trigger.current && trigger.current.getClientRects().length === 0) setOpen(false)
@@ -90,7 +90,7 @@ export function SearchSelect({ value, options, groups, onChange, label, placehol
   return <span className={`hep-search-select ${className}`}>
     {name && <input type="hidden" name={name} value={value}/>}
     <button id={id} ref={trigger} type="button" role="combobox" aria-label={label} aria-required={required} aria-expanded={open} aria-controls={listId} aria-haspopup="listbox" disabled={disabled}
-      title={selected?.description || selected?.label || value || placeholder}
+      title={[selected?.detail, selected?.description].filter(Boolean).join('\n') || selected?.label || value || placeholder}
       onClick={() => open ? close() : show()} onKeyDown={event => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); show() } }}>
       <span>{selected?.label || value || placeholder}</span><span aria-hidden="true">⌄</span>
     </button>
@@ -108,7 +108,7 @@ export function SearchSelect({ value, options, groups, onChange, label, placehol
       <div className="hep-search-input"><input ref={search} aria-label={`搜索${label}`} aria-controls={listId} aria-activedescendant={active >= 0 ? `${uid}-${active}` : undefined} value={query} placeholder={`搜索${label}`} onChange={event => { setQuery(event.target.value); setActive(-1) }}/>{query && <button type="button" aria-label="清空搜索" onClick={() => { setQuery(''); setActive(-1); search.current?.focus() }}>×</button>}</div>
       <div id={listId} role="listbox" aria-label={label}>
         {visible.length ? visible.map((option, index) => <button id={`${uid}-${index}`} data-option-index={index} type="button" role="option" key={option.value} aria-selected={option.value === value} disabled={option.disabled} data-active={active === index || undefined} onPointerMove={() => setActive(index)} onClick={() => choose(option)}>
-          <span><strong>{option.label}</strong>{(option.description || (!groups && option.group)) && <small style={descriptionLines ? { display: '-webkit-box', WebkitLineClamp: descriptionLines, WebkitBoxOrient: 'vertical', overflow: 'hidden' } : undefined}>{[!groups && option.group, option.description].filter(Boolean).join(' · ')}</small>}</span>{option.value === value && <span aria-hidden="true">✓</span>}
+          <span><strong>{option.label}</strong>{option.detail && <small>{option.detail}</small>}{(option.description || (!groups && option.group)) && <small style={descriptionLines ? { display: '-webkit-box', WebkitLineClamp: descriptionLines, WebkitBoxOrient: 'vertical', overflow: 'hidden' } : undefined}>{[!groups && option.group, option.description].filter(Boolean).join(' · ')}</small>}</span>{option.value === value && <span aria-hidden="true">✓</span>}
         </button>) : <p role="status">没有匹配项</p>}
       </div>
     </div>, trigger.current?.closest('dialog') ?? document.body)}

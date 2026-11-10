@@ -199,8 +199,8 @@ export async function loadOpenApi(server: any): Promise<any> {
       const body = raw.requestBody ? resolveObject(spec, raw.requestBody) : undefined
       const uri = operationUrl(base, path).href
       const description = raw.summary || raw.description || `${method.toUpperCase()} ${path}`
-      const httpOperation = { method: method.toUpperCase(), path }
-      const item = { name, method, path, parameters, body, raw, uri, description }
+      const httpOperation = { method: method.toUpperCase(), path, urlTemplate: uri.replace(/%7B/gi, '{').replace(/%7D/gi, '}') }
+      const item = { name, method, path, parameters, body, raw, uri, description, httpOperation }
       operations.set(name, item)
       const queryReadable = method === 'get' && parameters.some(parameter => parameter.in === 'query')
       if (method === 'get' && !body && parameters.every(parameter => ['path', 'query'].includes(parameter.in)
@@ -210,7 +210,7 @@ export async function loadOpenApi(server: any): Promise<any> {
           inputSchema: { ...operationSchema(spec, parameters, body), additionalProperties: false } }
         if (parameters.length) {
           const queryNames = parameters.filter(parameter => parameter.in === 'query').map(parameter => parameter.name)
-          resourceTemplates.push({ ...info, uriTemplate: uri.replace(/%7B/gi, '{').replace(/%7D/gi, '}')
+          resourceTemplates.push({ ...info, uriTemplate: httpOperation.urlTemplate
             + (queryNames.length ? `{?${queryNames.join(',')}}` : '') })
         }
         else resources.push({ ...info, uri })
@@ -221,7 +221,7 @@ export async function loadOpenApi(server: any): Promise<any> {
     }
   }
   const businessTools = [...tools, ...readable.filter(item => !tools.some(tool => tool.name === item.name)).map(item => ({ name: item.name, title: item.raw.summary,
-    description: item.description, httpOperation: { method: item.method.toUpperCase(), path: item.path },
+    description: item.description, httpOperation: item.httpOperation,
     inputSchema: operationSchema(spec, item.parameters, item.body) }))]
   return { spec, base, tools, businessTools, resources, resourceTemplates, operations, readable, server }
 }
