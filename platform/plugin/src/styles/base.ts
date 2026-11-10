@@ -47,8 +47,6 @@ export const baseTheme = `${visualTokens}
 .harness-avatar{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--hep-primary-soft);color:var(--hep-link)}
 .harness-body{display:flex;flex:1;min-width:0;min-height:0}
 .harness-content{position:relative;flex:1;min-width:0;min-height:0;overflow:auto;scrollbar-width:thin}
-.harness-platform[data-page=conversations] .harness-breadcrumb{padding:18px var(--hep-page-padding) 0;color:var(--hep-muted);font-size:12px}
-@media(max-width:680px){.harness-platform[data-page=conversations] .harness-breadcrumb{display:none}}
 @media(min-width:1101px){.harness-platform :is(.harness-agents,.harness-evaluation,.harness-instances-page,.harness-mcp-page){--hep-page-padding:36px;max-width:1360px;margin-inline:auto}}
 
 .harness-page-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px}
