@@ -427,9 +427,22 @@ export async function apply(ctx: Context, config: BusinessRuntimeConfig): Promis
   ctx.effect(() => () => control.setAvailable(false), 'business Runtime: authorization lifecycle')
   const managedTools = new Set<string>(), resourceServers = new Set<string>(), localTools = new Set(config.localTools ?? [])
   const connection = new BusinessConnection(ctx, config, control)
+  type BusinessApiHandler = (req: IncomingMessage, res: ServerResponse, context: BusinessContext) => void | Promise<void>
+  const apiRoutes = new Map<string, BusinessApiHandler>()
+  const registerApiRoute = (path: string, handler: BusinessApiHandler) => {
+    if (!/^\/api\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]+$/.test(path) || typeof handler !== 'function') throw new Error('业务 API 路由无效')
+    if (apiRoutes.has(path)) throw new Error(`业务 API 路由重复：${path}`)
+    apiRoutes.set(path, handler)
+    return () => { if (apiRoutes.get(path) === handler) apiRoutes.delete(path) }
+  }
   ctx.provide('businessRuntime', Object.freeze({ binding: Object.freeze({ ...config.binding }),
     requiresAuthentication: () => !control.isAnonymousInstance(config.binding),
     basePath: config.basePath ?? `/agents/${config.binding.agentId}/instances/${config.binding.instanceId}/`, managedTools, resourceServers,
+    currentIdentity: () => {
+      const current = currentBusinessContext()
+      return current ? { ...current.subject, expiresAt: current.identity?.expiresAt, shared: control.isSharedContext(current) } : undefined
+    },
+    registerApiRoute,
     isTrustedChildSession: (parentId: string, childId: string) => trustedNativeChild(ctx, control, config.binding, parentId, childId),
     groupUrl: (id: string) => platformGroupUrl(config.assetRoot, id),
     groupFetch: (id: string, sessionId?: string) => connection.groupFetch(id, sessionId) }))
@@ -462,7 +475,13 @@ export async function apply(ctx: Context, config: BusinessRuntimeConfig): Promis
     res.once('close', () => lifetime.abort())
     try {
       const base = admission.context
-      const report = /^\/api\/business-control\/reports\/([a-f0-9-]{36})$/.exec(new URL(req.url || '/', 'http://runtime').pathname)
+      const requestPath = new URL(req.url || '/', 'http://runtime').pathname
+      const customRoute = apiRoutes.get(requestPath)
+      if (customRoute) {
+        await withBusinessContext(base, () => customRoute(req, res, base))
+        return
+      }
+      const report = /^\/api\/business-control\/reports\/([a-f0-9-]{36})$/.exec(requestPath)
       if (report) {
         if (req.method !== 'GET') throw new Error('报告只允许读取')
         const result = await readBusinessReport(config.assetRoot, base, report[1], lifetime.signal)
