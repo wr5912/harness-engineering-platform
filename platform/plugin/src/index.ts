@@ -272,6 +272,11 @@ export async function apply(ctx: Context, config: Config) {
     .replace(/<link\b[^>]*\brel=["'](?:shortcut )?icon["'][^>]*>/gi, '')
     .replace(/<title>[^<]*<\/title>/i, () => `<title>${branding().name.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}</title>`)
     .replace('</head>', `${icon}</head>`)))
+  // shortcut: 当前 DSH 原生首屏没有整行公开槽位；升级 DSH 后需重新核对该布局类名。
+  ctx.on('webserver/index-inject', table => table.push({
+    kind: 'style',
+    text: '[data-conversation-content] .wSkVaW_heroWorkspaceRow { display: none !important; }',
+  }))
   applyTools(ctx)
   const publicUrl = platformEntryUrl(assetRoot, { publicUrl: config.publicUrl, host: ctx.webServer.host,
     fallback: `${ctx.webServer.protocol}//${ctx.webServer.host}:${ctx.webServer.port}${ctx.webServer.publicPath('/')}` })
