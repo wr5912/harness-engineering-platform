@@ -626,6 +626,16 @@ test('MCP 配置使用数据仓库 revision，调试管理复用实际 dispatche
   assert.equal(calls[1].action, 'sources')
 })
 
+test('MCP 调试错误保留调度状态和上游原因', async () => {
+  const bridge = assistantMcp({
+    dispatch: async () => ({ status: 502, value: { message: '依赖工具发现失败；连接=fixture；阶段=discovery；操作=inspection_routine' } }),
+  })
+  const result = await bridge('sources/test', {}, new AbortController().signal)
+  assert.equal(result.ok, false)
+  assert.match(result.error.message, /依赖工具发现失败.*MCP调度状态=502/u)
+  assert.deepEqual(result.error.details, { action: 'test', status: 502 })
+})
+
 test('源码变量式凭据引用可以编辑，读回正文和摘要保持一致', async t => {
   const content = 'export const auth = options => `Bearer ${options.token}`;\n'
   const f = fixture(t, endpoint => endpoint === 'agents/edit/read' ? { ok: true, value: { content, sha256: sha256(content), content_sha256: sha256(content), editable: true, redacted: false } } : undefined)

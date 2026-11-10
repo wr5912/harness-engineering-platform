@@ -8,6 +8,18 @@ function containsCredentialField(value: unknown): boolean {
   return Object.entries(value).some(([key, item]) => credentialField.test(key) || containsCredentialField(item))
 }
 
+function dispatchError(action: string, response: { status: number; value: any }) {
+  const detail = [response.value?.message, response.value?.error, response.value?.detail]
+    .find(value => typeof value === 'string' && value.trim())
+  return {
+    code: 'mcp_operation_failed',
+    message: detail
+      ? `${detail}（动作=${action}；MCP调度状态=${response.status}）`
+      : `MCP调试操作未完成：动作=${action}；MCP调度状态=${response.status}；上游未提供错误详情`,
+    details: { action, status: response.status },
+  }
+}
+
 export function mcpCredentialEdit(input: Record<string, any>): boolean {
   return containsCredentialField(input) || Array.isArray(input.ops) && input.ops.some((op: any) =>
     Array.isArray(op?.path) && op.path.some((part: any) => credentialField.test(String(part))))
@@ -53,6 +65,6 @@ export function assistantMcp(manager: ManagerConfig) {
     if (!manager.dispatch) throw new Error('MCP 调试服务尚未就绪')
     const nativeAction = action === 'sources/list' ? 'sources' : action.startsWith('sources/') ? action.slice(8) : action
     const response = await manager.dispatch({ ...input, action: nativeAction }, signal)
-    return response.status < 400 ? { ok: true, value: response.value } : { ok: false, error: { code: 'mcp_operation_failed', message: response.value?.error ?? 'MCP 操作失败', details: {} } }
+    return response.status < 400 ? { ok: true, value: response.value } : { ok: false, error: dispatchError(nativeAction, response) }
   }
 }

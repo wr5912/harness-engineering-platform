@@ -21,6 +21,12 @@ type LivePageProps = { updates?: PlatformUpdates; onContext?(context: Record<str
 type NavigationProps = { target?: PlatformNavigation; onNavigate?(target: PlatformNavigation): void; active?: boolean }
 type CompositionAttempt = { execution_id: string; selection_key: string; asset: string; payload: any; state: 'running' | 'unknown' | 'responded'; run_ids?: string[]; message?: string }
 
+function transportDetail(error: unknown) {
+  if (error instanceof Error && error.message) return error.message
+  if (typeof error === 'string' && error) return error
+  return '运行时未提供错误详情，请查看平台日志'
+}
+
 const tabs = [
   { id: 'servers', title: '服务列表' },
   { id: 'groups', title: '工具与资源分组' },
@@ -57,13 +63,13 @@ export function McpPage({ rpc, updates, onContext, target, onNavigate, active = 
         setState(response.ok ? { status: 'ready', writable: true, ...(response.value as object) }
           : (previous: any) => previous.status === 'ready' ? { ...previous, error: response.error.message }
             : { status: 'unavailable', error: response.error.message })
-      }).catch(() => setState((previous: any) => previous.status === 'ready'
-        ? { ...previous, error: '无法读取 MCP 数据配置，请检查连接后重试。' }
-        : { status: 'unavailable', error: '无法读取 MCP 数据配置，请检查连接后重试。' })),
+      }).catch(error => setState((previous: any) => previous.status === 'ready'
+        ? { ...previous, error: `读取 MCP 数据配置失败：${transportDetail(error)}` }
+        : { status: 'unavailable', error: `读取 MCP 数据配置失败：${transportDetail(error)}` })),
       page === 'composition' ? Promise.resolve() : rpc.call(CHANNEL, 'mcp/list', {}).then(response => {
         if (response.ok) { setPublishedService((response.value as any).publishedService ?? null); setServiceError(''); setServiceLoaded(true) }
         else setServiceError(response.error.message)
-      }).catch(() => setServiceError('无法读取已发布组合服务，请刷新重试。')),
+      }).catch(error => setServiceError(`读取已发布组合服务失败：${transportDetail(error)}`)),
     ])
   })
   useEffect(() => { void refreshConfiguration() }, [rpc])
@@ -337,7 +343,7 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
       if (id !== requestId.current) return
       if (response.ok) { accept(response.value); setError(''); setConflictDetected(false) }
       else setError(response.error.message)
-    } catch { if (id === requestId.current) setError('无法读取编排目录。') }
+    } catch (error) { if (id === requestId.current) setError(`读取编排目录失败：${transportDetail(error)}`) }
     finally { if (id === requestId.current) setCatalogLoading(false) }
   })
   useEffect(() => { void refreshCatalog(); return () => { requestId.current++ } }, [configuration])
@@ -396,7 +402,7 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
         select(saved, 'published', saved.publishedVersionId, false); setResult(value.dry)
       } else if (['withdrawComposition', 'deleteComposition'].includes(endpoint)) { accept(value); setSelection(null); setError(endpoint === 'withdrawComposition' ? '已下架，新调用已停止；已有记录保留。' : '已删除编排及其源码、文档和发布包；历史运行记录保留。') } else setResult(value)
       if (['saveCompositionDraft', 'publishComposition', 'withdrawComposition', 'deleteComposition'].includes(endpoint)) updates?.invalidate(['mcp'])
-    } catch { if (id === actionId.current) setError('操作失败，请检查连接并重试。') }
+    } catch (error) { if (id === actionId.current) setError(`组合操作未完成：${transportDetail(error)}`) }
     finally { if (id === actionId.current) { setBusy(false); setPendingAction('') } }
   }
   const selectedPayload = { compositionId: entry?.id, version: selection?.version, ...(selection?.versionId ? { versionId: selection.versionId } : {}), revision: data?.revision, input: testInput }
@@ -413,7 +419,7 @@ function CompositionPage({ rpc, configuration, onCatalogChange, updates, onConte
       if (!response.ok) { remember(null, original.selection_key); setAttempt(null); setError(response.error.message); return }
       const value = response.value as any
       acceptReceipt(value.execution_receipt ?? { state: 'responded', result: value }, original)
-    } catch { if (id === actionId.current) setAttempt({ ...original, state: 'unknown', message: '未收到执行回执，远端可能已经执行。请核对原请求，平台不会自动再次执行。' }) }
+    } catch (error) { if (id === actionId.current) setAttempt({ ...original, state: 'unknown', message: `未收到执行回执（传输原因：${transportDetail(error)}），远端可能已经执行。请核对原请求，平台不会自动再次执行。` }) }
     finally { if (id === actionId.current) { setBusy(false); setPendingAction('') } }
   }
   async function readOriginalRun(runId: string) {
