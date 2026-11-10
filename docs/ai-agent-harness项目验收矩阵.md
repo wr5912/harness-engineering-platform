@@ -276,6 +276,8 @@
 
 ### PA-08 DSH Runtime API 与 Web UI 的 Session、消息与结果闭环
 
+- **管理对话精简与原生重试（2026-11-09，UTC 11-10，关联 PA-12）**：`099d00a9` 隐藏原生首屏的工作区与 Agent Preset 选择行，`2a20bab7` 移除“工作空间 / 管理对话”面包屑；实际首屏确认选择行不可见，1440px 桌面与 390px 窄屏核对面包屑已移除、原生输入区可用且无横向溢出，未观察到脚本异常；类型检查通过。本机 DSH 用户 Profile 的 Codex 重试策略通过原生 HMR 生效，最多重试 17 次，包含过载对应的 `PI_AI_ERROR`；退避等待合计约 910 秒，含随机抖动，模型请求耗时另计，不是严格的 15 分钟截止时间。原生会话 `session-91cbfad8-0bb0-44f8-9030-fb21a38274a9` 的 `session.v4.jsonl.zstd` 中，序号 1713 记录真实过载及新策略，1714 启动重试，1715–1718 在同一轮、同一步恢复消息、工具调用和结果，中间没有用户续发消息。`dsh-deploy update` 回执 `2a145010-7786-4e5b-93ba-0a6da35d944c` 为 unchanged，平台 PID `1953525` 保持；不修改 DSH 源码或另建平台重试循环，重试配置只由本机 Profile 维护。未执行连续过载耗尽全部次数的测试，不提升业务 Evaluation 或 Research Release 结论。
+
 - **232 门户当前实例接入（2026-11-02，远端验证时间 2026-11-03，关联 `PA-12`）**：[配置与浏览器回执](../platform/plugin/test/evidence/portal-integration-20261102/acceptance.json)记录 RC5 数据目录补齐 `gateway.proxyOrigin`，门户既有 `/agents/` 路由保留完整路径并转发到 `53106`，AI助手菜单已指向当前 `hep-deploy-accept-amd64-final`。真实菜单进入、iframe 新会话模型回复、iframe 与门户刷新保留、WebSocket 收发通过，脚本与 HTTP 错误为零；18120 管理入口与原 7 个管理会话可读。操作中配置原子替换未保留属主导致目标容器退出，已恢复权限并启动原容器；平台启动超过 60 秒后恢复，长期启动稳定性未由此验证。本次只修改部署配置，未修改程序或门户源码；保持免认证共享实例，未验证 SSO 票据、证书信任链或业务 MCP。
 
 - **170 网关原生会话实测（2026-10-28）**：实例按钮打开入口、匿名连接、真实模型回复及刷新后会话保留的证据见 [`PA-05` 的恢复回执](../platform/plugin/test/evidence/conversation-recovery-20261028/gateway-recovery.json)。本次未修改 DSH 源码，不将普通聊天通过认定为其他业务工具通过。
