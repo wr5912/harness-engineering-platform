@@ -259,6 +259,35 @@ test('未选提供方缺密钥或动态端点不阻断已就绪默认模型，�
   } finally { source.cleanup() }
 })
 
+test('OpenAI 兼容思考模型必须声明协议格式，且投影保留该声明', async () => {
+  const selected = { provider: 'qwen-local', model: 'Qwen3.8-27B' }
+  const source = fixture({ allowed: [selected], default: selected })
+  try {
+    const base = {
+      sessionController: { modelCatalog: async () => ({ default: selected, routableProviders: ['qwen-local'], failures: [], groups: [
+        { id: 'qwen-local', models: [{ id: selected.model, reasoning: { efforts: [{ id: 'high' }], defaultEffort: 'high' } }] },
+      ] }) },
+      settingsController: { describe: () => ({ namespaces: [{ ns: 'llm-pi-ai', value: { providers: {
+        'qwen-local': { apiKeyEnv: 'QWEN_LOCAL_API_KEY', api: 'openai-completions', baseURL: 'http://qwen.local/v1', models: [{ id: selected.model, reasoning: true }] },
+      } } }] }) },
+      credentials: { resolve: async ref => ref === 'QWEN_LOCAL_API_KEY' ? { value: 'fixture-key' } : undefined },
+      llm: { listConfigurableProviders: () => [{ provider: 'qwen-local', settingsNs: 'llm-pi-ai', nativeAuth: { env: ['QWEN_LOCAL_API_KEY'], oauth: false } }] },
+    }
+    await assert.rejects(projectModelPolicy(source.root, 'example-agent', base), /缺少 compat\.thinkingFormat/)
+
+    const configured = { ...base,
+      settingsController: { describe: () => ({ namespaces: [{ ns: 'llm-pi-ai', value: { providers: {
+        'qwen-local': { apiKeyEnv: 'QWEN_LOCAL_API_KEY', api: 'openai-completions', baseURL: 'http://qwen.local/v1', compat: { thinkingFormat: 'qwen-chat-template' }, models: [{ id: selected.model, reasoning: true }] },
+      } } }] }) },
+    }
+    const result = await projectModelPolicy(source.root, 'example-agent', configured)
+    const provider = result.policy.patch.find(item => item.id === 'llm-pi-ai').config.providers['qwen-local']
+    assert.deepEqual(provider.models, [{ id: selected.model, reasoning: true }])
+    assert.deepEqual(provider.compat, { thinkingFormat: 'qwen-chat-template' })
+    assertDshPolicyAccepted(result.policy, source.root)
+  } finally { source.cleanup() }
+})
+
 test('模型从平台目录移除时拒绝生成业务启动投影', async () => {
   const source = fixture({ allowed: [{ provider: 'acme', model: 'small' }], default: { provider: 'acme', model: 'small' } })
   try {

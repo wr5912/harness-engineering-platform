@@ -52,6 +52,11 @@ function safeFields(value: unknown, keys: string[]): Record<string, unknown> {
   return Object.fromEntries(keys.filter(key => input[key] !== undefined).map(key => [key, input[key]]))
 }
 
+function thinkingFormat(value: unknown): string | undefined {
+  const format = record(record(value).compat).thinkingFormat
+  return typeof format === 'string' && format ? format : undefined
+}
+
 function publicConfigWithResolvedRefs(value: unknown, refs: Set<string>, selectedProvider: boolean): unknown {
   if (Array.isArray(value)) return value.map(item => publicConfigWithResolvedRefs(item, refs, selectedProvider))
   if (!value || typeof value !== 'object') return value
@@ -265,8 +270,12 @@ export async function projectModelPolicy(assetRoot: string, agentId: string, ser
       const overrides = record(source.modelOverrides)
       const models = routes.filter(item => item.provider === provider).map(item => {
         const base = configured.find(model => model.id === item.model)
-        if (base) return base
-        return { id: item.model, ...record(overrides[item.model]) }
+        const model = base ?? { id: item.model, ...record(overrides[item.model]) }
+        if (source.api === 'openai-completions' && model.reasoning === true
+          && !thinkingFormat(model) && !thinkingFormat(source)) {
+          throw new Error(`模型提供方 ${provider}/${item.model} 已声明思考能力，但缺少 compat.thinkingFormat`)
+        }
+        return model
       })
       const config: Record<string, unknown> = { ...safeFields(source, ['apiKeyEnv', 'displayName', 'api', 'baseURL', 'compat', 'reasoning', 'defaultContextWindow', 'defaultMaxTokens', 'retryPolicy']), models }
       providers[provider] = publicConfigWithResolvedRefs(config, refs, requiredProviders.has(provider))
