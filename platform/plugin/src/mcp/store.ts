@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import { prepareBusinessRuntimeFile } from '../business-control/secret-file.ts'
 import { mcpCredentialFile, mcpCredentialPaths } from './credential-path.ts'
 import { workspaceConfigPath } from '../workspace.ts'
+import { migrateServiceOrigins } from '../../../../plugins/mcp-manager/resource-address.ts'
 
 type Document = { schemaVersion: 1; servers: any[]; groups: any[] }
 type Secrets = { schemaVersion: 1; sharedToken: string; servers: Record<string, {
@@ -208,6 +209,7 @@ export class McpConfigStore {
       throw new Error('MCP 配置字段无效')
     }
     this.validate(next as McpConfiguration)
+    migrateServiceOrigins(current.value, next as McpConfiguration)
     const { document, secrets } = split(next as McpConfiguration)
     checkDocument(document, secrets)
     const publicRaw = JSON.stringify(document, null, 2) + '\n'

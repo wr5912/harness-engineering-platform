@@ -1,0 +1,19 @@
+{
+  "at": "2026-11-10T09:12:08.958Z",
+  "mode": "actual-platform-read-only",
+  "page": "http://172.16.138.228:18120/hep/#/mcp?server_id=ai-soc-correlate&tab=groups",
+  "member": "ai-soc-correlate",
+  "resourceTemplates": [
+    "http://172.16.138.223:18085/correlate/incident/{incidentId}",
+    "http://172.16.138.223:18085/correlate/reasoning/rules/{ruleId}",
+    "http://172.16.138.223:18085/correlate/rule/{ruleId}",
+    "http://172.16.138.223:18085/correlate/reasoning/rules/{ruleId}/definition",
+    "http://172.16.138.223:18085/correlate/incident/{incidentId}/evidence/{ref}{?includeAlertOriginal}",
+    "http://172.16.138.223:18085/correlate/incident/{incidentId}/rule-hits/{hitId}"
+  ],
+  "visible": true,
+  "confirmedSavedSpecUrl": "http://172.16.138.223:18085/v3/api-docs/mcp",
+  "runtimeUpdate": "local-update.json",
+  "configurationWritten": false,
+  "externalBusinessCalls": false
+}

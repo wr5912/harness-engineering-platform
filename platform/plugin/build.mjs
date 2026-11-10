@@ -29,6 +29,7 @@ export const managerSources = {
         contents = `import * as React from 'react'; const { useEffect, useState, useRef } = React;
 import { connectionIssue } from './connection.ts';
 import { copyText } from './clipboard.ts';
+import { matchResourceAddress } from './resource-address.ts';
 import { createParameterEditor, initialArguments, parameterErrors, templateParameterSchema } from './debug-parameters.tsx';
 const ParameterEditor = createParameterEditor(React);
 ${client}
@@ -89,7 +90,7 @@ const implementationFiles = ['definition.ts', 'compositions.ts', 'executor.ts', 
   .concat(['runtime/adapters/dsh-web/src/resolve-runtime.ts', 'platform/plugin/build.mjs', 'platform/plugin/package.json', 'platform/plugin/pnpm-lock.yaml', 'platform/plugin/src/index.ts',
     'platform/plugin/src/evaluation/model-attempts.ts', 'platform/plugin/src/workflows/graph.ts',
     ...['contracts.ts', 'core.ts', 'gateway.ts', 'group-link.ts', 'providers.ts', 'replica.ts', 'reports.ts', 'runtime.ts'].map(file => `platform/plugin/src/business-control/${file}`),
-    ...['index.ts', 'openapi.ts', 'connection.ts'].map(file => `plugins/mcp-manager/${file}`),
+    ...['index.ts', 'openapi.ts', 'connection.ts', 'resource-address.ts'].map(file => `plugins/mcp-manager/${file}`),
     'platform/plugin/src/mcp/store.ts', 'platform/plugin/src/mcp/credential-path.ts',
     'platform/plugin/assets/mcp-credential-layout.json'])
 for (const directory of ['agent-access', 'instances/external']) {

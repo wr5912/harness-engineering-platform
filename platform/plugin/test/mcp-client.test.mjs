@@ -6,7 +6,7 @@ import test from 'node:test'
 import { compositionQueries } from '../src/mcp/definition.ts'
 
 // 运行实际客户端产物，只替换 React 的状态调度和 Portal 容器。
-function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理请求') }, clipboardFailure = false, SearchSelect } = {}) {
+function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理请求') }, clipboardFailure = false, SearchSelect, writeResult } = {}) {
   const require = createRequire(import.meta.url)
   const states = [], dependencies = []
   const clipboard = []
@@ -61,6 +61,7 @@ function editor({ fetch = async () => { throw new Error('未预期的 MCP 管理
       tools: { mode: 'all', names: ['query_asset_related_alerts'] } },
     write: async (ops, revision) => {
       writes.push({ ops, revision })
+      if (writeResult) return writeResult(ops, revision)
       return revision === props.form.state.revision ? { ok: true }
         : { ok: false, error: { message: '配置版本冲突' } }
     },
@@ -593,6 +594,87 @@ test('分组三类选择保留草稿；完整发现会移除失效项，三个�
   assert.doesNotMatch(afterDiscovery, /当前未发现/)
   ui.setView('connection')
   assert.equal(heading().length, 0)
+})
+
+test('保存服务地址后页面采用后端迁移结果，再次保存使用新版本且不覆盖分组选择', async () => {
+  const { migrateServiceOrigins } = await import('../../../plugins/mcp-manager/resource-address.ts')
+  let saved, revision = 1
+  const ui = editor({ writeResult: ops => {
+    const value = Object.fromEntries(ops.map(op => [op.path[0], structuredClone(op.value)]))
+    migrateServiceOrigins({ servers: [ui.server] }, value)
+    saved = { value, revision: `r${++revision}` }
+    ui.refreshValue(value, saved.revision)
+    return { ok: true, value: saved }
+  } })
+  const old = 'http://127.0.0.1:18080', current = 'https://172.16.138.223:18087'
+  ui.refreshValue({ servers: [ui.server], groups: [{ id: 'one', members: [{ serverId: ui.server.id,
+    names: ['update_item'], resourceUris: [`${old}/status`], resourceTemplates: [`${old}/items/{id}{?q}`] }] }], sharedToken: '' })
+  ui.input('OpenAPI 接口规范地址').props.onChange({ target: { value: `${current}/v3/api-docs/mcp` } })
+  ui.render()
+  await ui.button('保存更改').props.onClick(); ui.render()
+  ui.setView('groups')
+  assert.match(ui.text(ui.render()), /https:\/\/172\.16\.138\.223:18087\/items\/\{id\}\{\?q\}/)
+  assert.doesNotMatch(ui.text(ui.render()), /当前草稿尚未保存/)
+  await ui.button('保存更改').props.onClick()
+  assert.equal(ui.writes.at(-1).revision, 'r2')
+  assert.deepEqual(JSON.parse(JSON.stringify(saved.value.groups[0].members[0])), {
+    serverId: ui.server.id, names: ['update_item'], resourceUris: [`${current}/status`], resourceTemplates: [`${current}/items/{id}{?q}`],
+  })
+})
+
+test('刷新后首次发现按 HTTP 路径迁移旧地址选择，所有分组保留工具与模板占位符', async () => {
+  const old = 'http://172.16.138.232:18085', current = 'https://172.16.138.223:18087'
+  const ui = editor({ fetch: async () => ({ ok: true, json: async () => ({ tools: [{ name: 'update_item' }],
+    resources: { resources: [{ name: 'status', uri: `${current}/api/status?mode=full` }] },
+    resourceTemplates: { resourceTemplates: [{ name: 'lookup', uriTemplate: `${current}/api/items/{id}{?page,size}` }] },
+  }) }) })
+  const member = { serverId: ui.server.id, names: ['update_item'], resourceUris: [`${old}/api/status?mode=full`],
+    resourceTemplates: [`${old}/api/items/{id}{?page,size}`] }
+  ui.refreshValue({ servers: [{ ...ui.server, specUrl: `${current}/v3/api-docs/mcp` }],
+    groups: ['one', 'two'].map(id => ({ id, members: [structuredClone(member)] })), sharedToken: '' })
+  ui.setView('groups')
+  ui.button('发现工具与资源').props.onClick()
+  await new Promise(resolve => setImmediate(resolve)); ui.render()
+  assert.match(ui.text(ui.render()), /已将资源 1 项、资源模板 1 项迁移到当前服务地址/)
+  assert.doesNotMatch(ui.text(ui.render()), /已移除|当前未发现/)
+  await ui.button('保存更改').props.onClick()
+  const saved = ui.writes.at(-1).ops.find(op => op.path[0] === 'groups').value
+  for (const group of saved) assert.deepEqual(JSON.parse(JSON.stringify(group.members[0])), {
+    ...member, resourceUris: [`${current}/api/status?mode=full`], resourceTemplates: [`${current}/api/items/{id}{?page,size}`],
+  })
+})
+
+test('地址迁移遇到发现失败或类别不可用时保留原选择', async () => {
+  let fail = true
+  const ui = editor({ fetch: async () => {
+    if (fail) throw new Error('新地址连接超时')
+    return { ok: true, json: async () => ({ toolsUnavailable: true,
+      resources: { unavailable: true }, resourceTemplates: { unavailable: true } }) }
+  } })
+  const member = { serverId: ui.server.id, names: ['update_item'],
+    resourceUris: ['http://old.example/status'], resourceTemplates: ['http://old.example/items/{id}{?q}'] }
+  ui.refreshValue({ servers: [{ ...ui.server, specUrl: 'https://new.example/spec' }], groups: [{ id: 'one', members: [member] }], sharedToken: '' })
+  ui.setView('groups')
+  for (const unavailable of [false, true]) {
+    fail = !unavailable
+    ui.button('发现工具与资源').props.onClick()
+    await new Promise(resolve => setImmediate(resolve)); ui.render()
+    assert.match(ui.text(ui.render()), unavailable ? /原选择已保留/ : /新地址连接超时/)
+    await ui.button('保存更改').props.onClick()
+    const groups = ui.writes.at(-1).ops.find(op => op.path[0] === 'groups').value
+    assert.deepEqual(JSON.parse(JSON.stringify(groups[0].members[0])), member)
+  }
+})
+
+test('迁移只接受唯一的相同 HTTP 路径；不把其他路径或原生 MCP 资源猜成新地址', async () => {
+  const { matchResourceAddress } = await import('../../../plugins/mcp-manager/resource-address.ts')
+  const address = 'http://old.example/items/{id}{?page}'
+  assert.equal(matchResourceAddress(address, new Set(['https://new.example/items/{id}{?page}'])), 'https://new.example/items/{id}{?page}')
+  for (const candidates of [new Set(['https://new.example/other/{id}{?page}']), new Set(['https://new.example/items/{id}{?size}']),
+    new Set(['https://one.example/items/{id}{?page}', 'https://two.example/items/{id}{?page}'])]) {
+    assert.equal(matchResourceAddress(address, candidates), undefined)
+  }
+  assert.equal(matchResourceAddress('soc://items/{id}', new Set(['https://new.example/items/{id}'])), undefined)
 })
 
 test('服务内关键词同时筛选三类项目，勾选状态不影响大小写、中文及字面匹配', async () => {

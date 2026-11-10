@@ -1,5 +1,6 @@
 import { connectionIssue } from './connection.ts'
 import { copyText } from './clipboard.ts'
+import { matchResourceAddress } from './resource-address.ts'
 import { createParameterEditor, initialArguments, parameterErrors, templateParameterSchema } from './debug-parameters.tsx'
 
 window.__ModuleLoader__.load({
@@ -303,6 +304,8 @@ window.__ModuleLoader__.load({
           { field: 'resourceTemplates', label: '资源模板', values: data.resourceTemplates?.unavailable || !Array.isArray(data.resourceTemplates?.resourceTemplates) ? undefined : new Set(data.resourceTemplates.resourceTemplates.map(template => template.uriTemplate).filter(Boolean)) },
         ]
         const removed = categories.map(category => ({ ...category, values: [] }))
+        const migrated = categories.map(category => ({ ...category, values: [] }))
+        const openapi = (state.value.servers ?? []).find(server => server.id === serverId)?.specUrl
         const next = structuredClone(draft)
         for (const group of next.groups) {
           for (const member of group.members ?? []) {
@@ -310,16 +313,21 @@ window.__ModuleLoader__.load({
             for (const [index, category] of categories.entries()) {
               if (!category.values) continue
               const current = member[category.field] ?? []
-              member[category.field] = current.filter(value => {
-                if (category.values.has(value)) return true
+              member[category.field] = [...new Set(current.flatMap(value => {
+                const matched = category.values.has(value) ? value : openapi && category.field !== 'names'
+                  ? matchResourceAddress(value, category.values) : undefined
+                if (matched) {
+                  if (matched !== value && !migrated[index].values.includes(matched)) migrated[index].values.push(matched)
+                  return [matched]
+                }
                 if (!removed[index].values.includes(value)) removed[index].values.push(value)
-                return false
-              })
+                return []
+              }))]
             }
           }
           group.members = (group.members ?? []).filter(member => member.names?.length || member.resourceUris?.length || member.resourceTemplates?.length)
         }
-        return { draft: next, removed: removed.filter(category => category.values.length), unavailable: categories.filter(category => !category.values) }
+        return { draft: next, removed: removed.filter(category => category.values.length), migrated: migrated.filter(category => category.values.length), unavailable: categories.filter(category => !category.values) }
       }
       const savedServers = [...(state.value.servers ?? []), ...(publishedService ? [publishedService] : [])]
       const isGroup = selected.startsWith('group:')
@@ -465,6 +473,11 @@ window.__ModuleLoader__.load({
           ], value.revision)
           setStatus(response.ok ? '配置已保存。请新建会话验证连接与工具发现。'
             : `保存失败：${response.error.message}`)
+          if (response.ok && response.value?.value && response.value.revision) {
+            const saved = { ...structuredClone(response.value.value), revision: response.value.revision }
+            draftBase.current = JSON.stringify({ servers: saved.servers, groups: saved.groups, sharedToken: saved.sharedToken })
+            setDraft(saved)
+          }
           if (response.ok) setCatalog(null)
           if (response.ok) setChecks({})
         } catch (error) { setStatus(String(error)) }
@@ -896,7 +909,8 @@ window.__ModuleLoader__.load({
           if (!current()) return
           if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`)
           const reconciliation = reconcileGroupSelections(serverId, data)
-          if (reconciliation.removed.length) setDraft(reconciliation.draft)
+          const changed = reconciliation.removed.length || reconciliation.migrated.length
+          if (changed) setDraft(reconciliation.draft)
           setCatalog({ serverId, data })
           setDiscovered(previous => ({ ...previous, [serverId]: data.toolsUnavailable ? undefined : data.tools ?? [] }))
           setDiscoveredResources(previous => ({ ...previous, [serverId]: {
@@ -912,8 +926,9 @@ window.__ModuleLoader__.load({
           ].join('、')
           const removed = reconciliation.removed.map(category => `${category.label} ${category.values.length} 项（${category.values.join('、')}）`).join('、')
           const unavailable = reconciliation.unavailable.map(category => `${category.label}列表无法核对，原选择已保留`).join('；')
-          const summary = removed ? `已移除当前地址未发现的${removed}。` : unavailable ? '已完成可用类别核对，未能核对的类别保留原选择。' : '当前分组选择与发现结果一致。'
-          setStatus(`${serverId} 当前服务已发现 ${counts}。${summary}${unavailable ? `${unavailable}。` : ''}${removed ? '当前分组修改尚未保存，请点击“保存更改”。' : ''}`)
+          const migrated = reconciliation.migrated.map(category => `${category.label} ${category.values.length} 项`).join('、')
+          const summary = `${migrated ? `已将${migrated}迁移到当前服务地址。` : ''}${removed ? `已移除当前地址未发现的${removed}。` : changed || unavailable ? '' : '当前分组选择与发现结果一致。'}`
+          setStatus(`${serverId} 当前服务已发现 ${counts}。${summary}${unavailable ? `${unavailable}。` : ''}${changed ? '当前分组修改尚未保存，请点击“保存更改”。' : ''}`)
         } catch (error) {
           if (!current()) return
           setChecks(previous => ({ ...previous, [serverId]: { at: new Date().toLocaleString(), revision: state.revision, failed: true } }))

@@ -11,6 +11,7 @@ import { McpServer, createMcpHandler } from '@modelcontextprotocol/server'
 import { toNodeHandler } from '@modelcontextprotocol/node'
 import { runtimeModule } from '../../../runtime/adapters/dsh-web/src/resolve-runtime.ts'
 import { boundDrafts, saveDraftBinding, withDraftInstance } from '../src/mcp/draft-bindings.ts'
+import { migrateServiceOrigins } from '../../../plugins/mcp-manager/resource-address.ts'
 
 async function waitFor(check) {
   for (let i = 0; i < 300 && !check(); i++) await new Promise(resolve => setTimeout(resolve, 10))
@@ -522,6 +523,56 @@ test('OpenAPI 地址模板与实际请求共用服务器基址及路径解析，
     await callOpenApiTool(source, 'lookup', { id: 'A B' })
     assert.deepEqual(calls.at(-1), { method: operation.method, url: operation.urlTemplate.replace('{id}', 'A%20B') })
   }
+})
+
+test('服务基址迁移后分组工具、资源和模板实际访问新地址，不依赖旧服务在线', async t => {
+  const manager = await managerModule(t), calls = []
+  let offline = false
+  const endpoint = async label => {
+    let origin = ''
+    origin = await serve(t, (req, res) => {
+      calls.push({ label, path: req.url })
+      if (label === 'old' && offline) return res.writeHead(503).end()
+      if (req.url === '/spec') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({
+        openapi: '3.0.0', servers: [{ url: origin }], paths: {
+          '/status': { get: { operationId: 'status' } },
+          '/items/{id}': { get: { operationId: 'get_item', parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+            { name: 'q', in: 'query', schema: { type: 'string' } },
+          ] } },
+          '/update': { post: { operationId: 'update_item' } },
+        },
+      }))
+      res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ label, path: req.url }))
+    })
+    return origin
+  }
+  const old = await endpoint('old'), current = await endpoint('new')
+  const servers = [{ id: 'api', enabled: true, specUrl: `${old}/spec`, tools: { mode: 'all', names: [] } }]
+  const groups = [{ id: 'migration', members: [{ serverId: 'api', names: ['update_item'],
+    resourceUris: [`${old}/status`], resourceTemplates: [`${old}/items/{id}{?q}`] }] }]
+  const { client } = await groupServer(t, manager, servers, groups)
+  const v2 = await client(2)
+  const sourceUri = uri => Buffer.from(uri.split('/').at(-1).split('{')[0], 'base64url').toString('utf8')
+  assert.equal(sourceUri((await v2.listResources()).resources[0].uri), `${old}/status`)
+  const previous = structuredClone({ servers })
+  servers[0].specUrl = `${current}/spec`
+  migrateServiceOrigins(previous, { servers, groups })
+  offline = true
+  calls.length = 0
+  const resource = (await v2.listResources()).resources[0].uri
+  assert.equal(sourceUri(resource), `${current}/status`)
+  const template = (await v2.listResourceTemplates()).resourceTemplates[0].uriTemplate
+  assert.equal(sourceUri(template), `${current}/items/{id}{?q}`)
+  assert.ok((await v2.listTools()).tools.some(tool => tool.name === 'update_item'))
+  const uri = new UriTemplate(template).expand({ id: 'A B', q: 'x y' })
+  for (const address of [resource, uri]) {
+    const result = await v2.readResource({ uri: address })
+    assert.equal(JSON.parse(result.contents[0].text).label, 'new')
+  }
+  assert.equal(JSON.parse((await v2.callTool({ name: 'update_item', arguments: {} })).content[0].text).label, 'new')
+  assert.ok(calls.some(call => call.path === '/items/A%20B?q=x+y'))
+  assert.ok(calls.every(call => call.label === 'new'), JSON.stringify(calls))
 })
 
 test('OpenAPI 同一操作只发布一个工具，保留资源读取与已选包装工具调用', async t => {

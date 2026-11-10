@@ -30,6 +30,33 @@ function fixture(t) {
   return { root, publicFile, secretFile, store }
 }
 
+test('仅更改 HTTP(S) 协议、主机或端口时保存即迁移全部分组，保留路径、模板和工具选择', t => {
+  const { publicFile, store } = fixture(t)
+  const document = JSON.parse(readFileSync(publicFile, 'utf8'))
+  const old = 'http://172.16.138.232:18085'
+  document.servers[0].specUrl = `${old}/v3/api-docs/mcp`
+  delete document.servers[0].url
+  const member = { serverId: 'first', names: ['create', 'update'],
+    resourceUris: [`${old}/api/items?limit=10`, 'soc://inventory', 'https://external.example/shared'],
+    resourceTemplates: [`${old}/api/items/{id}{?page,size}`, `${old}/api/items/{id}?type={type}`] }
+  document.groups = ['one', 'two'].map(id => ({ id, members: [structuredClone(member), { ...structuredClone(member), serverId: 'other' }] }))
+  writeFileSync(publicFile, JSON.stringify(document))
+  for (const origin of ['http://172.16.138.223:18085', 'http://172.16.138.223:18087', 'https://172.16.138.223:18087']) {
+    const current = store.view()
+    const saved = store.mutate([{ op: 'set', path: ['servers', '0', 'specUrl'], value: `${origin}/v3/api-docs/mcp` }], current.revision)
+    for (const group of saved.value.groups) {
+      assert.deepEqual(group.members[0], { ...member,
+        resourceUris: [`${origin}/api/items?limit=10`, ...member.resourceUris.slice(1)],
+        resourceTemplates: member.resourceTemplates.map(uri => uri.replace(old, origin)) })
+      assert.deepEqual(group.members[1], { ...member, serverId: 'other' })
+    }
+    assert.deepEqual(store.view(), saved)
+  }
+  const before = store.view()
+  const saved = store.mutate([{ op: 'set', path: ['servers', '0', 'specUrl'], value: 'https://changed.example/other-spec' }], before.revision)
+  assert.deepEqual(saved.value.groups, before.value.groups, '规范路径改变不能视为仅地址迁移')
+})
+
 test('MCP 保存共用数据仓库版本，凭据只进本地文件，旧版本拒绝覆盖', t => {
   const { publicFile, secretFile, store } = fixture(t)
   const original = store.view()

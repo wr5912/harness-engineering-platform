@@ -149,7 +149,7 @@ export function McpPage({ rpc, updates, onContext, target, onNavigate, active = 
           setState({ status: 'ready', writable: true, ...(response.value as object) })
           updates?.invalidate(['mcp'])
         }
-        return response.ok ? { ok: true } : { ok: false, error: response.error }
+        return response
       } catch { return { ok: false, error: { message: 'MCP 数据配置保存失败，请检查连接后重试。' } } }
     }} />}</div>
     <div hidden={page !== 'composition'}><CompositionPage rpc={rpc} configuration={state} updates={updates} active={active && page === 'composition'} target={target} onNavigate={onNavigate} onContext={compositionContext} onCatalogChange={value => { setPublishedService(value.publishedService ?? null); setServiceError(''); setServiceLoaded(true) }} /></div>

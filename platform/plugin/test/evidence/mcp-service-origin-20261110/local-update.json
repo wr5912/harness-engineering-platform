@@ -1,0 +1,20 @@
+{
+  "status": "applied",
+  "programRoot": "/home/cmp/work/harness-engineering-platform",
+  "dataRoot": "/home/cmp/harness-engineering-platform-data",
+  "workspaceId": "workspace-95db14d2-d53d-4015-8256-ade8612b1b77",
+  "pid": 2369310,
+  "activation": "managed-restart",
+  "busy": [
+    {
+      "kind": "session",
+      "id": "*",
+      "state": "interruption-authorized-not-enumerated"
+    }
+  ],
+  "changed": [
+    "../../harness-engineering-platform-data/.local/platform-home/profiles/harness-platform/harness-platform.patch.yml"
+  ],
+  "stage": "/home/cmp/work/harness-engineering-platform/.local/platform-updates/492834a4-ddd4-40c6-aaab-9a9b31b696f5",
+  "receipt": "/home/cmp/work/harness-engineering-platform/.local/platform-updates/492834a4-ddd4-40c6-aaab-9a9b31b696f5/receipt.json"
+}
