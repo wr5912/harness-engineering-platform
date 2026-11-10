@@ -265,7 +265,7 @@ test('服务列表区分检查成功、失败和未保存配置', async () => {
   await new Promise(resolve => setImmediate(resolve))
   disconnected.render()
   assert.match(disconnected.text(disconnected.render()), /连接测试失败.*检查服务地址、网络与凭据后重试/)
-  assert.doesNotMatch(disconnected.text(disconnected.render()), /Error POSTing to endpoint/)
+  assert.match(disconnected.text(disconnected.render()), /连接测试失败：Error POSTing to endpoint/)
 })
 
 test('原生 MCP 成功检查后才标记连接已验证，列表身份和选中态保持真实配置', async () => {
@@ -459,7 +459,7 @@ test('已发布组合更名后保留旧分组选择并标记当前未发现', ()
   assert.doesNotMatch(ui.text(ui.render()), /已选来源 platform-compositions 不在服务列表中/)
 })
 
-test('分组三类选择保留草稿；发现后失效项可见，三个页签不重复显示总述', async () => {
+test('分组三类选择保留草稿；完整发现会移除失效项，三个页签不重复显示总述', async () => {
   let discovered = { tools: [{ name: 'query_asset' }], resources: { resources: [{ uri: 'soc://asset/9106' }] },
     resourceTemplates: { resourceTemplates: [{ uriTemplate: 'soc://asset/{id}' }] } }
   const ui = editor({ fetch: async (_url, init) => {
@@ -484,16 +484,13 @@ test('分组三类选择保留草稿；发现后失效项可见，三个页签�
   const member = ui.writes.at(-1).ops.find(op => op.path[0] === 'groups').value[0].members.find(item => item.serverId === 'biz-soc-framework')
   assert.deepEqual(JSON.parse(JSON.stringify(member)), { serverId: 'biz-soc-framework', names: ['query_asset'],
     resourceUris: ['soc://asset/9106'], resourceTemplates: ['soc://asset/{id}'] })
-  ui.nodes(choice('query_asset')).find(node => node.type === 'input').props.onChange()
-  ui.render()
-  await ui.button('保存更改').props.onClick()
-  const resourcesOnly = ui.writes.at(-1).ops.find(op => op.path[0] === 'groups').value[0].members.find(item => item.serverId === 'biz-soc-framework')
-  assert.deepEqual(JSON.parse(JSON.stringify(resourcesOnly)), { serverId: 'biz-soc-framework', names: [],
-    resourceUris: ['soc://asset/9106'], resourceTemplates: ['soc://asset/{id}'] })
   discovered = { tools: [], resources: { resources: [] }, resourceTemplates: { resourceTemplates: [] } }
   ui.button('发现工具与资源').props.onClick()
   await new Promise(resolve => setImmediate(resolve)); ui.render()
-  assert.equal((ui.text(ui.render()).match(/当前未发现/g) ?? []).length, 2)
+  const afterDiscovery = ui.text(ui.render())
+  assert.match(afterDiscovery, /已移除当前地址未发现的工具 1 项（query_asset）、资源 1 项（soc:\/\/asset\/9106）、资源模板 1 项（soc:\/\/asset\/\{id\}）/)
+  assert.match(afterDiscovery, /当前分组修改尚未保存，请点击“保存更改”/)
+  assert.doesNotMatch(afterDiscovery, /当前未发现/)
   ui.setView('connection')
   assert.equal(heading().length, 0)
 })
@@ -529,10 +526,10 @@ test('服务内关键词同时筛选三类项目，勾选状态不影响大小�
   assert.equal(service.choices().length, 0, '关键词中的正则符号只按字面匹配')
   assert.equal((ui.text(service.root()).match(/没有匹配项。/g) ?? []).length, 3)
   service.query('   ')
-  assert.equal(service.choices().length, 12)
+  assert.equal(service.choices().length, 11)
   assert.equal(requests, 1, '关键词输入不能重新发现上游')
   assert.equal(ui.writes.length, 0, '关键词输入不能自动保存配置')
-  assert.doesNotMatch(ui.text(ui.render()), /当前草稿尚未保存；链接仍使用上次保存的配置/)
+  assert.match(ui.text(ui.render()), /当前分组修改尚未保存，请点击“保存更改”/)
 })
 
 test('筛选不丢失不可见选择，保存只反映勾选操作，内置清空恢复列表与焦点', async () => {
@@ -603,7 +600,7 @@ test('服务筛选按 ID 隔离，切换分组和页签及服务重排后保留�
   assert.equal(serviceSelection(reloaded, other.id).input().props.value, '')
 })
 
-test('筛选无匹配不混淆未发现或已知空列表，已保存的失效项目仍保持原状态', async () => {
+test('筛选无匹配不混淆未发现或已知空列表，完整发现会移除失效项目', async () => {
   const ui = editor({ fetch: async () => ({ ok: true, json: async () => ({
     tools: [], resources: { resources: [] }, resourceTemplates: { resourceTemplates: [] },
   }) }) })
@@ -619,14 +616,14 @@ test('筛选无匹配不混淆未发现或已知空列表，已保存的失效�
   }
   ui.button('发现工具与资源').props.onClick()
   await new Promise(resolve => setImmediate(resolve)); ui.render()
-  assert.match(service.sectionText('工具'), /没有匹配项。/)
+  assert.match(service.sectionText('工具'), /没有可选项目。/)
   for (const title of ['资源 URI', '资源模板']) {
     assert.match(service.sectionText(title), /没有可选项目。/)
     assert.doesNotMatch(service.sectionText(title), /没有匹配项。|尚未发现/)
   }
   service.query('saved')
-  assert.match(ui.text(service.choices()[0]), /saved_tool（当前未发现）/)
-  assert.equal(ui.nodes(service.choices()[0]).find(node => node.type === 'input').props.checked, true)
+  assert.equal(service.choices().length, 0)
+  assert.match(service.sectionText('工具'), /没有可选项目。/)
 })
 
 test('深链按服务 ID 恢复，失效 ID 不静默选中其他服务', () => {

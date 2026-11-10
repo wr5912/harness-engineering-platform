@@ -296,6 +296,31 @@ window.__ModuleLoader__.load({
         update(next.groups[index])
         return next
       })
+      const reconcileGroupSelections = (serverId, data) => {
+        const categories = [
+          { field: 'names', label: '工具', values: data.toolsUnavailable || !Array.isArray(data.tools) ? undefined : new Set(data.tools.map(tool => tool.name).filter(Boolean)) },
+          { field: 'resourceUris', label: '资源', values: data.resources?.unavailable || !Array.isArray(data.resources?.resources) ? undefined : new Set(data.resources.resources.map(resource => resource.uri).filter(Boolean)) },
+          { field: 'resourceTemplates', label: '资源模板', values: data.resourceTemplates?.unavailable || !Array.isArray(data.resourceTemplates?.resourceTemplates) ? undefined : new Set(data.resourceTemplates.resourceTemplates.map(template => template.uriTemplate).filter(Boolean)) },
+        ]
+        const removed = categories.map(category => ({ ...category, values: [] }))
+        const next = structuredClone(draft)
+        for (const group of next.groups) {
+          for (const member of group.members ?? []) {
+            if (member.serverId !== serverId) continue
+            for (const [index, category] of categories.entries()) {
+              if (!category.values) continue
+              const current = member[category.field] ?? []
+              member[category.field] = current.filter(value => {
+                if (category.values.has(value)) return true
+                if (!removed[index].values.includes(value)) removed[index].values.push(value)
+                return false
+              })
+            }
+          }
+          group.members = (group.members ?? []).filter(member => member.names?.length || member.resourceUris?.length || member.resourceTemplates?.length)
+        }
+        return { draft: next, removed: removed.filter(category => category.values.length), unavailable: categories.filter(category => !category.values) }
+      }
       const savedServers = [...(state.value.servers ?? []), ...(publishedService ? [publishedService] : [])]
       const isGroup = selected.startsWith('group:')
       const diagnosticGroup = isGroup ? (state.value.groups ?? []).find(group => group.id === selected.slice(6)) : null
@@ -864,7 +889,9 @@ window.__ModuleLoader__.load({
             headers: { 'content-type': 'application/json' }, body: JSON.stringify({ serverId, action: 'test' }) })
           const data = await response.json()
           if (!current()) return
-          if (!response.ok) throw new Error(data.error)
+          if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`)
+          const reconciliation = reconcileGroupSelections(serverId, data)
+          if (reconciliation.removed.length) setDraft(reconciliation.draft)
           setCatalog({ serverId, data })
           setDiscovered(previous => ({ ...previous, [serverId]: data.toolsUnavailable ? undefined : data.tools ?? [] }))
           setDiscoveredResources(previous => ({ ...previous, [serverId]: {
@@ -873,12 +900,20 @@ window.__ModuleLoader__.load({
           } }))
           setChecks(previous => ({ ...previous, [serverId]: { at: new Date().toLocaleString(), revision: state.revision, tools: data.tools?.length ?? 0,
             kind: (state.value.servers ?? []).find(server => server.id === serverId)?.specUrl ? 'openapi' : 'mcp' } }))
-          setStatus(`${serverId} 已发现 ${data.tools?.length ?? 0} 个工具、${data.resources?.resources?.length ?? 0} 个资源、${data.resourceTemplates?.resourceTemplates?.length ?? 0} 个模板。${data.toolsUnavailable || data.resources?.unavailable || data.resourceTemplates?.unavailable ? "部分列表读取失败，可重试发现。" : ""}`)
+          const counts = [
+            Array.isArray(data.tools) ? `${data.tools.length} 个工具` : '工具列表未返回',
+            Array.isArray(data.resources?.resources) ? `${data.resources.resources.length} 个资源` : '资源列表未返回',
+            Array.isArray(data.resourceTemplates?.resourceTemplates) ? `${data.resourceTemplates.resourceTemplates.length} 个模板` : '模板列表未返回',
+          ].join('、')
+          const removed = reconciliation.removed.map(category => `${category.label} ${category.values.length} 项（${category.values.join('、')}）`).join('、')
+          const unavailable = reconciliation.unavailable.map(category => `${category.label}列表无法核对，原选择已保留`).join('；')
+          const summary = removed ? `已移除当前地址未发现的${removed}。` : unavailable ? '已完成可用类别核对，未能核对的类别保留原选择。' : '当前分组选择与发现结果一致。'
+          setStatus(`${serverId} 当前服务已发现 ${counts}。${summary}${unavailable ? `${unavailable}。` : ''}${removed ? '当前分组修改尚未保存，请点击“保存更改”。' : ''}`)
         } catch (error) {
           if (!current()) return
           setChecks(previous => ({ ...previous, [serverId]: { at: new Date().toLocaleString(), revision: state.revision, failed: true } }))
           const reason = error instanceof Error ? error.message : String(error)
-          setStatus(`${serverId} 连接测试失败：${/[\u4e00-\u9fff]/.test(reason) ? reason : '连接或工具发现未完成'}。请检查服务地址、网络与凭据后重试。`)
+          setStatus(`${serverId} 连接测试失败：${reason || '服务端未返回失败原因'}。请检查服务地址、网络与凭据后重试。`)
         }
         finally { if (current()) setBusy(false) }
       }
