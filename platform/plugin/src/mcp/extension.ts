@@ -24,6 +24,7 @@ export interface ThreatRuntime {
 import type { Catalog, CompositionConfig } from './compositions.ts'
 export type WorkflowContext = {
   runId: string; nodeId: string; signal: AbortSignal; shared: any
+  composition?(selection: { compositionId: string; versionId: string }, input: Record<string, any>): Promise<any>
   progress(value: Record<string, any>): void
   call<T>(call: () => Promise<T>): Promise<T>
   map<T, R>(items: T[], call: (item: T, index: number) => Promise<R>): Promise<R[]>

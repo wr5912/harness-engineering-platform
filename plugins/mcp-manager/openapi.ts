@@ -76,6 +76,13 @@ function operationSchema(spec: any, parameters: any[], body: any, budget: Discov
   for (const parameter of parameters) {
     budget.value(parameter.name, location)
     properties[parameter.name] = schemaOf(spec, parameter.schema ?? { type: 'string' }, budget, location)
+    // SOC发现路径ID以十进制字符串返回；int64不能经过JS Number截断。
+    if (parameter.in === 'path' && parameter.name === 'taskId' && parameter.schema?.type === 'integer' && parameter.schema?.format === 'int64') {
+      properties[parameter.name] = { oneOf: [
+        { type: 'string', pattern: '^[1-9][0-9]{0,18}$' },
+        { type: 'integer', minimum: 1, maximum: Number.MAX_SAFE_INTEGER },
+      ] }
+    }
     if (parameter.description) { budget.value(parameter.description, location); properties[parameter.name].description = parameter.description }
     if (parameter.required || parameter.in === 'path') required.push(parameter.name)
   }

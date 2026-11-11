@@ -78,7 +78,25 @@ export function workflowRuns(root: string) {
       metrics.peak_concurrency = Math.max(metrics.peak_concurrency, requests)
       try { return await call() } finally { const next = waiting.shift(); if (next) next(); else requests-- }
     }
-    const prepared = await prepare({ call: limited })
+    let prepared = await prepare({ call: limited })
+    if (request.input.resume_run_id !== undefined) {
+      const previous = read(request.input.resume_run_id)
+      if (!previous || !terminal.has(previous.status) || state.active.has(previous.run_id)) throw new Error('延续来源不存在或仍在执行；不重发')
+      if (previous.composition_id !== request.compositionId || previous.version?.versionId !== request.version.versionId) throw new Error('延续必须使用原固定编排版本')
+      const scopeInput = (value: any) => { const { resume_run_id: _resume, ...rest } = value; return rest }
+      if (compositionExecutionDigest(scopeInput(previous.input)) !== compositionExecutionDigest(scopeInput(request.input))) throw new Error('延续不能改变冻结对象、服务、时间范围')
+      if (!previous.snapshot?.diagnostic_loop) throw new Error('原运行没有可恢复诊断快照')
+      if (compositionExecutionDigest(previous.snapshot.connection_fingerprints) !== compositionExecutionDigest(prepared.connection_fingerprints)) throw new Error('延续连接已变化；先核原请求，禁止切换来源')
+      prepared = structuredClone(previous.snapshot)
+      prepared.diagnostic_id ??= previous.run_id
+      prepared.parent_run_id = previous.run_id
+      prepared.continuations ??= []
+      prepared.continuations.push({run_id:previous.run_id,status:previous.status,continued_at:now()})
+      const unresolved = Object.values<any>(prepared.diagnostic_loop.attempts ?? {}).some(attempt => attempt.status === 'unknown')
+      const proposalUnknown = (prepared.diagnostic_loop.proposals ?? []).some((attempt: any) => attempt.status === 'unknown')
+      prepared.diagnostic_loop.stop_reason = unresolved || proposalUnknown ? '原执行或提议未知；已核原运行，禁止自动重发，等待可核响应' : null
+      prepared.diagnostic_loop.pending = null
+    }
     const preparationMs = Date.now() - submittedAt
     metrics.preparation_ms = preparationMs
     const runId = `run-${randomUUID()}`, path = file(runId)

@@ -44,7 +44,7 @@ function flowChildren(flow: any): { compositionId: string; versionId: string }[]
 }
 
 export function lfxDependencies(root: string, config: CompositionConfig) {
-  return config.engine === 'lfx' ? flowChildren(loadLfxBundle(root, config.workflow!, config).flow) : config.steps ?? []
+  return config.engine === 'lfx' ? [...flowChildren(loadLfxBundle(root, config.workflow!, config).flow), ...(config.options?.fixedDependencies ?? [])] : config.steps ?? []
 }
 
 export function loadLfxBundle(root: string, id: string, config: CompositionConfig, catalog?: Catalog, ancestors = new Set<string>()): LfxBundle {

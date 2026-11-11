@@ -348,6 +348,7 @@ function assertReadonlyOperation(source: Awaited<ReturnType<typeof loadOpenApi>>
 export async function executeComposition(registry: McpRegistry, assetRoot: string, config: CompositionConfig, input: Record<string, any>, signal?: AbortSignal, catalog?: Catalog, nested = false, execution?: CompositionExecutionContext, checkedVersion?: Awaited<ReturnType<typeof compositionVersion>>): Promise<any> {
   const context = registry.access?.context()
   if (context && typeof input.run_id === 'string') registry.access!.assertRunRead(context, input.run_id)
+  if (context && typeof input.resume_run_id === 'string') registry.access!.assertRunRead(context, input.resume_run_id)
   const resolvedCatalog = catalog ?? readCompositions(workspaceConfigPath(assetRoot, 'mcp-compositions.json')).catalog
   const version = checkedVersion ?? await compositionVersion(assetRoot, config, registry.extension, resolvedCatalog, registry)
   const attempts: ModelAttempt[] = []
@@ -386,6 +387,17 @@ export async function executeComposition(registry: McpRegistry, assetRoot: strin
       return { ok: true, version: accepted.version, result: accepted, receipts: [], graph_execution: graphExecution() }
     }
     const workflowContext = runContext.workflowContext
+    workflowContext.composition = async (selection, childInput) => {
+      if (!(config.options?.fixedDependencies ?? []).some((item: any) => item.compositionId === selection.compositionId && item.versionId === selection.versionId)) throw new Error('未声明的固定子组合依赖')
+      const child = versionConfig(resolvedCatalog, selection.compositionId, selection.versionId)
+      const childWorkflow = child.workflow && registry.extension?.workflows?.[child.workflow]
+      if (!childWorkflow) throw new Error('固定子组合实现未装载')
+      const validatedChild = compositionInput(childInput, child, registry.extension)
+      const shared = await childWorkflow.prepare?.(validatedChild, child, workflowContext.signal, workflowContext)
+      const childContext = { ...workflowContext, nodeId: workflowContext.nodeId + '/availability', shared }
+      const response = await executeComposition(registry, assetRoot, child, validatedChild, workflowContext.signal, resolvedCatalog, true, { ...runContext, workflowContext: childContext })
+      return response.result
+    }
     workflowContext.signal.throwIfAborted()
     workflowContext.progress({ status: 'running', title: config.title, version_id: version.versionId, input_digest: compositionExecutionDigest(validated), implementation_digest: version.implementationDigest })
     try {
