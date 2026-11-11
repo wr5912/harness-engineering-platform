@@ -90,7 +90,7 @@ function fixture(t, responder, root) {
     const deadline = Date.now() + 3000
     while (Date.now() < deadline) {
       const value = (await status(id)).proposals.findLast(item => !observed.has(item.id) && ['completed', 'failed', 'cancelled', 'unknown'].includes(item.state))
-      if (value) { observed.add(value.id); return value }
+      if (value) { observed.add(value.id); return (await rpc('confirm', { session_id: id, proposal_id: value.id })).value }
       await setImmediate()
     }
     assert.fail('未出现已结算操作')
@@ -299,12 +299,46 @@ test('原生权限后的工具直接返回真实回执，不生成额外待确�
   assert.equal(receipt.state, 'completed')
   assert.equal(receipt.preview, undefined, '已结算工具结果不得携带仍要求确认的旧预览')
   assert.equal(receipt.input, undefined)
-  assert.ok((await f.status(id)).proposals[0].preview, '原始提案预览仍留在Session供界面核对')
+  assert.equal((await f.status(id)).proposals[0].preview, undefined, '状态查询不重复返回历史预览正文')
+  assert.ok(confirmed.value.preview, '原始提案预览仍留在Session，可按需读取')
   assert.equal(receipt.result.value.source, 'instances/run')
   await f.rpc('confirm', { session_id: id, proposal_id: proposed.id })
   assert.equal(f.calls.filter(call => call.endpoint === 'instances/run').length, 1)
   assert.equal(f.calls.find(call => call.endpoint === 'instances/run').input.confirmed, true)
   assert.equal(f.prompts.length, 1)
+})
+
+test('已结束操作投影只保留摘要，完整回执可从原生历史冷恢复且不重放', async t => {
+  const content = 'large-result-'.repeat(180_000)
+  const f = fixture(t, endpoint => endpoint === 'instances/run' ? { ok: true, value: { content } } : undefined)
+  const id = (await f.rpc('session', { task: '核对大回执' })).value.session_id
+  const receipt = await f.execute(id, 'instances', 'run', { name: 'large', operation: 'stop' })
+  assert.equal(receipt.result.value.content, content)
+  const session = f.sessions.get(id).session
+  const checkpoint = f.services.projections.checkpoint(session)
+  assert.ok(JSON.stringify(checkpoint.harnessPlatformAssistant).length < 3000)
+  assert.ok(JSON.stringify(await f.status(id)).length < 4000)
+  const summary = (await f.status(id)).proposals[0]
+  assert.equal(summary.result, undefined)
+  assert.equal(summary.input, undefined)
+  const history = JSON.parse(JSON.stringify(f.sessions.get(id).events))
+  const original = JSON.stringify(history)
+  checkpoint.harnessPlatformAssistant.ver = 9
+  checkpoint.harnessPlatformAssistant.val.proposals[0] = { ...summary, result: receipt.result }
+  const restored = fixture(t, undefined, f.root)
+  restored.addSession(id, f.root, history)
+  assert.equal(restored.services.projections.restoreFloor(checkpoint), 0)
+  const rebuilt = restored.services.projections.restore(checkpoint, history, 0, session.header, session.inheritedEventCount)
+  assert.ok(JSON.stringify(rebuilt.checkpoint.harnessPlatformAssistant).length < 3000)
+  const confirmed = await restored.rpc('confirm', { session_id: id, proposal_id: summary.id })
+  assert.equal(confirmed.value.result.value.content, content)
+  assert.equal(restored.calls.length, 0, '历史确认只读原回执')
+  assert.equal(JSON.stringify(restored.sessions.get(id).events), original, '不改写原生历史')
+  restored.services.sessionEvents = undefined
+  const unavailable = await restored.rpc('confirm', { session_id: id, proposal_id: summary.id })
+  assert.equal(unavailable.ok, false)
+  assert.match(unavailable.error.message, /无法读取原生会话历史.*未重复执行/)
+  assert.equal(restored.calls.length, 0)
 })
 
 test('实例创建、启动和重启由助手内部预览冻结来源、端口及模型设置，原生许可后直接执行', async t => {
@@ -939,7 +973,7 @@ test('资产写入保留预览，评测直接由启动接口核对原Run预留�
   const settled = (await f.status(id)).proposals
   assert.equal(settled.length, 1)
   assert.equal(settled[0].state, 'failed')
-  assert.equal(settled[0].result.error.code, 'creation_expired')
+  assert.equal((await f.rpc('confirm', { session_id: id, proposal_id: settled[0].id })).value.result.error.code, 'creation_expired')
   assert.equal(f.calls.some(call => call.endpoint === 'agents/eval/preview'), false)
 })
 
@@ -1134,7 +1168,7 @@ test('冻结模型回执省略完整编译diff并保留真实摘要，持久提�
     assert.doesNotMatch(JSON.stringify(projected), /compiled-esm-boundary/)
     assert.ok(JSON.stringify(projected).length < 5000)
   }
-  assert.equal((await f.status(id)).proposals[0].preview.value.diff, diff)
+  assert.equal((await f.status(id)).proposals[0].preview, undefined)
 })
 
 test('用户可仅拒绝当前旧待确认操作，另一个操作可确认一次且不重放', async t => {

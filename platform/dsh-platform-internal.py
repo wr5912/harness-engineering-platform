@@ -202,7 +202,7 @@ def link_program_asset(target, source, relative):
     target.symlink_to(source, target_is_directory=True)
 
 
-def check_artifacts():
+def check_artifacts(applied=False):
     for name in ("index.js", "client.js", "mcp-manager.js", "platform-mcp-manager.js"):
         path = PLUGIN / "lib" / name
         if not path.is_file():
@@ -210,7 +210,7 @@ def check_artifacts():
     path = WEB / "lib" / "platform-webserver.mjs"
     if not path.is_file():
         raise PlatformError(f"缺少 Web 基址适配构建产物：{path}；请先运行 prepare。")
-    for extension in workspace_extensions():
+    for extension in ([] if applied else workspace_extensions()):
         if not (extension_output(extension, path_only=True) / "plugin.js").is_file():
             raise PlatformError(f"扩展 {extension['id']} 尚未按当前来源构建；请运行 prepare。")
 
@@ -261,6 +261,47 @@ def check_profile(profile, rendered):
         if normalized_mcp_patch(profile, source) != source or legacy_mcp_row(source) is not None:
             raise PlatformError("原生 MCP 配置尚未迁至数据工作区；请运行 prepare。")
     check_mcp_store()
+
+
+def normalized_retry_patch(source):
+    """使用 CodexConnect 原生策略；保留用户的退避设置及其他插件配置。"""
+    import yaml
+    document = yaml.compose(source, Loader=yaml.SafeLoader)
+    replacements = []
+    for row in document.value if isinstance(document, yaml.SequenceNode) else []:
+        if not isinstance(row, yaml.MappingNode):
+            continue
+        fields = {k.value: v for k, v in row.value}
+        if fields.get("id") is None or fields["id"].value != "llm-openai-codex":
+            continue
+        config = fields.get("config")
+        if not isinstance(config, yaml.MappingNode):
+            raise PlatformError("CodexConnect 配置必须是映射；未更改重试策略。")
+        policy = next((v for k, v in config.value if k.value == "retryPolicy"), None)
+        value = yaml.safe_load(yaml.serialize(policy)) if policy else {}
+        if not isinstance(value, dict):
+            raise PlatformError("CodexConnect retryPolicy 必须是映射。")
+        original = dict(value)
+        value.update(mode="normal", maxRetries=10, retryableCodes=["EMPTY_RESPONSE", "RATE_LIMIT", "SERVER", "TIMEOUT", "TRANSPORT"])
+        if value == original:
+            continue
+        if policy and policy.flow_style:
+            replacements.append((policy.start_mark.index, policy.end_mark.index, json.dumps(value)))
+            continue
+        if not policy and config.flow_style:
+            at = config.end_mark.index - 1
+            replacements.append((at, at, (", " if config.value else "") + "retryPolicy: " + json.dumps(value)))
+            continue
+        text = yaml.safe_dump(value, allow_unicode=True, sort_keys=False).rstrip()
+        if policy:
+            indent = policy.start_mark.column if isinstance(policy, yaml.ScalarNode) else config.start_mark.column + 2
+            replacements.append((policy.start_mark.index, policy.end_mark.index, text.replace("\n", "\n" + " " * indent) + "\n" + " " * policy.end_mark.column))
+        else:
+            indent = config.start_mark.column
+            replacements.append((config.end_mark.index, config.end_mark.index, " " * indent + "retryPolicy:\n" + "\n".join(" " * (indent + 2) + line for line in text.splitlines()) + "\n"))
+    for start, end, text in reversed(replacements):
+        source = source[:start] + text + source[end:]
+    return source
 
 
 def normalized_mcp_patch(profile, source=None):
@@ -869,8 +910,8 @@ def initialize_from_browser(host, port):
         os.environ["HARNESS_ASSET_ROOT"] = selected
 
 
-def start(home, host, port, dry_run, public_url=None):
-    state = bootstrap_state()
+def start(home, host, port, dry_run, public_url=None, applied=False):
+    state = {"ready": True} if applied else bootstrap_state()
     if not state["ready"]:
         host = host or default_host()
         if dry_run:
@@ -881,10 +922,21 @@ def start(home, host, port, dry_run, public_url=None):
         home = platform_home()
     workspace = check_workspace()
     executable, version = global_dsh(home)
-    rendered = rendered_profile()
-    check_artifacts()
     profile = home / "profiles" / PROFILE_NAME
-    check_profile(profile, rendered)
+    if applied:
+        # 故障恢复使用已应用的 Profile，不重新解析尚在编辑的扩展源码。
+        check_artifacts(applied=True)
+        bundle = profile / "node_modules/@ai-agent-harness/harness-platform"
+        if not bundle.is_symlink() or bundle.resolve() != PLUGIN:
+            raise PlatformError("已应用 Profile 的平台链接不属于当前程序目录。")
+        for name in ("package.json", "pnpm-workspace.yaml", PLATFORM_PATCH, "cordis.patch.yml"):
+            if not (profile / name).is_file():
+                raise PlatformError(f"已应用 Profile 缺少 {name}，请通过更新工具恢复。")
+        json.loads((profile / "package.json").read_text())
+    else:
+        rendered = rendered_profile()
+        check_artifacts()
+        check_profile(profile, rendered)
     host = host or default_host()
     if not dry_run:
         check_port(host, port)
@@ -938,6 +990,7 @@ def main():
     start_parser.add_argument("--port", type=port_value, default=18120, help="监听端口，默认 18120")
     start_parser.add_argument("--host", type=host_value, help="监听 IPv4，默认选择本机局域网地址")
     start_parser.add_argument("--public-url", help="公开访问入口，与本机监听地址分开")
+    start_parser.add_argument("--applied", action="store_true", help=argparse.SUPPRESS)
     start_parser.add_argument("--dry-run", action="store_true", help="只读检查并预览启动参数")
     args = parser.parse_args()
     try:
@@ -945,10 +998,10 @@ def main():
         if args.command == "prepare":
             prepare(home, offline=args.offline)
         else:
-            start(home, args.host, args.port, args.dry_run, args.public_url)
-    except (PlatformError, OSError) as exc:
+            start(home, args.host, args.port, args.dry_run, args.public_url, args.applied)
+    except (PlatformError, OSError, ValueError) as exc:
         print(f"dsh-platform: {exc}", file=sys.stderr)
-        return 1
+        return 78
     return 0
 
 

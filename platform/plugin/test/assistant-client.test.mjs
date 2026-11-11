@@ -65,7 +65,7 @@ test('每个新任务使用独立 Session；融合确认可以续接原任务，
   assert.ok(f.references.every(item => item.released === 1))
 })
 
-test('状态读取丢弃过时响应，重连恢复同会话，不创建或投递任务', async () => {
+test('状态刷新串行合并，重连恢复同会话，不创建或投递任务', async () => {
   const pending = []
   let creates = 0
   const f = fixture(async (_channel, endpoint) => {
@@ -77,10 +77,13 @@ test('状态读取丢弃过时响应，重连恢复同会话，不创建或投�
   pending.push(null)
   const first = f.assistant.refresh()
   const second = f.assistant.refresh()
-  pending[2]({ ok: true, value: { proposals: [{ id: 'p', state: 'completed' }] } })
-  await second
+  const third = f.assistant.refresh()
+  assert.equal(pending.length, 2, '同一时刻只发一个状态请求')
   pending[1]({ ok: true, value: { proposals: [{ id: 'p', state: 'awaiting_confirmation' }] } })
-  await first
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(pending.length, 3, '并发刷新合并为一次后续读取')
+  pending[2]({ ok: true, value: { proposals: [{ id: 'p', state: 'completed' }] } })
+  await Promise.all([first, second, third])
   assert.equal(f.assistant.getSnapshot().status.proposals[0].state, 'completed')
   pending.splice(0)
   const retainedBeforeReconnect = f.retained.length
@@ -314,9 +317,10 @@ test('确认回执优先于在途旧状态，刷新失败保持结算且显式�
   await f.assistant.create('继续')
   hold = true
   const refresh = f.assistant.refresh()
-  f.assistant.applySettlement('s', { id: 'p', state: 'completed' })
+  f.assistant.applySettlement('s', { id: 'p', state: 'completed', result: { content: 'large'.repeat(200_000) } })
   pending({ ok: true, value: { proposals: [{ id: 'p', state: 'awaiting_confirmation' }] } }); await refresh
   assert.equal(f.assistant.getSnapshot().status.proposals[0].state, 'completed')
+  assert.equal(f.assistant.getSnapshot().status.proposals[0].result, undefined)
   fail = true; await f.assistant.refresh()
   assert.match(f.assistant.getSnapshot().statusError, /读取失败/)
   assert.equal(f.assistant.getSnapshot().status.proposals[0].state, 'completed')

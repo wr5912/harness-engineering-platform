@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
-import { managedState, ownsPort, processBirth, restoreManagedProcess } from '../lifecycle.mts'
+import { managedState, ownsPort, platformNodeOptions, processBirth, restoreManagedProcess, serviceOwner } from '../lifecycle.mts'
 import { workspaceIdentity, instanceStateRoot, workspaceLocalPath, workspaceOwnsCwd, mcpLocalPath } from '../plugin/src/workspace.ts'
 
 export type UpdateOptions = { programRoot: string; dataRoot: string; dryRun?: boolean; interruptSessions?: boolean; clientOnly?: boolean }
@@ -13,7 +13,7 @@ export type UpdateInspection = {
   state: ServiceState; workspaceId: string; environment: NodeJS.ProcessEnv; busy: BusyItem[]
   command?: string[]
   pendingActivation?: boolean
-  overlay?: { path: string; text: string }; extensions?: Array<{ entry: string; output: string }>
+  overlay?: { path: string; text: string }; userPatch?: { path: string; text: string }; extensions?: Array<{ entry: string; output: string }>
 }
 export type UpdateEntry = { source: string; target: string }
 export interface UpdateServices {
@@ -100,11 +100,11 @@ function preparedProfile(options: UpdateOptions, environment: NodeJS.ProcessEnv)
   }
   if (options.clientOnly) return {}
   // 只调用现有渲染与兼容检查，不调用会修改运行目录的 prepare。
-  const script = `import importlib.util,json,sys\nfrom pathlib import Path\nspec=importlib.util.spec_from_file_location('platform_update_source',sys.argv[1])\nm=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)\nhome=m.platform_home();m.global_dsh(home);r=m.rendered_profile();p=home/'profiles'/m.PROFILE_NAME\na=(p/'package.json').read_text();r['package.json']=m.merged_profile_manifest(a,r['package.json'])\nassert json.loads(a)==json.loads(r['package.json']), 'Profile依赖合同变化，需要prepare'\nassert (p/'pnpm-workspace.yaml').read_text()==r['pnpm-workspace.yaml'], 'Profile模板变化，需要prepare'\nassert (p/'node_modules/@ai-agent-harness/harness-platform').resolve()==m.PLUGIN, 'Profile程序链接不符'\nassert m.normalized_mcp_patch(p)==(p/'cordis.patch.yml').read_text(), '用户Patch需要prepare'\nprint(json.dumps({'overlay':r[m.PLATFORM_PATCH],'extensions':[{'entry':str(m.asset_root()/e['path']/'build.mjs'),'output':str(m.extension_output(e,path_only=True))} for e in m.workspace_extensions()]}))\n`
+  const script = `import importlib.util,json,sys\nfrom pathlib import Path\nspec=importlib.util.spec_from_file_location('platform_update_source',sys.argv[1])\nm=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)\nhome=m.platform_home();m.global_dsh(home);r=m.rendered_profile();p=home/'profiles'/m.PROFILE_NAME\na=(p/'package.json').read_text();r['package.json']=m.merged_profile_manifest(a,r['package.json'])\nassert json.loads(a)==json.loads(r['package.json']), 'Profile依赖合同变化，需要prepare'\nassert (p/'pnpm-workspace.yaml').read_text()==r['pnpm-workspace.yaml'], 'Profile模板变化，需要prepare'\nassert (p/'node_modules/@ai-agent-harness/harness-platform').resolve()==m.PLUGIN, 'Profile程序链接不符'\nassert m.normalized_mcp_patch(p)==(p/'cordis.patch.yml').read_text(), '用户Patch需要prepare'\nprint(json.dumps({'overlay':r[m.PLATFORM_PATCH],'userPatch':m.normalized_retry_patch((p/'cordis.patch.yml').read_text()),'extensions':[{'entry':str(m.asset_root()/e['path']/'build.mjs'),'output':str(m.extension_output(e,path_only=True))} for e in m.workspace_extensions()]}))\n`
   const value = JSON.parse(command(environment.HARNESS_PYTHON || '/usr/bin/python3.10', ['-c', script, join(options.programRoot, 'platform/dsh-platform-internal.py')], { cwd: options.programRoot, env: environment }))
   const path = join(options.dataRoot, '.local/platform-home/profiles/harness-platform/harness-platform.patch.yml')
   // 依赖与 Runtime 合同已在上方核对；渲染后的模板与程序制品一起暂存、应用和回滚。
-  return { overlay: { path, text: value.overlay as string }, extensions: value.extensions as Array<{ entry: string; output: string }> }
+  return { overlay: { path, text: value.overlay as string }, userPatch: { path: join(dirname(path), 'cordis.patch.yml'), text: value.userPatch as string }, extensions: value.extensions as Array<{ entry: string; output: string }> }
 }
 
 /** 只读取已有会话与操作，不创建管理任务。凭据仅留在本次HTTP连接内。 */
@@ -162,9 +162,11 @@ export async function readUpdateActivity(options: UpdateOptions, state: ServiceS
     const hint = session.projections?.values?.harnessPlatformAssistant
     // 子会话由 DSH 子代理路由持有，继承的助手投影不是独立管理会话；运行状态仍在上方核对。
     if (hint?.workspace_id === workspaceId && session.origin !== 'subagent') {
-      const current = await rpc('assistant/status', { session_id: session.sessionId })
-      if (typeof current?.running !== 'boolean' || !Array.isArray(current.proposals) || !current.submissions || typeof current.submissions !== 'object') throw new Error('管理会话状态不完整，不能判断为空闲')
-      if (current.running || current.proposals?.some((item: any) => item.state === 'running') || Object.values(current.submissions ?? {}).some((item: any) => ['pending', 'unknown'].includes(item.state))) busy.push({ kind: 'assistant', id: session.sessionId, state: 'pending' })
+      if (Number.isInteger(hint.running_proposals) && hint.running_proposals >= 0 && Number.isInteger(hint.pending_submissions) && hint.pending_submissions >= 0) {
+        if (hint.running_proposals || hint.pending_submissions) busy.push({ kind: 'assistant', id: session.sessionId, state: 'pending' })
+        continue
+      }
+      throw new Error(`管理会话 ${session.sessionId} 缺少在途计数，不能判断为空闲；需明确允许中断会话后再更新`)
     }
   }
   for (const run of evaluationRuns) {
@@ -228,8 +230,9 @@ async function inspect(options: UpdateOptions): Promise<UpdateInspection> {
   const command = [readlinkSync(`/proc/${state.pid}/exe`), ...readFileSync(`/proc/${state.pid}/cmdline`, 'utf8').split('\0').filter(Boolean).slice(1)]
   // 原地构建可能先于 update；启动记录之后写入的服务端制品不能视为已装载。
   const started = statSync(join(options.dataRoot, '.local/platform-service/state.json')).mtimeMs
-  const pendingActivation = !options.clientOnly && Object.keys(liveSnapshot(options)).some(path => path.endsWith('.js')
-    && !['client.js', 'sdk-worker.js'].includes(path.split('/').at(-1)!) && statSync(path).mtimeMs > started)
+  const pendingActivation = !options.clientOnly && (environment.NODE_OPTIONS !== platformNodeOptions(environment.NODE_OPTIONS, state.nodeHeapMb)
+    || Object.keys(liveSnapshot(options)).some(path => path.endsWith('.js')
+      && !['client.js', 'sdk-worker.js'].includes(path.split('/').at(-1)!) && statSync(path).mtimeMs > started))
   return { state, workspaceId, environment, command, pendingActivation, ...prepared, busy: await readUpdateActivity(options, state, workspaceId) }
 }
 async function build(options: UpdateOptions, stage: string, inspection: UpdateInspection): Promise<UpdateEntry[]> {
@@ -262,10 +265,12 @@ async function build(options: UpdateOptions, stage: string, inspection: UpdateIn
     entries.push({ source: file, target })
   }
   if (inspection.overlay) { const file = join(stage, 'harness-platform.patch.yml'); writeFileSync(file, inspection.overlay.text); entries.push({ source: file, target: inspection.overlay.path }) }
+  if (inspection.userPatch) { const file = join(stage, 'cordis.patch.yml'); writeFileSync(file, inspection.userPatch.text, { mode: 0o600 }); entries.push({ source: file, target: inspection.userPatch.path }) }
   return entries
 }
 async function lifecycle(action: 'stop' | 'start' | 'restore', options: UpdateOptions, inspection: UpdateInspection) {
   if (action === 'restore') { await restoreManagedProcess(inspection.state, inspection.command ?? [], inspection.environment); return }
+  if (action === 'stop' && serviceOwner(options.dataRoot)) command(join(options.programRoot, 'platform/dsh-platform'), ['autostart', 'enable'], { cwd: options.programRoot, env: inspection.environment })
   const args = action === 'start' ? ['start', '--host', inspection.state.host, '--port', String(inspection.state.port), '--public-url', inspection.state.publicUrl ?? inspection.state.url] : ['stop']
   command(join(options.programRoot, 'platform/dsh-platform'), args, { cwd: options.programRoot, env: inspection.environment, timeout: 120_000 })
 }
@@ -299,7 +304,7 @@ export async function updatePlatform(input: UpdateOptions, services: UpdateServi
     const current = await services.inspect(options)
     if (current.state.pid !== observed.state.pid || current.state.birth !== observed.state.birth || current.workspaceId !== observed.workspaceId) throw new Error('受管进程在构建期间变化，未应用')
     report.busy = current.busy
-    if (JSON.stringify(current.overlay) !== JSON.stringify(observed.overlay) || JSON.stringify(current.extensions) !== JSON.stringify(observed.extensions)) throw new Error('生成Profile来源在更新准备期间变化；保留构建结果，未应用')
+    if (JSON.stringify(current.userPatch) !== JSON.stringify(observed.userPatch) || JSON.stringify(current.overlay) !== JSON.stringify(observed.overlay) || JSON.stringify(current.extensions) !== JSON.stringify(observed.extensions)) throw new Error('生成Profile来源在更新准备期间变化；保留构建结果，未应用')
     if (sourceSnapshot(options) !== source || !sameSnapshot(liveSnapshot(options), live) || !sameSnapshot(extensionSnapshot(observed), extensions) || entries.some((entry, index) => sha(entry.source) !== staged[index])) throw new Error('应用前来源或制品摘要变化；保留构建结果，未应用')
     const changed = entries.filter(entry => sha(entry.source) !== sha(entry.target))
     report.changed = changed.map(entry => relative(options.programRoot, entry.target))

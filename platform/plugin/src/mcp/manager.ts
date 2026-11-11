@@ -243,6 +243,7 @@ export function apply(ctx: Context, suppliedConfig: ManagerConfig) {
       if (currentBusinessContext()) return run()
       return managementDispatch(assetRoot, run)
     },
+    workspaceId: assetRoot,
     groupUrl: (id: string) => platformGroupUrl(assetRoot, id),
     platformDispatch: (handler: NonNullable<ManagerConfig['dispatch']>) => { dispatch = handler }, servers: { get() {
     const servers = config.servers.get()

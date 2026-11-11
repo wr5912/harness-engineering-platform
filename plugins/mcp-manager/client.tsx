@@ -228,12 +228,10 @@ window.__ModuleLoader__.load({
         })
       }, [state?.value, state?.revision, state?.status])
       useEffect(() => {
-        setChecks({})
         setBatch(null)
         return () => cancelConnectionTests()
       }, [state?.revision])
       useEffect(() => {
-        if (active && connectionTestTarget) void testConnections()
         return () => cancelConnectionTests()
       }, [active, !!connectionTestTarget])
 
@@ -261,7 +259,7 @@ window.__ModuleLoader__.load({
           tools: data.toolsUnavailable ? undefined : data.tools?.length ?? 0,
           resources: data.resources?.unavailable ? undefined : data.resources?.resources?.length,
           templates: data.resourceTemplates?.unavailable ? undefined : data.resourceTemplates?.resourceTemplates?.length,
-          partial: unavailable.length > 0, reason: unavailable.length ? `${unavailable.join('、')}目录读取失败，可重试连接测试。` : '',
+          partial: unavailable.length > 0, reason: unavailable.length ? [data.toolsError, data.resources?.error, data.resourceTemplates?.error].filter(Boolean).join('；') || `${unavailable.join('、')}目录读取失败，可重试连接测试。` : '',
           kind: server.platformComposition ? 'platform' : server.specUrl ? 'openapi' : 'mcp' } }))
         return unavailable.length > 0
       }
@@ -554,7 +552,7 @@ window.__ModuleLoader__.load({
             setDraft(saved)
           }
           if (response.ok) setCatalog(null)
-          if (response.ok) setChecks({})
+          if (response.ok) cancelConnectionTests()
         } catch (error) { setStatus(String(error)) }
         finally { setBusy(false) }
       }
@@ -673,6 +671,7 @@ window.__ModuleLoader__.load({
                       : check?.failed ? ['检查失败', 'failed']
                       : check?.partial ? ['部分可用', 'changed']
                       : check ? [check.kind === 'platform' ? '平台目录已读取' : check.kind === 'openapi' ? '规范已读取' : '连接已验证', 'verified']
+                      : checks[server.id] ? ['配置已变，需重查', 'changed']
                       : server.platformComposition ? ['平台服务', 'neutral']
                       : ['连接待检查', 'neutral']
                     return <button key={index} className="mcp-list-item" data-server-id={server.id} type="button" aria-current={currentServerIndex === index ? 'true' : undefined} onClick={() => { setActiveServer(index); setServicePane('tools'); onSelectServerId?.(server.id) }}>
@@ -701,7 +700,7 @@ window.__ModuleLoader__.load({
                     <article><small>工具发现</small><strong>{currentCheck?.tools !== undefined ? `${currentCheck.tools} 个工具` : '待核对'}</strong><small>{currentCheck?.tools !== undefined ? '已枚举工具定义' : '尚无可用的发现结果'}</small></article>
                     {currentCheck && !currentCheck.pending && !currentCheck.failed && <article><small>资源与模板</small><strong>{currentCheck.resources ?? '未知'} 个资源 · {currentCheck.templates ?? '未知'} 个模板</strong></article>}
                   </div>
-                  <p className="mcp-service-scope">{currentCheck?.at ? `最近检查 ${currentCheck.at}。` : ''}{serverDraftChanged(editingServer) ? '当前配置未保存，连接测试使用已保存配置；保存后可检查新配置。' : '连接检查只确认接口读取与工具枚举；实际调用和业务结果待验证。'}{currentCheck?.reason && <span role="alert">{currentCheck.reason}</span>}</p>
+                  <p className="mcp-service-scope">{checks[editingServer.id]?.at ? `最近检查 ${checks[editingServer.id].at}。${!currentCheck ? '配置已变化，旧结果已过期，请重新检查。' : ''}` : ''}{serverDraftChanged(editingServer) ? '当前配置未保存，连接测试使用已保存配置；保存后可检查新配置。' : '连接检查只确认接口读取与工具枚举；实际调用和业务结果待验证。'}{currentCheck?.reason && <span role="alert">{currentCheck.reason}</span>}</p>
                   <nav className="mcp-service-tabs" aria-label="服务详情"><button type="button" aria-current={servicePane === 'tools' ? 'page' : undefined} onClick={() => setServicePane('tools')}>工具与调试</button><button type="button" aria-current={servicePane === 'connection' ? 'page' : undefined} onClick={() => setServicePane('connection')}>连接配置</button></nav>
                   {servicePane === 'tools' && <section className="mcp-section"><h3>已发现的工具</h3>{currentTools.length ? <ul className="mcp-discovered-list">{currentTools.map(tool => <li key={tool.name}><div><strong>{tool.name}</strong>{tool.description && <p className="mcp-muted">{tool.description}</p>}</div><button type="button" onClick={() => openDiagnostic(editingServer.id, tool.name)}>调试</button></li>)}</ul> : <p className="mcp-muted">{currentCheck?.failed ? '最近一次检查失败，暂不能列出当前配置的工具。' : '当前配置尚无已验证的工具目录。保存配置后运行连接测试，才能显示实际发现的工具。'}</p>}</section>}
                   {servicePane === 'connection' && <>
@@ -928,7 +927,7 @@ window.__ModuleLoader__.load({
                 {!currentCatalog ? <p className="mcp-empty">先发现当前对象的工具与资源。</p> : <>
                   {debugType === 'tools' && <>
                     <div className="mcp-debug-selector"><span>工具</span>{objectSelect({ label: '工具', value: toolName, placeholder: '请选择工具', descriptionLines: 2, popupMinWidth: 560, options: (currentCatalog.tools ?? []).map(tool => ({ value: tool.name, label: tool.title && tool.title !== tool.name ? `${tool.title} · ${tool.name}` : tool.name, detail: diagnosticServer?.specUrl && tool.httpOperation?.urlTemplate ? `${tool.httpOperation.method} ${tool.httpOperation.urlTemplate}` : undefined, description: tool.description })), onChange: selectDebugTool })}</div>
-                    {currentCatalog.toolsUnavailable ? <p className="mcp-note">工具列表读取失败，可重新发现。</p> : !currentCatalog.tools?.length ? <p className="mcp-muted">没有可调用的工具。</p> : currentTool && description(currentTool.description, toolName)}
+                    {currentCatalog.toolsUnavailable ? <p className="mcp-note">{currentCatalog.toolsError || '工具列表读取失败，可重新发现。'}</p> : !currentCatalog.tools?.length ? <p className="mcp-muted">没有可调用的工具。</p> : currentTool && description(currentTool.description, toolName)}
                     {currentTool && diagnosticServer?.specUrl && (currentTool.httpOperation?.urlTemplate ? <>
                       <p className="mcp-muted">接口地址模板：<code>{currentTool.httpOperation.method} {currentTool.httpOperation.urlTemplate}</code></p>
                       {button('复制接口地址', () => copy(`tool-url:${targetKey}:${toolName}`, currentTool.httpOperation.urlTemplate))}
@@ -937,11 +936,11 @@ window.__ModuleLoader__.load({
                   </>}
                   {debugType === 'resources' && <>
                     <div className="mcp-debug-selector"><span>资源</span>{objectSelect({ label: '资源', value: uriText, placeholder: '搜索资源名称、URI 或说明', descriptionLines: 2, popupMinWidth: 560, options: (currentCatalog.resources?.resources ?? []).map(item => ({ value: item.uri, label: item.name && item.name !== item.uri ? `${item.name} · ${item.uri}` : item.uri, description: item.description })), onChange: uri => { setUriText(uri); restoreDiagnosticReceipt('resources', uri) } })}</div>
-                    {currentCatalog.resources?.unavailable ? <p className="mcp-note">资源列表未提供或读取失败；可填写已知 URI。</p> : !currentCatalog.resources?.resources?.length ? <p className="mcp-muted">没有可列出的资源，可填写已知 URI。</p> : currentResource && description(currentResource.description, uriText)}
+                    {currentCatalog.resources?.unavailable ? <p className="mcp-note">{currentCatalog.resources.error || '资源列表读取失败；可填写已知 URI。'}</p> : !currentCatalog.resources?.resources?.length ? <p className="mcp-muted">没有可列出的资源，可填写已知 URI。</p> : currentResource && description(currentResource.description, uriText)}
                   </>}
                   {debugType === 'templates' && <>
                     <div className="mcp-debug-selector"><span>资源模板</span>{objectSelect({ label: '资源模板', value: templateUri, placeholder: '请选择模板', descriptionLines: 2, popupMinWidth: 560, options: (currentCatalog.resourceTemplates?.resourceTemplates ?? []).map(item => ({ value: item.uriTemplate, label: item.name && item.name !== item.uriTemplate ? `${item.name} · ${item.uriTemplate}` : item.uriTemplate, description: item.description })), onChange: selectDebugTemplate })}</div>
-                    {currentCatalog.resourceTemplates?.unavailable ? <p className="mcp-note">模板列表未提供或读取失败，可重新发现。</p> : !currentCatalog.resourceTemplates?.resourceTemplates?.length ? <p className="mcp-muted">没有可用的资源模板。</p> : currentTemplate && <>{description(currentTemplate.description, templateUri)}<p className="mcp-muted"><code>{templateUri}</code></p></>}
+                    {currentCatalog.resourceTemplates?.unavailable ? <p className="mcp-note">{currentCatalog.resourceTemplates.error || '模板列表读取失败，可重新发现。'}</p> : !currentCatalog.resourceTemplates?.resourceTemplates?.length ? <p className="mcp-muted">没有可用的资源模板。</p> : currentTemplate && <>{description(currentTemplate.description, templateUri)}<p className="mcp-muted"><code>{templateUri}</code></p></>}
                   </>}
                 </>}
               </section>

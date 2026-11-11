@@ -30,7 +30,7 @@ interface AssistantSnapshot {
   error: string
   pendingSubmission?: { sessionId: SessionId; requestId: string }
   statusError?: string
-  status?: { task_context?: Record<string, any>; running?: boolean; proposals?: { id: string; state: 'awaiting_confirmation' | 'running' | 'completed' | 'failed' | 'cancelled' | 'unknown'; domain: string; action: string; input?: Record<string, any>; preview?: unknown; result?: unknown; error?: string; continuation?: string }[] }
+  status?: { task_context?: Record<string, any>; running?: boolean; proposals?: { id: string; state: 'awaiting_confirmation' | 'running' | 'completed' | 'failed' | 'cancelled' | 'unknown'; domain: string; action: string; input?: Record<string, any>; error?: string; continuation?: string }[] }
 }
 
 /** 浏览器只保留当前会话引用，任务与业务结果由原生 Session 和后端维护。 */
@@ -85,7 +85,9 @@ export function createAssistant(ctx: Pick<Context, 'sessions' | 'uiSession' | 'u
     const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd
     return Boolean(root && cwd && [root, ...getLegacyRoots()].includes(cwd))
   }
-  const refresh = async () => {
+  let refreshing: Promise<void> | undefined
+  let refreshPending = false
+  const refreshOnce = async () => {
     const sessionId = snapshot.sessionId
     if (!sessionId || snapshot.platformContext === false || disposed) return
     const current = generation
@@ -98,6 +100,14 @@ export function createAssistant(ctx: Pick<Context, 'sessions' | 'uiSession' | 'u
     } catch {
       if (!disposed && generation === current && request === refreshGeneration) publish({ statusError: '操作状态读取失败，当前显示上次结果；请重试核对。' })
     }
+  }
+  const refresh = (): Promise<void> => {
+    refreshPending = true
+    if (refreshing) return refreshing
+    refreshing = (async () => {
+      while (refreshPending && !disposed) { refreshPending = false; await refreshOnce() }
+    })().finally(() => { refreshing = undefined })
+    return refreshing
   }
   async function syncContext() {
     contextPending = true
@@ -193,7 +203,8 @@ export function createAssistant(ctx: Pick<Context, 'sessions' | 'uiSession' | 'u
       if (disposed || snapshot.sessionId !== sessionId || !receipt || !['running', 'completed', 'failed', 'cancelled', 'unknown'].includes(receipt.state)) return
       refreshGeneration++
       const id = receipt.id ?? receipt.proposal_id
-      publish({ status: { ...snapshot.status, proposals: snapshot.status?.proposals?.map(proposal => proposal.id === id ? { ...proposal, ...receipt } : proposal) } })
+      const { state, error, continuation } = receipt
+      publish({ status: { ...snapshot.status, proposals: snapshot.status?.proposals?.map(proposal => proposal.id === id ? { ...proposal, state, error, continuation } : proposal) } })
     },
     restore,
     reveal() { if (snapshot.sessionId) ctx.uiWorkspace.openSession(snapshot.sessionId) },

@@ -17,7 +17,8 @@ import { createAgentsHandler } from './agents/index.ts'
 import { createRunDownloadHandler } from './agents/run-files.ts'
 import { createInstancesHandler } from './instances/index.ts'
 import { createModelsHandler } from './models/index.ts'
-import { modelProviderReadiness, projectModelPolicy } from './models/projection.ts'
+import { modelCompatibilityIssues, modelProviderReadiness, projectModelPolicy } from './models/projection.ts'
+import { compactAssistantHistory } from './assistant/history-cache.ts'
 import { applyMcpGateway, createMcpHandler } from './mcp/index.ts'
 import { compositionInputSchema } from './mcp/definition.ts'
 import type {} from './mcp/manager.ts'
@@ -41,7 +42,7 @@ import type {} from './branding-config.ts'
 const WebApp: typeof NativeWebApp = await runtimeModule('@deepseek-ai/dsh-web-app')
 
 export const name = 'harness-platform'
-export const inject = ['connection', 'webServer', 'platformBranding', 'credentials', 'platformMcp', 'workspaceRegistry', 'workspaceController', 'sessionController', 'sessionQuery', 'settingsController', 'agentDefaultModel', 'llm', 'tools', 'agents', 'sessionProjections', 'systemPrompt', 'skills', 'attachments', 'fs']
+export const inject = ['connection', 'webServer', 'platformBranding', 'credentials', 'platformMcp', 'workspaceRegistry', 'workspaceController', 'sessionController', 'sessionQuery', 'sessionPersistence', 'sessionProjectionCache', 'sessions', 'settingsController', 'agentDefaultModel', 'llm', 'tools', 'agents', 'sessionProjections', 'systemPrompt', 'skills', 'attachments', 'fs']
 export const Config = WebApp.Config
 export type Config = NativeWebApp.Config
 
@@ -222,6 +223,7 @@ export function applyTools(ctx: Context) {
     instances: wrap('instances', createInstancesHandler(assetRoot, modelProjection)), mcp: wrap('mcp', mcpManagement),
     models: wrap('models', createModelsHandler(assetRoot, {
       modelCatalog: () => ctx.sessionController.modelCatalog(),
+      modelIssues: catalog => modelCompatibilityIssues(catalog, ctx.settingsController),
       providerReadiness: providers => modelProviderReadiness(providers, {
         settingsController: ctx.settingsController, credentials: ctx.credentials, llm: ctx.llm,
       }),
@@ -234,6 +236,7 @@ export function applyTools(ctx: Context) {
   const services = ctx as any
   const assistant = createAssistant(assetRoot, handler, {
     controller: services.sessionController,
+    observeSession: (id, signal) => services.sessionQuery.observeSession(id, { signal, projectionMode: 'none' }),
     readDocument: createDocumentReader(assetRoot, services),
     sessionEvents: async (id, signal) => {
       signal.throwIfAborted()
@@ -248,6 +251,13 @@ export function applyTools(ctx: Context) {
     notify, mcp: manager ? assistantMcp(manager) : undefined,
   })
   domains.assistant = assistant.handler
+  ctx.effect(() => {
+    const controller = new AbortController()
+    const work = runtimeModule('@deepseek-ai/dsh-session').then(native => compactAssistantHistory(assetRoot, services, native.Session.fromRestore, controller.signal))
+      .then(summary => ctx.logger('harness-platform').info('助手历史缓存检查：%o', summary))
+      .catch(error => { if (!controller.signal.aborted) ctx.logger('harness-platform').warn('助手历史缓存检查未完成：%s', error.name) })
+    return async () => { controller.abort(); await work }
+  })
   assistant.registerTools(services.tools)
   ctx.effect(() => () => assistant.dispose())
   ctx.on('session/event' as any, ((session: any) => notify(['assistant'], [session.id])) as any)

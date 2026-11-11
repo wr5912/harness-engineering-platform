@@ -5,14 +5,6 @@ import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
 
-// 验收可显式指定产物目录，避免覆盖运行中平台正在观察的 lib。
-const outputArgument = process.argv.indexOf('--out-dir')
-const outputDirectory = outputArgument < 0 ? 'lib' : process.argv[outputArgument + 1]
-if (!outputDirectory || (process.argv.length !== 2 && (process.argv.length !== 4 || outputArgument !== 2))) throw new Error('用法：node build.mjs [--out-dir DIRECTORY]')
-const outputPath = path => path === 'lib' ? outputDirectory : path.startsWith('lib/') ? join(outputDirectory, path.slice(4)) : path === 'business' && outputArgument >= 0 ? join(outputDirectory, 'business') : path
-const build = options => esbuild({ ...options, ...(options.outfile ? { outfile: outputPath(options.outfile) } : {}), ...(options.outdir ? { outdir: outputPath(options.outdir) } : {}) })
-execFileSync(process.execPath, [fileURLToPath(new URL('../../runtime/adapters/dsh-web/build.mjs', import.meta.url)), ...(outputArgument >= 0 ? ['--out-dir', resolve(outputDirectory, 'dsh-web')] : [])], { stdio: 'inherit' })
-
 export const managerSource = fileURLToPath(new URL('../../plugins/mcp-manager', import.meta.url))
 export const managerSources = {
   name: 'existing-mcp-manager',
@@ -66,7 +58,7 @@ export { Manager };`
           signal?.throwIfAborted()
           const current = snapshot(config)
           const timeoutMs = Number.isSafeInteger(request.timeoutMs) && request.timeoutMs > 0 && request.timeoutMs <= 36 * 60_000 ? request.timeoutMs : undefined
-          current.servers = current.servers.map((server: any) => ({ ...server, platformSignal: signal, platformTimeoutMs: timeoutMs }))
+          current.servers = current.servers.map((server: any) => ({ ...server, platformSignal: signal, platformTimeoutMs: timeoutMs, platformWorkspaceId: config.workspaceId }))
           const reply = (status: number, value: any) => ({ status, value })
           try { ${dispatchBody} } catch (error) { return reply(400, { error: error instanceof Error ? error.message : String(error) }) }
         }
@@ -74,7 +66,9 @@ export { Manager };`
           ? config.withManagement(() => runPlatformDispatch(request, signal)) : runPlatformDispatch(request, signal)
         config.platformDispatch?.(platformDispatch)
 `
-        contents = contents.slice(0, dispatchStart) + `      const outcome = await platformDispatch(request)\n      return send(res, outcome.status, outcome.value)\n` + contents.slice(dispatchEnd)
+        contents = contents.slice(0, dispatchStart) + `      const outcome = await platformDispatch(request, signal)
+      if (!signal.aborted && !res.destroyed) return send(res, outcome.status, outcome.value)
+` + contents.slice(dispatchEnd)
         contents = contents.slice(0, adminStart) + dispatcher + contents.slice(adminStart)
         contents = `import { runtimeRequire as resolveRuntimeRequire } from ${JSON.stringify(resolve('../../runtime/adapters/dsh-web/src/resolve-runtime.ts'))};\n${contents}`
       }
@@ -83,6 +77,15 @@ export { Manager };`
   },
 }
 
+async function main() {
+// 验收可显式指定产物目录，避免覆盖运行中平台正在观察的 lib。
+const outputArgument = process.argv.indexOf('--out-dir')
+const outputDirectory = outputArgument < 0 ? 'lib' : process.argv[outputArgument + 1]
+if (!outputDirectory || (process.argv.length !== 2 && (process.argv.length !== 4 || outputArgument !== 2))) throw new Error('用法：node build.mjs [--out-dir DIRECTORY]')
+const outputPath = path => path === 'lib' ? outputDirectory : path.startsWith('lib/') ? join(outputDirectory, path.slice(4)) : path === 'business' && outputArgument >= 0 ? join(outputDirectory, 'business') : path
+const build = options => esbuild({ ...options, ...(options.outfile ? { outfile: outputPath(options.outfile) } : {}), ...(options.outdir ? { outdir: outputPath(options.outdir) } : {}) })
+execFileSync(process.execPath, [fileURLToPath(new URL('../../runtime/adapters/dsh-web/build.mjs', import.meta.url)), ...(outputArgument >= 0 ? ['--out-dir', resolve(outputDirectory, 'dsh-web')] : [])], { stdio: 'inherit' })
+
 const { name } = JSON.parse(await readFile(new URL('./package.json', import.meta.url), 'utf8'))
 // 固定已打包执行代码的身份，不能用运行时工作树替代实际装载制品。
 const implementationFiles = ['definition.ts', 'compositions.ts', 'executor.ts', 'source-digest.ts', 'workflow-graph.ts', 'workflow-runs.ts', 'execution-receipts.ts', 'index.ts', 'openapi.ts', 'native.ts', 'nested.ts', 'extension.ts', 'control.ts', 'manager.ts', 'platform-manager.ts', 'draft-bindings.ts']
@@ -90,7 +93,7 @@ const implementationFiles = ['definition.ts', 'compositions.ts', 'executor.ts', 
   .concat(['runtime/adapters/dsh-web/src/resolve-runtime.ts', 'platform/plugin/build.mjs', 'platform/plugin/package.json', 'platform/plugin/pnpm-lock.yaml', 'platform/plugin/src/index.ts',
     'platform/plugin/src/evaluation/model-attempts.ts', 'platform/plugin/src/workflows/graph.ts',
     ...['contracts.ts', 'core.ts', 'gateway.ts', 'group-link.ts', 'providers.ts', 'replica.ts', 'reports.ts', 'runtime.ts'].map(file => `platform/plugin/src/business-control/${file}`),
-    ...['index.ts', 'openapi.ts', 'connection.ts', 'resource-address.ts'].map(file => `plugins/mcp-manager/${file}`),
+    ...['index.ts', 'openapi.ts', 'connection.ts', 'resource-address.ts', 'limits.ts', 'discovery.ts'].map(file => `plugins/mcp-manager/${file}`),
     'platform/plugin/src/mcp/store.ts', 'platform/plugin/src/mcp/credential-path.ts',
     'platform/plugin/assets/mcp-credential-layout.json'])
 for (const directory of ['agent-access', 'instances/external']) {
@@ -187,3 +190,6 @@ await build({
   },
   footer: { js: 'return module.exports;}});' },
 })
+
+}
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main()

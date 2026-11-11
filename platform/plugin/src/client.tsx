@@ -453,7 +453,7 @@ export function apply(ctx: ClientContext) {
   ctx.effect(() => { void catalog.refresh(); return () => catalog.dispose() })
   const assistant = createAssistant(ctx, ctx.connection.rpc, () => catalog.getSnapshot().inventory?.root, () => catalog.getSnapshot().inventory?.workspace?.legacyRoots ?? [])
   ctx.effect(() => () => assistant.dispose())
-  ctx.effect(() => updates.subscribe(() => { void assistant.refresh() }))
+  ctx.effect(() => updates.subscribe(() => { if (updates.getSnapshot().domains.includes('assistant')) void assistant.refresh() }))
   ctx.on('connection/reset', () => { void catalog.refresh(); void assistant.reconnect() })
   let nativeReady = false
   let nativeVisible = false

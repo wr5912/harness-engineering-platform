@@ -2,6 +2,8 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypt
 import { createRequire } from 'node:module'
 import { callOpenApiTool, loadOpenApi, readOpenApiResource, validateAuthHeader, validateSpecUrl } from './openapi.mjs'
 import { assertConnectionReady, connectionIssue } from './connection.ts'
+import { DiscoveryBudget, MAX_CATALOG_ITEMS } from './limits.ts'
+import { discover } from './discovery.ts'
 export { assertConnectionReady } from './connection.ts'
 
 const runtimeRequire = createRequire('/opt/dsh/packages/mcp/mcp-client/package.json')
@@ -162,7 +164,7 @@ async function serverTools(server: any): Promise<any[]> {
     const source = await loadOpenApi(server)
     return server.platformToolResources ? source.businessTools : source.tools
   }
-  return withClient(server, client => listCatalog(client, 'tools', server.platformSignal))
+  return discover(server, 'native:tools', active => withClient(active, client => listCatalog(client, 'tools', active.platformSignal)))
 }
 
 async function listCatalog(client: any, kind: 'tools' | 'resources' | 'resourceTemplates', signal?: AbortSignal): Promise<any[]> {
@@ -170,10 +172,15 @@ async function listCatalog(client: any, kind: 'tools' | 'resources' | 'resourceT
   if (typeof client.getServerCapabilities === 'function' && !client.getServerCapabilities()?.[capability]) return []
   const method = kind === 'tools' ? 'listTools' : kind === 'resources' ? 'listResources' : 'listResourceTemplates'
   const items: any[] = [], cursors = new Set<string>()
+  const budget = new DiscoveryBudget(`MCP ${kind}`)
   let cursor: string | undefined
   do {
+    if (cursors.size >= MAX_CATALOG_ITEMS) budget.fail('分页次数', MAX_CATALOG_ITEMS, kind)
     const page = await client[method](cursor ? { cursor } : undefined, { signal })
-    items.push(...page[kind])
+    for (const item of page[kind]) {
+      if (items.length >= MAX_CATALOG_ITEMS) budget.fail('目录条目', MAX_CATALOG_ITEMS, kind)
+      budget.value(item, String(item.name ?? item.uri ?? item.uriTemplate ?? kind)); items.push(item)
+    }
     cursor = page.nextCursor
     if (cursor && cursors.has(cursor)) throw new Error('MCP 发现分页游标重复')
     if (cursor) cursors.add(cursor)
@@ -451,7 +458,7 @@ async function resourceCatalog(server: any, kind: 'r' | 't'): Promise<any[]> {
     const source = await loadOpenApi(server)
     return kind === 'r' ? source.resources : source.resourceTemplates
   }
-  return withClient(server, client => listCatalog(client, kind === 'r' ? 'resources' : 'resourceTemplates', server.platformSignal))
+  return discover(server, `native:${kind}`, active => withClient(active, client => listCatalog(client, kind === 'r' ? 'resources' : 'resourceTemplates', active.platformSignal)))
 }
 
 async function discoverServer(server: any, groups: string[] = []): Promise<any> {
@@ -461,17 +468,20 @@ async function discoverServer(server: any, groups: string[] = []): Promise<any> 
       resources: { resources: discoveryMetadata(server, 'r', source.resources, groups) },
       resourceTemplates: { resourceTemplates: discoveryMetadata(server, 't', source.resourceTemplates, groups) } }
   }
-  return withClient(server, async client => {
+  const [tools, resources, templates] = await discover(server, 'native:all', active => withClient(active, async client => {
     const [tools, resources, templates] = await Promise.allSettled(
-      (['tools', 'resources', 'resourceTemplates'] as const).map(kind => listCatalog(client, kind, server.platformSignal)))
-    if ([tools, resources, templates].every(result => result.status === 'rejected')) throw new Error('MCP 工具与资源发现均未完成')
+      (['tools', 'resources', 'resourceTemplates'] as const).map(kind => listCatalog(client, kind, active.platformSignal)))
+    if ([tools, resources, templates].every(result => result.status === 'rejected')) throw new Error(`服务 ${server.id}：MCP 工具与资源发现失败：${[tools, resources, templates].map(result => result.status === 'rejected' ? String(result.reason) : '').join('；')}`)
+    const budget = new DiscoveryBudget(`服务 ${server.id}`)
+    for (const result of [tools, resources, templates]) if (result.status === 'fulfilled') budget.value(result.value, '完整目录')
+    return [tools, resources, templates]
+  }))
     return { tools: tools.status === 'fulfilled' ? discoveryMetadata(server, 'tools', tools.value, groups) : [],
-      ...(tools.status === 'rejected' ? { toolsUnavailable: true } : {}),
+      ...(tools.status === 'rejected' ? { toolsUnavailable: true, toolsError: String(tools.reason) } : {}),
       resources: { resources: resources.status === 'fulfilled' ? discoveryMetadata(server, 'r', resources.value, groups) : [],
-        ...(resources.status === 'rejected' ? { unavailable: true } : {}) },
+        ...(resources.status === 'rejected' ? { unavailable: true, error: String(resources.reason) } : {}) },
       resourceTemplates: { resourceTemplates: templates.status === 'fulfilled' ? discoveryMetadata(server, 't', templates.value, groups) : [],
-        ...(templates.status === 'rejected' ? { unavailable: true } : {}) } }
-  })
+        ...(templates.status === 'rejected' ? { unavailable: true, error: String(templates.reason) } : {}) } }
 }
 
 async function selectedResources(target: GroupTarget, kind: 'r' | 't', signal?: AbortSignal, unavailable: string[] = []): Promise<any[]> {
@@ -835,8 +845,12 @@ export function apply(ctx: any, config: any): void {
       const admission = ctx.connection.admit(req)
       if ('rejection' in admission || admission.peer.principal.kind !== 'owner') return send(res, 403, { error: 'management owner required' })
     }
+    const controller = new AbortController(), signal = controller.signal
+    const abort = () => { if (!res.writableFinished) controller.abort() }
+    req.once('aborted', abort); res.once('close', abort)
     try {
       const current = snapshot(config)
+      if (req.aborted || res.destroyed) controller.abort()
       if (req.method === 'GET') return send(res, 200, {
         servers: current.servers.map(server => ({ id: server.id, enabled: server.enabled,
           addressConfigured: Boolean(server.specUrl || resolvedUrl(server)), managementConfigured: Boolean(server.managementUrl), configurationIssue: connectionIssue(server) })),
@@ -853,6 +867,7 @@ export function apply(ctx: any, config: any): void {
         return { id: request.groupId, enabled: true, url: config.groupUrl(request.groupId),
           headers: [{ name: 'Authorization', value: `Bearer ${current.sharedToken}` }], tools: { mode: 'all', names: [] } }
       })() : undefined)
+      if (server) server.platformSignal = signal
       if (Boolean(request.serverId) === Boolean(request.groupId)) return send(res, 400, { error: '请选择一个服务器或已保存分组' })
       if (!server) return send(res, 404, { error: request.groupId ? '已保存分组不存在，请重新选择' : 'MCP server not found' })
       if (request.groupId && !['test', 'callTool', 'resources', 'resourceTemplates', 'readResource'].includes(request.action)) return send(res, 400, { error: '分组调试不提供来源管理操作' })
@@ -882,7 +897,8 @@ export function apply(ctx: any, config: any): void {
         return send(res, 200, { [request.action]: discoveryMetadata(server, kind, await resourceCatalog(server, kind)) })
       }
       return send(res, 200, await manage(server, request))
-    } catch (error) { send(res, 400, { error: error instanceof Error ? error.message : String(error) }) }
+    } catch (error) { if (!signal.aborted && !res.destroyed) send(res, 400, { error: error instanceof Error ? error.message : String(error) }) }
+    finally { req.removeListener('aborted', abort); res.removeListener('close', abort) }
   } }), 'mcp-manager.admin')
 
   const loadServers = async (selected: any[], preset: object, scopes: any[], unavailable: Set<string>) => {

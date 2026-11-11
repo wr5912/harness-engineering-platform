@@ -57,6 +57,23 @@ function thinkingFormat(value: unknown): string | undefined {
   return typeof format === 'string' && format ? format : undefined
 }
 
+/** 模型自身的协议缺项只影响该路由，目录和装载共用同一判断。 */
+export function modelCompatibilityIssues(catalog: ModelCatalog, settings: Services['settingsController']): Record<string, string> {
+  const pi = record(settings.describe().namespaces.find(item => item.ns === 'llm-pi-ai')?.value)
+  const providers = record(pi.providers), issues: Record<string, string> = {}
+  for (const group of catalog.groups) {
+    const source = record(providers[group.id])
+    if (source.api !== 'openai-completions') continue
+    for (const entry of group.models) {
+      const model = modelEntries(source.models).find(item => item.id === entry.id) ?? record(record(source.modelOverrides)[entry.id])
+      if ((model.reasoning ?? source.reasoning) === true && !thinkingFormat(model) && !thinkingFormat(source)) {
+        issues[JSON.stringify([group.id, entry.id])] = `模型 ${group.id}/${entry.id} 已声明思考能力，但缺少 compat.thinkingFormat；请在设置 → 模型中补齐。`
+      }
+    }
+  }
+  return issues
+}
+
 function publicConfigWithResolvedRefs(value: unknown, refs: Set<string>, selectedProvider: boolean): unknown {
   if (Array.isArray(value)) return value.map(item => publicConfigWithResolvedRefs(item, refs, selectedProvider))
   if (!value || typeof value !== 'object') return value
@@ -199,11 +216,13 @@ export async function projectModelPolicy(assetRoot: string, agentId: string, ser
     if (!connections.has(group.id)) connections.set(group.id, await providerConnection(group.id, namespaces, directory, services.credentials))
   }
   const platformOnly = new Set([...connections].filter(([, connection]) => connection.readiness.state === 'platform_only').map(([provider]) => provider))
-  const routes = businessCatalogRoutes(catalog, platformOnly).filter(item => !localRoutes.some(local => sameRoute(item, local)))
+  const issues = modelCompatibilityIssues(catalog, services.settingsController)
+  const routes = businessCatalogRoutes(catalog, platformOnly).filter(item => !issues[JSON.stringify([item.provider, item.model])]).filter(item => !localRoutes.some(local => sameRoute(item, local)))
   const allowed = [...routes, ...localRoutes]
   const required = [selected, ...Object.values(runtime?.model_bindings?.presets ?? {})]
   const requiredProviders = new Set(required.map(item => item.provider))
   for (const binding of required) {
+    if (issues[JSON.stringify([binding.provider, binding.model])]) throw new Error(issues[JSON.stringify([binding.provider, binding.model])])
     if (!allowed.some(item => sameRoute(item, binding))) throw new Error(`此实例默认模型或角色绑定 ${binding.provider}/${binding.model} 不在当前业务可用目录中；请重新选择`)
     const selectedModel = catalog.groups.find(group => group.id === binding.provider)?.models.find(model => model.id === binding.model)
     const local = localRoutes.some(item => sameRoute(item, binding))
@@ -271,10 +290,6 @@ export async function projectModelPolicy(assetRoot: string, agentId: string, ser
       const models = routes.filter(item => item.provider === provider).map(item => {
         const base = configured.find(model => model.id === item.model)
         const model = base ?? { id: item.model, ...record(overrides[item.model]) }
-        if (source.api === 'openai-completions' && model.reasoning === true
-          && !thinkingFormat(model) && !thinkingFormat(source)) {
-          throw new Error(`模型提供方 ${provider}/${item.model} 已声明思考能力，但缺少 compat.thinkingFormat`)
-        }
         return model
       })
       const config: Record<string, unknown> = { ...safeFields(source, ['apiKeyEnv', 'displayName', 'api', 'baseURL', 'compat', 'reasoning', 'defaultContextWindow', 'defaultMaxTokens', 'retryPolicy']), models }

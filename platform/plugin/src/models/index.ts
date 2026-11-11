@@ -13,6 +13,7 @@ type MapValue = Record<string, unknown>
 export interface ModelsDependencies {
   modelCatalog(): Promise<ModelCatalog>
   providerReadiness(providers: readonly string[]): Promise<Record<string, ProviderReadiness>>
+  modelIssues?(catalog: ModelCatalog): Record<string, string>
   currentSelection(): ModelSelection
   saveSelection(selection: ModelSelection): Promise<void>
 }
@@ -90,8 +91,10 @@ export function createModelsHandler(assetRoot: string, deps: ModelsDependencies)
         const catalog = await deps.modelCatalog()
         const providerReadiness = await deps.providerReadiness(catalog.groups.map(group => group.id))
         const business = readBusinessDefault(root)
+        const issues = deps.modelIssues?.(catalog) ?? {}
         return ok({ catalog, provider_readiness: providerReadiness, platform_default: deps.currentSelection(),
-          business_allowed: businessCatalogRoutes(catalog, platformOnlyProviders(providerReadiness)),
+          model_unavailable: issues,
+          business_allowed: businessCatalogRoutes(catalog, platformOnlyProviders(providerReadiness)).filter(item => !issues[JSON.stringify([item.provider, item.model])]),
           business_default: business.default, business_model_revision: business.revision,
           migration_required: business.migrationRequired, legacy_default: business.legacyDefault })
       }
@@ -107,6 +110,8 @@ export function createModelsHandler(assetRoot: string, deps: ModelsDependencies)
         if (typeof body.revision !== 'string' || !/^[a-f0-9]{64}$/.test(body.revision)) throw new ModelsError('invalid_request', '业务默认模型配置修订摘要无效')
         if (selected) {
           const catalog = await deps.modelCatalog()
+          const issues = deps.modelIssues?.(catalog) ?? {}
+          if (issues[JSON.stringify([selected.provider, selected.model])]) throw new ModelsError('model_unavailable', issues[JSON.stringify([selected.provider, selected.model])])
           const readiness = await deps.providerReadiness(catalog.groups.map(group => group.id))
           if (!businessCatalogRoutes(catalog, platformOnlyProviders(readiness)).some(item => item.provider === selected.provider && item.model === selected.model)) {
             throw new ModelsError('model_unavailable', '该模型不在当前可用于业务智能体的目录中')

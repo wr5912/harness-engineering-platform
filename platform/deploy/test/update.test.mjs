@@ -260,14 +260,13 @@ test('启动 bootstrap 尚未装载登录路由时等待装载，错误凭据立
 
 test('在线只读核对覆盖原生会话、管理提案和评测、SDK任务，不从摘要推断空闲', async t => {
   const f = await activityFixture(t, {
-    'session/list': { items: [{ sessionId: 'session-active', running: true }, { sessionId: 'assistant-active', running: false, projections: { values: { harnessPlatformAssistant: { workspace_id: 'workspace-update-test' } } } }] },
-    'assistant/status': { running: false, proposals: [{ state: 'running' }], submissions: {} },
+    'session/list': { items: [{ sessionId: 'session-active', running: true }, { sessionId: 'assistant-active', running: false, projections: { values: { harnessPlatformAssistant: { workspace_id: 'workspace-update-test', running_proposals: 1, pending_submissions: 0 } } } }] },
     'agents/eval/list': { jobs: [{ job_id: 'eval-active', status: 'cancelling' }] },
     'agents/sdk/list': [{ id: 'sdk-active', status: 'starting' }],
   })
   const busy = await readUpdateActivity(f.options, f.state, 'workspace-update-test')
   assert.deepEqual(busy.map(item => [item.kind, item.id]), [['session', 'session-active'], ['assistant', 'assistant-active'], ['evaluation', 'eval-active'], ['sdk', 'sdk-active']])
-  assert.ok(f.requested.includes('assistant/status'))
+  assert.equal(f.requested.includes('assistant/status'), false)
   assert.ok(f.requested.every(endpoint => ['inventory', 'session/list', 'assistant/status', 'agents/eval/list', 'agents/sdk/list'].includes(endpoint)))
 })
 
@@ -276,6 +275,25 @@ test('读取失败或状态缺失不被当作空闲', async t => {
   await assert.rejects(readUpdateActivity(f.options, f.state, 'workspace-update-test'), /只读核对失败/)
   const malformed = await activityFixture(t, { 'session/list': { items: [] }, 'agents/eval/list': { jobs: [{ job_id: 'broken' }] }, 'agents/sdk/list': [] })
   await assert.rejects(readUpdateActivity(malformed.options, malformed.state, 'workspace-update-test'), /评测运行状态不完整/)
+})
+
+test('新版助手在途计数直接取自原生投影，不装载历史管理会话', async t => {
+  const sessions = [
+    { sessionId: 'idle', running: false, proposals: 0, submissions: 0 },
+    { sessionId: 'proposal', running: false, proposals: 1, submissions: 0 },
+    { sessionId: 'submission', running: false, proposals: 0, submissions: 1 },
+    { sessionId: 'native', running: true, proposals: 0, submissions: 0 },
+  ].map(({ proposals, submissions, ...session }) => ({ ...session, projections: { values: { harnessPlatformAssistant: {
+    workspace_id: 'workspace-update-test', running_proposals: proposals, pending_submissions: submissions,
+  } } } }))
+  const f = await activityFixture(t, { 'session/list': { items: sessions }, 'agents/eval/list': { jobs: [] }, 'agents/sdk/list': [] })
+  assert.deepEqual((await readUpdateActivity(f.options, f.state, 'workspace-update-test')).map(item => [item.kind, item.id]), [
+    ['assistant', 'proposal'], ['assistant', 'submission'], ['session', 'native'],
+  ])
+  assert.equal(f.requested.includes('assistant/status'), false)
+  sessions[0].projections.values.harnessPlatformAssistant.running_proposals = -1
+  await assert.rejects(readUpdateActivity(f.options, f.state, 'workspace-update-test'), /缺少在途计数/)
+  assert.equal(f.requested.includes('assistant/status'), false)
 })
 
 test('明确允许中断会话时不枚举历史，仍核对评测和 SDK 任务并标明未枚举', async t => {

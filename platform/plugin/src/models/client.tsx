@@ -7,7 +7,7 @@ import { modelSettingsTheme } from './style.ts'
 
 type ModelRef = Pick<ModelSelection, 'provider' | 'model'>
 type ProviderReadiness = { state: 'ready' | 'runtime_check' | 'missing_api_key' | 'platform_only' | 'unknown'; message: string }
-type ModelList = { catalog: ModelCatalog; provider_readiness?: Record<string, ProviderReadiness>; platform_default: ModelSelection | null;
+type ModelList = { catalog: ModelCatalog; provider_readiness?: Record<string, ProviderReadiness>; model_unavailable?: Record<string, string>; platform_default: ModelSelection | null;
   business_allowed: ModelRef[]; business_default: ModelSelection | null; business_model_revision: string;
   migration_required: boolean; legacy_default: ModelSelection | null }
 type Draft<T> = { base: T; value: T; revision?: unknown }
@@ -210,6 +210,7 @@ function BusinessDefaultEditor({ data, save, writable }: { data: ModelList; save
       <p className="hep-model-sharing-note">统一默认只有一个，保存新选择会替换旧选择。新建实例预选该模型；创建或管理单个实例时可从当前业务可用目录另选，现有实例继续使用各自登记的默认模型。</p></div><span>新建实例预选</span></div>
     {data.migration_required && <p className="hep-model-sharing-status" data-tone="warning" role="status">当前设置需确认新的统一默认模型。旧值仅作预选，不会自动用于新实例。{data.legacy_default ? `旧默认：${modelName(data.catalog, data.legacy_default)}。` : ''}</p>}
     <div className="hep-model-sharing-connection-state" data-state={connection.kind} role="status"><strong>{connection.label}</strong><p>{connection.description}</p></div>
+    {Object.entries(data.model_unavailable ?? {}).map(([key, cause]) => <p key={key} className="hep-model-sharing-status" data-tone="warning">{cause}</p>)}
     <label className="hep-model-sharing-field"><span>统一默认模型</span><ModelOptions catalog={data.catalog} allowed={data.business_allowed} value={draft.value} disabled={busy}
       onChange={value => { setDraft(current => ({ ...businessDefaultState(current, data).draft, value, edited: true })); setStatus(null) }}/></label>
     <ModelEffort catalog={data.catalog} value={draft.value} disabled={busy} onChange={value => { setDraft(current => ({ ...businessDefaultState(current, data).draft, value, edited: true })); setStatus(null) }}/>

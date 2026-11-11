@@ -680,6 +680,26 @@ if sys.argv[1:] == ["run", "build"]:
                 self.assertEqual(patch.read_text(), source)
                 self.assertFalse((self.assets / "config/mcp-manager.json").exists())
 
+    def test_codex_retry_patch_preserves_other_settings_and_is_idempotent(self):
+        import yaml
+        normalize = runpy.run_path(str(self.launcher))["normalized_retry_patch"]
+        for config in (
+            "    foo: bar\n    retryPolicy:\n      maxRetries: 17\n      backoff: {initialDelayMs: 10000}\n    after: okay\n",
+            "    foo: bar\n",
+            "    retryPolicy: {maxRetries: 17}\n",
+        ):
+            source = "- id: llm-openai-codex\n  config:\n" + config + "- id: other\n  config: !expr '{}'\n"
+            result = normalize(source)
+            self.assertEqual(normalize(result), result)
+            self.assertTrue(result.endswith("- id: other\n  config: !expr '{}'\n"))
+            value = yaml.safe_load(result.split("- id: other")[0])[0]["config"]
+            self.assertEqual(value["retryPolicy"]["maxRetries"], 10)
+            self.assertNotIn("PI_AI_ERROR", value["retryPolicy"]["retryableCodes"])
+            self.assertEqual(value.get("foo"), "bar" if "foo" in config else None)
+        for config in ("{foo: bar, retryPolicy: {maxRetries: 17}}", "{foo: bar}", "{}"):
+            result = normalize("- id: llm-openai-codex\n  config: " + config + "\n")
+            self.assertEqual(yaml.safe_load(result)[0]["config"]["retryPolicy"]["maxRetries"], 10)
+
     def test_missing_yaml_dependency_does_not_block_bootstrap_check(self):
         with mock.patch.dict(sys.modules, {"yaml": None}):
             namespace = runpy.run_path(str(self.launcher))

@@ -274,6 +274,16 @@ test('OpenAI 兼容思考模型必须声明协议格式，且投影保留该声�
       llm: { listConfigurableProviders: () => [{ provider: 'qwen-local', settingsNs: 'llm-pi-ai', nativeAuth: { env: ['QWEN_LOCAL_API_KEY'], oauth: false } }] },
     }
     await assert.rejects(projectModelPolicy(source.root, 'example-agent', base), /缺少 compat\.thinkingFormat/)
+    const healthy = { provider: selected.provider, model: 'healthy' }
+    const originalCatalog = base.sessionController.modelCatalog
+    base.sessionController.modelCatalog = async () => ({ default: healthy, routableProviders: [selected.provider], failures: [], groups: [
+      { id: selected.provider, models: [{ id: selected.model }, { id: healthy.model }] },
+    ] })
+    const usable = await projectModelPolicy(source.root, 'example-agent', base, healthy)
+    assert.deepEqual(usable.policy.allowed, [healthy])
+    assert.deepEqual(usable.policy.patch.find(row => row.id === 'llm-pi-ai').config.providers[selected.provider].models, [{ id: healthy.model }])
+    await assert.rejects(projectModelPolicy(source.root, 'example-agent', base, selected), /缺少 compat\.thinkingFormat/)
+    base.sessionController.modelCatalog = originalCatalog
 
     const configured = { ...base,
       settingsController: { describe: () => ({ namespaces: [{ ns: 'llm-pi-ai', value: { providers: {

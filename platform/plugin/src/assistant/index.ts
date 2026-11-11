@@ -37,6 +37,7 @@ export interface AssistantServices {
   mcp?: (action: string, input: MapValue, signal: AbortSignal) => Promise<any>
   readDocument?: DocumentReader
   sessionEvents?(sessionId: string, signal: AbortSignal): Promise<readonly MapValue[]>
+  observeSession?(id: string, signal?: AbortSignal): Promise<{ header: any; inheritedEventCount: any; events: readonly any[]; [Symbol.dispose](): void }>
 }
 
 
@@ -61,9 +62,16 @@ const assistantStateSchema = z.object({
   submissions: z.record(z.string(), z.record(z.string(), z.any())).default({}),
 })
 type AssistantState = z.infer<typeof assistantStateSchema>
+function proposalState(proposal: MapValue): MapValue {
+  if (['awaiting_confirmation', 'running'].includes(proposal.state)) return proposal
+  // 完整输入、预览和回执由原生事件保存，避免每次状态刷新与检查点重复复制正文。
+  const { input, preview, result, ...summary } = proposal
+  return { ...summary, ...(typeof input?.preview_id === 'string' ? { input: { preview_id: input.preview_id } } : {}) }
+}
 const assistantViewSchema = z.object({
   session_id: z.string(), workspace_id: z.string().optional(),
   pending_proposals: z.number().int().nonnegative(), unknown_proposals: z.number().int().nonnegative(),
+  running_proposals: z.number().int().nonnegative(), pending_submissions: z.number().int().nonnegative(),
 })
 export type AssistantView = z.infer<typeof assistantViewSchema>
 declare module '@deepseek-ai/dsh-session-projection/types' {
@@ -76,11 +84,13 @@ declare module '@deepseek-ai/dsh-session' {
 
 // 框架负责按 Session 增量折叠、冷恢复和 fork；阅读证据按需通过原生只读查询核对。
 export const assistantProjection = {
-  key: projectionKey, stateVersion: 9, stateSchema: assistantStateSchema,
+  key: projectionKey, stateVersion: 10, stateSchema: assistantStateSchema,
   wire: { viewSchema: assistantViewSchema, view: state => ({ session_id: state.session_id,
     ...(state.workspace_id ? { workspace_id: state.workspace_id } : {}),
     pending_proposals: state.proposals.filter(item => item.state === 'awaiting_confirmation').length,
-    unknown_proposals: state.proposals.filter(item => item.state === 'unknown').length }) },
+    unknown_proposals: state.proposals.filter(item => item.state === 'unknown').length,
+    running_proposals: state.proposals.filter(item => item.state === 'running').length,
+    pending_submissions: Object.values(state.submissions).filter(item => ['pending', 'unknown'].includes(item.state)).length }) },
   init: (header, inheritedEventCount) => ({ session_id: header.id, inherited_event_count: inheritedEventCount, active: false, context: {}, task_context: {}, proposals: [], running: false, tool_contracts: {}, submissions: {} }),
   apply(state, event) {
     if (event.type === 'request/header') {
@@ -117,10 +127,10 @@ export const assistantProjection = {
       if (!Object.hasOwn(actions, data.domain) || !actions[data.domain as Domain].includes(data.action)) return state
       // fork 只继承上下文，不继承父会话的写操作授权；兼容旧记录时检查继承前缀。
       if (data.owner_session_id ? data.owner_session_id !== state.session_id : pluginRecord.seq < state.inherited_event_count) return state
-      return { ...state, proposals: [...state.proposals.filter(item => item.id !== data.id), { ...data, owner_session_id: state.session_id }] }
+      return { ...state, proposals: [...state.proposals.filter(item => item.id !== data.id), proposalState({ ...data, owner_session_id: state.session_id })] }
     }
     if (data.kind === 'settlement' && state.proposals.some(item => item.id === data.id)) {
-      return { ...state, proposals: state.proposals.map(item => item.id === data.id ? { ...item, ...data } : item) }
+      return { ...state, proposals: state.proposals.map(item => item.id === data.id ? proposalState({ ...item, ...data }) : item) }
     }
     return state
   },
@@ -286,9 +296,17 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
   const busy = new Set<string>()
   const operationLocks = new Map<string, Promise<unknown>>()
   const unregisterProjection = services.projections.register(assistantProjection)
-  async function inspect(id: string, signal?: AbortSignal) {
+  async function inspect(id: string, signal?: AbortSignal, readOnly = false) {
     if (!id) throw new Error('缺少 Session ID')
     signal?.throwIfAborted()
+    if (readOnly && services.observeSession) {
+      const observation = await services.observeSession(id, signal)
+      try {
+        let state = assistantProjection.init(observation.header, observation.inheritedEventCount) as AssistantState
+        for (const event of observation.events) { signal?.throwIfAborted(); state = assistantProjection.apply(state, event) as AssistantState }
+        return { state, session: { header: observation.header } as Session, observedEvents: observation.events, agent: undefined }
+      } finally { observation[Symbol.dispose]() }
+    }
     const found = await services.controller.resolveAgent(id)
     if (found.error) throw found.error
     const session: Session = found.agent.session
@@ -535,7 +553,21 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
     const proposal = state.proposals.find((item: any) => item.id === proposalId)
     if (!proposal) throw new Error('提案不存在，请重新生成预览')
     if (proposal.owner_session_id !== id) throw new Error('提案只能由发起它的原会话确认')
-    if (proposal.state !== 'awaiting_confirmation') return proposal
+    if (proposal.state !== 'awaiting_confirmation') {
+      if (!services.sessionEvents) throw new Error('当前服务无法读取原生会话历史，不能返回完整操作回执；未重复执行操作。')
+      const events = await services.sessionEvents(id, signal)
+      let receipt: MapValue | undefined
+      for (const event of events) {
+        const entry = pluginRecordOf(event as Parameters<typeof pluginRecordOf>[0])
+        if (entry?.type !== recordType) continue
+        const data = entry.data as MapValue
+        if (data.id !== proposalId) continue
+        if (data.kind === 'proposal' && (data.owner_session_id ? data.owner_session_id === id : entry.seq >= state.inherited_event_count)) receipt = { ...data, owner_session_id: id }
+        if (data.kind === 'settlement' && receipt) receipt = { ...receipt, ...data }
+      }
+      if (!receipt) throw new Error('原生会话历史中未找到此操作的完整记录，请核对会话；未重复执行操作。')
+      return receipt
+    }
     if (!Object.hasOwn(actions, proposal.domain) || !actions[proposal.domain as Domain].includes(proposal.action)) throw new Error('该历史操作已停用，请通过当前平台工具继续办理')
     assertNoCredentials(proposal.domain, proposal.action, proposal.input)
     if (proposal.domain === 'mcp' && (proposal.action === 'callPublishedComposition' || proposal.action === 'callTool' && proposal.input.serverId === COMPOSITION_SERVICE_ID)
@@ -627,14 +659,14 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
         })
       }
       const id = String(body.session_id ?? '')
-      const { session, state, agent } = await inspect(id, signal)
+      const { session, state, agent, observedEvents } = await inspect(id, signal, endpoint === 'status')
       if (endpoint === 'context') { await record(id, { kind: 'context', context: redactAssistant(object(body.context)) }); return result(true, { session_id: id }) as any }
       if (endpoint === 'status') {
         let submission = typeof body.request_id === 'string' ? state.submissions?.[body.request_id] ?? { request_id: body.request_id, state: 'not_received' } : undefined
         if (submission && submission.state !== 'accepted') {
           const matches = (message: any) => message?.source?.kind === 'user' && message.source.rpcId === body.request_id
-          const accepted = [...(agent.inbox?.nextTurn ?? []), ...(agent.inbox?.nextStep ?? [])].some(matches)
-            || session.snapshotEvents().some(event => event.type === 'user/message' && matches(event.data))
+          const accepted = [...(agent?.inbox?.nextTurn ?? []), ...(agent?.inbox?.nextStep ?? [])].some(matches)
+            || (observedEvents ?? session.snapshotEvents()).some(event => event.type === 'user/message' && matches(event.data))
           if (accepted) submission = { ...submission, state: 'accepted' }
           else if (submission.state === 'pending') submission = { ...submission, state: 'unknown' }
         }

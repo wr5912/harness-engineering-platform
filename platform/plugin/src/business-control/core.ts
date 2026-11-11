@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { isDeepStrictEqual } from 'node:util'
 import { dirname, join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import type {
@@ -145,6 +146,7 @@ export class BusinessControl {
   private confirmationSynchronizer?: (signal: AbortSignal) => Promise<void>
   private available = true
   private observedManagedGateway = false
+  private replicaObservedAt = new Map<string, string>()
 
   constructor(readonly assetRoot: string, stateRoot?: string) {
     this.path = join(stateRoot ?? join(assetRoot, '.local', 'business-control'), 'state.json')
@@ -254,7 +256,7 @@ export class BusinessControl {
     return Object.values(this.state.sessions).map(session => ({ sessionId: session.sessionId, subjectId: session.subjectId,
       agentId: session.agentId, instanceId: session.instanceId, identitySource: session.subject.identitySource,
       verifiedAt: session.identity?.evidence.verifiedAt, expiresAt: session.identity?.expiresAt,
-      credentialExpiresAt: session.identity?.evidence.expiresAt, observedAt: session.observedAt ?? session.createdAt,
+      credentialExpiresAt: session.identity?.evidence.expiresAt, observedAt: this.replicaObservedAt.get(session.sessionId) ?? session.observedAt ?? session.createdAt,
       state: session.identity && future(session.identity.expiresAt) && future(session.identity.evidence.expiresAt) ? 'evidence-held' : 'expired' }))
   }
   exportReplicaState(binding: InstanceBinding): ReplicaObservation {
@@ -302,7 +304,7 @@ export class BusinessControl {
       || observation.sessions.length > 10000 || observation.riskFacts.length > 5000 || observation.events.length > 1000) return error('replica_observation_invalid')
     const subjects = new Set<string>(), sessions = new Map<string, SessionBinding>()
     for (const session of observation.sessions) {
-      if (!session.sessionId || ['__proto__', 'constructor', 'prototype'].includes(session.sessionId)
+      if (!session.sessionId || sessions.has(session.sessionId) || ['__proto__', 'constructor', 'prototype'].includes(session.sessionId)
         || Object.entries(binding).some(([key, value]) => session[key as keyof InstanceBinding] !== value)
         || (session.parentSessionId !== undefined && (typeof session.parentSessionId !== 'string' || !session.parentSessionId
           || session.parentSessionId === session.sessionId))
@@ -321,13 +323,15 @@ export class BusinessControl {
         || parent.subject.identitySource !== session.subject.identitySource)
         return error('replica_session_invalid')
     }
+    const factIds = new Set<string>()
     for (const fact of observation.riskFacts) {
-      if (!this.validRiskFact(fact) || fact.scope.workspaceId !== binding.workspaceId || fact.scope.agentId !== binding.agentId
+      if (!this.validRiskFact(fact) || factIds.has(fact.id) || fact.scope.workspaceId !== binding.workspaceId || fact.scope.agentId !== binding.agentId
         || fact.scope.instanceId !== binding.instanceId || fact.scope.runtimeGeneration !== binding.runtimeGeneration
         || !fact.scope.subjectId || !subjects.has(fact.scope.subjectId)
         || (fact.scope.sessionId && sessions.get(fact.scope.sessionId)?.subjectId !== fact.scope.subjectId)) return error('replica_risk_scope_invalid')
       const previous = this.state.riskFacts[fact.id]
       if (previous && previous.version === fact.version && this.riskMeaning(previous) !== this.riskMeaning(fact)) return error('risk_fact_version_conflict')
+      factIds.add(fact.id)
     }
     for (const event of observation.events) {
       if (!event.id || !event.sessionId || !sessions.has(event.sessionId) || event.subjectId !== sessions.get(event.sessionId)!.subjectId
@@ -343,18 +347,23 @@ export class BusinessControl {
           || event.authorization.provider !== undefined && (() => { try { const url = new URL(event.authorization!.provider!); return !['http:', 'https:'].includes(url.protocol) || url.origin !== event.authorization!.provider } catch { return true } })()))) return error('replica_event_invalid')
     }
     // 全部对象先校验，再写观察索引；重复上报不改已有归属或推进同一事实版本。
+    let changed = false
     for (const session of sessions.values()) {
       const previous = this.state.sessions[session.sessionId]
-      const saved = structuredClone(session)
-      if (previous?.identity && Date.parse(previous.identity.evidence.verifiedAt) > Date.parse(saved.identity!.evidence.verifiedAt)) saved.identity = structuredClone(previous.identity)
-      saved.observedAt = iso()
-      this.state.sessions[session.sessionId] = saved
+      const { observedAt: _received, ...incoming } = session
+      const { observedAt: _stored, ...stored } = previous ?? {}
+      if (previous?.identity && Date.parse(previous.identity.evidence.verifiedAt) > Date.parse(incoming.identity!.evidence.verifiedAt)) incoming.identity = previous.identity
+      this.replicaObservedAt.set(session.sessionId, iso())
+      if (!isDeepStrictEqual(incoming, stored)) {
+        this.state.sessions[session.sessionId] = { ...structuredClone(incoming), observedAt: iso() } as SessionBinding
+        changed = true
+      }
     }
     for (const fact of observation.riskFacts) this.updateRisk(fact)
     const eventIds = new Set(this.state.events.map(event => event.id))
-    this.state.events.push(...structuredClone(observation.events.filter(event => !eventIds.has(event.id))))
-    this.state.events = this.state.events.slice(-1000)
-    this.persist()
+    const newEvents = observation.events.filter(event => !eventIds.has(event.id))
+    if (newEvents.length) { this.state.events = [...this.state.events, ...structuredClone(newEvents)].slice(-1000); changed = true }
+    if (changed) this.persist()
   }
   private persist(): void {
     mkdirSync(dirname(this.path), { recursive: true, mode: 0o700 })
@@ -665,7 +674,11 @@ export class BusinessControl {
     if (previous && fact.version < previous.version) return false
     if (previous && fact.version === previous.version) {
       if (this.riskMeaning(previous) !== this.riskMeaning(fact)) return error('risk_fact_version_conflict')
-      facts[fact.id] = structuredClone(fact); this.persist(); return false
+      const { observedAt: _previous, ...before } = previous
+      const { observedAt: _incoming, ...after } = fact
+      if (!isDeepStrictEqual(before, after)) { facts[fact.id] = structuredClone(fact); this.persist() }
+      else previous.observedAt = fact.observedAt
+      return false
     }
     facts[fact.id] = structuredClone(fact)
     if (!this.requiredSnapshots.size) this.state.restrictionVersion++

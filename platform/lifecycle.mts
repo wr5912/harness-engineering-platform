@@ -14,8 +14,26 @@ import { reportBusinessReadiness } from './business-readiness.mts'
 const programRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const autostartService = 'harness-engineering-platform.service'
 const autostartMarker = '# Managed by harness-engineering-platform dsh-platform autostart.'
-type State = { pid: number; birth: string; programRoot: string; dataRoot: string; url: string; publicUrl?: string; host: string; port: number; log: string; phase: string; detached: boolean }
+type State = { pid: number; birth: string; programRoot: string; dataRoot: string; url: string; publicUrl?: string; host: string; port: number; log: string; phase: string; detached: boolean; nodeHeapMb?: number }
 const json = (path: string) => JSON.parse(readFileSync(path, 'utf8'))
+export function platformNodeOptions(options = '', heapMb = 8192): string {
+  const heap = `--max-old-space-size=${heapMb}`
+  return options.trimEnd().endsWith(heap) ? options : `${options} ${heap}`.trim()
+}
+export function processHeapMb(pid: number): number | undefined {
+  try {
+    const options = readFileSync(`/proc/${pid}/environ`, 'utf8').split('\0').find(value => value.startsWith('NODE_OPTIONS=')) ?? ''
+    const args = readFileSync(`/proc/${pid}/cmdline`, 'utf8').replaceAll('\0', ' ')
+    const match = [...`${options.slice('NODE_OPTIONS='.length)} ${args}`.matchAll(/--max[-_]old[-_]space[-_]size[= ](\d+)/g)].at(-1)
+    return match ? Number(match[1]) : undefined
+  } catch { return undefined }
+}
+function previousState(dataRoot: string): State | undefined {
+  try {
+    const stored = json(join(dataRoot, '.local/platform-service/state.json')) as State
+    if (stored.programRoot === programRoot && stored.dataRoot === resolve(dataRoot)) return stored
+  } catch { /* 首次启动没有历史记录。 */ }
+}
 function atomic(path: string, value: unknown, business = false) {
   const temporary = `${path}.${process.pid}.tmp`
   writeFileSync(temporary, JSON.stringify(value, null, 2) + '\n', { mode: 0o600 })
@@ -34,6 +52,7 @@ export function managedState(dataRoot: string, expectedProgram = programRoot): S
   const path = join(dataRoot, '.local/platform-service/state.json')
   if (!existsSync(path)) return undefined
   const state = json(path) as State
+  if (state.pid === 0 && state.phase === 'stopped') return undefined
   if (!Number.isInteger(state.pid) || state.pid <= 1 || !state.birth) throw new Error('平台进程记录无效；请检查 state.json')
   if (processBirth(state.pid) !== state.birth) return undefined
   if (state.dataRoot !== resolve(dataRoot) || state.programRoot !== resolve(expectedProgram)) {
@@ -74,11 +93,7 @@ export function launchAddress(dataRoot: string, host?: string, port?: string, pu
   let configured: URL | undefined
   const access = join(dataRoot, 'config/business-access.json')
   if (existsSync(access) && json(access).gateway?.managementUrl !== undefined) configured = new URL(platformEntryUrl(dataRoot))
-  let previous: State | undefined
-  try {
-    const stored = json(join(dataRoot, '.local/platform-service/state.json')) as State
-    if (stored.programRoot === programRoot && stored.dataRoot === resolve(dataRoot)) previous = stored
-  } catch { /* 首次启动没有历史监听地址。 */ }
+  const previous = previousState(dataRoot)
   const local = (value: string) => Object.values(networkInterfaces()).flat().some(item => item?.address === value)
   const separate = configured && (configured.protocol === 'https:' || !local(configured.hostname)
     || previous?.publicUrl === configured.href && previous.publicUrl !== previous.url)
@@ -114,7 +129,7 @@ export function renderAutostartUnit(root = programRoot, dataRoot = defaultAssetR
   return [autostartMarker, '[Unit]', 'Description=Harness Engineering Platform', '', '[Service]', 'Type=simple',
     `WorkingDirectory=${systemdPath(root)}`, `Environment=${systemdQuote(`HARNESS_PROGRAM_ROOT=${root}`)}`,
     `Environment=${systemdQuote(`HARNESS_ASSET_ROOT=${dataRoot}`)}`, `Environment=${systemdQuote(`PATH=${runtimePath}`)}`,
-    `ExecStart=${systemdQuote(join(root, 'platform/dsh-platform'))} start --foreground`, 'Restart=on-failure', 'RestartSec=5s',
+    `ExecStart=${systemdQuote(join(root, 'platform/dsh-platform'))} start --foreground --recover`, 'Restart=always', 'RestartPreventExitStatus=78', 'RestartSec=5s',
     'TimeoutStartSec=10min', 'TimeoutStopSec=45s', 'KillMode=control-group', '', '[Install]', 'WantedBy=default.target', ''].join('\n')
 }
 function commandResult(command: string, args: string[]) {
@@ -128,11 +143,12 @@ function systemctl(args: string[]) { return commandResult('systemctl', ['--user'
 function stripLauncherPrefix(value: string): string {
   return value.replace(/^dsh-platform:\s*/gm, '')
 }
+class ConfigurationError extends Error { exitCode = 78 }
 function runStartPreflight(args: string[]): string {
   const result = spawnSync(python(), privateArgs([...args, '--dry-run']), { encoding: 'utf8' })
   if (result.error) throw new Error(`无法执行启动预检：${result.error.message}`)
   const output = stripLauncherPrefix(`${result.stderr ?? ''}${result.stdout ?? ''}`).trim()
-  if (result.status !== 0) throw new Error(output || '启动预检未通过')
+  if (result.status !== 0) throw new ConfigurationError(output || '启动预检未通过')
   return `${result.stdout ?? ''}`.trim()
 }
 function preflightSummary(output: string, dataRoot: string): string {
@@ -209,7 +225,7 @@ function manageAutostart(subcommand: string, dataRoot: string, asJson: boolean) 
   if (existing && !existing.includes(autostartMarker)) throw new Error(`已有非平台管理的 systemd 单元：${unitPath}；未覆盖`)
   if (subcommand === 'disable') {
     if (!existing) return 0
-    systemctl(['disable', autostartService]); rmSync(unitPath); systemctl(['daemon-reload'])
+    systemctl(['disable', autostartService])
     console.log('平台自启动已停用（未停止当前平台进程）'); return 0
   }
   systemctl(['show-environment']); ensureLinger(); mkdirSync(directory, { recursive: true, mode: 0o700 })
@@ -246,6 +262,29 @@ async function lock(directory: string): Promise<() => void> {
   throw new Error('另一个启停操作仍在执行，请稍后重试')
 }
 
+export function serviceOwner(dataRoot: string): boolean {
+  const path = autostartUnitPath()
+  if (!existsSync(path)) return false
+  const unit = readFileSync(path, 'utf8')
+  return unit.includes(autostartMarker)
+    && unit.includes(`Environment=${systemdQuote(`HARNESS_PROGRAM_ROOT=${programRoot}`)}`)
+    && unit.includes(`Environment=${systemdQuote(`HARNESS_ASSET_ROOT=${resolve(dataRoot)}`)}`)
+}
+function insideService(): boolean {
+  try { return readFileSync('/proc/self/cgroup', 'utf8').split('\n').some(line => line.endsWith('/' + autostartService)) }
+  catch { return false }
+}
+async function waitForService(dataRoot: string): Promise<State> {
+  const deadline = Date.now() + 60_000
+  while (Date.now() < deadline) {
+    const state = managedState(dataRoot)
+    if (state && ownsPort(state.pid, state.host, state.port) && await httpPhase(state.url) !== 'unavailable') return state
+    if (probe('systemctl', ['--user', 'is-failed', autostartService]).status === 0) break
+    await delay(200)
+  }
+  throw new Error(`systemd 平台未在 60 秒内就绪；请运行 journalctl --user -u ${autostartService} 查看实际启动错误`)
+}
+
 async function stop(dataRoot: string) {
   const state = managedState(dataRoot)
   if (!state) return
@@ -265,6 +304,11 @@ export async function restoreManagedProcess(original: State, command: string[], 
     || command[command.indexOf('--patch') + 1] !== join(original.dataRoot, '.local/platform-home/profiles/harness-platform/harness-platform.patch.yml')
     || environment.HARNESS_PROGRAM_ROOT !== original.programRoot || environment.HARNESS_ASSET_ROOT !== original.dataRoot
     || environment.DSH_HOME !== join(original.dataRoot, '.local/platform-home') || !isAbsolute(environment.HOME ?? '')) throw new Error('原平台启动身份不完整，未执行恢复')
+  if (serviceOwner(original.dataRoot) && !insideService()) {
+    atomic(join(original.dataRoot, '.local/platform-service/state.json'), original)
+    systemctl(['reset-failed', autostartService]); systemctl(['start', autostartService])
+    return waitForService(original.dataRoot)
+  }
   const service = join(original.dataRoot, '.local/platform-service'), unlock = await lock(join(service, 'operation.lock'))
   try {
     if (managedState(original.dataRoot, original.programRoot)) throw new Error('平台已有受管进程，未覆盖恢复')
@@ -293,8 +337,33 @@ export async function restoreManagedProcess(original: State, command: string[], 
 
 export async function main(args = process.argv.slice(2)): Promise<number> {
   const [command, ...rest] = args
-  if (!command || command === '--help') {
-    console.log('用法：dsh-platform prepare [--offline] | start [--foreground] [--host IPv4] [--port 18120] [--public-url URL] [--dry-run] | stop | restart [--host IPv4] [--port 18120] [--public-url URL] | status [--json] | autostart enable|disable|status [--json]')
+  if (!command || ['-h', '--help'].includes(command)
+    || ['prepare', 'start', 'stop', 'restart', 'status', 'autostart'].includes(command) && rest.some(arg => ['-h', '--help'].includes(arg))) {
+    console.log(`用法：
+  dsh-platform prepare [--offline]
+  dsh-platform start [启动选项] [--dry-run]
+  dsh-platform restart [启动选项]
+  dsh-platform stop
+  dsh-platform status [--json]
+  dsh-platform autostart enable|disable|status [--json]
+
+启动选项：
+  --host IPv4                  本机监听地址，默认沿用当前配置或自动确定
+  --port 端口                  监听端口，默认 18120；已有配置时沿用
+  --public-url URL             对外访问地址，默认沿用当前配置
+  --foreground                 前台运行，供 systemd 等进程管理器使用
+  --max-old-space-size MiB      Node.js 老生代堆上限，首次默认 8192 MiB（8 GiB）
+                               重启、再次启动和更新沿用上次设置；需改值时使用 restart
+  --dry-run                    仅 start：检查启动条件，不启动或停止服务
+  -h, --help                   显示帮助，也支持放在子命令后
+
+示例：
+  ./platform/dsh-platform start
+  ./platform/dsh-platform restart --max-old-space-size 8192
+  ./platform/dsh-platform start --help
+
+堆上限通过 NODE_OPTIONS 传给平台 Node.js 进程，其他 Node.js 选项保留。
+这是老生代堆上限，进程总内存还包括新生代、Buffer 和原生内存，可能高于此值。`)
     return 0
   }
   const dataRoot = defaultAssetRoot()
@@ -306,13 +375,13 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
     return manageAutostart(subcommand, dataRoot, autostartArgs.includes('--json'))
   }
   const flags = new Set<string>(), values: Record<string, string> = {}
-  const allowed: Record<string, string[]> = { prepare: ['--offline'], start: ['--foreground', '--dry-run', '--host', '--port', '--public-url'], restart: ['--foreground', '--host', '--port', '--public-url'], stop: [], status: ['--json'] }
+  const allowed: Record<string, string[]> = { prepare: ['--offline'], start: ['--recover', '--foreground', '--dry-run', '--host', '--port', '--public-url', '--max-old-space-size'], restart: ['--foreground', '--host', '--port', '--public-url', '--max-old-space-size'], stop: [], status: ['--json'] }
   if (!allowed[command]) throw new Error(`未知命令：${command}`)
   for (let n = 0; n < rest.length; n++) {
     const key = rest[n]
     if (!allowed[command].includes(key) || flags.has(key)) throw new Error(`不支持或重复的选项：${key}`)
     flags.add(key)
-    if (['--host', '--port', '--public-url'].includes(key)) {
+    if (['--host', '--port', '--public-url', '--max-old-space-size'].includes(key)) {
       if (!rest[n + 1] || rest[n + 1].startsWith('--')) throw new Error(`${key} 需要值`)
       values[key] = rest[++n]
     }
@@ -326,13 +395,42 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
     const state = managedState(dataRoot)
     let status = state ? 'starting' : 'stopped'
     if (state && ownsPort(state.pid, state.host, state.port)) status = await httpPhase(state.url)
-    console.log(flags.has('--json') ? JSON.stringify({ status, ...state }, null, 2) : `${status}${state ? ` ${state.publicUrl ?? state.url}\nPID：${state.pid}\n日志：${state.log}` : ''}`)
+    const owner = serviceOwner(dataRoot) ? 'systemd' : 'direct'
+    const logSource = owner === 'systemd' ? `journalctl --user -u ${autostartService}` : state?.log
+    const runtimeNodeHeapMb = state ? processHeapMb(state.pid) : undefined
+    console.log(flags.has('--json') ? JSON.stringify({ status, ...state, runtimeNodeHeapMb, owner, logSource, lastExit: existsSync(join(dataRoot, '.local/platform-service/last-exit.json')) ? json(join(dataRoot, '.local/platform-service/last-exit.json')) : undefined }, null, 2) : `${status}${state ? ` ${state.publicUrl ?? state.url}\nPID：${state.pid}\n堆启动配置：${state.nodeHeapMb === undefined ? '未知（旧启动记录）' : `${state.nodeHeapMb} MiB`}\n运行进程堆参数：${runtimeNodeHeapMb === undefined ? '未知（未读取到显式参数）' : `${runtimeNodeHeapMb} MiB`}\n日志：${logSource}` : ''}`)
     return 0
   }
   const address = command === 'stop' ? undefined : launchAddress(dataRoot, values['--host'], values['--port'], values['--public-url'])
-  const startArgs = address ? ['start', '--host', address.host, '--port', String(address.port), '--public-url', address.publicUrl] : []
-  if (flags.has('--dry-run')) return spawnSync(python(), privateArgs([...startArgs, '--dry-run']), { stdio: 'inherit' }).status ?? 1
+  const nodeHeapMb = command === 'stop' ? 8192 : Number(values['--max-old-space-size'] ?? previousState(dataRoot)?.nodeHeapMb ?? 8192)
+  if (!Number.isSafeInteger(nodeHeapMb) || nodeHeapMb <= 0) throw new Error('--max-old-space-size 必须是正整数，单位 MiB（8 GiB = 8192 MiB）')
+  if (flags.has('--recover') && (!insideService() || !flags.has('--foreground'))) throw new ConfigurationError('--recover 仅供平台 systemd 服务恢复已应用制品')
+  const startArgs = address ? ['start', ...(flags.has('--recover') ? ['--applied'] : []), '--host', address.host, '--port', String(address.port), '--public-url', address.publicUrl] : []
+  if (flags.has('--dry-run')) {
+    console.log(JSON.stringify({ ...JSON.parse(runStartPreflight(startArgs)), node_heap_mb: nodeHeapMb }, null, 2))
+    return 0
+  }
   const service = join(dataRoot, '.local/platform-service')
+  if (serviceOwner(dataRoot) && !insideService()) {
+    if (command === 'restart' || command === 'start' && !managedState(dataRoot)) runStartPreflight(startArgs)
+    if (command === 'stop') {
+      mkdirSync(service, { recursive: true })
+      writeFileSync(join(service, 'explicit-stop'), new Date().toISOString(), { mode: 0o600 })
+      systemctl(['stop', autostartService]); console.log('平台已停止（systemd）'); return 0
+    }
+    const existing = managedState(dataRoot)
+    if (command === 'start' && existing && (existing.url !== address!.url || (existing.publicUrl ?? existing.url) !== address!.publicUrl
+      || flags.has('--max-old-space-size') && existing.nodeHeapMb !== nodeHeapMb)) throw new Error('平台运行设置已变化；请用 restart 应用，原进程已保留')
+    if (command === 'restart') systemctl(['stop', autostartService])
+    const previous = previousState(dataRoot)
+    mkdirSync(service, { recursive: true })
+    atomic(join(service, 'state.json'), { pid: 0, birth: '', phase: 'stopped', detached: true, programRoot, dataRoot, log: join(service, 'platform.log'), ...previous, ...address!, nodeHeapMb })
+    rmSync(join(service, 'explicit-stop'), { force: true })
+    systemctl(['reset-failed', autostartService]); systemctl(['start', autostartService])
+    const state = await waitForService(dataRoot)
+    console.log(`平台已启动（systemd）：${state.publicUrl ?? state.url}\nPID：${state.pid}\n日志：journalctl --user -u ${autostartService}`)
+    return 0
+  }
   const unlock = await lock(join(service, 'operation.lock'))
   try {
     if (command === 'restart') {
@@ -344,11 +442,12 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
       }
     }
     if (command === 'stop' || command === 'restart') await stop(dataRoot)
-    if (command === 'stop') { console.log('平台已停止'); return 0 }
+    if (command === 'stop') { writeFileSync(join(service, 'explicit-stop'), new Date().toISOString(), { mode: 0o600 }); console.log('平台已停止'); return 0 }
     const existing = managedState(dataRoot)
     if (existing) {
       if (existing.url !== address!.url) throw new Error(`平台已使用 ${existing.url} 启动；请用 restart 修改地址`)
       if ((existing.publicUrl ?? existing.url) !== address!.publicUrl) throw new Error('平台公开入口已变化；请用 restart 应用地址')
+      if (flags.has('--max-old-space-size') && existing.nodeHeapMb !== nodeHeapMb) throw new Error('Node.js 堆上限需要重启生效；请用 restart --max-old-space-size 修改，原平台进程已保留')
       if (!ownsPort(existing.pid, existing.host, existing.port)) throw new Error(`平台进程仍在启动但尚未监听；请检查日志 ${existing.log}`)
       const phase = await httpPhase(existing.url)
       if (phase === 'unavailable') throw new Error(`平台进程仍在监听，但 HTTP 未就绪：${existing.url}；请检查日志 ${existing.log}`)
@@ -357,6 +456,7 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
       return 0
     }
     const checked = runStartPreflight(startArgs)
+    rmSync(join(service, 'explicit-stop'), { force: true })
     console.log(preflightSummary(checked, dataRoot))
     const accessPath = join(dataRoot, 'config/business-access.json')
     const before = existsSync(accessPath) ? readFileSync(accessPath, 'utf8') : undefined
@@ -370,18 +470,23 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
     const logOffset = existsSync(log) ? statSync(log).size : 0
     const foreground = flags.has('--foreground')
     const fd = foreground ? undefined : openSync(log, 'a', 0o600)
-    const child = spawn(python(), privateArgs(startArgs), { detached: true, stdio: foreground ? 'inherit' : ['ignore', fd!, fd!], env: process.env })
+    const child = spawn(python(), privateArgs(startArgs), { detached: true, stdio: foreground ? 'inherit' : ['ignore', fd!, fd!], env: { ...process.env, NODE_OPTIONS: platformNodeOptions(process.env.NODE_OPTIONS, nodeHeapMb) } })
     if (fd !== undefined) closeSync(fd)
     let failure: Error | undefined
     child.on('error', error => { failure = error })
-    const exited = new Promise<number>(resolveExit => child.on('exit', code => resolveExit(code ?? 1)))
+    const exited = new Promise<number>(resolveExit => child.on('exit', (code, signal) => {
+      const exit = { at: new Date().toISOString(), pid: child.pid, code, signal, owner: insideService() ? 'systemd' : 'direct' }
+      atomic(join(service, 'last-exit.json'), exit)
+      console.error(`平台子进程退出：${JSON.stringify(exit)}`)
+      resolveExit(code ?? (signal === 'SIGTERM' ? 143 : signal === 'SIGINT' ? 130 : 1))
+    }))
     if (!child.pid) {
       if (saved && readFileSync(accessPath, 'utf8') === saved) {
         if (before === undefined) rmSync(accessPath); else writeFileSync(accessPath, before, { mode: 0o600 })
       }
       throw new Error('无法执行 Python 3.10+；平台未启动')
     }
-    const state: State = { pid: child.pid, birth: processBirth(child.pid)!, programRoot, dataRoot, ...address!, log, phase: 'starting', detached: true }
+    const state: State = { pid: child.pid, birth: processBirth(child.pid)!, programRoot, dataRoot, ...address!, log, phase: 'starting', detached: true, nodeHeapMb }
     atomic(join(service, 'state.json'), state)
     const forward = (signal: NodeJS.Signals) => { if (processBirth(state.pid) === state.birth) process.kill(-state.pid, signal) }
     const sigint = () => forward('SIGINT'), sigterm = () => forward('SIGTERM')
@@ -430,5 +535,5 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main().then(code => { process.exitCode = code }).catch(error => { console.error(`dsh-platform: ${error.message}`); process.exitCode = 1 })
+  main().then(code => { process.exitCode = code }).catch(error => { console.error(`dsh-platform: ${error.message}`); process.exitCode = error.exitCode ?? 1 })
 }

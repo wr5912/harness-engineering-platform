@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto'
 import { assertConnectionReady } from './connection.ts'
+import { DiscoveryBudget, MAX_CATALOG_ITEMS, limitedText } from './limits.ts'
+import { discover } from './discovery.ts'
 
 const MAX_DOCUMENT = 2 * 1024 * 1024
 const MAX_RESULT = 1024 * 1024
@@ -18,13 +20,6 @@ export function validateSpecUrl(value: string): string {
   return url.href
 }
 
-async function limitedText(response: Response, limit: number): Promise<string> {
-  if (Number(response.headers.get('content-length')) > limit) throw new Error('上游响应过大')
-  const body = await response.arrayBuffer()
-  if (body.byteLength > limit) throw new Error('上游响应过大')
-  return new TextDecoder().decode(body)
-}
-
 function resolveObject(spec: any, value: any): any {
   if (!value?.$ref) return value
   const path = String(value.$ref).split('/')
@@ -34,7 +29,8 @@ function resolveObject(spec: any, value: any): any {
   return target
 }
 
-function schemaOf(spec: any, value: any, seen = new Set<string>()): any {
+function schemaOf(spec: any, value: any, budget: DiscoveryBudget, location: string, seen = new Set<string>(), depth = 0): any {
+  budget.node(depth, location)
   // shortcut: 仅保留 DSH 支持的约束；需要严格校验完整 OpenAPI Schema 时扩展 Runtime 子集。
   if (!value || typeof value !== 'object') return {}
   if (value.$ref) {
@@ -45,24 +41,27 @@ function schemaOf(spec: any, value: any, seen = new Set<string>()): any {
     if (!original) throw new Error(`Schema 不存在：${name}`)
     // shortcut: 递归引用退化为任意 JSON；需要保留递归约束时再扩展 DSH Schema 支持。
     if (seen.has(name)) return {}
-    return schemaOf(spec, original, new Set([...seen, name]))
+    return schemaOf(spec, original, budget, `${location} -> ${name}`, new Set([...seen, name]), depth + 1)
   }
   const type = value.type ?? (value.properties ? 'object' : value.items ? 'array' : undefined)
   const result: any = {}
   for (const key of ['description', 'title', 'default', 'examples']) {
-    if (value[key] !== undefined) result[key] = value[key]
+    if (value[key] !== undefined) { budget.value(value[key], `${location}.${key}`, depth); result[key] = value[key] }
   }
   if (['object', 'array', 'string', 'number', 'integer', 'boolean', 'null'].includes(type)) result.type = type
   if (result.type === 'object') {
-    result.properties = Object.fromEntries(Object.entries(value.properties ?? {}).map(([key, item]) => [key, schemaOf(spec, item, seen)]))
-    if (Array.isArray(value.required)) result.required = value.required
+    result.properties = Object.fromEntries(Object.entries(value.properties ?? {}).map(([key, item]) => {
+      budget.value(key, location, depth)
+      return [key, schemaOf(spec, item, budget, location, seen, depth + 1)]
+    }))
+    if (Array.isArray(value.required)) { budget.value(value.required, location, depth); result.required = value.required }
     if (typeof value.additionalProperties === 'boolean') result.additionalProperties = value.additionalProperties
-  } else if (result.type === 'array' && value.items) result.items = schemaOf(spec, value.items, seen)
+  } else if (result.type === 'array' && value.items) result.items = schemaOf(spec, value.items, budget, location, seen, depth + 1)
   else if (['string', 'number', 'integer', 'boolean', 'null'].includes(result.type)) {
     const matches = (item: any) => result.type === 'null' ? item === null :
       result.type === 'integer' ? Number.isInteger(item) : typeof item === result.type
-    if (Array.isArray(value.enum) && value.enum.length && value.enum.every(matches)) result.enum = value.enum
-    if (value.const !== undefined && matches(value.const) && (!result.enum || result.enum.includes(value.const))) result.const = value.const
+    if (Array.isArray(value.enum) && value.enum.length && value.enum.every(matches)) { budget.value(value.enum, location, depth); result.enum = value.enum }
+    if (value.const !== undefined && matches(value.const) && (!result.enum || result.enum.includes(value.const))) { budget.value(value.const, location, depth); result.const = value.const }
   }
   return result
 }
@@ -71,18 +70,19 @@ function operationUrl(base: URL, path: string): URL {
   return new URL(`${base.pathname.replace(/\/$/, '')}${path}`, base.origin)
 }
 
-function operationSchema(spec: any, parameters: any[], body: any): any {
+function operationSchema(spec: any, parameters: any[], body: any, budget: DiscoveryBudget, location: string): any {
   const properties: Record<string, any> = {}
   const required: string[] = []
   for (const parameter of parameters) {
-    properties[parameter.name] = schemaOf(spec, parameter.schema ?? { type: 'string' })
-    if (parameter.description) properties[parameter.name].description = parameter.description
+    budget.value(parameter.name, location)
+    properties[parameter.name] = schemaOf(spec, parameter.schema ?? { type: 'string' }, budget, location)
+    if (parameter.description) { budget.value(parameter.description, location); properties[parameter.name].description = parameter.description }
     if (parameter.required || parameter.in === 'path') required.push(parameter.name)
   }
   if (body) {
     const content = body.content?.['application/json']
     if (!content) throw new Error('当前仅支持 application/json 请求体')
-    properties.body = schemaOf(spec, content.schema ?? { type: 'object' })
+    properties.body = schemaOf(spec, content.schema ?? { type: 'object' }, budget, location)
     if (body.required) required.push('body')
   }
   return { type: 'object', properties, ...(required.length ? { required: [...new Set(required)] } : {}) }
@@ -103,7 +103,7 @@ export function validateAuthHeader(value: string): string {
   return value
 }
 
-const loginCache = new Map<string, { config: string; token?: string; pending?: Promise<string> }>()
+const loginCache = new Map<string, { config: string; token?: string }>()
 
 function loginState(server: any) {
   const id = String(server.id || server.specUrl)
@@ -119,7 +119,7 @@ function loginState(server: any) {
 async function loginToken(server: any): Promise<string> {
   const state = loginState(server)
   if (state.token) return state.token
-  if (!state.pending) state.pending = (async () => {
+  // 不共享登录中的请求信号；目录发现本身已按调用者合并。
     const response = await fetch(validateSpecUrl(server.loginUrl), {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ username: server.loginUsername, password: server.loginPassword }),
@@ -131,8 +131,6 @@ async function loginToken(server: any): Promise<string> {
     if (typeof token !== 'string' || !token) throw new Error('登录响应缺少凭据字段')
     state.token = token
     return token
-  })().finally(() => { state.pending = undefined })
-  return state.pending
 }
 
 async function authorizedFetch(server: any, url: URL, init: RequestInit, spec?: any, operation?: any, controlled?: any) {
@@ -161,6 +159,7 @@ async function authorizedFetch(server: any, url: URL, init: RequestInit, spec?: 
   let result = await request()
   // 已派发的业务写请求不因 401 自动重放；规格发现仍可刷新凭据重试。
   if (result.response.status === 401 && server.authType === 'login' && !controlled) {
+    await result.response.body?.cancel()
     const state = loginState(server)
     if (state.token === result.credential) state.token = undefined
     result = await request()
@@ -168,7 +167,11 @@ async function authorizedFetch(server: any, url: URL, init: RequestInit, spec?: 
   return result
 }
 
-export async function loadOpenApi(server: any): Promise<any> {
+export function loadOpenApi(server: any): Promise<any> {
+  return discover(server, 'openapi', loadOpenApiDocument).then(source => ({ ...source, server }))
+}
+
+async function loadOpenApiDocument(server: any): Promise<any> {
   assertConnectionReady(server)
   const specUrl = validateSpecUrl(server.specUrl)
   let response = await fetch(specUrl, { signal: requestSignal(server) })
@@ -180,6 +183,8 @@ export async function loadOpenApi(server: any): Promise<any> {
   }
   if (!response.ok) throw new Error(`读取 OpenAPI 规范失败：HTTP ${response.status}（${retriedWithAuth ? '凭据重试' : '匿名访问'}）`)
   const spec = JSON.parse(await limitedText(response, MAX_DOCUMENT))
+  const source = `OpenAPI 服务 ${server.id || new URL(specUrl).host}`
+  const schemaBudget = new DiscoveryBudget(source), catalogBudget = new DiscoveryBudget(source)
   if (!spec.openapi || !spec.paths || typeof spec.paths !== 'object') throw new Error('OpenAPI 规范缺少 openapi 或 paths')
   const base = new URL(spec.servers?.[0]?.url ?? '/', specUrl)
   if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password || base.search || base.hash) {
@@ -194,35 +199,38 @@ export async function loadOpenApi(server: any): Promise<any> {
     for (const [method, raw] of Object.entries(pathItem) as [string, any][]) {
       if (!methods.has(method)) continue
       const name = String(raw.operationId || `${method}_${path}`).replace(/[^A-Za-z0-9_.-]/g, '_')
+      if (operations.size >= MAX_CATALOG_ITEMS) catalogBudget.fail('操作数', MAX_CATALOG_ITEMS, name)
       if (operations.has(name)) throw new Error(`OpenAPI 操作名重复：${name}`)
       const parameters = [...(pathItem.parameters ?? []), ...(raw.parameters ?? [])].map(item => resolveObject(spec, item))
       const body = raw.requestBody ? resolveObject(spec, raw.requestBody) : undefined
       const uri = operationUrl(base, path).href
       const description = raw.summary || raw.description || `${method.toUpperCase()} ${path}`
+      const inputSchema = operationSchema(spec, parameters, body, schemaBudget, name)
       const httpOperation = { method: method.toUpperCase(), path, urlTemplate: uri.replace(/%7B/gi, '{').replace(/%7D/gi, '}') }
-      const item = { name, method, path, parameters, body, raw, uri, description, httpOperation }
+      const item = { name, method, path, parameters, body, raw, uri, description, httpOperation, inputSchema }
       operations.set(name, item)
       const queryReadable = method === 'get' && parameters.some(parameter => parameter.in === 'query')
       if (method === 'get' && !body && parameters.every(parameter => ['path', 'query'].includes(parameter.in)
         && (parameter.in !== 'query' || parameter.schema?.type !== 'array' && /^[A-Za-z0-9_.-]+$/.test(parameter.name)))) {
         readable.push(item)
         const info = { name, title: raw.summary, description, httpOperation, mimeType: 'application/json',
-          inputSchema: { ...operationSchema(spec, parameters, body), additionalProperties: false } }
+          inputSchema: { ...inputSchema, additionalProperties: false } }
         if (parameters.length) {
           const queryNames = parameters.filter(parameter => parameter.in === 'query').map(parameter => parameter.name)
           resourceTemplates.push({ ...info, uriTemplate: httpOperation.urlTemplate
             + (queryNames.length ? `{?${queryNames.join(',')}}` : '') })
         }
         else resources.push({ ...info, uri })
-        if (queryReadable) tools.push({ name, title: raw.summary, description, httpOperation, inputSchema: operationSchema(spec, parameters, body) })
+        if (queryReadable) tools.push({ name, title: raw.summary, description, httpOperation, inputSchema })
       } else {
-        tools.push({ name, title: raw.summary, description, httpOperation, inputSchema: operationSchema(spec, parameters, body) })
+        tools.push({ name, title: raw.summary, description, httpOperation, inputSchema })
       }
     }
   }
   const businessTools = [...tools, ...readable.filter(item => !tools.some(tool => tool.name === item.name)).map(item => ({ name: item.name, title: item.raw.summary,
     description: item.description, httpOperation: item.httpOperation,
-    inputSchema: operationSchema(spec, item.parameters, item.body) }))]
+    inputSchema: item.inputSchema }))]
+  for (const list of [tools, resources, resourceTemplates, businessTools]) for (const item of list) catalogBudget.value(item, item.name)
   return { spec, base, tools, businessTools, resources, resourceTemplates, operations, readable, server }
 }
 

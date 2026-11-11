@@ -5,9 +5,46 @@ import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
-import { launchAddress, managedState, processBirth, renderAutostartUnit } from './lifecycle.mts'
+import { launchAddress, managedState, platformNodeOptions, processBirth, processHeapMb, renderAutostartUnit } from './lifecycle.mts'
 import { handoffService } from './bootstrap/server.ts'
 import { platformGroupUrl } from './plugin/src/business-control/group-link.ts'
+
+test('平台 Node 堆上限默认 8 GiB，支持自定义并保留其他选项，重复启动不累加', () => {
+  for (const [original, heapMb] of [['', undefined], ['--stack-trace-limit=42 --max-old-space-size=1024', undefined], ['--stack-trace-limit=42', 6144]]) {
+    const options = platformNodeOptions(original, heapMb)
+    assert.equal(platformNodeOptions(options, heapMb), options)
+    const child = spawnSync(process.execPath, ['-p', 'JSON.stringify({ heap: require("node:v8").getHeapStatistics().heap_size_limit, stack: Error.stackTraceLimit })'], {
+      env: { ...process.env, NODE_OPTIONS: options }, encoding: 'utf8',
+    })
+    assert.equal(child.status, 0, child.stderr)
+    const actual = JSON.parse(child.stdout)
+    const reference = spawnSync(process.execPath, [`--max-old-space-size=${heapMb ?? 8192}`, '-p', 'require("node:v8").getHeapStatistics().heap_size_limit'], { env: { ...process.env, NODE_OPTIONS: options }, encoding: 'utf8' })
+    assert.equal(reference.status, 0, reference.stderr)
+    assert.equal(actual.heap, Number(reference.stdout))
+    if (original) assert.equal(actual.stack, 42)
+  }
+})
+
+test('-h、--help 和子命令帮助说明默认堆上限与启动参数，不启动平台', () => {
+  for (const args of [['-h'], ['--help'], ['start', '-h'], ['restart', '--help'], ['autostart', 'enable', '-h']]) {
+    const result = spawnSync(join(import.meta.dirname, 'dsh-platform'), args, { encoding: 'utf8' })
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(result.stdout, /--max-old-space-size MiB/)
+    assert.match(result.stdout, /8192 MiB（8 GiB）/)
+    assert.match(result.stdout, /restart --max-old-space-size 8192/)
+  }
+})
+
+test('读取运行进程堆参数，以命令行覆盖 NODE_OPTIONS，退出后保持未知', async () => {
+  const child = spawn(process.execPath, ['--max-old-space-size=4096', '-e', 'setInterval(() => {}, 1000)'], {
+    env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=8192' }, stdio: 'ignore',
+  })
+  try {
+    await new Promise(resolve => child.once('spawn', resolve))
+    assert.equal(processHeapMb(child.pid), 4096)
+  } finally { child.kill(); await new Promise(resolve => child.once('exit', resolve)) }
+  assert.equal(processHeapMb(child.pid), undefined)
+})
 
 test('自启动单元固定程序根、数据根和用户服务入口', () => {
   const unit = renderAutostartUnit('/opt/hep root', '/srv/hep data', '/opt/node/bin:/usr/bin')
@@ -93,6 +130,7 @@ if '--dry-run' in sys.argv:
     print(json.dumps({'dry': True})); sys.exit(0)
 if os.environ.get('HEP_FIXTURE_FAIL_START'):
     print('fixture startup failure Authorization: Bearer fixture-secret https://example.invalid/?token=fixture-query', file=sys.stderr); sys.exit(7)
+pathlib.Path(${JSON.stringify(join(data, 'fixture-node-options.txt'))}).write_text(os.environ.get('NODE_OPTIONS', ''))
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         path = pathlib.Path(${JSON.stringify(health)})
@@ -118,12 +156,15 @@ http.server.ThreadingHTTPServer((host, port), Handler).serve_forever()
   try {
     const dry = cli('start', '--dry-run')
     assert.equal(dry.status, 0, dry.stderr || dry.stdout)
+    assert.equal(JSON.parse(dry.stdout).node_heap_mb, 8192)
     assert.equal(managedState(data, repo), undefined)
     const first = cli('start')
     assert.equal(first.status, 0, first.stderr || first.stdout)
     assert.match(first.stdout, /启动预检通过/)
     assert.match(first.stdout, /平台启动中/)
     const pid = state().pid
+    assert.equal(state().nodeHeapMb, 8192)
+    assert.match(readFileSync(join(data, 'fixture-node-options.txt'), 'utf8'), /--max-old-space-size=8192$/)
     assert.equal(state().status, 'running')
     assert.equal(cli('start').status, 0)
     assert.equal(state().pid, pid)
@@ -149,8 +190,23 @@ http.server.ThreadingHTTPServer((host, port), Handler).serve_forever()
     assert.equal(state().pid, pid, '启动检查失败必须保留正在运行的平台')
     assert.equal(state().status, 'running')
     rmSync(invalid)
+    for (const value of ['0', '-1', '1.5', 'no', 'Infinity', '9007199254740992']) {
+      const rejected = cli('restart', '--max-old-space-size', value)
+      assert.notEqual(rejected.status, 0)
+      assert.match(rejected.stderr, /正整数/)
+      assert.equal(state().pid, pid, '无效堆上限不能停止原平台')
+    }
+    const mismatch = cli('start', '--max-old-space-size', '6144')
+    assert.notEqual(mismatch.status, 0)
+    assert.match(mismatch.stderr, /需要重启生效/)
+    assert.equal(state().pid, pid)
+    const custom = cli('restart', '--max-old-space-size', '6144')
+    assert.equal(custom.status, 0, custom.stderr || custom.stdout)
+    assert.equal(state().nodeHeapMb, 6144)
+    assert.match(readFileSync(join(data, 'fixture-node-options.txt'), 'utf8'), /--max-old-space-size=6144$/)
     assert.equal(cli('restart').status, 0)
     assert.notEqual(state().pid, pid)
+    assert.equal(state().nodeHeapMb, 6144, '未指定堆上限时沿用上次设置')
     const publicUrl = 'https://platform.example/hep/'
     const nat = cli('restart', '--host', '127.0.0.1', '--port', String(port), '--public-url', publicUrl)
     assert.equal(nat.status, 0, nat.stderr || nat.stdout)
@@ -179,6 +235,7 @@ http.server.ThreadingHTTPServer((host, port), Handler).serve_forever()
     assert.doesNotMatch(failedStart.stderr, /fixture-secret|fixture-query|old-secret/)
     assert.match(failedStart.stderr, /日志：/)
     assert.equal(cli('start').status, 0)
+    assert.equal(state().nodeHeapMb, 6144, '停止后再启动保留堆上限')
     assert.equal(state().publicUrl, publicUrl, '停止后启动仍保留公开入口')
     assert.equal(state().port, port, '停止后启动复用此前本机监听端口')
     assert.equal(cli('stop').status, 0)
