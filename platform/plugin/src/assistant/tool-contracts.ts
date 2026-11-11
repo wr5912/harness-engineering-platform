@@ -2,13 +2,14 @@ import { z } from 'zod'
 import { businessCasesSchema } from '../agents/business-cases.ts'
 import { DECISION_EXTRACTION_CONTRACT } from '../evaluation/decision-dataset-contract.ts'
 
-export type AssistantDomain = 'agents' | 'instances' | 'mcp'
+export type AssistantDomain = 'agents' | 'instances' | 'mcp' | 'browser'
 type MapValue = Record<string, any>
 const migrationActions = ['migrations/inspect', 'migrations/read', 'migrations/preview', 'migrations/apply', 'migrations/status', 'migrations/resolve', 'assets/build-preview', 'assets/build', 'assets/dependencies/prepare']
 export const assistantActions: Record<AssistantDomain, readonly string[]> = {
   agents: ['sdk/start', 'sdk/status', 'sdk/stop', 'sdk/list', 'sdk/guide', ...migrationActions, 'versions/migration-plan', 'versions/migration-apply', 'documents/read', 'documents/inspect', 'documents/prepare', 'documents/apply', 'documents/status', 'documents/recover', 'research/read-reference', 'research/validate', 'legacy/inspect', 'decision/preview', 'list', 'detail', 'edit/read', 'edit/preview', 'edit/apply', 'cases/list', 'cases/read', 'cases/update', 'cases/delete', 'cases/renumber-preview', 'cases/renumber', 'cases/reorder-preview', 'cases/reorder', 'eval/preview', 'eval/start', 'eval/batch-start', 'eval/status', 'eval/cancel', 'runs/index', 'runs/delete', 'runs/show', 'runs/evidence', 'runs/report', 'runs/files', 'runs/read-file', 'runs/compare', 'runs/trace', 'assets/diff', 'assets/read-fixed', 'compute-variants/context', 'compute-variants/source', 'compute-variants/identity-preview', 'compute-variants/identity-apply', 'compute-variants/preview', 'compute-variants/create', 'compute-variants/rename', 'compute-variants/plan-preview', 'compute-variants/plan-apply', 'compute-variants/prepare', 'compute-variants/build-preview', 'compute-variants/build', 'compute-variants/freeze-preview', 'compute-variants/freeze', 'compute-variants/compare', 'new', 'create', 'cases/create-context', 'cases/from-run', 'cases/create-preview', 'cases/create', 'datasets/source', 'datasets/preview', 'datasets/apply', 'datasets/list', 'datasets/read', 'datasets/review', 'datasets/export', 'decision/update', 'features/read-source', 'features/preview', 'features/proposal', 'features/apply', 'fusion/preview', 'fusion/prepare', 'fusion/resolve', 'fusion/recover', 'fusion/proposal', 'fusion/confirm', 'fusion/status', 'fusion/verify', 'fusion/finalize', 'tasks/capabilities', 'tasks/assembly-preview', 'tasks/assembly-apply'],
   instances: ['list', 'detail', 'url', 'logs', 'preview', 'batch-preview', 'run', 'batch'],
   mcp: ['list', 'configuration', 'saveConfiguration', 'test', 'resources', 'resourceTemplates', 'readResource', 'callTool', 'sources/list', 'sources/create', 'sources/refresh', 'sources/toggle', 'sources/components', 'sources/logs', 'sources/preview', 'sources/invoke', 'saveCompositionDraft', 'bindCompositionDrafts', 'publishComposition', 'withdrawComposition', 'deleteComposition', 'executeComposition', 'dryRunComposition', 'callPublishedComposition', 'compositionRun', 'compositionArtifact', 'compositionDetails', 'compositionSource', 'compositionGraph', 'seedThreatCompositions', 'control/status', 'control/saveConfiguration', 'control/restrict', 'control/reassess', 'control/release'],
+  browser: ['inspect'],
 }
 
 const string = { type: 'string' }, strings = { type: 'array', items: string }, object = { type: 'object', additionalProperties: true }
@@ -65,6 +66,7 @@ const fields: MapValue = {
 type Hint = [actions: string, input: string, note?: string]
 // 这里是模型的逐操作用法索引，不是第二套业务校验器；完整语义仍由原接口处理。
 const hints: Record<AssistantDomain, Hint[]> = {
+  browser: [['inspect', 'target actions screenshot timeout_ms', '检查已登记的平台页面或业务实例；使用受限的角色、标签、文本、占位符或 test id 定位器，结果包含页面快照、操作记录、截图和失败阶段。截图会作为当前原生会话的图片上下文回传。']],
   instances: [
     ['list', ''], ['detail url', 'name'], ['logs', 'name tail'],
     ['preview run', 'name operation source port allow_missing_env business_control access_mode identity_mode model_selection apply_source_mcp', 'operation=create/start/stop/restart/reload/delete；reload 只重载运行中实例，内部先预览并绑定资产和运行代次摘要，保留 HOME、会话、端口、模型和网关身份，核验实际加载回执；批量逐项返回结果，不自动重放失败或未知写请求；创建必须传明确的 experiment:<ID> 来源。创建业务实例默认且必须经过统一网关，默认 access_mode=anonymous、identity_mode=development；可明确选择 authenticated 或 published。网关不可用时说明原因并修复配置，禁止省略参数或传 false 改为直连。独立研究评测使用 agents/eval 入口，不用业务实例创建接口绕过网关。用户要求最新版本时，先用 agents/detail 的 versions[0].id 确定版本，再作为 source 传入；默认 detail.experiment 可能是已启用版本，不等于最新版本。直接调用 run 即可由平台内部预览并核对模型、业务来源摘要与访问设置，按 DSH 原生权限执行；无需另调 preview 或额外索取确认。业务实例创建后用 instances/url 取统一网关入口，不要把容器直连端口当作业务链接。'],
@@ -168,6 +170,33 @@ const hints: Record<AssistantDomain, Hint[]> = {
 export function assistantActionContract(domain: AssistantDomain, action: string): { domain: AssistantDomain; action: string; input_schema: MapValue; instructions: string } {
   const hint = hints[domain].find(([names]) => names.split(' ').includes(action))
   if (!hint) throw new Error('未知的领域操作合同')
+  if (domain === 'browser' && action === 'inspect') return {
+    domain, action,
+    input_schema: {
+      type: 'object', additionalProperties: false, required: ['target'], properties: {
+        target: { oneOf: [
+          { type: 'object', additionalProperties: false, required: ['kind', 'page'], properties: { kind: { type: 'string', const: 'platform' }, page: { type: 'string', enum: ['home', 'conversations', 'agents', 'evaluation', 'instances', 'gateway', 'mcp'] } } },
+          { type: 'object', additionalProperties: false, required: ['kind', 'name'], properties: { kind: { type: 'string', const: 'instance' }, name: { type: 'string', pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' } } },
+        ] },
+        actions: { type: 'array', maxItems: 12, items: { oneOf: [
+          { type: 'object', additionalProperties: false, required: ['action', 'locator'], properties: { action: { const: 'click' }, locator: { $ref: '#/$defs/locator' } } },
+          { type: 'object', additionalProperties: false, required: ['action', 'locator', 'value'], properties: { action: { const: 'fill' }, locator: { $ref: '#/$defs/locator' }, value: { type: 'string', maxLength: 4096 } } },
+          { type: 'object', additionalProperties: false, required: ['action', 'locator', 'key'], properties: { action: { const: 'press' }, locator: { $ref: '#/$defs/locator' }, key: { type: 'string', minLength: 1, maxLength: 80 } } },
+          { type: 'object', additionalProperties: false, required: ['action', 'text'], properties: { action: { const: 'wait_for' }, text: { type: 'string', minLength: 1, maxLength: 500 } } },
+        ] } },
+        screenshot: { oneOf: [
+          { type: 'object', additionalProperties: false, required: ['scope'], properties: { scope: { const: 'viewport' } } },
+          { type: 'object', additionalProperties: false, required: ['scope'], properties: { scope: { const: 'full_page' } } },
+          { type: 'object', additionalProperties: false, required: ['scope', 'locator'], properties: { scope: { const: 'element' }, locator: { $ref: '#/$defs/locator' } } },
+        ] },
+        timeout_ms: { type: 'integer', minimum: 1000, maximum: 120000 },
+      },
+      $defs: { locator: { type: 'object', additionalProperties: false, required: ['kind', 'value'], properties: {
+        kind: { type: 'string', enum: ['role', 'label', 'text', 'placeholder', 'test_id'] }, value: { type: 'string', minLength: 1, maxLength: 240 }, name: { type: 'string', maxLength: 240 }, exact: { type: 'boolean' },
+      } } },
+    },
+    instructions: hint[2]!,
+  }
   const properties = Object.fromEntries(hint[1].split(' ').filter(Boolean).map(key => [key, fields[key] ?? (/^(?:.*_id|.*_sha256|.*_ref|agent_id|source|target_source|name|description|role|path|ref|content|title|scene|expected_behavior|mode|executor|review|model|compare_to|left|right|filename|status|outcome|operation|serverId|sourceId|componentId|compositionId|artifactId|toolName|specUrl|uri|version|revision|topic|variant_name|strategy|resource_metric|variant_model|variant_reasoning_effort|entry_path|check_id)$/.test(key) ? string : {})]))
   if (action === 'eval/preview' || action === 'eval/start') {
     properties.program_root = { ...string, description: '可选的已构建程序根绝对路径；省略时使用当前平台程序。评测保留原生模型策略和凭据注入。' }

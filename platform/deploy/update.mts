@@ -45,6 +45,7 @@ function files(path: string): string[] {
 function sourceSnapshot(options: UpdateOptions) {
   const roots = ['platform/plugin/src', 'platform/plugin/assets', 'platform/plugin/business', 'platform/mcp/lfx', 'plugins/mcp-manager', 'runtime/adapters/dsh-web/src', 'platform/profile']
   const selected = roots.flatMap(path => files(join(options.programRoot, path)))
+  selected.push(join(options.programRoot, 'runtime/adapters/dsh-container/dsh-browser-inspect.mjs'))
   for (const folder of ['platform/plugin', 'runtime/adapters/dsh-web']) for (const name of ['package.json', 'pnpm-lock.yaml', 'build.mjs']) selected.push(join(options.programRoot, folder, name))
   for (const name of ['platform/dsh-platform-internal.py', 'platform/dsh-platform', 'platform/lifecycle.mts', 'platform/deploy/update.mts']) selected.push(join(options.programRoot, name))
   for (const name of ['workspace.json', 'AGENTS.md']) if (existsSync(join(options.dataRoot, name))) selected.push(join(options.dataRoot, name))
@@ -75,6 +76,7 @@ function liveSnapshot(options: UpdateOptions) {
   return Object.fromEntries([
     ...files(join(options.programRoot, 'platform/plugin/lib')),
     ...files(join(options.programRoot, 'runtime/adapters/dsh-web/lib')),
+    ...[join(options.programRoot, 'runtime/adapters/dsh-container/dsh-browser-inspect.mjs')].filter(existsSync),
     ...['runtime.js', 'mcp-manager.js'].map(name => join(options.programRoot, 'platform/plugin/business', name)).filter(existsSync),
     ...files(join(options.dataRoot, '.local/platform-home/profiles/harness-platform')).filter(path => !path.includes('/node_modules/') && !path.endsWith('/node_modules')),
     ...activeExtensions,
@@ -263,6 +265,12 @@ async function build(options: UpdateOptions, stage: string, inspection: UpdateIn
       writeFileSync(file, JSON.stringify(value, null, 2) + '\n')
     }
     entries.push({ source: file, target })
+  }
+  const browserDriver = join(options.programRoot, 'runtime/adapters/dsh-container/dsh-browser-inspect.mjs')
+  if (existsSync(browserDriver)) {
+    const stagedDriver = join(stage, 'dsh-browser-inspect.mjs')
+    writeFileSync(stagedDriver, readFileSync(browserDriver))
+    entries.push({ source: stagedDriver, target: browserDriver })
   }
   if (inspection.overlay) { const file = join(stage, 'harness-platform.patch.yml'); writeFileSync(file, inspection.overlay.text); entries.push({ source: file, target: inspection.overlay.path }) }
   if (inspection.userPatch) { const file = join(stage, 'cordis.patch.yml'); writeFileSync(file, inspection.userPatch.text, { mode: 0o600 }); entries.push({ source: file, target: inspection.userPatch.path }) }

@@ -2,6 +2,8 @@ import { assetText } from '../agents/asset-text.ts'
 import { createHash, randomUUID } from 'node:crypto'
 import { workspaceIdentity } from '../workspace.ts'
 import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
+import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session } from '@deepseek-ai/dsh-session'
 import { pluginRecordOf } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition, SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
@@ -18,6 +20,7 @@ import { decisionExtractionModelContract, normalizeDecisionModelSubmission } fro
 import type { DocumentReader } from './documents.ts'
 import { collectDecisionReviewInput } from './decision-review-input.ts'
 import { assistantModelCatalog } from './model-catalog.ts'
+import type { BrowserInspector } from './browser.ts'
 
 type MapValue = Record<string, any>
 type Domain = AssistantDomain
@@ -35,6 +38,8 @@ export interface AssistantServices {
   running?: (id: string) => boolean
   notify(domains: string[], ids?: string[]): void
   mcp?: (action: string, input: MapValue, signal: AbortSignal) => Promise<any>
+  browser?: BrowserInspector
+  attachments?: Pick<AttachmentStore, 'saveImage'>
   readDocument?: DocumentReader
   sessionEvents?(sessionId: string, signal: AbortSignal): Promise<readonly MapValue[]>
   observeSession?(id: string, signal?: AbortSignal): Promise<{ header: any; inheritedEventCount: any; events: readonly any[]; [Symbol.dispose](): void }>
@@ -697,7 +702,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
   function registerTools(registry: { register(tool: any): any }) {
     for (const domain of Object.keys(actions) as Domain[]) registry.register({
       name: `platform_${domain}`,
-      description: `平台${domain}工具。context 读取固定任务与页面上下文${domain === 'agents' ? '，普通管理会话还返回 model_catalog 中业务可选的实际 provider/model 和推理档位' : ''}；describe(input.action=操作名)读取单个操作的参数合同。优先查已有对象和能力，再执行；工具权限遵循 DSH 原生设置，写入前核对预览与目标。`,
+      description: `${domain === 'browser' ? '平台页面核验工具。' : `平台${domain}工具。`}context 读取固定任务与页面上下文${domain === 'agents' ? '，普通管理会话还返回 model_catalog 中业务可选的实际 provider/model 和推理档位' : ''}；describe(input.action=操作名)读取单个操作的参数合同。优先查已有对象和能力，再执行；工具权限遵循 DSH 原生设置，写入前核对预览与目标。`,
       parameters: { type: 'object', properties: { action: { type: 'string', enum: ['context', 'describe', ...actions[domain]] }, input: { type: 'object', additionalProperties: true } }, required: ['action', 'input'], additionalProperties: false },
       output: { schema: { type: 'object', additionalProperties: true }, render: (args: any, value: any) => [{ type: 'text', text: JSON.stringify(modelToolValue(domain, args.action, value)) }], presentationMeta: (args: any, value: any) => {
         const projected = modelToolValue(domain, args.action, value)
@@ -726,6 +731,28 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
         if (!actions[domain].includes(args.action)) throw new Error('未知的领域操作')
         const input = domain === 'agents' && args.action === 'datasets/preview'
           ? normalizeDecisionModelSubmission({ ...object(args.input) }) : { ...object(args.input) }
+        if (domain === 'browser' && args.action === 'inspect') {
+          if (!services.browser) throw new Error('当前平台未装载页面核验能力')
+          const inspected = await services.browser(input, exec.signal)
+          const screenshot = inspected._screenshot
+          const { _screenshot: _ignored, ...value } = inspected
+          if (screenshot) {
+            if (!services.attachments) return wireValue({ kind: 'platform-operation', domain, action: args.action, state: 'failed', result: {
+              ...value, ok: false, visual_review: 'unavailable', error: '页面核验已完成，但当前 DSH 未提供原生图片附件存储，截图未进入会话。',
+            } })
+            try {
+              const attachment = await services.attachments.saveImage({ data: screenshot.bytes, mediaType: 'image/png', name: 'platform-browser-inspection.png' })
+              exec.deferContext(createUserMessage({ content: [{ type: 'image', attachment }], source: { kind: 'ptc-mode' } as any }))
+              value.visual_review = 'attached'
+              value.screenshot = { ...(value.screenshot ?? {}), attachment_id: attachment.attachmentId, media_type: attachment.mediaType, width: attachment.width, height: attachment.height }
+            } catch (error) {
+              return wireValue({ kind: 'platform-operation', domain, action: args.action, state: 'failed', result: {
+                ...value, ok: false, visual_review: 'unavailable', error: `页面核验已完成，但截图写入 DSH 原生附件失败：${error instanceof Error ? error.message : String(error)}`,
+              } })
+            }
+          }
+          return wireValue({ kind: 'platform-operation', domain, action: args.action, state: value.ok === false ? 'failed' : 'completed', result: value })
+        }
         if (domain === 'agents' && args.action === 'documents/read') {
           if (!services.readDocument) throw new Error('当前平台未装载文档读取服务')
           return wireValue({ domain, action: args.action, ok: true, value: await services.readDocument(input, exec.agent, exec.signal) })

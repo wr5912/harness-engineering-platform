@@ -25,6 +25,7 @@ import type {} from './mcp/manager.ts'
 import { createManagedMcpHandler } from './mcp/native.ts'
 import { runtimeModule } from '../../../runtime/adapters/dsh-web/src/resolve-runtime.ts'
 import { createAssistant } from './assistant/index.ts'
+import { createBrowserInspector } from './assistant/browser.ts'
 import { createDocumentReader } from './assistant/documents.ts'
 import { createDeployments } from './deployment/index.ts'
 import { createDeploymentSeed } from './deployment/seed.ts'
@@ -248,6 +249,7 @@ export function applyTools(ctx: Context) {
     running: id => services.agents.get(id)?.status === 'running',
     record: async (session, type, value) => { const records = await runtimeModule('@deepseek-ai/dsh-session'); records.appendPluginRecord(session, type, value) },
     projections: services.sessionProjections, skills: services.skills,
+    browser: createBrowserInspector(assetRoot, handler), attachments: services.attachments,
     notify, mcp: manager ? assistantMcp(manager) : undefined,
   })
   domains.assistant = assistant.handler
