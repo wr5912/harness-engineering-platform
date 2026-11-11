@@ -23,6 +23,10 @@ async function input() {
   if (!value || typeof value !== 'object' || typeof value.target_url !== 'string'
     || !/^https?:\/\/[^\s]+$/.test(value.target_url) || typeof value.evidence_root !== 'string'
     || !Array.isArray(value.actions) || !value.screenshot) throw new Error('检查请求格式无效')
+  if (value.auth_cookie !== undefined && (!value.auth_cookie || typeof value.auth_cookie !== 'object'
+    || typeof value.auth_cookie.name !== 'string' || !/^[A-Za-z0-9_-]{1,120}$/.test(value.auth_cookie.name)
+    || typeof value.auth_cookie.value !== 'string' || !/^[A-Za-z0-9_-]{1,512}$/.test(value.auth_cookie.value)
+    || typeof value.auth_cookie.url !== 'string' || !/^https?:\/\/[^\s]+$/.test(value.auth_cookie.url))) throw new Error('页面认证 Cookie 无效')
   if (value.actions.length > 12) throw new Error('页面操作数量超过 12 个')
   if (!Number.isInteger(value.timeout_ms) || value.timeout_ms < 1000 || value.timeout_ms > 120000) throw new Error('页面检查超时时间无效')
   for (const item of value.actions) {
@@ -82,6 +86,7 @@ async function inspect(value) {
   const resultFile = 'result.json'
   const target = new URL(value.target_url)
   if (!['http:', 'https:'].includes(target.protocol) || target.username || target.password) throw new Error('页面入口地址无效')
+  if (value.auth_cookie && new URL(value.auth_cookie.url).origin !== target.origin) throw new Error('页面认证 Cookie 不属于目标站点')
   const browser = await chromium.launch({
     executablePath: '/usr/bin/chromium',
     headless: true,
@@ -90,11 +95,17 @@ async function inspect(value) {
   const context = await browser.newContext({ locale: 'zh-CN', timezoneId: 'UTC' })
   const page = await context.newPage()
   const origin = target.origin
-  await context.tracing.start({ screenshots: true, snapshots: true, sources: false })
   try {
+    if (value.auth_cookie) await context.addCookies([{ ...value.auth_cookie, httpOnly: true, sameSite: 'Strict', secure: target.protocol === 'https:' }])
+    // DOM 网络快照会保存 Cookie 等请求头；可读快照单独写入 snapshot.txt。
+    await context.tracing.start({ screenshots: true, snapshots: false, sources: false })
     stage = 'navigation'
     await page.goto(value.target_url, { waitUntil: 'domcontentloaded', timeout: value.timeout_ms })
     assertSameOrigin(page, origin)
+    if (value.auth_cookie) {
+      if (new URL(page.url()).pathname !== target.pathname) throw new Error('平台登录态未生效，页面未进入指定入口')
+      await page.locator('.harness-platform').waitFor({ state: 'visible', timeout: value.timeout_ms })
+    }
     stage = 'action'
     for (const item of value.actions) {
       if (item.action === 'wait_for') await page.getByText(item.text, { exact: false }).waitFor({ state: 'visible', timeout: value.timeout_ms })

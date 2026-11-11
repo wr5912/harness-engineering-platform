@@ -51,6 +51,29 @@ function targetUrl(root: string, input: BrowserInspectInput, instanceUrl?: strin
   return `${platformEntryUrl(root)}${navigationHash({ page: input.target.page })}`
 }
 
+export async function platformAuthCookie(root: string, target: string, signal: AbortSignal): Promise<{ name: string; value: string; url: string }> {
+  let account: any
+  try { account = JSON.parse(await readFile(workspaceLocalPath(root, 'credentials', 'admin.json'), 'utf8')) }
+  catch { throw new Error('无法读取平台账号配置，页面核验无法建立登录态') }
+  if (typeof account?.username !== 'string' || !account.username.trim()
+    || typeof account?.password !== 'string' || !account.password) throw new Error('平台账号配置无效，页面核验无法建立登录态')
+  const base = new URL(target)
+  base.hash = ''
+  base.search = ''
+  const response = await fetch(new URL('login', base), {
+    method: 'POST', redirect: 'manual', headers: { origin: base.origin, 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ username: account.username, password: account.password }),
+    signal: AbortSignal.any([signal, AbortSignal.timeout(30000)]),
+  })
+  await response.body?.cancel()
+  if (response.status !== 303) throw new Error(`平台登录失败（HTTP ${response.status}），页面核验未建立登录态`)
+  const raw = response.headers.getSetCookie().find(cookie => /^dsh-auth-[A-Za-z0-9_-]+=/.test(cookie) && !/Max-Age=0(?:;|$)/i.test(cookie)) ?? ''
+  const pair = raw.split(';', 1)[0]
+  const separator = pair.indexOf('=')
+  if (separator < 1 || separator === pair.length - 1) throw new Error('平台登录未返回有效会话 Cookie')
+  return { name: pair.slice(0, separator), value: pair.slice(separator + 1), url: base.origin }
+}
+
 async function imageRef(signal: AbortSignal): Promise<string> {
   const configured = process.env.DSH_IMAGE_TAG?.trim()
   if (configured) return configured
@@ -102,6 +125,7 @@ function driverCommand(image: string, evidenceRoot: string): string[] {
     '--user', `${process.getuid?.() ?? 0}:${process.getgid?.() ?? 0}`,
     '--entrypoint', 'node',
     '--mount', `type=bind,src=${driver},dst=${containerDriver},readonly`,
+    '--mount', 'type=bind,src=/usr/share/fonts,dst=/usr/local/share/fonts/host,readonly',
     '--mount', `type=bind,src=${evidenceRoot},dst=/work/evidence`,
     image, containerDriver,
   ]
@@ -122,13 +146,15 @@ export function createBrowserInspector(root: string, platform: ConnectionRpcHand
     const evidenceRoot = workspaceLocalPath(root, 'browser-inspections', randomUUID())
     await mkdir(evidenceRoot, { recursive: true, mode: 0o700 })
     const image = await imageRef(signal)
-    const payload = { ...input, target_url: target, evidence_root: '/work/evidence' }
+    const authCookie = input.target.kind === 'platform' ? await platformAuthCookie(root, target, signal) : undefined
+    const payload = { ...input, target_url: target, evidence_root: '/work/evidence', ...(authCookie ? { auth_cookie: authCookie } : {}) }
     const result = await runProcess('docker', driverCommand(image, evidenceRoot), signal, input.timeout_ms + 30000, JSON.stringify(payload))
     const line = result.stdout.trim().split('\n').filter(Boolean).at(-1)
     if (!line) throw new Error(result.stderr.trim() || '浏览器驱动没有返回检查结果')
     let valueResult: Record<string, any>
     try { valueResult = JSON.parse(line) } catch { throw new Error('浏览器驱动返回了无法解析的检查结果') }
     if (typeof valueResult !== 'object' || valueResult === null) throw new Error('浏览器驱动返回格式无效')
+    valueResult.evidence = { ...valueResult.evidence, path: evidenceRoot }
     if (valueResult.ok && valueResult.screenshot_file) {
       if (valueResult.screenshot_file !== 'screenshot.png') throw new Error('浏览器驱动返回了无效的截图路径')
       const path = join(evidenceRoot, valueResult.screenshot_file)
