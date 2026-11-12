@@ -22,6 +22,7 @@ export interface PackOptions {
   includeImage: boolean
   includeData: boolean
   allowDirty: boolean
+  includeWorkingTree?: boolean
   keepStaging: boolean
   allowFixtureData: boolean
   arch: Arch
@@ -54,9 +55,9 @@ function copyAsset(source: string, target: string): void {
   copyTree(source, target)
 }
 
-function copyProgram(programRoot: string, staging: string, assetsDir?: string): void {
+function copyProgram(programRoot: string, staging: string, assetsDir?: string, workingTree = false): void {
   const target = join(staging, 'program')
-  snapshotRepository(programRoot, target, join(staging, 'repositories/program.bundle'))
+  snapshotRepository(programRoot, target, join(staging, 'repositories/program.bundle'), workingTree)
   removeTree(join(target, '.git'))
   if (assetsDir) {
     const preparedPlugin = join(assetsDir, 'program', 'platform', 'plugin', 'node_modules')
@@ -68,9 +69,9 @@ function copyProgram(programRoot: string, staging: string, assetsDir?: string): 
   }
 }
 
-function copyData(dataRoot: string, staging: string, assets: string): ReturnType<typeof snapshotRepository> {
+function copyData(dataRoot: string, staging: string, assets: string, workingTree = false): ReturnType<typeof snapshotRepository> {
   const target = join(staging, 'data')
-  const repository = snapshotRepository(dataRoot, target, join(staging, 'repositories/data.bundle'))
+  const repository = snapshotRepository(dataRoot, target, join(staging, 'repositories/data.bundle'), workingTree)
   removeTree(join(target, '.git'))
   const credentials = join(dataRoot, '.local/credentials')
   if (existsSync(credentials)) copyTree(credentials, join(target, '.local/credentials'))
@@ -147,8 +148,8 @@ export function pack(options: PackOptions): { archive: string; size: number } {
   const out = resolve(options.out)
   mkdirSync(out, { recursive: true })
   const { commit, dirty } = commitOf(programRoot)
-  if (dirty && !options.allowDirty) {
-    throw new Error('工作树存在未提交改动；请先提交或显式使用 --allow-dirty')
+  if (dirty && !options.allowDirty && !options.includeWorkingTree) {
+    throw new Error('工作树存在未提交改动；请提交，或显式使用 --include-working-tree / --allow-dirty')
   }
   if (!options.assetsDir || !existsSync(join(options.assetsDir, 'dsh', 'apps', 'cli', 'lib', 'bin.js'))) {
     throw new Error('离线资源缺少已构建的 DSH CLI：--assets-dir dsh/apps/cli/lib/bin.js')
@@ -200,11 +201,11 @@ export function pack(options: PackOptions): { archive: string; size: number } {
   let dataRepository: ReturnType<typeof snapshotRepository> | undefined
   for (const name of ['python', 'dsh']) if (!existsSync(join(offline, name))) throw new Error(`安装包缺少离线 ${name} 资源`)
   console.error('pack: 正在生成程序和数据仓库快照')
-  copyProgram(programRoot, staging, options.assetsDir)
+  copyProgram(programRoot, staging, options.assetsDir, options.includeWorkingTree)
   copyTree(join(staging, 'program/platform/deploy/install.sh'), join(staging, 'install.sh'))
   if (dataRoot) {
     dataCheck = assertRealWorkspace(dataRoot, options.allowFixtureData)
-    dataRepository = copyData(dataRoot, staging, options.assetsDir!)
+    dataRepository = copyData(dataRoot, staging, options.assetsDir!, options.includeWorkingTree)
     copyDataDependencies(join(staging, 'data'), options.assetsDir!)
     const knowledge = collectPlatformKnowledge(staging, options.knowledgeDir ?? join(options.assetsDir!, 'knowledge'))
     if (knowledge) runtime.knowledge = knowledge
@@ -220,6 +221,7 @@ export function pack(options: PackOptions): { archive: string; size: number } {
       version: versionOf(programRoot),
       commit,
       dirty,
+      snapshot: options.includeWorkingTree ? 'working-tree' : 'HEAD',
       arch: options.arch,
       createdAt: new Date().toISOString(),
     },

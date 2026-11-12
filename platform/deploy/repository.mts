@@ -1,8 +1,8 @@
-import { existsSync, mkdirSync } from 'node:fs'
-import { join } from 'node:path'
-import { run } from './fsutil.mts'
+import { cpSync, existsSync, lstatSync, mkdirSync, readlinkSync, symlinkSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { run, safeRelative } from './fsutil.mts'
 
-export function snapshotRepository(source: string, target: string, bundle: string): { commit: string; dirty: boolean; origin: string } {
+export function snapshotRepository(source: string, target: string, bundle: string, workingTree = false): { commit: string; dirty: boolean; origin: string } {
   const commit = run('git', ['-C', source, 'rev-parse', 'HEAD']).trim()
   const dirty = Boolean(run('git', ['-C', source, 'status', '--porcelain']).trim())
   const origin = run('git', ['-C', source, 'remote', 'get-url', 'origin']).trim()
@@ -15,9 +15,25 @@ export function snapshotRepository(source: string, target: string, bundle: strin
   try {
     mkdirSync(target, { recursive: true })
     mkdirSync(join(bundle, '..'), { recursive: true })
-    // 通过 bundle 的锁定提交检出，既保留完整历史，也不复制工作树临时文件。
+    // bundle 保留原始历史；工作树快照不会生成提交或带入被忽略的缓存和 HOME。
     run('git', ['-C', source, 'bundle', 'create', bundle, 'HEAD'])
-    restoreRepository(target, bundle, commit, origin, true)
+    restoreRepository(target, bundle, commit, origin, !workingTree)
+    if (workingTree) {
+      const files = new Set(run('git', ['-C', source, 'ls-files', '--cached', '--others', '--exclude-standard', '-z']).split('\0').filter(Boolean))
+      for (const file of files) {
+        const relative = safeRelative(file), from = join(source, relative), to = join(target, relative)
+        let stat
+        try { stat = lstatSync(from) } catch (error: any) { if (error.code === 'ENOENT') continue; throw error }
+        if (stat.isDirectory()) continue // 原文件在工作树中被目录替代，实际子文件由 ls-files 收集。
+        const ancestors = relative.split('/').slice(0, -1)
+        if (ancestors.some((_, index) => lstatSync(join(source, ...ancestors.slice(0, index + 1))).isSymbolicLink())) continue
+        if (!stat.isFile() && !stat.isSymbolicLink()) throw new Error(`工作树包含不支持的文件类型：${relative}`)
+        mkdirSync(dirname(to), { recursive: true })
+        if (stat.isSymbolicLink()) symlinkSync(readlinkSync(from), to)
+        else cpSync(from, to, { preserveTimestamps: true })
+      }
+      if (run('git', ['-C', source, 'rev-parse', 'HEAD']).trim() !== commit) throw new Error('仓库 HEAD 在打包时变化，请重新打包')
+    }
   } finally { process.umask(previousMask) }
   return { commit, dirty, origin }
 }

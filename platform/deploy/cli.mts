@@ -56,8 +56,8 @@ function validateOptions(command: string, options: Options): void {
   const flags: Record<string, string[]> = {
     'agent-cleanup': [],
     'agent-preview': ['update-assets'], 'agent-pack': [], 'agent-prepare': [],
-    pack: ['no-image', 'no-data', 'allow-dirty', 'allow-fixture-data', 'keep-staging'],
-    install: ['dry-run', 'skip-image', 'skip-prepare', 'strict-paths', 'allow-fixture-data', 'start'],
+    pack: ['no-image', 'no-data', 'allow-dirty', 'include-working-tree', 'allow-fixture-data', 'keep-staging'],
+    install: ['dry-run', 'skip-image', 'skip-prepare', 'strict-paths', 'allow-fixture-data', 'start', 'update'],
     verify: [],
     relocate: ['dry-run', 'resume'],
     'agent-update': ['dry-run'],
@@ -156,6 +156,7 @@ function usage(): string {
     --arch amd64|arm64           包架构，默认当前主机
     --no-image / --no-data       不包含镜像或数据根
     --allow-dirty                工作树有改动时仍打包 HEAD 快照（不包含未提交改动）
+    --include-working-tree       包含两个仓库当前未提交的新增、修改和删除
     --allow-fixture-data         允许夹具数据根（仅测试；真实部署默认拒绝）
     --keep-staging               保留暂存目录
 
@@ -174,6 +175,7 @@ function usage(): string {
     --url <地址>                 可选：核对受管进程与登录后的工作区清单
 
   dsh-deploy install [选项]
+    --update                     备份原安装后全量更新，保留现场配置、凭据和运行状态
     --bundle-root <目录>         解包后的安装包根目录（install.sh 会传入）
     --prefix <目录>              程序安装目录，默认 ~/work/harness-engineering-platform-data
     --data-root <目录>           数据根，默认 ~/harness-engineering-platform-data
@@ -186,7 +188,7 @@ function usage(): string {
     --skip-prepare               不执行 prepare（仅用于诊断/分步安装）
     --strict-paths               路径映射后仍有旧路径时失败
     --allow-fixture-data         允许夹具数据根（仅测试；真实部署默认拒绝）
-    --start                      安装完成后后台启动平台并启用用户级自启动，等待就绪后返回
+    --start                      安装后启动并启用自启动；全量更新后启动并保留原自启动配置
 
 可导入已准备的目标架构资源生成安装包；安装和运行须使用匹配架构的主机，AMD64 与 ARM64 不混用。`
 }
@@ -320,6 +322,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
         includeImage: !flag(options, 'no-image'),
         includeData: !flag(options, 'no-data'),
         allowDirty: flag(options, 'allow-dirty'),
+        includeWorkingTree: flag(options, 'include-working-tree'),
         allowFixtureData: flag(options, 'allow-fixture-data'),
         keepStaging: flag(options, 'keep-staging'),
         arch: archOf(text(options, 'arch')),
@@ -346,7 +349,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       if (text(options, 'port') && !host) throw new Error('--port 需要同时指定 --host')
       if (text(options, 'gateway-port') && !host) throw new Error('--gateway-port 需要同时指定 --host')
       if (text(options, 'public-url') && !host) throw new Error('--public-url 需要同时指定 --host')
-      const report = install({
+      const execute = flag(options, 'update') ? (await import('./bundle-update.mts')).updateBundle : install
+      const report = await execute({
         bundleRoot: resolve(bundleRoot),
         prefix: resolve(text(options, 'prefix', join(homedir(), 'work', 'harness-engineering-platform-data')) as string),
         dataRoot: resolve(text(options, 'data-root', join(homedir(), 'harness-engineering-platform-data')) as string),
@@ -368,6 +372,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
         console.log(`程序：${report.prefix}`)
         console.log(`数据根：${report.dataRoot}`)
         console.log(`架构：${report.arch}`)
+        if (report.backups) console.log(`原安装备份：${JSON.stringify(report.backups)}`)
         if (Object.keys(report.runtime).length) console.log(`运行时：${JSON.stringify(report.runtime)}`)
         console.log(`自启动：${report.autostart}`)
         if (report.image) console.log(`镜像：${report.image.tag ?? report.image.id ?? ''} loaded=${report.image.loaded}`)

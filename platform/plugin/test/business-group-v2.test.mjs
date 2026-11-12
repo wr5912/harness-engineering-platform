@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { createRequire } from 'node:module'
 import test from 'node:test'
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
-import { getBusinessControl, withBusinessContext } from '../lib/business-control.js'
+import { getBusinessControl, sharedInstanceIdentity, withBusinessContext } from '../lib/business-control.js'
 import { businessAssertionHeaders, businessRpcDigest, resolveBusinessInstance, signBusinessAssertion } from '../lib/business-gateway.js'
 
 test('业务 RPC 摘要递归忽略对象键顺序，保留数组顺序与 JSON 序列化语义', () => {
@@ -22,7 +22,7 @@ test('业务 RPC 摘要递归忽略对象键顺序，保留数组顺序与 JSON 
     params: { ...reordered.params, arguments: { ...reordered.params.arguments, values: [2, 1] } } }))
 })
 
-test('v2 分组只接受固定实例签名与当前受信 Session，签名不降级也不可重放', async t => {
+test('v2 分组保留实例与 Session 校验，匿名页面可读取资源', async t => {
   const root = mkdtempSync(join(tmpdir(), 'business-group-v2-'))
   const previousRoot = process.env.HARNESS_ASSET_ROOT
   const previousEntry = process.env.HARNESS_DSH_ENTRY
@@ -261,12 +261,22 @@ test('v2 分组只接受固定实例签名与当前受信 Session，签名不降
   const withoutSession = await connect(new StreamableHTTPClientTransport(url, { fetch: BusinessConnection.prototype.groupFetch.call(
     { businessConfig: { assetRoot: root, binding }, control }, 'soc-tools') }))
   assert.deepEqual((await withoutSession.listTools()).tools.map(tool => tool.name), expectedNames)
+  await assert.rejects(withoutSession.listResources(), /缺少受信 Session/)
   await assert.rejects(withoutSession.callTool({ name: 'echo', arguments: args }), /缺少受信 Session/)
   access.gateway.instances[0].identityMode = 'published'
   access.gateway.instances[0].accessMode = 'anonymous'
   access.enabled = false
   writeFileSync(join(root, 'config', 'business-access.json'), JSON.stringify(access))
   assert.notEqual((await devRequest(unsignedHeaders)).status, 401, '已发布的匿名实例也无需签名')
+  const sharedPage = control.createContext(sharedInstanceIdentity(binding), binding)
+  await withBusinessContext(sharedPage, async () => {
+    assert.equal((await withoutSession.listResources()).resources.length, 1, '匿名页面读取资源不依赖对话 Session')
+    assert.equal((await withoutSession.listResourceTemplates()).resourceTemplates.length, 0)
+    assert.equal((await withoutSession.readResource({ uri: resources[0].uri,
+      _meta: { 'io.deepseek.dsh/mcp-group-target': { digest: targetDigest } } })).contents[0].text, '{"reached":true}')
+    await assert.rejects(withoutSession.callTool({ name: 'echo', arguments: args }), /缺少受信 Session/)
+  })
+  await assert.rejects(withoutSession.listResources(), /缺少受信 Session/)
   for (const client of [throughRuntime, nativeClient]) {
     const result = await client.callTool({ name: 'echo', arguments: args,
       _meta: { 'io.deepseek.dsh/mcp-group-target': { digest: targetDigest } } })

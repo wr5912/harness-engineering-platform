@@ -27,10 +27,14 @@ export function collectPlatformKnowledge(staging: string, cacheDir?: string): Ru
   const program = join(staging, 'program')
   const localSources = inspectKnowledge({ roots, mode: 'offline' }).references.flatMap(reference => {
     const url = new URL(reference.url)
-    const prefix = '/wr5912/harness-engineering-platform/blob/main/'
-    if (url.hostname !== 'github.com' || !url.pathname.startsWith(prefix)) return []
-    const path = resolve(program, decodeURIComponent(url.pathname.slice(prefix.length)))
-    return path.startsWith(program + sep) && existsSync(path) ? [{ url: reference.url, path }] : []
+    if (url.hostname !== 'github.com') return []
+    for (const [repository, root] of [['harness-engineering-platform', program], ['harness-engineering-platform-data', data]]) {
+      const prefix = `/wr5912/${repository}/blob/main/`
+      if (!url.pathname.startsWith(prefix)) continue
+      const path = resolve(root, decodeURIComponent(url.pathname.slice(prefix.length)))
+      return path.startsWith(resolve(root) + sep) && existsSync(path) ? [{ url: reference.url, path }] : []
+    }
+    return []
   })
   if (localSources.length) roots.push({ root: program, label: 'program', include: [] })
   if (cacheDir && existsSync(cacheDir)) roots.push({ root: resolve(cacheDir), label: 'prepared-knowledge', include: [] })

@@ -27,10 +27,11 @@ export interface InstallOptions {
   start: boolean
   dryRun: boolean
   json: boolean
+  preserveFrom?: { prefix: string; dataRoot: string }
 }
 
 export interface InstallReport {
-  status: 'planned' | 'installed'
+  status: 'planned' | 'installed' | 'updated'
   prefix: string
   dataRoot: string
   arch: string
@@ -43,6 +44,7 @@ export interface InstallReport {
   autostart: 'skipped' | 'enabled'
   pendingInstances: string[]
   sensitive: boolean
+  backups?: { prefix: string; dataRoot: string }
 }
 
 function instanceNames(dataRoot: string): string[] {
@@ -51,7 +53,7 @@ function instanceNames(dataRoot: string): string[] {
   return readdirSync(root).sort()
 }
 
-export function install(options: InstallOptions): InstallReport {
+export function inspectBundle(options: InstallOptions, updating = false) {
   const bundleRoot = resolve(options.bundleRoot)
   const prefix = resolve(options.prefix)
   const dataRoot = resolve(options.dataRoot)
@@ -69,9 +71,10 @@ export function install(options: InstallOptions): InstallReport {
   if (manifest.image && (!manifest.image.tag || !manifest.image.id || !manifest.image.fingerprint || manifest.image.arch !== manifest.package.arch)) {
     throw new Error('安装包镜像身份不完整或架构不符；请使用标准 Runtime 镜像重新打包')
   }
-  if (existsSync(prefix) && readdirSync(prefix).length > 0) throw new Error(`目标程序目录已存在且非空：${prefix}`)
-  if (existsSync(dataRoot) && readdirSync(dataRoot).length > 0) throw new Error(`目标数据根已存在且非空：${dataRoot}`)
+  if (!updating && existsSync(prefix) && readdirSync(prefix).length > 0) throw new Error(`目标程序目录已存在且非空：${prefix}`)
+  if (!updating && existsSync(dataRoot) && readdirSync(dataRoot).length > 0) throw new Error(`目标数据根已存在且非空：${dataRoot}`)
   if (prefix === dataRoot || prefix.startsWith(dataRoot + sep) || dataRoot.startsWith(prefix + sep)) throw new Error('程序目录和数据根必须相互独立')
+  if ([prefix, dataRoot].some(root => bundleRoot === root || bundleRoot.startsWith(root + sep))) throw new Error('安装包解包目录必须位于程序和数据根之外')
 
   const warnings: string[] = []
   const report: InstallReport = {
@@ -94,6 +97,13 @@ export function install(options: InstallOptions): InstallReport {
     if (!existsSync(sourceData)) throw new Error('安装包声明包含数据根，但缺少 data/ 目录')
     assertRealWorkspace(sourceData, options.allowFixtureData)
   }
+  return { manifest, report }
+}
+
+export function install(options: InstallOptions): InstallReport {
+  const { manifest, report } = inspectBundle(options)
+  const { prefix, dataRoot } = report
+  const bundleRoot = resolve(options.bundleRoot), warnings = report.warnings
   if (options.dryRun) return report
 
 
@@ -119,6 +129,23 @@ export function install(options: InstallOptions): InstallReport {
       const remaining = scanKnownOldPaths(dataRoot, changedMappings.map(mapping => mapping.from), mappings.map(mapping => mapping.to))
       if (remaining.length && options.strictPaths) throw new Error(`数据根仍包含旧路径：\n${remaining.map(item => item.file + ':' + item.pattern).join('\n')}`)
       report.oldReferences.push(...remaining)
+    }
+    if (options.preserveFrom) {
+      // 现场配置和原生 HOME 属于目标安装，业务资产则完整采用包内快照。
+      for (const [source, target, paths] of [
+        [options.preserveFrom.prefix, prefix, ['.local']],
+        [options.preserveFrom.dataRoot, dataRoot, ['config', '.local', 'mcp/.local']],
+      ] as const) for (const relative of paths) {
+        if (!existsSync(join(source, relative))) continue
+        rmSync(join(target, relative), { recursive: true, force: true })
+        copyTree(join(source, relative), join(target, relative))
+      }
+      const workspacePath = join(dataRoot, 'workspace.json')
+      const workspace = JSON.parse(readFileSync(workspacePath, 'utf8'))
+      const previous = JSON.parse(readFileSync(join(options.preserveFrom.dataRoot, 'workspace.json'), 'utf8'))
+      workspace.id = previous.id
+      workspace.legacyRoots = [...new Set([...(workspace.legacyRoots ?? []), ...(previous.legacyRoots ?? [])])]
+      writeFileSync(workspacePath, JSON.stringify(workspace, null, 2) + '\n')
     }
     if (options.host && rewriteDeploymentAddress(dataRoot, options.host, options.port, options.gatewayPort, options.publicUrl)) {
       report.rewritten.push(join(dataRoot, 'config', 'business-access.json'))

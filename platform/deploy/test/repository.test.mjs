@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -39,5 +39,39 @@ test('仓库快照保留历史和 origin，排除工作树改动；安装不覆�
     assert.equal(readFileSync(join(installed, 'asset'), 'utf8'), 'remapped')
     assert.equal(run('git', ['-C', installed, 'remote', 'get-url', 'origin']).trim(), result.origin)
     assert.equal(run('git', ['-C', installed, 'rev-parse', 'HEAD']).trim(), result.commit)
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
+test('当前工作树快照包含增改删、链接和可执行权限，排除忽略文件并保留 Git 基线', () => {
+  const root = mkdtempSync(join(tmpdir(), 'hep-working-tree-'))
+  try {
+    const source = join(root, 'source'), target = join(root, 'snapshot')
+    mkdirSync(source)
+    const git = (...args) => run('git', ['-C', source, ...args]).trim()
+    git('init', '-b', 'main'); git('config', 'user.name', 'fixture'); git('config', 'user.email', 'fixture@example.invalid')
+    git('remote', 'add', 'origin', 'https://example.invalid/repository.git')
+    writeFileSync(join(source, '.gitignore'), '.local/\n*.llm-api-key\n')
+    writeFileSync(join(source, 'changed'), 'old'); writeFileSync(join(source, 'deleted'), 'old')
+    mkdirSync(join(source, 'replaced-directory')); writeFileSync(join(source, 'replaced-directory/asset'), 'old')
+    git('add', '.'); git('commit', '-m', 'baseline')
+    const baseline = git('rev-parse', 'HEAD')
+    writeFileSync(join(source, 'changed'), 'new'); rmSync(join(source, 'deleted'))
+    writeFileSync(join(source, 'added'), 'new'); chmodSync(join(source, 'added'), 0o755)
+    symlinkSync('added', join(source, 'linked'))
+    const external = join(root, 'external')
+    mkdirSync(external); writeFileSync(join(external, 'asset'), 'external')
+    rmSync(join(source, 'replaced-directory'), { recursive: true }); symlinkSync(external, join(source, 'replaced-directory'))
+    mkdirSync(join(source, '.local')); writeFileSync(join(source, '.local/cache'), 'excluded')
+    writeFileSync(join(source, 'model.llm-api-key'), 'fixture-key')
+    const result = snapshotRepository(source, target, join(root, 'repository.bundle'), true)
+    assert.equal(result.commit, baseline); assert.equal(result.dirty, true)
+    assert.equal(readFileSync(join(target, 'changed'), 'utf8'), 'new')
+    assert.equal(readFileSync(join(target, 'added'), 'utf8'), 'new')
+    assert.equal(statSync(join(target, 'added')).mode & 0o777, 0o755)
+    assert.equal(readlinkSync(join(target, 'linked')), 'added')
+    assert.equal(readlinkSync(join(target, 'replaced-directory')), external)
+    assert.equal(readFileSync(join(external, 'asset'), 'utf8'), 'external')
+    for (const name of ['deleted', '.local', 'model.llm-api-key']) assert.equal(existsSync(join(target, name)), false)
+    assert.equal(run('git', ['-C', target, 'rev-parse', 'HEAD']).trim(), baseline)
   } finally { rmSync(root, { recursive: true, force: true }) }
 })

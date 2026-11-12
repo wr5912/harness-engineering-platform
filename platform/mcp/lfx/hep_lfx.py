@@ -54,6 +54,18 @@ async def component(name, input_value, node_id):
                           module_digest=hashlib.sha256(source.encode()).hexdigest())
 
 
+import re as _re
+_SENSITIVE = _re.compile(r'(?i)(authorization|bearer|token|password|passwd|api[_-]?key|secret)\s*[:=]?\s*[^\s,;]+')
+def error_summary(error, depth=0):
+    """有界、脱敏的失败摘要；保留内层业务原因，不展开参数、headers 或源码。"""
+    if depth > 3:
+        return '……'
+    if isinstance(error, BaseExceptionGroup):
+        children = [error_summary(child, depth + 1) for child in error.exceptions[:3]]
+        return 'ExceptionGroup: ' + ' | '.join(child for child in children if child)
+    text = _SENSITIVE.sub(r'\1=[已脱敏]', ' '.join(str(error).split()))
+    return f'{type(error).__name__}: {text[:300]}' if text else type(error).__name__
+
 async def progress(node, **values):
     await callback("progress", node_id=current_path.get() + "/" + node, **values)
 
@@ -91,7 +103,7 @@ class HepComponent(Component):
             await progress(self._id, status="completed")
             return result
         except Exception as error:
-            await progress(self._id, status="failed", error=str(error))
+            await progress(self._id, status="failed", error=error_summary(error))
             raise
 
 
@@ -126,13 +138,26 @@ class HepBatch(HepComponent):
             while cursor < len(items):
                 index = cursor
                 cursor += 1
-                results[index] = await run_graph(body, {**value, "item": items[index], "index": index},
-                                                 f"{current_path.get()}/{self._id}[{index}]")
+                item = items[index]
+                try:
+                    results[index] = await run_graph(body, {**value, "item": item, "index": index},
+                                                     f"{current_path.get()}/{self._id}[{index}]")
+                except asyncio.CancelledError:
+                    raise
+                except Exception as error:
+                    # 单项失败按真实粒度保留，不能吞成成功，也不能丢其他已读项。
+                    base = dict(item) if isinstance(item, dict) else {"item": item}
+                    results[index] = {**base, "status": "failed", "complete": False,
+                                      "error": str(error) or type(error).__name__}
                 await progress(self._id, status="running", completed=sum(item is not None for item in results), total=len(items))
 
-        async with asyncio.TaskGroup() as group:
-            for _ in range(min(self.concurrency, len(items))):
-                group.create_task(worker())
+        try:
+            async with asyncio.TaskGroup() as group:
+                for _ in range(min(self.concurrency, len(items))):
+                    group.create_task(worker())
+        except BaseExceptionGroup as error:
+            # 进度/基础设施异常仍按 TaskGroup 取消并等待全部 worker；只保留有界原因。
+            raise RuntimeError('批次执行失败：' + error_summary(error)) from error
         return Data(data={**value, "items": results})
 
 

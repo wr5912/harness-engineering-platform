@@ -119,6 +119,8 @@ export function workflowRuns(root: string) {
     const persistProgress = () => { progressTimer ??= setTimeout(() => { progressTimer = undefined; persist() }, 250) }
     const context: WorkflowContext = { runId, nodeId: 'root', signal: AbortSignal.timeout(36 * 60_000), shared: prepared,
       progress(value) {
+        // 终态后迟到的进度只计数存档，不改写已冻结的节点与结果。
+        if (terminal.has(record.status)) { record.late_progress = (record.late_progress ?? 0) + 1; persist(); return }
         record.nodes[this.nodeId] = { ...record.nodes[this.nodeId], ...value, updated_at: now() }
         // 完成事实必须先落盘，调用方随后才能释放依赖该事实的后继。
         if (terminal.has(value.status)) { clearTimeout(progressTimer); progressTimer = undefined; persist() }

@@ -180,7 +180,8 @@ export async function collectKnowledge(options: KnowledgeOptions): Promise<Knowl
         const owner = options.roots.find(root => within(resolve(root.root), path))
         if (!isAbsolute(local.path) || !owner || !existsSync(path) || !lstatSync(path).isFile() || !within(realpathSync(owner.root), realpathSync(path))) throw new Error('本地资料不在冻结资产内')
         const mime: Record<string, string> = { '.md': 'text/markdown', '.markdown': 'text/markdown', '.txt': 'text/plain', '.html': 'text/html', '.htm': 'text/html', '.pdf': 'application/pdf', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }
-        const contentType = mime[extname(path).toLowerCase()]
+        const extension = extname(path).toLowerCase()
+        const contentType = mime[extension] ?? (/^\.(?:[cm]?[jt]sx?|py|json|ya?ml|sh)$/.test(extension) ? 'text/plain' : undefined)
         if (!contentType) throw new Error('本地资料格式不支持')
         if (lstatSync(path).size > 32 * 1024 * 1024) throw new Error('本地资料超过 32 MiB')
         providedFrom = `${owner.label}/${relative(owner.root, path).split(sep).join('/')}`

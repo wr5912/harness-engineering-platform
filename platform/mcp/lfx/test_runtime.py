@@ -142,6 +142,43 @@ class RuntimeTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.client.active, 0)
         self.assertEqual(sum(event['action'] == 'work' for event in self.client.events), 3)
 
+
+    async def test_batch_isolates_single_item_failure_and_preserves_identity(self):
+        body = flow([node(HepInput, 'input'), custom('check', ' async def build(self)->Data:\n  item=payload(self.value)["item"]\n  if item==1: raise ValueError("asset failed")\n  return Data(data={"index":item})\n', output=True)], [edge('input', 'check')])
+        native = flow([node(HepInput, 'input'), node(HepBatch, 'batch', output=True, concurrency=3, body=body)], [edge('input', 'batch')])
+        result = await self.execute(native, {'items': [0, 1, 2]})
+        self.assertEqual(result['items'][0], {'index': 0})
+        self.assertEqual(result['items'][1]['status'], 'failed')
+        self.assertEqual(result['items'][1]['complete'], False)
+        self.assertIn('asset failed', result['items'][1]['error'])
+        self.assertEqual(result['items'][2], {'index': 2})
+        self.assertEqual(self.client.active, 0)
+
+    async def test_batch_progress_failure_cancels_and_joins_all_workers(self):
+        body = flow([node(HepInput, 'input'), custom('check', ' async def build(self)->Data:\n  item=payload(self.value)["item"]\n  if item != 0: await callback("work",delay=60)\n  return Data(data={"item":item})\n', output=True)], [edge('input', 'check')])
+        native = flow([node(HepInput, 'input'), node(HepBatch, 'batch', output=True, concurrency=3, body=body)], [edge('input', 'batch')])
+        original = __import__('hep_lfx').progress
+        fired = False
+        async def failing_progress(node_id, **values):
+            nonlocal fired
+            if 'batch' in node_id and values.get('completed', 0) >= 1 and not fired:
+                fired = True
+                raise RuntimeError('batch post-item progress failed')
+            return await original(node_id, **values)
+        with patch('hep_lfx.progress', new=failing_progress):
+            with self.assertRaises(Exception) as caught:
+                await asyncio.wait_for(self.execute(native, {'items': [0, 1, 2]}), 5)
+        self.assertTrue(fired)
+        def messages(error):
+            yield str(error)
+            if isinstance(error, BaseExceptionGroup):
+                for child in error.exceptions:
+                    yield from messages(child)
+            if error.__cause__ is not None:
+                yield from messages(error.__cause__)
+        self.assertIn('batch post-item progress failed', ' | '.join(messages(caught.exception)))
+        self.assertEqual(self.client.active, 0)
+
     async def test_native_batch_releases_fast_branch_successor_before_unrelated_slow_branch(self):
         methods = ''.join(f' def route_{key}(self)->Data:\n'
                           '  selected=payload(self.value)["item"]\n'

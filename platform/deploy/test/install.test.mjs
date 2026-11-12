@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process'
 import test from 'node:test'
 import { installRuntime } from '../runtime.mts'
 import { install } from '../install.mts'
+import { updateBundle } from '../bundle-update.mts'
 import { copyTree } from '../fsutil.mts'
 import { collectEntries } from '../manifest.mts'
 import { inspectImageArchive, loadVerifiedImage, verifyImageInfo } from '../image.mts'
@@ -44,6 +45,50 @@ function manifest(path, image) {
 }
 const options = (path, prefix) => ({ bundleRoot: path, prefix, dataRoot: prefix + '-data', skipImage: false,
   skipPrepare: false, allowFixtureData: false, strictPaths: false, start: false, dryRun: false, json: false, port: 18120 })
+
+test('全量更新保留现场身份、配置和会话，删除旧业务资产；prepare 失败恢复后可重试', async () => {
+  const path = bundle('full-update-bundle'), prefix = join(root, 'full-update-program'), dataRoot = prefix + '-data'
+  write(join(path, 'data/workspace.json'), JSON.stringify({ id: 'source-workspace', extensions: [{ id: 'new-extension', path: 'mcp' }] }))
+  write(join(path, 'data/config/site.json'), 'source-config')
+  write(join(path, 'data/agents/new-asset'), 'current-working-tree')
+  manifest(path)
+  const m = JSON.parse(readFileSync(join(path, 'manifest.json'), 'utf8'))
+  m.data = { sensitive: true }; write(join(path, 'manifest.json'), JSON.stringify(m))
+  write(join(prefix, '.local/installation.json'), '{"old":true}')
+  write(join(prefix, 'old-program'), 'old')
+  write(join(dataRoot, 'workspace.json'), JSON.stringify({ id: 'target-workspace', legacyRoots: ['/old-root'], extensions: [{ id: 'removed-extension' }] }))
+  write(join(dataRoot, 'config/site.json'), 'target-config')
+  write(join(dataRoot, '.local/platform-home/sessions/saved'), 'target-session')
+  write(join(dataRoot, 'agents/removed-asset'), 'obsolete')
+  const opts = { ...options(path, prefix), allowFixtureData: true }
+  assert.equal((await updateBundle({ ...opts, dryRun: true })).status, 'planned')
+  assert.equal(readFileSync(join(prefix, 'old-program'), 'utf8'), 'old')
+  process.env.HEP_TEST_PREPARE_FAILURE = '3'
+  try { await assert.rejects(updateBundle(opts), /已恢复原安装.*prepare 失败/) }
+  finally { delete process.env.HEP_TEST_PREPARE_FAILURE }
+  assert.equal(readFileSync(join(prefix, 'old-program'), 'utf8'), 'old')
+  assert.equal(readFileSync(join(dataRoot, 'agents/removed-asset'), 'utf8'), 'obsolete')
+  assert.equal(existsSync(prefix + '.update-lock'), false)
+  const firewall = join(root, 'update-firewall-bin'), previousPath = process.env.PATH
+  write(join(firewall, 'firewall-cmd'), '#!/bin/sh\ncase "$*" in --state) exit 0;; --get-zone-of-interface=*) echo public; exit 0;; *--query-port=*) exit 1;; *) exit 13;; esac\n', true)
+  write(join(firewall, 'ip'), '#!/bin/sh\necho \'[{"ifname":"lo","addr_info":[{"local":"127.0.0.1"}]}]\'\n', true)
+  process.env.PATH = firewall + ':' + previousPath
+  try { await assert.rejects(updateBundle({ ...opts, start: true, host: '127.0.0.1' }), /已恢复原安装.*防火墙配置失败/) }
+  finally { process.env.PATH = previousPath }
+  assert.equal(readFileSync(join(prefix, 'old-program'), 'utf8'), 'old')
+  assert.equal(readFileSync(join(dataRoot, '.local/platform-home/sessions/saved'), 'utf8'), 'target-session')
+  const result = await updateBundle(opts)
+  assert.equal(result.status, 'updated'); assert.equal(result.prepare, 'ok')
+  assert.equal(readFileSync(join(dataRoot, 'agents/new-asset'), 'utf8'), 'current-working-tree')
+  assert.equal(existsSync(join(dataRoot, 'agents/removed-asset')), false)
+  assert.equal(JSON.parse(readFileSync(join(dataRoot, 'workspace.json'), 'utf8')).id, 'target-workspace')
+  assert.deepEqual(JSON.parse(readFileSync(join(dataRoot, 'workspace.json'), 'utf8')).extensions, [{ id: 'new-extension', path: 'mcp' }])
+  assert.ok(JSON.parse(readFileSync(join(dataRoot, 'workspace.json'), 'utf8')).legacyRoots.includes('/old-root'))
+  assert.equal(readFileSync(join(dataRoot, 'config/site.json'), 'utf8'), 'target-config')
+  assert.equal(readFileSync(join(dataRoot, '.local/platform-home/sessions/saved'), 'utf8'), 'target-session')
+  assert.equal(readFileSync(join(result.backups.dataRoot, 'agents/removed-asset'), 'utf8'), 'obsolete')
+  assert.equal(readFileSync(join(result.backups.prefix, 'old-program'), 'utf8'), 'old')
+})
 
 test('安装环境不依赖解包目录，特殊路径按原值进入 shell，Git 失败时明确拒绝', () => {
   const path = bundle('runtime-bundle')

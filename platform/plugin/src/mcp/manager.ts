@@ -196,7 +196,9 @@ export function apply(ctx: Context, suppliedConfig: ManagerConfig) {
       if (!control.enabled() && !control.isAnonymousInstance(assertion.binding)) throw new BusinessTransportError('registration', '业务接入已关闭')
       const scopedRun = () => withDraftInstance(assertion.binding, run)
       if (method === 'tools/list') return scopedRun()
-      if (!assertion?.context?.scope.sessionId) throw new BusinessTransportError('context', '业务 MCP 请求缺少受信 Session')
+      const sharedResourceRead = control.isAnonymousInstance(assertion.binding)
+        && ['resources/list', 'resources/templates/list', 'resources/read'].includes(method)
+      if (!assertion.context || !sharedResourceRead && !assertion.context.scope.sessionId) throw new BusinessTransportError('context', '业务 MCP 请求缺少受信 Session')
       if (!control.isUnrestrictedInstance(assertion.binding) && assertion.requestDigest !== businessRpcDigest(rpcRequest)) throw new BusinessTransportError('signature', '业务 MCP 请求内容与签名不一致')
       return withSignedRuntimeSession(() => {
         let context: BusinessContext

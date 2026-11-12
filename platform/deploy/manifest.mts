@@ -44,6 +44,7 @@ export interface Manifest {
     version: string
     commit: string
     dirty: boolean
+    snapshot?: 'HEAD' | 'working-tree'
     arch: Arch
     createdAt: string
   }

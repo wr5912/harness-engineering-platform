@@ -14,6 +14,8 @@
 
 2026-11-12 UTC 的[EXP027 融合、启动与策略组合发布核验](../platform/plugin/test/evidence/exp027-fusion-runtime-20261112/README.md)补充 `PA-03/05/06/08/12`：三特性主线的 `.env` 子文件挂载与 `home-init` 共同启动路径已修复并通过容器验证，`policy_change` 已发布固定版本；主干 `18503` 与反馈实例 `18504` 经平台生命周期入口重启后，两个实例的 11 个业务分组均发现成功，`policy-response-acceptance` 实际包含 `policy_change` 与 `emergency_action`。保留宿主机错误调用、外部 XX MCP 未配置、未执行真实策略写入及未完成业务 Evaluation/Research Release 的边界；程序根修复尚未提交推送，数据仓库本次发布提交已推送 `main`。
 
+2026-11-12 UTC 的[网络空间监控 MCP 鉴权核验](../platform/plugin/test/evidence/mcp-network-space-auth-20261112/README.md)补充 `PA-12` 及受影响实例相邻路径：插件复用原生分组传输，网关修正匿名页面资源读取的 Session 条件，本机通过维护工具应用并实测威胁查询恢复，页面显示 8 条真实记录；无 Authorization 直连仍为 401。定向回归 171、34、23、31 项分别通过，首次隔离夹具失败保留。拓扑读取超时和实例确认配置缺失导致的整包装载 `unknown` 继续保留，不提升完整业务、Research Release 或一级路径整体状态。
+
 2026-11-11 UTC 的声明文件保存核验补充 `PA-03/04`：EXP027 三特性融合暴露共同草稿检查将声明文件作为输出入口而异常；[共同校验](../platform/plugin/src/agents/index.ts)按普通 TypeScript 文件名进行语法检查，合法 `.d.ts/.d.mts/.d.cts` 可预览、保存及回读，错误语法仍拒绝且保留原文件。[声明、变量式凭据和本次草稿范围三项定向回归](../platform/plugin/test/agents.test.mjs)全部通过。程序修复仅在本地开发工作树，未部署或推送；数据侧离线融合结果由目标 Experiment 的观察记录维护，不提升真实装载、业务 Evaluation、Research Release 或路径整体状态。
 
 2026-11-11 UTC 的[管理助手 Playwright 页面核验](../platform/plugin/test/evidence/assistant-browser-20261111/README.md)补充 `PA-08/12`：管理助手通过插件浏览平台与已登记实例，截图进入 DSH 原生附件和图片上下文；平台原生登录、中文字体与追踪请求头处理完成。类型检查及 98 项定向测试通过；按用户指定的 `deepseek-flash / max`，四个新原生会话完成页面操作、元素截图、实例截图及预期超时的端到端验收，实际请求配置和图像身份均核对。本机经维护工具更新并复验生效；内部滚动区域的截图边界和此前失败保留在证据中。未同步远端、执行实例业务任务或提升业务 Evaluation、Research Release 及一级路径整体状态。

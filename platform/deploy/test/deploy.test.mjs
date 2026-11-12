@@ -313,6 +313,7 @@ test('完整包携带原生设置及匹配的目标插件依赖，排除 HOME �
     const write = (path, content) => { mkdirSync(join(path, '..'), { recursive: true }); writeFileSync(path, content) }
     for (const [repo, file] of [[program, 'platform/deploy/install.sh'], [data, 'workspace.json']]) {
       write(join(repo, file), '{}')
+      write(join(repo, '.gitignore'), '.local/\n')
       const git = (...args) => run('git', ['-C', repo, ...args])
       git('init', '-b', 'main'); git('config', 'user.name', 'fixture'); git('config', 'user.email', 'fixture@example.invalid')
       git('remote', 'add', 'origin', 'https://example.invalid/repo.git')
@@ -349,6 +350,19 @@ test('完整包携带原生设置及匹配的目标插件依赖，排除 HOME �
     assert.equal(readFileSync(join(unpacked, 'data', profile, 'package.json'), 'utf8'), manifest)
     assert.equal(existsSync(join(unpacked, 'data', profile, 'node_modules/dsh-example/index.js')), true)
     assert.equal(existsSync(join(unpacked, 'data', profile, 'node_modules/@ai-agent-harness/harness-platform')), false)
+    write(join(program, 'platform/deploy/install.sh'), '# current installer\n')
+    write(join(data, 'workspace.json'), '{"id":"current-workspace"}')
+    write(join(data, 'agents/new-agent.txt'), 'uncommitted-agent')
+    const current = pack({ ...options, out: join(root, 'working-tree-out'), includeWorkingTree: true })
+    const currentRoot = join(root, 'working-tree-unpacked')
+    tarExtract(current.archive, currentRoot)
+    assert.equal(readFileSync(join(currentRoot, 'program/platform/deploy/install.sh'), 'utf8'), '# current installer\n')
+    assert.equal(readFileSync(join(currentRoot, 'data/agents/new-agent.txt'), 'utf8'), 'uncommitted-agent')
+    assert.equal(JSON.parse(readFileSync(join(currentRoot, 'data/workspace.json'), 'utf8')).id, 'current-workspace')
+    assert.equal(existsSync(join(currentRoot, 'data/.local/platform-home/sessions')), false)
+    const currentManifest = JSON.parse(readFileSync(join(currentRoot, 'manifest.json'), 'utf8'))
+    assert.equal(currentManifest.package.snapshot, 'working-tree')
+    assert.equal(currentManifest.data.dirty, true)
   } finally { close() }
 })
 

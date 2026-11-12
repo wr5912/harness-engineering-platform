@@ -164,17 +164,26 @@ test('完整平台同步打包接入使用冻结管理快照，并清理暂存�
   assert.equal(existsSync(join(f.root, '.knowledge-result.json')), false)
 })
 
-test('程序 main 文档引用使用本包冻结源码', t => {
+test('两仓 main 文档引用使用本包冻结快照，包括尚未提交的内容', t => {
   const f = fixture(t)
   const url = 'https://github.com/wr5912/harness-engineering-platform/blob/main/runtime/research/compute-assets.md'
-  f.write('data/AGENTS.md', `[资产归拢](${url})`)
+  const dataUrl = 'https://github.com/wr5912/harness-engineering-platform-data/blob/main/docs/research.md'
+  const codeUrl = 'https://github.com/wr5912/harness-engineering-platform/blob/main/runtime/research/evaluation_contract.py'
+  f.write('data/AGENTS.md', `[资产归拢](${url})\n[研究方法](${dataUrl})\n[评测实现](${codeUrl})`)
   f.write('program/runtime/research/compute-assets.md', '# 本次冻结版本的实际用法\n')
+  f.write('data/docs/research.md', '# 数据工作树当前尚未提交的内容\n')
+  f.write('program/runtime/research/evaluation_contract.py', 'raise RuntimeError("只读归档，不应执行")\n')
   const metadata = collectPlatformKnowledge(f.root)
   const index = JSON.parse(readFileSync(join(f.root, metadata.path), 'utf8'))
   assert.equal(index.missing.length, 0)
   assert.equal(index.sources[0].url, url)
   assert.equal(index.sources[0].providedFrom, 'program/runtime/research/compute-assets.md')
   assert.equal(readFileSync(join(f.root, 'data/knowledge/offline', index.sources[0].path), 'utf8'), '# 本次冻结版本的实际用法\n')
+  assert.equal(index.sources[1].url, dataUrl)
+  assert.equal(index.sources[1].providedFrom, 'management/docs/research.md')
+  assert.equal(readFileSync(join(f.root, 'data/knowledge/offline', index.sources[1].path), 'utf8'), '# 数据工作树当前尚未提交的内容\n')
+  assert.equal(index.sources[2].providedFrom, 'program/runtime/research/evaluation_contract.py')
+  assert.equal(readFileSync(join(f.root, 'data/knowledge/offline', index.sources[2].path), 'utf8'), 'raise RuntimeError("只读归档，不应执行")\n')
 })
 
 test('完整平台复用资源目录中按摘要核对的知识；缓存正文不扩充依赖，损坏仍拒绝出包', async t => {
