@@ -1,0 +1,83 @@
+{
+  "checkedAt": "2026-11-12T12:39:34.605649+00:00",
+  "preservation": [
+    {
+      "kind": "session",
+      "session": "session-590ea61c-5fcc-4310-b3b3-d3271a604baa",
+      "originalBytesArePrefix": true,
+      "originalPrefixBytes": [
+        46188
+      ]
+    },
+    {
+      "kind": "session-lock",
+      "unchanged": true
+    },
+    {
+      "kind": "session",
+      "session": "session-ec2efc21-bb98-464e-ae84-47f7c3cd07b4",
+      "originalBytesArePrefix": true,
+      "originalPrefixBytes": [
+        331
+      ]
+    },
+    {
+      "kind": "session-lock",
+      "unchanged": true
+    },
+    {
+      "kind": "session",
+      "session": "session-8a42a1f4-10cd-4630-9cf4-4f35ab0f9b0a",
+      "originalBytesArePrefix": true,
+      "originalPrefixBytes": [
+        330
+      ]
+    },
+    {
+      "kind": "session-lock",
+      "unchanged": true
+    },
+    {
+      "kind": "runtime-config",
+      "unchanged": true
+    },
+    {
+      "kind": "runtime-config",
+      "unchanged": true
+    }
+  ],
+  "beforeRestartSessionCount": 9,
+  "sessionsIdleBeforeRestart": true,
+  "runtime": {
+    "containerId": "1d2352d91668",
+    "state": "healthy",
+    "image": "ai-agent-harness/dsh:b830ec950-amd64-2ed0d15ad02e",
+    "imageId": "sha256:c06d4e1fecc66f175a2fbeaa51e96ea0b2af8f58be22f89edac73df3c779bece",
+    "ports": {
+      "3080/tcp": [
+        {
+          "HostIp": "0.0.0.0",
+          "HostPort": "28033"
+        },
+        {
+          "HostIp": "::",
+          "HostPort": "28033"
+        }
+      ]
+    },
+    "candidateSha256": "9376ea16690200cb48c6dd02806cf923eb2e51d9e0bfe25a1a83d5c92920fdea",
+    "dirty": true,
+    "managedProjectionMatchesContainer": true,
+    "mcpEditorHasNoHiddenOpenApiUrl": true
+  },
+  "notifications": {
+    "connection": {
+      "state": "connected",
+      "message": "实时通知已连接。"
+    },
+    "items": 2,
+    "incidentItems": 0
+  },
+  "sessionsPresentAfterRestart": true,
+  "originalSessionCount": 3
+}

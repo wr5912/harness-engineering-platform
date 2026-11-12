@@ -7,8 +7,10 @@ import { externalDetail, externalInstances, getExternalInstance, mutateExternal 
 import { probeExternal } from '../plugin/src/instances/external/adapters.ts'
 import { AgentAccessService } from '../plugin/src/agent-access/service.ts'
 import { configureOpenCodeSample } from './opencode-sample.mts'
+import { readSampleEndpoints } from './endpoints.mts'
 
 const root = resolve(process.argv[2]), sample = resolve(process.argv[3]), id = 'remote-opencode-sample'
+const endpoints = readSampleEndpoints(root)
 const credential = JSON.parse(readFileSync(join(sample, 'server-credential.json'), 'utf8'))
 const authDir = join(root, '.local/credentials/external'); mkdirSync(authDir, { recursive: true, mode: 0o700 })
 writeFileSync(join(authDir, 'sample-opencode.json'), JSON.stringify({ headers: { authorization: `Basic ${Buffer.from(`opencode:${credential.password}`).toString('base64')}` } }), { mode: 0o600 })
@@ -26,8 +28,8 @@ const service = new AgentAccessService(root), connectorDirectory = join(sample, 
 const identity = service.createCredential(id, service.status(id).credentials.some(row => row.effectiveStatus === 'active'))
 writeFileSync(join(connectorDirectory, 'instance.secret'), identity.secret, { mode: 0o600 })
 service.saveGrant({ instanceId: id, resourceId: 'sample-assets', scopes: ['assets:read'], objects: ['A-1'], enabled: true, revision: service.status(id).revision })
-const config = { instanceId: id, clientId: identity.credential.clientId, secretFile: '/run/instance/instance.secret', tokenEndpoint: 'http://172.17.0.1:18656/oauth/token',
-  resourceUrl: 'http://172.17.0.1:18656/api/agent-access/v1/resources/sample-assets/mcp', audience: 'urn:harness:sample-assets', scopes: ['assets:read'], host: '0.0.0.0', port: 18700 }
+const config = { instanceId: id, clientId: identity.credential.clientId, secretFile: '/run/instance/instance.secret', tokenEndpoint: endpoints.origin + '/oauth/token',
+  resourceUrl: endpoints.origin + '/api/agent-access/v1/resources/sample-assets/mcp', audience: 'urn:harness:sample-assets', scopes: ['assets:read'], host: '0.0.0.0', port: 18700 }
 writeFileSync(join(connectorDirectory, 'config.json'), JSON.stringify(config, null, 2), { mode: 0o600 })
 await build({ entryPoints: [resolve('platform/plugin/src/agent-access/connector.ts')], outfile: join(connectorDirectory, 'connector.mjs'), bundle: true, platform: 'node', format: 'esm', packages: 'external', logLevel: 'silent' })
 const container = 'hep-cross-framework-opencode-connector'
@@ -40,7 +42,7 @@ try {
 run(['run', '-d', '--name', container, '--label', 'hep.sample=cross-framework-opencode-connector', '--user', `${process.getuid?.() ?? 1000}:${process.getgid?.() ?? 1000}`,
   '--network', 'hep-cross-framework-opencode', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--read-only',
   '-v', `${connectorDirectory}:/run/instance:ro`, 'node:24-bookworm-slim', 'node', '/run/instance/connector.mjs', '/run/instance/config.json'])
-configureOpenCodeSample(sample, { modelEndpoint: 'http://172.17.0.1:18650/v1', connectorUrl: `http://${container}:18700/mcp`, model: 'cross-framework-fixture',
-  nativeCatalog: { url: 'http://172.17.0.1:18650/catalog/mcp', credentialFile: join(root, '.local/credentials/fixture.json') } })
+configureOpenCodeSample(sample, { modelEndpoint: endpoints.model, connectorUrl: `http://${container}:18700/mcp`, model: 'cross-framework-fixture',
+  nativeCatalog: { url: endpoints.fixture + '/catalog/mcp', credentialFile: join(root, '.local/credentials/fixture.json') } })
 process.stdout.write(JSON.stringify({ instanceId: id, entryState: detail.instance.entryState, observedVersion: verification.observedVersion,
   connector: container, resource: 'sample-assets', credentialId: identity.credential.id, secretVisibleToModel: false }) + '\n')

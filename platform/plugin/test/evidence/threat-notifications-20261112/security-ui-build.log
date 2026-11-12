@@ -1,0 +1,17 @@
+
+> dsh-security-operations-ui@0.1.0 build
+> npm run typecheck && esbuild delegation.ts notification-state.ts --platform=node --format=esm --target=es2022 --outdir=. && esbuild client.tsx --bundle --platform=browser --format=iife --target=es2022 --loader:.gif=dataurl --loader:.webp=dataurl --outfile=client.js
+
+
+> dsh-security-operations-ui@0.1.0 typecheck
+> tsc -p tsconfig.json
+
+
+  delegation.js          1.0kb
+  notification-state.js  907b 
+
+⚡ Done in 7ms
+
+  client.js  402.1kb
+
+⚡ Done in 17ms

@@ -55,7 +55,7 @@ function validateOptions(command: string, options: Options): void {
   }
   const flags: Record<string, string[]> = {
     'agent-cleanup': [],
-    'agent-preview': [], 'agent-pack': [], 'agent-prepare': [],
+    'agent-preview': ['update-assets'], 'agent-pack': [], 'agent-prepare': [],
     pack: ['no-image', 'no-data', 'allow-dirty', 'allow-fixture-data', 'keep-staging'],
     install: ['dry-run', 'skip-image', 'skip-prepare', 'strict-paths', 'allow-fixture-data', 'start'],
     verify: [],
@@ -139,6 +139,7 @@ function usage(): string {
     --seed-file <*.llm-api-key> agent-pack 连接与凭据种子；不传时保留原生资产配置和工作区环境
     --expected-candidate-sha256 <摘要>  agent-pack 核对先前预览的实际资产
     --prefix <目录>             agent-preview 刷新已有独立预览的运行器；保留资产、配置、会话和镜像，随后用 agent restart 生效
+    --update-assets             与 --prefix 合用，改为更新同版本 Harness 资产及投影；现场冲突停止，保留备份、连接、HOME 和镜像
     --image-archive <tar>       agent-prepare 导入该架构标准镜像
     --docker-assets <目录>      agent-prepare 导入官方 docker-*.tgz 与 docker-compose
 
@@ -254,6 +255,14 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
         const { previewAgentPackage } = await import('./agent/pack.mts')
         const preview = previewAgentPackage(input)
         const prefix = text(options, 'prefix')
+        if (flag(options, 'update-assets')) {
+          if (!prefix) throw new Error('--update-assets 需要 --prefix')
+          const { inspectAgentSnapshot } = await import('./agent/snapshot.mts')
+          const { refreshAgentAssets } = await import('./agent/runtime/assets.mts')
+          const { expectedImage } = await import('./image.mts')
+          console.log(JSON.stringify(refreshAgentAssets(resolve(prefix), input.programRoot, inspectAgentSnapshot(input), input.arch, expectedImage(input.programRoot, input.arch).tag), null, 2))
+          return 0
+        }
         if (prefix) {
           const { refreshAgentPreview } = await import('./agent/runtime/index.mts')
           await refreshAgentPreview(resolve(prefix), input.programRoot, preview)

@@ -4,16 +4,18 @@ import { join, resolve } from 'node:path'
 import { AgentAccessService } from '../plugin/src/agent-access/service.ts'
 import { createExternalInstancesHandler } from '../plugin/src/instances/external/index.ts'
 import { externalInstances } from '../plugin/src/instances/external/registry.ts'
+import { readSampleEndpoints } from './endpoints.mts'
 
 const root = resolve(process.argv[2] ?? ''), sample = resolve(process.argv[3] ?? '')
 if (!process.argv[2] || !process.argv[3] || !root.includes('/.local/') || !sample.includes('/.local/')) throw new Error('请显式指定隔离平台数据根和 AgentScope 样本目录')
+const endpoints = readSampleEndpoints(root)
 const target = JSON.parse(readFileSync(join(sample, 'target.json'), 'utf8'))
 const credentials = JSON.parse(readFileSync(join(root, '.local/credentials/fixture.json'), 'utf8'))
 const instanceId = 'remote-agentscope-sample', service = new AgentAccessService(root)
 const original = service.status(instanceId).grants.find(row => row.resourceId === 'sample-assets')
 if (!original) throw new Error('缺少 AgentScope 的模拟资产授予')
 const originalGrant = structuredClone(original), results: any[] = []
-const endpoint = 'http://172.17.0.1:18656/api/external-instances/v1/' + instanceId + '/invoke'
+const endpoint = endpoints.origin + '/api/external-instances/v1/' + instanceId + '/invoke'
 const runId = new Date().toISOString().replace(/[:.]/g, '-')
 const knownSecrets = Object.values(credentials).filter((value): value is string => typeof value === 'string' && value.length > 0)
 for (const path of [join(sample, 'connector/instance.key'), join(sample, 'model.llm-api-key')]) if (existsSync(path)) knownSecrets.push(readFileSync(path, 'utf8').trim())
@@ -57,7 +59,7 @@ async function prepareSession() {
   const response = await native('/workspace/mcp' + query), clients: any[] = Array.isArray(response) ? response : response.mcps ?? response.items ?? []
   for (const item of clients) if (!['protected_assets', 'native_catalog'].includes(item.name)) await native('/workspace/mcp/' + encodeURIComponent(item.name) + query, 'DELETE')
   if (!clients.some(item => item.name === 'protected_assets')) await native('/workspace/mcp' + query, 'POST', { name: 'protected_assets', is_stateful: false, mcp_config: { type: 'http_mcp', url: 'http://hep-cross-framework-agentscope-connector:8080/mcp' } })
-  if (!clients.some(item => item.name === 'native_catalog')) await native('/workspace/mcp' + query, 'POST', { name: 'native_catalog', is_stateful: false, mcp_config: { type: 'http_mcp', url: 'http://172.17.0.1:18650/catalog/mcp', headers: { Authorization: `Bearer ${credentials.catalog}` } } })
+  if (!clients.some(item => item.name === 'native_catalog')) await native('/workspace/mcp' + query, 'POST', { name: 'native_catalog', is_stateful: false, mcp_config: { type: 'http_mcp', url: endpoints.fixture + '/catalog/mcp', headers: { Authorization: `Bearer ${credentials.catalog}` } } })
   writeFileSync(join(sample, 'target.json'), JSON.stringify(target), { mode: 0o600 })
 }
 async function run(label: string, input: string, tool: string) {

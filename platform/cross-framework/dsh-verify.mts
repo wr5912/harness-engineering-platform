@@ -4,12 +4,13 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { AgentAccessService } from '../plugin/src/agent-access/service.ts'
+import { readSampleEndpoints } from './endpoints.mts'
 
 if (!process.argv[2] || !process.argv[3]) throw new Error('用法：dsh-verify <隔离数据根> <DSH样本目录>')
 const root = resolve(process.argv[2]), sample = resolve(process.argv[3]), instanceId = 'remote-dsh-sample'
 if (!root.includes('/.local/') || !sample.includes('/.local/')) throw new Error('只允许隔离样本目录')
 const credentials = JSON.parse(readFileSync(join(root, '.local/credentials/fixture.json'), 'utf8'))
-const base = `http://172.17.0.1:18656/api/external-instances/v1/${instanceId}/invoke`
+const base = `${readSampleEndpoints(root).origin}/api/external-instances/v1/${instanceId}/invoke`
 async function call(operation: string, input: Record<string, unknown> = {}) {
   const response = await fetch(base, { method: 'POST', headers: { authorization: `Bearer ${credentials.userA}`, 'content-type': 'application/json' },
     body: JSON.stringify({ operation, requestId: randomUUID(), ...input }), signal: AbortSignal.timeout(30000) })

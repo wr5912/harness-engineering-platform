@@ -97,7 +97,10 @@ export function stageManagedProjections(staging: string, programRoot: string) {
   }
   inspect(managed)
   rmSync(projected, { recursive: true, force: true })
-  if (!changes.length) return []
+  if (!changes.length) {
+    rmSync(join(staging, 'runtime/managed-projection.json'), { force: true })
+    return []
+  }
   function linkTree(source: string, target: string) {
     mkdirSync(target, { recursive: true })
     for (const entry of readdirSync(source, { withFileTypes: true })) {

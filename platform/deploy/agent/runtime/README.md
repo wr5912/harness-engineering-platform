@@ -25,7 +25,7 @@ DSH 原生 MCP 客户端负责连接和装载工具、资源；分组和组合�
 
 ## 修改 Harness
 
-宿主目录 `assets/workspace/`、`assets/presets/` 和 `assets/managed/` 分别映射到容器的 `/work/harness/workspace`、`/opt/dsh-presets` 和 `/opt/dsh-managed`，容器内只读。编辑安装目录中的资产后执行 `./agent restart` 重新装载；不会构建镜像。若包内有 `runtime/managed-projection.json` 或 SDK 的 Preset 投影，实际映射路径以 `runtime/compose.yaml` 为准；这类编译资产需通过原工程重新导出。普通提示词、Skill 与本地知识可直接修改映射目录。修改后的部署是本地修订，不再与原始包校验和一致。
+宿主目录 `assets/workspace/`、`assets/presets/` 和 `assets/managed/` 分别映射到容器的 `/work/harness/workspace`、`/opt/dsh-presets` 和 `/opt/dsh-managed`，容器内只读。编辑安装目录中的资产后执行 `./agent restart` 重新装载；不会构建镜像。若包内有 `runtime/managed-projection.json` 或 SDK 的 Preset 投影，实际映射路径以 `runtime/compose.yaml` 为准。Web 包可从原工程使用 `platform/dsh-deploy agent-preview --prefix <安装目录> --update-assets` 更新同一版本的资产并重建编译投影，完整参数及边界见[独立包维护合同](https://github.com/wr5912/harness-engineering-platform/blob/main/docs/platform-design/23_%E7%A6%BB%E7%BA%BF%E4%B8%80%E9%94%AE%E6%89%93%E5%8C%85%E4%B8%8E%E5%AE%89%E8%A3%85.md#cli-与目标架构资源)；SDK 包需重新导出。普通提示词、Skill 与本地知识可直接修改映射目录。修改后的部署是本地修订，不再与原始包校验和一致。
 
 独立访问模式由 `assets/harness.yaml` 的 `standalone.web.access: anonymous-lan` 声明；旧资产未声明时沿用匿名局域网默认值，不支持的显式模式会报错。预览提示与选择控件由业务 Harness 的 UI 插件通过原生槽位配置，Preset 默认值由业务 Patch 声明，导出保留这些资产。重启会从映射资产重新生成装载 Patch，不覆盖当前原生模型设置与 MCP 配置。端口、目标机器地址和第三方凭据属于下述安装配置。
 

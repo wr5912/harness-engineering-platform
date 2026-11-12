@@ -6,10 +6,12 @@ import { join, resolve } from 'node:path'
 import { externalDetail, externalInstances, getExternalInstance, mutateExternal } from '../plugin/src/instances/external/registry.ts'
 import { probeExternal } from '../plugin/src/instances/external/adapters.ts'
 import { AgentAccessService } from '../plugin/src/agent-access/service.ts'
+import { readSampleEndpoints } from './endpoints.mts'
 
 if (!process.argv[2] || !process.argv[3] || !process.argv[4]) throw new Error('用法：dsh-setup <隔离数据根> <样本状态目录> <DSH专用凭据文件>')
 const root = resolve(process.argv[2]), sample = resolve(process.argv[3]), credentialFile = resolve(process.argv[4]), id = 'remote-dsh-sample'
 if (!root.includes('/.local/') || !sample.includes('/.local/')) throw new Error('样本只允许使用独立 .local 数据目录')
+const endpoints = readSampleEndpoints(root)
 const target = JSON.parse(readFileSync(join(sample, 'target.json'), 'utf8'))
 if (target.commit !== 'b830ec950faba0a46dda564be3e2d854afed94f1' || target.version !== '0.2.1-rc.5') throw new Error('DSH 样本版本与锁定来源不一致')
 const credentials = join(root, '.local/credentials/external'); mkdirSync(credentials, { recursive: true, mode: 0o700 })
@@ -32,7 +34,7 @@ if (!existsSync(connectorFile)) {
   const identity = service.createCredential(id)
   writeFileSync(join(connectorDirectory, 'instance.secret'), identity.secret, { mode: 0o600 })
   writeFileSync(connectorFile, JSON.stringify({ instanceId: id, clientId: identity.credential.clientId, secretFile: '/run/instance/instance.secret',
-    tokenEndpoint: 'http://172.17.0.1:18656/oauth/token', resourceUrl: 'http://172.17.0.1:18656/api/agent-access/v1/resources/sample-assets/mcp',
+    tokenEndpoint: endpoints.origin + '/oauth/token', resourceUrl: endpoints.origin + '/api/agent-access/v1/resources/sample-assets/mcp',
     audience: 'urn:harness:sample-assets', scopes: ['assets:read'], host: '0.0.0.0', port: 8080 }, null, 2), { mode: 0o600 })
 }
 service.saveGrant({ instanceId: id, resourceId: 'sample-assets', scopes: ['assets:read'], objects: ['A-1'], enabled: true, revision: service.status(id).revision })
@@ -54,7 +56,7 @@ const patchFile = join(sample, 'home/cordis.patch.yml'), patch = JSON.parse(read
 const additions = patch.find((row: any) => Array.isArray(row.insert))?.insert ?? []
 const signed = additions.find((row: any) => row.id === 'cross-framework-signed-mcp'), ordinary = additions.find((row: any) => row.id === 'cross-framework-ordinary-mcp')
 if (signed) signed.config.url = `http://${name}:8080/mcp`
-if (ordinary) { ordinary.config.url = 'http://172.17.0.1:18650/catalog/mcp'; ordinary.config.headers = { Authorization: `Bearer ${native.catalog}` } }
+if (ordinary) { ordinary.config.url = endpoints.fixture + '/catalog/mcp'; ordinary.config.headers = { Authorization: `Bearer ${native.catalog}` } }
 writeFileSync(patchFile, JSON.stringify(patch, null, 2) + '\n', { mode: 0o600 })
 writeFileSync(join(sample, 'setup.json'), JSON.stringify({ instanceId: id, entryState: detail.instance.entryState, connector: name, resource: 'sample-assets', endpoint: target.endpoint,
   sourceCommit: target.commit, runtimeVersion: target.version, evidenceScope: '真实DSH Runtime与模拟远程部署、模拟业务资源' }, null, 2) + '\n', { mode: 0o600 })

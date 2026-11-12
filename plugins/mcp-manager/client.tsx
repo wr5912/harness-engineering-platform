@@ -14,7 +14,6 @@ window.__ModuleLoader__.load({
       ...(server.publishedTools ?? []).map(tool => ({ ...tool, originLabel: '已发布编排' })),
       ...(server.builtinTools ?? []).map(tool => ({ ...tool, originLabel: '平台内置 · 运行查询' })),
     ].map(tool => ({ ...tool, name: tool.toolName || tool.name }))
-    const defaultSpec = 'http://172.16.138.232:18087/v3/api-docs/mcp'
     const emptyServer = () => ({ id: '', description: '', specUrl: '', authType: 'credential',
       apiKey: '', authHeader: 'Authorization', loginUrl: '', loginUsername: '', loginPassword: '', loginTokenPath: 'data.token',
       enabled: true, tools: { mode: 'all', names: [] } })
@@ -141,7 +140,7 @@ window.__ModuleLoader__.load({
       const [legacyArguments, setLegacyArguments] = useState('{}')
       const [legacyResult, setLegacyResult] = useState(null)
       const [specName, setSpecName] = useState('')
-      const [specUrl, setSpecUrl] = useState(defaultSpec)
+      const [specUrl, setSpecUrl] = useState('')
       const [toolName, setToolName] = useState('')
       const [argumentsText, setArgumentsText] = useState('{}')
       const [uriText, setUriText] = useState('')
@@ -713,7 +712,7 @@ window.__ModuleLoader__.load({
                     </select></label>
                   </div></section>
                   {'specUrl' in editingServer ? <section className="mcp-section"><h3>OpenAPI 接口</h3><p className="mcp-muted">保存后，接口规范中的操作会自动生成 MCP 工具或资源；服务器内全部开放。规范先匿名读取，遇 401/403 再用已配置的授权重试；业务接口始终按授权方式调用。</p><div className="mcp-fields">
-                    <label className="mcp-field mcp-wide">OpenAPI 接口规范地址{input(editingServer.specUrl, value => editServer(currentServerIndex, 'specUrl', value), { placeholder: defaultSpec })}</label>
+                    <label className="mcp-field mcp-wide">OpenAPI 接口规范地址{input(editingServer.specUrl, value => editServer(currentServerIndex, 'specUrl', value), { placeholder: 'https://服务地址/openapi.json' })}</label>
                     <label className="mcp-field">授权方式<select value={editingServer.authType || (editingServer.apiKey ? 'legacy' : 'credential')} onChange={event => editServer(currentServerIndex, 'authType', event.target.value)}>
                       {!editingServer.authType && editingServer.apiKey && <option value="legacy">按规范匹配（旧配置）</option>}
                       <option value="credential">凭据授权</option><option value="login">用户名密码登陆授权</option>

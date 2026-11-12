@@ -1,0 +1,116 @@
+{
+  "results": [
+    {
+      "name": "actual live UI",
+      "sidebar": "暂无威胁事件通知。",
+      "notification": {
+        "items": [
+          {
+            "eventKey": "60811bb2362958d7c556a9c3281ee90b60ea99bea975bf0f2ab1a33674c3bb03",
+            "type": "COLLECTION_ALERT",
+            "label": "采集告警",
+            "receivedAt": 1794486037119,
+            "incidentIds": [],
+            "severity": "",
+            "title": "采集告警",
+            "summary": "采集绑定 未知 的判定：STALE。",
+            "status": "",
+            "investigationStatus": "",
+            "fromStatus": "",
+            "toStatus": "",
+            "conclusion": "",
+            "investigation": "",
+            "account": "",
+            "nodeId": "",
+            "instanceId": "",
+            "bindingId": "",
+            "pluginId": "generic-ssh",
+            "verdict": "STALE",
+            "recovered": false,
+            "links": [],
+            "isRead": false,
+            "refreshRequired": false
+          },
+          {
+            "eventKey": "4dd9dc0fd724a1b4d53c8c5495faabc35d34b92548c5f3e0d341cfa72cb22bf9",
+            "type": "COLLECTION_ALERT",
+            "label": "采集告警",
+            "receivedAt": 1794484269911,
+            "incidentIds": [],
+            "severity": "",
+            "title": "采集告警",
+            "summary": "采集绑定 未知 的判定：HEALTHY。",
+            "status": "",
+            "investigationStatus": "",
+            "fromStatus": "",
+            "toStatus": "",
+            "conclusion": "",
+            "investigation": "",
+            "account": "",
+            "nodeId": "",
+            "instanceId": "",
+            "bindingId": "",
+            "pluginId": "generic-ssh",
+            "verdict": "HEALTHY",
+            "recovered": true,
+            "links": [],
+            "isRead": false,
+            "refreshRequired": false
+          }
+        ],
+        "unreadCount": 2,
+        "connection": {
+          "state": "connected",
+          "message": "实时通知已连接。"
+        }
+      },
+      "composer": true
+    },
+    {
+      "name": "handled while AI running",
+      "text": "威胁事件更新\nFIXTURE-RUNNING：事件处置已处置；AI 自动研判研判中。\n2026/11/12 04:22:24\n事件 ID：FIXTURE-RUNNING\n事件处置：已处置\nAI 自动研判：研判中\n\n靶标按钮仅填入草稿，发送后先查询当前研判状态；事件处置与 AI 自动研判分别核对。",
+      "button": "将事件上下文填入输入框，核对并研判"
+    },
+    {
+      "name": "new incident with completed AI",
+      "text": "威胁事件更新\n未读\nFIXTURE-SUCCEEDED：事件处置新建；AI 自动研判已完成。\n2026/11/12 04:22:23\n事件 ID：FIXTURE-SUCCEEDED\n事件处置：新建\nAI 自动研判：已完成\n\n已有 AI 自动研判完成记录；靶标按钮可准备复核草稿，发送后核对当前结果。",
+      "button": "将事件上下文填入输入框，复核已有研判"
+    },
+    {
+      "name": "draft only",
+      "text": "请查询并复核已有研判结果：FIXTURE-SUCCEEDED。\n\n先按事件 ID 查询完整详情、证据和当前研判状态；若已经研判或正在研判，请告知已有结果或进度，不要重复启动。本次仅复核现有结论及证据缺口，不重新启动研判。不执行处置动作。\n\n请研判以下事件：\n\n{\n\n  \"incident_ids\": [\n\n    \"FIXTURE-SUCCEEDED\"\n\n  ],\n\n  \"ready_notification_incident_ids\": [\n\n    \"FIXTURE-SUCCEEDED\"\n\n  ],\n\n  \"notification_type\": \"INCIDENT\",\n\n  \"title\": \"威胁事件更新\",\n\n  \"summary\": \"FIXTURE-SUCCEEDED：事件处置新建；AI 自动研判已完成。\",\n\n  \"notified_status\": \"NEW\",\n\n  \"notified_investigation_status\": \"SUCCEEDED\"\n\n}",
+      "notice": "已追加事件上下文，保留原有草稿；请核对后发送。"
+    },
+    {
+      "name": "390px",
+      "width": 390,
+      "documentWidth": 390,
+      "notificationsWidth": 353,
+      "details": "事件 ID：FIXTURE-SUCCEEDED\n事件处置：新建\nAI 自动研判：已完成\n\n已有 AI 自动研判完成记录；靶标按钮可准备复核草稿，发送后核对当前结果。"
+    },
+    {
+      "name": "connection interruption retains history",
+      "passed": true
+    }
+  ],
+  "interceptedRequests": [
+    {
+      "url": "http://172.16.138.228:28033/assistant/api/security-operations/notifications",
+      "method": "GET"
+    },
+    {
+      "url": "http://172.16.138.228:28033/assistant/api/security-operations/notifications/read",
+      "method": "POST"
+    },
+    {
+      "url": "http://172.16.138.228:28033/assistant/api/security-operations/notifications/read",
+      "method": "POST"
+    },
+    {
+      "url": "http://172.16.138.228:28033/assistant/api/security-operations/notifications",
+      "method": "GET"
+    }
+  ],
+  "errors": [],
+  "scope": "actual deployed UI; synthetic notifications intercepted in an isolated browser context; no upstream NATS publish or real read mutation"
+}
